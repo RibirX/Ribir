@@ -35,7 +35,15 @@ pub struct AvatarStyle {
   pub text_style: CowArc<TextStyle>,
 }
 
-impl CustomStyle for AvatarStyle {}
+impl CustomStyle for AvatarStyle {
+  fn default_style(ctx: &BuildCtx) -> Self {
+    AvatarStyle {
+      size: Size::splat(40.),
+      radius: Some(20.),
+      text_style: TypographyTheme::of(ctx).body_large.text.clone(),
+    }
+  }
+}
 
 pub struct AvatarDecorator;
 
@@ -95,7 +103,10 @@ impl ComposeChild for Avatar {
               }),
               Container {
                 size,
-                widget::from(image)
+                DynWidget{
+                  box_fit: BoxFit::Contain,
+                  dyns: image,
+                }
               }
             }
           }
@@ -103,12 +114,4 @@ impl ComposeChild for Avatar {
       }
     }
   }
-}
-
-pub(crate) fn add_to_theme(theme: &mut FullTheme) {
-  theme.custom_styles.set_custom_style(AvatarStyle {
-    size: Size::splat(40.),
-    radius: Some(20.),
-    text_style: theme.typography_theme.body_large.text.clone(),
-  });
 }

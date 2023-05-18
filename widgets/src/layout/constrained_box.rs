@@ -45,7 +45,7 @@ mod tests {
     expect_layout_result_with_theme(
       w,
       None,
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &[LayoutTestItem {
         path: &[0, 0, 0],
         expect: ExpectRect::from_size(Size::new(50., 50.)),
@@ -69,7 +69,7 @@ mod tests {
     expect_layout_result_with_theme(
       w,
       None,
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &[LayoutTestItem {
         path: &[0, 0],
         expect: ExpectRect {
@@ -98,7 +98,7 @@ mod tests {
     expect_layout_result_with_theme(
       w,
       None,
-      Theme::Full(FullTheme::default()),
+      <_>::default(),
       &[LayoutTestItem {
         path: &[0, 0],
         expect: ExpectRect {

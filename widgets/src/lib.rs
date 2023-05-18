@@ -1,5 +1,3 @@
-use ribir_core::prelude::FullTheme;
-
 pub mod avatar;
 pub mod buttons;
 pub mod checkbox;
@@ -17,7 +15,6 @@ pub mod scrollbar;
 pub mod tabs;
 pub mod text;
 pub mod text_field;
-pub mod themes;
 pub mod transform_box;
 pub mod prelude {
   pub use super::avatar::*;
@@ -37,17 +34,5 @@ pub mod prelude {
   pub use super::tabs::*;
   pub use super::text::*;
   pub use super::text_field::*;
-  pub use super::themes::*;
   pub use super::transform_box::*;
-}
-
-pub fn widget_theme_init(theme: &mut FullTheme) {
-  avatar::add_to_theme(theme);
-  buttons::add_to_theme(theme);
-  checkbox::add_to_theme(theme);
-  lists::add_to_theme(theme);
-  tabs::add_to_theme(theme);
-  scrollbar::add_to_theme(theme);
-  input::add_to_theme(theme);
-  themes::add_to_theme(theme);
 }

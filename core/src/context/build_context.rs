@@ -1,14 +1,9 @@
 use crate::prelude::*;
-use std::{
-  cell::{Ref, RefCell},
-  ops::Deref,
-  rc::Rc,
-};
+use std::{ops::Deref, rc::Rc};
 
-#[derive(Clone)]
 pub struct BuildCtx<'a> {
-  themes: &'a RefCell<Vec<Rc<Theme>>>,
-  wnd_ctx: &'a WindowCtx,
+  themes: &'a mut Vec<Rc<Theme>>,
+  wnd_ctx: &'a mut WindowCtx,
 }
 
 impl<'a> BuildCtx<'a> {
@@ -16,29 +11,38 @@ impl<'a> BuildCtx<'a> {
   pub fn wnd_ctx(&self) -> &WindowCtx { self.wnd_ctx }
 
   #[inline]
-  pub(crate) fn new(themes: &'a RefCell<Vec<Rc<Theme>>>, wnd_ctx: &'a WindowCtx) -> Self {
+  pub(crate) fn new(themes: &'a mut Vec<Rc<Theme>>, wnd_ctx: &'a mut WindowCtx) -> Self {
     Self { themes, wnd_ctx }
   }
 
-  pub(crate) fn find_cfg<T>(&self, f: impl Fn(&Theme) -> Option<&T>) -> Option<Ref<'_, T>> {
-    let themes = self.themes.borrow();
-    Ref::filter_map(themes, |themes| {
-      let mut v = None;
-      for t in themes.iter().rev() {
-        v = f(t);
-        if v.is_some() || matches!(t.deref(), Theme::Full(_)) {
-          break;
-        }
+  pub(crate) fn find_cfg<T>(&self, f: impl Fn(&Theme) -> Option<&T>) -> Option<&T> {
+    for t in self.themes.iter().rev() {
+      let v = f(t);
+      if v.is_some() {
+        return v;
+      } else if matches!(t.deref(), Theme::Full(_)) {
+        return None;
       }
-      v
-    })
-    .ok()
+    }
+    f(self.app_theme())
   }
 
   #[inline]
   pub fn app_ctx(&self) -> &AppContext { &self.wnd_ctx.app_ctx }
 
-  pub(crate) fn push_theme(&self, theme: Rc<Theme>) { self.themes.borrow_mut().push(theme); }
+  #[inline]
+  // todo: should &mut self here, but we need to remove `init ctx =>` first
+  pub(crate) fn push_theme(&self, theme: Rc<Theme>) {
+    #[allow(clippy::cast_ref_to_mut)]
+    let this = unsafe { &mut *(self as *const Self as *mut Self) };
+    this.themes.push(theme);
+  }
+
+  #[inline]
+  pub(crate) fn app_theme(&self) -> &Theme { self.app_ctx().app_theme() }
+
+  #[inline]
+  pub(crate) fn app_theme_mut(&self) -> &mut Theme { self.wnd_ctx.app_ctx.app_theme_mut() }
 }
 
 #[cfg(test)]
@@ -46,23 +50,6 @@ mod tests {
   use super::*;
   use crate::test::*;
   use std::{cell::RefCell, rc::Rc};
-
-  #[test]
-  #[should_panic(expected = "Get a default theme from context")]
-  fn always_have_default_theme() {
-    let w = widget! {
-      DynWidget {
-        dyns: move |ctx: &BuildCtx| {
-          assert!(ctx.themes.borrow().len() > 0);
-          panic!("Get a default theme from context");
-          #[allow(unreachable_code)]
-          Void {}
-        }
-      }
-    };
-    // should panic when construct widget tree
-    default_mock_window(w);
-  }
 
   #[test]
   fn themes() {
@@ -97,7 +84,7 @@ mod tests {
               size: ZERO_SIZE,
               DynWidget {
                 dyns: move |ctx: &BuildCtx| {
-                  *themes = ctx.themes.borrow().clone();
+                  *themes = ctx.themes.clone();
                   Void
                 }
               }
@@ -110,13 +97,12 @@ mod tests {
     let mut wnd = default_mock_window(light_dark);
     wnd.layout();
     let themes = themes.state_ref();
-    assert_eq!(themes.len(), 3);
+    assert_eq!(themes.len(), 2);
     let mut iter = themes.iter().filter_map(|t| match t.deref() {
       Theme::Full(t) => Some(t.palette.brightness),
       Theme::Inherit(i) => i.palette.as_ref().map(|palette| palette.brightness),
     });
 
-    assert_eq!(iter.next(), Some(Brightness::Light));
     assert_eq!(iter.next(), Some(Brightness::Light));
     assert_eq!(iter.next(), Some(Brightness::Dark));
   }

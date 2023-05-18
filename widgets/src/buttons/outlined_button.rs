@@ -13,7 +13,20 @@ pub struct OutlinedButtonStyle {
   pub border_width: f32,
 }
 
-impl CustomStyle for OutlinedButtonStyle {}
+impl CustomStyle for OutlinedButtonStyle {
+  fn default_style(ctx: &BuildCtx) -> Self {
+    OutlinedButtonStyle {
+      height: 40.,
+      icon_size: Size::splat(18.),
+      label_gap: 8.,
+      icon_pos: IconPosition::Before,
+      label_style: TypographyTheme::of(ctx).label_large.text.clone(),
+      radius: 20.,
+      padding_style: EdgeInsets::horizontal(16.),
+      border_width: 1.,
+    }
+  }
+}
 
 #[derive(Clone, Declare)]
 pub struct OutlinedButtonDecorator {
@@ -33,7 +46,7 @@ impl ComposeDecorator for OutlinedButtonDecorator {
 /// # example
 /// ```
 /// # use ribir_core::prelude::*;
-/// # use ribir_widgets::prelude::{OutlinedButton, Label, svgs};
+/// # use ribir_widgets::prelude::{OutlinedButton, Label};
 ///
 /// // only icon
 /// let outlined_icon_button = widget! {
@@ -119,17 +132,4 @@ impl ComposeChild for OutlinedButton {
       }
     }
   }
-}
-
-pub(crate) fn add_to_theme(theme: &mut FullTheme) {
-  theme.custom_styles.set_custom_style(OutlinedButtonStyle {
-    height: 40.,
-    icon_size: Size::splat(18.),
-    label_gap: 8.,
-    icon_pos: IconPosition::Before,
-    label_style: theme.typography_theme.label_large.text.clone(),
-    radius: 20.,
-    padding_style: EdgeInsets::horizontal(16.),
-    border_width: 1.,
-  });
 }

@@ -18,10 +18,10 @@ pub(crate) struct WidgetTree {
 }
 
 impl WidgetTree {
-  pub(crate) fn new(root: Widget, wnd_ctx: WindowCtx) -> WidgetTree {
+  pub(crate) fn new(root: Widget, mut wnd_ctx: WindowCtx) -> WidgetTree {
     let mut arena = Arena::default();
     let root = root
-      .into_subtree(None, &mut arena, &wnd_ctx)
+      .into_subtree(None, &mut arena, &mut wnd_ctx)
       .expect("must have a root");
     let store = LayoutStore::default();
     let dirty_set = DirtySet::default();
@@ -126,7 +126,7 @@ impl Widget {
     self,
     parent: Option<WidgetId>,
     arena: &mut TreeArena,
-    wnd_ctx: &WindowCtx,
+    wnd_ctx: &mut WindowCtx,
   ) -> Option<WidgetId> {
     enum NodeInfo {
       BackTheme,
@@ -135,7 +135,7 @@ impl Widget {
     }
 
     let mut themes = vec![];
-    let full = parent.map_or(false, |p| {
+    if let Some(p) = parent {
       p.ancestors(arena).any(|p| {
         p.assert_get(arena).query_all_type(
           |t: &Rc<Theme>| {
@@ -145,17 +145,14 @@ impl Widget {
           QueryOrder::InnerFirst,
         );
         matches!(themes.last().map(Rc::deref), Some(Theme::Full(_)))
-      })
-    });
-    if !full {
-      themes.push(wnd_ctx.app_theme());
+      });
     }
 
     pub(crate) struct InflateHelper<'a> {
       stack: Vec<NodeInfo>,
       arena: &'a mut TreeArena,
-      wnd_ctx: &'a WindowCtx,
-      themes: RefCell<Vec<Rc<Theme>>>,
+      wnd_ctx: &'a mut WindowCtx,
+      themes: Vec<Rc<Theme>>,
       parent: Option<WidgetId>,
       root: Option<WidgetId>,
     }
@@ -167,7 +164,7 @@ impl Widget {
           let Some(node) = self.stack.pop() else{ break};
           match node {
             NodeInfo::BackTheme => {
-              self.themes.borrow_mut().pop();
+              self.themes.pop();
             }
             NodeInfo::Parent(p) => self.parent = Some(p),
             NodeInfo::Widget(w) => {
@@ -182,10 +179,10 @@ impl Widget {
       fn place_node_in_tree(&mut self, widget: Widget) {
         match widget {
           Widget::Compose(c) => {
-            let theme_cnt = self.themes.borrow().len();
-            let mut build_ctx = BuildCtx::new(&self.themes, self.wnd_ctx);
+            let theme_cnt = self.themes.len();
+            let mut build_ctx = BuildCtx::new(&mut self.themes, self.wnd_ctx);
             let c = c(&mut build_ctx);
-            if theme_cnt < self.themes.borrow().len() {
+            if theme_cnt < self.themes.len() {
               self.stack.push(NodeInfo::BackTheme);
             }
             self.stack.push(NodeInfo::Widget(c));
@@ -229,7 +226,7 @@ impl Widget {
       stack: vec![],
       arena,
       wnd_ctx,
-      themes: RefCell::new(themes),
+      themes,
       parent,
       root: None,
     };

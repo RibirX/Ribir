@@ -226,13 +226,7 @@ where
       EdgeWidget::Avatar(w) => widget! {
         DynWidget {
           dyns: avatar.gap.map(|margin| Margin { margin }),
-          SizedBox {
-            size: avatar.size,
-            DynWidget {
-              box_fit: BoxFit::Contain,
-              dyns: w.decorate(|_, c| c.into_widget())
-            }
-          }
+          DecorateTml::decorate(w, |_, c| c.into_widget())
         }
       },
       EdgeWidget::Image(w) => widget! {
@@ -375,7 +369,84 @@ pub struct ListItemStyle {
   pub trailing_config: EdgeWidgetStyle,
 }
 
-impl CustomStyle for ListItemStyle {}
+impl CustomStyle for ListItemStyle {
+  fn default_style(ctx: &BuildCtx) -> Self {
+    let typography = TypographyTheme::of(ctx);
+    let palette = Palette::of(ctx);
+    ListItemStyle {
+      padding_style: Some(EdgeInsets {
+        left: 0.,
+        right: 24.,
+        bottom: 8.,
+        top: 8.,
+      }),
+      item_align: |num| {
+        if num >= 2 {
+          Align::Start
+        } else {
+          Align::Center
+        }
+      },
+      label_gap: Some(EdgeInsets::only_left(16.)),
+      headline_style: typography.body_large.text.clone(),
+      supporting_style: typography.body_medium.text.clone(),
+      leading_config: EdgeWidgetStyle {
+        icon: EdgeItemStyle {
+          size: Size::splat(24.),
+          gap: Some(EdgeInsets::only_left(16.)),
+        },
+        text: EdgeTextItemStyle {
+          style: typography.label_small.text.clone(),
+          foreground: palette.on_surface_variant().into(),
+          gap: Some(EdgeInsets::only_left(16.)),
+        },
+        avatar: EdgeItemStyle {
+          size: Size::splat(40.),
+          gap: Some(EdgeInsets::only_left(16.)),
+        },
+        image: EdgeItemStyle {
+          size: Size::splat(56.),
+          gap: Some(EdgeInsets::only_left(16.)),
+        },
+        poster: EdgeItemStyle {
+          size: Size::new(120., 64.),
+          gap: None,
+        },
+        custom: EdgeItemStyle {
+          size: Size::splat(40.),
+          gap: Some(EdgeInsets::only_left(16.)),
+        },
+      },
+      trailing_config: EdgeWidgetStyle {
+        icon: EdgeItemStyle {
+          size: Size::splat(24.),
+          gap: Some(EdgeInsets::only_left(16.)),
+        },
+        text: EdgeTextItemStyle {
+          style: typography.label_small.text.clone(),
+          foreground: palette.on_surface_variant().into(),
+          gap: Some(EdgeInsets::only_left(16.)),
+        },
+        avatar: EdgeItemStyle {
+          size: Size::splat(40.),
+          gap: Some(EdgeInsets::only_left(16.)),
+        },
+        image: EdgeItemStyle {
+          size: Size::splat(56.),
+          gap: Some(EdgeInsets::only_left(16.)),
+        },
+        poster: EdgeItemStyle {
+          size: Size::new(120., 64.),
+          gap: None,
+        },
+        custom: EdgeItemStyle {
+          size: Size::splat(40.),
+          gap: Some(EdgeInsets::only_left(16.)),
+        },
+      },
+    }
+  }
+}
 
 #[derive(Clone, Declare)]
 pub struct ListItemDecorator {}
@@ -383,79 +454,4 @@ pub struct ListItemDecorator {}
 impl ComposeDecorator for ListItemDecorator {
   type Host = Widget;
   fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
-}
-
-pub(crate) fn add_to_theme(theme: &mut FullTheme) {
-  theme.custom_styles.set_custom_style(ListItemStyle {
-    padding_style: Some(EdgeInsets {
-      left: 0.,
-      right: 24.,
-      bottom: 8.,
-      top: 8.,
-    }),
-    item_align: |num| {
-      if num >= 2 {
-        Align::Start
-      } else {
-        Align::Center
-      }
-    },
-    label_gap: Some(EdgeInsets::only_left(16.)),
-    headline_style: theme.typography_theme.body_large.text.clone(),
-    supporting_style: theme.typography_theme.body_medium.text.clone(),
-    leading_config: EdgeWidgetStyle {
-      icon: EdgeItemStyle {
-        size: Size::splat(24.),
-        gap: Some(EdgeInsets::only_left(16.)),
-      },
-      text: EdgeTextItemStyle {
-        style: theme.typography_theme.label_small.text.clone(),
-        foreground: theme.palette.on_surface_variant().into(),
-        gap: Some(EdgeInsets::only_left(16.)),
-      },
-      avatar: EdgeItemStyle {
-        size: Size::splat(40.),
-        gap: Some(EdgeInsets::only_left(16.)),
-      },
-      image: EdgeItemStyle {
-        size: Size::splat(56.),
-        gap: Some(EdgeInsets::only_left(16.)),
-      },
-      poster: EdgeItemStyle {
-        size: Size::new(120., 64.),
-        gap: None,
-      },
-      custom: EdgeItemStyle {
-        size: Size::splat(40.),
-        gap: Some(EdgeInsets::only_left(16.)),
-      },
-    },
-    trailing_config: EdgeWidgetStyle {
-      icon: EdgeItemStyle {
-        size: Size::splat(24.),
-        gap: Some(EdgeInsets::only_left(16.)),
-      },
-      text: EdgeTextItemStyle {
-        style: theme.typography_theme.label_small.text.clone(),
-        foreground: theme.palette.on_surface_variant().into(),
-        gap: Some(EdgeInsets::only_left(16.)),
-      },
-      avatar: EdgeItemStyle {
-        size: Size::splat(40.),
-        gap: Some(EdgeInsets::only_left(16.)),
-      },
-      image: EdgeItemStyle {
-        size: Size::splat(56.),
-        gap: Some(EdgeInsets::only_left(16.)),
-      },
-      poster: EdgeItemStyle {
-        size: Size::new(120., 64.),
-        gap: None,
-      },
-      custom: EdgeItemStyle {
-        size: Size::splat(40.),
-        gap: Some(EdgeInsets::only_left(16.)),
-      },
-    },
-  });
 }

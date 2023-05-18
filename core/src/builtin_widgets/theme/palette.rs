@@ -1,10 +1,6 @@
-use std::{cell::Ref, rc::Rc};
-
-use ribir_painter::{Color, LightnessTone};
-
-use crate::prelude::BuildCtx;
-
 use super::{Brightness, Theme};
+use crate::prelude::BuildCtx;
+use ribir_painter::{Color, LightnessTone};
 
 /// The palette enables you to modify the color of your application to suit
 /// your brand. `Palette` provide colors base on the 8 key colors with different
@@ -103,7 +99,7 @@ pub struct LightnessCfg {
 
 impl Palette {
   #[inline]
-  pub fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Rc<Self>> {
+  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(f) => Some(&f.palette),

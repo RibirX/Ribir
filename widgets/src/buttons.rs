@@ -101,10 +101,3 @@ pub use button::*;
 
 mod fab_button;
 pub use fab_button::*;
-
-pub(crate) fn add_to_theme(theme: &mut FullTheme) {
-  filled_button::add_to_theme(theme);
-  outlined_button::add_to_theme(theme);
-  button::add_to_theme(theme);
-  fab_button::add_to_theme(theme);
-}

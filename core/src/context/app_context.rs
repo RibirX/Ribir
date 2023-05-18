@@ -1,5 +1,6 @@
 use std::{
   cell::RefCell,
+  ptr::NonNull,
   rc::Rc,
   sync::{Arc, RwLock},
 };
@@ -20,7 +21,8 @@ use ribir_text::{font_db::FontDB, TextReorder, TypographyStore};
 
 #[derive(Clone)]
 pub struct AppContext {
-  pub app_theme: Rc<Theme>,
+  // todo: tmp code, We'll share AppContext by reference.
+  app_theme: NonNull<Theme>,
   pub font_db: Arc<RwLock<FontDB>>,
   pub shaper: TextShaper,
   pub reorder: TextReorder,
@@ -48,12 +50,36 @@ impl Default for Executor {
 
 impl AppContext {
   pub fn new(theme: FullTheme) -> Self {
-    let ctx = AppContext {
-      app_theme: Rc::new(Theme::Full(theme)),
-      ..Default::default()
-    };
-    ctx.load_font_from_theme(&ctx.app_theme);
-    ctx
+    // temp leak
+    let theme = Box::new(Theme::Full(theme));
+    let app_theme = Box::leak(theme).into();
+
+    let mut font_db = FontDB::default();
+    font_db.load_system_fonts();
+    let font_db = Arc::new(RwLock::new(font_db));
+    let shaper = TextShaper::new(font_db.clone());
+    let reorder = TextReorder::default();
+    let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
+
+    AppContext {
+      font_db,
+      app_theme,
+      shaper,
+      reorder,
+      typography_store,
+      clipboard: Rc::new(RefCell::new(UnSpportClipboard {})),
+      executor: <_>::default(),
+    }
+  }
+
+  pub fn app_theme(&self) -> &Theme { unsafe { self.app_theme.as_ref() } }
+
+  // todo: should &mut self here, but we need to remove `init ctx =>` first
+  #[allow(clippy::mut_from_ref)]
+  pub fn app_theme_mut(&self) -> &mut Theme {
+    let mut ptr = self.app_theme;
+    // tmp code
+    unsafe { &mut *ptr.as_mut() }
   }
 
   pub(crate) fn end_frame(&mut self) {
@@ -85,24 +111,7 @@ impl AppContext {
 }
 
 impl Default for AppContext {
-  fn default() -> Self {
-    let mut font_db = FontDB::default();
-    font_db.load_system_fonts();
-    let font_db = Arc::new(RwLock::new(font_db));
-    let shaper = TextShaper::new(font_db.clone());
-    let reorder = TextReorder::default();
-    let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
-
-    AppContext {
-      font_db,
-      app_theme: <_>::default(),
-      shaper,
-      reorder,
-      typography_store,
-      executor: <_>::default(),
-      clipboard: Rc::new(RefCell::new(UnSpportClipboard {})),
-    }
-  }
+  fn default() -> Self { AppContext::new(<_>::default()) }
 }
 
 impl Executor {

@@ -72,7 +72,6 @@ impl ComposeDecorators {
 #[cfg(test)]
 mod tests {
   use crate::{prelude::*, test::*};
-  use std::rc::Rc;
 
   #[test]
   fn compose_decorator_smoke() {
@@ -102,10 +101,7 @@ mod tests {
       }}
     };
 
-    let ctx = AppContext {
-      app_theme: Rc::new(Theme::Full(theme)),
-      ..Default::default()
-    };
+    let ctx = AppContext::new(theme);
     let mut wnd = mock_window(w, Size::new(500., 500.), ctx);
     wnd.draw_frame();
 

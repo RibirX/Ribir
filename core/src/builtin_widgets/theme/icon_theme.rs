@@ -1,7 +1,7 @@
 use super::Theme;
 use crate::prelude::*;
 use ribir_algo::ShareResource;
-use std::{cell::Ref, collections::HashMap};
+use std::collections::HashMap;
 
 /// The theme of icon, which specify the icon size standard and provide a store
 /// of svg icons to use.
@@ -93,7 +93,7 @@ impl IconTheme {
 
 impl IconSize {
   #[inline]
-  pub fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Self> {
+  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(t) => Some(&t.icon_theme.icon_size),
@@ -128,6 +128,40 @@ impl NamedSvg {
         Theme::Full(t) => t.icon_theme.svgs.get(&self),
         Theme::Inherit(i) => i.icons.as_ref().and_then(|icons| icons.get(&self)),
       })
-      .map(|x| x.clone())
+      .cloned()
   }
+}
+
+pub mod svgs {
+  use super::*;
+
+  define_named_svg!(
+    BEGIN,
+    ADD,
+    ARROW_BACK,
+    ARROW_DROP_DOWN,
+    ARROW_FORWARD,
+    CANCEL,
+    CHECK_BOX,
+    CHECK_BOX_OUTLINE_BLANK,
+    CHEVRON_RIGHT,
+    CLOSE,
+    DELETE,
+    DONE,
+    EXPAND_MORE,
+    FAVORITE,
+    HOME,
+    INDETERMINATE_CHECK_BOX,
+    LOGIN,
+    LOGOUT,
+    MENU,
+    MORE_HORIZ,
+    MORE_VERT,
+    OPEN_IN_NEW,
+    SEARCH,
+    SETTINGS,
+    STAR,
+    TEXT_CARET,
+    THEME_EXTEND
+  );
 }

@@ -191,8 +191,8 @@ impl Compose for HRawScrollbar {
         let ScrollBarStyle {
           thickness,
           thumb_min_size,
-          ref track_brush,
-        } = *ScrollBarStyle::of(ctx);
+          track_brush,
+        } = ScrollBarStyle::of(ctx).clone();
       }
 
       Stack {
@@ -280,14 +280,14 @@ fn safe_recip(v: f32) -> f32 {
   if v.is_infinite() || v.is_nan() { 0. } else { v }
 }
 
-impl CustomStyle for ScrollBarStyle {}
-
-pub(crate) fn add_to_theme(theme: &mut FullTheme) {
-  theme.custom_styles.set_custom_style(ScrollBarStyle {
-    thumb_min_size: 12.,
-    thickness: 8.,
-    track_brush: theme.palette.primary_container().into(),
-  });
+impl CustomStyle for ScrollBarStyle {
+  fn default_style(ctx: &BuildCtx) -> Self {
+    ScrollBarStyle {
+      thumb_min_size: 12.,
+      thickness: 8.,
+      track_brush: Palette::of(ctx).primary_container().into(),
+    }
+  }
 }
 
 #[cfg(test)]
@@ -313,13 +313,12 @@ mod test {
       }
     };
 
-    let mut theme = FullTheme::default();
-    super::add_to_theme(&mut theme);
+    let theme = FullTheme::default();
 
     expect_layout_result_with_theme(
       w,
       Some(Size::new(200., 200.)),
-      Theme::Full(theme),
+      theme,
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -391,12 +390,8 @@ mod test {
       }
     };
 
-    let mut theme = FullTheme::default();
-    super::add_to_theme(&mut theme);
-    let ctx = AppContext {
-      app_theme: std::rc::Rc::new(Theme::Full(theme)),
-      ..<_>::default()
-    };
+    let theme = FullTheme::default();
+    let ctx = AppContext::new(theme);
     let mut wnd = mock_window(w, Size::new(1024., 1024.), ctx);
     {
       *offset.state_ref() = Point::new(10., 10.);

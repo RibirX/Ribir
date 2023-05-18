@@ -3,7 +3,8 @@
 
 use crate::{
   declare::DeclareBuilder,
-  impl_query_self_only,
+  fill_svgs, impl_query_self_only,
+  prelude::include_svg,
   prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
   state::State,
 };
@@ -120,10 +121,40 @@ impl Default for FullTheme {
       Color::BLACK.with_alpha(0.87).into(),
     );
 
+    let mut icon_theme = IconTheme::new(icon_size);
+    fill_svgs! {
+      icon_theme,
+      svgs::ADD: "./theme/icons/add_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::ARROW_BACK: "./theme/icons/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::ARROW_DROP_DOWN: "./theme/icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::ARROW_FORWARD: "./theme/icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::CANCEL: "./theme/icons/cancel_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::CHECK_BOX: "./theme/icons/check_box_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::CHECK_BOX_OUTLINE_BLANK: "./theme/icons/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::CHEVRON_RIGHT: "./theme/icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::CLOSE: "./theme/icons/close_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::DELETE: "./theme/icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::DONE: "./theme/icons/done_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::EXPAND_MORE: "./theme/icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::FAVORITE: "./theme/icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::HOME: "./theme/icons/home_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::INDETERMINATE_CHECK_BOX: "./theme/icons/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::LOGIN: "./theme/icons/login_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::LOGOUT: "./theme/icons/logout_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::MENU: "./theme/icons/menu_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::MORE_HORIZ: "./theme/icons/more_horiz_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::MORE_VERT: "./theme/icons/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::OPEN_IN_NEW: "./theme/icons/open_in_new_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::SEARCH: "./theme/icons/search_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::SETTINGS: "./theme/icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::STAR: "./theme/icons/star_FILL0_wght400_GRAD0_opsz48.svg",
+      svgs::TEXT_CARET: "./theme/icons/text_caret.svg"
+    };
+
     FullTheme {
       palette: Default::default(),
       typography_theme,
-      icon_theme: IconTheme::new(icon_size),
+      icon_theme,
       transitions_theme: Default::default(),
       compose_decorators: Default::default(),
       custom_styles: Default::default(),

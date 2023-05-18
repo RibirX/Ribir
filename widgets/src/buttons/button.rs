@@ -11,7 +11,18 @@ pub struct ButtonStyle {
   pub padding_style: EdgeInsets,
 }
 
-impl CustomStyle for ButtonStyle {}
+impl CustomStyle for ButtonStyle {
+  fn default_style(ctx: &BuildCtx) -> Self {
+    ButtonStyle {
+      height: 40.,
+      icon_size: Size::splat(18.),
+      label_gap: 8.,
+      icon_pos: IconPosition::Before,
+      label_style: TypographyTheme::of(ctx).label_large.text.clone(),
+      padding_style: EdgeInsets::horizontal(16.),
+    }
+  }
+}
 
 #[derive(Clone, Declare)]
 pub struct ButtonDecorator {
@@ -31,7 +42,7 @@ impl ComposeDecorator for ButtonDecorator {
 /// # example
 /// ```
 /// # use ribir_core::prelude::*;
-/// # use ribir_widgets::prelude::{Button, Label, svgs};
+/// # use ribir_widgets::prelude::{Button, Label};
 ///
 /// // only icon
 /// let raw_icon_button = widget! {
@@ -102,15 +113,4 @@ impl ComposeChild for Button {
       }
     }
   }
-}
-
-pub(crate) fn add_to_theme(theme: &mut FullTheme) {
-  theme.custom_styles.set_custom_style(ButtonStyle {
-    height: 40.,
-    icon_size: Size::splat(18.),
-    label_gap: 8.,
-    icon_pos: IconPosition::Before,
-    label_style: theme.typography_theme.label_large.text.clone(),
-    padding_style: EdgeInsets::horizontal(16.),
-  });
 }

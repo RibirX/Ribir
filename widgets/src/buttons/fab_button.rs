@@ -12,7 +12,19 @@ pub struct FabButtonStyle {
   pub padding_style: EdgeInsets,
 }
 
-impl CustomStyle for FabButtonStyle {}
+impl CustomStyle for FabButtonStyle {
+  fn default_style(ctx: &BuildCtx) -> Self {
+    FabButtonStyle {
+      height: 56.,
+      icon_size: Size::splat(24.),
+      label_gap: 8.,
+      icon_pos: IconPosition::Before,
+      label_style: TypographyTheme::of(ctx).label_large.text.clone(),
+      radius: 16.,
+      padding_style: EdgeInsets::horizontal(16.),
+    }
+  }
+}
 
 #[derive(Clone, Declare)]
 pub struct FabButtonDecorator {
@@ -32,7 +44,7 @@ impl ComposeDecorator for FabButtonDecorator {
 /// # example
 /// ```
 /// # use ribir_core::prelude::*;
-/// # use ribir_widgets::prelude::{FabButton, Label, svgs};
+/// # use ribir_widgets::prelude::{FabButton, Label};
 ///
 /// // only icon
 /// let fab_icon_button = widget! {
@@ -114,16 +126,4 @@ impl ComposeChild for FabButton {
       }
     }
   }
-}
-
-pub(crate) fn add_to_theme(theme: &mut FullTheme) {
-  theme.custom_styles.set_custom_style(FabButtonStyle {
-    height: 56.,
-    icon_size: Size::splat(24.),
-    label_gap: 8.,
-    icon_pos: IconPosition::Before,
-    label_style: theme.typography_theme.label_large.text.clone(),
-    radius: 16.,
-    padding_style: EdgeInsets::horizontal(16.),
-  });
 }

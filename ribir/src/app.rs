@@ -27,7 +27,13 @@ impl App {
     ctx.clipboard = Rc::new(RefCell::new(clipboard));
 
     let _ = NEW_TIMER_FN.set(new_timer);
-    Self { ctx, ..Default::default() }
+
+    Self {
+      ctx,
+      windows: Default::default(),
+      event_loop: EventLoop::new(),
+      active_wnd: None,
+    }
   }
 
   /// Start an application with the `root` widget, this will use the default
@@ -137,15 +143,7 @@ impl App {
 
 impl Default for App {
   fn default() -> Self {
-    let mut theme = FullTheme::default();
-    ribir_widgets::widget_theme_init(&mut theme);
-    let ctx = AppContext::new(theme);
-
-    Self {
-      windows: Default::default(),
-      event_loop: EventLoop::new(),
-      ctx,
-      active_wnd: None,
-    }
+    let theme = FullTheme::default();
+    App::new(theme)
   }
 }

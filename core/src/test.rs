@@ -82,13 +82,10 @@ pub fn mock_window<M: ImplMarker>(root: impl IntoWidget<M>, size: Size, ctx: App
 pub fn expect_layout_result_with_theme(
   w: Widget,
   wnd_size: Option<Size>,
-  theme: Theme,
+  theme: FullTheme,
   items: &[LayoutTestItem],
 ) {
-  let ctx = AppContext {
-    app_theme: std::rc::Rc::new(theme),
-    ..<_>::default()
-  };
+  let ctx = AppContext::new(theme);
   let mut wnd = Window::new(w, Box::new(MockShellWindow::new(wnd_size)), ctx);
   wnd.draw_frame();
   items.iter().for_each(|LayoutTestItem { path, expect }| {
