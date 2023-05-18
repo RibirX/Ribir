@@ -26,7 +26,10 @@ impl Placeholder {
 pub struct InputStyle {
   pub size: Option<f32>,
 }
-impl CustomStyle for InputStyle {}
+
+impl CustomStyle for InputStyle {
+  fn default_style(_: &BuildCtx) -> Self { InputStyle { size: Some(20.) } }
+}
 
 #[derive(Declare)]
 pub struct Input {
@@ -134,7 +137,9 @@ pub struct TextAreaStyle {
   pub rows: Option<f32>,
   pub cols: Option<f32>,
 }
-impl CustomStyle for TextAreaStyle {}
+impl CustomStyle for TextAreaStyle {
+  fn default_style(_: &BuildCtx) -> Self { TextAreaStyle { rows: Some(2.), cols: Some(20.) } }
+}
 
 impl ComposeChild for TextArea {
   type Child = Option<Placeholder>;
@@ -195,15 +200,3 @@ fn glyph_width(font_size: FontSize) -> f32 {
 }
 
 fn line_height(line_height: Em) -> f32 { FontSize::Em(line_height).into_pixel().value() }
-
-pub fn add_to_theme(theme: &mut FullTheme) {
-  theme
-    .custom_styles
-    .set_custom_style(InputStyle { size: Some(20.) });
-  theme
-    .custom_styles
-    .set_custom_style(TextAreaStyle { rows: Some(2.), cols: Some(20.) });
-  theme.custom_styles.set_custom_style(SelectedTextStyle {
-    brush: Color::from_rgb(181, 215, 254).into(),
-  });
-}

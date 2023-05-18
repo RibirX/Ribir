@@ -1,6 +1,6 @@
 use crate::{
   common_widget::{Leading, Trailing},
-  prelude::{svgs, Icon, Label, Row, Text},
+  prelude::{Icon, Label, Row, Text},
 };
 use ribir_core::prelude::*;
 
@@ -133,15 +133,15 @@ impl ComposeChild for Checkbox {
   }
 }
 
-pub(crate) fn add_to_theme(theme: &mut FullTheme) {
-  theme.custom_styles.set_custom_style(CheckBoxStyle {
-    icon_size: Size::splat(24.),
-    label_style: theme.typography_theme.body_large.text.clone(),
-    label_color: theme.palette.on_surface().into(),
-  });
+impl CustomStyle for CheckBoxStyle {
+  fn default_style(ctx: &BuildCtx) -> Self {
+    CheckBoxStyle {
+      icon_size: Size::splat(24.),
+      label_style: TypographyTheme::of(ctx).body_large.text.clone(),
+      label_color: Palette::of(ctx).on_surface().into(),
+    }
+  }
 }
-
-impl CustomStyle for CheckBoxStyle {}
 #[cfg(test)]
 mod tests {
 
@@ -151,13 +151,12 @@ mod tests {
   #[test]
   fn layout() {
     let w = widget! { Checkbox {} };
-    let mut theme = FullTheme::default();
-    super::add_to_theme(&mut theme);
+    let theme = FullTheme::default();
 
     expect_layout_result_with_theme(
       w,
       None,
-      Theme::Full(theme),
+      theme,
       &[LayoutTestItem {
         path: &[0],
         expect: ExpectRect {

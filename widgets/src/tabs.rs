@@ -83,7 +83,22 @@ pub struct TabsStyle {
   pub indicator: IndicatorStyle,
 }
 
-impl CustomStyle for TabsStyle {}
+impl CustomStyle for TabsStyle {
+  fn default_style(ctx: &BuildCtx) -> Self {
+    let palette = Palette::of(ctx);
+    TabsStyle {
+      extent_with_both: 64.,
+      extent_only_label: 48.,
+      extent_only_icon: 48.,
+      icon_size: Size::splat(24.),
+      icon_pos: Position::Top,
+      active_color: palette.primary().into(),
+      foreground: palette.on_surface_variant().into(),
+      label_style: TypographyTheme::of(ctx).title_small.text.clone(),
+      indicator: IndicatorStyle { extent: 3., measure: Some(60.) },
+    }
+  }
+}
 #[derive(Declare)]
 pub struct TabsDecorator {}
 
@@ -348,18 +363,4 @@ impl ComposeChild for Tabs {
       }
     }
   }
-}
-
-pub(crate) fn add_to_theme(theme: &mut FullTheme) {
-  theme.custom_styles.set_custom_style(TabsStyle {
-    extent_with_both: 64.,
-    extent_only_label: 48.,
-    extent_only_icon: 48.,
-    icon_size: Size::splat(24.),
-    icon_pos: Position::Top,
-    active_color: theme.palette.primary().into(),
-    foreground: theme.palette.on_surface_variant().into(),
-    label_style: theme.typography_theme.title_small.text.clone(),
-    indicator: IndicatorStyle { extent: 3., measure: Some(60.) },
-  });
 }

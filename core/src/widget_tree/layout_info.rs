@@ -105,7 +105,7 @@ pub struct Layouter<'a> {
   pub(crate) wid: WidgetId,
   pub(crate) arena: &'a mut TreeArena,
   pub(crate) store: &'a mut LayoutStore,
-  pub(crate) wnd_ctx: &'a WindowCtx,
+  pub(crate) wnd_ctx: &'a mut WindowCtx,
   pub(crate) dirty_set: &'a DirtySet,
   pub(crate) is_layout_root: bool,
 }

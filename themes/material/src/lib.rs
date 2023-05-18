@@ -79,7 +79,6 @@ fn new(palette: Palette) -> FullTheme {
     material_svgs::INFO: "./icons/info_FILL0_wght400_GRAD0_opsz48.svg"
   }
 
-  ribir_widgets::widget_theme_init(&mut theme);
   override_compose_decorator(&mut theme);
   init_custom_style(&mut theme);
   theme

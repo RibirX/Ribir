@@ -1,4 +1,4 @@
-use crate::{layout::SizedBox, themes::svgs};
+use crate::layout::SizedBox;
 use ribir_core::prelude::*;
 use std::time::Duration;
 #[derive(Declare)]

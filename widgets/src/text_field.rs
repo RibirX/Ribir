@@ -180,11 +180,15 @@ pub enum TextFieldState {
   // Disabled,
 }
 
-impl CustomStyle for TextFieldThemeSuit {}
+impl CustomStyle for TextFieldThemeSuit {
+  fn default_style(ctx: &BuildCtx) -> Self {
+    Self::from_theme(Palette::of(ctx), TypographyTheme::of(ctx))
+  }
+}
 
 impl TextFieldThemeSuit {
   pub fn from_theme(palette: &Palette, typo_theme: &TypographyTheme) -> Self {
-    let body = &typo_theme.body_large.text;
+    let body: &CowArc<TextStyle> = &typo_theme.body_large.text;
     let header = &typo_theme.title_large.text;
     let caption = &typo_theme.label_small.text;
 

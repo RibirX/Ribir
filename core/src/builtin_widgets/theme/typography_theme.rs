@@ -1,8 +1,5 @@
-use std::cell::Ref;
-
-use crate::context::BuildCtx;
-
 use super::Theme;
+use crate::context::BuildCtx;
 use ribir_algo::CowArc;
 use ribir_painter::Brush;
 use ribir_text::FontFamily;
@@ -62,7 +59,7 @@ bitflags! {
 
 impl TypographyTheme {
   #[inline]
-  pub fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Self> {
+  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(t) => Some(&t.typography_theme),

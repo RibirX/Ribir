@@ -10,7 +10,13 @@ pub(crate) struct SelectedText {
 pub struct SelectedTextStyle {
   pub brush: Brush,
 }
-impl CustomStyle for SelectedTextStyle {}
+impl CustomStyle for SelectedTextStyle {
+  fn default_style(_: &BuildCtx) -> Self {
+    SelectedTextStyle {
+      brush: Color::from_rgb(181, 215, 254).into(),
+    }
+  }
+}
 
 impl Compose for SelectedText {
   fn compose(this: State<Self>) -> Widget {

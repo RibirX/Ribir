@@ -179,11 +179,11 @@ mod tests {
 
   #[test]
   fn fix_animate_circular_mut_borrow() {
-    let themes = RefCell::new(vec![]);
+    let mut themes = vec![];
     let pool = FuturesLocalSchedulerPool::default();
     let scheduler = pool.spawner();
     let mut wnd_ctx = WindowCtx::new(<_>::default(), scheduler);
-    let ctx = BuildCtx::new(&themes, &wnd_ctx);
+    let ctx = BuildCtx::new(&mut themes, &mut wnd_ctx);
     let animate = Animate::declare_builder()
       .transition(
         Transition::declare_builder()

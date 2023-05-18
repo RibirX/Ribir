@@ -1,12 +1,10 @@
 use std::{
   any::{Any, TypeId},
-  cell::Ref,
   collections::HashMap,
 };
 
-use crate::context::BuildCtx;
-
 use super::Theme;
+use crate::context::BuildCtx;
 
 /// A map can store any type of config, useful for widget which the common
 /// information of theme mod not enough and need have itself theme.
@@ -24,20 +22,24 @@ macro_rules! fill_custom_style {
 }
 
 pub trait CustomStyle: Sized + 'static {
+  fn default_style(ctx: &BuildCtx) -> Self;
+
   #[inline]
-  fn of<'a>(ctx: &'a BuildCtx) -> Ref<'a, Self> {
+  fn of<'a>(ctx: &'a BuildCtx) -> &'a Self {
     let tid = TypeId::of::<Self>();
     let c = ctx.find_cfg(|t| match t {
       Theme::Full(t) => t.custom_styles.themes.get(&tid),
       Theme::Inherit(i) => i.custom_styles.as_ref().and_then(|c| c.themes.get(&tid)),
     });
-    c.and_then(|c| Ref::filter_map(c, |c| c.downcast_ref::<Self>()).ok())
-      .unwrap_or_else(|| {
-        panic!(
-          "The custom theme({}) is not init in theme, use it after init.",
-          std::any::type_name::<Self>()
-        )
-      })
+
+    c.unwrap_or_else(|| {
+      let style = Self::default_style(ctx);
+      let Theme::Full(app_theme) = ctx.app_theme_mut() else { unreachable!() };
+      app_theme.custom_styles.set_custom_style(style);
+      app_theme.custom_styles.themes.get(&tid).unwrap()
+    })
+    .downcast_ref::<Self>()
+    .unwrap()
   }
 }
 

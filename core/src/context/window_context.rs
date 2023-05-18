@@ -10,7 +10,6 @@ use std::{cell::RefCell, convert::Infallible, rc::Rc, time::Instant};
 use super::AppContext;
 use crate::{
   animation::AnimateTrack,
-  builtin_widgets::Theme,
   events::focus_mgr::{FocusHandle, FocusManager, FocusType},
   ticker::{FrameMsg, FrameTicker},
   widget::{TreeArena, WidgetId},
@@ -27,8 +26,6 @@ pub struct WindowCtx {
 }
 
 impl WindowCtx {
-  pub fn app_theme(&self) -> Rc<Theme> { self.app_ctx.app_theme.clone() }
-
   pub fn new(app_ctx: AppContext, frame_scheduler: FuturesLocalScheduler) -> Self {
     Self {
       app_ctx,
@@ -39,6 +36,9 @@ impl WindowCtx {
       frame_scheduler,
     }
   }
+
+  #[inline]
+  pub fn app_ctx(&self) -> &AppContext { &self.app_ctx }
 
   /// Return an `rxRust` Scheduler, which will guarantee all task add to the
   /// scheduler will finished before current frame finished.
@@ -52,8 +52,6 @@ impl WindowCtx {
   }
 
   pub fn typography_store(&self) -> &TypographyStore { &self.app_ctx.typography_store }
-
-  pub fn app_ctx(&self) -> AppContext { self.app_ctx.clone() }
 
   pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, Infallible> {
     self.frame_ticker.frame_tick_stream()

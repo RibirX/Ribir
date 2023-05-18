@@ -382,7 +382,7 @@ mod tests {
     expect_layout_result_with_theme(
       row,
       Some(Size::new(500., 500.)),
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &[LayoutTestItem {
         path: &[0],
         expect: ExpectRect {
@@ -408,7 +408,7 @@ mod tests {
     expect_layout_result_with_theme(
       col,
       Some(Size::new(500., 500.)),
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &[LayoutTestItem {
         path: &[0],
         expect: ExpectRect::new(0., 0., 10., 200.),
@@ -469,7 +469,7 @@ mod tests {
     expect_layout_result_with_theme(
       row,
       Some(Size::new(500., 500.)),
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &layouts,
     );
   }
@@ -489,7 +489,7 @@ mod tests {
         }
       },
       Some(Size::new(500., 500.)),
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &[
         LayoutTestItem {
           path: &[0],
@@ -523,7 +523,7 @@ mod tests {
         }
       },
       Some(Size::new(500., 40.)),
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -552,7 +552,7 @@ mod tests {
         }
       },
       Some(Size::new(500., 40.)),
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -588,7 +588,7 @@ mod tests {
         }
       },
       Some(Size::new(500., 40.)),
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &[
         LayoutTestItem {
           path: &[0, 0],
@@ -648,7 +648,7 @@ mod tests {
     expect_layout_result_with_theme(
       row,
       Some(Size::new(500., 500.)),
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &layouts,
     );
   }
@@ -666,7 +666,7 @@ mod tests {
           }
         },
         Some(Size::new(500., 40.)),
-        Theme::Full(FullTheme::default()),
+        FullTheme::default(),
         &[
           LayoutTestItem {
             path: &[0],
@@ -703,7 +703,7 @@ mod tests {
     expect_layout_result_with_theme(
       row,
       Some(Size::new(500., 40.)),
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &[
         LayoutTestItem {
           path: &[0],
@@ -811,7 +811,7 @@ mod tests {
     expect_layout_result_with_theme(
       row,
       Some(Size::new(500., 500.)),
-      Theme::Full(FullTheme::default()),
+      FullTheme::default(),
       &[
         LayoutTestItem {
           path: &[0, 0],

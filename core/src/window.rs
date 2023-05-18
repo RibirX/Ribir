@@ -82,7 +82,7 @@ impl Window {
 
     self.widget_tree.draw(&mut self.painter);
 
-    let surface = match self.context.app_theme().as_ref() {
+    let surface = match self.context.app_ctx().app_theme() {
       Theme::Full(theme) => theme.palette.surface(),
       Theme::Inherit(_) => unreachable!(),
     };
