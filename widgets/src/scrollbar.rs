@@ -71,8 +71,6 @@ impl ComposeChild for HScrollBar {
           id: scrolling,
           scrollable: Scrollable::X,
           scroll_pos: Point::new(this.offset, 0.),
-          v_align: VAlign::Stretch,
-          h_align: HAlign::Stretch,
           DynWidget { dyns: child }
         }
         HRawScrollbar {
@@ -109,8 +107,6 @@ impl ComposeChild for VScrollBar {
           id: scrolling,
           scrollable: Scrollable::Y,
           scroll_pos: Point::new(0., this.offset),
-          v_align: VAlign::Stretch,
-          h_align: HAlign::Stretch,
           DynWidget { dyns: child }
         }
         VRawScrollbar {
@@ -146,8 +142,6 @@ impl ComposeChild for BothScrollbar {
           id: scrolling,
           scrollable: Scrollable::Both,
           scroll_pos: this.offset,
-          v_align: VAlign::Stretch,
-          h_align: HAlign::Stretch,
           DynWidget { dyns: child }
         }
         HRawScrollbar {
