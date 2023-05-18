@@ -27,6 +27,7 @@ arboard = "3.2.0"
 colored.workspace = true
 env_logger.workspace = true
 futures.workspace = true
+ribir_dev_helper = {path = "../dev-helper", version = "0.0.0"}
 ribir_material = {path = "../themes/material", version = "0.0.0"}
 
 [features]
@@ -39,4 +40,4 @@ widgets = ["ribir_widgets"]
 [[test]]
 harness = false
 name = "single_thread"
-path = "tests/single_thread.rs"
+path = "tests/timer_test.rs"
