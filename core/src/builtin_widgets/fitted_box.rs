@@ -81,7 +81,8 @@ impl Query for FittedBox {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
+  use ribir_dev_helper::*;
 
   const WND_SIZE: Size = Size::new(300., 300.);
 
@@ -108,15 +109,10 @@ mod tests {
           MockBox { size }
         }
       };
+      let mut wnd = TestWindow::new_with_size(w, WND_SIZE);
+      wnd.draw_frame();
 
-      expect_layout_result(
-        w,
-        Some(WND_SIZE),
-        &[LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect::from_size(expect),
-        }],
-      );
+      assert_layout_result_by_path!(wnd, {path = [0], size == expect,} );
       assert_eq!(c_fit.shallow_ref().scale_cache.get(), expected_scale);
     }
   }
@@ -167,23 +163,13 @@ mod tests {
     .test();
   }
 
-  #[test]
-  fn as_builtin_field() {
-    let w = widget! {
+  fn as_builtin_field() -> Widget {
+    widget! {
       MockBox {
         size: Size::new(200., 200.),
         box_fit: BoxFit::Fill,
       }
-    };
-
-    let wnd_size = Size::new(400., 400.);
-    expect_layout_result(
-      w,
-      Some(wnd_size),
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::from_size(wnd_size),
-      }],
-    );
+    }
   }
+  widget_layout_test!(as_builtin_field, wnd_size = WND_SIZE, size == WND_SIZE,);
 }

@@ -14,9 +14,13 @@ repository = "https://github.com/RibirX/Ribir/tests"
 version.workspace = true
 
 [dev-dependencies]
+paste.workspace = true
 ribir = {path = "../ribir", default-features = false, features = ["material", "widgets"]}
-trybuild = "1.0.77"
-winit = "0.28.6"
+ribir_geom = {path = "../geom"}
+
+ribir_dev_helper = {path = "../dev-helper"}
+trybuild.workspace = true
+winit.workspace = true
 
 [[test]]
 name = "compile_message"

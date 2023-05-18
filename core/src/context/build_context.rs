@@ -48,7 +48,7 @@ impl<'a> BuildCtx<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
   use std::{cell::RefCell, rc::Rc};
 
   #[test]
@@ -94,7 +94,7 @@ mod tests {
       }
     };
 
-    let mut wnd = default_mock_window(light_dark);
+    let mut wnd = TestWindow::new(light_dark);
     wnd.layout();
     let themes = themes.state_ref();
     assert_eq!(themes.len(), 2);

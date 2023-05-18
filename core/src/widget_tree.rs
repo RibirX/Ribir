@@ -238,7 +238,7 @@ impl Widget {
 mod tests {
   extern crate test;
   use crate::{
-    test::{default_mock_window, layout_size_by_path, mock_window, MockBox, MockMulti},
+    test_helper::{MockBox, MockMulti, TestWindow},
     widget::widget_id::dispose_nodes,
   };
 
@@ -345,9 +345,9 @@ mod tests {
         MockBox { size: *size }
       }
     };
-    let mut wnd = mock_window(w, Size::new(200., 200.), <_>::default());
+    let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
     wnd.draw_frame();
-    let size = layout_size_by_path(&wnd, &[0, 0]);
+    let size = wnd.layout_info_by_path(&[0, 0]).unwrap().size.unwrap();
     assert_eq!(size, expect_size);
 
     // when relayout the inner `MockBox`, its clamp should same with its previous
@@ -356,7 +356,7 @@ mod tests {
       *no_boundary_size.state_ref() = INFINITY_SIZE;
     }
     wnd.draw_frame();
-    let size = layout_size_by_path(&wnd, &[0, 0]);
+    let size = wnd.layout_info_by_path(&[0, 0]).unwrap().size.unwrap();
     assert_eq!(size, expect_size);
   }
 
@@ -374,7 +374,7 @@ mod tests {
       })
     };
 
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
     {
@@ -396,7 +396,7 @@ mod tests {
       })
     };
 
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
     {

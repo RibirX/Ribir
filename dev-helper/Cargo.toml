@@ -22,6 +22,8 @@ ribir_painter = {path = "../painter", features = ["png"], version = "0.0.0"}
 
 [dev-dependencies]
 colored.workspace = true
+paste.workspace = true
+ribir_core = {path = "../core", version = "0.0.0"}
 
 [features]
 wgpu = ["ribir_gpu/wgpu"]

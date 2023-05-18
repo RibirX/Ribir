@@ -225,8 +225,10 @@ impl Border {
 }
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::*;
+
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
 
   #[test]
   fn default_value_is_none() {
@@ -240,10 +242,9 @@ mod tests {
     assert_eq!(w.background, None);
   }
 
-  #[test]
-  fn layout() {
-    const SIZE: Size = Size::new(100., 100.);
-    let w = widget! {
+  const SIZE: Size = Size::new(100., 100.);
+  fn layout() -> Widget {
+    widget! {
       MockBox {
         size: SIZE,
         border: Border {
@@ -253,21 +254,11 @@ mod tests {
           bottom: BorderSide::new(4., Color::BLACK.into()),
         },
       }
-    };
-
-    expect_layout_result(
-      w,
-      None,
-      &[
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect::from_size(Size::new(103., 107.)),
-        },
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::new(1., 3., 100., 100.),
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    layout,
+    { path = [0],  width == 103., height == 107., }
+    { path = [0, 0], rect == ribir_geom::rect(1., 3., 100., 100.), }
+  );
 }

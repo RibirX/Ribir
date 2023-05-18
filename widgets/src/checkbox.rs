@@ -144,89 +144,27 @@ impl CustomStyle for CheckBoxStyle {
 }
 #[cfg(test)]
 mod tests {
-
   use super::*;
-  use ribir_core::test::{expect_layout_result_with_theme, ExpectRect, LayoutTestItem};
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn layout() {
-    let w = widget! { Checkbox {} };
-    let theme = FullTheme::default();
-
-    expect_layout_result_with_theme(
-      w,
-      None,
-      theme,
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect {
-          x: Some(0.),
-          y: Some(0.),
-          width: Some(24.),
-          height: Some(24.),
-        },
-      }],
-    );
+  fn checked() -> Widget {
+    widget! { Checkbox { checked: true } }
   }
+  widget_layout_test!(checked, width == 24., height == 24.,);
 
-  #[cfg(feature = "png")]
-  #[test]
-  fn checked_paint() {
-    use std::rc::Rc;
-
-    let c = widget! { Checkbox { checked: true } };
-    let theme = Rc::new(material::purple::light());
-    let mut window = Window::wgpu_headless(c, theme, DeviceSize::new(100, 100));
-    window.draw_frame();
-
-    let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    expected.push("src/test_imgs/checkbox_checked.png");
-    assert!(window.same_as_png(expected));
+  fn unchecked() -> Widget {
+    widget! { Checkbox {  } }
   }
+  widget_layout_test!(unchecked, width == 24., height == 24.,);
 
-  #[cfg(feature = "png")]
-  #[test]
-  fn unchecked_paint() {
-    use std::rc::Rc;
-
-    let theme = Rc::new(material::purple::light());
-    let mut window =
-      Window::wgpu_headless(widget! { Checkbox {} }, theme, DeviceSize::new(100, 100));
-    window.draw_frame();
-    let mut unchecked_expect = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    unchecked_expect.push("src/test_imgs/checkbox_uncheck.png");
-    assert!(window.same_as_png(unchecked_expect));
-  }
-
-  #[cfg(feature = "png")]
-  #[test]
-  fn indeterminate_paint() {
-    use std::rc::Rc;
-
-    let c = widget! {
+  fn indeterminate() -> Widget {
+    widget! {
       Checkbox {
         checked: true,
         indeterminate: true,
       }
-    };
-    let theme = Rc::new(material::purple::light());
-    let mut window = Window::wgpu_headless(c.into_widget(), theme, DeviceSize::new(100, 100));
-    window.draw_frame();
-
-    let mut expected = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    expected.push("src/test_imgs/checkbox_indeterminate.png");
-    assert!(window.same_as_png(expected.clone()));
-
-    let c = widget! {
-      Checkbox {
-        checked: false,
-        indeterminate: true,
-      }
-    };
-    let theme = Rc::new(material::purple::light());
-    let mut window = Window::wgpu_headless(c.into_widget(), theme, DeviceSize::new(100, 100));
-    window.draw_frame();
-
-    assert!(window.same_as_png(expected));
+    }
   }
+  widget_layout_test!(indeterminate, width == 24., height == 24.,);
 }

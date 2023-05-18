@@ -109,7 +109,7 @@ impl ScrollableWidget {
 
 #[cfg(test)]
 mod tests {
-  use crate::test::{layout_position_by_path, mock_window, MockBox};
+  use crate::test_helper::{MockBox, TestWindow};
 
   use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
@@ -122,8 +122,7 @@ mod tests {
       }
     };
 
-    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
-
+    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -136,9 +135,9 @@ mod tests {
     });
 
     wnd.layout();
-    let pos = layout_position_by_path(&wnd, &[0, 0, 0, 0]);
+    let pos = wnd.layout_info_by_path(&[0, 0, 0, 0]).unwrap().pos;
     assert_eq!(pos.y, expect_y);
-    let pos = layout_position_by_path(&wnd, &[0, 0, 0, 0, 0]);
+    let pos = wnd.layout_info_by_path(&[0, 0, 0, 0, 0]).unwrap().pos;
     assert_eq!(pos.x, expect_x);
   }
 

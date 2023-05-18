@@ -1,5 +1,6 @@
-use ribir::core::test::*;
+use ribir::core::test_helper::*;
 use ribir::prelude::*;
+use ribir_dev_helper::*;
 enum AB {
   A,
   B,
@@ -28,45 +29,13 @@ impl AB {
 
 #[test]
 fn path_widget() {
-  expect_layout_result(
-    widget! { AB::A },
-    None,
-    &[LayoutTestItem {
-      path: &[0],
-      expect: ExpectRect::from_size(ZERO_SIZE),
-    }],
-  );
-
-  expect_layout_result(
-    widget! { AB::B },
-    None,
-    &[LayoutTestItem {
-      path: &[0],
-      expect: ExpectRect::from_size(SIZE_ONE),
-    }],
-  );
-
-  expect_layout_result(
-    widget! { AB::a() },
-    None,
-    &[LayoutTestItem {
-      path: &[0],
-      expect: ExpectRect::from_size(ZERO_SIZE),
-    }],
-  );
-
-  expect_layout_result(
-    widget! { AB::b() },
-    None,
-    &[LayoutTestItem {
-      path: &[0],
-      expect: ExpectRect::from_size(SIZE_ONE),
-    }],
-  );
+  let _ = widget! { AB::A };
+  let _ = widget! { AB::B };
+  let _ = widget! { AB::a() };
+  let _ = widget! { AB::b() };
 }
 
-#[test]
-fn tuple_widget() {
+fn tuple_widget() -> Widget {
   struct TupleBox(Size);
   impl Compose for TupleBox {
     fn compose(this: State<Self>) -> Widget {
@@ -76,14 +45,6 @@ fn tuple_widget() {
       }
     }
   }
-
-  let size = Size::new(1., 1.);
-  expect_layout_result(
-    widget! { TupleBox(size) },
-    None,
-    &[LayoutTestItem {
-      path: &[0],
-      expect: ExpectRect::from_size(size),
-    }],
-  );
+  widget! { TupleBox(Size::new(1., 1.)) }
 }
+widget_layout_test!(tuple_widget, width == 1., height == 1.,);

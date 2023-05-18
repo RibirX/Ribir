@@ -34,89 +34,49 @@ impl Query for SizedBox {
 mod tests {
   use super::*;
   use crate::prelude::*;
-  use ribir_core::test::*;
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn fix_size() {
+  fn fix_size() -> Widget {
     let size: Size = Size::new(100., 100.);
-    let w = widget! {
+    widget! {
       SizedBox {
         size,
         Text { text: "" }
       }
-    };
-
-    expect_layout_result(
-      w,
-      None,
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::from_size(size),
-      }],
-    );
+    }
   }
+  widget_layout_test!(fix_size, width == 100., height == 100.,);
 
-  #[test]
-  fn shrink_size() {
-    let w = widget! {
+  fn shrink_size() -> Widget {
+    widget! {
       SizedBox {
         size: ZERO_SIZE,
         Text { text: "" }
       }
-    };
-
-    expect_layout_result(
-      w,
-      None,
-      &[
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect::from_size(ZERO_SIZE),
-        },
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::from_size(ZERO_SIZE),
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    shrink_size,
+    { path = [0], size == ZERO_SIZE,}
+    { path = [0, 0], size == ZERO_SIZE,}
+  );
 
-  #[test]
-  fn expanded_size() {
-    let wnd_size = Size::new(500., 500.);
-    let expand_box = widget! {
+  fn expanded_size() -> Widget {
+    widget! {
       SizedBox {
         size: INFINITY_SIZE,
         Text { text: "" }
       }
-    };
-
-    expect_layout_result(
-      expand_box,
-      Some(wnd_size),
-      &[
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect::from_size(wnd_size),
-        },
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::from_size(INFINITY_SIZE),
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    expanded_size,
+    wnd_size = Size::new(500., 500.),
+    { path = [0], size == Size::new(500., 500.),}
+    { path = [0, 0], size == INFINITY_SIZE,}
+  );
 
-  #[test]
-  fn empty_box() {
-    let size = Size::new(10., 10.);
-    expect_layout_result(
-      SizedBox { size }.into_widget(),
-      None,
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::from_size(size),
-      }],
-    );
-  }
+  fn empty_box() -> Widget { SizedBox { size: Size::new(10., 10.) }.into_widget() }
+  widget_layout_test!(empty_box, width == 10., height == 10.,);
 }

@@ -59,47 +59,24 @@ impl LayoutBox {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn smoke() {
-    expect_layout_result(
-      widget! {
-         MockMulti {
-          LayoutBox {
-            id: layout_box,
-            MockBox { size: Size::new(100., 200.) }
-          }
-          MockBox { size: layout_box.rect.size }
+  fn smoke() -> Widget {
+    widget! {
+        MockMulti {
+        LayoutBox {
+          id: layout_box,
+          MockBox { size: Size::new(100., 200.) }
         }
-      },
-      None,
-      &[
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect {
-            width: Some(200.),
-            height: Some(200.),
-            ..<_>::default()
-          },
-        },
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect {
-            width: Some(100.),
-            height: Some(200.),
-            ..<_>::default()
-          },
-        },
-        LayoutTestItem {
-          path: &[0, 1],
-          expect: ExpectRect {
-            width: Some(100.),
-            height: Some(200.),
-            ..<_>::default()
-          },
-        },
-      ],
-    );
+        MockBox { size: layout_box.rect.size }
+      }
+    }
   }
+  widget_layout_test!(
+    smoke,
+    { path = [0], width == 200., height == 200.,}
+    { path = [0, 0], width == 100., height == 200.,}
+    { path = [0, 1], width == 100., height == 200.,}
+  );
 }

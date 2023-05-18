@@ -1,4 +1,5 @@
-use ribir::{core::test::*, prelude::*};
+use ribir::{core::test_helper::*, prelude::*};
+use ribir_dev_helper::*;
 use std::{cell::Cell, rc::Rc, time::Duration};
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
@@ -26,16 +27,15 @@ fn simple_ref_bind_work() {
   };
 
   let flex_size = Size::new(200., 100.);
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.layout();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(flex_size));
+  assert_layout_result_by_path!(wnd, { path = [0], size == flex_size, });
 
   tap_at(&mut wnd, (1, 1));
 
   wnd.layout();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(flex_size * 2.));
+  assert_layout_result_by_path!(wnd, { path = [0], size == flex_size * 2., });
 }
-
 #[test]
 fn event_attr_sugar_work() {
   const BEFORE_SIZE: Size = Size::new(50., 50.);
@@ -51,17 +51,17 @@ fn event_attr_sugar_work() {
     }
   };
 
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
 
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(BEFORE_SIZE));
-  assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(BEFORE_SIZE));
+  assert_layout_result_by_path!(wnd, { path = [0], size == BEFORE_SIZE, });
+  assert_layout_result_by_path!(wnd, { path = [0, 0], size == BEFORE_SIZE, });
 
   tap_at(&mut wnd, (25, 25));
 
   wnd.draw_frame();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(AFTER_TAP_SIZE));
-  assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(AFTER_TAP_SIZE));
+  assert_layout_result_by_path!(wnd, { path = [0], size == AFTER_TAP_SIZE, });
+  assert_layout_result_by_path!(wnd, { path = [0, 0], size == AFTER_TAP_SIZE, });
 }
 
 #[test]
@@ -81,14 +81,14 @@ fn widget_wrap_bind_work() {
     }
   };
 
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(104., 52.)));
+  assert_layout_result_by_path!(wnd, { path = [0], width == 104., height == 52.,});
 
   tap_at(&mut wnd, (60, 1));
 
   wnd.draw_frame();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(70., 60.)));
+  assert_layout_result_by_path!(wnd, { path = [0], width == 70., height == 60.,});
 }
 
 #[test]
@@ -107,23 +107,23 @@ fn expression_for_children() {
     }
   };
 
-  let mut wnd = default_mock_window(embed_expr);
-  wnd.layout();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(4., 1.)));
-  assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(size_one));
-  assert_layout_result(&wnd, &[0, 1], &ExpectRect::from_size(size_one));
-  assert_layout_result(&wnd, &[0, 2], &ExpectRect::from_size(size_one));
-  assert_layout_result(&wnd, &[0, 3], &ExpectRect::from_size(size_one));
-  assert_layout_result(&wnd, &[0, 4], &ExpectRect::from_size(ZERO_SIZE));
+  let mut wnd = TestWindow::new(embed_expr);
+  wnd.draw_frame();
+  assert_layout_result_by_path!(wnd, { path = [0], width == 4., height == 1.,});
+  assert_layout_result_by_path!(wnd, { path = [0, 0], size == size_one,});
+  assert_layout_result_by_path!(wnd, { path = [0, 1], size == size_one,});
+  assert_layout_result_by_path!(wnd, { path = [0, 2], size == size_one,});
+  assert_layout_result_by_path!(wnd, { path = [0, 3], size == size_one,});
+  assert_layout_result_by_path!(wnd, { path = [0, 4], size == ZERO_SIZE,});
 
   tap_at(&mut wnd, (0, 0));
   wnd.layout();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(25., 5.)));
-  assert_layout_result(&wnd, &[0, 0], &ExpectRect::from_size(size_five));
-  assert_layout_result(&wnd, &[0, 1], &ExpectRect::from_size(size_five));
-  assert_layout_result(&wnd, &[0, 2], &ExpectRect::from_size(size_five));
-  assert_layout_result(&wnd, &[0, 3], &ExpectRect::from_size(size_five));
-  assert_layout_result(&wnd, &[0, 4], &ExpectRect::from_size(size_five));
+  assert_layout_result_by_path!(wnd, { path = [0], width == 25., height == 5.,});
+  assert_layout_result_by_path!(wnd, { path = [0, 0], size == size_five,});
+  assert_layout_result_by_path!(wnd, { path = [0, 1], size == size_five,});
+  assert_layout_result_by_path!(wnd, { path = [0, 2], size == size_five,});
+  assert_layout_result_by_path!(wnd, { path = [0, 3], size == size_five,});
+  assert_layout_result_by_path!(wnd, { path = [0, 4], size == size_five,});
 }
 
 #[test]
@@ -141,14 +141,13 @@ fn embed_widget_ref_outside() {
     }
   };
 
-  let mut wnd = default_mock_window(w);
-  wnd.layout();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(4., 1.)));
+  let mut wnd = TestWindow::new(w);
+  wnd.draw_frame();
+  assert_layout_result_by_path!(wnd, { path = [0], width == 4., height == 1.,});
 
   tap_at(&mut wnd, (0, 0));
-  wnd.layout();
-
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(Size::new(8., 2.)));
+  wnd.draw_frame();
+  assert_layout_result_by_path!(wnd, { path = [0], width == 8., height == 2.,});
 }
 
 #[test]
@@ -166,25 +165,24 @@ fn data_flow_macro() {
         .subscribe(move |v| c.size = v);
     }
   };
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  let size = layout_size_by_path(&wnd, &[0]);
+  let size = wnd.layout_info_by_path(&[0]).unwrap().size.unwrap();
   // data flow not affect on init.
   assert_eq!(size, Size::new(3., 1.));
 
   tap_at(&mut wnd, (0, 0));
   wnd.draw_frame();
 
-  let size = layout_size_by_path(&wnd, &[0]);
+  let size = wnd.layout_info_by_path(&[0]).unwrap().size.unwrap();
   assert_eq!(size, Size::new(8., 4.));
 }
 
-#[test]
-fn local_var_not_bind() {
+fn local_var_not_bind() -> Widget {
   const EXPECT_SIZE: Size = Size::new(5., 5.);
   const BE_CLIPPED_SIZE: Size = Size::new(500., 500.);
 
-  let w = widget! {
+  widget! {
     SizedBox {
       size: {
         let _size_box = EXPECT_SIZE;
@@ -196,21 +194,13 @@ fn local_var_not_bind() {
         size: BE_CLIPPED_SIZE,
       }
     }
-  };
-  let expect = ExpectRect {
-    width: Some(10.),
-    height: Some(10.),
-    ..<_>::default()
-  };
-  expect_layout_result(
-    w,
-    None,
-    &[
-      LayoutTestItem { path: &[0], expect },
-      LayoutTestItem { path: &[0, 0], expect },
-    ],
-  );
+  }
 }
+widget_layout_test!(
+  local_var_not_bind,
+  { path = [0], width == 10., height == 10. ,}
+  { path = [0, 0], width == 10., height == 10. ,}
+);
 
 #[test]
 
@@ -233,7 +223,7 @@ fn builtin_ref() {
     }
   };
 
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
 
   tap_at(&mut wnd, (1, 1));
@@ -262,14 +252,14 @@ fn builtin_bind_to_self() {
     }
   };
 
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
   tap_at(&mut wnd, (1, 1));
   wnd.draw_frame();
   assert_eq!(icon_track.get(), CursorIcon::Help);
 }
 
-fn tap_at(wnd: &mut Window, pos: (i32, i32)) {
+fn tap_at(wnd: &mut TestWindow, pos: (i32, i32)) {
   let device_id = unsafe { DeviceId::dummy() };
   let modifiers = ModifiersState::default();
 
@@ -310,7 +300,7 @@ fn builtin_method_support() {
     }
   };
 
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
 
   assert_eq!(&*layout_size.state_ref(), &Size::new(100., 100.));
@@ -325,7 +315,7 @@ fn fix_builtin_field_can_declare_as_widget() {
     }
   };
 
-  let wnd = default_mock_window(w);
+  let wnd = TestWindow::new(w);
   assert_eq!(wnd.widget_count(), 2);
 }
 
@@ -342,7 +332,7 @@ fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
     }
   };
 
-  let wnd = default_mock_window(w);
+  let wnd = TestWindow::new(w);
   assert_eq!(wnd.widget_count(), 2);
 }
 
@@ -377,7 +367,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
     }
   };
 
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
   {
     *trigger.state_ref() = true
@@ -396,9 +386,8 @@ fn fix_subscribe_cancel_after_widget_drop() {
   assert_eq!(*notify_cnt.state_ref(), 3);
 }
 
-#[test]
-fn fix_local_assign_tuple() {
-  let w = widget! {
+fn fix_local_assign_tuple() -> Widget {
+  widget! {
     Row {
       SizedBox {
         id: _sized,
@@ -411,17 +400,12 @@ fn fix_local_assign_tuple() {
         }
       }
     }
-  };
-
-  expect_layout_result(
-    w,
-    None,
-    &[LayoutTestItem {
-      path: &[0],
-      expect: ExpectRect::new(0., 0., 2., 1.),
-    }],
-  );
+  }
 }
+widget_layout_test!(
+  fix_local_assign_tuple,
+  rect == ribir_geom::rect(0., 0., 2., 1.),
+);
 
 #[test]
 fn fix_silent_not_relayout_dyn_widget() {
@@ -437,15 +421,15 @@ fn fix_silent_not_relayout_dyn_widget() {
     }
   };
 
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
+  assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
   {
     *trigger_size.state_ref().silent() = Size::new(100., 100.);
   }
   // after silent modified, dyn widget not rebuild.
   wnd.draw_frame();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
+  assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
 }
 
 #[test]
@@ -456,15 +440,15 @@ fn no_watch() {
     SizedBox { size: no_watch!(*size) }
   };
 
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
+  assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
 
   {
     *size.state_ref() = Size::new(100., 100.)
   }
   wnd.draw_frame();
-  assert_layout_result(&wnd, &[0], &ExpectRect::from_size(ZERO_SIZE));
+  assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
 }
 
 #[test]
@@ -515,7 +499,7 @@ fn untrack_prop_with_pure_lambda() {
     }
   };
 
-  let mut wnd = default_mock_window(w);
+  let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
 
   assert_eq!(*counter.state_ref(), 0);

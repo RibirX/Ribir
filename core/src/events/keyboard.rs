@@ -71,7 +71,7 @@ impl std::ops::DerefMut for KeyboardEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
   use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ElementState, KeyboardInput, WindowEvent};
 
@@ -117,7 +117,7 @@ mod tests {
     let w = Keys::default();
     let keys = w.0.clone();
 
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
     #[allow(deprecated)]

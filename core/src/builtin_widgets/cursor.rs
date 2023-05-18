@@ -90,7 +90,7 @@ impl Default for Cursor {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
   use winit::event::{DeviceId, WindowEvent};
 
   #[test]
@@ -112,11 +112,11 @@ mod tests {
       }
     };
 
-    let mut wnd = default_mock_window(row_tree);
+    let mut wnd = TestWindow::new(row_tree);
 
     wnd.draw_frame();
+    let wnd = &mut *wnd;
     let tree = &mut wnd.widget_tree;
-
     let device_id = unsafe { DeviceId::dummy() };
     let dispatcher = &mut wnd.dispatcher;
     dispatcher.dispatch(

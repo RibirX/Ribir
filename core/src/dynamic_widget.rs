@@ -494,7 +494,7 @@ mod tests {
   use std::{cell::RefCell, rc::Rc};
 
   use crate::{
-    builtin_widgets::key::KeyChange, impl_query_self_only, prelude::*, test::*,
+    builtin_widgets::key::KeyChange, impl_query_self_only, prelude::*, test_helper::*,
     widget_tree::WidgetTree,
   };
 
@@ -800,7 +800,7 @@ mod tests {
       }
     };
 
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     let mut removed = vec![];
 
     wnd.draw_frame();
@@ -907,7 +907,7 @@ mod tests {
       })
       }
     };
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
     let grandson_id = {

@@ -1,10 +1,10 @@
 # Dev helper
 
-This library provides macros to write tests and example for `Ribir`.
+This library provides macros to write tests for `Ribir`.
 
 ## Dependencies
  
-To use these macros add `paste` and `ribir_dev_helper` in `[dev-dependencies]` section of your `Cargo.toml`.
+To use these macros add `paste` and `ribir_dev_helper` in `[dev-dependencies]` section of your `Cargo.toml`. For the detail see the macros documents.
 
 ## Test case files
 

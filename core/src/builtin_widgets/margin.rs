@@ -129,30 +129,21 @@ impl std::ops::AddAssign for EdgeInsets {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn smoke() {
-    let widget = widget! {
+  fn smoke() -> Widget {
+    widget! {
       MockBox {
         margin: EdgeInsets::symmetrical(1., 1.),
         size: Size::new(100., 100.)
       }
-    };
-
-    expect_layout_result(
-      widget,
-      Some(Size::new(200., 200.)),
-      &[
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect::from_size(Size::new(102., 102.)),
-        },
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::new(1., 1.0, 100., 100.),
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    smoke,
+    wnd_size = Size::new(200., 200.),
+    { path = [0], width == 102., height == 102.,}
+    { path = [0, 0], rect == ribir_geom::rect(1., 1.0, 100., 100.),}
+  );
 }

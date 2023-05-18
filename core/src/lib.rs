@@ -70,4 +70,4 @@ pub mod prelude {
   pub use rxrust::prelude::*;
 }
 
-pub mod test;
+pub mod test_helper;

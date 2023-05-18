@@ -418,10 +418,10 @@ impl Default for BoxClamp {
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
-
   use super::*;
-  use crate::{impl_query_self_only, prelude::*, test::*};
+  use crate::{impl_query_self_only, prelude::*, test_helper::*};
+  use ribir_dev_helper::*;
+  use std::{cell::RefCell, rc::Rc};
 
   #[derive(Declare, Clone, SingleChild)]
   struct OffsetBox {
@@ -506,7 +506,7 @@ mod tests {
       }
     };
 
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
     assert_eq!([3, 2, 1], &**layout_order.state_ref());
     {
@@ -533,18 +533,24 @@ mod tests {
       }
     };
 
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_layout_result(&wnd, &[0, 0], &ExpectRect::new(50., 50., 50., 50.));
-    assert_layout_result(&wnd, &[0, 0, 0], &ExpectRect::new(0., 0., 0., 0.));
+    assert_layout_result_by_path!(
+      wnd,
+      { path = [0, 0], rect == ribir_geom::rect(50., 50., 50., 50.),}
+    );
+    assert_layout_result_by_path!(
+      wnd,
+      {path = [0, 0, 0], rect == ribir_geom::rect(0., 0., 0., 0.),}
+    );
 
     {
       *trigger.state_ref() = Size::new(10., 10.);
     }
 
     wnd.draw_frame();
-    assert_layout_result(&wnd, &[0, 0], &ExpectRect::new(50., 50., 50., 50.));
-    assert_layout_result(&wnd, &[0, 0, 0], &ExpectRect::new(0., 0., 10., 10.));
+    assert_layout_result_by_path!(wnd, {path = [0, 0], rect == ribir_geom::rect(50., 50., 50., 50.),});
+    assert_layout_result_by_path!(wnd, {path = [0, 0, 0], rect == ribir_geom::rect(0., 0., 10., 10.),});
   }
 
   #[test]
@@ -564,7 +570,7 @@ mod tests {
       }
     };
 
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
     assert_eq!(*cnt.borrow(), 1);
 
@@ -624,7 +630,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
     *trigger.state_ref() = Size::new(1., 1.);

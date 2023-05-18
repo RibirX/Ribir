@@ -53,7 +53,7 @@ impl std::ops::DerefMut for CharsEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
+  use crate::test_helper::*;
 
   use std::{cell::RefCell, rc::Rc};
   use winit::event::WindowEvent;
@@ -70,7 +70,7 @@ mod tests {
         on_chars: move |event| c_receive.borrow_mut().push_str(&event.chars)
       }
     };
-    let mut wnd = default_mock_window(widget);
+    let mut wnd = TestWindow::new(widget);
 
     let test_text_case = "Hello 世界！";
     wnd.draw_frame();

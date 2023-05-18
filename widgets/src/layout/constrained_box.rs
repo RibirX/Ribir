@@ -28,11 +28,11 @@ impl Query for ConstrainedBox {
 mod tests {
   use super::*;
   use crate::prelude::*;
-  use ribir_core::test::*;
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn outside_fixed_clamp() {
-    let w = widget! {
+  fn outside_fixed_clamp() -> Widget {
+    widget! {
       SizedBox {
         size: Size::new(50., 50.),
         ConstrainedBox {
@@ -40,22 +40,15 @@ mod tests {
           Void {}
         }
       }
-    };
-
-    expect_layout_result_with_theme(
-      w,
-      None,
-      FullTheme::default(),
-      &[LayoutTestItem {
-        path: &[0, 0, 0],
-        expect: ExpectRect::from_size(Size::new(50., 50.)),
-      }],
-    );
+    }
   }
+  widget_layout_test! (
+    outside_fixed_clamp,
+    {path =[0,0,0], width == 50., height == 50.,}
+  );
 
-  #[test]
-  fn expand_one_axis() {
-    let w = widget! {
+  fn expand_one_axis() -> Widget {
+    widget! {
       Container {
         size: Size::new(256., 50.),
         ConstrainedBox {
@@ -65,26 +58,15 @@ mod tests {
           }
         }
       }
-    };
-    expect_layout_result_with_theme(
-      w,
-      None,
-      FullTheme::default(),
-      &[LayoutTestItem {
-        path: &[0, 0],
-        expect: ExpectRect {
-          x: Some(0.),
-          y: Some(0.),
-          width: Some(256.),
-          height: Some(20.),
-        },
-      }],
-    );
+    }
   }
+  widget_layout_test!(
+    expand_one_axis,
+    { path = [0, 0], width==256., height == 20. ,}
+  );
 
-  #[test]
-  fn expand_both() {
-    let w = widget! {
+  fn expand_both() -> Widget {
+    widget! {
       Container {
         size: Size::new(256., 50.),
         ConstrainedBox {
@@ -94,20 +76,10 @@ mod tests {
           }
         }
       }
-    };
-    expect_layout_result_with_theme(
-      w,
-      None,
-      <_>::default(),
-      &[LayoutTestItem {
-        path: &[0, 0],
-        expect: ExpectRect {
-          x: Some(0.),
-          y: Some(0.),
-          width: Some(256.),
-          height: Some(50.),
-        },
-      }],
-    );
+    }
   }
+  widget_layout_test!(
+    expand_both,
+    { path = [0, 0], width == 256., height == 50.,}
+  );
 }

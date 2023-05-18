@@ -72,27 +72,21 @@ impl Query for Stack {
 #[cfg(test)]
 mod tests {
   use crate::prelude::*;
-  use ribir_core::test::*;
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
 
   use super::*;
-  #[test]
-  fn smoke() {
+  const FIVE: Size = Size::new(5., 5.);
+  fn smoke() -> Widget {
     let one = Size::new(1., 1.);
     let five = Size::new(5., 5.);
-    let w = widget! {
+    widget! {
       Stack {
         SizedBox { size: one}
         SizedBox { size: five}
       }
-    };
-
-    expect_layout_result(
-      w,
-      None,
-      &[LayoutTestItem {
-        path: &[0],
-        expect: ExpectRect::from_size(five),
-      }],
-    );
+    }
   }
+
+  widget_layout_test!(smoke, size == FIVE,);
 }

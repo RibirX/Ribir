@@ -37,13 +37,12 @@ impl Query for Expanded {
 mod tests {
   use super::*;
   use crate::prelude::*;
-  use ribir_core::test::*;
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn expaned_child_size_zero() {
+  fn expand_child_size_zero() -> Widget {
     let size = Size::new(100., 50.);
-
-    let widget = widget! {
+    widget! {
       Row {
         Expanded {
           flex: 1.,
@@ -55,28 +54,18 @@ mod tests {
           SizedBox { size: Size::new(0., 50.) }
         }
       }
-    };
-
-    expect_layout_result(
-      widget,
-      Some(Size::new(500., 500.)),
-      &[
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::from_size(Size::new(400., 50.)),
-        },
-        LayoutTestItem {
-          path: &[0, 2],
-          expect: ExpectRect::from_size(Size::new(0., 50.)),
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    expand_child_size_zero,
+    wnd_size = Size::new(500., 500.),
+    { path = [0, 0], width == 400., height == 50.,}
+    { path = [0, 2], width == 0., height == 50.,}
+  );
 
-  #[test]
-  fn one_line_expanded() {
+  fn one_line_expanded() -> Widget {
     let size = Size::new(100., 50.);
-    let widget = widget! {
+    widget! {
       Row {
         Expanded {
           flex: 1.,
@@ -89,40 +78,21 @@ mod tests {
           SizedBox { size }
         }
       }
-    };
-
-    expect_layout_result(
-      widget,
-      Some(Size::new(500., 500.)),
-      &[
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect::from_size(Size::new(500., 50.)),
-        },
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::from_size(size),
-        },
-        LayoutTestItem {
-          path: &[0, 1],
-          expect: ExpectRect::new(100., 0., size.width, size.height),
-        },
-        LayoutTestItem {
-          path: &[0, 2],
-          expect: ExpectRect::new(200., 0., size.width, size.height),
-        },
-        LayoutTestItem {
-          path: &[0, 3],
-          expect: ExpectRect::new(300., 0., 200., 50.),
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    one_line_expanded,
+    wnd_size = Size::new(500., 500.),
+    { path = [0], width == 500., height == 50.,}
+    { path = [0, 0], width == 100., height == 50., }
+    { path = [0, 1], rect == ribir_geom::rect(100., 0., 100., 50.),}
+    { path = [0, 2], rect == ribir_geom::rect(200., 0., 100., 50.),}
+    { path = [0, 3], rect == ribir_geom::rect(300., 0., 200., 50.),}
+  );
 
-  #[test]
-  fn wrap_expanded() {
+  fn wrap_expanded() -> Widget {
     let size = Size::new(100., 50.);
-    let row = widget! {
+    widget! {
       Row {
         wrap: true,
         Expanded {
@@ -142,45 +112,18 @@ mod tests {
           SizedBox { size, }
         }
       }
-    };
-
-    expect_layout_result(
-      row,
-      Some(Size::new(350., 500.)),
-      &[
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect::new(0., 0., 350., 100.),
-        },
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect::new(0., 0., 50., 50.),
-        },
-        LayoutTestItem {
-          path: &[0, 1],
-          expect: ExpectRect::new(50., 0., size.width, size.height),
-        },
-        LayoutTestItem {
-          path: &[0, 2],
-          expect: ExpectRect::new(150., 0., size.width, size.height),
-        },
-        LayoutTestItem {
-          path: &[0, 3],
-          expect: ExpectRect::new(250., 0., size.width, size.height),
-        },
-        LayoutTestItem {
-          path: &[0, 4],
-          expect: ExpectRect::new(0., 50., size.width, size.height),
-        },
-        LayoutTestItem {
-          path: &[0, 5],
-          expect: ExpectRect::new(100., 50., 50., 50.),
-        },
-        LayoutTestItem {
-          path: &[0, 6],
-          expect: ExpectRect::new(150., 50., 200., 50.),
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    wrap_expanded,
+    wnd_size = Size::new(350., 500.),
+    { path = [0], rect == ribir_geom::rect(0., 0., 350., 100.),}
+    { path = [0, 0], rect == ribir_geom::rect(0., 0., 50., 50.),}
+    { path = [0, 1], rect == ribir_geom::rect(50., 0., 100., 50.),}
+    { path = [0, 2], rect == ribir_geom::rect(150., 0., 100., 50.),}
+    { path = [0, 3], rect == ribir_geom::rect(250., 0., 100., 50.),}
+    { path = [0, 4], rect == ribir_geom::rect(0., 50., 100., 50.),}
+    { path = [0, 5], rect == ribir_geom::rect(100., 50., 50., 50.),}
+    { path = [0, 6], rect == ribir_geom::rect(150., 50., 200., 50.),}
+  );
 }

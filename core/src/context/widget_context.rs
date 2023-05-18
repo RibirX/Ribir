@@ -208,7 +208,7 @@ mod tests {
   use super::*;
   use crate::{
     prelude::*,
-    test::{default_mock_window, mock_window, MockBox},
+    test_helper::{MockBox, TestWindow},
     widget::WidgetTree,
   };
 
@@ -222,7 +222,7 @@ mod tests {
         margin: EdgeInsets::all(2.),
       }
     };
-    let mut wnd = default_mock_window(w);
+    let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
     let tree = &wnd.widget_tree;
@@ -249,7 +249,7 @@ mod tests {
       }
     };
 
-    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
+    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     let tree = &wnd.widget_tree;

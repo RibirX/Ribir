@@ -63,50 +63,26 @@ impl Padding {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::*;
-  #[test]
-  fn smoke() {
-    let widget = widget! {
+  use crate::test_helper::*;
+  use ribir_dev_helper::*;
+
+  fn smoke() -> Widget {
+    widget! {
       MockMulti {
         padding: EdgeInsets::only_left(1.),
         MockBox {
            size: Size::new(100., 100.),
         }
       }
-    };
-    expect_layout_result(
-      widget,
-      None,
-      &[
-        // padding widget
-        LayoutTestItem {
-          path: &[0],
-          expect: ExpectRect {
-            width: Some(101.),
-            height: Some(100.),
-            ..Default::default()
-          },
-        },
-        // MockMulti widget
-        LayoutTestItem {
-          path: &[0, 0],
-          expect: ExpectRect {
-            width: Some(101.),
-            height: Some(100.),
-            ..Default::default()
-          },
-        },
-        // MockBox
-        LayoutTestItem {
-          path: &[0, 0, 0],
-          expect: ExpectRect {
-            x: Some(1.),
-            y: Some(0.),
-            width: Some(100.),
-            height: Some(100.),
-          },
-        },
-      ],
-    );
+    }
   }
+  widget_layout_test!(
+    smoke,
+    // padding widget
+    { path = [0], width == 101., height == 100.,}
+    // MockMulti widget
+    { path = [0, 0], width == 101., height == 100., }
+    // MockBox
+    { path = [0, 0, 0], x == 1., width == 100., height == 100.,}
+  );
 }

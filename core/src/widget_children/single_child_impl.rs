@@ -102,7 +102,7 @@ where
 
 #[cfg(test)]
 mod tests {
-  use crate::test::MockBox;
+  use crate::test_helper::MockBox;
 
   use super::*;
 

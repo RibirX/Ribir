@@ -1,9 +1,9 @@
-use ribir::{core::test::default_mock_window, prelude::*};
+use ribir::{core::test_helper::*, prelude::*};
 use std::{cell::Cell, rc::Rc, time::Duration};
 use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
-fn wheel_widget(w: Widget) -> Window {
-  let mut wnd = default_mock_window(w);
+fn wheel_widget(w: Widget) -> TestWindow {
+  let mut wnd = TestWindow::new(w);
 
   wnd.draw_frame();
   let device_id = unsafe { DeviceId::dummy() };
