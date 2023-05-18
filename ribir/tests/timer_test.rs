@@ -162,8 +162,10 @@ mod test_single_thread {
 
 fn main() {
   use colored::Colorize;
+  use ribir_dev_helper::unit_test_describe;
+
   let _ = NEW_TIMER_FN.set(new_timer);
-  ribir_core::test::unit_test_describe! {
+  unit_test_describe! {
     run_unit_test(test_single_thread::test_widget_with_timer);
     run_unit_test(test_single_thread::test_double_tap);
     run_unit_test(test_single_thread::test_tripe_tap);
