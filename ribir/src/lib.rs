@@ -3,6 +3,7 @@ pub use ribir_core as core;
 pub use ribir_widgets as widgets;
 pub mod app;
 mod backends;
+pub mod clipboard;
 pub mod timer;
 mod winit_shell_wnd;
 #[cfg(feature = "material")]

@@ -1,8 +1,10 @@
-use super::{caret::Caret, glyphs_helper::GlyphsHelper, selected_text::SelectedText};
-use super::{CaretState, Placeholder};
-use crate::layout::{ConstrainedBox, Stack};
+use super::{caret::Caret, CaretState, Placeholder};
+use crate::input::TextSelectable;
+use crate::layout::{Stack, StackFit};
 use crate::prelude::Text;
 use ribir_core::prelude::*;
+use ribir_core::ticker::FrameMsg;
+use std::time::Duration;
 
 #[derive(Declare)]
 pub(crate) struct TextEditorArea {
@@ -17,80 +19,41 @@ impl ComposeChild for TextEditorArea {
   type Child = Option<Placeholder>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     widget! {
-      states {
-        this: this.into_writable(),
-        helper: Stateful::new(GlyphsHelper::default()),
-      }
-      init {
-        let layout_ready = Subject::default();
-        let mut layout_ready_emit = layout_ready.clone();
-      }
+    states {
+      this: this.into_writable(),
+    }
+    ScrollableWidget {
+      id: container,
+      scrollable: this.scroll_dir(),
+      padding: EdgeInsets::horizontal(1.),
+      on_key_down: move|key| this.key_handle(key, &selectable.helper),
+      on_chars: move|ch| this.edit_handle(ch),
 
-      ConstrainedBox {
-        id: outbox,
-        clamp: BoxClamp::EXPAND_BOTH,
-        on_key_down: move|key| this.key_handle(key, &helper),
-        on_chars: move|ch| this.edit_handle(ch),
-        on_pointer_move: move |e| {
-          if let CaretState::Selecting(begin, _) = this.caret {
-            if e.point_type == PointerType::Mouse
-              && e.mouse_buttons() == MouseButtons::PRIMARY {
-              let position = to_content_pos(&container, &e.position());
-              let cluster = helper.cluster_from_pos(position.x, position.y);
-              this.caret = CaretState::Selecting(begin, cluster as usize);
-            }
+      Stack {
+        fit: StackFit::Passthrough,
+        TextSelectable {
+          id: selectable,
+          caret: this.caret,
+          Text {
+            text: this.text.clone(),
+            text_style: this.style.clone(),
+            overflow: this.overflow(),
           }
-        },
-        on_performed_layout: move |_| layout_ready_emit.next(()),
-        on_pointer_down: move |e| {
-          let position = to_content_pos(&container, &e.position());
-          let cluster = helper.cluster_from_pos(position.x, position.y);
-          this.caret = CaretState::Selecting(cluster as usize, cluster as usize);
-        },
-        on_pointer_up: move |_| {
-          if let CaretState::Selecting(begin, end) = this.caret {
-            this.caret = if begin == end {
-             CaretState::Caret(begin)
-            } else {
-              CaretState::Select(begin, end)
-            };
+        }
+        Option::map(placeholder, |holder| widget! {
+          Text {
+            visible: this.text.is_empty(),
+            text: holder.0,
           }
-        },
-
-        ScrollableWidget {
-          id: container,
-          scrollable: this.scroll_dir(),
-          padding: EdgeInsets::horizontal(1.),
-          Stack {
-            SelectedText {
-              id: selected,
-              rects: vec![],
-            }
-            Text {
-              id: text,
-              text: this.text.clone(),
-              text_style: this.style.clone(),
-              overflow: this.overflow(),
-              on_performed_layout: move |ctx| {
-                let bound = ctx.layout_info().expect("layout info must exit in performed_layout").clamp;
-                helper.glyphs = Some(text.text_layout(
-                  ctx.wnd_ctx().typography_store(),
-                  bound,
-                ));
-              }
-            }
-            Option::map(placeholder, |holder| widget! {
-              Text {
-                visible: this.text.is_empty(),
-                text: holder.0,
-              }
-            })
-
+        })
+        IgnorePointer{
+          UnconstrainedBox {
+            dir: UnconstrainedDir::Both,
             Caret {
               id: caret,
               top_anchor: 0.,
               left_anchor: 0.,
-              focused: outbox.has_focus(),
+              focused: container.has_focus(),
               height: 0.,
               on_performed_layout: move |ctx| {
                 let size = ctx.layout_info().and_then(|info| info.size).unwrap();
@@ -100,28 +63,38 @@ impl ComposeChild for TextEditorArea {
           }
         }
       }
-      finally {
-        let_watch!(this.caret)
-          .distinct_until_changed()
-          .sample(layout_ready)
-          .subscribe(move |cursor| {
-            selected.rects = helper.selection(&cursor.select_range());
-            let (offset, height) = helper.cursor(cursor.offset());
-            caret.top_anchor = PositionUnit::Pixel(offset.y);
-            caret.left_anchor = PositionUnit::Pixel(offset.x);
-            caret.height = height;
-          });
-        let_watch!(Point::new(caret.left_anchor.abs_value(1.), caret.top_anchor.abs_value(1.)))
-          .scan_initial((Point::zero(), Point::zero()), |pair, v| (pair.1, v))
-          .distinct_until_changed()
-          .subscribe(move |(before, after)| {
-            let pos = auto_scroll_pos(&container, before, after, caret.layout_size());
-            container.silent().jump_to(pos);
-          });
+    }
+    finally ctx => {
+      let scheduler = ctx.wnd_ctx().frame_scheduler();
 
-        // let_watch!(this.caret).distinct_until_changed() will only be triggered after modify
-        // borrow mut from state_ref to manual triggered after init.
-        let _:&mut TextEditorArea = &mut this;
+      let_watch!(Point::new(caret.left_anchor.abs_value(1.), caret.top_anchor.abs_value(1.)))
+        .distinct_until_changed()
+        .scan_initial((Point::zero(), Point::zero()), |pair, v| (pair.1, v))
+        .subscribe(move |(before, after)| {
+          let pos = auto_scroll_pos(&container, before, after, caret.layout_size());
+          container.silent().jump_to(pos);
+        });
+
+      selectable.modifies()
+        .delay(Duration::ZERO, scheduler.clone())
+        .subscribe(move |_| {
+          if selectable.caret != this.caret {
+            this.silent().caret = selectable.caret.clone();
+          }
+        });
+
+      let tick_of_layout_ready = ctx.wnd_ctx()
+        .frame_tick_stream()
+        .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
+
+      selectable.modifies()
+        .sample(tick_of_layout_ready)
+        .subscribe(move |_| {
+          let (offset, height) = selectable.cursor_layout();
+          caret.top_anchor = PositionUnit::Pixel(offset.y);
+          caret.left_anchor = PositionUnit::Pixel(offset.x);
+          caret.height = height;
+        });
       }
     }
   }
@@ -170,8 +143,4 @@ fn auto_scroll_pos(container: &ScrollableWidget, before: Point, after: Point, si
     calc_offset(current.x, before.x, after.x, view_size.width, size.width),
     calc_offset(current.y, before.y, after.y, view_size.height, size.height),
   )
-}
-
-fn to_content_pos(container: &ScrollableWidget, view_position: &Point) -> Point {
-  *view_position - Size::from(container.scroll_pos.to_vector())
 }

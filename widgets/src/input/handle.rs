@@ -38,6 +38,9 @@ impl<'a> DerefMut for InputWriter<'a> {
 use super::{glyphs_helper::GlyphsHelper, TextEditorArea};
 impl TextEditorArea {
   pub(crate) fn edit_handle(&mut self, event: &mut CharsEvent) {
+    if event.common.with_command_key() {
+      return;
+    }
     let chars = event
       .chars
       .chars()
@@ -51,7 +54,36 @@ impl TextEditorArea {
     }
   }
 
-  pub(crate) fn key_handle(&mut self, key: &mut KeyboardEvent, helper: &GlyphsHelper) {
+  pub(crate) fn key_handle(&mut self, event: &mut KeyboardEvent, helper: &GlyphsHelper) {
+    let mut deal = false;
+    if event.common.with_command_key() {
+      deal = self.key_with_command(event, helper)
+    }
+
+    if deal {
+      return;
+    }
+    self.single_key(event, helper);
+  }
+
+  fn key_with_command(&mut self, event: &mut KeyboardEvent, _helper: &GlyphsHelper) -> bool {
+    if event.key == VirtualKeyCode::V && event.common.with_command_key() {
+      let clipboard = event.context().clipboard();
+      let txt = clipboard.borrow_mut().read_text();
+      if let Ok(txt) = txt {
+        let rg = self.caret.select_range();
+        let mut writer = InputWriter::new(self);
+        if !rg.is_empty() {
+          writer.delete_byte_range(&rg);
+        }
+        writer.insert_chars(&txt);
+      }
+      return true;
+    }
+    false
+  }
+
+  fn single_key(&mut self, key: &mut KeyboardEvent, helper: &GlyphsHelper) -> bool {
     match key.key {
       VirtualKeyCode::Left => {
         self.caret = helper.prev_cluster(self.caret.offset()).into();
@@ -88,5 +120,6 @@ impl TextEditorArea {
       }
       _ => (),
     };
+    true
   }
 }

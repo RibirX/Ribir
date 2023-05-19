@@ -34,7 +34,7 @@ impl<T: AsBytes> Storage<T> {
   }
 
   pub fn write_buffer(&mut self, device: &wgpu::Device, queue: &mut wgpu::Queue, data: &[T]) {
-    let buffer_size = (data.len() * size_of::<T>()) as wgpu::BufferAddress;
+    let buffer_size = (std::mem::size_of_val(data)) as wgpu::BufferAddress;
     if self.buffer.size() < buffer_size {
       (self.buffer, self.bind) = Self::new_bind(device, &self.layout, buffer_size);
     }
