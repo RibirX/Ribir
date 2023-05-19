@@ -241,7 +241,7 @@ impl Widget {
 mod tests {
   extern crate test;
   use crate::{
-    test::{layout_size_by_path, MockBox, MockMulti},
+    test::{default_mock_window, layout_size_by_path, mock_window, MockBox, MockMulti},
     widget::widget_id::dispose_nodes,
   };
 
@@ -348,7 +348,7 @@ mod tests {
         MockBox { size: *size }
       }
     };
-    let mut wnd = Window::default_mock(w, Some(Size::new(200., 200.)));
+    let mut wnd = mock_window(w, Size::new(200., 200.), <_>::default());
     wnd.draw_frame();
     let size = layout_size_by_path(&wnd, &[0, 0]);
     assert_eq!(size, expect_size);
@@ -377,7 +377,7 @@ mod tests {
       })
     };
 
-    let mut wnd = Window::default_mock(w, None);
+    let mut wnd = default_mock_window(w);
     wnd.draw_frame();
 
     {
@@ -399,7 +399,7 @@ mod tests {
       })
     };
 
-    let mut wnd = Window::default_mock(w, None);
+    let mut wnd = default_mock_window(w);
     wnd.draw_frame();
 
     {
@@ -522,7 +522,7 @@ mod tests {
     let shaper = TextShaper::new(font_db.clone());
     let store = TypographyStore::new(<_>::default(), font_db, shaper);
     let win_size = Size::new(150., 50.);
-    let mut painter = Painter::new(2., store, win_size);
+    let mut painter = Painter::new(Rect::from_size(win_size), store);
 
     let w1 = widget! {
        MockMulti {

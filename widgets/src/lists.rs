@@ -169,7 +169,7 @@ pub struct EdgeWidgetStyle {
   pub custom: EdgeItemStyle,
 }
 
-pub struct Poster(pub ShallowImage);
+pub struct Poster(pub ShareResource<PixelImage>);
 
 pub struct HeadlineText(pub Label);
 pub struct SupportingText(pub Label);
@@ -182,7 +182,7 @@ pub enum EdgeWidget<P: TmlFlag + Default + 'static> {
   Text(DecorateTml<P, State<Label>>),
   Icon(DecorateTml<P, NamedSvg>),
   Avatar(DecorateTml<P, ComposePair<State<Avatar>, AvatarTemplate>>),
-  Image(DecorateTml<P, ShallowImage>),
+  Image(DecorateTml<P, ShareResource<PixelImage>>),
   Poster(DecorateTml<P, Poster>),
   Custom(DecorateTml<P, Widget>),
 }
@@ -217,7 +217,7 @@ where
             states { label: label.into_readonly() }
             Text {
               text: label.0.clone(),
-              style: text.style.clone(),
+              text_style: text.style.clone(),
               foreground: text.foreground.clone(),
             }
           }))
@@ -334,7 +334,7 @@ impl ComposeChild for ListItem {
                   Text {
                     text: headline.0.0.clone(),
                     foreground: on_surface,
-                    style: headline_style.clone(),
+                    text_style: headline_style.clone(),
                   }
                   Option::map(supporting, |supporting| widget! {
                     states { supporting: supporting.into_readonly() }
@@ -343,7 +343,7 @@ impl ComposeChild for ListItem {
                       Text {
                         text: supporting.0.0.clone(),
                         foreground: on_surface_variant.clone(),
-                        style: supporting_style.clone(),
+                        text_style: supporting_style.clone(),
                       }
                     }
                   })

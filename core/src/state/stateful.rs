@@ -422,7 +422,7 @@ mod tests {
     });
 
     let state = sized_box.clone();
-    let mut wnd = Window::default_mock(sized_box.into_widget(), None);
+    let mut wnd = default_mock_window(sized_box);
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 0);
     assert!(!wnd.widget_tree.is_dirty());
@@ -439,7 +439,7 @@ mod tests {
 
   #[test]
   fn fix_pin_widget_node() {
-    let mut wnd = Window::default_mock(widget! { MockBox { size: Size::new(100., 100.) } }, None);
+    let mut wnd = default_mock_window(widget! { MockBox { size: Size::new(100., 100.) } });
     wnd.draw_frame();
     let tree = &wnd.widget_tree;
     assert_eq!(tree.root().descendants(&tree.arena).count(), 1);

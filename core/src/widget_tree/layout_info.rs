@@ -1,4 +1,4 @@
-use ribir_painter::ZERO_SIZE;
+use ribir_geom::ZERO_SIZE;
 
 use super::{widget_id::split_arena, DirtySet, WidgetId, WidgetTree};
 use crate::{
@@ -506,7 +506,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(w, None);
+    let mut wnd = default_mock_window(w);
     wnd.draw_frame();
     assert_eq!([3, 2, 1], &**layout_order.state_ref());
     {
@@ -533,7 +533,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(w, None);
+    let mut wnd = default_mock_window(w);
     wnd.draw_frame();
     assert_layout_result(&wnd, &[0, 0], &ExpectRect::new(50., 50., 50., 50.));
     assert_layout_result(&wnd, &[0, 0, 0], &ExpectRect::new(0., 0., 0., 0.));
@@ -564,7 +564,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(w, None);
+    let mut wnd = default_mock_window(w);
     wnd.draw_frame();
     assert_eq!(*cnt.borrow(), 1);
 
@@ -624,7 +624,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = Window::default_mock(w, None);
+    let mut wnd = default_mock_window(w);
     wnd.draw_frame();
 
     *trigger.state_ref() = Size::new(1., 1.);

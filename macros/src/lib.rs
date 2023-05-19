@@ -97,10 +97,10 @@ pub fn include_svg(input: TokenStream) -> TokenStream {
   let mut file = span.source_file().path();
   file.pop();
   file.push(w.value());
-  let encoded_bytes = ribir_painter::SvgPaths::open(file).and_then(|reader| reader.serialize());
+  let encoded_bytes = ribir_painter::Svg::open(file).and_then(|reader| reader.serialize());
   match encoded_bytes {
     Ok(data) => quote! {
-      SvgPaths::deserialize(#data).unwrap()
+      Svg::deserialize(#data).unwrap()
     }
     .into(),
     Err(err) => {

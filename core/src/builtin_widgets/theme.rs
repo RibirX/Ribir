@@ -1,10 +1,17 @@
 //! Theme use to share visual config or style compose logic. It can be defined
 //! to app-wide or particular part of the application.
 
-use std::{collections::HashMap, rc::Rc};
-
+use crate::{
+  declare::DeclareBuilder,
+  impl_query_self_only,
+  prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
+  state::State,
+};
 use ribir_algo::CowArc;
 pub use ribir_algo::ShareResource;
+use ribir_geom::Size;
+use std::{collections::HashMap, rc::Rc};
+
 mod palette;
 pub use palette::*;
 mod icon_theme;
@@ -18,27 +25,13 @@ pub use compose_decorators::*;
 mod custom_styles;
 pub use custom_styles::*;
 
-use crate::{
-  declare::DeclareBuilder,
-  impl_query_self_only,
-  prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
-  state::State,
-};
-
 pub use ribir_painter::*;
 pub use ribir_text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
-
-use super::SvgRender;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Brightness {
   Dark,
   Light,
-}
-#[derive(Clone, Debug, PartialEq)]
-pub struct TextSelectedBackground {
-  pub focus: Color,
-  pub blur: Color,
 }
 
 /// A full theme means all config have be defined in it. Everything of parent
@@ -64,7 +57,7 @@ pub struct InheritTheme {
   /// icon size standard
   pub icon_size: Option<IconSize>,
   /// a collection of icons.
-  pub icons: Option<HashMap<NamedSvg, ShareResource<SvgRender>, ahash::RandomState>>,
+  pub icons: Option<HashMap<NamedSvg, ShareResource<Svg>, ahash::RandomState>>,
   pub transitions_theme: Option<TransitionTheme>,
   pub compose_decorators: Option<ComposeDecorators>,
   pub custom_styles: Option<CustomStyles>,
@@ -166,7 +159,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(57.0.into()),
         letter_space: Some(Pixel(0.0.into())),
         font_face: regular_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -176,7 +168,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(45.0.into()),
         letter_space: Some(Pixel(0.0.into())),
         font_face: regular_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -186,7 +177,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(36.0.into()),
         letter_space: Some(Pixel(0.0.into())),
         font_face: regular_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -196,7 +186,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(32.0.into()),
         letter_space: Some(Pixel(0.0.into())),
         font_face: regular_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -206,7 +195,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(28.0.into()),
         letter_space: Some(Pixel(0.0.into())),
         font_face: regular_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -216,7 +204,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(24.0.into()),
         letter_space: Some(Pixel(0.0.into())),
         font_face: regular_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -226,7 +213,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(22.0.into()),
         letter_space: Some(Pixel(0.0.into())),
         font_face: medium_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -236,7 +222,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(16.0.into()),
         letter_space: Some(Pixel(0.15.into())),
         font_face: medium_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -246,7 +231,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(14.0.into()),
         letter_space: Some(Pixel(0.1.into())),
         font_face: medium_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -256,7 +240,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(14.0.into()),
         letter_space: Some(Pixel(0.1.into())),
         font_face: medium_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -266,7 +249,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(12.0.into()),
         letter_space: Some(Pixel(0.5.into())),
         font_face: medium_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -276,7 +258,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(11.0.into()),
         letter_space: Some(Pixel(0.5.into())),
         font_face: medium_face,
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -286,7 +267,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(16.0.into()),
         letter_space: Some(Pixel(0.5.into())),
         font_face: regular_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -296,7 +276,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(14.0.into()),
         letter_space: Some(Pixel(0.25.into())),
         font_face: regular_face.clone(),
-        path_style: PathStyle::Fill,
       }),
       decoration: decoration.clone(),
     },
@@ -306,7 +285,6 @@ fn typography_theme(
         font_size: FontSize::Pixel(12.0.into()),
         letter_space: Some(Pixel(0.4.into())),
         font_face: regular_face,
-        path_style: PathStyle::Fill,
       }),
       decoration,
     },

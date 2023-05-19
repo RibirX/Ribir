@@ -13,35 +13,20 @@ repository = "https://github.com/RibirX/Ribir/gpu"
 version.workspace = true
 
 [dependencies]
+ahash = "0.8.3"
 futures = {workspace = true, optional = true}
 guillotiere.workspace = true
-lyon_tessellation.workspace = true
-raw-window-handle = {workspace = true, optional = true}
+log.workspace = true
 rayon.workspace = true
 ribir_algo = {path = "../algo", version = "0.0.0"}
-ribir_painter = {path = "../painter", version = "0.0.0"}
-ribir_text = {path = "../text", version = "0.0.0"}
+ribir_geom = {path = "../geom", version = "0.0.0"}
+ribir_painter = {path = "../painter", features = ["tessellation"], version = "0.0.0"}
+slab = "0.4.8"
 wgpu = {workspace = true, optional = true}
 zerocopy.workspace = true
 
 [dev-dependencies]
-colored.workspace = true
-env_logger.workspace = true
-futures.workspace = true
-image.workspace = true
-ribir = {path = "../ribir", version = "*"}
-winit.workspace = true
+ribir_painter = {path = "../painter", features = ["tessellation", "png"], version = "0.0.0"}
 
 [features]
-test_gpu = []
-ui_window = []
-wgpu_gl = ["wgpu", "raw-window-handle", "futures"]
-
-[[example]]
-name = "wgpu-hello"
-required-features = ["wgpu_gl"]
-
-[[test]]
-harness = false
-name = "main_thread"
-path = "src/tests/main_threads.rs"
+wgpu = ["dep:wgpu", "futures"]

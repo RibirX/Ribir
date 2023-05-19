@@ -341,7 +341,7 @@ mod tests {
       .modifies()
       .subscribe(move |_| *c_cnt.borrow_mut() += 1);
 
-    let _ = Window::default_mock(A.with_child(child).into_widget(), None);
+    let _ = default_mock_window(A.with_child(child));
     assert_eq!(*cnt.borrow(), 0);
   }
 

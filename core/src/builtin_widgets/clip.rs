@@ -20,7 +20,7 @@ impl Render for Clip {
     let child_size = ctx.assert_perform_single_child_layout(clamp);
     match self.clip {
       ClipType::Auto => child_size,
-      ClipType::Path(ref path) => path.box_rect().max().to_tuple().into(),
+      ClipType::Path(ref path) => path.bounds().max().to_tuple().into(),
     }
   }
 
@@ -33,7 +33,7 @@ impl Render for Clip {
             .expect("impossible without size in painting stage")
             .size,
         );
-        Path::rect(&rect, PathStyle::Fill)
+        Path::rect(&rect)
       }
       ClipType::Path(path) => path.clone(),
     };

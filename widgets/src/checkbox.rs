@@ -76,14 +76,14 @@ impl Checkbox {
     }
   }
 
-  fn label(label: &State<Label>, label_color: Brush, style: CowArc<TextStyle>) -> Widget {
+  fn label(label: &State<Label>, label_color: Brush, text_style: CowArc<TextStyle>) -> Widget {
     let label = label.clone();
     widget! {
       states { label: label.into_readonly() }
       Text {
         text: label.0.clone(),
         foreground: label_color,
-        style,
+        text_style,
       }
     }
   }

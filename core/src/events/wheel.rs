@@ -53,7 +53,7 @@ impl std::ops::DerefMut for WheelEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::MockBox;
+  use crate::test::{mock_window, MockBox};
   use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
@@ -70,10 +70,11 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(widget, Some(Size::new(100., 100.)));
+    let mut wnd = mock_window(widget, Size::new(100., 100.), <_>::default());
 
     wnd.draw_frame();
     let device_id = unsafe { DeviceId::dummy() };
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,
       delta: MouseScrollDelta::PixelDelta((1.0, 1.0).into()),

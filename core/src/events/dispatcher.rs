@@ -438,10 +438,11 @@ mod tests {
       event_record.clone(),
       widget! { MockMulti { DynWidget  { dyns: record } } },
     );
-    let mut wnd = Window::default_mock(root, None);
+    let mut wnd = default_mock_window(root);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (1., 1.).into(),
@@ -455,6 +456,7 @@ mod tests {
       records.clear();
     }
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
@@ -475,10 +477,11 @@ mod tests {
       event_record.clone(),
       widget! { MockBox { size: Size::new(100., 30.) } },
     );
-    let mut wnd = Window::default_mock(root, None);
+    let mut wnd = default_mock_window(root);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
@@ -486,6 +489,7 @@ mod tests {
       modifiers: ModifiersState::default(),
     });
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
@@ -493,12 +497,14 @@ mod tests {
       modifiers: ModifiersState::default(),
     });
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (1, 1).into(),
       modifiers: ModifiersState::default(),
     });
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Released,
@@ -506,6 +512,7 @@ mod tests {
       modifiers: ModifiersState::default(),
     });
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Released,
@@ -533,10 +540,11 @@ mod tests {
       event_record.clone(),
       widget! { MockBox { size: Size::new(100., 30.) } },
     );
-    let mut wnd = Window::default_mock(root, None);
+    let mut wnd = default_mock_window(root);
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
@@ -552,6 +560,7 @@ mod tests {
       (&mut id as *mut DeviceId).write_bytes(1, 1);
       id
     };
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: device_id_2,
       state: ElementState::Pressed,
@@ -559,6 +568,7 @@ mod tests {
       modifiers: ModifiersState::default(),
     });
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: device_id_2,
       state: ElementState::Released,
@@ -567,6 +577,7 @@ mod tests {
     });
     assert_eq!(event_record.borrow().len(), 1);
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id: device_id_2,
       position: (1, 1).into(),
@@ -578,6 +589,7 @@ mod tests {
     assert_eq!(event_record.borrow().len(), 2);
     assert_eq!(event_record.borrow()[1].btns, MouseButtons::PRIMARY);
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Released,
@@ -615,9 +627,10 @@ mod tests {
     let root = EventRecord::default();
     let event_record = root.0.clone();
 
-    let mut wnd = Window::default_mock(root.into_widget(), Some(Size::new(100., 100.)));
+    let mut wnd = mock_window(root, Size::new(100., 100.), <_>::default());
     wnd.draw_frame();
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id: unsafe { DeviceId::dummy() },
       state: ElementState::Pressed,
@@ -659,11 +672,12 @@ mod tests {
     let enter_event = w.enter.clone();
     let leave_event = w.leave.clone();
 
-    let mut wnd = Window::default_mock(w.into_widget(), Some(Size::new(100., 100.)));
+    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (10, 10).into(),
@@ -672,6 +686,7 @@ mod tests {
     assert_eq!(&*enter_event.borrow(), &[2, 1]);
 
     // leave to parent
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (99, 99).into(),
@@ -681,6 +696,7 @@ mod tests {
 
     // move in same widget,
     // check if duplicate event fired.
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (99, 99).into(),
@@ -690,6 +706,7 @@ mod tests {
     assert_eq!(&*leave_event.borrow(), &[1]);
 
     // leave all
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (999, 999).into(),
@@ -700,11 +717,13 @@ mod tests {
 
     // leave event trigger by window left.
     leave_event.borrow_mut().clear();
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (10, 10).into(),
       modifiers: ModifiersState::default(),
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorLeft { device_id });
     assert_eq!(&*leave_event.borrow(), &[1, 2]);
   }
@@ -725,23 +744,26 @@ mod tests {
     };
 
     // Stretch row
-    let mut wnd = Window::default_mock(w, Some(Size::new(400., 400.)));
+    let mut wnd = mock_window(w, Size::new(400., 400.), <_>::default());
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
     let modifiers = ModifiersState::default();
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (50f64, 50f64).into(),
       modifiers,
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
       button: MouseButton::Left,
       modifiers,
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Released,
@@ -755,22 +777,26 @@ mod tests {
       *clicked = 0;
     }
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (50f64, 50f64).into(),
       modifiers,
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
       button: MouseButton::Left,
       modifiers,
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (50f64, 150f64).into(),
       modifiers,
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Released,
@@ -797,16 +823,18 @@ mod tests {
         }
       }
     };
-    let mut wnd = Window::default_mock(w, Some(Size::new(100., 100.)));
+    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
     let modifiers = ModifiersState::default();
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (45f64, 45f64).into(),
       modifiers,
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
@@ -817,17 +845,20 @@ mod tests {
     // point down on a focus widget
     assert!(wnd.dispatcher.focusing().is_some());
 
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Released,
       button: MouseButton::Left,
       modifiers,
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (80f64, 80f64).into(),
       modifiers,
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
@@ -841,7 +872,7 @@ mod tests {
   #[test]
   fn fix_hit_out_window() {
     let w = MockBox { size: INFINITY_SIZE };
-    let mut wnd = Window::default_mock(w.into_widget(), None);
+    let mut wnd = default_mock_window(w);
     wnd.draw_frame();
     wnd.dispatcher.info.cursor_pos = Point::new(-1., -1.);
     let hit = wnd.dispatcher.hit_widget(&wnd.widget_tree);
@@ -884,7 +915,7 @@ mod tests {
         }
       };
 
-      let mut wnd = Window::default_mock(w.into_widget(), Some(Size::new(500., 500.)));
+      let mut wnd = mock_window(w, Size::new(500., 500.), <_>::default());
       wnd.draw_frame();
       wnd.dispatcher.info.cursor_pos = Point::new(125., 125.);
       let hit_2 = wnd.dispatcher.hit_widget(&wnd.widget_tree);

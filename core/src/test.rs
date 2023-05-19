@@ -1,4 +1,10 @@
-use crate::{impl_query_self_only, prelude::*};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use crate::{
+  impl_query_self_only,
+  prelude::*,
+  window::{ShellWindow, WindowId},
+};
 
 #[derive(Default, Clone, Copy)]
 pub struct ExpectRect {
@@ -12,6 +18,67 @@ pub struct LayoutTestItem<'a> {
   pub expect: ExpectRect,
 }
 
+pub struct MockShellWindow {
+  pub size: Size,
+  pub cursor: Option<CursorIcon>,
+  pub id: WindowId,
+}
+
+impl ShellWindow for MockShellWindow {
+  fn inner_size(&self) -> Size { self.size }
+
+  fn outer_size(&self) -> Size { self.size }
+
+  fn set_size(&mut self, size: Size) { self.size = size; }
+
+  fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
+
+  fn set_title(&mut self, _: &str) {}
+
+  fn set_ime_pos(&mut self, _: Point) {}
+
+  fn as_any(&self) -> &dyn Any { self }
+
+  fn as_any_mut(&mut self) -> &mut dyn Any { self }
+
+  fn begin_frame(&mut self) {}
+
+  fn draw_commands(&mut self, _: Rect, _: Vec<PaintCommand>, _: Color) {}
+
+  fn end_frame(&mut self) {}
+
+  fn id(&self) -> WindowId { self.id }
+
+  fn device_pixel_ratio(&self) -> f32 { 1. }
+}
+impl MockShellWindow {
+  fn new(size: Option<Size>) -> Self {
+    static ID: AtomicU64 = AtomicU64::new(0);
+    let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
+    MockShellWindow {
+      size,
+      cursor: None,
+      id: ID.fetch_add(1, Ordering::Relaxed).into(),
+    }
+  }
+}
+
+pub fn default_mock_window<M: ImplMarker>(root: impl IntoWidget<M>) -> Window {
+  Window::new(
+    root.into_widget(),
+    Box::new(MockShellWindow::new(None)),
+    <_>::default(),
+  )
+}
+
+pub fn mock_window<M: ImplMarker>(root: impl IntoWidget<M>, size: Size, ctx: AppContext) -> Window {
+  Window::new(
+    root.into_widget(),
+    Box::new(MockShellWindow::new(Some(size))),
+    ctx,
+  )
+}
+
 pub fn expect_layout_result_with_theme(
   w: Widget,
   wnd_size: Option<Size>,
@@ -22,7 +89,7 @@ pub fn expect_layout_result_with_theme(
     app_theme: std::rc::Rc::new(theme),
     ..<_>::default()
   };
-  let mut wnd = Window::mock_window(w, wnd_size.unwrap_or_else(|| Size::new(1024., 1024.)), ctx);
+  let mut wnd = Window::new(w, Box::new(MockShellWindow::new(wnd_size)), ctx);
   wnd.draw_frame();
   items.iter().for_each(|LayoutTestItem { path, expect }| {
     assert_layout_result(&wnd, path, expect);
@@ -30,7 +97,7 @@ pub fn expect_layout_result_with_theme(
 }
 
 pub fn expect_layout_result(w: Widget, wnd_size: Option<Size>, items: &[LayoutTestItem]) {
-  let mut wnd = Window::default_mock(w, wnd_size);
+  let mut wnd = Window::new(w, Box::new(MockShellWindow::new(wnd_size)), <_>::default());
   wnd.draw_frame();
   items.iter().for_each(|LayoutTestItem { path, expect }| {
     assert_layout_result(&wnd, path, expect);
@@ -253,7 +320,7 @@ pub macro unit_test_describe($(run_unit_test($name: path);)* ) {{
 
   let count = count!($($name)*);
 
-  println!("running {} tests", count);
+  println!("running {} test", count);
   let mut res  = Result::Ok(());
   // catch panic and continue execute unit tests.
   $(
@@ -285,7 +352,6 @@ pub macro unit_test_describe($(run_unit_test($name: path);)* ) {{
     infos.iter().for_each(|info| println!("{}", info))
   }
 
-  println!("");
 
   if let Result::Err(err) = res {
     std::panic::resume_unwind(err);

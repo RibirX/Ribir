@@ -353,8 +353,18 @@ fn build_input_area(
   suffix: Option<TrailingText>,
   placeholder: Option<Placeholder>,
 ) -> Widget {
+  fn text_label(text: CowArc<str>, theme: StateRef<TextFieldThemeProxy>) -> Text {
+    Text {
+      text,
+      foreground: theme.foreground.clone(),
+      text_style: theme.text.clone(),
+      path_style: PathPaintStyle::Fill,
+      overflow: Overflow::Clip,
+    }
+  }
+
   widget! {
-    states { this: this.clone_stateful(), theme: theme.clone_stateful(), }
+    states { this: this.clone_stateful(), theme: theme.clone_stateful() }
     init ctx => {
       let linear = transitions::LINEAR.of(ctx);
       let prefix = prefix.map(move |p| p.child);
@@ -363,14 +373,7 @@ fn build_input_area(
     Row {
       id: input_area,
       visible: !this.text.is_empty() || theme.state == TextFieldState::Focused,
-      Option::map(prefix.clone(), move |text| {
-        Text {
-          text,
-          foreground: theme.foreground.clone(),
-          style: theme.text.clone(),
-          overflow: Overflow::Clip
-        }
-      })
+      Option::map(prefix.clone(), move |text| text_label(text, theme))
       Expanded {
         flex: 1.,
         Input {
@@ -379,18 +382,11 @@ fn build_input_area(
           widget::from(placeholder)
         }
       }
-      Option::map(suffix.clone(),  move |text| {
-        Text {
-          text,
-          foreground: theme.foreground.clone(),
-          style: theme.text.clone(),
-          overflow: Overflow::Clip
-        }
-      })
+      Option::map(suffix.clone(),   move |text| text_label(text, theme))
 
     }
     transition prop!(input_area.visible, move |_from, to, rate| *to && rate >= 1.) {
-        by: linear,
+      by: linear,
     }
 
     finally {
@@ -431,14 +427,14 @@ impl Compose for TextFieldLabel {
         id: label,
         v_align: VAlign::Top,
         text: this.text.clone(),
-        style: this.style.clone(),
+        text_style: this.style.clone(),
       }
 
       // todo: prop with inner field's property
       // transition prop!(label.style.font_size) {
       //   by: transitions::LINEAR.of(ctx)
       // }
-      transition prop!(label.style, move |from, to, rate| {
+      transition prop!(label.text_style, move |from, to, rate| {
         let from_size = from.font_size.into_pixel();
         let to_size = to.font_size.into_pixel();
 

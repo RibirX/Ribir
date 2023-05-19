@@ -1,9 +1,9 @@
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
-use lyon_path::math::{Point, Transform};
+use lyon_path::math::Point;
 use ribir_algo::FrameCache;
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use crate::{FontFace, FontFamily};
 /// A wrapper of fontdb and cache font data.
@@ -266,21 +266,17 @@ impl Face {
 
   pub fn as_rb_face(&self) -> &rustybuzz::Face { &self.rb_face }
 
+  // todo: should return its tight bounds
   pub fn outline_glyph(&self, glyph_id: GlyphId) -> Option<lyon_path::Path> {
     let mut builder = GlyphOutlineBuilder::default();
     self
       .rb_face
       .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder)?;
-
-    // By default, outlie glyphs is an mirror.
-    let units_per_em = self.units_per_em() as f32;
-    let mirror =
-      Transform::scale(1. / units_per_em, -1. / units_per_em).then_translate((0., 1.).into());
-    Some(builder.into_path().transformed(&mirror))
+    Some(builder.into_path())
   }
 
   #[inline]
-  pub fn units_per_em(&self) -> i32 { self.rb_face.units_per_em() }
+  pub fn units_per_em(&self) -> u16 { self.rb_face.deref().units_per_em() }
 }
 
 fn to_db_family(f: &FontFamily) -> Family {
@@ -381,7 +377,7 @@ fn get_or_insert_face<'a>(
   data_base: &'a Database,
   id: ID,
 ) -> &'a Option<Face> {
-  cache.get_or_insert_with(&id, || {
+  cache.get_or_insert_with(id, || {
     data_base.face_source(id).and_then(|(src, face_index)| {
       let source_data = match src {
         fontdb::Source::Binary(data) => Some(data),

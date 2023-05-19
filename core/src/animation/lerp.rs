@@ -1,8 +1,6 @@
-use ribir_painter::Transform;
-
 use crate::prelude::{
   Angle, Box2D, Brush, Color, DevicePoint, DeviceRect, DeviceSize, DeviceVector, Point, Radius,
-  Rect, Size, Vector,
+  Rect, Size, Transform, Vector,
 };
 
 /// Linearly interpolate between two value.
@@ -112,7 +110,7 @@ macro_rules! impl_lerp_for_device_geom {
       impl Lerp for $ty {
         #[inline]
         fn lerp(&self, to: &Self, factor: f32) -> Self{
-          self.to_f32().lerp(to.to_f32(), factor).to_u32()
+          self.to_f32().lerp(to.to_f32(), factor).to_i32()
         }
       }
     )*

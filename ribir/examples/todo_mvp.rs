@@ -18,16 +18,14 @@ impl Compose for TodoMVP {
       states { this: this.into_writable(), id_gen: Stateful::new(this.state_ref().tasks.len()) }
       init ctx => {
         let surface_variant = Palette::of(ctx).surface_variant();
-        let style = TypographyTheme::of(ctx).display_large.text.clone();
-        let surface: Brush = Palette::of(ctx).surface().clone().into();
+        let text_style = TypographyTheme::of(ctx).display_large.text.clone();
       }
       Column {
         padding: EdgeInsets::all(10.),
-        background: surface.clone(),
         Text {
           margin: EdgeInsets::only_bottom(10.),
           text: "Todo",
-          style,
+          text_style,
         }
         Row {
           Container {
@@ -182,12 +180,9 @@ fn main() {
     ],
   };
 
-  let mut theme = FullTheme::default();
-  ribir_widgets::widget_theme_init(&mut theme);
-  let app = Application::new(theme);
-  let wnd = Window::builder(todo.into_widget())
-    .with_inner_size(Size::new(400., 640.))
-    .with_title("todo")
-    .build(&app);
-  app::run_with_window(app, wnd);
+  let mut app = App::new(material::purple::light());
+  app
+    .new_window(todo.into_widget(), Some(Size::new(400., 640.)))
+    .set_title("todo");
+  app.exec()
 }

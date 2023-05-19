@@ -1,4 +1,4 @@
-use ribir::prelude::{include_svg, SvgPaths};
+use ribir::prelude::{include_svg, Svg};
 
 #[test]
 fn compile_msg() {
@@ -9,6 +9,6 @@ fn compile_msg() {
 
 #[test]
 fn include_svg() {
-  let svg: SvgPaths = include_svg!("./assets/test1.svg");
+  let svg: Svg = include_svg!("./assets/test1.svg");
   assert_eq!(svg.paths.len(), 2);
 }

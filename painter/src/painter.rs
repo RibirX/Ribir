@@ -1,14 +1,13 @@
-use crate::{
-  path::*, Angle, Brush, Color, DeviceSize, PathStyle, Point, Rect, Size, TextStyle, Transform,
-  Vector,
+use crate::{path::*, path_builder::PathBuilder, Brush, Color, PixelImage, TextStyle};
+use euclid::{num::Zero, Size2D, Vector2D};
+use ribir_algo::{ShareResource, Substr};
+use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
+use ribir_text::{
+  typography::{Overflow, PlaceLineDirection, TypographyCfg},
+  Em, FontFace, FontSize, Pixel, TypographyStore, VisualGlyphs,
 };
-use euclid::Size2D;
-pub use lyon_tessellation::{LineCap, LineJoin};
-use ribir_algo::{Resource, Substr};
-use ribir_text::typography::{Overflow, PlaceLineDirection, TypographyCfg};
-use ribir_text::FontSize;
-use ribir_text::{Em, FontFace, Glyph, Pixel, TypographyStore, VisualGlyphs};
-use std::error::Error;
+use serde::{Deserialize, Serialize};
+
 use std::ops::{Deref, DerefMut};
 
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
@@ -17,61 +16,81 @@ use std::ops::{Deref, DerefMut};
 /// bottom edge of the canvas.
 // #[derive(Default, Debug, Clone)]
 pub struct Painter {
-  size: Size,
+  bounds: Rect,
   state_stack: Vec<PainterState>,
   commands: Vec<PaintCommand>,
-  path_builder: Builder,
-  device_scale: f32,
+  path_builder: PathBuilder,
   typography_store: TypographyStore,
 }
 
-pub type CaptureCallback<'a> =
-  Box<dyn for<'r> FnOnce(DeviceSize, Box<dyn Iterator<Item = &[u8]> + 'r>) + 'a>;
-/// `PainterBackend` use to draw the picture what the `commands` described  to
-/// the target device. Usually is implemented by graphic library.
+/// `PainterBackend` use to draw textures for every frame, All `draw_commands`
+/// will called between `begin_frame` and `end_frame`
+///
+/// -- begin_frame()
+///
+///  +--> draw_commands --+
+///  ^                    V
+///  +----------<---------+
+///                       
+///
+///
+/// -+ end_frame()
+///                       
 pub trait PainterBackend {
-  /// Submit the paint commands to draw
-  fn submit(&mut self, commands: Vec<PaintCommand>);
+  type Texture;
 
-  fn commands_to_image(
+  fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing);
+
+  /// A frame start.
+  fn begin_frame(&mut self);
+
+  /// Paint `commands` to the `output` Texture.
+  /// This may be called more than once during a frame.
+  fn draw_commands(
     &mut self,
+    viewport: DeviceRect,
     commands: Vec<PaintCommand>,
-    capture: CaptureCallback,
-  ) -> Result<(), Box<dyn Error>>;
+    surface: Color,
+    output: &mut Self::Texture,
+  );
 
-  fn resize(&mut self, size: DeviceSize);
+  /// A frame end.
+  fn end_frame(&mut self);
 }
 
-#[derive(Clone)]
-pub enum PaintPath {
-  Path(Resource<Path>),
-  Text {
-    font_size: FontSize,
-    glyphs: Vec<Glyph<Pixel>>,
-    style: PathStyle,
-  },
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AntiAliasing {
+  None = 1,
+  Msaa2X = 2,
+  Msaa4X = 4,
+  Msaa8X = 8,
+  Msaa16X = 16,
 }
 
-// todo: need a way to batch commands as a single resource. so we can cache
-// their vertexes as a whole. useful for svg, animation and paint layers.
-#[derive(Clone)]
-pub struct PaintInstruct {
-  pub opacity: f32,
-  pub path: PaintPath,
-  pub transform: Transform,
-  pub brush: Brush,
-}
-
-#[derive(Clone)]
-pub struct ClipInstruct {
-  pub path: PaintPath,
+/// A path and its geometry information are friendly to paint and cache.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaintPath {
+  /// The path to painting, and its axis is relative to the `bounds`.
+  pub path: Path,
+  /// The bounds after path applied transform.
+  pub paint_bounds: Rect,
+  // The transform need to apply to the path.
   pub transform: Transform,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PaintCommand {
-  Paint(PaintInstruct),
-  PushClip(ClipInstruct),
+  ColorPath {
+    path: PaintPath,
+    color: Color,
+  },
+  ImgPath {
+    path: PaintPath,
+    img: ShareResource<PixelImage>,
+    opacity: f32,
+  },
+  // Todo: keep rectangle clip.
+  Clip(PaintPath),
   PopClip,
 }
 
@@ -86,21 +105,23 @@ struct PainterState {
   text_line_height: Option<Em>,
   transform: Transform,
   opacity: f32,
-  clip_cnt: u32,
-  visiual_rect: Option<Rect>,
+  clip_cnt: usize,
+
+  /// The bounds without transform.
+  bounds: Rect,
 }
 
 impl PainterState {
-  fn new(size: Size) -> PainterState {
+  fn new(bounds: Rect) -> PainterState {
     PainterState {
-      visiual_rect: Some(Rect::new(Point::zero(), size)),
+      bounds,
       stroke_options: <_>::default(),
       font_size: FontSize::Pixel(14.0.into()),
       letter_space: None,
       brush: Color::BLACK.into(),
       font_face: FontFace::default(),
       text_line_height: None,
-      transform: Transform::new(1., 0., 0., 1., 0., 0.),
+      transform: Transform::identity(),
       clip_cnt: 0,
       opacity: 1.,
     }
@@ -108,33 +129,33 @@ impl PainterState {
 }
 
 impl Painter {
-  pub fn new(device_scale: f32, typography_store: TypographyStore, size: Size) -> Self {
-    let size = Size::new(size.width * device_scale, size.height * device_scale);
-    let mut p = Self {
-      device_scale,
-      state_stack: vec![PainterState::new(size)],
+  pub fn new(bounds: Rect, typography_store: TypographyStore) -> Self {
+    Self {
+      state_stack: vec![PainterState::new(bounds)],
       commands: vec![],
       path_builder: Path::builder(),
       typography_store,
-      size,
-    };
-    p.scale(device_scale, device_scale);
-    p
+      bounds,
+    }
   }
 
-  pub fn resize(&mut self, logic_size: Size) {
-    self.size = Size::new(
-      logic_size.width * self.device_scale,
-      logic_size.height * self.device_scale,
-    );
+  /// Change the bounds of the painter can draw.But it won't take effect until
+  /// the next time you call [`Painter::reset`]!.
+  pub fn set_bounds(&mut self, bounds: Rect) { self.bounds = bounds; }
+
+  pub fn rect_in_paint_bounds(&self, rect: &Rect) -> bool {
+    let rect = self.get_transform().outer_transformed_rect(rect);
+    rect.intersects(&self.paint_bounds().to_f32().cast_unit())
   }
 
-  pub fn visual_rect(&self) -> Option<Rect> { self.current_state().visiual_rect }
+  pub fn paint_bounds(&self) -> &Rect { &self.current_state().bounds }
 
   #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
-    self.reset(None);
-    self.commands.drain(..).collect()
+    self.fill_all_pop_clips();
+    let commands = self.commands.clone();
+    self.commands.clear();
+    commands
   }
 
   /// Saves the entire state and return a guard to auto restore the state when
@@ -160,21 +181,15 @@ impl Painter {
   pub fn restore(&mut self) {
     let clip_cnt = self.current_state().clip_cnt;
     self.state_stack.pop();
-
-    (self.current_state().clip_cnt..clip_cnt)
-      .for_each(|_| self.commands.push(PaintCommand::PopClip));
+    self.push_n_pop_cmd(clip_cnt - self.current_state().clip_cnt);
   }
 
-  pub fn reset(&mut self, device_scale: Option<f32>) {
-    if let Some(scale) = device_scale {
-      self.device_scale = scale;
-    }
+  pub fn reset(&mut self) {
+    self.fill_all_pop_clips();
+    self.commands.clear();
     self.state_stack.clear();
-    self.state_stack.push(PainterState::new(self.size));
-    self.scale(self.device_scale, self.device_scale);
+    self.state_stack.push(PainterState::new(self.bounds));
   }
-
-  pub fn device_scale(&self) -> f32 { self.device_scale }
 
   /// Returns the color, gradient, or pattern used for draw. Only `Color`
   /// support now.
@@ -195,14 +210,20 @@ impl Painter {
 
   pub fn alpha(&self) -> f32 { self.current_state().opacity }
 
+  #[inline]
+  pub fn set_strokes(&mut self, strokes: StrokeOptions) -> &mut Self {
+    self.current_state_mut().stroke_options = strokes;
+    self
+  }
+
   /// Return the line width of the stroke pen.
   #[inline]
-  pub fn get_line_width(&self) -> f32 { self.stroke_options().line_width }
+  pub fn get_line_width(&self) -> f32 { self.stroke_options().width }
 
   /// Set the line width of the stroke pen with `line_width`
   #[inline]
   pub fn set_line_width(&mut self, line_width: f32) -> &mut Self {
-    self.current_state_mut().stroke_options.line_width = line_width;
+    self.current_state_mut().stroke_options.width = line_width;
     self
   }
 
@@ -216,26 +237,12 @@ impl Painter {
   }
 
   #[inline]
-  pub fn get_start_line_cap(&self) -> LineCap { self.stroke_options().start_cap }
-
-  #[inline]
-  pub fn set_start_line_cap(&mut self, start_cap: LineCap) -> &mut Self {
-    self.current_state_mut().stroke_options.start_cap = start_cap;
-    self
-  }
-
-  #[inline]
-  pub fn get_end_line_cap(&self) -> LineCap { self.stroke_options().end_cap }
-
-  #[inline]
-  pub fn set_end_line_cap(&mut self, end_cap: LineCap) -> &mut Self {
-    self.current_state_mut().stroke_options.end_cap = end_cap;
-    self
-  }
+  pub fn get_line_cap(&mut self) -> LineCap { self.stroke_options().line_cap }
 
   #[inline]
   pub fn set_line_cap(&mut self, line_cap: LineCap) -> &mut Self {
-    self.set_start_line_cap(line_cap).set_end_line_cap(line_cap)
+    self.current_state_mut().stroke_options.line_cap = line_cap;
+    self
   }
 
   #[inline]
@@ -256,11 +263,34 @@ impl Painter {
   }
 
   #[inline]
+  pub fn get_letter_space(&mut self) -> Pixel {
+    self
+      .current_state()
+      .letter_space
+      .unwrap_or_else(Pixel::zero)
+  }
+
+  #[inline]
+  pub fn set_letter_space(&mut self, letter_space: Pixel) -> &mut Self {
+    self.current_state_mut().letter_space = Some(letter_space);
+    self
+  }
+
+  #[inline]
   pub fn get_font(&self) -> &FontFace { &self.current_state().font_face }
 
   #[inline]
   pub fn set_font(&mut self, font: FontFace) -> &mut Self {
     self.current_state_mut().font_face = font;
+    self
+  }
+
+  #[inline]
+  pub fn get_font_size(&self) -> &FontSize { &self.current_state().font_size }
+
+  #[inline]
+  pub fn set_font_size(&mut self, font_size: FontSize) -> &mut Self {
+    self.current_state_mut().font_size = font_size;
     self
   }
 
@@ -277,146 +307,65 @@ impl Painter {
     self
   }
 
-  /// Multiplies the current transformation with the matrix. This lets you
-  /// scale, rotate, translate (move), and skew the context.
+  /// Apply this matrix to all subsequent paint commands。
   pub fn apply_transform(&mut self, transform: &Transform) -> &mut Self {
-    let t = &mut self.current_state_mut().transform;
-    *t = t.then(transform);
+    let t = transform.then(self.get_transform());
+    self.set_transform(t);
     self
   }
 
-  pub fn clip<P: Into<Resource<Path>>>(&mut self, path: P) -> &mut Self {
-    let transform = self.current_state().transform;
-    let path: Resource<Path> = path.into();
-    let path_rect = transform.outer_transformed_rect(&path.box_rect());
-    self.current_state_mut().visiual_rect = self
-      .current_state()
-      .visiual_rect
-      .and_then(|rc| rc.intersection(&path_rect));
-    self.commands.push(PaintCommand::PushClip(ClipInstruct {
-      path: PaintPath::Path(path),
-      transform,
-    }));
+  pub fn clip(&mut self, path: Path) -> &mut Self {
+    let paint_path = PaintPath::new(path, *self.get_transform());
 
+    self.current_state_mut().bounds = self
+      .current_state()
+      .bounds
+      .intersection(&paint_path.paint_bounds)
+      .unwrap_or(Rect::zero());
+
+    self.commands.push(PaintCommand::Clip(paint_path));
     self.current_state_mut().clip_cnt += 1;
     self
   }
 
-  /// Paint a path with its style.
-  pub fn paint_path<P: Into<Resource<Path>>>(&mut self, path: P) -> &mut Self {
-    let transform = self.current_state().transform;
-    let alpha = self.alpha();
-    let brush = self.current_state().brush.clone();
-    self.commands.push(PaintCommand::Paint(PaintInstruct {
-      opacity: alpha,
-      path: PaintPath::Path(path.into()),
-      transform,
-      brush,
-    }));
+  /// Fill a path with its style.
+  pub fn fill_path(&mut self, p: Path) -> &mut Self {
+    let ts = *self.get_transform();
+    let path = PaintPath::new(p, ts);
+    if !path.paint_bounds.is_empty() && path.paint_bounds.intersects(self.paint_bounds()) {
+      let opacity = self.alpha();
+      let cmd = match self.current_state().brush.clone() {
+        Brush::Color(color) => PaintCommand::ColorPath {
+          path,
+          color: color.apply_alpha(opacity),
+        },
+        Brush::Image(img) => PaintCommand::ImgPath { path, img, opacity },
+        Brush::Gradient => todo!(),
+      };
+      self.commands.push(cmd);
+    }
+
+    self
+  }
+
+  /// Fill a path with its style.
+  pub fn stroke_path(&mut self, path: Path) -> &mut Self {
+    if let Some(stroke_path) = path.stroke(self.stroke_options(), Some(self.get_transform())) {
+      self.fill_path(stroke_path);
+    }
     self
   }
 
   /// Strokes (outlines) the current path with the current brush and line width.
   pub fn stroke(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    let path = builder.stroke(self.stroke_options());
-    self.paint_path(path);
-    self
+    self.stroke_path(builder.build())
   }
 
   /// Fill the current path with current brush.
   pub fn fill(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    let path = builder.fill();
-    self.paint_path(path);
-    self
-  }
-
-  /// Paint text with its style
-  pub fn paint_text_with_style<T: Into<Substr>>(
-    &mut self,
-    text: T,
-    style: &TextStyle,
-    foreground: Brush,
-    bounds: Option<Size>,
-    overflow: Overflow,
-  ) -> &mut Self {
-    let transform = self.current_state().transform;
-
-    let Some(view_rc) = self
-      .visual_rect()
-      .zip(transform.inverse())
-      .map(|(rc, trans)| trans.outer_transformed_rect(&rc))
-      else { return self; };
-
-    let visual_glyphs: VisualGlyphs =
-      typography_with_text_style(&self.typography_store, text, style, bounds, overflow);
-    self.commands.push(PaintCommand::Paint(PaintInstruct {
-      path: PaintPath::Text {
-        font_size: style.font_size,
-        glyphs: visual_glyphs.pixel_glyphs_in_rect(view_rc).collect(),
-        style: style.path_style,
-      },
-      opacity: self.alpha(),
-      brush: foreground,
-      transform,
-    }));
-
-    self
-  }
-
-  /// Paint text without specify text style. The text style will come from the
-  /// current state of this painter. Draw from left to right, start at let top
-  /// position, use [`translate`](Painter::translate) move to the
-  /// position what you want.
-  pub fn paint_text_without_style<T: Into<Substr>>(
-    &mut self,
-    text: T,
-    path_style: PathStyle,
-    bounds: Option<Size>,
-    overflow: Overflow,
-  ) -> &mut Self {
-    let &PainterState {
-      font_size,
-      letter_space,
-      ref brush,
-      ref font_face,
-      text_line_height,
-      transform,
-      ..
-    } = self.current_state();
-
-    let Some(view_rc) = self.visual_rect()
-      .zip(transform.inverse())
-      .map(|(rc, trans)| trans.outer_transformed_rect(&rc))
-      else { return self; };
-
-    let visual_glyphs = typography_with_text_style(
-      &self.typography_store,
-      text,
-      &TextStyle {
-        font_size,
-        font_face: font_face.clone(),
-        letter_space,
-        path_style,
-        line_height: text_line_height,
-      },
-      bounds,
-      overflow,
-    );
-
-    let cmd = PaintCommand::Paint(PaintInstruct {
-      opacity: self.alpha(),
-      path: PaintPath::Text {
-        font_size,
-        glyphs: visual_glyphs.pixel_glyphs_in_rect(view_rc).collect(),
-        style: path_style,
-      },
-      transform,
-      brush: brush.clone(),
-    });
-    self.commands.push(cmd);
-    self
+    self.fill_path(builder.build())
   }
 
   /// Stroke `text` from left to right, start at let top position, use
@@ -425,13 +374,14 @@ impl Painter {
   /// `font_size` to specify the font and font size. Use
   /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
   /// fill complex text.
-  pub fn stroke_text<T: Into<Substr>>(&mut self, text: T, overflow: Overflow) -> &mut Self {
-    self.paint_text_without_style(
-      text,
-      PathStyle::Stroke(self.stroke_options()),
-      None,
-      overflow,
-    )
+  pub fn stroke_text<T: Into<Substr>>(
+    &mut self,
+    text: T,
+    bounds: Option<Size>,
+    overflow: Overflow,
+  ) -> &mut Self {
+    self.paint_text_command(text, true, bounds, overflow);
+    self
   }
 
   /// Fill `text` from left to right, start at let top position, use
@@ -446,7 +396,8 @@ impl Painter {
     bounds: Option<Size>,
     overflow: Overflow,
   ) -> &mut Self {
-    self.paint_text_without_style(text, PathStyle::Fill, bounds, overflow)
+    self.paint_text_command(text, false, bounds, overflow);
+    self
   }
 
   /// Adds a translation transformation to the current matrix by moving the
@@ -478,12 +429,8 @@ impl Painter {
   }
 
   /// Tell the painter the sub-path is finished.
-  /// if `close` is true,  causes the point of the pen to move back to the start
-  /// of the current sub-path. It tries to draw a straight line from the
-  /// current point to the start. If the shape has already been closed or has
-  /// only one point, nothing to do.
   #[inline]
-  pub fn close_path(&mut self, close: bool) -> &mut Self {
+  pub fn end_path(&mut self, close: bool) -> &mut Self {
     self.path_builder.end_path(close);
     self
   }
@@ -545,22 +492,6 @@ impl Painter {
     self
   }
 
-  #[inline]
-  pub fn segment(&mut self, from: Point, to: Point) -> &mut Self {
-    self.path_builder.segment(from, to);
-    self
-  }
-
-  /// Adds a sub-path containing an ellipse.
-  ///
-  /// There must be no sub-path in progress when this method is called.
-  /// No sub-path is in progress after the method is called.
-  #[inline]
-  pub fn ellipse(&mut self, center: Point, radius: Vector, rotation: f32) -> &mut Self {
-    self.path_builder.ellipse(center, radius, rotation);
-    self
-  }
-
   /// Adds a sub-path containing a rectangle.
   ///
   /// There must be no sub-path in progress when this method is called.
@@ -605,7 +536,87 @@ impl Painter {
       .expect("Must have one state in stack!")
   }
 
-  fn stroke_options(&self) -> StrokeOptions { self.current_state().stroke_options }
+  fn stroke_options(&self) -> &StrokeOptions { &self.current_state().stroke_options }
+
+  fn paint_text_command<T: Into<Substr>>(
+    &mut self,
+    text: T,
+    stroke: bool,
+    bounds: Option<Size>,
+    overflow: Overflow,
+  ) {
+    let &PainterState {
+      font_size,
+      letter_space,
+      ref font_face,
+      text_line_height,
+      ..
+    } = self.current_state();
+    let visual_glyphs = typography_with_text_style(
+      &self.typography_store,
+      text,
+      &TextStyle {
+        font_size,
+        font_face: font_face.clone(),
+        letter_space,
+        line_height: text_line_height,
+      },
+      bounds,
+      overflow,
+    );
+
+    visual_glyphs.pixel_glyphs().for_each(|g| {
+      let path = {
+        // todo: font db should load face when setup theme.
+        let mut font_db = self.typography_store.font_db().write().unwrap();
+        let face = font_db.face_data_or_insert(g.face_id);
+
+        face.and_then(|face| {
+          face.outline_glyph(g.glyph_id).map(|p| {
+            let unit = face.units_per_em();
+            (unit as f32, Path::from(p))
+          })
+        })
+      };
+
+      if let Some((unit, path)) = path {
+        let font_size = font_size.into_pixel().value();
+
+        // todo: path transform should applied in font face
+        let scale = font_size / unit;
+        let ts = Transform::scale(1., -1.)
+          .then_translate((0., unit).into())
+          .then_scale(scale, scale)
+          .then_translate(Vector2D::new(g.x_offset.value(), g.y_offset.value()));
+        let path = path.transform(&ts);
+
+        // todo: glyph path as resource.
+        if stroke {
+          self.stroke_path(path);
+        } else {
+          self.fill_path(path);
+        }
+      } else {
+        // todo: image or svg fallback
+      }
+    });
+  }
+
+  fn push_n_pop_cmd(&mut self, n: usize) {
+    for _ in 0..n {
+      if matches!(self.commands.last(), Some(PaintCommand::Clip(_))) {
+        self.commands.pop();
+      } else {
+        self.commands.push(PaintCommand::PopClip)
+      }
+    }
+  }
+
+  fn fill_all_pop_clips(&mut self) {
+    let clip_cnt = self.current_state().clip_cnt;
+    self.state_stack.iter_mut().for_each(|s| s.clip_cnt = 0);
+    self.push_n_pop_cmd(clip_cnt);
+  }
 }
 
 /// An RAII implementation of a "scoped state" of the render layer. When this
@@ -672,92 +683,80 @@ pub fn typography_with_text_style<T: Into<Substr>>(
   )
 }
 
-impl PaintInstruct {
-  pub fn style(&self) -> PathStyle {
-    match &self.path {
-      PaintPath::Path(p) => p.style,
-      PaintPath::Text { style, .. } => *style,
-    }
+impl PaintPath {
+  pub fn new(path: Path, transform: Transform) -> Self {
+    let paint_bounds = transform.outer_transformed_rect(path.bounds());
+    PaintPath { path, transform, paint_bounds }
+  }
+
+  pub fn scale(&mut self, scale: f32) {
+    self.transform = self.transform.then_scale(scale, scale);
+    self.paint_bounds = self.paint_bounds.scale(scale, scale);
   }
 }
 
 #[cfg(test)]
 mod test {
+  use super::*;
+  use ribir_geom::rect;
   use ribir_text::shaper::TextShaper;
 
-  use super::*;
-
-  fn new_painter(size: Size) -> Painter {
+  fn painter() -> Painter {
     Painter::new(
-      1.,
+      Rect::from_size(Size::new(512., 512.)),
       TypographyStore::new(
         <_>::default(),
         <_>::default(),
         TextShaper::new(<_>::default()),
       ),
-      size,
     )
   }
 
   #[test]
   fn save_guard() {
-    let mut layer = new_painter(Size::new(512., 512.));
+    let mut painter = painter();
     {
-      let mut paint = layer.save_guard();
+      let mut guard = painter.save_guard();
       let t = Transform::new(1., 1., 1., 1., 1., 1.);
-      paint.set_transform(t);
-      assert_eq!(&t, paint.get_transform());
+      guard.set_transform(t);
+      assert_eq!(&t, guard.get_transform());
       {
-        let mut p2 = paint.save_guard();
+        let mut p2 = guard.save_guard();
         let t2 = Transform::new(2., 2., 2., 2., 2., 2.);
         p2.set_transform(t2);
         assert_eq!(&t2, p2.get_transform());
       }
-      assert_eq!(&t, paint.get_transform());
+      assert_eq!(&t, guard.get_transform());
     }
     assert_eq!(
       &Transform::new(1., 0., 0., 1., 0., 0.),
-      layer.get_transform()
+      painter.get_transform()
     );
   }
 
-  fn collect_paint_glyphs(cmds: Vec<PaintCommand>) -> Vec<Glyph<Pixel>> {
-    let mut all = vec![];
-    for cmd in cmds {
-      if let PaintCommand::Paint(p) = cmd {
-        if let PaintPath::Text { glyphs, .. } = p.path {
-          all.extend(glyphs.into_iter())
-        }
-      }
-    }
-    all
-  }
   #[test]
-  fn paint_text_with_clip() {
-    let mut painter = new_painter(Size::new(100., 100.));
-    let bound_size = Size::new(20., 20.);
+  fn fix_clip_pop_without_restore() {
+    let mut painter = painter();
+    let commands = painter
+      .save()
+      .clip(Path::rect(&rect(0., 0., 100., 100.)))
+      .rect(&rect(0., 0., 10., 10.))
+      .fill()
+      .save()
+      .clip(Path::rect(&rect(0., 0., 50., 50.)))
+      .rect(&rect(0., 0., 10., 10.))
+      .fill()
+      .finish();
 
-    // paint long text
-    painter.fill_text(
-      "11111111111111111111111111111111111",
-      Some(bound_size),
-      Overflow::Clip,
-    );
-    let cmds1 = painter.finish();
+    assert_eq!(painter.current_state().clip_cnt, 0);
 
-    // paint shot text
-    painter.fill_text("1111", Some(bound_size), Overflow::Clip);
-    let cmds2 = painter.finish();
-
-    // the two text all will be clip to same glyph
-    assert_eq!(cmds1.len(), cmds2.len());
-    let glyphs1 = collect_paint_glyphs(cmds1);
-    let glyphs2 = collect_paint_glyphs(cmds2);
-    assert_eq!(glyphs1, glyphs2);
-
-    // the last glyph is partially out of bounds
-    let glyph = glyphs1.last().unwrap();
-    assert!((glyph.x_offset).value() < bound_size.width);
-    assert!(bound_size.width < (glyph.x_offset + glyph.x_advance).value());
+    assert!(matches!(
+      commands[commands.len() - 1],
+      PaintCommand::PopClip
+    ));
+    assert!(matches!(
+      commands[commands.len() - 2],
+      PaintCommand::PopClip
+    ));
   }
 }

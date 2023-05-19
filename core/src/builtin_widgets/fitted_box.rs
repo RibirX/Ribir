@@ -63,7 +63,7 @@ impl Render for FittedBox {
       .size;
 
     if child_size.greater_than(size).any() {
-      let path = Path::rect(&Rect::from(rect.size), PathStyle::Fill);
+      let path = Path::rect(&Rect::from(rect.size));
       ctx.painter().clip(path);
     }
 

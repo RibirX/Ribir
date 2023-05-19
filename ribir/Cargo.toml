@@ -13,17 +13,29 @@ repository = "https://github.com/RibirX/Ribir/ribir"
 version.workspace = true
 
 [dependencies]
-lyon_algorithms.workspace = true
-lyon_path.workspace = true
-ribir_core = {path = "../core", version = "0.0.0", features = ["png"]}
+once_cell.workspace = true
+ribir_core = {path = "../core", version = "0.0.0"}
 ribir_gpu = {path = "../gpu", version = "0.0.0"}
-ribir_widgets = {path = "../widgets", version = "0.0.0"}
+ribir_material = {path = "../themes/material", version = "0.0.0", optional = true}
+ribir_widgets = {path = "../widgets", version = "0.0.0", optional = true}
+rxrust.workspace = true
+wgpu = {workspace = true, optional = true}
+winit.workspace = true
 
 [dev-dependencies]
+colored.workspace = true
 env_logger.workspace = true
-image.workspace = true
+futures.workspace = true
 ribir_material = {path = "../themes/material", version = "0.0.0"}
 
 [features]
-default = ["wgpu_gl"]
-wgpu_gl = ["ribir_gpu/wgpu_gl"]
+default = ["wgpu", "widgets", "material"]
+material = ["ribir_material"]
+png = ["ribir_core/png"]
+wgpu = ["ribir_gpu/wgpu", "dep:wgpu"]
+widgets = ["ribir_widgets"]
+
+[[test]]
+harness = false
+name = "single_thread"
+path = "tests/single_thread.rs"

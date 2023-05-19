@@ -1,12 +1,13 @@
-use ribir::prelude::*;
+use ribir::{core::test::default_mock_window, prelude::*};
 use std::{cell::Cell, rc::Rc, time::Duration};
 use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
 fn wheel_widget(w: Widget) -> Window {
-  let mut wnd = Window::default_mock(w, None);
+  let mut wnd = default_mock_window(w);
 
   wnd.draw_frame();
   let device_id = unsafe { DeviceId::dummy() };
+  #[allow(deprecated)]
   wnd.processes_native_event(WindowEvent::MouseWheel {
     device_id,
     delta: MouseScrollDelta::LineDelta(1.0, 1.0),

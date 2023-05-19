@@ -1,11 +1,6 @@
 pub(crate) use crate::widget_tree::*;
-use crate::{
-  context::*,
-  prelude::ComposeChild,
-  state::{State, Stateful},
-};
+use crate::{context::*, prelude::*};
 use ribir_algo::ShareResource;
-use ribir_painter::*;
 use rxrust::subscription::{BoxSubscription, SubscriptionGuard};
 
 #[doc(hidden)]
@@ -53,7 +48,7 @@ pub trait Render: Query {
   /// widget size, and child nodes' size not affect its size.
   fn only_sized_by_parent(&self) -> bool { false }
 
-  /// deprecated, todo: auto filter unnecessary paint in lower layer.
+  /// todo: remove it, only use clip to control overflow.
   /// Hint if a render maybe paint over its layout boundary.
   fn can_overflow(&self) -> bool { false }
 

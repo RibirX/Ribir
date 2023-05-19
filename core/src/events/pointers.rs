@@ -337,7 +337,7 @@ impl ComposeChild for TapListener {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test::{MockBox, MockMulti};
+  use crate::test::{mock_window, MockBox, MockMulti};
   use std::{cell::RefCell, rc::Rc};
   use winit::{
     dpi::LogicalPosition,
@@ -347,17 +347,20 @@ mod tests {
   fn tap_on(wnd: &mut Window, x: f32, y: f32) {
     let device_id = unsafe { DeviceId::dummy() };
     let logical = LogicalPosition::new(x, y);
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
-      position: logical.to_physical(wnd.raw_window.scale_factor()),
+      position: logical.to_physical(1.),
       modifiers: ModifiersState::default(),
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Released,
@@ -392,8 +395,7 @@ mod tests {
           .subscribe(move |v| *is_focused1.borrow_mut() = v);
       }
     };
-
-    let mut wnd = Window::mock_window(w, Size::new(100., 100.), <_>::default());
+    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
     wnd.draw_frame();
 
     tap_on(&mut wnd, 25., 25.);

@@ -107,7 +107,7 @@ impl ScrollableWidget {
 
 #[cfg(test)]
 mod tests {
-  use crate::test::{layout_position_by_path, MockBox};
+  use crate::test::{layout_position_by_path, mock_window, MockBox};
 
   use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
@@ -120,11 +120,12 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(w, Some(Size::new(100., 100.)));
+    let mut wnd = mock_window(w, Size::new(100., 100.), <_>::default());
 
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
+    #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,
       delta: MouseScrollDelta::PixelDelta((delta_x, delta_y).into()),

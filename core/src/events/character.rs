@@ -70,10 +70,11 @@ mod tests {
         on_chars: move |event| c_receive.borrow_mut().push_str(&event.chars)
       }
     };
-    let mut wnd = Window::default_mock(widget.into_widget(), None);
+    let mut wnd = default_mock_window(widget);
 
     let test_text_case = "Hello 世界！";
     wnd.draw_frame();
+    #[allow(deprecated)]
     test_text_case
       .chars()
       .for_each(|c| wnd.processes_native_event(WindowEvent::ReceivedCharacter(c)));

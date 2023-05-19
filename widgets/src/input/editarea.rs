@@ -69,7 +69,7 @@ impl ComposeChild for TextEditorArea {
             Text {
               id: text,
               text: this.text.clone(),
-              style: this.style.clone(),
+              text_style: this.style.clone(),
               overflow: this.overflow(),
               on_performed_layout: move |ctx| {
                 let bound = ctx.layout_info().expect("layout info must exit in performed_layout").clamp;

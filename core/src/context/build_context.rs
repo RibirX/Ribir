@@ -61,7 +61,7 @@ mod tests {
       }
     };
     // should panic when construct widget tree
-    Window::default_mock(w, None);
+    default_mock_window(w);
   }
 
   #[test]
@@ -107,7 +107,7 @@ mod tests {
       }
     };
 
-    let mut wnd = Window::default_mock(light_dark, None);
+    let mut wnd = default_mock_window(light_dark);
     wnd.layout();
     let themes = themes.state_ref();
     assert_eq!(themes.len(), 3);

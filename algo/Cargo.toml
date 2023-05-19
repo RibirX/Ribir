@@ -16,3 +16,4 @@ version.workspace = true
 ahash.workspace = true
 log.workspace = true
 rayon.workspace = true
+serde = {workspace = true, features = ["derive"]}

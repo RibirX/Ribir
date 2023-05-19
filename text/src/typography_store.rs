@@ -148,6 +148,8 @@ impl TypographyStore {
     }
   }
 
+  pub fn font_db(&mut self) -> &Arc<RwLock<FontDB>> { &self.font_db }
+
   fn get_from_cache(
     &self,
     text: Substr,

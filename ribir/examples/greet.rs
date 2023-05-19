@@ -35,13 +35,13 @@ fn main() {
                   let ease_in = transitions::EASE_IN.of(ctx);
                 }
                 Row {
-                  Text { text: "Hello ", style: style.clone() }
+                  Text { text: "Hello ", text_style: style.clone() }
                   Text {
                     id: greet,
                     text: no_watch!(input.text()),
-                    style: style.clone()
+                    text_style: style.clone()
                   }
-                  Text { text: "!" , style }
+                  Text { text: "!" , text_style: style }
                 }
                 Animate {
                   id: greet_new,
@@ -65,5 +65,5 @@ fn main() {
     }
   };
 
-  app::run(hi);
+  App::run(hi);
 }
