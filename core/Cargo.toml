@@ -29,6 +29,7 @@ ribir_geom = {path = "../geom", version = "0.0.0"}
 rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
+arboard = "3.2.0"
 
 [dev-dependencies]
 colored.workspace = true

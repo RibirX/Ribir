@@ -12,6 +12,7 @@ mod state;
 pub(crate) mod widget_tree;
 
 pub mod assign_observable;
+pub mod clipboard;
 pub mod declare;
 mod decorator;
 pub mod dynamic_widget;
@@ -57,14 +58,14 @@ pub mod prelude {
   pub use crate::widget_tree::{BoxClamp, LayoutInfo, Layouter, WidgetId};
   #[doc(no_inline)]
   pub use crate::window::Window;
-  #[doc(no_inline)]
-  pub use ::ribir_painter::*;
   pub use log;
   #[doc(no_inline)]
   pub use ribir_algo::CowArc;
   pub use ribir_geom::*;
   #[doc(no_inline)]
   pub use ribir_macros::{include_svg, widget, Declare, Lerp, MultiChild, SingleChild, Template};
+  #[doc(no_inline)]
+  pub use ribir_painter::*;
   #[doc(hidden)]
   pub use rxrust::prelude::*;
 }

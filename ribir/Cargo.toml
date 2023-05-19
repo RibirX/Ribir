@@ -21,6 +21,7 @@ ribir_widgets = {path = "../widgets", version = "0.0.0", optional = true}
 rxrust.workspace = true
 wgpu = {workspace = true, optional = true}
 winit.workspace = true
+arboard = "3.2.0"
 
 [dev-dependencies]
 colored.workspace = true

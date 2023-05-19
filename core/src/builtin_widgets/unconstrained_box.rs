@@ -7,6 +7,9 @@ use crate::prelude::*;
 pub struct UnconstrainedBox {
   #[declare(default)]
   pub dir: UnconstrainedDir,
+
+  #[declare(default)]
+  pub clamp_dim: ClampDim,
 }
 
 /// Enum to describe which axis will imposes no constraints on its child, use by
@@ -19,20 +22,48 @@ pub enum UnconstrainedDir {
   Both,
 }
 
+bitflags! {
+  /// Enum to describe which box clamp dim will imposes no constraints on its
+  /// child, use by `UnConstrainedBox`.
+  ///
+  #[derive(Clone, Copy, Eq, PartialEq)]
+  pub struct ClampDim: u8 {
+    const MIN_SIZE = 0x01;
+    const MAX_SIZE = 0x02;
+    const Both = Self::MIN_SIZE.bits() | Self::MAX_SIZE.bits();
+  }
+}
+
+impl Default for ClampDim {
+  fn default() -> Self { ClampDim::Both }
+}
+
 impl Render for UnconstrainedBox {
   #[inline]
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    match self.dir {
-      UnconstrainedDir::X => {
-        clamp.min.width = 0.;
-        clamp.max.width = f32::INFINITY;
-      }
-      UnconstrainedDir::Y => {
-        clamp.min.height = 0.;
-        clamp.max.height = f32::INFINITY;
-      }
-      UnconstrainedDir::Both => clamp = clamp.expand().loose(),
-    };
+    if self.clamp_dim.contains(ClampDim::MIN_SIZE) {
+      match self.dir {
+        UnconstrainedDir::X => {
+          clamp.min.width = 0.;
+        }
+        UnconstrainedDir::Y => {
+          clamp.min.height = 0.;
+        }
+        UnconstrainedDir::Both => clamp = clamp.loose(),
+      };
+    }
+    if self.clamp_dim.contains(ClampDim::MAX_SIZE) {
+      match self.dir {
+        UnconstrainedDir::X => {
+          clamp.max.width = f32::INFINITY;
+        }
+        UnconstrainedDir::Y => {
+          clamp.max.height = f32::INFINITY;
+        }
+        UnconstrainedDir::Both => clamp = clamp.expand(),
+      };
+    }
+
     ctx.assert_perform_single_child_layout(clamp)
   }
 

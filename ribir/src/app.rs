@@ -1,7 +1,9 @@
+use crate::clipboard::Clipboard;
 use crate::timer::{new_timer, recently_timeout, wake_timeout_futures};
 use crate::winit_shell_wnd::{new_id, WinitShellWnd};
 use ribir_core::{prelude::*, window::WindowId};
 use rxrust::scheduler::NEW_TIMER_FN;
+use std::cell::RefCell;
 use std::{collections::HashMap, rc::Rc};
 use winit::{
   event::{Event, StartCause, WindowEvent},
@@ -20,8 +22,10 @@ impl App {
   #[inline]
   pub fn new(theme: FullTheme) -> Self {
     let app_theme = Rc::new(Theme::Full(theme));
+    let clipboard = Clipboard::new().unwrap();
     let ctx = AppContext {
       app_theme: app_theme.clone(),
+      clipboard: Rc::new(RefCell::new(clipboard)),
       ..Default::default()
     };
     ctx.load_font_from_theme(app_theme);

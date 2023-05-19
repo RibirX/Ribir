@@ -4,15 +4,18 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use crate::builtin_widgets::{FullTheme, InheritTheme, Theme};
+use crate::{
+  builtin_widgets::{FullTheme, InheritTheme, Theme},
+  clipboard::{Clipboard, UnSpportClipboard},
+};
 
-use ::ribir_text::shaper::TextShaper;
 pub use futures::task::SpawnError;
 use futures::{
   executor::{block_on, LocalPool},
   task::LocalSpawnExt,
   Future,
 };
+use ribir_text::shaper::TextShaper;
 use ribir_text::{font_db::FontDB, TextReorder, TypographyStore};
 
 #[derive(Clone)]
@@ -23,6 +26,7 @@ pub struct AppContext {
   pub reorder: TextReorder,
   pub typography_store: TypographyStore,
   pub executor: Executor,
+  pub clipboard: Rc<RefCell<dyn Clipboard>>,
 }
 
 #[derive(Clone)]
@@ -87,6 +91,7 @@ impl Default for AppContext {
       reorder,
       typography_store,
       executor: <_>::default(),
+      clipboard: Rc::new(RefCell::new(UnSpportClipboard {})),
     }
   }
 }
