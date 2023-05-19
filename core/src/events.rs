@@ -59,6 +59,27 @@ impl EventCommon {
   #[inline]
   pub fn modifiers(&self) -> ModifiersState { self.dispatch_info().modifiers() }
 
+  /// Returns `true` if the shift key is pressed.
+  pub fn with_shift_key(&self) -> bool { self.dispatch_info().modifiers().shift() }
+  /// Returns `true` if the alt key is pressed.
+  pub fn with_alt_key(&self) -> bool { self.dispatch_info().modifiers().alt() }
+  /// Returns `true` if the ctrl key is pressed.
+  pub fn with_ctrl_key(&self) -> bool { self.dispatch_info().modifiers().ctrl() }
+  /// Returns `true` if the logo key is pressed.
+  pub fn with_logo_key(&self) -> bool { self.dispatch_info().modifiers().logo() }
+
+  /// Returns true if the main modifier key in the
+  /// current platform is pressed. Specifically:
+  /// - the `logo` or command key (⌘) on macOS
+  /// - the `control` key on other platforms
+  pub fn with_command_key(&self) -> bool {
+    #[cfg(target_os = "macos")]
+    return self.with_logo_key();
+
+    #[cfg(not(target_os = "macos"))]
+    return self.with_ctrl_key();
+  }
+
   /// The X, Y coordinate of the mouse pointer in global (window) coordinates.
   #[inline]
   pub fn global_pos(&self) -> Point { self.dispatch_info().global_pos() }

@@ -22,7 +22,7 @@ pub struct Text {
 }
 
 impl Text {
-  pub fn text_layout(&self, t_store: &TypographyStore, bound: BoxClamp) -> VisualGlyphs {
+  pub fn text_layout(&self, t_store: &TypographyStore, bound: Size) -> VisualGlyphs {
     let TextStyle {
       font_size,
       letter_space,
@@ -31,8 +31,8 @@ impl Text {
       ..
     } = *self.text_style;
 
-    let width: Em = Pixel(bound.max.width.into()).into();
-    let height: Em = Pixel(bound.max.height.into()).into();
+    let width: Em = Pixel(bound.width.into()).into();
+    let height: Em = Pixel(bound.height.into()).into();
 
     t_store.typography(
       self.text.substr(..),
@@ -54,7 +54,7 @@ impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let wnd_ctx = ctx.wnd_ctx();
     self
-      .text_layout(wnd_ctx.typography_store(), clamp)
+      .text_layout(wnd_ctx.typography_store(), clamp.max)
       .visual_rect()
       .size
       .cast_unit()
@@ -65,7 +65,7 @@ impl Render for Text {
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let rect = ctx.box_rect().unwrap();
+    let bounds = ctx.layout_clamp().map(|b| b.max);
     let painter = ctx.painter();
     let TextStyle {
       font_size,
@@ -85,7 +85,6 @@ impl Render for Text {
     }
 
     let text = self.text.substr(..);
-    let bounds = Some(rect.size);
     match &self.path_style {
       PathPaintStyle::Fill => {
         painter.fill_text(text, bounds, self.overflow);

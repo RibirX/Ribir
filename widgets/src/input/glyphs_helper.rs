@@ -73,6 +73,9 @@ impl GlyphsHelper {
     if rg.is_empty() {
       return vec![];
     }
-    self.glyphs.as_ref().unwrap().select_range(rg)
+    self
+      .glyphs
+      .as_ref()
+      .map_or(vec![], |glyphs| glyphs.select_range(rg))
   }
 }

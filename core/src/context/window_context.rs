@@ -53,6 +53,8 @@ impl WindowCtx {
 
   pub fn typography_store(&self) -> &TypographyStore { &self.app_ctx.typography_store }
 
+  pub fn app_ctx(&self) -> AppContext { self.app_ctx.clone() }
+
   pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, Infallible> {
     self.frame_ticker.frame_tick_stream()
   }

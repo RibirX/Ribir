@@ -1,4 +1,8 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use super::{define_widget_context, WidgetCtxImpl, WindowCtx};
+use crate::clipboard::Clipboard;
 use crate::context::widget_context::WidgetContext;
 use crate::{
   events::dispatcher::DispatchInfo,
@@ -26,4 +30,6 @@ impl<'a> EventCtx<'a> {
     let pos = self.map_to_global(pos);
     wnd_ctx.set_ime_pos(pos);
   }
+
+  pub fn clipboard(&self) -> Rc<RefCell<dyn Clipboard>> { self.wnd_ctx.app_ctx.clipboard.clone() }
 }

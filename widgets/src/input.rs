@@ -4,9 +4,12 @@ mod editarea;
 mod glyphs_helper;
 mod handle;
 mod selected_text;
+mod text_selectable;
 use std::time::Duration;
 
 pub use caret_state::CaretState;
+
+pub use text_selectable::TextSelectable;
 
 use self::editarea::TextEditorArea;
 pub use self::selected_text::SelectedTextStyle;

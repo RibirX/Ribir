@@ -35,20 +35,22 @@ impl ComposeChild for ScrollableWidget {
       init ctx => {
         let smooth_scroll = transitions::SMOOTH_SCROLL.of(ctx);
       }
-      Clip { UnconstrainedBox {
-        id: view,
-        dir: match this.scrollable {
-          Scrollable::X => UnconstrainedDir::X,
-          Scrollable::Y => UnconstrainedDir::Y,
-          Scrollable::Both => UnconstrainedDir::Both,
-        },
-        on_wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
-        DynWidget {
-          id: content,
-          dyns: child,
-          left_anchor: this.scroll_pos.x,
-          top_anchor: this.scroll_pos.y,
-        }
+      Clip {
+        UnconstrainedBox {
+          id: view,
+          dir: match this.scrollable {
+            Scrollable::X => UnconstrainedDir::X,
+            Scrollable::Y => UnconstrainedDir::Y,
+            Scrollable::Both => UnconstrainedDir::Both,
+          },
+          clamp_dim: ClampDim::MAX_SIZE,
+          on_wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
+          DynWidget {
+            id: content,
+            dyns: child,
+            left_anchor: this.scroll_pos.x,
+            top_anchor: this.scroll_pos.y,
+          }
       }}
 
       transition (

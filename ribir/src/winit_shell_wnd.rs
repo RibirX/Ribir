@@ -114,6 +114,7 @@ impl WinitShellWnd {
     }
 
     let winit_wnd = winit_wnd.build(window_target).unwrap();
+    winit_wnd.set_ime_allowed(true);
     WinitShellWnd {
       backend: Backend::new(&winit_wnd),
       winit_wnd,
