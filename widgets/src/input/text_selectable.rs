@@ -61,6 +61,7 @@ impl ComposeChild for TextSelectable {
               ctx.wnd_ctx().typography_store(),
               bound.max,
             ));
+            this.forget_modifies();
           }
         }
       }
