@@ -301,6 +301,8 @@ impl<'a> Layouter<'a> {
     })
   }
 
+  pub fn has_child(&self) -> bool { self.wid.first_child(self.arena).is_some() }
+
   /// Return the rect of this layouter if it had performed layout.
   #[inline]
   pub fn layout_rect(&self) -> Option<Rect> {
@@ -549,8 +551,14 @@ mod tests {
     }
 
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, {path = [0, 0], rect == ribir_geom::rect(50., 50., 50., 50.),});
-    assert_layout_result_by_path!(wnd, {path = [0, 0, 0], rect == ribir_geom::rect(0., 0., 10., 10.),});
+    assert_layout_result_by_path!(
+      wnd,
+      {path = [0, 0], rect == ribir_geom::rect(50., 50., 50., 50.),}
+    );
+    assert_layout_result_by_path!(
+      wnd,
+      {path = [0, 0, 0], rect == ribir_geom::rect(0., 0., 10., 10.),}
+    );
   }
 
   #[test]
