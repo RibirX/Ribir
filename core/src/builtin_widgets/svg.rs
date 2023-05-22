@@ -10,8 +10,13 @@ impl Render for Svg {
     self.paths.iter().for_each(|c| {
       painter
         .apply_transform(&c.transform)
-        .set_brush(c.brush.clone())
-        .fill_path(c.path.clone());
+        .set_brush(c.brush.clone());
+      match &c.style {
+        PathPaintStyle::Fill => painter.fill_path(c.path.clone()),
+        PathPaintStyle::Stroke(options) => painter
+          .set_strokes(options.clone())
+          .stroke_path(c.path.clone()),
+      };
     });
   }
 }
