@@ -23,22 +23,23 @@ impl Render for Padding {
     ctx.force_child_relayout(child);
     let mut child_layouter = ctx.assert_single_child_layouter();
 
-    let size = child_layouter.perform_widget_layout(child_clamp);
+    let mut size = child_layouter.perform_widget_layout(child_clamp);
+    if child_layouter.has_child() {
+      // Expand the size, so the child have padding.
+      size = clamp.clamp(size + thickness);
+      child_layouter.update_size(child, size);
 
-    // Expand the size, so the child have padding.
-    let size = clamp.clamp(size + thickness);
-    child_layouter.update_size(child, size);
+      // Update child's children position, let they have a correct position after
+      // expanded with padding. padding.
+      let mut grandson_layouter = child_layouter.into_first_child_layouter();
+      while let Some(mut l) = grandson_layouter {
+        if let Some(pos) = l.layout_pos() {
+          let pos = pos + Vector::new(self.padding.left, self.padding.top);
+          l.update_position(pos);
+        }
 
-    // Update child's children position, let they have a correct position after
-    // expanded with padding. padding.
-    let mut layouter = child_layouter.into_first_child_layouter();
-    while let Some(mut l) = layouter {
-      if let Some(pos) = l.layout_pos() {
-        let pos = pos + Vector::new(self.padding.left, self.padding.top);
-        l.update_position(pos);
+        grandson_layouter = l.into_next_sibling()
       }
-
-      layouter = l.into_next_sibling()
     }
 
     size
