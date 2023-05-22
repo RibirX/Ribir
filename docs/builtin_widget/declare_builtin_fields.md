@@ -46,14 +46,14 @@
  	 - specify the event handler when user moving a mouse wheel or similar input device.
 - box_fit : [`BoxFit`] 
  	 -  set how its child should be resized to its box.
-- padding : [`EdgeInsets`] 
- 	 - set the padding area on all four sides of a widget.
 - background : [`Brush`] 
  	 - specify the background of the widget box.
 - border : [`Border`] 
  	 - specify the border of the widget which draw above the background
 - border_radius : [`Radius`] 
  	 - specify how rounded the corners have of the widget.
+- padding : [`EdgeInsets`] 
+ 	 - set the padding area on all four sides of a widget.
 - cursor : [`CursorIcon`] 
  	 - assign cursor to the widget.
 - margin : [`impl EdgeInsets`] 

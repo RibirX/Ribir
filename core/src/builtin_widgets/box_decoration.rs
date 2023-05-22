@@ -35,31 +35,26 @@ impl BorderSide {
 }
 
 impl Render for BoxDecoration {
+  #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let mut layouter = ctx.assert_single_child_layouter();
-    let mut size = layouter.perform_widget_layout(clamp);
-    if let Some(ref border) = self.border {
-      size.width += border.left.width + border.right.width;
-      size.height += border.top.width + border.bottom.width;
-      layouter.update_position(Point::new(border.left.width, border.top.width));
-    }
-    size
+    ctx.assert_perform_single_child_layout(clamp)
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let child = ctx.assert_single_child();
-    if let Some(content_rect) = ctx.widget_box_rect(child) {
+    let size = ctx.box_size().unwrap();
+    if !size.is_empty() {
+      let rect = Rect::from_size(size);
       let painter = ctx.painter();
       if let Some(ref background) = self.background {
         painter.set_brush(background.clone());
         if let Some(radius) = &self.border_radius {
-          painter.rect_round(&content_rect, radius);
+          painter.rect_round(&rect, radius);
         } else {
-          painter.rect(&content_rect);
+          painter.rect(&rect);
         }
         painter.fill();
       }
-      self.paint_border(painter, &content_rect);
+      self.paint_border(painter, &rect);
     }
   }
 }
@@ -243,7 +238,7 @@ mod tests {
   }
 
   const SIZE: Size = Size::new(100., 100.);
-  fn layout() -> Widget {
+  fn with_border() -> Widget {
     widget! {
       MockBox {
         size: SIZE,
@@ -257,8 +252,8 @@ mod tests {
     }
   }
   widget_layout_test!(
-    layout,
-    { path = [0],  width == 103., height == 107., }
-    { path = [0, 0], rect == ribir_geom::rect(1., 3., 100., 100.), }
+    with_border,
+    { path = [0],  width == 100., height == 100., }
+    { path = [0, 0], rect == ribir_geom::rect(0., 0., 100., 100.), }
   );
 }
