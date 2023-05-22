@@ -181,11 +181,6 @@ builtin! {
     box_fit: BoxFit,
   }
 
-  Padding {
-    #[doc="set the padding area on all four sides of a widget."]
-    padding: EdgeInsets
-  }
-
   BoxDecoration {
     #[doc="specify the background of the widget box."]
     background: Brush,
@@ -193,6 +188,11 @@ builtin! {
     border: Border,
     #[doc= "specify how rounded the corners have of the widget."]
     border_radius: Radius,
+  }
+
+  Padding {
+    #[doc="set the padding area on all four sides of a widget."]
+    padding: EdgeInsets
   }
 
   LayoutBox {
