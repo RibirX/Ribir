@@ -28,7 +28,7 @@ ribir_geom = {path = "../geom", version = "0.0.0"}
 ribir_text = {path = "../text", version = "0.0.0"}
 serde = {version = "1.0", features = ["rc", "derive"]}
 serde_json.workspace = true
-tiny-skia-path = "0.8.3"
+tiny-skia-path = "0.9.0"
 usvg.workspace = true
 zerocopy = {version = "0.7.0-alpha.3", optional = true}
 
