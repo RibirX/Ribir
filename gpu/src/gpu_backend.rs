@@ -315,14 +315,20 @@ where
 
   fn layers_submit(&mut self, output: &mut Impl::Texture, surface: Color) {
     let mut color = Some(surface);
-    self
-      .draw_indices
-      .drain(..)
-      .for_each(|indices| match indices {
-        DrawIndices::Color(rg) => self.gpu_impl.draw_color_triangles(output, rg, color.take()),
-        DrawIndices::Img(rg) => self.gpu_impl.draw_img_triangles(output, rg, color.take()),
-        DrawIndices::_Gradient(_) => todo!(),
-      });
+    if self.draw_indices.is_empty() {
+      self
+        .gpu_impl
+        .draw_color_triangles(output, 0..0, color.take())
+    } else {
+      self
+        .draw_indices
+        .drain(..)
+        .for_each(|indices| match indices {
+          DrawIndices::Color(rg) => self.gpu_impl.draw_color_triangles(output, rg, color.take()),
+          DrawIndices::Img(rg) => self.gpu_impl.draw_img_triangles(output, rg, color.take()),
+          DrawIndices::_Gradient(_) => todo!(),
+        });
+    }
   }
 }
 
