@@ -4,18 +4,26 @@ use crate::winit_shell_wnd::{new_id, WinitShellWnd};
 use ribir_core::{prelude::*, window::WindowId};
 use rxrust::scheduler::NEW_TIMER_FN;
 use std::cell::RefCell;
+use std::sync::Arc;
 use std::{collections::HashMap, rc::Rc};
+use winit::event_loop::EventLoopBuilder;
 use winit::{
   event::{Event, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop},
   platform::run_return::EventLoopExtRunReturn,
 };
 
+use std::sync::Mutex;
+
 pub struct App {
   windows: HashMap<WindowId, Window>,
   ctx: AppContext,
-  event_loop: EventLoop<()>,
+  event_loop: EventLoop<RibirEvent>,
   active_wnd: Option<WindowId>,
+}
+
+pub enum RibirEvent {
+  LocalFuturesReady,
 }
 
 impl App {
@@ -26,12 +34,19 @@ impl App {
     let clipboard = Clipboard::new().unwrap();
     ctx.clipboard = Rc::new(RefCell::new(clipboard));
 
-    let _ = NEW_TIMER_FN.set(new_timer);
+    let event_loop = EventLoopBuilder::with_user_event().build();
+    let proxy = Mutex::new(event_loop.create_proxy());
+    ctx.runtime_waker = Arc::new(Box::new(move || {
+      if let Ok(proxy) = proxy.lock() {
+        let _ = proxy.send_event(RibirEvent::LocalFuturesReady);
+      }
+    }));
 
+    let _ = NEW_TIMER_FN.set(new_timer);
     Self {
       ctx,
       windows: Default::default(),
-      event_loop: EventLoop::new(),
+      event_loop,
       active_wnd: None,
     }
   }
@@ -59,7 +74,7 @@ impl App {
   #[inline]
   pub fn context(&self) -> &AppContext { &self.ctx }
 
-  pub fn event_loop(&self) -> &EventLoop<()> { &self.event_loop }
+  pub fn event_loop(&self) -> &EventLoop<RibirEvent> { &self.event_loop }
 
   pub fn set_active_window(&mut self, id: WindowId) { self.active_wnd = Some(id); }
 
@@ -70,7 +85,9 @@ impl App {
       .expect("application at least have one window")
       .draw_frame();
 
-    let Self { windows, event_loop, .. } = self;
+    let Self {
+      windows, event_loop, ctx: app_ctx, ..
+    } = self;
 
     event_loop.run_return(move |event, _event_loop, control: &mut ControlFlow| {
       *control = ControlFlow::Wait;
@@ -134,6 +151,9 @@ impl App {
             wake_timeout_futures();
           }
           _ => (),
+        },
+        Event::UserEvent(event) => match event {
+          RibirEvent::LocalFuturesReady => app_ctx.run_until_stalled(),
         },
         _ => (),
       }

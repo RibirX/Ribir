@@ -26,9 +26,9 @@ pub trait Clipboard {
   fn clear(&mut self) -> Result<(), Error>;
 }
 
-pub(crate) struct UnSpportClipboard {}
+pub(crate) struct MockClipboard {}
 
-impl Clipboard for UnSpportClipboard {
+impl Clipboard for MockClipboard {
   fn read_text(&mut self) -> Result<String, Error> {
     warn!("read text from clipboard");
     Err(Error::new(

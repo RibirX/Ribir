@@ -1,13 +1,14 @@
+use crate::{
+  builtin_widgets::{FullTheme, InheritTheme, Theme},
+  clipboard::{Clipboard, MockClipboard},
+};
+use pin_project_lite::pin_project;
 use std::{
   cell::RefCell,
   ptr::NonNull,
   rc::Rc,
   sync::{Arc, RwLock},
-};
-
-use crate::{
-  builtin_widgets::{FullTheme, InheritTheme, Theme},
-  clipboard::{Clipboard, UnSpportClipboard},
+  task::{Context, RawWaker, RawWakerVTable, Waker},
 };
 
 pub use futures::task::SpawnError;
@@ -19,6 +20,7 @@ use futures::{
 use ribir_text::shaper::TextShaper;
 use ribir_text::{font_db::FontDB, TextReorder, TypographyStore};
 
+pub type WakeRuntimeFn = Box<dyn Fn() + Send + Sync>;
 #[derive(Clone)]
 pub struct AppContext {
   // todo: tmp code, We'll share AppContext by reference.
@@ -27,22 +29,19 @@ pub struct AppContext {
   pub shaper: TextShaper,
   pub reorder: TextReorder,
   pub typography_store: TypographyStore,
-  pub executor: Executor,
   pub clipboard: Rc<RefCell<dyn Clipboard>>,
+  pub runtime_waker: Arc<WakeRuntimeFn>,
+  executor: Executor,
 }
 
 #[derive(Clone)]
 pub struct Executor {
-  #[cfg(feature = "thread-pool")]
-  pub thread_pool: futures::executor::ThreadPool,
-  pub local: Rc<RefCell<LocalPool>>,
+  local: Rc<RefCell<LocalPool>>,
 }
 
 impl Default for Executor {
   fn default() -> Self {
     Self {
-      #[cfg(feature = "thread-pool")]
-      thread_pool: futures::executor::ThreadPool::new().unwrap(),
       local: Rc::new(RefCell::new(LocalPool::default())),
     }
   }
@@ -67,8 +66,9 @@ impl AppContext {
       shaper,
       reorder,
       typography_store,
-      clipboard: Rc::new(RefCell::new(UnSpportClipboard {})),
+      clipboard: Rc::new(RefCell::new(MockClipboard {})),
       executor: <_>::default(),
+      runtime_waker: Arc::new(Box::new(move || unimplemented!())),
     }
   }
 
@@ -108,31 +108,196 @@ impl AppContext {
       }
     }
   }
+
+  /// Runs all tasks in the local(usually means on the main thread) pool and
+  /// returns if no more progress can be made on any task.
+  pub fn run_until_stalled(&self) { self.executor.local.borrow_mut().run_until_stalled() }
 }
 
 impl Default for AppContext {
   fn default() -> Self { AppContext::new(<_>::default()) }
 }
 
-impl Executor {
+impl AppContext {
+  pub fn wait_future<F: Future>(f: F) -> F::Output { block_on(f) }
+
   #[inline]
   pub fn spawn_local<Fut>(&self, future: Fut) -> Result<(), SpawnError>
   where
     Fut: Future<Output = ()> + 'static,
   {
-    self.local.borrow().spawner().spawn_local(future)
-  }
-
-  #[cfg(feature = "thread-pool")]
-  #[inline]
-  pub fn spawn_in_pool<Fut>(&self, future: Fut)
-  where
-    Fut: 'static + Future<Output = ()> + Send,
-  {
-    self.thread_pool.spawn_ok(future)
+    (self.runtime_waker)();
+    self
+      .executor
+      .local
+      .borrow()
+      .spawner()
+      .spawn_local(LocalFuture {
+        fut: future,
+        waker: self.runtime_waker.clone(),
+      })
   }
 }
 
-impl AppContext {
-  pub fn wait_future<F: Future>(f: F) -> F::Output { block_on(f) }
+pin_project! {
+  struct LocalFuture<F> {
+    #[pin]
+    fut: F,
+    waker: Arc<WakeRuntimeFn>,
+  }
+}
+
+impl<F> LocalFuture<F>
+where
+  F: Future,
+{
+  fn local_waker(&self, cx: &mut std::task::Context<'_>) -> Waker {
+    type RawLocalWaker = (std::task::Waker, Arc<WakeRuntimeFn>);
+    fn clone(this: *const ()) -> RawWaker {
+      let waker = this as *const RawLocalWaker;
+      let (w, cb) = unsafe { &*waker };
+      let data = Box::new((w.clone(), cb.clone()));
+      let raw = Box::leak(data) as *const RawLocalWaker;
+      RawWaker::new(raw as *const (), &VTABLE)
+    }
+
+    unsafe fn wake(this: *const ()) {
+      let waker = this as *mut RawLocalWaker;
+      let (w, cb) = unsafe { &*waker };
+      w.wake_by_ref();
+      (cb)();
+      drop(this);
+    }
+
+    unsafe fn wake_by_ref(this: *const ()) {
+      let waker = this as *mut RawLocalWaker;
+      let (w, cb) = unsafe { &*waker };
+      w.wake_by_ref();
+      (cb)();
+    }
+
+    unsafe fn drop(this: *const ()) {
+      let waker = this as *mut RawLocalWaker;
+      let _ = Box::from_raw(waker);
+    }
+    static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
+
+    let old_waker = cx.waker().clone();
+    let data = Box::new((old_waker, self.waker.clone()));
+    let raw = RawWaker::new(
+      Box::leak(data) as *const RawLocalWaker as *const (),
+      &VTABLE,
+    );
+    unsafe { Waker::from_raw(raw) }
+  }
+}
+
+impl<F> Future for LocalFuture<F>
+where
+  F: Future,
+{
+  type Output = F::Output;
+  fn poll(
+    self: std::pin::Pin<&mut Self>,
+    cx: &mut std::task::Context<'_>,
+  ) -> std::task::Poll<Self::Output> {
+    let waker = self.local_waker(cx);
+    let mut cx = Context::from_waker(&waker);
+    let this = self.project();
+    this.fut.poll(&mut cx)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::Arc,
+    sync::Mutex,
+    task::{Poll, Waker},
+  };
+
+  use super::AppContext;
+  use futures::Future;
+
+  #[derive(Default)]
+  struct Trigger {
+    ready: bool,
+    waker: Option<Waker>,
+  }
+
+  impl Trigger {
+    fn trigger(&mut self) {
+      if self.ready {
+        return;
+      }
+      self.ready = true;
+      if let Some(waker) = self.waker.take() {
+        waker.wake();
+      }
+    }
+
+    fn pedding(&mut self, waker: &Waker) { self.waker = Some(waker.clone()) }
+  }
+
+  struct ManualFuture {
+    trigger: Rc<RefCell<Trigger>>,
+    cnt: usize,
+  }
+
+  impl Future for ManualFuture {
+    type Output = usize;
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+      if self.trigger.borrow().ready {
+        Poll::Ready(self.cnt)
+      } else {
+        self.trigger.borrow_mut().pedding(cx.waker());
+        Poll::Pending
+      }
+    }
+  }
+
+  #[test]
+  fn local_future_smoke() {
+    let mut ctx = AppContext::default();
+    let ctx_wake_cnt = Arc::new(Mutex::new(0));
+    let wake_cnt = ctx_wake_cnt.clone();
+    ctx.runtime_waker = Arc::new(Box::new(move || {
+      *wake_cnt.lock().unwrap() += 1;
+    }));
+
+    let triggers = (0..3)
+      .map(|_| Rc::new(RefCell::new(Trigger::default())))
+      .collect::<Vec<_>>();
+    let futs = triggers
+      .clone()
+      .into_iter()
+      .map(|trigger| ManualFuture { trigger, cnt: 1 });
+
+    let acc = Rc::new(RefCell::new(0));
+    let sum = acc.clone();
+    let _ = ctx.spawn_local(async move {
+      for fut in futs {
+        let v = fut.await;
+        *acc.borrow_mut() += v;
+      }
+    });
+    ctx.run_until_stalled();
+    let mut waker_cnt = *ctx_wake_cnt.lock().unwrap();
+
+    // when no trigger, nothing will change
+    ctx.run_until_stalled();
+    assert_eq!(*sum.borrow(), 0);
+    assert_eq!(*ctx_wake_cnt.lock().unwrap(), waker_cnt);
+
+    // once call trigger, the ctx.waker will be call once, and future step forward
+    for (idx, trigger) in triggers.into_iter().enumerate() {
+      trigger.borrow_mut().trigger();
+      waker_cnt += 1;
+      assert_eq!(*ctx_wake_cnt.lock().unwrap(), waker_cnt);
+      ctx.run_until_stalled();
+      assert_eq!(*sum.borrow(), idx + 1);
+    }
+  }
 }
