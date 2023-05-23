@@ -1,3 +1,5 @@
+#![feature(test)]
+
 pub mod avatar;
 pub mod buttons;
 pub mod checkbox;

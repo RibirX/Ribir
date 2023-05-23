@@ -6,7 +6,12 @@ use crate::{
   window::{ShellWindow, WindowId},
 };
 
-pub struct TestWindow(pub Window);
+pub struct Frame {
+  pub commands: Vec<PaintCommand>,
+  pub viewport: Rect,
+  pub surface: Color,
+}
+pub struct TestWindow(Window);
 
 impl TestWindow {
   /// Create a 1024x1024 window for test
@@ -53,6 +58,19 @@ impl TestWindow {
     }
     tree.store.layout_info(node)
   }
+
+  #[inline]
+  pub fn widget_count(&self) -> usize { self.widget_tree.count() }
+
+  pub fn take_last_frame(&mut self) -> Option<Frame> {
+    self
+      .shell_wnd_mut()
+      .as_any_mut()
+      .downcast_mut::<TestShellWindow>()
+      .unwrap()
+      .last_frame
+      .take()
+  }
 }
 
 impl std::ops::Deref for TestWindow {
@@ -69,6 +87,7 @@ pub struct TestShellWindow {
   pub size: Size,
   pub cursor: Option<CursorIcon>,
   pub id: WindowId,
+  pub last_frame: Option<Frame>,
 }
 
 impl ShellWindow for TestShellWindow {
@@ -94,7 +113,9 @@ impl ShellWindow for TestShellWindow {
 
   fn begin_frame(&mut self) {}
 
-  fn draw_commands(&mut self, _: Rect, _: Vec<PaintCommand>, _: Color) {}
+  fn draw_commands(&mut self, viewport: Rect, commands: Vec<PaintCommand>, surface: Color) {
+    self.last_frame = Some(Frame { commands, viewport, surface });
+  }
 
   fn end_frame(&mut self) {}
 
@@ -111,6 +132,7 @@ impl TestShellWindow {
       size,
       cursor: None,
       id: ID.fetch_add(1, Ordering::Relaxed).into(),
+      last_frame: None,
     }
   }
 }
@@ -194,9 +216,4 @@ impl Query for MockMulti {
 
 impl Query for MockBox {
   impl_query_self_only!();
-}
-
-impl Window {
-  #[inline]
-  pub fn widget_count(&self) -> usize { self.widget_tree.count() }
 }

@@ -147,16 +147,28 @@ mod tests {
   use super::*;
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
+  extern crate test;
+  use test::Bencher;
 
   fn checked() -> Widget {
     widget! { Checkbox { checked: true } }
   }
-  widget_layout_test!(checked, width == 24., height == 24.,);
+  widget_test_suit!(
+    checked,
+    wnd_size = Size::new(48., 48.),
+    width == 24.,
+    height == 24.,
+  );
 
   fn unchecked() -> Widget {
     widget! { Checkbox {  } }
   }
-  widget_layout_test!(unchecked, width == 24., height == 24.,);
+  widget_test_suit!(
+    unchecked,
+    wnd_size = Size::new(48., 48.),
+    width == 24.,
+    height == 24.,
+  );
 
   fn indeterminate() -> Widget {
     widget! {
@@ -166,5 +178,11 @@ mod tests {
       }
     }
   }
-  widget_layout_test!(indeterminate, width == 24., height == 24.,);
+
+  widget_test_suit!(
+    indeterminate,
+    wnd_size = Size::new(48., 48.),
+    width == 24.,
+    height == 24.,
+  );
 }

@@ -25,9 +25,10 @@ macro_rules! painter_backend_eq_image_test {
       #[test]
       fn [<wgpu_ $painter_fn>]() {
         let mut painter = $painter_fn();
-        let img = wgpu_render_commands(&mut painter);
-
-        let file_path = test_case_name!("wgpu", std::stringify!($painter_fn), "png");
+        let viewport = painter.paint_bounds().to_i32().cast_unit();
+        let img = wgpu_render_commands(painter.finish(), viewport, Color::TRANSPARENT);
+        let name = format!("{}_wgpu", std::stringify!($painter_fn));
+        let file_path = test_case_name!(name, "png");
         assert_texture_eq_png(img, &file_path);
       }
     }
@@ -35,65 +36,12 @@ macro_rules! painter_backend_eq_image_test {
 }
 
 #[macro_export]
-macro_rules! assert_texture_eq_png {
-  (img: ident, img_name: ident) => {
-    let mut expected = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
-    let module_path = std::module_path!();
-    let path = module_path.replace("::", "/");
-    expected.push(&format!("test_cases/{}/{}", path, img_name));
-
-    let overwrite = std::ffi::OsStr::new("overwrite");
-    if std::env::var_os("RIBIR_IMG_TEST").map_or(false, |var| var == overwrite) {
-      let folders = expected.parent().unwrap();
-      std::fs::create_dir_all(folders).unwrap();
-      let mut file = std::fs::File::create(expected.as_path()).unwrap();
-      img.write_as_png(&mut file).unwrap();
-    } else {
-      let mut f = std::fs::File::open(expected.as_path()).unwrap();
-      let mut bytes = Vec::new();
-      std::io::Read::read_to_end(&mut f, &mut bytes).unwrap();
-      let expected = PixelImage::from_png(&bytes);
-
-      assert_eq!($img.pixel_bytes().len(), expected.pixel_bytes().len());
-      assert_eq!($img.color_format(), ColorFormat::Rgba8);
-      assert_eq!(expected.color_format(), ColorFormat::Rgba8);
-
-      let dssim = dssim_core::Dssim::new();
-      let rgba_img = unsafe {
-        let ptr = $img.pixel_bytes().as_ptr() as *const _;
-        std::slice::from_raw_parts(ptr, $img.pixel_bytes().len() / 4)
-      };
-      let img = dssim
-        .create_image_rgba(rgba_img, $img.width() as usize, $img.height() as usize)
-        .unwrap();
-      let rgba_expected = unsafe {
-        let ptr = expected.pixel_bytes().as_ptr() as *const _;
-        std::slice::from_raw_parts(ptr, expected.pixel_bytes().len() / 4)
-      };
-      let expected = dssim
-        .create_image_rgba(
-          rgba_expected,
-          expected.width() as usize,
-          expected.height() as usize,
-        )
-        .unwrap();
-
-      let (v, _) = dssim.compare(&expected, img);
-      assert!(v < 0.0001, "`{v}` over image test tolerance 0.0001");
-    }
-  };
-}
-
-#[macro_export]
 macro_rules! test_case_name {
-  ($sub_folder: literal, $name: expr, $format: literal) => {{
+  ($name: ident, $format: literal) => {{
     let mut path_buffer = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
     let module_path = std::module_path!();
     let path = module_path.replace("::", "/");
-    path_buffer.push(&format!(
-      "test_cases/{path}/{}/{}.{}",
-      $sub_folder, $name, $format
-    ));
+    path_buffer.push(&format!("test_cases/{path}/{}.{}", $name, $format));
 
     path_buffer.into_boxed_path()
   }};
@@ -149,21 +97,23 @@ pub fn assert_texture_eq_png(img: PixelImage, file_path: &std::path::Path) {
 
 /// Render painter by wgpu backend, and return the image.
 #[cfg(feature = "wgpu")]
-pub fn wgpu_render_commands(painter: &mut ribir_painter::Painter) -> PixelImage {
+pub fn wgpu_render_commands(
+  commands: Vec<ribir_painter::PaintCommand>,
+  viewport: ribir_geom::DeviceRect,
+  surface: ribir_painter::Color,
+) -> PixelImage {
   use futures::executor::block_on;
   use ribir_geom::{DeviceRect, DeviceSize};
   use ribir_gpu::{GPUBackend, GPUBackendImpl, Texture};
-  use ribir_painter::{AntiAliasing, Color, PainterBackend};
+  use ribir_painter::{AntiAliasing, PainterBackend};
 
   let mut gpu_impl = block_on(ribir_gpu::WgpuImpl::headless());
-  let bounds = painter.paint_bounds().to_i32();
-  let rect = DeviceRect::from_size(DeviceSize::new(bounds.max_x() + 2, bounds.max_y() + 2));
+  let rect = DeviceRect::from_size(DeviceSize::new(viewport.max_x() + 2, viewport.max_y() + 2));
   let mut texture = gpu_impl.new_texture(rect.size, AntiAliasing::None, ColorFormat::Rgba8);
   let mut backend = GPUBackend::new(gpu_impl, AntiAliasing::None);
-  let commands = painter.finish();
 
   backend.begin_frame();
-  backend.draw_commands(rect, commands, Color::TRANSPARENT, &mut texture);
+  backend.draw_commands(rect, commands, surface, &mut texture);
   let img = texture.copy_as_image(&rect, backend.get_impl_mut());
   backend.end_frame();
   block_on(img).unwrap()

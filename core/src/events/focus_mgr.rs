@@ -610,7 +610,7 @@ mod tests {
     };
 
     let mut wnd = TestWindow::new(widget);
-    let Window { dispatcher, widget_tree, .. } = &mut wnd.0;
+    let Window { dispatcher, widget_tree, .. } = &mut *wnd;
     dispatcher.refresh_focus(widget_tree);
 
     let arena = &widget_tree.arena;
@@ -686,7 +686,7 @@ mod tests {
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
     let mut wnd = TestWindow::new(widget);
-    let Window { dispatcher, widget_tree: tree, .. } = &mut wnd.0;
+    let Window { dispatcher, widget_tree: tree, .. } = &mut *wnd;
 
     let parent = tree.root();
     let child = parent.first_child(&tree.arena).unwrap();
@@ -766,7 +766,7 @@ mod tests {
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
-    let Window { dispatcher, widget_tree: tree, .. } = &mut wnd.0;
+    let Window { dispatcher, widget_tree: tree, .. } = &mut *wnd;
     let first_box = tree.root().first_child(&tree.arena);
     let focus_scope = first_box.unwrap().next_sibling(&tree.arena);
     dispatcher.focus_mgr.borrow_mut().request_focusing = Some(focus_scope);

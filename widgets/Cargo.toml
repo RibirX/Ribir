@@ -24,3 +24,7 @@ webbrowser.workspace = true
 [dev-dependencies]
 paste.workspace = true
 ribir_dev_helper = {path = "../dev-helper", version = "0.0.0"}
+ribir_material = {path = "../themes/material", version = "0.0.0"}
+
+[features]
+wgpu = ["ribir_dev_helper/wgpu"]
