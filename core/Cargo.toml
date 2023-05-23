@@ -30,6 +30,7 @@ rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
 arboard = "3.2.0"
+pin-project-lite.workspace = true
 
 [dev-dependencies]
 colored.workspace = true
@@ -38,6 +39,3 @@ ribir_dev_helper = {path = "../dev-helper", version = "0.0.0"}
 
 [features]
 png = ["ribir_painter/png"]
-thread-pool = [
-  "futures/thread-pool",
-]

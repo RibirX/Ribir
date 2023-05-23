@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::{define_widget_context, WidgetCtxImpl, WindowCtx};
+use super::{define_widget_context, AppContext, WidgetCtxImpl, WindowCtx};
 use crate::clipboard::Clipboard;
 use crate::context::widget_context::WidgetContext;
 use crate::{
@@ -32,4 +32,6 @@ impl<'a> EventCtx<'a> {
   }
 
   pub fn clipboard(&self) -> Rc<RefCell<dyn Clipboard>> { self.wnd_ctx.app_ctx.clipboard.clone() }
+
+  pub fn app_ctx(&self) -> &AppContext { self.wnd_ctx.app_ctx() }
 }
