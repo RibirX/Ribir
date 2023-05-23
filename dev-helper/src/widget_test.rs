@@ -1,6 +1,72 @@
+/// This macro is equivalent to writing `widget_layout_test!`,
+/// `widget_image_test!`, `widget_bench!` three macros at the same time.
+#[macro_export]
+macro_rules! widget_test_suit {
+  (
+    $widget_fn: ident,
+    wnd_size = $size: expr,
+    $({
+      path = $path: expr,
+      $(x == $x_expect: expr,)?
+      $(y == $y_expect: expr,)?
+      $(width == $width_expect: expr,)?
+      $(height == $height_expect: expr,)?
+      $(rect == $rect_expect: expr,)?
+      $(size == $size_expect: expr,)?
+    })+
+  ) => {
+    widget_layout_test!(
+      $widget_fn,
+      wnd_size = $size,
+      $({
+        path = $path,
+        $(x == $x_expect,)?
+        $(y == $y_expect,)?
+        $(width == $width_expect,)?
+        $(height == $height_expect,)?
+        $(rect == $rect_expect,)?
+        $(size == $size_expect,)?
+      })+
+    );
+    widget_image_test!($widget_fn, wnd_size = $size,);
+    widget_bench!($widget_fn, wnd_size = $size,);
+  };
+
+  (
+    $widget_fn: ident,
+    wnd_size = $size: expr,
+    $(x == $x_expect: expr,)?
+    $(y == $y_expect: expr,)?
+    $(width == $width_expect: expr,)?
+    $(height == $height_expect: expr,)?
+    $(rect == $rect_expect: expr,)?
+    $(size == $size_expect: expr,)?
+  ) =>{
+    widget_test_suit!(
+      $widget_fn,
+      wnd_size = $size,
+      {
+        path = [0],
+        $(x == $x_expect,)?
+        $(y == $y_expect,)?
+        $(width == $width_expect,)?
+        $(height == $height_expect,)?
+        $(rect == $rect_expect,)?
+        $(size == $size_expect,)?
+      }
+    );
+  };
+  (
+    $widget_fn: ident,
+    $($t:tt)+
+  ) => {
+    widget_test_suit!($widget_fn, wnd_size = Size::new(1024., 1024.), $($t)+);
+  };
+}
+
 /// This macro generates a layout test for your widget. The first parameter must
-/// be a function name that returns the widget you want to test, and the macro
-/// will use the function name to generate a test with a '_layout' suffix. And
+/// be a function that returns the widget you want to test, and the macro will
+/// use the function name to generate a test with a '_layout' suffix. And
 /// then you can specify the window size for testing by `wnd_size = { expression
 /// for window size}`, if you have not specified, the window will use
 /// `1024x1024` as its default size.
@@ -61,50 +127,10 @@
 /// ```
 #[macro_export]
 macro_rules! widget_layout_test {
+
   (
     $widget_fn: ident,
     wnd_size = $size: expr,
-    $($t:tt)+
-  ) => {
-    widget_layout_test!(
-      window = TestWindow::new_with_size($widget_fn(), $size),
-      $widget_fn,
-      $($t)+
-    );
-  };
-  (
-    $widget_fn: ident,
-    $($t:tt)+
-  ) => {
-    widget_layout_test!(window = TestWindow::new($widget_fn()), $widget_fn, $($t)+);
-  };
-  (
-    window = $wnd: expr,
-    $widget_fn: ident,
-    $(x == $x_expect: expr,)?
-    $(y == $y_expect: expr,)?
-    $(width == $width_expect: expr,)?
-    $(height == $height_expect: expr,)?
-    $(rect == $rect_expect: expr,)?
-    $(size == $size_expect: expr,)?
-  ) =>{
-    widget_layout_test!(
-      window = $wnd,
-      $widget_fn,
-      {
-        path = [0],
-        $(x == $x_expect,)?
-        $(y == $y_expect,)?
-        $(width == $width_expect,)?
-        $(height == $height_expect,)?
-        $(rect == $rect_expect,)?
-        $(size == $size_expect,)?
-      }
-    );
-  };
-  (
-    window = $wnd: expr,
-    $widget_fn: ident,
     $({
       path = $path: expr,
       $(x == $x_expect: expr,)?
@@ -117,8 +143,8 @@ macro_rules! widget_layout_test {
   ) => {
     paste::paste! {
       #[test]
-      fn [<layout_ $widget_fn>]() {
-        let mut wnd = $wnd;
+      fn [<$widget_fn _layout>]() {
+        let mut wnd = TestWindow::new_with_size($widget_fn(), $size);
         wnd.draw_frame();
 
         assert_layout_result_by_path!(
@@ -136,6 +162,120 @@ macro_rules! widget_layout_test {
 
       }
     }
+  };
+  (
+    $widget_fn: ident,
+    wnd_size = $size: expr,
+    $(x == $x_expect: expr,)?
+    $(y == $y_expect: expr,)?
+    $(width == $width_expect: expr,)?
+    $(height == $height_expect: expr,)?
+    $(rect == $rect_expect: expr,)?
+    $(size == $size_expect: expr,)?
+  ) =>{
+    widget_layout_test!(
+      $widget_fn,
+      wnd_size = $size,
+      {
+        path = [0],
+        $(x == $x_expect,)?
+        $(y == $y_expect,)?
+        $(width == $width_expect,)?
+        $(height == $height_expect,)?
+        $(rect == $rect_expect,)?
+        $(size == $size_expect,)?
+      }
+    );
+  };
+  (
+    $widget_fn: ident,
+    $($t:tt)+
+  ) => {
+    widget_layout_test!($widget_fn, wnd_size = Size::new(1024., 1024.), $($t)+);
+  };
+}
+
+/// This macro generates image tests for a widget. The first parameter must be a
+/// function that returns the widget you want to test. And the macro will
+/// generate tests for the widget with every theme and painter backend. The test
+/// and image file name was formatted by `{widget name} _with_{theme
+/// name}_by_{painter backend name}`.
+///
+/// The image file is read from the `test_cases` folder in the workspace root
+/// with the test source path.
+///
+/// You can run the test with `RIBIR_IMG_TEST=overwrite` to overwrite the image
+/// file, for example ```
+/// RIBIR_IMG_TEST=overwrite cargo test -- smoke
+/// ```
+#[macro_export]
+macro_rules! widget_image_test {
+  (
+    $widget_fn: ident,
+    wnd_size = $size: expr $(,)?
+  ) => {
+    paste::paste! {
+      #[cfg(feature = "wgpu")]
+      #[test]
+      fn [<$widget_fn _with_default_by_wgpu>]() {
+        let mut wnd = TestWindow::new_with_size($widget_fn(), $size);
+        wnd.draw_frame();
+        let Frame { commands, viewport, surface} = wnd.take_last_frame().unwrap();
+        let viewport = viewport.to_i32().cast_unit();
+        let img = wgpu_render_commands(commands, viewport, surface);
+        let name = format!("{}_with_default_by_wgpu", std::stringify!($widget_fn));
+        let file_path = test_case_name!(name, "png");
+        assert_texture_eq_png(img, &file_path);
+      }
+
+      #[cfg(feature = "wgpu")]
+      #[test]
+      fn [<$widget_fn _with_material_by_wgpu>]() {
+        let ctx = AppContext::new(ribir_material::purple::light());
+        let mut wnd = TestWindow::new_with_ctx($widget_fn(), $size, ctx);
+        wnd.draw_frame();
+        let Frame { commands, viewport, surface} = wnd.take_last_frame().unwrap();
+        let viewport = viewport.to_i32().cast_unit();
+        let img = wgpu_render_commands(commands, viewport, surface);
+        let name = format!("{}_with_material_by_wgpu", std::stringify!($widget_fn));
+        let file_path = test_case_name!(name, "png");
+        assert_texture_eq_png(img, &file_path);
+      }
+    }
+  };
+  (
+    $widget_fn: ident $(,)?
+  ) => {
+    widget_image_test!($widget_fn, wnd_size = Size::new(128., 128.),);
+  };
+}
+
+/// This macro accepts a function that returns a widget to generate a benchmark
+/// for the returning widget.
+#[macro_export]
+macro_rules! widget_bench {
+  (
+    $widget_fn: ident,
+    wnd_size = $size: expr $(,)?
+  ) => {
+    paste::paste! {
+      #[bench]
+      fn [<$widget_fn _widget_bench>](b: &mut Bencher) {
+        let ctx = AppContext::default();
+        b.iter(move || {
+          let mut wnd = TestWindow::new_with_ctx($widget_fn(), $size, ctx.clone());
+          loop{
+            if !wnd.need_draw() {
+              break;
+            }
+            wnd.layout();
+          }
+        });
+      }
+    }
+  };
+  ($widget_fn: ident $(,)?) => {
+    widget_bench!($widget_fn, wnd_size = ribir_geom::Size::new(128., 128.));
   };
 }
 

@@ -26,3 +26,17 @@ impl Render for Void {
 impl Query for Void {
   impl_query_self_only!();
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::test_helper::*;
+  use ribir_dev_helper::*;
+  extern crate test;
+  use test::Bencher;
+
+  /// Measures the time required to build and layout an `Void` widget, and other
+  /// widget can subtract this time to obtain their own real time
+  fn base() -> Void { Void {} }
+  widget_bench!(base);
+}
