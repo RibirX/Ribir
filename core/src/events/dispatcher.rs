@@ -168,6 +168,7 @@ impl Dispatcher {
         }
       };
     }
+    self.refresh_focus(tree);
     Some(())
   }
 

@@ -101,17 +101,19 @@ impl ComposeChild for Input {
       states {
         this: this.into_writable(),
       }
-      ConstrainedBox {
-        clamp: size_clamp(&this.style, Some(1.), this.size),
-        TextEditorArea {
-          id: area,
-          text: this.text.clone(),
-          style: this.style.clone(),
-          caret: this.caret().clone(),
-          multi_line: false,
-          auto_wrap: false,
+      FocusScope {
+        ConstrainedBox {
+          clamp: size_clamp(&this.style, Some(1.), this.size),
+          TextEditorArea {
+            id: area,
+            text: this.text.clone(),
+            style: this.style.clone(),
+            caret: this.caret().clone(),
+            multi_line: false,
+            auto_wrap: false,
 
-          widget::from(placeholder)
+            widget::from(placeholder)
+          }
         }
       }
       finally {
@@ -151,17 +153,19 @@ impl ComposeChild for TextArea {
       states {
         this: this.into_writable(),
       }
-      ConstrainedBox {
-        clamp: size_clamp(&this.style, this.rows, this.cols),
-        TextEditorArea {
-          id: area,
-          text: this.text.clone(),
-          style: this.style.clone(),
-          caret: this.caret.clone(),
-          multi_line: true,
-          auto_wrap: no_watch!(this.auto_wrap),
+      FocusScope {
+        ConstrainedBox {
+          clamp: size_clamp(&this.style, this.rows, this.cols),
+          TextEditorArea {
+            id: area,
+            text: this.text.clone(),
+            style: this.style.clone(),
+            caret: this.caret.clone(),
+            multi_line: true,
+            auto_wrap: no_watch!(this.auto_wrap),
 
-          widget::from(placeholder)
+            widget::from(placeholder)
+          }
         }
       }
       finally {
