@@ -14,6 +14,7 @@ use super::dispatcher::Dispatcher;
 pub(crate) struct FocusManager {
   /// store current focusing node, and its position in tab_orders.
   focusing: Option<WidgetId>,
+  request_focusing: Option<Option<WidgetId>>,
   node_ids: HashMap<WidgetId, NodeId>,
   arena: Arena<FocusNodeInfo>,
   root: NodeId,
@@ -25,11 +26,13 @@ pub struct FocusHandle {
 }
 
 impl FocusHandle {
-  pub(crate) fn request_focus(&self) { self.mgr.borrow_mut().focus_to(Some(self.wid)); }
+  pub(crate) fn request_focus(&self) {
+    self.mgr.borrow_mut().request_focusing = Some(Some(self.wid));
+  }
 
   pub(crate) fn unfocus(&self) {
     if self.mgr.borrow().focusing == Some(self.wid) {
-      self.mgr.borrow_mut().focus_to(None);
+      self.mgr.borrow_mut().request_focusing = Some(None);
     }
   }
 }
@@ -42,6 +45,7 @@ impl Default for FocusManager {
       wid: None,
     });
     Self {
+      request_focusing: None,
       focusing: None,
       node_ids: HashMap::<WidgetId, NodeId>::new(),
       arena,
@@ -114,7 +118,29 @@ impl FocusManager {
     }
   }
 
-  pub fn focus_to(&mut self, wid: Option<WidgetId>) { self.focusing = wid; }
+  pub fn refresh(&mut self, arena: &TreeArena) {
+    let Some(focusing) = self.request_focusing.take() else { return };
+    if focusing.is_none() {
+      self.focusing = None;
+      return;
+    }
+
+    let focusing = focusing.filter(|node_id| self.ignore_scope_id(*node_id, arena).is_none());
+    let info = focusing
+      .and_then(|wid| self.node_ids.get(&wid))
+      .and_then(|id| self.get(*id));
+
+    let focus_to = if let Some(node) = info {
+      if node.focus_type.contains(FocusType::SCOPE) {
+        self.focus_step(None, true, arena)
+      } else {
+        node.wid
+      }
+    } else {
+      None
+    };
+    self.focusing = focus_to;
+  }
 
   pub(crate) fn next_focus(&mut self, arena: &TreeArena) -> Option<WidgetId> {
     self.focus_move_circle(false, arena)
@@ -436,13 +462,8 @@ impl Dispatcher {
   pub fn focusing(&self) -> Option<WidgetId> { self.focus_mgr.borrow_mut().focusing }
 
   pub fn refresh_focus(&mut self, tree: &WidgetTree) {
-    let focusing = self.focus_mgr.borrow().focusing.filter(|node_id| {
-      self
-        .focus_mgr
-        .borrow()
-        .ignore_scope_id(*node_id, &tree.arena)
-        .is_none()
-    });
+    self.focus_mgr.borrow_mut().refresh(&tree.arena);
+    let focusing = self.focus_mgr.borrow().focusing;
     if self.focus_widgets.get(0) != focusing.as_ref() {
       self.change_focusing_to(focusing, tree);
     }

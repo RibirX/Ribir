@@ -57,6 +57,13 @@ impl Query for FocusScopeRender {
 
 #[cfg(test)]
 mod tests {
+  use std::{cell::RefCell, rc::Rc};
+
+  use winit::{
+    dpi::LogicalPosition,
+    event::{DeviceId, ElementState, KeyboardInput, MouseButton, WindowEvent},
+  };
+
   use super::*;
   use crate::test_helper::*;
 
@@ -164,5 +171,64 @@ mod tests {
       dispatcher.prev_focus_widget(widget_tree);
       assert_eq!(dispatcher.focusing(), Some(id1));
     }
+  }
+
+  #[test]
+  fn focus_scope() {
+    let size = Size::new(50., 50.);
+    let tap_cnt = Rc::new(RefCell::new(0));
+    let result = tap_cnt.clone();
+    let widget = widget! {
+      init {
+        let tap_cnt2 = tap_cnt.clone();
+      }
+      MockMulti {
+        FocusScope {
+          id: host,
+          can_focus: false,
+          on_key_down: move |_| *tap_cnt.borrow_mut() += 1,
+          MockMulti {
+            MockBox { size, on_key_down: move |_| *tap_cnt2.borrow_mut() += 1, }
+          }
+        }
+        MockBox { size, on_pointer_down: move |_| host.request_focus(),}
+      }
+    };
+
+    let mut wnd = TestWindow::new(widget);
+    wnd.draw_frame();
+
+    // request_focus
+    let device_id = unsafe { DeviceId::dummy() };
+    #[allow(deprecated)]
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: LogicalPosition::new(75., 25.).to_physical(1.),
+      modifiers: ModifiersState::default(),
+    });
+    #[allow(deprecated)]
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+      modifiers: ModifiersState::default(),
+    });
+
+    // will deal key event twice (inner and host).
+    wnd.draw_frame();
+    #[allow(deprecated)]
+    wnd.processes_native_event(WindowEvent::KeyboardInput {
+      device_id: unsafe { DeviceId::dummy() },
+      input: KeyboardInput {
+        scancode: 0,
+        virtual_keycode: Some(VirtualKeyCode::A),
+        state: ElementState::Pressed,
+        modifiers: ModifiersState::default(),
+      },
+      is_synthetic: false,
+    });
+
+    wnd.draw_frame();
+    assert_eq!(*result.borrow(), 2);
   }
 }

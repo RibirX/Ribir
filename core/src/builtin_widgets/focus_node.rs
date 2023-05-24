@@ -93,7 +93,7 @@ impl ComposeChild for RequestFocus {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let this = this.into_writable();
-    let w = widget! {
+    let w: Widget = widget! {
       states { this: this.clone() }
       DynWidget {
         on_mounted: move |ctx| {
@@ -102,8 +102,7 @@ impl ComposeChild for RequestFocus {
         dyns: child
       }
     };
-    let widget = compose_child_as_data_widget(w, State::Stateful(this));
-    dynamic_compose_focus_node(widget)
+    compose_child_as_data_widget(w, State::Stateful(this))
   }
 }
 impl RequestFocus {
