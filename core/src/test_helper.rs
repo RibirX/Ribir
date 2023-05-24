@@ -78,6 +78,8 @@ impl ShellWindow for TestShellWindow {
 
   fn set_size(&mut self, size: Size) { self.size = size; }
 
+  fn set_min_size(&mut self, _: Size) {}
+
   fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
 
   fn set_title(&mut self, _: &str) {}

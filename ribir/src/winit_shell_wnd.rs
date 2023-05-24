@@ -4,7 +4,10 @@ use ribir_core::{
   prelude::*,
   window::{ShellWindow, WindowId},
 };
-use winit::{dpi::LogicalPosition, event_loop::EventLoopWindowTarget};
+use winit::{
+  dpi::{LogicalPosition, LogicalSize},
+  event_loop::EventLoopWindowTarget,
+};
 pub trait WinitBackend {
   fn new(window: &winit::window::Window) -> Self;
 
@@ -52,9 +55,15 @@ impl ShellWindow for WinitShellWnd {
     if self.inner_size() != size {
       self
         .winit_wnd
-        .set_inner_size(winit::dpi::LogicalSize::new(size.width, size.height));
+        .set_inner_size(LogicalSize::new(size.width, size.height));
       self.on_resize(size)
     }
+  }
+
+  fn set_min_size(&mut self, size: Size) {
+    self
+      .winit_wnd
+      .set_min_inner_size(Some(LogicalSize::new(size.width, size.height)))
   }
 
   #[inline]
@@ -120,7 +129,7 @@ impl WinitShellWnd {
   pub(crate) fn new<T>(size: Option<Size>, window_target: &EventLoopWindowTarget<T>) -> Self {
     let mut winit_wnd = winit::window::WindowBuilder::new();
     if let Some(size) = size {
-      winit_wnd = winit_wnd.with_inner_size(winit::dpi::LogicalSize::new(size.width, size.height));
+      winit_wnd = winit_wnd.with_inner_size(LogicalSize::new(size.width, size.height));
     }
 
     let winit_wnd = winit_wnd.build(window_target).unwrap();

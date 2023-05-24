@@ -29,6 +29,7 @@ pub trait ShellWindow {
   fn outer_size(&self) -> Size;
   fn set_ime_pos(&mut self, pos: Point);
   fn set_size(&mut self, size: Size);
+  fn set_min_size(&mut self, size: Size);
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn set_title(&mut self, str: &str);
   fn as_any(&self) -> &dyn Any;
@@ -139,6 +140,11 @@ impl Window {
   }
 
   pub fn set_size(&mut self, size: Size) { self.shell_wnd.set_size(size); }
+
+  pub fn set_min_size(&mut self, size: Size) -> &mut Self {
+    self.shell_wnd.set_min_size(size);
+    self
+  }
 
   pub fn on_wnd_resize_event(&mut self, size: Size) {
     self.widget_tree.mark_dirty(self.widget_tree.root());
