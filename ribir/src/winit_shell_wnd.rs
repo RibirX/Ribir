@@ -67,6 +67,16 @@ impl ShellWindow for WinitShellWnd {
   fn set_ime_pos(&mut self, pos: Point) {
     let position: LogicalPosition<f32> = LogicalPosition::new(pos.x, pos.y);
     self.winit_wnd.set_ime_position(position);
+
+    // tmp: winit set_ime_position fail when use sogou ime in window
+    // platform, issue link: https://github.com/rust-windowing/winit/issues/2780
+    #[cfg(windows)]
+    unsafe {
+      use winapi::um::winuser::SetCaretPos;
+      let pos: winit::dpi::PhysicalPosition<i32> =
+        position.to_physical(self.winit_wnd.scale_factor());
+      SetCaretPos(pos.x, pos.y);
+    }
   }
 
   #[inline]
@@ -114,7 +124,7 @@ impl WinitShellWnd {
     }
 
     let winit_wnd = winit_wnd.build(window_target).unwrap();
-    winit_wnd.set_ime_allowed(true);
+    set_ime_allowed(&winit_wnd);
     WinitShellWnd {
       backend: Backend::new(&winit_wnd),
       winit_wnd,
@@ -125,5 +135,29 @@ impl WinitShellWnd {
     let size: DeviceSize = (size * self.device_pixel_ratio()).to_i32().cast_unit();
 
     self.backend.on_resize(size);
+  }
+}
+
+fn set_ime_allowed(wnd: &winit::window::Window) {
+  wnd.set_ime_allowed(true);
+
+  // tmp:  winit set_ime_position fail when use sogou ime in window
+  // platform, issue link: https://github.com/rust-windowing/winit/issues/2780
+  #[cfg(windows)]
+  unsafe {
+    use std::ptr::null_mut;
+    use winapi::{
+      shared::minwindef::HINSTANCE,
+      shared::windef::HWND,
+      um::winuser::{CreateCaret, LoadBitmapW},
+    };
+    use winit::platform::windows::WindowExtWindows;
+
+    let hwnd = wnd.hwnd();
+    let hinst: HINSTANCE = null_mut();
+    let resource_id = 120;
+    let resource_id_wstr: Vec<u16> = format!("#{}", resource_id).encode_utf16().collect();
+    let hcaret = LoadBitmapW(hinst, resource_id_wstr.as_ptr());
+    CreateCaret(hwnd as HWND, hcaret, 0, 0);
   }
 }
