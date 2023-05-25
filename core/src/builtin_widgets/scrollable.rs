@@ -109,7 +109,10 @@ impl ScrollableWidget {
 
 #[cfg(test)]
 mod tests {
-  use crate::test_helper::{MockBox, TestWindow};
+  use crate::{
+    impl_query_self_only,
+    test_helper::{MockBox, TestWindow},
+  };
 
   use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
@@ -160,5 +163,50 @@ mod tests {
     test_assert(Scrollable::Both, -10., -10., -10., -10.);
     test_assert(Scrollable::Both, -10000., -10000., -900., -900.);
     test_assert(Scrollable::Both, 100., 100., 0., 0.);
+  }
+
+  #[derive(SingleChild, Declare, Clone)]
+  pub struct FixedBox {
+    pub size: Size,
+  }
+  impl Render for FixedBox {
+    #[inline]
+    fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+      ctx.perform_single_child_layout(BoxClamp { min: self.size, max: self.size });
+      self.size
+    }
+    #[inline]
+    fn only_sized_by_parent(&self) -> bool { true }
+    #[inline]
+    fn paint(&self, _: &mut PaintingCtx) {}
+  }
+  impl Query for FixedBox {
+    impl_query_self_only!();
+  }
+
+  #[test]
+  fn scroll_content_expand() {
+    let w = widget! {
+      FixedBox {
+        size: Size::new(200., 200.),
+        ScrollableWidget {
+          scrollable: Scrollable::Both,
+          on_performed_layout: move |ctx| {
+            let size = ctx.layout_info().and_then(|info| info.size);
+            assert_eq!(size, Some(Size::new(200., 200.)));
+          },
+          MockBox {
+            size: Size::new(100., 100.),
+            on_performed_layout: move |ctx| {
+              let size = ctx.layout_info().and_then(|info| info.size);
+              assert_eq!(size, Some(Size::new(200., 200.)));
+            },
+          }
+        }
+      }
+    };
+
+    let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
+    wnd.draw_frame();
   }
 }
