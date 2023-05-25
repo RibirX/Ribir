@@ -15,5 +15,7 @@ version.workspace = true
 [dependencies]
 ahash.workspace = true
 log.workspace = true
-rayon.workspace = true
 serde = {workspace = true, features = ["derive"]}
+
+[dev-dependencies]
+scoped_threadpool.workspace = true
