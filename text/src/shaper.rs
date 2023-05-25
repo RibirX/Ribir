@@ -66,7 +66,7 @@ impl TextShaper {
           .unwrap_or_default();
 
         let glyphs = Arc::new(ShapeResult { text: text.clone(), glyphs });
-        self.shape_cache.write().unwrap().insert(
+        self.shape_cache.write().unwrap().put(
           ShapeKey {
             face_ids: face_ids.into(),
             text: text.clone(),
@@ -141,7 +141,7 @@ impl TextShaper {
   ) -> Option<Arc<ShapeResult>> {
     self
       .shape_cache
-      .read()
+      .write()
       .unwrap()
       .get(&(face_ids, text, direction) as &(dyn ShapeKeySlice))
       .cloned()
@@ -263,18 +263,6 @@ impl PartialEq for dyn ShapeKeySlice + '_ {
 }
 
 impl Eq for dyn ShapeKeySlice + '_ {}
-
-// impl ToOwned for dyn ShapeKeySlice + '_ {
-//   type Owned = ShapeKey;
-
-//   fn to_owned(&self) -> Self::Owned {
-//     ShapeKey {
-//       face_ids: self.face_ids().into(),
-//       text: self.text().to_owned().into(),
-//       direction: self.direction(),
-//     }
-//   }
-// }
 
 impl ShapeKeySlice for ShapeKey {
   fn face_ids(&self) -> &[ID] { &self.face_ids }

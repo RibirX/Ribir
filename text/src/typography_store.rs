@@ -137,7 +137,7 @@ impl TypographyStore {
     let t_man = TypographyMan::new(inputs, t_cfg);
     let visual_info = t_man.typography_all();
     let visual_info = Arc::new(visual_info);
-    self.cache.write().unwrap().insert(
+    self.cache.write().unwrap().put(
       input,
       TypographyResult { bounds, infos: visual_info.clone() },
     );
@@ -157,7 +157,7 @@ impl TypographyStore {
     cfg: &TypographyCfg,
   ) -> Option<TypographyResult> {
     let input = Self::key(text, font_size, cfg);
-    self.cache.read().unwrap().get(&input).cloned()
+    self.cache.write().unwrap().get(&input).cloned()
   }
 
   fn key(text: Substr, font_size: FontSize, cfg: &TypographyCfg) -> TypographyKey {

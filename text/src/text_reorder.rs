@@ -23,7 +23,7 @@ pub struct TextReorder {
 
 impl TextReorder {
   pub fn get_from_cache(&self, text: &Substr) -> Option<Arc<ReorderResult>> {
-    self.cache.read().unwrap().get(text).cloned()
+    self.cache.write().unwrap().get(text).cloned()
   }
 
   pub fn reorder_text(&self, text: &Substr) -> Arc<ReorderResult> {
@@ -51,12 +51,12 @@ impl TextReorder {
         paras,
       });
       let mut cache = self.cache.write().unwrap();
-      cache.insert(text.clone(), result.clone());
+      cache.put(text.clone(), result.clone());
       result
     })
   }
 
-  pub fn end_frame(&mut self) { self.cache.write().unwrap().end_frame("Text Reorder") }
+  pub fn end_frame(&mut self) { self.cache.write().unwrap().end_frame("Text Reorder"); }
 }
 
 #[cfg(test)]

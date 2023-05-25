@@ -26,7 +26,7 @@ impl FontDB {
 
   pub fn default_font(&self) -> ID { self.default_font }
 
-  pub fn try_get_face_data(&self, face_id: ID) -> Option<&Face> {
+  pub fn try_get_face_data(&mut self, face_id: ID) -> Option<&Face> {
     self.cache.get(&face_id)?.as_ref()
   }
 
@@ -112,7 +112,7 @@ impl FontDB {
       .collect()
   }
 
-  pub fn end_frame(&mut self) { self.cache.end_frame("Font DB") }
+  pub fn end_frame(&mut self) { self.cache.end_frame("Font DB"); }
 
   fn static_generic_families(&mut self) {
     // We don't like to depends on some system library and not make the fallback
@@ -377,7 +377,7 @@ fn get_or_insert_face<'a>(
   data_base: &'a Database,
   id: ID,
 ) -> &'a Option<Face> {
-  cache.get_or_insert_with(id, || {
+  cache.get_or_insert(id, || {
     data_base.face_source(id).and_then(|(src, face_index)| {
       let source_data = match src {
         fontdb::Source::Binary(data) => Some(data),
