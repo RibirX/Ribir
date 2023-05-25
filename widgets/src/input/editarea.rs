@@ -31,6 +31,12 @@ impl ComposeChild for TextEditorArea {
 
       Stack {
         fit: StackFit::Passthrough,
+        Option::map(placeholder, |holder| widget! {
+          Text {
+            visible: this.text.is_empty(),
+            text: holder.0,
+          }
+        })
         TextSelectable {
           id: selectable,
           caret: this.caret,
@@ -40,12 +46,6 @@ impl ComposeChild for TextEditorArea {
             overflow: this.overflow(),
           }
         }
-        Option::map(placeholder, |holder| widget! {
-          Text {
-            visible: this.text.is_empty(),
-            text: holder.0,
-          }
-        })
         IgnorePointer{
           UnconstrainedBox {
             dir: UnconstrainedDir::Both,
@@ -68,7 +68,6 @@ impl ComposeChild for TextEditorArea {
       let scheduler = ctx.wnd_ctx().frame_scheduler();
 
       let_watch!(Point::new(caret.left_anchor.abs_value(1.), caret.top_anchor.abs_value(1.)))
-        .distinct_until_changed()
         .scan_initial((Point::zero(), Point::zero()), |pair, v| (pair.1, v))
         .subscribe(move |(before, after)| {
           let pos = auto_scroll_pos(&container, before, after, caret.layout_size());
