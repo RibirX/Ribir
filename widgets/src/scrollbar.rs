@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::layout::{Container, Stack};
+use crate::layout::{Container, Stack, StackFit};
 use ribir_core::prelude::*;
 
 /// A control widget that enables the user to access horizontal parts child that
@@ -67,12 +67,11 @@ impl ComposeChild for HScrollBar {
     widget! {
       states { this: this.into_writable() }
       Stack {
+        fit: StackFit::Passthrough,
         ScrollableWidget {
           id: scrolling,
           scrollable: Scrollable::X,
           scroll_pos: Point::new(this.offset, 0.),
-          v_align: VAlign::Stretch,
-          h_align: HAlign::Stretch,
           DynWidget { dyns: child }
         }
         HRawScrollbar {
@@ -105,12 +104,11 @@ impl ComposeChild for VScrollBar {
     widget! {
       states { this: this.into_writable() }
       Stack {
+        fit: StackFit::Passthrough,
         ScrollableWidget {
           id: scrolling,
           scrollable: Scrollable::Y,
           scroll_pos: Point::new(0., this.offset),
-          v_align: VAlign::Stretch,
-          h_align: HAlign::Stretch,
           DynWidget { dyns: child }
         }
         VRawScrollbar {
@@ -142,12 +140,11 @@ impl ComposeChild for BothScrollbar {
     widget! {
       states { this: this.into_writable() }
       Stack {
+        fit: StackFit::Passthrough,
         ScrollableWidget {
           id: scrolling,
           scrollable: Scrollable::Both,
           scroll_pos: this.offset,
-          v_align: VAlign::Stretch,
-          h_align: HAlign::Stretch,
           DynWidget { dyns: child }
         }
         HRawScrollbar {
@@ -292,7 +289,7 @@ impl CustomStyle for ScrollBarStyle {
 
 #[cfg(test)]
 mod test {
-  use crate::layout::Column;
+  use crate::layout::{Column, ConstrainedBox};
 
   use super::*;
   use ribir_core::test_helper::*;
@@ -300,15 +297,19 @@ mod test {
 
   fn content_expand_so_all_view_can_scroll() -> Widget {
     widget! {
-      Stack {
-        HScrollBar {
-          Container { size: Size::new(100., 100.) }
-        }
-        VScrollBar {
-          Container { size: Size::new(100., 100.) }
-        }
-        BothScrollbar {
-          Container { size: Size::new(100., 100.) }
+      ConstrainedBox {
+        clamp: BoxClamp::EXPAND_BOTH,
+        Stack {
+          fit: StackFit::Passthrough,
+          HScrollBar {
+            Container { size: Size::new(100., 100.) }
+          }
+          VScrollBar {
+            Container { size: Size::new(100., 100.) }
+          }
+          BothScrollbar {
+            Container { size: Size::new(100., 100.) }
+          }
         }
       }
     }
@@ -316,9 +317,9 @@ mod test {
   widget_layout_test!(
     content_expand_so_all_view_can_scroll,
     wnd_size = Size::new(200., 200.),
-    { path = [0, 0], width == 200., height == 200., }
-    { path = [0, 1], width == 200., height == 200., }
-    { path = [0, 2], width == 200., height == 200., }
+    { path = [0, 0, 0], width == 200., height == 200., }
+    { path = [0, 0, 1], width == 200., height == 200., }
+    { path = [0, 0, 2], width == 200., height == 200., }
   );
 
   #[test]
