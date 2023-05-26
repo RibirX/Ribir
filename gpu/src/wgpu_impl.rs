@@ -204,7 +204,19 @@ impl GPUBackendImpl for WgpuImpl {
     from_rect: &DeviceRect,
   ) {
     if dist_tex.format() == from_tex.format() {
-      self.copy_same_format_texture(dist_tex, dist_pos, from_tex, from_rect);
+      self.copy_same_format_texture(
+        dist_tex.inner_tex.texture(),
+        dist_pos,
+        from_tex.inner_tex.texture(),
+        from_rect,
+      );
+      if let Some(multi_sampler) = dist_tex.multisampler.as_ref() {
+        let from = from_tex
+          .multisampler
+          .as_ref()
+          .expect("multisampler texture must copy from a multismapler texture.");
+        self.copy_same_format_texture(multi_sampler, dist_pos, from, from_rect);
+      }
     } else {
       self.draw_texture_to_texture(dist_tex, dist_pos, from_tex, from_rect)
     }
@@ -222,7 +234,8 @@ pub struct WgpuTexture {
   inner_tex: InnerTexture,
   view: wgpu::TextureView,
   anti_aliasing: AntiAliasing,
-  multisampler: Option<wgpu::TextureView>,
+  multisampler: Option<wgpu::Texture>,
+  multisampler_view: Option<wgpu::TextureView>,
 }
 
 enum InnerTexture {
@@ -277,7 +290,7 @@ impl WgpuTexture {
     let view = self.view();
     let ops = wgpu::Operations { load, store: true };
 
-    if let Some(multi_sample) = &self.multisampler {
+    if let Some(multi_sample) = &self.multisampler_view {
       wgpu::RenderPassColorAttachment {
         view: multi_sample,
         resolve_target: Some(view),
@@ -295,6 +308,7 @@ impl WgpuTexture {
       view,
       anti_aliasing: AntiAliasing::None,
       multisampler: None,
+      multisampler_view: None,
     }
   }
 
@@ -339,13 +353,16 @@ impl Texture for WgpuTexture {
         sample_count: anti_aliasing as u32,
         dimension: wgpu::TextureDimension::D2,
         format: self.format(),
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+          | wgpu::TextureUsages::COPY_SRC
+          | wgpu::TextureUsages::COPY_DST,
         label: None,
         view_formats: &[],
       };
       let m_sampler = host.device.create_texture(m_desc);
       self.anti_aliasing = anti_aliasing;
-      self.multisampler = Some(m_sampler.create_view(&<_>::default()));
+      self.multisampler_view = Some(m_sampler.create_view(&<_>::default()));
+      self.multisampler = Some(m_sampler);
     }
   }
 
@@ -559,9 +576,9 @@ impl WgpuImpl {
 
   fn copy_same_format_texture(
     &mut self,
-    dist_tex: &WgpuTexture,
+    dist_tex: &wgpu::Texture,
     copy_to: DevicePoint,
-    from_tex: &WgpuTexture,
+    from_tex: &wgpu::Texture,
     from_rect: &DeviceRect,
   ) {
     assert_eq!(dist_tex.format(), from_tex.format());
@@ -584,13 +601,13 @@ impl WgpuImpl {
     };
     encoder.copy_texture_to_texture(
       wgpu::ImageCopyTexture {
-        texture: from_tex.inner_tex.texture(),
+        texture: from_tex,
         mip_level: 0,
         origin: src_origin,
         aspect: wgpu::TextureAspect::All,
       },
       wgpu::ImageCopyTexture {
-        texture: dist_tex.inner_tex.texture(),
+        texture: dist_tex,
         mip_level: 0,
         origin: dst_origin,
         aspect: wgpu::TextureAspect::All,
