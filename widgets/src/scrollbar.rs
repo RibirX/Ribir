@@ -84,6 +84,13 @@ impl ComposeChild for HScrollBar {
           .distinct_until_changed()
           .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(move |v| this.offset = v);
+        let_watch!(this.offset)
+          .distinct_until_changed()
+          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .subscribe(move |v| {
+            let y = scrolling.scroll_pos.y;
+            scrolling.jump_to(Point::new(v, y));
+          });
       }
     }
   }
@@ -121,6 +128,13 @@ impl ComposeChild for VScrollBar {
           .distinct_until_changed()
           .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(move |v| this.offset = v);
+        let_watch!(this.offset)
+          .distinct_until_changed()
+          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .subscribe(move |v| {
+            let x = scrolling.scroll_pos.x;
+            scrolling.jump_to(Point::new(x, v));
+          });
       }
     }
   }
@@ -165,6 +179,12 @@ impl ComposeChild for BothScrollbar {
           .distinct_until_changed()
           .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
           .subscribe(move |v| this.offset = v);
+        let_watch!(this.offset)
+          .distinct_until_changed()
+          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .subscribe(move |v| {
+            scrolling.jump_to(v);
+          });
       }
     }
   }
