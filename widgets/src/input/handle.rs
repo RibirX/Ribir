@@ -1,6 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
-use ribir_core::prelude::{CharsEvent, GraphemeCursor, KeyboardEvent, TextWriter, VirtualKeyCode};
+use ribir_core::prelude::{
+  CharsEvent, GraphemeCursor, KeyboardEvent, StateRef, TextWriter, VirtualKeyCode,
+};
 
 #[macro_export]
 macro_rules! declare_writer {
@@ -41,9 +43,9 @@ macro_rules! declare_writer {
 }
 
 declare_writer!(InputWriter, TextEditorArea);
-use super::{glyphs_helper::GlyphsHelper, TextEditorArea};
+use super::TextEditorArea;
 impl TextEditorArea {
-  pub(crate) fn edit_handle(&mut self, event: &mut CharsEvent) {
+  pub(crate) fn edit_handle(this: &mut StateRef<TextEditorArea>, event: &mut CharsEvent) {
     if event.common.with_command_key() {
       return;
     }
@@ -53,79 +55,65 @@ impl TextEditorArea {
       .filter(|c| !c.is_control())
       .collect::<String>();
     if !chars.is_empty() {
-      let rg = self.caret.select_range();
-      let mut writer = InputWriter::new(self);
+      let rg = this.caret.select_range();
+      let mut writer = InputWriter::new(this);
       writer.delete_byte_range(&rg);
       writer.insert_str(&chars);
     }
   }
 
-  pub(crate) fn key_handle(&mut self, event: &mut KeyboardEvent, helper: &GlyphsHelper) {
+  pub(crate) fn key_handle(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEvent) {
     let mut deal = false;
     if event.common.with_command_key() {
-      deal = self.key_with_command(event, helper)
+      deal = key_with_command(this, event)
     }
-
-    if deal {
-      return;
+    if !deal {
+      single_key(this, event);
     }
-    self.single_key(event, helper);
   }
+}
 
-  fn key_with_command(&mut self, event: &mut KeyboardEvent, _helper: &GlyphsHelper) -> bool {
-    if event.key == VirtualKeyCode::V && event.common.with_command_key() {
-      let clipboard = event.context().clipboard();
-      let txt = clipboard.borrow_mut().read_text();
-      if let Ok(txt) = txt {
-        let rg = self.caret.select_range();
-        let mut writer = InputWriter::new(self);
-        if !rg.is_empty() {
-          writer.delete_byte_range(&rg);
-        }
-        writer.insert_chars(&txt);
+fn key_with_command(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEvent) -> bool {
+  if event.key == VirtualKeyCode::V && event.common.with_command_key() {
+    let clipboard = event.context().clipboard();
+    let txt = clipboard.borrow_mut().read_text();
+    if let Ok(txt) = txt {
+      let rg = this.caret.select_range();
+      let mut writer = InputWriter::new(this);
+      if !rg.is_empty() {
+        writer.delete_byte_range(&rg);
       }
-      return true;
+      writer.insert_chars(&txt);
     }
-    false
+    return true;
   }
+  false
+}
 
-  fn single_key(&mut self, key: &mut KeyboardEvent, helper: &GlyphsHelper) -> bool {
-    match key.key {
-      VirtualKeyCode::Left => {
-        self.caret = helper.prev_cluster(self.caret.offset()).into();
+fn single_key(this: &mut StateRef<TextEditorArea>, key: &mut KeyboardEvent) -> bool {
+  match key.key {
+    VirtualKeyCode::NumpadEnter | VirtualKeyCode::Return => {
+      if this.multi_line {
+        InputWriter::new(this).insert_str("\r");
       }
-      VirtualKeyCode::Right => {
-        self.caret = helper.next_cluster(self.caret.offset()).into();
+    }
+    VirtualKeyCode::Back => {
+      let rg = this.caret.select_range();
+      if rg.is_empty() {
+        InputWriter::new(this).back_space();
+      } else {
+        InputWriter::new(this).delete_byte_range(&rg);
       }
-      VirtualKeyCode::Up => {
-        self.caret = helper.up_cluster(self.caret.offset()).into();
+    }
+    VirtualKeyCode::Delete => {
+      let rg = this.caret.select_range();
+      if rg.is_empty() {
+        InputWriter::new(this).del_char();
+      } else {
+        InputWriter::new(this).delete_byte_range(&rg);
       }
-      VirtualKeyCode::Down => {
-        self.caret = helper.down_cluster(self.caret.offset()).into();
-      }
-      VirtualKeyCode::NumpadEnter | VirtualKeyCode::Return => {
-        if self.multi_line {
-          InputWriter::new(self).insert_str("\r");
-        }
-      }
-      VirtualKeyCode::Back => {
-        let rg = self.caret.select_range();
-        if rg.is_empty() {
-          InputWriter::new(self).back_space();
-        } else {
-          InputWriter::new(self).delete_byte_range(&rg);
-        }
-      }
-      VirtualKeyCode::Delete => {
-        let rg = self.caret.select_range();
-        if rg.is_empty() {
-          InputWriter::new(self).del_char();
-        } else {
-          InputWriter::new(self).delete_byte_range(&rg);
-        }
-      }
-      _ => (),
-    };
-    true
-  }
+    }
+    _ => (),
+  };
+  true
 }

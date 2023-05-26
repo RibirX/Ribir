@@ -48,18 +48,7 @@ impl ComposeChild for TextSelectable {
           }
         },
 
-        on_key_down: move |event| {
-          if event.key == VirtualKeyCode::C && event.common.with_command_key(){
-            let rg = this.caret.select_range();
-            if !rg.is_empty() {
-              let substr = text.text.substr(rg);
-              let clipboard = event.context().clipboard();
-              let _ = clipboard.borrow_mut().clear();
-              let _ = clipboard.borrow_mut().write_text(&substr);
-            }
-            event.stop_bubbling();
-          }
-        },
+        on_key_down: move |event| key_handle(&mut this, &text.text, event),
         SelectedText {
           id: selected,
           rects: vec![],
@@ -90,4 +79,64 @@ impl TextSelectable {
   pub fn cursor_layout(&self) -> (Point, f32) { self.helper.cursor(self.caret.offset()) }
 
   fn selected_rect(&self) -> Vec<Rect> { self.helper.selection(&self.caret.select_range()) }
+}
+
+fn key_handle(this: &mut StateRef<TextSelectable>, text: &CowArc<str>, event: &mut KeyboardEvent) {
+  let mut deal = false;
+  if event.with_command_key() {
+    deal = deal_with_command(this, text, event);
+  }
+
+  if !deal {
+    deal_with_selection(this, event);
+  }
+}
+
+fn deal_with_command(
+  this: &mut StateRef<TextSelectable>,
+  text: &CowArc<str>,
+  event: &mut KeyboardEvent,
+) -> bool {
+  match event.key {
+    VirtualKeyCode::C => {
+      let rg = this.caret.select_range();
+      if !rg.is_empty() {
+        let clipboard = event.context().clipboard();
+        let _ = clipboard.borrow_mut().clear();
+        let _ = clipboard.borrow_mut().write_text(&text.substr(rg));
+      }
+    }
+    VirtualKeyCode::A => {
+      this.caret = CaretState::Select(0, text.len());
+    }
+    _ => return false,
+  }
+  true
+}
+
+fn deal_with_selection(this: &mut StateRef<TextSelectable>, event: &mut KeyboardEvent) {
+  let old_caret = this.caret;
+  match event.key {
+    VirtualKeyCode::Left => {
+      this.caret = this.helper.prev_cluster(this.caret.offset()).into();
+    }
+    VirtualKeyCode::Right => {
+      this.caret = this.helper.next_cluster(this.caret.offset()).into();
+    }
+    VirtualKeyCode::Up => {
+      this.caret = this.helper.up_cluster(this.caret.offset()).into();
+    }
+    VirtualKeyCode::Down => {
+      this.caret = this.helper.down_cluster(this.caret.offset()).into();
+    }
+    _ => (),
+  }
+
+  if event.with_shift_key() && old_caret != this.caret {
+    this.caret = match old_caret {
+      CaretState::Caret(begin) | CaretState::Select(begin, _) | CaretState::Selecting(begin, _) => {
+        CaretState::Select(begin, this.caret.offset())
+      }
+    };
+  }
 }
