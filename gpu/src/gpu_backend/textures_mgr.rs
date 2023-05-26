@@ -377,38 +377,29 @@ where
   }
 
   pub(crate) fn end_frame(&mut self) {
-    if self.rgba_atlas.hint_clear() {
-      self.rgba_atlas.clear();
-      self.resource_cache.clear();
-    } else {
-      self
-        .resource_cache
-        .end_frame("image atlas")
-        .for_each(|dist| match dist {
-          TextureDist::Atlas { alloc_id, .. } => {
-            self.rgba_atlas.deallocate(alloc_id);
-          }
-          TextureDist::Extra(id) => {
-            self.extra_textures.remove(id as usize);
-          }
-        });
-    }
-    if self.alpha_atlas.hint_clear() {
-      self.alpha_atlas.clear();
-      self.path_cache.clear();
-    } else {
-      self
-        .path_cache
-        .end_frame("path atlas")
-        .for_each(|(_, dist)| match dist {
-          TextureDist::Atlas { alloc_id, .. } => {
-            self.alpha_atlas.deallocate(alloc_id);
-          }
-          TextureDist::Extra(id) => {
-            self.extra_textures.remove(id as usize);
-          }
-        });
-    }
+    self
+      .resource_cache
+      .end_frame("image atlas")
+      .for_each(|dist| match dist {
+        TextureDist::Atlas { alloc_id, .. } => {
+          self.rgba_atlas.deallocate(alloc_id);
+        }
+        TextureDist::Extra(id) => {
+          self.extra_textures.remove(id as usize);
+        }
+      });
+
+    self
+      .path_cache
+      .end_frame("path atlas")
+      .for_each(|(_, dist)| match dist {
+        TextureDist::Atlas { alloc_id, .. } => {
+          self.alpha_atlas.deallocate(alloc_id);
+        }
+        TextureDist::Extra(id) => {
+          self.extra_textures.remove(id as usize);
+        }
+      });
   }
 
   fn anti_aliasing(&self) -> AntiAliasing { self.texture(TextureID::AlphaAtlas).anti_aliasing() }
@@ -690,5 +681,19 @@ pub mod tests {
 
     assert_eq!(ts1, Transform::new(1., 0., 0., 1., -2., -2.));
     assert_eq!(ts2, Transform::new(0.5, 0., 0., 0.5, 99., 99.));
+  }
+
+  #[test]
+  fn fix_texture_leak() {
+    let mut wgpu = block_on(WgpuImpl::headless());
+    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
+    let red_img = color_image(Color::RED, 32, 32);
+    let yellow_img = color_image(Color::YELLOW, 8192, 32);
+    mgr.store_image(&red_img, &mut wgpu);
+    mgr.store_image(&yellow_img, &mut wgpu);
+    mgr.end_frame();
+    mgr.end_frame();
+
+    assert!(mgr.extra_textures.is_empty())
   }
 }
