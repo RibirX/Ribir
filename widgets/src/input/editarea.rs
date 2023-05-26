@@ -26,8 +26,8 @@ impl ComposeChild for TextEditorArea {
       id: container,
       scrollable: this.scroll_dir(),
       padding: EdgeInsets::horizontal(1.),
-      on_key_down: move|key| this.key_handle(key, &selectable.helper),
-      on_chars: move|ch| this.edit_handle(ch),
+      on_key_down: move|key| Self::key_handle(&mut this, key),
+      on_chars: move|ch| Self::edit_handle(&mut this, ch),
 
       Stack {
         fit: StackFit::Passthrough,
