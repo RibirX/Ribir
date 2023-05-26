@@ -9,12 +9,12 @@ use std::time::Duration;
 
 pub use caret_state::CaretState;
 
-pub use text_selectable::TextSelectable;
-
 use self::editarea::TextEditorArea;
 pub use self::selected_text::SelectedTextStyle;
-use crate::layout::ConstrainedBox;
+use crate::{declare_writer, layout::ConstrainedBox};
 use ribir_core::prelude::*;
+use std::ops::{Deref, DerefMut};
+pub use text_selectable::TextSelectable;
 
 pub struct Placeholder(CowArc<str>);
 
@@ -73,7 +73,10 @@ impl Input {
     self.caret = caret;
     self.caret.valid(self.text.len());
   }
+
+  pub fn writer(&mut self) -> impl DerefMut<Target = TextWriter> + '_ { InputWriter::new(self) }
 }
+declare_writer!(InputWriter, Input);
 
 impl TextArea {
   pub fn text(&self) -> CowArc<str> { self.text.clone() }
@@ -89,7 +92,10 @@ impl TextArea {
     self.caret = caret;
     self.caret.valid(self.text.len());
   }
+
+  pub fn writer(&mut self) -> impl DerefMut<Target = TextWriter> + '_ { TextAreaWriter::new(self) }
 }
+declare_writer!(TextAreaWriter, TextArea);
 
 impl ComposeChild for Input {
   type Child = Option<Placeholder>;
