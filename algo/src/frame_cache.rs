@@ -798,6 +798,13 @@ impl<K: Hash + Eq, V> FrameCache<K, V> {
     }
   }
 
+  fn break_at(&mut self, node: *mut LruEntry<K, V>) {
+    unsafe {
+      (*(*node).prev).next = ptr::null_mut();
+      (*node).prev = ptr::null_mut();
+    }
+  }
+
   // Attaches `node` after the sigil `self.head` node.
   fn attach(&mut self, node: *mut LruEntry<K, V>) {
     unsafe {
@@ -831,9 +838,15 @@ pub struct FrameDrain<'a, K: Hash + Eq, V> {
 
 impl<'a, K: Hash + Eq, V> FrameDrain<'a, K, V> {
   pub fn new(cache: &'a mut FrameCache<K, V>, label: &'a str) -> Self {
+    let tail = cache.tail;
+
     unsafe {
-      let cursor = (*cache.tail).next;
-      (*cache.tail).next = ptr::null_mut();
+      cache.break_at(tail);
+      let cursor = (*tail).next;
+      if !cursor.is_null() {
+        cache.break_at(cursor);
+      }
+      cache.attach(tail);
       let size = cache.len();
       FrameDrain { size, cache, label, cursor }
     }
@@ -851,10 +864,10 @@ impl<'a, K: Hash + Eq, V> Iterator for FrameDrain<'a, K, V> {
         self.cache.map.remove(&old_key).unwrap();
         let v = *Box::from_raw(self.cursor);
 
-        let LruEntry { mut key, val, .. } = v;
+        let LruEntry { mut key, val, next, .. } = v;
         ptr::drop_in_place(key.as_mut_ptr());
 
-        self.cursor = (*self.cursor).next;
+        self.cursor = next;
         Some(val.assume_init())
       }
     } else {
@@ -867,14 +880,11 @@ impl<'a, K: Hash + Eq, V> Drop for FrameDrain<'a, K, V> {
   fn drop(&mut self) {
     while self.next().is_some() {}
 
-    let cache = &mut self.cache;
-    cache.detach(cache.tail);
-    cache.attach(cache.tail);
     if self.size > 0 {
       log::info!(
         "Frame[{}]: cache hit percent is {:.1}%",
         self.label,
-        cache.len() as f32 / self.size as f32
+        self.cache.len() as f32 / self.size as f32
       );
     }
   }
@@ -1759,5 +1769,13 @@ mod tests {
     assert_eq!(cache.pop_lru(), Some((1, 1)));
     assert_eq!(cache.pop_lru(), Some((0, 0)));
     assert_eq!(cache.pop_lru(), None);
+  }
+
+  #[test]
+  fn end_frame_remove_none() {
+    let mut cache = FrameCache::new();
+    cache.put(1, 1);
+    cache.end_frame("");
+    cache.end_frame("");
   }
 }
