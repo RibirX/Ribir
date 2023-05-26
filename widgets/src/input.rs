@@ -9,6 +9,7 @@ use std::time::Duration;
 
 pub use caret_state::CaretState;
 
+pub use self::editarea::PlaceholderStyle;
 use self::editarea::TextEditorArea;
 pub use self::selected_text::SelectedTextStyle;
 use crate::{declare_writer, layout::ConstrainedBox};
