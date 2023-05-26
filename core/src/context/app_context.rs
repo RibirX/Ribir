@@ -60,7 +60,7 @@ impl AppContext {
     let reorder = TextReorder::default();
     let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
 
-    AppContext {
+    let ctx = AppContext {
       font_db,
       app_theme,
       shaper,
@@ -69,7 +69,9 @@ impl AppContext {
       clipboard: Rc::new(RefCell::new(MockClipboard {})),
       executor: <_>::default(),
       runtime_waker: Arc::new(Box::new(move || unimplemented!())),
-    }
+    };
+    ctx.load_font_from_theme(ctx.app_theme());
+    ctx
   }
 
   pub fn app_theme(&self) -> &Theme { unsafe { self.app_theme.as_ref() } }
