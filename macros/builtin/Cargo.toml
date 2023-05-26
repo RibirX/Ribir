@@ -22,4 +22,4 @@ smallvec.workspace = true
 
 [dependencies.syn]
 features = ["full"]
-version = "1.0.109"
+version = "2.0.17"
