@@ -2,39 +2,45 @@ use std::ops::{Deref, DerefMut};
 
 use ribir_core::prelude::{CharsEvent, GraphemeCursor, KeyboardEvent, TextWriter, VirtualKeyCode};
 
-struct InputWriter<'a> {
-  input: &'a mut TextEditorArea,
-  writer: TextWriter<GraphemeCursor>,
-}
-
-impl<'a> InputWriter<'a> {
-  fn new(input: &'a mut TextEditorArea) -> Self {
-    let cursor = GraphemeCursor(input.caret.offset());
-    let string = input.text.to_string();
-    Self {
-      input,
-      writer: TextWriter::new(string, cursor),
+#[macro_export]
+macro_rules! declare_writer {
+  ($writer: ident, $host: ident) => {
+    struct $writer<'a> {
+      input: &'a mut $host,
+      writer: TextWriter<GraphemeCursor>,
     }
-  }
+
+    impl<'a> $writer<'a> {
+      fn new(input: &'a mut $host) -> Self {
+        let cursor = GraphemeCursor(input.caret.offset());
+        let string = input.text.to_string();
+        Self {
+          input,
+          writer: TextWriter::new(string, cursor),
+        }
+      }
+    }
+
+    impl<'a> Drop for $writer<'a> {
+      fn drop(&mut self) {
+        let Self { input, writer } = self;
+        input.caret = writer.byte_offset().into();
+        input.text = writer.text().clone().into();
+      }
+    }
+
+    impl<'a> Deref for $writer<'a> {
+      type Target = TextWriter<GraphemeCursor>;
+      fn deref(&self) -> &Self::Target { &self.writer }
+    }
+
+    impl<'a> DerefMut for $writer<'a> {
+      fn deref_mut(&mut self) -> &mut Self::Target { &mut self.writer }
+    }
+  };
 }
 
-impl<'a> Drop for InputWriter<'a> {
-  fn drop(&mut self) {
-    let Self { input, writer } = self;
-    input.caret = writer.byte_offset().into();
-    input.text = writer.text().clone().into();
-  }
-}
-
-impl<'a> Deref for InputWriter<'a> {
-  type Target = TextWriter<GraphemeCursor>;
-  fn deref(&self) -> &Self::Target { &self.writer }
-}
-
-impl<'a> DerefMut for InputWriter<'a> {
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.writer }
-}
-
+declare_writer!(InputWriter, TextEditorArea);
 use super::{glyphs_helper::GlyphsHelper, TextEditorArea};
 impl TextEditorArea {
   pub(crate) fn edit_handle(&mut self, event: &mut CharsEvent) {

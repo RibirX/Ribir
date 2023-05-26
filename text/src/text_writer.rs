@@ -1,5 +1,7 @@
 use std::ops::Range;
 
+use crate::GraphemeCursor;
+
 pub struct ControlChar;
 
 #[allow(dead_code)]
@@ -24,7 +26,7 @@ pub trait CharacterCursor {
   fn reset(&mut self, byte_offset: usize);
 }
 
-pub struct TextWriter<T>
+pub struct TextWriter<T = GraphemeCursor>
 where
   T: CharacterCursor,
 {
@@ -38,11 +40,16 @@ where
 {
   pub fn new(text: String, cursor: T) -> Self { Self { text, cursor } }
 
-  pub fn dispose(self) -> (String, T) { (self.text, self.cursor) }
-
   pub fn text(&self) -> &String { &self.text }
 
   pub fn byte_offset(&self) -> usize { self.cursor.byte_offset() }
+
+  pub fn set_to(&mut self, byte_offset: usize) {
+    assert!(byte_offset <= self.text.len());
+    self.cursor.reset(byte_offset);
+  }
+
+  pub fn move_by_char(&mut self, offset: isize) { self.cursor.move_by_char(&self.text, offset); }
 
   pub fn insert_chars(&mut self, s: &str) {
     self.text.insert_str(self.cursor.byte_offset(), s);
