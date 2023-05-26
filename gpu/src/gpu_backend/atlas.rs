@@ -10,9 +10,8 @@ pub const ATLAS_MIN_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
 pub const ATLAS_MAX_SIZE: DeviceSize = DeviceSize::new(4096, 4096);
 
 pub(crate) struct Atlas<T: Texture> {
-  pub texture: T,
   pub atlas_allocator: AtlasAllocator,
-  need_rearrange: bool,
+  pub texture: T,
 }
 
 impl<T: Texture> Atlas<T> {
@@ -24,7 +23,6 @@ impl<T: Texture> Atlas<T> {
     Self {
       texture,
       atlas_allocator: AtlasAllocator::new(ATLAS_MIN_SIZE.cast_unit()),
-      need_rearrange: false,
     }
   }
 
@@ -36,8 +34,9 @@ impl<T: Texture> Atlas<T> {
   {
     let alloc_size = size.to_i32().cast_unit();
     let mut alloc = self.atlas_allocator.allocate(alloc_size);
+
     if alloc.is_none() {
-      let expand_size = (size * 2).max(self.size()).min(ATLAS_MAX_SIZE);
+      let expand_size = (self.size() * 2).max(self.size()).min(ATLAS_MAX_SIZE);
       if expand_size != self.texture.size() {
         self.atlas_allocator.grow(expand_size.cast_unit());
         let mut new_tex = gpu_impl.new_texture(
@@ -56,29 +55,30 @@ impl<T: Texture> Atlas<T> {
         alloc = self.atlas_allocator.allocate(alloc_size);
       }
     }
-    if alloc.is_none() && self.used_rate() < 0.7 {
-      self.need_rearrange = true;
-    }
 
     alloc
   }
 
   pub fn deallocate(&mut self, id: AllocId) { self.atlas_allocator.deallocate(id); }
 
-  pub fn used_rate(&self) -> f32 {
-    let mut area = 0;
-    self
-      .atlas_allocator
-      .for_each_allocated_rectangle(|_, rect| area += rect.area());
-    area as f32 / self.texture.size().area() as f32
-  }
-
   pub fn size(&self) -> DeviceSize { self.texture.size() }
 
-  pub fn hint_clear(&self) -> bool { self.need_rearrange }
+  pub fn clear(&mut self) { self.atlas_allocator.clear(); }
+}
 
-  pub fn clear(&mut self) {
-    self.need_rearrange = false;
-    self.atlas_allocator.clear();
+#[cfg(feature = "wgpu")]
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::{WgpuImpl, WgpuTexture};
+  use futures::executor::block_on;
+
+  #[test]
+  fn atlas_grow_to_alloc() {
+    let mut gpu_impl = block_on(WgpuImpl::headless());
+    let mut atlas =
+      Atlas::<WgpuTexture>::new(ColorFormat::Alpha8, AntiAliasing::None, &mut gpu_impl);
+    let size = DeviceSize::new(ATLAS_MIN_SIZE.width + 1, 16);
+    assert!(atlas.allocate(size, &mut gpu_impl).is_some());
   }
 }
