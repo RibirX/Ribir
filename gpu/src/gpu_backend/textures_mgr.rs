@@ -10,6 +10,7 @@ use ribir_painter::{
   image::ColorFormat, AntiAliasing, PaintPath, Path, PathSegment, PixelImage, Vertex, VertexBuffers,
 };
 use slab::Slab;
+use std::hash::{Hash, Hasher};
 use std::{cmp::Ordering, ops::Range};
 const TOLERANCE: f32 = 0.1_f32;
 const PAR_CHUNKS_SIZE: usize = 64;
@@ -28,7 +29,6 @@ pub(super) struct TexturesMgr<T: Texture> {
   extra_textures: Slab<T>,
   path_cache: FrameCache<PathKey, (f32, TextureDist)>,
   resource_cache: FrameCache<*const (), TextureDist>,
-  uncached: Vec<TextureDist>,
   fill_task: Vec<FillTask>,
   fill_task_buffers: VertexBuffers<f32>,
 }
@@ -78,7 +78,6 @@ where
       extra_textures: <_>::default(),
       path_cache: <_>::default(),
       resource_cache: <_>::default(),
-      uncached: <_>::default(),
       fill_task: <_>::default(),
       fill_task_buffers: <_>::default(),
     }
@@ -109,7 +108,7 @@ where
     }
 
     let prefer_scale: f32 = transform.m11.max(transform.m22);
-    let key = PathKey::from(&path);
+    let key = PathKey::from_path(path);
 
     let mut slice_ts = None;
 
@@ -117,15 +116,23 @@ where
       if *scale < prefer_scale {
         // we will add a larger path cache later.
         let (_, dist) = self.path_cache.pop(&key).unwrap();
-        self.uncached.push(dist)
+        match dist {
+          TextureDist::Atlas { alloc_id, .. } => {
+            self.alpha_atlas.deallocate(alloc_id);
+          }
+          TextureDist::Extra(id) => {
+            self.extra_textures.remove(id as usize);
+          }
+        };
       } else {
         let slice = dist.as_tex_slice(&self.extra_textures).cut_blank_edge();
-        let cache_ts = cache_transform(&path, *scale, &slice);
+        let cache_ts = cache_transform(key.path(), *scale, &slice);
         slice_ts = Some((slice, cache_ts));
       }
     }
     let (slice, cache_ts) = slice_ts.unwrap_or_else(|| {
       let anti_aliasing = self.anti_aliasing();
+      let path = key.path().clone();
       let scale_bounds = path.bounds().scale(prefer_scale, prefer_scale).round_out();
       let prefer_cache_size = path_add_edges(scale_bounds.size.to_i32().cast_unit());
       let tex_dist = self.inner_alloc(
@@ -134,13 +141,14 @@ where
         prefer_cache_size,
         gpu_impl,
       );
-      self.path_cache.put(key, (prefer_scale, tex_dist));
       let slice = tex_dist.as_tex_slice(&self.extra_textures);
       let cut_blank_slice = slice.cut_blank_edge();
       let ts = cache_transform(&path, prefer_scale, &cut_blank_slice);
+
       self
         .fill_task
         .push(FillTask { slice, path, ts, clip_rect: None });
+      self.path_cache.put(key, (prefer_scale, tex_dist));
 
       (cut_blank_slice, ts)
     });
@@ -158,7 +166,7 @@ where
 
     let anti_aliasing = self.anti_aliasing();
     let tex_dist = self.inner_alloc(ColorFormat::Alpha8, anti_aliasing, alloc_size, gpu_impl);
-    self.uncached.push(tex_dist);
+
     let slice = tex_dist.as_tex_slice(&self.extra_textures);
     let path_slice = slice.cut_blank_edge();
 
@@ -169,10 +177,14 @@ where
     let task = FillTask {
       slice,
       ts,
-      path: path.path,
+      path: path.path.clone(),
       clip_rect: Some(slice.rect),
     };
     self.fill_task.push(task);
+    self.path_cache.push(
+      PathKey::from_path_with_clip(path, clip_view),
+      (1., tex_dist),
+    );
 
     (slice, ts)
   }
@@ -365,21 +377,6 @@ where
   }
 
   pub(crate) fn end_frame(&mut self) {
-    self.uncached.drain(..).for_each(|u| match u {
-      TextureDist::Atlas { alloc_id, tex_rect } => match tex_rect.tex_id {
-        TextureID::AlphaAtlas => {
-          self.alpha_atlas.deallocate(alloc_id);
-        }
-        TextureID::RgbaAtlas => {
-          self.rgba_atlas.deallocate(alloc_id);
-        }
-        TextureID::Extra(_) => unreachable!(),
-      },
-      TextureDist::Extra(id) => {
-        self.extra_textures.try_remove(id as usize);
-      }
-    });
-
     if self.rgba_atlas.hint_clear() {
       self.rgba_atlas.clear();
       self.resource_cache.clear();
@@ -469,57 +466,132 @@ impl TextureDist {
   }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-struct PathKey(Box<[SegKey]>);
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-enum SegKey {
-  MoveTo(DevicePoint),
-  LineTo(DevicePoint),
-  QuadTo {
-    ctrl: DevicePoint,
-    to: DevicePoint,
+#[derive(Debug, Clone)]
+enum PathKey {
+  Path {
+    path: Path,
+    hash: u64,
   },
-  CubicTo {
-    to: DevicePoint,
-    ctrl1: DevicePoint,
-    ctrl2: DevicePoint,
+  PathWithClip {
+    path: PaintPath,
+    hash: u64,
+    clip_rect: DeviceRect,
   },
-  Close,
 }
 
-impl From<&Path> for PathKey {
-  fn from(value: &Path) -> Self {
-    let point_key = |pt: Point| {
-      // Path pan to origin for comparison
-      let pos = pt - value.bounds().origin;
-      Point::new(pos.x * 10., pos.y * 10.).to_i32().cast_unit()
-    };
-    let mut seg_keys = vec![];
-    for s in value.segments() {
-      match s {
-        PathSegment::MoveTo(to) => seg_keys.push(SegKey::MoveTo(point_key(to))),
-        PathSegment::LineTo(to) => seg_keys.push(SegKey::LineTo(point_key(to))),
-        PathSegment::QuadTo { ctrl, to } => seg_keys.push(SegKey::QuadTo {
-          ctrl: point_key(ctrl),
-          to: point_key(to),
-        }),
-        PathSegment::CubicTo { to, ctrl1, ctrl2 } => seg_keys.push(SegKey::CubicTo {
-          to: point_key(to),
-          ctrl1: point_key(ctrl1),
-          ctrl2: point_key(ctrl2),
-        }),
-        PathSegment::Close(b) => {
-          if b {
-            seg_keys.push(SegKey::Close)
-          }
-        }
-      };
-    }
+fn pos_100_device(pos: Point) -> DevicePoint {
+  Point::new(pos.x * 100., pos.y * 100.).to_i32().cast_unit()
+}
 
-    PathKey(seg_keys.into_boxed_slice())
+fn path_inner_pos(pos: Point, path: &Path) -> DevicePoint {
+  // Path pan to origin for comparison
+  let pos = pos - path.bounds().origin;
+  pos_100_device(pos.to_point())
+}
+
+fn path_hash(path: &Path, pos_adjust: impl Fn(Point) -> DevicePoint) -> u64 {
+  let mut state = ahash::AHasher::default();
+
+  for s in path.segments() {
+    // core::mem::discriminant(&s).hash(&mut state);
+    match s {
+      PathSegment::MoveTo(to) | PathSegment::LineTo(to) => {
+        pos_adjust(to).hash(&mut state);
+      }
+      PathSegment::QuadTo { ctrl, to } => {
+        pos_adjust(ctrl).hash(&mut state);
+        pos_adjust(to).hash(&mut state);
+      }
+      PathSegment::CubicTo { to, ctrl1, ctrl2 } => {
+        pos_adjust(to).hash(&mut state);
+        pos_adjust(ctrl1).hash(&mut state);
+        pos_adjust(ctrl2).hash(&mut state);
+      }
+      PathSegment::Close(b) => b.hash(&mut state),
+    };
+  }
+
+  state.finish()
+}
+
+fn path_eq(a: &Path, b: &Path, pos_adjust: impl Fn(Point, &Path) -> DevicePoint) -> bool {
+  let a_adjust = |pos| pos_adjust(pos, a);
+  let b_adjust = |pos| pos_adjust(pos, b);
+
+  a.segments().zip(b.segments()).all(|(a, b)| match (a, b) {
+    (PathSegment::MoveTo(a), PathSegment::MoveTo(b))
+    | (PathSegment::LineTo(a), PathSegment::LineTo(b)) => a_adjust(a) == b_adjust(b),
+    (PathSegment::QuadTo { ctrl, to }, PathSegment::QuadTo { ctrl: ctrl_b, to: to_b }) => {
+      a_adjust(ctrl) == b_adjust(ctrl_b) && a_adjust(to) == b_adjust(to_b)
+    }
+    (
+      PathSegment::CubicTo { to, ctrl1, ctrl2 },
+      PathSegment::CubicTo {
+        to: to_b,
+        ctrl1: ctrl1_b,
+        ctrl2: ctrl2_b,
+      },
+    ) => {
+      a_adjust(to) == b_adjust(to_b)
+        && a_adjust(ctrl1) == b_adjust(ctrl1_b)
+        && a_adjust(ctrl2) == b_adjust(ctrl2_b)
+    }
+    (PathSegment::Close(a), PathSegment::Close(b)) => a == b,
+    _ => false,
+  })
+}
+
+impl PathKey {
+  fn from_path(value: Path) -> Self {
+    let hash = path_hash(&value, |pos| path_inner_pos(pos, &value));
+    PathKey::Path { path: value, hash }
+  }
+
+  fn from_path_with_clip(path: PaintPath, clip_rect: DeviceRect) -> Self {
+    let hash = path_hash(&path.path, pos_100_device);
+    PathKey::PathWithClip { path, hash, clip_rect }
+  }
+
+  fn path(&self) -> &Path {
+    match self {
+      PathKey::Path { path, .. } => path,
+      PathKey::PathWithClip { path, .. } => &path.path,
+    }
   }
 }
+
+impl Hash for PathKey {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    match self {
+      PathKey::Path { hash, .. } => hash.hash(state),
+      PathKey::PathWithClip { hash, clip_rect, .. } => {
+        clip_rect.hash(state);
+        hash.hash(state)
+      }
+    }
+  }
+}
+
+impl PartialEq for PathKey {
+  fn eq(&self, other: &Self) -> bool {
+    match (self, other) {
+      (PathKey::Path { path: a, .. }, PathKey::Path { path: b, .. }) => {
+        path_eq(a, b, path_inner_pos)
+      }
+      (
+        PathKey::PathWithClip { path: a, clip_rect: view_rect_a, .. },
+        PathKey::PathWithClip { path: b, clip_rect: view_rect_b, .. },
+      ) => {
+        view_rect_a == view_rect_b
+          && a.transform == b.transform
+          && path_eq(&a.path, &b.path, move |p, _| pos_100_device(p))
+      }
+      _ => false,
+    }
+  }
+}
+
+impl Eq for PathKey {}
 
 pub fn prefer_cache_size(path: &Path, transform: &Transform) -> DeviceSize {
   let prefer_scale: f32 = transform.m11.max(transform.m22);
