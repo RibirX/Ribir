@@ -134,27 +134,29 @@ where
     gpu_impl: &mut T::Host,
   ) -> (TextureSlice, Transform) {
     let alloc_size: DeviceSize = path_add_edges(clip_view.size);
-    let paint_origin = path.paint_bounds.origin;
-    let transform = path.transform;
+    let path_ts = path.transform;
+
     let key = PathKey::from_path_with_clip(path, clip_view);
 
-    if let Some(h) = self.alpha_atlas.get(&key).copied() {
-      let slice = alpha_tex_slice(&self.alpha_atlas, &h).cut_blank_edge();
-      let ts = transform.then_translate(slice.rect.origin.to_f32().cast_unit() - paint_origin);
-      (slice, ts)
+    let slice = if let Some(h) = self.alpha_atlas.get(&key).copied() {
+      alpha_tex_slice(&self.alpha_atlas, &h).cut_blank_edge()
     } else {
       let path = key.path().clone();
       let h = self.alpha_atlas.allocate(key, 1., alloc_size, gpu_impl);
       let slice = alpha_tex_slice(&self.alpha_atlas, &h);
       let no_blank_slice = slice.cut_blank_edge();
-      let ts =
-        transform.then_translate(no_blank_slice.rect.origin.to_f32().cast_unit() - paint_origin);
       let clip_rect = Some(slice.rect);
+      let offset = (no_blank_slice.rect.origin - clip_view.origin)
+        .to_f32()
+        .cast_unit();
+      let ts = path_ts.then_translate(offset);
       let task = FillTask { slice, ts, path, clip_rect };
       self.fill_task.push(task);
+      no_blank_slice
+    };
 
-      (no_blank_slice, ts)
-    }
+    let offset = (clip_view.origin - slice.rect.origin).to_f32();
+    (slice, Transform::translation(offset.x, offset.y))
   }
 
   pub(super) fn store_image(
@@ -593,5 +595,24 @@ pub mod tests {
 
     assert_eq!(ts1, Transform::new(1., 0., 0., 1., -2., -2.));
     assert_eq!(ts2, Transform::new(0.5, 0., 0., 0.5, 99., 99.));
+  }
+
+  #[test]
+  fn store_clipped_path() {
+    let mut wgpu = block_on(WgpuImpl::headless());
+    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
+
+    let path = PaintPath::new(
+      Path::rect(&rect(20., 20., 300., 300.)),
+      Transform::new(2., 0., 0., 2., -10., -10.),
+    );
+    let clip_view = ribir_geom::rect(10, 10, 100, 100);
+
+    let (slice1, ts1) = mgr.store_clipped_path(clip_view, path.clone(), &mut wgpu);
+    let (slice2, ts2) = mgr.store_clipped_path(clip_view, path, &mut wgpu);
+    assert_eq!(slice1, slice2);
+    assert_eq!(ts1, ts2);
+    assert_eq!(slice1.rect, ribir_geom::rect(2, 2, 100, 100));
+    assert_eq!(ts1, Transform::new(1., 0., 0., 1., 8., 8.));
   }
 }
