@@ -126,13 +126,14 @@ impl FocusManager {
     }
 
     let focusing = focusing.filter(|node_id| self.ignore_scope_id(*node_id, arena).is_none());
-    let info = focusing
-      .and_then(|wid| self.node_ids.get(&wid))
-      .and_then(|id| self.get(*id));
+    let focus_node = focusing.and_then(|wid| self.node_ids.get(&wid));
+    let info = focus_node.and_then(|id: &NodeId| self.get(*id));
 
     let focus_to = if let Some(node) = info {
       if node.focus_type.contains(FocusType::SCOPE) {
-        self.focus_step(None, true, arena)
+        self
+          .focus_step_in_scope(*focus_node.unwrap(), None, false, arena)
+          .and_then(|id| self.assert_get(id).wid)
       } else {
         node.wid
       }
@@ -737,5 +738,42 @@ mod tests {
     wnd.draw_frame();
 
     assert_eq!(wnd.dispatcher.focusing(), focus_id);
+  }
+
+  #[test]
+  fn scope_node_request_focus() {
+    let w = widget! {
+      MockMulti{
+        MockBox{
+          size: Size::zero(),
+          on_key_down: move |_| {}
+        }
+        FocusScope {
+          MockBox{
+            size: Size::zero(),
+            MockBox{
+              size: Size::zero(),
+              on_key_down: move |_| {}
+            }
+          }
+        }
+        MockBox{
+          size: Size::zero(),
+          on_key_down: move |_| {}
+        }
+      }
+    };
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+
+    let Window { dispatcher, widget_tree: tree, .. } = &mut wnd.0;
+    let first_box = tree.root().first_child(&tree.arena);
+    let focus_scope = first_box.unwrap().next_sibling(&tree.arena);
+    dispatcher.focus_mgr.borrow_mut().request_focusing = Some(focus_scope);
+
+    let second_box = focus_scope.unwrap().first_child(&tree.arena);
+    let inner_box = second_box.unwrap().first_child(&tree.arena);
+    dispatcher.refresh_focus(tree);
+    assert_eq!(dispatcher.focusing(), inner_box);
   }
 }

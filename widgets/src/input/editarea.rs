@@ -22,43 +22,44 @@ impl ComposeChild for TextEditorArea {
     states {
       this: this.into_writable(),
     }
-    ScrollableWidget {
-      id: container,
-      scrollable: this.scroll_dir(),
-      padding: EdgeInsets::horizontal(1.),
+    FocusScope {
       on_key_down: move|key| Self::key_handle(&mut this, key),
       on_chars: move|ch| Self::edit_handle(&mut this, ch),
-
-      Stack {
-        fit: StackFit::Passthrough,
-        Option::map(placeholder, |holder| widget! {
-          Text {
-            visible: this.text.is_empty(),
-            text: holder.0,
+      ScrollableWidget {
+        id: container,
+        scrollable: this.scroll_dir(),
+        padding: EdgeInsets::horizontal(1.),
+        Stack {
+          fit: StackFit::Passthrough,
+          Option::map(placeholder, |holder| widget! {
+            Text {
+              visible: this.text.is_empty(),
+              text: holder.0,
+            }
+          })
+          TextSelectable {
+            id: selectable,
+            caret: this.caret,
+            Text {
+              text: this.text.clone(),
+              text_style: this.style.clone(),
+              overflow: this.overflow(),
+            }
           }
-        })
-        TextSelectable {
-          id: selectable,
-          caret: this.caret,
-          Text {
-            text: this.text.clone(),
-            text_style: this.style.clone(),
-            overflow: this.overflow(),
-          }
-        }
-        IgnorePointer{
-          UnconstrainedBox {
-            dir: UnconstrainedDir::Both,
-            Caret {
-              id: caret,
-              top_anchor: 0.,
-              left_anchor: 0.,
-              focused: container.has_focus(),
-              height: 0.,
-              on_performed_layout: move |ctx| {
-                let size = ctx.layout_info().and_then(|info| info.size).unwrap();
-                ctx.set_ime_pos(Point::new(0., size.height));
-              },
+          IgnorePointer{
+            UnconstrainedBox {
+              dir: UnconstrainedDir::Both,
+              Caret {
+                id: caret,
+                top_anchor: 0.,
+                left_anchor: 0.,
+                focused: container.has_focus(),
+                height: 0.,
+                on_performed_layout: move |ctx| {
+                  let size = ctx.layout_info().and_then(|info| info.size).unwrap();
+                  ctx.set_ime_pos(Point::new(0., size.height));
+                },
+              }
             }
           }
         }
