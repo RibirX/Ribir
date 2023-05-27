@@ -223,7 +223,7 @@ where
   fn begin_draw_phase(&mut self, viewport: DeviceRect) {
     self.tex_ids_map.new_phase();
     self.viewport = viewport;
-    self.tex_ids_map.tex_idx(TextureID::AlphaAtlas);
+    self.tex_ids_map.tex_idx(TextureID::Alpha(0));
   }
 
   fn end_draw_phase(&mut self) {

@@ -1,15 +1,14 @@
-use super::atlas::Atlas;
+use super::atlas::{Atlas, AtlasHandle};
 use super::Texture;
 use crate::add_draw_rect_vertices;
 use crate::{gpu_backend::atlas::ATLAS_MAX_ITEM, GPUBackendImpl};
-use guillotiere::{euclid::SideOffsets2D, AllocId};
+use guillotiere::euclid::SideOffsets2D;
 use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
-use ribir_algo::{FrameCache, ShareResource};
+use ribir_algo::ShareResource;
 use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize, Point, Transform};
 use ribir_painter::{
   image::ColorFormat, AntiAliasing, PaintPath, Path, PathSegment, PixelImage, Vertex, VertexBuffers,
 };
-use slab::Slab;
 use std::hash::{Hash, Hasher};
 use std::{cmp::Ordering, ops::Range};
 const TOLERANCE: f32 = 0.1_f32;
@@ -17,18 +16,13 @@ const PAR_CHUNKS_SIZE: usize = 64;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Copy)]
 pub(super) enum TextureID {
-  AlphaAtlas,
-  RgbaAtlas,
-  Extra(u32),
+  Alpha(usize),
+  Rgba(usize),
 }
 
 pub(super) struct TexturesMgr<T: Texture> {
-  // todo: pair of alpha_atlas and path_cache
-  alpha_atlas: Atlas<T>,
-  rgba_atlas: Atlas<T>,
-  extra_textures: Slab<T>,
-  path_cache: FrameCache<PathKey, (f32, TextureDist)>,
-  resource_cache: FrameCache<*const (), TextureDist>,
+  alpha_atlas: Atlas<T, PathKey, f32>,
+  rgba_atlas: Atlas<T, *const (), ()>,
   fill_task: Vec<FillTask>,
   fill_task_buffers: VertexBuffers<f32>,
 }
@@ -50,9 +44,8 @@ pub(super) struct TextureSlice {
 macro_rules! id_to_texture_mut {
   ($mgr: ident, $id: expr) => {
     match $id {
-      TextureID::AlphaAtlas => &mut $mgr.alpha_atlas.texture,
-      TextureID::RgbaAtlas => &mut $mgr.rgba_atlas.texture,
-      TextureID::Extra(id) => &mut $mgr.extra_textures[id as usize],
+      TextureID::Alpha(id) => $mgr.alpha_atlas.get_texture_mut(id),
+      TextureID::Rgba(id) => $mgr.rgba_atlas.get_texture_mut(id),
     }
   };
 }
@@ -60,9 +53,8 @@ macro_rules! id_to_texture_mut {
 macro_rules! id_to_texture {
   ($mgr: ident, $id: expr) => {
     match $id {
-      TextureID::AlphaAtlas => &$mgr.alpha_atlas.texture,
-      TextureID::RgbaAtlas => &$mgr.rgba_atlas.texture,
-      TextureID::Extra(id) => &$mgr.extra_textures[id as usize],
+      TextureID::Alpha(id) => $mgr.alpha_atlas.get_texture(id),
+      TextureID::Rgba(id) => $mgr.rgba_atlas.get_texture(id),
     }
   };
 }
@@ -73,20 +65,15 @@ where
 {
   pub(super) fn new(gpu_impl: &mut T::Host, anti_aliasing: AntiAliasing) -> Self {
     Self {
-      alpha_atlas: Atlas::new(ColorFormat::Alpha8, anti_aliasing, gpu_impl),
-      rgba_atlas: Atlas::new(ColorFormat::Rgba8, anti_aliasing, gpu_impl),
-      extra_textures: <_>::default(),
-      path_cache: <_>::default(),
-      resource_cache: <_>::default(),
+      alpha_atlas: Atlas::new("Alpha atlas", ColorFormat::Alpha8, anti_aliasing, gpu_impl),
+      rgba_atlas: Atlas::new("Rgba atlas", ColorFormat::Rgba8, anti_aliasing, gpu_impl),
       fill_task: <_>::default(),
       fill_task_buffers: <_>::default(),
     }
   }
 
   pub(super) fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing, host: &mut T::Host) {
-    let alpha_tex = self.texture_mut(TextureID::AlphaAtlas);
-    alpha_tex.set_anti_aliasing(anti_aliasing, host);
-    self.alpha_atlas.clear();
+    self.alpha_atlas.set_anti_aliasing(anti_aliasing, host);
   }
 
   /// Store an alpha path in texture and return the texture and a transform that
@@ -97,10 +84,10 @@ where
     transform: &Transform,
     gpu_impl: &mut T::Host,
   ) -> (TextureSlice, Transform) {
-    fn cache_transform(path: &Path, cache_scale: f32, tex_slice: &TextureSlice) -> Transform {
+    fn cache_transform(path: &Path, cache_scale: f32, tex_rect: &DeviceRect) -> Transform {
       let scale_bounds = path.bounds().scale(cache_scale, cache_scale).round_out();
       Transform::scale(cache_scale, cache_scale)
-        .then_translate(tex_slice.rect.origin.to_f32().cast_unit() - scale_bounds.origin)
+        .then_translate(tex_rect.origin.to_f32().cast_unit() - scale_bounds.origin)
     }
 
     fn cache_to_view(cache_ts: &Transform, path_ts: &Transform) -> Transform {
@@ -110,48 +97,32 @@ where
     let prefer_scale: f32 = transform.m11.max(transform.m22);
     let key = PathKey::from_path(path);
 
-    let mut slice_ts = None;
-
-    if let Some((scale, dist)) = self.path_cache.get(&key) {
-      if *scale < prefer_scale {
-        // we will add a larger path cache later.
-        let (_, dist) = self.path_cache.pop(&key).unwrap();
-        match dist {
-          TextureDist::Atlas { alloc_id, .. } => {
-            self.alpha_atlas.deallocate(alloc_id);
-          }
-          TextureDist::Extra(id) => {
-            self.extra_textures.remove(id as usize);
-          }
-        };
-      } else {
-        let slice = dist.as_tex_slice(&self.extra_textures).cut_blank_edge();
-        let cache_ts = cache_transform(key.path(), *scale, &slice);
-        slice_ts = Some((slice, cache_ts));
-      }
-    }
-    let (slice, cache_ts) = slice_ts.unwrap_or_else(|| {
-      let anti_aliasing = self.anti_aliasing();
+    let (slice, cache_ts) = if let Some(h) = self
+      .alpha_atlas
+      .get(&key)
+      .filter(|h| h.attr >= prefer_scale)
+      .copied()
+    {
+      let slice = alpha_tex_slice(&self.alpha_atlas, &h).cut_blank_edge();
+      let cache_ts = cache_transform(key.path(), h.attr, &slice.rect);
+      (slice, cache_ts)
+    } else {
       let path = key.path().clone();
       let scale_bounds = path.bounds().scale(prefer_scale, prefer_scale).round_out();
       let prefer_cache_size = path_add_edges(scale_bounds.size.to_i32().cast_unit());
-      let tex_dist = self.inner_alloc(
-        ColorFormat::Alpha8,
-        anti_aliasing,
-        prefer_cache_size,
-        gpu_impl,
-      );
-      let slice = tex_dist.as_tex_slice(&self.extra_textures);
-      let cut_blank_slice = slice.cut_blank_edge();
-      let ts = cache_transform(&path, prefer_scale, &cut_blank_slice);
+      let h = self
+        .alpha_atlas
+        .allocate(key, prefer_scale, prefer_cache_size, gpu_impl);
+      let slice = alpha_tex_slice(&self.alpha_atlas, &h);
+      let no_blank_slice = slice.cut_blank_edge();
+      let ts = cache_transform(&path, prefer_scale, &no_blank_slice.rect);
 
       self
         .fill_task
         .push(FillTask { slice, path, ts, clip_rect: None });
-      self.path_cache.put(key, (prefer_scale, tex_dist));
 
-      (cut_blank_slice, ts)
-    });
+      (no_blank_slice, ts)
+    };
 
     (slice, cache_to_view(&cache_ts, transform))
   }
@@ -163,30 +134,27 @@ where
     gpu_impl: &mut T::Host,
   ) -> (TextureSlice, Transform) {
     let alloc_size: DeviceSize = path_add_edges(clip_view.size);
+    let paint_origin = path.paint_bounds.origin;
+    let transform = path.transform;
+    let key = PathKey::from_path_with_clip(path, clip_view);
 
-    let anti_aliasing = self.anti_aliasing();
-    let tex_dist = self.inner_alloc(ColorFormat::Alpha8, anti_aliasing, alloc_size, gpu_impl);
+    if let Some(h) = self.alpha_atlas.get(&key).copied() {
+      let slice = alpha_tex_slice(&self.alpha_atlas, &h).cut_blank_edge();
+      let ts = transform.then_translate(slice.rect.origin.to_f32().cast_unit() - paint_origin);
+      (slice, ts)
+    } else {
+      let path = key.path().clone();
+      let h = self.alpha_atlas.allocate(key, 1., alloc_size, gpu_impl);
+      let slice = alpha_tex_slice(&self.alpha_atlas, &h);
+      let no_blank_slice = slice.cut_blank_edge();
+      let ts =
+        transform.then_translate(no_blank_slice.rect.origin.to_f32().cast_unit() - paint_origin);
+      let clip_rect = Some(slice.rect);
+      let task = FillTask { slice, ts, path, clip_rect };
+      self.fill_task.push(task);
 
-    let slice = tex_dist.as_tex_slice(&self.extra_textures);
-    let path_slice = slice.cut_blank_edge();
-
-    let ts = path
-      .transform
-      .then_translate(path_slice.rect.origin.to_f32().cast_unit() - path.paint_bounds.origin);
-
-    let task = FillTask {
-      slice,
-      ts,
-      path: path.path.clone(),
-      clip_rect: Some(slice.rect),
-    };
-    self.fill_task.push(task);
-    self.path_cache.push(
-      PathKey::from_path_with_clip(path, clip_view),
-      (1., tex_dist),
-    );
-
-    (slice, ts)
+      (no_blank_slice, ts)
+    }
   }
 
   pub(super) fn store_image(
@@ -194,55 +162,23 @@ where
     img: &ShareResource<PixelImage>,
     gpu_impl: &mut T::Host,
   ) -> TextureSlice {
-    if let Some(dist) = self.resource_cache.get(&ShareResource::as_ptr(img)) {
-      return dist.as_tex_slice(&self.extra_textures);
+    let key = ShareResource::as_ptr(img);
+    match img.color_format() {
+      ColorFormat::Rgba8 => {
+        if let Some(h) = self.rgba_atlas.get(&key).copied() {
+          rgba_tex_slice(&self.rgba_atlas, &h)
+        } else {
+          let size = DeviceSize::new(img.width() as i32, img.height() as i32);
+          let h = self.rgba_atlas.allocate(key, (), size, gpu_impl);
+          let slice = rgba_tex_slice(&self.rgba_atlas, &h);
+
+          let texture = self.rgba_atlas.get_texture_mut(h.tex_id());
+          texture.write_data(&slice.rect, img.pixel_bytes(), gpu_impl);
+          slice
+        }
+      }
+      ColorFormat::Alpha8 => todo!(),
     }
-
-    let size = DeviceSize::new(img.width() as i32, img.height() as i32);
-    let tex_dist = self.inner_alloc(img.color_format(), AntiAliasing::None, size, gpu_impl);
-    let tex_rect = tex_dist.as_tex_slice(&self.extra_textures);
-
-    let texture = self.texture_mut(tex_rect.tex_id);
-    texture.write_data(&tex_rect.rect, img.pixel_bytes(), gpu_impl);
-
-    self
-      .resource_cache
-      .put(ShareResource::as_ptr(img), tex_dist);
-
-    tex_rect
-  }
-
-  fn inner_alloc(
-    &mut self,
-    format: ColorFormat,
-    anti_aliasing: AntiAliasing,
-    size: DeviceSize,
-    gpu_impl: &mut T::Host,
-  ) -> TextureDist {
-    let (tex_id, alloc) = match format {
-      ColorFormat::Rgba8 => (
-        TextureID::RgbaAtlas,
-        self.rgba_atlas.allocate(size, gpu_impl),
-      ),
-      ColorFormat::Alpha8 => (
-        TextureID::AlphaAtlas,
-        self.alpha_atlas.allocate(size, gpu_impl),
-      ),
-    };
-
-    if let Some(alloc) = alloc {
-      let rect = alloc.rectangle.to_rect().cast_unit();
-      let tex_rect = TextureSlice { tex_id, rect };
-      return TextureDist::Atlas { alloc_id: alloc.id, tex_rect };
-    }
-
-    let texture = gpu_impl.new_texture(size, anti_aliasing, format);
-    let id = self.extra_textures.insert(texture);
-    TextureDist::Extra(id as u32)
-  }
-
-  pub(super) fn texture_mut(&mut self, tex_id: TextureID) -> &mut T {
-    id_to_texture_mut!(self, tex_id)
   }
 
   pub(super) fn texture(&self, tex_id: TextureID) -> &T { id_to_texture!(self, tex_id) }
@@ -377,41 +313,29 @@ where
   }
 
   pub(crate) fn end_frame(&mut self) {
-    self
-      .resource_cache
-      .end_frame("image atlas")
-      .for_each(|dist| match dist {
-        TextureDist::Atlas { alloc_id, .. } => {
-          self.rgba_atlas.deallocate(alloc_id);
-        }
-        TextureDist::Extra(id) => {
-          self.extra_textures.remove(id as usize);
-        }
-      });
-
-    self
-      .path_cache
-      .end_frame("path atlas")
-      .for_each(|(_, dist)| match dist {
-        TextureDist::Atlas { alloc_id, .. } => {
-          self.alpha_atlas.deallocate(alloc_id);
-        }
-        TextureDist::Extra(id) => {
-          self.extra_textures.remove(id as usize);
-        }
-      });
+    self.alpha_atlas.end_frame();
+    self.rgba_atlas.end_frame();
   }
-
-  fn anti_aliasing(&self) -> AntiAliasing { self.texture(TextureID::AlphaAtlas).anti_aliasing() }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum TextureDist {
-  Atlas {
-    alloc_id: AllocId,
-    tex_rect: TextureSlice,
-  },
-  Extra(u32),
+fn alpha_tex_slice<T, K>(atlas: &Atlas<T, K, f32>, h: &AtlasHandle<f32>) -> TextureSlice
+where
+  T: Texture,
+{
+  TextureSlice {
+    tex_id: TextureID::Alpha(h.tex_id()),
+    rect: h.tex_rect(atlas),
+  }
+}
+
+fn rgba_tex_slice<T, K>(atlas: &Atlas<T, K, ()>, h: &AtlasHandle<()>) -> TextureSlice
+where
+  T: Texture,
+{
+  TextureSlice {
+    tex_id: TextureID::Rgba(h.tex_id()),
+    rect: h.tex_rect(atlas),
+  }
 }
 
 pub(crate) fn valid_cache_item(size: &DeviceSize) -> bool { size.lower_than(ATLAS_MAX_ITEM).any() }
@@ -438,22 +362,10 @@ fn path_add_edges(mut size: DeviceSize) -> DeviceSize {
 }
 
 impl TextureSlice {
-  pub fn cut_blank_edge(mut self) -> Self {
+  pub fn cut_blank_edge(mut self) -> TextureSlice {
     let blank_side = SideOffsets2D::new_all_same(BLANK_EDGE);
     self.rect = self.rect.inner_rect(blank_side);
     self
-  }
-}
-
-impl TextureDist {
-  fn as_tex_slice<T: Texture>(&self, extra_textures: &Slab<T>) -> TextureSlice {
-    match self {
-      TextureDist::Atlas { tex_rect, .. } => *tex_rect,
-      TextureDist::Extra(id) => TextureSlice {
-        tex_id: TextureID::Extra(*id),
-        rect: DeviceRect::from_size(extra_textures[*id as usize].size()),
-      },
-    }
   }
 }
 
@@ -681,19 +593,5 @@ pub mod tests {
 
     assert_eq!(ts1, Transform::new(1., 0., 0., 1., -2., -2.));
     assert_eq!(ts2, Transform::new(0.5, 0., 0., 0.5, 99., 99.));
-  }
-
-  #[test]
-  fn fix_texture_leak() {
-    let mut wgpu = block_on(WgpuImpl::headless());
-    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
-    let red_img = color_image(Color::RED, 32, 32);
-    let yellow_img = color_image(Color::YELLOW, 8192, 32);
-    mgr.store_image(&red_img, &mut wgpu);
-    mgr.store_image(&yellow_img, &mut wgpu);
-    mgr.end_frame();
-    mgr.end_frame();
-
-    assert!(mgr.extra_textures.is_empty())
   }
 }
