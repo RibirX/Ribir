@@ -149,7 +149,9 @@ impl DrawColorTrianglesPass {
           topology: wgpu::PrimitiveTopology::TriangleList,
           strip_index_format: None,
           front_face: wgpu::FrontFace::Ccw,
-          cull_mode: Some(wgpu::Face::Back),
+          // Always draw rect with transform, there is no distinction between front and back,
+          // everything needs to be drawn.
+          cull_mode: None,
           unclipped_depth: false,
           polygon_mode: wgpu::PolygonMode::Fill,
           conservative: false,
