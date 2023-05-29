@@ -31,6 +31,7 @@ pub trait ShellWindow {
   fn set_size(&mut self, size: Size);
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn set_title(&mut self, str: &str);
+  fn set_icon(&mut self, icon: &PixelImage);
   fn as_any(&self) -> &dyn Any;
   fn as_any_mut(&mut self) -> &mut dyn Any;
   /// The device pixel ratio of Window interface returns the ratio of the
@@ -135,6 +136,11 @@ impl Window {
 
   pub fn set_title(&mut self, title: &str) -> &mut Self {
     self.shell_wnd.set_title(title);
+    self
+  }
+
+  pub fn set_icon(&mut self, icon: &PixelImage) -> &mut Self {
+    self.shell_wnd.set_icon(icon);
     self
   }
 
