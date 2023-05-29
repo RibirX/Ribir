@@ -1,6 +1,6 @@
 use crate::{Brush, Color, LineCap, LineJoin, Path, PathPaintStyle, StrokeOptions};
 use palette::FromComponent;
-use ribir_geom::{Point, Size, Transform};
+use ribir_geom::{Point, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
 use usvg::{Options, Tree, TreeParsing};
@@ -8,6 +8,7 @@ use usvg::{Options, Tree, TreeParsing};
 #[derive(Serialize, Deserialize)]
 pub struct Svg {
   pub size: Size,
+  pub view_scale: Vector,
   pub paths: Box<[SvgPath]>,
 }
 
@@ -16,7 +17,6 @@ pub struct SvgPath {
   pub path: Path,
   pub brush: Brush,
   pub style: PathPaintStyle,
-  pub transform: Transform,
 }
 
 // todo: we need to support currentColor to change svg color.
@@ -27,10 +27,12 @@ impl Svg {
     let view_rect = tree.view_box.rect;
     let size = tree.size;
     let fit_size = size.fit_view_box(&tree.view_box);
-    let scale_x = size.width() / fit_size.width();
-    let scale_y = size.height() / fit_size.height();
-    let t = Transform::translation(-view_rect.x() as f32, -view_rect.y() as f32)
-      .then_scale(scale_x as f32, scale_y as f32);
+    let view_scale = Vector::new(
+      size.width() / fit_size.width(),
+      size.height() / fit_size.height(),
+    )
+    .to_f32();
+    let t = Transform::translation(-view_rect.x() as f32, -view_rect.y() as f32);
 
     let mut t_stack = TransformStack::new(t);
     let mut paths = vec![];
@@ -43,13 +45,13 @@ impl Svg {
           NodeKind::Path(p) => {
             t_stack.push(matrix_convert(p.transform));
             let path = usvg_path_to_path(p);
-            let transform = *t_stack.current_transform();
+            let path = path.transform(t_stack.current_transform());
             if let Some(ref fill) = p.fill {
               let brush = brush_from_usvg_paint(&fill.paint, fill.opacity);
+
               paths.push(SvgPath {
                 path: path.clone(),
                 brush,
-                transform,
                 style: PathPaintStyle::Fill,
               });
             }
@@ -76,7 +78,6 @@ impl Svg {
               paths.push(SvgPath {
                 path,
                 brush,
-                transform,
                 style: PathPaintStyle::Stroke(options),
               });
             };
@@ -114,6 +115,7 @@ impl Svg {
     Ok(Svg {
       size: Size::new(size.width() as f32, size.height() as f32),
       paths: paths.into_boxed_slice(),
+      view_scale,
     })
   }
 
