@@ -84,47 +84,60 @@ where
     transform: &Transform,
     gpu_impl: &mut T::Host,
   ) -> (TextureSlice, Transform) {
-    fn cache_transform(path: &Path, cache_scale: f32, tex_rect: &DeviceRect) -> Transform {
-      let scale_bounds = path.bounds().scale(cache_scale, cache_scale).round_out();
-      Transform::scale(cache_scale, cache_scale)
-        .then_translate(tex_rect.origin.to_f32().cast_unit() - scale_bounds.origin)
-    }
+    fn cache_to_view_matrix(
+      path: &Path,
+      path_ts: &Transform,
+      slice_origin: DevicePoint,
+      cache_scale: f32,
+    ) -> Transform {
+      // scale origin to the cached path, and aligned the pixel, let the view get an
+      // integer pixel mask as much as possible.
+      let aligned_origin = (path.bounds().origin * cache_scale).round();
 
-    fn cache_to_view(cache_ts: &Transform, path_ts: &Transform) -> Transform {
-      cache_ts.inverse().unwrap().then(path_ts)
+      // back to slice origin
+      Transform::translation(-slice_origin.x as f32, -slice_origin.y as f32)
+        // move to cache path axis.
+        .then_translate(aligned_origin.to_vector().cast_unit())
+        // scale back to path axis.
+        .then_scale(1. / cache_scale, 1. / cache_scale)
+        // apply path transform matrix to view.
+        .then(path_ts)
     }
 
     let prefer_scale: f32 = transform.m11.max(transform.m22);
     let key = PathKey::from_path(path);
 
-    let (slice, cache_ts) = if let Some(h) = self
+    if let Some(h) = self
       .alpha_atlas
       .get(&key)
       .filter(|h| h.attr >= prefer_scale)
       .copied()
     {
       let slice = alpha_tex_slice(&self.alpha_atlas, &h).cut_blank_edge();
-      let cache_ts = cache_transform(key.path(), h.attr, &slice.rect);
-      (slice, cache_ts)
+      let matrix = cache_to_view_matrix(key.path(), transform, slice.rect.origin, h.attr);
+      (slice, matrix)
     } else {
       let path = key.path().clone();
-      let scale_bounds = path.bounds().scale(prefer_scale, prefer_scale).round_out();
-      let prefer_cache_size = path_add_edges(scale_bounds.size.to_i32().cast_unit());
+      let scale_bounds = path.bounds().scale(prefer_scale, prefer_scale);
+      let prefer_cache_size = path_add_edges(scale_bounds.round_out().size.to_i32().cast_unit());
       let h = self
         .alpha_atlas
         .allocate(key, prefer_scale, prefer_cache_size, gpu_impl);
       let slice = alpha_tex_slice(&self.alpha_atlas, &h);
-      let no_blank_slice = slice.cut_blank_edge();
-      let ts = cache_transform(&path, prefer_scale, &no_blank_slice.rect);
+      let mask_slice = slice.cut_blank_edge();
+
+      let matrix = cache_to_view_matrix(&path, transform, mask_slice.rect.origin, prefer_scale);
+
+      let ts = Transform::scale(prefer_scale, prefer_scale)
+        .then_translate(-scale_bounds.origin.to_vector().cast_unit())
+        .then_translate(mask_slice.rect.origin.to_f32().to_vector().cast_unit());
 
       self
         .fill_task
         .push(FillTask { slice, path, ts, clip_rect: None });
 
-      (no_blank_slice, ts)
-    };
-
-    (slice, cache_to_view(&cache_ts, transform))
+      (mask_slice, matrix)
+    }
   }
 
   pub(super) fn store_clipped_path(

@@ -273,9 +273,8 @@ where
       .map_or(&self.viewport, |l| &l.viewport)
   }
 
-  fn new_mask_layer(&mut self, mut path: PaintPath) -> Option<([Point; 4], i32)> {
-    path.paint_bounds = path.paint_bounds.round_out();
-    let paint_bounds = path.paint_bounds.to_i32().cast_unit();
+  fn new_mask_layer(&mut self, path: PaintPath) -> Option<([Point; 4], i32)> {
+    let paint_bounds = path.paint_bounds.round_out().to_i32().cast_unit();
     let view = paint_bounds.intersection(self.viewport())?;
     let prefer_cache_size = prefer_cache_size(&path.path, &path.transform);
 
@@ -293,11 +292,6 @@ where
     let mut points = rect_corners(&mask.rect.to_f32().cast_unit());
     for p in points.iter_mut() {
       *p = mask_to_view.transform_point(*p);
-    }
-
-    // keep the rectangle corners in clock order.
-    if points[1].x < points[3].x {
-      points.swap(3, 1);
     }
 
     let index = self.mask_layers.len();
