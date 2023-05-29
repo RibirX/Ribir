@@ -48,10 +48,6 @@ pub trait Render: Query {
   /// widget size, and child nodes' size not affect its size.
   fn only_sized_by_parent(&self) -> bool { false }
 
-  /// todo: remove it, only use clip to control overflow.
-  /// Hint if a render maybe paint over its layout boundary.
-  fn can_overflow(&self) -> bool { false }
-
   /// Determines the set of render widgets located at the given position.
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
     let is_hit = hit_test_impl(ctx, pos);
@@ -332,9 +328,6 @@ impl<T: Render> Render for ribir_algo::ShareResource<T> {
   fn only_sized_by_parent(&self) -> bool { T::only_sized_by_parent(self) }
 
   #[inline]
-  fn can_overflow(&self) -> bool { T::can_overflow(self) }
-
-  #[inline]
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { T::hit_test(self, ctx, pos) }
 
   #[inline]
@@ -367,9 +360,6 @@ macro_rules! impl_proxy_render {
     fn only_sized_by_parent(&self) -> bool {
       self.$($proxy)*.only_sized_by_parent()
     }
-
-    #[inline]
-    fn can_overflow(&self) -> bool { self.$($proxy)*.can_overflow() }
 
     #[inline]
     fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {

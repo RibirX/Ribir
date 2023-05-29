@@ -246,7 +246,7 @@ impl WidgetId {
       if paint_ctx.painter.alpha() != 0. {
         if let Some(layout_box) = paint_ctx.box_rect() {
           let render = id.assert_get(arena);
-          if paint_ctx.painter.rect_in_paint_bounds(&layout_box) || render.can_overflow() {
+          if paint_ctx.painter.rect_in_paint_bounds(&layout_box) {
             paint_ctx
               .painter
               .translate(layout_box.min_x(), layout_box.min_y());

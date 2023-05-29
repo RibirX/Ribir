@@ -21,8 +21,6 @@ impl Render for Opacity {
 
   fn only_sized_by_parent(&self) -> bool { false }
 
-  fn can_overflow(&self) -> bool { self.opacity > 0. }
-
   fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
     HitTest { hit: false, can_hit_child: true }
   }

@@ -354,9 +354,6 @@ impl<W: Render + 'static> Render for Stateful<W> {
   fn paint(&self, ctx: &mut PaintingCtx) { self.state_ref().paint(ctx) }
 
   #[inline]
-  fn can_overflow(&self) -> bool { self.state_ref().can_overflow() }
-
-  #[inline]
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
     self.state_ref().hit_test(ctx, pos)
   }
