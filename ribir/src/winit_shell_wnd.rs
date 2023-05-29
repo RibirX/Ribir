@@ -1,7 +1,7 @@
 use crate::backends::*;
 
 use ribir_core::{
-  prelude::*,
+  prelude::{image::ColorFormat, *},
   window::{ShellWindow, WindowId},
 };
 use winit::{dpi::LogicalPosition, event_loop::EventLoopWindowTarget};
@@ -62,6 +62,15 @@ impl ShellWindow for WinitShellWnd {
 
   #[inline]
   fn set_title(&mut self, title: &str) { self.winit_wnd.set_title(title) }
+
+  #[inline]
+  fn set_icon(&mut self, icon: &PixelImage) {
+    assert!(icon.color_format() == ColorFormat::Rgba8);
+    let win_icon =
+      winit::window::Icon::from_rgba(icon.pixel_bytes().to_vec(), icon.width(), icon.height())
+        .unwrap();
+    self.winit_wnd.set_window_icon(Some(win_icon));
+  }
 
   #[inline]
   fn set_ime_pos(&mut self, pos: Point) {

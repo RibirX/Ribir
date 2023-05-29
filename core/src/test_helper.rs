@@ -82,6 +82,8 @@ impl ShellWindow for TestShellWindow {
 
   fn set_title(&mut self, _: &str) {}
 
+  fn set_icon(&mut self, _: &PixelImage) {}
+
   fn set_ime_pos(&mut self, _: Point) {}
 
   fn as_any(&self) -> &dyn Any { self }
