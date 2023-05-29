@@ -9,7 +9,7 @@ impl Render for Svg {
     let painter = ctx.painter();
     self.paths.iter().for_each(|c| {
       painter
-        .apply_transform(&c.transform)
+        .scale(self.view_scale.x, self.view_scale.y)
         .set_brush(c.brush.clone());
       match &c.style {
         PathPaintStyle::Fill => painter.fill_path(c.path.clone()),
