@@ -96,10 +96,6 @@ impl<D: 'static> Render for DynRender<D> {
     self.self_render.hit_test(ctx, pos)
   }
 
-  fn can_overflow(&self) -> bool {
-    !self.drop_until_widgets.is_empty() || self.self_render.can_overflow()
-  }
-
   fn get_transform(&self) -> Option<Transform> { self.self_render.get_transform() }
 }
 

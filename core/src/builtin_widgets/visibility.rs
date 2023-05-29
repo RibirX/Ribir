@@ -23,8 +23,6 @@ impl Render for Visibility {
     }
   }
 
-  fn can_overflow(&self) -> bool { self.visible }
-
   fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
     HitTest {
       hit: false,
