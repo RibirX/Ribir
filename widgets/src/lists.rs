@@ -320,6 +320,7 @@ impl ComposeChild for ListItem {
               flex: 1.,
               DynWidget {
                 dyns: label_gap.map(|padding| Padding { padding }),
+                // todo: need to implement clip logic in text paint
                 Clip {
                   Column {
                     Text {
