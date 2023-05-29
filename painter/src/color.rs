@@ -1,12 +1,13 @@
 use material_color_utilities_rs::htc;
-use palette::{
-  rgb::{channels::Rgba, Rgb},
-  Alpha, IntoComponent, Srgba,
-};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct Color(palette::Srgba<u8>);
+pub struct Color {
+  pub red: u8,
+  pub green: u8,
+  pub blue: u8,
+  pub alpha: u8,
+}
 
 /// Describe the light tone of a color, should between [0, 1.0], 0.0 gives
 /// absolute black and 1.0 give the brightest white.
@@ -21,83 +22,100 @@ impl LightnessTone {
 impl Color {
   #[inline]
   pub const fn new(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
-    let color = Alpha {
-      alpha,
-      color: Rgb {
-        red,
-        green,
-        blue,
-        standard: std::marker::PhantomData,
-      },
-    };
-    Self(color)
+    Self { red, green, blue, alpha }
   }
 
   #[inline]
   pub const fn from_rgb(r: u8, g: u8, b: u8) -> Self { Self::new(r, g, b, 255) }
 
   #[inline]
-  pub fn from_f32_rgb(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
-    let color = Alpha {
-      alpha,
-      color: Rgb {
-        red,
-        green,
-        blue,
-        standard: std::marker::PhantomData,
-      },
-    };
-    Self(color.into_format())
+  pub fn from_f32_rgba(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
+    Self {
+      red: f32_component_to_u8(red),
+      green: f32_component_to_u8(green),
+      blue: f32_component_to_u8(blue),
+      alpha: f32_component_to_u8(alpha),
+    }
   }
 
   #[inline]
-  pub fn from_u32(rgba: u32) -> Self { Self(palette::Srgba::from_u32::<Rgba>(rgba)) }
+  pub fn from_u32(rgba: u32) -> Self {
+    let bytes = rgba.to_be_bytes();
+    Self {
+      red: bytes[0],
+      green: bytes[1],
+      blue: bytes[2],
+      alpha: bytes[3],
+    }
+  }
 
   #[inline]
-  pub fn into_u32(self) -> u32 { self.0.into_u32::<Rgba>() }
+  pub fn into_u32(self) -> u32 {
+    let Self { red, green, blue, alpha } = self;
+    u32::from_be_bytes([red, green, blue, alpha])
+  }
 
   #[inline]
   pub fn with_alpha(mut self, alpha: f32) -> Self {
-    self.0.alpha = alpha.into_component();
+    self.alpha = f32_component_to_u8(alpha);
     self
   }
 
   /// return an new color after the color applied alpha.
   #[inline]
   pub fn apply_alpha(mut self, alpha: f32) -> Self {
-    let base: f32 = self.0.alpha.into_component();
-    self.0.alpha = (base * alpha).into_component();
+    let base: f32 = u8_component_to_f32(self.alpha);
+    self.alpha = f32_component_to_u8(base * alpha);
     self
   }
 
   #[inline]
   pub fn with_lightness(self, l: LightnessTone) -> Self {
-    let mut hct = htc::Hct::from_int([
-      self.0.alpha,
-      self.0.color.red,
-      self.0.color.green,
-      self.0.color.blue,
-    ]);
+    let mut hct = htc::Hct::from_int([self.alpha, self.red, self.green, self.blue]);
     hct.set_tone((l.0 * 100.).clamp(0., 100.) as f64);
     let argb = hct.to_int();
-    Color(Srgba::new(argb[1], argb[2], argb[3], argb[0]))
+    Self {
+      red: argb[1],
+      green: argb[2],
+      blue: argb[3],
+      alpha: argb[0],
+    }
   }
 
   #[inline]
   pub fn into_components(self) -> [u8; 4] {
-    let (r, g, b, a) = self.0.into_components();
-    [r, g, b, a]
+    let Self { red, green, blue, alpha } = self;
+    [red, green, blue, alpha]
   }
+
   #[inline]
   pub fn into_f32_components(self) -> [f32; 4] {
-    let (r, g, b, a) = self.0.into_components();
+    let Self { red, green, blue, alpha } = self;
     [
-      r.into_component(),
-      g.into_component(),
-      b.into_component(),
-      a.into_component(),
+      u8_component_to_f32(red),
+      u8_component_to_f32(green),
+      u8_component_to_f32(blue),
+      u8_component_to_f32(alpha),
     ]
   }
+}
+
+const C23: u32 = 0x4b00_0000;
+// Algorithm from https://github.com/Ogeon/palette/pull/184/files.
+fn u8_component_to_f32(v: u8) -> f32 {
+  let comp_u = v as u32 + C23;
+  let comp_f = f32::from_bits(comp_u) - f32::from_bits(C23);
+  let max_u = core::u8::MAX as u32 + C23;
+  let max_f = (f32::from_bits(max_u) - f32::from_bits(C23)).recip();
+  comp_f * max_f
+}
+
+// Algorithm from https://github.com/Ogeon/palette/pull/184/files.
+fn f32_component_to_u8(v: f32) -> u8 {
+  let max = u8::MAX as f32;
+  let scaled = (v * max).min(max);
+  let f = scaled + f32::from_bits(C23);
+  (f.to_bits().saturating_sub(C23)) as u8
 }
 
 impl Color {
@@ -308,21 +326,4 @@ impl Color {
   pub const YELLOW: Color = Self::from_rgb(255, 255, 0);
   pub const YELLOWGREEN: Color = Self::from_rgb(154, 205, 50);
   pub const TRANSPARENT: Color = Self::new(0, 0, 0, 0);
-}
-
-impl std::ops::Deref for Color {
-  type Target = palette::Srgba<u8>;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.0 }
-}
-
-impl std::ops::DerefMut for Color {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
-}
-
-impl From<palette::Srgb<u8>> for Color {
-  #[inline]
-  fn from(c: palette::Srgb<u8>) -> Self { Color(c.into()) }
 }

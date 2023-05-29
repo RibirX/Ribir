@@ -1,5 +1,4 @@
 use crate::{Brush, Color, LineCap, LineJoin, Path, PathPaintStyle, StrokeOptions};
-use palette::FromComponent;
 use ribir_geom::{Point, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
@@ -163,10 +162,9 @@ fn matrix_convert(t: usvg::Transform) -> Transform {
 
 fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity) -> Brush {
   match paint {
-    usvg::Paint::Color(usvg::Color { red, green, blue }) => {
-      let alpha = u8::from_component(opacity.get());
-      Color::new(*red, *green, *blue, alpha).into()
-    }
+    usvg::Paint::Color(usvg::Color { red, green, blue }) => Color::from_rgb(*red, *green, *blue)
+      .with_alpha(opacity.get() as f32)
+      .into(),
     paint => {
       log::warn!("[painter]: not support `{paint:?}` in svg, use black instead!");
       Color::BLACK.into()

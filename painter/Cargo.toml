@@ -19,7 +19,6 @@ log.workspace = true
 lyon_algorithms = {version = "1.0.3", features = ["serialization"]}
 lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional = true}
 material-color-utilities-rs = {workspace = true}
-palette = {workspace = true, features = ["serializing"]}
 rctree.workspace = true
 ribir_algo = {path = "../algo", version = "0.0.0"}
 ribir_geom = {path = "../geom", version = "0.0.0"}
