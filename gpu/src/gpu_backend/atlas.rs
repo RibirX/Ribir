@@ -201,6 +201,7 @@ mod tests {
       Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Alpha8, AntiAliasing::None, &mut gpu_impl);
     let size = DeviceSize::new(ATLAS_MIN_SIZE.width + 1, 16);
     let h = atlas.allocate(1, (), size, &mut gpu_impl);
+    gpu_impl.end_frame();
     assert_eq!(h.tex_id(), 0);
   }
 
@@ -213,6 +214,7 @@ mod tests {
     atlas.allocate(2, (), DeviceSize::new(4097, 16), &mut wgpu);
     atlas.end_frame();
     atlas.end_frame();
+    wgpu.end_frame();
 
     assert!(atlas.extras.is_empty());
     assert!(atlas.atlas_allocator.is_empty());
