@@ -1,0 +1,21 @@
+[package]
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "todos"
+publish = false
+version.workspace = true
+
+[dependencies]
+paste.workspace = true
+# we disable `default-features`, because we want more control over testing.
+ribir = {path = "../../ribir", features = ["material", "widgets"], default-features = false}
+ribir_dev_helper = {path = "../../dev-helper"}
+
+[features]
+wgpu = ["ribir/wgpu"]

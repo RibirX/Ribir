@@ -44,14 +44,6 @@ impl TimeReactor {
 pub(crate) static TIME_REACTOR: Lazy<Mutex<TimeReactor>> =
   Lazy::new(|| Mutex::new(TimeReactor::default()));
 
-pub fn wake_timeout_futures() {
-  let notifies = TIME_REACTOR.lock().unwrap().timeout_wakers(Instant::now());
-  notifies.for_each(|waker| waker.wake());
-}
-
-pub(crate) fn recently_timeout() -> Option<Instant> {
-  TIME_REACTOR.lock().unwrap().recently_timeout()
-}
 pub struct Timer {
   id: Option<usize>,
   when: Instant,
@@ -59,16 +51,24 @@ pub struct Timer {
 
 impl Timer {
   pub fn new(when: Instant) -> Self { Self { id: None, when } }
+
   pub fn reset(&mut self, timer: Instant) {
     if let Some(id) = self.id.take() {
       TIME_REACTOR.lock().unwrap().remove_timer(self.when, id)
     }
     self.when = timer;
   }
-}
 
-pub fn new_timer(dur: Duration) -> BoxFuture<'static, ()> {
-  Box::pin(Timer::new(Instant::now() + dur))
+  pub fn recently_timeout() -> Option<Instant> { TIME_REACTOR.lock().unwrap().recently_timeout() }
+
+  pub fn new_timer_future(dur: Duration) -> BoxFuture<'static, ()> {
+    Box::pin(Timer::new(Instant::now() + dur))
+  }
+
+  pub fn wake_timeout_futures() {
+    let notifies = TIME_REACTOR.lock().unwrap().timeout_wakers(Instant::now());
+    notifies.for_each(|waker| waker.wake());
+  }
 }
 
 impl Future for Timer {

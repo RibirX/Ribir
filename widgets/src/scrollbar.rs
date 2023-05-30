@@ -386,13 +386,13 @@ mod test {
 
     let mut wnd = TestWindow::new_with_size(w, Size::new(1024., 1024.));
     {
-      *offset.state_ref() = Point::new(10., 10.);
+      *offset.state_ref() = Point::new(-10., -10.);
     }
     {
-      *offset.state_ref() = Point::new(20., 20.);
+      *offset.state_ref() = Point::new(-20., -20.);
     }
     wnd.draw_frame();
-    assert!(*v_offset.state_ref() == offset.state_ref().y);
-    assert!(*h_offset.state_ref() == offset.state_ref().x);
+    assert_eq!(*v_offset.state_ref(), offset.state_ref().y);
+    assert_eq!(*h_offset.state_ref(), offset.state_ref().x);
   }
 }

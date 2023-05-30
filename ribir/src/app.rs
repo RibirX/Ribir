@@ -1,6 +1,6 @@
 use crate::clipboard::Clipboard;
-use crate::timer::{new_timer, recently_timeout, wake_timeout_futures};
 use crate::winit_shell_wnd::{new_id, WinitShellWnd};
+use ribir_core::timer::Timer;
 use ribir_core::{prelude::*, window::WindowId};
 use rxrust::scheduler::NEW_TIMER_FN;
 use std::cell::RefCell;
@@ -42,7 +42,7 @@ impl App {
       }
     }));
 
-    let _ = NEW_TIMER_FN.set(new_timer);
+    let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
     Self {
       ctx,
       windows: Default::default(),
@@ -140,7 +140,7 @@ impl App {
         Event::RedrawEventsCleared => {
           if windows.iter_mut().any(|(_, wnd)| wnd.need_draw()) {
             *control = ControlFlow::Poll;
-          } else if let Some(t) = recently_timeout() {
+          } else if let Some(t) = Timer::recently_timeout() {
             *control = ControlFlow::WaitUntil(t);
           } else {
             *control = ControlFlow::Wait;
@@ -148,7 +148,7 @@ impl App {
         }
         Event::NewEvents(cause) => match cause {
           StartCause::Poll | StartCause::ResumeTimeReached { start: _, requested_resume: _ } => {
-            wake_timeout_futures();
+            Timer::wake_timeout_futures();
           }
           _ => (),
         },

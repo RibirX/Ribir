@@ -157,10 +157,8 @@ impl TodoMVP {
   }
 }
 
-fn main() {
-  env_logger::init();
-
-  let todo = TodoMVP {
+pub fn todos() -> Widget {
+  TodoMVP {
     tasks: vec![
       Task {
         id: 0,
@@ -178,11 +176,6 @@ fn main() {
         label: "Support Virtual Scroll".to_string(),
       },
     ],
-  };
-
-  let mut app = App::new(material::purple::light());
-  app
-    .new_window(todo.into_widget(), Some(Size::new(400., 640.)))
-    .set_title("todo");
-  app.exec()
+  }
+  .into_widget()
 }

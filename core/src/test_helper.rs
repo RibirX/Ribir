@@ -1,3 +1,4 @@
+use crate::timer::Timer;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::{
@@ -16,6 +17,8 @@ pub struct TestWindow(Window);
 impl TestWindow {
   /// Create a 1024x1024 window for test
   pub fn new<M: ImplMarker>(root: impl IntoWidget<M>) -> Self {
+    let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
+
     Self(Window::new(
       root.into_widget(),
       Box::new(TestShellWindow::new(None)),
@@ -24,6 +27,8 @@ impl TestWindow {
   }
 
   pub fn new_with_size<M: ImplMarker>(root: impl IntoWidget<M>, size: Size) -> Self {
+    let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
+
     Self(Window::new(
       root.into_widget(),
       Box::new(TestShellWindow::new(Some(size))),
@@ -36,6 +41,8 @@ impl TestWindow {
     size: Size,
     ctx: AppContext,
   ) -> Self {
+    let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
+
     Self(Window::new(
       root.into_widget(),
       Box::new(TestShellWindow::new(Some(size))),
@@ -70,6 +77,13 @@ impl TestWindow {
       .unwrap()
       .last_frame
       .take()
+  }
+
+  pub fn draw_frame(&mut self) {
+    // Test window not have a eventloop, manually wake-up every frame.
+    Timer::wake_timeout_futures();
+
+    self.0.draw_frame();
   }
 }
 
