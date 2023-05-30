@@ -35,5 +35,5 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: release
-          args: alpha --execute
+          args: alpha --execute --no-confirm
         
