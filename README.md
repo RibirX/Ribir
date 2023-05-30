@@ -120,7 +120,7 @@ Ribir is [MIT licensed](./LICENSE)
 
 [Flutter]: https://flutter.dev/
 [QML]: https://doc.qt.io/qt-6/qtqml-index.html
-[Examples]: ./ribir/examples/
+[Examples]: ./examples/
 [Documents]: https://ribir.org/docs/introduction
 [Wgpu]: https://github.com/gfx-rs/wgpu
 

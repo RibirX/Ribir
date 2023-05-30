@@ -264,12 +264,7 @@ macro_rules! widget_bench {
         let ctx = AppContext::default();
         b.iter(move || {
           let mut wnd = TestWindow::new_with_ctx($widget_fn(), $size, ctx.clone());
-          loop{
-            if !wnd.need_draw() {
-              break;
-            }
-            wnd.layout();
-          }
+          wnd.draw_frame();
         });
       }
     }

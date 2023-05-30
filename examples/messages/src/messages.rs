@@ -1,5 +1,5 @@
+use material::material_svgs;
 use ribir::prelude::*;
-use ribir_material::material_svgs;
 
 #[derive(Clone)]
 struct Message {
@@ -11,6 +11,34 @@ struct Message {
 #[derive(Clone)]
 struct MessageList {
   messages: Vec<Message>,
+}
+
+pub fn messages() -> Widget {
+  MessageList {
+    messages: vec![
+      Message {
+        avatar: 2,
+        nick_name: "James Harden".to_string(),
+        content: "Coming soon!".to_string(),
+      },
+      Message {
+        avatar: 1,
+        nick_name: "Allen Iverson".to_string(),
+        content: "You are welcome!".to_string(),
+      },
+      Message {
+        avatar: 3,
+        nick_name: "Kyrie Irving".to_string(),
+        content: "See you next week!".to_string(),
+      },
+      Message {
+        avatar: 4,
+        nick_name: "Jaylon Lee".to_string(),
+        content: "Fighting!".to_string(),
+      },
+    ],
+  }
+  .into_widget()
 }
 
 impl Compose for MessageList {
@@ -66,7 +94,7 @@ impl Compose for MessageList {
                   DynWidget {
                     dyns: this.messages.clone().into_iter().map(move |message| {
                       let name = message.avatar.to_string();
-                      let mut avatar = format!("./ribir/examples/attachments/3DDD-{name}.png");
+                      let mut avatar = format!("{}/examples/attachments/3DDD-{name}.png", env!("CARGO_WORKSPACE_DIR"));
                       let img = PixelImage::from_png(&std::fs::read(avatar).unwrap());
                       let img = ShareResource::new(img);
 
@@ -103,37 +131,4 @@ impl Compose for MessageList {
       }
     }
   }
-}
-
-fn main() {
-  let message_list = MessageList {
-    messages: vec![
-      Message {
-        avatar: 2,
-        nick_name: "James Harden".to_string(),
-        content: "Coming soon!".to_string(),
-      },
-      Message {
-        avatar: 1,
-        nick_name: "Allen Iverson".to_string(),
-        content: "You are welcome!".to_string(),
-      },
-      Message {
-        avatar: 3,
-        nick_name: "Kyrie Irving".to_string(),
-        content: "See you next week!".to_string(),
-      },
-      Message {
-        avatar: 4,
-        nick_name: "Jaylon Lee".to_string(),
-        content: "Fighting!".to_string(),
-      },
-    ],
-  };
-
-  let mut app = App::new(material::purple::light());
-  app
-    .new_window(message_list.into_widget(), Some(Size::new(320., 568.)))
-    .set_title("Message");
-  app.exec();
 }

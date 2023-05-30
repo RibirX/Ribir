@@ -1,7 +1,7 @@
 on:
   workflow_dispatch: # allows manual triggering
   schedule:
-    - cron: '0 2 * * 2' # runs every tuesday at 00:00
+    - cron: "0 2 * * 2" # runs every tuesday at 00:00
 name: "release weekly alpha version"
 jobs:
   release:
@@ -30,10 +30,14 @@ jobs:
         with:
           command: login
           args: ${{ secrets.CRATE_RELEASE_TOKEN }}
+      - name: git config
+        run: |
+          git config --global user.email "Adoo@outlook.com"
+          git config --global user.name "Adoo"
+
       - name: Run cargo release
         if: ${{ env.NEW_COMMIT_COUNT > 0 }}
         uses: actions-rs/cargo@v1
         with:
           command: release
           args: alpha --execute --no-confirm
-        

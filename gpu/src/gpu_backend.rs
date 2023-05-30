@@ -483,9 +483,7 @@ mod tests {
     let mut painter = painter(Size::new(200., 100.));
 
     let brush1 = PixelImage::from_png(include_bytes!("../imgs/leaves.png"));
-    let brush2 = PixelImage::from_png(include_bytes!(
-      "../../ribir/examples/attachments/3DDD-1.png"
-    ));
+    let brush2 = PixelImage::from_png(include_bytes!("../../examples/attachments/3DDD-1.png"));
     let rect = rect(0., 0., 100., 100.);
     painter
       .set_brush(brush1)

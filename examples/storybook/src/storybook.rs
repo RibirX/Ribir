@@ -1,5 +1,5 @@
+use material::material_svgs;
 use ribir::prelude::*;
-use ribir_material::material_svgs;
 use std::rc::Rc;
 
 const NORMAL_BUTTON_SIZE: Size = Size::new(120., 40.);
@@ -17,7 +17,7 @@ impl Compose for Storybook {
       }
       ThemeWidget {
         id: theme,
-        theme: Rc::new(Theme::Full(ribir_material::purple::light())),
+        theme: Rc::new(Theme::Full(material::purple::light())),
         Column {
           background: surface_container_low.clone(),
           ConstrainedBox {
@@ -32,9 +32,9 @@ impl Compose for Storybook {
                 id: brightness,
                 on_tap: move |_| {
                   if brightness.checked {
-                    theme.theme = Rc::new(Theme::Full(ribir_material::purple::dark()));
+                    theme.theme = Rc::new(Theme::Full(material::purple::dark()));
                   } else {
-                    theme.theme = Rc::new(Theme::Full(ribir_material::purple::light()));
+                    theme.theme = Rc::new(Theme::Full(material::purple::light()));
                   }
                 },
                 Trailing {
@@ -277,7 +277,7 @@ impl Compose for Storybook {
                         line_number: 2,
                         Leading {
                           Avatar {
-                            ShareResource::new(PixelImage::from_png(include_bytes!("./attachments/3DDD-1.png")))
+                            ShareResource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png")))
                           }
                         }
                         HeadlineText(Label::new("Two lines list item"))
@@ -288,7 +288,7 @@ impl Compose for Storybook {
                       ListItem {
                         line_number: 1,
                         Leading {
-                          ShareResource::new(PixelImage::from_png(include_bytes!("./attachments/3DDD-2.png")))
+                          ShareResource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-2.png")))
                         }
                         HeadlineText(Label::new("One lines list item"))
                         SupportingText(Label::new("One lines supporting text"))
@@ -310,7 +310,7 @@ impl Compose for Storybook {
                       ListItem {
                         line_number: 1,
                         Leading {
-                          Poster(ShareResource::new(PixelImage::from_png(include_bytes!("./attachments/3DDD-3.png"))))
+                          Poster(ShareResource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png"))))
                         }
                         HeadlineText(Label::new("One lines list item"))
                         SupportingText(Label::new("One lines supporting text"))
@@ -355,11 +355,4 @@ impl Compose for Storybook {
   }
 }
 
-fn main() {
-  let system_theme = ribir_material::purple::light();
-  let mut app = App::new(system_theme);
-  app
-    .new_window(Storybook {}.into_widget(), Some(Size::new(1024., 768.)))
-    .set_title("Material 3 Theme Show Case");
-  app.exec();
-}
+pub fn storybook() -> Widget { Storybook {}.into_widget() }

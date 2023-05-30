@@ -31,11 +31,8 @@ jobs:
       - name: cargo check
         run: cargo check
   test:
-    name: Test Suite
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+    name: Test Suite / ubuntu-latest
+    runs-on: ubuntu-latest
     needs: lint
     steps:
       - uses: actions/checkout@v3
@@ -44,6 +41,7 @@ jobs:
           toolchain: nightly-2023-02-01
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --no-default-features
-  features-test:
-    needs: test
+  self-host:
+    name: Test Suite
+    needs: lint
     uses: RibirX/share-workflows/.github/workflows/ribir-win-image-tests.yaml@main

@@ -1,9 +1,8 @@
-use ribir::timer::new_timer;
+use ribir::core::timer::Timer;
 use rxrust::scheduler::NEW_TIMER_FN;
 
 mod test_single_thread {
   use futures::executor::LocalPool;
-  use ribir::timer::wake_timeout_futures;
   use ribir_core::test_helper::TestWindow;
   use ribir_dev_helper::*;
   use std::{cell::RefCell, rc::Rc};
@@ -38,7 +37,7 @@ mod test_single_thread {
     assert_layout_result_by_path!(wnd, {path = [0], width == 20., height == 20.,});
 
     // trigger timeout
-    wake_timeout_futures();
+    super::Timer::wake_timeout_futures();
     wnd.run_futures();
     wnd.draw_frame();
     assert_layout_result_by_path!(wnd, {path = [0], width == 10., height == 10.,});
@@ -62,7 +61,7 @@ mod test_single_thread {
 
   fn run_until(local_pool: &mut LocalPool, cond: impl Fn() -> bool) {
     loop {
-      wake_timeout_futures();
+      super::Timer::wake_timeout_futures();
       local_pool.run_until_stalled();
       if (cond)() {
         break;
@@ -162,7 +161,7 @@ fn main() {
   use colored::Colorize;
   use ribir_dev_helper::unit_test_describe;
 
-  let _ = NEW_TIMER_FN.set(new_timer);
+  let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
   unit_test_describe! {
     run_unit_test(test_single_thread::test_widget_with_timer);
     run_unit_test(test_single_thread::test_double_tap);

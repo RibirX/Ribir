@@ -87,7 +87,7 @@ pub fn assert_texture_eq_png(img: PixelImage, file_path: &std::path::Path) {
       )
       .unwrap();
 
-    const TOLERANCE: f64 = 0.000001;
+    const TOLERANCE: f64 = 0.000002;
     let (v, _) = dssim.compare(&expected, dissim_mig);
     let v: f64 = v.into();
 

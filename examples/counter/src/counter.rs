@@ -1,6 +1,7 @@
 use ribir::prelude::*;
-fn main() {
-  App::run(widget! {
+
+pub fn counter() -> Widget {
+  widget! {
     states { cnt: Stateful::new(0) }
     Column {
       h_align: HAlign::Center,
@@ -9,5 +10,5 @@ fn main() {
       H1 { text: cnt.to_string() }
       FilledButton { on_tap: move |_| *cnt += -1, Label::new("Sub") }
     }
-  });
+  }
 }

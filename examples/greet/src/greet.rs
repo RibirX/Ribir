@@ -3,8 +3,8 @@
 
 use ribir::prelude::*;
 
-fn main() {
-  let hi = widget! {
+pub fn greet() -> Widget {
+  widget! {
     states { counter: Stateful::new(0) }
     init ctx => {
       let style = TypographyTheme::of(ctx).display_large.text.clone();
@@ -63,7 +63,5 @@ fn main() {
         })
       }
     }
-  };
-
-  App::run(hi);
+  }
 }

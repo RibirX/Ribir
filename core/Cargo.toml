@@ -14,6 +14,7 @@ version.workspace = true
 
 [dependencies]
 ahash.workspace = true
+arboard.workspace = true
 bitflags.workspace = true
 blake3 = {workspace = true, features = ["rayon"]}
 futures.workspace = true
@@ -21,21 +22,21 @@ indextree.workspace = true
 lazy_static.workspace = true
 log.workspace = true
 lyon_geom.workspace = true
-ribir_algo = {path = "../algo", version = "0.0.1-alpha.1" }
-ribir_geom = {path = "../geom", version = "0.0.1-alpha.1" }
-ribir_macros = {path = "../macros", version = "0.0.1-alpha.1" }
-ribir_painter = {path = "../painter", version = "0.0.1-alpha.1" }
-ribir_text = {path = "../text", version = "0.0.1-alpha.1" }
+once_cell.workspace = true
+pin-project-lite.workspace = true
+ribir_algo = {path = "../algo", version = "0.0.1-alpha.1"}
+ribir_geom = {path = "../geom", version = "0.0.1-alpha.1"}
+ribir_macros = {path = "../macros", version = "0.0.1-alpha.1"}
+ribir_painter = {path = "../painter", version = "0.0.1-alpha.1"}
+ribir_text = {path = "../text", version = "0.0.1-alpha.1"}
 rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
-arboard = "3.2.0"
-pin-project-lite.workspace = true
 
 [dev-dependencies]
 colored.workspace = true
 paste.workspace = true
-ribir_dev_helper = {path = "../dev-helper", version = "0.0.1-alpha.1" }
+ribir_dev_helper = {path = "../dev-helper", version = "0.0.1-alpha.1"}
 
 [features]
 png = ["ribir_painter/png"]
