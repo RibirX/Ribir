@@ -24,57 +24,18 @@ jobs:
           toolchain: nightly-2023-02-01
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: format style check 
+      - name: format style check
         run: cargo fmt --all -- --check
       - name: cargo clippy check
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: cargo check
         run: cargo check
-  linux:
-    name: Test Suite (ubuntu-22.04)
-    needs: lint
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-      - name: install swiftshader
-        shell: bash
-        run: |
-          set -e
-          mkdir -p swiftshader
-          curl -LsSf https://github.com/gfx-rs/ci-build/releases/latest/download/swiftshader-linux-x86_64.tar.xz | tar -xf - -C swiftshader
-          echo "LD_LIBRARY_PATH=$PWD/swiftshader" >> $GITHUB_ENV
-      - name: install llvmpipe, vulkan sdk
-        shell: bash
-        run: |
-          set -e
-          sudo apt-get update -y -qq
-          # vulkan sdk
-          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
-          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
-          sudo apt-get update
-          sudo apt install -y libegl1-mesa libgl1-mesa-dri libxcb-xfixes0-dev vulkan-sdk
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: nightly-2023-02-01
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-llvm-cov
-      - uses: Swatinem/rust-cache@v2
-      - name: llvm-cov test
-        run: cargo llvm-cov --workspace --lcov --output-path lcov.info --all-features
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: lcov.info
-          fail_ci_if_error: false
-  win_mac: 
+  test:
     name: Test Suite
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest]
     needs: lint
     steps:
       - uses: actions/checkout@v3
@@ -83,3 +44,6 @@ jobs:
           toolchain: nightly-2023-02-01
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --no-default-features
+  features-test:
+    needs: test
+    uses: RibirX/share-workflows/.github/workflows/ribir-win-image-tests.yaml@main
