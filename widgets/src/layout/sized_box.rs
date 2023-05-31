@@ -19,11 +19,7 @@ impl Render for SizedBox {
   fn only_sized_by_parent(&self) -> bool { true }
 
   #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) {
-    let rect = Rect::from_size(ctx.box_rect().unwrap().size);
-    let path = Path::rect(&rect);
-    ctx.painter().clip(path);
-  }
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl Query for SizedBox {
