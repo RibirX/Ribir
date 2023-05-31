@@ -1,6 +1,5 @@
 use crate::{font_db::FontDB, Em, FontFace, FontSize, GlyphBound, Pixel};
 use ribir_algo::ShareResource;
-use ribir_geom::{Transform, Vector};
 use ribir_painter::{Brush, Painter, Path, PathPaintStyle};
 use std::sync::{Arc, RwLock};
 
@@ -46,12 +45,14 @@ pub fn paint_glyphs(
       let unit = face.units_per_em() as f32;
       let scale = font_size / unit;
       if let Some(path) = face.outline_glyph(g.glyph_id) {
-        let ts = Transform::scale(1., -1.)
-          .then_translate((0., unit).into())
-          .then_scale(scale, scale)
-          .then_translate(Vector::new(g.bound.min_x(), g.bound.min_y()));
-        let path = Path::from(path).transform(&ts);
+        let mut painter = painter.save_guard();
+        painter
+          .translate(g.bound.min_x(), g.bound.min_y())
+          .scale(scale, -scale)
+          .translate(0., -unit);
+
         painter.set_brush(brush.clone());
+        let path = Path::from(path);
         match path_style {
           PathPaintStyle::Fill => {
             painter.fill_path(path);
@@ -60,6 +61,24 @@ pub fn paint_glyphs(
             painter.set_strokes(stroke.clone()).stroke_path(path);
           }
         }
+      } else if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
+        let mut painter = painter.save_guard();
+        painter
+          .translate(0., unit)
+          .scale(scale, scale)
+          .translate(g.bound.min_x(), g.bound.min_y())
+          .draw_svg(&svg);
+      } else if let Some(img) = face.glyph_raster_image(g.glyph_id, (unit / font_size) as u16) {
+        let x_scale = g.bound.width() / (img.width() as f32);
+        let y_scale = g.bound.height() / (img.height() as f32);
+        let scale = x_scale.min(y_scale);
+        let x_offset = g.bound.min_x() + (g.bound.width() - (img.width() as f32 * scale)) / 2.;
+        let y_offset = g.bound.min_y() + (g.bound.height() - (img.height() as f32 * scale)) / 2.;
+        let mut painter = painter.save_guard();
+        painter
+          .translate(x_offset, y_offset)
+          .scale(scale, scale)
+          .draw_img(ShareResource::new(img));
       }
     }
   });

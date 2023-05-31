@@ -291,11 +291,13 @@ impl Face {
       })
   }
 
-  pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<Svg> {
-    self
-      .rb_face
-      .glyph_svg_image(glyph_id)
-      .and_then(|data| Svg::parse_from_bytes(data).ok())
+  pub fn glyph_svg_image(&self, _: GlyphId) -> Option<Svg> {
+    None
+    // todo: need to extract glyph svg image, but the svg parse cost too long.
+    // self
+    //  .rb_face
+    //  .glyph_svg_image(glyph_id)
+    //  .and_then(|data| Svg::parse_from_bytes(data).ok())
   }
 
   #[inline]

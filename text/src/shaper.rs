@@ -95,13 +95,8 @@ impl TextShaper {
     dir: TextDirection,
     face_ids: &[ID],
   ) -> Option<Vec<Glyph<Em>>> {
-    let default_font = {
-      let mut font_db = self.font_db.write().unwrap();
-      let font_id = font_db.default_font();
-      font_db.face_data_or_insert(font_id).cloned()
-    };
     let mut font_fallback = FallBackFaceHelper::new(face_ids, &self.font_db);
-    let face = font_fallback.next_fallback_face(text).or(default_font)?;
+    let face = font_fallback.next_fallback_face(text)?;
     let mut buffer = UnicodeBuffer::new();
     buffer.push_str(text);
     buffer.set_direction(dir.into());
@@ -331,10 +326,17 @@ impl<'a> FallBackFaceHelper<'a> {
   fn next_fallback_face(&mut self, text: &str) -> Option<Face> {
     let mut font_db = self.font_db.write().unwrap();
     loop {
-      let id = self.ids.get(self.face_idx)?;
+      if self.face_idx > self.ids.len() {
+        return None;
+      }
       self.face_idx += 1;
+      let id = self
+        .ids
+        .get(self.face_idx - 1)
+        .cloned()
+        .or_else(|| Some(font_db.default_font()))?;
       let face = font_db
-        .face_data_or_insert(*id)
+        .face_data_or_insert(id)
         .filter(|f| match text.is_empty() {
           true => true,
           false => text.chars().any(|c| f.has_char(c)),

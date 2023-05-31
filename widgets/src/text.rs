@@ -78,7 +78,6 @@ impl Render for Text {
     let rc = visual_glyphs.visual_rect();
     let font_db = ctx.typography_store().font_db().clone();
     let painter = ctx.painter();
-    visual_glyphs.visual_rect();
     let Some(paint_rect) = painter.rect_in_paint_bounds(&rc) else { return; };
     if !paint_rect.contains_rect(&rc) {
       painter.clip(Path::rect(&rc));
@@ -86,7 +85,7 @@ impl Render for Text {
     paint_glyphs(
       painter,
       font_db,
-      visual_glyphs.glyph_bounds_in_rect(paint_rect),
+      visual_glyphs.glyph_bounds_in_rect(&paint_rect),
       self.foreground.clone(),
       font_size,
       &self.path_style,
