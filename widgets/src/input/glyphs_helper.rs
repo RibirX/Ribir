@@ -17,6 +17,7 @@ impl GlyphsHelper {
   pub(crate) fn prev_cluster(&self, cursor: usize) -> u32 {
     let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
     let (mut row, mut col) = glyphs.position_by_cluster(cursor);
+
     if col > 0 {
       glyphs.position_to_cluster(row, col - 1)
     } else if row > 0 {
@@ -31,11 +32,16 @@ impl GlyphsHelper {
   pub(crate) fn next_cluster(&self, cursor: usize) -> u32 {
     let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
     let (mut row, mut col) = glyphs.position_by_cluster(cursor);
-    col += 1;
-    if col == glyphs.glyph_count(row) && row + 1 < glyphs.glyph_row_count() {
-      row += 1;
-      col = 0;
+
+    if col == glyphs.glyph_count(row) {
+      if row + 1 < glyphs.glyph_row_count() {
+        row += 1;
+        col = 0;
+      }
+    } else {
+      col += 1;
     }
+
     glyphs.position_to_cluster(row, col)
   }
 
