@@ -2,6 +2,7 @@ use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use lyon_path::math::Point;
 use ribir_algo::FrameCache;
+use ribir_painter::{PixelImage, Svg};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 use std::{ops::Deref, sync::Arc};
 
@@ -269,10 +270,32 @@ impl Face {
   // todo: should return its tight bounds
   pub fn outline_glyph(&self, glyph_id: GlyphId) -> Option<lyon_path::Path> {
     let mut builder = GlyphOutlineBuilder::default();
+    let rect = self
+      .rb_face
+      .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder);
+    rect.map(move |_| builder.into_path())
+  }
+
+  #[cfg(feature = "raster_png_font")]
+  pub fn glyph_raster_image(&self, glyph_id: GlyphId, pixels_per_em: u16) -> Option<PixelImage> {
+    use rustybuzz::ttf_parser::RasterImageFormat;
     self
       .rb_face
-      .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder)?;
-    Some(builder.into_path())
+      .glyph_raster_image(glyph_id, pixels_per_em)
+      .and_then(|img| {
+        if img.format == RasterImageFormat::PNG {
+          Some(PixelImage::from_png(img.data))
+        } else {
+          None
+        }
+      })
+  }
+
+  pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<Svg> {
+    self
+      .rb_face
+      .glyph_svg_image(glyph_id)
+      .and_then(|data| Svg::parse_from_bytes(data).ok())
   }
 
   #[inline]

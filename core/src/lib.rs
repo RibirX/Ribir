@@ -66,6 +66,8 @@ pub mod prelude {
   pub use ribir_macros::{include_svg, widget, Declare, Lerp, MultiChild, SingleChild, Template};
   #[doc(no_inline)]
   pub use ribir_painter::*;
+  #[doc(no_inline)]
+  pub use ribir_text::*;
   #[doc(hidden)]
   pub use rxrust::prelude::*;
 }

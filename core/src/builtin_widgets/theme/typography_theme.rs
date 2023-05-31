@@ -30,7 +30,7 @@ pub struct TypographyTheme {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextTheme {
-  pub text: CowArc<ribir_painter::TextStyle>,
+  pub text: CowArc<ribir_text::TextStyle>,
   pub decoration: TextDecorationStyle,
 }
 

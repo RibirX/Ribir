@@ -243,8 +243,7 @@ mod tests {
   };
 
   use super::*;
-  use ribir_painter::{font_db::FontDB, shaper::TextShaper};
-  use std::{sync::Arc, sync::RwLock};
+  use ribir_text::font_db::FontDB;
   use test::Bencher;
 
   #[derive(Clone, Debug)]
@@ -515,11 +514,8 @@ mod tests {
   fn draw_clip() {
     let mut font_db = FontDB::default();
     font_db.load_system_fonts();
-    let font_db = Arc::new(RwLock::new(font_db));
-    let shaper = TextShaper::new(font_db.clone());
-    let store = TypographyStore::new(<_>::default(), font_db, shaper);
     let win_size = Size::new(150., 50.);
-    let mut painter = Painter::new(Rect::from_size(win_size), store);
+    let mut painter = Painter::new(Rect::from_size(win_size));
 
     let w1 = widget! {
        MockMulti {

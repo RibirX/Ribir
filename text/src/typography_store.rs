@@ -17,7 +17,7 @@ use crate::{
     InputParagraph, InputRun, Overflow, PlaceLineDirection, TypographyCfg, TypographyMan,
     VisualInfos,
   },
-  Em, FontFace, FontSize, Glyph, Pixel, TextAlign, TextDirection, TextReorder,
+  Em, FontFace, FontSize, Glyph, GlyphBound, Pixel, TextAlign, TextDirection, TextReorder,
 };
 
 /// Typography `text` relative to 1em.
@@ -148,7 +148,7 @@ impl TypographyStore {
     }
   }
 
-  pub fn font_db(&mut self) -> &Arc<RwLock<FontDB>> { &self.font_db }
+  pub fn font_db(&self) -> &Arc<RwLock<FontDB>> { &self.font_db }
 
   fn get_from_cache(
     &self,
@@ -497,26 +497,41 @@ impl VisualGlyphs {
       .map(move |g| self.scale_to_pixel_glyph(&g))
   }
 
-  pub fn pixel_glyphs_in_rect(&self, rc: Rect) -> impl Iterator<Item = Glyph<Pixel>> + '_ {
+  pub fn glyph_bounds_in_rect(&self, rc: Rect) -> impl Iterator<Item = GlyphBound> + '_ {
     let min_x: Em = Pixel((rc.min_x() / self.scale).into()).into();
     let min_y: Em = Pixel((rc.min_y() / self.scale).into()).into();
     let max_x: Em = Pixel((rc.max_x() / self.scale).into()).into();
     let max_y: Em = Pixel((rc.max_y() / self.scale).into()).into();
+    let is_hline = !self.visual_info.line_dir.is_horizontal();
     self
       .visual_info
       .visual_lines
       .iter()
       .filter(move |l| !(l.y + l.height < min_y || max_y < l.y))
       .flat_map(move |l| {
-        l.glyphs.iter().map(|g| {
+        l.glyphs.iter().map(move |g| {
           let mut g = g.clone();
           g.x_offset += l.x;
           g.y_offset += l.y;
+          if is_hline {
+            g.y_advance = l.height;
+          } else {
+            g.x_advance = l.width;
+          }
           g
         })
       })
       .filter(move |g| !(g.x_offset + g.x_advance < min_x || max_x < g.x_offset))
       .map(move |g| self.scale_to_pixel_glyph(&g))
+      .map(|g| GlyphBound {
+        face_id: g.face_id,
+        bound: Rect::new(
+          Point::new(g.x_offset.value(), g.y_offset.value()),
+          ribir_geom::Size::new(g.x_advance.value(), g.y_advance.value()),
+        ),
+        glyph_id: g.glyph_id,
+        cluster: g.cluster,
+      })
   }
 
   fn scale_to_pixel_glyph(&self, g: &Glyph<Em>) -> Glyph<Pixel> {
@@ -657,8 +672,8 @@ mod tests {
 
       let info = typography_text(text, FontSize::Pixel(10.0.into()), cfg);
       info
-        .pixel_glyphs_in_rect(bound_rc)
-        .map(|g| (g.x_offset.value(), g.y_offset.value()))
+        .glyph_bounds_in_rect(bound_rc)
+        .map(|g| (g.bound.min_x(), g.bound.min_y()))
         .collect()
     }
 

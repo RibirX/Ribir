@@ -109,13 +109,12 @@ impl Window {
   }
 
   pub fn new(root: Widget, shell_wnd: Box<dyn ShellWindow>, context: AppContext) -> Self {
-    let typography = context.typography_store.clone();
     let frame_pool = FramePool(FuturesLocalSchedulerPool::new());
     let wnd_ctx = WindowCtx::new(context, frame_pool.0.spawner());
     let widget_tree = WidgetTree::new(root, wnd_ctx.clone());
     let dispatcher = Dispatcher::new(wnd_ctx.focus_mgr.clone());
     let size = shell_wnd.inner_size();
-    let mut painter = Painter::new(Rect::from_size(size), typography);
+    let mut painter = Painter::new(Rect::from_size(size));
     painter.set_bounds(Rect::from_size(size));
     Self {
       dispatcher,

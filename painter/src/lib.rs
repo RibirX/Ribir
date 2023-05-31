@@ -13,6 +13,4 @@ mod style;
 pub use crate::image::PixelImage;
 pub use style::*;
 mod svg;
-pub use ribir_text;
-pub use ribir_text::{typography::Overflow, *};
 pub use svg::Svg;

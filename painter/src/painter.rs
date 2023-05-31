@@ -1,10 +1,7 @@
-use crate::{path::*, path_builder::PathBuilder, Brush, Color, PixelImage, TextStyle};
-use ribir_algo::{ShareResource, Substr};
-use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector, Zero};
-use ribir_text::{
-  typography::{Overflow, PlaceLineDirection, TypographyCfg},
-  Em, FontFace, FontSize, Pixel, TypographyStore, VisualGlyphs,
-};
+use crate::{path::*, path_builder::PathBuilder, Brush, Color, PixelImage, Svg};
+use ribir_algo::ShareResource;
+use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
+
 use serde::{Deserialize, Serialize};
 
 use std::ops::{Deref, DerefMut};
@@ -19,7 +16,6 @@ pub struct Painter {
   state_stack: Vec<PainterState>,
   commands: Vec<PaintCommand>,
   path_builder: PathBuilder,
-  typography_store: TypographyStore,
 }
 
 /// `PainterBackend` use to draw textures for every frame, All `draw_commands`
@@ -97,11 +93,7 @@ pub enum PaintCommand {
 struct PainterState {
   /// The line width use to stroke path.
   stroke_options: StrokeOptions,
-  font_size: FontSize,
-  letter_space: Option<Pixel>,
   brush: Brush,
-  font_face: FontFace,
-  text_line_height: Option<Em>,
   transform: Transform,
   opacity: f32,
   clip_cnt: usize,
@@ -115,11 +107,7 @@ impl PainterState {
     PainterState {
       bounds,
       stroke_options: <_>::default(),
-      font_size: FontSize::Pixel(14.0.into()),
-      letter_space: None,
       brush: Color::BLACK.into(),
-      font_face: FontFace::default(),
-      text_line_height: None,
       transform: Transform::identity(),
       clip_cnt: 0,
       opacity: 1.,
@@ -128,12 +116,11 @@ impl PainterState {
 }
 
 impl Painter {
-  pub fn new(bounds: Rect, typography_store: TypographyStore) -> Self {
+  pub fn new(bounds: Rect) -> Self {
     Self {
       state_stack: vec![PainterState::new(bounds)],
       commands: vec![],
       path_builder: Path::builder(),
-      typography_store,
       bounds,
     }
   }
@@ -142,9 +129,12 @@ impl Painter {
   /// the next time you call [`Painter::reset`]!.
   pub fn set_bounds(&mut self, bounds: Rect) { self.bounds = bounds; }
 
-  pub fn rect_in_paint_bounds(&self, rect: &Rect) -> bool {
-    let rect = self.get_transform().outer_transformed_rect(rect);
-    rect.intersects(&self.paint_bounds().to_f32().cast_unit())
+  pub fn rect_in_paint_bounds(&self, rect: &Rect) -> Option<Rect> {
+    self.get_transform().inverse().and_then(|trans| {
+      trans
+        .outer_transformed_rect(self.paint_bounds())
+        .intersection(rect)
+    })
   }
 
   pub fn paint_bounds(&self) -> &Rect { &self.current_state().bounds }
@@ -253,46 +243,6 @@ impl Painter {
     self
   }
 
-  /// Set the text line height which is a factor use to multiplied by the font
-  /// size
-  #[inline]
-  pub fn set_text_line_height(&mut self, line_height: Em) -> &mut Self {
-    self.current_state_mut().text_line_height = Some(line_height);
-    self
-  }
-
-  #[inline]
-  pub fn get_letter_space(&mut self) -> Pixel {
-    self
-      .current_state()
-      .letter_space
-      .unwrap_or_else(Pixel::zero)
-  }
-
-  #[inline]
-  pub fn set_letter_space(&mut self, letter_space: Pixel) -> &mut Self {
-    self.current_state_mut().letter_space = Some(letter_space);
-    self
-  }
-
-  #[inline]
-  pub fn get_font(&self) -> &FontFace { &self.current_state().font_face }
-
-  #[inline]
-  pub fn set_font(&mut self, font: FontFace) -> &mut Self {
-    self.current_state_mut().font_face = font;
-    self
-  }
-
-  #[inline]
-  pub fn get_font_size(&self) -> &FontSize { &self.current_state().font_size }
-
-  #[inline]
-  pub fn set_font_size(&mut self, font_size: FontSize) -> &mut Self {
-    self.current_state_mut().font_size = font_size;
-    self
-  }
-
   /// Return the current transformation matrix being applied to the layer.
   #[inline]
   pub fn get_transform(&self) -> &Transform { &self.current_state().transform }
@@ -365,38 +315,6 @@ impl Painter {
   pub fn fill(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
     self.fill_path(builder.build())
-  }
-
-  /// Stroke `text` from left to right, start at let top position, use
-  /// [`translate`](Painter::translate) move to the position what you want.
-  /// Partially hitting the `max_width` will end the draw. Use `font` and
-  /// `font_size` to specify the font and font size. Use
-  /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
-  /// fill complex text.
-  pub fn stroke_text<T: Into<Substr>>(
-    &mut self,
-    text: T,
-    bounds: Option<Size>,
-    overflow: Overflow,
-  ) -> &mut Self {
-    self.paint_text_command(text, true, bounds, overflow);
-    self
-  }
-
-  /// Fill `text` from left to right, start at let top position, use
-  /// [`translate`](Painter::translate) move to the position what you want.
-  /// Partially hitting the `max_width` will end the draw. Use `font` and
-  /// `font_size` to specify the font and font size. Use
-  /// [`fill_complex_texts`](Rendering2DLayer::fill_complex_texts) method to
-  /// fill complex text.
-  pub fn fill_text<T: Into<Substr>>(
-    &mut self,
-    text: T,
-    bounds: Option<Size>,
-    overflow: Overflow,
-  ) -> &mut Self {
-    self.paint_text_command(text, false, bounds, overflow);
-    self
   }
 
   /// Adds a translation transformation to the current matrix by moving the
@@ -518,6 +436,32 @@ impl Painter {
     self.path_builder.rect_round(rect, radius);
     self
   }
+
+  pub fn paint_svg(&mut self, svg: &Svg) -> &mut Self {
+    svg.paths.iter().for_each(|c| {
+      self
+        .scale(svg.view_scale.x, svg.view_scale.y)
+        .set_brush(c.brush.clone());
+      match &c.style {
+        PathPaintStyle::Fill => self.fill_path(c.path.clone()),
+        PathPaintStyle::Stroke(options) => self
+          .set_strokes(options.clone())
+          .stroke_path(c.path.clone()),
+      };
+    });
+    self
+  }
+
+  pub fn paint_img(&mut self, img: ShareResource<PixelImage>) -> &mut Self {
+    self
+      .rect(&Rect::from_size(Size::new(
+        img.width() as f32,
+        img.height() as f32,
+      )))
+      .set_brush(img)
+      .fill();
+    self
+  }
 }
 
 impl Painter {
@@ -536,70 +480,6 @@ impl Painter {
   }
 
   fn stroke_options(&self) -> &StrokeOptions { &self.current_state().stroke_options }
-
-  fn paint_text_command<T: Into<Substr>>(
-    &mut self,
-    text: T,
-    stroke: bool,
-    bounds: Option<Size>,
-    overflow: Overflow,
-  ) {
-    let &PainterState {
-      font_size,
-      letter_space,
-      ref font_face,
-      text_line_height,
-      ..
-    } = self.current_state();
-    let visual_glyphs = typography_with_text_style(
-      &self.typography_store,
-      text,
-      &TextStyle {
-        font_size,
-        font_face: font_face.clone(),
-        letter_space,
-        line_height: text_line_height,
-      },
-      bounds,
-      overflow,
-    );
-
-    visual_glyphs.pixel_glyphs().for_each(|g| {
-      let path = {
-        // todo: font db should load face when setup theme.
-        let mut font_db = self.typography_store.font_db().write().unwrap();
-        let face = font_db.face_data_or_insert(g.face_id);
-
-        face.and_then(|face| {
-          face.outline_glyph(g.glyph_id).map(|p| {
-            let unit = face.units_per_em();
-            (unit as f32, Path::from(p))
-          })
-        })
-      };
-
-      if let Some((unit, path)) = path {
-        let font_size = font_size.into_pixel().value();
-
-        // todo: path transform should applied in font face
-        let scale = font_size / unit;
-        let ts = Transform::scale(1., -1.)
-          .then_translate((0., unit).into())
-          .then_scale(scale, scale)
-          .then_translate(Vector::new(g.x_offset.value(), g.y_offset.value()));
-        let path = path.transform(&ts);
-
-        // todo: glyph path as resource.
-        if stroke {
-          self.stroke_path(path);
-        } else {
-          self.fill_path(path);
-        }
-      } else {
-        // todo: image or svg fallback
-      }
-    });
-  }
 
   fn push_n_pop_cmd(&mut self, n: usize) {
     for _ in 0..n {
@@ -643,45 +523,6 @@ impl<'a> DerefMut for PainterGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.0 }
 }
 
-pub fn typography_with_text_style<T: Into<Substr>>(
-  store: &TypographyStore,
-  text: T,
-  style: &TextStyle,
-  bounds: Option<Size>,
-  overflow: Overflow,
-) -> VisualGlyphs {
-  let &TextStyle {
-    font_size,
-    letter_space,
-    line_height,
-    ref font_face,
-    ..
-  } = style;
-
-  let bounds = if let Some(b) = bounds {
-    let width: Em = Pixel(b.width.into()).into();
-    let height: Em = Pixel(b.height.into()).into();
-    Size::new(width, height)
-  } else {
-    let max = Em::absolute(f32::MAX);
-    Size::new(max, max)
-  };
-
-  store.typography(
-    text.into(),
-    font_size,
-    font_face,
-    TypographyCfg {
-      line_height,
-      letter_space,
-      text_align: None,
-      bounds,
-      line_dir: PlaceLineDirection::TopToBottom,
-      overflow,
-    },
-  )
-}
-
 impl PaintPath {
   pub fn new(path: Path, transform: Transform) -> Self {
     let paint_bounds = transform.outer_transformed_rect(path.bounds());
@@ -697,19 +538,9 @@ impl PaintPath {
 #[cfg(test)]
 mod test {
   use super::*;
-  use ribir_geom::rect;
-  use ribir_text::shaper::TextShaper;
+  use ribir_geom::{rect, Size};
 
-  fn painter() -> Painter {
-    Painter::new(
-      Rect::from_size(Size::new(512., 512.)),
-      TypographyStore::new(
-        <_>::default(),
-        <_>::default(),
-        TextShaper::new(<_>::default()),
-      ),
-    )
-  }
+  fn painter() -> Painter { Painter::new(Rect::from_size(Size::new(512., 512.))) }
 
   #[test]
   fn save_guard() {

@@ -11,6 +11,7 @@ use crate::{
 use ribir_algo::CowArc;
 pub use ribir_algo::ShareResource;
 use ribir_geom::Size;
+use ribir_text::TextStyle;
 use std::{collections::HashMap, rc::Rc};
 
 mod palette;
