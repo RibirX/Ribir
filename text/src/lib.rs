@@ -9,14 +9,18 @@ use derive_more::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 use fontdb::ID;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 pub use ribir_algo::Substr;
+use ribir_geom::Rect;
 use rustybuzz::ttf_parser::GlyphId;
 use std::hash::Hash;
 pub mod text_reorder;
 pub mod typography;
 use ordered_float::OrderedFloat;
 pub use text_reorder::TextReorder;
+pub use typography::Overflow;
 mod typography_store;
 pub use typography_store::{TypographyStore, VisualGlyphs};
+mod text_render;
+pub use text_render::{paint_glyphs, TextStyle};
 
 mod text_writer;
 pub use text_writer::{CharacterCursor, ControlChar, TextWriter};
@@ -147,6 +151,18 @@ pub struct Glyph<Unit> {
   /// How many units the glyph moves on the Y-axis before drawing it, this
   /// should not affect how many the line advances.
   pub y_offset: Unit,
+  /// The id of the glyph.
+  pub glyph_id: GlyphId,
+  /// An cluster of origin text as byte index.
+  pub cluster: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct GlyphBound {
+  /// The font face id of the glyph.
+  pub face_id: ID,
+  /// The pixel bound rect of the glyph.
+  pub bound: Rect,
   /// The id of the glyph.
   pub glyph_id: GlyphId,
   /// An cluster of origin text as byte index.

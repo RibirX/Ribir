@@ -66,36 +66,71 @@ impl Render for Text {
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
     let bounds = ctx.layout_clamp().map(|b| b.max);
-    let painter = ctx.painter();
-    let TextStyle {
-      font_size,
-      font_face,
-      letter_space,
-      line_height,
-    } = &*self.text_style;
-    painter
-      .set_brush(self.foreground.clone())
-      .set_font(font_face.clone())
-      .set_font_size(*font_size);
-    if let Some(letter_space) = letter_space {
-      painter.set_letter_space(*letter_space);
-    }
-    if let Some(line_height) = line_height {
-      painter.set_text_line_height(*line_height);
-    }
+    let visual_glyphs = typography_with_text_style(
+      ctx.typography_store(),
+      self.text.clone(),
+      &self.text_style,
+      bounds,
+      self.overflow,
+    );
 
-    let text = self.text.substr(..);
-    match &self.path_style {
-      PathPaintStyle::Fill => {
-        painter.fill_text(text, bounds, self.overflow);
-      }
-      PathPaintStyle::Stroke(stroke) => {
-        painter
-          .set_strokes(stroke.clone())
-          .stroke_text(text, bounds, self.overflow);
-      }
+    let font_size = self.text_style.font_size.into_pixel().value();
+    let rc = visual_glyphs.visual_rect();
+    let font_db = ctx.typography_store().font_db().clone();
+    let painter = ctx.painter();
+    visual_glyphs.visual_rect();
+    let Some(paint_rect) = painter.rect_in_paint_bounds(&rc) else { return; };
+    if !paint_rect.contains_rect(&rc) {
+      painter.clip(Path::rect(&rc));
     }
+    paint_glyphs(
+      painter,
+      font_db,
+      visual_glyphs.glyph_bounds_in_rect(paint_rect),
+      self.foreground.clone(),
+      font_size,
+      &self.path_style,
+    );
   }
+}
+
+pub fn typography_with_text_style<T: Into<Substr>>(
+  store: &TypographyStore,
+  text: T,
+  style: &TextStyle,
+  bounds: Option<Size>,
+  overflow: Overflow,
+) -> VisualGlyphs {
+  let &TextStyle {
+    font_size,
+    letter_space,
+    line_height,
+    ref font_face,
+    ..
+  } = style;
+
+  let bounds = if let Some(b) = bounds {
+    let width: Em = Pixel(b.width.into()).into();
+    let height: Em = Pixel(b.height.into()).into();
+    Size::new(width, height)
+  } else {
+    let max = Em::absolute(f32::MAX);
+    Size::new(max, max)
+  };
+
+  store.typography(
+    text.into(),
+    font_size,
+    font_face,
+    TypographyCfg {
+      line_height,
+      letter_space,
+      text_align: None,
+      bounds,
+      line_dir: PlaceLineDirection::TopToBottom,
+      overflow,
+    },
+  )
 }
 
 impl Query for Text {

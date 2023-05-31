@@ -3,7 +3,7 @@ use futures::{
   Future,
 };
 use ribir_geom::Point;
-use ribir_painter::TypographyStore;
+use ribir_text::TypographyStore;
 use rxrust::{scheduler::FuturesLocalScheduler, subject::Subject};
 use std::{cell::RefCell, convert::Infallible, rc::Rc, time::Instant};
 

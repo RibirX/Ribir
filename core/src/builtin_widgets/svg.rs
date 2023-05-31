@@ -7,17 +7,7 @@ impl Render for Svg {
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
     let painter = ctx.painter();
-    self.paths.iter().for_each(|c| {
-      painter
-        .scale(self.view_scale.x, self.view_scale.y)
-        .set_brush(c.brush.clone());
-      match &c.style {
-        PathPaintStyle::Fill => painter.fill_path(c.path.clone()),
-        PathPaintStyle::Stroke(options) => painter
-          .set_strokes(options.clone())
-          .stroke_path(c.path.clone()),
-      };
-    });
+    painter.paint_svg(self);
   }
 }
 

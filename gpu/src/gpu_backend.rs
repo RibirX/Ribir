@@ -379,16 +379,9 @@ mod tests {
   use ribir_algo::ShareResource;
   use ribir_dev_helper::*;
   use ribir_geom::*;
-  use ribir_painter::{
-    font_db::FontDB, shaper::TextShaper, Brush, Color, Painter, Path, PixelImage, TypographyStore,
-  };
-  use std::sync::{Arc, RwLock};
+  use ribir_painter::{Brush, Color, Painter, Path, PixelImage};
 
-  fn painter(bounds: Size) -> Painter {
-    let font_db = Arc::new(RwLock::new(FontDB::default()));
-    let store = TypographyStore::new(<_>::default(), font_db.clone(), TextShaper::new(font_db));
-    Painter::new(Rect::from_size(bounds), store)
-  }
+  fn painter(bounds: Size) -> Painter { Painter::new(Rect::from_size(bounds)) }
 
   painter_backend_eq_image_test!(smoke);
   fn smoke() -> Painter {
