@@ -497,7 +497,7 @@ impl VisualGlyphs {
       .map(move |g| self.scale_to_pixel_glyph(&g))
   }
 
-  pub fn glyph_bounds_in_rect(&self, rc: Rect) -> impl Iterator<Item = GlyphBound> + '_ {
+  pub fn glyph_bounds_in_rect(&self, rc: &Rect) -> impl Iterator<Item = GlyphBound> + '_ {
     let min_x: Em = Pixel((rc.min_x() / self.scale).into()).into();
     let min_y: Em = Pixel((rc.min_y() / self.scale).into()).into();
     let max_x: Em = Pixel((rc.max_x() / self.scale).into()).into();
@@ -672,7 +672,7 @@ mod tests {
 
       let info = typography_text(text, FontSize::Pixel(10.0.into()), cfg);
       info
-        .glyph_bounds_in_rect(bound_rc)
+        .glyph_bounds_in_rect(&bound_rc)
         .map(|g| (g.bound.min_x(), g.bound.min_y()))
         .collect()
     }

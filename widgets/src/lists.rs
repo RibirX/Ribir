@@ -320,26 +320,23 @@ impl ComposeChild for ListItem {
               flex: 1.,
               DynWidget {
                 dyns: label_gap.map(|padding| Padding { padding }),
-                // todo: need to implement clip logic in text paint
-                Clip {
-                  Column {
-                    Text {
-                      text: headline.0.0.clone(),
-                      foreground: on_surface,
-                      text_style: headline_style.clone(),
-                    }
-                    Option::map(supporting, |supporting| widget! {
-                      states { supporting: supporting.into_readonly() }
-                      ConstrainedBox {
-                        clamp: BoxClamp::fixed_height(*text_height.0),
-                        Text {
-                          text: supporting.0.0.clone(),
-                          foreground: on_surface_variant.clone(),
-                          text_style: supporting_style.clone(),
-                        }
-                      }
-                    })
+                Column {
+                  Text {
+                    text: headline.0.0.clone(),
+                    foreground: on_surface,
+                    text_style: headline_style.clone(),
                   }
+                  Option::map(supporting, |supporting| widget! {
+                    states { supporting: supporting.into_readonly() }
+                    ConstrainedBox {
+                      clamp: BoxClamp::fixed_height(*text_height.0),
+                      Text {
+                        text: supporting.0.0.clone(),
+                        foreground: on_surface_variant.clone(),
+                        text_style: supporting_style.clone(),
+                      }
+                    }
+                  })
                 }
               }
             }

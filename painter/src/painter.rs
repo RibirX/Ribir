@@ -437,7 +437,7 @@ impl Painter {
     self
   }
 
-  pub fn paint_svg(&mut self, svg: &Svg) -> &mut Self {
+  pub fn draw_svg(&mut self, svg: &Svg) -> &mut Self {
     svg.paths.iter().for_each(|c| {
       self
         .scale(svg.view_scale.x, svg.view_scale.y)
@@ -452,7 +452,7 @@ impl Painter {
     self
   }
 
-  pub fn paint_img(&mut self, img: ShareResource<PixelImage>) -> &mut Self {
+  pub fn draw_img(&mut self, img: ShareResource<PixelImage>) -> &mut Self {
     self
       .rect(&Rect::from_size(Size::new(
         img.width() as f32,

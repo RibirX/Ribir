@@ -7,7 +7,7 @@ impl Render for Svg {
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
     let painter = ctx.painter();
-    painter.paint_svg(self);
+    painter.draw_svg(self);
   }
 }
 
