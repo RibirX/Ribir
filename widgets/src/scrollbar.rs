@@ -32,9 +32,9 @@ pub struct HScrollBarThumbDecorator {
 impl ComposeDecorator for HScrollBarThumbDecorator {
   type Host = Widget;
 
-  fn compose_decorator(this: Stateful<Self>, host: Self::Host) -> Widget {
+  fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget {
     widget! {
-      states { this }
+      states { this: this.into_readonly() }
       DynWidget { left_anchor: this.offset, dyns: host }
     }
   }
@@ -50,9 +50,9 @@ pub struct VScrollBarThumbDecorator {
 impl ComposeDecorator for VScrollBarThumbDecorator {
   type Host = Widget;
 
-  fn compose_decorator(this: Stateful<Self>, host: Self::Host) -> Widget {
+  fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget {
     widget! {
-      states { this }
+      states { this: this.into_readonly() }
       DynWidget {
         top_anchor: this.offset,
         dyns: host

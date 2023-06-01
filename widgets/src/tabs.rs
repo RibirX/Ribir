@@ -105,7 +105,7 @@ pub struct TabsDecorator {}
 impl ComposeDecorator for TabsDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Template)]
@@ -129,7 +129,7 @@ pub struct TabDecorator {}
 impl ComposeDecorator for TabDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Declare)]
@@ -142,9 +142,9 @@ pub struct IndicatorDecorator {
 impl ComposeDecorator for IndicatorDecorator {
   type Host = Widget;
 
-  fn compose_decorator(this: Stateful<Self>, host: Self::Host) -> Widget {
+  fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget {
     widget! {
-      states { this }
+      states { this: this.into_readonly() }
       DynWidget {
         left_anchor: match this.pos {
           Position::Top | Position::Bottom => this.rect.origin.x

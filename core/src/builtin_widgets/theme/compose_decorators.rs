@@ -15,7 +15,7 @@ pub struct ComposeDecorators {
 pub trait ComposeDecorator: Sized {
   type Host;
 
-  fn compose_decorator(this: Stateful<Self>, host: Self::Host) -> Widget;
+  fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget;
 }
 
 impl<W: ComposeDecorator + 'static> ComposeChild for W {
@@ -35,7 +35,7 @@ impl<W: ComposeDecorator + 'static> ComposeChild for W {
       if let Some(style) = style {
         style(Box::new(this.into_writable()), Box::new(child))
       } else {
-        ComposeDecorator::compose_decorator(this.into_writable(), child)
+        ComposeDecorator::compose_decorator(this, child)
       }
     })
     .into_widget()
@@ -83,7 +83,7 @@ mod tests {
 
     impl ComposeDecorator for Size100Style {
       type Host = Widget;
-      fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+      fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
     }
     theme
       .compose_decorators
