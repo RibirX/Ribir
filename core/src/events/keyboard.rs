@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use crate::{
   data_widget::compose_child_as_data_widget, impl_compose_child_with_focus_for_listener,
-  impl_listener, impl_query_self_only, prelude::*,
+  impl_listener, impl_listener_and_compose_child_with_focus, impl_query_self_only, prelude::*,
 };
 
 #[derive(Debug)]
@@ -27,16 +27,27 @@ pub struct KeyUpListener {
   on_key_up: MutRefItemSubject<'static, KeyboardEvent, Infallible>,
 }
 
-impl_listener!(
+#[derive(Declare)]
+pub struct KeyDownCaptureListener {
+  #[declare(builtin, convert=custom)]
+  on_key_down_capture: MutRefItemSubject<'static, KeyboardEvent, Infallible>,
+}
+
+#[derive(Declare)]
+pub struct KeyUpCaptureListener {
+  #[declare(builtin, convert=custom)]
+  on_key_up_capture: MutRefItemSubject<'static, KeyboardEvent, Infallible>,
+}
+
+impl_listener_and_compose_child_with_focus!(
   KeyDownListener,
   KeyDownListenerDeclarer,
   on_key_down,
   KeyboardEvent,
   key_down_stream
 );
-impl_compose_child_with_focus_for_listener!(KeyDownListener);
 
-impl_listener!(
+impl_listener_and_compose_child_with_focus!(
   KeyUpListener,
   KeyUpListenerDeclarer,
   on_key_up,
@@ -44,7 +55,21 @@ impl_listener!(
   key_up_stream
 );
 
-impl_compose_child_with_focus_for_listener!(KeyUpListener);
+impl_listener_and_compose_child_with_focus!(
+  KeyDownCaptureListener,
+  KeyDownCaptureListenerDeclarer,
+  on_key_down_capture,
+  KeyboardEvent,
+  key_down_capture_stream
+);
+
+impl_listener_and_compose_child_with_focus!(
+  KeyUpCaptureListener,
+  KeyUpCaptureListenerDeclarer,
+  on_key_up_capture,
+  KeyboardEvent,
+  key_up_capture_stream
+);
 
 impl std::borrow::Borrow<EventCommon> for KeyboardEvent {
   #[inline]
@@ -100,14 +125,23 @@ mod tests {
           states { this: this.into_writable() }
           MockBox {
             size: Size::zero(),
-            auto_focus: true,
-            on_key_down: move |key| {
-              this.0
-                .borrow_mut()
-                .push(format!("key down {:?}", key.key));
+            on_key_down_capture: move |key| {
+              this.0.borrow_mut().push(format!("key down capture {:?}", key.key));
             },
-            on_key_up: move |key| {
-              this.0.borrow_mut().push(format!("key up {:?}", key.key));
+            on_key_up_capture: move |key| {
+              this.0.borrow_mut().push(format!("key up capture {:?}", key.key));
+            },
+            MockBox {
+              size: Size::zero(),
+              auto_focus: true,
+              on_key_down: move |key| {
+                this.0
+                  .borrow_mut()
+                  .push(format!("key down {:?}", key.key));
+              },
+              on_key_up: move |key| {
+                this.0.borrow_mut().push(format!("key up {:?}", key.key));
+              }
             }
           }
         }
@@ -132,9 +166,13 @@ mod tests {
     assert_eq!(
       &*keys.borrow(),
       &[
+        "key down capture Key0",
         "key down Key0",
+        "key up capture Key0",
         "key up Key0",
+        "key down capture Key1",
         "key down Key1",
+        "key up capture Key1",
         "key up Key1"
       ]
     );

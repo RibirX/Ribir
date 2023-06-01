@@ -80,8 +80,14 @@ impl Dispatcher {
           common: EventCommon::new(focus, tree, &self.info),
         };
         match input.state {
-          ElementState::Pressed => tree.bubble_event::<KeyDownListener>(&mut event),
-          ElementState::Released => tree.bubble_event::<KeyUpListener>(&mut event),
+          ElementState::Pressed => {
+            tree.capture_event::<KeyDownCaptureListener>(&mut event);
+            tree.bubble_event::<KeyDownListener>(&mut event);
+          }
+          ElementState::Released => {
+            tree.capture_event::<KeyUpCaptureListener>(&mut event);
+            tree.bubble_event::<KeyUpListener>(&mut event);
+          }
         };
 
         event.common.prevent_default
@@ -100,6 +106,7 @@ impl Dispatcher {
         chars: c,
         common: EventCommon::new(focus, tree, &self.info),
       };
+      tree.capture_event::<CharsCaptureListener>(&mut char_event);
       tree.bubble_event::<CharsListener>(&mut char_event);
     }
   }
@@ -123,6 +130,7 @@ impl Dispatcher {
     self.info.cursor_pos = position;
     self.pointer_enter_leave_dispatch(tree);
     if let Some(mut event) = self.pointer_event_for_hit_widget(tree) {
+      tree.capture_event::<PointerMoveCaptureListener>(&mut event);
       tree.bubble_event::<PointerMoveListener>(&mut event);
     }
   }
@@ -155,6 +163,7 @@ impl Dispatcher {
           if self.info.mouse_button.1.is_empty() {
             self.info.mouse_button.0 = None;
             let mut release_event = self.pointer_event_for_hit_widget(tree)?;
+            tree.capture_event::<PointerUpCaptureListener>(&mut release_event);
             tree.bubble_event::<PointerUpListener>(&mut release_event);
 
             let tap_on = self
@@ -163,6 +172,7 @@ impl Dispatcher {
               .lowest_common_ancestor(release_event.target(), &tree.arena)?;
             let mut tap_event = PointerEvent::from_mouse(tap_on, tree, &self.info);
 
+            tree.capture_event::<TapCaptureListener>(&mut tap_event);
             tree.bubble_event::<TapListener>(&mut tap_event);
           }
         }
@@ -192,6 +202,7 @@ impl Dispatcher {
         delta_y,
         common: EventCommon::new(wid, tree, &self.info),
       };
+      tree.capture_event::<WheelCaptureListener>(&mut wheel_event);
       tree.bubble_event::<WheelListener>(&mut wheel_event);
     }
   }
@@ -213,6 +224,7 @@ impl Dispatcher {
       self.blur(tree);
     }
     if let Some(mut event) = event {
+      tree.capture_event::<PointerDownCaptureListener>(&mut event);
       tree.bubble_event::<PointerDownListener>(&mut event);
     }
   }
@@ -242,7 +254,7 @@ impl Dispatcher {
         l.assert_get(arena).query_all_type(
           |pointer: &PointerLeaveListener| {
             pointer.dispatch(&mut event);
-            !event.bubbling_canceled()
+            !event.is_propagation()
           },
           QueryOrder::InnerFirst,
         );
@@ -274,7 +286,7 @@ impl Dispatcher {
           obj.query_all_type(
             |pointer: &PointerEnterListener| {
               pointer.dispatch(&mut event);
-              !event.bubbling_canceled()
+              !event.is_propagation()
             },
             QueryOrder::InnerFirst,
           );
@@ -286,7 +298,7 @@ impl Dispatcher {
 
   fn hit_widget(&self, tree: &WidgetTree) -> Option<WidgetId> {
     let mut w = Some(tree.root());
-    let mut hit_result = None;
+    let mut hit_target = None;
     let mut pos = self.info.cursor_pos;
     while let Some(id) = w {
       let WidgetTree { arena, store, wnd_ctx, .. } = tree;
@@ -297,7 +309,7 @@ impl Dispatcher {
       pos = store.map_from_parent(id, pos, arena);
 
       if hit {
-        hit_result = w;
+        hit_target = w;
       }
 
       w = id
@@ -320,7 +332,7 @@ impl Dispatcher {
 
               if let Some(id) = node {
                 pos = store.map_to_parent(id, pos, arena);
-                if node == hit_result {
+                if node == hit_target {
                   node = None;
                 }
               }
@@ -329,7 +341,7 @@ impl Dispatcher {
           node
         });
     }
-    hit_result
+    hit_target
   }
 
   fn pointer_event_for_hit_widget(&mut self, tree: &WidgetTree) -> Option<PointerEvent> {
@@ -357,6 +369,59 @@ impl DispatchInfo {
 }
 
 impl WidgetTree {
+  pub(crate) fn capture_event<Ty>(&mut self, event: &mut Ty::Event)
+  where
+    Ty: EventListener + 'static,
+  {
+    self.capture_event_with(event, |listener: &Ty, event| listener.dispatch(event));
+  }
+
+  pub(crate) fn capture_event_with<Ty, D, E>(&self, event: &mut E, mut dispatcher: D)
+  where
+    D: FnMut(&Ty, &mut E),
+    E: std::borrow::BorrowMut<EventCommon>,
+    Ty: 'static,
+  {
+    let mut hit_widget_path: Vec<WidgetId> = vec![];
+    let init_current_target = event.borrow().current_target;
+    let mut current_target = init_current_target;
+
+    loop {
+      current_target.assert_get(&self.arena).query_all_type(
+        |_: &Ty| {
+          hit_widget_path.push(current_target);
+          false
+        },
+        QueryOrder::OutsideFirst,
+      );
+
+      if let Some(p) = current_target.parent(&self.arena) {
+        current_target = p;
+      } else {
+        break;
+      }
+    }
+
+    hit_widget_path.reverse();
+
+    for w in hit_widget_path {
+      w.assert_get(&self.arena).query_all_type(
+        |listener: &Ty| {
+          event.borrow_mut().current_target = w;
+          dispatcher(listener, event);
+          !event.borrow_mut().is_propagation()
+        },
+        QueryOrder::OutsideFirst,
+      );
+
+      if event.borrow().is_propagation() {
+        break;
+      }
+    }
+
+    event.borrow_mut().current_target = init_current_target;
+  }
+
   pub(crate) fn bubble_event<Ty>(&mut self, event: &mut Ty::Event)
   where
     Ty: EventListener + 'static,
@@ -375,12 +440,12 @@ impl WidgetTree {
       current_target.assert_get(&self.arena).query_all_type(
         |listener: &Ty| {
           dispatcher(listener, event);
-          !event.borrow_mut().bubbling_canceled()
+          !event.borrow_mut().is_propagation()
         },
         QueryOrder::InnerFirst,
       );
 
-      if event.borrow().bubbling_canceled() {
+      if event.borrow().is_propagation() {
         break;
       }
 
@@ -617,7 +682,7 @@ mod tests {
               size: Size::new(100., 30.),
               on_pointer_down: move |e| {
                 this.0.borrow_mut().push(e.clone());
-                e.stop_bubbling();
+                e.stop_propagation();
               }
             }
           }
@@ -727,6 +792,57 @@ mod tests {
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorLeft { device_id });
     assert_eq!(&*leave_event.borrow(), &[1, 2]);
+  }
+
+  #[test]
+  fn capture_click() {
+    let click_path = Stateful::new(vec![]) as Stateful<Vec<usize>>;
+    let w = widget! {
+      states { click_path: click_path.clone() }
+      MockBox {
+        size: Size::new(100., 100.),
+        on_tap: move |_| (*click_path).push(4),
+        on_tap_capture: move |_| (*click_path).push(1),
+        MockBox {
+          size: Size::new(100., 100.),
+          on_tap: move |_| (*click_path).push(3),
+          on_tap_capture: move |_| (*click_path).push(2),
+        }
+      }
+    };
+
+    // Stretch row
+    let mut wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
+    wnd.draw_frame();
+
+    let device_id = unsafe { DeviceId::dummy() };
+    let modifiers = ModifiersState::default();
+
+    #[allow(deprecated)]
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (50f64, 50f64).into(),
+      modifiers,
+    });
+    #[allow(deprecated)]
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+      modifiers,
+    });
+    #[allow(deprecated)]
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Released,
+      button: MouseButton::Left,
+      modifiers,
+    });
+
+    {
+      let clicked = click_path.state_ref();
+      assert_eq!(*clicked, [1, 2, 3, 4]);
+    }
   }
 
   #[test]

@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use crate::{
   data_widget::compose_child_as_data_widget, impl_compose_child_for_listener, impl_listener,
-  impl_query_self_only, prelude::*,
+  impl_listener_and_compose_child, impl_query_self_only, prelude::*,
 };
 
 #[derive(Debug, Clone)]
@@ -20,7 +20,13 @@ pub struct WheelListener {
   on_wheel: MutRefItemSubject<'static, WheelEvent, Infallible>,
 }
 
-impl_listener!(
+#[derive(Declare)]
+pub struct WheelCaptureListener {
+  #[declare(builtin, convert=custom)]
+  on_wheel_capture: MutRefItemSubject<'static, WheelEvent, Infallible>,
+}
+
+impl_listener_and_compose_child!(
   WheelListener,
   WheelListenerDeclarer,
   on_wheel,
@@ -28,7 +34,13 @@ impl_listener!(
   wheel_stream
 );
 
-impl_compose_child_for_listener!(WheelListener);
+impl_listener_and_compose_child!(
+  WheelCaptureListener,
+  WheelCaptureListenerDeclarer,
+  on_wheel_capture,
+  WheelEvent,
+  wheel_capture_stream
+);
 
 impl std::borrow::Borrow<EventCommon> for WheelEvent {
   #[inline]
@@ -59,14 +71,29 @@ mod tests {
 
   #[test]
   fn smoke() {
-    let receive = Rc::new(RefCell::new((0., 0.)));
-    let c_receive = receive.clone();
+    let source_receive_for_bubble = Rc::new(RefCell::new((0., 0.)));
+    let bubble_receive = source_receive_for_bubble.clone();
+    let source_receive_for_capture = Rc::new(RefCell::new((0., 0.)));
+    let capture_receive = source_receive_for_capture.clone();
+    let event_order = Rc::new(RefCell::new(Vec::new()));
+    let bubble_event_order = event_order.clone();
+    let capture_event_order = event_order.clone();
 
     let widget = widget! {
       MockBox {
-        size: Size::new(100., 100.),
-        auto_focus: true,
-        on_wheel: move |wheel| *c_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y)
+        size: Size::new(200., 200.),
+        on_wheel_capture: move |wheel| {
+          *capture_receive.borrow_mut() = (wheel.delta_x,  wheel.delta_y);
+          (*capture_event_order.borrow_mut()).push("capture");
+        },
+        MockBox {
+          size: Size::new(100., 100.),
+          auto_focus: true,
+          on_wheel: move |wheel| {
+            *bubble_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y);
+            (*bubble_event_order.borrow_mut()).push("bubble");
+          }
+        }
       }
     };
 
@@ -82,6 +109,8 @@ mod tests {
       modifiers: ModifiersState::default(),
     });
 
-    assert_eq!(*receive.borrow(), (1., 1.));
+    assert_eq!(*source_receive_for_bubble.borrow(), (1., 1.));
+    assert_eq!(*source_receive_for_capture.borrow(), (1., 1.));
+    assert_eq!(*event_order.borrow(), ["capture", "bubble"]);
   }
 }

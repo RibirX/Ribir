@@ -501,9 +501,17 @@ impl Dispatcher {
       .find(|wid| !(*wid).is_dropped(&tree.arena))
     {
       let mut focus_event = FocusEvent::new(*wid, tree, info);
+      tree.capture_event_with(
+        &mut focus_event,
+        |focus_out_capture: &FocusOutCaptureListener, event| {
+          if !common_ancestors.contains(&event.current_target()) {
+            focus_out_capture.dispatch(event);
+          }
+        },
+      );
       tree.bubble_event_with(&mut focus_event, |focus_out: &FocusOutListener, event| {
         if common_ancestors.contains(&event.current_target()) {
-          event.stop_bubbling();
+          event.stop_propagation();
         } else {
           focus_out.dispatch(event);
         }
@@ -520,11 +528,18 @@ impl Dispatcher {
         });
 
       let mut focus_event = FocusEvent::new(wid, tree, info);
-
+      tree.capture_event_with(
+        &mut focus_event,
+        |focus_in_capture: &FocusInCaptureListener, event| {
+          if !common_ancestors.contains(&event.current_target()) {
+            focus_in_capture.dispatch(event);
+          }
+        },
+      );
       // bubble focus in
       tree.bubble_event_with(&mut focus_event, |focus_in: &FocusInListener, event| {
         if common_ancestors.contains(&event.current_target()) {
-          event.stop_bubbling();
+          event.stop_propagation();
         } else {
           focus_in.dispatch(event);
         }

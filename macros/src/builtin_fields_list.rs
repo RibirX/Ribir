@@ -2,45 +2,66 @@ builtin! {
   PerformedLayoutListener {
     #[doc="action perform after widget performed layout."]
     on_performed_layout: Box<dyn for<'r> FnMut(LifeCycleCtx<'r>)>,
-    #[doc= "return an observable stream of the performed layout event"]
+    #[doc= "return an observable stream of the performed layout event."]
     performed_layout_stream: LifecycleSubject,
   }
 
   PointerDownListener {
-    #[doc="specify the event handler for the pointer down event."]
+    #[doc="specify the event handler for the pointer down event in bubble phase."]
     on_pointer_down: impl FnMut(&mut PointerEvent),
-    #[doc= "return an observable stream of the pointer down event"]
+    #[doc="return an observable stream of the pointer down event in bubble phase."]
     fn pointer_down_stream(&self) -> MutRefItemSubject<'static, PointerEvent, ()>,
   }
 
+  PointerDownCaptureListener {
+    #[doc="specify the event handler for the pointer down event in capture phase."]
+    on_pointer_down_capture: impl FnMut(&mut PointerEvent),
+    #[doc="return an observable stream of the pointer down event in capture phase."]
+    fn pointer_down_capture_stream(&self) -> MutRefItemSubject<'static, PointerEvent, ()>,
+  }
+
   PointerUpListener {
-    #[doc="specify the event handler for the pointer up event."]
+    #[doc="specify the event handler for the pointer up event in bubble phase."]
     on_pointer_up: impl FnMut(&mut PointerEvent),
-    #[doc= "return an observable stream of the pointer up event"]
+    #[doc="return an observable stream of the pointer up event in bubble phase."]
     fn pointer_up_stream(&self) -> MutRefItemSubject<'static, PointerEvent, ()>,
   }
 
+  PointerUpCaptureListener {
+    #[doc="specify the event handler for the pointer up event in capture phase."]
+    on_pointer_up_capture: impl FnMut(&mut PointerEvent),
+    #[doc="return an observable stream of the pointer up event in capture phase."]
+    fn pointer_up_capture_stream(&self) -> MutRefItemSubject<'static, PointerEvent, ()>,
+  }
+
   PointerMoveListener {
-    #[doc="specify the event handler for the pointer move event."]
+    #[doc="specify the event handler for the pointer move event in bubble phase."]
     on_pointer_move: impl FnMut(&mut PointerEvent),
-    #[doc= "return an observable stream of the pointer move event"]
+    #[doc="return an observable stream of the pointer move event in bubble phase."]
     fn pointer_move_stream(&self) -> MutRefItemSubject<'static, PointerEvent, ()>,
   }
 
+  PointerMoveCaptureListener {
+    #[doc="specify the event handler for the pointer move event in capture phase."]
+    on_pointer_move_capture: impl FnMut(&mut PointerEvent),
+    #[doc="return an observable stream of the pointer move event in bubble phase."]
+    fn pointer_move_capture_stream(&self) -> MutRefItemSubject<'static, PointerEvent, ()>,
+  }
+
   TapListener {
-    #[doc="specify the event handler for the pointer tap event."]
+    #[doc="specify the event handler for the pointer tap event in bubble phase."]
     on_tap: impl FnMut(&mut PointerEvent),
-    #[doc="specify the event handler for the pointer double tap event."]
+    #[doc="specify the event handler for the pointer double tap event in bubble phase."]
     on_double_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
-    #[doc="specify the event handler for the pointer triple tap event."]
-    on_tripe_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
-    #[doc="specify the event handler for the pointer `x` times tap event."]
+    #[doc="specify the event handler for the pointer triple tap event in bubble phase."]
+    on_triple_tap: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+    #[doc="specify the event handler for the pointer `x` times tap event in bubble phase."]
     on_x_times_tap: (usize, Box<dyn for<'r> FnMut(&'r mut PointerEvent)>),
 
-    #[doc= "return an observable stream of the pointer tap event"]
+    #[doc= "return an observable stream of the pointer tap event in bubble phase."]
     fn tap_stream(&self) -> MutRefItemSubject<'static, PointerEvent, ()>,
 
-    #[doc=" Return an observable stream of double tap event"]
+    #[doc=" Return an observable stream of double tap event in bubble phase."]
     fn double_tap_stream(
       &self,
     ) -> FilterMapOp<
@@ -49,7 +70,7 @@ builtin! {
       &mut PointerEvent,
     >,
 
-    #[doc="Return an observable stream of tripe tap event"]
+    #[doc="Return an observable stream of tripe tap event in bubble phase."]
     fn triple_tap_stream(
       &self,
     ) -> FilterMapOp<
@@ -57,9 +78,54 @@ builtin! {
       impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent>,
       &mut PointerEvent,
     >,
+
     #[doc=" Return an observable stream of x-tap event that user tapped 'x' \
-    times in the specify duration `dur`."]
+    times in the specify duration `dur` in bubble phase."]
     fn x_times_tap_stream(
+      &self,
+      x: usize,
+      dur: Duration,
+    ) -> FilterMapOp<
+      MutRefItemSubject<'static, PointerEvent, ()>,
+      impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent>,
+      &mut PointerEvent,
+    >,
+  }
+
+  TapCaptureListener {
+    #[doc="specify the event handler for the pointer tap event in capture phase."]
+    on_tap_capture: impl FnMut(&mut PointerEvent),
+    #[doc="specify the event handler for the pointer double tap event in capture phase."]
+    on_double_tap_capture: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+    #[doc="specify the event handler for the pointer triple tap event in capture phase."]
+    on_triple_tap_capture: Box<dyn for<'r> FnMut(&'r mut PointerEvent)>,
+    #[doc="specify the event handler for the pointer `x` times tap event in capture phase."]
+    on_x_times_tap_capture: (usize, Box<dyn for<'r> FnMut(&'r mut PointerEvent)>),
+    
+    #[doc= "return an observable stream of the pointer tap event in capture phase."]
+    fn tap_capture_stream(&self) -> MutRefItemSubject<'static, PointerEvent, ()>,
+
+    #[doc="return an observable stream of double tap event in capture phase."]
+    fn double_tap_capture_stream(
+      &self,
+    ) -> FilterMapOp<
+      MutRefItemSubject<'static, PointerEvent, ()>,
+      impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent>,
+      &mut PointerEvent,
+    >,
+
+    #[doc="Return an observable stream of tripe tap event in capture phase."]
+    fn triple_tap_capture_stream(
+      &self,
+    ) -> FilterMapOp<
+      MutRefItemSubject<'static, PointerEvent, ()>,
+      impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent>,
+      &mut PointerEvent,
+    >,
+
+    #[doc=" Return an observable stream of x-tap event that user tapped 'x' \
+    times in the specify duration `dur` in capture phase."]
+    fn x_times_tap_capture_stream(
       &self,
       x: usize,
       dur: Duration,
@@ -121,17 +187,31 @@ builtin! {
   }
 
   FocusInListener {
-    #[doc="specify the event handler to process focusin event."]
+    #[doc="specify the event handler to process focusin event in bubble phase."]
     on_focus_in: impl FnMut(&mut FocusEvent),
-    #[doc= "return an observable stream of the pointer focus-in event"]
+    #[doc="return an observable stream of the pointer focus-in event in bubble phase."]
     fn focus_in_stream(&self) -> MutRefItemSubject<'static, FocusEvent, ()>,
   }
 
+  FocusInCaptureListener {
+    #[doc="specify the event handler to process focusin event in capture phase."]
+    on_focus_in_capture: impl FnMut(&mut FocusEvent),
+    #[doc="return an observable stream of the pointer focus-in event in capture phase."]
+    fn focus_in_capture_stream(&self) -> MutRefItemSubject<'static, FocusEvent, ()>,
+  }
+
   FocusOutListener{
-    #[doc="specify the event handler to process focusout event."]
+    #[doc="specify the event handler to process focusout event in bubble phase."]
     on_focus_out: impl FnMut(&mut FocusEvent),
-    #[doc= "return an observable stream of the pointer focus-out event"]
+    #[doc="return an observable stream of the pointer focus-out event in bubble phase."]
     fn focus_out_stream(&self) -> MutRefItemSubject<'static, FocusEvent, ()>,
+  }
+
+  FocusOutCaptureListener {
+    #[doc="specify the event handler to process focusout event in capture phase."]
+    on_focus_out_capture: impl FnMut(&mut FocusEvent),
+    #[doc="return an observable stream of the pointer focus-out event in capture phase."]
+    fn focus_out_capture_stream(&self) -> MutRefItemSubject<'static, FocusEvent, ()>,
   }
 
   HasFocus {
@@ -140,32 +220,61 @@ builtin! {
   }
 
   KeyDownListener {
-    #[doc="specify the event handler when keyboard press down."]
+    #[doc="specify the event handler when keyboard press down in bubble phase."]
     on_key_down: impl FnMut(&mut KeyboardEvent),
-    #[doc= "return an observable stream of the key down event"]
+    #[doc="return an observable stream of the key down event in bubble phase."]
     fn key_down_stream(&self) -> MutRefItemSubject<'static, KeyboardEvent, ()>,
   }
 
+  KeyDownCaptureListener {
+    #[doc="specify the event handler when keyboard press down in capture phase."]
+    on_key_down_capture: impl FnMut(&mut KeyboardEvent),
+    #[doc="return an observable stream of the key down event in capture phase."]
+    fn key_down_capture_stream(&self) -> MutRefItemSubject<'static, KeyboardEvent, ()>,
+  }
+
   KeyUpListener {
-    #[doc="specify the event handler when a key is released."]
+    #[doc="specify the event handler when a key is released in bubble phase."]
     on_key_up: impl FnMut(&mut KeyboardEvent),
-    #[doc= "return an observable stream of the key up event"]
+    #[doc="return an observable stream of the key up event in bubble phase."]
     fn key_up_stream(&self) -> MutRefItemSubject<'static, KeyboardEvent, ()>,
   }
 
+  KeyUpCaptureListener {
+    #[doc="specify the event handler when a key is released in capture phase."]
+    on_key_up_capture: impl FnMut(&mut KeyboardEvent),
+    #[doc="return an observable stream of the key up event in capture phase."]
+    fn key_up_capture_stream(&self) -> MutRefItemSubject<'static, KeyboardEvent, ()>,
+  }
+
   CharsListener {
-    #[doc="specify the event handler when received unicode characters."]
+    #[doc="specify the event handler when received unicode characters in bubble phase."]
     on_chars: impl FnMut(&mut CharsEvent),
-    #[doc= "return an observable stream of the char event"]
+    #[doc="return an observable stream of the chars event in bubble phase."]
     fn chars_stream(&self) -> MutRefItemSubject<'static, CharsEvent, ()>,
   }
 
+  CharsCaptureListener {
+    #[doc="specify the event handler when received unicode characters in capture phase."]
+    on_chars_capture: impl FnMut(&mut CharsEvent),
+    #[doc="return an observable stream of the chars event in capture phase."]
+    fn chars_capture_stream(&self) -> MutRefItemSubject<'static, CharsEvent, ()>,
+  }
+
   WheelListener {
-    #[doc="specify the event handler when user moving a mouse wheel or similar input device."]
+    #[doc="specify the event handler when user moving a mouse wheel or similar input device in bubble phase."]
     on_wheel: impl FnMut(&mut WheelEvent),
-    #[doc= "return an observable stream of the wheel event"]
+    #[doc="return an observable stream of the wheel event in bubble phase."]
     fn key_down_stream(&self) -> MutRefItemSubject<'static, WheelEvent, ()>,
   }
+
+  WheelCaptureListener {
+    #[doc="specify the event handler when user moving a mouse wheel or similar input device in capture phase."]
+    on_wheel_capture: impl FnMut(&mut WheelEvent),
+    #[doc="return an observable stream of the wheel event in capture phase."]
+    fn wheel_capture_stream(&self) -> MutRefItemSubject<'static, WheelEvent, ()>,
+  }
+
   MouseHover {
     #[doc="return if the pointer is hover on the widget"]
     fn mouse_hover(&self) -> bool,

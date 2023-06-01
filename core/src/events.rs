@@ -27,7 +27,7 @@ use self::dispatcher::DispatchInfo;
 pub struct EventCommon {
   pub(crate) target: WidgetId,
   pub(crate) current_target: WidgetId,
-  pub(crate) cancel_bubble: bool,
+  pub(crate) is_propagation: bool,
   pub(crate) prevent_default: bool,
   tree: NonNull<WidgetTree>,
   info: NonNull<DispatchInfo>,
@@ -47,14 +47,15 @@ impl EventCommon {
   pub fn current_target(&self) -> WidgetId { self.current_target }
   /// Prevent event bubbling to parent.
   #[inline]
-  pub fn stop_bubbling(&mut self) { self.cancel_bubble = true }
+  pub fn stop_propagation(&mut self) { self.is_propagation = true }
   /// Return it the event is canceled to bubble to parent.
   #[inline]
-  pub fn bubbling_canceled(&self) -> bool { self.cancel_bubble }
+  pub fn is_propagation(&self) -> bool { self.is_propagation }
   /// Tells the user agent that if the event does not get explicitly handled,
   /// its default action should not be taken as it normally would be.
   #[inline]
   pub fn prevent_default(&mut self) { self.prevent_default = true; }
+
   /// Represents the current state of the keyboard modifiers
   #[inline]
   pub fn modifiers(&self) -> ModifiersState { self.dispatch_info().modifiers() }
@@ -149,7 +150,7 @@ impl std::fmt::Debug for EventCommon {
     f.debug_struct("CommonEvent")
       .field("target", &self.target)
       .field("current_target", &self.current_target)
-      .field("cancel_bubble", &self.cancel_bubble)
+      .field("is_propagation", &self.is_propagation)
       .finish()
   }
 }
@@ -159,7 +160,7 @@ impl EventCommon {
     Self {
       target,
       current_target: target,
-      cancel_bubble: <_>::default(),
+      is_propagation: <_>::default(),
       prevent_default: <_>::default(),
       tree: NonNull::from(tree),
       info: NonNull::from(info),
