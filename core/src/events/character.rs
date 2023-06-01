@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use crate::{
   data_widget::compose_child_as_data_widget, impl_compose_child_with_focus_for_listener,
-  impl_listener, impl_query_self_only, prelude::*,
+  impl_listener, impl_listener_and_compose_child_with_focus, impl_query_self_only, prelude::*,
 };
 
 /// An attribute that sends a single Unicode codepoint. The character can be
@@ -19,14 +19,27 @@ pub struct CharsEvent {
   pub common: EventCommon,
 }
 
-impl_listener!(
+impl_listener_and_compose_child_with_focus!(
   CharsListener,
   CharsListenerDeclarer,
   on_chars,
   CharsEvent,
-  char_stream
+  chars_stream
 );
-impl_compose_child_with_focus_for_listener!(CharsListener);
+
+#[derive(Declare)]
+pub struct CharsCaptureListener {
+  #[declare(builtin, convert=custom)]
+  on_chars_capture: MutRefItemSubject<'static, CharsEvent, Infallible>,
+}
+
+impl_listener_and_compose_child_with_focus!(
+  CharsCaptureListener,
+  CharsCaptureListenerDeclarer,
+  on_chars_capture,
+  CharsEvent,
+  chars_stream_capture
+);
 
 impl std::borrow::Borrow<EventCommon> for CharsEvent {
   #[inline]
@@ -80,5 +93,39 @@ mod tests {
       .for_each(|c| wnd.processes_native_event(WindowEvent::ReceivedCharacter(c)));
 
     assert_eq!(&*receive.borrow(), test_text_case);
+  }
+
+  #[test]
+  fn chars_capture() {
+    let receive = Rc::new(RefCell::new("".to_string()));
+    let chars_receive = receive.clone();
+    let capture_receive = receive.clone();
+
+    let widget = widget! {
+      MockBox {
+        size: ZERO_SIZE,
+        on_chars_capture: move |event| {
+          let chars = event.chars.to_string();
+          // The value received first is multiplied by 2
+          let char = (chars.parse::<i32>().unwrap() * 2).to_string();
+          capture_receive.borrow_mut().push_str(&char);
+        },
+        MockBox {
+          size: ZERO_SIZE,
+          auto_focus: true,
+          on_chars: move |event| chars_receive.borrow_mut().push_str(&event.chars),
+        }
+      }
+    };
+    let mut wnd = TestWindow::new(widget);
+
+    let test_text_case = "123";
+    wnd.draw_frame();
+    #[allow(deprecated)]
+    test_text_case
+      .chars()
+      .for_each(|c| wnd.processes_native_event(WindowEvent::ReceivedCharacter(c)));
+
+    assert_eq!(&*receive.borrow(), "214263");
   }
 }

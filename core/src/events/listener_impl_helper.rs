@@ -55,3 +55,19 @@ macro_rules! impl_compose_child_with_focus_for_listener {
     }
   };
 }
+
+#[macro_export]
+macro_rules! impl_listener_and_compose_child {
+  ($listener:ident, $declarer: ident, $field: ident, $event_ty: ident, $stream_name: ident) => {
+    impl_listener!($listener, $declarer, $field, $event_ty, $stream_name);
+    impl_compose_child_for_listener!($listener);
+  };
+}
+
+#[macro_export]
+macro_rules! impl_listener_and_compose_child_with_focus {
+  ($listener:ident, $declarer: ident, $field: ident, $event_ty: ident, $stream_name: ident) => {
+    impl_listener!($listener, $declarer, $field, $event_ty, $stream_name);
+    impl_compose_child_with_focus_for_listener!($listener);
+  };
+}
