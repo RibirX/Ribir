@@ -50,7 +50,7 @@ pub struct AvatarDecorator;
 impl ComposeDecorator for AvatarDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: Stateful<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
 }
 
 #[derive(Template)]
