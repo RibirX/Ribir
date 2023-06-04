@@ -22,7 +22,7 @@ pub(super) enum TextureID {
 
 pub(super) struct TexturesMgr<T: Texture> {
   alpha_atlas: Atlas<T, PathKey, f32>,
-  rgba_atlas: Atlas<T, *const (), ()>,
+  rgba_atlas: Atlas<T, ShareResource<PixelImage>, ()>,
   fill_task: Vec<FillTask>,
   fill_task_buffers: VertexBuffers<f32>,
 }
@@ -177,14 +177,13 @@ where
     img: &ShareResource<PixelImage>,
     gpu_impl: &mut T::Host,
   ) -> TextureSlice {
-    let key = ShareResource::as_ptr(img);
     match img.color_format() {
       ColorFormat::Rgba8 => {
-        if let Some(h) = self.rgba_atlas.get(&key).copied() {
+        if let Some(h) = self.rgba_atlas.get(img).copied() {
           rgba_tex_slice(&self.rgba_atlas, &h)
         } else {
           let size = DeviceSize::new(img.width() as i32, img.height() as i32);
-          let h = self.rgba_atlas.allocate(key, (), size, gpu_impl);
+          let h = self.rgba_atlas.allocate(img.clone(), (), size, gpu_impl);
           let slice = rgba_tex_slice(&self.rgba_atlas, &h);
 
           let texture = self.rgba_atlas.get_texture_mut(h.tex_id());
@@ -627,5 +626,24 @@ pub mod tests {
     assert_eq!(ts1, ts2);
     assert_eq!(slice1.rect, ribir_geom::rect(2, 2, 100, 100));
     assert_eq!(ts1, Transform::new(1., 0., 0., 1., 8., 8.));
+  }
+
+  #[test]
+  fn fix_resource_address_conflict() {
+    // because the next resource may allocate at same address of a deallocated
+    // address.
+
+    let mut wgpu = block_on(WgpuImpl::headless());
+    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
+    {
+      let red_img = color_image(Color::RED, 32, 32);
+      mgr.store_image(&red_img, &mut wgpu);
+    }
+
+    for _ in 0..10 {
+      mgr.end_frame();
+      let red_img = color_image(Color::RED, 32, 32);
+      assert!(mgr.rgba_atlas.get(&red_img).is_none());
+    }
   }
 }
