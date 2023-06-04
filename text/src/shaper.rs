@@ -13,6 +13,7 @@ use ribir_algo::{FrameCache, Substr};
 pub use rustybuzz::ttf_parser::GlyphId;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
 
+pub const EMPTY_GLYPH_ID: GlyphId = GlyphId(core::u16::MAX);
 /// Shaper to shape the `text` using provided font faces, and will do BIDI
 /// reordering before to shape text.
 ///
@@ -61,9 +62,17 @@ impl TextShaper {
     self
       .get_from_cache(text, face_ids, direction)
       .unwrap_or_else(|| {
-        let glyphs = self
+        let mut glyphs = self
           .shape_text_with_fallback(text, direction, face_ids)
           .unwrap_or_default();
+
+        if let Some(last_char) = text.bytes().last() {
+          if last_char == b'\r' || last_char == b'\n' {
+            if let Some(g) = glyphs.last_mut() {
+              g.glyph_id = EMPTY_GLYPH_ID;
+            }
+          }
+        }
 
         let glyphs = Arc::new(ShapeResult { text: text.clone(), glyphs });
         self.shape_cache.write().unwrap().put(
