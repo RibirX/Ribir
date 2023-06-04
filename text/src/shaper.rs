@@ -1,5 +1,6 @@
 use std::{
   borrow::Borrow,
+  collections::HashSet,
   hash::{Hash, Hasher},
   sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
@@ -168,6 +169,7 @@ fn collect_miss_part<'a>(
   let mut miss_parts = vec![];
   for (start, end, helper) in new_part {
     let mut miss_start = None;
+    let mut miss_cluster = HashSet::new();
     glyphs[*start..*end]
       .iter()
       .enumerate()
@@ -176,8 +178,9 @@ fn collect_miss_part<'a>(
         if glyph.is_miss() {
           if miss_start.is_none() {
             miss_start = Some(idx);
+            miss_cluster.insert(glyph.cluster);
           }
-        } else if miss_start.is_some() {
+        } else if !miss_cluster.contains(&glyph.cluster) && miss_start.is_some() {
           miss_parts.push((miss_start.take().unwrap(), idx, helper.clone()));
         }
       });
@@ -508,5 +511,27 @@ mod tests {
       let str = include_str!("../../LICENSE").into();
       shaper.shape_text(&str, &ids, TextDirection::LeftToRight)
     })
+  }
+
+  #[test]
+  fn shape_compose_emoji() {
+    let shaper = TextShaper::new(<_>::default());
+    let path = env!("CARGO_MANIFEST_DIR").to_owned();
+    let _ = shaper
+      .font_db_mut()
+      .load_font_file(path.clone() + "/../fonts/DejaVuSans.ttf");
+    let _ = shaper
+      .font_db_mut()
+      .load_font_file(path + "/../fonts/NotoSerifSC-Bold.你好世界.otf");
+    let ids_all = shaper.font_db().select_all_match(&FontFace {
+      families: Box::new([
+        FontFamily::Name("DejaVu Sans".into()),
+        FontFamily::Name("Noto Serif SC".into()),
+      ]),
+      ..<_>::default()
+    });
+
+    let res = shaper.shape_text(&"👨‍👩‍👦‍👦".into(), &ids_all, TextDirection::LeftToRight);
+    assert!(res.glyphs.len() == 7);
   }
 }
