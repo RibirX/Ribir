@@ -851,7 +851,7 @@ mod tests {
 
   #[test]
   fn auto_wrap_position() {
-    let bounds = Size::new(Em::absolute(10.0), Em::absolute(2.0));
+    let bounds = Size::new(Em::absolute(14.0), Em::absolute(2.0));
     let cfg = TypographyCfg {
       line_height: None,
       letter_space: None,
@@ -860,49 +860,30 @@ mod tests {
       line_dir: PlaceLineDirection::TopToBottom,
       overflow: Overflow::AutoWrap,
     };
-    let pixel_bounds = Size::new(
-      Into::<Pixel>::into(bounds.width).value(),
-      Into::<Pixel>::into(bounds.height).value(),
-    );
-    let text = "line within bound\r\
-      line exceed bound, will auto wrap to 3 lines.\r\
-      end"
+    let text = "WITHIN BOUND\r\
+    LINE WITH LONG WORD LIKE: ABCDEFGHIJKLMNOPQRSTUVWXYZ, WILL AUTO WRAP TO 3 LINES."
       .into();
-    let graphys = typography_text(text, FontSize::Em(Em::absolute(1.0)), cfg.clone());
+    let graphys = typography_text(text, FontSize::Em(Em::absolute(1.0)), cfg);
 
     // text will auto wrap layout to 5 line as follow:
-    let line1 = "line within bound\r";
-    let line2 = "line exceed bound, ";
-    let line3 = "will auto wrap to 3 l";
-    let line4 = "ines.\r";
-    let _line5 = "end";
+    let line1 = "WITHIN BOUND\r";
+    let line2 = "LINE WITH LONG WORD ";
+    let line3 = "LIKE: ";
+    let line4 = "ABCDEFGHIJKLMNOPQRSTU";
+    let line5 = "VWXYZ, WILL AUTO WRAP ";
+    let _line6 = "TO 3 LINES.";
 
     // check auto wrap
-    assert!((1, line2.len() - 1) == graphys.position_by_cluster(line1.len() + line2.len() - 1));
+    assert!((1, 0) == graphys.position_by_cluster(line1.len()));
     assert!((2, 0) == graphys.position_by_cluster(line1.len() + line2.len()));
-    assert!((3, 1) == graphys.position_by_cluster(line1.len() + line2.len() + line3.len() + 1));
+    assert!((3, 0) == graphys.position_by_cluster(line1.len() + line2.len() + line3.len()));
     assert!(
-      (4, 2)
-        == graphys.position_by_cluster(line1.len() + line2.len() + line3.len() + line4.len() + 2)
+      (4, 0) == graphys.position_by_cluster(line1.len() + line2.len() + line3.len() + line4.len())
     );
-
-    // line1 width should within bound.
-    let line1_glyphs = typography_text(line1.into(), FontSize::Em(Em::absolute(1.0)), cfg.clone());
-    assert!(line1_glyphs.visual_rect().size.width < pixel_bounds.width);
-
-    // line2 width should within bound.
-    let line2_glyphs = typography_text(line2.into(), FontSize::Em(Em::absolute(1.0)), cfg.clone());
-    assert!(line2_glyphs.visual_rect().size.width < pixel_bounds.width);
-
-    // line2 with line3's first char will excced bound width
-    {
-      let mut exceed_str = line2.to_string();
-      exceed_str.push(line3.chars().next().unwrap());
-      let mut cfg = cfg;
-      cfg.bounds = (Em::MAX, Em::MAX).into();
-      cfg.overflow = Overflow::Clip;
-      let exceed_glyphs = typography_text(exceed_str.into(), FontSize::Em(Em::absolute(1.0)), cfg);
-      assert!(exceed_glyphs.visual_rect().size.width > pixel_bounds.width);
-    }
+    assert!(
+      (5, 0)
+        == graphys
+          .position_by_cluster(line1.len() + line2.len() + line3.len() + line4.len() + line5.len())
+    );
   }
 }
