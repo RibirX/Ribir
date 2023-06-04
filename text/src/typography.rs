@@ -1,6 +1,7 @@
 use ribir_geom::{Size, Zero};
-use std::{iter::Peekable, ops::Range};
+use std::ops::Range;
 use unicode_script::{Script, UnicodeScript};
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{Em, FontSize, Glyph, Pixel, TextAlign};
 
@@ -53,6 +54,8 @@ pub trait InlineCursor {
   fn position(&self) -> Em;
 
   fn reset(&mut self);
+
+  fn measure(&self, glyph: &Glyph<Em>, origin_text: &str) -> Em;
 }
 
 #[derive(Default)]
@@ -256,68 +259,99 @@ where
     }
   }
 
+  fn split_word<'a>(
+    &self,
+    run: &'a Runs::Item,
+  ) -> impl Iterator<Item = impl Iterator<Item = &'a Glyph<Em>> + 'a> + 'a {
+    let text = run.text();
+    let mut reorder_text = String::new();
+
+    // text and glyphs in run may in different order, so we recollect the chars.
+    // and reorder_text may smaller then src text when have composited glyph,
+    // like '👨‍👩‍👦‍👦'
+    reorder_text.reserve(text.len());
+    run
+      .glyphs()
+      .iter()
+      .for_each(|gh| reorder_text.push(text[gh.cluster as usize..].chars().next().unwrap()));
+
+    let mut it = reorder_text.split_word_bounds();
+    let mut base = 0;
+    let mut words = vec![];
+    for text in it.by_ref() {
+      let char_cnt = text.chars().count();
+      words.push(base..char_cnt + base);
+      base += char_cnt;
+    }
+    words.into_iter().map(move |rg| {
+      rg.into_iter()
+        .map(move |idx| run.glyphs().get(idx).unwrap())
+    })
+  }
+
   fn consume_run(&mut self, run: &Runs::Item, cursor: &mut impl InlineCursor) {
     let font_size = run.font_size().into_em();
     let text = run.text();
     let base = run.range().start as u32;
-
-    let mut it = run
-      .glyphs()
-      .iter()
-      .cloned()
-      .map(|mut g| {
-        g.scale(font_size.value());
-        g
-      })
-      .peekable();
     let line_offset = (font_size - Em::absolute(1.)) / 2.;
+    let is_auto_wrap = self.cfg.overflow.is_auto_wrap();
 
-    loop {
-      let line = self.visual_lines.last_mut().unwrap();
-      if self.cfg.line_dir.is_horizontal() {
+    let verify_line_height = |this: &mut Self| {
+      let line = this.visual_lines.last_mut().unwrap();
+      if this.cfg.line_dir.is_horizontal() {
         line.width = line.width.max(font_size)
       } else {
         line.height = line.height.max(font_size)
       }
-      let over_bound = self.consume_run_glyphs(cursor, &mut it, line_offset, text, base);
-      self.inline_cursor = cursor.position();
-      if over_bound && self.cfg.overflow.is_auto_wrap() {
-        // new line
-        self.end_line();
-        self.begin_line();
-        cursor.reset();
-      } else {
-        break;
-      }
-    }
-  }
+    };
+    let new_line = |this: &mut Self, cursor: &mut dyn InlineCursor| {
+      this.end_line();
+      this.begin_line();
+      (verify_line_height)(this);
+      cursor.reset();
+    };
 
-  fn consume_run_glyphs<I>(
-    &mut self,
-    cursor: &mut impl InlineCursor,
-    it: &mut Peekable<I>,
-    line_offset: Em,
-    text: &str,
-    cluster_base: u32,
-  ) -> bool
-  where
-    I: Iterator<Item = Glyph<Em>>,
-  {
-    while let Some(g) = it.peek() {
-      let mut at = g.clone();
-      let over_boundary = cursor.advance_glyph(&mut at, line_offset, text);
-      at.cluster += cluster_base;
-      if over_boundary {
-        if self.cfg.overflow.is_auto_wrap() {
-          return true;
-        }
-        self.push_glyph(at);
-        return true;
+    let words = self
+      .split_word(run)
+      .map(|it| {
+        it.cloned().map(|mut g| {
+          g.scale(font_size.value());
+          g
+        })
+      })
+      .map(|it| {
+        let word = it.collect::<Vec<_>>();
+        let width = word
+          .iter()
+          .fold(Em::zero(), |acc, glyph| acc + cursor.measure(glyph, text));
+        (width, word)
+      })
+      .collect::<Vec<_>>();
+
+    (verify_line_height)(self);
+    for (width, word) in words {
+      if is_auto_wrap
+        && self.inline_cursor != Em::zero()
+        && self.is_over_line_bound(width + self.inline_cursor)
+      {
+        new_line(self, cursor);
       }
-      self.push_glyph(at);
-      it.next();
+
+      let mut word = word.iter().peekable();
+      while let Some(g) = word.peek() {
+        let mut at = (*g).clone();
+        let over_boundary = cursor.advance_glyph(&mut at, line_offset, text);
+        at.cluster += base;
+
+        if self.inline_cursor == Em::zero() || !over_boundary || !is_auto_wrap {
+          self.push_glyph(at);
+          self.inline_cursor = cursor.position();
+          word.next();
+        } else {
+          new_line(self, cursor);
+        }
+      }
     }
-    false
   }
 
   fn push_glyph(&mut self, g: Glyph<Em>) {
@@ -342,13 +376,17 @@ where
       }
     }
 
-    self.over_bounds |= if self.cfg.line_dir.is_horizontal() {
-      self.cfg.bounds.height < self.inline_cursor
-    } else {
-      self.cfg.bounds.width < self.inline_cursor
-    };
+    self.over_bounds |= self.is_over_line_bound(self.inline_cursor);
     self.over_bounds |= self.is_last_line_over();
     self.inline_cursor = Em::zero();
+  }
+
+  fn is_over_line_bound(&self, position: Em) -> bool {
+    if self.cfg.line_dir.is_horizontal() {
+      self.cfg.bounds.height < position
+    } else {
+      self.cfg.bounds.width < position
+    }
   }
 
   fn is_last_line_over(&self) -> bool {
@@ -414,6 +452,8 @@ impl InlineCursor for HInlineCursor {
     false
   }
 
+  fn measure(&self, glyph: &Glyph<Em>, _origin_text: &str) -> Em { glyph.x_advance }
+
   fn advance(&mut self, c: Em) -> bool {
     self.pos += c;
     false
@@ -438,6 +478,8 @@ impl InlineCursor for VInlineCursor {
     false
   }
 
+  fn measure(&self, glyph: &Glyph<Em>, _origin_text: &str) -> Em { glyph.y_advance }
+
   fn position(&self) -> Em { self.pos }
 
   fn reset(&mut self) { self.pos = Em::zero(); }
@@ -454,6 +496,20 @@ impl<'a, I: InlineCursor> InlineCursor for LetterSpaceCursor<'a, I> {
     }
 
     res
+  }
+
+  fn measure(&self, glyph: &Glyph<Em>, origin_text: &str) -> Em {
+    let mut advance = self.inner_cursor.measure(glyph, origin_text);
+
+    let c = origin_text[glyph.cluster as usize..]
+      .chars()
+      .next()
+      .unwrap();
+    if letter_spacing_char(c) {
+      advance += self.letter_space;
+    }
+
+    advance
   }
 
   fn advance(&mut self, c: Em) -> bool { self.inner_cursor.advance(c) }
@@ -474,6 +530,10 @@ impl<'a, I: InlineCursor> InlineCursor for BoundsCursor<'a, I> {
   fn advance(&mut self, c: Em) -> bool {
     self.inner_cursor.advance(c);
     self.bounds.contains(&self.position())
+  }
+
+  fn measure(&self, glyph: &Glyph<Em>, origin_text: &str) -> Em {
+    self.inner_cursor.measure(glyph, origin_text)
   }
 
   fn position(&self) -> Em { self.inner_cursor.position() }
