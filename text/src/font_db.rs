@@ -1,17 +1,16 @@
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use lyon_path::math::Point;
-use ribir_algo::FrameCache;
 use ribir_painter::{PixelImage, Svg};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
-use std::{ops::Deref, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 use crate::{FontFace, FontFamily};
 /// A wrapper of fontdb and cache font data.
 pub struct FontDB {
   default_font: ID,
   data_base: fontdb::Database,
-  cache: FrameCache<ID, Option<Face>>,
+  cache: HashMap<ID, Option<Face>>,
 }
 
 #[derive(Clone)]
@@ -27,7 +26,7 @@ impl FontDB {
 
   pub fn default_font(&self) -> ID { self.default_font }
 
-  pub fn try_get_face_data(&mut self, face_id: ID) -> Option<&Face> {
+  pub fn try_get_face_data(&self, face_id: ID) -> Option<&Face> {
     self.cache.get(&face_id)?.as_ref()
   }
 
@@ -98,22 +97,25 @@ impl FontDB {
   }
 
   /// Performs a CSS-like query and returns the all matched font face ids
-  pub fn select_all_match(&self, face: &FontFace) -> Vec<ID> {
+  pub fn select_all_match(&mut self, face: &FontFace) -> Vec<ID> {
     let FontFace { families, stretch, style, weight } = face;
     families
       .iter()
       .filter_map(|f| {
-        self.data_base.query(&Query {
+        if let Some(id) = self.data_base.query(&Query {
           families: &[to_db_family(f)],
           weight: *weight,
           stretch: *stretch,
           style: *style,
-        })
+        }) {
+          if self.face_data_or_insert(id).is_some() {
+            return Some(id);
+          }
+        }
+        None
       })
       .collect()
   }
-
-  pub fn end_frame(&mut self) { self.cache.end_frame("Font DB"); }
 
   fn static_generic_families(&mut self) {
     // We don't like to depends on some system library and not make the fallback
@@ -236,11 +238,13 @@ impl Default for FontDB {
     let mut data_base = fontdb::Database::new();
     data_base.load_font_data(include_bytes!("../../fonts/Lato-Regular.ttf").to_vec());
     let default_font = data_base.faces().next().map(|f| f.id).unwrap();
-    FontDB {
+    let mut this = FontDB {
       default_font,
       data_base,
       cache: <_>::default(),
-    }
+    };
+    this.face_data_or_insert(default_font);
+    this
   }
 }
 
@@ -376,7 +380,7 @@ where
 {
   face_id_iter: T,
   data_base: &'a Database,
-  cache: &'a mut FrameCache<ID, Option<Face>>,
+  cache: &'a mut HashMap<ID, Option<Face>>,
 }
 
 impl<'a, T> Iterator for FaceIter<'a, T>
@@ -398,11 +402,11 @@ where
 }
 
 fn get_or_insert_face<'a>(
-  cache: &'a mut FrameCache<ID, Option<Face>>,
+  cache: &'a mut HashMap<ID, Option<Face>>,
   data_base: &'a Database,
   id: ID,
 ) -> &'a Option<Face> {
-  cache.get_or_insert(id, || {
+  cache.entry(id).or_insert_with(|| {
     data_base.face_source(id).and_then(|(src, face_index)| {
       let source_data = match src {
         fontdb::Source::Binary(data) => Some(data),
@@ -461,7 +465,7 @@ mod tests {
   fn load_sys_fonts() {
     let mut db = FontDB::default();
     db.load_system_fonts();
-    assert!(matches!(db.faces_info_iter().next(), Some(_)))
+    assert!(db.faces_info_iter().next().is_some())
   }
 
   #[test]

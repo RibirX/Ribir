@@ -112,8 +112,8 @@ impl Default for FullTheme {
       huge: Size::new(64., 64.),
     };
 
-    let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato Regular"))]);
-    let medium_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato Regular"))]);
+    let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato"))]);
+    let medium_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato"))]);
 
     let typography_theme = typography_theme(
       regular_family,
