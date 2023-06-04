@@ -55,19 +55,19 @@ impl Render for FittedBox {
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let rect = ctx.box_rect().unwrap();
-    let size = rect.size;
-    let child_size = ctx
-      .single_child_box()
-      .expect("Should always have a single child")
-      .size;
-
-    if child_size.greater_than(size).any() {
-      let path = Path::rect(&Rect::from(rect.size));
-      ctx.painter().clip(path);
+    let Transform { m11: x, m22: y, .. } = self.scale_cache.get();
+    if matches!(self.box_fit, BoxFit::Cover) {
+      let size = ctx.box_size().unwrap();
+      let child_size = ctx
+        .single_child_box()
+        .expect("Should always have a single child")
+        .size;
+      if size.width < child_size.width * x || size.height < child_size.height * y {
+        let path = Path::rect(&Rect::from(size));
+        ctx.painter().clip(path);
+      }
     }
 
-    let Transform { m11: x, m22: y, .. } = self.scale_cache.get();
     ctx.painter().scale(x, y);
   }
 

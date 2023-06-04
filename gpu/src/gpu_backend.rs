@@ -499,4 +499,26 @@ mod tests {
 
     painter
   }
+
+  painter_backend_eq_image_test!(draw_partial_img);
+  fn draw_partial_img() -> Painter {
+    let img = ShareResource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
+    let m_width = img.width() as f32;
+    let m_height = img.height() as f32;
+    let mut painter = painter(Size::new(m_width / 2., m_height / 2.));
+
+    painter.draw_img(
+      img,
+      &Rect::new(
+        Point::new(m_width / 4., m_height / 4.),
+        Size::new(m_width / 4., m_height / 4.),
+      ),
+      &Some(Rect::new(
+        Point::new(m_width / 2., m_height / 2.),
+        Size::new(m_width / 2., m_height / 2.),
+      )),
+    );
+
+    painter
+  }
 }

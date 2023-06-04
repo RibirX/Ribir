@@ -8,12 +8,12 @@ impl Render for ShareResource<PixelImage> {
 
   fn paint(&self, ctx: &mut PaintingCtx) {
     let size = ctx.box_size().unwrap();
-    let rect = Rect::from_size(size);
+    let box_rect = Rect::from_size(size);
+    let img_rect = Rect::from_size(Size::new(self.width() as f32, self.height() as f32));
     let painter = ctx.painter();
-    if self.width() > size.width as u32 || self.height() > size.height as u32 {
-      painter.clip(Path::rect(&rect));
+    if let Some(rc) = img_rect.intersection(&box_rect) {
+      painter.draw_img(self.clone(), &rc, &Some(rc));
     }
-    painter.set_brush(self.clone()).rect(&rect).fill();
   }
 }
 
