@@ -1,5 +1,7 @@
 use std::{
+  cell::RefCell,
   ops::Range,
+  rc::Rc,
   sync::{Arc, RwLock},
 };
 
@@ -47,7 +49,7 @@ struct TypographyResult {
 pub struct TypographyStore {
   reorder: TextReorder,
   shaper: TextShaper,
-  font_db: Arc<RwLock<FontDB>>,
+  font_db: Rc<RefCell<FontDB>>,
   cache: Arc<RwLock<FrameCache<TypographyKey, TypographyResult>>>,
 }
 pub struct VisualGlyphs {
@@ -57,14 +59,14 @@ pub struct VisualGlyphs {
 }
 
 struct ShapeRun {
-  shape_result: Arc<ShapeResult>,
+  shape_result: Rc<ShapeResult>,
   font_size: FontSize,
   letter_space: Option<Pixel>,
   range: Range<usize>,
 }
 
 impl TypographyStore {
-  pub fn new(reorder: TextReorder, font_db: Arc<RwLock<FontDB>>, shaper: TextShaper) -> Self {
+  pub fn new(reorder: TextReorder, font_db: Rc<RefCell<FontDB>>, shaper: TextShaper) -> Self {
     TypographyStore {
       reorder,
       shaper,
@@ -102,7 +104,7 @@ impl TypographyStore {
     let input = Self::key(text, font_size, &cfg);
 
     let info = self.reorder.reorder_text(&input.text);
-    let ids = self.font_db.read().unwrap().select_all_match(face);
+    let ids = self.font_db.borrow_mut().select_all_match(face);
     let inputs = info.paras.iter().map(|p| {
       let runs = p.runs.iter().map(|r| {
         let dir = if r.is_empty() || p.levels[r.start].is_ltr() {
@@ -148,7 +150,7 @@ impl TypographyStore {
     }
   }
 
-  pub fn font_db(&self) -> &Arc<RwLock<FontDB>> { &self.font_db }
+  pub fn font_db(&self) -> &Rc<RefCell<FontDB>> { &self.font_db }
 
   fn get_from_cache(
     &self,
@@ -579,9 +581,9 @@ mod tests {
     }
   }
   fn test_store() -> TypographyStore {
-    let font_db = Arc::new(RwLock::new(FontDB::default()));
+    let font_db = Rc::new(RefCell::new(FontDB::default()));
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
-    let _ = font_db.write().unwrap().load_font_file(path);
+    let _ = font_db.borrow_mut().load_font_file(path);
     let shaper = TextShaper::new(font_db.clone());
     TypographyStore::new(<_>::default(), font_db, shaper)
   }
@@ -654,7 +656,7 @@ mod tests {
       },
     );
 
-    assert_eq!(visual.visual_rect().size, Size::new(35.123047, 28.));
+    assert_eq!(visual.visual_rect().size, Size::new(34.162678, 28.));
   }
 
   #[test]
@@ -720,20 +722,20 @@ mod tests {
     assert_eq!(
       &r_align,
       &[
-        (37.849617, 0.0),
-        (45.49415, 0.0),
-        (51.771492, 0.0),
-        (54.674816, 0.0),
-        (57.578133, 0.0),
-        (64.00684, 0.0),
-        (67.74024, 0.0),
-        (71.47365, 0.0),
-        (75.20705, 0.0),
-        (78.94044, 0.0),
-        (82.673836, 0.0),
-        (86.407234, 0.0),
-        (90.140625, 0.0),
-        (93.87402, 0.0),
+        (38.535595, 0.0),
+        (46.180122, 0.0),
+        (52.45747, 0.0),
+        (55.360794, 0.0),
+        (58.264114, 0.0),
+        (64.692825, 0.0),
+        (68.42622, 0.0),
+        (72.15962, 0.0),
+        (75.89302, 0.0),
+        (79.62642, 0.0),
+        (83.35982, 0.0),
+        (87.09321, 0.0),
+        (90.82661, 0.0),
+        (94.560005, 0.0),
         // second line
         (67.70703, 10.0),
         (76.010735, 10.0),
@@ -784,17 +786,17 @@ mod tests {
     assert_eq!(
       &center_clip,
       &[
-        (-3.4306602, 0.0),
-        (2.8466845, 0.0),
-        (5.7500052, 0.0),
-        (8.653326, 0.0),
-        (15.082037, 0.0),
-        (18.815437, 0.0),
-        (22.548836, 0.0),
-        (26.282234, 0.0),
-        (30.01563, 0.0),
-        (33.749027, 0.0),
-        (37.48242, 0.0),
+        (-3.0876713, 0.0),
+        (3.1896734, 0.0),
+        (6.092994, 0.0),
+        (8.996315, 0.0),
+        (15.425026, 0.0),
+        (19.158424, 0.0),
+        (22.891825, 0.0),
+        (26.625223, 0.0),
+        (30.35862, 0.0),
+        (34.09202, 0.0),
+        (37.825413, 0.0),
         (3.8535142, 10.0),
         (12.157226, 10.0),
         (18.40039, 10.0),

@@ -2,7 +2,7 @@ use crate::{font_db::FontDB, Em, FontFace, FontSize, GlyphBound, Pixel};
 use ribir_algo::ShareResource;
 use ribir_geom::{Rect, Size};
 use ribir_painter::{Brush, Painter, Path, PathPaintStyle};
-use std::sync::{Arc, RwLock};
+use std::{cell::RefCell, rc::Rc};
 
 /// Encapsulates the text style for painting.
 #[derive(Clone, Debug, PartialEq)]
@@ -32,14 +32,14 @@ impl Default for TextStyle {
 
 pub fn paint_glyphs(
   painter: &mut Painter,
-  font_db: Arc<RwLock<FontDB>>,
+  font_db: Rc<RefCell<FontDB>>,
   glyphs: impl Iterator<Item = GlyphBound>,
   brush: Brush,
   font_size: f32,
   path_style: &PathPaintStyle,
 ) {
   glyphs.for_each(|g| {
-    let mut font_db = font_db.write().unwrap();
+    let font_db = font_db.borrow();
     let face = font_db.try_get_face_data(g.face_id);
 
     if let Some(face) = face {

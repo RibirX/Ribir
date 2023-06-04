@@ -7,7 +7,7 @@ use std::{
   cell::RefCell,
   ptr::NonNull,
   rc::Rc,
-  sync::{Arc, RwLock},
+  sync::Arc,
   task::{Context, RawWaker, RawWakerVTable, Waker},
 };
 
@@ -25,7 +25,7 @@ pub type WakeRuntimeFn = Box<dyn Fn() + Send + Sync>;
 pub struct AppContext {
   // todo: tmp code, We'll share AppContext by reference.
   app_theme: NonNull<Theme>,
-  pub font_db: Arc<RwLock<FontDB>>,
+  pub font_db: Rc<RefCell<FontDB>>,
   pub shaper: TextShaper,
   pub reorder: TextReorder,
   pub typography_store: TypographyStore,
@@ -55,7 +55,7 @@ impl AppContext {
 
     let mut font_db = FontDB::default();
     font_db.load_system_fonts();
-    let font_db = Arc::new(RwLock::new(font_db));
+    let font_db = Rc::new(RefCell::new(font_db));
     let shaper = TextShaper::new(font_db.clone());
     let reorder = TextReorder::default();
     let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
@@ -93,7 +93,7 @@ impl AppContext {
   }
 
   pub fn load_font_from_theme(&self, theme: &Theme) {
-    let mut font_db = self.font_db.write().unwrap();
+    let mut font_db = self.font_db.borrow_mut();
     match theme {
       Theme::Full(FullTheme { font_bytes, font_files, .. })
       | Theme::Inherit(InheritTheme { font_bytes, font_files, .. }) => {
