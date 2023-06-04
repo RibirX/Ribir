@@ -1,5 +1,6 @@
 use crate::{font_db::FontDB, Em, FontFace, FontSize, GlyphBound, Pixel};
 use ribir_algo::ShareResource;
+use ribir_geom::{Rect, Size};
 use ribir_painter::{Brush, Painter, Path, PathPaintStyle};
 use std::sync::{Arc, RwLock};
 
@@ -69,16 +70,21 @@ pub fn paint_glyphs(
           .translate(g.bound.min_x(), g.bound.min_y())
           .draw_svg(&svg);
       } else if let Some(img) = face.glyph_raster_image(g.glyph_id, (unit / font_size) as u16) {
-        let x_scale = g.bound.width() / (img.width() as f32);
-        let y_scale = g.bound.height() / (img.height() as f32);
-        let scale = x_scale.min(y_scale);
-        let x_offset = g.bound.min_x() + (g.bound.width() - (img.width() as f32 * scale)) / 2.;
-        let y_offset = g.bound.min_y() + (g.bound.height() - (img.height() as f32 * scale)) / 2.;
+        let m_width = img.width() as f32;
+        let m_height = img.height() as f32;
+        let scale = (g.bound.width() / m_width).min(g.bound.height() / m_height);
+
+        let x_offset = g.bound.min_x() + (g.bound.width() - (m_width * scale)) / 2.;
+        let y_offset = g.bound.min_y() + (g.bound.height() - (m_height * scale)) / 2.;
         let mut painter = painter.save_guard();
         painter
           .translate(x_offset, y_offset)
           .scale(scale, scale)
-          .draw_img(ShareResource::new(img));
+          .draw_img(
+            ShareResource::new(img),
+            &Rect::from_size(Size::new(m_width, m_height)),
+            &None,
+          );
       }
     }
   });

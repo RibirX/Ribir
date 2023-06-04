@@ -452,14 +452,42 @@ impl Painter {
     self
   }
 
-  pub fn draw_img(&mut self, img: ShareResource<PixelImage>) -> &mut Self {
-    self
-      .rect(&Rect::from_size(Size::new(
-        img.width() as f32,
-        img.height() as f32,
-      )))
-      .set_brush(img)
-      .fill();
+  /// Draw the image
+  ///
+  /// if src_rect is None then will draw the whole image fitted into dst_rect,
+  /// otherise will draw the partial src_rect of the image fitted into dst_rect.
+  pub fn draw_img(
+    &mut self,
+    img: ShareResource<PixelImage>,
+    dst_rect: &Rect,
+    src_rect: &Option<Rect>,
+  ) -> &mut Self {
+    {
+      let mut painter = self.save_guard();
+      painter.translate(dst_rect.min_x(), dst_rect.min_y());
+
+      let m_width = img.width() as f32;
+      let m_height = img.height() as f32;
+      let mut paint_rect = Rect::from_size(Size::new(m_width, m_height));
+      if let Some(rc) = src_rect {
+        assert!(paint_rect.contains_rect(rc));
+
+        if paint_rect.width() != rc.width() || paint_rect.height() != rc.height() {
+          painter.clip(Path::rect(&Rect::from_size(dst_rect.size)));
+        }
+        paint_rect = *rc;
+      }
+      painter
+        .scale(
+          dst_rect.width() / paint_rect.width(),
+          dst_rect.height() / paint_rect.height(),
+        )
+        .translate(-paint_rect.min_x(), -paint_rect.min_y())
+        .rect(&Rect::from_size(Size::new(m_width, m_height)))
+        .set_brush(img)
+        .fill();
+    }
+
     self
   }
 }
