@@ -194,7 +194,10 @@ impl ComposeChild for TextArea {
 }
 
 fn size_clamp(style: &TextStyle, rows: Option<f32>, cols: Option<f32>) -> BoxClamp {
-  let mut clamp: BoxClamp = BoxClamp::EXPAND_BOTH;
+  let mut clamp: BoxClamp = BoxClamp {
+    min: Size::new(0., 0.),
+    max: Size::new(f32::INFINITY, f32::INFINITY),
+  };
   if let Some(cols) = cols {
     let width = cols * glyph_width(style.font_size);
     clamp = clamp.with_fixed_width(width);
