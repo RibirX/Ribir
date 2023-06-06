@@ -20,7 +20,7 @@ pub use typography::Overflow;
 mod typography_store;
 pub use typography_store::{TypographyStore, VisualGlyphs};
 mod text_render;
-pub use text_render::{paint_glyphs, TextStyle};
+pub use text_render::{draw_glyphs, draw_glyphs_in_rect, TextStyle};
 
 mod text_writer;
 pub use text_writer::{CharacterCursor, ControlChar, TextWriter};

@@ -74,21 +74,17 @@ impl Render for Text {
       self.overflow,
     );
 
-    let font_size = self.text_style.font_size.into_pixel().value();
-    let rc = visual_glyphs.visual_rect();
     let font_db = ctx.typography_store().font_db().clone();
-    let painter = ctx.painter();
-    let Some(paint_rect) = painter.rect_in_paint_bounds(&rc) else { return; };
-    if !paint_rect.contains_rect(&rc) {
-      painter.clip(Path::rect(&rc));
-    }
-    paint_glyphs(
-      painter,
-      font_db,
-      visual_glyphs.glyph_bounds_in_rect(&paint_rect),
+    let font_size = self.text_style.font_size.into_pixel().value();
+    let box_rect = Rect::from_size(ctx.box_size().unwrap());
+    draw_glyphs_in_rect(
+      ctx.painter(),
+      visual_glyphs,
+      box_rect,
       self.foreground.clone(),
       font_size,
       &self.path_style,
+      font_db,
     );
   }
 }
@@ -173,3 +169,27 @@ define_text_with_theme_style!(H3, headline_small);
 define_text_with_theme_style!(H4, title_large);
 define_text_with_theme_style!(H5, title_medium);
 define_text_with_theme_style!(H6, title_small);
+
+#[cfg(test)]
+mod tests {
+  use crate::layout::SizedBox;
+
+  use super::*;
+  use ribir_core::test_helper::*;
+  use ribir_geom::Size;
+
+  #[test]
+  fn text_clip() {
+    let w = widget! {
+      SizedBox {
+        size: Size::new(50., 45.),
+        Text {
+          text: "hello world,\rnice to meet you.",
+        }
+      }
+    };
+    let mut wnd = TestWindow::new_with_size(w, Size::new(120., 80.));
+
+    wnd.layout();
+  }
+}
