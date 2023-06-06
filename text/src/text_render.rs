@@ -1,4 +1,4 @@
-use crate::{font_db::FontDB, Em, FontFace, FontSize, GlyphBound, Pixel};
+use crate::{font_db::FontDB, Em, FontFace, FontSize, GlyphBound, Pixel, VisualGlyphs};
 use ribir_algo::ShareResource;
 use ribir_geom::{Rect, Size};
 use ribir_painter::{Brush, Painter, Path, PathPaintStyle};
@@ -30,13 +30,40 @@ impl Default for TextStyle {
   }
 }
 
-pub fn paint_glyphs(
+/// draw the text glyphs within the box_rect, with the given brush font_size and
+/// path style
+pub fn draw_glyphs_in_rect(
   painter: &mut Painter,
+  visual_glyphs: VisualGlyphs,
+  box_rect: Rect,
+  brush: Brush,
+  font_size: f32,
+  path_style: &PathPaintStyle,
   font_db: Rc<RefCell<FontDB>>,
+) {
+  let visual_rect = visual_glyphs.visual_rect();
+  let Some(paint_rect) = painter.rect_in_paint_bounds(&box_rect) else { return; };
+  if !paint_rect.contains_rect(&visual_rect) {
+    painter.clip(Path::rect(&paint_rect));
+  }
+  draw_glyphs(
+    painter,
+    visual_glyphs.glyph_bounds_in_rect(&paint_rect),
+    brush,
+    font_size,
+    path_style,
+    font_db,
+  );
+}
+
+/// draw the glyphs with the given brush, font_size and path style
+pub fn draw_glyphs(
+  painter: &mut Painter,
   glyphs: impl Iterator<Item = GlyphBound>,
   brush: Brush,
   font_size: f32,
   path_style: &PathPaintStyle,
+  font_db: Rc<RefCell<FontDB>>,
 ) {
   glyphs.for_each(|g| {
     let font_db = font_db.borrow();
