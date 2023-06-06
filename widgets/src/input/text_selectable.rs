@@ -22,6 +22,7 @@ impl ComposeChild for TextSelectable {
         text: text.into_readonly(),
       }
       Stack {
+        id: host,
         fit: StackFit::Passthrough,
         on_pointer_move: move |e| {
           if let CaretState::Selecting(begin, _) = this.caret {
@@ -51,6 +52,7 @@ impl ComposeChild for TextSelectable {
         on_key_down: move |event| key_handle(&mut this, &text.text, event),
         SelectedText {
           id: selected,
+          visible: host.has_focus(),
           rects: vec![],
         }
         DynWidget {
