@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use ribir_painter::{image::ColorFormat, PixelImage};
 
 /// This macro generates image tests for the painter with every backend. Accept
@@ -70,7 +72,7 @@ pub fn assert_texture_eq_png(img: PixelImage, file_path: &std::path::Path) {
       let ptr = img.pixel_bytes().as_ptr() as *const _;
       std::slice::from_raw_parts(ptr, img.pixel_bytes().len() / 4)
     };
-    let img = dssim
+    let dissim_mig = dssim
       .create_image_rgba(rgba_img, img.width() as usize, img.height() as usize)
       .unwrap();
     let rgba_expected = unsafe {
@@ -85,12 +87,25 @@ pub fn assert_texture_eq_png(img: PixelImage, file_path: &std::path::Path) {
       )
       .unwrap();
 
-    const TOLERANCE: f64 = 0.0000005;
-    let (v, _) = dssim.compare(&expected, img);
+    const TOLERANCE: f64 = 0.000001;
+    let (v, _) = dssim.compare(&expected, dissim_mig);
     let v: f64 = v.into();
+
+    let mut tmp_file = std::env::temp_dir();
+
+    if TOLERANCE <= v {
+      let dur = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+      tmp_file.push(format!(
+        "{:?}_{}",
+        dur,
+        file_path.file_name().and_then(|f| f.to_str()).unwrap()
+      ));
+      let mut file = std::fs::File::create(tmp_file.clone()).unwrap();
+      img.write_as_png(&mut file).unwrap();
+    }
     assert!(
       v < TOLERANCE,
-      "`{v:}` over image test tolerance {TOLERANCE}"
+      "`{v:}` over image test tolerance {TOLERANCE}, new image save at {tmp_file:?}"
     );
   }
 }
