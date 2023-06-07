@@ -354,21 +354,17 @@ impl VisualGlyphs {
     (line_para, offset)
   }
 
-  pub fn position_to_cluster(&self, mut para: usize, mut offset: usize) -> u32 {
+  pub fn position_to_cluster(&self, row: usize, mut col: usize) -> u32 {
     let lines = &self.visual_info.visual_lines;
-    if para < lines.len() && offset == lines[para].glyphs.len() {
-      para += 1;
-      offset = 0;
+    if lines.len() <= row || (row + 1 == lines.len() && lines[row].glyphs.len() <= col) {
+      return self
+        .order_info
+        .paras
+        .last()
+        .map_or(0, |p| p.range.end as u32);
     }
-    if para < lines.len() && offset < lines[para].glyphs.len() {
-      return lines[para].glyphs[offset].cluster;
-    }
-
-    self
-      .order_info
-      .paras
-      .last()
-      .map_or(0, |p| p.range.end as u32)
+    col = col.min(lines[row].glyphs.len() - 1);
+    lines[row].glyphs[col].cluster
   }
 
   pub fn glyph_rect(&self, mut para: usize, mut offset: usize) -> Rect {

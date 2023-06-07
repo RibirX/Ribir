@@ -33,13 +33,11 @@ impl GlyphsHelper {
     let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
     let (mut row, mut col) = glyphs.position_by_cluster(cursor);
 
-    if col == glyphs.glyph_count(row) {
-      if row + 1 < glyphs.glyph_row_count() {
-        row += 1;
-        col = 0;
-      }
-    } else {
+    if col + 1 < glyphs.glyph_count(row) {
       col += 1;
+    } else {
+      row += 1;
+      col = 0;
     }
 
     glyphs.position_to_cluster(row, col)
