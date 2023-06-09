@@ -32,9 +32,6 @@ impl ComposeChild for ScrollableWidget {
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget! {
       states { this: this.into_writable() }
-      init ctx => {
-        let smooth_scroll = transitions::SMOOTH_SCROLL.of(ctx);
-      }
       Clip {
         UnconstrainedBox {
           id: view,
@@ -52,11 +49,6 @@ impl ComposeChild for ScrollableWidget {
             top_anchor: this.scroll_pos.y,
           }
       }}
-
-      transition (
-        prop!(content.left_anchor, PositionUnit::lerp_fn(content.layout_width())),
-        prop!(content.top_anchor, PositionUnit::lerp_fn(content.layout_height()))
-      ) { by: smooth_scroll.clone() }
 
       finally {
         let_watch!(content.layout_size())
