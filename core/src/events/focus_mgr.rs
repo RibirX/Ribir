@@ -95,7 +95,7 @@ impl FocusManager {
     }
 
     if focus_type == FocusType::NODE && self.focusing.is_none() && auto_focus {
-      self.focusing = Some(wid);
+      self.request_focusing = Some(Some(wid));
     }
   }
 
@@ -105,7 +105,7 @@ impl FocusManager {
 
   pub(crate) fn remove_focus_node(&mut self, wid: WidgetId, focus_type: FocusType) {
     if Some(wid) == self.focusing && focus_type.intersects(FocusType::NODE) {
-      self.focusing = None;
+      self.request_focusing = Some(None);
     }
     if let Some(id) = self.node_ids.get(&wid).cloned() {
       let node = self.arena[id].get_mut();
@@ -143,22 +143,21 @@ impl FocusManager {
     self.focusing = focus_to;
   }
 
-  pub(crate) fn next_focus(&mut self, arena: &TreeArena) -> Option<WidgetId> {
-    self.focus_move_circle(false, arena)
+  pub(crate) fn request_next_focus(&mut self, arena: &TreeArena) {
+    self.focus_move_circle(false, arena);
   }
 
-  pub(crate) fn prev_focus(&mut self, arena: &TreeArena) -> Option<WidgetId> {
-    self.focus_move_circle(true, arena)
+  pub(crate) fn request_prev_focus(&mut self, arena: &TreeArena) {
+    self.focus_move_circle(true, arena);
   }
 
-  fn focus_move_circle(&mut self, backward: bool, arena: &TreeArena) -> Option<WidgetId> {
+  fn focus_move_circle(&mut self, backward: bool, arena: &TreeArena) {
     let has_focus = self.focusing.is_some();
     let mut wid = self.focus_step(self.focusing, backward, arena);
     if wid.is_none() && has_focus {
       wid = self.focus_step(wid, backward, arena);
     }
-    self.focusing = wid;
-    wid
+    self.request_focusing = Some(wid);
   }
 
   fn focus_step(
@@ -447,11 +446,13 @@ impl FocusManager {
 
 impl Dispatcher {
   pub fn next_focus_widget(&mut self, tree: &WidgetTree) {
-    self.focus_mgr.borrow_mut().next_focus(&tree.arena);
+    self.focus_mgr.borrow_mut().request_next_focus(&tree.arena);
+    self.refresh_focus(tree);
   }
 
   pub fn prev_focus_widget(&mut self, tree: &WidgetTree) {
-    self.focus_mgr.borrow_mut().prev_focus(&tree.arena);
+    self.focus_mgr.borrow_mut().request_prev_focus(&tree.arena);
+    self.refresh_focus(tree);
   }
 
   /// Removes keyboard focus from the current focusing widget and return its id.
