@@ -73,11 +73,11 @@ impl WindowCtx {
   }
 
   pub(crate) fn next_focus(&self, arena: &TreeArena) {
-    self.focus_mgr.borrow_mut().next_focus(arena);
+    self.focus_mgr.borrow_mut().request_next_focus(arena);
   }
 
   pub(crate) fn prev_focus(&self, arena: &TreeArena) {
-    self.focus_mgr.borrow_mut().prev_focus(arena);
+    self.focus_mgr.borrow_mut().request_prev_focus(arena);
   }
 
   pub(crate) fn focus_handle(&self, wid: WidgetId) -> FocusHandle {
