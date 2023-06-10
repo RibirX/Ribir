@@ -173,11 +173,13 @@ mod more_impl_for_fill_tml {
 
 mod decorate_tml_impl {
   use super::*;
+  use crate::widget::SelfImpl;
 
-  impl<W, C> ComposeWithChild<NotSelf<[(); 0]>, C> for State<W>
+  impl<M, W, C> ComposeWithChild<NotSelf<[M; 0]>, C> for State<W>
   where
     W: ComposeChild<Child = Widget> + 'static,
-    C: DecorateTmlMarker,
+    C: DecorateTmlMarker<M>,
+    M: ImplMarker,
   {
     type Target = ComposePair<Self, C>;
 
@@ -195,11 +197,20 @@ mod decorate_tml_impl {
     }
   }
 
-  trait DecorateTmlMarker {}
+  trait DecorateTmlMarker<M: ImplMarker> {}
 
-  impl<T: TmlFlag, C> DecorateTmlMarker for DecorateTml<T, C> {}
-  impl<T: TmlFlag, C> DecorateTmlMarker for WidgetPair<T, C> {}
-  impl<T, C: TmlFlag> DecorateTmlMarker for ComposePair<T, C> {}
+  impl<T: TmlFlag, C> DecorateTmlMarker<SelfImpl> for DecorateTml<T, C> {}
+
+  impl<T: TmlFlag, C> DecorateTmlMarker<NotSelf<()>> for WidgetPair<T, C> {}
+
+  impl<M, T, C> DecorateTmlMarker<NotSelf<M>> for WidgetPair<T, C>
+  where
+    M: ImplMarker,
+    C: DecorateTmlMarker<M>,
+  {
+  }
+
+  impl<M: ImplMarker, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<M> for ComposePair<T, C> {}
 }
 
 impl<W, M, C> IntoWidget<NotSelf<[M; 0]>> for ComposePair<State<W>, C>
