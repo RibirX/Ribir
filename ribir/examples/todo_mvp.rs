@@ -135,7 +135,7 @@ impl TodoMVP {
             }
           }
           Trailing {
-            // cursor: CursorIcon::Hand,
+            cursor: CursorIcon::Hand,
             visible: item.mouse_hover(),
             on_tap: move |_| { this.tasks.remove(idx); },
             svgs::CLOSE

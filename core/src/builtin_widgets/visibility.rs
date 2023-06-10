@@ -1,15 +1,37 @@
 use crate::{impl_query_self_only, prelude::*};
 
-#[derive(SingleChild, Declare, Clone)]
+#[derive(Declare)]
 pub struct Visibility {
   #[declare(builtin)]
   pub visible: bool,
 }
 
-impl Render for Visibility {
+impl ComposeChild for Visibility {
+  type Child = Widget;
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+    widget! {
+      states { this: this.into_readonly(), }
+      FocusScope {
+        skip_descendants: !this.visible,
+        can_focus: this.visible,
+        VisibilityRender {
+          display: this.visible,
+          widget::from(child)
+        }
+      }
+    }
+  }
+}
+
+#[derive(SingleChild, Declare, Clone)]
+struct VisibilityRender {
+  display: bool,
+}
+
+impl Render for VisibilityRender {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    if self.visible {
+    if self.display {
       ctx.assert_perform_single_child_layout(clamp)
     } else {
       ZERO_SIZE
@@ -18,7 +40,7 @@ impl Render for Visibility {
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
-    if !self.visible {
+    if !self.display {
       ctx.painter().apply_alpha(0.);
     }
   }
@@ -26,12 +48,12 @@ impl Render for Visibility {
   fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
     HitTest {
       hit: false,
-      can_hit_child: self.visible,
+      can_hit_child: self.display,
     }
   }
 }
 
-impl Query for Visibility {
+impl Query for VisibilityRender {
   impl_query_self_only!();
 }
 
