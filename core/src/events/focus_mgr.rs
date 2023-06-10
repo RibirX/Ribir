@@ -40,10 +40,7 @@ impl FocusHandle {
 impl Default for FocusManager {
   fn default() -> Self {
     let mut arena = Arena::new();
-    let root = arena.new_node(FocusNodeInfo {
-      focus_type: FocusType::SCOPE,
-      wid: None,
-    });
+    let root = arena.new_node(FocusNodeInfo { node_cnt: 0, scope_cnt: 1, wid: None });
     Self {
       request_focusing: None,
       focusing: None,
@@ -54,18 +51,47 @@ impl Default for FocusManager {
   }
 }
 
-bitflags! {
-  #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-  pub(crate) struct FocusType: u8 {
-    const SCOPE = 0x01;
-    const NODE = 0x02;
-  }
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub(crate) enum FocusType {
+  Scope,
+  Node,
 }
 
 #[derive(Debug)]
 pub(crate) struct FocusNodeInfo {
-  pub focus_type: FocusType,
+  pub scope_cnt: u32,
+  pub node_cnt: u32,
   pub wid: Option<WidgetId>,
+}
+
+impl FocusNodeInfo {
+  fn new(wid: WidgetId) -> Self {
+    FocusNodeInfo {
+      scope_cnt: 0,
+      node_cnt: 0,
+      wid: Some(wid),
+    }
+  }
+
+  fn has_focus_node(&self) -> bool { self.node_cnt > 0 }
+
+  fn has_focus_scope(&self) -> bool { self.scope_cnt > 0 }
+
+  fn add_focus(&mut self, ft: FocusType) {
+    match ft {
+      FocusType::Node => self.node_cnt += 1,
+      FocusType::Scope => self.scope_cnt += 1,
+    }
+  }
+
+  fn remove_focus(&mut self, ft: FocusType) {
+    match ft {
+      FocusType::Node => self.node_cnt -= 1,
+      FocusType::Scope => self.scope_cnt -= 1,
+    }
+  }
+
+  fn is_empty(&self) -> bool { self.node_cnt + self.scope_cnt == 0 }
 }
 
 impl FocusManager {
@@ -78,12 +104,11 @@ impl FocusManager {
   ) {
     if let Some(id) = self.node_ids.get(&wid) {
       let node = self.arena[*id].get_mut();
-      assert!(node.wid == Some(wid) && !node.focus_type.intersects(focus_type));
-      node.focus_type = node.focus_type.union(focus_type);
+      node.add_focus(focus_type);
     } else {
-      let node_id = self
-        .arena
-        .new_node(FocusNodeInfo { focus_type, wid: Some(wid) });
+      let mut node = FocusNodeInfo::new(wid);
+      node.add_focus(focus_type);
+      let node_id = self.arena.new_node(node);
       self.node_ids.insert(wid, node_id);
 
       let it = wid.ancestors(arena).skip(1);
@@ -94,7 +119,11 @@ impl FocusManager {
       self.insert_node(*parent, node_id, wid, arena);
     }
 
-    if focus_type == FocusType::NODE && self.focusing.is_none() && auto_focus {
+    if auto_focus
+      && focus_type == FocusType::Node
+      && self.focusing.is_none()
+      && self.request_focusing.is_none()
+    {
       self.request_focusing = Some(Some(wid));
     }
   }
@@ -104,17 +133,18 @@ impl FocusManager {
   }
 
   pub(crate) fn remove_focus_node(&mut self, wid: WidgetId, focus_type: FocusType) {
-    if Some(wid) == self.focusing && focus_type.intersects(FocusType::NODE) {
+    let Some(id) = self.node_ids.get(&wid).cloned() else { return; };
+
+    let node = self.arena[id].get_mut();
+    node.remove_focus(focus_type);
+
+    if Some(wid) == self.focusing && !node.has_focus_node() {
       self.request_focusing = Some(None);
     }
-    if let Some(id) = self.node_ids.get(&wid).cloned() {
-      let node = self.arena[id].get_mut();
-      assert!(node.focus_type.intersects(focus_type));
-      node.focus_type.remove(focus_type);
-      if node.focus_type.is_empty() {
-        id.remove(&mut self.arena);
-        self.node_ids.remove(&wid);
-      }
+
+    if node.is_empty() {
+      id.remove(&mut self.arena);
+      self.node_ids.remove(&wid);
     }
   }
 
@@ -130,10 +160,17 @@ impl FocusManager {
     let info = focus_node.and_then(|id: &NodeId| self.get(*id));
 
     let focus_to = if let Some(node) = info {
-      if node.focus_type.contains(FocusType::SCOPE) {
-        self
-          .focus_step_in_scope(*focus_node.unwrap(), None, false, arena)
-          .and_then(|id| self.assert_get(id).wid)
+      if node.has_focus_scope() {
+        let scope = self.scope_property(node.wid, arena);
+        if node.has_focus_node() && scope.can_focus {
+          node.wid
+        } else if !scope.skip_descendants {
+          self
+            .focus_step_in_scope(*focus_node.unwrap(), None, false, arena)
+            .and_then(|id| self.assert_get(id).wid)
+        } else {
+          None
+        }
       } else {
         node.wid
       }
@@ -186,30 +223,30 @@ impl FocusManager {
     backward: bool,
     arena: &TreeArena,
   ) -> Vec<(i16, NodeId, FocusType)> {
-    let scope_tab_type = |id| {
+    let scope_tab_type = |id, has_focus_node: bool| {
       let mut v = vec![];
-      let node = self.focus_scope_node(id, arena);
-      if node.can_focus {
-        v.push(FocusType::NODE);
+      let node = self.scope_property(id, arena);
+
+      if has_focus_node && node.can_focus {
+        v.push(FocusType::Node);
       }
       if !node.skip_descendants {
-        v.push(FocusType::SCOPE);
+        v.push(FocusType::Scope);
       }
+
       v
     };
-    let is_scope = |id| self.assert_get(id).focus_type.intersects(FocusType::SCOPE);
+    let is_scope = |id| self.assert_get(id).has_focus_scope();
     let node_type = |id| {
-      self
-        .arena
-        .get(id)
-        .map(|n| n.get())
-        .map_or(vec![FocusType::NODE], |node| {
-          if node.focus_type.intersects(FocusType::SCOPE) {
-            scope_tab_type(node.wid)
-          } else {
-            vec![FocusType::NODE]
-          }
-        })
+      self.arena.get(id).map(|n| n.get()).map_or(vec![], |node| {
+        if node.has_focus_scope() {
+          scope_tab_type(node.wid, node.has_focus_node())
+        } else if node.has_focus_node() {
+          vec![FocusType::Node]
+        } else {
+          vec![]
+        }
+      })
     };
 
     let next_sibling = |level: &mut u32, mut id| {
@@ -280,7 +317,7 @@ impl FocusManager {
     };
 
     for (_, id, focus_type) in it {
-      let next = if focus_type == FocusType::SCOPE {
+      let next = if focus_type == FocusType::Scope {
         self.focus_step_in_scope(id, None, backward, arena)
       } else {
         Some(id)
@@ -298,7 +335,7 @@ impl FocusManager {
     node_id
       .ancestors(&self.arena)
       .skip(1)
-      .take_while(|n| self.assert_get(*n).focus_type.intersects(FocusType::SCOPE))
+      .filter(|n| self.assert_get(*n).has_focus_scope())
   }
 
   fn ignore_scope_id(&self, wid: WidgetId, arena: &TreeArena) -> Option<NodeId> {
@@ -311,9 +348,13 @@ impl FocusManager {
         let mut has_ignore = false;
         self.get(*id).and_then(|n| n.wid).map(|wid| {
           wid.get(arena).map(|r| {
-            r.query_on_first_type(QueryOrder::InnerFirst, |s: &FocusScope| {
-              has_ignore = s.skip_descendants;
-            })
+            r.query_all_type(
+              |s: &FocusScope| {
+                has_ignore = s.skip_descendants;
+                !has_ignore
+              },
+              QueryOrder::InnerFirst,
+            )
           })
         });
         has_ignore
@@ -321,18 +362,24 @@ impl FocusManager {
     })
   }
 
-  fn focus_scope_node(&self, scope_id: Option<WidgetId>, arena: &TreeArena) -> FocusScope {
+  fn scope_property(&self, scope_id: Option<WidgetId>, arena: &TreeArena) -> FocusScope {
     scope_id
       .and_then(|wid| {
         wid.get(arena).and_then(|r| {
           let mut node = None;
           r.query_on_first_type(QueryOrder::InnerFirst, |s: &FocusScope| {
-            node = Some(s.clone());
+            if node.is_none() {
+              node = Some(s.clone());
+            } else {
+              let n = node.as_mut().unwrap();
+              n.skip_descendants |= s.skip_descendants;
+              n.can_focus &= s.can_focus;
+            }
           });
           node
         })
       })
-      .unwrap_or_default()
+      .unwrap_or(FocusScope::default())
   }
 
   fn tab_index(&self, node_id: NodeId, arena: &TreeArena) -> i16 {
@@ -342,7 +389,7 @@ impl FocusManager {
       .and_then(|n| n.wid)
       .and_then(|wid| wid.get(arena))
     {
-      r.query_on_first_type(QueryOrder::InnerFirst, |s: &FocusNode| {
+      r.query_on_first_type(QueryOrder::OutsideFirst, |s: &FocusNode| {
         index = s.tab_index;
       });
     };
@@ -581,12 +628,13 @@ mod tests {
       }
     };
 
-    let wnd = TestWindow::new(widget);
-    let tree = &wnd.widget_tree;
+    let mut wnd = TestWindow::new(widget);
+    let Window { dispatcher, widget_tree, .. } = &mut *wnd;
+    dispatcher.refresh_focus(widget_tree);
 
-    let id = tree.root().first_child(&tree.arena);
+    let id = widget_tree.root().first_child(&widget_tree.arena);
     assert!(id.is_some());
-    assert_eq!(wnd.dispatcher.focusing(), id);
+    assert_eq!(dispatcher.focusing(), id);
   }
 
   #[test]
@@ -600,15 +648,16 @@ mod tests {
       }
     };
 
-    let wnd = TestWindow::new(widget);
-    let tree = &wnd.widget_tree;
+    let mut wnd = TestWindow::new(widget);
+    let Window { dispatcher, widget_tree, .. } = &mut *wnd;
 
-    let id = tree
+    let id = widget_tree
       .root()
-      .first_child(&tree.arena)
-      .and_then(|p| p.next_sibling(&tree.arena));
+      .first_child(&widget_tree.arena)
+      .and_then(|p| p.next_sibling(&widget_tree.arena));
     assert!(id.is_some());
-    assert_eq!(wnd.dispatcher.focusing(), id);
+    dispatcher.refresh_focus(widget_tree);
+    assert_eq!(dispatcher.focusing(), id);
   }
 
   #[test]
@@ -787,8 +836,7 @@ mod tests {
     let focus_scope = first_box.unwrap().next_sibling(&tree.arena);
     dispatcher.focus_mgr.borrow_mut().request_focusing = Some(focus_scope);
 
-    let second_box = focus_scope.unwrap().first_child(&tree.arena);
-    let inner_box = second_box.unwrap().first_child(&tree.arena);
+    let inner_box = focus_scope.unwrap().first_child(&tree.arena);
     dispatcher.refresh_focus(tree);
     assert_eq!(dispatcher.focusing(), inner_box);
   }

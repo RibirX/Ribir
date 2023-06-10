@@ -46,9 +46,9 @@ impl ComposeChild for FocusNode {
       states { this: this.clone() }
       DynWidget {
         on_mounted: move |ctx| WidgetCtxImpl::wnd_ctx(&ctx)
-          .add_focus_node(ctx.id, this.auto_focus, FocusType::NODE, ctx.tree_arena()),
+          .add_focus_node(ctx.id, this.auto_focus, FocusType::Node, ctx.tree_arena()),
         on_disposed: move|ctx| WidgetCtxImpl::wnd_ctx(&ctx)
-          .remove_focus_node(ctx.id, FocusType::NODE),
+          .remove_focus_node(ctx.id, FocusType::Node),
         dyns: child
       }
     };
