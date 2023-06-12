@@ -26,23 +26,22 @@ impl Compose for SelectedText {
         let color = SelectedTextStyle::of(ctx).brush.clone();
       }
       Stack {
-        DynWidget {
-          dyns: {
-            this.rects.iter().copied()
-            .map(|rc| {
-              let color = color.clone();
-              widget! {
-                  Container {
-                    background: color,
-                    top_anchor: rc.origin.y,
-                    left_anchor: rc.origin.x,
-                    size: rc.size,
-                  }
-              }
-            }).collect::<Vec<_>>()
-          }
-        }
+        Multi::new(
+          this.rects.iter().copied()
+          .map(|rc| {
+            let color = color.clone();
+            widget! {
+                Container {
+                  background: color,
+                  top_anchor: rc.origin.y,
+                  left_anchor: rc.origin.x,
+                  size: rc.size,
+                }
+            }
+          }).collect::<Vec<_>>()
+        )
       }
     }
+    .into()
   }
 }

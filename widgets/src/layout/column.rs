@@ -30,8 +30,9 @@ impl ComposeChild for Column {
         justify_content: this.justify_content,
         main_axis_gap: this.item_gap,
         cross_axis_gap: this.line_gap,
-        widget::from(children)
+        Multi::new(children)
       }
     }
+    .into()
   }
 }

@@ -1,9 +1,5 @@
 # Full builtin fields list 
 
-- on_performed_layout : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >) >`] 
- 	 - action perform after widget performed layout.
-- performed_layout_stream : [`LifecycleSubject`] 
- 	 - return an observable stream of the performed layout event.
 - on_pointer_down : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler for the pointer down event in bubble phase.
 - on_pointer_down_capture : [`impl FnMut(& mut PointerEvent)`] 
@@ -16,28 +12,28 @@
  	 - specify the event handler for the pointer move event in bubble phase.
 - on_pointer_move_capture : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler for the pointer move event in capture phase.
-- on_tap : [`impl FnMut(& mut PointerEvent)`] 
- 	 - specify the event handler for the pointer tap event in bubble phase.
-- on_double_tap : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
- 	 - specify the event handler for the pointer double tap event in bubble phase.
-- on_triple_tap : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
- 	 - specify the event handler for the pointer triple tap event in bubble phase.
-- on_x_times_tap : [`(usize, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)`] 
- 	 - specify the event handler for the pointer `x` times tap event in bubble phase.
-- on_tap_capture : [`impl FnMut(& mut PointerEvent)`] 
- 	 - specify the event handler for the pointer tap event in capture phase.
-- on_double_tap_capture : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
- 	 - specify the event handler for the pointer double tap event in capture phase.
-- on_triple_tap_capture : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
- 	 - specify the event handler for the pointer triple tap event in capture phase.
-- on_x_times_tap_capture : [`(usize, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)`] 
- 	 - specify the event handler for the pointer `x` times tap event in capture phase.
 - on_pointer_cancel : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler to process pointer cancel event.
 - on_pointer_enter : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler when pointer enter this widget.
 - on_pointer_leave : [`impl FnMut(& mut PointerEvent)`] 
  	 - specify the event handler when pointer leave this widget.
+- on_tap : [`impl FnMut(& mut PointerEvent)`] 
+ 	 - specify the event handler for the pointer tap event in bubble phase.
+- on_tap_capture : [`impl FnMut(& mut PointerEvent)`] 
+ 	 - specify the event handler for the pointer tap event in capture phase.
+- on_double_tap : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
+ 	 - specify the event handler for the pointer double tap event in bubble phase.
+- on_double_tap_capture : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
+ 	 - specify the event handler for the pointer double tap event in capture phase.
+- on_triple_tap : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
+ 	 - specify the event handler for the pointer triple tap event in bubble phase.
+- on_triple_tap_capture : [`Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >`] 
+ 	 - specify the event handler for the pointer triple tap event in capture phase.
+- on_x_times_tap : [`(usize, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)`] 
+ 	 - specify the event handler for the pointer `x` times tap event in bubble phase.
+- on_x_times_tap_capture : [`(usize, Box < dyn for < 'r > FnMut(& 'r mut PointerEvent) >)`] 
+ 	 - specify the event handler for the pointer `x` times tap event in capture phase.
 - auto_focus : [`bool`] 
  	 - Indicates whether the widget should automatically get focus when the window loads.
 - tab_index : [`i16`] 
@@ -54,10 +50,10 @@
  	 - specify the event handler to process focusout event in bubble phase.
 - on_focus_out_capture : [`impl FnMut(& mut FocusEvent)`] 
  	 - specify the event handler to process focusout event in capture phase.
-- on_key_down : [`impl FnMut(& mut KeyboardEvent)`] 
- 	 - specify the event handler when keyboard press down in bubble phase.
 - on_key_down_capture : [`impl FnMut(& mut KeyboardEvent)`] 
  	 - specify the event handler when keyboard press down in capture phase.
+- on_key_down : [`impl FnMut(& mut KeyboardEvent)`] 
+ 	 - specify the event handler when keyboard press down in bubble phase.
 - on_key_up : [`impl FnMut(& mut KeyboardEvent)`] 
  	 - specify the event handler when a key is released in bubble phase.
 - on_key_up_capture : [`impl FnMut(& mut KeyboardEvent)`] 
@@ -108,41 +104,14 @@
  	 - Opacity is the degree to which content behind an element is hidden, and is the opposite of transparency.
 - on_mounted : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >, MountedType) >`] 
  	 - action perform after widget be added to the widget tree.
-- mounted_stream : [`LifecycleSubject`] 
- 	 - return an observable stream of the widget mounted event
 - on_disposed : [`Box < dyn for < 'r > FnMut(LifeCycleCtx < 'r >, DisposedType) >`] 
  	 - action perform after widget remove from widget tree.
-- disposed_stream : [`LifecycleSubject`] 
- 	 - return an observable stream of the widget disposed event
+- on_performed_layout : [`impl FnMut(& mut PointerEvent)`] 
+ 	 - specify the event handler for the pointer down event in bubble phase.
+- lifecycle_stream : [`LifecycleSubject`] 
+ 	 - return the stream of lifecycle.
 - delay_drop_until : [`bool`] 
  	 - The widget delay the drop of its child until the field delay_drop_until is false, but not affect its dispose event emit time. It's useful to ensure the disappear-animate display fully.
-
- - `fn pointer_down_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
-() >`
- 	- return an observable stream of the pointer down event in bubble phase.
-
- - `fn pointer_down_capture_stream(& self) -> MutRefItemSubject < 'static,
-PointerEvent, () >`
- 	- return an observable stream of the pointer down event in capture phase.
-
- - `fn pointer_up_stream(& self) -> MutRefItemSubject < 'static, PointerEvent, ()
->`
- 	- return an observable stream of the pointer up event in bubble phase.
-
- - `fn pointer_up_capture_stream(& self) -> MutRefItemSubject < 'static,
-PointerEvent, () >`
- 	- return an observable stream of the pointer up event in capture phase.
-
- - `fn pointer_move_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
-() >`
- 	- return an observable stream of the pointer move event in bubble phase.
-
- - `fn pointer_move_capture_stream(& self) -> MutRefItemSubject < 'static,
-PointerEvent, () >`
- 	- return an observable stream of the pointer move event in bubble phase.
-
- - `fn tap_stream(& self) -> MutRefItemSubject < 'static, PointerEvent, () >`
- 	- return an observable stream of the pointer tap event in bubble phase.
 
  - `fn double_tap_stream(& self,) -> FilterMapOp < MutRefItemSubject < 'static,
 PointerEvent, () >, impl FnMut(& mut PointerEvent) -> Option < & mut
@@ -180,17 +149,8 @@ FnMut(& mut PointerEvent) -> Option < & mut PointerEvent >, & mut
 PointerEvent, >`
  	-  Return an observable stream of x-tap event that user tapped 'x' times in the specify duration `dur` in capture phase.
 
- - `fn pointer_cancel_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
-() >`
- 	- return an observable stream of the pointer cancel event
-
- - `fn pointer_enter_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
-() >`
- 	- return an observable stream of the pointer enter event
-
- - `fn pointer_leave_stream(& self) -> MutRefItemSubject < 'static, PointerEvent,
-() >`
- 	- return an observable stream of the pointer leave event
+ - `fn pointer_stream(& self) -> PointerSubject`
+ 	- return the stream include all pointer events.
 
  - `fn request_focus(& self)`
  	- request the this node to be focused.
@@ -199,55 +159,23 @@ PointerEvent, >`
  	- removes the focus from this node.
 
  - `fn focus_stream(& self) -> MutRefItemSubject < 'static, FocusEvent, () >`
- 	- return an observable stream of the pointer focus event
+ 	- Return the stream include all focus and blur events.
 
- - `fn blur_stream(& self) -> MutRefItemSubject < 'static, FocusEvent, () >`
- 	- return an observable stream of the pointer blur event
-
- - `fn focus_in_stream(& self) -> MutRefItemSubject < 'static, FocusEvent, () >`
- 	- return an observable stream of the pointer focus-in event in bubble phase.
-
- - `fn focus_in_capture_stream(& self) -> MutRefItemSubject < 'static, FocusEvent,
-() >`
- 	- return an observable stream of the pointer focus-in event in capture phase.
-
- - `fn focus_out_stream(& self) -> MutRefItemSubject < 'static, FocusEvent, () >`
- 	- return an observable stream of the pointer focus-out event in bubble phase.
-
- - `fn focus_out_capture_stream(& self) -> MutRefItemSubject < 'static,
-FocusEvent, () >`
- 	- return an observable stream of the pointer focus-out event in capture phase.
+ - `fn focus_bubble_stream(& self) -> MutRefItemSubject < 'static, FocusEvent, ()
+>`
+ 	- Return the stream include all focus in/out related events.
 
  - `fn has_focus(& self) -> bool`
  	- return if the widget has focus.
 
- - `fn key_down_stream(& self) -> MutRefItemSubject < 'static, KeyboardEvent, () >`
- 	- return an observable stream of the key down event in bubble phase.
+ - `fn keyboard_stream(& self) -> KeyboardSubject`
+ 	- return the stream include all keyboard events.
 
- - `fn key_down_capture_stream(& self) -> MutRefItemSubject < 'static,
-KeyboardEvent, () >`
- 	- return an observable stream of the key down event in capture phase.
+ - `fn chars_stream(& self) -> CharsSubject`
+ 	- return the stream include all chars events.
 
- - `fn key_up_stream(& self) -> MutRefItemSubject < 'static, KeyboardEvent, () >`
- 	- return an observable stream of the key up event in bubble phase.
-
- - `fn key_up_capture_stream(& self) -> MutRefItemSubject < 'static,
-KeyboardEvent, () >`
- 	- return an observable stream of the key up event in capture phase.
-
- - `fn chars_stream(& self) -> MutRefItemSubject < 'static, CharsEvent, () >`
- 	- return an observable stream of the chars event in bubble phase.
-
- - `fn chars_capture_stream(& self) -> MutRefItemSubject < 'static, CharsEvent, ()
->`
- 	- return an observable stream of the chars event in capture phase.
-
- - `fn key_down_stream(& self) -> MutRefItemSubject < 'static, WheelEvent, () >`
- 	- return an observable stream of the wheel event in bubble phase.
-
- - `fn wheel_capture_stream(& self) -> MutRefItemSubject < 'static, WheelEvent, ()
->`
- 	- return an observable stream of the wheel event in capture phase.
+ - `fn wheel_stream(& self) -> MutRefItemSubject < 'static, WheelEvent, () >`
+ 	- return the stream include all wheel events.
 
  - `fn mouse_hover(& self) -> bool`
  	- return if the pointer is hover on the widget

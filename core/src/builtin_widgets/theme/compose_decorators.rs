@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, widget::FnWidget};
 use std::{any::type_name, collections::HashMap};
 
 type ComposeDecoratorFn = dyn Fn(Box<dyn Any>, Box<dyn Any>) -> Widget;
@@ -22,7 +22,7 @@ impl<W: ComposeDecorator + 'static> ComposeChild for W {
   type Child = W::Host;
 
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    (move |ctx: &BuildCtx| {
+    FnWidget::new(move |ctx: &BuildCtx| {
       let tid = TypeId::of::<W>();
       let style = ctx.find_cfg(|t| match t {
         Theme::Full(t) => t.compose_decorators.styles.get(&tid),
@@ -33,12 +33,12 @@ impl<W: ComposeDecorator + 'static> ComposeChild for W {
       });
 
       if let Some(style) = style {
-        style(Box::new(this.into_writable()), Box::new(child))
+        style(Box::new(this.into_writable()), Box::new(child)).build(ctx)
       } else {
-        ComposeDecorator::compose_decorator(this, child)
+        ComposeDecorator::compose_decorator(this, child).build(ctx)
       }
     })
-    .into_widget()
+    .into()
   }
 }
 
@@ -96,6 +96,7 @@ mod tests {
             DynWidget { dyns: host }
           }
         }
+        .into()
       });
 
     let w = widget! {

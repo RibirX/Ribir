@@ -18,6 +18,7 @@ impl Compose for AB {
         }
       }
     }
+    .into()
   }
 }
 
@@ -43,8 +44,9 @@ fn tuple_widget() -> Widget {
         states { this: this.into_readonly() }
         SizedBox { size: this.0 }
       }
+      .into()
     }
   }
-  widget! { TupleBox(Size::new(1., 1.)) }
+  widget! { TupleBox(Size::new(1., 1.)) }.into()
 }
 widget_layout_test!(tuple_widget, width == 1., height == 1.,);

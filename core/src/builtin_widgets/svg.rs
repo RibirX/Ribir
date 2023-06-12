@@ -11,6 +11,4 @@ impl Render for Svg {
   }
 }
 
-impl Query for Svg {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Svg);

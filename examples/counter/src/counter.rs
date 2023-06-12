@@ -11,4 +11,5 @@ pub fn counter() -> Widget {
       FilledButton { on_tap: move |_| *cnt += -1, Label::new("Sub") }
     }
   }
+  .into()
 }

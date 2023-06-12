@@ -1,65 +1,44 @@
+use crate::{
+  impl_all_event, impl_common_event_deref, impl_compose_child_for_listener, impl_listener,
+  impl_multi_event_listener, impl_query_self_only, prelude::*,
+};
+use rxrust::{
+  prelude::*,
+  rc::{MutRc, RcDeref, RcDerefMut},
+};
+use smallvec::SmallVec;
 use std::convert::Infallible;
 
-use crate::{
-  data_widget::compose_child_as_data_widget, impl_compose_child_for_listener, impl_listener,
-  impl_listener_and_compose_child, impl_query_self_only, prelude::*,
-};
-
-#[derive(Debug, Clone)]
-pub struct WheelEvent {
+#[derive(Debug)]
+pub struct WheelEvent<'a> {
   pub delta_x: f32,
   pub delta_y: f32,
-  pub common: EventCommon,
+  pub common: CommonEvent<'a>,
 }
 
-/// Firing the wheel event when the user rotates a wheel button on a pointing
-/// device (typically a mouse).
-#[derive(Declare)]
-pub struct WheelListener {
-  #[declare(builtin, convert=custom)]
-  on_wheel: MutRefItemSubject<'static, WheelEvent, Infallible>,
+impl_event_subject!(Wheel, event_name = AllWheel);
+
+impl_multi_event_listener! {
+  "The listener use to fire and listen wheel events.",
+  Wheel,
+  "Firing the wheel event when the user rotates a wheel button on a pointing \
+  device (typically a mouse).",
+  Wheel,
+  "Same as `Wheel` but emit in capture phase.",
+  WheelCapture
 }
+impl_compose_child_for_listener!(WheelListener);
+impl_common_event_deref!(WheelEvent);
 
-#[derive(Declare)]
-pub struct WheelCaptureListener {
-  #[declare(builtin, convert=custom)]
-  on_wheel_capture: MutRefItemSubject<'static, WheelEvent, Infallible>,
-}
-
-impl_listener_and_compose_child!(
-  WheelListener,
-  WheelListenerDeclarer,
-  on_wheel,
-  WheelEvent,
-  wheel_stream
-);
-
-impl_listener_and_compose_child!(
-  WheelCaptureListener,
-  WheelCaptureListenerDeclarer,
-  on_wheel_capture,
-  WheelEvent,
-  wheel_capture_stream
-);
-
-impl std::borrow::Borrow<EventCommon> for WheelEvent {
+impl<'a> WheelEvent<'a> {
   #[inline]
-  fn borrow(&self) -> &EventCommon { &self.common }
-}
-
-impl std::borrow::BorrowMut<EventCommon> for WheelEvent {
-  #[inline]
-  fn borrow_mut(&mut self) -> &mut EventCommon { &mut self.common }
-}
-
-impl std::ops::Deref for WheelEvent {
-  type Target = EventCommon;
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.common }
-}
-
-impl std::ops::DerefMut for WheelEvent {
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
+  pub fn new(delta_x: f32, delta_y: f32, id: WidgetId, wnd: &'a Window) -> Self {
+    Self {
+      delta_x,
+      delta_y,
+      common: CommonEvent::new(id, wnd),
+    }
+  }
 }
 
 #[cfg(test)]

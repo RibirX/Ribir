@@ -131,9 +131,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
   )
 }
 
-impl Query for Text {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Text);
 
 macro_rules! define_text_with_theme_style {
   ($name: ident, $style: ident) => {
@@ -161,6 +159,7 @@ macro_rules! define_text_with_theme_style {
             overflow: this.overflow,
           }
         }
+        .into()
       }
     }
   };
@@ -193,8 +192,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = TestWindow::new_with_size(w, Size::new(120., 80.));
-
+    let wnd = TestWindow::new_with_size(w, Size::new(120., 80.));
     wnd.layout();
   }
 }

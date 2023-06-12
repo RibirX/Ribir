@@ -21,5 +21,6 @@ impl ComposeChild for MouseHover {
         on_pointer_leave: move |_| this.hover = false,
       }
     }
+    .into()
   }
 }

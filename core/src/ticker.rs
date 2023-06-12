@@ -27,7 +27,7 @@ pub enum FrameMsg {
 
 impl FrameTicker {
   #[inline]
-  pub(crate) fn emit(&mut self, msg: FrameMsg) { self.subject.next(msg) }
+  pub(crate) fn emit(&self, msg: FrameMsg) { self.subject.clone().next(msg) }
 
   #[inline]
   pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, Infallible> { self.subject.clone() }

@@ -74,7 +74,7 @@ impl ComposeChild for Avatar {
       }
       SizedBox {
         size,
-        widget::from(match child {
+        widget::from::<Widget>(match child {
           AvatarTemplate::Text(text) => widget! {
             states { text: text.into_readonly() }
             BoxDecoration {
@@ -91,7 +91,7 @@ impl ComposeChild for Avatar {
                 }
               }
             }
-          },
+          }.into(),
           AvatarTemplate::Image(image) => widget! {
             DynWidget {
               dyns: radius.map(|radius| {
@@ -109,9 +109,10 @@ impl ComposeChild for Avatar {
                 }
               }
             }
-          }
+          }.into()
         })
       }
     }
+    .into()
   }
 }

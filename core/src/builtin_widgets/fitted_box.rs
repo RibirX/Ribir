@@ -9,12 +9,12 @@ pub enum BoxFit {
   /// will be stretched to fit.
   Fill,
   /// Widget is scaled to maintain its aspect ratio while fitting within the
-  /// container box. The entire widget is made to fill the box, while
-  /// preserving its aspect ratio,
+  /// container box. The entire widget is made to fill the box, while preserving
+  /// its aspect ratio,
   Contain,
   /// Widget is scale to maintain its aspect ratio while filling to full cover
-  /// its container box. If the widget's aspect ratio does not match the
-  /// aspect ratio of its box, then the widget will be clipped to fit.
+  /// its container box. If the widget's aspect ratio does not the aspect ratio
+  /// of its box, then the widget will be clipped to fit.
   Cover,
 }
 
@@ -74,9 +74,7 @@ impl Render for FittedBox {
   fn get_transform(&self) -> Option<Transform> { Some(self.scale_cache.get()) }
 }
 
-impl Query for FittedBox {
-  crate::impl_query_self_only!();
-}
+crate::impl_query_self_only!(FittedBox);
 
 #[cfg(test)]
 mod tests {
@@ -172,6 +170,7 @@ mod tests {
         box_fit: BoxFit::Fill,
       }
     }
+    .into()
   }
   widget_layout_test!(as_builtin_field, wnd_size = WND_SIZE, size == WND_SIZE,);
 }

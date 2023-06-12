@@ -17,6 +17,4 @@ impl Render for ShareResource<PixelImage> {
   }
 }
 
-impl Query for ShareResource<PixelImage> {
-  impl_query_self_only!();
-}
+impl_query_self_only!(ShareResource<PixelImage>);

@@ -91,9 +91,7 @@ impl Render for HAlignWidget {
   }
 }
 
-impl Query for HAlignWidget {
-  crate::impl_query_self_only!();
-}
+crate::impl_query_self_only!(HAlignWidget);
 
 impl Render for VAlignWidget {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
@@ -119,9 +117,7 @@ impl Render for VAlignWidget {
   }
 }
 
-impl Query for VAlignWidget {
-  crate::impl_query_self_only!();
-}
+crate::impl_query_self_only!(VAlignWidget);
 
 impl Align {
   pub fn align_value(self, child_size: f32, box_size: f32) -> f32 {
@@ -172,6 +168,7 @@ mod tests {
         MockBox { size: CHILD_SIZE }
       }
     }
+    .into()
   }
   fn left_align() -> Widget { h_align(HAlign::Left) }
   widget_layout_test!(
@@ -212,6 +209,7 @@ mod tests {
         MockBox { size: CHILD_SIZE }
       }
     }
+    .into()
   }
 
   fn top_align() -> Widget { v_align(VAlign::Top) }

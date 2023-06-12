@@ -64,4 +64,5 @@ pub fn greet() -> Widget {
       }
     }
   }
+  .into()
 }

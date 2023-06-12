@@ -103,7 +103,7 @@ impl ComposeChild for Input {
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     widget! {
       init ctx => {
-        let frame_scheduler = ctx.wnd_ctx().frame_scheduler();
+        let frame_scheduler = ctx.window().frame_scheduler();
       }
       states {
         this: this.into_writable(),
@@ -137,7 +137,7 @@ impl ComposeChild for Input {
           });
       }
     }
-    .into_widget()
+    .into()
   }
 }
 
@@ -155,7 +155,7 @@ impl ComposeChild for TextArea {
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     widget! {
       init ctx => {
-        let frame_scheduler = ctx.wnd_ctx().frame_scheduler();
+        let frame_scheduler = ctx.window().frame_scheduler();
       }
       states {
         this: this.into_writable(),
@@ -189,7 +189,7 @@ impl ComposeChild for TextArea {
           });
       }
     }
-    .into_widget()
+    .into()
   }
 }
 

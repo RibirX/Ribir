@@ -98,7 +98,7 @@ macro_rules! widget_test_suit {
 ///         size: Size::new(50., 50.)
 ///       }
 ///     }
-///   }
+///   }.into()
 /// }
 ///
 /// // only use to avoid conflict.

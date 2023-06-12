@@ -108,7 +108,7 @@ fn main() {
       }
     ]
   }.into_stateful();
-  app::run(todo_data.into_widget());
+  app::run(todo_data.into());
 }
 ```
 
@@ -167,7 +167,7 @@ fn main() {
       }
     ]
   }.into_stateful();
-  app::run(todo_data.into_widget());
+  app::run(todo_data.into());
 }
 ```
 

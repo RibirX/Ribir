@@ -125,5 +125,6 @@ impl ComposeChild for FabButton {
         }
       }
     }
+    .into()
   }
 }

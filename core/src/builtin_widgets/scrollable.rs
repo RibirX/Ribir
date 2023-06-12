@@ -69,8 +69,8 @@ impl ComposeChild for ScrollableWidget {
               this.jump_to(scroll_pos);
           });
       }
-
     }
+    .into()
   }
 }
 
@@ -189,9 +189,8 @@ mod tests {
     #[inline]
     fn paint(&self, _: &mut PaintingCtx) {}
   }
-  impl Query for FixedBox {
-    impl_query_self_only!();
-  }
+
+  impl_query_self_only!(FixedBox);
 
   #[test]
   fn scroll_content_expand() {
@@ -203,14 +202,12 @@ mod tests {
         ScrollableWidget {
           scrollable: Scrollable::Both,
           on_performed_layout: move |ctx| {
-            let size = ctx.layout_info().and_then(|info| info.size);
-            assert_eq!(size, Some(Size::new(200., 200.)));
+            assert_eq!(ctx.box_size(), Some(Size::new(200., 200.)));
           },
           MockBox {
             size: Size::new(100., 100.),
             on_performed_layout: move |ctx| {
-              let size = ctx.layout_info().and_then(|info| info.size);
-              assert_eq!(size, Some(Size::new(200., 200.)));
+              assert_eq!(ctx.box_size(), Some(Size::new(200., 200.)));
             },
           }
         }

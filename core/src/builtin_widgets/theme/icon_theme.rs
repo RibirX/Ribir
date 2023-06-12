@@ -62,10 +62,9 @@ impl Compose for NamedSvg {
   fn compose(this: State<Self>) -> Widget {
     widget! {
       states { this: this.into_readonly() }
-      DynWidget {
-        dyns: move |ctx: &BuildCtx| this.of_or_miss(ctx)
-      }
+      FnWidget::new(move |ctx: &BuildCtx| this.of_or_miss(ctx))
     }
+    .into()
   }
 }
 

@@ -1,7 +1,7 @@
 use ribir_core::{impl_query_self_only, prelude::*};
 
-/// Widget just use as a paint kit for a path and not care about its size.
-/// Use `[PathWidget]!` instead of.
+/// Widget just use as a paint kit for a path and not care about its size. Use
+/// `[PathWidget]!` instead of.
 #[derive(Declare, Clone)]
 pub struct PathPaintKit {
   pub path: Path,
@@ -40,9 +40,7 @@ impl Render for PathPaintKit {
   }
 }
 
-impl Query for PathPaintKit {
-  impl_query_self_only!();
-}
+impl_query_self_only!(PathPaintKit);
 
 #[derive(Declare)]
 /// A path widget which size careful and can process events only if user hit at
@@ -66,6 +64,4 @@ impl Render for PathWidget {
   paint_method!();
 }
 
-impl Query for PathWidget {
-  impl_query_self_only!();
-}
+impl_query_self_only!(PathWidget);

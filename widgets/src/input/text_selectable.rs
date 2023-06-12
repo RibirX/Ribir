@@ -56,9 +56,9 @@ impl ComposeChild for TextSelectable {
           rects: vec![],
         }
         DynWidget {
-          dyns: text.clone().into_widget(),
+          dyns: text.clone(),
           on_performed_layout: move |ctx| {
-            let bound = ctx.layout_info().expect("layout info must exit in performed_layout").clamp;
+            let bound = ctx.layout_clamp().expect("layout info must exit in performed_layout");
             this.helper.glyphs = Some(text.text_layout(
               AppCtx::typography_store(),
               bound.max,
@@ -74,7 +74,7 @@ impl ComposeChild for TextSelectable {
           });
       }
     }
-    .into_widget()
+    .into()
   }
 }
 

@@ -10,17 +10,11 @@ impl ComposeChild for DelayDropWidget {
   type Child = Widget;
   #[inline]
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let this = match this {
-      State::Stateless(w) => Stateful::new(w),
-      State::Stateful(w) => w,
-    };
-    widget_attach_data(child, this)
+    DataWidget::attach(child, this.into_writable())
   }
 }
 
-impl Query for DelayDropWidget {
-  impl_query_self_only!();
-}
+impl_query_self_only!(DelayDropWidget);
 
 pub(crate) fn query_drop_until_widget(
   wid: WidgetId,

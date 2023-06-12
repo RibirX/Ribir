@@ -5,8 +5,9 @@ use crate::{
   declare::DeclareBuilder,
   fill_svgs, impl_query_self_only,
   prelude::include_svg,
-  prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId, Widget},
+  prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId},
   state::State,
+  widget::{Widget, WidgetBuilder},
 };
 use ribir_algo::CowArc;
 pub use ribir_algo::ShareResource;
@@ -82,22 +83,27 @@ impl ComposeChild for ThemeWidget {
   #[inline]
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     use crate::prelude::*;
-    widget! {
-      init ctx => {  AppCtx::load_font_from_theme(&this.theme); }
-      states { this: this.into_readonly() }
-      DynWidget {
-        dyns: move |ctx: &BuildCtx| {
-          ctx.push_theme(this.theme.clone());
-          widget_attach_data(child, this.theme.clone())
-        }
-      }
-    }
+    FnWidget::new(move |ctx| {
+      let theme = match this {
+        State::Stateless(t) => t.theme,
+        State::Stateful(s) => s.state_ref().theme.clone(),
+      };
+
+      AppCtx::load_font_from_theme(&theme);
+      ctx.push_theme(theme.clone());
+      let p = DataWidget::new(Box::new(Void), theme).build(ctx);
+      let old = ctx.force_as_mut().reset_ctx_from(Some(p));
+      let c = child.build(ctx);
+      ctx.append_child(p, c);
+      ctx.force_as_mut().reset_ctx_from(old);
+      ctx.pop_theme();
+      p
+    })
+    .into()
   }
 }
 
-impl Query for Theme {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Theme);
 
 impl Default for Theme {
   fn default() -> Self { Theme::Full(<_>::default()) }

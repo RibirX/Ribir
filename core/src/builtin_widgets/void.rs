@@ -21,9 +21,7 @@ impl Render for Void {
   }
 }
 
-impl Query for Void {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Void);
 
 #[cfg(test)]
 mod tests {

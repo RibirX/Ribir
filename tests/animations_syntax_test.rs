@@ -50,7 +50,7 @@ fn listener_trigger_have_handler() {
     }
   };
 
-  wheel_widget(w);
+  wheel_widget(w.into());
 
   assert!(*animate_state.state_ref());
   assert_eq!(handler_call_times.get(), 1);
@@ -87,7 +87,7 @@ fn listener_trigger() {
     }
   };
 
-  wheel_widget(w);
+  wheel_widget(w.into());
 
   assert!(*animate_state.state_ref());
 }

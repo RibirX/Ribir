@@ -3,12 +3,13 @@ use crate::{events::focus_mgr::FocusType, impl_query_self_only, prelude::*};
 #[derive(Declare, Clone, Default)]
 pub struct FocusScope {
   /// If true, the descendants can not be focused.
-  /// Defalut value is false, then the hold FocusScope subtree can be focused
+  /// Default value is false, then the hold FocusScope subtree can be focused
   #[declare(default)]
   pub skip_descendants: bool,
 
   /// If true, the child widget can be focused.
-  /// Defalut value is false, then the child widget can't be focused
+  /// Default value is false, then the child widget can't be focused, but not
+  /// skip the whole subtree.
   #[declare(default)]
   pub can_focus: bool,
 }
@@ -19,19 +20,15 @@ impl ComposeChild for FocusScope {
     let w = widget! {
       DynWidget {
         dyns: child,
-        on_mounted: move |ctx| WidgetCtxImpl::wnd_ctx(&ctx)
-          .add_focus_node(ctx.id, false, FocusType::Scope, ctx.tree_arena()),
-        on_disposed: move|ctx| WidgetCtxImpl::wnd_ctx(&ctx)
-          .remove_focus_node(ctx.id, FocusType::Scope),
+        on_mounted: move |ctx| ctx.window().add_focus_node(ctx.id, false, FocusType::Scope),
+        on_disposed: move|ctx| ctx.window().remove_focus_node(ctx.id, FocusType::Scope),
       }
     };
-    compose_child_as_data_widget(w, this)
+    DataWidget::attach_state(w.into(), this)
   }
 }
 
-impl Query for FocusScope {
-  impl_query_self_only!();
-}
+impl_query_self_only!(FocusScope);
 
 #[cfg(test)]
 mod tests {
@@ -66,12 +63,13 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(widget);
-    let Window { dispatcher, widget_tree, .. } = &mut *wnd;
-    dispatcher.refresh_focus(widget_tree);
+    let wnd = TestWindow::new(widget);
+    let mut focus_mgr = wnd.focus_mgr.borrow_mut();
+    focus_mgr.refresh_focus();
 
-    let arena = &widget_tree.arena;
-    let id0 = widget_tree.root().first_child(arena).unwrap();
+    let tree = wnd.widget_tree.borrow();
+    let arena = &tree.arena;
+    let id0 = tree.root().first_child(arena).unwrap();
     let scope = id0.next_sibling(arena).unwrap();
     let scope_id1 = scope.first_child(arena).unwrap();
     let scope_id2 = scope_id1.next_sibling(arena).unwrap();
@@ -80,26 +78,26 @@ mod tests {
 
     {
       // next focus sequential
-      dispatcher.next_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(id1));
-      dispatcher.next_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(scope_id1));
-      dispatcher.next_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(scope_id2));
-      dispatcher.next_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(scope_id3));
-      dispatcher.next_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(id0));
+      focus_mgr.focus_next_widget();
+      assert_eq!(focus_mgr.focusing(), Some(id1));
+      focus_mgr.focus_next_widget();
+      assert_eq!(focus_mgr.focusing(), Some(scope_id1));
+      focus_mgr.focus_next_widget();
+      assert_eq!(focus_mgr.focusing(), Some(scope_id2));
+      focus_mgr.focus_next_widget();
+      assert_eq!(focus_mgr.focusing(), Some(scope_id3));
+      focus_mgr.focus_next_widget();
+      assert_eq!(focus_mgr.focusing(), Some(id0));
 
       // previous focus sequential
-      dispatcher.prev_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(scope_id3));
-      dispatcher.prev_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(scope_id2));
-      dispatcher.prev_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(scope_id1));
-      dispatcher.prev_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(id1));
+      focus_mgr.focus_prev_widget();
+      assert_eq!(focus_mgr.focusing(), Some(scope_id3));
+      focus_mgr.focus_prev_widget();
+      assert_eq!(focus_mgr.focusing(), Some(scope_id2));
+      focus_mgr.focus_prev_widget();
+      assert_eq!(focus_mgr.focusing(), Some(scope_id1));
+      focus_mgr.focus_prev_widget();
+      assert_eq!(focus_mgr.focusing(), Some(id1));
     }
   }
 
@@ -125,9 +123,10 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(widget);
-    let Window { dispatcher, widget_tree, .. } = &mut *wnd;
-    dispatcher.refresh_focus(widget_tree);
+    let wnd = TestWindow::new(widget);
+    let mut focus_mgr = wnd.focus_mgr.borrow_mut();
+    let widget_tree = wnd.widget_tree.borrow();
+    focus_mgr.refresh_focus();
 
     let arena = &widget_tree.arena;
     let id0 = widget_tree.root().first_child(arena).unwrap();
@@ -136,18 +135,18 @@ mod tests {
 
     {
       // next focus sequential
-      dispatcher.next_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(id1));
-      dispatcher.next_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(scope));
-      dispatcher.next_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(id0));
+      focus_mgr.focus_next_widget();
+      assert_eq!(focus_mgr.focusing(), Some(id1));
+      focus_mgr.focus_next_widget();
+      assert_eq!(focus_mgr.focusing(), Some(scope));
+      focus_mgr.focus_next_widget();
+      assert_eq!(focus_mgr.focusing(), Some(id0));
 
       // previous focus sequential
-      dispatcher.prev_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(scope));
-      dispatcher.prev_focus_widget(widget_tree);
-      assert_eq!(dispatcher.focusing(), Some(id1));
+      focus_mgr.focus_prev_widget();
+      assert_eq!(focus_mgr.focusing(), Some(scope));
+      focus_mgr.focus_prev_widget();
+      assert_eq!(focus_mgr.focusing(), Some(id1));
     }
   }
 
@@ -208,6 +207,7 @@ mod tests {
       is_synthetic: false,
     });
 
+    wnd.emit_events();
     wnd.draw_frame();
     assert_eq!(*result.borrow(), 2);
   }

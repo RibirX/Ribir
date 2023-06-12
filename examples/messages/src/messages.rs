@@ -38,7 +38,7 @@ pub fn messages() -> Widget {
       },
     ],
   }
-  .into_widget()
+  .into()
 }
 
 impl Compose for MessageList {
@@ -91,27 +91,25 @@ impl Compose for MessageList {
             TabPane {
               VScrollBar {
                 Lists {
-                  DynWidget {
-                    dyns: this.messages.clone().into_iter().map(move |message| {
-                      let name = message.avatar.to_string();
-                      let mut avatar = format!("{}/examples/attachments/3DDD-{name}.png", env!("CARGO_WORKSPACE_DIR"));
-                      let img = PixelImage::from_png(&std::fs::read(avatar).unwrap());
-                      let img = ShareResource::new(img);
+                  Multi::new(this.messages.clone().into_iter().map(move |message| {
+                    let name = message.avatar.to_string();
+                    let mut avatar = format!("{}/examples/attachments/3DDD-{name}.png", env!("CARGO_WORKSPACE_DIR"));
+                    let img = PixelImage::from_png(&std::fs::read(avatar).unwrap());
+                    let img = ShareResource::new(img);
 
-                      widget! {
-                        Column {
-                          ListItem {
-                            line_number: 1,
-                            HeadlineText(Label::new(message.nick_name.clone()))
-                            SupportingText(Label::new(message.content.clone()))
-                            Leading { Avatar { widget::from(img) } }
-                            Trailing { svgs::MORE_HORIZ }
-                          }
-                          Divider {}
+                    widget! {
+                      Column {
+                        ListItem {
+                          line_number: 1,
+                          HeadlineText(Label::new(message.nick_name.clone()))
+                          SupportingText(Label::new(message.content.clone()))
+                          Leading { Avatar { widget::from(img) } }
+                          Trailing { svgs::MORE_HORIZ }
                         }
+                        Divider {}
                       }
-                    }),
-                  }
+                    }
+                  }))
                 }
               }
             }
@@ -129,6 +127,6 @@ impl Compose for MessageList {
           }
         }
       }
-    }
+    }.into()
   }
 }

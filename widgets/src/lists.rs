@@ -59,12 +59,12 @@ use ribir_core::prelude::*;
 ///     // use leading custom widget
 ///     ListItem {
 ///       Leading {
-///         widget! {
+///         CustomEdgeWidget(widget! {
 ///           Container {
 ///             size: Size::splat(40.),
 ///             background: Color::YELLOW,
 ///           }
-///         }
+///         }.into())
 ///       }
 ///     }
 ///   }
@@ -92,12 +92,12 @@ use ribir_core::prelude::*;
 ///     ListItem {
 ///       HeadlineText(Label::new("headline text"))
 ///       Trailing {
-///         widget! {
+///         CustomEdgeWidget(widget! {
 ///           Container {
 ///             size: Size::splat(40.),
 ///             background: Color::YELLOW,
 ///           }
-///         }
+///         }.into())
 ///       }
 ///     }
 ///   }
@@ -139,10 +139,11 @@ impl ComposeChild for Lists {
     widget! {
       ListsDecorator {
         Column {
-          DynWidget { dyns: child.into_iter() }
+          Multi::new(child)
         }
       }
     }
+    .into()
   }
 }
 
@@ -174,9 +175,6 @@ pub struct Poster(pub ShareResource<PixelImage>);
 pub struct HeadlineText(pub Label);
 pub struct SupportingText(pub Label);
 
-impl TmlFlag for Leading {}
-impl TmlFlag for Trailing {}
-
 #[derive(Template)]
 pub enum EdgeWidget<P: TmlFlag + Default + 'static> {
   Text(DecorateTml<P, State<Label>>),
@@ -184,8 +182,10 @@ pub enum EdgeWidget<P: TmlFlag + Default + 'static> {
   Avatar(DecorateTml<P, ComposePair<State<Avatar>, AvatarTemplate>>),
   Image(DecorateTml<P, ShareResource<PixelImage>>),
   Poster(DecorateTml<P, Poster>),
-  Custom(DecorateTml<P, Widget>),
+  Custom(DecorateTml<P, CustomEdgeWidget>),
 }
+
+pub struct CustomEdgeWidget(pub Widget);
 
 impl<P> EdgeWidget<P>
 where
@@ -206,10 +206,11 @@ where
           dyns: icon.gap.map(|margin| Margin { margin }),
           Icon {
             size: icon.size,
-            widget::from(w.decorate(|_, c| c))
+            widget::from(w.decorate(|_, c| c.into()))
           }
         }
-      },
+      }
+      .into(),
       EdgeWidget::Text(w) => widget! {
         DynWidget {
           dyns: text.gap.map(|margin| Margin { margin }),
@@ -220,15 +221,17 @@ where
               text_style: text.style.clone(),
               foreground: text.foreground.clone(),
             }
-          }))
+          }.into()))
         }
-      },
+      }
+      .into(),
       EdgeWidget::Avatar(w) => widget! {
         DynWidget {
           dyns: avatar.gap.map(|margin| Margin { margin }),
-          DecorateTml::decorate(w, |_, c| c.into_widget())
+          DecorateTml::decorate(w, |_, c| c.into())
         }
-      },
+      }
+      .into(),
       EdgeWidget::Image(w) => widget! {
         DynWidget {
           dyns: image.gap.map(|margin| Margin { margin }),
@@ -236,11 +239,12 @@ where
             size: image.size,
             DynWidget {
               box_fit: BoxFit::None,
-              dyns: w.decorate(|_, c| c)
+              dyns: w.decorate(|_, c| c.into())
             }
           }
         }
-      },
+      }
+      .into(),
       EdgeWidget::Poster(w) => widget! {
         DynWidget {
           dyns: poster.gap.map(|margin| Margin { margin }),
@@ -248,36 +252,36 @@ where
             size: poster.size,
             DynWidget {
               box_fit: BoxFit::None,
-              dyns: w.decorate(|_, c| c.0)
+              dyns: w.decorate(|_, c| c.0.into())
             }
           }
         }
-      },
+      }
+      .into(),
       EdgeWidget::Custom(w) => widget! {
         DynWidget {
           dyns: custom.gap.map(|margin| Margin { margin }),
-          widget::from(w.decorate(|_, c| c))
+          widget::from(w.decorate(|_, c| c.0))
         }
-      },
+      }
+      .into(),
     }
   }
 }
 
 #[derive(Template)]
-pub struct ListItemTemplate {
+pub struct ListItemTml {
   headline: State<HeadlineText>,
   supporting: Option<State<SupportingText>>,
-  #[template(flat_fill)]
   leading: Option<EdgeWidget<Leading>>,
-  #[template(flat_fill)]
   trailing: Option<EdgeWidget<Trailing>>,
 }
 
 impl ComposeChild for ListItem {
-  type Child = ListItemTemplate;
+  type Child = ListItemTml;
 
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let ListItemTemplate {
+    let ListItemTml {
       headline,
       supporting,
       leading,
@@ -345,6 +349,7 @@ impl ComposeChild for ListItem {
         }
       }
     }
+    .into()
   }
 }
 

@@ -11,7 +11,7 @@ use std::{
 /// Stateful object use to watch the modifies of the inner data.
 pub struct Stateful<W> {
   inner: Rc<InnerStateful<W>>,
-  modify_notifier: StateChangeNotifier,
+  pub(crate) modify_notifier: StateChangeNotifier,
 }
 
 /// notify downstream when widget state changed, the value mean if the change it
@@ -341,37 +341,11 @@ impl<'a, W> StateRef<'a, W> {
 impl<W: SingleChild> SingleChild for Stateful<W> {}
 impl<W: MultiChild> MultiChild for Stateful<W> {}
 
-impl<W: Render + 'static> Render for Stateful<W> {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.state_ref().perform_layout(clamp, ctx)
-  }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.state_ref().only_sized_by_parent() }
-
-  #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.state_ref().paint(ctx) }
-
-  #[inline]
-  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
-    self.state_ref().hit_test(ctx, pos)
-  }
-
-  #[inline]
-  fn get_transform(&self) -> Option<Transform> { self.state_ref().get_transform() }
-}
+impl_proxy_query!(paths [modify_notifier, state_ref()], Stateful<R>, <R>, where R: Query + 'static );
+impl_query_self_only!(StateChangeNotifier);
 
 impl<'a, W> Drop for StateRef<'a, W> {
   fn drop(&mut self) { self.release_borrow(); }
-}
-
-impl<W: Query + 'static> Query for Stateful<W> {
-  impl_proxy_query!(self.modify_notifier, self.state_ref());
-}
-
-impl Query for StateChangeNotifier {
-  impl_query_self_only!();
 }
 
 impl StateChangeNotifier {
@@ -426,13 +400,13 @@ mod tests {
     let mut wnd = TestWindow::new(sized_box);
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 0);
-    assert!(!wnd.widget_tree.is_dirty());
+    assert!(!wnd.widget_tree.borrow().is_dirty());
     assert_eq!(&*changed_size.borrow(), &Size::new(0., 0.));
 
     {
       state.state_ref().size = Size::new(1., 1.);
     }
-    assert!(wnd.widget_tree.is_dirty());
+    assert!(wnd.widget_tree.borrow().is_dirty());
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 1);
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));
@@ -444,7 +418,7 @@ mod tests {
 
     let mut wnd = TestWindow::new(widget! { MockBox { size: Size::new(100., 100.) } });
     wnd.draw_frame();
-    let tree = &wnd.widget_tree;
+    let tree = wnd.widget_tree.borrow();
     assert_eq!(tree.root().descendants(&tree.arena).count(), 1);
   }
 

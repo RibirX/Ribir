@@ -28,3 +28,14 @@ note: You should manual watch expression and add operator to break the circular,
 ...
 29 |         cursor: a.cursor
    |         ^^^^^^
+
+error[E0282]: type annotations needed
+  --> compile_msg/declare/fix_attr_indirect_follow_host_fail.rs:21:7
+   |
+21 |   let _fix_attr_indirect_follow_host_attr_fail = widget! {
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: consider giving `_fix_attr_indirect_follow_host_attr_fail` an explicit type
+   |
+21 |   let _fix_attr_indirect_follow_host_attr_fail: /* Type */ = widget! {
+   |                                               ++++++++++++

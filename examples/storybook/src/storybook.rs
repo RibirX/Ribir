@@ -351,8 +351,8 @@ impl Compose for Storybook {
           }
         }
       }
-    }
+    }.into()
   }
 }
 
-pub fn storybook() -> Widget { Storybook {}.into_widget() }
+pub fn storybook() -> Widget { Storybook {}.into() }

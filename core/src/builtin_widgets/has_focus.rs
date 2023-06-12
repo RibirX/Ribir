@@ -20,5 +20,6 @@ impl ComposeChild for HasFocus {
         on_focus_out: move |_| this.focused = false,
       }
     }
+    .into()
   }
 }

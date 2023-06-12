@@ -112,5 +112,6 @@ impl ComposeChild for Button {
         }
       }
     }
+    .into()
   }
 }

@@ -78,6 +78,4 @@ impl Render for GridView {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for GridView {
-  impl_query_self_only!();
-}
+impl_query_self_only!(GridView);

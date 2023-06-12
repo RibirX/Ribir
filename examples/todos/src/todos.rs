@@ -71,6 +71,7 @@ impl Compose for TodoMVP {
         }
       }
     }
+    .into()
   }
 }
 
@@ -87,18 +88,21 @@ impl TodoMVP {
           DynWidget {
             dyns: {
               let tasks = this.tasks.clone();
-              tasks
+              Multi::new(
+                tasks
                 .into_iter()
                 .enumerate()
                 .filter(move |(_, task)| { cond(task) })
                 .map(move |(idx, task)| {
                   no_watch!(Self::task(this, task, idx, mount_task_cnt))
                 })
+              )
             }
           }
         }
       }
     }
+    .into()
   }
 
   fn task(this: StateRef<Self>, task: Task, idx: usize, mount_task_cnt: StateRef<i32>) -> Widget {
@@ -122,7 +126,7 @@ impl TodoMVP {
           },
           HeadlineText(Label::new(task.label.clone()))
           Leading {
-            widget! {
+            CustomEdgeWidget(widget! {
               Checkbox {
                 id: checkbox,
                 checked: task.finished,
@@ -132,7 +136,7 @@ impl TodoMVP {
                 let_watch!(checkbox.checked)
                   .subscribe(move |v| this.tasks[idx].finished = v);
               }
-            }
+            }.into())
           }
           Trailing {
             cursor: CursorIcon::Hand,
@@ -154,6 +158,7 @@ impl TodoMVP {
         from: Transform::translation(-400., 0. ),
       }
     }
+    .into()
   }
 }
 
@@ -177,5 +182,5 @@ pub fn todos() -> Widget {
       },
     ],
   }
-  .into_widget()
+  .into()
 }

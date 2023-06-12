@@ -6,13 +6,22 @@ pub use readonly::*;
 use rxrust::prelude::ObservableItem;
 pub use stateful::*;
 
-use crate::dynamic_widget::DynWidget;
+use crate::{
+  context::BuildCtx,
+  dynamic_widget::DynWidget,
+  widget::{Compose, WidgetId, WidgetBuilder},
+};
 
 /// Enum to store both stateless and stateful object.
 #[derive(Clone)]
 pub enum State<W> {
   Stateless(W),
   Stateful(Stateful<W>),
+}
+
+impl<C: Compose> WidgetBuilder for State<C> {
+  #[inline]
+  fn build(self, ctx: &BuildCtx) -> WidgetId { Compose::compose(self).build(ctx) }
 }
 
 impl<W> State<W> {
@@ -34,18 +43,23 @@ impl<W> State<W> {
   }
 }
 
-impl<W> From<W> for State<W> {
-  #[inline]
-  fn from(w: W) -> Self { State::Stateless(w) }
+pub(crate) trait StateFrom<V> {
+  fn state_from(value: V) -> Self;
 }
 
-impl<W> From<Stateful<W>> for State<W> {
+impl<W> StateFrom<W> for State<W> {
   #[inline]
-  fn from(w: Stateful<W>) -> Self { State::Stateful(w) }
+  fn state_from(value: W) -> State<W> { State::Stateless(value) }
 }
 
-impl<D: 'static> From<Stateful<DynWidget<D>>> for State<D> {
-  fn from(value: Stateful<DynWidget<D>>) -> Self {
+impl<W> StateFrom<Stateful<W>> for State<W> {
+  #[inline]
+  fn state_from(value: Stateful<W>) -> State<W> { State::Stateful(value) }
+}
+
+impl<W: 'static> StateFrom<Stateful<DynWidget<W>>> for State<W> {
+  #[inline]
+  fn state_from(value: Stateful<DynWidget<W>>) -> State<W> {
     let c_value = value.clone();
     let v = value.silent_ref().dyns.take().unwrap();
     let v = Stateful::new(v);
@@ -65,8 +79,15 @@ impl<D: 'static> From<Stateful<DynWidget<D>>> for State<D> {
         c_value.forget_modifies();
       }
     });
-    v.into()
+    State::Stateful(v)
   }
+}
+
+impl<W, T> From<T> for State<W>
+where
+  Self: StateFrom<T>,
+{
+  fn from(value: T) -> Self { StateFrom::state_from(value) }
 }
 
 #[cfg(test)]

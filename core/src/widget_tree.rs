@@ -1,49 +1,49 @@
-use indextree::*;
-use std::{cell::RefCell, collections::HashSet, ops::Deref, rc::Rc};
+use std::{
+  cell::RefCell,
+  cmp::Reverse,
+  collections::HashSet,
+  rc::{Rc, Weak},
+};
 
 pub mod widget_id;
 pub(crate) use widget_id::TreeArena;
 pub use widget_id::WidgetId;
 mod layout_info;
-use crate::{prelude::*, widget::widget_id::new_node};
+use crate::prelude::*;
 pub use layout_info::*;
 
 pub(crate) type DirtySet = Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
+
+#[derive(Default)]
 pub(crate) struct WidgetTree {
-  root: WidgetId,
+  pub(crate) root: Option<WidgetId>,
+  wnd: Weak<Window>,
   pub(crate) arena: TreeArena,
   pub(crate) store: LayoutStore,
-  pub(crate) wnd_ctx: WindowCtx,
-  dirty_set: DirtySet,
+  pub(crate) dirty_set: DirtySet,
 }
 
 impl WidgetTree {
-  pub(crate) fn new(root: Widget, mut wnd_ctx: WindowCtx) -> WidgetTree {
-    let mut arena = Arena::default();
-    let root = root
-      .into_subtree(None, &mut arena, &mut wnd_ctx)
-      .expect("must have a root");
-    let store = LayoutStore::default();
-    let dirty_set = DirtySet::default();
-    root.on_mounted_subtree(&arena, &store, &wnd_ctx, &dirty_set);
-    let tree = Self {
-      root,
-      arena,
-      wnd_ctx,
-      store,
-      dirty_set,
-    };
-    tree.mark_dirty(root);
-    tree
+  pub(crate) fn new() -> WidgetTree { Self::default() }
+
+  pub fn init(&mut self, widget: Widget, wnd: Weak<Window>) {
+    self.wnd = wnd;
+    let build_ctx = BuildCtx::new(None, self);
+    let root = widget.build(&build_ctx);
+    self.root = Some(root);
+    self.mark_dirty(root);
+    root.on_mounted_subtree(self);
   }
 
-  pub(crate) fn root(&self) -> WidgetId { self.root }
+  pub(crate) fn root(&self) -> WidgetId {
+    self.root.expect("Try to access a not init `WidgetTree`")
+  }
 
   /// Draw current tree by painter.
-  pub(crate) fn draw(&self, painter: &mut Painter) {
-    self
-      .root
-      .paint_subtree(&self.arena, &self.store, &self.wnd_ctx, painter);
+  pub(crate) fn draw(&self) {
+    let wnd = self.window();
+    let mut ctx = PaintingCtx::new(self.root(), &wnd);
+    self.root().paint_subtree(&mut ctx);
   }
 
   /// Do the work of computing the layout for all node which need, Return if any
@@ -62,26 +62,11 @@ impl WidgetTree {
           .map(|info| info.clamp)
           .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
 
-        let Self { arena, store, wnd_ctx, dirty_set, .. } = self;
-        let mut layouter = Layouter {
-          wid,
-          arena,
-          store,
-          wnd_ctx,
-          dirty_set,
-          is_layout_root: true,
-        };
-        layouter.perform_widget_layout(clamp);
+        let wnd = self.window();
+        let wnd = &*wnd;
 
-        store.take_performed().into_iter().for_each(|id| {
-          id.assert_get(arena).query_all_type(
-            |l: &PerformedLayoutListener| {
-              l.dispatch(LifeCycleCtx { id, arena, store, wnd_ctx });
-              true
-            },
-            QueryOrder::OutsideFirst,
-          );
-        });
+        let mut layouter = Layouter::new(wid, wnd, true, self);
+        layouter.perform_widget_layout(clamp);
       }
     }
   }
@@ -90,7 +75,14 @@ impl WidgetTree {
 
   pub(crate) fn is_dirty(&self) -> bool { !self.dirty_set.borrow().is_empty() }
 
-  pub(crate) fn count(&self) -> usize { self.root.descendants(&self.arena).count() }
+  pub(crate) fn count(&self) -> usize { self.root().descendants(&self.arena).count() }
+
+  pub(crate) fn window(&self) -> Rc<Window> {
+    self
+      .wnd
+      .upgrade()
+      .expect("The window of `FocusManager` has already dropped.")
+  }
 
   #[allow(unused)]
   pub fn display_tree(&self, sub_tree: WidgetId) -> String {
@@ -119,128 +111,62 @@ impl WidgetTree {
     display_node("".to_string(), sub_tree, &self.arena, &mut display);
     display
   }
-}
 
-impl Widget {
-  pub(crate) fn into_subtree(
-    self,
-    parent: Option<WidgetId>,
-    arena: &mut TreeArena,
-    wnd_ctx: &mut WindowCtx,
-  ) -> Option<WidgetId> {
-    enum NodeInfo {
-      BackTheme,
-      Parent(WidgetId),
-      Widget(Widget),
+  pub(crate) fn layout_list(&mut self) -> Option<Vec<WidgetId>> {
+    if self.dirty_set.borrow().is_empty() {
+      return None;
     }
 
-    let mut themes = vec![];
-    if let Some(p) = parent {
-      p.ancestors(arena).any(|p| {
-        p.assert_get(arena).query_all_type(
-          |t: &Rc<Theme>| {
-            themes.push(t.clone());
-            matches!(t.deref(), Theme::Inherit(_))
-          },
-          QueryOrder::InnerFirst,
-        );
-        matches!(themes.last().map(Rc::deref), Some(Theme::Full(_)))
-      });
-    }
+    let mut needs_layout = vec![];
 
-    pub(crate) struct InflateHelper<'a> {
-      stack: Vec<NodeInfo>,
-      arena: &'a mut TreeArena,
-      wnd_ctx: &'a mut WindowCtx,
-      themes: Vec<Rc<Theme>>,
-      parent: Option<WidgetId>,
-      root: Option<WidgetId>,
-    }
-
-    impl<'a> InflateHelper<'a> {
-      pub(crate) fn inflate(mut self, widget: Widget) -> Option<WidgetId> {
-        self.place_node_in_tree(widget);
-        loop {
-          let Some(node) = self.stack.pop() else{ break};
-          match node {
-            NodeInfo::BackTheme => {
-              self.themes.pop();
-            }
-            NodeInfo::Parent(p) => self.parent = Some(p),
-            NodeInfo::Widget(w) => {
-              self.place_node_in_tree(w);
-            }
-          }
-        }
-
-        self.root
-      }
-
-      fn place_node_in_tree(&mut self, widget: Widget) {
-        match widget {
-          Widget::Compose(c) => {
-            let theme_cnt = self.themes.len();
-            let mut build_ctx = BuildCtx::new(&mut self.themes, self.wnd_ctx);
-            let c = c(&mut build_ctx);
-            if theme_cnt < self.themes.len() {
-              self.stack.push(NodeInfo::BackTheme);
-            }
-            self.stack.push(NodeInfo::Widget(c));
-          }
-          Widget::Render { render, children } => {
-            let wid = new_node(self.arena, render);
-            if let Some(children) = children {
-              let children_size = children.len();
-              self.push_children(children);
-              self.perpend(wid, children_size > 0);
-            } else {
-              self.perpend(wid, false);
-            }
-          }
-        }
-      }
-
-      fn push_children(&mut self, children: Vec<Widget>) {
-        if let Some(p) = self.parent {
-          self.stack.push(NodeInfo::Parent(p));
-        }
-        self
-          .stack
-          .extend(children.into_iter().map(NodeInfo::Widget));
-      }
-
-      fn perpend(&mut self, child: WidgetId, has_child: bool) {
-        if let Some(o) = self.parent {
-          o.prepend(child, self.arena);
-        }
-        if has_child || self.parent.is_none() {
-          self.parent = Some(child)
-        }
-        if self.root.is_none() {
-          self.root = Some(child)
-        }
-      }
-    }
-
-    let helper = InflateHelper {
-      stack: vec![],
-      arena,
-      wnd_ctx,
-      themes,
-      parent,
-      root: None,
+    let dirty_widgets = {
+      let mut state_changed = self.dirty_set.borrow_mut();
+      let dirty_widgets = state_changed.clone();
+      state_changed.clear();
+      dirty_widgets
     };
-    helper.inflate(self)
+
+    for id in dirty_widgets.iter() {
+      if id.is_dropped(&self.arena) {
+        continue;
+      }
+
+      let mut relayout_root = *id;
+      if let Some(info) = self.store.get_mut(id) {
+        info.size.take();
+      }
+
+      // All ancestors of this render widget should relayout until the one which only
+      // sized by parent.
+      for p in id.0.ancestors(&self.arena).skip(1).map(WidgetId) {
+        if self.store.layout_box_size(p).is_none() {
+          break;
+        }
+
+        relayout_root = p;
+        if let Some(info) = self.store.get_mut(&p) {
+          info.size.take();
+        }
+
+        let r = self.arena.get(p.0).unwrap().get();
+        if r.only_sized_by_parent() {
+          break;
+        }
+      }
+      needs_layout.push(relayout_root);
+    }
+
+    (!needs_layout.is_empty()).then(|| {
+      needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(&self.arena).count()));
+      needs_layout
+    })
   }
 }
 
 #[cfg(test)]
 mod tests {
   extern crate test;
-  use crate::{
-    test_helper::{MockBox, MockMulti, TestWindow},
-    widget::widget_id::dispose_nodes,
-  };
+  use crate::test_helper::{MockBox, MockMulti, TestWindow};
 
   use super::*;
   use test::Bencher;
@@ -256,21 +182,22 @@ mod tests {
       widget! {
         states { this: this.into_writable() }
         MockMulti {
-          DynWidget {
-            dyns: (0..this.width)
-              .map(move |_| {
-                if this.depth > 1 {
-                  Recursive {
-                    width: this.width,
-                    depth: this.depth - 1,
-                  }.into_widget()
-                } else {
-                  MockBox { size: Size::new(10., 10.)}.into_widget()
+          Multi::new((0..this.width)
+          .map(move |_| {
+            if this.depth > 1 {
+              Widget::from(
+                Recursive {
+                  width: this.width,
+                  depth: this.depth - 1,
                 }
-              })
-          }
+              )
+            } else {
+              Widget::from(MockBox { size: Size::new(10., 10.)})
+            }
+          }))
         }
       }
+      .into()
     }
   }
 
@@ -285,34 +212,31 @@ mod tests {
       widget! {
         states { this: this.into_writable()}
         MockMulti {
+          Multi::new((0..this.width - 1)
+          .map(move |_| {
+            MockBox { size: Size::new(10., 10.)}
+          }))
           DynWidget {
-            dyns: (0..this.width - 1)
-              .map(move |_| {
-                MockBox { size: Size::new(10., 10.)}
-              })
-          }
-          DynWidget {
-            dyns: if this.depth > 1{
-              Embed {
+            dyns: if this.depth > 1 {
+              Widget::from(Embed {
                 width: this.width,
                 depth: this.depth - 1,
-              }.into_widget()
+              })
             } else {
-              MockBox { size: Size::new(10., 10.)}.into_widget()
+              Widget::from(MockBox { size: Size::new(10., 10.)})
             }
           }
         }
       }
+      .into()
     }
   }
 
   fn bench_recursive_inflate(width: usize, depth: usize, b: &mut Bencher) {
-    let scheduler = FuturesLocalSchedulerPool::default().spawner();
+    let wnd = TestWindow::new(Void {});
     b.iter(move || {
-      let mut tree = WidgetTree::new(
-        Recursive { width, depth }.into_widget(),
-        WindowCtx::new(scheduler.clone()),
-      );
+      let mut tree = wnd.widget_tree.borrow_mut();
+      tree.init(Recursive { width, depth }.into(), Rc::downgrade(&wnd.0));
       tree.layout(Size::new(512., 512.));
     });
   }
@@ -320,8 +244,8 @@ mod tests {
   fn bench_recursive_repair(width: usize, depth: usize, b: &mut Bencher) {
     let w = Stateful::new(Recursive { width, depth });
     let trigger = w.clone();
-    let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(scheduler));
+    let wnd = TestWindow::new(w);
+    let mut tree = wnd.widget_tree.borrow_mut();
     b.iter(|| {
       {
         let _: &mut Recursive = &mut trigger.state_ref();
@@ -418,16 +342,15 @@ mod tests {
     let _guard = unsafe { AppCtx::new_lock_scope() };
 
     let post = Embed { width: 5, depth: 3 };
-    let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(post.into_widget(), WindowCtx::new(scheduler));
+    let wnd = TestWindow::new(post);
+    let mut tree = wnd.widget_tree.borrow_mut();
     tree.layout(Size::new(512., 512.));
     assert_eq!(tree.count(), 16);
 
-    tree.mark_dirty(tree.root());
-    let WidgetTree { root, arena, store, wnd_ctx, .. } = &mut tree;
+    let root = tree.root();
+    tree.mark_dirty(root);
 
-    dispose_nodes(root.descendants(arena), arena, store, wnd_ctx);
-    root.remove_subtree(arena, store);
+    root.remove_subtree(&mut tree);
 
     assert_eq!(tree.layout_list(), None);
     assert!(!tree.is_dirty());
@@ -435,12 +358,12 @@ mod tests {
 
   #[bench]
   fn inflate_5_x_1000(b: &mut Bencher) {
-    let scheduler = FuturesLocalSchedulerPool::default().spawner();
     let _guard = unsafe { AppCtx::new_lock_scope() };
+    let wnd = TestWindow::new(Void);
 
     b.iter(move || {
       let post = Embed { width: 5, depth: 1000 };
-      WidgetTree::new(post.into_widget(), WindowCtx::new(scheduler.clone()));
+      WidgetTree::new().init(post.into(), Rc::downgrade(&wnd.0));
     });
   }
 
@@ -473,8 +396,9 @@ mod tests {
     let _guard = unsafe { AppCtx::new_lock_scope() };
     let post = Stateful::new(Embed { width: 5, depth: 1000 });
     let trigger = post.clone();
-    let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(post.into_widget(), WindowCtx::new(scheduler));
+    let wnd = TestWindow::new(post);
+    let mut tree = wnd.widget_tree.borrow_mut();
+
     b.iter(|| {
       {
         let _: &mut Embed = &mut trigger.state_ref();
@@ -515,18 +439,16 @@ mod tests {
     let widget = widget! {
       states { trigger: trigger.clone() }
       MockMulti {
-        DynWidget {
-          dyns: (0..3).map(move |_| if *trigger > 0 {
-            MockBox { size: Size::new(1., 1.)}
-          } else {
-            MockBox { size: Size::zero()}
-          })
-        }
+        Multi::new((0..3).map(move |_| if *trigger > 0 {
+          MockBox { size: Size::new(1., 1.)}
+        } else {
+          MockBox { size: Size::zero()}
+        }))
       }
     };
 
-    let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(widget, WindowCtx::new(scheduler));
+    let wnd = TestWindow::new(widget);
+    let mut tree = wnd.widget_tree.borrow_mut();
     tree.layout(Size::new(100., 100.));
     {
       *trigger.silent_ref() = 2;
@@ -538,40 +460,33 @@ mod tests {
   fn draw_clip() {
     let _guard = unsafe { AppCtx::new_lock_scope() };
     let win_size = Size::new(150., 50.);
-    let mut painter = Painter::new(Rect::from_size(win_size));
 
     let w1 = widget! {
        MockMulti {
-        DynWidget {
-          dyns: (0..100).map(|_|
-            widget! { MockBox {
-             size: Size::new(150., 50.),
-             background: Color::BLUE,
-          }})
-        }
-    }};
-    let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree1 = WidgetTree::new(w1, WindowCtx::new(scheduler));
-    tree1.layout(win_size);
-    tree1.draw(&mut painter);
+        Multi::new((0..100).map(|_|
+          widget! { MockBox {
+           size: Size::new(150., 50.),
+           background: Color::BLUE,
+        }}))
 
-    let len_100_widget = painter.finish().len();
+    }};
+    let mut wnd = TestWindow::new_with_size(w1, win_size);
+    wnd.draw_frame();
+
+    let len_100_widget = wnd.painter.borrow_mut().finish().len();
 
     let w2 = widget! {
-       MockMulti {
-        DynWidget {
-          dyns: (0..1).map(|_|
-            widget! { MockBox {
-             size: Size::new(150., 50.),
-             background: Color::BLUE,
-          }})
-        }
+      MockMulti {
+        Multi::new((0..1).map(|_|
+          widget! { MockBox {
+           size: Size::new(150., 50.),
+           background: Color::BLUE,
+        }}))
     }};
-    let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree2 = WidgetTree::new(w2, WindowCtx::new(scheduler));
-    tree2.layout(win_size);
-    tree2.draw(&mut painter);
-    let len_1_widget = painter.finish().len();
+
+    let mut wnd = TestWindow::new(w2);
+    wnd.draw_frame();
+    let len_1_widget = wnd.painter.borrow_mut().finish().len();
     assert_eq!(len_1_widget, len_100_widget);
   }
 }

@@ -1,372 +1,161 @@
-use super::{ComposeChild, ComposePair, DecorateTml, TemplateBuilder, TmlFlag, WidgetPair};
+use super::{
+  decorate_tml_impl::IntoDecorateTml, ComposeChild, ComposePair, DecorateTml, Multi, TmlFlag,
+  WidgetPair,
+};
 use crate::{
   dynamic_widget::{DynRender, DynWidget},
-  state::{State, Stateful},
+  state::{State, StateFrom, Stateful},
   widget::*,
 };
 
-/// Trait for conversions between child.
-pub trait IntoChild<M: ImplMarker, Target> {
-  fn into_child(self) -> Target;
+/// Trait for conversions type as a compose child.
+pub trait ChildFrom<V, M> {
+  fn child_from(value: V) -> Self;
 }
 
-/// Trait implement conversions for enum template.
-pub trait IntoEnumVariable<M: ImplMarker, C> {
-  fn into_variable(self) -> C;
-}
-
-// W -> W
-impl<W> IntoChild<SelfImpl, W> for W {
+impl<T> ChildFrom<T, ()> for T {
   #[inline]
-  fn into_child(self) -> W { self }
+  fn child_from(value: T) -> Self { value }
+}
+
+impl<C, T: FromAnother<C, M>, M> ChildFrom<C, (M,)> for T {
+  #[inline]
+  fn child_from(value: C) -> Self { FromAnother::from_another(value) }
+}
+
+/// Convert from another type to the compose child.
+pub trait FromAnother<V, M> {
+  fn from_another(value: V) -> Self;
 }
 
 // W -> Widget
-impl<W, M> IntoChild<NotSelf<[M; 0]>, Widget> for W
-where
-  W: IntoWidget<NotSelf<M>>,
-{
+impl<W: WidgetBuilder + 'static> FromAnother<W, ()> for Widget {
   #[inline]
-  fn into_child(self) -> Widget { self.into_widget() }
+  fn from_another(value: W) -> Self { value.into() }
 }
 
 // W -> State<W>
-impl<W> IntoChild<NotSelf<[(); 1]>, State<W>> for W {
-  #[inline]
-  fn into_child(self) -> State<W> { self.into() }
-}
-
 // Stateful<W> -> State<W>
-impl<W> IntoChild<NotSelf<[(); 1]>, State<W>> for Stateful<W> {
-  #[inline]
-  fn into_child(self) -> State<W> { self.into() }
-}
-
 // Stateful<DynWidget<W>> -> State<W>
-impl<W: 'static> IntoChild<NotSelf<[(); 1]>, State<W>> for Stateful<DynWidget<W>> {
-  #[inline]
-  fn into_child(self) -> State<W> { self.into() }
-}
-
-// Option<W> --- C(not W) ---> Option<C>
-impl<W, C, M> IntoChild<NotSelf<[M; 3]>, Option<C>> for Option<W>
+impl<W, T> FromAnother<T, ()> for State<W>
 where
-  W: IntoChild<NotSelf<M>, C>,
+  State<W>: StateFrom<T>,
 {
   #[inline]
-  fn into_child(self) -> Option<C> { self.map(IntoChild::into_child) }
+  fn from_another(value: T) -> Self { Self::state_from(value) }
 }
 
 // W --- C ---> Option<C>
-impl<W, C, M> IntoChild<NotSelf<[M; 4]>, Option<C>> for W
+impl<W, C, M> ChildFrom<W, [M; 1]> for Option<C>
 where
-  W: IntoChild<M, C>,
-  M: ImplMarker,
+  C: ChildFrom<W, M>,
 {
   #[inline]
-  fn into_child(self) -> Option<C> { Some(self.into_child()) }
+  fn child_from(value: W) -> Self { Some(ChildFrom::child_from(value)) }
 }
 
-// TemplateBuilder --> TemplateBuilder::Target
-impl<T> IntoChild<NotSelf<[(); 5]>, T::Target> for T
+// Option<W>  ---> Option<C>
+impl<W, C, M> FromAnother<Option<C>, M> for Option<W>
 where
-  T: TemplateBuilder,
+  W: FromAnother<C, M>,
 {
   #[inline]
-  fn into_child(self) -> T::Target { self.build_tml() }
+
+  fn from_another(value: Option<C>) -> Self { value.map(FromAnother::from_another) }
 }
 
 // WidgetPair<W, C> --> WidgetPair<W2, C2>
-impl<M1, M2, W, W2, C, C2> IntoChild<NotSelf<[(M1, M2); 5]>, WidgetPair<W2, C2>>
-  for WidgetPair<W, C>
+impl<W, W2, C, C2, M1, M2> FromAnother<WidgetPair<W2, C2>, [(M1, M2); 0]> for WidgetPair<W, C>
 where
-  C: IntoChild<NotSelf<M1>, C2>,
-  W: IntoChild<NotSelf<M2>, W2>,
+  W: FromAnother<W2, M1>,
+  C: ChildFrom<C2, M2>,
 {
   #[inline]
-  fn into_child(self) -> WidgetPair<W2, C2> {
-    let Self { widget, child } = self;
+  fn from_another(value: WidgetPair<W2, C2>) -> Self {
+    let WidgetPair { widget, child } = value;
     WidgetPair {
-      widget: widget.into_child(),
-      child: child.into_child(),
+      widget: W::from_another(widget),
+      child: C::child_from(child),
     }
   }
 }
 
-// WidgetPair<W, C> --> WidgetPair<W, C2>
-impl<M, W, C, C2> IntoChild<NotSelf<[M; 6]>, WidgetPair<W, C2>> for WidgetPair<W, C>
+impl<W, W2, C, C2, M1, M2> FromAnother<WidgetPair<W2, C2>, [(M1, M2); 1]> for WidgetPair<W, C>
 where
-  C: IntoChild<NotSelf<M>, C2>,
+  W: ChildFrom<W2, M1>,
+  C: FromAnother<C2, M2>,
 {
   #[inline]
-  fn into_child(self) -> WidgetPair<W, C2> {
-    let Self { widget, child } = self;
-    WidgetPair { widget, child: child.into_child() }
-  }
-}
-
-// WidgetPair<W, C> --> WidgetPair<W2, C>
-impl<M, W, W2, C> IntoChild<NotSelf<[M; 7]>, WidgetPair<W2, C>> for WidgetPair<W, C>
-where
-  W: IntoChild<NotSelf<M>, W2>,
-{
-  #[inline]
-  fn into_child(self) -> WidgetPair<W2, C> {
-    let Self { widget, child } = self;
-    WidgetPair { widget: widget.into_child(), child }
-  }
-}
-
-// WidgetPair<W, C> --> DecorateTml<W, C2>
-impl<W, C, M, C2> IntoChild<NotSelf<[M; 8]>, DecorateTml<W, C2>> for WidgetPair<W, C>
-where
-  W: TmlFlag,
-  C: IntoChild<M, C2>,
-  M: ImplMarker,
-{
-  #[inline]
-  fn into_child(self) -> DecorateTml<W, C2> {
-    let WidgetPair { widget: tml_flag, child } = self;
-    let decorator = Box::new(|w| w);
-    DecorateTml {
-      decorator,
-      tml_flag,
-      child: child.into_child(),
+  fn from_another(value: WidgetPair<W2, C2>) -> Self {
+    let WidgetPair { widget, child } = value;
+    WidgetPair {
+      widget: W::child_from(widget),
+      child: C::from_another(child),
     }
   }
 }
 
-// ComposePair<W, C> --> DecorateTml<W, C2>
-impl<W, C, T, C2, M> IntoChild<NotSelf<[M; 8]>, DecorateTml<T, C2>> for ComposePair<State<W>, C>
+// C --> DecorateTml<W, C2>
+impl<C, M, C2, Flag> FromAnother<C2, [M; 0]> for DecorateTml<Flag, C>
 where
-  W: ComposeChild<Child = Widget> + 'static,
-  C: IntoChild<M, DecorateTml<T, C2>>,
-  M: ImplMarker,
-  T: TmlFlag,
+  C2: IntoDecorateTml<C, M, Flag = Flag>,
+  Flag: TmlFlag,
 {
   #[inline]
-  fn into_child(self) -> DecorateTml<T, C2> {
-    let ComposePair { widget, child } = self;
-    let DecorateTml { decorator, tml_flag, child } = child.into_child();
-    DecorateTml {
-      decorator: Box::new(move |w| ComposeChild::compose_child(widget, decorator(w))),
-      tml_flag,
-      child,
-    }
-  }
+  fn from_another(value: C2) -> Self { value.into_decorate_tml() }
 }
 
 // ComposePair<W, C> --- W: ComposeChild---> ComposePair<W, W::Child>
-impl<W, C> IntoChild<NotSelf<[(); 8]>, ComposePair<State<W>, W::Child>> for ComposePair<State<W>, C>
+impl<W, C, C2, M> FromAnother<ComposePair<State<W>, C2>, M> for ComposePair<State<W>, C>
 where
   W: ComposeChild,
-  C: TemplateBuilder<Target = W::Child>,
+  C: FromAnother<C2, M>,
 {
-  fn into_child(self) -> ComposePair<State<W>, W::Child> {
-    let ComposePair { widget, child } = self;
-    ComposePair { widget, child: child.build_tml() }
-  }
-}
-
-// WidgetPair<W, C> --> DecorateTml<W, C2>
-impl<W, C, W2, C2, M1, M2> IntoChild<NotSelf<[(M1, M2); 9]>, DecorateTml<W2, C2>>
-  for WidgetPair<W, C>
-where
-  W: 'static,
-  W2: TmlFlag,
-  WidgetPair<W, Widget>: IntoWidget<M1>,
-  C: IntoChild<M2, DecorateTml<W2, C2>>,
-  M1: ImplMarker,
-  M2: ImplMarker,
-{
-  #[inline]
-  fn into_child(self) -> DecorateTml<W2, C2> {
-    let Self { widget, child } = self;
-    let DecorateTml { decorator, tml_flag, child } = child.into_child();
-    DecorateTml {
-      decorator: Box::new(move |w| WidgetPair { widget, child: decorator(w) }.into_widget()),
-      tml_flag,
-      child,
+  fn from_another(value: ComposePair<State<W>, C2>) -> Self {
+    let ComposePair { widget, child } = value;
+    ComposePair {
+      widget,
+      child: FromAnother::from_another(child),
     }
   }
 }
 
-/////////////////////////////////////
-pub(crate) trait FillVec<M, C> {
+pub(crate) trait FillVec<C, M> {
   fn fill_vec(self, vec: &mut Vec<C>);
 }
 
-// W --- C ---> Vec<C>
-impl<W, C, M> FillVec<NotSelf<[M; 0]>, C> for W
-where
-  W: IntoChild<M, C>,
-  M: ImplMarker,
-{
+impl<W, C: ChildFrom<W, M>, M> FillVec<C, [M; 0]> for W {
   #[inline]
-  fn fill_vec(self, vec: &mut Vec<C>) { vec.push(self.into_child()) }
+  fn fill_vec(self, vec: &mut Vec<C>) { vec.push(ChildFrom::child_from(self)) }
 }
 
-// Iter<W> -- Iter<Option<C>> -> Vec<C>
-impl<W, C, M> FillVec<NotSelf<[M; 1]>, C> for W
+impl<W, C, M> FillVec<C, [M; 1]> for Option<W>
 where
-  W: IntoIterator,
-  W::Item: IntoChild<M, Option<C>>,
-  M: ImplMarker,
+  C: ChildFrom<W, M>,
 {
   #[inline]
   fn fill_vec(self, vec: &mut Vec<C>) {
-    vec.extend(self.into_iter().filter_map(IntoChild::into_child))
+    if let Some(w) = self {
+      vec.push(ChildFrom::child_from(w))
+    }
   }
 }
 
-impl<D, M> FillVec<NotSelf<[M; 2]>, Widget> for Stateful<DynWidget<D>>
+impl<W, C, M> FillVec<C, [M; 1]> for Multi<W>
+where
+  W: IntoIterator,
+  C: ChildFrom<W::Item, M>,
+{
+  #[inline]
+  fn fill_vec(self, vec: &mut Vec<C>) {
+    vec.extend(self.into_inner().into_iter().map(ChildFrom::child_from))
+  }
+}
+
+impl<D> FillVec<Widget, [(); 2]> for Stateful<DynWidget<Multi<D>>>
 where
   D: IntoIterator + 'static,
-  D::Item: IntoChild<M, Option<Widget>>,
-  M: ImplMarker,
+  Widget: From<D::Item>,
 {
-  fn fill_vec(self, vec: &mut Vec<Widget>) { vec.push(DynRender::new(self).into_widget()) }
-}
-
-/////////////////////////////////
-// W -> W
-impl<W> IntoEnumVariable<SelfImpl, W> for W {
-  #[inline]
-  fn into_variable(self) -> W { self }
-}
-
-// W -> State<W>
-impl<W> IntoEnumVariable<NotSelf<[(); 1]>, State<W>> for W {
-  #[inline]
-  fn into_variable(self) -> State<W> { self.into() }
-}
-
-// Stateful<W> -> State<W>
-impl<W> IntoEnumVariable<NotSelf<[(); 1]>, State<W>> for Stateful<W> {
-  #[inline]
-  fn into_variable(self) -> State<W> { self.into() }
-}
-
-// Stateful<DynWidget<W>> -> State<W>
-impl<W: 'static> IntoEnumVariable<NotSelf<[(); 1]>, State<W>> for Stateful<DynWidget<W>> {
-  #[inline]
-  fn into_variable(self) -> State<W> { self.into() }
-}
-
-// WidgetPair<W, C> --> DecorateTml<W, C2>
-impl<W, C, M, C2> IntoEnumVariable<NotSelf<[M; 2]>, DecorateTml<W, C2>> for WidgetPair<W, C>
-where
-  W: TmlFlag,
-  C: IntoEnumVariable<M, C2>,
-  M: ImplMarker,
-{
-  #[inline]
-  fn into_variable(self) -> DecorateTml<W, C2> {
-    let WidgetPair { widget: tml_flag, child } = self;
-    let decorator = Box::new(|w| w);
-    DecorateTml {
-      decorator,
-      tml_flag,
-      child: child.into_variable(),
-    }
-  }
-}
-
-// WidgetPair<W, C> --> DecorateTml<W, C2>
-impl<W, C, W2, C2, M1, M2> IntoEnumVariable<NotSelf<[(M1, M2); 2]>, DecorateTml<W2, C2>>
-  for WidgetPair<W, C>
-where
-  W: 'static,
-  W2: TmlFlag,
-  WidgetPair<W, Widget>: IntoWidget<M1>,
-  C: IntoEnumVariable<M2, DecorateTml<W2, C2>>,
-  M1: ImplMarker,
-  M2: ImplMarker,
-{
-  #[inline]
-  fn into_variable(self) -> DecorateTml<W2, C2> {
-    let Self { widget, child } = self;
-    let DecorateTml { decorator, tml_flag, child } = child.into_variable();
-    DecorateTml {
-      decorator: Box::new(move |w| WidgetPair { widget, child: decorator(w) }.into_widget()),
-      tml_flag,
-      child,
-    }
-  }
-}
-
-impl<W, C, T, C2, M> IntoEnumVariable<NotSelf<[M; 2]>, DecorateTml<T, C2>>
-  for ComposePair<State<W>, C>
-where
-  W: ComposeChild<Child = Widget> + 'static,
-  C: IntoEnumVariable<M, DecorateTml<T, C2>>,
-  M: ImplMarker,
-  T: TmlFlag,
-{
-  #[inline]
-  fn into_variable(self) -> DecorateTml<T, C2> {
-    let ComposePair { widget, child } = self;
-    let DecorateTml { decorator, tml_flag, child } = child.into_variable();
-    DecorateTml {
-      decorator: Box::new(move |w| ComposeChild::compose_child(widget, decorator(w))),
-      tml_flag,
-      child,
-    }
-  }
-}
-
-impl<W, C> IntoEnumVariable<NotSelf<[(); 8]>, ComposePair<State<W>, W::Child>>
-  for ComposePair<State<W>, C>
-where
-  W: ComposeChild,
-  C: TemplateBuilder<Target = W::Child>,
-{
-  fn into_variable(self) -> ComposePair<State<W>, W::Child> {
-    let ComposePair { widget, child } = self;
-    ComposePair { widget, child: child.build_tml() }
-  }
-}
-
-// WidgetPair<W, C> --> WidgetPair<W2, C2>
-impl<M1, M2, W, W2, C, C2> IntoEnumVariable<NotSelf<[(M1, M2); 2]>, WidgetPair<W2, C2>>
-  for WidgetPair<W, C>
-where
-  C: IntoEnumVariable<NotSelf<M1>, C2>,
-  W: IntoEnumVariable<NotSelf<M2>, W2>,
-{
-  #[inline]
-  fn into_variable(self) -> WidgetPair<W2, C2> {
-    let Self { widget, child } = self;
-    WidgetPair {
-      widget: widget.into_variable(),
-      child: child.into_variable(),
-    }
-  }
-}
-
-// WidgetPair<W, C> --> WidgetPair<W, C2>
-impl<M, W, C, C2> IntoEnumVariable<NotSelf<[M; 3]>, WidgetPair<W, C2>> for WidgetPair<W, C>
-where
-  C: IntoEnumVariable<NotSelf<M>, C2>,
-{
-  #[inline]
-  fn into_variable(self) -> WidgetPair<W, C2> {
-    let Self { widget, child } = self;
-    WidgetPair { widget, child: child.into_variable() }
-  }
-}
-
-// WidgetPair<W, C> --> WidgetPair<W2, C>
-impl<M, W, W2, C> IntoEnumVariable<NotSelf<[M; 4]>, WidgetPair<W2, C>> for WidgetPair<W, C>
-where
-  W: IntoEnumVariable<NotSelf<M>, W2>,
-{
-  #[inline]
-  fn into_variable(self) -> WidgetPair<W2, C> {
-    let Self { widget, child } = self;
-    WidgetPair {
-      widget: widget.into_variable(),
-      child,
-    }
-  }
+  fn fill_vec(self, vec: &mut Vec<Widget>) { vec.push(DynRender::multi(self).into()) }
 }

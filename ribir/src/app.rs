@@ -3,7 +3,8 @@ use crate::register_platform_app_events_handlers;
 use crate::winit_shell_wnd::{new_id, WinitShellWnd};
 use ribir_core::{prelude::*, timer::Timer, window::WindowId};
 use rxrust::scheduler::NEW_TIMER_FN;
-use std::{collections::HashMap, convert::Infallible, sync::Once};
+use std::rc::Rc;
+use std::{convert::Infallible, sync::Once};
 use winit::{
   event::{Event, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
@@ -11,7 +12,6 @@ use winit::{
 };
 
 pub struct App {
-  windows: HashMap<WindowId, Window>,
   event_loop: EventLoop<AppEvent>,
   active_wnd: Option<WindowId>,
   events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
@@ -41,25 +41,21 @@ impl App {
   /// window, then run the application.
   #[track_caller]
   pub fn run(root: Widget) {
-    Self::new_window(root, None, |_| {});
+    Self::new_window(root, None);
     App::exec()
   }
 
-  /// create a new window with the `root` widget, and you can config the new
-  /// window in the callback, then return the window id.
+  /// create a new window with the `root` widget and return the window id.
   #[track_caller]
-  pub fn new_window(root: Widget, size: Option<Size>, cb: impl FnOnce(&mut Window)) -> WindowId {
+  pub fn new_window(root: Widget, size: Option<Size>) -> WindowId {
     let app = unsafe { App::shared_mut() };
-
     let shell_wnd = WinitShellWnd::new(size, &app.event_loop);
     let wnd = Window::new(root, Box::new(shell_wnd));
     let id = wnd.id();
+    AppCtx::windows().borrow_mut().insert(id, wnd);
     if app.active_wnd.is_none() {
       app.active_wnd = Some(id);
     }
-    app.windows.insert(id, wnd);
-    cb(app.windows.get_mut(&id).unwrap());
-
     id
   }
 
@@ -72,6 +68,13 @@ impl App {
 
   pub fn events_stream() -> MutRefItemSubject<'static, AppEvent, Infallible> {
     App::shared().events_stream.clone()
+  }
+
+  pub fn active_window() -> Rc<Window> {
+    App::shared()
+      .active_wnd
+      .and_then(AppCtx::get_window)
+      .expect("application at least have one window before use.")
   }
 
   /// set the window with `id` to be the active window, and the active window.
@@ -87,12 +90,7 @@ impl App {
   /// thread until the application exit.
   #[track_caller]
   pub fn exec() {
-    let app = unsafe { App::shared_mut() };
-    app
-      .active_wnd
-      .and_then(|id| app.windows.get_mut(&id))
-      .expect("application at least have one window")
-      .draw_frame();
+    Self::active_window().draw_frame();
 
     let event_loop = &mut unsafe { App::shared_mut() }.event_loop;
 
@@ -100,54 +98,54 @@ impl App {
       *control = ControlFlow::Wait;
       match event {
         Event::WindowEvent { event, window_id } => {
-          let windows = unsafe { &mut App::shared_mut().windows };
-          if let Some(wnd) = windows.get_mut(&new_id(window_id)) {
-            match event {
-              WindowEvent::CloseRequested => {
-                windows.remove(&new_id(window_id));
-                if windows.is_empty() {
-                  *control = ControlFlow::Exit;
-                }
+          let wnd_id = new_id(window_id);
+          let wnd = AppCtx::get_window(wnd_id).expect("Window not found!");
+          match event {
+            WindowEvent::CloseRequested => {
+              AppCtx::remove_wnd(wnd_id);
+              if !AppCtx::has_wnd() {
+                *control = ControlFlow::Exit;
               }
-              WindowEvent::Resized(size) => {
-                let scale = wnd.device_pixel_ratio();
-                let size = size.to_logical(scale as f64);
-                let size = Size::new(size.width, size.height);
-                let shell_wnd = wnd
-                  .shell_wnd_mut()
-                  .as_any_mut()
-                  .downcast_mut::<WinitShellWnd>()
-                  .unwrap();
-                shell_wnd.on_resize(size);
-                wnd.on_wnd_resize_event(size);
-              }
-              event => {
-                #[allow(deprecated)]
-                wnd.processes_native_event(event);
-              }
+            }
+            WindowEvent::Resized(size) => {
+              let scale = wnd.device_pixel_ratio();
+              let size = size.to_logical(scale as f64);
+              let size = Size::new(size.width, size.height);
+              let mut shell_wnd = wnd.shell_wnd().borrow_mut();
+              let shell_wnd = shell_wnd
+                .as_any_mut()
+                .downcast_mut::<WinitShellWnd>()
+                .unwrap();
+              shell_wnd.on_resize(size);
+              wnd.on_wnd_resize_event(size);
+            }
+            event => {
+              #[allow(deprecated)]
+              wnd.processes_native_event(event);
             }
           }
         }
         Event::MainEventsCleared => {
           AppCtx::run_until_stalled();
-          App::shared().windows.iter().for_each(|(_, wnd)| {
+          AppCtx::windows().borrow().values().for_each(|wnd| {
             if wnd.need_draw() {
-              let wnd = wnd
-                .shell_wnd()
-                .as_any()
-                .downcast_ref::<WinitShellWnd>()
-                .unwrap();
-              wnd.winit_wnd.request_redraw();
+              let wnd = wnd.shell_wnd().borrow();
+              let shell = wnd.as_any().downcast_ref::<WinitShellWnd>().unwrap();
+              shell.winit_wnd.request_redraw();
             }
           })
         }
         Event::RedrawRequested(id) => {
-          if let Some(wnd) = unsafe { App::shared_mut() }.windows.get_mut(&new_id(id)) {
-            wnd.draw_frame();
+          if let Some(wnd) = AppCtx::get_window(new_id(id)) {
+            wnd.draw_frame()
           }
         }
         Event::RedrawEventsCleared => {
-          if App::shared().windows.iter().any(|(_, wnd)| wnd.need_draw()) {
+          let need_draw = AppCtx::windows()
+            .borrow()
+            .values()
+            .any(|wnd| wnd.need_draw());
+          if need_draw {
             *control = ControlFlow::Poll;
           } else if let Some(t) = Timer::recently_timeout() {
             *control = ControlFlow::WaitUntil(t);
@@ -191,7 +189,6 @@ impl App {
       let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
       register_platform_app_events_handlers();
       APP = Some(App {
-        windows: <_>::default(),
         event_loop,
         events_stream: <_>::default(),
         active_wnd: None,

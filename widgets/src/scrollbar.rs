@@ -37,6 +37,7 @@ impl ComposeDecorator for HScrollBarThumbDecorator {
       states { this: this.into_readonly() }
       DynWidget { left_anchor: this.offset, dyns: host }
     }
+    .into()
   }
 }
 
@@ -58,6 +59,7 @@ impl ComposeDecorator for VScrollBarThumbDecorator {
         dyns: host
       }
     }
+    .into()
   }
 }
 
@@ -82,17 +84,18 @@ impl ComposeChild for HScrollBar {
       finally ctx => {
         let_watch!(scrolling.scroll_pos.x)
           .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
           .subscribe(move |v| this.offset = v);
         let_watch!(this.offset)
           .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
           .subscribe(move |v| {
             let y = scrolling.scroll_pos.y;
             scrolling.jump_to(Point::new(v, y));
           });
       }
     }
+    .into()
   }
 }
 
@@ -126,17 +129,18 @@ impl ComposeChild for VScrollBar {
       finally ctx => {
         let_watch!(scrolling.scroll_pos.y)
           .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
           .subscribe(move |v| this.offset = v);
         let_watch!(this.offset)
           .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
           .subscribe(move |v| {
             let x = scrolling.scroll_pos.x;
             scrolling.jump_to(Point::new(x, v));
           });
       }
     }
+    .into()
   }
 }
 /// A control widget that enables the user to access horizontal parts child that
@@ -177,16 +181,17 @@ impl ComposeChild for BothScrollbar {
       finally ctx => {
         let_watch!(scrolling.scroll_pos)
           .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
           .subscribe(move |v| this.offset = v);
         let_watch!(this.offset)
           .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.wnd_ctx().frame_scheduler())
+          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
           .subscribe(move |v| {
             scrolling.jump_to(v);
           });
       }
     }
+    .into()
   }
 }
 
@@ -238,6 +243,7 @@ impl Compose for HRawScrollbar {
         }
       }
     }
+    .into()
   }
 }
 
@@ -289,6 +295,7 @@ impl Compose for VRawScrollbar {
         }
       }
     }
+    .into()
   }
 }
 
@@ -333,6 +340,7 @@ mod test {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(
     content_expand_so_all_view_can_scroll,

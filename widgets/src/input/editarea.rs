@@ -72,8 +72,9 @@ impl ComposeChild for TextEditorArea {
                 focused: container.has_focus(),
                 height: 0.,
                 on_performed_layout: move |ctx| {
-                  let size = ctx.layout_info().and_then(|info| info.size).unwrap();
-                  ctx.set_ime_pos(Point::new(0., size.height));
+                  let height = ctx.box_size().unwrap().height;
+                  let pos = ctx.map_to_global(Point::new(0., height));
+                  ctx.window().set_ime_pos(pos);
                 },
               }
             }
@@ -82,7 +83,7 @@ impl ComposeChild for TextEditorArea {
       }
     }
     finally ctx => {
-      let scheduler = ctx.wnd_ctx().frame_scheduler();
+      let scheduler = ctx.window().frame_scheduler();
 
       let_watch!(Point::new(caret.left_anchor.abs_value(1.), caret.top_anchor.abs_value(1.)))
         .scan_initial((Point::zero(), Point::zero()), |pair, v| (pair.1, v))
@@ -99,7 +100,7 @@ impl ComposeChild for TextEditorArea {
           }
         });
 
-      let tick_of_layout_ready = ctx.wnd_ctx()
+      let tick_of_layout_ready = ctx.window()
         .frame_tick_stream()
         .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
 
@@ -114,6 +115,7 @@ impl ComposeChild for TextEditorArea {
         });
       }
     }
+    .into()
   }
 }
 

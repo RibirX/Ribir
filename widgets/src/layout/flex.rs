@@ -89,10 +89,7 @@ impl Render for Flex {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for Flex {
-  impl_query_self_only!();
-}
-
+impl_query_self_only!(Flex);
 #[derive(Debug, Clone, Copy, Default)]
 struct FlexSize {
   main: f32,
@@ -190,7 +187,7 @@ impl FlexLayouter {
       let size = FlexSize::from_size(size, dir);
 
       let mut flex = None;
-      l.query_widget_type(|expanded: &Expanded| flex = Some(expanded.flex));
+      l.query_type(|expanded: &Expanded| flex = Some(expanded.flex));
 
       // flex-item need use empty space to resize after all fixed widget performed
       // layout.
@@ -371,11 +368,10 @@ mod tests {
   fn horizontal_line() -> Widget {
     widget! {
       Flex {
-        DynWidget {
-          dyns: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
-        }
+        Multi::new((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))
       }
     }
+    .into()
   }
   widget_layout_test!(horizontal_line, width == 100., height == 20.,);
 
@@ -383,11 +379,10 @@ mod tests {
     widget! {
       Flex {
         direction: Direction::Vertical,
-        DynWidget  {
-         dyns: (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
-        }
+        Multi::new((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))
       }
     }
+    .into()
   }
   widget_layout_test!(vertical_line, width == 10., height == 200.,);
 
@@ -396,11 +391,10 @@ mod tests {
     widget! {
       Flex {
         wrap: true,
-        DynWidget {
-          dyns: (0..3).map(|_| SizedBox { size })
-        }
+        Multi::new((0..3).map(|_| SizedBox { size }))
       }
     }
+    .into()
   }
   widget_layout_test!(
     row_wrap,
@@ -417,11 +411,10 @@ mod tests {
       Flex {
         wrap: true,
         reverse: true,
-        DynWidget {
-          dyns: (0..3).map(|_| SizedBox { size })
-        }
+        Multi::new((0..3).map(|_| SizedBox { size }))
       }
     }
+    .into()
   }
   widget_layout_test!(
     reverse_row_wrap,
@@ -441,6 +434,7 @@ mod tests {
         SizedBox { size: Size::new(30., 20.) }
       }
     }
+    .into()
   }
   widget_layout_test!(
     main_axis_gap,
@@ -460,6 +454,7 @@ mod tests {
         SizedBox { size: Size::new(30., 20.) }
       }
     }
+    .into()
   }
   widget_layout_test!(
     main_axis_reverse_gap,
@@ -486,6 +481,7 @@ mod tests {
         SizedBox { size: Size::new(30., 20.) }
       }
     }
+    .into()
   }
   widget_layout_test!(
     main_axis_expand,
@@ -504,11 +500,10 @@ mod tests {
         wrap: true,
         cross_axis_gap: 10.,
         align_items: Align::Center,
-        DynWidget {
-          dyns: (0..3).map(|_| SizedBox { size })
-        }
+        Multi::new((0..3).map(|_| SizedBox { size }))
       }
     }
+    .into()
   }
   widget_layout_test!(
     cross_axis_gap,
@@ -528,6 +523,7 @@ mod tests {
         SizedBox { size: Size::new(100., 40.) }
       }
     }
+    .into()
   }
 
   fn start_cross_align() -> Widget { cross_align(Align::Start) }
@@ -581,6 +577,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
 
   fn start_main_align() -> Widget { main_align(JustifyContent::Start) }
@@ -662,6 +659,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(
     flex_expand,

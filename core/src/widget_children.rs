@@ -37,12 +37,22 @@ pub use compose_child_impl::*;
 pub use multi_child_impl::*;
 pub use single_child_impl::*;
 pub mod child_convert;
-pub use child_convert::{IntoChild, IntoEnumVariable};
+pub use child_convert::{ChildFrom, FromAnother};
 /// Trait to tell Ribir a widget can have one child.
 pub trait SingleChild {}
 
-/// Trait to tell Ribir a widget can have multi child.
+/// A render widget that has one child.
+pub trait RenderSingleChild: Render + SingleChild {
+  fn into_render(self: Box<Self>) -> Box<dyn Render>;
+}
+
+/// Trait to tell Ribir a widget that has multi children.
 pub trait MultiChild {}
+
+/// A render widget that has multi children.
+pub trait RenderMultiChild: Render + MultiChild {
+  fn into_render(self: Box<Self>) -> Box<dyn Render>;
+}
 
 /// Trait mark widget can have one child and also have compose logic for widget
 /// and its child.
@@ -51,14 +61,23 @@ pub trait ComposeChild: Sized {
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget;
 }
 
-/// A alias of `WidgetPair<W, Widget>`, means `Widget` is the child of the
-/// generic type.
+/// A alias of `WidgetPair<W, Widget>`, means `Widget` is the
+/// child of the generic type.
 pub type WidgetOf<W> = WidgetPair<W, Widget>;
+
+impl<T: Render + SingleChild + 'static> RenderSingleChild for T {
+  fn into_render(self: Box<Self>) -> Box<dyn Render> { Box::new(*self) }
+}
+
+impl<T: Render + MultiChild + 'static> RenderMultiChild for T {
+  fn into_render(self: Box<Self>) -> Box<dyn Render> { Box::new(*self) }
+}
 
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::test_helper::*;
+  use crate::widget::WidgetBuilder;
   use ribir_dev_helper::*;
   use std::{cell::RefCell, rc::Rc};
 
@@ -190,7 +209,7 @@ mod tests {
       states { size: size }
       DynWidget {
         dyns: widget::then(size.area() > 0., || MockBox { size: Size::zero() }),
-        DynWidget { dyns: Void.into_widget() }
+        widget::from(Void)
       }
     };
   }
@@ -225,11 +244,13 @@ mod tests {
     struct X;
     impl ComposeChild for X {
       type Child = WidgetOf<MockBox>;
-      fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+      fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
     }
 
-    let child = MockBox { size: ZERO_SIZE }.with_child(Void.into_widget());
-    X.with_child(child);
+    let _ = FnWidget::new(|ctx| {
+      let child = MockBox { size: ZERO_SIZE }.with_child(Void, ctx);
+      X.with_child(child, ctx).build(ctx)
+    });
   }
 
   fn dyns_compose_child() -> Widget {
@@ -238,7 +259,7 @@ mod tests {
 
     impl ComposeChild for X {
       type Child = MockBox;
-      fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into_widget() }
+      fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into() }
     }
 
     let dyns = Stateful::new(DynWidget { dyns: Some(X) });
@@ -255,7 +276,7 @@ mod tests {
 
     impl ComposeChild for X {
       type Child = State<MockBox>;
-      fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into_widget() }
+      fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into() }
     }
 
     let trigger = Stateful::new(true);
@@ -272,11 +293,12 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(compose_dyns_child, size == COMPOSE_DYNS_CHILD_SIZE,);
 
   const FIX_OPTION_TEMPLATE_EXPECT_SIZE: Size = Size::new(100., 200.);
-  fn fix_option_template() -> Widget {
+  fn fix_option_template() -> impl Into<Widget> {
     struct Field(String);
 
     #[derive(Template, Default)]
@@ -289,13 +311,11 @@ mod tests {
     impl ComposeChild for Host {
       type Child = Option<ConfigTml>;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
-        widget! { MockBox { size: FIX_OPTION_TEMPLATE_EXPECT_SIZE } }
+        widget! { MockBox { size: FIX_OPTION_TEMPLATE_EXPECT_SIZE } }.into()
       }
     }
 
-    widget! {
-      Host { Field("test".into()) }
-    }
+    widget! { Host { Field("test".into()) }}
   }
   widget_layout_test!(
     fix_option_template,
@@ -304,17 +324,19 @@ mod tests {
 
   #[test]
   fn compose_dyn_multi_child() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     struct A;
 
     impl ComposeChild for A {
       type Child = Vec<Widget>;
 
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
-        MockMulti.with_child(child).into_widget()
+        FnWidget::new(move |ctx| MockMulti.with_child(Multi::new(child), ctx).build(ctx)).into()
       }
     }
 
-    let child = DynWidget { dyns: Some([Void]) };
+    let child = DynWidget { dyns: Some(Multi::new([Void])) };
     let child = Stateful::new(child);
     let cnt = Rc::new(RefCell::new(0));
     let c_cnt = cnt.clone();
@@ -322,7 +344,7 @@ mod tests {
       .modifies()
       .subscribe(move |_| *c_cnt.borrow_mut() += 1);
 
-    let _ = TestWindow::new(A.with_child(child));
+    let _ = TestWindow::new(FnWidget::new(|ctx| A.with_child(child, ctx).build(ctx)));
     assert_eq!(*cnt.borrow(), 0);
   }
 
@@ -331,10 +353,12 @@ mod tests {
     struct M;
     impl ComposeChild for M {
       type Child = Vec<Widget>;
-      fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+      fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
     }
 
-    let c = Stateful::new(DynWidget { dyns: Some(Some(Void)) });
-    let _ = M.with_child(c).into_widget();
+    let _ = FnWidget::new(|ctx| {
+      let c = Stateful::new(DynWidget { dyns: Some(Some(Void)) });
+      M.with_child(c, ctx).build(ctx)
+    });
   }
 }

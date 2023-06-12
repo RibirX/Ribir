@@ -33,7 +33,7 @@ impl Render for Padding {
       // expanded with padding. padding.
       let mut grandson_layouter = child_layouter.into_first_child_layouter();
       while let Some(mut l) = grandson_layouter {
-        if let Some(pos) = l.layout_pos() {
+        if let Some(pos) = l.box_pos() {
           let pos = pos + Vector::new(self.padding.left, self.padding.top);
           l.update_position(pos);
         }
@@ -52,9 +52,7 @@ impl Render for Padding {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for Padding {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Padding);
 
 impl Padding {
   #[inline]
@@ -76,6 +74,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(
     smoke,

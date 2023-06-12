@@ -27,9 +27,7 @@ impl Render for TransformBox {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for TransformBox {
-  impl_query_self_only!();
-}
+impl_query_self_only!(TransformBox);
 
 impl TransformBox {
   #[inline]
@@ -51,6 +49,7 @@ mod tests {
         SizedBox { size: Size::new(100., 100.) }
       }
     }
+    .into()
   }
   widget_layout_test!(smoke, width == 200., height == 200.,);
 }

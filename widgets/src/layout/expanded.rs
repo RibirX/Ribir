@@ -1,4 +1,4 @@
-use ribir_core::{data_widget::compose_child_as_data_widget, impl_query_self_only, prelude::*};
+use ribir_core::{impl_query_self_only, prelude::*};
 
 use super::ConstrainedBox;
 
@@ -25,13 +25,11 @@ impl ComposeChild for Expanded {
         }
       }
     };
-    compose_child_as_data_widget(w, this)
+    DataWidget::attach_state(w.into(), this)
   }
 }
 
-impl Query for Expanded {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Expanded);
 
 #[cfg(test)]
 mod tests {
@@ -55,6 +53,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(
     expand_child_size_zero,
@@ -79,6 +78,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(
     one_line_expanded,
@@ -113,6 +113,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(
     wrap_expanded,

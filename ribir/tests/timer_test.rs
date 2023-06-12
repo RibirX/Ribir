@@ -71,7 +71,7 @@ mod test_single_thread {
   }
 
   pub fn test_double_tap() {
-    let (mut wnd, count) = env(2);
+    let (wnd, count) = env(2);
 
     let mut local_pool = LocalPool::new();
     let device_id = unsafe { DeviceId::dummy() };
@@ -94,12 +94,13 @@ mod test_single_thread {
           button: MouseButton::Left,
           modifiers: ModifiersState::default(),
         });
+        wnd.emit_events();
       });
 
     run_until(&mut local_pool, || *is_complete2.borrow());
     assert_eq!(*count.borrow(), 2);
 
-    let (mut wnd, count) = env(2);
+    let (wnd, count) = env(2);
     let is_complete = Rc::new(RefCell::new(false));
     let is_complete2 = is_complete.clone();
     observable::interval(Duration::from_millis(251), local_pool.spawner())
@@ -119,6 +120,7 @@ mod test_single_thread {
           button: MouseButton::Left,
           modifiers: ModifiersState::default(),
         });
+        wnd.emit_events();
       });
 
     run_until(&mut local_pool, || *is_complete2.borrow());
@@ -126,7 +128,7 @@ mod test_single_thread {
   }
 
   pub fn test_tripe_tap() {
-    let (mut wnd, count) = env(3);
+    let (wnd, count) = env(3);
 
     let mut local_pool = LocalPool::new();
     let device_id = unsafe { DeviceId::dummy() };
@@ -149,6 +151,7 @@ mod test_single_thread {
           button: MouseButton::Left,
           modifiers: ModifiersState::default(),
         });
+        wnd.emit_events();
       });
 
     run_until(&mut local_pool, || *is_complete2.borrow());

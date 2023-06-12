@@ -65,9 +65,7 @@ impl Render for Stack {
   }
 }
 
-impl Query for Stack {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Stack);
 
 #[cfg(test)]
 mod tests {
@@ -86,6 +84,7 @@ mod tests {
         SizedBox { size: five}
       }
     }
+    .into()
   }
 
   widget_layout_test!(smoke, size == FIVE,);

@@ -25,5 +25,6 @@ impl ComposeChild for PointerPressed {
         on_pointer_up: move |_| this.pointer_pressed = false,
       }
     }
+    .into()
   }
 }
