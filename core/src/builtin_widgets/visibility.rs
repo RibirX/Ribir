@@ -20,6 +20,7 @@ impl ComposeChild for Visibility {
         }
       }
     }
+    .into()
   }
 }
 
@@ -53,9 +54,7 @@ impl Render for VisibilityRender {
   }
 }
 
-impl Query for VisibilityRender {
-  impl_query_self_only!();
-}
+impl_query_self_only!(VisibilityRender);
 
 impl Visibility {
   #[inline]

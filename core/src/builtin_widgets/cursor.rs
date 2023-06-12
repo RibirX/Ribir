@@ -15,7 +15,7 @@ impl ComposeChild for Cursor {
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     widget! {
       states {
-        save_cursor: Stateful::new(None),
+        save_cursor: Stateful::new(CursorIcon::Default),
         this: this.into_readonly()
       }
       DynWidget {
@@ -24,17 +24,17 @@ impl ComposeChild for Cursor {
           if e.point_type == PointerType::Mouse
             && e.mouse_buttons() == MouseButtons::empty()
           {
-            let mut ctx = e.context();
-            *save_cursor = ctx.stage_cursor_icon();
-            ctx.set_cursor_icon(this.cursor.get());
+            let wnd = e.window();
+            *save_cursor = wnd.get_cursor();
+            wnd.set_cursor(this.cursor.get());
           }
         },
         on_pointer_leave: move |e: &mut PointerEvent| {
-          let cursor = save_cursor.unwrap_or_default();
-          e.context().set_cursor_icon(cursor);
+          e.window().set_cursor(*save_cursor);
         }
       }
     }
+    .into()
   }
 }
 
@@ -117,67 +117,64 @@ mod tests {
     let mut wnd = TestWindow::new(row_tree);
 
     wnd.draw_frame();
-    let wnd = &mut *wnd;
-    let tree = &mut wnd.widget_tree;
     let device_id = unsafe { DeviceId::dummy() };
-    let dispatcher = &mut wnd.dispatcher;
-    dispatcher.dispatch(
+    wnd.dispatcher.borrow_mut().dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (1f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      tree,
       1.,
     );
-    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Help));
+    wnd.emit_events();
+    assert_eq!(wnd.get_cursor(), CursorIcon::Help);
 
     let device_id = unsafe { DeviceId::dummy() };
-    dispatcher.dispatch(
+    wnd.dispatcher.borrow_mut().dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (101f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      tree,
       1.,
     );
-    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
+    wnd.emit_events();
+    assert_eq!(wnd.get_cursor(), CursorIcon::Hand);
 
     let device_id = unsafe { DeviceId::dummy() };
-    dispatcher.dispatch(
+    wnd.dispatcher.borrow_mut().dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (201f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      tree,
       1.,
     );
-    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::AllScroll));
+    wnd.emit_events();
+    assert_eq!(wnd.get_cursor(), CursorIcon::AllScroll);
 
     let device_id = unsafe { DeviceId::dummy() };
-    dispatcher.dispatch(
+    wnd.dispatcher.borrow_mut().dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (101f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      tree,
       1.,
     );
-    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Hand));
+    wnd.emit_events();
+    assert_eq!(wnd.get_cursor(), CursorIcon::Hand);
 
     let device_id = unsafe { DeviceId::dummy() };
-    dispatcher.dispatch(
+    wnd.dispatcher.borrow_mut().dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (1f64, 1.).into(),
         modifiers: ModifiersState::default(),
       },
-      tree,
       1.,
     );
-    assert_eq!(dispatcher.take_cursor_icon(), Some(CursorIcon::Help));
+    wnd.emit_events();
+    assert_eq!(wnd.get_cursor(), CursorIcon::Help);
   }
 }

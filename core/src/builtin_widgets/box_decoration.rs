@@ -59,9 +59,7 @@ impl Render for BoxDecoration {
   }
 }
 
-impl Query for BoxDecoration {
-  impl_query_self_only!();
-}
+impl_query_self_only!(BoxDecoration);
 
 pub trait IntoBackground<M> {
   fn into_background(self) -> Option<Brush>;
@@ -250,6 +248,7 @@ mod tests {
         },
       }
     }
+    .into()
   }
   widget_layout_test!(
     with_border,

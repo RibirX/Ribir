@@ -87,6 +87,4 @@ impl Render for Divider {
   }
 }
 
-impl Query for Divider {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Divider);

@@ -26,5 +26,6 @@ impl ComposeChild for Link {
         dyns: child,
       }
     }
+    .into()
   }
 }

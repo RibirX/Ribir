@@ -1,31 +1,164 @@
 #[macro_export]
+macro_rules! impl_all_event {
+  ($name: ident, $($on_doc: literal, $event_ty: ident),+) => {
+    paste::paste! {
+      #[doc="All `" $name:snake "` related events"]
+      pub enum [<All $name>]<'a> {
+        $(
+          #[doc = $on_doc]
+          $event_ty([<$name Event>]<'a>),
+        )+
+      }
+
+      impl<'a> std::ops::Deref for [<All $name>]<'a> {
+        type Target = [<$name Event>]<'a>;
+        fn deref(&self) -> &Self::Target {
+          match self {
+            $([<All $name>]::$event_ty(e)) |+ => e
+          }
+        }
+      }
+
+      impl<'a> std::ops::DerefMut for [<All $name>]<'a> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+          match self {
+            $([<All $name>]::$event_ty(e)) |+ => e
+          }
+        }
+      }
+
+      impl<'a> [<All $name>]<'a> {
+        pub fn into_inner(self) -> [<$name Event>]<'a> {
+          match self {
+            $([<All $name>]::$event_ty(e)) |+ => e
+          }
+        }
+      }
+    }
+  };
+}
+
+#[macro_export]
 macro_rules! impl_listener {
-  ($listener:ident, $declarer: ident, $field: ident, $event_ty: ident, $stream_name: ident) => {
-    impl $declarer {
-      pub fn $field(mut self, handler: impl for<'r> FnMut(&'r mut $event_ty) + 'static) -> Self {
-        assert!(self.$field.is_none());
-        let subject = MutRefItemSubject::default();
-        subject.clone().subscribe(handler);
-        self.$field = Some(subject);
-        self
+  ($doc: literal, $name: ident, $event_ty: ident) => {
+    paste::paste! {
+      #[doc= $doc]
+      #[derive(Declare)]
+      pub struct [<$name Listener>]{
+        #[declare(skip)]
+        [<$name:snake _subject>]: [<$name Subject>]
+      }
+
+      impl [<$name ListenerDeclarer>] {
+        fn subject(&mut self) -> [<$name Subject>] {
+          self
+            .[<$name:snake _subject>]
+            .get_or_insert_with([<$name Subject>]::default)
+            .clone()
+        }
+      }
+
+      impl [<$name Listener>] {
+        /// Convert a observable stream of this event.
+        pub fn [<$name:snake _stream>](&self) -> [<$name Subject>] {
+          self.[<$name:snake _subject>].clone()
+        }
+      }
+
+      impl EventListener for [<$name Listener>] {
+        type Event<'a> = $event_ty<'a>;
+        #[inline]
+        fn dispatch(&self, event: &mut Self::Event<'_>) {
+          self.[<$name:snake _subject>].clone().next(event)
+        }
+      }
+
+      impl_query_self_only!([<$name Listener>]);
+    }
+  };
+}
+
+#[macro_export]
+macro_rules! impl_multi_event_listener {
+  (
+    $doc: literal, $name: ident,
+    $($on_doc: literal, $event_ty: ident),+
+  ) => {
+    paste::paste! {
+      impl_all_event!($name, $($on_doc, $event_ty),+);
+      impl_listener!($doc, $name, [<All $name>]);
+
+      impl [<$name ListenerDeclarer>] {
+        $(
+          #[doc = "Sets up a function that will be called \
+            whenever the `" $event_ty "` is delivered"]
+          pub fn [<on_ $event_ty:snake>](
+            mut self,
+            handler: impl for<'r> FnMut(&'r mut [<$name Event>]<'_>) + 'static
+          ) -> Self {
+            self
+              .subject()
+              .filter_map(
+                (|e| match e {
+                  [<All $name>]::$event_ty(e) => Some(e),
+                  _ => None,
+                }) as for<'a, 'b> fn(&'a mut [<All $name>]::<'b>)
+                  -> Option<&'a mut [<$name Event>]<'b>>,
+              )
+              .subscribe(handler);
+            self
+          }
+        )+
       }
     }
+  };
+}
 
-    impl Query for $listener {
-      impl_query_self_only!();
-    }
+#[macro_export]
+macro_rules! impl_single_event_listener {
+  ($doc: literal, $name: ident) => {
+    paste::paste! {
+      impl_listener!($doc, $name);
 
-    impl $listener {
-      /// Convert a observable stream of this event.
-      pub fn $stream_name(&self) -> MutRefItemSubject<'static, $event_ty, Infallible> {
-        self.$field.clone()
+      impl [<$name ListenerDeclarer>] {
+        #[doc = "Sets up a function that will be called whenever the `" [<$name Event>] "` is delivered"]
+        pub fn [<on_ $name:snake>](
+          self,
+          handler: impl for<'r> FnMut(&'r mut [<$name Event>]<'_>) + 'static
+        ) -> Self {
+          self
+            .subject()
+            .subscribe(handler);
+          self
+        }
       }
     }
+  };
+}
 
-    impl EventListener for $listener {
-      type Event = $event_ty;
+#[macro_export]
+macro_rules! impl_common_event_deref {
+  ($event_name: ident) => {
+    impl<'a> std::ops::Deref for $event_name<'a> {
+      type Target = CommonEvent<'a>;
+
       #[inline]
-      fn dispatch(&self, event: &mut $event_ty) { self.$field.clone().next(event) }
+      fn deref(&self) -> &Self::Target { &self.common }
+    }
+
+    impl<'a> std::ops::DerefMut for $event_name<'a> {
+      #[inline]
+      fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
+    }
+
+    impl<'a> std::borrow::Borrow<CommonEvent<'a>> for $event_name<'a> {
+      #[inline]
+      fn borrow(&self) -> &CommonEvent<'a> { &self.common }
+    }
+
+    impl<'a> std::borrow::BorrowMut<CommonEvent<'a>> for $event_name<'a> {
+      #[inline]
+      fn borrow_mut(&mut self) -> &mut CommonEvent<'a> { &mut self.common }
     }
   };
 }
@@ -37,7 +170,7 @@ macro_rules! impl_compose_child_for_listener {
       type Child = Widget;
       #[inline]
       fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-        compose_child_as_data_widget(child, this)
+        DataWidget::attach_state(child, this)
       }
     }
   };
@@ -49,25 +182,9 @@ macro_rules! impl_compose_child_with_focus_for_listener {
     impl ComposeChild for $listener {
       type Child = Widget;
       fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-        let widget = dynamic_compose_focus_node(child);
-        compose_child_as_data_widget(widget, this)
+        let child = dynamic_compose_focus_node(child);
+        DataWidget::attach_state(child, this)
       }
     }
-  };
-}
-
-#[macro_export]
-macro_rules! impl_listener_and_compose_child {
-  ($listener:ident, $declarer: ident, $field: ident, $event_ty: ident, $stream_name: ident) => {
-    impl_listener!($listener, $declarer, $field, $event_ty, $stream_name);
-    impl_compose_child_for_listener!($listener);
-  };
-}
-
-#[macro_export]
-macro_rules! impl_listener_and_compose_child_with_focus {
-  ($listener:ident, $declarer: ident, $field: ident, $event_ty: ident, $stream_name: ident) => {
-    impl_listener!($listener, $declarer, $field, $event_ty, $stream_name);
-    impl_compose_child_with_focus_for_listener!($listener);
   };
 }

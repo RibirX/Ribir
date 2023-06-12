@@ -2,9 +2,9 @@ use crate::layout::SizedBox;
 use ribir_core::prelude::*;
 
 /// Widget that let child paint as a icon with special size. Unlike icon in
-/// classic frameworks, it's not draw anything and not require you to provide
-/// image or font fot it to draw, it just center align and fit size of its
-/// child. So you can declare any widget as its child to display as a icon.
+/// classic frameworks, it's not draw anything and not require you to
+/// provide image or font fot it to draw, it just center align and fit size of
+/// its child. So you can declare any widget as its child to display as a icon.
 #[derive(Declare, Default, Clone)]
 pub struct Icon {
   #[declare(default = IconSize::of(ctx).small)]
@@ -26,5 +26,6 @@ impl ComposeChild for Icon {
         }
       }
     }
+    .into()
   }
 }

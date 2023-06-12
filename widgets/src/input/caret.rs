@@ -42,5 +42,6 @@ impl Compose for Caret {
           });
       }
     }
+    .into()
   }
 }

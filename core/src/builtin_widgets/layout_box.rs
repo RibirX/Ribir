@@ -23,6 +23,7 @@ impl ComposeChild for LayoutBox {
         }
       }
     }
+    .into()
   }
 }
 
@@ -72,6 +73,7 @@ mod tests {
         MockBox { size: layout_box.rect.size }
       }
     }
+    .into()
   }
   widget_layout_test!(
     smoke,

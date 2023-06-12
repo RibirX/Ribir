@@ -110,7 +110,7 @@ fn expression_for_children() {
       on_tap: move |_| sized_box.size = size_five,
       SizedBox { id: sized_box, size: size_one }
       // todo: how should we hint user, he/she need wrap inner widget of `DynWidget` to track named widget change.
-      DynWidget { dyns: (0..3).map(move |_| widget!{ SizedBox { size: sized_box.size } }) }
+      Multi::new((0..3).map(move |_| widget!{ SizedBox { size: sized_box.size } }))
       DynWidget {
          dyns: (sized_box.size.area() > 2.).then(|| widget!{ SizedBox { size: sized_box.size } })
       }
@@ -147,9 +147,7 @@ fn embed_widget_ref_outside() {
         size: Size::new(1., 1.),
         on_tap: move |_| first.size = Size::new(2., 2.)
       }
-      DynWidget {
-        dyns: (0..3).map(move |_| widget!{ SizedBox { size: first.size } } )
-      }
+      Multi::new((0..3).map(move |_| widget!{ SizedBox { size: first.size } }))
     }
   };
 
@@ -209,6 +207,7 @@ fn local_var_not_bind() -> Widget {
       }
     }
   }
+  .into()
 }
 widget_layout_test!(
   local_var_not_bind,
@@ -427,6 +426,7 @@ fn fix_local_assign_tuple() -> Widget {
       }
     }
   }
+  .into()
 }
 widget_layout_test!(
   fix_local_assign_tuple,
@@ -487,7 +487,7 @@ fn embed_shadow_states() {
 
   let _ = widget! {
     // variable `_a` here
-    widget::from(|_a: &BuildCtx| widget! {
+    FnWidget::new(|_: &BuildCtx| widget! {
       // states shadow `a`
       states { _a: Stateful::new(ZERO_SIZE) }
       // `_a` should be the state `_a`

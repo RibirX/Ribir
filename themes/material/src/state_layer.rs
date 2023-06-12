@@ -31,6 +31,7 @@ impl Compose for StateLayer {
         brush: this.role.calc_color(this.color),
       }
     )
+    .into()
   }
 }
 
@@ -64,6 +65,7 @@ impl ComposeChild for InteractiveLayer {
         }
       }
     }
+    .into()
   }
 }
 

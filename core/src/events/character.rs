@@ -1,66 +1,41 @@
+use crate::{
+  impl_all_event, impl_common_event_deref, impl_compose_child_with_focus_for_listener,
+  impl_listener, impl_multi_event_listener, impl_query_self_only, prelude::*,
+};
+use rxrust::{
+  prelude::*,
+  rc::{MutRc, RcDeref, RcDerefMut},
+};
+use smallvec::SmallVec;
 use std::convert::Infallible;
 
-use crate::{
-  data_widget::compose_child_as_data_widget, impl_compose_child_with_focus_for_listener,
-  impl_listener, impl_listener_and_compose_child_with_focus, impl_query_self_only, prelude::*,
-};
-
-/// An attribute that sends a single Unicode codepoint. The character can be
-/// pushed to the end of a string.
-#[derive(Declare)]
-pub struct CharsListener {
-  #[declare(builtin, convert=custom)]
-  on_chars: MutRefItemSubject<'static, CharsEvent, Infallible>,
-}
-
 #[derive(Debug)]
-pub struct CharsEvent {
+pub struct CharsEvent<'a> {
   pub chars: String,
-  pub common: EventCommon,
+  pub common: CommonEvent<'a>,
 }
 
-impl_listener_and_compose_child_with_focus!(
-  CharsListener,
-  CharsListenerDeclarer,
-  on_chars,
-  CharsEvent,
-  chars_stream
-);
+impl_event_subject!(Chars, event_name = AllChars);
 
-#[derive(Declare)]
-pub struct CharsCaptureListener {
-  #[declare(builtin, convert=custom)]
-  on_chars_capture: MutRefItemSubject<'static, CharsEvent, Infallible>,
+impl_multi_event_listener! {
+  "The listener use to fire and listen chars events.",
+  Chars,
+  "", Chars,
+  "", CharsCapture
 }
 
-impl_listener_and_compose_child_with_focus!(
-  CharsCaptureListener,
-  CharsCaptureListenerDeclarer,
-  on_chars_capture,
-  CharsEvent,
-  chars_stream_capture
-);
+impl_compose_child_with_focus_for_listener!(CharsListener);
 
-impl std::borrow::Borrow<EventCommon> for CharsEvent {
+impl_common_event_deref!(CharsEvent);
+
+impl<'a> CharsEvent<'a> {
   #[inline]
-  fn borrow(&self) -> &EventCommon { &self.common }
-}
-
-impl std::borrow::BorrowMut<EventCommon> for CharsEvent {
-  #[inline]
-  fn borrow_mut(&mut self) -> &mut EventCommon { &mut self.common }
-}
-
-impl std::ops::Deref for CharsEvent {
-  type Target = EventCommon;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.common }
-}
-
-impl std::ops::DerefMut for CharsEvent {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
+  pub fn new(chars: String, id: WidgetId, wnd: &'a Window) -> Self {
+    Self {
+      chars,
+      common: CommonEvent::new(id, wnd),
+    }
+  }
 }
 
 #[cfg(test)]

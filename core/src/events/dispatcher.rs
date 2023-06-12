@@ -1,28 +1,32 @@
-use std::{cell::RefCell, rc::Rc};
-
-use crate::{prelude::*, widget_tree::WidgetTree};
+use crate::{prelude::*, widget_tree::WidgetTree, window::DelayEvent};
 use ribir_text::PIXELS_PER_EM;
+use std::rc::{Rc, Weak};
 use winit::event::{DeviceId, ElementState, Ime, MouseButton, MouseScrollDelta, WindowEvent};
 
-use super::focus_mgr::FocusManager;
-
 pub(crate) struct Dispatcher {
-  pub(crate) focus_mgr: Rc<RefCell<FocusManager>>,
-  pub(crate) focus_widgets: Vec<WidgetId>,
+  wnd: Weak<Window>,
   pub(crate) info: DispatchInfo,
   pub(crate) entered_widgets: Vec<WidgetId>,
   pub(crate) pointer_down_uid: Option<WidgetId>,
 }
 
 impl Dispatcher {
-  pub fn new(focus_mgr: Rc<RefCell<FocusManager>>) -> Self {
+  pub fn new() -> Self {
     Self {
-      focus_mgr,
-      focus_widgets: vec![],
+      wnd: Weak::new(),
       info: <_>::default(),
       entered_widgets: vec![],
       pointer_down_uid: None,
     }
+  }
+
+  pub fn init(&mut self, wnd: Weak<Window>) { self.wnd = wnd; }
+
+  pub fn window(&self) -> Rc<Window> {
+    self
+      .wnd
+      .upgrade()
+      .expect("The window of the `Dispatcher` already dropped")
   }
 }
 #[derive(Default)]
@@ -31,113 +35,70 @@ pub(crate) struct DispatchInfo {
   mouse_button: (Option<DeviceId>, MouseButtons),
   /// The current global position (relative to window) of mouse
   cursor_pos: Point,
-  /// Cursor icon try to set to window.
-  cursor_icon: Option<CursorIcon>,
   /// The current state of the keyboard modifiers
   modifiers: ModifiersState,
 }
 
 impl Dispatcher {
-  pub fn dispatch(&mut self, event: WindowEvent, tree: &mut WidgetTree, wnd_factor: f64) {
+  pub fn dispatch(&mut self, event: WindowEvent, wnd_factor: f64) {
     log::info!("Dispatch winit event {:?}", event);
     match event {
       WindowEvent::ModifiersChanged(s) => self.info.modifiers = s,
       WindowEvent::CursorMoved { position, .. } => {
         let pos = position.to_logical::<f32>(wnd_factor);
-        self.cursor_move_to(Point::new(pos.x, pos.y), tree)
+        self.cursor_move_to(Point::new(pos.x, pos.y))
       }
-      WindowEvent::CursorLeft { .. } => self.on_cursor_left(tree),
+      WindowEvent::CursorLeft { .. } => self.on_cursor_left(),
       WindowEvent::MouseInput { state, button, device_id, .. } => {
-        self.dispatch_mouse_input(device_id, state, button, tree);
+        self.dispatch_mouse_input(device_id, state, button);
       }
       WindowEvent::KeyboardInput { input, .. } => {
-        self.dispatch_keyboard_input(input, tree);
+        self.dispatch_keyboard_input(input);
       }
       WindowEvent::ReceivedCharacter(c) => {
-        self.dispatch_received_chars(c.to_string(), tree);
+        self.add_chars_event(c.to_string());
       }
       WindowEvent::Ime(ime) => {
         if let Ime::Commit(s) = ime {
-          self.dispatch_received_chars(s, tree);
+          self.add_chars_event(s)
         }
       }
-
-      WindowEvent::MouseWheel { delta, .. } => self.dispatch_wheel(delta, tree, wnd_factor),
+      WindowEvent::MouseWheel { delta, .. } => self.dispatch_wheel(delta, wnd_factor),
       _ => log::info!("not processed event {:?}", event),
     }
   }
 
-  pub fn dispatch_keyboard_input(
-    &mut self,
-    input: winit::event::KeyboardInput,
-    tree: &mut WidgetTree,
-  ) {
-    if let Some(key) = input.virtual_keycode {
-      let prevented = if let Some(focus) = self.focusing() {
-        let mut event = KeyboardEvent {
-          key,
-          scan_code: input.scancode,
-          common: EventCommon::new(focus, tree, &self.info),
-        };
-        match input.state {
-          ElementState::Pressed => {
-            tree.capture_event::<KeyDownCaptureListener>(&mut event);
-            tree.bubble_event::<KeyDownListener>(&mut event);
-          }
-          ElementState::Released => {
-            tree.capture_event::<KeyUpCaptureListener>(&mut event);
-            tree.bubble_event::<KeyUpListener>(&mut event);
-          }
-        };
-
-        event.common.prevent_default
-      } else {
-        false
+  pub fn dispatch_keyboard_input(&mut self, input: winit::event::KeyboardInput) {
+    let wnd = self.window();
+    if let (Some(key), Some(id)) = (input.virtual_keycode, wnd.focusing()) {
+      let scancode = input.scancode;
+      match input.state {
+        ElementState::Pressed => wnd.add_delay_event(DelayEvent::KeyDown { id, scancode, key }),
+        ElementState::Released => wnd.add_delay_event(DelayEvent::KeyUp { id, scancode, key }),
       };
-      if !prevented {
-        self.shortcut_process(key, input.state, tree);
-      }
     }
   }
 
-  pub fn dispatch_received_chars(&mut self, c: String, tree: &mut WidgetTree) {
-    if let Some(focus) = self.focusing() {
-      let mut char_event = CharsEvent {
-        chars: c,
-        common: EventCommon::new(focus, tree, &self.info),
-      };
-      tree.capture_event::<CharsCaptureListener>(&mut char_event);
-      tree.bubble_event::<CharsListener>(&mut char_event);
+  pub fn add_chars_event(&mut self, chars: String) {
+    let wnd = self.window();
+    if let Some(focus) = wnd.focusing() {
+      self
+        .window()
+        .add_delay_event(DelayEvent::Chars { id: focus, chars });
     }
   }
 
-  pub fn shortcut_process(
-    &mut self,
-    key: VirtualKeyCode,
-    state: ElementState,
-    tree: &mut WidgetTree,
-  ) {
-    if key == VirtualKeyCode::Tab && ElementState::Pressed == state {
-      if self.info.modifiers.contains(ModifiersState::SHIFT) {
-        self.prev_focus_widget(tree);
-      } else {
-        self.next_focus_widget(tree);
-      }
-    }
-  }
-
-  pub fn cursor_move_to(&mut self, position: Point, tree: &mut WidgetTree) {
+  pub fn cursor_move_to(&mut self, position: Point) {
     self.info.cursor_pos = position;
-    self.pointer_enter_leave_dispatch(tree);
-    if let Some(mut event) = self.pointer_event_for_hit_widget(tree) {
-      tree.capture_event::<PointerMoveCaptureListener>(&mut event);
-      tree.bubble_event::<PointerMoveListener>(&mut event);
+    self.pointer_enter_leave_dispatch();
+    if let Some(hit) = self.hit_widget() {
+      self.window().add_delay_event(DelayEvent::PointerMove(hit));
     }
   }
 
-  pub fn on_cursor_left(&mut self, tree: &mut WidgetTree) {
+  pub fn on_cursor_left(&mut self) {
     self.info.cursor_pos = Point::new(-1., -1.);
-    self.pointer_enter_leave_dispatch(tree);
+    self.pointer_enter_leave_dispatch();
   }
 
   pub fn dispatch_mouse_input(
@@ -145,8 +106,7 @@ impl Dispatcher {
     device_id: DeviceId,
     state: ElementState,
     button: MouseButton,
-    tree: &mut WidgetTree,
-  ) -> Option<()> {
+  ) {
     // A mouse press/release emit during another mouse's press will ignored.
     if self.info.mouse_button.0.get_or_insert(device_id) == &device_id {
       match state {
@@ -154,7 +114,7 @@ impl Dispatcher {
           self.info.mouse_button.1 |= button.into();
           // only the first button press emit event.
           if self.info.mouse_button.1 == button.into() {
-            self.bubble_mouse_down(tree);
+            self.bubble_pointer_down();
           }
         }
         ElementState::Released => {
@@ -162,33 +122,28 @@ impl Dispatcher {
           // only the last button release emit event.
           if self.info.mouse_button.1.is_empty() {
             self.info.mouse_button.0 = None;
-            let mut release_event = self.pointer_event_for_hit_widget(tree)?;
-            tree.capture_event::<PointerUpCaptureListener>(&mut release_event);
-            tree.bubble_event::<PointerUpListener>(&mut release_event);
+            let wnd = self.window();
+            let mut dispatch = |tree: &WidgetTree| {
+              let hit = self.hit_widget()?;
+              wnd.add_delay_event(DelayEvent::PointerUp(hit));
 
-            let tap_on = self
-              .pointer_down_uid
-              .take()?
-              .lowest_common_ancestor(release_event.target(), &tree.arena)?;
-            let mut tap_event = PointerEvent::from_mouse(tap_on, tree, &self.info);
+              let tap_on = self
+                .pointer_down_uid
+                .take()?
+                .lowest_common_ancestor(hit, &tree.arena)?;
+              wnd.add_delay_event(DelayEvent::Tap(tap_on));
+              Some(())
+            };
 
-            tree.capture_event::<TapCaptureListener>(&mut tap_event);
-            tree.bubble_event::<TapListener>(&mut tap_event);
+            dispatch(&wnd.widget_tree.borrow());
           }
         }
       };
     }
-    self.refresh_focus(tree);
-    Some(())
   }
 
-  pub fn dispatch_wheel(
-    &mut self,
-    delta: MouseScrollDelta,
-    tree: &mut WidgetTree,
-    wnd_factor: f64,
-  ) {
-    if let Some(wid) = self.hit_widget(tree) {
+  pub fn dispatch_wheel(&mut self, delta: MouseScrollDelta, wnd_factor: f64) {
+    if let Some(wid) = self.hit_widget() {
       let (delta_x, delta_y) = match delta {
         MouseScrollDelta::LineDelta(x, y) => (x * PIXELS_PER_EM, y * PIXELS_PER_EM),
         MouseScrollDelta::PixelDelta(delta) => {
@@ -197,21 +152,18 @@ impl Dispatcher {
         }
       };
 
-      let mut wheel_event = WheelEvent {
-        delta_x,
-        delta_y,
-        common: EventCommon::new(wid, tree, &self.info),
-      };
-      tree.capture_event::<WheelCaptureListener>(&mut wheel_event);
-      tree.bubble_event::<WheelListener>(&mut wheel_event);
+      self
+        .window()
+        .add_delay_event(DelayEvent::Wheel { id: wid, delta_x, delta_y });
     }
   }
 
-  pub fn take_cursor_icon(&mut self) -> Option<CursorIcon> { self.info.cursor_icon.take() }
+  fn bubble_pointer_down(&mut self) {
+    let hit = self.hit_widget();
+    self.pointer_down_uid = hit;
+    let wnd = self.window();
+    let tree = wnd.widget_tree.borrow();
 
-  fn bubble_mouse_down(&mut self, tree: &mut WidgetTree) {
-    let event = self.pointer_event_for_hit_widget(tree);
-    self.pointer_down_uid = event.as_ref().map(|e| e.target());
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(&tree.arena).find(|id| {
         id.get(&tree.arena)
@@ -219,94 +171,55 @@ impl Dispatcher {
       })
     });
     if let Some(focus_id) = nearest_focus {
-      self.focus(focus_id, tree);
+      self.window().focus_mgr.borrow_mut().focus(focus_id);
     } else {
-      self.blur(tree);
+      self.window().focus_mgr.borrow_mut().blur();
     }
-    if let Some(mut event) = event {
-      tree.capture_event::<PointerDownCaptureListener>(&mut event);
-      tree.bubble_event::<PointerDownListener>(&mut event);
+    if let Some(hit) = hit {
+      wnd.add_delay_event(DelayEvent::PointerDown(hit));
     }
   }
 
-  fn pointer_enter_leave_dispatch(&mut self, tree: &mut WidgetTree) {
-    let new_hit = self.hit_widget(tree);
+  fn pointer_enter_leave_dispatch(&mut self) {
+    let new_hit = self.hit_widget();
+    let wnd = self.window();
+    let tree = wnd.widget_tree.borrow();
 
-    let arena = &tree.arena;
-    let already_entered_start = new_hit
-      .and_then(|new_hit| {
-        self
-          .entered_widgets
-          .iter()
-          .position(|e| e.ancestors_of(new_hit, arena))
-      })
-      .unwrap_or(self.entered_widgets.len());
-
-    let mut already_entered = vec![];
-    self.entered_widgets[already_entered_start..].clone_into(&mut already_entered);
-
-    // fire leave
-    self.entered_widgets[..already_entered_start]
+    let old = self
+      .entered_widgets
       .iter()
-      .filter(|w| !w.is_dropped(arena))
-      .for_each(|l| {
-        let mut event = PointerEvent::from_mouse(*l, tree, &self.info);
-        l.assert_get(arena).query_all_type(
-          |pointer: &PointerLeaveListener| {
-            pointer.dispatch(&mut event);
-            !event.is_propagation()
-          },
-          QueryOrder::InnerFirst,
-        );
-      });
+      .find(|wid| !(*wid).is_dropped(&tree.arena))
+      .copied();
 
-    let new_enter_end = self.entered_widgets.get(already_entered_start).cloned();
-    self.entered_widgets.clear();
+    if let Some(old) = old {
+      let ancestor = new_hit.and_then(|w| w.common_ancestors(old, &tree.arena).next());
+      wnd.add_delay_event(DelayEvent::PointerLeave { bottom: old, up: ancestor });
+    };
 
-    // fire new entered
-    if let Some(hit_widget) = new_hit {
-      // collect new entered
-      for w in hit_widget.ancestors(arena) {
-        if Some(w) != new_enter_end {
-          let obj = w.assert_get(arena);
-          if obj.contain_type::<PointerEnterListener>()
-            || obj.contain_type::<PointerLeaveListener>()
-          {
-            self.entered_widgets.push(w);
-          }
-        } else {
-          break;
-        }
-      }
-
-      self.entered_widgets.iter().rev().for_each(|w| {
-        let obj = w.assert_get(arena);
-        if obj.contain_type::<PointerEnterListener>() {
-          let mut event = PointerEvent::from_mouse(*w, tree, &self.info);
-          obj.query_all_type(
-            |pointer: &PointerEnterListener| {
-              pointer.dispatch(&mut event);
-              !event.is_propagation()
-            },
-            QueryOrder::InnerFirst,
-          );
-        }
-      });
-      self.entered_widgets.extend(already_entered);
+    if let Some(new) = new_hit {
+      let ancestor = old.and_then(|o| o.common_ancestors(new, &tree.arena).next());
+      wnd.add_delay_event(DelayEvent::PointerEnter { bottom: new, up: ancestor });
     }
+
+    self.entered_widgets =
+      new_hit.map_or(vec![], |wid| wid.ancestors(&tree.arena).collect::<Vec<_>>());
   }
 
-  fn hit_widget(&self, tree: &WidgetTree) -> Option<WidgetId> {
-    let mut w = Some(tree.root());
+  fn hit_widget(&self) -> Option<WidgetId> {
     let mut hit_target = None;
+    let wnd = self.window();
+    let tree = wnd.widget_tree.borrow();
+    let arena = &tree.arena;
+    let store = &tree.store;
+
+    let mut w = Some(tree.root());
     let mut pos = self.info.cursor_pos;
     while let Some(id) = w {
-      let WidgetTree { arena, store, wnd_ctx, .. } = tree;
       let r = id.assert_get(arena);
-      let ctx = HitTestCtx { id, arena, store, wnd_ctx };
+      let ctx = HitTestCtx { id, wnd: &wnd };
       let HitTest { hit, can_hit_child } = r.hit_test(&ctx, pos);
 
-      pos = store.map_from_parent(id, pos, arena);
+      pos = tree.store.map_from_parent(id, pos, arena);
 
       if hit {
         hit_target = w;
@@ -343,21 +256,9 @@ impl Dispatcher {
     }
     hit_target
   }
-
-  fn pointer_event_for_hit_widget(&mut self, tree: &WidgetTree) -> Option<PointerEvent> {
-    self
-      .hit_widget(tree)
-      .map(|target| PointerEvent::from_mouse(target, tree, &self.info))
-  }
 }
 
 impl DispatchInfo {
-  #[inline]
-  pub fn set_cursor_icon(&mut self, icon: CursorIcon) { self.cursor_icon = Some(icon) }
-  /// Return the cursor icon that will submit to window.
-  #[inline]
-  pub fn stage_cursor_icon(&self) -> Option<CursorIcon> { self.cursor_icon }
-
   #[inline]
   pub fn modifiers(&self) -> ModifiersState { self.modifiers }
 
@@ -366,96 +267,6 @@ impl DispatchInfo {
 
   #[inline]
   pub fn mouse_buttons(&self) -> MouseButtons { self.mouse_button.1 }
-}
-
-impl WidgetTree {
-  pub(crate) fn capture_event<Ty>(&mut self, event: &mut Ty::Event)
-  where
-    Ty: EventListener + 'static,
-  {
-    self.capture_event_with(event, |listener: &Ty, event| listener.dispatch(event));
-  }
-
-  pub(crate) fn capture_event_with<Ty, D, E>(&self, event: &mut E, mut dispatcher: D)
-  where
-    D: FnMut(&Ty, &mut E),
-    E: std::borrow::BorrowMut<EventCommon>,
-    Ty: 'static,
-  {
-    let mut hit_widget_path: Vec<WidgetId> = vec![];
-    let init_current_target = event.borrow().current_target;
-    let mut current_target = init_current_target;
-
-    loop {
-      current_target.assert_get(&self.arena).query_all_type(
-        |_: &Ty| {
-          hit_widget_path.push(current_target);
-          false
-        },
-        QueryOrder::OutsideFirst,
-      );
-
-      if let Some(p) = current_target.parent(&self.arena) {
-        current_target = p;
-      } else {
-        break;
-      }
-    }
-
-    hit_widget_path.reverse();
-
-    for w in hit_widget_path {
-      w.assert_get(&self.arena).query_all_type(
-        |listener: &Ty| {
-          event.borrow_mut().current_target = w;
-          dispatcher(listener, event);
-          !event.borrow_mut().is_propagation()
-        },
-        QueryOrder::OutsideFirst,
-      );
-
-      if event.borrow().is_propagation() {
-        break;
-      }
-    }
-
-    event.borrow_mut().current_target = init_current_target;
-  }
-
-  pub(crate) fn bubble_event<Ty>(&mut self, event: &mut Ty::Event)
-  where
-    Ty: EventListener + 'static,
-  {
-    self.bubble_event_with(event, |listener: &Ty, event| listener.dispatch(event));
-  }
-
-  pub(crate) fn bubble_event_with<Ty, D, E>(&self, event: &mut E, mut dispatcher: D)
-  where
-    D: FnMut(&Ty, &mut E),
-    E: std::borrow::BorrowMut<EventCommon>,
-    Ty: 'static,
-  {
-    loop {
-      let current_target = event.borrow().current_target;
-      current_target.assert_get(&self.arena).query_all_type(
-        |listener: &Ty| {
-          dispatcher(listener, event);
-          !event.borrow_mut().is_propagation()
-        },
-        QueryOrder::InnerFirst,
-      );
-
-      if event.borrow().is_propagation() {
-        break;
-      }
-
-      if let Some(p) = current_target.parent(&self.arena) {
-        event.borrow_mut().current_target = p;
-      } else {
-        break;
-      }
-    }
-  }
 }
 
 #[cfg(test)]
@@ -491,6 +302,7 @@ mod tests {
         on_pointer_cancel: handler_ctor(),
       }
     }
+    .into()
   }
 
   #[test]
@@ -500,11 +312,11 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } },
+      widget! { MockBox { size: Size::new(100., 30.) } }.into(),
     );
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockMulti { DynWidget  { dyns: record } } },
+      widget! { MockMulti { DynWidget  { dyns: record } } }.into(),
     );
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
@@ -545,7 +357,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } },
+      widget! { MockBox { size: Size::new(100., 30.) } }.into(),
     );
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
@@ -610,7 +422,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } },
+      widget! { MockBox { size: Size::new(100., 30.) } }.into(),
     );
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
@@ -676,24 +488,25 @@ mod tests {
   fn cancel_bubble() {
     let _guard = unsafe { AppCtx::new_lock_scope() };
     #[derive(Default)]
-    struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
+    struct EventRecord(Rc<RefCell<Vec<WidgetId>>>);
     impl Compose for EventRecord {
       fn compose(this: State<Self>) -> Widget {
         widget! {
           states { this: this.into_writable() }
           MockBox {
             size: INFINITY_SIZE,
-            on_pointer_down: move |e| { this.0.borrow_mut().push(e.clone()); },
+            on_pointer_down: move |e| { this.0.borrow_mut().push(e.current_target()); },
 
             MockBox {
               size: Size::new(100., 30.),
               on_pointer_down: move |e| {
-                this.0.borrow_mut().push(e.clone());
+                this.0.borrow_mut().push(e.current_target());
                 e.stop_propagation();
               }
             }
           }
         }
+        .into()
       }
     }
 
@@ -740,6 +553,7 @@ mod tests {
             }
           }
         }
+        .into()
       }
     }
 
@@ -975,7 +789,7 @@ mod tests {
     });
 
     // point down on a focus widget
-    assert!(wnd.dispatcher.focusing().is_some());
+    assert!(wnd.focus_mgr.borrow().focusing().is_some());
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -998,7 +812,7 @@ mod tests {
       modifiers,
     });
 
-    assert!(wnd.dispatcher.focusing().is_none());
+    assert!(wnd.focus_mgr.borrow().focusing().is_none());
   }
 
   #[test]
@@ -1008,8 +822,9 @@ mod tests {
     let w = MockBox { size: INFINITY_SIZE };
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    wnd.dispatcher.info.cursor_pos = Point::new(-1., -1.);
-    let hit = wnd.dispatcher.hit_widget(&wnd.widget_tree);
+    let mut dispatcher = wnd.dispatcher.borrow_mut();
+    dispatcher.info.cursor_pos = Point::new(-1., -1.);
+    let hit = dispatcher.hit_widget();
 
     assert_eq!(hit, None);
   }
@@ -1053,12 +868,13 @@ mod tests {
 
       let mut wnd = TestWindow::new_with_size(w, Size::new(500., 500.));
       wnd.draw_frame();
-      wnd.dispatcher.info.cursor_pos = Point::new(125., 125.);
-      let hit_2 = wnd.dispatcher.hit_widget(&wnd.widget_tree);
+      let mut dispatcher = wnd.dispatcher.borrow_mut();
+      dispatcher.info.cursor_pos = Point::new(125., 125.);
+      let hit_2 = dispatcher.hit_widget();
       assert_eq!(hit_2, data.borrow().wid2);
 
-      wnd.dispatcher.info.cursor_pos = Point::new(80., 80.);
-      let hit_1 = wnd.dispatcher.hit_widget(&wnd.widget_tree);
+      dispatcher.info.cursor_pos = Point::new(80., 80.);
+      let hit_1 = dispatcher.hit_widget();
       assert_eq!(hit_1, data.borrow().wid1);
     }
 

@@ -1,6 +1,7 @@
 use crate::{
   builtin_widgets::{FullTheme, InheritTheme, Theme},
   clipboard::{Clipboard, MockClipboard},
+  window::{Window, WindowId},
 };
 use pin_project_lite::pin_project;
 use std::{
@@ -36,6 +37,7 @@ pub trait RuntimeWaker {
 /// already hold by others.
 pub struct AppCtx {
   app_theme: Theme,
+  windows: RefCell<ahash::HashMap<WindowId, Rc<Window>>>,
   font_db: Rc<RefCell<FontDB>>,
   shaper: TextShaper,
   reorder: TextReorder,
@@ -58,6 +60,37 @@ impl AppCtx {
   /// Get the theme of the application.
   #[track_caller]
   pub fn app_theme() -> &'static Theme { &Self::shared().app_theme }
+
+  /// Get the window by the window id. Return an count reference of the window.
+  ///
+  /// If you want store the `Window`, you'd better store the `WindowId` instead.
+  /// Because `Window` owns so many resources, and it's easy to cause a circular
+  /// reference if you store it in another struct with count reference that
+  /// belongs to `Window`.
+  #[track_caller]
+  #[inline]
+  pub fn get_window(id: WindowId) -> Option<Rc<Window>> {
+    Self::shared().windows.borrow().get(&id).cloned()
+  }
+
+  /// Return the windows collection of the application.
+  pub fn windows() -> &'static RefCell<ahash::HashMap<WindowId, Rc<Window>>> {
+    &Self::shared().windows
+  }
+
+  /// Returns the number of windows.
+  #[track_caller]
+  #[inline]
+  pub fn wnd_cnt() -> usize { Self::shared().windows.borrow().len() }
+
+  /// Returns true if there is any window in the application.
+  #[track_caller]
+  #[inline]
+  pub fn has_wnd() -> bool { !Self::shared().windows.borrow().is_empty() }
+
+  /// Remove the window by the window id.
+  #[track_caller]
+  pub fn remove_wnd(id: WindowId) { Self::shared().windows.borrow_mut().remove(&id); }
 
   /// Get the scheduler of the application.
   #[track_caller]
@@ -91,6 +124,7 @@ impl AppCtx {
   /// you needn't use this method manually, it's called automatically when you
   /// use the methods of `AppCtx`. But it's useful when you want your code to
   /// keep same behavior like `AppCtx`.
+  #[track_caller]
   pub fn thread_check() {
     let current_thread = std::thread::current().id();
     unsafe {
@@ -191,6 +225,7 @@ impl AppCtx {
         clipboard: RefCell::new(Box::new(MockClipboard {})),
         executor: <_>::default(),
         runtime_waker: Box::new(MockWaker),
+        windows: RefCell::new(ahash::HashMap::default()),
       };
 
       INIT_THREAD_ID = Some(std::thread::current().id());

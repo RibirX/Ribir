@@ -23,9 +23,7 @@ impl Render for IgnorePointer {
   }
 }
 
-impl Query for IgnorePointer {
-  impl_query_self_only!();
-}
+impl_query_self_only!(IgnorePointer);
 
 impl IgnorePointer {
   #[inline]

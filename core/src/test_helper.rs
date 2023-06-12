@@ -1,5 +1,8 @@
 use crate::timer::Timer;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+  rc::Rc,
+  sync::atomic::{AtomicU64, Ordering},
+};
 
 use crate::{
   impl_query_self_only,
@@ -12,24 +15,21 @@ pub struct Frame {
   pub viewport: Rect,
   pub surface: Color,
 }
-pub struct TestWindow(Window);
+pub struct TestWindow(pub Rc<Window>);
 
 impl TestWindow {
   /// Create a 1024x1024 window for test
-  pub fn new<M: ImplMarker>(root: impl IntoWidget<M>) -> Self {
+  pub fn new(root: impl Into<Widget>) -> Self {
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-
-    Self(Window::new(
-      root.into_widget(),
-      Box::new(TestShellWindow::new(None)),
-    ))
+    let wnd = Window::new(root.into(), Box::new(TestShellWindow::new(None)));
+    AppCtx::windows().borrow_mut().insert(wnd.id(), wnd.clone());
+    Self(wnd)
   }
 
-  pub fn new_with_size<M: ImplMarker>(root: impl IntoWidget<M>, size: Size) -> Self {
+  pub fn new_with_size(root: impl Into<Widget>, size: Size) -> Self {
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-
     Self(Window::new(
-      root.into_widget(),
+      root.into(),
       Box::new(TestShellWindow::new(Some(size))),
     ))
   }
@@ -38,24 +38,25 @@ impl TestWindow {
   /// [0, 1] means use the second child of the root.
   /// [0, 1, 2] the first node at the root level (must be 0), then down to its
   /// second child, then down to third child.
-  pub fn layout_info_by_path<'a>(&'a self, path: &[usize]) -> Option<&'a LayoutInfo> {
+  pub fn layout_info_by_path(&self, path: &[usize]) -> Option<LayoutInfo> {
     assert_eq!(path[0], 0);
-    let tree = &self.0.widget_tree;
+    let tree = self.0.widget_tree.borrow();
     let mut node = tree.root();
     for (level, idx) in path[1..].iter().enumerate() {
       node = node.children(&tree.arena).nth(*idx).unwrap_or_else(|| {
         panic!("node no exist: {:?}", &path[0..level]);
       });
     }
-    tree.store.layout_info(node)
+    tree.store.layout_info(node).cloned()
   }
 
   #[inline]
-  pub fn widget_count(&self) -> usize { self.widget_tree.count() }
+  pub fn widget_count(&self) -> usize { self.widget_tree.borrow().count() }
 
   pub fn take_last_frame(&mut self) -> Option<Frame> {
     self
-      .shell_wnd_mut()
+      .shell_wnd()
+      .borrow_mut()
       .as_any_mut()
       .downcast_mut::<TestShellWindow>()
       .unwrap()
@@ -78,13 +79,9 @@ impl std::ops::Deref for TestWindow {
   fn deref(&self) -> &Self::Target { &self.0 }
 }
 
-impl std::ops::DerefMut for TestWindow {
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
-}
-
 pub struct TestShellWindow {
   pub size: Size,
-  pub cursor: Option<CursorIcon>,
+  pub cursor: CursorIcon,
   pub id: WindowId,
   pub last_frame: Option<Frame>,
 }
@@ -98,7 +95,9 @@ impl ShellWindow for TestShellWindow {
 
   fn set_min_size(&mut self, _: Size) {}
 
-  fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = Some(cursor); }
+  fn set_cursor(&mut self, cursor: CursorIcon) { self.cursor = cursor; }
+
+  fn cursor(&self) -> CursorIcon { self.cursor }
 
   fn set_title(&mut self, _: &str) {}
 
@@ -129,7 +128,7 @@ impl TestShellWindow {
     let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
     TestShellWindow {
       size,
-      cursor: None,
+      cursor: CursorIcon::Default,
       id: ID.fetch_add(1, Ordering::Relaxed).into(),
       last_frame: None,
     }
@@ -165,9 +164,7 @@ impl Render for MockStack {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for MockStack {
-  impl_query_self_only!();
-}
+impl_query_self_only!(MockStack);
 
 #[derive(Declare, MultiChild)]
 pub struct MockMulti;
@@ -209,10 +206,5 @@ impl Render for MockBox {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for MockMulti {
-  impl_query_self_only!();
-}
-
-impl Query for MockBox {
-  impl_query_self_only!();
-}
+impl_query_self_only!(MockMulti);
+impl_query_self_only!(MockBox);

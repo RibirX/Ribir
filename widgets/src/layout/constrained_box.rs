@@ -20,9 +20,7 @@ impl Render for ConstrainedBox {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for ConstrainedBox {
-  impl_query_self_only!();
-}
+impl_query_self_only!(ConstrainedBox);
 
 #[cfg(test)]
 mod tests {
@@ -41,6 +39,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test! (
     outside_fixed_clamp,
@@ -59,6 +58,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(
     expand_one_axis,
@@ -77,6 +77,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(
     expand_both,

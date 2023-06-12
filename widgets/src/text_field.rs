@@ -137,6 +137,7 @@ impl ComposeChild for TextFieldThemeProxy {
         },
       }
     }
+    .into()
   }
 }
 
@@ -326,9 +327,7 @@ impl ComposeChild for TextField {
               }
               Expanded {
                 flex: 1.,
-                DynWidget {
-                  dyns: move |_: &BuildCtx| build_content_area(&mut this, &mut theme, config)
-                }
+                build_content_area(no_watch!(&mut this), no_watch!(&mut theme), config)
               }
               ConstrainedBox {
                 clamp: BoxClamp::EXPAND_Y,
@@ -347,6 +346,7 @@ impl ComposeChild for TextField {
           }
       }
     }
+    .into()
   }
 }
 
@@ -412,6 +412,7 @@ fn build_input_area(
         });
     }
   }
+  .into()
 }
 
 #[derive(Declare)]
@@ -449,6 +450,7 @@ impl Compose for TextFieldLabel {
         by: linear,
       }
     }
+    .into()
   }
 }
 
@@ -493,6 +495,7 @@ fn build_content_area(
 
     transition prop!(content_area.padding) { by: linear }
   }
+  .into()
 }
 
 fn build_icon(icon: Option<Widget>) -> Widget {
@@ -508,7 +511,8 @@ fn build_icon(icon: Option<Widget>) -> Widget {
         }
       }
     }
+    .into()
   } else {
-    Void.into_widget()
+    Void.into()
   }
 }

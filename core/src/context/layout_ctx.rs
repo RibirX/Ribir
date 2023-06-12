@@ -1,27 +1,32 @@
-use super::{WidgetContext, WidgetCtxImpl, WindowCtx};
+use super::{WidgetCtx, WidgetCtxImpl};
 use crate::{
-  widget::{BoxClamp, DirtySet, LayoutStore, Layouter, TreeArena},
+  widget::{BoxClamp, Layouter, WidgetTree},
   widget_tree::WidgetId,
+  window::Window,
 };
 use ribir_geom::Size;
 
-/// A place to compute the render object's layout. Rather than holding children
-/// directly, `Layout` perform layout across `LayoutCtx`. `LayoutCtx`
-/// provide method to perform child layout and also provides methods to update
+/// A place to compute the render object's layout. Rather than holding  children
+/// directly, `Layout` perform layout across `LayoutCtx`. `LayoutCtx` provide
+/// method to perform child layout and also provides methods to update
 /// descendants position.
 pub struct LayoutCtx<'a> {
   pub(crate) id: WidgetId,
-  pub(crate) arena: &'a mut TreeArena,
-  pub(crate) store: &'a mut LayoutStore,
-  pub(crate) wnd_ctx: &'a mut WindowCtx,
-  pub(crate) dirty_set: &'a DirtySet,
+  pub(crate) wnd: &'a Window,
+  /// The widget tree of the window, not borrow it from `wnd` is because a
+  /// `LayoutCtx` always in a mutable borrow.
+  pub(crate) tree: &'a mut WidgetTree,
+}
+
+impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
+  fn id(&self) -> WidgetId { self.id }
+
+  fn current_wnd(&self) -> &Window { self.wnd }
+
+  fn with_tree<F: FnOnce(&WidgetTree) -> R, R>(&self, f: F) -> R { f(self.tree) }
 }
 
 impl<'a> LayoutCtx<'a> {
-  /// Return if there is child of this widget.
-  #[inline]
-  pub fn has_child(&self) -> bool { self.id.first_child(self.tree_arena()).is_some() }
-
   /// Quick method to do the work of computing the layout for the single child,
   /// and return its size it should have.
   ///
@@ -46,12 +51,12 @@ impl<'a> LayoutCtx<'a> {
 
   /// Return the layouter of the first child.
   pub fn first_child_layouter(&mut self) -> Option<Layouter> {
-    self.first_child().map(|wid| self.new_layouter(wid, false))
+    self.first_child().map(|wid| self.new_layouter(wid))
   }
 
   /// Return the layouter of the first child.
   pub fn single_child_layouter(&mut self) -> Option<Layouter> {
-    self.single_child().map(|wid| self.new_layouter(wid, false))
+    self.single_child().map(|wid| self.new_layouter(wid))
   }
 
   /// Return the layouter of the first child.
@@ -59,7 +64,7 @@ impl<'a> LayoutCtx<'a> {
   /// panic if there is not only one child it have.
   pub fn assert_single_child_layouter(&mut self) -> Layouter {
     let wid = self.assert_single_child();
-    self.new_layouter(wid, false)
+    self.new_layouter(wid)
   }
 
   /// Clear the child layout information, so the `child` will be force layout
@@ -67,29 +72,12 @@ impl<'a> LayoutCtx<'a> {
   /// information with same input.
   #[inline]
   pub fn force_child_relayout(&mut self, child: WidgetId) -> bool {
-    assert_eq!(child.parent(self.arena), Some(self.id));
-    self.store.force_layout(child).is_some()
+    assert_eq!(child.parent(&self.tree.arena), Some(self.id));
+    self.tree.store.force_layout(child).is_some()
   }
 
-  fn new_layouter(&mut self, wid: WidgetId, is_layout_root: bool) -> Layouter {
-    let Self { arena, store, wnd_ctx, dirty_set, .. } = self;
-    Layouter {
-      wid,
-      arena,
-      store,
-      wnd_ctx,
-      dirty_set,
-      is_layout_root,
-    }
+  pub(crate) fn new_layouter(&mut self, id: WidgetId) -> Layouter {
+    let LayoutCtx { wnd, tree, .. } = self;
+    Layouter::new(id, wnd, false, tree)
   }
-}
-
-impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
-  fn id(&self) -> WidgetId { self.id }
-
-  fn tree_arena(&self) -> &TreeArena { self.arena }
-
-  fn layout_store(&self) -> &LayoutStore { self.store }
-
-  fn wnd_ctx(&self) -> &WindowCtx { self.wnd_ctx }
 }

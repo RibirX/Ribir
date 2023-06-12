@@ -1,11 +1,12 @@
-use super::{child_convert::IntoChild, *};
-use crate::widget::ImplMarker;
+use crate::widget::{RenderFul, WidgetBuilder};
+
+use super::*;
 
 /// Trait specify what child a widget can have, and the target type is the
 /// result of widget compose its child.
-pub trait SingleWithChild<M, C> {
+pub trait SingleWithChild<C> {
   type Target;
-  fn with_child(self, child: C) -> Self::Target;
+  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
 }
 
 /// A node of widget with not compose its child.
@@ -16,65 +17,22 @@ pub struct WidgetPair<W, C> {
 
 impl<W: SingleChild> SingleChild for Option<W> {}
 
-impl<W: SingleChild, C> SingleWithChild<W, C> for W {
+impl<W: SingleChild, C> SingleWithChild<C> for W {
   type Target = WidgetPair<W, C>;
 
   #[inline]
-  fn with_child(self, child: C) -> Self::Target { WidgetPair { widget: self, child } }
+  fn with_child(self, child: C, _: &BuildCtx) -> Self::Target { WidgetPair { widget: self, child } }
 }
 
-impl<W, C1: SingleChild, C2> SingleWithChild<W, C2> for WidgetPair<W, C1> {
+impl<W, C1: SingleChild, C2> SingleWithChild<C2> for WidgetPair<W, C1> {
   type Target = WidgetPair<W, WidgetPair<C1, C2>>;
 
-  fn with_child(self, c: C2) -> Self::Target {
+  fn with_child(self, c: C2, ctx: &BuildCtx) -> Self::Target {
     let WidgetPair { widget, child } = self;
-    WidgetPair { widget, child: child.with_child(c) }
-  }
-}
-
-impl<W, C, M> IntoWidget<NotSelf<M>> for WidgetPair<W, C>
-where
-  W: IntoSingleParent,
-  C: IntoChild<M, Option<Widget>>,
-  M: ImplMarker,
-{
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    Widget::Render {
-      render: widget.into_single_parent(),
-      children: Some(child.into_child().map_or_else(Vec::default, |w| vec![w])),
+    WidgetPair {
+      widget,
+      child: child.with_child(c, ctx),
     }
-  }
-}
-
-impl<W, C, M1, M2> IntoWidget<NotSelf<[(M1, M2); 1]>> for WidgetPair<Option<W>, C>
-where
-  WidgetPair<W, C>: IntoWidget<M1>,
-  C: IntoWidget<M2>,
-  M1: ImplMarker,
-  M2: ImplMarker,
-{
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    if let Some(widget) = widget {
-      WidgetPair { widget, child }.into_widget()
-    } else {
-      child.into_widget()
-    }
-  }
-}
-
-impl<W, D, M1, M2> IntoWidget<NotSelf<[(M1, M2); 2]>>
-  for WidgetPair<W, Stateful<DynWidget<Option<D>>>>
-where
-  WidgetPair<W, Widget>: IntoWidget<M1>,
-  D: IntoChild<M2, Widget> + 'static,
-  M1: ImplMarker,
-  M2: ImplMarker,
-{
-  fn into_widget(self) -> Widget {
-    let Self { widget, child } = self;
-    WidgetPair { widget, child: child.into_widget() }.into_widget()
   }
 }
 
@@ -82,22 +40,92 @@ trait IntoSingleParent {
   fn into_single_parent(self) -> Box<dyn Render>;
 }
 
-impl<W: SingleChild + Render + 'static> IntoSingleParent for W {
+trait WidgetChild {
+  fn child_build(self, ctx: &BuildCtx) -> WidgetId;
+}
+
+impl IntoSingleParent for Box<dyn RenderSingleChild> {
+  fn into_single_parent(self) -> Box<dyn Render> { self.into_render() }
+}
+
+impl<W: RenderSingleChild + 'static> IntoSingleParent for W {
   fn into_single_parent(self) -> Box<dyn Render> { Box::new(self) }
+}
+
+impl<W: RenderSingleChild + 'static> IntoSingleParent for Stateful<W> {
+  #[inline]
+  fn into_single_parent(self) -> Box<dyn Render> { Box::new(RenderFul(self)) }
 }
 
 impl<D> IntoSingleParent for Stateful<DynWidget<D>>
 where
-  D: SingleChild + Render + 'static,
+  D: RenderSingleChild + WidgetBuilder + 'static,
 {
-  fn into_single_parent(self) -> Box<dyn Render> { Box::new(DynRender::new(self)) }
+  #[inline]
+  fn into_single_parent(self) -> Box<dyn Render> { Box::new(DynRender::single(self)) }
 }
 
 impl<D> IntoSingleParent for Stateful<DynWidget<Option<D>>>
 where
-  D: SingleChild + Render + 'static,
+  D: RenderSingleChild + WidgetBuilder + 'static,
 {
-  fn into_single_parent(self) -> Box<dyn Render> { Box::new(DynRender::new(self)) }
+  #[inline]
+  fn into_single_parent(self) -> Box<dyn Render> { Box::new(DynRender::option(self)) }
+}
+
+impl WidgetChild for Widget {
+  #[inline]
+  fn child_build(self, ctx: &BuildCtx) -> WidgetId { self.build(ctx) }
+}
+
+impl<W: WidgetBuilder> WidgetChild for W {
+  #[inline]
+  fn child_build(self, ctx: &BuildCtx) -> WidgetId { self.build(ctx) }
+}
+
+impl<W, C> WidgetBuilder for WidgetPair<W, C>
+where
+  W: IntoSingleParent,
+  C: WidgetChild,
+{
+  fn build(self, ctx: &BuildCtx) -> WidgetId {
+    let Self { widget, child } = self;
+    let p = ctx.alloc_widget(widget.into_single_parent());
+    let child = child.child_build(ctx);
+    ctx.append_child(p, child);
+    p
+  }
+}
+
+impl<W, C> WidgetBuilder for WidgetPair<Option<W>, C>
+where
+  W: IntoSingleParent,
+  C: WidgetChild,
+{
+  fn build(self, ctx: &BuildCtx) -> WidgetId {
+    let Self { widget, child } = self;
+    if let Some(widget) = widget {
+      WidgetPair { widget, child }.build(ctx)
+    } else {
+      child.child_build(ctx)
+    }
+  }
+}
+
+impl<W, C> WidgetBuilder for WidgetPair<W, Option<C>>
+where
+  W: IntoSingleParent,
+  C: WidgetChild,
+{
+  fn build(self, ctx: &BuildCtx) -> WidgetId {
+    let Self { widget, child } = self;
+    if let Some(child) = child {
+      WidgetPair { widget, child }.build(ctx)
+    } else {
+      let node = widget.into_single_parent();
+      ctx.alloc_widget(node)
+    }
+  }
 }
 
 #[cfg(test)]
@@ -109,10 +137,12 @@ mod tests {
   #[test]
   fn pair_with_child() {
     let mock_box = MockBox { size: ZERO_SIZE };
-    let _ = mock_box
-      .clone()
-      .with_child(mock_box.clone())
-      .with_child(mock_box)
-      .into_widget();
+    let _ = FnWidget::new(|ctx| {
+      mock_box
+        .clone()
+        .with_child(mock_box.clone(), ctx)
+        .with_child(mock_box, ctx)
+        .build(ctx)
+    });
   }
 }

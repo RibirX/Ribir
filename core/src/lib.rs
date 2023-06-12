@@ -14,9 +14,7 @@ pub(crate) mod widget_tree;
 pub mod assign_observable;
 pub mod clipboard;
 pub mod declare;
-mod decorator;
 pub mod dynamic_widget;
-pub mod enum_widget;
 pub mod events;
 pub mod ticker;
 pub mod timer;
@@ -33,15 +31,11 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::context::*;
   #[doc(no_inline)]
-  pub use crate::data_widget::{
-    compose_child_as_data_widget, widget_attach_data, AnonymousData, DataWidget,
-  };
+  pub use crate::data_widget::{AnonymousData, DataWidget};
   #[doc(no_inline)]
   pub use crate::declare::*;
-  pub use crate::decorator::Decorator;
   #[doc(no_inline)]
   pub use crate::dynamic_widget::*;
-  pub use crate::enum_widget::*;
   #[doc(no_inline)]
   pub use crate::events::*;
   #[doc(no_inline)]
@@ -50,8 +44,7 @@ pub mod prelude {
   pub use crate::widget;
   #[doc(no_inline)]
   pub use crate::widget::{
-    Any, Compose, HitTest, ImplMarker, IntoWidget, NotSelf, Query, QueryFiler, QueryOrder, Render,
-    SelfImpl, TypeId, Widget,
+    Any, Compose, FnWidget, HitTest, Query, QueryFiler, QueryOrder, Render, TypeId, Widget,
   };
   #[doc(no_inline)]
   pub use crate::widget_children::*;

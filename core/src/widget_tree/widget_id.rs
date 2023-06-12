@@ -1,38 +1,67 @@
 use indextree::{Arena, Node, NodeId};
-use ribir_painter::Painter;
 use rxrust::prelude::*;
 
-use super::{DirtySet, LayoutStore};
+use super::WidgetTree;
 use crate::{
-  builtin_widgets::{DisposedListener, MountedListener, Void},
-  context::{LifeCycleCtx, PaintingCtx, WidgetContext, WindowCtx},
+  builtin_widgets::Void,
+  context::{PaintingCtx, WidgetCtx},
   state::{ModifyScope, StateChangeNotifier},
   widget::{QueryOrder, Render},
+  window::DelayEvent,
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug, Hash)]
 
 pub struct WidgetId(pub(crate) NodeId);
 
-pub(crate) type TreeArena = Arena<Box<dyn Render>>;
+pub(crate) type TreeArena = Arena<RenderNode>;
+
+bitflags! {
+  #[derive(Default, PartialEq, Eq, Clone, Copy, Hash, Debug)]
+  pub(crate) struct  RenderNodeFlag: u8 {
+    const NONE = 0;
+    const DROPPED = 0b0001;
+  }
+}
+pub(crate) struct RenderNode {
+  flags: RenderNodeFlag,
+  data: Box<dyn Render>,
+}
 
 impl WidgetId {
-  pub(crate) fn new_node(tree: &mut TreeArena) -> WidgetId {
-    WidgetId(tree.new_node(Box::new(Void)))
-  }
-
   /// Returns a reference to the node data.
   pub(crate) fn get(self, tree: &TreeArena) -> Option<&dyn Render> {
-    tree.get(self.0).map(|node| node.get().as_ref())
+    self.get_node(tree).map(|n| n.data.as_ref())
   }
 
   /// Returns a mutable reference to the node data.
   pub(crate) fn get_mut(self, tree: &mut TreeArena) -> Option<&mut Box<dyn Render>> {
-    tree.get_mut(self.0).map(|node| node.get_mut())
+    self.get_node_mut(tree).map(|n| &mut n.data)
+  }
+
+  pub(crate) fn get_node(self, tree: &TreeArena) -> Option<&RenderNode> {
+    tree.get(self.0).map(|n| n.get())
+  }
+
+  pub(crate) fn get_node_mut(self, tree: &mut TreeArena) -> Option<&mut RenderNode> {
+    tree.get_mut(self.0).map(|n| n.get_mut())
+  }
+
+  /// Mark the widget dropped but not release the node, caller has the
+  /// responsibility to release it.
+  pub(crate) fn mark_drop(self, tree: &mut TreeArena) {
+    if let Some(node) = self.get_node_mut(tree) {
+      node.flags.insert(RenderNodeFlag::DROPPED);
+    }
   }
 
   /// detect if the widget of this id point to is dropped.
-  pub(crate) fn is_dropped(self, tree: &TreeArena) -> bool { self.0.is_removed(tree) }
+  pub(crate) fn is_dropped(self, tree: &TreeArena) -> bool {
+    self.0.is_removed(tree)
+      || self
+        .get_node(tree)
+        .map_or(true, |n| n.flags.contains(RenderNodeFlag::DROPPED))
+  }
 
   #[allow(clippy::needless_collect)]
   pub(crate) fn lowest_common_ancestor(
@@ -88,11 +117,6 @@ impl WidgetId {
     self.0.ancestors(tree).map(WidgetId)
   }
 
-  /// Detect if this widget is the ancestors of `w`
-  pub(crate) fn ancestors_of(self, w: WidgetId, tree: &TreeArena) -> bool {
-    w.ancestors(tree).any(|a| a == self)
-  }
-
   #[inline]
   pub(crate) fn children(self, arena: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.children(arena).map(WidgetId)
@@ -102,65 +126,25 @@ impl WidgetId {
     self.0.descendants(tree).map(WidgetId)
   }
 
-  pub(crate) fn swap_id(self, other: WidgetId, tree: &mut TreeArena, store: &mut LayoutStore) {
-    self.swap_data(other, tree);
-    store.swap(self, other);
-
-    let guard = WidgetId::new_node(tree);
-    self.transplant(guard, tree);
-    other.transplant(self, tree);
-    guard.transplant(other, tree);
-    guard.0.remove(tree);
-  }
-
-  pub(crate) fn transplant(self, other: WidgetId, tree: &mut TreeArena) {
-    self.insert_after(other, tree);
-    let first_child = self.first_child(tree);
-    let mut cursor = first_child;
-    while let Some(c) = cursor {
-      cursor = c.next_sibling(tree);
-      other.append(c, tree);
-    }
-    self.detach(tree);
-  }
-
-  pub(crate) fn swap_data(self, other: WidgetId, tree: &mut TreeArena) {
-    // Safety: mut borrow two node not intersect.
-    let (tree1, tree2) = unsafe { split_arena(tree) };
-    std::mem::swap(self.assert_get_mut(tree1), other.assert_get_mut(tree2));
-  }
-
   pub(crate) fn detach(self, tree: &mut TreeArena) { self.0.detach(tree) }
 
-  pub(crate) fn remove_subtree(self, arena: &mut TreeArena, store: &mut LayoutStore) {
-    self.descendants(arena).for_each(|id| {
-      store.remove(id);
+  pub(crate) fn remove_subtree(self, tree: &mut WidgetTree) {
+    self.descendants(&tree.arena).for_each(|id| {
+      tree.store.remove(id);
     });
-    self.0.remove_subtree(arena);
+    self.0.remove_subtree(&mut tree.arena);
   }
 
-  pub(crate) fn on_mounted_subtree(
-    self,
-    arena: &TreeArena,
-    store: &LayoutStore,
-    wnd_ctx: &WindowCtx,
-    dirty_set: &DirtySet,
-  ) {
+  pub(crate) fn on_mounted_subtree(self, tree: &WidgetTree) {
     self
-      .descendants(arena)
-      .for_each(|w| w.on_mounted(arena, store, wnd_ctx, dirty_set));
+      .descendants(&tree.arena)
+      .for_each(|w| w.on_mounted(tree));
   }
 
-  pub(crate) fn on_mounted(
-    self,
-    arena: &TreeArena,
-    store: &LayoutStore,
-    wnd_ctx: &WindowCtx,
-    dirty_sets: &DirtySet,
-  ) {
-    self.assert_get(arena).query_all_type(
+  pub(crate) fn on_mounted(self, tree: &WidgetTree) {
+    self.assert_get(&tree.arena).query_all_type(
       |notifier: &StateChangeNotifier| {
-        let state_changed = dirty_sets.clone();
+        let state_changed = tree.dirty_set.clone();
         notifier
           .raw_modifies()
           .filter(|b| b.contains(ModifyScope::FRAMEWORK))
@@ -172,13 +156,7 @@ impl WidgetId {
       QueryOrder::OutsideFirst,
     );
 
-    self.assert_get(arena).query_all_type(
-      |m: &MountedListener| {
-        m.dispatch(LifeCycleCtx { id: self, arena, store, wnd_ctx });
-        true
-      },
-      QueryOrder::OutsideFirst,
-    );
+    tree.window().add_delay_event(DelayEvent::Mounted(self));
   }
 
   pub(crate) fn insert_after(self, next: WidgetId, tree: &mut TreeArena) {
@@ -187,10 +165,6 @@ impl WidgetId {
 
   pub(crate) fn insert_before(self, before: WidgetId, tree: &mut TreeArena) {
     self.0.insert_before(before.0, tree);
-  }
-
-  pub(crate) fn prepend(self, child: WidgetId, tree: &mut TreeArena) {
-    self.0.prepend(child.0, tree);
   }
 
   pub(crate) fn append(self, child: WidgetId, tree: &mut TreeArena) {
@@ -207,10 +181,10 @@ impl WidgetId {
     self.first_child(tree)
   }
 
-  fn node_feature<F: Fn(&Node<Box<dyn Render>>) -> Option<NodeId>>(
+  fn node_feature(
     self,
     tree: &TreeArena,
-    method: F,
+    method: impl FnOnce(&Node<RenderNode>) -> Option<NodeId>,
   ) -> Option<WidgetId> {
     tree.get(self.0).and_then(method).map(WidgetId)
   }
@@ -223,42 +197,31 @@ impl WidgetId {
     self.get_mut(tree).expect("Widget not exists in the `tree`")
   }
 
-  pub(crate) fn paint_subtree(
-    self,
-    arena: &TreeArena,
-    store: &LayoutStore,
-    wnd_ctx: &WindowCtx,
-    painter: &mut Painter,
-  ) {
-    let mut paint_ctx = PaintingCtx {
-      id: self,
-      arena,
-      store,
-      wnd_ctx,
-      painter,
-    };
+  pub(crate) fn paint_subtree(self, ctx: &mut PaintingCtx) {
     let mut w = Some(self);
     while let Some(id) = w {
-      paint_ctx.id = id;
-      paint_ctx.painter.save();
+      ctx.id = id;
+      ctx.painter.save();
 
       let mut need_paint = false;
-      if paint_ctx.painter.alpha() != 0. {
-        if let Some(layout_box) = paint_ctx.box_rect() {
-          let render = id.assert_get(arena);
-          paint_ctx
+      if ctx.painter.alpha() != 0. {
+        if let Some(layout_box) = ctx.box_rect() {
+          let tree = ctx.wnd.widget_tree.borrow();
+          let render = id.assert_get(&tree.arena);
+          ctx
             .painter
             .translate(layout_box.min_x(), layout_box.min_y());
-          render.paint(&mut paint_ctx);
+          render.paint(ctx);
           need_paint = true;
         }
       }
 
+      let arena = &ctx.wnd.widget_tree.borrow().arena;
       w = id.first_child(arena).filter(|_| need_paint).or_else(|| {
         let mut node = w;
         while let Some(p) = node {
           // self node sub-tree paint finished, goto sibling
-          paint_ctx.painter.restore();
+          ctx.painter.restore();
           node = match p == self {
             true => None,
             false => p.next_sibling(arena),
@@ -282,24 +245,19 @@ pub(crate) unsafe fn split_arena(tree: &mut TreeArena) -> (&mut TreeArena, &mut 
 }
 
 pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn Render>) -> WidgetId {
-  WidgetId(arena.new_node(node))
+  WidgetId(arena.new_node(RenderNode {
+    flags: RenderNodeFlag::NONE,
+    data: node,
+  }))
 }
 
 pub(crate) fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }
 
-pub(crate) fn dispose_nodes<T: Iterator<Item = WidgetId>>(
-  it: T,
-  arena: &TreeArena,
-  store: &LayoutStore,
-  wnd_ctx: &WindowCtx,
-) {
-  it.for_each(|id| {
-    id.assert_get(arena).query_all_type(
-      |d: &DisposedListener| {
-        d.dispatch(LifeCycleCtx { id, arena, store, wnd_ctx });
-        true
-      },
-      QueryOrder::OutsideFirst,
-    )
-  });
+impl std::ops::Deref for RenderNode {
+  type Target = dyn Render;
+  fn deref(&self) -> &Self::Target { self.data.as_ref() }
+}
+
+impl std::ops::DerefMut for RenderNode {
+  fn deref_mut(&mut self) -> &mut Self::Target { self.data.as_mut() }
 }

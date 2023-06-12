@@ -1,19 +1,18 @@
 use crate::{
+  context::BuildCtx,
   dynamic_widget::DynWidget,
+  prelude::ChildFrom,
   state::{State, Stateful},
-  widget::{ImplMarker, IntoWidget, NotSelf, Widget},
+  widget::{Widget, WidgetBuilder, WidgetId},
 };
 
-use super::{
-  child_convert::{FillVec, IntoChild},
-  ComposeChild, WidgetPair,
-};
+use super::{child_convert::FillVec, ComposeChild, WidgetPair};
 
 /// Trait specify what child a compose child widget can have, and the target
 /// type after widget compose its child.
-pub trait ComposeWithChild<M, C> {
+pub trait ComposeWithChild<C, M> {
   type Target;
-  fn with_child(self, child: C) -> Self::Target;
+  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
 }
 
 /// The pair a `ComposeChild` widget with its child that may some children not
@@ -46,206 +45,244 @@ pub trait TemplateBuilder: Sized {
   fn build_tml(self) -> Self::Target;
 }
 
-pub trait FillTml<M, C> {
-  fn fill_tml(&mut self, c: C);
-}
-
-use helper_impl::IntoComposeChildState;
-impl<M, T, C, Target> ComposeWithChild<[M; 0], C> for T
+impl<M, T, C> ComposeWithChild<C, M> for T
 where
-  T: IntoComposeChildState,
-  State<T::C>: ComposeWithChild<M, C, Target = Target>,
+  T: ComposeChild,
+  State<T>: ComposeWithChild<C, M>,
 {
-  type Target = Target;
-
-  fn with_child(self, child: C) -> Self::Target {
-    self.into_compose_child_state().with_child(child)
+  type Target = <State<T> as ComposeWithChild<C, M>>::Target;
+  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
+    State::Stateless(self).with_child(child, ctx)
   }
 }
 
-impl<M, W, C1, C2> ComposeWithChild<[M; 0], C2> for WidgetPair<W, C1>
+impl<M, T, C> ComposeWithChild<C, M> for Stateful<T>
 where
-  C1: ComposeWithChild<M, C2>,
+  T: ComposeChild,
+  State<T>: ComposeWithChild<C, M>,
+{
+  type Target = <State<T> as ComposeWithChild<C, M>>::Target;
+  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
+    State::Stateful(self).with_child(child, ctx)
+  }
+}
+
+impl<M, T, C> ComposeWithChild<C, M> for Stateful<DynWidget<T>>
+where
+  T: ComposeChild + 'static,
+  State<T>: ComposeWithChild<C, M>,
+{
+  type Target = <State<T> as ComposeWithChild<C, M>>::Target;
+  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
+    State::from(self).with_child(child, ctx)
+  }
+}
+
+impl<M, W, C1, C2> ComposeWithChild<C2, M> for WidgetPair<W, C1>
+where
+  C1: ComposeWithChild<C2, M>,
 {
   type Target = WidgetPair<W, C1::Target>;
 
-  fn with_child(self, c: C2) -> Self::Target {
+  fn with_child(self, c: C2, ctx: &BuildCtx) -> Self::Target {
     let WidgetPair { widget, child } = self;
-    WidgetPair { widget, child: child.with_child(c) }
+    WidgetPair {
+      widget,
+      child: child.with_child(c, ctx),
+    }
   }
 }
 
-impl<C, W, M> ComposeWithChild<[M; 0], C> for State<W>
+impl<W, C, Builder, M> ComposeWithChild<C, M> for ComposePair<State<W>, Builder>
 where
   W: ComposeChild,
-  C: IntoChild<M, W::Child>,
-  M: ImplMarker,
+  Builder: TemplateBuilder + ComposeWithChild<C, M, Target = Builder>,
+{
+  type Target = ComposePair<State<W>, Builder>;
+
+  fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
+    let Self { widget, child } = self;
+    let child = child.with_child(c, ctx);
+    ComposePair { widget, child }
+  }
+}
+
+impl<C, W, M> ComposeWithChild<C, [M; 0]> for State<W>
+where
+  W: ComposeChild,
+  W::Child: ChildFrom<C, M>,
 {
   type Target = ComposePair<State<W>, W::Child>;
 
   #[inline]
-  fn with_child(self, child: C) -> Self::Target {
+  fn with_child(self, child: C, _: &BuildCtx) -> Self::Target {
     ComposePair {
       widget: self,
-      child: child.into_child(),
+      child: ChildFrom::child_from(child),
     }
   }
 }
 
-impl<C, W, Child, M> ComposeWithChild<[M; 1], C> for State<W>
+impl<W, C, Child, M> ComposeWithChild<C, [M; 1]> for State<W>
 where
-  W: ComposeChild<Child = Vec<Child>>,
-  C: FillVec<M, Child>,
-  M: ImplMarker,
+  W: ComposeChild<Child = Child>,
+  Child: Template,
+  Child::Builder: ComposeWithChild<C, M, Target = Child::Builder>,
 {
-  type Target = ComposePair<State<W>, Vec<Child>>;
+  type Target = ComposePair<State<W>, Child::Builder>;
 
   #[inline]
-  fn with_child(self, c: C) -> Self::Target {
-    let mut child = vec![];
-    c.fill_vec(&mut child);
+  fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
+    let builder = W::Child::builder();
+    let child = builder.with_child(c, ctx);
     ComposePair { widget: self, child }
   }
 }
 
-impl<W, C1, C2, M> ComposeWithChild<[M; 2], C1> for ComposePair<State<W>, Vec<C2>>
+impl<W, C, Child, M> ComposeWithChild<C, [M; 2]> for State<W>
 where
-  C1: FillVec<M, C2>,
+  W: ComposeChild<Child = Option<Child>>,
+  Child: Template,
+  Child::Builder: ComposeWithChild<C, M, Target = Child::Builder>,
 {
-  type Target = ComposePair<State<W>, Vec<C2>>;
+  type Target = ComposePair<State<W>, Child::Builder>;
 
-  fn with_child(mut self, child: C1) -> Self::Target {
-    child.fill_vec(&mut self.child);
-    self
+  fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
+    let builder = Child::builder();
+    let child = builder.with_child(c, ctx);
+    ComposePair { widget: self, child }
   }
 }
 
-mod more_impl_for_fill_tml {
+pub(crate) mod decorate_tml_impl {
   use super::*;
-  macro_rules! impl_template_with_child {
-    ($child: ty, $idx:tt) => {
-      impl<W, C, Child, M> ComposeWithChild<[M; $idx], C> for State<W>
-      where
-        W: ComposeChild<Child = $child>,
-        Child: Template,
-        Child::Builder: FillTml<M, C>,
-      {
-        type Target = ComposePair<State<W>, Child::Builder>;
 
-        fn with_child(self, c: C) -> Self::Target {
-          let mut builder = Child::builder();
-          builder.fill_tml(c);
-          ComposePair { widget: self, child: builder }
-        }
-      }
-    };
-  }
-
-  impl_template_with_child!(Child, 5);
-  impl_template_with_child!(Option<Child>, 6);
-
-  impl<W, C, Builder, M> ComposeWithChild<[M; 6], C> for ComposePair<State<W>, Builder>
-  where
-    W: ComposeChild,
-    Builder: FillTml<M, C>,
-  {
-    type Target = ComposePair<State<W>, Builder>;
-
-    fn with_child(mut self, c: C) -> Self::Target {
-      self.child.fill_tml(c);
-      self
-    }
-  }
-
-  impl<T, C, M> ComposeWithChild<NotSelf<[M; 7]>, C> for T
-  where
-    T: TemplateBuilder + FillTml<M, C>,
-  {
-    type Target = Self;
-
-    #[inline]
-    fn with_child(mut self, child: C) -> Self::Target {
-      self.fill_tml(child);
-      self
-    }
-  }
-}
-
-mod decorate_tml_impl {
-  use super::*;
-  use crate::widget::SelfImpl;
-
-  impl<M, W, C> ComposeWithChild<NotSelf<[M; 0]>, C> for State<W>
+  impl<M, W, C> ComposeWithChild<C, [M; 3]> for State<W>
   where
     W: ComposeChild<Child = Widget> + 'static,
     C: DecorateTmlMarker<M>,
-    M: ImplMarker,
   {
     type Target = ComposePair<Self, C>;
 
     #[inline]
-    fn with_child(self, child: C) -> Self::Target { ComposePair { widget: self, child } }
-  }
-
-  impl<T: TmlFlag, C> DecorateTml<T, C> {
-    pub fn decorate<M: ImplMarker, W: IntoWidget<M>>(
-      self,
-      tml_to_widget: impl FnOnce(T, C) -> W,
-    ) -> Widget {
-      let Self { decorator, tml_flag, child } = self;
-      decorator(tml_to_widget(tml_flag, child).into_widget())
+    fn with_child(self, child: C, _: &BuildCtx) -> Self::Target {
+      ComposePair { widget: self, child }
     }
   }
 
-  trait DecorateTmlMarker<M: ImplMarker> {}
-
-  impl<T: TmlFlag, C> DecorateTmlMarker<SelfImpl> for DecorateTml<T, C> {}
-
-  impl<T: TmlFlag, C> DecorateTmlMarker<NotSelf<()>> for WidgetPair<T, C> {}
-
-  impl<M, T, C> DecorateTmlMarker<NotSelf<M>> for WidgetPair<T, C>
-  where
-    M: ImplMarker,
-    C: DecorateTmlMarker<M>,
-  {
+  impl<T: TmlFlag, C> DecorateTml<T, C> {
+    pub fn decorate(self, tml_to_widget: impl FnOnce(T, C) -> Widget) -> Widget {
+      let Self { decorator, tml_flag, child } = self;
+      let w = tml_to_widget(tml_flag, child);
+      decorator(w)
+    }
   }
 
-  impl<M: ImplMarker, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<M> for ComposePair<T, C> {}
+  trait DecorateTmlMarker<M> {}
+
+  impl<T: TmlFlag, C> DecorateTmlMarker<()> for DecorateTml<T, C> {}
+
+  impl<T: TmlFlag, C> DecorateTmlMarker<[(); 0]> for WidgetPair<T, C> {}
+
+  impl<M, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<[M; 1]> for WidgetPair<T, C> {}
+
+  impl<M, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<M> for ComposePair<T, C> {}
+
+  pub(crate) trait IntoDecorateTml<C, M> {
+    type Flag: TmlFlag;
+    fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C>;
+  }
+
+  impl<W, C, M, C2> IntoDecorateTml<C, [M; 0]> for WidgetPair<W, C2>
+  where
+    W: TmlFlag,
+    C: ChildFrom<C2, M>,
+  {
+    type Flag = W;
+
+    fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C> {
+      let WidgetPair { widget: tml_flag, child } = self;
+      let decorator = Box::new(|w| w);
+      let child = C::child_from(child);
+      DecorateTml { decorator, tml_flag, child }
+    }
+  }
+
+  impl<W, C, C2, M> IntoDecorateTml<C, [M; 1]> for WidgetPair<W, C2>
+  where
+    W: 'static,
+    C2: IntoDecorateTml<C, M>,
+    WidgetPair<W, Widget>: WidgetBuilder,
+  {
+    type Flag = C2::Flag;
+
+    fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C> {
+      let WidgetPair { widget, child } = self;
+      let DecorateTml { decorator, tml_flag, child } = ChildFrom::child_from(child);
+      DecorateTml {
+        decorator: Box::new(move |w| WidgetPair { widget, child: decorator(w) }.into()),
+        tml_flag,
+        child,
+      }
+    }
+  }
+
+  impl<W, C, C2, M> IntoDecorateTml<C, M> for ComposePair<State<W>, C2>
+  where
+    W: ComposeChild<Child = Widget> + 'static,
+    C2: IntoDecorateTml<C, M>,
+  {
+    type Flag = C2::Flag;
+
+    fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C> {
+      let ComposePair { widget, child } = self;
+      let DecorateTml { decorator, tml_flag, child } = child.into_decorate_tml();
+      DecorateTml {
+        decorator: Box::new(move |w| ComposeChild::compose_child(widget, decorator(w))),
+        tml_flag,
+        child,
+      }
+    }
+  }
 }
 
-impl<W, M, C> IntoWidget<NotSelf<[M; 0]>> for ComposePair<State<W>, C>
+impl<W, C> WidgetBuilder for ComposePair<State<W>, C>
 where
   W: ComposeChild,
-  C: IntoChild<M, W::Child>,
-  M: ImplMarker,
+  W::Child: From<C>,
 {
   #[inline]
-  fn into_widget(self) -> Widget {
+  fn build(self, ctx: &BuildCtx) -> WidgetId {
     let Self { widget, child } = self;
-    ComposeChild::compose_child(widget, child.into_child())
+    ComposeChild::compose_child(widget, child.into()).build(ctx)
   }
 }
 
-mod helper_impl {
-  use super::*;
-  pub trait IntoComposeChildState {
-    type C: ComposeChild;
-    fn into_compose_child_state(self) -> State<Self::C>;
-  }
+// impl Vec<T> as Template
 
-  macro_rules! impl_compose_child_state {
-    ($ty: ty $(,$static:lifetime)?) => {
-      impl<C: ComposeChild $(+ $static)?> IntoComposeChildState for $ty {
-        type C = C;
-        #[inline]
-        fn into_compose_child_state(self) -> State<Self::C> { self.into() }
-      }
-    };
-  }
+impl<T> Template for Vec<T> {
+  type Builder = Self;
+  #[inline]
+  fn builder() -> Self::Builder { vec![] }
+}
 
-  impl_compose_child_state!(C);
-  impl_compose_child_state!(Stateful<C>);
-  impl_compose_child_state!(Stateful<DynWidget<C>>, 'static);
+impl<T> TemplateBuilder for Vec<T> {
+  type Target = Self;
+  #[inline]
+  fn build_tml(self) -> Self::Target { self }
+}
+
+impl<M, C, T> ComposeWithChild<C, M> for Vec<T>
+where
+  C: FillVec<T, M>,
+{
+  type Target = Self;
+
+  #[inline]
+  fn with_child(mut self, child: C, _: &BuildCtx) -> Self::Target {
+    child.fill_vec(&mut self);
+    self
+  }
 }
 
 #[cfg(test)]
@@ -256,7 +293,6 @@ mod tests {
   use crate::{prelude::*, test_helper::MockBox};
   #[derive(Template)]
   struct PTml {
-    #[template(flat_fill)]
     _child: CTml,
   }
 
@@ -269,7 +305,7 @@ mod tests {
 
   impl ComposeChild for P {
     type Child = PTml;
-    fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+    fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
   }
 
   #[derive(Declare)]
@@ -278,32 +314,20 @@ mod tests {
   impl ComposeChild for X {
     type Child = Widget;
 
-    fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+    fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
   }
 
   #[test]
-  fn template_fill_template() { let _ = P.with_child(Void).into_widget(); }
+  fn template_fill_template() { let _ = FnWidget::new(|ctx| P.with_child(Void, ctx).build(ctx)); }
 
   #[test]
   fn pair_compose_child() {
-    let _ = MockBox { size: ZERO_SIZE }
-      .with_child(X)
-      .with_child(Void {})
-      .into_widget();
-  }
-
-  #[test]
-  fn enum_widget_compose_child() {
-    let flag = true;
-    let _ = widget! {
-      DynWidget {
-        dyns: match flag {
-          true => WidgetE2::A(MockBox{ size: ZERO_SIZE }.with_child(X)),
-          false => WidgetE2::B(X),
-        },
-        X { Void {} }
-      }
-    };
+    let _ = FnWidget::new(|ctx| {
+      MockBox { size: ZERO_SIZE }
+        .with_child(X, ctx)
+        .with_child(Void {}, ctx)
+        .build(ctx)
+    });
   }
 
   #[derive(SingleChild)]
@@ -319,14 +343,25 @@ mod tests {
       type Child = DecorateTml<Tml, A>;
 
       fn compose_child(_this: State<Self>, child: Self::Child) -> Widget {
-        child.decorate(|_, _| Void.into_widget())
+        child.decorate(|_, _| Void.into())
       }
     }
     let mb = MockBox { size: Size::zero() };
-    let _: Widget = WithDecorate
-      .with_child(mb.clone().with_child(mb.with_child(Tml.with_child(A))))
-      .into_widget();
-    let _: Widget = WithDecorate.with_child(Tml.with_child(A)).into_widget();
+    let _ = FnWidget::new(|ctx| {
+      WithDecorate
+        .with_child(
+          mb.clone()
+            .with_child(mb.with_child(Tml.with_child(A, ctx), ctx), ctx),
+          ctx,
+        )
+        .build(ctx)
+    });
+
+    let _ = FnWidget::new(|ctx| {
+      WithDecorate
+        .with_child(Tml.with_child(A, ctx), ctx)
+        .build(ctx)
+    });
   }
 
   #[test]
@@ -339,17 +374,29 @@ mod tests {
       type Child = EmbedDecorateTml;
 
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
-        child.0.decorate(|_, _| Void.into_widget())
+        child.0.decorate(|_, _| Void.into())
       }
     }
 
-    let _ = WithDecorate.with_child(Tml.with_child(A)).into_widget();
+    let _ = FnWidget::new(|ctx| {
+      WithDecorate
+        .with_child(Tml.with_child(A, ctx), ctx)
+        .build(ctx)
+    });
     let mb = MockBox { size: Size::zero() };
-    let _ = WithDecorate.with_child(mb.clone().with_child(Tml.with_child(A)));
-    let cursor = Cursor {
-      cursor: Rc::new(Cell::new(CursorIcon::Hand)),
-    };
-    let x = cursor.with_child(Tml.with_child(A));
-    let _ = WithDecorate.with_child(mb.with_child(x)).into_widget();
+    let _ = FnWidget::new(|ctx| {
+      WithDecorate
+        .with_child(mb.clone().with_child(Tml.with_child(A, ctx), ctx), ctx)
+        .build(ctx)
+    });
+    let _ = FnWidget::new(|ctx| {
+      let cursor = Cursor {
+        cursor: Rc::new(Cell::new(CursorIcon::Hand)),
+      };
+      let x = cursor.with_child(Tml.with_child(A, ctx), ctx);
+      WithDecorate
+        .with_child(mb.with_child(x, ctx), ctx)
+        .build(ctx)
+    });
   }
 }

@@ -23,9 +23,7 @@ impl Render for Container {
   fn only_sized_by_parent(&self) -> bool { true }
 }
 
-impl Query for Container {
-  ribir_core::impl_query_self_only!();
-}
+ribir_core::impl_query_self_only!(Container);
 
 #[cfg(test)]
 mod tests {
@@ -35,8 +33,6 @@ mod tests {
   use ribir_geom::Size;
 
   const SIZE: Size = Size::new(100., 100.);
-  fn smoke() -> Widget {
-    widget! { Container { size: SIZE }}
-  }
+  fn smoke() -> Widget { widget! { Container { size: SIZE }}.into() }
   widget_layout_test!(smoke, size == SIZE,);
 }

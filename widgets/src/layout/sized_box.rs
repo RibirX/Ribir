@@ -22,9 +22,7 @@ impl Render for SizedBox {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for SizedBox {
-  impl_query_self_only!();
-}
+impl_query_self_only!(SizedBox);
 
 #[cfg(test)]
 mod tests {
@@ -41,6 +39,7 @@ mod tests {
         Text { text: "" }
       }
     }
+    .into()
   }
   widget_layout_test!(fix_size, width == 100., height == 100.,);
 
@@ -51,6 +50,7 @@ mod tests {
         Text { text: "" }
       }
     }
+    .into()
   }
   widget_layout_test!(
     shrink_size,
@@ -65,6 +65,7 @@ mod tests {
         Text { text: "" }
       }
     }
+    .into()
   }
   widget_layout_test!(
     expanded_size,
@@ -73,6 +74,6 @@ mod tests {
     { path = [0, 0], size == INFINITY_SIZE,}
   );
 
-  fn empty_box() -> Widget { SizedBox { size: Size::new(10., 10.) }.into_widget() }
+  fn empty_box() -> Widget { SizedBox { size: Size::new(10., 10.) }.into() }
   widget_layout_test!(empty_box, width == 10., height == 10.,);
 }

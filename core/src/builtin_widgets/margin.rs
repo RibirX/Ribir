@@ -37,9 +37,7 @@ impl Render for Margin {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for Margin {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Margin);
 
 impl Margin {
   #[inline]
@@ -139,6 +137,7 @@ mod tests {
         size: Size::new(100., 100.)
       }
     }
+    .into()
   }
   widget_layout_test!(
     smoke,

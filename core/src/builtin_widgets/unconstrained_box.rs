@@ -71,9 +71,7 @@ impl Render for UnconstrainedBox {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl Query for UnconstrainedBox {
-  crate::impl_query_self_only!();
-}
+crate::impl_query_self_only!(UnconstrainedBox);
 
 #[cfg(test)]
 mod tests {
@@ -99,6 +97,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(
     smoke,

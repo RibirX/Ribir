@@ -1,8 +1,15 @@
 use crate::{
-  context::EventCtx,
-  widget_tree::{WidgetId, WidgetTree},
+  context::{define_widget_context, WidgetCtx, WidgetCtxImpl},
+  widget_tree::WidgetId,
+  window::Window,
 };
-use std::ptr::NonNull;
+
+use rxrust::{
+  prelude::*,
+  rc::{MutRc, RcDeref, RcDerefMut},
+};
+use smallvec::SmallVec;
+use std::convert::Infallible;
 
 pub(crate) mod dispatcher;
 mod pointers;
@@ -19,21 +26,15 @@ mod wheel;
 pub use wheel::*;
 pub(crate) mod focus_mgr;
 mod listener_impl_helper;
-use self::dispatcher::DispatchInfo;
 
-/// Event itself contains the properties and methods which are common to all
-/// events
-#[derive(Clone)]
-pub struct EventCommon {
-  pub(crate) target: WidgetId,
-  pub(crate) current_target: WidgetId,
-  pub(crate) is_propagation: bool,
-  pub(crate) prevent_default: bool,
-  tree: NonNull<WidgetTree>,
-  info: NonNull<DispatchInfo>,
-}
+define_widget_context!(
+  CommonEvent,
+  target: WidgetId,
+  propagation: bool,
+  prevent_default: bool
+);
 
-impl EventCommon {
+impl<'a> CommonEvent<'a> {
   /// The target property of the Event interface is a reference to the object
   /// onto which the event was dispatched. It is different from
   /// Event::current_target when the event handler is called during the bubbling
@@ -44,30 +45,36 @@ impl EventCommon {
   /// object to which the event is currently slated to be sent. It's possible
   /// this has been changed along the way through retargeting.
   #[inline]
-  pub fn current_target(&self) -> WidgetId { self.current_target }
+  pub fn current_target(&self) -> WidgetId { self.id }
   /// Prevent event bubbling to parent.
   #[inline]
-  pub fn stop_propagation(&mut self) { self.is_propagation = true }
-  /// Return it the event is canceled to bubble to parent.
+  pub fn stop_propagation(&mut self) { self.propagation = false }
+  /// Whether the event is bubbling or not.
   #[inline]
-  pub fn is_propagation(&self) -> bool { self.is_propagation }
+  pub fn is_propagation(&self) -> bool { self.propagation }
   /// Tells the user agent that if the event does not get explicitly handled,
   /// its default action should not be taken as it normally would be.
   #[inline]
   pub fn prevent_default(&mut self) { self.prevent_default = true; }
 
+  /// Whether the event is prevented the default action or not.
+  #[inline]
+  pub(crate) fn is_prevent_default(&self) -> bool { self.prevent_default }
+
   /// Represents the current state of the keyboard modifiers
   #[inline]
-  pub fn modifiers(&self) -> ModifiersState { self.dispatch_info().modifiers() }
+  pub fn modifiers(&self) -> ModifiersState { self.pick_info(DispatchInfo::modifiers) }
 
   /// Returns `true` if the shift key is pressed.
-  pub fn with_shift_key(&self) -> bool { self.dispatch_info().modifiers().shift() }
+  pub fn with_shift_key(&self) -> bool { self.modifiers().shift() }
+
   /// Returns `true` if the alt key is pressed.
-  pub fn with_alt_key(&self) -> bool { self.dispatch_info().modifiers().alt() }
+  pub fn with_alt_key(&self) -> bool { self.modifiers().alt() }
+
   /// Returns `true` if the ctrl key is pressed.
-  pub fn with_ctrl_key(&self) -> bool { self.dispatch_info().modifiers().ctrl() }
+  pub fn with_ctrl_key(&self) -> bool { self.modifiers().ctrl() }
   /// Returns `true` if the logo key is pressed.
-  pub fn with_logo_key(&self) -> bool { self.dispatch_info().modifiers().logo() }
+  pub fn with_logo_key(&self) -> bool { self.modifiers().logo() }
 
   /// Returns true if the main modifier key in the
   /// current platform is pressed. Specifically:
@@ -83,87 +90,152 @@ impl EventCommon {
 
   /// The X, Y coordinate of the mouse pointer in global (window) coordinates.
   #[inline]
-  pub fn global_pos(&self) -> Point { self.dispatch_info().global_pos() }
+  pub fn global_pos(&self) -> Point { self.pick_info(DispatchInfo::global_pos) }
 
   /// The X, Y coordinate of the pointer in current target widget.
   #[inline]
-  pub fn position(&self) -> Point {
-    let tree = unsafe { self.tree.as_ref() };
-    tree
-      .store
-      .map_from_global(self.global_pos(), self.current_target, &tree.arena)
-  }
+  pub fn position(&self) -> Point { self.map_from_global(self.global_pos()) }
 
   /// The buttons being depressed (if any) in current state.
   #[inline]
-  pub fn mouse_buttons(&self) -> MouseButtons { self.dispatch_info().mouse_buttons() }
+  pub fn mouse_buttons(&self) -> MouseButtons { self.pick_info(DispatchInfo::mouse_buttons) }
 
   /// The button number that was pressed (if applicable) when the mouse event
   /// was fired.
   #[inline]
   pub fn button_num(&self) -> u32 { self.mouse_buttons().bits().count_ones() }
-
-  #[inline]
-  pub fn context(&mut self) -> EventCtx {
-    // Safety: framework promise event context only live in event dispatch and
-    // there is no others to share `Context`.
-    let WidgetTree { arena, store, wnd_ctx, .. } = unsafe { self.tree.as_ref() };
-    EventCtx {
-      id: self.current_target(),
-      arena,
-      store,
-      wnd_ctx,
-      info: self.dispatch_info_mut(),
-    }
-  }
-
-  pub fn next_focus(&self) {
-    let tree = unsafe { self.tree.as_ref() };
-    tree.wnd_ctx.next_focus(&tree.arena);
-  }
-
-  pub fn prev_focus(&self) {
-    let tree = unsafe { self.tree.as_ref() };
-    tree.wnd_ctx.prev_focus(&tree.arena);
-  }
-
-  fn dispatch_info_mut(&mut self) -> &mut DispatchInfo {
-    // Safety: framework promise `info` only live in event dispatch and
-    // there is no others borrow `info`.
-    unsafe { self.info.as_mut() }
-  }
-
-  fn dispatch_info(&self) -> &DispatchInfo {
-    // Safety: framework promise `info` only live in event dispatch and
-    // there is no others mutable borrow `info`.
-    unsafe { self.info.as_ref() }
-  }
 }
 
 pub trait EventListener {
-  type Event: std::borrow::BorrowMut<EventCommon>;
-  fn dispatch(&self, event: &mut Self::Event);
+  type Event<'a>;
+  fn dispatch(&self, event: &mut Self::Event<'_>);
 }
 
-impl std::fmt::Debug for EventCommon {
+impl<'a> std::fmt::Debug for CommonEvent<'a> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_struct("CommonEvent")
-      .field("target", &self.target)
-      .field("current_target", &self.current_target)
-      .field("is_propagation", &self.is_propagation)
+      .field("target", &self.id)
+      .field("current_target", &self.id)
+      .field("is_propagation", &self.propagation)
       .finish()
   }
 }
 
-impl EventCommon {
-  pub(crate) fn new(target: WidgetId, tree: &WidgetTree, info: &DispatchInfo) -> Self {
+impl<'a> CommonEvent<'a> {
+  /// Create a new common event.
+  ///
+  /// Although the `dispatcher` is contained in the `wnd`, we still need to pass
+  /// it because in most case the event create in a environment that the
+  /// `Dispatcher` already borrowed.
+  pub(crate) fn new(target: WidgetId, wnd: &'a Window) -> Self {
     Self {
       target,
-      current_target: target,
-      is_propagation: <_>::default(),
-      prevent_default: <_>::default(),
-      tree: NonNull::from(tree),
-      info: NonNull::from(info),
+      wnd,
+      id: target,
+      propagation: true,
+      prevent_default: false,
     }
   }
+
+  pub(crate) fn set_current_target(&mut self, id: WidgetId) { self.id = id; }
+
+  fn pick_info<R>(&self, f: impl FnOnce(&DispatchInfo) -> R) -> R {
+    f(&self.wnd.dispatcher.borrow().info)
+  }
 }
+
+macro_rules! impl_event_subject {
+  ($name: ident) => {
+    paste::paste! {
+      impl_event_subject!($name, event_name = [<$name Event>]);
+    }
+  };
+  ($name: ident, event_name = $event: ident) => {
+    paste::paste! {
+      pub(crate) type [<$name Publisher>] =
+        MutRc<Option<SmallVec<
+          [Box<dyn for<'a, 'b> Publisher<&'a mut $event<'b>, Infallible>>; 1]
+        >>>;
+
+      #[derive(Clone)]
+      pub struct [<$name Subject>] {
+        observers: [<$name Publisher>],
+        chamber: [<$name Publisher>],
+      }
+
+      impl<'a, 'b, O> Observable<&'a mut $event<'b>, Infallible, O> for [<$name Subject>]
+      where
+        O: for<'r1, 'r2> Observer<&'r1 mut $event<'r2>, Infallible> + 'static,
+      {
+        type Unsub = Subscriber<O>;
+
+        fn actual_subscribe(self, observer: O) -> Self::Unsub {
+          if let Some(chamber) = self.chamber.rc_deref_mut().as_mut() {
+            self
+              .observers
+              .rc_deref_mut()
+              .as_mut()
+              .unwrap()
+              .retain(|p| !p.p_is_closed());
+
+            let subscriber = Subscriber::new(Some(observer));
+            chamber.push(Box::new(subscriber.clone()));
+            subscriber
+          } else {
+            Subscriber::new(None)
+          }
+        }
+      }
+      impl<'a, 'b> ObservableExt<&'a mut $event<'b>, Infallible> for [<$name Subject>] {}
+
+      impl<'a, 'b> Observer<&'a mut $event<'b>, Infallible> for [<$name Subject>] {
+        fn next(&mut self, value: &'a mut $event<'b>) {
+          self.load();
+          if let Some(observers) = self.observers.rc_deref_mut().as_mut() {
+            for p in observers.iter_mut() {
+              p.p_next(value);
+            }
+          }
+        }
+
+        fn error(self, _: Infallible) {}
+
+        fn complete(mut self) {
+          self.load();
+          if let Some(observers) = self.observers.rc_deref_mut().take() {
+            observers
+              .into_iter()
+              .filter(|o| !o.p_is_closed())
+              .for_each(|subscriber| subscriber.p_complete());
+          }
+        }
+
+        #[inline]
+        fn is_finished(&self) -> bool { self.observers.rc_deref().is_none() }
+      }
+
+      impl [<$name Subject>] {
+        fn load(&mut self) {
+          if let Some(observers) = self.observers.rc_deref_mut().as_mut() {
+            observers.append(self.chamber.rc_deref_mut().as_mut().unwrap());
+          }
+        }
+      }
+
+      impl Default for [<$name Subject>] {
+        fn default() -> Self {
+          Self {
+            observers: MutRc::own(Some(<_>::default())),
+            chamber: MutRc::own(Some(<_>::default())),
+          }
+        }
+      }
+    }
+  };
+}
+
+pub(crate) use impl_event_subject;
+
+use self::dispatcher::DispatchInfo;
+
+impl_event_subject!(Common);

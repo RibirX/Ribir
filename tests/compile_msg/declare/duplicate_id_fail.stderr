@@ -51,3 +51,14 @@ error: Same `id: same_id` assign to multiple objects, id must be unique.
 ...
 60 |           states { same_id: Stateful::new(0),}
    |                    ^^^^^^^
+
+error[E0282]: type annotations needed
+ --> compile_msg/declare/duplicate_id_fail.rs:4:7
+  |
+4 |   let _id_must_be_unique_err = widget! {
+  |       ^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: consider giving `_id_must_be_unique_err` an explicit type
+  |
+4 |   let _id_must_be_unique_err: /* Type */ = widget! {
+  |                             ++++++++++++

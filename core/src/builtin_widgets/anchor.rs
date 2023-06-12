@@ -39,20 +39,10 @@ pub struct BottomAnchor {
   pub bottom_anchor: PositionUnit,
 }
 
-impl Query for LeftAnchor {
-  crate::impl_query_self_only!();
-}
-
-impl Query for TopAnchor {
-  crate::impl_query_self_only!();
-}
-
-impl Query for RightAnchor {
-  crate::impl_query_self_only!();
-}
-impl Query for BottomAnchor {
-  crate::impl_query_self_only!();
-}
+crate::impl_query_self_only!(LeftAnchor);
+crate::impl_query_self_only!(TopAnchor);
+crate::impl_query_self_only!(RightAnchor);
+crate::impl_query_self_only!(BottomAnchor);
 
 impl Render for LeftAnchor {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
@@ -160,6 +150,7 @@ mod test {
         top_anchor: 1.,
       }
     }
+    .into()
   }
   widget_layout_test!(
     pixel_left_top,
@@ -176,6 +167,7 @@ mod test {
         bottom_anchor: 1.,
       }
     }
+    .into()
   }
   widget_layout_test!(
     pixel_left_bottom,
@@ -192,6 +184,7 @@ mod test {
         top_anchor: 1.,
       }
     }
+    .into()
   }
   widget_layout_test!(
     pixel_top_right,
@@ -208,6 +201,7 @@ mod test {
         bottom_anchor: 1.,
       }
     }
+    .into()
   }
   widget_layout_test!(
     pixel_bottom_right,
@@ -224,6 +218,7 @@ mod test {
         top_anchor: Percent(10.),
       }
     }
+    .into()
   }
   widget_layout_test!(
     percent_left_top,
@@ -240,6 +235,7 @@ mod test {
         bottom_anchor: Percent( 10.),
       }
     }
+    .into()
   }
   widget_layout_test! {
     percent_left_bottom,
@@ -256,6 +252,7 @@ mod test {
         top_anchor: Percent(10.),
       }
     }
+    .into()
   }
   widget_layout_test!(
     percent_top_right,
@@ -272,6 +269,7 @@ mod test {
         bottom_anchor: Percent(10.),
       }
     }
+    .into()
   }
   widget_layout_test!(
     percent_bottom_right,

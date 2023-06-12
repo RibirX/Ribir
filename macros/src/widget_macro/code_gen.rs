@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use syn::{
   parse_macro_input, parse_quote,
   spanned::Spanned,
-  token::{Brace, Dot, Paren, Semi},
+  token::{Brace, Comma, Dot, Paren, Semi},
   visit_mut::VisitMut,
   Expr, Ident,
 };
@@ -162,7 +162,7 @@ impl Desugared {
     if !errors.is_empty() {
       Brace::default().surround(tokens, |tokens| {
         errors.iter().for_each(|err| err.to_compile_error(tokens));
-        quote! { Void.into_widget() }.to_tokens(tokens);
+        quote! { Void.into() }.to_tokens(tokens);
       });
 
       return;
@@ -198,17 +198,17 @@ impl Desugared {
       finally.to_tokens(tokens);
 
       if ctx.has_guards_data {
-        quote! { widget_attach_data }.to_tokens(tokens);
+        quote! { DataWidget::attach }.to_tokens(tokens);
         Paren::default().surround(tokens, |tokens| {
           w.gen_compose_node(named_objs, tokens);
           let guards_vec = guard_vec_ident();
-          quote! { .into_widget(), #guards_vec }.to_tokens(tokens)
+          quote! { .into(), #guards_vec }.to_tokens(tokens)
         });
       } else {
         w.gen_compose_node(named_objs, tokens)
       }
     });
-    quote! { ; #name.into_widget() }.to_tokens(tokens);
+    quote! { ; FnWidget::new(#name) }.to_tokens(tokens);
   }
 
   pub fn collect_warnings(&mut self, ctx: &VisitCtx) { self.collect_unused_declare_obj(ctx); }
@@ -513,16 +513,23 @@ impl WidgetNode {
       let first = &nodes[0];
       first.to_tokens(tokens);
       let span = first.span();
+      let ctx_name = ctx_ident();
 
       if nodes.len() > 1 {
         quote_spanned! { span => .with_child}.to_tokens(tokens);
         Paren(span).surround(tokens, |tokens| {
           recursive_compose(&nodes[1..], children, named_objs, tokens);
+          Comma::default().to_tokens(tokens);
+          ctx_name.to_tokens(tokens);
         });
       } else {
         children.iter().for_each(|c| {
           quote_spanned!(span => .with_child).to_tokens(tokens);
-          Paren(span).surround(tokens, |tokens| c.gen_compose_node(named_objs, tokens))
+          Paren(span).surround(tokens, |tokens| {
+            c.gen_compose_node(named_objs, tokens);
+            Comma::default().to_tokens(tokens);
+            ctx_name.to_tokens(tokens);
+          })
         });
       }
     }

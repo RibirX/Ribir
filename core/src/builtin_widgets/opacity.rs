@@ -7,9 +7,7 @@ pub struct Opacity {
   pub opacity: f32,
 }
 
-impl Query for Opacity {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Opacity);
 
 impl Render for Opacity {
   #[inline]

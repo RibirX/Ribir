@@ -41,6 +41,4 @@ impl Render for Clip {
   }
 }
 
-impl Query for Clip {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Clip);

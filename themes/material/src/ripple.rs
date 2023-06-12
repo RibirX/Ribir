@@ -121,6 +121,7 @@ impl ComposeChild for Ripple {
         })
       }
     }
+    .into()
   }
 }
 

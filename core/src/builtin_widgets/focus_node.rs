@@ -1,5 +1,5 @@
 use crate::{
-  data_widget::compose_child_as_data_widget,
+  data_widget::attach_to_id,
   events::focus_mgr::{FocusHandle, FocusType},
   impl_query_self_only,
   prelude::*,
@@ -41,47 +41,63 @@ impl ComposeChild for FocusNode {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let this = this.into_writable();
+    FnWidget::new(|ctx| {
+      let id = child.build(ctx);
 
-    let w = widget! {
-      states { this: this.clone() }
-      DynWidget {
-        on_mounted: move |ctx| WidgetCtxImpl::wnd_ctx(&ctx)
-          .add_focus_node(ctx.id, this.auto_focus, FocusType::Node, ctx.tree_arena()),
-        on_disposed: move|ctx| WidgetCtxImpl::wnd_ctx(&ctx)
-          .remove_focus_node(ctx.id, FocusType::Node),
-        dyns: child
-      }
-    };
-    compose_child_as_data_widget(w, State::Stateful(this))
-  }
-}
+      if !ctx.assert_get(id).contain_type::<FocusNode>() {
+        let mut subject = None;
+        ctx.assert_get(id).query_on_first_type(
+          QueryOrder::OutsideFirst,
+          |l: &LifecycleListener| {
+            subject = Some(l.lifecycle_stream());
+          },
+        );
+        let subject = subject.unwrap_or_else(|| {
+          let listener = LifecycleListener::default();
+          let subject = listener.lifecycle_stream();
+          attach_to_id(id, ctx.force_as_mut(), |child| {
+            Box::new(DataWidget::new(child, listener))
+          });
+          subject
+        });
 
-impl Query for FocusNode {
-  impl_query_self_only!();
-}
-
-fn has_focus(r: &dyn Render) -> bool {
-  let mut focused = false;
-  r.query_on_first_type(QueryOrder::OutsideFirst, |_: &FocusNode| focused = true);
-  focused
-}
-
-pub(crate) fn dynamic_compose_focus_node(widget: Widget) -> Widget {
-  match widget {
-    Widget::Compose(c) => (|ctx: &BuildCtx| dynamic_compose_focus_node(c(ctx))).into_widget(),
-    Widget::Render { ref render, children: _ } => {
-      if has_focus(render) {
-        widget
-      } else {
-        widget! {
-          DynWidget {
-            tab_index: 0,
-            dyns: widget,
+        fn subscribe_fn(
+          this: Stateful<FocusNode>,
+        ) -> impl for<'a, 'b> FnMut(&'a mut AllLifecycle<'b>) + 'static {
+          move |e: &mut AllLifecycle<'_>| match e {
+            AllLifecycle::Mounted(e) => {
+              let auto_focus = this.state_ref().auto_focus;
+              e.window().add_focus_node(e.id, auto_focus, FocusType::Node)
+            }
+            AllLifecycle::PerformedLayout(_) => {}
+            AllLifecycle::Disposed(e) => e.window().remove_focus_node(e.id, FocusType::Node),
           }
         }
+        let h = subject
+          .subscribe(subscribe_fn(this.clone()))
+          .unsubscribe_when_dropped();
+
+        attach_to_id(id, ctx.force_as_mut(), |child| {
+          let d = DataWidget::new(child, this);
+          Box::new(DataWidget::new(
+            Box::new(d),
+            AnonymousData::new(Box::new(h)),
+          ))
+        });
       }
-    }
+      id
+    })
+    .into()
   }
+}
+
+impl_query_self_only!(FocusNode);
+
+pub(crate) fn dynamic_compose_focus_node(widget: Widget) -> Widget {
+  FnWidget::new(move |ctx: &BuildCtx| {
+    FocusNode { tab_index: 0, auto_focus: false }.with_child(widget, ctx)
+  })
+  .into()
 }
 #[derive(Declare)]
 pub struct RequestFocus {
@@ -97,12 +113,13 @@ impl ComposeChild for RequestFocus {
       states { this: this.clone() }
       DynWidget {
         on_mounted: move |ctx| {
-          this.silent().handle = Some(ctx.wnd_ctx().focus_handle(ctx.id));
+          this.silent().handle = Some(ctx.window().focus_mgr.borrow().focus_handle(ctx.id));
         },
         dyns: child
       }
-    };
-    compose_child_as_data_widget(w, State::Stateful(this))
+    }
+    .into();
+    DataWidget::attach(w, this)
   }
 }
 impl RequestFocus {
@@ -119,9 +136,7 @@ impl RequestFocus {
   }
 }
 
-impl Query for RequestFocus {
-  impl_query_self_only!();
-}
+impl_query_self_only!(RequestFocus);
 
 #[cfg(test)]
 mod tests {
@@ -130,6 +145,8 @@ mod tests {
 
   #[test]
   fn dynamic_focus_node() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     #[derive(Declare)]
     struct AutoFocusNode {}
 
@@ -153,7 +170,7 @@ mod tests {
     };
 
     let wnd = TestWindow::new(widget);
-    let tree = &wnd.widget_tree;
+    let tree = wnd.widget_tree.borrow();
     let id = tree.root();
     let node = id.get(&tree.arena).unwrap();
     let mut cnt = 0;

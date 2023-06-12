@@ -28,6 +28,7 @@ pub trait WinitBackend {
 pub struct WinitShellWnd {
   pub(crate) winit_wnd: winit::window::Window,
   backend: Backend,
+  cursor: CursorIcon,
 }
 
 impl ShellWindow for WinitShellWnd {
@@ -66,8 +67,13 @@ impl ShellWindow for WinitShellWnd {
       .set_min_inner_size(Some(LogicalSize::new(size.width, size.height)))
   }
 
+  fn set_cursor(&mut self, cursor: CursorIcon) {
+    self.cursor = cursor;
+    self.winit_wnd.set_cursor_icon(cursor)
+  }
+
   #[inline]
-  fn set_cursor(&mut self, cursor: CursorIcon) { self.winit_wnd.set_cursor_icon(cursor) }
+  fn cursor(&self) -> CursorIcon { self.cursor }
 
   #[inline]
   fn set_title(&mut self, title: &str) { self.winit_wnd.set_title(title) }
@@ -146,6 +152,7 @@ impl WinitShellWnd {
     WinitShellWnd {
       backend: Backend::new(&winit_wnd),
       winit_wnd,
+      cursor: CursorIcon::Default,
     }
   }
 

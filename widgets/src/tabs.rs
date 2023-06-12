@@ -161,6 +161,7 @@ impl ComposeDecorator for IndicatorDecorator {
         dyns: host,
       }
     }
+    .into()
   }
 }
 
@@ -241,6 +242,7 @@ impl Tabs {
               .subscribe(move |v| indicator.silent_ref().rect = v);
           }
         }
+        .into()
       })
   }
 }
@@ -307,10 +309,12 @@ impl ComposeChild for Tabs {
                   Position::Top | Position::Bottom => Direction::Horizontal,
                   Position::Left | Position::Right => Direction::Vertical,
                 },
-                Tabs::tab_header(
-                  headers, tabs_style.clone(),
-                  no_watch!(this.clone_stateful()),
-                  no_watch!(indicator_decorator.clone_stateful()),
+                Multi::new(
+                  Tabs::tab_header(
+                    headers, tabs_style.clone(),
+                    no_watch!(this.clone_stateful()),
+                    no_watch!(indicator_decorator.clone_stateful()),
+                  )
                 )
               }
             }
@@ -358,9 +362,10 @@ impl ComposeChild for Tabs {
           },
           reverse: matches!(this.silent_ref().pos, Position::Right | Position::Bottom),
           widget::from(header)
-          widget::from(panes)
+          Multi::new(panes)
         }
       }
     }
+    .into()
   }
 }

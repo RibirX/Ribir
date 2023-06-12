@@ -1,13 +1,13 @@
 use ribir_geom::ZERO_SIZE;
 
-use super::{widget_id::split_arena, DirtySet, WidgetId, WidgetTree};
+use super::{WidgetId, WidgetTree};
 use crate::{
-  builtin_widgets::PerformedLayoutListener,
-  context::{LayoutCtx, WindowCtx},
-  prelude::{Point, Rect, Size, INFINITY_SIZE},
-  widget::{QueryOrder, TreeArena},
+  context::{LayoutCtx, WidgetCtx, WidgetCtxImpl},
+  prelude::{Point, Size, INFINITY_SIZE},
+  widget::TreeArena,
+  window::{DelayEvent, Window},
 };
-use std::{cmp::Reverse, collections::HashMap};
+use std::collections::HashMap;
 
 /// boundary limit of the render object's layout
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -98,16 +98,19 @@ pub struct LayoutInfo {
 #[derive(Default)]
 pub(crate) struct LayoutStore {
   data: HashMap<WidgetId, LayoutInfo, ahash::RandomState>,
-  performed: Vec<WidgetId>,
 }
 
 pub struct Layouter<'a> {
-  pub(crate) wid: WidgetId,
-  pub(crate) arena: &'a mut TreeArena,
-  pub(crate) store: &'a mut LayoutStore,
-  pub(crate) wnd_ctx: &'a mut WindowCtx,
-  pub(crate) dirty_set: &'a DirtySet,
+  pub(crate) id: WidgetId,
+  pub(crate) wnd: &'a Window,
   pub(crate) is_layout_root: bool,
+  pub(crate) tree: &'a mut WidgetTree,
+}
+
+impl<'a> WidgetCtxImpl for Layouter<'a> {
+  fn id(&self) -> WidgetId { self.id }
+  fn current_wnd(&self) -> &Window { self.wnd }
+  fn with_tree<F: FnOnce(&WidgetTree) -> R, R>(&self, f: F) -> R { f(self.tree) }
 }
 
 impl LayoutStore {
@@ -125,22 +128,6 @@ impl LayoutStore {
   }
 
   pub(crate) fn layout_info(&self, id: WidgetId) -> Option<&LayoutInfo> { self.data.get(&id) }
-
-  pub(crate) fn swap(&mut self, id1: WidgetId, id2: WidgetId) {
-    let info1 = self.layout_info(id1).cloned();
-    let info2 = self.layout_info(id2).cloned();
-
-    let mut reset = |id, v| {
-      if let Some(info) = v {
-        self.data.insert(id, info);
-      } else {
-        self.data.remove(&id);
-      }
-    };
-
-    reset(id1, info2);
-    reset(id2, info1);
-  }
 
   /// return a mutable reference of the layout info  of `id`, if it's not exist
   /// insert a default value before return
@@ -180,12 +167,6 @@ impl LayoutStore {
       .rev()
       .fold(pos, |pos, p| self.map_from_parent(*p, pos, arena))
   }
-
-  pub(crate) fn take_performed(&mut self) -> Vec<WidgetId> {
-    let performed = self.performed.clone();
-    self.performed.clear();
-    performed
-  }
 }
 
 impl BoxClamp {
@@ -210,125 +191,70 @@ impl<'a> Layouter<'a> {
   /// reset the widget position back to (0, 0) relative to parent, return the
   /// size result after layout
   pub fn perform_widget_layout(&mut self, clamp: BoxClamp) -> Size {
-    let Self {
-      wid,
-      arena,
-      store,
-      wnd_ctx,
-      dirty_set,
-      is_layout_root,
-    } = self;
-
-    let size = store
-      .layout_info(*wid)
-      .filter(|info| clamp == info.clamp)
+    let info = self.tree.store.layout_info(self.id);
+    let size = info
+      .filter(|info| info.clamp == clamp)
       .and_then(|info| info.size)
       .unwrap_or_else(|| {
-        // Safety: `arena1` and `arena2` access different part of `arena`;
-        let (arena1, arena2) = unsafe { split_arena(arena) };
+        // Safety: the `tree` just use to get the widget of `id`, and `tree2` not drop
+        // or modify it during perform layout.
+        let tree2 = unsafe { &mut *(self.tree as *mut WidgetTree) };
 
-        let layout = wid.assert_get(arena1);
-        let mut ctx = LayoutCtx {
-          id: *wid,
-          arena: arena2,
-          store,
-          wnd_ctx,
-          dirty_set,
-        };
-        let size = layout.perform_layout(clamp, &mut ctx);
+        let Self { id, wnd, ref tree, .. } = *self;
+        let mut ctx = LayoutCtx { id, wnd, tree: tree2 };
+        let size = id.assert_get(&tree.arena).perform_layout(clamp, &mut ctx);
+        // The dynamic widget maybe generate a new widget to instead of self. In that
+        // way we needn't add a layout event because it perform layout in another widget
+        // and added the event in that widget.
+        if id == ctx.id {
+          wnd.add_delay_event(DelayEvent::PerformedLayout(id));
+        } else {
+          self.id = ctx.id;
+        }
+
+        let mut info = tree2.store.layout_info_or_default(id);
         let size = clamp.clamp(size);
-        let info = store.layout_info_or_default(*wid);
         info.clamp = clamp;
         info.size = Some(size);
 
-        layout.query_all_type(
-          |_: &PerformedLayoutListener| {
-            store.performed.push(*wid);
-            false
-          },
-          QueryOrder::OutsideFirst,
-        );
         size
       });
-    if !*is_layout_root {
-      store.layout_info_or_default(*wid).pos = Point::zero();
+
+    if !self.is_layout_root {
+      self.update_position(Point::zero())
     }
+
     size
   }
 
   /// Get layouter of the next sibling of this layouter, panic if self is not
   /// performed layout.
-  pub fn into_next_sibling(self) -> Option<Self> {
+  pub fn into_next_sibling(mut self) -> Option<Self> {
     assert!(
-      self.layout_rect().is_some(),
+      self.box_rect().is_some(),
       "Before try to layout next sibling, self must performed layout."
     );
-    let Self {
-      arena,
-      store,
-      wnd_ctx,
-      dirty_set,
-      wid,
-      ..
-    } = self;
-    wid.next_sibling(arena).map(move |sibling| Layouter {
-      wid: sibling,
-      arena,
-      store,
-      wnd_ctx,
-      dirty_set,
-      is_layout_root: false,
+    let next = self.id.next_sibling(&self.tree.arena);
+    next.map(move |sibling| {
+      self.id = sibling;
+      self
     })
   }
 
   /// Return layouter of the first child of this widget.
-  pub fn into_first_child_layouter(self) -> Option<Self> {
-    let Self {
-      arena,
-      store,
-      wnd_ctx,
-      dirty_set,
-      wid,
-      ..
-    } = self;
-    wid.first_child(arena).map(move |wid| Layouter {
-      wid,
-      arena,
-      store,
-      wnd_ctx,
-      dirty_set,
-      is_layout_root: false,
+  #[inline]
+  pub fn into_first_child_layouter(mut self) -> Option<Self> {
+    self.first_child().map(|id| {
+      self.id = id;
+      self
     })
-  }
-
-  pub fn has_child(&self) -> bool { self.wid.first_child(self.arena).is_some() }
-
-  /// Return the rect of this layouter if it had performed layout.
-  #[inline]
-  pub fn layout_rect(&self) -> Option<Rect> {
-    self
-      .store
-      .layout_info(self.wid)
-      .and_then(|info| info.size.map(|size| Rect::new(info.pos, size)))
-  }
-
-  /// Return the position of this layouter if it had performed layout.
-  #[inline]
-  pub fn layout_pos(&self) -> Option<Point> {
-    self.store.layout_info(self.wid).map(|info| info.pos)
-  }
-
-  /// Return the size of this layouter if it had performed layout.
-  #[inline]
-  pub fn layout_size(&self) -> Option<Size> {
-    self.store.layout_info(self.wid).and_then(|info| info.size)
   }
 
   /// Update the position of the child render object should place. Relative to
   /// parent.
   #[inline]
   pub fn update_position(&mut self, pos: Point) {
-    self.store.layout_info_or_default(self.wid).pos = pos;
+    self.tree.store.layout_info_or_default(self.id).pos = pos;
   }
 
   /// Update the size of layout widget. Use this method to directly change the
@@ -337,75 +263,18 @@ impl<'a> Layouter<'a> {
   /// are doing.
   #[inline]
   pub fn update_size(&mut self, child: WidgetId, size: Size) {
-    self.store.layout_info_or_default(child).size = Some(size);
-  }
-
-  #[inline]
-  pub fn query_widget_type<W: 'static>(&self, callback: impl FnOnce(&W)) {
-    self
-      .wid
-      .assert_get(self.arena)
-      .query_on_first_type(QueryOrder::OutsideFirst, callback);
-  }
-
-  /// reset the child layout position to Point::zero()
-  pub fn reset_children_position(&mut self) {
-    let Self { wid, arena, store, .. } = self;
-    wid.children(arena).for_each(move |id| {
-      store.layout_info_or_default(id).pos = Point::zero();
-    });
+    self.tree.store.layout_info_or_default(child).size = Some(size);
   }
 }
 
-impl WidgetTree {
-  pub(crate) fn layout_list(&mut self) -> Option<Vec<WidgetId>> {
-    if self.dirty_set.borrow().is_empty() {
-      return None;
-    }
-
-    let mut needs_layout = vec![];
-
-    let dirty_widgets = {
-      let mut state_changed = self.dirty_set.borrow_mut();
-      let dirty_widgets = state_changed.clone();
-      state_changed.clear();
-      dirty_widgets
-    };
-
-    for id in dirty_widgets.iter() {
-      if id.is_dropped(&self.arena) {
-        continue;
-      }
-
-      let mut relayout_root = *id;
-      if let Some(info) = self.store.data.get_mut(id) {
-        info.size.take();
-      }
-
-      // All ancestors of this render widget should relayout until the one which only
-      // sized by parent.
-      for p in id.0.ancestors(&self.arena).skip(1).map(WidgetId) {
-        if self.store.layout_box_size(p).is_none() {
-          break;
-        }
-
-        relayout_root = p;
-        if let Some(info) = self.store.data.get_mut(&p) {
-          info.size.take();
-        }
-
-        let r = self.arena.get(p.0).unwrap().get();
-        if r.only_sized_by_parent() {
-          break;
-        }
-      }
-      needs_layout.push(relayout_root);
-    }
-
-    (!needs_layout.is_empty()).then(|| {
-      needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(&self.arena).count()));
-      needs_layout
-    })
+impl<'a> Layouter<'a> {
+  pub(crate) fn new(
+    id: WidgetId,
+    wnd: &'a Window,
+    is_layout_root: bool,
+    tree: &'a mut WidgetTree,
+  ) -> Self {
+    Self { id, wnd, is_layout_root, tree }
   }
 }
 
@@ -416,6 +285,15 @@ impl Default for BoxClamp {
       max: Size::new(f32::INFINITY, f32::INFINITY),
     }
   }
+}
+
+impl std::ops::Deref for LayoutStore {
+  type Target = HashMap<WidgetId, LayoutInfo, ahash::RandomState>;
+  fn deref(&self) -> &Self::Target { &self.data }
+}
+
+impl std::ops::DerefMut for LayoutStore {
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.data }
 }
 
 #[cfg(test)]
@@ -446,9 +324,8 @@ mod tests {
     fn paint(&self, _: &mut PaintingCtx) {}
   }
 
-  impl Query for OffsetBox {
-    impl_query_self_only!();
-  }
+  impl_query_self_only!(OffsetBox);
+
   #[test]
   fn fix_incorrect_relayout_root() {
     let _guard = unsafe { AppCtx::new_lock_scope() };
@@ -467,22 +344,21 @@ mod tests {
         on_performed_layout: move |_| *root_layout_cnt += 1,
         DynWidget {
           dyns: if child_box.size.is_empty() {
-            MockBox { size: Size::new(1., 1.) }.into_widget()
+            Widget::from(MockBox { size: Size::new(1., 1.) })
           } else {
-            child_box.clone_stateful().into_widget()
+            Widget::from(child_box.clone_stateful())
           }
         }
       }
     };
 
-    let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(scheduler));
-    tree.layout(Size::zero());
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
     assert_eq!(*root_layout_cnt.state_ref(), 1);
     {
       child_box.state_ref().size = Size::new(2., 2.);
     }
-    tree.layout(Size::zero());
+    wnd.draw_frame();
     assert_eq!(*root_layout_cnt.state_ref(), 2);
   }
 
@@ -608,10 +484,7 @@ mod tests {
 
     impl Render for MockWidget {
       fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-        *self.pos.borrow_mut() = ctx
-          .layout_store()
-          .layout_box_position(ctx.id)
-          .unwrap_or_default();
+        *self.pos.borrow_mut() = ctx.box_pos().unwrap_or_default();
         self.size
       }
       #[inline]
@@ -621,9 +494,7 @@ mod tests {
       fn paint(&self, _: &mut PaintingCtx) {}
     }
 
-    impl Query for MockWidget {
-      impl_query_self_only!();
-    }
+    impl_query_self_only!(MockWidget);
 
     let pos = Rc::new(RefCell::new(Point::zero()));
     let pos2 = pos.clone();

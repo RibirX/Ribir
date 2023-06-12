@@ -131,5 +131,6 @@ impl ComposeChild for OutlinedButton {
         }
       }
     }
+    .into()
   }
 }

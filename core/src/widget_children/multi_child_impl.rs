@@ -1,62 +1,122 @@
-use super::{child_convert::FillVec, *};
+use super::*;
+use crate::widget::{RenderFul, WidgetBuilder};
 
 /// Trait specify what child a multi child widget can have, and the target type
 /// after widget compose its child.
-pub trait MultiWithChild<M, C> {
+pub trait MultiWithChild<C> {
   type Target;
-  fn with_child(self, child: C) -> Self::Target;
+  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
 }
 
-pub struct MultiChildWidget<W> {
-  pub widget: W,
-  pub children: Vec<Widget>,
+pub struct MultiChildWidget {
+  pub widget: Box<dyn Render>,
+  pub children: Vec<WidgetId>,
 }
 
-impl<R, C, M> MultiWithChild<M, C> for R
-where
-  R: MultiChild,
-  C: FillVec<M, Widget>,
-{
-  type Target = MultiChildWidget<R>;
+/// A struct hold multi object in it, as a representative of multiple children,
+/// so the parent know combined children one by one in it.
+pub struct Multi<W>(W);
 
-  fn with_child(self, child: C) -> Self::Target {
-    let mut children = vec![];
-    child.fill_vec(&mut children);
-    MultiChildWidget { widget: self, children }
-  }
-}
-
-impl<W, C, M> MultiWithChild<M, C> for MultiChildWidget<W>
-where
-  C: FillVec<M, Widget>,
-{
-  type Target = Self;
+impl<W: IntoIterator> Multi<W> {
   #[inline]
-  fn with_child(mut self, child: C) -> Self::Target {
-    child.fill_vec(&mut self.children);
-    self
-  }
+  pub fn new(v: W) -> Self { Self(v) }
+
+  #[inline]
+  pub fn into_inner(self) -> W { self.0 }
 }
 
-impl<R: Render + MultiChild + 'static> IntoWidget<NotSelf<()>> for MultiChildWidget<R> {
-  fn into_widget(self) -> Widget {
-    let MultiChildWidget { widget, children } = self;
-    Widget::Render {
-      render: Box::new(widget),
-      children: Some(children),
+trait IntoMultiParent {
+  fn into_multi_parent(self) -> Box<dyn Render>;
+}
+
+// Same with ChildConvert::FillVec, but only for MultiChild,
+// There are some duplicate implementations, but better compile error for
+// users
+trait FillVec {
+  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx);
+}
+
+impl<W: Into<Widget>> FillVec for W {
+  #[inline]
+  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) { vec.push(self.into().build(ctx)) }
+}
+
+impl<W: Into<Widget>> FillVec for Option<W> {
+  #[inline]
+  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) {
+    if let Some(w) = self {
+      vec.push(w.into().build(ctx))
     }
   }
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::test_helper::MockMulti;
+impl<W> FillVec for Multi<W>
+where
+  W: IntoIterator,
+  W::Item: Into<Widget>,
+{
+  #[inline]
+  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) {
+    vec.extend(self.0.into_iter().map(|w| w.into().build(ctx)))
+  }
+}
 
-  #[test]
-  fn multi_option_child() {
-    let _ = MockMulti {}
-      .with_child([widget::then(true, || Void)])
-      .into_widget();
+impl<D> FillVec for Stateful<DynWidget<Multi<D>>>
+where
+  D: IntoIterator + 'static,
+  Widget: From<D::Item>,
+{
+  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) {
+    vec.push(DynRender::multi(self).build(ctx))
+  }
+}
+
+impl<R: MultiChild + Render + 'static> IntoMultiParent for R {
+  #[inline]
+  fn into_multi_parent(self) -> Box<dyn Render> { Box::new(self) }
+}
+
+impl<R: MultiChild + Render + 'static> IntoMultiParent for Stateful<R> {
+  #[inline]
+  fn into_multi_parent(self) -> Box<dyn Render> { Box::new(RenderFul(self)) }
+}
+
+impl<R, C> MultiWithChild<C> for R
+where
+  R: IntoMultiParent,
+  C: FillVec,
+{
+  type Target = MultiChildWidget;
+
+  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
+    let mut children = vec![];
+    child.fill_vec(&mut children, ctx);
+    MultiChildWidget {
+      widget: self.into_multi_parent(),
+      children,
+    }
+  }
+}
+
+impl<C> MultiWithChild<C> for MultiChildWidget
+where
+  C: FillVec,
+{
+  type Target = Self;
+  #[inline]
+  fn with_child(mut self, child: C, ctx: &BuildCtx) -> Self::Target {
+    child.fill_vec(&mut self.children, ctx);
+    self
+  }
+}
+
+impl WidgetBuilder for MultiChildWidget {
+  fn build(self, ctx: &BuildCtx) -> WidgetId {
+    let MultiChildWidget { widget, children } = self;
+    let p = ctx.alloc_widget(widget);
+    children
+      .into_iter()
+      .for_each(|child| ctx.append_child(p, child));
+    p
   }
 }

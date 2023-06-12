@@ -1,15 +1,17 @@
-use rxrust::ops::filter_map::FilterMapOp;
-
-use super::EventCommon;
+use super::CommonEvent;
 use crate::{
-  data_widget::compose_child_as_data_widget, impl_compose_child_for_listener, impl_listener,
-  impl_listener_and_compose_child, impl_query_self_only, prelude::*,
+  impl_all_event, impl_common_event_deref, impl_compose_child_for_listener, impl_listener,
+  impl_multi_event_listener, impl_query_self_only, prelude::*,
 };
+use rxrust::{
+  prelude::*,
+  rc::{MutRc, RcDeref, RcDerefMut},
+};
+use smallvec::SmallVec;
 use std::{
   convert::Infallible,
   time::{Duration, Instant},
 };
-
 mod from_mouse;
 const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,8 +24,8 @@ pub struct PointerId(usize);
 /// device-specific handling is desired, pointer events defines a pointerType
 /// property to inspect the device type which produced the event.
 /// Reference: <https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#term_pointer_event>
-#[derive(Debug, Clone)]
-pub struct PointerEvent {
+#[derive(Debug)]
+pub struct PointerEvent<'a> {
   /// A unique identifier for the pointer causing the event.
   pub id: PointerId,
   /// The width (magnitude on the X axis), in pixels, of the contact geometry of
@@ -56,7 +58,7 @@ pub struct PointerEvent {
   /// type.
   pub is_primary: bool,
 
-  pub common: EventCommon,
+  pub common: CommonEvent<'a>,
 }
 
 bitflags! {
@@ -85,283 +87,44 @@ pub enum PointerType {
   Touch,
 }
 
-impl std::borrow::Borrow<EventCommon> for PointerEvent {
-  #[inline]
-  fn borrow(&self) -> &EventCommon { &self.common }
-}
-
-impl std::borrow::BorrowMut<EventCommon> for PointerEvent {
-  #[inline]
-  fn borrow_mut(&mut self) -> &mut EventCommon { &mut self.common }
-}
-
-impl std::ops::Deref for PointerEvent {
-  type Target = EventCommon;
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.common }
-}
-
-impl std::ops::DerefMut for PointerEvent {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
-}
-
-#[derive(Declare)]
-pub struct PointerDownListener {
-  #[declare(builtin, convert=custom)]
-  on_pointer_down: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-#[derive(Declare)]
-pub struct PointerDownCaptureListener {
-  #[declare(builtin, convert=custom)]
-  on_pointer_down_capture: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-#[derive(Declare)]
-pub struct PointerUpListener {
-  #[declare(builtin, convert=custom)]
-  on_pointer_up: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-#[derive(Declare)]
-pub struct PointerUpCaptureListener {
-  #[declare(builtin, convert=custom)]
-  on_pointer_up_capture: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-#[derive(Declare)]
-pub struct PointerMoveListener {
-  #[declare(builtin, convert=custom)]
-  on_pointer_move: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-#[derive(Declare)]
-pub struct PointerMoveCaptureListener {
-  #[declare(builtin, convert=custom)]
-  on_pointer_move_capture: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-#[derive(Declare)]
-pub struct TapListener {
-  #[declare(builtin, convert=custom)]
-  on_tap: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-#[derive(Declare)]
-pub struct TapCaptureListener {
-  #[declare(builtin, convert=custom)]
-  on_tap_capture: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-#[derive(Declare)]
-pub struct PointerCancelListener {
-  #[declare(builtin, convert=custom)]
-  pub on_pointer_cancel: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-#[derive(Declare)]
-pub struct PointerEnterListener {
-  #[declare(builtin, convert=custom)]
-  on_pointer_enter: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-#[derive(Declare)]
-pub struct PointerLeaveListener {
-  #[declare(builtin, convert=custom)]
-  pub on_pointer_leave: MutRefItemSubject<'static, PointerEvent, Infallible>,
-}
-
-impl_listener_and_compose_child!(
-  PointerDownListener,
-  PointerDownListenerDeclarer,
-  on_pointer_down,
-  PointerEvent,
-  pointer_down_stream
+impl_multi_event_listener!(
+  "The listener use to fire and listen pointer events.",
+  Pointer,
+  "",
+  PointerDown,
+  "",
+  PointerDownCapture,
+  "",
+  PointerUp,
+  "",
+  PointerUpCapture,
+  "",
+  PointerMove,
+  "",
+  PointerMoveCapture,
+  "",
+  PointerCancel,
+  "",
+  PointerEnter,
+  "",
+  PointerLeave,
+  "",
+  Tap,
+  "",
+  TapCapture
 );
 
-impl_listener_and_compose_child!(
-  PointerDownCaptureListener,
-  PointerDownCaptureListenerDeclarer,
-  on_pointer_down_capture,
-  PointerEvent,
-  pointer_down_capture_stream
-);
+impl_common_event_deref!(PointerEvent);
 
-impl_listener_and_compose_child!(
-  PointerUpListener,
-  PointerUpListenerDeclarer,
-  on_pointer_up,
-  PointerEvent,
-  pointer_up_stream
-);
+impl_event_subject!(Pointer, event_name = AllPointer);
 
-impl_listener_and_compose_child!(
-  PointerUpCaptureListener,
-  PointerUpCaptureListenerDeclarer,
-  on_pointer_up_capture,
-  PointerEvent,
-  pointer_up_capture_stream
-);
-
-impl_listener_and_compose_child!(
-  PointerMoveListener,
-  PointerMoveListenerDeclarer,
-  on_pointer_move,
-  PointerEvent,
-  pointer_move_stream
-);
-
-impl_listener_and_compose_child!(
-  PointerMoveCaptureListener,
-  PointerMoveCaptureListenerDeclarer,
-  on_pointer_move_capture,
-  PointerEvent,
-  pointer_move_capture_stream
-);
-
-impl_listener_and_compose_child!(
-  PointerCancelListener,
-  PointerCancelListenerDeclarer,
-  on_pointer_cancel,
-  PointerEvent,
-  pointer_cancel_stream
-);
-
-impl_listener_and_compose_child!(
-  PointerEnterListener,
-  PointerEnterListenerDeclarer,
-  on_pointer_enter,
-  PointerEvent,
-  pointer_enter_stream
-);
-
-impl_listener_and_compose_child!(
-  PointerLeaveListener,
-  PointerLeaveListenerDeclarer,
-  on_pointer_leave,
-  PointerEvent,
-  pointer_leave_stream
-);
-
-macro_rules! impl_tap_listener {
-  (
-    $listener: ident,
-    $declarer: ident,
-    $x_times_tap: ident,
-    $tap: ident,
-    $dobule_tap: ident,
-    $triple_tap: ident,
-    $x_times_tap_stream: ident,
-    $tap_stream: ident,
-    $double_tap_stream: ident,
-    $triple_tap_stream: ident
-  ) => {
-    impl $declarer {
-      pub fn $tap(mut self, handler: impl for<'r> FnMut(&'r mut PointerEvent) + 'static) -> Self {
-        self.tap_subject().subscribe(handler);
-        self
-      }
-
-      pub fn $x_times_tap(
-        mut self,
-        (times, handler): (usize, impl for<'r> FnMut(&'r mut PointerEvent) + 'static),
-      ) -> Self {
-        self
-          .tap_subject()
-          .filter_map(x_times_tap_map_filter(times, MULTI_TAP_DURATION))
-          .subscribe(handler);
-        self
-      }
-
-      pub fn $dobule_tap(
-        self,
-        handler: impl for<'r> FnMut(&'r mut PointerEvent) + 'static,
-      ) -> Self {
-        self.$x_times_tap((2, handler))
-      }
-
-      pub fn $triple_tap(
-        self,
-        handler: impl for<'r> FnMut(&'r mut PointerEvent) + 'static,
-      ) -> Self {
-        self.$x_times_tap((3, handler))
-      }
-
-      fn tap_subject(&mut self) -> MutRefItemSubject<'static, PointerEvent, Infallible> {
-        self.$tap.get_or_insert_with(Default::default).clone()
-      }
-    }
-
-    impl Query for $listener {
-      impl_query_self_only!();
-    }
-    impl $listener {
-      /// Return an observable stream of this event.
-      pub fn $tap_stream(&self) -> MutRefItemSubject<'static, PointerEvent, Infallible> {
-        self.$tap.clone()
-      }
-
-      /// Return an observable stream of double tap event
-      #[inline]
-      pub fn $double_tap_stream(
-        &self,
-      ) -> FilterMapOp<
-        MutRefItemSubject<'static, PointerEvent, Infallible>,
-        impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent>,
-        &mut PointerEvent,
-      > {
-        self.$x_times_tap_stream(2, MULTI_TAP_DURATION)
-      }
-
-      /// Return an observable stream of tripe tap event
-      #[inline]
-      pub fn $triple_tap_stream(
-        &self,
-      ) -> FilterMapOp<
-        MutRefItemSubject<'static, PointerEvent, Infallible>,
-        impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent>,
-        &mut PointerEvent,
-      > {
-        self.$x_times_tap_stream(2, MULTI_TAP_DURATION)
-      }
-
-      /// Return an observable stream of x-tap event that user tapped 'x' times in
-      /// the specify duration `dur`.
-      pub fn $x_times_tap_stream(
-        &self,
-        x: usize,
-        dur: Duration,
-      ) -> FilterMapOp<
-        MutRefItemSubject<'static, PointerEvent, Infallible>,
-        impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent>,
-        &mut PointerEvent,
-      > {
-        self
-          .$tap_stream()
-          .filter_map(x_times_tap_map_filter(x, dur))
-      }
-    }
-    impl EventListener for $listener {
-      type Event = PointerEvent;
-      #[inline]
-      fn dispatch(&self, event: &mut PointerEvent) { self.$tap.clone().next(event) }
-    }
-
-    impl ComposeChild for $listener {
-      type Child = Widget;
-      #[inline]
-      fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-        compose_child_as_data_widget(child, this)
-      }
-    }
-  };
-}
+impl_compose_child_for_listener!(PointerListener);
 
 fn x_times_tap_map_filter(
   x: usize,
   dur: Duration,
-) -> impl FnMut(&mut PointerEvent) -> Option<&mut PointerEvent> {
+  capture: bool,
+) -> impl for<'a, 'b> FnMut(&'a mut AllPointer<'b>) -> Option<&'a mut PointerEvent<'b>> {
   assert!(x > 0);
   struct TapInfo {
     pointer_id: PointerId,
@@ -369,7 +132,12 @@ fn x_times_tap_map_filter(
   }
 
   let mut type_info: Option<TapInfo> = None;
-  move |e: &mut PointerEvent| {
+  move |e: &mut AllPointer| {
+    let e = match e {
+      AllPointer::Tap(e) if !capture => e,
+      AllPointer::TapCapture(e) if capture => e,
+      _ => return None,
+    };
     let now = Instant::now();
     match &mut type_info {
       Some(info) if info.pointer_id == e.id => {
@@ -397,31 +165,135 @@ fn x_times_tap_map_filter(
   }
 }
 
-impl_tap_listener!(
-  TapListener,
-  TapListenerDeclarer,
-  on_x_times_tap,
-  on_tap,
-  on_double_tap,
-  on_triple_tap,
-  x_times_tap_stream,
-  tap_stream,
-  dobule_tap_stream,
-  triple_tap_stream
-);
+impl PointerListenerDeclarer {
+  pub fn on_double_tap(
+    self,
+    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+  ) -> Self {
+    self.on_x_times_tap((2, handler))
+  }
 
-impl_tap_listener!(
-  TapCaptureListener,
-  TapCaptureListenerDeclarer,
-  on_x_times_tap_capture,
-  on_tap_capture,
-  on_double_tap_capture,
-  on_triple_tap_capture,
-  x_times_tap_capture_stream,
-  tap_capture_stream,
-  double_tap_capture_stream,
-  triple_tap_capture_stream
-);
+  pub fn on_double_tap_capture(
+    self,
+    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+  ) -> Self {
+    self.on_x_times_tap_capture((2, handler))
+  }
+
+  pub fn on_triple_tap(
+    self,
+    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+  ) -> Self {
+    self.on_x_times_tap((3, handler))
+  }
+
+  pub fn on_triple_tap_capture(
+    self,
+    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+  ) -> Self {
+    self.on_x_times_tap_capture((3, handler))
+  }
+
+  pub fn on_x_times_tap(
+    mut self,
+    (times, handler): (
+      usize,
+      impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+    ),
+  ) -> Self {
+    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler);
+    self
+  }
+
+  pub fn on_x_times_tap_capture(
+    mut self,
+    (times, handler): (
+      usize,
+      impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+    ),
+  ) -> Self {
+    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler);
+    self
+  }
+
+  fn on_x_times_tap_impl(
+    &mut self,
+    times: usize,
+    dur: Duration,
+    capture: bool,
+    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+  ) {
+    self
+      .subject()
+      .filter_map(x_times_tap_map_filter(times, dur, capture))
+      .subscribe(handler);
+  }
+}
+
+impl PointerListener {
+  pub fn on_double_tap(
+    self,
+    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+  ) -> Self {
+    self.on_x_times_tap((2, handler))
+  }
+
+  pub fn on_double_tap_capture(
+    self,
+    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+  ) -> Self {
+    self.on_x_times_tap_capture((2, handler))
+  }
+
+  pub fn on_triple_tap(
+    self,
+    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+  ) -> Self {
+    self.on_x_times_tap((3, handler))
+  }
+
+  pub fn on_triple_tap_capture(
+    self,
+    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+  ) -> Self {
+    self.on_x_times_tap_capture((3, handler))
+  }
+
+  pub fn on_x_times_tap(
+    self,
+    (times, handler): (
+      usize,
+      impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+    ),
+  ) -> Self {
+    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler);
+    self
+  }
+
+  pub fn on_x_times_tap_capture(
+    self,
+    (times, handler): (
+      usize,
+      impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+    ),
+  ) -> Self {
+    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler);
+    self
+  }
+
+  fn on_x_times_tap_impl(
+    &self,
+    x: usize,
+    dur: Duration,
+    capture: bool,
+    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+  ) {
+    self
+      .pointer_stream()
+      .filter_map(x_times_tap_map_filter(x, dur, capture))
+      .subscribe(handler);
+  }
+}
 
 #[cfg(test)]
 mod tests {
@@ -433,7 +305,7 @@ mod tests {
     event::{DeviceId, ElementState, MouseButton, WindowEvent},
   };
 
-  fn tap_on(wnd: &mut Window, x: f32, y: f32) {
+  fn tap_on(wnd: &Window, x: f32, y: f32) {
     let device_id = unsafe { DeviceId::dummy() };
     let logical = LogicalPosition::new(x, y);
     #[allow(deprecated)]
@@ -489,12 +361,12 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    tap_on(&mut wnd, 25., 25.);
+    tap_on(&wnd, 25., 25.);
     wnd.draw_frame();
     assert_eq!(*tap_cnt.borrow(), 1);
     assert!(!*is_focused.borrow());
 
-    tap_on(&mut wnd, 75., 25.);
+    tap_on(&wnd, 75., 25.);
     wnd.draw_frame();
     assert_eq!(*tap_cnt.borrow(), 2);
     assert!(*is_focused.borrow());

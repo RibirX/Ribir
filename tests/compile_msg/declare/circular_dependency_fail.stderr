@@ -65,3 +65,14 @@ note: You should manual watch expression and add operator to break the circular,
 ...
 29 |         margin: parent.margin.clone(),
    |         ^^^^^^
+
+error[E0282]: type annotations needed
+ --> compile_msg/declare/circular_dependency_fail.rs:4:7
+  |
+4 |   let _circular_dependency_err = widget! {
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: consider giving `_circular_dependency_err` an explicit type
+  |
+4 |   let _circular_dependency_err: /* Type */ = widget! {
+  |                               ++++++++++++

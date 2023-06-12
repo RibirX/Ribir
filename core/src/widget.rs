@@ -3,13 +3,13 @@ use crate::{context::*, prelude::*};
 use ribir_algo::ShareResource;
 use rxrust::subscription::{BoxSubscription, SubscriptionGuard};
 
+use std::rc::Rc;
 #[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
   marker::PhantomData,
   ops::Deref,
 };
-use std::{cell::RefCell, rc::Rc};
 pub trait Compose: Sized {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
@@ -23,12 +23,6 @@ pub struct HitTest {
 
 /// RenderWidget is a widget which want to paint something or do a layout to
 /// calc itself size and update children positions.
-///
-/// Render Widget should at least implement one of `Layout` or `Paint`, if all
-/// of `as_layout` and `as_paint` return None, the widget will not display.
-///
-/// If `as_layout` return none, widget size will detected by its single child if
-/// it has or as large as possible.
 pub trait Render: Query {
   /// Do the work of computing the layout for this widget, and return the
   /// size it need.
@@ -61,13 +55,8 @@ pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
   ctx.box_rect().map_or(false, |rect| rect.contains(pos))
 }
 
-pub enum Widget {
-  Compose(Box<dyn for<'r> FnOnce(&'r BuildCtx) -> Widget>),
-  Render {
-    render: Box<dyn Render>,
-    children: Option<Vec<Widget>>,
-  },
-}
+/// The common type of all widget can convert to.
+pub struct Widget(Box<dyn FnOnce(&BuildCtx) -> WidgetId>);
 
 /// A trait to query dynamic type and its inner type on runtime, use this trait
 /// to provide type information you want framework know.
@@ -97,11 +86,6 @@ pub trait QueryFiler {
   /// query self type by type id, and return a mut reference of `Any` trait to
   /// cast to target type if type match.
   fn query_filter_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
-}
-
-/// Convert a widget to `Widget`
-pub trait IntoWidget<M: ImplMarker> {
-  fn into_widget(self) -> Widget;
 }
 
 impl<W: 'static> QueryFiler for W {
@@ -153,86 +137,48 @@ impl<'a> dyn Render + 'a {
   }
 }
 
-pub trait ImplMarker {}
-/// implement marker means this converter not hope to convert continue.
-pub struct SelfImpl;
-/// implement marker means this converter can use as a generic bounds to convert
-/// continue.
-pub struct NotSelf<M>(PhantomData<fn(M)>);
+pub struct FnWidget<F>(F);
 
-impl ImplMarker for SelfImpl {}
-impl<M> ImplMarker for NotSelf<M> {}
+pub(crate) trait WidgetBuilder {
+  fn build(self, ctx: &BuildCtx) -> WidgetId;
+}
+pub(crate) trait WidgetOrId {
+  fn build_id(self, ctx: &BuildCtx) -> WidgetId;
+}
 
-impl IntoWidget<SelfImpl> for Widget {
+impl<T: WidgetBuilder> WidgetOrId for T {
   #[inline]
-  fn into_widget(self) -> Widget { self }
+  fn build_id(self, ctx: &BuildCtx) -> WidgetId { self.build(ctx) }
 }
 
-macro_rules! impl_compose_into_widget {
-  ($ty: ty) => {
-    impl<C: Compose> IntoWidget<NotSelf<[(); 0]>> for $ty {
-      #[inline]
-      fn into_widget(self) -> Widget { Compose::compose(State::<C>::from(self)) }
-    }
-  };
-}
-
-impl_compose_into_widget!(State<C>);
-impl_compose_into_widget!(C);
-impl_compose_into_widget!(Stateful<C>);
-// `Stateful<DynWidget<C>>` has its own implementation.
-// impl_compose_into_widget!(Stateful<DynWidget<C>>);
-
-impl<R: Render + 'static> IntoWidget<NotSelf<[(); 1]>> for R {
+impl WidgetOrId for WidgetId {
   #[inline]
-  fn into_widget(self) -> Widget {
-    Widget::Render {
-      render: Box::new(self),
-      children: None,
-    }
+  fn build_id(self, _: &BuildCtx) -> WidgetId { self }
+}
+
+impl WidgetOrId for Widget {
+  #[inline]
+  fn build_id(self, ctx: &BuildCtx) -> WidgetId { self.build(ctx) }
+}
+
+impl<F> FnWidget<F> {
+  pub fn new<R>(f: F) -> Self
+  where
+    F: FnOnce(&BuildCtx) -> R,
+  {
+    FnWidget(f)
   }
+
+  #[inline]
+  pub fn into_inner(self) -> F { self.0 }
 }
 
-impl<M1, M2, W> IntoWidget<NotSelf<(M1, M2)>> for State<W>
-where
-  W: IntoWidget<M1>,
-  Stateful<W>: IntoWidget<M2>,
-  M1: ImplMarker,
-  M2: ImplMarker,
-{
-  fn into_widget(self) -> crate::widget::Widget {
-    match self {
-      State::Stateless(w) => w.into_widget(),
-      State::Stateful(s) => s.into_widget(),
-    }
-  }
-}
-
-macro_rules! impl_compose_option_child_into_widget {
-  ($ty: ty) => {
-    impl<T, C> IntoWidget<NotSelf<[(); 2]>> for $ty
-    where
-      T: ComposeChild<Child = Option<C>> + 'static,
-    {
-      #[inline]
-      fn into_widget(self) -> Widget { ComposeChild::compose_child(State::<T>::from(self), None) }
-    }
-  };
-}
-
-impl_compose_option_child_into_widget!(Stateful<T>);
-impl_compose_option_child_into_widget!(T);
-// `Stateful<DynWidget<T>>` has its own implementation.
-// impl_compose_option_child_into_widget!(Stateful<DynWidget<T>>);
-
-impl<F, R, M> IntoWidget<NotSelf<[M; 3]>> for F
+impl<F, R> WidgetBuilder for FnWidget<F>
 where
   F: FnOnce(&BuildCtx) -> R + 'static,
-  R: IntoWidget<M>,
-  M: ImplMarker,
+  R: WidgetOrId,
 {
-  #[inline]
-  fn into_widget(self) -> Widget { Widget::Compose(Box::new(move |ctx| self(ctx).into_widget())) }
+  fn build(self, ctx: &BuildCtx) -> WidgetId { (self.0)(ctx).build_id(ctx) }
 }
 
 #[macro_export]
@@ -242,55 +188,62 @@ macro_rules! impl_proxy_query {
   };
   (reverse [] $($reversed: expr)*) => { $($reversed)* };
   (
-    $($self: ident .$name: ident $(($($args: ident),*))?),+
+    paths [
+      $(
+        $($name: tt $(($($args: ident),*))?).*
+      ),+
+    ],
+    $ty: ty $(, <$($($lf: lifetime)? $($p: ident)?), *>)? $(,where $($w:tt)*)?
   ) => {
-    #[inline]
-    fn query_all(
-      &self,
-      type_id: TypeId,
-      callback: &mut dyn FnMut(&dyn Any) -> bool,
-      order: QueryOrder,
-    ) {
-      let mut query_more = true;
-      match order {
-        QueryOrder::InnerFirst => {
-          impl_proxy_query!(reverse
-            [$(
-              if query_more {
-                self.$name $(($($args),*))?
-                  .query_all(
-                    type_id,
-                    &mut |any| {
-                      query_more = callback(any);
-                      query_more
-                    },
-                    order,
-                  );
-              }
-            ),+]
-          );
-          if let Some(a) = self.query_filter(type_id) {
-            callback(a);
+    impl $(<$($($lf)? $($p)?),*>)? Query for $ty $(where $($w)*)? {
+      #[inline]
+      fn query_all(
+        &self,
+        type_id: TypeId,
+        callback: &mut dyn FnMut(&dyn Any) -> bool,
+        order: QueryOrder,
+      ) {
+        let mut query_more = true;
+        match order {
+          QueryOrder::InnerFirst => {
+            impl_proxy_query!(reverse
+              [$(
+                if query_more {
+                  self.$($name $(($($args),*))?).*
+                    .query_all(
+                      type_id,
+                      &mut |any| {
+                        query_more = callback(any);
+                        query_more
+                      },
+                      order,
+                    );
+                }
+              ),+]
+            );
+            if let Some(a) = self.query_filter(type_id) {
+              callback(a);
+            }
           }
-        }
-        QueryOrder::OutsideFirst => {
-          if let Some(a) = self.query_filter(type_id) {
-            query_more = callback(a);
-          }
-          if query_more {
-            $(
-              if query_more {
-                self.$name $(($($args),*))?
-                  .query_all(
-                    type_id,
-                    &mut |any| {
-                      query_more = callback(any);
-                      query_more
-                    },
-                    order,
-                  );
-              }
-            )+
+          QueryOrder::OutsideFirst => {
+            if let Some(a) = self.query_filter(type_id) {
+              query_more = callback(a);
+            }
+            if query_more {
+              $(
+                if query_more {
+                  self.$($name $(($($args),*))?).*
+                    .query_all(
+                      type_id,
+                      &mut |any| {
+                        query_more = callback(any);
+                        query_more
+                      },
+                      order,
+                    );
+                }
+              )+
+            }
           }
         }
       }
@@ -300,106 +253,104 @@ macro_rules! impl_proxy_query {
 
 #[macro_export]
 macro_rules! impl_query_self_only {
-  () => {
-    #[inline]
-    fn query_all(
-      &self,
-      type_id: TypeId,
-      callback: &mut dyn FnMut(&dyn Any) -> bool,
-      _: QueryOrder,
-    ) {
-      if let Some(a) = self.query_filter(type_id) {
-        callback(a);
+  ($name: ty $(, <$($($lf: lifetime)? $($p: ident)?), *>)? $(,where $($w:tt)*)?) => {
+    impl $(<$($($lf)? $($p)?),*>)? Query for $name $(where $($w)*)? {
+      #[inline]
+      fn query_all(
+        &self,
+        type_id: TypeId,
+        callback: &mut dyn FnMut(&dyn Any) -> bool,
+        _: QueryOrder,
+      ) {
+        if let Some(a) = self.query_filter(type_id) {
+          callback(a);
+        }
       }
     }
   };
 }
 
-impl<T: Render> Render for ribir_algo::ShareResource<T> {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    T::perform_layout(self, clamp, ctx)
-  }
-
-  #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { T::paint(self, ctx) }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { T::only_sized_by_parent(self) }
-
-  #[inline]
-  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { T::hit_test(self, ctx, pos) }
-
-  #[inline]
-  fn get_transform(&self) -> Option<Transform> { T::get_transform(self) }
-}
-
-impl<T: Query> Query for ShareResource<T> {
-  fn query_all(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
-    order: QueryOrder,
-  ) {
-    (**self).query_all(type_id, callback, order)
-  }
-}
-
 #[macro_export]
 macro_rules! impl_proxy_render {
-  ($($proxy: tt)*) => {
-    #[inline]
-    fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-      self.$($proxy)*.perform_layout(clamp, ctx)
-    }
+  (
+    proxy $($mem: tt $(($($args: ident),*))?).*,
+    $name: ty $(,<$($($lf: lifetime)? $($p: ident)?), *>)?
+    $(,where $($w:tt)*)?
+  ) => {
+    impl $(<$($($lf)? $($p)?),*>)? Render for $name $(where $($w)*)? {
+      #[inline]
+      fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+        self.$($mem $(($($args),*))?).*.perform_layout(clamp, ctx)
+      }
 
-    #[inline]
-    fn paint(&self, ctx: &mut PaintingCtx) { self.$($proxy)*.paint(ctx) }
+      #[inline]
+      fn paint(&self, ctx: &mut PaintingCtx) {
+        self.$($mem $(($($args),*))?).*.paint(ctx)
+      }
 
-    #[inline]
-    fn only_sized_by_parent(&self) -> bool {
-      self.$($proxy)*.only_sized_by_parent()
-    }
+      #[inline]
+      fn only_sized_by_parent(&self) -> bool {
+        self.$($mem $(($($args),*))?).*.only_sized_by_parent()
+      }
 
-    #[inline]
-    fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
-      self.$($proxy)*.hit_test(ctx, pos)
-    }
+      #[inline]
+      fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
+        self.$($mem $(($($args),*))?).*.hit_test(ctx, pos)
+      }
 
-    #[inline]
-    fn get_transform(&self) -> Option<Transform> {
-      self.$($proxy)*.get_transform()
+      #[inline]
+      fn get_transform(&self) -> Option<Transform> {
+        self.$($mem $(($($args),*))?).*.get_transform()
+      }
     }
   };
 }
 
-impl<W: Render + 'static> Render for RefCell<W> {
-  impl_proxy_render!(borrow());
+impl<C: Compose> WidgetBuilder for C {
+  #[inline]
+  fn build(self, ctx: &BuildCtx) -> WidgetId { State::Stateless(self).build(ctx) }
 }
 
-impl<W: Query + 'static> Query for RefCell<W> {
-  impl_proxy_query!(self.borrow());
+impl<C: Compose> WidgetBuilder for Stateful<C> {
+  #[inline]
+  fn build(self, ctx: &BuildCtx) -> WidgetId { State::Stateful(self).build(ctx) }
 }
 
-impl<W: Render + 'static> Render for Rc<W> {
-  impl_proxy_render!(deref());
+#[repr(transparent)]
+pub(crate) struct RenderFul<R>(pub(crate) Stateful<R>);
+
+impl_proxy_query!(paths [0], RenderFul<R>, <R>, where R: Render + 'static);
+impl_proxy_render!(proxy 0.state_ref(), RenderFul<R>, <R>, where R: Render + 'static);
+
+impl<R: Render + 'static> Compose for R {
+  fn compose(this: State<Self>) -> Widget {
+    FnWidget::new(move |ctx| {
+      let node: Box<dyn Render> = match this {
+        State::Stateless(r) => Box::new(r),
+        State::Stateful(s) => Box::new(RenderFul(s)),
+      };
+      ctx.alloc_widget(node)
+    })
+    .into()
+  }
 }
 
-impl<W: Query + 'static> Query for Rc<W> {
-  impl_proxy_query!(self.deref());
+impl<W: WidgetBuilder + 'static> From<W> for Widget {
+  #[inline]
+  fn from(value: W) -> Self { Self(Box::new(|ctx| value.build(ctx))) }
 }
 
-impl Render for Box<dyn Render> {
-  impl_proxy_render!(deref());
+impl Widget {
+  #[inline]
+  pub fn build(self, ctx: &BuildCtx) -> WidgetId { (self.0)(ctx) }
 }
 
-impl Query for Box<dyn Render> {
-  impl_proxy_query!(self.deref());
-}
+impl_proxy_query!(paths [deref()], ShareResource<T>, <T>, where  T: Render + 'static);
+impl_proxy_render!(proxy deref(), ShareResource<T>, <T>, where  T: Render + 'static);
+impl_proxy_query!(paths [deref()], Rc<W>, <W>, where W: Query + 'static);
+impl_proxy_render!(proxy deref(), Rc<W>, <W>, where W: Render + 'static);
 
-impl Query for Vec<SubscriptionGuard<BoxSubscription<'static>>> {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Vec<SubscriptionGuard<BoxSubscription<'static>>>);
 
 /// Directly return `v`, this function does nothing, but it's useful to help you
 /// declare a widget expression in `widget!` macro.

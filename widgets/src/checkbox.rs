@@ -74,6 +74,7 @@ impl Checkbox {
         }
       }
     }
+    .into()
   }
 
   fn label(label: &State<Label>, label_color: Brush, text_style: CowArc<TextStyle>) -> Widget {
@@ -86,6 +87,7 @@ impl Checkbox {
         text_style,
       }
     }
+    .into()
   }
 }
 
@@ -115,7 +117,7 @@ impl ComposeChild for Checkbox {
             Checkbox::icon(no_watch!(this.clone_stateful()), icon_size),
             |child| widget! {
               Row {
-                widget::from(match &child {
+                Multi::new(match &child {
                   CheckboxTemplate::Before(w) => [
                     Checkbox::label(&w.child, label_color.clone(), label_style.clone()),
                     Checkbox::icon(this.clone_stateful(), icon_size),
@@ -126,11 +128,18 @@ impl ComposeChild for Checkbox {
                   ],
                 })
               }
-          })
+          }.into())
         },
       }
     }
+    .into()
   }
+}
+
+// A Checkbox can be a widget even if it has no children
+impl Compose for Checkbox {
+  #[inline]
+  fn compose(this: State<Self>) -> Widget { ComposeChild::compose_child(this, None) }
 }
 
 impl CustomStyle for CheckBoxStyle {
@@ -150,9 +159,7 @@ mod tests {
   extern crate test;
   use test::Bencher;
 
-  fn checked() -> Widget {
-    widget! { Checkbox { checked: true } }
-  }
+  fn checked() -> Widget { widget! { Checkbox { checked: true } }.into() }
   widget_test_suit!(
     checked,
     wnd_size = Size::new(48., 48.),
@@ -160,9 +167,7 @@ mod tests {
     height == 24.,
   );
 
-  fn unchecked() -> Widget {
-    widget! { Checkbox {  } }
-  }
+  fn unchecked() -> Widget { widget! { Checkbox {  } }.into() }
   widget_test_suit!(
     unchecked,
     wnd_size = Size::new(48., 48.),
@@ -177,6 +182,7 @@ mod tests {
         indeterminate: true,
       }
     }
+    .into()
   }
 
   widget_test_suit!(

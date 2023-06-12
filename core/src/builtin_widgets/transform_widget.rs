@@ -27,9 +27,7 @@ impl Render for TransformWidget {
   fn get_transform(&self) -> Option<Transform> { Some(self.transform) }
 }
 
-impl Query for TransformWidget {
-  impl_query_self_only!();
-}
+impl_query_self_only!(TransformWidget);
 
 impl TransformWidget {
   #[inline]
@@ -51,6 +49,7 @@ mod tests {
         }
       }
     }
+    .into()
   }
   widget_layout_test!(smoke, width == 100., height == 100.,);
 }

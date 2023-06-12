@@ -1,96 +1,50 @@
+use rxrust::{
+  prelude::*,
+  rc::{MutRc, RcDeref, RcDerefMut},
+};
+use smallvec::SmallVec;
 use std::convert::Infallible;
 
 use crate::{
-  data_widget::compose_child_as_data_widget, impl_compose_child_with_focus_for_listener,
-  impl_listener, impl_listener_and_compose_child_with_focus, impl_query_self_only, prelude::*,
+  impl_all_event, impl_common_event_deref, impl_compose_child_with_focus_for_listener,
+  impl_listener, impl_multi_event_listener, impl_query_self_only, prelude::*,
 };
 
 #[derive(Debug)]
-pub struct KeyboardEvent {
+pub struct KeyboardEvent<'a> {
   pub scan_code: ScanCode,
   pub key: VirtualKeyCode,
-  pub common: EventCommon,
+  common: CommonEvent<'a>,
 }
 
-#[derive(Declare)]
-pub struct KeyDownListener {
-  #[declare(builtin, default, convert=custom)]
-  on_key_down: MutRefItemSubject<'static, KeyboardEvent, Infallible>,
+impl_event_subject!(Keyboard, event_name = AllKeyboard);
+
+impl_multi_event_listener! {
+  "The listener use to fire and listen keyboard events.",
+  Keyboard,
+  "The `KeyDown` event is fired when a key is pressed.",
+  KeyDown,
+  "The `KeyDownCapture` event is same as `KeyDown` but emit in capture phase.",
+  KeyDownCapture,
+  "The `KeyUp` event is fired when a key is released.",
+  KeyUp,
+  "The `KeyUpCapture` event is same as `KeyUp` but emit in capture phase.",
+  KeyUpCapture
 }
 
-#[derive(Declare)]
-pub struct KeyUpListener {
-  #[declare(
-    builtin,
-    convert=custom
-  )]
-  on_key_up: MutRefItemSubject<'static, KeyboardEvent, Infallible>,
-}
+impl_common_event_deref!(KeyboardEvent);
 
-#[derive(Declare)]
-pub struct KeyDownCaptureListener {
-  #[declare(builtin, convert=custom)]
-  on_key_down_capture: MutRefItemSubject<'static, KeyboardEvent, Infallible>,
-}
+impl_compose_child_with_focus_for_listener!(KeyboardListener);
 
-#[derive(Declare)]
-pub struct KeyUpCaptureListener {
-  #[declare(builtin, convert=custom)]
-  on_key_up_capture: MutRefItemSubject<'static, KeyboardEvent, Infallible>,
-}
-
-impl_listener_and_compose_child_with_focus!(
-  KeyDownListener,
-  KeyDownListenerDeclarer,
-  on_key_down,
-  KeyboardEvent,
-  key_down_stream
-);
-
-impl_listener_and_compose_child_with_focus!(
-  KeyUpListener,
-  KeyUpListenerDeclarer,
-  on_key_up,
-  KeyboardEvent,
-  key_up_stream
-);
-
-impl_listener_and_compose_child_with_focus!(
-  KeyDownCaptureListener,
-  KeyDownCaptureListenerDeclarer,
-  on_key_down_capture,
-  KeyboardEvent,
-  key_down_capture_stream
-);
-
-impl_listener_and_compose_child_with_focus!(
-  KeyUpCaptureListener,
-  KeyUpCaptureListenerDeclarer,
-  on_key_up_capture,
-  KeyboardEvent,
-  key_up_capture_stream
-);
-
-impl std::borrow::Borrow<EventCommon> for KeyboardEvent {
+impl<'a> KeyboardEvent<'a> {
   #[inline]
-  fn borrow(&self) -> &EventCommon { &self.common }
-}
-
-impl std::borrow::BorrowMut<EventCommon> for KeyboardEvent {
-  #[inline]
-  fn borrow_mut(&mut self) -> &mut EventCommon { &mut self.common }
-}
-
-impl std::ops::Deref for KeyboardEvent {
-  type Target = EventCommon;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.common }
-}
-
-impl std::ops::DerefMut for KeyboardEvent {
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
+  pub fn new(scan_code: ScanCode, key: VirtualKeyCode, id: WidgetId, wnd: &'a Window) -> Self {
+    Self {
+      scan_code,
+      key,
+      common: CommonEvent::new(id, wnd),
+    }
+  }
 }
 
 #[cfg(test)]
@@ -147,6 +101,7 @@ mod tests {
             }
           }
         }
+        .into()
       }
     }
 

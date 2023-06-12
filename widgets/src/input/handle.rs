@@ -64,7 +64,7 @@ impl TextEditorArea {
 
   pub(crate) fn key_handle(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEvent) {
     let mut deal = false;
-    if event.common.with_command_key() {
+    if event.with_command_key() {
       deal = key_with_command(this, event)
     }
     if !deal {
@@ -74,7 +74,7 @@ impl TextEditorArea {
 }
 
 fn key_with_command(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEvent) -> bool {
-  if event.key == VirtualKeyCode::V && event.common.with_command_key() {
+  if event.key == VirtualKeyCode::V && event.with_command_key() {
     let clipboard = AppCtx::clipboard();
     let txt = clipboard.borrow_mut().read_text();
     if let Ok(txt) = txt {

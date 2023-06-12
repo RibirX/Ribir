@@ -18,11 +18,11 @@ pub struct Animate<T, P: AnimateProperty> {
   pub from: P::Value,
   #[declare(skip)]
   running_info: Option<AnimateInfo<P::Value>>,
-  #[declare(skip, default = ctx.wnd_ctx().frame_ticker.clone())]
+  #[declare(skip, default = ctx.window().frame_ticker.clone())]
   frame_ticker: FrameTicker,
-  #[declare(skip, default = ctx.wnd_ctx().animate_track())]
+  #[declare(skip, default = ctx.window().animate_track())]
   animate_track: AnimateTrack,
-  #[declare(skip, default = ctx.wnd_ctx().frame_scheduler())]
+  #[declare(skip, default = ctx.window().frame_scheduler())]
   frame_scheduler: FuturesLocalScheduler,
 }
 
@@ -175,15 +175,17 @@ mod tests {
     animation::{easing, Prop},
     declare::Declare,
     state::Stateful,
+    test_helper::TestWindow,
   };
 
   #[test]
   fn fix_animate_circular_mut_borrow() {
-    let mut themes = vec![];
-    let pool = FuturesLocalSchedulerPool::default();
-    let scheduler = pool.spawner();
-    let mut wnd_ctx = WindowCtx::new(scheduler);
-    let ctx = BuildCtx::new(&mut themes, &mut wnd_ctx);
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
+    let wnd = TestWindow::new(Void {});
+    let mut tree = wnd.widget_tree.borrow_mut();
+    let ctx = BuildCtx::new(None, &mut tree);
+
     let animate = Animate::declare_builder()
       .transition(
         Transition::declare_builder()
@@ -202,8 +204,6 @@ mod tests {
     let animate = Stateful::new(animate);
     animate.state_ref().run();
 
-    wnd_ctx
-      .frame_ticker
-      .emit(FrameMsg::LayoutReady(Instant::now()));
+    wnd.frame_ticker.emit(FrameMsg::LayoutReady(Instant::now()));
   }
 }

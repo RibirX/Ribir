@@ -1,4 +1,4 @@
-use crate::{data_widget::widget_attach_data, impl_query_self_only, prelude::*};
+use crate::{impl_query_self_only, prelude::*};
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
@@ -142,13 +142,11 @@ impl<V: 'static + Clone + PartialEq> ComposeChild for KeyWidget<V> {
   #[inline]
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let data: Box<dyn AnyKey> = Box::new(this);
-    widget_attach_data(child, data)
+    DataWidget::attach(child, data)
   }
 }
 
-impl Query for Box<dyn AnyKey> {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Box<dyn AnyKey>);
 
 impl<V> KeyWidget<V>
 where
@@ -172,9 +170,7 @@ where
   }
 }
 
-impl Query for Key {
-  impl_query_self_only!();
-}
+impl_query_self_only!(Key);
 
 macro from_key_impl($($ty: ty : $name: ident)*) {
   $(

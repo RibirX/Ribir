@@ -425,7 +425,7 @@ Text {
 > **Tips**
 >
 > - `TypographyTheme` configures the text style used in the application as a part of `Theme`. Click [`Introduction to Theme[wip]`] to learn more.
-> - `BuildCtx` construct when adding a widget to the widget tree can be used to find the theme information and access the `WindowCtx`. The theme information consists of all themes from the widget parent to the root of the widget tree, and the window context is about the widget's host window. `BuildCtx` will provide additional contexts for the application of the `widget!` in the future.
+> - `BuildCtx` construct when adding a widget to the widget tree can be used to find the theme information and access the `WndCtx`. The theme information consists of all themes from the widget parent to the root of the widget tree, and the window context is about the widget's host window. `BuildCtx` will provide additional contexts for the application of the `widget!` in the future.
 
 ## Animations
 

@@ -1,4 +1,4 @@
-use ribir::{core::test_helper::TestWindow, prelude::*};
+use ribir::prelude::*;
 
 #[derive(Declare)]
 struct P;
@@ -17,7 +17,7 @@ struct ChildTemplateOfP {
 impl ComposeChild for P {
   type Child = ChildTemplateOfP;
 
-  fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+  fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
 }
 
 #[derive(Declare)]
@@ -29,7 +29,7 @@ struct TupleStructTemplate(ChildA, Option<ChildB>, Option<ChildC>);
 impl ComposeChild for P2 {
   type Child = TupleStructTemplate;
 
-  fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+  fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
 }
 
 #[derive(Declare)]
@@ -45,7 +45,7 @@ enum EnumTml {
 impl ComposeChild for P3 {
   type Child = EnumTml;
 
-  fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into_widget() }
+  fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
 }
 
 #[test]
@@ -89,17 +89,4 @@ fn enum_template() {
   let _c = widget! {
     P { self::ChildC }
   };
-}
-
-#[test]
-#[should_panic = "Try to fill enum template with two variant."]
-fn panic_multi_enum_variant() {
-  let w = widget! {
-    P3 {
-      self::ChildA
-      self::ChildB
-    }
-  };
-
-  let _ = TestWindow::new(w);
 }
