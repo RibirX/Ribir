@@ -1,6 +1,5 @@
 use std::{
   cell::RefCell,
-  collections::HashSet,
   hash::{Hash, Hasher},
   rc::Rc,
 };
@@ -158,7 +157,7 @@ fn collect_miss_part<'a>(
   let mut miss_parts = vec![];
   for (start, end, helper) in new_part {
     let mut miss_start = None;
-    let mut miss_cluster = HashSet::new();
+    let mut last_miss_cluster = None;
     glyphs[*start..*end]
       .iter()
       .enumerate()
@@ -167,9 +166,13 @@ fn collect_miss_part<'a>(
         if glyph.is_miss() {
           if miss_start.is_none() {
             miss_start = Some(idx);
-            miss_cluster.insert(glyph.cluster);
           }
-        } else if !miss_cluster.contains(&glyph.cluster) && miss_start.is_some() {
+          last_miss_cluster = Some(glyph.cluster);
+        } else if last_miss_cluster
+          .as_ref()
+          .map_or(true, |cluster| *cluster != glyph.cluster)
+          && miss_start.is_some()
+        {
           miss_parts.push((miss_start.take().unwrap(), idx, helper.clone()));
         }
       });
@@ -178,14 +181,12 @@ fn collect_miss_part<'a>(
     }
   }
 
-  miss_parts.iter_mut().for_each(|(start, end, _)| {
+  miss_parts.iter_mut().for_each(|(start, _, _)| {
     while 0 < *start && glyphs[*start - 1].cluster == glyphs[*start].cluster {
       *start -= 1;
     }
-    while *end < glyphs.len() && glyphs[*end - 1].cluster == glyphs[*end].cluster {
-      *end += 1;
-    }
   });
+
   miss_parts
 }
 
