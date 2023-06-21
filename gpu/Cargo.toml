@@ -27,7 +27,7 @@ zerocopy.workspace = true
 
 [dev-dependencies]
 paste.workspace = true
-ribir_dev_helper = {path = "../dev-helper", version = "0.0.1-alpha.1"}
+ribir_dev_helper = {path = "../dev-helper"}
 
 [features]
 default = ["wgpu"]

@@ -236,7 +236,7 @@ impl FontDB {
 impl Default for FontDB {
   fn default() -> FontDB {
     let mut data_base = fontdb::Database::new();
-    data_base.load_font_data(include_bytes!("../../fonts/Lato-Regular.ttf").to_vec());
+    data_base.load_font_data(include_bytes!("../Lato-Regular.ttf").to_vec());
     let default_font = data_base.faces().next().map(|f| f.id).unwrap();
     let mut this = FontDB {
       default_font,
