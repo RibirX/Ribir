@@ -29,6 +29,7 @@ pub(crate) struct Atlas<T: Texture, K, Attr> {
   label: &'static str,
   cache: FrameCache<K, AtlasHandle<Attr>>,
   extras: Slab<T>,
+  islands: Vec<AtlasHandle<Attr>>,
 }
 
 macro_rules! release_handle {
@@ -62,6 +63,7 @@ where
       atlas_allocator: AtlasAllocator::new(ATLAS_MIN_SIZE.cast_unit()),
       cache: FrameCache::new(),
       extras: Slab::default(),
+      islands: vec![],
     }
   }
 
@@ -126,7 +128,9 @@ where
     let handle = AtlasHandle { attr, atlas_dist };
 
     if let Some(h) = self.cache.put(key, handle) {
-      release_handle!(self, h);
+      // Hold the old handle until the frame end, because it's maybe used by other
+      // commands.
+      self.islands.push(h);
     }
 
     handle
@@ -165,6 +169,10 @@ where
       .cache
       .end_frame(self.label)
       .for_each(|h| release_handle!(self, h));
+    self
+      .islands
+      .drain(..)
+      .for_each(|h| release_handle!(self, h))
   }
 }
 
@@ -218,5 +226,29 @@ mod tests {
 
     assert!(atlas.extras.is_empty());
     assert!(atlas.atlas_allocator.is_empty());
+  }
+
+  #[test]
+  fn fix_scale_path_cache_miss() {
+    let mut wgpu = block_on(WgpuImpl::headless());
+    let mut atlas =
+      Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Rgba8, AntiAliasing::None, &mut wgpu);
+    atlas.allocate(1, (), DeviceSize::new(32, 32), &mut wgpu);
+    atlas.allocate(1, (), DeviceSize::new(512, 512), &mut wgpu);
+    // before the frame end, two allocation for key(1) should keep.
+    let mut alloc_count = 0;
+    atlas
+      .atlas_allocator
+      .for_each_allocated_rectangle(|_, _| alloc_count += 1);
+    assert_eq!(alloc_count, 2);
+
+    atlas.end_frame();
+
+    // after end frame, the smaller allocation of the keep should be release.
+    alloc_count = 0;
+    atlas
+      .atlas_allocator
+      .for_each_allocated_rectangle(|_, _| alloc_count += 1);
+    assert_eq!(alloc_count, 1);
   }
 }
