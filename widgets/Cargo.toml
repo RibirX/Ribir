@@ -17,14 +17,11 @@ version.workspace = true
 [dependencies]
 lyon_algorithms.workspace = true
 lyon_path.workspace = true
-ribir_core = {path = "../core", version = "0.0.1-alpha.1" }
-ribir_geom = {path = "../geom", version = "0.0.1-alpha.1" }
+ribir_core = {path = "../core", version = "0.0.1-alpha.1"}
+ribir_geom = {path = "../geom", version = "0.0.1-alpha.1"}
 webbrowser.workspace = true
 
 [dev-dependencies]
 paste.workspace = true
-ribir_dev_helper = {path = "../dev-helper", version = "0.0.1-alpha.1" }
-ribir_material = {path = "../themes/material", version = "0.0.1-alpha.1" }
-
-[features]
-wgpu = ["ribir_dev_helper/wgpu"]
+ribir_dev_helper = {path = "../dev-helper", version = "0.0.1-alpha.1"}
+ribir_material = {path = "../themes/material", version = "0.0.1-alpha.1"}

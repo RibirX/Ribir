@@ -215,7 +215,6 @@ macro_rules! widget_image_test {
     wnd_size = $size: expr $(,)?
   ) => {
     paste::paste! {
-      #[cfg(feature = "wgpu")]
       #[test]
       fn [<$widget_fn _with_default_by_wgpu>]() {
         let mut wnd = TestWindow::new_with_size($widget_fn(), $size);
@@ -228,7 +227,6 @@ macro_rules! widget_image_test {
         assert_texture_eq_png(img, &file_path);
       }
 
-      #[cfg(feature = "wgpu")]
       #[test]
       fn [<$widget_fn _with_material_by_wgpu>]() {
         let ctx = AppContext::new(ribir_material::purple::light());
