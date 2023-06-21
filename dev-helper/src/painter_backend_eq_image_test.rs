@@ -22,7 +22,6 @@ use ribir_painter::{image::ColorFormat, PixelImage};
 #[macro_export]
 macro_rules! painter_backend_eq_image_test {
   ($painter_fn: ident) => {
-    #[cfg(feature = "wgpu")]
     paste::paste! {
       #[test]
       fn [<wgpu_ $painter_fn>]() {
@@ -111,7 +110,6 @@ pub fn assert_texture_eq_png(img: PixelImage, file_path: &std::path::Path) {
 }
 
 /// Render painter by wgpu backend, and return the image.
-#[cfg(feature = "wgpu")]
 pub fn wgpu_render_commands(
   commands: Vec<ribir_painter::PaintCommand>,
   viewport: ribir_geom::DeviceRect,
