@@ -121,17 +121,19 @@ impl App {
             }
           }
         }
-        Event::MainEventsCleared => windows.iter_mut().for_each(|(_, wnd)| {
-          wnd.run_futures();
-          if wnd.need_draw() {
-            let wnd = wnd
-              .shell_wnd()
-              .as_any()
-              .downcast_ref::<WinitShellWnd>()
-              .unwrap();
-            wnd.winit_wnd.request_redraw();
-          }
-        }),
+        Event::MainEventsCleared => {
+          app_ctx.run_until_stalled();
+          windows.iter_mut().for_each(|(_, wnd)| {
+            if wnd.need_draw() {
+              let wnd = wnd
+                .shell_wnd()
+                .as_any()
+                .downcast_ref::<WinitShellWnd>()
+                .unwrap();
+              wnd.winit_wnd.request_redraw();
+            }
+          })
+        }
         Event::RedrawRequested(id) => {
           if let Some(wnd) = windows.get_mut(&new_id(id)) {
             wnd.draw_frame();

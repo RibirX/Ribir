@@ -11,6 +11,7 @@ use std::{
   task::{Context, RawWaker, RawWakerVTable, Waker},
 };
 
+use crate::prelude::FuturesLocalScheduler;
 pub use futures::task::SpawnError;
 use futures::{
   executor::{block_on, LocalPool},
@@ -83,6 +84,8 @@ impl AppContext {
     // tmp code
     unsafe { &mut *ptr.as_mut() }
   }
+
+  pub fn scheduler(&self) -> FuturesLocalScheduler { self.executor.local.borrow().spawner() }
 
   pub(crate) fn end_frame(&mut self) {
     // todo: frame cache is not a good choice? because not every text will relayout

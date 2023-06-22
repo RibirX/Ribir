@@ -19,7 +19,7 @@ mod test_single_thread {
       }
       finally ctx => {
         observable::of(Size::new(10., 10.))
-          .delay(Duration::from_millis(10), ctx.wnd_ctx().frame_scheduler())
+          .delay(Duration::from_millis(10), ctx.wnd_ctx().scheduler())
           .subscribe(move |v| c.size = v);
       }
     };
@@ -29,16 +29,16 @@ mod test_single_thread {
     wnd.draw_frame();
     assert_layout_result_by_path!(wnd, {path = [0], width == 20., height == 20.,});
 
-    sleep(Duration::from_millis(10));
-
     // keep same
-    wnd.run_futures();
+    wnd.wnd_ctx().app_ctx().run_until_stalled();
     wnd.draw_frame();
     assert_layout_result_by_path!(wnd, {path = [0], width == 20., height == 20.,});
 
+    sleep(Duration::from_millis(10));
+
     // trigger timeout
     super::Timer::wake_timeout_futures();
-    wnd.run_futures();
+    wnd.wnd_ctx().app_ctx().run_until_stalled();
     wnd.draw_frame();
     assert_layout_result_by_path!(wnd, {path = [0], width == 10., height == 10.,});
   }
