@@ -40,6 +40,10 @@ impl WindowCtx {
   #[inline]
   pub fn app_ctx(&self) -> &AppContext { &self.app_ctx }
 
+  /// Return an local `rxRust` Scheduler
+  #[inline]
+  pub fn scheduler(&self) -> FuturesLocalScheduler { self.app_ctx.scheduler() }
+
   /// Return an `rxRust` Scheduler, which will guarantee all task add to the
   /// scheduler will finished before current frame finished.
   #[inline]

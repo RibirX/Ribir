@@ -58,6 +58,8 @@ impl Window {
     }
   }
 
+  pub fn wnd_ctx(&self) -> &WindowCtx { &self.context }
+
   /// Draw an image what current render tree represent.
   pub fn draw_frame(&mut self) {
     if !self.need_draw() {
@@ -71,7 +73,7 @@ impl Window {
       self.layout();
 
       // wait all frame task finished.
-      self.run_futures();
+      self.frame_pool.0.run();
 
       if !self.widget_tree.is_dirty() {
         break;
@@ -96,8 +98,6 @@ impl Window {
     self.shell_wnd.end_frame();
     self.context.end_frame();
   }
-
-  pub fn run_futures(&mut self) { self.frame_pool.0.run_until_stalled(); }
 
   pub fn layout(&mut self) {
     self.widget_tree.layout(self.shell_wnd.inner_size());

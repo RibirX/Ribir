@@ -25,7 +25,7 @@ impl Compose for Caret {
         }
       }
       finally ctx => {
-        let scheduler = ctx.wnd_ctx().frame_scheduler();
+        let scheduler = ctx.wnd_ctx().scheduler();
         let mut _guard = None;
         let_watch!(this.focused)
           .distinct_until_changed()

@@ -82,7 +82,7 @@ impl Future for Timer {
     if let Some(id) = self.as_mut().id.take() {
       TIME_REACTOR.lock().unwrap().remove_timer(when, id);
     }
-    if now > when {
+    if now >= when {
       return Poll::Ready(());
     }
 
