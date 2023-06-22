@@ -66,11 +66,14 @@ impl GlyphsHelper {
   }
 
   pub(crate) fn cursor(&self, cursor: usize) -> (Point, f32) {
-    let glyphs = self.glyphs.as_ref().unwrap();
-    let (para, offset) = glyphs.position_by_cluster(cursor);
-    let glphy = glyphs.glyph_rect(para, offset);
-    let line_height = glyphs.line_height(para);
-    (Point::new(glphy.min_x(), glphy.min_y()), line_height)
+    if let Some(glyphs) = self.glyphs.as_ref() {
+      let (para, offset) = glyphs.position_by_cluster(cursor);
+      let glphy = glyphs.glyph_rect(para, offset);
+      let line_height = glyphs.line_height(para);
+      (Point::new(glphy.min_x(), glphy.min_y()), line_height)
+    } else {
+      (Point::zero(), 0.)
+    }
   }
 
   pub(crate) fn selection(&self, rg: &Range<usize>) -> Vec<Rect> {
