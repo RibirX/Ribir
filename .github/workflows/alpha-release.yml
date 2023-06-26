@@ -2,6 +2,8 @@ on:
   workflow_dispatch: # allows manual triggering
   schedule:
     - cron: "0 2 * * 2" # runs every tuesday at 00:00
+permissions:
+  contents: write
 name: "release weekly alpha version"
 jobs:
   release:

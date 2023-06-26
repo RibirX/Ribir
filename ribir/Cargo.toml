@@ -13,22 +13,22 @@ repository = "https://github.com/RibirX/Ribir/ribir"
 version.workspace = true
 
 [dependencies]
+arboard = "3.2.0"
 once_cell.workspace = true
-ribir_core = {path = "../core", version = "0.0.1-alpha.2" }
-ribir_gpu = {path = "../gpu", version = "0.0.1-alpha.2" }
+ribir_core = {path = "../core", version = "0.0.1-alpha.2"}
+ribir_gpu = {path = "../gpu", version = "0.0.1-alpha.2"}
 ribir_material = {path = "../themes/material", version = "0.0.1-alpha.2", optional = true}
 ribir_widgets = {path = "../widgets", version = "0.0.1-alpha.2", optional = true}
 rxrust.workspace = true
 wgpu = {workspace = true, optional = true}
 winit.workspace = true
-arboard = "3.2.0"
 
 [dev-dependencies]
 colored.workspace = true
 env_logger.workspace = true
 futures.workspace = true
-ribir_dev_helper = {path = "../dev-helper", version = "0.0.1-alpha.2" }
-ribir_material = {path = "../themes/material", version = "0.0.1-alpha.2" }
+ribir_dev_helper = {path = "../dev-helper"}
+ribir_material = {path = "../themes/material"}
 
 [features]
 default = ["wgpu", "widgets", "material"]
@@ -44,3 +44,6 @@ path = "tests/timer_test.rs"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.3.9"
+
+[package.metadata.release]
+tag = true
