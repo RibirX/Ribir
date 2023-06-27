@@ -48,15 +48,26 @@ impl ComposeChild for ScrollableWidget {
             left_anchor: this.scroll_pos.x,
             top_anchor: this.scroll_pos.y,
           }
-      }}
+        }
+      }
 
       finally {
         let_watch!(content.layout_size())
           .distinct_until_changed()
-          .subscribe(move |v| this.content_size = v);
+          .subscribe(move |v| {
+            this.content_size = v;
+            // content size update need to update scroll offset.
+            let scroll_pos = this.scroll_pos;
+            this.jump_to(scroll_pos);
+          });
         let_watch!(view.layout_size())
           .distinct_until_changed()
-          .subscribe(move |v| this.page = v);
+          .subscribe(move |v| {
+              this.page = v;
+              // view size update need to update scroll offset.
+              let scroll_pos = this.scroll_pos;
+              this.jump_to(scroll_pos);
+          });
       }
 
     }
