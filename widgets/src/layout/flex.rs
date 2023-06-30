@@ -274,27 +274,24 @@ impl FlexLayouter {
     } = self;
 
     let cross_size = lines.iter().map(|l| l.cross_line_height).sum();
-    let cross_offset = align_items.align_value(cross_size, bound.cross);
+    // cross gap don't use calc offset
+    let cross_gap_count = (lines.len() - 1) as f32 * self.cross_axis_gap;
+    let cross_offset = align_items.align_value(cross_size, bound.cross - cross_gap_count);
 
     macro_rules! update_position {
       ($($rev: ident)?) => {
-        let mut cross = cross_offset;
-        let last_line_idx = lines.len() - 1;
-        let mut cross_step = 0.;
-        lines.iter_mut()$(.$rev())?.enumerate().for_each(|(line_idx, line)| {
+        let mut cross = cross_offset - self.cross_axis_gap;
+        lines.iter_mut()$(.$rev())?.for_each(|line| {
           let (mut main, step) = line.place_args(bound.main, *justify_content, self.main_axis_gap);
           line.items_info.iter_mut()$(.$rev())?.for_each(|item| {
             let item_cross_offset =
               align_items.align_value(item.size.cross, line.cross_line_height);
 
-            item.pos.cross = cross + item_cross_offset + cross_step;
+            item.pos.cross = cross + item_cross_offset + self.cross_axis_gap;
             item.pos.main = main;
             main = main + item.size.main + step;
           });
-          cross += line.cross_line_height;
-          if line_idx != last_line_idx {
-            cross_step += self.cross_axis_gap;
-          }
+          cross += line.cross_line_height + self.cross_axis_gap;
         });
       };
     }
@@ -506,6 +503,7 @@ mod tests {
       Flex {
         wrap: true,
         cross_axis_gap: 10.,
+        align_items: Align::Center,
         DynWidget {
           dyns: (0..3).map(|_| SizedBox { size })
         }
