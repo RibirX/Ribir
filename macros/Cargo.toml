@@ -22,10 +22,10 @@ bitflags.workspace = true
 lazy_static.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
-ribir_builtin = {path = "./builtin", version = "0.0.1-alpha.2" }
-ribir_painter = {path = "../painter", version = "0.0.1-alpha.2" }
+ribir_builtin = {path = "./builtin", version = "0.0.1-alpha.4" }
+ribir_painter = {path = "../painter", version = "0.0.1-alpha.4" }
 smallvec.workspace = true
 syn = {workspace = true, features = ["visit-mut", "full", "extra-traits"]}
 
 [build-dependencies]
-ribir_builtin = {path = "./builtin", version = "0.0.1-alpha.2" }
+ribir_builtin = {path = "./builtin", version = "0.0.1-alpha.4" }
