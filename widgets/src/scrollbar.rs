@@ -101,7 +101,7 @@ impl ComposeChild for HScrollBar {
 
 /// A control widget that enables the user to access vertical parts child that
 /// is larger than the box rect.
-#[derive(Declare, Clone)]
+#[derive(Declare, Declare2, Clone)]
 pub struct VScrollBar {
   /// Scrolled pixels of child content.
   #[declare(default)]

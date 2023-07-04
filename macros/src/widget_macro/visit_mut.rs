@@ -440,7 +440,7 @@ impl VisitCtx {
                 let field_subject = ribir_suffix_variable(&f.member, "subject");
                 let field_value = ribir_suffix_variable(&f.member, "init");
                 let pre_def = quote_spanned! { expr.span() =>
-                  let (#field_value, #field_subject) = AssignObservable::unzip(#expr);
+                  let (#field_value, #field_subject) = Pipe::unzip(#expr);
                 };
                 expr.expr = parse_quote_spanned! { expr.span() => #field_value };
                 let guards = guard_vec_ident();

@@ -36,7 +36,7 @@ pub struct AnimateInfo<V> {
   _tick_msg_guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
 }
 
-impl<'a, T: Roc, P: AnimateProperty> StateRef<'a, Animate<T, P>>
+impl<'a, T: Roc, P: AnimateProperty> StatefulRef<'a, Animate<T, P>>
 where
   Animate<T, P>: 'static,
 {

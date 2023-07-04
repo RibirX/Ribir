@@ -189,7 +189,14 @@ impl AppCtx {
   #[track_caller]
   pub unsafe fn new_lock_scope() -> MutexGuard<'static, ()> {
     static LOCK: Mutex<()> = Mutex::new(());
-    let locker = LOCK.lock().unwrap();
+
+    let locker = LOCK.lock().unwrap_or_else(|e| {
+      // Only clear for test, so we have a clear error message.
+      #[cfg(test)]
+      LOCK.clear_poison();
+
+      e.into_inner()
+    });
     APP_CTX_INIT = Once::new();
     locker
   }

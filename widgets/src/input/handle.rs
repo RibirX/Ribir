@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use ribir_core::prelude::{
-  AppCtx, CharsEvent, GraphemeCursor, KeyboardEvent, StateRef, TextWriter, VirtualKeyCode,
+  AppCtx, CharsEvent, GraphemeCursor, KeyboardEvent, StatefulRef, TextWriter, VirtualKeyCode,
 };
 
 #[macro_export]
@@ -50,7 +50,7 @@ macro_rules! declare_writer {
 declare_writer!(InputWriter, TextEditorArea);
 use super::TextEditorArea;
 impl TextEditorArea {
-  pub(crate) fn edit_handle(this: &mut StateRef<TextEditorArea>, event: &mut CharsEvent) {
+  pub(crate) fn edit_handle(this: &mut StatefulRef<TextEditorArea>, event: &mut CharsEvent) {
     if event.common.with_command_key() {
       return;
     }
@@ -67,7 +67,7 @@ impl TextEditorArea {
     }
   }
 
-  pub(crate) fn key_handle(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEvent) {
+  pub(crate) fn key_handle(this: &mut StatefulRef<TextEditorArea>, event: &mut KeyboardEvent) {
     let mut deal = false;
     if event.with_command_key() {
       deal = key_with_command(this, event)
@@ -78,7 +78,7 @@ impl TextEditorArea {
   }
 }
 
-fn key_with_command(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEvent) -> bool {
+fn key_with_command(this: &mut StatefulRef<TextEditorArea>, event: &mut KeyboardEvent) -> bool {
   if !event.with_command_key() {
     return false;
   }
@@ -111,7 +111,7 @@ fn key_with_command(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEve
   }
 }
 
-fn single_key(this: &mut StateRef<TextEditorArea>, key: &mut KeyboardEvent) -> bool {
+fn single_key(this: &mut StatefulRef<TextEditorArea>, key: &mut KeyboardEvent) -> bool {
   match key.key {
     VirtualKeyCode::NumpadEnter | VirtualKeyCode::Return => {
       if this.multi_line {

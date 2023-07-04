@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Widget let user to access the layout result of its child.
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct LayoutBox {
   #[declare(skip)]
   /// the rect box of its child and the coordinate is relative to its parent.

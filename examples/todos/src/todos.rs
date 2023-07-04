@@ -76,7 +76,7 @@ impl Compose for TodoMVP {
 }
 
 impl TodoMVP {
-  fn pane(this: StateRef<Self>, cond: fn(&Task) -> bool) -> Widget {
+  fn pane(this: StatefulRef<Self>, cond: fn(&Task) -> bool) -> Widget {
     let this = this.clone_stateful();
     widget! {
       states { this, mount_task_cnt: Stateful::new(0) }
@@ -105,7 +105,12 @@ impl TodoMVP {
     .into()
   }
 
-  fn task(this: StateRef<Self>, task: Task, idx: usize, mount_task_cnt: StateRef<i32>) -> Widget {
+  fn task(
+    this: StatefulRef<Self>,
+    task: Task,
+    idx: usize,
+    mount_task_cnt: StatefulRef<i32>,
+  ) -> Widget {
     let this = this.clone_stateful();
     let mount_task_cnt = mount_task_cnt.clone_stateful();
     widget! {

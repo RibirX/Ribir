@@ -3,6 +3,7 @@ pub use guards::ModifyGuard;
 use rxrust::{ops::box_it::BoxOp, prelude::*};
 use std::{
   cell::{Cell, RefCell, UnsafeCell},
+  collections::LinkedList,
   convert::Infallible,
   ops::{Deref, DerefMut},
   rc::Rc,
@@ -17,6 +18,7 @@ pub struct Stateful<W> {
 /// notify downstream when widget state changed, the value mean if the change it
 /// as silent or not.
 #[derive(Default, Clone)]
+// todo: remove rc<RefCell>
 pub(crate) struct StateChangeNotifier(Rc<RefCell<Subject<'static, ModifyScope, Infallible>>>);
 
 /// A reference of `Stateful which tracked the state change across if user
@@ -35,7 +37,7 @@ pub(crate) struct StateChangeNotifier(Rc<RefCell<Subject<'static, ModifyScope, I
 /// But in logic, first borrow needn't live as long as the statement. See
 /// relative rust issue https://github.com/rust-lang/rust/issues/37612
 
-pub struct StateRef<'a, W> {
+pub struct StatefulRef<'a, W> {
   /// - None, Not used the value
   /// - Some(false), borrow used the value
   /// - Some(true), mutable borrow used the value
@@ -107,6 +109,11 @@ struct InnerStateful<W> {
   borrowed_at: Cell<Option<&'static std::panic::Location<'static>>>,
   guard_cnt: Cell<usize>,
   data: UnsafeCell<W>,
+  /// A link list to store anonymous data, so keep it live as long as the
+  /// `Stateful` data. When this `Stateful` subscribe to a stream, append the
+  /// unsubscribe handle to this list let you can unsubscribe when this
+  /// `Stateful` drop.
+  slot_link: UnsafeCell<LinkedList<Box<dyn Any>>>,
 }
 
 impl<W> Clone for Stateful<W> {
@@ -129,6 +136,7 @@ impl<W> Stateful<W> {
         #[cfg(debug_assertions)]
         borrowed_at: Cell::new(None),
         guard_cnt: Cell::new(0),
+        slot_link: <_>::default(),
       }),
       modify_notifier: <_>::default(),
     }
@@ -141,7 +149,7 @@ impl<W> Stateful<W> {
   /// Return a reference of `Stateful`, modify across this reference will notify
   /// data and framework.
   #[inline]
-  pub fn state_ref(&self) -> StateRef<W> { StateRef::new(self, ModifyScope::BOTH) }
+  pub fn state_ref(&self) -> StatefulRef<W> { StatefulRef::new(self, ModifyScope::BOTH) }
 
   /// Return a reference of `Stateful`, modify across this reference will notify
   /// data only, the relayout or paint depends on this object will not be skip.
@@ -149,7 +157,7 @@ impl<W> Stateful<W> {
   /// If you not very clear how `silent_ref` work, use [`Stateful::state_ref`]!
   /// instead of.
   #[inline]
-  pub fn silent_ref(&self) -> StateRef<W> { StateRef::new(self, ModifyScope::DATA) }
+  pub fn silent_ref(&self) -> StatefulRef<W> { StatefulRef::new(self, ModifyScope::DATA) }
 
   /// Return a reference of `Stateful`, modify across this reference will notify
   /// framework only. That means this modify only effect framework but not
@@ -158,7 +166,9 @@ impl<W> Stateful<W> {
   /// If you not very clear how `shallow_ref` work, use [`Stateful::state_ref`]!
   /// instead of.
   #[inline]
-  pub(crate) fn shallow_ref(&self) -> StateRef<W> { StateRef::new(self, ModifyScope::FRAMEWORK) }
+  pub(crate) fn shallow_ref(&self) -> StatefulRef<W> {
+    StatefulRef::new(self, ModifyScope::FRAMEWORK)
+  }
 
   pub fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> {
     self.modify_notifier.raw_modifies()
@@ -178,6 +188,11 @@ impl<W> Stateful<W> {
   /// reference because we try to early release inner borrow when clone occur.
   #[inline]
   pub fn clone_stateful(&self) -> Stateful<W> { self.clone() }
+
+  pub fn own_data(&self, data: impl Any) {
+    let ptr = self.state_ref().value.inner.slot_link.get();
+    unsafe { &mut *ptr }.push_back(Box::new(data));
+  }
 
   pub(crate) fn try_into_inner(self) -> Result<W, Self> {
     if Rc::strong_count(&self.inner) == 1 {
@@ -211,7 +226,7 @@ macro_rules! already_borrow_panic {
   };
 }
 
-impl<'a, W> Deref for StateRef<'a, W> {
+impl<'a, W> Deref for StatefulRef<'a, W> {
   type Target = W;
 
   #[track_caller]
@@ -239,7 +254,7 @@ impl<'a, W> Deref for StateRef<'a, W> {
   }
 }
 
-impl<'a, W> DerefMut for StateRef<'a, W> {
+impl<'a, W> DerefMut for StatefulRef<'a, W> {
   #[track_caller]
   fn deref_mut(&mut self) -> &mut Self::Target {
     let b = &self.value.inner.borrow_flag;
@@ -277,11 +292,11 @@ impl<'a, W> DerefMut for StateRef<'a, W> {
   }
 }
 
-impl<'a, W> StateRef<'a, W> {
+impl<'a, W> StatefulRef<'a, W> {
   /// Fork a silent reference
-  pub fn silent(&self) -> StateRef<'a, W> {
+  pub fn silent(&self) -> StatefulRef<'a, W> {
     self.release_borrow();
-    StateRef::new(self.value.inner_ref(), ModifyScope::DATA)
+    StatefulRef::new(self.value.inner_ref(), ModifyScope::DATA)
   }
 
   /// Forget all modifies record in this reference. So the downstream will no
@@ -341,10 +356,13 @@ impl<'a, W> StateRef<'a, W> {
 impl<W: SingleChild> SingleChild for Stateful<W> {}
 impl<W: MultiChild> MultiChild for Stateful<W> {}
 
-impl_proxy_query!(paths [modify_notifier, state_ref()], Stateful<R>, <R>, where R: Query + 'static );
+impl_proxy_query!(
+  paths [modify_notifier, state_ref()],
+  Stateful<R>, <R>, where R: Query + 'static
+);
 impl_query_self_only!(StateChangeNotifier);
 
-impl<'a, W> Drop for StateRef<'a, W> {
+impl<'a, W> Drop for StatefulRef<'a, W> {
   fn drop(&mut self) { self.release_borrow(); }
 }
 

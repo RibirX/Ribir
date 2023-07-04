@@ -1,6 +1,6 @@
 use crate::{impl_query_self_only, prelude::*};
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct Visibility {
   #[declare(builtin)]
   pub visible: bool,

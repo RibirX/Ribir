@@ -56,11 +56,11 @@ use ribir_core::prelude::*;
 ///   }
 /// };
 /// ```
-#[derive(Declare, Clone)]
+#[derive(Declare, Declare2, Clone)]
 pub struct Tabs {
   #[declare(default = Position::Top)]
   pub pos: Position,
-  #[declare(default = 0)]
+  #[declare(default)]
   pub cur_idx: usize,
 }
 
@@ -120,7 +120,7 @@ pub struct TabItem {
   label: Option<State<Label>>,
 }
 
-#[derive(Declare, SingleChild)]
+#[derive(Declare, Declare2, SingleChild)]
 pub struct TabPane;
 
 #[derive(Declare)]

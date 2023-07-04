@@ -1,4 +1,4 @@
-use super::{ModifyScope, StateRef, Stateful};
+use super::{ModifyScope, Stateful, StatefulRef};
 use rxrust::{observable, ops::box_it::BoxOp, prelude::BoxIt, subject::Subject};
 use std::{convert::Infallible, rc::Rc};
 
@@ -8,7 +8,7 @@ pub enum Readonly<W> {
 }
 
 pub enum ReadRef<'a, W> {
-  Stateful(StateRef<'a, W>),
+  Stateful(StatefulRef<'a, W>),
   Stateless(&'a Rc<W>),
 }
 

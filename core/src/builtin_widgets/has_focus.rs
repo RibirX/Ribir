@@ -1,5 +1,5 @@
 use crate::prelude::*;
-#[derive(PartialEq, Clone, Declare)]
+#[derive(PartialEq, Clone, Declare, Declare2)]
 pub struct HasFocus {
   #[declare(skip, default)]
   focused: bool,

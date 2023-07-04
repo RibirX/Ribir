@@ -1,5 +1,5 @@
 use super::*;
-use crate::widget::{RenderFul, WidgetBuilder};
+use crate::widget::WidgetBuilder;
 
 /// Trait specify what child a multi child widget can have, and the target type
 /// after widget compose its child.
@@ -8,8 +8,8 @@ pub trait MultiWithChild<C> {
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
 }
 
-pub struct MultiChildWidget {
-  pub widget: Box<dyn Render>,
+pub struct MultiPair {
+  pub parent: WidgetId,
   pub children: Vec<WidgetId>,
 }
 
@@ -23,10 +23,6 @@ impl<W: IntoIterator> Multi<W> {
 
   #[inline]
   pub fn into_inner(self) -> W { self.0 }
-}
-
-trait IntoMultiParent {
-  fn into_multi_parent(self) -> Box<dyn Render>;
 }
 
 // Same with ChildConvert::FillVec, but only for MultiChild,
@@ -71,34 +67,46 @@ where
   }
 }
 
-impl<R: MultiChild + Render + 'static> IntoMultiParent for R {
-  #[inline]
-  fn into_multi_parent(self) -> Box<dyn Render> { Box::new(self) }
+impl<D> FillVec for Pipe<Multi<D>>
+where
+  D: IntoIterator + 'static,
+  D::Item: Into<Widget>,
+{
+  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) {
+    self.build_multi(vec, ctx.force_as_mut());
+  }
 }
 
-impl<R: MultiChild + Render + 'static> IntoMultiParent for Stateful<R> {
+trait MultiParent {
+  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId;
+}
+
+impl<R: Into<Box<dyn Render>> + MultiChild> MultiParent for R {
   #[inline]
-  fn into_multi_parent(self) -> Box<dyn Render> { Box::new(RenderFul(self)) }
+  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId { ctx.alloc_widget(self.into()) }
+}
+
+impl<W: Into<Box<dyn Render>> + MultiChild> MultiParent for Pipe<W> {
+  #[inline]
+  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.build_as_render_parent(ctx) }
 }
 
 impl<R, C> MultiWithChild<C> for R
 where
-  R: IntoMultiParent,
+  R: MultiParent,
   C: FillVec,
 {
-  type Target = MultiChildWidget;
+  type Target = MultiPair;
 
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
+    let parent = self.build_as_parent(ctx.force_as_mut());
     let mut children = vec![];
     child.fill_vec(&mut children, ctx);
-    MultiChildWidget {
-      widget: self.into_multi_parent(),
-      children,
-    }
+    MultiPair { parent, children }
   }
 }
 
-impl<C> MultiWithChild<C> for MultiChildWidget
+impl<C> MultiWithChild<C> for MultiPair
 where
   C: FillVec,
 {
@@ -110,13 +118,13 @@ where
   }
 }
 
-impl WidgetBuilder for MultiChildWidget {
+impl WidgetBuilder for MultiPair {
   fn build(self, ctx: &BuildCtx) -> WidgetId {
-    let MultiChildWidget { widget, children } = self;
-    let p = ctx.alloc_widget(widget);
+    let MultiPair { parent, children } = self;
     children
       .into_iter()
-      .for_each(|child| ctx.append_child(p, child));
-    p
+      .for_each(|child| ctx.force_as_mut().append_child(parent, child));
+
+    parent
   }
 }

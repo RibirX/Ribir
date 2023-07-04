@@ -51,10 +51,6 @@ pub trait Render: Query {
   fn get_transform(&self) -> Option<Transform> { None }
 }
 
-pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
-  ctx.box_rect().map_or(false, |rect| rect.contains(pos))
-}
-
 /// The common type of all widget can convert to.
 pub struct Widget(Box<dyn FnOnce(&BuildCtx) -> WidgetId>);
 
@@ -105,7 +101,7 @@ impl<'a> dyn Render + 'a {
   pub fn query_all_type<T: Any>(&self, mut callback: impl FnMut(&T) -> bool, order: QueryOrder) {
     self.query_all(
       TypeId::of::<T>(),
-      &mut |a: &dyn Any| a.downcast_ref().map_or(true, &mut callback),
+      &mut |a| a.downcast_ref().map_or(true, &mut callback),
       order,
     )
   }
@@ -148,29 +144,17 @@ pub struct FnWidget<F>(F);
 pub(crate) trait WidgetBuilder {
   fn build(self, ctx: &BuildCtx) -> WidgetId;
 }
-pub(crate) trait WidgetOrId {
-  fn build_id(self, ctx: &BuildCtx) -> WidgetId;
-}
 
-impl<T: WidgetBuilder> WidgetOrId for T {
+impl From<WidgetId> for Widget {
   #[inline]
-  fn build_id(self, ctx: &BuildCtx) -> WidgetId { self.build(ctx) }
-}
-
-impl WidgetOrId for WidgetId {
-  #[inline]
-  fn build_id(self, _: &BuildCtx) -> WidgetId { self }
-}
-
-impl WidgetOrId for Widget {
-  #[inline]
-  fn build_id(self, ctx: &BuildCtx) -> WidgetId { self.build(ctx) }
+  fn from(id: WidgetId) -> Self { Widget(Box::new(move |_| id)) }
 }
 
 impl<F> FnWidget<F> {
+  #[inline]
   pub fn new<R>(f: F) -> Self
   where
-    F: FnOnce(&BuildCtx) -> R,
+    F: FnOnce(&BuildCtx) -> R + Into<FnWidget<F>>,
   {
     FnWidget(f)
   }
@@ -182,9 +166,9 @@ impl<F> FnWidget<F> {
 impl<F, R> WidgetBuilder for FnWidget<F>
 where
   F: FnOnce(&BuildCtx) -> R + 'static,
-  R: WidgetOrId,
+  R: Into<Widget>,
 {
-  fn build(self, ctx: &BuildCtx) -> WidgetId { (self.0)(ctx).build_id(ctx) }
+  fn build(self, ctx: &BuildCtx) -> WidgetId { (self.0)(ctx).into().build(ctx) }
 }
 
 #[macro_export]
@@ -327,6 +311,8 @@ pub(crate) struct RenderFul<R>(pub(crate) Stateful<R>);
 
 impl_proxy_query!(paths [0], RenderFul<R>, <R>, where R: Render + 'static);
 impl_proxy_render!(proxy 0.state_ref(), RenderFul<R>, <R>, where R: Render + 'static);
+impl_proxy_query!(paths[0.state_ref()], RenderFul<Box<dyn Render>>);
+impl_proxy_render!(proxy 0.state_ref(), RenderFul<Box<dyn Render>>);
 
 impl<R: Render + 'static> Compose for R {
   fn compose(this: State<Self>) -> Widget {
@@ -346,9 +332,28 @@ impl<W: WidgetBuilder + 'static> From<W> for Widget {
   fn from(value: W) -> Self { Self(Box::new(|ctx| value.build(ctx))) }
 }
 
+impl<F, R> From<F> for FnWidget<F>
+where
+  F: FnOnce(&BuildCtx) -> R,
+  R: Into<Widget>,
+{
+  #[inline]
+  fn from(value: F) -> Self { Self(value) }
+}
+
 impl Widget {
   #[inline]
   pub fn build(self, ctx: &BuildCtx) -> WidgetId { (self.0)(ctx) }
+}
+
+impl<R: Render + 'static> From<R> for Box<dyn Render> {
+  #[inline]
+  fn from(value: R) -> Self { Box::new(value) }
+}
+
+impl<R: Render + 'static> From<Stateful<R>> for Box<dyn Render> {
+  #[inline]
+  fn from(value: Stateful<R>) -> Self { Box::new(RenderFul(value)) }
 }
 
 impl_proxy_query!(paths [deref()], ShareResource<T>, <T>, where  T: Render + 'static);
@@ -371,3 +376,7 @@ pub fn then<W>(b: bool, f: impl FnOnce() -> W) -> Option<W> { b.then(f) }
 /// calls the closure on `value` and returns
 #[inline]
 pub fn map<T, W>(value: T, f: impl FnOnce(T) -> W) -> W { f(value) }
+
+pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
+  ctx.box_rect().map_or(false, |rect| rect.contains(pos))
+}
