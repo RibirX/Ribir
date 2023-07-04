@@ -1,7 +1,7 @@
 use ribir_core::{impl_query_self_only, prelude::*};
 
 /// A widget that overlap children align with left top.
-#[derive(MultiChild, Declare)]
+#[derive(MultiChild, Declare, Declare2)]
 pub struct Stack {
   #[declare(default)]
   fit: StackFit,

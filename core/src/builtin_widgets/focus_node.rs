@@ -5,7 +5,7 @@ use crate::{
   prelude::*,
 };
 
-#[derive(Default, Declare)]
+#[derive(Default, Declare, Declare2)]
 pub struct FocusNode {
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
@@ -97,7 +97,7 @@ pub(crate) fn dynamic_compose_focus_node(widget: Widget) -> Widget {
   })
   .into()
 }
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct RequestFocus {
   #[declare(default)]
   handle: Option<FocusHandle>,

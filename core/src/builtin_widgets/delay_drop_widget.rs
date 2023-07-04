@@ -1,6 +1,6 @@
 use crate::{impl_query_self_only, prelude::*};
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct DelayDropWidget {
   #[declare(builtin)]
   pub delay_drop_until: bool,

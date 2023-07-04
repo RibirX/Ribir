@@ -99,7 +99,11 @@ impl TextSelectable {
   fn selected_rect(&self) -> Vec<Rect> { self.helper.selection(&self.caret.select_range()) }
 }
 
-fn key_handle(this: &mut StateRef<TextSelectable>, text: &CowArc<str>, event: &mut KeyboardEvent) {
+fn key_handle(
+  this: &mut StatefulRef<TextSelectable>,
+  text: &CowArc<str>,
+  event: &mut KeyboardEvent,
+) {
   let mut deal = false;
   if event.with_command_key() {
     deal = deal_with_command(this, text, event);
@@ -111,7 +115,7 @@ fn key_handle(this: &mut StateRef<TextSelectable>, text: &CowArc<str>, event: &m
 }
 
 fn deal_with_command(
-  this: &mut StateRef<TextSelectable>,
+  this: &mut StatefulRef<TextSelectable>,
   text: &CowArc<str>,
   event: &mut KeyboardEvent,
 ) -> bool {
@@ -139,17 +143,21 @@ fn is_move_by_word(event: &KeyboardEvent) -> bool {
   return event.with_ctrl_key();
 }
 
-fn move_to_line_begin(this: &mut StateRef<TextSelectable>) {
+fn move_to_line_begin(this: &mut StatefulRef<TextSelectable>) {
   let (row, _) = this.helper.glyph_position(this.caret.offset());
   this.caret = this.helper.cluster_from_glyph_position(row, 0).into();
 }
 
-fn move_to_line_end(this: &mut StateRef<TextSelectable>) {
+fn move_to_line_end(this: &mut StatefulRef<TextSelectable>) {
   let (row, _) = this.helper.glyph_position(this.caret.offset());
   this.caret = this.helper.cluster_from_glyph_position(row + 1, 0).into();
 }
 
-fn deal_with_selection(this: &mut StateRef<TextSelectable>, text: &str, event: &mut KeyboardEvent) {
+fn deal_with_selection(
+  this: &mut StatefulRef<TextSelectable>,
+  text: &str,
+  event: &mut KeyboardEvent,
+) {
   let old_caret = this.caret;
   match event.key {
     VirtualKeyCode::Left => {

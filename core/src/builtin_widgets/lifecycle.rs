@@ -12,7 +12,7 @@ define_widget_context!(LifecycleEvent);
 
 crate::events::impl_event_subject!(Lifecycle, event_name = AllLifecycle);
 
-#[derive(Declare, Default)]
+#[derive(Declare, Declare2, Default)]
 pub struct LifecycleListener {
   #[declare(skip)]
   lifecycle: LifecycleSubject,
@@ -82,6 +82,48 @@ impl LifecycleListenerDeclarer {
     self
       .lifecycle
       .get_or_insert_with(LifecycleSubject::default)
+      .clone()
+  }
+}
+
+impl LifecycleListenerDeclarer2 {
+  pub fn on_mounted(
+    mut self,
+    handler: impl for<'r> FnMut(&'r mut LifecycleEvent<'_>) + 'static,
+  ) -> Self {
+    let _ = self
+      .subject()
+      .filter_map(match_closure!(Mounted))
+      .take(1)
+      .subscribe(handler);
+
+    self
+  }
+
+  pub fn on_performed_layout(mut self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
+    let _ = self
+      .subject()
+      .filter_map(match_closure!(PerformedLayout))
+      .subscribe(handler);
+
+    self
+  }
+
+  pub fn on_disposed(mut self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
+    let _ = self
+      .subject()
+      .filter_map(match_closure!(Disposed))
+      .take(1)
+      .subscribe(handler);
+
+    self
+  }
+
+  fn subject(&mut self) -> LifecycleSubject {
+    self
+      .lifecycle
+      .get_or_insert_with(DeclareInit::default)
+      .value()
       .clone()
   }
 }

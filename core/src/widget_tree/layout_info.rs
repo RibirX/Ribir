@@ -212,7 +212,7 @@ impl<'a> Layouter<'a> {
           self.id = ctx.id;
         }
 
-        let mut info = tree2.store.layout_info_or_default(id);
+        let info = tree2.store.layout_info_or_default(id);
         let size = clamp.clamp(size);
         info.clamp = clamp;
         info.size = Some(size);

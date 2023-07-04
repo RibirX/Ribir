@@ -53,6 +53,8 @@ impl App {
     let wnd = Window::new(root, Box::new(shell_wnd));
     let id = wnd.id();
     AppCtx::windows().borrow_mut().insert(id, wnd);
+    AppCtx::get_window(id).unwrap().emit_events();
+
     if app.active_wnd.is_none() {
       app.active_wnd = Some(id);
     }

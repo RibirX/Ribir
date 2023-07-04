@@ -1,0 +1,13 @@
+error: Syntax error: expected an identifier after `$`
+ --> compile_msg/declare/dollar_position_fail.rs:5:22
+  |
+5 |     rdl! { Row { x: $1 } }
+  |                      ^
+
+error: expected `,`
+ --> compile_msg/declare/dollar_position_fail.rs:9:5
+  |
+9 |     rdl! { Row { $x: 1} }
+  |     ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `rdl` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -351,13 +351,13 @@ impl ComposeChild for TextField {
 }
 
 fn build_input_area(
-  this: &mut StateRef<TextField>,
-  theme: &mut StateRef<TextFieldThemeProxy>,
+  this: &mut StatefulRef<TextField>,
+  theme: &mut StatefulRef<TextFieldThemeProxy>,
   prefix: Option<LeadingText>,
   suffix: Option<TrailingText>,
   placeholder: Option<Placeholder>,
 ) -> Widget {
-  fn text_label(text: CowArc<str>, theme: StateRef<TextFieldThemeProxy>) -> Text {
+  fn text_label(text: CowArc<str>, theme: StatefulRef<TextFieldThemeProxy>) -> Text {
     Text {
       text,
       foreground: theme.foreground.clone(),
@@ -456,8 +456,8 @@ impl Compose for TextFieldLabel {
 }
 
 fn build_content_area(
-  this: &mut StateRef<TextField>,
-  theme: &mut StateRef<TextFieldThemeProxy>,
+  this: &mut StatefulRef<TextField>,
+  theme: &mut StatefulRef<TextFieldThemeProxy>,
   mut config: TextFieldTml,
 ) -> Widget {
   widget! {

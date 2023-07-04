@@ -1,7 +1,7 @@
 use crate::impl_query_self_only;
 use crate::prelude::*;
 
-#[derive(Declare, Default, Clone, SingleChild)]
+#[derive(Declare, Declare2, Default, Clone, SingleChild)]
 pub struct Opacity {
   #[declare(builtin)]
   pub opacity: f32,

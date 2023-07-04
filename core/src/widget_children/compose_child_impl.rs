@@ -6,7 +6,7 @@ use crate::{
   widget::{Widget, WidgetBuilder, WidgetId},
 };
 
-use super::{child_convert::FillVec, ComposeChild, WidgetPair};
+use super::{child_convert::FillVec, ComposeChild, SinglePair};
 
 /// Trait specify what child a compose child widget can have, and the target
 /// type after widget compose its child.
@@ -79,15 +79,15 @@ where
   }
 }
 
-impl<M, W, C1, C2> ComposeWithChild<C2, M> for WidgetPair<W, C1>
+impl<M, W, C1, C2> ComposeWithChild<C2, M> for SinglePair<W, C1>
 where
   C1: ComposeWithChild<C2, M>,
 {
-  type Target = WidgetPair<W, C1::Target>;
+  type Target = SinglePair<W, C1::Target>;
 
   fn with_child(self, c: C2, ctx: &BuildCtx) -> Self::Target {
-    let WidgetPair { widget, child } = self;
-    WidgetPair {
+    let SinglePair { widget, child } = self;
+    SinglePair {
       widget,
       child: child.with_child(c, ctx),
     }
@@ -183,9 +183,9 @@ pub(crate) mod decorate_tml_impl {
 
   impl<T: TmlHolder, C> DecorateTmlMarker<()> for DecorateTml<T, C> {}
 
-  impl<T: TmlHolder, C> DecorateTmlMarker<[(); 0]> for WidgetPair<T, C> {}
+  impl<T: TmlHolder, C> DecorateTmlMarker<[(); 0]> for SinglePair<T, C> {}
 
-  impl<M, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<[M; 1]> for WidgetPair<T, C> {}
+  impl<M, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<[M; 1]> for SinglePair<T, C> {}
 
   impl<M, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<M> for ComposePair<T, C> {}
 
@@ -194,7 +194,7 @@ pub(crate) mod decorate_tml_impl {
     fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C>;
   }
 
-  impl<W, C, M, C2> IntoDecorateTml<C, [M; 0]> for WidgetPair<W, C2>
+  impl<W, C, M, C2> IntoDecorateTml<C, [M; 0]> for SinglePair<W, C2>
   where
     W: TmlHolder,
     C: ChildFrom<C2, M>,
@@ -202,26 +202,26 @@ pub(crate) mod decorate_tml_impl {
     type Flag = W;
 
     fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C> {
-      let WidgetPair { widget: tml_flag, child } = self;
+      let SinglePair { widget: tml_flag, child } = self;
       let decorator = Box::new(|w| w);
       let child = C::child_from(child);
       DecorateTml { decorator, tml_flag, child }
     }
   }
 
-  impl<W, C, C2, M> IntoDecorateTml<C, [M; 1]> for WidgetPair<W, C2>
+  impl<W, C, C2, M> IntoDecorateTml<C, [M; 1]> for SinglePair<W, C2>
   where
     W: 'static,
     C2: IntoDecorateTml<C, M>,
-    WidgetPair<W, Widget>: WidgetBuilder,
+    SinglePair<W, Widget>: WidgetBuilder,
   {
     type Flag = C2::Flag;
 
     fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C> {
-      let WidgetPair { widget, child } = self;
+      let SinglePair { widget, child } = self;
       let DecorateTml { decorator, tml_flag, child } = ChildFrom::child_from(child);
       DecorateTml {
-        decorator: Box::new(move |w| WidgetPair { widget, child: decorator(w) }.into()),
+        decorator: Box::new(move |w| SinglePair { widget, child: decorator(w) }.into()),
         tml_flag,
         child,
       }

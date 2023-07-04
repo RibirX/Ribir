@@ -45,7 +45,7 @@ macro_rules! example_framework {
         AppCtx::set_app_theme(material::purple::light());
       }
       let name = env!("CARGO_PKG_NAME");
-      let id = App::new_window($widget_fn(), Some($size));
+      let id = App::new_window($widget_fn().into(), Some($size));
       AppCtx::get_window(id).unwrap().set_title(name);
       App::exec();
     }

@@ -7,7 +7,7 @@ use ribir_core::{
 };
 
 /// The text widget display text with a single style.
-#[derive(Debug, Declare, Clone, PartialEq)]
+#[derive(Debug, Declare, Declare2, Clone, PartialEq)]
 pub struct Text {
   #[declare(convert=into)]
   pub text: CowArc<str>,
@@ -135,11 +135,11 @@ impl_query_self_only!(Text);
 
 macro_rules! define_text_with_theme_style {
   ($name: ident, $style: ident) => {
-    #[derive(Declare)]
+    #[derive(Declare, Declare2)]
     pub struct $name {
       #[declare(convert=into)]
       pub text: CowArc<str>,
-      #[declare(default = Brush::Color(Palette::of(ctx).on_surface_variant()), convert = into)]
+      #[declare(default = Palette::of(ctx).on_surface_variant(), convert = into)]
       pub foreground: Brush,
       #[declare(default)]
       pub overflow: Overflow,

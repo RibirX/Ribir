@@ -1,6 +1,6 @@
 mod readonly;
 mod stateful;
-use std::rc::Rc;
+use std::{mem::MaybeUninit, rc::Rc};
 
 pub use readonly::*;
 use rxrust::prelude::ObservableItem;
@@ -9,7 +9,8 @@ pub use stateful::*;
 use crate::{
   context::BuildCtx,
   dynamic_widget::DynWidget,
-  widget::{Compose, WidgetBuilder, WidgetId},
+  prelude::{BoxMultiParent, BoxedSingleParent, MultiChild, SingleChild},
+  widget::{Compose, Render, RenderFul, WidgetBuilder, WidgetId},
 };
 
 /// Enum to store both stateless and stateful object.
@@ -17,6 +18,42 @@ use crate::{
 pub enum State<W> {
   Stateless(W),
   Stateful(Stateful<W>),
+}
+
+pub enum StateRef<'a, W> {
+  Stateful(StatefulRef<'a, W>),
+  Stateless(&'a W),
+}
+
+impl<W: SingleChild> SingleChild for State<W> {}
+impl<W: MultiChild> MultiChild for State<W> {}
+
+impl<W: SingleChild + Render + 'static> BoxedSingleParent for State<W> {
+  fn into_render(self: Box<Self>) -> Box<dyn Render> {
+    match *self {
+      State::Stateless(w) => Box::new(w),
+      State::Stateful(w) => Box::new(RenderFul(w)),
+    }
+  }
+}
+
+impl<W: MultiChild + Render + 'static> BoxMultiParent for State<W> {
+  fn into_render(self: Box<Self>) -> Box<dyn Render> {
+    match *self {
+      State::Stateless(w) => Box::new(w),
+      State::Stateful(w) => Box::new(RenderFul(w)),
+    }
+  }
+}
+
+impl<W: Render + 'static> From<State<W>> for Box<dyn Render> {
+  #[inline]
+  fn from(s: State<W>) -> Self {
+    match s {
+      State::Stateless(w) => w.into(),
+      State::Stateful(w) => w.into(),
+    }
+  }
 }
 
 impl<C: Compose> WidgetBuilder for State<C> {
@@ -39,6 +76,37 @@ impl<W> State<W> {
         Ok(w) => Readonly::Stateless(Rc::new(w)),
         Err(s) => Readonly::Stateful(s),
       },
+    }
+  }
+
+  pub fn clone_stateful(&mut self) -> Stateful<W> { self.to_stateful().clone() }
+
+  pub fn stateful_ref(&mut self) -> StatefulRef<W> { self.to_stateful().state_ref() }
+
+  pub fn to_stateful(&mut self) -> &mut Stateful<W> {
+    match self {
+      State::Stateless(w) => {
+        // convert the stateless value to stateful first.
+        let uninit: MaybeUninit<_> = MaybeUninit::zeroed();
+        let v = std::mem::replace(w, unsafe { uninit.assume_init() });
+        let stateful = State::Stateful(Stateful::new(v));
+        let uninit = std::mem::replace(self, stateful);
+        // the tmp value not init, so we need forget it.
+        std::mem::forget(uninit);
+
+        match self {
+          State::Stateful(w) => w,
+          _ => unreachable!(),
+        }
+      }
+      State::Stateful(w) => w,
+    }
+  }
+
+  pub fn state_ref(&self) -> StateRef<W> {
+    match self {
+      State::Stateless(w) => StateRef::Stateless(w),
+      State::Stateful(w) => StateRef::Stateful(w.state_ref()),
     }
   }
 }
@@ -88,6 +156,17 @@ where
   Self: StateFrom<T>,
 {
   fn from(value: T) -> Self { StateFrom::state_from(value) }
+}
+
+impl<'a, W> std::ops::Deref for StateRef<'a, W> {
+  type Target = W;
+
+  fn deref(&self) -> &Self::Target {
+    match self {
+      StateRef::Stateful(s) => s.deref(),
+      StateRef::Stateless(r) => r,
+    }
+  }
 }
 
 #[cfg(test)]

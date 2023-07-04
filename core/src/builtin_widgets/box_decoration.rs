@@ -1,7 +1,7 @@
 use crate::{impl_query_self_only, prelude::*};
 
 /// The BoxDecoration provides a variety of ways to draw a box.
-#[derive(SingleChild, Default, Clone, Declare)]
+#[derive(SingleChild, Default, Clone, Declare, Declare2)]
 pub struct BoxDecoration {
   /// The background of the box.
   #[declare(builtin, default, convert=custom)]

@@ -44,8 +44,8 @@ impl Checkbox {
 
 #[derive(Template)]
 pub enum CheckboxTemplate {
-  Before(WidgetPair<Leading, State<Label>>),
-  After(WidgetPair<Trailing, State<Label>>),
+  Before(SinglePair<Leading, State<Label>>),
+  After(SinglePair<Trailing, State<Label>>),
 }
 
 impl ComposeDecorator for CheckBoxDecorator {

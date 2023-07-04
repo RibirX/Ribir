@@ -36,26 +36,26 @@ fn panic_if_miss_require_field() {
 
 #[test]
 
-fn empty_default_field() {
+fn default_field() {
   #[derive(Declare)]
-  struct T {
+  struct DefaultDeclare {
     #[declare(default)]
     a: f32,
   }
 
-  let t = <T as Declare>::declare_builder().build(dummy_ctx());
+  let t = <DefaultDeclare as Declare>::declare_builder().build(dummy_ctx());
   assert_eq!(t.a, 0.);
 }
 
 #[test]
 
-fn string_default_field() {
+fn default_field_with_value() {
   #[derive(Declare)]
-  struct T {
+  struct DefaultWithValue {
     #[declare(default = "hi!")]
     text: &'static str,
   }
 
-  let t = <T as Declare>::declare_builder().build(dummy_ctx());
+  let t = <DefaultWithValue as Declare>::declare_builder().build(dummy_ctx());
   assert_eq!(t.text, "hi!");
 }

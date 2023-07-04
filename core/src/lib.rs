@@ -1,4 +1,5 @@
-#![feature(test, decl_macro)]
+#![feature(decl_macro)]
+#![cfg_attr(test, feature(mutex_unpoison, test))]
 
 #[macro_use]
 extern crate bitflags;
@@ -11,11 +12,11 @@ pub mod data_widget;
 mod state;
 pub(crate) mod widget_tree;
 
-pub mod assign_observable;
 pub mod clipboard;
 pub mod declare;
 pub mod dynamic_widget;
 pub mod events;
+pub mod pipe;
 pub mod ticker;
 pub mod timer;
 pub mod widget;
@@ -24,8 +25,6 @@ pub mod window;
 
 pub mod prelude {
   pub use crate::animation::*;
-  #[doc(no_inline)]
-  pub use crate::assign_observable::AssignObservable;
   #[doc(no_inline)]
   pub use crate::builtin_widgets::*;
   #[doc(no_inline)]
@@ -38,6 +37,8 @@ pub mod prelude {
   pub use crate::dynamic_widget::*;
   #[doc(no_inline)]
   pub use crate::events::*;
+  #[doc(no_inline)]
+  pub use crate::pipe::Pipe;
   #[doc(no_inline)]
   pub use crate::state::*;
   #[doc(no_inline)]
@@ -57,7 +58,10 @@ pub mod prelude {
   pub use ribir_algo::CowArc;
   pub use ribir_geom::*;
   #[doc(no_inline)]
-  pub use ribir_macros::{include_svg, widget, Declare, Lerp, MultiChild, SingleChild, Template};
+  pub use ribir_macros::{
+    ctx, fn_widget, include_svg, pipe, rdl, set_build_ctx, widget, Declare, Declare2, Lerp,
+    MultiChild, SingleChild, Template, _dollar_ಠ_ಠ,
+  };
   #[doc(no_inline)]
   pub use ribir_painter::*;
   #[doc(no_inline)]

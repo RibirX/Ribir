@@ -256,8 +256,9 @@ impl<D: 'static> DynRender<D> {
       tree: &mut WidgetTree,
     ) {
       let mut handlers = SmallVec::<[_; 1]>::new();
+      tree.detach(wid);
+
       let arena = &mut tree.arena;
-      wid.detach(arena);
       wid.assert_get(arena).query_all_type(
         |notifier: &StateChangeNotifier| {
           let state_changed = tree.dirty_set.clone();
@@ -285,7 +286,7 @@ impl<D: 'static> DynRender<D> {
         .delay(std::time::Duration::ZERO, tree.window().frame_scheduler())
         .subscribe(move |_| {
           if let Some(wnd) = AppCtx::get_window(wnd_id) {
-            wid.remove_subtree(&mut wnd.widget_tree.borrow_mut());
+            wnd.widget_tree.borrow_mut().remove_subtree(wid);
           }
           host.wids.borrow_mut().remove(&wid);
           handlers.clear();
@@ -309,7 +310,8 @@ impl<D: 'static> DynRender<D> {
       self.drop_until_widgets.add(wid);
       tree.dirty_set.borrow_mut().insert(wid);
     } else {
-      wid.detach(&mut tree.arena);
+      tree.detach(wid);
+
       let (arena1, arena2) = unsafe { split_arena(&mut tree.arena) };
       wid
         .descendants(arena1)
@@ -394,12 +396,10 @@ impl_query_self_only!(DynWidget<D>, <D>, where D: 'static);
 
 fn inspect_key(id: &WidgetId, tree: &TreeArena, mut cb: impl FnMut(&dyn AnyKey)) {
   #[allow(clippy::borrowed_box)]
-  id.assert_get(tree).query_on_first_type(
-    QueryOrder::OutsideFirst,
-    |key_widget: &Box<dyn AnyKey>| {
-      cb(&**key_widget);
-    },
-  );
+  id.assert_get(tree)
+    .query_on_first_type(QueryOrder::OutsideFirst, |key_widget: &Box<dyn AnyKey>| {
+      cb(&**key_widget)
+    });
 }
 
 fn single_down(id: WidgetId, arena: &TreeArena, mut down_level: isize) -> Option<WidgetId> {

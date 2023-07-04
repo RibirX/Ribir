@@ -121,7 +121,7 @@ use ribir_core::prelude::*;
 ///   }
 /// };
 /// ```
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct Lists;
 
 #[derive(Declare)]
@@ -353,9 +353,9 @@ impl ComposeChild for ListItem {
   }
 }
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct ListItem {
-  #[declare(default = 1)]
+  #[declare(default = 1usize)]
   pub line_number: usize,
   #[declare(default = Palette::of(ctx).primary())]
   pub active_background: Color,

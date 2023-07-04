@@ -43,7 +43,7 @@ macro_rules! impl_listener {
   ($doc: literal, $name: ident, $event_ty: ident) => {
     paste::paste! {
       #[doc= $doc]
-      #[derive(Declare)]
+      #[derive(Declare, Declare2)]
       pub struct [<$name Listener>]{
         #[declare(skip)]
         [<$name:snake _subject>]: [<$name Subject>]
@@ -54,6 +54,16 @@ macro_rules! impl_listener {
           self
             .[<$name:snake _subject>]
             .get_or_insert_with([<$name Subject>]::default)
+            .clone()
+        }
+      }
+
+      impl [<$name ListenerDeclarer2>] {
+        fn subject(&mut self) -> [<$name Subject>] {
+          self
+            .[<$name:snake _subject>]
+            .get_or_insert_with(DeclareInit::default)
+            .value()
             .clone()
         }
       }
@@ -88,6 +98,36 @@ macro_rules! impl_multi_event_listener {
       impl_all_event!($name, $($on_doc, $event_ty),+);
       impl_listener!($doc, $name, [<All $name>]);
 
+      impl [<$name ListenerDeclarer2>] {
+        $(
+          #[doc = "Sets up a function that will be called whenever the `" $event_ty "` is delivered"]
+          pub fn [<on_ $event_ty:snake>]<_F>(mut self, handler: impl Into<DeclareInit<_F>>) -> Self
+          where
+            _F: FnMut(&'_ mut [<$name Event>]<'_>) + 'static
+          {
+            let (v, pipe) = handler.into().unzip();
+
+            let subscribe = move |mut handler: _F| {
+              move |e: &'_ mut [<All $name>]::<'_>| match e {
+                [<All $name>]::$event_ty(e) => handler(e),
+                _ => {}
+              }
+            };
+
+            let mut _unsub = self.subject().subscribe(subscribe(v)).unsubscribe_when_dropped();
+
+            if let Some(pipe) = pipe {
+              let subject = self.subject().clone();
+              pipe.subscribe(move |handler| {
+                _unsub = subject.clone().subscribe(subscribe(handler)).unsubscribe_when_dropped();
+              });
+            }
+
+            self
+          }
+        )+
+      }
+
       impl [<$name ListenerDeclarer>] {
         $(
           #[doc = "Sets up a function that will be called \
@@ -120,11 +160,24 @@ macro_rules! impl_single_event_listener {
     paste::paste! {
       impl_listener!($doc, $name);
 
+      impl [<$name ListenerDeclarer2>] {
+        #[doc = "Sets up a function that will be called whenever the `" [<$name Event>] "` is delivered"]
+        pub fn [<on_ $name:snake>](
+          self,
+          handler: impl FnMut(&'_ mut [<$name Event>]<'_>) + 'static
+        ) -> Self {
+          self
+            .subject()
+            .subscribe(handler);
+          self
+        }
+      }
+
       impl [<$name ListenerDeclarer>] {
         #[doc = "Sets up a function that will be called whenever the `" [<$name Event>] "` is delivered"]
         pub fn [<on_ $name:snake>](
           self,
-          handler: impl for<'r> FnMut(&'r mut [<$name Event>]<'_>) + 'static
+          handler: impl FnMut(&'_ mut [<$name Event>]<'_>) + 'static
         ) -> Self {
           self
             .subject()

@@ -15,7 +15,7 @@ pub enum Scrollable {
 }
 
 /// Helper struct for builtin scrollable field.
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct ScrollableWidget {
   #[declare(builtin, default)]
   pub scrollable: Scrollable,

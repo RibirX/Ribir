@@ -161,12 +161,41 @@ impl WidgetTree {
       needs_layout
     })
   }
+
+  pub fn detach(&mut self, id: WidgetId) {
+    if self.root() == id {
+      let root = self.root();
+      let new_root = root
+        .next_sibling(&self.arena)
+        .or_else(|| root.prev_sibling(&self.arena))
+        .expect("Try to remove the root and there is no other widget can be the new root.");
+      self.root = Some(new_root);
+    }
+
+    id.0.detach(&mut self.arena);
+  }
+
+  pub(crate) fn remove_subtree(&mut self, id: WidgetId) {
+    assert_ne!(
+      id,
+      self.root(),
+      "You should detach the root widget before remove it."
+    );
+
+    id.descendants(&self.arena).for_each(|id| {
+      self.store.remove(id);
+    });
+    id.0.remove_subtree(&mut self.arena);
+  }
 }
 
 #[cfg(test)]
 mod tests {
   extern crate test;
-  use crate::test_helper::{MockBox, MockMulti, TestWindow};
+  use crate::{
+    test_helper::{MockBox, MockMulti, TestWindow},
+    widget::widget_id::empty_node,
+  };
 
   use super::*;
   use test::Bencher;
@@ -349,11 +378,13 @@ mod tests {
 
     let root = tree.root();
     tree.mark_dirty(root);
+    let new_root = empty_node(&mut tree.arena);
+    root.insert_after(new_root, &mut tree.arena);
+    tree.mark_dirty(new_root);
+    tree.detach(root);
+    tree.remove_subtree(root);
 
-    root.remove_subtree(&mut tree);
-
-    assert_eq!(tree.layout_list(), None);
-    assert!(!tree.is_dirty());
+    assert_eq!(tree.layout_list(), Some(vec![new_root]));
   }
 
   #[bench]
