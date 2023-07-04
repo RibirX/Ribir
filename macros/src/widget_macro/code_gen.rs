@@ -86,7 +86,7 @@ pub(crate) fn gen_assign_watch(input: TokenStream, ctx: &mut VisitCtx) -> proc_m
     watch_expr.used_name_info.state_refs_tokens(tokens);
     watch_expr.to_tokens(tokens);
   });
-  quote_spanned!(watch_expr.span() => AssignObservable::new(#value, #tokens)).into()
+  quote_spanned!(watch_expr.span() => Pipe::new(#value, #tokens.box_it())).into()
 }
 
 pub(crate) fn gen_prop_macro(

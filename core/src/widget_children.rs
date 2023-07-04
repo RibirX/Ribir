@@ -38,19 +38,19 @@ pub use multi_child_impl::*;
 pub use single_child_impl::*;
 pub mod child_convert;
 pub use child_convert::{ChildFrom, FromAnother};
-/// Trait to tell Ribir a widget can have one child.
+/// Trait to tell Ribir a object can have one child.
 pub trait SingleChild {}
 
-/// A render widget that has one child.
-pub trait RenderSingleChild: Render + SingleChild {
+/// A boxed render widget that has one child.
+pub trait BoxedSingleParent: SingleChild {
   fn into_render(self: Box<Self>) -> Box<dyn Render>;
 }
 
-/// Trait to tell Ribir a widget that has multi children.
+/// Trait to tell Ribir a object that has multi children.
 pub trait MultiChild {}
 
-/// A render widget that has multi children.
-pub trait RenderMultiChild: Render + MultiChild {
+/// A boxed render widget that has multi children.
+pub trait BoxMultiParent: MultiChild {
   fn into_render(self: Box<Self>) -> Box<dyn Render>;
 }
 
@@ -63,16 +63,20 @@ pub trait ComposeChild: Sized {
 
 /// A alias of `WidgetPair<W, Widget>`, means `Widget` is the
 /// child of the generic type.
-pub type WidgetOf<W> = WidgetPair<W, Widget>;
+pub type WidgetOf<W> = SinglePair<W, Widget>;
 
-impl<T: Render + SingleChild + 'static> RenderSingleChild for T {
-  fn into_render(self: Box<Self>) -> Box<dyn Render> { Box::new(*self) }
+impl SingleChild for Box<dyn BoxedSingleParent> {}
+impl MultiChild for Box<dyn BoxMultiParent> {}
+
+impl From<Box<dyn BoxMultiParent>> for Box<dyn Render> {
+  #[inline]
+  fn from(v: Box<dyn BoxMultiParent>) -> Self { v.into_render() }
 }
 
-impl<T: Render + MultiChild + 'static> RenderMultiChild for T {
-  fn into_render(self: Box<Self>) -> Box<dyn Render> { Box::new(*self) }
+impl From<Box<dyn BoxedSingleParent>> for Box<dyn Render> {
+  #[inline]
+  fn from(value: Box<dyn BoxedSingleParent>) -> Self { value.into_render() }
 }
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -124,7 +128,7 @@ mod tests {
     struct Child;
 
     impl ComposeChild for Parent {
-      type Child = Option<WidgetPair<Child, Widget>>;
+      type Child = Option<SinglePair<Child, Widget>>;
 
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
         unreachable!("Only for syntax support check");
@@ -272,9 +276,9 @@ mod tests {
   const COMPOSE_DYNS_CHILD_SIZE: Size = Size::new(100., 200.);
   fn compose_dyns_child() -> Widget {
     #[derive(Declare)]
-    struct X;
+    struct AcceptStateChild;
 
-    impl ComposeChild for X {
+    impl ComposeChild for AcceptStateChild {
       type Child = State<MockBox>;
       fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into() }
     }
@@ -283,7 +287,7 @@ mod tests {
 
     widget! {
       states { trigger: trigger }
-      X {
+      AcceptStateChild {
         DynWidget {
           dyns: if *trigger {
             MockBox { size: COMPOSE_DYNS_CHILD_SIZE }

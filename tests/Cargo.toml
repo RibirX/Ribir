@@ -16,9 +16,8 @@ version.workspace = true
 [dev-dependencies]
 paste.workspace = true
 ribir = {path = "../ribir", features = ["material", "widgets"]}
-ribir_geom = {path = "../geom"}
-
 ribir_dev_helper = {path = "../dev-helper"}
+ribir_geom = {path = "../geom"}
 trybuild.workspace = true
 winit.workspace = true
 
@@ -27,8 +26,8 @@ name = "compile_message"
 path = "compile_message.rs"
 
 [[test]]
-name = "code_gen_logic"
-path = "code_gen_test.rs"
+name = "rdl_macro_test"
+path = "rdl_macro_test.rs"
 
 [[test]]
 name = "animations_syntax"

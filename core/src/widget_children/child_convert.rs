@@ -1,6 +1,6 @@
 use super::{
-  decorate_tml_impl::IntoDecorateTml, ComposeChild, ComposePair, DecorateTml, Multi, TmlFlag,
-  WidgetPair,
+  decorate_tml_impl::IntoDecorateTml, ComposeChild, ComposePair, DecorateTml, Multi, SinglePair,
+  TmlFlag,
 };
 use crate::{
   dynamic_widget::{DynRender, DynWidget},
@@ -65,30 +65,30 @@ where
 }
 
 // WidgetPair<W, C> --> WidgetPair<W2, C2>
-impl<W, W2, C, C2, M1, M2> FromAnother<WidgetPair<W2, C2>, [(M1, M2); 0]> for WidgetPair<W, C>
+impl<W, W2, C, C2, M1, M2> FromAnother<SinglePair<W2, C2>, [(M1, M2); 0]> for SinglePair<W, C>
 where
   W: FromAnother<W2, M1>,
   C: ChildFrom<C2, M2>,
 {
   #[inline]
-  fn from_another(value: WidgetPair<W2, C2>) -> Self {
-    let WidgetPair { widget, child } = value;
-    WidgetPair {
+  fn from_another(value: SinglePair<W2, C2>) -> Self {
+    let SinglePair { widget, child } = value;
+    SinglePair {
       widget: W::from_another(widget),
       child: C::child_from(child),
     }
   }
 }
 
-impl<W, W2, C, C2, M1, M2> FromAnother<WidgetPair<W2, C2>, [(M1, M2); 1]> for WidgetPair<W, C>
+impl<W, W2, C, C2, M1, M2> FromAnother<SinglePair<W2, C2>, [(M1, M2); 1]> for SinglePair<W, C>
 where
   W: ChildFrom<W2, M1>,
   C: FromAnother<C2, M2>,
 {
   #[inline]
-  fn from_another(value: WidgetPair<W2, C2>) -> Self {
-    let WidgetPair { widget, child } = value;
-    WidgetPair {
+  fn from_another(value: SinglePair<W2, C2>) -> Self {
+    let SinglePair { widget, child } = value;
+    SinglePair {
       widget: W::child_from(widget),
       child: C::from_another(child),
     }

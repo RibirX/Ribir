@@ -108,6 +108,9 @@ impl WidgetId {
   pub(crate) fn next_sibling(self, tree: &TreeArena) -> Option<WidgetId> {
     self.node_feature(tree, |node| node.next_sibling())
   }
+  pub(crate) fn prev_sibling(self, tree: &TreeArena) -> Option<WidgetId> {
+    self.node_feature(tree, Node::previous_sibling)
+  }
 
   pub(crate) fn previous_sibling(self, tree: &TreeArena) -> Option<WidgetId> {
     self.node_feature(tree, |node| node.previous_sibling())
@@ -124,15 +127,6 @@ impl WidgetId {
 
   pub(crate) fn descendants(self, tree: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.descendants(tree).map(WidgetId)
-  }
-
-  pub(crate) fn detach(self, tree: &mut TreeArena) { self.0.detach(tree) }
-
-  pub(crate) fn remove_subtree(self, tree: &mut WidgetTree) {
-    self.descendants(&tree.arena).for_each(|id| {
-      tree.store.remove(id);
-    });
-    self.0.remove_subtree(&mut tree.arena);
   }
 
   pub(crate) fn on_mounted_subtree(self, tree: &WidgetTree) {

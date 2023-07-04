@@ -120,6 +120,8 @@ impl Window {
   /// Draw an image what current render tree represent.
   #[track_caller]
   pub fn draw_frame(&self) {
+    self.emit_events();
+
     if !self.need_draw() || self.size().is_empty() {
       return;
     }
@@ -136,11 +138,16 @@ impl Window {
       self.frame_pool.borrow_mut().run();
 
       if !self.widget_tree.borrow().is_dirty() {
-        break;
+        self.focus_mgr.borrow_mut().refresh_focus();
+        self.emit_events();
+
+        // focus refresh and event emit may cause widget tree dirty again.
+        if !self.widget_tree.borrow().is_dirty() {
+          break;
+        }
       }
     }
 
-    self.focus_mgr.borrow_mut().refresh_focus();
     self.widget_tree.borrow().draw();
 
     let surface = match AppCtx::app_theme() {
@@ -199,7 +206,6 @@ impl Window {
       .borrow_mut()
       .init(root, Rc::downgrade(&window));
 
-    window.emit_events();
     window
   }
 
@@ -288,7 +294,7 @@ impl Window {
             });
 
           if !delay_drop {
-            id.remove_subtree(&mut self.widget_tree.borrow_mut())
+            self.widget_tree.borrow_mut().remove_subtree(id);
           }
         }
         DelayEvent::Focus(id) => {
@@ -394,14 +400,17 @@ impl Window {
   where
     L: EventListener + 'static,
   {
-    id.assert_get(&self.widget_tree.borrow().arena)
-      .query_all_type(
-        |m: &L| {
-          m.dispatch(&mut e);
-          true
-        },
-        QueryOrder::InnerFirst,
-      );
+    // Safety: we only use tree to query the inner data of a node and dispatch a
+    // event by it, and never read or write the node. And in the callback, there is
+    // no way to mut access the inner data of node or destroy the node.
+    let tree = unsafe { &*(&*self.widget_tree.borrow() as *const WidgetTree) };
+    id.assert_get(&tree.arena).query_all_type(
+      |m: &L| {
+        m.dispatch(&mut e);
+        true
+      },
+      QueryOrder::InnerFirst,
+    );
   }
 
   fn bottom_down_emit<'a, L>(&self, e: &mut L::Event<'a>, bottom: WidgetId, up: Option<WidgetId>)

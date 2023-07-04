@@ -44,8 +44,8 @@ impl Checkbox {
 
 #[derive(Template)]
 pub enum CheckboxTemplate {
-  Before(WidgetPair<Leading, State<Label>>),
-  After(WidgetPair<Trailing, State<Label>>),
+  Before(SinglePair<Leading, State<Label>>),
+  After(SinglePair<Trailing, State<Label>>),
 }
 
 impl ComposeDecorator for CheckBoxDecorator {
@@ -77,7 +77,7 @@ impl Checkbox {
     .into()
   }
 
-  fn label(label: &State<Label>, label_color: Brush, text_style: CowArc<TextStyle>) -> Widget {
+  fn label(mut label: State<Label>, label_color: Brush, text_style: CowArc<TextStyle>) -> Widget {
     let label = label.clone();
     widget! {
       states { label: label.into_readonly() }
@@ -115,16 +115,16 @@ impl ComposeChild for Checkbox {
           let label_color = label_color.clone();
           child.map_or(
             Checkbox::icon(no_watch!(this.clone_stateful()), icon_size),
-            |child| widget! {
+            |mut child| widget! {
               Row {
-                Multi::new(match &child {
+                Multi::new(match &mut child {
                   CheckboxTemplate::Before(w) => [
-                    Checkbox::label(&w.child, label_color.clone(), label_style.clone()),
+                    Checkbox::label(w.child.clone(), label_color.clone(), label_style.clone()),
                     Checkbox::icon(this.clone_stateful(), icon_size),
                   ],
                   CheckboxTemplate::After(w) => [
                     Checkbox::icon(this.clone_stateful(), icon_size),
-                    Checkbox::label(&w.child, label_color.clone(), label_style.clone()),
+                    Checkbox::label(w.child.clone(), label_color.clone(), label_style.clone()),
                   ],
                 })
               }

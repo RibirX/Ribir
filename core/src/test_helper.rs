@@ -19,19 +19,19 @@ pub struct TestWindow(pub Rc<Window>);
 
 impl TestWindow {
   /// Create a 1024x1024 window for test
-  pub fn new(root: impl Into<Widget>) -> Self {
-    let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-    let wnd = Window::new(root.into(), Box::new(TestShellWindow::new(None)));
-    AppCtx::windows().borrow_mut().insert(wnd.id(), wnd.clone());
-    Self(wnd)
-  }
+  pub fn new(root: impl Into<Widget>) -> Self { Self::new_wnd(root, None) }
 
   pub fn new_with_size(root: impl Into<Widget>, size: Size) -> Self {
+    Self::new_wnd(root, Some(size))
+  }
+
+  fn new_wnd(root: impl Into<Widget>, size: Option<Size>) -> Self {
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-    Self(Window::new(
-      root.into(),
-      Box::new(TestShellWindow::new(Some(size))),
-    ))
+    let wnd = Window::new(root.into(), Box::new(TestShellWindow::new(size)));
+    let id = wnd.id();
+    AppCtx::windows().borrow_mut().insert(wnd.id(), wnd.clone());
+    AppCtx::get_window(id).unwrap().emit_events();
+    Self(wnd)
   }
 
   /// Ues a index path to access widget tree and return the layout info,

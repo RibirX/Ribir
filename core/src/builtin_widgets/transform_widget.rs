@@ -1,6 +1,6 @@
 use crate::{impl_query_self_only, prelude::*, widget::hit_test_impl};
 
-#[derive(SingleChild, Declare, Clone)]
+#[derive(SingleChild, Declare, Declare2, Clone)]
 pub struct TransformWidget {
   #[declare(builtin, default)]
   pub transform: Transform,

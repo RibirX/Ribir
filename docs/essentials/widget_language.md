@@ -213,7 +213,7 @@ DynWidget {
 
 We added three lines of code. 
 
-The first line is `dyns := assign_watch!(*counter > 0)`, we use operator `:=` instead of `:` to initialize the `dyns`. Unlike `:`, `:=` accepts an `AssignObservable` as its initialization value and explicitly subscribes to it to update the field. `AssignObservable` is a type that contain the initialization value and an observable stream of that value. The `assign_watch!` macro is used to convert a expression to an `AssignObservable`. 
+The first line is `dyns := assign_watch!(*counter > 0)`, we use operator `:=` instead of `:` to initialize the `dyns`. Unlike `:`, `:=` accepts an `Pipe` as its initialization value and explicitly subscribes to it to update the field. `Pipe` is a type that contain the initialization value and an observable stream of that value. The `assign_watch!` macro is used to convert a expression to an `Pipe`. 
 
 In the second line we use `stream_map` to chain `distinct_until_changed` on the stream observable. So we accept the changes only when the result of `*counter > 0` changed.
 

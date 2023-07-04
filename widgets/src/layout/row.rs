@@ -1,7 +1,7 @@
 use super::{flex::*, Direction};
 use ribir_core::prelude::*;
 
-#[derive(Default, Declare, Clone)]
+#[derive(Default, Declare, Declare2, Clone)]
 pub struct Row {
   #[declare(default)]
   pub reverse: bool,

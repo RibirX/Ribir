@@ -84,6 +84,8 @@ impl ComposeChild for ThemeWidget {
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     use crate::prelude::*;
     FnWidget::new(move |ctx| {
+      let ctx = ctx.force_as_mut();
+
       let theme = match this {
         State::Stateless(t) => t.theme,
         State::Stateful(s) => s.state_ref().theme.clone(),

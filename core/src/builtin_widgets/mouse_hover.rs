@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(PartialEq, Clone, Declare)]
+#[derive(PartialEq, Clone, Declare, Declare2)]
 pub struct MouseHover {
   #[declare(skip, default)]
   hover: bool,

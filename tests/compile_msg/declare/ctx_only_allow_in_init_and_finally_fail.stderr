@@ -1,5 +1,5 @@
-error[E0425]: cannot find value `ctx` in this scope
+error[E0423]: expected value, found macro `ctx`
   --> compile_msg/declare/ctx_only_allow_in_init_and_finally_fail.rs:31:48
    |
 31 |       size: ZERO_SIZE, background: Palette::of(ctx).primary()
-   |                                                ^^^ not found in this scope
+   |                                                ^^^ not a value
