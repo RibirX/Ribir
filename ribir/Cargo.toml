@@ -15,13 +15,16 @@ version.workspace = true
 [dependencies]
 arboard = "3.2.0"
 once_cell.workspace = true
-ribir_core = {path = "../core", version = "0.0.1-alpha.4" }
-ribir_gpu = {path = "../gpu", version = "0.0.1-alpha.4" }
+ribir_core = {path = "../core", version = "0.0.1-alpha.4"}
+ribir_gpu = {path = "../gpu", version = "0.0.1-alpha.4"}
 ribir_material = {path = "../themes/material", version = "0.0.1-alpha.4", optional = true}
 ribir_widgets = {path = "../widgets", version = "0.0.1-alpha.4", optional = true}
 rxrust.workspace = true
 wgpu = {workspace = true, optional = true}
 winit.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2.workspace = true
 
 [dev-dependencies]
 colored.workspace = true

@@ -8,6 +8,8 @@ mod winit_shell_wnd;
 #[cfg(feature = "material")]
 pub use ribir_material as material;
 
+mod platform;
+pub use platform::*;
 pub mod prelude {
   #[cfg(feature = "material")]
   pub use super::material;
