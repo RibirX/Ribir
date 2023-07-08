@@ -1,29 +1,39 @@
 use crate::clipboard::Clipboard;
+use crate::register_platform_app_events_handlers;
 use crate::winit_shell_wnd::{new_id, WinitShellWnd};
-use ribir_core::timer::Timer;
-use ribir_core::{prelude::*, window::WindowId};
+use ribir_core::{prelude::*, timer::Timer, window::WindowId};
 use rxrust::scheduler::NEW_TIMER_FN;
-use std::collections::HashMap;
-use std::sync::Once;
-use winit::event_loop::{EventLoopBuilder, EventLoopProxy};
+use std::{collections::HashMap, convert::Infallible, sync::Once};
 use winit::{
   event::{Event, StartCause, WindowEvent},
-  event_loop::{ControlFlow, EventLoop},
+  event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
   platform::run_return::EventLoopExtRunReturn,
 };
 
 pub struct App {
   windows: HashMap<WindowId, Window>,
-  event_loop: EventLoop<RibirEvent>,
+  event_loop: EventLoop<AppEvent>,
   active_wnd: Option<WindowId>,
+  events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
 }
 
-pub enum RibirEvent {
-  LocalFuturesReady,
+pub enum AppEvent {
+  /// The event is sent when any future is waked to poll.
+  FuturesWake,
+  /// The event is sent when the application is be required to open a url. For
+  /// example, it's launched from browser with a url.
+  OpenUrl(String),
+  /// The custom event, you can send any data with this event.
+  Custom(Box<dyn Any>),
 }
+
+/// A sender to send event to the application event loop from which the
+/// `EventSender` was created.
+#[derive(Clone)]
+pub struct EventSender(EventLoopProxy<AppEvent>);
 
 #[derive(Clone)]
-pub struct EventSender(EventLoopProxy<RibirEvent>);
+pub struct EventWaker(EventLoopProxy<AppEvent>);
 
 impl App {
   /// Start an application with the `root` widget, this will use the default
@@ -39,7 +49,7 @@ impl App {
   /// window in the callback, then return the window id.
   #[track_caller]
   pub fn new_window(root: Widget, size: Option<Size>, cb: impl FnOnce(&mut Window)) -> WindowId {
-    let app = unsafe { App::shared() };
+    let app = unsafe { App::shared_mut() };
 
     let shell_wnd = WinitShellWnd::new(size, &app.event_loop);
     let wnd = Window::new(root, Box::new(shell_wnd));
@@ -53,10 +63,21 @@ impl App {
     id
   }
 
+  /// Get a event sender of the application event loop, you can use this to send
+  /// event.
+  pub fn event_sender() -> EventSender {
+    let proxy = App::shared().event_loop.create_proxy();
+    EventSender(proxy)
+  }
+
+  pub fn events_stream() -> MutRefItemSubject<'static, AppEvent, Infallible> {
+    App::shared().events_stream.clone()
+  }
+
   /// set the window with `id` to be the active window, and the active window.
   #[track_caller]
   pub fn set_active_window(id: WindowId) {
-    let app = unsafe { App::shared() };
+    let app = unsafe { App::shared_mut() };
     app.active_wnd = Some(id);
     // todo: set the window to be the top window, but we not really support
     // multi window fully, implement this later.
@@ -66,20 +87,20 @@ impl App {
   /// thread until the application exit.
   #[track_caller]
   pub fn exec() {
-    let app = unsafe { App::shared() };
+    let app = unsafe { App::shared_mut() };
     app
       .active_wnd
       .and_then(|id| app.windows.get_mut(&id))
       .expect("application at least have one window")
       .draw_frame();
 
-    let Self { windows, event_loop, .. } = app;
+    let event_loop = &mut unsafe { App::shared_mut() }.event_loop;
 
     event_loop.run_return(move |event, _event_loop, control: &mut ControlFlow| {
       *control = ControlFlow::Wait;
-
       match event {
         Event::WindowEvent { event, window_id } => {
+          let windows = unsafe { &mut App::shared_mut().windows };
           if let Some(wnd) = windows.get_mut(&new_id(window_id)) {
             match event {
               WindowEvent::CloseRequested => {
@@ -109,7 +130,7 @@ impl App {
         }
         Event::MainEventsCleared => {
           AppCtx::run_until_stalled();
-          windows.iter_mut().for_each(|(_, wnd)| {
+          App::shared().windows.iter().for_each(|(_, wnd)| {
             if wnd.need_draw() {
               let wnd = wnd
                 .shell_wnd()
@@ -121,12 +142,12 @@ impl App {
           })
         }
         Event::RedrawRequested(id) => {
-          if let Some(wnd) = windows.get_mut(&new_id(id)) {
+          if let Some(wnd) = unsafe { App::shared_mut() }.windows.get_mut(&new_id(id)) {
             wnd.draw_frame();
           }
         }
         Event::RedrawEventsCleared => {
-          if windows.iter_mut().any(|(_, wnd)| wnd.need_draw()) {
+          if App::shared().windows.iter().any(|(_, wnd)| wnd.need_draw()) {
             *control = ControlFlow::Poll;
           } else if let Some(t) = Timer::recently_timeout() {
             *control = ControlFlow::WaitUntil(t);
@@ -140,30 +161,39 @@ impl App {
           }
           _ => (),
         },
-        Event::UserEvent(event) => match event {
-          RibirEvent::LocalFuturesReady => AppCtx::run_until_stalled(),
-        },
+        Event::UserEvent(mut event) => {
+          if let AppEvent::FuturesWake = event {
+            AppCtx::run_until_stalled()
+          }
+          let app = unsafe { App::shared_mut() };
+          app.events_stream.next(&mut event);
+        }
         _ => (),
       }
     });
   }
 
   #[track_caller]
-  unsafe fn shared() -> &'static mut App {
+  fn shared() -> &'static App { unsafe { Self::shared_mut() } }
+
+  #[track_caller]
+  unsafe fn shared_mut() -> &'static mut App {
     static mut INIT_ONCE: Once = Once::new();
     static mut APP: Option<App> = None;
     INIT_ONCE.call_once(|| {
       let event_loop = EventLoopBuilder::with_user_event().build();
-      let waker = EventSender(event_loop.create_proxy());
+      let waker = EventWaker(event_loop.create_proxy());
       let clipboard = Clipboard::new().unwrap();
       unsafe {
         AppCtx::set_clipboard(Box::new(clipboard));
         AppCtx::set_runtime_waker(Box::new(waker));
       }
       let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
+      register_platform_app_events_handlers();
       APP = Some(App {
-        windows: Default::default(),
+        windows: <_>::default(),
         event_loop,
+        events_stream: <_>::default(),
         active_wnd: None,
       })
     });
@@ -173,7 +203,18 @@ impl App {
   }
 }
 
-impl RuntimeWaker for EventSender {
-  fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> { Box::new(self.clone()) }
-  fn wake(&self) { let _ = self.0.send_event(RibirEvent::LocalFuturesReady); }
+impl EventSender {
+  pub fn send(&self, e: AppEvent) {
+    if let Err(err) = self.0.send_event(e) {
+      log::error!("{}", err.to_string())
+    }
+  }
 }
+
+impl RuntimeWaker for EventWaker {
+  fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> { Box::new(self.clone()) }
+  fn wake(&self) { let _ = self.0.send_event(AppEvent::FuturesWake); }
+}
+
+/// EventWaker only send `RibirEvent::FuturesWake`.
+unsafe impl Send for EventWaker {}
