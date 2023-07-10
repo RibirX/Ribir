@@ -47,6 +47,8 @@ mod tests {
 
   #[test]
   fn tab_scope() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let size = Size::zero();
     let widget = widget! {
       MockMulti {
@@ -103,6 +105,8 @@ mod tests {
 
   #[test]
   fn tab_scope_self_only() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let size = Size::zero();
     let widget = widget! {
       MockMulti {
@@ -149,6 +153,8 @@ mod tests {
 
   #[test]
   fn focus_scope() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let size = Size::new(50., 50.);
     let tap_cnt = Rc::new(RefCell::new(0));
     let result = tap_cnt.clone();

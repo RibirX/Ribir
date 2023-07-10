@@ -182,7 +182,7 @@ mod tests {
     let mut themes = vec![];
     let pool = FuturesLocalSchedulerPool::default();
     let scheduler = pool.spawner();
-    let mut wnd_ctx = WindowCtx::new(<_>::default(), scheduler);
+    let mut wnd_ctx = WindowCtx::new(scheduler);
     let ctx = BuildCtx::new(&mut themes, &mut wnd_ctx);
     let animate = Animate::declare_builder()
       .transition(

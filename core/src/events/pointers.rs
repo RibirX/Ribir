@@ -460,6 +460,8 @@ mod tests {
 
   #[test]
   fn tap_focus() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let tap_cnt = Rc::new(RefCell::new(0));
     let is_focused = Rc::new(RefCell::new(false));
 

@@ -5,6 +5,8 @@ use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 #[test]
 fn declare_smoke() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let _ = widget! {
     SizedBox {
       size: Size::new(500.,500.),
@@ -15,6 +17,8 @@ fn declare_smoke() {
 
 #[test]
 fn simple_ref_bind_work() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let size = Size::new(100., 100.);
   let w = widget! {
     Flex {
@@ -36,8 +40,10 @@ fn simple_ref_bind_work() {
   wnd.layout();
   assert_layout_result_by_path!(wnd, { path = [0], size == flex_size * 2., });
 }
+
 #[test]
 fn event_attr_sugar_work() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
   const BEFORE_SIZE: Size = Size::new(50., 50.);
   const AFTER_TAP_SIZE: Size = Size::new(100., 100.);
   let w = widget! {
@@ -66,6 +72,8 @@ fn event_attr_sugar_work() {
 
 #[test]
 fn widget_wrap_bind_work() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let w = widget! {
     Flex {
       SizedBox {
@@ -93,6 +101,8 @@ fn widget_wrap_bind_work() {
 
 #[test]
 fn expression_for_children() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let size_one = Size::new(1., 1.);
   let size_five = Size::new(5., 5.);
   let embed_expr = widget! {
@@ -128,6 +138,8 @@ fn expression_for_children() {
 
 #[test]
 fn embed_widget_ref_outside() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let w = widget! {
     Flex {
       SizedBox {
@@ -152,6 +164,8 @@ fn embed_widget_ref_outside() {
 
 #[test]
 fn data_flow_macro() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let size = Size::new(1., 1.);
   let w = widget! {
     Flex {
@@ -205,6 +219,8 @@ widget_layout_test!(
 #[test]
 
 fn builtin_ref() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let icon_track = Rc::new(Cell::new(CursorIcon::default()));
   let c_icon_track = icon_track.clone();
 
@@ -233,6 +249,8 @@ fn builtin_ref() {
 
 #[test]
 fn builtin_bind_to_self() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let icon_track = Rc::new(Cell::new(CursorIcon::default()));
   let c_icon_track = icon_track.clone();
   let w = widget! {
@@ -287,6 +305,8 @@ fn tap_at(wnd: &mut TestWindow, pos: (i32, i32)) {
 
 #[test]
 fn builtin_method_support() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let layout_size = Stateful::new(Size::zero());
   let w = widget! {
     states { layout_size: layout_size.clone() }
@@ -308,6 +328,8 @@ fn builtin_method_support() {
 
 #[test]
 fn fix_builtin_field_can_declare_as_widget() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let w = widget! {
     Margin {
       margin: EdgeInsets::all(1.),
@@ -321,6 +343,8 @@ fn fix_builtin_field_can_declare_as_widget() {
 
 #[test]
 fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let w = widget! {
     Margin {
       id: margin,
@@ -352,6 +376,8 @@ fn fix_access_builtin_with_gap() {
 
 #[test]
 fn fix_subscribe_cancel_after_widget_drop() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let notify_cnt = Stateful::new(0);
   let trigger = Stateful::new(true);
   let w = widget! {
@@ -409,6 +435,8 @@ widget_layout_test!(
 
 #[test]
 fn fix_silent_not_relayout_dyn_widget() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let trigger_size = Stateful::new(ZERO_SIZE);
   let w = widget! {
     states { trigger_size: trigger_size.clone() }
@@ -434,6 +462,8 @@ fn fix_silent_not_relayout_dyn_widget() {
 
 #[test]
 fn no_watch() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let size = Stateful::new(ZERO_SIZE);
   let w = widget! {
     states { size: size.clone() }
@@ -453,6 +483,8 @@ fn no_watch() {
 
 #[test]
 fn embed_shadow_states() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let _ = widget! {
     // variable `_a` here
     widget::from(|_a: &BuildCtx| widget! {
@@ -466,6 +498,8 @@ fn embed_shadow_states() {
 
 #[test]
 fn untrack_prop_with_pure_lambda() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let trigger = Stateful::new(0_u32);
   let counter = Stateful::new(0_u32);
   let w = widget! {
@@ -511,6 +545,8 @@ fn untrack_prop_with_pure_lambda() {
 
 #[test]
 fn embed_widget() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let _ = widget! {
     Column {
       widget! { // simple case & as first child

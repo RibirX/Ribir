@@ -19,6 +19,8 @@ fn wheel_widget(w: Widget) -> TestWindow {
 
 #[test]
 fn listener_trigger_have_handler() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let handler_call_times = Rc::new(Cell::new(0));
   let h1 = handler_call_times.clone();
   let animate_state = Stateful::new(false);
@@ -56,6 +58,8 @@ fn listener_trigger_have_handler() {
 
 #[test]
 fn listener_trigger() {
+  let _guard = unsafe { AppCtx::new_lock_scope() };
+
   let animate_state = Stateful::new(false);
 
   let w = widget! {

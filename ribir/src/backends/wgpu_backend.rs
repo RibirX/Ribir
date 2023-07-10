@@ -1,5 +1,5 @@
 use ribir_core::prelude::{
-  AntiAliasing, AppContext, Color, DeviceRect, DeviceSize, PaintCommand, PainterBackend,
+  AntiAliasing, AppCtx, Color, DeviceRect, DeviceSize, PaintCommand, PainterBackend,
 };
 use ribir_gpu::WgpuTexture;
 
@@ -15,7 +15,7 @@ impl WinitBackend for WgpuBackend {
   fn new(window: &winit::window::Window) -> WgpuBackend {
     let instance = wgpu::Instance::new(<_>::default());
     let surface = unsafe { instance.create_surface(window).unwrap() };
-    let wgpu = AppContext::wait_future(ribir_gpu::WgpuImpl::new(instance, Some(&surface)));
+    let wgpu = AppCtx::wait_future(ribir_gpu::WgpuImpl::new(instance, Some(&surface)));
     let size = window.inner_size();
     surface.configure(
       wgpu.device(),

@@ -391,6 +391,8 @@ mod tests {
 
   #[test]
   fn smoke() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     // Simulate `MockBox` widget need modify its size in event callback. Can use the
     // `cell_ref` in closure.
     let stateful = Stateful::new(MockBox { size: Size::zero() });
@@ -402,6 +404,8 @@ mod tests {
 
   #[test]
   fn state_notify_and_relayout() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     use std::{cell::RefCell, rc::Rc};
     let notified_count = Rc::new(RefCell::new(0));
     let cnc = notified_count.clone();
@@ -436,6 +440,8 @@ mod tests {
 
   #[test]
   fn fix_pin_widget_node() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let mut wnd = TestWindow::new(widget! { MockBox { size: Size::new(100., 100.) } });
     wnd.draw_frame();
     let tree = &wnd.widget_tree;
@@ -444,6 +450,8 @@ mod tests {
 
   #[test]
   fn change_notify() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let notified = Rc::new(RefCell::new(vec![]));
     let c_notified = notified.clone();
     let w = Stateful::new(MockBox { size: Size::zero() });

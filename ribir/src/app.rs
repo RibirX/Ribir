@@ -3,8 +3,7 @@ use crate::winit_shell_wnd::{new_id, WinitShellWnd};
 use ribir_core::timer::Timer;
 use ribir_core::{prelude::*, window::WindowId};
 use rxrust::scheduler::NEW_TIMER_FN;
-use std::cell::RefCell;
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 use winit::event_loop::{EventLoopBuilder, EventLoopProxy};
 use winit::{
   event::{Event, StartCause, WindowEvent},
@@ -14,7 +13,6 @@ use winit::{
 
 pub struct App {
   windows: HashMap<WindowId, Window>,
-  ctx: AppContext,
   event_loop: EventLoop<RibirEvent>,
   active_wnd: Option<WindowId>,
 }
@@ -32,13 +30,14 @@ impl App {
   pub fn new(theme: FullTheme) -> Self {
     let event_loop = EventLoopBuilder::with_user_event().build();
     let waker = EventSender(event_loop.create_proxy());
-    let mut ctx = AppContext::new(theme, Box::new(waker));
     let clipboard = Clipboard::new().unwrap();
-    ctx.clipboard = Rc::new(RefCell::new(clipboard));
-
+    unsafe {
+      AppCtx::set_app_theme(theme);
+      AppCtx::set_clipboard(Box::new(clipboard));
+      AppCtx::set_runtime_waker(Box::new(waker));
+    }
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
     Self {
-      ctx,
       windows: Default::default(),
       event_loop,
       active_wnd: None,
@@ -56,7 +55,7 @@ impl App {
 
   pub fn new_window(&mut self, root: Widget, size: Option<Size>) -> &mut Window {
     let shell_wnd = WinitShellWnd::new(size, &self.event_loop);
-    let wnd = Window::new(root, Box::new(shell_wnd), self.context().clone());
+    let wnd = Window::new(root, Box::new(shell_wnd));
     let id = wnd.id();
     assert!(self.windows.get(&id).is_none());
     if self.active_wnd.is_none() {
@@ -64,9 +63,6 @@ impl App {
     }
     self.windows.entry(id).or_insert(wnd)
   }
-
-  #[inline]
-  pub fn context(&self) -> &AppContext { &self.ctx }
 
   pub fn event_loop(&self) -> &EventLoop<RibirEvent> { &self.event_loop }
 
@@ -79,9 +75,7 @@ impl App {
       .expect("application at least have one window")
       .draw_frame();
 
-    let Self {
-      windows, event_loop, ctx: app_ctx, ..
-    } = self;
+    let Self { windows, event_loop, .. } = self;
 
     event_loop.run_return(move |event, _event_loop, control: &mut ControlFlow| {
       *control = ControlFlow::Wait;
@@ -116,7 +110,7 @@ impl App {
           }
         }
         Event::MainEventsCleared => {
-          app_ctx.run_until_stalled();
+          AppCtx::run_until_stalled();
           windows.iter_mut().for_each(|(_, wnd)| {
             if wnd.need_draw() {
               let wnd = wnd
@@ -149,7 +143,7 @@ impl App {
           _ => (),
         },
         Event::UserEvent(event) => match event {
-          RibirEvent::LocalFuturesReady => app_ctx.run_until_stalled(),
+          RibirEvent::LocalFuturesReady => AppCtx::run_until_stalled(),
         },
         _ => (),
       }

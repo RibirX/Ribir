@@ -1,6 +1,4 @@
-use crate::{
-  context::AppContext, events::dispatcher::Dispatcher, prelude::*, widget_tree::WidgetTree,
-};
+use crate::{context::AppCtx, events::dispatcher::Dispatcher, prelude::*, widget_tree::WidgetTree};
 
 use winit::event::WindowEvent;
 pub use winit::window::CursorIcon;
@@ -61,6 +59,7 @@ impl Window {
   pub fn wnd_ctx(&self) -> &WindowCtx { &self.context }
 
   /// Draw an image what current render tree represent.
+  #[track_caller]
   pub fn draw_frame(&mut self) {
     if !self.need_draw() {
       return;
@@ -85,10 +84,11 @@ impl Window {
 
     self.widget_tree.draw(&mut self.painter);
 
-    let surface = match self.context.app_ctx().app_theme() {
+    let surface = match AppCtx::app_theme() {
       Theme::Full(theme) => theme.palette.surface(),
       Theme::Inherit(_) => unreachable!(),
     };
+
     self.shell_wnd.draw_commands(
       Rect::from_size(self.shell_wnd.inner_size()),
       self.painter.finish(),
@@ -97,6 +97,7 @@ impl Window {
 
     self.shell_wnd.end_frame();
     self.context.end_frame();
+    AppCtx::end_frame();
   }
 
   pub fn layout(&mut self) {
@@ -108,9 +109,9 @@ impl Window {
     self.widget_tree.is_dirty() || self.context.has_actived_animate()
   }
 
-  pub fn new(root: Widget, shell_wnd: Box<dyn ShellWindow>, context: AppContext) -> Self {
+  pub fn new(root: Widget, shell_wnd: Box<dyn ShellWindow>) -> Self {
     let frame_pool = FramePool(FuturesLocalSchedulerPool::new());
-    let wnd_ctx = WindowCtx::new(context, frame_pool.0.spawner());
+    let wnd_ctx = WindowCtx::new(frame_pool.0.spawner());
     let widget_tree = WidgetTree::new(root, wnd_ctx.clone());
     let dispatcher = Dispatcher::new(wnd_ctx.focus_mgr.clone());
     let size = shell_wnd.inner_size();
@@ -180,6 +181,8 @@ mod tests {
 
   #[test]
   fn layout_after_wnd_resize() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let w = widget! {
        MockBox { size: INFINITY_SIZE }
     };

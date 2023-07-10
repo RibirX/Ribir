@@ -495,6 +495,8 @@ mod tests {
 
   #[test]
   fn mouse_pointer_bubble() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
@@ -538,6 +540,8 @@ mod tests {
 
   #[test]
   fn mouse_buttons() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
@@ -601,6 +605,8 @@ mod tests {
   #[cfg(not(target_os = "macos"))]
   #[test]
   fn different_device_mouse() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
@@ -668,6 +674,7 @@ mod tests {
 
   #[test]
   fn cancel_bubble() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<PointerEvent>>>);
     impl Compose for EventRecord {
@@ -709,6 +716,8 @@ mod tests {
 
   #[test]
   fn enter_leave() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     #[derive(Default)]
     struct EnterLeave {
       enter: Rc<RefCell<Vec<i32>>>,
@@ -796,6 +805,8 @@ mod tests {
 
   #[test]
   fn capture_click() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let click_path = Stateful::new(vec![]) as Stateful<Vec<usize>>;
     let w = widget! {
       states { click_path: click_path.clone() }
@@ -847,6 +858,8 @@ mod tests {
 
   #[test]
   fn click() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let click_path = Stateful::new(0);
     let w = widget! {
       states { click_path: click_path.clone() }
@@ -929,6 +942,8 @@ mod tests {
 
   #[test]
   fn focus_change_by_event() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let w = widget! {
       MockMulti {
         MockBox {
@@ -988,6 +1003,8 @@ mod tests {
 
   #[test]
   fn fix_hit_out_window() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let w = MockBox { size: INFINITY_SIZE };
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
@@ -999,6 +1016,8 @@ mod tests {
 
   #[test]
   fn hit_test_case() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     fn normal_mode_search() {
       struct T {
         pub wid1: Option<WidgetId>,

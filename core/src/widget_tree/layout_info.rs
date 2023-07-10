@@ -451,6 +451,8 @@ mod tests {
   }
   #[test]
   fn fix_incorrect_relayout_root() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     // Can't use layout info of dirty widget to detect if the ancestors path have
     // in relayout list. Because new widget insert by `DynWidget` not have layout
     // info, but its parent have.
@@ -473,9 +475,8 @@ mod tests {
       }
     };
 
-    let app_ctx = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(app_ctx, scheduler));
+    let mut tree = WidgetTree::new(w, WindowCtx::new(scheduler));
     tree.layout(Size::zero());
     assert_eq!(*root_layout_cnt.state_ref(), 1);
     {
@@ -487,6 +488,8 @@ mod tests {
 
   #[test]
   fn layout_list_from_root_to_leaf() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let layout_order = Stateful::new(vec![]);
     let trigger = Stateful::new(Size::zero());
     let w = widget! {
@@ -520,6 +523,8 @@ mod tests {
 
   #[test]
   fn relayout_size() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let trigger = Stateful::new(Size::zero());
     let w = widget! {
       states {trigger: trigger.clone()}
@@ -563,6 +568,8 @@ mod tests {
 
   #[test]
   fn relayout_from_parent() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let trigger = Stateful::new(Size::zero());
     let cnt = Rc::new(RefCell::new(0));
     let cnt2 = cnt.clone();
@@ -591,6 +598,8 @@ mod tests {
 
   #[test]
   fn layout_visit_prev_position() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     #[derive(Declare)]
     struct MockWidget {
       pos: RefCell<Point>,

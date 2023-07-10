@@ -260,7 +260,7 @@ impl Compose for VRawScrollbar {
           thickness,
           thumb_min_size,
           ref track_brush
-        } = *ScrollBarStyle::of(ctx);
+        } = ScrollBarStyle::of(ctx);
       }
 
       Stack {
@@ -344,6 +344,8 @@ mod test {
 
   #[test]
   fn scrollable() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let offset = Stateful::new(Point::zero());
     let v_offset = Stateful::new(0.);
     let h_offset = Stateful::new(0.);

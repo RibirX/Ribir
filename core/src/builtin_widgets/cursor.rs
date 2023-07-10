@@ -95,6 +95,8 @@ mod tests {
 
   #[test]
   fn tree_down_up() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let row_tree = widget! {
       MockBox {
         size: Size::new(f32::INFINITY, f32::INFINITY),

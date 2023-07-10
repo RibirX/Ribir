@@ -24,11 +24,8 @@ impl<'a> BuildCtx<'a> {
         return None;
       }
     }
-    f(self.app_theme())
+    f(AppCtx::app_theme())
   }
-
-  #[inline]
-  pub fn app_ctx(&self) -> &AppContext { &self.wnd_ctx.app_ctx }
 
   #[inline]
   // todo: should &mut self here, but we need to remove `init ctx =>` first
@@ -37,12 +34,6 @@ impl<'a> BuildCtx<'a> {
     let this = unsafe { &mut *(self as *const Self as *mut Self) };
     this.themes.push(theme);
   }
-
-  #[inline]
-  pub(crate) fn app_theme(&self) -> &Theme { self.app_ctx().app_theme() }
-
-  #[inline]
-  pub(crate) fn app_theme_mut(&self) -> &mut Theme { self.wnd_ctx.app_ctx.app_theme_mut() }
 }
 
 #[cfg(test)]
@@ -53,6 +44,8 @@ mod tests {
 
   #[test]
   fn themes() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     #[derive(Default, Clone)]
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 

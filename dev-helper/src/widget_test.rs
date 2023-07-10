@@ -144,6 +144,8 @@ macro_rules! widget_layout_test {
     paste::paste! {
       #[test]
       fn [<$widget_fn _layout>]() {
+        let _scope = unsafe { AppCtx::new_lock_scope() };
+
         let mut wnd = TestWindow::new_with_size($widget_fn(), $size);
         wnd.draw_frame();
 
@@ -217,6 +219,7 @@ macro_rules! widget_image_test {
     paste::paste! {
       #[test]
       fn [<$widget_fn _with_default_by_wgpu>]() {
+        let _scope = unsafe { AppCtx::new_lock_scope() };
         let mut wnd = TestWindow::new_with_size($widget_fn(), $size);
         wnd.draw_frame();
         let Frame { commands, viewport, surface} = wnd.take_last_frame().unwrap();
@@ -229,8 +232,10 @@ macro_rules! widget_image_test {
 
       #[test]
       fn [<$widget_fn _with_material_by_wgpu>]() {
-        let ctx = AppContext::new(ribir_material::purple::light(), Box::new(MockWaker));
-        let mut wnd = TestWindow::new_with_ctx($widget_fn(), $size, ctx);
+        let _scope = unsafe { AppCtx::new_lock_scope() };
+        unsafe { AppCtx::set_app_theme(ribir_material::purple::light()) };
+
+        let mut wnd = TestWindow::new_with_size($widget_fn(), $size);
         wnd.draw_frame();
         let Frame { commands, viewport, surface} = wnd.take_last_frame().unwrap();
         let viewport = viewport.to_i32().cast_unit();
@@ -259,9 +264,11 @@ macro_rules! widget_bench {
     paste::paste! {
       #[bench]
       fn [<$widget_fn _widget_bench>](b: &mut Bencher) {
-        let ctx = AppContext::default();
+        let _scope = unsafe { AppCtx::new_lock_scope() };
+        // init app context before benchmark
+        let _ = AppCtx::shared();
         b.iter(move || {
-          let mut wnd = TestWindow::new_with_ctx($widget_fn(), $size, ctx.clone());
+          let mut wnd = TestWindow::new_with_size($widget_fn(), $size);
           wnd.draw_frame();
         });
       }

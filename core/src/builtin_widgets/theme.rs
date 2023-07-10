@@ -83,7 +83,7 @@ impl ComposeChild for ThemeWidget {
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     use crate::prelude::*;
     widget! {
-      init ctx => { ctx.app_ctx().load_font_from_theme(&this.theme); }
+      init ctx => {  AppCtx::load_font_from_theme(&this.theme); }
       states { this: this.into_readonly() }
       DynWidget {
         dyns: move |ctx: &BuildCtx| {

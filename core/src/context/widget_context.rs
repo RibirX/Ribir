@@ -5,7 +5,7 @@ use crate::{
 };
 use ribir_geom::{Point, Rect, Size};
 
-use super::{AppContext, WindowCtx};
+use super::WindowCtx;
 
 /// common action for all context of widget.
 pub trait WidgetContext {
@@ -55,8 +55,6 @@ pub trait WidgetContext {
   fn query_widget_type<T: 'static>(&self, id: WidgetId, callback: impl FnOnce(&T));
 
   fn wnd_ctx(&self) -> &WindowCtx;
-
-  fn app_ctx(&self) -> &AppContext { &self.wnd_ctx().app_ctx }
 }
 
 pub(crate) trait WidgetCtxImpl {
@@ -216,6 +214,8 @@ mod tests {
 
   #[test]
   fn map_self_eq_self() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let w = widget! {
       MockBox {
         size: Size::zero(),
@@ -237,6 +237,8 @@ mod tests {
 
   #[test]
   fn map_transform_test() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let w = widget! {
       MockBox {
         size: Size::new(100., 100.),

@@ -22,7 +22,6 @@ impl TestWindow {
     Self(Window::new(
       root.into_widget(),
       Box::new(TestShellWindow::new(None)),
-      <_>::default(),
     ))
   }
 
@@ -32,21 +31,6 @@ impl TestWindow {
     Self(Window::new(
       root.into_widget(),
       Box::new(TestShellWindow::new(Some(size))),
-      <_>::default(),
-    ))
-  }
-
-  pub fn new_with_ctx<M: ImplMarker>(
-    root: impl IntoWidget<M>,
-    size: Size,
-    ctx: AppContext,
-  ) -> Self {
-    let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-
-    Self(Window::new(
-      root.into_widget(),
-      Box::new(TestShellWindow::new(Some(size))),
-      ctx,
     ))
   }
 
@@ -79,6 +63,7 @@ impl TestWindow {
       .take()
   }
 
+  #[track_caller]
   pub fn draw_frame(&mut self) {
     // Test window not have a eventloop, manually wake-up every frame.
     Timer::wake_timeout_futures();

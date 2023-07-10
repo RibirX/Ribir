@@ -619,6 +619,8 @@ mod tests {
 
   #[test]
   fn two_auto_focus() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     // two auto focus widget
     let size = Size::zero();
     let widget = widget! {
@@ -639,6 +641,7 @@ mod tests {
 
   #[test]
   fn on_auto_focus() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
     // one auto focus widget
     let size = Size::zero();
     let widget = widget! {
@@ -662,6 +665,8 @@ mod tests {
 
   #[test]
   fn tab_index() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let size = Size::zero();
     let widget = widget! {
       MockMulti {
@@ -721,6 +726,8 @@ mod tests {
 
   #[test]
   fn focus_event() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     #[derive(Debug, Default)]
     struct EmbedFocus {
       log: Rc<RefCell<Vec<&'static str>>>,
@@ -778,6 +785,8 @@ mod tests {
 
   #[test]
   fn dynamic_focus() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let visible = Stateful::new(Some(()));
     let w = widget! {
       states { visible: visible.clone_stateful() }
@@ -807,6 +816,8 @@ mod tests {
 
   #[test]
   fn scope_node_request_focus() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let w = widget! {
       MockMulti{
         MockBox{
