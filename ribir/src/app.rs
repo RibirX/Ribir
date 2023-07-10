@@ -4,16 +4,13 @@ use ribir_core::timer::Timer;
 use ribir_core::{prelude::*, window::WindowId};
 use rxrust::scheduler::NEW_TIMER_FN;
 use std::cell::RefCell;
-use std::sync::Arc;
 use std::{collections::HashMap, rc::Rc};
-use winit::event_loop::EventLoopBuilder;
+use winit::event_loop::{EventLoopBuilder, EventLoopProxy};
 use winit::{
   event::{Event, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop},
   platform::run_return::EventLoopExtRunReturn,
 };
-
-use std::sync::Mutex;
 
 pub struct App {
   windows: HashMap<WindowId, Window>,
@@ -26,21 +23,18 @@ pub enum RibirEvent {
   LocalFuturesReady,
 }
 
+#[derive(Clone)]
+pub struct EventSender(EventLoopProxy<RibirEvent>);
+
 impl App {
   /// Create an application with a theme, caller should init your widgets
   /// library with the theme before create the application.
   pub fn new(theme: FullTheme) -> Self {
-    let mut ctx = AppContext::new(theme);
+    let event_loop = EventLoopBuilder::with_user_event().build();
+    let waker = EventSender(event_loop.create_proxy());
+    let mut ctx = AppContext::new(theme, Box::new(waker));
     let clipboard = Clipboard::new().unwrap();
     ctx.clipboard = Rc::new(RefCell::new(clipboard));
-
-    let event_loop = EventLoopBuilder::with_user_event().build();
-    let proxy = Mutex::new(event_loop.create_proxy());
-    ctx.runtime_waker = Arc::new(Box::new(move || {
-      if let Ok(proxy) = proxy.lock() {
-        let _ = proxy.send_event(RibirEvent::LocalFuturesReady);
-      }
-    }));
 
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
     Self {
@@ -168,4 +162,9 @@ impl Default for App {
     let theme = FullTheme::default();
     App::new(theme)
   }
+}
+
+impl RuntimeWaker for EventSender {
+  fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> { Box::new(self.clone()) }
+  fn wake(&self) { let _ = self.0.send_event(RibirEvent::LocalFuturesReady); }
 }

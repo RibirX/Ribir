@@ -7,7 +7,6 @@ use std::{
   cell::RefCell,
   ptr::NonNull,
   rc::Rc,
-  sync::Arc,
   task::{Context, RawWaker, RawWakerVTable, Waker},
 };
 
@@ -21,7 +20,11 @@ use futures::{
 use ribir_text::shaper::TextShaper;
 use ribir_text::{font_db::FontDB, TextReorder, TypographyStore};
 
-pub type WakeRuntimeFn = Box<dyn Fn() + Send + Sync>;
+pub trait RuntimeWaker {
+  fn clone_box(&self) -> Box<dyn RuntimeWaker + Send>;
+  fn wake(&self);
+}
+
 #[derive(Clone)]
 pub struct AppContext {
   // todo: tmp code, We'll share AppContext by reference.
@@ -31,7 +34,7 @@ pub struct AppContext {
   pub reorder: TextReorder,
   pub typography_store: TypographyStore,
   pub clipboard: Rc<RefCell<dyn Clipboard>>,
-  pub runtime_waker: Arc<WakeRuntimeFn>,
+  pub runtime_waker: Box<dyn RuntimeWaker + Send>,
   executor: Executor,
 }
 
@@ -49,7 +52,7 @@ impl Default for Executor {
 }
 
 impl AppContext {
-  pub fn new(theme: FullTheme) -> Self {
+  pub fn new(theme: FullTheme, runtime_waker: Box<dyn RuntimeWaker + Send>) -> Self {
     // temp leak
     let theme = Box::new(Theme::Full(theme));
     let app_theme = Box::leak(theme).into();
@@ -69,7 +72,7 @@ impl AppContext {
       typography_store,
       clipboard: Rc::new(RefCell::new(MockClipboard {})),
       executor: <_>::default(),
-      runtime_waker: Arc::new(Box::new(move || unimplemented!())),
+      runtime_waker,
     };
     ctx.load_font_from_theme(ctx.app_theme());
     ctx
@@ -120,7 +123,7 @@ impl AppContext {
 }
 
 impl Default for AppContext {
-  fn default() -> Self { AppContext::new(<_>::default()) }
+  fn default() -> Self { AppContext::new(<_>::default(), Box::new(MockWaker)) }
 }
 
 impl AppContext {
@@ -131,7 +134,7 @@ impl AppContext {
   where
     Fut: Future<Output = ()> + 'static,
   {
-    (self.runtime_waker)();
+    self.runtime_waker.wake();
     self
       .executor
       .local
@@ -148,8 +151,12 @@ pin_project! {
   struct LocalFuture<F> {
     #[pin]
     fut: F,
-    waker: Arc<WakeRuntimeFn>,
+    waker: Box<dyn RuntimeWaker + Send>,
   }
+}
+
+impl Clone for Box<dyn RuntimeWaker + Send> {
+  fn clone(&self) -> Self { self.clone_box() }
 }
 
 impl<F> LocalFuture<F>
@@ -157,7 +164,7 @@ where
   F: Future,
 {
   fn local_waker(&self, cx: &mut std::task::Context<'_>) -> Waker {
-    type RawLocalWaker = (std::task::Waker, Arc<WakeRuntimeFn>);
+    type RawLocalWaker = (std::task::Waker, Box<dyn RuntimeWaker + Send>);
     fn clone(this: *const ()) -> RawWaker {
       let waker = this as *const RawLocalWaker;
       let (w, cb) = unsafe { &*waker };
@@ -168,17 +175,17 @@ where
 
     unsafe fn wake(this: *const ()) {
       let waker = this as *mut RawLocalWaker;
-      let (w, cb) = unsafe { &*waker };
+      let (w, ribir_waker) = unsafe { &*waker };
       w.wake_by_ref();
-      (cb)();
+      ribir_waker.wake();
       drop(this);
     }
 
     unsafe fn wake_by_ref(this: *const ()) {
       let waker = this as *mut RawLocalWaker;
-      let (w, cb) = unsafe { &*waker };
+      let (w, ribir_waker) = unsafe { &*waker };
       w.wake_by_ref();
-      (cb)();
+      ribir_waker.wake();
     }
 
     unsafe fn drop(this: *const ()) {
@@ -213,8 +220,17 @@ where
   }
 }
 
+#[derive(Clone, Copy, Default)]
+pub struct MockWaker;
+impl RuntimeWaker for MockWaker {
+  fn wake(&self) {}
+  fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> { Box::new(MockWaker) }
+}
+
 #[cfg(test)]
 mod tests {
+  use super::*;
+  use futures::Future;
   use std::{
     cell::RefCell,
     rc::Rc,
@@ -222,9 +238,6 @@ mod tests {
     sync::Mutex,
     task::{Poll, Waker},
   };
-
-  use super::AppContext;
-  use futures::Future;
 
   #[derive(Default)]
   struct Trigger {
@@ -265,12 +278,15 @@ mod tests {
 
   #[test]
   fn local_future_smoke() {
-    let mut ctx = AppContext::default();
+    struct WakerCnt(Arc<Mutex<usize>>);
+    impl RuntimeWaker for WakerCnt {
+      fn wake(&self) { *self.0.lock().unwrap() += 1; }
+      fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> { Box::new(WakerCnt(self.0.clone())) }
+    }
+
     let ctx_wake_cnt = Arc::new(Mutex::new(0));
     let wake_cnt = ctx_wake_cnt.clone();
-    ctx.runtime_waker = Arc::new(Box::new(move || {
-      *wake_cnt.lock().unwrap() += 1;
-    }));
+    let ctx = AppContext::new(<_>::default(), Box::new(WakerCnt(wake_cnt)));
 
     let triggers = (0..3)
       .map(|_| Rc::new(RefCell::new(Trigger::default())))

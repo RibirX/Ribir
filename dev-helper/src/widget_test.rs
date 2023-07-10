@@ -229,7 +229,7 @@ macro_rules! widget_image_test {
 
       #[test]
       fn [<$widget_fn _with_material_by_wgpu>]() {
-        let ctx = AppContext::new(ribir_material::purple::light());
+        let ctx = AppContext::new(ribir_material::purple::light(), Box::new(MockWaker));
         let mut wnd = TestWindow::new_with_ctx($widget_fn(), $size, ctx);
         wnd.draw_frame();
         let Frame { commands, viewport, surface} = wnd.take_last_frame().unwrap();
