@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use ribir_core::prelude::{
-  CharsEvent, GraphemeCursor, KeyboardEvent, StateRef, TextWriter, VirtualKeyCode,
+  AppCtx, CharsEvent, GraphemeCursor, KeyboardEvent, StateRef, TextWriter, VirtualKeyCode,
 };
 
 #[macro_export]
@@ -75,7 +75,7 @@ impl TextEditorArea {
 
 fn key_with_command(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEvent) -> bool {
   if event.key == VirtualKeyCode::V && event.common.with_command_key() {
-    let clipboard = event.context().clipboard();
+    let clipboard = AppCtx::clipboard();
     let txt = clipboard.borrow_mut().read_text();
     if let Ok(txt) = txt {
       let rg = this.caret.select_range();

@@ -76,6 +76,8 @@ mod tests {
 
   #[test]
   fn compose_decorator_smoke() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let mut theme = FullTheme::default();
 
     #[derive(Declare)]
@@ -102,8 +104,9 @@ mod tests {
       }}
     };
 
-    let ctx = AppContext::new(theme, Box::new(MockWaker));
-    let mut wnd = TestWindow::new_with_ctx(w, Size::new(500., 500.), ctx);
+    unsafe { AppCtx::set_app_theme(theme) };
+
+    let mut wnd = TestWindow::new_with_size(w, Size::new(500., 500.));
     wnd.draw_frame();
     assert_layout_result_by_path!(
       wnd,

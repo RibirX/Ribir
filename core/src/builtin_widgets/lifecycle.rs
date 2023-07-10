@@ -208,7 +208,7 @@ mod tests {
     };
 
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree = WidgetTree::new(w, WindowCtx::new(scheduler));
     assert_eq!(&**lifecycle.state_ref(), ["static mounted"]);
     tree.layout(Size::new(100., 100.));
     assert_eq!(
@@ -266,7 +266,7 @@ mod tests {
     };
 
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree = WidgetTree::new(w, WindowCtx::new(scheduler));
     tree.layout(Size::new(100., 100.));
     let mounted_ids = (*mounted.state_ref()).clone();
 

@@ -24,8 +24,8 @@ impl Compose for Caret {
           box_fit: BoxFit::Fill,
         }
       }
-      finally ctx => {
-        let scheduler = ctx.wnd_ctx().scheduler();
+      finally {
+        let scheduler = AppCtx::scheduler();
         let mut _guard = None;
         let_watch!(this.focused)
           .distinct_until_changed()

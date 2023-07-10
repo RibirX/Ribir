@@ -71,6 +71,8 @@ mod tests {
 
   #[test]
   fn smoke() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let source_receive_for_bubble = Rc::new(RefCell::new((0., 0.)));
     let bubble_receive = source_receive_for_bubble.clone();
     let source_receive_for_capture = Rc::new(RefCell::new((0., 0.)));

@@ -73,6 +73,7 @@ mod tests {
 
   #[test]
   fn smoke() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
     let receive = Rc::new(RefCell::new("".to_string()));
     let c_receive = receive.clone();
 
@@ -97,6 +98,7 @@ mod tests {
 
   #[test]
   fn chars_capture() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
     let receive = Rc::new(RefCell::new("".to_string()));
     let chars_receive = receive.clone();
     let capture_receive = receive.clone();

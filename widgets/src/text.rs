@@ -51,10 +51,9 @@ impl Text {
 }
 
 impl Render for Text {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let wnd_ctx = ctx.wnd_ctx();
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
     self
-      .text_layout(wnd_ctx.typography_store(), clamp.max)
+      .text_layout(AppCtx::typography_store(), clamp.max)
       .visual_rect()
       .size
       .cast_unit()
@@ -67,14 +66,14 @@ impl Render for Text {
   fn paint(&self, ctx: &mut PaintingCtx) {
     let bounds = ctx.layout_clamp().map(|b| b.max);
     let visual_glyphs = typography_with_text_style(
-      ctx.typography_store(),
+      AppCtx::typography_store(),
       self.text.clone(),
       &self.text_style,
       bounds,
       self.overflow,
     );
 
-    let font_db = ctx.typography_store().font_db().clone();
+    let font_db = AppCtx::font_db().clone();
     let font_size = self.text_style.font_size.into_pixel().value();
     let box_rect = Rect::from_size(ctx.box_size().unwrap());
     draw_glyphs_in_rect(
@@ -180,6 +179,8 @@ mod tests {
 
   #[test]
   fn text_clip() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let w = widget! {
       SizedBox {
         size: Size::new(50., 45.),

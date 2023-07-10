@@ -119,6 +119,8 @@ mod tests {
 
   #[test]
   fn fit_test() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let small_size: Size = Size::new(100., 150.);
 
     FitTestCase {

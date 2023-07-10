@@ -60,7 +60,7 @@ impl ComposeChild for TextSelectable {
           on_performed_layout: move |ctx| {
             let bound = ctx.layout_info().expect("layout info must exit in performed_layout").clamp;
             this.helper.glyphs = Some(text.text_layout(
-              ctx.wnd_ctx().typography_store(),
+              AppCtx::typography_store(),
               bound.max,
             ));
             this.forget_modifies();
@@ -104,7 +104,7 @@ fn deal_with_command(
     VirtualKeyCode::C => {
       let rg = this.caret.select_range();
       if !rg.is_empty() {
-        let clipboard = event.context().clipboard();
+        let clipboard = AppCtx::clipboard();
         let _ = clipboard.borrow_mut().clear();
         let _ = clipboard.borrow_mut().write_text(&text.substr(rg));
       }

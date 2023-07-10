@@ -21,25 +21,20 @@ macro_rules! fill_custom_style {
   };
 }
 
-pub trait CustomStyle: Sized + 'static {
+pub trait CustomStyle: Sized + Clone + 'static {
   fn default_style(ctx: &BuildCtx) -> Self;
 
   #[inline]
-  fn of<'a>(ctx: &'a BuildCtx) -> &'a Self {
+  fn of(ctx: &BuildCtx) -> Self {
     let tid = TypeId::of::<Self>();
     let c = ctx.find_cfg(|t| match t {
       Theme::Full(t) => t.custom_styles.themes.get(&tid),
       Theme::Inherit(i) => i.custom_styles.as_ref().and_then(|c| c.themes.get(&tid)),
     });
 
-    c.unwrap_or_else(|| {
-      let style = Self::default_style(ctx);
-      let Theme::Full(app_theme) = ctx.app_theme_mut() else { unreachable!() };
-      app_theme.custom_styles.set_custom_style(style);
-      app_theme.custom_styles.themes.get(&tid).unwrap()
-    })
-    .downcast_ref::<Self>()
-    .unwrap()
+    c.and_then(|c| c.downcast_ref::<Self>())
+      .cloned()
+      .unwrap_or_else(|| Self::default_style(ctx))
   }
 }
 

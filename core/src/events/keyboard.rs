@@ -116,6 +116,8 @@ mod tests {
 
   #[test]
   fn smoke() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     #[derive(Default)]
     struct Keys(Rc<RefCell<Vec<String>>>);
 

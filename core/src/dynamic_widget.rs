@@ -496,6 +496,8 @@ mod tests {
 
   #[test]
   fn expr_widget_as_root() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let size = Stateful::new(Size::zero());
     let w = widget! {
       states { size: size.clone() }
@@ -505,7 +507,7 @@ mod tests {
       }
     };
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree = WidgetTree::new(w, WindowCtx::new(scheduler));
     tree.layout(Size::zero());
     let ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
     assert_eq!(ids.len(), 2);
@@ -521,6 +523,8 @@ mod tests {
 
   #[test]
   fn expr_widget_with_declare_child() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let size = Stateful::new(Size::zero());
     let w = widget! {
       states { size: size.clone() }
@@ -532,9 +536,8 @@ mod tests {
         }
       }
     };
-    let app_ctx = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(app_ctx, scheduler));
+    let mut tree = WidgetTree::new(w, WindowCtx::new(scheduler));
     tree.layout(Size::zero());
     let ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
     assert_eq!(ids.len(), 3);
@@ -551,6 +554,8 @@ mod tests {
 
   #[test]
   fn expr_widget_mounted_new() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let v = Stateful::new(vec![1, 2, 3]);
 
     let new_cnt = Stateful::new(0);
@@ -577,7 +582,7 @@ mod tests {
       }}
     };
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree = WidgetTree::new(w, WindowCtx::new(scheduler));
     tree.layout(Size::zero());
     assert_eq!(*new_cnt.state_ref(), 3);
     assert_eq!(*drop_cnt.state_ref(), 0);
@@ -595,6 +600,8 @@ mod tests {
 
   #[test]
   fn dyn_widgets_with_key() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let v = Stateful::new(vec![(1, '1'), (2, '2'), (3, '3')]);
     let enter_list: Stateful<Vec<char>> = Stateful::new(vec![]);
     let update_list: Stateful<Vec<char>> = Stateful::new(vec![]);
@@ -646,9 +653,8 @@ mod tests {
     };
 
     // 1. 3 item enter
-    let app_ctx = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w, WindowCtx::new(app_ctx, scheduler));
+    let mut tree = WidgetTree::new(w, WindowCtx::new(scheduler));
     tree.layout(Size::zero());
     let expect_vec = vec!['1', '2', '3'];
     assert_eq!((*enter_list.state_ref()).len(), 3);
@@ -727,6 +733,8 @@ mod tests {
 
   #[test]
   fn delay_drop_widgets() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     #[derive(Default, Clone)]
     struct Task {
       mounted: u32,
@@ -878,6 +886,8 @@ mod tests {
 
   #[test]
   fn remove_delay_drop_widgets() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let child = Stateful::new(Some(()));
     let child_destroy_until = Stateful::new(false);
     let grandson = Stateful::new(Some(()));

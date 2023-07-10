@@ -149,6 +149,8 @@ mod tests {
 
   #[test]
   fn x_scroll() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     test_assert(Scrollable::X, -10., -10., -10., 0.);
     test_assert(Scrollable::X, -10000., -10., -900., 0.);
     test_assert(Scrollable::X, 100., -10., 0., 0.);
@@ -156,6 +158,8 @@ mod tests {
 
   #[test]
   fn y_scroll() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     test_assert(Scrollable::Y, -10., -10., 0., -10.);
     test_assert(Scrollable::Y, -10., -10000., 0., -900.);
     test_assert(Scrollable::Y, 10., 100., 0., 0.);
@@ -163,6 +167,8 @@ mod tests {
 
   #[test]
   fn both_scroll() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     test_assert(Scrollable::Both, -10., -10., -10., -10.);
     test_assert(Scrollable::Both, -10000., -10000., -900., -900.);
     test_assert(Scrollable::Both, 100., 100., 0., 0.);
@@ -189,6 +195,8 @@ mod tests {
 
   #[test]
   fn scroll_content_expand() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let w = widget! {
       FixedBox {
         size: Size::new(200., 200.),

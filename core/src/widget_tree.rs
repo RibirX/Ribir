@@ -243,7 +243,6 @@ mod tests {
   };
 
   use super::*;
-  use ribir_text::font_db::FontDB;
   use test::Bencher;
 
   #[derive(Clone, Debug)]
@@ -308,12 +307,11 @@ mod tests {
   }
 
   fn bench_recursive_inflate(width: usize, depth: usize, b: &mut Bencher) {
-    let ctx: AppContext = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
     b.iter(move || {
       let mut tree = WidgetTree::new(
         Recursive { width, depth }.into_widget(),
-        WindowCtx::new(ctx.clone(), scheduler.clone()),
+        WindowCtx::new(scheduler.clone()),
       );
       tree.layout(Size::new(512., 512.));
     });
@@ -322,9 +320,8 @@ mod tests {
   fn bench_recursive_repair(width: usize, depth: usize, b: &mut Bencher) {
     let w = Stateful::new(Recursive { width, depth });
     let trigger = w.clone();
-    let app_ctx = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(app_ctx, scheduler));
+    let mut tree = WidgetTree::new(w.into_widget(), WindowCtx::new(scheduler));
     b.iter(|| {
       {
         let _: &mut Recursive = &mut trigger.state_ref();
@@ -335,6 +332,8 @@ mod tests {
 
   #[test]
   fn fix_relayout_incorrect_clamp() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let expect_size = Size::new(20., 20.);
     let no_boundary_size = Stateful::new(INFINITY_SIZE);
     let w = widget! {
@@ -361,6 +360,8 @@ mod tests {
 
   #[test]
   fn fix_dropped_child_expr_widget() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let parent = Stateful::new(true);
     let child = Stateful::new(true);
     let w = widget! {
@@ -387,6 +388,8 @@ mod tests {
 
   #[test]
   fn fix_child_expr_widget_same_root_as_parent() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let trigger = Stateful::new(true);
     let w = widget! {
       states { trigger: trigger.clone() }
@@ -412,12 +415,11 @@ mod tests {
   }
   #[test]
   fn drop_info_clear() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let post = Embed { width: 5, depth: 3 };
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(
-      post.into_widget(),
-      WindowCtx::new(AppContext::default(), scheduler),
-    );
+    let mut tree = WidgetTree::new(post.into_widget(), WindowCtx::new(scheduler));
     tree.layout(Size::new(512., 512.));
     assert_eq!(tree.count(), 16);
 
@@ -433,38 +435,46 @@ mod tests {
 
   #[bench]
   fn inflate_5_x_1000(b: &mut Bencher) {
-    let ctx: AppContext = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     b.iter(move || {
       let post = Embed { width: 5, depth: 1000 };
-      WidgetTree::new(
-        post.into_widget(),
-        WindowCtx::new(ctx.clone(), scheduler.clone()),
-      );
+      WidgetTree::new(post.into_widget(), WindowCtx::new(scheduler.clone()));
     });
   }
 
   #[bench]
-  fn inflate_50_pow_2(b: &mut Bencher) { bench_recursive_inflate(50, 2, b); }
+  fn inflate_50_pow_2(b: &mut Bencher) {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+    bench_recursive_inflate(50, 2, b);
+  }
 
   #[bench]
-  fn inflate_100_pow_2(b: &mut Bencher) { bench_recursive_inflate(100, 2, b); }
+  fn inflate_100_pow_2(b: &mut Bencher) {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+    bench_recursive_inflate(100, 2, b);
+  }
 
   #[bench]
-  fn inflate_10_pow_4(b: &mut Bencher) { bench_recursive_inflate(10, 4, b); }
+  fn inflate_10_pow_4(b: &mut Bencher) {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+    bench_recursive_inflate(10, 4, b);
+  }
 
   #[bench]
-  fn inflate_10_pow_5(b: &mut Bencher) { bench_recursive_inflate(10, 5, b); }
+  fn inflate_10_pow_5(b: &mut Bencher) {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+    bench_recursive_inflate(10, 5, b);
+  }
 
   #[bench]
   fn repair_5_x_1000(b: &mut Bencher) {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
     let post = Stateful::new(Embed { width: 5, depth: 1000 });
     let trigger = post.clone();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(
-      post.into_widget(),
-      WindowCtx::new(AppContext::default(), scheduler),
-    );
+    let mut tree = WidgetTree::new(post.into_widget(), WindowCtx::new(scheduler));
     b.iter(|| {
       {
         let _: &mut Embed = &mut trigger.state_ref();
@@ -474,19 +484,33 @@ mod tests {
   }
 
   #[bench]
-  fn repair_50_pow_2(b: &mut Bencher) { bench_recursive_repair(50, 2, b); }
+  fn repair_50_pow_2(b: &mut Bencher) {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+    bench_recursive_repair(50, 2, b);
+  }
 
   #[bench]
-  fn repair_100_pow_2(b: &mut Bencher) { bench_recursive_repair(100, 2, b); }
+  fn repair_100_pow_2(b: &mut Bencher) {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+    bench_recursive_repair(100, 2, b);
+  }
 
   #[bench]
-  fn repair_10_pow_4(b: &mut Bencher) { bench_recursive_repair(10, 4, b); }
+  fn repair_10_pow_4(b: &mut Bencher) {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+    bench_recursive_repair(10, 4, b);
+  }
 
   #[bench]
-  fn repair_10_pow_5(b: &mut Bencher) { bench_recursive_repair(10, 5, b); }
+  fn repair_10_pow_5(b: &mut Bencher) {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+    bench_recursive_repair(10, 5, b);
+  }
 
   #[test]
   fn perf_silent_ref_should_not_dirty_expr_widget() {
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+
     let trigger = Stateful::new(1);
     let widget = widget! {
       states { trigger: trigger.clone() }
@@ -502,7 +526,7 @@ mod tests {
     };
 
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree = WidgetTree::new(widget, WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree = WidgetTree::new(widget, WindowCtx::new(scheduler));
     tree.layout(Size::new(100., 100.));
     {
       *trigger.silent_ref() = 2;
@@ -512,8 +536,7 @@ mod tests {
 
   #[test]
   fn draw_clip() {
-    let mut font_db = FontDB::default();
-    font_db.load_system_fonts();
+    let _guard = unsafe { AppCtx::new_lock_scope() };
     let win_size = Size::new(150., 50.);
     let mut painter = Painter::new(Rect::from_size(win_size));
 
@@ -527,9 +550,8 @@ mod tests {
           }})
         }
     }};
-    let app_ctx = <_>::default();
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree1 = WidgetTree::new(w1, WindowCtx::new(app_ctx, scheduler));
+    let mut tree1 = WidgetTree::new(w1, WindowCtx::new(scheduler));
     tree1.layout(win_size);
     tree1.draw(&mut painter);
 
@@ -546,7 +568,7 @@ mod tests {
         }
     }};
     let scheduler = FuturesLocalSchedulerPool::default().spawner();
-    let mut tree2 = WidgetTree::new(w2, WindowCtx::new(AppContext::default(), scheduler));
+    let mut tree2 = WidgetTree::new(w2, WindowCtx::new(scheduler));
     tree2.layout(win_size);
     tree2.draw(&mut painter);
     let len_1_widget = painter.finish().len();
