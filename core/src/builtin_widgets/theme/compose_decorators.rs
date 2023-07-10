@@ -102,7 +102,7 @@ mod tests {
       }}
     };
 
-    let ctx = AppContext::new(theme);
+    let ctx = AppContext::new(theme, Box::new(MockWaker));
     let mut wnd = TestWindow::new_with_ctx(w, Size::new(500., 500.), ctx);
     wnd.draw_frame();
     assert_layout_result_by_path!(
