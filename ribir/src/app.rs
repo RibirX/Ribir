@@ -4,6 +4,7 @@ use ribir_core::timer::Timer;
 use ribir_core::{prelude::*, window::WindowId};
 use rxrust::scheduler::NEW_TIMER_FN;
 use std::collections::HashMap;
+use std::sync::Once;
 use winit::event_loop::{EventLoopBuilder, EventLoopProxy};
 use winit::{
   event::{Event, StartCause, WindowEvent},
@@ -25,57 +26,54 @@ pub enum RibirEvent {
 pub struct EventSender(EventLoopProxy<RibirEvent>);
 
 impl App {
-  /// Create an application with a theme, caller should init your widgets
-  /// library with the theme before create the application.
-  pub fn new(theme: FullTheme) -> Self {
-    let event_loop = EventLoopBuilder::with_user_event().build();
-    let waker = EventSender(event_loop.create_proxy());
-    let clipboard = Clipboard::new().unwrap();
-    unsafe {
-      AppCtx::set_app_theme(theme);
-      AppCtx::set_clipboard(Box::new(clipboard));
-      AppCtx::set_runtime_waker(Box::new(waker));
-    }
-    let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-    Self {
-      windows: Default::default(),
-      event_loop,
-      active_wnd: None,
-    }
-  }
-
   /// Start an application with the `root` widget, this will use the default
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
+  #[track_caller]
   pub fn run(root: Widget) {
-    let mut app = App::default();
-    app.new_window(root, None);
-    app.exec()
+    Self::new_window(root, None, |_| {});
+    App::exec()
   }
 
-  pub fn new_window(&mut self, root: Widget, size: Option<Size>) -> &mut Window {
-    let shell_wnd = WinitShellWnd::new(size, &self.event_loop);
+  /// create a new window with the `root` widget, and you can config the new
+  /// window in the callback, then return the window id.
+  #[track_caller]
+  pub fn new_window(root: Widget, size: Option<Size>, cb: impl FnOnce(&mut Window)) -> WindowId {
+    let app = unsafe { App::shared() };
+
+    let shell_wnd = WinitShellWnd::new(size, &app.event_loop);
     let wnd = Window::new(root, Box::new(shell_wnd));
     let id = wnd.id();
-    assert!(self.windows.get(&id).is_none());
-    if self.active_wnd.is_none() {
-      self.active_wnd = Some(id);
+    if app.active_wnd.is_none() {
+      app.active_wnd = Some(id);
     }
-    self.windows.entry(id).or_insert(wnd)
+    app.windows.insert(id, wnd);
+    cb(app.windows.get_mut(&id).unwrap());
+
+    id
   }
 
-  pub fn event_loop(&self) -> &EventLoop<RibirEvent> { &self.event_loop }
+  /// set the window with `id` to be the active window, and the active window.
+  #[track_caller]
+  pub fn set_active_window(id: WindowId) {
+    let app = unsafe { App::shared() };
+    app.active_wnd = Some(id);
+    // todo: set the window to be the top window, but we not really support
+    // multi window fully, implement this later.
+  }
 
-  pub fn set_active_window(&mut self, id: WindowId) { self.active_wnd = Some(id); }
-
-  pub fn exec(&mut self) {
-    self
+  /// run the application, this will start the event loop and block the current
+  /// thread until the application exit.
+  #[track_caller]
+  pub fn exec() {
+    let app = unsafe { App::shared() };
+    app
       .active_wnd
-      .and_then(|id| self.windows.get_mut(&id))
+      .and_then(|id| app.windows.get_mut(&id))
       .expect("application at least have one window")
       .draw_frame();
 
-    let Self { windows, event_loop, .. } = self;
+    let Self { windows, event_loop, .. } = app;
 
     event_loop.run_return(move |event, _event_loop, control: &mut ControlFlow| {
       *control = ControlFlow::Wait;
@@ -149,12 +147,29 @@ impl App {
       }
     });
   }
-}
 
-impl Default for App {
-  fn default() -> Self {
-    let theme = FullTheme::default();
-    App::new(theme)
+  #[track_caller]
+  unsafe fn shared() -> &'static mut App {
+    static mut INIT_ONCE: Once = Once::new();
+    static mut APP: Option<App> = None;
+    INIT_ONCE.call_once(|| {
+      let event_loop = EventLoopBuilder::with_user_event().build();
+      let waker = EventSender(event_loop.create_proxy());
+      let clipboard = Clipboard::new().unwrap();
+      unsafe {
+        AppCtx::set_clipboard(Box::new(clipboard));
+        AppCtx::set_runtime_waker(Box::new(waker));
+      }
+      let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
+      APP = Some(App {
+        windows: Default::default(),
+        event_loop,
+        active_wnd: None,
+      })
+    });
+    AppCtx::thread_check();
+
+    APP.as_mut().unwrap()
   }
 }
 
