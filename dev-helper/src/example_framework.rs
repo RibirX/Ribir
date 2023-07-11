@@ -41,10 +41,14 @@ macro_rules! example_framework {
     widget_image_test!($widget_fn, wnd_size = $size,);
 
     fn main() {
-      let mut app = App::new(material::purple::light());
+      unsafe {
+        AppCtx::set_app_theme(material::purple::light());
+      }
       let name = env!("CARGO_PKG_NAME");
-      app.new_window($widget_fn(), Some($size)).set_title(name);
-      app.exec()
+      App::new_window($widget_fn(), Some($size), |wnd| {
+        wnd.set_title(name);
+      });
+      App::exec();
     }
   };
 }
