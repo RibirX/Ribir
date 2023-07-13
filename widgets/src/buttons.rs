@@ -43,8 +43,8 @@ pub enum ButtonType {
 
 #[derive(Template)]
 pub struct ButtonTemplate {
-  label: Option<State<Label>>,
-  icon: Option<NamedSvg>,
+  pub label: Option<State<Label>>,
+  pub icon: Option<NamedSvg>,
 }
 
 impl ComposeChild for ButtonImpl {
