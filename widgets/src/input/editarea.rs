@@ -31,7 +31,7 @@ impl CustomStyle for PlaceholderStyle {
 }
 
 impl ComposeChild for TextEditorArea {
-  type Child = Option<Placeholder>;
+  type Child = Option<State<Placeholder>>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     widget! {
     states {
@@ -47,9 +47,10 @@ impl ComposeChild for TextEditorArea {
         Stack {
           fit: StackFit::Passthrough,
           Option::map(placeholder, |holder| widget! {
+            states { holder: holder.into_readonly() }
             Text {
               visible: this.text.is_empty(),
-              text: holder.0,
+              text: holder.0.clone(),
             }
           })
           TextSelectable {

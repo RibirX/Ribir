@@ -99,7 +99,7 @@ impl TextArea {
 declare_writer!(TextAreaWriter, TextArea);
 
 impl ComposeChild for Input {
-  type Child = Option<Placeholder>;
+  type Child = Option<State<Placeholder>>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     widget! {
       init ctx => {
@@ -151,7 +151,7 @@ impl CustomStyle for TextAreaStyle {
 }
 
 impl ComposeChild for TextArea {
-  type Child = Option<Placeholder>;
+  type Child = Option<State<Placeholder>>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     widget! {
       init ctx => {
