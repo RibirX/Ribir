@@ -5,7 +5,7 @@
 #![feature(test)]
 pub mod font_db;
 pub mod shaper;
-use derive_more::{Add, AddAssign, Div, Mul, Sub, SubAssign};
+use derive_more::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 use fontdb::ID;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 pub use ribir_algo::Substr;
@@ -71,6 +71,7 @@ pub struct Pixel(pub OrderedFloat<f32>);
   Eq,
   Ord,
   Hash,
+  Neg,
 )]
 pub struct Em(OrderedFloat<f32>);
 

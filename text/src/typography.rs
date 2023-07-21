@@ -32,7 +32,7 @@ pub enum PlaceLineDirection {
 pub struct TypographyCfg {
   pub line_height: Option<Em>,
   pub letter_space: Option<Pixel>,
-  pub text_align: Option<TextAlign>,
+  pub text_align: TextAlign,
   // The size glyphs can place, and hint `TypographyMan` where to early return.
   // the result of typography may over bounds.
   pub bounds: Size<Em>,
@@ -70,11 +70,10 @@ pub struct VisualLine {
 
 pub struct VisualInfos {
   pub visual_lines: Vec<VisualLine>,
+  pub text_align: TextAlign,
   /// if the typography result over the bounds provide by caller.
   pub over_bounds: bool,
   pub line_dir: PlaceLineDirection,
-  pub visual_x: Em,
-  pub visual_y: Em,
   pub visual_width: Em,
   pub visual_height: Em,
 }
@@ -117,72 +116,50 @@ where
     }
 
     let (visual_width, visual_height) = self.visual_size();
-    let (visual_x, visual_y) = self.adjust_lines(visual_width, visual_height);
+    self.adjust_lines(visual_width, visual_height);
 
     VisualInfos {
-      visual_x,
-      visual_y,
       visual_width,
       visual_height,
+      text_align: self.cfg.text_align,
       visual_lines: self.visual_lines,
       over_bounds: self.over_bounds,
       line_dir: self.cfg.line_dir,
     }
   }
 
-  fn adjust_lines(&mut self, visual_width: Em, visual_height: Em) -> (Em, Em) {
-    let text_align = self.cfg.text_align.unwrap_or(TextAlign::Start);
+  fn adjust_lines(&mut self, visual_width: Em, visual_height: Em) {
+    let text_align = self.cfg.text_align;
 
-    let bounds_width = self.cfg.bounds.width;
-    let bounds_height = self.cfg.bounds.height;
-
-    let (visual_x, visual_y) = match self.cfg.line_dir {
+    match self.cfg.line_dir {
       PlaceLineDirection::LeftToRight | PlaceLineDirection::RightToLeft => {
-        let mut x_offset = if self.cfg.line_dir == PlaceLineDirection::RightToLeft {
-          bounds_width - visual_width
-        } else {
-          Em::absolute(0.)
-        };
+        let mut x_offset = Em::absolute(0.);
         self.visual_lines.iter_mut().for_each(move |l| {
           l.x = x_offset;
           x_offset += l.width;
         });
-        (x_offset, Em::absolute(0.))
       }
       PlaceLineDirection::TopToBottom | PlaceLineDirection::BottomToTop => {
-        let mut y_offset = if self.cfg.line_dir == PlaceLineDirection::BottomToTop {
-          bounds_height - visual_height
-        } else {
-          Em::absolute(0.)
-        };
+        let mut y_offset = Em::absolute(0.);
         self.visual_lines.iter_mut().for_each(move |l| {
           l.y = y_offset;
           y_offset += l.height;
         });
-        (Em::absolute(0.), y_offset)
       }
     };
 
-    match (text_align, self.cfg.line_dir.is_horizontal()) {
-      (TextAlign::Start, _) => {}
-      (TextAlign::Center, true) => self
-        .visual_lines
-        .iter_mut()
-        .for_each(move |l| l.y = (bounds_height - l.height) / 2.),
-      (TextAlign::Center, false) => self
-        .visual_lines
-        .iter_mut()
-        .for_each(move |l| l.x = (bounds_width - l.width) / 2.),
-      (TextAlign::End, true) => self
-        .visual_lines
-        .iter_mut()
-        .for_each(move |l| l.y = bounds_height - l.height),
-      (TextAlign::End, false) => self
-        .visual_lines
-        .iter_mut()
-        .for_each(move |l| l.x = bounds_width - l.width),
-    };
-    (visual_x, visual_y)
+    self.visual_lines.iter_mut().for_each(|l| {
+      let (x, y) = text_align_offset(
+        self.cfg.line_dir.is_horizontal(),
+        text_align,
+        visual_width,
+        visual_height,
+        l.width,
+        l.height,
+      );
+      l.x += x;
+      l.y += y;
+    });
   }
 
   fn visual_size(&self) -> (Em, Em) {
@@ -243,7 +220,7 @@ where
     run: &Runs::Item,
     inner_cursor: &mut impl InlineCursor,
   ) {
-    if self.cfg.text_align != Some(TextAlign::Center) {
+    if self.cfg.text_align != TextAlign::Center {
       let bounds = if self.cfg.line_dir.is_horizontal() {
         self.cfg.bounds.height
       } else {
@@ -407,7 +384,6 @@ where
 }
 
 pub struct InputParagraph<Runs> {
-  pub text_align: Option<TextAlign>,
   pub runs: Runs,
 }
 
@@ -564,6 +540,24 @@ impl VisualLine {
     } else {
       self.height
     }
+  }
+}
+
+pub(crate) fn text_align_offset(
+  is_horizontal: bool,
+  text_align: TextAlign,
+  bound_width: Em,
+  bound_height: Em,
+  visual_width: Em,
+  visual_height: Em,
+) -> (Em, Em) {
+  let zero = Em::zero();
+  match (text_align, is_horizontal) {
+    (TextAlign::Start, _) => (zero, zero),
+    (TextAlign::Center, true) => (zero, (bound_height - visual_height) / 2.),
+    (TextAlign::Center, false) => ((bound_width - visual_width) / 2., zero),
+    (TextAlign::End, true) => (zero, bound_height - visual_height),
+    (TextAlign::End, false) => (bound_width - visual_width, zero),
   }
 }
 

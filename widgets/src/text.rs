@@ -19,6 +19,8 @@ pub struct Text {
   pub path_style: PathPaintStyle,
   #[declare(default)]
   pub overflow: Overflow,
+  #[declare(default = TextAlign::Start)]
+  pub text_align: TextAlign,
 }
 
 impl Text {
@@ -41,7 +43,7 @@ impl Text {
       TypographyCfg {
         line_height,
         letter_space,
-        text_align: None,
+        text_align: self.text_align,
         bounds: (width, height).into(),
         line_dir: PlaceLineDirection::TopToBottom,
         overflow: self.overflow,
@@ -70,6 +72,7 @@ impl Render for Text {
       self.text.clone(),
       &self.text_style,
       bounds,
+      self.text_align,
       self.overflow,
     );
 
@@ -93,6 +96,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
   text: T,
   style: &TextStyle,
   bounds: Option<Size>,
+  text_align: TextAlign,
   overflow: Overflow,
 ) -> VisualGlyphs {
   let &TextStyle {
@@ -119,7 +123,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
     TypographyCfg {
       line_height,
       letter_space,
-      text_align: None,
+      text_align,
       bounds,
       line_dir: PlaceLineDirection::TopToBottom,
       overflow,

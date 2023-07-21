@@ -46,6 +46,7 @@ pub fn draw_glyphs_in_rect(
   if !paint_rect.contains_rect(&visual_rect) {
     painter.clip(Path::rect(&paint_rect));
   }
+  painter.translate(visual_rect.origin.x, visual_rect.origin.y);
   draw_glyphs(
     painter,
     visual_glyphs.glyph_bounds_in_rect(&paint_rect),
