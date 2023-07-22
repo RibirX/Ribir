@@ -2,7 +2,7 @@ use super::Texture;
 use crate::GPUBackendImpl;
 use guillotiere::{Allocation, AtlasAllocator};
 use ribir_algo::FrameCache;
-use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
+use ribir_geom::{DeviceRect, DeviceSize};
 use ribir_painter::{image::ColorFormat, AntiAliasing};
 use slab::Slab;
 use std::hash::Hash;
@@ -101,12 +101,21 @@ where
           self.texture.anti_aliasing(),
           self.texture.color_format(),
         );
-        gpu_impl.copy_texture_from_texture(
-          &mut new_tex,
-          DevicePoint::zero(),
-          &self.texture,
-          &DeviceRect::from_size(current_size),
-        );
+        // Copy old texture to new texture item by item, not copy whole texture. Because
+        // the new texture will overlap with the old texture. And we promise to the
+        // gpu backend implementation that our operations not overlap in one texture in
+        // one frame. So the implementation can batch and reorder the operations to
+        // improve the performance.
+        self
+          .atlas_allocator
+          .for_each_allocated_rectangle(|_, rect| {
+            gpu_impl.copy_texture_from_texture(
+              &mut new_tex,
+              rect.min.cast_unit(),
+              &self.texture,
+              &rect.to_rect().cast_unit(),
+            );
+          });
 
         self.texture = new_tex;
         alloc = self.atlas_allocator.allocate(alloc_size);
@@ -250,5 +259,38 @@ mod tests {
       .atlas_allocator
       .for_each_allocated_rectangle(|_, _| alloc_count += 1);
     assert_eq!(alloc_count, 1);
+  }
+
+  #[test]
+  fn fix_atlas_expand_overlap() {
+    let mut wgpu = block_on(WgpuImpl::headless());
+    let mut atlas =
+      Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Alpha8, AntiAliasing::None, &mut wgpu);
+    let icon = DeviceSize::new(32, 32);
+    atlas.allocate(1, (), icon, &mut wgpu);
+
+    atlas
+      .texture
+      .write_data(&DeviceRect::from_size(icon), &[1; 32 * 32], &mut wgpu);
+
+    // force atlas to expand
+    let h = atlas.allocate(2, (), ATLAS_MIN_SIZE, &mut wgpu);
+    let second_rect = h.tex_rect(&atlas);
+    const SECOND_AREA: usize = (ATLAS_MIN_SIZE.width * ATLAS_MIN_SIZE.height) as usize;
+    atlas
+      .texture
+      .write_data(&second_rect, &[2; SECOND_AREA], &mut wgpu);
+    let img = atlas
+      .texture
+      .copy_as_image(&DeviceRect::from_size(atlas.size()), &mut wgpu);
+
+    wgpu.end_frame();
+    let img = block_on(img).unwrap();
+
+    // check sum of the texture.
+    assert_eq!(
+      img.pixel_bytes().iter().map(|v| *v as usize).sum::<usize>(),
+      icon.area() as usize + SECOND_AREA * 2
+    )
   }
 }

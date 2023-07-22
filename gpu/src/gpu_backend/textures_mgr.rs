@@ -66,7 +66,12 @@ where
   pub(super) fn new(gpu_impl: &mut T::Host, anti_aliasing: AntiAliasing) -> Self {
     Self {
       alpha_atlas: Atlas::new("Alpha atlas", ColorFormat::Alpha8, anti_aliasing, gpu_impl),
-      rgba_atlas: Atlas::new("Rgba atlas", ColorFormat::Rgba8, anti_aliasing, gpu_impl),
+      rgba_atlas: Atlas::new(
+        "Rgba atlas",
+        ColorFormat::Rgba8,
+        AntiAliasing::None,
+        gpu_impl,
+      ),
       fill_task: <_>::default(),
       fill_task_buffers: <_>::default(),
     }
