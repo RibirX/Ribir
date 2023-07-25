@@ -45,21 +45,19 @@ impl ComposeChild for FocusNode {
       let id = child.build(ctx);
 
       if !ctx.assert_get(id).contain_type::<FocusNode>() {
-        let mut subject = None;
-        ctx.assert_get(id).query_on_first_type(
-          QueryOrder::OutsideFirst,
-          |l: &LifecycleListener| {
-            subject = Some(l.lifecycle_stream());
-          },
-        );
-        let subject = subject.unwrap_or_else(|| {
-          let listener = LifecycleListener::default();
-          let subject = listener.lifecycle_stream();
-          attach_to_id(id, ctx.force_as_mut(), |child| {
-            Box::new(DataWidget::new(child, listener))
+        let subject = ctx
+          .assert_get(id)
+          .query_on_first_type(QueryOrder::OutsideFirst, |l: &LifecycleListener| {
+            l.lifecycle_stream()
+          })
+          .unwrap_or_else(|| {
+            let listener = LifecycleListener::default();
+            let subject = listener.lifecycle_stream();
+            attach_to_id(id, ctx.force_as_mut(), |child| {
+              Box::new(DataWidget::new(child, listener))
+            });
+            subject
           });
-          subject
-        });
 
         fn subscribe_fn(
           this: Stateful<FocusNode>,

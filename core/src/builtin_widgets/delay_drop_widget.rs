@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*, widget::TreeArena};
+use crate::{impl_query_self_only, prelude::*};
 
 #[derive(Declare)]
 pub struct DelayDropWidget {
@@ -15,16 +15,3 @@ impl ComposeChild for DelayDropWidget {
 }
 
 impl_query_self_only!(DelayDropWidget);
-
-pub(crate) fn query_drop_until_widget(
-  wid: WidgetId,
-  arena: &TreeArena,
-) -> Option<Stateful<DelayDropWidget>> {
-  let mut drop_widget = None;
-  wid
-    .assert_get(arena)
-    .query_on_first_type(QueryOrder::OutsideFirst, |w: &Stateful<DelayDropWidget>| {
-      drop_widget = Some(w.clone_stateful())
-    });
-  drop_widget
-}
