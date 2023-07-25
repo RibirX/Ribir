@@ -1,7 +1,7 @@
 use smallvec::SmallVec;
 
 use crate::{
-  builtin_widgets::{delay_drop_widget::query_drop_until_widget, key::AnyKey},
+  builtin_widgets::key::AnyKey,
   impl_proxy_query, impl_query_self_only,
   prelude::*,
   widget::{
@@ -294,7 +294,12 @@ impl<D: 'static> DynRender<D> {
 
     let wnd = tree.window();
 
-    let drop_until = query_drop_until_widget(wid, &tree.arena);
+    let drop_until = wid
+      .assert_get(&tree.arena)
+      .query_on_first_type(QueryOrder::OutsideFirst, |w: &Stateful<DelayDropWidget>| {
+        w.clone_stateful()
+      });
+
     let is_drop = drop_until
       .as_ref()
       .map_or(true, |w| w.state_ref().delay_drop_until);

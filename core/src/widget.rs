@@ -112,16 +112,22 @@ impl<'a> dyn Render + 'a {
 
   /// Query the first match type in all type by special order, and call
   /// `callback`
-  pub fn query_on_first_type<T: Any>(&self, order: QueryOrder, callback: impl FnOnce(&T)) {
+  pub fn query_on_first_type<T: Any, R>(
+    &self,
+    order: QueryOrder,
+    callback: impl FnOnce(&T) -> R,
+  ) -> Option<R> {
     let mut callback = Some(callback);
+    let mut res = None;
     self.query_all_type(
-      move |a| {
+      |a| {
         let cb = callback.take().expect("should only call once");
-        cb(a);
+        res = Some(cb(a));
         false
       },
       order,
     );
+    res
   }
 
   pub fn contain_type<T: Any>(&self) -> bool {

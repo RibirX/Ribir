@@ -354,36 +354,22 @@ impl FocusManager {
   }
 
   fn scope_property(&self, scope_id: Option<WidgetId>) -> FocusScope {
-    let mut node = None;
     let wnd = self.window();
     let tree = wnd.widget_tree.borrow();
-    if let Some(r) = scope_id.and_then(|id| id.get(&tree.arena)) {
-      r.query_on_first_type(QueryOrder::InnerFirst, |s: &FocusScope| {
-        if node.is_none() {
-          node = Some(s.clone());
-        } else {
-          let n = node.as_mut().unwrap();
-          n.skip_descendants |= s.skip_descendants;
-          n.can_focus &= s.can_focus;
-        }
-      });
-    }
-
-    node.unwrap_or(FocusScope::default())
+    scope_id
+      .and_then(|id| id.get(&tree.arena))
+      .and_then(|r| r.query_on_first_type(QueryOrder::InnerFirst, |s: &FocusScope| s.clone()))
+      .unwrap_or_default()
   }
 
   fn tab_index(&self, node_id: NodeId) -> i16 {
     let wnd = self.window();
 
     let get_index = || {
-      let mut index = 0;
       let wid = self.get(node_id)?.wid?;
       let tree = wnd.widget_tree.borrow();
       let r = wid.get(&tree.arena)?;
-      r.query_on_first_type(QueryOrder::OutsideFirst, |s: &FocusNode| {
-        index = s.tab_index;
-      });
-      Some(index)
+      r.query_on_first_type(QueryOrder::OutsideFirst, |s: &FocusNode| s.tab_index)
     };
 
     get_index().unwrap_or(0)

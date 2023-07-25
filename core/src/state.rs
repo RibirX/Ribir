@@ -9,7 +9,7 @@ pub use stateful::*;
 use crate::{
   context::BuildCtx,
   dynamic_widget::DynWidget,
-  widget::{Compose, WidgetId, WidgetBuilder},
+  widget::{Compose, WidgetBuilder, WidgetId},
 };
 
 /// Enum to store both stateless and stateful object.
