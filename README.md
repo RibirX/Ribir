@@ -5,8 +5,7 @@
 
 Ribir is a framework for building modern native/wasm cross-platform user interface applications.
 
-![CI](https://github.com/RibirX/Ribir/actions/workflows/main.yml/badge.svg
-)
+[![CI](https://github.com/RibirX/Ribir/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/RibirX/Ribir/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/RibirX/Ribir/branch/master/graph/badge.svg)](https://codecov.io/gh/RibirX/ribir)
 [![License](https://img.shields.io/badge/license-MIT-informational)](https://github.com/RibirX/ribir/blob/master/LICENSE)
 
