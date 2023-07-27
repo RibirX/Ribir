@@ -25,14 +25,15 @@ pub struct ComposePair<W, C> {
 /// support built-in widgets. For example, if you define a template `Leading`,
 /// you can use DecorateTml<Leading> as the template, so the user can use
 /// built-in widgets for `Leading`.
-pub struct DecorateTml<T: TmlFlag, C> {
+pub struct DecorateTml<T: TmlHolder, C> {
   pub(crate) decorator: Box<dyn FnOnce(Widget) -> Widget>,
   pub(crate) tml_flag: T,
   pub(crate) child: C,
 }
 
-/// Trait mark a type is a template flag that can be used with `DecorateTml`.
-pub trait TmlFlag {}
+/// Trait mark a type is a widget placeholder that can be used like a widget
+/// child but not composed immediately.
+pub trait TmlHolder {}
 
 // Template use to construct child of a widget.
 pub trait Template: Sized {
@@ -170,7 +171,7 @@ pub(crate) mod decorate_tml_impl {
     }
   }
 
-  impl<T: TmlFlag, C> DecorateTml<T, C> {
+  impl<T: TmlHolder, C> DecorateTml<T, C> {
     pub fn decorate(self, tml_to_widget: impl FnOnce(T, C) -> Widget) -> Widget {
       let Self { decorator, tml_flag, child } = self;
       let w = tml_to_widget(tml_flag, child);
@@ -180,22 +181,22 @@ pub(crate) mod decorate_tml_impl {
 
   trait DecorateTmlMarker<M> {}
 
-  impl<T: TmlFlag, C> DecorateTmlMarker<()> for DecorateTml<T, C> {}
+  impl<T: TmlHolder, C> DecorateTmlMarker<()> for DecorateTml<T, C> {}
 
-  impl<T: TmlFlag, C> DecorateTmlMarker<[(); 0]> for WidgetPair<T, C> {}
+  impl<T: TmlHolder, C> DecorateTmlMarker<[(); 0]> for WidgetPair<T, C> {}
 
   impl<M, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<[M; 1]> for WidgetPair<T, C> {}
 
   impl<M, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<M> for ComposePair<T, C> {}
 
   pub(crate) trait IntoDecorateTml<C, M> {
-    type Flag: TmlFlag;
+    type Flag: TmlHolder;
     fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C>;
   }
 
   impl<W, C, M, C2> IntoDecorateTml<C, [M; 0]> for WidgetPair<W, C2>
   where
-    W: TmlFlag,
+    W: TmlHolder,
     C: ChildFrom<C2, M>,
   {
     type Flag = W;
@@ -333,7 +334,7 @@ mod tests {
   #[derive(SingleChild)]
   struct Tml;
   struct A;
-  impl TmlFlag for Tml {}
+  impl TmlHolder for Tml {}
 
   #[test]
   fn decorate_tml() {

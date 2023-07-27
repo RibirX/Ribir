@@ -176,7 +176,7 @@ pub struct HeadlineText(pub Label);
 pub struct SupportingText(pub Label);
 
 #[derive(Template)]
-pub enum EdgeWidget<P: TmlFlag + Default + 'static> {
+pub enum EdgeWidget<P: TmlHolder + Default + 'static> {
   Text(DecorateTml<P, State<Label>>),
   Icon(DecorateTml<P, NamedSvg>),
   Avatar(DecorateTml<P, ComposePair<State<Avatar>, AvatarTemplate>>),
@@ -189,7 +189,7 @@ pub struct CustomEdgeWidget(pub Widget);
 
 impl<P> EdgeWidget<P>
 where
-  P: TmlFlag + Default,
+  P: TmlHolder + Default,
 {
   fn compose_with_style(self, config: EdgeWidgetStyle) -> Widget {
     let EdgeWidgetStyle {
