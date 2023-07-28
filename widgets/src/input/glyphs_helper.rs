@@ -8,13 +8,28 @@ pub(crate) struct GlyphsHelper {
 }
 
 impl GlyphsHelper {
-  pub(crate) fn cluster_from_pos(&self, x: f32, y: f32) -> u32 {
+  pub(crate) fn cluster_from_pos(&self, x: f32, y: f32) -> usize {
     let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
     let (para, offset) = glyphs.nearest_glyph(x, y);
     glyphs.position_to_cluster(para, offset)
   }
 
-  pub(crate) fn prev_cluster(&self, cursor: usize) -> u32 {
+  pub(crate) fn glyph_position(&self, cluster: usize) -> (usize, usize) {
+    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
+    glyphs.position_by_cluster(cluster)
+  }
+
+  pub(crate) fn cluster_from_glyph_position(&self, row: usize, col: usize) -> usize {
+    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
+    glyphs.position_to_cluster(row, col)
+  }
+
+  pub(crate) fn col_count(&self, row: usize) -> usize {
+    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
+    glyphs.glyph_count(row)
+  }
+
+  pub(crate) fn prev_cluster(&self, cursor: usize) -> usize {
     let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
     let (mut row, mut col) = glyphs.position_by_cluster(cursor);
 
@@ -29,7 +44,7 @@ impl GlyphsHelper {
     }
   }
 
-  pub(crate) fn next_cluster(&self, cursor: usize) -> u32 {
+  pub(crate) fn next_cluster(&self, cursor: usize) -> usize {
     let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
     let (mut row, mut col) = glyphs.position_by_cluster(cursor);
 
@@ -43,11 +58,11 @@ impl GlyphsHelper {
     glyphs.position_to_cluster(row, col)
   }
 
-  pub(crate) fn up_cluster(&self, cursor: usize) -> u32 {
+  pub(crate) fn up_cluster(&self, cursor: usize) -> usize {
     let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
     let (mut row, mut col) = glyphs.position_by_cluster(cursor);
     if row == 0 {
-      return cursor as u32;
+      return cursor;
     } else {
       row -= 1;
       col = col.min(glyphs.glyph_count(row) - 1);
@@ -55,11 +70,11 @@ impl GlyphsHelper {
     glyphs.position_to_cluster(row, col)
   }
 
-  pub(crate) fn down_cluster(&self, cursor: usize) -> u32 {
+  pub(crate) fn down_cluster(&self, cursor: usize) -> usize {
     let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
     let (mut row, col) = glyphs.position_by_cluster(cursor);
     if row == glyphs.glyph_row_count() - 1 {
-      return cursor as u32;
+      return cursor;
     }
     row += 1;
     glyphs.position_to_cluster(row, col)

@@ -74,20 +74,36 @@ impl TextEditorArea {
 }
 
 fn key_with_command(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEvent) -> bool {
-  if event.key == VirtualKeyCode::V && event.common.with_command_key() {
-    let clipboard = AppCtx::clipboard();
-    let txt = clipboard.borrow_mut().read_text();
-    if let Ok(txt) = txt {
-      let rg = this.caret.select_range();
-      let mut writer = InputWriter::new(this);
-      if !rg.is_empty() {
-        writer.delete_byte_range(&rg);
-      }
-      writer.insert_chars(&txt);
-    }
-    return true;
+  if !event.with_command_key() {
+    return false;
   }
-  false
+  match event.key {
+    VirtualKeyCode::V => {
+      let clipboard = AppCtx::clipboard();
+      let txt = clipboard.borrow_mut().read_text();
+      if let Ok(txt) = txt {
+        let rg = this.caret.select_range();
+        let mut writer = InputWriter::new(this);
+        if !rg.is_empty() {
+          writer.delete_byte_range(&rg);
+        }
+        writer.insert_chars(&txt);
+      }
+      return true;
+    }
+    VirtualKeyCode::X => {
+      let rg = this.caret.select_range();
+      if !rg.is_empty() {
+        let txt = this.text.substr(rg.clone()).to_string();
+        InputWriter::new(this).delete_byte_range(&rg);
+        let clipboard = AppCtx::clipboard();
+        let _ = clipboard.borrow_mut().clear();
+        let _ = clipboard.borrow_mut().write_text(&txt);
+      }
+      return true;
+    }
+    _ => false,
+  }
 }
 
 fn single_key(this: &mut StateRef<TextEditorArea>, key: &mut KeyboardEvent) -> bool {
