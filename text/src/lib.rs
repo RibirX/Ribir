@@ -23,7 +23,9 @@ mod text_render;
 pub use text_render::{draw_glyphs, draw_glyphs_in_rect, TextStyle};
 
 mod text_writer;
-pub use text_writer::{CharacterCursor, ControlChar, TextWriter};
+pub use text_writer::{
+  select_next_word, select_prev_word, select_word, CharacterCursor, ControlChar, TextWriter,
+};
 
 mod grapheme_cursor;
 pub use grapheme_cursor::GraphemeCursor;

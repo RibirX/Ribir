@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use crate::GraphemeCursor;
-
+use unicode_segmentation::UnicodeSegmentation;
 pub struct ControlChar;
 
 #[allow(dead_code)]
@@ -104,5 +104,152 @@ where
       _ => cursor,
     };
     self.cursor.reset(new_cursor);
+  }
+}
+
+pub fn select_word(text: &str, cluster: usize) -> Range<usize> {
+  let start = select_prev_word(text, cluster, true).start;
+  let mut base = start;
+  let it = text[start..].split_word_bounds();
+  for word in it {
+    if base + word.len() > cluster {
+      return Range { start: base, end: base + word.len() };
+    }
+    base += word.len();
+  }
+  Range { start: text.len(), end: text.len() }
+}
+
+pub fn select_next_word(text: &str, cluster: usize, skip_whitespace: bool) -> Range<usize> {
+  let it = text[cluster..].split_word_bound_indices();
+  for (i, word) in it {
+    if skip_whitespace && word.trim().is_empty() {
+      continue;
+    }
+    return Range {
+      start: cluster + i,
+      end: cluster + i + word.len(),
+    };
+  }
+  Range { start: text.len(), end: text.len() }
+}
+
+pub fn select_prev_word(text: &str, cluster: usize, skip_whitespace: bool) -> Range<usize> {
+  let mut it = text[..cluster].split_word_bound_indices();
+  while let Some((i, word)) = it.next_back() {
+    if skip_whitespace && word.trim().is_empty() {
+      continue;
+    }
+    return Range { start: i, end: i + word.len() };
+  }
+  Range { start: 0, end: 0 }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::text_writer::select_prev_word;
+
+  #[test]
+  fn test_select_word() {
+    use super::select_word;
+    assert_eq!(select_word("hello,   my number is 123456", 0), 0..5); // hello
+    assert_eq!(select_word("hello,   my number is 123456", 5), 5..6); // ,
+    assert_eq!(select_word("hello,   my number is 123456", 7), 6..9); // "   "
+    assert_eq!(select_word("hello,   my number is 123456", 9), 9..11); // my
+    assert_eq!(select_word("hello,   my number is 123456", 12), 12..18); // number
+    assert_eq!(select_word("hello,   my number is 123456", 19), 19..21); // is
+    assert_eq!(select_word("hello,   my number is 123456", 22), 22..28); //123456
+  }
+
+  #[test]
+  fn test_move_by_word() {
+    use super::select_next_word;
+    // hello
+    assert_eq!(
+      select_next_word("hello,   my number is 123456", 0, false),
+      0..5
+    );
+    // lo
+    assert_eq!(
+      select_next_word("hello,   my number is 123456", 3, false),
+      3..5
+    );
+    // ,
+    assert_eq!(
+      select_next_word("hello,   my number is 123456", 5, false),
+      5..6
+    );
+
+    // "   "
+    assert_eq!(
+      select_next_word("hello,   my number is 123456", 6, false),
+      6..9
+    );
+
+    // my
+    assert_eq!(
+      select_next_word("hello,   my number is 123456", 6, true),
+      9..11
+    );
+
+    // number
+    assert_eq!(
+      select_next_word("hello,   my number is 123456", 11, true),
+      12..18
+    );
+
+    // is
+    assert_eq!(
+      select_next_word("hello,   my number is 123456", 18, true),
+      19..21
+    );
+
+    //3456
+    assert_eq!(
+      select_next_word("hello,   my number is 123456", 24, false),
+      24..28
+    );
+
+    // 123456
+    assert_eq!(
+      select_prev_word("hello,   my number is 123456", 28, false),
+      22..28
+    );
+
+    // is
+    assert_eq!(
+      select_prev_word("hello,   my number is 123456", 21, false),
+      19..21
+    );
+
+    // numb
+    assert_eq!(
+      select_prev_word("hello,   my number is 123456", 16, false),
+      12..16
+    );
+
+    // " "
+    assert_eq!(
+      select_prev_word("hello,   my number is 123456", 12, false),
+      11..12
+    );
+
+    // my
+    assert_eq!(
+      select_prev_word("hello,   my number is 123456", 12, true),
+      9..11
+    );
+
+    // ,
+    assert_eq!(
+      select_prev_word("hello,   my number is 123456", 5, false),
+      0..5
+    );
+
+    // hel
+    assert_eq!(
+      select_prev_word("hello,   my number is 123456", 3, false),
+      0..3
+    );
   }
 }
