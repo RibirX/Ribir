@@ -4,9 +4,9 @@ struct VertexOutput {
 }
 
 @vertex
-fn vs_main(@location(0) pos: vec2<f32>, @location(1) tex: vec2<f32>) -> VertexOutput {
+fn vs_main(@location(0) input_pos: vec2<f32>, @location(1) tex: vec2<f32>) -> VertexOutput {
     var output: VertexOutput;
-    let pos = pos * vec2(2., -2.) + vec2(-1., 1.);
+    let pos = input_pos * vec2(2., -2.) + vec2(-1., 1.);
     output.pos = vec4<f32>(pos, 0.0, 1.0);
     output.tex_pos = tex;
     return output;
