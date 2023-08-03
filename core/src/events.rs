@@ -1,15 +1,11 @@
+use self::dispatcher::DispatchInfo;
 use crate::{
   context::{define_widget_context, WidgetCtx, WidgetCtxImpl},
+  prelude::AppCtx,
   widget_tree::WidgetId,
-  window::Window,
+  window::{Window, WindowId},
 };
-
-use rxrust::{
-  prelude::*,
-  rc::{MutRc, RcDeref, RcDerefMut},
-};
-use smallvec::SmallVec;
-use std::convert::Infallible;
+use std::rc::Rc;
 
 pub(crate) mod dispatcher;
 mod pointers;
@@ -34,7 +30,7 @@ define_widget_context!(
   prevent_default: bool
 );
 
-impl<'a> CommonEvent<'a> {
+impl CommonEvent {
   /// The target property of the Event interface is a reference to the object
   /// onto which the event was dispatched. It is different from
   /// Event::current_target when the event handler is called during the bubbling
@@ -107,11 +103,11 @@ impl<'a> CommonEvent<'a> {
 }
 
 pub trait EventListener {
-  type Event<'a>;
-  fn dispatch(&self, event: &mut Self::Event<'_>);
+  type Event;
+  fn dispatch(&self, event: &mut Self::Event);
 }
 
-impl<'a> std::fmt::Debug for CommonEvent<'a> {
+impl std::fmt::Debug for CommonEvent {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_struct("CommonEvent")
       .field("target", &self.id)
@@ -121,16 +117,16 @@ impl<'a> std::fmt::Debug for CommonEvent<'a> {
   }
 }
 
-impl<'a> CommonEvent<'a> {
+impl CommonEvent {
   /// Create a new common event.
   ///
   /// Although the `dispatcher` is contained in the `wnd`, we still need to pass
   /// it because in most case the event create in a environment that the
   /// `Dispatcher` already borrowed.
-  pub(crate) fn new(target: WidgetId, wnd: &'a Window) -> Self {
+  pub(crate) fn new(target: WidgetId, wnd_id: WindowId) -> Self {
     Self {
       target,
-      wnd,
+      wnd_id,
       id: target,
       propagation: true,
       prevent_default: false,
@@ -140,102 +136,6 @@ impl<'a> CommonEvent<'a> {
   pub(crate) fn set_current_target(&mut self, id: WidgetId) { self.id = id; }
 
   fn pick_info<R>(&self, f: impl FnOnce(&DispatchInfo) -> R) -> R {
-    f(&self.wnd.dispatcher.borrow().info)
+    f(&self.current_wnd().dispatcher.borrow().info)
   }
 }
-
-macro_rules! impl_event_subject {
-  ($name: ident) => {
-    paste::paste! {
-      impl_event_subject!($name, event_name = [<$name Event>]);
-    }
-  };
-  ($name: ident, event_name = $event: ident) => {
-    paste::paste! {
-      pub(crate) type [<$name Publisher>] =
-        MutRc<Option<SmallVec<
-          [Box<dyn for<'a, 'b> Publisher<&'a mut $event<'b>, Infallible>>; 1]
-        >>>;
-
-      #[derive(Clone)]
-      pub struct [<$name Subject>] {
-        observers: [<$name Publisher>],
-        chamber: [<$name Publisher>],
-      }
-
-      impl<'a, 'b, O> Observable<&'a mut $event<'b>, Infallible, O> for [<$name Subject>]
-      where
-        O: for<'r1, 'r2> Observer<&'r1 mut $event<'r2>, Infallible> + 'static,
-      {
-        type Unsub = Subscriber<O>;
-
-        fn actual_subscribe(self, observer: O) -> Self::Unsub {
-          if let Some(chamber) = self.chamber.rc_deref_mut().as_mut() {
-            self
-              .observers
-              .rc_deref_mut()
-              .as_mut()
-              .unwrap()
-              .retain(|p| !p.p_is_closed());
-
-            let subscriber = Subscriber::new(Some(observer));
-            chamber.push(Box::new(subscriber.clone()));
-            subscriber
-          } else {
-            Subscriber::new(None)
-          }
-        }
-      }
-      impl<'a, 'b> ObservableExt<&'a mut $event<'b>, Infallible> for [<$name Subject>] {}
-
-      impl<'a, 'b> Observer<&'a mut $event<'b>, Infallible> for [<$name Subject>] {
-        fn next(&mut self, value: &'a mut $event<'b>) {
-          self.load();
-          if let Some(observers) = self.observers.rc_deref_mut().as_mut() {
-            for p in observers.iter_mut() {
-              p.p_next(value);
-            }
-          }
-        }
-
-        fn error(self, _: Infallible) {}
-
-        fn complete(mut self) {
-          self.load();
-          if let Some(observers) = self.observers.rc_deref_mut().take() {
-            observers
-              .into_iter()
-              .filter(|o| !o.p_is_closed())
-              .for_each(|subscriber| subscriber.p_complete());
-          }
-        }
-
-        #[inline]
-        fn is_finished(&self) -> bool { self.observers.rc_deref().is_none() }
-      }
-
-      impl [<$name Subject>] {
-        fn load(&mut self) {
-          if let Some(observers) = self.observers.rc_deref_mut().as_mut() {
-            observers.append(self.chamber.rc_deref_mut().as_mut().unwrap());
-          }
-        }
-      }
-
-      impl Default for [<$name Subject>] {
-        fn default() -> Self {
-          Self {
-            observers: MutRc::own(Some(<_>::default())),
-            chamber: MutRc::own(Some(<_>::default())),
-          }
-        }
-      }
-    }
-  };
-}
-
-pub(crate) use impl_event_subject;
-
-use self::dispatcher::DispatchInfo;
-
-impl_event_subject!(Common);

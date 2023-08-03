@@ -216,7 +216,7 @@ impl Dispatcher {
     let mut pos = self.info.cursor_pos;
     while let Some(id) = w {
       let r = id.assert_get(arena);
-      let ctx = HitTestCtx { id, wnd: &wnd };
+      let ctx = HitTestCtx { id, wnd_id: wnd.id() };
       let HitTest { hit, can_hit_child } = r.hit_test(&ctx, pos);
 
       pos = tree.store.map_from_parent(id, pos, arena);

@@ -73,6 +73,14 @@ impl AppCtx {
     Self::shared().windows.borrow().get(&id).cloned()
   }
 
+  /// Get the window by the window id. Same as `get_window` but will panic if
+  /// the window not found.
+  #[track_caller]
+  #[inline]
+  pub fn get_window_assert(id: WindowId) -> Rc<Window> {
+    Self::get_window(id).expect("Window not found!")
+  }
+
   /// Return the windows collection of the application.
   pub fn windows() -> &'static RefCell<ahash::HashMap<WindowId, Rc<Window>>> {
     &Self::shared().windows

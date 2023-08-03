@@ -1,22 +1,18 @@
 use crate::{
   impl_all_event, impl_common_event_deref, impl_compose_child_for_listener, impl_listener,
-  impl_multi_event_listener, impl_query_self_only, prelude::*,
+  impl_multi_event_listener, impl_query_self_only, prelude::*, window::WindowId,
 };
-use rxrust::{
-  prelude::*,
-  rc::{MutRc, RcDeref, RcDerefMut},
-};
-use smallvec::SmallVec;
+use rxrust::prelude::*;
 use std::convert::Infallible;
 
 #[derive(Debug)]
-pub struct WheelEvent<'a> {
+pub struct WheelEvent {
   pub delta_x: f32,
   pub delta_y: f32,
-  pub common: CommonEvent<'a>,
+  pub common: CommonEvent,
 }
 
-impl_event_subject!(Wheel, event_name = AllWheel);
+pub type WheelSubject = MutRefItemSubject<'static, AllWheel, Infallible>;
 
 impl_multi_event_listener! {
   "The listener use to fire and listen wheel events.",
@@ -30,13 +26,13 @@ impl_multi_event_listener! {
 impl_compose_child_for_listener!(WheelListener);
 impl_common_event_deref!(WheelEvent);
 
-impl<'a> WheelEvent<'a> {
+impl WheelEvent {
   #[inline]
-  pub fn new(delta_x: f32, delta_y: f32, id: WidgetId, wnd: &'a Window) -> Self {
+  pub fn new(delta_x: f32, delta_y: f32, id: WidgetId, wnd_id: WindowId) -> Self {
     Self {
       delta_x,
       delta_y,
-      common: CommonEvent::new(id, wnd),
+      common: CommonEvent::new(id, wnd_id),
     }
   }
 }
