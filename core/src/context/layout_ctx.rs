@@ -1,10 +1,11 @@
-use super::{WidgetCtx, WidgetCtxImpl};
+use super::{AppCtx, WidgetCtx, WidgetCtxImpl};
 use crate::{
   widget::{BoxClamp, Layouter, WidgetTree},
   widget_tree::WidgetId,
-  window::Window,
+  window::{Window, WindowId},
 };
 use ribir_geom::Size;
+use std::rc::Rc;
 
 /// A place to compute the render object's layout. Rather than holding  children
 /// directly, `Layout` perform layout across `LayoutCtx`. `LayoutCtx` provide
@@ -12,7 +13,7 @@ use ribir_geom::Size;
 /// descendants position.
 pub struct LayoutCtx<'a> {
   pub(crate) id: WidgetId,
-  pub(crate) wnd: &'a Window,
+  pub(crate) wnd_id: WindowId,
   /// The widget tree of the window, not borrow it from `wnd` is because a
   /// `LayoutCtx` always in a mutable borrow.
   pub(crate) tree: &'a mut WidgetTree,
@@ -21,7 +22,7 @@ pub struct LayoutCtx<'a> {
 impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
   fn id(&self) -> WidgetId { self.id }
 
-  fn current_wnd(&self) -> &Window { self.wnd }
+  fn current_wnd(&self) -> Rc<Window> { AppCtx::get_window_assert(self.wnd_id) }
 
   fn with_tree<F: FnOnce(&WidgetTree) -> R, R>(&self, f: F) -> R { f(self.tree) }
 }
@@ -77,7 +78,7 @@ impl<'a> LayoutCtx<'a> {
   }
 
   pub(crate) fn new_layouter(&mut self, id: WidgetId) -> Layouter {
-    let LayoutCtx { wnd, tree, .. } = self;
-    Layouter::new(id, wnd, false, tree)
+    let LayoutCtx { wnd_id, tree, .. } = self;
+    Layouter::new(id, *wnd_id, false, tree)
   }
 }

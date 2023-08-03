@@ -1,8 +1,4 @@
-use rxrust::{
-  prelude::*,
-  rc::{MutRc, RcDeref, RcDerefMut},
-};
-use smallvec::SmallVec;
+use rxrust::prelude::*;
 use std::convert::Infallible;
 
 use crate::{
@@ -10,8 +6,9 @@ use crate::{
   impl_listener, impl_multi_event_listener, impl_query_self_only, prelude::*,
 };
 
-pub type FocusEvent<'a> = CommonEvent<'a>;
-impl_event_subject!(Focus, event_name = AllFocus);
+pub type FocusEvent = CommonEvent;
+pub type FocusSubject = MutRefItemSubject<'static, AllFocus, Infallible>;
+
 impl_multi_event_listener! {
   "The listener use to fire and listen focus events.",
   Focus,
@@ -25,8 +22,9 @@ impl_multi_event_listener! {
 }
 impl_compose_child_with_focus_for_listener!(FocusListener);
 
-type FocusBubbleEvent<'a> = CommonEvent<'a>;
-impl_event_subject!(FocusBubble, event_name = AllFocusBubble);
+pub type FocusBubbleEvent = CommonEvent;
+pub type FocusBubbleSubject = MutRefItemSubject<'static, AllFocusBubble, Infallible>;
+
 impl_multi_event_listener! {
   "The listener use to fire and listen focusin and focusout events.",
   FocusBubble,

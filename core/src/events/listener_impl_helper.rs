@@ -3,15 +3,15 @@ macro_rules! impl_all_event {
   ($name: ident, $($on_doc: literal, $event_ty: ident),+) => {
     paste::paste! {
       #[doc="All `" $name:snake "` related events"]
-      pub enum [<All $name>]<'a> {
+      pub enum [<All $name>] {
         $(
           #[doc = $on_doc]
-          $event_ty([<$name Event>]<'a>),
+          $event_ty([<$name Event>]),
         )+
       }
 
-      impl<'a> std::ops::Deref for [<All $name>]<'a> {
-        type Target = [<$name Event>]<'a>;
+      impl std::ops::Deref for [<All $name>] {
+        type Target = [<$name Event>];
         fn deref(&self) -> &Self::Target {
           match self {
             $([<All $name>]::$event_ty(e)) |+ => e
@@ -19,7 +19,7 @@ macro_rules! impl_all_event {
         }
       }
 
-      impl<'a> std::ops::DerefMut for [<All $name>]<'a> {
+      impl std::ops::DerefMut for [<All $name>] {
         fn deref_mut(&mut self) -> &mut Self::Target {
           match self {
             $([<All $name>]::$event_ty(e)) |+ => e
@@ -27,8 +27,8 @@ macro_rules! impl_all_event {
         }
       }
 
-      impl<'a> [<All $name>]<'a> {
-        pub fn into_inner(self) -> [<$name Event>]<'a> {
+      impl [<All $name>] {
+        pub fn into_inner(self) -> [<$name Event>] {
           match self {
             $([<All $name>]::$event_ty(e)) |+ => e
           }
@@ -76,9 +76,9 @@ macro_rules! impl_listener {
       }
 
       impl EventListener for [<$name Listener>] {
-        type Event<'a> = $event_ty<'a>;
+        type Event = $event_ty;
         #[inline]
-        fn dispatch(&self, event: &mut Self::Event<'_>) {
+        fn dispatch(&self, event: &mut Self::Event) {
           self.[<$name:snake _subject>].clone().next(event)
         }
       }
@@ -103,12 +103,12 @@ macro_rules! impl_multi_event_listener {
           #[doc = "Sets up a function that will be called whenever the `" $event_ty "` is delivered"]
           pub fn [<on_ $event_ty:snake>]<_F>(mut self, handler: impl Into<DeclareInit<_F>>) -> Self
           where
-            _F: FnMut(&'_ mut [<$name Event>]<'_>) + 'static
+            _F: FnMut(&mut [<$name Event>]) + 'static
           {
             let (v, pipe) = handler.into().unzip();
 
             let subscribe = move |mut handler: _F| {
-              move |e: &'_ mut [<All $name>]::<'_>| match e {
+              move |e: &mut [<All $name>]| match e {
                 [<All $name>]::$event_ty(e) => handler(e),
                 _ => {}
               }
@@ -134,7 +134,7 @@ macro_rules! impl_multi_event_listener {
             whenever the `" $event_ty "` is delivered"]
           pub fn [<on_ $event_ty:snake>](
             mut self,
-            handler: impl for<'r> FnMut(&'r mut [<$name Event>]<'_>) + 'static
+            handler: impl FnMut(&mut [<$name Event>]) + 'static
           ) -> Self {
             self
               .subject()
@@ -142,8 +142,7 @@ macro_rules! impl_multi_event_listener {
                 (|e| match e {
                   [<All $name>]::$event_ty(e) => Some(e),
                   _ => None,
-                }) as for<'a, 'b> fn(&'a mut [<All $name>]::<'b>)
-                  -> Option<&'a mut [<$name Event>]<'b>>,
+                }) as fn(&mut [<All $name>]) -> Option<&mut [<$name Event>]>
               )
               .subscribe(handler);
             self
@@ -192,26 +191,26 @@ macro_rules! impl_single_event_listener {
 #[macro_export]
 macro_rules! impl_common_event_deref {
   ($event_name: ident) => {
-    impl<'a> std::ops::Deref for $event_name<'a> {
-      type Target = CommonEvent<'a>;
+    impl std::ops::Deref for $event_name {
+      type Target = CommonEvent;
 
       #[inline]
       fn deref(&self) -> &Self::Target { &self.common }
     }
 
-    impl<'a> std::ops::DerefMut for $event_name<'a> {
+    impl std::ops::DerefMut for $event_name {
       #[inline]
       fn deref_mut(&mut self) -> &mut Self::Target { &mut self.common }
     }
 
-    impl<'a> std::borrow::Borrow<CommonEvent<'a>> for $event_name<'a> {
+    impl std::borrow::Borrow<CommonEvent> for $event_name {
       #[inline]
-      fn borrow(&self) -> &CommonEvent<'a> { &self.common }
+      fn borrow(&self) -> &CommonEvent { &self.common }
     }
 
-    impl<'a> std::borrow::BorrowMut<CommonEvent<'a>> for $event_name<'a> {
+    impl std::borrow::BorrowMut<CommonEvent> for $event_name {
       #[inline]
-      fn borrow_mut(&mut self) -> &mut CommonEvent<'a> { &mut self.common }
+      fn borrow_mut(&mut self) -> &mut CommonEvent { &mut self.common }
     }
   };
 }

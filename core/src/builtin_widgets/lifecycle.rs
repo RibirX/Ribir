@@ -1,16 +1,13 @@
-use std::convert::Infallible;
-
-use crate::{impl_all_event, impl_compose_child_for_listener, impl_query_self_only, prelude::*};
-use rxrust::{
-  prelude::*,
-  rc::{MutRc, RcDeref, RcDerefMut},
-  subscriber::{Publisher, Subscriber},
+use crate::{
+  impl_all_event, impl_compose_child_for_listener, impl_query_self_only, prelude::*,
+  window::WindowId,
 };
-use smallvec::SmallVec;
+use rxrust::prelude::*;
+use std::{convert::Infallible, rc::Rc};
 
 define_widget_context!(LifecycleEvent);
 
-crate::events::impl_event_subject!(Lifecycle, event_name = AllLifecycle);
+pub type LifecycleSubject = MutRefItemSubject<'static, AllLifecycle, Infallible>;
 
 #[derive(Declare, Declare2, Default)]
 pub struct LifecycleListener {
@@ -41,15 +38,12 @@ macro_rules! match_closure {
     (|e| match e {
       AllLifecycle::$event_ty(e) => Some(e),
       _ => None,
-    }) as for<'a, 'b> fn(&'a mut AllLifecycle<'b>) -> Option<&'a mut LifecycleEvent<'b>>
+    }) as fn(&mut AllLifecycle) -> Option<&mut LifecycleEvent>
   };
 }
 
 impl LifecycleListenerDeclarer {
-  pub fn on_mounted(
-    mut self,
-    handler: impl for<'r> FnMut(&'r mut LifecycleEvent<'_>) + 'static,
-  ) -> Self {
+  pub fn on_mounted(mut self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
     let _ = self
       .subject()
       .filter_map(match_closure!(Mounted))
@@ -87,10 +81,7 @@ impl LifecycleListenerDeclarer {
 }
 
 impl LifecycleListenerDeclarer2 {
-  pub fn on_mounted(
-    mut self,
-    handler: impl for<'r> FnMut(&'r mut LifecycleEvent<'_>) + 'static,
-  ) -> Self {
+  pub fn on_mounted(mut self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
     let _ = self
       .subject()
       .filter_map(match_closure!(Mounted))
@@ -131,9 +122,9 @@ impl LifecycleListenerDeclarer2 {
 impl_query_self_only!(LifecycleListener);
 
 impl EventListener for LifecycleListener {
-  type Event<'a> = AllLifecycle<'a>;
+  type Event = AllLifecycle;
   #[inline]
-  fn dispatch(&self, event: &mut Self::Event<'_>) { self.lifecycle.clone().next(event) }
+  fn dispatch(&self, event: &mut Self::Event) { self.lifecycle.clone().next(event) }
 }
 
 #[cfg(test)]

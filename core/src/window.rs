@@ -277,17 +277,17 @@ impl Window {
 
       match e {
         DelayEvent::Mounted(id) => {
-          let e = AllLifecycle::Mounted(LifecycleEvent { id, wnd: self });
+          let e = AllLifecycle::Mounted(LifecycleEvent { id, wnd_id: self.id() });
           self.emit::<LifecycleListener>(id, e);
         }
         DelayEvent::PerformedLayout(id) => {
-          let e = AllLifecycle::PerformedLayout(LifecycleEvent { id, wnd: self });
+          let e = AllLifecycle::PerformedLayout(LifecycleEvent { id, wnd_id: self.id() });
           self.emit::<LifecycleListener>(id, e);
         }
         DelayEvent::Disposed { id, delay_drop } => {
           id.descendants(&self.widget_tree.borrow().arena)
             .for_each(|id| {
-              let e = AllLifecycle::Disposed(LifecycleEvent { id, wnd: self });
+              let e = AllLifecycle::Disposed(LifecycleEvent { id, wnd_id: self.id() });
               self.emit::<LifecycleListener>(id, e);
             });
 
@@ -296,27 +296,27 @@ impl Window {
           }
         }
         DelayEvent::Focus(id) => {
-          let e = AllFocus::Focus(FocusEvent::new(id, self));
+          let e = AllFocus::Focus(FocusEvent::new(id, self.id()));
           self.emit::<FocusListener>(id, e);
         }
         DelayEvent::FocusIn { bottom, up } => {
-          let mut e = AllFocusBubble::FocusInCapture(FocusEvent::new(bottom, self));
+          let mut e = AllFocusBubble::FocusInCapture(FocusEvent::new(bottom, self.id()));
           self.bottom_down_emit::<FocusBubbleListener>(&mut e, bottom, up);
           let mut e = AllFocusBubble::FocusIn(e.into_inner());
           self.bottom_up_emit::<FocusBubbleListener>(&mut e, bottom, up);
         }
         DelayEvent::Blur(id) => {
-          let e = AllFocus::Blur(FocusEvent::new(id, self));
+          let e = AllFocus::Blur(FocusEvent::new(id, self.id()));
           self.emit::<FocusListener>(id, e);
         }
         DelayEvent::FocusOut { bottom, up } => {
-          let mut e = AllFocusBubble::FocusOutCapture(FocusEvent::new(bottom, self));
+          let mut e = AllFocusBubble::FocusOutCapture(FocusEvent::new(bottom, self.id()));
           self.bottom_down_emit::<FocusBubbleListener>(&mut e, bottom, up);
           let mut e = AllFocusBubble::FocusOut(e.into_inner());
           self.bottom_up_emit::<FocusBubbleListener>(&mut e, bottom, up);
         }
         DelayEvent::KeyDown { id, scancode, key } => {
-          let mut e = AllKeyboard::KeyDownCapture(KeyboardEvent::new(scancode, key, id, self));
+          let mut e = AllKeyboard::KeyDownCapture(KeyboardEvent::new(scancode, key, id, self.id()));
           self.bottom_down_emit::<KeyboardListener>(&mut e, id, None);
           let mut e = AllKeyboard::KeyDown(e.into_inner());
           self.bottom_up_emit::<KeyboardListener>(&mut e, id, None);
@@ -336,19 +336,19 @@ impl Window {
           }
         }
         DelayEvent::KeyUp { id, scancode, key } => {
-          let mut e = AllKeyboard::KeyUpCapture(KeyboardEvent::new(scancode, key, id, self));
+          let mut e = AllKeyboard::KeyUpCapture(KeyboardEvent::new(scancode, key, id, self.id()));
           self.bottom_down_emit::<KeyboardListener>(&mut e, id, None);
           let mut e = AllKeyboard::KeyUp(e.into_inner());
           self.bottom_up_emit::<KeyboardListener>(&mut e, id, None);
         }
         DelayEvent::Chars { id, chars } => {
-          let mut e = AllChars::CharsCapture(CharsEvent::new(chars, id, self));
+          let mut e = AllChars::CharsCapture(CharsEvent::new(chars, id, self.id()));
           self.bottom_down_emit::<CharsListener>(&mut e, id, None);
           let mut e = AllChars::Chars(e.into_inner());
           self.bottom_up_emit::<CharsListener>(&mut e, id, None);
         }
         DelayEvent::Wheel { id, delta_x, delta_y } => {
-          let mut e = AllWheel::WheelCapture(WheelEvent::new(delta_x, delta_y, id, self));
+          let mut e = AllWheel::WheelCapture(WheelEvent::new(delta_x, delta_y, id, self.id()));
           self.bottom_down_emit::<WheelListener>(&mut e, id, None);
           let mut e = AllWheel::Wheel(e.into_inner());
           self.bottom_up_emit::<WheelListener>(&mut e, id, None);
@@ -394,7 +394,7 @@ impl Window {
     }
   }
 
-  fn emit<L>(&self, id: WidgetId, mut e: L::Event<'_>)
+  fn emit<L>(&self, id: WidgetId, mut e: L::Event)
   where
     L: EventListener + 'static,
   {
@@ -411,11 +411,11 @@ impl Window {
     );
   }
 
-  fn bottom_down_emit<'a, L>(&self, e: &mut L::Event<'a>, bottom: WidgetId, up: Option<WidgetId>)
+  fn bottom_down_emit<L>(&self, e: &mut L::Event, bottom: WidgetId, up: Option<WidgetId>)
   where
     L: EventListener + 'static,
-    L::Event<'a>: DerefMut,
-    <L::Event<'a> as Deref>::Target: std::borrow::BorrowMut<CommonEvent<'a>>,
+    L::Event: DerefMut,
+    <L::Event as Deref>::Target: std::borrow::BorrowMut<CommonEvent>,
   {
     use std::borrow::Borrow;
 
@@ -438,11 +438,11 @@ impl Window {
     });
   }
 
-  fn bottom_up_emit<'a, L>(&self, e: &mut L::Event<'a>, bottom: WidgetId, up: Option<WidgetId>)
+  fn bottom_up_emit<L>(&self, e: &mut L::Event, bottom: WidgetId, up: Option<WidgetId>)
   where
     L: EventListener + 'static,
-    L::Event<'a>: DerefMut,
-    <L::Event<'a> as Deref>::Target: std::borrow::BorrowMut<CommonEvent<'a>>,
+    L::Event: DerefMut,
+    <L::Event as Deref>::Target: std::borrow::BorrowMut<CommonEvent>,
   {
     use std::borrow::Borrow;
     if !(**e).borrow().is_propagation() {

@@ -196,12 +196,13 @@ impl WidgetId {
     while let Some(id) = w {
       ctx.id = id;
       ctx.painter.save();
+      let wnd = ctx.window();
+      let arena = &wnd.widget_tree.borrow().arena;
 
       let mut need_paint = false;
       if ctx.painter.alpha() != 0. {
         if let Some(layout_box) = ctx.box_rect() {
-          let tree = ctx.wnd.widget_tree.borrow();
-          let render = id.assert_get(&tree.arena);
+          let render = id.assert_get(arena);
           ctx
             .painter
             .translate(layout_box.min_x(), layout_box.min_y());
@@ -210,7 +211,6 @@ impl WidgetId {
         }
       }
 
-      let arena = &ctx.wnd.widget_tree.borrow().arena;
       w = id.first_child(arena).filter(|_| need_paint).or_else(|| {
         let mut node = w;
         while let Some(p) = node {

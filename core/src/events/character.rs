@@ -1,21 +1,17 @@
 use crate::{
   impl_all_event, impl_common_event_deref, impl_compose_child_with_focus_for_listener,
-  impl_listener, impl_multi_event_listener, impl_query_self_only, prelude::*,
+  impl_listener, impl_multi_event_listener, impl_query_self_only, prelude::*, window::WindowId,
 };
-use rxrust::{
-  prelude::*,
-  rc::{MutRc, RcDeref, RcDerefMut},
-};
-use smallvec::SmallVec;
+use rxrust::prelude::*;
 use std::convert::Infallible;
 
 #[derive(Debug)]
-pub struct CharsEvent<'a> {
+pub struct CharsEvent {
   pub chars: String,
-  pub common: CommonEvent<'a>,
+  pub common: CommonEvent,
 }
 
-impl_event_subject!(Chars, event_name = AllChars);
+pub type CharsSubject = MutRefItemSubject<'static, AllChars, Infallible>;
 
 impl_multi_event_listener! {
   "The listener use to fire and listen chars events.",
@@ -28,12 +24,12 @@ impl_compose_child_with_focus_for_listener!(CharsListener);
 
 impl_common_event_deref!(CharsEvent);
 
-impl<'a> CharsEvent<'a> {
+impl CharsEvent {
   #[inline]
-  pub fn new(chars: String, id: WidgetId, wnd: &'a Window) -> Self {
+  pub fn new(chars: String, id: WidgetId, wnd_id: WindowId) -> Self {
     Self {
       chars,
-      common: CommonEvent::new(id, wnd),
+      common: CommonEvent::new(id, wnd_id),
     }
   }
 }

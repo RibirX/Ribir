@@ -183,9 +183,7 @@ widget_layout_test!(pipe_with_builtin_field, width == 4., height == 2.,);
 fn capture_closure_used_ctx() -> impl Into<Widget> {
   fn_widget! {
     let mut size_box = @SizedBox { size: ZERO_SIZE };
-    let on_mounted = move |_: &'_ mut LifecycleEvent<'_>| {
-      $size_box.size =  IconSize::of(ctx!()).tiny
-    };
+    let on_mounted = move |_: &mut _| $size_box.size =  IconSize::of(ctx!()).tiny;
     @ $size_box { on_mounted }
   }
 }
@@ -362,9 +360,7 @@ fn closure_in_fn_widget_capture() {
   let hi_res2 = hi_res.clone();
   let w = fn_widget! {
     let mut text = @ Text { text: "hi" };
-    let on_mounted = move |_: &'_ mut LifecycleEvent<'_>| {
-      *$hi_res =$text.text.clone()
-    };
+    let on_mounted = move |_: &mut _| *$hi_res =$text.text.clone();
     @ $text { on_mounted }
   };
 

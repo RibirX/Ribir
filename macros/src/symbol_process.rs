@@ -169,7 +169,7 @@ impl Fold for DollarRefs {
   fn fold_expr_method_call(&mut self, mut i: ExprMethodCall) -> ExprMethodCall {
     if let Some(builtin_ty) = WIDGET_OF_BUILTIN_METHOD.get(i.method.to_string().as_str()) {
       self.replace_builtin_ident(
-        &mut *i.receiver,
+        &mut i.receiver,
         &builtin_ty.to_snake_case(),
         self.fold_refs_inline,
       );

@@ -1,10 +1,11 @@
 use crate::{
-  prelude::QueryOrder,
+  prelude::{AppCtx, QueryOrder},
   widget::{BoxClamp, WidgetTree},
   widget_tree::WidgetId,
-  window::Window,
+  window::{Window, WindowId},
 };
 use ribir_geom::{Point, Rect, Size};
+use std::rc::Rc;
 
 /// common action for all context of widget.
 pub trait WidgetCtx {
@@ -63,14 +64,15 @@ pub trait WidgetCtx {
     id: WidgetId,
     callback: impl FnOnce(&W) -> R,
   ) -> Option<R>;
-  /// Get the window of this context in the callback.
-  fn window(&self) -> &Window;
+  /// Get the window of this context, yous should not store the window, store
+  /// its id instead.
+  fn window(&self) -> Rc<Window>;
 }
 
 pub(crate) trait WidgetCtxImpl {
   fn id(&self) -> WidgetId;
 
-  fn current_wnd(&self) -> &Window;
+  fn current_wnd(&self) -> Rc<Window>;
 
   #[inline]
   fn with_tree<F: FnOnce(&WidgetTree) -> R, R>(&self, f: F) -> R {
@@ -171,7 +173,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     })
   }
 
-  fn window(&self) -> &Window { self.current_wnd() }
+  fn window(&self) -> Rc<Window> { self.current_wnd() }
 }
 
 macro_rules! define_widget_context {
@@ -180,19 +182,18 @@ macro_rules! define_widget_context {
     $name: ident $(, $extra_name: ident: $extra_ty: ty)*
   ) => {
     $(#[$outer])*
-    pub struct $name<'a> {
+    pub struct $name {
       pub(crate) id: WidgetId,
-      /// use a reference to avoid user hold the `Window`.
-      pub(crate) wnd: &'a Window,
+      pub(crate) wnd_id: WindowId,
       $(pub(crate) $extra_name: $extra_ty,)*
     }
 
-    impl<'a> WidgetCtxImpl for $name<'a> {
+    impl WidgetCtxImpl for $name {
       #[inline]
       fn id(&self) -> WidgetId { self.id }
 
       #[inline]
-      fn current_wnd(&self) -> &Window { self.wnd }
+      fn current_wnd(&self) -> Rc<Window> { AppCtx::get_window_assert(self.wnd_id) }
     }
   };
 }
@@ -229,7 +230,7 @@ mod tests {
     let pos = Point::zero();
     let child = root.single_child(&tree.arena).unwrap();
 
-    let w_ctx = TestCtx { id: child, wnd: &wnd };
+    let w_ctx = TestCtx { id: child, wnd_id: wnd.id() };
     assert_eq!(w_ctx.map_from(pos, child), pos);
     assert_eq!(w_ctx.map_to(pos, child), pos);
   }
@@ -255,7 +256,7 @@ mod tests {
 
     let root = wnd.widget_tree.borrow().root();
     let child = get_single_child_by_depth(root, &wnd.widget_tree.borrow().arena, 4);
-    let w_ctx = TestCtx { id: root, wnd: &wnd };
+    let w_ctx = TestCtx { id: root, wnd_id: wnd.id() };
     let from_pos = Point::new(30., 30.);
     assert_eq!(w_ctx.map_from(from_pos, child), Point::new(45., 45.));
     let to_pos = Point::new(50., 50.);
