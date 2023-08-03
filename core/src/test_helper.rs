@@ -121,6 +121,29 @@ impl ShellWindow for TestShellWindow {
   fn id(&self) -> WindowId { self.id }
 
   fn device_pixel_ratio(&self) -> f32 { 1. }
+
+  fn set_outer_position(&mut self, pos: Point) { todo!() }
+
+  fn set_visible(&mut self, visible: bool) { todo!() }
+
+  fn set_resizable(&mut self, resizable: bool) { todo!() }
+
+  fn set_minimized(&mut self, minimized: bool) { todo!() }
+
+  fn is_minimized(&self) -> bool { todo!() }
+
+  fn set_window_level(&mut self, level: crate::window::ShellWindowLevel) { todo!() }
+
+  fn focus_window(&self) { todo!() }
+
+  fn set_decorations(&mut self, decorations: bool) { todo!() }
+
+  fn request_user_attention(
+    &self,
+    request_type: Option<crate::window::ShellWindowUserAttentionType>,
+  ) {
+    todo!()
+  }
 }
 
 impl TestShellWindow {

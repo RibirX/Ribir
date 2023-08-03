@@ -2,7 +2,7 @@ use crate::backends::*;
 
 use ribir_core::{
   prelude::{image::ColorFormat, *},
-  window::{ShellWindow, WindowId},
+  window::{ShellWindow, ShellWindowLevel, ShellWindowUserAttentionType, WindowId},
 };
 use winit::{
   dpi::{LogicalPosition, LogicalSize},
@@ -127,6 +127,30 @@ impl ShellWindow for WinitShellWnd {
 
   #[inline]
   fn end_frame(&mut self) { self.backend.end_frame() }
+
+  fn set_outer_position(&mut self, pos: Point) { todo!() }
+
+  fn set_visible(&mut self, visible: bool) { self.winit_wnd.set_visible(visible); }
+
+  fn set_resizable(&mut self, resizable: bool) { self.winit_wnd.set_resizable(resizable); }
+
+  fn set_minimized(&mut self, minimized: bool) { self.winit_wnd.set_minimized(minimized); }
+
+  fn is_minimized(&self) -> bool { self.winit_wnd.is_minimized().unwrap_or_default() }
+
+  fn set_window_level(&mut self, level: ShellWindowLevel) {
+    self.winit_wnd.set_window_level(level.into());
+  }
+
+  fn focus_window(&self) { self.winit_wnd.focus_window() }
+
+  fn set_decorations(&mut self, decorations: bool) { self.winit_wnd.set_decorations(decorations); }
+
+  fn request_user_attention(&self, request_type: Option<ShellWindowUserAttentionType>) {
+    self
+      .winit_wnd
+      .request_user_attention(request_type.map(Into::into));
+  }
 }
 
 pub(crate) fn new_id(id: winit::window::WindowId) -> WindowId {

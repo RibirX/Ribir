@@ -21,6 +21,40 @@ pub struct Window {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
 pub struct WindowId(u64);
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ShellWindowLevel {
+  OnBottom,
+  Normal,
+  OnTop,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ShellWindowUserAttentionType {
+  Critical,
+  Informational,
+}
+
+impl From<ShellWindowLevel> for winit::window::WindowLevel {
+  fn from(value: ShellWindowLevel) -> Self {
+    match value {
+      ShellWindowLevel::Normal => winit::window::WindowLevel::Normal,
+      ShellWindowLevel::OnTop => winit::window::WindowLevel::AlwaysOnTop,
+      ShellWindowLevel::OnBottom => winit::window::WindowLevel::AlwaysOnBottom,
+    }
+  }
+}
+
+impl From<ShellWindowUserAttentionType> for winit::window::UserAttentionType {
+  fn from(value: ShellWindowUserAttentionType) -> Self {
+    match value {
+      ShellWindowUserAttentionType::Critical => winit::window::UserAttentionType::Critical,
+      ShellWindowUserAttentionType::Informational => {
+        winit::window::UserAttentionType::Informational
+      }
+    }
+  }
+}
+
 pub trait ShellWindow {
   fn id(&self) -> WindowId;
   fn inner_size(&self) -> Size;
@@ -31,6 +65,18 @@ pub trait ShellWindow {
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn set_title(&mut self, str: &str);
   fn set_icon(&mut self, icon: &PixelImage);
+  fn set_outer_position(&mut self, pos: Point);
+  fn set_visible(&mut self, visible: bool);
+  fn set_resizable(&mut self, resizable: bool);
+  fn set_minimized(&mut self, minimized: bool);
+  fn is_minimized(&self) -> bool;
+  fn set_window_level(&mut self, level: ShellWindowLevel);
+  fn focus_window(&self);
+  fn set_decorations(&mut self, decorations: bool);
+  /// Request user attention to the window, the type of request is dependent on
+  /// the platform.
+  /// if request_type is none, unset the request.
+  fn request_user_attention(&self, request_type: Option<ShellWindowUserAttentionType>);
   fn as_any(&self) -> &dyn Any;
   fn as_any_mut(&mut self) -> &mut dyn Any;
   /// The device pixel ratio of Window interface returns the ratio of the
