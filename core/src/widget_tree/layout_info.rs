@@ -2,12 +2,12 @@ use ribir_geom::ZERO_SIZE;
 
 use super::{WidgetId, WidgetTree};
 use crate::{
-  context::{LayoutCtx, WidgetCtx, WidgetCtxImpl},
+  context::{AppCtx, LayoutCtx, WidgetCtx, WidgetCtxImpl},
   prelude::{Point, Size, INFINITY_SIZE},
   widget::TreeArena,
-  window::{DelayEvent, Window},
+  window::{DelayEvent, Window, WindowId},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 /// boundary limit of the render object's layout
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -102,14 +102,16 @@ pub(crate) struct LayoutStore {
 
 pub struct Layouter<'a> {
   pub(crate) id: WidgetId,
-  pub(crate) wnd: &'a Window,
+  pub(crate) wnd_id: WindowId,
   pub(crate) is_layout_root: bool,
   pub(crate) tree: &'a mut WidgetTree,
 }
 
 impl<'a> WidgetCtxImpl for Layouter<'a> {
+  #[inline]
   fn id(&self) -> WidgetId { self.id }
-  fn current_wnd(&self) -> &Window { self.wnd }
+  #[inline]
+  fn current_wnd(&self) -> Rc<Window> { AppCtx::get_window_assert(self.wnd_id) }
   fn with_tree<F: FnOnce(&WidgetTree) -> R, R>(&self, f: F) -> R { f(self.tree) }
 }
 
@@ -200,14 +202,16 @@ impl<'a> Layouter<'a> {
         // or modify it during perform layout.
         let tree2 = unsafe { &mut *(self.tree as *mut WidgetTree) };
 
-        let Self { id, wnd, ref tree, .. } = *self;
-        let mut ctx = LayoutCtx { id, wnd, tree: tree2 };
+        let Self { id, wnd_id, ref tree, .. } = *self;
+        let mut ctx = LayoutCtx { id, wnd_id, tree: tree2 };
         let size = id.assert_get(&tree.arena).perform_layout(clamp, &mut ctx);
         // The dynamic widget maybe generate a new widget to instead of self. In that
         // way we needn't add a layout event because it perform layout in another widget
         // and added the event in that widget.
         if id == ctx.id {
-          wnd.add_delay_event(DelayEvent::PerformedLayout(id));
+          self
+            .window()
+            .add_delay_event(DelayEvent::PerformedLayout(id));
         } else {
           self.id = ctx.id;
         }
@@ -270,11 +274,11 @@ impl<'a> Layouter<'a> {
 impl<'a> Layouter<'a> {
   pub(crate) fn new(
     id: WidgetId,
-    wnd: &'a Window,
+    wnd_id: WindowId,
     is_layout_root: bool,
     tree: &'a mut WidgetTree,
   ) -> Self {
-    Self { id, wnd, is_layout_root, tree }
+    Self { id, wnd_id, is_layout_root, tree }
   }
 }
 

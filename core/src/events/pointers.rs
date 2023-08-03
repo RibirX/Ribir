@@ -3,11 +3,7 @@ use crate::{
   impl_all_event, impl_common_event_deref, impl_compose_child_for_listener, impl_listener,
   impl_multi_event_listener, impl_query_self_only, prelude::*,
 };
-use rxrust::{
-  prelude::*,
-  rc::{MutRc, RcDeref, RcDerefMut},
-};
-use smallvec::SmallVec;
+use rxrust::prelude::*;
 use std::{
   convert::Infallible,
   time::{Duration, Instant},
@@ -25,7 +21,7 @@ pub struct PointerId(usize);
 /// property to inspect the device type which produced the event.
 /// Reference: <https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#term_pointer_event>
 #[derive(Debug)]
-pub struct PointerEvent<'a> {
+pub struct PointerEvent {
   /// A unique identifier for the pointer causing the event.
   pub id: PointerId,
   /// The width (magnitude on the X axis), in pixels, of the contact geometry of
@@ -58,7 +54,7 @@ pub struct PointerEvent<'a> {
   /// type.
   pub is_primary: bool,
 
-  pub common: CommonEvent<'a>,
+  pub common: CommonEvent,
 }
 
 bitflags! {
@@ -116,7 +112,7 @@ impl_multi_event_listener!(
 
 impl_common_event_deref!(PointerEvent);
 
-impl_event_subject!(Pointer, event_name = AllPointer);
+pub type PointerSubject = MutRefItemSubject<'static, AllPointer, Infallible>;
 
 impl_compose_child_for_listener!(PointerListener);
 
@@ -124,7 +120,7 @@ fn x_times_tap_map_filter(
   x: usize,
   dur: Duration,
   capture: bool,
-) -> impl for<'a, 'b> FnMut(&'a mut AllPointer<'b>) -> Option<&'a mut PointerEvent<'b>> {
+) -> impl FnMut(&mut AllPointer) -> Option<&mut PointerEvent> {
   assert!(x > 0);
   struct TapInfo {
     pointer_id: PointerId,
@@ -166,40 +162,25 @@ fn x_times_tap_map_filter(
 }
 
 impl PointerListenerDeclarer {
-  pub fn on_double_tap(
-    self,
-    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-  ) -> Self {
+  pub fn on_double_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
     self.on_x_times_tap((2, handler))
   }
 
-  pub fn on_double_tap_capture(
-    self,
-    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-  ) -> Self {
+  pub fn on_double_tap_capture(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
     self.on_x_times_tap_capture((2, handler))
   }
 
-  pub fn on_triple_tap(
-    self,
-    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-  ) -> Self {
+  pub fn on_triple_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
     self.on_x_times_tap((3, handler))
   }
 
-  pub fn on_triple_tap_capture(
-    self,
-    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-  ) -> Self {
+  pub fn on_triple_tap_capture(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
     self.on_x_times_tap_capture((3, handler))
   }
 
   pub fn on_x_times_tap(
     mut self,
-    (times, handler): (
-      usize,
-      impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-    ),
+    (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> Self {
     self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler);
     self
@@ -207,10 +188,7 @@ impl PointerListenerDeclarer {
 
   pub fn on_x_times_tap_capture(
     mut self,
-    (times, handler): (
-      usize,
-      impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-    ),
+    (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> Self {
     self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler);
     self
@@ -221,7 +199,7 @@ impl PointerListenerDeclarer {
     times: usize,
     dur: Duration,
     capture: bool,
-    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+    handler: impl FnMut(&mut PointerEvent) + 'static,
   ) {
     self
       .subject()
@@ -231,40 +209,25 @@ impl PointerListenerDeclarer {
 }
 
 impl PointerListener {
-  pub fn on_double_tap(
-    self,
-    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-  ) -> Self {
+  pub fn on_double_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
     self.on_x_times_tap((2, handler))
   }
 
-  pub fn on_double_tap_capture(
-    self,
-    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-  ) -> Self {
+  pub fn on_double_tap_capture(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
     self.on_x_times_tap_capture((2, handler))
   }
 
-  pub fn on_triple_tap(
-    self,
-    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-  ) -> Self {
+  pub fn on_triple_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
     self.on_x_times_tap((3, handler))
   }
 
-  pub fn on_triple_tap_capture(
-    self,
-    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-  ) -> Self {
+  pub fn on_triple_tap_capture(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
     self.on_x_times_tap_capture((3, handler))
   }
 
   pub fn on_x_times_tap(
     self,
-    (times, handler): (
-      usize,
-      impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-    ),
+    (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> Self {
     self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler);
     self
@@ -272,10 +235,7 @@ impl PointerListener {
 
   pub fn on_x_times_tap_capture(
     self,
-    (times, handler): (
-      usize,
-      impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
-    ),
+    (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> Self {
     self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler);
     self
@@ -286,7 +246,7 @@ impl PointerListener {
     x: usize,
     dur: Duration,
     capture: bool,
-    handler: impl for<'a, 'b> FnMut(&'a mut PointerEvent<'b>) + 'static,
+    handler: impl FnMut(&mut PointerEvent) + 'static,
   ) {
     self
       .pointer_stream()

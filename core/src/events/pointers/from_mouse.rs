@@ -2,8 +2,8 @@ use super::PointerId;
 use crate::prelude::*;
 use winit::event::MouseButton;
 
-impl<'a> PointerEvent<'a> {
-  pub(crate) fn from_mouse(target: WidgetId, wnd: &'a Window) -> Self {
+impl PointerEvent {
+  pub(crate) fn from_mouse(target: WidgetId, wnd: &Window) -> Self {
     let no_button = wnd.dispatcher.borrow().info.mouse_buttons().is_empty();
     PointerEvent {
       // todo: we need to trace the pressed pointer, how to generate pointer id, by device + button?
@@ -16,7 +16,7 @@ impl<'a> PointerEvent<'a> {
       twist: 0.,
       point_type: PointerType::Mouse,
       is_primary: true,
-      common: CommonEvent::new(target, wnd),
+      common: CommonEvent::new(target, wnd.id()),
     }
   }
 }

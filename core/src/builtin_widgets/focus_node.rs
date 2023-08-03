@@ -59,10 +59,8 @@ impl ComposeChild for FocusNode {
             subject
           });
 
-        fn subscribe_fn(
-          this: Stateful<FocusNode>,
-        ) -> impl for<'a, 'b> FnMut(&'a mut AllLifecycle<'b>) + 'static {
-          move |e: &mut AllLifecycle<'_>| match e {
+        fn subscribe_fn(this: Stateful<FocusNode>) -> impl FnMut(&'_ mut AllLifecycle) + 'static {
+          move |e| match e {
             AllLifecycle::Mounted(e) => {
               let auto_focus = this.state_ref().auto_focus;
               e.window().add_focus_node(e.id, auto_focus, FocusType::Node)

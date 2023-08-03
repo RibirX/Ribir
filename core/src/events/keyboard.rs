@@ -1,23 +1,19 @@
-use rxrust::{
-  prelude::*,
-  rc::{MutRc, RcDeref, RcDerefMut},
-};
-use smallvec::SmallVec;
+use rxrust::prelude::*;
 use std::convert::Infallible;
 
 use crate::{
   impl_all_event, impl_common_event_deref, impl_compose_child_with_focus_for_listener,
-  impl_listener, impl_multi_event_listener, impl_query_self_only, prelude::*,
+  impl_listener, impl_multi_event_listener, impl_query_self_only, prelude::*, window::WindowId,
 };
 
 #[derive(Debug)]
-pub struct KeyboardEvent<'a> {
+pub struct KeyboardEvent {
   pub scan_code: ScanCode,
   pub key: VirtualKeyCode,
-  common: CommonEvent<'a>,
+  common: CommonEvent,
 }
 
-impl_event_subject!(Keyboard, event_name = AllKeyboard);
+pub type KeyboardSubject = MutRefItemSubject<'static, AllKeyboard, Infallible>;
 
 impl_multi_event_listener! {
   "The listener use to fire and listen keyboard events.",
@@ -36,13 +32,13 @@ impl_common_event_deref!(KeyboardEvent);
 
 impl_compose_child_with_focus_for_listener!(KeyboardListener);
 
-impl<'a> KeyboardEvent<'a> {
+impl KeyboardEvent {
   #[inline]
-  pub fn new(scan_code: ScanCode, key: VirtualKeyCode, id: WidgetId, wnd: &'a Window) -> Self {
+  pub fn new(scan_code: ScanCode, key: VirtualKeyCode, id: WidgetId, wnd_id: WindowId) -> Self {
     Self {
       scan_code,
       key,
-      common: CommonEvent::new(id, wnd),
+      common: CommonEvent::new(id, wnd_id),
     }
   }
 }

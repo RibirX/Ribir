@@ -42,7 +42,8 @@ impl WidgetTree {
   /// Draw current tree by painter.
   pub(crate) fn draw(&self) {
     let wnd = self.window();
-    let mut ctx = PaintingCtx::new(self.root(), &wnd);
+    let mut painter = wnd.painter.borrow_mut();
+    let mut ctx = PaintingCtx::new(self.root(), wnd.id(), &mut painter);
     self.root().paint_subtree(&mut ctx);
   }
 
@@ -62,10 +63,7 @@ impl WidgetTree {
           .map(|info| info.clamp)
           .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
 
-        let wnd = self.window();
-        let wnd = &*wnd;
-
-        let mut layouter = Layouter::new(wid, wnd, true, self);
+        let mut layouter = Layouter::new(wid, self.window().id(), true, self);
         layouter.perform_widget_layout(clamp);
       }
     }
