@@ -201,3 +201,17 @@ impl<T> std::ops::DerefMut for FatObj<T> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.host }
 }
+
+impl<W> BoxedSingleParent for FatObj<W>
+where
+  W: SingleChild + Into<Box<dyn Render>> + Into<Widget> + 'static,
+{
+  fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId { self.build(ctx) }
+}
+
+impl<W> BoxMultiParent for FatObj<W>
+where
+  W: MultiChild + Into<Box<dyn Render>> + Into<Widget> + 'static,
+{
+  fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId { self.build(ctx) }
+}

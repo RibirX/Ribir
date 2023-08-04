@@ -28,20 +28,22 @@ impl<W: SingleChild> SingleChild for State<W> {}
 impl<W: MultiChild> MultiChild for State<W> {}
 
 impl<W: SingleChild + Render + 'static> BoxedSingleParent for State<W> {
-  fn into_render(self: Box<Self>) -> Box<dyn Render> {
-    match *self {
+  fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId {
+    let r: Box<dyn Render> = match *self {
       State::Stateless(w) => Box::new(w),
       State::Stateful(w) => Box::new(RenderFul(w)),
-    }
+    };
+    ctx.alloc_widget(r)
   }
 }
 
 impl<W: MultiChild + Render + 'static> BoxMultiParent for State<W> {
-  fn into_render(self: Box<Self>) -> Box<dyn Render> {
-    match *self {
+  fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId {
+    let r: Box<dyn Render> = match *self {
       State::Stateless(w) => Box::new(w),
       State::Stateful(w) => Box::new(RenderFul(w)),
-    }
+    };
+    ctx.alloc_widget(r)
   }
 }
 

@@ -78,17 +78,17 @@ where
 }
 
 trait MultiParent {
-  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId;
+  fn into_multi_parent(self, ctx: &mut BuildCtx) -> WidgetId;
 }
 
-impl<R: Into<Box<dyn Render>> + MultiChild> MultiParent for R {
+impl<R: RenderParent + MultiChild> MultiParent for R {
   #[inline]
-  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId { ctx.alloc_widget(self.into()) }
+  fn into_multi_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.into_render_parent(ctx) }
 }
 
-impl<W: Into<Box<dyn Render>> + MultiChild> MultiParent for Pipe<W> {
+impl<W: RenderParent + MultiChild> MultiParent for Pipe<W> {
   #[inline]
-  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.build_as_render_parent(ctx) }
+  fn into_multi_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.into_only_parent(ctx) }
 }
 
 impl<R, C> MultiWithChild<C> for R
@@ -99,7 +99,7 @@ where
   type Target = MultiPair;
 
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    let parent = self.build_as_parent(ctx.force_as_mut());
+    let parent = self.into_multi_parent(ctx.force_as_mut());
     let mut children = vec![];
     child.fill_vec(&mut children, ctx);
     MultiPair { parent, children }
