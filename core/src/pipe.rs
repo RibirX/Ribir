@@ -13,8 +13,8 @@ use crate::{
   builtin_widgets::{key::AnyKey, Void},
   context::BuildCtx,
   data_widget::attach_to_id,
-  prelude::{AnonymousData, DataWidget, Multi, MultiChild, SingleChild},
-  widget::{QueryOrder, Render, Widget, WidgetBuilder, WidgetId},
+  prelude::{AnonymousData, DataWidget, Multi, MultiChild, RenderParent, SingleChild},
+  widget::{QueryOrder, Widget, WidgetBuilder, WidgetId},
 };
 
 /// A value that can be subscribed its continuous change from the observable
@@ -99,10 +99,13 @@ impl<W: Into<Widget>> WidgetBuilder for Pipe<W> {
   }
 }
 
-impl<R: Into<Box<dyn Render>>> Pipe<R> {
-  pub(crate) fn build_as_render_parent(self, ctx: &mut BuildCtx) -> WidgetId {
+impl<R> Pipe<R> {
+  pub(crate) fn into_only_parent(self, ctx: &mut BuildCtx) -> WidgetId
+  where
+    R: RenderParent,
+  {
     let (v, modifies) = self.unzip();
-    let id = ctx.alloc_widget(v.into());
+    let id = v.into_render_parent(ctx);
     let id_share = Rc::new(Cell::new(id));
     let handle = ctx.handle();
     let h = modifies
@@ -110,7 +113,7 @@ impl<R: Into<Box<dyn Render>>> Pipe<R> {
         handle.with_ctx(|ctx| {
           let id = id_share.get();
           let ctx = ctx.force_as_mut();
-          let new_id = ctx.alloc_widget(v.into());
+          let new_id = v.into_render_parent(ctx);
 
           update_key_status_single(id, new_id, ctx);
           let mut cursor = id.first_child(&ctx.tree.arena);
