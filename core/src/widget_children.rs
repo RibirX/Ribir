@@ -41,16 +41,16 @@ pub use child_convert::{ChildFrom, FromAnother};
 /// Trait to tell Ribir a object can have one child.
 pub trait SingleChild {}
 
-/// A boxed render widget that has one child.
-pub trait BoxedSingleParent: SingleChild {
+/// A boxed render widget that support accept one child.
+pub trait BoxedSingleParent {
   fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId;
 }
 
 /// Trait to tell Ribir a object that has multi children.
 pub trait MultiChild {}
 
-/// A boxed render widget that has multi children.
-pub trait BoxMultiParent: MultiChild {
+/// A boxed render widget that support accept multi children.
+pub trait BoxMultiParent {
   fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId;
 }
 

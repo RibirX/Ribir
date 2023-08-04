@@ -49,13 +49,7 @@ pub struct DeclareField {
   /// field member name.
   pub member: Ident,
   pub colon_tk: Option<Colon>,
-  pub value: FieldValue,
-}
-
-pub struct FieldValue {
-  refs: DollarRefs,
-  /// field value
-  value: Expr,
+  pub value: Expr,
 }
 
 impl Parse for RdlBody {
@@ -135,19 +129,11 @@ impl Parse for DeclareField {
     let value = if colon_tk.is_none() {
       parse_quote!(#member)
     } else {
-      input.parse()?
+      let mut refs = DollarRefs::default();
+      refs.fold_expr(input.parse()?)
     };
 
     Ok(DeclareField { member, colon_tk, value })
-  }
-}
-
-impl Parse for FieldValue {
-  fn parse(input: ParseStream) -> SynResult<Self> {
-    let mut refs = DollarRefs::default();
-    let value = refs.fold_expr(input.parse()?);
-    refs.dedup();
-    Ok(FieldValue { refs, value })
   }
 }
 
@@ -167,20 +153,6 @@ impl ToTokens for DeclareField {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     let DeclareField { member, value, .. } = self;
     quote_spanned! {value.span()=> .#member(#value)}.to_tokens(tokens);
-  }
-}
-
-impl ToTokens for FieldValue {
-  fn to_tokens(&self, tokens: &mut TokenStream) {
-    let Self { refs, value } = self;
-    if !refs.is_empty() {
-      Brace(value.span()).surround(tokens, |tokens| {
-        refs.to_tokens(tokens);
-        value.to_tokens(tokens);
-      });
-    } else {
-      value.to_tokens(tokens);
-    }
   }
 }
 

@@ -14,7 +14,7 @@ pub struct FnWidgetMacro {
 impl Parse for FnWidgetMacro {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let stmts = syn::Block::parse_within(input)?;
-    let mut refs = DollarRefs::new(true);
+    let mut refs = DollarRefs::default();
     let stmts = stmts.into_iter().map(|s| refs.fold_stmt(s)).collect();
     Ok(Self { stmts })
   }

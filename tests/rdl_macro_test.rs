@@ -82,7 +82,7 @@ widget_layout_test!(
 
 fn access_rdl_widget() -> impl Into<Widget> {
   fn_widget! {
-    let b = rdl! { SizedBox {size: Size::new(500.,500.)}};
+    let mut b = rdl! { SizedBox {size: Size::new(500.,500.)}};
     rdl! { Row {
       rdl! { SizedBox { size: $b.size } }
       rdl! { b }
@@ -183,8 +183,9 @@ widget_layout_test!(pipe_with_builtin_field, width == 4., height == 2.,);
 fn capture_closure_used_ctx() -> impl Into<Widget> {
   fn_widget! {
     let mut size_box = @SizedBox { size: ZERO_SIZE };
-    let on_mounted = move |_: &mut _| $size_box.size =  IconSize::of(ctx!()).tiny;
-    @ $size_box { on_mounted }
+    @ $size_box {
+      on_mounted: move |_| $size_box.size = IconSize::of(ctx!()).tiny
+    }
   }
 }
 widget_layout_test!(capture_closure_used_ctx, width == 18., height == 18.,);

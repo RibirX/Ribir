@@ -101,28 +101,20 @@ macro_rules! impl_multi_event_listener {
       impl [<$name ListenerDeclarer2>] {
         $(
           #[doc = "Sets up a function that will be called whenever the `" $event_ty "` is delivered"]
-          pub fn [<on_ $event_ty:snake>]<_F>(mut self, handler: impl Into<DeclareInit<_F>>) -> Self
-          where
-            _F: FnMut(&mut [<$name Event>]) + 'static
+          pub fn [<on_ $event_ty:snake>](
+            mut self,
+            handler: impl for<'r> FnMut(&'r mut [<$name Event>]) + 'static
+          ) -> Self
           {
-            let (v, pipe) = handler.into().unzip();
-
-            let subscribe = move |mut handler: _F| {
-              move |e: &mut [<All $name>]| match e {
-                [<All $name>]::$event_ty(e) => handler(e),
-                _ => {}
-              }
-            };
-
-            let mut _unsub = self.subject().subscribe(subscribe(v)).unsubscribe_when_dropped();
-
-            if let Some(pipe) = pipe {
-              let subject = self.subject().clone();
-              pipe.subscribe(move |handler| {
-                _unsub = subject.clone().subscribe(subscribe(handler)).unsubscribe_when_dropped();
-              });
-            }
-
+            self
+            .subject()
+            .filter_map(
+              (|e| match e {
+                [<All $name>]::$event_ty(e) => Some(e),
+                _ => None,
+              }) as fn(&mut [<All $name>]) -> Option<&mut [<$name Event>]>
+            )
+            .subscribe(handler);
             self
           }
         )+

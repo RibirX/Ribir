@@ -1,9 +1,9 @@
 mod readonly;
 mod stateful;
-use std::{mem::MaybeUninit, rc::Rc};
+use std::{convert::Infallible, mem::MaybeUninit, rc::Rc};
 
 pub use readonly::*;
-use rxrust::prelude::ObservableItem;
+use rxrust::{ops::box_it::BoxOp, prelude::ObservableItem};
 pub use stateful::*;
 
 use crate::{
@@ -14,7 +14,6 @@ use crate::{
 };
 
 /// Enum to store both stateless and stateful object.
-#[derive(Clone)]
 pub enum State<W> {
   Stateless(W),
   Stateful(Stateful<W>),
@@ -22,7 +21,7 @@ pub enum State<W> {
 
 pub enum StateRef<'a, W> {
   Stateful(StatefulRef<'a, W>),
-  Stateless(&'a W),
+  Stateless(&'a mut W),
 }
 
 impl<W: SingleChild> SingleChild for State<W> {}
@@ -83,6 +82,13 @@ impl<W> State<W> {
 
   pub fn clone_stateful(&mut self) -> Stateful<W> { self.to_stateful().clone() }
 
+  pub fn modifies(&mut self) -> BoxOp<'static, (), Infallible> { self.to_stateful().modifies() }
+
+  pub fn clone(&mut self) -> State<W> {
+    let stateful = self.to_stateful().clone();
+    State::Stateful(stateful)
+  }
+
   pub fn stateful_ref(&mut self) -> StatefulRef<W> { self.to_stateful().state_ref() }
 
   pub fn to_stateful(&mut self) -> &mut Stateful<W> {
@@ -105,7 +111,7 @@ impl<W> State<W> {
     }
   }
 
-  pub fn state_ref(&self) -> StateRef<W> {
+  pub fn state_ref(&mut self) -> StateRef<W> {
     match self {
       State::Stateless(w) => StateRef::Stateless(w),
       State::Stateful(w) => StateRef::Stateful(w.state_ref()),
@@ -153,6 +159,15 @@ impl<W: 'static> StateFrom<Stateful<DynWidget<W>>> for State<W> {
   }
 }
 
+impl<'a, T> StateRef<'a, T> {
+  pub fn forget_modifies(&self) {
+    match self {
+      StateRef::Stateless(_) => {}
+      StateRef::Stateful(w) => w.forget_modifies(),
+    }
+  }
+}
+
 impl<W, T> From<T> for State<W>
 where
   Self: StateFrom<T>,
@@ -166,6 +181,15 @@ impl<'a, W> std::ops::Deref for StateRef<'a, W> {
   fn deref(&self) -> &Self::Target {
     match self {
       StateRef::Stateful(s) => s.deref(),
+      StateRef::Stateless(r) => r,
+    }
+  }
+}
+
+impl<'a, W> std::ops::DerefMut for StateRef<'a, W> {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    match self {
+      StateRef::Stateful(s) => s.deref_mut(),
       StateRef::Stateless(r) => r,
     }
   }

@@ -1,15 +1,16 @@
 use crate::{
   rdl_macro::{DeclareField, RdlParent, StructLiteral},
-  widget_macro::{WIDGETS, WIDGET_OF_BUILTIN_FIELD},
+  widget_macro::{ribir_variable, WIDGETS, WIDGET_OF_BUILTIN_FIELD},
 };
 use inflector::Inflector;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
+use quote::quote;
+use quote::{quote_spanned, ToTokens};
 use smallvec::SmallVec;
 use syn::{
   parse_str,
   spanned::Spanned,
-  token::{Comma, Paren},
+  token::{Brace, Comma, Paren},
   Ident, Macro, Path,
 };
 
@@ -75,37 +76,15 @@ impl<'a> ToTokens for DeclareObj<'a> {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     let Self { this, span, builtin, children } = self;
 
-    let compose_child = |tokens: &mut TokenStream| {
-      this.to_tokens(tokens);
-      children.iter().for_each(|c| {
-        quote_spanned! { c.span() => .with_child(#c, ctx!())}.to_tokens(tokens);
-      });
-    };
+    // if children is empty, we declare a `FatObj`, so it's can be used and
+    // referenced by others, otherwise directly composed.
 
-    if builtin.is_empty() {
-      compose_child(tokens);
+    if children.is_empty() && builtin.is_empty() {
+      quote_spanned! { *span => FatObj::new(#this) }.to_tokens(tokens)
     } else {
-      let mut builtin_names: SmallVec<[Ident; 1]> = <_>::default();
-      let mut builtin_types: SmallVec<[Path; 1]> = <_>::default();
-      let mut fat_obj_init: SmallVec<[Ident; 1]> = <_>::default();
-
-      WIDGETS
-        .iter()
-        .filter(|b_widget| builtin.contains_key(b_widget.ty))
-        .for_each(|b| {
-          let ty = &b.ty;
-          let name = ty.to_snake_case();
-          let ty = parse_str::<Path>(ty).unwrap();
-          builtin_names.push(Ident::new(&name, ty.span()));
-          builtin_types.push(ty);
-          fat_obj_init.push(Ident::new(&format!("with_{}", name), name.span()));
-        });
-
-      let mut builtin_objs = WIDGETS
-        .iter()
-        .filter_map(|b| builtin.get(&b.ty))
-        .zip(builtin_types.iter())
-        .map(|(fields, ty)| {
+      Brace::default().surround(tokens, |tokens| {
+        let mut builtin_names = vec![];
+        for (ty_str, fields) in builtin {
           // 'b is live longer than 'a, safe convert, but we can't directly convert
           // `SmallVec<[&'b DeclareField; 1]>` to `SmallVec<[&'a DeclareField;
           // 1]>`, because `SmallVec<T>` is invariant over `T`.
@@ -115,30 +94,60 @@ impl<'a> ToTokens for DeclareObj<'a> {
             unsafe { std::mem::transmute(fields.clone()) }
           }
           let fields = shorter_lifetime(fields.clone());
-          ObjNode::Obj { ty, span: *span, fields }
-        });
 
-      let p = builtin_names.first().unwrap();
-      let mut compose_tokens = quote!();
-      recursive_compose_with(
-        p,
-        builtin_names.iter().skip(1),
-        &mut compose_tokens,
-        |tokens| quote!(host).to_tokens(tokens),
-      );
+          let builtin_span = fields[0].span();
+          let ty = parse_str::<Path>(ty_str).unwrap();
+          let obj = ObjNode::Obj { ty: &ty, span: builtin_span, fields };
 
-      if children.is_empty() {
-        // Declare a struct for the `declare!` macro according to user
-        // declaration.
-        quote_spanned! { *span =>
-          FatObj::new(#this)
-            #(.#fat_obj_init(#builtin_objs))*
+          let snaked_ty_str = ty_str.to_snake_case();
+          let name = Ident::new(&snaked_ty_str, builtin_span);
+          quote_spanned! { builtin_span => let #name = #obj; }.to_tokens(tokens);
+          builtin_names.push(name);
         }
-        .to_tokens(tokens);
-      } else {
-        let p = builtin_objs.next().unwrap();
-        recursive_compose_with(p, builtin_objs, tokens, compose_child);
-      }
+
+        let mut children_names = vec![];
+        for (i, c) in children.iter().enumerate() {
+          let child = ribir_variable(&format!("child_{i}"), c.span());
+          quote_spanned! { c.span() => let #child = #c; }.to_tokens(tokens);
+          children_names.push(child)
+        }
+
+        if children.is_empty() {
+          let builtin_init = builtin_names
+            .iter()
+            .map(|name| Ident::new(&format!("with_{name}"), name.span()));
+
+          quote_spanned! {
+            *span =>FatObj::new(#this)#(.#builtin_init(#builtin_names))*
+          }
+          .to_tokens(tokens);
+        } else {
+          // todo: tmp code, we should use FatObj to compose builtin widgets in every
+          // where, so we can keep the builtin widget compose order consistent.
+          builtin_names.sort_by_key(|name| {
+            WIDGETS
+              .iter()
+              .position(|b| *name == b.ty.to_snake_case())
+              .unwrap()
+          });
+          if !builtin.is_empty() {
+            let first = &builtin_names[0];
+            let rest_builtin = &builtin_names[1..];
+
+            recursive_compose_with(first, rest_builtin.iter(), tokens, |tokens| {
+              quote_spanned! { *span =>
+                #this #(.with_child(#children_names, ctx!()))*
+              }
+              .to_tokens(tokens)
+            });
+          } else {
+            quote_spanned! { *span =>
+              #this #(.with_child(#children_names, ctx!()))*
+            }
+            .to_tokens(tokens)
+          }
+        }
+      });
     }
   }
 }

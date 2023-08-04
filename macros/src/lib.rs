@@ -116,13 +116,13 @@ pub fn widget(input: TokenStream) -> TokenStream { gen_widget_macro(input, None)
 ///   wrap: true } }`, if the `Row` contain any child, its child can be embed in
 ///   the struct literal, but must be use `rdl!` or `@` to declare, like:
 ///
-///   ```
+///   ```ignore
 ///     rdl!{ Row { wrap: true, child: rdl!{ Text { text: "hello" } } } }
 ///   ```
 /// - 2. similar to the first, but use a variable as parent and not accept any
 ///   fields of the parent(the builtin fields allowed), like:
 ///
-///   ```
+///   ```ignore
 ///     let row = rdl!{ Row { wrap: true } };
 ///     rdl!{ $row { rdl!{ Text { text: "hello" } } } }
 ///   ```

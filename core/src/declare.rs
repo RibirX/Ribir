@@ -62,16 +62,6 @@ pub trait DeclareFrom<V, M> {
   fn declare_from(value: V) -> Self;
 }
 
-impl<V> From<V> for DeclareInit<V> {
-  #[inline]
-  fn from(value: V) -> Self { Self::Value(value) }
-}
-
-impl<V> From<Pipe<V>> for DeclareInit<V> {
-  #[inline]
-  fn from(value: Pipe<V>) -> Self { Self::Pipe(value) }
-}
-
 impl<V, U: From<V>> DeclareFrom<V, ()> for DeclareInit<U> {
   #[inline]
   fn declare_from(value: V) -> Self { Self::Value(value.into()) }

@@ -41,7 +41,7 @@ pub fn messages() -> impl Into<Widget> {
 }
 
 impl Compose for MessageList {
-  fn compose(this: State<Self>) -> Widget {
+  fn compose(mut this: State<Self>) -> Widget {
     fn_widget! {
       let palette = Palette::of(ctx!());
 

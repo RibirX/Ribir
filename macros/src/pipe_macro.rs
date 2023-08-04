@@ -1,4 +1,4 @@
-use crate::symbol_process::{CaptureRef, DollarRefs};
+use crate::symbol_process::DollarRefs;
 use quote::{quote, ToTokens};
 use syn::{
   fold::Fold,
@@ -14,9 +14,10 @@ pub(crate) struct PipeExpr {
 impl Parse for PipeExpr {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let mut refs = DollarRefs::default();
-
+    refs.in_capture += 1;
     let stmts = syn::Block::parse_within(input)?;
     let stmts = stmts.into_iter().map(|s| refs.fold_stmt(s)).collect();
+    refs.in_capture -= 1;
     if refs.is_empty() {
       let err = syn::Error::new(
         input.span(),
@@ -34,18 +35,13 @@ impl ToTokens for PipeExpr {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
     let Self { refs, expr } = self;
 
-    let captures = refs.capture_state_tokens();
     let upstream = refs.upstream_tokens();
-    let capture_refs = refs.iter().map(CaptureRef);
 
     if refs.used_ctx() {
       quote! {{
-        #captures
+        #refs
         let upstream = #upstream;
-        let mut expr_value = move |ctx!(): &BuildCtx<'_>| {
-          #(#capture_refs)*
-          #(#expr)*
-        };
+        let mut expr_value = move |ctx!(): &BuildCtx<'_>| { #(#expr)* };
         let _ctx_handle = ctx!().handle();
 
         Pipe::new(
@@ -58,12 +54,9 @@ impl ToTokens for PipeExpr {
       .to_tokens(tokens)
     } else {
       quote! {{
-        #captures
+        #refs
         let upstream = #upstream;
-        let mut expr_value = move || {
-          #(#capture_refs)*
-          #(#expr)*
-        };
+        let mut expr_value = move || { #(#expr)* };
         Pipe::new(
           expr_value(),
           upstream.map(move |_| expr_value()).box_it()
