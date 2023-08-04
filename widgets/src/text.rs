@@ -24,7 +24,7 @@ pub struct Text {
 }
 
 impl Text {
-  pub fn text_layout(&self, t_store: &TypographyStore, bound: Size) -> VisualGlyphs {
+  pub fn text_layout(&self, bound: Size) -> VisualGlyphs {
     let TextStyle {
       font_size,
       letter_space,
@@ -35,8 +35,7 @@ impl Text {
 
     let width: Em = Pixel(bound.width.into()).into();
     let height: Em = Pixel(bound.height.into()).into();
-
-    t_store.typography(
+    AppCtx::typography_store().typography(
       self.text.substr(..),
       font_size,
       font_face,
@@ -54,11 +53,7 @@ impl Text {
 
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
-    self
-      .text_layout(AppCtx::typography_store(), clamp.max)
-      .visual_rect()
-      .size
-      .cast_unit()
+    self.text_layout(clamp.max).visual_rect().size.cast_unit()
   }
 
   #[inline]
