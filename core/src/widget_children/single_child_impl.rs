@@ -1,6 +1,5 @@
-use crate::widget::WidgetBuilder;
-
 use super::*;
+use crate::widget::WidgetBuilder;
 
 /// Trait specify what child a widget can have, and the target type is the
 /// result of widget compose its child.
@@ -37,20 +36,21 @@ impl<W, C1: SingleChild, C2> SingleWithChild<C2> for SinglePair<W, C1> {
 }
 
 trait SingleParent {
-  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId;
+  fn into_single_parent(self, ctx: &mut BuildCtx) -> WidgetId;
 }
 
 trait WidgetChild {
   fn child_build(self, ctx: &BuildCtx) -> WidgetId;
 }
 
-impl<W: Into<Box<dyn Render>> + SingleChild + 'static> SingleParent for W {
-  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId { ctx.alloc_widget(self.into()) }
+impl<W: RenderParent + SingleChild + 'static> SingleParent for W {
+  #[inline]
+  fn into_single_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.into_render_parent(ctx) }
 }
 
-impl<W: Into<Box<dyn Render>> + SingleChild + 'static> SingleParent for Pipe<W> {
+impl<W: RenderParent + SingleChild> SingleParent for Pipe<W> {
   #[inline]
-  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.build_as_render_parent(ctx) }
+  fn into_single_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.into_only_parent(ctx) }
 }
 
 impl<D> SingleParent for Stateful<DynWidget<D>>
@@ -58,7 +58,7 @@ where
   D: Render + SingleChild + WidgetBuilder + 'static,
 {
   #[inline]
-  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId {
+  fn into_single_parent(self, ctx: &mut BuildCtx) -> WidgetId {
     Box::new(DynRender::single(self)).build(ctx)
   }
 }
@@ -68,7 +68,7 @@ where
   D: Render + SingleChild + WidgetBuilder + 'static,
 {
   #[inline]
-  fn build_as_parent(self, ctx: &mut BuildCtx) -> WidgetId {
+  fn into_single_parent(self, ctx: &mut BuildCtx) -> WidgetId {
     Box::new(DynRender::option(self)).build(ctx)
   }
 }
@@ -90,7 +90,7 @@ where
 {
   fn build(self, ctx: &BuildCtx) -> WidgetId {
     let Self { widget, child } = self;
-    let p = widget.build_as_parent(ctx.force_as_mut());
+    let p = widget.into_single_parent(ctx.force_as_mut());
     let child = child.child_build(ctx);
     ctx.force_as_mut().append_child(p, child);
     p
@@ -122,7 +122,7 @@ where
     if let Some(child) = child {
       SinglePair { widget, child }.build(ctx)
     } else {
-      widget.build_as_parent(ctx.force_as_mut())
+      widget.into_single_parent(ctx.force_as_mut())
     }
   }
 }

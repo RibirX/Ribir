@@ -43,7 +43,7 @@ pub trait SingleChild {}
 
 /// A boxed render widget that has one child.
 pub trait BoxedSingleParent: SingleChild {
-  fn into_render(self: Box<Self>) -> Box<dyn Render>;
+  fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId;
 }
 
 /// Trait to tell Ribir a object that has multi children.
@@ -51,7 +51,7 @@ pub trait MultiChild {}
 
 /// A boxed render widget that has multi children.
 pub trait BoxMultiParent: MultiChild {
-  fn into_render(self: Box<Self>) -> Box<dyn Render>;
+  fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId;
 }
 
 /// Trait mark widget can have one child and also have compose logic for widget
@@ -68,15 +68,23 @@ pub type WidgetOf<W> = SinglePair<W, Widget>;
 impl SingleChild for Box<dyn BoxedSingleParent> {}
 impl MultiChild for Box<dyn BoxMultiParent> {}
 
-impl From<Box<dyn BoxMultiParent>> for Box<dyn Render> {
-  #[inline]
-  fn from(v: Box<dyn BoxMultiParent>) -> Self { v.into_render() }
+impl RenderParent for Box<dyn BoxedSingleParent> {
+  fn into_render_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.into_parent(ctx) }
 }
 
-impl From<Box<dyn BoxedSingleParent>> for Box<dyn Render> {
-  #[inline]
-  fn from(value: Box<dyn BoxedSingleParent>) -> Self { value.into_render() }
+impl RenderParent for Box<dyn BoxMultiParent> {
+  fn into_render_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.into_parent(ctx) }
 }
+
+pub(crate) trait RenderParent {
+  fn into_render_parent(self, ctx: &mut BuildCtx) -> WidgetId;
+}
+
+impl<T: Into<Box<dyn Render>>> RenderParent for T {
+  #[inline]
+  fn into_render_parent(self, ctx: &mut BuildCtx) -> WidgetId { ctx.alloc_widget(self.into()) }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
