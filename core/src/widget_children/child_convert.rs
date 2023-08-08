@@ -3,8 +3,8 @@ use super::{
   TmlFlag,
 };
 use crate::{
-  dynamic_widget::{DynRender, DynWidget},
-  state::{State, StateFrom, Stateful},
+  builtin_widgets::FatObj,
+  state::{State, StateFrom},
   widget::*,
 };
 
@@ -68,28 +68,38 @@ where
 impl<W, W2, C, C2, M1, M2> FromAnother<SinglePair<W2, C2>, [(M1, M2); 0]> for SinglePair<W, C>
 where
   W: FromAnother<W2, M1>,
-  C: ChildFrom<C2, M2>,
-{
-  #[inline]
-  fn from_another(value: SinglePair<W2, C2>) -> Self {
-    let SinglePair { widget, child } = value;
-    SinglePair {
-      widget: W::from_another(widget),
-      child: C::child_from(child),
-    }
-  }
-}
-
-impl<W, W2, C, C2, M1, M2> FromAnother<SinglePair<W2, C2>, [(M1, M2); 1]> for SinglePair<W, C>
-where
-  W: ChildFrom<W2, M1>,
   C: FromAnother<C2, M2>,
 {
   #[inline]
   fn from_another(value: SinglePair<W2, C2>) -> Self {
     let SinglePair { widget, child } = value;
     SinglePair {
-      widget: W::child_from(widget),
+      widget: W::from_another(widget),
+      child: C::from_another(child),
+    }
+  }
+}
+
+impl<W, W2, C, M> FromAnother<SinglePair<W2, C>, [M; 1]> for SinglePair<W, C>
+where
+  W: FromAnother<W2, M>,
+{
+  #[inline]
+  fn from_another(value: SinglePair<W2, C>) -> Self {
+    let SinglePair { widget, child } = value;
+    SinglePair { widget: W::child_from(widget), child }
+  }
+}
+
+impl<W, C, C2, M> FromAnother<SinglePair<W, C2>, [M; 2]> for SinglePair<W, C>
+where
+  C: FromAnother<C2, M>,
+{
+  #[inline]
+  fn from_another(value: SinglePair<W, C2>) -> Self {
+    let SinglePair { widget, child } = value;
+    SinglePair {
+      widget,
       child: C::from_another(child),
     }
   }
@@ -118,6 +128,24 @@ where
       child: FromAnother::from_another(child),
     }
   }
+}
+
+impl<T1, T2, M> FromAnother<FatObj<T1>, [M; 0]> for FatObj<T2>
+where
+  T2: FromAnother<T1, M>,
+{
+  fn from_another(value: FatObj<T1>) -> Self {
+    let (host, builtin) = value.unzip();
+    FatObj::new(T2::from_another(host), builtin)
+  }
+}
+
+impl<T1, T2, M> FromAnother<T1, [M; 1]> for FatObj<T2>
+where
+  T2: ChildFrom<T1, M>,
+{
+  #[inline]
+  fn from_another(value: T1) -> Self { FatObj::from_host(ChildFrom::child_from(value)) }
 }
 
 pub(crate) trait FillVec<C, M> {
@@ -150,12 +178,4 @@ where
   fn fill_vec(self, vec: &mut Vec<C>) {
     vec.extend(self.into_inner().into_iter().map(ChildFrom::child_from))
   }
-}
-
-impl<D> FillVec<Widget, [(); 2]> for Stateful<DynWidget<Multi<D>>>
-where
-  D: IntoIterator + 'static,
-  Widget: From<D::Item>,
-{
-  fn fill_vec(self, vec: &mut Vec<Widget>) { vec.push(DynRender::multi(self).into()) }
 }

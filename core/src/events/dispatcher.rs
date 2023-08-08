@@ -192,12 +192,12 @@ impl Dispatcher {
       .copied();
 
     if let Some(old) = old {
-      let ancestor = new_hit.and_then(|w| w.common_ancestors(old, &tree.arena).next());
+      let ancestor = new_hit.and_then(|w| w.lowest_common_ancestor(old, &tree.arena));
       wnd.add_delay_event(DelayEvent::PointerLeave { bottom: old, up: ancestor });
     };
 
     if let Some(new) = new_hit {
-      let ancestor = old.and_then(|o| o.common_ancestors(new, &tree.arena).next());
+      let ancestor = old.and_then(|o| o.lowest_common_ancestor(new, &tree.arena));
       wnd.add_delay_event(DelayEvent::PointerEnter { bottom: new, up: ancestor });
     }
 

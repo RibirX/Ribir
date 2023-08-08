@@ -5,7 +5,7 @@ use super::WidgetTree;
 use crate::{
   builtin_widgets::Void,
   context::{PaintingCtx, WidgetCtx},
-  state::{ModifyScope, StateChangeNotifier},
+  state::{ModifyScope, Notifier},
   widget::{QueryOrder, Render},
   window::DelayEvent,
 };
@@ -30,7 +30,7 @@ pub(crate) struct RenderNode {
 
 impl WidgetId {
   /// Returns a reference to the node data.
-  pub(crate) fn get(self, tree: &TreeArena) -> Option<&dyn Render> {
+  pub(crate) fn get<'a, 'b>(self, tree: &'a TreeArena) -> Option<&'a (dyn Render + 'b)> {
     self.get_node(tree).map(|n| n.data.as_ref())
   }
 
@@ -116,6 +116,10 @@ impl WidgetId {
     self.node_feature(tree, |node| node.previous_sibling())
   }
 
+  pub(crate) fn ancestor_of(self, other: WidgetId, tree: &TreeArena) -> bool {
+    other.ancestors(tree).find(|p| self == *p).is_some()
+  }
+
   pub(crate) fn ancestors(self, tree: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
     self.0.ancestors(tree).map(WidgetId)
   }
@@ -137,7 +141,7 @@ impl WidgetId {
 
   pub(crate) fn on_mounted(self, tree: &WidgetTree) {
     self.assert_get(&tree.arena).query_all_type(
-      |notifier: &StateChangeNotifier| {
+      |notifier: &Notifier| {
         let state_changed = tree.dirty_set.clone();
         notifier
           .raw_modifies()
@@ -183,7 +187,7 @@ impl WidgetId {
     tree.get(self.0).and_then(method).map(WidgetId)
   }
 
-  pub(crate) fn assert_get(self, tree: &TreeArena) -> &dyn Render {
+  pub(crate) fn assert_get<'a, 'b>(self, tree: &'a TreeArena) -> &'a (dyn Render + 'b) {
     self.get(tree).expect("Widget not exists in the `tree`")
   }
 

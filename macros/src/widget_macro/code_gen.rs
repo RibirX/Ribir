@@ -205,7 +205,7 @@ impl Desugared {
           quote! { .into(), #guards_vec }.to_tokens(tokens)
         });
       } else {
-        w.gen_compose_node(named_objs, tokens)
+        w.gen_compose_node(named_objs, tokens);
       }
     });
     quote! { ; FnWidget::new(#name) }.to_tokens(tokens);
@@ -442,7 +442,7 @@ impl DeclareObj {
         Paren(value.span()).surround(tokens, |tokens| value.to_tokens(tokens))
       });
       let build_ctx = ctx_ident();
-      tokens.extend(quote_spanned! { span => .build(#build_ctx) });
+      tokens.extend(quote_spanned! { span => .build_declare(#build_ctx) });
     };
     let builder = |tokens: &mut TokenStream| {
       let is_stateful = *stateful || !watch_stmts.is_empty();

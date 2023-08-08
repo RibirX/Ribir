@@ -9,8 +9,8 @@ mod util;
 mod widget_macro;
 use fn_widget_macro::FnWidgetMacro;
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens};
-use symbol_process::symbol_to_macro;
+use quote::quote;
+use symbol_process::DollarRefsCtx;
 use syn::{parse_macro_input, DeriveInput};
 use widget_macro::gen_widget_macro;
 mod child_template;
@@ -18,9 +18,10 @@ mod fn_widget_macro;
 mod pipe_macro;
 mod rdl_macro;
 mod watch_macro;
+mod writer_map_macro;
 pub(crate) use rdl_macro::*;
 
-use crate::pipe_macro::PipeExpr;
+use crate::pipe_macro::PipeMacro;
 use crate::watch_macro::WatchMacro;
 pub(crate) mod declare_obj;
 pub(crate) mod symbol_process;
@@ -33,13 +34,23 @@ pub(crate) const ASSIGN_WATCH_MACRO_NAME: &str = "assign_watch";
 pub(crate) const LET_WATCH_MACRO_NAME: &str = "let_watch";
 pub(crate) const PROP_MACRO_NAME: &str = "prop";
 
+macro_rules! ok {
+  ($e: expr) => {
+    match $e {
+      Ok(ok) => ok,
+      Err(err) => return err.into(),
+    }
+  };
+}
+pub(crate) use ok;
+
 #[proc_macro_derive(SingleChild)]
 pub fn single_marco_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
   let name = input.ident;
   quote! {
-      impl #impl_generics SingleChild for #name #ty_generics #where_clause {}
+    impl #impl_generics SingleChild for #name #ty_generics #where_clause {}
   }
   .into()
 }
@@ -50,7 +61,7 @@ pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
   let name = input.ident;
   quote! {
-      impl #impl_generics MultiChild for #name #ty_generics #where_clause {}
+    impl #impl_generics MultiChild for #name #ty_generics #where_clause {}
   }
   .into()
 }
@@ -132,13 +143,7 @@ pub fn widget(input: TokenStream) -> TokenStream { gen_widget_macro(input, None)
 ///   like: `let row = rdl!{ Widget::new(Void) };`
 #[proc_macro]
 pub fn rdl(input: TokenStream) -> TokenStream {
-  symbol_to_macro(input).map_or_else(
-    |err| err,
-    |input| {
-      let declare = parse_macro_input! { input as RdlBody };
-      declare.to_token_stream().into()
-    },
-  )
+  RdlMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// The `fn_widget` is a macro that create a widget from a function widget from
@@ -147,14 +152,19 @@ pub fn rdl(input: TokenStream) -> TokenStream {
 /// use to expression a state reference of `name`.
 #[proc_macro]
 pub fn fn_widget(input: TokenStream) -> TokenStream {
-  symbol_to_macro(input).map_or_else(
-    |err| err,
-    |input| {
-      let widget_macro = parse_macro_input!(input as FnWidgetMacro);
-      widget_macro.to_token_stream().into()
-    },
-  )
+  // if input.to_string().contains("$child.layout_size()") {
+  //   println!(
+  //     "gen code\n  {}",
+  //     FnWidgetMacro::gen_code(input.clone().into(), &mut
+  // DollarRefsCtx::top_level()).to_string()   )
+  // }
+  FnWidgetMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
+
+/// This macro just return the input token stream. It's do nothing but help
+/// `ribir` mark that a macro has been expanded.
+#[proc_macro]
+pub fn ribir_expanded_ಠ_ಠ(input: TokenStream) -> TokenStream { input }
 
 /// set the `BuildCtx` to a special variable `_ctx_ಠ_ಠ`, so the user can use
 /// `ctx!` to access it.
@@ -180,33 +190,32 @@ pub fn ctx(input: TokenStream) -> TokenStream {
 /// to its modify.
 #[proc_macro]
 pub fn pipe(input: TokenStream) -> TokenStream {
-  symbol_to_macro(input).map_or_else(
-    |err| err,
-    |input| {
-      let expr = parse_macro_input! { input as PipeExpr };
-      expr.to_token_stream().into()
-    },
-  )
+  PipeMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// `watch!` macro use to convert a expression to a `Observable` stream. Use the
 /// `$` mark the state reference and auto subscribe to its modify.
 #[proc_macro]
 pub fn watch(input: TokenStream) -> TokenStream {
-  symbol_to_macro(input).map_or_else(
-    |err| err,
-    |input| {
-      let expr = parse_macro_input! { input as WatchMacro };
-      expr.to_token_stream().into()
-    },
-  )
+  WatchMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
-/// The macro to use a state as its StateRef. Transplanted from the `$`.
+/// macro split a new writer from a state writer. For example,
+/// `split_writer!($label.visible);` will return a writer of `bool` that is
+/// partial of the `Visibility`. This macros is a convenient way for
+/// `StateWriter::split_writer`
 #[proc_macro]
-pub fn _dollar_ಠ_ಠ(input: TokenStream) -> TokenStream {
-  let name = parse_macro_input! { input as syn::Ident };
-  quote! { #name.state_ref() }.into()
+pub fn split_writer(input: TokenStream) -> TokenStream {
+  writer_map_macro::gen_split_path_writer(input.into(), &mut DollarRefsCtx::top_level())
+}
+
+/// macro map a write to another state write. For example,
+/// `map_writer!($label.visible);` will return a writer of `bool` that is
+/// partial of the `Visibility`. This macros is a convenient way for
+/// `StateWriter::map_writer`
+#[proc_macro]
+pub fn map_writer(input: TokenStream) -> TokenStream {
+  writer_map_macro::gen_map_path_writer(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 #[proc_macro]

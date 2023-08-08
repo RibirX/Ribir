@@ -176,21 +176,18 @@ pub struct HeadlineText(pub Label);
 pub struct SupportingText(pub Label);
 
 #[derive(Template)]
-pub enum EdgeWidget<P: TmlFlag + Default + 'static> {
-  Text(DecorateTml<P, State<Label>>),
-  Icon(DecorateTml<P, NamedSvg>),
-  Avatar(DecorateTml<P, ComposePair<State<Avatar>, AvatarTemplate>>),
-  Image(DecorateTml<P, ShareResource<PixelImage>>),
-  Poster(DecorateTml<P, Poster>),
-  Custom(DecorateTml<P, CustomEdgeWidget>),
+pub enum EdgeWidget {
+  Text(State<Label>),
+  Icon(NamedSvg),
+  Avatar(ComposePair<State<Avatar>, AvatarTemplate>),
+  Image(ShareResource<PixelImage>),
+  Poster(Poster),
+  Custom(CustomEdgeWidget),
 }
 
 pub struct CustomEdgeWidget(pub Widget);
 
-impl<P> EdgeWidget<P>
-where
-  P: TmlFlag + Default,
-{
+impl EdgeWidget {
   fn compose_with_style(self, config: EdgeWidgetStyle) -> Widget {
     let EdgeWidgetStyle {
       icon,
@@ -206,7 +203,7 @@ where
           dyns: icon.gap.map(|margin| Margin { margin }),
           Icon {
             size: icon.size,
-            widget::from(w.decorate(|_, c| c.into()))
+            widget::from(w)
           }
         }
       }
@@ -214,21 +211,21 @@ where
       EdgeWidget::Text(w) => widget! {
         DynWidget {
           dyns: text.gap.map(|margin| Margin { margin }),
-          widget::from(w.decorate(|_, label| widget!{
-            states { label: label.into_readonly() }
+          widget!{
+            states { label: w.into_readonly() }
             Text {
               text: label.0.clone(),
               text_style: text.style.clone(),
               foreground: text.foreground.clone(),
             }
-          }.into()))
+          }
         }
       }
       .into(),
       EdgeWidget::Avatar(w) => widget! {
         DynWidget {
           dyns: avatar.gap.map(|margin| Margin { margin }),
-          DecorateTml::decorate(w, |_, c| c.into())
+          widget::from(w)
         }
       }
       .into(),
@@ -239,7 +236,7 @@ where
             size: image.size,
             DynWidget {
               box_fit: BoxFit::None,
-              dyns: w.decorate(|_, c| c.into())
+              dyns: w
             }
           }
         }
@@ -252,7 +249,7 @@ where
             size: poster.size,
             DynWidget {
               box_fit: BoxFit::None,
-              dyns: w.decorate(|_, c| c.0.into())
+              dyns: w.0
             }
           }
         }
@@ -261,7 +258,7 @@ where
       EdgeWidget::Custom(w) => widget! {
         DynWidget {
           dyns: custom.gap.map(|margin| Margin { margin }),
-          widget::from(w.decorate(|_, c| c.0))
+          widget::from(w.0)
         }
       }
       .into(),
@@ -273,78 +270,83 @@ where
 pub struct ListItemTml {
   headline: State<HeadlineText>,
   supporting: Option<State<SupportingText>>,
-  leading: Option<EdgeWidget<Leading>>,
-  trailing: Option<EdgeWidget<Trailing>>,
+  leading: Option<FatObj<SinglePair<Leading, EdgeWidget>>>,
+  trailing: Option<FatObj<SinglePair<Trailing, EdgeWidget>>>,
 }
 
 impl ComposeChild for ListItem {
   type Child = ListItemTml;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
     let ListItemTml {
-      headline,
+      mut headline,
       supporting,
       leading,
       trailing,
     } = child;
 
-    widget! {
-      states {
-        this: this.into_readonly(),
-        headline: headline.into_readonly(),
-      }
-      init ctx => {
-        let palette = Palette::of(ctx);
-        let on_surface: Brush = palette.on_surface().clone().into();
-        let on_surface_variant: Brush = palette.on_surface_variant().clone().into();
-        let ListItemStyle {
-          padding_style,
-          label_gap,
-          headline_style,
-          supporting_style,
-          leading_config,
-          trailing_config,
-          item_align,
-        } = ListItemStyle::of(ctx).clone();
-        let TextStyle { line_height, font_size, .. } = *supporting_style.clone();
-        let line_height = line_height
-          .map_or(font_size, FontSize::Em)
-          .into_pixel();
-        let text_height = line_height * this.line_number as f32;
-      }
-      ListItemDecorator {
-        color: this.active_background,
+    fn_widget! {
+      let palette = Palette::of(ctx!());
+      let ListItemStyle {
+        padding_style,
+        label_gap,
+        headline_style,
+        supporting_style,
+        leading_config,
+        trailing_config,
+        item_align,
+      } = ListItemStyle::of(ctx).clone();
+
+      let padding = padding_style.map(|padding| Padding { padding });
+      let label_gap = label_gap.map(|padding| Padding { padding });
+
+      @ListItemDecorator {
+        color: pipe!($this.active_background),
         is_active: false,
-        DynWidget {
-          dyns: padding_style.map(|padding| Padding { padding }),
-          Row {
-            align_items: item_align(this.line_number),
-            Option::map(leading, |w| w.compose_with_style(leading_config))
-            Expanded {
+        @ $padding {
+          @Row {
+            align_items: pipe!(item_align($this.line_number)),
+            @{
+              leading.map(|w| {
+                let (SinglePair { child,.. }, builtin) = w.unzip();
+                builtin.compose_with_host(child.compose_with_style(leading_config), ctx!())
+              })
+            }
+            @Expanded {
               flex: 1.,
-              DynWidget {
-                dyns: label_gap.map(|padding| Padding { padding }),
-                Column {
-                  Text {
-                    text: headline.0.0.clone(),
-                    foreground: on_surface,
-                    text_style: headline_style.clone(),
+              @ $label_gap {
+                @Column {
+                  @Text {
+                    text: pipe!($headline.0.0.clone()),
+                    foreground: palette.on_surface().clone(),
+                    text_style: headline_style,
                   }
-                  Option::map(supporting, |supporting| widget! {
-                    states { supporting: supporting.into_readonly() }
-                    ConstrainedBox {
-                      clamp: BoxClamp::fixed_height(*text_height.0),
-                      Text {
-                        text: supporting.0.0.clone(),
-                        foreground: on_surface_variant.clone(),
-                        text_style: supporting_style.clone(),
+                  @{ supporting.map(|mut supporting|  {
+                    @ConstrainedBox {
+                      clamp: {
+                        let TextStyle { line_height, font_size, .. } = &*supporting_style;
+                        let line_height = line_height.map_or(*font_size, FontSize::Em).into_pixel();
+                        pipe!{
+                          let text_height = line_height * $this.line_number as f32;
+                          BoxClamp::fixed_height(*text_height.0)
+                        }
+                      } ,
+                      @Text {
+                        text: pipe!($supporting.0.0.clone()),
+                        foreground:  palette.on_surface_variant().clone(),
+                        text_style: supporting_style,
                       }
                     }
-                  })
+                  })}
                 }
               }
             }
-            Option::map(trailing, |w| w.compose_with_style(trailing_config))
+            @{
+              trailing.map(|w| {
+                let (SinglePair { child,.. }, builtin) = w.unzip();
+                builtin.compose_with_host(child.compose_with_style(trailing_config), ctx!())
+              })
+            }
           }
         }
       }
@@ -451,7 +453,7 @@ impl CustomStyle for ListItemStyle {
   }
 }
 
-#[derive(Clone, Declare)]
+#[derive(Clone, Declare, Declare2)]
 pub struct ListItemDecorator {
   pub color: Color,
   pub is_active: bool,

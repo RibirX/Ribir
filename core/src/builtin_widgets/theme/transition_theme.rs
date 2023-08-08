@@ -47,7 +47,6 @@ pub mod transitions {
     EASE_IN,
     EASE_OUT,
     EASE_IN_OUT,
-    SMOOTH_SCROLL,
     THEME_EXTEND
   );
 
@@ -123,12 +122,6 @@ impl Default for TransitionTheme {
         delay: None,
         duration: Duration::from_millis(250),
         easing: easing::EASE_IN_OUT,
-        repeat: None,
-      },
-      transitions::SMOOTH_SCROLL:Transition {
-        delay: None,
-        duration: Duration::from_millis(200),
-        easing: easing::EASE_IN,
         repeat: None,
       }
     }

@@ -1,3 +1,5 @@
+use ribir_text::{Em, FontSize, Pixel, PIXELS_PER_EM};
+
 use crate::prelude::{
   Angle, Box2D, Brush, Color, DevicePoint, DeviceRect, DeviceSize, DeviceVector, Point, Radius,
   Rect, Size, Transform, Vector,
@@ -166,6 +168,31 @@ impl Lerp for Transform {
     let m32 = self.m32.lerp(&to.m32, factor);
 
     Transform::new(m11, m12, m21, m22, m31, m32)
+  }
+}
+
+impl Lerp for Pixel {
+  #[inline]
+  fn lerp(&self, to: &Self, factor: f32) -> Self {
+    let v = self.0.lerp(&to.0, factor);
+    Pixel(v.into())
+  }
+}
+
+impl Lerp for Em {
+  #[inline]
+  fn lerp(&self, to: &Self, factor: f32) -> Self {
+    let v = self.value().lerp(&to.value(), factor);
+    Em::relative_to(v, FontSize::Pixel(PIXELS_PER_EM.into()))
+  }
+}
+
+impl Lerp for FontSize {
+  fn lerp(&self, to: &Self, factor: f32) -> Self {
+    let from = self.into_pixel().value();
+    let to = to.into_pixel().value();
+    let v = from.lerp(&to, factor);
+    FontSize::Pixel(v.into())
   }
 }
 

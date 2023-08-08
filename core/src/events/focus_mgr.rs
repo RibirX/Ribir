@@ -696,7 +696,7 @@ mod tests {
     log.borrow_mut().clear();
 
     wnd.focus_mgr.borrow_mut().focus(parent);
-    wnd.emit_events();
+    wnd.run_frame_tasks();
     assert_eq!(
       &*log.borrow(),
       &["blur child", "focusout child", "focus parent",]
@@ -704,7 +704,7 @@ mod tests {
     log.borrow_mut().clear();
 
     wnd.focus_mgr.borrow_mut().blur();
-    wnd.emit_events();
+    wnd.run_frame_tasks();
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
   }
 

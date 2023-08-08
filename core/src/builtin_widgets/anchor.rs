@@ -13,21 +13,21 @@ pub enum PositionUnit {
 /// Widget use to anchor child constraints with the left edge of parent widget.
 #[derive(Declare, Declare2, SingleChild)]
 pub struct LeftAnchor {
-  #[declare(convert=into, builtin)]
+  #[declare(convert=into, builtin, default=0.)]
   pub left_anchor: PositionUnit,
 }
 
 /// Widget use to anchor child constraints with the right edge of parent widget.
 #[derive(Declare, Declare2, SingleChild)]
 pub struct RightAnchor {
-  #[declare(convert=into, builtin)]
+  #[declare(convert=into, builtin, default=0.)]
   pub right_anchor: PositionUnit,
 }
 
 /// Widget use to anchor child constraints with the top edge of parent widget.
 #[derive(Declare, Declare2, SingleChild)]
 pub struct TopAnchor {
-  #[declare(convert=into, builtin)]
+  #[declare(convert=into, builtin, default=0.)]
   pub top_anchor: PositionUnit,
 }
 
@@ -35,7 +35,7 @@ pub struct TopAnchor {
 /// widget.
 #[derive(Declare, Declare2, SingleChild)]
 pub struct BottomAnchor {
-  #[declare(convert=into, builtin)]
+  #[declare(convert=into, builtin, default=0.)]
   pub bottom_anchor: PositionUnit,
 }
 
@@ -124,12 +124,10 @@ impl PositionUnit {
     }
   }
 
-  pub fn lerp_fn(self_size: f32) -> impl Fn(&Self, &Self, f32) -> Self + Clone {
-    move |from, to, rate| {
-      let from = from.abs_value(self_size);
-      let to = to.abs_value(self_size);
-      PositionUnit::Pixel(from.lerp(&to, rate))
-    }
+  pub fn lerp_fn(from: &Self, to: &Self, rate: f32, self_size: f32) -> PositionUnit {
+    let from = from.abs_value(self_size);
+    let to = to.abs_value(self_size);
+    PositionUnit::Pixel(from.lerp(&to, rate))
   }
 }
 

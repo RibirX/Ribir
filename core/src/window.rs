@@ -1,5 +1,4 @@
 use crate::{
-  animation::AnimateTrack,
   context::AppCtx,
   events::{
     dispatcher::Dispatcher,
@@ -18,7 +17,7 @@ use ribir_geom::Point;
 use rxrust::{scheduler::FuturesLocalScheduler, subject::Subject};
 use std::{
   borrow::BorrowMut,
-  cell::RefCell,
+  cell::{Cell, RefCell},
   collections::VecDeque,
   convert::Infallible,
   ops::{Deref, DerefMut},
@@ -41,7 +40,7 @@ pub struct Window {
   pub(crate) widget_tree: RefCell<WidgetTree>,
   pub(crate) frame_ticker: FrameTicker,
   pub(crate) focus_mgr: RefCell<FocusManager>,
-  pub(crate) running_animates: Rc<RefCell<u32>>,
+  pub(crate) running_animates: Rc<Cell<u32>>,
   /// This vector store the task to emit events. When perform layout, dispatch
   /// event and so on, some part of window may be already mutable borrowed and
   /// the user event callback may also query borrow that part, so we can't emit
@@ -52,6 +51,14 @@ pub struct Window {
   /// all task finished before current frame end.
   frame_pool: RefCell<FuturesLocalSchedulerPool>,
   shell_wnd: RefCell<Box<dyn ShellWindow>>,
+  /// A vector store the widget id pair of (parent, child). The child need to
+  /// drop after its `DelayDrop::delay_drop_until` be false or its parent
+  /// is dropped.
+  ///
+  /// This widgets it's detached from its parent, but still need to paint.
+  delay_drop_widgets: RefCell<Vec<(Option<WidgetId>, WidgetId)>>,
+  /// A hash set store the root of the subtree need to regenerate.
+  regenerating_subtree: RefCell<ahash::HashMap<WidgetId, Option<WidgetId>>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
@@ -86,7 +93,7 @@ impl Window {
   pub fn processes_native_event(&self, event: WindowEvent) {
     let ratio = self.device_pixel_ratio() as f64;
     self.dispatcher.borrow_mut().dispatch(event, ratio);
-    self.emit_events();
+    self.run_frame_tasks();
   }
 
   /// Request switch the focus to next widget.
@@ -110,79 +117,83 @@ impl Window {
     self.frame_ticker.frame_tick_stream()
   }
 
-  pub fn animate_track(&self) -> AnimateTrack {
-    AnimateTrack {
-      actived: false,
-      actived_cnt: self.running_animates.clone(),
-    }
-  }
+  pub fn inc_running_animate(&self) { self.running_animates.set(self.running_animates.get() + 1); }
+
+  pub fn dec_running_animate(&self) { self.running_animates.set(self.running_animates.get() - 1); }
 
   /// Draw an image what current render tree represent.
   #[track_caller]
-  pub fn draw_frame(&self) {
-    self.emit_events();
-
-    if !self.need_draw() || self.size().is_empty() {
-      return;
-    }
-
+  pub fn draw_frame(&self) -> bool {
+    self.run_frame_tasks();
     self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now()));
 
-    self.shell_wnd.borrow_mut().begin_frame();
+    let draw = self.need_draw() && !self.size().is_empty();
+    if draw {
+      self.shell_wnd.borrow_mut().begin_frame();
 
-    loop {
       self.layout();
-      self.emit_events();
 
-      // wait all frame task finished.
-      self.frame_pool.borrow_mut().run();
+      self.widget_tree.borrow().draw();
+      self.draw_delay_drop_widgets();
 
-      if !self.widget_tree.borrow().is_dirty() {
-        self.focus_mgr.borrow_mut().refresh_focus();
-        self.emit_events();
+      let surface = match AppCtx::app_theme() {
+        Theme::Full(theme) => theme.palette.surface(),
+        Theme::Inherit(_) => unreachable!(),
+      };
 
-        // focus refresh and event emit may cause widget tree dirty again.
-        if !self.widget_tree.borrow().is_dirty() {
-          break;
-        }
-      }
+      let mut shell = self.shell_wnd.borrow_mut();
+      let inner_size = shell.inner_size();
+      let paint_cmds = self.painter.borrow_mut().finish();
+      shell.draw_commands(Rect::from_size(inner_size), paint_cmds, surface);
+
+      shell.end_frame();
     }
 
-    self.widget_tree.borrow().draw();
-
-    let surface = match AppCtx::app_theme() {
-      Theme::Full(theme) => theme.palette.surface(),
-      Theme::Inherit(_) => unreachable!(),
-    };
-
-    let mut shell = self.shell_wnd.borrow_mut();
-    let inner_size = shell.inner_size();
-    let paint_cmds = self.painter.borrow_mut().finish();
-    shell.draw_commands(Rect::from_size(inner_size), paint_cmds, surface);
-
-    shell.end_frame();
-    self.frame_ticker.emit(FrameMsg::Finish(Instant::now()));
     AppCtx::end_frame();
+    self.frame_ticker.emit(FrameMsg::Finish(Instant::now()));
+
+    draw
   }
 
   pub fn layout(&self) {
-    self
-      .widget_tree
-      .borrow_mut()
-      .layout(self.shell_wnd.borrow().inner_size());
+    loop {
+      self.run_frame_tasks();
 
-    self
-      .frame_ticker
-      .emit(FrameMsg::LayoutReady(Instant::now()));
+      self
+        .widget_tree
+        .borrow_mut()
+        .layout(self.shell_wnd.borrow().inner_size());
+
+      if !self.widget_tree.borrow().is_dirty() {
+        self.focus_mgr.borrow_mut().refresh_focus();
+      }
+
+      // we need to run frame tasks before we emit `FrameMsg::LayoutReady` to keep the
+      // task and event emit order.
+      if !self.widget_tree.borrow().is_dirty() {
+        self.run_frame_tasks();
+      }
+      if !self.widget_tree.borrow().is_dirty() {
+        let ready = FrameMsg::LayoutReady(Instant::now());
+        self.frame_ticker.emit(ready);
+      }
+
+      if !self.widget_tree.borrow().is_dirty() {
+        break;
+      }
+    }
   }
 
   pub fn need_draw(&self) -> bool {
-    self.widget_tree.borrow().is_dirty() || *self.running_animates.borrow() > 0
+    self.widget_tree.borrow().is_dirty()
+      || self.running_animates.get() > 0
+      // if a `pipe` widget is regenerating, need a new frame to finish it.
+      || !self.regenerating_subtree.borrow().is_empty()
   }
 
-  pub fn new(root: Widget, shell_wnd: Box<dyn ShellWindow>) -> Rc<Self> {
+  pub fn new(shell_wnd: Box<dyn ShellWindow>) -> Rc<Self> {
     let focus_mgr = RefCell::new(FocusManager::new());
-    let widget_tree = RefCell::new(WidgetTree::new());
+    let widget_tree = RefCell::new(WidgetTree::default());
     let dispatcher = RefCell::new(Dispatcher::new());
     let size = shell_wnd.inner_size();
     let mut painter = Painter::new(Rect::from_size(size));
@@ -194,19 +205,24 @@ impl Window {
       focus_mgr,
       delay_emitter: <_>::default(),
       frame_ticker: FrameTicker::default(),
-      running_animates: Rc::new(RefCell::new(0)),
-      frame_pool: RefCell::new(<_>::default()),
+      running_animates: <_>::default(),
+      frame_pool: <_>::default(),
       shell_wnd: RefCell::new(shell_wnd),
+      delay_drop_widgets: <_>::default(),
+      regenerating_subtree: <_>::default(),
     };
     let window = Rc::new(window);
     window.dispatcher.borrow_mut().init(Rc::downgrade(&window));
     window.focus_mgr.borrow_mut().init(Rc::downgrade(&window));
-    window
-      .widget_tree
-      .borrow_mut()
-      .init(root, Rc::downgrade(&window));
+    window.widget_tree.borrow_mut().init(Rc::downgrade(&window));
 
     window
+  }
+
+  pub fn set_content_widget(&self, root: Widget) {
+    let build_ctx = BuildCtx::new(None, &self.widget_tree);
+    let root = root.build(&build_ctx);
+    self.widget_tree.borrow_mut().set_root(root)
   }
 
   #[inline]
@@ -270,10 +286,63 @@ impl Window {
     self.delay_emitter.borrow_mut().push_back(e);
   }
 
+  pub(crate) fn is_in_another_regenerating(&self, wid: WidgetId) -> bool {
+    let regen = self.regenerating_subtree.borrow();
+    if regen.is_empty() {
+      return false;
+    }
+    let tree = self.widget_tree.borrow();
+    let Some(p) = wid.parent(&tree.arena) else { return false };
+    let in_another = p.ancestors(&tree.arena).any(|p| {
+      regen.get(&p).map_or(false, |to| {
+        to.map_or(true, |to| wid.ancestor_of(to, &tree.arena))
+      })
+    });
+    in_another
+  }
+
+  pub(crate) fn mark_widgets_regenerating(&self, from: WidgetId, to: Option<WidgetId>) {
+    self.regenerating_subtree.borrow_mut().insert(from, to);
+  }
+
+  pub(crate) fn remove_regenerating_mark(&self, from: WidgetId) {
+    self.regenerating_subtree.borrow_mut().remove(&from);
+  }
+
+  fn draw_delay_drop_widgets(&self) {
+    let mut delay_widgets = self.delay_drop_widgets.borrow_mut();
+    let mut painter = self.painter.borrow_mut();
+
+    delay_widgets.retain(|(parent, wid)| {
+      let tree = self.widget_tree.borrow();
+      let drop_conditional = wid
+        .assert_get(&self.widget_tree.borrow().arena)
+        .query_on_first_type(QueryOrder::OutsideFirst, |d: &DelayDrop| d.delay_drop_until)
+        .unwrap_or(true);
+      let parent_dropped = parent.map_or(false, |p| {
+        p.ancestors(&tree.arena).last() != Some(tree.root())
+      });
+      let need_drop = drop_conditional || parent_dropped;
+      if need_drop {
+        drop(tree);
+        self.widget_tree.borrow_mut().remove_subtree(*wid);
+      } else {
+        let mut painter = painter.save_guard();
+        if let Some(p) = parent {
+          let offset = tree.store.map_to_global(Point::zero(), *p, &tree.arena);
+          painter.translate(offset.x, offset.y);
+        }
+        let mut ctx = PaintingCtx::new(*wid, self.id(), &mut painter);
+        wid.paint_subtree(&mut ctx);
+      }
+      !need_drop
+    });
+  }
+
   /// Immediately emit all delay events. You should not call this method only if
   /// you want to interfere with the framework event dispatch process and know
   /// what you are doing.
-  pub fn emit_events(&self) {
+  fn emit_events(&self) {
     loop {
       let Some(e) = self.delay_emitter.borrow_mut().pop_front() else{ break};
 
@@ -286,14 +355,20 @@ impl Window {
           let e = AllLifecycle::PerformedLayout(LifecycleEvent { id, wnd_id: self.id() });
           self.emit::<LifecycleListener>(id, e);
         }
-        DelayEvent::Disposed { id, delay_drop } => {
+        DelayEvent::Disposed { id, parent } => {
           id.descendants(&self.widget_tree.borrow().arena)
             .for_each(|id| {
               let e = AllLifecycle::Disposed(LifecycleEvent { id, wnd_id: self.id() });
               self.emit::<LifecycleListener>(id, e);
             });
 
-          if !delay_drop {
+          let delay_drop = id
+            .assert_get(&self.widget_tree.borrow().arena)
+            .contain_type::<DelayDrop>();
+
+          if delay_drop {
+            self.delay_drop_widgets.borrow_mut().push((parent, id));
+          } else {
             self.widget_tree.borrow_mut().remove_subtree(id);
           }
         }
@@ -467,6 +542,22 @@ impl Window {
         (**e).borrow().is_propagation()
       });
   }
+
+  /// Run all async tasks need finished in current frame and emit all delay
+  /// events.
+  pub fn run_frame_tasks(&self) {
+    loop {
+      // wait all frame task finished.
+      self.frame_pool.borrow_mut().run();
+      // run all ready async tasks
+      AppCtx::run_until_stalled();
+      if !self.delay_emitter.borrow().is_empty() {
+        self.emit_events();
+      } else {
+        break;
+      }
+    }
+  }
 }
 
 /// Event that delay to emit, emit it when the window is not busy(nobody borrow
@@ -476,8 +567,8 @@ pub(crate) enum DelayEvent {
   Mounted(WidgetId),
   PerformedLayout(WidgetId),
   Disposed {
+    parent: Option<WidgetId>,
     id: WidgetId,
-    delay_drop: bool,
   },
   Focus(WidgetId),
   Blur(WidgetId),

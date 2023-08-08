@@ -2,7 +2,7 @@ use ribir_core::{impl_query_self_only, prelude::*};
 
 /// Widget just use as a paint kit for a path and not care about its size. Use
 /// `[PathWidget]!` instead of.
-#[derive(Declare, Clone)]
+#[derive(Declare, Declare2, Clone)]
 pub struct PathPaintKit {
   pub path: Path,
   #[declare(convert=into)]

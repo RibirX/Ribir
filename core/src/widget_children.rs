@@ -29,7 +29,7 @@
 //! clone, this seems too strict and if `A` is not support clone, the compile
 //! error is too complex to diagnostic.
 
-use crate::prelude::*;
+use crate::{prelude::*, widget::WidgetBuilder};
 mod compose_child_impl;
 mod multi_child_impl;
 mod single_child_impl;
@@ -43,15 +43,21 @@ pub trait SingleChild {}
 
 /// A boxed render widget that support accept one child.
 pub trait BoxedSingleParent {
-  fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId;
+  fn boxed_append_child(self: Box<Self>, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId;
+  fn boxed_build(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId;
 }
 
 /// Trait to tell Ribir a object that has multi children.
 pub trait MultiChild {}
 
 /// A boxed render widget that support accept multi children.
-pub trait BoxMultiParent {
-  fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId;
+pub trait BoxedMultiParent {
+  fn boxed_append_children(
+    self: Box<Self>,
+    children: Vec<WidgetId>,
+    ctx: &mut BuildCtx,
+  ) -> WidgetId;
+  fn boxed_build(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId;
 }
 
 /// Trait mark widget can have one child and also have compose logic for widget
@@ -66,23 +72,81 @@ pub trait ComposeChild: Sized {
 pub type WidgetOf<W> = SinglePair<W, Widget>;
 
 impl SingleChild for Box<dyn BoxedSingleParent> {}
-impl MultiChild for Box<dyn BoxMultiParent> {}
+impl MultiChild for Box<dyn BoxedMultiParent> {}
 
-impl RenderParent for Box<dyn BoxedSingleParent> {
-  fn into_render_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.into_parent(ctx) }
-}
-
-impl RenderParent for Box<dyn BoxMultiParent> {
-  fn into_render_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.into_parent(ctx) }
-}
-
-pub(crate) trait RenderParent {
-  fn into_render_parent(self, ctx: &mut BuildCtx) -> WidgetId;
-}
-
-impl<T: Into<Box<dyn Render>>> RenderParent for T {
+impl WidgetBuilder for Box<dyn BoxedSingleParent> {
   #[inline]
-  fn into_render_parent(self, ctx: &mut BuildCtx) -> WidgetId { ctx.alloc_widget(self.into()) }
+  fn build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx.force_as_mut()) }
+}
+
+impl SingleParent for Box<dyn BoxedSingleParent> {
+  #[inline]
+  fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
+    self.boxed_append_child(child, ctx)
+  }
+}
+
+impl WidgetBuilder for Box<dyn BoxedMultiParent> {
+  #[inline]
+  fn build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx.force_as_mut()) }
+}
+
+impl MultiParent for Box<dyn BoxedMultiParent> {
+  #[inline]
+  fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId {
+    self.boxed_append_children(children, ctx)
+  }
+}
+
+pub(crate) trait SingleParent: WidgetBuilder {
+  fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId;
+}
+
+pub(crate) trait MultiParent: WidgetBuilder {
+  fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId;
+}
+
+impl<T: Into<Box<dyn Render>> + SingleChild + WidgetBuilder> SingleParent for T {
+  fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
+    let p = self.build(ctx);
+    ctx.append_child(p, child);
+    p
+  }
+}
+
+impl<T: Into<Box<dyn Render>> + MultiChild + WidgetBuilder> MultiParent for T {
+  #[inline]
+  fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId {
+    let p = self.build(ctx);
+    for c in children {
+      ctx.append_child(p, c);
+    }
+    p
+  }
+}
+
+impl<W: SingleParent + 'static> BoxedSingleParent for W {
+  #[inline]
+  fn boxed_append_child(self: Box<Self>, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
+    (*self).append_child(child, ctx)
+  }
+
+  #[inline]
+  fn boxed_build(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId { (*self).build(ctx) }
+}
+
+impl<W: MultiParent + 'static> BoxedMultiParent for W {
+  #[inline]
+  fn boxed_append_children(
+    self: Box<Self>,
+    children: Vec<WidgetId>,
+    ctx: &mut BuildCtx,
+  ) -> WidgetId {
+    (*self).append_children(children, ctx)
+  }
+
+  #[inline]
+  fn boxed_build(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId { (*self).build(ctx) }
 }
 
 #[cfg(test)]
@@ -91,7 +155,6 @@ mod tests {
   use crate::test_helper::*;
   use crate::widget::WidgetBuilder;
   use ribir_dev_helper::*;
-  use std::{cell::RefCell, rc::Rc};
 
   #[test]
   fn compose_template_child() {

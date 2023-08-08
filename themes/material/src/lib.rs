@@ -252,15 +252,11 @@ fn init_custom_style(theme: &mut FullTheme) {
 
 fn override_compose_decorator(theme: &mut FullTheme) {
   fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
-    widget! {
-      init ctx => {
-        let background = Palette::of(ctx).primary();
-      }
-      DynWidget {
-        dyns: host,
+    fn_widget! {
+      @$host {
         margin,
         border_radius: Radius::all(4.),
-        background
+        background: Palette::of(ctx!()).primary(),
       }
     }
     .into()
@@ -268,142 +264,167 @@ fn override_compose_decorator(theme: &mut FullTheme) {
 
   let styles = &mut theme.compose_decorators;
   styles.override_compose_decorator::<HScrollBarThumbDecorator>(|this, host| {
-    widget! {
-      states { this }
-      init ctx => {
-        let  smooth_scroll = transitions::SMOOTH_SCROLL.of(ctx);
-      }
-      DynWidget {
-        id: thumb,
-        left_anchor: this.offset,
-        dyns: scrollbar_thumb(host, EdgeInsets::vertical(1.))
-      }
+    fn_widget! {
+      let host = scrollbar_thumb(host, EdgeInsets::vertical(1.));
+      let mut thumb = @ $host { left_anchor: pipe!($this.offset) };
 
-      transition prop!(thumb.left_anchor, PositionUnit::lerp_fn(thumb.layout_width())) {
-        by: smooth_scroll,
-      }
+      let left_trans = map_writer!($thumb.left_anchor);
+      left_trans.transition_with(
+        transitions::LINEAR.of(ctx!()),
+        move |from, to, rate| PositionUnit::lerp(from, to, rate, $thumb.layout_width()),
+        ctx!()
+      );
+
+      thumb
     }
     .into()
   });
   styles.override_compose_decorator::<VScrollBarThumbDecorator>(|this, host| {
-    widget! {
-      states { this }
-      init ctx => {
-        let smooth_scroll = transitions::SMOOTH_SCROLL.of(ctx);
-      }
-      DynWidget {
-        id: thumb,
-        top_anchor: this.offset,
-        dyns: scrollbar_thumb(host, EdgeInsets::vertical(1.))
-      }
+    fn_widget! {
+      let host = scrollbar_thumb(host, EdgeInsets::vertical(1.));
+      let mut thumb = @ $host { top_anchor: pipe!($this.offset) };
 
-      transition prop!(thumb.top_anchor, PositionUnit::lerp_fn(thumb.layout_height())) {
-        by: smooth_scroll
-      }
+      let top_trans = map_writer!($thumb.top_anchor);
+      top_trans.transition_with(
+        transitions::LINEAR.of(ctx!()),
+        move |from, to, rate| PositionUnit::lerp(from, to, rate, $thumb.layout_height()),
+        ctx!()
+      );
+
+      thumb
     }
     .into()
   });
   styles.override_compose_decorator::<IndicatorDecorator>(|style, host| {
-    widget! {
-      states { style }
-      init ctx => {
-        let ease_in = transitions::EASE_IN.of(ctx);
-      }
-      DynWidget {
-        id: indicator,
-        left_anchor: match style.pos {
-          Position::Top | Position::Bottom => style.rect.origin.x
-            + (style.rect.size.width - INDICATOR_SIZE) / 2.,
-          Position::Left => style.rect.size.width - style.extent,
-          Position::Right => 0.,
+    fn_widget! {
+      let mut indicator = @ $host {
+        left_anchor: pipe!{
+          let mut style = $style;
+          match style.pos {
+            Position::Top | Position::Bottom => style.rect.origin.x
+              + (style.rect.size.width - INDICATOR_SIZE) / 2.,
+            Position::Left => style.rect.size.width - style.extent,
+            Position::Right => 0.,
+          }
         },
-        top_anchor: match style.pos {
-          Position::Left | Position::Right => style.rect.origin.y
-            + (style.rect.size.height - INDICATOR_SIZE) / 2.,
-          Position::Top => style.rect.size.height - style.extent,
-          Position::Bottom => 0.,
+        top_anchor: pipe!{
+          let style = $style;
+          match style.pos {
+            Position::Left | Position::Right => style.rect.origin.y
+              + (style.rect.size.height - INDICATOR_SIZE) / 2.,
+            Position::Top => style.rect.size.height - style.extent,
+            Position::Bottom => 0.,
+          }
         },
-        dyns: host,
+      };
+
+      let ease_in = transitions::EASE_IN.of(ctx!());
+      match $style.pos {
+        Position::Top | Position::Bottom => {
+          let left = map_writer!($indicator.left_anchor);
+          left.transition_with(
+            ease_in.clone(),
+            move |from, to, rate| PositionUnit::lerp(from, to, rate, $style.rect.width()),
+            ctx!()
+          );
+
+        }
+        Position::Left | Position::Right => {
+          let top = map_writer!($indicator.top_anchor);
+          top.transition_with(
+            ease_in,
+            move |from, to, rate| PositionUnit::lerp(from, to, rate, $style.rect.height()),
+            ctx!()
+          );
+        }
       }
-      transition prop!(
-        indicator.left_anchor,
-        PositionUnit::lerp_fn(style.rect.size.width)
-      ) { by: ease_in.clone() }
-      transition prop!(
-        indicator.top_anchor,
-        PositionUnit::lerp_fn(style.rect.size.height)
-      ) { by: ease_in }
+
+      indicator
     }
     .into()
   });
   styles.override_compose_decorator::<CheckBoxDecorator>(move |style, host| {
-    widget! {
-      states { style }
-      Ripple {
+    fn_widget! {
+      @Ripple {
         center: true,
-        color: style.color,
+        color: pipe!($style.color),
         radius: 24.,
         bounded: RippleBound::Unbounded,
-        InteractiveLayer {
-          color: style.color, border_radii: Radius::all(24.),
-          DynWidget { dyns: host, margin: EdgeInsets::all(12.) }
+        @InteractiveLayer {
+          color: pipe!($style.color),
+          border_radii: Radius::all(24.),
+          @$host {
+            margin: EdgeInsets::all(12.)
+          }
         }
       }
     }
     .into()
   });
   styles.override_compose_decorator::<FilledButtonDecorator>(move |style, host| {
-    widget! {
-      init ctx => {
-        let palette1 = Palette::of(ctx).clone();
-        let palette2 = Palette::of(ctx).clone();
-      }
-      states { style }
-      Ripple {
+    fn_widget! {
+      @Ripple {
         center: false,
-        color: palette1.on_of(&palette1.base_of(&style.color)),
+        color: {
+          let palette = Palette::of(ctx!()).clone();
+          pipe!(palette.on_of(&palette.base_of(&$style.color)))
+        },
         bounded: RippleBound::Radius(Radius::all(20.)),
-        InteractiveLayer {
-          color: palette2.on_of(&palette2.base_of(&style.color)), border_radii: Radius::all(20.),
-          DynWidget { dyns: host, margin: EdgeInsets::all(0.) }
+        @InteractiveLayer {
+          border_radii: Radius::all(20.),
+          color: {
+            let palette = Palette::of(ctx!()).clone();
+            pipe!(palette.on_of(&palette.base_of(&$style.color)))
+          },
+          @$host {
+            margin: EdgeInsets::all(0.)
+          }
         }
       }
     }
     .into()
   });
   styles.override_compose_decorator::<OutlinedButtonDecorator>(move |style, host| {
-    widget! {
-      init ctx => {
-        let palette1 = Palette::of(ctx).clone();
-        let palette2 = Palette::of(ctx).clone();
-      }
-      states { style }
-      Ripple {
+    fn_widget! {
+      @Ripple {
         center: false,
-        color: palette1.base_of(&style.color),
+        color: {
+          let palette = Palette::of(ctx!()).clone();
+          pipe!(palette.base_of(&$style.color))
+        },
         bounded: RippleBound::Radius(Radius::all(20.)),
-        InteractiveLayer {
-          color: palette2.base_of(&style.color), border_radii: Radius::all(20.),
-          DynWidget { dyns: host, margin: EdgeInsets::all(0.) }
+        @InteractiveLayer {
+          border_radii: Radius::all(20.),
+          color: {
+            let palette = Palette::of(ctx!()).clone();
+            pipe!(palette.base_of(&$style.color))
+          },
+          @$host {
+            margin: EdgeInsets::all(0.)
+          }
         }
       }
     }
     .into()
   });
   styles.override_compose_decorator::<ButtonDecorator>(move |style, host| {
-    widget! {
-      init ctx => {
-        let palette1 = Palette::of(ctx).clone();
-        let palette2 = Palette::of(ctx).clone();
-      }
-      states { style }
-      Ripple {
+    fn_widget! {
+      @Ripple {
         center: false,
-        color: palette1.base_of(&style.color),
+        color: {
+          let palette = Palette::of(ctx!()).clone();
+          pipe!(palette.on_of(&palette.base_of(&$style.color)))
+        },
         bounded: RippleBound::Radius(Radius::all(20.)),
-        InteractiveLayer {
-          color: palette2.base_of(&style.color), border_radii: Radius::all(20.),
-          DynWidget { dyns: host, margin: EdgeInsets::all(0.) }
+        @InteractiveLayer {
+          border_radii: Radius::all(20.),
+          color: {
+            let palette = Palette::of(ctx!()).clone();
+            pipe!(palette.on_of(&palette.base_of(&$style.color)))
+          },
+          @$host {
+            margin: EdgeInsets::all(0.)
+          }
         }
       }
     }

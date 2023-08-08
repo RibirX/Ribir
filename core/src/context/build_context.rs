@@ -3,15 +3,20 @@ use crate::{
   widget::{widget_id::new_node, TreeArena, WidgetTree},
   window::{DelayEvent, WindowId},
 };
-use std::{ops::Deref, rc::Rc};
+use std::{
+  cell::{Ref, RefCell, UnsafeCell},
+  ops::Deref,
+  rc::Rc,
+};
 
 /// A context provide during build the widget tree.
 pub struct BuildCtx<'a> {
-  pub(crate) themes: Option<Vec<Rc<Theme>>>,
+  // tmp `UnsafeCell` before use `BuildCtx` as mutable reference.
+  pub(crate) themes: UnsafeCell<Option<Vec<Rc<Theme>>>>,
   /// The widget which this `BuildCtx` is created from. It's not means this
   /// is the parent of the widget which is builded by this `BuildCtx`.
   ctx_from: Option<WidgetId>,
-  pub(crate) tree: &'a mut WidgetTree,
+  pub(crate) tree: &'a RefCell<WidgetTree>,
 }
 
 /// A handle of `BuildCtx` that you can store it and access the `BuildCtx` later
@@ -24,16 +29,16 @@ pub struct BuildCtxHandle {
 
 impl<'a> BuildCtx<'a> {
   /// Return the window of this context is created from.
-  pub fn window(&self) -> Rc<Window> { self.tree.window() }
+  pub fn window(&self) -> Rc<Window> { self.tree.borrow().window() }
 
   /// Get the widget which this `BuildCtx` is created from.
-  pub fn ctx_from(&self) -> WidgetId { self.ctx_from.unwrap_or_else(|| self.tree.root()) }
+  pub fn ctx_from(&self) -> WidgetId { self.ctx_from.unwrap_or_else(|| self.tree.borrow().root()) }
 
   /// Create a handle of this `BuildCtx` which support `Clone`, `Copy` and
   /// convert back to this `BuildCtx`. This let you can store the `BuildCtx`.
   pub fn handle(&self) -> BuildCtxHandle {
     BuildCtxHandle {
-      wnd_id: self.tree.window().id(),
+      wnd_id: self.window().id(),
       ctx_from: self.ctx_from,
     }
   }
@@ -43,8 +48,12 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
-  pub(crate) fn new(from: Option<WidgetId>, tree: &'a mut WidgetTree) -> Self {
-    Self { themes: None, ctx_from: from, tree }
+  pub(crate) fn new(from: Option<WidgetId>, tree: &'a RefCell<WidgetTree>) -> Self {
+    Self {
+      themes: UnsafeCell::new(None),
+      ctx_from: from,
+      tree,
+    }
   }
 
   pub(crate) fn find_cfg<T>(&self, f: impl Fn(&Theme) -> Option<&T>) -> Option<&T> {
@@ -60,41 +69,37 @@ impl<'a> BuildCtx<'a> {
   }
 
   /// Get the widget back of `id`, panic if not exist.
-  pub(crate) fn assert_get(&self, id: WidgetId) -> &dyn Render { id.assert_get(&self.tree.arena) }
-
-  pub(crate) fn assert_get_mut(&self, id: WidgetId) -> &mut Box<dyn Render> {
-    id.assert_get_mut(&mut self.force_as_mut().tree.arena)
+  pub(crate) fn assert_get(&self, id: WidgetId) -> Ref<dyn Render> {
+    Ref::map(self.tree.borrow(), |tree| id.assert_get(&tree.arena))
   }
 
   pub(crate) fn alloc_widget(&self, widget: Box<dyn Render>) -> WidgetId {
-    let arena = &mut self.force_as_mut().tree.arena;
-    new_node(arena, widget)
+    new_node(&mut self.tree.borrow_mut().arena, widget)
   }
 
   pub(crate) fn append_child(&mut self, parent: WidgetId, child: WidgetId) {
-    parent.append(child, &mut self.tree.arena);
+    parent.append(child, &mut self.tree.borrow_mut().arena);
   }
 
   /// Insert `next` after `prev`
   pub(crate) fn insert_after(&mut self, prev: WidgetId, next: WidgetId) {
-    let arena = &mut self.tree.arena;
-    prev.insert_after(next, arena);
+    prev.insert_after(next, &mut self.tree.borrow_mut().arena);
   }
 
   /// After insert new subtree to the widget tree, call this to watch the
   /// subtree and fire mount events.
   pub(crate) fn on_subtree_mounted(&self, id: WidgetId) {
-    id.descendants(&self.tree.arena)
+    id.descendants(&self.tree.borrow().arena)
       .for_each(|w| self.on_widget_mounted(w));
-    self.tree.mark_dirty(id);
+    self.tree.borrow_mut().mark_dirty(id);
   }
 
   /// After insert new widget to the widget tree, call this to watch the widget
   /// and fire mount events.
   pub(crate) fn on_widget_mounted(&self, id: WidgetId) {
     self.assert_get(id).query_all_type(
-      |notifier: &StateChangeNotifier| {
-        let state_changed = self.tree.dirty_set.clone();
+      |notifier: &Notifier| {
+        let state_changed = self.tree.borrow().dirty_set.clone();
         notifier
           .raw_modifies()
           .filter(|b| b.contains(ModifyScope::FRAMEWORK))
@@ -111,17 +116,17 @@ impl<'a> BuildCtx<'a> {
 
   /// Dispose the whole subtree of `id`, include `id` itself.
   pub(crate) fn dispose_subtree(&self, id: WidgetId) {
-    // todo: delay drop query
-    let tree = &mut self.force_as_mut().tree;
+    let mut tree = self.tree.borrow_mut();
+    let parent = id.parent(&tree.arena);
     tree.detach(id);
-    self
+    tree
       .window()
-      .add_delay_event(DelayEvent::Disposed { id, delay_drop: false });
+      .add_delay_event(DelayEvent::Disposed { id, parent });
     let (arena1, arena2) = unsafe { split_arena(&mut tree.arena) };
     id.descendants(arena1).for_each(|id| id.mark_drop(arena2))
   }
 
-  pub(crate) fn mark_dirty(&mut self, id: WidgetId) { self.tree.mark_dirty(id); }
+  pub(crate) fn mark_dirty(&mut self, id: WidgetId) { self.tree.borrow_mut().mark_dirty(id); }
 
   #[inline]
   pub(crate) fn push_theme(&self, theme: Rc<Theme>) { self.themes().push(theme); }
@@ -141,13 +146,14 @@ impl<'a> BuildCtx<'a> {
     }
   }
 
+  #[allow(clippy::mut_from_ref)]
   fn themes(&self) -> &mut Vec<Rc<Theme>> {
     let this = self.force_as_mut();
-    this.themes.get_or_insert_with(|| {
+    unsafe { &mut *this.themes.get() }.get_or_insert_with(|| {
       let mut themes = vec![];
       let Some(p) = self.ctx_from else { return themes };
 
-      let arena = &mut this.tree.arena;
+      let arena = &this.tree.borrow().arena;
       p.ancestors(arena).any(|p| {
         p.assert_get(arena).query_all_type(
           |t: &Rc<Theme>| {
@@ -168,9 +174,8 @@ impl BuildCtxHandle {
   /// the window is closed or widget is removed.
   pub fn with_ctx<R>(self, f: impl FnOnce(&BuildCtx) -> R) -> Option<R> {
     AppCtx::get_window(self.wnd_id).map(|wnd| {
-      let mut tree = wnd.widget_tree.borrow_mut();
-      let ctx = BuildCtx::new(self.ctx_from, &mut tree);
-      f(&ctx)
+      let mut ctx = BuildCtx::new(self.ctx_from, &wnd.widget_tree);
+      f(&mut ctx)
     })
   }
 }
@@ -194,6 +199,7 @@ mod tests {
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     let themes: Stateful<Vec<Rc<Theme>>> = Stateful::new(vec![]);
+    let c_themes = themes.clone_writer();
     let light_palette = Palette {
       brightness: Brightness::Light,
       ..Default::default()
@@ -202,27 +208,29 @@ mod tests {
       brightness: Brightness::Dark,
       ..Default::default()
     };
-    let light_dark = widget! {
-      states { themes: themes.clone() }
-      ThemeWidget {
+    let light_dark = fn_widget! {
+      @ThemeWidget {
         theme: Rc::new(Theme::Inherit(InheritTheme {
           palette: Some(Rc::new(light_palette)),
           ..<_>::default()
 
         })),
-        MockBox {
+        @MockBox {
           size: INFINITY_SIZE,
-          ThemeWidget {
+          @ThemeWidget {
             theme: Rc::new(Theme::Inherit(InheritTheme {
               palette: Some(Rc::new(dark_palette)),
               ..<_>::default()
             })),
-            MockBox {
+            @MockBox {
               size: ZERO_SIZE,
-              FnWidget::new(move |ctx: &BuildCtx| {
-                no_watch!(*themes) = ctx.themes().clone();
-                Void
-              })
+              @ {
+                FnWidget::new(move |ctx: &BuildCtx| {
+                  *$c_themes.write() = ctx.themes().clone();
+                  Void
+                })
+              }
+
             }
           }
         }

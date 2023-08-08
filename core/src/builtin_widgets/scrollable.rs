@@ -29,45 +29,34 @@ pub struct ScrollableWidget {
 
 impl ComposeChild for ScrollableWidget {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_writable() }
-      Clip {
-        UnconstrainedBox {
-          id: view,
-          dir: match this.scrollable {
-            Scrollable::X => UnconstrainedDir::X,
-            Scrollable::Y => UnconstrainedDir::Y,
-            Scrollable::Both => UnconstrainedDir::Both,
-          },
-          clamp_dim: ClampDim::MAX_SIZE,
-          on_wheel: move |e| this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
-          DynWidget {
-            id: content,
-            dyns: child,
-            left_anchor: this.scroll_pos.x,
-            top_anchor: this.scroll_pos.y,
-          }
-        }
-      }
+  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+    fn_widget! {
+      let mut view = @UnconstrainedBox {
+        dir: pipe!(match $this.get_scrollable() {
+          Scrollable::X => UnconstrainedDir::X,
+          Scrollable::Y => UnconstrainedDir::Y,
+          Scrollable::Both => UnconstrainedDir::Both,
+        }),
+        clamp_dim: ClampDim::MAX_SIZE,
+      };
 
-      finally {
-        let_watch!(content.layout_size())
-          .distinct_until_changed()
-          .subscribe(move |v| {
-            this.content_size = v;
-            // content size update need to update scroll offset.
-            let scroll_pos = this.scroll_pos;
-            this.jump_to(scroll_pos);
-          });
-        let_watch!(view.layout_size())
-          .distinct_until_changed()
-          .subscribe(move |v| {
-              this.page = v;
-              // view size update need to update scroll offset.
-              let scroll_pos = this.scroll_pos;
-              this.jump_to(scroll_pos);
-          });
+    let mut child = @ $child {
+      left_anchor: pipe!($this.get_scroll_pos().x),
+      top_anchor: pipe!($this.get_scroll_pos().y),
+    };
+
+    watch!($child.layout_size())
+      .distinct_until_changed()
+      .subscribe(move |v| $this.set_content_size(v));
+    watch!($view.layout_size())
+      .distinct_until_changed()
+      .subscribe(move |v| $this.set_page(v));
+
+      @Clip {
+        @ $view {
+          on_wheel: move |e| $this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
+          @ { child }
+        }
       }
     }
     .into()
@@ -108,6 +97,22 @@ impl ScrollableWidget {
     }
     self.jump_to(new);
   }
+
+  pub fn set_content_size(&mut self, content_size: Size) {
+    self.content_size = content_size;
+    self.sync_pos()
+  }
+
+  pub fn set_page(&mut self, page: Size) {
+    self.page = page;
+    self.sync_pos()
+  }
+
+  fn get_scrollable(&self) -> Scrollable { self.scrollable }
+
+  fn get_scroll_pos(&self) -> Point { self.scroll_pos }
+
+  fn sync_pos(&mut self) { self.jump_to(self.scroll_pos) }
 }
 
 #[cfg(test)]
@@ -140,7 +145,7 @@ mod tests {
       modifiers: ModifiersState::default(),
     });
 
-    wnd.layout();
+    wnd.draw_frame();
     let pos = wnd.layout_info_by_path(&[0, 0, 0, 0]).unwrap().pos;
     assert_eq!(pos.y, expect_y);
     let pos = wnd.layout_info_by_path(&[0, 0, 0, 0, 0]).unwrap().pos;

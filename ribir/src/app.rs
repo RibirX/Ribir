@@ -47,18 +47,15 @@ impl App {
 
   /// create a new window with the `root` widget and return the window id.
   #[track_caller]
-  pub fn new_window(root: Widget, size: Option<Size>) -> WindowId {
+  pub fn new_window(root: Widget, size: Option<Size>) -> Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let shell_wnd = WinitShellWnd::new(size, &app.event_loop);
-    let wnd = Window::new(root, Box::new(shell_wnd));
-    let id = wnd.id();
-    AppCtx::windows().borrow_mut().insert(id, wnd);
-    AppCtx::get_window(id).unwrap().emit_events();
+    let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
 
     if app.active_wnd.is_none() {
-      app.active_wnd = Some(id);
+      app.active_wnd = Some(wnd.id());
     }
-    id
+    wnd
   }
 
   /// Get a event sender of the application event loop, you can use this to send
@@ -129,17 +126,19 @@ impl App {
         }
         Event::MainEventsCleared => {
           AppCtx::run_until_stalled();
-          AppCtx::windows().borrow().values().for_each(|wnd| {
-            if wnd.need_draw() {
-              let wnd = wnd.shell_wnd().borrow();
-              let shell = wnd.as_any().downcast_ref::<WinitShellWnd>().unwrap();
-              shell.winit_wnd.request_redraw();
-            }
-          })
+          AppCtx::windows()
+            .borrow()
+            .values()
+            .filter(|wnd| wnd.need_draw())
+            .for_each(|wnd| request_redraw(wnd))
         }
         Event::RedrawRequested(id) => {
           if let Some(wnd) = AppCtx::get_window(new_id(id)) {
-            wnd.draw_frame()
+            // if this frame is really draw, request another redraw. To make sure the draw
+            // always end with a empty draw and emit an extra tick cycle message.
+            if wnd.draw_frame() {
+              request_redraw(&wnd);
+            }
           }
         }
         Event::RedrawEventsCleared => {
@@ -217,3 +216,9 @@ impl RuntimeWaker for EventWaker {
 
 /// EventWaker only send `RibirEvent::FuturesWake`.
 unsafe impl Send for EventWaker {}
+
+fn request_redraw(wnd: &Window) {
+  let wnd = wnd.shell_wnd().borrow();
+  let shell = wnd.as_any().downcast_ref::<WinitShellWnd>().unwrap();
+  shell.winit_wnd.request_redraw();
+}

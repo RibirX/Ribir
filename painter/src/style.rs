@@ -24,6 +24,11 @@ impl From<Color> for Brush {
   fn from(c: Color) -> Self { Brush::Color(c) }
 }
 
+impl From<Color> for Option<Brush> {
+  #[inline]
+  fn from(c: Color) -> Self { Some(c.into()) }
+}
+
 impl From<ShareResource<PixelImage>> for Brush {
   #[inline]
   fn from(img: ShareResource<PixelImage>) -> Self { Brush::Image(img) }

@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 #[derive(Declare, Declare2, Default, Clone, SingleChild)]
 pub struct Opacity {
-  #[declare(builtin)]
+  #[declare(builtin, default = 1.)]
   pub opacity: f32,
 }
 

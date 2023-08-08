@@ -8,8 +8,8 @@ pub trait MultiWithChild<C> {
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
 }
 
-pub struct MultiPair {
-  pub parent: WidgetId,
+pub struct MultiPair<P> {
+  pub parent: P,
   pub children: Vec<WidgetId>,
 }
 
@@ -57,16 +57,6 @@ where
   }
 }
 
-impl<D> FillVec for Stateful<DynWidget<Multi<D>>>
-where
-  D: IntoIterator + 'static,
-  Widget: From<D::Item>,
-{
-  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) {
-    vec.push(DynRender::multi(self).build(ctx))
-  }
-}
-
 impl<D> FillVec for Pipe<Multi<D>>
 where
   D: IntoIterator + 'static,
@@ -77,36 +67,21 @@ where
   }
 }
 
-trait MultiParent {
-  fn into_multi_parent(self, ctx: &mut BuildCtx) -> WidgetId;
-}
-
-impl<R: RenderParent + MultiChild> MultiParent for R {
-  #[inline]
-  fn into_multi_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.into_render_parent(ctx) }
-}
-
-impl<W: RenderParent + MultiChild> MultiParent for Pipe<W> {
-  #[inline]
-  fn into_multi_parent(self, ctx: &mut BuildCtx) -> WidgetId { self.into_only_parent(ctx) }
-}
-
-impl<R, C> MultiWithChild<C> for R
+impl<P, C> MultiWithChild<C> for P
 where
-  R: MultiParent,
+  P: MultiChild,
   C: FillVec,
 {
-  type Target = MultiPair;
+  type Target = MultiPair<P>;
 
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    let parent = self.into_multi_parent(ctx.force_as_mut());
     let mut children = vec![];
     child.fill_vec(&mut children, ctx);
-    MultiPair { parent, children }
+    MultiPair { parent: self, children }
   }
 }
 
-impl<C> MultiWithChild<C> for MultiPair
+impl<C, P> MultiWithChild<C> for MultiPair<P>
 where
   C: FillVec,
 {
@@ -118,13 +93,9 @@ where
   }
 }
 
-impl WidgetBuilder for MultiPair {
+impl<P: MultiParent> WidgetBuilder for MultiPair<P> {
   fn build(self, ctx: &BuildCtx) -> WidgetId {
     let MultiPair { parent, children } = self;
-    children
-      .into_iter()
-      .for_each(|child| ctx.force_as_mut().append_child(parent, child));
-
-    parent
+    parent.append_children(children, ctx.force_as_mut())
   }
 }

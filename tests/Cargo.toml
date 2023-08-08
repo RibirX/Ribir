@@ -30,10 +30,6 @@ name = "rdl_macro_test"
 path = "rdl_macro_test.rs"
 
 [[test]]
-name = "animations_syntax"
-path = "animations_syntax_test.rs"
-
-[[test]]
 name = "child_template_derive"
 path = "child_template_derive_test.rs"
 

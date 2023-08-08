@@ -50,38 +50,36 @@ pub struct ButtonTemplate {
 impl ComposeChild for ButtonImpl {
   type Child = ButtonTemplate;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
     let ButtonTemplate { icon, label } = child;
-    widget! {
-      states { this: this.into_readonly() }
-      BoxDecoration {
-        border_radius: this.radius.map(Radius::all),
-        background: this.background_color.clone(),
-        border: this.border_style.clone(),
-        ConstrainedBox {
-          clamp: BoxClamp::min_width(this.min_width).with_fixed_height(this.height),
-          DynWidget {
-            dyns: Option::map(this.padding_style, |padding| Padding { padding }),
-            Row {
-              justify_content: JustifyContent::Center,
-              align_items: Align::Center,
-              Option::map(icon, |icon| widget! {
-                Icon {
-                  size: this.icon_size,
-                  widget::from(icon)
-                }
-              })
-              Option::map(label, |label| widget! {
-                states { text: label.into_readonly() }
-                Margin {
-                  margin: EdgeInsets::horizontal(this.label_gap),
-                  Text {
-                    text: text.0.clone(),
-                    foreground: this.foreground_color.clone(),
-                    text_style: this.label_style.clone()
-                  }
-                }
-              })
+    fn_widget! {
+      @BoxDecoration {
+        border_radius: pipe!($this.radius.map(Radius::all)),
+        background: pipe!($this.background_color.clone()),
+        border: pipe!($this.border_style.clone()),
+        @ConstrainedBox {
+          clamp: pipe!(BoxClamp::min_width($this.min_width)
+            .with_fixed_height($this.height)),
+          @{
+            let padding = pipe!($this.padding_style.map(|padding| Padding { padding }));
+            let icon = icon.map(|icon| @Icon {
+              size: pipe!($this.icon_size),
+              @{ icon }
+            });
+            let label = label.map(|mut label| @Text {
+              margin: pipe!(EdgeInsets::horizontal($this.label_gap)),
+              text: pipe!($label.0.clone()),
+              foreground: pipe!($this.foreground_color.clone()),
+              text_style: pipe!($this.label_style.clone())
+            });
+
+            @$ padding {
+              @Row {
+                justify_content: JustifyContent::Center,
+                align_items: Align::Center,
+                @ { icon }
+                @{ label }
+              }
             }
           }
         }

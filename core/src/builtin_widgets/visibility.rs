@@ -8,15 +8,14 @@ pub struct Visibility {
 
 impl ComposeChild for Visibility {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_readonly(), }
-      FocusScope {
-        skip_descendants: !this.visible,
-        can_focus: this.visible,
-        VisibilityRender {
-          display: this.visible,
-          widget::from(child)
+  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+    fn_widget! {
+      @FocusScope {
+        skip_descendants: pipe!(!$this.get_visible()),
+        can_focus: pipe!($this.get_visible()),
+        @VisibilityRender {
+          display: pipe!($this.get_visible()),
+          @ { child }
         }
       }
     }
@@ -24,7 +23,7 @@ impl ComposeChild for Visibility {
   }
 }
 
-#[derive(SingleChild, Declare, Clone)]
+#[derive(SingleChild, Declare, Declare2, Clone)]
 struct VisibilityRender {
   display: bool,
 }
@@ -59,4 +58,7 @@ impl_query_self_only!(VisibilityRender);
 impl Visibility {
   #[inline]
   pub fn new(visible: bool) -> Self { Self { visible } }
+
+  #[inline]
+  fn get_visible(&self) -> bool { self.visible }
 }

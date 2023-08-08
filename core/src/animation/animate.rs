@@ -1,32 +1,47 @@
-use crate::{
-  prelude::*,
-  ticker::{FrameMsg, FrameTicker},
-};
-use std::{
-  cell::RefCell,
-  ops::DerefMut,
-  rc::Rc,
-  time::{Duration, Instant},
-};
+use crate::{prelude::*, ticker::FrameMsg, window::WindowId};
+use std::time::Instant;
 
-use super::property::AnimateProperty;
-
-#[derive(Declare)]
-pub struct Animate<T, P: AnimateProperty> {
+#[derive(Declare2)]
+pub struct Animate<T, S>
+where
+  T: Roc + 'static,
+  S: AnimateState + 'static,
+{
+  #[declare(strict)]
   pub transition: T,
-  pub prop: P,
-  pub from: P::Value,
+  #[declare(strict)]
+  pub state: S,
+  pub from: <S::State as StateReader>::Value,
   #[declare(skip)]
-  running_info: Option<AnimateInfo<P::Value>>,
-  #[declare(skip, default = ctx.window().frame_ticker.clone())]
-  frame_ticker: FrameTicker,
-  #[declare(skip, default = ctx.window().animate_track())]
-  animate_track: AnimateTrack,
-  #[declare(skip, default = ctx.window().frame_scheduler())]
-  frame_scheduler: FuturesLocalScheduler,
+  running_info: Option<AnimateInfo<<S::State as StateReader>::Value>>,
+  #[declare(skip, default = ctx.window().id())]
+  window_id: WindowId,
 }
 
-pub struct AnimateInfo<V> {
+pub trait AnimateState {
+  type State: StateWriter;
+  fn state(&self) -> &Self::State;
+
+  fn calc_lerp_value(
+    &mut self,
+    from: &<Self::State as StateReader>::Value,
+    to: &<Self::State as StateReader>::Value,
+    rate: f32,
+  ) -> <Self::State as StateReader>::Value;
+}
+
+/// A state with a lerp function as an animation state that use the `lerp_fn`
+/// function to calc the linearly lerp value by rate, and not require the value
+/// type of the state to implement the `Lerp` trait.
+///
+/// User can use it if the value type of the state is not implement the `Lerp`
+/// or override the lerp algorithm of the value type of state.
+pub struct LerpFnState<S, F> {
+  lerp_fn: F,
+  state: S,
+}
+
+pub(crate) struct AnimateInfo<V> {
   from: V,
   to: V,
   start_at: Instant,
@@ -36,53 +51,75 @@ pub struct AnimateInfo<V> {
   _tick_msg_guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
 }
 
-impl<'a, T: Roc, P: AnimateProperty> StatefulRef<'a, Animate<T, P>>
+impl<T, S> State<Animate<T, S>>
 where
-  Animate<T, P>: 'static,
+  T: Roc + 'static,
+  S: AnimateState + 'static,
+  <S::State as StateReader>::Value: Clone,
 {
   pub fn run(&mut self) {
-    let new_to = self.prop.get();
-    // if animate is running, animate start from current value.
-    let Animate { prop, running_info, .. } = self.deref_mut();
-    if let Some(AnimateInfo { from, to, last_progress, .. }) = running_info {
-      *from = prop.calc_lerp_value(from, to, last_progress.value());
+    let mut animate_ref = self.write();
+    let this = &mut *animate_ref;
+    let wnd_id = this.window_id;
+    let new_to = this.state.state().read().clone();
+
+    if let Some(AnimateInfo { from, to, last_progress, .. }) = &mut this.running_info {
+      *from = this.state.calc_lerp_value(from, to, last_progress.value());
       *to = new_to;
-    } else {
-      let animate = self.clone_stateful();
-      let ticker = self.frame_ticker.frame_tick_stream();
-      let unsub = ticker.subscribe(move |msg| match msg {
-        FrameMsg::NewFrame(_) => {}
-        FrameMsg::LayoutReady(time) => {
-          let p = animate.shallow_ref().lerp(time);
-          if matches!(p, AnimateProgress::Finish) {
-            let scheduler = animate.silent_ref().frame_scheduler.clone();
-            let animate = animate.clone();
-            observable::of(())
-              .delay(Duration::ZERO, scheduler)
-              .subscribe(move |_| {
-                animate.silent_ref().stop();
-              });
+    } else if let Some(wnd) = AppCtx::get_window(wnd_id) {
+      drop(animate_ref);
+
+      let animate = self.clone_writer();
+      let ticker = wnd.frame_ticker.frame_tick_stream();
+      let unsub = ticker.subscribe(move |msg| {
+        match msg {
+          FrameMsg::NewFrame(time) => {
+            let p = animate.read().running_info.as_ref().unwrap().last_progress;
+            // Stop the animate at the next frame of animate finished, to ensure draw the
+            // last frame of the animate.
+            if matches!(p, AnimateProgress::Finish) {
+              let wnd = AppCtx::get_window(wnd_id).unwrap();
+              let animate = animate.clone_writer();
+              wnd
+                .frame_spawn(async move { animate.silent().stop() })
+                .unwrap();
+            } else {
+              animate.shallow().lerp_by_instant(time);
+            }
+          }
+          FrameMsg::LayoutReady(_) => {}
+          // use silent_ref because the state of animate change, bu no need to effect the framework.
+          FrameMsg::Finish(_) => {
+            let animate = &mut *animate.silent();
+            let info = animate.running_info.as_mut().unwrap();
+            *animate.state.state().shallow() = info.to.clone();
+            info.already_lerp = false;
           }
         }
-        // use silent_ref because the state of animate change, bu no need to effect the framework.
-        FrameMsg::Finish(_) => animate.silent_ref().frame_finished(),
       });
       let guard = BoxSubscription::new(unsub).unsubscribe_when_dropped();
-      self.running_info = Some(AnimateInfo {
-        from: self.from.clone(),
+      let animate = &mut *self.write();
+      animate.running_info = Some(AnimateInfo {
+        from: animate.from.clone(),
         to: new_to,
         start_at: Instant::now(),
         last_progress: AnimateProgress::Dismissed,
         _tick_msg_guard: Some(guard),
         already_lerp: false,
       });
-      self.animate_track.set_actived(true);
+      wnd.inc_running_animate();
     }
   }
 }
 
-impl<T: Roc, P: AnimateProperty> Animate<T, P> {
-  fn lerp(&mut self, now: Instant) -> AnimateProgress {
+impl<T: Roc, S> Animate<T, S>
+where
+  S: AnimateState + 'static,
+{
+  fn lerp_by_instant(&mut self, now: Instant) -> AnimateProgress
+  where
+    <S::State as StateReader>::Value: Clone,
+  {
     let AnimateInfo {
       from,
       to,
@@ -102,15 +139,15 @@ impl<T: Roc, P: AnimateProperty> Animate<T, P> {
     let elapsed = now - *start_at;
     let progress = self.transition.rate_of_change(elapsed);
 
-    let prop = &mut self.prop;
     match progress {
       AnimateProgress::Between(rate) => {
+        let value = self.state.calc_lerp_value(from, to, rate);
+        let state = &mut self.state.state().shallow();
         // the state may change during animate.
-        *to = prop.get();
-        let value = prop.calc_lerp_value(from, to, rate);
-        prop.shallow_set(value);
+        *to = state.clone();
+        **state = value;
       }
-      AnimateProgress::Dismissed => prop.set(from.clone()),
+      AnimateProgress::Dismissed => *self.state.state().shallow() = from.clone(),
       AnimateProgress::Finish => {}
     }
 
@@ -120,90 +157,89 @@ impl<T: Roc, P: AnimateProperty> Animate<T, P> {
     progress
   }
 
-  fn frame_finished(&mut self) {
-    let info = self
-      .running_info
-      .as_mut()
-      .expect("This animation is not running.");
-
-    if !matches!(info.last_progress, AnimateProgress::Finish) {
-      self.prop.set(info.to.clone())
-    }
-    info.already_lerp = false;
-  }
-
   pub fn stop(&mut self) {
-    self.animate_track.set_actived(false);
-    self.running_info.take();
+    if self.is_running() {
+      if let Some(wnd) = AppCtx::get_window(self.window_id) {
+        wnd.dec_running_animate();
+        self.running_info.take();
+      }
+    }
   }
 
   #[inline]
   pub fn is_running(&self) -> bool { self.running_info.is_some() }
 }
 
-pub struct AnimateTrack {
-  pub(crate) actived: bool,
-  pub(crate) actived_cnt: Rc<RefCell<u32>>,
-}
-
-impl Drop for AnimateTrack {
+impl<T: Roc, P> Drop for Animate<T, P>
+where
+  P: AnimateState + 'static,
+{
   fn drop(&mut self) {
-    if self.actived {
-      *self.actived_cnt.borrow_mut() -= 1;
+    if self.is_running() {
+      if let Some(wnd) = AppCtx::get_window(self.window_id).filter(|_| self.is_running()) {
+        wnd.dec_running_animate();
+      }
     }
-    self.actived = false;
   }
 }
 
-impl AnimateTrack {
-  fn set_actived(&mut self, actived: bool) {
-    if self.actived == actived {
-      return;
-    }
-    self.actived = actived;
-    match actived {
-      true => *self.actived_cnt.borrow_mut() += 1,
-      false => *self.actived_cnt.borrow_mut() -= 1,
-    };
-  }
+impl<V, S> AnimateState for S
+where
+  S: StateWriter<Value = V>,
+  V: Lerp,
+{
+  type State = S;
+
+  fn state(&self) -> &Self::State { self }
+
+  fn calc_lerp_value(&mut self, from: &V, to: &V, rate: f32) -> V { from.lerp(to, rate) }
+}
+
+impl<V, S, F> AnimateState for LerpFnState<S, F>
+where
+  S: StateWriter<Value = V>,
+  F: FnMut(&V, &V, f32) -> V,
+{
+  type State = S;
+
+  fn state(&self) -> &Self::State { &self.state }
+
+  fn calc_lerp_value(&mut self, from: &V, to: &V, rate: f32) -> V { (self.lerp_fn)(from, to, rate) }
+}
+
+impl<V, S, F> LerpFnState<S, F>
+where
+  S: StateReader<Value = V>,
+  F: FnMut(&V, &V, f32) -> V,
+{
+  #[inline]
+  pub fn new(state: S, lerp_fn: F) -> Self { Self { state, lerp_fn } }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{
-    animation::{easing, Prop},
-    declare::Declare,
-    state::Stateful,
-    test_helper::TestWindow,
-  };
+  use crate::{animation::easing, state::Stateful, test_helper::TestWindow};
+  use std::time::Duration;
 
   #[test]
   fn fix_animate_circular_mut_borrow() {
     let _guard = unsafe { AppCtx::new_lock_scope() };
 
-    let wnd = TestWindow::new(Void {});
-    let mut tree = wnd.widget_tree.borrow_mut();
-    let ctx = BuildCtx::new(None, &mut tree);
+    let w = fn_widget! {
+      let mut animate = @Animate {
+        transition: @Transition {
+          easing: easing::LINEAR,
+          duration: Duration::ZERO,
+        }.into_inner(),
+        state: Stateful::new(1.),
+        from: 0.,
+      };
+      animate.run();
+      @Void {}
+    };
 
-    let animate = Animate::declare_builder()
-      .transition(
-        Transition::declare_builder()
-          .easing(easing::LINEAR)
-          .duration(Duration::ZERO)
-          .build(&ctx),
-      )
-      .prop(Prop::new(
-        Stateful::new(1.),
-        |v| *v,
-        |_: &mut f32, _: f32| {},
-      ))
-      .from(0.)
-      .build(&ctx);
-
-    let animate = Stateful::new(animate);
-    animate.state_ref().run();
-
-    wnd.frame_ticker.emit(FrameMsg::LayoutReady(Instant::now()));
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
   }
 }

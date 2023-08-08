@@ -1,5 +1,5 @@
 use std::{
-  borrow::Borrow,
+  borrow::{Borrow, BorrowMut},
   fmt::Debug,
   hash::Hash,
   ops::{Bound, Range},
@@ -86,6 +86,13 @@ where
       CowArc::Owned(ref owned) => (**owned).borrow(),
     }
   }
+}
+
+impl<B: ?Sized + ToOwned> std::ops::DerefMut for CowArc<B>
+where
+  B::Owned: Clone + std::borrow::BorrowMut<B>,
+{
+  fn deref_mut(&mut self) -> &mut B { self.to_mut().borrow_mut() }
 }
 
 impl<T: ToOwned + ?Sized + 'static> Clone for CowArc<T> {

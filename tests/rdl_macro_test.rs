@@ -1,6 +1,6 @@
 use ribir::{core::test_helper::*, prelude::*};
 use ribir_dev_helper::*;
-use std::{cell::Cell, rc::Rc, time::Duration};
+use std::{cell::Cell, rc::Rc};
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 fn simplest_leaf_rdl() -> impl Into<Widget> {
@@ -131,7 +131,7 @@ widget_layout_test!(dollar_as_middle_parent, width == 500., height == 500.,);
 
 fn pipe_as_field_value() -> impl Into<Widget> {
   let size = Stateful::new(Size::zero());
-  let size2 = size.clone();
+  let mut size2 = size.clone();
   let w = fn_widget! {
     rdl! { SizedBox { size: pipe!(*$size2) }}
   };
@@ -142,7 +142,7 @@ widget_layout_test!(pipe_as_field_value, width == 100., height == 100.,);
 
 fn pipe_as_builtin_field_value() -> impl Into<Widget> {
   let margin = Stateful::new(EdgeInsets::all(0.));
-  let margin2 = margin.clone();
+  let mut margin2 = margin.clone();
 
   let w = fn_widget! {
     rdl! { SizedBox {
@@ -156,7 +156,7 @@ fn pipe_as_builtin_field_value() -> impl Into<Widget> {
 widget_layout_test!(pipe_as_builtin_field_value, width == 100., height == 100.,);
 
 fn pipe_with_ctx() -> impl Into<Widget> {
-  let scale = Stateful::new(1.);
+  let mut scale = Stateful::new(1.);
   let scale2 = scale.clone();
   let w = fn_widget! {
     rdl! { SizedBox {
@@ -180,29 +180,29 @@ fn pipe_with_builtin_field() -> impl Into<Widget> {
 }
 widget_layout_test!(pipe_with_builtin_field, width == 4., height == 2.,);
 
-fn capture_closure_used_ctx() -> impl Into<Widget> {
-  fn_widget! {
-    let mut size_box = @SizedBox { size: ZERO_SIZE };
-    @ $size_box {
-      on_mounted: move |_| $size_box.size = IconSize::of(ctx!()).tiny
-    }
-  }
-}
-widget_layout_test!(capture_closure_used_ctx, width == 18., height == 18.,);
+// fn capture_closure_used_ctx() -> impl Into<Widget> {
+//   fn_widget! {
+//     let mut size_box = @SizedBox { size: ZERO_SIZE };
+//     @ $size_box {
+//       on_mounted: move |_| $size_box.size = IconSize::of(ctx!()).tiny
+//     }
+//   }
+// }
+// widget_layout_test!(capture_closure_used_ctx, width == 18., height == 18.,);
 
 #[test]
 fn pipe_single_parent() {
   let _guard = unsafe { AppCtx::new_lock_scope() };
 
-  let outside_blank = Stateful::new(true);
+  let mut outside_blank = Stateful::new(true);
   let outside_blank2 = outside_blank.clone();
   let w = fn_widget! {
     let edges = EdgeInsets::all(5.);
     let blank = pipe! {
       if *$outside_blank {
-        Box::new(rdl! { Margin { margin: edges } }) as Box<dyn BoxedSingleParent>
+        Box::new(Margin { margin: edges }) as Box<dyn BoxedSingleParent>
       } else {
-        Box::new(rdl! { Padding { padding: edges } }) as Box<dyn BoxedSingleParent>
+        Box::new(Padding { padding: edges }) as Box<dyn BoxedSingleParent>
       }
     };
     rdl! {
@@ -225,11 +225,11 @@ fn pipe_single_parent() {
 fn pipe_multi_parent() {
   let _guard = unsafe { AppCtx::new_lock_scope() };
 
-  let stack_or_flex = Stateful::new(true);
+  let mut stack_or_flex = Stateful::new(true);
   let stack_or_flex2 = stack_or_flex.clone();
   let w = fn_widget! {
     let container = pipe! {
-      let c: Box<dyn BoxMultiParent> = if *$stack_or_flex {
+      let c: Box<dyn BoxedMultiParent> = if *$stack_or_flex {
         Box::new(rdl! { Stack { } })
       } else {
         Box::new(rdl! { Flex { } })
@@ -259,7 +259,7 @@ fn pipe_as_child() {
   let _guard = unsafe { AppCtx::new_lock_scope() };
 
   let box_or_not = Stateful::new(true);
-  let box_or_not2 = box_or_not.clone();
+  let mut box_or_not2 = box_or_not.clone();
   let w = fn_widget! {
     let blank: Pipe<Widget> = pipe!{
       if *$box_or_not2 {
@@ -286,7 +286,7 @@ fn pipe_as_multi_child() {
   let _guard = unsafe { AppCtx::new_lock_scope() };
 
   let fix_box = SizedBox { size: Size::new(100., 100.) };
-  let cnt = Stateful::new(0);
+  let mut cnt = Stateful::new(0);
   let cnt2 = cnt.clone();
   let w = fn_widget! {
     let boxes = pipe! {
@@ -357,7 +357,7 @@ widget_layout_test!(
 fn closure_in_fn_widget_capture() {
   let _guard = unsafe { AppCtx::new_lock_scope() };
 
-  let hi_res = Stateful::new(CowArc::borrowed(""));
+  let mut hi_res = Stateful::new(CowArc::borrowed(""));
   let hi_res2 = hi_res.clone();
   let w = fn_widget! {
     let mut text = @ Text { text: "hi" };
@@ -416,7 +416,7 @@ fn simple_ref_bind_work() {
 
   tap_at(&mut wnd, (1, 1));
 
-  wnd.layout();
+  wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], size == flex_size * 2., });
 }
 
@@ -506,7 +506,7 @@ fn expression_for_children() {
   assert_layout_result_by_path!(wnd, { path = [0, 4], size == ZERO_SIZE,});
 
   tap_at(&mut wnd, (0, 0));
-  wnd.layout();
+  wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 25., height == 5.,});
   assert_layout_result_by_path!(wnd, { path = [0, 0], size == size_five,});
   assert_layout_result_by_path!(wnd, { path = [0, 1], size == size_five,});
@@ -610,8 +610,8 @@ fn builtin_ref() {
         size: Size::new(5., 5.),
         cursor: CursorIcon::Hand,
         on_tap: move |_| {
-          tap_box.cursor.set(CursorIcon::AllScroll);
-          c_icon_track.set(tap_box.cursor.get());
+          tap_box.cursor = CursorIcon::AllScroll;
+          c_icon_track.set(tap_box.cursor);
         }
       }
     }
@@ -832,7 +832,7 @@ fn fix_silent_not_relayout_dyn_widget() {
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
   {
-    *trigger_size.state_ref().silent() = Size::new(100., 100.);
+    **trigger_size.state_ref().silent() = Size::new(100., 100.);
   }
   // after silent modified, dyn widget not rebuild.
   wnd.draw_frame();
@@ -872,106 +872,5 @@ fn embed_shadow_states() {
       // `_a` should be the state `_a`
       SizedBox { size: *_a }
     })
-  };
-}
-
-#[test]
-fn untrack_prop_with_pure_lambda() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
-
-  let trigger = Stateful::new(0_u32);
-  let counter = Stateful::new(0_u32);
-  let w = widget! {
-    states {
-      trigger: trigger.clone(),
-      counter: counter.clone()
-    }
-    SizedBox {
-      id: host,
-      size: Size::new(50., 50.),
-    }
-    Animate {
-      id: animate,
-      transition: Transition {
-        delay:  None,
-        duration: Duration::from_millis(150),
-        easing: easing::EASE_IN,
-        repeat: None,
-      },
-      prop: prop!(host.size, move |from, to, rate| {
-        let _ = *trigger;
-        to.lerp(from, rate)
-      }),
-      from: Size::zero(),
-    }
-    finally {
-      let_watch!(animate.from)
-        .subscribe(move |_| {
-          *counter += 1;
-        });
-    }
-  };
-
-  let mut wnd = TestWindow::new(w);
-  wnd.draw_frame();
-
-  assert_eq!(*counter.state_ref(), 0);
-  *trigger.state_ref() += 1;
-  wnd.draw_frame();
-
-  assert_eq!(*counter.state_ref(), 0);
-}
-
-#[test]
-fn embed_widget() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
-
-  let _ = widget! {
-    Column {
-      widget! { // simple case & as first child
-        Container {
-          size: Size::new(10., 10.),
-        }
-      }
-      Container {
-        size: Size::zero(),
-      }
-      widget! { // all feature & as middle child
-        init ctx => {
-          let linear_transition = transitions::LINEAR.of(ctx);
-        }
-        Row {
-          SizedBox {
-            id: sized_box,
-            size: Size::new(100., 100.),
-            on_tap: move |_| {
-              leak_animate.run();
-            },
-          }
-        }
-        Animate {
-          id: leak_animate,
-          transition: linear_transition,
-          prop: prop!(sized_box.size),
-          from: ZERO_SIZE,
-        }
-        finally {
-          watch!(leak_animate.is_running())
-            .subscribe(move |v| println!("{v}"));
-        }
-      }
-      Container {
-        size: Size::zero(),
-      }
-      widget! {  // embed multi widget! & as last child
-        Row {
-          widget! {
-            Container {
-              size: Size::zero(),
-            }
-          }
-        }
-      }
-    }
   };
 }

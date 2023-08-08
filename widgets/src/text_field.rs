@@ -1,9 +1,4 @@
-use crate::{
-  common_widget::{Leading, LeadingText, Trailing, TrailingText},
-  input::Placeholder,
-  layout::{Column, ConstrainedBox, Container},
-  prelude::{Expanded, Icon, Input, Label, Row, Stack, Text},
-};
+use crate::prelude::*;
 use ribir_core::prelude::*;
 use std::{collections::HashMap, hash::Hash, ops::Deref};
 
@@ -94,8 +89,8 @@ where
   fn get(&self, state: S) -> Option<&T> { self.themes.get(&state) }
 }
 
-#[derive(Declare)]
-struct ThemeSuitProxy<S, T>
+#[derive(Declare, Declare2)]
+struct ThemeSuitProxy<S: 'static, T: 'static>
 where
   S: Hash + Eq,
 {
@@ -107,32 +102,27 @@ type TextFieldThemeProxy = ThemeSuitProxy<TextFieldState, TextFieldTheme>;
 
 impl ComposeChild for TextFieldThemeProxy {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget
-  where
-    Self: Sized,
-  {
-    widget! {
-      states {this: this.into_writable()}
-      DynWidget {
-        dyns: {
-          child
-        },
+  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+    fn_widget! {
+      @ $child {
         on_tap: move |_| {
+          let mut this = $this;
           match this.state {
             TextFieldState::Enabled => this.state = TextFieldState::Focused,
             TextFieldState::Hovered => this.state = TextFieldState::Focused,
             _ => (),
           };
         },
-
         on_pointer_move: move |_| {
+          let mut this = $this;
           if this.state == TextFieldState::Enabled { this.state = TextFieldState::Hovered }
         },
-
         on_pointer_leave: move |_| {
+          let mut this = $this;
           if this.state == TextFieldState::Hovered { this.state = TextFieldState::Enabled }
         },
         on_focus_out: move |_| {
+          let mut this = $this;
           if this.state == TextFieldState::Focused { this.state = TextFieldState::Enabled }
         },
       }
@@ -291,59 +281,46 @@ macro_rules! take_option_field {
 
 impl ComposeChild for TextField {
   type Child = Option<TextFieldTml>;
-  fn compose_child(this: State<Self>, config: Self::Child) -> Widget
-  where
-    Self: Sized,
-  {
-    let mut config = config.unwrap_or_default();
-    widget! {
-      states {
-        this: this.into_writable(),
-      }
-      init ctx => {
-        let theme_suit = TextFieldThemeSuit::of(ctx).clone();
-      }
-      init {
-        take_option_field!({leading_icon, trailing_icon}, config);
-      }
+  fn compose_child(mut this: State<Self>, config: Self::Child) -> Widget {
+    fn_widget! {
+      let mut config = config.unwrap_or_default();
+      take_option_field!({leading_icon, trailing_icon}, config);
 
-      TextFieldThemeProxy {
-        id: theme,
+      let theme_suit = TextFieldThemeSuit::of(ctx!());
+      let mut theme = @TextFieldThemeProxy {
         suit: theme_suit,
         state: TextFieldState::default(),
-
-          Stack {
-            Container {
-              size: Size::new(0., theme.container_height),
-              background: theme.container_color,
-            }
-            Row {
-              ConstrainedBox {
-                clamp: BoxClamp::EXPAND_Y,
-                DynWidget {
-                  v_align: VAlign::Center,
-                  dyns: build_icon(leading_icon.map(|l| l.child))
-                }
-              }
-              Expanded {
-                flex: 1.,
-                build_content_area(no_watch!(&mut this), no_watch!(&mut theme), config)
-              }
-              ConstrainedBox {
-                clamp: BoxClamp::EXPAND_Y,
-                DynWidget {
-                  v_align: VAlign::Center,
-                  dyns: build_icon(trailing_icon.map(|t| t.child))
-                }
-              }
-            }
-
-            Container {
-              v_align: VAlign::Bottom,
-              size: Size::new(f32::MAX, theme.indicator_height),
-              background: theme.indicator,
-            }
+      };
+      @Stack {
+        @Container {
+          size: pipe!(Size::new(0., $theme.container_height)),
+          background: pipe!($theme.container_color),
+        }
+        @Row {
+          justify_content: JustifyContent::Center,
+          align_items: Align::Stretch,
+          @{
+            leading_icon.map(|t| @Icon {
+              size: IconSize::of(ctx!()).small,
+              @{ t.child }
+            })
           }
+          @Expanded {
+            flex: 1.,
+            @{ build_content_area(this.clone_state(), theme.clone_state(), config) }
+          }
+          @{
+            trailing_icon.map(|t| @Icon {
+              size: IconSize::of(ctx!()).small,
+              @{ t.child }
+            })
+          }
+        }
+        @Container {
+          v_align: VAlign::Bottom,
+          size: pipe!(Size::new(f32::MAX, $theme.indicator_height)),
+          background: pipe!($theme.indicator),
+        }
       }
     }
     .into()
@@ -351,169 +328,113 @@ impl ComposeChild for TextField {
 }
 
 fn build_input_area(
-  this: &mut StatefulRef<TextField>,
-  theme: &mut StatefulRef<TextFieldThemeProxy>,
+  mut this: Stateful<TextField>,
+  mut theme: Stateful<TextFieldThemeProxy>,
   prefix: Option<LeadingText>,
   suffix: Option<TrailingText>,
   placeholder: Option<Placeholder>,
 ) -> Widget {
-  fn text_label(text: CowArc<str>, theme: StatefulRef<TextFieldThemeProxy>) -> Text {
-    Text {
-      text,
-      foreground: theme.foreground.clone(),
-      text_style: theme.text.clone(),
-      path_style: PathPaintStyle::Fill,
-      overflow: Overflow::Clip,
-      text_align: TextAlign::Start,
-    }
-  }
+  fn_widget! {
+    let mut input_area = @Row {
+      visible: pipe!(!$this.text.is_empty() || $theme.state == TextFieldState::Focused),
+    };
 
-  widget! {
-    states { this: this.clone_stateful(), theme: theme.clone_stateful() }
-    init ctx => {
-      let linear = transitions::LINEAR.of(ctx);
-      let prefix = prefix.map(move |p| p.child);
-      let suffix = suffix.map(move|s| s.child);
-    }
-    Row {
-      id: input_area,
-      visible: !this.text.is_empty() || theme.state == TextFieldState::Focused,
-      Option::map(prefix.clone(), move |text| text_label(text, theme))
-      Expanded {
-        flex: 1.,
-        Input {
-          id: input,
-          style: theme.text.clone(),
-          widget::from(placeholder)
-        }
+    let mut visible = route_state!($input_area.visible);
+    visible.transition(transitions::LINEAR.of(ctx!()), ctx!());
+
+    let mut input = @Input{ style: pipe!($theme.text.clone()) };
+    $input.set_text($this.text.clone());
+
+    watch!($input.text())
+      .distinct_until_changed()
+      .subscribe(move |val| $this.silent().text = val);
+
+    watch!($this.text.clone())
+      .distinct_until_changed()
+      .subscribe(move |val| $input.set_text(val));
+
+    let h = watch!($theme.state)
+      .distinct_until_changed()
+      .filter(|state| state == &TextFieldState::Focused)
+      .subscribe(move |_| $input.request_focus())
+      .unsubscribe_when_dropped();
+    input.own_data(h);
+
+
+    @Row {
+      @{
+        prefix.map(|p| @Text{
+          text: p.child,
+          foreground: pipe!($theme.foreground.clone()),
+          text_style: pipe!($theme.text.clone()),
+        })
       }
-      Option::map(suffix.clone(),   move |text| text_label(text, theme))
-
-    }
-    transition prop!(input_area.visible, move |_from, to, rate| *to && rate >= 1.) {
-      by: linear,
-    }
-
-    finally {
-      input.set_text(this.text.clone());
-      let_watch!(input.text())
-        .distinct_until_changed()
-        .subscribe(move |val| {
-          this.silent().text = val;
-        });
-      let_watch!(this.text.clone())
-        .distinct_until_changed()
-        .subscribe(move |val| input.set_text(val));
-      let_watch!(theme.state)
-        .distinct_until_changed()
-        .subscribe(move |state| {
-          if state == TextFieldState::Focused {
-            input.request_focus();
-          }
-        });
+      @Expanded {
+        flex: 1.,
+        @ $input { @{placeholder} }
+      }
+      @{
+        suffix.map(|s| @Text{
+          text: s.child,
+          foreground: pipe!($theme.foreground.clone()),
+          text_style: pipe!($theme.text.clone()),
+        })
+      }
     }
   }
   .into()
 }
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 struct TextFieldLabel {
   text: CowArc<str>,
   style: CowArc<TextStyle>,
 }
 
 impl Compose for TextFieldLabel {
-  fn compose(this: State<Self>) -> Widget {
-    widget! {
-      states { this: this.into_readonly() }
-      init ctx => {
-        let linear = transitions::LINEAR.of(ctx);
-      }
-      Text {
-        id: label,
+  fn compose(mut this: State<Self>) -> Widget {
+    fn_widget! {
+      let label = @Text {
         v_align: VAlign::Top,
-        text: this.text.clone(),
-        text_style: this.style.clone(),
-      }
+        text: pipe!($this.text.clone()),
+        text_style: pipe!($this.style.clone()),
+      };
 
-      // todo: prop with inner field's property
-      // transition prop!(label.style.font_size) {
-      //   by: transitions::LINEAR.of(ctx)
-      // }
-      transition prop!(label.text_style, move |from, to, rate| {
-        let from_size = from.font_size.into_pixel();
-        let to_size = to.font_size.into_pixel();
+      let mut font_size = route_state!($this.style.font_size);
+      font_size.transition(transitions::LINEAR.of(ctx!()), ctx!());
 
-        let mut res = to.clone();
-        res.to_mut().font_size = FontSize::Pixel(Pixel(from_size.0.lerp(&to_size.0, rate).into()));
-        res
-      }) {
-        by: linear,
-      }
+      label
     }
     .into()
   }
 }
 
 fn build_content_area(
-  this: &mut StatefulRef<TextField>,
-  theme: &mut StatefulRef<TextFieldThemeProxy>,
+  mut this: Stateful<TextField>,
+  mut theme: Stateful<TextFieldThemeProxy>,
   mut config: TextFieldTml,
 ) -> Widget {
-  widget! {
-    states { this: this.clone_stateful(), theme: theme.clone_stateful(), }
-    init ctx => {
-      let linear = transitions::LINEAR.of(ctx);
-    }
-    init {
-      take_option_field!({label, prefix, suffix, placeholder}, config);
-    }
-    Column {
-      id: content_area,
-      padding: theme.input_padding(this.text.is_empty()),
+  fn_widget! {
+    take_option_field!({label, prefix, suffix, placeholder}, config);
+    let mut content_area = @Column {
+      padding: pipe!($theme.input_padding($this.text.is_empty())),
+    };
 
-      DynWidget {
-        dyns: label.map(move |label| {
-          widget! {
-            Expanded {
-              flex: 1.,
-              TextFieldLabel {
-                text: label.0.clone(),
-                style: theme.label_style(this.text.is_empty()),
-              }
-            }
+    let mut padding = route_state!($content_area.padding);
+    padding.transition(transitions::LINEAR.of(ctx!()), ctx!());
+
+    @ $content_area {
+      @ {
+        label.map(|label| @Expanded {
+          flex: 1.,
+          @TextFieldLabel {
+            text: label.0,
+            style: pipe!($theme.label_style($this.text.is_empty())),
           }
         })
       }
-      build_input_area(
-        no_watch!(&mut this),
-        no_watch!(&mut theme),
-        prefix,
-        suffix,
-        placeholder
-      )
+      @ { build_input_area(this.clone(), theme.clone(), prefix, suffix, placeholder)}
     }
-
-    transition prop!(content_area.padding) { by: linear }
   }
   .into()
-}
-
-fn build_icon(icon: Option<Widget>) -> Widget {
-  if icon.is_some() {
-    widget! {
-      init ctx => {
-        let icon_size = IconSize::of(ctx).small;
-      }
-      Icon {
-        size: icon_size,
-        DynWidget {
-          dyns: icon.unwrap()
-        }
-      }
-    }
-    .into()
-  } else {
-    Void.into()
-  }
 }

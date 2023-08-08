@@ -28,6 +28,7 @@ struct DeclareAttr {
   custom: Option<kw::custom>,
   // field with `skip` attr, will not generate setter method and use default to init value.
   skip: Option<kw::skip>,
+  strict: Option<kw::strict>,
 }
 
 struct DeclareField<'a> {
@@ -41,6 +42,7 @@ mod kw {
   custom_keyword!(default);
   custom_keyword!(custom);
   custom_keyword!(skip);
+  custom_keyword!(strict);
   // todo: tmp code, only for compatibility.
   custom_keyword!(convert);
 }
@@ -82,6 +84,8 @@ impl Parse for DeclareAttr {
         attr.default = Some(input.parse()?);
       } else if lookahead.peek(kw::skip) {
         attr.skip = Some(input.parse()?);
+      } else if lookahead.peek(kw::strict) {
+        attr.strict = Some(input.parse()?);
       } else if lookahead.peek(kw::convert) {
         input.parse::<kw::convert>()?;
         input.parse::<token::Eq>()?;
@@ -97,6 +101,15 @@ impl Parse for DeclareAttr {
         d.set_spans(vec![rename.span().unwrap(), builtin.span().unwrap()]);
         d.emit();
       }
+      if let (Some(convert), Some(skip)) = (attr.strict.as_ref(), attr.skip.as_ref()) {
+        let mut d = Diagnostic::new(
+          Level::Error,
+          "field is marked as `skip` is not allowed to use `convert`.",
+        );
+        d.set_spans(vec![convert.span().unwrap(), skip.span().unwrap()]);
+        d.emit();
+      }
+
       if !input.is_empty() {
         input.parse::<syn::Token![,]>()?;
       }
@@ -111,16 +124,22 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   let stt = data_struct_unwrap(data, DECLARE)?;
 
   if stt.fields.is_empty() {
+    let construct = match &stt.fields {
+      Fields::Named(_) => quote!(#name {}),
+      Fields::Unnamed(_) => quote!(#name()),
+      Fields::Unit => quote!(#name),
+    };
     let tokens = quote! {
-        impl Declare2 for #name  {
-          type Builder = #name;
-          fn declare2_builder() -> Self::Builder { #name }
-        }
+      impl Declare2 for #name  {
+        type Builder = #name;
+        fn declare2_builder() -> Self::Builder { #construct }
+      }
 
-        impl DeclareBuilder for #name {
-          type Target = #name;
-          fn build(self, _: &BuildCtx) -> Self::Target { self }
-        }
+      impl DeclareBuilder for #name {
+        type Target = #name;
+        #[inline]
+        fn build_declare(self, _: &BuildCtx) -> Self::Target { self }
+      }
     };
     Ok(tokens)
   } else {
@@ -134,8 +153,6 @@ fn struct_with_fields_gen(
   generics: &syn::Generics,
   name: &syn::Ident,
 ) -> syn::Result<TokenStream> {
-  let (g_impl, g_ty, g_where) = generics.split_for_impl();
-
   let mut builder_fields = collect_filed_and_attrs(stt)?;
 
   // reverse name check.
@@ -153,16 +170,25 @@ fn struct_with_fields_gen(
       let field_name = f.field.ident.as_ref().unwrap();
       let ty = &f.field.ty;
       let set_method = f.set_method_name();
-
-      builder_methods.extend(quote! {
-        #[inline]
-        #vis fn #set_method<_M, _V>(mut self, v: _V) -> Self
-          where DeclareInit<#ty>: DeclareFrom<_V, _M>
-        {
-          self.#field_name = Some(DeclareInit::declare_from(v));
-          self
-        }
-      });
+      if f.attr.as_ref().map_or(false, |attr| attr.strict.is_some()) {
+        builder_methods.extend(quote! {
+          #[inline]
+          #vis fn #set_method(mut self, v: #ty) -> Self {
+            self.#field_name = Some(DeclareInit::Value(v));
+            self
+          }
+        });
+      } else {
+        builder_methods.extend(quote! {
+          #[inline]
+          #vis fn #set_method<_M, _V>(mut self, v: _V) -> Self
+            where DeclareInit<#ty>: DeclareFrom<_V, _M>
+          {
+            self.#field_name = Some(DeclareInit::declare_from(v));
+            self
+          }
+        });
+      }
     });
 
   // builder define
@@ -206,12 +232,9 @@ fn struct_with_fields_gen(
 
   let unzip_fields = builder_fields.iter().map(|df| {
     let field_name = df.field.ident.as_ref().unwrap();
-    let method = df.set_method_name();
+    let err = format!("Required field `{name}::{field_name}` not init");
     quote_spanned! { field_name.span() =>
-      let #field_name = self.#field_name.expect(&format!(
-        "Required field `{}::{}` not set, use method `{}` init it",
-        stringify!(#name), stringify!(#field_name), stringify!(#method)
-      )).unzip();
+      let #field_name = self.#field_name.expect(#err).unzip();
     }
   });
 
@@ -219,8 +242,15 @@ fn struct_with_fields_gen(
   let field_names2 = field_names.clone();
   let field_names3 = field_names.clone();
 
+  let (g_impl, g_ty, g_where) = generics.split_for_impl();
+  let syn::Generics {
+    lt_token,
+    params,
+    gt_token,
+    where_clause,
+  } = generics;
   let tokens = quote! {
-      #vis struct #declarer #g_impl #g_where {
+      #vis struct #declarer #lt_token #params #gt_token #where_clause {
         #(#def_fields)*
       }
 
@@ -238,24 +268,36 @@ fn struct_with_fields_gen(
 
       impl #g_impl DeclareBuilder for #declarer #g_ty #g_where {
         type Target = State<#name #g_ty>;
-        fn build(mut self, ctx: &BuildCtx) -> Self::Target {
+
+        #[inline]
+        fn build_declare(mut self, ctx: &BuildCtx) -> Self::Target {
           set_build_ctx!(ctx);
 
           #(#fill_default)*
           #(#unzip_fields)*
-          let mut _ribir = State::Stateless(#name {
+          let mut _ribir_ಠ_ಠ = State::value(#name {
             #(#field_names2 : #field_names2.0),*
           });
+          let mut _unsub_ಠ_ಠ = None;
+
           #(
             if let Some(u) = #field_names3.1 {
-              let mut _ribir2 = _ribir.clone_stateful();
-              let h = u.subscribe(move |v| _ribir2.state_ref().#field_names3 = v)
-              .unsubscribe_when_dropped();
-              _ribir.to_stateful().own_data(h);
+              let mut _ribir2 = _ribir_ಠ_ಠ.clone_writer();
+              let h = u.subscribe(move |(_, v)| _ribir2.write().#field_names3 = v);
+              _unsub_ಠ_ಠ = if let Some(u) = _unsub_ಠ_ಠ {
+                let unsub = ZipSubscription::new(u, h);
+                Some(BoxSubscription::new(unsub))
+              } else {
+                Some(h)
+              };
             }
           );*
 
-          _ribir
+          if let Some(unsub) = _unsub_ಠ_ಠ {
+            _ribir_ಠ_ಠ.as_stateful().unsubscribe_on_drop(unsub);
+          }
+
+          _ribir_ಠ_ಠ
         }
       }
   };

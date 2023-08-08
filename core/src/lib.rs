@@ -14,7 +14,6 @@ pub(crate) mod widget_tree;
 
 pub mod clipboard;
 pub mod declare;
-pub mod dynamic_widget;
 pub mod events;
 pub mod pipe;
 pub mod ticker;
@@ -22,6 +21,7 @@ pub mod timer;
 pub mod widget;
 pub mod widget_children;
 pub mod window;
+pub use rxrust;
 
 pub mod prelude {
   pub use crate::animation::*;
@@ -34,10 +34,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::declare::*;
   #[doc(no_inline)]
-  pub use crate::dynamic_widget::*;
-  #[doc(no_inline)]
   pub use crate::events::*;
-  pub use crate::path_state_splitter;
   #[doc(no_inline)]
   pub use crate::pipe::Pipe;
   #[doc(no_inline)]
@@ -60,8 +57,8 @@ pub mod prelude {
   pub use ribir_geom::*;
   #[doc(no_inline)]
   pub use ribir_macros::{
-    ctx, fn_widget, include_svg, pipe, rdl, set_build_ctx, watch, widget, Declare, Declare2, Lerp,
-    MultiChild, SingleChild, Template, _dollar_ಠ_ಠ,
+    ctx, fn_widget, include_svg, map_writer, pipe, rdl, ribir_expanded_ಠ_ಠ, set_build_ctx,
+    split_writer, watch, widget, Declare, Declare2, Lerp, MultiChild, SingleChild, Template,
   };
   #[doc(no_inline)]
   pub use ribir_painter::*;
