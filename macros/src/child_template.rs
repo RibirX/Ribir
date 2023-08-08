@@ -71,7 +71,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         impl #g_impl DeclareBuilder for #builder #g_ty {
           type Target = Self;
           #[inline]
-          fn build(self, _: &BuildCtx) -> Self { self }
+          fn build_declare(self, _: &BuildCtx) -> Self { self }
         }
 
 

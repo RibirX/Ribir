@@ -81,15 +81,11 @@ pub struct ThemeWidget {
 impl ComposeChild for ThemeWidget {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
     use crate::prelude::*;
     FnWidget::new(move |ctx| {
       let ctx = ctx.force_as_mut();
-
-      let theme = match this {
-        State::Stateless(t) => t.theme,
-        State::Stateful(s) => s.state_ref().theme.clone(),
-      };
+      let theme = this.read().theme.clone();
 
       AppCtx::load_font_from_theme(&theme);
       ctx.push_theme(theme.clone());
@@ -110,6 +106,7 @@ impl_query_self_only!(Theme);
 impl Default for Theme {
   fn default() -> Self { Theme::Full(<_>::default()) }
 }
+
 impl Default for FullTheme {
   fn default() -> Self {
     let icon_size = IconSize {

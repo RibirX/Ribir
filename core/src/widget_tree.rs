@@ -12,11 +12,12 @@ mod layout_info;
 use crate::prelude::*;
 pub use layout_info::*;
 
+use self::widget_id::empty_node;
+
 pub(crate) type DirtySet = Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
 
-#[derive(Default)]
 pub(crate) struct WidgetTree {
-  pub(crate) root: Option<WidgetId>,
+  pub(crate) root: WidgetId,
   wnd: Weak<Window>,
   pub(crate) arena: TreeArena,
   pub(crate) store: LayoutStore,
@@ -24,20 +25,15 @@ pub(crate) struct WidgetTree {
 }
 
 impl WidgetTree {
-  pub(crate) fn new() -> WidgetTree { Self::default() }
+  pub fn init(&mut self, wnd: Weak<Window>) { self.wnd = wnd; }
 
-  pub fn init(&mut self, widget: Widget, wnd: Weak<Window>) {
-    self.wnd = wnd;
-    let build_ctx = BuildCtx::new(None, self);
-    let root = widget.build(&build_ctx);
-    self.root = Some(root);
-    self.mark_dirty(root);
-    root.on_mounted_subtree(self);
+  pub fn set_root(&mut self, root: WidgetId) {
+    self.root = root;
+    self.mark_dirty(self.root);
+    self.root.on_mounted_subtree(self);
   }
 
-  pub(crate) fn root(&self) -> WidgetId {
-    self.root.expect("Try to access a not init `WidgetTree`")
-  }
+  pub(crate) fn root(&self) -> WidgetId { self.root }
 
   /// Draw current tree by painter.
   pub(crate) fn draw(&self) {
@@ -79,7 +75,7 @@ impl WidgetTree {
     self
       .wnd
       .upgrade()
-      .expect("The window of `FocusManager` has already dropped.")
+      .expect("Must initialize the widget tree before use it.")
   }
 
   #[allow(unused)]
@@ -167,7 +163,7 @@ impl WidgetTree {
         .next_sibling(&self.arena)
         .or_else(|| root.prev_sibling(&self.arena))
         .expect("Try to remove the root and there is no other widget can be the new root.");
-      self.root = Some(new_root);
+      self.root = new_root;
     }
 
     id.0.detach(&mut self.arena);
@@ -184,6 +180,19 @@ impl WidgetTree {
       self.store.remove(id);
     });
     id.0.remove_subtree(&mut self.arena);
+  }
+}
+
+impl Default for WidgetTree {
+  fn default() -> Self {
+    let mut arena = TreeArena::new();
+    Self {
+      root: empty_node(&mut arena),
+      wnd: Weak::new(),
+      arena,
+      store: LayoutStore::default(),
+      dirty_set: Rc::new(RefCell::new(HashSet::default())),
+    }
   }
 }
 
@@ -262,9 +271,8 @@ mod tests {
   fn bench_recursive_inflate(width: usize, depth: usize, b: &mut Bencher) {
     let wnd = TestWindow::new(Void {});
     b.iter(move || {
-      let mut tree = wnd.widget_tree.borrow_mut();
-      tree.init(Recursive { width, depth }.into(), Rc::downgrade(&wnd.0));
-      tree.layout(Size::new(512., 512.));
+      wnd.set_content_widget(Recursive { width, depth }.into());
+      wnd.layout();
     });
   }
 
@@ -272,12 +280,11 @@ mod tests {
     let w = Stateful::new(Recursive { width, depth });
     let trigger = w.clone();
     let wnd = TestWindow::new(w);
-    let mut tree = wnd.widget_tree.borrow_mut();
     b.iter(|| {
       {
         let _: &mut Recursive = &mut trigger.state_ref();
       }
-      tree.layout(Size::new(512., 512.));
+      wnd.layout();
     });
   }
 
@@ -392,7 +399,7 @@ mod tests {
 
     b.iter(move || {
       let post = Embed { width: 5, depth: 1000 };
-      WidgetTree::new().init(post.into(), Rc::downgrade(&wnd.0));
+      wnd.set_content_widget(post.into());
     });
   }
 

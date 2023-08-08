@@ -69,12 +69,7 @@ where
   V: Default + Clone + PartialEq,
   Self: Any,
 {
-  fn key(&self) -> Key {
-    match self {
-      State::Stateless(this) => this.key.clone(),
-      State::Stateful(this) => this.state_ref().key.clone(),
-    }
-  }
+  fn key(&self) -> Key { self.read().key.clone() }
 
   fn record_prev_key_widget(&self, key: &dyn AnyKey) {
     assert_eq!(self.key(), key.key());
@@ -82,19 +77,10 @@ where
       log::warn!("Different value type for same key.");
       return;
     };
-    match self {
-      // stateless key widget needn't record before value.
-      State::Stateless(_) => {}
-      State::Stateful(this) => match key {
-        State::Stateless(key) => this.state_ref().record_before_value(key.value.clone()),
-        State::Stateful(key) => this
-          .state_ref()
-          .record_before_value(key.state_ref().value.clone()),
-      },
-    }
+    self.write().record_before_value(key.read().value.clone());
   }
 
-  fn record_next_key_widget(&self, _: &dyn AnyKey) { self.as_ref().has_successor.set(true); }
+  fn record_next_key_widget(&self, _: &dyn AnyKey) { self.write().has_successor.set(true); }
 
   fn as_any(&self) -> &dyn Any { self }
 }

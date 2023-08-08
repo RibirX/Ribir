@@ -111,7 +111,7 @@ mod tests {
       wnd.draw_frame();
 
       assert_layout_result_by_path!(wnd, {path = [0], size == expect,} );
-      assert_eq!(c_fit.shallow_ref().scale_cache.get(), expected_scale);
+      assert_eq!(c_fit.state_ref().scale_cache.get(), expected_scale);
     }
   }
 

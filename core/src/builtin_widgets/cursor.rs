@@ -1,36 +1,31 @@
 use crate::prelude::*;
-use std::{cell::Cell, rc::Rc};
 use winit::window::CursorIcon;
 
 /// `Cursor` is an attribute to assign an `cursor` to a widget.
 
-#[derive(Declare, Debug, Declare2)]
+#[derive(Declare, Default, Debug, Declare2)]
 pub struct Cursor {
-  #[declare(convert=custom, builtin, default)]
-  pub cursor: Rc<Cell<CursorIcon>>,
+  #[declare(builtin, default)]
+  pub cursor: CursorIcon,
 }
 
 impl ComposeChild for Cursor {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states {
-        save_cursor: Stateful::new(CursorIcon::Default),
-        this: this.into_readonly()
-      }
-      DynWidget {
-        dyns: child,
+  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+    fn_widget! {
+      let mut save_cursor = Stateful::new(CursorIcon::Default);
+      @$child {
         on_pointer_enter: move |e: &mut PointerEvent| {
           if e.point_type == PointerType::Mouse
             && e.mouse_buttons() == MouseButtons::empty()
           {
             let wnd = e.window();
-            *save_cursor = wnd.get_cursor();
-            wnd.set_cursor(this.cursor.get());
+            *$save_cursor = wnd.get_cursor();
+            wnd.set_cursor($this.get_cursor());
           }
         },
         on_pointer_leave: move |e: &mut PointerEvent| {
-          e.window().set_cursor(*save_cursor);
+          e.window().set_cursor(*$save_cursor);
         }
       }
     }
@@ -38,53 +33,8 @@ impl ComposeChild for Cursor {
   }
 }
 
-pub trait IntoCursorIcon {
-  fn into_cursor_icon(self) -> Rc<Cell<CursorIcon>>;
-}
-
-impl IntoCursorIcon for Rc<Cell<CursorIcon>> {
-  #[inline]
-  fn into_cursor_icon(self) -> Rc<Cell<CursorIcon>> { self }
-}
-
-impl IntoCursorIcon for CursorIcon {
-  #[inline]
-  fn into_cursor_icon(self) -> Rc<Cell<CursorIcon>> { Rc::new(Cell::new(self)) }
-}
-
-impl CursorDeclarer {
-  #[inline]
-  pub fn cursor<C: IntoCursorIcon>(mut self, icon: C) -> Self {
-    self.cursor = Some(icon.into_cursor_icon());
-    self
-  }
-}
-
 impl Cursor {
-  #[inline]
-  pub fn set_declare_cursor<C: IntoCursorIcon>(&mut self, icon: C) {
-    self.cursor = icon.into_cursor_icon();
-  }
-}
-
-impl Cursor {
-  #[inline]
-  pub fn icon(&self) -> CursorIcon { self.cursor.get() }
-
-  #[inline]
-  pub fn set_icon(&self, icon: CursorIcon) { self.cursor.set(icon) }
-
-  #[inline]
-  pub fn new_icon(icon: CursorIcon) -> Rc<Cell<CursorIcon>> { Rc::new(Cell::new(icon)) }
-}
-
-impl Default for Cursor {
-  #[inline]
-  fn default() -> Self {
-    Cursor {
-      cursor: Rc::new(Cell::new(CursorIcon::Default)),
-    }
-  }
+  fn get_cursor(&self) -> CursorIcon { self.cursor }
 }
 
 #[cfg(test)]
@@ -126,7 +76,7 @@ mod tests {
       },
       1.,
     );
-    wnd.emit_events();
+    wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Help);
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -138,7 +88,7 @@ mod tests {
       },
       1.,
     );
-    wnd.emit_events();
+    wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Hand);
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -150,7 +100,7 @@ mod tests {
       },
       1.,
     );
-    wnd.emit_events();
+    wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::AllScroll);
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -162,7 +112,7 @@ mod tests {
       },
       1.,
     );
-    wnd.emit_events();
+    wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Hand);
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -174,7 +124,7 @@ mod tests {
       },
       1.,
     );
-    wnd.emit_events();
+    wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Help);
   }
 }

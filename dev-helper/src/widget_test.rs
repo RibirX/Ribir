@@ -345,11 +345,11 @@ macro_rules! assert_layout_result_by_path {
     ) => {
       $(
         let info = $test_wnd.layout_info_by_path(&$path).unwrap();
-        $(assert_eq!($x_expect, info.pos.x, "unexpected x");)?
-        $(assert_eq!($y_expect, info.pos.y, "unexpected y");)?
-        $(assert_eq!($width_expect, info.size.unwrap().width, "unexpected width");)?
-        $(assert_eq!($height_expect, info.size.unwrap().height, "unexpected height");)?
-        $(assert_eq!($size_expect, info.size.unwrap(), "unexpected size");)?
+        $(assert_eq!(info.pos.x, $x_expect, "unexpected x");)?
+        $(assert_eq!(info.pos.y, $y_expect, "unexpected y");)?
+        $(assert_eq!(info.size.unwrap().width, $width_expect, "unexpected width");)?
+        $(assert_eq!(info.size.unwrap().height, $height_expect, "unexpected height");)?
+        $(assert_eq!(info.size.unwrap(), $size_expect, "unexpected size");)?
         $(
           let size = info.size.unwrap();
           assert_eq!(Rect::new(info.pos, size), $rect_expect, "unexpected rect");

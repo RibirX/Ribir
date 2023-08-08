@@ -1,42 +1,44 @@
-use crate::symbol_process::DollarRefs;
+use crate::symbol_process::{not_subscribe_anything, DollarRefsCtx, DollarRefsScope};
+use crate::{ok, symbol_process::symbol_to_macro};
+use proc_macro::TokenStream as TokenStream1;
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
+use syn::fold::Fold;
 use syn::{
-  fold::Fold,
   parse::{Parse, ParseStream},
+  parse_macro_input,
+  spanned::Spanned,
   Stmt,
 };
 
-pub(crate) struct PipeExpr {
-  refs: DollarRefs,
+pub(crate) struct BodyExpr(pub(crate) Vec<Stmt>);
+pub(crate) struct PipeMacro {
+  refs: DollarRefsScope,
   expr: Vec<Stmt>,
 }
 
-impl Parse for PipeExpr {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
-    let (refs, stmts) = fold_expr_as_in_closure(input)?;
-    Ok(Self { refs, expr: stmts })
+impl PipeMacro {
+  pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream1 {
+    let span = input.span();
+    let input = ok!(symbol_to_macro(TokenStream1::from(input)));
+    let expr = parse_macro_input! { input as BodyExpr };
+
+    refs_ctx.new_dollar_scope(true);
+    let expr = expr.0.into_iter().map(|s| refs_ctx.fold_stmt(s)).collect();
+    let refs = refs_ctx.pop_dollar_scope(true);
+    if refs.is_empty() {
+      not_subscribe_anything(span).into()
+    } else {
+      PipeMacro { refs, expr }.to_token_stream().into()
+    }
   }
 }
 
-pub fn fold_expr_as_in_closure(input: ParseStream) -> syn::Result<(DollarRefs, Vec<Stmt>)> {
-  let mut refs = DollarRefs::default();
-  refs.in_capture += 1;
-  let stmts = syn::Block::parse_within(input)?;
-  let stmts = stmts.into_iter().map(|s| refs.fold_stmt(s)).collect();
-  refs.in_capture -= 1;
-  if refs.is_empty() {
-    let err = syn::Error::new(
-      input.span(),
-      "expression not subscribe anything, it must contain at least one $",
-    );
-    Err(err)
-  } else {
-    refs.dedup();
-    Ok((refs, stmts))
-  }
+impl Parse for BodyExpr {
+  fn parse(input: ParseStream) -> syn::Result<Self> { Ok(Self(syn::Block::parse_within(input)?)) }
 }
 
-impl ToTokens for PipeExpr {
+impl ToTokens for PipeMacro {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
     let Self { refs, expr } = self;
 
@@ -46,13 +48,15 @@ impl ToTokens for PipeExpr {
       quote! {{
         #refs
         let upstream = #upstream;
+        let _ctx_handle_ಠ_ಠ = ctx!().handle();
         let mut expr_value = move |ctx!(): &BuildCtx<'_>| { #(#expr)* };
-        let _ctx_handle = ctx!().handle();
-
         Pipe::new(
           expr_value(ctx!()),
           upstream
-            .filter_map(move |_| _ctx_handle.with_ctx(&mut expr_value))
+            .filter_map(move |scope| _ctx_handle_ಠ_ಠ
+              .with_ctx(&mut expr_value)
+              .map(|v| (scope, v))
+            )
             .box_it()
         )
       }}
@@ -64,7 +68,7 @@ impl ToTokens for PipeExpr {
         let mut expr_value = move || { #(#expr)* };
         Pipe::new(
           expr_value(),
-          upstream.map(move |_| expr_value()).box_it()
+          upstream.map(move |scope| (scope, expr_value())).box_it()
         )
       }}
       .to_tokens(tokens)

@@ -1,6 +1,5 @@
 use crate::{
   context::BuildCtx,
-  dynamic_widget::DynWidget,
   prelude::ChildFrom,
   state::{State, Stateful},
   widget::{Widget, WidgetBuilder, WidgetId},
@@ -52,7 +51,7 @@ where
 {
   type Target = <State<T> as ComposeWithChild<C, M>>::Target;
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    State::Stateless(self).with_child(child, ctx)
+    State::value(self).with_child(child, ctx)
   }
 }
 
@@ -63,18 +62,7 @@ where
 {
   type Target = <State<T> as ComposeWithChild<C, M>>::Target;
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    State::Stateful(self).with_child(child, ctx)
-  }
-}
-
-impl<M, T, C> ComposeWithChild<C, M> for Stateful<DynWidget<T>>
-where
-  T: ComposeChild + 'static,
-  State<T>: ComposeWithChild<C, M>,
-{
-  type Target = <State<T> as ComposeWithChild<C, M>>::Target;
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    State::from(self).with_child(child, ctx)
+    State::stateful(self).with_child(child, ctx)
   }
 }
 
@@ -287,7 +275,6 @@ where
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::Cell, rc::Rc};
 
   use super::*;
   use crate::{prelude::*, test_helper::MockBox};
@@ -390,9 +377,7 @@ mod tests {
         .build(ctx)
     });
     let _ = FnWidget::new(|ctx| {
-      let cursor = Cursor {
-        cursor: Rc::new(Cell::new(CursorIcon::Hand)),
-      };
+      let cursor = Cursor { cursor: CursorIcon::Hand };
       let x = cursor.with_child(Tml.with_child(A, ctx), ctx);
       WithDecorate
         .with_child(mb.with_child(x, ctx), ctx)

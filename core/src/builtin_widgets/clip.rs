@@ -7,7 +7,7 @@ pub enum ClipType {
   Path(Path),
 }
 
-#[derive(SingleChild, Clone, Declare)]
+#[derive(SingleChild, Clone, Declare, Declare2)]
 pub struct Clip {
   #[declare(default)]
   pub clip: ClipType,
@@ -27,7 +27,7 @@ impl Render for Clip {
   fn paint(&self, ctx: &mut PaintingCtx) {
     let path = match &self.clip {
       ClipType::Auto => {
-        let rect = Rect::from_size(
+        let rect: lyon_geom::euclid::Rect<f32, LogicUnit> = Rect::from_size(
           ctx
             .box_rect()
             .expect("impossible without size in painting stage")

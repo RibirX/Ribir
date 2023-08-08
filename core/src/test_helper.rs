@@ -15,7 +15,17 @@ pub struct Frame {
   pub viewport: Rect,
   pub surface: Color,
 }
+
+#[derive(Clone)]
 pub struct TestWindow(pub Rc<Window>);
+
+#[macro_export]
+macro_rules! reset_test_env {
+  () => {
+    let _ = rxrust::scheduler::NEW_TIMER_FN.set(Timer::new_timer_future);
+    let _guard = unsafe { AppCtx::new_lock_scope() };
+  };
+}
 
 impl TestWindow {
   /// Create a 1024x1024 window for test
@@ -27,10 +37,8 @@ impl TestWindow {
 
   fn new_wnd(root: impl Into<Widget>, size: Option<Size>) -> Self {
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-    let wnd = Window::new(root.into(), Box::new(TestShellWindow::new(size)));
-    let id = wnd.id();
-    AppCtx::windows().borrow_mut().insert(wnd.id(), wnd.clone());
-    AppCtx::get_window(id).unwrap().emit_events();
+    let wnd = AppCtx::new_window(Box::new(TestShellWindow::new(size)), root.into());
+    wnd.run_frame_tasks();
     Self(wnd)
   }
 
@@ -68,6 +76,8 @@ impl TestWindow {
   pub fn draw_frame(&mut self) {
     // Test window not have a eventloop, manually wake-up every frame.
     Timer::wake_timeout_futures();
+    AppCtx::run_until_stalled();
+    self.run_frame_tasks();
 
     self.0.draw_frame();
   }

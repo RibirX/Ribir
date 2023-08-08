@@ -1,7 +1,8 @@
 use crate::{
   builtin_widgets::{FullTheme, InheritTheme, Theme},
   clipboard::{Clipboard, MockClipboard},
-  window::{Window, WindowId},
+  widget::Widget,
+  window::{ShellWindow, Window, WindowId},
 };
 use pin_project_lite::pin_project;
 use std::{
@@ -44,8 +45,13 @@ pub struct AppCtx {
   typography_store: TypographyStore,
   clipboard: RefCell<Box<dyn Clipboard>>,
   runtime_waker: Box<dyn RuntimeWaker + Send>,
+  scheduler: FuturesLocalScheduler,
   executor: RefCell<LocalPool>,
+  triggers: TriggerMap,
 }
+
+type TriggerMap = RefCell<ahash::HashMap<*const (), Box<dyn FnOnce()>>>;
+pub struct AppCtxScopeGuard(MutexGuard<'static, ()>);
 
 static mut INIT_THREAD_ID: Option<ThreadId> = None;
 static mut APP_CTX_INIT: Once = Once::new();
@@ -60,6 +66,16 @@ impl AppCtx {
   /// Get the theme of the application.
   #[track_caller]
   pub fn app_theme() -> &'static Theme { &Self::shared().app_theme }
+
+  pub fn new_window(shell_wnd: Box<dyn ShellWindow>, content: Widget) -> Rc<Window> {
+    let wnd = Window::new(shell_wnd);
+    let id = wnd.id();
+
+    Self::shared().windows.borrow_mut().insert(id, wnd.clone());
+    wnd.set_content_widget(content);
+
+    wnd
+  }
 
   /// Get the window by the window id. Return an count reference of the window.
   ///
@@ -102,7 +118,7 @@ impl AppCtx {
 
   /// Get the scheduler of the application.
   #[track_caller]
-  pub fn scheduler() -> FuturesLocalScheduler { Self::shared().executor.borrow_mut().spawner() }
+  pub fn scheduler() -> FuturesLocalScheduler { Self::shared().scheduler.clone() }
 
   /// Get the clipboard of the application.
   #[track_caller]
@@ -116,10 +132,41 @@ impl AppCtx {
   #[track_caller]
   pub fn font_db() -> &'static Rc<RefCell<FontDB>> { &Self::shared().font_db }
 
+  /// Add a trigger task to the application, this task use an pointer address as
+  /// its identity. You can use the identity to trigger this task in a
+  /// deterministic time by calling `AppCtx::trigger_task`.
+  pub fn add_trigger_task(trigger: *const (), task: Box<dyn FnOnce()>) {
+    let mut tasks = AppCtx::shared().triggers.borrow_mut();
+    let task: Box<dyn FnOnce()> = if let Some(t) = tasks.remove(&trigger) {
+      Box::new(move || {
+        t();
+        task();
+      })
+    } else {
+      Box::new(task)
+    };
+    tasks.insert(trigger, Box::new(task));
+  }
+
+  /// Trigger the task by the pointer address identity. Returns true if the task
+  /// is found.
+  pub fn trigger_task(trigger: *const ()) -> bool {
+    let task = Self::shared().triggers.borrow_mut().remove(&trigger);
+    if let Some(task) = task {
+      task();
+      true
+    } else {
+      false
+    }
+  }
+
   /// Runs all tasks in the local(usually means on the main thread) pool and
   /// returns if no more progress can be made on any task.
   #[track_caller]
-  pub fn run_until_stalled() { Self::shared().executor.borrow_mut().run_until_stalled() }
+  pub fn run_until_stalled() {
+    let mut executor = Self::shared().executor.borrow_mut();
+    while executor.try_run_one() {}
+  }
 
   /// Loads the font from the theme config and import it into the font database.
   #[track_caller]
@@ -195,7 +242,7 @@ impl AppCtx {
   /// If your application want create multi `AppCtx` instances, hold a scope for
   /// every instance. Otherwise, the behavior is undefined.
   #[track_caller]
-  pub unsafe fn new_lock_scope() -> MutexGuard<'static, ()> {
+  pub unsafe fn new_lock_scope() -> AppCtxScopeGuard {
     static LOCK: Mutex<()> = Mutex::new(());
 
     let locker = LOCK.lock().unwrap_or_else(|e| {
@@ -205,14 +252,14 @@ impl AppCtx {
 
       e.into_inner()
     });
-    APP_CTX_INIT = Once::new();
-    locker
+
+    AppCtxScopeGuard(locker)
   }
 
   #[track_caller]
   pub(crate) fn end_frame() {
-    // todo: frame cache is not a good choice? because not every text will relayout
-    // in every frame.
+    // todo: frame cache is not a good algorithm? because not every text will
+    // relayout in every frame.
     let ctx = unsafe { Self::shared_mut() };
     ctx.shaper.end_frame();
     ctx.reorder.end_frame();
@@ -231,6 +278,9 @@ impl AppCtx {
       let reorder = TextReorder::default();
       let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
 
+      let executor = LocalPool::new();
+      let scheduler = executor.spawner();
+
       let ctx = AppCtx {
         font_db,
         app_theme,
@@ -238,9 +288,11 @@ impl AppCtx {
         reorder,
         typography_store,
         clipboard: RefCell::new(Box::new(MockClipboard {})),
-        executor: <_>::default(),
+        executor: RefCell::new(executor),
+        scheduler,
         runtime_waker: Box::new(MockWaker),
         windows: RefCell::new(ahash::HashMap::default()),
+        triggers: RefCell::new(ahash::HashMap::default()),
       };
 
       INIT_THREAD_ID = Some(std::thread::current().id());
@@ -261,8 +313,7 @@ impl AppCtx {
     Fut: Future<Output = ()> + 'static,
   {
     let ctx = AppCtx::shared();
-    ctx.runtime_waker.wake();
-    ctx.executor.borrow().spawner().spawn_local(LocalFuture {
+    ctx.scheduler.spawn_local(LocalFuture {
       fut: future,
       waker: ctx.runtime_waker.clone(),
     })
@@ -363,6 +414,26 @@ pub fn load_font_from_theme(theme: &Theme, font_db: &mut FontDB) {
           let _ = font_db.load_font_file(path);
         });
       }
+    }
+  }
+}
+
+impl Drop for AppCtxScopeGuard {
+  fn drop(&mut self) {
+    let ctx = AppCtx::shared();
+    ctx.windows.borrow_mut().clear();
+
+    while !ctx.triggers.borrow().is_empty() {
+      // drop task may generate new trigger task, use a vector to collect the tasks
+      // to delay drop these tasks after the borrow scope.
+      let _vec = ctx.triggers.borrow_mut().drain().collect::<Vec<_>>();
+    }
+
+    // Safety: this guard guarantee only one thread can access the `AppCtx`.
+    unsafe {
+      APP_CTX = None;
+      INIT_THREAD_ID = None;
+      APP_CTX_INIT = Once::new();
     }
   }
 }

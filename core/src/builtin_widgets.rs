@@ -7,8 +7,8 @@ pub mod key;
 pub use key::{Key, KeyWidget};
 pub mod image_widget;
 pub use image_widget::*;
-pub mod delay_drop_widget;
-pub use delay_drop_widget::DelayDropWidget;
+pub mod delay_drop;
+pub use delay_drop::DelayDrop;
 mod theme;
 pub use theme::*;
 mod cursor;
@@ -61,30 +61,34 @@ pub use focus_scope::*;
 
 use crate::{prelude::*, widget::WidgetBuilder};
 
-macro_rules! impl_fat_obj {
+macro_rules! impl_builtin_obj {
   ($($builtin_ty: ty),*) => {
     paste::paste! {
-      #[doc="A fat object that extend the `T` object with all builtin widgets \
-       ability.\
-       During the compose phase, the `FatObj` will be created when a object \
-       use the builtin fields and methods. And they are only a help obj to \
-       build the finally widget, so they will be dropped after composed."
-      ]
-      pub struct FatObj<T> {
-        pub host: T,
+      #[doc="A builtin object contains all builtin widgets, and can be used to \
+      extend other object in the declare syntax, so other objects can use the \
+      builtin fields and methods like self fields and methods."]
+      #[derive(Default)]
+      pub struct BuiltinObj {
         $([< $builtin_ty: snake:lower >]: Option<State<$builtin_ty>>),*
       }
 
-      impl<T> FatObj<T> {
-        pub fn new(host: T) -> Self {
-          Self {
-            host,
-            $([< $builtin_ty: snake:lower >]: None),*
-          }
+      impl BuiltinObj {
+        pub fn is_empty(&self) -> bool {
+          $(self.[< $builtin_ty: snake:lower >].is_none())&& *
         }
 
         $(
-          pub fn [< with_ $builtin_ty: snake:lower >](
+          pub fn [< $builtin_ty: snake:lower >](&mut self, ctx: &BuildCtx)
+            -> &mut State<$builtin_ty>
+          {
+            self
+              .[< $builtin_ty: snake:lower >]
+              .get_or_insert_with(|| $builtin_ty::declare2_builder().build_declare(ctx))
+          }
+        )*
+
+        $(
+          pub fn [< set_builtin_ $builtin_ty: snake:lower >](
             mut self, builtin: State<$builtin_ty>
           ) -> Self {
             self.[< $builtin_ty: snake:lower >] = Some(builtin);
@@ -93,73 +97,39 @@ macro_rules! impl_fat_obj {
         )*
 
         $(
-          pub fn [< $builtin_ty: snake:lower >](&mut self, ctx: &BuildCtx)
+          pub fn [< get_builtin_ $builtin_ty: snake:lower >](&mut self, ctx: &BuildCtx)
             -> &mut State<$builtin_ty>
           {
             self
               .[< $builtin_ty: snake:lower >]
-              .get_or_insert_with(|| $builtin_ty::declare2_builder().build(ctx))
+              .get_or_insert_with(|| $builtin_ty::declare2_builder().build_declare(ctx))
           }
         )*
-      }
 
-      impl<T: 'static> WidgetBuilder for FatObj<T>
-      where
-        T: Into<Widget>
-      {
-        fn build(self, ctx: &BuildCtx) -> WidgetId {
-          let mut host: Widget = self.host.into();
+        pub fn compose_with_host(self, mut host: Widget, ctx: &BuildCtx) -> Widget {
           $(
             if let Some(builtin) = self.[< $builtin_ty: snake:lower >] {
               host = builtin.with_child(host, ctx).into();
             }
           )*
-          host.build(ctx)
+          host
         }
       }
 
-      impl<T: SingleWithChild<C>, C> SingleWithChild<C> for FatObj<T>{
-        type Target = FatObj<T::Target>;
-        fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-          let Self { host, $([< $builtin_ty: snake:lower >]),* } = self;
-          let host = host.with_child(child, ctx);
-          FatObj {
-            host,
-            $([< $builtin_ty: snake:lower >]),*
+      impl<T> FatObj<T> {
+        $(
+          pub fn [< get_builtin_ $builtin_ty: snake:lower >](&mut self, ctx: &BuildCtx)
+            -> &mut State<$builtin_ty>
+          {
+            self.builtin.[<get_builtin_ $builtin_ty: snake:lower >](ctx)
           }
-        }
-      }
-
-      impl<T: MultiWithChild<C>, C> MultiWithChild<C> for FatObj<T>{
-        type Target = FatObj<T::Target>;
-        fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-          let Self { host, $([< $builtin_ty: snake:lower >]),* } = self;
-          let host = host.with_child(child, ctx);
-          FatObj {
-            host,
-            $([< $builtin_ty: snake:lower >]),*
-          }
-        }
-      }
-      impl<T, M, C> ComposeWithChild<C, M> for FatObj<T>
-      where
-        T: ComposeWithChild<C, M>
-      {
-        type Target = FatObj<T::Target>;
-        fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-          let Self { host, $([< $builtin_ty: snake:lower >]),* } = self;
-          let host = host.with_child(child, ctx);
-          FatObj {
-            host,
-            $([< $builtin_ty: snake:lower >]),*
-          }
-        }
+        )*
       }
     }
   };
 }
 
-impl_fat_obj!(
+impl_builtin_obj!(
   PointerListener,
   FocusNode,
   RequestFocus,
@@ -188,8 +158,94 @@ impl_fat_obj!(
   Visibility,
   Opacity,
   LifecycleListener,
-  DelayDropWidget
+  DelayDrop
 );
+
+/// A fat object that extend the `T` object with all builtin widgets ability. A
+/// `FatObj` will create during the compose phase, and compose with the builtin
+/// widgets it actually use, and drop after composed.
+pub struct FatObj<T> {
+  host: T,
+  builtin: BuiltinObj,
+}
+
+impl<T> FatObj<T> {
+  pub fn from_host(host: T) -> Self { Self { host, builtin: BuiltinObj::default() } }
+
+  pub fn new(host: T, builtin: BuiltinObj) -> Self { Self { host, builtin } }
+
+  pub fn unzip(self) -> (T, BuiltinObj) { (self.host, self.builtin) }
+
+  pub fn into_inner(self) -> T {
+    assert!(
+      self.builtin.is_empty(),
+      "Unwrap a FatObj with contains builtin widgets is not allowed."
+    );
+    self.host
+  }
+}
+
+impl<T: Into<Widget>> WidgetBuilder for FatObj<T> {
+  fn build(self, ctx: &BuildCtx) -> WidgetId {
+    let Self { host, builtin } = self;
+    builtin.compose_with_host(host.into(), ctx).build(ctx)
+  }
+}
+
+impl<T: SingleChild> SingleChild for FatObj<T> {}
+impl<T: MultiChild> MultiChild for FatObj<T> {}
+impl<T: ComposeChild + 'static> ComposeChild for FatObj<State<T>> {
+  type Child = T::Child;
+
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+    let this = this.into_value();
+    let Self { host, builtin } = this;
+    FnWidget::new(move |ctx| {
+      let this = host.with_child(child, ctx);
+      builtin.compose_with_host(this.into(), ctx)
+    })
+    .into()
+  }
+}
+
+impl<T: ComposeChild + 'static> ComposeChild for FatObj<T> {
+  type Child = T::Child;
+
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+    let this = this.into_value();
+    let Self { host, builtin } = this;
+    FnWidget::new(move |ctx| {
+      let this = host.with_child(child, ctx);
+      builtin.compose_with_host(this.into(), ctx)
+    })
+    .into()
+  }
+}
+
+impl<T: SingleParent + 'static> SingleParent for FatObj<T> {
+  fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
+    let Self { host, builtin } = self;
+    let p = host.append_child(child, ctx);
+    builtin.compose_with_host(p.into(), ctx).build(ctx)
+  }
+}
+
+impl<T: MultiParent + 'static> MultiParent for FatObj<T> {
+  fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId {
+    let Self { host, builtin } = self;
+    let host = host.append_children(children, ctx);
+    builtin.compose_with_host(host.into(), ctx).build(ctx)
+  }
+}
+
+impl ComposeChild for BuiltinObj {
+  type Child = Widget;
+
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+    let this = this.into_value();
+    fn_widget! { this.compose_with_host(child, ctx!()) }.into()
+  }
+}
 
 impl<T> std::ops::Deref for FatObj<T> {
   type Target = T;
@@ -200,18 +256,4 @@ impl<T> std::ops::Deref for FatObj<T> {
 impl<T> std::ops::DerefMut for FatObj<T> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.host }
-}
-
-impl<W> BoxedSingleParent for FatObj<W>
-where
-  W: SingleChild + Into<Box<dyn Render>> + Into<Widget> + 'static,
-{
-  fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId { self.build(ctx) }
-}
-
-impl<W> BoxMultiParent for FatObj<W>
-where
-  W: MultiChild + Into<Box<dyn Render>> + Into<Widget> + 'static,
-{
-  fn into_parent(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId { self.build(ctx) }
 }

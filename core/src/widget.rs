@@ -298,32 +298,17 @@ macro_rules! impl_proxy_render {
 
 impl<C: Compose> WidgetBuilder for C {
   #[inline]
-  fn build(self, ctx: &BuildCtx) -> WidgetId { State::Stateless(self).build(ctx) }
+  fn build(self, ctx: &BuildCtx) -> WidgetId { State::value(self).build(ctx) }
 }
 
 impl<C: Compose> WidgetBuilder for Stateful<C> {
   #[inline]
-  fn build(self, ctx: &BuildCtx) -> WidgetId { State::Stateful(self).build(ctx) }
+  fn build(self, ctx: &BuildCtx) -> WidgetId { State::stateful(self).build(ctx) }
 }
-
-#[repr(transparent)]
-pub(crate) struct RenderFul<R>(pub(crate) Stateful<R>);
-
-impl_proxy_query!(paths [0], RenderFul<R>, <R>, where R: Render + 'static);
-impl_proxy_render!(proxy 0.state_ref(), RenderFul<R>, <R>, where R: Render + 'static);
-impl_proxy_query!(paths[0.state_ref()], RenderFul<Box<dyn Render>>);
-impl_proxy_render!(proxy 0.state_ref(), RenderFul<Box<dyn Render>>);
 
 impl<R: Render + 'static> Compose for R {
   fn compose(this: State<Self>) -> Widget {
-    FnWidget::new(move |ctx| {
-      let node: Box<dyn Render> = match this {
-        State::Stateless(r) => Box::new(r),
-        State::Stateful(s) => Box::new(RenderFul(s)),
-      };
-      ctx.alloc_widget(node)
-    })
-    .into()
+    FnWidget::new(move |ctx| ctx.alloc_widget(this.into())).into()
   }
 }
 

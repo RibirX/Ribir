@@ -1,7 +1,7 @@
 use ribir_core::prelude::*;
 
 /// Widget with fixed size as a container for its child.
-#[derive(Declare, SingleChild)]
+#[derive(Declare, Declare2, SingleChild)]
 pub struct Container {
   pub size: Size,
 }

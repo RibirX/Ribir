@@ -2,15 +2,65 @@ use super::easing::Easing;
 use crate::prelude::{BuildCtx, *};
 use std::{ops::Deref, rc::Rc, time::Duration};
 
-/// Transition describe how the state change form init to final smoothly.
-#[derive(Declare, Clone, Debug, PartialEq)]
-pub struct Transition<E> {
+/// Transition use rate to describe how the state change form init to final
+/// smoothly.
+#[derive(Declare2, Clone, Debug, PartialEq)]
+pub struct Transition<E: 'static> {
   #[declare(default, convert=strip_option)]
   pub delay: Option<Duration>,
   pub duration: Duration,
+  #[declare(strict)]
   pub easing: E,
   #[declare(default, convert=strip_option)]
   pub repeat: Option<f32>,
+}
+
+/// Trait help to transition the state.
+pub trait TransitionState: Sized + 'static {
+  /// Use an animate to transition the state after it modified.
+  fn transition<T: Roc + 'static>(self, transition: T, ctx: &BuildCtx) -> Writer<Animate<T, Self>>
+  where
+    Self: AnimateState,
+    <Self::State as StateReader>::Value: Clone,
+  {
+    let state = self.state().clone_writer();
+    let from = state.read().clone();
+    let mut animate: State<Animate<T, Self>> = Animate::declare2_builder()
+      .transition(transition)
+      .from(from)
+      .state(self)
+      .build_declare(ctx);
+
+    let c_animate = animate.clone_writer();
+    let init_value = observable::of(state.read().clone());
+    state
+      .modifies()
+      .map(move |_| state.read().clone())
+      .merge(init_value)
+      .pairwise()
+      .subscribe(move |(old, _)| {
+        animate.write().from = old;
+        animate.run();
+      });
+    c_animate
+  }
+
+  /// Transition the state with a lerp function.
+  fn transition_with<T, F>(
+    self,
+    transition: T,
+    lerp_fn: F,
+    ctx: &BuildCtx,
+  ) -> Writer<Animate<T, LerpFnState<Self, F>>>
+  where
+    Self: StateWriter,
+    Self::Value: Clone,
+    F: FnMut(&Self::Value, &Self::Value, f32) -> Self::Value + 'static,
+    T: Roc + 'static,
+  {
+    let animate_state = LerpFnState::new(self, lerp_fn);
+    animate_state.transition(transition, ctx)
+  }
 }
 
 /// Calc the rate of change over time.
@@ -46,11 +96,20 @@ impl<E: Easing> Roc for Transition<E> {
   }
 }
 
-impl<T: Roc> Roc for Stateful<T> {
-  #[inline]
-  fn rate_of_change(&self, dur: Duration) -> AnimateProgress {
-    self.state_ref().rate_of_change(dur)
-  }
+impl<T: StateReader> Roc for T
+where
+  T::Value: Roc,
+{
+  fn rate_of_change(&self, dur: Duration) -> AnimateProgress { self.read().rate_of_change(dur) }
+}
+
+impl<S: StateWriter + 'static> TransitionState for S {}
+
+impl<V, S, F> TransitionState for LerpFnState<S, F>
+where
+  S: StateWriter<Value = V> + 'static,
+  F: FnMut(&V, &V, f32) -> V + 'static,
+{
 }
 
 impl Roc for Box<dyn Roc> {

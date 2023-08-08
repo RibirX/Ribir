@@ -1,6 +1,6 @@
 use crate::{events::focus_mgr::FocusType, impl_query_self_only, prelude::*};
 
-#[derive(Declare, Clone, Default)]
+#[derive(Declare, Declare2, Clone, Default)]
 pub struct FocusScope {
   /// If true, the descendants can not be focused.
   /// Default value is false, then the hold FocusScope subtree can be focused
@@ -207,7 +207,7 @@ mod tests {
       is_synthetic: false,
     });
 
-    wnd.emit_events();
+    wnd.run_frame_tasks();
     wnd.draw_frame();
     assert_eq!(*result.borrow(), 2);
   }

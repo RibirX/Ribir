@@ -53,16 +53,16 @@ impl ComposeChild for FocusNode {
           .unwrap_or_else(|| {
             let listener = LifecycleListener::default();
             let subject = listener.lifecycle_stream();
-            attach_to_id(id, ctx.force_as_mut(), |child| {
+            attach_to_id(id, &mut *ctx.tree.borrow_mut(), |child| {
               Box::new(DataWidget::new(child, listener))
             });
             subject
           });
 
-        fn subscribe_fn(this: Stateful<FocusNode>) -> impl FnMut(&'_ mut AllLifecycle) + 'static {
+        fn subscribe_fn(this: Reader<FocusNode>) -> impl FnMut(&'_ mut AllLifecycle) + 'static {
           move |e| match e {
             AllLifecycle::Mounted(e) => {
-              let auto_focus = this.state_ref().auto_focus;
+              let auto_focus = this.read().auto_focus;
               e.window().add_focus_node(e.id, auto_focus, FocusType::Node)
             }
             AllLifecycle::PerformedLayout(_) => {}
@@ -70,10 +70,10 @@ impl ComposeChild for FocusNode {
           }
         }
         let h = subject
-          .subscribe(subscribe_fn(this.clone()))
+          .subscribe(subscribe_fn(this.clone_reader()))
           .unsubscribe_when_dropped();
 
-        attach_to_id(id, ctx.force_as_mut(), |child| {
+        attach_to_id(id, &mut *ctx.tree.borrow_mut(), |child| {
           let d = DataWidget::new(child, this);
           Box::new(DataWidget::new(
             Box::new(d),
@@ -104,18 +104,17 @@ pub struct RequestFocus {
 impl ComposeChild for RequestFocus {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let this = this.into_writable();
-    let w: Widget = widget! {
-      states { this: this.clone() }
-      DynWidget {
-        on_mounted: move |ctx| {
-          this.silent().handle = Some(ctx.window().focus_mgr.borrow().focus_handle(ctx.id));
-        },
-        dyns: child
+    let this2 = this.clone_reader();
+    let w: Widget = fn_widget! {
+      @$child {
+        on_mounted: move |e| {
+          let handle = e.window().focus_mgr.borrow().focus_handle(e.id);
+          $this.silent().handle = Some(handle);
+        }
       }
     }
     .into();
-    DataWidget::attach(w, this)
+    DataWidget::attach(w, this2)
   }
 }
 impl RequestFocus {

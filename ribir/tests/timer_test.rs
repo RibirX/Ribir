@@ -2,7 +2,8 @@ use ribir::core::timer::Timer;
 use rxrust::scheduler::NEW_TIMER_FN;
 
 mod test_single_thread {
-  use futures::executor::LocalPool;
+  use super::*;
+  use ribir_core::reset_test_env;
   use ribir_core::test_helper::TestWindow;
   use ribir_dev_helper::*;
   use std::{cell::RefCell, rc::Rc};
@@ -59,10 +60,12 @@ mod test_single_thread {
     (wnd, count)
   }
 
-  fn run_until(local_pool: &mut LocalPool, cond: impl Fn() -> bool) {
+  fn run_until(wnd: &TestWindow, cond: impl Fn() -> bool) {
     loop {
-      super::Timer::wake_timeout_futures();
-      local_pool.run_until_stalled();
+      Timer::wake_timeout_futures();
+      AppCtx::run_until_stalled();
+      wnd.run_frame_tasks();
+
       if (cond)() {
         break;
       }
@@ -71,20 +74,21 @@ mod test_single_thread {
   }
 
   pub fn test_double_tap() {
+    reset_test_env!();
     let (wnd, count) = env(2);
+    let c_wnd = wnd.clone();
 
-    let mut local_pool = LocalPool::new();
     let device_id = unsafe { DeviceId::dummy() };
     let is_complete = Rc::new(RefCell::new(false));
     let is_complete2 = is_complete.clone();
-    observable::interval(Duration::from_millis(10), local_pool.spawner())
+    observable::interval(Duration::from_millis(10), AppCtx::scheduler())
       .take(8)
       .on_complete(move || {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
         #[allow(deprecated)]
-        wnd.processes_native_event(WindowEvent::MouseInput {
+        c_wnd.processes_native_event(WindowEvent::MouseInput {
           device_id,
           state: if i % 2 == 0 {
             ElementState::Pressed
@@ -94,23 +98,24 @@ mod test_single_thread {
           button: MouseButton::Left,
           modifiers: ModifiersState::default(),
         });
-        wnd.emit_events();
       });
 
-    run_until(&mut local_pool, || *is_complete2.borrow());
+    run_until(&wnd, || *is_complete2.borrow());
     assert_eq!(*count.borrow(), 2);
 
     let (wnd, count) = env(2);
+    let c_wnd = wnd.clone();
+
     let is_complete = Rc::new(RefCell::new(false));
     let is_complete2 = is_complete.clone();
-    observable::interval(Duration::from_millis(251), local_pool.spawner())
+    observable::interval(Duration::from_millis(251), AppCtx::scheduler())
       .take(8)
       .on_complete(move || {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
         #[allow(deprecated)]
-        wnd.processes_native_event(WindowEvent::MouseInput {
+        c_wnd.processes_native_event(WindowEvent::MouseInput {
           device_id,
           state: if i % 2 == 0 {
             ElementState::Pressed
@@ -120,28 +125,28 @@ mod test_single_thread {
           button: MouseButton::Left,
           modifiers: ModifiersState::default(),
         });
-        wnd.emit_events();
       });
 
-    run_until(&mut local_pool, || *is_complete2.borrow());
+    run_until(&wnd, || *is_complete2.borrow());
     assert_eq!(*count.borrow(), 0);
   }
 
   pub fn test_tripe_tap() {
+    reset_test_env!();
     let (wnd, count) = env(3);
+    let c_wnd = wnd.clone();
 
-    let mut local_pool = LocalPool::new();
     let device_id = unsafe { DeviceId::dummy() };
     let is_complete = Rc::new(RefCell::new(false));
     let is_complete2 = is_complete.clone();
-    observable::interval(Duration::from_millis(10), local_pool.spawner())
+    observable::interval(Duration::from_millis(10), AppCtx::scheduler())
       .take(12)
       .on_complete(move || {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
         #[allow(deprecated)]
-        wnd.processes_native_event(WindowEvent::MouseInput {
+        c_wnd.processes_native_event(WindowEvent::MouseInput {
           device_id,
           state: if i % 2 == 0 {
             ElementState::Pressed
@@ -151,10 +156,9 @@ mod test_single_thread {
           button: MouseButton::Left,
           modifiers: ModifiersState::default(),
         });
-        wnd.emit_events();
       });
 
-    run_until(&mut local_pool, || *is_complete2.borrow());
+    run_until(&wnd, || *is_complete2.borrow());
 
     assert_eq!(*count.borrow(), 2);
   }

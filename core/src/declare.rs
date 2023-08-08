@@ -1,4 +1,4 @@
-use crate::{context::BuildCtx, prelude::Pipe};
+use crate::{context::BuildCtx, prelude::Pipe, state::ModifyScope};
 use rxrust::ops::box_it::BoxOp;
 use std::convert::Infallible;
 
@@ -18,7 +18,9 @@ pub trait Declare2 {
 /// document](declare) to know how to use it.
 pub trait DeclareBuilder {
   type Target;
-  fn build(self, ctx: &BuildCtx) -> Self::Target;
+  /// build the object with the given context, return the object and not care
+  /// about if this object is subscribed to other or not.
+  fn build_declare(self, ctx: &BuildCtx) -> Self::Target;
 }
 
 /// The type use to store the init value of the field when declare a object.
@@ -27,8 +29,10 @@ pub enum DeclareInit<V> {
   Pipe(Pipe<V>),
 }
 
+type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
+
 impl<V: 'static> DeclareInit<V> {
-  pub fn unzip(self) -> (V, Option<BoxOp<'static, V, Infallible>>) {
+  pub fn unzip(self) -> (V, Option<ValueStream<V>>) {
     match self {
       Self::Value(v) => (v, None),
       Self::Pipe(v) => {
@@ -67,21 +71,9 @@ impl<V, U: From<V>> DeclareFrom<V, ()> for DeclareInit<U> {
   fn declare_from(value: V) -> Self { Self::Value(value.into()) }
 }
 
-impl<V, U: From<V>> DeclareFrom<V, Option<()>> for DeclareInit<Option<U>> {
-  #[inline]
-  fn declare_from(value: V) -> Self { Self::Value(Some(value.into())) }
-}
-
 impl<V: 'static, U: From<V> + 'static> DeclareFrom<Pipe<V>, Pipe<()>> for DeclareInit<U> {
   #[inline]
   fn declare_from(value: Pipe<V>) -> Self { Self::Pipe(value.map(U::from)) }
-}
-
-impl<V: 'static, U: From<V> + 'static> DeclareFrom<Pipe<V>, Option<Pipe<()>>>
-  for DeclareInit<Option<U>>
-{
-  #[inline]
-  fn declare_from(value: Pipe<V>) -> Self { Self::Pipe(value.map(|v| Some(v.into()))) }
 }
 
 #[derive(Debug, PartialEq, Hash)]

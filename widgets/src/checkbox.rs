@@ -5,7 +5,7 @@ use crate::{
 use ribir_core::prelude::*;
 
 /// Represents a control that a user can select and clear.
-#[derive(Clone, Declare)]
+#[derive(Clone, Declare, Declare2)]
 pub struct Checkbox {
   #[declare(default)]
   pub checked: bool,
@@ -77,10 +77,9 @@ impl Checkbox {
     .into()
   }
 
-  fn label(mut label: State<Label>, label_color: Brush, text_style: CowArc<TextStyle>) -> Widget {
-    let label = label.clone();
+  fn label(label: Stateful<Label>, label_color: Brush, text_style: CowArc<TextStyle>) -> Widget {
     widget! {
-      states { label: label.into_readonly() }
+      states { label }
       Text {
         text: label.0.clone(),
         foreground: label_color,
@@ -119,12 +118,12 @@ impl ComposeChild for Checkbox {
               Row {
                 Multi::new(match &mut child {
                   CheckboxTemplate::Before(w) => [
-                    Checkbox::label(w.child.clone(), label_color.clone(), label_style.clone()),
+                    Checkbox::label(w.child.clone_state(), label_color.clone(), label_style.clone()),
                     Checkbox::icon(this.clone_stateful(), icon_size),
                   ],
                   CheckboxTemplate::After(w) => [
                     Checkbox::icon(this.clone_stateful(), icon_size),
-                    Checkbox::label(w.child.clone(), label_color.clone(), label_style.clone()),
+                    Checkbox::label(w.child.clone_state(), label_color.clone(), label_style.clone()),
                   ],
                 })
               }

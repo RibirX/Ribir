@@ -4,7 +4,7 @@ use ribir_widgets::{layout::Stack, path::PathPaintKit};
 
 /// Widget that as an visual indicator of material design used to present the
 /// interactive status of its child.
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct StateLayer {
   pub color: Color,
   pub path: Path,
@@ -23,14 +23,13 @@ pub struct InteractiveLayer {
 }
 
 impl Compose for StateLayer {
-  fn compose(this: State<Self>) -> Widget {
-    widget!(
-      states { this: this.into_readonly() }
-      PathPaintKit {
-        path: this.path.clone(),
-        brush: this.role.calc_color(this.color),
+  fn compose(mut this: State<Self>) -> Widget {
+    fn_widget! {
+      @PathPaintKit {
+        path: pipe!($this.path.clone()),
+        brush: pipe!($this.role.calc_color($this.color)),
       }
-    )
+    }
     .into()
   }
 }
@@ -38,31 +37,33 @@ impl Compose for StateLayer {
 impl ComposeChild for InteractiveLayer {
   type Child = Widget;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_readonly() }
-      Stack {
-        fit: StackFit::Passthrough,
-        DynWidget { id: host, dyns: child }
-        IgnorePointer {
-          Container {
-            size: host.layout_size(),
-            StateLayer {
-              color: this.color,
-              path: Path::rect_round(&host.layout_rect(), &this.border_radii),
-              role: if host.pointer_pressed() {
-                StateRole::pressed()
-              } else if host.has_focus() {
-                StateRole::focus()
-              } else if host.mouse_hover() {
-                StateRole::hover()
-              } else {
-                // todo: not support drag & drop now
-                StateRole::custom(0.)
-              }
-            }
+  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+    fn_widget! {
+      let mut host = @$child { };
+      let layer = @IgnorePointer {
+        @Container {
+          size: pipe!($host.layout_size()),
+          @StateLayer {
+            color: pipe!($this.color),
+            path: pipe!(Path::rect_round(&$host.layout_rect(), &$this.border_radii)),
+            role: pipe!(if $host.pointer_pressed() {
+              StateRole::pressed()
+            } else if $host.has_focus() {
+              StateRole::focus()
+            } else if $host.mouse_hover() {
+              StateRole::hover()
+            } else {
+              // todo: not support drag & drop now
+              StateRole::custom(0.)
+            })
           }
         }
+      };
+
+      @Stack {
+        fit: StackFit::Passthrough,
+        @{ host }
+        @{ layer }
       }
     }
     .into()

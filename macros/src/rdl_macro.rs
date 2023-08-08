@@ -1,3 +1,9 @@
+use crate::{
+  declare_obj::DeclareObj,
+  ok,
+  symbol_process::{kw, symbol_to_macro, DollarRefsCtx},
+};
+use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote_spanned, ToTokens};
 use std::collections::HashSet;
@@ -5,19 +11,14 @@ use syn::{
   braced,
   fold::Fold,
   parse::{Parse, ParseBuffer, ParseStream},
-  parse_quote,
+  parse_macro_input, parse_quote,
   punctuated::Punctuated,
   spanned::Spanned,
   token::{At, Bang, Brace, Colon, Comma, Dollar},
   Expr, Ident, Macro, Path, Result as SynResult, Stmt,
 };
 
-use crate::{
-  declare_obj::DeclareObj,
-  symbol_process::{kw, DollarRefs},
-};
-
-pub enum RdlBody {
+pub enum RdlMacro {
   Literal(StructLiteral),
   /// Declare an expression as a object, like `rdl! { Widget::new(...) }`
   ExprObj {
@@ -55,17 +56,44 @@ pub struct DeclareField {
   pub value: Expr,
 }
 
-impl Parse for RdlBody {
+impl RdlMacro {
+  pub fn gen_code(input: TokenStream, refs: &mut DollarRefsCtx) -> TokenStream1 {
+    let input = ok!(symbol_to_macro(TokenStream1::from(input)));
+
+    match parse_macro_input! { input as RdlMacro } {
+      RdlMacro::Literal(mut l) => {
+        let fields = l.fields.into_iter().map(|mut f: DeclareField| {
+          f.value = refs.fold_expr(f.value);
+          f
+        });
+        l.fields = fields.collect();
+        l.children = l.children.into_iter().map(|m| refs.fold_macro(m)).collect();
+
+        let obj = ok!(DeclareObj::from_literal(&l));
+        obj.to_token_stream().into()
+      }
+      RdlMacro::ExprObj { span, stmts } => {
+        let stmts = stmts.into_iter().map(|s| refs.fold_stmt(s));
+        if stmts.len() > 1 {
+          quote_spanned! { span => { #(#stmts)* }}.into()
+        } else {
+          quote_spanned! { span => #(#stmts)* }.into()
+        }
+      }
+    }
+  }
+}
+
+impl Parse for RdlMacro {
   fn parse(input: ParseStream) -> SynResult<Self> {
     let fork = input.fork();
     if fork.parse::<RdlParent>().is_ok() && fork.peek(Brace) {
-      Ok(RdlBody::Literal(input.parse()?))
+      Ok(RdlMacro::Literal(input.parse()?))
     } else {
-      let span = input.span();
-      let stmts = syn::Block::parse_within(input)?;
-      let mut refs = DollarRefs::default();
-      let stmts = stmts.into_iter().map(|s| refs.fold_stmt(s)).collect();
-      Ok(RdlBody::ExprObj { span, stmts })
+      Ok(RdlMacro::ExprObj {
+        span: input.span(),
+        stmts: syn::Block::parse_within(input)?,
+      })
     }
   }
 }
@@ -131,31 +159,10 @@ impl Parse for DeclareField {
     let value = if colon_tk.is_none() {
       parse_quote!(#member)
     } else {
-      let mut refs = DollarRefs::default();
-      refs.fold_expr(input.parse()?)
+      input.parse()?
     };
 
     Ok(DeclareField { member, colon_tk, value })
-  }
-}
-
-impl ToTokens for RdlBody {
-  fn to_tokens(&self, tokens: &mut TokenStream) {
-    match self {
-      RdlBody::Literal(l) => match DeclareObj::from_literal(l) {
-        Ok(declare) => declare.to_tokens(tokens),
-        Err(err) => err.to_tokens(tokens),
-      },
-      RdlBody::ExprObj { span, stmts } => {
-        if stmts.len() > 1 {
-          Brace(*span).surround(tokens, |tokens| {
-            stmts.iter().for_each(|s| s.to_tokens(tokens));
-          })
-        } else {
-          stmts.iter().for_each(|s| s.to_tokens(tokens));
-        }
-      }
-    }
   }
 }
 

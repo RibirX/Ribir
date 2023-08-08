@@ -105,7 +105,7 @@ impl ComposeChild for TextEditorArea {
         .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
 
       selectable.modifies()
-        .merge(observable::of(()))
+        .merge(observable::of(ModifyScope::BOTH))
         .sample(tick_of_layout_ready)
         .subscribe(move |_| {
           let (offset, height) = selectable.cursor_layout();
