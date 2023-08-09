@@ -22,9 +22,8 @@ ribir_widgets = {path = "../widgets", version = "0.0.1-alpha.4", optional = true
 rxrust.workspace = true
 wgpu = {workspace = true, optional = true}
 winit.workspace = true
-
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2.workspace = true
+icrate = {workspace = true, features = ["Foundation", "Foundation_NSAppleEventManager", "objective-c", "AppKit", "AppKit_NSEvent"]}
 
 [dev-dependencies]
 colored.workspace = true
