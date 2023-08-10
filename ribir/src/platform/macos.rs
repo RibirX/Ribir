@@ -1,4 +1,4 @@
-use crate::prelude::{App, AppEvent};
+use crate::prelude::{App, AppEvent, HotkeyEvent};
 use icrate::{
   block2::ConcreteBlock,
   objc2::{
@@ -6,11 +6,17 @@ use icrate::{
     runtime::{AnyObject, Sel},
     *,
   },
-  AppKit::{NSEvent, NSEventMaskKeyDown, NSEventMaskLeftMouseDown},
+  AppKit::{
+    NSEvent, NSEventMaskKeyDown, NSEventMaskLeftMouseDown, NSEventModifierFlagCapsLock,
+    NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagFunction,
+    NSEventModifierFlagHelp, NSEventModifierFlagNumericPad, NSEventModifierFlagOption,
+    NSEventModifierFlagShift,
+  },
   Foundation::NSObject,
 };
+use winit::event::{ModifiersState, VirtualKeyCode};
 
-use std::{ptr::NonNull, sync::Once};
+use std::{fmt::format, ptr::NonNull, sync::Once};
 
 extern_class!(
   #[derive(Debug, PartialEq, Eq, Hash)]
@@ -105,12 +111,150 @@ pub fn register_platform_app_events_handlers() {
       NSEvent::addGlobalMonitorForEventsMatchingMask_handler(
         NSEventMaskLeftMouseDown | NSEventMaskKeyDown,
         &ConcreteBlock::new(|e: NonNull<NSEvent>| {
-          println!("mouse or key down");
-          if let Some(chars) = e.as_ref().characters() {
-            println!("chars: {:?}", chars);
+          let key_code = scancode_to_key(e.as_ref().keyCode() as u32);
+          let modifiers = modifier_flag(e.as_ref().modifierFlags());
+          match (key_code, modifiers) {
+            (None, None) => {}
+            _ => {
+              App::event_sender().send(AppEvent::Hotkey(HotkeyEvent { key_code, modifiers }));
+            }
           }
         }),
       );
     });
+  }
+}
+
+fn modifier_flag(modifiers: usize) -> Option<ModifiersState> {
+  let mut modifiers_state = ModifiersState::empty();
+
+  if (modifiers & NSEventModifierFlagCommand) == NSEventModifierFlagCommand {
+    modifiers_state.insert(ModifiersState::LOGO);
+  }
+  if (modifiers & NSEventModifierFlagShift) == NSEventModifierFlagShift {
+    modifiers_state.insert(ModifiersState::SHIFT);
+  }
+  if (modifiers & NSEventModifierFlagControl) == NSEventModifierFlagControl {
+    modifiers_state.insert(ModifiersState::CTRL);
+  }
+  if (modifiers & NSEventModifierFlagOption) == NSEventModifierFlagOption {
+    modifiers_state.insert(ModifiersState::ALT);
+  }
+
+  if !modifiers_state.is_empty() {
+    Some(modifiers_state)
+  } else {
+    None
+  }
+}
+
+fn scancode_to_key(key_code: u32) -> Option<VirtualKeyCode> {
+  match key_code {
+    0x00 => Some(VirtualKeyCode::A),
+    0x01 => Some(VirtualKeyCode::S),
+    0x02 => Some(VirtualKeyCode::D),
+    0x03 => Some(VirtualKeyCode::F),
+    0x04 => Some(VirtualKeyCode::H),
+    0x05 => Some(VirtualKeyCode::G),
+    0x06 => Some(VirtualKeyCode::Z),
+    0x07 => Some(VirtualKeyCode::X),
+    0x08 => Some(VirtualKeyCode::C),
+    0x09 => Some(VirtualKeyCode::V),
+    0x0B => Some(VirtualKeyCode::B),
+    0x0C => Some(VirtualKeyCode::Q),
+    0x0D => Some(VirtualKeyCode::W),
+    0x0E => Some(VirtualKeyCode::E),
+    0x0F => Some(VirtualKeyCode::R),
+    0x10 => Some(VirtualKeyCode::Y),
+    0x11 => Some(VirtualKeyCode::T),
+    0x12 => Some(VirtualKeyCode::Key1),
+    0x13 => Some(VirtualKeyCode::Key2),
+    0x14 => Some(VirtualKeyCode::Key3),
+    0x15 => Some(VirtualKeyCode::Key4),
+    0x16 => Some(VirtualKeyCode::Key6),
+    0x17 => Some(VirtualKeyCode::Key5),
+    0x18 => Some(VirtualKeyCode::Equals),
+    0x19 => Some(VirtualKeyCode::Key9),
+    0x1A => Some(VirtualKeyCode::Key7),
+    0x1B => Some(VirtualKeyCode::Minus),
+    0x1C => Some(VirtualKeyCode::Key8),
+    0x1D => Some(VirtualKeyCode::Key0),
+    0x1E => Some(VirtualKeyCode::RBracket),
+    0x1F => Some(VirtualKeyCode::O),
+    0x20 => Some(VirtualKeyCode::U),
+    0x21 => Some(VirtualKeyCode::LBracket),
+    0x22 => Some(VirtualKeyCode::I),
+    0x23 => Some(VirtualKeyCode::P),
+    0x24 => Some(VirtualKeyCode::Return),
+    0x25 => Some(VirtualKeyCode::L),
+    0x26 => Some(VirtualKeyCode::J),
+    0x27 => Some(VirtualKeyCode::Apostrophe),
+    0x28 => Some(VirtualKeyCode::K),
+    0x29 => Some(VirtualKeyCode::Semicolon),
+    0x2A => Some(VirtualKeyCode::Backslash),
+    0x2B => Some(VirtualKeyCode::Comma),
+    0x2C => Some(VirtualKeyCode::Slash),
+    0x2D => Some(VirtualKeyCode::N),
+    0x2E => Some(VirtualKeyCode::M),
+    0x2F => Some(VirtualKeyCode::Period),
+    0x30 => Some(VirtualKeyCode::Tab),
+    0x31 => Some(VirtualKeyCode::Space),
+    0x32 => Some(VirtualKeyCode::Grave),
+    0x33 => Some(VirtualKeyCode::Back),
+    0x35 => Some(VirtualKeyCode::Escape),
+    0x40 => Some(VirtualKeyCode::F17),
+    0x41 => Some(VirtualKeyCode::NumpadDecimal),
+    0x43 => Some(VirtualKeyCode::NumpadMultiply),
+    0x45 => Some(VirtualKeyCode::NumpadAdd),
+    0x47 => Some(VirtualKeyCode::Numlock),
+    0x48 => Some(VirtualKeyCode::VolumeUp),
+    0x49 => Some(VirtualKeyCode::VolumeDown),
+    0x4A => Some(VirtualKeyCode::Mute),
+    0x4B => Some(VirtualKeyCode::NumpadDivide),
+    0x4C => Some(VirtualKeyCode::NumpadEnter),
+    0x4E => Some(VirtualKeyCode::NumpadSubtract),
+    0x4F => Some(VirtualKeyCode::F18),
+    0x50 => Some(VirtualKeyCode::F19),
+    0x51 => Some(VirtualKeyCode::NumpadEquals),
+    0x52 => Some(VirtualKeyCode::Numpad0),
+    0x53 => Some(VirtualKeyCode::Numpad1),
+    0x54 => Some(VirtualKeyCode::Numpad2),
+    0x55 => Some(VirtualKeyCode::Numpad3),
+    0x56 => Some(VirtualKeyCode::Numpad4),
+    0x57 => Some(VirtualKeyCode::Numpad5),
+    0x58 => Some(VirtualKeyCode::Numpad6),
+    0x59 => Some(VirtualKeyCode::Numpad7),
+    0x5A => Some(VirtualKeyCode::F20),
+    0x5B => Some(VirtualKeyCode::Numpad8),
+    0x5C => Some(VirtualKeyCode::Numpad9),
+    0x60 => Some(VirtualKeyCode::F5),
+    0x61 => Some(VirtualKeyCode::F6),
+    0x62 => Some(VirtualKeyCode::F7),
+    0x63 => Some(VirtualKeyCode::F3),
+    0x64 => Some(VirtualKeyCode::F8),
+    0x65 => Some(VirtualKeyCode::F9),
+    0x67 => Some(VirtualKeyCode::F11),
+    0x69 => Some(VirtualKeyCode::F13),
+    0x6A => Some(VirtualKeyCode::F16),
+    0x6B => Some(VirtualKeyCode::F14),
+    0x6D => Some(VirtualKeyCode::F10),
+    0x6F => Some(VirtualKeyCode::F12),
+    0x71 => Some(VirtualKeyCode::F15),
+    0x72 => Some(VirtualKeyCode::Insert),
+    0x73 => Some(VirtualKeyCode::Home),
+    0x74 => Some(VirtualKeyCode::PageUp),
+    0x75 => Some(VirtualKeyCode::Delete),
+    0x76 => Some(VirtualKeyCode::F4),
+    0x77 => Some(VirtualKeyCode::End),
+    0x78 => Some(VirtualKeyCode::F2),
+    0x79 => Some(VirtualKeyCode::PageDown),
+    0x7A => Some(VirtualKeyCode::F1),
+    0x7B => Some(VirtualKeyCode::Left),
+    0x7C => Some(VirtualKeyCode::Right),
+    0x7D => Some(VirtualKeyCode::Down),
+    0x7E => Some(VirtualKeyCode::Up),
+    0x39 => Some(VirtualKeyCode::Capital),
+    0x46 => Some(VirtualKeyCode::Snapshot),
+    _ => None,
   }
 }

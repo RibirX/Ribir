@@ -17,12 +17,20 @@ pub struct App {
   events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct HotkeyEvent {
+  pub key_code: Option<VirtualKeyCode>,
+  pub modifiers: Option<ModifiersState>,
+}
+
 pub enum AppEvent {
   /// The event is sent when any future is waked to poll.
   FuturesWake,
   /// The event is sent when the application is be required to open a url. For
   /// example, it's launched from browser with a url.
   OpenUrl(String),
+  /// The event is get global hotkey, it will receive the hotkey event.
+  Hotkey(HotkeyEvent),
   /// The custom event, you can send any data with this event.
   Custom(Box<dyn Any + Send>),
 }
