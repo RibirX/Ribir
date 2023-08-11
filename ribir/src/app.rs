@@ -31,6 +31,7 @@ pub enum AppEvent {
   OpenUrl(String),
   /// The event is get global hotkey, it will receive the hotkey event.
   Hotkey(HotkeyEvent),
+  WndFocusChanged(WindowId, bool),
   /// The custom event, you can send any data with this event.
   Custom(Box<dyn Any>),
 }
@@ -102,14 +103,19 @@ impl App {
     app.windows.get_mut(&id).map(|wnd| {
       wnd
         .shell_wnd_mut()
-        .set_window_level(ribir_core::window::ShellWindowLevel::OnTop)
+        .set_window_level(ribir_core::window::ShellWindowLevel::OnTop);
+      wnd.shell_wnd_mut().focus_window();
     });
   }
 
   // TODO: remove it
   pub fn remove_window(id: WindowId) {
-    let windows = unsafe { &mut App::shared_mut().windows };
-    windows.remove(&id);
+    let app = unsafe { &mut App::shared_mut() };
+    app.windows.remove(&id);
+    if app.active_wnd == Some(id) {
+      let wnd = app.windows.keys().next().copied();
+      app.active_wnd = wnd;
+    }
   }
 
   /// run the application, this will start the event loop and block the current
@@ -130,10 +136,11 @@ impl App {
       match event {
         Event::WindowEvent { event, window_id } => {
           let windows = unsafe { &mut App::shared_mut().windows };
-          if let Some(wnd) = windows.get_mut(&new_id(window_id)) {
+          let wnd_id = new_id(window_id);
+          if let Some(wnd) = windows.get_mut(&wnd_id) {
             match event {
               WindowEvent::CloseRequested => {
-                windows.remove(&new_id(window_id));
+                windows.remove(&wnd_id);
                 if windows.is_empty() {
                   *control = ControlFlow::Exit;
                 }
@@ -149,6 +156,12 @@ impl App {
                   .unwrap();
                 shell_wnd.on_resize(size);
                 wnd.on_wnd_resize_event(size);
+              }
+              WindowEvent::Focused(focused) => {
+                println!("focused: {}", focused);
+                let mut event = AppEvent::WndFocusChanged(wnd_id, focused);
+                let app = unsafe { App::shared_mut() };
+                app.events_stream.next(&mut event);
               }
               event => {
                 #[allow(deprecated)]

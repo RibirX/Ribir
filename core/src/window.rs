@@ -6,6 +6,7 @@ pub use winit::window::CursorIcon;
 /// A rx scheduler pool that block until all task finished before every frame
 /// end.
 struct FramePool(FuturesLocalSchedulerPool);
+
 /// Window is the root to represent.
 pub struct Window {
   pub(crate) context: WindowCtx,
