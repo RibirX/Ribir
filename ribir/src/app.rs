@@ -89,6 +89,27 @@ impl App {
     app.active_wnd = Some(id);
     // todo: set the window to be the top window, but we not really support
     // multi window fully, implement this later.
+    app.windows.get_mut(&id).map(|wnd| {
+      wnd
+        .shell_wnd_mut()
+        .set_window_level(ribir_core::window::ShellWindowLevel::Normal)
+    });
+  }
+
+  // TODO: remove it
+  pub fn set_window_on_top(id: WindowId) {
+    let app = unsafe { App::shared_mut() };
+    app.windows.get_mut(&id).map(|wnd| {
+      wnd
+        .shell_wnd_mut()
+        .set_window_level(ribir_core::window::ShellWindowLevel::OnTop)
+    });
+  }
+
+  // TODO: remove it
+  pub fn remove_window(id: WindowId) {
+    let windows = unsafe { &mut App::shared_mut().windows };
+    windows.remove(&id);
   }
 
   /// run the application, this will start the event loop and block the current

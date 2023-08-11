@@ -109,7 +109,7 @@ pub fn register_platform_app_events_handlers() {
       APP_EVENTS_HANDLERS = Some(handler);
 
       NSEvent::addGlobalMonitorForEventsMatchingMask_handler(
-        NSEventMaskLeftMouseDown | NSEventMaskKeyDown,
+        NSEventMaskKeyDown,
         &ConcreteBlock::new(|e: NonNull<NSEvent>| {
           let key_code = scancode_to_key(e.as_ref().keyCode() as u32);
           let modifiers = modifier_flag(e.as_ref().modifierFlags());
