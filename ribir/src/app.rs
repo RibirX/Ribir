@@ -110,12 +110,20 @@ impl App {
 
   // TODO: remove it
   pub fn remove_window(id: WindowId) {
-    let app = unsafe { &mut App::shared_mut() };
+    let app = unsafe { App::shared_mut() };
     app.windows.remove(&id);
     if app.active_wnd == Some(id) {
       let wnd = app.windows.keys().next().copied();
       app.active_wnd = wnd;
     }
+  }
+
+  // TODO: remove it
+  pub fn set_window_size(id: WindowId, size: Size) {
+    let app = unsafe { App::shared_mut() };
+    app.windows.get_mut(&id).map(|wnd| {
+      wnd.set_size(size);
+    });
   }
 
   /// run the application, this will start the event loop and block the current
