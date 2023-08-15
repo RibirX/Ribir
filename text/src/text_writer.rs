@@ -110,19 +110,19 @@ where
 pub fn select_word(text: &str, cluster: usize) -> Range<usize> {
   let start = select_prev_word(text, cluster, true).start;
   let mut base = start;
-  let mut it = text[start..].split_word_bounds();
-  while let Some(word) = it.next() {
+  let it = text[start..].split_word_bounds();
+  for word in it {
     if base + word.len() > cluster {
       return Range { start: base, end: base + word.len() };
     }
     base += word.len();
   }
-  return Range { start: text.len(), end: text.len() };
+  Range { start: text.len(), end: text.len() }
 }
 
 pub fn select_next_word(text: &str, cluster: usize, skip_whitespace: bool) -> Range<usize> {
-  let mut it = text[cluster..].split_word_bound_indices();
-  while let Some((i, word)) = it.next() {
+  let it = text[cluster..].split_word_bound_indices();
+  for (i, word) in it {
     if skip_whitespace && word.trim().is_empty() {
       continue;
     }

@@ -11,7 +11,7 @@ use ribir_geom::{Point, Rect, Size};
 
 use crate::{
   font_db::FontDB,
-  shaper::{ShapeResult, TextShaper},
+  shaper::{ShapeResult, TextShaper, NEWLINE_GLYPH_ID},
   text_reorder::ReorderResult,
   typography::{
     text_align_offset, InputParagraph, InputRun, Overflow, PlaceLineDirection, TypographyCfg,
@@ -281,13 +281,7 @@ impl VisualGlyphs {
         .enumerate()
         .rev()
         .find(|(_, g)| Em::zero() < g.x_advance && g.x_offset <= x)
-        .map(|(i, g)| {
-          if x - g.x_offset >= g.x_offset + g.x_advance - x {
-            i + 1
-          } else {
-            i
-          }
-        })
+        .map(|(i, _)| i)
         .unwrap_or(0);
       return (row, idx);
     }
@@ -374,13 +368,17 @@ impl VisualGlyphs {
     (line_para, offset)
   }
 
-  pub fn position_to_cluster(&self, row: usize, mut col: usize) -> usize {
+  pub fn position_to_cluster(&self, row: usize, col: usize) -> usize {
     let lines = &self.visual_info.visual_lines;
-    if lines.len() <= row || (row + 1 == lines.len() && lines[row].glyphs.len() <= col) {
-      return self.order_info.paras.last().map_or(0, |p| p.range.end);
+
+    if row < lines.len() && col < lines[row].glyphs.len() {
+      lines[row].glyphs[col].cluster as usize
+    } else {
+      return lines
+        .get(row + 1)
+        .and_then(|l| l.glyphs.first().map(|g| g.cluster as usize))
+        .unwrap_or_else(|| self.order_info.paras.last().map_or(0, |p| p.range.end));
     }
-    col = col.min(lines[row].glyphs.len() - 1);
-    lines[row].glyphs[col].cluster as usize
   }
 
   pub fn glyph_rect(&self, mut para: usize, mut offset: usize) -> Rect {
@@ -575,12 +573,22 @@ impl VisualGlyphs {
     }
   }
 
-  pub fn glyph_count(&self, row: usize) -> usize {
-    self
-      .visual_info
-      .visual_lines
-      .get(row)
-      .map_or(0, |l| l.glyphs.len())
+  pub fn glyph_count(&self, row: usize, ignore_new_line: bool) -> usize {
+    self.visual_info.visual_lines.get(row).map_or(0, |l| {
+      if ignore_new_line {
+        if l
+          .glyphs
+          .last()
+          .map_or(false, |g| g.glyph_id == NEWLINE_GLYPH_ID)
+        {
+          l.glyphs.len() - 1
+        } else {
+          l.glyphs.len()
+        }
+      } else {
+        l.glyphs.len()
+      }
+    })
   }
 
   pub fn glyph_row_count(&self) -> usize { self.visual_info.visual_lines.len() }

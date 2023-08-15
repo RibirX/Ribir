@@ -7,12 +7,13 @@ mod selected_text;
 mod text_selectable;
 use std::time::Duration;
 
-pub use caret_state::CaretState;
+pub use caret_state::{CaretPosition, CaretState};
 
 pub use self::editarea::PlaceholderStyle;
 use self::editarea::TextEditorArea;
 pub use self::selected_text::SelectedTextStyle;
 use crate::{declare_writer, layout::ConstrainedBox};
+
 use ribir_core::prelude::*;
 use std::ops::{Deref, DerefMut};
 pub use text_selectable::TextSelectable;
@@ -67,13 +68,10 @@ impl Input {
 
   pub fn set_text(&mut self, text: impl Into<CowArc<str>>) {
     self.text = text.into();
-    self.caret.valid(self.text.len());
+    self.caret = self.caret.valid(self.text.len());
   }
 
-  pub fn set_caret(&mut self, caret: CaretState) {
-    self.caret = caret;
-    self.caret.valid(self.text.len());
-  }
+  pub fn set_caret(&mut self, caret: CaretState) { self.caret = caret.valid(self.text.len()); }
 
   pub fn writer(&mut self) -> impl DerefMut<Target = TextWriter> + '_ { InputWriter::new(self) }
 }
@@ -86,13 +84,10 @@ impl TextArea {
 
   pub fn set_text(&mut self, text: impl Into<CowArc<str>>) {
     self.text = text.into();
-    self.caret.valid(self.text.len());
+    self.caret = self.caret.valid(self.text.len());
   }
 
-  pub fn set_caret(&mut self, caret: CaretState) {
-    self.caret = caret;
-    self.caret.valid(self.text.len());
-  }
+  pub fn set_caret(&mut self, caret: CaretState) { self.caret = caret.valid(self.text.len()); }
 
   pub fn writer(&mut self) -> impl DerefMut<Target = TextWriter> + '_ { TextAreaWriter::new(self) }
 }

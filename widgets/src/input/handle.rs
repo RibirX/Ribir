@@ -14,7 +14,7 @@ macro_rules! declare_writer {
 
     impl<'a> $writer<'a> {
       fn new(input: &'a mut $host) -> Self {
-        let cursor = GraphemeCursor(input.caret.offset());
+        let cursor = GraphemeCursor(input.caret.cluster());
         let string = input.text.to_string();
         Self {
           input,
@@ -25,8 +25,13 @@ macro_rules! declare_writer {
 
     impl<'a> Drop for $writer<'a> {
       fn drop(&mut self) {
+        use $crate::input::caret_state::CaretPosition;
         let Self { input, writer } = self;
-        input.caret = writer.byte_offset().into();
+        input.caret = CaretPosition {
+          cluster: writer.byte_offset(),
+          position: None,
+        }
+        .into();
         input.text = writer.text().clone().into();
       }
     }
@@ -89,7 +94,7 @@ fn key_with_command(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEve
         }
         writer.insert_chars(&txt);
       }
-      return true;
+      true
     }
     VirtualKeyCode::X => {
       let rg = this.caret.select_range();
@@ -100,7 +105,7 @@ fn key_with_command(this: &mut StateRef<TextEditorArea>, event: &mut KeyboardEve
         let _ = clipboard.borrow_mut().clear();
         let _ = clipboard.borrow_mut().write_text(&txt);
       }
-      return true;
+      true
     }
     _ => false,
   }

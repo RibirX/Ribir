@@ -33,7 +33,7 @@ pub enum AppEvent {
   Hotkey(HotkeyEvent),
   WndFocusChanged(WindowId, bool),
   /// The custom event, you can send any data with this event.
-  Custom(Box<dyn Any>),
+  Custom(Box<dyn Any + Send>),
 }
 
 /// A sender to send event to the application event loop from which the
@@ -154,16 +154,18 @@ impl App {
                 }
               }
               WindowEvent::Resized(size) => {
-                let scale = wnd.device_pixel_ratio();
-                let size = size.to_logical(scale as f64);
-                let size = Size::new(size.width, size.height);
-                let shell_wnd = wnd
-                  .shell_wnd_mut()
-                  .as_any_mut()
-                  .downcast_mut::<WinitShellWnd>()
-                  .unwrap();
-                shell_wnd.on_resize(size);
-                wnd.on_wnd_resize_event(size);
+                if size.width > 0 && size.height > 0 {
+                  let scale = wnd.device_pixel_ratio();
+                  let size = size.to_logical(scale as f64);
+                  let size = Size::new(size.width, size.height);
+                  let shell_wnd = wnd
+                    .shell_wnd_mut()
+                    .as_any_mut()
+                    .downcast_mut::<WinitShellWnd>()
+                    .unwrap();
+                  shell_wnd.on_resize(size);
+                  wnd.on_wnd_resize_event(size);
+                }
               }
               WindowEvent::Focused(focused) => {
                 println!("focused: {}", focused);
