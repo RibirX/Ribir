@@ -120,7 +120,7 @@ impl Window {
   /// Draw an image what current render tree represent.
   #[track_caller]
   pub fn draw_frame(&self) {
-    if !self.need_draw() {
+    if !self.need_draw() || self.size().is_empty() {
       return;
     }
 
@@ -229,6 +229,8 @@ impl Window {
   pub fn set_ime_pos(&self, pos: Point) { self.shell_wnd.borrow_mut().set_ime_pos(pos); }
 
   pub fn set_size(&self, size: Size) { self.shell_wnd.borrow_mut().set_size(size); }
+
+  pub fn size(&self) -> Size { self.shell_wnd.borrow().inner_size() }
 
   pub fn set_min_size(&self, size: Size) { self.shell_wnd.borrow_mut().set_min_size(size); }
 
