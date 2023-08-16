@@ -108,7 +108,7 @@ impl Window {
   /// Draw an image what current render tree represent.
   #[track_caller]
   pub fn draw_frame(&mut self) {
-    if !self.need_draw() {
+    if !self.need_draw() || self.size().is_empty() {
       return;
     }
 
@@ -191,6 +191,8 @@ impl Window {
     self.shell_wnd.set_icon(icon);
     self
   }
+
+  pub fn size(&self) -> Size { self.shell_wnd.inner_size() }
 
   pub fn set_size(&mut self, size: Size) { self.shell_wnd.set_size(size); }
 
