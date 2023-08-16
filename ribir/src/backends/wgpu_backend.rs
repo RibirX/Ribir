@@ -30,10 +30,12 @@ impl WinitBackend for WgpuBackend {
   }
 
   fn on_resize(&mut self, size: DeviceSize) {
-    self.surface.configure(
-      self.backend.get_impl().device(),
-      &Self::surface_config(size.width as u32, size.height as u32),
-    );
+    if !size.is_empty() {
+      self.surface.configure(
+        self.backend.get_impl().device(),
+        &Self::surface_config(size.width as u32, size.height as u32),
+      );
+    }
   }
 
   fn begin_frame(&mut self) {
