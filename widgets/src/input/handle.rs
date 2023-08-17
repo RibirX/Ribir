@@ -14,7 +14,7 @@ macro_rules! declare_writer {
 
     impl<'a> $writer<'a> {
       fn new(input: &'a mut $host) -> Self {
-        let cursor = GraphemeCursor(input.caret.offset());
+        let cursor = GraphemeCursor(input.caret.cluster());
         let string = input.text.to_string();
         Self {
           input,
@@ -25,8 +25,13 @@ macro_rules! declare_writer {
 
     impl<'a> Drop for $writer<'a> {
       fn drop(&mut self) {
+        use $crate::input::caret_state::CaretPosition;
         let Self { input, writer } = self;
-        input.caret = writer.byte_offset().into();
+        input.caret = CaretPosition {
+          cluster: writer.byte_offset(),
+          position: None,
+        }
+        .into();
         input.text = writer.text().clone().into();
       }
     }

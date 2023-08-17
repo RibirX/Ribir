@@ -24,7 +24,7 @@ pub enum AppEvent {
   /// example, it's launched from browser with a url.
   OpenUrl(String),
   /// The custom event, you can send any data with this event.
-  Custom(Box<dyn Any>),
+  Custom(Box<dyn Any + Send>),
 }
 
 /// A sender to send event to the application event loop from which the

@@ -1,3 +1,4 @@
+use super::caret_state::CaretPosition;
 use super::CaretState;
 use super::{glyphs_helper::GlyphsHelper, selected_text::SelectedText};
 use crate::layout::{Stack, StackFit};
@@ -29,14 +30,14 @@ impl ComposeChild for TextSelectable {
             if e.point_type == PointerType::Mouse
               && e.mouse_buttons() == MouseButtons::PRIMARY {
               let position = e.position();
-              let cluster = this.helper.cluster_from_pos(position.x, position.y);
-              this.caret = CaretState::Selecting(begin, cluster);
+              let end = this.helper.caret_position_from_pos(position.x, position.y);
+              this.caret = CaretState::Selecting(begin, end);
             }
           }
         },
         on_pointer_down: move |e| {
           let position = e.position();
-          let cluster = this.helper.cluster_from_pos(position.x, position.y);
+          let end = this.helper.caret_position_from_pos(position.x, position.y);
           let begin = if e.with_shift_key() {
             match this.caret {
               CaretState::Caret(begin) |
@@ -44,9 +45,9 @@ impl ComposeChild for TextSelectable {
               CaretState::Selecting(begin, _) => begin,
             }
           } else {
-            cluster
+            end
           };
-          this.caret = CaretState::Selecting(begin, cluster);
+          this.caret = CaretState::Selecting(begin, end);
         },
         on_pointer_up: move |_| {
           if let CaretState::Selecting(begin, end) = this.caret {
@@ -59,9 +60,12 @@ impl ComposeChild for TextSelectable {
         },
         on_double_tap: move |e| {
           let position = e.position();
-          let cluster = this.helper.cluster_from_pos(position.x, position.y);
-          let rg = select_word(&text.text, cluster);
-          this.caret = CaretState::Select(rg.start, rg.end);
+          let caret = this.helper.caret_position_from_pos(position.x, position.y);
+          let rg = select_word(&text.text, caret.cluster);
+          this.caret = CaretState::Select(
+            CaretPosition { cluster: rg.start, position: None },
+            CaretPosition { cluster: rg.end, position: None }
+          );
         },
 
         on_key_down: move |event| key_handle(&mut this, &text.text, event),
@@ -94,7 +98,7 @@ impl ComposeChild for TextSelectable {
 }
 
 impl TextSelectable {
-  pub fn cursor_layout(&self) -> (Point, f32) { self.helper.cursor(self.caret.offset()) }
+  pub fn cursor_layout(&self) -> (Point, f32) { self.helper.cursor(self.caret.caret_position()) }
 
   fn selected_rect(&self) -> Vec<Rect> { self.helper.selection(&self.caret.select_range()) }
 }
@@ -125,7 +129,10 @@ fn deal_with_command(
       }
     }
     VirtualKeyCode::A => {
-      this.caret = CaretState::Select(0, text.len());
+      this.caret = CaretState::Select(
+        CaretPosition { cluster: 0, position: None },
+        CaretPosition { cluster: text.len(), position: None },
+      );
     }
     _ => return false,
   }
@@ -139,58 +146,44 @@ fn is_move_by_word(event: &KeyboardEvent) -> bool {
   return event.with_ctrl_key();
 }
 
-fn move_to_line_begin(this: &mut StateRef<TextSelectable>) {
-  let (row, _) = this.helper.glyph_position(this.caret.offset());
-  this.caret = this.helper.cluster_from_glyph_position(row, 0).into();
-}
-
-fn move_to_line_end(this: &mut StateRef<TextSelectable>) {
-  let (row, _) = this.helper.glyph_position(this.caret.offset());
-  this.caret = this.helper.cluster_from_glyph_position(row + 1, 0).into();
-}
-
 fn deal_with_selection(this: &mut StateRef<TextSelectable>, text: &str, event: &mut KeyboardEvent) {
   let old_caret = this.caret;
   match event.key {
     VirtualKeyCode::Left => {
       if is_move_by_word(event) {
-        this.caret = select_prev_word(text, this.caret.offset(), false)
-          .start
-          .into();
+        let cluster = select_prev_word(text, this.caret.cluster(), false).start;
+        this.caret = CaretPosition { cluster, position: None }.into();
       } else if event.with_command_key() {
-        move_to_line_begin(this);
+        this.caret = this.helper.line_begin(this.caret.caret_position()).into()
       } else {
-        this.caret = this.helper.prev_cluster(this.caret.offset()).into();
+        this.caret = this.helper.prev(this.caret.caret_position()).into();
       }
     }
     VirtualKeyCode::Right => {
       if is_move_by_word(event) {
-        this.caret = select_next_word(text, this.caret.offset(), true).end.into();
+        let cluster = select_next_word(text, this.caret.cluster(), true).end;
+        this.caret = CaretPosition { cluster, position: None }.into()
       } else if event.with_command_key() {
-        move_to_line_end(this);
+        this.caret = this.helper.line_end(this.caret.caret_position()).into()
       } else {
-        this.caret = this.helper.next_cluster(this.caret.offset()).into();
+        this.caret = this.helper.next(this.caret.caret_position()).into();
       }
     }
     VirtualKeyCode::Up => {
-      this.caret = this.helper.up_cluster(this.caret.offset()).into();
+      this.caret = this.helper.up(this.caret.caret_position()).into();
     }
     VirtualKeyCode::Down => {
-      this.caret = this.helper.down_cluster(this.caret.offset()).into();
+      this.caret = this.helper.down(this.caret.caret_position()).into();
     }
-    VirtualKeyCode::Home => {
-      move_to_line_begin(this);
-    }
-    VirtualKeyCode::End => {
-      move_to_line_end(this);
-    }
+    VirtualKeyCode::Home => this.caret = this.helper.line_begin(this.caret.caret_position()).into(),
+    VirtualKeyCode::End => this.caret = this.helper.line_end(this.caret.caret_position()).into(),
     _ => (),
   }
 
   if event.with_shift_key() && old_caret != this.caret {
     this.caret = match old_caret {
       CaretState::Caret(begin) | CaretState::Select(begin, _) | CaretState::Selecting(begin, _) => {
-        CaretState::Select(begin, this.caret.offset())
+        CaretState::Select(begin, this.caret.caret_position())
       }
     };
   }
