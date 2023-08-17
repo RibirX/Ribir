@@ -126,6 +126,13 @@ impl App {
     });
   }
 
+  pub fn set_window_visible(id: WindowId, visible: bool) {
+    let app = unsafe { App::shared_mut() };
+    app.windows.get_mut(&id).map(|wnd| {
+      wnd.shell_wnd_mut().set_visible(visible);
+    });
+  }
+
   /// run the application, this will start the event loop and block the current
   /// thread until the application exit.
   #[track_caller]
