@@ -13,7 +13,7 @@ use ribir_algo::{FrameCache, Substr};
 pub use rustybuzz::ttf_parser::GlyphId;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
 
-pub const EMPTY_GLYPH_ID: GlyphId = GlyphId(core::u16::MAX);
+pub const NEWLINE_GLYPH_ID: GlyphId = GlyphId(core::u16::MAX);
 /// Shaper to shape the `text` using provided font faces, and will do BIDI
 /// reordering before to shape text.
 ///
@@ -66,7 +66,7 @@ impl TextShaper {
         if let Some(last_char) = text.bytes().last() {
           if last_char == b'\r' || last_char == b'\n' {
             if let Some(g) = glyphs.last_mut() {
-              g.glyph_id = EMPTY_GLYPH_ID;
+              g.glyph_id = NEWLINE_GLYPH_ID;
             }
           }
         }
