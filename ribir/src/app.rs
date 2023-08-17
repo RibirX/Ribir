@@ -99,7 +99,7 @@ impl App {
       match event {
         Event::WindowEvent { event, window_id } => {
           let wnd_id = new_id(window_id);
-          let wnd = AppCtx::get_window(wnd_id).expect("Window not found!");
+          let Some(wnd) =  AppCtx::get_window(wnd_id) else { return; };
           match event {
             WindowEvent::CloseRequested => {
               AppCtx::remove_wnd(wnd_id);
