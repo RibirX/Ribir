@@ -109,7 +109,7 @@ where
         .then(path_ts)
     }
 
-    let prefer_scale: f32 = transform.m11.max(transform.m22);
+    let prefer_scale: f32 = transform.m11.abs().max(transform.m22.abs());
     let key = PathKey::from_path(path);
 
     if let Some(h) = self
