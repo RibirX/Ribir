@@ -71,7 +71,7 @@ fn fs_main(f: VertexOutput) -> @location(0) vec4<f32> {
 
     var color = textureSample(img_tex, img_smapler, img_pos);
     var mask_idx = prim.mask_head;
-    loop {
+    for (var i = 0; i < 32; i++) {
         if mask_idx < 0 {
             break;
         }
