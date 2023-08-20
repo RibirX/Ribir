@@ -128,7 +128,7 @@ impl ShellWindow for WinitShellWnd {
   #[inline]
   fn end_frame(&mut self) { self.backend.end_frame() }
 
-  fn set_outer_position(&mut self, pos: Point) { todo!() }
+  fn set_outer_position(&mut self, _pos: Point) { todo!() }
 
   fn set_visible(&mut self, visible: bool) { self.winit_wnd.set_visible(visible); }
 
@@ -151,6 +151,8 @@ impl ShellWindow for WinitShellWnd {
       .winit_wnd
       .request_user_attention(request_type.map(Into::into));
   }
+
+  fn is_visible(&self) -> Option<bool> { self.winit_wnd.is_visible() }
 }
 
 pub(crate) fn new_id(id: winit::window::WindowId) -> WindowId {

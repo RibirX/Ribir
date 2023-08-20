@@ -133,6 +133,14 @@ impl App {
     });
   }
 
+  pub fn get_window_visible(id: WindowId) -> Option<bool> {
+    let app = unsafe { App::shared_mut() };
+    app
+      .windows
+      .get_mut(&id)
+      .and_then(|wnd| wnd.shell_wnd_mut().is_visible())
+  }
+
   /// run the application, this will start the event loop and block the current
   /// thread until the application exit.
   #[track_caller]
@@ -175,7 +183,6 @@ impl App {
                 }
               }
               WindowEvent::Focused(focused) => {
-                println!("focused: {}", focused);
                 let mut event = AppEvent::WndFocusChanged(wnd_id, focused);
                 let app = unsafe { App::shared_mut() };
                 app.events_stream.next(&mut event);

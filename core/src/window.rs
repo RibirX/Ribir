@@ -68,6 +68,7 @@ pub trait ShellWindow {
   fn set_icon(&mut self, icon: &PixelImage);
   fn set_outer_position(&mut self, pos: Point);
   fn set_visible(&mut self, visible: bool);
+  fn is_visible(&self) -> Option<bool>;
   fn set_resizable(&mut self, resizable: bool);
   fn set_minimized(&mut self, minimized: bool);
   fn is_minimized(&self) -> bool;

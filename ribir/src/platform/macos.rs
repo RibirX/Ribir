@@ -7,16 +7,14 @@ use icrate::{
     *,
   },
   AppKit::{
-    NSEvent, NSEventMaskKeyDown, NSEventMaskLeftMouseDown, NSEventModifierFlagCapsLock,
-    NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagFunction,
-    NSEventModifierFlagHelp, NSEventModifierFlagNumericPad, NSEventModifierFlagOption,
-    NSEventModifierFlagShift,
+    NSEvent, NSEventMaskKeyDown, NSEventModifierFlagCommand, NSEventModifierFlagControl,
+    NSEventModifierFlagOption, NSEventModifierFlagShift,
   },
   Foundation::NSObject,
 };
 use winit::event::{ModifiersState, VirtualKeyCode};
 
-use std::{fmt::format, ptr::NonNull, sync::Once};
+use std::{ptr::NonNull, sync::Once};
 
 extern_class!(
   #[derive(Debug, PartialEq, Eq, Hash)]
