@@ -51,6 +51,8 @@ pub struct TextArea {
   pub style: CowArc<TextStyle>,
   #[declare(default = true)]
   pub auto_wrap: bool,
+  #[declare(default = true)]
+  pub multi_line: bool,
   #[declare(skip)]
   text: CowArc<str>,
   #[declare(skip)]
@@ -163,7 +165,7 @@ impl ComposeChild for TextArea {
             text: this.text.clone(),
             style: this.style.clone(),
             caret: this.caret.clone(),
-            multi_line: true,
+            multi_line: this.multi_line,
             auto_wrap: no_watch!(this.auto_wrap),
 
             widget::from(placeholder)

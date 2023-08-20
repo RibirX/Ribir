@@ -54,11 +54,16 @@ impl TextEditorArea {
     if event.common.with_command_key() {
       return;
     }
-    let chars = event
-      .chars
-      .chars()
-      .filter(|c| !c.is_control())
-      .collect::<String>();
+
+    let it = event.chars.chars().filter(|c| !c.is_control());
+
+    let chars = if this.multi_line {
+      it.collect::<String>()
+    } else {
+      it.map(|c| if c == '\r' || c == '\n' { ' ' } else { c })
+        .collect::<String>()
+    };
+
     if !chars.is_empty() {
       let rg = this.caret.select_range();
       let mut writer = InputWriter::new(this);
