@@ -51,6 +51,8 @@ pub struct TextArea {
   pub style: CowArc<TextStyle>,
   #[declare(default = true)]
   pub auto_wrap: bool,
+  #[declare(default = true)]
+  pub multi_line: bool,
   #[declare(skip)]
   text: CowArc<str>,
   #[declare(skip)]
@@ -149,7 +151,7 @@ impl ComposeChild for TextArea {
         text: pipe!($this.text.clone()),
         style: pipe!($this.style.clone()),
         caret: pipe!($this.caret),
-        multi_line: true,
+        multi_line: pipe!($this.multi_line),
         auto_wrap: $this.auto_wrap,
       };
       area.modifies()
