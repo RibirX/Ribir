@@ -275,8 +275,9 @@ impl FlexLayouter {
 
     let cross_size = lines.iter().map(|l| l.cross_line_height).sum();
     // cross gap don't use calc offset
-    let cross_gap_count = (lines.len() - 1) as f32 * self.cross_axis_gap;
-    let cross_offset = align_items.align_value(cross_size, bound.cross - cross_gap_count);
+    let gap_count = if lines.len() > 0 { lines.len() - 1 } else { 0 };
+    let cross_gap_total_size = gap_count as f32 * self.cross_axis_gap;
+    let cross_offset = align_items.align_value(cross_size, bound.cross - cross_gap_total_size);
 
     macro_rules! update_position {
       ($($rev: ident)?) => {
