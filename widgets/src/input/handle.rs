@@ -48,6 +48,17 @@ macro_rules! declare_writer {
   };
 }
 
+fn txt_line_handler(txt: &str, multi_line: bool) -> String {
+  let it = txt.chars().filter(|c| !c.is_control());
+
+  if multi_line {
+    it.collect::<String>()
+  } else {
+    it.map(|c| if c == '\r' || c == '\n' { ' ' } else { c })
+      .collect::<String>()
+  }
+}
+
 declare_writer!(InputWriter, TextEditorArea);
 use super::TextEditorArea;
 impl TextEditorArea {
@@ -55,11 +66,9 @@ impl TextEditorArea {
     if event.common.with_command_key() {
       return;
     }
-    let chars = event
-      .chars
-      .chars()
-      .filter(|c| !c.is_control())
-      .collect::<String>();
+
+    let chars = txt_line_handler(&event.chars, this.multi_line);
+
     if !chars.is_empty() {
       let rg = this.caret.select_range();
       let mut writer = InputWriter::new(this);
@@ -91,12 +100,13 @@ fn key_with_command(this: &mut TextEditorArea, event: &KeyboardEvent) -> bool {
       let clipboard = AppCtx::clipboard();
       let txt = clipboard.borrow_mut().read_text();
       if let Ok(txt) = txt {
+        let chars = txt_line_handler(&txt, this.multi_line);
         let rg = this.caret.select_range();
         let mut writer = InputWriter::new(this);
         if !rg.is_empty() {
           writer.delete_byte_range(&rg);
         }
-        writer.insert_chars(&txt);
+        writer.insert_chars(&chars);
       }
       true
     }
