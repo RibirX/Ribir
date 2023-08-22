@@ -345,18 +345,12 @@ impl<D: 'static> DynRender<D> {
         let key = &new_key_widget.key();
         if let Some(wid) = old_key_list.get(key) {
           inspect_key(wid, arena, |old_key_widget: &dyn AnyKey| {
-            new_key_widget.record_before_value(old_key_widget);
+            new_key_widget.record_prev_key_widget(old_key_widget);
+            old_key_widget.record_next_key_widget(new_key_widget);
           });
-          old_key_list.remove(key);
-        } else {
-          new_key_widget.mounted();
         }
       });
     });
-
-    old_key_list
-      .values()
-      .for_each(|wid| inspect_key(wid, arena, |old_key_widget| old_key_widget.disposed()));
   }
 }
 
@@ -588,23 +582,23 @@ mod tests {
             KeyWidget {
               id: key,
               key: Key::from(i),
-              value: Some(c),
+              value: c,
 
               MockBox {
                 size: Size::zero(),
                 on_mounted: move |_| {
                   if key.is_enter() {
-                    (*enter_list).push(key.value.unwrap());
+                    (*enter_list).push(key.value);
                   }
 
                   if key.is_changed() {
-                    (*update_list).push(key.value.unwrap());
+                    (*update_list).push(key.value);
                     *key_change = key.get_change();
                   }
                 },
                 on_disposed: move |_| {
-                  if key.is_disposed() {
-                    (*leave_list).push(key.value.unwrap());
+                  if key.is_leave() {
+                    (*leave_list).push(key.value);
                   }
                 }
               }
@@ -661,7 +655,7 @@ mod tests {
         .iter()
         .all(|item| expect_vec.contains(item))
     );
-    assert_eq!(*key_change.state_ref(), KeyChange(Some('2'), Some('b')));
+    assert_eq!(*key_change.state_ref(), KeyChange(Some('2'), 'b'));
     (*update_list.state_ref()).clear();
 
     // 4. remove the second item
@@ -690,7 +684,7 @@ mod tests {
         .iter()
         .all(|item| expect_vec.contains(item))
     );
-    assert_eq!(*key_change.state_ref(), KeyChange(Some('1'), Some('a')));
+    assert_eq!(*key_change.state_ref(), KeyChange(Some('1'), 'a'));
     (*update_list.state_ref()).clear();
   }
 

@@ -207,10 +207,8 @@ fn update_key_status_single(new: WidgetId, old: WidgetId, ctx: &BuildCtx) {
   inspect_key(old, ctx, |old_key| {
     inspect_key(new, ctx, |new_key| {
       if old_key.key() == new_key.key() {
-        new_key.record_before_value(old_key);
-      } else {
-        old_key.disposed();
-        new_key.mounted();
+        new_key.record_prev_key_widget(old_key);
+        old_key.record_next_key_widget(new_key);
       }
     })
   })
@@ -230,19 +228,13 @@ fn update_key_state_multi(old: &[WidgetId], new: &[WidgetId], ctx: &BuildCtx) {
     inspect_key(*n, ctx, |new_key: &dyn AnyKey| {
       let key = &new_key.key();
       if let Some(o) = old_key_list.get(key) {
-        inspect_key(*o, ctx, |old_key_widget: &dyn AnyKey| {
-          new_key.record_before_value(old_key_widget)
+        inspect_key(*o, ctx, |old_key: &dyn AnyKey| {
+          new_key.record_prev_key_widget(old_key);
+          old_key.record_next_key_widget(new_key);
         });
-        old_key_list.remove(key);
-      } else {
-        new_key.mounted();
       }
     });
   }
-
-  old_key_list
-    .values()
-    .for_each(|o| inspect_key(*o, ctx, |old_key| old_key.disposed()));
 }
 
 fn inspect_key(id: WidgetId, ctx: &BuildCtx, mut cb: impl FnMut(&dyn AnyKey)) {

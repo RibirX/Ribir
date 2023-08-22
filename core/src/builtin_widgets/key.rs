@@ -1,5 +1,6 @@
 use crate::{impl_query_self_only, prelude::*};
 use std::{
+  cell::Cell,
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
 };
@@ -29,66 +30,43 @@ pub enum Key {
   K32([u8; 32]),
 }
 
-/// The KeyStatus is the status of the Key, not the status of the KeyWidget.
-/// The change of Key status is determined by its associated KeyWidget state
-/// and its own state.
-///
-/// The KeyStatus has four status:
-/// The first status: The KeyWidget associated with the Key was constructed, the
-/// Key didn't exist in DynWidget Key List, the key status is `KeyStatus::Init`.
-///
-/// The second status: The KeyWidget associated with the Key was mounted, and
-/// now its status is `KeyStatus::Init`, the key status will be changed
-/// `KeyStatus::Mounted`.
-///
-/// The third status: The KeyWidget associated with the Key was disposed, and
-/// the same key has anther associated KeyWidget was mounted, the key status
-/// will be changed `KeyStatus::Updated`.
-///
-/// The last status: The KeyWidget associated with the Key was disposed, the
-/// same key don't has anther associated KeyWidget, the key status will be
-/// changed `KeyStatus::Disposed`.
-#[derive(PartialEq, Debug, Clone, Copy)]
-pub enum KeyStatus {
-  Init,
-  Mounted,
-  Updated,
-  Disposed,
-}
-
-impl Default for KeyStatus {
-  fn default() -> Self { Self::Init }
-}
-
 #[derive(Clone, Debug, PartialEq, Copy)]
-pub struct KeyChange<V>(pub Option<V>, pub Option<V>);
+pub struct KeyChange<V>(pub Option<V>, pub V);
 
-impl<V> Default for KeyChange<V> {
-  fn default() -> Self { KeyChange(None, None) }
+impl<V: Default> Default for KeyChange<V> {
+  fn default() -> Self { KeyChange(None, V::default()) }
 }
-#[derive(Declare)]
-pub struct KeyWidget<V = ()> {
+
+/// A widget that can be used to track if the widget is the same widget in two
+/// frames by its key. If two widget has same parent and key in two frames, the
+/// new widget in the next frame will be treated as the same widget in the last
+/// frame.
+#[derive(Declare, Declare2)]
+pub struct KeyWidget<V: Default + 'static = ()> {
   #[declare(convert=into)]
   pub key: Key,
-  pub value: Option<V>,
-
-  #[declare(default)]
+  #[declare(default, strict)]
+  pub value: V,
+  #[declare(skip)]
   before_value: Option<V>,
-  #[declare(default)]
-  status: KeyStatus,
+  #[declare(skip)]
+  has_successor: Cell<bool>,
 }
 
+/// A trait for `keyWidget` that use to record information of the previous and
+/// next key widget.
 pub(crate) trait AnyKey: Any {
   fn key(&self) -> Key;
-  fn record_before_value(&self, key: &dyn AnyKey);
-  fn disposed(&self);
-  fn mounted(&self);
+  /// Record the previous KeyWidget associated with the same key.
+  fn record_prev_key_widget(&self, key: &dyn AnyKey);
+  /// Record the next KeyWidget associated with the same key.
+  fn record_next_key_widget(&self, key: &dyn AnyKey);
   fn as_any(&self) -> &dyn Any;
 }
 
 impl<V> AnyKey for State<KeyWidget<V>>
 where
-  V: Clone + PartialEq,
+  V: Default + Clone + PartialEq,
   Self: Any,
 {
   fn key(&self) -> Key {
@@ -98,7 +76,7 @@ where
     }
   }
 
-  fn record_before_value(&self, key: &dyn AnyKey) {
+  fn record_prev_key_widget(&self, key: &dyn AnyKey) {
     assert_eq!(self.key(), key.key());
     let Some(key) = key.as_any().downcast_ref::<Self>() else {
       log::warn!("Different value type for same key.");
@@ -116,28 +94,12 @@ where
     }
   }
 
-  fn disposed(&self) {
-    match self {
-      State::Stateless(_) => (),
-      State::Stateful(this) => {
-        this.state_ref().status = KeyStatus::Disposed;
-      }
-    }
-  }
-
-  fn mounted(&self) {
-    match self {
-      State::Stateless(_) => {}
-      State::Stateful(this) => {
-        this.state_ref().status = KeyStatus::Mounted;
-      }
-    }
-  }
+  fn record_next_key_widget(&self, _: &dyn AnyKey) { self.as_ref().has_successor.set(true); }
 
   fn as_any(&self) -> &dyn Any { self }
 }
 
-impl<V: 'static + Clone + PartialEq> ComposeChild for KeyWidget<V> {
+impl<V: 'static + Default + Clone + PartialEq> ComposeChild for KeyWidget<V> {
   type Child = Widget;
   #[inline]
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
@@ -150,24 +112,27 @@ impl_query_self_only!(Box<dyn AnyKey>);
 
 impl<V> KeyWidget<V>
 where
-  V: Clone + PartialEq,
+  V: Default + Clone + PartialEq,
 {
-  fn record_before_value(&mut self, value: Option<V>) {
-    self.status = KeyStatus::Updated;
-    self.before_value = value;
+  /// Detect if the key widget is a new widget, there is not predecessor widget
+  /// that has same key. Usually used in `on_mounted` callback.
+  pub fn is_enter(&self) -> bool { self.before_value.is_none() }
+  /// Detect if the key widget is really be disposed, there is not successor
+  /// widget has same key. Usually used in `on_disposed` callback.
+  pub fn is_leave(&self) -> bool { !self.has_successor.get() }
+
+  /// Detect if the value of the key widget is changed
+  pub fn is_changed(&self) -> bool {
+    self.before_value.is_some() && self.before_value.as_ref() != Some(&self.value)
   }
-
-  pub fn is_enter(&self) -> bool { self.status == KeyStatus::Mounted }
-
-  pub fn is_modified(&self) -> bool { self.status == KeyStatus::Updated }
-
-  pub fn is_changed(&self) -> bool { self.is_modified() && self.before_value != self.value }
-
-  pub fn is_disposed(&self) -> bool { self.status == KeyStatus::Disposed }
 
   pub fn get_change(&self) -> KeyChange<V> {
     KeyChange(self.before_value.clone(), self.value.clone())
   }
+
+  pub fn before_value(&self) -> Option<&V> { self.before_value.as_ref() }
+
+  fn record_before_value(&mut self, value: V) { self.before_value = Some(value); }
 }
 
 impl_query_self_only!(Key);
