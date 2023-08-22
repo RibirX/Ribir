@@ -32,6 +32,7 @@ pub enum AppEvent {
   /// The event is get global hotkey, it will receive the hotkey event.
   Hotkey(HotkeyEvent),
   WndFocusChanged(WindowId, bool),
+  WndOccludedChanged(WindowId, bool),
   /// The custom event, you can send any data with this event.
   Custom(Box<dyn Any + Send>),
 }
@@ -91,9 +92,10 @@ impl App {
     // todo: set the window to be the top window, but we not really support
     // multi window fully, implement this later.
     app.windows.get_mut(&id).map(|wnd| {
-      wnd
-        .shell_wnd_mut()
-        .set_window_level(ribir_core::window::ShellWindowLevel::Normal)
+      if wnd.shell_wnd().is_minimized() {
+        wnd.shell_wnd_mut().set_minimized(false);
+      }
+      wnd.shell_wnd_mut().focus_window();
     });
   }
 
@@ -184,6 +186,11 @@ impl App {
               }
               WindowEvent::Focused(focused) => {
                 let mut event = AppEvent::WndFocusChanged(wnd_id, focused);
+                let app = unsafe { App::shared_mut() };
+                app.events_stream.next(&mut event);
+              }
+              WindowEvent::Occluded(occluded) => {
+                let mut event = AppEvent::WndOccludedChanged(wnd_id, occluded);
                 let app = unsafe { App::shared_mut() };
                 app.events_stream.next(&mut event);
               }

@@ -7,7 +7,9 @@ use ribir_core::{
 use winit::{
   dpi::{LogicalPosition, LogicalSize},
   event_loop::EventLoopWindowTarget,
+  platform::macos::WindowExtMacOS,
 };
+
 pub trait WinitBackend {
   fn new(window: &winit::window::Window) -> Self;
 
@@ -168,6 +170,7 @@ impl WinitShellWnd {
     }
 
     let winit_wnd = winit_wnd.build(window_target).unwrap();
+    let id = winit_wnd.ns_window() as u64;
     set_ime_allowed(&winit_wnd);
     WinitShellWnd {
       backend: Backend::new(&winit_wnd),
