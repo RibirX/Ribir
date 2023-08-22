@@ -54,6 +54,7 @@ mod kw {
   custom_keyword!(into);
   custom_keyword!(custom);
   custom_keyword!(skip);
+  custom_keyword!(strict);
   custom_keyword!(strip_option);
 }
 
@@ -129,6 +130,8 @@ impl Parse for DeclareAttr {
         attr.default = Some(input.parse()?);
       } else if lookahead.peek(kw::skip) {
         attr.skip = Some(input.parse()?);
+      } else if lookahead.peek(kw::strict) {
+        let _ = input.parse::<kw::strict>();
       } else {
         return Err(lookahead.error());
       }
