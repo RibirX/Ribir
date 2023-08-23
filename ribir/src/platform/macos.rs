@@ -12,9 +12,11 @@ use icrate::{
   },
   Foundation::NSObject,
 };
+use ribir_core::prelude::AppCtx;
+use rxrust::prelude::{interval, Observable, ObservableExt, ObservableItem};
 use winit::event::{ModifiersState, VirtualKeyCode};
 
-use std::{ptr::NonNull, sync::Once};
+use std::{ptr::NonNull, sync::Once, time::Duration};
 
 extern_class!(
   #[derive(Debug, PartialEq, Eq, Hash)]
@@ -106,21 +108,55 @@ pub fn register_platform_app_events_handlers() {
       );
       APP_EVENTS_HANDLERS = Some(handler);
 
-      NSEvent::addGlobalMonitorForEventsMatchingMask_handler(
-        NSEventMaskKeyDown,
-        &ConcreteBlock::new(|e: NonNull<NSEvent>| {
-          let key_code = scancode_to_key(e.as_ref().keyCode() as u32);
-          let modifiers = modifier_flag(e.as_ref().modifierFlags());
-          match (key_code, modifiers) {
-            (None, None) => {}
-            _ => {
-              App::event_sender().send(AppEvent::Hotkey(HotkeyEvent { key_code, modifiers }));
-            }
-          }
-        }),
-      );
+      if query_accessibility_permissions_with_prompt() {
+        add_global_monitor_for_events_matching_mask_handler();
+      } else {
+        let _ = interval(Duration::from_secs(5), AppCtx::scheduler())
+          .take_while(|_| !query_accessibility_permissions())
+          .on_complete(|| {
+            println!("interval complete");
+            add_global_monitor_for_events_matching_mask_handler();
+          })
+          .subscribe(|_| {
+            println!("interval tick");
+          });
+      }
     });
   }
+}
+
+fn add_global_monitor_for_events_matching_mask_handler() -> Option<Id<AnyObject>> {
+  unsafe {
+    NSEvent::addGlobalMonitorForEventsMatchingMask_handler(
+      NSEventMaskKeyDown,
+      &ConcreteBlock::new(|e: NonNull<NSEvent>| {
+        let key_code = scancode_to_key(e.as_ref().keyCode() as u32);
+        let modifiers = modifier_flag(e.as_ref().modifierFlags());
+        match (key_code, modifiers) {
+          (None, None) => {}
+          _ => {
+            App::event_sender().send(AppEvent::Hotkey(HotkeyEvent { key_code, modifiers }));
+          }
+        }
+      }),
+    )
+  }
+}
+
+#[cfg(target_os = "macos")]
+fn query_accessibility_permissions_with_prompt() -> bool {
+  let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
+  if trusted {
+    print!("Application is totally trusted!");
+  } else {
+    print!("Application isn't trusted :(");
+  }
+  return trusted;
+}
+
+#[cfg(target_os = "macos")]
+fn query_accessibility_permissions() -> bool {
+  macos_accessibility_client::accessibility::application_is_trusted()
 }
 
 fn modifier_flag(modifiers: usize) -> Option<ModifiersState> {
