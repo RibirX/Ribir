@@ -13,7 +13,7 @@ use icrate::{
   Foundation::NSObject,
 };
 use ribir_core::prelude::AppCtx;
-use rxrust::prelude::{interval, Observable, ObservableExt, ObservableItem};
+use rxrust::prelude::{interval, ObservableExt, ObservableItem};
 use winit::event::{ModifiersState, VirtualKeyCode};
 
 use std::{ptr::NonNull, sync::Once, time::Duration};
