@@ -108,7 +108,7 @@ pub fn register_platform_app_events_handlers() {
       );
       APP_EVENTS_HANDLERS = Some(handler);
 
-      if query_accessibility_permissions_with_prompt() {
+      if query_accessibility_permissions() {
         add_global_monitor_for_events_matching_mask_handler();
       } else {
         let _ = interval(Duration::from_secs(5), AppCtx::scheduler())
@@ -141,17 +141,6 @@ fn add_global_monitor_for_events_matching_mask_handler() -> Option<Id<AnyObject>
       }),
     )
   }
-}
-
-#[cfg(target_os = "macos")]
-fn query_accessibility_permissions_with_prompt() -> bool {
-  let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
-  if trusted {
-    print!("Application is totally trusted!");
-  } else {
-    print!("Application isn't trusted :(");
-  }
-  return trusted;
 }
 
 #[cfg(target_os = "macos")]
