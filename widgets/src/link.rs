@@ -6,7 +6,7 @@ use webbrowser::{open_browser as open, Browser};
 pub struct Link {
   /// Want to open url
   #[declare(convert=into)]
-  url: CowArc<str>,
+  pub url: CowArc<str>,
   /// Select the browser software you expect to open
   #[declare(default=Browser::Default)]
   browser: Browser,
