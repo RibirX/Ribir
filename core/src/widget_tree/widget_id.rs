@@ -16,15 +16,7 @@ pub struct WidgetId(pub(crate) NodeId);
 
 pub(crate) type TreeArena = Arena<RenderNode>;
 
-bitflags! {
-  #[derive(Default, PartialEq, Eq, Clone, Copy, Hash, Debug)]
-  pub(crate) struct  RenderNodeFlag: u8 {
-    const NONE = 0;
-    const DROPPED = 0b0001;
-  }
-}
 pub(crate) struct RenderNode {
-  flags: RenderNodeFlag,
   data: Box<dyn Render>,
 }
 
@@ -47,21 +39,8 @@ impl WidgetId {
     tree.get_mut(self.0).map(|n| n.get_mut())
   }
 
-  /// Mark the widget dropped but not release the node, caller has the
-  /// responsibility to release it.
-  pub(crate) fn mark_drop(self, tree: &mut TreeArena) {
-    if let Some(node) = self.get_node_mut(tree) {
-      node.flags.insert(RenderNodeFlag::DROPPED);
-    }
-  }
-
   /// detect if the widget of this id point to is dropped.
-  pub(crate) fn is_dropped(self, tree: &TreeArena) -> bool {
-    self.0.is_removed(tree)
-      || self
-        .get_node(tree)
-        .map_or(true, |n| n.flags.contains(RenderNodeFlag::DROPPED))
-  }
+  pub(crate) fn is_dropped(self, tree: &TreeArena) -> bool { self.0.is_removed(tree) }
 
   #[allow(clippy::needless_collect)]
   pub(crate) fn lowest_common_ancestor(
@@ -234,10 +213,7 @@ impl WidgetId {
 }
 
 pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn Render>) -> WidgetId {
-  WidgetId(arena.new_node(RenderNode {
-    flags: RenderNodeFlag::NONE,
-    data: node,
-  }))
+  WidgetId(arena.new_node(RenderNode { data: node }))
 }
 
 pub(crate) fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }

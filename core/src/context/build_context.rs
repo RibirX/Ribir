@@ -1,6 +1,6 @@
 use crate::{
   prelude::*,
-  widget::{widget_id::new_node, TreeArena, WidgetTree},
+  widget::{widget_id::new_node, WidgetTree},
   window::{DelayEvent, WindowId},
 };
 use std::{
@@ -122,8 +122,6 @@ impl<'a> BuildCtx<'a> {
     tree
       .window()
       .add_delay_event(DelayEvent::Disposed { id, parent });
-    let (arena1, arena2) = unsafe { split_arena(&mut tree.arena) };
-    id.descendants(arena1).for_each(|id| id.mark_drop(arena2))
   }
 
   pub(crate) fn mark_dirty(&mut self, id: WidgetId) { self.tree.borrow_mut().mark_dirty(id); }
@@ -178,11 +176,6 @@ impl BuildCtxHandle {
       f(&mut ctx)
     })
   }
-}
-
-pub(crate) unsafe fn split_arena(tree: &mut TreeArena) -> (&mut TreeArena, &mut TreeArena) {
-  let ptr = tree as *mut TreeArena;
-  (&mut *ptr, &mut *ptr)
 }
 
 #[cfg(test)]
