@@ -1,11 +1,9 @@
-use std::time::Duration;
-
 use crate::layout::{Container, Stack, StackFit};
 use ribir_core::prelude::*;
 
 /// A control widget that enables the user to access horizontal parts child that
 /// is larger than the box rect.
-#[derive(Declare, Clone)]
+#[derive(Declare, Declare2, Clone)]
 pub struct HScrollBar {
   /// Scrolled pixels of child content.
   #[declare(default)]
@@ -24,7 +22,7 @@ pub struct ScrollBarStyle {
 
 /// Compose style that use to decoration the thumb of horizontal scrollbar,
 /// overwrite it when init theme.
-#[derive(Debug, Declare)]
+#[derive(Debug, Declare, Declare2)]
 pub struct HScrollBarThumbDecorator {
   pub offset: f32,
 }
@@ -33,17 +31,13 @@ impl ComposeDecorator for HScrollBarThumbDecorator {
   type Host = Widget;
 
   fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget {
-    widget! {
-      states { this: this.into_readonly() }
-      DynWidget { left_anchor: this.offset, dyns: host }
-    }
-    .into()
+    fn_widget! { @$host { left_anchor: pipe!($this.offset) } }.into()
   }
 }
 
 /// Compose style that use to decoration the thumb of vertical scrollbar,
 /// overwrite it when init theme.
-#[derive(Debug, Declare)]
+#[derive(Debug, Declare, Declare2)]
 pub struct VScrollBarThumbDecorator {
   pub offset: f32,
 }
@@ -52,47 +46,38 @@ impl ComposeDecorator for VScrollBarThumbDecorator {
   type Host = Widget;
 
   fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget {
-    widget! {
-      states { this: this.into_readonly() }
-      DynWidget {
-        top_anchor: this.offset,
-        dyns: host
-      }
-    }
-    .into()
+    fn_widget! { @$host { top_anchor: pipe!($this.offset) } }.into()
   }
 }
 
 impl ComposeChild for HScrollBar {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_writable() }
-      Stack {
+    fn_widget! {
+      let mut scrolling = @ScrollableWidget {
+        scrollable: Scrollable::X,
+        scroll_pos: Point::new($this.offset, 0.),
+      };
+      let scrollbar = @HRawScrollbar {
+        scrolling: scrolling.get_builtin_scrollable_widget(ctx!()).clone_reader(),
+        v_align: VAlign::Bottom,
+      };
+
+      // `scrolling` and `this` have same lifetime, so we needn't unsubscribe.
+      watch!($scrolling.scroll_pos.x)
+        .distinct_until_changed()
+        .subscribe(move |v| $this.write().offset = v);
+      watch!($this.offset)
+        .distinct_until_changed()
+        .subscribe(move |v| {
+          let y = $scrolling.scroll_pos.y;
+          $scrolling.write().jump_to(Point::new(v, y));
+        });
+
+      @Stack {
         fit: StackFit::Passthrough,
-        ScrollableWidget {
-          id: scrolling,
-          scrollable: Scrollable::X,
-          scroll_pos: Point::new(this.offset, 0.),
-          DynWidget { dyns: child }
-        }
-        HRawScrollbar {
-          scrolling: scrolling.clone_stateful(),
-          v_align: VAlign::Bottom,
-        }
-      }
-      finally ctx => {
-        let_watch!(scrolling.scroll_pos.x)
-          .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
-          .subscribe(move |v| this.offset = v);
-        let_watch!(this.offset)
-          .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
-          .subscribe(move |v| {
-            let y = scrolling.scroll_pos.y;
-            scrolling.jump_to(Point::new(v, y));
-          });
+        @ $scrolling { @{ child } }
+        @ { scrollbar }
       }
     }
     .into()
@@ -111,33 +96,32 @@ pub struct VScrollBar {
 impl ComposeChild for VScrollBar {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_writable() }
-      Stack {
+    fn_widget! {
+      let mut scrolling = @ScrollableWidget {
+        scrollable: Scrollable::Y,
+        scroll_pos: Point::new(0., $this.offset),
+      };
+
+      let scrollbar = @VRawScrollbar {
+        scrolling: scrolling.get_builtin_scrollable_widget(ctx!()).clone_reader(),
+        h_align: HAlign::Right
+      };
+
+      // `scrolling` and `this` have same lifetime, so we needn't unsubscribe.
+      watch!($scrolling.scroll_pos.y)
+        .distinct_until_changed()
+        .subscribe(move |v| $this.write().offset = v);
+      watch!($this.offset)
+        .distinct_until_changed()
+        .subscribe(move |v| {
+          let x = $scrolling.scroll_pos.x;
+          $scrolling.write().jump_to(Point::new(x, v));
+        });
+
+      @Stack {
         fit: StackFit::Passthrough,
-        ScrollableWidget {
-          id: scrolling,
-          scrollable: Scrollable::Y,
-          scroll_pos: Point::new(0., this.offset),
-          DynWidget { dyns: child }
-        }
-        VRawScrollbar {
-          scrolling: scrolling.clone_stateful(),
-          h_align: HAlign::Right
-        }
-      }
-      finally ctx => {
-        let_watch!(scrolling.scroll_pos.y)
-          .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
-          .subscribe(move |v| this.offset = v);
-        let_watch!(this.offset)
-          .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
-          .subscribe(move |v| {
-            let x = scrolling.scroll_pos.x;
-            scrolling.jump_to(Point::new(x, v));
-          });
+        @ $scrolling { @{ child } }
+        @ { scrollbar }
       }
     }
     .into()
@@ -145,7 +129,7 @@ impl ComposeChild for VScrollBar {
 }
 /// A control widget that enables the user to access horizontal parts child that
 /// is larger than the box rect.
-#[derive(Declare, Clone)]
+#[derive(Declare, Declare2, Clone)]
 pub struct BothScrollbar {
   /// Scrolled pixels of child content.
   #[declare(default)]
@@ -155,40 +139,34 @@ pub struct BothScrollbar {
 impl ComposeChild for BothScrollbar {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_writable() }
-      Stack {
+    fn_widget! {
+      let mut scrolling = @ScrollableWidget {
+        scrollable: Scrollable::Both,
+        scroll_pos: $this.offset,
+      };
+      let mut h_bar = @HRawScrollbar {
+        scrolling: scrolling.get_builtin_scrollable_widget(ctx!()).clone_reader(),
+        v_align: VAlign::Bottom,
+      };
+      let mut v_bar = @VRawScrollbar {
+        scrolling: scrolling.get_builtin_scrollable_widget(ctx!()).clone_reader(),
+        h_align: HAlign::Right,
+        margin: EdgeInsets::only_bottom($h_bar.layout_height())
+      };
+
+      // `scrolling` and `this` have same lifetime, so we needn't unsubscribe.
+      watch!($scrolling.scroll_pos)
+        .distinct_until_changed()
+        .subscribe(move |v| $this.write().offset = v);
+      watch!($this.offset)
+        .distinct_until_changed()
+        .subscribe(move |v| $scrolling.write().jump_to(v) );
+
+      @Stack{
         fit: StackFit::Passthrough,
-        ScrollableWidget {
-          id: scrolling,
-          scrollable: Scrollable::Both,
-          scroll_pos: this.offset,
-          DynWidget { dyns: child }
-        }
-        HRawScrollbar {
-          id: h_bar,
-          scrolling: scrolling.clone_stateful(),
-          v_align: VAlign::Bottom,
-          margin: EdgeInsets::only_right(v_bar.layout_width())
-        }
-        VRawScrollbar {
-          id: v_bar,
-          scrolling: scrolling.clone_stateful(),
-          h_align: HAlign::Right,
-          margin: EdgeInsets::only_bottom(h_bar.layout_height())
-        }
-      }
-      finally ctx => {
-        let_watch!(scrolling.scroll_pos)
-          .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
-          .subscribe(move |v| this.offset = v);
-        let_watch!(this.offset)
-          .distinct_until_changed()
-          .debounce(Duration::ZERO, ctx.window().frame_scheduler())
-          .subscribe(move |v| {
-            scrolling.jump_to(v);
-          });
+        @ $scrolling { @{ child } }
+        @ $h_bar{ margin: EdgeInsets::only_right($v_bar.layout_width()) }
+        @ { v_bar }
       }
     }
     .into()
@@ -197,51 +175,61 @@ impl ComposeChild for BothScrollbar {
 
 /// A widget that display the horizontal scrolling information of the
 /// `scrolling` widget.
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct HRawScrollbar {
-  scrolling: Stateful<ScrollableWidget>,
+  scrolling: Reader<ScrollableWidget>,
 }
 
 impl Compose for HRawScrollbar {
   fn compose(this: State<Self>) -> Widget {
-    let this = this.into_writable();
-    let scrolling = this.state_ref().scrolling.clone();
-
-    widget! {
-      states { scrolling, this }
-      init ctx => {
+    fn_widget! {
+      @ {
+        let mut scrolling = $this.scrolling.clone_reader();
         let ScrollBarStyle {
           thickness,
           thumb_min_size,
           track_brush,
-        } = ScrollBarStyle::of(ctx).clone();
+        } = ScrollBarStyle::of(ctx);
+
+        let mut track_box = @Container {
+          size: Size::new(f32::MAX, 0.),
+          background: track_brush
+        };
+
+        let thumb_outline = @HScrollBarThumbDecorator {
+          offset: pipe!{
+            let scrolling = $scrolling;
+            let content_width = scrolling.scroll_content_size().width;
+            -scrolling.scroll_pos.x * safe_recip(content_width) * $track_box.layout_width()
+          }
+        };
+
+        let mut container = @Container {
+          size: {
+            let scrolling = $scrolling;
+            let page_width = scrolling.scroll_view_size().width;
+            let content_width = scrolling.scroll_content_size().width;
+            let width = page_width / content_width * $track_box.layout_width();
+            Size::new(width.max(thumb_min_size), thickness)
+          },
+        };
+
+        watch!($container.layout_height())
+          .distinct_until_changed()
+          .subscribe(move |v| $track_box.write().size.height = v);
+
+        @Stack {
+          visible: pipe! {
+            let scrolling = $scrolling;
+            scrolling.can_scroll()
+          },
+          @ { track_box }
+          @$thumb_outline {
+            @ { container }
+          }
+        }
       }
 
-      Stack {
-        visible: scrolling.can_scroll(),
-        Container {
-          id: track_box,
-          size: Size::new(f32::MAX, thumb_outline.layout_height()),
-          background: track_brush.clone()
-        }
-        LayoutBox {
-          id: thumb_outline,
-          HScrollBarThumbDecorator{
-            offset: {
-              let content_width = scrolling.scroll_content_size().width;
-              -scrolling.scroll_pos.x * safe_recip(content_width) * track_box.layout_width()
-            },
-            Container {
-              size: {
-                let page_width = scrolling.scroll_view_size().width;
-                let content_width = scrolling.scroll_content_size().width;
-                let width = page_width / content_width * track_box.layout_width();
-                Size::new(width.max(thumb_min_size), thickness)
-              },
-            }
-         }
-        }
-      }
     }
     .into()
   }
@@ -249,48 +237,54 @@ impl Compose for HRawScrollbar {
 
 /// A widget that display the vertical scrolling information of the
 /// `scrolling` widget.
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct VRawScrollbar {
-  scrolling: Stateful<ScrollableWidget>,
+  scrolling: Reader<ScrollableWidget>,
 }
 
 impl Compose for VRawScrollbar {
   fn compose(this: State<Self>) -> Widget {
-    let this = this.into_writable();
-    let scrolling = this.state_ref().scrolling.clone();
-
-    widget! {
-      states { scrolling, this }
-      init ctx => {
+    fn_widget! {
+      @ {
+        let mut scrolling = $this.scrolling.clone_reader();
         let ScrollBarStyle {
           thickness,
           thumb_min_size,
           ref track_brush
         } = ScrollBarStyle::of(ctx);
-      }
 
-      Stack {
-        visible: scrolling.can_scroll(),
-        Container {
-          id: track_box,
-          size: Size::new(thumb_outline.layout_width() , f32::MAX),
-          background: track_brush.clone(),
-        }
-        LayoutBox {
-          id: thumb_outline,
-          VScrollBarThumbDecorator {
-            offset: {
-              let content_height = scrolling.scroll_content_size().height;
-              -scrolling.scroll_pos.y * safe_recip(content_height) * track_box.layout_height()
-            },
-            Container {
-              size: {
-                let page_height = scrolling.scroll_view_size().height;
-                let content_height = scrolling.scroll_content_size().height;
-                let height = page_height / content_height * track_box.layout_height();
-                Size::new(thickness, height.max(thumb_min_size))
-              },
-            }
+        let mut track_box = @Container {
+          size: Size::new(0., f32::MAX),
+          background: track_brush.clone()
+        };
+
+        let thumb_outline = @VScrollBarThumbDecorator {
+          offset: pipe! {
+            let scrolling = $scrolling;
+            let content_height = scrolling.scroll_content_size().height;
+            -scrolling.scroll_pos.y * safe_recip(content_height) * $track_box.layout_height()
+          }
+        };
+
+        let mut container = @Container {
+          size: pipe! {
+            let scrolling = $scrolling;
+            let page_height = scrolling.scroll_view_size().height;
+            let content_height = scrolling.scroll_content_size().height;
+            let height = page_height / content_height * $track_box.layout_height();
+            Size::new(thickness, height.max(thumb_min_size))
+          },
+        };
+
+        watch!($container.layout_width())
+          .distinct_until_changed()
+          .subscribe(move |v| $track_box.write().size.width = v);
+
+        @Stack {
+          visible: pipe! { $scrolling.can_scroll() },
+          @ { track_box }
+          @$thumb_outline {
+            @ { container }
           }
         }
       }
@@ -316,10 +310,9 @@ impl CustomStyle for ScrollBarStyle {
 
 #[cfg(test)]
 mod test {
-  use crate::layout::{Column, ConstrainedBox};
-
   use super::*;
-  use ribir_core::test_helper::*;
+  use crate::layout::{Column, ConstrainedBox};
+  use ribir_core::{reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
 
   fn content_expand_so_all_view_can_scroll() -> Widget {
@@ -352,57 +345,51 @@ mod test {
 
   #[test]
   fn scrollable() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let offset = Stateful::new(Point::zero());
     let v_offset = Stateful::new(0.);
     let h_offset = Stateful::new(0.);
-    let w = widget! {
-      states { offset: offset.clone(), v_offset: v_offset.clone(), h_offset: h_offset.clone() }
-      Column {
-        Container {
-          size: Size::new(30., 30.),
-          BothScrollbar {
-            id: both_bar,
-            offset: *offset,
-            Container { size: Size::new(100., 100.) }
-          }
-        }
-        Container {
-          size: Size::new(30., 30.),
-          HScrollBar {
-            id: h_bar,
-            offset: both_bar.offset.x,
-            Container { size: Size::new(100., 100.) }
-          }
-        }
-        Container {
-          size: Size::new(30., 30.),
-          VScrollBar {
-            id: v_bar,
-            offset: both_bar.offset.y,
-            Container { size: Size::new(100., 100.) }
-          }
-        }
-      }
+    let c_offset = offset.clone_writer();
+    let c_v_offset = v_offset.clone_reader();
+    let c_h_offset = h_offset.clone_reader();
+    let w = fn_widget! {
+      let mut both_bar = @BothScrollbar { offset: pipe!(*$offset) };
+      let mut h_bar = @HScrollBar { offset: pipe!($both_bar.offset.x) };
+      let mut v_bar = @VScrollBar { offset: pipe!($both_bar.offset.y) };
 
-      finally {
-        let_watch!(v_bar.offset)
-          .subscribe(move|v| *v_offset = v);
-        let_watch!(h_bar.offset)
-          .subscribe(move|v| *h_offset = v);
+      watch!($v_bar.offset)
+        .subscribe(move|v| *$v_offset.write() = v);
+      watch!($h_bar.offset)
+        .subscribe(move|v| *$h_offset.write() = v);
+
+      let container_size = Size::new(100., 100.);
+      @Column {
+        @Container {
+          size: Size::new(30., 30.),
+          @$both_bar { @Container { size: container_size } }
+        }
+        @Container {
+          size: Size::new(30., 30.),
+          @$h_bar { @Container { size: container_size } }
+        }
+        @Container {
+          size: Size::new(30., 30.),
+          @$v_bar { @Container { size: container_size } }
+        }
       }
     };
 
     let mut wnd = TestWindow::new_with_size(w, Size::new(1024., 1024.));
+    wnd.draw_frame();
     {
-      *offset.state_ref() = Point::new(-10., -10.);
+      *c_offset.write() = Point::new(-10., -10.);
     }
     {
-      *offset.state_ref() = Point::new(-20., -20.);
+      *c_offset.write() = Point::new(-20., -20.);
     }
     wnd.draw_frame();
-    assert_eq!(*v_offset.state_ref(), offset.state_ref().y);
-    assert_eq!(*h_offset.state_ref(), offset.state_ref().x);
+    assert_eq!(*c_v_offset.read(), c_offset.read().y);
+    assert_eq!(*c_h_offset.read(), c_offset.read().x);
   }
 }

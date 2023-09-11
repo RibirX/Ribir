@@ -13,7 +13,7 @@ pub struct StateLayer {
 /// Widget that as visual indicator of material design used to communicate the
 /// status of interactive widget, its visual state will reactive to its child
 /// interactive state.
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct InteractiveLayer {
   /// the color of the state layer, will apply a fixed opacity in different
   /// state.
@@ -23,7 +23,7 @@ pub struct InteractiveLayer {
 }
 
 impl Compose for StateLayer {
-  fn compose(mut this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> Widget {
     fn_widget! {
       @PathPaintKit {
         path: pipe!($this.path.clone()),
@@ -37,7 +37,7 @@ impl Compose for StateLayer {
 impl ComposeChild for InteractiveLayer {
   type Child = Widget;
 
-  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     fn_widget! {
       let mut host = @$child { };
       let layer = @IgnorePointer {

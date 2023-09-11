@@ -100,18 +100,15 @@ mod tests {
         expected_scale,
       } = self;
       let fit = Stateful::new(FittedBox { box_fit, scale_cache: <_>::default() });
-      let c_fit = fit.clone();
-      let w = widget! {
-        DynWidget {
-          dyns: fit,
-          MockBox { size }
-        }
+      let c_fit = fit.clone_reader();
+      let w = fn_widget! {
+        @$fit { @MockBox { size } }
       };
       let mut wnd = TestWindow::new_with_size(w, WND_SIZE);
       wnd.draw_frame();
 
       assert_layout_result_by_path!(wnd, {path = [0], size == expect,} );
-      assert_eq!(c_fit.state_ref().scale_cache.get(), expected_scale);
+      assert_eq!(c_fit.read().scale_cache.get(), expected_scale);
     }
   }
 

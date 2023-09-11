@@ -14,7 +14,7 @@ struct Todos {
 }
 
 impl Compose for Todos {
-  fn compose(mut this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> Widget {
     fn_widget! {
       @Column {
         padding: EdgeInsets::all(10.),
@@ -25,8 +25,8 @@ impl Compose for Todos {
         @{
           let mut input = @Input { };
           let add_task = move |_: &mut _| if !$input.text().is_empty() {
-              $this.new_task($input.text().to_string());
-              $input.set_text("");
+              $this.write().new_task($input.text().to_string());
+              $input.write().set_text("");
           };
           @Row {
             @Container {
@@ -48,15 +48,15 @@ impl Compose for Todos {
           pos: Position::Top,
           @Tab {
             @TabItem { @{ Label::new("ALL") } }
-            @TabPane { @{ Self::pane(this.clone_state(), |_| true) } }
+            @TabPane { @{ Self::pane(this.clone_writer(), |_| true) } }
           }
           @Tab {
             @TabItem { @{ Label::new("ACTIVE") } }
-            @TabPane { @{ Self::pane(this.clone_state(), |task| !task.finished)} }
+            @TabPane { @{ Self::pane(this.clone_writer(), |task| !task.finished)} }
           }
           @Tab {
             @TabItem { @{ Label::new("DONE") } }
-            @TabPane { @{ Self::pane(this.clone_state(), |task| task.finished) } }
+            @TabPane { @{ Self::pane(this.clone_writer(), |task| task.finished) } }
           }
         }
       }
@@ -66,25 +66,24 @@ impl Compose for Todos {
 }
 
 impl Todos {
-  fn pane(mut this: Stateful<Self>, cond: fn(&Task) -> bool) -> Widget {
+  fn pane(this: Writer<Self>, cond: fn(&Task) -> bool) -> Widget {
     fn_widget! {
-
+      // todo: pipe only for list items, not lists
       @VScrollBar { @ { pipe! {
         let mut mount_task_cnt = Stateful::new(0);
 
         @Lists {
           // when performed layout, means all task are mounted, we reset the mount count.
-          on_performed_layout: move |_| *$mount_task_cnt = 0,
+          on_performed_layout: move |_| *$mount_task_cnt.write() = 0,
           padding: EdgeInsets::vertical(8.),
           @ {
-            let mut this2 = this.clone_state();
             let task_widget_iter = $this
               .tasks
               .iter()
               .enumerate()
               .filter_map(move |(idx, task)| { cond(task).then_some(idx) })
               .map(move |idx| {
-                let mut task = partial_state!($this2.tasks[idx]);
+                let mut task = split_writer!($this.tasks[idx]);
                 let mut key = @KeyWidget { key: $task.id, value: () };
                 let mut mount_idx = Stateful::new(0);
 
@@ -94,14 +93,14 @@ impl Todos {
                     duration: Duration::from_millis(150),
                     easing: easing::EASE_IN,
                   }.into_inner(),
-                  state: route_state!($key.transform),
+                  state: map_writer!($key.transform),
                   from: Transform::translation(-400., 0. ),
                 };
                 @ $key {
                   @ListItem {
                     on_mounted: move |_| if $key.is_enter() {
-                      *$mount_idx = *$mount_task_cnt;
-                      *$mount_task_cnt += 1;
+                      *$mount_idx.write() = *$mount_task_cnt;
+                      *$mount_task_cnt.write() += 1;
                       mount_animate.run();
                     },
                     @{ HeadlineText(Label::new($task.label.clone())) }
@@ -111,14 +110,16 @@ impl Todos {
                           checked: pipe!($task.finished),
                           margin: EdgeInsets::vertical(4.),
                         };
-                        watch!($checkbox.checked).subscribe(move |v| $task.finished = v);
+                        watch!($checkbox.checked)
+                          .distinct_until_changed()
+                          .subscribe(move |v| $task.write().finished = v);
                         CustomEdgeWidget(checkbox.into())
                       }
                     }
                     @Trailing {
                       cursor: CursorIcon::Hand,
                       visible: $key.mouse_hover(),
-                      on_tap: move |_| { $this2.tasks.remove(idx); },
+                      on_tap: move |_| { $this.write().tasks.remove(idx); },
                       @{ svgs::CLOSE }
                     }
                   }

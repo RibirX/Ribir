@@ -85,6 +85,7 @@ mod tests {
       phase: TouchPhase::Started,
       modifiers: ModifiersState::default(),
     });
+    wnd.run_frame_tasks();
 
     assert_eq!(*source_receive_for_bubble.borrow(), (1., 1.));
     assert_eq!(*source_receive_for_capture.borrow(), (1., 1.));

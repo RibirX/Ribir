@@ -43,21 +43,21 @@ impl ComposeChild for FocusNode {
     let this = this.into_writable();
     FnWidget::new(|ctx| {
       let id = child.build(ctx);
-
-      if !ctx.assert_get(id).contain_type::<FocusNode>() {
+      let has_focus_node = ctx.assert_get(id).contain_type::<FocusNode>();
+      if !has_focus_node {
         let subject = ctx
           .assert_get(id)
           .query_on_first_type(QueryOrder::OutsideFirst, |l: &LifecycleListener| {
             l.lifecycle_stream()
-          })
-          .unwrap_or_else(|| {
-            let listener = LifecycleListener::default();
-            let subject = listener.lifecycle_stream();
-            attach_to_id(id, &mut *ctx.tree.borrow_mut(), |child| {
-              Box::new(DataWidget::new(child, listener))
-            });
-            subject
           });
+        let subject = subject.unwrap_or_else(|| {
+          let listener = LifecycleListener::default();
+          let subject = listener.lifecycle_stream();
+          attach_to_id(id, &mut *ctx.tree.borrow_mut(), |child| {
+            Box::new(DataWidget::new(child, listener))
+          });
+          subject
+        });
 
         fn subscribe_fn(this: Reader<FocusNode>) -> impl FnMut(&'_ mut AllLifecycle) + 'static {
           move |e| match e {

@@ -17,12 +17,10 @@ impl PointerPressed {
 impl ComposeChild for PointerPressed {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_writable()}
-      DynWidget {
-        dyns: child,
-        on_pointer_down: move|_| this.pointer_pressed = true,
-        on_pointer_up: move |_| this.pointer_pressed = false,
+    fn_widget! {
+      @ $child {
+        on_pointer_down: move|_| $this.write().pointer_pressed = true,
+        on_pointer_up: move |_| $this.write().pointer_pressed = false,
       }
     }
     .into()

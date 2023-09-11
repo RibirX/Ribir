@@ -6,7 +6,7 @@ use ribir_core::prelude::*;
 use ribir_core::ticker::FrameMsg;
 use std::time::Duration;
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub(crate) struct TextEditorArea {
   pub(crate) style: CowArc<TextStyle>,
   pub(crate) text: CowArc<str>,
@@ -33,70 +33,34 @@ impl CustomStyle for PlaceholderStyle {
 impl ComposeChild for TextEditorArea {
   type Child = Option<State<Placeholder>>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
-    widget! {
-    states {
-      this: this.into_writable(),
-    }
-    FocusScope {
-      on_key_down: move|key| Self::key_handle(&mut this, key),
-      on_chars: move|ch| Self::edit_handle(&mut this, ch),
-      ScrollableWidget {
-        id: container,
-        scrollable: this.scroll_dir(),
-        padding: EdgeInsets::horizontal(1.),
-        Stack {
-          fit: StackFit::Passthrough,
-          Option::map(placeholder, |holder| widget! {
-            states { holder: holder.into_readonly() }
-            Text {
-              visible: this.text.is_empty(),
-              text: holder.0.clone(),
-            }
-          })
-          TextSelectable {
-            id: selectable,
-            caret: this.caret,
-            Text {
-              text: this.text.clone(),
-              text_style: this.style.clone(),
-              overflow: this.overflow(),
-            }
-          }
-          IgnorePointer{
-            UnconstrainedBox {
-              dir: UnconstrainedDir::Both,
-              Caret {
-                id: caret,
-                top_anchor: 0.,
-                left_anchor: 0.,
-                focused: container.has_focus(),
-                height: 0.,
-                on_performed_layout: move |ctx| {
-                  let height = ctx.box_size().unwrap().height;
-                  let pos = ctx.map_to_global(Point::new(0., height));
-                  ctx.window().set_ime_pos(pos);
-                },
-              }
-            }
-          }
-        }
-      }
-    }
-    finally ctx => {
-      let scheduler = ctx.window().frame_scheduler();
+    fn_widget! {
+      let mut container = @Stack {
+        fit: StackFit::Passthrough,
+        scrollable: pipe!($this.scroll_dir()),
+        padding: EdgeInsets::horizontal(1.)
+      };
+      let mut selectable = @TextSelectable { caret: pipe!($this.caret) };
+      let mut caret = @Caret {
+        focused: pipe!($container.has_focus()),
+        height: 0.
+      };
 
-      let_watch!(Point::new(caret.left_anchor.abs_value(1.), caret.top_anchor.abs_value(1.)))
+      let scrollable = container.get_builtin_scrollable_widget(ctx!());
+      watch!(Point::new($caret.left_anchor.abs_value(1.), $caret.top_anchor.abs_value(1.)))
         .scan_initial((Point::zero(), Point::zero()), |pair, v| (pair.1, v))
         .subscribe(move |(before, after)| {
-          let pos = auto_scroll_pos(&container, before, after, caret.layout_size());
-          container.silent().jump_to(pos);
+          let mut scrollable = $scrollable.silent();
+          let pos = auto_scroll_pos(&scrollable, before, after, $caret.layout_size());
+          scrollable.jump_to(pos);
         });
 
       selectable.modifies()
-        .delay(Duration::ZERO, scheduler.clone())
+        .delay(Duration::ZERO, ctx!().window().frame_scheduler())
         .subscribe(move |_| {
+          let mut this = $this.silent();
+          let selectable = $selectable;
           if selectable.caret != this.caret {
-            this.silent().caret = selectable.caret.clone();
+            this.caret = selectable.caret;
           }
         });
 
@@ -108,11 +72,45 @@ impl ComposeChild for TextEditorArea {
         .merge(observable::of(ModifyScope::BOTH))
         .sample(tick_of_layout_ready)
         .subscribe(move |_| {
-          let (offset, height) = selectable.cursor_layout();
-          caret.top_anchor = PositionUnit::Pixel(offset.y);
-          caret.left_anchor = PositionUnit::Pixel(offset.x);
-          caret.height = height;
+          let (offset, height) = $selectable.cursor_layout();
+          $caret.write().top_anchor = PositionUnit::Pixel(offset.y);
+          $caret.write().left_anchor = PositionUnit::Pixel(offset.x);
+          $caret.write().height = height;
         });
+
+      @FocusScope {
+        on_key_down: move|key| Self::key_handle(&mut $this.write(), key),
+        on_chars: move|ch| Self::edit_handle(&mut $this.write(), ch),
+        @$container {
+          @{
+            placeholder.map(move |mut holder| @Text {
+              visible: pipe!($this.text.is_empty()),
+              text: pipe!($holder.0.clone()),
+            })
+          }
+          @$selectable {
+            @{
+              @Text {
+                text: pipe!($this.text.clone()),
+                text_style: pipe!($this.style.clone()),
+                overflow: pipe!($this.overflow()),
+              }.into_inner()
+            }
+
+          }
+          @IgnorePointer{
+            @UnconstrainedBox {
+              dir: UnconstrainedDir::Both,
+              @$caret {
+                on_performed_layout: move |e| {
+                  let height = e.box_size().unwrap().height;
+                  let pos = e.map_to_global(Point::new(0., height));
+                  e.window().set_ime_pos(pos);
+                }
+              }
+            }
+          }
+        }
       }
     }
     .into()

@@ -276,20 +276,10 @@ where
 mod tests {
   use std::cell::Cell;
 
+  use ribir_algo::Sc;
+
   use super::*;
   use crate::{context::AppCtx, prelude::*, reset_test_env, timer::Timer};
-
-  #[test]
-  fn fix_dyn_widget_to_state_circular_mut_borrow_panic() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
-
-    let dyn_widget = Stateful::new(DynWidget { dyns: Some(1) });
-    let c_dyns = dyn_widget.clone();
-    let _: State<i32> = dyn_widget.into();
-    {
-      c_dyns.state_ref().dyns = Some(2);
-    }
-  }
 
   struct Origin {
     a: i32,
@@ -300,13 +290,13 @@ mod tests {
   fn path_state_router_test() {
     reset_test_env!();
 
-    let mut origin = State::Stateless(Origin { a: 0, b: 0 });
-    let mut a = partial_state!($origin.a);
-    let mut b = route_state!($origin.b);
+    let origin = State::value(Origin { a: 0, b: 0 });
+    let a = split_writer!($origin.a);
+    let b = map_writer!($origin.b);
 
-    let track_origin = Rc::new(Cell::new(0));
-    let track_a = Rc::new(Cell::new(0));
-    let track_b = Rc::new(Cell::new(0));
+    let track_origin = Sc::new(Cell::new(0));
+    let track_a = Sc::new(Cell::new(0));
+    let track_b = Sc::new(Cell::new(0));
 
     let c_origin = track_origin.clone();
     origin.modifies().subscribe(move |_| {
@@ -323,7 +313,7 @@ mod tests {
       c_b.set(c_b.get() + 1);
     });
 
-    origin.state_ref().a = 1;
+    origin.write().a = 1;
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
@@ -331,7 +321,7 @@ mod tests {
     assert_eq!(track_a.get(), 1);
     assert_eq!(track_b.get(), 1);
 
-    *a.state_ref() = 1;
+    *a.write() = 1;
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
@@ -339,7 +329,7 @@ mod tests {
     assert_eq!(track_a.get(), 2);
     assert_eq!(track_b.get(), 1);
 
-    *b.state_ref() = 1;
+    *b.write() = 1;
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 

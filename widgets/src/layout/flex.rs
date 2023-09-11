@@ -58,6 +58,64 @@ pub struct Flex {
   pub cross_axis_gap: f32,
 }
 
+/// A type help to declare flex widget as horizontal.
+pub struct Row;
+
+/// A type help to declare flex widget as Vertical.
+pub struct Column;
+
+impl Declare for Row {
+  type Builder = FlexDeclarer;
+  fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Horizontal) }
+}
+
+impl FlexDeclarer {
+  pub fn item_gap(mut self, gap: f32) -> Self {
+    self.main_axis_gap = Some(gap);
+    self
+  }
+
+  pub fn line_gap(mut self, gap: f32) -> Self {
+    self.cross_axis_gap = Some(gap);
+    self
+  }
+}
+
+impl Declare2 for Row {
+  type Builder = FlexDeclarer2;
+  fn declare2_builder() -> Self::Builder {
+    Flex::declare2_builder().direction(Direction::Horizontal)
+  }
+}
+
+impl FlexDeclarer2 {
+  pub fn item_gap<M, T>(mut self, gap: T) -> Self
+  where
+    DeclareInit<f32>: DeclareFrom<T, M>,
+  {
+    self.main_axis_gap = Some(DeclareInit::declare_from(gap));
+    self
+  }
+
+  pub fn line_gap<M, T>(mut self, gap: T) -> Self
+  where
+    DeclareInit<f32>: DeclareFrom<T, M>,
+  {
+    self.cross_axis_gap = Some(DeclareInit::declare_from(gap));
+    self
+  }
+}
+
+impl Declare for Column {
+  type Builder = FlexDeclarer;
+  fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Vertical) }
+}
+
+impl Declare2 for Column {
+  type Builder = FlexDeclarer2;
+  fn declare2_builder() -> Self::Builder { Flex::declare2_builder().direction(Direction::Vertical) }
+}
+
 impl Render for Flex {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     if Align::Stretch == self.align_items && self.wrap {
@@ -366,9 +424,11 @@ mod tests {
   use ribir_dev_helper::*;
 
   fn horizontal_line() -> Widget {
-    widget! {
-      Flex {
-        Multi::new((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))
+    fn_widget! {
+      @Flex {
+        @{
+          Multi::new((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))
+        }
       }
     }
     .into()
@@ -376,10 +436,10 @@ mod tests {
   widget_layout_test!(horizontal_line, width == 100., height == 20.,);
 
   fn vertical_line() -> Widget {
-    widget! {
-      Flex {
+    fn_widget! {
+      @Flex {
         direction: Direction::Vertical,
-        Multi::new((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))
+        @{ Multi::new((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))}
       }
     }
     .into()
@@ -388,10 +448,10 @@ mod tests {
 
   fn row_wrap() -> Widget {
     let size = Size::new(200., 20.);
-    widget! {
-      Flex {
+    fn_widget! {
+      @Flex {
         wrap: true,
-        Multi::new((0..3).map(|_| SizedBox { size }))
+        @{ Multi::new((0..3).map(|_| SizedBox { size })) }
       }
     }
     .into()
@@ -407,11 +467,11 @@ mod tests {
 
   fn reverse_row_wrap() -> Widget {
     let size = Size::new(200., 20.);
-    widget! {
-      Flex {
+    fn_widget! {
+      @Flex {
         wrap: true,
         reverse: true,
-        Multi::new((0..3).map(|_| SizedBox { size }))
+        @{ Multi::new((0..3).map(|_| SizedBox { size })) }
       }
     }
     .into()
@@ -495,12 +555,12 @@ mod tests {
 
   fn cross_axis_gap() -> Widget {
     let size = Size::new(200., 20.);
-    widget! {
-      Flex {
+    fn_widget! {
+      @Flex {
         wrap: true,
         cross_axis_gap: 10.,
         align_items: Align::Center,
-        Multi::new((0..3).map(|_| SizedBox { size }))
+        @{ Multi::new((0..3).map(|_| SizedBox { size })) }
       }
     }
     .into()

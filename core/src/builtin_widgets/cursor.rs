@@ -11,7 +11,7 @@ pub struct Cursor {
 
 impl ComposeChild for Cursor {
   type Child = Widget;
-  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     fn_widget! {
       let mut save_cursor = Stateful::new(CursorIcon::Default);
       @$child {
@@ -20,7 +20,7 @@ impl ComposeChild for Cursor {
             && e.mouse_buttons() == MouseButtons::empty()
           {
             let wnd = e.window();
-            *$save_cursor = wnd.get_cursor();
+            *$save_cursor.write() = wnd.get_cursor();
             wnd.set_cursor($this.get_cursor());
           }
         },

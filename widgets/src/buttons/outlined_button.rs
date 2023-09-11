@@ -28,7 +28,7 @@ impl CustomStyle for OutlinedButtonStyle {
   }
 }
 
-#[derive(Clone, Declare)]
+#[derive(Clone, Declare, Declare2)]
 pub struct OutlinedButtonDecorator {
   #[allow(unused)]
   pub button_type: ButtonType,
@@ -49,33 +49,33 @@ impl ComposeDecorator for OutlinedButtonDecorator {
 /// # use ribir_widgets::prelude::{OutlinedButton, Label};
 ///
 /// // only icon
-/// let outlined_icon_button = widget! {
-///   OutlinedButton { svgs::ADD }
+/// let outlined_icon_button = fn_widget! {
+///   @OutlinedButton { @{ svgs::ADD } }
 /// };
 ///
 /// // only label
-/// let outlined_label_button = widget! {
-///   OutlinedButton { Label::new("outlined button") }
+/// let outlined_label_button = fn_widget! {
+///   @OutlinedButton { @{ Label::new("outlined button") } }
 /// };
 ///
 /// // both icon and label
-/// let outlined_button = widget! {
-///    OutlinedButton {
-///     svgs::ADD
-///     Label::new("outlined button")
+/// let outlined_button = fn_widget! {
+///    @OutlinedButton {
+///     @ { svgs::ADD }
+///     @ { Label::new("outlined button")}
 ///   }
 /// };
 ///
 /// // use custom color
-/// let custom_color_button = widget! {
-///   OutlinedButton {
+/// let custom_color_button = fn_widget! {
+///   @OutlinedButton {
 ///     color: Color::RED,
-///     svgs::ADD
-///     Label::new("outlined button")
+///     @ { svgs::ADD }
+///     @ { Label::new("outlined button") }
 ///   }
 /// };
 /// ```
-#[derive(Declare, Default)]
+#[derive(Declare, Default, Declare2)]
 pub struct OutlinedButton {
   #[declare(default=Palette::of(ctx).primary())]
   color: Color,
@@ -93,9 +93,8 @@ impl ComposeChild for OutlinedButton {
       (None, None) => panic!("Button content cannot be empty!"),
     };
 
-    widget! {
-      states { this: this.into_readonly() }
-      init ctx => {
+    fn_widget! {
+      @ {
         let OutlinedButtonStyle {
           height,
           icon_size,
@@ -105,29 +104,30 @@ impl ComposeChild for OutlinedButton {
           radius,
           padding_style,
           border_width,
-        } = OutlinedButtonStyle::of(ctx).clone();
+        } = OutlinedButtonStyle::of(ctx);
         let palette1 = Palette::of(ctx).clone();
         let palette2 = Palette::of(ctx).clone();
-      }
-      OutlinedButtonDecorator {
-        button_type,
-        color: this.color,
-        ButtonImpl {
-          height,
-          icon_size,
-          label_gap,
-          icon_pos,
-          label_style,
-          background_color: None,
-          foreground_color: Brush::from(palette1.base_of(&this.color)),
-          radius,
-          border_style: Border::all(BorderSide {
-            width: border_width,
-            color: Brush::from(palette2.base_of(&this.color))
-          }),
-          padding_style,
 
-          widget::from(child)
+        @OutlinedButtonDecorator {
+          button_type,
+          color: pipe!($this.color),
+          @ButtonImpl {
+            height,
+            icon_size,
+            label_gap,
+            icon_pos,
+            label_style,
+            background_color: None,
+            foreground_color: pipe!(Brush::from(palette1.base_of(&$this.color))),
+            radius,
+            border_style: pipe!(Border::all(BorderSide {
+              width: border_width,
+              color: Brush::from(palette2.base_of(&$this.color))
+            })),
+            padding_style,
+
+            @ { child }
+          }
         }
       }
     }

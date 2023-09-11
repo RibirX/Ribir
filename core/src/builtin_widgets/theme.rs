@@ -1,17 +1,10 @@
 //! Theme use to share visual config or style compose logic. It can be defined
 //! to app-wide or particular part of the application.
 
-use crate::{
-  declare::DeclareBuilder,
-  fill_svgs, impl_query_self_only,
-  prelude::include_svg,
-  prelude::{Any, BuildCtx, ComposeChild, Declare, Query, QueryFiler, QueryOrder, TypeId},
-  state::State,
-  widget::{Widget, WidgetBuilder},
-};
-use ribir_algo::CowArc;
-pub use ribir_algo::ShareResource;
+use crate::{fill_svgs, impl_query_self_only, prelude::*, widget::WidgetBuilder};
+pub use ribir_algo::{CowArc, ShareResource};
 use ribir_geom::Size;
+use ribir_macros::Declare2;
 use ribir_text::TextStyle;
 use std::{collections::HashMap, rc::Rc};
 
@@ -73,7 +66,7 @@ pub enum Theme {
   Inherit(InheritTheme),
 }
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct ThemeWidget {
   pub theme: Rc<Theme>,
 }
@@ -81,7 +74,7 @@ pub struct ThemeWidget {
 impl ComposeChild for ThemeWidget {
   type Child = Widget;
   #[inline]
-  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     use crate::prelude::*;
     FnWidget::new(move |ctx| {
       let ctx = ctx.force_as_mut();

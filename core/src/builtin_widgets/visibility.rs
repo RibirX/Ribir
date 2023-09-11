@@ -8,7 +8,7 @@ pub struct Visibility {
 
 impl ComposeChild for Visibility {
   type Child = Widget;
-  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     fn_widget! {
       @FocusScope {
         skip_descendants: pipe!(!$this.get_visible()),

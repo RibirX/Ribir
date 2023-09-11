@@ -124,7 +124,7 @@ impl PositionUnit {
     }
   }
 
-  pub fn lerp_fn(from: &Self, to: &Self, rate: f32, self_size: f32) -> PositionUnit {
+  pub fn lerp(from: &Self, to: &Self, rate: f32, self_size: f32) -> PositionUnit {
     let from = from.abs_value(self_size);
     let to = to.abs_value(self_size);
     PositionUnit::Pixel(from.lerp(&to, rate))

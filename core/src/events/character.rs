@@ -37,14 +37,14 @@ impl CharsEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::*;
+  use crate::{reset_test_env, test_helper::*};
 
   use std::{cell::RefCell, rc::Rc};
   use winit::event::WindowEvent;
 
   #[test]
   fn smoke() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
     let receive = Rc::new(RefCell::new("".to_string()));
     let c_receive = receive.clone();
 
@@ -63,13 +63,14 @@ mod tests {
     test_text_case
       .chars()
       .for_each(|c| wnd.processes_native_event(WindowEvent::ReceivedCharacter(c)));
+    wnd.run_frame_tasks();
 
     assert_eq!(&*receive.borrow(), test_text_case);
   }
 
   #[test]
   fn chars_capture() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
     let receive = Rc::new(RefCell::new("".to_string()));
     let chars_receive = receive.clone();
     let capture_receive = receive.clone();
@@ -98,7 +99,7 @@ mod tests {
     test_text_case
       .chars()
       .for_each(|c| wnd.processes_native_event(WindowEvent::ReceivedCharacter(c)));
-
+    wnd.run_frame_tasks();
     assert_eq!(&*receive.borrow(), "214263");
   }
 }

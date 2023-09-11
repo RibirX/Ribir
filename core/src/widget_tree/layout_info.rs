@@ -303,7 +303,7 @@ impl std::ops::DerefMut for LayoutStore {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{impl_query_self_only, prelude::*, test_helper::*};
+  use crate::{impl_query_self_only, prelude::*, reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
   use std::{cell::RefCell, rc::Rc};
 
@@ -332,50 +332,47 @@ mod tests {
 
   #[test]
   fn fix_incorrect_relayout_root() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     // Can't use layout info of dirty widget to detect if the ancestors path have
     // in relayout list. Because new widget insert by `DynWidget` not have layout
     // info, but its parent have.
     let child_box = Stateful::new(MockBox { size: Size::zero() });
     let root_layout_cnt = Stateful::new(0);
-    let w = widget! {
-      states {
-        child_box: child_box.clone(),
-        root_layout_cnt: root_layout_cnt.clone(),
-      }
-      MockMulti {
-        on_performed_layout: move |_| *root_layout_cnt += 1,
-        DynWidget {
-          dyns: if child_box.size.is_empty() {
+    let c_child_box = child_box.clone_writer();
+    let c_root_layout_cnt = root_layout_cnt.clone_reader();
+    let w = fn_widget! {
+      @MockMulti {
+        on_performed_layout: move |_| *$root_layout_cnt.write() += 1,
+        @ { pipe!($child_box.size.is_empty()).map(move|b| if b {
             Widget::from(MockBox { size: Size::new(1., 1.) })
           } else {
-            Widget::from(child_box.clone_stateful())
-          }
+            Widget::from(child_box.clone_writer().into_inner())
+          })
         }
       }
     };
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_eq!(*root_layout_cnt.state_ref(), 1);
+    assert_eq!(*c_root_layout_cnt.read(), 1);
     {
-      child_box.state_ref().size = Size::new(2., 2.);
+      c_child_box.write().size = Size::new(2., 2.);
     }
     wnd.draw_frame();
-    assert_eq!(*root_layout_cnt.state_ref(), 2);
+    assert_eq!(*c_root_layout_cnt.read(), 2);
   }
 
   #[test]
   fn layout_list_from_root_to_leaf() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let layout_order = Stateful::new(vec![]);
     let trigger = Stateful::new(Size::zero());
     let w = widget! {
       states {
-        layout_order: layout_order.clone(),
-        trigger: trigger.clone()
+        layout_order: layout_order.clone_stateful(),
+        trigger: trigger.clone_stateful()
       }
       MockBox {
         size: *trigger,
@@ -403,11 +400,11 @@ mod tests {
 
   #[test]
   fn relayout_size() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let trigger = Stateful::new(Size::zero());
     let w = widget! {
-      states {trigger: trigger.clone()}
+      states {trigger: trigger.clone_stateful()}
       OffsetBox {
         size: Size::new(100., 100.),
         offset: Point::new(50., 50.),
@@ -448,13 +445,13 @@ mod tests {
 
   #[test]
   fn relayout_from_parent() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let trigger = Stateful::new(Size::zero());
     let cnt = Rc::new(RefCell::new(0));
     let cnt2 = cnt.clone();
     let w = widget! {
-      states {trigger: trigger.clone()}
+      states {trigger: trigger.clone_stateful()}
       init { let cnt = cnt2; }
       MockBox {
         size: Size::new(50., 50.),
@@ -478,7 +475,7 @@ mod tests {
 
   #[test]
   fn layout_visit_prev_position() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     #[derive(Declare)]
     struct MockWidget {
@@ -504,7 +501,7 @@ mod tests {
     let pos2 = pos.clone();
     let trigger = Stateful::new(Size::zero());
     let w = widget! {
-      states {trigger: trigger.clone()}
+      states {trigger: trigger.clone_stateful()}
       init {
         let pos = pos2.clone();
       }

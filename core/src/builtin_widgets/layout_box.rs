@@ -11,14 +11,12 @@ pub struct LayoutBox {
 impl ComposeChild for LayoutBox {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_writable() }
-      DynWidget {
-        dyns: child,
-        on_performed_layout: move |ctx| {
-          let new_rect = ctx.box_rect().unwrap();
-          if this.rect != new_rect {
-            this.silent().rect = new_rect;
+    fn_widget! {
+      @ $child {
+        on_performed_layout: move |e| {
+          let new_rect = e.box_rect().unwrap();
+          if $this.rect != new_rect {
+            $this.silent().rect = new_rect;
           }
         }
       }

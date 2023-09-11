@@ -8,49 +8,49 @@ use ribir_core::prelude::*;
 /// # use ribir_core::prelude::*;
 /// # use ribir_widgets::prelude::*;
 ///
-/// let tabs = widget! {
-///   Tabs {
-///     Tab {
-///       TabItem {
-///         svgs::HOME
-///         Label::new("Home")
+/// let tabs = fn_widget! {
+///   @Tabs {
+///     @Tab {
+///       @TabItem {
+///         @ { svgs::HOME }
+///         @ { Label::new("Home") }
 ///       }
-///       TabPane {
-///         Text { text: "content" }
+///       @TabPane {
+///         @{ Text { text: "content" } }
 ///       }
 ///     }
-///     Tab {
-///       TabItem {
-///         svgs::HOME
-///         Label::new("Home")
+///     @Tab {
+///       @TabItem {
+///         @ { svgs::HOME }
+///         @ { Label::new("Home") }
 ///       }
-///       TabPane {
-///         Text { text: "content" }
+///       @TabPane {
+///         @Text { text: "content" }
 ///       }
 ///     }
 ///   }
 /// };
 ///
 /// // bottom tabs
-/// let bottom_tabs = widget! {
-///   Tabs {
+/// let bottom_tabs = fn_widget! {
+///   @Tabs {
 ///     pos: Position::Bottom,
-///     Tab {
-///       TabItem {
-///         svgs::HOME
-///         Label::new("Home")
+///     @Tab {
+///       @TabItem {
+///         @ { svgs::HOME }
+///         @ { Label::new("Home") }
 ///       }
-///       TabPane {
-///         Text { text: "content" }
+///       @TabPane {
+///         @Text { text: "content" }
 ///       }
 ///     }
-///     Tab {
-///       TabItem {
-///         svgs::HOME
-///         Label::new("Home")
+///     @Tab {
+///       @TabItem {
+///         @ { svgs::HOME }
+///         @ { Label::new("Home") }
 ///       }
-///       TabPane {
-///         Text { text: "content" }
+///       @TabPane {
+///         @Text { text: "content" }
 ///       }
 ///     }
 ///   }
@@ -99,7 +99,7 @@ impl CustomStyle for TabsStyle {
     }
   }
 }
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct TabsDecorator {}
 
 impl ComposeDecorator for TabsDecorator {
@@ -110,20 +110,20 @@ impl ComposeDecorator for TabsDecorator {
 
 #[derive(Template)]
 pub struct Tab {
-  header: TabItem,
-  pane: Option<WidgetOf<TabPane>>,
+  label: TabItem,
+  child: Option<WidgetOf<TabPane>>,
 }
 
 #[derive(Template)]
 pub struct TabItem {
   icon: Option<NamedSvg>,
-  label: Option<State<Label>>,
+  text: Option<State<Label>>,
 }
 
 #[derive(Declare, Declare2, SingleChild)]
 pub struct TabPane;
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct TabDecorator {}
 
 impl ComposeDecorator for TabDecorator {
@@ -132,7 +132,7 @@ impl ComposeDecorator for TabDecorator {
   fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
 }
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct IndicatorDecorator {
   pub pos: Position,
   pub rect: Rect,
@@ -143,22 +143,26 @@ impl ComposeDecorator for IndicatorDecorator {
   type Host = Widget;
 
   fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget {
-    widget! {
-      states { this: this.into_readonly() }
-      DynWidget {
-        left_anchor: match this.pos {
-          Position::Top | Position::Bottom => this.rect.origin.x
-            + (this.rect.size.width - 60.) / 2.,
-          Position::Left => this.rect.size.width - this.extent,
-          Position::Right => 0.,
+    fn_widget! {
+      @ $host{
+        left_anchor: pipe!{
+          let this = $this;
+          match this.pos {
+            Position::Top | Position::Bottom => this.rect.origin.x
+              + (this.rect.size.width - 60.) / 2.,
+            Position::Left => this.rect.size.width - this.extent,
+            Position::Right => 0.,
+          }
         },
-        top_anchor: match this.pos {
-          Position::Left | Position::Right => this.rect.origin.y
-            + (this.rect.size.height - 60.) / 2.,
-          Position::Top => this.rect.size.height - this.extent,
-          Position::Bottom => 0.,
-        },
-        dyns: host,
+        top_anchor: pipe! {
+          let this = $this;
+          match this.pos {
+            Position::Left | Position::Right => this.rect.origin.y
+              + (this.rect.size.height - 60.) / 2.,
+            Position::Top => this.rect.size.height - this.extent,
+            Position::Bottom => 0.,
+          }
+        }
       }
     }
     .into()
@@ -169,8 +173,8 @@ impl Tabs {
   fn tab_header(
     headers: Vec<(Option<NamedSvg>, Option<State<Label>>)>,
     tabs_style: TabsStyle,
-    tabs: Stateful<Tabs>,
-    indicator: Stateful<IndicatorDecorator>,
+    tabs: impl StateWriter<Value = Tabs> + 'static,
+    indicator: impl StateWriter<Value = IndicatorDecorator> + 'static,
   ) -> impl Iterator<Item = Widget> {
     let TabsStyle {
       icon_size: size,
@@ -184,62 +188,49 @@ impl Tabs {
       .into_iter()
       .enumerate()
       .map(move |(idx, (icon, label))| {
-        let icon_widget = icon.map(|icon| {
-          widget! {
-            Icon {
-              size,
-              widget::from(icon)
-            }
-          }
-        });
-
+        let tabs = tabs.clone_writer();
         let active_color = active_color.clone();
         let foreground = foreground.clone();
         let label_style = label_style.clone();
-        let label_widget = label.map(|label| {
-          widget! {
-            states {
-              tabs: tabs.clone(),
-              text: label.into_readonly(),
-            }
-            Text {
-              text: text.0.clone(),
-              foreground: match tabs.cur_idx == idx {
+        let indicator = indicator.clone_writer();
+        fn_widget! {
+          let icon_widget = icon.map(|icon| @Icon { size, @ { icon }});
+          let label_widget = label.map(|label| {
+            @Text {
+              text: pipe!($label.0.clone()),
+              foreground: pipe!(match $tabs.cur_idx == idx {
                 true => active_color.clone(),
                 false => foreground.clone(),
-              },
+              }),
               text_style: label_style,
             }
-          }
-        });
-        let indicator = indicator.clone();
-        widget! {
-          states { tabs: tabs.clone() }
-          TabDecorator {
-            Expanded {
-              id: tab_header,
-              flex: 1.,
-              on_tap: move |_| if tabs.cur_idx != idx {
-                tabs.cur_idx = idx;
+          });
+          @ {
+            let mut tab_header = @Expanded {
+              on_tap: move |_| if $tabs.cur_idx != idx {
+                $tabs.write().cur_idx = idx;
               },
-              Flex {
-                align_items: Align::Center,
-                justify_content: JustifyContent::Center,
-                direction: match icon_pos {
-                  Position::Left | Position::Right => Direction::Horizontal,
-                  Position::Top | Position::Bottom => Direction::Vertical,
-                },
-                reverse: matches!(icon_pos, Position::Right | Position::Bottom),
-                widget::from(icon_widget)
-                // todo: insert `Spacer`
-                widget::from(label_widget)
+            };
+
+            watch!(($tabs.cur_idx == idx, $tab_header.layout_rect()))
+              .filter_map(|(active, rect)| active.then_some(rect))
+              .subscribe(move |v| $indicator.write().rect = v);
+
+            @TabDecorator {
+              @$tab_header {
+                @Flex {
+                  align_items: Align::Center,
+                  justify_content: JustifyContent::Center,
+                  direction: match icon_pos {
+                    Position::Left | Position::Right => Direction::Horizontal,
+                    Position::Top | Position::Bottom => Direction::Vertical,
+                  },
+                  reverse: matches!(icon_pos, Position::Right | Position::Bottom),
+                  @ { icon_widget }
+                  @ { label_widget }
+                }
               }
             }
-          }
-          finally {
-            let_watch!((tabs.cur_idx == idx, tab_header.layout_rect()))
-              .filter_map(|(active, rect)| active.then_some(rect))
-              .subscribe(move |v| indicator.silent_ref().rect = v);
           }
         }
         .into()
@@ -255,17 +246,15 @@ impl ComposeChild for Tabs {
     let mut panes = vec![];
 
     for tab in child.into_iter() {
-      let Tab { header, pane } = tab;
-      headers.push((header.icon, header.label));
+      let Tab { label: header, child: pane } = tab;
+      headers.push((header.icon, header.text));
       if let Some(pane) = pane {
-        panes.push(pane.child)
+        panes.push(pane.child())
       }
     }
 
-    widget! {
-      states { this: this.into_writable() }
-      init ctx => {
-        let tabs_style = TabsStyle::of(ctx);
+    fn_widget! {
+      let tabs_style = TabsStyle::of(ctx!());
         let TabsStyle {
           extent_only_icon,
           extent_only_label,
@@ -274,7 +263,6 @@ impl ComposeChild for Tabs {
           indicator,
           ..
         } = tabs_style.clone();
-        let tabs_style = tabs_style.clone();
         let has_icon = headers.iter().any(|item| item.0.is_some());
         let has_label = headers.iter().any(|item| item.1.is_some());
         let extent = match (has_icon, has_label) {
@@ -285,84 +273,83 @@ impl ComposeChild for Tabs {
         };
         let mut panes = panes.into_iter()
           .enumerate()
-          .map(move |(idx, pane)| {
-            widget! {
-              Expanded {
-                flex: 1.,
-                DynWidget {
-                  visible: this.cur_idx == idx,
-                  dyns: pane,
-                }
-              }
-            }
+          .map(move |(idx, pane)| @Expanded {
+            flex: 1.,
+            @ $pane { visible: pipe!($this.cur_idx == idx) }
           });
-        let mut header = widget! {
-          Stack {
-            ConstrainedBox {
-              clamp: match this.pos {
-                Position::Top | Position::Bottom => BoxClamp::fixed_height(extent),
-                Position::Left | Position::Right => BoxClamp::fixed_width(extent),
-              },
-              Flex {
-                id: flex,
-                direction: match this.pos {
-                  Position::Top | Position::Bottom => Direction::Horizontal,
-                  Position::Left | Position::Right => Direction::Vertical,
-                },
+        let mut flex = @Flex {
+          direction: pipe!(match $this.pos {
+            Position::Top | Position::Bottom => Direction::Horizontal,
+            Position::Left | Position::Right => Direction::Vertical,
+          })
+        };
+        let divider = @Divider {
+          direction: pipe!(match $this.pos {
+            Position::Top | Position::Bottom => Direction::Horizontal,
+            Position::Left | Position::Right => Direction::Vertical,
+          }),
+          left_anchor: pipe!(match $this.pos {
+            Position::Left => $flex.layout_size().width - 1.,
+            Position::Top | Position::Right | Position::Bottom => 0.,
+          }),
+          top_anchor: pipe!(match $this.pos {
+            Position::Top => $flex.layout_size().height - 1.,
+            Position::Bottom | Position::Right | Position::Left => 0.,
+          }),
+        };
+        let mut indicator_decorator = @IndicatorDecorator {
+          pos: pipe!($this.pos),
+          extent: indicator.extent,
+          rect: Rect::zero()
+        };
+        let mut header = @Stack {
+          @ConstrainedBox {
+            clamp: pipe!(match $this.pos {
+              Position::Top | Position::Bottom => BoxClamp::fixed_height(extent),
+              Position::Left | Position::Right => BoxClamp::fixed_width(extent),
+            }),
+            @ $flex {
+              @ {
                 Multi::new(
                   Tabs::tab_header(
-                    headers, tabs_style.clone(),
-                    no_watch!(this.clone_stateful()),
-                    no_watch!(indicator_decorator.clone_stateful()),
+                    headers, tabs_style,
+                    this.clone_writer(),
+                    indicator_decorator.clone_writer()
                   )
                 )
               }
             }
-            Divider {
-              direction: match this.pos {
-                Position::Top | Position::Bottom => Direction::Horizontal,
-                Position::Left | Position::Right => Direction::Vertical,
-              },
-              left_anchor: match this.pos {
-                Position::Left => flex.layout_size().width - 1.,
-                Position::Top | Position::Right | Position::Bottom => 0.,
-              },
-              top_anchor: match this.pos {
-                Position::Top => flex.layout_size().height - 1.,
-                Position::Bottom | Position::Right | Position::Left => 0.,
-              },
-            }
-            IndicatorDecorator {
-              id: indicator_decorator,
-              pos: this.pos,
-              extent: indicator.extent,
-              rect: Rect::zero(),
-              Container {
-                background: active_color.clone(),
-                size: match this.pos {
-                  Position::Top | Position::Bottom => indicator.measure.map_or(
-                    Size::new(indicator_decorator.rect.width(), indicator.extent),
-                    |measure| Size::new(measure, indicator.extent)
-                  ),
-                  Position::Left | Position::Right => indicator.measure.map_or(
-                    Size::new(indicator.extent, indicator_decorator.rect.height()),
-                    |measure| Size::new(indicator.extent, measure)
-                  ),
-                }
-              }
+          }
+          @ { divider }
+          @ $indicator_decorator {
+            @ Container {
+              background: active_color,
+              size: pipe!(match $this.pos {
+                Position::Top | Position::Bottom => indicator.measure.map_or(
+                  Size::new($indicator_decorator.rect.width(), indicator.extent),
+                  |measure| Size::new(measure, indicator.extent)
+                ),
+                Position::Left | Position::Right => indicator.measure.map_or(
+                  Size::new(indicator.extent, $indicator_decorator.rect.height()),
+                  |measure| Size::new(indicator.extent, measure)
+                ),
+              })
             }
           }
         };
-      }
-      TabsDecorator {
-        Flex {
-          direction: match this.pos {
+
+      @TabsDecorator {
+        @Flex {
+          direction: pipe!(match  $this.pos {
             Position::Left | Position::Right => Direction::Horizontal,
             Position::Top | Position::Bottom => Direction::Vertical,
+          }),
+          reverse: pipe!{
+            let pos = $this.pos;
+            matches!(pos, Position::Right | Position::Bottom)
           },
-          reverse: matches!(this.silent_ref().pos, Position::Right | Position::Bottom),
-          widget::from(header)
-          Multi::new(panes)
+          @ { header }
+          @ { Multi::new(panes) }
         }
       }
     }

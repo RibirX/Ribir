@@ -133,43 +133,47 @@ mod tests {
 
   use crate::{
     prelude::*,
+    reset_test_env,
     test_helper::{MockBox, MockMulti, TestWindow},
   };
 
   #[test]
   fn full_lifecycle() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let trigger = Stateful::new(true);
     let lifecycle = Stateful::new(vec![]);
+    let c_lc = lifecycle.clone_reader();
+    let c_trigger = trigger.clone_writer();
 
-    let w = widget! {
-      states {
-        trigger: trigger.clone(),
-        lifecycle: lifecycle.clone()
-      }
-      MockBox {
+    let w = fn_widget! {
+      @MockBox {
         size: Size::zero(),
-        on_mounted: move |_| lifecycle.silent().push("static mounted"),
-        on_performed_layout: move |_| lifecycle.silent().push("static performed layout"),
-        on_disposed: move |_| lifecycle.silent().push("static disposed"),
-        widget::then(*trigger, || widget! {
-          MockBox {
-            size: Size::zero(),
-            on_mounted: move |_| lifecycle.silent().push("dyn mounted"),
-            on_performed_layout: move |_| lifecycle.silent().push("dyn performed layout"),
-            on_disposed: move |_| lifecycle.silent().push("dyn disposed")
-          }
-        })
+        on_mounted: move |_| $lifecycle.write().push("static mounted"),
+        on_performed_layout: move |_| $lifecycle.write().push("static performed layout"),
+        on_disposed: move |_| $lifecycle.write().push("static disposed"),
+        @ {
+          pipe!(*$trigger).map(move  |b| {
+            b.then(move || {
+              @MockBox {
+                size: Size::zero(),
+                on_mounted: move |_| $lifecycle.write().push("dyn mounted"),
+                on_performed_layout: move |_| $lifecycle.write().push("dyn performed layout"),
+                on_disposed: move |_| $lifecycle.write().push("dyn disposed")
+              }
+            })
+          })
+        }
       }
     };
 
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
-    assert_eq!(&**lifecycle.state_ref(), ["static mounted"]);
+    assert_eq!(&**c_lc.read(), ["static mounted", "dyn mounted",]);
+
     wnd.draw_frame();
 
     assert_eq!(
-      &**lifecycle.state_ref(),
+      &**c_lc.read(),
       [
         "static mounted",
         "dyn mounted",
@@ -178,11 +182,11 @@ mod tests {
       ]
     );
     {
-      *trigger.state_ref() = false;
+      *c_trigger.write() = false;
     }
     wnd.draw_frame();
     assert_eq!(
-      &**lifecycle.state_ref(),
+      &**c_lc.read(),
       [
         "static mounted",
         "dyn mounted",
@@ -196,42 +200,39 @@ mod tests {
 
   #[test]
   fn track_lifecycle() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let cnt = Stateful::new(3);
     let mounted: Stateful<HashSet<WidgetId>> = Stateful::new(HashSet::default());
     let disposed: Stateful<HashSet<WidgetId>> = Stateful::new(HashSet::default());
-    let w = widget! {
-      states {
-        cnt: cnt.clone(),
-        mounted: mounted.clone(),
-        disposed: disposed.clone(),
-      }
-      MockMulti {
-        Multi::new((0..*cnt).map(move |_| widget! {
-          MockBox {
-            size: Size::zero(),
-            on_mounted: move |ctx| {
-              mounted.insert(ctx.id);
-            },
-            on_disposed: move |ctx| {
-              disposed.insert(ctx.id);
-            },
-          }
-        }))
+
+    let c_cnt = cnt.clone_writer();
+    let c_mounted = mounted.clone_reader();
+    let c_disposed = disposed.clone_reader();
+    let w = fn_widget! {
+      @MockMulti {
+        @ {
+          pipe!(*$cnt).map(move |cnt| {
+            let iter = (0..cnt).map(move |_| @MockBox {
+              size: Size::zero(),
+              on_mounted: move |e| { $mounted.write().insert(e.id); },
+              on_disposed: move |e| { $disposed.write().insert(e.id); },
+            });
+            Multi::new(iter)
+          })
+        }
       }
     };
 
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
-    let mounted_ids = (*mounted.state_ref()).clone();
+    let mounted_ids = c_mounted.read().clone();
 
-    *cnt.state_ref() = 5;
+    *c_cnt.write() = 5;
     wnd.on_wnd_resize_event(Size::zero());
     wnd.draw_frame();
 
-    let disposed_ids = (*disposed.state_ref()).clone();
     assert_eq!(mounted_ids.len(), 3);
-    assert_eq!(mounted_ids, disposed_ids);
+    assert_eq!(&mounted_ids, &*c_disposed.read());
   }
 }

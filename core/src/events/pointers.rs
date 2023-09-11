@@ -179,36 +179,35 @@ impl PointerListenerDeclarer {
   }
 
   pub fn on_x_times_tap(
-    mut self,
+    self,
     (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> Self {
-    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler);
-    self
+    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler)
   }
 
   pub fn on_x_times_tap_capture(
-    mut self,
+    self,
     (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> Self {
-    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler);
-    self
+    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler)
   }
 
   fn on_x_times_tap_impl(
-    &mut self,
+    mut self,
     times: usize,
     dur: Duration,
     capture: bool,
     handler: impl FnMut(&mut PointerEvent) + 'static,
-  ) {
+  ) -> Self {
     self
       .subject()
       .filter_map(x_times_tap_map_filter(times, dur, capture))
       .subscribe(handler);
+    self
   }
 }
 
-impl PointerListener {
+impl PointerListenerDeclarer2 {
   pub fn on_double_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
     self.on_x_times_tap((2, handler))
   }
@@ -229,16 +228,57 @@ impl PointerListener {
     self,
     (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> Self {
-    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler);
-    self
+    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler)
   }
 
   pub fn on_x_times_tap_capture(
     self,
     (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> Self {
-    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler);
+    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler)
+  }
+
+  fn on_x_times_tap_impl(
+    mut self,
+    times: usize,
+    dur: Duration,
+    capture: bool,
+    handler: impl FnMut(&mut PointerEvent) + 'static,
+  ) -> Self {
     self
+      .subject()
+      .filter_map(x_times_tap_map_filter(times, dur, capture))
+      .subscribe(handler);
+    self
+  }
+}
+
+impl PointerListener {
+  pub fn on_double_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) {
+    self.on_x_times_tap((2, handler))
+  }
+
+  pub fn on_double_tap_capture(self, handler: impl FnMut(&mut PointerEvent) + 'static) {
+    self.on_x_times_tap_capture((2, handler))
+  }
+
+  pub fn on_triple_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) {
+    self.on_x_times_tap((3, handler))
+  }
+
+  pub fn on_triple_tap_capture(self, handler: impl FnMut(&mut PointerEvent) + 'static) {
+    self.on_x_times_tap_capture((3, handler))
+  }
+
+  pub fn on_x_times_tap(self, (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static)) {
+    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler);
+  }
+
+  pub fn on_x_times_tap_capture(
+    self,
+    (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
+  ) {
+    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler);
   }
 
   fn on_x_times_tap_impl(
@@ -258,7 +298,10 @@ impl PointerListener {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::{MockBox, MockMulti, TestWindow};
+  use crate::{
+    reset_test_env,
+    test_helper::{MockBox, MockMulti, TestWindow},
+  };
   use std::{cell::RefCell, rc::Rc};
   use winit::{
     dpi::LogicalPosition,
@@ -292,30 +335,29 @@ mod tests {
 
   #[test]
   fn tap_focus() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let tap_cnt = Rc::new(RefCell::new(0));
     let is_focused = Rc::new(RefCell::new(false));
 
     let tap_cnt1 = tap_cnt.clone();
     let tap_cnt2 = tap_cnt.clone();
-    let is_focused1 = is_focused.clone();
-    let w = widget! {
-      MockMulti {
-        id: host,
-        MockBox {
+    let is_focused2 = is_focused.clone();
+    let w = fn_widget! {
+      let mut host = @MockMulti {};
+      watch!($host.has_focus())
+        .subscribe(move |v| *is_focused2.borrow_mut() = v);
+
+      @$host {
+        @MockBox {
           size: Size::new(50., 50.,),
           on_tap: move |_| *tap_cnt1.borrow_mut() += 1,
         }
-        MockBox {
+        @MockBox {
           size: Size::new(50., 50.,),
           on_tap: move |_| *tap_cnt2.borrow_mut() += 1,
           on_key_down: move |_| println!("dummy code"),
         }
-      }
-      finally {
-        let_watch!(host.has_focus())
-          .subscribe(move |v| *is_focused1.borrow_mut() = v);
       }
     };
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));

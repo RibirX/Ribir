@@ -1,4 +1,7 @@
-use ribir::{core::test_helper::*, prelude::*};
+use ribir::{
+  core::{reset_test_env, test_helper::*},
+  prelude::*,
+};
 use ribir_dev_helper::*;
 use std::{cell::Cell, rc::Rc};
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
@@ -131,18 +134,18 @@ widget_layout_test!(dollar_as_middle_parent, width == 500., height == 500.,);
 
 fn pipe_as_field_value() -> impl Into<Widget> {
   let size = Stateful::new(Size::zero());
-  let mut size2 = size.clone();
+  let size2 = size.clone_reader();
   let w = fn_widget! {
     rdl! { SizedBox { size: pipe!(*$size2) }}
   };
-  *size.state_ref() = Size::new(100., 100.);
+  *size.write() = Size::new(100., 100.);
   w
 }
 widget_layout_test!(pipe_as_field_value, width == 100., height == 100.,);
 
 fn pipe_as_builtin_field_value() -> impl Into<Widget> {
   let margin = Stateful::new(EdgeInsets::all(0.));
-  let mut margin2 = margin.clone();
+  let margin2 = margin.clone_reader();
 
   let w = fn_widget! {
     rdl! { SizedBox {
@@ -150,20 +153,20 @@ fn pipe_as_builtin_field_value() -> impl Into<Widget> {
       margin: pipe!(*$margin2)
     }}
   };
-  *margin.state_ref() = EdgeInsets::all(50.);
+  *margin.write() = EdgeInsets::all(50.);
   w
 }
 widget_layout_test!(pipe_as_builtin_field_value, width == 100., height == 100.,);
 
 fn pipe_with_ctx() -> impl Into<Widget> {
-  let mut scale = Stateful::new(1.);
-  let scale2 = scale.clone();
+  let scale = Stateful::new(1.);
+  let scale2 = scale.clone_writer();
   let w = fn_widget! {
     rdl! { SizedBox {
       size: pipe!(IconSize::of(ctx!()).tiny * *$scale)
     }}
   };
-  *scale2.state_ref() = 2.;
+  *scale2.write() = 2.;
   w
 }
 widget_layout_test!(pipe_with_ctx, width == 36., height == 36.,);
@@ -180,22 +183,22 @@ fn pipe_with_builtin_field() -> impl Into<Widget> {
 }
 widget_layout_test!(pipe_with_builtin_field, width == 4., height == 2.,);
 
-// fn capture_closure_used_ctx() -> impl Into<Widget> {
-//   fn_widget! {
-//     let mut size_box = @SizedBox { size: ZERO_SIZE };
-//     @ $size_box {
-//       on_mounted: move |_| $size_box.size = IconSize::of(ctx!()).tiny
-//     }
-//   }
-// }
-// widget_layout_test!(capture_closure_used_ctx, width == 18., height == 18.,);
+fn capture_closure_used_ctx() -> impl Into<Widget> {
+  fn_widget! {
+    let mut size_box = @SizedBox { size: ZERO_SIZE };
+    @ $size_box {
+      on_mounted: move |_| $size_box.write().size = IconSize::of(ctx!()).tiny
+    }
+  }
+}
+widget_layout_test!(capture_closure_used_ctx, width == 18., height == 18.,);
 
 #[test]
 fn pipe_single_parent() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
-  let mut outside_blank = Stateful::new(true);
-  let outside_blank2 = outside_blank.clone();
+  let outside_blank = Stateful::new(true);
+  let outside_blank2 = outside_blank.clone_writer();
   let w = fn_widget! {
     let edges = EdgeInsets::all(5.);
     let blank = pipe! {
@@ -216,17 +219,17 @@ fn pipe_single_parent() {
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 110., height == 110., });
 
-  *outside_blank2.state_ref() = false;
+  *outside_blank2.write() = false;
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 100., height == 100., });
 }
 
 #[test]
 fn pipe_multi_parent() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
-  let mut stack_or_flex = Stateful::new(true);
-  let stack_or_flex2 = stack_or_flex.clone();
+  let stack_or_flex = Stateful::new(true);
+  let stack_or_flex2 = stack_or_flex.clone_writer();
   let w = fn_widget! {
     let container = pipe! {
       let c: Box<dyn BoxedMultiParent> = if *$stack_or_flex {
@@ -249,17 +252,17 @@ fn pipe_multi_parent() {
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 100., height == 100., });
 
-  *stack_or_flex2.state_ref() = false;
+  *stack_or_flex2.write() = false;
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 200., height == 100., });
 }
 
 #[test]
 fn pipe_as_child() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let box_or_not = Stateful::new(true);
-  let mut box_or_not2 = box_or_not.clone();
+  let box_or_not2 = box_or_not.clone_reader();
   let w = fn_widget! {
     let blank: Pipe<Widget> = pipe!{
       if *$box_or_not2 {
@@ -283,11 +286,11 @@ fn pipe_as_child() {
 
 #[test]
 fn pipe_as_multi_child() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let fix_box = SizedBox { size: Size::new(100., 100.) };
-  let mut cnt = Stateful::new(0);
-  let cnt2 = cnt.clone();
+  let cnt = Stateful::new(0);
+  let cnt2 = cnt.clone_writer();
   let w = fn_widget! {
     let boxes = pipe! {
       Multi::new((0..*$cnt).map(|_| fix_box.clone()).collect::<Vec<_>>())
@@ -299,7 +302,7 @@ fn pipe_as_multi_child() {
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 0., height == 0., });
 
-  *cnt2.state_ref() = 3;
+  *cnt2.write() = 3;
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 300., height == 100., });
 }
@@ -355,20 +358,20 @@ widget_layout_test!(
 
 #[test]
 fn closure_in_fn_widget_capture() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
-  let mut hi_res = Stateful::new(CowArc::borrowed(""));
-  let hi_res2 = hi_res.clone();
+  let hi_res = Stateful::new(CowArc::borrowed(""));
+  let hi_res2 = hi_res.clone_reader();
   let w = fn_widget! {
     let mut text = @ Text { text: "hi" };
-    let on_mounted = move |_: &mut _| *$hi_res =$text.text.clone();
+    let on_mounted = move |_: &mut _| *$hi_res.write() =$text.text.clone();
     @ $text { on_mounted }
   };
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
 
-  assert_eq!(&**hi_res2.state_ref(), "hi");
+  assert_eq!(&**hi_res2.read(), "hi");
 }
 
 fn at_embed_in_expression() -> impl Into<Widget> {
@@ -384,7 +387,7 @@ widget_layout_test!(at_embed_in_expression, width == 300., height == 100.,);
 
 #[test]
 fn declare_smoke() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let _ = widget! {
     SizedBox {
@@ -396,7 +399,7 @@ fn declare_smoke() {
 
 #[test]
 fn simple_ref_bind_work() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let size = Size::new(100., 100.);
   let w = widget! {
@@ -422,7 +425,7 @@ fn simple_ref_bind_work() {
 
 #[test]
 fn event_attr_sugar_work() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
   const BEFORE_SIZE: Size = Size::new(50., 50.);
   const AFTER_TAP_SIZE: Size = Size::new(100., 100.);
   let w = widget! {
@@ -451,7 +454,7 @@ fn event_attr_sugar_work() {
 
 #[test]
 fn widget_wrap_bind_work() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let w = widget! {
     Flex {
@@ -480,19 +483,22 @@ fn widget_wrap_bind_work() {
 
 #[test]
 fn expression_for_children() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let size_one = Size::new(1., 1.);
   let size_five = Size::new(5., 5.);
-  let embed_expr = widget! {
-    Flex {
-      on_tap: move |_| sized_box.size = size_five,
-      SizedBox { id: sized_box, size: size_one }
-      // todo: how should we hint user, he/she need wrap inner widget of `DynWidget` to track named widget change.
-      Multi::new((0..3).map(move |_| widget!{ SizedBox { size: sized_box.size } }))
-      DynWidget {
-         dyns: (sized_box.size.area() > 2.).then(|| widget!{ SizedBox { size: sized_box.size } })
-      }
+  let embed_expr = fn_widget! {
+    let sized_box = @SizedBox { size: size_one };
+    let multi_box = Multi::new((0..3).map(move |_| @SizedBox { size: pipe!($sized_box.size) } ))
+    ;
+    let pipe_box = pipe!($sized_box.size.area() > 2.)
+      .map(move |v| v.then(|| @SizedBox { size: pipe!($sized_box.size) }));
+
+    @Flex {
+      on_tap: move |_| $sized_box.write().size = size_five,
+      @ { sized_box }
+      @ { multi_box }
+      @ { pipe_box }
     }
   };
 
@@ -517,16 +523,14 @@ fn expression_for_children() {
 
 #[test]
 fn embed_widget_ref_outside() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
-  let w = widget! {
-    Flex {
-      SizedBox {
-        id: first,
-        size: Size::new(1., 1.),
-        on_tap: move |_| first.size = Size::new(2., 2.)
-      }
-      Multi::new((0..3).map(move |_| widget!{ SizedBox { size: first.size } }))
+  let w = fn_widget! {
+    let first = @SizedBox { size: Size::new(1., 1.) };
+    let three_box = @{ Multi::new((0..3).map(move |_| @ SizedBox { size: pipe!($first.size) } ))};
+    @Flex {
+      @$first { on_tap: move |_| $first.write().size = Size::new(2., 2.)}
+      @{ three_box }
     }
   };
 
@@ -540,20 +544,19 @@ fn embed_widget_ref_outside() {
 }
 
 #[test]
-fn data_flow_macro() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+fn bind_fields() {
+  reset_test_env!();
 
   let size = Size::new(1., 1.);
-  let w = widget! {
-    Flex {
-      on_tap: move |_| a.size *= 2.,
-      SizedBox { id: c, size }
-      SizedBox { id: a, size }
-      SizedBox { id: b, size: a.size }
-    }
-    finally {
-      watch!(a.size + b.size)
-        .subscribe(move |v| c.size = v);
+  let w = fn_widget! {
+    let a = @SizedBox { size };
+    let b = @SizedBox { size: pipe!($a.size) };
+    let c = @SizedBox { size };
+    watch!($a.size + $b.size)
+      .subscribe(move |v| $c.write().size = v);
+    @Flex {
+      on_tap: move |_| $a.write().size *= 2.,
+      @ { Multi::new([a, b, c]) }
     }
   };
   let mut wnd = TestWindow::new(w);
@@ -597,7 +600,7 @@ widget_layout_test!(
 #[test]
 
 fn builtin_ref() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let icon_track = Rc::new(Cell::new(CursorIcon::default()));
   let c_icon_track = icon_track.clone();
@@ -627,7 +630,7 @@ fn builtin_ref() {
 
 #[test]
 fn builtin_bind_to_self() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let icon_track = Rc::new(Cell::new(CursorIcon::default()));
   let c_icon_track = icon_track.clone();
@@ -683,35 +686,31 @@ fn tap_at(wnd: &mut TestWindow, pos: (i32, i32)) {
 
 #[test]
 fn builtin_method_support() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let layout_size = Stateful::new(Size::zero());
-  let w = widget! {
-    states { layout_size: layout_size.clone() }
-    SizedBox {
-      id: sized_box,
-      size: Size::new(100., 100.),
-    }
-    finally{
-      watch!(sized_box.layout_size())
-        .subscribe(move |v| *layout_size = v);
-    }
+  let c_layout_size = layout_size.clone_reader();
+  let w = fn_widget! {
+    let mut sized_box  = @SizedBox { size: Size::new(100., 100.) };
+    watch!($sized_box.layout_size())
+      .subscribe(move |v| *$layout_size.write() = v);
+    sized_box
   };
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
 
-  assert_eq!(&*layout_size.state_ref(), &Size::new(100., 100.));
+  assert_eq!(*c_layout_size.read(), Size::new(100., 100.));
 }
 
 #[test]
 fn fix_builtin_field_can_declare_as_widget() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
-  let w = widget! {
-    Margin {
+  let w = fn_widget! {
+    @Margin {
       margin: EdgeInsets::all(1.),
-      Void {}
+      @Void {}
     }
   };
 
@@ -721,17 +720,12 @@ fn fix_builtin_field_can_declare_as_widget() {
 
 #[test]
 fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
-  let w = widget! {
-    Margin {
-      id: margin,
-      margin: EdgeInsets::all(1.),
-      Void {}
-    }
-    finally {
-      watch!(margin.margin.clone()).subscribe(|_| {});
-    }
+  let w = fn_widget! {
+    let mut margin = @Margin { margin: EdgeInsets::all(1.) };
+    watch!($margin.margin).subscribe(|_| {});
+    @$margin  { @Void {} }
   };
 
   let wnd = TestWindow::new(w);
@@ -740,13 +734,12 @@ fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
 
 #[test]
 fn fix_access_builtin_with_gap() {
-  widget! {
-    Void {
-      id: this,
-      cursor: CursorIcon::Hand,
+  fn_widget! {
+    let mut this = @Void { cursor: CursorIcon::Hand };
+    @$this {
       on_tap: move |_| {
         // this access cursor across `silent` should compile pass.
-        let _ = this.silent().cursor;
+        let _ = $this.silent().cursor;
       }
     }
   };
@@ -754,40 +747,43 @@ fn fix_access_builtin_with_gap() {
 
 #[test]
 fn fix_subscribe_cancel_after_widget_drop() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let notify_cnt = Stateful::new(0);
+  let cnt: Writer<i32> = notify_cnt.clone_writer();
   let trigger = Stateful::new(true);
-  let w = widget! {
-    states { cnt: notify_cnt.clone(), trigger: trigger.clone() }
-    SizedBox {
-      size: Size::zero(),
-      widget::then(*trigger, || widget! {
-        SizedBox { size: Size::zero() }
-        finally {
-          let_watch!(*trigger).subscribe(move |_| *cnt +=1 );
-        }
-      })
+  let c_trigger = trigger.clone_reader();
+  let w = fn_widget! {
+    let mut container = @SizedBox { size: Size::zero() };
+    let h = watch!(*$c_trigger).subscribe(move |_| *$cnt.write() +=1 );
+    container.as_stateful().unsubscribe_on_drop(h);
+
+    @$container {
+      @ {
+        pipe!{$c_trigger.then(|| {
+          @SizedBox { size: Size::zero() }
+        })}
+      }
     }
   };
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
   {
-    *trigger.state_ref() = true
+    *trigger.write() = true
   }
   wnd.draw_frame();
-  assert_eq!(*notify_cnt.state_ref(), 1);
+  assert_eq!(*notify_cnt.read(), 1);
   {
-    *trigger.state_ref() = true
+    *trigger.write() = true
   }
   wnd.draw_frame();
-  assert_eq!(*notify_cnt.state_ref(), 2);
+  assert_eq!(*notify_cnt.read(), 2);
   {
-    *trigger.state_ref() = true
+    *trigger.write() = true
   }
   wnd.draw_frame();
-  assert_eq!(*notify_cnt.state_ref(), 3);
+  assert_eq!(*notify_cnt.read(), 3);
 }
 
 fn fix_local_assign_tuple() -> Widget {
@@ -814,14 +810,14 @@ widget_layout_test!(
 
 #[test]
 fn fix_silent_not_relayout_dyn_widget() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let trigger_size = Stateful::new(ZERO_SIZE);
-  let w = widget! {
-    states { trigger_size: trigger_size.clone() }
-    DynWidget {
-      dyns: if trigger_size.area() > 0. {
-        SizedBox { size: *trigger_size }
+  let c_trigger_size = trigger_size.clone_writer();
+  let w = fn_widget! {
+    pipe! {
+      if $trigger_size.area() > 0. {
+        SizedBox { size: *$trigger_size }
       } else {
         SizedBox { size: ZERO_SIZE }
       }
@@ -832,7 +828,7 @@ fn fix_silent_not_relayout_dyn_widget() {
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
   {
-    **trigger_size.state_ref().silent() = Size::new(100., 100.);
+    *c_trigger_size.silent() = Size::new(100., 100.);
   }
   // after silent modified, dyn widget not rebuild.
   wnd.draw_frame();
@@ -841,11 +837,11 @@ fn fix_silent_not_relayout_dyn_widget() {
 
 #[test]
 fn no_watch() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
+  reset_test_env!();
 
   let size = Stateful::new(ZERO_SIZE);
   let w = widget! {
-    states { size: size.clone() }
+    states { size: size.clone_stateful() }
     SizedBox { size: no_watch!(*size) }
   };
 
@@ -854,23 +850,8 @@ fn no_watch() {
   assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
 
   {
-    *size.state_ref() = Size::new(100., 100.)
+    *size.write() = Size::new(100., 100.)
   }
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
-}
-
-#[test]
-fn embed_shadow_states() {
-  let _guard = unsafe { AppCtx::new_lock_scope() };
-
-  let _ = widget! {
-    // variable `_a` here
-    FnWidget::new(|_: &BuildCtx| widget! {
-      // states shadow `a`
-      states { _a: Stateful::new(ZERO_SIZE) }
-      // `_a` should be the state `_a`
-      SizedBox { size: *_a }
-    })
-  };
 }

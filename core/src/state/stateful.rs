@@ -392,8 +392,6 @@ impl Notifier {
   }
 
   pub(crate) fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> { self.0.clone() }
-
-  pub(crate) fn reset(&self) { *self.0.clone().complete() }
 }
 
 impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {

@@ -102,11 +102,11 @@ type TextFieldThemeProxy = ThemeSuitProxy<TextFieldState, TextFieldTheme>;
 
 impl ComposeChild for TextFieldThemeProxy {
   type Child = Widget;
-  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     fn_widget! {
       @ $child {
         on_tap: move |_| {
-          let mut this = $this;
+          let mut this = $this.write();
           match this.state {
             TextFieldState::Enabled => this.state = TextFieldState::Focused,
             TextFieldState::Hovered => this.state = TextFieldState::Focused,
@@ -114,15 +114,15 @@ impl ComposeChild for TextFieldThemeProxy {
           };
         },
         on_pointer_move: move |_| {
-          let mut this = $this;
+          let mut this = $this.write();
           if this.state == TextFieldState::Enabled { this.state = TextFieldState::Hovered }
         },
         on_pointer_leave: move |_| {
-          let mut this = $this;
+          let mut this = $this.write();
           if this.state == TextFieldState::Hovered { this.state = TextFieldState::Enabled }
         },
         on_focus_out: move |_| {
-          let mut this = $this;
+          let mut this = $this.write();
           if this.state == TextFieldState::Focused { this.state = TextFieldState::Enabled }
         },
       }
@@ -281,7 +281,7 @@ macro_rules! take_option_field {
 
 impl ComposeChild for TextField {
   type Child = Option<TextFieldTml>;
-  fn compose_child(mut this: State<Self>, config: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, config: Self::Child) -> Widget {
     fn_widget! {
       let mut config = config.unwrap_or_default();
       take_option_field!({leading_icon, trailing_icon}, config);
@@ -290,7 +290,9 @@ impl ComposeChild for TextField {
       let mut theme = @TextFieldThemeProxy {
         suit: theme_suit,
         state: TextFieldState::default(),
-      };
+      }.into_inner();
+      let indicator_size = pipe!(Size::new(f32::MAX, $theme.indicator_height));
+      let indicator_bg =  pipe!($theme.indicator);
       @Stack {
         @Container {
           size: pipe!(Size::new(0., $theme.container_height)),
@@ -302,24 +304,24 @@ impl ComposeChild for TextField {
           @{
             leading_icon.map(|t| @Icon {
               size: IconSize::of(ctx!()).small,
-              @{ t.child }
+              @{ t.child() }
             })
           }
           @Expanded {
             flex: 1.,
-            @{ build_content_area(this.clone_state(), theme.clone_state(), config) }
+            @{ build_content_area(this, theme, config) }
           }
           @{
             trailing_icon.map(|t| @Icon {
               size: IconSize::of(ctx!()).small,
-              @{ t.child }
+              @{ t.child() }
             })
           }
         }
         @Container {
           v_align: VAlign::Bottom,
-          size: pipe!(Size::new(f32::MAX, $theme.indicator_height)),
-          background: pipe!($theme.indicator),
+          size: indicator_size,
+          background: indicator_bg,
         }
       }
     }
@@ -328,8 +330,8 @@ impl ComposeChild for TextField {
 }
 
 fn build_input_area(
-  mut this: Stateful<TextField>,
-  mut theme: Stateful<TextFieldThemeProxy>,
+  this: State<TextField>,
+  theme: State<TextFieldThemeProxy>,
   prefix: Option<LeadingText>,
   suffix: Option<TrailingText>,
   placeholder: Option<Placeholder>,
@@ -339,11 +341,11 @@ fn build_input_area(
       visible: pipe!(!$this.text.is_empty() || $theme.state == TextFieldState::Focused),
     };
 
-    let mut visible = route_state!($input_area.visible);
+    let mut visible = map_writer!($input_area.visible);
     visible.transition(transitions::LINEAR.of(ctx!()), ctx!());
 
     let mut input = @Input{ style: pipe!($theme.text.clone()) };
-    $input.set_text($this.text.clone());
+    $input.write().set_text($this.text.clone());
 
     watch!($input.text())
       .distinct_until_changed()
@@ -351,20 +353,18 @@ fn build_input_area(
 
     watch!($this.text.clone())
       .distinct_until_changed()
-      .subscribe(move |val| $input.set_text(val));
+      .subscribe(move |val| $input.write().set_text(val));
 
     let h = watch!($theme.state)
       .distinct_until_changed()
       .filter(|state| state == &TextFieldState::Focused)
-      .subscribe(move |_| $input.request_focus())
-      .unsubscribe_when_dropped();
-    input.own_data(h);
-
+      .subscribe(move |_| $input.request_focus());
+    input.as_stateful().unsubscribe_on_drop(h);
 
     @Row {
       @{
         prefix.map(|p| @Text{
-          text: p.child,
+          text: p.child(),
           foreground: pipe!($theme.foreground.clone()),
           text_style: pipe!($theme.text.clone()),
         })
@@ -375,7 +375,7 @@ fn build_input_area(
       }
       @{
         suffix.map(|s| @Text{
-          text: s.child,
+          text: s.child(),
           foreground: pipe!($theme.foreground.clone()),
           text_style: pipe!($theme.text.clone()),
         })
@@ -392,7 +392,7 @@ struct TextFieldLabel {
 }
 
 impl Compose for TextFieldLabel {
-  fn compose(mut this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> Widget {
     fn_widget! {
       let label = @Text {
         v_align: VAlign::Top,
@@ -400,8 +400,8 @@ impl Compose for TextFieldLabel {
         text_style: pipe!($this.style.clone()),
       };
 
-      let mut font_size = route_state!($this.style.font_size);
-      font_size.transition(transitions::LINEAR.of(ctx!()), ctx!());
+      map_writer!($this.style.font_size)
+        .transition(transitions::LINEAR.of(ctx!()), ctx!());
 
       label
     }
@@ -410,8 +410,8 @@ impl Compose for TextFieldLabel {
 }
 
 fn build_content_area(
-  mut this: Stateful<TextField>,
-  mut theme: Stateful<TextFieldThemeProxy>,
+  this: State<TextField>,
+  theme: State<TextFieldThemeProxy>,
   mut config: TextFieldTml,
 ) -> Widget {
   fn_widget! {
@@ -420,8 +420,8 @@ fn build_content_area(
       padding: pipe!($theme.input_padding($this.text.is_empty())),
     };
 
-    let mut padding = route_state!($content_area.padding);
-    padding.transition(transitions::LINEAR.of(ctx!()), ctx!());
+    map_writer!($content_area.padding)
+      .transition(transitions::LINEAR.of(ctx!()), ctx!());
 
     @ $content_area {
       @ {
@@ -433,7 +433,7 @@ fn build_content_area(
           }
         })
       }
-      @ { build_input_area(this.clone(), theme.clone(), prefix, suffix, placeholder)}
+      @ { build_input_area(this, theme, prefix, suffix, placeholder)}
     }
   }
   .into()

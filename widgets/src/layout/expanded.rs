@@ -7,6 +7,7 @@ use super::ConstrainedBox;
 /// divided among them according to the flex factor.
 #[derive(Clone, PartialEq, Declare, Declare2)]
 pub struct Expanded {
+  #[declare(default = 1.)]
   pub flex: f32,
 }
 
@@ -14,15 +15,13 @@ impl ComposeChild for Expanded {
   type Child = Widget;
   #[inline]
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let w = widget! {
-      ConstrainedBox {
+    let w = fn_widget! {
+      @ConstrainedBox {
         clamp: BoxClamp {
           min: Size::new(0., 0.),
           max: Size::new(f32::INFINITY, f32::INFINITY)
         },
-        DynWidget {
-          dyns: child
-        }
+        @{ child }
       }
     };
     DataWidget::attach_state(w.into(), this)

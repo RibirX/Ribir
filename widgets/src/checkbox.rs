@@ -25,7 +25,7 @@ pub struct CheckBoxStyle {
   pub label_color: Brush,
 }
 
-#[derive(Clone, Declare)]
+#[derive(Clone, Declare, Declare2)]
 pub struct CheckBoxDecorator {
   #[declare(default=Palette::of(ctx).primary())]
   pub color: Color,
@@ -54,81 +54,57 @@ impl ComposeDecorator for CheckBoxDecorator {
   fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
 }
 
-impl Checkbox {
-  fn icon(this: Stateful<Self>, size: Size) -> Widget {
-    widget! {
-      states { this }
-      CheckBoxDecorator {
-        color: this.color,
-        Icon {
-          size,
-          widget::from(
-            if this.indeterminate {
-              svgs::INDETERMINATE_CHECK_BOX
-            } else if this.checked {
-              svgs::CHECK_BOX
-            } else {
-              svgs::CHECK_BOX_OUTLINE_BLANK
-            }
-          )
-        }
-      }
-    }
-    .into()
-  }
-
-  fn label(label: Stateful<Label>, label_color: Brush, text_style: CowArc<TextStyle>) -> Widget {
-    widget! {
-      states { label }
-      Text {
-        text: label.0.clone(),
-        foreground: label_color,
-        text_style,
-      }
-    }
-    .into()
-  }
-}
-
 impl ComposeChild for Checkbox {
   type Child = Option<CheckboxTemplate>;
 
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_writable() }
-      init ctx => {
-        let CheckBoxStyle {
-          icon_size,
-          label_style,
-          label_color,
-        } = CheckBoxStyle::of(ctx).clone();
-      }
-      DynWidget {
+    fn_widget! {
+      let CheckBoxStyle {
+        icon_size,
+        label_style,
+        label_color,
+      } = CheckBoxStyle::of(ctx!());
+
+      let icon: Widget = @CheckBoxDecorator {
+        color: pipe!($this.color),
+        @Icon { size: icon_size,
+          @ { pipe!{
+            if $this.indeterminate {
+              svgs::INDETERMINATE_CHECK_BOX
+            } else if $this.checked {
+              svgs::CHECK_BOX
+            } else {
+              svgs::CHECK_BOX_OUTLINE_BLANK
+            }
+          }}
+        }
+      }.into();
+
+      let checkbox: Widget = if let Some(child) = child  {
+        let label = |mut label: State<Label>| @Text {
+          text: $label.0.clone(),
+          foreground: label_color,
+          text_style: label_style,
+        }.into();
+
+        @Row {
+          @ {
+            Multi::new(match child {
+              CheckboxTemplate::Before(w) => [ label(w.child()), icon ],
+              CheckboxTemplate::After(w) => [ icon, label(w.child())],
+            })
+          }
+        }.into()
+      } else {
+        icon
+      };
+
+      @ $checkbox {
         cursor: CursorIcon::Hand,
-        on_tap: move |_| this.switch_check(),
+        on_tap: move |_| $this.write().switch_check(),
         on_key_up: move |k| if k.key == VirtualKeyCode::Space {
-          this.switch_check()
-        },
-        dyns: {
-          let label_style = label_style.clone();
-          let label_color = label_color.clone();
-          child.map_or(
-            Checkbox::icon(no_watch!(this.clone_stateful()), icon_size),
-            |mut child| widget! {
-              Row {
-                Multi::new(match &mut child {
-                  CheckboxTemplate::Before(w) => [
-                    Checkbox::label(w.child.clone_state(), label_color.clone(), label_style.clone()),
-                    Checkbox::icon(this.clone_stateful(), icon_size),
-                  ],
-                  CheckboxTemplate::After(w) => [
-                    Checkbox::icon(this.clone_stateful(), icon_size),
-                    Checkbox::label(w.child.clone_state(), label_color.clone(), label_style.clone()),
-                  ],
-                })
-              }
-          }.into())
-        },
+          $this.write().switch_check()
+        }
       }
     }
     .into()

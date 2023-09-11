@@ -123,6 +123,7 @@ impl App {
               wnd.processes_native_event(event);
             }
           }
+          wnd.run_frame_tasks();
         }
         Event::MainEventsCleared => {
           AppCtx::run_until_stalled();

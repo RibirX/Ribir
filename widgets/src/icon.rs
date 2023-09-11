@@ -14,12 +14,10 @@ pub struct Icon {
 impl ComposeChild for Icon {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_readonly() }
-      SizedBox {
-        size: this.size,
-        DynWidget {
-          dyns: child,
+    fn_widget! {
+      @SizedBox {
+        size: pipe!($this.size),
+        @ $child {
           box_fit: BoxFit::Contain,
           h_align: HAlign::Center,
           v_align: VAlign::Center,
