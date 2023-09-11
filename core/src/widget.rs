@@ -56,7 +56,7 @@ pub struct Widget(Box<dyn FnOnce(&BuildCtx) -> WidgetId>);
 
 /// A trait to query dynamic type and its inner type on runtime, use this trait
 /// to provide type information you want framework know.
-pub trait Query {
+pub trait Query: QueryFiler {
   /// A type can composed by others, this method query all type(include self)
   /// match the type id, and call the callback one by one. The callback accept
   /// an `& dyn Any` of the target type, and return if it want to continue.
@@ -137,6 +137,8 @@ impl<'a> dyn Render + 'a {
     );
     hit
   }
+
+  pub fn is<T: Any>(&self) -> bool { self.query_filter(TypeId::of::<T>()).is_some() }
 }
 
 pub struct FnWidget<F>(F);

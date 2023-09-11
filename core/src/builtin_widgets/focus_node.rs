@@ -1,5 +1,4 @@
 use crate::{
-  data_widget::attach_to_id,
   events::focus_mgr::{FocusHandle, FocusType},
   impl_query_self_only,
   prelude::*,
@@ -53,7 +52,7 @@ impl ComposeChild for FocusNode {
         let subject = subject.unwrap_or_else(|| {
           let listener = LifecycleListener::default();
           let subject = listener.lifecycle_stream();
-          attach_to_id(id, &mut *ctx.tree.borrow_mut(), |child| {
+          id.wrap_node(&mut ctx.tree.borrow_mut().arena, |child| {
             Box::new(DataWidget::new(child, listener))
           });
           subject
@@ -73,7 +72,7 @@ impl ComposeChild for FocusNode {
           .subscribe(subscribe_fn(this.clone_reader()))
           .unsubscribe_when_dropped();
 
-        attach_to_id(id, &mut *ctx.tree.borrow_mut(), |child| {
+        id.wrap_node(&mut ctx.tree.borrow_mut().arena, |child| {
           let d = DataWidget::new(child, this);
           Box::new(DataWidget::new(
             Box::new(d),
