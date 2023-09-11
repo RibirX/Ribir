@@ -121,8 +121,6 @@ where
   fn record_before_value(&mut self, value: V) { self.before_value = Some(value); }
 }
 
-impl_query_self_only!(Key);
-
 macro from_key_impl($($ty: ty : $name: ident)*) {
   $(
     impl From<$ty> for Key {

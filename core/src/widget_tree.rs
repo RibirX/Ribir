@@ -2,6 +2,7 @@ use std::{
   cell::RefCell,
   cmp::Reverse,
   collections::HashSet,
+  mem::MaybeUninit,
   rc::{Rc, Weak},
 };
 
@@ -12,7 +13,7 @@ mod layout_info;
 use crate::prelude::*;
 pub use layout_info::*;
 
-use self::widget_id::empty_node;
+use self::widget_id::{empty_node, RenderNode};
 
 pub(crate) type DirtySet = Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
 
@@ -142,7 +143,7 @@ impl WidgetTree {
           info.size.take();
         }
 
-        let r = self.arena.get(p.0).unwrap().get();
+        let r = p.assert_get(&self.arena);
         if r.only_sized_by_parent() {
           break;
         }
@@ -180,6 +181,23 @@ impl WidgetTree {
       self.store.remove(id);
     });
     id.0.remove_subtree(&mut self.arena);
+  }
+
+  pub(crate) fn get_many_mut<const N: usize>(
+    &mut self,
+    ids: &[WidgetId; N],
+  ) -> [&mut RenderNode; N] {
+    unsafe {
+      let mut outs: MaybeUninit<[&mut RenderNode; N]> = MaybeUninit::uninit();
+      let outs_ptr = outs.as_mut_ptr();
+      for (idx, wid) in ids.iter().enumerate() {
+        let arena = &mut *(&mut self.arena as *mut TreeArena);
+        let cur = wid.get_node_mut(arena).expect("Invalid widget id.");
+
+        *(*outs_ptr).get_unchecked_mut(idx) = cur;
+      }
+      outs.assume_init()
+    }
   }
 }
 

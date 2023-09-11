@@ -16,23 +16,12 @@ pub struct WidgetId(pub(crate) NodeId);
 
 pub(crate) type TreeArena = Arena<RenderNode>;
 
-pub(crate) struct RenderNode {
-  data: Box<dyn Render>,
-}
+pub(crate) struct RenderNode(Box<dyn Render>);
 
 impl WidgetId {
   /// Returns a reference to the node data.
   pub(crate) fn get<'a, 'b>(self, tree: &'a TreeArena) -> Option<&'a (dyn Render + 'b)> {
-    self.get_node(tree).map(|n| n.data.as_ref())
-  }
-
-  /// Returns a mutable reference to the node data.
-  pub(crate) fn get_mut(self, tree: &mut TreeArena) -> Option<&mut Box<dyn Render>> {
-    self.get_node_mut(tree).map(|n| &mut n.data)
-  }
-
-  pub(crate) fn get_node(self, tree: &TreeArena) -> Option<&RenderNode> {
-    tree.get(self.0).map(|n| n.get())
+    tree.get(self.0).map(|n| &*n.get().0)
   }
 
   pub(crate) fn get_node_mut(self, tree: &mut TreeArena) -> Option<&mut RenderNode> {
@@ -166,8 +155,19 @@ impl WidgetId {
     self.get(tree).expect("Widget not exists in the `tree`")
   }
 
-  pub(crate) fn assert_get_mut(self, tree: &mut TreeArena) -> &mut Box<dyn Render> {
-    self.get_mut(tree).expect("Widget not exists in the `tree`")
+  /// We assume the `f` wrap the widget into a new widget, and keep the old
+  /// widget as part of the new widget, otherwise, undefined behavior.
+  pub(crate) fn wrap_node(
+    self,
+    tree: &mut TreeArena,
+    f: impl FnOnce(Box<dyn Render>) -> Box<dyn Render>,
+  ) {
+    let node = self.get_node_mut(tree).unwrap();
+    unsafe {
+      let data = Box::from_raw(&mut *node.0 as *mut _);
+      let copied = node.replace(f(data));
+      std::mem::forget(copied)
+    }
   }
 
   pub(crate) fn paint_subtree(self, ctx: &mut PaintingCtx) {
@@ -213,16 +213,15 @@ impl WidgetId {
 }
 
 pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn Render>) -> WidgetId {
-  WidgetId(arena.new_node(RenderNode { data: node }))
+  WidgetId(arena.new_node(RenderNode(node)))
 }
 
 pub(crate) fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }
 
-impl std::ops::Deref for RenderNode {
-  type Target = dyn Render;
-  fn deref(&self) -> &Self::Target { self.data.as_ref() }
-}
+impl RenderNode {
+  pub(crate) fn as_widget_mut(&mut self) -> &mut Box<dyn Render> { &mut self.0 }
 
-impl std::ops::DerefMut for RenderNode {
-  fn deref_mut(&mut self) -> &mut Self::Target { self.data.as_mut() }
+  pub(crate) fn replace(&mut self, value: Box<dyn Render>) -> Box<dyn Render> {
+    std::mem::replace(&mut self.0, value)
+  }
 }

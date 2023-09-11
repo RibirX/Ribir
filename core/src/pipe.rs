@@ -5,7 +5,7 @@ use rxrust::{
   subscription::Subscription,
 };
 use std::{
-  cell::{Cell, RefCell},
+  cell::{Cell, RefCell, UnsafeCell},
   convert::Infallible,
   ops::{Deref, Range},
 };
@@ -13,13 +13,10 @@ use std::{
 use crate::{
   builtin_widgets::{key::AnyKey, Void},
   context::{AppCtx, BuildCtx},
-  data_widget::attach_to_id,
-  prelude::{
-    AnonymousData, BoxedSingleParent, DataWidget, Multi, MultiChild, MultiParent, SingleChild,
-    SingleParent,
-  },
+  impl_proxy_render,
+  prelude::*,
   ticker::FrameMsg,
-  widget::{QueryOrder, Widget, WidgetBuilder, WidgetId, WidgetTree},
+  widget::{Query, QueryOrder, Render, Widget, WidgetBuilder, WidgetId, WidgetTree},
   window::WindowId,
 };
 
@@ -88,10 +85,18 @@ impl<V> Pipe<V> {
 }
 
 impl<W: Into<Widget> + 'static> WidgetBuilder for Pipe<W> {
-  fn build(self, ctx: &crate::context::BuildCtx) -> WidgetId {
+  fn build(self, ctx: &BuildCtx) -> WidgetId {
     let (v, modifies) = self.unzip();
     let id = v.into().build(ctx);
     let id_share = Sc::new(Cell::new(id));
+
+    let mut pipe_node = None;
+    id.wrap_node(&mut ctx.tree.borrow_mut().arena, |r| {
+      let p = PipeNode::new(r);
+      pipe_node = Some(p.clone());
+      Box::new(p)
+    });
+
     let id_share2 = id_share.clone();
     let handle = ctx.handle();
     let wnd_id = ctx.window().id();
@@ -118,6 +123,28 @@ impl<W: Into<Widget> + 'static> WidgetBuilder for Pipe<W> {
           let ctx = ctx.force_as_mut();
           if !ctx.window().is_in_another_regenerating(id) {
             let new_id = v.into().build(ctx);
+
+            // We use a `PipeNode` wrap the initial widget node, so if the widget node is
+            // not a `PipeNode` means the node is attached some data, we need to keep the
+            // data attached when it replaced by the new widget, because the data is the
+            // static stuff.
+            //
+            // Only pipe widget as a normal widget need to do this, because compose child
+            // widget not support pipe object as its child if it's not a normal widget. Only
+            // compose child widget has the ability to apply new logic on a widget that
+            // built.
+            if let Some(pn) = pipe_node.as_mut() {
+              let mut tree = ctx.tree.borrow_mut();
+              if !id.assert_get(&tree.arena).is::<PipeNode>() {
+                let [old_node, new_node] = tree.get_many_mut(&[id, new_id]);
+
+                std::mem::swap(pn.as_mut(), new_node.as_widget_mut());
+                std::mem::swap(old_node, new_node);
+              } else {
+                // we know widget node not attached data, we can not care about it now.
+                pipe_node.take();
+              }
+            }
 
             update_key_status_single(id, new_id, ctx);
 
@@ -343,7 +370,7 @@ fn attach_unsubscribe_guard(id: WidgetId, wnd: WindowId, unsub: impl Subscriptio
       // auto unsubscribe when the widget is not a root and its parent is None.
       if let Some(p) = id.parent(&tree.arena) {
         let guard = AnonymousData::new(Box::new(guard));
-        attach_to_id(p, &mut *tree, |d| Box::new(DataWidget::new(d, guard)))
+        p.wrap_node(&mut tree.arena, |d| Box::new(DataWidget::new(d, guard)))
       }
     }
   })
@@ -461,6 +488,39 @@ fn update_key_states(
 impl<W: SingleChild> SingleChild for Pipe<W> {}
 impl<W: MultiChild> MultiChild for Pipe<W> {}
 
+/// `PipeNode` just use to wrap a `Box<dyn Render>`, and provide a choice to
+/// change the inner `Box<dyn Render>` by `UnsafeCell` at a safe time. It's
+/// transparent except the `Pipe` widget.
+#[derive(Clone)]
+struct PipeNode(Sc<UnsafeCell<Box<dyn Render>>>);
+
+impl PipeNode {
+  fn new(value: Box<dyn Render>) -> Self { Self(Sc::new(UnsafeCell::new(value))) }
+
+  fn as_ref(&self) -> &dyn Render {
+    // safety: see the `PipeNode` document.
+    unsafe { &**self.0.get() }
+  }
+
+  fn as_mut(&mut self) -> &mut Box<dyn Render> {
+    // safety: see the `PipeNode` document.
+    unsafe { &mut *self.0.get() }
+  }
+}
+
+impl Query for PipeNode {
+  fn query_all(
+    &self,
+    type_id: std::any::TypeId,
+    callback: &mut dyn FnMut(&dyn std::any::Any) -> bool,
+    order: QueryOrder,
+  ) {
+    self.as_ref().query_all(type_id, callback, order)
+  }
+}
+
+impl_proxy_render!(proxy as_ref(), PipeNode);
+
 #[cfg(test)]
 mod tests {
   use std::{
@@ -469,8 +529,12 @@ mod tests {
   };
 
   use crate::{
-    builtin_widgets::key::KeyChange, impl_query_self_only, prelude::*, reset_test_env,
-    test_helper::*, widget::TreeArena,
+    builtin_widgets::key::{AnyKey, KeyChange},
+    impl_query_self_only,
+    prelude::*,
+    reset_test_env,
+    test_helper::*,
+    widget::TreeArena,
   };
 
   #[test]
@@ -527,6 +591,41 @@ mod tests {
 
     assert_eq!(ids[0], new_ids[0]);
     assert_eq!(ids[2], new_ids[2]);
+  }
+
+  #[test]
+  fn attach_data_to_pipe_widget() {
+    reset_test_env!();
+    let trigger = Stateful::new(false);
+    let c_trigger = trigger.clone_reader();
+    let w = fn_widget! {
+      let p = pipe! {
+        // just use to force update the widget, when trigger modified.
+        $c_trigger;
+        MockBox { size: Size::zero() }
+      };
+      @KeyWidget {
+        key: 0,
+        value: (),
+        @ { p }
+      }
+    };
+
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+    {
+      *trigger.write() = true;
+    }
+    wnd.draw_frame();
+    let tree = wnd.widget_tree.borrow();
+
+    // the key should still in the root widget after pipe widget updated.
+    assert!(
+      tree
+        .root()
+        .assert_get(&tree.arena)
+        .contain_type::<Box<dyn AnyKey>>()
+    );
   }
 
   #[test]
