@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use ribir_core::prelude::*;
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct ButtonImpl {
   #[declare(default = 48.)]
   pub min_width: f32,
@@ -50,7 +50,7 @@ pub struct ButtonTemplate {
 impl ComposeChild for ButtonImpl {
   type Child = ButtonTemplate;
 
-  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let ButtonTemplate { icon, label } = child;
     fn_widget! {
       @BoxDecoration {

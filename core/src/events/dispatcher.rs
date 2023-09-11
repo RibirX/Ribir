@@ -272,7 +272,7 @@ impl DispatchInfo {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::*;
+  use crate::{reset_test_env, test_helper::*};
   use std::{cell::RefCell, rc::Rc};
   use winit::event::WindowEvent;
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton};
@@ -293,9 +293,8 @@ mod tests {
         })
       }
     };
-    widget! {
-      DynWidget {
-        dyns: widget,
+    fn_widget! {
+      @$widget {
         on_pointer_down : handler_ctor(),
         on_pointer_move: handler_ctor(),
         on_pointer_up: handler_ctor(),
@@ -307,7 +306,7 @@ mod tests {
 
   #[test]
   fn mouse_pointer_bubble() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
@@ -316,7 +315,7 @@ mod tests {
     );
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockMulti { DynWidget  { dyns: record } } }.into(),
+      fn_widget! { @MockMulti { @ { record } } }.into(),
     );
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
@@ -328,14 +327,14 @@ mod tests {
       position: (1., 1.).into(),
       modifiers: ModifiersState::default(),
     });
-
+    wnd.run_frame_tasks();
     {
       let mut records = event_record.borrow_mut();
       assert_eq!(records.len(), 2);
       assert_eq!(records[0].btns.bits().count_ones(), 0);
       records.clear();
     }
-
+    wnd.run_frame_tasks();
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
@@ -343,7 +342,7 @@ mod tests {
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
-
+    wnd.run_frame_tasks();
     let mut records = event_record.borrow_mut();
     assert_eq!(records[0].btns.bits().count_ones(), 1);
     assert_eq!(records[0].pos, (1., 1.).into());
@@ -352,12 +351,12 @@ mod tests {
 
   #[test]
   fn mouse_buttons() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } }.into(),
+      fn_widget! { @MockBox { size: Size::new(100., 30.) } }.into(),
     );
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
@@ -370,6 +369,7 @@ mod tests {
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
+    wnd.run_frame_tasks();
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -378,6 +378,7 @@ mod tests {
       button: MouseButton::Right,
       modifiers: ModifiersState::default(),
     });
+    wnd.run_frame_tasks();
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
@@ -385,6 +386,7 @@ mod tests {
       position: (1, 1).into(),
       modifiers: ModifiersState::default(),
     });
+    wnd.run_frame_tasks();
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -393,6 +395,7 @@ mod tests {
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
+    wnd.run_frame_tasks();
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
@@ -401,7 +404,7 @@ mod tests {
       button: MouseButton::Right,
       modifiers: ModifiersState::default(),
     });
-
+    wnd.run_frame_tasks();
     let records = event_record.borrow();
     assert_eq!(records.len(), 3);
 
@@ -417,7 +420,7 @@ mod tests {
   #[cfg(not(target_os = "macos"))]
   #[test]
   fn different_device_mouse() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
@@ -435,7 +438,7 @@ mod tests {
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
-
+    wnd.run_frame_tasks();
     assert_eq!(event_record.borrow().len(), 1);
 
     // A mouse press/release emit during another mouse's press will be ignored.
@@ -459,6 +462,7 @@ mod tests {
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
+    wnd.run_frame_tasks();
     assert_eq!(event_record.borrow().len(), 1);
 
     #[allow(deprecated)]
@@ -467,7 +471,7 @@ mod tests {
       position: (1, 1).into(),
       modifiers: ModifiersState::default(),
     });
-
+    wnd.run_frame_tasks();
     // but cursor move processed.
     assert_eq!(event_record.borrow().len(), 2);
     assert_eq!(event_record.borrow().len(), 2);
@@ -480,27 +484,26 @@ mod tests {
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
-
+    wnd.run_frame_tasks();
     assert_eq!(event_record.borrow().len(), 3);
   }
 
   #[test]
   fn cancel_bubble() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<WidgetId>>>);
     impl Compose for EventRecord {
       fn compose(this: State<Self>) -> Widget {
-        widget! {
-          states { this: this.into_writable() }
-          MockBox {
+        fn_widget! {
+          @MockBox {
             size: INFINITY_SIZE,
-            on_pointer_down: move |e| { this.0.borrow_mut().push(e.current_target()); },
+            on_pointer_down: move |e| { $this.0.borrow_mut().push(e.current_target()); },
 
-            MockBox {
+            @MockBox {
               size: Size::new(100., 30.),
               on_pointer_down: move |e| {
-                this.0.borrow_mut().push(e.current_target());
+                $this.0.borrow_mut().push(e.current_target());
                 e.stop_propagation();
               }
             }
@@ -523,13 +526,13 @@ mod tests {
       button: MouseButton::Left,
       modifiers: ModifiersState::default(),
     });
-
+    wnd.run_frame_tasks();
     assert_eq!(event_record.borrow().len(), 1);
   }
 
   #[test]
   fn enter_leave() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     #[derive(Default)]
     struct EnterLeave {
@@ -539,17 +542,16 @@ mod tests {
 
     impl Compose for EnterLeave {
       fn compose(this: State<Self>) -> Widget {
-        widget! {
-          states { this: this.into_writable() }
-          MockBox {
+        fn_widget! {
+          @MockBox {
             size: INFINITY_SIZE,
-            on_pointer_enter: move |_| { this.enter.borrow_mut().push(2); },
-            on_pointer_leave: move |_| { this.leave.borrow_mut().push(2); },
-            MockBox {
+            on_pointer_enter: move |_| { $this.enter.borrow_mut().push(2); },
+            on_pointer_leave: move |_| { $this.leave.borrow_mut().push(2); },
+            @MockBox {
               margin: EdgeInsets::all(4.),
               size: INFINITY_SIZE,
-              on_pointer_enter: move |_| { this.enter.borrow_mut().push(1); },
-              on_pointer_leave: move |_| { this.leave.borrow_mut().push(1); }
+              on_pointer_enter: move |_| { $this.enter.borrow_mut().push(1); },
+              on_pointer_leave: move |_| { $this.leave.borrow_mut().push(1); }
             }
           }
         }
@@ -572,6 +574,7 @@ mod tests {
       position: (10, 10).into(),
       modifiers: ModifiersState::default(),
     });
+    wnd.run_frame_tasks();
     assert_eq!(&*enter_event.borrow(), &[2, 1]);
 
     // leave to parent
@@ -581,6 +584,7 @@ mod tests {
       position: (99, 99).into(),
       modifiers: ModifiersState::default(),
     });
+    wnd.run_frame_tasks();
     assert_eq!(&*leave_event.borrow(), &[1]);
 
     // move in same widget,
@@ -591,6 +595,7 @@ mod tests {
       position: (99, 99).into(),
       modifiers: ModifiersState::default(),
     });
+    wnd.run_frame_tasks();
     assert_eq!(&*enter_event.borrow(), &[2, 1]);
     assert_eq!(&*leave_event.borrow(), &[1]);
 
@@ -601,7 +606,7 @@ mod tests {
       position: (999, 999).into(),
       modifiers: ModifiersState::default(),
     });
-
+    wnd.run_frame_tasks();
     assert_eq!(&*leave_event.borrow(), &[1, 2]);
 
     // leave event trigger by window left.
@@ -614,16 +619,17 @@ mod tests {
     });
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorLeft { device_id });
+    wnd.run_frame_tasks();
     assert_eq!(&*leave_event.borrow(), &[1, 2]);
   }
 
   #[test]
   fn capture_click() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let click_path = Stateful::new(vec![]) as Stateful<Vec<usize>>;
     let w = widget! {
-      states { click_path: click_path.clone() }
+      states { click_path: click_path.clone_stateful() }
       MockBox {
         size: Size::new(100., 100.),
         on_tap: move |_| (*click_path).push(4),
@@ -663,7 +669,7 @@ mod tests {
       button: MouseButton::Left,
       modifiers,
     });
-
+    wnd.run_frame_tasks();
     {
       let clicked = click_path.state_ref();
       assert_eq!(*clicked, [1, 2, 3, 4]);
@@ -672,11 +678,11 @@ mod tests {
 
   #[test]
   fn click() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let click_path = Stateful::new(0);
     let w = widget! {
-      states { click_path: click_path.clone() }
+      states { click_path: click_path.clone_stateful() }
       MockMulti {
         on_tap: move |_| *click_path += 1,
         MockBox {
@@ -715,6 +721,7 @@ mod tests {
       modifiers,
     });
 
+    wnd.run_frame_tasks();
     {
       let mut clicked = click_path.state_ref();
       assert_eq!(*clicked, 2);
@@ -747,7 +754,7 @@ mod tests {
       button: MouseButton::Left,
       modifiers,
     });
-
+    wnd.run_frame_tasks();
     {
       let clicked = click_path.state_ref();
       assert_eq!(*clicked, 1);
@@ -756,7 +763,7 @@ mod tests {
 
   #[test]
   fn focus_change_by_event() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let w = widget! {
       MockMulti {
@@ -817,7 +824,7 @@ mod tests {
 
   #[test]
   fn fix_hit_out_window() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let w = MockBox { size: INFINITY_SIZE };
     let mut wnd = TestWindow::new(w);
@@ -831,7 +838,7 @@ mod tests {
 
   #[test]
   fn hit_test_case() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     fn normal_mode_search() {
       struct T {

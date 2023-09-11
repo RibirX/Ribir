@@ -14,10 +14,10 @@ use ribir_core::prelude::*;
 /// # use ribir_widgets::prelude::*;
 ///
 /// // only single headline text
-/// widget! {
-///   Lists {
-///     ListItem {
-///       HeadlineText(Label::new("One line list item"))
+/// fn_widget! {
+///   @Lists {
+///     @ListItem {
+///       @{ HeadlineText(Label::new("One line list item")) }
 ///     }
 ///   }
 /// };
@@ -29,11 +29,11 @@ use ribir_core::prelude::*;
 /// # use ribir_widgets::prelude::*;
 ///
 /// // single headline text and supporting text
-/// widget! {
-///   Lists {
-///     ListItem {
-///       HeadlineText(Label::new("headline text"))
-///       SupportingText(Label::new("supporting text"))
+/// fn_widget! {
+///   @Lists {
+///     @ListItem {
+///       @ { HeadlineText(Label::new("headline text")) }
+///       @ { SupportingText(Label::new("supporting text")) }
 ///     }
 ///   }
 /// };
@@ -44,27 +44,27 @@ use ribir_core::prelude::*;
 /// # use ribir_core::prelude::*;
 /// # use ribir_widgets::prelude::*;
 ///
-/// widget! {
-///   Lists {
+/// fn_widget! {
+///   @Lists {
 ///     // use leading icon
-///     ListItem {
-///       Leading { svgs::CHECK_BOX_OUTLINE_BLANK }
-///       HeadlineText(Label::new("headline text"))
+///     @ListItem {
+///       @Leading { @{ svgs::CHECK_BOX_OUTLINE_BLANK } }
+///       @HeadlineText(Label::new("headline text"))
 ///     }
 ///     // use leading label
-///     ListItem {
-///       Leading { Label::new("A") }
-///       HeadlineText(Label::new("headline text"))
+///     @ListItem {
+///       @Leading { @{ Label::new("A") } }
+///       @HeadlineText(Label::new("headline text"))
 ///     }
 ///     // use leading custom widget
-///     ListItem {
-///       Leading {
-///         CustomEdgeWidget(widget! {
-///           Container {
+///     @ListItem {
+///       @Leading {
+///         @CustomEdgeWidget(
+///           @Container {
 ///             size: Size::splat(40.),
 ///             background: Color::YELLOW,
-///           }
-///         }.into())
+///           }.into()
+///         )
 ///       }
 ///     }
 ///   }
@@ -76,28 +76,28 @@ use ribir_core::prelude::*;
 /// # use ribir_core::prelude::*;
 /// # use ribir_widgets::prelude::*;
 ///
-/// widget! {
-///   Lists {
+/// fn_widget! {
+///   @Lists {
 ///     // use trailing icon
-///     ListItem {
-///       HeadlineText(Label::new("headline text"))
-///       Trailing { svgs::CHECK_BOX_OUTLINE_BLANK }
+///     @ListItem {
+///       @HeadlineText(Label::new("headline text"))
+///       @Trailing { @{ svgs::CHECK_BOX_OUTLINE_BLANK } }
 ///     }
 ///     // use trailing label
-///     ListItem {
-///       HeadlineText(Label::new("headline text"))
-///       Trailing { Label::new("A") }
+///     @ListItem {
+///       @HeadlineText(Label::new("headline text"))
+///       @Trailing { @{ Label::new("A") } }
 ///     }
 ///     // use trailing custom widget
-///     ListItem {
-///       HeadlineText(Label::new("headline text"))
-///       Trailing {
-///         CustomEdgeWidget(widget! {
-///           Container {
+///     @ListItem {
+///       @HeadlineText(Label::new("headline text"))
+///       @Trailing {
+///         @CustomEdgeWidget(
+///           @Container {
 ///             size: Size::splat(40.),
 ///             background: Color::YELLOW,
-///           }
-///         }.into())
+///           }.into()
+///         )
 ///       }
 ///     }
 ///   }
@@ -109,14 +109,14 @@ use ribir_core::prelude::*;
 /// # use ribir_core::prelude::*;
 /// # use ribir_widgets::prelude::*;
 ///
-/// widget! {
-///   Lists {
-///     ListItem {
-///       HeadlineText(Label::new("One line list item"))
+/// fn_widget! {
+///   @Lists {
+///     @ListItem {
+///       @ { HeadlineText(Label::new("One line list item")) }
 ///     }
-///     Divider {}
-///     ListItem {
-///       HeadlineText(Label::new("One line list item"))
+///     @Divider {}
+///     @ListItem {
+///       @ { HeadlineText(Label::new("One line list item")) }
 ///     }
 ///   }
 /// };
@@ -124,7 +124,7 @@ use ribir_core::prelude::*;
 #[derive(Declare, Declare2)]
 pub struct Lists;
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub struct ListsDecorator {}
 impl ComposeDecorator for ListsDecorator {
   type Host = Widget;
@@ -136,10 +136,10 @@ impl ComposeChild for Lists {
   type Child = Vec<Widget>;
 
   fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      ListsDecorator {
-        Column {
-          Multi::new(child)
+    fn_widget! {
+      @ListsDecorator {
+        @Column {
+          @ { Multi::new(child) }
         }
       }
     }
@@ -197,72 +197,58 @@ impl EdgeWidget {
       poster,
       custom,
     } = config;
-    match self {
-      EdgeWidget::Icon(w) => widget! {
-        DynWidget {
-          dyns: icon.gap.map(|margin| Margin { margin }),
-          Icon {
-            size: icon.size,
-            widget::from(w)
-          }
-        }
-      }
-      .into(),
-      EdgeWidget::Text(w) => widget! {
-        DynWidget {
-          dyns: text.gap.map(|margin| Margin { margin }),
-          widget!{
-            states { label: w.into_readonly() }
-            Text {
-              text: label.0.clone(),
+    fn_widget! {
+      let w: Widget = match self {
+        EdgeWidget::Icon(w) => {
+          let margin = icon.gap.map(|margin| Margin { margin });
+          @ $margin {
+            @Icon {
+              size: icon.size,
+              @ { w }
+            }
+          }.into()
+        },
+        EdgeWidget::Text(mut label) => {
+          let margin =  text.gap.map(|margin| Margin { margin });
+          @ $margin {
+            @Text {
+              text: $label.0.clone(),
               text_style: text.style.clone(),
               foreground: text.foreground.clone(),
             }
-          }
-        }
-      }
-      .into(),
-      EdgeWidget::Avatar(w) => widget! {
-        DynWidget {
-          dyns: avatar.gap.map(|margin| Margin { margin }),
-          widget::from(w)
-        }
-      }
-      .into(),
-      EdgeWidget::Image(w) => widget! {
-        DynWidget {
-          dyns: image.gap.map(|margin| Margin { margin }),
-          SizedBox {
-            size: image.size,
-            DynWidget {
-              box_fit: BoxFit::None,
-              dyns: w
+          }.into()
+        },
+        EdgeWidget::Avatar(w) => {
+          let margin = avatar.gap.map(|margin| Margin { margin });
+          @ $margin { @ { w }}.into()
+        },
+        EdgeWidget::Image(w) => {
+          let margin = image.gap.map(|margin| Margin { margin });
+          @ $margin {
+            @SizedBox {
+              size: image.size,
+              @ $w { box_fit: BoxFit::None }
             }
-          }
-        }
-      }
-      .into(),
-      EdgeWidget::Poster(w) => widget! {
-        DynWidget {
-          dyns: poster.gap.map(|margin| Margin { margin }),
-          SizedBox {
-            size: poster.size,
-            DynWidget {
-              box_fit: BoxFit::None,
-              dyns: w.0
+          }.into()
+        },
+        EdgeWidget::Poster(w) => {
+          let margin = poster.gap.map(|margin| Margin { margin });
+          let w = w.0;
+          @ $margin {
+            @ SizedBox {
+              size: poster.size,
+              @ $w { box_fit: BoxFit::None }
             }
-          }
-        }
-      }
-      .into(),
-      EdgeWidget::Custom(w) => widget! {
-        DynWidget {
-          dyns: custom.gap.map(|margin| Margin { margin }),
-          widget::from(w.0)
-        }
-      }
-      .into(),
+          }.into()
+        },
+        EdgeWidget::Custom(w) => {
+          let margin = custom.gap.map(|margin| Margin { margin });
+          @$margin { @ { w.0 }}.into()
+        },
+      };
+      w
     }
+    .into()
   }
 }
 
@@ -270,16 +256,16 @@ impl EdgeWidget {
 pub struct ListItemTml {
   headline: State<HeadlineText>,
   supporting: Option<State<SupportingText>>,
-  leading: Option<FatObj<SinglePair<Leading, EdgeWidget>>>,
-  trailing: Option<FatObj<SinglePair<Trailing, EdgeWidget>>>,
+  leading: Option<SinglePair<FatObj<Leading>, EdgeWidget>>,
+  trailing: Option<SinglePair<FatObj<Trailing>, EdgeWidget>>,
 }
 
 impl ComposeChild for ListItem {
   type Child = ListItemTml;
 
-  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     let ListItemTml {
-      mut headline,
+      headline,
       supporting,
       leading,
       trailing,
@@ -295,7 +281,7 @@ impl ComposeChild for ListItem {
         leading_config,
         trailing_config,
         item_align,
-      } = ListItemStyle::of(ctx).clone();
+      } = ListItemStyle::of(ctx);
 
       let padding = padding_style.map(|padding| Padding { padding });
       let label_gap = label_gap.map(|padding| Padding { padding });
@@ -308,8 +294,9 @@ impl ComposeChild for ListItem {
             align_items: pipe!(item_align($this.line_number)),
             @{
               leading.map(|w| {
-                let (SinglePair { child,.. }, builtin) = w.unzip();
-                builtin.compose_with_host(child.compose_with_style(leading_config), ctx!())
+                let (leading, widget) = w.unzip();
+                let (_, builtin)  = leading.unzip();
+                builtin.compose_with_host(widget.compose_with_style(leading_config), ctx!())
               })
             }
             @Expanded {
@@ -318,7 +305,7 @@ impl ComposeChild for ListItem {
                 @Column {
                   @Text {
                     text: pipe!($headline.0.0.clone()),
-                    foreground: palette.on_surface().clone(),
+                    foreground: palette.on_surface(),
                     text_style: headline_style,
                   }
                   @{ supporting.map(|mut supporting|  {
@@ -333,7 +320,7 @@ impl ComposeChild for ListItem {
                       } ,
                       @Text {
                         text: pipe!($supporting.0.0.clone()),
-                        foreground:  palette.on_surface_variant().clone(),
+                        foreground:  palette.on_surface_variant(),
                         text_style: supporting_style,
                       }
                     }
@@ -341,12 +328,11 @@ impl ComposeChild for ListItem {
                 }
               }
             }
-            @{
-              trailing.map(|w| {
-                let (SinglePair { child,.. }, builtin) = w.unzip();
-                builtin.compose_with_host(child.compose_with_style(trailing_config), ctx!())
-              })
-            }
+            @{ trailing.map(|w| {
+              let (trailing, widget) = w.unzip();
+              let (_, builtin)  = trailing.unzip();
+              builtin.compose_with_host(widget.compose_with_style(trailing_config), ctx!())
+            })}
           }
         }
       }

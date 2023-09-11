@@ -1,6 +1,6 @@
 use ribir::prelude::*;
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 struct P;
 
 struct ChildA;
@@ -20,7 +20,7 @@ impl ComposeChild for P {
   fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
 }
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 struct P2;
 
 #[derive(Template)]
@@ -32,7 +32,7 @@ impl ComposeChild for P2 {
   fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
 }
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 struct P3;
 
 #[derive(Template)]
@@ -50,43 +50,43 @@ impl ComposeChild for P3 {
 
 #[test]
 fn syntax_pass() {
-  let _no_care_order = widget! {
-    P {
-      self::ChildC
-      self::ChildA
-      self::ChildB
+  let _no_care_order = fn_widget! {
+    @P {
+      @{self::ChildC}
+      @{self::ChildA}
+      @{self::ChildB}
     }
   };
-  let _omit_option = widget! {
-    P {
-      self::ChildA
+  let _omit_option = fn_widget! {
+    @P {
+      @{self::ChildA}
     }
   };
 }
 
 #[test]
 fn tuple_struct_template_syntax_pass() {
-  let _no_care_order = widget! {
-    P2 {
-      self::ChildC
-      self::ChildA
-      self::ChildB
+  let _no_care_order = fn_widget! {
+    @P2 {
+      @{ self::ChildC }
+      @{ self::ChildA }
+      @{ self::ChildB }
     }
   };
-  let _omit_option = widget! {
-    P2 { self::ChildA }
+  let _omit_option = fn_widget! {
+    @P2 { @{self::ChildA} }
   };
 }
 
 #[test]
 fn enum_template() {
-  let _a = widget! {
-    P3 { self::ChildA }
+  let _a = fn_widget! {
+    @P3 { @{ self::ChildA } }
   };
-  let _b = widget! {
-    P { self::ChildB }
+  let _b = fn_widget! {
+    @P { @{ self::ChildB } }
   };
-  let _c = widget! {
-    P { self::ChildC }
+  let _c = fn_widget! {
+    @P { @{ self::ChildC } }
   };
 }

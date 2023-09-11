@@ -531,12 +531,12 @@ impl FocusManager {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::*;
+  use crate::{reset_test_env, test_helper::*};
   use std::{cell::RefCell, rc::Rc};
 
   #[test]
   fn two_auto_focus() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     // two auto focus widget
     let size = Size::zero();
@@ -560,7 +560,7 @@ mod tests {
 
   #[test]
   fn on_auto_focus() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
     // one auto focus widget
     let size = Size::zero();
     let widget = widget! {
@@ -585,7 +585,7 @@ mod tests {
 
   #[test]
   fn tab_index() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let size = Size::zero();
     let widget = widget! {
@@ -648,7 +648,7 @@ mod tests {
 
   #[test]
   fn focus_event() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     #[derive(Debug, Default)]
     struct EmbedFocus {
@@ -657,20 +657,35 @@ mod tests {
 
     impl Compose for EmbedFocus {
       fn compose(this: State<Self>) -> Widget {
-        widget! {
-          states { this: this.into_writable() }
-          MockBox {
+        fn_widget! {
+          @MockBox {
             size: INFINITY_SIZE,
-            on_focus: move |_| { this.log.borrow_mut().push("focus parent"); },
-            on_blur: move |_| { this.log.borrow_mut().push("blur parent"); },
-            on_focus_in: move |_| { this.log.borrow_mut().push("focusin parent"); },
-            on_focus_out: move |_| { this.log.borrow_mut().push("focusout parent"); },
-            MockBox {
+            on_focus: move |_| {
+              $this.log.borrow_mut().push("focus parent");
+            },
+            on_blur: move |_| {
+              $this.log.borrow_mut().push("blur parent");
+            },
+            on_focus_in: move |_| {
+              $this.log.borrow_mut().push("focusin parent");
+            },
+            on_focus_out: move |_| {
+              $this.log.borrow_mut().push("focusout parent");
+            },
+            @MockBox {
               size: Size::zero(),
-              on_focus: move |_| { this.log.borrow_mut().push("focus child"); },
-              on_blur: move |_| { this.log.borrow_mut().push("blur child"); },
-              on_focus_in: move |_| { this.log.borrow_mut().push("focusin child"); },
-              on_focus_out: move |_| { this.log.borrow_mut().push("focusout child"); },
+              on_focus: move |_| {
+                $this.log.borrow_mut().push("focus child");
+              },
+              on_blur: move |_| {
+                $this.log.borrow_mut().push("blur child");
+              },
+              on_focus_in: move |_| {
+                $this.log.borrow_mut().push("focusin child");
+              },
+              on_focus_out: move |_| {
+                $this.log.borrow_mut().push("focusout child");
+              },
             }
           }
         }
@@ -710,18 +725,18 @@ mod tests {
 
   #[test]
   fn dynamic_focus() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let visible = Stateful::new(Some(()));
-    let w = widget! {
-      states { visible: visible.clone_stateful() }
-      MockMulti{
-        Option::map(*visible, |_| widget!{
-          MockBox {
+    let c_visible = visible.clone_writer();
+    let w = fn_widget! {
+      @MockMulti{
+        @ { pipe! {
+          $visible.map(|_| @MockBox {
             size: Size::default(),
             on_tap: move |_| {},
-          }
-        })
+          })}
+        }
       }
     };
 
@@ -730,10 +745,10 @@ mod tests {
 
     wnd.draw_frame();
 
-    *visible.state_ref() = None;
+    *c_visible.write() = None;
     wnd.draw_frame();
 
-    *visible.state_ref() = Some(());
+    *c_visible.write() = Some(());
     wnd.draw_frame();
 
     assert_eq!(wnd.focus_mgr.borrow().focusing(), focus_id);
@@ -741,7 +756,7 @@ mod tests {
 
   #[test]
   fn scope_node_request_focus() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let w = widget! {
       MockMulti{

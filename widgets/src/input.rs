@@ -96,40 +96,31 @@ declare_writer!(TextAreaWriter, TextArea);
 impl ComposeChild for Input {
   type Child = Option<State<Placeholder>>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
-    widget! {
-      init ctx => {
-        let frame_scheduler = ctx.window().frame_scheduler();
-      }
-      states {
-        this: this.into_writable(),
-      }
-      FocusScope {
-        ConstrainedBox {
-          clamp: size_clamp(&this.style, Some(1.), this.size),
-          TextEditorArea {
-            id: area,
-            text: this.text.clone(),
-            style: this.style.clone(),
-            caret: this.caret().clone(),
-            multi_line: false,
-            auto_wrap: false,
-
-            widget::from(placeholder)
+    fn_widget! {
+      let mut area = @TextEditorArea {
+        text: pipe!($this.text.clone()),
+        style: pipe!($this.style.clone()),
+        caret: pipe!(*$this.caret()),
+        multi_line: false,
+        auto_wrap: false,
+      };
+      area.modifies()
+        .delay(Duration::ZERO, ctx!().window().frame_scheduler())
+        .subscribe(move |_| {
+          let mut this = $this.silent();
+          let area = $area;
+          if area.caret != this.caret {
+            this.caret = area.caret;
           }
+          if area.text != this.text {
+            this.text = area.text.clone();
+          }
+        });
+      @FocusScope {
+        @ConstrainedBox {
+          clamp: pipe!(size_clamp(&$this.style, Some(1.), $this.size)),
+          @$area { @{ placeholder }}
         }
-      }
-      finally {
-        let_watch!(area.clone_stateful())
-          .delay(Duration::ZERO, frame_scheduler)
-          .subscribe(move |area| {
-            let area = area.state_ref();
-            if area.caret != this.caret {
-              this.silent().caret = area.caret.clone();
-            }
-            if area.text != this.text {
-              this.silent().text = area.text.clone();
-            }
-          });
       }
     }
     .into()
@@ -148,40 +139,31 @@ impl CustomStyle for TextAreaStyle {
 impl ComposeChild for TextArea {
   type Child = Option<State<Placeholder>>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
-    widget! {
-      init ctx => {
-        let frame_scheduler = ctx.window().frame_scheduler();
-      }
-      states {
-        this: this.into_writable(),
-      }
-      FocusScope {
-        ConstrainedBox {
-          clamp: size_clamp(&this.style, this.rows, this.cols),
-          TextEditorArea {
-            id: area,
-            text: this.text.clone(),
-            style: this.style.clone(),
-            caret: this.caret.clone(),
-            multi_line: true,
-            auto_wrap: no_watch!(this.auto_wrap),
-
-            widget::from(placeholder)
+    fn_widget! {
+      let mut area = @TextEditorArea {
+        text: pipe!($this.text.clone()),
+        style: pipe!($this.style.clone()),
+        caret: pipe!($this.caret),
+        multi_line: true,
+        auto_wrap: $this.auto_wrap,
+      };
+      area.modifies()
+        .delay(Duration::ZERO, ctx!().window().frame_scheduler())
+        .subscribe(move |_| {
+          let mut this = $this.silent();
+          let mut area = $area;
+          if area.caret != this.caret {
+            this.caret = area.caret;
           }
+          if area.text != this.text {
+            this.text = area.text.clone();
+          }
+        });
+      @FocusScope {
+        @ConstrainedBox {
+          clamp: pipe!(size_clamp(&$this.style, $this.rows, $this.cols)),
+          @$area { @{ placeholder }}
         }
-      }
-      finally {
-        let_watch!(area.clone_stateful())
-          .delay(Duration::ZERO, frame_scheduler)
-          .subscribe(move |area| {
-            let area = area.state_ref();
-            if area.caret != this.caret {
-              this.silent().caret = area.caret.clone();
-            }
-            if area.text != this.text {
-              this.silent().text = area.text.clone();
-            }
-          });
       }
     }
     .into()

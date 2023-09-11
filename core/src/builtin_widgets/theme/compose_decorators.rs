@@ -90,10 +90,10 @@ mod tests {
     theme
       .compose_decorators
       .override_compose_decorator::<Size100Style>(|_, host| {
-        widget! {
-          MockBox {
+        fn_widget! {
+          @MockBox {
             size: Size::new(100., 100.),
-            DynWidget { dyns: host }
+            @ { host }
           }
         }
         .into()

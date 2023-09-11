@@ -29,7 +29,7 @@ pub struct ScrollableWidget {
 
 impl ComposeChild for ScrollableWidget {
   type Child = Widget;
-  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     fn_widget! {
       let mut view = @UnconstrainedBox {
         dir: pipe!(match $this.get_scrollable() {
@@ -40,21 +40,21 @@ impl ComposeChild for ScrollableWidget {
         clamp_dim: ClampDim::MAX_SIZE,
       };
 
-    let mut child = @ $child {
-      left_anchor: pipe!($this.get_scroll_pos().x),
-      top_anchor: pipe!($this.get_scroll_pos().y),
-    };
+      let mut child = @ $child {
+        left_anchor: pipe!($this.get_scroll_pos().x),
+        top_anchor: pipe!($this.get_scroll_pos().y),
+      };
 
-    watch!($child.layout_size())
-      .distinct_until_changed()
-      .subscribe(move |v| $this.set_content_size(v));
-    watch!($view.layout_size())
-      .distinct_until_changed()
-      .subscribe(move |v| $this.set_page(v));
+      watch!($child.layout_size())
+        .distinct_until_changed()
+        .subscribe(move |v| $this.write().set_content_size(v));
+      watch!($view.layout_size())
+        .distinct_until_changed()
+        .subscribe(move |v| $this.write().set_page(v));
 
       @Clip {
         @ $view {
-          on_wheel: move |e| $this.validate_scroll(Point::new(e.delta_x, e.delta_y)),
+          on_wheel: move |e| $this.write().validate_scroll(Point::new(e.delta_x, e.delta_y)),
           @ { child }
         }
       }

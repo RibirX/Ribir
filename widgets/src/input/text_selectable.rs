@@ -5,7 +5,7 @@ use crate::layout::{Stack, StackFit};
 use crate::prelude::Text;
 use ribir_core::prelude::*;
 
-#[derive(Declare, Default)]
+#[derive(Declare, Declare2, Default)]
 pub struct TextSelectable {
   #[declare(default)]
   pub caret: CaretState,
@@ -14,18 +14,18 @@ pub struct TextSelectable {
 }
 
 impl ComposeChild for TextSelectable {
-  type Child = State<Text>;
+  type Child = FatObj<State<Text>>;
   fn compose_child(this: State<Self>, text: Self::Child) -> Widget {
-    let this = this.into_writable();
-    widget! {
-      states {
-        this: this.clone(),
-        text: text.into_readonly(),
-      }
-      Stack {
-        id: host,
-        fit: StackFit::Passthrough,
+    fn_widget! {
+      let mut host = @Stack { fit: StackFit::Passthrough };
+      let mut selected = @SelectedText {
+        visible: pipe!($host.has_focus()),
+        rects: pipe!($this.selected_rect()),
+      };
+
+      @$host {
         on_pointer_move: move |e| {
+          let mut this = $this.write();
           if let CaretState::Selecting(begin, _) = this.caret {
             if e.point_type == PointerType::Mouse
               && e.mouse_buttons() == MouseButtons::PRIMARY {
@@ -37,9 +37,9 @@ impl ComposeChild for TextSelectable {
         },
         on_pointer_down: move |e| {
           let position = e.position();
-          let end = this.helper.caret_position_from_pos(position.x, position.y);
+          let end = $this.helper.caret_position_from_pos(position.x, position.y);
           let begin = if e.with_shift_key() {
-            match this.caret {
+            match $this.caret {
               CaretState::Caret(begin) |
               CaretState::Select(begin, _) |
               CaretState::Selecting(begin, _) => begin,
@@ -47,9 +47,10 @@ impl ComposeChild for TextSelectable {
           } else {
             end
           };
-          this.caret = CaretState::Selecting(begin, end);
+          $this.write().caret = CaretState::Selecting(begin, end);
         },
         on_pointer_up: move |_| {
+          let mut this = $this.write();
           if let CaretState::Selecting(begin, end) = this.caret {
             this.caret = if begin == end {
               CaretState::Caret(begin)
@@ -60,37 +61,22 @@ impl ComposeChild for TextSelectable {
         },
         on_double_tap: move |e| {
           let position = e.position();
-          let caret = this.helper.caret_position_from_pos(position.x, position.y);
-          let rg = select_word(&text.text, caret.cluster);
-          this.caret = CaretState::Select(
+          let caret = $this.helper.caret_position_from_pos(position.x, position.y);
+          let rg = select_word(&$text.text, caret.cluster);
+          $this.write().caret = CaretState::Select(
             CaretPosition { cluster: rg.start, position: None },
             CaretPosition { cluster: rg.end, position: None }
           );
         },
-
-        on_key_down: move |event| key_handle(&mut this, &text.text, event),
-        SelectedText {
-          id: selected,
-          visible: host.has_focus(),
-          rects: vec![],
-        }
-        DynWidget {
-          dyns: text.clone(),
-          on_performed_layout: move |ctx| {
-            let bound = ctx.layout_clamp().expect("layout info must exit in performed_layout");
-            this.helper.glyphs = Some(text.text_layout(
-              AppCtx::typography_store(),
-              bound.max,
-            ));
-            this.forget_modifies();
-          }
-        }
-      }
-      finally {
-        this.modifies()
-          .subscribe(move |_| {
-            selected.rects = this.selected_rect();
-          });
+        on_key_down: move |event| key_handle(&mut $this.write(), &$text.text, event),
+        on_performed_layout: move |e: &mut LifecycleEvent| {
+          let mut this = $this.write();
+          let bound = e.layout_clamp().expect("layout info must exit in performed_layout");
+          this.helper.glyphs = Some($text.text_layout(bound.max));
+          this.forget_modifies();
+        },
+        @ { selected }
+        @ { text }
       }
     }
     .into()
@@ -103,7 +89,7 @@ impl TextSelectable {
   fn selected_rect(&self) -> Vec<Rect> { self.helper.selection(&self.caret.select_range()) }
 }
 
-fn key_handle(this: &mut RefState<TextSelectable>, text: &CowArc<str>, event: &mut KeyboardEvent) {
+fn key_handle(this: &mut TextSelectable, text: &CowArc<str>, event: &mut KeyboardEvent) {
   let mut deal = false;
   if event.with_command_key() {
     deal = deal_with_command(this, text, event);
@@ -115,7 +101,7 @@ fn key_handle(this: &mut RefState<TextSelectable>, text: &CowArc<str>, event: &m
 }
 
 fn deal_with_command(
-  this: &mut RefState<TextSelectable>,
+  this: &mut TextSelectable,
   text: &CowArc<str>,
   event: &mut KeyboardEvent,
 ) -> bool {
@@ -146,7 +132,7 @@ fn is_move_by_word(event: &KeyboardEvent) -> bool {
   return event.with_ctrl_key();
 }
 
-fn deal_with_selection(this: &mut RefState<TextSelectable>, text: &str, event: &mut KeyboardEvent) {
+fn deal_with_selection(this: &mut TextSelectable, text: &str, event: &mut KeyboardEvent) {
   let old_caret = this.caret;
   match event.key {
     VirtualKeyCode::Left => {

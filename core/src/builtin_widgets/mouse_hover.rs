@@ -13,12 +13,10 @@ impl MouseHover {
 impl ComposeChild for MouseHover {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states {this: this.into_writable()}
-      DynWidget {
-        dyns: child,
-        on_pointer_enter: move |_| this.hover = true,
-        on_pointer_leave: move |_| this.hover = false,
+    fn_widget! {
+      @ $child {
+        on_pointer_enter: move |_| $this.write().hover = true,
+        on_pointer_leave: move |_| $this.write().hover = false,
       }
     }
     .into()

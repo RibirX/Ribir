@@ -26,7 +26,7 @@ impl CustomStyle for FilledButtonStyle {
   }
 }
 
-#[derive(Clone, Declare)]
+#[derive(Clone, Declare, Declare2)]
 pub struct FilledButtonDecorator {
   #[allow(unused)]
   pub button_type: ButtonType,
@@ -47,29 +47,29 @@ impl ComposeDecorator for FilledButtonDecorator {
 /// # use ribir_widgets::prelude::{FilledButton, Label};
 ///
 /// // only icon
-/// let filled_icon_button = widget! {
-///   FilledButton { svgs::ADD }
+/// let filled_icon_button = fn_widget! {
+///   @FilledButton { @{ svgs::ADD } }
 /// };
 ///
 /// // only label
-/// let filled_label_button = widget! {
-///   FilledButton { Label::new("filled button") }
+/// let filled_label_button = fn_widget! {
+///   @FilledButton { @{ Label::new("filled button") } }
 /// };
 ///
 /// // both icon and label
-/// let filled_button = widget! {
-///    FilledButton {
-///     svgs::ADD
-///     Label::new("filled button")
+/// let filled_button = fn_widget! {
+///    @FilledButton {
+///     @ { svgs::ADD }
+///     @ { Label::new("filled button") }
 ///   }
 /// };
 ///
 /// // use custom color
-/// let custom_color_button = widget! {
-///   FilledButton {
+/// let custom_color_button = fn_widget! {
+///   @FilledButton {
 ///     color: Color::RED,
-///     svgs::ADD
-///     Label::new("filled button")
+///     @ { svgs::ADD }
+///     @ { Label::new("filled button") }
 ///   }
 /// };
 /// ```
@@ -91,9 +91,8 @@ impl ComposeChild for FilledButton {
       (None, None) => panic!("Button content cannot be empty!"),
     };
 
-    widget! {
-      states { this: this.into_readonly() }
-      init ctx => {
+    fn_widget! {
+      @ {
         let FilledButtonStyle {
           height,
           icon_size,
@@ -102,26 +101,27 @@ impl ComposeChild for FilledButton {
           label_style,
           radius,
           padding_style,
-        } = FilledButtonStyle::of(ctx).clone();
+        } = FilledButtonStyle::of(ctx);
         let palette1 = Palette::of(ctx).clone();
         let palette2 = Palette::of(ctx).clone();
-      }
-      FilledButtonDecorator {
-        button_type,
-        color: this.color,
-        ButtonImpl {
-          height,
-          icon_size,
-          label_gap,
-          icon_pos,
-          label_style,
-          background_color: Brush::from(palette1.base_of(&this.color)),
-          foreground_color: Brush::from(palette2.on_of(&palette2.base_of(&this.color))),
-          radius,
-          border_style: None,
-          padding_style,
 
-          widget::from(child)
+        @FilledButtonDecorator {
+          button_type,
+          color: pipe!($this.color),
+          @ButtonImpl {
+            height,
+            icon_size,
+            label_gap,
+            icon_pos,
+            label_style,
+            background_color: pipe!(Brush::from(palette1.base_of(&$this.color))),
+            foreground_color: pipe!(Brush::from(palette2.on_of(&palette2.base_of(&$this.color)))),
+            radius,
+            border_style: None,
+            padding_style,
+
+            @ { child }
+          }
         }
       }
     }

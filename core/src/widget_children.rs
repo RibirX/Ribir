@@ -152,12 +152,13 @@ impl<W: MultiParent + 'static> BoxedMultiParent for W {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::*;
   use crate::widget::WidgetBuilder;
+  use crate::{reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
 
   #[test]
   fn compose_template_child() {
+    reset_test_env!();
     #[derive(Declare)]
     struct Page;
     #[derive(Declare, SingleChild)]
@@ -193,6 +194,8 @@ mod tests {
 
   #[test]
   fn compose_option_child() {
+    reset_test_env!();
+
     #[derive(Declare)]
     struct Parent;
     #[derive(Declare, SingleChild)]
@@ -215,16 +218,18 @@ mod tests {
 
   #[test]
   fn compose_option_dyn_parent() {
-    widget! {
-      DynWidget {
-        dyns: widget::then(true, || MockBox { size: Size::zero() }),
-        Void {}
-      }
+    reset_test_env!();
+
+    fn_widget! {
+      let p = Some(MockBox { size: Size::zero() });
+      @$p { @{ Void } }
     };
   }
 
   #[test]
   fn tuple_as_vec() {
+    reset_test_env!();
+
     #[derive(Declare)]
     struct A;
     #[derive(Declare)]
@@ -247,60 +252,61 @@ mod tests {
 
   #[test]
   fn expr_with_child() {
+    reset_test_env!();
+
     let size = Stateful::new(Size::zero());
+    let c_size = size.clone_reader();
     // with single child
-    let _e = widget! {
-      states { size: size.clone() }
-      DynWidget {
-        dyns: if size.area() > 0. {
-           MockBox { size: *size }
+    let _e = fn_widget! {
+      let p = pipe!{
+        if $c_size.area() > 0. {
+          MockBox { size: *$c_size }
         } else {
           MockBox { size: Size::new(1., 1.) }
-        },
-        MockBox { size: *size }
-      }
+        }
+      };
+      @$p { @MockBox { size: pipe!(*$c_size) } }
     };
+
     // with multi child
-    let _e = widget! {
-      DynWidget {
-        dyns: MockMulti {},
-        MockBox { size: Size::zero() }
-        MockBox { size: Size::zero() }
-        MockBox { size: Size::zero() }
+    let _e = fn_widget! {
+      @MockMulti {
+        @MockBox { size: Size::zero() }
+        @MockBox { size: Size::zero() }
+        @MockBox { size: Size::zero() }
       }
     };
 
+    let c_size = size.clone_reader();
     // option with single child
-    let _e = widget! {
-      states { size: size.clone() }
-      DynWidget {
-        dyns: widget::then(size.area() > 0., || MockBox { size: Size::zero() }),
-        MockBox { size: Size::zero() }
-      }
+    let _e = fn_widget! {
+      let p = pipe!(($c_size.area() > 0.).then(|| @MockBox { size: Size::zero() }));
+      @$p { @MockBox { size: Size::zero() } }
     };
 
     // option with `Widget`
-    let _e = widget! {
-      states { size: size }
-      DynWidget {
-        dyns: widget::then(size.area() > 0., || MockBox { size: Size::zero() }),
-        widget::from(Void)
-      }
+    let _e = fn_widget! {
+      let p = pipe!(($size.area() > 0.).then(|| @MockBox { size: Size::zero() }));
+      @$p { @ { Void }}
     };
   }
 
   #[test]
-  fn compose_const_dyn_option_widget() {
-    let _ = widget! {
-      MockBox {
+  fn compose_expr_option_widget() {
+    reset_test_env!();
+
+    let _ = fn_widget! {
+      @MockBox {
         size: ZERO_SIZE,
-        widget::then(true, || MockBox { size: Size::zero() })
+        @{ Some(@MockBox { size: Size::zero() })}
       }
     };
   }
 
   #[test]
   fn pair_to_pair() {
+    reset_test_env!();
+
     #[derive(Declare)]
     struct P;
 
@@ -316,6 +322,8 @@ mod tests {
 
   #[test]
   fn fix_multi_fill_for_pair() {
+    reset_test_env!();
+
     struct X;
     impl ComposeChild for X {
       type Child = WidgetOf<MockBox>;
@@ -328,50 +336,6 @@ mod tests {
     });
   }
 
-  fn dyns_compose_child() -> Widget {
-    #[derive(Declare)]
-    struct X;
-
-    impl ComposeChild for X {
-      type Child = MockBox;
-      fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into() }
-    }
-
-    let dyns = Stateful::new(DynWidget { dyns: Some(X) });
-    let size = Size::new(100., 200.);
-
-    ComposeChild::compose_child(State::<X>::from(dyns), MockBox { size })
-  }
-  widget_layout_test!(dyns_compose_child, width == 100., height == 200.,);
-
-  const COMPOSE_DYNS_CHILD_SIZE: Size = Size::new(100., 200.);
-  fn compose_dyns_child() -> Widget {
-    #[derive(Declare)]
-    struct AcceptStateChild;
-
-    impl ComposeChild for AcceptStateChild {
-      type Child = State<MockBox>;
-      fn compose_child(_: State<Self>, child: Self::Child) -> Widget { child.into() }
-    }
-
-    let trigger = Stateful::new(true);
-
-    widget! {
-      states { trigger: trigger }
-      AcceptStateChild {
-        DynWidget {
-          dyns: if *trigger {
-            MockBox { size: COMPOSE_DYNS_CHILD_SIZE }
-          } else {
-            MockBox { size: ZERO_SIZE }
-          }
-        }
-      }
-    }
-    .into()
-  }
-  widget_layout_test!(compose_dyns_child, size == COMPOSE_DYNS_CHILD_SIZE,);
-
   const FIX_OPTION_TEMPLATE_EXPECT_SIZE: Size = Size::new(100., 200.);
   fn fix_option_template() -> impl Into<Widget> {
     struct Field(String);
@@ -380,60 +344,20 @@ mod tests {
     pub struct ConfigTml {
       _field: Option<Field>,
     }
-    #[derive(Declare)]
+    #[derive(Declare, Declare2)]
     struct Host {}
 
     impl ComposeChild for Host {
       type Child = Option<ConfigTml>;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget {
-        widget! { MockBox { size: FIX_OPTION_TEMPLATE_EXPECT_SIZE } }.into()
+        fn_widget! { @MockBox { size: FIX_OPTION_TEMPLATE_EXPECT_SIZE } }.into()
       }
     }
 
-    widget! { Host { Field("test".into()) }}
+    fn_widget! { @Host { @{ Field("test".into()) } }}
   }
   widget_layout_test!(
     fix_option_template,
     { path = [0], size == FIX_OPTION_TEMPLATE_EXPECT_SIZE, }
   );
-
-  #[test]
-  fn compose_dyn_multi_child() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
-
-    struct A;
-
-    impl ComposeChild for A {
-      type Child = Vec<Widget>;
-
-      fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
-        FnWidget::new(move |ctx| MockMulti.with_child(Multi::new(child), ctx).build(ctx)).into()
-      }
-    }
-
-    let child = DynWidget { dyns: Some(Multi::new([Void])) };
-    let child = Stateful::new(child);
-    let cnt = Rc::new(RefCell::new(0));
-    let c_cnt = cnt.clone();
-    child
-      .modifies()
-      .subscribe(move |_| *c_cnt.borrow_mut() += 1);
-
-    let _ = TestWindow::new(FnWidget::new(|ctx| A.with_child(child, ctx).build(ctx)));
-    assert_eq!(*cnt.borrow(), 0);
-  }
-
-  #[test]
-  fn compose_multi_with_stateful_option() {
-    struct M;
-    impl ComposeChild for M {
-      type Child = Vec<Widget>;
-      fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
-    }
-
-    let _ = FnWidget::new(|ctx| {
-      let c = Stateful::new(DynWidget { dyns: Some(Some(Void)) });
-      M.with_child(c, ctx).build(ctx)
-    });
-  }
 }

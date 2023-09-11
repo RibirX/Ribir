@@ -200,6 +200,7 @@ impl Default for WidgetTree {
 mod tests {
   extern crate test;
   use crate::{
+    reset_test_env,
     test_helper::{MockBox, MockMulti, TestWindow},
     widget::widget_id::empty_node,
   };
@@ -215,23 +216,22 @@ mod tests {
 
   impl Compose for Recursive {
     fn compose(this: State<Self>) -> Widget {
-      widget! {
-        states { this: this.into_writable() }
-        MockMulti {
-          Multi::new((0..this.width)
-          .map(move |_| {
-            if this.depth > 1 {
-              Widget::from(
-                Recursive {
-                  width: this.width,
-                  depth: this.depth - 1,
-                }
-              )
-            } else {
-              Widget::from(MockBox { size: Size::new(10., 10.)})
-            }
-          }))
-        }
+      fn_widget! {
+        @MockMulti {
+          @{
+            pipe!(($this.width, $this.depth))
+              .map(|(width, depth)| {
+                let iter = (0..width).map(move |_| -> Widget {
+                  if depth > 1 {
+                    Recursive { width, depth: depth - 1 }.into()
+                  } else {
+                    MockBox { size: Size::new(10., 10.)}.into()
+                  }
+                });
+                Multi::new(iter)
+              })
+          }
+         }
       }
       .into()
     }
@@ -245,23 +245,21 @@ mod tests {
 
   impl Compose for Embed {
     fn compose(this: State<Self>) -> Widget {
-      widget! {
-        states { this: this.into_writable()}
-        MockMulti {
-          Multi::new((0..this.width - 1)
-          .map(move |_| {
-            MockBox { size: Size::new(10., 10.)}
-          }))
-          DynWidget {
-            dyns: if this.depth > 1 {
-              Widget::from(Embed {
-                width: this.width,
-                depth: this.depth - 1,
-              })
-            } else {
-              Widget::from(MockBox { size: Size::new(10., 10.)})
-            }
-          }
+      fn_widget! {
+        let recursive_child: Widget = if $this.depth > 1 {
+          let width = $this.width;
+          let depth = $this.depth - 1;
+          Embed { width, depth }.into()
+        } else {
+          MockBox { size: Size::new(10., 10.) }.into()
+        };
+        @MockMulti {
+          @{ pipe!{
+            let leafs = (0..$this.width - 1)
+              .map(|_| MockBox { size: Size::new(10., 10.)} );
+            Multi::new(leafs)
+          }}
+          @{ recursive_child }
         }
       }
       .into()
@@ -269,36 +267,36 @@ mod tests {
   }
 
   fn bench_recursive_inflate(width: usize, depth: usize, b: &mut Bencher) {
-    let wnd = TestWindow::new(Void {});
+    let mut wnd = TestWindow::new(Void {});
     b.iter(move || {
       wnd.set_content_widget(Recursive { width, depth }.into());
-      wnd.layout();
+      wnd.draw_frame();
     });
   }
 
   fn bench_recursive_repair(width: usize, depth: usize, b: &mut Bencher) {
     let w = Stateful::new(Recursive { width, depth });
-    let trigger = w.clone();
-    let wnd = TestWindow::new(w);
+    let trigger = w.clone_writer();
+    let mut wnd = TestWindow::new(w);
     b.iter(|| {
       {
-        let _: &mut Recursive = &mut trigger.state_ref();
+        let _ = trigger.write();
       }
-      wnd.layout();
+      wnd.draw_frame();
     });
   }
 
   #[test]
   fn fix_relayout_incorrect_clamp() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let expect_size = Size::new(20., 20.);
     let no_boundary_size = Stateful::new(INFINITY_SIZE);
-    let w = widget! {
-      states { size: no_boundary_size.clone() }
-      MockBox {
+    let c_size = no_boundary_size.clone_writer();
+    let w = fn_widget! {
+      @MockBox {
         size: expect_size,
-        MockBox { size: *size }
+        @MockBox { size: pipe!(*$no_boundary_size) }
       }
     };
     let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
@@ -309,7 +307,7 @@ mod tests {
     // when relayout the inner `MockBox`, its clamp should same with its previous
     // layout, and clamp its size.
     {
-      *no_boundary_size.state_ref() = INFINITY_SIZE;
+      *c_size.write() = INFINITY_SIZE;
     }
     wnd.draw_frame();
     let size = wnd.layout_info_by_path(&[0, 0]).unwrap().size.unwrap();
@@ -318,26 +316,29 @@ mod tests {
 
   #[test]
   fn fix_dropped_child_expr_widget() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let parent = Stateful::new(true);
     let child = Stateful::new(true);
-    let w = widget! {
-      states { parent: parent.clone(), child: child.clone() }
-      widget::then(*parent, || widget!{
-        MockBox {
-          size: Size::zero(),
-          widget::then(*child, || Void)
-        }
-      })
+    let c_p = parent.clone_writer();
+    let c_c = child.clone_writer();
+    let w = fn_widget! {
+      @ {
+        pipe!(*$parent).map(move |p|{
+          p.then(|| @MockBox {
+            size: Size::zero(),
+            @ { pipe!($child.then(|| Void)) }
+          })
+        })
+      }
     };
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
     {
-      *child.state_ref() = false;
-      *parent.state_ref() = false;
+      *c_c.write() = false;
+      *c_p.write() = false;
     }
 
     // fix crash here.
@@ -346,21 +347,17 @@ mod tests {
 
   #[test]
   fn fix_child_expr_widget_same_root_as_parent() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let trigger = Stateful::new(true);
-    let w = widget! {
-      states { trigger: trigger.clone() }
-      widget::then(*trigger, || widget!{
-        widget::then(*trigger, || Void)
-      })
-    };
+    let c_trigger = trigger.clone_writer();
+    let w = fn_widget! { @ { pipe!($trigger.then(|| Void)) }};
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
     {
-      *trigger.state_ref() = false;
+      *c_trigger.write() = false;
     }
 
     // fix crash here
@@ -373,7 +370,7 @@ mod tests {
   }
   #[test]
   fn drop_info_clear() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let post = Embed { width: 5, depth: 3 };
     let wnd = TestWindow::new(post);
@@ -393,8 +390,9 @@ mod tests {
   }
 
   #[bench]
-  fn inflate_5_x_1000(b: &mut Bencher) {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+  fn new_5_x_1000(b: &mut Bencher) {
+    reset_test_env!();
+
     let wnd = TestWindow::new(Void);
 
     b.iter(move || {
@@ -404,82 +402,96 @@ mod tests {
   }
 
   #[bench]
-  fn inflate_50_pow_2(b: &mut Bencher) {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+  fn new_50_pow_2(b: &mut Bencher) {
+    reset_test_env!();
+
     bench_recursive_inflate(50, 2, b);
   }
 
   #[bench]
-  fn inflate_100_pow_2(b: &mut Bencher) {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+  fn new_100_pow_2(b: &mut Bencher) {
+    reset_test_env!();
+
     bench_recursive_inflate(100, 2, b);
   }
 
   #[bench]
-  fn inflate_10_pow_4(b: &mut Bencher) {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+  fn new_10_pow_4(b: &mut Bencher) {
+    reset_test_env!();
+
     bench_recursive_inflate(10, 4, b);
   }
 
   #[bench]
-  fn inflate_10_pow_5(b: &mut Bencher) {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+  fn new_10_pow_5(b: &mut Bencher) {
+    reset_test_env!();
+
     bench_recursive_inflate(10, 5, b);
   }
 
   #[bench]
-  fn repair_5_x_1000(b: &mut Bencher) {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+  fn regen_5_x_1000(b: &mut Bencher) {
+    reset_test_env!();
+
     let post = Stateful::new(Embed { width: 5, depth: 1000 });
-    let trigger = post.clone();
+    let trigger = post.clone_writer();
     let wnd = TestWindow::new(post);
     let mut tree = wnd.widget_tree.borrow_mut();
 
     b.iter(|| {
       {
-        let _: &mut Embed = &mut trigger.state_ref();
+        let _ = trigger.write();
       }
       tree.layout(Size::new(512., 512.));
     });
   }
 
   #[bench]
-  fn repair_50_pow_2(b: &mut Bencher) {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+  fn regen_50_pow_2(b: &mut Bencher) {
+    reset_test_env!();
+
     bench_recursive_repair(50, 2, b);
   }
 
   #[bench]
-  fn repair_100_pow_2(b: &mut Bencher) {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+  fn regen_100_pow_2(b: &mut Bencher) {
+    reset_test_env!();
+
     bench_recursive_repair(100, 2, b);
   }
 
   #[bench]
-  fn repair_10_pow_4(b: &mut Bencher) {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+  fn regen_10_pow_4(b: &mut Bencher) {
+    reset_test_env!();
+
     bench_recursive_repair(10, 4, b);
   }
 
   #[bench]
-  fn repair_10_pow_5(b: &mut Bencher) {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+  fn regen_10_pow_5(b: &mut Bencher) {
+    reset_test_env!();
+
     bench_recursive_repair(10, 5, b);
   }
 
   #[test]
   fn perf_silent_ref_should_not_dirty_expr_widget() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let trigger = Stateful::new(1);
-    let widget = widget! {
-      states { trigger: trigger.clone() }
-      MockMulti {
-        Multi::new((0..3).map(move |_| if *trigger > 0 {
-          MockBox { size: Size::new(1., 1.)}
-        } else {
-          MockBox { size: Size::zero()}
-        }))
+    let c_trigger = trigger.clone_stateful();
+    let widget = fn_widget! {
+      @ MockMulti {
+        @{
+          pipe!(*$trigger).map(move |b| {
+            let size = if b > 0 {
+              Size::new(1., 1.)
+            } else {
+              Size::zero()
+            };
+            Multi::new((0..3).map(move |_| MockBox { size }))
+          })
+        }
       }
     };
 
@@ -487,37 +499,41 @@ mod tests {
     let mut tree = wnd.widget_tree.borrow_mut();
     tree.layout(Size::new(100., 100.));
     {
-      *trigger.silent_ref() = 2;
+      *c_trigger.write() = 2;
     }
     assert!(!tree.is_dirty())
   }
 
   #[test]
   fn draw_clip() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
+
     let win_size = Size::new(150., 50.);
 
-    let w1 = widget! {
-       MockMulti {
-        Multi::new((0..100).map(|_|
-          widget! { MockBox {
-           size: Size::new(150., 50.),
-           background: Color::BLUE,
-        }}))
-
+    let w1 = fn_widget! {
+       @MockMulti {
+        @ {
+          Multi::new((0..100).map(|_|
+            widget! { MockBox {
+            size: Size::new(150., 50.),
+            background: Color::BLUE,
+          }}))
+        }
     }};
     let mut wnd = TestWindow::new_with_size(w1, win_size);
     wnd.draw_frame();
 
     let len_100_widget = wnd.painter.borrow_mut().finish().len();
 
-    let w2 = widget! {
-      MockMulti {
-        Multi::new((0..1).map(|_|
-          widget! { MockBox {
-           size: Size::new(150., 50.),
-           background: Color::BLUE,
-        }}))
+    let w2 = fn_widget! {
+      @MockMulti {
+        @ {
+          Multi::new((0..1).map(|_|
+            widget! { MockBox {
+             size: Size::new(150., 50.),
+             background: Color::BLUE,
+          }}))
+        }
     }};
 
     let mut wnd = TestWindow::new(w2);

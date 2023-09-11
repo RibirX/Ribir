@@ -73,26 +73,25 @@ mod tests {
 
     impl Compose for Keys {
       fn compose(this: State<Self>) -> Widget {
-        widget! {
-          states { this: this.into_writable() }
-          MockBox {
+        fn_widget! {
+          @MockBox {
             size: Size::zero(),
             on_key_down_capture: move |key| {
-              this.0.borrow_mut().push(format!("key down capture {:?}", key.key));
+              $this.0.borrow_mut().push(format!("key down capture {:?}", key.key));
             },
             on_key_up_capture: move |key| {
-              this.0.borrow_mut().push(format!("key up capture {:?}", key.key));
+              $this.0.borrow_mut().push(format!("key up capture {:?}", key.key));
             },
-            MockBox {
+            @MockBox {
               size: Size::zero(),
               auto_focus: true,
               on_key_down: move |key| {
-                this.0
+                $this.0
                   .borrow_mut()
                   .push(format!("key down {:?}", key.key));
               },
               on_key_up: move |key| {
-                this.0.borrow_mut().push(format!("key up {:?}", key.key));
+                $this.0.borrow_mut().push(format!("key up {:?}", key.key));
               }
             }
           }
@@ -115,6 +114,8 @@ mod tests {
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key1, ElementState::Pressed));
     #[allow(deprecated)]
     wnd.processes_native_event(new_key_event(VirtualKeyCode::Key1, ElementState::Released));
+
+    wnd.run_frame_tasks();
 
     assert_eq!(
       &*keys.borrow(),

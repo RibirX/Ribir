@@ -24,7 +24,7 @@ impl CustomStyle for ButtonStyle {
   }
 }
 
-#[derive(Clone, Declare)]
+#[derive(Clone, Declare, Declare2)]
 pub struct ButtonDecorator {
   #[allow(unused)]
   pub button_type: ButtonType,
@@ -45,24 +45,24 @@ impl ComposeDecorator for ButtonDecorator {
 /// # use ribir_widgets::prelude::{Button, Label};
 ///
 /// // only icon
-/// let raw_icon_button = widget! {
-///   Button { svgs::ADD }
+/// let raw_icon_button = fn_widget! {
+///   @Button { @{ svgs::ADD } }
 /// };
 ///
 /// // only label
-/// let raw_label_button = widget! {
-///   Button { Label::new("raw button") }
+/// let raw_label_button = fn_widget! {
+///   @Button { @ { Label::new("raw button") } }
 /// };
 ///
 /// // use custom color
-/// let custom_color_button = widget! {
-///   Button {
+/// let custom_color_button = fn_widget! {
+///   @Button {
 ///     color: Color::RED,
-///     Label::new("raw button")
+///     @{ Label::new("raw button") }
 ///   }
 /// };
 /// ```
-#[derive(Declare, Default)]
+#[derive(Declare, Default, Declare2)]
 pub struct Button {
   #[declare(default=Palette::of(ctx).primary())]
   color: Color,
@@ -80,9 +80,8 @@ impl ComposeChild for Button {
       (None, None) => panic!("Button content cannot be empty!"),
     };
 
-    widget! {
-      states { this: this.into_readonly() }
-      init ctx => {
+    fn_widget! {
+      @ {
         let ButtonStyle {
           height,
           icon_size,
@@ -90,25 +89,26 @@ impl ComposeChild for Button {
           icon_pos,
           label_style,
           padding_style,
-        } = ButtonStyle::of(ctx).clone();
+        } = ButtonStyle::of(ctx);
         let palette = Palette::of(ctx).clone();
-      }
-      ButtonDecorator {
-        button_type,
-        color: this.color,
-        ButtonImpl {
-          height,
-          icon_size,
-          label_gap,
-          icon_pos,
-          label_style,
-          background_color: None,
-          foreground_color: Brush::from(palette.base_of(&this.color)),
-          radius: None,
-          border_style: None,
-          padding_style,
 
-          widget::from(child)
+        @ButtonDecorator {
+          button_type,
+          color: pipe!($this.color),
+          @ButtonImpl {
+            height,
+            icon_size,
+            label_gap,
+            icon_pos,
+            label_style,
+            background_color: None,
+            foreground_color: pipe!(Brush::from(palette.base_of(&$this.color))),
+            radius: None,
+            border_style: None,
+            padding_style,
+
+            @ { child }
+          }
         }
       }
     }

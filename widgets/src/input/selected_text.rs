@@ -1,7 +1,7 @@
 use crate::layout::{Container, Stack};
 use ribir_core::prelude::*;
 
-#[derive(Declare)]
+#[derive(Declare, Declare2)]
 pub(crate) struct SelectedText {
   pub(crate) rects: Vec<Rect>,
 }
@@ -20,26 +20,21 @@ impl CustomStyle for SelectedTextStyle {
 
 impl Compose for SelectedText {
   fn compose(this: State<Self>) -> Widget {
-    widget! {
-      states { this: this.into_readonly() }
-      init ctx => {
-        let color = SelectedTextStyle::of(ctx).brush.clone();
-      }
-      Stack {
-        Multi::new(
-          this.rects.iter().copied()
-          .map(|rc| {
-            let color = color.clone();
-            widget! {
-                Container {
-                  background: color,
-                  top_anchor: rc.origin.y,
-                  left_anchor: rc.origin.x,
-                  size: rc.size,
-                }
+    fn_widget! {
+      let color = SelectedTextStyle::of(ctx!()).brush;
+      @Stack {
+        @ { pipe!{
+          let color = color.clone();
+          let iter = $this.rects.clone().into_iter().map(move |rc| {
+            @Container {
+              background: color.clone(),
+              top_anchor: rc.origin.y,
+              left_anchor: rc.origin.x,
+              size: rc.size,
             }
-          }).collect::<Vec<_>>()
-        )
+          });
+          Multi::new(iter)
+        }}
       }
     }
     .into()

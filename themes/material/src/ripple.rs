@@ -4,7 +4,7 @@ use ribir_widgets::prelude::*;
 
 /// Widget use to do ripple animate as a visual feedback to user interactive.
 /// Usually for touch and mouse.
-#[derive(Declare, Debug)]
+#[derive(Declare, Debug, Declare2)]
 pub struct Ripple {
   /// The color of ripples.
   pub color: Color,
@@ -38,10 +38,10 @@ pub enum RippleBound {
 impl ComposeChild for Ripple {
   type Child = Widget;
 
-  fn compose_child(mut this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     fn_widget! {
       let mut container = @Stack { fit: StackFit::Passthrough };
-      let mut ripple_at = $this.ripple_at.clone_state();
+      let mut ripple_at = $this.ripple_at.clone_writer();
 
       let ripple_widget = pipe!(*$ripple_at)
         .map(move |launch_at| {
@@ -61,7 +61,7 @@ impl ComposeChild for Ripple {
           let mut ripper_enter = @Animate {
             transition: transitions::LINEAR.of(ctx!()),
             state: LerpFnState::new(
-              route_state!($ripple.path),
+              map_writer!($ripple.path),
               move |_, _, rate| {
                 let radius = Lerp::lerp(&0., &radius, rate);
                 Path::circle(launch_at, radius)
@@ -75,11 +75,11 @@ impl ComposeChild for Ripple {
             // the ripple used only once, so we unsubscribe it after the animate finished.
             .take(1)
             .subscribe(move |_| {
-              $ripple_at.take();
+              $ripple_at.write().take();
             });
 
 
-          let mut ripper_fade_out = route_state!($ripple.opacity)
+          let mut ripper_fade_out = map_writer!($ripple.opacity)
             .transition(transitions::EASE_OUT.of(ctx!()), ctx!());
 
           let bounded = $this.bounded;
@@ -95,7 +95,7 @@ impl ComposeChild for Ripple {
 
           Some(@IgnorePointer {
             delay_drop_until: pipe!(!$ripper_fade_out.is_running()),
-            on_disposed: move |_| $ripple.opacity = 0.,
+            on_disposed: move |_| $ripple.write().opacity = 0.,
             on_mounted: move |_| { ripper_enter.run(); },
             @Container {
               size: $container.layout_size(),
@@ -105,7 +105,7 @@ impl ComposeChild for Ripple {
       });
 
       @ $container {
-        on_pointer_down: move |e| *$ripple_at = if $this.center {
+        on_pointer_down: move |e| *$ripple_at.write() = if $this.center {
           let center = $container.layout_size() / 2.;
           Some(Point::new(center.width, center.height))
         } else {
@@ -121,5 +121,5 @@ impl ComposeChild for Ripple {
 
 impl Ripple {
   /// Manual launch a ripple animate at `pos`.
-  pub fn launch_at(&mut self, pos: Point) { *self.ripple_at.state_ref() = Some(pos); }
+  pub fn launch_at(&mut self, pos: Point) { *self.ripple_at.write() = Some(pos); }
 }

@@ -93,7 +93,6 @@ impl Window {
   pub fn processes_native_event(&self, event: WindowEvent) {
     let ratio = self.device_pixel_ratio() as f64;
     self.dispatcher.borrow_mut().dispatch(event, ratio);
-    self.run_frame_tasks();
   }
 
   /// Request switch the focus to next widget.

@@ -26,7 +26,7 @@ impl CustomStyle for FabButtonStyle {
   }
 }
 
-#[derive(Clone, Declare)]
+#[derive(Clone, Declare, Declare2)]
 pub struct FabButtonDecorator {
   #[allow(unused)]
   pub button_type: ButtonType,
@@ -47,33 +47,33 @@ impl ComposeDecorator for FabButtonDecorator {
 /// # use ribir_widgets::prelude::{FabButton, Label};
 ///
 /// // only icon
-/// let fab_icon_button = widget! {
-///   FabButton { svgs::ADD }
+/// let fab_icon_button = fn_widget! {
+///   @FabButton { @{ svgs::ADD } }
 /// };
 ///
 /// // only label
-/// let fab_label_button = widget! {
-///   FabButton { Label::new("fab button") }
+/// let fab_label_button = fn_widget! {
+///   @FabButton { @ { Label::new("fab button") } }
 /// };
 ///
 /// // both icon and label
-/// let fab_button = widget! {
-///    FabButton {
-///     svgs::ADD
-///     Label::new("fab button")
+/// let fab_button = fn_widget! {
+///    @FabButton {
+///     @ { svgs::ADD }
+///     @ { Label::new("fab button") }
 ///   }
 /// };
 ///
 /// // use custom color
-/// let custom_color_button = widget! {
-///   FabButton {
+/// let custom_color_button = fn_widget! {
+///   @FabButton {
 ///     color: Color::RED,
-///     svgs::ADD
-///     Label::new("fab button")
+///     @ { svgs::ADD }
+///     @ { Label::new("fab button") }
 ///   }
 /// };
 /// ```
-#[derive(Declare, Default)]
+#[derive(Declare, Default, Declare2)]
 pub struct FabButton {
   #[declare(default=Palette::of(ctx).primary())]
   color: Color,
@@ -91,9 +91,8 @@ impl ComposeChild for FabButton {
       (None, None) => panic!("Button content cannot be empty!"),
     };
 
-    widget! {
-      states { this: this.into_readonly() }
-      init ctx => {
+    fn_widget! {
+      @ {
         let FabButtonStyle {
           height,
           icon_size,
@@ -102,26 +101,27 @@ impl ComposeChild for FabButton {
           label_style,
           radius,
           padding_style,
-        } = FabButtonStyle::of(ctx).clone();
+        } = FabButtonStyle::of(ctx);
         let palette1 = Palette::of(ctx).clone();
         let palette2 = Palette::of(ctx).clone();
-      }
-      FabButtonDecorator {
-        button_type,
-        color: this.color,
-        ButtonImpl {
-          height,
-          icon_size,
-          label_gap,
-          icon_pos,
-          label_style,
-          background_color: Brush::from(palette1.base_of(&this.color)),
-          foreground_color: Brush::from(palette2.on_of(&palette2.base_of(&this.color))),
-          radius,
-          border_style: None,
-          padding_style,
 
-          widget::from(child)
+        @FabButtonDecorator {
+          button_type,
+          color: pipe!($this.color),
+          @ButtonImpl {
+            height,
+            icon_size,
+            label_gap,
+            icon_pos,
+            label_style,
+            background_color: pipe!(Brush::from(palette1.base_of(&$this.color))),
+            foreground_color: pipe!(Brush::from(palette2.on_of(&palette2.base_of(&$this.color)))),
+            radius,
+            border_style: None,
+            padding_style,
+
+            @ { child }
+          }
         }
       }
     }

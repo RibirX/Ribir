@@ -9,16 +9,16 @@ use ribir_core::prelude::*;
 /// # use ribir_core::prelude::*;
 /// # use ribir_widgets::prelude::*;
 ///
-/// widget! {
-///   Avatar {
-///     Label::new("A")
+/// fn_widget! {
+///   @ Avatar {
+///     @ { Label::new("A") }
 ///   }
 /// };
 ///
 /// # #[cfg(feature="png")]
-/// widget! {
-///   Avatar {
-///     ShallowImage::from_png(include_bytes!("../../gpu/examples/leaves.png"))
+/// fn_widget! {
+///   @ Avatar {
+///     @ { ShallowImage::from_png(include_bytes!("../../gpu/examples/leaves.png")) }
 ///   }
 /// };
 /// ```
@@ -63,54 +63,51 @@ impl ComposeChild for Avatar {
   type Child = AvatarTemplate;
 
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    widget! {
-      states { this: this.into_readonly() }
-      init ctx => {
+    fn_widget! {
+      @ {
         let AvatarStyle {
           size, radius, text_style,
-        } = AvatarStyle::of(ctx).clone();
-        let palette1 = Palette::of(ctx).clone();
-        let palette2 = Palette::of(ctx).clone();
-      }
-      SizedBox {
-        size,
-        widget::from::<Widget>(match child {
-          AvatarTemplate::Text(text) => widget! {
-            states { text: text.into_readonly() }
-            BoxDecoration {
-              background: Brush::from(palette1.base_of(&this.color)),
+        } = AvatarStyle::of(ctx!());
+        let palette1 = Palette::of(ctx!()).clone();
+        let palette2 = Palette::of(ctx!()).clone();
+        let w: Widget = match child {
+          AvatarTemplate::Text(mut text) => {
+            @Container {
+              size,
               border_radius: radius.map(Radius::all),
-              Container {
-                size,
-                Text {
-                  h_align: HAlign::Center,
-                  v_align: VAlign::Center,
-                  text: text.0.clone(),
-                  text_style: text_style.clone(),
-                  foreground: Brush::from(palette2.on_of(&palette2.base_of(&this.color))),
-                }
+              background: pipe!(Brush::from(palette1.base_of(&$this.color))),
+              @Text {
+                h_align: HAlign::Center,
+                v_align: VAlign::Center,
+                text: $text.0.clone(),
+                text_style,
+                foreground: pipe!(Brush::from(palette2.on_of(&palette2.base_of(&$this.color)))),
               }
-            }
-          }.into(),
-          AvatarTemplate::Image(image) => widget! {
-            DynWidget {
-              dyns: radius.map(|radius| {
-                let path = Path::rect_round(
-                  &Rect::from_size(size),
-                  &Radius::all(radius),
-                );
-                Clip { clip: ClipType::Path(path) }
-              }),
-              Container {
+            }.into()
+          },
+          AvatarTemplate::Image(image) => {
+            let clip = radius.map(|radius| {
+              let path = Path::rect_round(
+                &Rect::from_size(size),
+                &Radius::all(radius),
+              );
+              Clip { clip: ClipType::Path(path) }
+            });
+            @$clip {
+              @Container {
                 size,
-                DynWidget{
+                @$image {
                   box_fit: BoxFit::Contain,
-                  dyns: image,
                 }
               }
-            }
-          }.into()
-        })
+            }.into()
+          }
+        };
+
+        @SizedBox {
+          size,
+          @ { w }
+        }
       }
     }
     .into()

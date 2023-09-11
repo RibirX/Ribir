@@ -1,4 +1,4 @@
-use crate::timer::Timer;
+pub use crate::timer::Timer;
 use std::{
   rc::Rc,
   sync::atomic::{AtomicU64, Ordering},
@@ -22,8 +22,8 @@ pub struct TestWindow(pub Rc<Window>);
 #[macro_export]
 macro_rules! reset_test_env {
   () => {
-    let _ = rxrust::scheduler::NEW_TIMER_FN.set(Timer::new_timer_future);
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    let _ = $crate::prelude::NEW_TIMER_FN.set($crate::timer::Timer::new_timer_future);
+    let _guard = unsafe { $crate::prelude::AppCtx::new_lock_scope() };
   };
 }
 
@@ -76,7 +76,6 @@ impl TestWindow {
   pub fn draw_frame(&mut self) {
     // Test window not have a eventloop, manually wake-up every frame.
     Timer::wake_timeout_futures();
-    AppCtx::run_until_stalled();
     self.run_frame_tasks();
 
     self.0.draw_frame();
@@ -176,10 +175,10 @@ impl Render for MockStack {
 
 impl_query_self_only!(MockStack);
 
-#[derive(Declare, MultiChild)]
+#[derive(Declare, Declare2, MultiChild)]
 pub struct MockMulti;
 
-#[derive(Declare, Clone, SingleChild)]
+#[derive(Declare, Declare2, Clone, SingleChild)]
 pub struct MockBox {
   pub size: Size,
 }

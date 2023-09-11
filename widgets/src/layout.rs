@@ -21,14 +21,10 @@ impl Direction {
   pub fn is_vertical(&self) -> bool { matches!(self, Direction::Vertical) }
 }
 
-mod column;
 pub mod container;
 pub mod flex;
-mod row;
 mod sized_box;
-pub use column::Column;
 pub use flex::*;
-pub use row::Row;
 pub use sized_box::SizedBox;
 pub mod expanded;
 pub use container::Container;

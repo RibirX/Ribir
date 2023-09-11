@@ -117,7 +117,7 @@ impl WidgetId {
   }
 
   pub(crate) fn ancestor_of(self, other: WidgetId, tree: &TreeArena) -> bool {
-    other.ancestors(tree).find(|p| self == *p).is_some()
+    other.ancestors(tree).any(|p| self == p)
   }
 
   pub(crate) fn ancestors(self, tree: &TreeArena) -> impl Iterator<Item = WidgetId> + '_ {
@@ -159,10 +159,6 @@ impl WidgetId {
 
   pub(crate) fn insert_after(self, next: WidgetId, tree: &mut TreeArena) {
     self.0.insert_after(next.0, tree);
-  }
-
-  pub(crate) fn insert_before(self, before: WidgetId, tree: &mut TreeArena) {
-    self.0.insert_before(before.0, tree);
   }
 
   pub(crate) fn append(self, child: WidgetId, tree: &mut TreeArena) {
@@ -235,11 +231,6 @@ impl WidgetId {
       });
     }
   }
-}
-
-pub(crate) unsafe fn split_arena(tree: &mut TreeArena) -> (&mut TreeArena, &mut TreeArena) {
-  let ptr = tree as *mut TreeArena;
-  (&mut *ptr, &mut *ptr)
 }
 
 pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn Render>) -> WidgetId {

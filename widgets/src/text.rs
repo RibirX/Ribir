@@ -24,7 +24,7 @@ pub struct Text {
 }
 
 impl Text {
-  pub fn text_layout(&self, t_store: &TypographyStore, bound: Size) -> VisualGlyphs {
+  pub fn text_layout(&self, bound: Size) -> VisualGlyphs {
     let TextStyle {
       font_size,
       letter_space,
@@ -35,8 +35,7 @@ impl Text {
 
     let width: Em = Pixel(bound.width.into()).into();
     let height: Em = Pixel(bound.height.into()).into();
-
-    t_store.typography(
+    AppCtx::typography_store().typography(
       self.text.substr(..),
       font_size,
       font_face,
@@ -54,11 +53,7 @@ impl Text {
 
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
-    self
-      .text_layout(AppCtx::typography_store(), clamp.max)
-      .visual_rect()
-      .size
-      .cast_unit()
+    self.text_layout(clamp.max).visual_rect().size.cast_unit()
   }
 
   #[inline]
@@ -147,16 +142,12 @@ macro_rules! define_text_with_theme_style {
 
     impl Compose for $name {
       fn compose(this: State<Self>) -> Widget {
-        widget! {
-          init ctx => {
-            let text_style = TypographyTheme::of(ctx).$style.text.clone();
-          }
-          states { this: this.into_readonly() }
-          Text {
-            text: this.text.clone(),
-            foreground: this.foreground.clone(),
-            text_style,
-            overflow: this.overflow,
+        fn_widget! {
+          @Text {
+            text: pipe!($this.text.clone()),
+            foreground: pipe!($this.foreground.clone()),
+            text_style: TypographyTheme::of(ctx).$style.text.clone(),
+            overflow: pipe!($this.overflow),
           }
         }
         .into()
