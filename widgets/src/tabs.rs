@@ -309,14 +309,12 @@ impl ComposeChild for Tabs {
               Position::Left | Position::Right => BoxClamp::fixed_width(extent),
             }),
             @ $flex {
-              @ {
-                Multi::new(
+              @{
                   Tabs::tab_header(
                     headers, tabs_style,
                     this.clone_writer(),
                     indicator_decorator.clone_writer()
                   )
-                )
               }
             }
           }
@@ -349,7 +347,7 @@ impl ComposeChild for Tabs {
             matches!(pos, Position::Right | Position::Bottom)
           },
           @ { header }
-          @ { Multi::new(panes) }
+          @ { panes }
         }
       }
     }

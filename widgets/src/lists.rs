@@ -138,9 +138,7 @@ impl ComposeChild for Lists {
   fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
     fn_widget! {
       @ListsDecorator {
-        @Column {
-          @ { Multi::new(child) }
-        }
+        @Column { @ { child } }
       }
     }
     .into()

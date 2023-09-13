@@ -293,7 +293,7 @@ fn pipe_as_multi_child() {
   let cnt2 = cnt.clone_writer();
   let w = fn_widget! {
     let boxes = pipe! {
-      Multi::new((0..*$cnt).map(|_| fix_box.clone()).collect::<Vec<_>>())
+      (0..*$cnt).map(|_| fix_box.clone()).collect::<Vec<_>>()
     };
     rdl! { Flex { rdl!{ boxes } } }
   };
@@ -377,9 +377,9 @@ fn closure_in_fn_widget_capture() {
 fn at_embed_in_expression() -> impl Into<Widget> {
   fn_widget! {
     @Row {
-      @{ Multi::new((0..3).map(|_| {
-          @SizedBox { size: Size::new(100., 100.) }
-      }))}
+      @{ (0..3).map(|_| {
+        @SizedBox { size: Size::new(100., 100.) }
+      })}
     }
   }
 }
@@ -489,7 +489,7 @@ fn expression_for_children() {
   let size_five = Size::new(5., 5.);
   let embed_expr = fn_widget! {
     let sized_box = @SizedBox { size: size_one };
-    let multi_box = Multi::new((0..3).map(move |_| @SizedBox { size: pipe!($sized_box.size) } ))
+    let multi_box = (0..3).map(move |_| @SizedBox { size: pipe!($sized_box.size) })
     ;
     let pipe_box = pipe!($sized_box.size.area() > 2.)
       .map(move |v| v.then(|| @SizedBox { size: pipe!($sized_box.size) }));
@@ -527,7 +527,7 @@ fn embed_widget_ref_outside() {
 
   let w = fn_widget! {
     let first = @SizedBox { size: Size::new(1., 1.) };
-    let three_box = @{ Multi::new((0..3).map(move |_| @ SizedBox { size: pipe!($first.size) } ))};
+    let three_box = @{ (0..3).map(move |_| @ SizedBox { size: pipe!($first.size) } )};
     @Flex {
       @$first { on_tap: move |_| $first.write().size = Size::new(2., 2.)}
       @{ three_box }
@@ -556,7 +556,7 @@ fn bind_fields() {
       .subscribe(move |v| $c.write().size = v);
     @Flex {
       on_tap: move |_| $a.write().size *= 2.,
-      @ { Multi::new([a, b, c]) }
+      @ { [a, b, c] }
     }
   };
   let mut wnd = TestWindow::new(w);

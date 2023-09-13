@@ -213,12 +213,11 @@ mod tests {
       @MockMulti {
         @ {
           pipe!(*$cnt).map(move |cnt| {
-            let iter = (0..cnt).map(move |_| @MockBox {
+            (0..cnt).map(move |_| @MockBox {
               size: Size::zero(),
               on_mounted: move |e| { $mounted.write().insert(e.id); },
               on_disposed: move |e| { $disposed.write().insert(e.id); },
-            });
-            Multi::new(iter)
+            })
           })
         }
       }

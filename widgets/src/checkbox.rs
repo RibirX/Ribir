@@ -89,10 +89,10 @@ impl ComposeChild for Checkbox {
 
         @Row {
           @ {
-            Multi::new(match child {
+            match child {
               CheckboxTemplate::Before(w) => [ label(w.child()), icon ],
               CheckboxTemplate::After(w) => [ icon, label(w.child())],
-            })
+            }
           }
         }.into()
       } else {

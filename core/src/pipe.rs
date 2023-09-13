@@ -16,7 +16,7 @@ use crate::{
   impl_proxy_render,
   prelude::*,
   ticker::FrameMsg,
-  widget::{Query, QueryOrder, Render, Widget, WidgetBuilder, WidgetId, WidgetTree},
+  widget::{Query, QueryOrder, Render, StrictBuilder, Widget, WidgetBuilder, WidgetId, WidgetTree},
   window::WindowId,
 };
 
@@ -84,8 +84,8 @@ impl<V> Pipe<V> {
   pub fn value_mut(&mut self) -> &mut V { &mut self.value }
 }
 
-impl<W: Into<Widget> + 'static> WidgetBuilder for Pipe<W> {
-  fn build(self, ctx: &BuildCtx) -> WidgetId {
+impl<W: Into<Widget> + 'static> StrictBuilder for Pipe<W> {
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
     let (v, modifies) = self.unzip();
     let id = v.into().build(ctx);
     let id_share = Sc::new(Cell::new(id));
@@ -166,7 +166,7 @@ impl<W: Into<Widget> + 'static> WidgetBuilder for Pipe<Option<W>> {
   fn build(self, ctx: &crate::context::BuildCtx) -> WidgetId {
     self
       .map(|w| w.map_or_else(|| Widget::from(Void), |w| w.into()))
-      .build(ctx)
+      .strict_build(ctx)
   }
 }
 
@@ -183,11 +183,11 @@ impl<W: SingleParent + 'static> SingleParent for Pipe<W> {
   }
 }
 
-impl<W: MultiParent + 'static> MultiParent for Pipe<W> {
+impl<W: MultiParent + StrictBuilder + 'static> MultiParent for Pipe<W> {
   fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId {
     // if children is empty, we can let the pipe parent as the whole subtree.
     if children.is_empty() {
-      self.build(ctx)
+      self.strict_build(ctx)
     } else {
       let (v, modifies) = self.unzip();
       let first_child = children[0];
@@ -202,7 +202,7 @@ impl<W: MultiParent + 'static> MultiParent for Pipe<W> {
   }
 }
 
-impl<W: SingleParent + 'static> SingleParent for Pipe<Option<W>> {
+impl<W: SingleParent + Into<Widget> + 'static> SingleParent for Pipe<Option<W>> {
   fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
     self
       .map(|p| -> Box<dyn BoxedSingleParent> {
@@ -275,24 +275,20 @@ fn update_pipe_parent<W: 'static>(
   attach_unsubscribe_guard(parent.start, ctx.window().id(), unsub);
 }
 
-impl<W: 'static> Pipe<Multi<W>> {
+impl<W: 'static> Pipe<W> {
   pub(crate) fn build_multi(self, vec: &mut Vec<WidgetId>, ctx: &mut BuildCtx)
   where
     W: IntoIterator,
-    W::Item: Into<Widget>,
+    W::Item: WidgetBuilder,
   {
     fn build_multi(
-      v: Multi<impl IntoIterator<Item = impl Into<Widget>>>,
+      v: impl IntoIterator<Item = impl WidgetBuilder>,
       ctx: &mut BuildCtx,
     ) -> Vec<WidgetId> {
-      let mut ids = v
-        .into_inner()
-        .into_iter()
-        .map(|w| w.into().build(ctx))
-        .collect::<Vec<_>>();
+      let mut ids = v.into_iter().map(|w| w.build(ctx)).collect::<Vec<_>>();
 
       if ids.is_empty() {
-        ids.push(Void.build(ctx));
+        ids.push(Void.strict_build(ctx));
       }
 
       ids
@@ -643,14 +639,13 @@ mod tests {
       @MockMulti {
         @ {
           pipe!($v.clone()).map(move |v| {
-            let iter = v.into_iter().map(move |_| {
+            v.into_iter().map(move |_| {
               @MockBox{
                 size: Size::zero(),
                 on_mounted: move |_| *$new_cnt.write() += 1,
                 on_disposed: move |_| *$drop_cnt.write() += 1
               }
-            });
-            Multi::new(iter)
+            })
           })
         }
       }
@@ -733,7 +728,7 @@ mod tests {
       @MockMulti {
         @ {
           pipe!($v.clone()).map(move |v| {
-            let iter = v.into_iter().map(move |(i, c)| {
+            v.into_iter().map(move |(i, c)| {
               let mut key = @KeyWidget { key: i, value: c };
               @$key {
                 @MockBox {
@@ -753,8 +748,7 @@ mod tests {
                   }
                 }
               }
-            });
-            Multi::new(iter)
+            })
           })
         }
       }
@@ -909,8 +903,7 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ { pipe!{
-          let iter = $c_tasks.iter().map(|t| build(t.clone_writer())).collect::<Vec<_>>();
-          Multi::new(iter)
+          $c_tasks.iter().map(|t| build(t.clone_writer())).collect::<Vec<_>>()
         }}
       }
     };

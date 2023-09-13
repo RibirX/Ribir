@@ -239,14 +239,13 @@ mod tests {
           @{
             pipe!(($this.width, $this.depth))
               .map(|(width, depth)| {
-                let iter = (0..width).map(move |_| -> Widget {
+                (0..width).map(move |_| -> Widget {
                   if depth > 1 {
                     Recursive { width, depth: depth - 1 }.into()
                   } else {
                     MockBox { size: Size::new(10., 10.)}.into()
                   }
-                });
-                Multi::new(iter)
+                })
               })
           }
          }
@@ -273,9 +272,8 @@ mod tests {
         };
         @MockMulti {
           @{ pipe!{
-            let leafs = (0..$this.width - 1)
-              .map(|_| MockBox { size: Size::new(10., 10.)} );
-            Multi::new(leafs)
+            (0..$this.width - 1)
+              .map(|_| MockBox { size: Size::new(10., 10.)})
           }}
           @{ recursive_child }
         }
@@ -507,7 +505,7 @@ mod tests {
             } else {
               Size::zero()
             };
-            Multi::new((0..3).map(move |_| MockBox { size }))
+            (0..3).map(move |_| MockBox { size })
           })
         }
       }
@@ -531,11 +529,11 @@ mod tests {
     let w1 = fn_widget! {
        @MockMulti {
         @ {
-          Multi::new((0..100).map(|_|
+          (0..100).map(|_|
             widget! { MockBox {
             size: Size::new(150., 50.),
             background: Color::BLUE,
-          }}))
+          }})
         }
     }};
     let mut wnd = TestWindow::new_with_size(w1, win_size);
@@ -546,11 +544,11 @@ mod tests {
     let w2 = fn_widget! {
       @MockMulti {
         @ {
-          Multi::new((0..1).map(|_|
+          (0..1).map(|_|
             widget! { MockBox {
              size: Size::new(150., 50.),
              background: Color::BLUE,
-          }}))
+          }})
         }
     }};
 

@@ -25,15 +25,14 @@ impl Compose for SelectedText {
       @Stack {
         @ { pipe!{
           let color = color.clone();
-          let iter = $this.rects.clone().into_iter().map(move |rc| {
+          $this.rects.clone().into_iter().map(move |rc| {
             @Container {
               background: color.clone(),
               top_anchor: rc.origin.y,
               left_anchor: rc.origin.x,
               size: rc.size,
             }
-          });
-          Multi::new(iter)
+          })
         }}
       }
     }

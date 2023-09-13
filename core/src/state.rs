@@ -17,7 +17,7 @@ pub use stateful::*;
 use crate::{
   context::BuildCtx,
   prelude::{MultiChild, SingleChild},
-  widget::{Compose, Render, WidgetBuilder, WidgetId},
+  widget::{Compose, Render, StrictBuilder, WidgetId},
 };
 
 /// The `StateReader` trait allows for reading, clone and map the state.
@@ -190,9 +190,9 @@ impl<W: Render + 'static> From<State<W>> for Box<dyn Render> {
   }
 }
 
-impl<C: Compose> WidgetBuilder for State<C> {
+impl<C: Compose> StrictBuilder for State<C> {
   #[inline]
-  fn build(self, ctx: &BuildCtx) -> WidgetId { Compose::compose(self).build(ctx) }
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { Compose::compose(self).build(ctx) }
 }
 
 impl<W> State<W> {

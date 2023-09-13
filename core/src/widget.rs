@@ -143,20 +143,45 @@ impl<'a> dyn Render + 'a {
 
 pub struct FnWidget<F>(F);
 
+/// Trait to build a type to a widget, `StrictBuilder` and `WidgetBuilder` is
+/// only for type distinction and help us to build complex widget.
+///
+///
+/// These type implement this trait:
+///
+/// - type implemented `Compose` trait
+/// - type implemented `Render` trait
+/// - `ComposePair<_,_>`
+/// - `SinglePair<_, _>`
+/// - `MultiPair<_, _>`
+/// - `Pipe<W>` if `W` implement `LooseBuilder`
+pub(crate) trait StrictBuilder {
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId;
+}
+
+/// Trait to build a type to a widget and allow to create new widget in build
+/// phase.
+///
+/// - Types implemented `StrictBuilder` will auto implement `WidgetBuilder`
+/// - `Pipe<Option<W>>` directly implement this trait.
 pub(crate) trait WidgetBuilder {
   fn build(self, ctx: &BuildCtx) -> WidgetId;
 }
 
-impl From<WidgetId> for Widget {
+impl<T: Into<Widget>> WidgetBuilder for T {
   #[inline]
-  fn from(id: WidgetId) -> Self { Widget(Box::new(move |_| id)) }
+  fn build(self, ctx: &BuildCtx) -> WidgetId { self.into().build(ctx) }
+}
+
+impl StrictBuilder for WidgetId {
+  fn strict_build(self, _: &BuildCtx) -> WidgetId { self }
 }
 
 impl<F> FnWidget<F> {
   #[inline]
   pub fn new<R>(f: F) -> Self
   where
-    F: FnOnce(&BuildCtx) -> R + Into<FnWidget<F>>,
+    F: FnOnce(&BuildCtx) -> R,
   {
     FnWidget(f)
   }
@@ -165,12 +190,12 @@ impl<F> FnWidget<F> {
   pub fn into_inner(self) -> F { self.0 }
 }
 
-impl<F, R> WidgetBuilder for FnWidget<F>
+impl<F, R> StrictBuilder for FnWidget<F>
 where
   F: FnOnce(&BuildCtx) -> R + 'static,
-  R: Into<Widget>,
+  R: WidgetBuilder,
 {
-  fn build(self, ctx: &BuildCtx) -> WidgetId { (self.0)(ctx).into().build(ctx) }
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { (self.0)(ctx).build(ctx) }
 }
 
 #[macro_export]
@@ -298,14 +323,14 @@ macro_rules! impl_proxy_render {
   };
 }
 
-impl<C: Compose> WidgetBuilder for C {
+impl<C: Compose> StrictBuilder for C {
   #[inline]
-  fn build(self, ctx: &BuildCtx) -> WidgetId { State::value(self).build(ctx) }
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { State::value(self).strict_build(ctx) }
 }
 
-impl<C: Compose> WidgetBuilder for Stateful<C> {
+impl<C: Compose> StrictBuilder for Stateful<C> {
   #[inline]
-  fn build(self, ctx: &BuildCtx) -> WidgetId { State::stateful(self).build(ctx) }
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { State::stateful(self).strict_build(ctx) }
 }
 
 impl<R: Render + 'static> Compose for R {
@@ -314,9 +339,9 @@ impl<R: Render + 'static> Compose for R {
   }
 }
 
-impl<W: WidgetBuilder + 'static> From<W> for Widget {
+impl<W: StrictBuilder + 'static> From<W> for Widget {
   #[inline]
-  fn from(value: W) -> Self { Self(Box::new(|ctx| value.build(ctx))) }
+  fn from(value: W) -> Self { Self(Box::new(|ctx| value.strict_build(ctx))) }
 }
 
 impl<F, R> From<F> for FnWidget<F>

@@ -1,6 +1,7 @@
-use super::{ComposeChild, ComposePair, Multi, SinglePair};
+use super::{ComposeChild, ComposePair, SinglePair};
 use crate::{
-  builtin_widgets::FatObj,
+  builtin_widgets::{FatObj, Void},
+  prelude::Pipe,
   state::{State, StateFrom},
   widget::*,
 };
@@ -26,9 +27,17 @@ pub trait FromAnother<V, M> {
 }
 
 // W -> Widget
-impl<W: WidgetBuilder + 'static> FromAnother<W, ()> for Widget {
+impl<W: StrictBuilder + 'static> FromAnother<W, ()> for Widget {
   #[inline]
   fn from_another(value: W) -> Self { value.into() }
+}
+
+impl<W: Into<Widget> + 'static> FromAnother<Pipe<Option<W>>, ()> for Widget {
+  fn from_another(value: Pipe<Option<W>>) -> Self {
+    value
+      .map(|w| w.map_or_else(|| Widget::from(Void), |w| w.into()))
+      .into()
+  }
 }
 
 // W -> State<W>
@@ -144,25 +153,11 @@ impl<W, C: ChildFrom<W, M>, M> FillVec<C, [M; 0]> for W {
   fn fill_vec(self, vec: &mut Vec<C>) { vec.push(ChildFrom::child_from(self)) }
 }
 
-impl<W, C, M> FillVec<C, [M; 1]> for Option<W>
-where
-  C: ChildFrom<W, M>,
-{
-  #[inline]
-  fn fill_vec(self, vec: &mut Vec<C>) {
-    if let Some(w) = self {
-      vec.push(ChildFrom::child_from(w))
-    }
-  }
-}
-
-impl<W, C, M> FillVec<C, [M; 1]> for Multi<W>
+impl<W, C, M> FillVec<C, [M; 1]> for W
 where
   W: IntoIterator,
   C: ChildFrom<W::Item, M>,
 {
   #[inline]
-  fn fill_vec(self, vec: &mut Vec<C>) {
-    vec.extend(self.into_inner().into_iter().map(ChildFrom::child_from))
-  }
+  fn fill_vec(self, vec: &mut Vec<C>) { vec.extend(self.into_iter().map(ChildFrom::child_from)) }
 }

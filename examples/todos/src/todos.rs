@@ -77,7 +77,7 @@ impl Todos {
           on_performed_layout: move |_| *$mount_task_cnt.write() = 0,
           padding: EdgeInsets::vertical(8.),
           @ {
-            let task_widget_iter = $this
+            $this
               .tasks
               .iter()
               .enumerate()
@@ -124,8 +124,7 @@ impl Todos {
                     }
                   }
                 }
-              }).collect::<Vec<_>>();
-            Multi::new(task_widget_iter)
+              }).collect::<Vec<_>>()
           }
 
         }
