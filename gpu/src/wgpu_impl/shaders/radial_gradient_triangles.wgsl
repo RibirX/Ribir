@@ -83,7 +83,7 @@ fn calc_mask_alpha(pos: vec2<f32>, mask_idx: i32) -> f32 {
 
         let tex_size = textureDimensions(texture);
         mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
-        let a = textureSample(texture, s_sampler, mask_pos).r;
+        let a = textureSampleLevel(texture, s_sampler, mask_pos, 0.).r;
         alpha = alpha * a;
         if alpha == 0. {
             break;
