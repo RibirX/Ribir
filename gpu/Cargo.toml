@@ -23,7 +23,7 @@ ribir_geom = {path = "../geom", version = "0.0.1-alpha.4" }
 ribir_painter = {path = "../painter", features = ["tessellation"], version = "0.0.1-alpha.4" }
 slab = "0.4.8"
 wgpu = {workspace = true, optional = true}
-zerocopy.workspace = true
+zerocopy = {workspace=true, features = ["derive"]}
 
 [dev-dependencies]
 paste.workspace = true

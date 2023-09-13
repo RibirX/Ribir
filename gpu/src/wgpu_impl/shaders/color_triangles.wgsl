@@ -11,7 +11,6 @@ struct FragInput {
 }
  
 
-
 @vertex
 fn vs_main(v: Vertex) -> FragInput {
     var input: FragInput;
@@ -45,7 +44,7 @@ var samplers: binding_array<sampler>;
 fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
     var color = input.color;
     var mask_idx = input.mask_head;
-    for (var i = 0; i < 32; i++) {
+    loop {
         if mask_idx < 0 {
             break;
         }
@@ -63,7 +62,7 @@ fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
 
         let tex_size = textureDimensions(texture);
         mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
-        let alpha = textureSample(texture, s_sampler, mask_pos).r;
+        let alpha = textureSampleLevel(texture, s_sampler, mask_pos, 0.).r;
         if alpha == 0. {
             color.a = 0.;
             break;

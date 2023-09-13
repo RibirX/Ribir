@@ -71,7 +71,7 @@ fn fs_main(f: VertexOutput) -> @location(0) vec4<f32> {
 
     var color = textureSample(img_tex, img_smapler, img_pos);
     var mask_idx = prim.mask_head;
-    for (var i = 0; i < 32; i++) {
+    loop {
         if mask_idx < 0 {
             break;
         }
@@ -88,7 +88,7 @@ fn fs_main(f: VertexOutput) -> @location(0) vec4<f32> {
         let mask_sampler = samplers[mask_tex_idx];
         let mask_tex_size = textureDimensions(mask_tex);
         mask_pos = mask_pos / vec2<f32>(f32(mask_tex_size.x), f32(mask_tex_size.y));
-        let alpha = textureSample(mask_tex, mask_sampler, mask_pos).r;
+        let alpha = textureSampleLevel(mask_tex, mask_sampler, mask_pos, 0.).r;
         if alpha == 0. {
             color.a = 0.;
             break;
