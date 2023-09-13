@@ -1,5 +1,5 @@
 use super::*;
-use crate::widget::WidgetBuilder;
+use crate::widget::{StrictBuilder, WidgetBuilder};
 
 /// Trait specify what child a widget can have, and the target type is the
 /// result of widget compose its child.
@@ -47,42 +47,42 @@ impl<W, C1: SingleChild, C2> SingleWithChild<C2> for SinglePair<W, C1> {
   }
 }
 
-impl<W, C> WidgetBuilder for SinglePair<W, C>
+impl<W, C> StrictBuilder for SinglePair<W, C>
 where
   W: SingleParent,
-  C: Into<Widget>,
+  C: WidgetBuilder,
 {
-  fn build(self, ctx: &BuildCtx) -> WidgetId {
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
     let Self { widget, child } = self;
-    let child = child.into().build(ctx);
+    let child = child.build(ctx);
     widget.append_child(child, ctx.force_as_mut())
   }
 }
 
-impl<W, C> WidgetBuilder for SinglePair<Option<W>, C>
+impl<W, C> StrictBuilder for SinglePair<Option<W>, C>
 where
   W: SingleParent,
-  C: Into<Widget>,
+  C: WidgetBuilder,
 {
-  fn build(self, ctx: &BuildCtx) -> WidgetId {
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
     let Self { widget, child } = self;
     if let Some(widget) = widget {
-      SinglePair { widget, child }.build(ctx)
+      SinglePair { widget, child }.strict_build(ctx)
     } else {
-      child.into().build(ctx)
+      child.build(ctx)
     }
   }
 }
 
-impl<W, C> WidgetBuilder for SinglePair<W, Option<C>>
+impl<W, C> StrictBuilder for SinglePair<W, Option<C>>
 where
-  W: SingleParent,
-  SinglePair<W, C>: WidgetBuilder,
+  W: SingleParent + WidgetBuilder,
+  SinglePair<W, C>: StrictBuilder,
 {
-  fn build(self, ctx: &BuildCtx) -> WidgetId {
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
     let Self { widget, child } = self;
     if let Some(child) = child {
-      SinglePair { widget, child }.build(ctx)
+      SinglePair { widget, child }.strict_build(ctx)
     } else {
       widget.build(ctx)
     }
@@ -103,7 +103,7 @@ mod tests {
         .clone()
         .with_child(mock_box.clone(), ctx)
         .with_child(mock_box, ctx)
-        .build(ctx)
+        .strict_build(ctx)
     });
   }
 }

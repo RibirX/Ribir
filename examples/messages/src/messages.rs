@@ -99,7 +99,7 @@ impl Compose for MessageList {
                       }
                     };
 
-                    Multi::new($this.messages.clone().into_iter().map(message_gen))
+                    $this.messages.clone().into_iter().map(message_gen)
                   }
                 }
               }

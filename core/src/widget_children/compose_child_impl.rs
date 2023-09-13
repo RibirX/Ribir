@@ -2,7 +2,7 @@ use crate::{
   context::BuildCtx,
   prelude::ChildFrom,
   state::{State, Stateful},
-  widget::{WidgetBuilder, WidgetId},
+  widget::{StrictBuilder, WidgetId},
 };
 
 use super::{child_convert::FillVec, ComposeChild, SinglePair};
@@ -130,13 +130,13 @@ where
   }
 }
 
-impl<W, C> WidgetBuilder for ComposePair<State<W>, C>
+impl<W, C> StrictBuilder for ComposePair<State<W>, C>
 where
   W: ComposeChild,
   W::Child: From<C>,
 {
   #[inline]
-  fn build(self, ctx: &BuildCtx) -> WidgetId {
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
     let Self { widget, child } = self;
     ComposeChild::compose_child(widget, child.into()).build(ctx)
   }
@@ -201,7 +201,9 @@ mod tests {
   }
 
   #[test]
-  fn template_fill_template() { let _ = FnWidget::new(|ctx| P.with_child(Void, ctx).build(ctx)); }
+  fn template_fill_template() {
+    let _ = FnWidget::new(|ctx| P.with_child(Void, ctx).strict_build(ctx));
+  }
 
   #[test]
   fn pair_compose_child() {
@@ -209,7 +211,7 @@ mod tests {
       MockBox { size: ZERO_SIZE }
         .with_child(X, ctx)
         .with_child(Void {}, ctx)
-        .build(ctx)
+        .strict_build(ctx)
     });
   }
 }

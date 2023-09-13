@@ -29,7 +29,10 @@
 //! clone, this seems too strict and if `A` is not support clone, the compile
 //! error is too complex to diagnostic.
 
-use crate::{prelude::*, widget::WidgetBuilder};
+use crate::{
+  prelude::*,
+  widget::{StrictBuilder, WidgetBuilder},
+};
 mod compose_child_impl;
 mod multi_child_impl;
 mod single_child_impl;
@@ -38,6 +41,7 @@ pub use multi_child_impl::*;
 pub use single_child_impl::*;
 pub mod child_convert;
 pub use child_convert::{ChildFrom, FromAnother};
+
 /// Trait to tell Ribir a object can have one child.
 pub trait SingleChild {}
 
@@ -74,9 +78,9 @@ pub type WidgetOf<W> = SinglePair<W, Widget>;
 impl SingleChild for Box<dyn BoxedSingleParent> {}
 impl MultiChild for Box<dyn BoxedMultiParent> {}
 
-impl WidgetBuilder for Box<dyn BoxedSingleParent> {
+impl StrictBuilder for Box<dyn BoxedSingleParent> {
   #[inline]
-  fn build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx.force_as_mut()) }
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx.force_as_mut()) }
 }
 
 impl SingleParent for Box<dyn BoxedSingleParent> {
@@ -86,9 +90,9 @@ impl SingleParent for Box<dyn BoxedSingleParent> {
   }
 }
 
-impl WidgetBuilder for Box<dyn BoxedMultiParent> {
+impl StrictBuilder for Box<dyn BoxedMultiParent> {
   #[inline]
-  fn build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx.force_as_mut()) }
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx.force_as_mut()) }
 }
 
 impl MultiParent for Box<dyn BoxedMultiParent> {
@@ -98,26 +102,26 @@ impl MultiParent for Box<dyn BoxedMultiParent> {
   }
 }
 
-pub(crate) trait SingleParent: WidgetBuilder {
+pub(crate) trait SingleParent {
   fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId;
 }
 
-pub(crate) trait MultiParent: WidgetBuilder {
+pub(crate) trait MultiParent {
   fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId;
 }
 
-impl<T: Into<Box<dyn Render>> + SingleChild + WidgetBuilder> SingleParent for T {
+impl<T: Into<Box<dyn Render>> + SingleChild> SingleParent for T {
   fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
-    let p = self.build(ctx);
+    let p = ctx.alloc_widget(self.into());
     ctx.append_child(p, child);
     p
   }
 }
 
-impl<T: Into<Box<dyn Render>> + MultiChild + WidgetBuilder> MultiParent for T {
+impl<T: Into<Box<dyn Render>> + MultiChild> MultiParent for T {
   #[inline]
   fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId {
-    let p = self.build(ctx);
+    let p = ctx.alloc_widget(self.into());
     for c in children {
       ctx.append_child(p, c);
     }
@@ -125,7 +129,7 @@ impl<T: Into<Box<dyn Render>> + MultiChild + WidgetBuilder> MultiParent for T {
   }
 }
 
-impl<W: SingleParent + 'static> BoxedSingleParent for W {
+impl<W: SingleParent + WidgetBuilder + 'static> BoxedSingleParent for W {
   #[inline]
   fn boxed_append_child(self: Box<Self>, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
     (*self).append_child(child, ctx)
@@ -135,7 +139,7 @@ impl<W: SingleParent + 'static> BoxedSingleParent for W {
   fn boxed_build(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId { (*self).build(ctx) }
 }
 
-impl<W: MultiParent + 'static> BoxedMultiParent for W {
+impl<W: MultiParent + StrictBuilder + 'static> BoxedMultiParent for W {
   #[inline]
   fn boxed_append_children(
     self: Box<Self>,
@@ -152,7 +156,7 @@ impl<W: MultiParent + 'static> BoxedMultiParent for W {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::widget::WidgetBuilder;
+  use crate::widget::StrictBuilder;
   use crate::{reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
 
@@ -332,7 +336,7 @@ mod tests {
 
     let _ = FnWidget::new(|ctx| {
       let child = MockBox { size: ZERO_SIZE }.with_child(Void, ctx);
-      X.with_child(child, ctx).build(ctx)
+      X.with_child(child, ctx).strict_build(ctx)
     });
   }
 

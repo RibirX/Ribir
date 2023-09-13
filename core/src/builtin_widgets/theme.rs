@@ -1,7 +1,7 @@
 //! Theme use to share visual config or style compose logic. It can be defined
 //! to app-wide or particular part of the application.
 
-use crate::{fill_svgs, impl_query_self_only, prelude::*, widget::WidgetBuilder};
+use crate::{fill_svgs, impl_query_self_only, prelude::*, widget::StrictBuilder};
 pub use ribir_algo::{CowArc, ShareResource};
 use ribir_geom::Size;
 use ribir_macros::Declare2;
@@ -82,7 +82,7 @@ impl ComposeChild for ThemeWidget {
 
       AppCtx::load_font_from_theme(&theme);
       ctx.push_theme(theme.clone());
-      let p = DataWidget::new(Box::new(Void), theme).build(ctx);
+      let p = DataWidget::new(Box::new(Void), theme).strict_build(ctx);
       let old = ctx.force_as_mut().reset_ctx_from(Some(p));
       let c = child.build(ctx);
       ctx.append_child(p, c);

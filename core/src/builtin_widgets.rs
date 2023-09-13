@@ -59,7 +59,7 @@ pub use focus_node::*;
 pub mod focus_scope;
 pub use focus_scope::*;
 
-use crate::{prelude::*, widget::WidgetBuilder};
+use crate::{prelude::*, widget::StrictBuilder};
 
 macro_rules! impl_builtin_obj {
   ($($builtin_ty: ty),*) => {
@@ -185,8 +185,8 @@ impl<T> FatObj<T> {
   }
 }
 
-impl<T: Into<Widget>> WidgetBuilder for FatObj<T> {
-  fn build(self, ctx: &BuildCtx) -> WidgetId {
+impl<T: Into<Widget>> StrictBuilder for FatObj<T> {
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
     let Self { host, builtin } = self;
     builtin.compose_with_host(host.into(), ctx).build(ctx)
   }

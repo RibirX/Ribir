@@ -1,9 +1,9 @@
 use super::*;
-use crate::widget::WidgetBuilder;
+use crate::widget::StrictBuilder;
 
 /// Trait specify what child a multi child widget can have, and the target type
 /// after widget compose its child.
-pub trait MultiWithChild<C> {
+pub trait MultiWithChild<C, M> {
   type Target;
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
 }
@@ -13,64 +13,44 @@ pub struct MultiPair<P> {
   pub children: Vec<WidgetId>,
 }
 
-/// A struct hold multi object in it, as a representative of multiple children,
-/// so the parent know combined children one by one in it.
-pub struct Multi<W>(W);
-
-impl<W: IntoIterator> Multi<W> {
-  #[inline]
-  pub fn new(v: W) -> Self { Self(v) }
-
-  #[inline]
-  pub fn into_inner(self) -> W { self.0 }
-}
-
 // Same with ChildConvert::FillVec, but only for MultiChild,
 // There are some duplicate implementations, but better compile error for
-// users
-trait FillVec {
+// users and `MultiChild` support `pipe<impl IntoIterator<Item = impl Widget>>`
+// as child but `ComposeChild` not.
+trait FillVec<M> {
   fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx);
 }
 
-impl<W: Into<Widget>> FillVec for W {
+impl<W: Into<Widget>> FillVec<()> for W {
   #[inline]
-  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) { vec.push(self.into().build(ctx)) }
+  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) { vec.push(self.build(ctx)) }
 }
 
-impl<W: Into<Widget>> FillVec for Option<W> {
-  #[inline]
-  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) {
-    if let Some(w) = self {
-      vec.push(w.into().build(ctx))
-    }
-  }
-}
-
-impl<W> FillVec for Multi<W>
+impl<W> FillVec<[WidgetId; 0]> for W
 where
   W: IntoIterator,
-  W::Item: Into<Widget>,
+  W::Item: WidgetBuilder,
 {
   #[inline]
   fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) {
-    vec.extend(self.0.into_iter().map(|w| w.into().build(ctx)))
+    vec.extend(self.into_iter().map(|w| w.build(ctx)))
   }
 }
 
-impl<D> FillVec for Pipe<Multi<D>>
+impl<D> FillVec<[(); 1]> for Pipe<D>
 where
   D: IntoIterator + 'static,
-  D::Item: Into<Widget>,
+  D::Item: WidgetBuilder,
 {
   fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) {
     self.build_multi(vec, ctx.force_as_mut());
   }
 }
 
-impl<P, C> MultiWithChild<C> for P
+impl<M, P, C> MultiWithChild<C, M> for P
 where
   P: MultiChild,
-  C: FillVec,
+  C: FillVec<M>,
 {
   type Target = MultiPair<P>;
 
@@ -81,9 +61,9 @@ where
   }
 }
 
-impl<C, P> MultiWithChild<C> for MultiPair<P>
+impl<M, C, P> MultiWithChild<C, M> for MultiPair<P>
 where
-  C: FillVec,
+  C: FillVec<M>,
 {
   type Target = Self;
   #[inline]
@@ -93,8 +73,8 @@ where
   }
 }
 
-impl<P: MultiParent> WidgetBuilder for MultiPair<P> {
-  fn build(self, ctx: &BuildCtx) -> WidgetId {
+impl<P: MultiParent> StrictBuilder for MultiPair<P> {
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
     let MultiPair { parent, children } = self;
     parent.append_children(children, ctx.force_as_mut())
   }

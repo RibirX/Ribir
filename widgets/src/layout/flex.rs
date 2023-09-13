@@ -427,7 +427,7 @@ mod tests {
     fn_widget! {
       @Flex {
         @{
-          Multi::new((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))
+          (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
         }
       }
     }
@@ -439,7 +439,7 @@ mod tests {
     fn_widget! {
       @Flex {
         direction: Direction::Vertical,
-        @{ Multi::new((0..10).map(|_| SizedBox { size: Size::new(10., 20.) }))}
+        @{ (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })}
       }
     }
     .into()
@@ -451,7 +451,7 @@ mod tests {
     fn_widget! {
       @Flex {
         wrap: true,
-        @{ Multi::new((0..3).map(|_| SizedBox { size })) }
+        @{ (0..3).map(|_| SizedBox { size }) }
       }
     }
     .into()
@@ -471,7 +471,7 @@ mod tests {
       @Flex {
         wrap: true,
         reverse: true,
-        @{ Multi::new((0..3).map(|_| SizedBox { size })) }
+        @{ (0..3).map(|_| SizedBox { size }) }
       }
     }
     .into()
@@ -560,7 +560,7 @@ mod tests {
         wrap: true,
         cross_axis_gap: 10.,
         align_items: Align::Center,
-        @{ Multi::new((0..3).map(|_| SizedBox { size })) }
+        @{ (0..3).map(|_| SizedBox { size }) }
       }
     }
     .into()
