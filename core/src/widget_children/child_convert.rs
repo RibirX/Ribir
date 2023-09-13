@@ -1,7 +1,4 @@
-use super::{
-  decorate_tml_impl::IntoDecorateTml, ComposeChild, ComposePair, DecorateTml, Multi, SinglePair,
-  TmlFlag,
-};
+use super::{ComposeChild, ComposePair, Multi, SinglePair};
 use crate::{
   builtin_widgets::FatObj,
   state::{State, StateFrom},
@@ -103,16 +100,6 @@ where
       child: C::from_another(child),
     }
   }
-}
-
-// C --> DecorateTml<W, C2>
-impl<C, M, C2, Flag> FromAnother<C2, [M; 0]> for DecorateTml<Flag, C>
-where
-  C2: IntoDecorateTml<C, M, Flag = Flag>,
-  Flag: TmlFlag,
-{
-  #[inline]
-  fn from_another(value: C2) -> Self { value.into_decorate_tml() }
 }
 
 // ComposePair<W, C> --- W: ComposeChild---> ComposePair<W, W::Child>
