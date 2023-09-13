@@ -2,7 +2,7 @@ use crate::{
   context::BuildCtx,
   prelude::ChildFrom,
   state::{State, Stateful},
-  widget::{Widget, WidgetBuilder, WidgetId},
+  widget::{WidgetBuilder, WidgetId},
 };
 
 use super::{child_convert::FillVec, ComposeChild, SinglePair};
@@ -20,18 +20,6 @@ pub struct ComposePair<W, C> {
   pub widget: W,
   pub child: C,
 }
-/// `DecorateTml` lets a template can declare like a widget, so a template can
-/// support built-in widgets. For example, if you define a template `Leading`,
-/// you can use DecorateTml<Leading> as the template, so the user can use
-/// built-in widgets for `Leading`.
-pub struct DecorateTml<T: TmlFlag, C> {
-  pub(crate) decorator: Box<dyn FnOnce(Widget) -> Widget>,
-  pub(crate) tml_flag: T,
-  pub(crate) child: C,
-}
-
-/// Trait mark a type is a template flag that can be used with `DecorateTml`.
-pub trait TmlFlag {}
 
 // Template use to construct child of a widget.
 pub trait Template: Sized {
@@ -142,98 +130,6 @@ where
   }
 }
 
-pub(crate) mod decorate_tml_impl {
-  use super::*;
-
-  impl<M, W, C> ComposeWithChild<C, [M; 3]> for State<W>
-  where
-    W: ComposeChild<Child = Widget> + 'static,
-    C: DecorateTmlMarker<M>,
-  {
-    type Target = ComposePair<Self, C>;
-
-    #[inline]
-    fn with_child(self, child: C, _: &BuildCtx) -> Self::Target {
-      ComposePair { widget: self, child }
-    }
-  }
-
-  impl<T: TmlFlag, C> DecorateTml<T, C> {
-    pub fn decorate(self, tml_to_widget: impl FnOnce(T, C) -> Widget) -> Widget {
-      let Self { decorator, tml_flag, child } = self;
-      let w = tml_to_widget(tml_flag, child);
-      decorator(w)
-    }
-  }
-
-  trait DecorateTmlMarker<M> {}
-
-  impl<T: TmlFlag, C> DecorateTmlMarker<()> for DecorateTml<T, C> {}
-
-  impl<T: TmlFlag, C> DecorateTmlMarker<[(); 0]> for SinglePair<T, C> {}
-
-  impl<M, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<[M; 1]> for SinglePair<T, C> {}
-
-  impl<M, T, C: DecorateTmlMarker<M>> DecorateTmlMarker<M> for ComposePair<T, C> {}
-
-  pub(crate) trait IntoDecorateTml<C, M> {
-    type Flag: TmlFlag;
-    fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C>;
-  }
-
-  impl<W, C, M, C2> IntoDecorateTml<C, [M; 0]> for SinglePair<W, C2>
-  where
-    W: TmlFlag,
-    C: ChildFrom<C2, M>,
-  {
-    type Flag = W;
-
-    fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C> {
-      let SinglePair { widget: tml_flag, child } = self;
-      let decorator = Box::new(|w| w);
-      let child = C::child_from(child);
-      DecorateTml { decorator, tml_flag, child }
-    }
-  }
-
-  impl<W, C, C2, M> IntoDecorateTml<C, [M; 1]> for SinglePair<W, C2>
-  where
-    W: 'static,
-    C2: IntoDecorateTml<C, M>,
-    SinglePair<W, Widget>: WidgetBuilder,
-  {
-    type Flag = C2::Flag;
-
-    fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C> {
-      let SinglePair { widget, child } = self;
-      let DecorateTml { decorator, tml_flag, child } = ChildFrom::child_from(child);
-      DecorateTml {
-        decorator: Box::new(move |w| SinglePair { widget, child: decorator(w) }.into()),
-        tml_flag,
-        child,
-      }
-    }
-  }
-
-  impl<W, C, C2, M> IntoDecorateTml<C, M> for ComposePair<State<W>, C2>
-  where
-    W: ComposeChild<Child = Widget> + 'static,
-    C2: IntoDecorateTml<C, M>,
-  {
-    type Flag = C2::Flag;
-
-    fn into_decorate_tml(self) -> DecorateTml<Self::Flag, C> {
-      let ComposePair { widget, child } = self;
-      let DecorateTml { decorator, tml_flag, child } = child.into_decorate_tml();
-      DecorateTml {
-        decorator: Box::new(move |w| ComposeChild::compose_child(widget, decorator(w))),
-        tml_flag,
-        child,
-      }
-    }
-  }
-}
-
 impl<W, C> WidgetBuilder for ComposePair<State<W>, C>
 where
   W: ComposeChild,
@@ -313,74 +209,6 @@ mod tests {
       MockBox { size: ZERO_SIZE }
         .with_child(X, ctx)
         .with_child(Void {}, ctx)
-        .build(ctx)
-    });
-  }
-
-  #[derive(SingleChild)]
-  struct Tml;
-  struct A;
-  impl TmlFlag for Tml {}
-
-  #[test]
-  fn decorate_tml() {
-    struct WithDecorate;
-
-    impl ComposeChild for WithDecorate {
-      type Child = DecorateTml<Tml, A>;
-
-      fn compose_child(_this: State<Self>, child: Self::Child) -> Widget {
-        child.decorate(|_, _| Void.into())
-      }
-    }
-    let mb = MockBox { size: Size::zero() };
-    let _ = FnWidget::new(|ctx| {
-      WithDecorate
-        .with_child(
-          mb.clone()
-            .with_child(mb.with_child(Tml.with_child(A, ctx), ctx), ctx),
-          ctx,
-        )
-        .build(ctx)
-    });
-
-    let _ = FnWidget::new(|ctx| {
-      WithDecorate
-        .with_child(Tml.with_child(A, ctx), ctx)
-        .build(ctx)
-    });
-  }
-
-  #[test]
-  fn with_embed_decorate() {
-    struct WithDecorate;
-    #[derive(Template)]
-    struct EmbedDecorateTml(DecorateTml<Tml, A>);
-
-    impl ComposeChild for WithDecorate {
-      type Child = EmbedDecorateTml;
-
-      fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
-        child.0.decorate(|_, _| Void.into())
-      }
-    }
-
-    let _ = FnWidget::new(|ctx| {
-      WithDecorate
-        .with_child(Tml.with_child(A, ctx), ctx)
-        .build(ctx)
-    });
-    let mb = MockBox { size: Size::zero() };
-    let _ = FnWidget::new(|ctx| {
-      WithDecorate
-        .with_child(mb.clone().with_child(Tml.with_child(A, ctx), ctx), ctx)
-        .build(ctx)
-    });
-    let _ = FnWidget::new(|ctx| {
-      let cursor = Cursor { cursor: CursorIcon::Hand };
-      let x = cursor.with_child(Tml.with_child(A, ctx), ctx);
-      WithDecorate
-        .with_child(mb.with_child(x, ctx), ctx)
         .build(ctx)
     });
   }

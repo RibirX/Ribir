@@ -9,6 +9,3 @@ pub struct Trailing;
 pub type TrailingText = SinglePair<Trailing, CowArc<str>>;
 
 pub type LeadingText = SinglePair<Leading, CowArc<str>>;
-
-impl TmlFlag for Leading {}
-impl TmlFlag for Trailing {}
