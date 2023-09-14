@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use ribir_core::prelude::*;
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct ButtonImpl {
   #[declare(default = 48.)]
   pub min_width: f32,
@@ -12,13 +12,9 @@ pub struct ButtonImpl {
   pub icon_pos: IconPosition,
   pub label_style: CowArc<TextStyle>,
   pub foreground_color: Brush,
-  #[declare(convert=strip_option)]
   pub background_color: Option<Brush>,
-  #[declare(convert=strip_option)]
   pub radius: Option<f32>,
-  #[declare(convert=strip_option)]
   pub border_style: Option<Border>,
-  #[declare(convert=strip_option)]
   pub padding_style: Option<EdgeInsets>,
 }
 

@@ -54,14 +54,14 @@ pub enum VAlign {
 }
 
 /// A widget that align its child in x-axis, base on child's width.
-#[derive(Declare, Declare2, SingleChild)]
+#[derive(Declare2, SingleChild)]
 pub struct HAlignWidget {
   #[declare(default, builtin)]
   pub h_align: HAlign,
 }
 
 /// A widget that align its child in y-axis, base on child's height.
-#[derive(Declare, Declare2, SingleChild)]
+#[derive(Declare2, SingleChild)]
 pub struct VAlignWidget {
   #[declare(default, builtin)]
   pub v_align: VAlign,
@@ -162,10 +162,10 @@ mod tests {
   const WND_SIZE: Size = Size::new(100., 100.);
 
   fn h_align(h_align: HAlign) -> Widget {
-    widget! {
-      HAlignWidget {
+    fn_widget! {
+      @HAlignWidget {
         h_align,
-        MockBox { size: CHILD_SIZE }
+        @MockBox { size: CHILD_SIZE }
       }
     }
     .into()
@@ -203,10 +203,10 @@ mod tests {
   );
 
   fn v_align(v_align: VAlign) -> Widget {
-    widget! {
-      VAlignWidget {
+    fn_widget! {
+      @VAlignWidget {
         v_align,
-        MockBox { size: CHILD_SIZE }
+        @MockBox { size: CHILD_SIZE }
       }
     }
     .into()

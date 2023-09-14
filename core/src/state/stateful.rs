@@ -462,7 +462,7 @@ mod tests {
   fn fix_pin_widget_node() {
     crate::reset_test_env!();
 
-    let mut wnd = TestWindow::new(widget! { MockBox { size: Size::new(100., 100.) } });
+    let mut wnd = TestWindow::new(MockBox { size: Size::new(100., 100.) });
     wnd.draw_frame();
     let tree = wnd.widget_tree.borrow();
     assert_eq!(tree.root().descendants(&tree.arena).count(), 1);

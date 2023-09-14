@@ -18,12 +18,11 @@ paste.workspace = true
 ribir = {path = "../ribir", features = ["material", "widgets"]}
 ribir_dev_helper = {path = "../dev-helper"}
 ribir_geom = {path = "../geom"}
-trybuild.workspace = true
 winit.workspace = true
 
 [[test]]
-name = "compile_message"
-path = "compile_message.rs"
+name = "include_svg"
+path = "include_svg_test.rs"
 
 [[test]]
 name = "rdl_macro_test"

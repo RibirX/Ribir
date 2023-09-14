@@ -1,7 +1,7 @@
 use ribir_core::prelude::*;
 
 /// Widget with fixed size as a container for its child.
-#[derive(Declare, Declare2, SingleChild)]
+#[derive(Declare2, SingleChild)]
 pub struct Container {
   pub size: Size,
 }
@@ -33,6 +33,6 @@ mod tests {
   use ribir_geom::Size;
 
   const SIZE: Size = Size::new(100., 100.);
-  fn smoke() -> Widget { widget! { Container { size: SIZE }}.into() }
+  fn smoke() -> Widget { fn_widget! { @Container { size: SIZE }}.into() }
   widget_layout_test!(smoke, size == SIZE,);
 }

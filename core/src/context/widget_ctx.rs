@@ -216,8 +216,8 @@ mod tests {
   fn map_self_eq_self() {
     let _guard = unsafe { AppCtx::new_lock_scope() };
 
-    let w = widget! {
-      MockBox {
+    let w = fn_widget! {
+      @MockBox {
         size: Size::zero(),
         margin: EdgeInsets::all(2.),
       }
@@ -239,10 +239,10 @@ mod tests {
   fn map_transform_test() {
     let _guard = unsafe { AppCtx::new_lock_scope() };
 
-    let w = widget! {
-      MockBox {
+    let w = fn_widget! {
+      @MockBox {
         size: Size::new(100., 100.),
-        MockBox {
+        @MockBox {
           transform: Transform::scale(0.5, 0.5),
           left_anchor: 30.,
           top_anchor: 30.,

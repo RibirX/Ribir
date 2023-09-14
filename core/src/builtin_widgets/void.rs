@@ -4,7 +4,7 @@ use crate::{impl_query_self_only, prelude::*};
 /// node in `widget!` macro, or hold a place in tree. When it have a child
 /// itself will be dropped when build tree, otherwise as a render widget but do
 /// nothing.
-#[derive(Declare, SingleChild, Declare2)]
+#[derive(SingleChild, Declare2)]
 pub struct Void;
 
 impl Render for Void {

@@ -91,10 +91,10 @@ macro_rules! widget_test_suit {
 /// use ribir_dev_helper::*;
 ///
 /// fn my_widget() -> Widget {
-///   widget!{
-///     MockBox {
+///   fn_widget!{
+///     @MockBox {
 ///       size: Size::new(100., 100.),
-///       MockBox {
+///       @MockBox {
 ///         size: Size::new(50., 50.)
 ///       }
 ///     }

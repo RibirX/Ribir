@@ -2,10 +2,9 @@ use log::warn;
 use ribir_core::prelude::*;
 use webbrowser::{open_browser as open, Browser};
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct Link {
   /// Want to open url
-  #[declare(convert=into)]
   url: CowArc<str>,
   /// Select the browser software you expect to open
   #[declare(default=Browser::Default)]

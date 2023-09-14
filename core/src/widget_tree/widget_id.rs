@@ -5,6 +5,7 @@ use super::WidgetTree;
 use crate::{
   builtin_widgets::Void,
   context::{PaintingCtx, WidgetCtx},
+  prelude::{AnonymousData, DataWidget},
   state::{ModifyScope, Notifier},
   widget::{QueryOrder, Render},
   window::DelayEvent,
@@ -101,27 +102,39 @@ impl WidgetId {
     self.0.descendants(tree).map(WidgetId)
   }
 
-  pub(crate) fn on_mounted_subtree(self, tree: &WidgetTree) {
+  pub(crate) fn on_mounted_subtree(self, tree: &mut WidgetTree) {
+    // safety: just
+    let tree2 = unsafe { &mut *(tree as *mut _) };
     self
       .descendants(&tree.arena)
-      .for_each(|w| w.on_mounted(tree));
+      .for_each(|w| w.on_mounted(tree2));
   }
 
-  pub(crate) fn on_mounted(self, tree: &WidgetTree) {
+  pub(crate) fn on_mounted(self, tree: &mut WidgetTree) {
+    let mut handles = vec![];
     self.assert_get(&tree.arena).query_all_type(
       |notifier: &Notifier| {
         let state_changed = tree.dirty_set.clone();
-        notifier
+        let h = notifier
           .raw_modifies()
           .filter(|b| b.contains(ModifyScope::FRAMEWORK))
           .subscribe(move |_| {
             state_changed.borrow_mut().insert(self);
-          });
+          })
+          .unsubscribe_when_dropped();
+        handles.push(h);
         true
       },
       QueryOrder::OutsideFirst,
     );
 
+    // will auto cancel subscription when node removed.
+    self.wrap_node(&mut tree.arena, move |node| {
+      Box::new(DataWidget::new(
+        node,
+        AnonymousData::new(Box::new(handles.into_boxed_slice())),
+      ))
+    });
     tree.window().add_delay_event(DelayEvent::Mounted(self));
   }
 

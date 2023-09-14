@@ -22,7 +22,7 @@ use ribir_core::prelude::*;
 ///   }
 /// };
 /// ```
-#[derive(Declare, Declare2, Default, Clone)]
+#[derive(Declare2, Default, Clone)]
 pub struct Avatar {
   #[declare(default=Palette::of(ctx).primary())]
   pub color: Color,

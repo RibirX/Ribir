@@ -19,7 +19,7 @@ pub enum BoxFit {
 }
 
 /// Widget set how its child should be scale to fit its box.
-#[derive(Declare, Declare2, SingleChild)]
+#[derive(Declare2, SingleChild)]
 pub struct FittedBox {
   #[declare(builtin)]
   pub box_fit: BoxFit,
@@ -161,8 +161,8 @@ mod tests {
   }
 
   fn as_builtin_field() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         size: Size::new(200., 200.),
         box_fit: BoxFit::Fill,
       }

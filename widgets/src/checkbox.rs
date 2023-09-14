@@ -5,7 +5,7 @@ use crate::{
 use ribir_core::prelude::*;
 
 /// Represents a control that a user can select and clear.
-#[derive(Clone, Declare, Declare2)]
+#[derive(Clone, Declare2)]
 pub struct Checkbox {
   #[declare(default)]
   pub checked: bool,
@@ -25,7 +25,7 @@ pub struct CheckBoxStyle {
   pub label_color: Brush,
 }
 
-#[derive(Clone, Declare, Declare2)]
+#[derive(Clone, Declare2)]
 pub struct CheckBoxDecorator {
   #[declare(default=Palette::of(ctx).primary())]
   pub color: Color,
@@ -134,7 +134,7 @@ mod tests {
   extern crate test;
   use test::Bencher;
 
-  fn checked() -> Widget { widget! { Checkbox { checked: true } }.into() }
+  fn checked() -> Widget { fn_widget! { @Checkbox { checked: true } }.into() }
   widget_test_suit!(
     checked,
     wnd_size = Size::new(48., 48.),
@@ -142,7 +142,7 @@ mod tests {
     height == 24.,
   );
 
-  fn unchecked() -> Widget { widget! { Checkbox {  } }.into() }
+  fn unchecked() -> Widget { fn_widget! { @Checkbox {} }.into() }
   widget_test_suit!(
     unchecked,
     wnd_size = Size::new(48., 48.),
@@ -151,8 +151,8 @@ mod tests {
   );
 
   fn indeterminate() -> Widget {
-    widget! {
-      Checkbox {
+    fn_widget! {
+      @Checkbox {
         checked: true,
         indeterminate: true,
       }

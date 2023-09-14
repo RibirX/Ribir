@@ -5,7 +5,7 @@ use ribir_core::prelude::*;
 /// classic frameworks, it's not draw anything and not require you to
 /// provide image or font fot it to draw, it just center align and fit size of
 /// its child. So you can declare any widget as its child to display as a icon.
-#[derive(Declare, Declare2, Default, Clone, Copy)]
+#[derive(Declare2, Default, Clone, Copy)]
 pub struct Icon {
   #[declare(default = IconSize::of(ctx).small)]
   pub size: Size,

@@ -3,8 +3,8 @@ use crate::pipe_macro::PipeMacro;
 use crate::rdl_macro::RdlMacro;
 use crate::writer_map_macro::{gen_map_path_writer, gen_split_path_writer};
 use crate::{
+  variable_names::{ribir_suffix_variable, WIDGET_OF_BUILTIN_FIELD, WIDGET_OF_BUILTIN_METHOD},
   watch_macro::WatchMacro,
-  widget_macro::{ribir_suffix_variable, WIDGET_OF_BUILTIN_FIELD, WIDGET_OF_BUILTIN_METHOD},
 };
 use inflector::Inflector;
 use proc_macro2::{Ident, Span, TokenStream};

@@ -79,7 +79,6 @@ serde_json = "1.0.82"
 smallvec = "1.8.0"
 syn = "1.0.109"
 tiny-skia-path = {version = "0.11.0"}
-trybuild = "1.0.77"
 unicode-bidi = "0.3.7"
 unicode-script = "0.5.4"
 unicode-segmentation = "1.9.0"

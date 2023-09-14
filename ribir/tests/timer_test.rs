@@ -6,6 +6,7 @@ mod test_single_thread {
   use ribir_core::reset_test_env;
   use ribir_core::test_helper::TestWindow;
   use ribir_dev_helper::*;
+  use std::cell::Cell;
   use std::{cell::RefCell, rc::Rc};
   use std::{thread::sleep, time::Duration};
   use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton, WindowEvent};
@@ -13,16 +14,12 @@ mod test_single_thread {
   use ribir_core::{prelude::*, test_helper::MockBox};
 
   pub fn test_widget_with_timer() {
-    let w = widget! {
-      MockBox {
-        id: c,
-        size: Size::new(20., 20.)
-      }
-      finally {
-        observable::of(Size::new(10., 10.))
-          .delay(Duration::from_millis(10), AppCtx::scheduler())
-          .subscribe(move |v| c.size = v);
-      }
+    let w = fn_widget! {
+      let c = @MockBox { size: Size::new(20., 20.) };
+      observable::of(Size::new(10., 10.))
+        .delay(Duration::from_millis(10), AppCtx::scheduler())
+        .subscribe(move |v| $c.write().size = v);
+      c
     };
 
     let mut wnd = TestWindow::new(w);
@@ -44,14 +41,14 @@ mod test_single_thread {
     assert_layout_result_by_path!(wnd, {path = [0], width == 10., height == 10.,});
   }
 
-  fn env(times: usize) -> (TestWindow, Rc<RefCell<usize>>) {
+  fn env(times: usize) -> (TestWindow, Rc<Cell<usize>>) {
     let size = Size::new(400., 400.);
-    let count = Rc::new(RefCell::new(0));
+    let count = Rc::new(Cell::new(0));
     let c_count = count.clone();
-    let w = widget! {
-      MockBox {
+    let w = fn_widget! {
+      @MockBox {
         size,
-        on_x_times_tap: (times, move |_| *c_count.borrow_mut() += 1)
+        on_x_times_tap: (times, move |_| c_count.set(c_count.get() + 1))
       }
     };
     let mut wnd = TestWindow::new_with_size(w, size);
@@ -101,7 +98,7 @@ mod test_single_thread {
       });
 
     run_until(&wnd, || *is_complete2.borrow());
-    assert_eq!(*count.borrow(), 2);
+    assert_eq!(count.get(), 2);
 
     let (wnd, count) = env(2);
     let c_wnd = wnd.clone();
@@ -128,7 +125,7 @@ mod test_single_thread {
       });
 
     run_until(&wnd, || *is_complete2.borrow());
-    assert_eq!(*count.borrow(), 0);
+    assert_eq!(count.get(), 0);
   }
 
   pub fn test_tripe_tap() {
@@ -160,7 +157,7 @@ mod test_single_thread {
 
     run_until(&wnd, || *is_complete2.borrow());
 
-    assert_eq!(*count.borrow(), 2);
+    assert_eq!(count.get(), 2);
   }
 }
 

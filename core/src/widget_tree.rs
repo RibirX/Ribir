@@ -530,10 +530,10 @@ mod tests {
        @MockMulti {
         @ {
           (0..100).map(|_|
-            widget! { MockBox {
+            @MockBox {
             size: Size::new(150., 50.),
             background: Color::BLUE,
-          }})
+          })
         }
     }};
     let mut wnd = TestWindow::new_with_size(w1, win_size);
@@ -545,10 +545,10 @@ mod tests {
       @MockMulti {
         @ {
           (0..1).map(|_|
-            widget! { MockBox {
+            @MockBox {
              size: Size::new(150., 50.),
              background: Color::BLUE,
-          }})
+          })
         }
     }};
 

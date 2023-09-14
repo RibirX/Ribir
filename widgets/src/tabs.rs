@@ -56,7 +56,7 @@ use ribir_core::prelude::*;
 ///   }
 /// };
 /// ```
-#[derive(Declare, Declare2, Clone)]
+#[derive(Declare2, Clone)]
 pub struct Tabs {
   #[declare(default = Position::Top)]
   pub pos: Position,
@@ -99,7 +99,7 @@ impl CustomStyle for TabsStyle {
     }
   }
 }
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct TabsDecorator {}
 
 impl ComposeDecorator for TabsDecorator {
@@ -120,10 +120,10 @@ pub struct TabItem {
   text: Option<State<Label>>,
 }
 
-#[derive(Declare, Declare2, SingleChild)]
+#[derive(Declare2, SingleChild)]
 pub struct TabPane;
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct TabDecorator {}
 
 impl ComposeDecorator for TabDecorator {
@@ -132,7 +132,7 @@ impl ComposeDecorator for TabDecorator {
   fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
 }
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct IndicatorDecorator {
   pub pos: Position,
   pub rect: Rect,

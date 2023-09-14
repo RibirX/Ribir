@@ -191,7 +191,7 @@ mod tests {
     fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
   }
 
-  #[derive(Declare)]
+  #[derive(Declare2)]
   struct X;
 
   impl ComposeChild for X {

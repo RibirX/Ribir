@@ -849,21 +849,19 @@ mod tests {
       wid: Option<WidgetId>,
     }
 
-    fn build(item: Writer<Task>) -> Widget {
-      let item = item.into_inner();
-      widget! {
-        states { task: item.clone_stateful() }
-        TaskWidget {
-          delay_drop_until: !task.pin,
-          layout_cnt: task.layout_cnt.clone(),
-          paint_cnt: task.paint_cnt.clone(),
-          trigger: task.trigger,
+    fn build(task: Writer<Task>) -> Widget {
+      fn_widget! {
+       @TaskWidget {
+          delay_drop_until: pipe!(!$task.pin),
+          layout_cnt: pipe!($task.layout_cnt.clone()),
+          paint_cnt: pipe!($task.paint_cnt.clone()),
+          trigger: pipe!($task.trigger),
           on_mounted: move |ctx| {
-            task.mounted += 1;
-            task.wid = Some(ctx.id);
+            $task.write().mounted += 1;
+            $task.write().wid = Some(ctx.id);
           },
           on_disposed: move |ctx| {
-            let wid = task.wid.take();
+            let wid = $task.write().wid.take();
             assert_eq!(wid, Some(ctx.id));
           }
         }
@@ -871,7 +869,7 @@ mod tests {
       .into()
     }
 
-    #[derive(Declare)]
+    #[derive(Declare2)]
     struct TaskWidget {
       trigger: u32,
       paint_cnt: Rc<Cell<u32>>,
@@ -933,7 +931,7 @@ mod tests {
 
     // the remove pined widget only mark self dirty
     let first_layout_cnt = removed[0].state_ref().layout_cnt.get();
-    let secord_layout_cnt = removed[1].state_ref().layout_cnt.get();
+    let second_layout_cnt = removed[1].state_ref().layout_cnt.get();
     let host_layout_cnt = tasks.state_ref()[0].state_ref().layout_cnt.get();
     removed[0].state_ref().trigger += 1;
     wnd.draw_frame();
@@ -942,7 +940,7 @@ mod tests {
       first_layout_cnt + 1
     );
     assert_eq!(removed[0].state_ref().paint_cnt.get(), 4);
-    assert_eq!(removed[1].state_ref().layout_cnt.get(), secord_layout_cnt);
+    assert_eq!(removed[1].state_ref().layout_cnt.get(), second_layout_cnt);
     assert_eq!(
       tasks.state_ref()[0].state_ref().layout_cnt.get(),
       host_layout_cnt

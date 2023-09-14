@@ -2,11 +2,6 @@ use crate::{context::BuildCtx, prelude::Pipe, state::ModifyScope};
 use rxrust::ops::box_it::BoxOp;
 use std::convert::Infallible;
 
-pub trait Declare {
-  type Builder: DeclareBuilder;
-  fn declare_builder() -> Self::Builder;
-}
-
 /// The next version of `Declare` trait. It will replace the `Declare` trait
 /// after it is stable.
 pub trait Declare2 {
@@ -74,46 +69,6 @@ impl<V, U: From<V>> DeclareFrom<V, ()> for DeclareInit<U> {
 impl<V: 'static, U: From<V> + 'static> DeclareFrom<Pipe<V>, Pipe<()>> for DeclareInit<U> {
   #[inline]
   fn declare_from(value: Pipe<V>) -> Self { Self::Pipe(value.map(U::from)) }
-}
-
-#[derive(Debug, PartialEq, Hash)]
-pub struct DeclareStripOption<O>(O);
-
-impl<V> From<V> for DeclareStripOption<Option<V>> {
-  #[inline]
-  fn from(value: V) -> Self { Self(Some(value)) }
-}
-
-impl<V> From<Option<V>> for DeclareStripOption<Option<V>> {
-  #[inline]
-  fn from(value: Option<V>) -> Self { Self(value) }
-}
-
-impl<V> DeclareStripOption<Option<V>> {
-  #[inline]
-  pub fn into_option_value(self) -> Option<V> { self.0 }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use ribir_painter::{Brush, Color};
-
-  #[test]
-  fn inner_value_into() {
-    assert_eq!(
-      DeclareStripOption::from(Brush::from(Color::RED)),
-      DeclareStripOption(Some(Brush::from(Color::RED)))
-    );
-  }
-
-  #[test]
-  fn option_self_can_use_with_strip() {
-    assert_eq!(
-      DeclareStripOption::from(Some(Brush::from(Color::RED))),
-      DeclareStripOption(Some(Brush::from(Color::RED)))
-    )
-  }
 }
 
 /// struct help the generate code have better type hint.

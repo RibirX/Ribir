@@ -56,14 +56,14 @@ mod tests {
     let bubble_event_order = event_order.clone();
     let capture_event_order = event_order.clone();
 
-    let widget = widget! {
-      MockBox {
+    let widget = fn_widget! {
+      @MockBox {
         size: Size::new(200., 200.),
         on_wheel_capture: move |wheel| {
           *capture_receive.borrow_mut() = (wheel.delta_x,  wheel.delta_y);
           (*capture_event_order.borrow_mut()).push("capture");
         },
-        MockBox {
+        @MockBox {
           size: Size::new(100., 100.),
           auto_focus: true,
           on_wheel: move |wheel| {

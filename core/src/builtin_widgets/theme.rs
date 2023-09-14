@@ -66,7 +66,7 @@ pub enum Theme {
   Inherit(InheritTheme),
 }
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct ThemeWidget {
   pub theme: Rc<Theme>,
 }

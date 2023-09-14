@@ -48,8 +48,8 @@ mod tests {
     let receive = Rc::new(RefCell::new("".to_string()));
     let c_receive = receive.clone();
 
-    let widget = widget! {
-      MockBox {
+    let widget = fn_widget! {
+      @MockBox {
         size: ZERO_SIZE,
         auto_focus: true,
         on_chars: move |event| c_receive.borrow_mut().push_str(&event.chars)
@@ -75,8 +75,8 @@ mod tests {
     let chars_receive = receive.clone();
     let capture_receive = receive.clone();
 
-    let widget = widget! {
-      MockBox {
+    let widget = fn_widget! {
+      @MockBox {
         size: ZERO_SIZE,
         on_chars_capture: move |event| {
           let chars = event.chars.to_string();
@@ -84,7 +84,7 @@ mod tests {
           let char = (chars.parse::<i32>().unwrap() * 2).to_string();
           capture_receive.borrow_mut().push_str(&char);
         },
-        MockBox {
+        @MockBox {
           size: ZERO_SIZE,
           auto_focus: true,
           on_chars: move |event| chars_receive.borrow_mut().push_str(&event.chars),

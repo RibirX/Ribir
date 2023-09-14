@@ -1,17 +1,17 @@
 use crate::{impl_query_self_only, prelude::*};
 
 /// The BoxDecoration provides a variety of ways to draw a box.
-#[derive(SingleChild, Default, Clone, Declare, Declare2)]
+#[derive(SingleChild, Default, Clone, Declare2)]
 pub struct BoxDecoration {
   /// The background of the box.
-  #[declare(builtin, default, convert=custom)]
+  #[declare(builtin, default)]
   pub background: Option<Brush>,
   /// A border to draw above the background
-  #[declare(builtin, default, convert=strip_option)]
+  #[declare(builtin, default)]
   pub border: Option<Border>,
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
-  #[declare(builtin, default, convert=strip_option)]
+  #[declare(builtin, default)]
   pub border_radius: Option<Radius>,
 }
 
@@ -60,35 +60,6 @@ impl Render for BoxDecoration {
 }
 
 impl_query_self_only!(BoxDecoration);
-
-pub trait IntoBackground<M> {
-  fn into_background(self) -> Option<Brush>;
-}
-
-impl<T: Into<Brush>> IntoBackground<Brush> for T {
-  #[inline]
-  fn into_background(self) -> Option<Brush> { Some(self.into()) }
-}
-
-impl IntoBackground<Option<Brush>> for Option<Brush> {
-  #[inline]
-  fn into_background(self) -> Option<Brush> { self }
-}
-
-impl BoxDecorationDeclarer {
-  #[inline]
-  pub fn background<M>(mut self, b: impl IntoBackground<M>) -> Self {
-    self.background = Some(b.into_background());
-    self
-  }
-}
-
-impl BoxDecoration {
-  #[inline]
-  pub fn set_declare_background<M>(&mut self, b: impl IntoBackground<M>) {
-    self.background = b.into_background();
-  }
-}
 
 impl BoxDecoration {
   fn paint_border(&self, painter: &mut Painter, rect: &Rect) {
@@ -228,17 +199,19 @@ mod tests {
     let dummy = std::mem::MaybeUninit::uninit();
     // just for test, we know BoxDecoration not use `ctx` to build.
     let ctx: BuildCtx<'static> = unsafe { dummy.assume_init() };
-    let w = BoxDecoration::declare_builder().build_declare(&ctx);
+    let w = BoxDecoration::declare2_builder().build_declare(&ctx);
 
-    assert_eq!(w.border, None);
-    assert_eq!(w.border_radius, None);
-    assert_eq!(w.background, None);
+    assert_eq!(w.read().border, None);
+    assert_eq!(w.read().border_radius, None);
+    assert_eq!(w.read().background, None);
+
+    std::mem::forget(ctx);
   }
 
   const SIZE: Size = Size::new(100., 100.);
   fn with_border() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         size: SIZE,
         border: Border {
           left: BorderSide::new(1., Color::BLACK.into()),

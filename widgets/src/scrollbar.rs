@@ -3,7 +3,7 @@ use ribir_core::prelude::*;
 
 /// A control widget that enables the user to access horizontal parts child that
 /// is larger than the box rect.
-#[derive(Declare, Declare2, Clone)]
+#[derive(Declare2, Clone)]
 pub struct HScrollBar {
   /// Scrolled pixels of child content.
   #[declare(default)]
@@ -22,7 +22,7 @@ pub struct ScrollBarStyle {
 
 /// Compose style that use to decoration the thumb of horizontal scrollbar,
 /// overwrite it when init theme.
-#[derive(Debug, Declare, Declare2)]
+#[derive(Debug, Declare2)]
 pub struct HScrollBarThumbDecorator {
   pub offset: f32,
 }
@@ -37,7 +37,7 @@ impl ComposeDecorator for HScrollBarThumbDecorator {
 
 /// Compose style that use to decoration the thumb of vertical scrollbar,
 /// overwrite it when init theme.
-#[derive(Debug, Declare, Declare2)]
+#[derive(Debug, Declare2)]
 pub struct VScrollBarThumbDecorator {
   pub offset: f32,
 }
@@ -86,7 +86,7 @@ impl ComposeChild for HScrollBar {
 
 /// A control widget that enables the user to access vertical parts child that
 /// is larger than the box rect.
-#[derive(Declare, Declare2, Clone)]
+#[derive(Declare2, Clone)]
 pub struct VScrollBar {
   /// Scrolled pixels of child content.
   #[declare(default)]
@@ -129,7 +129,7 @@ impl ComposeChild for VScrollBar {
 }
 /// A control widget that enables the user to access horizontal parts child that
 /// is larger than the box rect.
-#[derive(Declare, Declare2, Clone)]
+#[derive(Declare2, Clone)]
 pub struct BothScrollbar {
   /// Scrolled pixels of child content.
   #[declare(default)]
@@ -175,7 +175,7 @@ impl ComposeChild for BothScrollbar {
 
 /// A widget that display the horizontal scrolling information of the
 /// `scrolling` widget.
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct HRawScrollbar {
   scrolling: Reader<ScrollableWidget>,
 }
@@ -237,7 +237,7 @@ impl Compose for HRawScrollbar {
 
 /// A widget that display the vertical scrolling information of the
 /// `scrolling` widget.
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct VRawScrollbar {
   scrolling: Reader<ScrollableWidget>,
 }
@@ -316,19 +316,19 @@ mod test {
   use ribir_dev_helper::*;
 
   fn content_expand_so_all_view_can_scroll() -> Widget {
-    widget! {
-      ConstrainedBox {
+    fn_widget! {
+      @ConstrainedBox {
         clamp: BoxClamp::EXPAND_BOTH,
-        Stack {
+        @Stack {
           fit: StackFit::Passthrough,
-          HScrollBar {
-            Container { size: Size::new(100., 100.) }
+          @HScrollBar {
+            @Container { size: Size::new(100., 100.) }
           }
-          VScrollBar {
-            Container { size: Size::new(100., 100.) }
+          @VScrollBar {
+            @Container { size: Size::new(100., 100.) }
           }
-          BothScrollbar {
-            Container { size: Size::new(100., 100.) }
+          @BothScrollbar {
+            @Container { size: Size::new(100., 100.) }
           }
         }
       }

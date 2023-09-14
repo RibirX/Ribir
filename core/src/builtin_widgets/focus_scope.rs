@@ -1,6 +1,6 @@
 use crate::{events::focus_mgr::FocusType, impl_query_self_only, prelude::*};
 
-#[derive(Declare, Declare2, Clone, Default)]
+#[derive(Declare2, Clone, Default)]
 pub struct FocusScope {
   /// If true, the descendants can not be focused.
   /// Default value is false, then the hold FocusScope subtree can be focused
@@ -31,8 +31,6 @@ impl_query_self_only!(FocusScope);
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
-
   use winit::{
     dpi::LogicalPosition,
     event::{DeviceId, ElementState, KeyboardInput, MouseButton, WindowEvent},
@@ -46,19 +44,19 @@ mod tests {
     let _guard = unsafe { AppCtx::new_lock_scope() };
 
     let size = Size::zero();
-    let widget = widget! {
-      MockMulti {
-        MockBox { size, tab_index: 0, auto_focus: true }
-        FocusScope {
+    let widget = fn_widget! {
+      @MockMulti {
+        @MockBox { size, tab_index: 0i16, auto_focus: true }
+        @FocusScope {
           skip_descendants: false,
-          tab_index: 3,
-          MockMulti {
-            MockBox { size, tab_index: 1, }
-            MockBox { size, tab_index: 2, }
-            MockBox { size, tab_index: 3, }
+          tab_index: 3i16,
+          @MockMulti {
+            @MockBox { size, tab_index: 1i16, }
+            @MockBox { size, tab_index: 2i16, }
+            @MockBox { size, tab_index: 3i16, }
           }
         }
-        MockBox { size, tab_index: 1 }
+        @MockBox { size, tab_index: 1i16 }
       }
     };
 
@@ -105,20 +103,20 @@ mod tests {
     let _guard = unsafe { AppCtx::new_lock_scope() };
 
     let size = Size::zero();
-    let widget = widget! {
-      MockMulti {
-        MockBox { size, tab_index: 0, auto_focus: true }
-        FocusScope {
+    let widget = fn_widget! {
+      @MockMulti {
+        @MockBox { size, tab_index: 0i16, auto_focus: true }
+        @FocusScope {
           can_focus: true,
           skip_descendants: true,
-          tab_index: 3,
-          MockMulti {
-            MockBox { size, tab_index: 1, }
-            MockBox { size, tab_index: 2, }
-            MockBox { size, tab_index: 3, }
+          tab_index: 3i16,
+          @MockMulti {
+            @MockBox { size, tab_index: 1i16, }
+            @MockBox { size, tab_index: 2i16, }
+            @MockBox { size, tab_index: 3i16, }
           }
         }
-        MockBox { size, tab_index: 1 }
+        @MockBox { size, tab_index: 1i16 }
       }
     };
 
@@ -154,22 +152,24 @@ mod tests {
     let _guard = unsafe { AppCtx::new_lock_scope() };
 
     let size = Size::new(50., 50.);
-    let tap_cnt = Rc::new(RefCell::new(0));
-    let result = tap_cnt.clone();
-    let widget = widget! {
-      init {
-        let tap_cnt2 = tap_cnt.clone();
-      }
-      MockMulti {
-        FocusScope {
-          id: host,
-          can_focus: false,
-          on_key_down: move |_| *tap_cnt.borrow_mut() += 1,
-          MockMulti {
-            MockBox { size, on_key_down: move |_| *tap_cnt2.borrow_mut() += 1, }
+    let tap_cnt = Stateful::new(0);
+    let result = tap_cnt.clone_reader();
+    let widget = fn_widget! {
+      let mut host = @FocusScope {
+        can_focus: false,
+        on_key_down: move |_| *$tap_cnt.write() += 1,
+      };
+      let request_focus_box = @MockBox {
+        size,
+        on_pointer_down: move |_| $host.request_focus()
+      };
+      @MockMulti {
+        @$host {
+          @MockMulti {
+            @MockBox { size, on_key_down: move |_| *$tap_cnt.write() += 1, }
           }
         }
-        MockBox { size, on_pointer_down: move |_| host.request_focus(),}
+        @ { request_focus_box }
       }
     };
 
@@ -208,6 +208,6 @@ mod tests {
 
     wnd.run_frame_tasks();
     wnd.draw_frame();
-    assert_eq!(*result.borrow(), 2);
+    assert_eq!(*result.read(), 2);
   }
 }

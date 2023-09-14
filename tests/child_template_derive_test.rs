@@ -1,6 +1,6 @@
 use ribir::prelude::*;
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 struct P;
 
 struct ChildA;
@@ -20,7 +20,7 @@ impl ComposeChild for P {
   fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
 }
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 struct P2;
 
 #[derive(Template)]
@@ -32,7 +32,7 @@ impl ComposeChild for P2 {
   fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
 }
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 struct P3;
 
 #[derive(Template)]

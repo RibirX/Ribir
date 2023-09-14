@@ -6,12 +6,12 @@ use std::{ops::Deref, rc::Rc, time::Duration};
 /// smoothly.
 #[derive(Declare2, Clone, Debug, PartialEq)]
 pub struct Transition<E: 'static> {
-  #[declare(default, convert=strip_option)]
+  #[declare(default)]
   pub delay: Option<Duration>,
   pub duration: Duration,
   #[declare(strict)]
   pub easing: E,
-  #[declare(default, convert=strip_option)]
+  #[declare(default)]
   pub repeat: Option<f32>,
 }
 

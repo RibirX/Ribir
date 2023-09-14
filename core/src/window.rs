@@ -625,18 +625,15 @@ impl From<WindowId> for u64 {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::*;
+  use crate::{reset_test_env, test_helper::*};
   use ribir_dev_helper::assert_layout_result_by_path;
 
   #[test]
   fn layout_after_wnd_resize() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
-    let w = widget! {
-       MockBox { size: INFINITY_SIZE }
-    };
     let size = Size::new(100., 100.);
-    let mut wnd = TestWindow::new_with_size(w, size);
+    let mut wnd = TestWindow::new_with_size(MockBox { size: INFINITY_SIZE }, size);
     wnd.draw_frame();
     assert_layout_result_by_path!(wnd, { path = [0], size == size, });
 

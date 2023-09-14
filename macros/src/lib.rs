@@ -1,22 +1,19 @@
 #![feature(proc_macro_diagnostic, proc_macro_span)]
 extern crate proc_macro;
 
-mod declare_derive;
 mod declare_derive2;
-mod error;
 mod lerp_derive;
 mod util;
-mod widget_macro;
 use fn_widget_macro::FnWidgetMacro;
 use proc_macro::TokenStream;
 use quote::quote;
 use symbol_process::DollarRefsCtx;
 use syn::{parse_macro_input, DeriveInput};
-use widget_macro::gen_widget_macro;
 mod child_template;
 mod fn_widget_macro;
 mod pipe_macro;
 mod rdl_macro;
+pub(crate) mod variable_names;
 mod watch_macro;
 mod writer_map_macro;
 pub(crate) use rdl_macro::*;
@@ -25,14 +22,6 @@ use crate::pipe_macro::PipeMacro;
 use crate::watch_macro::WatchMacro;
 pub(crate) mod declare_obj;
 pub(crate) mod symbol_process;
-
-pub(crate) const WIDGET_MACRO_NAME: &str = "widget";
-pub(crate) const MOVE_TO_WIDGET_MACRO_NAME: &str = "move_to_widget";
-pub(crate) const WATCH_MACRO_NAME: &str = "watch";
-pub(crate) const NO_WATCH_MACRO_NAME: &str = "no_watch";
-pub(crate) const ASSIGN_WATCH_MACRO_NAME: &str = "assign_watch";
-pub(crate) const LET_WATCH_MACRO_NAME: &str = "let_watch";
-pub(crate) const PROP_MACRO_NAME: &str = "prop";
 
 macro_rules! ok {
   ($e: expr) => {
@@ -84,20 +73,8 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
 /// - implement `DeclareBuilder` for `XXXBuilder` which build `XXX` and used by
 ///   `declare！` to build the `XXX` widget.
 /// - for every field of `XXXBuilder`
-///   - implement an associate method `into_xxx`   use to convert a value to the
-///     `xxx` field type, which effect by the `convert` meta. `widget!` will use
-///     it to convert the field value
 ///   - implement method with same name of the field and use to init the field.
-///
 ///  [declare]: ../ribir/declare/index.html
-#[proc_macro_derive(Declare, attributes(declare))]
-pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
-  let mut input = parse_macro_input!(input as DeriveInput);
-  declare_derive::declare_derive(&mut input)
-    .unwrap_or_else(|e| e.into_compile_error())
-    .into()
-}
-
 #[proc_macro_derive(Declare2, attributes(declare))]
 pub fn declare_trait_macro_derive2(input: TokenStream) -> TokenStream {
   let mut input = parse_macro_input!(input as DeriveInput);
@@ -113,9 +90,6 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
     .unwrap_or_else(|e| e.into_compile_error())
     .into()
 }
-
-#[proc_macro]
-pub fn widget(input: TokenStream) -> TokenStream { gen_widget_macro(input, None) }
 
 /// The macro use to declare a object, this macro will use `ctx!()` to access
 /// the `BuildCtx`, so it can only use in the `fn_widget!` macro, or any scope

@@ -4,7 +4,7 @@ use ribir_core::{impl_query_self_only, prelude::*};
 ///
 /// This widget forces its child to have a specific width and/or height
 /// (assuming values are permitted by the parent of this widget).
-#[derive(SingleChild, Declare, Declare2, Clone)]
+#[derive(SingleChild, Declare2, Clone)]
 pub struct SizedBox {
   pub size: Size,
 }
@@ -33,10 +33,10 @@ mod tests {
 
   fn fix_size() -> Widget {
     let size: Size = Size::new(100., 100.);
-    widget! {
-      SizedBox {
+    fn_widget! {
+      @SizedBox {
         size,
-        Text { text: "" }
+        @Text { text: "" }
       }
     }
     .into()
@@ -44,10 +44,10 @@ mod tests {
   widget_layout_test!(fix_size, width == 100., height == 100.,);
 
   fn shrink_size() -> Widget {
-    widget! {
-      SizedBox {
+    fn_widget! {
+      @SizedBox {
         size: ZERO_SIZE,
-        Text { text: "" }
+        @Text { text: "" }
       }
     }
     .into()
@@ -59,10 +59,10 @@ mod tests {
   );
 
   fn expanded_size() -> Widget {
-    widget! {
-      SizedBox {
+    fn_widget! {
+      @SizedBox {
         size: INFINITY_SIZE,
-        Text { text: "" }
+        @Text { text: "" }
       }
     }
     .into()

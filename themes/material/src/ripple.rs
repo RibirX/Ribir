@@ -4,14 +4,14 @@ use ribir_widgets::prelude::*;
 
 /// Widget use to do ripple animate as a visual feedback to user interactive.
 /// Usually for touch and mouse.
-#[derive(Declare, Debug, Declare2)]
+#[derive(Debug, Declare2)]
 pub struct Ripple {
   /// The color of ripples.
   pub color: Color,
   /// The radius in pixels of foreground ripples when fully expanded. The
   /// default radius will be the distance from the center of the ripple to the
   /// furthest corner of the host bounding rectangle.
-  #[declare(default, convert=strip_option)]
+  #[declare(default)]
   pub radius: Option<f32>,
   /// Whether the ripple always originates from the center of the host bound.
   #[declare(default)]

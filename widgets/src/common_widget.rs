@@ -1,9 +1,9 @@
 use ribir_core::prelude::*;
 
-#[derive(Default, Declare, Declare2, SingleChild)]
+#[derive(Default, Declare2, SingleChild)]
 pub struct Leading;
 
-#[derive(Default, Declare, Declare2, SingleChild)]
+#[derive(Default, Declare2, SingleChild)]
 pub struct Trailing;
 
 pub type TrailingText = SinglePair<Trailing, CowArc<str>>;
