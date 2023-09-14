@@ -43,19 +43,10 @@ macro_rules! impl_listener {
   ($doc: literal, $name: ident, $event_ty: ident) => {
     paste::paste! {
       #[doc= $doc]
-      #[derive(Declare, Declare2)]
+      #[derive(Declare2)]
       pub struct [<$name Listener>]{
         #[declare(skip)]
         [<$name:snake _subject>]: [<$name Subject>]
-      }
-
-      impl [<$name ListenerDeclarer>] {
-        fn subject(&mut self) -> [<$name Subject>] {
-          self
-            .[<$name:snake _subject>]
-            .get_or_insert_with([<$name Subject>]::default)
-            .clone()
-        }
       }
 
       impl [<$name ListenerDeclarer2>] {
@@ -115,28 +106,6 @@ macro_rules! impl_multi_event_listener {
               }) as fn(&mut [<All $name>]) -> Option<&mut [<$name Event>]>
             )
             .subscribe(handler);
-            self
-          }
-        )+
-      }
-
-      impl [<$name ListenerDeclarer>] {
-        $(
-          #[doc = "Sets up a function that will be called \
-            whenever the `" $event_ty "` is delivered"]
-          pub fn [<on_ $event_ty:snake>](
-            mut self,
-            handler: impl FnMut(&mut [<$name Event>]) + 'static
-          ) -> Self {
-            self
-              .subject()
-              .filter_map(
-                (|e| match e {
-                  [<All $name>]::$event_ty(e) => Some(e),
-                  _ => None,
-                }) as fn(&mut [<All $name>]) -> Option<&mut [<$name Event>]>
-              )
-              .subscribe(handler);
             self
           }
         )+

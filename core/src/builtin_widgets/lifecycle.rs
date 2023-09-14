@@ -9,7 +9,7 @@ define_widget_context!(LifecycleEvent);
 
 pub type LifecycleSubject = MutRefItemSubject<'static, AllLifecycle, Infallible>;
 
-#[derive(Declare, Declare2, Default)]
+#[derive(Declare2, Default)]
 pub struct LifecycleListener {
   #[declare(skip)]
   lifecycle: LifecycleSubject,
@@ -40,44 +40,6 @@ macro_rules! match_closure {
       _ => None,
     }) as fn(&mut AllLifecycle) -> Option<&mut LifecycleEvent>
   };
-}
-
-impl LifecycleListenerDeclarer {
-  pub fn on_mounted(mut self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
-    let _ = self
-      .subject()
-      .filter_map(match_closure!(Mounted))
-      .take(1)
-      .subscribe(handler);
-
-    self
-  }
-
-  pub fn on_performed_layout(mut self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
-    let _ = self
-      .subject()
-      .filter_map(match_closure!(PerformedLayout))
-      .subscribe(handler);
-
-    self
-  }
-
-  pub fn on_disposed(mut self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
-    let _ = self
-      .subject()
-      .filter_map(match_closure!(Disposed))
-      .take(1)
-      .subscribe(handler);
-
-    self
-  }
-
-  fn subject(&mut self) -> LifecycleSubject {
-    self
-      .lifecycle
-      .get_or_insert_with(LifecycleSubject::default)
-      .clone()
-  }
 }
 
 impl LifecycleListenerDeclarer2 {

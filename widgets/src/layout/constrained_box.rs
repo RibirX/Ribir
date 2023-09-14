@@ -1,7 +1,7 @@
 use ribir_core::{impl_query_self_only, prelude::*};
 
 /// a widget that imposes additional constraints clamp on its child.
-#[derive(SingleChild, Declare, Declare2, Clone)]
+#[derive(SingleChild, Declare2, Clone)]
 pub struct ConstrainedBox {
   pub clamp: BoxClamp,
 }
@@ -30,12 +30,12 @@ mod tests {
   use ribir_dev_helper::*;
 
   fn outside_fixed_clamp() -> Widget {
-    widget! {
-      SizedBox {
+    fn_widget! {
+      @SizedBox {
         size: Size::new(50., 50.),
-        ConstrainedBox {
+        @ConstrainedBox {
           clamp: BoxClamp::fixed_size(Size::new(40., 40.)),
-          Void {}
+          @Void {}
         }
       }
     }
@@ -47,12 +47,12 @@ mod tests {
   );
 
   fn expand_one_axis() -> Widget {
-    widget! {
-      Container {
+    fn_widget! {
+      @Container {
         size: Size::new(256., 50.),
-        ConstrainedBox {
+        @ConstrainedBox {
           clamp: BoxClamp::EXPAND_X,
-          Container {
+          @Container {
             size: Size::new(128., 20.),
           }
         }
@@ -66,12 +66,12 @@ mod tests {
   );
 
   fn expand_both() -> Widget {
-    widget! {
-      Container {
+    fn_widget! {
+      @Container {
         size: Size::new(256., 50.),
-        ConstrainedBox {
+        @ConstrainedBox {
           clamp: BoxClamp::EXPAND_BOTH,
-          Container {
+          @Container {
             size: Size::new(128., 20.),
           }
         }

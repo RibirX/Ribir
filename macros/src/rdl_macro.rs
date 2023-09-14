@@ -14,7 +14,7 @@ use syn::{
   parse_macro_input, parse_quote,
   punctuated::Punctuated,
   spanned::Spanned,
-  token::{At, Bang, Brace, Colon, Comma, Dollar},
+  token::{Bang, Brace, Colon, Comma, Dollar},
   Expr, Ident, Macro, Path, Result as SynResult, Stmt,
 };
 
@@ -30,14 +30,18 @@ pub enum RdlMacro {
 /// Declare a object use struct literal, like `rdl! { Row { ... } }` or
 /// `@parent { ... }`
 pub struct StructLiteral {
+  pub span: Span,
   pub parent: RdlParent,
-  pub brace: Brace,
   pub fields: Punctuated<DeclareField, Comma>,
   /// Declare a child in `rdl!` can use `rdl!` macro or `@` symbol.
   /// `rdl! { Row { rdl! { SizedBox {...} } } }`
   /// or
   /// `rdl! { Row { @ SizedBox{ ... } } }`
-  /// but will be all processed as `rdl! { ... }`
+  /// and the second case will be instead by
+  /// ```ignore
+  /// rdl! { Row { rdl! { SizedBox {...} } } }
+  /// ```
+  ///  in preprocessor.
   pub children: Vec<Macro>,
 }
 
@@ -100,9 +104,10 @@ impl Parse for RdlMacro {
 
 impl Parse for StructLiteral {
   fn parse(input: ParseStream) -> SynResult<Self> {
+    let span = input.span();
     let parent = input.parse()?;
     let content;
-    let brace = braced!(content in input);
+    let _ = braced!(content in input);
     let mut children = vec![];
     let mut fields = Punctuated::default();
     loop {
@@ -110,7 +115,7 @@ impl Parse for StructLiteral {
         break;
       }
 
-      if content.peek(At) || content.peek(kw::rdl) && content.peek2(Bang) {
+      if content.peek(kw::rdl) && content.peek2(Bang) {
         children.push(content.parse()?);
       } else if content.peek(Ident) {
         let f: DeclareField = content.parse()?;
@@ -131,7 +136,7 @@ impl Parse for StructLiteral {
     }
 
     check_duplicate_field(&fields)?;
-    Ok(StructLiteral { parent, brace, fields, children })
+    Ok(StructLiteral { span, parent, fields, children })
   }
 }
 

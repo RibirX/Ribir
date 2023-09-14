@@ -163,13 +163,13 @@ mod tests {
   #[test]
   fn compose_template_child() {
     reset_test_env!();
-    #[derive(Declare)]
+    #[derive(Declare2)]
     struct Page;
-    #[derive(Declare, SingleChild)]
+    #[derive(Declare2, SingleChild)]
     struct Header;
-    #[derive(Declare, SingleChild)]
+    #[derive(Declare2, SingleChild)]
     struct Content;
-    #[derive(Declare, SingleChild)]
+    #[derive(Declare2, SingleChild)]
     struct Footer;
 
     #[derive(Template)]
@@ -187,11 +187,11 @@ mod tests {
       }
     }
 
-    widget! {
-      Page {
-        Header { Void {} }
-        Content { Void {} }
-        Footer { Void {} }
+    fn_widget! {
+      @Page {
+        @Header { @Void {} }
+        @Content { @Void {} }
+        @Footer { @Void {} }
       }
     };
   }
@@ -200,9 +200,9 @@ mod tests {
   fn compose_option_child() {
     reset_test_env!();
 
-    #[derive(Declare)]
+    #[derive(Declare2)]
     struct Parent;
-    #[derive(Declare, SingleChild)]
+    #[derive(Declare2, SingleChild)]
     struct Child;
 
     impl ComposeChild for Parent {
@@ -213,9 +213,9 @@ mod tests {
       }
     }
 
-    widget! {
-      Parent {
-        Child { Void {} }
+    fn_widget! {
+      @Parent {
+        @Child { @Void {} }
       }
     };
   }
@@ -234,9 +234,9 @@ mod tests {
   fn tuple_as_vec() {
     reset_test_env!();
 
-    #[derive(Declare)]
+    #[derive(Declare2)]
     struct A;
-    #[derive(Declare)]
+    #[derive(Declare2)]
     struct B;
 
     impl ComposeChild for A {
@@ -246,10 +246,11 @@ mod tests {
         unreachable!("Only for syntax support check");
       }
     }
-    widget! {
-      A {
-        B {}
-        B {}
+    let a = A;
+    fn_widget! {
+      @$a {
+        @ { B}
+        @ { B }
       }
     };
   }
@@ -311,16 +312,16 @@ mod tests {
   fn pair_to_pair() {
     reset_test_env!();
 
-    #[derive(Declare)]
+    #[derive(Declare2)]
     struct P;
 
     impl ComposeChild for P {
-      type Child = WidgetOf<MockBox>;
+      type Child = WidgetOf<State<MockBox>>;
       fn compose_child(_: State<Self>, _: Self::Child) -> Widget { unreachable!() }
     }
 
-    let _ = widget! {
-      P { MockBox { Void {} } }
+    let _ = fn_widget! {
+      @P { @MockBox { @Void {} } }
     };
   }
 
@@ -348,7 +349,7 @@ mod tests {
     pub struct ConfigTml {
       _field: Option<Field>,
     }
-    #[derive(Declare, Declare2)]
+    #[derive(Declare2)]
     struct Host {}
 
     impl ComposeChild for Host {

@@ -11,31 +11,31 @@ pub enum PositionUnit {
 }
 
 /// Widget use to anchor child constraints with the left edge of parent widget.
-#[derive(Declare, Declare2, SingleChild)]
+#[derive(Declare2, SingleChild)]
 pub struct LeftAnchor {
-  #[declare(convert=into, builtin, default=0.)]
+  #[declare(builtin, default = 0.)]
   pub left_anchor: PositionUnit,
 }
 
 /// Widget use to anchor child constraints with the right edge of parent widget.
-#[derive(Declare, Declare2, SingleChild)]
+#[derive(Declare2, SingleChild)]
 pub struct RightAnchor {
-  #[declare(convert=into, builtin, default=0.)]
+  #[declare(builtin, default = 0.)]
   pub right_anchor: PositionUnit,
 }
 
 /// Widget use to anchor child constraints with the top edge of parent widget.
-#[derive(Declare, Declare2, SingleChild)]
+#[derive(Declare2, SingleChild)]
 pub struct TopAnchor {
-  #[declare(convert=into, builtin, default=0.)]
+  #[declare(builtin, default = 0.)]
   pub top_anchor: PositionUnit,
 }
 
 /// Widget use to anchor child constraints with the bottom edge of parent
 /// widget.
-#[derive(Declare, Declare2, SingleChild)]
+#[derive(Declare2, SingleChild)]
 pub struct BottomAnchor {
-  #[declare(convert=into, builtin, default=0.)]
+  #[declare(builtin, default = 0.)]
   pub bottom_anchor: PositionUnit,
 }
 
@@ -141,8 +141,8 @@ mod test {
   const WND_SIZE: Size = Size::new(100., 100.);
 
   fn pixel_left_top() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         size: CHILD_SIZE,
         left_anchor: 1.,
         top_anchor: 1.,
@@ -158,8 +158,8 @@ mod test {
   );
 
   fn pixel_left_bottom() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         size: CHILD_SIZE,
         left_anchor: 1.,
         bottom_anchor: 1.,
@@ -175,8 +175,8 @@ mod test {
   );
 
   fn pixel_top_right() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         size: CHILD_SIZE,
         right_anchor: 1.,
         top_anchor: 1.,
@@ -192,8 +192,8 @@ mod test {
   );
 
   fn pixel_bottom_right() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         size: CHILD_SIZE,
         right_anchor: 1.,
         bottom_anchor: 1.,
@@ -209,8 +209,8 @@ mod test {
   );
 
   fn percent_left_top() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         size: CHILD_SIZE,
         left_anchor: Percent(10.),
         top_anchor: Percent(10.),
@@ -226,8 +226,8 @@ mod test {
   );
 
   fn percent_left_bottom() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         size: CHILD_SIZE,
         left_anchor: Percent( 10.),
         bottom_anchor: Percent( 10.),
@@ -243,8 +243,8 @@ mod test {
   }
 
   fn percent_top_right() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         size: CHILD_SIZE,
         right_anchor: Percent(10.),
         top_anchor: Percent(10.),
@@ -260,8 +260,8 @@ mod test {
   );
 
   fn percent_bottom_right() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         size: CHILD_SIZE,
         right_anchor: Percent(10.),
         bottom_anchor: Percent(10.),

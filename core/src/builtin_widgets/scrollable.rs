@@ -15,7 +15,7 @@ pub enum Scrollable {
 }
 
 /// Helper struct for builtin scrollable field.
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct ScrollableWidget {
   #[declare(builtin, default)]
   pub scrollable: Scrollable,
@@ -126,8 +126,8 @@ mod tests {
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
-    let w = widget! {
-      MockBox {
+    let w = fn_widget! {
+      @MockBox {
         size: Size::new(1000., 1000.),
         scrollable,
       }
@@ -179,7 +179,7 @@ mod tests {
     test_assert(Scrollable::Both, 100., 100., 0., 0.);
   }
 
-  #[derive(SingleChild, Declare, Clone)]
+  #[derive(SingleChild, Declare2, Clone)]
   pub struct FixedBox {
     pub size: Size,
   }
@@ -201,15 +201,15 @@ mod tests {
   fn scroll_content_expand() {
     let _guard = unsafe { AppCtx::new_lock_scope() };
 
-    let w = widget! {
-      FixedBox {
+    let w = fn_widget! {
+      @FixedBox {
         size: Size::new(200., 200.),
-        ScrollableWidget {
+        @ScrollableWidget {
           scrollable: Scrollable::Both,
           on_performed_layout: move |ctx| {
             assert_eq!(ctx.box_size(), Some(Size::new(200., 200.)));
           },
-          MockBox {
+          @MockBox {
             size: Size::new(100., 100.),
             on_performed_layout: move |ctx| {
               assert_eq!(ctx.box_size(), Some(Size::new(200., 200.)));

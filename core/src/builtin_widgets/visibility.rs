@@ -1,6 +1,6 @@
 use crate::{impl_query_self_only, prelude::*};
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct Visibility {
   #[declare(builtin)]
   pub visible: bool,
@@ -23,7 +23,7 @@ impl ComposeChild for Visibility {
   }
 }
 
-#[derive(SingleChild, Declare, Declare2, Clone)]
+#[derive(SingleChild, Declare2, Clone)]
 struct VisibilityRender {
   display: bool,
 }

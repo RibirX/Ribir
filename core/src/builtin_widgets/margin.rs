@@ -9,7 +9,7 @@ pub struct EdgeInsets {
 }
 
 /// A widget that create space around its child.
-#[derive(SingleChild, Default, Clone, PartialEq, Declare, Declare2)]
+#[derive(SingleChild, Default, Clone, PartialEq, Declare2)]
 pub struct Margin {
   #[declare(builtin, default)]
   pub margin: EdgeInsets,
@@ -131,8 +131,8 @@ mod tests {
   use ribir_dev_helper::*;
 
   fn smoke() -> Widget {
-    widget! {
-      MockBox {
+    fn_widget! {
+      @MockBox {
         margin: EdgeInsets::symmetrical(1., 1.),
         size: Size::new(100., 100.)
       }

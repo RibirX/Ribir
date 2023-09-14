@@ -1,6 +1,6 @@
 use crate::{impl_query_self_only, prelude::*, widget::hit_test_impl};
 
-#[derive(SingleChild, Declare, Declare2, Clone)]
+#[derive(SingleChild, Declare2, Clone)]
 pub struct TransformWidget {
   #[declare(builtin, default)]
   pub transform: Transform,
@@ -41,10 +41,10 @@ mod tests {
   use ribir_dev_helper::*;
 
   fn smoke() -> Widget {
-    widget! {
-      TransformWidget {
+    fn_widget! {
+      @TransformWidget {
         transform: Transform::new(2., 0., 0., 2., 0., 0.),
-        MockBox {
+        @MockBox {
           size: Size::new(100., 100.)
         }
       }

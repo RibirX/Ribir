@@ -9,19 +9,19 @@ use ribir_core::{impl_query_self_only, prelude::*};
 /// # use ribir_widgets::prelude::{Divider, SizedBox, Direction, Column};
 ///
 /// // use default Divider default settings
-/// let widget = widget! {
-///   Column {
-///     SizedBox { size: Size::new(10., 0.) }
-///     Divider { extent: 20. }
-///     SizedBox { size: Size::new(10., 0.) }
+/// let widget = fn_widget! {
+///   @Column {
+///     @SizedBox { size: Size::new(10., 0.) }
+///     @Divider { extent: 20. }
+///     @SizedBox { size: Size::new(10., 0.) }
 ///   }
 /// };
 ///
 /// // use custom settings
-/// let widget = widget! {
-///   Column {
-///     SizedBox { size: Size::new(10., 0.) }
-///     Divider {
+/// let widget = fn_widget! {
+///   @Column {
+///     @SizedBox { size: Size::new(10., 0.) }
+///     @Divider {
 ///       extent: 20.,
 ///       color: Color::RED,
 ///       direction: Direction::Horizontal,
@@ -32,17 +32,17 @@ use ribir_core::{impl_query_self_only, prelude::*};
 ///       // behind indentation distance
 ///       end_indent: 10.,
 ///     }
-///     SizedBox { size: Size::new(10., 0.) }
+///     @SizedBox { size: Size::new(10., 0.) }
 ///   }
 /// };
 /// ```
-#[derive(Default, Declare, Declare2)]
+#[derive(Default, Declare2)]
 pub struct Divider {
   #[declare(default = 1.)]
   // Extent of divider
   pub extent: f32,
   // Color of divider
-  #[declare(default=Palette::of(ctx).outline_variant(), convert=into)]
+  #[declare(default=Palette::of(ctx).outline_variant())]
   pub color: Brush,
   // Direction of divider
   #[declare(default=Direction::Horizontal)]

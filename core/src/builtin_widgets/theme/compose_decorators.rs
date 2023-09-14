@@ -71,16 +71,16 @@ impl ComposeDecorators {
 
 #[cfg(test)]
 mod tests {
-  use crate::{prelude::*, test_helper::*};
+  use crate::{prelude::*, reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
 
   #[test]
   fn compose_decorator_smoke() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let mut theme = FullTheme::default();
 
-    #[derive(Declare)]
+    #[derive(Declare2)]
     struct Size100Style;
 
     impl ComposeDecorator for Size100Style {
@@ -99,8 +99,8 @@ mod tests {
         .into()
       });
 
-    let w = widget! {
-      Size100Style { MockBox {
+    let w = fn_widget! {
+      @Size100Style { @MockBox {
         size: Size::zero(),
       }}
     };

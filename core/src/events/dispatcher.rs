@@ -311,7 +311,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } }.into(),
+      MockBox { size: Size::new(100., 30.) }.into(),
     );
     let root = record_pointer(
       event_record.clone(),
@@ -425,7 +425,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      widget! { MockBox { size: Size::new(100., 30.) } }.into(),
+      MockBox { size: Size::new(100., 30.) }.into(),
     );
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
@@ -628,16 +628,16 @@ mod tests {
     reset_test_env!();
 
     let click_path = Stateful::new(vec![]) as Stateful<Vec<usize>>;
-    let w = widget! {
-      states { click_path: click_path.clone_stateful() }
-      MockBox {
+    let c_click_path = click_path.clone_writer();
+    let w = fn_widget! {
+      @MockBox {
         size: Size::new(100., 100.),
-        on_tap: move |_| (*click_path).push(4),
-        on_tap_capture: move |_| (*click_path).push(1),
-        MockBox {
+        on_tap: move |_| $c_click_path.write().push(4),
+        on_tap_capture: move |_| $c_click_path.write().push(1),
+        @MockBox {
           size: Size::new(100., 100.),
-          on_tap: move |_| (*click_path).push(3),
-          on_tap_capture: move |_| (*click_path).push(2),
+          on_tap: move |_| $c_click_path.write().push(3),
+          on_tap_capture: move |_| $c_click_path.write().push(2),
         }
       }
     };
@@ -681,15 +681,15 @@ mod tests {
     reset_test_env!();
 
     let click_path = Stateful::new(0);
-    let w = widget! {
-      states { click_path: click_path.clone_stateful() }
-      MockMulti {
-        on_tap: move |_| *click_path += 1,
-        MockBox {
+    let c_click_path = click_path.clone_writer();
+    let w = fn_widget! {
+      @MockMulti {
+        on_tap: move |_| *$c_click_path.write() += 1,
+        @MockBox {
           size: Size::new(100., 100.),
-          on_tap: move |_| *click_path += 1,
+          on_tap: move |_| *$c_click_path.write() += 1,
         }
-        MockBox { size: Size::new(100., 400.) }
+        @MockBox { size: Size::new(100., 400.) }
       }
     };
 
@@ -723,7 +723,7 @@ mod tests {
 
     wnd.run_frame_tasks();
     {
-      let mut clicked = click_path.state_ref();
+      let mut clicked = click_path.write();
       assert_eq!(*clicked, 2);
       *clicked = 0;
     }
@@ -765,13 +765,13 @@ mod tests {
   fn focus_change_by_event() {
     reset_test_env!();
 
-    let w = widget! {
-      MockMulti {
-        MockBox {
+    let w = fn_widget! {
+      @MockMulti {
+        @MockBox {
           size: Size::new(50., 50.),
-          tab_index: 0
+          tab_index: 0i16
         }
-        MockBox {
+        @MockBox {
           size: Size::new(50., 50.)
         }
       }
@@ -849,21 +849,21 @@ mod tests {
       let data1 = data.clone();
       let data2 = data.clone();
 
-      let w = widget! {
-        MockBox {
+      let w = fn_widget! {
+        @MockBox {
           size: Size::new(200., 200.),
-          MockStack {
+          @MockStack {
             child_pos: vec![
               Point::new(50., 50.),
               Point::new(100., 100.),
             ],
-            MockBox {
+            @MockBox {
               on_mounted: move |ctx| {
                 data1.borrow_mut().wid1 = Some(ctx.id);
               },
               size: Size::new(100., 100.),
             }
-            MockBox {
+            @MockBox {
               on_mounted: move |ctx| {
                 data2.borrow_mut().wid2 = Some(ctx.id);
               },

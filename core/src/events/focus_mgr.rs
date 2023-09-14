@@ -540,10 +540,10 @@ mod tests {
 
     // two auto focus widget
     let size = Size::zero();
-    let widget = widget! {
-      MockMulti  {
-        MockBox { size, auto_focus: true, }
-        MockBox { size, auto_focus: true, }
+    let widget = fn_widget! {
+      @MockMulti  {
+        @MockBox { size, auto_focus: true, }
+        @MockBox { size, auto_focus: true, }
       }
     };
 
@@ -563,10 +563,10 @@ mod tests {
     reset_test_env!();
     // one auto focus widget
     let size = Size::zero();
-    let widget = widget! {
-      MockMulti {
-        MockBox { size }
-        MockBox { size, auto_focus: true}
+    let widget = fn_widget! {
+      @MockMulti {
+        @MockBox { size }
+        @MockBox { size, auto_focus: true}
       }
     };
 
@@ -588,14 +588,14 @@ mod tests {
     reset_test_env!();
 
     let size = Size::zero();
-    let widget = widget! {
-      MockMulti {
-        MockBox { size, tab_index: -1, }
-        MockBox { size, tab_index: 0, }
-        MockBox { size, tab_index: 1, auto_focus: true}
-        MockBox { size, tab_index: 2, }
-        MockMulti { tab_index: 4, MockBox { size, tab_index: 3, } }
-        MockBox { size, tab_index: 0 }
+    let widget = fn_widget! {
+      @MockMulti {
+        @MockBox { size, tab_index: -1i16, }
+        @MockBox { size, tab_index: 0i16, }
+        @MockBox { size, tab_index: 1i16, auto_focus: true}
+        @MockBox { size, tab_index: 2i16, }
+        @MockMulti { tab_index: 4i16, @MockBox { size, tab_index: 3i16, } }
+        @MockBox { size, tab_index: 0i16 }
       }
     };
 
@@ -758,22 +758,22 @@ mod tests {
   fn scope_node_request_focus() {
     reset_test_env!();
 
-    let w = widget! {
-      MockMulti{
-        MockBox{
+    let w = fn_widget! {
+      @MockMulti{
+        @MockBox{
           size: Size::zero(),
           on_key_down: move |_| {}
         }
-        FocusScope {
-          MockBox{
+        @FocusScope {
+          @MockBox{
             size: Size::zero(),
-            MockBox{
+            @MockBox{
               size: Size::zero(),
               on_key_down: move |_| {}
             }
           }
         }
-        MockBox{
+        @MockBox{
           size: Size::zero(),
           on_key_down: move |_| {}
         }

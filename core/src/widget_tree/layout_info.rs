@@ -305,9 +305,9 @@ mod tests {
   use super::*;
   use crate::{impl_query_self_only, prelude::*, reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
-  use std::{cell::RefCell, rc::Rc};
+  use std::{cell::Cell, rc::Rc};
 
-  #[derive(Declare, Clone, SingleChild)]
+  #[derive(Declare2, Clone, SingleChild)]
   struct OffsetBox {
     pub offset: Point,
     pub size: Size,
@@ -369,20 +369,18 @@ mod tests {
 
     let layout_order = Stateful::new(vec![]);
     let trigger = Stateful::new(Size::zero());
-    let w = widget! {
-      states {
-        layout_order: layout_order.clone_stateful(),
-        trigger: trigger.clone_stateful()
-      }
-      MockBox {
-        size: *trigger,
-        on_performed_layout: move |_| layout_order.push(1),
-        MockBox {
-          size: *trigger,
-          on_performed_layout: move |_| layout_order.push(2),
-          MockBox {
-            size: *trigger,
-            on_performed_layout: move |_| layout_order.push(3),
+    let order = layout_order.clone_writer();
+    let size = trigger.clone_reader();
+    let w = fn_widget! {
+      @MockBox {
+        size: pipe!(*$size),
+        on_performed_layout: move |_| $order.write().push(1),
+        @MockBox {
+          size: pipe!(*$size),
+          on_performed_layout: move |_| $order.write().push(2),
+          @MockBox {
+            size: pipe!(*$size),
+            on_performed_layout: move |_| $order.write().push(3),
           }
         }
       }
@@ -390,12 +388,12 @@ mod tests {
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_eq!([3, 2, 1], &**layout_order.state_ref());
+    assert_eq!([3, 2, 1], &**layout_order.read());
     {
-      *trigger.state_ref() = Size::new(1., 1.);
+      *trigger.write() = Size::new(1., 1.);
     }
     wnd.draw_frame();
-    assert_eq!([3, 2, 1, 3, 2, 1], &**layout_order.state_ref());
+    assert_eq!([3, 2, 1, 3, 2, 1], &**layout_order.read());
   }
 
   #[test]
@@ -403,16 +401,14 @@ mod tests {
     reset_test_env!();
 
     let trigger = Stateful::new(Size::zero());
-    let w = widget! {
-      states {trigger: trigger.clone_stateful()}
-      OffsetBox {
+    let size = trigger.clone_reader();
+    let w = fn_widget! {
+      @OffsetBox {
         size: Size::new(100., 100.),
         offset: Point::new(50., 50.),
-        MockBox {
+        @MockBox {
           size: Size::new(50., 50.),
-          MockBox {
-            size: *trigger,
-          }
+          @MockBox { size: pipe!(*$size) }
         }
       }
     };
@@ -429,7 +425,7 @@ mod tests {
     );
 
     {
-      *trigger.state_ref() = Size::new(10., 10.);
+      *trigger.write() = Size::new(10., 10.);
     }
 
     wnd.draw_frame();
@@ -448,44 +444,41 @@ mod tests {
     reset_test_env!();
 
     let trigger = Stateful::new(Size::zero());
-    let cnt = Rc::new(RefCell::new(0));
+    let cnt = Rc::new(Cell::new(0));
     let cnt2 = cnt.clone();
-    let w = widget! {
-      states {trigger: trigger.clone_stateful()}
-      init { let cnt = cnt2; }
-      MockBox {
+    let size = trigger.clone_reader();
+    let w = fn_widget! {
+      @MockBox {
         size: Size::new(50., 50.),
-        on_performed_layout: move |_| *cnt.borrow_mut() += 1,
-        MockBox {
-          size: *trigger,
-        }
+        on_performed_layout: move |_| cnt2.set(cnt2.get() + 1),
+        @MockBox { size: pipe!(*$size) }
       }
     };
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_eq!(*cnt.borrow(), 1);
+    assert_eq!(cnt.get(), 1);
 
     {
-      *trigger.state_ref() = Size::new(10., 10.);
+      *trigger.write() = Size::new(10., 10.);
     }
     wnd.draw_frame();
-    assert_eq!(*cnt.borrow(), 2);
+    assert_eq!(cnt.get(), 2);
   }
 
   #[test]
   fn layout_visit_prev_position() {
     reset_test_env!();
 
-    #[derive(Declare)]
+    #[derive(Declare2)]
     struct MockWidget {
-      pos: RefCell<Point>,
+      pos: Cell<Point>,
       size: Size,
     }
 
     impl Render for MockWidget {
       fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-        *self.pos.borrow_mut() = ctx.box_pos().unwrap_or_default();
+        self.pos.set(ctx.box_pos().unwrap_or_default());
         self.size
       }
       #[inline]
@@ -497,33 +490,27 @@ mod tests {
 
     impl_query_self_only!(MockWidget);
 
-    let pos = Rc::new(RefCell::new(Point::zero()));
+    let pos = Rc::new(Cell::new(Point::zero()));
     let pos2 = pos.clone();
     let trigger = Stateful::new(Size::zero());
-    let w = widget! {
-      states {trigger: trigger.clone_stateful()}
-      init {
-        let pos = pos2.clone();
-      }
-      MockMulti {
-        MockBox{
-          size: Size::new(50., 50.),
-        }
-        MockWidget {
-          id: w,
-          size: *trigger,
-          pos: RefCell::new(Point::zero()),
-          on_performed_layout: move |_| {
-            *pos.borrow_mut() = *w.pos.borrow();
-          }
+    let size = trigger.clone_reader();
+    let w = fn_widget! {
+      let w = @MockWidget {
+        size: pipe!(*$size),
+        pos: Cell::new(Point::zero()),
+      };
+      @MockMulti {
+        @MockBox{ size: Size::new(50., 50.) }
+        @$w {
+          on_performed_layout: move |_| pos2.set($w.pos.get())
         }
       }
     };
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
-    *trigger.state_ref() = Size::new(1., 1.);
+    *trigger.write() = Size::new(1., 1.);
     wnd.draw_frame();
-    assert_eq!(*pos.borrow(), Point::new(50., 0.));
+    assert_eq!(pos.get(), Point::new(50., 0.));
   }
 }

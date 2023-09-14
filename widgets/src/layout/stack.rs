@@ -1,7 +1,7 @@
 use ribir_core::{impl_query_self_only, prelude::*};
 
 /// A widget that overlap children align with left top.
-#[derive(MultiChild, Declare, Declare2)]
+#[derive(MultiChild, Declare2)]
 pub struct Stack {
   #[declare(default)]
   fit: StackFit,
@@ -78,10 +78,10 @@ mod tests {
   fn smoke() -> Widget {
     let one = Size::new(1., 1.);
     let five = Size::new(5., 5.);
-    widget! {
-      Stack {
-        SizedBox { size: one}
-        SizedBox { size: five}
+    fn_widget! {
+      @Stack {
+        @SizedBox { size: one}
+        @SizedBox { size: five}
       }
     }
     .into()

@@ -121,10 +121,10 @@ use ribir_core::prelude::*;
 ///   }
 /// };
 /// ```
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct Lists;
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct ListsDecorator {}
 impl ComposeDecorator for ListsDecorator {
   type Host = Widget;
@@ -339,7 +339,7 @@ impl ComposeChild for ListItem {
   }
 }
 
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct ListItem {
   #[declare(default = 1usize)]
   pub line_number: usize,
@@ -437,7 +437,7 @@ impl CustomStyle for ListItemStyle {
   }
 }
 
-#[derive(Clone, Declare, Declare2)]
+#[derive(Clone, Declare2)]
 pub struct ListItemDecorator {
   pub color: Color,
   pub is_active: bool,

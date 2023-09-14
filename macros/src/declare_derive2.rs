@@ -43,8 +43,6 @@ mod kw {
   custom_keyword!(custom);
   custom_keyword!(skip);
   custom_keyword!(strict);
-  // todo: tmp code, only for compatibility.
-  custom_keyword!(convert);
 }
 
 impl Parse for DefaultMeta {
@@ -86,10 +84,6 @@ impl Parse for DeclareAttr {
         attr.skip = Some(input.parse()?);
       } else if lookahead.peek(kw::strict) {
         attr.strict = Some(input.parse()?);
-      } else if lookahead.peek(kw::convert) {
-        input.parse::<kw::convert>()?;
-        input.parse::<token::Eq>()?;
-        input.parse::<Ident>()?;
       } else {
         return Err(lookahead.error());
       }
@@ -232,7 +226,7 @@ fn struct_with_fields_gen(
 
   let unzip_fields = builder_fields.iter().map(|df| {
     let field_name = df.field.ident.as_ref().unwrap();
-    let err = format!("Required field `{name}::{field_name}` not init");
+    let err = format!("Required field `{name}::{field_name}` not set");
     quote_spanned! { field_name.span() =>
       let #field_name = self.#field_name.expect(#err).unzip();
     }
@@ -367,7 +361,7 @@ impl<'a> DeclareField<'a> {
 
   fn check_reserve(&mut self) {
     // reverse name check.
-    let reserve_ident = &crate::widget_macro::RESERVE_IDENT;
+    let reserve_ident = &crate::variable_names::RESERVE_IDENT;
 
     let not_builtin = self
       .attr

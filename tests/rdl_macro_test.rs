@@ -389,8 +389,8 @@ widget_layout_test!(at_embed_in_expression, width == 300., height == 100.,);
 fn declare_smoke() {
   reset_test_env!();
 
-  let _ = widget! {
-    SizedBox {
+  let _ = fn_widget! {
+    @SizedBox {
       size: Size::new(500.,500.),
       background: Color::RED,
     }
@@ -402,13 +402,14 @@ fn simple_ref_bind_work() {
   reset_test_env!();
 
   let size = Size::new(100., 100.);
-  let w = widget! {
-    Flex {
-     SizedBox {
-       size: size2.size,
-       on_tap: move |_| size2.size *= 2.,
+  let w = fn_widget! {
+    let size2 = @SizedBox { size };
+    @Flex {
+     @SizedBox {
+       size: pipe!($size2.size),
+       on_tap: move |_| $size2.write().size *= 2.,
      }
-     SizedBox { id: size2, size, }
+     @ { size2 }
    }
   };
 
@@ -428,13 +429,12 @@ fn event_attr_sugar_work() {
   reset_test_env!();
   const BEFORE_SIZE: Size = Size::new(50., 50.);
   const AFTER_TAP_SIZE: Size = Size::new(100., 100.);
-  let w = widget! {
-    SizedBox {
-      id: sized_box,
-      size: BEFORE_SIZE,
-      SizedBox {
-        size: sized_box.size,
-        on_tap: move |_| sized_box.size = AFTER_TAP_SIZE,
+  let w = fn_widget! {
+    let sized_box = @SizedBox { size: BEFORE_SIZE };
+    @$sized_box {
+      @SizedBox {
+        size: pipe!($sized_box.size),
+        on_tap: move |_| $sized_box.write().size = AFTER_TAP_SIZE,
       }
     }
   };
@@ -456,18 +456,18 @@ fn event_attr_sugar_work() {
 fn widget_wrap_bind_work() {
   reset_test_env!();
 
-  let w = widget! {
-    Flex {
-      SizedBox {
-        id: sibling,
-        margin: EdgeInsets::all(1.0),
-        size: Size::new(50., 50.),
-      }
-      SizedBox {
-        margin: sibling.margin.clone(),
-        size: if sibling.margin.left > 1. { Size::zero() } else { sibling.size },
-        on_tap: move |_| sibling.margin = EdgeInsets::all(5.),
-      }
+  let w = fn_widget! {
+    let mut sibling = @SizedBox {
+      margin: EdgeInsets::all(1.0),
+      size: Size::new(50., 50.),
+    };
+    let next_box = @SizedBox {
+      margin: pipe!($sibling.margin),
+      size: pipe!(if $sibling.margin.left > 1. { Size::zero() } else { $sibling.size }),
+      on_tap: move |_| $sibling.write().margin = EdgeInsets::all(5.),
+    };
+    @Flex {
+      @ { [sibling, next_box ] }
     }
   };
 
@@ -576,17 +576,15 @@ fn local_var_not_bind() -> Widget {
   const EXPECT_SIZE: Size = Size::new(5., 5.);
   const BE_CLIPPED_SIZE: Size = Size::new(500., 500.);
 
-  widget! {
-    SizedBox {
+  fn_widget! {
+    let _size_box = @SizedBox { size: BE_CLIPPED_SIZE };
+    @SizedBox {
       size: {
         let _size_box = EXPECT_SIZE;
         let _size_box_def = EXPECT_SIZE;
         _size_box + _size_box_def
       },
-      SizedBox {
-        id: _size_box,
-        size: BE_CLIPPED_SIZE,
-      }
+      @{ _size_box }
     }
   }
   .into()
@@ -605,16 +603,17 @@ fn builtin_ref() {
   let icon_track = Rc::new(Cell::new(CursorIcon::default()));
   let c_icon_track = icon_track.clone();
 
-  let w = widget! {
-    Flex {
-      cursor: tap_box.cursor.clone(),
-      SizedBox {
-        id: tap_box,
-        size: Size::new(5., 5.),
-        cursor: CursorIcon::Hand,
+  let w = fn_widget! {
+    let mut tap_box = @SizedBox {
+      size: Size::new(5., 5.),
+      cursor: CursorIcon::Hand,
+    };
+    @Flex {
+      cursor: pipe!($tap_box.cursor),
+      @$tap_box {
         on_tap: move |_| {
-          tap_box.cursor = CursorIcon::AllScroll;
-          c_icon_track.set(tap_box.cursor);
+          $tap_box.write().cursor = CursorIcon::AllScroll;
+          c_icon_track.set($tap_box.cursor);
         }
       }
     }
@@ -634,12 +633,11 @@ fn builtin_bind_to_self() {
 
   let icon_track = Rc::new(Cell::new(CursorIcon::default()));
   let c_icon_track = icon_track.clone();
-  let w = widget! {
-    SizedBox {
-      id: sized_box,
-      size: Size::new(5., 5.),
-      cursor: {
-        let icon = if sized_box.size.area() < 100. {
+  let w = fn_widget! {
+    let sized_box = @SizedBox { size: Size::new(5., 5.) };
+    @$sized_box {
+      cursor: pipe!{
+        let icon = if $sized_box.size.area() < 100. {
           CursorIcon::Hand
         } else {
           CursorIcon::Help
@@ -647,7 +645,7 @@ fn builtin_bind_to_self() {
         c_icon_track.set(icon);
         icon
       },
-      on_tap: move |_|  sized_box.size = Size::new(20.,20.),
+      on_tap: move |_| $sized_box.write().size = Size::new(20.,20.),
     }
   };
 
@@ -787,18 +785,17 @@ fn fix_subscribe_cancel_after_widget_drop() {
 }
 
 fn fix_local_assign_tuple() -> Widget {
-  widget! {
-    Row {
-      SizedBox {
-        id: _sized,
-        size: Size::new(1., 1.,),
+  fn_widget! {
+    let _sized = @SizedBox { size: Size::new(1., 1.) };
+    let sized_box2 = @SizedBox {
+      size: {
+        let (x, _) = ($_sized, 2);
+        x.size
       }
-      SizedBox {
-        size: {
-          let (x, _) = (_sized, 2);
-          x.size
-        }
-      }
+    };
+    @Row {
+      @ { _sized }
+      @ { sized_box2 }
     }
   }
   .into()
@@ -840,9 +837,9 @@ fn no_watch() {
   reset_test_env!();
 
   let size = Stateful::new(ZERO_SIZE);
-  let w = widget! {
-    states { size: size.clone_stateful() }
-    SizedBox { size: no_watch!(*size) }
+  let c_size = size.clone_reader();
+  let w = fn_widget! {
+    @SizedBox { size: *$c_size }
   };
 
   let mut wnd = TestWindow::new(w);

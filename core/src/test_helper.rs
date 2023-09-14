@@ -144,7 +144,7 @@ impl TestShellWindow {
   }
 }
 
-#[derive(Declare, MultiChild)]
+#[derive(Declare2, MultiChild)]
 pub struct MockStack {
   child_pos: Vec<Point>,
 }
@@ -175,10 +175,10 @@ impl Render for MockStack {
 
 impl_query_self_only!(MockStack);
 
-#[derive(Declare, Declare2, MultiChild)]
+#[derive(Declare2, MultiChild)]
 pub struct MockMulti;
 
-#[derive(Declare, Declare2, Clone, SingleChild)]
+#[derive(Declare2, Clone, SingleChild)]
 pub struct MockBox {
   pub size: Size,
 }

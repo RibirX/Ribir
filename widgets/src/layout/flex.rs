@@ -31,7 +31,7 @@ pub enum JustifyContent {
   SpaceEvenly,
 }
 
-#[derive(Default, MultiChild, Declare, Declare2, Clone, PartialEq)]
+#[derive(Default, MultiChild, Declare2, Clone, PartialEq)]
 pub struct Flex {
   /// Reverse the main axis.
   #[declare(default)]
@@ -64,23 +64,6 @@ pub struct Row;
 /// A type help to declare flex widget as Vertical.
 pub struct Column;
 
-impl Declare for Row {
-  type Builder = FlexDeclarer;
-  fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Horizontal) }
-}
-
-impl FlexDeclarer {
-  pub fn item_gap(mut self, gap: f32) -> Self {
-    self.main_axis_gap = Some(gap);
-    self
-  }
-
-  pub fn line_gap(mut self, gap: f32) -> Self {
-    self.cross_axis_gap = Some(gap);
-    self
-  }
-}
-
 impl Declare2 for Row {
   type Builder = FlexDeclarer2;
   fn declare2_builder() -> Self::Builder {
@@ -104,11 +87,6 @@ impl FlexDeclarer2 {
     self.cross_axis_gap = Some(DeclareInit::declare_from(gap));
     self
   }
-}
-
-impl Declare for Column {
-  type Builder = FlexDeclarer;
-  fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Vertical) }
 }
 
 impl Declare2 for Column {
@@ -486,12 +464,12 @@ mod tests {
   );
 
   fn main_axis_gap() -> Widget {
-    widget! {
-      Row {
+    fn_widget! {
+      @Row {
         item_gap: 15.,
-        SizedBox { size: Size::new(120., 20.) }
-        SizedBox { size: Size::new(80., 20.) }
-        SizedBox { size: Size::new(30., 20.) }
+        @SizedBox { size: Size::new(120., 20.) }
+        @SizedBox { size: Size::new(80., 20.) }
+        @SizedBox { size: Size::new(30., 20.) }
       }
     }
     .into()
@@ -505,13 +483,13 @@ mod tests {
   );
 
   fn main_axis_reverse_gap() -> Widget {
-    widget! {
-      Row {
+    fn_widget! {
+      @Row {
         item_gap: 15.,
         reverse: true,
-        SizedBox { size: Size::new(120., 20.) }
-        SizedBox { size: Size::new(80., 20.) }
-        SizedBox { size: Size::new(30., 20.) }
+        @SizedBox { size: Size::new(120., 20.) }
+        @SizedBox { size: Size::new(80., 20.) }
+        @SizedBox { size: Size::new(30., 20.) }
       }
     }
     .into()
@@ -525,20 +503,20 @@ mod tests {
   );
 
   fn main_axis_expand() -> Widget {
-    widget! {
-      Row {
+    fn_widget! {
+      @Row {
         item_gap: 15.,
-        SizedBox { size: Size::new(120., 20.) }
-        Expanded {
+        @SizedBox { size: Size::new(120., 20.) }
+        @Expanded {
           flex: 1.,
-          SizedBox { size: Size::new(10., 20.) }
+          @SizedBox { size: Size::new(10., 20.) }
         }
-        SizedBox { size: Size::new(80., 20.) }
-        Expanded {
+        @SizedBox { size: Size::new(80., 20.) }
+        @Expanded {
           flex: 2.,
-          SizedBox { size: Size::new(10., 20.) }
+          @SizedBox { size: Size::new(10., 20.) }
         }
-        SizedBox { size: Size::new(30., 20.) }
+        @SizedBox { size: Size::new(30., 20.) }
       }
     }
     .into()
@@ -575,12 +553,12 @@ mod tests {
   );
 
   fn cross_align(align: Align) -> Widget {
-    widget! {
-      Row {
+    fn_widget! {
+      @Row {
         align_items: align,
-        SizedBox { size: Size::new(100., 20.) }
-        SizedBox { size: Size::new(100., 30.) }
-        SizedBox { size: Size::new(100., 40.) }
+        @SizedBox { size: Size::new(100., 20.) }
+        @SizedBox { size: Size::new(100., 30.) }
+        @SizedBox { size: Size::new(100., 40.) }
       }
     }
     .into()
@@ -625,15 +603,15 @@ mod tests {
 
   fn main_align(justify_content: JustifyContent) -> Widget {
     let item_size = Size::new(100., 20.);
-    widget! {
-      SizedBox {
+    fn_widget! {
+      @SizedBox {
         size: Size::new(500., 500.),
-        Row {
+        @Row {
           justify_content,
           align_items: Align::Start,
-          SizedBox { size: item_size }
-          SizedBox { size: item_size }
-          SizedBox { size: item_size }
+          @SizedBox { size: item_size }
+          @SizedBox { size: item_size }
+          @SizedBox { size: item_size }
         }
       }
     }
@@ -702,19 +680,19 @@ mod tests {
   );
 
   fn flex_expand() -> Widget {
-    widget! {
-      SizedBox {
+    fn_widget! {
+      @SizedBox {
         size: Size::new(500., 25.),
-        Flex {
+        @Flex {
           direction: Direction::Horizontal,
-          Expanded {
+          @Expanded {
             flex: 1.,
-            SizedBox { size: INFINITY_SIZE,}
+            @SizedBox { size: INFINITY_SIZE,}
           }
-          SizedBox { size: Size::new(100., 20.) }
-          Expanded {
+          @SizedBox { size: Size::new(100., 20.) }
+          @Expanded {
             flex: 3.,
-            SizedBox { size: INFINITY_SIZE, }
+            @SizedBox { size: INFINITY_SIZE, }
           }
         }
       }

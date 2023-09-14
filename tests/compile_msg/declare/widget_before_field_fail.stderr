@@ -1,5 +1,0 @@
-error: Field should always declare before children.
- --> compile_msg/declare/widget_before_field_fail.rs:8:7
-  |
-8 |       size
-  |       ^^^^

@@ -4,7 +4,7 @@ use crate::{
   prelude::*,
 };
 
-#[derive(Default, Declare, Declare2)]
+#[derive(Default, Declare2)]
 pub struct FocusNode {
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
@@ -94,7 +94,7 @@ pub(crate) fn dynamic_compose_focus_node(widget: Widget) -> Widget {
   })
   .into()
 }
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct RequestFocus {
   #[declare(default)]
   handle: Option<FocusHandle>,
@@ -135,13 +135,13 @@ impl_query_self_only!(RequestFocus);
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::*;
+  use crate::{reset_test_env, test_helper::*};
 
   #[test]
   fn dynamic_focus_node() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
-    #[derive(Declare)]
+    #[derive(Declare2)]
     struct AutoFocusNode {}
 
     impl ComposeChild for AutoFocusNode {
@@ -151,11 +151,11 @@ mod tests {
         dynamic_compose_focus_node(child)
       }
     }
-    let widget = widget! {
-      AutoFocusNode{
-        AutoFocusNode{
-          AutoFocusNode {
-            MockBox {
+    let widget = fn_widget! {
+      @AutoFocusNode{
+        @AutoFocusNode{
+          @AutoFocusNode {
+            @MockBox {
               size: Size::default(),
             }
           }

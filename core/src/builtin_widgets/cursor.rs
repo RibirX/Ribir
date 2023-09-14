@@ -3,7 +3,7 @@ use winit::window::CursorIcon;
 
 /// `Cursor` is an attribute to assign an `cursor` to a widget.
 
-#[derive(Declare, Default, Debug, Declare2)]
+#[derive(Default, Debug, Declare2)]
 pub struct Cursor {
   #[declare(builtin, default)]
   pub cursor: CursorIcon,
@@ -40,22 +40,22 @@ impl Cursor {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::*;
+  use crate::{reset_test_env, test_helper::*};
   use winit::event::{DeviceId, WindowEvent};
 
   #[test]
   fn tree_down_up() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
-    let row_tree = widget! {
-      MockBox {
+    let row_tree = fn_widget! {
+      @MockBox {
         size: Size::new(f32::INFINITY, f32::INFINITY),
         cursor: CursorIcon::AllScroll,
-        MockMulti{
-          MockBox {
+        @MockMulti{
+          @MockBox {
             size: Size::new(200., 200.),
             cursor: CursorIcon::Hand,
-            MockBox {
+            @MockBox {
               size:  Size::new(100., 100.),
               cursor: CursorIcon::Help,
             }

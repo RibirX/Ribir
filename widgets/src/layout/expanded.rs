@@ -5,7 +5,7 @@ use super::ConstrainedBox;
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
-#[derive(Clone, PartialEq, Declare, Declare2)]
+#[derive(Clone, PartialEq, Declare2)]
 pub struct Expanded {
   #[declare(default = 1.)]
   pub flex: f32,
@@ -39,16 +39,16 @@ mod tests {
 
   fn expand_child_size_zero() -> Widget {
     let size = Size::new(100., 50.);
-    widget! {
-      Row {
-        Expanded {
+    fn_widget! {
+      @Row {
+        @Expanded {
           flex: 1.,
-          SizedBox { size }
+          @SizedBox { size }
         }
-        SizedBox { size }
-        Expanded {
+        @SizedBox { size }
+        @Expanded {
           flex: 2.,
-          SizedBox { size: Size::new(0., 50.) }
+          @SizedBox { size: Size::new(0., 50.) }
         }
       }
     }
@@ -63,17 +63,17 @@ mod tests {
 
   fn one_line_expanded() -> Widget {
     let size = Size::new(100., 50.);
-    widget! {
-      Row {
-        Expanded {
+    fn_widget! {
+      @Row {
+        @Expanded {
           flex: 1.,
-          SizedBox { size }
+          @SizedBox { size }
         }
-        SizedBox { size }
-        SizedBox { size }
-        Expanded {
+        @SizedBox { size }
+        @SizedBox { size }
+        @Expanded {
           flex: 2.,
-          SizedBox { size }
+          @SizedBox { size }
         }
       }
     }
@@ -91,24 +91,24 @@ mod tests {
 
   fn wrap_expanded() -> Widget {
     let size = Size::new(100., 50.);
-    widget! {
-      Row {
+    fn_widget! {
+      @Row {
         wrap: true,
-        Expanded {
+        @Expanded {
           flex: 1. ,
-          SizedBox { size }
+          @SizedBox { size }
         }
-        SizedBox { size }
-        SizedBox { size }
-        SizedBox { size }
-        SizedBox { size }
-        Expanded {
+        @SizedBox { size }
+        @SizedBox { size }
+        @SizedBox { size }
+        @SizedBox { size }
+        @Expanded {
           flex: 1. ,
-          SizedBox { size, }
+          @SizedBox { size, }
         }
-        Expanded {
+        @Expanded {
           flex: 4.,
-          SizedBox { size, }
+          @SizedBox { size, }
         }
       }
     }

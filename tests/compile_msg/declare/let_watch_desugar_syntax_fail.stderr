@@ -1,5 +1,0 @@
-error: expected `;`
- --> compile_msg/declare/let_watch_desugar_syntax_fail.rs:7:7
-  |
-7 |       let_watch!(sized_box.size).subscribe(|_| {})
-  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

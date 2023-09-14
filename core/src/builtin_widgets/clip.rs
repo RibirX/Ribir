@@ -7,7 +7,7 @@ pub enum ClipType {
   Path(Path),
 }
 
-#[derive(SingleChild, Clone, Declare, Declare2)]
+#[derive(SingleChild, Clone, Declare2)]
 pub struct Clip {
   #[declare(default)]
   pub clip: ClipType,

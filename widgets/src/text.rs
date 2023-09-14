@@ -7,11 +7,10 @@ use ribir_core::{
 };
 
 /// The text widget display text with a single style.
-#[derive(Debug, Declare, Declare2, Clone, PartialEq)]
+#[derive(Debug, Declare2, Clone, PartialEq)]
 pub struct Text {
-  #[declare(convert=into)]
   pub text: CowArc<str>,
-  #[declare(default = Palette::of(ctx).on_surface_variant(), convert=into)]
+  #[declare(default = Palette::of(ctx).on_surface_variant())]
   pub foreground: Brush,
   #[declare(default = TypographyTheme::of(ctx).body_medium.text.clone())]
   pub text_style: CowArc<TextStyle>,
@@ -130,11 +129,10 @@ impl_query_self_only!(Text);
 
 macro_rules! define_text_with_theme_style {
   ($name: ident, $style: ident) => {
-    #[derive(Declare, Declare2)]
+    #[derive(Declare2)]
     pub struct $name {
-      #[declare(convert=into)]
       pub text: CowArc<str>,
-      #[declare(default = Palette::of(ctx).on_surface_variant(), convert = into)]
+      #[declare(default = Palette::of(ctx).on_surface_variant())]
       pub foreground: Brush,
       #[declare(default)]
       pub overflow: Overflow,
@@ -175,10 +173,10 @@ mod tests {
   fn text_clip() {
     let _guard = unsafe { AppCtx::new_lock_scope() };
 
-    let w = widget! {
-      SizedBox {
+    let w = fn_widget! {
+      @SizedBox {
         size: Size::new(50., 45.),
-        Text {
+        @Text {
           text: "hello world,\rnice to meet you.",
         }
       }

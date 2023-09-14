@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Widget let user to access the layout result of its child.
-#[derive(Declare, Declare2)]
+#[derive(Declare2)]
 pub struct LayoutBox {
   #[declare(skip)]
   /// the rect box of its child and the coordinate is relative to its parent.
@@ -62,13 +62,11 @@ mod tests {
   use ribir_dev_helper::*;
 
   fn smoke() -> Widget {
-    widget! {
-        MockMulti {
-        LayoutBox {
-          id: layout_box,
-          MockBox { size: Size::new(100., 200.) }
-        }
-        MockBox { size: layout_box.rect.size }
+    fn_widget! {
+      let mut first_box = @MockBox { size: Size::new(100., 200.) };
+      let second_box = @MockBox { size: pipe!($first_box.layout_size()) };
+      @MockMulti {
+        @ { [first_box, second_box  ] }
       }
     }
     .into()

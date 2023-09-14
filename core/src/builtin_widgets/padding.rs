@@ -1,7 +1,7 @@
 use crate::{impl_query_self_only, prelude::*};
 
 /// A widget that insets its child by the given padding.
-#[derive(SingleChild, Clone, Declare, Declare2)]
+#[derive(SingleChild, Clone, Declare2)]
 pub struct Padding {
   #[declare(builtin)]
   pub padding: EdgeInsets,
@@ -66,10 +66,10 @@ mod tests {
   use ribir_dev_helper::*;
 
   fn smoke() -> Widget {
-    widget! {
-      MockMulti {
+    fn_widget! {
+      @MockMulti {
         padding: EdgeInsets::only_left(1.),
-        MockBox {
+        @MockBox {
            size: Size::new(100., 100.),
         }
       }

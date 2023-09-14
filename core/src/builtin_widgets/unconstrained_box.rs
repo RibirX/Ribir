@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Declare, Declare2, SingleChild)]
+#[derive(Declare2, SingleChild)]
 /// A widget that imposes no constraints on its child, allowing it to layout and
 /// display as its "natural" size. Its size is equal to its child then clamp by
 /// parent.
@@ -82,18 +82,18 @@ mod tests {
 
   fn smoke() -> Widget {
     let size = Size::new(200., 200.);
-    widget! {
-      MockMulti {
-        UnconstrainedBox {
-          MockBox { size}
+    fn_widget! {
+      @MockMulti {
+        @UnconstrainedBox {
+          @MockBox { size}
         }
-        UnconstrainedBox {
+        @UnconstrainedBox {
           dir: UnconstrainedDir::X,
-          MockBox { size }
+          @MockBox { size }
         }
-        UnconstrainedBox {
+        @UnconstrainedBox {
           dir: UnconstrainedDir::Y,
-          MockBox { size }
+          @MockBox { size }
         }
       }
     }

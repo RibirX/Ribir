@@ -1,6 +1,6 @@
 use ribir_core::{impl_query_self_only, prelude::*};
 
-#[derive(SingleChild, Declare, Clone)]
+#[derive(SingleChild, Declare2, Clone)]
 pub struct TransformBox {
   pub matrix: Transform,
 }
@@ -43,10 +43,10 @@ mod tests {
   use crate::prelude::*;
 
   fn smoke() -> Widget {
-    widget! {
-      TransformBox {
+    fn_widget! {
+      @TransformBox {
         matrix: Transform::new(2., 0., 0., 2., 0., 0.),
-        SizedBox { size: Size::new(100., 100.) }
+        @SizedBox { size: Size::new(100., 100.) }
       }
     }
     .into()

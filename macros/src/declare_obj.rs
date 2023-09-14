@@ -1,6 +1,6 @@
 use crate::{
   rdl_macro::{DeclareField, RdlParent, StructLiteral},
-  widget_macro::{WIDGETS, WIDGET_OF_BUILTIN_FIELD},
+  variable_names::{WIDGETS, WIDGET_OF_BUILTIN_FIELD},
 };
 use inflector::Inflector;
 use proc_macro2::{Span, TokenStream};
@@ -28,7 +28,8 @@ enum ObjNode<'a> {
 
 impl<'a> DeclareObj<'a> {
   pub fn from_literal(mac: &'a StructLiteral) -> Result<Self, TokenStream> {
-    let StructLiteral { parent, brace, fields, children } = mac;
+    let StructLiteral { span, parent, fields, children } = mac;
+    let span = *span;
     let mut builtin: Vec<(&'static str, SmallVec<[&'a DeclareField; 1]>)> = vec![];
 
     let mut self_fields = SmallVec::default();
@@ -58,7 +59,6 @@ impl<'a> DeclareObj<'a> {
 
     match parent {
       RdlParent::Type(ty) => {
-        let span = ty.span().join(brace.span).unwrap();
         if WIDGETS.iter().any(|w| ty.is_ident(w.ty)) {
           invalid_member_err(
             &self_fields,
@@ -76,7 +76,6 @@ impl<'a> DeclareObj<'a> {
           "only allow to declare builtin fields in a variable parent.",
         )?;
         let this = Some(ObjNode::Var(name));
-        let span = name.span().join(brace.span).unwrap();
         Ok(Self { this, span, builtin, children })
       }
     }
