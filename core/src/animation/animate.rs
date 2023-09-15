@@ -14,7 +14,7 @@ where
   pub from: <S::State as StateReader>::Value,
   #[declare(skip)]
   running_info: Option<AnimateInfo<<S::State as StateReader>::Value>>,
-  #[declare(skip, default = ctx.window().id())]
+  #[declare(skip, default = ctx!().window().id())]
   window_id: WindowId,
 }
 

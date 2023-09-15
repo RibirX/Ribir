@@ -77,7 +77,7 @@ impl ComposeDecorator for OutlinedButtonDecorator {
 /// ```
 #[derive(Default, Declare2)]
 pub struct OutlinedButton {
-  #[declare(default=Palette::of(ctx).primary())]
+  #[declare(default=Palette::of(ctx!()).primary())]
   color: Color,
 }
 
@@ -104,9 +104,7 @@ impl ComposeChild for OutlinedButton {
           radius,
           padding_style,
           border_width,
-        } = OutlinedButtonStyle::of(ctx);
-        let palette1 = Palette::of(ctx).clone();
-        let palette2 = Palette::of(ctx).clone();
+        } = OutlinedButtonStyle::of(ctx!());
 
         @OutlinedButtonDecorator {
           button_type,
@@ -118,11 +116,11 @@ impl ComposeChild for OutlinedButton {
             icon_pos,
             label_style,
             background_color: None,
-            foreground_color: pipe!(Brush::from(palette1.base_of(&$this.color))),
+            foreground_color: pipe!(Palette::of(ctx!()).base_of(&$this.color)),
             radius,
             border_style: pipe!(Border::all(BorderSide {
               width: border_width,
-              color: Brush::from(palette2.base_of(&$this.color))
+              color: Palette::of(ctx!()).base_of(&$this.color).into()
             })),
             padding_style,
 

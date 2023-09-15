@@ -43,10 +43,8 @@ pub fn messages() -> impl Into<Widget> {
 impl Compose for MessageList {
   fn compose(this: State<Self>) -> Widget {
     fn_widget! {
-      let palette = Palette::of(ctx!());
-
       @Column {
-        background: palette.surface(),
+        background: Palette::of(ctx!()).surface(),
         @Row {
           justify_content: JustifyContent::SpaceBetween,
           padding: EdgeInsets::new(8., 16., 8., 16.),
@@ -56,7 +54,7 @@ impl Compose for MessageList {
             @TinyIcon { @{ svgs::MENU } }
             @Text {
               text: "Message",
-              foreground: palette.on_surface(),
+              foreground: Palette::of(ctx!()).on_surface(),
               text_style: TypographyTheme::of(ctx!()).title_large.text.clone(),
             }
           }
@@ -77,7 +75,7 @@ impl Compose for MessageList {
               @VScrollBar {
                 @Lists {
                   @{
-                    let message_gen = |message: Message| {
+                    let message_gen = move |message: Message| {
                       @Column {
                         @ListItem {
                           line_number: 1usize,

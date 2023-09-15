@@ -7,7 +7,7 @@ use ribir_core::prelude::*;
 /// its child. So you can declare any widget as its child to display as a icon.
 #[derive(Declare2, Default, Clone, Copy)]
 pub struct Icon {
-  #[declare(default = IconSize::of(ctx).small)]
+  #[declare(default = IconSize::of(ctx!()).small)]
   pub size: Size,
 }
 
@@ -38,7 +38,7 @@ macro_rules! define_fixed_size_icon {
         type Child = Widget;
         fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
           fn_widget! {
-            let icon = @Icon { size: IconSize::of(ctx).$field };
+            let icon = @Icon { size: IconSize::of(ctx!()).$field };
             @ $icon { @ { child } }
           }
           .into()

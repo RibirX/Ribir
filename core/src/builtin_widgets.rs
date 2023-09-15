@@ -223,7 +223,7 @@ impl<T: ComposeChild + 'static> ComposeChild for FatObj<T> {
 }
 
 impl<T: SingleParent + 'static> SingleParent for FatObj<T> {
-  fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
+  fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
     let Self { host, builtin } = self;
     let p = host.append_child(child, ctx);
     builtin.compose_with_host(p.into(), ctx).build(ctx)
@@ -231,7 +231,7 @@ impl<T: SingleParent + 'static> SingleParent for FatObj<T> {
 }
 
 impl<T: MultiParent + 'static> MultiParent for FatObj<T> {
-  fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId {
+  fn append_children(self, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId {
     let Self { host, builtin } = self;
     let host = host.append_children(children, ctx);
     builtin.compose_with_host(host.into(), ctx).build(ctx)

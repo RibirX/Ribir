@@ -189,7 +189,7 @@ impl Compose for HRawScrollbar {
           thickness,
           thumb_min_size,
           track_brush,
-        } = ScrollBarStyle::of(ctx);
+        } = ScrollBarStyle::of(ctx!());
 
         let mut track_box = @Container {
           size: Size::new(f32::MAX, 0.),
@@ -251,7 +251,7 @@ impl Compose for VRawScrollbar {
           thickness,
           thumb_min_size,
           ref track_brush
-        } = ScrollBarStyle::of(ctx);
+        } = ScrollBarStyle::of(ctx!());
 
         let mut track_box = @Container {
           size: Size::new(0., f32::MAX),

@@ -1,6 +1,6 @@
 pub(crate) use crate::widget_tree::*;
 use crate::{context::*, prelude::*};
-use ribir_algo::ShareResource;
+use ribir_algo::{Sc, ShareResource};
 use rxrust::subscription::{BoxSubscription, SubscriptionGuard};
 
 use std::rc::Rc;
@@ -372,6 +372,8 @@ impl_proxy_query!(paths [deref()], ShareResource<T>, <T>, where  T: Render + 'st
 impl_proxy_render!(proxy deref(), ShareResource<T>, <T>, where  T: Render + 'static);
 impl_proxy_query!(paths [deref()], Rc<W>, <W>, where W: Query + 'static);
 impl_proxy_render!(proxy deref(), Rc<W>, <W>, where W: Render + 'static);
+impl_proxy_query!(paths [deref()], Sc<W>, <W>, where W: Query + 'static);
+impl_proxy_render!(proxy deref(), Sc<W>, <W>, where W: Render + 'static);
 
 impl_query_self_only!(Vec<SubscriptionGuard<BoxSubscription<'static>>>);
 

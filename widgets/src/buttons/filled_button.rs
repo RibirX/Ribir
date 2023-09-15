@@ -75,7 +75,7 @@ impl ComposeDecorator for FilledButtonDecorator {
 /// ```
 #[derive(Declare2, Default)]
 pub struct FilledButton {
-  #[declare(default=Palette::of(ctx).primary())]
+  #[declare(default=Palette::of(ctx!()).primary())]
   color: Color,
 }
 
@@ -101,9 +101,7 @@ impl ComposeChild for FilledButton {
           label_style,
           radius,
           padding_style,
-        } = FilledButtonStyle::of(ctx);
-        let palette1 = Palette::of(ctx).clone();
-        let palette2 = Palette::of(ctx).clone();
+        } = FilledButtonStyle::of(ctx!());
 
         @FilledButtonDecorator {
           button_type,
@@ -114,8 +112,11 @@ impl ComposeChild for FilledButton {
             label_gap,
             icon_pos,
             label_style,
-            background_color: pipe!(Brush::from(palette1.base_of(&$this.color))),
-            foreground_color: pipe!(Brush::from(palette2.on_of(&palette2.base_of(&$this.color)))),
+            background_color: pipe!(Palette::of(ctx!()).base_of(&$this.color)),
+            foreground_color: pipe! {
+              let palette = Palette::of(ctx!());
+              palette.on_of(&palette.base_of(&$this.color))
+            },
             radius,
             border_style: None,
             padding_style,

@@ -47,8 +47,8 @@ pub trait SingleChild {}
 
 /// A boxed render widget that support accept one child.
 pub trait BoxedSingleParent {
-  fn boxed_append_child(self: Box<Self>, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId;
-  fn boxed_build(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId;
+  fn boxed_append_child(self: Box<Self>, child: WidgetId, ctx: &BuildCtx) -> WidgetId;
+  fn boxed_build(self: Box<Self>, ctx: &BuildCtx) -> WidgetId;
 }
 
 /// Trait to tell Ribir a object that has multi children.
@@ -56,12 +56,8 @@ pub trait MultiChild {}
 
 /// A boxed render widget that support accept multi children.
 pub trait BoxedMultiParent {
-  fn boxed_append_children(
-    self: Box<Self>,
-    children: Vec<WidgetId>,
-    ctx: &mut BuildCtx,
-  ) -> WidgetId;
-  fn boxed_build(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId;
+  fn boxed_append_children(self: Box<Self>, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId;
+  fn boxed_build(self: Box<Self>, ctx: &BuildCtx) -> WidgetId;
 }
 
 /// Trait mark widget can have one child and also have compose logic for widget
@@ -80,38 +76,38 @@ impl MultiChild for Box<dyn BoxedMultiParent> {}
 
 impl StrictBuilder for Box<dyn BoxedSingleParent> {
   #[inline]
-  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx.force_as_mut()) }
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx) }
 }
 
 impl SingleParent for Box<dyn BoxedSingleParent> {
   #[inline]
-  fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
+  fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
     self.boxed_append_child(child, ctx)
   }
 }
 
 impl StrictBuilder for Box<dyn BoxedMultiParent> {
   #[inline]
-  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx.force_as_mut()) }
+  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx) }
 }
 
 impl MultiParent for Box<dyn BoxedMultiParent> {
   #[inline]
-  fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId {
+  fn append_children(self, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId {
     self.boxed_append_children(children, ctx)
   }
 }
 
 pub(crate) trait SingleParent {
-  fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId;
+  fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId;
 }
 
 pub(crate) trait MultiParent {
-  fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId;
+  fn append_children(self, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId;
 }
 
 impl<T: Into<Box<dyn Render>> + SingleChild> SingleParent for T {
-  fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
+  fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
     let p = ctx.alloc_widget(self.into());
     ctx.append_child(p, child);
     p
@@ -120,7 +116,7 @@ impl<T: Into<Box<dyn Render>> + SingleChild> SingleParent for T {
 
 impl<T: Into<Box<dyn Render>> + MultiChild> MultiParent for T {
   #[inline]
-  fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId {
+  fn append_children(self, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId {
     let p = ctx.alloc_widget(self.into());
     for c in children {
       ctx.append_child(p, c);
@@ -131,26 +127,22 @@ impl<T: Into<Box<dyn Render>> + MultiChild> MultiParent for T {
 
 impl<W: SingleParent + WidgetBuilder + 'static> BoxedSingleParent for W {
   #[inline]
-  fn boxed_append_child(self: Box<Self>, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
+  fn boxed_append_child(self: Box<Self>, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
     (*self).append_child(child, ctx)
   }
 
   #[inline]
-  fn boxed_build(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId { (*self).build(ctx) }
+  fn boxed_build(self: Box<Self>, ctx: &BuildCtx) -> WidgetId { (*self).build(ctx) }
 }
 
 impl<W: MultiParent + StrictBuilder + 'static> BoxedMultiParent for W {
   #[inline]
-  fn boxed_append_children(
-    self: Box<Self>,
-    children: Vec<WidgetId>,
-    ctx: &mut BuildCtx,
-  ) -> WidgetId {
+  fn boxed_append_children(self: Box<Self>, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId {
     (*self).append_children(children, ctx)
   }
 
   #[inline]
-  fn boxed_build(self: Box<Self>, ctx: &mut BuildCtx) -> WidgetId { (*self).build(ctx) }
+  fn boxed_build(self: Box<Self>, ctx: &BuildCtx) -> WidgetId { (*self).build(ctx) }
 }
 
 #[cfg(test)]

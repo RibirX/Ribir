@@ -270,7 +270,6 @@ impl ComposeChild for ListItem {
     } = child;
 
     fn_widget! {
-      let palette = Palette::of(ctx!());
       let ListItemStyle {
         padding_style,
         label_gap,
@@ -279,7 +278,7 @@ impl ComposeChild for ListItem {
         leading_config,
         trailing_config,
         item_align,
-      } = ListItemStyle::of(ctx);
+      } = ListItemStyle::of(ctx!());
 
       let padding = padding_style.map(|padding| Padding { padding });
       let label_gap = label_gap.map(|padding| Padding { padding });
@@ -291,7 +290,7 @@ impl ComposeChild for ListItem {
           @Row {
             align_items: pipe!(item_align($this.line_number)),
             @{
-              leading.map(|w| {
+              leading.map(move |w| {
                 let (leading, widget) = w.unzip();
                 let (_, builtin)  = leading.unzip();
                 builtin.compose_with_host(widget.compose_with_style(leading_config), ctx!())
@@ -303,7 +302,7 @@ impl ComposeChild for ListItem {
                 @Column {
                   @Text {
                     text: pipe!($headline.0.0.clone()),
-                    foreground: palette.on_surface(),
+                    foreground: Palette::of(ctx!()).on_surface(),
                     text_style: headline_style,
                   }
                   @{ supporting.map(|mut supporting|  {
@@ -318,7 +317,7 @@ impl ComposeChild for ListItem {
                       } ,
                       @Text {
                         text: pipe!($supporting.0.0.clone()),
-                        foreground:  palette.on_surface_variant(),
+                        foreground:  Palette::of(ctx!()).on_surface_variant(),
                         text_style: supporting_style,
                       }
                     }
@@ -343,7 +342,7 @@ impl ComposeChild for ListItem {
 pub struct ListItem {
   #[declare(default = 1usize)]
   pub line_number: usize,
-  #[declare(default = Palette::of(ctx).primary())]
+  #[declare(default = Palette::of(ctx!()).primary())]
   pub active_background: Color,
 }
 

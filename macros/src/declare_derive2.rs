@@ -264,8 +264,7 @@ fn struct_with_fields_gen(
         type Target = State<#name #g_ty>;
 
         #[inline]
-        fn build_declare(mut self, ctx: &BuildCtx) -> Self::Target {
-          set_build_ctx!(ctx);
+        fn build_declare(mut self, ctx!(): &BuildCtx) -> Self::Target {
 
           #(#fill_default)*
           #(#unzip_fields)*

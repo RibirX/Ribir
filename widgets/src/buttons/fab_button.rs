@@ -75,7 +75,7 @@ impl ComposeDecorator for FabButtonDecorator {
 /// ```
 #[derive(Default, Declare2)]
 pub struct FabButton {
-  #[declare(default=Palette::of(ctx).primary())]
+  #[declare(default=Palette::of(ctx!()).primary())]
   color: Color,
 }
 
@@ -101,9 +101,9 @@ impl ComposeChild for FabButton {
           label_style,
           radius,
           padding_style,
-        } = FabButtonStyle::of(ctx);
-        let palette1 = Palette::of(ctx).clone();
-        let palette2 = Palette::of(ctx).clone();
+        } = FabButtonStyle::of(ctx!());
+        let palette1 = Palette::of(ctx!()).clone();
+        let palette2 = Palette::of(ctx!()).clone();
 
         @FabButtonDecorator {
           button_type,
