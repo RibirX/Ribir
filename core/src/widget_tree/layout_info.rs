@@ -134,7 +134,7 @@ impl LayoutStore {
   /// return a mutable reference of the layout info  of `id`, if it's not exist
   /// insert a default value before return
   pub(crate) fn layout_info_or_default(&mut self, id: WidgetId) -> &mut LayoutInfo {
-    self.data.entry(id).or_insert_with(LayoutInfo::default)
+    self.data.entry(id).or_default()
   }
 
   pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {

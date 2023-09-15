@@ -98,7 +98,9 @@ where
     let mut commands = commands.into_iter();
     let output_size = output.size();
     loop {
-      let Some(cmd) = commands.next() else { break; };
+      let Some(cmd) = commands.next() else {
+        break;
+      };
       self.draw_command(cmd, output_size);
     }
     self.expand_indices_range();

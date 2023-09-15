@@ -143,7 +143,9 @@ impl FocusManager {
   }
 
   pub(crate) fn remove_focus_node(&mut self, wid: WidgetId, focus_type: FocusType) {
-    let Some(id) = self.node_ids.get(&wid).cloned() else { return; };
+    let Some(id) = self.node_ids.get(&wid).cloned() else {
+      return;
+    };
 
     let node = self.arena[id].get_mut();
     node.remove_focus(focus_type);
@@ -159,7 +161,9 @@ impl FocusManager {
   }
 
   pub fn refresh(&mut self) {
-    let Some(focusing) = self.request_focusing.take() else { return };
+    let Some(focusing) = self.request_focusing.take() else {
+      return;
+    };
     if focusing.is_none() {
       self.focusing = None;
       return;

@@ -89,7 +89,7 @@ impl TextSelectable {
   fn selected_rect(&self) -> Vec<Rect> { self.helper.selection(&self.caret.select_range()) }
 }
 
-fn key_handle(this: &mut TextSelectable, text: &CowArc<str>, event: &mut KeyboardEvent) {
+fn key_handle(this: &mut TextSelectable, text: &CowArc<str>, event: &KeyboardEvent) {
   let mut deal = false;
   if event.with_command_key() {
     deal = deal_with_command(this, text, event);
@@ -100,11 +100,7 @@ fn key_handle(this: &mut TextSelectable, text: &CowArc<str>, event: &mut Keyboar
   }
 }
 
-fn deal_with_command(
-  this: &mut TextSelectable,
-  text: &CowArc<str>,
-  event: &mut KeyboardEvent,
-) -> bool {
+fn deal_with_command(this: &mut TextSelectable, text: &CowArc<str>, event: &KeyboardEvent) -> bool {
   match event.key {
     VirtualKeyCode::C => {
       let rg = this.caret.select_range();
@@ -132,7 +128,7 @@ fn is_move_by_word(event: &KeyboardEvent) -> bool {
   return event.with_ctrl_key();
 }
 
-fn deal_with_selection(this: &mut TextSelectable, text: &str, event: &mut KeyboardEvent) {
+fn deal_with_selection(this: &mut TextSelectable, text: &str, event: &KeyboardEvent) {
   let old_caret = this.caret;
   match event.key {
     VirtualKeyCode::Left => {

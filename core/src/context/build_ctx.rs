@@ -138,7 +138,9 @@ impl<'a> BuildCtx<'a> {
   pub(crate) fn themes(&self) -> &Vec<Sc<Theme>> {
     self.themes.get_or_init(|| {
       let mut themes = vec![];
-      let Some(p) = self.ctx_from else { return themes };
+      let Some(p) = self.ctx_from else {
+        return themes;
+      };
 
       let arena = &self.tree.borrow().arena;
       p.ancestors(arena).any(|p| {

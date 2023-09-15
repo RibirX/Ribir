@@ -297,7 +297,9 @@ where
         break;
       }
 
-      let (tex_id,  rg,Some(clip_rect)) = &draw_indices[idx] else { break; };
+      let (tex_id, rg, Some(clip_rect)) = &draw_indices[idx] else {
+        break;
+      };
       let texture = id_to_texture_mut!(self, *tex_id);
       gpu_impl.draw_alpha_triangles_with_scissor(rg, texture, *clip_rect);
       idx += 1;
@@ -307,7 +309,9 @@ where
       if idx >= draw_indices.len() {
         break;
       }
-      let (tex_id,rg, None) = &draw_indices[idx] else { unreachable!(); };
+      let (tex_id, rg, None) = &draw_indices[idx] else {
+        unreachable!();
+      };
       let next = draw_indices[idx..]
         .iter()
         .position(|(next, _, _)| tex_id != next);
@@ -361,14 +365,14 @@ pub(crate) fn valid_cache_item(size: &DeviceSize) -> bool { size.lower_than(ATLA
 
 fn extend_buffer<V>(dist: &mut VertexBuffers<V>, from: VertexBuffers<V>) {
   if dist.vertices.is_empty() {
-    dist.vertices.extend(from.vertices.into_iter());
-    dist.indices.extend(from.indices.into_iter());
+    dist.vertices.extend(from.vertices);
+    dist.indices.extend(from.indices);
   } else {
     let offset = dist.vertices.len() as u32;
     dist
       .indices
       .extend(from.indices.into_iter().map(|i| offset + i));
-    dist.vertices.extend(from.vertices.into_iter());
+    dist.vertices.extend(from.vertices);
   }
 }
 

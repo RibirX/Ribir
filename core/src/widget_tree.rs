@@ -48,7 +48,9 @@ impl WidgetTree {
   /// node has really computing the layout.
   pub(crate) fn layout(&mut self, win_size: Size) {
     loop {
-      let Some(mut needs_layout) = self.layout_list() else {break;};
+      let Some(mut needs_layout) = self.layout_list() else {
+        break;
+      };
       while let Some(wid) = needs_layout.pop() {
         if wid.is_dropped(&self.arena) {
           continue;

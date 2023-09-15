@@ -202,7 +202,9 @@ fn option_type_extract(ty: &syn::Type) -> Option<&syn::Type> {
     seg.ident == ident && seg.arguments.is_empty()
   }
 
-  let syn::Type::Path(ref path) = ty else { return None };
+  let syn::Type::Path(ref path) = ty else {
+    return None;
+  };
   let mut iter = path.path.segments.iter().rev();
   iter
     .next()

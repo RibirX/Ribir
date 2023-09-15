@@ -336,7 +336,7 @@ impl<F> LocalFuture<F>
 where
   F: Future,
 {
-  fn local_waker(&self, cx: &mut std::task::Context<'_>) -> Waker {
+  fn local_waker(&self, cx: &std::task::Context<'_>) -> Waker {
     type RawLocalWaker = (std::task::Waker, Box<dyn RuntimeWaker + Send>);
     fn clone(this: *const ()) -> RawWaker {
       let waker = this as *const RawLocalWaker;

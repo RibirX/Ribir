@@ -37,7 +37,7 @@ impl DrawColorTrianglesPass {
     &mut self,
     buffers: &VertexBuffers<ColorAttr>,
     device: &wgpu::Device,
-    queue: &mut wgpu::Queue,
+    queue: &wgpu::Queue,
   ) {
     self.vertices_buffer.write_buffer(buffers, device, queue);
   }
@@ -45,7 +45,7 @@ impl DrawColorTrianglesPass {
   #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
     &mut self,
-    texture: &mut WgpuTexture,
+    texture: &WgpuTexture,
     indices: Range<u32>,
     clear: Option<Color>,
     device: &wgpu::Device,

@@ -418,7 +418,7 @@ fn simple_ref_bind_work() {
   wnd.layout();
   assert_layout_result_by_path!(wnd, { path = [0], size == flex_size, });
 
-  tap_at(&mut wnd, (1, 1));
+  tap_at(&wnd, (1, 1));
 
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], size == flex_size * 2., });
@@ -445,7 +445,7 @@ fn event_attr_sugar_work() {
   assert_layout_result_by_path!(wnd, { path = [0], size == BEFORE_SIZE, });
   assert_layout_result_by_path!(wnd, { path = [0, 0], size == BEFORE_SIZE, });
 
-  tap_at(&mut wnd, (25, 25));
+  tap_at(&wnd, (25, 25));
 
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], size == AFTER_TAP_SIZE, });
@@ -475,7 +475,7 @@ fn widget_wrap_bind_work() {
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 104., height == 52.,});
 
-  tap_at(&mut wnd, (60, 1));
+  tap_at(&wnd, (60, 1));
 
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 70., height == 60.,});
@@ -511,7 +511,7 @@ fn expression_for_children() {
   assert_layout_result_by_path!(wnd, { path = [0, 3], size == size_one,});
   assert_layout_result_by_path!(wnd, { path = [0, 4], size == ZERO_SIZE,});
 
-  tap_at(&mut wnd, (0, 0));
+  tap_at(&wnd, (0, 0));
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 25., height == 5.,});
   assert_layout_result_by_path!(wnd, { path = [0, 0], size == size_five,});
@@ -538,7 +538,7 @@ fn embed_widget_ref_outside() {
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 4., height == 1.,});
 
-  tap_at(&mut wnd, (0, 0));
+  tap_at(&wnd, (0, 0));
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 8., height == 2.,});
 }
@@ -565,7 +565,7 @@ fn bind_fields() {
   // data flow not affect on init.
   assert_eq!(size, Size::new(3., 1.));
 
-  tap_at(&mut wnd, (0, 0));
+  tap_at(&wnd, (0, 0));
   wnd.draw_frame();
 
   let size = wnd.layout_info_by_path(&[0]).unwrap().size.unwrap();
@@ -622,7 +622,7 @@ fn builtin_ref() {
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
 
-  tap_at(&mut wnd, (1, 1));
+  tap_at(&wnd, (1, 1));
   wnd.draw_frame();
   assert_eq!(icon_track.get(), CursorIcon::AllScroll);
 }
@@ -651,12 +651,12 @@ fn builtin_bind_to_self() {
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  tap_at(&mut wnd, (1, 1));
+  tap_at(&wnd, (1, 1));
   wnd.draw_frame();
   assert_eq!(icon_track.get(), CursorIcon::Help);
 }
 
-fn tap_at(wnd: &mut TestWindow, pos: (i32, i32)) {
+fn tap_at(wnd: &TestWindow, pos: (i32, i32)) {
   let device_id = unsafe { DeviceId::dummy() };
   let modifiers = ModifiersState::default();
 

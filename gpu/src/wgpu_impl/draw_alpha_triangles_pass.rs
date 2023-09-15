@@ -31,7 +31,7 @@ impl DrawAlphaTrianglesPass {
     &mut self,
     buffers: &VertexBuffers<f32>,
     device: &wgpu::Device,
-    queue: &mut wgpu::Queue,
+    queue: &wgpu::Queue,
   ) {
     self.vertices_buffer.write_buffer(buffers, device, queue);
   }
@@ -39,7 +39,7 @@ impl DrawAlphaTrianglesPass {
   pub fn draw_alpha_triangles(
     &mut self,
     indices: &Range<u32>,
-    texture: &mut WgpuTexture,
+    texture: &WgpuTexture,
     scissor: Option<DeviceRect>,
     encoder: &mut wgpu::CommandEncoder,
     device: &wgpu::Device,

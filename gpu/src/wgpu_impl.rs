@@ -106,31 +106,31 @@ impl GPUBackendImpl for WgpuImpl {
   fn load_alpha_vertices(&mut self, buffers: &VertexBuffers<f32>) {
     self
       .draw_alpha_triangles_pass
-      .load_alpha_vertices(buffers, &self.device, &mut self.queue);
+      .load_alpha_vertices(buffers, &self.device, &self.queue);
   }
 
   fn load_color_vertices(&mut self, buffers: &VertexBuffers<ColorAttr>) {
     self
       .draw_color_triangles_pass
-      .load_triangles_vertices(buffers, &self.device, &mut self.queue);
+      .load_triangles_vertices(buffers, &self.device, &self.queue);
   }
 
   fn load_img_vertices(&mut self, buffers: &VertexBuffers<u32>) {
     self
       .draw_img_triangles_pass
-      .load_triangles_vertices(buffers, &self.device, &mut self.queue);
+      .load_triangles_vertices(buffers, &self.device, &self.queue);
   }
 
   fn load_img_primitives(&mut self, primitives: &[ImgPrimitive]) {
     self
       .draw_img_triangles_pass
-      .load_img_primitives(&self.device, &mut self.queue, primitives);
+      .load_img_primitives(&self.device, &self.queue, primitives);
   }
 
   fn load_mask_layers(&mut self, layers: &[crate::MaskLayer]) {
     self
       .mask_layers_storage
-      .write_buffer(&self.device, &mut self.queue, layers);
+      .write_buffer(&self.device, &self.queue, layers);
   }
 
   fn draw_alpha_triangles(&mut self, indices: &Range<u32>, texture: &mut Self::Texture) {
@@ -567,7 +567,7 @@ impl WgpuImpl {
       self.command_buffers.push(encoder.finish());
     }
     if !self.command_buffers.is_empty() {
-      self.draw_tex_pass.submit(&mut self.queue);
+      self.draw_tex_pass.submit(&self.queue);
       self.queue.submit(self.command_buffers.drain(..));
     } else {
       self.draw_tex_pass.clear();

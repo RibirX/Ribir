@@ -124,7 +124,7 @@ impl DrawTexturePass {
     }
   }
 
-  pub fn submit(&mut self, queue: &mut wgpu::Queue) { self.vertices_pool.submit_buffer(queue); }
+  pub fn submit(&mut self, queue: &wgpu::Queue) { self.vertices_pool.submit_buffer(queue); }
 
   pub fn clear(&mut self) { self.vertices_pool.clear() }
 }

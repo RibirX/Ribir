@@ -50,7 +50,7 @@ macro_rules! declare_writer {
 declare_writer!(InputWriter, TextEditorArea);
 use super::TextEditorArea;
 impl TextEditorArea {
-  pub(crate) fn edit_handle(this: &mut TextEditorArea, event: &mut CharsEvent) {
+  pub(crate) fn edit_handle(this: &mut TextEditorArea, event: &CharsEvent) {
     if event.common.with_command_key() {
       return;
     }
@@ -67,7 +67,7 @@ impl TextEditorArea {
     }
   }
 
-  pub(crate) fn key_handle(this: &mut TextEditorArea, event: &mut KeyboardEvent) {
+  pub(crate) fn key_handle(this: &mut TextEditorArea, event: &KeyboardEvent) {
     let mut deal = false;
     if event.with_command_key() {
       deal = key_with_command(this, event)
@@ -78,7 +78,7 @@ impl TextEditorArea {
   }
 }
 
-fn key_with_command(this: &mut TextEditorArea, event: &mut KeyboardEvent) -> bool {
+fn key_with_command(this: &mut TextEditorArea, event: &KeyboardEvent) -> bool {
   if !event.with_command_key() {
     return false;
   }
@@ -111,7 +111,7 @@ fn key_with_command(this: &mut TextEditorArea, event: &mut KeyboardEvent) -> boo
   }
 }
 
-fn single_key(this: &mut TextEditorArea, key: &mut KeyboardEvent) -> bool {
+fn single_key(this: &mut TextEditorArea, key: &KeyboardEvent) -> bool {
   match key.key {
     VirtualKeyCode::NumpadEnter | VirtualKeyCode::Return => {
       if this.multi_line {
