@@ -291,7 +291,9 @@ impl Window {
       return false;
     }
     let tree = self.widget_tree.borrow();
-    let Some(p) = wid.parent(&tree.arena) else { return false };
+    let Some(p) = wid.parent(&tree.arena) else {
+      return false;
+    };
     let in_another = p.ancestors(&tree.arena).any(|p| {
       regen.get(&p).map_or(false, |to| {
         to.map_or(true, |to| wid.ancestor_of(to, &tree.arena))
@@ -343,7 +345,9 @@ impl Window {
   /// what you are doing.
   fn emit_events(&self) {
     loop {
-      let Some(e) = self.delay_emitter.borrow_mut().pop_front() else{ break};
+      let Some(e) = self.delay_emitter.borrow_mut().pop_front() else {
+        break;
+      };
 
       match e {
         DelayEvent::Mounted(id) => {

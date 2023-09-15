@@ -755,7 +755,7 @@ mod tests {
     // 1. 3 item enter
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    let expect_vec = vec!['1', '2', '3'];
+    let expect_vec = ['1', '2', '3'];
     assert_eq!((*enter_list.state_ref()).len(), 3);
     assert!(
       (*enter_list.state_ref())
@@ -770,7 +770,7 @@ mod tests {
     wnd.on_wnd_resize_event(ZERO_SIZE);
     wnd.draw_frame();
 
-    let expect_vec = vec!['4'];
+    let expect_vec = ['4'];
     assert_eq!((*enter_list.state_ref()).len(), 1);
     assert!(
       (*enter_list.state_ref())
@@ -784,7 +784,7 @@ mod tests {
     c_v.write()[1].1 = 'b';
     wnd.draw_frame();
 
-    let expect_vec = vec![];
+    let expect_vec = [];
     assert_eq!((*enter_list.state_ref()).len(), 0);
     assert!(
       (*enter_list.state_ref())
@@ -792,7 +792,7 @@ mod tests {
         .all(|item| expect_vec.contains(item))
     );
 
-    let expect_vec = vec!['b'];
+    let expect_vec = ['b'];
     assert_eq!((*update_list.state_ref()).len(), 1);
     assert!(
       (*update_list.state_ref())
@@ -821,7 +821,7 @@ mod tests {
 
     assert_eq!((*enter_list.state_ref()).len(), 0);
 
-    let expect_vec = vec!['a'];
+    let expect_vec = ['a'];
     assert_eq!((*update_list.state_ref()).len(), 1);
     assert!(
       (*update_list.state_ref())

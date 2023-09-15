@@ -179,8 +179,8 @@ mod tokens_pre_process {
 
   fn in_macro(tokens: &[TokenTree]) -> bool {
     let [.., TokenTree::Ident(_), TokenTree::Punct(p)] = tokens else {
-    return  false;
-  };
+      return false;
+    };
     p.as_char() == '!'
   }
 }
@@ -280,7 +280,9 @@ impl Fold for DollarRefsCtx {
 
     // fold if write on state.
     let write_mac = is_state_write_method(&i).then(|| {
-      let Expr::Macro(m) = &mut *i.receiver else { return None };
+      let Expr::Macro(m) = &mut *i.receiver else {
+        return None;
+      };
       parse_dollar_macro(&m.mac).map(|d| (d.name, &mut m.mac))
     });
     if let Some(Some((name, mac))) = write_mac {

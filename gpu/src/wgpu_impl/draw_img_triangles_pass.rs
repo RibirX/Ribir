@@ -42,7 +42,7 @@ impl DrawImgTrianglesPass {
     &mut self,
     buffers: &VertexBuffers<u32>,
     device: &wgpu::Device,
-    queue: &mut wgpu::Queue,
+    queue: &wgpu::Queue,
   ) {
     self.vertices_buffer.write_buffer(buffers, device, queue);
   }
@@ -50,7 +50,7 @@ impl DrawImgTrianglesPass {
   pub fn load_img_primitives(
     &mut self,
     device: &wgpu::Device,
-    queue: &mut wgpu::Queue,
+    queue: &wgpu::Queue,
     primitives: &[ImgPrimitive],
   ) {
     self.prims_storage.write_buffer(device, queue, primitives);
@@ -59,7 +59,7 @@ impl DrawImgTrianglesPass {
   #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
     &mut self,
-    texture: &mut WgpuTexture,
+    texture: &WgpuTexture,
     indices: Range<u32>,
     clear: Option<Color>,
     device: &wgpu::Device,

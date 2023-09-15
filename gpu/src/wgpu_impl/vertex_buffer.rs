@@ -21,7 +21,7 @@ impl<T: AsBytes> VerticesBuffer<T> {
     &mut self,
     data: &ribir_painter::VertexBuffers<T>,
     device: &wgpu::Device,
-    queue: &mut wgpu::Queue,
+    queue: &wgpu::Queue,
   ) {
     let vertices_data = data.vertices.as_bytes();
     let indices_data = data.indices.as_bytes();

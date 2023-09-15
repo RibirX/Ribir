@@ -37,7 +37,7 @@ impl<T: AsBytes> BufferPool<T> {
     })
   }
 
-  pub fn submit_buffer(&mut self, queue: &mut wgpu::Queue) {
+  pub fn submit_buffer(&mut self, queue: &wgpu::Queue) {
     if !self.data.is_empty() {
       queue.write_buffer(&self.buffer, 0, self.data.as_bytes());
       self.data.clear();
