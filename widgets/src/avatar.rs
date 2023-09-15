@@ -24,7 +24,7 @@ use ribir_core::prelude::*;
 /// ```
 #[derive(Declare2, Default, Clone)]
 pub struct Avatar {
-  #[declare(default=Palette::of(ctx).primary())]
+  #[declare(default=Palette::of(ctx!()).primary())]
   pub color: Color,
 }
 

@@ -55,7 +55,7 @@ where
   fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
     let Self { widget, child } = self;
     let child = child.build(ctx);
-    widget.append_child(child, ctx.force_as_mut())
+    widget.append_child(child, ctx)
   }
 }
 

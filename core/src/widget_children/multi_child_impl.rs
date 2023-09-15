@@ -42,9 +42,7 @@ where
   D: IntoIterator + 'static,
   D::Item: WidgetBuilder,
 {
-  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) {
-    self.build_multi(vec, ctx.force_as_mut());
-  }
+  fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx) { self.build_multi(vec, ctx); }
 }
 
 impl<M, P, C> MultiWithChild<C, M> for P
@@ -76,6 +74,6 @@ where
 impl<P: MultiParent> StrictBuilder for MultiPair<P> {
   fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
     let MultiPair { parent, children } = self;
-    parent.append_children(children, ctx.force_as_mut())
+    parent.append_children(children, ctx)
   }
 }

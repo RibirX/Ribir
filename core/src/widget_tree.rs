@@ -531,8 +531,8 @@ mod tests {
         @ {
           (0..100).map(|_|
             @MockBox {
-            size: Size::new(150., 50.),
-            background: Color::BLUE,
+              size: Size::new(150., 50.),
+              background: Color::BLUE,
           })
         }
     }};

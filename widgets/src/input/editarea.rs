@@ -64,7 +64,7 @@ impl ComposeChild for TextEditorArea {
           }
         });
 
-      let tick_of_layout_ready = ctx.window()
+      let tick_of_layout_ready = ctx!().window()
         .frame_tick_stream()
         .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
 

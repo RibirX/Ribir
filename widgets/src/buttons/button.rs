@@ -64,7 +64,7 @@ impl ComposeDecorator for ButtonDecorator {
 /// ```
 #[derive(Default, Declare2)]
 pub struct Button {
-  #[declare(default=Palette::of(ctx).primary())]
+  #[declare(default=Palette::of(ctx!()).primary())]
   color: Color,
 }
 
@@ -89,8 +89,8 @@ impl ComposeChild for Button {
           icon_pos,
           label_style,
           padding_style,
-        } = ButtonStyle::of(ctx);
-        let palette = Palette::of(ctx).clone();
+        } = ButtonStyle::of(ctx!());
+        let palette = Palette::of(ctx!()).clone();
 
         @ButtonDecorator {
           button_type,

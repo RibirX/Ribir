@@ -2,6 +2,7 @@
 //! to app-wide or particular part of the application.
 
 use crate::{fill_svgs, impl_query_self_only, prelude::*, widget::StrictBuilder};
+use ribir_algo::Sc;
 pub use ribir_algo::{CowArc, ShareResource};
 use ribir_geom::Size;
 use ribir_macros::Declare2;
@@ -68,7 +69,7 @@ pub enum Theme {
 
 #[derive(Declare2)]
 pub struct ThemeWidget {
-  pub theme: Rc<Theme>,
+  pub theme: Sc<Theme>,
 }
 
 impl ComposeChild for ThemeWidget {
@@ -77,17 +78,18 @@ impl ComposeChild for ThemeWidget {
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     use crate::prelude::*;
     FnWidget::new(move |ctx| {
-      let ctx = ctx.force_as_mut();
       let theme = this.read().theme.clone();
-
       AppCtx::load_font_from_theme(&theme);
-      ctx.push_theme(theme.clone());
+
+      let mut themes = ctx.themes().clone();
+      themes.push(theme.clone());
+
       let p = DataWidget::new(Box::new(Void), theme).strict_build(ctx);
-      let old = ctx.force_as_mut().reset_ctx_from(Some(p));
-      let c = child.build(ctx);
+      // shadow the context with the theme.
+      let ctx = BuildCtx::new_with_data(Some(p), ctx.tree, themes);
+      let c = child.build(&ctx);
       ctx.append_child(p, c);
-      ctx.force_as_mut().reset_ctx_from(old);
-      ctx.pop_theme();
+
       p
     })
     .into()

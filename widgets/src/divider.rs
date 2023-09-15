@@ -42,7 +42,7 @@ pub struct Divider {
   // Extent of divider
   pub extent: f32,
   // Color of divider
-  #[declare(default=Palette::of(ctx).outline_variant())]
+  #[declare(default=Palette::of(ctx!()).outline_variant())]
   pub color: Brush,
   // Direction of divider
   #[declare(default=Direction::Horizontal)]

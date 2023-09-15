@@ -10,9 +10,9 @@ use ribir_core::{
 #[derive(Debug, Declare2, Clone, PartialEq)]
 pub struct Text {
   pub text: CowArc<str>,
-  #[declare(default = Palette::of(ctx).on_surface_variant())]
+  #[declare(default = Palette::of(ctx!()).on_surface_variant())]
   pub foreground: Brush,
-  #[declare(default = TypographyTheme::of(ctx).body_medium.text.clone())]
+  #[declare(default = TypographyTheme::of(ctx!()).body_medium.text.clone())]
   pub text_style: CowArc<TextStyle>,
   #[declare(default)]
   pub path_style: PathPaintStyle,
@@ -132,7 +132,7 @@ macro_rules! define_text_with_theme_style {
     #[derive(Declare2)]
     pub struct $name {
       pub text: CowArc<str>,
-      #[declare(default = Palette::of(ctx).on_surface_variant())]
+      #[declare(default = Palette::of(ctx!()).on_surface_variant())]
       pub foreground: Brush,
       #[declare(default)]
       pub overflow: Overflow,
@@ -144,7 +144,7 @@ macro_rules! define_text_with_theme_style {
           @Text {
             text: pipe!($this.text.clone()),
             foreground: pipe!($this.foreground.clone()),
-            text_style: TypographyTheme::of(ctx).$style.text.clone(),
+            text_style: TypographyTheme::of(ctx!()).$style.text.clone(),
             overflow: pipe!($this.overflow),
           }
         }

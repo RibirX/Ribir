@@ -1,18 +1,19 @@
+use ribir_algo::Sc;
+
 use crate::{
   prelude::*,
   widget::{widget_id::new_node, WidgetTree},
   window::{DelayEvent, WindowId},
 };
 use std::{
-  cell::{Ref, RefCell, UnsafeCell},
+  cell::{OnceCell, Ref, RefCell},
   ops::Deref,
   rc::Rc,
 };
 
 /// A context provide during build the widget tree.
 pub struct BuildCtx<'a> {
-  // tmp `UnsafeCell` before use `BuildCtx` as mutable reference.
-  pub(crate) themes: UnsafeCell<Option<Vec<Rc<Theme>>>>,
+  pub(crate) themes: OnceCell<Vec<Sc<Theme>>>,
   /// The widget which this `BuildCtx` is created from. It's not means this
   /// is the parent of the widget which is builded by this `BuildCtx`.
   ctx_from: Option<WidgetId>,
@@ -43,17 +44,25 @@ impl<'a> BuildCtx<'a> {
     }
   }
 
-  pub fn reset_ctx_from(&mut self, reset: Option<WidgetId>) -> Option<WidgetId> {
-    std::mem::replace(&mut self.ctx_from, reset)
-  }
-
   #[inline]
   pub(crate) fn new(from: Option<WidgetId>, tree: &'a RefCell<WidgetTree>) -> Self {
     Self {
-      themes: UnsafeCell::new(None),
+      themes: OnceCell::new(),
       ctx_from: from,
       tree,
     }
+  }
+
+  pub(crate) fn new_with_data(
+    from: Option<WidgetId>,
+    tree: &'a RefCell<WidgetTree>,
+    data: Vec<Sc<Theme>>,
+  ) -> Self {
+    let themes: OnceCell<Vec<Sc<Theme>>> = OnceCell::new();
+    // Safety: we just create the `OnceCell` and it's empty.
+    unsafe { themes.set(data).unwrap_unchecked() };
+
+    Self { themes, ctx_from: from, tree }
   }
 
   pub(crate) fn find_cfg<T>(&self, f: impl Fn(&Theme) -> Option<&T>) -> Option<&T> {
@@ -77,12 +86,12 @@ impl<'a> BuildCtx<'a> {
     new_node(&mut self.tree.borrow_mut().arena, widget)
   }
 
-  pub(crate) fn append_child(&mut self, parent: WidgetId, child: WidgetId) {
+  pub(crate) fn append_child(&self, parent: WidgetId, child: WidgetId) {
     parent.append(child, &mut self.tree.borrow_mut().arena);
   }
 
   /// Insert `next` after `prev`
-  pub(crate) fn insert_after(&mut self, prev: WidgetId, next: WidgetId) {
+  pub(crate) fn insert_after(&self, prev: WidgetId, next: WidgetId) {
     prev.insert_after(next, &mut self.tree.borrow_mut().arena);
   }
 
@@ -124,43 +133,23 @@ impl<'a> BuildCtx<'a> {
       .add_delay_event(DelayEvent::Disposed { id, parent });
   }
 
-  pub(crate) fn mark_dirty(&mut self, id: WidgetId) { self.tree.borrow_mut().mark_dirty(id); }
+  pub(crate) fn mark_dirty(&self, id: WidgetId) { self.tree.borrow_mut().mark_dirty(id); }
 
-  #[inline]
-  pub(crate) fn push_theme(&self, theme: Rc<Theme>) { self.themes().push(theme); }
-
-  #[inline]
-  pub(crate) fn pop_theme(&self) { self.themes().pop(); }
-
-  /// todo: tmp code
-  /// because we use `BuildCtx` as reference now, but we need to use it as
-  /// mutable reference. Do a unsafe cast here, and remove it when we use
-  /// `BuildCtx` as mutable reference in `Widget`
-  #[allow(clippy::mut_from_ref)]
-  pub(crate) fn force_as_mut(&self) -> &mut Self {
-    #[allow(clippy::cast_ref_to_mut)]
-    unsafe {
-      &mut *(self as *const Self as *mut Self)
-    }
-  }
-
-  #[allow(clippy::mut_from_ref)]
-  fn themes(&self) -> &mut Vec<Rc<Theme>> {
-    let this = self.force_as_mut();
-    unsafe { &mut *this.themes.get() }.get_or_insert_with(|| {
+  pub(crate) fn themes(&self) -> &Vec<Sc<Theme>> {
+    self.themes.get_or_init(|| {
       let mut themes = vec![];
       let Some(p) = self.ctx_from else { return themes };
 
-      let arena = &this.tree.borrow().arena;
+      let arena = &self.tree.borrow().arena;
       p.ancestors(arena).any(|p| {
         p.assert_get(arena).query_all_type(
-          |t: &Rc<Theme>| {
+          |t: &Sc<Theme>| {
             themes.push(t.clone());
             matches!(t.deref(), Theme::Inherit(_))
           },
           QueryOrder::InnerFirst,
         );
-        matches!(themes.last().map(Rc::deref), Some(Theme::Full(_)))
+        matches!(themes.last().map(Sc::deref), Some(Theme::Full(_)))
       });
       themes
     })
@@ -191,7 +180,7 @@ mod tests {
     #[derive(Default, Clone)]
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
-    let themes: Stateful<Vec<Rc<Theme>>> = Stateful::new(vec![]);
+    let themes: Stateful<Vec<Sc<Theme>>> = Stateful::new(vec![]);
     let c_themes = themes.clone_writer();
     let light_palette = Palette {
       brightness: Brightness::Light,
@@ -203,7 +192,7 @@ mod tests {
     };
     let light_dark = fn_widget! {
       @ThemeWidget {
-        theme: Rc::new(Theme::Inherit(InheritTheme {
+        theme: Sc::new(Theme::Inherit(InheritTheme {
           palette: Some(Rc::new(light_palette)),
           ..<_>::default()
 
@@ -211,7 +200,7 @@ mod tests {
         @MockBox {
           size: INFINITY_SIZE,
           @ThemeWidget {
-            theme: Rc::new(Theme::Inherit(InheritTheme {
+            theme: Sc::new(Theme::Inherit(InheritTheme {
               palette: Some(Rc::new(dark_palette)),
               ..<_>::default()
             })),

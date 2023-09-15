@@ -35,19 +35,19 @@ impl CustomStyle for InputStyle {
 
 #[derive(Declare2)]
 pub struct Input {
-  #[declare(default = TypographyTheme::of(ctx).body_large.text.clone())]
+  #[declare(default = TypographyTheme::of(ctx!()).body_large.text.clone())]
   pub style: CowArc<TextStyle>,
   #[declare(skip)]
   text: CowArc<str>,
   #[declare(skip)]
   caret: CaretState,
-  #[declare(default = InputStyle::of(ctx).size)]
+  #[declare(default = InputStyle::of(ctx!()).size)]
   size: Option<f32>,
 }
 
 #[derive(Declare2)]
 pub struct TextArea {
-  #[declare(default = TypographyTheme::of(ctx).body_large.text.clone())]
+  #[declare(default = TypographyTheme::of(ctx!()).body_large.text.clone())]
   pub style: CowArc<TextStyle>,
   #[declare(default = true)]
   pub auto_wrap: bool,
@@ -55,9 +55,9 @@ pub struct TextArea {
   text: CowArc<str>,
   #[declare(skip)]
   caret: CaretState,
-  #[declare(default = TextAreaStyle::of(ctx).rows)]
+  #[declare(default = TextAreaStyle::of(ctx!()).rows)]
   rows: Option<f32>,
-  #[declare(default = TextAreaStyle::of(ctx).cols)]
+  #[declare(default = TextAreaStyle::of(ctx!()).cols)]
   cols: Option<f32>,
 }
 

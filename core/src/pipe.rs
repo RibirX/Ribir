@@ -120,7 +120,6 @@ impl<W: Into<Widget> + 'static> StrictBuilder for Pipe<W> {
           let wnd = ctx.window();
           AppCtx::spawn_local(async move { wnd.remove_regenerating_mark(id) }).unwrap();
 
-          let ctx = ctx.force_as_mut();
           if !ctx.window().is_in_another_regenerating(id) {
             let new_id = v.into().build(ctx);
 
@@ -171,7 +170,7 @@ impl<W: Into<Widget> + 'static> WidgetBuilder for Pipe<Option<W>> {
 }
 
 impl<W: SingleParent + 'static> SingleParent for Pipe<W> {
-  fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
+  fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
     let (v, modifies) = self.unzip();
     let p = v.append_child(child, ctx);
     let rg = half_to_close_interval(p..child, &ctx.tree.borrow());
@@ -184,7 +183,7 @@ impl<W: SingleParent + 'static> SingleParent for Pipe<W> {
 }
 
 impl<W: MultiParent + StrictBuilder + 'static> MultiParent for Pipe<W> {
-  fn append_children(self, children: Vec<WidgetId>, ctx: &mut BuildCtx) -> WidgetId {
+  fn append_children(self, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId {
     // if children is empty, we can let the pipe parent as the whole subtree.
     if children.is_empty() {
       self.strict_build(ctx)
@@ -203,7 +202,7 @@ impl<W: MultiParent + StrictBuilder + 'static> MultiParent for Pipe<W> {
 }
 
 impl<W: SingleParent + Into<Widget> + 'static> SingleParent for Pipe<Option<W>> {
-  fn append_child(self, child: WidgetId, ctx: &mut BuildCtx) -> WidgetId {
+  fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
     self
       .map(|p| -> Box<dyn BoxedSingleParent> {
         if let Some(p) = p {
@@ -225,8 +224,8 @@ fn update_pipe_parent<W: 'static>(
   parent: Range<WidgetId>,
   // transplant the children of the old parent to the new widget.
   modifies: BoxOp<'static, (ModifyScope, W), Infallible>,
-  ctx: &mut BuildCtx,
-  transplant: impl Fn(W, WidgetId, &mut BuildCtx) -> WidgetId + 'static,
+  ctx: &BuildCtx,
+  transplant: impl Fn(W, WidgetId, &BuildCtx) -> WidgetId + 'static,
 ) {
   let id_share = Sc::new(RefCell::new(parent.clone()));
   let id_share2 = id_share.clone();
@@ -243,7 +242,6 @@ fn update_pipe_parent<W: 'static>(
     .sample(new_frame_sampler!(ctx))
     .subscribe(move |(_, v)| {
       handle.with_ctx(|ctx| {
-        let ctx = ctx.force_as_mut();
         let rg = id_share.borrow().clone();
 
         let wnd = ctx.window();
@@ -253,7 +251,7 @@ fn update_pipe_parent<W: 'static>(
 
         if !ctx.window().is_in_another_regenerating(rg.start) {
           let first_child = rg.end.first_child(&ctx.tree.borrow().arena).unwrap();
-          let p = transplant(v, rg.end, ctx.force_as_mut());
+          let p = transplant(v, rg.end, ctx);
           let new_rg = half_to_close_interval(p..first_child, &ctx.tree.borrow());
 
           update_key_status_single(rg.start, new_rg.start, ctx);
@@ -276,14 +274,14 @@ fn update_pipe_parent<W: 'static>(
 }
 
 impl<W: 'static> Pipe<W> {
-  pub(crate) fn build_multi(self, vec: &mut Vec<WidgetId>, ctx: &mut BuildCtx)
+  pub(crate) fn build_multi(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx)
   where
     W: IntoIterator,
     W::Item: WidgetBuilder,
   {
     fn build_multi(
       v: impl IntoIterator<Item = impl WidgetBuilder>,
-      ctx: &mut BuildCtx,
+      ctx: &BuildCtx,
     ) -> Vec<WidgetId> {
       let mut ids = v.into_iter().map(|w| w.build(ctx)).collect::<Vec<_>>();
 
@@ -320,7 +318,6 @@ impl<W: 'static> Pipe<W> {
       .box_it()
       .subscribe(move |(_, m)| {
         handle.with_ctx(|ctx| {
-          let ctx = ctx.force_as_mut();
           let mut old = ids_share.borrow_mut();
           let removed_subtree = old.clone();
 
