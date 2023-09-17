@@ -1,9 +1,13 @@
 use self::{
   draw_alpha_triangles_pass::DrawAlphaTrianglesPass,
   draw_color_triangles_pass::DrawColorTrianglesPass, draw_img_triangles_pass::DrawImgTrianglesPass,
-  draw_texture_pass::DrawTexturePass, storage::Storage,
+  draw_radial_gradient_pass::DrawRadialGradientTrianglesPass, draw_texture_pass::DrawTexturePass,
+  storage::Storage,
 };
-use crate::{gpu_backend::Texture, ColorAttr, GPUBackendImpl, ImgPrimitive, MaskLayer};
+use crate::{
+  gpu_backend::Texture, ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImgPrimitive, MaskLayer,
+  RadialGradientAttr, RadialGradientPrimitive,
+};
 use futures::{channel::oneshot, Future};
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::{image::ColorFormat, AntiAliasing, Color, PixelImage, VertexBuffers};
@@ -15,6 +19,7 @@ mod vertex_buffer;
 mod draw_alpha_triangles_pass;
 mod draw_color_triangles_pass;
 mod draw_img_triangles_pass;
+mod draw_radial_gradient_pass;
 mod draw_texture_pass;
 
 pub struct WgpuImpl {
@@ -29,6 +34,7 @@ pub struct WgpuImpl {
   draw_alpha_triangles_pass: DrawAlphaTrianglesPass,
   draw_color_triangles_pass: DrawColorTrianglesPass,
   draw_img_triangles_pass: DrawImgTrianglesPass,
+  draw_radial_gradient_pass: draw_radial_gradient_pass::DrawRadialGradientTrianglesPass,
 
   textures_bind: TexturesBind,
   mask_layers_storage: Storage<MaskLayer>,
@@ -127,6 +133,24 @@ impl GPUBackendImpl for WgpuImpl {
       .load_img_primitives(&self.device, &self.queue, primitives);
   }
 
+  fn load_radial_gradient_primitives(&mut self, primitives: &[RadialGradientPrimitive]) {
+    self
+      .draw_radial_gradient_pass
+      .load_radial_gradient_primitives(&self.device, &mut self.queue, primitives);
+  }
+
+  fn load_radial_gradient_stops(&mut self, stops: &[GradientStopPrimitive]) {
+    self
+      .draw_radial_gradient_pass
+      .load_gradient_stops(&self.device, &mut self.queue, stops);
+  }
+
+  fn load_radial_gradient_vertices(&mut self, buffers: &VertexBuffers<RadialGradientAttr>) {
+    self
+      .draw_radial_gradient_pass
+      .load_triangles_vertices(buffers, &self.device, &mut self.queue);
+  }
+
   fn load_mask_layers(&mut self, layers: &[crate::MaskLayer]) {
     self
       .mask_layers_storage
@@ -141,6 +165,25 @@ impl GPUBackendImpl for WgpuImpl {
       None,
       encoder,
       &self.device,
+    );
+  }
+
+  fn draw_radial_gradient_triangles(
+    &mut self,
+    texture: &mut Self::Texture,
+    indices: Range<u32>,
+    clear: Option<Color>,
+  ) {
+    let encoder = command_encoder!(self);
+
+    self.draw_radial_gradient_pass.draw_triangles(
+      texture,
+      indices,
+      clear,
+      &self.device,
+      encoder,
+      &self.textures_bind,
+      &self.mask_layers_storage,
     );
   }
 
@@ -539,6 +582,7 @@ impl WgpuImpl {
 
     let draw_color_triangles_pass = DrawColorTrianglesPass::new(&device);
     let draw_img_triangles_pass = DrawImgTrianglesPass::new(&device);
+    let radial_gradient_pass = DrawRadialGradientTrianglesPass::new(&device);
     let mask_layers_storage = Storage::new(&device, wgpu::ShaderStages::FRAGMENT, 512);
     WgpuImpl {
       device,
@@ -551,6 +595,7 @@ impl WgpuImpl {
       draw_alpha_triangles_pass,
       draw_color_triangles_pass,
       draw_img_triangles_pass,
+      draw_radial_gradient_pass: radial_gradient_pass,
       textures_bind: TexturesBind::default(),
       mask_layers_storage,
     }

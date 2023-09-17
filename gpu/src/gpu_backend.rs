@@ -1,5 +1,8 @@
 use self::textures_mgr::{TextureID, TexturesMgr};
-use crate::{ColorAttr, GPUBackendImpl, ImgPrimitive, MaskLayer};
+use crate::{
+  ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImgPrimitive, MaskLayer, RadialGradientAttr,
+  RadialGradientPrimitive,
+};
 use ribir_geom::{rect_corners, DeviceRect, DeviceSize, Point};
 use ribir_painter::{
   image::ColorFormat, AntiAliasing, Color, PaintCommand, PaintPath, PainterBackend, PixelImage,
@@ -8,6 +11,7 @@ use ribir_painter::{
 use std::{error::Error, future::Future, ops::Range, pin::Pin};
 
 mod atlas;
+
 mod textures_mgr;
 use textures_mgr::*;
 
@@ -16,6 +20,9 @@ pub struct GPUBackend<Impl: GPUBackendImpl> {
   tex_mgr: TexturesMgr<Impl::Texture>,
   color_vertices_buffer: VertexBuffers<ColorAttr>,
   img_vertices_buffer: VertexBuffers<u32>,
+  radial_gradient_vertices_buffer: VertexBuffers<RadialGradientAttr>,
+  gradient_stops: Vec<GradientStopPrimitive>,
+  radial_gradient_prims: Vec<RadialGradientPrimitive>,
   img_prims: Vec<ImgPrimitive>,
   draw_indices: Vec<DrawIndices>,
   tex_ids_map: TextureIdxMap,
@@ -29,7 +36,7 @@ pub struct GPUBackend<Impl: GPUBackendImpl> {
 enum DrawIndices {
   Color(Range<u32>),
   Img(Range<u32>),
-  _Gradient(Range<u32>),
+  RadialGradient(Range<u32>),
 }
 
 struct ClipLayer {
@@ -124,6 +131,17 @@ where
       self.gpu_impl.load_img_primitives(&self.img_prims);
       self.gpu_impl.load_img_vertices(&self.img_vertices_buffer);
     }
+    if !self.radial_gradient_vertices_buffer.indices.is_empty() {
+      self
+        .gpu_impl
+        .load_radial_gradient_primitives(&self.radial_gradient_prims);
+      self
+        .gpu_impl
+        .load_radial_gradient_stops(&self.gradient_stops);
+      self
+        .gpu_impl
+        .load_radial_gradient_vertices(&self.radial_gradient_vertices_buffer);
+    }
 
     self.tex_mgr.submit(&mut self.gpu_impl);
     self.layers_submit(output, surface);
@@ -146,9 +164,12 @@ where
       tex_ids_map: <_>::default(),
       mask_layers: vec![],
       clip_layer_stack: vec![],
+      radial_gradient_prims: vec![],
       skip_clip_cnt: 0,
       color_vertices_buffer: VertexBuffers::with_capacity(256, 512),
       img_vertices_buffer: VertexBuffers::with_capacity(256, 512),
+      radial_gradient_vertices_buffer: VertexBuffers::with_capacity(256, 512),
+      gradient_stops: vec![],
       img_prims: vec![],
       draw_indices: vec![],
       viewport: DeviceRect::zero(),
@@ -196,6 +217,47 @@ where
           add_draw_rect_vertices(rect, output_tex_size, prim_idx, buffer);
         }
       }
+      PaintCommand::RadialGradient {
+        path,
+        stops,
+        start,
+        start_radius,
+        end,
+        end_radius,
+        spread,
+        transform,
+      } => {
+        let ts = transform.then(&path.transform);
+        if let Some((rect, mask_head)) = self.new_mask_layer(path) {
+          self.update_to_radial_gradient_indices();
+          let prim: RadialGradientPrimitive = RadialGradientPrimitive {
+            transform: ts.inverse().unwrap().to_array(),
+            stop_start: self.gradient_stops.len() as u32,
+            stop_cnt: stops.len() as u32,
+            start_center: start.to_array(),
+            start_radius,
+            end_center: end.to_array(),
+            end_radius,
+            mask_head,
+            spread: spread as u32,
+          };
+          self.gradient_stops.extend(stops.into_iter().map(|stop| {
+            let color = stop.color.into_f32_components();
+            GradientStopPrimitive {
+              red: color[0],
+              green: color[1],
+              blue: color[2],
+              alpha: color[3],
+              offset: stop.offset,
+            }
+          }));
+          let prim_idx = self.radial_gradient_prims.len() as u32;
+          self.radial_gradient_prims.push(prim);
+          let buffer = &mut self.radial_gradient_vertices_buffer;
+          let attr = RadialGradientAttr { prim_idx };
+          add_draw_rect_vertices(rect, output_tex_size, attr, buffer);
+        }
+      }
       PaintCommand::Clip(path) => {
         if self.skip_clip_cnt == 0 {
           if let Some(viewport) = path
@@ -235,6 +297,10 @@ where
     self.img_vertices_buffer.indices.clear();
     self.img_prims.clear();
     self.mask_layers.clear();
+    self.radial_gradient_vertices_buffer.indices.clear();
+    self.radial_gradient_vertices_buffer.vertices.clear();
+    self.radial_gradient_prims.clear();
+    self.gradient_stops.clear();
   }
 
   fn update_to_color_indices(&mut self) {
@@ -253,12 +319,27 @@ where
     }
   }
 
+  fn update_to_radial_gradient_indices(&mut self) {
+    if !matches!(
+      self.draw_indices.last(),
+      Some(DrawIndices::RadialGradient(_))
+    ) {
+      self.expand_indices_range();
+      let start = self.radial_gradient_vertices_buffer.indices.len() as u32;
+      self
+        .draw_indices
+        .push(DrawIndices::RadialGradient(start..start));
+    }
+  }
+
   fn expand_indices_range(&mut self) -> Option<&DrawIndices> {
     let cmd = self.draw_indices.last_mut()?;
     match cmd {
       DrawIndices::Color(rg) => rg.end = self.color_vertices_buffer.indices.len() as u32,
       DrawIndices::Img(rg) => rg.end = self.img_vertices_buffer.indices.len() as u32,
-      DrawIndices::_Gradient(_) => todo!(),
+      DrawIndices::RadialGradient(rg) => {
+        rg.end = self.radial_gradient_vertices_buffer.indices.len() as u32
+      }
     };
 
     Some(&*cmd)
@@ -322,7 +403,11 @@ where
         .for_each(|indices| match indices {
           DrawIndices::Color(rg) => self.gpu_impl.draw_color_triangles(output, rg, color.take()),
           DrawIndices::Img(rg) => self.gpu_impl.draw_img_triangles(output, rg, color.take()),
-          DrawIndices::_Gradient(_) => todo!(),
+          DrawIndices::RadialGradient(rg) => {
+            self
+              .gpu_impl
+              .draw_radial_gradient_triangles(output, rg, color.take())
+          }
         });
     }
   }
