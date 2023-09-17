@@ -1,21 +1,39 @@
-use crate::{Brush, Color, LineCap, LineJoin, Path, PathPaintStyle, StrokeOptions};
+use crate::{
+  color::RadialGradient, Brush, Color, GradientStop, LineCap, LineJoin, Path, PathPaintStyle,
+  StrokeOptions,
+};
 use ribir_geom::{Point, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
-use std::{error::Error, io::Read};
+use std::{error::Error, io::Read, rc::Rc, time::Instant};
 use usvg::{Options, Tree, TreeParsing};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Svg {
   pub size: Size,
   pub view_scale: Vector,
   pub paths: Box<[SvgPath]>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SvgPath {
   pub path: Path,
   pub brush: Brush,
   pub style: PathPaintStyle,
+}
+
+/// Fits size into a viewbox.
+fn fit_view_box(s: usvg::Size, vb: &usvg::ViewBox) -> usvg::Size {
+  let s = vb.rect.size();
+
+  if vb.aspect.align == usvg::Align::None {
+    s
+  } else {
+    if vb.aspect.slice {
+      s.expand_to(s)
+    } else {
+      s.scale_to(s)
+    }
+  }
 }
 
 // todo: we need to support currentColor to change svg color.
@@ -25,7 +43,8 @@ impl Svg {
     let tree = Tree::from_data(svg_data, &opt).unwrap();
     let view_rect = tree.view_box.rect;
     let size = tree.size;
-    let fit_size = size.fit_view_box(&tree.view_box);
+    let fit_size = fit_view_box(size, &tree.view_box);
+
     let view_scale = Vector::new(
       size.width() / fit_size.width(),
       size.height() / fit_size.height(),
@@ -46,7 +65,7 @@ impl Svg {
             let path = usvg_path_to_path(p);
             let path = path.transform(t_stack.current_transform());
             if let Some(ref fill) = p.fill {
-              let brush = brush_from_usvg_paint(&fill.paint, fill.opacity);
+              let brush = brush_from_usvg_paint(&fill.paint, fill.opacity, &size);
 
               paths.push(SvgPath {
                 path: path.clone(),
@@ -73,7 +92,7 @@ impl Svg {
                 miter_limit: stroke.miterlimit.get() as f32,
               };
 
-              let brush = brush_from_usvg_paint(&stroke.paint, stroke.opacity);
+              let brush = brush_from_usvg_paint(&stroke.paint, stroke.opacity, &size);
               paths.push(SvgPath {
                 path,
                 brush,
@@ -136,35 +155,85 @@ impl Svg {
 fn usvg_path_to_path(path: &usvg::Path) -> Path {
   let mut builder = lyon_algorithms::path::Path::svg_builder();
   path.data.segments().for_each(|seg| match seg {
-    usvg::PathSegment::MoveTo { x, y } => {
-      builder.move_to(point(x, y));
+    usvg::tiny_skia_path::PathSegment::MoveTo(pt) => {
+      builder.move_to(point(pt.x, pt.y));
     }
-    usvg::PathSegment::LineTo { x, y } => {
-      builder.line_to(point(x, y));
+    usvg::tiny_skia_path::PathSegment::LineTo(pt) => {
+      builder.line_to(point(pt.x, pt.y));
     }
-    usvg::PathSegment::CurveTo { x1, y1, x2, y2, x, y } => {
-      builder.cubic_bezier_to(point(x1, y1), point(x2, y2), point(x, y));
+    usvg::tiny_skia_path::PathSegment::CubicTo(pt1, pt2, pt3) => {
+      builder.cubic_bezier_to(
+        point(pt1.x, pt1.y),
+        point(pt2.x, pt2.y),
+        point(pt3.x, pt3.y),
+      );
     }
-    usvg::PathSegment::ClosePath => builder.close(),
+    usvg::tiny_skia_path::PathSegment::QuadTo(pt1, pt2) => {
+      builder.quadratic_bezier_to(point(pt1.x, pt1.y), point(pt2.x, pt2.y));
+    }
+    usvg::tiny_skia_path::PathSegment::Close => builder.close(),
   });
 
   builder.build().into()
 }
 
-fn point(x: f64, y: f64) -> lyon_algorithms::math::Point {
-  Point::new(x as f32, y as f32).to_untyped()
-}
+fn point(x: f32, y: f32) -> lyon_algorithms::math::Point { Point::new(x, y).to_untyped() }
 
 fn matrix_convert(t: usvg::Transform) -> Transform {
-  let usvg::Transform { a, b, c, d, e, f } = t;
-  Transform::new(a as f32, b as f32, c as f32, d as f32, e as f32, f as f32)
+  let usvg::Transform { sx, kx, ky, sy, tx, ty } = t;
+  Transform::new(sx, ky, kx, sy, tx, ty)
 }
 
-fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity) -> Brush {
+fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity, size: &usvg::Size) -> Brush {
   match paint {
     usvg::Paint::Color(usvg::Color { red, green, blue }) => Color::from_rgb(*red, *green, *blue)
       .with_alpha(opacity.get() as f32)
       .into(),
+    usvg::Paint::LinearGradient(gradient) => {
+      let mut stops = gradient.stops.clone();
+      stops.sort_by(|s1, s2| s1.offset.cmp(&s2.offset));
+      let mut offset = 0.;
+      let mut red = 0.;
+      let mut green = 0.;
+      let mut blue = 0.;
+      for stop in stops.iter() {
+        let color = stop.color;
+        let weight = stop.offset.get() - offset;
+        offset = stop.offset.get();
+        red += (color.red as f32 - red) * weight;
+        blue += (color.blue as f32 - blue) * weight;
+        green += (color.green as f32 - green) * weight;
+      }
+      Color::from_rgb(red as u8, green as u8, blue as u8).into()
+    }
+    usvg::Paint::RadialGradient(gradient) => {
+      let mut stops = gradient.stops.clone();
+      stops.sort_by(|s1, s2| s1.offset.cmp(&s2.offset));
+
+      let stops = stops
+        .iter()
+        .map(|stop| {
+          let usvg::Color { red, green, blue } = stop.color;
+          GradientStop {
+            offset: stop.offset.get(),
+            color: Color::from_rgb(red, green, blue),
+          }
+        })
+        .collect();
+      let size_scale = match gradient.units {
+        usvg::Units::UserSpaceOnUse => (1., 1.),
+        usvg::Units::ObjectBoundingBox => (size.width(), size.height()),
+      };
+      let radial = RadialGradient {
+        start_center: Point::new(gradient.fx * size_scale.0, gradient.fy * size_scale.1),
+        start_radius: 0.,
+        end_center: Point::new(gradient.cx * size_scale.0, gradient.cy * size_scale.1),
+        end_radius: gradient.r.get() * size_scale.0,
+        stops,
+        transform: matrix_convert(gradient.transform),
+      };
+      Brush::RadialGradient(radial)
+    }
     paint => {
       log::warn!("[painter]: not support `{paint:?}` in svg, use black instead!");
       Color::BLACK.into()

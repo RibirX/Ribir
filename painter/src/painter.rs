@@ -1,11 +1,12 @@
-use crate::{path::*, path_builder::PathBuilder, Brush, Color, PixelImage, Svg};
+use crate::{
+  color::GradientStop, path::*, path_builder::PathBuilder, Brush, Color, PixelImage, Svg,
+};
 use ribir_algo::ShareResource;
 use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
 
 use serde::{Deserialize, Serialize};
 
 use std::ops::{Deref, DerefMut};
-
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
 /// the right edge of the canvas. Along the Y-axis, values increase towards the
@@ -73,6 +74,14 @@ pub struct PaintPath {
   pub transform: Transform,
 }
 
+#[repr(u32)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SpreadMethod {
+  Pad,
+  Reflect,
+  Repeat,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PaintCommand {
   ColorPath {
@@ -83,6 +92,16 @@ pub enum PaintCommand {
     path: PaintPath,
     img: ShareResource<PixelImage>,
     opacity: f32,
+  },
+  RadialGradient {
+    path: PaintPath,
+    stops: Vec<GradientStop>,
+    start: Point,
+    start_radius: f32,
+    end: Point,
+    end_radius: f32,
+    spread: SpreadMethod,
+    transform: Transform,
   },
   // Todo: keep rectangle clip.
   Clip(PaintPath),
@@ -289,7 +308,16 @@ impl Painter {
           color: color.apply_alpha(opacity),
         },
         Brush::Image(img) => PaintCommand::ImgPath { path, img, opacity },
-        Brush::Gradient => todo!(),
+        Brush::RadialGradient(radial_gradient) => PaintCommand::RadialGradient {
+          path: path,
+          stops: radial_gradient.stops,
+          start: radial_gradient.start_center,
+          start_radius: radial_gradient.start_radius,
+          end: radial_gradient.end_center,
+          end_radius: radial_gradient.end_radius,
+          transform: radial_gradient.transform,
+          spread: SpreadMethod::Pad,
+        },
       };
       self.commands.push(cmd);
     }
@@ -438,10 +466,9 @@ impl Painter {
   }
 
   pub fn draw_svg(&mut self, svg: &Svg) -> &mut Self {
+    self.scale(svg.view_scale.x, svg.view_scale.y);
     svg.paths.iter().for_each(|c| {
-      self
-        .scale(svg.view_scale.x, svg.view_scale.y)
-        .set_brush(c.brush.clone());
+      self.set_brush(c.brush.clone());
       match &c.style {
         PathPaintStyle::Fill => self.fill_path(c.path.clone()),
         PathPaintStyle::Stroke(options) => self

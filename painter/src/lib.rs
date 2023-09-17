@@ -5,7 +5,7 @@ pub mod color;
 mod painter;
 pub mod path;
 pub mod path_builder;
-pub use crate::color::{Color, LightnessTone};
+pub use crate::color::{Color, GradientStop, LightnessTone};
 pub use crate::painter::*;
 pub use path::*;
 pub mod image;

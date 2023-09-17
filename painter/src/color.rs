@@ -1,4 +1,5 @@
 use material_color_utilities_rs::htc;
+use ribir_geom::{Point, Transform};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -7,6 +8,21 @@ pub struct Color {
   pub green: u8,
   pub blue: u8,
   pub alpha: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct GradientStop {
+  pub color: Color,
+  pub offset: f32,
+}
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct RadialGradient {
+  pub start_center: Point,
+  pub start_radius: f32,
+  pub end_center: Point,
+  pub end_radius: f32,
+  pub stops: Vec<GradientStop>,
+  pub transform: Transform,
 }
 
 /// Describe the light tone of a color, should between [0, 1.0], 0.0 gives

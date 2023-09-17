@@ -87,6 +87,7 @@ pub trait GPUBackendImpl {
     texture: &mut Self::Texture,
     scissor: DeviceRect,
   );
+
   /// load textures that will be use in this draw phase
   fn load_textures(&mut self, textures: &[&Self::Texture]);
   /// load the mask layers that the current draw phase will use, called at
@@ -99,6 +100,15 @@ pub trait GPUBackendImpl {
   fn load_img_primitives(&mut self, primitives: &[ImgPrimitive]);
   /// Load the vertices and indices buffer that `draw_img_triangles` will use.
   fn load_img_vertices(&mut self, buffers: &VertexBuffers<u32>);
+
+  /// Load the primitives that `draw_radial_gradient_triangles` will use.
+  fn load_radial_gradient_primitives(&mut self, primitives: &[RadialGradientPrimitive]);
+  /// Load the gradient color stops that `draw_radial_gradient_triangles` will
+  /// use.
+  fn load_radial_gradient_stops(&mut self, stops: &[GradientStopPrimitive]);
+  /// Load the vertices and indices buffer that `draw_radial_gradient_triangles`
+  /// will use.
+  fn load_radial_gradient_vertices(&mut self, buffers: &VertexBuffers<RadialGradientAttr>);
   /// Draw pure color triangles in the texture. And use the clear color clear
   /// the texture first if it's a Some-Value
   fn draw_color_triangles(
@@ -110,6 +120,14 @@ pub trait GPUBackendImpl {
   /// Draw triangles fill with image. And use the clear color clear the texture
   /// first if it's a Some-Value
   fn draw_img_triangles(
+    &mut self,
+    texture: &mut Self::Texture,
+    indices: Range<u32>,
+    clear: Option<Color>,
+  );
+  /// Draw triangles fill with color radial gradient. And use the clear color
+  /// clear the texture first if it's a Some-Value
+  fn draw_radial_gradient_triangles(
     &mut self,
     texture: &mut Self::Texture,
     indices: Range<u32>,
@@ -134,6 +152,54 @@ pub struct ColorAttr {
   pub color: [u8; 4],
   /// The index of the head mask layer.
   pub mask_head: i32,
+}
+
+#[repr(packed)]
+#[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
+pub struct RadialGradientAttr {
+  pub prim_idx: u32,
+}
+
+#[repr(packed)]
+#[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
+pub struct GradientStopPrimitive {
+  pub red: f32,
+  pub green: f32,
+  pub blue: f32,
+  pub alpha: f32,
+  pub offset: f32,
+}
+
+#[repr(u32)]
+enum SpreadMethod {
+  Pad,
+  Reflect,
+  Repeat,
+}
+
+#[repr(packed)]
+#[derive(AsBytes, PartialEq, Clone, Copy)]
+pub struct RadialGradientPrimitive {
+  /// A 2x3 column-major matrix, transform a vertex position to the radial path
+  /// position
+  pub transform: [f32; 6],
+  /// The origin of the image placed in texture.
+  pub stop_start: u32,
+  /// The size of the image image.
+  pub stop_cnt: u32,
+  /// The index of texture, `load_color_primitives` method provide all textures
+  /// a draw phase need.
+  pub start_center: [f32; 2],
+  /// The index of the head mask layer.
+  pub end_center: [f32; 2],
+
+  pub start_radius: f32,
+
+  pub end_radius: f32,
+
+  pub mask_head: i32,
+
+  pub spread: u32,
 }
 
 #[repr(packed)]
