@@ -201,15 +201,20 @@ impl<W: MultiParent + StrictBuilder + 'static> MultiParent for Pipe<W> {
   }
 }
 
-impl<W: SingleParent + Into<Widget> + 'static> SingleParent for Pipe<Option<W>> {
+impl<W: SingleChild + WidgetBuilder + 'static> SingleParent for Pipe<Option<W>> {
   fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
+    let handle = ctx.handle();
     self
-      .map(|p| -> Box<dyn BoxedSingleParent> {
-        if let Some(p) = p {
-          Box::new(p)
-        } else {
-          Box::new(Void)
-        }
+      .map(move |p| {
+        handle
+          .with_ctx(|ctx| {
+            if let Some(p) = p {
+              BoxedSingleParent::new(p, ctx)
+            } else {
+              BoxedSingleParent::new(Void, ctx)
+            }
+          })
+          .expect("Context not available")
       })
       .append_child(child, ctx)
   }

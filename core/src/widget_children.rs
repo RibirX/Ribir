@@ -1,34 +1,3 @@
-//! # How parent compost dynamic child (Stateful<Dynamic<_>>).
-//!
-//! - for `SingleChild` or `MultiChild`, they're not care about if its child is
-//!   a dynamic widget. Because the child not effect the result of compose. They
-//!   always accept `Widget` and not care about the information. So if the
-//!   dynamic return `Widget`, it can be as the child of them.
-//!
-//! - for `ComposeChild`, it has custom logic to compose child:
-//!   - a. if its child accept `Widget`, `Option<Widget>` or `Vec<Widget>`, that
-//!     means it not care about the information of its child, so its compose
-//!     child logic will not depends on its child information. if the dynamic
-//!     child only generate at most one widget, it can be treat as normal child,
-//!     because the compose logic work on dynamic child or the return of dynamic
-//!     child have not different, because the dynamic child and itself first
-//!     generate widget is same object in widget tree.
-//!   - b. if it meet a dynamic child generate more than one widget (iterator),
-//!     its compose logic need work on the dynamic child generate result.
-//!   - c. if its child is accept a specific type and meet a dynamic child which
-//!     generate that, means the compose logic maybe depends on the type
-//!     information.
-//!   - d. Both `b` and `c` need to expand the dynamic scope. The compose logic
-//!     should work in dynamic widget.
-//!
-//! In implementation, I finally decide to remove the partial dynamic
-//! child support, partial dynamic child means, partial of element array or
-//! partial of `Template` fields is dynamic, for example, if a `ComposeChild`
-//! widget accept `Vec<A>` child, it not allow accept a children list like `A,
-//! Stateful<DynWidget<W>>, A`. If we allow accept that list, require A support
-//! clone, this seems too strict and if `A` is not support clone, the compile
-//! error is too complex to diagnostic.
-
 use crate::{
   prelude::*,
   widget::{StrictBuilder, WidgetBuilder},
@@ -46,19 +15,15 @@ pub use child_convert::{ChildFrom, FromAnother};
 pub trait SingleChild {}
 
 /// A boxed render widget that support accept one child.
-pub trait BoxedSingleParent {
-  fn boxed_append_child(self: Box<Self>, child: WidgetId, ctx: &BuildCtx) -> WidgetId;
-  fn boxed_build(self: Box<Self>, ctx: &BuildCtx) -> WidgetId;
-}
+#[derive(SingleChild)]
+pub struct BoxedSingleParent(WidgetId);
 
 /// Trait to tell Ribir a object that has multi children.
 pub trait MultiChild {}
 
 /// A boxed render widget that support accept multi children.
-pub trait BoxedMultiParent {
-  fn boxed_append_children(self: Box<Self>, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId;
-  fn boxed_build(self: Box<Self>, ctx: &BuildCtx) -> WidgetId;
-}
+#[derive(MultiChild)]
+pub struct BoxedMultiParent(WidgetId);
 
 /// Trait mark widget can have one child and also have compose logic for widget
 /// and its child.
@@ -71,30 +36,30 @@ pub trait ComposeChild: Sized {
 /// child of the generic type.
 pub type WidgetOf<W> = SinglePair<W, Widget>;
 
-impl SingleChild for Box<dyn BoxedSingleParent> {}
-impl MultiChild for Box<dyn BoxedMultiParent> {}
-
-impl StrictBuilder for Box<dyn BoxedSingleParent> {
+impl StrictBuilder for BoxedSingleParent {
   #[inline]
-  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx) }
+  fn strict_build(self, _: &BuildCtx) -> WidgetId { self.0 }
 }
 
-impl SingleParent for Box<dyn BoxedSingleParent> {
+impl SingleParent for BoxedSingleParent {
   #[inline]
   fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
-    self.boxed_append_child(child, ctx)
+    ctx.append_child(self.0, child);
+    self.0
   }
 }
 
-impl StrictBuilder for Box<dyn BoxedMultiParent> {
+impl StrictBuilder for BoxedMultiParent {
   #[inline]
-  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { self.boxed_build(ctx) }
+  fn strict_build(self, _: &BuildCtx) -> WidgetId { self.0 }
 }
 
-impl MultiParent for Box<dyn BoxedMultiParent> {
-  #[inline]
+impl MultiParent for BoxedMultiParent {
   fn append_children(self, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId {
-    self.boxed_append_children(children, ctx)
+    for c in children {
+      ctx.append_child(self.0, c)
+    }
+    self.0
   }
 }
 
@@ -125,24 +90,18 @@ impl<T: Into<Box<dyn Render>> + MultiChild> MultiParent for T {
   }
 }
 
-impl<W: SingleParent + WidgetBuilder + 'static> BoxedSingleParent for W {
+impl BoxedSingleParent {
   #[inline]
-  fn boxed_append_child(self: Box<Self>, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
-    (*self).append_child(child, ctx)
+  pub fn new(widget: impl WidgetBuilder + SingleChild, ctx: &BuildCtx) -> Self {
+    Self(widget.build(ctx))
   }
-
-  #[inline]
-  fn boxed_build(self: Box<Self>, ctx: &BuildCtx) -> WidgetId { (*self).build(ctx) }
 }
 
-impl<W: MultiParent + StrictBuilder + 'static> BoxedMultiParent for W {
+impl BoxedMultiParent {
   #[inline]
-  fn boxed_append_children(self: Box<Self>, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId {
-    (*self).append_children(children, ctx)
+  pub fn new(widget: impl WidgetBuilder + MultiChild, ctx: &BuildCtx) -> Self {
+    Self(widget.build(ctx))
   }
-
-  #[inline]
-  fn boxed_build(self: Box<Self>, ctx: &BuildCtx) -> WidgetId { (*self).build(ctx) }
 }
 
 #[cfg(test)]
