@@ -164,7 +164,7 @@ pub(crate) trait StrictBuilder {
 ///
 /// - Types implemented `StrictBuilder` will auto implement `WidgetBuilder`
 /// - `Pipe<Option<W>>` directly implement this trait.
-pub(crate) trait WidgetBuilder {
+pub trait WidgetBuilder {
   fn build(self, ctx: &BuildCtx) -> WidgetId;
 }
 
