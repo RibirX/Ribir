@@ -23,10 +23,7 @@ impl ToTokens for FnWidgetMacro {
   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
     let Self(stmts) = self;
     quote! {
-      FnWidget::new(move |ctx!(): &BuildCtx| {
-        #[allow(unused_mut)]
-        { #(#stmts)* }
-      })
+      FnWidget::new(move |ctx!(): &BuildCtx| { #(#stmts)* })
     }
     .to_tokens(tokens)
   }

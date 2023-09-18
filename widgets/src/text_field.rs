@@ -287,7 +287,7 @@ impl ComposeChild for TextField {
       take_option_field!({leading_icon, trailing_icon}, config);
 
       let theme_suit = TextFieldThemeSuit::of(ctx!());
-      let mut theme = @TextFieldThemeProxy {
+      let theme = @TextFieldThemeProxy {
         suit: theme_suit,
         state: TextFieldState::default(),
       }.into_inner();
@@ -341,7 +341,7 @@ fn build_input_area(
       visible: pipe!(!$this.text.is_empty() || $theme.state == TextFieldState::Focused),
     };
 
-    let mut visible = map_writer!($input_area.visible);
+    let visible = map_writer!($input_area.visible);
     visible.transition(transitions::LINEAR.of(ctx!()), ctx!());
 
     let mut input = @Input{ style: pipe!($theme.text.clone()) };

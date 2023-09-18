@@ -2,7 +2,7 @@ use ribir::prelude::*;
 
 pub fn counter() -> impl Into<Widget> {
   fn_widget! {
-    let mut cnt = Stateful::new(0);
+    let cnt = Stateful::new(0);
 
     @Column {
       h_align: HAlign::Center,

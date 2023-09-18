@@ -23,7 +23,7 @@ impl Compose for Todos {
           text: "Todo",
         }
         @{
-          let mut input = @Input { };
+          let input = @Input { };
           let add_task = move |_: &mut _| if !$input.text().is_empty() {
               $this.write().new_task($input.text().to_string());
               $input.write().set_text("");
@@ -70,7 +70,7 @@ impl Todos {
     fn_widget! {
       // todo: pipe only for list items, not lists
       @VScrollBar { @ { pipe! {
-        let mut mount_task_cnt = Stateful::new(0);
+        let mount_task_cnt = Stateful::new(0);
 
         @Lists {
           // when performed layout, means all task are mounted, we reset the mount count.
@@ -83,9 +83,9 @@ impl Todos {
               .enumerate()
               .filter_map(move |(idx, task)| { cond(task).then_some(idx) })
               .map(move |idx| {
-                let mut task = split_writer!($this.tasks[idx]);
+                let task = split_writer!($this.tasks[idx]);
                 let mut key = @KeyWidget { key: $task.id, value: () };
-                let mut mount_idx = Stateful::new(0);
+                let mount_idx = Stateful::new(0);
 
                 let mut mount_animate = @Animate {
                   transition: @Transition {
@@ -106,7 +106,7 @@ impl Todos {
                     @{ HeadlineText(Label::new($task.label.clone())) }
                     @Leading {
                       @{
-                        let mut checkbox = @Checkbox {
+                        let checkbox = @Checkbox {
                           checked: pipe!($task.finished),
                           margin: EdgeInsets::vertical(4.),
                         };

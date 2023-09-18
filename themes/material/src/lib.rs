@@ -299,7 +299,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
     fn_widget! {
       let mut indicator = @ $host {
         left_anchor: pipe!{
-          let mut style = $style;
+          let style = $style;
           match style.pos {
             Position::Top | Position::Bottom => style.rect.origin.x
               + (style.rect.size.width - INDICATOR_SIZE) / 2.,

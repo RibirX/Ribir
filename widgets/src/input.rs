@@ -97,7 +97,7 @@ impl ComposeChild for Input {
   type Child = Option<State<Placeholder>>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     fn_widget! {
-      let mut area = @TextEditorArea {
+      let area = @TextEditorArea {
         text: pipe!($this.text.clone()),
         style: pipe!($this.style.clone()),
         caret: pipe!(*$this.caret()),
@@ -140,7 +140,7 @@ impl ComposeChild for TextArea {
   type Child = Option<State<Placeholder>>;
   fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
     fn_widget! {
-      let mut area = @TextEditorArea {
+      let area = @TextEditorArea {
         text: pipe!($this.text.clone()),
         style: pipe!($this.style.clone()),
         caret: pipe!($this.caret),
@@ -151,7 +151,7 @@ impl ComposeChild for TextArea {
         .delay(Duration::ZERO, ctx!().window().frame_scheduler())
         .subscribe(move |_| {
           let mut this = $this.silent();
-          let mut area = $area;
+          let area = $area;
           if area.caret != this.caret {
             this.caret = area.caret;
           }

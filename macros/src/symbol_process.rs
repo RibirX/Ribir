@@ -376,27 +376,23 @@ fn mark_macro_expanded(mac: &mut Macro) {
 impl ToTokens for DollarRefsScope {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     for DollarRef { name, builtin, write } in &self.refs {
-      let reader_writer = if *write {
-        "clone_writer"
-      } else {
-        "clone_reader"
-      };
-      // todo: reader needn't mut
-      let reader_or_writer = Ident::new(reader_writer, name.span());
-      match builtin {
-        Some(builtin) => {
-          let BuiltinInfo { host, member } = builtin;
-          quote_spanned! {
-            name.span() => let mut #name = #host.#member(ctx!()).#reader_or_writer();
-          }
-          .to_tokens(tokens);
+      match (builtin, *write) {
+        (None, true) => quote_spanned! { name.span() =>
+          let #name = #name.clone_writer();
         }
-        _ => {
-          quote_spanned! {
-            name.span() => let mut #name = #name.#reader_or_writer();
-          }
-          .to_tokens(tokens);
+        .to_tokens(tokens),
+        (None, false) => quote_spanned! { name.span() =>
+          let #name = #name.clone_reader();
         }
+        .to_tokens(tokens),
+        (Some(BuiltinInfo { host, member }), false) => quote_spanned! { name.span() =>
+          let #name = #host.#member(ctx!()).clone_reader();
+        }
+        .to_tokens(tokens),
+        (Some(BuiltinInfo { host, member }), true) => quote_spanned! { name.span() =>
+          let #name = #host.#member(ctx!()).clone_writer();
+        }
+        .to_tokens(tokens),
       }
     }
   }

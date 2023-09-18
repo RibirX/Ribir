@@ -13,7 +13,7 @@ impl ComposeChild for Cursor {
   type Child = Widget;
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     fn_widget! {
-      let mut save_cursor = Stateful::new(CursorIcon::Default);
+      let save_cursor = Stateful::new(CursorIcon::Default);
       @$child {
         on_pointer_enter: move |e: &mut PointerEvent| {
           if e.point_type == PointerType::Mouse
