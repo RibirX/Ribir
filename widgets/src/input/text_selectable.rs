@@ -18,7 +18,7 @@ impl ComposeChild for TextSelectable {
   fn compose_child(this: State<Self>, text: Self::Child) -> Widget {
     fn_widget! {
       let mut host = @Stack { fit: StackFit::Passthrough };
-      let mut selected = @SelectedText {
+      let selected = @SelectedText {
         visible: pipe!($host.has_focus()),
         rects: pipe!($this.selected_rect()),
       };

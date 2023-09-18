@@ -39,7 +39,7 @@ impl ComposeChild for TextEditorArea {
         scrollable: pipe!($this.scroll_dir()),
         padding: EdgeInsets::horizontal(1.)
       };
-      let mut selectable = @TextSelectable { caret: pipe!($this.caret) };
+      let selectable = @TextSelectable { caret: pipe!($this.caret) };
       let mut caret = @Caret {
         focused: pipe!($container.has_focus()),
         height: 0.
@@ -83,7 +83,7 @@ impl ComposeChild for TextEditorArea {
         on_chars: move|ch| Self::edit_handle(&mut $this.write(), ch),
         @$container {
           @{
-            placeholder.map(move |mut holder| @Text {
+            placeholder.map(move |holder| @Text {
               visible: pipe!($this.text.is_empty()),
               text: pipe!($holder.0.clone()),
             })

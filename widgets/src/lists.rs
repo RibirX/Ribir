@@ -206,7 +206,7 @@ impl EdgeWidget {
             }
           }.into()
         },
-        EdgeWidget::Text(mut label) => {
+        EdgeWidget::Text(label) => {
           let margin =  text.gap.map(|margin| Margin { margin });
           @ $margin {
             @Text {
@@ -305,7 +305,7 @@ impl ComposeChild for ListItem {
                     foreground: Palette::of(ctx!()).on_surface(),
                     text_style: headline_style,
                   }
-                  @{ supporting.map(|mut supporting|  {
+                  @{ supporting.map(|supporting|  {
                     @ConstrainedBox {
                       clamp: {
                         let TextStyle { line_height, font_size, .. } = &*supporting_style;

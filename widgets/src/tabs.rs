@@ -271,7 +271,7 @@ impl ComposeChild for Tabs {
           (true, false) => extent_only_icon,
           (false, false) => 0.
         };
-        let mut panes = panes.into_iter()
+        let panes = panes.into_iter()
           .enumerate()
           .map(move |(idx, pane)| @Expanded {
             flex: 1.,
@@ -297,12 +297,12 @@ impl ComposeChild for Tabs {
             Position::Bottom | Position::Right | Position::Left => 0.,
           }),
         };
-        let mut indicator_decorator = @IndicatorDecorator {
+        let indicator_decorator = @IndicatorDecorator {
           pos: pipe!($this.pos),
           extent: indicator.extent,
           rect: Rect::zero()
         };
-        let mut header = @Stack {
+        let header = @Stack {
           @ConstrainedBox {
             clamp: pipe!(match $this.pos {
               Position::Top | Position::Bottom => BoxClamp::fixed_height(extent),

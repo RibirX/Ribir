@@ -71,7 +71,7 @@ impl ComposeChild for Avatar {
         let palette1 = Palette::of(ctx!()).clone();
         let palette2 = Palette::of(ctx!()).clone();
         let w: Widget = match child {
-          AvatarTemplate::Text(mut text) => {
+          AvatarTemplate::Text(text) => {
             @Container {
               size,
               border_radius: radius.map(Radius::all),

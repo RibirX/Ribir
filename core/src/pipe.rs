@@ -729,7 +729,7 @@ mod tests {
         @ {
           pipe!($v.clone()).map(move |v| {
             v.into_iter().map(move |(i, c)| {
-              let mut key = @KeyWidget { key: i, value: c };
+              let key = @KeyWidget { key: i, value: c };
               @$key {
                 @MockBox {
                   size: Size::zero(),

@@ -85,7 +85,7 @@ widget_layout_test!(
 
 fn access_rdl_widget() -> impl Into<Widget> {
   fn_widget! {
-    let mut b = rdl! { SizedBox {size: Size::new(500.,500.)}};
+    let b = rdl! { SizedBox {size: Size::new(500.,500.)}};
     rdl! { Row {
       rdl! { SizedBox { size: $b.size } }
       rdl! { b }
@@ -174,7 +174,7 @@ widget_layout_test!(pipe_with_ctx, width == 36., height == 36.,);
 fn pipe_with_builtin_field() -> impl Into<Widget> {
   fn_widget! {
     let mut box1 = @SizedBox { size: Size::zero(), margin: EdgeInsets::all(1.) };
-    let mut box2 = @SizedBox { size: $box1.size, margin: pipe!($box1.margin) };
+    let box2 = @SizedBox { size: $box1.size, margin: pipe!($box1.margin) };
     @Row {
       @{ box1 }
       @{ box2 }
@@ -185,7 +185,7 @@ widget_layout_test!(pipe_with_builtin_field, width == 4., height == 2.,);
 
 fn capture_closure_used_ctx() -> impl Into<Widget> {
   fn_widget! {
-    let mut size_box = @SizedBox { size: ZERO_SIZE };
+    let size_box = @SizedBox { size: ZERO_SIZE };
     @ $size_box {
       on_mounted: move |_| $size_box.write().size = IconSize::of(ctx!()).tiny
     }
@@ -363,7 +363,7 @@ fn closure_in_fn_widget_capture() {
   let hi_res = Stateful::new(CowArc::borrowed(""));
   let hi_res2 = hi_res.clone_reader();
   let w = fn_widget! {
-    let mut text = @ Text { text: "hi" };
+    let text = @ Text { text: "hi" };
     let on_mounted = move |_: &mut _| *$hi_res.write() =$text.text.clone();
     @ $text { on_mounted }
   };
@@ -752,7 +752,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
   let trigger = Stateful::new(true);
   let c_trigger = trigger.clone_reader();
   let w = fn_widget! {
-    let mut container = @SizedBox { size: Size::zero() };
+    let container = @SizedBox { size: Size::zero() };
     let h = watch!(*$c_trigger).subscribe(move |_| *$cnt.write() +=1 );
     container.as_stateful().unsubscribe_on_drop(h);
 

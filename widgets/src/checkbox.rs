@@ -81,7 +81,7 @@ impl ComposeChild for Checkbox {
       }.into();
 
       let checkbox: Widget = if let Some(child) = child  {
-        let label = |mut label: State<Label>| @Text {
+        let label = |label: State<Label>| @Text {
           text: $label.0.clone(),
           foreground: label_color,
           text_style: label_style,

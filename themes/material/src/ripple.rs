@@ -41,7 +41,7 @@ impl ComposeChild for Ripple {
   fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
     fn_widget! {
       let mut container = @Stack { fit: StackFit::Passthrough };
-      let mut ripple_at = $this.ripple_at.clone_writer();
+      let ripple_at = $this.ripple_at.clone_writer();
 
       let ripple_widget = pipe!(*$ripple_at)
         .map(move |launch_at| {
@@ -79,7 +79,7 @@ impl ComposeChild for Ripple {
             });
 
 
-          let mut ripper_fade_out = map_writer!($ripple.opacity)
+          let ripper_fade_out = map_writer!($ripple.opacity)
             .transition(transitions::EASE_OUT.of(ctx!()), ctx!());
 
           let bounded = $this.bounded;

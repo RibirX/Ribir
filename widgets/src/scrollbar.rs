@@ -184,7 +184,7 @@ impl Compose for HRawScrollbar {
   fn compose(this: State<Self>) -> Widget {
     fn_widget! {
       @ {
-        let mut scrolling = $this.scrolling.clone_reader();
+        let scrolling = $this.scrolling.clone_reader();
         let ScrollBarStyle {
           thickness,
           thumb_min_size,
@@ -246,7 +246,7 @@ impl Compose for VRawScrollbar {
   fn compose(this: State<Self>) -> Widget {
     fn_widget! {
       @ {
-        let mut scrolling = $this.scrolling.clone_reader();
+        let scrolling = $this.scrolling.clone_reader();
         let ScrollBarStyle {
           thickness,
           thumb_min_size,
@@ -354,9 +354,9 @@ mod test {
     let c_v_offset = v_offset.clone_reader();
     let c_h_offset = h_offset.clone_reader();
     let w = fn_widget! {
-      let mut both_bar = @BothScrollbar { offset: pipe!(*$offset) };
-      let mut h_bar = @HScrollBar { offset: pipe!($both_bar.offset.x) };
-      let mut v_bar = @VScrollBar { offset: pipe!($both_bar.offset.y) };
+      let both_bar = @BothScrollbar { offset: pipe!(*$offset) };
+      let h_bar = @HScrollBar { offset: pipe!($both_bar.offset.x) };
+      let v_bar = @VScrollBar { offset: pipe!($both_bar.offset.y) };
 
       watch!($v_bar.offset)
         .subscribe(move|v| *$v_offset.write() = v);

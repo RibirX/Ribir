@@ -62,7 +62,7 @@ impl ComposeChild for ButtonImpl {
               size: pipe!($this.icon_size),
               @{ icon }
             });
-            let label = label.map(|mut label| @Text {
+            let label = label.map(|label| @Text {
               margin: pipe!(EdgeInsets::horizontal($this.label_gap)),
               text: pipe!($label.0.clone()),
               foreground: pipe!($this.foreground_color.clone()),
