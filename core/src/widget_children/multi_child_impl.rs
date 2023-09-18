@@ -13,10 +13,6 @@ pub struct MultiPair<P> {
   pub children: Vec<WidgetId>,
 }
 
-// Same with ChildConvert::FillVec, but only for MultiChild,
-// There are some duplicate implementations, but better compile error for
-// users and `MultiChild` support `pipe<impl IntoIterator<Item = impl Widget>>`
-// as child but `ComposeChild` not.
 trait FillVec<M> {
   fn fill_vec(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx);
 }

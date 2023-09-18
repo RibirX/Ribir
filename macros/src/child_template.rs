@@ -38,9 +38,9 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
     tokens.extend(quote! {
       impl #g_impl ComposeWithChild<_C, [_M; #f_idx]> for #builder #g_ty #g_where  {
         type Target = Self;
-        fn with_child(mut self, c: _C, _ctx: &BuildCtx) -> Self::Target {
+        fn with_child(mut self, c: _C, ctx: &BuildCtx) -> Self::Target {
           assert!(self.#field_name.is_none(), "Try to fill same type twice.");
-          self.#field_name = Some(ChildFrom::child_from(c));
+          self.#field_name = Some(ChildFrom::child_from(c, ctx));
           self
         }
       }
@@ -71,7 +71,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
         impl #g_impl FromAnother<#builder #g_ty, ()> for #name #g_ty #g_where {
           #[inline]
-          fn from_another(value: #builder #g_ty) -> Self { value.build_tml() }
+          fn from_another(value: #builder #g_ty, _: &BuildCtx) -> Self { value.build_tml() }
         }
 
         impl #g_impl std::convert::From<#builder #g_ty> for #name #g_ty #g_where {
@@ -179,8 +179,8 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             let idx = Index::from(idx);
             tokens.extend(quote! {
               impl #g_impl FromAnother<_V, [_M; #idx]> for #name #g_ty #g_where  {
-                fn from_another(value: _V) -> Self {
-                  #name::#v_name(ChildFrom::child_from(value))
+                fn from_another(value: _V,  ctx: &BuildCtx) -> Self {
+                  #name::#v_name(ChildFrom::child_from(value, ctx))
                 }
               }
             });
