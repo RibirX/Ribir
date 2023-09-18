@@ -118,6 +118,7 @@ impl ShellWindow for WinitShellWnd {
       PaintCommand::ColorPath { path, .. }
       | PaintCommand::ImgPath { path, .. }
       | PaintCommand::RadialGradient { path, .. }
+      | PaintCommand::LinearGradient { path, .. }
       | PaintCommand::Clip(path) => path.scale(self.winit_wnd.scale_factor() as f32),
       PaintCommand::PopClip => {}
     });

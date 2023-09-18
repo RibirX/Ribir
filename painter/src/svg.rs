@@ -1,11 +1,11 @@
 use crate::{
-  color::RadialGradient, Brush, Color, GradientStop, LineCap, LineJoin, Path, PathPaintStyle,
-  StrokeOptions,
+  color::{LinearGradient, RadialGradient},
+  Brush, Color, GradientStop, LineCap, LineJoin, Path, PathPaintStyle, StrokeOptions,
 };
 use ribir_geom::{Point, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
-use std::{error::Error, io::Read, rc::Rc, time::Instant};
-use usvg::{Options, Tree, TreeParsing};
+use std::{error::Error, io::Read};
+use usvg::{Options, Stop, Tree, TreeParsing};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Svg {
@@ -21,18 +21,16 @@ pub struct SvgPath {
   pub style: PathPaintStyle,
 }
 
-/// Fits size into a viewbox.
-fn fit_view_box(s: usvg::Size, vb: &usvg::ViewBox) -> usvg::Size {
+/// Fits size into a viewbox. copy from resvg
+fn fit_view_box(size: usvg::Size, vb: &usvg::ViewBox) -> usvg::Size {
   let s = vb.rect.size();
 
   if vb.aspect.align == usvg::Align::None {
     s
+  } else if vb.aspect.slice {
+    size.expand_to(s)
   } else {
-    if vb.aspect.slice {
-      s.expand_to(s)
-    } else {
-      s.scale_to(s)
-    }
+    size.scale_to(s)
   }
 }
 
@@ -50,7 +48,7 @@ impl Svg {
       size.height() / fit_size.height(),
     )
     .to_f32();
-    let t = Transform::translation(-view_rect.x() as f32, -view_rect.y() as f32);
+    let t = Transform::translation(-view_rect.x(), -view_rect.y());
 
     let mut t_stack = TransformStack::new(t);
     let mut paths = vec![];
@@ -86,10 +84,10 @@ impl Svg {
                 usvg::LineJoin::Round => LineJoin::Round,
               };
               let options = StrokeOptions {
-                width: stroke.width.get() as f32,
+                width: stroke.width.get(),
                 line_cap: cap,
                 line_join: join,
-                miter_limit: stroke.miterlimit.get() as f32,
+                miter_limit: stroke.miterlimit.get(),
               };
 
               let brush = brush_from_usvg_paint(&stroke.paint, stroke.opacity, &size);
@@ -131,7 +129,7 @@ impl Svg {
     });
 
     Ok(Svg {
-      size: Size::new(size.width() as f32, size.height() as f32),
+      size: Size::new(size.width(), size.height()),
       paths: paths.into_boxed_slice(),
       view_scale,
     })
@@ -187,58 +185,80 @@ fn matrix_convert(t: usvg::Transform) -> Transform {
 fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity, size: &usvg::Size) -> Brush {
   match paint {
     usvg::Paint::Color(usvg::Color { red, green, blue }) => Color::from_rgb(*red, *green, *blue)
-      .with_alpha(opacity.get() as f32)
+      .with_alpha(opacity.get())
       .into(),
-    usvg::Paint::LinearGradient(gradient) => {
-      let mut stops = gradient.stops.clone();
-      stops.sort_by(|s1, s2| s1.offset.cmp(&s2.offset));
-      let mut offset = 0.;
-      let mut red = 0.;
-      let mut green = 0.;
-      let mut blue = 0.;
-      for stop in stops.iter() {
-        let color = stop.color;
-        let weight = stop.offset.get() - offset;
-        offset = stop.offset.get();
-        red += (color.red as f32 - red) * weight;
-        blue += (color.blue as f32 - blue) * weight;
-        green += (color.green as f32 - green) * weight;
-      }
-      Color::from_rgb(red as u8, green as u8, blue as u8).into()
-    }
-    usvg::Paint::RadialGradient(gradient) => {
-      let mut stops = gradient.stops.clone();
-      stops.sort_by(|s1, s2| s1.offset.cmp(&s2.offset));
-
-      let stops = stops
-        .iter()
-        .map(|stop| {
-          let usvg::Color { red, green, blue } = stop.color;
-          GradientStop {
-            offset: stop.offset.get(),
-            color: Color::from_rgb(red, green, blue),
-          }
-        })
-        .collect();
-      let size_scale = match gradient.units {
+    usvg::Paint::LinearGradient(linear) => {
+      let stops = convert_to_gradient_stops(&linear.stops);
+      let size_scale = match linear.units {
         usvg::Units::UserSpaceOnUse => (1., 1.),
         usvg::Units::ObjectBoundingBox => (size.width(), size.height()),
       };
-      let radial = RadialGradient {
-        start_center: Point::new(gradient.fx * size_scale.0, gradient.fy * size_scale.1),
-        start_radius: 0.,
-        end_center: Point::new(gradient.cx * size_scale.0, gradient.cy * size_scale.1),
-        end_radius: gradient.r.get() * size_scale.0,
+      let gradient = LinearGradient {
+        start: Point::new(linear.x1 * size_scale.0, linear.y1 * size_scale.1),
+        end: Point::new(linear.y2 * size_scale.0, linear.y2 * size_scale.1),
         stops,
-        transform: matrix_convert(gradient.transform),
+        transform: matrix_convert(linear.transform),
+        spread_method: linear.spread_method.into(),
       };
-      Brush::RadialGradient(radial)
+      Brush::LinearGradient(gradient)
+    }
+    usvg::Paint::RadialGradient(radial_gradient) => {
+      let stops = convert_to_gradient_stops(&radial_gradient.stops);
+      let size_scale = match radial_gradient.units {
+        usvg::Units::UserSpaceOnUse => (1., 1.),
+        usvg::Units::ObjectBoundingBox => (size.width(), size.height()),
+      };
+      let gradient = RadialGradient {
+        start_center: Point::new(
+          radial_gradient.fx * size_scale.0,
+          radial_gradient.fy * size_scale.1,
+        ),
+        start_radius: 0.,
+        end_center: Point::new(
+          radial_gradient.cx * size_scale.0,
+          radial_gradient.cy * size_scale.1,
+        ),
+        end_radius: radial_gradient.r.get() * size_scale.0,
+        stops,
+        transform: matrix_convert(radial_gradient.transform),
+        spread_method: radial_gradient.spread_method.into(),
+      };
+      Brush::RadialGradient(gradient)
     }
     paint => {
       log::warn!("[painter]: not support `{paint:?}` in svg, use black instead!");
       Color::BLACK.into()
     }
   }
+}
+
+fn convert_to_gradient_stops(stops: &Vec<Stop>) -> Vec<GradientStop> {
+  assert!(!stops.is_empty());
+
+  let mut stops: Vec<_> = stops
+    .iter()
+    .map(|stop| {
+      let usvg::Color { red, green, blue } = stop.color;
+      GradientStop {
+        offset: stop.offset.get(),
+        color: Color::from_rgb(red, green, blue),
+      }
+    })
+    .collect();
+
+  stops.sort_by(|s1, s2| s1.offset.partial_cmp(&s2.offset).unwrap());
+
+  if let Some(first) = stops.first() {
+    if first.offset != 0. {
+      stops.insert(0, GradientStop { offset: 0., color: first.color });
+    }
+  }
+  if let Some(last) = stops.last() {
+    if last.offset < 1. {
+      stops.push(GradientStop { offset: 1., color: last.color });
+    }
+  }
+  stops
 }
 
 struct TransformStack {

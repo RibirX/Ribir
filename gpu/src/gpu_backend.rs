@@ -1,6 +1,7 @@
 use self::textures_mgr::{TextureID, TexturesMgr};
 use crate::{
-  ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImgPrimitive, MaskLayer, RadialGradientAttr,
+  ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex, ImgPrimitive,
+  LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, RadialGradientPrimIndex,
   RadialGradientPrimitive,
 };
 use ribir_geom::{rect_corners, DeviceRect, DeviceSize, Point};
@@ -19,11 +20,14 @@ pub struct GPUBackend<Impl: GPUBackendImpl> {
   gpu_impl: Impl,
   tex_mgr: TexturesMgr<Impl::Texture>,
   color_vertices_buffer: VertexBuffers<ColorAttr>,
-  img_vertices_buffer: VertexBuffers<u32>,
-  radial_gradient_vertices_buffer: VertexBuffers<RadialGradientAttr>,
-  gradient_stops: Vec<GradientStopPrimitive>,
-  radial_gradient_prims: Vec<RadialGradientPrimitive>,
+  img_vertices_buffer: VertexBuffers<ImagePrimIndex>,
   img_prims: Vec<ImgPrimitive>,
+  radial_gradient_vertices_buffer: VertexBuffers<RadialGradientPrimIndex>,
+  radial_gradient_stops: Vec<GradientStopPrimitive>,
+  radial_gradient_prims: Vec<RadialGradientPrimitive>,
+  linear_gradient_prims: Vec<LinearGradientPrimitive>,
+  linear_gradient_stops: Vec<GradientStopPrimitive>,
+  linear_gradient_vertices_buffer: VertexBuffers<LinearGradientPrimIndex>,
   draw_indices: Vec<DrawIndices>,
   tex_ids_map: TextureIdxMap,
   viewport: DeviceRect,
@@ -37,6 +41,7 @@ enum DrawIndices {
   Color(Range<u32>),
   Img(Range<u32>),
   RadialGradient(Range<u32>),
+  LinearGradient(Range<u32>),
 }
 
 struct ClipLayer {
@@ -137,10 +142,21 @@ where
         .load_radial_gradient_primitives(&self.radial_gradient_prims);
       self
         .gpu_impl
-        .load_radial_gradient_stops(&self.gradient_stops);
+        .load_radial_gradient_stops(&self.radial_gradient_stops);
       self
         .gpu_impl
         .load_radial_gradient_vertices(&self.radial_gradient_vertices_buffer);
+    }
+    if !self.linear_gradient_vertices_buffer.indices.is_empty() {
+      self
+        .gpu_impl
+        .load_linear_gradient_primitives(&self.linear_gradient_prims);
+      self
+        .gpu_impl
+        .load_linear_gradient_stops(&self.linear_gradient_stops);
+      self
+        .gpu_impl
+        .load_linear_gradient_vertices(&self.linear_gradient_vertices_buffer);
     }
 
     self.tex_mgr.submit(&mut self.gpu_impl);
@@ -164,12 +180,15 @@ where
       tex_ids_map: <_>::default(),
       mask_layers: vec![],
       clip_layer_stack: vec![],
-      radial_gradient_prims: vec![],
       skip_clip_cnt: 0,
       color_vertices_buffer: VertexBuffers::with_capacity(256, 512),
       img_vertices_buffer: VertexBuffers::with_capacity(256, 512),
       radial_gradient_vertices_buffer: VertexBuffers::with_capacity(256, 512),
-      gradient_stops: vec![],
+      radial_gradient_prims: vec![],
+      radial_gradient_stops: vec![],
+      linear_gradient_vertices_buffer: VertexBuffers::with_capacity(256, 512),
+      linear_gradient_stops: vec![],
+      linear_gradient_prims: vec![],
       img_prims: vec![],
       draw_indices: vec![],
       viewport: DeviceRect::zero(),
@@ -214,48 +233,80 @@ where
           };
           self.img_prims.push(prim);
           let buffer = &mut self.img_vertices_buffer;
-          add_draw_rect_vertices(rect, output_tex_size, prim_idx, buffer);
+          add_draw_rect_vertices(rect, output_tex_size, ImagePrimIndex(prim_idx), buffer);
         }
       }
-      PaintCommand::RadialGradient {
-        path,
-        stops,
-        start,
-        start_radius,
-        end,
-        end_radius,
-        spread,
-        transform,
-      } => {
-        let ts = transform.then(&path.transform);
+      PaintCommand::RadialGradient { path, radial_gradient } => {
+        let ts = path.transform;
         if let Some((rect, mask_head)) = self.new_mask_layer(path) {
           self.update_to_radial_gradient_indices();
           let prim: RadialGradientPrimitive = RadialGradientPrimitive {
-            transform: ts.inverse().unwrap().to_array(),
-            stop_start: self.gradient_stops.len() as u32,
-            stop_cnt: stops.len() as u32,
-            start_center: start.to_array(),
-            start_radius,
-            end_center: end.to_array(),
-            end_radius,
+            transform: radial_gradient
+              .transform
+              .then(&ts)
+              .inverse()
+              .unwrap()
+              .to_array(),
+            stop_start: self.radial_gradient_stops.len() as u32,
+            stop_cnt: radial_gradient.stops.len() as u32,
+            start_center: radial_gradient.start_center.to_array(),
+            start_radius: radial_gradient.start_radius,
+            end_center: radial_gradient.end_center.to_array(),
+            end_radius: radial_gradient.end_radius,
             mask_head,
-            spread: spread as u32,
+            spread: radial_gradient.spread_method as u32,
           };
-          self.gradient_stops.extend(stops.into_iter().map(|stop| {
-            let color = stop.color.into_f32_components();
-            GradientStopPrimitive {
-              red: color[0],
-              green: color[1],
-              blue: color[2],
-              alpha: color[3],
-              offset: stop.offset,
-            }
-          }));
+          self.radial_gradient_stops.extend(
+            radial_gradient
+              .stops
+              .into_iter()
+              .map(Into::<GradientStopPrimitive>::into),
+          );
           let prim_idx = self.radial_gradient_prims.len() as u32;
           self.radial_gradient_prims.push(prim);
           let buffer = &mut self.radial_gradient_vertices_buffer;
-          let attr = RadialGradientAttr { prim_idx };
-          add_draw_rect_vertices(rect, output_tex_size, attr, buffer);
+
+          add_draw_rect_vertices(
+            rect,
+            output_tex_size,
+            RadialGradientPrimIndex(prim_idx),
+            buffer,
+          );
+        }
+      }
+      PaintCommand::LinearGradient { path, linear_gradient } => {
+        let ts = path.transform;
+        if let Some((rect, mask_head)) = self.new_mask_layer(path) {
+          self.update_to_linear_gradient_indices();
+          let prim: LinearGradientPrimitive = LinearGradientPrimitive {
+            transform: linear_gradient
+              .transform
+              .then(&ts)
+              .inverse()
+              .unwrap()
+              .to_array(),
+            stop_start: self.linear_gradient_stops.len() as u32,
+            stop_cnt: linear_gradient.stops.len() as u32,
+            start_position: linear_gradient.start.to_array(),
+            end_position: linear_gradient.end.to_array(),
+            mask_head,
+            spread: linear_gradient.spread_method as u32,
+          };
+          self.linear_gradient_stops.extend(
+            linear_gradient
+              .stops
+              .into_iter()
+              .map(Into::<GradientStopPrimitive>::into),
+          );
+          let prim_idx = self.linear_gradient_prims.len() as u32;
+          self.linear_gradient_prims.push(prim);
+          let buffer = &mut self.linear_gradient_vertices_buffer;
+          add_draw_rect_vertices(
+            rect,
+            output_tex_size,
+            LinearGradientPrimIndex(prim_idx),
+            buffer,
+          );
         }
       }
       PaintCommand::Clip(path) => {
@@ -300,7 +351,10 @@ where
     self.radial_gradient_vertices_buffer.indices.clear();
     self.radial_gradient_vertices_buffer.vertices.clear();
     self.radial_gradient_prims.clear();
-    self.gradient_stops.clear();
+    self.radial_gradient_stops.clear();
+    self.linear_gradient_prims.clear();
+    self.linear_gradient_vertices_buffer.indices.clear();
+    self.linear_gradient_stops.clear();
   }
 
   fn update_to_color_indices(&mut self) {
@@ -332,6 +386,19 @@ where
     }
   }
 
+  fn update_to_linear_gradient_indices(&mut self) {
+    if !matches!(
+      self.draw_indices.last(),
+      Some(DrawIndices::LinearGradient(_))
+    ) {
+      self.expand_indices_range();
+      let start = self.linear_gradient_vertices_buffer.indices.len() as u32;
+      self
+        .draw_indices
+        .push(DrawIndices::LinearGradient(start..start));
+    }
+  }
+
   fn expand_indices_range(&mut self) -> Option<&DrawIndices> {
     let cmd = self.draw_indices.last_mut()?;
     match cmd {
@@ -339,6 +406,9 @@ where
       DrawIndices::Img(rg) => rg.end = self.img_vertices_buffer.indices.len() as u32,
       DrawIndices::RadialGradient(rg) => {
         rg.end = self.radial_gradient_vertices_buffer.indices.len() as u32
+      }
+      DrawIndices::LinearGradient(rg) => {
+        rg.end = self.linear_gradient_vertices_buffer.indices.len() as u32
       }
     };
 
@@ -408,6 +478,11 @@ where
               .gpu_impl
               .draw_radial_gradient_triangles(output, rg, color.take())
           }
+          DrawIndices::LinearGradient(rg) => {
+            self
+              .gpu_impl
+              .draw_linear_gradient_triangles(output, rg, color.take())
+          }
         });
     }
   }
@@ -466,7 +541,10 @@ mod tests {
   use ribir_algo::ShareResource;
   use ribir_dev_helper::*;
   use ribir_geom::*;
-  use ribir_painter::{Brush, Color, Painter, Path, PixelImage};
+  use ribir_painter::{
+    color::{LinearGradient, RadialGradient},
+    Brush, Color, GradientStop, Painter, Path, PixelImage,
+  };
 
   fn painter(bounds: Size) -> Painter { Painter::new(Rect::from_size(bounds)) }
 
@@ -600,6 +678,51 @@ mod tests {
         Size::new(m_width / 2., m_height / 2.),
       )),
     );
+
+    painter
+  }
+
+  painter_backend_eq_image_test!(draw_radial_gradient);
+  fn draw_radial_gradient() -> Painter {
+    let mut painter = painter(Size::new(64., 64.));
+    let brush = Brush::RadialGradient(RadialGradient {
+      start_center: Point::new(16., 32.),
+      start_radius: 0.,
+      end_center: Point::new(32., 32.),
+      end_radius: 32.,
+      stops: vec![
+        GradientStop::new(Color::RED, 0.),
+        GradientStop::new(Color::BLUE, 1.),
+      ],
+      transform: Transform::translation(16., 0.),
+      ..Default::default()
+    });
+
+    painter
+      .set_brush(brush)
+      .rect(&Rect::from_size(Size::new(64., 64.)))
+      .fill();
+
+    painter
+  }
+
+  painter_backend_eq_image_test!(draw_linear_gradient);
+  fn draw_linear_gradient() -> Painter {
+    let mut painter = painter(Size::new(32., 32.));
+    let brush = Brush::LinearGradient(LinearGradient {
+      start: Point::new(0., 0.),
+      end: Point::new(16., 16.),
+      stops: vec![
+        GradientStop::new(Color::RED, 0.),
+        GradientStop::new(Color::BLUE, 1.),
+      ],
+      ..Default::default()
+    });
+
+    painter
+      .set_brush(brush)
+      .rect(&Rect::from_size(Size::new(64., 64.)))
+      .fill();
 
     painter
   }

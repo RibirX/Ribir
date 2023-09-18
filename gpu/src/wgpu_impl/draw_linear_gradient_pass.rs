@@ -1,59 +1,74 @@
 use super::{storage::Storage, vertex_buffer::VerticesBuffer};
-use crate::{ImagePrimIndex, ImgPrimitive, MaskLayer, TexturesBind, WgpuTexture};
+use crate::{
+  GradientStopPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, TexturesBind,
+  WgpuTexture,
+};
 use ribir_painter::{AntiAliasing, Color, Vertex, VertexBuffers};
 use std::{mem::size_of, ops::Range};
 
-pub struct DrawImgTrianglesPass {
+pub struct DrawLinearGradientTrianglesPass {
   label: &'static str,
-  vertices_buffer: VerticesBuffer<ImagePrimIndex>,
+  vertices_buffer: VerticesBuffer<LinearGradientPrimIndex>,
   pipeline: Option<wgpu::RenderPipeline>,
   shader: wgpu::ShaderModule,
-
-  prims_storage: Storage<ImgPrimitive>,
   format: Option<wgpu::TextureFormat>,
-  anti_aliasing: AntiAliasing,
+  prims_storage: Storage<LinearGradientPrimitive>,
+  stops_storage: Storage<GradientStopPrimitive>,
   textures_count: usize,
+  anti_aliasing: AntiAliasing,
 }
 
-impl DrawImgTrianglesPass {
+impl DrawLinearGradientTrianglesPass {
   pub fn new(device: &wgpu::Device) -> Self {
-    let vertices_buffer = VerticesBuffer::new(128, 512, device);
-    let label = "Image triangles pass";
+    let vertices_buffer = VerticesBuffer::new(512, 1024, device);
+    let label = "linear gradient triangles pass";
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
       label: Some(label),
-      source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/img_triangles.wgsl").into()),
+      source: wgpu::ShaderSource::Wgsl(
+        include_str!("./shaders/linear_gradient_triangles.wgsl").into(),
+      ),
     });
-
     let prims_storage = Storage::new(device, wgpu::ShaderStages::FRAGMENT, 64);
+    let stops_storage = Storage::new(device, wgpu::ShaderStages::FRAGMENT, 64);
 
     Self {
       label,
       vertices_buffer,
       pipeline: None,
       shader,
-      prims_storage,
       format: None,
       textures_count: 0,
+      prims_storage,
+      stops_storage,
       anti_aliasing: AntiAliasing::None,
     }
   }
 
   pub fn load_triangles_vertices(
     &mut self,
-    buffers: &VertexBuffers<ImagePrimIndex>,
+    buffers: &VertexBuffers<LinearGradientPrimIndex>,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
   ) {
     self.vertices_buffer.write_buffer(buffers, device, queue);
   }
 
-  pub fn load_img_primitives(
+  pub fn load_linear_gradient_primitives(
     &mut self,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    primitives: &[ImgPrimitive],
+    primitives: &[LinearGradientPrimitive],
   ) {
     self.prims_storage.write_buffer(device, queue, primitives);
+  }
+
+  pub fn load_gradient_stops(
+    &mut self,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    stops: &[GradientStopPrimitive],
+  ) {
+    self.stops_storage.write_buffer(device, queue, stops);
   }
 
   #[allow(clippy::too_many_arguments)]
@@ -75,6 +90,7 @@ impl DrawImgTrianglesPass {
       mask_layer_storage.layout(),
     );
     let pipeline = self.pipeline.as_ref().unwrap();
+
     let color_attachments = texture.color_attachments(clear);
     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
       label: Some(self.label),
@@ -88,8 +104,9 @@ impl DrawImgTrianglesPass {
       wgpu::IndexFormat::Uint32,
     );
     rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
-    rpass.set_bind_group(1, self.prims_storage.bind_group(), &[]);
-    rpass.set_bind_group(2, textures_bind.assert_bind(), &[]);
+    rpass.set_bind_group(1, self.stops_storage.bind_group(), &[]);
+    rpass.set_bind_group(2, self.prims_storage.bind_group(), &[]);
+    rpass.set_bind_group(3, textures_bind.assert_bind(), &[]);
 
     rpass.set_pipeline(pipeline);
     rpass.draw_indexed(indices, 0, 0..1);
@@ -118,6 +135,7 @@ impl DrawImgTrianglesPass {
         label: Some("update triangles pipeline layout"),
         bind_group_layouts: &[
           mask_bind_layout,
+          self.stops_storage.layout(),
           self.prims_storage.layout(),
           textures_bind.assert_layout(),
         ],
@@ -130,7 +148,7 @@ impl DrawImgTrianglesPass {
           module: &self.shader,
           entry_point: "vs_main",
           buffers: &[wgpu::VertexBufferLayout {
-            array_stride: size_of::<Vertex<u32>>() as wgpu::BufferAddress,
+            array_stride: size_of::<Vertex<LinearGradientPrimIndex>>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
               // position
@@ -170,7 +188,7 @@ impl DrawImgTrianglesPass {
         },
         depth_stencil: None,
         multisample: wgpu::MultisampleState {
-          count: 1,
+          count: anti_aliasing as u32,
           mask: !0,
           alpha_to_coverage_enabled: false,
         },

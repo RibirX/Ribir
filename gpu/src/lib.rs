@@ -1,7 +1,7 @@
 pub mod error;
 pub use gpu_backend::Texture;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
-use ribir_painter::{image::ColorFormat, AntiAliasing, Color, VertexBuffers};
+use ribir_painter::{image::ColorFormat, AntiAliasing, Color, GradientStop, VertexBuffers};
 use std::ops::Range;
 mod gpu_backend;
 use zerocopy::AsBytes;
@@ -99,7 +99,7 @@ pub trait GPUBackendImpl {
   /// Load the vertices and indices buffer that `draw_img_triangles` will use.
   fn load_img_primitives(&mut self, primitives: &[ImgPrimitive]);
   /// Load the vertices and indices buffer that `draw_img_triangles` will use.
-  fn load_img_vertices(&mut self, buffers: &VertexBuffers<u32>);
+  fn load_img_vertices(&mut self, buffers: &VertexBuffers<ImagePrimIndex>);
 
   /// Load the primitives that `draw_radial_gradient_triangles` will use.
   fn load_radial_gradient_primitives(&mut self, primitives: &[RadialGradientPrimitive]);
@@ -108,7 +108,16 @@ pub trait GPUBackendImpl {
   fn load_radial_gradient_stops(&mut self, stops: &[GradientStopPrimitive]);
   /// Load the vertices and indices buffer that `draw_radial_gradient_triangles`
   /// will use.
-  fn load_radial_gradient_vertices(&mut self, buffers: &VertexBuffers<RadialGradientAttr>);
+  fn load_radial_gradient_vertices(&mut self, buffers: &VertexBuffers<RadialGradientPrimIndex>);
+
+  /// Load the primitives that `draw_linear_gradient_triangles` will use.
+  fn load_linear_gradient_primitives(&mut self, primitives: &[LinearGradientPrimitive]);
+  /// Load the gradient color stops that `draw_linear_gradient_triangles` will
+  /// use.
+  fn load_linear_gradient_stops(&mut self, stops: &[GradientStopPrimitive]);
+  /// Load the vertices and indices buffer that `draw_linear_gradient_triangles`
+  /// will use.
+  fn load_linear_gradient_vertices(&mut self, buffers: &VertexBuffers<LinearGradientPrimIndex>);
   /// Draw pure color triangles in the texture. And use the clear color clear
   /// the texture first if it's a Some-Value
   fn draw_color_triangles(
@@ -128,6 +137,15 @@ pub trait GPUBackendImpl {
   /// Draw triangles fill with color radial gradient. And use the clear color
   /// clear the texture first if it's a Some-Value
   fn draw_radial_gradient_triangles(
+    &mut self,
+    texture: &mut Self::Texture,
+    indices: Range<u32>,
+    clear: Option<Color>,
+  );
+
+  /// Draw triangles fill with color linear gradient. And use the clear color
+  /// clear the texture first if it's a Some-Value
+  fn draw_linear_gradient_triangles(
     &mut self,
     texture: &mut Self::Texture,
     indices: Range<u32>,
@@ -156,9 +174,15 @@ pub struct ColorAttr {
 
 #[repr(packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
-pub struct RadialGradientAttr {
-  pub prim_idx: u32,
-}
+pub struct ImagePrimIndex(u32);
+
+#[repr(packed)]
+#[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
+pub struct RadialGradientPrimIndex(u32);
+
+#[repr(packed)]
+#[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
+pub struct LinearGradientPrimIndex(u32);
 
 #[repr(packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
@@ -170,35 +194,62 @@ pub struct GradientStopPrimitive {
   pub offset: f32,
 }
 
-#[repr(u32)]
-enum SpreadMethod {
-  Pad,
-  Reflect,
-  Repeat,
+impl From<GradientStop> for GradientStopPrimitive {
+  fn from(stop: GradientStop) -> Self {
+    let color = stop.color.into_f32_components();
+    GradientStopPrimitive {
+      red: color[0],
+      green: color[1],
+      blue: color[2],
+      alpha: color[3],
+      offset: stop.offset,
+    }
+  }
 }
 
 #[repr(packed)]
-#[derive(AsBytes, PartialEq, Clone, Copy)]
+#[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
 pub struct RadialGradientPrimitive {
-  /// A 2x3 column-major matrix, transform a vertex position to the radial path
+  /// A 2x3 column-major matrix, transform a vertex position to the texture
   /// position
   pub transform: [f32; 6],
-  /// The origin of the image placed in texture.
+  /// The color stop's start index
   pub stop_start: u32,
-  /// The size of the image image.
+  /// The size of the color stop
   pub stop_cnt: u32,
-  /// The index of texture, `load_color_primitives` method provide all textures
-  /// a draw phase need.
+  /// position of the start center
   pub start_center: [f32; 2],
-  /// The index of the head mask layer.
+  /// position of the end center
   pub end_center: [f32; 2],
-
+  /// the radius of the start circle.
   pub start_radius: f32,
-
+  /// the radius of the end circle.
   pub end_radius: f32,
-
+  /// The index of the head mask layer.
   pub mask_head: i32,
+  /// the spread method of the gradient. 0 for pad, 1 for reflect and 2
+  /// for repeat
+  pub spread: u32,
+}
 
+#[repr(packed)]
+#[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
+pub struct LinearGradientPrimitive {
+  /// A 2x3 column-major matrix, transform a vertex position to the texture
+  /// position
+  pub transform: [f32; 6],
+  /// The color stop's start index
+  pub stop_start: u32,
+  /// The size of the color stop
+  pub stop_cnt: u32,
+  /// position of the start center
+  pub start_position: [f32; 2],
+  /// position of the end center
+  pub end_position: [f32; 2],
+  /// The index of the head mask layer.
+  pub mask_head: i32,
+  /// the spread method of the gradient. 0 for pad, 1 for reflect and 2
+  /// for repeat
   pub spread: u32,
 }
 

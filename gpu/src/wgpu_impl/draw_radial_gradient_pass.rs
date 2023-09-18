@@ -1,6 +1,6 @@
 use super::{storage::Storage, vertex_buffer::VerticesBuffer};
 use crate::{
-  GradientStopPrimitive, MaskLayer, RadialGradientAttr, RadialGradientPrimitive, TexturesBind,
+  GradientStopPrimitive, MaskLayer, RadialGradientPrimIndex, RadialGradientPrimitive, TexturesBind,
   WgpuTexture,
 };
 use ribir_painter::{AntiAliasing, Color, Vertex, VertexBuffers};
@@ -8,7 +8,7 @@ use std::{mem::size_of, ops::Range};
 
 pub struct DrawRadialGradientTrianglesPass {
   label: &'static str,
-  vertices_buffer: VerticesBuffer<RadialGradientAttr>,
+  vertices_buffer: VerticesBuffer<RadialGradientPrimIndex>,
   pipeline: Option<wgpu::RenderPipeline>,
   shader: wgpu::ShaderModule,
   format: Option<wgpu::TextureFormat>,
@@ -46,9 +46,9 @@ impl DrawRadialGradientTrianglesPass {
 
   pub fn load_triangles_vertices(
     &mut self,
-    buffers: &VertexBuffers<RadialGradientAttr>,
+    buffers: &VertexBuffers<RadialGradientPrimIndex>,
     device: &wgpu::Device,
-    queue: &mut wgpu::Queue,
+    queue: &wgpu::Queue,
   ) {
     self.vertices_buffer.write_buffer(buffers, device, queue);
   }
@@ -56,7 +56,7 @@ impl DrawRadialGradientTrianglesPass {
   pub fn load_radial_gradient_primitives(
     &mut self,
     device: &wgpu::Device,
-    queue: &mut wgpu::Queue,
+    queue: &wgpu::Queue,
     primitives: &[RadialGradientPrimitive],
   ) {
     self.prims_storage.write_buffer(device, queue, primitives);
@@ -65,7 +65,7 @@ impl DrawRadialGradientTrianglesPass {
   pub fn load_gradient_stops(
     &mut self,
     device: &wgpu::Device,
-    queue: &mut wgpu::Queue,
+    queue: &wgpu::Queue,
     stops: &[GradientStopPrimitive],
   ) {
     self.stops_storage.write_buffer(device, queue, stops);
@@ -74,7 +74,7 @@ impl DrawRadialGradientTrianglesPass {
   #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
     &mut self,
-    texture: &mut WgpuTexture,
+    texture: &WgpuTexture,
     indices: Range<u32>,
     clear: Option<Color>,
     device: &wgpu::Device,
@@ -148,7 +148,7 @@ impl DrawRadialGradientTrianglesPass {
           module: &self.shader,
           entry_point: "vs_main",
           buffers: &[wgpu::VertexBufferLayout {
-            array_stride: size_of::<Vertex<RadialGradientAttr>>() as wgpu::BufferAddress,
+            array_stride: size_of::<Vertex<RadialGradientPrimIndex>>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
               // position

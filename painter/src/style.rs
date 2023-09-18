@@ -1,4 +1,7 @@
-use crate::{color::RadialGradient, Color, PixelImage};
+use crate::{
+  color::{LinearGradient, RadialGradient},
+  Color, PixelImage,
+};
 use ribir_algo::ShareResource;
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +11,7 @@ pub enum Brush {
   /// Image brush always use a repeat mode to brush the path.
   Image(ShareResource<PixelImage>),
   RadialGradient(RadialGradient),
+  LinearGradient(LinearGradient),
 }
 
 impl Brush {
