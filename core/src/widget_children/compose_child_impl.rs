@@ -5,7 +5,7 @@ use crate::{
   widget::{StrictBuilder, WidgetId},
 };
 
-use super::{child_convert::FillVec, ComposeChild, SinglePair};
+use super::{ComposeChild, SinglePair};
 
 /// Trait specify what child a compose child widget can have, and the target
 /// type after widget compose its child.
@@ -91,10 +91,10 @@ where
   type Target = ComposePair<State<W>, W::Child>;
 
   #[inline]
-  fn with_child(self, child: C, _: &BuildCtx) -> Self::Target {
+  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
     ComposePair {
       widget: self,
-      child: ChildFrom::child_from(child),
+      child: ChildFrom::child_from(child, ctx),
     }
   }
 }
@@ -156,15 +156,29 @@ impl<T> TemplateBuilder for Vec<T> {
   fn build_tml(self) -> Self::Target { self }
 }
 
-impl<M, C, T> ComposeWithChild<C, M> for Vec<T>
+impl<M, C, T> ComposeWithChild<C, [M; 0]> for Vec<T>
 where
-  C: FillVec<T, M>,
+  T: ChildFrom<C, M>,
 {
   type Target = Self;
 
   #[inline]
-  fn with_child(mut self, child: C, _: &BuildCtx) -> Self::Target {
-    child.fill_vec(&mut self);
+  fn with_child(mut self, child: C, ctx: &BuildCtx) -> Self::Target {
+    self.push(ChildFrom::child_from(child, ctx));
+    self
+  }
+}
+
+impl<M, C, T> ComposeWithChild<C, [M; 1]> for Vec<T>
+where
+  C: IntoIterator,
+  T: ChildFrom<C::Item, M>,
+{
+  type Target = Self;
+
+  #[inline]
+  fn with_child(mut self, child: C, ctx: &BuildCtx) -> Self::Target {
+    self.extend(child.into_iter().map(|v| ChildFrom::child_from(v, ctx)));
     self
   }
 }

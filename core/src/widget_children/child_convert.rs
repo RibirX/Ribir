@@ -1,6 +1,7 @@
 use super::{ComposeChild, ComposePair, SinglePair};
 use crate::{
   builtin_widgets::{FatObj, Void},
+  context::BuildCtx,
   prelude::Pipe,
   state::{State, StateFrom},
   widget::*,
@@ -8,32 +9,32 @@ use crate::{
 
 /// Trait for conversions type as a compose child.
 pub trait ChildFrom<V, M> {
-  fn child_from(value: V) -> Self;
+  fn child_from(value: V, ctx: &BuildCtx) -> Self;
 }
 
 impl<T> ChildFrom<T, ()> for T {
   #[inline]
-  fn child_from(value: T) -> Self { value }
+  fn child_from(value: T, _: &BuildCtx) -> Self { value }
 }
 
 impl<C, T: FromAnother<C, M>, M> ChildFrom<C, (M,)> for T {
   #[inline]
-  fn child_from(value: C) -> Self { FromAnother::from_another(value) }
+  fn child_from(value: C, ctx: &BuildCtx) -> Self { FromAnother::from_another(value, ctx) }
 }
 
 /// Convert from another type to the compose child.
 pub trait FromAnother<V, M> {
-  fn from_another(value: V) -> Self;
+  fn from_another(value: V, _: &BuildCtx) -> Self;
 }
 
 // W -> Widget
 impl<W: StrictBuilder + 'static> FromAnother<W, ()> for Widget {
   #[inline]
-  fn from_another(value: W) -> Self { value.into() }
+  fn from_another(value: W, _: &BuildCtx) -> Self { value.into() }
 }
 
 impl<W: Into<Widget> + 'static> FromAnother<Pipe<Option<W>>, ()> for Widget {
-  fn from_another(value: Pipe<Option<W>>) -> Self {
+  fn from_another(value: Pipe<Option<W>>, _: &BuildCtx) -> Self {
     value
       .map(|w| w.map_or_else(|| Widget::from(Void), |w| w.into()))
       .into()
@@ -48,26 +49,27 @@ where
   State<W>: StateFrom<T>,
 {
   #[inline]
-  fn from_another(value: T) -> Self { Self::state_from(value) }
+  fn from_another(value: T, _: &BuildCtx) -> Self { Self::state_from(value) }
 }
 
 // W --- C ---> Option<C>
-impl<W, C, M> ChildFrom<W, [M; 1]> for Option<C>
+impl<W, C, M> FromAnother<W, [M; 0]> for Option<C>
 where
   C: ChildFrom<W, M>,
 {
   #[inline]
-  fn child_from(value: W) -> Self { Some(ChildFrom::child_from(value)) }
+  fn from_another(value: W, ctx: &BuildCtx) -> Self { Some(ChildFrom::child_from(value, ctx)) }
 }
 
 // Option<W>  ---> Option<C>
-impl<W, C, M> FromAnother<Option<C>, M> for Option<W>
+impl<W, C, M> FromAnother<Option<C>, [M; 1]> for Option<W>
 where
   W: FromAnother<C, M>,
 {
   #[inline]
-
-  fn from_another(value: Option<C>) -> Self { value.map(FromAnother::from_another) }
+  fn from_another(value: Option<C>, ctx: &BuildCtx) -> Self {
+    value.map(|v| FromAnother::from_another(v, ctx))
+  }
 }
 
 // WidgetPair<W, C> --> WidgetPair<W2, C2>
@@ -77,11 +79,11 @@ where
   C: FromAnother<C2, M2>,
 {
   #[inline]
-  fn from_another(value: SinglePair<W2, C2>) -> Self {
+  fn from_another(value: SinglePair<W2, C2>, ctx: &BuildCtx) -> Self {
     let SinglePair { widget, child } = value;
     SinglePair {
-      widget: W::from_another(widget),
-      child: C::from_another(child),
+      widget: W::from_another(widget, ctx),
+      child: C::from_another(child, ctx),
     }
   }
 }
@@ -91,9 +93,12 @@ where
   W: FromAnother<W2, M>,
 {
   #[inline]
-  fn from_another(value: SinglePair<W2, C>) -> Self {
+  fn from_another(value: SinglePair<W2, C>, ctx: &BuildCtx) -> Self {
     let SinglePair { widget, child } = value;
-    SinglePair { widget: W::child_from(widget), child }
+    SinglePair {
+      widget: W::child_from(widget, ctx),
+      child,
+    }
   }
 }
 
@@ -102,11 +107,11 @@ where
   C: FromAnother<C2, M>,
 {
   #[inline]
-  fn from_another(value: SinglePair<W, C2>) -> Self {
+  fn from_another(value: SinglePair<W, C2>, ctx: &BuildCtx) -> Self {
     let SinglePair { widget, child } = value;
     SinglePair {
       widget,
-      child: C::from_another(child),
+      child: C::from_another(child, ctx),
     }
   }
 }
@@ -117,11 +122,11 @@ where
   W: ComposeChild,
   C: FromAnother<C2, M>,
 {
-  fn from_another(value: ComposePair<State<W>, C2>) -> Self {
+  fn from_another(value: ComposePair<State<W>, C2>, ctx: &BuildCtx) -> Self {
     let ComposePair { widget, child } = value;
     ComposePair {
       widget,
-      child: FromAnother::from_another(child),
+      child: FromAnother::from_another(child, ctx),
     }
   }
 }
@@ -130,9 +135,9 @@ impl<T1, T2, M> FromAnother<FatObj<T1>, [M; 0]> for FatObj<T2>
 where
   T2: FromAnother<T1, M>,
 {
-  fn from_another(value: FatObj<T1>) -> Self {
+  fn from_another(value: FatObj<T1>, ctx: &BuildCtx) -> Self {
     let (host, builtin) = value.unzip();
-    FatObj::new(T2::from_another(host), builtin)
+    FatObj::new(T2::from_another(host, ctx), builtin)
   }
 }
 
@@ -141,23 +146,7 @@ where
   T2: ChildFrom<T1, M>,
 {
   #[inline]
-  fn from_another(value: T1) -> Self { FatObj::from_host(ChildFrom::child_from(value)) }
-}
-
-pub(crate) trait FillVec<C, M> {
-  fn fill_vec(self, vec: &mut Vec<C>);
-}
-
-impl<W, C: ChildFrom<W, M>, M> FillVec<C, [M; 0]> for W {
-  #[inline]
-  fn fill_vec(self, vec: &mut Vec<C>) { vec.push(ChildFrom::child_from(self)) }
-}
-
-impl<W, C, M> FillVec<C, [M; 1]> for W
-where
-  W: IntoIterator,
-  C: ChildFrom<W::Item, M>,
-{
-  #[inline]
-  fn fill_vec(self, vec: &mut Vec<C>) { vec.extend(self.into_iter().map(ChildFrom::child_from)) }
+  fn from_another(value: T1, ctx: &BuildCtx) -> Self {
+    FatObj::from_host(ChildFrom::child_from(value, ctx))
+  }
 }
