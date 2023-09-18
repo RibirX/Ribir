@@ -1,5 +1,8 @@
 use crate::{
-  color::GradientStop, path::*, path_builder::PathBuilder, Brush, Color, PixelImage, Svg,
+  color::{LinearGradient, RadialGradient},
+  path::*,
+  path_builder::PathBuilder,
+  Brush, Color, PixelImage, Svg,
 };
 use ribir_algo::ShareResource;
 use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
@@ -75,11 +78,22 @@ pub struct PaintPath {
 }
 
 #[repr(u32)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq)]
 pub enum SpreadMethod {
+  #[default]
   Pad,
   Reflect,
   Repeat,
+}
+
+impl From<usvg::SpreadMethod> for SpreadMethod {
+  fn from(value: usvg::SpreadMethod) -> Self {
+    match value {
+      usvg::SpreadMethod::Pad => SpreadMethod::Pad,
+      usvg::SpreadMethod::Reflect => SpreadMethod::Reflect,
+      usvg::SpreadMethod::Repeat => SpreadMethod::Repeat,
+    }
+  }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,13 +109,11 @@ pub enum PaintCommand {
   },
   RadialGradient {
     path: PaintPath,
-    stops: Vec<GradientStop>,
-    start: Point,
-    start_radius: f32,
-    end: Point,
-    end_radius: f32,
-    spread: SpreadMethod,
-    transform: Transform,
+    radial_gradient: RadialGradient,
+  },
+  LinearGradient {
+    path: PaintPath,
+    linear_gradient: LinearGradient,
   },
   // Todo: keep rectangle clip.
   Clip(PaintPath),
@@ -308,16 +320,12 @@ impl Painter {
           color: color.apply_alpha(opacity),
         },
         Brush::Image(img) => PaintCommand::ImgPath { path, img, opacity },
-        Brush::RadialGradient(radial_gradient) => PaintCommand::RadialGradient {
-          path: path,
-          stops: radial_gradient.stops,
-          start: radial_gradient.start_center,
-          start_radius: radial_gradient.start_radius,
-          end: radial_gradient.end_center,
-          end_radius: radial_gradient.end_radius,
-          transform: radial_gradient.transform,
-          spread: SpreadMethod::Pad,
-        },
+        Brush::RadialGradient(radial_gradient) => {
+          PaintCommand::RadialGradient { path, radial_gradient }
+        }
+        Brush::LinearGradient(linear_gradient) => {
+          PaintCommand::LinearGradient { path, linear_gradient }
+        }
       };
       self.commands.push(cmd);
     }

@@ -2,6 +2,8 @@ use material_color_utilities_rs::htc;
 use ribir_geom::{Point, Transform};
 use serde::{Deserialize, Serialize};
 
+use crate::SpreadMethod;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Color {
   pub red: u8,
@@ -15,7 +17,13 @@ pub struct GradientStop {
   pub color: Color,
   pub offset: f32,
 }
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+
+impl GradientStop {
+  #[inline]
+  pub fn new(color: Color, offset: f32) -> Self { Self { color, offset } }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct RadialGradient {
   pub start_center: Point,
   pub start_radius: f32,
@@ -23,6 +31,16 @@ pub struct RadialGradient {
   pub end_radius: f32,
   pub stops: Vec<GradientStop>,
   pub transform: Transform,
+  pub spread_method: SpreadMethod,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct LinearGradient {
+  pub start: Point,
+  pub end: Point,
+  pub stops: Vec<GradientStop>,
+  pub transform: Transform,
+  pub spread_method: SpreadMethod,
 }
 
 /// Describe the light tone of a color, should between [0, 1.0], 0.0 gives
