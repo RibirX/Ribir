@@ -1,9 +1,7 @@
 //! Data widget help attach data to a widget and get a new widget which behavior
 //! is same as origin widget.
 
-use crate::{
-  impl_proxy_query, impl_proxy_render, impl_query_self_only, prelude::*, widget::FnWidget,
-};
+use crate::{impl_proxy_query, impl_proxy_render, prelude::*, widget::FnWidget};
 
 pub struct DataWidget<D> {
   render: Box<dyn Render>,
@@ -38,14 +36,29 @@ impl<D: Query + 'static> DataWidget<D> {
 impl_proxy_query!(paths [data, render], DataWidget<D>, <D>, where D: Query + 'static);
 impl_proxy_render!(proxy render, DataWidget<D>, <D>, where D: Query + 'static);
 
-/// Data attach widget that we don't care about its type.
-/// todo: directly use Box<dyn Any> instead of AnonymousData
-pub struct AnonymousData(Box<dyn Any>);
-
-impl AnonymousData {
-  #[inline]
-  pub fn new(data: Box<dyn Any>) -> Self { Self(data) }
+/// A wrapper widget which can attach any data to a widget and not care about
+/// what the data is.
+pub struct AnonymousWrapper {
+  widget: Box<dyn Render>,
+  _data: Box<dyn Any>,
 }
 
-impl_query_self_only!(AnonymousData);
-impl_query_self_only!(Vec<AnonymousData>);
+impl AnonymousWrapper {
+  #[inline]
+  pub fn new(widget: Box<dyn Render>, data: Box<dyn Any>) -> Self {
+    AnonymousWrapper { widget, _data: data }
+  }
+}
+
+impl Query for AnonymousWrapper {
+  #[inline]
+  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
+    self.widget.query_inside_first(type_id, callback)
+  }
+  #[inline]
+  fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
+    self.widget.query_outside_first(type_id, callback)
+  }
+}
+
+impl_proxy_render!(proxy widget, AnonymousWrapper);

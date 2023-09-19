@@ -5,9 +5,9 @@ use super::WidgetTree;
 use crate::{
   builtin_widgets::Void,
   context::{PaintingCtx, WidgetCtx},
-  prelude::{AnonymousData, DataWidget},
+  prelude::AnonymousWrapper,
   state::{ModifyScope, Notifier},
-  widget::{QueryOrder, Render},
+  widget::Render,
   window::DelayEvent,
 };
 
@@ -112,8 +112,9 @@ impl WidgetId {
 
   pub(crate) fn on_mounted(self, tree: &mut WidgetTree) {
     let mut handles = vec![];
-    self.assert_get(&tree.arena).query_all_type(
-      |notifier: &Notifier| {
+    self
+      .assert_get(&tree.arena)
+      .query_type_outside_first(|notifier: &Notifier| {
         let state_changed = tree.dirty_set.clone();
         let h = notifier
           .raw_modifies()
@@ -124,15 +125,13 @@ impl WidgetId {
           .unsubscribe_when_dropped();
         handles.push(h);
         true
-      },
-      QueryOrder::OutsideFirst,
-    );
+      });
 
     // will auto cancel subscription when node removed.
     self.wrap_node(&mut tree.arena, move |node| {
-      Box::new(DataWidget::new(
+      Box::new(AnonymousWrapper::new(
         node,
-        AnonymousData::new(Box::new(handles.into_boxed_slice())),
+        Box::new(handles.into_boxed_slice()),
       ))
     });
     tree.window().add_delay_event(DelayEvent::Mounted(self));

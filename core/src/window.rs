@@ -318,7 +318,7 @@ impl Window {
       let tree = self.widget_tree.borrow();
       let drop_conditional = wid
         .assert_get(&self.widget_tree.borrow().arena)
-        .query_on_first_type(QueryOrder::OutsideFirst, |d: &DelayDrop| d.delay_drop_until)
+        .query_most_outside(|d: &DelayDrop| d.delay_drop_until)
         .unwrap_or(true);
       let parent_dropped = parent.map_or(false, |p| {
         p.ancestors(&tree.arena).last() != Some(tree.root())
@@ -482,13 +482,10 @@ impl Window {
     // event by it, and never read or write the node. And in the callback, there is
     // no way to mut access the inner data of node or destroy the node.
     let tree = unsafe { &*(&*self.widget_tree.borrow() as *const WidgetTree) };
-    id.assert_get(&tree.arena).query_all_type(
-      |m: &L| {
-        m.dispatch(&mut e);
-        true
-      },
-      QueryOrder::InnerFirst,
-    );
+    id.assert_get(&tree.arena).query_type_inside_first(|m: &L| {
+      m.dispatch(&mut e);
+      true
+    });
   }
 
   fn bottom_down_emit<L>(&self, e: &mut L::Event, bottom: WidgetId, up: Option<WidgetId>)
@@ -506,14 +503,12 @@ impl Window {
       .collect::<Vec<_>>();
 
     path.iter().rev().all(|id| {
-      id.assert_get(&tree.arena).query_all_type(
-        |m: &L| {
+      id.assert_get(&tree.arena)
+        .query_type_outside_first(|m: &L| {
           (**e).borrow_mut().set_current_target(*id);
           m.dispatch(e);
           (**e).borrow_mut().is_propagation()
-        },
-        QueryOrder::OutsideFirst,
-      );
+        });
       (**e).borrow().is_propagation()
     });
   }
@@ -534,14 +529,11 @@ impl Window {
       .ancestors(&tree.arena)
       .take_while(|id| Some(*id) != up)
       .all(|id| {
-        id.assert_get(&tree.arena).query_all_type(
-          |m: &L| {
-            (**e).borrow_mut().set_current_target(id);
-            m.dispatch(e);
-            (**e).borrow_mut().is_propagation()
-          },
-          QueryOrder::InnerFirst,
-        );
+        id.assert_get(&tree.arena).query_type_inside_first(|m: &L| {
+          (**e).borrow_mut().set_current_target(id);
+          m.dispatch(e);
+          (**e).borrow_mut().is_propagation()
+        });
         (**e).borrow().is_propagation()
       });
   }

@@ -343,14 +343,9 @@ impl FocusManager {
     self.scope_list(node_id).find(|id| {
       let mut has_ignore = false;
       self.get(*id).and_then(|n| n.wid).map(|wid| {
-        wid.get(arena).map(|r| {
-          r.query_all_type(
-            |s: &FocusScope| {
-              has_ignore = s.skip_descendants;
-              !has_ignore
-            },
-            QueryOrder::InnerFirst,
-          )
+        wid.get(arena)?.query_most_inside(|s: &FocusScope| {
+          has_ignore = s.skip_descendants;
+          !has_ignore
         })
       });
       has_ignore
@@ -362,7 +357,7 @@ impl FocusManager {
     let tree = wnd.widget_tree.borrow();
     scope_id
       .and_then(|id| id.get(&tree.arena))
-      .and_then(|r| r.query_on_first_type(QueryOrder::InnerFirst, |s: &FocusScope| s.clone()))
+      .and_then(|r| r.query_most_inside(|s: &FocusScope| s.clone()))
       .unwrap_or_default()
   }
 
@@ -373,7 +368,7 @@ impl FocusManager {
       let wid = self.get(node_id)?.wid?;
       let tree = wnd.widget_tree.borrow();
       let r = wid.get(&tree.arena)?;
-      r.query_on_first_type(QueryOrder::OutsideFirst, |s: &FocusNode| s.tab_index)
+      r.query_most_outside(|s: &FocusNode| s.tab_index)
     };
 
     get_index().unwrap_or(0)

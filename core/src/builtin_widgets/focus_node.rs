@@ -46,9 +46,7 @@ impl ComposeChild for FocusNode {
       if !has_focus_node {
         let subject = ctx
           .assert_get(id)
-          .query_on_first_type(QueryOrder::OutsideFirst, |l: &LifecycleListener| {
-            l.lifecycle_stream()
-          });
+          .query_most_outside(|l: &LifecycleListener| l.lifecycle_stream());
         let subject = subject.unwrap_or_else(|| {
           let listener = LifecycleListener::default();
           let subject = listener.lifecycle_stream();
@@ -74,10 +72,7 @@ impl ComposeChild for FocusNode {
 
         id.wrap_node(&mut ctx.tree.borrow_mut().arena, |child| {
           let d = DataWidget::new(child, this);
-          Box::new(DataWidget::new(
-            Box::new(d),
-            AnonymousData::new(Box::new(h)),
-          ))
+          Box::new(AnonymousWrapper::new(Box::new(d), Box::new(h)))
         });
       }
       id
@@ -168,13 +163,10 @@ mod tests {
     let id = tree.root();
     let node = id.get(&tree.arena).unwrap();
     let mut cnt = 0;
-    node.query_all_type(
-      |_: &FocusNode| {
-        cnt += 1;
-        true
-      },
-      QueryOrder::InnerFirst,
-    );
+    node.query_type_inside_first(|_: &FocusNode| {
+      cnt += 1;
+      true
+    });
 
     assert!(cnt == 1);
   }

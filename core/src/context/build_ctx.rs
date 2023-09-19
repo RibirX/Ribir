@@ -106,8 +106,9 @@ impl<'a> BuildCtx<'a> {
   /// After insert new widget to the widget tree, call this to watch the widget
   /// and fire mount events.
   pub(crate) fn on_widget_mounted(&self, id: WidgetId) {
-    self.assert_get(id).query_all_type(
-      |notifier: &Notifier| {
+    self
+      .assert_get(id)
+      .query_type_outside_first(|notifier: &Notifier| {
         let state_changed = self.tree.borrow().dirty_set.clone();
         notifier
           .raw_modifies()
@@ -116,9 +117,7 @@ impl<'a> BuildCtx<'a> {
             state_changed.borrow_mut().insert(id);
           });
         true
-      },
-      QueryOrder::OutsideFirst,
-    );
+      });
 
     self.window().add_delay_event(DelayEvent::Mounted(id));
   }
@@ -144,13 +143,11 @@ impl<'a> BuildCtx<'a> {
 
       let arena = &self.tree.borrow().arena;
       p.ancestors(arena).any(|p| {
-        p.assert_get(arena).query_all_type(
-          |t: &Sc<Theme>| {
+        p.assert_get(arena)
+          .query_type_inside_first(|t: &Sc<Theme>| {
             themes.push(t.clone());
             matches!(t.deref(), Theme::Inherit(_))
-          },
-          QueryOrder::InnerFirst,
-        );
+          });
         matches!(themes.last().map(Sc::deref), Some(Theme::Full(_)))
       });
       themes
