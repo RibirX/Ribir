@@ -54,91 +54,70 @@ pub trait Render: Query {
 /// The common type of all widget can convert to.
 pub struct Widget(Box<dyn FnOnce(&BuildCtx) -> WidgetId>);
 
-/// A trait to query dynamic type and its inner type on runtime, use this trait
-/// to provide type information you want framework know.
-pub trait Query: QueryFiler {
-  /// A type can composed by others, this method query all type(include self)
-  /// match the type id, and call the callback one by one. The callback accept
-  /// an `& dyn Any` of the target type, and return if it want to continue.
-  fn query_all(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
-    order: QueryOrder,
-  );
-}
-
-#[derive(Clone, Copy)]
-pub enum QueryOrder {
-  InnerFirst,
-  OutsideFirst,
-}
-
-/// Trait to detect if a type is match the `type_id`.
-pub trait QueryFiler {
-  /// query self type by type id, and return a reference of `Any` trait to cast
-  /// to target type if type match.
-  fn query_filter(&self, type_id: TypeId) -> Option<&dyn Any>;
-  /// query self type by type id, and return a mut reference of `Any` trait to
-  /// cast to target type if type match.
-  fn query_filter_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any>;
-}
-
-impl<W: 'static> QueryFiler for W {
-  #[inline]
-  fn query_filter(&self, type_id: TypeId) -> Option<&dyn Any> {
-    (self.type_id() == type_id).then_some(self as &dyn Any)
-  }
-
-  #[inline]
-  fn query_filter_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
-    ((*self).type_id() == type_id).then_some(self as &mut dyn Any)
-  }
+/// A type can composed by many types, this trait help us to query the type and
+/// the inner type by its type id, and call the callback one by one with a `&
+/// dyn Any` of the target type. You can control if you want to continue query
+/// by return `true` or `false` in the callback.
+pub trait Query: Any {
+  /// Query the type in a inside first order, and apply the callback to it,
+  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool);
+  /// Query the type in a outside first order, and apply the callback to it,
+  fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool);
 }
 
 impl<'a> dyn Render + 'a {
   #[inline]
-  pub fn query_all_type<T: Any>(&self, mut callback: impl FnMut(&T) -> bool, order: QueryOrder) {
-    self.query_all(
-      TypeId::of::<T>(),
-      &mut |a| a.downcast_ref().map_or(true, &mut callback),
-      order,
-    )
+  pub fn query_type_inside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) {
+    self.query_inside_first(TypeId::of::<T>(), &mut |a| {
+      a.downcast_ref().map_or(true, &mut callback)
+    })
   }
 
-  /// Query the first match type in all type by special order, and call
-  /// `callback`
-  pub fn query_on_first_type<T: Any, R>(
-    &self,
-    order: QueryOrder,
-    callback: impl FnOnce(&T) -> R,
-  ) -> Option<R> {
+  #[inline]
+  pub fn query_type_outside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) {
+    Query::query_outside_first(self, TypeId::of::<T>(), &mut |a| {
+      a.downcast_ref().map_or(true, &mut callback)
+    })
+  }
+
+  /// Query the most inside type match `T`, and apply the callback to it, return
+  /// what the callback return.
+  pub fn query_most_inside<T: Any, R>(&self, callback: impl FnOnce(&T) -> R) -> Option<R> {
     let mut callback = Some(callback);
     let mut res = None;
-    self.query_all_type(
-      |a| {
-        let cb = callback.take().expect("should only call once");
-        res = Some(cb(a));
-        false
-      },
-      order,
-    );
+    self.query_type_inside_first(|a| {
+      let cb = callback.take().expect("should only call once");
+      res = Some(cb(a));
+      false
+    });
     res
   }
 
+  /// Query the most outside type match `T`, and apply the callback to it,
+  /// return what the callback return.
+  pub fn query_most_outside<T: Any, R>(&self, callback: impl FnOnce(&T) -> R) -> Option<R> {
+    let mut callback = Some(callback);
+    let mut res = None;
+    self.query_type_outside_first(|a| {
+      let cb = callback.take().expect("should only call once");
+      res = Some(cb(a));
+      false
+    });
+    res
+  }
+
+  /// return if this object contain type `T`
   pub fn contain_type<T: Any>(&self) -> bool {
     let mut hit = false;
-    self.query_all_type(
-      |_: &T| {
-        hit = true;
-        false
-      },
-      QueryOrder::OutsideFirst,
-    );
+    self.query_type_outside_first(|_: &T| {
+      hit = true;
+      false
+    });
     hit
   }
 
-  pub fn is<T: Any>(&self) -> bool { self.query_filter(TypeId::of::<T>()).is_some() }
+  /// return if this object is type `T`
+  pub fn is<T: Any>(&self) -> bool { self.type_id() == TypeId::of::<T>() }
 }
 
 pub struct FnWidget<F>(F);
@@ -213,55 +192,45 @@ macro_rules! impl_proxy_query {
     $ty: ty $(, <$($($lf: lifetime)? $($p: ident)?), *>)? $(,where $($w:tt)*)?
   ) => {
     impl $(<$($($lf)? $($p)?),*>)? Query for $ty $(where $($w)*)? {
-      #[inline]
-      fn query_all(
-        &self,
-        type_id: TypeId,
-        callback: &mut dyn FnMut(&dyn Any) -> bool,
-        order: QueryOrder,
-      ) {
+
+      fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
         let mut query_more = true;
-        match order {
-          QueryOrder::InnerFirst => {
-            impl_proxy_query!(reverse
-              [$(
-                if query_more {
-                  self.$($name $(($($args),*))?).*
-                    .query_all(
-                      type_id,
-                      &mut |any| {
-                        query_more = callback(any);
-                        query_more
-                      },
-                      order,
-                    );
-                }
-              ),+]
-            );
-            if let Some(a) = self.query_filter(type_id) {
-              callback(a);
-            }
-          }
-          QueryOrder::OutsideFirst => {
-            if let Some(a) = self.query_filter(type_id) {
-              query_more = callback(a);
-            }
+        impl_proxy_query!(reverse
+          [$(
             if query_more {
-              $(
-                if query_more {
-                  self.$($name $(($($args),*))?).*
-                    .query_all(
-                      type_id,
-                      &mut |any| {
-                        query_more = callback(any);
-                        query_more
-                      },
-                      order,
-                    );
-                }
-              )+
+              self.$($name $(($($args),*))?).*
+                .query_inside_first(
+                  type_id,
+                  &mut |any| {
+                    query_more = callback(any);
+                    query_more
+                  },
+                );
             }
-          }
+          ),+]
+        );
+        if type_id == self.type_id() {
+          callback(self);
+        }
+      }
+      fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
+        if type_id == self.type_id() {
+          callback(self);
+        }
+        let mut query_more = true;
+        if query_more {
+          $(
+            if query_more {
+              self.$($name $(($($args),*))?).*
+                .query_outside_first(
+                  type_id,
+                  &mut |any| {
+                    query_more = callback(any);
+                    query_more
+                  },
+                );
+            }
+          )+
         }
       }
     }
@@ -273,14 +242,14 @@ macro_rules! impl_query_self_only {
   ($name: ty $(, <$($($lf: lifetime)? $($p: ident)?), *>)? $(,where $($w:tt)*)?) => {
     impl $(<$($($lf)? $($p)?),*>)? Query for $name $(where $($w)*)? {
       #[inline]
-      fn query_all(
-        &self,
-        type_id: TypeId,
-        callback: &mut dyn FnMut(&dyn Any) -> bool,
-        _: QueryOrder,
-      ) {
-        if let Some(a) = self.query_filter(type_id) {
-          callback(a);
+      fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
+        self.query_outside_first(type_id, callback)
+      }
+
+      #[inline]
+      fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
+        if type_id == self.type_id() {
+          callback(self);
         }
       }
     }
@@ -376,20 +345,6 @@ impl_proxy_query!(paths [deref()], Sc<W>, <W>, where W: Query + 'static);
 impl_proxy_render!(proxy deref(), Sc<W>, <W>, where W: Render + 'static);
 
 impl_query_self_only!(Vec<SubscriptionGuard<BoxSubscription<'static>>>);
-
-/// Directly return `v`, this function does nothing, but it's useful to help you
-/// declare a widget expression in `widget!` macro.
-#[inline]
-pub const fn from<W>(v: W) -> W { v }
-
-/// Return OptionWidget::Some widget if the `b` is true, the return value wrap
-/// from the return value of `f` method called.
-#[inline]
-pub fn then<W>(b: bool, f: impl FnOnce() -> W) -> Option<W> { b.then(f) }
-
-/// calls the closure on `value` and returns
-#[inline]
-pub fn map<T, W>(value: T, f: impl FnOnce(T) -> W) -> W { f(value) }
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
   ctx.box_rect().map_or(false, |rect| rect.contains(pos))

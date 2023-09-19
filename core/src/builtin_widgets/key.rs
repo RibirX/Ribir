@@ -1,6 +1,5 @@
 use crate::{impl_query_self_only, prelude::*};
 use std::{
-  cell::Cell,
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
 };
@@ -49,7 +48,7 @@ pub struct KeyWidget<V: Default + 'static = ()> {
   #[declare(skip)]
   before_value: Option<V>,
   #[declare(skip)]
-  has_successor: Cell<bool>,
+  has_successor: bool,
 }
 
 /// A trait for `keyWidget` that use to record information of the previous and
@@ -79,7 +78,7 @@ where
     self.write().record_before_value(key.read().value.clone());
   }
 
-  fn record_next_key_widget(&self, _: &dyn AnyKey) { self.write().has_successor.set(true); }
+  fn record_next_key_widget(&self, _: &dyn AnyKey) { self.silent().has_successor = true; }
 
   fn as_any(&self) -> &dyn Any { self }
 }
@@ -104,7 +103,7 @@ where
   pub fn is_enter(&self) -> bool { self.before_value.is_none() }
   /// Detect if the key widget is really be disposed, there is not successor
   /// widget has same key. Usually used in `on_disposed` callback.
-  pub fn is_leave(&self) -> bool { !self.has_successor.get() }
+  pub fn is_leave(&self) -> bool { !self.has_successor }
 
   /// Detect if the value of the key widget is changed
   pub fn is_changed(&self) -> bool {

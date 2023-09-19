@@ -1,5 +1,5 @@
 use crate::{
-  prelude::{AppCtx, QueryOrder},
+  prelude::AppCtx,
   widget::{BoxClamp, WidgetTree},
   widget_tree::WidgetId,
   window::{Window, WindowId},
@@ -167,10 +167,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     id: WidgetId,
     callback: impl FnOnce(&W) -> R,
   ) -> Option<R> {
-    self.with_tree(|tree| {
-      id.assert_get(&tree.arena)
-        .query_on_first_type(QueryOrder::OutsideFirst, callback)
-    })
+    self.with_tree(|tree| id.assert_get(&tree.arena).query_most_outside(callback))
   }
 
   fn window(&self) -> Rc<Window> { self.current_wnd() }

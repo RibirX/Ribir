@@ -30,7 +30,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::context::*;
   #[doc(no_inline)]
-  pub use crate::data_widget::{AnonymousData, DataWidget};
+  pub use crate::data_widget::{AnonymousWrapper, DataWidget};
   #[doc(no_inline)]
   pub use crate::declare::*;
   #[doc(no_inline)]
@@ -42,9 +42,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget;
   #[doc(no_inline)]
-  pub use crate::widget::{
-    Any, Compose, FnWidget, HitTest, Query, QueryFiler, QueryOrder, Render, TypeId, Widget,
-  };
+  pub use crate::widget::{Any, Compose, FnWidget, HitTest, Query, Render, TypeId, Widget};
   #[doc(no_inline)]
   pub use crate::widget_children::*;
   #[doc(no_inline)]

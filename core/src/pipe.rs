@@ -16,7 +16,7 @@ use crate::{
   impl_proxy_render,
   prelude::*,
   ticker::FrameMsg,
-  widget::{Query, QueryOrder, Render, StrictBuilder, Widget, WidgetBuilder, WidgetId, WidgetTree},
+  widget::{Query, Render, StrictBuilder, Widget, WidgetBuilder, WidgetId, WidgetTree},
   window::WindowId,
 };
 
@@ -367,8 +367,9 @@ fn attach_unsubscribe_guard(id: WidgetId, wnd: WindowId, unsub: impl Subscriptio
       let guard = unsub.unsubscribe_when_dropped();
       // auto unsubscribe when the widget is not a root and its parent is None.
       if let Some(p) = id.parent(&tree.arena) {
-        let guard = AnonymousData::new(Box::new(guard));
-        p.wrap_node(&mut tree.arena, |d| Box::new(DataWidget::new(d, guard)))
+        p.wrap_node(&mut tree.arena, |d| {
+          Box::new(AnonymousWrapper::new(d, Box::new(guard)))
+        })
       }
     }
   })
@@ -466,9 +467,7 @@ fn update_key_state_multi(
 fn inspect_key<R>(id: WidgetId, ctx: &BuildCtx, mut cb: impl FnMut(&dyn AnyKey) -> R) -> Option<R> {
   ctx
     .assert_get(id)
-    .query_on_first_type::<Box<dyn AnyKey>, _>(QueryOrder::OutsideFirst, |key_widget| {
-      cb(key_widget.deref())
-    })
+    .query_most_outside::<Box<dyn AnyKey>, _>(|key_widget| cb(key_widget.deref()))
 }
 
 fn update_key_states(
@@ -507,13 +506,12 @@ impl PipeNode {
 }
 
 impl Query for PipeNode {
-  fn query_all(
-    &self,
-    type_id: std::any::TypeId,
-    callback: &mut dyn FnMut(&dyn std::any::Any) -> bool,
-    order: QueryOrder,
-  ) {
-    self.as_ref().query_all(type_id, callback, order)
+  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
+    self.as_ref().query_inside_first(type_id, callback)
+  }
+
+  fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
+    self.as_ref().query_outside_first(type_id, callback)
   }
 }
 
