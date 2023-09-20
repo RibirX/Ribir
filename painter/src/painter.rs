@@ -120,6 +120,20 @@ pub enum PaintCommand {
   PopClip,
 }
 
+impl PaintCommand {
+  pub fn transform(mut self, transform: &Transform) -> Self {
+    match &mut self {
+      PaintCommand::ColorPath { path, .. }
+      | PaintCommand::ImgPath { path, .. }
+      | PaintCommand::RadialGradient { path, .. }
+      | PaintCommand::LinearGradient { path, .. }
+      | PaintCommand::Clip(path) => path.transform(transform),
+      PaintCommand::PopClip => {}
+    }
+    self
+  }
+}
+
 #[derive(Clone)]
 struct PainterState {
   /// The line width use to stroke path.
@@ -474,16 +488,11 @@ impl Painter {
   }
 
   pub fn draw_svg(&mut self, svg: &Svg) -> &mut Self {
-    self.scale(svg.view_scale.x, svg.view_scale.y);
-    svg.paths.iter().for_each(|c| {
-      self.set_brush(c.brush.clone());
-      match &c.style {
-        PathPaintStyle::Fill => self.fill_path(c.path.clone()),
-        PathPaintStyle::Stroke(options) => self
-          .set_strokes(options.clone())
-          .stroke_path(c.path.clone()),
-      };
-    });
+    let transform = *self.get_transform();
+    svg
+      .paint_commands
+      .iter()
+      .for_each(|c| self.commands.push(c.clone().transform(&transform)));
     self
   }
 
@@ -595,6 +604,11 @@ impl PaintPath {
   pub fn scale(&mut self, scale: f32) {
     self.transform = self.transform.then_scale(scale, scale);
     self.paint_bounds = self.paint_bounds.scale(scale, scale);
+  }
+
+  pub fn transform(&mut self, transform: &Transform) {
+    self.transform = self.transform.then(transform);
+    self.paint_bounds = self.transform.outer_transformed_rect(self.path.bounds());
   }
 }
 

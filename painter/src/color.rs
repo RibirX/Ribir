@@ -1,5 +1,5 @@
 use material_color_utilities_rs::htc;
-use ribir_geom::{Point, Transform};
+use ribir_geom::Point;
 use serde::{Deserialize, Serialize};
 
 use crate::SpreadMethod;
@@ -30,7 +30,6 @@ pub struct RadialGradient {
   pub end_center: Point,
   pub end_radius: f32,
   pub stops: Vec<GradientStop>,
-  pub transform: Transform,
   pub spread_method: SpreadMethod,
 }
 
@@ -39,7 +38,6 @@ pub struct LinearGradient {
   pub start: Point,
   pub end: Point,
   pub stops: Vec<GradientStop>,
-  pub transform: Transform,
   pub spread_method: SpreadMethod,
 }
 
