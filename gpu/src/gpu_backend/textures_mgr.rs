@@ -59,6 +59,11 @@ macro_rules! id_to_texture {
   };
 }
 
+fn get_transform_pref_scale(transform: &Transform) -> f32 {
+  let Transform { m11, m12, m21, m22, .. } = *transform;
+  (m11.abs() + m12.abs()).max(m21.abs() + m22.abs())
+}
+
 impl<T: Texture> TexturesMgr<T>
 where
   T::Host: GPUBackendImpl<Texture = T>,
@@ -109,7 +114,7 @@ where
         .then(path_ts)
     }
 
-    let prefer_scale: f32 = transform.m11.abs().max(transform.m22.abs());
+    let prefer_scale: f32 = get_transform_pref_scale(transform);
     let key = PathKey::from_path(path);
 
     if let Some(h) = self
@@ -217,7 +222,7 @@ where
     let tex_width = tex_size.width as f32;
     let tex_height = tex_size.height as f32;
 
-    let scale = ts.m11.max(ts.m22);
+    let scale = get_transform_pref_scale(ts);
 
     path.tessellate(TOLERANCE / scale, buffer, |pos| {
       let pos = ts.transform_point(pos);
@@ -520,7 +525,7 @@ impl PartialEq for PathKey {
 impl Eq for PathKey {}
 
 pub fn prefer_cache_size(path: &Path, transform: &Transform) -> DeviceSize {
-  let prefer_scale: f32 = transform.m11.max(transform.m22);
+  let prefer_scale: f32 = get_transform_pref_scale(transform);
   let prefer_cache_size = path
     .bounds()
     .scale(prefer_scale, prefer_scale)

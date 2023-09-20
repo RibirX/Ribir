@@ -1,8 +1,8 @@
 use crate::{
   color::{LinearGradient, RadialGradient},
-  Brush, Color, GradientStop, LineCap, LineJoin, Path, PathPaintStyle, StrokeOptions,
+  Brush, Color, GradientStop, LineCap, LineJoin, PaintCommand, Path, StrokeOptions,
 };
-use ribir_geom::{Point, Size, Transform, Vector};
+use ribir_geom::{Point, Rect, Size, Transform};
 use serde::{Deserialize, Serialize};
 use std::{error::Error, io::Read};
 use usvg::{Options, Stop, Tree, TreeParsing};
@@ -10,15 +10,7 @@ use usvg::{Options, Stop, Tree, TreeParsing};
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Svg {
   pub size: Size,
-  pub view_scale: Vector,
-  pub paths: Box<[SvgPath]>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct SvgPath {
-  pub path: Path,
-  pub brush: Brush,
-  pub style: PathPaintStyle,
+  pub paint_commands: Vec<PaintCommand>,
 }
 
 /// Fits size into a viewbox. copy from resvg
@@ -43,33 +35,28 @@ impl Svg {
     let size = tree.size;
     let fit_size = fit_view_box(size, &tree.view_box);
 
-    let view_scale = Vector::new(
-      size.width() / fit_size.width(),
-      size.height() / fit_size.height(),
-    )
-    .to_f32();
-    let t = Transform::translation(-view_rect.x(), -view_rect.y());
-
-    let mut t_stack = TransformStack::new(t);
-    let mut paths = vec![];
-
+    let bound_rect = Rect::from_size(Size::new(f32::INFINITY, f32::INFINITY));
+    let mut painter = crate::Painter::new(bound_rect);
+    painter.apply_transform(
+      &Transform::translation(-view_rect.x(), -view_rect.y()).then_scale(
+        size.width() / fit_size.width(),
+        size.height() / fit_size.height(),
+      ),
+    );
     tree.root.traverse().for_each(|edge| match edge {
       rctree::NodeEdge::Start(node) => {
         use usvg::NodeKind;
-
+        painter.save();
         match &*node.borrow() {
           NodeKind::Path(p) => {
-            t_stack.push(matrix_convert(p.transform));
+            painter.apply_transform(&matrix_convert(p.transform));
             let path = usvg_path_to_path(p);
-            let path = path.transform(t_stack.current_transform());
             if let Some(ref fill) = p.fill {
-              let brush = brush_from_usvg_paint(&fill.paint, fill.opacity, &size);
-
-              paths.push(SvgPath {
-                path: path.clone(),
-                brush,
-                style: PathPaintStyle::Fill,
-              });
+              let (brush, transform) = brush_from_usvg_paint(&fill.paint, fill.opacity, &size);
+              let mut painter = painter.save_guard();
+              painter.set_brush(brush.clone());
+              painter.apply_transform(&transform);
+              painter.fill_path(path.clone().transform(&transform.inverse().unwrap())); //&o_ts.then(&n_ts.inverse().unwrap())));
             }
 
             if let Some(ref stroke) = p.stroke {
@@ -90,12 +77,12 @@ impl Svg {
                 miter_limit: stroke.miterlimit.get(),
               };
 
-              let brush = brush_from_usvg_paint(&stroke.paint, stroke.opacity, &size);
-              paths.push(SvgPath {
-                path,
-                brush,
-                style: PathPaintStyle::Stroke(options),
-              });
+              let (brush, transform) = brush_from_usvg_paint(&stroke.paint, stroke.opacity, &size);
+              let mut painter = painter.save_guard();
+              painter.set_brush(brush.clone());
+              painter.apply_transform(&transform);
+              painter.set_strokes(options);
+              painter.stroke_path(path.transform(&transform.inverse().unwrap()));
             };
           }
           NodeKind::Image(_) => {
@@ -103,7 +90,7 @@ impl Svg {
             log::warn!("[painter]: not support draw embed image in svg, ignored!");
           }
           NodeKind::Group(ref g) => {
-            t_stack.push(matrix_convert(g.transform));
+            painter.apply_transform(&matrix_convert(g.transform));
             // todo;
             if g.opacity.get() != 1. {
               log::warn!("[painter]: not support `opacity` in svg, ignored!");
@@ -124,14 +111,13 @@ impl Svg {
         }
       }
       rctree::NodeEdge::End(_) => {
-        t_stack.pop();
+        painter.restore();
       }
     });
 
     Ok(Svg {
       size: Size::new(size.width(), size.height()),
-      paths: paths.into_boxed_slice(),
-      view_scale,
+      paint_commands: painter.finish(),
     })
   }
 
@@ -182,11 +168,18 @@ fn matrix_convert(t: usvg::Transform) -> Transform {
   Transform::new(sx, ky, kx, sy, tx, ty)
 }
 
-fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity, size: &usvg::Size) -> Brush {
+fn brush_from_usvg_paint(
+  paint: &usvg::Paint,
+  opacity: usvg::Opacity,
+  size: &usvg::Size,
+) -> (Brush, Transform) {
   match paint {
-    usvg::Paint::Color(usvg::Color { red, green, blue }) => Color::from_rgb(*red, *green, *blue)
-      .with_alpha(opacity.get())
-      .into(),
+    usvg::Paint::Color(usvg::Color { red, green, blue }) => (
+      Color::from_rgb(*red, *green, *blue)
+        .with_alpha(opacity.get())
+        .into(),
+      Transform::identity(),
+    ),
     usvg::Paint::LinearGradient(linear) => {
       let stops = convert_to_gradient_stops(&linear.stops);
       let size_scale = match linear.units {
@@ -195,12 +188,15 @@ fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity, size: &usv
       };
       let gradient = LinearGradient {
         start: Point::new(linear.x1 * size_scale.0, linear.y1 * size_scale.1),
-        end: Point::new(linear.y2 * size_scale.0, linear.y2 * size_scale.1),
+        end: Point::new(linear.x2 * size_scale.0, linear.y2 * size_scale.1),
         stops,
-        transform: matrix_convert(linear.transform),
         spread_method: linear.spread_method.into(),
       };
-      Brush::LinearGradient(gradient)
+
+      (
+        Brush::LinearGradient(gradient),
+        matrix_convert(linear.transform),
+      )
     }
     usvg::Paint::RadialGradient(radial_gradient) => {
       let stops = convert_to_gradient_stops(&radial_gradient.stops);
@@ -213,21 +209,24 @@ fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity, size: &usv
           radial_gradient.fx * size_scale.0,
           radial_gradient.fy * size_scale.1,
         ),
-        start_radius: 0.,
+        start_radius: 0., // usvg not support fr
         end_center: Point::new(
           radial_gradient.cx * size_scale.0,
           radial_gradient.cy * size_scale.1,
         ),
         end_radius: radial_gradient.r.get() * size_scale.0,
         stops,
-        transform: matrix_convert(radial_gradient.transform),
         spread_method: radial_gradient.spread_method.into(),
       };
-      Brush::RadialGradient(gradient)
+
+      (
+        Brush::RadialGradient(gradient),
+        matrix_convert(radial_gradient.transform),
+      )
     }
     paint => {
       log::warn!("[painter]: not support `{paint:?}` in svg, use black instead!");
-      Color::BLACK.into()
+      (Color::BLACK.into(), Transform::identity())
     }
   }
 }
@@ -241,7 +240,7 @@ fn convert_to_gradient_stops(stops: &Vec<Stop>) -> Vec<GradientStop> {
       let usvg::Color { red, green, blue } = stop.color;
       GradientStop {
         offset: stop.offset.get(),
-        color: Color::from_rgb(red, green, blue),
+        color: Color::new(red, green, blue, stop.opacity.to_u8()),
       }
     })
     .collect();
@@ -259,23 +258,4 @@ fn convert_to_gradient_stops(stops: &Vec<Stop>) -> Vec<GradientStop> {
     }
   }
   stops
-}
-
-struct TransformStack {
-  stack: Vec<Transform>,
-}
-
-impl TransformStack {
-  fn new(t: Transform) -> Self { TransformStack { stack: vec![t] } }
-
-  fn push(&mut self, mut t: Transform) {
-    if let Some(p) = self.stack.last() {
-      t = p.then(&t);
-    }
-    self.stack.push(t);
-  }
-
-  fn pop(&mut self) -> Option<Transform> { self.stack.pop() }
-
-  fn current_transform(&self) -> &Transform { self.stack.last().unwrap() }
 }

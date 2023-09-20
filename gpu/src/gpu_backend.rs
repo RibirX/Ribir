@@ -241,12 +241,7 @@ where
         if let Some((rect, mask_head)) = self.new_mask_layer(path) {
           self.update_to_radial_gradient_indices();
           let prim: RadialGradientPrimitive = RadialGradientPrimitive {
-            transform: radial_gradient
-              .transform
-              .then(&ts)
-              .inverse()
-              .unwrap()
-              .to_array(),
+            transform: ts.inverse().unwrap().to_array(),
             stop_start: self.radial_gradient_stops.len() as u32,
             stop_cnt: radial_gradient.stops.len() as u32,
             start_center: radial_gradient.start_center.to_array(),
@@ -279,12 +274,7 @@ where
         if let Some((rect, mask_head)) = self.new_mask_layer(path) {
           self.update_to_linear_gradient_indices();
           let prim: LinearGradientPrimitive = LinearGradientPrimitive {
-            transform: linear_gradient
-              .transform
-              .then(&ts)
-              .inverse()
-              .unwrap()
-              .to_array(),
+            transform: ts.inverse().unwrap().to_array(),
             stop_start: self.linear_gradient_stops.len() as u32,
             stop_cnt: linear_gradient.stops.len() as u32,
             start_position: linear_gradient.start.to_array(),
@@ -541,10 +531,7 @@ mod tests {
   use ribir_algo::ShareResource;
   use ribir_dev_helper::*;
   use ribir_geom::*;
-  use ribir_painter::{
-    color::{LinearGradient, RadialGradient},
-    Brush, Color, GradientStop, Painter, Path, PixelImage,
-  };
+  use ribir_painter::{Brush, Color, Painter, Path, PixelImage, Svg};
 
   fn painter(bounds: Size) -> Painter { Painter::new(Rect::from_size(bounds)) }
 
@@ -682,48 +669,13 @@ mod tests {
     painter
   }
 
-  painter_backend_eq_image_test!(draw_radial_gradient);
-  fn draw_radial_gradient() -> Painter {
+  painter_backend_eq_image_test!(draw_svg_gradient);
+  fn draw_svg_gradient() -> Painter {
     let mut painter = painter(Size::new(64., 64.));
-    let brush = Brush::RadialGradient(RadialGradient {
-      start_center: Point::new(16., 32.),
-      start_radius: 0.,
-      end_center: Point::new(32., 32.),
-      end_radius: 32.,
-      stops: vec![
-        GradientStop::new(Color::RED, 0.),
-        GradientStop::new(Color::BLUE, 1.),
-      ],
-      transform: Transform::translation(16., 0.),
-      ..Default::default()
-    });
+    let svg =
+      Svg::parse_from_bytes(include_bytes!("../../tests/assets/fill_with_gradient.svg")).unwrap();
 
-    painter
-      .set_brush(brush)
-      .rect(&Rect::from_size(Size::new(64., 64.)))
-      .fill();
-
-    painter
-  }
-
-  painter_backend_eq_image_test!(draw_linear_gradient);
-  fn draw_linear_gradient() -> Painter {
-    let mut painter = painter(Size::new(32., 32.));
-    let brush = Brush::LinearGradient(LinearGradient {
-      start: Point::new(0., 0.),
-      end: Point::new(16., 16.),
-      stops: vec![
-        GradientStop::new(Color::RED, 0.),
-        GradientStop::new(Color::BLUE, 1.),
-      ],
-      ..Default::default()
-    });
-
-    painter
-      .set_brush(brush)
-      .rect(&Rect::from_size(Size::new(64., 64.)))
-      .fill();
-
+    painter.draw_svg(&svg);
     painter
   }
 }
