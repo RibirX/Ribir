@@ -68,7 +68,7 @@ impl ComposeChild for FocusNode {
         let h = subject
           .subscribe(subscribe_fn(this.clone_reader()))
           .unsubscribe_when_dropped();
-        child = child.attach_state_data(this, ctx!()).attach_anonymous_data(Box::new(h), ctx!());
+        child = child.attach_state_data(this, ctx!()).attach_anonymous_data(h, ctx!());
       }
       child
     }
