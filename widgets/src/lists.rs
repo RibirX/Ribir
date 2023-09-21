@@ -129,19 +129,18 @@ pub struct ListsDecorator {}
 impl ComposeDecorator for ListsDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 impl ComposeChild for Lists {
   type Child = Vec<Widget>;
 
-  fn compose_child(_: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(_: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ListsDecorator {
         @Column { @ { child } }
       }
     }
-    .into()
   }
 }
 
@@ -177,7 +176,7 @@ pub struct SupportingText(pub Label);
 pub enum EdgeWidget {
   Text(State<Label>),
   Icon(NamedSvg),
-  Avatar(ComposePair<State<Avatar>, AvatarTemplate>),
+  Avatar(Pair<State<Avatar>, AvatarTemplate>),
   Image(ShareResource<PixelImage>),
   Poster(Poster),
   Custom(CustomEdgeWidget),
@@ -186,7 +185,7 @@ pub enum EdgeWidget {
 pub struct CustomEdgeWidget(pub Widget);
 
 impl EdgeWidget {
-  fn compose_with_style(self, config: EdgeWidgetStyle) -> Widget {
+  fn compose_with_style(self, config: EdgeWidgetStyle) -> impl WidgetBuilder {
     let EdgeWidgetStyle {
       icon,
       text,
@@ -204,7 +203,7 @@ impl EdgeWidget {
               size: icon.size,
               @ { w }
             }
-          }.into()
+          }
         },
         EdgeWidget::Text(label) => {
           let margin =  text.gap.map(|margin| Margin { margin });
@@ -214,11 +213,11 @@ impl EdgeWidget {
               text_style: text.style.clone(),
               foreground: text.foreground.clone(),
             }
-          }.into()
+          }
         },
         EdgeWidget::Avatar(w) => {
           let margin = avatar.gap.map(|margin| Margin { margin });
-          @ $margin { @ { w }}.into()
+          @ $margin { @ { w }}
         },
         EdgeWidget::Image(w) => {
           let margin = image.gap.map(|margin| Margin { margin });
@@ -227,7 +226,7 @@ impl EdgeWidget {
               size: image.size,
               @ $w { box_fit: BoxFit::None }
             }
-          }.into()
+          }
         },
         EdgeWidget::Poster(w) => {
           let margin = poster.gap.map(|margin| Margin { margin });
@@ -237,16 +236,15 @@ impl EdgeWidget {
               size: poster.size,
               @ $w { box_fit: BoxFit::None }
             }
-          }.into()
+          }
         },
         EdgeWidget::Custom(w) => {
           let margin = custom.gap.map(|margin| Margin { margin });
-          @$margin { @ { w.0 }}.into()
+          @$margin { @ { w.0 }}
         },
       };
       w
     }
-    .into()
   }
 }
 
@@ -254,14 +252,14 @@ impl EdgeWidget {
 pub struct ListItemTml {
   headline: State<HeadlineText>,
   supporting: Option<State<SupportingText>>,
-  leading: Option<SinglePair<FatObj<Leading>, EdgeWidget>>,
-  trailing: Option<SinglePair<FatObj<Trailing>, EdgeWidget>>,
+  leading: Option<Pair<FatObj<Leading>, EdgeWidget>>,
+  trailing: Option<Pair<FatObj<Trailing>, EdgeWidget>>,
 }
 
 impl ComposeChild for ListItem {
   type Child = ListItemTml;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     let ListItemTml {
       headline,
       supporting,
@@ -293,7 +291,8 @@ impl ComposeChild for ListItem {
               leading.map(move |w| {
                 let (leading, widget) = w.unzip();
                 let (_, builtin)  = leading.unzip();
-                builtin.compose_with_host(widget.compose_with_style(leading_config), ctx!())
+                let leading = widget.compose_with_style(leading_config).widget_build(ctx!());
+                builtin.compose_with_host(leading, ctx!())
               })
             }
             @Expanded {
@@ -328,13 +327,13 @@ impl ComposeChild for ListItem {
             @{ trailing.map(|w| {
               let (trailing, widget) = w.unzip();
               let (_, builtin)  = trailing.unzip();
-              builtin.compose_with_host(widget.compose_with_style(trailing_config), ctx!())
+              let trailing = widget.compose_with_style(trailing_config).widget_build(ctx!());
+              builtin.compose_with_host(trailing, ctx!())
             })}
           }
         }
       }
     }
-    .into()
   }
 }
 
@@ -444,5 +443,7 @@ pub struct ListItemDecorator {
 
 impl ComposeDecorator for ListItemDecorator {
   type Host = Widget;
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder {
+    fn_widget! { host }
+  }
 }

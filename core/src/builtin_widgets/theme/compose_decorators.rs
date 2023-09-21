@@ -1,11 +1,11 @@
-use crate::{prelude::*, widget::FnWidget};
-use std::{any::type_name, collections::HashMap};
+use crate::prelude::*;
+use std::any::type_name;
 
-type ComposeDecoratorFn = dyn Fn(Box<dyn Any>, Box<dyn Any>) -> Widget;
+type ComposeDecoratorFn = dyn Fn(Box<dyn Any>, Box<dyn Any>, &BuildCtx) -> Widget;
 /// Compose style is a compose child widget to decoration its child.
 #[derive(Default)]
 pub struct ComposeDecorators {
-  styles: HashMap<TypeId, Box<ComposeDecoratorFn>, ahash::RandomState>,
+  styles: ahash::HashMap<TypeId, Box<ComposeDecoratorFn>>,
 }
 
 /// `ComposeDecorator` is a trait let you can convert your host widget to
@@ -14,15 +14,14 @@ pub struct ComposeDecorators {
 /// no overwrite function in `Theme`.
 pub trait ComposeDecorator: Sized {
   type Host;
-
-  fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget;
+  fn compose_decorator(this: State<Self>, host: Self::Host) -> impl WidgetBuilder;
 }
 
 impl<W: ComposeDecorator + 'static> ComposeChild for W {
   type Child = W::Host;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    FnWidget::new(move |ctx: &BuildCtx| {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+    move |ctx: &BuildCtx| {
       let tid = TypeId::of::<W>();
       let style = ctx.find_cfg(|t| match t {
         Theme::Full(t) => t.compose_decorators.styles.get(&tid),
@@ -33,12 +32,11 @@ impl<W: ComposeDecorator + 'static> ComposeChild for W {
       });
 
       if let Some(style) = style {
-        style(Box::new(this.into_writable()), Box::new(child)).build(ctx)
+        style(Box::new(this.into_writable()), Box::new(child), ctx)
       } else {
-        ComposeDecorator::compose_decorator(this, child).build(ctx)
+        ComposeDecorator::compose_decorator(this, child).widget_build(ctx)
       }
-    })
-    .into()
+    }
   }
 }
 
@@ -46,25 +44,27 @@ impl ComposeDecorators {
   #[inline]
   pub fn override_compose_decorator<W: ComposeDecorator + 'static>(
     &mut self,
-    compose_decorator: impl Fn(Stateful<W>, W::Host) -> Widget + Clone + 'static,
+    compose_decorator: impl Fn(Stateful<W>, W::Host, &BuildCtx) -> Widget + 'static,
   ) {
     self.styles.insert(
       TypeId::of::<W>(),
-      Box::new(move |this: Box<dyn Any>, host: Box<dyn Any>| {
-        let this = this.downcast().unwrap_or_else(|_| {
-          panic!(
-            "Caller should guarantee the boxed type is Stateful<{}>.",
-            type_name::<W>()
-          )
-        });
-        let host = host.downcast().unwrap_or_else(|_| {
-          panic!(
-            "Caller should guarantee the boxed type is {}.",
-            type_name::<W::Host>(),
-          )
-        });
-        compose_decorator(*this, *host)
-      }),
+      Box::new(
+        move |this: Box<dyn Any>, host: Box<dyn Any>, ctx: &BuildCtx| {
+          let this = this.downcast().unwrap_or_else(|_| {
+            panic!(
+              "Caller should guarantee the boxed type is Stateful<{}>.",
+              type_name::<W>()
+            )
+          });
+          let host = host.downcast().unwrap_or_else(|_| {
+            panic!(
+              "Caller should guarantee the boxed type is {}.",
+              type_name::<W::Host>(),
+            )
+          });
+          compose_decorator(*this, *host, ctx)
+        },
+      ),
     );
   }
 }
@@ -85,18 +85,20 @@ mod tests {
 
     impl ComposeDecorator for Size100Style {
       type Host = Widget;
-      fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
+      fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder {
+        fn_widget!(host)
+      }
     }
     theme
       .compose_decorators
-      .override_compose_decorator::<Size100Style>(|_, host| {
+      .override_compose_decorator::<Size100Style>(|_, host, ctx| {
         fn_widget! {
           @MockBox {
             size: Size::new(100., 100.),
             @ { host }
           }
         }
-        .into()
+        .widget_build(ctx)
       });
 
     let w = fn_widget! {

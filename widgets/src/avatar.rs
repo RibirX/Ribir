@@ -50,7 +50,7 @@ pub struct AvatarDecorator;
 impl ComposeDecorator for AvatarDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 #[derive(Template)]
@@ -62,7 +62,7 @@ pub enum AvatarTemplate {
 impl ComposeChild for Avatar {
   type Child = AvatarTemplate;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ {
         let AvatarStyle {
@@ -83,7 +83,7 @@ impl ComposeChild for Avatar {
                 text_style,
                 foreground: pipe!(Brush::from(palette2.on_of(&palette2.base_of(&$this.color)))),
               }
-            }.into()
+            }
           },
           AvatarTemplate::Image(image) => {
             let clip = radius.map(|radius| {
@@ -100,7 +100,7 @@ impl ComposeChild for Avatar {
                   box_fit: BoxFit::Contain,
                 }
               }
-            }.into()
+            }
           }
         };
 
@@ -110,6 +110,5 @@ impl ComposeChild for Avatar {
         }
       }
     }
-    .into()
   }
 }

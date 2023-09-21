@@ -86,9 +86,11 @@ where
 impl<V: 'static + Default + Clone + PartialEq> ComposeChild for KeyWidget<V> {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let data: Box<dyn AnyKey> = Box::new(this);
-    DataWidget::attach(child, data)
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+    fn_widget! {
+      let data: Box<dyn AnyKey> = Box::new(this);
+      child.attach_data(data, ctx!()).widget_build(ctx!())
+    }
   }
 }
 

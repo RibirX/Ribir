@@ -29,7 +29,7 @@ pub struct ScrollableWidget {
 
 impl ComposeChild for ScrollableWidget {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut view = @UnconstrainedBox {
         dir: pipe!(match $this.get_scrollable() {
@@ -59,7 +59,6 @@ impl ComposeChild for ScrollableWidget {
         }
       }
     }
-    .into()
   }
 }
 

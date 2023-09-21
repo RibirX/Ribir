@@ -44,20 +44,20 @@ impl Checkbox {
 
 #[derive(Template)]
 pub enum CheckboxTemplate {
-  Before(SinglePair<Leading, State<Label>>),
-  After(SinglePair<Trailing, State<Label>>),
+  Before(Pair<Leading, State<Label>>),
+  After(Pair<Trailing, State<Label>>),
 }
 
 impl ComposeDecorator for CheckBoxDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 impl ComposeChild for Checkbox {
   type Child = Option<CheckboxTemplate>;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let CheckBoxStyle {
         icon_size,
@@ -65,7 +65,7 @@ impl ComposeChild for Checkbox {
         label_color,
       } = CheckBoxStyle::of(ctx!());
 
-      let icon: Widget = @CheckBoxDecorator {
+      let icon = @CheckBoxDecorator {
         color: pipe!($this.color),
         @Icon { size: icon_size,
           @ { pipe!{
@@ -78,14 +78,14 @@ impl ComposeChild for Checkbox {
             }
           }}
         }
-      }.into();
+      }.widget_build(ctx!());
 
-      let checkbox: Widget = if let Some(child) = child  {
+      let checkbox = if let Some(child) = child  {
         let label = |label: State<Label>| @Text {
           text: $label.0.clone(),
           foreground: label_color,
           text_style: label_style,
-        }.into();
+        }.widget_build(ctx!());
 
         @Row {
           @ {
@@ -94,7 +94,7 @@ impl ComposeChild for Checkbox {
               CheckboxTemplate::After(w) => [ icon, label(w.child())],
             }
           }
-        }.into()
+        }.widget_build(ctx!())
       } else {
         icon
       };
@@ -107,14 +107,7 @@ impl ComposeChild for Checkbox {
         }
       }
     }
-    .into()
   }
-}
-
-// A Checkbox can be a widget even if it has no children
-impl Compose for Checkbox {
-  #[inline]
-  fn compose(this: State<Self>) -> Widget { ComposeChild::compose_child(this, None) }
 }
 
 impl CustomStyle for CheckBoxStyle {
@@ -134,7 +127,9 @@ mod tests {
   extern crate test;
   use test::Bencher;
 
-  fn checked() -> Widget { fn_widget! { @Checkbox { checked: true } }.into() }
+  fn checked() -> impl WidgetBuilder {
+    fn_widget! { @Checkbox { checked: true } }
+  }
   widget_test_suit!(
     checked,
     wnd_size = Size::new(48., 48.),
@@ -142,7 +137,9 @@ mod tests {
     height == 24.,
   );
 
-  fn unchecked() -> Widget { fn_widget! { @Checkbox {} }.into() }
+  fn unchecked() -> impl WidgetBuilder {
+    fn_widget! { @Checkbox {} }
+  }
   widget_test_suit!(
     unchecked,
     wnd_size = Size::new(48., 48.),
@@ -150,14 +147,13 @@ mod tests {
     height == 24.,
   );
 
-  fn indeterminate() -> Widget {
+  fn indeterminate() -> impl WidgetBuilder {
     fn_widget! {
       @Checkbox {
         checked: true,
         indeterminate: true,
       }
     }
-    .into()
   }
 
   widget_test_suit!(

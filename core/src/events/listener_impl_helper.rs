@@ -182,8 +182,8 @@ macro_rules! impl_compose_child_for_listener {
     impl ComposeChild for $listener {
       type Child = Widget;
       #[inline]
-      fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-        DataWidget::attach_state(child, this)
+      fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+        move |ctx: &BuildCtx| child.attach_state_data(this, ctx)
       }
     }
   };
@@ -194,9 +194,13 @@ macro_rules! impl_compose_child_with_focus_for_listener {
   ($listener: ident) => {
     impl ComposeChild for $listener {
       type Child = Widget;
-      fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-        let child = dynamic_compose_focus_node(child);
-        DataWidget::attach_state(child, this)
+      fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+        fn_widget! {
+          @FocusNode {
+            tab_index: 0i16, auto_focus: false,
+            @ { child.attach_state_data(this, ctx!()) }
+          }
+        }
       }
     }
   };

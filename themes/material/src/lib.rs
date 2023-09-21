@@ -1,3 +1,5 @@
+#![feature(return_position_impl_trait_in_trait)]
+
 use std::rc::Rc;
 
 use ribir_core::{fill_svgs, prelude::*};
@@ -251,7 +253,7 @@ fn init_custom_style(theme: &mut FullTheme) {
 }
 
 fn override_compose_decorator(theme: &mut FullTheme) {
-  fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
+  fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> impl WidgetBuilder {
     fn_widget! {
       @$host {
         margin,
@@ -259,11 +261,10 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         background: Palette::of(ctx!()).primary(),
       }
     }
-    .into()
   }
 
   let styles = &mut theme.compose_decorators;
-  styles.override_compose_decorator::<HScrollBarThumbDecorator>(|this, host| {
+  styles.override_compose_decorator::<HScrollBarThumbDecorator>(|this, host, ctx| {
     fn_widget! {
       let host = scrollbar_thumb(host, EdgeInsets::vertical(1.));
       let mut thumb = @ $host { left_anchor: pipe!($this.offset) };
@@ -277,9 +278,9 @@ fn override_compose_decorator(theme: &mut FullTheme) {
 
       thumb
     }
-    .into()
+    .widget_build(ctx)
   });
-  styles.override_compose_decorator::<VScrollBarThumbDecorator>(|this, host| {
+  styles.override_compose_decorator::<VScrollBarThumbDecorator>(|this, host, ctx| {
     fn_widget! {
       let host = scrollbar_thumb(host, EdgeInsets::vertical(1.));
       let mut thumb = @ $host { top_anchor: pipe!($this.offset) };
@@ -293,9 +294,9 @@ fn override_compose_decorator(theme: &mut FullTheme) {
 
       thumb
     }
-    .into()
+    .widget_build(ctx)
   });
-  styles.override_compose_decorator::<IndicatorDecorator>(|style, host| {
+  styles.override_compose_decorator::<IndicatorDecorator>(|style, host, ctx| {
     fn_widget! {
       let mut indicator = @ $host {
         left_anchor: pipe!{
@@ -341,9 +342,9 @@ fn override_compose_decorator(theme: &mut FullTheme) {
 
       indicator
     }
-    .into()
+    .widget_build(ctx)
   });
-  styles.override_compose_decorator::<CheckBoxDecorator>(move |style, host| {
+  styles.override_compose_decorator::<CheckBoxDecorator>(move |style, host, ctx| {
     fn_widget! {
       @Ripple {
         center: true,
@@ -359,9 +360,9 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         }
       }
     }
-    .into()
+    .widget_build(ctx)
   });
-  styles.override_compose_decorator::<FilledButtonDecorator>(move |style, host| {
+  styles.override_compose_decorator::<FilledButtonDecorator>(move |style, host, ctx| {
     fn_widget! {
       @Ripple {
         center: false,
@@ -382,9 +383,9 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         }
       }
     }
-    .into()
+    .widget_build(ctx)
   });
-  styles.override_compose_decorator::<OutlinedButtonDecorator>(move |style, host| {
+  styles.override_compose_decorator::<OutlinedButtonDecorator>(move |style, host, ctx| {
     fn_widget! {
       @Ripple {
         center: false,
@@ -405,9 +406,9 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         }
       }
     }
-    .into()
+    .widget_build(ctx)
   });
-  styles.override_compose_decorator::<ButtonDecorator>(move |style, host| {
+  styles.override_compose_decorator::<ButtonDecorator>(move |style, host, ctx| {
     fn_widget! {
       @Ripple {
         center: false,
@@ -428,7 +429,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         }
       }
     }
-    .into()
+    .widget_build(ctx)
   });
   let textfield = TextFieldThemeSuit::from_theme(&theme.palette, &theme.typography_theme);
   theme.custom_styles.set_custom_style(textfield);

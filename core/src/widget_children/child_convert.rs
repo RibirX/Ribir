@@ -1,4 +1,4 @@
-use super::{ComposeChild, ComposePair, SinglePair};
+use super::Pair;
 use crate::{
   builtin_widgets::{FatObj, Void},
   context::BuildCtx,
@@ -28,16 +28,18 @@ pub trait FromAnother<V, M> {
 }
 
 // W -> Widget
-impl<W: StrictBuilder + 'static> FromAnother<W, ()> for Widget {
-  #[inline]
-  fn from_another(value: W, _: &BuildCtx) -> Self { value.into() }
+crate::widget::multi_build_replace_impl! {
+  impl<W: {#} > FromAnother<W, &dyn {#}> for Widget {
+    #[inline]
+    fn from_another(value: W, ctx: &BuildCtx) -> Self { value.widget_build(ctx) }
+  }
 }
 
-impl<W: Into<Widget> + 'static> FromAnother<Pipe<Option<W>>, ()> for Widget {
-  fn from_another(value: Pipe<Option<W>>, _: &BuildCtx) -> Self {
-    value
-      .map(|w| w.map_or_else(|| Widget::from(Void), |w| w.into()))
-      .into()
+crate::widget::multi_build_replace_impl_include_self! {
+  impl<W: {#} + 'static> FromAnother<Pipe<Option<W>>, &dyn {#}> for Widget {
+    fn from_another(value: Pipe<Option<W>>, ctx: &BuildCtx) -> Self {
+      crate::pipe::pipe_option_to_widget!(value, ctx)
+     }
   }
 }
 
@@ -73,60 +75,45 @@ where
 }
 
 // WidgetPair<W, C> --> WidgetPair<W2, C2>
-impl<W, W2, C, C2, M1, M2> FromAnother<SinglePair<W2, C2>, [(M1, M2); 0]> for SinglePair<W, C>
+impl<W, W2, C, C2, M1, M2> FromAnother<Pair<W2, C2>, [(M1, M2); 0]> for Pair<W, C>
 where
   W: FromAnother<W2, M1>,
   C: FromAnother<C2, M2>,
 {
   #[inline]
-  fn from_another(value: SinglePair<W2, C2>, ctx: &BuildCtx) -> Self {
-    let SinglePair { widget, child } = value;
-    SinglePair {
-      widget: W::from_another(widget, ctx),
+  fn from_another(value: Pair<W2, C2>, ctx: &BuildCtx) -> Self {
+    let Pair { parent: widget, child } = value;
+    Pair {
+      parent: W::from_another(widget, ctx),
       child: C::from_another(child, ctx),
     }
   }
 }
 
-impl<W, W2, C, M> FromAnother<SinglePair<W2, C>, [M; 1]> for SinglePair<W, C>
+impl<W, W2, C, M> FromAnother<Pair<W2, C>, [M; 1]> for Pair<W, C>
 where
   W: FromAnother<W2, M>,
 {
   #[inline]
-  fn from_another(value: SinglePair<W2, C>, ctx: &BuildCtx) -> Self {
-    let SinglePair { widget, child } = value;
-    SinglePair {
-      widget: W::child_from(widget, ctx),
+  fn from_another(value: Pair<W2, C>, ctx: &BuildCtx) -> Self {
+    let Pair { parent: widget, child } = value;
+    Pair {
+      parent: W::child_from(widget, ctx),
       child,
     }
   }
 }
 
-impl<W, C, C2, M> FromAnother<SinglePair<W, C2>, [M; 2]> for SinglePair<W, C>
+impl<W, C, C2, M> FromAnother<Pair<W, C2>, [M; 2]> for Pair<W, C>
 where
   C: FromAnother<C2, M>,
 {
   #[inline]
-  fn from_another(value: SinglePair<W, C2>, ctx: &BuildCtx) -> Self {
-    let SinglePair { widget, child } = value;
-    SinglePair {
-      widget,
+  fn from_another(value: Pair<W, C2>, ctx: &BuildCtx) -> Self {
+    let Pair { parent: widget, child } = value;
+    Pair {
+      parent: widget,
       child: C::from_another(child, ctx),
-    }
-  }
-}
-
-// ComposePair<W, C> --- W: ComposeChild---> ComposePair<W, W::Child>
-impl<W, C, C2, M> FromAnother<ComposePair<State<W>, C2>, M> for ComposePair<State<W>, C>
-where
-  W: ComposeChild,
-  C: FromAnother<C2, M>,
-{
-  fn from_another(value: ComposePair<State<W>, C2>, ctx: &BuildCtx) -> Self {
-    let ComposePair { widget, child } = value;
-    ComposePair {
-      widget,
-      child: FromAnother::from_another(child, ctx),
     }
   }
 }

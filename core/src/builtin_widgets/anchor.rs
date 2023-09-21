@@ -140,7 +140,7 @@ mod test {
   const CHILD_SIZE: Size = Size::new(50., 50.);
   const WND_SIZE: Size = Size::new(100., 100.);
 
-  fn pixel_left_top() -> Widget {
+  fn pixel_left_top() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -148,7 +148,6 @@ mod test {
         top_anchor: 1.,
       }
     }
-    .into()
   }
   widget_layout_test!(
     pixel_left_top,
@@ -157,7 +156,7 @@ mod test {
     { path = [0, 0, 0], x == 1., }
   );
 
-  fn pixel_left_bottom() -> Widget {
+  fn pixel_left_bottom() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -165,7 +164,6 @@ mod test {
         bottom_anchor: 1.,
       }
     }
-    .into()
   }
   widget_layout_test!(
     pixel_left_bottom,
@@ -174,7 +172,7 @@ mod test {
     { path = [0, 0, 0], x == 1., }
   );
 
-  fn pixel_top_right() -> Widget {
+  fn pixel_top_right() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -182,7 +180,6 @@ mod test {
         top_anchor: 1.,
       }
     }
-    .into()
   }
   widget_layout_test!(
     pixel_top_right,
@@ -191,7 +188,7 @@ mod test {
     { path = [0, 0, 0], x == 49.,}
   );
 
-  fn pixel_bottom_right() -> Widget {
+  fn pixel_bottom_right() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -199,7 +196,6 @@ mod test {
         bottom_anchor: 1.,
       }
     }
-    .into()
   }
   widget_layout_test!(
     pixel_bottom_right,
@@ -208,7 +204,7 @@ mod test {
     { path = [0, 0, 0], x== 49.,}
   );
 
-  fn percent_left_top() -> Widget {
+  fn percent_left_top() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -216,7 +212,6 @@ mod test {
         top_anchor: Percent(10.),
       }
     }
-    .into()
   }
   widget_layout_test!(
     percent_left_top,
@@ -225,7 +220,7 @@ mod test {
     { path = [0, 0, 0], x == 5.,}
   );
 
-  fn percent_left_bottom() -> Widget {
+  fn percent_left_bottom() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -233,7 +228,6 @@ mod test {
         bottom_anchor: Percent( 10.),
       }
     }
-    .into()
   }
   widget_layout_test! {
     percent_left_bottom,
@@ -242,7 +236,7 @@ mod test {
     { path = [0, 0, 0], x == 5., }
   }
 
-  fn percent_top_right() -> Widget {
+  fn percent_top_right() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -250,7 +244,6 @@ mod test {
         top_anchor: Percent(10.),
       }
     }
-    .into()
   }
   widget_layout_test!(
     percent_top_right,
@@ -259,7 +252,7 @@ mod test {
     { path = [0, 0, 0],  x == 45.,}
   );
 
-  fn percent_bottom_right() -> Widget {
+  fn percent_bottom_right() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -267,7 +260,6 @@ mod test {
         bottom_anchor: Percent(10.),
       }
     }
-    .into()
   }
   widget_layout_test!(
     percent_bottom_right,

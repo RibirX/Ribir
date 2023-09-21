@@ -16,14 +16,15 @@ pub struct FocusScope {
 
 impl ComposeChild for FocusScope {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let w = fn_widget! {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+    fn_widget! {
       @ $child {
         on_mounted: move |e| e.window().add_focus_node(e.id, false, FocusType::Scope),
         on_disposed: move|e| e.window().remove_focus_node(e.id, FocusType::Scope),
       }
-    };
-    DataWidget::attach_state(w.into(), this)
+      .widget_build(ctx!())
+      .attach_state_data(this, ctx!())
+    }
   }
 }
 

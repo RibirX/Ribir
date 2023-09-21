@@ -130,14 +130,13 @@ mod tests {
   use crate::test_helper::*;
   use ribir_dev_helper::*;
 
-  fn smoke() -> Widget {
+  fn smoke() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         margin: EdgeInsets::symmetrical(1., 1.),
         size: Size::new(100., 100.)
       }
     }
-    .into()
   }
   widget_layout_test!(
     smoke,

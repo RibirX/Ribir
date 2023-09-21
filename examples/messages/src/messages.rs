@@ -13,35 +13,37 @@ struct MessageList {
   messages: Vec<Message>,
 }
 
-pub fn messages() -> impl Into<Widget> {
-  MessageList {
-    messages: vec![
-      Message {
-        avatar: 2,
-        nick_name: "James Harden".to_string(),
-        content: "Coming soon!".to_string(),
-      },
-      Message {
-        avatar: 1,
-        nick_name: "Allen Iverson".to_string(),
-        content: "You are welcome!".to_string(),
-      },
-      Message {
-        avatar: 3,
-        nick_name: "Kyrie Irving".to_string(),
-        content: "See you next week!".to_string(),
-      },
-      Message {
-        avatar: 4,
-        nick_name: "Jaylon Lee".to_string(),
-        content: "Fighting!".to_string(),
-      },
-    ],
+pub fn messages() -> impl WidgetBuilder {
+  fn_widget! {
+    MessageList {
+      messages: vec![
+        Message {
+          avatar: 2,
+          nick_name: "James Harden".to_string(),
+          content: "Coming soon!".to_string(),
+        },
+        Message {
+          avatar: 1,
+          nick_name: "Allen Iverson".to_string(),
+          content: "You are welcome!".to_string(),
+        },
+        Message {
+          avatar: 3,
+          nick_name: "Kyrie Irving".to_string(),
+          content: "See you next week!".to_string(),
+        },
+        Message {
+          avatar: 4,
+          nick_name: "Jaylon Lee".to_string(),
+          content: "Fighting!".to_string(),
+        },
+      ],
+    }
   }
 }
 
 impl Compose for MessageList {
-  fn compose(this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> impl WidgetBuilder {
     fn_widget! {
       @Column {
         background: Palette::of(ctx!()).surface(),
@@ -113,6 +115,5 @@ impl Compose for MessageList {
         }
       }
     }
-    .into()
   }
 }

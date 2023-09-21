@@ -19,7 +19,7 @@ struct HeroCard {
 }
 
 impl Compose for HeroCard {
-  fn compose(this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> impl WidgetBuilder {
     unreachable!("We don't care how implement `HeroCard` here, but focus on how to use it.")
   }
 }

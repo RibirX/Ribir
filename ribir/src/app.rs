@@ -40,14 +40,14 @@ impl App {
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run(root: Widget) {
+  pub fn run(root: impl WidgetBuilder) {
     Self::new_window(root, None);
     App::exec()
   }
 
   /// create a new window with the `root` widget and return the window id.
   #[track_caller]
-  pub fn new_window(root: Widget, size: Option<Size>) -> Rc<Window> {
+  pub fn new_window(root: impl WidgetBuilder, size: Option<Size>) -> Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let shell_wnd = WinitShellWnd::new(size, &app.event_loop);
     let wnd = AppCtx::new_window(Box::new(shell_wnd), root);

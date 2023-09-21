@@ -40,7 +40,7 @@ mod tests {
   use crate::test_helper::*;
   use ribir_dev_helper::*;
 
-  fn smoke() -> Widget {
+  fn smoke() -> impl WidgetBuilder {
     fn_widget! {
       @TransformWidget {
         transform: Transform::new(2., 0., 0., 2., 0., 0.),
@@ -49,7 +49,6 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(smoke, width == 100., height == 100.,);
 }

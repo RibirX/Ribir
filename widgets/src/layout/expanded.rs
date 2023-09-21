@@ -14,17 +14,16 @@ pub struct Expanded {
 impl ComposeChild for Expanded {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let w = fn_widget! {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+    fn_widget! {
       @ConstrainedBox {
         clamp: BoxClamp {
           min: Size::new(0., 0.),
           max: Size::new(f32::INFINITY, f32::INFINITY)
         },
-        @{ child }
+        @{ child.attach_state_data(this, ctx!()) }
       }
-    };
-    DataWidget::attach_state(w.into(), this)
+    }
   }
 }
 
@@ -37,7 +36,7 @@ mod tests {
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
 
-  fn expand_child_size_zero() -> Widget {
+  fn expand_child_size_zero() -> impl WidgetBuilder {
     let size = Size::new(100., 50.);
     fn_widget! {
       @Row {
@@ -52,7 +51,6 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(
     expand_child_size_zero,
@@ -61,7 +59,7 @@ mod tests {
     { path = [0, 2], width == 0., height == 50.,}
   );
 
-  fn one_line_expanded() -> Widget {
+  fn one_line_expanded() -> impl WidgetBuilder {
     let size = Size::new(100., 50.);
     fn_widget! {
       @Row {
@@ -77,7 +75,6 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(
     one_line_expanded,
@@ -89,7 +86,7 @@ mod tests {
     { path = [0, 3], rect == ribir_geom::rect(300., 0., 200., 50.),}
   );
 
-  fn wrap_expanded() -> Widget {
+  fn wrap_expanded() -> impl WidgetBuilder {
     let size = Size::new(100., 50.);
     fn_widget! {
       @Row {
@@ -112,7 +109,6 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(
     wrap_expanded,

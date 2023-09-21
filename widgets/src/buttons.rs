@@ -46,7 +46,7 @@ pub struct ButtonTemplate {
 impl ComposeChild for ButtonImpl {
   type Child = ButtonTemplate;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     let ButtonTemplate { icon, label } = child;
     fn_widget! {
       @BoxDecoration {
@@ -81,7 +81,6 @@ impl ComposeChild for ButtonImpl {
         }
       }
     }
-    .into()
   }
 }
 

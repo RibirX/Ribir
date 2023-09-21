@@ -211,13 +211,19 @@ pub(crate) struct StateData<W> {
   writer_count: Cell<usize>,
 }
 
-#[repr(transparent)]
-pub(crate) struct RenderFul<R>(pub(crate) Stateful<R>);
+impl<C: Compose> ComposeBuilder for Stateful<C> {
+  #[inline]
+  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+    Compose::compose(State::stateful(self)).widget_build(ctx)
+  }
+}
 
-impl_proxy_query!(paths [0], RenderFul<R>, <R>, where R: Render + 'static);
-impl_proxy_render!(proxy 0.read(), RenderFul<R>, <R>, where R: Render + 'static);
-impl_proxy_query!(paths[0.read()], RenderFul<Box<dyn Render>>);
-impl_proxy_render!(proxy 0.read(), RenderFul<Box<dyn Render>>);
+impl<R: ComposeChild<Child = Option<C>>, C> ComposeChildBuilder for Stateful<R> {
+  #[inline]
+  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+    ComposeChild::compose_child(State::stateful(self), None).widget_build(ctx)
+  }
+}
 
 impl<W> Stateful<W> {
   pub fn new(data: W) -> Self {
@@ -354,6 +360,7 @@ impl_proxy_query!(
   paths [notifier, read()],
   Stateful<R>, <R>, where R: Query + 'static
 );
+impl_proxy_render!(proxy read(), Stateful<R>, <R>, where R: Render + 'static);
 impl_query_self_only!(Notifier);
 impl_proxy_query!(paths [0], Reader<T>, <T>, where T: Query + 'static);
 impl_proxy_query!(paths [0], Writer<T>, <T>, where T: Query + 'static);
@@ -441,7 +448,7 @@ mod tests {
     });
 
     let state = sized_box.clone_writer();
-    let mut wnd = TestWindow::new(sized_box);
+    let mut wnd = TestWindow::new(fn_widget! {sized_box});
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 0);
     assert!(!wnd.widget_tree.borrow().is_dirty());
@@ -462,7 +469,7 @@ mod tests {
   fn fix_pin_widget_node() {
     crate::reset_test_env!();
 
-    let mut wnd = TestWindow::new(MockBox { size: Size::new(100., 100.) });
+    let mut wnd = TestWindow::new(fn_widget!(MockBox { size: Size::new(100., 100.) }));
     wnd.draw_frame();
     let tree = wnd.widget_tree.borrow();
     assert_eq!(tree.root().descendants(&tree.arena).count(), 1);

@@ -655,7 +655,7 @@ mod tests {
     }
 
     impl Compose for EmbedFocus {
-      fn compose(this: State<Self>) -> Widget {
+      fn compose(this: State<Self>) -> impl WidgetBuilder {
         fn_widget! {
           @MockBox {
             size: INFINITY_SIZE,
@@ -688,13 +688,12 @@ mod tests {
             }
           }
         }
-        .into()
       }
     }
 
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
-    let mut wnd = TestWindow::new(widget);
+    let mut wnd = TestWindow::new(fn_widget!(widget));
     let tree = wnd.widget_tree.borrow();
     let parent = tree.root();
     let child = parent.first_child(&tree.arena).unwrap();

@@ -2,23 +2,16 @@ use crate::{
   context::BuildCtx,
   prelude::ChildFrom,
   state::{State, Stateful},
-  widget::{StrictBuilder, WidgetId},
+  widget::{Widget, WidgetBuilder},
 };
 
-use super::{ComposeChild, SinglePair};
+use super::{ComposeChild, Pair};
 
 /// Trait specify what child a compose child widget can have, and the target
 /// type after widget compose its child.
 pub trait ComposeWithChild<C, M> {
   type Target;
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
-}
-
-/// The pair a `ComposeChild` widget with its child that may some children not
-/// fill.
-pub struct ComposePair<W, C> {
-  pub widget: W,
-  pub child: C,
 }
 
 // Template use to construct child of a widget.
@@ -54,32 +47,18 @@ where
   }
 }
 
-impl<M, W, C1, C2> ComposeWithChild<C2, M> for SinglePair<W, C1>
+impl<M, W, C1, C2> ComposeWithChild<C2, M> for Pair<W, C1>
 where
   C1: ComposeWithChild<C2, M>,
 {
-  type Target = SinglePair<W, C1::Target>;
+  type Target = Pair<W, C1::Target>;
 
   fn with_child(self, c: C2, ctx: &BuildCtx) -> Self::Target {
-    let SinglePair { widget, child } = self;
-    SinglePair {
-      widget,
+    let Pair { parent: widget, child } = self;
+    Pair {
+      parent: widget,
       child: child.with_child(c, ctx),
     }
-  }
-}
-
-impl<W, C, Builder, M> ComposeWithChild<C, M> for ComposePair<State<W>, Builder>
-where
-  W: ComposeChild,
-  Builder: TemplateBuilder + ComposeWithChild<C, M, Target = Builder>,
-{
-  type Target = ComposePair<State<W>, Builder>;
-
-  fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
-    let Self { widget, child } = self;
-    let child = child.with_child(c, ctx);
-    ComposePair { widget, child }
   }
 }
 
@@ -88,12 +67,12 @@ where
   W: ComposeChild,
   W::Child: ChildFrom<C, M>,
 {
-  type Target = ComposePair<State<W>, W::Child>;
+  type Target = Pair<State<W>, W::Child>;
 
   #[inline]
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    ComposePair {
-      widget: self,
+    Pair {
+      parent: self,
       child: ChildFrom::child_from(child, ctx),
     }
   }
@@ -105,13 +84,13 @@ where
   Child: Template,
   Child::Builder: ComposeWithChild<C, M, Target = Child::Builder>,
 {
-  type Target = ComposePair<State<W>, Child::Builder>;
+  type Target = Pair<State<W>, Child::Builder>;
 
   #[inline]
   fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
     let builder = W::Child::builder();
     let child = builder.with_child(c, ctx);
-    ComposePair { widget: self, child }
+    Pair { parent: self, child }
   }
 }
 
@@ -121,24 +100,24 @@ where
   Child: Template,
   Child::Builder: ComposeWithChild<C, M, Target = Child::Builder>,
 {
-  type Target = ComposePair<State<W>, Child::Builder>;
+  type Target = Pair<State<W>, Child::Builder>;
 
   fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
     let builder = Child::builder();
     let child = builder.with_child(c, ctx);
-    ComposePair { widget: self, child }
+    Pair { parent: self, child }
   }
 }
 
-impl<W, C> StrictBuilder for ComposePair<State<W>, C>
+impl<W, C> WidgetBuilder for Pair<State<W>, C>
 where
   W: ComposeChild,
   W::Child: From<C>,
 {
   #[inline]
-  fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
-    let Self { widget, child } = self;
-    ComposeChild::compose_child(widget, child.into()).build(ctx)
+  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+    let Self { parent, child } = self;
+    ComposeChild::compose_child(parent, child.into()).widget_build(ctx)
   }
 }
 
@@ -202,7 +181,7 @@ mod tests {
 
   impl ComposeChild for P {
     type Child = PTml;
-    fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
+    fn compose_child(_: State<Self>, _: Self::Child) -> impl WidgetBuilder { fn_widget!(Void) }
   }
 
   #[derive(Declare2)]
@@ -211,21 +190,18 @@ mod tests {
   impl ComposeChild for X {
     type Child = Widget;
 
-    fn compose_child(_: State<Self>, _: Self::Child) -> Widget { Void.into() }
+    fn compose_child(_: State<Self>, _: Self::Child) -> impl WidgetBuilder { fn_widget!(Void) }
   }
 
   #[test]
-  fn template_fill_template() {
-    let _ = FnWidget::new(|ctx| P.with_child(Void, ctx).strict_build(ctx));
-  }
+  fn template_fill_template() { let _ = |ctx| P.with_child(Void, ctx).widget_build(ctx); }
 
   #[test]
   fn pair_compose_child() {
-    let _ = FnWidget::new(|ctx| {
+    let _ = |ctx| -> Widget {
       MockBox { size: ZERO_SIZE }
-        .with_child(X, ctx)
-        .with_child(Void {}, ctx)
-        .strict_build(ctx)
-    });
+        .with_child(X.with_child(Void {}, ctx), ctx)
+        .widget_build(ctx)
+    };
   }
 }

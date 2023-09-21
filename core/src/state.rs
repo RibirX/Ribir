@@ -9,16 +9,11 @@ use std::{
   ops::{Deref, DerefMut},
 };
 
+use crate::prelude::*;
 pub use map_state::*;
 use rxrust::{ops::box_it::BoxOp, subject::Subject};
 pub use splitted_state::*;
 pub use stateful::*;
-
-use crate::{
-  context::BuildCtx,
-  prelude::{MultiChild, SingleChild},
-  widget::{Compose, Render, StrictBuilder, WidgetId},
-};
 
 /// The `StateReader` trait allows for reading, clone and map the state.
 pub trait StateReader: Sized {
@@ -177,24 +172,6 @@ impl<T> StateWriter for State<T> {
   fn origin_writer(&self) -> &Self::OriginWriter { self }
 }
 
-impl<W: SingleChild> SingleChild for State<W> {}
-impl<W: MultiChild> MultiChild for State<W> {}
-
-impl<W: Render + 'static> From<State<W>> for Box<dyn Render> {
-  #[inline]
-  fn from(s: State<W>) -> Self {
-    match s.0.into_inner() {
-      InnerState::Data(w) => w.into_inner().into(),
-      InnerState::Stateful(w) => w.into(),
-    }
-  }
-}
-
-impl<C: Compose> StrictBuilder for State<C> {
-  #[inline]
-  fn strict_build(self, ctx: &BuildCtx) -> WidgetId { Compose::compose(self).build(ctx) }
-}
-
 impl<W> State<W> {
   pub fn stateful(stateful: Stateful<W>) -> Self {
     State(UnsafeCell::new(InnerState::Stateful(stateful)))
@@ -272,6 +249,49 @@ where
   fn from(value: T) -> Self { StateFrom::state_from(value) }
 }
 
+impl<C: Compose> ComposeBuilder for State<C> {
+  #[inline]
+  fn widget_build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).widget_build(ctx) }
+}
+
+impl<P: ComposeChild<Child = Option<C>>, C> ComposeChildBuilder for State<P> {
+  #[inline]
+  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+    ComposeChild::compose_child(self, None).widget_build(ctx)
+  }
+}
+
+impl<W: SingleChild> SingleChild for State<W> {}
+impl<W: MultiChild> MultiChild for State<W> {}
+
+impl<R: Render> RenderBuilder for State<R> {
+  #[inline]
+  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+    match self.0.into_inner() {
+      InnerState::Data(w) => w.into_inner().widget_build(ctx),
+      InnerState::Stateful(w) => w.widget_build(ctx),
+    }
+  }
+}
+
+impl<W: SingleChild + Render> SingleParent for State<W> {
+  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
+    match self.0.into_inner() {
+      InnerState::Data(w) => w.into_inner().compose_child(child, ctx),
+      InnerState::Stateful(w) => w.compose_child(child, ctx),
+    }
+  }
+}
+
+impl<W: MultiChild + Render> MultiParent for State<W> {
+  fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
+    match self.0.into_inner() {
+      InnerState::Data(w) => w.into_inner().compose_children(children, ctx),
+      InnerState::Stateful(w) => w.compose_children(children, ctx),
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use std::cell::Cell;
@@ -279,7 +299,7 @@ mod tests {
   use ribir_algo::Sc;
 
   use super::*;
-  use crate::{context::AppCtx, prelude::*, reset_test_env, timer::Timer};
+  use crate::{context::AppCtx, reset_test_env, timer::Timer};
 
   struct Origin {
     a: i32,

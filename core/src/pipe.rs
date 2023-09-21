@@ -16,7 +16,7 @@ use crate::{
   impl_proxy_render,
   prelude::*,
   ticker::FrameMsg,
-  widget::{Query, Render, StrictBuilder, Widget, WidgetBuilder, WidgetId, WidgetTree},
+  widget::{Query, Render, RenderBuilder, Widget, WidgetId, WidgetTree},
   window::WindowId,
 };
 
@@ -82,16 +82,17 @@ impl<V> Pipe<V> {
 
   #[inline]
   pub fn value_mut(&mut self) -> &mut V { &mut self.value }
-}
 
-impl<W: Into<Widget> + 'static> StrictBuilder for Pipe<W> {
-  fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
+  fn build(self, ctx: &BuildCtx, build: impl Fn(V, &BuildCtx) -> Widget + 'static) -> Widget
+  where
+    V: 'static,
+  {
     let (v, modifies) = self.unzip();
-    let id = v.into().build(ctx);
-    let id_share = Sc::new(Cell::new(id));
+    let v = build(v, ctx);
+    let id_share = Sc::new(Cell::new(v.id()));
 
     let mut pipe_node = None;
-    id.wrap_node(&mut ctx.tree.borrow_mut().arena, |r| {
+    v.id().wrap_node(&mut ctx.tree.borrow_mut().arena, |r| {
       let p = PipeNode::new(r);
       pipe_node = Some(p.clone());
       Box::new(p)
@@ -121,7 +122,7 @@ impl<W: Into<Widget> + 'static> StrictBuilder for Pipe<W> {
           AppCtx::spawn_local(async move { wnd.remove_regenerating_mark(id) }).unwrap();
 
           if !ctx.window().is_in_another_regenerating(id) {
-            let new_id = v.into().build(ctx);
+            let new_id = build(v, ctx).consume();
 
             // We use a `PipeNode` wrap the initial widget node, so if the widget node is
             // not a `PipeNode` means the node is attached some data, we need to keep the
@@ -137,7 +138,7 @@ impl<W: Into<Widget> + 'static> StrictBuilder for Pipe<W> {
               if !id.assert_get(&tree.arena).is::<PipeNode>() {
                 let [old_node, new_node] = tree.get_many_mut(&[id, new_id]);
 
-                std::mem::swap(pn.as_mut(), new_node.as_widget_mut());
+                std::mem::swap(pn.as_mut(), new_node);
                 std::mem::swap(old_node, new_node);
               } else {
                 // we know widget node not attached data, we can not care about it now.
@@ -155,68 +156,93 @@ impl<W: Into<Widget> + 'static> StrictBuilder for Pipe<W> {
           }
         });
       });
-    attach_unsubscribe_guard(id, ctx.window().id(), unsub);
+    attach_unsubscribe_guard(v.id(), ctx.window().id(), unsub);
 
-    id
+    v
   }
 }
 
-impl<W: Into<Widget> + 'static> WidgetBuilder for Pipe<Option<W>> {
-  fn build(self, ctx: &crate::context::BuildCtx) -> WidgetId {
-    self
-      .map(|w| w.map_or_else(|| Widget::from(Void), |w| w.into()))
-      .strict_build(ctx)
+crate::widget::multi_build_replace_impl! {
+  impl<W: {#} + 'static> {#} for Pipe<W> {
+    fn widget_build(self, ctx: &BuildCtx) -> Widget {
+      self.build(ctx, |w, ctx| w.widget_build(ctx))
+    }
   }
 }
 
-impl<W: SingleParent + 'static> SingleParent for Pipe<W> {
-  fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
+impl WidgetBuilder for Pipe<Widget> {
+  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.build(ctx, |v, _| v) }
+}
+
+macro_rules! pipe_option_to_widget {
+  ($name: ident, $ctx: ident) => {
+    $name
+      .map(|w| {
+        move |ctx: &BuildCtx| {
+          if let Some(w) = w {
+            w.widget_build(ctx)
+          } else {
+            Void.widget_build(ctx)
+          }
+        }
+      })
+      .widget_build($ctx)
+  };
+}
+
+pub(crate) use pipe_option_to_widget;
+
+impl<W: SingleParent + RenderBuilder + 'static> SingleParent for Pipe<W> {
+  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
     let (v, modifies) = self.unzip();
-    let p = v.append_child(child, ctx);
-    let rg = half_to_close_interval(p..child, &ctx.tree.borrow());
+    let c = child.id();
+    let p = v.compose_child(child, ctx);
+    let rg = half_to_close_interval(p.id()..c, &ctx.tree.borrow());
     update_pipe_parent(rg, modifies, ctx, |new_p, old_p, ctx| {
       let child = old_p.single_child(&ctx.tree.borrow().arena).unwrap();
-      new_p.append_child(child, ctx)
+      let child = Widget::from_id(child, ctx);
+      new_p.compose_child(child, ctx).consume()
     });
     p
   }
 }
 
-impl<W: MultiParent + StrictBuilder + 'static> MultiParent for Pipe<W> {
-  fn append_children(self, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId {
+impl<W: MultiParent + RenderBuilder + 'static> MultiParent for Pipe<W> {
+  fn compose_children(self, mut children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
     // if children is empty, we can let the pipe parent as the whole subtree.
-    if children.is_empty() {
-      self.strict_build(ctx)
-    } else {
+    let first_child = children.next();
+    if let Some(first_child) = first_child {
       let (v, modifies) = self.unzip();
-      let first_child = children[0];
-      let p = v.append_children(children, ctx);
-      let rg = half_to_close_interval(p..first_child, &ctx.tree.borrow());
+      let p = v.compose_children(children, ctx);
+      let rg = half_to_close_interval(p.id()..first_child.id(), &ctx.tree.borrow());
       update_pipe_parent(rg, modifies, ctx, |new_p, old_p, ctx| {
-        let children = old_p.children(&ctx.tree.borrow().arena).collect::<Vec<_>>();
-        new_p.append_children(children, ctx)
+        let arena = &ctx.tree.borrow().arena;
+        let children = old_p.children(arena).map(|id| Widget::from_id(id, ctx));
+        new_p.compose_children(children, ctx).consume()
       });
       p
+    } else {
+      self.widget_build(ctx)
     }
   }
 }
 
-impl<W: SingleChild + WidgetBuilder + 'static> SingleParent for Pipe<Option<W>> {
-  fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
+impl<W: SingleParent + RenderBuilder + 'static> SingleParent for Pipe<Option<W>> {
+  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
     let handle = ctx.handle();
     self
       .map(move |p| {
         handle
           .with_ctx(|ctx| {
             if let Some(p) = p {
-              BoxedSingleParent::new(p, ctx)
+              BoxedSingleChild::from_id(p.widget_build(ctx))
             } else {
-              BoxedSingleParent::new(Void, ctx)
+              BoxedSingleChild::new(Void, ctx)
             }
           })
           .expect("Context not available")
       })
-      .append_child(child, ctx)
+      .compose_child(child, ctx)
   }
 }
 
@@ -279,19 +305,26 @@ fn update_pipe_parent<W: 'static>(
 }
 
 impl<W: 'static> Pipe<W> {
-  pub(crate) fn build_multi(self, vec: &mut Vec<WidgetId>, ctx: &BuildCtx)
-  where
+  pub(crate) fn build_multi(
+    self,
+    vec: &mut Vec<Widget>,
+    f: impl Fn(W::Item, &BuildCtx) -> Widget + 'static,
+    ctx: &BuildCtx,
+  ) where
     W: IntoIterator,
-    W::Item: WidgetBuilder,
   {
-    fn build_multi(
-      v: impl IntoIterator<Item = impl WidgetBuilder>,
+    fn build_multi<V: IntoIterator>(
+      v: V,
+      f: impl Fn(V::Item, &BuildCtx) -> Widget,
       ctx: &BuildCtx,
     ) -> Vec<WidgetId> {
-      let mut ids = v.into_iter().map(|w| w.build(ctx)).collect::<Vec<_>>();
+      let mut ids = v
+        .into_iter()
+        .map(|w| f(w, ctx).consume())
+        .collect::<Vec<_>>();
 
       if ids.is_empty() {
-        ids.push(Void.strict_build(ctx));
+        ids.push(Void.widget_build(ctx).consume());
       }
 
       ids
@@ -299,9 +332,10 @@ impl<W: 'static> Pipe<W> {
 
     let (m, modifies) = self.unzip();
 
-    let ids = build_multi(m, ctx);
+    let ids = build_multi(m, &f, ctx);
     let first_id = ids[0];
-    vec.extend(&ids);
+
+    vec.extend(ids.iter().copied().map(|id| Widget::from_id(id, ctx)));
 
     let ids_share = Sc::new(RefCell::new(ids));
     let id_share2 = ids_share.clone();
@@ -337,7 +371,7 @@ impl<W: 'static> Pipe<W> {
           .unwrap();
 
           if !ctx.window().is_in_another_regenerating(old[0]) {
-            let new = build_multi(m, ctx);
+            let new = build_multi(m, &f, ctx);
 
             update_key_state_multi(old.iter().copied(), new.iter().copied(), ctx);
 
@@ -482,6 +516,7 @@ fn update_key_states(
   update_children_key_status(old, new, ctx)
 }
 
+impl<W: SingleChild> SingleChild for Pipe<Option<W>> {}
 impl<W: SingleChild> SingleChild for Pipe<W> {}
 impl<W: MultiChild> MultiChild for Pipe<W> {}
 
@@ -724,7 +759,7 @@ mod tests {
     let c_update_list = update_list.clone_writer();
     let c_leave_list = leave_list.clone_writer();
     let c_key_change = key_change.clone_writer();
-    let w: Widget = fn_widget! {
+    let w = fn_widget! {
       @MockMulti {
         @ {
           pipe!($v.clone()).map(move |v| {
@@ -752,8 +787,7 @@ mod tests {
           })
         }
       }
-    }
-    .into();
+    };
 
     // 1. 3 item enter
     let mut wnd = TestWindow::new(w);
@@ -849,7 +883,7 @@ mod tests {
       wid: Option<WidgetId>,
     }
 
-    fn build(task: Writer<Task>) -> Widget {
+    fn build(task: Writer<Task>) -> impl WidgetBuilder {
       fn_widget! {
        @TaskWidget {
           delay_drop_until: pipe!(!$task.pin),
@@ -866,7 +900,6 @@ mod tests {
           }
         }
       }
-      .into()
     }
 
     #[derive(Declare2)]

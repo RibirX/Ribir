@@ -218,10 +218,10 @@ impl Window {
     window
   }
 
-  pub fn set_content_widget(&self, root: Widget) {
+  pub fn set_content_widget(&self, root: impl WidgetBuilder) {
     let build_ctx = BuildCtx::new(None, &self.widget_tree);
-    let root = root.build(&build_ctx);
-    self.widget_tree.borrow_mut().set_root(root)
+    let root = root.widget_build(&build_ctx);
+    self.widget_tree.borrow_mut().set_root(root.consume())
   }
 
   #[inline]
@@ -629,7 +629,7 @@ mod tests {
     reset_test_env!();
 
     let size = Size::new(100., 100.);
-    let mut wnd = TestWindow::new_with_size(MockBox { size: INFINITY_SIZE }, size);
+    let mut wnd = TestWindow::new_with_size(fn_widget! { MockBox { size: INFINITY_SIZE } }, size);
     wnd.draw_frame();
     assert_layout_result_by_path!(wnd, { path = [0], size == size, });
 

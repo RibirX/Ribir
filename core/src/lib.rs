@@ -1,4 +1,4 @@
-#![feature(decl_macro)]
+#![feature(decl_macro, return_position_impl_trait_in_trait)]
 #![cfg_attr(test, feature(mutex_unpoison, test))]
 
 #[macro_use]
@@ -42,7 +42,10 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget;
   #[doc(no_inline)]
-  pub use crate::widget::{Any, Compose, FnWidget, HitTest, Query, Render, TypeId, Widget};
+  pub use crate::widget::{
+    Any, Compose, ComposeBuilder, ComposeChildBuilder, HitTest, Query, Render, RenderBuilder,
+    SelfBuilder, TypeId, Widget, WidgetBuilder,
+  };
   #[doc(no_inline)]
   pub use crate::widget_children::*;
   #[doc(no_inline)]
@@ -56,7 +59,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use ribir_macros::{
     ctx, fn_widget, include_svg, map_writer, pipe, rdl, ribir_expanded_ಠ_ಠ, set_build_ctx,
-    split_writer, watch, Declare2, Lerp, MultiChild, SingleChild, Template,
+    split_writer, watch, Declare2, Lerp, MultiChild, PairChild, SingleChild, Template,
   };
   #[doc(no_inline)]
   pub use ribir_painter::*;

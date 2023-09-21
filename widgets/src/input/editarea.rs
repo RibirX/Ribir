@@ -32,7 +32,7 @@ impl CustomStyle for PlaceholderStyle {
 
 impl ComposeChild for TextEditorArea {
   type Child = Option<State<Placeholder>>;
-  fn compose_child(this: State<Self>, placeholder: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, placeholder: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut container = @Stack {
         fit: StackFit::Passthrough,
@@ -113,7 +113,6 @@ impl ComposeChild for TextEditorArea {
         }
       }
     }
-    .into()
   }
 }
 

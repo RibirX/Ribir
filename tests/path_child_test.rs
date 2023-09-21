@@ -1,3 +1,4 @@
+#![feature(return_position_impl_trait_in_trait)]
 use ribir::core::test_helper::*;
 use ribir::prelude::*;
 use ribir_dev_helper::*;
@@ -8,7 +9,7 @@ enum AB {
 
 const SIZE_ONE: Size = Size::new(1., 1.);
 impl Compose for AB {
-  fn compose(this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> impl WidgetBuilder {
     fn_widget! {
       @SizedBox {
         size: match *$this {
@@ -17,7 +18,6 @@ impl Compose for AB {
         }
       }
     }
-    .into()
   }
 }
 
@@ -35,18 +35,17 @@ fn path_widget() {
   let _ = fn_widget! { AB::b() };
 }
 
-fn tuple_widget() -> Widget {
+fn tuple_widget() -> impl WidgetBuilder {
   struct TupleBox(Size);
   impl Compose for TupleBox {
-    fn compose(this: State<Self>) -> Widget {
+    fn compose(this: State<Self>) -> impl WidgetBuilder {
       fn_widget! {
         @SizedBox {
           size: pipe!($this.0),
         }
       }
-      .into()
     }
   }
-  fn_widget! { TupleBox(Size::new(1., 1.)) }.into()
+  fn_widget! { TupleBox(Size::new(1., 1.)) }
 }
 widget_layout_test!(tuple_widget, width == 1., height == 1.,);

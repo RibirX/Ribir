@@ -102,7 +102,7 @@ type TextFieldThemeProxy = ThemeSuitProxy<TextFieldState, TextFieldTheme>;
 
 impl ComposeChild for TextFieldThemeProxy {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ $child {
         on_tap: move |_| {
@@ -127,7 +127,6 @@ impl ComposeChild for TextFieldThemeProxy {
         },
       }
     }
-    .into()
   }
 }
 
@@ -281,7 +280,7 @@ macro_rules! take_option_field {
 
 impl ComposeChild for TextField {
   type Child = Option<TextFieldTml>;
-  fn compose_child(this: State<Self>, config: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, config: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut config = config.unwrap_or_default();
       take_option_field!({leading_icon, trailing_icon}, config);
@@ -325,7 +324,6 @@ impl ComposeChild for TextField {
         }
       }
     }
-    .into()
   }
 }
 
@@ -335,7 +333,7 @@ fn build_input_area(
   prefix: Option<LeadingText>,
   suffix: Option<TrailingText>,
   placeholder: Option<Placeholder>,
-) -> Widget {
+) -> impl WidgetBuilder {
   fn_widget! {
     let mut input_area = @Row {
       visible: pipe!(!$this.text.is_empty() || $theme.state == TextFieldState::Focused),
@@ -382,7 +380,6 @@ fn build_input_area(
       }
     }
   }
-  .into()
 }
 
 #[derive(Declare2)]
@@ -392,7 +389,7 @@ struct TextFieldLabel {
 }
 
 impl Compose for TextFieldLabel {
-  fn compose(this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> impl WidgetBuilder {
     fn_widget! {
       let label = @Text {
         v_align: VAlign::Top,
@@ -405,7 +402,6 @@ impl Compose for TextFieldLabel {
 
       label
     }
-    .into()
   }
 }
 
@@ -413,7 +409,7 @@ fn build_content_area(
   this: State<TextField>,
   theme: State<TextFieldThemeProxy>,
   mut config: TextFieldTml,
-) -> Widget {
+) -> impl WidgetBuilder {
   fn_widget! {
     take_option_field!({label, prefix, suffix, placeholder}, config);
     let mut content_area = @Column {
@@ -436,5 +432,4 @@ fn build_content_area(
       @ { build_input_area(this, theme, prefix, suffix, placeholder)}
     }
   }
-  .into()
 }

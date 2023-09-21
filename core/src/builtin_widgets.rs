@@ -59,7 +59,10 @@ pub use focus_node::*;
 pub mod focus_scope;
 pub use focus_scope::*;
 
-use crate::{prelude::*, widget::StrictBuilder};
+use crate::{
+  prelude::*,
+  widget::{Widget, WidgetBuilder},
+};
 
 macro_rules! impl_builtin_obj {
   ($($builtin_ty: ty),*) => {
@@ -109,7 +112,7 @@ macro_rules! impl_builtin_obj {
         pub fn compose_with_host(self, mut host: Widget, ctx: &BuildCtx) -> Widget {
           $(
             if let Some(builtin) = self.[< $builtin_ty: snake:lower >] {
-              host = builtin.with_child(host, ctx).into();
+              host = builtin.with_child(host, ctx).widget_build(ctx);
             }
           )*
           host
@@ -185,65 +188,65 @@ impl<T> FatObj<T> {
   }
 }
 
-impl<T: Into<Widget>> StrictBuilder for FatObj<T> {
-  fn strict_build(self, ctx: &BuildCtx) -> WidgetId {
-    let Self { host, builtin } = self;
-    builtin.compose_with_host(host.into(), ctx).build(ctx)
-  }
-}
-
 impl<T: SingleChild> SingleChild for FatObj<T> {}
 impl<T: MultiChild> MultiChild for FatObj<T> {}
-impl<T: ComposeChild + 'static> ComposeChild for FatObj<State<T>> {
-  type Child = T::Child;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let this = this.into_value();
-    let Self { host, builtin } = this;
-    FnWidget::new(move |ctx| {
-      let this = host.with_child(child, ctx);
-      builtin.compose_with_host(this.into(), ctx)
-    })
-    .into()
+crate::widget::multi_build_replace_impl! {
+  impl<T: {#} > {#} for FatObj<T> {
+    fn widget_build(self, ctx: &BuildCtx) -> Widget {
+      let Self { host, builtin } = self;
+      builtin.compose_with_host(host.widget_build(ctx), ctx)
+    }
   }
 }
 
-impl<T: ComposeChild + 'static> ComposeChild for FatObj<T> {
-  type Child = T::Child;
-
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let this = this.into_value();
-    let Self { host, builtin } = this;
-    FnWidget::new(move |ctx| {
-      let this = host.with_child(child, ctx);
-      builtin.compose_with_host(this.into(), ctx)
-    })
-    .into()
+impl WidgetBuilder for FatObj<Widget> {
+  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+    let Self { host, builtin } = self;
+    builtin.compose_with_host(host, ctx)
   }
+}
+
+impl<T: ComposeWithChild<C, M>, C, M> ComposeWithChild<C, M> for FatObj<T> {
+  type Target = FatObj<T::Target>;
+
+  #[inline]
+  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
+    let Self { host, builtin } = self;
+    let w = host.with_child(child, ctx);
+    FatObj::new(w, builtin)
+  }
+}
+
+impl<T: PairWithChild<C>, C> PairWithChild<C> for FatObj<T> {
+  type Target = Pair<FatObj<T>, C>;
+
+  #[inline]
+  fn with_child(self, child: C, _: &BuildCtx) -> Self::Target { Pair::new(self, child) }
 }
 
 impl<T: SingleParent + 'static> SingleParent for FatObj<T> {
-  fn append_child(self, child: WidgetId, ctx: &BuildCtx) -> WidgetId {
+  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
     let Self { host, builtin } = self;
-    let p = host.append_child(child, ctx);
-    builtin.compose_with_host(p.into(), ctx).build(ctx)
+    let p = host.compose_child(child, ctx);
+    builtin.compose_with_host(p, ctx)
   }
 }
 
 impl<T: MultiParent + 'static> MultiParent for FatObj<T> {
-  fn append_children(self, children: Vec<WidgetId>, ctx: &BuildCtx) -> WidgetId {
+  fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
     let Self { host, builtin } = self;
-    let host = host.append_children(children, ctx);
-    builtin.compose_with_host(host.into(), ctx).build(ctx)
+    let host = host.compose_children(children, ctx);
+    builtin.compose_with_host(host, ctx)
   }
 }
 
 impl ComposeChild for BuiltinObj {
   type Child = Widget;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     let this = this.into_value();
-    fn_widget! { this.compose_with_host(child, ctx!()) }.into()
+    fn_widget! { this.compose_with_host(child, ctx!()) }
   }
 }
 

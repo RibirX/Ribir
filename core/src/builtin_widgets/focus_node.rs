@@ -38,23 +38,22 @@ pub struct FocusNode {
 
 impl ComposeChild for FocusNode {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let this = this.into_writable();
-    FnWidget::new(|ctx| {
-      let id = child.build(ctx);
-      let has_focus_node = ctx.assert_get(id).contain_type::<FocusNode>();
+  fn compose_child(this: State<Self>, mut child: Self::Child) -> impl WidgetBuilder {
+    fn_widget! {
+      let tree = ctx!().tree.borrow();
+      let node = child.id().assert_get(&tree.arena);
+      let has_focus_node = node.contain_type::<FocusNode>();
       if !has_focus_node {
-        let subject = ctx
-          .assert_get(id)
-          .query_most_outside(|l: &LifecycleListener| l.lifecycle_stream());
-        let subject = subject.unwrap_or_else(|| {
+        let subject = node.query_most_outside(|l: &LifecycleListener| l.lifecycle_stream());
+        drop(tree);
+        let subject = if let Some(subject) = subject {
+          subject
+        } else {
           let listener = LifecycleListener::default();
           let subject = listener.lifecycle_stream();
-          id.wrap_node(&mut ctx.tree.borrow_mut().arena, |child| {
-            Box::new(DataWidget::new(child, listener))
-          });
+          child = child.attach_data(listener, ctx!());
           subject
-        });
+        };
 
         fn subscribe_fn(this: Reader<FocusNode>) -> impl FnMut(&'_ mut AllLifecycle) + 'static {
           move |e| match e {
@@ -69,26 +68,15 @@ impl ComposeChild for FocusNode {
         let h = subject
           .subscribe(subscribe_fn(this.clone_reader()))
           .unsubscribe_when_dropped();
-
-        id.wrap_node(&mut ctx.tree.borrow_mut().arena, |child| {
-          let d = DataWidget::new(child, this);
-          Box::new(AnonymousWrapper::new(Box::new(d), Box::new(h)))
-        });
+        child = child.attach_state_data(this, ctx!()).attach_anonymous_data(Box::new(h), ctx!());
       }
-      id
-    })
-    .into()
+      child
+    }
   }
 }
 
 impl_query_self_only!(FocusNode);
 
-pub(crate) fn dynamic_compose_focus_node(widget: Widget) -> Widget {
-  FnWidget::new(move |ctx: &BuildCtx| {
-    FocusNode { tab_index: 0, auto_focus: false }.with_child(widget, ctx)
-  })
-  .into()
-}
 #[derive(Declare2)]
 pub struct RequestFocus {
   #[declare(default)]
@@ -97,18 +85,17 @@ pub struct RequestFocus {
 
 impl ComposeChild for RequestFocus {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    let this2 = this.clone_reader();
-    let w: Widget = fn_widget! {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+    fn_widget! {
       @$child {
         on_mounted: move |e| {
           let handle = e.window().focus_mgr.borrow().focus_handle(e.id);
           $this.silent().handle = Some(handle);
         }
       }
+      .widget_build(ctx!())
+      .attach_state_data(this, ctx!())
     }
-    .into();
-    DataWidget::attach(w, this2)
   }
 }
 impl RequestFocus {
@@ -136,20 +123,13 @@ mod tests {
   fn dynamic_focus_node() {
     reset_test_env!();
 
-    #[derive(Declare2)]
-    struct AutoFocusNode {}
-
-    impl ComposeChild for AutoFocusNode {
-      type Child = Widget;
-      #[inline]
-      fn compose_child(_this: State<Self>, child: Self::Child) -> Widget {
-        dynamic_compose_focus_node(child)
-      }
-    }
     let widget = fn_widget! {
-      @AutoFocusNode{
-        @AutoFocusNode{
-          @AutoFocusNode {
+      @FocusNode {
+        tab_index: 0i16, auto_focus: false,
+        @FocusNode {
+          tab_index: 0i16, auto_focus: false,
+          @FocusNode {
+            tab_index: 0i16, auto_focus: false,
             @MockBox {
               size: Size::default(),
             }

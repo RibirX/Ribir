@@ -31,7 +31,7 @@ mod tests {
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
 
-  fn fix_size() -> Widget {
+  fn fix_size() -> impl WidgetBuilder {
     let size: Size = Size::new(100., 100.);
     fn_widget! {
       @SizedBox {
@@ -39,18 +39,16 @@ mod tests {
         @Text { text: "" }
       }
     }
-    .into()
   }
   widget_layout_test!(fix_size, width == 100., height == 100.,);
 
-  fn shrink_size() -> Widget {
+  fn shrink_size() -> impl WidgetBuilder {
     fn_widget! {
       @SizedBox {
         size: ZERO_SIZE,
         @Text { text: "" }
       }
     }
-    .into()
   }
   widget_layout_test!(
     shrink_size,
@@ -58,14 +56,13 @@ mod tests {
     { path = [0, 0], size == ZERO_SIZE,}
   );
 
-  fn expanded_size() -> Widget {
+  fn expanded_size() -> impl WidgetBuilder {
     fn_widget! {
       @SizedBox {
         size: INFINITY_SIZE,
         @Text { text: "" }
       }
     }
-    .into()
   }
   widget_layout_test!(
     expanded_size,
@@ -74,6 +71,6 @@ mod tests {
     { path = [0, 0], size == INFINITY_SIZE,}
   );
 
-  fn empty_box() -> Widget { SizedBox { size: Size::new(10., 10.) }.into() }
+  fn empty_box() -> impl WidgetBuilder { fn_widget!(SizedBox { size: Size::new(10., 10.) }) }
   widget_layout_test!(empty_box, width == 10., height == 10.,);
 }
