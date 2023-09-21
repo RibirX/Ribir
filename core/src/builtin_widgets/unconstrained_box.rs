@@ -80,7 +80,7 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  fn smoke() -> Widget {
+  fn smoke() -> impl WidgetBuilder {
     let size = Size::new(200., 200.);
     fn_widget! {
       @MockMulti {
@@ -97,7 +97,6 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(
     smoke,

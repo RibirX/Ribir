@@ -1,4 +1,4 @@
-#![feature(test)]
+#![feature(test, return_position_impl_trait_in_trait)]
 
 mod todos;
 use ribir::prelude::*;

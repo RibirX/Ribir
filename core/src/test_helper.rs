@@ -29,15 +29,15 @@ macro_rules! reset_test_env {
 
 impl TestWindow {
   /// Create a 1024x1024 window for test
-  pub fn new(root: impl Into<Widget>) -> Self { Self::new_wnd(root, None) }
+  pub fn new(root: impl WidgetBuilder) -> Self { Self::new_wnd(root, None) }
 
-  pub fn new_with_size(root: impl Into<Widget>, size: Size) -> Self {
+  pub fn new_with_size(root: impl WidgetBuilder, size: Size) -> Self {
     Self::new_wnd(root, Some(size))
   }
 
-  fn new_wnd(root: impl Into<Widget>, size: Option<Size>) -> Self {
+  fn new_wnd(root: impl WidgetBuilder, size: Option<Size>) -> Self {
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-    let wnd = AppCtx::new_window(Box::new(TestShellWindow::new(size)), root.into());
+    let wnd = AppCtx::new_window(Box::new(TestShellWindow::new(size)), root);
     wnd.run_frame_tasks();
     Self(wnd)
   }

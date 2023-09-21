@@ -401,7 +401,7 @@ mod tests {
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
 
-  fn horizontal_line() -> Widget {
+  fn horizontal_line() -> impl WidgetBuilder {
     fn_widget! {
       @Flex {
         @{
@@ -409,22 +409,20 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(horizontal_line, width == 100., height == 20.,);
 
-  fn vertical_line() -> Widget {
+  fn vertical_line() -> impl WidgetBuilder {
     fn_widget! {
       @Flex {
         direction: Direction::Vertical,
         @{ (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })}
       }
     }
-    .into()
   }
   widget_layout_test!(vertical_line, width == 10., height == 200.,);
 
-  fn row_wrap() -> Widget {
+  fn row_wrap() -> impl WidgetBuilder {
     let size = Size::new(200., 20.);
     fn_widget! {
       @Flex {
@@ -432,7 +430,6 @@ mod tests {
         @{ (0..3).map(|_| SizedBox { size }) }
       }
     }
-    .into()
   }
   widget_layout_test!(
     row_wrap,
@@ -443,7 +440,7 @@ mod tests {
     {path = [0, 2], rect == ribir_geom::rect(0., 20., 200., 20.),}
   );
 
-  fn reverse_row_wrap() -> Widget {
+  fn reverse_row_wrap() -> impl WidgetBuilder {
     let size = Size::new(200., 20.);
     fn_widget! {
       @Flex {
@@ -452,7 +449,6 @@ mod tests {
         @{ (0..3).map(|_| SizedBox { size }) }
       }
     }
-    .into()
   }
   widget_layout_test!(
     reverse_row_wrap,
@@ -463,7 +459,7 @@ mod tests {
     { path = [0, 2], rect == ribir_geom::rect(0., 0., 200., 20.),}
   );
 
-  fn main_axis_gap() -> Widget {
+  fn main_axis_gap() -> impl WidgetBuilder {
     fn_widget! {
       @Row {
         item_gap: 15.,
@@ -472,7 +468,6 @@ mod tests {
         @SizedBox { size: Size::new(30., 20.) }
       }
     }
-    .into()
   }
   widget_layout_test!(
     main_axis_gap,
@@ -482,7 +477,7 @@ mod tests {
     { path = [0, 2], rect == ribir_geom::rect(230., 0., 30., 20.),}
   );
 
-  fn main_axis_reverse_gap() -> Widget {
+  fn main_axis_reverse_gap() -> impl WidgetBuilder {
     fn_widget! {
       @Row {
         item_gap: 15.,
@@ -492,7 +487,6 @@ mod tests {
         @SizedBox { size: Size::new(30., 20.) }
       }
     }
-    .into()
   }
   widget_layout_test!(
     main_axis_reverse_gap,
@@ -502,7 +496,7 @@ mod tests {
     { path = [0, 2], rect == ribir_geom::rect(0., 0., 30., 20.),}
   );
 
-  fn main_axis_expand() -> Widget {
+  fn main_axis_expand() -> impl WidgetBuilder {
     fn_widget! {
       @Row {
         item_gap: 15.,
@@ -519,7 +513,6 @@ mod tests {
         @SizedBox { size: Size::new(30., 20.) }
       }
     }
-    .into()
   }
   widget_layout_test!(
     main_axis_expand,
@@ -531,7 +524,7 @@ mod tests {
     { path = [0, 4], rect == ribir_geom::rect(470., 0., 30., 20.),}
   );
 
-  fn cross_axis_gap() -> Widget {
+  fn cross_axis_gap() -> impl WidgetBuilder {
     let size = Size::new(200., 20.);
     fn_widget! {
       @Flex {
@@ -541,7 +534,6 @@ mod tests {
         @{ (0..3).map(|_| SizedBox { size }) }
       }
     }
-    .into()
   }
   widget_layout_test!(
     cross_axis_gap,
@@ -552,7 +544,7 @@ mod tests {
     { path = [0, 2], rect == ribir_geom::rect(0., 30., 200., 20.),}
   );
 
-  fn cross_align(align: Align) -> Widget {
+  fn cross_align(align: Align) -> impl WidgetBuilder {
     fn_widget! {
       @Row {
         align_items: align,
@@ -561,10 +553,9 @@ mod tests {
         @SizedBox { size: Size::new(100., 40.) }
       }
     }
-    .into()
   }
 
-  fn start_cross_align() -> Widget { cross_align(Align::Start) }
+  fn start_cross_align() -> impl WidgetBuilder { cross_align(Align::Start) }
   widget_layout_test!(
     start_cross_align,
     { path =[0],  width == 300., height == 40., }
@@ -573,7 +564,7 @@ mod tests {
     { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
   );
 
-  fn center_cross_align() -> Widget { cross_align(Align::Center) }
+  fn center_cross_align() -> impl WidgetBuilder { cross_align(Align::Center) }
   widget_layout_test!(
     center_cross_align,
     { path =[0],  width == 300., height == 40., }
@@ -582,7 +573,7 @@ mod tests {
     { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
   );
 
-  fn end_cross_align() -> Widget { cross_align(Align::End) }
+  fn end_cross_align() -> impl WidgetBuilder { cross_align(Align::End) }
   widget_layout_test!(
     end_cross_align,
     { path =[0],  width == 300., height == 40., }
@@ -591,7 +582,7 @@ mod tests {
     { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
   );
 
-  fn stretch_cross_align() -> Widget { cross_align(Align::Stretch) }
+  fn stretch_cross_align() -> impl WidgetBuilder { cross_align(Align::Stretch) }
   widget_layout_test!(
     stretch_cross_align,
     wnd_size = Size::new(500., 40.),
@@ -601,7 +592,7 @@ mod tests {
     { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
   );
 
-  fn main_align(justify_content: JustifyContent) -> Widget {
+  fn main_align(justify_content: JustifyContent) -> impl WidgetBuilder {
     let item_size = Size::new(100., 20.);
     fn_widget! {
       @SizedBox {
@@ -615,10 +606,9 @@ mod tests {
         }
       }
     }
-    .into()
   }
 
-  fn start_main_align() -> Widget { main_align(JustifyContent::Start) }
+  fn start_main_align() -> impl WidgetBuilder { main_align(JustifyContent::Start) }
   widget_layout_test!(
     start_main_align,
     wnd_size = Size::new(500., 500.),
@@ -628,7 +618,7 @@ mod tests {
     { path =[0, 0, 2], x == 200.,}
   );
 
-  fn center_main_align() -> Widget { main_align(JustifyContent::Center) }
+  fn center_main_align() -> impl WidgetBuilder { main_align(JustifyContent::Center) }
   widget_layout_test!(
     center_main_align,
     wnd_size = Size::new(500., 500.),
@@ -638,7 +628,7 @@ mod tests {
     { path =[0, 0, 2], x == 300.,}
   );
 
-  fn end_main_align() -> Widget { main_align(JustifyContent::End) }
+  fn end_main_align() -> impl WidgetBuilder { main_align(JustifyContent::End) }
   widget_layout_test!(
     end_main_align,
     wnd_size = Size::new(500., 500.),
@@ -648,7 +638,7 @@ mod tests {
     { path =[0, 0, 2], x == 400.,}
   );
 
-  fn space_between_align() -> Widget { main_align(JustifyContent::SpaceBetween) }
+  fn space_between_align() -> impl WidgetBuilder { main_align(JustifyContent::SpaceBetween) }
   widget_layout_test!(
     space_between_align,
     wnd_size = Size::new(500., 500.),
@@ -658,7 +648,7 @@ mod tests {
     { path =[0, 0, 2], x == 400.,}
   );
 
-  fn space_around_align() -> Widget { main_align(JustifyContent::SpaceAround) }
+  fn space_around_align() -> impl WidgetBuilder { main_align(JustifyContent::SpaceAround) }
   const AROUND_SPACE: f32 = 200.0 / 3.0;
   widget_layout_test!(
     space_around_align,
@@ -669,7 +659,7 @@ mod tests {
     { path =[0, 0, 2], x == 2.5 * AROUND_SPACE+ 200.,}
   );
 
-  fn space_evenly_align() -> Widget { main_align(JustifyContent::SpaceEvenly) }
+  fn space_evenly_align() -> impl WidgetBuilder { main_align(JustifyContent::SpaceEvenly) }
   widget_layout_test!(
     space_evenly_align,
     wnd_size = Size::new(500., 500.),
@@ -679,7 +669,7 @@ mod tests {
     { path =[0, 0, 2], x == 350.,}
   );
 
-  fn flex_expand() -> Widget {
+  fn flex_expand() -> impl WidgetBuilder {
     fn_widget! {
       @SizedBox {
         size: Size::new(500., 25.),
@@ -697,7 +687,6 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(
     flex_expand,

@@ -21,8 +21,8 @@ pub struct DelayDrop {
 impl ComposeChild for DelayDrop {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
-    DataWidget::attach(child, this.into_writable())
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+    fn_widget! { child.attach_state_data(this, ctx!()) }
   }
 }
 

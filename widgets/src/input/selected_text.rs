@@ -19,7 +19,7 @@ impl CustomStyle for SelectedTextStyle {
 }
 
 impl Compose for SelectedText {
-  fn compose(this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> impl WidgetBuilder {
     fn_widget! {
       let color = SelectedTextStyle::of(ctx!()).brush;
       @Stack {
@@ -36,6 +36,5 @@ impl Compose for SelectedText {
         }}
       }
     }
-    .into()
   }
 }

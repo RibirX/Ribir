@@ -10,7 +10,7 @@ pub struct LayoutBox {
 
 impl ComposeChild for LayoutBox {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ $child {
         on_performed_layout: move |e| {
@@ -21,7 +21,6 @@ impl ComposeChild for LayoutBox {
         }
       }
     }
-    .into()
   }
 }
 
@@ -61,7 +60,7 @@ mod tests {
   use crate::test_helper::*;
   use ribir_dev_helper::*;
 
-  fn smoke() -> Widget {
+  fn smoke() -> impl WidgetBuilder {
     fn_widget! {
       let mut first_box = @MockBox { size: Size::new(100., 200.) };
       let second_box = @MockBox { size: pipe!($first_box.layout_size()) };
@@ -69,7 +68,6 @@ mod tests {
         @ { [first_box, second_box  ] }
       }
     }
-    .into()
   }
   widget_layout_test!(
     smoke,

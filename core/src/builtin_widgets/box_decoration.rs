@@ -209,7 +209,7 @@ mod tests {
   }
 
   const SIZE: Size = Size::new(100., 100.);
-  fn with_border() -> Widget {
+  fn with_border() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         size: SIZE,
@@ -221,7 +221,6 @@ mod tests {
         },
       }
     }
-    .into()
   }
   widget_layout_test!(
     with_border,

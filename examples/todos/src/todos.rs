@@ -14,7 +14,7 @@ struct Todos {
 }
 
 impl Compose for Todos {
-  fn compose(this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> impl WidgetBuilder {
     fn_widget! {
       @Column {
         padding: EdgeInsets::all(10.),
@@ -61,12 +61,11 @@ impl Compose for Todos {
         }
       }
     }
-    .into()
   }
 }
 
 impl Todos {
-  fn pane(this: Writer<Self>, cond: fn(&Task) -> bool) -> Widget {
+  fn pane(this: Writer<Self>, cond: fn(&Task) -> bool) -> impl WidgetBuilder {
     fn_widget! {
       // todo: pipe only for list items, not lists
       @VScrollBar { @ { pipe! {
@@ -113,7 +112,7 @@ impl Todos {
                         watch!($checkbox.checked)
                           .distinct_until_changed()
                           .subscribe(move |v| $task.write().finished = v);
-                        CustomEdgeWidget(checkbox.into())
+                        CustomEdgeWidget(checkbox.widget_build(ctx!()))
                       }
                     }
                     @Trailing {
@@ -130,7 +129,6 @@ impl Todos {
         }
       }}}
     }
-    .into()
   }
 
   fn new_task(&mut self, label: String) {
@@ -143,26 +141,27 @@ impl Todos {
   }
 }
 
-pub fn todos() -> Widget {
-  Todos {
-    tasks: vec![
-      Task {
-        id: 0,
-        finished: true,
-        label: "Implement Checkbox".to_string(),
-      },
-      Task {
-        id: 1,
-        finished: true,
-        label: "Support Scroll".to_string(),
-      },
-      Task {
-        id: 2,
-        finished: false,
-        label: "Support Virtual Scroll".to_string(),
-      },
-    ],
-    id_gen: 3,
+pub fn todos() -> impl WidgetBuilder {
+  fn_widget! {
+    Todos {
+      tasks: vec![
+        Task {
+          id: 0,
+          finished: true,
+          label: "Implement Checkbox".to_string(),
+        },
+        Task {
+          id: 1,
+          finished: true,
+          label: "Support Scroll".to_string(),
+        },
+        Task {
+          id: 2,
+          finished: false,
+          label: "Support Virtual Scroll".to_string(),
+        },
+      ],
+      id_gen: 3,
+    }
   }
-  .into()
 }

@@ -16,13 +16,12 @@ impl PointerPressed {
 
 impl ComposeChild for PointerPressed {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ $child {
         on_pointer_down: move|_| $this.write().pointer_pressed = true,
         on_pointer_up: move |_| $this.write().pointer_pressed = false,
       }
     }
-    .into()
   }
 }

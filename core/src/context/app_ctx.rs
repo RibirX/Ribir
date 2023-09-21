@@ -1,7 +1,7 @@
 use crate::{
   builtin_widgets::{FullTheme, InheritTheme, Theme},
   clipboard::{Clipboard, MockClipboard},
-  widget::Widget,
+  widget::WidgetBuilder,
   window::{ShellWindow, Window, WindowId},
 };
 use pin_project_lite::pin_project;
@@ -67,7 +67,7 @@ impl AppCtx {
   #[track_caller]
   pub fn app_theme() -> &'static Theme { &Self::shared().app_theme }
 
-  pub fn new_window(shell_wnd: Box<dyn ShellWindow>, content: Widget) -> Rc<Window> {
+  pub fn new_window(shell_wnd: Box<dyn ShellWindow>, content: impl WidgetBuilder) -> Rc<Window> {
     let wnd = Window::new(shell_wnd);
     let id = wnd.id();
 

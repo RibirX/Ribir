@@ -2,7 +2,7 @@ use ribir::{material::material_svgs, prelude::*};
 
 static NORMAL_BUTTON_SIZE: Size = Size::new(120., 40.);
 
-fn header() -> Widget {
+fn header() -> impl WidgetBuilder {
   static HEADER_HEIGHT: f32 = 64.;
   static TITLE: &str = "Material Design";
   fn_widget! {
@@ -17,11 +17,10 @@ fn header() -> Widget {
       }
     }
   }
-  .into()
 }
 
-fn content() -> Widget {
-  fn actions_show() -> Widget {
+fn content() -> impl WidgetBuilder {
+  fn actions_show() -> impl WidgetBuilder {
     fn_widget! {
       @VScrollBar {
         @Column {
@@ -170,10 +169,9 @@ fn content() -> Widget {
         }
       }
     }
-    .into()
   }
 
-  fn tabs_show() -> Widget {
+  fn tabs_show() -> impl WidgetBuilder {
     fn_widget! {
       @Tabs {
         @Tab {
@@ -196,10 +194,9 @@ fn content() -> Widget {
         }
       }
     }
-    .into()
   }
 
-  fn containment_show() -> Widget {
+  fn containment_show() -> impl WidgetBuilder {
     fn_widget! {
       @Column {
         @ConstrainedBox {
@@ -216,10 +213,9 @@ fn content() -> Widget {
         @Divider {}
       }
     }
-    .into()
   }
 
-  fn lists_show() -> Widget {
+  fn lists_show() -> impl WidgetBuilder {
     fn_widget! {
       @Column {
         margin: EdgeInsets::all(20.),
@@ -286,10 +282,9 @@ fn content() -> Widget {
         }
       }
     }
-    .into()
   }
 
-  fn checkbox_show() -> Widget {
+  fn checkbox_show() -> impl WidgetBuilder {
     fn_widget! {
       @Column {
         margin: EdgeInsets::all(20.),
@@ -312,7 +307,6 @@ fn content() -> Widget {
         }
       }
     }
-    .into()
   }
 
   fn_widget! {
@@ -360,10 +354,9 @@ fn content() -> Widget {
       }
     }
   }
-  .into()
 }
 
-pub fn storybook() -> Widget {
+pub fn storybook() -> impl WidgetBuilder {
   fn_widget! {
     @Column {
       background: Palette::of(ctx!()).surface_container_low(),
@@ -373,5 +366,4 @@ pub fn storybook() -> Widget {
       }
     }
   }
-  .into()
 }

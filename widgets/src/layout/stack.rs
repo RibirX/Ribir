@@ -75,7 +75,7 @@ mod tests {
 
   use super::*;
   const FIVE: Size = Size::new(5., 5.);
-  fn smoke() -> Widget {
+  fn smoke() -> impl WidgetBuilder {
     let one = Size::new(1., 1.);
     let five = Size::new(5., 5.);
     fn_widget! {
@@ -84,7 +84,6 @@ mod tests {
         @SizedBox { size: five}
       }
     }
-    .into()
   }
 
   widget_layout_test!(smoke, size == FIVE,);

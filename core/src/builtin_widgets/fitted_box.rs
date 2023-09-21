@@ -160,14 +160,13 @@ mod tests {
     .test();
   }
 
-  fn as_builtin_field() -> Widget {
+  fn as_builtin_field() -> impl WidgetBuilder {
     fn_widget! {
       @MockBox {
         size: Size::new(200., 200.),
         box_fit: BoxFit::Fill,
       }
     }
-    .into()
   }
   widget_layout_test!(as_builtin_field, wnd_size = WND_SIZE, size == WND_SIZE,);
 }

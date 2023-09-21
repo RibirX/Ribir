@@ -6,14 +6,14 @@ use ribir_dev_helper::*;
 use std::{cell::Cell, rc::Rc};
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
-fn simplest_leaf_rdl() -> impl Into<Widget> {
+fn simplest_leaf_rdl() -> impl WidgetBuilder {
   fn_widget! {
     rdl! { SizedBox { size: Size::new(500.,500.) } }
   }
 }
 widget_layout_test!(simplest_leaf_rdl, width == 500., height == 500.,);
 
-fn with_child_rdl() -> impl Into<Widget> {
+fn with_child_rdl() -> impl WidgetBuilder {
   fn_widget! {
     rdl!{
       Row {
@@ -24,7 +24,7 @@ fn with_child_rdl() -> impl Into<Widget> {
 }
 widget_layout_test!(with_child_rdl, width == 500., height == 500.,);
 
-fn with_builtin_child_rdl() -> impl Into<Widget> {
+fn with_builtin_child_rdl() -> impl WidgetBuilder {
   fn_widget! {
     rdl! { SizedBox {
       size: Size::new(500.,500.),
@@ -34,7 +34,7 @@ fn with_builtin_child_rdl() -> impl Into<Widget> {
 }
 widget_layout_test!(with_builtin_child_rdl, width == 520., height == 520.,);
 
-fn rdl_with_child() -> impl Into<Widget> {
+fn rdl_with_child() -> impl WidgetBuilder {
   fn_widget! {
     let single_p = rdl!{ SizedBox { size: Size::new(500.,500.)  }};
     rdl! { $single_p { rdl! { Void } } }
@@ -42,7 +42,7 @@ fn rdl_with_child() -> impl Into<Widget> {
 }
 widget_layout_test!(rdl_with_child, width == 500., height == 500.,);
 
-fn single_rdl_has_builtin_with_child() -> impl Into<Widget> {
+fn single_rdl_has_builtin_with_child() -> impl WidgetBuilder {
   fn_widget! {
     let single_p = rdl!{ SizedBox {
       size: Size::new(500.,500.),
@@ -57,7 +57,7 @@ widget_layout_test!(
   height == 520.,
 );
 
-fn multi_child_rdl_has_builtin_with_child() -> impl Into<Widget> {
+fn multi_child_rdl_has_builtin_with_child() -> impl WidgetBuilder {
   fn_widget! {
     let multi_p = rdl! { Flex {
       margin: EdgeInsets::all(10.)
@@ -71,7 +71,7 @@ widget_layout_test!(
   height == 20.,
 );
 
-fn compose_child_rdl_has_builtin_with_child() -> impl Into<Widget> {
+fn compose_child_rdl_has_builtin_with_child() -> impl WidgetBuilder {
   fn_widget! {
     let multi_p = rdl!{ Row { margin: EdgeInsets::all(10.) }};
     rdl! { $multi_p { rdl!{ Void {} }} }
@@ -83,7 +83,7 @@ widget_layout_test!(
   height == 20.,
 );
 
-fn access_rdl_widget() -> impl Into<Widget> {
+fn access_rdl_widget() -> impl WidgetBuilder {
   fn_widget! {
     let b = rdl! { SizedBox {size: Size::new(500.,500.)}};
     rdl! { Row {
@@ -94,7 +94,7 @@ fn access_rdl_widget() -> impl Into<Widget> {
 }
 widget_layout_test!(access_rdl_widget, width == 1000., height == 500.,);
 
-fn access_builtin_rdl_widget() -> impl Into<Widget> {
+fn access_builtin_rdl_widget() -> impl WidgetBuilder {
   fn_widget! {
     let mut b = rdl! { SizedBox {
       size: Size::new(100.,100.),
@@ -116,7 +116,7 @@ fn access_builtin_rdl_widget() -> impl Into<Widget> {
 }
 widget_layout_test!(access_builtin_rdl_widget, width == 240., height == 120.,);
 
-fn dollar_as_rdl_parent() -> impl Into<Widget> {
+fn dollar_as_rdl_parent() -> impl WidgetBuilder {
   fn_widget! {
     let b = rdl! {SizedBox { size: Size::new(500.,500.) }};
     rdl! { $b { rdl! { Void {}} } }
@@ -124,7 +124,7 @@ fn dollar_as_rdl_parent() -> impl Into<Widget> {
 }
 widget_layout_test!(dollar_as_rdl_parent, width == 500., height == 500.,);
 
-fn dollar_as_middle_parent() -> impl Into<Widget> {
+fn dollar_as_middle_parent() -> impl WidgetBuilder {
   fn_widget! {
     let b = rdl! { SizedBox { size: Size::new(500.,500.) }};
     rdl! { Row { rdl! { $b { rdl! { Void {} } } } } }
@@ -132,7 +132,7 @@ fn dollar_as_middle_parent() -> impl Into<Widget> {
 }
 widget_layout_test!(dollar_as_middle_parent, width == 500., height == 500.,);
 
-fn pipe_as_field_value() -> impl Into<Widget> {
+fn pipe_as_field_value() -> impl WidgetBuilder {
   let size = Stateful::new(Size::zero());
   let size2 = size.clone_reader();
   let w = fn_widget! {
@@ -143,7 +143,7 @@ fn pipe_as_field_value() -> impl Into<Widget> {
 }
 widget_layout_test!(pipe_as_field_value, width == 100., height == 100.,);
 
-fn pipe_as_builtin_field_value() -> impl Into<Widget> {
+fn pipe_as_builtin_field_value() -> impl WidgetBuilder {
   let margin = Stateful::new(EdgeInsets::all(0.));
   let margin2 = margin.clone_reader();
 
@@ -158,7 +158,7 @@ fn pipe_as_builtin_field_value() -> impl Into<Widget> {
 }
 widget_layout_test!(pipe_as_builtin_field_value, width == 100., height == 100.,);
 
-fn pipe_with_ctx() -> impl Into<Widget> {
+fn pipe_with_ctx() -> impl WidgetBuilder {
   let scale = Stateful::new(1.);
   let scale2 = scale.clone_writer();
   let w = fn_widget! {
@@ -171,7 +171,7 @@ fn pipe_with_ctx() -> impl Into<Widget> {
 }
 widget_layout_test!(pipe_with_ctx, width == 36., height == 36.,);
 
-fn pipe_with_builtin_field() -> impl Into<Widget> {
+fn pipe_with_builtin_field() -> impl WidgetBuilder {
   fn_widget! {
     let mut box1 = @SizedBox { size: Size::zero(), margin: EdgeInsets::all(1.) };
     let box2 = @SizedBox { size: $box1.size, margin: pipe!($box1.margin) };
@@ -183,7 +183,7 @@ fn pipe_with_builtin_field() -> impl Into<Widget> {
 }
 widget_layout_test!(pipe_with_builtin_field, width == 4., height == 2.,);
 
-fn capture_closure_used_ctx() -> impl Into<Widget> {
+fn capture_closure_used_ctx() -> impl WidgetBuilder {
   fn_widget! {
     let size_box = @SizedBox { size: ZERO_SIZE };
     @ $size_box {
@@ -203,9 +203,9 @@ fn pipe_single_parent() {
     let edges = EdgeInsets::all(5.);
     let blank = pipe! {
       if *$outside_blank {
-        BoxedSingleParent::new(Margin { margin: edges }, ctx!())
+        BoxedSingleChild::new(Margin { margin: edges }, ctx!())
       } else {
-        BoxedSingleParent::new(Padding { padding: edges }, ctx!())
+        BoxedSingleChild::new(Padding { padding: edges }, ctx!())
       }
     };
     rdl! {
@@ -232,12 +232,11 @@ fn pipe_multi_parent() {
   let stack_or_flex2 = stack_or_flex.clone_writer();
   let w = fn_widget! {
     let container = pipe! {
-      let c = if *$stack_or_flex {
-        BoxedMultiParent::new(rdl! { Stack { } }, ctx!())
+      if *$stack_or_flex {
+        BoxedMultiChild::new(rdl! { Stack { } }, ctx!())
       } else {
-        BoxedMultiParent::new(rdl! { Flex { } }, ctx!())
-      };
-      c
+        BoxedMultiChild::new(rdl! { Flex { } }, ctx!())
+      }
     };
 
     rdl! {
@@ -264,12 +263,8 @@ fn pipe_as_child() {
   let box_or_not = Stateful::new(true);
   let box_or_not2 = box_or_not.clone_reader();
   let w = fn_widget! {
-    let blank: Pipe<Widget> = pipe!{
-      if *$box_or_not2 {
-        rdl! { SizedBox { size: Size::new(100., 100.) } }.into()
-      } else {
-        Void.into()
-      }
+    let blank = pipe!{
+      $box_or_not2.then(|| rdl! { SizedBox { size: Size::new(100., 100.) } })
     };
     rdl! { Stack { rdl! { blank } } }
   };
@@ -307,14 +302,14 @@ fn pipe_as_multi_child() {
   assert_layout_result_by_path!(wnd, { path = [0], width == 300., height == 100., });
 }
 
-fn at_in_widget_macro() -> impl Into<Widget> {
+fn at_in_widget_macro() -> impl WidgetBuilder {
   fn_widget! {
     @SizedBox { size: Size::new(100., 100.) }
   }
 }
 widget_layout_test!(at_in_widget_macro, width == 100., height == 100.,);
 
-fn at_as_variable_in_widget() -> impl Into<Widget> {
+fn at_as_variable_in_widget() -> impl WidgetBuilder {
   fn_widget! {
     let size = Size::new(100., 100.);
     let row = @Row {};
@@ -328,7 +323,7 @@ fn at_as_variable_in_widget() -> impl Into<Widget> {
 }
 widget_layout_test!(at_as_variable_in_widget, width == 200., height == 100.,);
 
-fn at_as_variable_in_rdl() -> impl Into<Widget> {
+fn at_as_variable_in_rdl() -> impl WidgetBuilder {
   fn_widget! {
     let size = Size::new(100., 100.);
     let row = @Row {};
@@ -342,7 +337,7 @@ fn at_as_variable_in_rdl() -> impl Into<Widget> {
 }
 widget_layout_test!(at_as_variable_in_rdl, width == 200., height == 100.,);
 
-fn access_builtin_field_by_dollar() -> impl Into<Widget> {
+fn access_builtin_field_by_dollar() -> impl WidgetBuilder {
   fn_widget! {
     let size = Size::new(100., 100.);
     let mut box1 = @SizedBox { size, margin: EdgeInsets::all(10.) };
@@ -374,7 +369,7 @@ fn closure_in_fn_widget_capture() {
   assert_eq!(&**hi_res2.read(), "hi");
 }
 
-fn at_embed_in_expression() -> impl Into<Widget> {
+fn at_embed_in_expression() -> impl WidgetBuilder {
   fn_widget! {
     @Row {
       @{ (0..3).map(|_| {
@@ -572,7 +567,7 @@ fn bind_fields() {
   assert_eq!(size, Size::new(8., 4.));
 }
 
-fn local_var_not_bind() -> Widget {
+fn local_var_not_bind() -> impl WidgetBuilder {
   const EXPECT_SIZE: Size = Size::new(5., 5.);
   const BE_CLIPPED_SIZE: Size = Size::new(500., 500.);
 
@@ -587,7 +582,6 @@ fn local_var_not_bind() -> Widget {
       @{ _size_box }
     }
   }
-  .into()
 }
 widget_layout_test!(
   local_var_not_bind,
@@ -732,7 +726,7 @@ fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
 
 #[test]
 fn fix_access_builtin_with_gap() {
-  fn_widget! {
+  let _ = fn_widget! {
     let mut this = @Void { cursor: CursorIcon::Hand };
     @$this {
       on_tap: move |_| {
@@ -784,7 +778,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
   assert_eq!(*notify_cnt.read(), 3);
 }
 
-fn fix_local_assign_tuple() -> Widget {
+fn fix_local_assign_tuple() -> impl WidgetBuilder {
   fn_widget! {
     let _sized = @SizedBox { size: Size::new(1., 1.) };
     let sized_box2 = @SizedBox {
@@ -798,7 +792,6 @@ fn fix_local_assign_tuple() -> Widget {
       @ { sized_box2 }
     }
   }
-  .into()
 }
 widget_layout_test!(
   fix_local_assign_tuple,

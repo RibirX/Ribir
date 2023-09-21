@@ -105,7 +105,7 @@ pub struct TabsDecorator {}
 impl ComposeDecorator for TabsDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 #[derive(Template)]
@@ -120,7 +120,7 @@ pub struct TabItem {
   text: Option<State<Label>>,
 }
 
-#[derive(Declare2, SingleChild)]
+#[derive(Declare2, PairChild)]
 pub struct TabPane;
 
 #[derive(Declare2)]
@@ -129,7 +129,7 @@ pub struct TabDecorator {}
 impl ComposeDecorator for TabDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 #[derive(Declare2)]
@@ -142,7 +142,7 @@ pub struct IndicatorDecorator {
 impl ComposeDecorator for IndicatorDecorator {
   type Host = Widget;
 
-  fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget {
+  fn compose_decorator(this: State<Self>, host: Self::Host) -> impl WidgetBuilder {
     fn_widget! {
       @ $host{
         left_anchor: pipe!{
@@ -165,7 +165,6 @@ impl ComposeDecorator for IndicatorDecorator {
         }
       }
     }
-    .into()
   }
 }
 
@@ -175,7 +174,7 @@ impl Tabs {
     tabs_style: TabsStyle,
     tabs: impl StateWriter<Value = Tabs> + 'static,
     indicator: impl StateWriter<Value = IndicatorDecorator> + 'static,
-  ) -> impl Iterator<Item = Widget> {
+  ) -> impl Iterator<Item = impl WidgetBuilder> {
     let TabsStyle {
       icon_size: size,
       icon_pos,
@@ -233,7 +232,6 @@ impl Tabs {
             }
           }
         }
-        .into()
       })
   }
 }
@@ -241,7 +239,7 @@ impl Tabs {
 impl ComposeChild for Tabs {
   type Child = Vec<Tab>;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     let mut headers = vec![];
     let mut panes = vec![];
 
@@ -351,6 +349,5 @@ impl ComposeChild for Tabs {
         }
       }
     }
-    .into()
   }
 }

@@ -86,8 +86,8 @@ impl<'a> BuildCtx<'a> {
     new_node(&mut self.tree.borrow_mut().arena, widget)
   }
 
-  pub(crate) fn append_child(&self, parent: WidgetId, child: WidgetId) {
-    parent.append(child, &mut self.tree.borrow_mut().arena);
+  pub(crate) fn append_child(&self, parent: WidgetId, child: Widget) {
+    parent.append(child.consume(), &mut self.tree.borrow_mut().arena);
   }
 
   /// Insert `next` after `prev`
@@ -169,51 +169,58 @@ impl BuildCtxHandle {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::*;
+  use crate::{reset_test_env, test_helper::*};
   use std::{cell::RefCell, rc::Rc};
 
   #[test]
   fn themes() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     #[derive(Default, Clone)]
     struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     let themes: Stateful<Vec<Sc<Theme>>> = Stateful::new(vec![]);
     let c_themes = themes.clone_writer();
-    let light_palette = Palette {
-      brightness: Brightness::Light,
-      ..Default::default()
-    };
-    let dark_palette = Palette {
-      brightness: Brightness::Dark,
-      ..Default::default()
-    };
+
     let light_dark = fn_widget! {
+      let light_palette = Palette {
+        brightness: Brightness::Light,
+        ..Default::default()
+      };
       @ThemeWidget {
         theme: Sc::new(Theme::Inherit(InheritTheme {
           palette: Some(Rc::new(light_palette)),
           ..<_>::default()
 
         })),
-        @MockBox {
-          size: INFINITY_SIZE,
-          @ThemeWidget {
-            theme: Sc::new(Theme::Inherit(InheritTheme {
-              palette: Some(Rc::new(dark_palette)),
-              ..<_>::default()
-            })),
+        @ {
+          Box::new(fn_widget!{
+            let c_themes = c_themes.clone_writer();
+            let dark_palette = Palette {
+              brightness: Brightness::Dark,
+              ..Default::default()
+            };
             @MockBox {
-              size: ZERO_SIZE,
-              @ {
-                FnWidget::new(move |ctx: &BuildCtx| {
-                  *$c_themes.write() = ctx.themes().clone();
-                  Void
-                })
+              size: INFINITY_SIZE,
+              @ThemeWidget {
+                theme: Sc::new(Theme::Inherit(InheritTheme {
+                  palette: Some(Rc::new(dark_palette)),
+                  ..<_>::default()
+                })),
+                @ {
+                  Box::new(fn_widget!{
+                    @MockBox {
+                      size: ZERO_SIZE,
+                      @ {
+                        *$c_themes.write() = ctx!().themes().clone();
+                        Void.widget_build(ctx!())
+                      }
+                    }
+                  })
+                }
               }
-
             }
-          }
+          })
         }
       }
     };

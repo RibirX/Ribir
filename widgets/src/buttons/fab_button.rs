@@ -36,7 +36,7 @@ pub struct FabButtonDecorator {
 impl ComposeDecorator for FabButtonDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 /// FabButton usage
@@ -82,7 +82,7 @@ pub struct FabButton {
 impl ComposeChild for FabButton {
   type Child = ButtonTemplate;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     let ButtonTemplate { icon, label } = &child;
     let button_type = match (&icon, &label) {
       (Some(_), Some(_)) => ButtonType::BOTH,
@@ -125,6 +125,5 @@ impl ComposeChild for FabButton {
         }
       }
     }
-    .into()
   }
 }

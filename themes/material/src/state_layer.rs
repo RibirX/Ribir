@@ -23,21 +23,20 @@ pub struct InteractiveLayer {
 }
 
 impl Compose for StateLayer {
-  fn compose(this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> impl WidgetBuilder {
     fn_widget! {
       @PathPaintKit {
         path: pipe!($this.path.clone()),
         brush: pipe!($this.role.calc_color($this.color)),
       }
     }
-    .into()
   }
 }
 
 impl ComposeChild for InteractiveLayer {
   type Child = Widget;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut host = @$child { };
       let layer = @IgnorePointer {
@@ -66,7 +65,6 @@ impl ComposeChild for InteractiveLayer {
         @{ layer }
       }
     }
-    .into()
   }
 }
 

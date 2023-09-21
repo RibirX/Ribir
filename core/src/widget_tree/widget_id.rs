@@ -15,17 +15,15 @@ use crate::{
 
 pub struct WidgetId(pub(crate) NodeId);
 
-pub(crate) type TreeArena = Arena<RenderNode>;
-
-pub(crate) struct RenderNode(Box<dyn Render>);
+pub(crate) type TreeArena = Arena<Box<dyn Render>>;
 
 impl WidgetId {
   /// Returns a reference to the node data.
   pub(crate) fn get<'a, 'b>(self, tree: &'a TreeArena) -> Option<&'a (dyn Render + 'b)> {
-    tree.get(self.0).map(|n| &*n.get().0)
+    tree.get(self.0).map(|n| &**n.get())
   }
 
-  pub(crate) fn get_node_mut(self, tree: &mut TreeArena) -> Option<&mut RenderNode> {
+  pub(crate) fn get_node_mut(self, tree: &mut TreeArena) -> Option<&mut Box<dyn Render>> {
     tree.get_mut(self.0).map(|n| n.get_mut())
   }
 
@@ -158,7 +156,7 @@ impl WidgetId {
   fn node_feature(
     self,
     tree: &TreeArena,
-    method: impl FnOnce(&Node<RenderNode>) -> Option<NodeId>,
+    method: impl FnOnce(&Node<Box<dyn Render>>) -> Option<NodeId>,
   ) -> Option<WidgetId> {
     tree.get(self.0).and_then(method).map(WidgetId)
   }
@@ -176,8 +174,8 @@ impl WidgetId {
   ) {
     let node = self.get_node_mut(tree).unwrap();
     unsafe {
-      let data = Box::from_raw(&mut *node.0 as *mut _);
-      let copied = node.replace(f(data));
+      let data = Box::from_raw(&mut **node as *mut _);
+      let copied = std::mem::replace(node, f(data));
       std::mem::forget(copied)
     }
   }
@@ -225,15 +223,7 @@ impl WidgetId {
 }
 
 pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn Render>) -> WidgetId {
-  WidgetId(arena.new_node(RenderNode(node)))
+  WidgetId(arena.new_node(node))
 }
 
 pub(crate) fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }
-
-impl RenderNode {
-  pub(crate) fn as_widget_mut(&mut self) -> &mut Box<dyn Render> { &mut self.0 }
-
-  pub(crate) fn replace(&mut self, value: Box<dyn Render>) -> Box<dyn Render> {
-    std::mem::replace(&mut self.0, value)
-  }
-}

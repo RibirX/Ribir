@@ -33,6 +33,8 @@ mod tests {
   use ribir_geom::Size;
 
   const SIZE: Size = Size::new(100., 100.);
-  fn smoke() -> Widget { fn_widget! { @Container { size: SIZE }}.into() }
+  fn smoke() -> impl WidgetBuilder {
+    fn_widget! { @Container { size: SIZE }}
+  }
   widget_layout_test!(smoke, size == SIZE,);
 }

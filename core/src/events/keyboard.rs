@@ -72,7 +72,7 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl Compose for Keys {
-      fn compose(this: State<Self>) -> Widget {
+      fn compose(this: State<Self>) -> impl WidgetBuilder {
         fn_widget! {
           @MockBox {
             size: Size::zero(),
@@ -96,14 +96,13 @@ mod tests {
             }
           }
         }
-        .into()
       }
     }
 
     let w = Keys::default();
     let keys = w.0.clone();
 
-    let mut wnd = TestWindow::new(w);
+    let mut wnd = TestWindow::new(fn_widget!(w));
     wnd.draw_frame();
 
     #[allow(deprecated)]

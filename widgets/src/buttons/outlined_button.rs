@@ -38,7 +38,7 @@ pub struct OutlinedButtonDecorator {
 impl ComposeDecorator for OutlinedButtonDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 /// OutlinedButton usage
@@ -84,7 +84,7 @@ pub struct OutlinedButton {
 impl ComposeChild for OutlinedButton {
   type Child = ButtonTemplate;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     let ButtonTemplate { icon, label } = &child;
     let button_type = match (&icon, &label) {
       (Some(_), Some(_)) => ButtonType::BOTH,
@@ -129,6 +129,5 @@ impl ComposeChild for OutlinedButton {
         }
       }
     }
-    .into()
   }
 }

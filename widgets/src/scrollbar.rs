@@ -30,8 +30,8 @@ pub struct HScrollBarThumbDecorator {
 impl ComposeDecorator for HScrollBarThumbDecorator {
   type Host = Widget;
 
-  fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget {
-    fn_widget! { @$host { left_anchor: pipe!($this.offset) } }.into()
+  fn compose_decorator(this: State<Self>, host: Self::Host) -> impl WidgetBuilder {
+    fn_widget! { @$host { left_anchor: pipe!($this.offset) } }
   }
 }
 
@@ -45,14 +45,14 @@ pub struct VScrollBarThumbDecorator {
 impl ComposeDecorator for VScrollBarThumbDecorator {
   type Host = Widget;
 
-  fn compose_decorator(this: State<Self>, host: Self::Host) -> Widget {
-    fn_widget! { @$host { top_anchor: pipe!($this.offset) } }.into()
+  fn compose_decorator(this: State<Self>, host: Self::Host) -> impl WidgetBuilder {
+    fn_widget! { @$host { top_anchor: pipe!($this.offset) } }
   }
 }
 
 impl ComposeChild for HScrollBar {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut scrolling = @ScrollableWidget {
         scrollable: Scrollable::X,
@@ -80,7 +80,6 @@ impl ComposeChild for HScrollBar {
         @ { scrollbar }
       }
     }
-    .into()
   }
 }
 
@@ -95,7 +94,7 @@ pub struct VScrollBar {
 
 impl ComposeChild for VScrollBar {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut scrolling = @ScrollableWidget {
         scrollable: Scrollable::Y,
@@ -124,7 +123,6 @@ impl ComposeChild for VScrollBar {
         @ { scrollbar }
       }
     }
-    .into()
   }
 }
 /// A control widget that enables the user to access horizontal parts child that
@@ -138,7 +136,7 @@ pub struct BothScrollbar {
 
 impl ComposeChild for BothScrollbar {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut scrolling = @ScrollableWidget {
         scrollable: Scrollable::Both,
@@ -169,7 +167,6 @@ impl ComposeChild for BothScrollbar {
         @ { v_bar }
       }
     }
-    .into()
   }
 }
 
@@ -181,7 +178,7 @@ pub struct HRawScrollbar {
 }
 
 impl Compose for HRawScrollbar {
-  fn compose(this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> impl WidgetBuilder {
     fn_widget! {
       @ {
         let scrolling = $this.scrolling.clone_reader();
@@ -231,7 +228,6 @@ impl Compose for HRawScrollbar {
       }
 
     }
-    .into()
   }
 }
 
@@ -243,7 +239,7 @@ pub struct VRawScrollbar {
 }
 
 impl Compose for VRawScrollbar {
-  fn compose(this: State<Self>) -> Widget {
+  fn compose(this: State<Self>) -> impl WidgetBuilder {
     fn_widget! {
       @ {
         let scrolling = $this.scrolling.clone_reader();
@@ -289,7 +285,6 @@ impl Compose for VRawScrollbar {
         }
       }
     }
-    .into()
   }
 }
 
@@ -315,7 +310,7 @@ mod test {
   use ribir_core::{reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
 
-  fn content_expand_so_all_view_can_scroll() -> Widget {
+  fn content_expand_so_all_view_can_scroll() -> impl WidgetBuilder {
     fn_widget! {
       @ConstrainedBox {
         clamp: BoxClamp::EXPAND_BOTH,
@@ -333,7 +328,6 @@ mod test {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(
     content_expand_so_all_view_can_scroll,

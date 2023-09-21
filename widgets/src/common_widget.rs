@@ -1,11 +1,11 @@
 use ribir_core::prelude::*;
 
-#[derive(Default, Declare2, SingleChild)]
+#[derive(Default, Declare2, PairChild)]
 pub struct Leading;
 
-#[derive(Default, Declare2, SingleChild)]
+#[derive(Default, Declare2, PairChild)]
 pub struct Trailing;
 
-pub type TrailingText = SinglePair<Trailing, CowArc<str>>;
+pub type TrailingText = Pair<Trailing, CowArc<str>>;
 
-pub type LeadingText = SinglePair<Leading, CowArc<str>>;
+pub type LeadingText = Pair<Leading, CowArc<str>>;

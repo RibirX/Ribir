@@ -345,9 +345,9 @@ mod tests {
       @MockMulti {
         on_performed_layout: move |_| *$root_layout_cnt.write() += 1,
         @ { pipe!($child_box.size.is_empty()).map(move|b| if b {
-            Widget::from(MockBox { size: Size::new(1., 1.) })
+            MockBox { size: Size::new(1., 1.) }.widget_build(ctx!())
           } else {
-            Widget::from(child_box.clone_writer().into_inner())
+            child_box.clone_writer().into_inner().widget_build(ctx!())
           })
         }
       }

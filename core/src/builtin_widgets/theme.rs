@@ -1,7 +1,7 @@
 //! Theme use to share visual config or style compose logic. It can be defined
 //! to app-wide or particular part of the application.
 
-use crate::{fill_svgs, impl_query_self_only, prelude::*, widget::StrictBuilder};
+use crate::{fill_svgs, impl_query_self_only, prelude::*, widget::WidgetBuilder};
 use ribir_algo::Sc;
 pub use ribir_algo::{CowArc, ShareResource};
 use ribir_geom::Size;
@@ -73,26 +73,25 @@ pub struct ThemeWidget {
 }
 
 impl ComposeChild for ThemeWidget {
-  type Child = Widget;
+  type Child = Box<dyn Fn(&BuildCtx) -> Widget>;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     use crate::prelude::*;
-    FnWidget::new(move |ctx| {
+    fn_widget! {
       let theme = this.read().theme.clone();
       AppCtx::load_font_from_theme(&theme);
 
-      let mut themes = ctx.themes().clone();
+      let mut themes = ctx!().themes().clone();
       themes.push(theme.clone());
 
-      let p = DataWidget::new(Box::new(Void), theme).strict_build(ctx);
+      let p = Void.widget_build(ctx!()).attach_data(theme, ctx!());
       // shadow the context with the theme.
-      let ctx = BuildCtx::new_with_data(Some(p), ctx.tree, themes);
-      let c = child.build(&ctx);
-      ctx.append_child(p, c);
+      let ctx = BuildCtx::new_with_data(Some(p.id()), ctx!().tree, themes);
+      let child = child(&ctx);
+      ctx.append_child(p.id(), child);
 
       p
-    })
-    .into()
+    }
   }
 }
 

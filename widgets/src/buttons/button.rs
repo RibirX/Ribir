@@ -34,7 +34,7 @@ pub struct ButtonDecorator {
 impl ComposeDecorator for ButtonDecorator {
   type Host = Widget;
 
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> Widget { host }
+  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 /// Button usage
@@ -71,7 +71,7 @@ pub struct Button {
 impl ComposeChild for Button {
   type Child = ButtonTemplate;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     let ButtonTemplate { icon, label } = &child;
     let button_type = match (&icon, &label) {
       (Some(_), Some(_)) => ButtonType::BOTH,
@@ -112,6 +112,5 @@ impl ComposeChild for Button {
         }
       }
     }
-    .into()
   }
 }

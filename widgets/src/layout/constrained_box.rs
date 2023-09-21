@@ -29,7 +29,7 @@ mod tests {
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
 
-  fn outside_fixed_clamp() -> Widget {
+  fn outside_fixed_clamp() -> impl WidgetBuilder {
     fn_widget! {
       @SizedBox {
         size: Size::new(50., 50.),
@@ -39,14 +39,13 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test! (
     outside_fixed_clamp,
     {path =[0,0,0], width == 50., height == 50.,}
   );
 
-  fn expand_one_axis() -> Widget {
+  fn expand_one_axis() -> impl WidgetBuilder {
     fn_widget! {
       @Container {
         size: Size::new(256., 50.),
@@ -58,14 +57,13 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(
     expand_one_axis,
     { path = [0, 0], width==256., height == 20. ,}
   );
 
-  fn expand_both() -> Widget {
+  fn expand_both() -> impl WidgetBuilder {
     fn_widget! {
       @Container {
         size: Size::new(256., 50.),
@@ -77,7 +75,6 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(
     expand_both,

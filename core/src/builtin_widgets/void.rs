@@ -33,6 +33,6 @@ mod tests {
 
   /// Measures the time required to build and layout an `Void` widget, and other
   /// widget can subtract this time to obtain their own real time
-  fn base() -> Void { Void {} }
+  fn base() -> impl WidgetBuilder { fn_widget!(Void) }
   widget_bench!(base);
 }

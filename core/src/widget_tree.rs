@@ -13,7 +13,7 @@ mod layout_info;
 use crate::prelude::*;
 pub use layout_info::*;
 
-use self::widget_id::{empty_node, RenderNode};
+use self::widget_id::empty_node;
 
 pub(crate) type DirtySet = Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
 
@@ -188,9 +188,9 @@ impl WidgetTree {
   pub(crate) fn get_many_mut<const N: usize>(
     &mut self,
     ids: &[WidgetId; N],
-  ) -> [&mut RenderNode; N] {
+  ) -> [&mut Box<dyn Render>; N] {
     unsafe {
-      let mut outs: MaybeUninit<[&mut RenderNode; N]> = MaybeUninit::uninit();
+      let mut outs: MaybeUninit<[&mut Box<dyn Render>; N]> = MaybeUninit::uninit();
       let outs_ptr = outs.as_mut_ptr();
       for (idx, wid) in ids.iter().enumerate() {
         let arena = &mut *(&mut self.arena as *mut TreeArena);
@@ -235,24 +235,23 @@ mod tests {
   }
 
   impl Compose for Recursive {
-    fn compose(this: State<Self>) -> Widget {
+    fn compose(this: State<Self>) -> impl WidgetBuilder {
       fn_widget! {
         @MockMulti {
           @{
             pipe!(($this.width, $this.depth))
-              .map(|(width, depth)| {
+              .map(move |(width, depth)| {
                 (0..width).map(move |_| -> Widget {
                   if depth > 1 {
-                    Recursive { width, depth: depth - 1 }.into()
+                    Recursive { width, depth: depth - 1 }.widget_build(ctx!())
                   } else {
-                    MockBox { size: Size::new(10., 10.)}.into()
+                    MockBox { size: Size::new(10., 10.)}.widget_build(ctx!())
                   }
                 })
               })
           }
          }
       }
-      .into()
     }
   }
 
@@ -263,14 +262,14 @@ mod tests {
   }
 
   impl Compose for Embed {
-    fn compose(this: State<Self>) -> Widget {
+    fn compose(this: State<Self>) -> impl WidgetBuilder {
       fn_widget! {
         let recursive_child: Widget = if $this.depth > 1 {
           let width = $this.width;
           let depth = $this.depth - 1;
-          Embed { width, depth }.into()
+          Embed { width, depth }.widget_build(ctx!())
         } else {
-          MockBox { size: Size::new(10., 10.) }.into()
+          MockBox { size: Size::new(10., 10.) }.widget_build(ctx!())
         };
         @MockMulti {
           @{ pipe!{
@@ -280,14 +279,13 @@ mod tests {
           @{ recursive_child }
         }
       }
-      .into()
     }
   }
 
   fn bench_recursive_inflate(width: usize, depth: usize, b: &mut Bencher) {
-    let mut wnd = TestWindow::new(Void {});
+    let mut wnd = TestWindow::new(fn_widget!(Void));
     b.iter(move || {
-      wnd.set_content_widget(Recursive { width, depth }.into());
+      wnd.set_content_widget(fn_widget! {Recursive { width, depth }});
       wnd.draw_frame();
     });
   }
@@ -295,7 +293,7 @@ mod tests {
   fn bench_recursive_repair(width: usize, depth: usize, b: &mut Bencher) {
     let w = Stateful::new(Recursive { width, depth });
     let trigger = w.clone_writer();
-    let mut wnd = TestWindow::new(w);
+    let mut wnd = TestWindow::new(fn_widget!(w));
     b.iter(|| {
       {
         let _ = trigger.write();
@@ -343,10 +341,14 @@ mod tests {
     let w = fn_widget! {
       @ {
         pipe!(*$parent).map(move |p|{
-          p.then(|| @MockBox {
-            size: Size::zero(),
-            @ { pipe!($child.then(|| Void)) }
-          })
+          if p {
+            @MockBox {
+              size: Size::zero(),
+              @ { pipe!($child.then(|| Void)) }
+            }.widget_build(ctx!())
+          } else {
+            Void.widget_build(ctx!())
+          }
         })
       }
     };
@@ -369,7 +371,7 @@ mod tests {
 
     let trigger = Stateful::new(true);
     let c_trigger = trigger.clone_writer();
-    let w = fn_widget! { @ { pipe!($trigger.then(|| Void)) }};
+    let w = fn_widget! { @ { pipe!($trigger; Void) }};
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
@@ -391,7 +393,7 @@ mod tests {
     reset_test_env!();
 
     let post = Embed { width: 5, depth: 3 };
-    let wnd = TestWindow::new(post);
+    let wnd = TestWindow::new(fn_widget!(post));
     let mut tree = wnd.widget_tree.borrow_mut();
     tree.layout(Size::new(512., 512.));
     assert_eq!(tree.count(), 16);
@@ -411,11 +413,10 @@ mod tests {
   fn new_5_x_1000(b: &mut Bencher) {
     reset_test_env!();
 
-    let wnd = TestWindow::new(Void);
+    let wnd = TestWindow::new(fn_widget!(Void));
 
     b.iter(move || {
-      let post = Embed { width: 5, depth: 1000 };
-      wnd.set_content_widget(post.into());
+      wnd.set_content_widget(fn_widget!(Embed { width: 5, depth: 1000 }));
     });
   }
 
@@ -453,7 +454,7 @@ mod tests {
 
     let post = Stateful::new(Embed { width: 5, depth: 1000 });
     let trigger = post.clone_writer();
-    let wnd = TestWindow::new(post);
+    let wnd = TestWindow::new(fn_widget!(post));
     let mut tree = wnd.widget_tree.borrow_mut();
 
     b.iter(|| {

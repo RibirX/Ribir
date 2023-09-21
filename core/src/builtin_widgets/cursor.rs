@@ -11,7 +11,7 @@ pub struct Cursor {
 
 impl ComposeChild for Cursor {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> Widget {
+  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let save_cursor = Stateful::new(CursorIcon::Default);
       @$child {
@@ -29,7 +29,6 @@ impl ComposeChild for Cursor {
         }
       }
     }
-    .into()
   }
 }
 

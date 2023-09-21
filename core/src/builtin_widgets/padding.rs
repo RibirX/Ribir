@@ -65,7 +65,7 @@ mod tests {
   use crate::test_helper::*;
   use ribir_dev_helper::*;
 
-  fn smoke() -> Widget {
+  fn smoke() -> impl WidgetBuilder {
     fn_widget! {
       @MockMulti {
         padding: EdgeInsets::only_left(1.),
@@ -74,7 +74,6 @@ mod tests {
         }
       }
     }
-    .into()
   }
   widget_layout_test!(
     smoke,

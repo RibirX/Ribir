@@ -282,7 +282,10 @@ mod tests {
     btns: MouseButtons,
   }
 
-  fn record_pointer(event_stack: Rc<RefCell<Vec<Info>>>, widget: Widget) -> Widget {
+  fn record_pointer(
+    event_stack: Rc<RefCell<Vec<Info>>>,
+    widget: impl WidgetBuilder,
+  ) -> impl WidgetBuilder {
     let handler_ctor = move || {
       let stack = event_stack.clone();
 
@@ -301,7 +304,6 @@ mod tests {
         on_pointer_cancel: handler_ctor(),
       }
     }
-    .into()
   }
 
   #[test]
@@ -311,11 +313,11 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let record = record_pointer(
       event_record.clone(),
-      MockBox { size: Size::new(100., 30.) }.into(),
+      fn_widget!(MockBox { size: Size::new(100., 30.) }),
     );
     let root = record_pointer(
       event_record.clone(),
-      fn_widget! { @MockMulti { @ { record } } }.into(),
+      fn_widget! { @MockMulti { @ { record } } },
     );
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
@@ -356,7 +358,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      fn_widget! { @MockBox { size: Size::new(100., 30.) } }.into(),
+      fn_widget! { @MockBox { size: Size::new(100., 30.) } },
     );
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
@@ -425,7 +427,7 @@ mod tests {
     let event_record = Rc::new(RefCell::new(vec![]));
     let root = record_pointer(
       event_record.clone(),
-      MockBox { size: Size::new(100., 30.) }.into(),
+      fn_widget!(MockBox { size: Size::new(100., 30.) }),
     );
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
@@ -494,7 +496,7 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<WidgetId>>>);
     impl Compose for EventRecord {
-      fn compose(this: State<Self>) -> Widget {
+      fn compose(this: State<Self>) -> impl WidgetBuilder {
         fn_widget! {
           @MockBox {
             size: INFINITY_SIZE,
@@ -509,14 +511,13 @@ mod tests {
             }
           }
         }
-        .into()
       }
     }
 
     let root = EventRecord::default();
     let event_record = root.0.clone();
 
-    let mut wnd = TestWindow::new_with_size(root, Size::new(100., 100.));
+    let mut wnd = TestWindow::new_with_size(fn_widget!(root), Size::new(100., 100.));
     wnd.draw_frame();
 
     #[allow(deprecated)]
@@ -541,7 +542,7 @@ mod tests {
     }
 
     impl Compose for EnterLeave {
-      fn compose(this: State<Self>) -> Widget {
+      fn compose(this: State<Self>) -> impl WidgetBuilder {
         fn_widget! {
           @MockBox {
             size: INFINITY_SIZE,
@@ -555,7 +556,6 @@ mod tests {
             }
           }
         }
-        .into()
       }
     }
 
@@ -563,7 +563,7 @@ mod tests {
     let enter_event = w.enter.clone();
     let leave_event = w.leave.clone();
 
-    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    let mut wnd = TestWindow::new_with_size(fn_widget!(w), Size::new(100., 100.));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -827,7 +827,7 @@ mod tests {
     reset_test_env!();
 
     let w = MockBox { size: INFINITY_SIZE };
-    let mut wnd = TestWindow::new(w);
+    let mut wnd = TestWindow::new(fn_widget!(w));
     wnd.draw_frame();
     let mut dispatcher = wnd.dispatcher.borrow_mut();
     dispatcher.info.cursor_pos = Point::new(-1., -1.);
