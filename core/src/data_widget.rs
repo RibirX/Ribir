@@ -18,6 +18,10 @@ pub struct AnonymousWrapper {
   _data: Box<dyn Any>,
 }
 
+impl<D> DataWidget<D> {
+  pub(crate) fn new(render: Box<dyn Render>, data: D) -> Self { DataWidget { render, data } }
+}
+
 impl AnonymousWrapper {
   #[inline]
   pub fn new(render: Box<dyn Render>, data: Box<dyn Any>) -> Self {
@@ -41,9 +45,7 @@ impl_proxy_render!(proxy render, AnonymousWrapper);
 impl Widget {
   pub fn attach_data<D: Query>(self, data: D, ctx: &BuildCtx) -> Widget {
     let arena = &mut ctx.tree.borrow_mut().arena;
-    self
-      .id()
-      .wrap_node(arena, |render| Box::new(DataWidget { render, data }));
+    self.id().attach_data(data, arena);
 
     self
   }
@@ -58,12 +60,9 @@ impl Widget {
     }
   }
 
-  pub fn attach_anonymous_data(self, data: Box<dyn Any>, ctx: &BuildCtx) -> Widget {
+  pub fn attach_anonymous_data(self, data: impl Any, ctx: &BuildCtx) -> Widget {
     let arena = &mut ctx.tree.borrow_mut().arena;
-    self.id().wrap_node(arena, |render| {
-      Box::new(AnonymousWrapper::new(render, data))
-    });
-
+    self.id().attach_anonymous_data(data, arena);
     self
   }
 }

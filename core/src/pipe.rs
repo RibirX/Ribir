@@ -17,7 +17,6 @@ use crate::{
   prelude::*,
   ticker::FrameMsg,
   widget::{Query, Render, RenderBuilder, Widget, WidgetId, WidgetTree},
-  window::WindowId,
 };
 
 /// A value that can be subscribed its continuous change from the observable
@@ -87,21 +86,17 @@ impl<V> Pipe<V> {
   where
     V: 'static,
   {
-    let (v, modifies) = self.unzip();
-    let v = build(v, ctx);
-    let id_share = Sc::new(Cell::new(v.id()));
+    let (w, modifies) = self.unzip();
+    let w = build(w, ctx);
+    let id_share = Sc::new(Cell::new(w.id()));
 
-    let mut pipe_node = None;
-    v.id().wrap_node(&mut ctx.tree.borrow_mut().arena, |r| {
-      let p = PipeNode::new(r);
-      pipe_node = Some(p.clone());
-      Box::new(p)
-    });
+    let mut pipe_node = PipeNode::share_capture(w.id(), ctx);
 
     let id_share2 = id_share.clone();
     let handle = ctx.handle();
     let wnd_id = ctx.window().id();
-    let unsub = modifies
+
+    let u = modifies
       // Collects all the subtrees need to be regenerated before executing the regeneration in the
       // `subscribe` method. Because the `sampler` will delay the `subscribe` until a new frame
       // start.
@@ -112,7 +107,8 @@ impl<V> Pipe<V> {
         }
       })
       .sample(new_frame_sampler!(ctx))
-      .subscribe(move |(_, v)| {
+      .box_it()
+      .subscribe(move |(_, w)| {
         handle.with_ctx(|ctx| {
           let id = id_share.get();
 
@@ -122,30 +118,8 @@ impl<V> Pipe<V> {
           AppCtx::spawn_local(async move { wnd.remove_regenerating_mark(id) }).unwrap();
 
           if !ctx.window().is_in_another_regenerating(id) {
-            let new_id = build(v, ctx).consume();
-
-            // We use a `PipeNode` wrap the initial widget node, so if the widget node is
-            // not a `PipeNode` means the node is attached some data, we need to keep the
-            // data attached when it replaced by the new widget, because the data is the
-            // static stuff.
-            //
-            // Only pipe widget as a normal widget need to do this, because compose child
-            // widget not support pipe object as its child if it's not a normal widget. Only
-            // compose child widget has the ability to apply new logic on a widget that
-            // built.
-            if let Some(pn) = pipe_node.as_mut() {
-              let mut tree = ctx.tree.borrow_mut();
-              if !id.assert_get(&tree.arena).is::<PipeNode>() {
-                let [old_node, new_node] = tree.get_many_mut(&[id, new_id]);
-
-                std::mem::swap(pn.as_mut(), new_node);
-                std::mem::swap(old_node, new_node);
-              } else {
-                // we know widget node not attached data, we can not care about it now.
-                pipe_node.take();
-              }
-            }
-
+            let new_id = build(w, ctx).consume();
+            pipe_node.transplant_to(id, new_id, ctx);
             update_key_status_single(id, new_id, ctx);
 
             ctx.insert_after(id, new_id);
@@ -155,10 +129,10 @@ impl<V> Pipe<V> {
             ctx.mark_dirty(new_id)
           }
         });
-      });
-    attach_unsubscribe_guard(v.id(), ctx.window().id(), unsub);
+      })
+      .unsubscribe_when_dropped();
 
-    v
+    w.attach_anonymous_data(u, ctx)
   }
 }
 
@@ -258,11 +232,13 @@ fn update_pipe_parent<W: 'static>(
   ctx: &BuildCtx,
   transplant: impl Fn(W, WidgetId, &BuildCtx) -> WidgetId + 'static,
 ) {
+  let mut pipe_node = PipeNode::share_capture(parent.start, ctx);
+
   let id_share = Sc::new(RefCell::new(parent.clone()));
   let id_share2 = id_share.clone();
   let handle = ctx.handle();
   let wnd_id = ctx.window().id();
-  let unsub = modifies
+  let u = modifies
     .filter(|(scope, _)| scope.contains(ModifyScope::FRAMEWORK))
     .tap(move |_| {
       if let Some(wnd) = AppCtx::get_window(wnd_id) {
@@ -271,7 +247,8 @@ fn update_pipe_parent<W: 'static>(
       }
     })
     .sample(new_frame_sampler!(ctx))
-    .subscribe(move |(_, v)| {
+    .box_it()
+    .subscribe(move |(_, w)| {
       handle.with_ctx(|ctx| {
         let rg = id_share.borrow().clone();
 
@@ -282,8 +259,9 @@ fn update_pipe_parent<W: 'static>(
 
         if !ctx.window().is_in_another_regenerating(rg.start) {
           let first_child = rg.end.first_child(&ctx.tree.borrow().arena).unwrap();
-          let p = transplant(v, rg.end, ctx);
+          let p = transplant(w, rg.end, ctx);
           let new_rg = half_to_close_interval(p..first_child, &ctx.tree.borrow());
+          pipe_node.transplant_to(rg.start, new_rg.start, ctx);
 
           update_key_status_single(rg.start, new_rg.start, ctx);
 
@@ -299,9 +277,12 @@ fn update_pipe_parent<W: 'static>(
           *id_share.borrow_mut() = new_rg;
         }
       });
-    });
+    })
+    .unsubscribe_when_dropped();
 
-  attach_unsubscribe_guard(parent.start, ctx.window().id(), unsub);
+  parent
+    .start
+    .attach_anonymous_data(u, &mut ctx.tree.borrow_mut().arena);
 }
 
 impl<W: 'static> Pipe<W> {
@@ -313,35 +294,28 @@ impl<W: 'static> Pipe<W> {
   ) where
     W: IntoIterator,
   {
-    fn build_multi<V: IntoIterator>(
-      v: V,
-      f: impl Fn(V::Item, &BuildCtx) -> Widget,
-      ctx: &BuildCtx,
-    ) -> Vec<WidgetId> {
-      let mut ids = v
-        .into_iter()
-        .map(|w| f(w, ctx).consume())
-        .collect::<Vec<_>>();
-
-      if ids.is_empty() {
-        ids.push(Void.widget_build(ctx).consume());
+    let build_multi = move |widgets: W, ctx: &BuildCtx| {
+      let mut widgets = widgets.into_iter().map(|w| f(w, ctx)).collect::<Vec<_>>();
+      if widgets.is_empty() {
+        widgets.push(Void.widget_build(ctx));
       }
-
-      ids
-    }
+      widgets
+    };
 
     let (m, modifies) = self.unzip();
 
-    let ids = build_multi(m, &f, ctx);
-    let first_id = ids[0];
+    let widgets = build_multi(m, ctx);
+    let ids = widgets.iter().map(|w| w.id()).collect::<Vec<_>>();
+    let first = ids[0];
+    let mut pipe_node = PipeNode::share_capture(first, ctx);
 
-    vec.extend(ids.iter().copied().map(|id| Widget::from_id(id, ctx)));
+    vec.extend(widgets);
 
     let ids_share = Sc::new(RefCell::new(ids));
     let id_share2 = ids_share.clone();
     let wnd_id = ctx.window().id();
     let handle = ctx.handle();
-    let unsub = modifies
+    let u = modifies
       .filter(|(scope, _)| scope.contains(ModifyScope::FRAMEWORK))
       // Collects all the subtrees need to be regenerated before executing the regeneration in the
       // `subscribe` method. Because the `sampler` will delay the `subscribe` until a new frame
@@ -371,7 +345,12 @@ impl<W: 'static> Pipe<W> {
           .unwrap();
 
           if !ctx.window().is_in_another_regenerating(old[0]) {
-            let new = build_multi(m, &f, ctx);
+            let new = build_multi(m, ctx)
+              .into_iter()
+              .map(Widget::consume)
+              .collect::<Vec<_>>();
+
+            pipe_node.transplant_to(old[0], new[0], ctx);
 
             update_key_state_multi(old.iter().copied(), new.iter().copied(), ctx);
 
@@ -384,30 +363,11 @@ impl<W: 'static> Pipe<W> {
             *old = new;
           }
         });
-      });
-    attach_unsubscribe_guard(first_id, ctx.window().id(), unsub);
+      })
+      .unsubscribe_when_dropped();
+
+    first.attach_anonymous_data(u, &mut ctx.tree.borrow_mut().arena);
   }
-}
-
-fn attach_unsubscribe_guard(id: WidgetId, wnd: WindowId, unsub: impl Subscription + 'static) {
-  AppCtx::spawn_local(async move {
-    let Some(wnd) = AppCtx::get_window(wnd) else {
-      unsub.unsubscribe();
-      return;
-    };
-    let mut tree = wnd.widget_tree.borrow_mut();
-
-    if tree.root() != id {
-      let guard = unsub.unsubscribe_when_dropped();
-      // auto unsubscribe when the widget is not a root and its parent is None.
-      if let Some(p) = id.parent(&tree.arena) {
-        p.wrap_node(&mut tree.arena, |d| {
-          Box::new(AnonymousWrapper::new(d, Box::new(guard)))
-        })
-      }
-    }
-  })
-  .unwrap();
 }
 
 fn update_children_key_status(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
@@ -523,11 +483,34 @@ impl<W: MultiChild> MultiChild for Pipe<W> {}
 /// `PipeNode` just use to wrap a `Box<dyn Render>`, and provide a choice to
 /// change the inner `Box<dyn Render>` by `UnsafeCell` at a safe time. It's
 /// transparent except the `Pipe` widget.
+///
+/// We use a `PipeNode` wrap the widget node of the pipe, so we can only
+/// replace the dynamic part come from the pipe, and keep the static data
+/// attached to this node. For example, we attached the unsubscribe handle of
+/// the pipe to the first node, and user can attach `key` or `listener` to the
+/// widget after `Pipe::build_widget` call.
 #[derive(Clone)]
 struct PipeNode(Sc<UnsafeCell<Box<dyn Render>>>);
 
 impl PipeNode {
-  fn new(value: Box<dyn Render>) -> Self { Self(Sc::new(UnsafeCell::new(value))) }
+  fn share_capture(id: WidgetId, ctx: &BuildCtx) -> Self {
+    let mut pipe_node = None;
+    id.wrap_node(&mut ctx.tree.borrow_mut().arena, |r| {
+      let p = Self(Sc::new(UnsafeCell::new(r)));
+      pipe_node = Some(p.clone());
+      Box::new(p)
+    });
+    // we init before.
+    unsafe { pipe_node.unwrap_unchecked() }
+  }
+
+  fn transplant_to(&mut self, from: WidgetId, to: WidgetId, ctx: &BuildCtx) {
+    let mut tree = ctx.tree.borrow_mut();
+    let [old_node, new_node] = tree.get_many_mut(&[from, to]);
+
+    std::mem::swap(self.as_mut(), new_node);
+    std::mem::swap(old_node, new_node);
+  }
 
   fn as_ref(&self) -> &dyn Render {
     // safety: see the `PipeNode` document.
@@ -736,12 +719,16 @@ mod tests {
 
     // trigger the parent update
     *c_p_trigger.write() = true;
-    wnd.run_frame_tasks();
     // then trigger the child update.
     *c_c_trigger.write() = true;
-
     wnd.draw_frame();
     assert_eq!(*mnt_cnt2.read(), 4);
+
+    // old pipe should be unsubscribed.
+    *c_p_trigger.write() = true;
+    *c_c_trigger.write() = true;
+    wnd.draw_frame();
+    assert_eq!(*mnt_cnt2.read(), 6);
   }
 
   #[test]
