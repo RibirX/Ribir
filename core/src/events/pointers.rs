@@ -161,7 +161,7 @@ fn x_times_tap_map_filter(
   }
 }
 
-impl PointerListenerDeclarer2 {
+impl PointerListener {
   pub fn on_double_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
     self.on_x_times_tap((2, handler))
   }
@@ -204,48 +204,6 @@ impl PointerListenerDeclarer2 {
       .filter_map(x_times_tap_map_filter(times, dur, capture))
       .subscribe(handler);
     self
-  }
-}
-
-impl PointerListener {
-  pub fn on_double_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) {
-    self.on_x_times_tap((2, handler))
-  }
-
-  pub fn on_double_tap_capture(self, handler: impl FnMut(&mut PointerEvent) + 'static) {
-    self.on_x_times_tap_capture((2, handler))
-  }
-
-  pub fn on_triple_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) {
-    self.on_x_times_tap((3, handler))
-  }
-
-  pub fn on_triple_tap_capture(self, handler: impl FnMut(&mut PointerEvent) + 'static) {
-    self.on_x_times_tap_capture((3, handler))
-  }
-
-  pub fn on_x_times_tap(self, (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static)) {
-    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler);
-  }
-
-  pub fn on_x_times_tap_capture(
-    self,
-    (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
-  ) {
-    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler);
-  }
-
-  fn on_x_times_tap_impl(
-    &self,
-    x: usize,
-    dur: Duration,
-    capture: bool,
-    handler: impl FnMut(&mut PointerEvent) + 'static,
-  ) {
-    self
-      .pointer_stream()
-      .filter_map(x_times_tap_map_filter(x, dur, capture))
-      .subscribe(handler);
   }
 }
 

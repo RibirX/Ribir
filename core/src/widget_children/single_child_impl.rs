@@ -1,3 +1,5 @@
+use crate::pipe::{InnerPipe, MapPipe};
+
 use super::*;
 
 /// Trait specify what child a widget can have, and the target type is the
@@ -31,15 +33,19 @@ crate::widget::multi_build_replace_impl_include_self! {
       }
     }
   }
+}
 
-  impl<P, C: 'static> SingleWithChild<Pipe<Option<C>>, dyn {#}> for P
+crate::widget::multi_build_replace_impl_include_self! {
+  impl<P, V, S> SingleWithChild<MapPipe<Option<V>, S>, dyn {#}> for P
   where
     P: SingleParent + {#},
-    C: {#},
+    S: InnerPipe,
+    V: {#} + 'static,
+    S::Value: 'static,
   {
     type Target = Widget;
 
-    fn with_child(self, child: Pipe<Option<C>>, ctx: &BuildCtx) -> Self::Target {
+    fn with_child(self, child: MapPipe<Option<V>, S>, ctx: &BuildCtx) -> Self::Target {
       let child = crate::pipe::pipe_option_to_widget!(child, ctx);
       self.with_child(child, ctx)
     }

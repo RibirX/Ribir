@@ -37,7 +37,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::events::*;
   #[doc(no_inline)]
-  pub use crate::pipe::Pipe;
+  pub use crate::pipe::{FinalChain, MapPipe, ModifiesPipe, Pipe};
   #[doc(no_inline)]
   pub use crate::state::*;
   #[doc(no_inline)]

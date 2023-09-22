@@ -2,7 +2,7 @@ use super::Pair;
 use crate::{
   builtin_widgets::{FatObj, Void},
   context::BuildCtx,
-  prelude::Pipe,
+  pipe::{FinalChain, InnerPipe, MapPipe, Pipe},
   state::{State, StateFrom},
   widget::*,
 };
@@ -36,10 +36,23 @@ crate::widget::multi_build_replace_impl! {
 }
 
 crate::widget::multi_build_replace_impl_include_self! {
-  impl<W: {#} + 'static> FromAnother<Pipe<Option<W>>, &dyn {#}> for Widget {
-    fn from_another(value: Pipe<Option<W>>, ctx: &BuildCtx) -> Self {
+  impl<V: {#} + 'static, S: InnerPipe> FromAnother<MapPipe<Option<V>, S>, &dyn {#}> for Widget
+  where
+    S::Value: 'static,
+  {
+    #[inline]
+    fn from_another(value: MapPipe<Option<V>, S>, ctx: &BuildCtx) -> Self {
       crate::pipe::pipe_option_to_widget!(value, ctx)
-     }
+    }
+  }
+
+  impl<V: {#} + 'static, S: InnerPipe<Value = Option<V>>>
+    FromAnother<FinalChain<Option<V>, S>, &dyn {#}> for Widget
+  {
+    #[inline]
+    fn from_another(value: FinalChain<Option<V>, S>, ctx: &BuildCtx) -> Self {
+      crate::pipe::pipe_option_to_widget!(value, ctx)
+    }
   }
 }
 

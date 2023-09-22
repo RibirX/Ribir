@@ -9,9 +9,8 @@ define_widget_context!(LifecycleEvent);
 
 pub type LifecycleSubject = MutRefItemSubject<'static, AllLifecycle, Infallible>;
 
-#[derive(Declare2, Default)]
+#[derive(Default)]
 pub struct LifecycleListener {
-  #[declare(skip)]
   lifecycle: LifecycleSubject,
 }
 
@@ -42,7 +41,17 @@ macro_rules! match_closure {
   };
 }
 
-impl LifecycleListenerDeclarer2 {
+impl Declare2 for LifecycleListener {
+  type Builder = Self;
+  fn declare2_builder() -> Self::Builder { Self::default() }
+}
+
+impl DeclareBuilder for LifecycleListener {
+  type Target = State<Self>;
+  fn build_declare(self, _: &BuildCtx) -> Self::Target { State::value(self) }
+}
+
+impl LifecycleListener {
   pub fn on_mounted(mut self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
     let _ = self
       .subject()
@@ -72,13 +81,7 @@ impl LifecycleListenerDeclarer2 {
     self
   }
 
-  fn subject(&mut self) -> LifecycleSubject {
-    self
-      .lifecycle
-      .get_or_insert_with(DeclareInit::default)
-      .value()
-      .clone()
-  }
+  fn subject(&mut self) -> LifecycleSubject { self.lifecycle.clone() }
 }
 
 impl_query_self_only!(LifecycleListener);
