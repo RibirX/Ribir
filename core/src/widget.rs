@@ -4,15 +4,14 @@ use crate::{
   prelude::*,
 };
 use ribir_algo::{Sc, ShareResource};
-use rxrust::subscription::{BoxSubscription, SubscriptionGuard};
 
-use std::rc::Rc;
 #[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
   marker::PhantomData,
   ops::Deref,
 };
+use std::{convert::Infallible, rc::Rc};
 pub trait Compose: Sized {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
@@ -170,6 +169,25 @@ impl Widget {
     let id = self.id;
     std::mem::forget(self);
     id
+  }
+
+  /// Subscribe the modifies `upstream` to mark the widget dirty when the
+  /// `upstream` emit a modify event that contains `ModifyScope::FRAMEWORK`.
+  pub(crate) fn dirty_subscribe(
+    self,
+    upstream: Subject<'static, ModifyScope, Infallible>,
+    ctx: &BuildCtx,
+  ) -> Self {
+    let dirty_set = ctx.tree.borrow().dirty_set.clone();
+    let id = self.id();
+    let h = upstream
+      .filter(|b| b.contains(ModifyScope::FRAMEWORK))
+      .subscribe(move |_| {
+        dirty_set.borrow_mut().insert(id);
+      })
+      .unsubscribe_when_dropped();
+
+    self.attach_anonymous_data(h, ctx)
   }
 
   pub(crate) fn id(&self) -> WidgetId { self.id }
@@ -332,9 +350,6 @@ impl_proxy_render!(proxy deref(), ShareResource<T>, <T>, where  T: Render + 'sta
 impl_proxy_query!(paths [deref()], Rc<W>, <W>, where W: Query + 'static);
 impl_proxy_render!(proxy deref(), Rc<W>, <W>, where W: Render + 'static);
 impl_proxy_query!(paths [deref()], Sc<W>, <W>, where W: Query + 'static);
-impl_proxy_render!(proxy deref(), Sc<W>, <W>, where W: Render + 'static);
-
-impl_query_self_only!(Vec<SubscriptionGuard<BoxSubscription<'static>>>);
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
   ctx.box_rect().map_or(false, |rect| rect.contains(pos))

@@ -1,4 +1,7 @@
-use crate::{impl_proxy_query, impl_proxy_render, impl_query_self_only, prelude::*};
+use crate::{
+  prelude::*,
+  render_helper::{RenderProxy, RenderTarget},
+};
 use ribir_algo::Sc;
 use rxrust::{ops::box_it::BoxOp, prelude::*};
 use std::{
@@ -225,6 +228,18 @@ impl<R: ComposeChild<Child = Option<C>>, C> ComposeChildBuilder for Stateful<R> 
   }
 }
 
+impl<R: Render> RenderBuilder for Stateful<R> {
+  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+    match self.try_into_inner() {
+      Ok(r) => r.widget_build(ctx),
+      Err(s) => {
+        let w = RenderProxy::new(s.clone_writer().into_inner()).widget_build(ctx);
+        w.dirty_subscribe(s.raw_modifies(), ctx)
+      }
+    }
+  }
+}
+
 impl<W> Stateful<W> {
   pub fn new(data: W) -> Self {
     Stateful {
@@ -356,14 +371,38 @@ impl<'a, W> WriteRef<'a, W> {
 impl<W: SingleChild> SingleChild for Stateful<W> {}
 impl<W: MultiChild> MultiChild for Stateful<W> {}
 
-impl_proxy_query!(
-  paths [notifier, read()],
-  Stateful<R>, <R>, where R: Query + 'static
-);
-impl_proxy_render!(proxy read(), Stateful<R>, <R>, where R: Render + 'static);
-impl_query_self_only!(Notifier);
-impl_proxy_query!(paths [0], Reader<T>, <T>, where T: Query + 'static);
-impl_proxy_query!(paths [0], Writer<T>, <T>, where T: Query + 'static);
+impl<W: SingleChild + Render> SingleParent for Stateful<W> {
+  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
+    let p = self.widget_build(ctx);
+    ctx.append_child(p.id(), child);
+    p
+  }
+}
+
+impl<W: MultiChild + Render> MultiParent for Stateful<W> {
+  fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
+    let p = self.widget_build(ctx);
+    for c in children {
+      ctx.append_child(p.id(), c);
+    }
+    p
+  }
+}
+
+impl<R: Render> RenderTarget for Stateful<R> {
+  type Target = R;
+  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(&*self.read()) }
+}
+
+impl<T: Query> Query for Stateful<T> {
+  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
+    self.read().query_inside_first(type_id, callback)
+  }
+
+  fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
+    self.read().query_inside_first(type_id, callback)
+  }
+}
 
 impl<'a, W> Drop for WriteRef<'a, W> {
   fn drop(&mut self) {

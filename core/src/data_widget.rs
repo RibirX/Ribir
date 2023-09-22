@@ -1,7 +1,7 @@
 //! Data widget help attach data to a widget and get a new widget which behavior
 //! is same as origin widget.
 
-use crate::{impl_proxy_query, impl_proxy_render, prelude::*};
+use crate::{impl_proxy_query, impl_proxy_render, prelude::*, render_helper::RenderTarget};
 
 pub struct DataWidget<D> {
   render: Box<dyn Render>,
@@ -29,18 +29,11 @@ impl AnonymousWrapper {
   }
 }
 
-impl Query for AnonymousWrapper {
+impl RenderTarget for AnonymousWrapper {
+  type Target = dyn Render;
   #[inline]
-  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-    self.render.query_inside_first(type_id, callback)
-  }
-  #[inline]
-  fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-    self.render.query_outside_first(type_id, callback)
-  }
+  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(&*self.render) }
 }
-
-impl_proxy_render!(proxy render, AnonymousWrapper);
 
 impl Widget {
   pub fn attach_data<D: Query>(self, data: D, ctx: &BuildCtx) -> Widget {

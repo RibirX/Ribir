@@ -9,6 +9,7 @@ pub mod animation;
 pub mod builtin_widgets;
 mod context;
 pub mod data_widget;
+pub(crate) mod render_helper;
 mod state;
 pub(crate) mod widget_tree;
 

@@ -1,14 +1,13 @@
 use std::any::Any;
 
 use indextree::{Arena, Node, NodeId};
-use rxrust::prelude::*;
 
 use super::WidgetTree;
 use crate::{
   builtin_widgets::Void,
   context::{PaintingCtx, WidgetCtx},
   prelude::{AnonymousWrapper, DataWidget},
-  state::{ModifyScope, Notifier},
+  render_helper::RenderProxy,
   widget::{Query, Render},
   window::DelayEvent,
 };
@@ -109,34 +108,10 @@ impl WidgetId {
     self.0.descendants(tree).map(WidgetId)
   }
 
-  pub(crate) fn on_mounted_subtree(self, tree: &mut WidgetTree) {
-    // safety: just
-    let tree2 = unsafe { &mut *(tree as *mut _) };
+  pub(crate) fn on_mounted_subtree(self, tree: &WidgetTree) {
     self
       .descendants(&tree.arena)
-      .for_each(|w| w.on_mounted(tree2));
-  }
-
-  pub(crate) fn on_mounted(self, tree: &mut WidgetTree) {
-    let mut handles = vec![];
-    self
-      .assert_get(&tree.arena)
-      .query_type_outside_first(|notifier: &Notifier| {
-        let state_changed = tree.dirty_set.clone();
-        let h = notifier
-          .raw_modifies()
-          .filter(|b| b.contains(ModifyScope::FRAMEWORK))
-          .subscribe(move |_| {
-            state_changed.borrow_mut().insert(self);
-          })
-          .unsubscribe_when_dropped();
-        handles.push(h);
-        true
-      });
-
-    // will auto cancel subscription when node removed.
-    self.attach_anonymous_data(handles.into_boxed_slice(), &mut tree.arena);
-    tree.window().add_delay_event(DelayEvent::Mounted(self));
+      .for_each(|w| tree.window().add_delay_event(DelayEvent::Mounted(w)));
   }
 
   pub(crate) fn insert_after(self, next: WidgetId, tree: &mut TreeArena) {
@@ -190,7 +165,8 @@ impl WidgetId {
 
   pub fn attach_anonymous_data(self, data: impl Any, tree: &mut TreeArena) {
     self.wrap_node(tree, |render| {
-      Box::new(AnonymousWrapper::new(render, Box::new(data)))
+      let r = RenderProxy::new(AnonymousWrapper::new(render, Box::new(data)));
+      Box::new(r)
     });
   }
 
