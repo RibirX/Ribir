@@ -21,8 +21,9 @@ impl ComposeChild for Expanded {
           min: Size::new(0., 0.),
           max: Size::new(f32::INFINITY, f32::INFINITY)
         },
-        @{ child.attach_state_data(this, ctx!()) }
+        @{ child }
       }
+      .attach_state_data(this, ctx!())
     }
   }
 }

@@ -43,20 +43,28 @@ macro_rules! impl_listener {
   ($doc: literal, $name: ident, $event_ty: ident) => {
     paste::paste! {
       #[doc= $doc]
-      #[derive(Declare2)]
-      pub struct [<$name Listener>]{
-        #[declare(skip)]
+       pub struct [<$name Listener>]{
         [<$name:snake _subject>]: [<$name Subject>]
       }
 
-      impl [<$name ListenerDeclarer2>] {
+      impl [<$name Listener>] {
         fn subject(&mut self) -> [<$name Subject>] {
           self
             .[<$name:snake _subject>]
-            .get_or_insert_with(DeclareInit::default)
-            .value()
             .clone()
         }
+      }
+
+      impl Declare2 for [<$name Listener>] {
+        type Builder = Self;
+        fn declare2_builder() -> Self::Builder {
+          Self { [<$name:snake _subject>]: Default::default()}
+        }
+      }
+
+      impl DeclareBuilder for [<$name Listener>] {
+        type Target = State<Self>;
+        fn build_declare(self, _ctx: &BuildCtx) -> Self::Target { State::value(self) }
       }
 
       impl [<$name Listener>] {
@@ -89,7 +97,7 @@ macro_rules! impl_multi_event_listener {
       impl_all_event!($name, $($on_doc, $event_ty),+);
       impl_listener!($doc, $name, [<All $name>]);
 
-      impl [<$name ListenerDeclarer2>] {
+      impl [<$name Listener>] {
         $(
           #[doc = "Sets up a function that will be called whenever the `" $event_ty "` is delivered"]
           pub fn [<on_ $event_ty:snake>](

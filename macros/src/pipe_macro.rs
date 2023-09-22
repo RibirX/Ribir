@@ -47,28 +47,23 @@ impl ToTokens for PipeMacro {
     if refs.used_ctx() {
       quote! {{
         #refs
-        let upstream = #upstream;
         let _ctx_handle_ಠ_ಠ = ctx!().handle();
-        let mut expr_value = move |ctx!(): &BuildCtx<'_>| { #(#expr)* };
-        Pipe::new(
-          expr_value(ctx!()),
-          upstream
-            .filter_map(move |scope| _ctx_handle_ಠ_ಠ
-              .with_ctx(&mut expr_value)
-              .map(|v| (scope, v))
-            )
-            .box_it()
+        MapPipe::new(
+          ModifiesPipe::new(#upstream.box_it()),
+          move |_: ModifyScope| {
+            _ctx_handle_ಠ_ಠ
+              .with_ctx(|ctx!(): &BuildCtx<'_>| { #(#expr)* })
+              .expect("ctx is not available")
+          }
         )
       }}
       .to_tokens(tokens)
     } else {
       quote! {{
         #refs
-        let upstream = #upstream;
-        let mut expr_value = move || { #(#expr)* };
-        Pipe::new(
-          expr_value(),
-          upstream.map(move |scope| (scope, expr_value())).box_it()
+        MapPipe::new(
+          ModifiesPipe::new(#upstream.box_it()),
+          move |_: ModifyScope| { #(#expr)* },
         )
       }}
       .to_tokens(tokens)

@@ -1,4 +1,4 @@
-use crate::{context::BuildCtx, prelude::Pipe, state::ModifyScope};
+use crate::{context::BuildCtx, pipe::Pipe, state::ModifyScope};
 use rxrust::ops::box_it::BoxOp;
 use std::convert::Infallible;
 
@@ -21,7 +21,7 @@ pub trait DeclareBuilder {
 /// The type use to store the init value of the field when declare a object.
 pub enum DeclareInit<V> {
   Value(V),
-  Pipe(Pipe<V>),
+  Pipe(Box<dyn Pipe<Value = V>>),
 }
 
 type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
@@ -31,23 +31,9 @@ impl<V: 'static> DeclareInit<V> {
     match self {
       Self::Value(v) => (v, None),
       Self::Pipe(v) => {
-        let (v, pipe) = v.unzip();
+        let (v, pipe) = v.box_unzip();
         (v, Some(pipe))
       }
-    }
-  }
-
-  pub fn value(&self) -> &V {
-    match self {
-      Self::Value(v) => v,
-      Self::Pipe(v) => v.value(),
-    }
-  }
-
-  pub fn value_mut(&mut self) -> &mut V {
-    match self {
-      Self::Value(v) => v,
-      Self::Pipe(v) => v.value_mut(),
     }
   }
 }
@@ -66,9 +52,12 @@ impl<V, U: From<V>> DeclareFrom<V, ()> for DeclareInit<U> {
   fn declare_from(value: V) -> Self { Self::Value(value.into()) }
 }
 
-impl<V: 'static, U: From<V> + 'static> DeclareFrom<Pipe<V>, Pipe<()>> for DeclareInit<U> {
+impl<P: Pipe + 'static, V> DeclareFrom<P, &dyn Pipe<Value = ()>> for DeclareInit<V>
+where
+  V: From<P::Value> + 'static,
+{
   #[inline]
-  fn declare_from(value: Pipe<V>) -> Self { Self::Pipe(value.map(U::from)) }
+  fn declare_from(value: P) -> Self { Self::Pipe(Box::new(Pipe::map(value, |v| v.into()))) }
 }
 
 /// struct help the generate code have better type hint.

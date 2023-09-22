@@ -370,11 +370,13 @@ macro_rules! _replace {
 
 macro_rules! multi_build_replace_impl {
   ($($rest:tt)*) => {
-    $crate::widget::_replace!(@replace($crate::widget::ComposeBuilder) $($rest)*);
-    $crate::widget::_replace!(@replace($crate::widget::RenderBuilder) $($rest)*);
-    $crate::widget::_replace!(@replace($crate::widget::ComposeChildBuilder) $($rest)*);
-    $crate::widget::_replace!(@replace($crate::widget::WidgetBuilder) $($rest)*);
-  }
+    $crate::widget::repeat_and_replace!([
+      $crate::widget::ComposeBuilder,
+      $crate::widget::RenderBuilder,
+      $crate::widget::ComposeChildBuilder,
+      $crate::widget::WidgetBuilder
+    ] $($rest)*);
+  };
 }
 
 macro_rules! multi_build_replace_impl_include_self {
@@ -385,9 +387,19 @@ macro_rules! multi_build_replace_impl_include_self {
   ({} $($rest:tt)*) => {}
 }
 
+macro_rules! repeat_and_replace {
+  ([$first: path $(,$n: path)*] $($rest:tt)*) => {
+    $crate::widget::_replace!(@replace($first) $($rest)*);
+    $crate::widget::repeat_and_replace!([$($n),*] $($rest)*);
+  };
+  ([] $($rest:tt)*) => {
+  };
+}
+
 pub(crate) use _replace;
 pub(crate) use multi_build_replace_impl;
 pub(crate) use multi_build_replace_impl_include_self;
+pub(crate) use repeat_and_replace;
 
 impl Drop for Widget {
   fn drop(&mut self) {
