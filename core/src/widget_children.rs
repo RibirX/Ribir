@@ -107,7 +107,6 @@ impl<T: SingleParent> SingleParent for Option<T> {
 }
 
 impl<T: Render + MultiChild> MultiParent for T {
-  #[inline]
   fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
     let p = self.widget_build(ctx);
     for c in children {

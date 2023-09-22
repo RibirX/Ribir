@@ -22,7 +22,10 @@ impl ComposeChild for DelayDrop {
   type Child = Widget;
   #[inline]
   fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
-    fn_widget! { child.attach_state_data(this, ctx!()) }
+    fn_widget! {
+      let modifies = this.raw_modifies();
+      child.attach_state_data(this, ctx!()).dirty_subscribe(modifies, ctx!())
+    }
   }
 }
 

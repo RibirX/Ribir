@@ -106,19 +106,6 @@ impl<'a> BuildCtx<'a> {
   /// After insert new widget to the widget tree, call this to watch the widget
   /// and fire mount events.
   pub(crate) fn on_widget_mounted(&self, id: WidgetId) {
-    self
-      .assert_get(id)
-      .query_type_outside_first(|notifier: &Notifier| {
-        let state_changed = self.tree.borrow().dirty_set.clone();
-        notifier
-          .raw_modifies()
-          .filter(|b| b.contains(ModifyScope::FRAMEWORK))
-          .subscribe(move |_| {
-            state_changed.borrow_mut().insert(id);
-          });
-        true
-      });
-
     self.window().add_delay_event(DelayEvent::Mounted(id));
   }
 

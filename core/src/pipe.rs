@@ -13,10 +13,10 @@ use std::{
 use crate::{
   builtin_widgets::{key::AnyKey, Void},
   context::{AppCtx, BuildCtx},
-  impl_proxy_render,
   prelude::*,
+  render_helper::{RenderProxy, RenderTarget},
   ticker::FrameMsg,
-  widget::{Query, Render, RenderBuilder, Widget, WidgetId, WidgetTree},
+  widget::{Render, RenderBuilder, Widget, WidgetId, WidgetTree},
 };
 
 /// A value that can be subscribed its continuous change from the observable
@@ -498,7 +498,7 @@ impl PipeNode {
     id.wrap_node(&mut ctx.tree.borrow_mut().arena, |r| {
       let p = Self(Sc::new(UnsafeCell::new(r)));
       pipe_node = Some(p.clone());
-      Box::new(p)
+      Box::new(RenderProxy::new(p))
     });
     // we init before.
     unsafe { pipe_node.unwrap_unchecked() }
@@ -523,17 +523,10 @@ impl PipeNode {
   }
 }
 
-impl Query for PipeNode {
-  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-    self.as_ref().query_inside_first(type_id, callback)
-  }
-
-  fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-    self.as_ref().query_outside_first(type_id, callback)
-  }
+impl RenderTarget for PipeNode {
+  type Target = dyn Render;
+  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(self.as_ref()) }
 }
-
-impl_proxy_render!(proxy as_ref(), PipeNode);
 
 #[cfg(test)]
 mod tests {
