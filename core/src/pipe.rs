@@ -476,9 +476,12 @@ macro_rules! multi_parent_impl {
             (p, child)
           },
           move |new_p, old_p, ctx| {
-            let arena = &ctx.tree.borrow().arena;
+            // Safety: we escape the borrow of arena, but we only access the children of the
+            // `old_p` and we know `compose_children` will not modifies the children of
+            // `old_p`.
+            let arena = unsafe { &(*ctx.tree.as_ptr()).arena };
             let children = old_p.children(arena).map(|id| Widget::from_id(id, ctx));
-            new_p.compose_children(children, ctx).consume()
+            new_p.compose_children(children.into_iter(), ctx).consume()
           },
         )
       } else {

@@ -63,7 +63,7 @@ use ribir_core::prelude::*;
 ///           @Container {
 ///             size: Size::splat(40.),
 ///             background: Color::YELLOW,
-///           }.into()
+///           }.widget_build(ctx!())
 ///         )
 ///       }
 ///     }
@@ -96,7 +96,7 @@ use ribir_core::prelude::*;
 ///           @Container {
 ///             size: Size::splat(40.),
 ///             background: Color::YELLOW,
-///           }.into()
+///           }.widget_build(ctx!())
 ///         )
 ///       }
 ///     }
