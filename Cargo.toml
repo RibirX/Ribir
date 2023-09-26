@@ -87,6 +87,7 @@ webbrowser = "0.8.8"
 wgpu = {version = "0.16.0"}
 winit = {version = "0.28.5", default-features = false, features = ["x11", "wayland", "wayland-dlopen"]}
 zerocopy = "0.7.3"
+quick-xml = "0.30.0"
 
 [workspace.metadata.release]
 shared-version = true
