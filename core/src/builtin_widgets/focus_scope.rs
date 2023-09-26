@@ -1,6 +1,6 @@
-use crate::{events::focus_mgr::FocusType, impl_query_self_only, prelude::*};
+use crate::{events::focus_mgr::FocusType, prelude::*};
 
-#[derive(Declare2, Clone, Default)]
+#[derive(Declare2, Query, Clone, Default)]
 pub struct FocusScope {
   /// If true, the descendants can not be focused.
   /// Default value is false, then the hold FocusScope subtree can be focused
@@ -27,8 +27,6 @@ impl ComposeChild for FocusScope {
     }
   }
 }
-
-impl_query_self_only!(FocusScope);
 
 #[cfg(test)]
 mod tests {

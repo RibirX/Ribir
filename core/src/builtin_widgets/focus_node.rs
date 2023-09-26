@@ -1,10 +1,9 @@
 use crate::{
   events::focus_mgr::{FocusHandle, FocusType},
-  impl_query_self_only,
   prelude::*,
 };
 
-#[derive(Default, Declare2)]
+#[derive(Default, Query, Declare2)]
 pub struct FocusNode {
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
@@ -75,9 +74,7 @@ impl ComposeChild for FocusNode {
   }
 }
 
-impl_query_self_only!(FocusNode);
-
-#[derive(Declare2)]
+#[derive(Declare2, Query)]
 pub struct RequestFocus {
   #[declare(default)]
   handle: Option<FocusHandle>,
@@ -111,8 +108,6 @@ impl RequestFocus {
     }
   }
 }
-
-impl_query_self_only!(RequestFocus);
 
 #[cfg(test)]
 mod tests {

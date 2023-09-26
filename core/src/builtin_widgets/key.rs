@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
@@ -94,7 +94,9 @@ impl<V: 'static + Default + Clone + PartialEq> ComposeChild for KeyWidget<V> {
   }
 }
 
-impl_query_self_only!(Box<dyn AnyKey>);
+impl Query for Box<dyn AnyKey> {
+  crate::widget::impl_query_self_only!();
+}
 
 impl<V> KeyWidget<V>
 where

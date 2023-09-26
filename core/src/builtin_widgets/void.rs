@@ -1,10 +1,10 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
 /// A virtual widget use to help write code when you need a widget as a virtual
 /// node in `widget!` macro, or hold a place in tree. When it have a child
 /// itself will be dropped when build tree, otherwise as a render widget but do
 /// nothing.
-#[derive(SingleChild, Declare2)]
+#[derive(SingleChild, Query, Declare2)]
 pub struct Void;
 
 impl Render for Void {
@@ -20,8 +20,6 @@ impl Render for Void {
     HitTest { hit: false, can_hit_child: true }
   }
 }
-
-impl_query_self_only!(Void);
 
 #[cfg(test)]
 mod tests {

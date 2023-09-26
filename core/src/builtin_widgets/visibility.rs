@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
 #[derive(Declare2)]
 pub struct Visibility {
@@ -22,7 +22,7 @@ impl ComposeChild for Visibility {
   }
 }
 
-#[derive(SingleChild, Declare2, Clone)]
+#[derive(SingleChild, Query, Declare2, Clone)]
 struct VisibilityRender {
   display: bool,
 }
@@ -51,8 +51,6 @@ impl Render for VisibilityRender {
     }
   }
 }
-
-impl_query_self_only!(VisibilityRender);
 
 impl Visibility {
   #[inline]

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use ribir_core::{impl_query_self_only, prelude::*};
+use ribir_core::prelude::*;
 
 /// Divider is a thin horizontal or vertical line, with padding on either side.
 ///
@@ -36,7 +36,7 @@ use ribir_core::{impl_query_self_only, prelude::*};
 ///   }
 /// };
 /// ```
-#[derive(Default, Declare2)]
+#[derive(Default, Query, Declare2)]
 pub struct Divider {
   #[declare(default = 1.)]
   // Extent of divider
@@ -86,5 +86,3 @@ impl Render for Divider {
     painter.fill();
   }
 }
-
-impl_query_self_only!(Divider);

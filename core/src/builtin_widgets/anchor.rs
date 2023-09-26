@@ -11,21 +11,21 @@ pub enum PositionUnit {
 }
 
 /// Widget use to anchor child constraints with the left edge of parent widget.
-#[derive(Declare2, SingleChild)]
+#[derive(Declare2, Query, SingleChild)]
 pub struct LeftAnchor {
   #[declare(builtin, default = 0.)]
   pub left_anchor: PositionUnit,
 }
 
 /// Widget use to anchor child constraints with the right edge of parent widget.
-#[derive(Declare2, SingleChild)]
+#[derive(Declare2, Query, SingleChild)]
 pub struct RightAnchor {
   #[declare(builtin, default = 0.)]
   pub right_anchor: PositionUnit,
 }
 
 /// Widget use to anchor child constraints with the top edge of parent widget.
-#[derive(Declare2, SingleChild)]
+#[derive(Declare2, Query, SingleChild)]
 pub struct TopAnchor {
   #[declare(builtin, default = 0.)]
   pub top_anchor: PositionUnit,
@@ -33,16 +33,11 @@ pub struct TopAnchor {
 
 /// Widget use to anchor child constraints with the bottom edge of parent
 /// widget.
-#[derive(Declare2, SingleChild)]
+#[derive(Declare2, Query, SingleChild)]
 pub struct BottomAnchor {
   #[declare(builtin, default = 0.)]
   pub bottom_anchor: PositionUnit,
 }
-
-crate::impl_query_self_only!(LeftAnchor);
-crate::impl_query_self_only!(TopAnchor);
-crate::impl_query_self_only!(RightAnchor);
-crate::impl_query_self_only!(BottomAnchor);
 
 impl Render for LeftAnchor {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {

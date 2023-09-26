@@ -54,14 +54,14 @@ pub enum VAlign {
 }
 
 /// A widget that align its child in x-axis, base on child's width.
-#[derive(Declare2, SingleChild)]
+#[derive(Declare2, Query, SingleChild)]
 pub struct HAlignWidget {
   #[declare(default, builtin)]
   pub h_align: HAlign,
 }
 
 /// A widget that align its child in y-axis, base on child's height.
-#[derive(Declare2, SingleChild)]
+#[derive(Declare2, Query, SingleChild)]
 pub struct VAlignWidget {
   #[declare(default, builtin)]
   pub v_align: VAlign,
@@ -91,8 +91,6 @@ impl Render for HAlignWidget {
   }
 }
 
-crate::impl_query_self_only!(HAlignWidget);
-
 impl Render for VAlignWidget {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let mut layouter = ctx.assert_single_child_layouter();
@@ -116,8 +114,6 @@ impl Render for VAlignWidget {
     HitTest { hit: false, can_hit_child: true }
   }
 }
-
-crate::impl_query_self_only!(VAlignWidget);
 
 impl Align {
   pub fn align_value(self, child_size: f32, box_size: f32) -> f32 {

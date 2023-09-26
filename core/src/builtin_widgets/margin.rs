@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
 #[derive(Debug, Copy, Clone, Default, PartialEq, Lerp)]
 pub struct EdgeInsets {
@@ -9,7 +9,7 @@ pub struct EdgeInsets {
 }
 
 /// A widget that create space around its child.
-#[derive(SingleChild, Default, Clone, PartialEq, Declare2)]
+#[derive(SingleChild, Default, Query, Clone, PartialEq, Declare2)]
 pub struct Margin {
   #[declare(builtin, default)]
   pub margin: EdgeInsets,
@@ -36,8 +36,6 @@ impl Render for Margin {
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
 }
-
-impl_query_self_only!(Margin);
 
 impl Margin {
   #[inline]

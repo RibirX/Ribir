@@ -1,7 +1,7 @@
 use ribir_core::prelude::*;
 
 /// Widget with fixed size as a container for its child.
-#[derive(Declare2, SingleChild)]
+#[derive(Declare2, Query, SingleChild)]
 pub struct Container {
   pub size: Size,
 }
@@ -22,8 +22,6 @@ impl Render for Container {
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
 }
-
-ribir_core::impl_query_self_only!(Container);
 
 #[cfg(test)]
 mod tests {

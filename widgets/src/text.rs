@@ -1,13 +1,10 @@
-use ribir_core::{
-  impl_query_self_only,
-  prelude::{
-    typography::{PlaceLineDirection, TypographyCfg},
-    *,
-  },
+use ribir_core::prelude::{
+  typography::{PlaceLineDirection, TypographyCfg},
+  *,
 };
 
 /// The text widget display text with a single style.
-#[derive(Debug, Declare2, Clone, PartialEq)]
+#[derive(Debug, Declare2, Query, Clone, PartialEq)]
 pub struct Text {
   pub text: CowArc<str>,
   #[declare(default = Palette::of(ctx!()).on_surface_variant())]
@@ -124,8 +121,6 @@ pub fn typography_with_text_style<T: Into<Substr>>(
     },
   )
 }
-
-impl_query_self_only!(Text);
 
 macro_rules! define_text_with_theme_style {
   ($name: ident, $style: ident) => {

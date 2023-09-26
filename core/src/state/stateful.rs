@@ -395,13 +395,7 @@ impl<R: Render> RenderTarget for Stateful<R> {
 }
 
 impl<T: Query> Query for Stateful<T> {
-  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-    self.read().query_inside_first(type_id, callback)
-  }
-
-  fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-    self.read().query_inside_first(type_id, callback)
-  }
+  crate::widget::impl_proxy_query!(read());
 }
 
 impl<'a, W> Drop for WriteRef<'a, W> {

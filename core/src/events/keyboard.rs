@@ -3,7 +3,7 @@ use std::convert::Infallible;
 
 use crate::{
   impl_all_event, impl_common_event_deref, impl_compose_child_with_focus_for_listener,
-  impl_listener, impl_multi_event_listener, impl_query_self_only, prelude::*, window::WindowId,
+  impl_listener, impl_multi_event_listener, prelude::*, window::WindowId,
 };
 
 #[derive(Debug)]

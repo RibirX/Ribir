@@ -31,7 +31,6 @@ impl WidgetId {
   /// detect if the widget of this id point to is dropped.
   pub(crate) fn is_dropped(self, tree: &TreeArena) -> bool { self.0.is_removed(tree) }
 
-  #[allow(clippy::needless_collect)]
   pub(crate) fn lowest_common_ancestor(
     self,
     other: WidgetId,
@@ -40,7 +39,6 @@ impl WidgetId {
     self.common_ancestors(other, tree).last()
   }
 
-  #[allow(clippy::needless_collect)]
   // return ancestors from root to lowest common ancestor
   pub(crate) fn common_ancestors(
     self,
@@ -160,7 +158,7 @@ impl WidgetId {
   }
 
   pub(crate) fn attach_data(self, data: impl Query, tree: &mut TreeArena) {
-    self.wrap_node(tree, |node| Box::new(DataWidget::new(node, data)));
+    self.wrap_node(tree, |node| DataWidget::attach(node, data));
   }
 
   pub fn attach_anonymous_data(self, data: impl Any, tree: &mut TreeArena) {

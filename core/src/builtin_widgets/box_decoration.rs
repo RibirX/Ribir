@@ -1,7 +1,7 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
-#[derive(SingleChild, Default, Clone, Declare2)]
+#[derive(SingleChild, Default, Clone, Declare2, Query)]
 pub struct BoxDecoration {
   /// The background of the box.
   #[declare(builtin, default)]
@@ -58,8 +58,6 @@ impl Render for BoxDecoration {
     }
   }
 }
-
-impl_query_self_only!(BoxDecoration);
 
 impl BoxDecoration {
   fn paint_border(&self, painter: &mut Painter, rect: &Rect) {

@@ -5,13 +5,13 @@ use crate::{
 };
 use ribir_algo::{Sc, ShareResource};
 
+use std::convert::Infallible;
 #[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
   marker::PhantomData,
   ops::Deref,
 };
-use std::{convert::Infallible, rc::Rc};
 pub trait Compose: Sized {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
@@ -65,21 +65,28 @@ pub struct Widget {
 /// by return `true` or `false` in the callback.
 pub trait Query: Any {
   /// Query the type in a inside first order, and apply the callback to it,
-  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool);
+  /// return what the callback return.
+  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool)
+  -> bool;
   /// Query the type in a outside first order, and apply the callback to it,
-  fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool);
+  /// return what the callback return.
+  fn query_outside_first(
+    &self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&dyn Any) -> bool,
+  ) -> bool;
 }
 
 impl<'a> dyn Render + 'a {
   #[inline]
-  pub fn query_type_inside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) {
+  pub fn query_type_inside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) -> bool {
     self.query_inside_first(TypeId::of::<T>(), &mut |a| {
       a.downcast_ref().map_or(true, &mut callback)
     })
   }
 
   #[inline]
-  pub fn query_type_outside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) {
+  pub fn query_type_outside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) -> bool {
     Query::query_outside_first(self, TypeId::of::<T>(), &mut |a| {
       a.downcast_ref().map_or(true, &mut callback)
     })
@@ -212,86 +219,56 @@ where
   fn widget_build(self, ctx: &BuildCtx) -> Widget { self(ctx) }
 }
 
-#[macro_export]
 macro_rules! impl_proxy_query {
-  (reverse [$first: expr $(, $rest: expr)*] $($reversed: expr)*) => {
-    impl_proxy_query!(reverse [$($rest),*] $first $($reversed)*);
-  };
-  (reverse [] $($reversed: expr)*) => { $($reversed)* };
-  (
-    paths [
-      $(
-        $($name: tt $(($($args: ident),*))?).*
-      ),+
-    ],
-    $ty: ty $(, <$($($lf: lifetime)? $($p: ident)?), *>)? $(,where $($w:tt)*)?
-  ) => {
-    impl $(<$($($lf)? $($p)?),*>)? Query for $ty $(where $($w)*)? {
-
-      fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-        let mut query_more = true;
-        impl_proxy_query!(reverse
-          [$(
-            if query_more {
-              self.$($name $(($($args),*))?).*
-                .query_inside_first(
-                  type_id,
-                  &mut |any| {
-                    query_more = callback(any);
-                    query_more
-                  },
-                );
-            }
-          ),+]
-        );
-        if type_id == self.type_id() {
-          callback(self);
-        }
-      }
-      fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-        if type_id == self.type_id() {
-          callback(self);
-        }
-        let mut query_more = true;
-        if query_more {
-          $(
-            if query_more {
-              self.$($name $(($($args),*))?).*
-                .query_outside_first(
-                  type_id,
-                  &mut |any| {
-                    query_more = callback(any);
-                    query_more
-                  },
-                );
-            }
-          )+
-        }
-      }
+  ($($t:tt)*) => {
+    #[inline]
+    fn query_inside_first(
+      &self,
+      type_id: TypeId,
+      callback: &mut dyn FnMut(&dyn Any) -> bool,
+    ) -> bool {
+      self.$($t)*.query_inside_first(type_id, callback)
     }
-  };
-}
 
-#[macro_export]
+    #[inline]
+    fn query_outside_first(
+      &self,
+      type_id: TypeId,
+      callback: &mut dyn FnMut(&dyn Any) -> bool,
+    ) -> bool {
+      self.$($t)*.query_outside_first(type_id, callback)
+    }
+  }
+}
+pub(crate) use impl_proxy_query;
+
 macro_rules! impl_query_self_only {
-  ($name: ty $(, <$($($lf: lifetime)? $($p: ident)?), *>)? $(,where $($w:tt)*)?) => {
-    impl $(<$($($lf)? $($p)?),*>)? Query for $name $(where $($w)*)? {
-      #[inline]
-      fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-        self.query_outside_first(type_id, callback)
-      }
+  () => {
+    #[inline]
+    fn query_inside_first(
+      &self,
+      type_id: TypeId,
+      callback: &mut dyn FnMut(&dyn Any) -> bool,
+    ) -> bool {
+      self.query_outside_first(type_id, callback)
+    }
 
-      #[inline]
-      fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-        if type_id == self.type_id() {
-          callback(self);
-        }
+    #[inline]
+    fn query_outside_first(
+      &self,
+      type_id: TypeId,
+      callback: &mut dyn FnMut(&dyn Any) -> bool,
+    ) -> bool {
+      if type_id == self.type_id() {
+        callback(self)
+      } else {
+        true
       }
     }
   };
 }
+pub(crate) use impl_query_self_only;
 
-#[macro_export]
 macro_rules! impl_proxy_render {
   (
     proxy $($mem: tt $(($($args: ident),*))?).*,
@@ -345,11 +322,13 @@ impl<W: ComposeChild<Child = Option<C>>, C> ComposeChildBuilder for W {
   }
 }
 
-impl_proxy_query!(paths [deref()], ShareResource<T>, <T>, where  T: Render + 'static);
+impl<T: Query> Query for ShareResource<T> {
+  impl_proxy_query!(deref());
+}
+impl<T: Query> Query for Sc<T> {
+  impl_proxy_query!(deref());
+}
 impl_proxy_render!(proxy deref(), ShareResource<T>, <T>, where  T: Render + 'static);
-impl_proxy_query!(paths [deref()], Rc<W>, <W>, where W: Query + 'static);
-impl_proxy_render!(proxy deref(), Rc<W>, <W>, where W: Render + 'static);
-impl_proxy_query!(paths [deref()], Sc<W>, <W>, where W: Query + 'static);
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
   ctx.box_rect().map_or(false, |rect| rect.contains(pos))

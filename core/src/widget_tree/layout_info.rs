@@ -303,11 +303,11 @@ impl std::ops::DerefMut for LayoutStore {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{impl_query_self_only, prelude::*, reset_test_env, test_helper::*};
+  use crate::{prelude::*, reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
   use std::{cell::Cell, rc::Rc};
 
-  #[derive(Declare2, Clone, SingleChild)]
+  #[derive(Declare2, Clone, Query, SingleChild)]
   struct OffsetBox {
     pub offset: Point,
     pub size: Size,
@@ -327,8 +327,6 @@ mod tests {
     #[inline]
     fn paint(&self, _: &mut PaintingCtx) {}
   }
-
-  impl_query_self_only!(OffsetBox);
 
   #[test]
   fn fix_incorrect_relayout_root() {
@@ -470,7 +468,7 @@ mod tests {
   fn layout_visit_prev_position() {
     reset_test_env!();
 
-    #[derive(Declare2)]
+    #[derive(Declare2, Query)]
     struct MockWidget {
       pos: Cell<Point>,
       size: Size,
@@ -487,8 +485,6 @@ mod tests {
       #[inline]
       fn paint(&self, _: &mut PaintingCtx) {}
     }
-
-    impl_query_self_only!(MockWidget);
 
     let pos = Rc::new(Cell::new(Point::zero()));
     let pos2 = pos.clone();

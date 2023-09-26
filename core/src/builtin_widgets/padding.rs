@@ -1,7 +1,7 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
 /// A widget that insets its child by the given padding.
-#[derive(SingleChild, Clone, Declare2)]
+#[derive(SingleChild, Query, Clone, Declare2)]
 pub struct Padding {
   #[declare(builtin)]
   pub padding: EdgeInsets,
@@ -51,8 +51,6 @@ impl Render for Padding {
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
 }
-
-impl_query_self_only!(Padding);
 
 impl Padding {
   #[inline]

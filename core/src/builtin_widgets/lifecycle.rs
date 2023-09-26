@@ -1,7 +1,4 @@
-use crate::{
-  impl_all_event, impl_compose_child_for_listener, impl_query_self_only, prelude::*,
-  window::WindowId,
-};
+use crate::{impl_all_event, impl_compose_child_for_listener, prelude::*, window::WindowId};
 use rxrust::prelude::*;
 use std::{convert::Infallible, rc::Rc};
 
@@ -9,7 +6,7 @@ define_widget_context!(LifecycleEvent);
 
 pub type LifecycleSubject = MutRefItemSubject<'static, AllLifecycle, Infallible>;
 
-#[derive(Default)]
+#[derive(Default, Query)]
 pub struct LifecycleListener {
   lifecycle: LifecycleSubject,
 }
@@ -83,8 +80,6 @@ impl LifecycleListener {
 
   fn subject(&mut self) -> LifecycleSubject { self.lifecycle.clone() }
 }
-
-impl_query_self_only!(LifecycleListener);
 
 impl EventListener for LifecycleListener {
   type Event = AllLifecycle;

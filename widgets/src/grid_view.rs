@@ -1,7 +1,7 @@
 use crate::layout::Direction;
-use ribir_core::{impl_query_self_only, prelude::*};
+use ribir_core::prelude::*;
 
-#[derive(MultiChild)]
+#[derive(MultiChild, Query)]
 pub struct GridView {
   axis_dir: Direction,
   cross_axis_cnt: u32,
@@ -77,5 +77,3 @@ impl Render for GridView {
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
 }
-
-impl_query_self_only!(GridView);

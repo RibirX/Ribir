@@ -7,7 +7,7 @@ pub(crate) trait RenderTarget {
 
 pub(crate) struct RenderProxy<R: RenderTarget>(R);
 
-impl<R: RenderTarget> RenderProxy<R> {
+impl<R: RenderTarget + Query> RenderProxy<R> {
   #[inline]
   pub fn new(render: R) -> Self { Self(render) }
 }
@@ -26,7 +26,7 @@ where
 {
 }
 
-impl<R: RenderTarget + 'static> Render for RenderProxy<R> {
+impl<R: RenderTarget + Query> Render for RenderProxy<R> {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     self.0.proxy(|r| r.perform_layout(clamp, ctx))
@@ -47,14 +47,6 @@ impl<R: RenderTarget + 'static> Render for RenderProxy<R> {
   fn get_transform(&self) -> Option<Transform> { self.0.proxy(|r| r.get_transform()) }
 }
 
-impl<R: RenderTarget + 'static> Query for RenderProxy<R> {
-  #[inline]
-  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-    self.0.proxy(|r| r.query_inside_first(type_id, callback))
-  }
-
-  #[inline]
-  fn query_outside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool) {
-    self.0.proxy(|r| r.query_outside_first(type_id, callback))
-  }
+impl<R: RenderTarget + Query> Query for RenderProxy<R> {
+  crate::widget::impl_proxy_query!(0);
 }

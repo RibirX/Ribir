@@ -19,7 +19,7 @@ pub enum BoxFit {
 }
 
 /// Widget set how its child should be scale to fit its box.
-#[derive(Declare2, SingleChild)]
+#[derive(Declare2, Query, SingleChild)]
 pub struct FittedBox {
   #[declare(builtin)]
   pub box_fit: BoxFit,
@@ -73,8 +73,6 @@ impl Render for FittedBox {
 
   fn get_transform(&self) -> Option<Transform> { Some(self.scale_cache.get()) }
 }
-
-crate::impl_query_self_only!(FittedBox);
 
 #[cfg(test)]
 mod tests {

@@ -1,8 +1,5 @@
 use super::{Direction, Expanded};
-use ribir_core::{
-  impl_query_self_only,
-  prelude::{log::warn, *},
-};
+use ribir_core::prelude::{log::warn, *};
 
 /// How the children should be placed along the main axis in a flex layout.
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
@@ -31,7 +28,7 @@ pub enum JustifyContent {
   SpaceEvenly,
 }
 
-#[derive(Default, MultiChild, Declare2, Clone, PartialEq)]
+#[derive(Default, MultiChild, Declare2, Query, Clone, PartialEq)]
 pub struct Flex {
   /// Reverse the main axis.
   #[declare(default)]
@@ -125,7 +122,6 @@ impl Render for Flex {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-impl_query_self_only!(Flex);
 #[derive(Debug, Clone, Copy, Default)]
 struct FlexSize {
   main: f32,

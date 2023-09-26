@@ -1,6 +1,6 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
-#[derive(Declare2, SingleChild, Clone)]
+#[derive(Declare2, SingleChild, Query, Clone)]
 pub struct IgnorePointer {
   #[declare(default = true)]
   pub ignore: bool,
@@ -22,8 +22,6 @@ impl Render for IgnorePointer {
     }
   }
 }
-
-impl_query_self_only!(IgnorePointer);
 
 impl IgnorePointer {
   #[inline]

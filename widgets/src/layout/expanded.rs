@@ -1,11 +1,11 @@
-use ribir_core::{impl_query_self_only, prelude::*};
+use ribir_core::prelude::*;
 
 use super::ConstrainedBox;
 
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
-#[derive(Clone, PartialEq, Declare2)]
+#[derive(Clone, PartialEq, Query, Declare2)]
 pub struct Expanded {
   #[declare(default = 1.)]
   pub flex: f32,
@@ -27,8 +27,6 @@ impl ComposeChild for Expanded {
     }
   }
 }
-
-impl_query_self_only!(Expanded);
 
 #[cfg(test)]
 mod tests {
