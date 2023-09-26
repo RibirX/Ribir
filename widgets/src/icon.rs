@@ -13,7 +13,7 @@ pub struct Icon {
 
 impl ComposeChild for Icon {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @SizedBox {
         size: pipe!($this.size),
@@ -35,7 +35,9 @@ macro_rules! define_fixed_size_icon {
 
       impl ComposeChild for $name {
         type Child = Widget;
-        fn compose_child(_: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+        fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child)
+          -> impl WidgetBuilder
+        {
           fn_widget! {
             let icon = @Icon { size: IconSize::of(ctx!()).$field };
             @ $icon { @ { child } }

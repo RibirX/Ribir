@@ -233,7 +233,7 @@ impl Tabs {
 impl ComposeChild for Tabs {
   type Child = Vec<Tab>;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     let mut headers = vec![];
     let mut panes = vec![];
 

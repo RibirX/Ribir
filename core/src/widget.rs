@@ -316,7 +316,7 @@ impl<R: Render + 'static> RenderBuilder for R {
   fn widget_build(self, ctx: &BuildCtx) -> Widget { Widget::new(Box::new(self), ctx) }
 }
 
-impl<W: ComposeChild<Child = Option<C>>, C> ComposeChildBuilder for W {
+impl<W: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for W {
   #[inline]
   fn widget_build(self, ctx: &BuildCtx) -> Widget {
     ComposeChild::compose_child(State::value(self), None).widget_build(ctx)

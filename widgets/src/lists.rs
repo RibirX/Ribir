@@ -133,7 +133,7 @@ impl ComposeDecorator for ListsDecorator {
 impl ComposeChild for Lists {
   type Child = Vec<Widget>;
 
-  fn compose_child(_: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ListsDecorator {
         @Column { @ { child } }
@@ -257,7 +257,7 @@ pub struct ListItemTml {
 impl ComposeChild for ListItem {
   type Child = ListItemTml;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     let ListItemTml {
       headline,
       supporting,

@@ -38,7 +38,7 @@ pub enum RippleBound {
 impl ComposeChild for Ripple {
   type Child = Widget;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut container = @Stack { fit: StackFit::Passthrough };
       let ripple_at = $this.ripple_at.clone_writer();

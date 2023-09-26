@@ -44,7 +44,13 @@ pub trait StateReader: 'static {
   /// Return a modifies `Rx` stream of the state, user can subscribe it to
   /// response the state changes.
   fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible>;
+
   fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible>;
+  /// try convert this state into the value, if there is no other share this
+  /// state, otherwise return an error with self.
+  fn try_into_value(self) -> Result<Self::Value, Self>
+  where
+    Self: Sized;
 }
 
 pub trait StateWriter: StateReader {
@@ -141,6 +147,13 @@ impl<T: 'static> StateReader for State<T> {
   fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> {
     self.as_stateful().raw_modifies()
   }
+
+  fn try_into_value(self) -> Result<Self::Value, Self> {
+    match self.0.into_inner() {
+      InnerState::Data(w) => Ok(w.into_inner()),
+      InnerState::Stateful(w) => w.try_into_value().map_err(State::stateful),
+    }
+  }
 }
 
 impl<T: 'static> StateWriter for State<T> {
@@ -172,19 +185,6 @@ impl<W> State<W> {
   }
 
   pub fn value(value: W) -> Self { State(UnsafeCell::new(InnerState::Data(StateData::new(value)))) }
-
-  /// Unwrap the state and return the inner value.
-  ///
-  /// # Panics
-  /// panic if the state is stateful or already attached data.
-  pub fn into_value(self) -> W {
-    match self.0.into_inner() {
-      InnerState::Data(w) => w.into_inner(),
-      InnerState::Stateful(w) => w
-        .try_into_inner()
-        .unwrap_or_else(|_| panic!("can't convert stateful to value")),
-    }
-  }
 
   pub fn as_stateful(&self) -> &Stateful<W> {
     match self.inner_ref() {
@@ -244,7 +244,7 @@ impl<C: Compose + 'static> ComposeBuilder for State<C> {
   fn widget_build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).widget_build(ctx) }
 }
 
-impl<P: ComposeChild<Child = Option<C>>, C> ComposeChildBuilder for State<P> {
+impl<P: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for State<P> {
   #[inline]
   fn widget_build(self, ctx: &BuildCtx) -> Widget {
     ComposeChild::compose_child(self, None).widget_build(ctx)
@@ -300,9 +300,12 @@ where
     type_id: TypeId,
     callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool {
-    let v = self.read();
-    let any = &*v;
-    any.type_id() == type_id && callback(any)
+    let any: &T::Value = &self.read();
+    if type_id == any.type_id() {
+      callback(any)
+    } else {
+      true
+    }
   }
 }
 
@@ -317,6 +320,19 @@ macro_rules! impl_compose_builder {
     {
       fn widget_build(self, ctx: &crate::context::BuildCtx) -> Widget {
         Compose::compose(self).widget_build(ctx)
+      }
+    }
+
+    impl<V, W, RM, WM, Child> ComposeChildBuilder for $name<V, W, RM, WM>
+    where
+      W: StateWriter,
+      RM: FnOnce(&W::Value) -> &V + Copy + 'static,
+      WM: FnOnce(&mut W::Value) -> &mut V + Copy + 'static,
+      V: ComposeChild<Child = Option<Child>> + 'static,
+    {
+      #[inline]
+      fn widget_build(self, ctx: &BuildCtx) -> Widget {
+        ComposeChild::compose_child(self, None).widget_build(ctx)
       }
     }
   };
@@ -404,9 +420,11 @@ mod tests {
     let _state_compose_widget = fn_widget! {
       State::value(C)
     };
+
     let _sateful_compose_widget = fn_widget! {
       Stateful::new(C)
     };
+
     let _writer_compose_widget = fn_widget! {
       Stateful::new(C).clone_writer()
     };
@@ -417,6 +435,99 @@ mod tests {
     };
     let _split_writer_compose_widget = fn_widget! {
       let s = Stateful::new((C, 0));
+      split_writer!($s.0)
+    };
+  }
+
+  struct CC;
+  impl ComposeChild for CC {
+    type Child = Option<Widget>;
+    fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> impl WidgetBuilder {
+      fn_widget! { @{ Void } }
+    }
+  }
+
+  #[test]
+  fn state_writer_compose_child_builder() {
+    let _state_with_child = fn_widget! {
+      let cc = State::value(CC);
+      @$cc { @{ Void } }
+    };
+
+    let _state_without_child = fn_widget! {
+      State::value(CC)
+    };
+
+    let _stateful_with_child = fn_widget! {
+      let cc = Stateful::new(CC);
+      @$cc { @{ Void } }
+    };
+
+    let _stateful_without_child = fn_widget! {
+      Stateful::new(CC)
+    };
+
+    let _writer_with_child = fn_widget! {
+      let cc = Stateful::new(CC).clone_writer();
+      @$cc { @{ Void } }
+    };
+
+    let _writer_without_child = fn_widget! {
+      Stateful::new(CC).clone_writer()
+    };
+
+    let _map_writer_with_child = fn_widget! {
+      let s = Stateful::new((CC, 0));
+      let w = map_writer!($s.0);
+      @$w { @{ Void } }
+    };
+
+    let _map_writer_without_child = fn_widget! {
+      let s = Stateful::new((CC, 0));
+      map_writer!($s.0)
+    };
+
+    let _split_writer_with_child = fn_widget! {
+      let s = Stateful::new((CC, 0));
+      let w = split_writer!($s.0);
+      @$w { @{ Void } }
+    };
+
+    let _split_writer_without_child = fn_widget! {
+      let s = Stateful::new((CC, 0));
+      split_writer!($s.0)
+    };
+  }
+
+  #[test]
+  fn state_reader_builder() {
+    let _state_render_widget = fn_widget! {
+      State::value(Void)
+    };
+
+    let _stateful_render_widget = fn_widget! {
+      Stateful::new(Void)
+    };
+
+    let _reader_render_widget = fn_widget! {
+      Stateful::new(Void).clone_reader()
+    };
+
+    let _writer_render_widget = fn_widget! {
+      Stateful::new(Void).clone_writer()
+    };
+
+    let _map_reader_render_widget = fn_widget! {
+      Stateful::new((Void, 0)).map_reader(|v| &v.0)
+    };
+
+    let _map_writer_render_widget = fn_widget! {
+      let s = Stateful::new((Void, 0));
+      map_writer!($s.0)
+    };
+
+    let _split_writer_render_widget = fn_widget! {
+      let s = Stateful::new((Void, 0));
       split_writer!($s.0)
     };
   }

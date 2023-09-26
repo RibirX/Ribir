@@ -16,7 +16,7 @@ pub struct FocusScope {
 
 impl ComposeChild for FocusScope {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ $child {
         on_mounted: move |e| e.window().add_focus_node(e.id, false, FocusType::Scope),

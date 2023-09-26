@@ -1,7 +1,7 @@
 use crate::{
   context::BuildCtx,
   prelude::ChildFrom,
-  state::{State, Stateful},
+  state::{State, StateWriter},
   widget::{Widget, WidgetBuilder},
 };
 
@@ -36,17 +36,6 @@ where
   }
 }
 
-impl<M, T, C> ComposeWithChild<C, M> for Stateful<T>
-where
-  T: ComposeChild,
-  State<T>: ComposeWithChild<C, M>,
-{
-  type Target = <State<T> as ComposeWithChild<C, M>>::Target;
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    State::stateful(self).with_child(child, ctx)
-  }
-}
-
 impl<M, W, C1, C2> ComposeWithChild<C2, M> for Pair<W, C1>
 where
   C1: ComposeWithChild<C2, M>,
@@ -62,12 +51,13 @@ where
   }
 }
 
-impl<C, W, M> ComposeWithChild<C, [M; 0]> for State<W>
+impl<C, W, M, Child> ComposeWithChild<C, [M; 1]> for W
 where
-  W: ComposeChild,
-  W::Child: ChildFrom<C, M>,
+  W: StateWriter,
+  W::Value: ComposeChild<Child = Child>,
+  Child: ChildFrom<C, M>,
 {
-  type Target = Pair<State<W>, W::Child>;
+  type Target = Pair<Self, Child>;
 
   #[inline]
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
@@ -78,29 +68,31 @@ where
   }
 }
 
-impl<W, C, Child, M> ComposeWithChild<C, [M; 1]> for State<W>
+impl<W, C, Child, M> ComposeWithChild<C, [M; 2]> for W
 where
-  W: ComposeChild<Child = Child>,
+  W: StateWriter,
+  W::Value: ComposeChild<Child = Child>,
   Child: Template,
   Child::Builder: ComposeWithChild<C, M, Target = Child::Builder>,
 {
-  type Target = Pair<State<W>, Child::Builder>;
+  type Target = Pair<W, Child::Builder>;
 
   #[inline]
   fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
-    let builder = W::Child::builder();
+    let builder = Child::builder();
     let child = builder.with_child(c, ctx);
     Pair { parent: self, child }
   }
 }
 
-impl<W, C, Child, M> ComposeWithChild<C, [M; 2]> for State<W>
+impl<W, C, Child, M> ComposeWithChild<C, [M; 3]> for W
 where
-  W: ComposeChild<Child = Option<Child>>,
+  W: StateWriter,
+  W::Value: ComposeChild<Child = Option<Child>>,
   Child: Template,
   Child::Builder: ComposeWithChild<C, M, Target = Child::Builder>,
 {
-  type Target = Pair<State<W>, Child::Builder>;
+  type Target = Pair<W, Child::Builder>;
 
   fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
     let builder = Child::builder();
@@ -109,10 +101,11 @@ where
   }
 }
 
-impl<W, C> WidgetBuilder for Pair<State<W>, C>
+impl<W, C, Child> WidgetBuilder for Pair<W, C>
 where
-  W: ComposeChild,
-  W::Child: From<C>,
+  W: StateWriter,
+  W::Value: ComposeChild<Child = Child>,
+  Child: From<C>,
 {
   #[inline]
   fn widget_build(self, ctx: &BuildCtx) -> Widget {
@@ -181,7 +174,9 @@ mod tests {
 
   impl ComposeChild for P {
     type Child = PTml;
-    fn compose_child(_: State<Self>, _: Self::Child) -> impl WidgetBuilder { fn_widget!(Void) }
+    fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> impl WidgetBuilder {
+      fn_widget!(Void)
+    }
   }
 
   #[derive(Declare2)]
@@ -190,7 +185,9 @@ mod tests {
   impl ComposeChild for X {
     type Child = Widget;
 
-    fn compose_child(_: State<Self>, _: Self::Child) -> impl WidgetBuilder { fn_widget!(Void) }
+    fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> impl WidgetBuilder {
+      fn_widget!(Void)
+    }
   }
 
   #[test]

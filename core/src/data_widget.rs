@@ -39,13 +39,14 @@ impl Widget {
     self
   }
 
-  pub fn attach_state_data<D: Query>(self, data: State<D>, ctx: &BuildCtx) -> Widget {
-    match data.0.into_inner() {
-      InnerState::Data(data) => {
-        let data = data.into_inner();
-        self.attach_data(data, ctx)
-      }
-      InnerState::Stateful(data) => self.attach_data(data.inner.clone(), ctx),
+  pub fn attach_state_data<D: Query>(
+    self,
+    data: impl StateReader<Value = D>,
+    ctx: &BuildCtx,
+  ) -> Widget {
+    match data.try_into_value() {
+      Ok(data) => self.attach_data(data, ctx),
+      Err(data) => self.attach_data(data, ctx),
     }
   }
 

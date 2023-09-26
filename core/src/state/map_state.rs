@@ -1,3 +1,9 @@
+use crate::{
+  context::BuildCtx,
+  render_helper::{RenderProxy, RenderTarget},
+  widget::{Render, RenderBuilder, Widget},
+};
+
 use super::{ModifyScope, RefWrite, StateReader, StateWriter};
 use rxrust::{ops::box_it::BoxOp, subject::Subject};
 use std::{
@@ -49,7 +55,7 @@ where
   F: FnOnce(&R::Value) -> &V + Copy,
 {
   #[inline]
-  pub fn new(origin_state: R, map_fn: F) -> Self { Self { origin_reader: origin_state, map_fn } }
+  pub fn new(origin_reader: R, map_fn: F) -> Self { Self { origin_reader, map_fn } }
 }
 
 impl<V, W, RM> MapReader<V, W, RM>
@@ -128,6 +134,9 @@ where
   fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> {
     self.origin_reader.raw_modifies()
   }
+
+  #[inline]
+  fn try_into_value(self) -> Result<Self::Value, Self> { Err(self) }
 }
 
 impl<V, W, RM, WM> StateReader for MapWriter<V, W, RM, WM>
@@ -168,6 +177,9 @@ where
   fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> {
     self.origin_writer.raw_modifies()
   }
+
+  #[inline]
+  fn try_into_value(self) -> Result<Self::Value, Self> { Err(self) }
 }
 
 impl<V, W, RM, WM> StateWriter for MapWriter<V, W, RM, WM>
@@ -259,4 +271,42 @@ where
 {
   #[inline]
   fn forget_modifies(&mut self) -> bool { self.origin_ref.forget_modifies() }
+}
+
+impl<R, S, F> RenderTarget for MapReader<R, S, F>
+where
+  R: Render,
+  S: StateReader,
+  F: FnOnce(&S::Value) -> &R + Copy + 'static,
+{
+  type Target = R;
+
+  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V {
+    let v = self.read();
+    f(&*v)
+  }
+}
+
+impl<V: Render, R: StateReader, F: FnOnce(&R::Value) -> &V + Copy + 'static> RenderBuilder
+  for MapReader<V, R, F>
+{
+  #[inline]
+  fn widget_build(self, ctx: &BuildCtx) -> Widget { RenderProxy::new(self).widget_build(ctx) }
+}
+
+impl<V, W, RM, WM> RenderBuilder for MapWriter<V, W, RM, WM>
+where
+  V: Render,
+  W: StateWriter,
+  RM: FnOnce(&W::Value) -> &V + Copy + 'static,
+  WM: FnOnce(&mut W::Value) -> &mut V + Copy,
+{
+  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+    // we needn't keep a writer as render widget, keep a reader is enough.
+    MapReader {
+      origin_reader: self.origin_writer.clone_reader(),
+      map_fn: self.map_reader,
+    }
+    .widget_build(ctx)
+  }
 }

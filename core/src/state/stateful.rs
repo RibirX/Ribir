@@ -69,6 +69,18 @@ impl<W: 'static> StateReader for Stateful<W> {
   fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> {
     self.notifier.raw_modifies()
   }
+
+  fn try_into_value(self) -> Result<W, Self> {
+    if Sc::ref_count(&self.inner) == 1 {
+      let inner = self.inner.clone();
+      drop(self);
+      // SAFETY: `Rc::strong_count(&self.inner) == 1` guarantees unique access.
+      let inner = unsafe { Sc::try_unwrap(inner).unwrap_unchecked() };
+      Ok(inner.data.into_inner())
+    } else {
+      Err(self)
+    }
+  }
 }
 
 impl<W: 'static> StateWriter for Stateful<W> {
@@ -107,6 +119,12 @@ impl<W: 'static> StateReader for Reader<W> {
 
   #[inline]
   fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> { self.0.raw_modifies() }
+
+  fn try_into_value(self) -> Result<Self::Value, Self> {
+    let inner = self.0.clone_writer().0;
+    drop(self);
+    inner.try_into_value().map_err(Reader)
+  }
 }
 
 impl<W: 'static> StateReader for Writer<W> {
@@ -129,6 +147,9 @@ impl<W: 'static> StateReader for Writer<W> {
 
   #[inline]
   fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> { self.0.raw_modifies() }
+
+  #[inline]
+  fn try_into_value(self) -> Result<Self::Value, Self> { self.0.try_into_value().map_err(Writer) }
 }
 
 impl<W: 'static> StateWriter for Writer<W> {
@@ -214,28 +235,28 @@ pub(crate) struct StateData<W> {
   writer_count: Cell<usize>,
 }
 
-macro_rules! compose_impl {
+macro_rules! compose_builder_impl {
   ($name: ident) => {
     impl<C: Compose + 'static> ComposeBuilder for $name<C> {
       #[inline]
       fn widget_build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).widget_build(ctx) }
     }
+
+    impl<R: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for $name<R> {
+      #[inline]
+      fn widget_build(self, ctx: &BuildCtx) -> Widget {
+        ComposeChild::compose_child(self, None).widget_build(ctx)
+      }
+    }
   };
 }
 
-compose_impl!(Stateful);
-compose_impl!(Writer);
-
-impl<R: ComposeChild<Child = Option<C>>, C> ComposeChildBuilder for Stateful<R> {
-  #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget {
-    ComposeChild::compose_child(State::stateful(self), None).widget_build(ctx)
-  }
-}
+compose_builder_impl!(Stateful);
+compose_builder_impl!(Writer);
 
 impl<R: Render> RenderBuilder for Stateful<R> {
   fn widget_build(self, ctx: &BuildCtx) -> Widget {
-    match self.try_into_inner() {
+    match self.try_into_value() {
       Ok(r) => r.widget_build(ctx),
       Err(s) => {
         let w = RenderProxy::new(s.inner.clone()).widget_build(ctx);
@@ -243,6 +264,16 @@ impl<R: Render> RenderBuilder for Stateful<R> {
       }
     }
   }
+}
+
+impl<R: Render> RenderBuilder for Writer<R> {
+  #[inline]
+  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.0.widget_build(ctx) }
+}
+
+impl<R: Render> RenderBuilder for Reader<R> {
+  #[inline]
+  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.0.clone_writer().widget_build(ctx) }
 }
 
 impl<W> Stateful<W> {
@@ -273,18 +304,6 @@ impl<W> Stateful<W> {
     Self {
       inner: Sc::new(data),
       notifier: <_>::default(),
-    }
-  }
-
-  pub(crate) fn try_into_inner(self) -> Result<W, Self> {
-    if Sc::ref_count(&self.inner) == 1 {
-      let inner = self.inner.clone();
-      drop(self);
-      // SAFETY: `Rc::strong_count(&self.inner) == 1` guarantees unique access.
-      let inner = unsafe { Sc::try_unwrap(inner).unwrap_unchecked() };
-      Ok(inner.data.into_inner())
-    } else {
-      Err(self)
     }
   }
 

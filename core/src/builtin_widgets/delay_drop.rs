@@ -21,7 +21,7 @@ pub struct DelayDrop {
 impl ComposeChild for DelayDrop {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let modifies = this.raw_modifies();
       child.attach_state_data(this, ctx!()).dirty_subscribe(modifies, ctx!())
