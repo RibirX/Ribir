@@ -235,7 +235,7 @@ mod tests {
   }
 
   impl Compose for Recursive {
-    fn compose(this: State<Self>) -> impl WidgetBuilder {
+    fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
       fn_widget! {
         @MockMulti {
           @{
@@ -262,7 +262,7 @@ mod tests {
   }
 
   impl Compose for Embed {
-    fn compose(this: State<Self>) -> impl WidgetBuilder {
+    fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
       fn_widget! {
         let recursive_child: Widget = if $this.depth > 1 {
           let width = $this.width;

@@ -214,12 +214,17 @@ pub(crate) struct StateData<W> {
   writer_count: Cell<usize>,
 }
 
-impl<C: Compose> ComposeBuilder for Stateful<C> {
-  #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget {
-    Compose::compose(State::stateful(self)).widget_build(ctx)
-  }
+macro_rules! compose_impl {
+  ($name: ident) => {
+    impl<C: Compose + 'static> ComposeBuilder for $name<C> {
+      #[inline]
+      fn widget_build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).widget_build(ctx) }
+    }
+  };
 }
+
+compose_impl!(Stateful);
+compose_impl!(Writer);
 
 impl<R: ComposeChild<Child = Option<C>>, C> ComposeChildBuilder for Stateful<R> {
   #[inline]

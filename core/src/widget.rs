@@ -15,7 +15,7 @@ pub use std::{
 pub trait Compose: Sized {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn compose(this: State<Self>) -> impl WidgetBuilder;
+  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder;
 }
 
 pub struct HitTest {
@@ -304,7 +304,7 @@ macro_rules! impl_proxy_render {
   };
 }
 
-impl<C: Compose> ComposeBuilder for C {
+impl<C: Compose + 'static> ComposeBuilder for C {
   #[inline]
   fn widget_build(self, ctx: &BuildCtx) -> Widget {
     Compose::compose(State::value(self)).widget_build(ctx)

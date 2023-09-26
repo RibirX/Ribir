@@ -10,7 +10,7 @@ pub struct Caret {
 }
 
 impl Compose for Caret {
-  fn compose(this: State<Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
     let blink_interval = Duration::from_millis(500);
     fn_widget! {
       let icon = $this.icon;

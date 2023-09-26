@@ -59,7 +59,7 @@ pub const CUSTOM_ICON_START: NamedSvg = NamedSvg::new(65536);
 pub struct NamedSvg(pub usize);
 
 impl Compose for NamedSvg {
-  fn compose(this: State<Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
     fn_widget! { @ { pipe!($this.of_or_miss(ctx!())) }}
   }
 }

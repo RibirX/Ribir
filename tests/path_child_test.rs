@@ -9,7 +9,7 @@ enum AB {
 
 const SIZE_ONE: Size = Size::new(1., 1.);
 impl Compose for AB {
-  fn compose(this: State<Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
     fn_widget! {
       @SizedBox {
         size: match *$this {
@@ -38,7 +38,7 @@ fn path_widget() {
 fn tuple_widget() -> impl WidgetBuilder {
   struct TupleBox(Size);
   impl Compose for TupleBox {
-    fn compose(this: State<Self>) -> impl WidgetBuilder {
+    fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
       fn_widget! {
         @SizedBox {
           size: pipe!($this.0),

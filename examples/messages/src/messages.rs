@@ -43,7 +43,7 @@ pub fn messages() -> impl WidgetBuilder {
 }
 
 impl Compose for MessageList {
-  fn compose(this: State<Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
     fn_widget! {
       @Column {
         background: Palette::of(ctx!()).surface(),
