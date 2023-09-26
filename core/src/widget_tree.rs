@@ -498,7 +498,7 @@ mod tests {
     reset_test_env!();
 
     let trigger = Stateful::new(1);
-    let c_trigger = trigger.clone_stateful();
+    let c_trigger = trigger.clone_writer();
     let widget = fn_widget! {
       @ MockMulti {
         @{
@@ -517,9 +517,8 @@ mod tests {
     let wnd = TestWindow::new(widget);
     let mut tree = wnd.widget_tree.borrow_mut();
     tree.layout(Size::new(100., 100.));
-    {
-      *c_trigger.write() = 2;
-    }
+
+    *c_trigger.write() = 2;
     assert!(!tree.is_dirty())
   }
 

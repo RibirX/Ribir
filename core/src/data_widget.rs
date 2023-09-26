@@ -45,7 +45,7 @@ impl Widget {
         let data = data.into_inner();
         self.attach_data(data, ctx)
       }
-      InnerState::Stateful(data) => self.attach_data(data, ctx),
+      InnerState::Stateful(data) => self.attach_data(data.inner.clone(), ctx),
     }
   }
 

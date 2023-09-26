@@ -94,13 +94,14 @@ impl<V, O: Deref, F: FnOnce(&O::Target) -> &V + Copy> MapReadRef<V, O, F> {
 
 impl<V, R, M> StateReader for MapReader<V, R, M>
 where
+  Self: 'static,
   R: StateReader,
   M: FnOnce(&R::Value) -> &V + Copy,
 {
   type Value = V;
   type OriginReader = R;
   type Reader = MapReader<V, R::Reader, M>;
-  type Ref<'a> = MapReadRef<V, R::Ref<'a>, M> where Self:'a;
+  type Ref<'a> = MapReadRef<V, R::Ref<'a>, M>;
 
   #[inline]
   fn read(&'_ self) -> Self::Ref<'_> {
@@ -131,6 +132,7 @@ where
 
 impl<V, W, RM, WM> StateReader for MapWriter<V, W, RM, WM>
 where
+  Self: 'static,
   W: StateWriter,
   RM: FnOnce(&W::Value) -> &V + Copy,
   WM: FnOnce(&mut W::Value) -> &mut V + Copy,
@@ -138,7 +140,7 @@ where
   type Value = V;
   type OriginReader = W;
   type Reader = MapReader<V, W::Reader, RM>;
-  type Ref<'a> = MapReadRef<V, W::Ref<'a>, RM> where Self:'a;
+  type Ref<'a> = MapReadRef<V, W::Ref<'a>, RM>;
 
   #[inline]
   fn read(&'_ self) -> Self::Ref<'_> {
@@ -170,13 +172,14 @@ where
 
 impl<V, W, RM, WM> StateWriter for MapWriter<V, W, RM, WM>
 where
+  Self: 'static,
   W: StateWriter,
   RM: FnOnce(&W::Value) -> &V + Copy,
   WM: FnOnce(&mut W::Value) -> &mut V + Copy,
 {
   type Writer = MapWriter<V, W::Writer, RM, WM>;
   type OriginWriter = W;
-  type RefWrite<'a> = MapWriteRef<V, W::RefWrite<'a>, RM, WM> where Self:'a;
+  type RefWrite<'a> = MapWriteRef<V, W::RefWrite<'a>, RM, WM>;
 
   fn write(&'_ self) -> Self::RefWrite<'_> {
     MapWriteRef {

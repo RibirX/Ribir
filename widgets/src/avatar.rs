@@ -48,9 +48,7 @@ impl CustomStyle for AvatarStyle {
 pub struct AvatarDecorator;
 
 impl ComposeDecorator for AvatarDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 #[derive(Template)]

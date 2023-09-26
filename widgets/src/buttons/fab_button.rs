@@ -34,9 +34,7 @@ pub struct FabButtonDecorator {
 }
 
 impl ComposeDecorator for FabButtonDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 /// FabButton usage

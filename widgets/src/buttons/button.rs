@@ -32,9 +32,7 @@ pub struct ButtonDecorator {
 }
 
 impl ComposeDecorator for ButtonDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 /// Button usage

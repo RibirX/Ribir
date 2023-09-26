@@ -34,9 +34,7 @@ pub struct FilledButtonDecorator {
 }
 
 impl ComposeDecorator for FilledButtonDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 /// FilledButton usage

@@ -47,11 +47,11 @@ bitflags! {
   }
 }
 
-impl<W> StateReader for Stateful<W> {
+impl<W: 'static> StateReader for Stateful<W> {
   type Value = W;
   type OriginReader = Self;
   type Reader = Reader<W>;
-  type Ref<'a> = ReadRef<'a, W> where Self: 'a,;
+  type Ref<'a> = ReadRef<'a, W>;
 
   #[inline]
   fn read(&self) -> ReadRef<'_, W> { self.inner.read() }
@@ -71,7 +71,7 @@ impl<W> StateReader for Stateful<W> {
   }
 }
 
-impl<W> StateWriter for Stateful<W> {
+impl<W: 'static> StateWriter for Stateful<W> {
   type Writer = Writer<W>;
   type OriginWriter = Self;
   type RefWrite<'a> = WriteRef<'a, W> where Self: 'a;
@@ -87,7 +87,7 @@ impl<W> StateWriter for Stateful<W> {
   fn origin_writer(&self) -> &Self::OriginWriter { self }
 }
 
-impl<W> StateReader for Reader<W> {
+impl<W: 'static> StateReader for Reader<W> {
   type Value = W;
   type OriginReader = Self;
   type Reader = Self;
@@ -109,11 +109,11 @@ impl<W> StateReader for Reader<W> {
   fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> { self.0.raw_modifies() }
 }
 
-impl<W> StateReader for Writer<W> {
+impl<W: 'static> StateReader for Writer<W> {
   type Value = W;
   type OriginReader = Self;
   type Reader = Reader<W>;
-  type Ref<'a> = ReadRef<'a, W> where W:'a;
+  type Ref<'a> = ReadRef<'a, W>;
 
   #[inline]
   fn read(&'_ self) -> Self::Ref<'_> { self.0.read() }
@@ -131,10 +131,10 @@ impl<W> StateReader for Writer<W> {
   fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> { self.0.raw_modifies() }
 }
 
-impl<W> StateWriter for Writer<W> {
+impl<W: 'static> StateWriter for Writer<W> {
   type Writer = Self;
   type OriginWriter = Self;
-  type RefWrite<'a> = WriteRef<'a, W> where W:'a;
+  type RefWrite<'a> = WriteRef<'a, W>;
 
   #[inline]
   fn write(&'_ self) -> Self::RefWrite<'_> { self.0.write() }
@@ -233,7 +233,7 @@ impl<R: Render> RenderBuilder for Stateful<R> {
     match self.try_into_inner() {
       Ok(r) => r.widget_build(ctx),
       Err(s) => {
-        let w = RenderProxy::new(s.clone_writer().into_inner()).widget_build(ctx);
+        let w = RenderProxy::new(s.inner.clone()).widget_build(ctx);
         w.dirty_subscribe(s.raw_modifies(), ctx)
       }
     }
@@ -247,15 +247,6 @@ impl<W> Stateful<W> {
       notifier: <_>::default(),
     }
   }
-
-  /// Clone the stateful widget of which the reference point to. Require mutable
-  /// reference because we try to early release inner borrow when clone occur.
-  #[inline]
-  pub fn clone_stateful(&self) -> Stateful<W> { self.clone_writer().0 }
-
-  /// just for compatibility with `Stateful` in old syntax.
-  #[inline]
-  pub fn state_ref(&self) -> WriteRef<W> { self.write() }
 
   /// Run the `task` when the inner state data will drop.
   #[inline]
@@ -389,12 +380,12 @@ impl<W: MultiChild + Render> MultiParent for Stateful<W> {
   }
 }
 
-impl<R: Render> RenderTarget for Stateful<R> {
+impl<R: Render> RenderTarget for Sc<StateData<R>> {
   type Target = R;
   fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(&*self.read()) }
 }
 
-impl<T: Query> Query for Stateful<T> {
+impl<T: Query> Query for StateData<T> {
   crate::widget::impl_proxy_query!(read());
 }
 
@@ -436,7 +427,9 @@ impl Notifier {
 
 impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.debug_tuple("Stateful").field(&*self.read()).finish()
+    f.debug_tuple("Stateful")
+      .field(&*self.inner.read())
+      .finish()
   }
 }
 
@@ -455,9 +448,9 @@ mod tests {
     // `cell_ref` in closure.
     let stateful = Stateful::new(MockBox { size: Size::zero() });
     {
-      stateful.state_ref().size = Size::new(100., 100.)
+      stateful.write().size = Size::new(100., 100.)
     }
-    assert_eq!(stateful.state_ref().size, Size::new(100., 100.));
+    assert_eq!(stateful.read().size, Size::new(100., 100.));
   }
 
   #[test]
@@ -519,7 +512,7 @@ mod tests {
       .subscribe(move |b| c_notified.borrow_mut().push(b));
 
     {
-      let _ = &mut w.state_ref().size;
+      let _ = &mut w.write().size;
     }
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();

@@ -310,6 +310,7 @@ impl<C: Compose> ComposeBuilder for C {
     Compose::compose(State::value(self)).widget_build(ctx)
   }
 }
+
 impl<R: Render + 'static> RenderBuilder for R {
   #[inline]
   fn widget_build(self, ctx: &BuildCtx) -> Widget { Widget::new(Box::new(self), ctx) }
