@@ -103,9 +103,7 @@ impl CustomStyle for TabsStyle {
 pub struct TabsDecorator {}
 
 impl ComposeDecorator for TabsDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 #[derive(Template)]
@@ -127,9 +125,7 @@ pub struct TabPane;
 pub struct TabDecorator {}
 
 impl ComposeDecorator for TabDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 #[derive(Declare2)]
@@ -140,9 +136,7 @@ pub struct IndicatorDecorator {
 }
 
 impl ComposeDecorator for IndicatorDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(this: State<Self>, host: Self::Host) -> impl WidgetBuilder {
+  fn compose_decorator(this: State<Self>, host: Widget) -> impl WidgetBuilder {
     fn_widget! {
       @ $host{
         left_anchor: pipe!{

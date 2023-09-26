@@ -273,7 +273,7 @@ fn pipe_as_child() {
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 100., height == 100., });
 
-  *box_or_not.state_ref() = false;
+  *box_or_not.write() = false;
 
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 0., height == 0., });

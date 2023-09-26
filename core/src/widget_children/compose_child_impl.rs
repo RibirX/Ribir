@@ -25,7 +25,7 @@ pub trait TemplateBuilder: Sized {
   fn build_tml(self) -> Self::Target;
 }
 
-impl<M, T, C> ComposeWithChild<C, M> for T
+impl<M, T, C> ComposeWithChild<C, [M; 0]> for T
 where
   T: ComposeChild,
   State<T>: ComposeWithChild<C, M>,

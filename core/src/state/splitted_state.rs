@@ -27,6 +27,7 @@ where
 
 impl<V, O, R, W> StateReader for SplittedWriter<V, O, R, W>
 where
+  Self: 'static,
   O: StateWriter,
   R: FnOnce(&O::Value) -> &V + Copy,
   W: FnOnce(&mut O::Value) -> &mut V + Copy,
@@ -61,19 +62,19 @@ where
 
 impl<V, O, R, W> StateWriter for SplittedWriter<V, O, R, W>
 where
+  Self: 'static,
   O: StateWriter,
   R: FnOnce(&O::Value) -> &V + Copy,
   W: FnOnce(&mut O::Value) -> &mut V + Copy,
 {
   type Writer = SplittedWriter<V, O::Writer, R, W>;
   type OriginWriter = O;
-  type RefWrite<'a> = SplittedWriteRef<'a, V, O::RefWrite<'a>, R, W> where Self: 'a;
-
+  type RefWrite<'a> = SplittedWriteRef<'a, V, O::RefWrite<'a>, R, W>;
   #[inline]
   fn write(&'_ self) -> Self::RefWrite<'_> { self.write_ref(ModifyScope::BOTH) }
-
+  #[inline]
   fn silent(&'_ self) -> Self::RefWrite<'_> { self.write_ref(ModifyScope::DATA) }
-
+  #[inline]
   fn shallow(&'_ self) -> Self::RefWrite<'_> { self.write_ref(ModifyScope::FRAMEWORK) }
 
   #[inline]

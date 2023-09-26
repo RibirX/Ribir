@@ -16,7 +16,7 @@ pub use splitted_state::*;
 pub use stateful::*;
 
 /// The `StateReader` trait allows for reading, clone and map the state.
-pub trait StateReader: Sized {
+pub trait StateReader: 'static {
   /// The value type of this state.
   type Value;
   /// The origin state type that this state map or split from . Otherwise
@@ -24,10 +24,7 @@ pub trait StateReader: Sized {
   type OriginReader: StateReader;
   type Reader: StateReader<Value = Self::Value>;
   /// The reference type that can read the value of the state.
-  type Ref<'a>: Deref<Target = Self::Value>
-  where
-    Self: 'a;
-
+  type Ref<'a>: Deref<Target = Self::Value>;
   /// Return a reference of this state.
   fn read(&'_ self) -> Self::Ref<'_>;
   /// get a clone of this state that only can read.
@@ -122,14 +119,11 @@ pub(crate) enum InnerState<W> {
   Stateful(Stateful<W>),
 }
 
-impl<T> StateReader for State<T> {
+impl<T: 'static> StateReader for State<T> {
   type Value = T;
   type OriginReader = Self;
   type Reader = Reader<T>;
-  type Ref<'a> = ReadRef<'a,T>
-  where
-    Self: 'a;
-
+  type Ref<'a> = ReadRef<'a, T>;
   fn read(&'_ self) -> Self::Ref<'_> {
     match self.inner_ref() {
       InnerState::Data(w) => w.read(),
@@ -149,7 +143,7 @@ impl<T> StateReader for State<T> {
   }
 }
 
-impl<T> StateWriter for State<T> {
+impl<T: 'static> StateWriter for State<T> {
   type Writer = Writer<T>;
   type OriginWriter = Self;
   type RefWrite<'a> = WriteRef<'a,T>
@@ -191,10 +185,6 @@ impl<W> State<W> {
         .unwrap_or_else(|_| panic!("can't convert stateful to value")),
     }
   }
-
-  pub fn into_writable(self) -> Stateful<W> { self.as_stateful().clone_stateful() }
-
-  pub fn clone_stateful(&mut self) -> Stateful<W> { self.as_stateful().clone_stateful() }
 
   pub fn as_stateful(&self) -> &Stateful<W> {
     match self.inner_ref() {
@@ -289,6 +279,30 @@ impl<W: MultiChild + Render> MultiParent for State<W> {
       InnerState::Data(w) => w.into_inner().compose_children(children, ctx),
       InnerState::Stateful(w) => w.compose_children(children, ctx),
     }
+  }
+}
+
+impl<T: StateReader + 'static> Query for T
+where
+  T::Value: 'static,
+{
+  #[inline]
+  fn query_inside_first(
+    &self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&dyn Any) -> bool,
+  ) -> bool {
+    self.query_outside_first(type_id, callback)
+  }
+
+  fn query_outside_first(
+    &self,
+    type_id: TypeId,
+    callback: &mut dyn FnMut(&dyn Any) -> bool,
+  ) -> bool {
+    let v = self.read();
+    let any = &*v;
+    any.type_id() == type_id && callback(any)
   }
 }
 

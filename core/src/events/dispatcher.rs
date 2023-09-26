@@ -670,10 +670,7 @@ mod tests {
       modifiers,
     });
     wnd.run_frame_tasks();
-    {
-      let clicked = click_path.state_ref();
-      assert_eq!(*clicked, [1, 2, 3, 4]);
-    }
+    assert_eq!(*click_path.read(), [1, 2, 3, 4]);
   }
 
   #[test]
@@ -755,10 +752,7 @@ mod tests {
       modifiers,
     });
     wnd.run_frame_tasks();
-    {
-      let clicked = click_path.state_ref();
-      assert_eq!(*clicked, 1);
-    }
+    assert_eq!(*click_path.read(), 1);
   }
 
   #[test]

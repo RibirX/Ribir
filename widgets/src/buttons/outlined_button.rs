@@ -36,9 +36,7 @@ pub struct OutlinedButtonDecorator {
 }
 
 impl ComposeDecorator for OutlinedButtonDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 /// OutlinedButton usage

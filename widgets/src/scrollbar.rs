@@ -28,9 +28,7 @@ pub struct HScrollBarThumbDecorator {
 }
 
 impl ComposeDecorator for HScrollBarThumbDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(this: State<Self>, host: Self::Host) -> impl WidgetBuilder {
+  fn compose_decorator(this: State<Self>, host: Widget) -> impl WidgetBuilder {
     fn_widget! { @$host { left_anchor: pipe!($this.offset) } }
   }
 }
@@ -43,9 +41,7 @@ pub struct VScrollBarThumbDecorator {
 }
 
 impl ComposeDecorator for VScrollBarThumbDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(this: State<Self>, host: Self::Host) -> impl WidgetBuilder {
+  fn compose_decorator(this: State<Self>, host: Widget) -> impl WidgetBuilder {
     fn_widget! { @$host { top_anchor: pipe!($this.offset) } }
   }
 }

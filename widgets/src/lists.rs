@@ -127,9 +127,7 @@ pub struct Lists;
 #[derive(Declare2)]
 pub struct ListsDecorator {}
 impl ComposeDecorator for ListsDecorator {
-  type Host = Widget;
-
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder { fn_widget!(host) }
 }
 
 impl ComposeChild for Lists {
@@ -442,8 +440,7 @@ pub struct ListItemDecorator {
 }
 
 impl ComposeDecorator for ListItemDecorator {
-  type Host = Widget;
-  fn compose_decorator(_: State<Self>, host: Self::Host) -> impl WidgetBuilder {
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder {
     fn_widget! { host }
   }
 }

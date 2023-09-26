@@ -214,7 +214,7 @@ mod tests {
 
     let wnd = TestWindow::new(light_dark);
     wnd.layout();
-    let themes = themes.state_ref();
+    let themes = themes.read();
     assert_eq!(themes.len(), 2);
     let mut iter = themes.iter().filter_map(|t| match t.deref() {
       Theme::Full(t) => Some(t.palette.brightness),

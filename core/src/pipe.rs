@@ -957,14 +957,14 @@ mod tests {
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
     let expect_vec = ['1', '2', '3'];
-    assert_eq!((*enter_list.state_ref()).len(), 3);
+    assert_eq!((*enter_list.read()).len(), 3);
     assert!(
-      (*enter_list.state_ref())
+      (*enter_list.read())
         .iter()
         .all(|item| expect_vec.contains(item))
     );
     // clear enter list vec
-    (*enter_list.state_ref()).clear();
+    enter_list.write().clear();
 
     // 2. add 1 item
     c_v.write().push((4, '4'));
@@ -972,65 +972,67 @@ mod tests {
     wnd.draw_frame();
 
     let expect_vec = ['4'];
-    assert_eq!((*enter_list.state_ref()).len(), 1);
+    assert_eq!((*enter_list.read()).len(), 1);
     assert!(
-      (*enter_list.state_ref())
+      enter_list
+        .read()
         .iter()
         .all(|item| expect_vec.contains(item))
     );
     // clear enter list vec
-    (*enter_list.state_ref()).clear();
+    enter_list.write().clear();
 
     // 3. update the second item
     c_v.write()[1].1 = 'b';
     wnd.draw_frame();
 
     let expect_vec = [];
-    assert_eq!((*enter_list.state_ref()).len(), 0);
+    assert_eq!((*enter_list.read()).len(), 0);
     assert!(
-      (*enter_list.state_ref())
+      (*enter_list.read())
         .iter()
         .all(|item| expect_vec.contains(item))
     );
 
     let expect_vec = ['b'];
-    assert_eq!((*update_list.state_ref()).len(), 1);
+    assert_eq!((*update_list.read()).len(), 1);
     assert!(
-      (*update_list.state_ref())
+      (*update_list.read())
         .iter()
         .all(|item| expect_vec.contains(item))
     );
-    assert_eq!(*key_change.state_ref(), KeyChange(Some('2'), 'b'));
-    (*update_list.state_ref()).clear();
+    assert_eq!(*key_change.read(), KeyChange(Some('2'), 'b'));
+    update_list.write().clear();
 
     // 4. remove the second item
     c_v.write().remove(1);
     wnd.draw_frame();
     let expect_vec = vec!['b'];
-    assert_eq!((*leave_list.state_ref()), expect_vec);
-    assert_eq!((*leave_list.state_ref()).len(), 1);
+    assert_eq!((*leave_list.read()), expect_vec);
+    assert_eq!((*leave_list.read()).len(), 1);
     assert!(
-      (*leave_list.state_ref())
+      leave_list
+        .read()
         .iter()
         .all(|item| expect_vec.contains(item))
     );
-    (*leave_list.state_ref()).clear();
+    leave_list.write().clear();
 
     // 5. update the first item
     c_v.write()[0].1 = 'a';
     wnd.draw_frame();
 
-    assert_eq!((*enter_list.state_ref()).len(), 0);
+    assert_eq!((*enter_list.read()).len(), 0);
 
     let expect_vec = ['a'];
-    assert_eq!((*update_list.state_ref()).len(), 1);
+    assert_eq!((*update_list.read()).len(), 1);
     assert!(
-      (*update_list.state_ref())
+      (*update_list.read())
         .iter()
         .all(|item| expect_vec.contains(item))
     );
-    assert_eq!(*key_change.state_ref(), KeyChange(Some('1'), 'a'));
-    (*update_list.state_ref()).clear();
+    assert_eq!(*key_change.read(), KeyChange(Some('1'), 'a'));
+    update_list.write().clear();
   }
 
   #[test]
@@ -1108,65 +1110,56 @@ mod tests {
     assert_eq!(child_count(&wnd), 3);
 
     // the first pined widget will still paint it
-    tasks.state_ref()[0].state_ref().pin = true;
-    removed.push(tasks.state_ref().remove(0));
+    tasks.read()[0].write().pin = true;
+    removed.push(tasks.write().remove(0));
     wnd.draw_frame();
     assert_eq!(child_count(&wnd), 2);
-    assert_eq!(removed[0].state_ref().paint_cnt.get(), 2);
+    assert_eq!(removed[0].read().paint_cnt.get(), 2);
 
     // the remove pined widget will paint and no layout when no changed
-    let first_layout_cnt = removed[0].state_ref().layout_cnt.get();
-    tasks.state_ref().get(0).unwrap().state_ref().pin = true;
-    removed.push(tasks.state_ref().remove(0));
+    let first_layout_cnt = removed[0].read().layout_cnt.get();
+    tasks.read().get(0).unwrap().write().pin = true;
+    removed.push(tasks.write().remove(0));
     wnd.draw_frame();
     assert_eq!(child_count(&wnd), 1);
-    assert_eq!(removed[0].state_ref().paint_cnt.get(), 3);
-    assert_eq!(removed[1].state_ref().paint_cnt.get(), 3);
-    assert_eq!(removed[0].state_ref().layout_cnt.get(), first_layout_cnt);
+    assert_eq!(removed[0].read().paint_cnt.get(), 3);
+    assert_eq!(removed[1].read().paint_cnt.get(), 3);
+    assert_eq!(removed[0].read().layout_cnt.get(), first_layout_cnt);
 
     // the remove pined widget only mark self dirty
-    let first_layout_cnt = removed[0].state_ref().layout_cnt.get();
-    let second_layout_cnt = removed[1].state_ref().layout_cnt.get();
-    let host_layout_cnt = tasks.state_ref()[0].state_ref().layout_cnt.get();
-    removed[0].state_ref().trigger += 1;
+    let first_layout_cnt = removed[0].read().layout_cnt.get();
+    let second_layout_cnt = removed[1].read().layout_cnt.get();
+    let host_layout_cnt = tasks.read()[0].read().layout_cnt.get();
+    removed[0].write().trigger += 1;
     wnd.draw_frame();
-    assert_eq!(
-      removed[0].state_ref().layout_cnt.get(),
-      first_layout_cnt + 1
-    );
-    assert_eq!(removed[0].state_ref().paint_cnt.get(), 4);
-    assert_eq!(removed[1].state_ref().layout_cnt.get(), second_layout_cnt);
-    assert_eq!(
-      tasks.state_ref()[0].state_ref().layout_cnt.get(),
-      host_layout_cnt
-    );
+    assert_eq!(removed[0].read().layout_cnt.get(), first_layout_cnt + 1);
+    assert_eq!(removed[0].read().paint_cnt.get(), 4);
+    assert_eq!(removed[1].read().layout_cnt.get(), second_layout_cnt);
+    assert_eq!(tasks.read()[0].read().layout_cnt.get(), host_layout_cnt);
 
     // when unpined, it will no paint anymore
-    removed[0].state_ref().pin = false;
+    removed[0].write().pin = false;
     wnd.draw_frame();
-    assert_eq!(removed[0].state_ref().paint_cnt.get(), 4);
-    assert_eq!(removed[1].state_ref().paint_cnt.get(), 5);
+    assert_eq!(removed[0].read().paint_cnt.get(), 4);
+    assert_eq!(removed[1].read().paint_cnt.get(), 5);
 
     // after removed, it will no paint and layout anymore
-    let first_layout_cnt = removed[0].state_ref().layout_cnt.get();
-    removed[0].state_ref().trigger += 1;
+    let first_layout_cnt = removed[0].read().layout_cnt.get();
+    removed[0].write().trigger += 1;
     wnd.draw_frame();
-    assert_eq!(removed[0].state_ref().paint_cnt.get(), 4);
-    assert_eq!(removed[1].state_ref().paint_cnt.get(), 5);
-    assert_eq!(removed[0].state_ref().layout_cnt.get(), first_layout_cnt);
+    assert_eq!(removed[0].read().paint_cnt.get(), 4);
+    assert_eq!(removed[1].read().paint_cnt.get(), 5);
+    assert_eq!(removed[0].read().layout_cnt.get(), first_layout_cnt);
 
     // other pined widget is work fine.
-    let first_layout_cnt = removed[0].state_ref().layout_cnt.get();
-    let second_layout_cnt = removed[1].state_ref().layout_cnt.get();
-    removed[1].state_ref().trigger += 1;
+    let first_layout_cnt = removed[0].read().layout_cnt.get();
+    let second_layout_cnt = removed[1].read().layout_cnt.get();
+    removed[1].write().trigger += 1;
     wnd.draw_frame();
-    assert_eq!(removed[0].state_ref().paint_cnt.get(), 4);
-    assert_eq!(removed[1].state_ref().paint_cnt.get(), 6);
-    assert_eq!(removed[0].state_ref().layout_cnt.get(), first_layout_cnt);
-    assert_eq!(
-      removed[1].state_ref().layout_cnt.get(),
-      second_layout_cnt + 1,
-    );
+    assert_eq!(removed[0].read().paint_cnt.get(), 4);
+    assert_eq!(removed[1].read().paint_cnt.get(), 6);
+    assert_eq!(removed[0].read().layout_cnt.get(), first_layout_cnt);
+    assert_eq!(removed[1].read().layout_cnt.get(), second_layout_cnt + 1,);
   }
 
   #[test]
