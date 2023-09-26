@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 use ribir_geom::{Rect, Size};
 
 impl Render for ShareResource<PixelImage> {
@@ -17,4 +17,6 @@ impl Render for ShareResource<PixelImage> {
   }
 }
 
-impl_query_self_only!(ShareResource<PixelImage>);
+impl Query for ShareResource<PixelImage> {
+  crate::widget::impl_query_self_only!();
+}

@@ -3,7 +3,7 @@ use std::convert::Infallible;
 
 use crate::{
   impl_all_event, impl_compose_child_for_listener, impl_compose_child_with_focus_for_listener,
-  impl_listener, impl_multi_event_listener, impl_query_self_only, prelude::*,
+  impl_listener, impl_multi_event_listener, prelude::*,
 };
 
 pub type FocusEvent = CommonEvent;

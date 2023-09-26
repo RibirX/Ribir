@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
 #[derive(Clone, Default)]
 pub enum ClipType {
@@ -7,7 +7,7 @@ pub enum ClipType {
   Path(Path),
 }
 
-#[derive(SingleChild, Clone, Declare2)]
+#[derive(SingleChild, Query, Clone, Declare2)]
 pub struct Clip {
   #[declare(default)]
   pub clip: ClipType,
@@ -40,5 +40,3 @@ impl Render for Clip {
     ctx.painter().clip(path);
   }
 }
-
-impl_query_self_only!(Clip);

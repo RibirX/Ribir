@@ -1,6 +1,6 @@
-use crate::{impl_query_self_only, prelude::*, widget::hit_test_impl};
+use crate::{prelude::*, widget::hit_test_impl};
 
-#[derive(SingleChild, Declare2, Clone)]
+#[derive(SingleChild, Query, Declare2, Clone)]
 pub struct TransformWidget {
   #[declare(builtin, default)]
   pub transform: Transform,
@@ -26,8 +26,6 @@ impl Render for TransformWidget {
 
   fn get_transform(&self) -> Option<Transform> { Some(self.transform) }
 }
-
-impl_query_self_only!(TransformWidget);
 
 impl TransformWidget {
   #[inline]

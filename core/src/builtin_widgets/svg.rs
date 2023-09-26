@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
 impl Render for Svg {
   #[inline]
@@ -11,4 +11,6 @@ impl Render for Svg {
   }
 }
 
-impl_query_self_only!(Svg);
+impl Query for Svg {
+  crate::widget::impl_query_self_only!();
+}

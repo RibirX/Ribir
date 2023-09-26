@@ -1,7 +1,7 @@
 use super::CommonEvent;
 use crate::{
   impl_all_event, impl_common_event_deref, impl_compose_child_for_listener, impl_listener,
-  impl_multi_event_listener, impl_query_self_only, prelude::*,
+  impl_multi_event_listener, prelude::*,
 };
 use rxrust::prelude::*;
 use std::{

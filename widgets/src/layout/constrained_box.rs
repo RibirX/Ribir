@@ -1,7 +1,7 @@
-use ribir_core::{impl_query_self_only, prelude::*};
+use ribir_core::prelude::*;
 
 /// a widget that imposes additional constraints clamp on its child.
-#[derive(SingleChild, Declare2, Clone)]
+#[derive(SingleChild, Query, Declare2, Clone)]
 pub struct ConstrainedBox {
   pub clamp: BoxClamp,
 }
@@ -19,8 +19,6 @@ impl Render for ConstrainedBox {
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
 }
-
-impl_query_self_only!(ConstrainedBox);
 
 #[cfg(test)]
 mod tests {

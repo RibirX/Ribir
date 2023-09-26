@@ -1,7 +1,7 @@
 //! Theme use to share visual config or style compose logic. It can be defined
 //! to app-wide or particular part of the application.
 
-use crate::{fill_svgs, impl_query_self_only, prelude::*, widget::WidgetBuilder};
+use crate::{fill_svgs, prelude::*, widget::WidgetBuilder};
 use ribir_algo::Sc;
 pub use ribir_algo::{CowArc, ShareResource};
 use ribir_geom::Size;
@@ -62,6 +62,7 @@ pub struct InheritTheme {
   pub font_files: Option<Vec<String>>,
 }
 
+#[derive(Query)]
 pub enum Theme {
   Full(FullTheme),
   Inherit(InheritTheme),
@@ -94,8 +95,6 @@ impl ComposeChild for ThemeWidget {
     }
   }
 }
-
-impl_query_self_only!(Theme);
 
 impl Default for Theme {
   fn default() -> Self { Theme::Full(<_>::default()) }

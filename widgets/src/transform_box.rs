@@ -1,6 +1,6 @@
-use ribir_core::{impl_query_self_only, prelude::*};
+use ribir_core::prelude::*;
 
-#[derive(SingleChild, Declare2, Clone)]
+#[derive(SingleChild, Query, Declare2, Clone)]
 pub struct TransformBox {
   pub matrix: Transform,
 }
@@ -26,8 +26,6 @@ impl Render for TransformBox {
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
 }
-
-impl_query_self_only!(TransformBox);
 
 impl TransformBox {
   #[inline]

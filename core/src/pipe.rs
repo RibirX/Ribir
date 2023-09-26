@@ -702,6 +702,10 @@ impl PipeNode {
   }
 }
 
+impl Query for PipeNode {
+  crate::widget::impl_proxy_query!(as_ref());
+}
+
 impl RenderTarget for PipeNode {
   type Target = dyn Render;
   fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(self.as_ref()) }
@@ -716,7 +720,6 @@ mod tests {
 
   use crate::{
     builtin_widgets::key::{AnyKey, KeyChange},
-    impl_query_self_only,
     prelude::*,
     reset_test_env,
     test_helper::*,
@@ -1063,7 +1066,7 @@ mod tests {
       }
     }
 
-    #[derive(Declare2)]
+    #[derive(Declare2, Query)]
     struct TaskWidget {
       trigger: u32,
       paint_cnt: Rc<Cell<u32>>,
@@ -1078,8 +1081,6 @@ mod tests {
 
       fn paint(&self, _: &mut PaintingCtx) { self.paint_cnt.set(self.paint_cnt.get() + 1); }
     }
-
-    impl_query_self_only!(TaskWidget);
 
     fn child_count(wnd: &Window) -> usize {
       let tree = wnd.widget_tree.borrow();

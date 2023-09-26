@@ -116,10 +116,7 @@ impl ScrollableWidget {
 
 #[cfg(test)]
 mod tests {
-  use crate::{
-    impl_query_self_only,
-    test_helper::{MockBox, TestWindow},
-  };
+  use crate::test_helper::{MockBox, TestWindow};
 
   use super::*;
   use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
@@ -178,7 +175,7 @@ mod tests {
     test_assert(Scrollable::Both, 100., 100., 0., 0.);
   }
 
-  #[derive(SingleChild, Declare2, Clone)]
+  #[derive(SingleChild, Query, Declare2, Clone)]
   pub struct FixedBox {
     pub size: Size,
   }
@@ -193,8 +190,6 @@ mod tests {
     #[inline]
     fn paint(&self, _: &mut PaintingCtx) {}
   }
-
-  impl_query_self_only!(FixedBox);
 
   #[test]
   fn scroll_content_expand() {

@@ -43,7 +43,8 @@ macro_rules! impl_listener {
   ($doc: literal, $name: ident, $event_ty: ident) => {
     paste::paste! {
       #[doc= $doc]
-       pub struct [<$name Listener>]{
+      #[derive(Query)]
+      pub struct [<$name Listener>]{
         [<$name:snake _subject>]: [<$name Subject>]
       }
 
@@ -81,8 +82,6 @@ macro_rules! impl_listener {
           self.[<$name:snake _subject>].clone().next(event)
         }
       }
-
-      impl_query_self_only!([<$name Listener>]);
     }
   };
 }

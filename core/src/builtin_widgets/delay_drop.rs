@@ -1,4 +1,4 @@
-use crate::{impl_query_self_only, prelude::*};
+use crate::prelude::*;
 
 /// A widget that can delay drop its child until the `delay_drop_until` field be
 /// set to `true`.
@@ -12,7 +12,7 @@ use crate::{impl_query_self_only, prelude::*};
 /// dropped.
 ///
 /// It's useful when you need run a leave animation for a widget.
-#[derive(Declare2)]
+#[derive(Declare2, Query)]
 pub struct DelayDrop {
   #[declare(builtin)]
   pub delay_drop_until: bool,
@@ -28,5 +28,3 @@ impl ComposeChild for DelayDrop {
     }
   }
 }
-
-impl_query_self_only!(DelayDrop);

@@ -1,13 +1,10 @@
-use crate::impl_query_self_only;
 use crate::prelude::*;
 
-#[derive(Declare2, Default, Clone, SingleChild)]
+#[derive(Declare2, Default, Query, Clone, SingleChild)]
 pub struct Opacity {
   #[declare(builtin, default = 1.)]
   pub opacity: f32,
 }
-
-impl_query_self_only!(Opacity);
 
 impl Render for Opacity {
   #[inline]

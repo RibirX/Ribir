@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Declare2, SingleChild)]
+#[derive(Declare2, Query, SingleChild)]
 /// A widget that imposes no constraints on its child, allowing it to layout and
 /// display as its "natural" size. Its size is equal to its child then clamp by
 /// parent.
@@ -70,8 +70,6 @@ impl Render for UnconstrainedBox {
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
 }
-
-crate::impl_query_self_only!(UnconstrainedBox);
 
 #[cfg(test)]
 mod tests {

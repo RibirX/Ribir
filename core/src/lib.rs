@@ -60,7 +60,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use ribir_macros::{
     ctx, fn_widget, include_svg, map_writer, pipe, rdl, ribir_expanded_ಠ_ಠ, set_build_ctx,
-    split_writer, watch, Declare2, Lerp, MultiChild, PairChild, SingleChild, Template,
+    split_writer, watch, Declare2, Lerp, MultiChild, PairChild, Query, SingleChild, Template,
   };
   #[doc(no_inline)]
   pub use ribir_painter::*;
