@@ -59,16 +59,29 @@ var textures: binding_array<texture_2d<f32>>;
 @group(3) @binding(1)
 var samplers: binding_array<sampler>;
 
-fn calc_mask_alpha(pos: vec2<f32>, mask_idx: i32) -> f32 {
+
+fn calc_offset(x: f32, y: f32, x_0: f32, y_0: f32, x_1: f32, y_1: f32) -> f32 {
+    let dx_0 = x - x_0;
+    let dy_0 = y - y_0;
+    let dx_1_0 = x_1 - x_0;
+    let dy_1_0 = y_1 - y_0;
+
+    return (dx_0 * dx_1_0 + dy_0 * dy_1_0) / (dx_1_0 * dx_1_0 + dy_1_0 * dy_1_0);
+}
+
+@fragment
+fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
+    let prim = prims[input.prim_idx];
+    let pos = prim.transform * vec3(input.pos.xy, 1.);
     var alpha = 1.;
-    var mask_idx = mask_idx;
+    var mask_idx = prim.mask_head;
     loop {
         if mask_idx < 0 {
             break;
         }
         let mask = mask_layers[u32(mask_idx)];
 
-        var mask_pos = mask.transform * vec3(pos, 1.);
+        var mask_pos = mask.transform * vec3(input.pos.xy, 1.);
         if any(mask_pos < mask.min) || any(mask.max < mask_pos) {
             alpha = 0.;
             break;
@@ -87,23 +100,6 @@ fn calc_mask_alpha(pos: vec2<f32>, mask_idx: i32) -> f32 {
         }
         mask_idx = mask.prev_mask_idx;
     }
-    return alpha;
-}
-
-fn calc_offset(x: f32, y: f32, x_0: f32, y_0: f32, x_1: f32, y_1: f32) -> f32 {
-    let dx_0 = x - x_0;
-    let dy_0 = y - y_0;
-    let dx_1_0 = x_1 - x_0;
-    let dy_1_0 = y_1 - y_0;
-
-    return (dx_0 * dx_1_0 + dy_0 * dy_1_0) / (dx_1_0 * dx_1_0 + dy_1_0 * dy_1_0);
-}
-
-@fragment
-fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
-    let prim = prims[input.prim_idx];
-    let pos = prim.transform * vec3(input.pos.xy, 1.);
-    let alpha = calc_mask_alpha(input.pos.xy, prim.mask_head);
 
     if (prim.start_position.x == prim.end_position.x &&
         prim.start_position.y == prim.end_position.y) {
