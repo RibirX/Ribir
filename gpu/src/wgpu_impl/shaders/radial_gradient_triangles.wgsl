@@ -62,37 +62,6 @@ var textures: binding_array<texture_2d<f32>>;
 var samplers: binding_array<sampler>;
 
 
-fn calc_mask_alpha(pos: vec2<f32>, mask_idx: i32) -> f32 {
-    var alpha = 1.;
-    var mask_idx = mask_idx;
-    loop {
-        if mask_idx < 0 {
-            break;
-        }
-        let mask = mask_layers[u32(mask_idx)];
-
-        var mask_pos = mask.transform * vec3(pos, 1.);
-        if any(mask_pos < mask.min) || any(mask.max < mask_pos) {
-            alpha = 0.;
-            break;
-        }
-
-        let mask_tex_idx = mask.mask_tex_idx;
-        let texture = textures[mask_tex_idx];
-        let s_sampler = samplers[mask_tex_idx];
-
-        let tex_size = textureDimensions(texture);
-        mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
-        let a = textureSampleLevel(texture, s_sampler, mask_pos, 0.).r;
-        alpha = alpha * a;
-        if alpha == 0. {
-            break;
-        }
-        mask_idx = mask.prev_mask_idx;
-    }
-    return alpha;
-}
-
 
 // input the center and radius of the circles, return the tag of resolvable (1. mean resolvable and -1. unresolvable) and the offset if tag is resolvable.
 fn calc_offset(x: f32, y: f32, x_0: f32, y_0: f32, r_0: f32, x_1: f32, y_1: f32, r_1: f32) -> vec2<f32> {
@@ -159,7 +128,34 @@ fn calc_offset(x: f32, y: f32, x_0: f32, y_0: f32, r_0: f32, x_1: f32, y_1: f32,
 fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
     let prim = prims[input.prim_idx];
     let pos = prim.transform * vec3(input.pos.xy, 1.);
-    let alpha = calc_mask_alpha(input.pos.xy, prim.mask_head);
+
+    var alpha = 1.;
+    var mask_idx = prim.mask_head;
+    loop {
+        if mask_idx < 0 {
+            break;
+        }
+        let mask = mask_layers[u32(mask_idx)];
+
+        var mask_pos = mask.transform * vec3(input.pos.xy, 1.);
+        if any(mask_pos < mask.min) || any(mask.max < mask_pos) {
+            alpha = 0.;
+            break;
+        }
+
+        let mask_tex_idx = mask.mask_tex_idx;
+        let texture = textures[mask_tex_idx];
+        let s_sampler = samplers[mask_tex_idx];
+
+        let tex_size = textureDimensions(texture);
+        mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
+        let a = textureSampleLevel(texture, s_sampler, mask_pos, 0.).r;
+        alpha = alpha * a;
+        if alpha == 0. {
+            break;
+        }
+        mask_idx = mask.prev_mask_idx;
+    }
 
     let res = calc_offset(pos.x, pos.y, prim.start_center.x, prim.start_center.y, prim.start_radius, prim.end_center.x, prim.end_center.y, prim.end_radius);
     
