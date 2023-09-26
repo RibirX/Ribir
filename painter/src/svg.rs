@@ -54,9 +54,10 @@ impl Svg {
             if let Some(ref fill) = p.fill {
               let (brush, transform) = brush_from_usvg_paint(&fill.paint, fill.opacity, &size);
               let mut painter = painter.save_guard();
-              painter.set_brush(brush.clone());
-              painter.apply_transform(&transform);
-              painter.fill_path(path.clone().transform(&transform.inverse().unwrap())); //&o_ts.then(&n_ts.inverse().unwrap())));
+              painter
+                .set_brush(brush.clone())
+                .apply_transform(&transform)
+                .fill_path(path.clone().transform(&transform.inverse().unwrap())); //&o_ts.then(&n_ts.inverse().unwrap())));
             }
 
             if let Some(ref stroke) = p.stroke {
@@ -79,10 +80,11 @@ impl Svg {
 
               let (brush, transform) = brush_from_usvg_paint(&stroke.paint, stroke.opacity, &size);
               let mut painter = painter.save_guard();
-              painter.set_brush(brush.clone());
-              painter.apply_transform(&transform);
-              painter.set_strokes(options);
-              painter.stroke_path(path.transform(&transform.inverse().unwrap()));
+              painter
+                .set_brush(brush.clone())
+                .apply_transform(&transform)
+                .set_strokes(options)
+                .stroke_path(path.transform(&transform.inverse().unwrap()));
             };
           }
           NodeKind::Image(_) => {

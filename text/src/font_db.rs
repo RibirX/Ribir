@@ -1,10 +1,14 @@
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use lyon_path::math::Point;
+use ribir_algo::ShareResource;
 use ribir_painter::{PixelImage, Svg};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
 
+use crate::svg_font_document::SvgDocument;
 use crate::{FontFace, FontFamily};
 /// A wrapper of fontdb and cache font data.
 pub struct FontDB {
@@ -13,12 +17,18 @@ pub struct FontDB {
   cache: HashMap<ID, Option<Face>>,
 }
 
+type FontGlyphCache<K, V> = Rc<RefCell<HashMap<K, Option<V>>>>;
 #[derive(Clone)]
 pub struct Face {
   pub face_id: ID,
   pub source_data: Arc<dyn AsRef<[u8]> + Sync + Send>,
   pub face_data_index: u32,
   pub rb_face: rustybuzz::Face<'static>,
+  #[cfg(feature = "raster_png_font")]
+  raster_image_glyphs: FontGlyphCache<GlyphId, ShareResource<PixelImage>>,
+  outline_glyphs: FontGlyphCache<GlyphId, lyon_path::Path>,
+  svg_glyphs: FontGlyphCache<GlyphId, Svg>,
+  svg_docs: FontGlyphCache<*const u8, SvgDocument>,
 }
 
 impl FontDB {
@@ -263,6 +273,11 @@ impl Face {
       face_data_index: face_index,
       rb_face,
       face_id,
+      outline_glyphs: <_>::default(),
+      #[cfg(feature = "raster_png_font")]
+      raster_image_glyphs: <_>::default(),
+      svg_glyphs: <_>::default(),
+      svg_docs: <_>::default(),
     })
   }
 
@@ -273,35 +288,65 @@ impl Face {
 
   // todo: should return its tight bounds
   pub fn outline_glyph(&self, glyph_id: GlyphId) -> Option<lyon_path::Path> {
-    let mut builder = GlyphOutlineBuilder::default();
-    let rect = self
-      .rb_face
-      .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder);
-    rect.map(move |_| builder.into_path())
+    self
+      .outline_glyphs
+      .borrow_mut()
+      .entry(glyph_id)
+      .or_insert_with(|| {
+        let mut builder = GlyphOutlineBuilder::default();
+        let rect = self
+          .rb_face
+          .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder);
+        rect.map(move |_| builder.into_path())
+      })
+      .as_ref()
+      .cloned()
   }
 
   #[cfg(feature = "raster_png_font")]
-  pub fn glyph_raster_image(&self, glyph_id: GlyphId, pixels_per_em: u16) -> Option<PixelImage> {
+  pub fn glyph_raster_image(
+    &self,
+    glyph_id: GlyphId,
+    pixels_per_em: u16,
+  ) -> Option<ShareResource<PixelImage>> {
     use rustybuzz::ttf_parser::RasterImageFormat;
     self
-      .rb_face
-      .glyph_raster_image(glyph_id, pixels_per_em)
-      .and_then(|img| {
-        if img.format == RasterImageFormat::PNG {
-          Some(PixelImage::from_png(img.data))
-        } else {
-          None
-        }
+      .raster_image_glyphs
+      .borrow_mut()
+      .entry(glyph_id)
+      .or_insert_with(|| {
+        self
+          .rb_face
+          .glyph_raster_image(glyph_id, pixels_per_em)
+          .and_then(|img| {
+            if img.format == RasterImageFormat::PNG {
+              Some(ShareResource::new(PixelImage::from_png(img.data)))
+            } else {
+              None
+            }
+          })
       })
+      .clone()
   }
 
-  pub fn glyph_svg_image(&self, _: GlyphId) -> Option<Svg> {
-    None
-    // todo: need to extract glyph svg image, but the svg parse cost too long.
-    // self
-    //  .rb_face
-    //  .glyph_svg_image(glyph_id)
-    //  .and_then(|data| Svg::parse_from_bytes(data).ok())
+  pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<Svg> {
+    self
+      .svg_glyphs
+      .borrow_mut()
+      .entry(glyph_id)
+      .or_insert_with(|| {
+        self.rb_face.glyph_svg_image(glyph_id).and_then(|data| {
+          self
+            .svg_docs
+            .borrow_mut()
+            .entry(&data[0] as *const u8)
+            .or_insert_with(|| SvgDocument::parse(unsafe { std::str::from_utf8_unchecked(data) }))
+            .as_ref()
+            .and_then(|doc| doc.glyph_svg(glyph_id, self))
+            .and_then(|content| Svg::parse_from_bytes(content.as_bytes()).ok())
+        })
+      })
+      .clone()
   }
 
   #[inline]

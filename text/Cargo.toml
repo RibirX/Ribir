@@ -27,6 +27,9 @@ rustybuzz.workspace = true
 unicode-bidi.workspace = true
 unicode-script.workspace = true
 unicode-segmentation.workspace = true
+quick-xml.workspace = true
+ahash.workspace = true
+
 
 [features]
 default = ["raster_png_font"]
