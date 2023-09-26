@@ -15,7 +15,7 @@ impl<R: RenderTarget + Query> RenderProxy<R> {
 impl<R> SingleChild for RenderProxy<R>
 where
   R: RenderTarget,
-  R::Target: SingleChild,
+  R::Target: SingleChild, 
 {
 }
 
