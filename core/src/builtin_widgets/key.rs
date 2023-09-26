@@ -41,9 +41,9 @@ impl<V: Default> Default for KeyChange<V> {
 /// new widget in the next frame will be treated as the same widget in the last
 /// frame.
 #[derive(Declare2)]
-pub struct KeyWidget<V: Default + 'static = ()> {
+pub struct KeyWidget<V: 'static> {
   pub key: Key,
-  #[declare(default, strict)]
+  #[declare(strict)]
   pub value: V,
   #[declare(skip)]
   before_value: Option<V>,
@@ -62,10 +62,10 @@ pub(crate) trait AnyKey: Any {
   fn as_any(&self) -> &dyn Any;
 }
 
-impl<V> AnyKey for State<KeyWidget<V>>
+impl<T, V> AnyKey for T
 where
-  V: Default + Clone + PartialEq,
-  Self: Any,
+  T: StateWriter<Value = KeyWidget<V>>,
+  V: Clone + PartialEq + 'static,
 {
   fn key(&self) -> Key { self.read().key.clone() }
 
@@ -86,7 +86,7 @@ where
 impl<V: 'static + Default + Clone + PartialEq> ComposeChild for KeyWidget<V> {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let data: Box<dyn AnyKey> = Box::new(this);
       child.attach_data(data, ctx!()).widget_build(ctx!())
@@ -100,7 +100,7 @@ impl Query for Box<dyn AnyKey> {
 
 impl<V> KeyWidget<V>
 where
-  V: Default + Clone + PartialEq,
+  V: Clone + PartialEq,
 {
   /// Detect if the key widget is a new widget, there is not predecessor widget
   /// that has same key. Usually used in `on_mounted` callback.

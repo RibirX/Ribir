@@ -1,5 +1,8 @@
 use super::{MapReadRef, MapReader, ModifyScope, Notifier, RefWrite, StateReader, StateWriter};
-use crate::context::AppCtx;
+use crate::{
+  context::{AppCtx, BuildCtx},
+  widget::{Render, RenderBuilder, Widget},
+};
 use ribir_algo::Sc;
 use rxrust::{
   ops::box_it::BoxOp,
@@ -57,6 +60,9 @@ where
   fn raw_modifies(&self) -> Subject<'static, ModifyScope, std::convert::Infallible> {
     self.notifier.raw_modifies()
   }
+
+  #[inline]
+  fn try_into_value(self) -> Result<Self::Value, Self> { Err(self) }
 }
 
 impl<V, O, R, W> StateWriter for SplittedWriter<V, O, R, W>
@@ -201,5 +207,17 @@ where
     } else {
       self.batched_modify.set(batched_modify | scope);
     }
+  }
+}
+
+impl<V, O, R, W> RenderBuilder for SplittedWriter<V, O, R, W>
+where
+  V: Render,
+  O: StateWriter,
+  R: FnOnce(&O::Value) -> &V + Copy + 'static,
+  W: FnOnce(&mut O::Value) -> &mut V + Copy,
+{
+  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+    MapReader::new(self.origin_writer.clone_reader(), self.reader).widget_build(ctx)
   }
 }

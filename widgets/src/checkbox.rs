@@ -55,7 +55,7 @@ impl ComposeDecorator for CheckBoxDecorator {
 impl ComposeChild for Checkbox {
   type Child = Option<CheckboxTemplate>;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let CheckBoxStyle {
         icon_size,

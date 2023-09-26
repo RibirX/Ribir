@@ -48,7 +48,7 @@ impl ComposeDecorator for VScrollBarThumbDecorator {
 
 impl ComposeChild for HScrollBar {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut scrolling = @ScrollableWidget {
         scrollable: Scrollable::X,
@@ -90,7 +90,7 @@ pub struct VScrollBar {
 
 impl ComposeChild for VScrollBar {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut scrolling = @ScrollableWidget {
         scrollable: Scrollable::Y,
@@ -132,7 +132,7 @@ pub struct BothScrollbar {
 
 impl ComposeChild for BothScrollbar {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut scrolling = @ScrollableWidget {
         scrollable: Scrollable::Both,

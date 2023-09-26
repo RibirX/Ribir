@@ -102,7 +102,7 @@ type TextFieldThemeProxy = ThemeSuitProxy<TextFieldState, TextFieldTheme>;
 
 impl ComposeChild for TextFieldThemeProxy {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ $child {
         on_tap: move |_| {
@@ -280,7 +280,10 @@ macro_rules! take_option_field {
 
 impl ComposeChild for TextField {
   type Child = Option<TextFieldTml>;
-  fn compose_child(this: State<Self>, config: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(
+    this: impl StateWriter<Value = Self>,
+    config: Self::Child,
+  ) -> impl WidgetBuilder {
     fn_widget! {
       let mut config = config.unwrap_or_default();
       take_option_field!({leading_icon, trailing_icon}, config);
@@ -328,7 +331,7 @@ impl ComposeChild for TextField {
 }
 
 fn build_input_area(
-  this: State<TextField>,
+  this: impl StateWriter<Value = TextField>,
   theme: State<TextFieldThemeProxy>,
   prefix: Option<LeadingText>,
   suffix: Option<TrailingText>,
@@ -406,7 +409,7 @@ impl Compose for TextFieldLabel {
 }
 
 fn build_content_area(
-  this: State<TextField>,
+  this: impl StateWriter<Value = TextField>,
   theme: State<TextFieldThemeProxy>,
   mut config: TextFieldTml,
 ) -> impl WidgetBuilder {

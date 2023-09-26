@@ -15,7 +15,7 @@ pub struct TextSelectable {
 
 impl ComposeChild for TextSelectable {
   type Child = FatObj<State<Text>>;
-  fn compose_child(this: State<Self>, text: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, text: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let mut host = @Stack { fit: StackFit::Passthrough };
       let selected = @SelectedText {

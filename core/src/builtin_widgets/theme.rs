@@ -76,7 +76,7 @@ pub struct ThemeWidget {
 impl ComposeChild for ThemeWidget {
   type Child = Box<dyn Fn(&BuildCtx) -> Widget>;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     use crate::prelude::*;
     fn_widget! {
       let theme = this.read().theme.clone();

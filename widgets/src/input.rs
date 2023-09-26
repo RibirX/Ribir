@@ -95,7 +95,10 @@ declare_writer!(TextAreaWriter, TextArea);
 
 impl ComposeChild for Input {
   type Child = Option<State<Placeholder>>;
-  fn compose_child(this: State<Self>, placeholder: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(
+    this: impl StateWriter<Value = Self>,
+    placeholder: Self::Child,
+  ) -> impl WidgetBuilder {
     fn_widget! {
       let area = @TextEditorArea {
         text: pipe!($this.text.clone()),
@@ -137,7 +140,10 @@ impl CustomStyle for TextAreaStyle {
 
 impl ComposeChild for TextArea {
   type Child = Option<State<Placeholder>>;
-  fn compose_child(this: State<Self>, placeholder: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(
+    this: impl StateWriter<Value = Self>,
+    placeholder: Self::Child,
+  ) -> impl WidgetBuilder {
     fn_widget! {
       let area = @TextEditorArea {
         text: pipe!($this.text.clone()),

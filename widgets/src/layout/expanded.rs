@@ -14,7 +14,7 @@ pub struct Expanded {
 impl ComposeChild for Expanded {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ConstrainedBox {
         clamp: BoxClamp {

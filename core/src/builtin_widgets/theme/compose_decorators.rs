@@ -19,7 +19,7 @@ pub trait ComposeDecorator: Sized {
 // todo: remove it, keep it for backward compatibility.
 // `ComposeDecorator` without share state should not implement as a
 // `ComposeDecorator`.
-impl<M, T, C> ComposeWithChild<C, [M; 1]> for T
+impl<M, T, C> ComposeWithChild<C, [M; 100]> for T
 where
   T: ComposeDecorator,
   State<T>: ComposeWithChild<C, M>,
@@ -30,7 +30,7 @@ where
   }
 }
 
-impl<M, W, C> ComposeWithChild<C, [M; 3]> for State<W>
+impl<M, W, C> ComposeWithChild<C, [M; 101]> for State<W>
 where
   W: ComposeDecorator + 'static,
   Widget: ChildFrom<C, M>,

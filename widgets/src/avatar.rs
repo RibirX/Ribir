@@ -60,7 +60,7 @@ pub enum AvatarTemplate {
 impl ComposeChild for Avatar {
   type Child = AvatarTemplate;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ {
         let AvatarStyle {

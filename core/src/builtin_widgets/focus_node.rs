@@ -37,7 +37,10 @@ pub struct FocusNode {
 
 impl ComposeChild for FocusNode {
   type Child = Widget;
-  fn compose_child(this: State<Self>, mut child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(
+    this: impl StateWriter<Value = Self>,
+    mut child: Self::Child,
+  ) -> impl WidgetBuilder {
     fn_widget! {
       let tree = ctx!().tree.borrow();
       let node = child.id().assert_get(&tree.arena);
@@ -54,7 +57,9 @@ impl ComposeChild for FocusNode {
           subject
         };
 
-        fn subscribe_fn(this: Reader<FocusNode>) -> impl FnMut(&'_ mut AllLifecycle) + 'static {
+        fn subscribe_fn(this: impl StateReader<Value = FocusNode>)
+          -> impl FnMut(&'_ mut AllLifecycle) + 'static
+        {
           move |e| match e {
             AllLifecycle::Mounted(e) => {
               let auto_focus = this.read().auto_focus;
@@ -82,7 +87,7 @@ pub struct RequestFocus {
 
 impl ComposeChild for RequestFocus {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @$child {
         on_mounted: move |e| {

@@ -244,8 +244,10 @@ impl<T: MultiParent + 'static> MultiParent for FatObj<T> {
 impl ComposeChild for BuiltinObj {
   type Child = Widget;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
-    let this = this.into_value();
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+    let Ok(this) = this.try_into_value() else {
+      unreachable!("BuiltinObj should never be a state.")
+    };
     fn_widget! { this.compose_with_host(child, ctx!()) }
   }
 }

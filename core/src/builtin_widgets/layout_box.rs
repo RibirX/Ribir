@@ -10,7 +10,7 @@ pub struct LayoutBox {
 
 impl ComposeChild for LayoutBox {
   type Child = Widget;
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ $child {
         on_performed_layout: move |e| {

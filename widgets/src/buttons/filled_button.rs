@@ -80,7 +80,7 @@ pub struct FilledButton {
 impl ComposeChild for FilledButton {
   type Child = ButtonTemplate;
 
-  fn compose_child(this: State<Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     let ButtonTemplate { icon, label } = &child;
     let button_type = match (&icon, &label) {
       (Some(_), Some(_)) => ButtonType::BOTH,
