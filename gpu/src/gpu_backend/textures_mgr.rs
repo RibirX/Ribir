@@ -123,13 +123,14 @@ where
       .filter(|h| h.attr >= prefer_scale)
       .copied()
     {
-      let slice = alpha_tex_slice(&self.alpha_atlas, &h).cut_blank_edge();
-      let matrix = cache_to_view_matrix(key.path(), transform, slice.rect.origin, h.attr);
-      (slice, matrix)
+      let mask_slice = alpha_tex_slice(&self.alpha_atlas, &h).cut_blank_edge();
+      let matrix = cache_to_view_matrix(key.path(), transform, mask_slice.rect.origin, h.attr);
+      (mask_slice.expand_for_paste(), matrix)
     } else {
       let path = key.path().clone();
       let scale_bounds = path.bounds().scale(prefer_scale, prefer_scale);
       let prefer_cache_size = path_add_edges(scale_bounds.round_out().size.to_i32().cast_unit());
+
       let h = self
         .alpha_atlas
         .allocate(key, prefer_scale, prefer_cache_size, gpu_impl);
@@ -146,7 +147,7 @@ where
         .fill_task
         .push(FillTask { slice, path, ts, clip_rect: None });
 
-      (mask_slice, matrix)
+      (mask_slice.expand_for_paste(), matrix)
     }
   }
 
@@ -179,7 +180,10 @@ where
     };
 
     let offset = (clip_view.origin - slice.rect.origin).to_f32();
-    (slice, Transform::translation(offset.x, offset.y))
+    (
+      slice.expand_for_paste(),
+      Transform::translation(offset.x, offset.y),
+    )
   }
 
   pub(super) fn store_image(
@@ -393,6 +397,13 @@ impl TextureSlice {
   pub fn cut_blank_edge(mut self) -> TextureSlice {
     let blank_side = SideOffsets2D::new_all_same(BLANK_EDGE);
     self.rect = self.rect.inner_rect(blank_side);
+    self
+  }
+
+  pub fn expand_for_paste(mut self) -> TextureSlice {
+    const EXPANDED_EDGE: i32 = 1;
+    let blank_side = SideOffsets2D::new_all_same(EXPANDED_EDGE);
+    self.rect = self.rect.outer_rect(blank_side);
     self
   }
 }
@@ -638,7 +649,7 @@ pub mod tests {
     let (slice2, ts2) = mgr.store_clipped_path(clip_view, path, &mut wgpu);
     assert_eq!(slice1, slice2);
     assert_eq!(ts1, ts2);
-    assert_eq!(slice1.rect, ribir_geom::rect(2, 2, 100, 100));
+    assert_eq!(slice1.rect, ribir_geom::rect(1, 1, 102, 102));
     assert_eq!(ts1, Transform::new(1., 0., 0., 1., 8., 8.));
   }
 
