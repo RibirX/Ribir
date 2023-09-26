@@ -496,7 +496,7 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<WidgetId>>>);
     impl Compose for EventRecord {
-      fn compose(this: State<Self>) -> impl WidgetBuilder {
+      fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
         fn_widget! {
           @MockBox {
             size: INFINITY_SIZE,
@@ -542,7 +542,7 @@ mod tests {
     }
 
     impl Compose for EnterLeave {
-      fn compose(this: State<Self>) -> impl WidgetBuilder {
+      fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
         fn_widget! {
           @MockBox {
             size: INFINITY_SIZE,

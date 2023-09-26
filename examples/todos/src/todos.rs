@@ -14,7 +14,7 @@ struct Todos {
 }
 
 impl Compose for Todos {
-  fn compose(this: State<Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
     fn_widget! {
       @Column {
         padding: EdgeInsets::all(10.),
@@ -65,7 +65,7 @@ impl Compose for Todos {
 }
 
 impl Todos {
-  fn pane(this: Writer<Self>, cond: fn(&Task) -> bool) -> impl WidgetBuilder {
+  fn pane(this: impl StateWriter<Value = Self>, cond: fn(&Task) -> bool) -> impl WidgetBuilder {
     fn_widget! {
       // todo: pipe only for list items, not lists
       @VScrollBar { @ { pipe! {

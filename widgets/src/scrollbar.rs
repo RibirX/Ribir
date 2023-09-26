@@ -174,7 +174,7 @@ pub struct HRawScrollbar {
 }
 
 impl Compose for HRawScrollbar {
-  fn compose(this: State<Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
     fn_widget! {
       @ {
         let scrolling = $this.scrolling.clone_reader();
@@ -235,7 +235,7 @@ pub struct VRawScrollbar {
 }
 
 impl Compose for VRawScrollbar {
-  fn compose(this: State<Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
     fn_widget! {
       @ {
         let scrolling = $this.scrolling.clone_reader();

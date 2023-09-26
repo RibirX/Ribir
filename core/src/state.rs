@@ -239,7 +239,7 @@ where
   fn from(value: T) -> Self { StateFrom::state_from(value) }
 }
 
-impl<C: Compose> ComposeBuilder for State<C> {
+impl<C: Compose + 'static> ComposeBuilder for State<C> {
   #[inline]
   fn widget_build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).widget_build(ctx) }
 }
@@ -306,6 +306,25 @@ where
   }
 }
 
+macro_rules! impl_compose_builder {
+  ($name: ident) => {
+    impl<V, W, RM, WM> ComposeBuilder for $name<V, W, RM, WM>
+    where
+      W: StateWriter,
+      RM: FnOnce(&W::Value) -> &V + Copy + 'static,
+      WM: FnOnce(&mut W::Value) -> &mut V + Copy + 'static,
+      V: Compose + 'static,
+    {
+      fn widget_build(self, ctx: &crate::context::BuildCtx) -> Widget {
+        Compose::compose(self).widget_build(ctx)
+      }
+    }
+  };
+}
+
+impl_compose_builder!(MapWriter);
+impl_compose_builder!(SplittedWriter);
+
 #[cfg(test)]
 mod tests {
   use std::cell::Cell;
@@ -370,5 +389,35 @@ mod tests {
     assert_eq!(track_origin.get(), 2);
     assert_eq!(track_a.get(), 3);
     assert_eq!(track_b.get(), 2);
+  }
+
+  struct C;
+
+  impl Compose for C {
+    fn compose(_: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+      fn_widget! { Void }
+    }
+  }
+
+  #[test]
+  fn state_writer_compose_builder() {
+    let _state_compose_widget = fn_widget! {
+      State::value(C)
+    };
+    let _sateful_compose_widget = fn_widget! {
+      Stateful::new(C)
+    };
+    let _writer_compose_widget = fn_widget! {
+      Stateful::new(C).clone_writer()
+    };
+
+    let _map_writer_compose_widget = fn_widget! {
+      let s = Stateful::new((C, 0));
+      map_writer!($s.0)
+    };
+    let _split_writer_compose_widget = fn_widget! {
+      let s = Stateful::new((C, 0));
+      split_writer!($s.0)
+    };
   }
 }
