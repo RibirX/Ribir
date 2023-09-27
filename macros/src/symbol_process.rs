@@ -103,7 +103,7 @@ mod tokens_pre_process {
           if at.as_char() == '@' && !matches!(tokens.last(), Some(TokenTree::Ident(_))) =>
         {
           tokens.push(TokenTree::Ident(Ident::new(KW_RDL, at.span())));
-          tokens.push(TokenTree::Punct(Punct::new('!', Spacing::Alone)));
+          tokens.push(not_token(at.span()));
 
           let body = match iter.next() {
             // declare a new widget: `@ SizedBox { ... }`
@@ -147,7 +147,7 @@ mod tokens_pre_process {
           match iter.next() {
             Some(TokenTree::Ident(name)) => {
               tokens.push(TokenTree::Ident(Ident::new(KW_DOLLAR_STR, p.span())));
-              tokens.push(TokenTree::Punct(Punct::new('!', Spacing::Alone)));
+              tokens.push(not_token(p.span()));
               let span = name.span();
               let mut g = Group::new(
                 Delimiter::Parenthesis,
@@ -183,6 +183,12 @@ mod tokens_pre_process {
     };
     p.as_char() == '!'
   }
+
+  fn not_token(span: Span) -> TokenTree {
+    let mut t = Punct::new('!', Spacing::Alone);
+    t.set_span(span);
+    TokenTree::Punct(t)
+  }
 }
 
 impl Fold for DollarRefsCtx {
@@ -204,11 +210,8 @@ impl Fold for DollarRefsCtx {
   fn fold_local(&mut self, mut i: syn::Local) -> syn::Local {
     //  we fold right expression first, then fold pattern, because the `=` is a
     // right operator.
-    i.init = i
-      .init
-      .map(|(assign, e)| (assign, Box::new(self.fold_expr(*e))));
+    i.init = i.init.map(|init| self.fold_local_init(init));
     i.pat = self.fold_pat(i.pat);
-
     i
   }
 

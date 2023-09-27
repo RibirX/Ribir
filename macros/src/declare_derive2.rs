@@ -307,10 +307,9 @@ fn collect_filed_and_attrs(stt: &mut DataStruct) -> Result<Punctuated<DeclareFie
         .pairs_mut()
         .try_for_each::<_, syn::Result<()>>(|pair| {
           let (field, comma) = pair.into_tuple();
-          let idx = field
-            .attrs
-            .iter()
-            .position(|attr| attr.path.is_ident(DECLARE_ATTR));
+          let idx = field.attrs.iter().position(
+            |attr| matches!(&attr.meta, syn::Meta::List(l) if l.path.is_ident(DECLARE_ATTR)),
+          );
           let builder_attr = if let Some(idx) = idx {
             let attr = field.attrs.remove(idx);
             let args: DeclareAttr = attr.parse_args()?;

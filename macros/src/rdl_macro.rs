@@ -14,7 +14,7 @@ use syn::{
   parse_macro_input, parse_quote,
   punctuated::Punctuated,
   spanned::Spanned,
-  token::{Bang, Brace, Colon, Comma, Dollar},
+  token::{Brace, Colon, Comma, Dollar, Not},
   Expr, Ident, Macro, Path, Result as SynResult, Stmt,
 };
 
@@ -115,7 +115,7 @@ impl Parse for StructLiteral {
         break;
       }
 
-      if content.peek(kw::rdl) && content.peek2(Bang) {
+      if content.peek(kw::rdl) && content.peek2(Not) {
         children.push(content.parse()?);
       } else if content.peek(Ident) {
         let f: DeclareField = content.parse()?;
@@ -142,7 +142,7 @@ impl Parse for StructLiteral {
 
 impl Parse for RdlParent {
   fn parse(input: ParseStream) -> SynResult<Self> {
-    if input.peek(kw::_dollar_ಠ_ಠ) && input.peek2(Bang) {
+    if input.peek(kw::_dollar_ಠ_ಠ) && input.peek2(Not) {
       let mac: Macro = input.parse()?;
 
       Ok(RdlParent::Var(mac.parse_body_with(

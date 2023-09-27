@@ -81,8 +81,8 @@ impl ToTokens for Item {
       Item::Field { doc_attr, mem, _colon, ty } => {
         let ty = quote! { #ty }.to_string();
         let name = mem.to_string();
-        let doc = match &doc_attr.lit {
-          syn::Lit::Str(str) => str,
+        let doc = match &doc_attr.value {
+          syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(str), .. }) => str,
           _ => unreachable!(),
         };
         tokens.extend(quote! {
@@ -96,8 +96,8 @@ impl ToTokens for Item {
       Item::Method { doc_attr, sign } => {
         let name = sign.ident.to_string();
         let sign = sign.to_token_stream().to_string();
-        let doc = match &doc_attr.lit {
-          syn::Lit::Str(str) => str,
+        let doc = match &doc_attr.value {
+          syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(str), .. }) => str,
           _ => unreachable!(),
         };
         tokens.extend(quote! {
