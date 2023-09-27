@@ -19,7 +19,4 @@ proc-macro = true
 proc-macro2.workspace = true
 quote.workspace = true
 smallvec.workspace = true
-
-[dependencies.syn]
-features = ["full"]
-version = "1.0.109"
+syn ={ workspace=true, features = ["full"]}
