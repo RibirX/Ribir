@@ -77,6 +77,13 @@ pub trait ShellWindow {
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn set_title(&mut self, str: &str);
   fn set_icon(&mut self, icon: &PixelImage);
+  fn set_visible(&mut self, visible: bool);
+  fn is_resizable(&self) -> bool;
+  fn set_resizable(&mut self, resizable: bool);
+  fn is_minimized(&self) -> bool;
+  fn set_minimized(&mut self, minimized: bool);
+  fn focus_window(&mut self);
+  fn set_decorations(&mut self, decorations: bool);
   fn as_any(&self) -> &dyn Any;
   fn as_any_mut(&mut self) -> &mut dyn Any;
   /// The device pixel ratio of Window interface returns the ratio of the
