@@ -114,6 +114,34 @@ impl ShellWindow for WinitShellWnd {
   }
 
   #[inline]
+  fn set_visible(&mut self, visible: bool) { self.winit_wnd.set_visible(visible) }
+
+  #[inline]
+  fn set_resizable(&mut self, resizable: bool) { self.winit_wnd.set_resizable(resizable) }
+
+  #[inline]
+  fn is_resizable(&self) -> bool { self.winit_wnd.is_resizable() }
+
+  #[inline]
+  fn is_minimized(&self) -> bool { self.winit_wnd.is_minimized().unwrap_or_default() }
+
+  #[inline]
+  fn set_minimized(&mut self, minimized: bool) {
+    if minimized {
+      self.winit_wnd.set_minimized(minimized);
+    } else {
+      self.winit_wnd.set_visible(true);
+      self.winit_wnd.set_minimized(minimized);
+    }
+  }
+
+  #[inline]
+  fn focus_window(&mut self) { self.winit_wnd.focus_window() }
+
+  #[inline]
+  fn set_decorations(&mut self, decorations: bool) { self.winit_wnd.set_decorations(decorations) }
+
+  #[inline]
   fn as_any(&self) -> &dyn std::any::Any { self }
 
   #[inline]

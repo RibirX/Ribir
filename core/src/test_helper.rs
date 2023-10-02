@@ -118,6 +118,20 @@ impl ShellWindow for TestShellWindow {
 
   fn set_ime_cursor_area(&mut self, _: &Rect) {}
 
+  fn set_visible(&mut self, _: bool) {}
+
+  fn set_resizable(&mut self, _: bool) {}
+
+  fn is_resizable(&self) -> bool { true }
+
+  fn focus_window(&mut self) {}
+
+  fn set_decorations(&mut self, _: bool) {}
+
+  fn is_minimized(&self) -> bool { false }
+
+  fn set_minimized(&mut self, _: bool) {}
+
   fn as_any(&self) -> &dyn Any { self }
 
   fn as_any_mut(&mut self) -> &mut dyn Any { self }
