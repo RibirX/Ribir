@@ -15,22 +15,29 @@ version.workspace = true
 [dependencies]
 arboard = "3.2.0"
 once_cell.workspace = true
-ribir_core = {path = "../core", version = "0.0.1-alpha.4"}
-ribir_gpu = {path = "../gpu", version = "0.0.1-alpha.4"}
-ribir_material = {path = "../themes/material", version = "0.0.1-alpha.4", optional = true}
-ribir_widgets = {path = "../widgets", version = "0.0.1-alpha.4", optional = true}
+ribir_core = { path = "../core", version = "0.0.1-alpha.4" }
+ribir_gpu = { path = "../gpu", version = "0.0.1-alpha.4" }
+ribir_material = { path = "../themes/material", version = "0.0.1-alpha.4", optional = true }
+ribir_widgets = { path = "../widgets", version = "0.0.1-alpha.4", optional = true }
 rxrust.workspace = true
-wgpu = {workspace = true, optional = true}
+wgpu = { workspace = true, optional = true }
 winit.workspace = true
 [target.'cfg(target_os = "macos")'.dependencies]
-icrate = {workspace = true, features = ["Foundation", "Foundation_NSAppleEventManager", "objective-c", "AppKit", "AppKit_NSEvent"]}
+icrate = { workspace = true, features = [
+  "Foundation",
+  "Foundation_NSAppleEventManager",
+  "objective-c",
+  "AppKit",
+  "AppKit_NSEvent",
+] }
+macos-accessibility-client = { workspace = true }
 
 [dev-dependencies]
 colored.workspace = true
 env_logger.workspace = true
 futures.workspace = true
-ribir_dev_helper = {path = "../dev-helper"}
-ribir_material = {path = "../themes/material"}
+ribir_dev_helper = { path = "../dev-helper" }
+ribir_material = { path = "../themes/material" }
 
 [features]
 default = ["wgpu", "widgets", "material"]
