@@ -1,0 +1,23 @@
+
+[package]
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "wordle_game"
+publish = false
+version.workspace = true
+
+[dependencies]
+paste.workspace = true
+ribir = {path = "../../ribir", features = ["material", "widgets"]}
+ribir_dev_helper = {path = "../../dev-helper"}
+csv = "1.3.0"
+rand = "0.8.5"
+
+[features]
+wgpu = ["ribir/wgpu"]

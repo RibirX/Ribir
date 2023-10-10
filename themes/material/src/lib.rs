@@ -13,8 +13,8 @@ pub use styles_sheet::*;
 
 /// Crate a material theme with palette.
 fn new(palette: Palette) -> FullTheme {
-  let regular_family = Box::new([FontFamily::Name("Roboto".into())]);
-  let medium_family = Box::new([FontFamily::Name("Roboto Medium".into())]);
+  let regular_family = Box::new([FontFamily::Name("Roboto".into()), FontFamily::Serif]);
+  let medium_family = Box::new([FontFamily::Name("Roboto Medium".into()), FontFamily::Serif]);
 
   let typography_theme = typography_theme(
     regular_family,
