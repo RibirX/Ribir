@@ -172,7 +172,7 @@ pub(crate) trait InnerPipe: Pipe {
 
             update_key_state_multi(old.iter().copied(), new.iter().copied(), ctx);
 
-            new.iter().for_each(|w| ctx.insert_after(old[0], *w));
+            new.iter().rev().for_each(|w| ctx.insert_after(old[0], *w));
             old.iter().for_each(|id| ctx.dispose_subtree(*id));
             new.iter().for_each(|w| {
               ctx.on_subtree_mounted(*w);
