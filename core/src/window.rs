@@ -381,7 +381,7 @@ impl Window {
         }
         DelayEvent::FocusIn { bottom, up } => {
           let mut e = AllFocusBubble::FocusInCapture(FocusEvent::new(bottom, self.id()));
-          self.bottom_down_emit::<FocusBubbleListener>(&mut e, bottom, up);
+          self.top_down_emit::<FocusBubbleListener>(&mut e, bottom, up);
           let mut e = AllFocusBubble::FocusIn(e.into_inner());
           self.bottom_up_emit::<FocusBubbleListener>(&mut e, bottom, up);
         }
@@ -391,13 +391,13 @@ impl Window {
         }
         DelayEvent::FocusOut { bottom, up } => {
           let mut e = AllFocusBubble::FocusOutCapture(FocusEvent::new(bottom, self.id()));
-          self.bottom_down_emit::<FocusBubbleListener>(&mut e, bottom, up);
+          self.top_down_emit::<FocusBubbleListener>(&mut e, bottom, up);
           let mut e = AllFocusBubble::FocusOut(e.into_inner());
           self.bottom_up_emit::<FocusBubbleListener>(&mut e, bottom, up);
         }
         DelayEvent::KeyDown { id, scancode, key } => {
           let mut e = AllKeyboard::KeyDownCapture(KeyboardEvent::new(scancode, key, id, self.id()));
-          self.bottom_down_emit::<KeyboardListener>(&mut e, id, None);
+          self.top_down_emit::<KeyboardListener>(&mut e, id, None);
           let mut e = AllKeyboard::KeyDown(e.into_inner());
           self.bottom_up_emit::<KeyboardListener>(&mut e, id, None);
 
@@ -417,38 +417,38 @@ impl Window {
         }
         DelayEvent::KeyUp { id, scancode, key } => {
           let mut e = AllKeyboard::KeyUpCapture(KeyboardEvent::new(scancode, key, id, self.id()));
-          self.bottom_down_emit::<KeyboardListener>(&mut e, id, None);
+          self.top_down_emit::<KeyboardListener>(&mut e, id, None);
           let mut e = AllKeyboard::KeyUp(e.into_inner());
           self.bottom_up_emit::<KeyboardListener>(&mut e, id, None);
         }
         DelayEvent::Chars { id, chars } => {
           let mut e = AllChars::CharsCapture(CharsEvent::new(chars, id, self.id()));
-          self.bottom_down_emit::<CharsListener>(&mut e, id, None);
+          self.top_down_emit::<CharsListener>(&mut e, id, None);
           let mut e = AllChars::Chars(e.into_inner());
           self.bottom_up_emit::<CharsListener>(&mut e, id, None);
         }
         DelayEvent::Wheel { id, delta_x, delta_y } => {
           let mut e = AllWheel::WheelCapture(WheelEvent::new(delta_x, delta_y, id, self.id()));
-          self.bottom_down_emit::<WheelListener>(&mut e, id, None);
+          self.top_down_emit::<WheelListener>(&mut e, id, None);
           let mut e = AllWheel::Wheel(e.into_inner());
           self.bottom_up_emit::<WheelListener>(&mut e, id, None);
         }
         DelayEvent::PointerDown(id) => {
           let mut e = AllPointer::PointerDownCapture(PointerEvent::from_mouse(id, self));
-          self.bottom_down_emit::<PointerListener>(&mut e, id, None);
+          self.top_down_emit::<PointerListener>(&mut e, id, None);
           let mut e = AllPointer::PointerDown(e.into_inner());
           self.bottom_up_emit::<PointerListener>(&mut e, id, None);
           self.focus_mgr.borrow_mut().refresh_focus();
         }
         DelayEvent::PointerMove(id) => {
           let mut e = AllPointer::PointerMoveCapture(PointerEvent::from_mouse(id, self));
-          self.bottom_down_emit::<PointerListener>(&mut e, id, None);
+          self.top_down_emit::<PointerListener>(&mut e, id, None);
           let mut e = AllPointer::PointerMove(e.into_inner());
           self.bottom_up_emit::<PointerListener>(&mut e, id, None);
         }
         DelayEvent::PointerUp(id) => {
           let mut e = AllPointer::PointerUpCapture(PointerEvent::from_mouse(id, self));
-          self.bottom_down_emit::<PointerListener>(&mut e, id, None);
+          self.top_down_emit::<PointerListener>(&mut e, id, None);
           let mut e = AllPointer::PointerUp(e.into_inner());
           self.bottom_up_emit::<PointerListener>(&mut e, id, None);
         }
@@ -458,7 +458,7 @@ impl Window {
         }
         DelayEvent::PointerEnter { bottom, up } => {
           let mut e = AllPointer::PointerEnter(PointerEvent::from_mouse(bottom, self));
-          self.bottom_down_emit::<PointerListener>(&mut e, bottom, up);
+          self.top_down_emit::<PointerListener>(&mut e, bottom, up);
         }
         DelayEvent::PointerLeave { bottom, up } => {
           let mut e = AllPointer::PointerLeave(PointerEvent::from_mouse(bottom, self));
@@ -466,7 +466,7 @@ impl Window {
         }
         DelayEvent::Tap(wid) => {
           let mut e = AllPointer::TapCapture(PointerEvent::from_mouse(wid, self));
-          self.bottom_down_emit::<PointerListener>(&mut e, wid, None);
+          self.top_down_emit::<PointerListener>(&mut e, wid, None);
           let mut e = AllPointer::Tap(e.into_inner());
           self.bottom_up_emit::<PointerListener>(&mut e, wid, None);
         }
@@ -488,7 +488,7 @@ impl Window {
     });
   }
 
-  fn bottom_down_emit<L>(&self, e: &mut L::Event, bottom: WidgetId, up: Option<WidgetId>)
+  fn top_down_emit<L>(&self, e: &mut L::Event, bottom: WidgetId, up: Option<WidgetId>)
   where
     L: EventListener + 'static,
     L::Event: DerefMut,
