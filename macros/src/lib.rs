@@ -135,9 +135,9 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
     .into()
 }
 
-/// The macro use to declare a object, this macro will use `ctx!()` to access
-/// the `BuildCtx`, so it can only use in the `fn_widget!` macro, or any scope
-/// that called `set_build_ctx!` macro.
+/// A macro use to declare an object. This macro will use `ctx!()` to access
+/// the `BuildCtx`, so it can only use in a scope that has a `BuildCtx` named as
+/// `ctx!()`.
 ///
 /// # The Syntax
 ///
@@ -148,7 +148,7 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
 ///   the struct literal, but must be use `rdl!` or `@` to declare, like:
 ///
 ///   ```ignore
-///     rdl!{ Row { wrap: true, child: rdl!{ Text { text: "hello" } } } }
+///     rdl!{ Row { wrap: true, rdl!{ Text { text: "hello" } } } }
 ///   ```
 /// - 2. similar to the first, but use a variable as parent and not accept any
 ///   fields of the parent(the builtin fields allowed), like:
@@ -180,15 +180,8 @@ pub fn fn_widget(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn ribir_expanded_ಠ_ಠ(input: TokenStream) -> TokenStream { input }
 
-/// set the `BuildCtx` to a special variable `_ctx_ಠ_ಠ`, so the user can use
-/// `ctx!` to access it.
-#[proc_macro]
-pub fn set_build_ctx(input: TokenStream) -> TokenStream {
-  let input: proc_macro2::TokenStream = input.into();
-  quote! { let _ctx_ಠ_ಠ = #input; }.into()
-}
-
-/// get the `BuildCtx` set by `set_build_ctx!` macro, if no `BuildCtx` set.
+/// The `ctx!` macro is a special name that use to share the `BuildCtx` between
+/// macros.
 #[proc_macro]
 pub fn ctx(input: TokenStream) -> TokenStream {
   let tokens = if !input.is_empty() {
