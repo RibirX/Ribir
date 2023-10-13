@@ -2,7 +2,7 @@
 
 use ribir::prelude::*;
 
-#[derive(Declare2)]
+#[derive(Declare)]
 struct P;
 
 struct ChildA;
@@ -24,7 +24,7 @@ impl ComposeChild for P {
   }
 }
 
-#[derive(Declare2)]
+#[derive(Declare)]
 struct P2;
 
 #[derive(Template)]
@@ -38,7 +38,7 @@ impl ComposeChild for P2 {
   }
 }
 
-#[derive(Declare2)]
+#[derive(Declare)]
 struct P3;
 
 #[derive(Template)]

@@ -3,7 +3,7 @@ use crate::{
   prelude::*,
 };
 
-#[derive(Default, Query, Declare2)]
+#[derive(Default, Query, Declare)]
 pub struct FocusNode {
   /// Indicates that `widget` can be focused, and where it participates in
   /// sequential keyboard navigation (usually with the Tab key, hence the name.
@@ -79,7 +79,7 @@ impl ComposeChild for FocusNode {
   }
 }
 
-#[derive(Declare2, Query)]
+#[derive(Declare, Query)]
 pub struct RequestFocus {
   #[declare(default)]
   handle: Option<FocusHandle>,

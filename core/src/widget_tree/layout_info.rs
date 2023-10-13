@@ -307,7 +307,7 @@ mod tests {
   use ribir_dev_helper::*;
   use std::{cell::Cell, rc::Rc};
 
-  #[derive(Declare2, Clone, Query, SingleChild)]
+  #[derive(Declare, Clone, Query, SingleChild)]
   struct OffsetBox {
     pub offset: Point,
     pub size: Size,
@@ -468,7 +468,7 @@ mod tests {
   fn layout_visit_prev_position() {
     reset_test_env!();
 
-    #[derive(Declare2, Query)]
+    #[derive(Declare, Query)]
     struct MockWidget {
       pos: Cell<Point>,
       size: Size,

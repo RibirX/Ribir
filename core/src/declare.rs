@@ -4,9 +4,9 @@ use std::convert::Infallible;
 
 /// The next version of `Declare` trait. It will replace the `Declare` trait
 /// after it is stable.
-pub trait Declare2 {
+pub trait Declare {
   type Builder: DeclareBuilder;
-  fn declare2_builder() -> Self::Builder;
+  fn declare_builder() -> Self::Builder;
 }
 
 /// widget builder use to construct a widget in  `widget!`. See the [mod level
@@ -58,19 +58,4 @@ where
 {
   #[inline]
   fn declare_from(value: P) -> Self { Self::Pipe(Box::new(Pipe::map(value, |v| v.into()))) }
-}
-
-/// struct help the generate code have better type hint.
-#[derive(Clone)]
-pub struct DeclareFieldValue<F>(F);
-
-impl<R, F> DeclareFieldValue<F>
-where
-  F: FnMut() -> R,
-{
-  #[inline]
-  pub fn new(f: F) -> Self { Self(f) }
-
-  #[inline]
-  pub fn value(&mut self) -> R { (self.0)() }
 }

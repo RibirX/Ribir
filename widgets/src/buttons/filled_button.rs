@@ -26,7 +26,7 @@ impl CustomStyle for FilledButtonStyle {
   }
 }
 
-#[derive(Clone, Declare2)]
+#[derive(Clone, Declare)]
 pub struct FilledButtonDecorator {
   #[allow(unused)]
   pub button_type: ButtonType,
@@ -71,7 +71,7 @@ impl ComposeDecorator for FilledButtonDecorator {
 ///   }
 /// };
 /// ```
-#[derive(Declare2, Default)]
+#[derive(Declare, Default)]
 pub struct FilledButton {
   #[declare(default=Palette::of(ctx!()).primary())]
   color: Color,

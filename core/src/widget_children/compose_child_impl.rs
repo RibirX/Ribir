@@ -179,7 +179,7 @@ mod tests {
     }
   }
 
-  #[derive(Declare2)]
+  #[derive(Declare)]
   struct X;
 
   impl ComposeChild for X {

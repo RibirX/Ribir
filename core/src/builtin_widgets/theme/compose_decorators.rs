@@ -88,7 +88,7 @@ mod tests {
 
     let mut theme = FullTheme::default();
 
-    #[derive(Declare2)]
+    #[derive(Declare)]
     struct Size100Style;
 
     impl ComposeDecorator for Size100Style {

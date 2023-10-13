@@ -4,7 +4,7 @@ use std::{ops::Deref, rc::Rc, time::Duration};
 
 /// Transition use rate to describe how the state change form init to final
 /// smoothly.
-#[derive(Declare2, Clone, Debug, PartialEq)]
+#[derive(Declare, Clone, Debug, PartialEq)]
 pub struct Transition<E: 'static> {
   #[declare(default)]
   pub delay: Option<Duration>,
@@ -25,7 +25,7 @@ pub trait TransitionState: Sized + 'static {
   {
     let state = self.state().clone_writer();
     let from = state.read().clone();
-    let mut animate: State<Animate<T, Self>> = Animate::declare2_builder()
+    let mut animate: State<Animate<T, Self>> = Animate::declare_builder()
       .transition(transition)
       .from(from)
       .state(self)

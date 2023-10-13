@@ -15,7 +15,7 @@ pub enum Scrollable {
 }
 
 /// Helper struct for builtin scrollable field.
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct ScrollableWidget {
   #[declare(builtin, default)]
   pub scrollable: Scrollable,
@@ -175,7 +175,7 @@ mod tests {
     test_assert(Scrollable::Both, 100., 100., 0., 0.);
   }
 
-  #[derive(SingleChild, Query, Declare2, Clone)]
+  #[derive(SingleChild, Query, Declare, Clone)]
   pub struct FixedBox {
     pub size: Size,
   }

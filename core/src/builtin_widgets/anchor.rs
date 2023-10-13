@@ -11,21 +11,21 @@ pub enum PositionUnit {
 }
 
 /// Widget use to anchor child constraints with the left edge of parent widget.
-#[derive(Declare2, Query, SingleChild)]
+#[derive(Declare, Query, SingleChild)]
 pub struct LeftAnchor {
   #[declare(builtin, default = 0.)]
   pub left_anchor: PositionUnit,
 }
 
 /// Widget use to anchor child constraints with the right edge of parent widget.
-#[derive(Declare2, Query, SingleChild)]
+#[derive(Declare, Query, SingleChild)]
 pub struct RightAnchor {
   #[declare(builtin, default = 0.)]
   pub right_anchor: PositionUnit,
 }
 
 /// Widget use to anchor child constraints with the top edge of parent widget.
-#[derive(Declare2, Query, SingleChild)]
+#[derive(Declare, Query, SingleChild)]
 pub struct TopAnchor {
   #[declare(builtin, default = 0.)]
   pub top_anchor: PositionUnit,
@@ -33,7 +33,7 @@ pub struct TopAnchor {
 
 /// Widget use to anchor child constraints with the bottom edge of parent
 /// widget.
-#[derive(Declare2, Query, SingleChild)]
+#[derive(Declare, Query, SingleChild)]
 pub struct BottomAnchor {
   #[declare(builtin, default = 0.)]
   pub bottom_anchor: PositionUnit,

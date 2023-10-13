@@ -5,7 +5,7 @@ use crate::{fill_svgs, prelude::*, widget::WidgetBuilder};
 use ribir_algo::Sc;
 pub use ribir_algo::{CowArc, ShareResource};
 use ribir_geom::Size;
-use ribir_macros::Declare2;
+use ribir_macros::Declare;
 use ribir_text::TextStyle;
 use std::{collections::HashMap, rc::Rc};
 
@@ -68,7 +68,7 @@ pub enum Theme {
   Inherit(InheritTheme),
 }
 
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct ThemeWidget {
   pub theme: Sc<Theme>,
 }

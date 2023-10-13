@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// A widget that insets its child by the given padding.
-#[derive(SingleChild, Query, Clone, Declare2)]
+#[derive(SingleChild, Query, Clone, Declare)]
 pub struct Padding {
   #[declare(builtin)]
   pub padding: EdgeInsets,

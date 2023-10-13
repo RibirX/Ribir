@@ -4,7 +4,7 @@ use ribir_widgets::prelude::*;
 
 /// Widget use to do ripple animate as a visual feedback to user interactive.
 /// Usually for touch and mouse.
-#[derive(Debug, Declare2)]
+#[derive(Debug, Declare)]
 pub struct Ripple {
   /// The color of ripples.
   pub color: Color,

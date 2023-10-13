@@ -26,7 +26,7 @@ impl CustomStyle for FabButtonStyle {
   }
 }
 
-#[derive(Clone, Declare2)]
+#[derive(Clone, Declare)]
 pub struct FabButtonDecorator {
   #[allow(unused)]
   pub button_type: ButtonType,
@@ -71,7 +71,7 @@ impl ComposeDecorator for FabButtonDecorator {
 ///   }
 /// };
 /// ```
-#[derive(Default, Declare2)]
+#[derive(Default, Declare)]
 pub struct FabButton {
   #[declare(default=Palette::of(ctx!()).primary())]
   color: Color,

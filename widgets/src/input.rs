@@ -33,7 +33,7 @@ impl CustomStyle for InputStyle {
   fn default_style(_: &BuildCtx) -> Self { InputStyle { size: Some(20.) } }
 }
 
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct Input {
   #[declare(default = TypographyTheme::of(ctx!()).body_large.text.clone())]
   pub style: CowArc<TextStyle>,
@@ -45,7 +45,7 @@ pub struct Input {
   size: Option<f32>,
 }
 
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct TextArea {
   #[declare(default = TypographyTheme::of(ctx!()).body_large.text.clone())]
   pub style: CowArc<TextStyle>,

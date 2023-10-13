@@ -1068,7 +1068,7 @@ mod tests {
       }
     }
 
-    #[derive(Declare2, Query)]
+    #[derive(Declare, Query)]
     struct TaskWidget {
       trigger: u32,
       paint_cnt: Rc<Cell<u32>>,

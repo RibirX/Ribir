@@ -36,7 +36,7 @@ use ribir_core::prelude::*;
 ///   }
 /// };
 /// ```
-#[derive(Default, Query, Declare2)]
+#[derive(Default, Query, Declare)]
 pub struct Divider {
   #[declare(default = 1.)]
   // Extent of divider

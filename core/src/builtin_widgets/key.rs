@@ -40,7 +40,7 @@ impl<V: Default> Default for KeyChange<V> {
 /// frames by its key. If two widget has same parent and key in two frames, the
 /// new widget in the next frame will be treated as the same widget in the last
 /// frame.
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct KeyWidget<V: 'static> {
   pub key: Key,
   #[declare(strict)]

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Declare2, Default, Query, Clone, SingleChild)]
+#[derive(Declare, Default, Query, Clone, SingleChild)]
 pub struct Opacity {
   #[declare(builtin, default = 1.)]
   pub opacity: f32,

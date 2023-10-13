@@ -12,7 +12,7 @@ use crate::prelude::*;
 /// dropped.
 ///
 /// It's useful when you need run a leave animation for a widget.
-#[derive(Declare2, Query)]
+#[derive(Declare, Query)]
 pub struct DelayDrop {
   #[declare(builtin)]
   pub delay_drop_until: bool,

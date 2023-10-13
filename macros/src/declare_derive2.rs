@@ -10,7 +10,7 @@ use syn::{
   token, DataStruct, Fields, Ident, Result,
 };
 
-const DECLARE: &str = "Declare2";
+const DECLARE: &str = "Declare";
 pub const DECLARER: &str = "Declarer2";
 const DECLARE_ATTR: &str = "declare";
 
@@ -124,9 +124,9 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       Fields::Unit => quote!(#name),
     };
     let tokens = quote! {
-      impl Declare2 for #name  {
+      impl Declare for #name  {
         type Builder = #name;
-        fn declare2_builder() -> Self::Builder { #construct }
+        fn declare_builder() -> Self::Builder { #construct }
       }
 
       impl DeclareBuilder for #name {
@@ -248,10 +248,10 @@ fn struct_with_fields_gen(
         #(#def_fields)*
       }
 
-      impl #g_impl Declare2 for #name #g_ty #g_where {
+      impl #g_impl Declare for #name #g_ty #g_where {
         type Builder = #declarer #g_ty;
 
-        fn declare2_builder() -> Self::Builder {
+        fn declare_builder() -> Self::Builder {
           #declarer { #(#field_names : None ),*}
         }
       }

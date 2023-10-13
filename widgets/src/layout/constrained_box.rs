@@ -1,7 +1,7 @@
 use ribir_core::prelude::*;
 
 /// a widget that imposes additional constraints clamp on its child.
-#[derive(SingleChild, Query, Declare2, Clone)]
+#[derive(SingleChild, Query, Declare, Clone)]
 pub struct ConstrainedBox {
   pub clamp: BoxClamp,
 }

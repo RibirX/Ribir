@@ -9,7 +9,7 @@ pub struct EdgeInsets {
 }
 
 /// A widget that create space around its child.
-#[derive(SingleChild, Default, Query, Clone, PartialEq, Declare2)]
+#[derive(SingleChild, Default, Query, Clone, PartialEq, Declare)]
 pub struct Margin {
   #[declare(builtin, default)]
   pub margin: EdgeInsets,

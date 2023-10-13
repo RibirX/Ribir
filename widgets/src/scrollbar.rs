@@ -3,7 +3,7 @@ use ribir_core::prelude::*;
 
 /// A control widget that enables the user to access horizontal parts child that
 /// is larger than the box rect.
-#[derive(Declare2, Clone)]
+#[derive(Declare, Clone)]
 pub struct HScrollBar {
   /// Scrolled pixels of child content.
   #[declare(default)]
@@ -22,7 +22,7 @@ pub struct ScrollBarStyle {
 
 /// Compose style that use to decoration the thumb of horizontal scrollbar,
 /// overwrite it when init theme.
-#[derive(Debug, Declare2)]
+#[derive(Debug, Declare)]
 pub struct HScrollBarThumbDecorator {
   pub offset: f32,
 }
@@ -35,7 +35,7 @@ impl ComposeDecorator for HScrollBarThumbDecorator {
 
 /// Compose style that use to decoration the thumb of vertical scrollbar,
 /// overwrite it when init theme.
-#[derive(Debug, Declare2)]
+#[derive(Debug, Declare)]
 pub struct VScrollBarThumbDecorator {
   pub offset: f32,
 }
@@ -81,7 +81,7 @@ impl ComposeChild for HScrollBar {
 
 /// A control widget that enables the user to access vertical parts child that
 /// is larger than the box rect.
-#[derive(Declare2, Clone)]
+#[derive(Declare, Clone)]
 pub struct VScrollBar {
   /// Scrolled pixels of child content.
   #[declare(default)]
@@ -123,7 +123,7 @@ impl ComposeChild for VScrollBar {
 }
 /// A control widget that enables the user to access horizontal parts child that
 /// is larger than the box rect.
-#[derive(Declare2, Clone)]
+#[derive(Declare, Clone)]
 pub struct BothScrollbar {
   /// Scrolled pixels of child content.
   #[declare(default)]
@@ -168,7 +168,7 @@ impl ComposeChild for BothScrollbar {
 
 /// A widget that display the horizontal scrolling information of the
 /// `scrolling` widget.
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct HRawScrollbar {
   scrolling: Reader<ScrollableWidget>,
 }
@@ -229,7 +229,7 @@ impl Compose for HRawScrollbar {
 
 /// A widget that display the vertical scrolling information of the
 /// `scrolling` widget.
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct VRawScrollbar {
   scrolling: Reader<ScrollableWidget>,
 }
