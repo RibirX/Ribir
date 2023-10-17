@@ -162,6 +162,7 @@ impl Easing for Steps {
   }
 }
 
+#[derive(Clone)]
 pub struct StepEnd(pub f32);
 impl Easing for StepEnd {
   #[inline]

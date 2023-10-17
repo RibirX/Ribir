@@ -1,6 +1,7 @@
-use std::{collections::HashMap, rc::Rc, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
 use crate::{
+  animation::RocBoxClone,
   context::BuildCtx,
   fill_transition,
   prelude::{easing, Roc, Transition},
@@ -8,9 +9,8 @@ use crate::{
 
 use super::Theme;
 
-#[derive(Clone)]
 pub struct TransitionTheme {
-  pub transitions: HashMap<TransitionIdent, Rc<Box<dyn Roc>>, ahash::RandomState>,
+  pub transitions: HashMap<TransitionIdent, Box<dyn RocBoxClone>, ahash::RandomState>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -35,7 +35,7 @@ pub mod transitions {
   #[macro_export]
   macro_rules! fill_transition {
       ($transitions: ident, $($name: path: $expr: expr),+) => {
-        $($transitions.set_transition($name,  Rc::new(Box::new($expr)));)+
+        $($transitions.set_transition($name, (Box::new($expr)));)+
       };
     }
 
@@ -59,8 +59,8 @@ impl TransitionTheme {
   pub fn set_transition(
     &mut self,
     ident: TransitionIdent,
-    transition: Rc<Box<dyn Roc>>,
-  ) -> Option<Rc<Box<dyn Roc>>> {
+    transition: Box<dyn RocBoxClone>,
+  ) -> Option<Box<dyn RocBoxClone>> {
     self.transitions.insert(ident, transition)
   }
 }
@@ -70,7 +70,7 @@ impl TransitionIdent {
 
   /// get transition of the transition identify from the context if it have or
   /// return linear transition.
-  pub fn of(self, ctx: &BuildCtx) -> Rc<Box<dyn Roc>> {
+  pub fn of(self, ctx: &BuildCtx) -> Box<dyn Roc> {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(t) => {
@@ -86,7 +86,7 @@ impl TransitionIdent {
           .and_then(|t| t.transitions.get(&self)),
       })
       .unwrap()
-      .clone()
+      .box_clone()
   }
 }
 
@@ -95,34 +95,24 @@ impl Default for TransitionTheme {
     let mut theme = Self { transitions: Default::default() };
     fill_transition! { theme,
       transitions::EASE: Transition {
-        delay: None,
         duration: Duration::from_millis(250),
         easing: easing::EASE,
-        repeat: None,
       },
       transitions::LINEAR: Transition {
-        delay: None,
         duration: Duration::from_millis(200),
         easing: easing::LINEAR,
-        repeat: None,
       },
       transitions::EASE_IN: Transition {
-        delay: None,
         duration: Duration::from_millis(250),
         easing: easing::EASE_IN,
-        repeat: None,
       },
       transitions::EASE_OUT: Transition {
-        delay: None,
         duration: Duration::from_millis(200),
         easing: easing::EASE_OUT,
-        repeat: None,
       },
       transitions::EASE_IN_OUT: Transition {
-        delay: None,
         duration: Duration::from_millis(250),
         easing: easing::EASE_IN_OUT,
-        repeat: None,
       }
     }
 

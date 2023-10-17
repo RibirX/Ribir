@@ -86,12 +86,7 @@ impl Todos {
                 let mut key = @KeyWidget { key: $task.id, value: () };
                 let mount_idx = Stateful::new(0);
 
-                let mut mount_animate = @Animate {
-                  transition: @Transition {
-                    delay: pipe!(Duration::from_millis(100).mul_f32(*$mount_idx as f32)),
-                    duration: Duration::from_millis(150),
-                    easing: easing::EASE_IN,
-                  }.into_inner(),
+                let mount_animate = @Animate {
                   state: map_writer!($key.transform),
                   from: Transform::translation(-400., 0. ),
                 };
@@ -100,6 +95,11 @@ impl Todos {
                     on_mounted: move |_| if $key.is_enter() {
                       *$mount_idx.write() = *$mount_task_cnt;
                       *$mount_task_cnt.write() += 1;
+                      $mount_animate.write().transition = Transition {
+                        duration: Duration::from_millis(450),
+                        easing: easing::EASE_IN,
+                      }.delay(Duration::from_millis(100 * *$mount_idx)).box_it();
+
                       mount_animate.run();
                     },
                     @{ HeadlineText(Label::new($task.label.clone())) }

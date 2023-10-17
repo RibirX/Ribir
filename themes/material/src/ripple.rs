@@ -58,7 +58,7 @@ impl ComposeChild for Ripple {
             path: Path::circle(launch_at, radius),
           };
 
-          let mut ripper_enter = @Animate {
+          let ripper_enter = @Animate {
             transition: transitions::LINEAR.of(ctx!()),
             state: LerpFnState::new(
               map_writer!($ripple.path),
