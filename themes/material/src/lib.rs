@@ -324,7 +324,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         Position::Top | Position::Bottom => {
           let left = map_writer!($indicator.left_anchor);
           left.transition_with(
-            ease_in.clone(),
+            ease_in,
             move |from, to, rate| PositionUnit::lerp(from, to, rate, $style.rect.width()),
             ctx!()
           );

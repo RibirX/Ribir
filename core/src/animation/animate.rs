@@ -2,13 +2,12 @@ use crate::{prelude::*, ticker::FrameMsg, window::WindowId};
 use std::time::Instant;
 
 #[derive(Declare)]
-pub struct Animate<T, S>
+pub struct Animate<S>
 where
-  T: Roc + 'static,
   S: AnimateState + 'static,
 {
-  #[declare(strict)]
-  pub transition: T,
+  #[declare(strict, default = transitions::LINEAR.of(ctx!()))]
+  pub transition: Box<dyn Roc>,
   #[declare(strict)]
   pub state: S,
   pub from: <S::State as StateReader>::Value,
@@ -51,13 +50,12 @@ pub(crate) struct AnimateInfo<V> {
   _tick_msg_guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
 }
 
-impl<T, S> State<Animate<T, S>>
+pub trait AnimateRun<S>: StateWriter<Value = Animate<S>>
 where
-  T: Roc + 'static,
   S: AnimateState + 'static,
   <S::State as StateReader>::Value: Clone,
 {
-  pub fn run(&mut self) {
+  fn run(&self) {
     let mut animate_ref = self.write();
     let this = &mut *animate_ref;
     let wnd_id = this.window_id;
@@ -112,7 +110,15 @@ where
   }
 }
 
-impl<T: Roc, S> Animate<T, S>
+impl<S, T> AnimateRun<S> for T
+where
+  S: AnimateState + 'static,
+  <S::State as StateReader>::Value: Clone,
+  T: StateWriter<Value = Animate<S>>,
+{
+}
+
+impl<S> Animate<S>
 where
   S: AnimateState + 'static,
 {
@@ -170,7 +176,7 @@ where
   pub fn is_running(&self) -> bool { self.running_info.is_some() }
 }
 
-impl<T: Roc, P> Drop for Animate<T, P>
+impl<P> Drop for Animate<P>
 where
   P: AnimateState + 'static,
 {
@@ -227,11 +233,11 @@ mod tests {
     let _guard = unsafe { AppCtx::new_lock_scope() };
 
     let w = fn_widget! {
-      let mut animate = @Animate {
-        transition: @Transition {
+      let animate = @Animate {
+        transition: Transition {
           easing: easing::LINEAR,
           duration: Duration::ZERO,
-        }.into_inner(),
+        }.box_it(),
         state: Stateful::new(1.),
         from: 0.,
       };
