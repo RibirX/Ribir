@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use ribir_core::prelude::*;
 
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct ButtonImpl {
   #[declare(default = 48.)]
   pub min_width: f32,

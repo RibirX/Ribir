@@ -38,9 +38,9 @@ macro_rules! match_closure {
   };
 }
 
-impl Declare2 for LifecycleListener {
+impl Declare for LifecycleListener {
   type Builder = Self;
-  fn declare2_builder() -> Self::Builder { Self::default() }
+  fn declare_builder() -> Self::Builder { Self::default() }
 }
 
 impl DeclareBuilder for LifecycleListener {

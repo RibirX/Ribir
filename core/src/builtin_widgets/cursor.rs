@@ -3,7 +3,7 @@ use winit::window::CursorIcon;
 
 /// `Cursor` is an attribute to assign an `cursor` to a widget.
 
-#[derive(Default, Debug, Declare2)]
+#[derive(Default, Debug, Declare)]
 pub struct Cursor {
   #[declare(builtin, default)]
   pub cursor: CursorIcon,

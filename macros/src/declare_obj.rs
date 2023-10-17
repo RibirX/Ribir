@@ -179,7 +179,7 @@ impl<'a> ToTokens for ObjNode<'a> {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     match self {
       Self::Obj { ty, span, fields } => {
-        quote_spanned! { *span => #ty::declare2_builder() }.to_tokens(tokens);
+        quote_spanned! { *span => #ty::declare_builder() }.to_tokens(tokens);
         fields.iter().for_each(|f| f.to_tokens(tokens));
         tokens.extend(quote_spanned! { *span => .build_declare(ctx!()) });
       }

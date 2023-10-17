@@ -28,7 +28,7 @@ pub enum JustifyContent {
   SpaceEvenly,
 }
 
-#[derive(Default, MultiChild, Declare2, Query, Clone, PartialEq)]
+#[derive(Default, MultiChild, Declare, Query, Clone, PartialEq)]
 pub struct Flex {
   /// Reverse the main axis.
   #[declare(default)]
@@ -61,11 +61,9 @@ pub struct Row;
 /// A type help to declare flex widget as Vertical.
 pub struct Column;
 
-impl Declare2 for Row {
+impl Declare for Row {
   type Builder = FlexDeclarer2;
-  fn declare2_builder() -> Self::Builder {
-    Flex::declare2_builder().direction(Direction::Horizontal)
-  }
+  fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Horizontal) }
 }
 
 impl FlexDeclarer2 {
@@ -86,9 +84,9 @@ impl FlexDeclarer2 {
   }
 }
 
-impl Declare2 for Column {
+impl Declare for Column {
   type Builder = FlexDeclarer2;
-  fn declare2_builder() -> Self::Builder { Flex::declare2_builder().direction(Direction::Vertical) }
+  fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Vertical) }
 }
 
 impl Render for Flex {

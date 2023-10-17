@@ -19,7 +19,7 @@ pub enum BoxFit {
 }
 
 /// Widget set how its child should be scale to fit its box.
-#[derive(Declare2, Query, SingleChild)]
+#[derive(Declare, Query, SingleChild)]
 pub struct FittedBox {
   #[declare(builtin)]
   pub box_fit: BoxFit,

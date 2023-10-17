@@ -56,9 +56,9 @@ macro_rules! impl_listener {
         }
       }
 
-      impl Declare2 for [<$name Listener>] {
+      impl Declare for [<$name Listener>] {
         type Builder = Self;
-        fn declare2_builder() -> Self::Builder {
+        fn declare_builder() -> Self::Builder {
           Self { [<$name:snake _subject>]: Default::default()}
         }
       }

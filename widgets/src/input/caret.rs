@@ -1,7 +1,7 @@
 use crate::layout::SizedBox;
 use ribir_core::prelude::*;
 use std::time::Duration;
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct Caret {
   pub focused: bool,
   pub height: f32,

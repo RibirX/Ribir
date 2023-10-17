@@ -24,7 +24,7 @@ impl CustomStyle for ButtonStyle {
   }
 }
 
-#[derive(Clone, Declare2)]
+#[derive(Clone, Declare)]
 pub struct ButtonDecorator {
   #[allow(unused)]
   pub button_type: ButtonType,
@@ -60,7 +60,7 @@ impl ComposeDecorator for ButtonDecorator {
 ///   }
 /// };
 /// ```
-#[derive(Default, Declare2)]
+#[derive(Default, Declare)]
 pub struct Button {
   #[declare(default=Palette::of(ctx!()).primary())]
   color: Color,

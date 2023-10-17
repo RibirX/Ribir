@@ -86,7 +86,7 @@ macro_rules! impl_builtin_obj {
           {
             self
               .[< $builtin_ty: snake:lower >]
-              .get_or_insert_with(|| $builtin_ty::declare2_builder().build_declare(ctx))
+              .get_or_insert_with(|| $builtin_ty::declare_builder().build_declare(ctx))
           }
         )*
 
@@ -105,7 +105,7 @@ macro_rules! impl_builtin_obj {
           {
             self
               .[< $builtin_ty: snake:lower >]
-              .get_or_insert_with(|| $builtin_ty::declare2_builder().build_declare(ctx))
+              .get_or_insert_with(|| $builtin_ty::declare_builder().build_declare(ctx))
           }
         )*
 

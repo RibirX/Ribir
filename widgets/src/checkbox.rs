@@ -5,7 +5,7 @@ use crate::{
 use ribir_core::prelude::*;
 
 /// Represents a control that a user can select and clear.
-#[derive(Clone, Declare2)]
+#[derive(Clone, Declare)]
 pub struct Checkbox {
   #[declare(default)]
   pub checked: bool,
@@ -25,7 +25,7 @@ pub struct CheckBoxStyle {
   pub label_color: Brush,
 }
 
-#[derive(Clone, Declare2)]
+#[derive(Clone, Declare)]
 pub struct CheckBoxDecorator {
   #[declare(default=Palette::of(ctx!()).primary())]
   pub color: Color,

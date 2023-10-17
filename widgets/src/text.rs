@@ -4,7 +4,7 @@ use ribir_core::prelude::{
 };
 
 /// The text widget display text with a single style.
-#[derive(Debug, Declare2, Query, Clone, PartialEq)]
+#[derive(Debug, Declare, Query, Clone, PartialEq)]
 pub struct Text {
   pub text: CowArc<str>,
   #[declare(default = Palette::of(ctx!()).on_surface_variant())]
@@ -124,7 +124,7 @@ pub fn typography_with_text_style<T: Into<Substr>>(
 
 macro_rules! define_text_with_theme_style {
   ($name: ident, $style: ident) => {
-    #[derive(Declare2)]
+    #[derive(Declare)]
     pub struct $name {
       pub text: CowArc<str>,
       #[declare(default = Palette::of(ctx!()).on_surface_variant())]

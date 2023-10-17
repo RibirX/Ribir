@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
-#[derive(SingleChild, Default, Clone, Declare2, Query)]
+#[derive(SingleChild, Default, Clone, Declare, Query)]
 pub struct BoxDecoration {
   /// The background of the box.
   #[declare(builtin, default)]
@@ -197,7 +197,7 @@ mod tests {
     let dummy = std::mem::MaybeUninit::uninit();
     // just for test, we know BoxDecoration not use `ctx` to build.
     let ctx: BuildCtx<'static> = unsafe { dummy.assume_init() };
-    let w = BoxDecoration::declare2_builder().build_declare(&ctx);
+    let w = BoxDecoration::declare_builder().build_declare(&ctx);
 
     assert_eq!(w.read().border, None);
     assert_eq!(w.read().border_radius, None);

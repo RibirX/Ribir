@@ -1,7 +1,7 @@
 use crate::layout::{Container, Stack};
 use ribir_core::prelude::*;
 
-#[derive(Declare2)]
+#[derive(Declare)]
 pub(crate) struct SelectedText {
   pub(crate) rects: Vec<Rect>,
 }

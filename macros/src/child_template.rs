@@ -56,10 +56,10 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
           fn builder() -> Self::Builder {  <_>::default() }
         }
 
-        impl #g_impl Declare2 for #name #g_ty #g_where {
+        impl #g_impl Declare for #name #g_ty #g_where {
           type Builder = #builder #g_ty;
           #[inline]
-          fn declare2_builder() -> Self::Builder { #name::builder() }
+          fn declare_builder() -> Self::Builder { #name::builder() }
         }
 
         impl #g_impl DeclareBuilder for #builder #g_ty {

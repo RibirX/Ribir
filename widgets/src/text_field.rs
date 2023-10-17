@@ -2,7 +2,7 @@ use crate::prelude::*;
 use ribir_core::prelude::*;
 use std::{collections::HashMap, hash::Hash, ops::Deref};
 
-#[derive(Declare2, Default)]
+#[derive(Declare, Default)]
 pub struct TextField {
   /// textfield's input value
   #[declare(skip)]
@@ -89,7 +89,7 @@ where
   fn get(&self, state: S) -> Option<&T> { self.themes.get(&state) }
 }
 
-#[derive(Declare2)]
+#[derive(Declare)]
 struct ThemeSuitProxy<S: 'static, T: 'static>
 where
   S: Hash + Eq,
@@ -385,7 +385,7 @@ fn build_input_area(
   }
 }
 
-#[derive(Declare2)]
+#[derive(Declare)]
 struct TextFieldLabel {
   text: CowArc<str>,
   style: CowArc<TextStyle>,

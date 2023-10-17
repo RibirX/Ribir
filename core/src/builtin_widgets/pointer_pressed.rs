@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// Widget keep the pointer press state of its child. As a builtin widget, user
 /// can call `pointer_pressed` method to get the pressed state of a widget.
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct PointerPressed {
   #[declare(skip, builtin)]
   pointer_pressed: bool,

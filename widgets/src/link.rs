@@ -2,7 +2,7 @@ use log::warn;
 use ribir_core::prelude::*;
 use webbrowser::{open_browser as open, Browser};
 
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct Link {
   /// Want to open url
   url: CowArc<str>,

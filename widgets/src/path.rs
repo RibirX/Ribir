@@ -2,7 +2,7 @@ use ribir_core::prelude::*;
 
 /// Widget just use as a paint kit for a path and not care about its size. Use
 /// `[PathWidget]!` instead of.
-#[derive(Declare2, Query, Clone)]
+#[derive(Declare, Query, Clone)]
 pub struct PathPaintKit {
   pub path: Path,
   pub brush: Brush,
@@ -39,7 +39,7 @@ impl Render for PathPaintKit {
   }
 }
 
-#[derive(Declare2, Query)]
+#[derive(Declare, Query)]
 /// A path widget which size careful and can process events only if user hit at
 /// the path self, not its size cover area.
 pub struct PathWidget {

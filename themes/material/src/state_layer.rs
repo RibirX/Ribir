@@ -4,7 +4,7 @@ use ribir_widgets::{layout::Stack, path::PathPaintKit};
 
 /// Widget that as an visual indicator of material design used to present the
 /// interactive status of its child.
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct StateLayer {
   pub color: Color,
   pub path: Path,
@@ -13,7 +13,7 @@ pub struct StateLayer {
 /// Widget that as visual indicator of material design used to communicate the
 /// status of interactive widget, its visual state will reactive to its child
 /// interactive state.
-#[derive(Declare2)]
+#[derive(Declare)]
 pub struct InteractiveLayer {
   /// the color of the state layer, will apply a fixed opacity in different
   /// state.

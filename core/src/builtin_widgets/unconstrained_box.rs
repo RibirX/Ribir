@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Declare2, Query, SingleChild)]
+#[derive(Declare, Query, SingleChild)]
 /// A widget that imposes no constraints on its child, allowing it to layout and
 /// display as its "natural" size. Its size is equal to its child then clamp by
 /// parent.

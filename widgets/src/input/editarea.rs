@@ -6,7 +6,7 @@ use ribir_core::prelude::*;
 use ribir_core::ticker::FrameMsg;
 use std::time::Duration;
 
-#[derive(Declare2)]
+#[derive(Declare)]
 pub(crate) struct TextEditorArea {
   pub(crate) style: CowArc<TextStyle>,
   pub(crate) text: CowArc<str>,

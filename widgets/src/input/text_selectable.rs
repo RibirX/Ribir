@@ -5,7 +5,7 @@ use crate::layout::{Stack, StackFit};
 use crate::prelude::Text;
 use ribir_core::prelude::*;
 
-#[derive(Declare2, Default)]
+#[derive(Declare, Default)]
 pub struct TextSelectable {
   #[declare(default)]
   pub caret: CaretState,

@@ -28,7 +28,7 @@ impl CustomStyle for OutlinedButtonStyle {
   }
 }
 
-#[derive(Clone, Declare2)]
+#[derive(Clone, Declare)]
 pub struct OutlinedButtonDecorator {
   #[allow(unused)]
   pub button_type: ButtonType,
@@ -73,7 +73,7 @@ impl ComposeDecorator for OutlinedButtonDecorator {
 ///   }
 /// };
 /// ```
-#[derive(Default, Declare2)]
+#[derive(Default, Declare)]
 pub struct OutlinedButton {
   #[declare(default=Palette::of(ctx!()).primary())]
   color: Color,

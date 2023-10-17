@@ -185,13 +185,13 @@ mod tests {
   #[test]
   fn compose_template_child() {
     reset_test_env!();
-    #[derive(Declare2)]
+    #[derive(Declare)]
     struct Page;
-    #[derive(Declare2, PairChild)]
+    #[derive(Declare, PairChild)]
     struct Header;
-    #[derive(Declare2, PairChild)]
+    #[derive(Declare, PairChild)]
     struct Content;
-    #[derive(Declare2, PairChild)]
+    #[derive(Declare, PairChild)]
     struct Footer;
 
     #[derive(Template)]
@@ -222,9 +222,9 @@ mod tests {
   fn compose_option_child() {
     reset_test_env!();
 
-    #[derive(Declare2)]
+    #[derive(Declare)]
     struct Parent;
-    #[derive(Declare2, PairChild)]
+    #[derive(Declare, PairChild)]
     struct Child;
 
     impl ComposeChild for Parent {
@@ -256,9 +256,9 @@ mod tests {
   fn tuple_as_vec() {
     reset_test_env!();
 
-    #[derive(Declare2)]
+    #[derive(Declare)]
     struct A;
-    #[derive(Declare2)]
+    #[derive(Declare)]
     struct B;
 
     impl ComposeChild for A {
@@ -334,10 +334,10 @@ mod tests {
   fn pair_to_pair() {
     reset_test_env!();
 
-    #[derive(Declare2)]
+    #[derive(Declare)]
     struct P;
 
-    #[derive(Declare2, PairChild)]
+    #[derive(Declare, PairChild)]
     struct X;
 
     impl ComposeChild for P {
@@ -381,7 +381,7 @@ mod tests {
     pub struct ConfigTml {
       _field: Option<Field>,
     }
-    #[derive(Declare2)]
+    #[derive(Declare)]
     struct Host {}
 
     impl ComposeChild for Host {
