@@ -253,6 +253,7 @@ impl From<StrokeOptions> for tiny_skia_path::Stroke {
         LineJoin::Miter => tiny_skia_path::LineJoin::Miter,
         LineJoin::Round => tiny_skia_path::LineJoin::Round,
         LineJoin::Bevel => tiny_skia_path::LineJoin::Bevel,
+        LineJoin::MiterClip => tiny_skia_path::LineJoin::MiterClip,
       },
       dash: None,
     }

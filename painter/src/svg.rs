@@ -70,6 +70,7 @@ impl Svg {
                 usvg::LineJoin::Miter => LineJoin::Miter,
                 usvg::LineJoin::Bevel => LineJoin::Bevel,
                 usvg::LineJoin::Round => LineJoin::Round,
+                usvg::LineJoin::MiterClip => LineJoin::MiterClip,
               };
               let options = StrokeOptions {
                 width: stroke.width.get(),

@@ -70,6 +70,8 @@ pub enum LineJoin {
   /// Extends to miter limit.
   #[default]
   Miter,
+  /// Extends to miter limit, then clips the corner.
+  MiterClip,
   /// Adds circle.
   Round,
   /// Connects outside edges.
