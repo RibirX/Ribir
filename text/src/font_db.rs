@@ -1,14 +1,14 @@
+use ahash::HashMap;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use lyon_path::math::Point;
-use ribir_algo::ShareResource;
+use ribir_algo::{Sc, ShareResource};
 use ribir_painter::{PixelImage, Svg};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 use std::cell::RefCell;
-use std::rc::Rc;
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc};
 
-use crate::svg_font_document::SvgDocument;
+use crate::svg_glyph_cache::SvgGlyphCache;
 use crate::{FontFace, FontFamily};
 /// A wrapper of fontdb and cache font data.
 pub struct FontDB {
@@ -17,7 +17,7 @@ pub struct FontDB {
   cache: HashMap<ID, Option<Face>>,
 }
 
-type FontGlyphCache<K, V> = Rc<RefCell<HashMap<K, Option<V>>>>;
+type FontGlyphCache<K, V> = Sc<RefCell<HashMap<K, Option<V>>>>;
 #[derive(Clone)]
 pub struct Face {
   pub face_id: ID,
@@ -27,8 +27,7 @@ pub struct Face {
   #[cfg(feature = "raster_png_font")]
   raster_image_glyphs: FontGlyphCache<GlyphId, ShareResource<PixelImage>>,
   outline_glyphs: FontGlyphCache<GlyphId, lyon_path::Path>,
-  svg_glyphs: FontGlyphCache<GlyphId, Svg>,
-  svg_docs: FontGlyphCache<*const u8, SvgDocument>,
+  svg_glyphs: Sc<RefCell<SvgGlyphCache>>,
 }
 
 impl FontDB {
@@ -277,7 +276,6 @@ impl Face {
       #[cfg(feature = "raster_png_font")]
       raster_image_glyphs: <_>::default(),
       svg_glyphs: <_>::default(),
-      svg_docs: <_>::default(),
     })
   }
 
@@ -333,19 +331,7 @@ impl Face {
     self
       .svg_glyphs
       .borrow_mut()
-      .entry(glyph_id)
-      .or_insert_with(|| {
-        self.rb_face.glyph_svg_image(glyph_id).and_then(|data| {
-          self
-            .svg_docs
-            .borrow_mut()
-            .entry(&data[0] as *const u8)
-            .or_insert_with(|| SvgDocument::parse(unsafe { std::str::from_utf8_unchecked(data) }))
-            .as_ref()
-            .and_then(|doc| doc.glyph_svg(glyph_id, self))
-            .and_then(|content| Svg::parse_from_bytes(content.as_bytes()).ok())
-        })
-      })
+      .svg_or_insert(glyph_id, &self.rb_face)
       .clone()
   }
 
