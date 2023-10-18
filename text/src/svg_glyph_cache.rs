@@ -3,45 +3,70 @@ use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
 use quick_xml::reader::Reader;
+use ribir_painter::Svg;
 use rustybuzz::ttf_parser::GlyphId;
 
 use ahash::{HashMap, HashSet};
 use std::borrow::Cow;
 
+use std::collections::BTreeMap;
 use std::io::prelude::*;
+use std::ops::RangeInclusive;
 
-use crate::font_db::Face;
+#[derive(Default)]
+pub struct SvgGlyphCache {
+  svg_docs: SvgDocumentCache,
+  svg_glyphs: HashMap<GlyphId, Option<Svg>>,
+}
 
-pub(crate) struct SvgDocument {
+impl SvgGlyphCache {
+  pub fn svg_or_insert(&mut self, glyph_id: GlyphId, rb_face: &rustybuzz::Face) -> &Option<Svg> {
+    let SvgGlyphCache { svg_docs, svg_glyphs } = self;
+    svg_glyphs.entry(glyph_id).or_insert_with(|| {
+      if let Some(doc) = svg_docs.get(glyph_id) {
+        doc.glyph_svg(glyph_id, rb_face)
+      } else {
+        rb_face.glyph_svg_image(glyph_id).and_then(|doc| {
+          let doc = SvgDocument::new(doc.glyphs_range(), doc.data);
+          let svg = doc.glyph_svg(glyph_id, rb_face);
+          svg_docs.insert(doc);
+          svg
+        })
+      }
+    })
+  }
+}
+
+#[derive(Default)]
+struct SvgDocumentCache {
+  docs: BTreeMap<GlyphId, SvgDocument>,
+}
+
+impl SvgDocumentCache {
+  fn insert(&mut self, doc: SvgDocument) { self.docs.insert(*doc.range.start(), doc); }
+
+  fn get(&self, glyph_id: GlyphId) -> Option<&SvgDocument> {
+    // use btreemap.lower_bound is better, but it's unstable now
+    let its = self.docs.range(..=glyph_id);
+    its
+      .last()
+      .and_then(|(_, doc)| doc.range.contains(&glyph_id).then_some(doc))
+  }
+}
+
+struct SvgDocument {
+  range: RangeInclusive<GlyphId>,
   elems: HashMap<String, String>,
 }
 
 impl SvgDocument {
-  pub(crate) fn parse(content: &str) -> Option<Self> {
-    let mut reader = Reader::from_str(content);
-    let mut buf = Vec::new();
-    let mut doc = Self { elems: HashMap::default() };
-    loop {
-      match reader.read_event_into(&mut buf) {
-        Ok(ref e @ Event::Start(ref tag)) | Ok(ref e @ Event::Empty(ref tag)) => {
-          if tag.name() != QName(b"defs") {
-            let has_child = matches!(e, Event::Start(_));
-            doc.collect_named_obj(&mut reader, content, tag, has_child);
-          }
-        }
-        Ok(Event::Eof) => break, // exits the loop when reaching end of file
-        Err(e) => {
-          warn!("Error at position {}: {:?}", reader.buffer_position(), e);
-          return None;
-        }
+  fn new(range: RangeInclusive<GlyphId>, content: &[u8]) -> Self {
+    let elems = Self::parse(content).unwrap_or_default();
 
-        _ => (), // There are several other `Event`s we do not consider here
-      }
-    }
-    Some(doc)
+    Self { range, elems }
   }
 
-  pub fn glyph_svg(&self, glyph: GlyphId, face: &Face) -> Option<String> {
+  fn glyph_svg(&self, glyph: GlyphId, face: &rustybuzz::Face) -> Option<Svg> {
     let key = format!("glyph{}", glyph.0);
     if !self.elems.contains_key(&key) {
       return None;
@@ -56,8 +81,8 @@ impl SvgDocument {
       }
     }
 
-    let units_per_em = face.units_per_em() as i32;
-    let ascender = face.rb_face.ascender() as i32;
+    let units_per_em = face.units_per_em();
+    let ascender = face.ascender() as i32;
     let mut writer = std::io::Cursor::new(Vec::new());
 
     writer.write_all(format!(
@@ -77,16 +102,39 @@ impl SvgDocument {
       .ok()?;
     writer.write_all("</svg>".as_bytes()).ok()?;
 
-    Some(
-      std::str::from_utf8(&writer.into_inner())
-        .unwrap()
-        .to_string(),
-    )
+    std::str::from_utf8(&writer.into_inner())
+      .ok()
+      .and_then(|str| Svg::parse_from_bytes(str.as_bytes()).ok())
+  }
+
+  fn parse(data: &[u8]) -> Option<HashMap<String, String>> {
+    let content = std::str::from_utf8(data).ok()?;
+    let mut reader = Reader::from_str(content);
+    let mut buf = Vec::new();
+    let mut elems = HashMap::default();
+    loop {
+      match reader.read_event_into(&mut buf) {
+        Ok(ref e @ Event::Start(ref tag)) | Ok(ref e @ Event::Empty(ref tag)) => {
+          if tag.name() != QName(b"defs") {
+            let has_child = matches!(e, Event::Start(_));
+            Self::collect_named_obj(&mut reader, &mut elems, content, tag, has_child);
+          }
+        }
+        Ok(Event::Eof) => break, // exits the loop when reaching end of file
+        Err(e) => {
+          warn!("Error at position {}: {:?}", reader.buffer_position(), e);
+          return None;
+        }
+
+        _ => (), // There are several other `Event`s we do not consider here
+      }
+    }
+    Some(elems)
   }
 
   fn collect_named_obj(
-    &mut self,
     reader: &mut Reader<&[u8]>,
+    elems: &mut HashMap<String, String>,
     source: &str,
     e: &BytesStart,
     has_children: bool,
@@ -98,9 +146,7 @@ impl SvgDocument {
     {
       unsafe {
         let content = Self::extra_elem(reader, e, source, has_children);
-        self
-          .elems
-          .insert(std::str::from_utf8_unchecked(&id).to_string(), content);
+        elems.insert(std::str::from_utf8_unchecked(&id).to_string(), content);
       }
     };
   }
@@ -195,9 +241,9 @@ impl SvgDocument {
 
 #[cfg(test)]
 mod tests {
-  use rustybuzz::ttf_parser::GlyphId;
-
+  use super::{SvgDocument, SvgDocumentCache};
   use crate::font_db::FontDB;
+  use rustybuzz::ttf_parser::GlyphId;
 
   #[test]
   fn test_svg_document() {
@@ -221,11 +267,35 @@ mod tests {
               transform="matrix(7.674 0 0 7.674 12593.511 3663.078)" fill="#FFCC32" />
           </g>
         </svg>"##;
-    let doc = super::SvgDocument::parse(content).unwrap();
+    let doc = super::SvgDocument::new(GlyphId(2428)..=GlyphId(2428), content.as_bytes());
     let mut db = FontDB::default();
     let dummy_face = db.face_data_or_insert(db.default_font()).unwrap();
     assert_eq!(doc.elems.len(), 4);
-    assert!(doc.glyph_svg(GlyphId(2428), dummy_face).is_some());
-    assert!(doc.glyph_svg(GlyphId(0), dummy_face).is_none());
+    assert!(
+      doc
+        .glyph_svg(GlyphId(2428), dummy_face.as_rb_face())
+        .is_some()
+    );
+    assert!(doc.glyph_svg(GlyphId(0), dummy_face.as_rb_face()).is_none());
+  }
+
+  #[test]
+  fn test_svg_document_cache() {
+    let mut cache = SvgDocumentCache::default();
+    cache.insert(SvgDocument::new(GlyphId(0)..=GlyphId(10), "".as_bytes()));
+    cache.insert(SvgDocument::new(GlyphId(11)..=GlyphId(20), "".as_bytes()));
+    cache.insert(SvgDocument::new(GlyphId(31)..=GlyphId(40), "".as_bytes()));
+
+    assert_eq!(
+      Some(GlyphId(11)),
+      cache.get(GlyphId(11)).map(|doc| *doc.range.start())
+    );
+
+    assert_eq!(
+      Some(GlyphId(31)),
+      cache.get(GlyphId(40)).map(|doc| *doc.range.start())
+    );
+
+    assert_eq!(None, cache.get(GlyphId(21)).map(|doc| *doc.range.start()));
   }
 }
