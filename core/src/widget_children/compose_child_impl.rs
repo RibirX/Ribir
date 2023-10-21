@@ -1,6 +1,6 @@
 use crate::{
   context::BuildCtx,
-  prelude::ChildFrom,
+  prelude::{BoxPipe, ChildFrom},
   state::{State, StateWriter},
   widget::{Widget, WidgetBuilder},
 };
@@ -114,10 +114,21 @@ where
   }
 }
 
+impl<T: 'static> From<T> for BoxPipe<T> {
+  #[inline]
+  fn from(t: T) -> Self { BoxPipe::value(t) }
+}
+
 // impl Vec<T> as Template
 
 impl<T> Template for Vec<T> {
   type Builder = Self;
+  #[inline]
+  fn builder() -> Self::Builder { vec![] }
+}
+
+impl<T> Template for BoxPipe<Vec<T>> {
+  type Builder = Vec<T>;
   #[inline]
   fn builder() -> Self::Builder { vec![] }
 }
@@ -159,7 +170,7 @@ where
 mod tests {
 
   use super::*;
-  use crate::{prelude::*, test_helper::MockBox};
+  use crate::{pipe::BoxPipe, prelude::*, test_helper::MockBox};
   #[derive(Template)]
   struct PTml {
     _child: CTml,
@@ -199,6 +210,29 @@ mod tests {
       MockBox { size: ZERO_SIZE }
         .with_child(X.with_child(Void {}, ctx), ctx)
         .widget_build(ctx)
+    };
+  }
+
+  #[derive(Declare)]
+  struct PipeParent;
+
+  impl ComposeChild for PipeParent {
+    type Child = BoxPipe<usize>;
+
+    fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> impl WidgetBuilder {
+      fn_widget!(Void)
+    }
+  }
+
+  #[test]
+  fn compose_pipe_child() {
+    let _value_child = fn_widget! {
+      @PipeParent {  @ { 0 } }
+    };
+
+    let _pipe_child = fn_widget! {
+      let state = State::value(0);
+      @PipeParent {  @ { pipe!(*$state) } }
     };
   }
 }

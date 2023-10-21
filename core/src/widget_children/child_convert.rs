@@ -2,7 +2,7 @@ use super::Pair;
 use crate::{
   builtin_widgets::{FatObj, Void},
   context::BuildCtx,
-  pipe::{FinalChain, InnerPipe, MapPipe, Pipe},
+  pipe::{BoxPipe, InnerPipe, Pipe},
   state::{State, StateFrom},
   widget::*,
 };
@@ -36,23 +36,63 @@ crate::widget::multi_build_replace_impl! {
 }
 
 crate::widget::multi_build_replace_impl_include_self! {
-  impl<V: {#} + 'static, S: InnerPipe> FromAnother<MapPipe<Option<V>, S>, &dyn {#}> for Widget
+  impl<V: {#} + 'static, PP> FromAnother<PP, Box<dyn {#}>> for Widget
   where
-    S::Value: 'static,
+    PP: InnerPipe<Value = Option<V>>,
   {
     #[inline]
-    fn from_another(value: MapPipe<Option<V>, S>, ctx: &BuildCtx) -> Self {
+    fn from_another(value: PP, ctx: &BuildCtx) -> Self {
       crate::pipe::pipe_option_to_widget!(value, ctx)
     }
   }
+}
 
-  impl<V: {#} + 'static, S: InnerPipe<Value = Option<V>>>
-    FromAnother<FinalChain<Option<V>, S>, &dyn {#}> for Widget
-  {
-    #[inline]
-    fn from_another(value: FinalChain<Option<V>, S>, ctx: &BuildCtx) -> Self {
-      crate::pipe::pipe_option_to_widget!(value, ctx)
-    }
+impl<M, T: 'static, V> FromAnother<T, [M; 0]> for BoxPipe<V>
+where
+  V: ChildFrom<T, M> + 'static,
+{
+  #[inline]
+  fn from_another(value: T, ctx: &BuildCtx) -> Self {
+    BoxPipe::value(ChildFrom::child_from(value, ctx))
+  }
+}
+
+impl<T, V, M> FromAnother<T, [M; 1]> for BoxPipe<V>
+where
+  T: Pipe + 'static,
+  V: ChildFrom<T::Value, M> + 'static,
+{
+  fn from_another(value: T, ctx: &BuildCtx) -> Self {
+    let handle = ctx.handle();
+    let pipe = value.map(move |v| {
+      handle
+        .with_ctx(|ctx| ChildFrom::child_from(v, ctx))
+        .unwrap()
+    });
+    BoxPipe::pipe(Box::new(pipe))
+  }
+}
+
+impl<T, Item, V, M> FromAnother<T, [M; 2]> for BoxPipe<Vec<V>>
+where
+  T: Pipe + 'static,
+  T::Value: IntoIterator<Item = Item>,
+  V: ChildFrom<Item, M> + 'static,
+{
+  fn from_another(value: T, ctx: &BuildCtx) -> Self {
+    let handle = ctx.handle();
+    let pipe = value.map(move |v| {
+      handle
+        .with_ctx(|ctx| {
+          let v = v
+            .into_iter()
+            .map(|v| ChildFrom::child_from(v, ctx))
+            .collect::<Vec<_>>();
+          ChildFrom::child_from(v, ctx)
+        })
+        .unwrap()
+    });
+    BoxPipe::pipe(Box::new(pipe))
   }
 }
 

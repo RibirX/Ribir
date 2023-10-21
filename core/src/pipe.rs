@@ -28,37 +28,75 @@ pub trait Pipe {
   /// value.
   fn unzip(self) -> (Self::Value, ValueStream<Self::Value>);
 
-  fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>);
-
-  /// Maps an `Pipe<Value=T>` to `Pipe<Value=T>` by applying a function to the
-  /// continuous value
-  fn map<R>(self, f: impl FnMut(Self::Value) -> R + 'static) -> MapPipe<R, Self>
-  where
-    Self: Sized,
-  {
-    MapPipe { source: self, f: Box::new(f) }
-  }
-}
-
-pub(crate) trait InnerPipe: Pipe {
   /// unzip the pipe value stream with a tick sample, only for build widget use.
-  fn widget_unzip(
+  fn tick_unzip(
     self,
-    tap_before_all: impl Fn(&Window) + 'static,
+    tap_first: Box<dyn Fn(&Window)>,
     ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>);
 
-  /// Chain more operations on the pipe value stream by applying the `f` on the
-  /// final value stream. This a lazy operation, it will not execute the `f`
-  /// until the pipe is be subscribed.
-  fn final_stream_chain<F>(
-    self,
-    f: impl FnOnce(ValueStream<Self::Value>) -> ValueStream<Self::Value> + 'static,
-  ) -> FinalChain<Self::Value, Self>
+  fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>);
+
+  fn box_tick_unzip(
+    self: Box<Self>,
+    tap_first: Box<dyn Fn(&Window)>,
+    ctx: &BuildCtx,
+  ) -> (Self::Value, ValueStream<Self::Value>);
+
+  /// Maps an `Pipe<Value=T>` to `Pipe<Value=T>` by applying a function to the
+  /// continuous value
+  fn map<R, F: FnMut(Self::Value) -> R + 'static>(self, f: F) -> MapPipe<R, Self, F>
   where
     Self: Sized,
   {
-    FinalChain { source: self, f: Box::new(f) }
+    MapPipe::new(self, f)
+  }
+}
+
+/// A trait object type for `Pipe`, help to store a concrete `Pipe`
+/// or just a value.
+///
+/// This type not implement `Pipe` trait to avoid boxing the `Pipe` twice and
+/// has a better conversion from `Pipe` to `BoxPipe`.
+///
+/// Call `into_pipe` to convert it to a `Pipe` type.
+pub struct BoxPipe<V>(Box<dyn Pipe<Value = V>>);
+
+pub struct MapPipe<V, S: Pipe, F: FnMut(S::Value) -> V> {
+  source: S,
+  f: F,
+}
+
+pub struct FinalChain<V, S, F>
+where
+  S: Pipe<Value = V>,
+  F: FnOnce(ValueStream<V>) -> ValueStream<V>,
+{
+  source: S,
+  f: F,
+}
+
+impl<V: 'static> BoxPipe<V> {
+  #[inline]
+  pub fn value(v: V) -> Self { Self(Box::new(ValuePipe(v))) }
+
+  #[inline]
+  pub fn pipe(p: Box<dyn Pipe<Value = V>>) -> Self { Self(p) }
+
+  #[inline]
+  pub fn into_pipe(self) -> Box<dyn Pipe<Value = V>> { self.0 }
+}
+
+pub(crate) trait InnerPipe: Pipe {
+  /// Chain more operations on the pipe value stream by applying the `f` on the
+  /// final value stream. This a lazy operation, it will not execute the `f`
+  /// until the pipe is be subscribed.
+  fn final_stream_chain<F>(self, f: F) -> FinalChain<Self::Value, Self, F>
+  where
+    Self: Sized,
+    F: FnOnce(ValueStream<Self::Value>) -> ValueStream<Self::Value> + 'static,
+  {
+    FinalChain { source: self, f }
   }
 
   fn build(
@@ -72,42 +110,42 @@ pub(crate) trait InnerPipe: Pipe {
   {
     let id_share = Sc::new(Cell::new(ctx.tree.borrow().root()));
     let id_share2 = id_share.clone();
-    let (w, modifies) = self.widget_unzip(
-      move |wnd| wnd.mark_widgets_regenerating(id_share2.get(), None),
+    let (w, modifies) = self.tick_unzip(
+      Box::new(move |wnd| wnd.mark_widgets_regenerating(id_share2.get(), None)),
       ctx,
     );
     let w = build(w, ctx);
     id_share.set(w.id());
 
     let mut pipe_node = PipeNode::share_capture(w.id(), ctx);
+    let c_pipe_node = pipe_node.clone();
+
     let handle = ctx.handle();
 
-    let u = modifies
-      .subscribe(move |(_, w)| {
-        handle.with_ctx(|ctx| {
-          let id = id_share.get();
+    let u = modifies.subscribe(move |(_, w)| {
+      handle.with_ctx(|ctx| {
+        let id = id_share.get();
 
-          // async clean the mark when all regenerating is done to avoid other pipe
-          // regenerate in the regenerating scope.
-          let wnd = ctx.window();
-          AppCtx::spawn_local(async move { wnd.remove_regenerating_mark(id) }).unwrap();
+        // async clean the mark when all regenerating is done to avoid other pipe
+        // regenerate in the regenerating scope.
+        let wnd = ctx.window();
+        AppCtx::spawn_local(async move { wnd.remove_regenerating_mark(id) }).unwrap();
 
-          if !ctx.window().is_in_another_regenerating(id) {
-            let new_id = build(w, ctx).consume();
-            pipe_node.transplant_to(id, new_id, ctx);
-            update_key_status_single(id, new_id, ctx);
+        if !ctx.window().is_in_another_regenerating(id) {
+          let new_id = build(w, ctx).consume();
+          pipe_node.transplant_to(id, new_id, ctx);
+          update_key_status_single(id, new_id, ctx);
 
-            ctx.insert_after(id, new_id);
-            ctx.dispose_subtree(id);
-            ctx.on_subtree_mounted(new_id);
-            id_share.set(new_id);
-            ctx.mark_dirty(new_id)
-          }
-        });
-      })
-      .unsubscribe_when_dropped();
-
-    w.attach_anonymous_data(u, ctx)
+          ctx.insert_after(id, new_id);
+          ctx.dispose_subtree(id);
+          ctx.on_subtree_mounted(new_id);
+          id_share.set(new_id);
+          ctx.mark_dirty(new_id)
+        }
+      });
+    });
+    disconnect_when_dropped(c_pipe_node, w.id(), u, ctx);
+    w
   }
 
   fn build_multi(
@@ -129,12 +167,12 @@ pub(crate) trait InnerPipe: Pipe {
 
     let ids_share = Sc::new(RefCell::new(vec![]));
     let id_share2 = ids_share.clone();
-    let (m, modifies) = self.widget_unzip(
-      move |wnd| {
+    let (m, modifies) = self.tick_unzip(
+      Box::new(move |wnd| {
         for id in id_share2.borrow().iter() {
           wnd.mark_widgets_regenerating(*id, None)
         }
-      },
+      }),
       ctx,
     );
 
@@ -144,47 +182,45 @@ pub(crate) trait InnerPipe: Pipe {
     vec.extend(widgets);
 
     let mut pipe_node = PipeNode::share_capture(first, ctx);
+    let c_pipe_node = pipe_node.clone();
 
     let handle = ctx.handle();
-    let u = modifies
-      .subscribe(move |(_, m)| {
-        handle.with_ctx(|ctx| {
-          let mut old = ids_share.borrow_mut();
-          let removed_subtree = old.clone();
+    let u = modifies.subscribe(move |(_, m)| {
+      handle.with_ctx(|ctx| {
+        let mut old = ids_share.borrow_mut();
+        let removed_subtree = old.clone();
 
-          // async clean the mark when all regenerating is done to avoid other pipe
-          // regenerate in the regenerating scope.
-          let wnd = ctx.window();
-          AppCtx::spawn_local(async move {
-            for id in removed_subtree {
-              wnd.remove_regenerating_mark(id);
-            }
-          })
-          .unwrap();
-
-          if !ctx.window().is_in_another_regenerating(old[0]) {
-            let new = build_multi(m, ctx)
-              .into_iter()
-              .map(Widget::consume)
-              .collect::<Vec<_>>();
-
-            pipe_node.transplant_to(old[0], new[0], ctx);
-
-            update_key_state_multi(old.iter().copied(), new.iter().copied(), ctx);
-
-            new.iter().rev().for_each(|w| ctx.insert_after(old[0], *w));
-            old.iter().for_each(|id| ctx.dispose_subtree(*id));
-            new.iter().for_each(|w| {
-              ctx.on_subtree_mounted(*w);
-              ctx.mark_dirty(*w)
-            });
-            *old = new;
+        // async clean the mark when all regenerating is done to avoid other pipe
+        // regenerate in the regenerating scope.
+        let wnd = ctx.window();
+        AppCtx::spawn_local(async move {
+          for id in removed_subtree {
+            wnd.remove_regenerating_mark(id);
           }
-        });
-      })
-      .unsubscribe_when_dropped();
+        })
+        .unwrap();
 
-    first.attach_anonymous_data(u, &mut ctx.tree.borrow_mut().arena);
+        if !ctx.window().is_in_another_regenerating(old[0]) {
+          let new = build_multi(m, ctx)
+            .into_iter()
+            .map(Widget::consume)
+            .collect::<Vec<_>>();
+
+          pipe_node.transplant_to(old[0], new[0], ctx);
+
+          update_key_state_multi(old.iter().copied(), new.iter().copied(), ctx);
+
+          new.iter().rev().for_each(|w| ctx.insert_after(old[0], *w));
+          old.iter().for_each(|id| ctx.dispose_subtree(*id));
+          new.iter().for_each(|w| {
+            ctx.on_subtree_mounted(*w);
+            ctx.mark_dirty(*w)
+          });
+          *old = new;
+        }
+      });
+    });
+    disconnect_when_dropped(c_pipe_node, first, u, ctx);
   }
 
   fn only_parent_build(
@@ -200,73 +236,76 @@ pub(crate) trait InnerPipe: Pipe {
     let id_share = Sc::new(RefCell::new(root..root));
     let id_share2 = id_share.clone();
 
-    let (v, modifies) = self.widget_unzip(
-      move |wnd| {
+    let (v, modifies) = self.tick_unzip(
+      Box::new(move |wnd| {
         let rg = id_share2.borrow().clone();
         wnd.mark_widgets_regenerating(rg.start, Some(rg.end))
-      },
+      }),
       ctx,
     );
     let (p, child) = compose_child(v);
     let parent = half_to_close_interval(p.id()..child, ctx);
     let mut pipe_node = PipeNode::share_capture(parent.start, ctx);
+    let c_pipe_node = pipe_node.clone();
     *id_share.borrow_mut() = parent;
 
     let handle = ctx.handle();
 
-    let u = modifies
-      .subscribe(move |(_, w)| {
-        handle.with_ctx(|ctx| {
-          let rg = id_share.borrow().clone();
+    let u = modifies.subscribe(move |(_, w)| {
+      handle.with_ctx(|ctx| {
+        let rg = id_share.borrow().clone();
 
-          let wnd = ctx.window();
-          // async clean the mark when all regenerating is done to avoid other pipe
-          // regenerate in the regenerating scope.
-          AppCtx::spawn_local(async move { wnd.remove_regenerating_mark(rg.start) }).unwrap();
+        let wnd = ctx.window();
+        // async clean the mark when all regenerating is done to avoid other pipe
+        // regenerate in the regenerating scope.
+        AppCtx::spawn_local(async move { wnd.remove_regenerating_mark(rg.start) }).unwrap();
 
-          if !ctx.window().is_in_another_regenerating(rg.start) {
-            let first_child = rg.end.first_child(&ctx.tree.borrow().arena).unwrap();
-            let p = transplant(w, rg.end, ctx);
-            let new_rg = half_to_close_interval(p..first_child, ctx);
-            pipe_node.transplant_to(rg.start, new_rg.start, ctx);
+        if !ctx.window().is_in_another_regenerating(rg.start) {
+          let first_child = rg.end.first_child(&ctx.tree.borrow().arena).unwrap();
+          let p = transplant(w, rg.end, ctx);
+          let new_rg = half_to_close_interval(p..first_child, ctx);
+          pipe_node.transplant_to(rg.start, new_rg.start, ctx);
 
-            update_key_status_single(rg.start, new_rg.start, ctx);
+          update_key_status_single(rg.start, new_rg.start, ctx);
 
-            ctx.insert_after(rg.start, new_rg.start);
-            ctx.dispose_subtree(rg.start);
-            new_rg
-              .end
-              .ancestors(&ctx.tree.borrow().arena)
-              .take_while(|w| w != &new_rg.start)
-              .for_each(|p| ctx.on_widget_mounted(p));
+          ctx.insert_after(rg.start, new_rg.start);
+          ctx.dispose_subtree(rg.start);
+          new_rg
+            .end
+            .ancestors(&ctx.tree.borrow().arena)
+            .take_while(|w| w != &new_rg.start)
+            .for_each(|p| ctx.on_widget_mounted(p));
 
-            ctx.mark_dirty(new_rg.start);
-            *id_share.borrow_mut() = new_rg;
-          }
-        });
-      })
-      .unsubscribe_when_dropped();
-
-    p.id()
-      .attach_anonymous_data(u, &mut ctx.tree.borrow_mut().arena);
+          ctx.mark_dirty(new_rg.start);
+          *id_share.borrow_mut() = new_rg;
+        }
+      });
+    });
+    disconnect_when_dropped(c_pipe_node, p.id(), u, ctx);
     p
   }
 }
 
-pub struct MapPipe<V, S: Pipe> {
-  source: S,
-  f: Box<dyn FnMut(S::Value) -> V>,
-}
-
-pub struct FinalChain<V, S: Pipe<Value = V>> {
-  source: S,
-  f: Box<dyn FnOnce(ValueStream<V>) -> ValueStream<V>>,
-}
-
-impl<S: Pipe, V> MapPipe<V, S> {
-  pub fn new(source: S, f: impl FnMut(S::Value) -> V + 'static) -> Self {
-    Self { source, f: Box::new(f) }
+fn disconnect_when_dropped(
+  mut node: PipeNode,
+  id: WidgetId,
+  u: impl Subscription + 'static,
+  ctx: &BuildCtx,
+) {
+  let tree = &mut ctx.tree.borrow_mut().arena;
+  if u.is_closed() {
+    // if the subscription is closed, we can cancel and unwrap the `PipeNode`
+    // immediately.
+    let v = std::mem::replace(node.as_mut(), Box::new(Void));
+    *id.get_node_mut(tree).unwrap() = v;
+  } else {
+    id.attach_anonymous_data(u.unsubscribe_when_dropped(), tree)
   }
+}
+
+impl<S: Pipe, V, F: FnMut(S::Value) -> V + 'static> MapPipe<V, S, F> {
+  #[inline]
+  pub fn new(source: S, f: F) -> Self { Self { source, f } }
 }
 
 pub struct ModifiesPipe(BoxOp<'static, ModifyScope, Infallible>);
@@ -287,12 +326,10 @@ impl Pipe for ModifiesPipe {
   }
 
   fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).unzip() }
-}
 
-impl InnerPipe for ModifiesPipe {
-  fn widget_unzip(
+  fn tick_unzip(
     self,
-    tap_before_all: impl Fn(&Window) + 'static,
+    tap_first: Box<dyn Fn(&Window)>,
     ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     let wnd_id = ctx.window().id();
@@ -301,7 +338,7 @@ impl InnerPipe for ModifiesPipe {
       .filter(|s| s.contains(ModifyScope::FRAMEWORK))
       .tap(move |_| {
         if let Some(wnd) = AppCtx::get_window(wnd_id) {
-          tap_before_all(&wnd)
+          tap_first(&wnd)
         }
       })
       .sample(
@@ -312,13 +349,55 @@ impl InnerPipe for ModifiesPipe {
       )
       .map(|s| (s, s))
       .box_it();
+
     (ModifyScope::empty(), stream)
   }
+
+  fn box_tick_unzip(
+    self: Box<Self>,
+    tap_first: Box<dyn Fn(&Window)>,
+    ctx: &BuildCtx,
+  ) -> (Self::Value, ValueStream<Self::Value>) {
+    (*self).tick_unzip(tap_first, ctx)
+  }
 }
 
-impl<V: 'static, S: Pipe> Pipe for MapPipe<V, S>
+impl InnerPipe for ModifiesPipe {}
+
+impl<V> Pipe for Box<dyn Pipe<Value = V>> {
+  type Value = V;
+
+  #[inline]
+  fn unzip(self) -> (Self::Value, ValueStream<Self::Value>) { self.box_unzip() }
+
+  #[inline]
+  fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).box_unzip() }
+
+  #[inline]
+  fn tick_unzip(
+    self,
+    tap_first: Box<dyn Fn(&Window)>,
+    ctx: &BuildCtx,
+  ) -> (Self::Value, ValueStream<Self::Value>) {
+    self.box_tick_unzip(tap_first, ctx)
+  }
+
+  #[inline]
+  fn box_tick_unzip(
+    self: Box<Self>,
+    tap_first: Box<dyn Fn(&Window)>,
+    ctx: &BuildCtx,
+  ) -> (Self::Value, ValueStream<Self::Value>) {
+    (*self).box_tick_unzip(tap_first, ctx)
+  }
+}
+
+impl<V> InnerPipe for Box<dyn Pipe<Value = V>> {}
+
+impl<V: 'static, S: Pipe, F> Pipe for MapPipe<V, S, F>
 where
   S::Value: 'static,
+  F: FnMut(S::Value) -> V + 'static,
 {
   type Value = V;
 
@@ -328,78 +407,140 @@ where
     (f(v), stream.map(move |(s, v)| (s, f(v))).box_it())
   }
 
+  #[inline]
   fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).unzip() }
-}
 
-impl<V: 'static, S: InnerPipe> InnerPipe for MapPipe<V, S>
-where
-  S::Value: 'static,
-{
-  fn widget_unzip(
+  fn tick_unzip(
     self,
-    tap_before_all: impl Fn(&Window) + 'static,
+    tap_first: Box<dyn Fn(&Window)>,
     ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     let Self { source, mut f } = self;
-    let (v, stream) = source.widget_unzip(tap_before_all, ctx);
+    let (v, stream) = source.tick_unzip(tap_first, ctx);
     (f(v), stream.map(move |(s, v)| (s, f(v))).box_it())
+  }
+
+  #[inline]
+  fn box_tick_unzip(
+    self: Box<Self>,
+    tap_first: Box<dyn Fn(&Window)>,
+    ctx: &BuildCtx,
+  ) -> (Self::Value, ValueStream<Self::Value>) {
+    (*self).tick_unzip(tap_first, ctx)
   }
 }
 
-impl<V, S: Pipe<Value = V>> Pipe for FinalChain<V, S> {
+impl<V: 'static, S: InnerPipe, F> InnerPipe for MapPipe<V, S, F>
+where
+  S::Value: 'static,
+  F: FnMut(S::Value) -> V + 'static,
+{
+}
+
+impl<V, S, F> Pipe for FinalChain<V, S, F>
+where
+  S: Pipe<Value = V>,
+  F: FnOnce(ValueStream<V>) -> ValueStream<V> + 'static,
+{
   type Value = V;
 
-  fn unzip(self) -> (Self::Value, ValueStream<Self::Value>) {
+  fn unzip(self) -> (V, ValueStream<V>) {
     let Self { source, f } = self;
     let (v, stream) = source.unzip();
     (v, f(stream))
   }
 
-  fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).unzip() }
-}
+  #[inline]
+  fn box_unzip(self: Box<Self>) -> (V, ValueStream<V>) { (*self).unzip() }
 
-impl<V, S: InnerPipe<Value = V>> InnerPipe for FinalChain<V, S> {
-  fn widget_unzip(
+  fn tick_unzip(
     self,
-    tap_before_all: impl Fn(&Window) + 'static,
+    tap_first: Box<dyn Fn(&Window)>,
     ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     let Self { source, f } = self;
-    let (v, stream) = source.widget_unzip(tap_before_all, ctx);
+    let (v, stream) = source.tick_unzip(tap_first, ctx);
     (v, f(stream))
   }
-}
 
-crate::widget::multi_build_replace_impl! {
-  impl<V: {#} + 'static, S: InnerPipe> {#} for MapPipe<V, S>
-  where
-    S::Value: 'static,
-  {
-    fn widget_build(self, ctx: &BuildCtx) -> Widget {
-      self.build(ctx, |w, ctx| w.widget_build(ctx))
-    }
-  }
-
-  impl<V: {#} + 'static, S: InnerPipe<Value = V>> {#} for FinalChain<V, S>
-  where
-    S::Value: 'static,
-  {
-    fn widget_build(self, ctx: &BuildCtx) -> Widget {
-      self.build(ctx, |w, ctx| w.widget_build(ctx))
-    }
+  #[inline]
+  fn box_tick_unzip(
+    self: Box<Self>,
+    tap_first: Box<dyn Fn(&Window)>,
+    ctx: &BuildCtx,
+  ) -> (Self::Value, ValueStream<Self::Value>) {
+    (*self).tick_unzip(tap_first, ctx)
   }
 }
 
-impl<S> WidgetBuilder for MapPipe<Widget, S>
+impl<V, S, F> InnerPipe for FinalChain<V, S, F>
 where
-  S: InnerPipe,
-  S::Value: 'static,
+  S: InnerPipe<Value = V>,
+  F: FnOnce(ValueStream<V>) -> ValueStream<V> + 'static,
 {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.build(ctx, |v, _| v) }
 }
 
-impl<S: InnerPipe<Value = Widget>> WidgetBuilder for FinalChain<Widget, S> {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.build(ctx, |v, _| v) }
+/// A pipe that never changes, help to construct a pipe from a value.
+struct ValuePipe<V>(V);
+
+impl<V> Pipe for ValuePipe<V> {
+  type Value = V;
+
+  fn unzip(self) -> (Self::Value, ValueStream<Self::Value>) {
+    (self.0, observable::empty().box_it())
+  }
+
+  #[inline]
+  fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).unzip() }
+
+  fn tick_unzip(
+    self,
+    _: Box<dyn Fn(&Window)>,
+    _: &BuildCtx,
+  ) -> (Self::Value, ValueStream<Self::Value>) {
+    self.unzip()
+  }
+
+  #[inline]
+  fn box_tick_unzip(
+    self: Box<Self>,
+    tap_first: Box<dyn Fn(&Window)>,
+    ctx: &BuildCtx,
+  ) -> (Self::Value, ValueStream<Self::Value>) {
+    (*self).tick_unzip(tap_first, ctx)
+  }
+}
+
+crate::widget::multi_build_replace_impl_include_self! {
+  impl<V, S, F> {#} for MapPipe<V, S, F>
+  where
+    V: {#} + 'static,
+    S: InnerPipe,
+    S::Value: 'static,
+    F: FnMut(S::Value) -> V + 'static,
+  {
+    fn widget_build(self, ctx: &BuildCtx) -> Widget {
+      self.build(ctx, |w, ctx| w.widget_build(ctx))
+    }
+  }
+
+  impl<V, S, F> {#} for FinalChain<V, S, F>
+  where
+    V: {#} + 'static,
+    S: InnerPipe<Value = V>,
+    F: FnOnce(ValueStream<V>) -> ValueStream<V> + 'static,
+  {
+    fn widget_build(self, ctx: &BuildCtx) -> Widget {
+      self.build(ctx, |w, ctx| w.widget_build(ctx))
+    }
+  }
+
+  impl<V: {#} + 'static> {#} for Box<dyn Pipe<Value = V>>
+  {
+    fn widget_build(self, ctx: &BuildCtx) -> Widget {
+      self.build(ctx, |w, ctx| w.widget_build(ctx))
+    }
+  }
 }
 
 macro_rules! pipe_option_to_widget {
@@ -440,21 +581,26 @@ macro_rules! single_parent_impl {
   };
 }
 
-impl<V, S> SingleParent for MapPipe<V, S>
+impl<V, S, F> SingleParent for MapPipe<V, S, F>
 where
   S: InnerPipe,
   V: SingleParent + RenderBuilder + 'static,
   S::Value: 'static,
+  F: FnMut(S::Value) -> V + 'static,
 {
   single_parent_impl!();
 }
 
-impl<V, S> SingleParent for FinalChain<V, S>
+impl<V, S, F> SingleParent for FinalChain<V, S, F>
 where
   S: InnerPipe<Value = V>,
   V: SingleParent + RenderBuilder + 'static,
-  S::Value: 'static,
+  F: FnOnce(ValueStream<V>) -> ValueStream<V> + 'static,
 {
+  single_parent_impl!();
+}
+
+impl<V: SingleParent + RenderBuilder + 'static> SingleParent for Box<dyn Pipe<Value = V>> {
   single_parent_impl!();
 }
 
@@ -491,18 +637,26 @@ macro_rules! multi_parent_impl {
   };
 }
 
-impl<V, S> MultiParent for MapPipe<V, S>
+impl<V, S, F> MultiParent for MapPipe<V, S, F>
 where
   S: InnerPipe,
   V: MultiParent + RenderBuilder + 'static,
   S::Value: 'static,
+  F: FnMut(S::Value) -> V + 'static,
 {
   multi_parent_impl!();
 }
 
-impl<V: MultiParent + RenderBuilder + 'static, S: InnerPipe<Value = V>> MultiParent
-  for FinalChain<V, S>
+impl<V, S, F> MultiParent for FinalChain<V, S, F>
+where
+  V: MultiParent + RenderBuilder + 'static,
+  S: InnerPipe<Value = V>,
+  F: FnOnce(ValueStream<V>) -> ValueStream<V> + 'static,
 {
+  multi_parent_impl!();
+}
+
+impl<V: MultiParent + RenderBuilder + 'static> MultiParent for Box<dyn Pipe<Value = V>> {
   multi_parent_impl!();
 }
 
@@ -526,20 +680,28 @@ macro_rules! option_single_parent_impl {
   };
 }
 
-impl<V, S> SingleParent for MapPipe<Option<V>, S>
+impl<V, S, F> SingleParent for MapPipe<Option<V>, S, F>
 where
   S: InnerPipe,
   V: SingleParent + RenderBuilder + 'static,
   S::Value: 'static,
+  F: FnMut(S::Value) -> Option<V> + 'static,
 {
   option_single_parent_impl!();
 }
 
-impl<V, S> SingleParent for FinalChain<Option<V>, S>
+impl<V, S, F> SingleParent for FinalChain<Option<V>, S, F>
 where
   S: InnerPipe<Value = Option<V>>,
   V: SingleParent + RenderBuilder + 'static,
-  S::Value: 'static,
+  F: FnOnce(ValueStream<Option<V>>) -> ValueStream<Option<V>> + 'static,
+{
+  option_single_parent_impl!();
+}
+
+impl<V> SingleParent for Box<dyn Pipe<Value = Option<V>>>
+where
+  V: SingleParent + RenderBuilder + 'static,
 {
   option_single_parent_impl!();
 }
@@ -654,10 +816,20 @@ fn update_key_states(
   update_children_key_status(old, new, ctx)
 }
 
-impl<S: Pipe, V: SingleChild> SingleChild for MapPipe<V, S> {}
-impl<S: Pipe<Value = V>, V: MultiChild> MultiChild for FinalChain<V, S> {}
-impl<S: Pipe, V: SingleChild> SingleChild for MapPipe<Option<V>, S> {}
-impl<S: Pipe<Value = Option<V>>, V: MultiChild> MultiChild for FinalChain<Option<V>, S> {}
+impl<S: Pipe, V: SingleChild, F: FnMut(S::Value) -> V + 'static> SingleChild for MapPipe<V, S, F> {}
+impl<S, V, F> MultiChild for FinalChain<V, S, F>
+where
+  S: Pipe<Value = V>,
+  V: MultiChild,
+  F: FnOnce(ValueStream<V>) -> ValueStream<V>,
+{
+}
+impl<S: Pipe, V: SingleChild, F: FnMut(S::Value) -> Option<V> + 'static> SingleChild
+  for MapPipe<Option<V>, S, F>
+{
+}
+impl<V: SingleChild> SingleChild for Box<dyn Pipe<Value = V>> {}
+impl<V: MultiChild> MultiChild for Box<dyn Pipe<Value = V>> {}
 
 /// `PipeNode` just use to wrap a `Box<dyn Render>`, and provide a choice to
 /// change the inner `Box<dyn Render>` by `UnsafeCell` at a safe time. It's
@@ -1216,5 +1388,22 @@ mod tests {
     *c_child_destroy_until.write() = true;
     wnd.draw_frame();
     assert!(grandson_id.is_dropped(&tree_arena(&wnd)));
+  }
+
+  #[test]
+  fn value_pipe() {
+    reset_test_env!();
+    let hit = State::value(-1);
+
+    let v = BoxPipe::value(0);
+    let (v, s) = v.into_pipe().unzip();
+
+    assert_eq!(v, 0);
+
+    let c_hit = hit.clone_writer();
+    let u = s.subscribe(move |_| *c_hit.write() += 1);
+
+    assert_eq!(*hit.read(), -1);
+    assert!(u.is_closed());
   }
 }

@@ -67,31 +67,32 @@ impl Compose for Todos {
 impl Todos {
   fn pane(this: impl StateWriter<Value = Self>, cond: fn(&Task) -> bool) -> impl WidgetBuilder {
     fn_widget! {
-      // todo: pipe only for list items, not lists
-      @VScrollBar { @ { pipe! {
+      @VScrollBar { @ {
         let mount_task_cnt = Stateful::new(0);
-
         @Lists {
           // when performed layout, means all task are mounted, we reset the mount count.
           on_performed_layout: move |_| *$mount_task_cnt.write() = 0,
           padding: EdgeInsets::vertical(8.),
           @ {
-            $this
+            pipe!($this;).map(move |_| {
+              $this
               .tasks
               .iter()
               .enumerate()
               .filter_map(move |(idx, task)| { cond(task).then_some(idx) })
               .map(move |idx| {
                 let task = split_writer!($this.tasks[idx]);
-                let mut key = @KeyWidget { key: $task.id, value: () };
+                let key = @KeyWidget { key: $task.id, value: () };
                 let mount_idx = Stateful::new(0);
 
+                let mut item = @ListItem {};
                 let mount_animate = @Animate {
-                  state: map_writer!($key.transform),
+                  state: map_writer!($item.transform),
                   from: Transform::translation(-400., 0. ),
                 };
-                @ $key {
-                  @ListItem {
+
+                @$key {
+                  @$item {
                     on_mounted: move |_| if $key.is_enter() {
                       *$mount_idx.write() = *$mount_task_cnt;
                       *$mount_task_cnt.write() += 1;
@@ -117,17 +118,18 @@ impl Todos {
                     }
                     @Trailing {
                       cursor: CursorIcon::Hand,
-                      visible: $key.mouse_hover(),
+                      visible: $item.mouse_hover(),
                       on_tap: move |_| { $this.write().tasks.remove(idx); },
                       @{ svgs::CLOSE }
                     }
                   }
                 }
               }).collect::<Vec<_>>()
+            })
           }
 
         }
-      }}}
+      }}
     }
   }
 

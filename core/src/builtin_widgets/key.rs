@@ -40,6 +40,41 @@ impl<V: Default> Default for KeyChange<V> {
 /// frames by its key. If two widget has same parent and key in two frames, the
 /// new widget in the next frame will be treated as the same widget in the last
 /// frame.
+///
+/// ## Notice
+///
+/// You should always keep the `KeyWidget` is the root of a `Pipe` widget. And
+/// not use builtin fields for `KeyWidget`. For example:
+///
+/// ```rust
+/// use ribir_core::prelude::*;
+///  
+/// let trigger = State::value(0);
+///
+/// // This widget will be tracked by `Key`, `Pipe` know itself generate `KeyWidget`
+/// fn_widget!{
+///   @ {
+///     pipe!($trigger;).map(move |_| @KeyWidget {
+///       key: "key",
+///       value: (),
+///       @Void {}
+///     })
+///   }
+/// };
+///
+/// let trigger = State::value(0);
+/// // This widget will not be tracked by `Key`, `Pipe` don't know itself
+/// // generate `KeyWidget`, because the root of generated widget is `Margin`.
+/// fn_widget!{
+///   @ {
+///     pipe!($trigger;).map(move |_| @KeyWidget {
+///       margin: EdgeInsets::all(10.),
+///       key: "key",
+///       value: (),
+///       @Void {}
+///     })
+///   }
+/// };
 #[derive(Declare)]
 pub struct KeyWidget<V: 'static> {
   pub key: Key,

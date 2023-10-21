@@ -421,12 +421,13 @@ pub fn load_font_from_theme(theme: &Theme, font_db: &mut FontDB) {
 impl Drop for AppCtxScopeGuard {
   fn drop(&mut self) {
     let ctx = AppCtx::shared();
-    ctx.windows.borrow_mut().clear();
 
-    while !ctx.triggers.borrow().is_empty() {
-      // drop task may generate new trigger task, use a vector to collect the tasks
-      // to delay drop these tasks after the borrow scope.
-      let _vec = ctx.triggers.borrow_mut().drain().collect::<Vec<_>>();
+    {
+      // clear resources may introduce new triggers, so keep it to delay release.
+      let _windows = std::mem::take(&mut *ctx.windows.borrow_mut());
+      while !ctx.triggers.borrow().is_empty() {
+        let _vec = std::mem::take(&mut *ctx.triggers.borrow_mut());
+      }
     }
 
     // Safety: this guard guarantee only one thread can access the `AppCtx`.

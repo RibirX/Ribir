@@ -1,4 +1,4 @@
-use crate::{context::BuildCtx, pipe::Pipe, state::ModifyScope};
+use crate::{context::BuildCtx, pipe::Pipe, prelude::BoxPipe, state::ModifyScope};
 use rxrust::ops::box_it::BoxOp;
 use std::convert::Infallible;
 
@@ -21,7 +21,7 @@ pub trait DeclareBuilder {
 /// The type use to store the init value of the field when declare a object.
 pub enum DeclareInit<V> {
   Value(V),
-  Pipe(Box<dyn Pipe<Value = V>>),
+  Pipe(BoxPipe<V>),
 }
 
 type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
@@ -31,7 +31,7 @@ impl<V: 'static> DeclareInit<V> {
     match self {
       Self::Value(v) => (v, None),
       Self::Pipe(v) => {
-        let (v, pipe) = v.box_unzip();
+        let (v, pipe) = v.into_pipe().unzip();
         (v, Some(pipe))
       }
     }
@@ -57,5 +57,8 @@ where
   V: From<P::Value> + 'static,
 {
   #[inline]
-  fn declare_from(value: P) -> Self { Self::Pipe(Box::new(Pipe::map(value, |v| v.into()))) }
+  fn declare_from(value: P) -> Self {
+    let pipe = Box::new(value.map(Into::into));
+    Self::Pipe(BoxPipe::pipe(pipe))
+  }
 }
