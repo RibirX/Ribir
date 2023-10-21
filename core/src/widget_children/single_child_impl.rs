@@ -1,4 +1,4 @@
-use crate::pipe::{InnerPipe, MapPipe};
+use crate::pipe::InnerPipe;
 
 use super::*;
 
@@ -36,16 +36,15 @@ crate::widget::multi_build_replace_impl_include_self! {
 }
 
 crate::widget::multi_build_replace_impl_include_self! {
-  impl<P, V, S> SingleWithChild<MapPipe<Option<V>, S>, dyn {#}> for P
+  impl<P, V, PP> SingleWithChild<PP, &dyn {#}> for P
   where
     P: SingleParent + {#},
-    S: InnerPipe,
+    PP: InnerPipe<Value=Option<V>>,
     V: {#} + 'static,
-    S::Value: 'static,
   {
     type Target = Widget;
 
-    fn with_child(self, child: MapPipe<Option<V>, S>, ctx: &BuildCtx) -> Self::Target {
+    fn with_child(self, child: PP, ctx: &BuildCtx) -> Self::Target {
       let child = crate::pipe::pipe_option_to_widget!(child, ctx);
       self.with_child(child, ctx)
     }

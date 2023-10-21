@@ -1,8 +1,5 @@
 use super::*;
-use crate::{
-  pipe::{FinalChain, InnerPipe, MapPipe},
-  widget::WidgetBuilder,
-};
+use crate::{pipe::InnerPipe, widget::WidgetBuilder};
 
 /// Trait specify what child a multi child widget can have, and the target type
 /// after widget compose its child.
@@ -39,21 +36,9 @@ crate::widget::multi_build_replace_impl_include_self! {
 }
 
 crate::widget::multi_build_replace_impl_include_self! {
-  impl<V, S> FillVec<&dyn {#}> for MapPipe<V, S>
+  impl<T, V> FillVec<&&dyn {#}> for T
   where
-    S: InnerPipe,
-    S::Value: 'static,
-    V: IntoIterator + 'static,
-    V::Item: {#},
-  {
-    fn fill_vec(self, vec: &mut Vec<Widget>, ctx: &BuildCtx) {
-      self.build_multi(vec, |v, ctx| v.widget_build(ctx), ctx);
-    }
-  }
-
-  impl<V, S> FillVec<&dyn {#}> for FinalChain<V, S>
-  where
-    S: InnerPipe<Value = V>,
+    T: InnerPipe<Value=V>,
     V: IntoIterator + 'static,
     V::Item: {#},
   {

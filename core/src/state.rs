@@ -218,6 +218,8 @@ impl<W> State<W> {
   }
 }
 
+// todo: We should use `BoxPipe<T>` to replace `State<T>` as the dynamic child.
+// remove it after no widget use `State<T>` Child.
 pub(crate) trait StateFrom<V> {
   fn state_from(value: V) -> Self;
 }

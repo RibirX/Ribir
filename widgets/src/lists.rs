@@ -131,12 +131,12 @@ impl ComposeDecorator for ListsDecorator {
 }
 
 impl ComposeChild for Lists {
-  type Child = Vec<Widget>;
+  type Child = BoxPipe<Vec<Widget>>;
 
   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ListsDecorator {
-        @Column { @ { child } }
+        @Column { @ { child.into_pipe() } }
       }
     }
   }
