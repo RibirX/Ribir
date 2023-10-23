@@ -49,7 +49,7 @@ derive_more = "0.99.17"
 dssim-core = "3.2.6"
 env_logger = "0.7.1"
 euclid = "0.22.6"
-fontdb = "0.14.1"
+fontdb = "0.15.0"
 futures = "0.3.26"
 guillotiere = "0.6.0"
 image = {version = "0.24.5", default-features = false}
