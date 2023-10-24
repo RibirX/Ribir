@@ -1,4 +1,4 @@
-#![feature(test, return_position_impl_trait_in_trait)]
+#![feature(test)]
 
 pub mod avatar;
 pub mod buttons;

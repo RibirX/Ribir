@@ -1,4 +1,3 @@
-#![feature(return_position_impl_trait_in_trait)]
 use ribir::core::test_helper::*;
 use ribir::prelude::*;
 use ribir_dev_helper::*;

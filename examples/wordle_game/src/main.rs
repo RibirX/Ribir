@@ -1,4 +1,4 @@
-#![feature(test, return_position_impl_trait_in_trait)]
+#![feature(test)]
 
 use ribir::prelude::*;
 use ribir_dev_helper::*;

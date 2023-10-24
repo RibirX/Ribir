@@ -4,7 +4,7 @@ All the examples in this folder use the macro `example_framework!` to startup, t
 
 Run examples:
 
-```
+``` sh
 cargo run -p storybook --features="wgpu"
 ```
 
