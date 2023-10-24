@@ -49,7 +49,7 @@ impl ComposeChild for TextEditorArea {
       };
 
       let scrollable = container.get_builtin_scrollable_widget(ctx!());
-      watch!(Point::new($caret.left_anchor.abs_value(1.), $caret.top_anchor.abs_value(1.)))
+      watch!(Point::new($caret.left_anchor, $caret.top_anchor))
         .scan_initial((Point::zero(), Point::zero()), |pair, v| (pair.1, v))
         .subscribe(move |(before, after)| {
           let mut scrollable = $scrollable.silent();
@@ -76,8 +76,8 @@ impl ComposeChild for TextEditorArea {
         .sample(tick_of_layout_ready)
         .subscribe(move |_| {
           let (offset, height) = $selectable.cursor_layout();
-          $caret.write().top_anchor = PositionUnit::Pixel(offset.y);
-          $caret.write().left_anchor = PositionUnit::Pixel(offset.x);
+          $caret.write().top_anchor = offset.y;
+          $caret.write().left_anchor = offset.x;
           $caret.write().height = height;
         });
 
