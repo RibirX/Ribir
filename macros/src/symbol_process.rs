@@ -633,7 +633,7 @@ impl<'a> Drop for StackGuard<'a> {
 impl Default for DollarRefsCtx {
   fn default() -> Self {
     Self {
-      scopes: smallvec![DollarRefsScope::default()],
+      scopes: smallvec![],
       capture_level_heads: smallvec![],
       variable_stacks: vec![vec![]],
     }
