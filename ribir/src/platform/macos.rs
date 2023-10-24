@@ -58,7 +58,7 @@ declare_class!(
         let event: *mut Object = msg_send![event, paramDescriptorForKeyword: keyDirectObject];
         let nsstring: *mut Object = msg_send![event, stringValue];
         let cstr: *const i8 = msg_send![nsstring, UTF8String];
-        if cstr != std::ptr::null() {
+        if cstr.is_null() {
           std::ffi::CStr::from_ptr(cstr)
         } else {
           return;

@@ -4,10 +4,8 @@ Example of a wordle game.
 
 You can run with:
 
-```
-
+``` sh
 cargo run -p wordle_game
-
 ```
 
 ## How to play
@@ -17,7 +15,7 @@ To start the game, just enter the word and press 'Enter' to submit, for example:
 
 <img src="./wordle_guess.png" width="332" height="69"/>
 
-```
+``` text
 Pink color like O and T, hint that not the letter in the target word at all.
 Light orange color like R, hint that the letter in the word but in the wrong spot.
 Green color like B and I, hint that the letter in the word and in the correct spot.

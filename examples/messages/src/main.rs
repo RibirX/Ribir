@@ -1,4 +1,4 @@
-#![feature(test, return_position_impl_trait_in_trait)]
+#![feature(test)]
 
 mod messages;
 use messages::messages;

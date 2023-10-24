@@ -1,4 +1,4 @@
-#![feature(decl_macro, return_position_impl_trait_in_trait)]
+#![feature(decl_macro)]
 #![cfg_attr(test, feature(mutex_unpoison, test))]
 
 #[macro_use]

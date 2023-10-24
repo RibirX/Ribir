@@ -489,7 +489,7 @@ impl FocusManager {
 
   pub fn refresh_focus(&mut self) {
     self.refresh();
-    if self.focus_widgets.get(0) != self.focusing.as_ref() {
+    if self.focus_widgets.first() != self.focusing.as_ref() {
       self.change_focusing_to(self.focusing);
     }
   }

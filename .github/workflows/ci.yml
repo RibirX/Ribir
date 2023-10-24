@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly-2023-09-14
+          toolchain: nightly-2023-10-15
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: format style check
@@ -34,3 +34,17 @@ jobs:
     name: Test Suite
     needs: lint
     uses: RibirX/share-workflows/.github/workflows/ribir-win-image-tests.yaml@main
+  doc-examples:
+    name: compile doc examples
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly-2023-10-15
+      - uses: Swatinem/rust-cache@v2
+      - name: build ribir
+        run: cargo build
+      - name: compile doc examples
+        run: find "./docs" -name "*.md" |  xargs -I {} rustdoc -Z unstable-options --test --no-run  {} -L target/debug/deps/  --edition 2018 --extern ribir=target/debug/libribir.rlib
