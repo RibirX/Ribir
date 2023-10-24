@@ -845,3 +845,11 @@ fn no_watch() {
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
 }
+
+#[test]
+fn fix_direct_use_map_writer_with_builtin() {
+  fn _x(mut host: FatObj<Void>, ctx!(): &BuildCtx) {
+    let _left = map_writer!($host.left_anchor);
+    let _left = split_writer!($host.left_anchor);
+  }
+}
