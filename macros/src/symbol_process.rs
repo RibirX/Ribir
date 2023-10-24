@@ -605,10 +605,15 @@ struct DollarMacro {
 
 impl Parse for DollarMacro {
   fn parse(input: ParseStream) -> syn::Result<Self> {
-    Ok(Self {
-      _dollar: input.parse()?,
-      name: input.parse()?,
-    })
+    let _dollar = input.parse()?;
+    let name = if input.peek(syn::token::SelfValue) {
+      let name = input.parse::<syn::token::SelfValue>()?;
+      Ident::new("self", name.span())
+    } else {
+      input.parse::<Ident>()?
+    };
+
+    Ok(Self { _dollar, name })
   }
 }
 
