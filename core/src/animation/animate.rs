@@ -10,34 +10,11 @@ where
   pub transition: Box<dyn Roc>,
   #[declare(strict)]
   pub state: S,
-  pub from: <S::State as StateReader>::Value,
+  pub from: S::Value,
   #[declare(skip)]
-  running_info: Option<AnimateInfo<<S::State as StateReader>::Value>>,
+  running_info: Option<AnimateInfo<S::Value>>,
   #[declare(skip, default = ctx!().window().id())]
   window_id: WindowId,
-}
-
-pub trait AnimateState {
-  type State: StateWriter;
-  fn state(&self) -> &Self::State;
-
-  fn calc_lerp_value(
-    &mut self,
-    from: &<Self::State as StateReader>::Value,
-    to: &<Self::State as StateReader>::Value,
-    rate: f32,
-  ) -> <Self::State as StateReader>::Value;
-}
-
-/// A state with a lerp function as an animation state that use the `lerp_fn`
-/// function to calc the linearly lerp value by rate, and not require the value
-/// type of the state to implement the `Lerp` trait.
-///
-/// User can use it if the value type of the state is not implement the `Lerp`
-/// or override the lerp algorithm of the value type of state.
-pub struct LerpFnState<S, F> {
-  lerp_fn: F,
-  state: S,
 }
 
 pub(crate) struct AnimateInfo<V> {
@@ -53,13 +30,12 @@ pub(crate) struct AnimateInfo<V> {
 pub trait AnimateRun<S>: StateWriter<Value = Animate<S>>
 where
   S: AnimateState + 'static,
-  <S::State as StateReader>::Value: Clone,
 {
   fn run(&self) {
     let mut animate_ref = self.write();
     let this = &mut *animate_ref;
     let wnd_id = this.window_id;
-    let new_to = this.state.state().read().clone();
+    let new_to = this.state.get();
 
     if let Some(AnimateInfo { from, to, last_progress, .. }) = &mut this.running_info {
       *from = this.state.calc_lerp_value(from, to, last_progress.value());
@@ -90,7 +66,7 @@ where
           FrameMsg::Finish(_) => {
             let animate = &mut *animate.silent();
             let info = animate.running_info.as_mut().unwrap();
-            *animate.state.state().shallow() = info.to.clone();
+            animate.state.set(info.to.clone());
             info.already_lerp = false;
           }
         }
@@ -113,7 +89,6 @@ where
 impl<S, T> AnimateRun<S> for T
 where
   S: AnimateState + 'static,
-  <S::State as StateReader>::Value: Clone,
   T: StateWriter<Value = Animate<S>>,
 {
 }
@@ -122,10 +97,7 @@ impl<S> Animate<S>
 where
   S: AnimateState + 'static,
 {
-  fn lerp_by_instant(&mut self, now: Instant) -> AnimateProgress
-  where
-    <S::State as StateReader>::Value: Clone,
-  {
+  fn lerp_by_instant(&mut self, now: Instant) -> AnimateProgress {
     let AnimateInfo {
       from,
       to,
@@ -148,12 +120,11 @@ where
     match progress {
       AnimateProgress::Between(rate) => {
         let value = self.state.calc_lerp_value(from, to, rate);
-        let state = &mut self.state.state().shallow();
         // the state may change during animate.
-        *to = state.clone();
-        **state = value;
+        *to = self.state.get();
+        self.state.set(value);
       }
-      AnimateProgress::Dismissed => *self.state.state().shallow() = from.clone(),
+      AnimateProgress::Dismissed => self.state.set(from.clone()),
       AnimateProgress::Finish => {}
     }
 
@@ -187,39 +158,6 @@ where
       }
     }
   }
-}
-
-impl<V, S> AnimateState for S
-where
-  S: StateWriter<Value = V>,
-  V: Lerp,
-{
-  type State = S;
-
-  fn state(&self) -> &Self::State { self }
-
-  fn calc_lerp_value(&mut self, from: &V, to: &V, rate: f32) -> V { from.lerp(to, rate) }
-}
-
-impl<V, S, F> AnimateState for LerpFnState<S, F>
-where
-  S: StateWriter<Value = V>,
-  F: FnMut(&V, &V, f32) -> V,
-{
-  type State = S;
-
-  fn state(&self) -> &Self::State { &self.state }
-
-  fn calc_lerp_value(&mut self, from: &V, to: &V, rate: f32) -> V { (self.lerp_fn)(from, to, rate) }
-}
-
-impl<V, S, F> LerpFnState<S, F>
-where
-  S: StateReader<Value = V>,
-  F: FnMut(&V, &V, f32) -> V,
-{
-  #[inline]
-  pub fn new(state: S, lerp_fn: F) -> Self { Self { state, lerp_fn } }
 }
 
 #[cfg(test)]
