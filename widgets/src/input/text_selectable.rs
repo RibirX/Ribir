@@ -100,8 +100,10 @@ fn key_handle(this: &mut TextSelectable, text: &CowArc<str>, event: &KeyboardEve
 }
 
 fn deal_with_command(this: &mut TextSelectable, text: &CowArc<str>, event: &KeyboardEvent) -> bool {
-  match event.key {
-    VirtualKeyCode::C => {
+  // use the physical key to make sure the keyboard with different
+  // layout use the same key as shortcut.
+  match event.physical_key {
+    PhysicalKey::Code(KeyCode::KeyC) => {
       let rg = this.caret.select_range();
       if !rg.is_empty() {
         let clipboard = AppCtx::clipboard();
@@ -109,7 +111,7 @@ fn deal_with_command(this: &mut TextSelectable, text: &CowArc<str>, event: &Keyb
         let _ = clipboard.borrow_mut().write_text(&text.substr(rg));
       }
     }
-    VirtualKeyCode::A => {
+    PhysicalKey::Code(KeyCode::KeyA) => {
       this.caret = CaretState::Select(
         CaretPosition { cluster: 0, position: None },
         CaretPosition { cluster: text.len(), position: None },
@@ -130,7 +132,7 @@ fn is_move_by_word(event: &KeyboardEvent) -> bool {
 fn deal_with_selection(this: &mut TextSelectable, text: &str, event: &KeyboardEvent) {
   let old_caret = this.caret;
   match event.key {
-    VirtualKeyCode::Left => {
+    VirtualKey::Named(NamedKey::ArrowLeft) => {
       if is_move_by_word(event) {
         let cluster = select_prev_word(text, this.caret.cluster(), false).start;
         this.caret = CaretPosition { cluster, position: None }.into();
@@ -140,7 +142,7 @@ fn deal_with_selection(this: &mut TextSelectable, text: &str, event: &KeyboardEv
         this.caret = this.helper.prev(this.caret.caret_position()).into();
       }
     }
-    VirtualKeyCode::Right => {
+    VirtualKey::Named(NamedKey::ArrowRight) => {
       if is_move_by_word(event) {
         let cluster = select_next_word(text, this.caret.cluster(), true).end;
         this.caret = CaretPosition { cluster, position: None }.into()
@@ -150,14 +152,18 @@ fn deal_with_selection(this: &mut TextSelectable, text: &str, event: &KeyboardEv
         this.caret = this.helper.next(this.caret.caret_position()).into();
       }
     }
-    VirtualKeyCode::Up => {
+    VirtualKey::Named(NamedKey::ArrowUp) => {
       this.caret = this.helper.up(this.caret.caret_position()).into();
     }
-    VirtualKeyCode::Down => {
+    VirtualKey::Named(NamedKey::ArrowDown) => {
       this.caret = this.helper.down(this.caret.caret_position()).into();
     }
-    VirtualKeyCode::Home => this.caret = this.helper.line_begin(this.caret.caret_position()).into(),
-    VirtualKeyCode::End => this.caret = this.helper.line_end(this.caret.caret_position()).into(),
+    VirtualKey::Named(NamedKey::Home) => {
+      this.caret = this.helper.line_begin(this.caret.caret_position()).into()
+    }
+    VirtualKey::Named(NamedKey::End) => {
+      this.caret = this.helper.line_end(this.caret.caret_position()).into()
+    }
     _ => (),
   }
 

@@ -37,10 +37,9 @@ impl CharsEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{reset_test_env, test_helper::*};
+  use crate::{reset_test_env, test_helper::*, window::DelayEvent};
 
   use std::{cell::RefCell, rc::Rc};
-  use winit::event::WindowEvent;
 
   #[test]
   fn smoke() {
@@ -60,9 +59,11 @@ mod tests {
     let test_text_case = "Hello 世界！";
     wnd.draw_frame();
     #[allow(deprecated)]
-    test_text_case
-      .chars()
-      .for_each(|c| wnd.processes_native_event(WindowEvent::ReceivedCharacter(c)));
+    test_text_case.chars().for_each(|c| {
+      if let Some(focus) = wnd.focusing() {
+        wnd.add_delay_event(DelayEvent::Chars { id: focus, chars: c.into() });
+      }
+    });
     wnd.run_frame_tasks();
 
     assert_eq!(&*receive.borrow(), test_text_case);
@@ -96,9 +97,11 @@ mod tests {
     let test_text_case = "123";
     wnd.draw_frame();
     #[allow(deprecated)]
-    test_text_case
-      .chars()
-      .for_each(|c| wnd.processes_native_event(WindowEvent::ReceivedCharacter(c)));
+    test_text_case.chars().for_each(|c| {
+      if let Some(focus) = wnd.focusing() {
+        wnd.add_delay_event(DelayEvent::Chars { id: focus, chars: c.into() });
+      }
+    });
     wnd.run_frame_tasks();
     assert_eq!(&*receive.borrow(), "214263");
   }

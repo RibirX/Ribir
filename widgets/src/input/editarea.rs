@@ -106,9 +106,9 @@ impl ComposeChild for TextEditorArea {
               dir: UnconstrainedDir::Both,
               @$caret {
                 on_performed_layout: move |e| {
-                  let height = e.box_size().unwrap().height;
-                  let pos = e.map_to_global(Point::new(0., height));
-                  e.window().set_ime_pos(pos);
+                  let mut rc = e.box_rect().unwrap();
+                  rc.origin = e.map_to_global(rc.origin);
+                  e.window().set_ime_cursor_area(&rc);
                 }
               }
             }

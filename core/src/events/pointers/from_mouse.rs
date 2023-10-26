@@ -27,8 +27,8 @@ impl From<MouseButton> for MouseButtons {
       MouseButton::Left => MouseButtons::PRIMARY,
       MouseButton::Right => MouseButtons::SECONDARY,
       MouseButton::Middle => MouseButtons::AUXILIARY,
-      MouseButton::Other(1) => MouseButtons::FOURTH,
-      MouseButton::Other(2) => MouseButtons::FIFTH,
+      MouseButton::Back => MouseButtons::FOURTH,
+      MouseButton::Forward => MouseButtons::FIFTH,
       MouseButton::Other(v) => {
         log::warn!("Not support the mouse button {} now", v);
         MouseButtons::default()

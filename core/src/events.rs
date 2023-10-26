@@ -11,7 +11,6 @@ pub(crate) mod dispatcher;
 mod pointers;
 pub use pointers::*;
 use ribir_geom::Point;
-pub use winit::event::{ModifiersState, ScanCode, VirtualKeyCode};
 mod focus;
 pub use focus::*;
 mod keyboard;
@@ -20,6 +19,7 @@ mod character;
 pub use character::*;
 mod wheel;
 pub use wheel::*;
+pub use winit::keyboard::{Key as VirtualKey, KeyCode, ModifiersState, NamedKey, PhysicalKey};
 pub(crate) mod focus_mgr;
 mod listener_impl_helper;
 
@@ -62,15 +62,15 @@ impl CommonEvent {
   pub fn modifiers(&self) -> ModifiersState { self.pick_info(DispatchInfo::modifiers) }
 
   /// Returns `true` if the shift key is pressed.
-  pub fn with_shift_key(&self) -> bool { self.modifiers().shift() }
+  pub fn with_shift_key(&self) -> bool { self.modifiers().shift_key() }
 
   /// Returns `true` if the alt key is pressed.
-  pub fn with_alt_key(&self) -> bool { self.modifiers().alt() }
+  pub fn with_alt_key(&self) -> bool { self.modifiers().alt_key() }
 
   /// Returns `true` if the ctrl key is pressed.
-  pub fn with_ctrl_key(&self) -> bool { self.modifiers().ctrl() }
+  pub fn with_ctrl_key(&self) -> bool { self.modifiers().control_key() }
   /// Returns `true` if the logo key is pressed.
-  pub fn with_logo_key(&self) -> bool { self.modifiers().logo() }
+  pub fn with_logo_key(&self) -> bool { self.modifiers().super_key() }
 
   /// Returns true if the main modifier key in the
   /// current platform is pressed. Specifically:

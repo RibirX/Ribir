@@ -1017,7 +1017,6 @@ mod tests {
     };
 
     let mut wnd = TestWindow::new(w);
-    wnd.on_wnd_resize_event(Size::zero());
     wnd.draw_frame();
     assert_eq!(*c_new_cnt.read(), 3);
     assert_eq!(*c_drop_cnt.read(), 0);
@@ -1140,7 +1139,6 @@ mod tests {
 
     // 2. add 1 item
     c_v.write().push((4, '4'));
-    wnd.on_wnd_resize_event(ZERO_SIZE);
     wnd.draw_frame();
 
     let expect_vec = ['4'];

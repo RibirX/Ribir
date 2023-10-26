@@ -68,8 +68,10 @@ pub trait ShellWindow {
   fn id(&self) -> WindowId;
   fn inner_size(&self) -> Size;
   fn outer_size(&self) -> Size;
-  fn set_ime_pos(&mut self, pos: Point);
-  fn set_size(&mut self, size: Size);
+  fn set_ime_cursor_area(&mut self, rect: &Rect);
+
+  fn request_resize(&mut self, size: Size);
+  fn on_resize(&mut self, size: Size);
   fn set_min_size(&mut self, size: Size);
   fn cursor(&self) -> CursorIcon;
   fn set_cursor(&mut self, cursor: CursorIcon);
@@ -125,7 +127,7 @@ impl Window {
   pub fn draw_frame(&self) -> bool {
     self.run_frame_tasks();
     self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now()));
-
+    self.update_painter_bound();
     let draw = self.need_draw() && !self.size().is_empty();
     if draw {
       self.shell_wnd.borrow_mut().begin_frame();
@@ -180,6 +182,19 @@ impl Window {
       if !self.widget_tree.borrow().is_dirty() {
         break;
       }
+    }
+  }
+
+  pub fn update_painter_bound(&self) {
+    let size = self.shell_wnd.borrow().inner_size();
+    if self.painter.borrow().paint_bounds().size != size {
+      let mut tree = self.widget_tree.borrow_mut();
+      let root = tree.root();
+      tree.mark_dirty(root);
+      tree.store.remove(root);
+      let mut painter = self.painter.borrow_mut();
+      painter.set_bounds(Rect::from_size(size));
+      painter.reset();
     }
   }
 
@@ -247,23 +262,15 @@ impl Window {
 
   /// Sets location of IME candidate box in window global coordinates relative
   /// to the top left.
-  pub fn set_ime_pos(&self, pos: Point) { self.shell_wnd.borrow_mut().set_ime_pos(pos); }
+  pub fn set_ime_cursor_area(&self, rect: &Rect) {
+    self.shell_wnd.borrow_mut().set_ime_cursor_area(rect);
+  }
 
-  pub fn set_size(&self, size: Size) { self.shell_wnd.borrow_mut().set_size(size); }
+  pub fn request_resize(&self, size: Size) { self.shell_wnd.borrow_mut().request_resize(size) }
 
   pub fn size(&self) -> Size { self.shell_wnd.borrow().inner_size() }
 
   pub fn set_min_size(&self, size: Size) { self.shell_wnd.borrow_mut().set_min_size(size); }
-
-  pub fn on_wnd_resize_event(&self, size: Size) {
-    let mut tree = self.widget_tree.borrow_mut();
-    let root = tree.root();
-    tree.mark_dirty(root);
-    tree.store.remove(root);
-    let mut painter = self.painter.borrow_mut();
-    painter.set_bounds(Rect::from_size(size));
-    painter.reset();
-  }
 
   pub fn shell_wnd(&self) -> &RefCell<Box<dyn ShellWindow>> { &self.shell_wnd }
 
@@ -395,13 +402,18 @@ impl Window {
           let mut e = AllFocusBubble::FocusOut(e.into_inner());
           self.bottom_up_emit::<FocusBubbleListener>(&mut e, bottom, up);
         }
-        DelayEvent::KeyDown { id, scancode, key } => {
-          let mut e = AllKeyboard::KeyDownCapture(KeyboardEvent::new(scancode, key, id, self.id()));
+        DelayEvent::KeyDown { id, physical_key, key } => {
+          let mut e = AllKeyboard::KeyDownCapture(KeyboardEvent::new(
+            physical_key,
+            key.clone(),
+            id,
+            self.id(),
+          ));
           self.top_down_emit::<KeyboardListener>(&mut e, id, None);
           let mut e = AllKeyboard::KeyDown(e.into_inner());
           self.bottom_up_emit::<KeyboardListener>(&mut e, id, None);
 
-          if !e.is_prevent_default() && key == VirtualKeyCode::Tab {
+          if !e.is_prevent_default() && key == VirtualKey::Named(NamedKey::Tab) {
             let pressed_shift = {
               let dispatcher = self.dispatcher.borrow();
               dispatcher.info.modifiers().contains(ModifiersState::SHIFT)
@@ -415,8 +427,9 @@ impl Window {
             }
           }
         }
-        DelayEvent::KeyUp { id, scancode, key } => {
-          let mut e = AllKeyboard::KeyUpCapture(KeyboardEvent::new(scancode, key, id, self.id()));
+        DelayEvent::KeyUp { id, physical_key, key } => {
+          let mut e =
+            AllKeyboard::KeyUpCapture(KeyboardEvent::new(physical_key, key, id, self.id()));
           self.top_down_emit::<KeyboardListener>(&mut e, id, None);
           let mut e = AllKeyboard::KeyUp(e.into_inner());
           self.bottom_up_emit::<KeyboardListener>(&mut e, id, None);
@@ -577,13 +590,13 @@ pub(crate) enum DelayEvent {
   },
   KeyDown {
     id: WidgetId,
-    scancode: ScanCode,
-    key: VirtualKeyCode,
+    physical_key: PhysicalKey,
+    key: VirtualKey,
   },
   KeyUp {
     id: WidgetId,
-    scancode: ScanCode,
-    key: VirtualKeyCode,
+    physical_key: PhysicalKey,
+    key: VirtualKey,
   },
   Chars {
     id: WidgetId,
@@ -634,9 +647,8 @@ mod tests {
     assert_layout_result_by_path!(wnd, { path = [0], size == size, });
 
     let new_size = Size::new(200., 200.);
-    wnd.set_size(new_size);
-    // not have a shell window, trigger the resize manually.
-    wnd.on_wnd_resize_event(new_size);
+    wnd.request_resize(new_size);
+
     wnd.draw_frame();
     assert_layout_result_by_path!(wnd, { path = [0], size == new_size, });
   }

@@ -1,7 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
 use ribir_core::prelude::{
-  AppCtx, CharsEvent, GraphemeCursor, KeyboardEvent, TextWriter, VirtualKeyCode,
+  AppCtx, CharsEvent, GraphemeCursor, KeyCode, KeyboardEvent, NamedKey, PhysicalKey, TextWriter,
+  VirtualKey,
 };
 
 #[macro_export]
@@ -82,8 +83,11 @@ fn key_with_command(this: &mut TextEditorArea, event: &KeyboardEvent) -> bool {
   if !event.with_command_key() {
     return false;
   }
-  match event.key {
-    VirtualKeyCode::V => {
+
+  // use the physical key to make sure the keyboard with different
+  // layout use the same key as shortcut.
+  match event.physical_key {
+    PhysicalKey::Code(KeyCode::KeyV) => {
       let clipboard = AppCtx::clipboard();
       let txt = clipboard.borrow_mut().read_text();
       if let Ok(txt) = txt {
@@ -96,7 +100,7 @@ fn key_with_command(this: &mut TextEditorArea, event: &KeyboardEvent) -> bool {
       }
       true
     }
-    VirtualKeyCode::X => {
+    PhysicalKey::Code(KeyCode::KeyX) => {
       let rg = this.caret.select_range();
       if !rg.is_empty() {
         let txt = this.text.substr(rg.clone()).to_string();
@@ -113,12 +117,12 @@ fn key_with_command(this: &mut TextEditorArea, event: &KeyboardEvent) -> bool {
 
 fn single_key(this: &mut TextEditorArea, key: &KeyboardEvent) -> bool {
   match key.key {
-    VirtualKeyCode::NumpadEnter | VirtualKeyCode::Return => {
+    VirtualKey::Named(NamedKey::Enter) => {
       if this.multi_line {
         InputWriter::new(this).insert_str("\r");
       }
     }
-    VirtualKeyCode::Back => {
+    VirtualKey::Named(NamedKey::Backspace) => {
       let rg = this.caret.select_range();
       if rg.is_empty() {
         InputWriter::new(this).back_space();
@@ -126,7 +130,7 @@ fn single_key(this: &mut TextEditorArea, key: &KeyboardEvent) -> bool {
         InputWriter::new(this).delete_byte_range(&rg);
       }
     }
-    VirtualKeyCode::Delete => {
+    VirtualKey::Named(NamedKey::Delete) => {
       let rg = this.caret.select_range();
       if rg.is_empty() {
         InputWriter::new(this).del_char();
