@@ -27,9 +27,11 @@ pub(crate) struct AnimateInfo<V> {
   _tick_msg_guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
 }
 
-pub trait AnimateRun<S>: StateWriter<Value = Animate<S>>
+impl<S, T> Animation for T
 where
   S: AnimateState + 'static,
+  S::Value: Clone,
+  T: StateWriter<Value = Animate<S>>,
 {
   fn run(&self) {
     let mut animate_ref = self.write();
@@ -54,11 +56,9 @@ where
             if matches!(p, AnimateProgress::Finish) {
               let wnd = AppCtx::get_window(wnd_id).unwrap();
               let animate = animate.clone_writer();
-              wnd
-                .frame_spawn(async move { animate.silent().stop() })
-                .unwrap();
+              wnd.frame_spawn(async move { animate.stop() }).unwrap();
             } else {
-              animate.shallow().lerp_by_instant(time);
+              animate.advance_to(time);
             }
           }
           FrameMsg::LayoutReady(_) => {}
@@ -84,20 +84,9 @@ where
       wnd.inc_running_animate();
     }
   }
-}
 
-impl<S, T> AnimateRun<S> for T
-where
-  S: AnimateState + 'static,
-  T: StateWriter<Value = Animate<S>>,
-{
-}
-
-impl<S> Animate<S>
-where
-  S: AnimateState + 'static,
-{
-  fn lerp_by_instant(&mut self, now: Instant) -> AnimateProgress {
+  fn advance_to(&self, at: Instant) -> AnimateProgress {
+    let this = &mut *self.shallow();
     let AnimateInfo {
       from,
       to,
@@ -105,7 +94,7 @@ where
       last_progress,
       already_lerp,
       ..
-    } = self
+    } = this
       .running_info
       .as_mut()
       .expect("This animation is not running.");
@@ -114,17 +103,17 @@ where
       return *last_progress;
     }
 
-    let elapsed = now - *start_at;
-    let progress = self.transition.rate_of_change(elapsed);
+    let elapsed = at - *start_at;
+    let progress = this.transition.rate_of_change(elapsed);
 
     match progress {
       AnimateProgress::Between(rate) => {
-        let value = self.state.calc_lerp_value(from, to, rate);
+        let value = this.state.calc_lerp_value(from, to, rate);
         // the state may change during animate.
-        *to = self.state.get();
-        self.state.set(value);
+        *to = this.state.get();
+        this.state.set(value);
       }
-      AnimateProgress::Dismissed => self.state.set(from.clone()),
+      AnimateProgress::Dismissed => this.state.set(from.clone()),
       AnimateProgress::Finish => {}
     }
 
@@ -134,16 +123,21 @@ where
     progress
   }
 
-  pub fn stop(&mut self) {
-    if self.is_running() {
-      if let Some(wnd) = AppCtx::get_window(self.window_id) {
+  fn stop(&self) {
+    let mut this = self.silent();
+    if this.is_running() {
+      if let Some(wnd) = AppCtx::get_window(this.window_id) {
         wnd.dec_running_animate();
-        self.running_info.take();
+        this.running_info.take();
       }
     }
   }
+}
 
-  #[inline]
+impl<S> Animate<S>
+where
+  S: AnimateState + 'static,
+{
   pub fn is_running(&self) -> bool { self.running_info.is_some() }
 }
 
@@ -152,8 +146,8 @@ where
   P: AnimateState + 'static,
 {
   fn drop(&mut self) {
-    if self.is_running() {
-      if let Some(wnd) = AppCtx::get_window(self.window_id).filter(|_| self.is_running()) {
+    if self.running_info.is_some() {
+      if let Some(wnd) = AppCtx::get_window(self.window_id) {
         wnd.dec_running_animate();
       }
     }
