@@ -38,6 +38,7 @@ winit.workspace = true
 colored.workspace = true
 paste.workspace = true
 ribir_dev_helper = {path = "../dev-helper"}
+ribir = { path = "../ribir" }
 
 [features]
 png = ["ribir_painter/png"]

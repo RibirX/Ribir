@@ -58,16 +58,19 @@ where
               let animate = animate.clone_writer();
               wnd.frame_spawn(async move { animate.stop() }).unwrap();
             } else {
-              animate.advance_to(time);
+              animate.shallow().advance_to(time);
             }
           }
           FrameMsg::LayoutReady(_) => {}
           // use silent_ref because the state of animate change, bu no need to effect the framework.
           FrameMsg::Finish(_) => {
-            let animate = &mut *animate.silent();
+            let mut animate = animate.write();
+            let data_value = animate.running_info.as_mut().unwrap().to.clone();
             let info = animate.running_info.as_mut().unwrap();
-            animate.state.set(info.to.clone());
             info.already_lerp = false;
+            animate.state.set(data_value);
+
+            animate.forget_modifies();
           }
         }
       });
@@ -85,43 +88,7 @@ where
     }
   }
 
-  fn advance_to(&self, at: Instant) -> AnimateProgress {
-    let this = &mut *self.shallow();
-    let AnimateInfo {
-      from,
-      to,
-      start_at,
-      last_progress,
-      already_lerp,
-      ..
-    } = this
-      .running_info
-      .as_mut()
-      .expect("This animation is not running.");
-
-    if *already_lerp {
-      return *last_progress;
-    }
-
-    let elapsed = at - *start_at;
-    let progress = this.transition.rate_of_change(elapsed);
-
-    match progress {
-      AnimateProgress::Between(rate) => {
-        let value = this.state.calc_lerp_value(from, to, rate);
-        // the state may change during animate.
-        *to = this.state.get();
-        this.state.set(value);
-      }
-      AnimateProgress::Dismissed => this.state.set(from.clone()),
-      AnimateProgress::Finish => {}
-    }
-
-    *last_progress = progress;
-    *already_lerp = true;
-
-    progress
-  }
+  fn is_running(&self) -> bool { self.read().is_running() }
 
   fn stop(&self) {
     let mut this = self.silent();
@@ -132,6 +99,8 @@ where
       }
     }
   }
+
+  fn box_clone(&self) -> Box<dyn Animation> { Box::new(self.clone_writer()) }
 }
 
 impl<S> Animate<S>
@@ -139,6 +108,49 @@ where
   S: AnimateState + 'static,
 {
   pub fn is_running(&self) -> bool { self.running_info.is_some() }
+
+  /// Advance the animation to the given time, you must start the animation
+  /// before calling this method, the `at` relative to the start time.
+  ///
+  /// ## Panics
+  ///
+  /// Panics if the animation is not running.
+  fn advance_to(&mut self, at: Instant) -> AnimateProgress {
+    let AnimateInfo {
+      from,
+      to,
+      start_at,
+      last_progress,
+      already_lerp,
+      ..
+    } = self
+      .running_info
+      .as_mut()
+      .expect("This animation is not running.");
+
+    if *already_lerp {
+      return *last_progress;
+    }
+
+    let elapsed = at - *start_at;
+    let progress = self.transition.rate_of_change(elapsed);
+
+    match progress {
+      AnimateProgress::Between(rate) => {
+        let value = self.state.calc_lerp_value(from, to, rate);
+        // the state may change during animate.
+        *to = self.state.get();
+        self.state.set(value);
+      }
+      AnimateProgress::Dismissed => self.state.set(from.clone()),
+      AnimateProgress::Finish => {}
+    }
+
+    *last_progress = progress;
+    *already_lerp = true;
+
+    progress
+  }
 }
 
 impl<P> Drop for Animate<P>

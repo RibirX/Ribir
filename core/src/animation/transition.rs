@@ -1,5 +1,6 @@
 use super::easing::Easing;
 use crate::prelude::{BuildCtx, *};
+use ribir_algo::Sc;
 use std::time::Duration;
 
 /// Transition use rate to describe how the state change form init to final
@@ -151,6 +152,12 @@ impl<T: Roc> Roc for RepeatTransition<T> {
 }
 
 impl Roc for Box<dyn Roc> {
+  fn rate_of_change(&self, dur: Duration) -> AnimateProgress { (**self).rate_of_change(dur) }
+
+  fn duration(&self) -> Duration { (**self).duration() }
+}
+
+impl<T: Roc> Roc for Sc<T> {
   fn rate_of_change(&self, dur: Duration) -> AnimateProgress { (**self).rate_of_change(dur) }
 
   fn duration(&self) -> Duration { (**self).duration() }
