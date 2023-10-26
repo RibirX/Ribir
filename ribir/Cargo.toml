@@ -47,6 +47,7 @@ path = "tests/timer_test.rs"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.3.9"
+raw-window-handle.workspace = true
 
 [package.metadata.release]
 tag = true

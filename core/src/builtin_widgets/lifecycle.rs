@@ -188,7 +188,6 @@ mod tests {
     let mounted_ids = c_mounted.read().clone();
 
     *c_cnt.write() = 5;
-    wnd.on_wnd_resize_event(Size::zero());
     wnd.draw_frame();
 
     assert_eq!(mounted_ids.len(), 3);

@@ -600,7 +600,7 @@ fn builtin_ref() {
   let w = fn_widget! {
     let mut tap_box = @SizedBox {
       size: Size::new(5., 5.),
-      cursor: CursorIcon::Hand,
+      cursor: CursorIcon::Pointer,
     };
     @Flex {
       cursor: pipe!($tap_box.cursor),
@@ -632,7 +632,7 @@ fn builtin_bind_to_self() {
     @$sized_box {
       cursor: pipe!{
         let icon = if $sized_box.size.area() < 100. {
-          CursorIcon::Hand
+          CursorIcon::Pointer
         } else {
           CursorIcon::Help
         };
@@ -652,27 +652,20 @@ fn builtin_bind_to_self() {
 
 fn tap_at(wnd: &TestWindow, pos: (i32, i32)) {
   let device_id = unsafe { DeviceId::dummy() };
-  let modifiers = ModifiersState::default();
 
   #[allow(deprecated)]
-  wnd.processes_native_event(WindowEvent::CursorMoved {
-    device_id,
-    position: pos.into(),
-    modifiers,
-  });
+  wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: pos.into() });
   #[allow(deprecated)]
   wnd.processes_native_event(WindowEvent::MouseInput {
     device_id,
     state: ElementState::Pressed,
     button: MouseButton::Left,
-    modifiers,
   });
   #[allow(deprecated)]
   wnd.processes_native_event(WindowEvent::MouseInput {
     device_id,
     state: ElementState::Released,
     button: MouseButton::Left,
-    modifiers,
   });
 }
 
@@ -727,7 +720,7 @@ fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
 #[test]
 fn fix_access_builtin_with_gap() {
   let _ = fn_widget! {
-    let mut this = @Void { cursor: CursorIcon::Hand };
+    let mut this = @Void { cursor: CursorIcon::Pointer };
     @$this {
       on_tap: move |_| {
         // this access cursor across `silent` should compile pass.

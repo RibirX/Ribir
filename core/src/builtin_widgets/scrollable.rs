@@ -119,7 +119,7 @@ mod tests {
   use crate::test_helper::{MockBox, TestWindow};
 
   use super::*;
-  use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
+  use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
     let w = fn_widget! {
@@ -138,7 +138,6 @@ mod tests {
       device_id,
       delta: MouseScrollDelta::PixelDelta((delta_x, delta_y).into()),
       phase: TouchPhase::Started,
-      modifiers: ModifiersState::default(),
     });
 
     wnd.draw_frame();

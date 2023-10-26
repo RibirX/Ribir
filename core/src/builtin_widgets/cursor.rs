@@ -53,7 +53,7 @@ mod tests {
         @MockMulti{
           @MockBox {
             size: Size::new(200., 200.),
-            cursor: CursorIcon::Hand,
+            cursor: CursorIcon::Pointer,
             @MockBox {
               size:  Size::new(100., 100.),
               cursor: CursorIcon::Help,
@@ -71,7 +71,6 @@ mod tests {
       WindowEvent::CursorMoved {
         device_id,
         position: (1f64, 1.).into(),
-        modifiers: ModifiersState::default(),
       },
       1.,
     );
@@ -83,19 +82,17 @@ mod tests {
       WindowEvent::CursorMoved {
         device_id,
         position: (101f64, 1.).into(),
-        modifiers: ModifiersState::default(),
       },
       1.,
     );
     wnd.run_frame_tasks();
-    assert_eq!(wnd.get_cursor(), CursorIcon::Hand);
+    assert_eq!(wnd.get_cursor(), CursorIcon::Pointer);
 
     let device_id = unsafe { DeviceId::dummy() };
     wnd.dispatcher.borrow_mut().dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (201f64, 1.).into(),
-        modifiers: ModifiersState::default(),
       },
       1.,
     );
@@ -107,19 +104,17 @@ mod tests {
       WindowEvent::CursorMoved {
         device_id,
         position: (101f64, 1.).into(),
-        modifiers: ModifiersState::default(),
       },
       1.,
     );
     wnd.run_frame_tasks();
-    assert_eq!(wnd.get_cursor(), CursorIcon::Hand);
+    assert_eq!(wnd.get_cursor(), CursorIcon::Pointer);
 
     let device_id = unsafe { DeviceId::dummy() };
     wnd.dispatcher.borrow_mut().dispatch(
       WindowEvent::CursorMoved {
         device_id,
         position: (1f64, 1.).into(),
-        modifiers: ModifiersState::default(),
       },
       1.,
     );

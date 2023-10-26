@@ -32,11 +32,11 @@ impl ComposeChild for FocusScope {
 mod tests {
   use winit::{
     dpi::LogicalPosition,
-    event::{DeviceId, ElementState, KeyboardInput, MouseButton, WindowEvent},
+    event::{DeviceId, ElementState, MouseButton, WindowEvent},
   };
 
   use super::*;
-  use crate::test_helper::*;
+  use crate::{test_helper::*, window::DelayEvent};
 
   #[test]
   fn tab_scope() {
@@ -181,28 +181,21 @@ mod tests {
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: LogicalPosition::new(75., 25.).to_physical(1.),
-      modifiers: ModifiersState::default(),
     });
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseInput {
       device_id,
       state: ElementState::Pressed,
       button: MouseButton::Left,
-      modifiers: ModifiersState::default(),
     });
 
     // will deal key event twice (inner and host).
     wnd.draw_frame();
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::KeyboardInput {
-      device_id: unsafe { DeviceId::dummy() },
-      input: KeyboardInput {
-        scancode: 0,
-        virtual_keycode: Some(VirtualKeyCode::A),
-        state: ElementState::Pressed,
-        modifiers: ModifiersState::default(),
-      },
-      is_synthetic: false,
+
+    wnd.add_delay_event(DelayEvent::KeyDown {
+      id: wnd.focusing().unwrap(),
+      physical_key: PhysicalKey::Code(KeyCode::Digit1),
+      key: VirtualKey::Character("1".into()),
     });
 
     wnd.run_frame_tasks();

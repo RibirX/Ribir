@@ -5,10 +5,10 @@ use ribir_core::{prelude::*, timer::Timer, window::WindowId};
 use rxrust::scheduler::NEW_TIMER_FN;
 use std::rc::Rc;
 use std::{convert::Infallible, sync::Once};
+use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
 use winit::{
   event::{Event, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
-  platform::run_return::EventLoopExtRunReturn,
 };
 
 pub struct App {
@@ -93,8 +93,7 @@ impl App {
 
     let event_loop = &mut unsafe { App::shared_mut() }.event_loop;
 
-    event_loop.run_return(move |event, _event_loop, control: &mut ControlFlow| {
-      *control = ControlFlow::Wait;
+    let _ = event_loop.run_on_demand(move |event, loop_handle| {
       match event {
         Event::WindowEvent { event, window_id } => {
           let wnd_id = new_id(window_id);
@@ -105,20 +104,22 @@ impl App {
             WindowEvent::CloseRequested => {
               AppCtx::remove_wnd(wnd_id);
               if !AppCtx::has_wnd() {
-                *control = ControlFlow::Exit;
+                loop_handle.exit();
               }
             }
-            WindowEvent::Resized(size) => {
-              let scale = wnd.device_pixel_ratio();
-              let size = size.to_logical(scale as f64);
-              let size = Size::new(size.width, size.height);
-              let mut shell_wnd = wnd.shell_wnd().borrow_mut();
-              let shell_wnd = shell_wnd
-                .as_any_mut()
-                .downcast_mut::<WinitShellWnd>()
-                .unwrap();
-              shell_wnd.on_resize(size);
-              wnd.on_wnd_resize_event(size);
+            WindowEvent::RedrawRequested => {
+              if let Some(wnd) = AppCtx::get_window(wnd_id) {
+                // if this frame is really draw, request another redraw. To make sure the draw
+                // always end with a empty draw and emit an extra tick cycle message.
+                if wnd.draw_frame() {
+                  request_redraw(&wnd);
+                }
+              }
+            }
+            WindowEvent::Resized(_) => {
+              let size = wnd.shell_wnd().borrow().inner_size();
+              wnd.shell_wnd().borrow_mut().on_resize(size);
+              request_redraw(&wnd)
             }
             event => {
               #[allow(deprecated)]
@@ -127,34 +128,23 @@ impl App {
           }
           wnd.run_frame_tasks();
         }
-        Event::MainEventsCleared => {
+        Event::AboutToWait => {
           AppCtx::run_until_stalled();
           AppCtx::windows()
             .borrow()
             .values()
             .filter(|wnd| wnd.need_draw())
-            .for_each(|wnd| request_redraw(wnd))
-        }
-        Event::RedrawRequested(id) => {
-          if let Some(wnd) = AppCtx::get_window(new_id(id)) {
-            // if this frame is really draw, request another redraw. To make sure the draw
-            // always end with a empty draw and emit an extra tick cycle message.
-            if wnd.draw_frame() {
-              request_redraw(&wnd);
-            }
-          }
-        }
-        Event::RedrawEventsCleared => {
+            .for_each(|wnd| request_redraw(wnd));
           let need_draw = AppCtx::windows()
             .borrow()
             .values()
             .any(|wnd| wnd.need_draw());
           if need_draw {
-            *control = ControlFlow::Poll;
+            loop_handle.set_control_flow(ControlFlow::Poll);
           } else if let Some(t) = Timer::recently_timeout() {
-            *control = ControlFlow::WaitUntil(t);
+            loop_handle.set_control_flow(ControlFlow::WaitUntil(t));
           } else {
-            *control = ControlFlow::Wait;
+            loop_handle.set_control_flow(ControlFlow::Wait);
           };
         }
         Event::NewEvents(cause) => match cause {
@@ -183,7 +173,7 @@ impl App {
     static mut INIT_ONCE: Once = Once::new();
     static mut APP: Option<App> = None;
     INIT_ONCE.call_once(|| {
-      let event_loop = EventLoopBuilder::with_user_event().build();
+      let event_loop = EventLoopBuilder::with_user_event().build().unwrap();
       let waker = EventWaker(event_loop.create_proxy());
       let clipboard = Clipboard::new().unwrap();
       unsafe {
@@ -220,7 +210,7 @@ impl RuntimeWaker for EventWaker {
 /// EventWaker only send `RibirEvent::FuturesWake`.
 unsafe impl Send for EventWaker {}
 
-fn request_redraw(wnd: &Window) {
+pub(crate) fn request_redraw(wnd: &Window) {
   let wnd = wnd.shell_wnd().borrow();
   let shell = wnd.as_any().downcast_ref::<WinitShellWnd>().unwrap();
   shell.winit_wnd.request_redraw();

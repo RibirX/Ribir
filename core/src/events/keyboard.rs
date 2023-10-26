@@ -8,8 +8,8 @@ use crate::{
 
 #[derive(Debug)]
 pub struct KeyboardEvent {
-  pub scan_code: ScanCode,
-  pub key: VirtualKeyCode,
+  pub physical_key: PhysicalKey,
+  pub key: VirtualKey,
   common: CommonEvent,
 }
 
@@ -34,9 +34,9 @@ impl_compose_child_with_focus_for_listener!(KeyboardListener);
 
 impl KeyboardEvent {
   #[inline]
-  pub fn new(scan_code: ScanCode, key: VirtualKeyCode, id: WidgetId, wnd_id: WindowId) -> Self {
+  pub fn new(physical_key: PhysicalKey, key: VirtualKey, id: WidgetId, wnd_id: WindowId) -> Self {
     Self {
-      scan_code,
+      physical_key,
       key,
       common: CommonEvent::new(id, wnd_id),
     }
@@ -46,23 +46,8 @@ impl KeyboardEvent {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::*;
+  use crate::{test_helper::*, window::DelayEvent};
   use std::{cell::RefCell, rc::Rc};
-  use winit::event::{DeviceId, ElementState, KeyboardInput, WindowEvent};
-
-  fn new_key_event(key: VirtualKeyCode, state: ElementState) -> WindowEvent<'static> {
-    #[allow(deprecated)]
-    WindowEvent::KeyboardInput {
-      device_id: unsafe { DeviceId::dummy() },
-      input: KeyboardInput {
-        scancode: 0,
-        virtual_keycode: Some(key),
-        state,
-        modifiers: ModifiersState::default(),
-      },
-      is_synthetic: false,
-    }
-  }
 
   #[test]
   fn smoke() {
@@ -105,28 +90,45 @@ mod tests {
     let mut wnd = TestWindow::new(fn_widget!(w));
     wnd.draw_frame();
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Pressed));
-    #[allow(deprecated)]
-    wnd.processes_native_event(new_key_event(VirtualKeyCode::Key0, ElementState::Released));
-    #[allow(deprecated)]
-    wnd.processes_native_event(new_key_event(VirtualKeyCode::Key1, ElementState::Pressed));
-    #[allow(deprecated)]
-    wnd.processes_native_event(new_key_event(VirtualKeyCode::Key1, ElementState::Released));
+    let focusing = wnd.focusing().unwrap();
+
+    wnd.add_delay_event(DelayEvent::KeyDown {
+      id: focusing,
+      physical_key: PhysicalKey::Code(KeyCode::Digit0),
+      key: VirtualKey::Character("Key0".into()),
+    });
+
+    wnd.add_delay_event(DelayEvent::KeyUp {
+      id: focusing,
+      physical_key: PhysicalKey::Code(KeyCode::Digit0),
+      key: VirtualKey::Character("Key0".into()),
+    });
+
+    wnd.add_delay_event(DelayEvent::KeyDown {
+      id: focusing,
+      physical_key: PhysicalKey::Code(KeyCode::Digit1),
+      key: VirtualKey::Character("Key1".into()),
+    });
+
+    wnd.add_delay_event(DelayEvent::KeyUp {
+      id: focusing,
+      physical_key: PhysicalKey::Code(KeyCode::Digit1),
+      key: VirtualKey::Character("Key1".into()),
+    });
 
     wnd.run_frame_tasks();
 
     assert_eq!(
       &*keys.borrow(),
       &[
-        "key down capture Key0",
-        "key down Key0",
-        "key up capture Key0",
-        "key up Key0",
-        "key down capture Key1",
-        "key down Key1",
-        "key up capture Key1",
-        "key up Key1"
+        "key down capture Character(\"Key0\")",
+        "key down Character(\"Key0\")",
+        "key up capture Character(\"Key0\")",
+        "key up Character(\"Key0\")",
+        "key down capture Character(\"Key1\")",
+        "key down Character(\"Key1\")",
+        "key up capture Character(\"Key1\")",
+        "key up Character(\"Key1\")"
       ]
     );
   }

@@ -42,7 +42,7 @@ mod tests {
   use super::*;
   use crate::test_helper::{MockBox, TestWindow};
   use std::{cell::RefCell, rc::Rc};
-  use winit::event::{DeviceId, ModifiersState, MouseScrollDelta, TouchPhase, WindowEvent};
+  use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
   #[test]
   fn smoke() {
@@ -83,7 +83,6 @@ mod tests {
       device_id,
       delta: MouseScrollDelta::PixelDelta((1.0, 1.0).into()),
       phase: TouchPhase::Started,
-      modifiers: ModifiersState::default(),
     });
     wnd.run_frame_tasks();
 

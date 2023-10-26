@@ -9,7 +9,7 @@ mod test_single_thread {
   use std::cell::Cell;
   use std::{cell::RefCell, rc::Rc};
   use std::{thread::sleep, time::Duration};
-  use winit::event::{DeviceId, ElementState, ModifiersState, MouseButton, WindowEvent};
+  use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
   use ribir_core::{prelude::*, test_helper::MockBox};
 
@@ -93,7 +93,6 @@ mod test_single_thread {
             ElementState::Released
           },
           button: MouseButton::Left,
-          modifiers: ModifiersState::default(),
         });
       });
 
@@ -120,7 +119,6 @@ mod test_single_thread {
             ElementState::Released
           },
           button: MouseButton::Left,
-          modifiers: ModifiersState::default(),
         });
       });
 
@@ -151,7 +149,6 @@ mod test_single_thread {
             ElementState::Released
           },
           button: MouseButton::Left,
-          modifiers: ModifiersState::default(),
         });
       });
 
