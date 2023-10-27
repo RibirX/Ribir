@@ -102,7 +102,7 @@ fn key_handle(this: &mut TextSelectable, text: &CowArc<str>, event: &KeyboardEve
 fn deal_with_command(this: &mut TextSelectable, text: &CowArc<str>, event: &KeyboardEvent) -> bool {
   // use the physical key to make sure the keyboard with different
   // layout use the same key as shortcut.
-  match event.physical_key {
+  match event.key_code() {
     PhysicalKey::Code(KeyCode::KeyC) => {
       let rg = this.caret.select_range();
       if !rg.is_empty() {
@@ -131,7 +131,7 @@ fn is_move_by_word(event: &KeyboardEvent) -> bool {
 
 fn deal_with_selection(this: &mut TextSelectable, text: &str, event: &KeyboardEvent) {
   let old_caret = this.caret;
-  match event.key {
+  match event.key() {
     VirtualKey::Named(NamedKey::ArrowLeft) => {
       if is_move_by_word(event) {
         let cluster = select_prev_word(text, this.caret.cluster(), false).start;

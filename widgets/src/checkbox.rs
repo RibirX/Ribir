@@ -100,7 +100,7 @@ impl ComposeChild for Checkbox {
       @ $checkbox {
         cursor: CursorIcon::Pointer,
         on_tap: move |_| $this.write().switch_check(),
-        on_key_up: move |k| if k.key == VirtualKey::Named(NamedKey::Space) {
+        on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
           $this.write().switch_check()
         }
       }

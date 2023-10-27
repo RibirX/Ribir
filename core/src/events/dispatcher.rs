@@ -2,7 +2,7 @@ use crate::{prelude::*, widget_tree::WidgetTree, window::DelayEvent};
 use ribir_text::PIXELS_PER_EM;
 use std::rc::{Rc, Weak};
 use winit::{
-  event::{DeviceId, ElementState, Ime, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
+  event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent},
   keyboard::ModifiersState,
 };
 
@@ -55,38 +55,32 @@ impl Dispatcher {
       WindowEvent::MouseInput { state, button, device_id, .. } => {
         self.dispatch_mouse_input(device_id, state, button);
       }
-      WindowEvent::KeyboardInput { event, .. } => {
-        self.dispatch_keyboard_input(event);
-      }
-      WindowEvent::Ime(ime) => {
-        if let Ime::Commit(s) = ime {
-          self.add_chars_event(s)
-        }
-      }
       WindowEvent::MouseWheel { delta, .. } => self.dispatch_wheel(delta, wnd_factor),
       _ => log::info!("not processed event {:?}", event),
     }
   }
 
-  pub fn dispatch_keyboard_input(&mut self, event: KeyEvent) {
+  pub fn dispatch_keyboard_input(
+    &mut self,
+    physical_key: PhysicalKey,
+    key: VirtualKey,
+    is_repeat: bool,
+    location: KeyLocation,
+    state: ElementState,
+  ) {
     let wnd = self.window();
-    if let Some(id) = wnd.focusing() {
-      let KeyEvent { physical_key, logical_key, text, .. } = event;
-      match event.state {
+    if let Some(focus_id) = wnd.focusing() {
+      let event = KeyboardEvent::new(wnd.id(), focus_id, physical_key, key, is_repeat, location);
+      match state {
         ElementState::Pressed => {
-          wnd.add_delay_event(DelayEvent::KeyDown { id, physical_key, key: logical_key });
-          if let Some(text) = text {
-            self.add_chars_event(text.to_string());
-          }
+          wnd.add_delay_event(DelayEvent::KeyDown(event));
         }
-        ElementState::Released => {
-          wnd.add_delay_event(DelayEvent::KeyUp { id, physical_key, key: logical_key })
-        }
+        ElementState::Released => wnd.add_delay_event(DelayEvent::KeyUp(event)),
       };
     }
   }
 
-  pub fn add_chars_event(&mut self, chars: String) {
+  pub fn dispatch_receive_chars(&mut self, chars: String) {
     let wnd = self.window();
     if let Some(focus) = wnd.focusing() {
       self
