@@ -6,11 +6,31 @@ use crate::{
   impl_listener, impl_multi_event_listener, prelude::*, window::WindowId,
 };
 
+pub use winit::keyboard::{
+  Key as VirtualKey, KeyCode, KeyLocation, ModifiersState, NamedKey, PhysicalKey,
+};
+
 #[derive(Debug)]
 pub struct KeyboardEvent {
-  pub physical_key: PhysicalKey,
-  pub key: VirtualKey,
+  physical_key: PhysicalKey,
+  key: VirtualKey,
+  is_repeat: bool,
+  location: KeyLocation,
   common: CommonEvent,
+}
+
+impl KeyboardEvent {
+  #[inline]
+  pub fn key_code(&self) -> &PhysicalKey { &self.physical_key }
+
+  #[inline]
+  pub fn key(&self) -> &VirtualKey { &self.key }
+
+  #[inline]
+  pub fn is_repeat(&self) -> bool { self.is_repeat }
+
+  #[inline]
+  pub fn location(&self) -> KeyLocation { self.location }
 }
 
 pub type KeyboardSubject = MutRefItemSubject<'static, AllKeyboard, Infallible>;
@@ -34,10 +54,19 @@ impl_compose_child_with_focus_for_listener!(KeyboardListener);
 
 impl KeyboardEvent {
   #[inline]
-  pub fn new(physical_key: PhysicalKey, key: VirtualKey, id: WidgetId, wnd_id: WindowId) -> Self {
+  pub fn new(
+    wnd_id: WindowId,
+    id: WidgetId,
+    physical_key: PhysicalKey,
+    key: VirtualKey,
+    is_repeat: bool,
+    location: KeyLocation,
+  ) -> Self {
     Self {
       physical_key,
       key,
+      is_repeat,
+      location,
       common: CommonEvent::new(id, wnd_id),
     }
   }
@@ -45,8 +74,10 @@ impl KeyboardEvent {
 
 #[cfg(test)]
 mod tests {
+  use winit::event::ElementState;
+
   use super::*;
-  use crate::{test_helper::*, window::DelayEvent};
+  use crate::test_helper::*;
   use std::{cell::RefCell, rc::Rc};
 
   #[test]
@@ -90,45 +121,50 @@ mod tests {
     let mut wnd = TestWindow::new(fn_widget!(w));
     wnd.draw_frame();
 
-    let focusing = wnd.focusing().unwrap();
+    wnd.processes_keyboard_event(
+      PhysicalKey::Code(KeyCode::Digit0),
+      VirtualKey::Character("0".into()),
+      false,
+      KeyLocation::Standard,
+      ElementState::Pressed,
+    );
 
-    wnd.add_delay_event(DelayEvent::KeyDown {
-      id: focusing,
-      physical_key: PhysicalKey::Code(KeyCode::Digit0),
-      key: VirtualKey::Character("Key0".into()),
-    });
+    wnd.processes_keyboard_event(
+      PhysicalKey::Code(KeyCode::Digit0),
+      VirtualKey::Character("0".into()),
+      false,
+      KeyLocation::Standard,
+      ElementState::Released,
+    );
 
-    wnd.add_delay_event(DelayEvent::KeyUp {
-      id: focusing,
-      physical_key: PhysicalKey::Code(KeyCode::Digit0),
-      key: VirtualKey::Character("Key0".into()),
-    });
+    wnd.processes_keyboard_event(
+      PhysicalKey::Code(KeyCode::Digit1),
+      VirtualKey::Character("1".into()),
+      false,
+      KeyLocation::Standard,
+      ElementState::Pressed,
+    );
 
-    wnd.add_delay_event(DelayEvent::KeyDown {
-      id: focusing,
-      physical_key: PhysicalKey::Code(KeyCode::Digit1),
-      key: VirtualKey::Character("Key1".into()),
-    });
-
-    wnd.add_delay_event(DelayEvent::KeyUp {
-      id: focusing,
-      physical_key: PhysicalKey::Code(KeyCode::Digit1),
-      key: VirtualKey::Character("Key1".into()),
-    });
+    wnd.processes_keyboard_event(
+      PhysicalKey::Code(KeyCode::Digit1),
+      VirtualKey::Character("1".into()),
+      false,
+      KeyLocation::Standard,
+      ElementState::Released,
+    );
 
     wnd.run_frame_tasks();
-
     assert_eq!(
       &*keys.borrow(),
       &[
-        "key down capture Character(\"Key0\")",
-        "key down Character(\"Key0\")",
-        "key up capture Character(\"Key0\")",
-        "key up Character(\"Key0\")",
-        "key down capture Character(\"Key1\")",
-        "key down Character(\"Key1\")",
-        "key up capture Character(\"Key1\")",
-        "key up Character(\"Key1\")"
+        "key down capture Character(\"0\")",
+        "key down Character(\"0\")",
+        "key up capture Character(\"0\")",
+        "key up Character(\"0\")",
+        "key down capture Character(\"1\")",
+        "key down Character(\"1\")",
+        "key up capture Character(\"1\")",
+        "key up Character(\"1\")"
       ]
     );
   }

@@ -36,7 +36,7 @@ mod tests {
   };
 
   use super::*;
-  use crate::{test_helper::*, window::DelayEvent};
+  use crate::test_helper::*;
 
   #[test]
   fn tab_scope() {
@@ -192,11 +192,13 @@ mod tests {
     // will deal key event twice (inner and host).
     wnd.draw_frame();
 
-    wnd.add_delay_event(DelayEvent::KeyDown {
-      id: wnd.focusing().unwrap(),
-      physical_key: PhysicalKey::Code(KeyCode::Digit1),
-      key: VirtualKey::Character("1".into()),
-    });
+    wnd.processes_keyboard_event(
+      PhysicalKey::Code(KeyCode::Digit0),
+      VirtualKey::Character("0".into()),
+      false,
+      KeyLocation::Standard,
+      ElementState::Pressed,
+    );
 
     wnd.run_frame_tasks();
     wnd.draw_frame();

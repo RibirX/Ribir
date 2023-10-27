@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::{convert::Infallible, sync::Once};
 use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
 use winit::{
-  event::{Event, StartCause, WindowEvent},
+  event::{Event, Ime, KeyEvent, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
 };
 
@@ -122,8 +122,7 @@ impl App {
               request_redraw(&wnd)
             }
             event => {
-              #[allow(deprecated)]
-              wnd.processes_native_event(event);
+              App::dispatch_wnd_native_event(&wnd, event);
             }
           }
           wnd.run_frame_tasks();
@@ -163,6 +162,34 @@ impl App {
         _ => (),
       }
     });
+  }
+
+  fn dispatch_wnd_native_event(wnd: &Window, event: WindowEvent) {
+    match event {
+      WindowEvent::KeyboardInput { event, .. } => {
+        let KeyEvent {
+          physical_key,
+          logical_key,
+          text,
+          location,
+          repeat,
+          state,
+          ..
+        } = event;
+        wnd.processes_keyboard_event(physical_key, logical_key, repeat, location, state);
+
+        if let Some(txt) = text {
+          wnd.processes_receive_chars(txt.to_string());
+        }
+      }
+      WindowEvent::Ime(ime) => {
+        if let Ime::Commit(s) = ime {
+          wnd.processes_receive_chars(s)
+        }
+      }
+      #[allow(deprecated)]
+      _ => wnd.processes_native_event(event),
+    }
   }
 
   #[track_caller]

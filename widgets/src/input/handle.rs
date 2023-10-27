@@ -86,7 +86,7 @@ fn key_with_command(this: &mut TextEditorArea, event: &KeyboardEvent) -> bool {
 
   // use the physical key to make sure the keyboard with different
   // layout use the same key as shortcut.
-  match event.physical_key {
+  match event.key_code() {
     PhysicalKey::Code(KeyCode::KeyV) => {
       let clipboard = AppCtx::clipboard();
       let txt = clipboard.borrow_mut().read_text();
@@ -116,7 +116,7 @@ fn key_with_command(this: &mut TextEditorArea, event: &KeyboardEvent) -> bool {
 }
 
 fn single_key(this: &mut TextEditorArea, key: &KeyboardEvent) -> bool {
-  match key.key {
+  match key.key() {
     VirtualKey::Named(NamedKey::Enter) => {
       if this.multi_line {
         InputWriter::new(this).insert_str("\r");
