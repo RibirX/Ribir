@@ -4,7 +4,7 @@ use crate::{
   animation::RocBoxClone,
   context::BuildCtx,
   fill_transition,
-  prelude::{easing, Roc, Transition},
+  prelude::{easing, EasingTransition, Transition},
 };
 
 use super::Theme;
@@ -70,7 +70,7 @@ impl TransitionIdent {
 
   /// get transition of the transition identify from the context if it have or
   /// return linear transition.
-  pub fn of(self, ctx: &BuildCtx) -> Box<dyn Roc> {
+  pub fn of(self, ctx: &BuildCtx) -> Box<dyn Transition> {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(t) => {
@@ -94,23 +94,23 @@ impl Default for TransitionTheme {
   fn default() -> Self {
     let mut theme = Self { transitions: Default::default() };
     fill_transition! { theme,
-      transitions::EASE: Transition {
+      transitions::EASE: EasingTransition {
         duration: Duration::from_millis(250),
         easing: easing::EASE,
       },
-      transitions::LINEAR: Transition {
+      transitions::LINEAR: EasingTransition {
         duration: Duration::from_millis(200),
         easing: easing::LINEAR,
       },
-      transitions::EASE_IN: Transition {
+      transitions::EASE_IN: EasingTransition {
         duration: Duration::from_millis(250),
         easing: easing::EASE_IN,
       },
-      transitions::EASE_OUT: Transition {
+      transitions::EASE_OUT: EasingTransition {
         duration: Duration::from_millis(200),
         easing: easing::EASE_OUT,
       },
-      transitions::EASE_IN_OUT: Transition {
+      transitions::EASE_IN_OUT: EasingTransition {
         duration: Duration::from_millis(250),
         easing: easing::EASE_IN_OUT,
       }

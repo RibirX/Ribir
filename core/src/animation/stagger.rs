@@ -60,7 +60,7 @@ pub struct Stagger<T> {
   run_times: usize,
 }
 
-impl<T: Roc + 'static> Stagger<T> {
+impl<T: Transition + 'static> Stagger<T> {
   /// **stagger**: the default duration between two adjacent animations start.
   /// **transition**: the transition for the states.
   pub fn new(stagger: Duration, transition: T) -> Stateful<Self> {
@@ -142,7 +142,7 @@ struct AnimationCursor {
   index: usize,
 }
 
-impl<T: Roc + 'static> Animation for Stateful<Stagger<T>> {
+impl<T: Transition + 'static> Animation for Stateful<Stagger<T>> {
   fn run(&self) {
     if self.is_running() {
       self.stop()
@@ -178,7 +178,7 @@ impl<T: Roc + 'static> Animation for Stateful<Stagger<T>> {
   }
 }
 
-impl<T: Roc + 'static> Stateful<Stagger<T>> {
+impl<T: Transition + 'static> Stateful<Stagger<T>> {
   fn trigger_next(&self) {
     let mut this = self.write();
     if let Some(step) = this.next_to_run.take() {
@@ -262,7 +262,7 @@ mod tests {
 
     let stagger = Stagger::new(
       Duration::from_millis(100),
-      Transition {
+      EasingTransition {
         duration: Duration::ZERO,
         easing: easing::LINEAR,
       },
