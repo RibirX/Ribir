@@ -7,7 +7,7 @@ where
   S: AnimateState + 'static,
 {
   #[declare(strict, default = transitions::LINEAR.of(ctx!()))]
-  pub transition: Box<dyn Roc>,
+  pub transition: Box<dyn Transition>,
   #[declare(strict)]
   pub state: S,
   pub from: S::Value,
@@ -178,7 +178,7 @@ mod tests {
 
     let w = fn_widget! {
       let animate = @Animate {
-        transition: Transition {
+        transition: EasingTransition {
           easing: easing::LINEAR,
           duration: Duration::ZERO,
         }.box_it(),
