@@ -114,12 +114,9 @@ pub fn register_platform_app_events_handlers() {
         let _ = interval(Duration::from_secs(5), AppCtx::scheduler())
           .take_while(|_| !query_accessibility_permissions())
           .on_complete(|| {
-            println!("interval complete");
             add_global_monitor_for_events_matching_mask_handler();
           })
-          .subscribe(|_| {
-            println!("interval tick");
-          });
+          .subscribe(|_| {});
       }
     });
   }
