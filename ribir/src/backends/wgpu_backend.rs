@@ -6,6 +6,7 @@ use ribir_gpu::WgpuTexture;
 use crate::winit_shell_wnd::WinitBackend;
 
 pub struct WgpuBackend {
+  size: DeviceSize,
   surface: wgpu::Surface,
   backend: ribir_gpu::GPUBackend<ribir_gpu::WgpuImpl>,
   current_texture: Option<ribir_gpu::WgpuTexture>,
@@ -23,6 +24,7 @@ impl WinitBackend for WgpuBackend {
     );
 
     WgpuBackend {
+      size: DeviceSize::new(size.width as i32, size.height as i32),
       surface,
       backend: ribir_gpu::GPUBackend::new(wgpu, AntiAliasing::Msaa4X),
       current_texture: None,
@@ -30,7 +32,8 @@ impl WinitBackend for WgpuBackend {
   }
 
   fn on_resize(&mut self, size: DeviceSize) {
-    if !size.is_empty() {
+    if !size.is_empty() && size != self.size {
+      self.size = size;
       self.surface.configure(
         self.backend.get_impl().device(),
         &Self::surface_config(size.width as u32, size.height as u32),
