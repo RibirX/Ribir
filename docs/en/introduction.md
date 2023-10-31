@@ -51,15 +51,17 @@ Due to the need to handle multiple complex real-life situations, a general GUI f
 **Pure composition**: Ribir uses widgets to build interfaces. Unlike common object-oriented GUI frameworks, Ribir widgets do not need to inherit a base class or hold a base object. It is a pure composition model, even the parent-child relationship and built-in fields are completed through composition. The advantage of this is that the widget only needs to focus on the capabilities it provides, so it can be made very small to improve reuse. For example, Ribir has many very mini built-in widgets, and using these built-in widgets to extend ordinary widgets is powerful, but does not bring any overhead to them. For example:
 
 ```rust
+use ribir::prelude::*;
+
 fn_widget!{
   @Text {
     // `margin` is not a field of `Text`,
     // it is a field of the built-in widget `Margin`,
     // but it can still be used directly by `Text`.
-    margin: EdgeInset::all(8),
+    margin: EdgeInsets::all(8.),
     text: "Hello world!"
   }
-}
+};
 ```
 
 The above example shows the way of combining built-in widgets. Even if `Text` does not have a `margin` field, you can still use the `Margin::margin` and compose it with `Text` to form a new widget. `Margin` will only be created when a widget uses the `margin` field, otherwise there will be no overhead.
@@ -70,13 +72,15 @@ The above example shows the way of combining built-in widgets. Even if `Text` do
 At the same time, it provides the ability to split the state, so that the local view can directly depend on the modification of part of the data to update (introduced in detail in the subsequent tutorial). Another big difference is that stateful and stateless can be converted to each other. If a state has no write source, it will degenerate into stateless， because no one will update it. For example:
 
 ```rust
+use ribir::prelude::*;
+
 fn_widget!{
   let show_hi = Stateful::new(true);
   @Text {
-    visible: pipe!($show_hi),
+    visible: pipe!(*$show_hi),
     text: "Hello world!"
   }
-}
+};
 ```
 
 In the above example, we declared a `Text` and used the `pipe!` macro to directly associate the visibility of `Text` with `show_hi`. But this association will be eliminated when the view is constructed, because `show_hi` always remains unchanged - it has no write source. Therefore, Ribir constructs a simple static view.
