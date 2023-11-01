@@ -262,6 +262,7 @@ macro_rules! widget_bench {
     wnd_size = $size: expr $(,)?
   ) => {
     paste::paste! {
+      #[cfg(test)]
       #[bench]
       fn [<$widget_fn _widget_bench>](b: &mut Bencher) {
         let _scope = unsafe { AppCtx::new_lock_scope() };

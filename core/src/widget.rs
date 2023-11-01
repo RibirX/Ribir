@@ -60,6 +60,8 @@ pub struct Widget {
   handle: BuildCtxHandle,
 }
 
+pub type FnWidget = Box<dyn for<'a, 'b> FnOnce(&'a BuildCtx<'b>) -> Widget>;
+
 /// A type can composed by many types, this trait help us to query the type and
 /// the inner type by its type id, and call the callback one by one with a `&
 /// dyn Any` of the target type. You can control if you want to continue query
@@ -141,6 +143,26 @@ impl<'a> dyn Render + 'a {
 /// `ComposeChild`,  like function widget and  `Pipe<Widget>`.
 pub trait WidgetBuilder {
   fn widget_build(self, ctx: &BuildCtx) -> Widget;
+
+  /// Convert the widget to a `FnWidget`, this is useful when you want
+  /// store a widget and not want to call `widget_build(ctx!())` to build it
+  /// into the widget tree.
+  ///
+  /// # Example
+  ///
+  /// ```ignore
+  /// let w = if xxx {
+  ///   fn_widget! { ... }.box_fn_widget()
+  /// else {
+  ///   fn_widget! { ... }.box_fn_widget()
+  /// };
+  /// ```
+  fn box_fn_widget(self) -> FnWidget
+  where
+    Self: Sized + 'static,
+  {
+    Box::new(move |ctx| self.widget_build(ctx))
+  }
 }
 
 /// Trait to build a compose widget into widget tree with `BuildCtx` in the
