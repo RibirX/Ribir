@@ -16,6 +16,8 @@ paste.workspace = true
 # we disable `default-features`, because we want more control over testing.
 ribir = {path = "../../ribir", features = ["material", "widgets"]}
 ribir_dev_helper = {path = "../../dev-helper"}
+serde = {workspace = true, features = ["derive"]}
+serde_json = {workspace = true}
 
 [features]
 wgpu = ["ribir/wgpu"]

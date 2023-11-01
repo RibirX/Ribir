@@ -172,12 +172,6 @@ pub fn rdl(input: TokenStream) -> TokenStream {
 /// use to expression a state reference of `name`.
 #[proc_macro]
 pub fn fn_widget(input: TokenStream) -> TokenStream {
-  // if input.to_string().contains("$child.layout_size()") {
-  //   println!(
-  //     "gen code\n  {}",
-  //     FnWidgetMacro::gen_code(input.clone().into(), &mut
-  // DollarRefsCtx::top_level()).to_string()   )
-  // }
   FnWidgetMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
