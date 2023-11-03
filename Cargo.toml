@@ -85,7 +85,7 @@ webbrowser = "0.8.8"
 wgpu = {version = "0.17.1"}
 winit = { version="0.29.3", default-features = false, features = ["x11", "wayland", "wayland-dlopen", "rwh_05"]}
 zerocopy = "0.7.3"
-quick-xml = "0.30.0"
+quick-xml = "0.31.0"
 macos-accessibility-client = { version = "0.0.1" }
 
 [workspace.metadata.release]
