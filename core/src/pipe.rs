@@ -511,7 +511,7 @@ impl<V> Pipe for ValuePipe<V> {
   }
 }
 
-crate::widget::multi_build_replace_impl_include_self! {
+crate::widget::multi_build_replace_impl! {
   impl<V, S, F> {#} for MapPipe<V, S, F>
   where
     V: {#} + 'static,
@@ -541,6 +541,27 @@ crate::widget::multi_build_replace_impl_include_self! {
       self.build(ctx, |w, ctx| w.widget_build(ctx))
     }
   }
+}
+
+impl<S, F> WidgetBuilder for MapPipe<Widget, S, F>
+where
+  S: InnerPipe,
+  S::Value: 'static,
+  F: FnMut(S::Value) -> Widget + 'static,
+{
+  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.build(ctx, |w, ctx| w.widget_build(ctx)) }
+}
+
+impl<S, F> WidgetBuilder for FinalChain<Widget, S, F>
+where
+  S: InnerPipe<Value = Widget>,
+  F: FnOnce(ValueStream<Widget>) -> ValueStream<Widget> + 'static,
+{
+  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.build(ctx, |w, ctx| w.widget_build(ctx)) }
+}
+
+impl WidgetBuilder for Box<dyn Pipe<Value = Widget>> {
+  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.build(ctx, |w, ctx| w.widget_build(ctx)) }
 }
 
 macro_rules! pipe_option_to_widget {
@@ -1403,5 +1424,15 @@ mod tests {
 
     assert_eq!(*hit.read(), -1);
     assert!(u.is_closed());
+  }
+
+  #[test]
+  fn widget_from_pipe_widget() {
+    reset_test_env!();
+    let _ = fn_widget! {
+      let v = Stateful::new(true);
+      let w = pipe!(*$v).map(move |_| Void.widget_build(ctx!()));
+      Widget::child_from(w, ctx!())
+    };
   }
 }
