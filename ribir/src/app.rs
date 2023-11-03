@@ -9,6 +9,7 @@ use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
 use winit::{
   event::{Event, Ime, KeyEvent, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
+  keyboard::KeyCode,
 };
 
 pub struct App {
@@ -17,9 +18,9 @@ pub struct App {
   events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HotkeyEvent {
-  pub key_code: Option<VirtualKeyCode>,
+  pub key_code: Option<KeyCode>,
   pub modifiers: Option<ModifiersState>,
 }
 
