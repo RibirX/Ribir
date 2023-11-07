@@ -255,7 +255,7 @@ impl PathSampler {
 
 impl Radius {
   #[inline]
-  pub fn new(top_left: f32, top_right: f32, bottom_left: f32, bottom_right: f32) -> Radius {
+  pub const fn new(top_left: f32, top_right: f32, bottom_left: f32, bottom_right: f32) -> Radius {
     Radius {
       top_left,
       top_right,
@@ -266,41 +266,69 @@ impl Radius {
 
   /// Creates a radius where all radii are radius.
   #[inline]
-  pub fn all(radius: f32) -> Radius { Self::new(radius, radius, radius, radius) }
+  pub const fn all(radius: f32) -> Radius { Self::new(radius, radius, radius, radius) }
 
   #[inline]
-  pub fn left(left: f32) -> Radius { Self::new(left, 0., left, 0.) }
+  pub const fn left(left: f32) -> Radius { Self::new(left, 0., left, 0.) }
 
   #[inline]
-  pub fn right(right: f32) -> Radius { Self::new(0., right, 0., right) }
+  pub const fn right(right: f32) -> Radius { Self::new(0., right, 0., right) }
 
   #[inline]
-  pub fn top(top: f32) -> Radius { Self::new(top, top, 0., 0.) }
+  pub const fn top(top: f32) -> Radius { Self::new(top, top, 0., 0.) }
 
   #[inline]
-  pub fn bottom(bottom: f32) -> Radius { Self::new(0., 0., bottom, bottom) }
+  pub const fn bottom(bottom: f32) -> Radius { Self::new(0., 0., bottom, bottom) }
 
   /// Creates a horizontally symmetrical radius where the left and right sides
   /// of the rectangle have the same radii.
   #[inline]
-  pub fn horizontal(left: f32, right: f32) -> Radius { Self::new(left, right, left, right) }
+  pub const fn horizontal(left: f32, right: f32) -> Radius { Self::new(left, right, left, right) }
 
   ///Creates a vertically symmetric radius where the top and bottom sides of
   /// the rectangle have the same radii.
   #[inline]
-  pub fn vertical(top: f32, bottom: f32) -> Radius { Self::new(top, top, bottom, bottom) }
+  pub const fn vertical(top: f32, bottom: f32) -> Radius { Self::new(top, top, bottom, bottom) }
 
   #[inline]
-  pub fn top_left(top_left: f32) -> Self { Radius { top_left, ..<_>::default() } }
+  pub const fn top_left(top_left: f32) -> Self {
+    Radius {
+      top_left,
+      top_right: 0.,
+      bottom_left: 0.,
+      bottom_right: 0.,
+    }
+  }
 
   #[inline]
-  pub fn top_right(top_right: f32) -> Self { Radius { top_right, ..<_>::default() } }
+  pub const fn top_right(top_right: f32) -> Self {
+    Radius {
+      top_right,
+      top_left: 0.,
+      bottom_left: 0.,
+      bottom_right: 0.,
+    }
+  }
 
   #[inline]
-  pub fn bottom_left(bottom_left: f32) -> Self { Radius { bottom_left, ..<_>::default() } }
+  pub const fn bottom_left(bottom_left: f32) -> Self {
+    Radius {
+      bottom_left,
+      top_left: 0.,
+      top_right: 0.,
+      bottom_right: 0.,
+    }
+  }
 
   #[inline]
-  pub fn bottom_right(bottom_right: f32) -> Self { Radius { bottom_right, ..<_>::default() } }
+  pub const fn bottom_right(bottom_right: f32) -> Self {
+    Radius {
+      bottom_right,
+      top_left: 0.,
+      top_right: 0.,
+      bottom_left: 0.,
+    }
+  }
 }
 
 impl From<LyonPath> for Path {
