@@ -4,132 +4,208 @@ use ribir_core::prelude::*;
 
 use super::caret_state::CaretPosition;
 
-#[derive(Default)]
-pub(crate) struct GlyphsHelper {
-  pub(crate) glyphs: Option<VisualGlyphs>,
+impl<K, V> SingleKeyMap<K, V>
+where
+  K: Eq,
+{
+  fn get(&self, key: &K) -> Option<&V> { self.0.as_ref().filter(|(k, _)| k == key).map(|(_, v)| v) }
 }
 
-impl GlyphsHelper {
-  pub(crate) fn caret_position_from_pos(&self, x: f32, y: f32) -> CaretPosition {
-    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
-    let (para, mut offset) = glyphs.nearest_glyph(x, y);
-    let rc = glyphs.glyph_rect(para, offset);
+struct SingleKeyMap<K, V>(Option<(K, V)>);
+
+impl<K, V> Default for SingleKeyMap<K, V> {
+  fn default() -> Self { Self(None) }
+}
+
+#[derive(Default)]
+pub(crate) struct TextGlyphsHelper {
+  helper: SingleKeyMap<CowArc<str>, VisualGlyphs>,
+}
+
+impl TextGlyphsHelper {
+  pub(crate) fn new(text: CowArc<str>, glyphs: VisualGlyphs) -> Self {
+    Self {
+      helper: SingleKeyMap(Some((text, glyphs))),
+    }
+  }
+
+  pub(crate) fn line_end(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
+    self.helper.get(text)?.line_end(caret).into()
+  }
+
+  pub(crate) fn line_begin(
+    &self,
+    text: &CowArc<str>,
+    caret: CaretPosition,
+  ) -> Option<CaretPosition> {
+    self.helper.get(text)?.line_begin(caret).into()
+  }
+
+  pub(crate) fn prev(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
+    self.helper.get(text)?.prev(caret).into()
+  }
+
+  pub(crate) fn next(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
+    self.helper.get(text)?.next(caret).into()
+  }
+
+  pub(crate) fn up(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
+    self.helper.get(text)?.up(caret).into()
+  }
+
+  pub(crate) fn down(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
+    self.helper.get(text)?.down(caret).into()
+  }
+
+  pub(crate) fn cursor(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<Point> {
+    let this = self.helper.get(text)?;
+    this.cursor(caret).into()
+  }
+
+  pub(crate) fn line_height(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<f32> {
+    let this = self.helper.get(text)?;
+    this.line_height_by_caret(caret).into()
+  }
+
+  pub(crate) fn selection(&self, text: &CowArc<str>, rg: &Range<usize>) -> Option<Vec<Rect>> {
+    self.helper.get(text)?.selection(rg).into()
+  }
+}
+
+pub(crate) trait GlyphsHelper {
+  fn caret_position_from_pos(&self, x: f32, y: f32) -> CaretPosition;
+
+  fn line_end(&self, caret: CaretPosition) -> CaretPosition;
+
+  fn line_begin(&self, caret: CaretPosition) -> CaretPosition;
+
+  fn cluster_from_glyph_position(&self, row: usize, col: usize) -> usize;
+
+  fn prev(&self, caret: CaretPosition) -> CaretPosition;
+
+  fn next(&self, caret: CaretPosition) -> CaretPosition;
+
+  fn up(&self, caret: CaretPosition) -> CaretPosition;
+
+  fn down(&self, caret: CaretPosition) -> CaretPosition;
+
+  fn cursor(&self, caret: CaretPosition) -> Point;
+
+  fn line_height_by_caret(&self, caret: CaretPosition) -> f32;
+
+  fn selection(&self, rg: &Range<usize>) -> Vec<Rect>;
+
+  fn caret_position(&self, caret: CaretPosition) -> (usize, usize);
+}
+
+impl GlyphsHelper for VisualGlyphs {
+  fn caret_position_from_pos(&self, x: f32, y: f32) -> CaretPosition {
+    let (para, mut offset) = self.nearest_glyph(x, y);
+    let rc = self.glyph_rect(para, offset);
     if (rc.min_x() - x).abs() > (rc.max_x() - x).abs() {
       offset += 1;
     }
-    let cluster = glyphs.position_to_cluster(para, offset);
+    let cluster = self.position_to_cluster(para, offset);
     CaretPosition {
       cluster,
       position: Some((para, offset)),
     }
   }
 
-  pub(crate) fn line_end(&self, caret: CaretPosition) -> CaretPosition {
-    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
-
-    let row = caret_position(glyphs, caret).0;
-    let col = glyphs.glyph_count(row, true);
+  fn line_end(&self, caret: CaretPosition) -> CaretPosition {
+    let row = self.caret_position(caret).0;
+    let col = self.glyph_count(row, true);
     let cluster = self.cluster_from_glyph_position(row, col);
     CaretPosition { cluster, position: Some((row, col)) }
   }
 
-  pub(crate) fn line_begin(&self, caret: CaretPosition) -> CaretPosition {
-    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
-    let row = caret_position(glyphs, caret).0;
+  fn line_begin(&self, caret: CaretPosition) -> CaretPosition {
+    let row = self.caret_position(caret).0;
     let cluster: usize = self.cluster_from_glyph_position(row, 0);
     CaretPosition { cluster, position: Some((row, 0)) }
   }
 
-  pub(crate) fn cluster_from_glyph_position(&self, row: usize, col: usize) -> usize {
-    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
-    glyphs.position_to_cluster(row, col)
+  fn cluster_from_glyph_position(&self, row: usize, col: usize) -> usize {
+    self.position_to_cluster(row, col)
   }
 
-  pub(crate) fn prev(&self, caret: CaretPosition) -> CaretPosition {
-    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
-    let (mut row, mut col) = caret_position(glyphs, caret);
+  fn prev(&self, caret: CaretPosition) -> CaretPosition {
+    let (mut row, mut col) = self.caret_position(caret);
 
     (row, col) = match (row > 0, col > 0) {
       (_, true) => (row, col - 1),
-      (true, false) => (row - 1, glyphs.glyph_count(row - 1, true)),
+      (true, false) => (row - 1, self.glyph_count(row - 1, true)),
       (false, false) => (0, 0),
     };
 
-    let cluster = glyphs.position_to_cluster(row, col);
+    let cluster = self.position_to_cluster(row, col);
     CaretPosition { cluster, position: Some((row, col)) }
   }
 
-  pub(crate) fn next(&self, caret: CaretPosition) -> CaretPosition {
-    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
-    let (mut row, mut col) = caret_position(glyphs, caret);
+  fn next(&self, caret: CaretPosition) -> CaretPosition {
+    let (mut row, mut col) = self.caret_position(caret);
     (row, col) = match (
-      row + 1 < glyphs.glyph_row_count(),
-      col < glyphs.glyph_count(row, true),
+      row + 1 < self.glyph_row_count(),
+      col < self.glyph_count(row, true),
     ) {
       (_, true) => (row, col + 1),
       (true, false) => (row + 1, 0),
-      (false, false) => (row, glyphs.glyph_count(row, true)),
+      (false, false) => (row, self.glyph_count(row, true)),
     };
 
-    let cluster = glyphs.position_to_cluster(row, col);
+    let cluster = self.position_to_cluster(row, col);
     CaretPosition { cluster, position: Some((row, col)) }
   }
 
-  pub(crate) fn up(&self, caret: CaretPosition) -> CaretPosition {
-    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
-    let (mut row, mut col) = caret_position(glyphs, caret);
+  fn up(&self, caret: CaretPosition) -> CaretPosition {
+    let (mut row, mut col) = self.caret_position(caret);
 
     (row, col) = match row > 0 {
-      true => (row - 1, col.min(glyphs.glyph_count(row - 1, true))),
+      true => (row - 1, col.min(self.glyph_count(row - 1, true))),
       false => (row, col),
     };
-    let cluster = glyphs.position_to_cluster(row, col);
+    let cluster = self.position_to_cluster(row, col);
     CaretPosition { cluster, position: Some((row, col)) }
   }
 
-  pub(crate) fn down(&self, caret: CaretPosition) -> CaretPosition {
-    let glyphs: &VisualGlyphs = self.glyphs.as_ref().unwrap();
-    let (mut row, mut col) = caret_position(glyphs, caret);
-    (row, col) = match row + 1 < glyphs.glyph_row_count() {
-      true => (row + 1, col.min(glyphs.glyph_count(row + 1, true))),
+  fn down(&self, caret: CaretPosition) -> CaretPosition {
+    let (mut row, mut col) = self.caret_position(caret);
+    (row, col) = match row + 1 < self.glyph_row_count() {
+      true => (row + 1, col.min(self.glyph_count(row + 1, true))),
       false => (row, col),
     };
-    let cluster = glyphs.position_to_cluster(row, col);
+    let cluster = self.position_to_cluster(row, col);
     CaretPosition { cluster, position: Some((row, col)) }
   }
 
-  pub(crate) fn cursor(&self, caret: CaretPosition) -> (Point, f32) {
-    if let Some(glyphs) = self.glyphs.as_ref() {
-      let (row, col) = caret_position(glyphs, caret);
-
-      let line_height = glyphs.line_height(row);
-      if col == 0 {
-        let glphy = glyphs.glyph_rect(row, col);
-        (Point::new(glphy.min_x(), glphy.min_y()), line_height)
-      } else {
-        let glphy = glyphs.glyph_rect(row, col - 1);
-        (Point::new(glphy.max_x(), glphy.min_y()), line_height)
-      }
+  fn cursor(&self, caret: CaretPosition) -> Point {
+    let (row, col) = self.caret_position(caret);
+    if col == 0 {
+      let glphy = self.glyph_rect(row, col);
+      Point::new(glphy.min_x(), glphy.min_y())
     } else {
-      (Point::zero(), 0.)
+      let glphy = self.glyph_rect(row, col - 1);
+      Point::new(glphy.max_x(), glphy.min_y())
     }
   }
 
-  pub(crate) fn selection(&self, rg: &Range<usize>) -> Vec<Rect> {
+  fn line_height_by_caret(&self, caret: CaretPosition) -> f32 {
+    let (row, _col) = self.caret_position(caret);
+    self.line_height(row)
+  }
+
+  fn selection(&self, rg: &Range<usize>) -> Vec<Rect> {
     if rg.is_empty() {
       return vec![];
     }
-    self
-      .glyphs
-      .as_ref()
-      .map_or(vec![], |glyphs| glyphs.select_range(rg))
+    self.select_range(rg)
   }
-}
 
-fn caret_position(glyphs: &VisualGlyphs, caret: CaretPosition) -> (usize, usize) {
-  caret
-    .position
-    .unwrap_or_else(|| glyphs.position_by_cluster(caret.cluster))
+  fn caret_position(&self, caret: CaretPosition) -> (usize, usize) {
+    caret
+      .position
+      .unwrap_or_else(|| self.position_by_cluster(caret.cluster))
+  }
 }
 
 #[cfg(test)]
@@ -179,7 +255,7 @@ mod tests {
       &face,
       cfg,
     );
-    let helper = GlyphsHelper { glyphs: Some(glyphs) };
+    let helper = glyphs;
     let mut caret = CaretPosition { cluster: 0, position: None };
     caret = helper.prev(caret);
     assert!(caret == CaretPosition { cluster: 0, position: Some((0, 0)) });

@@ -161,7 +161,9 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
 ///   like: `let row = rdl!{ Widget::new(Void) };`
 #[proc_macro]
 pub fn rdl(input: TokenStream) -> TokenStream {
-  RdlMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  let mut refs = DollarRefsCtx::top_level();
+  refs.new_dollar_scope(false);
+  RdlMacro::gen_code(input.into(), &mut refs)
 }
 
 /// The `fn_widget` is a macro that create a widget from a function widget from

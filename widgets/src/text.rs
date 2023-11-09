@@ -1,7 +1,4 @@
-use ribir_core::prelude::{
-  typography::{PlaceLineDirection, TypographyCfg},
-  *,
-};
+use ribir_core::prelude::*;
 
 /// The text widget display text with a single style.
 #[derive(Debug, Declare, Query, Clone, PartialEq)]
@@ -19,37 +16,20 @@ pub struct Text {
   pub text_align: TextAlign,
 }
 
-impl Text {
-  pub fn text_layout(&self, bound: Size) -> VisualGlyphs {
-    let TextStyle {
-      font_size,
-      letter_space,
-      line_height,
-      ref font_face,
-      ..
-    } = *self.text_style;
-
-    let width: Em = Pixel(bound.width.into()).into();
-    let height: Em = Pixel(bound.height.into()).into();
-    AppCtx::typography_store().typography(
-      self.text.substr(..),
-      font_size,
-      font_face,
-      TypographyCfg {
-        line_height,
-        letter_space,
-        text_align: self.text_align,
-        bounds: (width, height).into(),
-        line_dir: PlaceLineDirection::TopToBottom,
-        overflow: self.overflow,
-      },
-    )
-  }
+impl VisualText for Text {
+  fn text(&self) -> CowArc<str> { self.text.clone() }
+  fn text_style(&self) -> &TextStyle { &self.text_style }
+  fn text_align(&self) -> TextAlign { self.text_align }
+  fn overflow(&self) -> Overflow { self.overflow }
 }
 
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
-    self.text_layout(clamp.max).visual_rect().size.cast_unit()
+    self
+      .text_layout(AppCtx::typography_store(), clamp.max)
+      .visual_rect()
+      .size
+      .cast_unit()
   }
 
   #[inline]
@@ -57,16 +37,9 @@ impl Render for Text {
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let bounds = ctx.layout_clamp().map(|b| b.max);
-    let visual_glyphs = typography_with_text_style(
-      AppCtx::typography_store(),
-      self.text.clone(),
-      &self.text_style,
-      bounds,
-      self.text_align,
-      self.overflow,
-    );
+    let bounds = ctx.layout_clamp().map(|b| b.max).unwrap();
 
+    let visual_glyphs = self.text_layout(AppCtx::typography_store(), bounds);
     let font_db = AppCtx::font_db().clone();
     let font_size = self.text_style.font_size.into_pixel().value();
     let box_rect = Rect::from_size(ctx.box_size().unwrap());
@@ -80,46 +53,6 @@ impl Render for Text {
       font_db,
     );
   }
-}
-
-pub fn typography_with_text_style<T: Into<Substr>>(
-  store: &TypographyStore,
-  text: T,
-  style: &TextStyle,
-  bounds: Option<Size>,
-  text_align: TextAlign,
-  overflow: Overflow,
-) -> VisualGlyphs {
-  let &TextStyle {
-    font_size,
-    letter_space,
-    line_height,
-    ref font_face,
-    ..
-  } = style;
-
-  let bounds = if let Some(b) = bounds {
-    let width: Em = Pixel(b.width.into()).into();
-    let height: Em = Pixel(b.height.into()).into();
-    Size::new(width, height)
-  } else {
-    let max = Em::absolute(f32::MAX);
-    Size::new(max, max)
-  };
-
-  store.typography(
-    text.into(),
-    font_size,
-    font_face,
-    TypographyCfg {
-      line_height,
-      letter_space,
-      text_align,
-      bounds,
-      line_dir: PlaceLineDirection::TopToBottom,
-      overflow,
-    },
-  )
 }
 
 macro_rules! define_text_with_theme_style {

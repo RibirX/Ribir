@@ -1,10 +1,8 @@
-use crate::layout::SizedBox;
 use ribir_core::prelude::*;
 use std::time::Duration;
 #[derive(Declare)]
 pub struct Caret {
   pub focused: bool,
-  pub height: f32,
   #[declare(default = svgs::TEXT_CARET)]
   pub icon: NamedSvg,
 }
@@ -16,11 +14,10 @@ impl Compose for Caret {
       let icon = $this.icon;
       let mut caret = @ $icon {
         opacity: 0.,
-        box_fit: BoxFit::Fill,
+        box_fit: BoxFit::CoverY,
       };
       let mut _guard = None;
       watch!($this.focused)
-        .distinct_until_changed()
         .subscribe(move |focused| {
           if focused {
             $caret.write().opacity = 1.;
@@ -33,12 +30,7 @@ impl Compose for Caret {
             _guard = None;
           }
         });
-
-      @SizedBox {
-        left_anchor: pipe!(-$this.height / 2.),
-        size: pipe!(Size::new($this.height, $this.height)),
-        @ { caret }
-      }
+      @ { caret }
     }
   }
 }

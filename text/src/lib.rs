@@ -8,10 +8,12 @@ pub mod shaper;
 use derive_more::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 use fontdb::ID;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
+use ribir_algo::CowArc;
 pub use ribir_algo::Substr;
-use ribir_geom::Rect;
+use ribir_geom::{Rect, Size};
 use rustybuzz::ttf_parser::GlyphId;
 use std::hash::Hash;
+use typography::{PlaceLineDirection, TypographyCfg};
 pub mod text_reorder;
 pub mod typography;
 use ordered_float::OrderedFloat;
@@ -25,7 +27,7 @@ mod svg_glyph_cache;
 
 mod text_writer;
 pub use text_writer::{
-  select_next_word, select_prev_word, select_word, CharacterCursor, ControlChar, TextWriter,
+  select_next_word, select_prev_word, select_word, CharacterCursor, TextWriter,
 };
 
 mod grapheme_cursor;
@@ -365,5 +367,38 @@ impl<U> Glyph<U> {
       glyph_id,
       cluster,
     }
+  }
+}
+
+pub trait VisualText {
+  fn text(&self) -> CowArc<str>;
+  fn text_style(&self) -> &TextStyle;
+  fn text_align(&self) -> TextAlign;
+  fn overflow(&self) -> Overflow;
+
+  fn text_layout(&self, typography_store: &TypographyStore, bound: Size) -> VisualGlyphs {
+    let TextStyle {
+      font_size,
+      letter_space,
+      line_height,
+      ref font_face,
+      ..
+    } = *self.text_style();
+
+    let width: Em = Pixel(bound.width.into()).into();
+    let height: Em = Pixel(bound.height.into()).into();
+    typography_store.typography(
+      self.text().substr(..),
+      font_size,
+      font_face,
+      TypographyCfg {
+        line_height,
+        letter_space,
+        text_align: self.text_align(),
+        bounds: (width, height).into(),
+        line_dir: PlaceLineDirection::TopToBottom,
+        overflow: self.overflow(),
+      },
+    )
   }
 }

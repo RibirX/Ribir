@@ -346,15 +346,15 @@ fn build_input_area(
     visible.transition(transitions::LINEAR.of(ctx!()), ctx!());
 
     let mut input = @Input{ style: pipe!($theme.text.clone()) };
-    $input.write().set_text($this.text.clone());
+    $input.write().set_text(&$this.text);
 
-    watch!($input.text())
+    watch!($input.text().clone())
       .distinct_until_changed()
-      .subscribe(move |val| $this.silent().text = val);
+      .subscribe(move |val| $this.silent().text = val.clone());
 
     watch!($this.text.clone())
       .distinct_until_changed()
-      .subscribe(move |val| $input.write().set_text(val));
+      .subscribe(move |val| $input.write().set_text(&val));
 
     let h = watch!($theme.state)
       .distinct_until_changed()

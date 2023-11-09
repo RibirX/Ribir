@@ -201,6 +201,14 @@ impl App {
       WindowEvent::Ime(ime) => {
         if let Ime::Commit(s) = ime {
           wnd.processes_receive_chars(s)
+        } else {
+          let ime = match ime {
+            Ime::Enabled => ImePreEdit::Begin,
+            Ime::Preedit(txt, selected) => ImePreEdit::PreEdit { value: txt, cursor: selected },
+            Ime::Disabled => ImePreEdit::End,
+            Ime::Commit(_) => unreachable!(),
+          };
+          wnd.processes_ime_pre_edit(ime)
         }
       }
       #[allow(deprecated)]
