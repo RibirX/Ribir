@@ -164,14 +164,11 @@ impl FocusManager {
     }
   }
 
-  pub fn refresh(&mut self) {
+  pub fn next_focus(&mut self) -> Option<WidgetId> {
     let Some(focusing) = self.request_focusing.take() else {
-      return;
+      return self.focusing;
     };
-    if focusing.is_none() {
-      self.focusing = None;
-      return;
-    }
+    focusing?;
 
     let focusing = focusing.filter(|node_id| self.ignore_scope_id(*node_id).is_none());
     let focus_node = focusing.and_then(|wid| self.node_ids.get(&wid));
@@ -195,7 +192,7 @@ impl FocusManager {
     } else {
       None
     };
-    self.focusing = focus_to;
+    focus_to
   }
 
   fn focus_move_circle(&mut self, backward: bool) {
@@ -492,9 +489,9 @@ impl FocusManager {
   pub fn focusing(&self) -> Option<WidgetId> { self.focusing }
 
   pub fn refresh_focus(&mut self) {
-    self.refresh();
-    if self.focus_widgets.first() != self.focusing.as_ref() {
-      self.change_focusing_to(self.focusing);
+    let new_focus = self.next_focus();
+    if self.focus_widgets.first() != new_focus.as_ref() {
+      self.change_focusing_to(new_focus);
     }
   }
 
@@ -712,7 +709,7 @@ mod tests {
     );
     log.borrow_mut().clear();
 
-    wnd.focus_mgr.borrow_mut().focus(parent);
+    wnd.focus_mgr.borrow_mut().focus_next_widget();
     wnd.run_frame_tasks();
     assert_eq!(
       &*log.borrow(),

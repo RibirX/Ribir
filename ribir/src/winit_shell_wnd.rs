@@ -191,7 +191,10 @@ impl WinitShellWnd {
     }
 
     let winit_wnd = winit_wnd.build(window_target).unwrap();
+
+    #[cfg(windows)]
     enable_ime(&winit_wnd);
+
     WinitShellWnd {
       backend: Backend::new(&winit_wnd),
       winit_wnd,
@@ -200,10 +203,10 @@ impl WinitShellWnd {
   }
 }
 
+// tmp:  winit set_ime_position fail when use sogou ime in window
+// platform, issue link: https://github.com/rust-windowing/winit/issues/2780
+#[cfg(windows)]
 fn enable_ime(wnd: &winit::window::Window) {
-  // tmp:  winit set_ime_position fail when use sogou ime in window
-  // platform, issue link: https://github.com/rust-windowing/winit/issues/2780
-  #[cfg(windows)]
   unsafe {
     use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
     use std::ptr::null_mut;
