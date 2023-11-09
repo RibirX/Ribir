@@ -114,9 +114,11 @@ fn init_custom_style(theme: &mut FullTheme) {
   theme
     .custom_styles
     .set_custom_style(TextAreaStyle { rows: Some(2.), cols: Some(20.) });
-  theme.custom_styles.set_custom_style(SelectedTextStyle {
-    brush: Color::from_rgb(181, 215, 254).into(),
-  });
+  theme
+    .custom_styles
+    .set_custom_style(SelectedHighLightStyle {
+      brush: Color::from_rgb(181, 215, 254).into(),
+    });
   theme.custom_styles.set_custom_style(FilledButtonStyle {
     height: 40.,
     icon_size: ICON_TINY,

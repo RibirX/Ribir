@@ -1,94 +1,101 @@
 use std::ops::{Deref, DerefMut};
 
 use ribir_core::prelude::{
-  AppCtx, CharsEvent, GraphemeCursor, KeyCode, KeyboardEvent, NamedKey, PhysicalKey, TextWriter,
-  VirtualKey,
+  AppCtx, CharsEvent, GraphemeCursor, KeyCode, KeyboardEvent, NamedKey, PhysicalKey, StateWriter,
+  TextWriter, VirtualKey,
 };
 
-#[macro_export]
-macro_rules! declare_writer {
-  ($writer: ident, $host: ident) => {
-    struct $writer<'a> {
-      input: &'a mut $host,
-      writer: TextWriter<GraphemeCursor>,
-    }
+use super::EditableText;
 
-    impl<'a> $writer<'a> {
-      fn new(input: &'a mut $host) -> Self {
-        let cursor = GraphemeCursor(input.caret.cluster());
-        let string = input.text.to_string();
-        Self {
-          input,
-          writer: TextWriter::new(string, cursor),
-        }
-      }
-    }
-
-    impl<'a> Drop for $writer<'a> {
-      fn drop(&mut self) {
-        use $crate::input::caret_state::CaretPosition;
-        let Self { input, writer } = self;
-        input.caret = CaretPosition {
-          cluster: writer.byte_offset(),
-          position: None,
-        }
-        .into();
-        input.text = writer.text().clone().into();
-      }
-    }
-
-    impl<'a> Deref for $writer<'a> {
-      type Target = TextWriter<GraphemeCursor>;
-      fn deref(&self) -> &Self::Target { &self.writer }
-    }
-
-    impl<'a> DerefMut for $writer<'a> {
-      fn deref_mut(&mut self) -> &mut Self::Target { &mut self.writer }
-    }
-  };
+pub struct TextCaretWriter<'a, H>
+where
+  H: EditableText,
+{
+  host: &'a mut H,
+  writer: TextWriter<GraphemeCursor>,
 }
 
-fn txt_line_handler(txt: &str, multi_line: bool) -> String {
-  let it = txt.chars().filter(|c| !c.is_control());
-
-  if multi_line {
-    it.collect::<String>()
-  } else {
-    it.map(|c| if c == '\r' || c == '\n' { ' ' } else { c })
-      .collect::<String>()
-  }
-}
-
-declare_writer!(InputWriter, TextEditorArea);
-use super::TextEditorArea;
-impl TextEditorArea {
-  pub(crate) fn edit_handle(this: &mut TextEditorArea, event: &CharsEvent) {
-    if event.common.with_command_key() {
-      return;
-    }
-
-    let chars = txt_line_handler(&event.chars, this.multi_line);
-
-    if !chars.is_empty() {
-      let rg = this.caret.select_range();
-      let mut writer = InputWriter::new(this);
-      writer.delete_byte_range(&rg);
-      writer.insert_str(&chars);
-    }
-  }
-
-  pub(crate) fn key_handle(this: &mut TextEditorArea, event: &KeyboardEvent) {
-    let mut deal = false;
-    if event.with_command_key() {
-      deal = key_with_command(this, event)
-    }
-    if !deal {
-      single_key(this, event);
+impl<'a, H> TextCaretWriter<'a, H>
+where
+  H: EditableText,
+{
+  pub fn new(host: &'a mut H) -> Self {
+    let cursor = GraphemeCursor(host.caret().cluster());
+    let string = host.text().to_string();
+    Self {
+      host,
+      writer: TextWriter::new(string, cursor),
     }
   }
 }
 
-fn key_with_command(this: &mut TextEditorArea, event: &KeyboardEvent) -> bool {
+impl<'a, H> Drop for TextCaretWriter<'a, H>
+where
+  H: EditableText,
+{
+  fn drop(&mut self) {
+    use crate::input::caret_state::CaretPosition;
+    let Self { host, writer } = self;
+    let text = writer.text().to_string();
+    let caret = CaretPosition {
+      cluster: writer.byte_offset(),
+      position: None,
+    };
+
+    host.set_text_with_caret(&text, caret.into());
+  }
+}
+
+impl<'a, H> Deref for TextCaretWriter<'a, H>
+where
+  H: EditableText,
+{
+  type Target = TextWriter<GraphemeCursor>;
+  fn deref(&self) -> &Self::Target { &self.writer }
+}
+
+impl<'a, H> DerefMut for TextCaretWriter<'a, H>
+where
+  H: EditableText,
+{
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.writer }
+}
+
+pub(crate) fn edit_handle<F: EditableText>(this: &impl StateWriter<Value = F>, event: &CharsEvent) {
+  if event.common.with_command_key() {
+    return;
+  }
+  let chars = event
+    .chars
+    .chars()
+    .filter(|c| !c.is_control() || c.is_ascii_whitespace())
+    .collect::<String>();
+  if !chars.is_empty() {
+    let mut this = this.write();
+    let rg = this.caret().select_range();
+    let mut writer = TextCaretWriter::new(&mut *this);
+    writer.delete_byte_range(&rg);
+    writer.insert_str(&chars);
+  }
+}
+
+pub(crate) fn edit_key_handle<F: EditableText>(
+  this: &impl StateWriter<Value = F>,
+  event: &KeyboardEvent,
+) {
+  let mut deal = false;
+  if event.with_command_key() {
+    deal = key_with_command(this, event)
+  }
+  if !deal {
+    single_key(this, event);
+  }
+}
+
+fn key_with_command<F: EditableText>(
+  this: &impl StateWriter<Value = F>,
+  event: &KeyboardEvent,
+) -> bool {
   if !event.with_command_key() {
     return false;
   }
@@ -100,21 +107,22 @@ fn key_with_command(this: &mut TextEditorArea, event: &KeyboardEvent) -> bool {
       let clipboard = AppCtx::clipboard();
       let txt = clipboard.borrow_mut().read_text();
       if let Ok(txt) = txt {
-        let chars = txt_line_handler(&txt, this.multi_line);
-        let rg = this.caret.select_range();
-        let mut writer = InputWriter::new(this);
+        let mut this = this.write();
+        let rg = this.caret().select_range();
+        let mut writer = TextCaretWriter::new(&mut *this);
         if !rg.is_empty() {
           writer.delete_byte_range(&rg);
         }
-        writer.insert_chars(&chars);
+        writer.insert_chars(&txt);
       }
       true
     }
     PhysicalKey::Code(KeyCode::KeyX) => {
-      let rg = this.caret.select_range();
+      let rg = this.read().caret().select_range();
       if !rg.is_empty() {
-        let txt = this.text.substr(rg.clone()).to_string();
-        InputWriter::new(this).delete_byte_range(&rg);
+        let mut this = this.write();
+        let txt = this.text().substr(rg.clone()).to_string();
+        TextCaretWriter::new(&mut *this).delete_byte_range(&rg);
         let clipboard = AppCtx::clipboard();
         let _ = clipboard.borrow_mut().clear();
         let _ = clipboard.borrow_mut().write_text(&txt);
@@ -125,27 +133,24 @@ fn key_with_command(this: &mut TextEditorArea, event: &KeyboardEvent) -> bool {
   }
 }
 
-fn single_key(this: &mut TextEditorArea, key: &KeyboardEvent) -> bool {
+fn single_key<F: EditableText>(this: &impl StateWriter<Value = F>, key: &KeyboardEvent) -> bool {
   match key.key() {
-    VirtualKey::Named(NamedKey::Enter) => {
-      if this.multi_line {
-        InputWriter::new(this).insert_str("\r");
-      }
-    }
     VirtualKey::Named(NamedKey::Backspace) => {
-      let rg = this.caret.select_range();
+      let mut this = this.write();
+      let rg = this.caret().select_range();
       if rg.is_empty() {
-        InputWriter::new(this).back_space();
+        TextCaretWriter::new(&mut *this).back_space();
       } else {
-        InputWriter::new(this).delete_byte_range(&rg);
+        TextCaretWriter::new(&mut *this).delete_byte_range(&rg);
       }
     }
     VirtualKey::Named(NamedKey::Delete) => {
-      let rg = this.caret.select_range();
+      let mut this = this.write();
+      let rg = this.caret().select_range();
       if rg.is_empty() {
-        InputWriter::new(this).del_char();
+        TextCaretWriter::new(&mut *this).del_char();
       } else {
-        InputWriter::new(this).delete_byte_range(&rg);
+        TextCaretWriter::new(&mut *this).delete_byte_range(&rg);
       }
     }
     _ => (),

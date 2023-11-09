@@ -62,6 +62,8 @@
  	 - specify the event handler when received unicode characters in bubble phase.
 - on_chars_capture : [`impl FnMut(& mut CharsEvent)`] 
  	 - specify the event handler when received unicode characters in capture phase.
+- on_ime_pre_edit : [`impl FnMut(& mut ImePreEditEvent)`] 
+ 	 - specify the event handler when received unicode characters in ime pre edit bubble phase.
 - on_wheel : [`impl FnMut(& mut WheelEvent)`] 
  	 - specify the event handler when user moving a mouse wheel or similar input device in bubble phase.
 - on_wheel_capture : [`impl FnMut(& mut WheelEvent)`] 

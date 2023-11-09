@@ -80,6 +80,13 @@ impl Dispatcher {
     }
   }
 
+  pub fn dispatch_ime_pre_edit(&mut self, pre_edit: ImePreEdit) {
+    let wnd = self.window();
+    if let Some(focus_id) = wnd.focusing() {
+      wnd.add_delay_event(DelayEvent::ImePreEdit { wid: focus_id, pre_edit });
+    }
+  }
+
   pub fn dispatch_receive_chars(&mut self, chars: String) {
     let wnd = self.window();
     if let Some(focus) = wnd.focusing() {

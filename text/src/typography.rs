@@ -1,5 +1,5 @@
 use ribir_geom::{Size, Zero};
-use std::ops::Range;
+use std::ops::{Range, RangeInclusive};
 use unicode_script::{Script, UnicodeScript};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -228,7 +228,7 @@ where
       };
       let mut cursor = BoundsCursor {
         inner_cursor,
-        bounds: Em::zero()..bounds,
+        bounds: Em::zero()..=bounds,
       };
       self.consume_run(run, &mut cursor);
     } else {
@@ -410,7 +410,7 @@ pub struct LetterSpaceCursor<'a, I> {
 
 struct BoundsCursor<'a, Inner> {
   inner_cursor: &'a mut Inner,
-  bounds: Range<Em>,
+  bounds: RangeInclusive<Em>,
 }
 
 impl<'a, I> LetterSpaceCursor<'a, I> {

@@ -2,26 +2,26 @@ use crate::layout::{Container, Stack};
 use ribir_core::prelude::*;
 
 #[derive(Declare)]
-pub(crate) struct SelectedText {
+pub(crate) struct SelectedHighLight {
   pub(crate) rects: Vec<Rect>,
 }
 
 #[derive(Clone, PartialEq)]
-pub struct SelectedTextStyle {
+pub struct SelectedHighLightStyle {
   pub brush: Brush,
 }
-impl CustomStyle for SelectedTextStyle {
+impl CustomStyle for SelectedHighLightStyle {
   fn default_style(_: &BuildCtx) -> Self {
-    SelectedTextStyle {
+    SelectedHighLightStyle {
       brush: Color::from_rgb(181, 215, 254).into(),
     }
   }
 }
 
-impl Compose for SelectedText {
+impl Compose for SelectedHighLight {
   fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
     fn_widget! {
-      let color = SelectedTextStyle::of(ctx!()).brush;
+      let color = SelectedHighLightStyle::of(ctx!()).brush;
       @Stack {
         @ { pipe!{
           let color = color.clone();

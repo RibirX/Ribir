@@ -17,6 +17,14 @@ pub enum BoxFit {
   /// its container box. If the widget's aspect ratio does not the aspect ratio
   /// of its box, then the widget will be clipped to fit.
   Cover,
+
+  /// The widget scales to maintain its aspect ratio while filling the full
+  /// coverage Y direction of its container box.
+  CoverY,
+
+  /// The widget scales to maintain its aspect ratio while filling the full
+  /// coverage X direction of its container box.
+  CoverX,
 }
 
 /// Widget set how its child should be scale to fit its box.
@@ -49,6 +57,12 @@ impl Render for FittedBox {
       BoxFit::Cover => {
         let scale = scale_x.max(scale_y);
         self.scale_cache.set(Transform::scale(scale, scale));
+      }
+      BoxFit::CoverY => {
+        self.scale_cache.set(Transform::scale(scale_y, scale_y));
+      }
+      BoxFit::CoverX => {
+        self.scale_cache.set(Transform::scale(scale_x, scale_x));
       }
     }
     let Transform { m11: x, m22: y, .. } = self.scale_cache.get();

@@ -2,14 +2,6 @@ use std::ops::Range;
 
 use crate::GraphemeCursor;
 use unicode_segmentation::UnicodeSegmentation;
-pub struct ControlChar;
-
-#[allow(dead_code)]
-impl ControlChar {
-  pub const BACKSPACE: char = '\u{8}';
-  pub const DEL: char = '\u{7f}';
-}
-
 pub trait CharacterCursor {
   fn measure_bytes(&self, text: &str, byte_from: usize, char_len: usize) -> usize;
 
@@ -40,7 +32,7 @@ where
 {
   pub fn new(text: String, cursor: T) -> Self { Self { text, cursor } }
 
-  pub fn text(&self) -> &String { &self.text }
+  pub fn text(&self) -> &str { &self.text }
 
   pub fn byte_offset(&self) -> usize { self.cursor.byte_offset() }
 

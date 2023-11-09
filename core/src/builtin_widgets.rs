@@ -141,6 +141,7 @@ impl_builtin_obj!(
   HasFocus,
   KeyboardListener,
   CharsListener,
+  ImePreEditListener,
   WheelListener,
   MouseHover,
   PointerPressed,

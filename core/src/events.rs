@@ -19,6 +19,8 @@ mod character;
 pub use character::*;
 mod wheel;
 pub use wheel::*;
+mod ime_pre_edit;
+pub use ime_pre_edit::*;
 
 pub(crate) mod focus_mgr;
 mod listener_impl_helper;

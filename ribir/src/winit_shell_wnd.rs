@@ -142,6 +142,9 @@ impl ShellWindow for WinitShellWnd {
   fn set_decorations(&mut self, decorations: bool) { self.winit_wnd.set_decorations(decorations) }
 
   #[inline]
+  fn set_ime_allowed(&mut self, allowed: bool) { self.winit_wnd.set_ime_allowed(allowed); }
+
+  #[inline]
   fn as_any(&self) -> &dyn std::any::Any { self }
 
   #[inline]
@@ -188,7 +191,7 @@ impl WinitShellWnd {
     }
 
     let winit_wnd = winit_wnd.build(window_target).unwrap();
-    set_ime_allowed(&winit_wnd);
+    enable_ime(&winit_wnd);
     WinitShellWnd {
       backend: Backend::new(&winit_wnd),
       winit_wnd,
@@ -197,9 +200,7 @@ impl WinitShellWnd {
   }
 }
 
-fn set_ime_allowed(wnd: &winit::window::Window) {
-  wnd.set_ime_allowed(true);
-
+fn enable_ime(wnd: &winit::window::Window) {
   // tmp:  winit set_ime_position fail when use sogou ime in window
   // platform, issue link: https://github.com/rust-windowing/winit/issues/2780
   #[cfg(windows)]

@@ -69,6 +69,7 @@ pub trait ShellWindow {
   fn inner_size(&self) -> Size;
   fn outer_size(&self) -> Size;
   fn set_ime_cursor_area(&mut self, rect: &Rect);
+  fn set_ime_allowed(&mut self, allowed: bool);
 
   fn request_resize(&mut self, size: Size);
   fn on_resize(&mut self, size: Size);
@@ -123,6 +124,10 @@ impl Window {
 
   pub fn processes_receive_chars(&self, chars: String) {
     self.dispatcher.borrow_mut().dispatch_receive_chars(chars)
+  }
+
+  pub fn processes_ime_pre_edit(&self, ime: ImePreEdit) {
+    self.dispatcher.borrow_mut().dispatch_ime_pre_edit(ime)
   }
 
   /// Request switch the focus to next widget.
@@ -292,6 +297,10 @@ impl Window {
   /// to the top left.
   pub fn set_ime_cursor_area(&self, rect: &Rect) {
     self.shell_wnd.borrow_mut().set_ime_cursor_area(rect);
+  }
+
+  pub fn set_ime_allowed(&self, allowed: bool) {
+    self.shell_wnd.borrow_mut().set_ime_allowed(allowed);
   }
 
   pub fn request_resize(&self, size: Size) { self.shell_wnd.borrow_mut().request_resize(size) }
@@ -508,6 +517,10 @@ impl Window {
           let mut e = AllPointer::Tap(e.into_inner());
           self.bottom_up_emit::<PointerListener>(&mut e, wid, None);
         }
+        DelayEvent::ImePreEdit { wid, pre_edit } => {
+          let mut event = ImePreEditEvent::new(pre_edit, wid, self);
+          self.bottom_up_emit::<ImePreEditListener>(&mut event, wid, None);
+        }
       }
     }
   }
@@ -637,6 +650,10 @@ pub(crate) enum DelayEvent {
     up: Option<WidgetId>,
   },
   Tap(WidgetId),
+  ImePreEdit {
+    wid: WidgetId,
+    pre_edit: ImePreEdit,
+  },
 }
 
 impl From<u64> for WindowId {

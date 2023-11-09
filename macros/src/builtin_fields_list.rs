@@ -165,6 +165,11 @@ builtin! {
     fn chars_stream(&self) -> CharsSubject,
   }
 
+  ImePreEditListener {
+    #[doc="specify the event handler when received unicode characters in ime pre edit bubble phase."]
+    on_ime_pre_edit: impl FnMut(&mut ImePreEditEvent),
+  }
+
   WheelListener {
     #[doc="specify the event handler when user moving a mouse wheel or similar input device in bubble phase."]
     on_wheel: impl FnMut(&mut WheelEvent),
