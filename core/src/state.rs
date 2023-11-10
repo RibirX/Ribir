@@ -3,7 +3,7 @@ mod splitted_state;
 mod stateful;
 
 use std::{
-  cell::UnsafeCell,
+  cell::{Cell, Ref, RefMut, UnsafeCell},
   convert::Infallible,
   mem::MaybeUninit,
   ops::{Deref, DerefMut},
@@ -11,6 +11,7 @@ use std::{
 
 use crate::prelude::*;
 pub use map_state::*;
+use ribir_algo::Sc;
 use rxrust::{ops::box_it::BoxOp, subject::Subject};
 pub use splitted_state::*;
 pub use stateful::*;
@@ -23,20 +24,20 @@ pub trait StateReader: 'static {
   /// return itself.
   type OriginReader: StateReader;
   type Reader: StateReader<Value = Self::Value>;
-  /// The reference type that can read the value of the state.
-  type Ref<'a>: Deref<Target = Self::Value>;
+
   /// Return a reference of this state.
-  fn read(&'_ self) -> Self::Ref<'_>;
+  fn read(&self) -> ReadRef<Self::Value>;
   /// get a clone of this state that only can read.
   fn clone_reader(&self) -> Self::Reader;
   /// Maps an reader to another by applying a function to a contained
   /// value. The return reader and the origin reader are the same reader. So
   /// when one of them is modified, they will both be notified.
-  fn map_reader<F, Target>(&self, f: F) -> MapReader<Target, Self::Reader, F>
+  #[inline]
+  fn map_reader<U, F>(&self, map: F) -> MapReader<U, Self::Reader, F>
   where
-    F: FnOnce(&Self::Value) -> &Target + Copy,
+    F: Fn(&Self::Value) -> &U + Clone,
   {
-    MapReader::new(self.clone_reader(), f)
+    MapReader { origin: self.clone_reader(), map }
   }
   /// Return the origin reader that this state map or split from . Otherwise
   /// return itself.
@@ -56,65 +57,78 @@ pub trait StateReader: 'static {
 pub trait StateWriter: StateReader {
   type Writer: StateWriter<Value = Self::Value>;
   type OriginWriter: StateWriter;
-  type RefWrite<'a>: RefWrite<Target = Self::Value>
-  where
-    Self: 'a;
 
   /// Return a write reference of this state.
-  fn write(&'_ self) -> Self::RefWrite<'_>;
+  fn write(&self) -> WriteRef<Self::Value>;
   /// Return a silent write reference which notifies will be ignored by the
   /// framework.
-  fn silent(&'_ self) -> Self::RefWrite<'_>;
+  fn silent(&self) -> WriteRef<Self::Value>;
   /// Convert this state reference to a shallow reference. Modify across this
   /// reference will notify framework only. That means the modifies on shallow
   /// reference should only effect framework but not effect on data. eg.
   /// temporary to modify the state and then modifies it back to trigger the
   /// view update. Use it only if you know how a shallow reference works.
-  fn shallow(&'_ self) -> Self::RefWrite<'_>;
+  fn shallow(&self) -> WriteRef<Self::Value>;
   /// Clone this state writer.
   fn clone_writer(&self) -> Self::Writer;
   /// Return the origin writer that this state map or split from.
   fn origin_writer(&self) -> &Self::OriginWriter;
   /// Return a new writer by applying a function to the contained value.
   ///
-  /// This writer share the same state with the origin writer. But has it's own
+  /// This writer share the same data with the origin writer. But has it's own
   /// notifier. When modifies across the return writer, the downstream
   /// subscribed on the origin state will not be notified. But when modifies
   /// across the origin writer, the downstream subscribed on the return writer
   /// will be notified.
   ///
-  /// If you want split a new writer that has same behavior with the origin
+  /// If you want split a new writer that has same notifier with the origin
   /// writer, you can use `map_reader(..).into_writer(..)`.
-  fn split_writer<Target, R, W>(
-    &self,
-    read_map: R,
-    writer_map: W,
-  ) -> SplittedWriter<Target, Self::Writer, R, W>
+  ///
+  /// #Notice
+  ///
+  /// Your `mut_map` function will accept a mutable reference, but you should
+  /// not modify it, just return a mutable reference to a part of it. Because
+  /// Ribir assume you will not modify the origin state in it. If you modify the
+  /// origin state in it, no downstream will be notified.
+  #[inline]
+  fn split_writer<V, R, W>(&self, map: R, mut_map: W) -> SplittedWriter<V, Self::Writer, R, W>
   where
-    R: FnOnce(&Self::Value) -> &Target + Copy,
-    W: FnOnce(&mut Self::Value) -> &mut Target + Copy,
+    R: Fn(&Self::Value) -> &V + Clone,
+    W: Fn(&mut Self::Value) -> &mut V + Clone,
   {
-    SplittedWriter::new(self.clone_writer(), read_map, writer_map)
+    SplittedWriter::new(self.clone_writer(), map, mut_map)
   }
 
-  fn map_writer<Target, R, W>(
-    &self,
-    read_map: R,
-    writer_map: W,
-  ) -> MapWriter<Target, Self::Writer, R, W>
+  /// Return a new writer by applying a function to the contained value. The
+  /// return writer is just a shortcut to access part of the origin writer. They
+  /// share same data and notifier.
+  /// #Notice
+  ///
+  /// Your `mut_map` function will accept a mutable reference, but you should
+  /// not modify it, just return a mutable reference to a part of it. Because
+  /// Ribir assume you will not modify the origin state in it. If you modify the
+  /// origin state in it, no downstream will be notified.
+  #[inline]
+  fn map_writer<V, R, W>(&self, map: R, mut_map: W) -> MapWriter<V, Self::Writer, R, W>
   where
-    R: FnOnce(&Self::Value) -> &Target + Copy,
-    W: FnOnce(&mut Self::Value) -> &mut Target + Copy,
+    R: Fn(&Self::Value) -> &V + Clone,
+    W: Fn(&mut Self::Value) -> &mut V + Clone,
   {
-    MapWriter::new(self.clone_writer(), read_map, writer_map)
+    let origin = self.clone_writer();
+    MapWriter { origin, map, mut_map }
   }
 }
 
-pub trait RefWrite: DerefMut {
-  /// Forget all modifies of this reference. So all the modifies occurred on
-  /// this reference before this call will not be notified. Return true if there
-  /// is any modifies on this reference.
-  fn forget_modifies(&mut self) -> bool;
+/// Wraps a borrowed reference to a value in a state.
+/// A wrapper type for an immutably borrowed value from a `RefCell<T>`.
+pub struct ReadRef<'a, V>(Ref<'a, V>);
+
+pub struct WriteRef<'a, V> {
+  value: Option<RefMut<'a, V>>,
+  modified: bool,
+  modify_scope: ModifyScope,
+  batched_modify: Sc<Cell<ModifyScope>>,
+  notifier: Notifier,
 }
 
 /// Enum to store both stateless and stateful object.
@@ -129,8 +143,8 @@ impl<T: 'static> StateReader for State<T> {
   type Value = T;
   type OriginReader = Self;
   type Reader = Reader<T>;
-  type Ref<'a> = ReadRef<'a, T>;
-  fn read(&'_ self) -> Self::Ref<'_> {
+
+  fn read(&self) -> ReadRef<T> {
     match self.inner_ref() {
       InnerState::Data(w) => w.read(),
       InnerState::Stateful(w) => w.read(),
@@ -159,18 +173,15 @@ impl<T: 'static> StateReader for State<T> {
 impl<T: 'static> StateWriter for State<T> {
   type Writer = Writer<T>;
   type OriginWriter = Self;
-  type RefWrite<'a> = WriteRef<'a,T>
-  where
-    Self: 'a;
 
   #[inline]
-  fn write(&'_ self) -> Self::RefWrite<'_> { self.as_stateful().write() }
+  fn write(&self) -> WriteRef<T> { self.as_stateful().write() }
 
   #[inline]
-  fn silent(&'_ self) -> Self::RefWrite<'_> { self.as_stateful().silent() }
+  fn silent(&self) -> WriteRef<T> { self.as_stateful().silent() }
 
   #[inline]
-  fn shallow(&'_ self) -> Self::RefWrite<'_> { self.as_stateful().shallow() }
+  fn shallow(&self) -> WriteRef<T> { self.as_stateful().shallow() }
 
   #[inline]
   fn clone_writer(&self) -> Self::Writer { self.as_stateful().clone_writer() }
@@ -215,6 +226,116 @@ impl<W> State<W> {
     // mutable reference of the inner state except the `as_stateful` method and the
     // `as_stateful` will check the inner borrow state.
     unsafe { &*self.0.get() }
+  }
+}
+
+impl<'a, V> ReadRef<'a, V> {
+  pub(crate) fn new(r: Ref<'a, V>) -> ReadRef<'a, V> { ReadRef(r) }
+
+  pub(crate) fn map<U>(r: ReadRef<'a, V>, f: impl FnOnce(&V) -> &U) -> ReadRef<'a, U> {
+    ReadRef(Ref::map(r.0, f))
+  }
+}
+
+impl<'a, V> WriteRef<'a, V> {
+  /// Forget all modifies of this reference. So all the modifies occurred on
+  /// this reference before this call will not be notified. Return true if there
+  /// is any modifies on this reference.
+  #[inline]
+  pub fn forget_modifies(&mut self) -> bool { std::mem::replace(&mut self.modified, false) }
+
+  pub(crate) fn new(
+    value: RefMut<'a, V>,
+    scope: ModifyScope,
+    batched_modify: Sc<Cell<ModifyScope>>,
+    notifier: Notifier,
+  ) -> WriteRef<'a, V> {
+    WriteRef {
+      value: Some(value),
+      modified: false,
+      modify_scope: scope,
+      batched_modify,
+      notifier,
+    }
+  }
+
+  pub(crate) fn map<U>(mut orig: WriteRef<V>, f: impl FnOnce(&mut V) -> &mut U) -> WriteRef<U> {
+    let value = orig.value.take().map(|orig| RefMut::map(orig, f));
+    WriteRef {
+      value,
+      modified: false,
+      modify_scope: orig.modify_scope,
+      batched_modify: orig.batched_modify.clone(),
+      notifier: orig.notifier.clone(),
+    }
+  }
+
+  pub(crate) fn split_map<U>(
+    mut orig: WriteRef<V>,
+    f: impl FnOnce(&mut V) -> &mut U,
+    batched_modify: Sc<Cell<ModifyScope>>,
+    notifier: Notifier,
+  ) -> WriteRef<U> {
+    let value = orig.value.take().map(|orig| RefMut::map(orig, f));
+    WriteRef {
+      value,
+      modified: false,
+      modify_scope: orig.modify_scope,
+      batched_modify,
+      notifier,
+    }
+  }
+}
+
+impl<'a, W> Deref for ReadRef<'a, W> {
+  type Target = W;
+
+  #[track_caller]
+  #[inline]
+  fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl<'a, W> Deref for WriteRef<'a, W> {
+  type Target = W;
+  #[track_caller]
+  #[inline]
+  fn deref(&self) -> &Self::Target {
+    // Safety: value always exists except in drop method.
+    unsafe { self.value.as_ref().unwrap_unchecked().deref() }
+  }
+}
+
+impl<'a, W> DerefMut for WriteRef<'a, W> {
+  #[track_caller]
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    self.modified = true;
+    // Safety: value always exists except in drop method.
+    unsafe { self.value.as_mut().unwrap_unchecked().deref_mut() }
+  }
+}
+
+impl<'a, W> Drop for WriteRef<'a, W> {
+  fn drop(&mut self) {
+    if !self.modified {
+      return;
+    }
+
+    let scope = self.modify_scope;
+    let batch_scope = self.batched_modify.get();
+    if batch_scope.is_empty() && !scope.is_empty() {
+      self.batched_modify.set(scope);
+
+      let mut subject = self.notifier.raw_modifies();
+      let share_scope = self.batched_modify.clone();
+      AppCtx::spawn_local(async move {
+        let scope = share_scope.replace(ModifyScope::empty());
+        subject.next(scope);
+      })
+      .unwrap();
+    } else {
+      self.batched_modify.set(batch_scope | scope);
+    }
   }
 }
 
@@ -316,8 +437,8 @@ macro_rules! impl_compose_builder {
     impl<V, W, RM, WM> ComposeBuilder for $name<V, W, RM, WM>
     where
       W: StateWriter,
-      RM: FnOnce(&W::Value) -> &V + Copy + 'static,
-      WM: FnOnce(&mut W::Value) -> &mut V + Copy + 'static,
+      RM: Fn(&W::Value) -> &V + Clone + 'static,
+      WM: Fn(&mut W::Value) -> &mut V + Clone + 'static,
       V: Compose + 'static,
     {
       fn widget_build(self, ctx: &crate::context::BuildCtx) -> Widget {
@@ -328,8 +449,8 @@ macro_rules! impl_compose_builder {
     impl<V, W, RM, WM, Child> ComposeChildBuilder for $name<V, W, RM, WM>
     where
       W: StateWriter,
-      RM: FnOnce(&W::Value) -> &V + Copy + 'static,
-      WM: FnOnce(&mut W::Value) -> &mut V + Copy + 'static,
+      RM: Fn(&W::Value) -> &V + Clone + 'static,
+      WM: Fn(&mut W::Value) -> &mut V + Clone + 'static,
       V: ComposeChild<Child = Option<Child>> + 'static,
     {
       #[inline]
