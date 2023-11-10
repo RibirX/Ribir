@@ -1,18 +1,18 @@
-use crate::{
-  prelude::*,
-  render_helper::{RenderProxy, RenderTarget},
-};
+use crate::{prelude::*, render_helper::RenderProxy};
 use ribir_algo::Sc;
 use rxrust::{ops::box_it::BoxOp, prelude::*};
 use std::{
   cell::{Cell, RefCell},
   convert::Infallible,
+  time::Instant,
 };
+
+use super::WriterControl;
 
 /// Stateful object use to watch the modifies of the inner data.
 pub struct Stateful<W> {
-  pub(crate) inner: Sc<StateData<W>>,
-  pub(crate) notifier: Notifier,
+  data: Sc<RefCell<W>>,
+  info: Sc<StatefulInfo>,
 }
 
 pub struct Reader<W>(Stateful<W>);
@@ -36,35 +36,46 @@ bitflags! {
   }
 }
 
+struct StatefulInfo {
+  notifier: Notifier,
+  /// The counter of the writer may be modified the data.
+  writer_count: Cell<usize>,
+  /// The batched modifies of the `State` which will be notified.
+  batch_modified: Cell<ModifyScope>,
+  /// The timestamp of the last modify of the data, not record the modify from
+  /// the splitted or mapped state.
+  last_modified: Cell<Instant>,
+}
+
 impl<W: 'static> StateReader for Stateful<W> {
   type Value = W;
   type OriginReader = Self;
   type Reader = Reader<W>;
 
   #[inline]
-  fn read(&self) -> ReadRef<W> { self.inner.read() }
+  fn read(&self) -> ReadRef<W> { ReadRef::new(self.data.borrow()) }
 
   #[inline]
-  fn clone_reader(&self) -> Self::Reader { Reader::from_stateful(self) }
+  fn clone_reader(&self) -> Self::Reader { Reader(self.clone()) }
 
   #[inline]
   fn origin_reader(&self) -> &Self::OriginReader { self }
 
   #[inline]
-  fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.notifier.modifies() }
+  fn time_stamp(&self) -> Instant { self.info.last_modified.get() }
 
   #[inline]
-  fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> {
-    self.notifier.raw_modifies()
+  fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
+    self.info.notifier.raw_modifies()
   }
 
   fn try_into_value(self) -> Result<W, Self> {
-    if Sc::ref_count(&self.inner) == 1 {
-      let inner = self.inner.clone();
+    if self.data.ref_count() == 1 {
+      let data = self.data.clone();
       drop(self);
       // SAFETY: `Rc::strong_count(&self.inner) == 1` guarantees unique access.
-      let inner = unsafe { Sc::try_unwrap(inner).unwrap_unchecked() };
-      Ok(inner.data.into_inner())
+      let data = unsafe { Sc::try_unwrap(data).unwrap_unchecked() };
+      Ok(data.into_inner())
     } else {
       Err(self)
     }
@@ -75,14 +86,19 @@ impl<W: 'static> StateWriter for Stateful<W> {
   type Writer = Writer<W>;
   type OriginWriter = Self;
 
+  #[inline]
   fn write(&self) -> WriteRef<W> { self.write_ref(ModifyScope::BOTH) }
 
+  #[inline]
   fn silent(&self) -> WriteRef<W> { self.write_ref(ModifyScope::DATA) }
 
+  #[inline]
   fn shallow(&self) -> WriteRef<W> { self.write_ref(ModifyScope::FRAMEWORK) }
 
-  fn clone_writer(&self) -> Self::Writer { Writer::from_stateful(self) }
+  #[inline]
+  fn clone_writer(&self) -> Self::Writer { Writer(self.clone()) }
 
+  #[inline]
   fn origin_writer(&self) -> &Self::OriginWriter { self }
 }
 
@@ -101,10 +117,10 @@ impl<W: 'static> StateReader for Reader<W> {
   fn origin_reader(&self) -> &Self::OriginReader { self }
 
   #[inline]
-  fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.0.modifies() }
+  fn time_stamp(&self) -> Instant { self.0.time_stamp() }
 
   #[inline]
-  fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> { self.0.raw_modifies() }
+  fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.0.raw_modifies() }
 
   fn try_into_value(self) -> Result<Self::Value, Self> {
     let inner = self.0.clone_writer().0;
@@ -128,10 +144,10 @@ impl<W: 'static> StateReader for Writer<W> {
   fn origin_reader(&self) -> &Self::OriginReader { self }
 
   #[inline]
-  fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.0.modifies() }
+  fn time_stamp(&self) -> Instant { self.0.time_stamp() }
 
   #[inline]
-  fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> { self.0.raw_modifies() }
+  fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.0.raw_modifies() }
 
   #[inline]
   fn try_into_value(self) -> Result<Self::Value, Self> { self.0.try_into_value().map_err(Writer) }
@@ -157,6 +173,20 @@ impl<V: 'static> StateWriter for Writer<V> {
   fn origin_writer(&self) -> &Self::OriginWriter { self }
 }
 
+impl WriterControl for Sc<StatefulInfo> {
+  #[inline]
+  fn last_modified_stamp(&self) -> &Cell<Instant> { &self.last_modified }
+
+  #[inline]
+  fn batched_modifies(&self) -> &Cell<ModifyScope> { &self.batch_modified }
+
+  #[inline]
+  fn notifier(&self) -> &Notifier { &self.notifier }
+
+  #[inline]
+  fn dyn_clone(&self) -> Box<dyn WriterControl> { Box::new(self.clone()) }
+}
+
 impl<W> Drop for Reader<W> {
   fn drop(&mut self) {
     // The `Stateful` is a writer but used as a reader in `Reader` that not
@@ -171,7 +201,7 @@ impl<W> Drop for Stateful<W> {
     self.dec_writer();
     // can cancel the notifier, because no one will modify the data.
     if self.writer_count() == 0 {
-      let notifier = self.notifier.clone();
+      let notifier = self.info.notifier.clone();
       // we use an async task to unsubscribe to wait the batched modifies to be
       // notified.
       AppCtx::spawn_local(async move {
@@ -183,40 +213,15 @@ impl<W> Drop for Stateful<W> {
     // Declare object may add task to disconnect to upstream, trigger that task if
     // this is the last reference. We not hold that task in `Stateful` to avoid
     // cycle reference.
-    if self.inner.ref_count() == 1 {
+    if self.data.ref_count() == 1 {
       AppCtx::trigger_task(self.heap_ptr() as *const ());
     }
-  }
-}
-
-impl<W> Reader<W> {
-  fn from_stateful(stateful: &Stateful<W>) -> Self {
-    Reader(Stateful {
-      inner: stateful.inner.clone(),
-      notifier: stateful.notifier.clone(),
-    })
   }
 }
 
 impl<W> Writer<W> {
   #[inline]
   pub fn into_inner(self) -> Stateful<W> { self.0 }
-
-  fn from_stateful(stateful: &Stateful<W>) -> Self {
-    stateful.inc_writer();
-    Writer(Stateful {
-      inner: stateful.inner.clone(),
-      notifier: stateful.notifier.clone(),
-    })
-  }
-}
-
-pub(crate) struct StateData<W> {
-  data: RefCell<W>,
-  /// The batched modifies of the `State` which will be notified.
-  batch_modified: Sc<Cell<ModifyScope>>,
-  /// The counter of the writer may be modified the data.
-  writer_count: Cell<usize>,
 }
 
 macro_rules! compose_builder_impl {
@@ -243,7 +248,7 @@ impl<R: Render> RenderBuilder for Stateful<R> {
     match self.try_into_value() {
       Ok(r) => r.widget_build(ctx),
       Err(s) => {
-        let w = RenderProxy::new(s.inner.clone()).widget_build(ctx);
+        let w = RenderProxy::new(s.data.clone()).widget_build(ctx);
         w.dirty_subscribe(s.raw_modifies(), ctx)
       }
     }
@@ -262,9 +267,9 @@ impl<R: Render> RenderBuilder for Reader<R> {
 
 impl<W> Stateful<W> {
   pub fn new(data: W) -> Self {
-    Stateful {
-      inner: Sc::new(StateData::new(data)),
-      notifier: <_>::default(),
+    Self {
+      data: Sc::new(RefCell::new(data)),
+      info: Sc::new(StatefulInfo::new()),
     }
   }
 
@@ -282,46 +287,40 @@ impl<W> Stateful<W> {
 
   /// return the heap pointer of the data.
   #[inline]
-  fn heap_ptr(&self) -> *const W { self.inner.data.as_ptr() }
-
-  pub(crate) fn from_state_data(data: StateData<W>) -> Self {
-    Self {
-      inner: Sc::new(data),
-      notifier: <_>::default(),
-    }
-  }
+  fn heap_ptr(&self) -> *const W { self.data.as_ptr() }
 
   fn write_ref(&self, scope: ModifyScope) -> WriteRef<'_, W> {
-    let value = self.inner.data.borrow_mut();
-    let batched_modify = self.inner.batch_modified.clone();
-    let modifier = self.notifier.clone();
-    WriteRef::new(value, scope, batched_modify, modifier)
-  }
-
-  fn writer_count(&self) -> usize { self.inner.writer_count.get() }
-  fn inc_writer(&self) { self.inner.writer_count.set(self.writer_count() + 1); }
-  fn dec_writer(&self) { self.inner.writer_count.set(self.writer_count() - 1); }
-}
-
-impl<W> StateData<W> {
-  /// Assert the state data is not used by any reader and writer.
-  #[inline]
-  #[track_caller]
-  pub(crate) fn assert_is_not_used(&self) { self.data.borrow_mut(); }
-
-  #[inline]
-  pub(crate) fn new(data: W) -> Self {
-    Self {
-      // the `StateData` in `Stateful` or `State` is a writer
-      writer_count: Cell::new(1),
-      data: RefCell::new(data),
-      batch_modified: <_>::default(),
+    let value = self.data.borrow_mut();
+    WriteRef {
+      value: Some(value),
+      modified: false,
+      modify_scope: scope,
+      control: &self.info,
     }
   }
 
-  pub(crate) fn into_inner(self) -> W { self.data.into_inner() }
+  fn writer_count(&self) -> usize { self.info.writer_count.get() }
+  fn inc_writer(&self) { self.info.writer_count.set(self.writer_count() + 1); }
+  fn dec_writer(&self) { self.info.writer_count.set(self.writer_count() - 1); }
 
-  pub(crate) fn read(&self) -> ReadRef<W> { ReadRef::new(self.data.borrow()) }
+  fn clone(&self) -> Self {
+    self.inc_writer();
+    Self {
+      data: self.data.clone(),
+      info: self.info.clone(),
+    }
+  }
+}
+
+impl StatefulInfo {
+  fn new() -> Self {
+    StatefulInfo {
+      batch_modified: <_>::default(),
+      writer_count: Cell::new(1),
+      notifier: <_>::default(),
+      last_modified: Cell::new(Instant::now()),
+    }
+  }
 }
 
 impl<W: SingleChild> SingleChild for Stateful<W> {}
@@ -345,30 +344,18 @@ impl<W: MultiChild + Render> MultiParent for Stateful<W> {
   }
 }
 
-impl<R: Render> RenderTarget for Sc<StateData<R>> {
-  type Target = R;
-  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(&*self.read()) }
-}
-
-impl<T: Query> Query for StateData<T> {
-  crate::widget::impl_proxy_query!(read());
-}
-
 impl Notifier {
-  pub fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
-    self
-      .raw_modifies()
-      .filter(|s| s.contains(ModifyScope::DATA))
-      .box_it()
+  pub(crate) fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
+    self.0.clone().box_it()
   }
 
-  pub(crate) fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> { self.0.clone() }
+  pub(crate) fn next(&self, scope: ModifyScope) { self.0.clone().next(scope) }
 }
 
 impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_tuple("Stateful")
-      .field(&*self.inner.read())
+      .field(&*self.data.borrow())
       .finish()
   }
 }

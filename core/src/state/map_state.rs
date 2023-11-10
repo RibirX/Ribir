@@ -5,29 +5,18 @@ use crate::{
 };
 
 use super::{ModifyScope, ReadRef, StateReader, StateWriter, WriteRef};
-use rxrust::{ops::box_it::BoxOp, subject::Subject};
-use std::convert::Infallible;
+use rxrust::ops::box_it::BoxOp;
+use std::{cell::RefMut, convert::Infallible, time::Instant};
 
 /// A state reader that map a reader to another by applying a function on the
 /// value. This reader is the same reader with the origin reader, It's also have
 /// the same modifier with the origin state.
-// Keep the `V` as the first generic, so the user know the actual value type
-// when ide hints.
-pub struct MapReader<V, S, F>
-where
-  S: StateReader,
-  F: Fn(&S::Value) -> &V + Clone + 'static,
-{
+pub struct MapReader<S, F> {
   pub(super) origin: S,
   pub(super) map: F,
 }
 
-pub struct MapWriter<V, W, RM, WM>
-where
-  W: StateWriter,
-  RM: Fn(&W::Value) -> &V + Clone,
-  WM: Fn(&mut W::Value) -> &mut V + Clone,
-{
+pub struct MapWriter<W, RM, WM> {
   pub(super) origin: W,
   pub(super) map: RM,
   pub(super) mut_map: WM,
@@ -35,89 +24,72 @@ where
 
 macro_rules! impl_reader_trivial_methods {
   () => {
+    type Value = V;
+    type OriginReader = S;
+    type Reader = MapReader<S::Reader, R>;
+
+    #[inline]
+    fn read(&self) -> ReadRef<Self::Value> { ReadRef::map(self.origin.read(), &self.map) }
+
+    #[inline]
+    fn clone_reader(&self) -> Self::Reader {
+      MapReader {
+        origin: self.origin.clone_reader(),
+        map: self.map.clone(),
+      }
+    }
+
     #[inline]
     fn origin_reader(&self) -> &Self::OriginReader { &self.origin }
 
     #[inline]
-    fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.origin.modifies() }
+    fn time_stamp(&self) -> Instant { self.origin.time_stamp() }
 
     #[inline]
-    fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> {
-      self.origin.raw_modifies()
-    }
+    fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.origin.raw_modifies() }
 
     #[inline]
     fn try_into_value(self) -> Result<Self::Value, Self> { Err(self) }
   };
 }
 
-impl<R, V, F> StateReader for MapReader<V, R, F>
+impl<S, V, R> StateReader for MapReader<S, R>
 where
   Self: 'static,
-  R: StateReader,
-  F: Fn(&R::Value) -> &V + Clone + 'static,
+  S: StateReader,
+  R: Fn(&S::Value) -> &V + Clone + 'static,
 {
-  type Value = V;
-  type OriginReader = R;
-  type Reader = MapReader<V, R::Reader, F>;
-
-  #[inline]
-  fn read(&self) -> ReadRef<Self::Value> { ReadRef::map(self.origin.read(), &self.map) }
-
-  #[inline]
-  fn clone_reader(&self) -> Self::Reader {
-    MapReader {
-      origin: self.origin.clone_reader(),
-      map: self.map.clone(),
-    }
-  }
-
   impl_reader_trivial_methods!();
 }
 
-impl<V, W, RM, WM> StateReader for MapWriter<V, W, RM, WM>
+impl<V, S, R, W> StateReader for MapWriter<S, R, W>
+where
+  Self: 'static,
+  S: StateWriter,
+  R: Fn(&S::Value) -> &V + Clone,
+  W: Fn(&mut S::Value) -> &mut V + Clone,
+{
+  impl_reader_trivial_methods!();
+}
+
+impl<V, W, RM, WM> StateWriter for MapWriter<W, RM, WM>
 where
   Self: 'static,
   W: StateWriter,
   RM: Fn(&W::Value) -> &V + Clone,
   WM: Fn(&mut W::Value) -> &mut V + Clone,
 {
-  type Value = V;
-  type OriginReader = W;
-  type Reader = MapReader<V, W::Reader, RM>;
-
-  #[inline]
-  fn read(&self) -> ReadRef<Self::Value> { ReadRef::map(self.origin.read(), &self.map) }
-
-  #[inline]
-  fn clone_reader(&self) -> Self::Reader {
-    MapReader {
-      origin: self.origin.clone_reader(),
-      map: self.map.clone(),
-    }
-  }
-
-  impl_reader_trivial_methods!();
-}
-
-impl<V, W, RM, WM> StateWriter for MapWriter<V, W, RM, WM>
-where
-  Self: 'static,
-  W: StateWriter,
-  RM: Fn(&W::Value) -> &V + Clone,
-  WM: Fn(&mut W::Value) -> &mut V + Clone,
-{
-  type Writer = MapWriter<V, W::Writer, RM, WM>;
+  type Writer = MapWriter<W::Writer, RM, WM>;
   type OriginWriter = W;
 
   #[inline]
-  fn write(&self) -> WriteRef<Self::Value> { WriteRef::map(self.origin.write(), &self.mut_map) }
+  fn write(&self) -> WriteRef<Self::Value> { self.map_ref(self.origin.write()) }
 
   #[inline]
-  fn silent(&self) -> WriteRef<Self::Value> { WriteRef::map(self.origin.silent(), &self.mut_map) }
+  fn silent(&self) -> WriteRef<Self::Value> { self.map_ref(self.origin.silent()) }
 
   #[inline]
-  fn shallow(&self) -> WriteRef<Self::Value> { WriteRef::map(self.origin.shallow(), &self.mut_map) }
+  fn shallow(&self) -> WriteRef<Self::Value> { self.map_ref(self.origin.shallow()) }
 
   #[inline]
   fn clone_writer(&self) -> Self::Writer {
@@ -132,7 +104,7 @@ where
   fn origin_writer(&self) -> &Self::OriginWriter { &self.origin }
 }
 
-impl<V, S, F> RenderTarget for MapReader<V, S, F>
+impl<V, S, F> RenderTarget for MapReader<S, F>
 where
   S: StateReader,
   F: Fn(&S::Value) -> &V + Clone + 'static,
@@ -146,7 +118,7 @@ where
   }
 }
 
-impl<V, S, F> RenderBuilder for MapReader<V, S, F>
+impl<V, S, F> RenderBuilder for MapReader<S, F>
 where
   S: StateReader,
   F: Fn(&S::Value) -> &V + Clone + 'static,
@@ -156,7 +128,7 @@ where
   fn widget_build(self, ctx: &BuildCtx) -> Widget { RenderProxy::new(self).widget_build(ctx) }
 }
 
-impl<V, S, RM, WM> RenderBuilder for MapWriter<V, S, RM, WM>
+impl<V, S, RM, WM> RenderBuilder for MapWriter<S, RM, WM>
 where
   Self: 'static,
   S: StateWriter,
@@ -166,4 +138,29 @@ where
 {
   #[inline]
   fn widget_build(self, ctx: &BuildCtx) -> Widget { self.clone_reader().widget_build(ctx) }
+}
+
+impl<V, S, RM, WM> MapWriter<S, RM, WM>
+where
+  Self: 'static,
+  S: StateWriter,
+  RM: Fn(&S::Value) -> &V + Clone,
+  WM: Fn(&mut S::Value) -> &mut V + Clone,
+{
+  fn map_ref<'a>(&'a self, mut orig: WriteRef<'a, S::Value>) -> WriteRef<'a, V>
+  where
+    WM: Fn(&mut S::Value) -> &mut V,
+  {
+    let value = orig
+      .value
+      .take()
+      .map(|orig| RefMut::map(orig, &self.mut_map));
+
+    WriteRef {
+      value,
+      modified: false,
+      modify_scope: orig.modify_scope,
+      control: orig.control,
+    }
+  }
 }

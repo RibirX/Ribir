@@ -3,16 +3,16 @@ mod splitted_state;
 mod stateful;
 
 use std::{
-  cell::{Cell, Ref, RefMut, UnsafeCell},
+  cell::{Cell, Ref, RefCell, RefMut, UnsafeCell},
   convert::Infallible,
   mem::MaybeUninit,
   ops::{Deref, DerefMut},
+  time::Instant,
 };
 
 use crate::prelude::*;
 pub use map_state::*;
-use ribir_algo::Sc;
-use rxrust::{ops::box_it::BoxOp, subject::Subject};
+use rxrust::ops::box_it::BoxOp;
 pub use splitted_state::*;
 pub use stateful::*;
 
@@ -30,10 +30,16 @@ pub trait StateReader: 'static {
   /// get a clone of this state that only can read.
   fn clone_reader(&self) -> Self::Reader;
   /// Maps an reader to another by applying a function to a contained
-  /// value. The return reader and the origin reader are the same reader. So
-  /// when one of them is modified, they will both be notified.
+  /// value. The return reader is just a shortcut to access part of the origin
+  /// reader.
+  ///
+  /// ## Undefined Behavior
+  ///
+  /// As `MapReader` is a shortcut to access part of the origin writer, it's
+  /// assume its part of data is always valid. If the data is invalid, and you
+  /// use `MapReader` to access it, it's undefined behavior.
   #[inline]
-  fn map_reader<U, F>(&self, map: F) -> MapReader<U, Self::Reader, F>
+  fn map_reader<U, F>(&self, map: F) -> MapReader<Self::Reader, F>
   where
     F: Fn(&Self::Value) -> &U + Clone,
   {
@@ -42,11 +48,22 @@ pub trait StateReader: 'static {
   /// Return the origin reader that this state map or split from . Otherwise
   /// return itself.
   fn origin_reader(&self) -> &Self::OriginReader;
+
+  /// Return the time stamp of the last modifies of this state.
+  fn time_stamp(&self) -> Instant;
+
   /// Return a modifies `Rx` stream of the state, user can subscribe it to
   /// response the state changes.
-  fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible>;
+  fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
+    self
+      .raw_modifies()
+      .filter(|s| s.contains(ModifyScope::DATA))
+      .box_it()
+  }
 
-  fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible>;
+  /// Return a modifies `Rx` stream of the state, including all modifies. Use
+  /// `modifies` instead if you only want to response the data changes.
+  fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible>;
   /// try convert this state into the value, if there is no other share this
   /// state, otherwise return an error with self.
   fn try_into_value(self) -> Result<Self::Value, Self>
@@ -63,53 +80,70 @@ pub trait StateWriter: StateReader {
   /// Return a silent write reference which notifies will be ignored by the
   /// framework.
   fn silent(&self) -> WriteRef<Self::Value>;
-  /// Convert this state reference to a shallow reference. Modify across this
-  /// reference will notify framework only. That means the modifies on shallow
-  /// reference should only effect framework but not effect on data. eg.
-  /// temporary to modify the state and then modifies it back to trigger the
-  /// view update. Use it only if you know how a shallow reference works.
+  /// Return a shallow write reference. Modify across this reference will notify
+  /// framework only. That means the modifies on shallow reference should only
+  /// effect framework but not effect on data. eg. temporary to modify the
+  /// state and then modifies it back to trigger the view update. Use it only
+  /// if you know how a shallow reference works.
   fn shallow(&self) -> WriteRef<Self::Value>;
   /// Clone this state writer.
   fn clone_writer(&self) -> Self::Writer;
   /// Return the origin writer that this state map or split from.
   fn origin_writer(&self) -> &Self::OriginWriter;
-  /// Return a new writer by applying a function to the contained value.
+  /// Return a new writer that be part of the origin writer by applying a
+  /// function to the contained value.
   ///
   /// This writer share the same data with the origin writer. But has it's own
   /// notifier. When modifies across the return writer, the downstream
-  /// subscribed on the origin state will not be notified. But when modifies
-  /// across the origin writer, the downstream subscribed on the return writer
-  /// will be notified.
+  /// subscribed on the origin state will not be notified.
   ///
-  /// If you want split a new writer that has same notifier with the origin
-  /// writer, you can use `map_reader(..).into_writer(..)`.
+  /// If you want a new writer that has same notifier with the origin writer,
+  /// you can use `map_writer(...)`.
   ///
-  /// #Notice
+  /// ##Notice
   ///
   /// Your `mut_map` function will accept a mutable reference, but you should
   /// not modify it, just return a mutable reference to a part of it. Because
-  /// Ribir assume you will not modify the origin state in it. If you modify the
-  /// origin state in it, no downstream will be notified.
+  /// Ribir assume you will not modify the origin data in it. If you modify the
+  /// origin data in it, no downstream will be notified.
+  ///
+  /// When you remove/invalid some data across the return writer, you should be
+  /// careful. Because that part may be in another state reader or writer, if
+  /// you invalid it, other state reader or writer will be invalid too.
+  ///
+  /// ## Panic
+  ///
+  /// 1. When the origin writer modifies, the return writer will be invalid,
+  ///    access its value will panic.
+  /// 2. If modifies the split part data causing any data to be invalid, it may
+  ///    panic.
+
   #[inline]
-  fn split_writer<V, R, W>(&self, map: R, mut_map: W) -> SplittedWriter<V, Self::Writer, R, W>
+  fn split_writer<V, R, W>(&self, map: R, mut_map: W) -> SplittedWriter<Self::Writer, R, W>
   where
-    R: Fn(&Self::Value) -> &V + Clone,
-    W: Fn(&mut Self::Value) -> &mut V + Clone,
+    R: Fn(&Self::Value) -> &V + Clone + 'static,
+    W: Fn(&mut Self::Value) -> &mut V + Clone + 'static,
   {
     SplittedWriter::new(self.clone_writer(), map, mut_map)
   }
 
   /// Return a new writer by applying a function to the contained value. The
-  /// return writer is just a shortcut to access part of the origin writer. They
-  /// share same data and notifier.
-  /// #Notice
+  /// return writer is just a shortcut to access part of the origin writer.
+  ///
+  /// ## Notice
   ///
   /// Your `mut_map` function will accept a mutable reference, but you should
   /// not modify it, just return a mutable reference to a part of it. Because
-  /// Ribir assume you will not modify the origin state in it. If you modify the
-  /// origin state in it, no downstream will be notified.
+  /// Ribir assume you will not modify the origin data in it. If you modify the
+  /// origin data in it, no downstream will be notified.
+  ///
+  /// ## Undefined Behavior
+  ///
+  /// As `MapWriter` is a shortcut to access part of the origin writer, it's
+  /// assume its part of data is always valid. If the data is invalid, and you
+  /// use `MapWriter` to access it, it's undefined behavior.
   #[inline]
-  fn map_writer<V, R, W>(&self, map: R, mut_map: W) -> MapWriter<V, Self::Writer, R, W>
+  fn map_writer<V, R, W>(&self, map: R, mut_map: W) -> MapWriter<Self::Writer, R, W>
   where
     R: Fn(&Self::Value) -> &V + Clone,
     W: Fn(&mut Self::Value) -> &mut V + Clone,
@@ -120,23 +154,29 @@ pub trait StateWriter: StateReader {
 }
 
 /// Wraps a borrowed reference to a value in a state.
-/// A wrapper type for an immutably borrowed value from a `RefCell<T>`.
+/// A wrapper type for an immutably borrowed value from a `StateReader`.
 pub struct ReadRef<'a, V>(Ref<'a, V>);
 
 pub struct WriteRef<'a, V> {
   value: Option<RefMut<'a, V>>,
-  modified: bool,
+  control: &'a dyn WriterControl,
   modify_scope: ModifyScope,
-  batched_modify: Sc<Cell<ModifyScope>>,
-  notifier: Notifier,
+  modified: bool,
 }
 
 /// Enum to store both stateless and stateful object.
 pub struct State<W>(pub(crate) UnsafeCell<InnerState<W>>);
 
 pub(crate) enum InnerState<W> {
-  Data(StateData<W>),
+  Data(RefCell<W>),
   Stateful(Stateful<W>),
+}
+
+trait WriterControl {
+  fn last_modified_stamp(&self) -> &Cell<Instant>;
+  fn batched_modifies(&self) -> &Cell<ModifyScope>;
+  fn notifier(&self) -> &Notifier;
+  fn dyn_clone(&self) -> Box<dyn WriterControl>;
 }
 
 impl<T: 'static> StateReader for State<T> {
@@ -146,19 +186,22 @@ impl<T: 'static> StateReader for State<T> {
 
   fn read(&self) -> ReadRef<T> {
     match self.inner_ref() {
-      InnerState::Data(w) => w.read(),
+      InnerState::Data(w) => ReadRef::new(w.borrow()),
       InnerState::Stateful(w) => w.read(),
     }
   }
 
+  #[inline]
   fn clone_reader(&self) -> Self::Reader { self.as_stateful().clone_reader() }
 
   #[inline]
   fn origin_reader(&self) -> &Self::OriginReader { self }
 
-  fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.as_stateful().modifies() }
+  #[inline]
+  fn time_stamp(&self) -> Instant { self.as_stateful().time_stamp() }
 
-  fn raw_modifies(&self) -> Subject<'static, ModifyScope, Infallible> {
+  #[inline]
+  fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
     self.as_stateful().raw_modifies()
   }
 
@@ -195,18 +238,19 @@ impl<W> State<W> {
     State(UnsafeCell::new(InnerState::Stateful(stateful)))
   }
 
-  pub fn value(value: W) -> Self { State(UnsafeCell::new(InnerState::Data(StateData::new(value)))) }
+  pub fn value(value: W) -> Self { State(UnsafeCell::new(InnerState::Data(RefCell::new(value)))) }
 
   pub fn as_stateful(&self) -> &Stateful<W> {
     match self.inner_ref() {
       InnerState::Data(w) => {
-        w.assert_is_not_used();
+        assert!(w.try_borrow_mut().is_ok());
 
         let mut uninit: MaybeUninit<_> = MaybeUninit::uninit();
         // Safety: we already check there is no other reference to the state data.
         unsafe {
           std::ptr::copy(w, uninit.as_mut_ptr(), 1);
-          let stateful = InnerState::Stateful(Stateful::from_state_data(uninit.assume_init()));
+          let value = uninit.assume_init().into_inner();
+          let stateful = InnerState::Stateful(Stateful::new(value));
           let copy = std::mem::replace(&mut *self.0.get(), stateful);
           // this is a copy of the inner data so we need forget it.
           std::mem::forget(copy);
@@ -243,48 +287,6 @@ impl<'a, V> WriteRef<'a, V> {
   /// is any modifies on this reference.
   #[inline]
   pub fn forget_modifies(&mut self) -> bool { std::mem::replace(&mut self.modified, false) }
-
-  pub(crate) fn new(
-    value: RefMut<'a, V>,
-    scope: ModifyScope,
-    batched_modify: Sc<Cell<ModifyScope>>,
-    notifier: Notifier,
-  ) -> WriteRef<'a, V> {
-    WriteRef {
-      value: Some(value),
-      modified: false,
-      modify_scope: scope,
-      batched_modify,
-      notifier,
-    }
-  }
-
-  pub(crate) fn map<U>(mut orig: WriteRef<V>, f: impl FnOnce(&mut V) -> &mut U) -> WriteRef<U> {
-    let value = orig.value.take().map(|orig| RefMut::map(orig, f));
-    WriteRef {
-      value,
-      modified: false,
-      modify_scope: orig.modify_scope,
-      batched_modify: orig.batched_modify.clone(),
-      notifier: orig.notifier.clone(),
-    }
-  }
-
-  pub(crate) fn split_map<U>(
-    mut orig: WriteRef<V>,
-    f: impl FnOnce(&mut V) -> &mut U,
-    batched_modify: Sc<Cell<ModifyScope>>,
-    notifier: Notifier,
-  ) -> WriteRef<U> {
-    let value = orig.value.take().map(|orig| RefMut::map(orig, f));
-    WriteRef {
-      value,
-      modified: false,
-      modify_scope: orig.modify_scope,
-      batched_modify,
-      notifier,
-    }
-  }
 }
 
 impl<'a, W> Deref for ReadRef<'a, W> {
@@ -310,6 +312,7 @@ impl<'a, W> DerefMut for WriteRef<'a, W> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target {
     self.modified = true;
+    self.control.last_modified_stamp().set(Instant::now());
     // Safety: value always exists except in drop method.
     unsafe { self.value.as_mut().unwrap_unchecked().deref_mut() }
   }
@@ -317,24 +320,23 @@ impl<'a, W> DerefMut for WriteRef<'a, W> {
 
 impl<'a, W> Drop for WriteRef<'a, W> {
   fn drop(&mut self) {
-    if !self.modified {
+    let Self { control, modify_scope, modified, .. } = self;
+    if !*modified {
       return;
     }
 
-    let scope = self.modify_scope;
-    let batch_scope = self.batched_modify.get();
-    if batch_scope.is_empty() && !scope.is_empty() {
-      self.batched_modify.set(scope);
+    let batched_modifies = control.batched_modifies();
+    if batched_modifies.get().is_empty() && !modify_scope.is_empty() {
+      batched_modifies.set(*modify_scope);
 
-      let mut subject = self.notifier.raw_modifies();
-      let share_scope = self.batched_modify.clone();
+      let control = control.dyn_clone();
       AppCtx::spawn_local(async move {
-        let scope = share_scope.replace(ModifyScope::empty());
-        subject.next(scope);
+        let scope = control.batched_modifies().replace(ModifyScope::empty());
+        control.notifier().next(scope);
       })
       .unwrap();
     } else {
-      self.batched_modify.set(batch_scope | scope);
+      batched_modifies.set(*modify_scope | batched_modifies.get());
     }
   }
 }
@@ -434,7 +436,7 @@ where
 
 macro_rules! impl_compose_builder {
   ($name: ident) => {
-    impl<V, W, RM, WM> ComposeBuilder for $name<V, W, RM, WM>
+    impl<V, W, RM, WM> ComposeBuilder for $name<W, RM, WM>
     where
       W: StateWriter,
       RM: Fn(&W::Value) -> &V + Clone + 'static,
@@ -446,7 +448,7 @@ macro_rules! impl_compose_builder {
       }
     }
 
-    impl<V, W, RM, WM, Child> ComposeChildBuilder for $name<V, W, RM, WM>
+    impl<V, W, RM, WM, Child> ComposeChildBuilder for $name<W, RM, WM>
     where
       W: StateWriter,
       RM: Fn(&W::Value) -> &V + Clone + 'static,
@@ -479,30 +481,23 @@ mod tests {
   }
 
   #[test]
-  fn path_state_router_test() {
+  fn map_same_with_origin() {
     reset_test_env!();
 
     let origin = State::value(Origin { a: 0, b: 0 });
-    let a = split_writer!($origin.a);
-    let b = map_writer!($origin.b);
+    let map_state = map_writer!($origin.b);
 
     let track_origin = Sc::new(Cell::new(0));
-    let track_a = Sc::new(Cell::new(0));
-    let track_b = Sc::new(Cell::new(0));
+    let track_map = Sc::new(Cell::new(0));
 
     let c_origin = track_origin.clone();
     origin.modifies().subscribe(move |_| {
       c_origin.set(c_origin.get() + 1);
     });
 
-    let c_a = track_a.clone();
-    a.modifies().subscribe(move |_| {
-      c_a.set(c_a.get() + 1);
-    });
-
-    let c_b = track_b.clone();
-    b.modifies().subscribe(move |_| {
-      c_b.set(c_b.get() + 1);
+    let c_map = track_map.clone();
+    map_state.modifies().subscribe(move |_| {
+      c_map.set(c_map.get() + 1);
     });
 
     origin.write().a = 1;
@@ -510,24 +505,62 @@ mod tests {
     AppCtx::run_until_stalled();
 
     assert_eq!(track_origin.get(), 1);
-    assert_eq!(track_a.get(), 1);
-    assert_eq!(track_b.get(), 1);
+    assert_eq!(track_map.get(), 1);
 
-    *a.write() = 1;
-    Timer::wake_timeout_futures();
-    AppCtx::run_until_stalled();
-
-    assert_eq!(track_origin.get(), 1);
-    assert_eq!(track_a.get(), 2);
-    assert_eq!(track_b.get(), 1);
-
-    *b.write() = 1;
+    *map_state.write() = 1;
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
     assert_eq!(track_origin.get(), 2);
-    assert_eq!(track_a.get(), 3);
-    assert_eq!(track_b.get(), 2);
+    assert_eq!(track_map.get(), 2);
+  }
+
+  #[test]
+  fn split_not_notify_origin() {
+    reset_test_env!();
+
+    let origin = State::value(Origin { a: 0, b: 0 });
+    let split = split_writer!($origin.b);
+
+    let track_origin = Sc::new(Cell::new(0));
+    let track_split = Sc::new(Cell::new(0));
+
+    let c_origin = track_origin.clone();
+    origin.modifies().subscribe(move |_| {
+      c_origin.set(c_origin.get() + 1);
+    });
+
+    let c_split = track_split.clone();
+    split.modifies().subscribe(move |_| {
+      c_split.set(c_split.get() + 1);
+    });
+
+    *split.write() = 1;
+    Timer::wake_timeout_futures();
+    AppCtx::run_until_stalled();
+
+    assert_eq!(track_origin.get(), 0);
+    assert_eq!(track_split.get(), 1);
+
+    origin.write().b = 1;
+    Timer::wake_timeout_futures();
+    AppCtx::run_until_stalled();
+    assert_eq!(track_origin.get(), 1);
+    // splitted downstream will not be notified.
+    assert_eq!(track_split.get(), 1);
+  }
+
+  #[test]
+  #[should_panic]
+  fn invalid_split_after_origin_modify() {
+    reset_test_env!();
+
+    let origin = State::value(Origin { a: 0, b: 0 });
+    let split = split_writer!($origin.b);
+
+    origin.write().b = 1;
+    // invalid split state
+    *split.write() = 1;
   }
 
   struct C;
