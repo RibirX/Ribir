@@ -5,9 +5,8 @@ use crate::{
 use ribir_algo::Sc;
 use rxrust::{ops::box_it::BoxOp, prelude::*};
 use std::{
-  cell::{Cell, Ref, RefCell, RefMut},
+  cell::{Cell, RefCell},
   convert::Infallible,
-  ops::{Deref, DerefMut},
 };
 
 /// Stateful object use to watch the modifies of the inner data.
@@ -19,16 +18,6 @@ pub struct Stateful<W> {
 pub struct Reader<W>(Stateful<W>);
 
 pub struct Writer<W>(Stateful<W>);
-
-pub struct ReadRef<'a, W>(Ref<'a, W>);
-
-pub struct WriteRef<'a, W> {
-  modified: bool,
-  modify_scope: ModifyScope,
-  value: RefMut<'a, W>,
-  batched_modify: &'a Sc<Cell<ModifyScope>>,
-  notifier: Option<&'a Notifier>,
-}
 
 /// The notifier is a `RxRust` stream that emit notification when the state
 /// changed.
@@ -51,10 +40,9 @@ impl<W: 'static> StateReader for Stateful<W> {
   type Value = W;
   type OriginReader = Self;
   type Reader = Reader<W>;
-  type Ref<'a> = ReadRef<'a, W>;
 
   #[inline]
-  fn read(&self) -> ReadRef<'_, W> { self.inner.read() }
+  fn read(&self) -> ReadRef<W> { self.inner.read() }
 
   #[inline]
   fn clone_reader(&self) -> Self::Reader { Reader::from_stateful(self) }
@@ -86,13 +74,12 @@ impl<W: 'static> StateReader for Stateful<W> {
 impl<W: 'static> StateWriter for Stateful<W> {
   type Writer = Writer<W>;
   type OriginWriter = Self;
-  type RefWrite<'a> = WriteRef<'a, W> where Self: 'a;
 
-  fn write(&'_ self) -> Self::RefWrite<'_> { self.write_ref(ModifyScope::BOTH) }
+  fn write(&self) -> WriteRef<W> { self.write_ref(ModifyScope::BOTH) }
 
-  fn silent(&'_ self) -> Self::RefWrite<'_> { self.write_ref(ModifyScope::DATA) }
+  fn silent(&self) -> WriteRef<W> { self.write_ref(ModifyScope::DATA) }
 
-  fn shallow(&'_ self) -> Self::RefWrite<'_> { self.write_ref(ModifyScope::FRAMEWORK) }
+  fn shallow(&self) -> WriteRef<W> { self.write_ref(ModifyScope::FRAMEWORK) }
 
   fn clone_writer(&self) -> Self::Writer { Writer::from_stateful(self) }
 
@@ -103,10 +90,9 @@ impl<W: 'static> StateReader for Reader<W> {
   type Value = W;
   type OriginReader = Self;
   type Reader = Self;
-  type Ref<'a> = ReadRef<'a, W> where W:'a;
 
   #[inline]
-  fn read(&'_ self) -> Self::Ref<'_> { self.0.read() }
+  fn read(&self) -> ReadRef<W> { self.0.read() }
 
   #[inline]
   fn clone_reader(&self) -> Self { self.0.clone_reader() }
@@ -131,10 +117,9 @@ impl<W: 'static> StateReader for Writer<W> {
   type Value = W;
   type OriginReader = Self;
   type Reader = Reader<W>;
-  type Ref<'a> = ReadRef<'a, W>;
 
   #[inline]
-  fn read(&'_ self) -> Self::Ref<'_> { self.0.read() }
+  fn read(&'_ self) -> ReadRef<W> { self.0.read() }
 
   #[inline]
   fn clone_reader(&self) -> Self::Reader { self.0.clone_reader() }
@@ -152,19 +137,18 @@ impl<W: 'static> StateReader for Writer<W> {
   fn try_into_value(self) -> Result<Self::Value, Self> { self.0.try_into_value().map_err(Writer) }
 }
 
-impl<W: 'static> StateWriter for Writer<W> {
+impl<V: 'static> StateWriter for Writer<V> {
   type Writer = Self;
   type OriginWriter = Self;
-  type RefWrite<'a> = WriteRef<'a, W>;
 
   #[inline]
-  fn write(&'_ self) -> Self::RefWrite<'_> { self.0.write() }
+  fn write(&self) -> WriteRef<V> { self.0.write() }
 
   #[inline]
-  fn silent(&'_ self) -> Self::RefWrite<'_> { self.0.silent() }
+  fn silent(&self) -> WriteRef<V> { self.0.silent() }
 
   #[inline]
-  fn shallow(&'_ self) -> Self::RefWrite<'_> { self.0.shallow() }
+  fn shallow(&self) -> WriteRef<V> { self.0.shallow() }
 
   #[inline]
   fn clone_writer(&self) -> Self { self.0.clone_writer() }
@@ -309,9 +293,9 @@ impl<W> Stateful<W> {
 
   fn write_ref(&self, scope: ModifyScope) -> WriteRef<'_, W> {
     let value = self.inner.data.borrow_mut();
-    let batched_modify = &self.inner.batch_modified;
-    let modifier = &self.notifier;
-    WriteRef::new(value, scope, batched_modify, Some(modifier))
+    let batched_modify = self.inner.batch_modified.clone();
+    let modifier = self.notifier.clone();
+    WriteRef::new(value, scope, batched_modify, modifier)
   }
 
   fn writer_count(&self) -> usize { self.inner.writer_count.get() }
@@ -337,50 +321,7 @@ impl<W> StateData<W> {
 
   pub(crate) fn into_inner(self) -> W { self.data.into_inner() }
 
-  pub(crate) fn read(&self) -> ReadRef<W> { ReadRef(self.data.borrow()) }
-}
-
-impl<'a, W> Deref for ReadRef<'a, W> {
-  type Target = W;
-
-  #[track_caller]
-  fn deref(&self) -> &Self::Target { &self.0 }
-}
-
-impl<'a, W> Deref for WriteRef<'a, W> {
-  type Target = W;
-  #[track_caller]
-  fn deref(&self) -> &Self::Target { &self.value }
-}
-
-impl<'a, W> DerefMut for WriteRef<'a, W> {
-  #[track_caller]
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    self.modified = true;
-    &mut self.value
-  }
-}
-
-impl<'a, W> RefWrite for WriteRef<'a, W> {
-  #[inline]
-  fn forget_modifies(&mut self) -> bool { std::mem::replace(&mut self.modified, false) }
-}
-
-impl<'a, W> WriteRef<'a, W> {
-  pub(crate) fn new(
-    value: RefMut<'a, W>,
-    scope: ModifyScope,
-    batch_scope: &'a Sc<Cell<ModifyScope>>,
-    modifier: Option<&'a Notifier>,
-  ) -> Self {
-    Self {
-      modified: false,
-      modify_scope: scope,
-      value,
-      batched_modify: batch_scope,
-      notifier: modifier,
-    }
-  }
+  pub(crate) fn read(&self) -> ReadRef<W> { ReadRef::new(self.data.borrow()) }
 }
 
 impl<W: SingleChild> SingleChild for Stateful<W> {}
@@ -411,31 +352,6 @@ impl<R: Render> RenderTarget for Sc<StateData<R>> {
 
 impl<T: Query> Query for StateData<T> {
   crate::widget::impl_proxy_query!(read());
-}
-
-impl<'a, W> Drop for WriteRef<'a, W> {
-  fn drop(&mut self) {
-    if !self.modified {
-      return;
-    }
-
-    let scope = self.modify_scope;
-    let batch_scope = self.batched_modify.get();
-    if batch_scope.is_empty() && !scope.is_empty() {
-      self.batched_modify.set(scope);
-      if let Some(m) = self.notifier.as_mut() {
-        let mut subject = m.raw_modifies();
-        let share_scope = self.batched_modify.clone();
-        AppCtx::spawn_local(async move {
-          let scope = share_scope.replace(ModifyScope::empty());
-          subject.next(scope);
-        })
-        .unwrap();
-      }
-    } else {
-      self.batched_modify.set(batch_scope | scope);
-    }
-  }
 }
 
 impl Notifier {
@@ -541,7 +457,7 @@ mod tests {
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
-    assert_eq!(notified.borrow().deref(), &[ModifyScope::BOTH]);
+    assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH]);
 
     {
       let _ = &mut w.silent().size;
@@ -549,10 +465,7 @@ mod tests {
 
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
-    assert_eq!(
-      notified.borrow().deref(),
-      &[ModifyScope::BOTH, ModifyScope::DATA]
-    );
+    assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH, ModifyScope::DATA]);
 
     {
       let _ = &mut w.write();
@@ -569,9 +482,6 @@ mod tests {
 
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
-    assert_eq!(
-      notified.borrow().deref(),
-      &[ModifyScope::BOTH, ModifyScope::DATA]
-    );
+    assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH, ModifyScope::DATA]);
   }
 }

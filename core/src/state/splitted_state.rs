@@ -1,6 +1,6 @@
-use super::{MapReadRef, MapReader, ModifyScope, Notifier, RefWrite, StateReader, StateWriter};
+use super::{MapReader, ModifyScope, Notifier, ReadRef, StateReader, StateWriter, WriteRef};
 use crate::{
-  context::{AppCtx, BuildCtx},
+  context::BuildCtx,
   widget::{Render, RenderBuilder, Widget},
 };
 use ribir_algo::Sc;
@@ -10,46 +10,46 @@ use rxrust::{
   subject::Subject,
   subscription::Subscription,
 };
-use std::{any::Any, cell::Cell, rc::Rc};
+use std::{any::Any, cell::Cell};
 
 /// A writer splitted writer from another writer, and has its own notifier.
 pub struct SplittedWriter<V, O, R, W>
 where
   O: StateWriter,
-  R: FnOnce(&O::Value) -> &V + Copy,
-  W: FnOnce(&mut O::Value) -> &mut V + Copy,
+  R: Fn(&O::Value) -> &V + Clone,
+  W: Fn(&mut O::Value) -> &mut V + Clone,
 {
-  origin_writer: O,
-  reader: R,
-  writer: W,
+  origin: O,
+  map: R,
+  mut_map: W,
   notifier: Notifier,
   batched_modify: Sc<Cell<ModifyScope>>,
-  connect_guard: Rc<Box<dyn Any>>,
+  connect_guard: Sc<Box<dyn Any>>,
 }
 
 impl<V, O, R, W> StateReader for SplittedWriter<V, O, R, W>
 where
   Self: 'static,
   O: StateWriter,
-  R: FnOnce(&O::Value) -> &V + Copy,
-  W: FnOnce(&mut O::Value) -> &mut V + Copy,
+  R: Fn(&O::Value) -> &V + Clone,
+  W: Fn(&mut O::Value) -> &mut V + Clone,
 {
   type Value = V;
   type OriginReader = O;
   type Reader = MapReader<V, O::Reader, R>;
 
-  type Ref<'a> = MapReadRef<V, O::Ref<'a>, R> where Self: 'a;
-
-  #[inline]
-  fn read(&'_ self) -> Self::Ref<'_> { MapReadRef::new(self.origin_writer.read(), self.reader) }
+  fn read(&self) -> ReadRef<Self::Value> { ReadRef::map(self.origin.read(), &self.map) }
 
   #[inline]
   fn clone_reader(&self) -> Self::Reader {
-    MapReader::new(self.origin_writer.clone_reader(), self.reader)
+    MapReader {
+      origin: self.origin.clone_reader(),
+      map: self.map.clone(),
+    }
   }
 
   #[inline]
-  fn origin_reader(&self) -> &Self::OriginReader { &self.origin_writer }
+  fn origin_reader(&self) -> &Self::OriginReader { &self.origin }
 
   #[inline]
   fn modifies(&self) -> BoxOp<'static, ModifyScope, std::convert::Infallible> {
@@ -69,25 +69,26 @@ impl<V, O, R, W> StateWriter for SplittedWriter<V, O, R, W>
 where
   Self: 'static,
   O: StateWriter,
-  R: FnOnce(&O::Value) -> &V + Copy,
-  W: FnOnce(&mut O::Value) -> &mut V + Copy,
+  R: Fn(&O::Value) -> &V + Clone,
+  W: Fn(&mut O::Value) -> &mut V + Clone,
 {
   type Writer = SplittedWriter<V, O::Writer, R, W>;
   type OriginWriter = O;
-  type RefWrite<'a> = SplittedWriteRef<'a, V, O::RefWrite<'a>, R, W>;
-  #[inline]
-  fn write(&'_ self) -> Self::RefWrite<'_> { self.write_ref(ModifyScope::BOTH) }
-  #[inline]
-  fn silent(&'_ self) -> Self::RefWrite<'_> { self.write_ref(ModifyScope::DATA) }
-  #[inline]
-  fn shallow(&'_ self) -> Self::RefWrite<'_> { self.write_ref(ModifyScope::FRAMEWORK) }
 
   #[inline]
+  fn write(&self) -> WriteRef<Self::Value> { self.split_ref(self.origin.write()) }
+
+  #[inline]
+  fn silent(&self) -> WriteRef<Self::Value> { self.split_ref(self.origin.silent()) }
+
+  #[inline]
+  fn shallow(&self) -> WriteRef<Self::Value> { self.split_ref(self.origin.shallow()) }
+
   fn clone_writer(&self) -> Self::Writer {
     SplittedWriter {
-      origin_writer: self.origin_writer.clone_writer(),
-      reader: self.reader,
-      writer: self.writer,
+      origin: self.origin.clone_writer(),
+      map: self.map.clone(),
+      mut_map: self.mut_map.clone(),
       notifier: self.notifier.clone(),
       batched_modify: self.batched_modify.clone(),
       connect_guard: self.connect_guard.clone(),
@@ -95,129 +96,56 @@ where
   }
 
   #[inline]
-  fn origin_writer(&self) -> &Self::OriginWriter { &self.origin_writer }
-}
-
-pub struct SplittedWriteRef<'a, V, O, R, W>
-where
-  O: RefWrite,
-  R: FnOnce(&O::Target) -> &V + Copy,
-  W: FnOnce(&mut O::Target) -> &mut V + Copy,
-{
-  origin_ref: O,
-  modify_scope: ModifyScope,
-  batched_modify: &'a Sc<Cell<ModifyScope>>,
-  notifier: &'a Notifier,
-  reader_fn: R,
-  writer_fn: W,
-}
-
-impl<'a, V, O, R, W> std::ops::Deref for SplittedWriteRef<'a, V, O, R, W>
-where
-  O: RefWrite,
-  R: FnOnce(&O::Target) -> &V + Copy,
-  W: FnOnce(&mut O::Target) -> &mut V + Copy,
-{
-  type Target = V;
-
-  #[inline]
-  fn deref(&self) -> &Self::Target { (self.reader_fn)(&*self.origin_ref) }
-}
-
-impl<'a, V, O, R, W> std::ops::DerefMut for SplittedWriteRef<'a, V, O, R, W>
-where
-  O: RefWrite,
-  R: FnOnce(&O::Target) -> &V + Copy,
-  W: FnOnce(&mut O::Target) -> &mut V + Copy,
-{
-  #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { (self.writer_fn)(&mut *self.origin_ref) }
-}
-
-impl<'a, V, O, R, W> RefWrite for SplittedWriteRef<'a, V, O, R, W>
-where
-  O: RefWrite,
-  R: FnOnce(&O::Target) -> &V + Copy,
-  W: FnOnce(&mut O::Target) -> &mut V + Copy,
-{
-  #[inline]
-  fn forget_modifies(&mut self) -> bool { self.origin_ref.forget_modifies() }
+  fn origin_writer(&self) -> &Self::OriginWriter { &self.origin }
 }
 
 impl<V, O, R, W> SplittedWriter<V, O, R, W>
 where
   O: StateWriter,
-  R: FnOnce(&O::Value) -> &V + Copy,
-  W: FnOnce(&mut O::Value) -> &mut V + Copy,
+  R: Fn(&O::Value) -> &V + Clone,
+  W: Fn(&mut O::Value) -> &mut V + Clone,
 {
-  pub(super) fn new(origin_writer: O, reader: R, writer: W) -> Self {
+  pub(super) fn new(origin: O, map: R, mut_map: W) -> Self {
     let notifier = Notifier::default();
     let c_modifier = notifier.clone();
 
-    let h = origin_writer
+    let h = origin
       .raw_modifies()
       .subscribe(move |v| c_modifier.raw_modifies().next(v))
       .unsubscribe_when_dropped();
 
     Self {
-      origin_writer,
-      reader,
-      writer,
+      origin,
+      map,
+      mut_map,
       notifier,
       batched_modify: <_>::default(),
-      connect_guard: Rc::new(Box::new(h)),
+      connect_guard: Sc::new(Box::new(h)),
     }
   }
 
-  fn write_ref(&'_ self, scope: ModifyScope) -> SplittedWriteRef<'_, V, O::RefWrite<'_>, R, W> {
-    SplittedWriteRef {
-      origin_ref: self.origin_writer.write(),
-      modify_scope: scope,
-      batched_modify: &self.batched_modify,
-      notifier: &self.notifier,
-      reader_fn: self.reader,
-      writer_fn: self.writer,
-    }
-  }
-}
-
-impl<'a, V, O, R, W> Drop for SplittedWriteRef<'a, V, O, R, W>
-where
-  O: RefWrite,
-  R: FnOnce(&O::Target) -> &V + Copy,
-  W: FnOnce(&mut O::Target) -> &mut V + Copy,
-{
-  fn drop(&mut self) {
-    if !self.origin_ref.forget_modifies() {
-      return;
-    }
-
-    let scope = self.modify_scope;
-    let batched_modify = self.batched_modify.get();
-    if batched_modify.is_empty() && !scope.is_empty() {
-      self.batched_modify.set(scope);
-
-      let mut subject = self.notifier.raw_modifies();
-      let batched_modify = self.batched_modify.clone();
-      AppCtx::spawn_local(async move {
-        let scope = batched_modify.replace(ModifyScope::empty());
-        subject.next(scope);
-      })
-      .unwrap();
-    } else {
-      self.batched_modify.set(batched_modify | scope);
-    }
+  fn split_ref<'a>(&'a self, origin_ref: WriteRef<'a, O::Value>) -> WriteRef<'a, V> {
+    WriteRef::split_map(
+      origin_ref,
+      &self.mut_map,
+      self.batched_modify.clone(),
+      self.notifier.clone(),
+    )
   }
 }
 
 impl<V, O, R, W> RenderBuilder for SplittedWriter<V, O, R, W>
 where
-  V: Render,
   O: StateWriter,
-  R: FnOnce(&O::Value) -> &V + Copy + 'static,
-  W: FnOnce(&mut O::Value) -> &mut V + Copy,
+  R: Fn(&O::Value) -> &V + Clone + 'static,
+  W: Fn(&mut O::Value) -> &mut V + Clone,
+  V: Render,
 {
   fn widget_build(self, ctx: &BuildCtx) -> Widget {
-    MapReader::new(self.origin_writer.clone_reader(), self.reader).widget_build(ctx)
+    MapReader {
+      origin: self.origin.clone_reader(),
+      map: self.map.clone(),
+    }
+    .widget_build(ctx)
   }
 }
