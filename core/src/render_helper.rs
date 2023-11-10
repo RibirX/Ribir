@@ -1,4 +1,6 @@
 use crate::prelude::*;
+use ribir_algo::Sc;
+use std::{cell::RefCell, ops::Deref};
 
 pub(crate) trait RenderTarget {
   type Target: Render + ?Sized;
@@ -49,4 +51,14 @@ impl<R: RenderTarget + Query> Render for RenderProxy<R> {
 
 impl<R: RenderTarget + Query> Query for RenderProxy<R> {
   crate::widget::impl_proxy_query!(0);
+}
+
+impl<R: Render> RenderTarget for RefCell<R> {
+  type Target = R;
+  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(&*self.borrow()) }
+}
+
+impl<R: RenderTarget> RenderTarget for Sc<R> {
+  type Target = R::Target;
+  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { self.deref().proxy(f) }
 }

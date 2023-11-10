@@ -4,14 +4,15 @@ use crate::{
   prelude::*,
 };
 use ribir_algo::{Sc, ShareResource};
+use rxrust::ops::box_it::BoxOp;
 
-use std::convert::Infallible;
 #[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
   marker::PhantomData,
   ops::Deref,
 };
+use std::{cell::RefCell, convert::Infallible};
 pub trait Compose: Sized {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
@@ -182,7 +183,7 @@ impl Widget {
   /// `upstream` emit a modify event that contains `ModifyScope::FRAMEWORK`.
   pub(crate) fn dirty_subscribe(
     self,
-    upstream: Subject<'static, ModifyScope, Infallible>,
+    upstream: BoxOp<'static, ModifyScope, Infallible>,
     ctx: &BuildCtx,
   ) -> Self {
     let dirty_set = ctx.tree.borrow().dirty_set.clone();
@@ -328,6 +329,9 @@ impl<T: Query> Query for ShareResource<T> {
 }
 impl<T: Query> Query for Sc<T> {
   impl_proxy_query!(deref());
+}
+impl<T: Query> Query for RefCell<T> {
+  impl_proxy_query!(borrow());
 }
 impl_proxy_render!(proxy deref(), ShareResource<T>, <T>, where  T: Render + 'static);
 
