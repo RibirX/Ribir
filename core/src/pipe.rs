@@ -51,6 +51,17 @@ pub trait Pipe {
   {
     MapPipe::new(self, f)
   }
+
+  /// Chain more operations on the pipe value stream by applying the `f` on the
+  /// final value stream when subscribe. This is a lazy operation, it will
+  /// not execute the `f` until the pipe is be subscribed.
+  fn value_chain<F>(self, f: F) -> FinalChain<Self::Value, Self, F>
+  where
+    Self: Sized,
+    F: FnOnce(ValueStream<Self::Value>) -> ValueStream<Self::Value> + 'static,
+  {
+    FinalChain { source: self, f }
+  }
 }
 
 /// A trait object type for `Pipe`, help to store a concrete `Pipe`
@@ -88,17 +99,6 @@ impl<V: 'static> BoxPipe<V> {
 }
 
 pub(crate) trait InnerPipe: Pipe {
-  /// Chain more operations on the pipe value stream by applying the `f` on the
-  /// final value stream. This a lazy operation, it will not execute the `f`
-  /// until the pipe is be subscribed.
-  fn final_stream_chain<F>(self, f: F) -> FinalChain<Self::Value, Self, F>
-  where
-    Self: Sized,
-    F: FnOnce(ValueStream<Self::Value>) -> ValueStream<Self::Value> + 'static,
-  {
-    FinalChain { source: self, f }
-  }
-
   fn build(
     self,
     ctx: &BuildCtx,
