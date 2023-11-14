@@ -1,7 +1,7 @@
 #![feature(proc_macro_diagnostic, proc_macro_span)]
 extern crate proc_macro;
 
-mod declare_derive2;
+mod declare_derive;
 mod lerp_derive;
 mod util;
 use fn_widget_macro::FnWidgetMacro;
@@ -122,7 +122,7 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Declare, attributes(declare))]
 pub fn declare_trait_macro_derive2(input: TokenStream) -> TokenStream {
   let mut input = parse_macro_input!(input as DeriveInput);
-  declare_derive2::declare_derive(&mut input)
+  declare_derive::declare_derive(&mut input)
     .unwrap_or_else(|e| e.into_compile_error())
     .into()
 }

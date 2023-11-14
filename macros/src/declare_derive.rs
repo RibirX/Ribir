@@ -11,7 +11,7 @@ use syn::{
 };
 
 const DECLARE: &str = "Declare";
-pub const DECLARER: &str = "Declarer2";
+pub const DECLARER: &str = "Declarer";
 const DECLARE_ATTR: &str = "declare";
 
 struct DefaultMeta {

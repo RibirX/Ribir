@@ -62,11 +62,11 @@ pub struct Row;
 pub struct Column;
 
 impl Declare for Row {
-  type Builder = FlexDeclarer2;
+  type Builder = FlexDeclarer;
   fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Horizontal) }
 }
 
-impl FlexDeclarer2 {
+impl FlexDeclarer {
   pub fn item_gap<M, T>(mut self, gap: T) -> Self
   where
     DeclareInit<f32>: DeclareFrom<T, M>,
@@ -85,7 +85,7 @@ impl FlexDeclarer2 {
 }
 
 impl Declare for Column {
-  type Builder = FlexDeclarer2;
+  type Builder = FlexDeclarer;
   fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Vertical) }
 }
 
