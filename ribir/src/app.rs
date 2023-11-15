@@ -95,6 +95,13 @@ impl App {
     app.active_wnd = Some(id);
     // todo: set the window to be the top window, but we not really support
     // multi window fully, implement this later.
+    if let Some(wnd) = AppCtx::get_window(id) {
+      let mut shell = wnd.shell_wnd().borrow_mut();
+      if shell.is_minimized() {
+        shell.set_minimized(false);
+      }
+      shell.focus_window();
+    };
   }
 
   /// run the application, this will start the event loop and block the current
