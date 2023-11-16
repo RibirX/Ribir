@@ -65,12 +65,12 @@ pub struct Widget {
 /// dyn Any` of the target type. You can control if you want to continue query
 /// by return `true` or `false` in the callback.
 pub trait Query: Any {
-  /// Query the type in a inside first order, and apply the callback to it,
-  /// return what the callback return.
+  /// Query the type in a inside first order, and apply the callback to it.
+  /// return what the callback return, hint if the query should continue.
   fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool)
   -> bool;
   /// Query the type in a outside first order, and apply the callback to it,
-  /// return what the callback return.
+  /// return what the callback return, hint if the query should continue.
   fn query_outside_first(
     &self,
     type_id: TypeId,
