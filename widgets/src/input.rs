@@ -278,7 +278,7 @@ where
       let only_text = text.clone_reader();
 
       let mut stack = @Stack {
-        fit: StackFit::Loose,
+        fit: StackFit::Passthrough,
         scrollable: scroll_dir,
       };
 
@@ -334,18 +334,24 @@ where
         },
       };
 
-      let high_light_rect = @OnlySizedByParent {
-        @SelectedHighLight {
-          visible: pipe!($stack.has_focus()),
-          rects: pipe! {
-            $this.select_text_rect(&$only_text, $text.layout_size())
+      let high_light_rect = @UnconstrainedBox {
+        clamp_dim: ClampDim::MIN_SIZE,
+        @OnlySizedByParent {
+          @SelectedHighLight {
+            visible: pipe!($stack.has_focus()),
+            rects: pipe! {
+              $this.select_text_rect(&$only_text, $text.layout_size())
+            }
           }
         }
       };
 
-      let caret = @OnlySizedByParent {
-        @$caret_box {
-          @Caret { focused: pipe!($stack.has_focus()) }
+      let caret = @UnconstrainedBox {
+        clamp_dim: ClampDim::MIN_SIZE,
+        @OnlySizedByParent {
+          @$caret_box {
+            @Caret { focused: pipe!($stack.has_focus()) }
+          }
         }
       };
 
@@ -423,7 +429,9 @@ fn auto_scroll_pos(container: &ScrollableWidget, before: Point, after: Point, si
 #[cfg(test)]
 mod tests {
   use super::{EditableText, Input};
+  use crate::layout::SizedBox;
   use ribir_core::{prelude::*, reset_test_env, test_helper::TestWindow};
+  use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
   fn split_value<T: 'static>(v: T) -> (impl StateReader<Value = T>, impl StateWriter<Value = T>) {
     let src = Stateful::new(v);
@@ -452,5 +460,51 @@ mod tests {
     wnd.processes_receive_chars("hello\nworld".into());
     wnd.draw_frame();
     assert_eq!(*input_value.read(), "hello world");
+  }
+
+  #[test]
+  fn input_tap_focus() {
+    reset_test_env!();
+    let (input_value, input_value_writer) = split_value(String::default());
+    let w = fn_widget! {
+      let input = @Input { size: None };
+      watch!($input.text().clone())
+        .subscribe(move |text| {
+          *input_value_writer.write() = text.to_string();
+        });
+
+      @SizedBox {
+        size: Size::new(200., 24.),
+        @ { input }
+      }
+    };
+
+    let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
+    wnd.draw_frame();
+    assert_eq!(*input_value.read(), "");
+
+    let device_id = unsafe { DeviceId::dummy() };
+    #[allow(deprecated)]
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id,
+      position: (50., 10.).into(),
+    });
+    #[allow(deprecated)]
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Pressed,
+      button: MouseButton::Left,
+    });
+    #[allow(deprecated)]
+    wnd.processes_native_event(WindowEvent::MouseInput {
+      device_id,
+      state: ElementState::Released,
+      button: MouseButton::Left,
+    });
+    wnd.draw_frame();
+
+    wnd.processes_receive_chars("hello".into());
+    wnd.draw_frame();
+    assert_eq!(*input_value.read(), "hello");
   }
 }
