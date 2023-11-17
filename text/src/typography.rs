@@ -1,5 +1,5 @@
 use ribir_geom::{Size, Zero};
-use std::ops::{Range, RangeInclusive};
+use std::ops::Range;
 use unicode_script::{Script, UnicodeScript};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -45,10 +45,10 @@ pub trait InlineCursor {
   /// advance the cursor by a glyph, the `glyph` position is relative to self
   /// before call this method,  and relative to the cursor coordinate after
   /// call.
-  /// return if the glyph is over boundary.
-  fn advance_glyph(&mut self, glyph: &mut Glyph<Em>, line_offset: Em, origin_text: &str) -> bool;
+  fn advance_glyph(&mut self, glyph: &mut Glyph<Em>, line_offset: Em, origin_text: &str);
 
-  fn advance(&mut self, c: Em) -> bool;
+  /// advance the cursor position by a offset em
+  fn advance(&mut self, offset: Em);
 
   /// cursor position relative of inline.
   fn position(&self) -> Em;
@@ -209,27 +209,6 @@ where
       .unwrap_or_else(Pixel::zero);
     if letter_space != Em::zero() {
       let mut cursor = LetterSpaceCursor::new(inner_cursor, letter_space.into());
-      self.consume_run_with_bounds_cursor(run, &mut cursor);
-    } else {
-      self.consume_run_with_bounds_cursor(run, inner_cursor);
-    }
-  }
-
-  fn consume_run_with_bounds_cursor(
-    &mut self,
-    run: &Runs::Item,
-    inner_cursor: &mut impl InlineCursor,
-  ) {
-    if self.cfg.text_align != TextAlign::Center {
-      let bounds = if self.cfg.line_dir.is_horizontal() {
-        self.cfg.bounds.height
-      } else {
-        self.cfg.bounds.width
-      };
-      let mut cursor = BoundsCursor {
-        inner_cursor,
-        bounds: Em::zero()..=bounds,
-      };
       self.consume_run(run, &mut cursor);
     } else {
       self.consume_run(run, inner_cursor);
@@ -315,12 +294,18 @@ where
       }
 
       let mut word = word.iter().peekable();
+
       while let Some(g) = word.peek() {
         let mut at = (*g).clone();
-        let over_boundary = cursor.advance_glyph(&mut at, line_offset, text);
+
+        cursor.advance_glyph(&mut at, line_offset, text);
+
         at.cluster += base;
 
-        if self.inline_cursor == Em::zero() || !over_boundary || !is_auto_wrap {
+        if self.inline_cursor == Em::zero()
+          || !is_auto_wrap
+          || !self.is_over_line_bound(cursor.position())
+        {
           self.push_glyph(at);
           self.inline_cursor = cursor.position();
           word.next();
@@ -359,10 +344,15 @@ where
   }
 
   fn is_over_line_bound(&self, position: Em) -> bool {
+    if self.cfg.text_align == TextAlign::Center {
+      return false;
+    }
+
+    let eps: Em = Em(0.00001_f32.into());
     if self.cfg.line_dir.is_horizontal() {
-      self.cfg.bounds.height < position
+      self.cfg.bounds.height + eps <= position
     } else {
-      self.cfg.bounds.width < position
+      self.cfg.bounds.width + eps <= position
     }
   }
 
@@ -408,11 +398,6 @@ pub struct LetterSpaceCursor<'a, I> {
   letter_space: Em,
 }
 
-struct BoundsCursor<'a, Inner> {
-  inner_cursor: &'a mut Inner,
-  bounds: RangeInclusive<Em>,
-}
-
 impl<'a, I> LetterSpaceCursor<'a, I> {
   pub fn new(inner_cursor: &'a mut I, letter_space: Em) -> Self {
     Self { inner_cursor, letter_space }
@@ -420,20 +405,15 @@ impl<'a, I> LetterSpaceCursor<'a, I> {
 }
 
 impl InlineCursor for HInlineCursor {
-  fn advance_glyph(&mut self, g: &mut Glyph<Em>, line_offset: Em, _: &str) -> bool {
+  fn advance_glyph(&mut self, g: &mut Glyph<Em>, line_offset: Em, _: &str) {
     g.x_offset += self.pos;
     g.y_offset += line_offset;
     self.pos = g.x_offset + g.x_advance;
-
-    false
   }
 
   fn measure(&self, glyph: &Glyph<Em>, _origin_text: &str) -> Em { glyph.x_advance }
 
-  fn advance(&mut self, c: Em) -> bool {
-    self.pos += c;
-    false
-  }
+  fn advance(&mut self, c: Em) { self.pos += c; }
 
   fn position(&self) -> Em { self.pos }
 
@@ -441,18 +421,13 @@ impl InlineCursor for HInlineCursor {
 }
 
 impl InlineCursor for VInlineCursor {
-  fn advance_glyph(&mut self, g: &mut Glyph<Em>, line_offset: Em, _: &str) -> bool {
+  fn advance_glyph(&mut self, g: &mut Glyph<Em>, line_offset: Em, _: &str) {
     g.x_offset += line_offset;
     g.y_offset += self.pos;
     self.pos = g.y_offset + g.y_advance;
-
-    false
   }
 
-  fn advance(&mut self, c: Em) -> bool {
-    self.pos += c;
-    false
-  }
+  fn advance(&mut self, c: Em) { self.pos += c; }
 
   fn measure(&self, glyph: &Glyph<Em>, _origin_text: &str) -> Em { glyph.y_advance }
 
@@ -462,16 +437,14 @@ impl InlineCursor for VInlineCursor {
 }
 
 impl<'a, I: InlineCursor> InlineCursor for LetterSpaceCursor<'a, I> {
-  fn advance_glyph(&mut self, g: &mut Glyph<Em>, line_offset: Em, origin_text: &str) -> bool {
+  fn advance_glyph(&mut self, g: &mut Glyph<Em>, line_offset: Em, origin_text: &str) {
     let cursor = &mut self.inner_cursor;
-    let res = cursor.advance_glyph(g, line_offset, origin_text);
+    cursor.advance_glyph(g, line_offset, origin_text);
 
     let c = origin_text[g.cluster as usize..].chars().next().unwrap();
     if letter_spacing_char(c) {
-      return cursor.advance(self.letter_space);
+      cursor.advance(self.letter_space);
     }
-
-    res
   }
 
   fn measure(&self, glyph: &Glyph<Em>, origin_text: &str) -> Em {
@@ -488,29 +461,7 @@ impl<'a, I: InlineCursor> InlineCursor for LetterSpaceCursor<'a, I> {
     advance
   }
 
-  fn advance(&mut self, c: Em) -> bool { self.inner_cursor.advance(c) }
-
-  fn position(&self) -> Em { self.inner_cursor.position() }
-
-  fn reset(&mut self) { self.inner_cursor.reset(); }
-}
-
-impl<'a, I: InlineCursor> InlineCursor for BoundsCursor<'a, I> {
-  fn advance_glyph(&mut self, glyph: &mut Glyph<Em>, line_offset: Em, origin_text: &str) -> bool {
-    self
-      .inner_cursor
-      .advance_glyph(glyph, line_offset, origin_text);
-    !self.bounds.contains(&self.position())
-  }
-
-  fn advance(&mut self, c: Em) -> bool {
-    self.inner_cursor.advance(c);
-    self.bounds.contains(&self.position())
-  }
-
-  fn measure(&self, glyph: &Glyph<Em>, origin_text: &str) -> Em {
-    self.inner_cursor.measure(glyph, origin_text)
-  }
+  fn advance(&mut self, c: Em) { self.inner_cursor.advance(c) }
 
   fn position(&self) -> Em { self.inner_cursor.position() }
 
