@@ -185,7 +185,6 @@ impl<T: Transition + 'static> Stateful<Stagger<T>> {
       if let Some((delay, next)) = this.animations.get(step.index) {
         let at = step.prev_at + *delay;
         let next = next.box_clone();
-
         this.next_to_run = Some(AnimationCursor { prev_at: at, index: step.index + 1 });
 
         // the status not changed(running -> running), so we can ignore the

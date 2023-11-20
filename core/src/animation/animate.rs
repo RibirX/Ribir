@@ -24,7 +24,7 @@ pub(crate) struct AnimateInfo<V> {
   last_progress: AnimateProgress,
   // Determines if lerp value in current frame.
   already_lerp: bool,
-  _tick_msg_guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
+  _tick_msg_guard: Option<Box<dyn Any>>,
 }
 
 impl<S, T> Animation for T
@@ -46,42 +46,60 @@ where
       drop(animate_ref);
 
       let animate = self.clone_writer();
-      let ticker = wnd.frame_ticker.frame_tick_stream();
-      let unsub = ticker.subscribe(move |msg| {
-        match msg {
-          FrameMsg::NewFrame(time) => {
-            let p = animate.read().running_info.as_ref().unwrap().last_progress;
-            // Stop the animate at the next frame of animate finished, to ensure draw the
-            // last frame of the animate.
-            if matches!(p, AnimateProgress::Finish) {
-              let wnd = AppCtx::get_window(wnd_id).unwrap();
-              let animate = animate.clone_writer();
-              wnd.frame_spawn(async move { animate.stop() }).unwrap();
-            } else {
-              animate.shallow().advance_to(time);
+      let this = &mut *self.write();
+      let tick_handle = wnd
+        .frame_ticker
+        .frame_tick_stream()
+        .subscribe(move |msg| {
+          match msg {
+            FrameMsg::NewFrame(time) => {
+              let p = animate.read().running_info.as_ref().unwrap().last_progress;
+              // Stop the animate at the next frame of animate finished, to ensure draw the
+              // last frame of the animate.
+              if matches!(p, AnimateProgress::Finish) {
+                let wnd = AppCtx::get_window(wnd_id).unwrap();
+                let animate = animate.clone_writer();
+                wnd.frame_spawn(async move { animate.stop() }).unwrap();
+              } else {
+                animate.shallow().advance_to(time);
+              }
+            }
+            FrameMsg::LayoutReady(_) => {}
+            FrameMsg::Finish(_) => {
+              let mut animate = animate.write();
+              let info = animate.running_info.as_mut().unwrap();
+              info.already_lerp = false;
+              let data_value = info.to.clone();
+              animate.state.set(data_value);
+
+              // Forgets modifies because we only modifies the inner info.
+              animate.forget_modifies();
             }
           }
-          FrameMsg::LayoutReady(_) => {}
-          // use silent_ref because the state of animate change, bu no need to effect the framework.
-          FrameMsg::Finish(_) => {
-            let mut animate = animate.write();
-            let data_value = animate.running_info.as_mut().unwrap().to.clone();
-            let info = animate.running_info.as_mut().unwrap();
-            info.already_lerp = false;
-            animate.state.set(data_value);
+        })
+        .unsubscribe_when_dropped();
 
-            animate.forget_modifies();
+      let animate = self.clone_writer();
+      let state_handle = this
+        .state
+        .animate_state_modifies()
+        .subscribe(move |_| {
+          let mut animate = animate.write();
+          let v = animate.state.get();
+          // if the animate state modified, we need to update the restore value.
+          if let Some(info) = animate.running_info.as_mut() {
+            info.to = v;
           }
-        }
-      });
-      let guard = BoxSubscription::new(unsub).unsubscribe_when_dropped();
-      let animate = &mut *self.write();
-      animate.running_info = Some(AnimateInfo {
-        from: animate.from.clone(),
+          animate.forget_modifies();
+        })
+        .unsubscribe_when_dropped();
+
+      this.running_info = Some(AnimateInfo {
+        from: this.from.clone(),
         to: new_to,
         start_at: Instant::now(),
         last_progress: AnimateProgress::Dismissed,
-        _tick_msg_guard: Some(guard),
+        _tick_msg_guard: Some(Box::new((tick_handle, state_handle))),
         already_lerp: false,
       });
       wnd.inc_running_animate();
@@ -169,12 +187,12 @@ where
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{animation::easing, state::Stateful, test_helper::TestWindow};
+  use crate::{animation::easing, reset_test_env, state::Stateful, test_helper::TestWindow};
   use std::time::Duration;
 
   #[test]
   fn fix_animate_circular_mut_borrow() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let w = fn_widget! {
       let animate = @Animate {
@@ -191,5 +209,30 @@ mod tests {
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
+  }
+
+  #[test]
+  fn fix_write_state_during_animate_running() {
+    reset_test_env!();
+    let state = Stateful::new(0);
+    let c_state = state.clone_reader();
+    let w = fn_widget! {
+      let animate = @Animate {
+        transition: EasingTransition {
+          easing: easing::LINEAR,
+          duration: Duration::from_millis(1),
+        }.box_it(),
+        state: state.clone_writer(),
+        from: 100,
+      };
+
+      animate.run();
+
+      @Void { on_performed_layout: move |_| *$state.write() = 1 }
+    };
+
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+    assert_eq!(*c_state.read(), 1);
   }
 }
