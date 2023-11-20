@@ -5,6 +5,7 @@ use ribir_core::{prelude::*, timer::Timer, window::WindowId};
 use rxrust::scheduler::NEW_TIMER_FN;
 use std::rc::Rc;
 use std::{convert::Infallible, sync::Once};
+use winit::event::ElementState;
 use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
 use winit::{
   event::{Event, Ime, KeyEvent, StartCause, WindowEvent},
@@ -193,9 +194,10 @@ impl App {
           ..
         } = event;
         wnd.processes_keyboard_event(physical_key, logical_key, repeat, location, state);
-
-        if let Some(txt) = text {
-          wnd.processes_receive_chars(txt.to_string());
+        if state == ElementState::Pressed {
+          if let Some(txt) = text {
+            wnd.processes_receive_chars(txt.to_string());
+          }
         }
       }
       WindowEvent::Ime(ime) => {
