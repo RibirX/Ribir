@@ -30,14 +30,14 @@ pub struct FocusHandle {
 impl FocusHandle {
   pub(crate) fn request_focus(&self) {
     if let Some(wnd) = AppCtx::get_window(self.wnd_id) {
-      wnd.focus_mgr.borrow_mut().request_focusing = Some(Some(self.wid));
+      wnd.focus_mgr.borrow_mut().request_focus_to(Some(self.wid));
     }
   }
 
   pub(crate) fn unfocus(&self) {
     if let Some(wnd) = AppCtx::get_window(self.wnd_id) {
       if wnd.focus_mgr.borrow().focusing == Some(self.wid) {
-        wnd.focus_mgr.borrow_mut().request_focusing = Some(None);
+        wnd.focus_mgr.borrow_mut().request_focus_to(None);
       }
     }
   }
@@ -129,12 +129,8 @@ impl FocusManager {
       self.insert_node(*parent, node_id, wid, arena);
     }
 
-    if auto_focus
-      && focus_type == FocusType::Node
-      && self.focusing.is_none()
-      && self.request_focusing.is_none()
-    {
-      self.request_focusing = Some(Some(wid));
+    if auto_focus && focus_type == FocusType::Node && self.focusing().is_none() {
+      self.request_focus_to(Some(wid));
     }
   }
 
@@ -147,20 +143,20 @@ impl FocusManager {
       return;
     };
 
-    let node = self.arena[id].get_mut();
-    node.remove_focus(focus_type);
-
-    if Some(wid) == self.focusing && !node.has_focus_node() {
-      if let Some(Some(request_wid)) = self.request_focusing {
-        if request_wid == wid {
-          self.request_focusing = Some(None);
-        }
+    let focusing = self.focusing();
+    let has_focus_node;
+    {
+      let node = self.arena[id].get_mut();
+      node.remove_focus(focus_type);
+      has_focus_node = node.has_focus_node();
+      if node.is_empty() {
+        id.remove(&mut self.arena);
+        self.node_ids.remove(&wid);
       }
     }
 
-    if node.is_empty() {
-      id.remove(&mut self.arena);
-      self.node_ids.remove(&wid);
+    if Some(wid) == focusing && !has_focus_node {
+      self.request_focus_to(None);
     }
   }
 
@@ -169,7 +165,6 @@ impl FocusManager {
       return self.focusing;
     };
     focusing?;
-
     let focusing = focusing.filter(|node_id| self.ignore_scope_id(*node_id).is_none());
     let focus_node = focusing.and_then(|wid| self.node_ids.get(&wid));
     let info = focus_node.and_then(|id: &NodeId| self.get(*id));
@@ -201,7 +196,7 @@ impl FocusManager {
     if wid.is_none() && has_focus {
       wid = self.focus_step(wid, backward);
     }
-    self.request_focusing = Some(wid);
+    self.request_focus_to(wid);
   }
 
   fn focus_step(&mut self, focusing: Option<WidgetId>, backward: bool) -> Option<WidgetId> {
@@ -480,18 +475,34 @@ impl FocusManager {
     self.refresh_focus();
   }
 
-  pub fn focus(&mut self, wid: WidgetId) { self.change_focusing_to(Some(wid)); }
+  pub fn focus(&mut self, wid: WidgetId) {
+    self.request_focus_to(Some(wid));
+    self.refresh_focus();
+  }
 
   /// Removes keyboard focus from the current focusing widget and return its id.
-  pub fn blur(&mut self) -> Option<WidgetId> { self.change_focusing_to(None) }
+  pub fn blur(&mut self) { self.request_focus_to(None); }
 
   /// return the focusing widget.
-  pub fn focusing(&self) -> Option<WidgetId> { self.focusing }
+  pub fn focusing(&self) -> Option<WidgetId> { self.request_focusing.unwrap_or(self.focusing) }
 
   pub fn refresh_focus(&mut self) {
     let new_focus = self.next_focus();
     if self.focus_widgets.first() != new_focus.as_ref() {
       self.change_focusing_to(new_focus);
+    }
+  }
+
+  // When focus_to is Some(wid), wid requests focus, which delays refreshing the
+  // focus, because wid may be a newly added widget in init. But you can call
+  // refresh_focus manually to force a refresh. Conversely, if focus_to is set
+  // to None and the focused widget requests blur, it will refresh focus
+  // immediately because the widget may be in a disposed state and the widget
+  // will be removed soon.
+  fn request_focus_to(&mut self, focus_to: Option<WidgetId>) {
+    self.request_focusing = Some(focus_to);
+    if focus_to.is_none() {
+      self.refresh_focus();
     }
   }
 
@@ -786,10 +797,55 @@ mod tests {
 
     let first_box = tree.root().first_child(&tree.arena);
     let focus_scope = first_box.unwrap().next_sibling(&tree.arena);
-    focus_mgr.request_focusing = Some(focus_scope);
+    focus_mgr.request_focus_to(focus_scope);
 
     let inner_box = focus_scope.unwrap().first_child(&tree.arena);
     focus_mgr.refresh_focus();
     assert_eq!(focus_mgr.focusing(), inner_box);
+  }
+
+  fn split_value<T: 'static>(v: T) -> (impl StateReader<Value = T>, impl StateWriter<Value = T>) {
+    let src = Stateful::new(v);
+    (src.clone_reader(), src.clone_writer())
+  }
+
+  #[test]
+  fn remove_focused_widget() {
+    reset_test_env!();
+    let (input, input_writer) = split_value(String::default());
+    let (focused, focused_writer) = split_value(true);
+    let w = fn_widget! {
+      @MockBox{
+        size: Size::new(20., 20.),
+        @ { pipe! {
+          if *$focused {
+            @MockBox {
+              auto_focus: true,
+              on_chars: move |e| $input_writer.write().push_str(&e.chars),
+              size: Size::new(10., 10.),
+            }.widget_build(ctx!())
+          } else {
+            Void.widget_build(ctx!())
+          }
+        }}
+      }
+    };
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+    wnd.processes_receive_chars("hello".to_string());
+    wnd.draw_frame();
+    assert_eq!(*input.read(), "hello");
+
+    *focused_writer.write() = false;
+    wnd.draw_frame();
+    wnd.processes_receive_chars("has no receiver".to_string());
+    wnd.draw_frame();
+    assert_eq!(*input.read(), "hello");
+
+    *focused_writer.write() = true;
+    wnd.draw_frame();
+    wnd.processes_receive_chars(" ribir".to_string());
+    wnd.draw_frame();
+    assert_eq!(*input.read(), "hello ribir");
   }
 }
