@@ -77,6 +77,8 @@ impl Dispatcher {
         }
         ElementState::Released => wnd.add_delay_event(DelayEvent::KeyUp(event)),
       };
+    } else if key == VirtualKey::Named(NamedKey::Tab) {
+      wnd.add_delay_event(DelayEvent::TabFocusMove);
     }
   }
 
