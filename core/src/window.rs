@@ -416,8 +416,11 @@ impl Window {
           if delay_drop {
             self.delay_drop_widgets.borrow_mut().push((parent, id));
           } else {
-            self.widget_tree.borrow_mut().remove_subtree(id);
+            self.add_delay_event(DelayEvent::RemoveSubtree(id));
           }
+        }
+        DelayEvent::RemoveSubtree(id) => {
+          self.widget_tree.borrow_mut().remove_subtree(id);
         }
         DelayEvent::Focus(id) => {
           let e = AllFocus::Focus(FocusEvent::new(id, self.id()));
@@ -616,6 +619,7 @@ pub(crate) enum DelayEvent {
     parent: Option<WidgetId>,
     id: WidgetId,
   },
+  RemoveSubtree(WidgetId),
   Focus(WidgetId),
   Blur(WidgetId),
   FocusIn {
