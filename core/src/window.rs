@@ -451,17 +451,20 @@ impl Window {
           self.bottom_up_emit::<KeyboardListener>(&mut e, id, None);
 
           if !e.is_prevent_default() && *e.key() == VirtualKey::Named(NamedKey::Tab) {
-            let pressed_shift = {
-              let dispatcher = self.dispatcher.borrow();
-              dispatcher.info.modifiers().contains(ModifiersState::SHIFT)
-            };
+            self.add_delay_event(DelayEvent::TabFocusMove);
+          }
+        }
+        DelayEvent::TabFocusMove => {
+          let pressed_shift = {
+            let dispatcher = self.dispatcher.borrow();
+            dispatcher.info.modifiers().contains(ModifiersState::SHIFT)
+          };
 
-            let mut focus_mgr = self.focus_mgr.borrow_mut();
-            if pressed_shift {
-              focus_mgr.focus_prev_widget();
-            } else {
-              focus_mgr.focus_next_widget();
-            }
+          let mut focus_mgr = self.focus_mgr.borrow_mut();
+          if pressed_shift {
+            focus_mgr.focus_prev_widget();
+          } else {
+            focus_mgr.focus_next_widget();
           }
         }
         DelayEvent::KeyUp(event) => {
@@ -632,6 +635,7 @@ pub(crate) enum DelayEvent {
   },
   KeyDown(KeyboardEvent),
   KeyUp(KeyboardEvent),
+  TabFocusMove,
   Chars {
     id: WidgetId,
     chars: String,
