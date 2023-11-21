@@ -52,9 +52,6 @@ impl Dispatcher {
         self.cursor_move_to(Point::new(pos.x, pos.y))
       }
       WindowEvent::CursorLeft { .. } => self.on_cursor_left(),
-      WindowEvent::MouseInput { state, button, device_id, .. } => {
-        self.dispatch_mouse_input(device_id, state, button);
-      }
       WindowEvent::MouseWheel { delta, .. } => self.dispatch_wheel(delta, wnd_factor),
       _ => log::info!("not processed event {:?}", event),
     }
@@ -343,12 +340,8 @@ mod tests {
       records.clear();
     }
     wnd.run_frame_tasks();
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
+
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
     wnd.run_frame_tasks();
     let mut records = event_record.borrow_mut();
     assert_eq!(records[0].btns.bits().count_ones(), 1);
@@ -369,40 +362,21 @@ mod tests {
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
+
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
     wnd.run_frame_tasks();
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Right,
-    });
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Right);
     wnd.run_frame_tasks();
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (1, 1).into() });
     wnd.run_frame_tasks();
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Released,
-      button: MouseButton::Left,
-    });
+    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
     wnd.run_frame_tasks();
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Released,
-      button: MouseButton::Right,
-    });
+    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Right);
     wnd.run_frame_tasks();
     let records = event_record.borrow();
     assert_eq!(records.len(), 3);
@@ -430,12 +404,8 @@ mod tests {
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
+
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
     wnd.run_frame_tasks();
     assert_eq!(event_record.borrow().len(), 1);
 
@@ -445,19 +415,9 @@ mod tests {
       (&mut id as *mut DeviceId).write_bytes(1, 1);
       id
     };
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: device_id_2,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: device_id_2,
-      state: ElementState::Released,
-      button: MouseButton::Left,
-    });
+    wnd.process_mouse_input(device_id_2, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_input(device_id_2, ElementState::Released, MouseButton::Left);
     wnd.run_frame_tasks();
     assert_eq!(event_record.borrow().len(), 1);
 
@@ -472,12 +432,7 @@ mod tests {
     assert_eq!(event_record.borrow().len(), 2);
     assert_eq!(event_record.borrow()[1].btns, MouseButtons::PRIMARY);
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Released,
-      button: MouseButton::Left,
-    });
+    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
     wnd.run_frame_tasks();
     assert_eq!(event_record.borrow().len(), 3);
   }
@@ -512,12 +467,11 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(fn_widget!(root), Size::new(100., 100.));
     wnd.draw_frame();
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id: unsafe { DeviceId::dummy() },
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
+    wnd.process_mouse_input(
+      unsafe { DeviceId::dummy() },
+      ElementState::Pressed,
+      MouseButton::Left,
+    );
     wnd.run_frame_tasks();
     assert_eq!(event_record.borrow().len(), 1);
   }
@@ -627,18 +581,8 @@ mod tests {
       device_id,
       position: (50f64, 50f64).into(),
     });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Released,
-      button: MouseButton::Left,
-    });
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
     wnd.run_frame_tasks();
     assert_eq!(*click_path.read(), [1, 2, 3, 4]);
   }
@@ -671,18 +615,9 @@ mod tests {
       device_id,
       position: (50f64, 50f64).into(),
     });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Released,
-      button: MouseButton::Left,
-    });
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+
+    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
 
     wnd.run_frame_tasks();
     {
@@ -696,23 +631,14 @@ mod tests {
       device_id,
       position: (50f64, 50f64).into(),
     });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
+
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (50f64, 150f64).into(),
     });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Released,
-      button: MouseButton::Left,
-    });
+    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
     wnd.run_frame_tasks();
     assert_eq!(*click_path.read(), 1);
   }
@@ -741,33 +667,20 @@ mod tests {
       device_id,
       position: (45f64, 45f64).into(),
     });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
+
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
 
     // point down on a focus widget
     assert!(wnd.focus_mgr.borrow().focusing().is_some());
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Released,
-      button: MouseButton::Left,
-    });
+    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,
       position: (80f64, 80f64).into(),
     });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
+
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
 
     assert!(wnd.focus_mgr.borrow().focusing().is_none());
   }

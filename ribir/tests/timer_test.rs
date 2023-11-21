@@ -9,7 +9,7 @@ mod test_single_thread {
   use std::cell::Cell;
   use std::{cell::RefCell, rc::Rc};
   use std::{thread::sleep, time::Duration};
-  use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
+  use winit::event::{DeviceId, ElementState, MouseButton};
 
   use ribir_core::{prelude::*, test_helper::MockBox};
 
@@ -84,16 +84,12 @@ mod test_single_thread {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
-        #[allow(deprecated)]
-        c_wnd.processes_native_event(WindowEvent::MouseInput {
-          device_id,
-          state: if i % 2 == 0 {
-            ElementState::Pressed
-          } else {
-            ElementState::Released
-          },
-          button: MouseButton::Left,
-        });
+        let state = if i % 2 == 0 {
+          ElementState::Pressed
+        } else {
+          ElementState::Released
+        };
+        c_wnd.process_mouse_input(device_id, state, MouseButton::Left);
       });
 
     run_until(&wnd, || *is_complete2.borrow());
@@ -110,16 +106,15 @@ mod test_single_thread {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
-        #[allow(deprecated)]
-        c_wnd.processes_native_event(WindowEvent::MouseInput {
+        c_wnd.process_mouse_input(
           device_id,
-          state: if i % 2 == 0 {
+          if i % 2 == 0 {
             ElementState::Pressed
           } else {
             ElementState::Released
           },
-          button: MouseButton::Left,
-        });
+          MouseButton::Left,
+        );
       });
 
     run_until(&wnd, || *is_complete2.borrow());
@@ -140,16 +135,15 @@ mod test_single_thread {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
-        #[allow(deprecated)]
-        c_wnd.processes_native_event(WindowEvent::MouseInput {
+        c_wnd.process_mouse_input(
           device_id,
-          state: if i % 2 == 0 {
+          if i % 2 == 0 {
             ElementState::Pressed
           } else {
             ElementState::Released
           },
-          button: MouseButton::Left,
-        });
+          MouseButton::Left,
+        );
       });
 
     run_until(&wnd, || *is_complete2.borrow());

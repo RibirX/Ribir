@@ -228,18 +228,10 @@ mod tests {
       device_id,
       position: logical.to_physical(1.),
     });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Released,
-      button: MouseButton::Left,
-    });
+
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+
+    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
   }
 
   #[test]

@@ -182,12 +182,7 @@ mod tests {
       device_id,
       position: LogicalPosition::new(75., 25.).to_physical(1.),
     });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
 
     // will deal key event twice (inner and host).
     wnd.draw_frame();
