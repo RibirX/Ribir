@@ -121,8 +121,8 @@ pub enum PaintCommand {
 }
 
 impl PaintCommand {
-  pub fn transform(mut self, transform: &Transform) -> Self {
-    match &mut self {
+  pub fn transform(&mut self, transform: &Transform) -> &mut Self {
+    match self {
       PaintCommand::ColorPath { path, .. }
       | PaintCommand::ImgPath { path, .. }
       | PaintCommand::RadialGradient { path, .. }
@@ -131,6 +131,41 @@ impl PaintCommand {
       PaintCommand::PopClip => {}
     }
     self
+  }
+
+  pub fn apply_alpha(&mut self, alpha: f32) -> &mut Self {
+    match self {
+      PaintCommand::ColorPath { color, .. } => *color = color.apply_alpha(alpha),
+      PaintCommand::ImgPath { opacity, .. } => *opacity *= alpha,
+      PaintCommand::RadialGradient { radial_gradient, .. } => {
+        radial_gradient
+          .stops
+          .iter_mut()
+          .for_each(|s| s.color = s.color.apply_alpha(alpha));
+      }
+      PaintCommand::LinearGradient { linear_gradient, .. } => {
+        linear_gradient
+          .stops
+          .iter_mut()
+          .for_each(|s| s.color = s.color.apply_alpha(alpha));
+      }
+      PaintCommand::Clip(_) | PaintCommand::PopClip => {}
+    }
+    self
+  }
+
+  pub fn is_visible(&self) -> bool {
+    match self {
+      PaintCommand::ColorPath { color, .. } => color.alpha > 0,
+      PaintCommand::ImgPath { opacity, .. } => *opacity > 0.,
+      PaintCommand::RadialGradient { radial_gradient, .. } => {
+        radial_gradient.stops.iter().any(|s| s.color.alpha > 0)
+      }
+      PaintCommand::LinearGradient { linear_gradient, .. } => {
+        linear_gradient.stops.iter().any(|s| s.color.alpha > 0)
+      }
+      PaintCommand::Clip(_) | PaintCommand::PopClip => true,
+    }
   }
 }
 
@@ -327,13 +362,9 @@ impl Painter {
     let ts = *self.get_transform();
     let path = PaintPath::new(p, ts);
     if !path.paint_bounds.is_empty() && path.paint_bounds.intersects(self.paint_bounds()) {
-      let opacity = self.alpha();
-      let cmd = match self.current_state().brush.clone() {
-        Brush::Color(color) => PaintCommand::ColorPath {
-          path,
-          color: color.apply_alpha(opacity),
-        },
-        Brush::Image(img) => PaintCommand::ImgPath { path, img, opacity },
+      let mut cmd = match self.current_state().brush.clone() {
+        Brush::Color(color) => PaintCommand::ColorPath { path, color },
+        Brush::Image(img) => PaintCommand::ImgPath { path, img, opacity: 1. },
         Brush::RadialGradient(radial_gradient) => {
           PaintCommand::RadialGradient { path, radial_gradient }
         }
@@ -341,7 +372,10 @@ impl Painter {
           PaintCommand::LinearGradient { path, linear_gradient }
         }
       };
-      self.commands.push(cmd);
+      cmd.apply_alpha(self.alpha());
+      if cmd.is_visible() {
+        self.commands.push(cmd);
+      }
     }
 
     self
@@ -489,17 +523,24 @@ impl Painter {
 
   pub fn draw_svg(&mut self, svg: &Svg) -> &mut Self {
     let transform = *self.get_transform();
-    svg
-      .paint_commands
-      .iter()
-      .for_each(|c| self.commands.push(c.clone().transform(&transform)));
+    let alpha = self.alpha();
+
+    for cmd in svg.paint_commands.iter() {
+      let mut cmd = cmd.clone();
+      cmd.transform(&transform).apply_alpha(alpha);
+      if cmd.is_visible() {
+        self.commands.push(cmd);
+      }
+    }
+
     self
   }
 
   /// Draw the image
   ///
   /// if src_rect is None then will draw the whole image fitted into dst_rect,
-  /// otherise will draw the partial src_rect of the image fitted into dst_rect.
+  /// otherwise will draw the partial src_rect of the image fitted into
+  /// dst_rect.
   pub fn draw_img(
     &mut self,
     img: ShareResource<PixelImage>,
