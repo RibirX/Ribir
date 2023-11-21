@@ -372,9 +372,10 @@ impl FocusManager {
 
   fn insert_node(&mut self, parent: NodeId, node_id: NodeId, wid: WidgetId, arena: &TreeArena) {
     enum TreePosition {
-      BeforeSibling,
-      SubTree,
-      AfterSibling,
+      BeforeSibling, // the new node is the sibling before current node
+      SubTree,       // the new node is in the subtree of current node
+      AfterSibling,  // the new node is the sibling after current node
+      Skip,          // the node is not in the parent's sub-tree
     }
 
     fn locate_position(
@@ -382,7 +383,7 @@ impl FocusManager {
       base: &Vec<WidgetId>,
       arena: &TreeArena,
     ) -> TreePosition {
-      assert!(dst.len() > 1 && base.len() > 1);
+      assert!(dst.len() > 1);
       let cnt = dst
         .iter()
         .rev()
@@ -392,6 +393,8 @@ impl FocusManager {
 
       if dst.len() == cnt {
         return TreePosition::SubTree;
+      } else if cnt == 0 {
+        return TreePosition::Skip;
       }
 
       let parent = dst[dst.len() - cnt];
@@ -436,6 +439,7 @@ impl FocusManager {
         TreePosition::BeforeSibling => before_sibling = Some(id),
         TreePosition::SubTree => children.push(id),
         TreePosition::AfterSibling => afrer_sibling = Some(id),
+        TreePosition::Skip => (),
       }
 
       if before_sibling.is_some() {
@@ -847,5 +851,50 @@ mod tests {
     wnd.processes_receive_chars(" ribir".to_string());
     wnd.draw_frame();
     assert_eq!(*input.read(), "hello ribir");
+  }
+
+  #[test]
+  fn multi_focused_update() {
+    reset_test_env!();
+    let (input, input_writer) = split_value(String::default());
+    let (active_idx, active_idx_writer) = split_value(0);
+    let w = fn_widget! {
+      @MockMulti{
+          @ { (0..4).map(move |i| {
+              pipe! (*$active_idx).map(move |idx| {
+                @MockBox {
+                  auto_focus: i == idx,
+                  on_chars: move |e| if idx == 2 { $input_writer.write().push_str(&e.chars) },
+                  size: Size::new(10., 10.),
+                }
+              }.widget_build(ctx!()))
+            }).collect::<Vec<_>>()
+          }
+        }
+    };
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+    wnd.processes_receive_chars("hello".to_string());
+    wnd.draw_frame();
+    assert_eq!(*input.read(), "");
+
+    *active_idx_writer.write() += 1;
+    wnd.draw_frame();
+    wnd.processes_receive_chars("ribir".to_string());
+    wnd.draw_frame();
+    assert_eq!(*input.read(), "");
+
+    *active_idx_writer.write() += 1;
+    wnd.draw_frame();
+    wnd.processes_receive_chars("nice to see you".to_string());
+    wnd.draw_frame();
+    assert_eq!(*input.read(), "nice to see you");
+
+    *active_idx_writer.write() += 1;
+    wnd.draw_frame();
+    wnd.processes_receive_chars("Bye-Bye".to_string());
+    wnd.draw_frame();
+    assert_eq!(*input.read(), "nice to see you");
+    wnd.draw_frame();
   }
 }
