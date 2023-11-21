@@ -655,18 +655,10 @@ fn tap_at(wnd: &TestWindow, pos: (i32, i32)) {
 
   #[allow(deprecated)]
   wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: pos.into() });
-  #[allow(deprecated)]
-  wnd.processes_native_event(WindowEvent::MouseInput {
-    device_id,
-    state: ElementState::Pressed,
-    button: MouseButton::Left,
-  });
-  #[allow(deprecated)]
-  wnd.processes_native_event(WindowEvent::MouseInput {
-    device_id,
-    state: ElementState::Released,
-    button: MouseButton::Left,
-  });
+
+  wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+
+  wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
 }
 
 #[test]

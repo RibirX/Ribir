@@ -189,6 +189,7 @@ impl App {
   }
 
   fn dispatch_wnd_native_event(wnd: &Window, event: WindowEvent) {
+    static mut PRE_EDIT_HANDLE: PreEditHandle = PreEditHandle::new();
     match event {
       WindowEvent::KeyboardInput { event, .. } => {
         let KeyEvent {
@@ -207,18 +208,16 @@ impl App {
           }
         }
       }
-      WindowEvent::Ime(ime) => {
-        if let Ime::Commit(s) = ime {
-          wnd.processes_receive_chars(s)
-        } else {
-          let ime = match ime {
-            Ime::Enabled => ImePreEdit::Begin,
-            Ime::Preedit(txt, selected) => ImePreEdit::PreEdit { value: txt, cursor: selected },
-            Ime::Disabled => ImePreEdit::End,
-            Ime::Commit(_) => unreachable!(),
-          };
-          wnd.processes_ime_pre_edit(ime)
+      WindowEvent::Ime(ime) => unsafe {
+        PRE_EDIT_HANDLE.update(wnd, &ime);
+      },
+      WindowEvent::MouseInput { state, button, device_id, .. } => {
+        if state == ElementState::Pressed {
+          unsafe {
+            PRE_EDIT_HANDLE.force_exit(wnd);
+          }
         }
+        wnd.process_mouse_input(device_id, state, button);
       }
       #[allow(deprecated)]
       _ => wnd.processes_native_event(event),
@@ -274,4 +273,52 @@ pub(crate) fn request_redraw(wnd: &Window) {
   let wnd = wnd.shell_wnd().borrow();
   let shell = wnd.as_any().downcast_ref::<WinitShellWnd>().unwrap();
   shell.winit_wnd.request_redraw();
+}
+
+#[derive(Default)]
+struct PreEditHandle(Option<String>);
+
+impl PreEditHandle {
+  const fn new() -> Self { Self(None) }
+  fn update(&mut self, wnd: &Window, pre_edit: &Ime) {
+    match pre_edit {
+      Ime::Enabled => {
+        if !self.is_in_pre_edit() {
+          self.0 = Some(String::new());
+          wnd.processes_ime_pre_edit(ImePreEdit::Begin);
+        }
+      }
+      Ime::Preedit(txt, cursor) => {
+        if self.is_in_pre_edit() {
+          self.0 = Some(txt.clone());
+          wnd.processes_ime_pre_edit(ImePreEdit::PreEdit { value: txt.clone(), cursor: *cursor });
+        }
+      }
+      Ime::Commit(value) => {
+        if self.is_in_pre_edit() {
+          wnd.processes_receive_chars(value.clone());
+        }
+      }
+      Ime::Disabled => {
+        if self.is_in_pre_edit() {
+          wnd.processes_ime_pre_edit(ImePreEdit::End);
+          self.0 = None;
+        }
+      }
+    }
+  }
+
+  fn is_in_pre_edit(&self) -> bool { self.0.is_some() }
+
+  fn force_exit(&mut self, wnd: &Window) {
+    if self.is_in_pre_edit() {
+      wnd.set_ime_allowed(false);
+      wnd.processes_ime_pre_edit(ImePreEdit::PreEdit { value: String::new(), cursor: None });
+      wnd.processes_ime_pre_edit(ImePreEdit::End);
+      if let Some(s) = self.0.take() {
+        wnd.processes_receive_chars(s);
+      }
+      wnd.set_ime_allowed(true);
+    }
+  }
 }

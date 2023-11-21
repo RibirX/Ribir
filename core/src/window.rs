@@ -24,7 +24,7 @@ use std::{
   rc::Rc,
   time::Instant,
 };
-use winit::event::{ElementState, WindowEvent};
+use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 pub use winit::window::CursorIcon;
 
 /// Window is the root to represent.
@@ -128,6 +128,13 @@ impl Window {
 
   pub fn processes_ime_pre_edit(&self, ime: ImePreEdit) {
     self.dispatcher.borrow_mut().dispatch_ime_pre_edit(ime)
+  }
+
+  pub fn process_mouse_input(&self, device_id: DeviceId, state: ElementState, button: MouseButton) {
+    self
+      .dispatcher
+      .borrow_mut()
+      .dispatch_mouse_input(device_id, state, button);
   }
 
   /// Request switch the focus to next widget.

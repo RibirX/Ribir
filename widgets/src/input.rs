@@ -175,6 +175,10 @@ impl PreEditHandle {
           position: host.read().caret().select_range().start,
           value: None,
         });
+        let mut host = host.write();
+        let rg = host.caret().select_range();
+        host.writer().delete_byte_range(&rg);
+
         let pos = e.map_to_global(*caret_position);
         let height = caret_size.height;
         e.window()
@@ -185,13 +189,9 @@ impl PreEditHandle {
           return;
         };
         let mut host = host.write();
-        let caret = host.caret();
         let mut writer = host.writer();
         if let Some(txt) = edit_value {
           writer.delete_byte_range(&(*position..*position + txt.len()));
-        } else {
-          let rg = caret.select_range();
-          writer.delete_byte_range(&rg);
         }
         writer.insert_str(value);
         writer.set_to(*position + cursor.map_or(0, |(start, _)| start));
@@ -311,7 +311,7 @@ where
         })
       };
 
-      let mut pre_edit_handle: PreEditHandle = PreEditHandle::default();
+      let mut pre_edit_handle = PreEditHandle::default();
       let mut stack = @ $stack {
         on_focus: move |e| e.window().set_ime_allowed(true),
         on_blur: move |e| e.window().set_ime_allowed(false),
@@ -489,18 +489,9 @@ mod tests {
       device_id,
       position: (50., 10.).into(),
     });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Pressed,
-      button: MouseButton::Left,
-    });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseInput {
-      device_id,
-      state: ElementState::Released,
-      button: MouseButton::Left,
-    });
+
+    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
     wnd.draw_frame();
 
     wnd.processes_receive_chars("hello".into());
