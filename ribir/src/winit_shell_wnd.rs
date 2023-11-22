@@ -66,7 +66,10 @@ impl ShellWindow for WinitShellWnd {
   }
 
   fn on_resize(&mut self, size: Size) {
-    let size: DeviceSize = (size * self.device_pixel_ratio()).to_i32().cast_unit();
+    let size: DeviceSize = (size * self.device_pixel_ratio())
+      .ceil()
+      .to_i32()
+      .cast_unit();
     self.backend.on_resize(size);
   }
 
