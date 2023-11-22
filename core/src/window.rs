@@ -160,7 +160,7 @@ impl Window {
   pub fn draw_frame(&self) -> bool {
     self.run_frame_tasks();
     self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now()));
-    self.update_painter_bound();
+    self.update_painter_viewport();
     let draw = self.need_draw() && !self.size().is_empty();
     if draw {
       self.shell_wnd.borrow_mut().begin_frame();
@@ -218,15 +218,15 @@ impl Window {
     }
   }
 
-  pub fn update_painter_bound(&self) {
+  pub fn update_painter_viewport(&self) {
     let size = self.shell_wnd.borrow().inner_size();
-    if self.painter.borrow().paint_bounds().size != size {
+    if self.painter.borrow().viewport().size != size {
       let mut tree = self.widget_tree.borrow_mut();
       let root = tree.root();
       tree.mark_dirty(root);
       tree.store.remove(root);
       let mut painter = self.painter.borrow_mut();
-      painter.set_bounds(Rect::from_size(size));
+      painter.set_viewport(Rect::from_size(size));
       painter.reset();
     }
   }
@@ -244,7 +244,7 @@ impl Window {
     let dispatcher = RefCell::new(Dispatcher::new());
     let size = shell_wnd.inner_size();
     let mut painter = Painter::new(Rect::from_size(size));
-    painter.set_bounds(Rect::from_size(size));
+    painter.set_viewport(Rect::from_size(size));
     let window = Self {
       dispatcher,
       widget_tree,

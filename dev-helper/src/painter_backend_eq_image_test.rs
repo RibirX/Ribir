@@ -26,7 +26,7 @@ macro_rules! painter_backend_eq_image_test {
       #[test]
       fn [<wgpu_ $painter_fn>]() {
         let mut painter = $painter_fn();
-        let viewport = painter.paint_bounds().to_i32().cast_unit();
+        let viewport = painter.viewport().to_i32().cast_unit();
         let img = wgpu_render_commands(painter.finish(), viewport, Color::TRANSPARENT);
         let name = format!("{}_wgpu", std::stringify!($painter_fn));
         let file_path = test_case_name!(name, "png");

@@ -41,7 +41,7 @@ pub fn draw_glyphs_in_rect(
   font_db: Rc<RefCell<FontDB>>,
 ) {
   let visual_rect = visual_glyphs.visual_rect();
-  let Some(paint_rect) = painter.rect_in_paint_bounds(&box_rect) else {
+  let Some(paint_rect) = painter.intersection_paint_bounds(&box_rect) else {
     return;
   };
   if !paint_rect.contains_rect(&visual_rect) {

@@ -600,7 +600,7 @@ mod tests {
 
   painter_backend_eq_image_test!(clip_layers);
   fn clip_layers() -> Painter {
-    let mut painter = painter(Size::new(1024., 512.));
+    let mut painter = painter(Size::new(120., 340.));
     let rect_100x100 = Rect::from_size(Size::new(100., 100.));
     painter
       .set_brush(Color::RED)
