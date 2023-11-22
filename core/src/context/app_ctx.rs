@@ -1,10 +1,12 @@
 use crate::{
   builtin_widgets::{FullTheme, InheritTheme, Theme},
   clipboard::{Clipboard, MockClipboard},
+  timer::Timer,
   widget::WidgetBuilder,
   window::{ShellWindow, Window, WindowId},
 };
 use pin_project_lite::pin_project;
+use rxrust::scheduler::NEW_TIMER_FN;
 use std::{
   cell::RefCell,
   rc::Rc,
@@ -270,6 +272,8 @@ impl AppCtx {
   unsafe fn shared_mut() -> &'static mut Self {
     APP_CTX_INIT.call_once(|| {
       let app_theme = Theme::Full(<_>::default());
+      let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
+
       let mut font_db = FontDB::default();
       font_db.load_system_fonts();
       load_font_from_theme(&app_theme, &mut font_db);

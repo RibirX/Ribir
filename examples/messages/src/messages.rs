@@ -74,34 +74,38 @@ impl Compose for MessageList {
               @{ Label::new("Messages") }
             }
             @TabPane {
-              @VScrollBar {
-                @Lists {
-                  @{
-                    let message_gen = move |message: Message| {
-                      @Column {
-                        @ListItem {
-                          line_number: 1usize,
-                          @HeadlineText(Label::new(message.nick_name.clone()))
-                          @SupportingText(Label::new(message.content.clone()))
-                          @Leading {
-                            @Avatar {
-                              @{
-                                let name = message.avatar.to_string();
-                                let avatar = format!("{}/examples/attachments/3DDD-{name}.png", env!("CARGO_WORKSPACE_DIR"));
-                                let img = PixelImage::from_png(&std::fs::read(avatar).unwrap());
-                                ShareResource::new(img)
+              @ {
+                fn_widget! {
+                  @VScrollBar {
+                    @Lists {
+                      @{
+                        let message_gen = move |message: Message| {
+                          @Column {
+                            @ListItem {
+                              line_number: 1usize,
+                              @HeadlineText(Label::new(message.nick_name.clone()))
+                              @SupportingText(Label::new(message.content.clone()))
+                              @Leading {
+                                @Avatar {
+                                  @{
+                                    let name = message.avatar.to_string();
+                                    let avatar = format!("{}/examples/attachments/3DDD-{name}.png", env!("CARGO_WORKSPACE_DIR"));
+                                    let img = PixelImage::from_png(&std::fs::read(avatar).unwrap());
+                                    ShareResource::new(img)
+                                  }
+                                }
                               }
+                              @Trailing { @{ svgs::MORE_HORIZ } }
                             }
+                            @Divider {}
                           }
-                          @Trailing { @{ svgs::MORE_HORIZ } }
-                        }
-                        @Divider {}
-                      }
-                    };
+                        };
 
-                    $this.messages.clone().into_iter().map(message_gen)
+                        $this.messages.clone().into_iter().map(message_gen)
+                      }
+                    }
                   }
-                }
+                }.into_gen_widget()
               }
             }
           }
@@ -110,7 +114,9 @@ impl Compose for MessageList {
               @{ material_svgs::ACCOUNT_CIRCLE }
               @{ Label::new("Person") }
             }
-            @TabPane { @Text { text: "Person" } }
+            @TabPane {
+              @{ fn_widget!(@Text { text: "Person" }).into_gen_widget() }
+            }
           }
         }
       }
