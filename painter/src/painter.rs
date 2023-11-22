@@ -16,7 +16,7 @@ use std::ops::{Deref, DerefMut};
 /// bottom edge of the canvas.
 // #[derive(Default, Debug, Clone)]
 pub struct Painter {
-  bounds: Rect,
+  viewport: Rect,
   state_stack: Vec<PainterState>,
   commands: Vec<PaintCommand>,
   path_builder: PathBuilder,
@@ -153,20 +153,6 @@ impl PaintCommand {
     }
     self
   }
-
-  pub fn is_visible(&self) -> bool {
-    match self {
-      PaintCommand::ColorPath { color, .. } => color.alpha > 0,
-      PaintCommand::ImgPath { opacity, .. } => *opacity > 0.,
-      PaintCommand::RadialGradient { radial_gradient, .. } => {
-        radial_gradient.stops.iter().any(|s| s.color.alpha > 0)
-      }
-      PaintCommand::LinearGradient { linear_gradient, .. } => {
-        linear_gradient.stops.iter().any(|s| s.color.alpha > 0)
-      }
-      PaintCommand::Clip(_) | PaintCommand::PopClip => true,
-    }
-  }
 }
 
 #[derive(Clone)]
@@ -196,26 +182,26 @@ impl PainterState {
 }
 
 impl Painter {
-  pub fn new(bounds: Rect) -> Self {
+  pub fn new(viewport: Rect) -> Self {
     Self {
-      state_stack: vec![PainterState::new(bounds)],
+      state_stack: vec![PainterState::new(viewport)],
       commands: vec![],
       path_builder: Path::builder(),
-      bounds,
+      viewport,
     }
   }
 
+  pub fn viewport(&self) -> &Rect { &self.viewport }
+
   /// Change the bounds of the painter can draw.But it won't take effect until
   /// the next time you call [`Painter::reset`]!.
-  pub fn set_bounds(&mut self, bounds: Rect) { self.bounds = bounds; }
+  pub fn set_viewport(&mut self, bounds: Rect) { self.viewport = bounds; }
 
-  pub fn rect_in_paint_bounds(&self, rect: &Rect) -> Option<Rect> {
-    self.get_transform().inverse().and_then(|trans| {
-      trans
-        .outer_transformed_rect(self.paint_bounds())
-        .intersection(rect)
-    })
+  pub fn intersection_paint_bounds(&self, rect: &Rect) -> Option<Rect> {
+    self.paint_bounds().intersection(rect)
   }
+
+  pub fn intersect_paint_bounds(&self, rect: &Rect) -> bool { self.paint_bounds().intersects(rect) }
 
   pub fn paint_bounds(&self) -> &Rect { &self.current_state().bounds }
 
@@ -257,7 +243,7 @@ impl Painter {
     self.fill_all_pop_clips();
     self.commands.clear();
     self.state_stack.clear();
-    self.state_stack.push(PainterState::new(self.bounds));
+    self.state_stack.push(PainterState::new(self.viewport));
   }
 
   /// Returns the color, gradient, or pattern used for draw. Only `Color`
@@ -344,24 +330,29 @@ impl Painter {
   }
 
   pub fn clip(&mut self, path: Path) -> &mut Self {
-    let paint_path = PaintPath::new(path, *self.get_transform());
+    invisible_return!(self);
 
-    self.current_state_mut().bounds = self
-      .current_state()
-      .bounds
-      .intersection(&paint_path.paint_bounds)
-      .unwrap_or(Rect::zero());
+    if locatable_bounds(&path.bounds) && self.intersect_paint_bounds(&path.bounds) {
+      let bounds = &mut self.current_state_mut().bounds;
+      *bounds = bounds.intersection(&path.bounds).unwrap_or_default();
+      let paint_path = PaintPath::new(path, *self.get_transform());
+      self.commands.push(PaintCommand::Clip(paint_path));
+      self.current_state_mut().clip_cnt += 1;
+    }
 
-    self.commands.push(PaintCommand::Clip(paint_path));
-    self.current_state_mut().clip_cnt += 1;
     self
   }
 
   /// Fill a path with its style.
   pub fn fill_path(&mut self, p: Path) -> &mut Self {
-    let ts = *self.get_transform();
-    let path = PaintPath::new(p, ts);
-    if !path.paint_bounds.is_empty() && path.paint_bounds.intersects(self.paint_bounds()) {
+    invisible_return!(self);
+
+    if locatable_bounds(&p.bounds)
+      && self.intersect_paint_bounds(&p.bounds)
+      && self.is_visible_brush()
+    {
+      let ts = *self.get_transform();
+      let path = PaintPath::new(p, ts);
       let mut cmd = match self.current_state().brush.clone() {
         Brush::Color(color) => PaintCommand::ColorPath { path, color },
         Brush::Image(img) => PaintCommand::ImgPath { path, img, opacity: 1. },
@@ -373,9 +364,7 @@ impl Painter {
         }
       };
       cmd.apply_alpha(self.alpha());
-      if cmd.is_visible() {
-        self.commands.push(cmd);
-      }
+      self.commands.push(cmd);
     }
 
     self
@@ -522,15 +511,15 @@ impl Painter {
   }
 
   pub fn draw_svg(&mut self, svg: &Svg) -> &mut Self {
+    invisible_return!(self);
+
     let transform = *self.get_transform();
     let alpha = self.alpha();
 
     for cmd in svg.paint_commands.iter() {
       let mut cmd = cmd.clone();
       cmd.transform(&transform).apply_alpha(alpha);
-      if cmd.is_visible() {
-        self.commands.push(cmd);
-      }
+      self.commands.push(cmd);
     }
 
     self
@@ -609,6 +598,29 @@ impl Painter {
     self.state_stack.iter_mut().for_each(|s| s.clip_cnt = 0);
     self.push_n_pop_cmd(clip_cnt);
   }
+
+  fn is_visible_canvas(&self) -> bool {
+    let t = self.current_state().transform;
+    self.alpha() > 0.
+      && locatable_bounds(self.viewport())
+      && t.m11.is_finite()
+      && t.m12.is_finite()
+      && t.m21.is_finite()
+      && t.m22.is_finite()
+      && t.m31.is_finite()
+      && t.m32.is_finite()
+  }
+
+  fn is_visible_brush(&self) -> bool {
+    match self.current_state().brush {
+      Brush::Color(c) => c.alpha > 0,
+      Brush::Image(_) => true,
+      Brush::RadialGradient(RadialGradient { ref stops, .. })
+      | Brush::LinearGradient(LinearGradient { ref stops, .. }) => {
+        stops.iter().any(|s| s.color.alpha > 0)
+      }
+    }
+  }
 }
 
 /// An RAII implementation of a "scoped state" of the render layer. When this
@@ -638,6 +650,13 @@ impl<'a> DerefMut for PainterGuard<'a> {
 
 impl PaintPath {
   pub fn new(path: Path, transform: Transform) -> Self {
+    if transform
+      .outer_transformed_rect(path.bounds())
+      .width()
+      .is_nan()
+    {
+      println!("paint_bounds.width().is_nan()");
+    }
     let paint_bounds = transform.outer_transformed_rect(path.bounds());
     PaintPath { path, transform, paint_bounds }
   }
@@ -652,6 +671,20 @@ impl PaintPath {
     self.paint_bounds = self.transform.outer_transformed_rect(self.path.bounds());
   }
 }
+
+// 可以定位的边界
+fn locatable_bounds(bounds: &Rect) -> bool {
+  bounds.origin.is_finite() && !bounds.width().is_nan() && !bounds.height().is_nan()
+}
+
+macro_rules! invisible_return {
+  ($this: ident) => {
+    if !$this.is_visible_canvas() {
+      return $this;
+    }
+  };
+}
+use invisible_return;
 
 #[cfg(test)]
 mod test {
@@ -706,5 +739,28 @@ mod test {
       commands[commands.len() - 2],
       PaintCommand::PopClip
     ));
+  }
+
+  #[test]
+  fn filter_invalid_clip() {
+    let mut painter = painter();
+
+    painter
+      .save()
+      .set_transform(Transform::translation(f32::NAN, f32::INFINITY))
+      .clip(Path::rect(&rect(0., 0., 10., 10.)));
+    assert_eq!(painter.commands.len(), 0);
+  }
+
+  #[test]
+  fn filter_invalid_commands() {
+    let mut painter = painter();
+
+    let svg = Svg::parse_from_bytes(include_bytes!("../../tests/assets/test1.svg")).unwrap();
+    painter
+      .save()
+      .set_transform(Transform::translation(f32::NAN, f32::INFINITY))
+      .draw_svg(&svg);
+    assert_eq!(painter.commands.len(), 0);
   }
 }
