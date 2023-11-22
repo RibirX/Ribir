@@ -2,7 +2,6 @@ use crate::clipboard::Clipboard;
 use crate::register_platform_app_events_handlers;
 use crate::winit_shell_wnd::{new_id, WinitShellWnd};
 use ribir_core::{prelude::*, timer::Timer, window::WindowId};
-use rxrust::scheduler::NEW_TIMER_FN;
 use std::rc::Rc;
 use std::{convert::Infallible, sync::Once};
 use winit::event::ElementState;
@@ -239,7 +238,6 @@ impl App {
         AppCtx::set_clipboard(Box::new(clipboard));
         AppCtx::set_runtime_waker(Box::new(waker));
       }
-      let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
       register_platform_app_events_handlers();
       APP = Some(App {
         event_loop,

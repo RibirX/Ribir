@@ -127,7 +127,7 @@ where
   }
 }
 
-// WidgetPair<W, C> --> WidgetPair<W2, C2>
+// Pair<W, C> --> Pair<W2, C2>
 impl<W, W2, C, C2, M1, M2> FromAnother<Pair<W2, C2>, [(M1, M2); 0]> for Pair<W, C>
 where
   W: FromAnother<W2, M1>,

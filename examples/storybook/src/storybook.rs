@@ -20,7 +20,7 @@ fn header() -> impl WidgetBuilder {
 }
 
 fn content() -> impl WidgetBuilder {
-  fn actions_show() -> impl WidgetBuilder {
+  fn actions_show() -> GenWidget {
     fn_widget! {
       @VScrollBar {
         @Column {
@@ -169,9 +169,10 @@ fn content() -> impl WidgetBuilder {
         }
       }
     }
+    .into_gen_widget()
   }
 
-  fn tabs_show() -> impl WidgetBuilder {
+  fn tabs_show() -> GenWidget {
     fn_widget! {
       @Tabs {
         @Tab {
@@ -194,9 +195,10 @@ fn content() -> impl WidgetBuilder {
         }
       }
     }
+    .into_gen_widget()
   }
 
-  fn containment_show() -> impl WidgetBuilder {
+  fn containment_show() -> GenWidget {
     fn_widget! {
       @Column {
         @ConstrainedBox {
@@ -213,9 +215,10 @@ fn content() -> impl WidgetBuilder {
         @Divider {}
       }
     }
+    .into_gen_widget()
   }
 
-  fn lists_show() -> impl WidgetBuilder {
+  fn lists_show() -> GenWidget {
     fn_widget! {
       @Column {
         margin: EdgeInsets::all(20.),
@@ -281,10 +284,10 @@ fn content() -> impl WidgetBuilder {
           }
         }
       }
-    }
+    }.into_gen_widget()
   }
 
-  fn checkbox_show() -> impl WidgetBuilder {
+  fn checkbox_show() -> GenWidget {
     fn_widget! {
       @Column {
         margin: EdgeInsets::all(20.),
@@ -307,6 +310,7 @@ fn content() -> impl WidgetBuilder {
         }
       }
     }
+    .into_gen_widget()
   }
 
   fn_widget! {
@@ -317,7 +321,7 @@ fn content() -> impl WidgetBuilder {
           @ { Label::new("Actions") }
         }
         @TabPane {
-          @ { actions_show() }
+           @ { actions_show() }
         }
       }
       @Tab {

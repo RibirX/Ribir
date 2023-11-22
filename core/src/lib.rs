@@ -43,10 +43,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget;
   #[doc(no_inline)]
-  pub use crate::widget::{
-    Any, Compose, ComposeBuilder, ComposeChildBuilder, HitTest, Query, Render, RenderBuilder,
-    SelfBuilder, TypeId, Widget, WidgetBuilder,
-  };
+  pub use crate::widget::*;
   #[doc(no_inline)]
   pub use crate::widget_children::*;
   #[doc(no_inline)]

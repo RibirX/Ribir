@@ -40,6 +40,7 @@ macro_rules! splitted_reader_impl {
     type OriginReader = O;
     type Reader = SplittedReader<O::Reader, R>;
 
+    #[track_caller]
     fn read(&self) -> ReadRef<Self::Value> {
       assert!(
         self.create_at > self.origin.time_stamp(),
@@ -176,6 +177,7 @@ where
     }
   }
 
+  #[track_caller]
   fn split_ref<'a>(&'a self, mut orig: WriteRef<'a, O::Value>) -> WriteRef<'a, V> {
     assert!(
       self.create_at > self.origin.time_stamp(),

@@ -16,7 +16,7 @@ use ribir_core::prelude::*;
 ///         @ { Label::new("Home") }
 ///       }
 ///       @TabPane {
-///         @{ Text { text: "content" } }
+///         @{ fn_widget!{ @Text { text: "content" } }.into_gen_widget() }
 ///       }
 ///     }
 ///     @Tab {
@@ -25,7 +25,7 @@ use ribir_core::prelude::*;
 ///         @ { Label::new("Home") }
 ///       }
 ///       @TabPane {
-///         @Text { text: "content" }
+///         @{ fn_widget!{ @Text { text: "content" } }.into_gen_widget() }
 ///       }
 ///     }
 ///   }
@@ -41,7 +41,7 @@ use ribir_core::prelude::*;
 ///         @ { Label::new("Home") }
 ///       }
 ///       @TabPane {
-///         @Text { text: "content" }
+///         @{ fn_widget!{ @Text { text: "content" } }.into_gen_widget() }
 ///       }
 ///     }
 ///     @Tab {
@@ -50,7 +50,7 @@ use ribir_core::prelude::*;
 ///         @ { Label::new("Home") }
 ///       }
 ///       @TabPane {
-///         @Text { text: "content" }
+///         @{ fn_widget!{ @Text { text: "content" } }.into_gen_widget() }
 ///       }
 ///     }
 ///   }
@@ -109,7 +109,7 @@ impl ComposeDecorator for TabsDecorator {
 #[derive(Template)]
 pub struct Tab {
   label: TabItem,
-  child: Option<WidgetOf<TabPane>>,
+  child: Pair<TabPane, GenWidget>,
 }
 
 #[derive(Template)]
@@ -240,9 +240,7 @@ impl ComposeChild for Tabs {
     for tab in child.into_iter() {
       let Tab { label: header, child: pane } = tab;
       headers.push((header.icon, header.text));
-      if let Some(pane) = pane {
-        panes.push(pane.child())
-      }
+      panes.push(pane.child())
     }
 
     fn_widget! {
@@ -263,12 +261,6 @@ impl ComposeChild for Tabs {
           (true, false) => extent_only_icon,
           (false, false) => 0.
         };
-        let panes = panes.into_iter()
-          .enumerate()
-          .map(move |(idx, pane)| @Expanded {
-            flex: 1.,
-            @ $pane { visible: pipe!($this.cur_idx == idx) }
-          });
         let mut flex = @Flex {
           direction: pipe!(match $this.pos {
             Position::Top | Position::Bottom => Direction::Horizontal,
@@ -339,7 +331,9 @@ impl ComposeChild for Tabs {
             matches!(pos, Position::Right | Position::Bottom)
           },
           @ { header }
-          @ { panes }
+          @Expanded {
+            @ { pipe!($this.cur_idx).map(move |idx| panes[idx](ctx!())) }
+          }
         }
       }
     }
