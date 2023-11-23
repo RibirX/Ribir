@@ -35,7 +35,7 @@ impl Svg {
     let size = tree.size;
     let fit_size = fit_view_box(size, &tree.view_box);
 
-    let bound_rect = Rect::from_size(Size::new(f32::INFINITY, f32::INFINITY));
+    let bound_rect = Rect::from_size(Size::new(f32::MAX, f32::MAX));
     let mut painter = crate::Painter::new(bound_rect);
     painter.apply_transform(
       &Transform::translation(-view_rect.x(), -view_rect.y()).then_scale(
