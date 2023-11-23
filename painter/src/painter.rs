@@ -163,8 +163,8 @@ struct PainterState {
   transform: Transform,
   opacity: f32,
   clip_cnt: usize,
-
-  /// The bounds without transform.
+  /// The visible boundary of the painter in visual axis, not care about the
+  /// transform.
   bounds: Rect,
 }
 
@@ -183,6 +183,7 @@ impl PainterState {
 
 impl Painter {
   pub fn new(viewport: Rect) -> Self {
+    assert!(viewport.is_finite(), "viewport must be finite!");
     Self {
       state_stack: vec![PainterState::new(viewport)],
       commands: vec![],
@@ -203,7 +204,14 @@ impl Painter {
 
   pub fn intersect_paint_bounds(&self, rect: &Rect) -> bool { self.paint_bounds().intersects(rect) }
 
-  pub fn paint_bounds(&self) -> &Rect { &self.current_state().bounds }
+  /// Returns the visible boundary of the painter in current state.
+  pub fn paint_bounds(&self) -> Rect {
+    let s = self.current_state();
+    s.transform
+      .inverse()
+      .unwrap()
+      .outer_transformed_rect(&s.bounds)
+  }
 
   #[inline]
   pub fn finish(&mut self) -> Vec<PaintCommand> {
@@ -332,12 +340,15 @@ impl Painter {
   pub fn clip(&mut self, path: Path) -> &mut Self {
     invisible_return!(self);
 
-    if locatable_bounds(&path.bounds) && self.intersect_paint_bounds(&path.bounds) {
-      let bounds = &mut self.current_state_mut().bounds;
-      *bounds = bounds.intersection(&path.bounds).unwrap_or_default();
-      let paint_path = PaintPath::new(path, *self.get_transform());
-      self.commands.push(PaintCommand::Clip(paint_path));
-      self.current_state_mut().clip_cnt += 1;
+    if locatable_bounds(&path.bounds) {
+      if let Some(bounds) = self.intersection_paint_bounds(&path.bounds) {
+        let s = self.current_state_mut();
+        s.bounds = s.transform.outer_transformed_rect(&bounds);
+
+        let paint_path = PaintPath::new(path, s.transform);
+        self.commands.push(PaintCommand::Clip(paint_path));
+        self.current_state_mut().clip_cnt += 1;
+      }
     }
 
     self
@@ -672,7 +683,7 @@ impl PaintPath {
   }
 }
 
-// 可以定位的边界
+// bounds that has a limited location and size
 fn locatable_bounds(bounds: &Rect) -> bool {
   bounds.origin.is_finite() && !bounds.width().is_nan() && !bounds.height().is_nan()
 }
@@ -762,5 +773,27 @@ mod test {
       .set_transform(Transform::translation(f32::NAN, f32::INFINITY))
       .draw_svg(&svg);
     assert_eq!(painter.commands.len(), 0);
+  }
+
+  #[test]
+  fn draw_svg_gradient() {
+    let mut painter = Painter::new(Rect::from_size(Size::new(64., 64.)));
+    let svg =
+      Svg::parse_from_bytes(include_bytes!("../../tests/assets/fill_with_gradient.svg")).unwrap();
+
+    painter.draw_svg(&svg);
+  }
+
+  #[test]
+  fn fix_incorrect_bounds_axis() {
+    let mut painter = painter();
+
+    painter
+      .save()
+      .clip(Path::rect(&rect(0., 0., 100., 100.)))
+      .set_transform(Transform::translation(500., 500.))
+      .rect(&rect(-500., -500., 10., 10.))
+      .fill();
+    assert_eq!(painter.commands.len(), 2);
   }
 }
