@@ -171,14 +171,11 @@ impl PreEditHandle {
   {
     match &e.pre_edit {
       ImePreEdit::Begin => {
-        self.0 = Some(PreEditState {
-          position: host.read().caret().select_range().start,
-          value: None,
-        });
         let mut host = host.write();
         let rg = host.caret().select_range();
         host.writer().delete_byte_range(&rg);
 
+        self.0 = Some(PreEditState { position: rg.start, value: None });
         let pos = e.map_to_global(*caret_position);
         let height = caret_size.height;
         e.window()
@@ -198,7 +195,11 @@ impl PreEditHandle {
         *edit_value = Some(value.clone());
       }
       ImePreEdit::End => {
-        self.0.take();
+        if let Some(PreEditState { value: Some(txt), position }) = self.0.take() {
+          let mut host = host.write();
+          let mut writer = host.writer();
+          writer.delete_byte_range(&(position..position + txt.len()));
+        }
       }
     }
   }

@@ -282,29 +282,16 @@ impl PreEditHandle {
   const fn new() -> Self { Self(None) }
   fn update(&mut self, wnd: &Window, pre_edit: &Ime) {
     match pre_edit {
-      Ime::Enabled => {
-        if !self.is_in_pre_edit() {
-          self.0 = Some(String::new());
-          wnd.processes_ime_pre_edit(ImePreEdit::Begin);
-        }
-      }
-      Ime::Preedit(txt, cursor) => {
-        if self.is_in_pre_edit() {
-          self.0 = Some(txt.clone());
-          wnd.processes_ime_pre_edit(ImePreEdit::PreEdit { value: txt.clone(), cursor: *cursor });
-        }
-      }
+      Ime::Enabled => {}
+      Ime::Preedit(txt, cursor) => match txt.is_empty() {
+        true => self.exit(wnd),
+        false => self.update_pre_edit(wnd, txt, cursor),
+      },
       Ime::Commit(value) => {
-        if self.is_in_pre_edit() {
-          wnd.processes_receive_chars(value.clone());
-        }
+        self.exit(wnd);
+        wnd.processes_receive_chars(value.clone());
       }
-      Ime::Disabled => {
-        if self.is_in_pre_edit() {
-          wnd.processes_ime_pre_edit(ImePreEdit::End);
-          self.0 = None;
-        }
-      }
+      Ime::Disabled => self.exit(wnd),
     }
   }
 
@@ -313,12 +300,142 @@ impl PreEditHandle {
   fn force_exit(&mut self, wnd: &Window) {
     if self.is_in_pre_edit() {
       wnd.set_ime_allowed(false);
-      wnd.processes_ime_pre_edit(ImePreEdit::PreEdit { value: String::new(), cursor: None });
       wnd.processes_ime_pre_edit(ImePreEdit::End);
       if let Some(s) = self.0.take() {
         wnd.processes_receive_chars(s);
       }
       wnd.set_ime_allowed(true);
     }
+  }
+
+  fn exit(&mut self, wnd: &Window) {
+    if self.is_in_pre_edit() {
+      wnd.processes_ime_pre_edit(ImePreEdit::End);
+      self.0.take();
+    }
+  }
+
+  fn update_pre_edit(&mut self, wnd: &Window, txt: &str, cursor: &Option<(usize, usize)>) {
+    if !self.is_in_pre_edit() {
+      wnd.processes_ime_pre_edit(ImePreEdit::Begin);
+    }
+
+    wnd.processes_ime_pre_edit(ImePreEdit::PreEdit {
+      value: txt.to_owned(),
+      cursor: *cursor,
+    });
+    self.0 = Some(txt.to_owned());
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use ribir_core::{
+    prelude::*,
+    test_helper::{MockBox, TestWindow},
+  };
+  use std::{cell::RefCell, rc::Rc};
+  use winit::event::{Ime, WindowEvent};
+
+  use super::App;
+  #[derive(Debug, Default)]
+  struct LogImeEvent {
+    log: Rc<RefCell<Vec<String>>>,
+  }
+  impl Compose for LogImeEvent {
+    fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+      fn_widget! {
+        @MockBox {
+          size: INFINITY_SIZE,
+          auto_focus: true,
+          on_ime_pre_edit: move |e| {
+            match &e.pre_edit {
+              ImePreEdit::Begin => $this.log.borrow_mut().push("on_ime_pre_edit_begin".to_string()),
+              ImePreEdit::PreEdit { value, .. } => $this.log.borrow_mut().push(format!("on_ime_pre_edit_update {value}")),
+              ImePreEdit::End => $this.log.borrow_mut().push("on_ime_pre_edit_end".to_string()),
+            }
+          },
+          on_chars: move|e| $this.log.borrow_mut().push(format!("on_chars {}", e.chars)),
+          on_tap: move |_| $this.log.borrow_mut().push("on_tap".to_string()),
+        }
+      }
+    }
+  }
+  #[test]
+  fn ime_pre_edit() {
+    let w = Stateful::new(LogImeEvent::default());
+    let log = w.read().log.clone();
+
+    let w = fn_widget! { @ {w} };
+    let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
+
+    wnd.draw_frame();
+
+    App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Enabled));
+    App::dispatch_wnd_native_event(
+      &wnd,
+      WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)),
+    );
+    App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Disabled));
+    wnd.draw_frame();
+    assert_eq!(
+      &*log.borrow(),
+      &[
+        "on_ime_pre_edit_begin",
+        "on_ime_pre_edit_update hello",
+        "on_ime_pre_edit_end"
+      ]
+    );
+
+    log.borrow_mut().clear();
+    App::dispatch_wnd_native_event(
+      &wnd,
+      WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)),
+    );
+    App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Commit("hello".to_string())));
+    wnd.draw_frame();
+    assert_eq!(
+      &*log.borrow(),
+      &[
+        "on_ime_pre_edit_begin",
+        "on_ime_pre_edit_update hello",
+        "on_ime_pre_edit_end",
+        "on_chars hello",
+      ]
+    );
+
+    log.borrow_mut().clear();
+    App::dispatch_wnd_native_event(
+      &wnd,
+      WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)),
+    );
+    let device_id = unsafe { winit::event::DeviceId::dummy() };
+    App::dispatch_wnd_native_event(
+      &wnd,
+      WindowEvent::MouseInput {
+        state: winit::event::ElementState::Pressed,
+        button: winit::event::MouseButton::Left,
+        device_id,
+      },
+    );
+    App::dispatch_wnd_native_event(
+      &wnd,
+      WindowEvent::MouseInput {
+        state: winit::event::ElementState::Released,
+        button: winit::event::MouseButton::Left,
+        device_id,
+      },
+    );
+    wnd.draw_frame();
+    assert_eq!(
+      &*log.borrow(),
+      &[
+        "on_ime_pre_edit_begin",
+        "on_ime_pre_edit_update hello",
+        "on_ime_pre_edit_end",
+        "on_chars hello",
+        "on_tap",
+      ]
+    );
   }
 }

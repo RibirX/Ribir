@@ -4,11 +4,9 @@ use std::convert::Infallible;
 
 #[derive(Debug)]
 pub enum ImePreEdit {
-  /// Notifies when the IME was enabled.
+  /// Notifies when the IME PreEdit begin a new round.
   ///
-  /// After getting this event you could receive [`Preedit`](Self::Preedit).
-  /// You should also start performing IME related requests like
-  /// [`Window::set_ime_cursor_area`].
+  /// After getting this event you could receive [`PreEdit`](Self::PreEdit).
   Begin,
 
   /// Notifies when a new composing text should be set at the cursor position.
@@ -24,11 +22,10 @@ pub enum ImePreEdit {
     cursor: Option<(usize, usize)>,
   },
 
-  /// Notifies when the IME was disabled.
+  /// Notifies when the IME PreEdit was finished this round.
   ///
   /// After receiving this event you won't get any more PreEdit event in this
-  /// round.You should also stop issuing IME related requests like
-  /// [`Window::set_ime_cursor_area`] and clear pending preedit text.
+  /// round.You should clear pending pre_edit text.
   End,
 }
 
