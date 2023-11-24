@@ -85,6 +85,12 @@ impl ComposeChild for ThemeWidget {
       let mut themes = ctx!().themes().clone();
       themes.push(theme.clone());
 
+      // Keep the empty node, because the subtree may be hold its id.
+      //
+      // And not try to swap child and the empty node, and remove the child
+      // node, because the subtree may be hold its id.
+      //
+      // A `Void` is cheap for a theme.
       let p = Void.widget_build(ctx!()).attach_data(theme, ctx!());
       // shadow the context with the theme.
       let ctx = BuildCtx::new_with_data(Some(p.id()), ctx!().tree, themes);

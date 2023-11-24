@@ -220,6 +220,7 @@ where
   fn widget_build(self, ctx: &BuildCtx) -> Widget { self(ctx) }
 }
 
+/// only query the inner object, not query self.
 macro_rules! impl_proxy_query {
   ($($t:tt)*) => {
     #[inline]
@@ -241,8 +242,36 @@ macro_rules! impl_proxy_query {
     }
   }
 }
-pub(crate) use impl_proxy_query;
 
+/// query self and proxy to the inner object.
+macro_rules! impl_proxy_and_self_query {
+  ($($t:tt)*) => {
+    fn query_inside_first(
+      &self,
+      type_id: TypeId,
+      callback: &mut dyn FnMut(&dyn Any) -> bool,
+    ) -> bool {
+      if !self.$($t)*.query_inside_first(type_id, callback) {
+        return false
+      }
+
+      type_id != self.type_id() || callback(self)
+    }
+
+    fn query_outside_first(
+      &self,
+      type_id: TypeId,
+      callback: &mut dyn FnMut(&dyn Any) -> bool,
+    ) -> bool {
+      if type_id == self.type_id() && !callback(self) {
+        return false
+      }
+      self.$($t)*.query_outside_first(type_id, callback)
+    }
+  }
+}
+
+/// query self only.
 macro_rules! impl_query_self_only {
   () => {
     #[inline]
@@ -268,6 +297,8 @@ macro_rules! impl_query_self_only {
     }
   };
 }
+pub(crate) use impl_proxy_and_self_query;
+pub(crate) use impl_proxy_query;
 pub(crate) use impl_query_self_only;
 
 macro_rules! impl_proxy_render {
@@ -325,13 +356,13 @@ impl<W: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for W 
 }
 
 impl<T: Query> Query for ShareResource<T> {
-  impl_proxy_query!(deref());
+  impl_proxy_and_self_query!(deref());
 }
 impl<T: Query> Query for Sc<T> {
-  impl_proxy_query!(deref());
+  impl_proxy_and_self_query!(deref());
 }
 impl<T: Query> Query for RefCell<T> {
-  impl_proxy_query!(borrow());
+  impl_proxy_and_self_query!(borrow());
 }
 impl_proxy_render!(proxy deref(), ShareResource<T>, <T>, where  T: Render + 'static);
 
@@ -392,4 +423,37 @@ impl Drop for Widget {
       .handle
       .with_ctx(|ctx| ctx.tree.borrow_mut().remove_subtree(self.id));
   }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  macro_rules! impl_wrap_test {
+    ($name: ident) => {
+      paste::paste! {
+        #[test]
+        fn [<$name:lower _support_query>]() {
+          let warp = $name::new(Void);
+          let void_tid = Void.type_id();
+          let w_tid = warp.type_id();
+          let mut hit = 0;
+
+          let mut hit_fn = |_: &dyn Any| {
+            hit += 1;
+            true
+          };
+
+          warp.query_inside_first(void_tid, &mut hit_fn);
+          warp.query_outside_first(void_tid, &mut hit_fn);
+          warp.query_inside_first(w_tid, &mut hit_fn);
+          warp.query_outside_first(w_tid, &mut hit_fn);
+          assert_eq!(hit, 4);
+        }
+      }
+    };
+  }
+  impl_wrap_test!(Sc);
+  impl_wrap_test!(RefCell);
+  impl_wrap_test!(ShareResource);
 }
