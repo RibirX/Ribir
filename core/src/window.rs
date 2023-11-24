@@ -531,8 +531,10 @@ impl Window {
           self.bottom_up_emit::<PointerListener>(&mut e, wid, None);
         }
         DelayEvent::ImePreEdit { wid, pre_edit } => {
-          let mut event = ImePreEditEvent::new(pre_edit, wid, self);
-          self.bottom_up_emit::<ImePreEditListener>(&mut event, wid, None);
+          let mut e = AllImePreEdit::ImePreEditCapture(ImePreEditEvent::new(pre_edit, wid, self));
+          self.top_down_emit::<ImePreEditListener>(&mut e, wid, None);
+          let mut e = AllImePreEdit::ImePreEdit(e.into_inner());
+          self.bottom_up_emit::<ImePreEditListener>(&mut e, wid, None);
         }
       }
     }
