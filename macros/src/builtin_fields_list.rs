@@ -168,6 +168,8 @@ builtin! {
   ImePreEditListener {
     #[doc="specify the event handler when received unicode characters in ime pre edit bubble phase."]
     on_ime_pre_edit: impl FnMut(&mut ImePreEditEvent),
+    #[doc="specify the event handler when received unicode characters in ime pre edit capture phase."]
+    on_ime_pre_edit_capture: impl FnMut(&mut ImePreEditEvent),
   }
 
   WheelListener {
