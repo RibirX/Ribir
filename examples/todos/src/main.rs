@@ -4,6 +4,6 @@ mod todos;
 use ribir::prelude::*;
 use ribir_dev_helper::*;
 mod ui;
-pub use ui::todos;
+use ui::todos;
 
 example_framework!(todos, wnd_size = Size::new(400., 640.));
