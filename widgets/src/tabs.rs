@@ -16,7 +16,7 @@ use ribir_core::prelude::*;
 ///         @ { Label::new("Home") }
 ///       }
 ///       @TabPane {
-///         @{ fn_widget!{ @Text { text: "content" } }.into_gen_widget() }
+///         @{ fn_widget!{ @Text { text: "content" } } }
 ///       }
 ///     }
 ///     @Tab {
@@ -25,7 +25,7 @@ use ribir_core::prelude::*;
 ///         @ { Label::new("Home") }
 ///       }
 ///       @TabPane {
-///         @{ fn_widget!{ @Text { text: "content" } }.into_gen_widget() }
+///         @{ fn_widget!{ @Text { text: "content" } } }
 ///       }
 ///     }
 ///   }
@@ -41,7 +41,7 @@ use ribir_core::prelude::*;
 ///         @ { Label::new("Home") }
 ///       }
 ///       @TabPane {
-///         @{ fn_widget!{ @Text { text: "content" } }.into_gen_widget() }
+///         @{ fn_widget!{ @Text { text: "content" } } }
 ///       }
 ///     }
 ///     @Tab {
@@ -50,7 +50,7 @@ use ribir_core::prelude::*;
 ///         @ { Label::new("Home") }
 ///       }
 ///       @TabPane {
-///         @{ fn_widget!{ @Text { text: "content" } }.into_gen_widget() }
+///         @{ fn_widget!{ @Text { text: "content" } } }
 ///       }
 ///     }
 ///   }
@@ -332,7 +332,7 @@ impl ComposeChild for Tabs {
           },
           @ { header }
           @Expanded {
-            @ { pipe!($this.cur_idx).map(move |idx| panes[idx](ctx!())) }
+            @ { pipe!($this.cur_idx).map(move |idx| panes[idx].gen_widget(ctx!())) }
           }
         }
       }

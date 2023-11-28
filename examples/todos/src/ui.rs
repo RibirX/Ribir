@@ -92,7 +92,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
       }
     }
   }
-  .into_gen_widget()
+  .into()
 }
 
 fn input(

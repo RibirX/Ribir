@@ -97,7 +97,7 @@ impl ComposeChild for ThemeWidget {
       let p = Void.widget_build(ctx!()).attach_data(theme, ctx!());
       // shadow the context with the theme.
       let ctx = BuildCtx::new_with_data(Some(p.id()), ctx!().tree, themes);
-      let child = child(&ctx);
+      let child = child.gen_widget(&ctx);
       ctx.append_child(p.id(), child);
 
       p

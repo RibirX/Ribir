@@ -105,7 +105,7 @@ impl Compose for MessageList {
                       }
                     }
                   }
-                }.into_gen_widget()
+                }
               }
             }
           }
@@ -115,7 +115,7 @@ impl Compose for MessageList {
               @{ Label::new("Person") }
             }
             @TabPane {
-              @{ fn_widget!(@Text { text: "Person" }).into_gen_widget() }
+              @{ fn_widget!(@Text { text: "Person" }) }
             }
           }
         }
