@@ -65,7 +65,7 @@ pub type BoxedWidget = Box<dyn for<'a, 'b> FnOnce(&'a BuildCtx<'b>) -> Widget>;
 
 /// A boxed function widget that can be called multiple times to regenerate
 /// widget.
-pub type GenWidget = Box<dyn for<'a, 'b> FnMut(&'a BuildCtx<'b>) -> Widget>;
+pub struct GenWidget(Box<dyn for<'a, 'b> FnMut(&'a BuildCtx<'b>) -> Widget>);
 
 /// A type can composed by many types, this trait help us to query the type and
 /// the inner type by its type id, and call the callback one by one with a `&
@@ -157,9 +157,9 @@ pub trait WidgetBuilder {
   ///
   /// ```ignore
   /// let w = if xxx {
-  ///   fn_widget! { ... }.box_fn_widget()
+  ///   fn_widget! { ... }.box_it()
   /// else {
-  ///   fn_widget! { ... }.box_fn_widget()
+  ///   fn_widget! { ... }.box_it()
   /// };
   /// ```
   fn box_it(self) -> BoxedWidget
@@ -168,12 +168,6 @@ pub trait WidgetBuilder {
   {
     Box::new(move |ctx| self.widget_build(ctx))
   }
-}
-
-/// Convert a function widget to a `GenWidget` if it can be called multiple
-/// times.
-pub trait IntoGenWidget {
-  fn into_gen_widget(self) -> GenWidget;
 }
 
 /// Trait to build a compose widget into widget tree with `BuildCtx` in the
@@ -253,12 +247,22 @@ where
   fn widget_build(self, ctx: &BuildCtx) -> Widget { self(ctx) }
 }
 
-impl<F> IntoGenWidget for F
-where
-  F: FnMut(&BuildCtx) -> Widget + 'static,
-{
+impl WidgetBuilder for GenWidget {
   #[inline]
-  fn into_gen_widget(self) -> GenWidget { Box::new(self) }
+  fn widget_build(mut self, ctx: &BuildCtx) -> Widget { self.gen_widget(ctx) }
+}
+
+impl GenWidget {
+  #[inline]
+  pub fn new(f: impl FnMut(&BuildCtx) -> Widget + 'static) -> Self { Self(Box::new(f)) }
+
+  #[inline]
+  pub fn gen_widget(&mut self, ctx: &BuildCtx) -> Widget { (self.0)(ctx) }
+}
+
+impl<F: FnMut(&BuildCtx) -> Widget + 'static> From<F> for GenWidget {
+  #[inline]
+  fn from(f: F) -> Self { Self::new(f) }
 }
 
 /// only query the inner object, not query self.

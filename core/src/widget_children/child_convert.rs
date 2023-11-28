@@ -96,6 +96,13 @@ where
   }
 }
 
+impl<F> FromAnother<F, ()> for GenWidget
+where
+  F: FnMut(&BuildCtx) -> Widget + 'static,
+{
+  fn from_another(value: F, _: &BuildCtx) -> Self { Self::new(value) }
+}
+
 // W -> State<W>
 // Stateful<W> -> State<W>
 // Stateful<DynWidget<W>> -> State<W>

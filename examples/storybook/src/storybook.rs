@@ -169,7 +169,7 @@ fn content() -> impl WidgetBuilder {
         }
       }
     }
-    .into_gen_widget()
+    .into()
   }
 
   fn tabs_show() -> GenWidget {
@@ -195,7 +195,7 @@ fn content() -> impl WidgetBuilder {
         }
       }
     }
-    .into_gen_widget()
+    .into()
   }
 
   fn containment_show() -> GenWidget {
@@ -215,7 +215,7 @@ fn content() -> impl WidgetBuilder {
         @Divider {}
       }
     }
-    .into_gen_widget()
+    .into()
   }
 
   fn lists_show() -> GenWidget {
@@ -284,7 +284,7 @@ fn content() -> impl WidgetBuilder {
           }
         }
       }
-    }.into_gen_widget()
+    }.into()
   }
 
   fn checkbox_show() -> GenWidget {
@@ -310,7 +310,7 @@ fn content() -> impl WidgetBuilder {
         }
       }
     }
-    .into_gen_widget()
+    .into()
   }
 
   fn_widget! {
