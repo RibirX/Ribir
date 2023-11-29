@@ -33,12 +33,18 @@ ribir_text = {path = "../text", version = "0.0.1-alpha.4"}
 rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
+tokio = { workspace = true, optional = true, features = ["rt-multi-thread", "rt"]}
 
 [dev-dependencies]
 colored.workspace = true
 paste.workspace = true
 ribir_dev_helper = {path = "../dev-helper"}
 ribir = { path = "../ribir" }
+tokio = { workspace = true, features = ["full"]}
+tokio-stream = { workspace = true }
 
 [features]
 png = ["ribir_painter/png"]
+tokio-async = ["tokio"]
+
+
