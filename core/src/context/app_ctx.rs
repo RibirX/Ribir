@@ -50,6 +50,9 @@ pub struct AppCtx {
   scheduler: FuturesLocalScheduler,
   executor: RefCell<LocalPool>,
   triggers: TriggerMap,
+
+  #[cfg(feature = "tokio-async")]
+  tokio_runtime: tokio::runtime::Runtime,
 }
 
 type TriggerMap = RefCell<ahash::HashMap<*const (), Box<dyn FnOnce()>>>;
@@ -297,6 +300,12 @@ impl AppCtx {
         runtime_waker: Box::new(MockWaker),
         windows: RefCell::new(ahash::HashMap::default()),
         triggers: RefCell::new(ahash::HashMap::default()),
+
+        #[cfg(feature = "tokio-async")]
+        tokio_runtime: tokio::runtime::Builder::new_multi_thread()
+          .enable_all()
+          .build()
+          .unwrap(),
       };
 
       INIT_THREAD_ID = Some(std::thread::current().id());
@@ -317,7 +326,7 @@ impl AppCtx {
     Fut: Future<Output = ()> + 'static,
   {
     let ctx = AppCtx::shared();
-    ctx.scheduler.spawn_local(LocalFuture {
+    ctx.scheduler.spawn_local(WakerFuture {
       fut: future,
       waker: ctx.runtime_waker.clone(),
     })
@@ -325,7 +334,7 @@ impl AppCtx {
 }
 
 pin_project! {
-  struct LocalFuture<F> {
+  struct WakerFuture<F> {
     #[pin]
     fut: F,
     waker: Box<dyn RuntimeWaker + Send>,
@@ -336,7 +345,7 @@ impl Clone for Box<dyn RuntimeWaker + Send> {
   fn clone(&self) -> Self { self.clone_box() }
 }
 
-impl<F> LocalFuture<F>
+impl<F> WakerFuture<F>
 where
   F: Future,
 {
@@ -381,7 +390,7 @@ where
   }
 }
 
-impl<F> Future for LocalFuture<F>
+impl<F> Future for WakerFuture<F>
 where
   F: Future,
 {
@@ -439,6 +448,122 @@ impl Drop for AppCtxScopeGuard {
       APP_CTX = None;
       INIT_THREAD_ID = None;
       APP_CTX_INIT = Once::new();
+    }
+  }
+}
+
+#[cfg(feature = "tokio-async")]
+pub mod tokio_async {
+  use futures::{future::RemoteHandle, Future, FutureExt, Stream, StreamExt};
+
+  impl AppCtx {
+    pub fn tokio_runtime() -> &'static tokio::runtime::Runtime {
+      let ctx = AppCtx::shared();
+      &ctx.tokio_runtime
+    }
+  }
+
+  use super::AppCtx;
+  use std::{cell::UnsafeCell, pin::Pin, sync::Arc, task::Poll};
+
+  /// Compatible with Streams that depend on the tokio runtime.
+  /// Stream dependent on the tokio runtime may not work properly when generated
+  /// using in the ribir runtime(AppCtx::spawn_local()), you should call
+  /// to_ribir_stream() to convert it.
+  pub trait TokioToRibirStream
+  where
+    Self: Sized + Stream + Unpin + Send + 'static,
+    Self::Item: Send,
+  {
+    fn to_ribir_stream(self) -> impl Stream<Item = Self::Item> {
+      LocalWaitStream {
+        stream: Arc::new(SyncUnsafeCell::new(self)),
+        receiver: None,
+      }
+    }
+  }
+
+  /// Compatible with futures that depend on the tokio runtime.
+  /// future dependent on the tokio runtime may not work properly when generated
+  /// using the ribir runtime (AppCtx::spawn_local()), you should call
+  /// to_ribir_future() to convert it.
+  pub trait TokioToRibirFuture
+  where
+    Self: Sized + Future + Send + 'static,
+    Self::Output: Send,
+  {
+    fn to_ribir_future(self) -> impl Future<Output = <Self as Future>::Output> {
+      async move {
+        let (remote, handle) = self.remote_handle();
+        AppCtx::tokio_runtime().spawn(remote);
+        handle.await
+      }
+    }
+  }
+
+  impl<S> TokioToRibirStream for S
+  where
+    S: Stream + Unpin + Send + Sized + 'static,
+    S::Item: Send,
+  {
+  }
+
+  impl<F> TokioToRibirFuture for F
+  where
+    F: Future + Send + Sized + 'static,
+    F::Output: Send,
+  {
+  }
+
+  struct SyncUnsafeCell<T> {
+    inner: UnsafeCell<T>,
+  }
+
+  unsafe impl<T> Sync for SyncUnsafeCell<T> {}
+
+  impl<T> SyncUnsafeCell<T> {
+    fn new(v: T) -> Self { Self { inner: UnsafeCell::new(v) } }
+    fn get(&self) -> *mut T { self.inner.get() }
+  }
+
+  struct LocalWaitStream<S: Stream> {
+    stream: Arc<SyncUnsafeCell<S>>,
+    receiver: Option<RemoteHandle<Option<S::Item>>>,
+  }
+
+  impl<S: Stream> Stream for LocalWaitStream<S>
+  where
+    S: Stream + Unpin + Send + 'static,
+    S::Item: Send,
+  {
+    type Item = S::Item;
+    fn poll_next(
+      self: std::pin::Pin<&mut Self>,
+      cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+      let this = Pin::get_mut(self);
+      if this.receiver.is_none() {
+        let stream = this.stream.clone();
+        let (remote, handle) = async move {
+          let stream = unsafe { &mut *stream.get() };
+          stream.next().await
+        }
+        .remote_handle();
+
+        AppCtx::tokio_runtime().spawn(remote);
+        this.receiver = Some(handle);
+      }
+
+      let item = this.receiver.as_mut().unwrap().poll_unpin(cx);
+      if item.is_ready() {
+        this.receiver = None;
+      }
+      item
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+      assert!(self.receiver.is_none());
+      unsafe { &*self.stream.get() }.size_hint()
     }
   }
 }
@@ -537,6 +662,79 @@ mod tests {
       assert_eq!(*ctx_wake_cnt.lock().unwrap(), waker_cnt);
       AppCtx::run_until_stalled();
       assert_eq!(*sum.borrow(), idx + 1);
+    }
+  }
+
+  #[cfg(feature = "tokio-async")]
+  mod tokio_tests {
+    use std::{
+      sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+      },
+      time::{Duration, Instant},
+    };
+
+    use tokio_stream::wrappers::IntervalStream;
+
+    use crate::{context::*, reset_test_env};
+    use tokio_stream::StreamExt;
+
+    #[derive(Default)]
+    struct MockWaker {
+      cnt: Arc<AtomicUsize>,
+    }
+
+    impl RuntimeWaker for MockWaker {
+      fn wake(&self) { self.cnt.fetch_add(1, std::sync::atomic::Ordering::SeqCst); }
+      fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> {
+        Box::new(MockWaker { cnt: self.cnt.clone() })
+      }
+    }
+
+    #[test]
+    fn tokio_runtime() {
+      reset_test_env!();
+      let waker = MockWaker::default();
+      unsafe { AppCtx::set_runtime_waker(waker.clone_box()) }
+
+      let _ = AppCtx::spawn_local(
+        async {
+          tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        .to_ribir_future(),
+      );
+      AppCtx::run_until_stalled();
+      assert_eq!(waker.cnt.load(Ordering::Relaxed), 0);
+
+      let finish = AtomicUsize::new(0);
+      let mut start = Instant::now();
+      AppCtx::wait_future(async {
+        async {
+          tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        .to_ribir_future()
+        .await;
+        finish.fetch_add(1, Ordering::SeqCst);
+      });
+      assert!(Instant::now().duration_since(start).as_millis() > 100);
+      assert_eq!(waker.cnt.load(Ordering::Relaxed), 1);
+
+      start = Instant::now();
+      AppCtx::wait_future(async {
+        let interval = async { tokio::time::interval(Duration::from_millis(10)) }
+          .to_ribir_future()
+          .await;
+        let mut stream = IntervalStream::new(interval).to_ribir_stream();
+
+        stream.next().await;
+        stream.next().await;
+        stream.next().await;
+        finish.fetch_add(1, Ordering::SeqCst);
+      });
+
+      assert!(Instant::now().duration_since(start).as_millis() >= 20);
+      assert_eq!(finish.load(Ordering::Relaxed), 2);
     }
   }
 }
