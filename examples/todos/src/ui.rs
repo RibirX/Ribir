@@ -53,34 +53,36 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
                 move |todos| todos.get_task(id).unwrap(),
                 move |todos| todos.get_task_mut(id).unwrap(),
               );
-              let item = pipe!(*$editing == Some($task.id())).map(move |b|{
-                if b {
-                  @Container {
-                    size: Size::new(f32::INFINITY, 64.),
-                    @{
-                      let input = input(Some($task.label.clone()), move |text|{
-                        $task.write().label = text.to_string();
-                        *$editing.write() = None;
-                      });
-                      @$input {
-                        v_align: VAlign::Center,
-                        on_key_down: move |e| {
-                          if e.key_code() == &PhysicalKey::Code(KeyCode::Escape) {
-                            *$editing.write() = None;
+              let item = pipe!(*$editing == Some($task.id()))
+                .value_chain(|s| s.distinct_until_changed().box_it())
+                .map(move |b|{
+                  if b {
+                    @Container {
+                      size: Size::new(f32::INFINITY, 64.),
+                      @{
+                        let input = input(Some($task.label.clone()), move |text|{
+                          $task.write().label = text.to_string();
+                          *$editing.write() = None;
+                        });
+                        @$input {
+                          v_align: VAlign::Center,
+                          on_key_down: move |e| {
+                            if e.key_code() == &PhysicalKey::Code(KeyCode::Escape) {
+                              *$editing.write() = None;
+                            }
                           }
                         }
                       }
-                    }
-                  }.widget_build(ctx!())
+                    }.widget_build(ctx!())
 
-                } else {
-                  let _hint = || $stagger.write();
-                  let item = task_item_widget(task.clone_writer(), stagger.clone_writer());
-                  @$item {
-                    on_double_tap: move |_| *$editing.write() = Some(id)
-                  }.widget_build(ctx!())
-                }
-              });
+                  } else {
+                    let _hint = || $stagger.write();
+                    let item = task_item_widget(task.clone_writer(), stagger.clone_writer());
+                    @$item {
+                      on_double_tap: move |_| *$editing.write() = Some(id)
+                    }.widget_build(ctx!())
+                  }
+                });
 
               widgets.push(item);
             }
