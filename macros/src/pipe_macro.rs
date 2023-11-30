@@ -49,7 +49,7 @@ impl ToTokens for PipeMacro {
         #refs
         let _ctx_handle_ಠ_ಠ = ctx!().handle();
         MapPipe::new(
-          ModifiesPipe::new(#upstream.box_it()),
+          ModifiesPipe::new(#upstream.filter(|s| s.contains(ModifyScope::FRAMEWORK)).box_it()),
           move |_: ModifyScope| {
             _ctx_handle_ಠ_ಠ
               .with_ctx(|ctx!(): &BuildCtx<'_>| { #(#expr)* })

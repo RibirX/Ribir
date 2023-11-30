@@ -526,28 +526,31 @@ mod tests {
     let track_split = Sc::new(Cell::new(0));
 
     let c_origin = track_origin.clone();
-    origin.modifies().subscribe(move |_| {
-      c_origin.set(c_origin.get() + 1);
+    origin.modifies().subscribe(move |s| {
+      c_origin.set(c_origin.get() + s.bits());
     });
 
     let c_split = track_split.clone();
-    split.modifies().subscribe(move |_| {
-      c_split.set(c_split.get() + 1);
+    split.modifies().subscribe(move |s| {
+      c_split.set(c_split.get() + s.bits());
     });
 
-    *split.write() = 1;
+    *split.write() = 0;
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
-    assert_eq!(track_origin.get(), 0);
-    assert_eq!(track_split.get(), 1);
+    assert_eq!(track_origin.get(), ModifyScope::DATA.bits());
+    assert_eq!(track_split.get(), ModifyScope::BOTH.bits());
 
-    origin.write().b = 1;
+    origin.write().b = 0;
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
-    assert_eq!(track_origin.get(), 1);
+    assert_eq!(
+      track_origin.get(),
+      ModifyScope::DATA.bits() + ModifyScope::BOTH.bits()
+    );
     // splitted downstream will not be notified.
-    assert_eq!(track_split.get(), 1);
+    assert_eq!(track_split.get(), ModifyScope::BOTH.bits());
   }
 
   #[test]
