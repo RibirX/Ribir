@@ -183,6 +183,15 @@ where
       self.create_at > self.origin.time_stamp(),
       "A splitted writer is invalid because its origin state is modified after it created."
     );
+
+    let modify_scope = orig.modify_scope;
+
+    // the origin mark as a silent write, because split writer not effect the origin
+    // state in ribir framework level. But keep notify in the data level.
+    assert!(!orig.modified);
+    orig.modify_scope.remove(ModifyScope::FRAMEWORK);
+    orig.modified = true;
+
     let value = orig
       .value
       .take()
@@ -191,7 +200,7 @@ where
     WriteRef {
       value,
       modified: false,
-      modify_scope: orig.modify_scope,
+      modify_scope,
       control: self,
     }
   }
