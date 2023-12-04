@@ -33,9 +33,11 @@ jobs:
           command: login
           args: ${{ secrets.CRATE_RELEASE_TOKEN }}
       - name: git config
+        if: ${{ env.NEW_COMMIT_COUNT > 0 }}
         run: |
+          git remote set-url origin https://${{ secrets.GITHUB_TOKEN }}@github.com/RibirX/Ribir
           git config --global user.email "Adoo@outlook.com"
-          git config --global user.name "Adoo"
+          git config --global user.name "Bot@Ribir"
 
       - name: Run cargo release
         if: ${{ env.NEW_COMMIT_COUNT > 0 }}
