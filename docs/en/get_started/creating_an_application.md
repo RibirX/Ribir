@@ -30,7 +30,7 @@ Next, edit the `Cargo.toml` file and add Ribir as a dependency:
 
 ```toml
 [dependencies]
-ribir = "0.0.1"
+ribir = "@RIBIR_VERSION"
 ```
 
 Or you can directly run `cargo add --git "https://github.com/RibirX/Ribir" ribir` to let Cargo add the latest Ribir version that is under development for you.
@@ -68,8 +68,9 @@ cd Ribir/Ribir
 and run the examples with one of the following commands:
 
 ```sh
-cargo run -p counter                          
+cargo run -p counter
 cargo run -p storybook
-cargo run -p messages                            
-cargo run -p todos          
+cargo run -p messages
+cargo run -p todos
+cargo run -p worle_game
 ```

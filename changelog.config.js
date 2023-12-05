@@ -4,11 +4,10 @@ module.exports = {
     "test",
     "feat",
     "fix",
-    "build",
-    "ci",
+    "deps",
+    "chore",
     "docs",
     "refactor",
-    "release",
     "perf",
     "ce"
   ],
@@ -42,15 +41,10 @@ module.exports = {
       "emoji": "🤖",
       "value": "chore"
     },
-    "ci": {
-      "description": "CI related changes",
-      "emoji": "🎡",
-      "value": "ci"
-    },
-    "build": {
+    "deps": {
       "description": "Changes that affect the build system or external dependencies",
       "emoji": "🎡",
-      "value": "build"
+      "value": "deps"
     },
     "docs": {
       "description": "Documentation only changes",
@@ -77,13 +71,8 @@ module.exports = {
       "emoji": "💡",
       "value": "refactor"
     },
-    "release": {
-      "description": "Create a release commit",
-      "emoji": "🏹",
-      "value": "release"
-    },
     "test": {
-      "description": "Adding missing tests",
+      "description": "Adding missing tests or correcting existing tests",
       "emoji": "💍",
       "value": "test"
     },
@@ -92,6 +81,5 @@ module.exports = {
       "emoji": "🔧",
       "value": "ce"
     }
-
   }
 };
