@@ -4,12 +4,15 @@
 //! self fields and methods.
 
 pub mod key;
+use std::cell::Cell;
+
 pub use key::{Key, KeyWidget};
 pub mod image_widget;
 pub use image_widget::*;
 pub mod delay_drop;
 pub use delay_drop::DelayDrop;
 mod theme;
+use ribir_algo::Sc;
 pub use theme::*;
 mod cursor;
 pub use cursor::Cursor;
@@ -72,12 +75,16 @@ macro_rules! impl_builtin_obj {
       builtin fields and methods like self fields and methods."]
       #[derive(Default)]
       pub struct BuiltinObj {
+        host_id: LazyWidgetId,
+        id: LazyWidgetId,
         $([< $builtin_ty: snake:lower >]: Option<State<$builtin_ty>>),*
       }
 
       impl BuiltinObj {
         pub fn is_empty(&self) -> bool {
-          $(self.[< $builtin_ty: snake:lower >].is_none())&& *
+          self.host_id.ref_count() == 1
+          && self.id.ref_count() == 1
+          && $(self.[< $builtin_ty: snake:lower >].is_none())&& *
         }
 
         $(
@@ -110,13 +117,19 @@ macro_rules! impl_builtin_obj {
         )*
 
         pub fn compose_with_host(self, mut host: Widget, ctx: &BuildCtx) -> Widget {
+          self.host_id.set(host.id());
           $(
             if let Some(builtin) = self.[< $builtin_ty: snake:lower >] {
               host = builtin.with_child(host, ctx).widget_build(ctx);
             }
           )*
+          self.id.set(host.id());
           host
         }
+
+        pub fn lazy_host_id(&self) -> LazyWidgetId { self.host_id.clone() }
+
+        pub fn lazy_id(&self) -> LazyWidgetId { self.id.clone() }
       }
 
       impl<T> FatObj<T> {
@@ -165,6 +178,10 @@ impl_builtin_obj!(
   DelayDrop
 );
 
+#[derive(Clone)]
+/// LazyWidgetId is a widget id that will be valid after widget build.
+pub struct LazyWidgetId(Sc<Cell<Option<WidgetId>>>);
+
 /// A fat object that extend the `T` object with all builtin widgets ability. A
 /// `FatObj` will create during the compose phase, and compose with the builtin
 /// widgets it actually use, and drop after composed.
@@ -173,12 +190,31 @@ pub struct FatObj<T> {
   builtin: BuiltinObj,
 }
 
+impl LazyWidgetId {
+  pub fn id(&self) -> Option<WidgetId> { self.0.get() }
+
+  pub fn assert_id(&self) -> WidgetId { self.0.get().unwrap() }
+
+  fn set(&self, wid: WidgetId) { self.0.set(Some(wid)); }
+
+  fn ref_count(&self) -> usize { self.0.ref_count() }
+}
+
+impl Default for LazyWidgetId {
+  fn default() -> Self { Self(Sc::new(Cell::new(None))) }
+}
+
 impl<T> FatObj<T> {
   pub fn from_host(host: T) -> Self { Self { host, builtin: BuiltinObj::default() } }
 
   pub fn new(host: T, builtin: BuiltinObj) -> Self { Self { host, builtin } }
 
   pub fn unzip(self) -> (T, BuiltinObj) { (self.host, self.builtin) }
+  #[inline]
+  pub(crate) fn map<V>(self, f: impl FnOnce(T) -> V) -> FatObj<V> {
+    let Self { host, builtin } = self;
+    FatObj { host: f(host), builtin }
+  }
 
   pub fn into_inner(self) -> T {
     assert!(
@@ -187,6 +223,14 @@ impl<T> FatObj<T> {
     );
     self.host
   }
+
+  /// Return the LazyWidgetId of the host widget, through which you can access
+  /// the WidgetId after building.
+  pub fn lazy_host_id(&self) -> LazyWidgetId { self.builtin.lazy_host_id() }
+
+  /// Return the LazyWidgetId point to WidgetId of the root of the sub widget
+  /// tree after the FatObj has built.
+  pub fn lazy_id(&self) -> LazyWidgetId { self.builtin.lazy_id() }
 }
 
 impl<T: SingleChild> SingleChild for FatObj<T> {}
@@ -195,13 +239,13 @@ impl<T: MultiChild> MultiChild for FatObj<T> {}
 crate::widget::multi_build_replace_impl! {
   impl<T: {#} > {#} for FatObj<T> {
     fn widget_build(self, ctx: &BuildCtx) -> Widget {
-      let Self { host, builtin } = self;
-      builtin.compose_with_host(host.widget_build(ctx), ctx)
+      self.map(|host| host.widget_build(ctx)).widget_build(ctx)
     }
   }
 }
 
 impl WidgetBuilder for FatObj<Widget> {
+  #[inline]
   fn widget_build(self, ctx: &BuildCtx) -> Widget {
     let Self { host, builtin } = self;
     builtin.compose_with_host(host, ctx)
@@ -213,9 +257,7 @@ impl<T: ComposeWithChild<C, M>, C, M> ComposeWithChild<C, M> for FatObj<T> {
 
   #[inline]
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    let Self { host, builtin } = self;
-    let w = host.with_child(child, ctx);
-    FatObj::new(w, builtin)
+    self.map(|host| host.with_child(child, ctx))
   }
 }
 
@@ -228,17 +270,17 @@ impl<T: PairWithChild<C>, C> PairWithChild<C> for FatObj<T> {
 
 impl<T: SingleParent + 'static> SingleParent for FatObj<T> {
   fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    let Self { host, builtin } = self;
-    let p = host.compose_child(child, ctx);
-    builtin.compose_with_host(p, ctx)
+    self
+      .map(|host| host.compose_child(child, ctx))
+      .widget_build(ctx)
   }
 }
 
 impl<T: MultiParent + 'static> MultiParent for FatObj<T> {
   fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
-    let Self { host, builtin } = self;
-    let host = host.compose_children(children, ctx);
-    builtin.compose_with_host(host, ctx)
+    self
+      .map(|host| host.compose_children(children, ctx))
+      .widget_build(ctx)
   }
 }
 

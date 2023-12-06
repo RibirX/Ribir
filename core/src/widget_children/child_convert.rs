@@ -183,8 +183,7 @@ where
   T2: FromAnother<T1, M>,
 {
   fn from_another(value: FatObj<T1>, ctx: &BuildCtx) -> Self {
-    let (host, builtin) = value.unzip();
-    FatObj::new(T2::from_another(host, ctx), builtin)
+    value.map(|v| FromAnother::from_another(v, ctx))
   }
 }
 

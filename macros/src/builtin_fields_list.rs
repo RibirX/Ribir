@@ -1,4 +1,10 @@
 builtin! {
+  BuiltinObj {
+    #[doc = "Return the LazyWidgetId of the host widget, through which you can access the WidgetId after building."]
+    fn lazy_host_id(&self) -> LazyWidgetId,
+    #[doc = "Return the LazyWidgetId of the external widget (wrapped with the built-in host), through which you can access the WidgetId after building."]
+    fn lazy_id(&self) -> LazyWidgetId,
+  }
   PointerListener {
     #[doc="specify the event handler for the pointer down event in bubble phase."]
     on_pointer_down: impl FnMut(&mut PointerEvent),
