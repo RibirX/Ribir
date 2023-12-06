@@ -117,6 +117,12 @@
 - delay_drop_until : [`bool`] 
  	 - The widget delay the drop of its child until the field delay_drop_until is false, but not affect its dispose event emit time. It's useful to ensure the disappear-animate display fully.
 
+ - `fn lazy_host_id(& self) -> LazyWidgetId`
+ 	- Return the LazyWidgetId of the host widget, through which you can access the WidgetId after building.
+
+ - `fn lazy_id(& self) -> LazyWidgetId`
+ 	- Return the LazyWidgetId of the external widget (wrapped with the built-in host), through which you can access the WidgetId after building.
+
  - `fn double_tap_stream(& self,) -> FilterMapOp < MutRefItemSubject < 'static,
 PointerEvent, () >, impl FnMut(& mut PointerEvent) -> Option < & mut
 PointerEvent >, & mut PointerEvent, >`
