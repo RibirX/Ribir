@@ -17,7 +17,7 @@ use crate::{
 };
 pub use caret_state::{CaretPosition, CaretState};
 pub use selected_text::SelectedHighLightStyle;
-use std::ops::Range;
+use std::{ops::Range, rc::Rc};
 pub use text_selectable::TextSelectable;
 
 pub struct Placeholder(CowArc<str>);
@@ -156,36 +156,51 @@ struct PreEditState {
   value: Option<String>,
 }
 
-#[derive(Default)]
-struct PreEditHandle(Option<PreEditState>);
+struct ImeHandle<H> {
+  host: H,
+  pre_edit: Option<PreEditState>,
+  guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
+  window: Rc<Window>,
+  caret_id: LazyWidgetId,
+}
 
-impl PreEditHandle {
-  fn update<H>(
-    &mut self,
-    host: &impl StateWriter<Value = H>,
-    e: &ImePreEditEvent,
-    caret_position: &Point,
-    caret_size: &Size,
-  ) where
-    H: EditableText + 'static,
-  {
+impl<E, H> ImeHandle<H>
+where
+  E: EditableText + 'static,
+  H: StateWriter<Value = E>,
+{
+  fn new(window: Rc<Window>, host: H, caret_id: LazyWidgetId) -> Self {
+    Self {
+      window,
+      host,
+      pre_edit: None,
+      guard: None,
+      caret_id,
+    }
+  }
+  fn ime_allowed(&mut self) {
+    self.window.set_ime_allowed(true);
+    self.track_cursor();
+  }
+
+  fn ime_disallowed(&mut self) {
+    self.window.set_ime_allowed(false);
+    self.guard = None;
+  }
+
+  fn update_pre_edit(&mut self, e: &ImePreEditEvent) {
     match &e.pre_edit {
       ImePreEdit::Begin => {
-        let mut host = host.write();
+        let mut host = self.host.write();
         let rg = host.caret().select_range();
         host.writer().delete_byte_range(&rg);
-
-        self.0 = Some(PreEditState { position: rg.start, value: None });
-        let pos = e.map_to_global(*caret_position);
-        let height = caret_size.height;
-        e.window()
-          .set_ime_cursor_area(&Rect::new(Point::new(pos.x, pos.y + height), *caret_size));
+        self.pre_edit = Some(PreEditState { position: rg.start, value: None });
       }
       ImePreEdit::PreEdit { value, cursor } => {
-        let Some(PreEditState { position, value: edit_value }) = self.0.as_mut() else {
+        let Some(PreEditState { position, value: edit_value }) = self.pre_edit.as_mut() else {
           return;
         };
-        let mut host = host.write();
+        let mut host = self.host.write();
         let mut writer = host.writer();
         if let Some(txt) = edit_value {
           writer.delete_byte_range(&(*position..*position + txt.len()));
@@ -195,13 +210,48 @@ impl PreEditHandle {
         *edit_value = Some(value.clone());
       }
       ImePreEdit::End => {
-        if let Some(PreEditState { value: Some(txt), position }) = self.0.take() {
-          let mut host = host.write();
+        if let Some(PreEditState { value: Some(txt), position, .. }) = self.pre_edit.take() {
+          let mut host = self.host.write();
           let mut writer = host.writer();
           writer.delete_byte_range(&(position..position + txt.len()));
         }
       }
     }
+    if self.pre_edit.is_none() {
+      self.track_cursor();
+    } else {
+      self.guard = None;
+    }
+  }
+
+  fn track_cursor(&mut self) {
+    if self.guard.is_some() {
+      return;
+    }
+
+    let window = self.window.clone();
+    let wid = self.caret_id.clone();
+
+    let pos = window.map_to_global(Point::zero(), wid.assert_id());
+    let size = window.layout_size(wid.assert_id()).unwrap_or_default();
+    window.set_ime_cursor_area(&Rect::new(pos, size));
+
+    let tick_of_layout_ready = window
+      .frame_tick_stream()
+      .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
+    self.guard = Some(
+      self
+        .host
+        .modifies()
+        .sample(tick_of_layout_ready)
+        .box_it()
+        .subscribe(move |_| {
+          let pos = window.map_to_global(Point::zero(), wid.assert_id());
+          let size = window.layout_size(wid.assert_id()).unwrap_or_default();
+          window.set_ime_cursor_area(&Rect::new(pos, size));
+        })
+        .unsubscribe_when_dropped(),
+    );
   }
 }
 
@@ -283,14 +333,17 @@ where
         scrollable: scroll_dir,
       };
 
-      let mut caret_box = @ConstrainedBox {
-        left_anchor: pipe!($this.caret_position(&$text, $text.layout_size()).map_or(0., |p| p.x)),
-        top_anchor: pipe!($this.caret_position(&$text, $text.layout_size()).map_or(0., |p| p.y)),
+      let caret_box = @ConstrainedBox {
         clamp: pipe!(
             $this.current_line_height(&$text, $text.layout_size()).unwrap_or(0.)
           ).map(BoxClamp::fixed_height),
       };
 
+      let caret_box_id = caret_box.lazy_host_id();
+      let mut caret_box = @$caret_box {
+        left_anchor: pipe!($this.caret_position(&$text, $text.layout_size()).map_or(0., |p| p.x)),
+        top_anchor: pipe!($this.caret_position(&$text, $text.layout_size()).map_or(0., |p| p.y)),
+      };
       let scrollable = stack.get_builtin_scrollable_widget(ctx!());
       let tick_of_layout_ready = ctx!().window()
         .frame_tick_stream()
@@ -312,10 +365,12 @@ where
         })
       };
 
-      let mut pre_edit_handle = PreEditHandle::default();
+      let ime_handle = Stateful::new(
+        ImeHandle::new(ctx!().window(), this.clone_writer(), caret_box_id)
+      );
       let mut stack = @ $stack {
-        on_focus: move |e| e.window().set_ime_allowed(true),
-        on_blur: move |e| e.window().set_ime_allowed(false),
+        on_focus: move |_| $ime_handle.write().ime_allowed(),
+        on_blur: move |_| $ime_handle.write().ime_disallowed(),
         on_chars: move |c| {
           let _hint_capture_writer = || $this.write();
           edit_handle(&this, c);
@@ -326,12 +381,7 @@ where
           edit_key_handle(&this, k);
         },
         on_ime_pre_edit: move |e| {
-          let _hint_capture_writer = || $this.write();
-          let base = $stack.scroll_pos;
-          let caret_position =
-            Point::new($caret_box.left_anchor, $caret_box.top_anchor) + base.to_vector();
-          let caret_size = $caret_box.layout_size();
-          pre_edit_handle.update(&this, e, &caret_position, &caret_size);
+          $ime_handle.write().update_pre_edit(e);
         },
       };
 
@@ -431,13 +481,12 @@ fn auto_scroll_pos(container: &ScrollableWidget, before: Point, after: Point, si
 mod tests {
   use super::{EditableText, Input};
   use crate::layout::SizedBox;
-  use ribir_core::{prelude::*, reset_test_env, test_helper::TestWindow};
+  use ribir_core::{
+    prelude::*,
+    reset_test_env,
+    test_helper::{split_value, TestWindow},
+  };
   use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
-
-  fn split_value<T: 'static>(v: T) -> (impl StateReader<Value = T>, impl StateWriter<Value = T>) {
-    let src = Stateful::new(v);
-    (src.clone_reader(), src.clone_writer())
-  }
 
   #[test]
   fn input_edit() {
