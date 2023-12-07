@@ -200,6 +200,9 @@ impl App {
           state,
           ..
         } = event;
+        if unsafe { PRE_EDIT_HANDLE.is_in_pre_edit() } {
+          return;
+        }
         wnd.processes_keyboard_event(physical_key, logical_key, repeat, location, state);
         if state == ElementState::Pressed {
           if let Some(txt) = text {
