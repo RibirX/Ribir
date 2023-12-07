@@ -808,11 +808,6 @@ mod tests {
     assert_eq!(focus_mgr.focusing(), inner_box);
   }
 
-  fn split_value<T: 'static>(v: T) -> (impl StateReader<Value = T>, impl StateWriter<Value = T>) {
-    let src = Stateful::new(v);
-    (src.clone_reader(), src.clone_writer())
-  }
-
   #[test]
   fn remove_focused_widget() {
     reset_test_env!();

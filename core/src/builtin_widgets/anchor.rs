@@ -35,7 +35,7 @@ impl Render for LeftAnchor {
     let child_size = layouter.perform_widget_layout(clamp);
     let left = self.left_anchor;
     layouter.update_position(Point::new(left, 0.));
-    Size::new((child_size.width + left).max(0.), child_size.height)
+    child_size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
@@ -53,7 +53,7 @@ impl Render for RightAnchor {
     let x = clamp.max.width - child_size.width - right;
     layouter.update_position(Point::new(x, 0.));
 
-    Size::new((child_size.width + x).max(0.), child_size.height)
+    child_size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
@@ -69,7 +69,7 @@ impl Render for TopAnchor {
     let child_size = layouter.perform_widget_layout(clamp);
     let top = self.top_anchor;
     layouter.update_position(Point::new(0., top));
-    Size::new(child_size.width, (child_size.height + top).max(0.))
+    child_size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
@@ -86,7 +86,7 @@ impl Render for BottomAnchor {
     let bottom = self.bottom_anchor;
     let y = clamp.max.height - child_size.height - bottom;
     layouter.update_position(Point::new(0., y));
-    Size::new(child_size.width, (child_size.height + y).max(0.))
+    child_size
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}

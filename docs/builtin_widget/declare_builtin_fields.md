@@ -80,6 +80,8 @@
  	 - specify how rounded the corners have of the widget.
 - padding : [`EdgeInsets`] 
  	 - set the padding area on all four sides of a widget.
+- global_anchor : [`AnchorPosition`] 
+ 	 - Anchor the widget's position using logical coordinates
 - cursor : [`CursorIcon`] 
  	 - assign cursor to the widget.
 - margin : [`impl EdgeInsets`] 

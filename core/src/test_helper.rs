@@ -15,6 +15,11 @@ pub struct Frame {
   pub surface: Color,
 }
 
+pub fn split_value<T: 'static>(v: T) -> (impl StateReader<Value = T>, impl StateWriter<Value = T>) {
+  let src = Stateful::new(v);
+  (src.clone_reader(), src.clone_writer())
+}
+
 #[derive(Clone)]
 pub struct TestWindow(pub Rc<Window>);
 
