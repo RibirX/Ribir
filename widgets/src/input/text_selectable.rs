@@ -155,7 +155,6 @@ impl ComposeChild for TextSelectable {
 
       let stack = @Stack {
         fit: StackFit::Loose,
-        scrollable: Scrollable::Both,
       };
 
       let high_light_rect = @ OnlySizedByParent {
