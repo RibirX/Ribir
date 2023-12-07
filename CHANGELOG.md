@@ -15,7 +15,7 @@ There are 5 types of changes:
 And please only add new entries below the [Unreleased](#unreleased---releasedate) header with the following format:
 
 ```md
-**crate or effect scope**: description of change ([#PR])
+**crate or effect scope**: description of change (#PR @contributor)
 ```
 
 <!-- next-header -->
