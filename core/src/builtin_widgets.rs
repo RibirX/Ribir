@@ -61,6 +61,8 @@ pub mod focus_node;
 pub use focus_node::*;
 pub mod focus_scope;
 pub use focus_scope::*;
+pub mod global_anchor;
+pub use global_anchor::*;
 
 use crate::{
   prelude::*,
@@ -172,6 +174,7 @@ impl_builtin_obj!(
   RightAnchor,
   TopAnchor,
   BottomAnchor,
+  GlobalAnchor,
   Visibility,
   Opacity,
   LifecycleListener,

@@ -27,15 +27,10 @@ mod tests {
   use ribir_core::{
     prelude::*,
     reset_test_env,
-    test_helper::{MockBox, MockMulti, TestWindow},
+    test_helper::{split_value, MockBox, MockMulti, TestWindow},
   };
 
   use crate::layout::OnlySizedByParent;
-
-  fn split_value<T: 'static>(v: T) -> (impl StateReader<Value = T>, impl StateWriter<Value = T>) {
-    let src = Stateful::new(v);
-    (src.clone_reader(), src.clone_writer())
-  }
 
   #[test]
   fn ignore_layout_changed() {

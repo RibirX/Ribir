@@ -219,6 +219,12 @@ impl Window {
         self.frame_ticker.emit(ready);
       }
 
+      // after emit `FrameMsg::LayoutReady`, we need to run frame tasks again to
+      // notify dirty
+      if !self.widget_tree.borrow().is_dirty() {
+        self.run_frame_tasks();
+      }
+
       if !self.widget_tree.borrow().is_dirty() {
         break;
       }
@@ -618,6 +624,18 @@ impl Window {
         break;
       }
     }
+  }
+
+  pub fn map_to_global(&self, point: Point, id: WidgetId) -> Point {
+    self
+      .widget_tree
+      .borrow()
+      .store
+      .map_to_global(point, id, &self.widget_tree.borrow().arena)
+  }
+
+  pub fn layout_size(&self, id: WidgetId) -> Option<Size> {
+    self.widget_tree.borrow().store.layout_box_size(id)
   }
 }
 

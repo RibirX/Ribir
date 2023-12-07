@@ -233,6 +233,11 @@ builtin! {
     fn layout_height(&self) -> f32,
   }
 
+  GlobalAnchor {
+    #[doc= "Anchor the widget's position using logical coordinates"]
+    global_anchor: AnchorPosition,
+  }
+
   Cursor {
     #[doc="assign cursor to the widget."]
     cursor: CursorIcon
