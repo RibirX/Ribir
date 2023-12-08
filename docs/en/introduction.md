@@ -4,7 +4,7 @@
 
 ## What is Ribir?
 
-Ribir is an open source Rust framework for building beautiful UI, natively compiled, multi-platform applications from a single codebase.
+Ribir is an open-source Rust framework for building beautiful, native, multi-platform applications from a single codebase.
 
 Ribir uses a non-intrusive declarative programming model that allows you to develop and design user interfaces as an independent module.
 
@@ -23,7 +23,7 @@ Ribir only interacts with the API of your data and does not require any pre-desi
 - No additional states
 - No additional notification mechanisms 
 - No inheritance of any base classes
-- No any other pre-constraints. 
+- No other pre-constraints. 
 
 It doesn't break the logic and structure of your existing data or inject any additional objects. When developing the core part of an application, you can focus on designing the data, logic, and API of the application without thinking about the UI at all.
 
@@ -33,7 +33,7 @@ The UI directly operates data, and data modifications directly drive UI updates,
 
 Ribir can be used to develop desktop, mobile, web and server-side rendering applications. It generates efficient binary code or WASM programs without relying on any runtime environment. It outputs a very simple, platform-independent drawing result, allowing you to choose to be rendered entirely by the GPU or CPU. You can even easily implement your own rendering backend to expand to uncovered platforms.
 
-### Declarative syntax that is easy to interact with Rust
+### The Declarative syntax that is easy to interact with Rust
 
 Ribir provides a declarative syntax that is easy to interact with Rust. It is not a new language, but a set of Rust macros. Therefore, it can interact well with Rust, making your code both a clear view description and a powerful logical expression, without any environment and tool dependencies.
 
@@ -64,9 +64,9 @@ fn_widget!{
 };
 ```
 
-The above example shows the way of combining built-in widgets. Even if `Text` does not have a `margin` field, you can still use the `Margin::margin` and compose it with `Text` to form a new widget. `Margin` will only be created when a widget uses the `margin` field, otherwise there will be no overhead.
+The above example shows the way of combining built-in widgets. Even if `Text` does not have a `margin` field, you can still use the `Margin::margin` and compose it with `Text` to form a new widget. `Margin` will only be created when a widget uses the `margin` field, otherwise, there will be no overhead.
 
-**Digestion of composite widget**: When describing the view of the data, in addition to some basic widgets, most widgets are composed of other widgets. For example, a `Button`, it is composed of `Text`, `Icon` or `BoxDecoration`, etc. widgets, `Button` itself is not a view element, we call this type of widget a composite widget. Composite widgets will be digested during view construction. They are like a function and are called once during view construction to build the final view and create the corresponding update logic, and do not exist in the final view.
+**Digestion of composite widgets**: When describing the view of the data, in addition to some basic widgets, most widgets are composed of other widgets. For example, a `Button` is composed of `Text`, `Icon` or `BoxDecoration`, etc. The `Button` itself is not a view element, we call this type of widget a composite widget. Composite widgets will be digested during view construction. They are like a function and are called once during view construction to build the final view and create the corresponding update logic, and do not exist in the final view.
 
 **Only state with write sources are real state**: Unlike other declarative frameworks that add fields to widgets to control widget updates. Ribir is non-intrusive. Ribir treats the entire widget as a state to control updates. 
 At the same time, it provides the ability to split the state, so that the local view can directly depend on the modification of part of the data to update (introduced in detail in the subsequent tutorial). Another big difference is that stateful and stateless can be converted to each other. If a state has no write source, it will degenerate into stateless， because no one will update it. For example:
@@ -83,18 +83,18 @@ fn_widget!{
 };
 ```
 
-In the above example, we declared a `Text` and used the `pipe!` macro to directly associate the visibility of `Text` with `show_hi`. But this association will be eliminated when the view is constructed, because `show_hi` always remains unchanged - it has no write source. Therefore, Ribir constructs a simple static view.
+In the above example, we declared a `Text` and used the `pipe!` macro to directly associate the visibility of `Text` with `show_hi`. But this association will be removed when the view is constructed because `show_hi` has no written source. Therefore, Ribir constructs a simple static view.
 
 ### Reliability
 
-Unlike general GUI frameworks that use inheritance and do not have any type constraints except base class inheritance, Ribir builds views based on widget composition and relies on the types between parent and child widgets to constrain whether and how to compose them. You can standardize your own child types, so many errors can be reported at compile time instead of being checked at runtime.
+Unlike general GUI frameworks that use inheritance and do not have any type constraints except base class inheritance, Ribir builds views based on widget composition and relies on the types between parent and child widgets to constrain whether and how to compose them. You can standardize your child types, so many errors can be reported at compile time instead of being checked at runtime.
 
 
 ## What is the current status of Ribir?
 
 ### Stability
 
-The core framework of Ribir is in a basically stable state, and the API and syntax will be iterated with a cautious attitude. Although the widget library already has many available widgets, it is still in a very rough state, and each version will have major changes.
+The core framework of Ribir is in a stable state, and the API and syntax will be iterated with a cautious attitude. Although the widget library already has many available widgets, it is still in a very rough state, and each version will have major changes.
 
 ### Platform coverage
 
@@ -108,4 +108,4 @@ In all important designs of the entire framework, performance is an important fa
 
 **Polestar Chat**: 
 
-**Sisyphus**: An editor for editing interactive documents, this is a long-term project, which is still in the early design and development stage, and it is the idea of this project that led to the birth of Ribir.
+**Sisyphus**: An editor for editing interactive documents, this is a long-term project, that is still in the early design and development stage, and it is the idea of this project that led to the birth of Ribir.

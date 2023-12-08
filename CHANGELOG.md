@@ -10,7 +10,7 @@ There are 5 types of changes:
 - `Changed` for changes in existing functionality.
 - `Fixed` for any bug fixes.
 - `Documented` for any changes to the documentation.
-- `Breaking` for the detail of any backwards incompatible changes.
+- `Breaking` for the detail of any backward incompatible changes.
 
 And please only add new entries below the [Unreleased](#unreleased---releasedate) header with the following format:
 
@@ -33,39 +33,26 @@ We use it in our own projects and have a good experience, and we hope you can al
 ### Features
 
 - **core**: control the process of the entire view: compose, build, update, layout and render.
-
 - **declarative language**: not a new language, but a set of Rust macros that easily interact with Rust.
-
 - **widgets compose system**: has four kinds of widgets to support you can implement your own widget in different ways:
-: function widget, `Compose`, `Render` and `ComposeChild`. So that
   - function widget and `Compose`, from other widgets composition.
-  - `Render`, implement your own layout or rendering logic
-  - `ComposeChild`, control the compose logic between parent and child widgets, and specify the template of child widgets.  
-
+  - `Render`, implement your layout and paint anything you want.
+  - `ComposeChild`, control the compose logic between parent and child widgets and specify the template of child widgets.  
 - **non-intrusive state**: convert your data to a listenable state, and update the view according to the change of the state.
-
-- **layout system**: learning and inspired by [Flutter] Sublinear layout, but not exactly the same.
-
-- **event system**: a compose event system, support event bubbling and capture. Support compose to any widget, and exist only if you use it.
-
-- **theme System**: support full and inherit/partial theme, so you can use it to override or dynamically switch the theme of the subtree. Include: palette, icons, animate transitions, the decoration widget of the widget, etc. In a very rough state and the API will be redesigned soon.
-
-- **animations**: base on state but no side effect animation, it's almost stable in concept, but not many predefined animations yet.
-
-- **painter**： convert view to 2d path.
-
-- **gpu render**: gpu backend for **painter**, do path tessellation, so that easy to render the triangles in any gpu render engine. A `wgpu` implementation is provided as the default gpu render engine. Tessellation base on [lyon].
-
-- **Text**: support basic text typography and ime input, in a usable but rough stage.
-
-- **widgets**: widgets library provide 20+ basic widgets, but all in a rough stage, and the API not stable yet.
-
+- **layout system**: learning and inspired by [Flutter] Sublinear layout, but not the same.
+- **event system**: a composition event system, that supports event bubbling and capture. Allow to compose with any widget, and exists only if you use it.
+- **theme System**: support full and inherit/partial theme, so you can use it to override or dynamically switch the theme of the subtree. Include palette, icons, animate transitions, the decoration widget of the widget, etc. In a very rough state and the API will be redesigned soon.
+- **animations**: based on state but no side effect animation, it's almost stable in concept, but not many predefined animations yet.
+- **painter**： convert the view to the 2D path.
+- **GPU render**: GPU backend for the **painter**, do path tessellation, so that easy to render the triangles in any GPU render engine. A `wgpu` implementation is provided as the default GPU render engine. Tessellation base on [lyon].
+- **text**: support basic text typography and IME input, in a usable but rough stage.
+- **widgets**: the widgets library provides 20+ basic widgets, but all are in a rough stage, and the API is not stable yet.
 - **examples**: counter, storybook, messages, todos, wordle_game, etc.
 
 ### Documented
 
 - **introduction**: add `introduction.md` to introduce Ribir and why choose it.
-- **get started**: add the `get_started` series of tutorials to help user get started with Ribir.
+- **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 
 [Flutter]: https://flutter.dev/

@@ -47,4 +47,8 @@ jobs:
       - name: build ribir
         run: cargo build
       - name: compile doc examples
-        run: find "./docs" -name "*.md" |  xargs -I {} rustdoc -Z unstable-options --test --no-run  {} -L target/debug/deps/  --edition 2018 --extern ribir=target/debug/libribir.rlib
+        run: |
+          {
+            echo ./README.md
+            find "./docs" -name "*.md"
+          } |  xargs -I {} rustdoc -Z unstable-options --test --no-run  {} -L target/debug/deps/  --edition 2018 --extern ribir=target/debug/libribir.rlib
