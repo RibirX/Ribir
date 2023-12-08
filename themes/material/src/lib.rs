@@ -267,9 +267,9 @@ fn override_compose_decorator(theme: &mut FullTheme) {
   styles.override_compose_decorator::<HScrollBarThumbDecorator>(|this, host, ctx| {
     fn_widget! {
       let host = scrollbar_thumb(host, EdgeInsets::vertical(1.));
-      let mut thumb = @ $host { left_anchor: pipe!($this.offset) };
+      let mut thumb = @ $host { anchor: pipe!($this.offset).map(Anchor::left) };
 
-      map_writer!($thumb.left_anchor)
+      map_writer!($thumb.anchor)
         .transition(transitions::LINEAR.of(ctx!()), ctx!());
 
       thumb
@@ -279,9 +279,9 @@ fn override_compose_decorator(theme: &mut FullTheme) {
   styles.override_compose_decorator::<VScrollBarThumbDecorator>(|this, host, ctx| {
     fn_widget! {
       let host = scrollbar_thumb(host, EdgeInsets::vertical(1.));
-      let mut thumb = @ $host { top_anchor: pipe!($this.offset) };
+      let mut thumb = @ $host { anchor: pipe!($this.offset).map(Anchor::top) };
 
-      map_writer!($thumb.top_anchor)
+      map_writer!($thumb.anchor)
         .transition(transitions::LINEAR.of(ctx!()), ctx!());
 
       thumb
@@ -291,34 +291,32 @@ fn override_compose_decorator(theme: &mut FullTheme) {
   styles.override_compose_decorator::<IndicatorDecorator>(|style, host, ctx| {
     fn_widget! {
       let mut indicator = @ $host {
-        left_anchor: pipe!{
+        anchor: pipe!{
           let style = $style;
-          match style.pos {
+          let x = match style.pos {
             Position::Top | Position::Bottom => style.rect.origin.x
               + (style.rect.size.width - INDICATOR_SIZE) / 2.,
             Position::Left => style.rect.size.width - style.extent,
             Position::Right => 0.,
-          }
-        },
-        top_anchor: pipe!{
-          let style = $style;
-          match style.pos {
+          };
+          let y = match style.pos {
             Position::Left | Position::Right => style.rect.origin.y
               + (style.rect.size.height - INDICATOR_SIZE) / 2.,
             Position::Top => style.rect.size.height - style.extent,
             Position::Bottom => 0.,
-          }
+          };
+          Anchor::left_top(x, y)
         },
       };
 
       let ease_in = transitions::EASE_IN.of(ctx!());
       match $style.pos {
         Position::Top | Position::Bottom => {
-          map_writer!($indicator.left_anchor)
+          map_writer!($indicator.anchor)
             .transition(ease_in, ctx!());
         }
         Position::Left | Position::Right => {
-          map_writer!($indicator.top_anchor)
+          map_writer!($indicator.anchor)
             .transition(ease_in, ctx!());
         }
       }

@@ -15,8 +15,7 @@ fn main() {
   });
   let w = widget! {
     PathsPaintKit {
-      top_anchor: 100.,
-      left_anchor: 100.,
+      anchor: Anchor::left_top(100., 100.),
       transform: Transform::scale(0.5, 0.5),
       id: path_widget,
       paths,
