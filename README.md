@@ -1,65 +1,86 @@
+<h1 align="center">
+Ribir - Non-intrusive Declarative GUI Framework
+</h1>
+<p align="center"><a href="https://ribir.org" target="_blank" rel="noopener noreferrer">
+<img src="website/static/img/logo.svg" alt="Ribir-logo"  width = "128px">
+</a></p>
+
+<p align="center">
+Use Rust to build multi-platform applications from a single codebase.
+</p>
 <div align="center">
-<img src="website/static/img/logo-animation.gif" width="480px" />
-
-<!-- # Ribir -->
-
-Ribir is a framework for building modern native/wasm cross-platform user interface applications.
 
 [![CI](https://github.com/RibirX/Ribir/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/RibirX/Ribir/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/RibirX/Ribir/branch/master/graph/badge.svg)](https://codecov.io/gh/RibirX/ribir)
-[![License](https://img.shields.io/badge/license-MIT-informational)](https://github.com/RibirX/ribir/blob/master/LICENSE)
+[![Crates.io](https://img.shields.io/crates/v/ribir)](https://crates.io/crates/ribir)
+[![Crates.io](https://img.shields.io/crates/d/ribir)](https://crates.io/crates/ribir)
 
-[Documents] | [Examples]
+[Website] | [Documents] | [Examples] | [Changelog]
 
+<!--todo: a demos picture here-->
 </div>
 
+## What's Ribir?
 
-## Principles
+Ribir is a Rust GUI framework that helps you build beautiful and native multi-platform applications from a single codebase.
 
-- **Non-injection and Non-invasive**: Ribir interacts with the APIs of your data structure, and does not require you to do any pre-design for the user interface. Developers can focus on designing the data struct, logic and APIs. Ribir will neither break your existing logic nor require injecting any of its own objects.
-
-- **Declarative**: The user interface is the description of data, the description will automatically react to the data modification. Once you describe your data, the description will keep describing your data.
-
-- **Purely composed**: Ribir creates UI via widgets. There is not a base-object, even if the built-in fields are provided in a composed way. For example,  only if you use `margin` field, the `Margin` widget will be composed, if you do not use it, you don't pay any overhead for `Margin`. "Only pay for what you need" is an important guideline for Ribir.
-
+Experience a novel approach to UI development that's directly based on your data structure APIs. Any data mutation will trigger a precise UI update. Your focus should be on designing your data structure and its APIs. Then, you can describe your data's UI without intruding on its logic.
 
 ## At First Glance
 
+A simple example of a counter:
 
-<div style="display:inline-block;">
-<div style="float:left;height:400px;overflow:scroll; ">
+
+<table>
+  <tr>
+    <td style="padding:10px">
+      <div>
 
 ``` rust
 use ribir::prelude::*;
 fn main() {
-  app::run(widget! {
-    states { cnt: Stateful::new(0) }
-    Column {
-      h_align: HAlign::Center,
-      align_items: Align::Center,
-      FilledButton { on_tap: move |_| *cnt += 1, Label::new("Add") }
-      H1 { text: cnt.to_string() }
-      FilledButton { on_tap: move |_| *cnt += -1, Label::new("Sub") }
+  let counter = fn_widget! {
+    let cnt = Stateful::new(0);
+    @Row {
+      @FilledButton {
+        on_tap: move |_| *$cnt.write() += 1,
+        @{ Label::new("Inc") }
+      }
+      @H1 { text: pipe!($cnt.to_string()) }
     }
-  });
+  };
+  App::run(counter);
 }
 ```
 </div>
-<img src="website/static/img/counter_demo.gif" width="300" style="float:right;"/>
-</div>
+    </td>
+      <td style="padding:10px">
+        <img src="website/static/img/counter_demo.gif" width="430"/>
+      </td>
+    </tr>
+</table>
+
+
 
 More [Examples]
 
 
-## Key Features
+## Features
 
-- **Write once run anywhere**: Compile native code for desktop and mobile(not yet), and WASM for Web(not yet). Since Ribir has rather few platform dependencies, it's not hard to support more platforms by yourself.
-- **Declarative language expanded from Rust syntax**: The declarative language is based on Rust, so interaction with Rust becomes natural and easy.
-- **Easy custom widget**: Ribir supports the implementation of custom `Compose`, `Render` and `ComposeChild` widgets, you only need to implement the corresponding traits. Evenmore, you are able to specify the template of the children of `ComposeChild`, just by deriving the `Template` traits.
-- **Powerful custom theme**: Specify the theme for the whole application or partial subtree. In the theme, you can configure the palette, icons, animate transitions, widget custom themes, the interactive behavior of widget and even compose more decoration widgets on it.
-- **Rich available official widgets**: A `ribir_widgets` library exists，containing common desktop and mobile widgets.
-- **No side effect animations**: Animation in Ribir is only a visual effect, that won't affect data. Animate support for any render widgets.
-- **Alternative rendering backends**: The rendering backend is replaceable, you can implement your own rendering to output image, html, svg or any other stuff. Ribir provides developers with a gpu backend basing on [wgpu] and perhaps a soft(cpu) render in the future.
+- **Declarative language** does not introduce a fully new language but rather provides a set of Rust macros for easy interaction.
+- **Widgets compose system** has four kinds of widgets to support you can implement your widget in different ways:
+  - function widget and `Compose`, from other widgets composition.
+  - `Render`, implement your layout and paint anything you want.
+  - `ComposeChild`, control the compose logic between parent and child widgets and specify the template of child widgets.  
+- **Non-intrusive state** converts your data to a listenable state and updates the view according to the change of the state.
+- **Layout system** learning and inspired by [Flutter] Sublinear layout, but not the same.
+- **Event system** is a composition event system, that supports event bubbling and capture. Allow to compose with any widget, and exists only if you use it.
+- **Theme system** supports full and inherit/partial themes, so you can use it to override or dynamically switch the theme of the subtree. Include palette, icons, animate transitions, the decoration widget of the widget, etc. In a very rough state and the API will be redesigned soon.
+- **Animations** based on the state but no side effect, it's almost stable in concept, but not many predefined animations yet.
+- **Painter** converts the view to 2D paths.
+- **GPU render** is a backend of the **Painter**, do path tessellation so that you can easily render the triangles in any GPU render engine. A [wgpu] implementation is provided as the default GPU render engine. Tessellation base on [lyon].
+- **Text** support basic text typography and IME input, in a usable but rough stage.
+- **Widgets** library provides 20+ basic widgets, but all are in a rough stage, and the API is not stable yet.
 
 ## Support Platform 
 
@@ -71,6 +92,23 @@ More [Examples]
 |iOS|🚧 Not yet|
 |Android|🚧 Not yet|
 |Web|🚧 Not yet|
+
+## Love Ribir?
+
+If you like Ribir, give our repo a [⭐ STAR ⬆️](https://github.com/RibirX/Ribir) and [WATCH 👀](https://github.com/RibirX/Ribir/subscription) our repository to stay updated with the latest developments!
+
+Every encouragement and feedback can support us to go further.
+
+## Known Issues
+
+
+The pipe/watch may easily introduce a cycle reference, which will cause a memory leak. We'll resolve this issue in v0.2.0.
+
+In most cases, the framework will be able to avoid cycle reference automatically. Documentation will be updated to explain how to avoid cycle reference in the rest cases, and we will provide an API to help developers resolve it.
+
+
+For a complete list of known issues, please see [Issues](https://github.com/RibirX/Ribir/issues).
+
 
 ## Contributing
 
@@ -99,13 +137,12 @@ Please [report all bugs](https://github.com/RibirX/Ribir/issues/new/choose)! We 
 
 ## Thanks
 
-This project exists thanks to all the people who contribute:
+This project exists thanks to all the people who contributed:
 
 <a href="https://github.com/RibirX/Ribir/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=RibirX/Ribir" height="50px">
 </a>
 
-<br/>
 <br/>
 
 We also found inspiration from the following frameworks:
@@ -114,12 +151,12 @@ We also found inspiration from the following frameworks:
 * [QML]
 
 ## License
+Ribir is [MIT-licensed](./LICENSE)
 
-Ribir is [MIT licensed](./LICENSE)
-
+[Website]: https://ribir.org
+[Changelog]: ./CHANGELOG.md
 [Flutter]: https://flutter.dev/
 [QML]: https://doc.qt.io/qt-6/qtqml-index.html
 [Examples]: ./examples/
 [Documents]: https://ribir.org/docs/introduction
-[Wgpu]: https://github.com/gfx-rs/wgpu
-
+[wgpu]: https://github.com/gfx-rs/wgpu
