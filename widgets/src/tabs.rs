@@ -139,24 +139,22 @@ impl ComposeDecorator for IndicatorDecorator {
   fn compose_decorator(this: State<Self>, host: Widget) -> impl WidgetBuilder {
     fn_widget! {
       @ $host{
-        left_anchor: pipe!{
+        anchor: pipe!{
           let this = $this;
-          match this.pos {
-            Position::Top | Position::Bottom => this.rect.origin.x
-              + (this.rect.size.width - 60.) / 2.,
+          let x = match this.pos {
+            Position::Top | Position::Bottom =>
+              this.rect.origin.x + (this.rect.size.width - 60.) / 2.,
             Position::Left => this.rect.size.width - this.extent,
             Position::Right => 0.,
-          }
-        },
-        top_anchor: pipe! {
-          let this = $this;
-          match this.pos {
+          };
+          let y = match this.pos {
             Position::Left | Position::Right => this.rect.origin.y
               + (this.rect.size.height - 60.) / 2.,
             Position::Top => this.rect.size.height - this.extent,
             Position::Bottom => 0.,
-          }
-        }
+          };
+          Anchor::left_top(x, y)
+        },
       }
     }
   }
@@ -272,15 +270,19 @@ impl ComposeChild for Tabs {
             Position::Top | Position::Bottom => Direction::Horizontal,
             Position::Left | Position::Right => Direction::Vertical,
           }),
-          left_anchor: pipe!(match $this.pos {
-            Position::Left => $flex.layout_size().width - 1.,
-            Position::Top | Position::Right | Position::Bottom => 0.,
-          }),
-          top_anchor: pipe!(match $this.pos {
-            Position::Top => $flex.layout_size().height - 1.,
-            Position::Bottom | Position::Right | Position::Left => 0.,
-          }),
+          anchor: pipe!(
+            let x = match $this.pos {
+              Position::Left => $flex.layout_size().width - 1.,
+              Position::Top | Position::Right | Position::Bottom => 0.,
+            };
+            let y = match $this.pos {
+              Position::Top => $flex.layout_size().height - 1.,
+              Position::Bottom | Position::Right | Position::Left => 0.,
+            };
+            Anchor::left_top(x, y)
+          )
         };
+
         let indicator_decorator = @IndicatorDecorator {
           pos: pipe!($this.pos),
           extent: indicator.extent,

@@ -80,8 +80,8 @@
  	 - specify how rounded the corners have of the widget.
 - padding : [`EdgeInsets`] 
  	 - set the padding area on all four sides of a widget.
-- global_anchor : [`AnchorPosition`] 
- 	 - Anchor the widget's position using logical coordinates
+- global_anchor : [`Anchor`] 
+ 	 - use to anchor child position, and the positioning used is relative to the window
 - cursor : [`CursorIcon`] 
  	 - assign cursor to the widget.
 - margin : [`impl EdgeInsets`] 
@@ -96,14 +96,8 @@
  	 - describe how widget align to its box in x-axis.
 - v_align : [`VAlign`] 
  	 - describe how widget align to its box in y-axis.
-- left_anchor : [`PositionUnit`] 
- 	 - use to anchor child constraints with the left edge of parent widget.
-- right_anchor : [`PositionUnit`] 
- 	 - use to anchor child constraints with the right edge of parent widget.
-- top_anchor : [`PositionUnit`] 
- 	 - use to anchor child constraints with the top edge of parent widget
-- bottom_anchor : [`PositionUnit`] 
- 	 - use to anchor child constraints with the bottom edge of parent widget.
+- anchor : [`Anchor`] 
+ 	 - use to anchor child position, and the positioning used is relative to the parent
 - visible : [`bool`] 
  	 - Whether to show or hide a child
 - opacity : [`f32`] 

@@ -241,8 +241,7 @@ mod tests {
         size: Size::new(100., 100.),
         @MockBox {
           transform: Transform::scale(0.5, 0.5),
-          left_anchor: 30.,
-          top_anchor: 30.,
+          anchor: Anchor::left_top(30., 30.),
           size: Size::new(40., 40.)
         }
       }
@@ -252,7 +251,7 @@ mod tests {
     wnd.draw_frame();
 
     let root = wnd.widget_tree.borrow().root();
-    let child = get_single_child_by_depth(root, &wnd.widget_tree.borrow().arena, 4);
+    let child = get_single_child_by_depth(root, &wnd.widget_tree.borrow().arena, 3);
     let w_ctx = TestCtx { id: root, wnd_id: wnd.id() };
     let from_pos = Point::new(30., 30.);
     assert_eq!(w_ctx.map_from(from_pos, child), Point::new(45., 45.));

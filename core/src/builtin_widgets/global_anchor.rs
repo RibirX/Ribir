@@ -1,66 +1,16 @@
 use crate::{prelude::*, ticker::FrameMsg};
+use std::rc::Rc;
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum HAnchor {
-  /// Anchor the left edge position of the widget
-  Left(f32),
-
-  /// Anchor the right edge position of the widget
-  Right(f32),
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum VAnchor {
-  /// Anchor the top edge position of the widget
-  Top(f32),
-
-  /// Anchor the bottom edge position of the widget
-  Bottom(f32),
-}
-
-#[derive(Clone, Copy, Default)]
-pub struct AnchorPosition {
-  x: Option<HAnchor>,
-  y: Option<VAnchor>,
-}
-
-impl AnchorPosition {
-  pub fn new(x: HAnchor, y: VAnchor) -> Self { Self { x: Some(x), y: Some(y) } }
-
-  pub fn left(x: f32) -> Self { Self { x: Some(HAnchor::Left(x)), y: None } }
-
-  pub fn right(x: f32) -> Self { Self { x: Some(HAnchor::Right(x)), y: None } }
-
-  pub fn top(y: f32) -> Self { Self { x: None, y: Some(VAnchor::Top(y)) } }
-
-  pub fn bottom(y: f32) -> Self { Self { x: None, y: Some(VAnchor::Bottom(y)) } }
-
-  pub fn top_left(x: f32, y: f32) -> Self { Self::new(HAnchor::Left(x), VAnchor::Top(y)) }
-
-  fn to_offset(self, size: &Size) -> (Option<f32>, Option<f32>) {
-    let x = self.x.map(|x| match x {
-      HAnchor::Left(x) => x,
-      HAnchor::Right(x) => x - size.width,
-    });
-    let y = self.y.map(|y| match y {
-      VAnchor::Top(y) => y,
-      VAnchor::Bottom(y) => y - size.height,
-    });
-    (x, y)
-  }
-}
-
-#[derive(Declare, Query)]
+#[derive(Declare, Query, Default)]
 pub struct GlobalAnchor {
   #[declare(builtin, default)]
-  global_anchor: AnchorPosition,
+  global_anchor: Anchor,
 }
 
 impl ComposeChild for GlobalAnchor {
   type Child = Widget;
   #[inline]
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
-    fn eq(f1: f32, f2: f32) -> bool { (f1 - f2).abs() < f32::EPSILON }
     fn_widget! {
       let wnd = ctx!().window();
       let tick_of_layout_ready = wnd
@@ -73,35 +23,72 @@ impl ComposeChild for GlobalAnchor {
         .sample(tick_of_layout_ready)
         .subscribe(move |_| {
           let size = $child.layout_size();
-          let base = wnd.map_to_global(Point::zero(), wid.wid_uncheck());
-          let (x, y) = $this.get_global_anchor().to_offset(&size);
-          let x = x.map_or(0., |x| x - base.x);
-          let y = y.map_or(0., |y| y - base.y);
-          if !eq($child.left_anchor, x) {
-            $child.write().left_anchor = x;
-          }
-          if !eq($child.top_anchor, y) {
-            $child.write().top_anchor = y;
+          let wnd_size = wnd.size();
+          let base = wnd.map_to_global(Point::zero(), wid.assert_id());
+          let Anchor {x, y} = $this.get_global_anchor();
+          let anchor = Anchor {
+            x: x.map(|x| match x {
+              HAnchor::Left(x) => x - base.x,
+              HAnchor::Right(x) => (wnd_size.width - x) - size.width - base.x,
+            }).map(HAnchor::Left),
+            y: y.map(|y| match y {
+              VAnchor::Top(y) => y - base.y,
+              VAnchor::Bottom(y) => (wnd_size.height - y) - size.height - base.y,
+            }).map(VAnchor::Top),
+          };
+          if $child.anchor != anchor {
+            $child.write().anchor = anchor;
           }
         });
-      child
-        .widget_build(ctx!())
-        .attach_state_data(this, ctx!())
+      child.widget_build(ctx!())
     }
   }
 }
 
 impl GlobalAnchor {
-  fn get_global_anchor(&self) -> AnchorPosition { self.global_anchor }
+  fn get_global_anchor(&self) -> Anchor { self.global_anchor }
+}
+
+fn bind_h_anchor(
+  this: &impl StateWriter<Value = GlobalAnchor>,
+  wnd: &Rc<Window>,
+  relative: HAnchor,
+  base: f32,
+) {
+  let size = wnd.size();
+  let anchor = match relative {
+    HAnchor::Left(x) => HAnchor::Left(base + x),
+    HAnchor::Right(x) => HAnchor::Right((size.width - base) + x),
+  };
+  if this.read().global_anchor.x != Some(anchor) {
+    this.write().global_anchor.x = Some(anchor);
+  }
+}
+
+fn bind_v_anchor(
+  this: &impl StateWriter<Value = GlobalAnchor>,
+  wnd: &Rc<Window>,
+  relative: VAnchor,
+  base: f32,
+) {
+  let size = wnd.size();
+  let anchor = match relative {
+    VAnchor::Top(x) => VAnchor::Top(base + x),
+    VAnchor::Bottom(x) => VAnchor::Bottom((size.height - base) + x),
+  };
+  if this.read().global_anchor.y != Some(anchor) {
+    this.write().global_anchor.y = Some(anchor);
+  }
 }
 
 impl<W> FatObj<W> {
-  /// Anchor the widget's horizontal position to the left edge of the widget
-  /// with WidgetId wid .
-  pub fn relative_to_left(
+  /// Anchor the widget's horizontal position by placing its left edge right to
+  /// the left edge of the specified widget (`wid`) with the given relative
+  /// pixel value (`relative`).
+  pub fn left_align_to(
     &mut self,
-    relative: HAnchor,
     wid: &LazyWidgetId,
+    offset: f32,
     ctx: &BuildCtx,
   ) -> impl Subscription {
     let this = self.get_builtin_global_anchor(ctx).clone_writer();
@@ -111,20 +98,18 @@ impl<W> FatObj<W> {
       .frame_tick_stream()
       .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
     tick_of_layout_ready.subscribe(move |_| {
-      let base = wnd.map_to_global(Point::zero(), wid.wid_uncheck()).x;
-      let anchor = relative.offset(base);
-      if this.read().global_anchor.x != Some(anchor) {
-        this.write().global_anchor.x = Some(anchor);
-      }
+      let base = wnd.map_to_global(Point::zero(), wid.assert_id()).x;
+      bind_h_anchor(&this, &wnd, HAnchor::Left(offset), base);
     })
   }
 
-  /// Anchor the widget's horizontal position to the right edge of the widget
-  /// with WidgetId wid .
-  pub fn relative_to_right(
+  /// Anchor the widget's horizontal position by placing its right edge left to
+  /// the right edge of the specified widget (`wid`) with the given relative
+  /// pixel value (`relative`).
+  pub fn right_align_to(
     &mut self,
-    relative: HAnchor,
     wid: &LazyWidgetId,
+    relative: f32,
     ctx: &BuildCtx,
   ) -> impl Subscription {
     let this = self.get_builtin_global_anchor(ctx).clone_writer();
@@ -134,21 +119,19 @@ impl<W> FatObj<W> {
       .frame_tick_stream()
       .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
     tick_of_layout_ready.subscribe(move |_| {
-      let base = wnd.map_to_global(Point::zero(), wid.wid_uncheck()).x;
-      let size = wnd.layout_size(wid.wid_uncheck()).unwrap_or_default();
-      let anchor = relative.offset(base).offset(size.width);
-      if this.read().global_anchor.x != Some(anchor) {
-        this.write().global_anchor.x = Some(anchor);
-      }
+      let base = wnd.map_to_global(Point::zero(), wid.assert_id()).x;
+      let size = wnd.layout_size(wid.assert_id()).unwrap_or_default();
+      bind_h_anchor(&this, &wnd, HAnchor::Right(relative), base + size.width);
     })
   }
 
-  /// Anchor the widget's vertical position to the top edge of the widget
-  /// with WidgetId wid.
-  pub fn relative_to_top(
+  /// Anchors the widget's vertical position by placing its top edge below the
+  /// top edge of the specified widget (`wid`) with the given relative pixel
+  /// value (`relative`).
+  pub fn top_align_to(
     &mut self,
-    relative: VAnchor,
     wid: &LazyWidgetId,
+    relative: f32,
     ctx: &BuildCtx,
   ) -> impl Subscription {
     let this = self.get_builtin_global_anchor(ctx).clone_writer();
@@ -158,20 +141,18 @@ impl<W> FatObj<W> {
       .frame_tick_stream()
       .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
     tick_of_layout_ready.subscribe(move |_| {
-      let base = wnd.map_to_global(Point::zero(), wid.wid_uncheck()).y;
-      let anchor = relative.offset(base);
-      if this.read().global_anchor.y != Some(anchor) {
-        this.write().global_anchor.y = Some(anchor);
-      }
+      let base = wnd.map_to_global(Point::zero(), wid.assert_id()).y;
+      bind_v_anchor(&this, &wnd, VAnchor::Top(relative), base);
     })
   }
 
-  /// Anchor the widget's vertical position to the bottom edge of the widget
-  /// with WidgetId wid.
-  pub fn relative_to_bottom(
+  /// Anchors the widget's vertical position by placing its bottom edge above
+  /// the bottom edge of the specified widget (`wid`) with the given relative
+  /// pixel value (`relative`).
+  pub fn bottom_align_to(
     &mut self,
-    relative: VAnchor,
     wid: &LazyWidgetId,
+    relative: f32,
     ctx: &BuildCtx,
   ) -> impl Subscription {
     let this = self.get_builtin_global_anchor(ctx).clone_writer();
@@ -181,87 +162,54 @@ impl<W> FatObj<W> {
       .frame_tick_stream()
       .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
     tick_of_layout_ready.subscribe(move |_| {
-      let base = wnd.map_to_global(Point::zero(), wid.wid_uncheck()).y;
-      let size = wnd.layout_size(wid.wid_uncheck()).unwrap_or_default();
-      let anchor = relative.offset(base).offset(size.height);
-      if this.read().global_anchor.y != Some(anchor) {
-        this.write().global_anchor.y = Some(anchor);
-      }
+      let base = wnd.map_to_global(Point::zero(), wid.assert_id()).y;
+      let size = wnd.layout_size(wid.assert_id()).unwrap_or_default();
+      bind_v_anchor(&this, &wnd, VAnchor::Bottom(relative), base + size.height);
     })
   }
 }
-
-impl HAnchor {
-  pub fn offset(self, offset: f32) -> Self {
-    match self {
-      HAnchor::Left(x) => HAnchor::Left(x + offset),
-      HAnchor::Right(x) => HAnchor::Right(x + offset),
-    }
-  }
-}
-
-impl VAnchor {
-  pub fn offset(self, offset: f32) -> Self {
-    match self {
-      VAnchor::Top(x) => VAnchor::Top(x + offset),
-      VAnchor::Bottom(x) => VAnchor::Bottom(x + offset),
-    }
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{reset_test_env, test_helper::*};
+  use crate::test_helper::*;
+  use ribir_dev_helper::*;
 
-  #[test]
-  fn global_anchor() {
-    reset_test_env!();
-    let (base_offset, offset_writer) = split_value(10.);
-    let (wid, wid_writer) = split_value(None);
-
-    let w = fn_widget! {
-      let child1 = @MockBox {
-        left_anchor: 10.,
-        top_anchor: 10.,
+  const WND_SIZE: Size = Size::new(100., 100.);
+  fn global_anchor() -> impl WidgetBuilder {
+    fn_widget! {
+      let parent = @MockBox {
+        anchor: Anchor::left_top(10., 10.),
+        size: Size::new(50., 50.),
+      };
+      let wid = parent.lazy_host_id();
+      let mut top_left = @MockBox {
         size: Size::new(10., 10.),
       };
-      let child1_id = child1.lazy_host_id();
-      let mut follow_widget = @MockBox {
-        size: Size::new(10., 10.)
-      };
-      *wid_writer.write() = Some(follow_widget.lazy_host_id());
-      follow_widget.relative_to_left(HAnchor::Left(0.), &child1_id, ctx!());
-      follow_widget.relative_to_bottom(VAnchor::Bottom(20.), &child1_id, ctx!());
+      top_left.left_align_to(&wid, 20., ctx!());
+      top_left.top_align_to(&wid, 10., ctx!());
 
-      @MockBox {
-        left_anchor: pipe!(*$base_offset),
-        size: Size::new(100., 100.),
+      let mut bottom_right = @MockBox {
+        size: Size::new(10., 10.),
+      };
+      bottom_right.right_align_to(&wid, 10.,  ctx!());
+      bottom_right.bottom_align_to(&wid, 20., ctx!());
+      @ $parent {
         @MockStack {
-          child_pos: vec![
-              Point::new(0., 10.),
-              Point::new(10., 0.),
-            ],
-          @ { child1 }
-          @ { follow_widget }
+          child_pos: vec![Point::new(0., 0.), Point::new(0., 0.)],
+          @ { top_left }
+          @ { bottom_right }
         }
       }
-    };
-
-    let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
-    wnd.draw_frame();
-
-    let follow_wid = wid.read().clone().unwrap();
-    assert_eq!(
-      wnd.map_to_global(Point::zero(), follow_wid.wid_uncheck()),
-      Point::new(20., 40.)
-    );
-
-    *offset_writer.write() = 20.;
-    wnd.draw_frame();
-    assert_eq!(
-      wnd.map_to_global(Point::zero(), follow_wid.wid_uncheck()),
-      Point::new(30., 40.)
-    );
+    }
   }
+
+  widget_layout_test!(
+    global_anchor,
+    wnd_size = WND_SIZE,
+    { path = [0, 0, 0, 0, 0], x == 20.,}
+    { path = [0, 0, 0, 0, 0], y == 10.,}
+
+    { path = [0, 0, 0, 1, 0], x == 30.,}
+    { path = [0, 0, 0, 1, 0], y == 20.,}
+  );
 }

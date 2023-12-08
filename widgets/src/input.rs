@@ -341,16 +341,19 @@ where
 
       let caret_box_id = caret_box.lazy_host_id();
       let mut caret_box = @$caret_box {
-        left_anchor: pipe!($this.caret_position(&$text, $text.layout_size()).map_or(0., |p| p.x)),
-        top_anchor: pipe!($this.caret_position(&$text, $text.layout_size()).map_or(0., |p| p.y)),
+        anchor: pipe!(
+          let pos = $this.caret_position(&$text, $text.layout_size()).unwrap_or_default();
+          Anchor::left_top(pos.x, pos.y)
+        ),
       };
       let scrollable = stack.get_builtin_scrollable_widget(ctx!());
       let tick_of_layout_ready = ctx!().window()
         .frame_tick_stream()
         .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
-      watch!(Point::new($caret_box.left_anchor, $caret_box.top_anchor))
+      watch!(SelectableText::caret(&*$this))
         .distinct_until_changed()
         .sample(tick_of_layout_ready)
+        .map(move |_| $this.caret_position(&$text, $text.layout_size()).unwrap_or_default())
         .scan_initial((Point::zero(), Point::zero()), |pair, v| (pair.1, v))
         .subscribe(move |(before, after)| {
           let mut scrollable = $scrollable.silent();

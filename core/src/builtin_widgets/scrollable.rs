@@ -41,8 +41,7 @@ impl ComposeChild for ScrollableWidget {
       };
 
       let mut child = @ $child {
-        left_anchor: pipe!($this.get_scroll_pos().x),
-        top_anchor: pipe!($this.get_scroll_pos().y),
+        anchor: pipe!($this.get_scroll_pos()).map(|pos| Anchor::left_top(pos.x, pos.y)),
       };
 
       watch!($child.layout_size())
@@ -142,9 +141,7 @@ mod tests {
 
     wnd.draw_frame();
     let pos = wnd.layout_info_by_path(&[0, 0, 0, 0]).unwrap().pos;
-    assert_eq!(pos.y, expect_y);
-    let pos = wnd.layout_info_by_path(&[0, 0, 0, 0, 0]).unwrap().pos;
-    assert_eq!(pos.x, expect_x);
+    assert_eq!(pos, Point::new(expect_x, expect_y));
   }
 
   #[test]

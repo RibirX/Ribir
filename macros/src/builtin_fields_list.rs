@@ -234,8 +234,8 @@ builtin! {
   }
 
   GlobalAnchor {
-    #[doc= "Anchor the widget's position using logical coordinates"]
-    global_anchor: AnchorPosition,
+    #[doc= "use to anchor child position, and the positioning used is relative to the window"]
+    global_anchor: Anchor,
   }
 
   Cursor {
@@ -276,24 +276,9 @@ builtin! {
     v_align: VAlign,
   }
 
-  LeftAnchor {
-    #[doc="use to anchor child constraints with the left edge of parent widget."]
-    left_anchor: PositionUnit,
-  }
-
-  RightAnchor {
-    #[doc="use to anchor child constraints with the right edge of parent widget."]
-    right_anchor: PositionUnit,
-  }
-
-  TopAnchor {
-    #[doc="use to anchor child constraints with the top edge of parent widget"]
-    top_anchor: PositionUnit,
-  }
-
-  BottomAnchor {
-    #[doc="use to anchor child constraints with the bottom edge of parent widget."]
-    bottom_anchor: PositionUnit,
+  RelativeAnchor {
+    #[doc="use to anchor child position, and the positioning used is relative to the parent"]
+    anchor: Anchor,
   }
 
   Visibility {

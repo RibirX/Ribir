@@ -28,8 +28,7 @@ impl Compose for SelectedHighLight {
           $this.rects.clone().into_iter().map(move |rc| {
             @Container {
               background: color.clone(),
-              top_anchor: rc.origin.y,
-              left_anchor: rc.origin.x,
+              anchor: Anchor::from_point(rc.origin),
               size: rc.size,
             }
           })
