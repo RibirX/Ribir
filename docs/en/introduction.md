@@ -66,10 +66,10 @@ fn_widget!{
 
 The above example shows the way of combining built-in widgets. Even if `Text` does not have a `margin` field, you can still use the `Margin::margin` and compose it with `Text` to form a new widget. `Margin` will only be created when a widget uses the `margin` field, otherwise, there will be no overhead.
 
-**Digestion of composite widgets**: When describing the view of the data, in addition to some basic widgets, most widgets are composed of other widgets. For example, a `Button` is composed of `Text`, `Icon` or `BoxDecoration`, etc. The `Button` itself is not a view element, we call this type of widget a composite widget. Composite widgets will be digested during view construction. They are like a function and are called once during view construction to build the final view and create the corresponding update logic, and do not exist in the final view.
+**Digestion of compose widget**: When describing the view of the data, in addition to some basic widgets, most widgets are composed of other widgets. For example, a `Button` is a composition of `Text, `Icon`, `BoxDecoration` and other widgets. 
+The `Button` itself is not a visual element, but a compose widget. During the view construction, compose widgets are processed. They are similar to a function that is invoked once during view construction to build the final view and establish the corresponding update logic. They do not persist in the final view.
 
-**Only state with write sources are real state**: Unlike other declarative frameworks that add fields to widgets to control widget updates. Ribir is non-intrusive. Ribir treats the entire widget as a state to control updates. 
-At the same time, it provides the ability to split the state, so that the local view can directly depend on the modification of part of the data to update (introduced in detail in the subsequent tutorial). Another big difference is that stateful and stateless can be converted to each other. If a state has no write source, it will degenerate into stateless， because no one will update it. For example:
+**Sateful without writing source will convert to Stateless**: Unlike other declarative frameworks that add fields to widgets to control widget updates. Ribir is non-intrusive. Ribir treats the entire widget as a state to control updates. It provides the ability to split the state so that the local view can directly depend on the modification of part of the data to update (introduced in detail in the subsequent tutorial). Another big difference is that stateful and stateless can be converted to each other. If a state has no write source, it will degenerate into stateless， because no one will update it. For example:
 
 ```rust
 use ribir::prelude::*;

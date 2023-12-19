@@ -93,9 +93,9 @@ pub trait StateWriter: StateReader {
   /// Return a new writer that be part of the origin writer by applying a
   /// function to the contained value.
   ///
-  /// This writer share the same data with the origin writer. But has it's own
-  /// notifier. When modifies across the return writer, the downstream
-  /// subscribed on the origin state will not be notified.
+  /// The return writer share the same data with the origin writer. But modify
+  /// the data through the return writer will not trigger the views depend on
+  /// the origin writer to update.
   ///
   /// If you want a new writer that has same notifier with the origin writer,
   /// you can use `map_writer(...)`.
