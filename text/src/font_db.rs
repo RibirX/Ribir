@@ -12,7 +12,7 @@ use crate::svg_glyph_cache::SvgGlyphCache;
 use crate::{FontFace, FontFamily};
 /// A wrapper of fontdb and cache font data.
 pub struct FontDB {
-  default_font: ID,
+  default_fonts: Vec<ID>,
   data_base: fontdb::Database,
   cache: HashMap<ID, Option<Face>>,
 }
@@ -31,9 +31,9 @@ pub struct Face {
 }
 
 impl FontDB {
-  pub fn set_default_font(&mut self, face_id: ID) { self.default_font = face_id; }
+  pub fn set_default_fonts(&mut self, ids: Vec<ID>) { self.default_fonts = ids; }
 
-  pub fn default_font(&self) -> ID { self.default_font }
+  pub fn default_fonts(&self) -> &[ID] { &self.default_fonts }
 
   pub fn try_get_face_data(&self, face_id: ID) -> Option<&Face> {
     self.cache.get(&face_id)?.as_ref()
@@ -248,7 +248,7 @@ impl Default for FontDB {
     data_base.load_font_data(include_bytes!("../Lato-Regular.ttf").to_vec());
     let default_font = data_base.faces().next().map(|f| f.id).unwrap();
     let mut this = FontDB {
-      default_font,
+      default_fonts: vec![default_font],
       data_base,
       cache: <_>::default(),
     };
