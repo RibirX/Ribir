@@ -2,12 +2,13 @@
 //! to app-wide or particular part of the application.
 
 use crate::{fill_svgs, prelude::*, widget::WidgetBuilder};
+use ahash::{HashMap, HashSet};
 use ribir_algo::Sc;
 pub use ribir_algo::{CowArc, ShareResource};
 use ribir_geom::Size;
 use ribir_macros::Declare;
-use ribir_text::TextStyle;
-use std::{collections::HashMap, rc::Rc};
+use ribir_text::{font_db::ID, TextStyle};
+use std::{rc::Rc, vec};
 
 mod palette;
 pub use palette::*;
@@ -54,7 +55,7 @@ pub struct InheritTheme {
   /// icon size standard
   pub icon_size: Option<IconSize>,
   /// a collection of icons.
-  pub icons: Option<HashMap<NamedSvg, ShareResource<Svg>, ahash::RandomState>>,
+  pub icons: Option<HashMap<NamedSvg, ShareResource<Svg>>>,
   pub transitions_theme: Option<TransitionTheme>,
   pub compose_decorators: Option<ComposeDecorators>,
   pub custom_styles: Option<CustomStyles>,
@@ -88,13 +89,7 @@ impl ComposeChild for ThemeWidget {
       let mut themes = ctx!().themes().clone();
       themes.push(theme.clone());
 
-      // Keep the empty node, because the subtree may be hold its id.
-      //
-      // And not try to swap child and the empty node, and remove the child
-      // node, because the subtree may be hold its id.
-      //
-      // A `Void` is cheap for a theme.
-      let p = Void.widget_build(ctx!()).attach_data(theme, ctx!());
+      let p = ThemeRender{ theme: theme.clone() }.widget_build(ctx!()).attach_data(theme, ctx!());
       // shadow the context with the theme.
       let ctx = BuildCtx::new_with_data(Some(p.id()), ctx!().tree, themes);
       let child = child.gen_widget(&ctx);
@@ -103,6 +98,53 @@ impl ComposeChild for ThemeWidget {
       p
     }
   }
+}
+
+// ThemeRender will install default font for the subtree in the
+// perform_layout.
+#[derive(Query, SingleChild)]
+struct ThemeRender {
+  theme: Sc<Theme>,
+}
+
+impl Render for ThemeRender {
+  #[inline]
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let mut fonts = vec![];
+    let font_db = AppCtx::font_db().clone();
+    let font_families = match self.theme.deref() {
+      Theme::Full(f) => Some(f.typography_theme.default_font_family.clone()),
+      Theme::Inherit(i) => i
+        .typography_theme
+        .as_ref()
+        .map(|typography_theme| typography_theme.default_font_family.clone()),
+    };
+
+    if let Some(families) = font_families {
+      fonts = font_db
+        .borrow_mut()
+        .select_all_match(&FontFace { families, ..<_>::default() });
+    }
+    if !fonts.is_empty() {
+      // install default font for the subtree.
+      let old_fonts = font_db.borrow().default_fonts().to_vec();
+      let mut set: HashSet<ID> = HashSet::from_iter(fonts.iter().cloned());
+      for font in old_fonts {
+        if set.insert(font) {
+          fonts.push(font);
+        }
+      }
+      font_db.borrow_mut().set_default_fonts(fonts);
+    }
+    if let Some(mut l) = ctx.single_child_layouter() {
+      l.perform_widget_layout(clamp)
+    } else {
+      Size::zero()
+    }
+  }
+
+  #[inline]
+  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl Default for Theme {
@@ -338,4 +380,66 @@ impl From<FullTheme> for Theme {
 impl From<InheritTheme> for Theme {
   #[inline]
   fn from(value: InheritTheme) -> Self { Theme::Inherit(value) }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::cell::RefCell;
+
+  use super::*;
+  use crate::{reset_test_env, test_helper::*};
+
+  #[derive(Query, Declare)]
+  struct QueryFont {
+    ids: Rc<RefCell<Vec<ID>>>,
+  }
+
+  impl Render for QueryFont {
+    fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size {
+      *self.ids.borrow_mut() = AppCtx::font_db().borrow().default_fonts().to_vec();
+      Size::zero()
+    }
+    fn paint(&self, _: &mut PaintingCtx) {}
+  }
+  #[test]
+  fn theme_font() {
+    reset_test_env!();
+
+    let font_db = AppCtx::font_db().clone();
+    let font_ids = Rc::new(RefCell::new(vec![]));
+    let font_ids2 = font_ids.clone();
+    let w = fn_widget! {
+      let mut typography_theme = TypographyTheme::of(ctx!()).clone();
+      typography_theme.default_font_family = Box::new([FontFamily::Name("DejaVu Sans".into())]);
+      @ThemeWidget {
+        theme: Sc::new(Theme::Inherit(InheritTheme {
+          typography_theme: Some(typography_theme),
+          font_files: Some(vec![env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf"]),
+          ..<_>::default()
+        })),
+        @{
+          Box::new(fn_widget!{
+            @QueryFont {
+              ids: font_ids2.clone(),
+            }
+         })
+        }
+      }
+    };
+
+    let old_path = font_db.borrow().default_fonts().to_vec();
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+
+    let ids = font_db.borrow_mut().select_all_match(&FontFace {
+      families: Box::new([
+        FontFamily::Name("DejaVu Sans".into()),
+        FontFamily::Name("Lato".into()),
+      ]),
+      ..<_>::default()
+    });
+
+    assert_eq!(*font_ids.borrow(), ids);
+    assert_eq!(&old_path, font_db.borrow().default_fonts());
+  }
 }
