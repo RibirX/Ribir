@@ -310,54 +310,37 @@ impl From<TextDirection> for rustybuzz::Direction {
 
 #[derive(Clone)]
 struct FallBackFaceHelper<'a> {
-  ids: Vec<ID>,
+  ids: &'a [ID],
   font_db: &'a RefCell<FontDB>,
   face_idx: usize,
 }
 
 impl<'a> FallBackFaceHelper<'a> {
-  fn new(ids: &'a [ID], font_db: &'a RefCell<FontDB>) -> Self {
-    let mut ids = ids.to_vec();
-    let set: ahash::HashSet<ID> = ahash::HashSet::from_iter(ids.iter().cloned());
-
-    {
-      let font_db = font_db.borrow();
-      let default_ids = font_db.default_fonts();
-      for id in default_ids.iter() {
-        if set.contains(id) {
-          continue;
-        }
-        ids.push(*id);
-      }
-    }
-
-    Self { ids, font_db, face_idx: 0 }
-  }
+  fn new(ids: &'a [ID], font_db: &'a RefCell<FontDB>) -> Self { Self { ids, font_db, face_idx: 0 } }
 
   fn next_fallback_face(&mut self, text: &str) -> Option<Face> {
     let font_db = self.font_db.borrow();
     loop {
-      if self.face_idx >= self.ids.len() {
+      if self.face_idx > self.ids.len() {
         return None;
+      }
+      let face_idx = self.face_idx;
+      self.face_idx += 1;
+      if face_idx == self.ids.len() {
+        return font_db.try_get_face_data(font_db.default_font()).cloned();
       }
 
       let face = self
         .ids
-        .get(self.face_idx)
+        .get(face_idx)
         .and_then(|id| font_db.try_get_face_data(*id))
-        .cloned();
-
-      self.face_idx += 1;
-      if self.face_idx == self.ids.len() {
-        return face;
-      } else {
-        let face = face.filter(|f| match text.is_empty() {
+        .filter(|f| match text.is_empty() {
           true => true,
           false => text.chars().any(|c| f.has_char(c)),
-        });
-        if face.is_some() {
-          return face;
-        }
+        })
+        .cloned();
+      if face.is_some() {
+        return face;
       }
     }
   }

@@ -7,8 +7,6 @@ use std::{
 };
 
 pub mod widget_id;
-use ribir_algo::Sc;
-use ribir_text::font_db::ID;
 pub(crate) use widget_id::TreeArena;
 pub use widget_id::WidgetId;
 mod layout_info;
@@ -57,8 +55,6 @@ impl WidgetTree {
         if wid.is_dropped(&self.arena) {
           continue;
         }
-
-        let _guard = DefaultFontGuard::install_default_font(self, wid);
 
         let clamp = self
           .store
@@ -204,65 +200,6 @@ impl WidgetTree {
       }
       outs.assume_init()
     }
-  }
-}
-
-struct DefaultFontGuard {
-  old_ids: Vec<ID>,
-}
-impl Drop for DefaultFontGuard {
-  fn drop(&mut self) {
-    let font_db = AppCtx::font_db().clone();
-    font_db.borrow_mut().set_default_fonts(self.old_ids.clone());
-  }
-}
-
-impl DefaultFontGuard {
-  fn install_default_font(tree: &WidgetTree, wid: WidgetId) -> Self {
-    fn add_font(
-      fonts: &mut Vec<FontFamily>,
-      set: &mut HashSet<FontFamily>,
-      new_fonts: &[FontFamily],
-    ) {
-      for font in new_fonts {
-        if set.insert(font.clone()) {
-          fonts.push(font.clone());
-        }
-      }
-    }
-
-    let mut fonts = vec![];
-    let mut set: HashSet<FontFamily> = HashSet::default();
-    let arena = &tree.arena;
-    wid.ancestors(arena).skip(1).for_each(|p| {
-      p.assert_get(arena)
-        .query_type_inside_first(|t: &Sc<Theme>| {
-          match t.deref() {
-            Theme::Full(f) => add_font(
-              &mut fonts,
-              &mut set,
-              &f.typography_theme.default_font_family,
-            ),
-            Theme::Inherit(i) => {
-              if let Some(f) = &i.typography_theme {
-                add_font(&mut fonts, &mut set, &f.default_font_family);
-              }
-            }
-          }
-          false
-        });
-    });
-
-    let font_db = AppCtx::font_db().clone();
-    let old_ids = font_db.borrow().default_fonts().to_vec();
-    let mut ids = font_db.borrow_mut().select_all_match(&FontFace {
-      families: fonts.into_boxed_slice(),
-      ..<_>::default()
-    });
-    let set: HashSet<ID> = HashSet::from_iter(ids.iter().cloned());
-    ids.extend(old_ids.iter().filter(|id| !set.contains(id)));
-    font_db.borrow_mut().set_default_fonts(ids);
-    Self { old_ids }
   }
 }
 
