@@ -1,33 +1,31 @@
-# Ribir 实践： 完整开发一个 Todos 应用
+# Ribir Practice: Develop a Todos app
 
-本教程将通过构建一个简单的 Todos 应用来向你展示一个 Ribir 应用的开发方式，同时帮你巩固 Ribir 的基本概念和使用方法。
+This chapter will show you how to develop a Ribir application by building a simple Todos app, and help you consolidate the basic concepts and usage of Ribir.
 
-该应用将允许你添加、删除、编辑和标记任务，并提供自动保存功能。
+This app will allow you to add, delete, edit and mark tasks finish, and support automatic save.
 
-> 你将了解：
+> You will learn:
 >
-> - 如何构建一个完整的 Ribir 应用
-> - Ribir 应用推荐的设计方式
+> - How to develop and design a Todos application using the recommended Ribir approach.
 
-## 前提条件
+## Prerequisites
 
-为了完成本教程，我们假设你：
+To complete this tutorial, we assume that you:
 
-- 了解 [Rust](https://www.rust-lang.org/learn) 语言的基础知识和语法
-- 完成了前置教程 [快速上手](../zh/快速上手) 系列
+- Mastered the basic concepts and syntax of [Rust](https://www.rust-lang.org/learn) language
+- Completed the prerequisite tutorial series [Quick Start](../en/QuickStart)
 
-
-## 最终效果展示
+## Showcase
 
 <img src="../../assets/todos-demo.gif" width=640px/>
 
-## 整体结构
+## Code structure
 
-作为一个 GUI 框架，Ribir 最重要的一个目标就是让你在应用设计之初，可以专注于数据结构和算法（业务逻辑）的抽象，而完全不用考虑 UI。UI 则作为一个完全独立的模块开发，两者之间通过前者定义的 API 完成连接。
+As a GUI framework, one of Ribir's most important goals is to enable you to concentrate on abstracting data structures and algorithms (business logic) during the initial stages of application design, without the need to consider the UI. The UI can be developed as a completely independent module, and they are interacted through the API defined by the former.
 
-因此，在 Ribir 仓库中，你会发现几乎所有非纯粹的界面展示的例子都有这样两个主要的文件：一个和应用同名的 `xxx.rs` 文件，实现了应用的核心数据和逻辑；一个 `ui.rs` 文件实现了对核心数据的 UI 描述。另外，还有一个 `main.rs` 文件作为应用的入口。
+So, in the Ribir repository, you will find that almost all non-pure UI examples have two main files: an `xxx.rs` file with the same name as the application, which implements the core data and logic of the application; a `ui.rs` file that implements the UI description of the core data. In addition, there is a `main.rs` file as the entry point of the application.
 
-在本教程中，我们也用同样的方式来组织我们的 Todos 应用：
+In this tutorial, we also organize our Todos app in the same way:
   
 ```text
 - src
@@ -36,11 +34,11 @@
   - ui.rs
 ```
 
-## 内核开发
+## Develop the core
 
-Ribir 与通常的 GUI 框架不同，不会一开始就考虑做控件的划分、层级结构的组织，UI 状态的管理等。Ribir 会推荐你先抽象好应用的核心数据结构和逻辑，设计定义好 API，再基于你的数据和视觉效果来组织你的 UI。
+Ribir doesn't start with dividing widgets, organizing hierarchical structures, or managing UI states. Ribir recommends that you first abstract the core data structures and logic of the application, design and define the API, and then organize your UI based on your data and visual effects.
 
-当然，如果是多人开发，上面这些工作可以是并行展开的。因为你需要独自完成全本章教程，所以让我们按顺序一步步来。第一步先来完成核心数据结构部分的开发，并完全不去考虑 UI 的事情。
+Of course, if multiple people are developing, the above work can be carried out in parallel. Because you need to complete the entire chapter tutorial by yourself, let's proceed step by step in order. The first step is to complete the development of the core data structure part and not consider the UI at all.
 
 ```rust ignore
 // todos.rs
@@ -116,32 +114,31 @@ impl TaskId {
 }
 ```
 
+The `Todos` core is mainly composed of three types: `Todos`, `Task`, and `TaskId`. `Todos` is a collection containing all tasks, `Task` is a struct for a task, and `TaskId` is a unique identifier for a task. `Todos` provides methods for adding, deleting, modifying, and querying tasks, as well as the ability to save to a file. Usually, you also need to write comprehensive unit tests to ensure the correctness of your code.
 
-`Todos` 内核主要由 `Todos`, `Task` 和 `TaskId` 三个类型组成，其中 `Todos` 是一个包含了所有任务的列表，`Task` 是一个任务的结构体，`TaskId` 是任务的唯一标识符。`Todos` 提供了对任务的增删改查的方法，并提供了保存到文件的能力。通常情况下，你还需要编写完备的单元测试来保证你的代码的正确性。
-
-这部分工作与你平时写无界面的 Rust 代码的方式没有什么不同，你可以按照自己的习惯来组织代码，只要最后能够提供完整能力的 API 即可。在 Ribir 应用的的设计理念中，这部分工作非常重要，但却不是本教程的重点，如果你熟悉 Rust 语法，你应该能够轻易理解，这里就不再赘述了。
+This part of the work is no different from how you usually write Rust code without a GUI. You can organize your code according to your own habits, as long as you can provide a complete API in the end.  In the design philosophy of Ribir applications, this part of the work is very important, but it is not the focus of this tutorial, so we won't go into detail here.
 
 
 > Tips
 >
-> 基于这样一个结构，完成这部分工作后，你可以轻易将你的核心部分变成一个库,并以此创建一个 CLI 应用，来给你的用户提供更好的开发体验和更多的使用场景。
+> Based on such a structure, after completing this part of the work, you can easily turn your core part into a library, and use it to create a CLI application to provide your users with a better development experience and more usage scenarios.
 
-现在你的应用，已经有了完备的逻辑，但是还没有任何界面。下一步，让我们用 Ribir 来为它构建一个界面。
+Now your application has a complete logic, but no UI yet. Next, let's use Ribir to build a UI for it.
 
-## 描述 UI
+## Describing the UI
 
-在正式进入 UI 开发之前，我们先对照原型图划分几个主要部分，以方便后文的交流：
+Before we start developing the UI, let's divide the UI into several main parts according to the prototype diagram, so that we can communicate better in the following text:
 
 <img src="../../assets/todos-widgets.png" width=830px/>
 
-1. Title 标题区，展示应用的名称
-2. Input 区，输入任务内容，按回车键添加任务
-3. Task Tabs，任务选项卡，分为 All, Active 和 Completed 三个选项卡，分别展示对应任务列表
-4. Task，单个任务的展示，提供标记完成和删除功能。
+1. Title area, showing the name of the application
+2. Input area, enter the task content, press Enter to add the task
+3. Task Tabs, divided into three tabs: All, Active and Completed, which display the corresponding task list respectively
+4. Task, the display of a single task, providing editing, marking completion and deletion functions.
 
-### 用 Ribir 搭建出整体结构
+### Build the overall structure with Ribir
 
-我们已经在 [内核开发](#内核开发) 中定义好 `Todos` 类型作为根数据结构，现在可以直接通过 `Compose` 从它开始对整个 UI 进行描述了。在此之前，你需要先在 `main.rs` 中引入 `todos.rs` 和 `ui.rs`，并添加一个 `main` 函数作为应用入口：
+We have defined the `Todos` type as the root data structure in [Develop the core](#develop-the-core), and now we can directly describe the entire UI from it through `Compose`. Before that, you need to import `todos.rs` and `ui.rs` in `main.rs`, and add a `main` function as the application entry:
 
 ```rust ignore
 //  main.rs
@@ -170,13 +167,13 @@ fn main() {
 }
 ```
 
-在 `main.rs` 中，先创建了一个 `State` 来保存 `Todos` 数据，并将它当做根 widget 传递给 `App::run` 方法，这样应用就可以运行起来了。
+In `main.rs`, a `State` is first created to save the `Todos` data, and it is passed to the `App::run` method as the root widget, so that the application can run.
 
-同时对 `todos` 的变更进行了监听，并每隔 5 秒钟将 `todos` 的变更保存到磁盘上。当然，你的应用现在还没有任何交互，无法对 `todos` 进行修改，所以保存逻辑不会触发，但很快当你添加了交互，就能用的上这个自动保存的功能了。
+Simultaneously, any modifications to `todos` are monitored, and it to the disk every 5 seconds. Currently, your application lacks interaction and cannot modify `todos`, so the auto-save logic won't be triggered. However, as soon as you add interaction, it'll work.
 
-注意到 `watch!($todo;)` 中的 `;` 号了吗？ 这是故意的，因为不想接收 `todos` 的变更结果，而只想知道它发生了变化，因为我们要在订阅函数中去读取它的最新值去保存。
+Have you noticed the `;` in `watch!($todo;)`? This is intentional, because we don't want to receive the result of `todos`, but just want to know that it has modified. This is because we will read its latest value in the subscription function to save it.
 
-接下来，在 `ui.rs` 中添加如下代码，来将 `Todos` 描述为一个 widget：
+Then, add the following code to `ui.rs` to describe `Todos` as a widget:
 
 ```rust ignore
 // ui.rs
@@ -195,9 +192,9 @@ impl Compose for Todos {
 }
 ```
 
-现在，当你通过 `cargo run` 运行时，你将看到窗口上面仅有一个标题 "Todo"。上面代码中，我们将 `Column` 作为 `Todo` 的根 widget，它是一个 `Render` 类型的 widget，能够将它的孩子按照垂直方向排列，并提供了一些相关属性，这里我们设置了 `align_items` 为 `Align::Center`，表示将孩子们在垂直方向上居中对齐，`item_gap` 为 `12.`，表示孩子之间的间隔为 12 个逻辑像素。
+When you run the application with `cargo run`, you'll see just a "Todo" title in the window. In the code, we use `Column` as the main widget for `Todo`. This type of widget lines up its child widgets in a vertical column. We've set align_items to Align::Center, this will make the child widgets line up in the center. Set item_gap to `12.` leaves a space of 12 pixels between each widget.
 
-下一步，我们先往 `Column` 中添加一个空的任务选项卡，撑起我们整个结构：
+Next, we'll add an empty task tabs to the `Column` to set up our entire structure.
 
 ```rust ignore
 @Tabs {
@@ -222,26 +219,26 @@ impl Compose for Todos {
 }
 ```
 
-同样 `Tabs` 也是 Ribir widgets 库为我们提供的，它是一个 `ComposeChild` widget，并且规定了它的孩子必须是 `Tab` 类型。因为，我们现在还没有准备好 `Tab` 中要展示的内容，所以用了一个 “Coming soon!” 的 `Text` 来占位。不过，在 `TabPane` 中，我们没有直接使用 `Text` 控件，而是用了一个函数 widget 来作为孩子，这是因为 `Tabs` 规定了 `TabPane` 的内容必须是一个 `GenWidget`, 因为它只想构建活动 `Tab` 对应的内容，而不是所有 `Tab`。而一个支持多次调用的函数 widget 可以转换成 `GenWidget`。
+`Tabs` is also provided by the Ribir widgets library. It's a `ComposeChild` widget, and its children must be of the `Tab` type. Since we're not ready to show content in the `Tab` yet, we're using a `Text` widget with "Coming soon!" as a placeholder. However, in `TabPane`, we didn't use the `Text` widget directly. Instead, we used a function widget as a child. This is because `Tabs` requires the content of `TabPane` to be a `GenWidget`, as it only wants to build the content for the active `Tab`, not all `Tabs`. A function widget that supports multiple calls can be converted into a `GenWidget`.
 
-### 增加任务录入能力
+### Add the ability to enter tasks
 
-现在，我们来添加录入数据的能力: 在 `Column` 中添加一个 `Input`，响应回车按钮将 `Input` 中的内容作为任务添加到 `Todos` 中。 等等，我们要怎么在一个 `Input` 中的事件回调中，访问 `Input` 自己呢？
+Now, let's add the ability to enter data: We'll add an `Input` to the `Column`, and when the Enter key is pressed, the content of the `Input` will be added to `Todos` as a task. But wait, how can we access the `Input` itself within an event callback in `Input`?
 
 ```rust ignore
 @Input {
   on_key_down: move |e| {
     if e.key_code() == &PhysicalKey::Code(KeyCode::Enter) {
-      // 如何获得 Input 自己？
+      // How to get the `Input` itself here?
     }
   }
 }
 ```
 
-好在，Ribir 非常易于和 Rust 交互，还记得在[组合 widget](../快速上手/快速入门.md#组合-widget) 中讲到的通过变量声明孩子吗？
+Fortunately, Ribir interacts seamlessly with Rust. Do you remember how we discussed declaring children through variables in the [Composing Widgets](../QuickStart/GettingStarted.md#Composing-Widgets) section?
+
 
 ```rust ignore
-
 @ {
   let input = @Input {};
   @$input {
@@ -258,17 +255,17 @@ impl Compose for Todos {
 
 ```
 
-现在，将上面的代码添加到 `Column` 的 `Tabs` 之前。你就可以通过这个输入框录入新的任务了。
+Now, add the above code before the `Tabs` in the `Column`. You can now use this input box to add new tasks.
 
-### 添加任务列表
+### Adding a Task List
 
-目前，`Tab` 中还没有任何内容展示，现在我们就来添加它。
+Currently, there's no content in the `Tab`. Let's add some now.
 
-三个选项卡的虽然内容不一样，但都有同样的展示结构，因此你可以将它们抽象成一个 widget。因为没有对应的数据结构，所以你可以用一个函数控件来实现它，假设这个函数被命名为 `task_list`。
+The three tabs have different content, but they all have the same structure. So, you can abstract them into one widget. Since there's no corresponding data structure, you can use a function widget to implement it. Let's call this function `task_list`.
 
-第二个可以抽象的 widget 是 `Task`，它虽然有自己的数据结构，但我们却不打算通过 `Compose` 来把它描述为 widget 。因为我们想将对 `Task` 的删除功能也实现在这个 widget 中，而仅凭`Task` 自己是无法实现删除的。所以，也抽象一个函数控件，方便获取上下文，假设这个函数被命名为 `task_item`。
+The second widget you can abstract is `Task`. It has its own data structure, but we don't plan to describe it as a widget using `Compose`. This is because we want to implement the delete function for `Task` in this widget, and `Task` alone can't do this. So, abstract another function widget to easily get the context. Let's call this function `task_item`.
 
-先来看 `task_list` 的实现：
+Let's look at the implementation of `task_list`:
 
 ```rust ignore
 // ui.rs
@@ -281,8 +278,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, filter: fn(&Task) -> bool)
     @VScrollBar {
       @Lists {
         @ { pipe!($this;).map(move |_| {
-          // 这里故意写一行不会执行的代码, 告诉 Ribir 
-          // 当前闭包需要捕获 `this` 的 Writer 而不是 Reader
+          // Here, we intentionally write a line of code that won't be executed, to tell Ribir that the current closure needs to capture `this`'s Writer, not its Reader
           let _hint_capture_writer = || $this.write();
           
           let mut widgets = vec![];
@@ -304,9 +300,9 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, filter: fn(&Task) -> bool)
 }
 ```
 
-这个函数控件用 `Lists` 来呈现整个列表的，并通过 `pipe!($this;).map(move |_| { ... })` 监听 `this` 的变化，确保任务列表的内容会随着 `this` 的变化而变化，最后通过一个 `VScrollBar` 来提供滚动能力。
+This function widget uses `Lists` to display the entire list. It listens to changes in `this` through `pipe!($this;).map(move |_| { ... })` to ensure that the task list content changes as `this` changes. Finally, it uses a `VScrollBar` to provide scrolling capability.
 
-注意到状态分裂这一行了吗？
+Did you notice the line about state splitting?
   
 ```rust ignore
 let task = this.split_writer(
@@ -315,17 +311,17 @@ let task = this.split_writer(
 );
 ```
 
-它从 `this` 中分裂出一个 `Task` 的 `Writer`, 并把它传递给 `task_item` 函数控件，这样在 `task_item` 控件中就可以直接修改 `Task` 数据而不影响整个 `Todos` 了。
+It splits a Writer of Task from `this` and passes it to the `task_item` function widget. This way, the `Task` data can be directly modified in the `task_item` widget without affecting the entire UI of `Todos`.
 
-在`task_lists`中，有一个 tricky 的地方，你一定也注意到了：
+In `task_lists`, there's a tricky part that you've probably noticed:
 
 ```rust ignore
 let _hint_capture_writer = || $this.write();
 ```
 
-为何需要这一行代码？因为 Ribir 在解析 move 闭包时会根据闭包内是否使用了 `$this` 的使用情况，来帮助你在闭包前自动对 this 的 reader 或 writer 进行捕获，避免你需要手动进行 clone_reader 或 clone_writer。当 move 闭包中只使用了读引用（$this），就捕获 Reader，如果使用了写引用（`$this.write()` 或 `$this.silent()`），则捕获 Writer。而上面的闭包中，完全没有用到的 `$this` 的写引用，但却需要通过 `this` 分裂一个子 `Writer` —— 只有 Writer 才能分裂子 `Writer`。因此故意写下这一行，来强制 Ribir 捕获 `this` 的 `Writer`。
+Why do we need this line of code? When Ribir parses a move closure, it checks whether `$this` is used within the closure. It then automatically captures the reader or writer of `this` for you, so you don't have to manually clone the reader or writer. If the move closure only uses a read reference (`$this`), it captures the Reader. If it uses a write reference (`$this.write()` or `$this.silent()`), it captures the Writer. In the above closure, `$this`'s write reference isn't used at all, but we need to split a child `Writer` from `this` — and only a Writer can split a child `Writer`. So, we intentionally write this line to force Ribir to capture `this`'s `Writer`.
 
-再来看 `task_item` 的实现：
+Next, let's look at the implementation of `task_item`:
 
 ```rust ignore
 // ui.rs
@@ -361,13 +357,13 @@ where
 }
 ```
 
-在这个函数控件中，有意思的的地方在于，并没有通过参数来传递 `Todos`, 而是规定了 `Task` 必须是从 `Todos` 中分裂出来的，这样你就可以反向拿到 `Todos` 的 `Writer` ，从而实现删除功能。
+In this function widget, the interesting part is that `Todos` is not passed as a parameter. Instead, it's stipulated that `Task` must be split from `Todos`. This way, you can get the `Writer` of `Todos` in reverse, which allows you to implement the delete function.
 
-接着，用 `Checkbox` 来展示任务是否完成，并监听它的变化，将变化同步回 `Task` 中。
+Next, use `Checkbox` to show whether the task is complete, monitor its changes, and synchronize the changes back to `Task`.
 
-最后，用 `ListItem` 来展示一个完整任务，将 `Checkbox`, 删除按钮和标题组合在一起。`ListItem` 也是 Ribir widgets 库提供的一个 widget，并规定了自己的孩子类型，这里用到了 `HeadlineText` 来展示标题， `Leading` 表示头部内容，`Trailing` 表示尾部内容。
+Finally, use `ListItem` to show a complete task, composing `Checkbox`, delete button and task content together. `ListItem` is also a widget provided by the Ribir widgets library, and specifies its own child type. Here, `HeadlineText` is used to show the title, `Leading` represents the header content, and `Trailing` represents the tail content.
 
-现在，在 `Todos` 的 `compose` 中找到 `TabPane` 并用 `task_lists` 来替换掉原来的 "coming soon!" 吧：
+Now, in the `compose` of `Todos`, find `TabPane` and replace the original "coming soon!" with `task_lists`.
 
 ```rust ignore
 // ui.rs
@@ -395,18 +391,18 @@ where
 ...
 ```
 
-### 增加对单个任务的编辑功能
+### Adding the ability to edit task
 
-你的 Todos 应用已经基本完成了，不过还差最后一步: 增加双击任务进行编辑内容的功能。
+Your Todos application is almost complete, but there's one final step: adding the ability to edit the content of a task by double-clicking it.
 
-通过双击来记录任务的编辑状态，当一个任务是编辑状态时，展示 `task_item`, 否则展示一个 `Input`。
+We'll use a double-click to mark a task as being in edit mode. When a task is not in edit mode, we'll display `task_item`, otherwise, we'll display an `Input`.
 
-回到 `task_lists` 中，做如下修改：
+Let's go back to `task_lists` and make the following changes:
 
 ```rust ignore
 
 fn_widget! {
-    // new: 新增一个状态，记录编辑任务的 Id
+    // new: Add a new state to record the ID of the task being edited
     let editing = Stateful::new(None);
 
     @VScrollBar {
@@ -421,7 +417,7 @@ fn_widget! {
                 move |todos| todos.get_task(id).unwrap(),
                 move |todos| todos.get_task_mut(id).unwrap(),
               );
-              // new: 如果任务处于编辑状态，则显示输入框，否则显示任务项
+              // new: If the task is in edit mode, display an input box. Otherwise, display the task item.
               let item = pipe!(*$editing == Some($task.id()))
                 .value_chain(|s| s.distinct_until_changed().box_it())
                 .map(move |b|{
@@ -460,15 +456,15 @@ fn_widget! {
   .into()
 ```
 
-到这里，你的 Todos 应用已经完成了，你可以运行它，添加、删除、标记任务，双击进行编辑，甚至可以关闭应用，再次打开时，你的任务列表还在，因为你的数据会自动将任务保存到磁盘上。
+At this point, your Todos application is complete. You can run the application , then add, delete, and mark tasks, double-click to edit, and even if you close the application and open it again, your task list will still be there because your data is automatically saved to the disk.
 
-通过这个教程，你应该发现了 Ribir 的一些特点，Ribir 不强调 UI 的状态管理，而是通过 API 对数据进行直接操作，UI 则自动响应数据的变化。而状态，只是将数据转换为可被侦听的一个包装。这样的设计，让你可以专注于数据结构和算法和 API 的设计，而 UI 则可以直接使用 API 来展示和操作数据。消去中间层，也消去了由这些中间层带来的复杂性。
+Through this tutorial, you should have noticed some features of Ribir. Ribir doesn't emphasize UI state management, but instead operates directly on data through APIs, with the UI automatically responding to data changes. The state is just a wrapper that makes data observable. This design allows you to focus on the design of data structures, algorithms, and APIs, while the UI can directly use APIs to display and manipulate data. By eliminating the middle layer, it also eliminates the complexity brought by these middle layers.
 
-## 完善样式和动画
+## Improving Styles and Animations
 
-在上面的教程中，你已经完成了一个完整的 Todos 应用，但是它的样式和交互还不够漂亮和现代，如果你想进一步完善你的应用，你可以到[完善样式和动画](./完善样式和动画.md)继续 Todos 应用的旅程。
+In the above tutorial, you've completed a full Todos application. However, its style and interactions might not be as attractive and modern as you'd like. If you want to further improve your application, you can continue your journey with the Todos application in the [Improving Styles and Animations](./improving_styles_and_animations.md) section.
 
-## 完整代码
+## Complete Code
 
 ```rust ignore
 // main.rs
@@ -614,7 +610,6 @@ impl Compose for Todos {
 fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -> GenWidget {
   let this = this.clone_writer();
   fn_widget! {
-    // new: 新增一个状态，记录编辑任务的 Id
     let editing = Stateful::new(None);
 
     @VScrollBar {

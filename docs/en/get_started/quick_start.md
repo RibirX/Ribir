@@ -739,5 +739,5 @@ let _: &Writer<AppData> = split_count.origin_writer();
 
 ## The next step
 
-You have mastered all the syntax and basic concepts needed to develop a Ribir application. It's time to put them into practice by [Practice: Todos application](../practice_todos_app/non-intrusive_developing.md).
+You have mastered all the syntax and basic concepts needed to develop a Ribir application. It's time to put them into practice by [Practice: Todos application](../practice_todos_app/develop_a_todos_app.md).
 
