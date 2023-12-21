@@ -66,7 +66,7 @@ impl<'a> BuildCtx<'a> {
   }
 
   pub(crate) fn find_cfg<T>(&self, f: impl Fn(&Theme) -> Option<&T>) -> Option<&T> {
-    for t in self.themes().iter() {
+    for t in self.themes().iter().rev() {
       let v = f(t);
       if v.is_some() {
         return v;
@@ -178,6 +178,7 @@ mod tests {
         theme: Sc::new(Theme::Inherit(InheritTheme {
           palette: Some(Rc::new(light_palette)),
           ..<_>::default()
+
         })),
         @ {
           Box::new(fn_widget!{

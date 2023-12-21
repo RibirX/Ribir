@@ -269,7 +269,7 @@ mod tests {
         </svg>"##;
     let doc = super::SvgDocument::new(GlyphId(2428)..=GlyphId(2428), content.as_bytes());
     let mut db = FontDB::default();
-    let dummy_face = db.face_data_or_insert(db.default_fonts()[0]).unwrap();
+    let dummy_face = db.face_data_or_insert(db.default_font()).unwrap();
     assert_eq!(doc.elems.len(), 4);
     assert!(
       doc
