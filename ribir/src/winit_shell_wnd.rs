@@ -104,16 +104,6 @@ impl ShellWindow for WinitShellWnd {
     let position: LogicalPosition<f32> = LogicalPosition::new(rect.origin.x, rect.origin.y);
     let size: LogicalSize<f32> = LogicalSize::new(rect.size.width, rect.size.height);
     self.winit_wnd.set_ime_cursor_area(position, size);
-
-    // tmp: winit set_ime_position fail when use sogou ime in window
-    // platform, issue link: https://github.com/rust-windowing/winit/issues/2780
-    #[cfg(windows)]
-    unsafe {
-      use winapi::um::winuser::SetCaretPos;
-      let pos: winit::dpi::PhysicalPosition<i32> =
-        position.to_physical(self.winit_wnd.scale_factor());
-      SetCaretPos(pos.x, pos.y);
-    }
   }
 
   #[inline]
@@ -194,38 +184,10 @@ impl WinitShellWnd {
     }
 
     let winit_wnd = winit_wnd.build(window_target).unwrap();
-
-    #[cfg(windows)]
-    enable_ime(&winit_wnd);
-
     WinitShellWnd {
       backend: Backend::new(&winit_wnd),
       winit_wnd,
       cursor: CursorIcon::Default,
-    }
-  }
-}
-
-// tmp:  winit set_ime_position fail when use sogou ime in window
-// platform, issue link: https://github.com/rust-windowing/winit/issues/2780
-#[cfg(windows)]
-fn enable_ime(wnd: &winit::window::Window) {
-  unsafe {
-    use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-    use std::ptr::null_mut;
-    use winapi::{
-      shared::minwindef::HINSTANCE,
-      shared::windef::HWND,
-      um::winuser::{CreateCaret, LoadBitmapW},
-    };
-
-    if let RawWindowHandle::Win32(handle) = wnd.raw_window_handle() {
-      let hwnd = handle.hwnd as *mut HWND;
-      let hinst: HINSTANCE = null_mut();
-      let resource_id = 120;
-      let resource_id_wstr: Vec<u16> = format!("#{}", resource_id).encode_utf16().collect();
-      let hcaret = LoadBitmapW(hinst, resource_id_wstr.as_ptr());
-      CreateCaret(hwnd as HWND, hcaret, 0, 0);
     }
   }
 }
