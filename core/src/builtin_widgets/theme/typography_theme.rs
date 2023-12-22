@@ -2,15 +2,12 @@ use super::Theme;
 use crate::context::BuildCtx;
 use ribir_algo::CowArc;
 use ribir_painter::Brush;
-use ribir_text::FontFamily;
 
 /// Use typography to present your design and content as clearly and efficiently
 /// as possible. The names of the TextTheme properties from the [Material Design
 /// spec](https://m3.material.io/styles/typography/type-scale-tokens)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypographyTheme {
-  /// Default text font families
-  pub default_font_family: Box<[FontFamily]>,
   pub display_large: TextTheme,
   pub display_medium: TextTheme,
   pub display_small: TextTheme,
