@@ -479,7 +479,6 @@ pub fn typography_theme(
   };
 
   TypographyTheme {
-    default_font_family: regular_family,
     display_large: TextTheme {
       text: CowArc::owned(TextStyle {
         line_height: Some(Pixel(64.0.into()).into()),
