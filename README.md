@@ -17,8 +17,9 @@ Use Rust to build multi-platform applications from a single codebase.
 
 [Website] | [Documents] | [Examples] | [Changelog]
 
-<!--todo: a demos picture here-->
 </div>
+
+![](./docs/assets/hero-banner.png)
 
 ## What's Ribir?
 
@@ -64,7 +65,6 @@ fn main() {
 
 More [Examples]
 
-
 ## Features
 
 - **Declarative language** does not introduce a fully new language but rather provides a set of Rust macros for easy interaction.
@@ -81,6 +81,10 @@ More [Examples]
 - **GPU render** is a backend of the **Painter**, do path tessellation so that you can easily render the triangles in any GPU render engine. A [wgpu] implementation is provided as the default GPU render engine. Tessellation base on [lyon].
 - **Text** support basic text typography and IME input, in a usable but rough stage.
 - **Widgets** library provides 20+ basic widgets, but all are in a rough stage, and the API is not stable yet.
+
+## Architecture overview
+
+![](./docs/assets/architecture.svg)
 
 ## Support Platform 
 
