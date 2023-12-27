@@ -12,7 +12,7 @@ There are 5 types of changes:
 - `Documented` for any changes to the documentation.
 - `Breaking` for the detail of any backward incompatible changes.
 
-And please only add new entries below the [Unreleased](#unreleased---releasedate) header with the following format:
+Please only add new entries below the [Unreleased](#unreleased---releasedate) header with the following format:
 
 ```md
 **crate or effect scope**: description of change (#PR @contributor)
@@ -24,11 +24,13 @@ And please only add new entries below the [Unreleased](#unreleased---releasedate
 
 🎉🎉🎉 The first version of Ribir. 
 
-![background](https://not.ready/demos.png)
+![background](./docs/assets/hero-banner.png)
 
-As the first version, its main content is to verify and stabilize the basic concepts, determine the overall framework process, and make preliminary attempts to verify all core modules. 
+The goal of this version of Ribir is to finish the core framework and answer our questions about the feasibility of the design.
 
-We use it in our own projects and have a good experience, and we hope you can also try it out and give us feedback. But it is still in a very rough stage, and be careful to use it in production.
+We use it to build examples and build some apps for our daily work. And we are satisfied with the experience of using it.
+
+We are very happy to share it with you. We hope you can try it out and give us feedback. But we don't recommend you to use it in production environments yet.
 
 ### Features
 
