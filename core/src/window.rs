@@ -417,6 +417,9 @@ impl Window {
         }
         DelayEvent::Disposed { id, parent } => {
           id.descendants(&self.widget_tree.borrow().arena)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
             .for_each(|id| {
               let e = AllLifecycle::Disposed(LifecycleEvent { id, wnd_id: self.id() });
               self.emit::<LifecycleListener>(id, e);
