@@ -13,20 +13,27 @@ impl ComposeChild for Cursor {
   type Child = Widget;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
-      let save_cursor = Stateful::new(CursorIcon::Default);
+      let save_cursor: Stateful<Option<CursorIcon>> = Stateful::new(None);
       @$child {
         on_pointer_enter: move |e: &mut PointerEvent| {
           if e.point_type == PointerType::Mouse
             && e.mouse_buttons() == MouseButtons::empty()
           {
             let wnd = e.window();
-            *$save_cursor.write() = wnd.get_cursor();
+            *$save_cursor.write() = Some(wnd.get_cursor());
             wnd.set_cursor($this.get_cursor());
           }
         },
         on_pointer_leave: move |e: &mut PointerEvent| {
-          e.window().set_cursor(*$save_cursor);
-        }
+          if let Some(cursor) = $save_cursor.write().take() {
+            e.window().set_cursor(cursor);
+          }
+        },
+        on_disposed: move |e| {
+          if let Some(cursor) = $save_cursor.write().take() {
+            e.window().set_cursor(cursor);
+          }
+        },
       }
     }
   }
