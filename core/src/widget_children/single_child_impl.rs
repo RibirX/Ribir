@@ -20,7 +20,7 @@ crate::widget::multi_build_replace_impl_include_self! {
 
   impl<P, C> SingleWithChild<Option<C>, dyn {#}> for P
   where
-    P: SingleParent + {#},
+    P: SingleParent + RenderBuilder,
     C: {#},
   {
     type Target = Widget;
@@ -38,7 +38,7 @@ crate::widget::multi_build_replace_impl_include_self! {
 crate::widget::multi_build_replace_impl_include_self! {
   impl<P, V, PP> SingleWithChild<PP, &dyn {#}> for P
   where
-    P: SingleParent + {#},
+    P: SingleParent,
     PP: InnerPipe<Value=Option<V>>,
     V: {#} + 'static,
   {
@@ -66,5 +66,12 @@ mod tests {
         .with_child(mock_box.clone().with_child(mock_box, ctx), ctx)
         .widget_build(ctx)
     };
+  }
+
+  #[test]
+  fn fix_mock_box_compose_pipe_option_widget() {
+    fn _x(w: BoxPipe<Option<Widget>>, ctx: &BuildCtx) {
+      MockBox { size: ZERO_SIZE }.with_child(w.into_pipe(), ctx);
+    }
   }
 }
