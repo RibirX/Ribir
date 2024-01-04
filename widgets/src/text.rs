@@ -37,12 +37,15 @@ impl Render for Text {
 
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let bounds = ctx.layout_clamp().map(|b| b.max).unwrap();
+    let box_rect = Rect::from_size(ctx.box_size().unwrap());
+    if ctx.painter().intersection_paint_bounds(&box_rect).is_none() {
+      return;
+    };
 
+    let bounds = ctx.layout_clamp().map(|b| b.max).unwrap();
     let visual_glyphs = self.text_layout(AppCtx::typography_store(), bounds);
     let font_db = AppCtx::font_db().clone();
     let font_size = self.text_style.font_size.into_pixel().value();
-    let box_rect = Rect::from_size(ctx.box_size().unwrap());
     draw_glyphs_in_rect(
       ctx.painter(),
       visual_glyphs,
