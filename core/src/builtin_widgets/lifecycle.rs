@@ -89,37 +89,44 @@ impl EventListener for LifecycleListener {
 
 #[cfg(test)]
 mod tests {
-  use std::collections::HashSet;
-
   use crate::{
     prelude::*,
     reset_test_env,
-    test_helper::{MockBox, MockMulti, TestWindow},
+    test_helper::{split_value, MockBox, MockMulti, TestWindow},
   };
+  use std::collections::HashSet;
 
   #[test]
   fn full_lifecycle() {
     reset_test_env!();
 
-    let trigger = Stateful::new(true);
+    let trigger = Stateful::new(0);
     let lifecycle = Stateful::new(vec![]);
     let c_lc = lifecycle.clone_reader();
     let c_trigger = trigger.clone_writer();
+    let (is_empty, clean_trigger) = split_value(false);
 
     let w = fn_widget! {
       @MockBox {
         size: Size::zero(),
-        on_mounted: move |_| $lifecycle.write().push("static mounted"),
-        on_performed_layout: move |_| $lifecycle.write().push("static performed layout"),
-        on_disposed: move |_| $lifecycle.write().push("static disposed"),
         @ {
-          pipe!(*$trigger).map(move  |b| {
-            b.then(move || {
+          pipe!(*$is_empty).map(move |v| {
+            (!v).then(move || {
               @MockBox {
                 size: Size::zero(),
-                on_mounted: move |_| $lifecycle.write().push("dyn mounted"),
-                on_performed_layout: move |_| $lifecycle.write().push("dyn performed layout"),
-                on_disposed: move |_| $lifecycle.write().push("dyn disposed")
+                on_mounted: move |_| $lifecycle.write().push("static mounted"),
+                on_performed_layout: move |_| $lifecycle.write().push("static performed layout"),
+                on_disposed: move |_| $lifecycle.write().push("static disposed"),
+                @ {
+                  pipe!(*$trigger).map(move |_| {
+                    @MockBox {
+                      size: Size::zero(),
+                      on_mounted: move |_| $lifecycle.write().push("dyn mounted"),
+                      on_performed_layout: move |_| $lifecycle.write().push("dyn performed layout"),
+                      on_disposed: move |_| $lifecycle.write().push("dyn disposed")
+                    }
+                  })
+                }
               }
             })
           })
@@ -142,7 +149,7 @@ mod tests {
       ]
     );
     {
-      *c_trigger.write() = false;
+      *c_trigger.write() += 1;
     }
     wnd.draw_frame();
     assert_eq!(
@@ -153,7 +160,29 @@ mod tests {
         "dyn performed layout",
         "static performed layout",
         "dyn disposed",
+        "dyn mounted",
+        "dyn performed layout",
         "static performed layout",
+      ]
+    );
+
+    {
+      *clean_trigger.write() = true;
+    }
+    wnd.draw_frame();
+    assert_eq!(
+      &**c_lc.read(),
+      [
+        "static mounted",
+        "dyn mounted",
+        "dyn performed layout",
+        "static performed layout",
+        "dyn disposed",
+        "dyn mounted",
+        "dyn performed layout",
+        "static performed layout",
+        "dyn disposed",
+        "static disposed",
       ]
     );
   }
