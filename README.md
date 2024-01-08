@@ -2,7 +2,7 @@
 Ribir - Non-intrusive Declarative GUI Framework
 </h1>
 <p align="center"><a href="https://ribir.org" target="_blank" rel="noopener noreferrer">
-<img src="website/static/img/logo.svg" alt="Ribir-logo"  width = "128px">
+<img src="docs/assets/logo.svg" alt="Ribir-logo"  width = "128px">
 </a></p>
 
 <p align="center">
