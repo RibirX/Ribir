@@ -239,7 +239,7 @@ Now, let's add the ability to enter data: We'll add an `Input` to the `Column`, 
 }
 ```
 
-Fortunately, Ribir interacts seamlessly with Rust. Do you remember how we discussed declaring children through variables in the [Composing Widgets](../QuickStart/GettingStarted.md#Composing-Widgets) section?
+Fortunately, Ribir interacts seamlessly with Rust. Do you remember how we discussed declaring children through variables in the [Composing Widgets](../get_started/quick_start.md#composing-widgets) section?
 
 
 ```rust ignore
