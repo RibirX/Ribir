@@ -18,7 +18,7 @@
 
 ## 最终效果展示
 
-<img src="../../assets/todos-demo.gif" width=640px/>
+<img src="/static/img/todos-demo.gif" width=640px/>
 
 ## 代码结构
 
@@ -131,7 +131,7 @@ impl TaskId {
 
 在正式进入 UI 开发之前，我们先对照原型图划分几个主要部分，以方便后文的交流：
 
-<img src="../../assets/todos-widgets.png" width=830px/>
+<img src="/static/img/todos-widgets.png" width=830px/>
 
 1. Title 标题区，展示应用的名称
 2. Input 区，输入任务内容，按回车键添加任务

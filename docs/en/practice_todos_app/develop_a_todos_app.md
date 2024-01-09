@@ -1,3 +1,7 @@
+---
+sidebar_position: 1
+---
+
 # Ribir Practice: Develop a Todos app
 
 This chapter will show you how to develop a Ribir application by building a simple Todos app, and help you consolidate the basic concepts and usage of Ribir.
@@ -17,7 +21,7 @@ To complete this tutorial, we assume that you:
 
 ## Showcase
 
-<img src="../../assets/todos-demo.gif" width=640px/>
+<img src="/static/img/todos-demo.gif" width=640px/>
 
 ## Code structure
 
@@ -129,7 +133,7 @@ Now your application has a complete logic, but no UI yet. Next, let's use Ribir 
 
 Before we start developing the UI, let's divide the UI into several main parts according to the prototype diagram, so that we can communicate better in the following text:
 
-<img src="../../assets/todos-widgets.png" width=830px/>
+<img src="/static/img/todos-widgets.png" width=830px/>
 
 1. Title area, showing the name of the application
 2. Input area, enter the task content, press Enter to add the task
