@@ -237,7 +237,7 @@ impl Compose for Todos {
 }
 ```
 
-好在，Ribir 非常易于和 Rust 交互，还记得在[组合 widget](../快速上手/快速入门.md#组合-widget) 中讲到的通过变量声明孩子吗？
+好在，Ribir 非常易于和 Rust 交互，还记得在[组合 widget](../get_started/quick_start.md#compose-widget--描述你的数据结构) 中讲到的通过变量声明孩子吗？
 
 ```rust ignore
 
@@ -465,7 +465,7 @@ fn_widget! {
 
 ## 完善样式和动画
 
-在上面的教程中，你已经完成了一个完整的 Todos 应用，但是它的样式和交互还不够漂亮和现代，如果你想进一步完善你的应用，你可以到[完善样式和动画](./完善样式和动画.md)继续 Todos 应用的旅程。
+在上面的教程中，你已经完成了一个完整的 Todos 应用，但是它的样式和交互还不够漂亮和现代，如果你想进一步完善你的应用，你可以到[完善样式和动画](./improving_styles_and_animations.md)继续 Todos 应用的旅程。
 
 ## 完整代码
 

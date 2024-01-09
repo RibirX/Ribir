@@ -23,14 +23,14 @@
 - `Render` widget
 - `ComposeChild` widget
 
-本章将只会介绍函数 widget 和 `Compose` widget。因为在大部分场景中这两种 widget 已经足够满足我们的需求了。作为进阶的内容，我们将在[深入 widget](./深入-widget.md)中覆盖 `Render` widget 和 `ComposeChild` widget。
+本章将只会介绍函数 widget 和 `Compose` widget。因为在大部分场景中这两种 widget 已经足够满足我们的需求了。作为进阶的内容，我们将在[深入 widget](./widget_in_depth.md)中覆盖 `Render` widget 和 `ComposeChild` widget。
 
 
 ## 函数 widget
 
 接收 `&BuildCtx` 作为入参并返回 `Widget` 的函数或闭包被称为函数 widget。
 
-在没有外部状态依赖的情况下，通过函数来定义 widget 是最简单的一种方式。在[创建一个应用](./创建一个应用.md)中，你已经见过一个 `Hello world!` 的函数 widget 了。本节中，我们仍通过 `Hello world!` 的例子来展开介绍。
+在没有外部状态依赖的情况下，通过函数来定义 widget 是最简单的一种方式。在[创建一个应用](./creating_an_application.md)中，你已经见过一个 `Hello world!` 的函数 widget 了。本节中，我们仍通过 `Hello world!` 的例子来展开介绍。
 
 ### 通过函数来定义 widget
 
@@ -99,7 +99,7 @@ fn main() {
 }
 ```
 
-你有没有发现，除了没有使用 `@` 以为，这个例子和你在[创建一个应用](./创建一个应用.md)中看到的已经一样了。
+你有没有发现，除了没有使用 `@` 以为，这个例子和你在[创建一个应用](./creating_an_application.md)中看到的已经一样了。
 
 ## 使用 `rdl!` 创建对象
 
@@ -191,7 +191,7 @@ fn main() {
 >
 > 在我们上面的例子中，`Row` 接收任意数目，任意类型的 widget,`Text` 不能接收任何孩子, 而 `FilledButton` 则更复杂一点，它允许接收一个 `Label` 作为它的文字和一个 `Svg` 作为按钮图标。
 >
-> 对于如何约束 widget 的孩子类型，我们将在[深入 widget](./深入-widget.md)中展开介绍。
+> 对于如何约束 widget 的孩子类型，我们将在[深入 widget](./widget_in_depth.md)中展开介绍。
 
 ### 表达式创建对象
 
@@ -611,7 +611,7 @@ fn main() {
 }
 ```
 
-参考 [内建 widget 列表](../../builtin_widget/declare_builtin_fields.md)查看所有可以用来作为扩展的内建字段和方法。
+参考 [内建 widget 列表](../builtin_widget/declare_builtin_fields.md)查看所有可以用来作为扩展的内建字段和方法。
 
 
 ## 状态的转换、分离和溯源
@@ -737,4 +737,4 @@ let _: &Writer<AppData> = split_count.origin_writer();
 
 ## 下一步
 
-至此，你已经掌握了开发 Ribir 引用所需的全部语法和基础概念了。是时候到[实践： Todos 应用](../实践：Todos%20应用/完整开一个Todos应用.md)将它们付诸实践了。
+至此，你已经掌握了开发 Ribir 引用所需的全部语法和基础概念了。是时候到[实践： Todos 应用](../practice_todos_app/develop_a_todos_app.md)将它们付诸实践了。
