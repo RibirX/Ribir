@@ -1,3 +1,7 @@
+---
+sidebar_position: 1
+---
+
 # Introduction
 
 > In this chapter, we will use the Ribir syntax to write some simple examples. You only need to understand the general idea, we'll go into more detail in the following chapters.

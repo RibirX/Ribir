@@ -2,7 +2,7 @@
 Ribir - Non-intrusive Declarative GUI Framework
 </h1>
 <p align="center"><a href="https://ribir.org" target="_blank" rel="noopener noreferrer">
-<img src="docs/assets/logo.svg" alt="Ribir-logo"  width = "128px">
+<img src="static/img/logo.svg" alt="Ribir-logo"  width = "128px">
 </a></p>
 
 <p align="center">
@@ -19,7 +19,7 @@ Use Rust to build multi-platform applications from a single codebase.
 
 </div>
 
-![](./docs/assets/hero-banner.png)
+![](/static/img/hero-banner.png)
 
 ## What's Ribir?
 
@@ -84,7 +84,7 @@ More [Examples]
 
 ## Architecture overview
 
-![](./docs/assets/architecture.svg)
+![](/static/img/architecture.svg)
 
 ## Support Platform 
 
