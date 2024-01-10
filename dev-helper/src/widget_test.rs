@@ -311,6 +311,7 @@ macro_rules! widget_bench {
 ///
 /// #[test]
 /// fn assert_layout_result_by_path_example(){
+///  reset_test_env!();
 ///  let w = widget!{
 ///    MockBox {
 ///      size: Size::new(100., 100.),

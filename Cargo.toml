@@ -93,3 +93,4 @@ tokio-stream = { version = "0.1" }
 [workspace.metadata.release]
 shared-version = true
 tag = false
+pre-release-hook = ["./rclog_hook.sh"]
