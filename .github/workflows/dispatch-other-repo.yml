@@ -1,0 +1,31 @@
+name: "Dispatch other repo"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - release-*
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.RIBIR_RELEASE }}
+        script: |-
+          await github.rest.actions.createWorkflowDispatch({
+              owner: 'RibirX',
+              repo: 'ribir-website',
+              workflow_id: 'sync-docs.yml',
+              ref: 'main',
+              inputs: {
+                branch_ref: "${{ github.ref }}"
+              },
+          }).catch(error => error).then(response => {
+            core.debug(response);
+            if (response.status !== 204) {
+              core.setFailed(`create workflow_dispatch received status code ${response.status}`);
+            }
+          });
+    

@@ -1,0 +1,26 @@
+on:
+  workflow_dispatch: # allows manual triggering
+  schedule:
+    - cron: "0 22 * * 2" # runs every tuesday at 22:00 UTC+0
+permissions:
+  contents: write
+name: "Alpha Version"
+jobs:
+  master_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Master check
+        if: github.ref != 'refs/heads/master'
+        run: |
+            echo "Alpha version can be released only from master branch"
+            exit 1
+  call-workflow-passing-data:
+    needs: master_check
+    uses: RibirX/rclog/.github/workflows/release-version.yml@main
+    with:
+      level: 'alpha'
+      ref: ${{ github.ref }}
+      merge_changelog: false
+    secrets:
+      CRATE_RELEASE_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
+      GITHUB_RELEASE_TOKEN: ${{ secrets.RIBIR_RELEASE }}
