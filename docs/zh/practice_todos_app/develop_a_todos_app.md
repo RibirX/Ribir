@@ -13,12 +13,12 @@
 为了完成本教程，我们假设你：
 
 - 了解 [Rust](https://www.rust-lang.org/learn) 语言的基础知识和语法
-- 完成了前置教程 [快速上手](../zh/快速上手) 系列
+- 完成了前置教程 [快速上手](../get_started/quick_start.md) 系列
 
 
 ## 最终效果展示
 
-<img src="/static/img/todos-demo.gif" width=640px/>
+![todos demo](../assets/todos-demo.gif)
 
 ## 代码结构
 
@@ -131,7 +131,7 @@ impl TaskId {
 
 在正式进入 UI 开发之前，我们先对照原型图划分几个主要部分，以方便后文的交流：
 
-<img src="/static/img/todos-widgets.png" width=830px/>
+[todos-widgets](../assets/todos-widgets.png)
 
 1. Title 标题区，展示应用的名称
 2. Input 区，输入任务内容，按回车键添加任务
@@ -667,7 +667,6 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
 
 fn task_item<S>(task: S) -> impl WidgetBuilder
 where
-  S: StateWriter<Value = Task> + 'static,
   S::OriginWriter: StateWriter<Value = Todos>,
 {
   let todos = task.origin_writer().clone_writer();

@@ -24,7 +24,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 🎉🎉🎉 The first version of Ribir. 
 
-![background](/static/img/hero-banner.png)
+![background](./static/hero-banner.png)
 
 The goal of this version of Ribir is to finish the core framework and answer our questions about the feasibility of the design.
 
