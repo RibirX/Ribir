@@ -271,7 +271,7 @@ fn main() {
 4. 通过状态接收到数据的变更，根据映射关系点对点更新视图
 5. 重复步骤 3 和 4 。
 
-![状态的生命周期](/static/img/data-flows.svg)
+![状态的生命周期](../assets/data-flows.svg)
 
 现在，让我们引入状态来改造我们的例子。
 
@@ -380,7 +380,7 @@ let sum = pipe!(*$a + *$b);
 假设你有一个计数器，这个计数器不是用文字来显示数目，而是通过红色小方块来计数：
 
 
-<img src="/static/img/box_counter.gif" width="519"/>
+![Box counter](../assets/box_counter.gif)
 
 代码：
 

@@ -17,11 +17,11 @@ This app will allow you to add, delete, edit and mark tasks finish, and support 
 To complete this tutorial, we assume that you:
 
 - Mastered the basic concepts and syntax of [Rust](https://www.rust-lang.org/learn) language
-- Completed the prerequisite tutorial series [Quick Start](../en/QuickStart)
+- Completed the prerequisite tutorial series [Getting Started](../get_started/quick_start.md)
 
 ## Showcase
 
-<img src="/static/img/todos-demo.gif" width=640px/>
+![todos demo](../assets/todos-demo.gif)
 
 ## Code structure
 
@@ -133,7 +133,7 @@ Now your application has a complete logic, but no UI yet. Next, let's use Ribir 
 
 Before we start developing the UI, let's divide the UI into several main parts according to the prototype diagram, so that we can communicate better in the following text:
 
-<img src="/static/img/todos-widgets.png" width=830px/>
+![todos-prototype](../assets/todos-widgets.png)
 
 1. Title area, showing the name of the application
 2. Input area, enter the task content, press Enter to add the task

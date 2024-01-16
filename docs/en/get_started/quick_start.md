@@ -275,7 +275,7 @@ The complete life cycle of an interactive Ribir widget is as follows:
 4. Receive data changes through the state, and update the view point-to-point according to the mapping relationship.
 5. Repeat steps 3 and 4.
 
-![lifecycle](/static/img/data-flows.svg)
+![lifecycle](../assets/data-flows.svg)
 
 Now, let's improve our example by introducing the state.
 
@@ -383,7 +383,7 @@ At this point, all the structures of the views you create are static, and only t
 
 Suppose you have a counter that doesn't display the count with numbers, but instead uses red squares to represent the count:
 
-<img src="/static/img/box_counter.gif" width="519"/>
+![box counter](../assets/box_counter.gif)
 
 The code:
 
