@@ -1,3 +1,7 @@
+---
+sidebar_position: 1
+---
+
 # Ribir 实践： 完整开发一个 Todos 应用
 
 本教程将通过构建一个简单的 Todos 应用来向你展示一个 Ribir 应用的开发方式，同时帮你巩固 Ribir 的基本概念和使用方法。

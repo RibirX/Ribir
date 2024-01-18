@@ -1,4 +1,8 @@
-# 创建一个 Ribir 应用
+---
+sidebar_position: 1
+---
+
+# 体验 Ribir
 
 这篇文档将向你介绍如何配置和创建一个 Ribir 应用。
 

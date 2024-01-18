@@ -105,7 +105,7 @@ Every encouragement and feedback can support us to go further.
 ## Known Issues
 
 
-The pipe/watch may easily introduce a cycle reference, which will cause a memory leak. We'll resolve this issue in v0.2.0.
+The pipe/watch may easily introduce a cycle reference, which will cause a memory leak if you do not manually unsubscribe. We'll resolve this issue in v0.2.0.
 
 In most cases, the framework will be able to avoid cycle reference automatically. Documentation will be updated to explain how to avoid cycle reference in the rest cases, and we will provide an API to help developers resolve it.
 
