@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+---
+
 # 快速入门
 
 本章节将为你介绍 Ribir 的全部语法和常用的基本概念。
@@ -23,7 +27,7 @@
 - `Render` widget
 - `ComposeChild` widget
 
-本章将只会介绍函数 widget 和 `Compose` widget。因为在大部分场景中这两种 widget 已经足够满足我们的需求了。作为进阶的内容，我们将在[深入 widget](./widget_in_depth.md)中覆盖 `Render` widget 和 `ComposeChild` widget。
+本章将只会介绍函数 widget 和 `Compose` widget。因为在大部分场景中这两种 widget 已经足够满足我们的需求了。作为进阶的内容，我们将在[深入 widget](../understanding_ribir/widget_in_depth.md)中覆盖 `Render` widget 和 `ComposeChild` widget。
 
 
 ## 函数 widget
@@ -191,7 +195,7 @@ fn main() {
 >
 > 在我们上面的例子中，`Row` 接收任意数目，任意类型的 widget,`Text` 不能接收任何孩子, 而 `FilledButton` 则更复杂一点，它允许接收一个 `Label` 作为它的文字和一个 `Svg` 作为按钮图标。
 >
-> 对于如何约束 widget 的孩子类型，我们将在[深入 widget](./widget_in_depth.md)中展开介绍。
+> 对于如何约束 widget 的孩子类型，我们将在[深入 widget](../understanding_ribir/widget_in_depth.md)中展开介绍。
 
 ### 表达式创建对象
 
