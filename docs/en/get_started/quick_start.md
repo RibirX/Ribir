@@ -1,5 +1,5 @@
 ---
-sidebar_position: 1
+sidebar_position: 2
 ---
 
 # Quick Start
@@ -27,7 +27,7 @@ If you don't understand the above words very well, don't worry, because you don'
 - `Render` widget
 - `ComposeChild` widget
 
-This chapter will only introduce function widget and `Compose` widget. Because in most scenarios, these two widgets are enough to meet our needs. As advanced content, we will cover `Render` widgets and `ComposeChild` widgets in [Widget In-depth](./widget_in_depth.md).
+This chapter will only introduce function widget and `Compose` widget. Because in most scenarios, these two widgets are enough to meet our needs. As advanced content, we will cover `Render` widgets and `ComposeChild` widgets in [Widget In-depth](../understanding_ribir/widget_in_depth.md).
 
 ## Function widget
 
@@ -196,7 +196,7 @@ Do you notice the `rdl! { $row { ... } }`? It is the same as the structure liter
 >
 > In our example above, `Row` accepts any number and any type of widget, `Text` cannot accept any children, and `FilledButton` is a bit more complicated, it allows to accept a `Label` as its text and a `Svg` as the button icon.
 >
-> For how to constrain the child type of the widget, we will introduce it in [Widget In-depth](./widget_in_depth.md).
+> For how to constrain the child type of the widget, we will introduce it in [Widget In-depth](../understanding_ribir/widget_in_depth.md).
 
 ### Creating objects through expressions
 
