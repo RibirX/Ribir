@@ -19,7 +19,7 @@ pub use stateful::*;
 /// The `StateReader` trait allows for reading, clone and map the state.
 pub trait StateReader: 'static {
   /// The value type of this state.
-  type Value;
+  type Value: ?Sized;
   /// The origin state type that this state map or split from . Otherwise
   /// return itself.
   type OriginReader: StateReader;
@@ -41,6 +41,7 @@ pub trait StateReader: 'static {
   #[inline]
   fn map_reader<U, F>(&self, map: F) -> MapReader<Self::Reader, F>
   where
+    U: ?Sized,
     F: Fn(&Self::Value) -> &U + Clone,
   {
     MapReader { origin: self.clone_reader(), map }
@@ -68,7 +69,8 @@ pub trait StateReader: 'static {
   /// state, otherwise return an error with self.
   fn try_into_value(self) -> Result<Self::Value, Self>
   where
-    Self: Sized;
+    Self: Sized,
+    Self::Value: Sized;
 }
 
 pub trait StateWriter: StateReader {
@@ -121,6 +123,7 @@ pub trait StateWriter: StateReader {
   #[inline]
   fn split_writer<V, R, W>(&self, map: R, mut_map: W) -> SplittedWriter<Self::Writer, R, W>
   where
+    V: ?Sized,
     R: Fn(&Self::Value) -> &V + Clone + 'static,
     W: Fn(&mut Self::Value) -> &mut V + Clone + 'static,
   {
@@ -145,6 +148,7 @@ pub trait StateWriter: StateReader {
   #[inline]
   fn map_writer<V, R, W>(&self, map: R, mut_map: W) -> MapWriter<Self::Writer, R, W>
   where
+    V: ?Sized,
     R: Fn(&Self::Value) -> &V + Clone,
     W: Fn(&mut Self::Value) -> &mut V + Clone,
   {
@@ -155,9 +159,9 @@ pub trait StateWriter: StateReader {
 
 /// Wraps a borrowed reference to a value in a state.
 /// A wrapper type for an immutably borrowed value from a `StateReader`.
-pub struct ReadRef<'a, V>(Ref<'a, V>);
+pub struct ReadRef<'a, V: ?Sized>(Ref<'a, V>);
 
-pub struct WriteRef<'a, V> {
+pub struct WriteRef<'a, V: ?Sized> {
   value: Option<RefMut<'a, V>>,
   control: &'a dyn WriterControl,
   modify_scope: ModifyScope,
@@ -273,15 +277,15 @@ impl<W> State<W> {
   }
 }
 
-impl<'a, V> ReadRef<'a, V> {
+impl<'a, V: ?Sized> ReadRef<'a, V> {
   pub(crate) fn new(r: Ref<'a, V>) -> ReadRef<'a, V> { ReadRef(r) }
 
-  pub(crate) fn map<U>(r: ReadRef<'a, V>, f: impl FnOnce(&V) -> &U) -> ReadRef<'a, U> {
+  pub(crate) fn map<U: ?Sized>(r: ReadRef<'a, V>, f: impl FnOnce(&V) -> &U) -> ReadRef<'a, U> {
     ReadRef(Ref::map(r.0, f))
   }
 }
 
-impl<'a, V> WriteRef<'a, V> {
+impl<'a, V: ?Sized> WriteRef<'a, V> {
   /// Forget all modifies of this reference. So all the modifies occurred on
   /// this reference before this call will not be notified. Return true if there
   /// is any modifies on this reference.
@@ -289,7 +293,7 @@ impl<'a, V> WriteRef<'a, V> {
   pub fn forget_modifies(&mut self) -> bool { std::mem::replace(&mut self.modified, false) }
 }
 
-impl<'a, W> Deref for ReadRef<'a, W> {
+impl<'a, W: ?Sized> Deref for ReadRef<'a, W> {
   type Target = W;
 
   #[track_caller]
@@ -297,7 +301,7 @@ impl<'a, W> Deref for ReadRef<'a, W> {
   fn deref(&self) -> &Self::Target { &self.0 }
 }
 
-impl<'a, W> Deref for WriteRef<'a, W> {
+impl<'a, W: ?Sized> Deref for WriteRef<'a, W> {
   type Target = W;
   #[track_caller]
   #[inline]
@@ -307,7 +311,7 @@ impl<'a, W> Deref for WriteRef<'a, W> {
   }
 }
 
-impl<'a, W> DerefMut for WriteRef<'a, W> {
+impl<'a, W: ?Sized> DerefMut for WriteRef<'a, W> {
   #[track_caller]
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target {
@@ -318,7 +322,7 @@ impl<'a, W> DerefMut for WriteRef<'a, W> {
   }
 }
 
-impl<'a, W> Drop for WriteRef<'a, W> {
+impl<'a, W: ?Sized> Drop for WriteRef<'a, W> {
   fn drop(&mut self) {
     let Self { control, modify_scope, modified, .. } = self;
     if !*modified {
@@ -409,7 +413,7 @@ impl<W: MultiChild + Render> MultiParent for State<W> {
 
 impl<T: StateReader + 'static> Query for T
 where
-  T::Value: 'static,
+  T::Value: 'static + Sized,
 {
   #[inline]
   fn query_inside_first(
@@ -689,5 +693,32 @@ mod tests {
       let s = Stateful::new((Void, 0));
       split_writer!($s.0)
     };
+  }
+
+  use crate::state::{StateReader, StateWriter};
+
+  #[test]
+  fn reader_from_trait() {
+    reset_test_env!();
+    struct A {}
+    trait T {
+      fn test(&self);
+      fn test_mut(&mut self);
+    }
+
+    impl T for A {
+      fn test(&self) {}
+      fn test_mut(&mut self) {}
+    }
+
+    let a = State::value(A {});
+    let split_writer = a.split_writer(|a| a as &dyn T, |a| a as &mut dyn T);
+    split_writer.read().test();
+    split_writer.write().test_mut();
+
+    let map_writer = a.map_writer(|a| a as &dyn T, |a| a as &mut dyn T);
+    let map_reader = a.map_reader(|a| a as &dyn T);
+    map_reader.read().test();
+    map_writer.write().test_mut();
   }
 }
