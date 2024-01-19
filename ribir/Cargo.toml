@@ -64,6 +64,7 @@ pre-release-replacements = [
   {file="../CHANGELOG.md", search="@ReleaseDate", replace="{{date}}", prerelease = true},
   {file="../CHANGELOG.md", search="<!-- next-header -->", replace="<!-- next-header -->\n\n## [@Unreleased] - @ReleaseDate", exactly=1, prerelease = true},
   {file="../CHANGELOG.md", search="<!-- next-url -->", replace="<!-- next-url -->\n[@Unreleased]: https://github.com/RibirX/Ribir/compare/{{tag_name}}...HEAD", exactly=1, prerelease = true},
-  {file="../docs/zh/快速上手/创建一个应用.md", search="@RIBIR_VERSION", replace="{{version}}", prerelease = true},
-  {file="../docs/en/get_started/creating_an_application.md", search="@RIBIR_VERSION", replace="{{version}}", prerelease = true},
+  {file="../docs/zh/get_started/try_it.md", search="@RIBIR_VERSION", replace="{{version}}", prerelease = true},
+  {file="../docs/en/get_started/try_it.md", search="@RIBIR_VERSION", replace="{{version}}", prerelease = true},
 ]
+pre-release-hook = ["./rclog_hook.sh"]
