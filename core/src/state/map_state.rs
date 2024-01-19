@@ -49,13 +49,19 @@ macro_rules! impl_reader_trivial_methods {
     fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.origin.raw_modifies() }
 
     #[inline]
-    fn try_into_value(self) -> Result<Self::Value, Self> { Err(self) }
+    fn try_into_value(self) -> Result<Self::Value, Self>
+    where
+      Self::Value: Sized,
+    {
+      Err(self)
+    }
   };
 }
 
 impl<S, V, R> StateReader for MapReader<S, R>
 where
   Self: 'static,
+  V: ?Sized,
   S: StateReader,
   R: Fn(&S::Value) -> &V + Clone + 'static,
 {
@@ -65,6 +71,7 @@ where
 impl<V, S, R, W> StateReader for MapWriter<S, R, W>
 where
   Self: 'static,
+  V: ?Sized,
   S: StateWriter,
   R: Fn(&S::Value) -> &V + Clone,
   W: Fn(&mut S::Value) -> &mut V + Clone,
@@ -75,6 +82,7 @@ where
 impl<V, W, RM, WM> StateWriter for MapWriter<W, RM, WM>
 where
   Self: 'static,
+  V: ?Sized,
   W: StateWriter,
   RM: Fn(&W::Value) -> &V + Clone,
   WM: Fn(&mut W::Value) -> &mut V + Clone,
@@ -143,6 +151,7 @@ where
 impl<V, S, RM, WM> MapWriter<S, RM, WM>
 where
   Self: 'static,
+  V: ?Sized,
   S: StateWriter,
   RM: Fn(&S::Value) -> &V + Clone,
   WM: Fn(&mut S::Value) -> &mut V + Clone,

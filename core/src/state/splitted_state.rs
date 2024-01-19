@@ -78,13 +78,19 @@ macro_rules! splitted_reader_impl {
     }
 
     #[inline]
-    fn try_into_value(self) -> Result<Self::Value, Self> { Err(self) }
+    fn try_into_value(self) -> Result<Self::Value, Self>
+    where
+      Self::Value: Sized,
+    {
+      Err(self)
+    }
   };
 }
 
 impl<V, O, R> StateReader for SplittedReader<O, R>
 where
   Self: 'static,
+  V: ?Sized,
   O: StateReader,
   R: Fn(&O::Value) -> &V + Clone,
 {
@@ -94,6 +100,7 @@ where
 impl<V, O, R, W> StateReader for SplittedWriter<O, R, W>
 where
   Self: 'static,
+  V: ?Sized,
   O: StateWriter,
   R: Fn(&O::Value) -> &V + Clone,
   W: Fn(&mut O::Value) -> &mut V + Clone,
@@ -104,6 +111,7 @@ where
 impl<V, O, R, W> StateWriter for SplittedWriter<O, R, W>
 where
   Self: 'static,
+  V: ?Sized,
   O: StateWriter,
   R: Fn(&O::Value) -> &V + Clone,
   W: Fn(&mut O::Value) -> &mut V + Clone,
@@ -139,6 +147,7 @@ where
 impl<V, O, R, W> WriterControl for SplittedWriter<O, R, W>
 where
   Self: 'static,
+  V: ?Sized,
   O: StateWriter,
   R: Fn(&O::Value) -> &V + Clone,
   W: Fn(&mut O::Value) -> &mut V + Clone,
@@ -162,6 +171,7 @@ where
   O: StateWriter,
   R: Fn(&O::Value) -> &V + Clone,
   W: Fn(&mut O::Value) -> &mut V + Clone,
+  V: ?Sized,
 {
   pub(super) fn new(origin: O, map: R, mut_map: W) -> Self {
     let create_at = Instant::now();
