@@ -50,6 +50,9 @@ pub struct Window {
   /// A task pool use to process `Future` or `rxRust` task, and will block until
   /// all task finished before current frame end.
   frame_pool: RefCell<FuturesLocalSchedulerPool>,
+  /// A priority queue of tasks. So that tasks with lower priority value will be
+  /// executed first.
+  priority_task_queue: PriorityTaskQueue<'static>,
   shell_wnd: RefCell<Box<dyn ShellWindow>>,
   /// A vector store the widget id pair of (parent, child). The child need to
   /// drop after its `DelayDrop::delay_drop_until` be false or its parent
@@ -57,8 +60,6 @@ pub struct Window {
   ///
   /// This widgets it's detached from its parent, but still need to paint.
   delay_drop_widgets: RefCell<Vec<(Option<WidgetId>, WidgetId)>>,
-  /// A hash set store the root of the subtree need to regenerate.
-  regenerating_subtree: RefCell<ahash::HashMap<WidgetId, Option<WidgetId>>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
@@ -154,6 +155,8 @@ impl Window {
     self.frame_scheduler().spawn_local(f)
   }
 
+  pub fn priority_task_queue(&self) -> &PriorityTaskQueue<'static> { &self.priority_task_queue }
+
   pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, Infallible> {
     self.frame_ticker.frame_tick_stream()
   }
@@ -165,8 +168,9 @@ impl Window {
   /// Draw an image what current render tree represent.
   #[track_caller]
   pub fn draw_frame(&self) -> bool {
-    self.run_frame_tasks();
     self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now()));
+    self.run_frame_tasks();
+
     self.update_painter_viewport();
     let draw = self.need_draw() && !self.size().is_empty();
     if draw {
@@ -204,24 +208,16 @@ impl Window {
         .widget_tree
         .borrow_mut()
         .layout(self.shell_wnd.borrow().inner_size());
+      self.run_frame_tasks();
 
       if !self.widget_tree.borrow().is_dirty() {
         self.focus_mgr.borrow_mut().refresh_focus();
-      }
-
-      // we need to run frame tasks before we emit `FrameMsg::LayoutReady` to keep the
-      // task and event emit order.
-      if !self.widget_tree.borrow().is_dirty() {
         self.run_frame_tasks();
       }
+
       if !self.widget_tree.borrow().is_dirty() {
         let ready = FrameMsg::LayoutReady(Instant::now());
         self.frame_ticker.emit(ready);
-      }
-
-      // after emit `FrameMsg::LayoutReady`, we need to run frame tasks again to
-      // notify dirty
-      if !self.widget_tree.borrow().is_dirty() {
         self.run_frame_tasks();
       }
 
@@ -245,10 +241,7 @@ impl Window {
   }
 
   pub fn need_draw(&self) -> bool {
-    self.widget_tree.borrow().is_dirty()
-      || self.running_animates.get() > 0
-      // if a `pipe` widget is regenerating, need a new frame to finish it.
-      || !self.regenerating_subtree.borrow().is_empty()
+    self.widget_tree.borrow().is_dirty() || self.running_animates.get() > 0
   }
 
   pub fn new(shell_wnd: Box<dyn ShellWindow>) -> Rc<Self> {
@@ -267,9 +260,9 @@ impl Window {
       frame_ticker: FrameTicker::default(),
       running_animates: <_>::default(),
       frame_pool: <_>::default(),
+      priority_task_queue: PriorityTaskQueue::default(),
       shell_wnd: RefCell::new(shell_wnd),
       delay_drop_widgets: <_>::default(),
-      regenerating_subtree: <_>::default(),
     };
     let window = Rc::new(window);
     window.dispatcher.borrow_mut().init(Rc::downgrade(&window));
@@ -342,31 +335,6 @@ impl Window {
     self.delay_emitter.borrow_mut().push_back(e);
   }
 
-  pub(crate) fn is_in_another_regenerating(&self, wid: WidgetId) -> bool {
-    let regen = self.regenerating_subtree.borrow();
-    if regen.is_empty() {
-      return false;
-    }
-    let tree = self.widget_tree.borrow();
-    let Some(p) = wid.parent(&tree.arena) else {
-      return false;
-    };
-    let in_another = p.ancestors(&tree.arena).any(|p| {
-      regen.get(&p).map_or(false, |to| {
-        to.map_or(true, |to| wid.ancestor_of(to, &tree.arena))
-      })
-    });
-    in_another
-  }
-
-  pub(crate) fn mark_widgets_regenerating(&self, from: WidgetId, to: Option<WidgetId>) {
-    self.regenerating_subtree.borrow_mut().insert(from, to);
-  }
-
-  pub(crate) fn remove_regenerating_mark(&self, from: WidgetId) {
-    self.regenerating_subtree.borrow_mut().remove(&from);
-  }
-
   fn draw_delay_drop_widgets(&self) {
     let mut delay_widgets = self.delay_drop_widgets.borrow_mut();
     let mut painter = self.painter.borrow_mut();
@@ -397,6 +365,16 @@ impl Window {
     });
   }
 
+  fn run_priority_tasks(&self) {
+    while let Some((task, _)) = self.priority_task_queue.pop() {
+      // `pipe` used priority task queue to update the subtree, we need to force
+      // execute the async task and emit events in order. For example, `pipe1`
+      // run first and remove a subtree, then `pipe2` run. We need to make sure
+      // when `pipe2` run, the subtree is really removed.
+      self.emit_events();
+      task.run();
+    }
+  }
   /// Immediately emit all delay events. You should not call this method only if
   /// you want to interfere with the framework event dispatch process and know
   /// what you are doing.
@@ -621,11 +599,13 @@ impl Window {
       self.frame_pool.borrow_mut().run();
       // run all ready async tasks
       AppCtx::run_until_stalled();
-      if !self.delay_emitter.borrow().is_empty() {
-        self.emit_events();
-      } else {
+      self.run_priority_tasks();
+
+      if self.delay_emitter.borrow().is_empty() {
         break;
       }
+
+      self.emit_events();
     }
   }
 

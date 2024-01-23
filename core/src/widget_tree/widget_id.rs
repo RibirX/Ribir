@@ -82,7 +82,7 @@ impl WidgetId {
     self.node_feature(tree, |node| node.previous_sibling())
   }
 
-  pub(crate) fn ancestor_of(self, other: WidgetId, tree: &TreeArena) -> bool {
+  pub fn ancestor_of(self, other: WidgetId, tree: &TreeArena) -> bool {
     other.ancestors(tree).any(|p| self == p)
   }
 
