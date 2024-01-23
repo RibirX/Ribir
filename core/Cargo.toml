@@ -34,6 +34,7 @@ rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
 tokio = { workspace = true, optional = true, features = ["rt-multi-thread", "rt"]}
+priority-queue = { workspace = true }
 
 [dev-dependencies]
 colored.workspace = true
