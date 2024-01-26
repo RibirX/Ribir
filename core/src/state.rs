@@ -2,7 +2,7 @@ mod map_state;
 mod prior_op;
 mod splitted_state;
 mod stateful;
-pub use prior_op::*;  
+pub use prior_op::*;
 
 use std::{
   cell::{Cell, Ref, RefCell, RefMut, UnsafeCell},

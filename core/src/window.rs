@@ -168,6 +168,7 @@ impl Window {
   /// Draw an image what current render tree represent.
   #[track_caller]
   pub fn draw_frame(&self) -> bool {
+    AppCtx::run_until_stalled();
     self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now()));
     self.run_frame_tasks();
 
@@ -346,7 +347,7 @@ impl Window {
         .query_most_outside(|d: &DelayDrop| d.delay_drop_until)
         .unwrap_or(true);
       let parent_dropped = parent.map_or(false, |p| {
-        p.ancestors(&tree.arena).last() != Some(tree.root())
+        p.is_dropped(&tree.arena) || p.ancestors(&tree.arena).last() != Some(tree.root())
       });
       let need_drop = drop_conditional || parent_dropped;
       if need_drop {
@@ -378,7 +379,7 @@ impl Window {
   /// Immediately emit all delay events. You should not call this method only if
   /// you want to interfere with the framework event dispatch process and know
   /// what you are doing.
-  fn emit_events(&self) {
+  pub fn emit_events(&self) {
     loop {
       let Some(e) = self.delay_emitter.borrow_mut().pop_front() else {
         break;
@@ -595,16 +596,16 @@ impl Window {
   /// events.
   pub fn run_frame_tasks(&self) {
     loop {
-      // wait all frame task finished.
       self.frame_pool.borrow_mut().run();
-      // run all ready async tasks
-      AppCtx::run_until_stalled();
-      self.run_priority_tasks();
 
-      if self.delay_emitter.borrow().is_empty() {
+      if self.delay_emitter.borrow().is_empty()
+        && self.priority_task_queue.is_empty()
+        && AppCtx::run_until_stalled() == 0
+      {
         break;
       }
 
+      self.run_priority_tasks();
       self.emit_events();
     }
   }

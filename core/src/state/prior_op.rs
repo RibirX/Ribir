@@ -131,7 +131,10 @@ impl<O> Subscription for PrioritySubscription<O> {
 }
 
 impl<'a> PartialEq for PriorityTask<'a> {
-  fn eq(&self, other: &Self) -> bool { std::ptr::eq(&*self.0, &*other.0) }
+  fn eq(&self, _: &Self) -> bool {
+    // Three isn't two task that are equal.
+    false
+  }
 }
 
 impl<'a> Eq for PriorityTask<'a> {}
