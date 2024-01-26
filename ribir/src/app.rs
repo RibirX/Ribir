@@ -148,20 +148,16 @@ impl App {
               App::dispatch_wnd_native_event(&wnd, event);
             }
           }
-          wnd.run_frame_tasks();
+          wnd.emit_events();
         }
         Event::AboutToWait => {
-          AppCtx::run_until_stalled();
-          AppCtx::windows()
-            .borrow()
-            .values()
-            .filter(|wnd| wnd.need_draw())
-            .for_each(|wnd| request_redraw(wnd));
-          let need_draw = AppCtx::windows()
-            .borrow()
-            .values()
-            .any(|wnd| wnd.need_draw());
-          if need_draw {
+          let run_count = AppCtx::run_until_stalled();
+          if run_count > 0 {
+            for wnd in AppCtx::windows().borrow().values() {
+              request_redraw(wnd);
+            }
+          }
+          if run_count > 0 {
             loop_handle.set_control_flow(ControlFlow::Poll);
           } else if let Some(t) = Timer::recently_timeout() {
             loop_handle.set_control_flow(ControlFlow::WaitUntil(t));
@@ -176,11 +172,11 @@ impl App {
           _ => (),
         },
         Event::UserEvent(mut event) => {
-          if let AppEvent::FuturesWake = event {
-            AppCtx::run_until_stalled()
-          }
-          let app = unsafe { App::shared_mut() };
-          app.events_stream.next(&mut event);
+          AppCtx::spawn_local(async move {
+            let app = unsafe { App::shared_mut() };
+            app.events_stream.next(&mut event);
+          })
+          .unwrap();
         }
         _ => (),
       }

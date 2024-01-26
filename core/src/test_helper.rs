@@ -81,7 +81,6 @@ impl TestWindow {
     // Test window not have a eventloop, manually wake-up every frame.
     Timer::wake_timeout_futures();
     self.run_frame_tasks();
-
     self.0.draw_frame();
   }
 }

@@ -168,9 +168,13 @@ impl AppCtx {
   /// Runs all tasks in the local(usually means on the main thread) pool and
   /// returns if no more progress can be made on any task.
   #[track_caller]
-  pub fn run_until_stalled() {
+  pub fn run_until_stalled() -> usize {
+    let mut count = 0;
     let mut executor = Self::shared().executor.borrow_mut();
-    while executor.try_run_one() {}
+    while executor.try_run_one() {
+      count += 1;
+    }
+    count
   }
 
   /// Loads the font from the theme config and import it into the font database.
