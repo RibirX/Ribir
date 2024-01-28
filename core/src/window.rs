@@ -139,10 +139,20 @@ impl Window {
   }
 
   /// Request switch the focus to next widget.
-  pub fn request_next_focus(&self) { self.focus_mgr.borrow_mut().focus_next_widget(); }
+  pub fn request_next_focus(&self) {
+    self
+      .focus_mgr
+      .borrow_mut()
+      .focus_next_widget(&self.widget_tree.borrow().arena);
+  }
 
   /// Request switch the focus to prev widget.
-  pub fn request_prev_focus(&self) { self.focus_mgr.borrow_mut().focus_prev_widget(); }
+  pub fn request_prev_focus(&self) {
+    self
+      .focus_mgr
+      .borrow_mut()
+      .focus_prev_widget(&self.widget_tree.borrow().arena);
+  }
 
   /// Return an `rxRust` Scheduler, which will guarantee all task add to the
   /// scheduler will finished before current frame finished.
@@ -212,7 +222,10 @@ impl Window {
       self.run_frame_tasks();
 
       if !self.widget_tree.borrow().is_dirty() {
-        self.focus_mgr.borrow_mut().refresh_focus();
+        self
+          .focus_mgr
+          .borrow_mut()
+          .refresh_focus(&self.widget_tree.borrow().arena);
         self.run_frame_tasks();
       }
 
@@ -400,6 +413,9 @@ impl Window {
             .into_iter()
             .rev()
             .for_each(|id| {
+              if Some(id) == self.focusing() {
+                self.focus_mgr.borrow_mut().blur_on_dispose();
+              }
               let e = AllLifecycle::Disposed(LifecycleEvent { id, wnd_id: self.id() });
               self.emit::<LifecycleListener>(id, e);
             });
@@ -457,9 +473,9 @@ impl Window {
 
           let mut focus_mgr = self.focus_mgr.borrow_mut();
           if pressed_shift {
-            focus_mgr.focus_prev_widget();
+            focus_mgr.focus_prev_widget(&self.widget_tree.borrow().arena);
           } else {
-            focus_mgr.focus_next_widget();
+            focus_mgr.focus_next_widget(&self.widget_tree.borrow().arena);
           }
         }
         DelayEvent::KeyUp(event) => {
@@ -486,7 +502,10 @@ impl Window {
           self.top_down_emit::<PointerListener>(&mut e, id, None);
           let mut e = AllPointer::PointerDown(e.into_inner());
           self.bottom_up_emit::<PointerListener>(&mut e, id, None);
-          self.focus_mgr.borrow_mut().refresh_focus();
+          self
+            .focus_mgr
+            .borrow_mut()
+            .refresh_focus(&self.widget_tree.borrow().arena);
         }
         DelayEvent::PointerMove(id) => {
           let mut e = AllPointer::PointerMoveCapture(PointerEvent::from_mouse(id, self));

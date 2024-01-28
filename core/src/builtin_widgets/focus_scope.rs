@@ -61,10 +61,11 @@ mod tests {
 
     let wnd = TestWindow::new(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
-    focus_mgr.refresh_focus();
-
     let tree = wnd.widget_tree.borrow();
     let arena = &tree.arena;
+
+    focus_mgr.refresh_focus(arena);
+
     let id0 = tree.root().first_child(arena).unwrap();
     let scope = id0.next_sibling(arena).unwrap();
     let scope_id1 = scope.first_child(arena).unwrap();
@@ -74,25 +75,25 @@ mod tests {
 
     {
       // next focus sequential
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id1));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(scope_id1));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(scope_id2));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(scope_id3));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id0));
 
       // previous focus sequential
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(scope_id3));
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(scope_id2));
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(scope_id1));
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id1));
     }
   }
@@ -122,7 +123,7 @@ mod tests {
     let wnd = TestWindow::new(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let widget_tree = wnd.widget_tree.borrow();
-    focus_mgr.refresh_focus();
+    focus_mgr.refresh_focus(&widget_tree.arena);
 
     let arena = &widget_tree.arena;
     let id0 = widget_tree.root().first_child(arena).unwrap();
@@ -131,17 +132,17 @@ mod tests {
 
     {
       // next focus sequential
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id1));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(scope));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id0));
 
       // previous focus sequential
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(scope));
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id1));
     }
   }
