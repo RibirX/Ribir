@@ -178,9 +178,13 @@ impl Dispatcher {
       })
     });
     if let Some(focus_id) = nearest_focus {
-      self.window().focus_mgr.borrow_mut().focus(focus_id);
+      let Window { focus_mgr, widget_tree, .. } = &*wnd;
+      focus_mgr
+        .borrow_mut()
+        .focus(focus_id, &widget_tree.borrow().arena);
     } else {
-      self.window().focus_mgr.borrow_mut().blur();
+      let Window { focus_mgr, widget_tree, .. } = &*wnd;
+      focus_mgr.borrow_mut().blur(&widget_tree.borrow().arena);
     }
     if let Some(hit) = hit {
       wnd.add_delay_event(DelayEvent::PointerDown(hit));

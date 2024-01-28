@@ -15,6 +15,7 @@ pub(crate) struct FocusManager {
   /// store current focusing node, and its position in tab_orders.
   focusing: Option<WidgetId>,
   request_focusing: Option<Option<WidgetId>>,
+  frame_auto_focus: Vec<WidgetId>,
   focus_widgets: Vec<WidgetId>,
   node_ids: ahash::HashMap<WidgetId, NodeId>,
   arena: Arena<FocusNodeInfo>,
@@ -93,6 +94,7 @@ impl FocusManager {
     Self {
       wnd: Weak::new(),
       focus_widgets: Vec::new(),
+      frame_auto_focus: vec![],
       request_focusing: None,
       focusing: None,
       node_ids: ahash::HashMap::default(),
@@ -129,8 +131,8 @@ impl FocusManager {
       self.insert_node(*parent, node_id, wid, arena);
     }
 
-    if auto_focus && focus_type == FocusType::Node && self.focusing().is_none() {
-      self.request_focus_to(Some(wid));
+    if auto_focus && focus_type == FocusType::Node {
+      self.frame_auto_focus.push(wid);
     }
   }
 
@@ -143,29 +145,25 @@ impl FocusManager {
       return;
     };
 
-    let focusing = self.focusing();
-    let has_focus_node;
-    {
-      let node = self.arena[id].get_mut();
-      node.remove_focus(focus_type);
-      has_focus_node = node.has_focus_node();
-      if node.is_empty() {
-        id.remove(&mut self.arena);
-        self.node_ids.remove(&wid);
-      }
-    }
-
-    if Some(wid) == focusing && !has_focus_node {
-      self.request_focus_to(None);
+    let node = self.arena[id].get_mut();
+    node.remove_focus(focus_type);
+    if node.is_empty() {
+      id.remove(&mut self.arena);
+      self.node_ids.remove(&wid);
     }
   }
 
-  pub fn next_focus(&mut self) -> Option<WidgetId> {
-    let Some(focusing) = self.request_focusing.take() else {
-      return self.focusing;
-    };
-    focusing?;
-    let focusing = focusing.filter(|node_id| self.ignore_scope_id(*node_id).is_none());
+  pub fn next_focus(&mut self, arena: &TreeArena) -> Option<WidgetId> {
+    let request_focus = self.request_focusing.take();
+    let autos = self.frame_auto_focus.drain(..);
+    let next_focus = request_focus
+      .into_iter()
+      .chain(autos.map(Some))
+      .find(|request| request.as_ref().map_or(true, |id| !id.is_dropped(arena)));
+
+    let focusing = next_focus
+      .unwrap_or(self.focusing)
+      .filter(|node_id| self.ignore_scope_id(*node_id).is_none());
     let focus_node = focusing.and_then(|wid| self.node_ids.get(&wid));
     let info = focus_node.and_then(|id: &NodeId| self.get(*id));
 
@@ -416,6 +414,9 @@ impl FocusManager {
       pid: Option<WidgetId>,
       arena: &TreeArena,
     ) -> Vec<WidgetId> {
+      if wid.is_dropped(arena) {
+        return vec![];
+      }
       if let Some(pid) = pid {
         let mut arr: Vec<WidgetId> = wid.ancestors(arena).take_while(|id| *id != pid).collect();
         arr.push(pid);
@@ -469,29 +470,33 @@ impl FocusManager {
 }
 
 impl FocusManager {
-  pub fn focus_next_widget(&mut self) {
+  pub fn focus_next_widget(&mut self, arena: &TreeArena) {
     self.focus_move_circle(false);
-    self.refresh_focus();
+    self.refresh_focus(arena);
   }
 
-  pub fn focus_prev_widget(&mut self) {
+  pub fn focus_prev_widget(&mut self, arena: &TreeArena) {
     self.focus_move_circle(true);
-    self.refresh_focus();
+    self.refresh_focus(arena);
   }
 
-  pub fn focus(&mut self, wid: WidgetId) {
+  pub fn focus(&mut self, wid: WidgetId, arena: &TreeArena) {
     self.request_focus_to(Some(wid));
-    self.refresh_focus();
+    self.refresh_focus(arena);
   }
 
-  /// Removes keyboard focus from the current focusing widget and return its id.
-  pub fn blur(&mut self) { self.request_focus_to(None); }
+  pub fn blur(&mut self, arena: &TreeArena) {
+    self.request_focus_to(None);
+    self.refresh_focus(arena);
+  }
+
+  pub(crate) fn blur_on_dispose(&mut self) { self.change_focusing_to(None); }
 
   /// return the focusing widget.
-  pub fn focusing(&self) -> Option<WidgetId> { self.request_focusing.unwrap_or(self.focusing) }
+  pub fn focusing(&self) -> Option<WidgetId> { self.focusing }
 
-  pub fn refresh_focus(&mut self) {
-    let new_focus = self.next_focus();
+  pub fn refresh_focus(&mut self, arena: &TreeArena) {
+    let new_focus = self.next_focus(arena);
     if self.focus_widgets.first() != new_focus.as_ref() {
       self.change_focusing_to(new_focus);
     }
@@ -505,9 +510,6 @@ impl FocusManager {
   // will be removed soon.
   fn request_focus_to(&mut self, focus_to: Option<WidgetId>) {
     self.request_focusing = Some(focus_to);
-    if focus_to.is_none() {
-      self.refresh_focus();
-    }
   }
 
   fn change_focusing_to(&mut self, node: Option<WidgetId>) -> Option<WidgetId> {
@@ -566,7 +568,7 @@ mod tests {
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let tree = wnd.widget_tree.borrow();
 
-    focus_mgr.refresh_focus();
+    focus_mgr.refresh_focus(&tree.arena);
 
     let id = tree.root().first_child(&tree.arena);
     assert!(id.is_some());
@@ -594,7 +596,7 @@ mod tests {
       .first_child(&tree.arena)
       .and_then(|p| p.next_sibling(&tree.arena));
     assert!(id.is_some());
-    focus_mgr.refresh_focus();
+    focus_mgr.refresh_focus(&tree.arena);
     assert_eq!(focus_mgr.focusing(), id);
   }
 
@@ -617,10 +619,10 @@ mod tests {
     let wnd = TestWindow::new(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let widget_tree = wnd.widget_tree.borrow();
-
-    focus_mgr.refresh_focus();
-
     let arena = &widget_tree.arena;
+
+    focus_mgr.refresh_focus(arena);
+
     let negative = widget_tree.root().first_child(arena).unwrap();
     let id0 = negative.next_sibling(arena).unwrap();
     let id1 = id0.next_sibling(arena).unwrap();
@@ -631,32 +633,32 @@ mod tests {
 
     {
       // next focus sequential
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id2));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id3));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id4));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id0));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id0_0));
-      focus_mgr.focus_next_widget();
+      focus_mgr.focus_next_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id1));
 
       // previous focus sequential
 
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id0_0));
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id0));
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id4));
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id3));
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id2));
-      focus_mgr.focus_prev_widget();
+      focus_mgr.focus_prev_widget(arena);
       assert_eq!(focus_mgr.focusing(), Some(id1));
     }
   }
@@ -715,8 +717,14 @@ mod tests {
     let child = parent.first_child(&tree.arena).unwrap();
     drop(tree);
 
-    wnd.focus_mgr.borrow_mut().refresh_focus();
-    wnd.focus_mgr.borrow_mut().focus(child);
+    wnd
+      .focus_mgr
+      .borrow_mut()
+      .refresh_focus(&wnd.widget_tree.borrow().arena);
+    wnd
+      .focus_mgr
+      .borrow_mut()
+      .focus(child, &wnd.widget_tree.borrow().arena);
     wnd.draw_frame();
     assert_eq!(
       &*log.borrow(),
@@ -724,7 +732,10 @@ mod tests {
     );
     log.borrow_mut().clear();
 
-    wnd.focus_mgr.borrow_mut().focus_next_widget();
+    wnd
+      .focus_mgr
+      .borrow_mut()
+      .focus_next_widget(&wnd.widget_tree.borrow().arena);
     wnd.run_frame_tasks();
     assert_eq!(
       &*log.borrow(),
@@ -732,7 +743,10 @@ mod tests {
     );
     log.borrow_mut().clear();
 
-    wnd.focus_mgr.borrow_mut().blur();
+    wnd
+      .focus_mgr
+      .borrow_mut()
+      .blur(&wnd.widget_tree.borrow().arena);
     wnd.run_frame_tasks();
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
   }
@@ -804,7 +818,7 @@ mod tests {
     focus_mgr.request_focus_to(focus_scope);
 
     let inner_box = focus_scope.unwrap().first_child(&tree.arena);
-    focus_mgr.refresh_focus();
+    focus_mgr.refresh_focus(&tree.arena);
     assert_eq!(focus_mgr.focusing(), inner_box);
   }
 

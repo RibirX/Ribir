@@ -484,8 +484,7 @@ fn expression_for_children() {
   let size_five = Size::new(5., 5.);
   let embed_expr = fn_widget! {
     let sized_box = @SizedBox { size: size_one };
-    let multi_box = (0..3).map(move |_| @SizedBox { size: pipe!($sized_box.size) })
-    ;
+    let multi_box = (0..3).map(move |_| @SizedBox { size: pipe!($sized_box.size) });
     let pipe_box = pipe!($sized_box.size.area() > 2.)
       .map(move |v| v.then(|| @SizedBox { size: pipe!($sized_box.size) }));
 
