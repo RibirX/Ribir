@@ -32,7 +32,7 @@ cd ribir-hello-world
 
 ```toml
 [dependencies]
-ribir = "@RIBIR_VERSION"
+ribir = "0.1.0-alpha.0"
 ```
 
 或者直接运行 `cargo add --git "https://github.com/RibirX/Ribir" ribir` 让 Cargo 为你添加正在开发中的最新 Ribir 版本.
