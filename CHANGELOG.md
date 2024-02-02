@@ -14,19 +14,17 @@ There are 5 types of changes:
 
 Please only add new entries below the [Unreleased](#unreleased---releasedate) header with the following format:
 
-```md
+``` md
 **crate or effect scope**: description of change (#PR @contributor)
 ```
 
 <!-- next-header -->
 
-## [@Unreleased] - @ReleaseDate
+## [@Unreleased](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0-beta.7...HEAD) - @ReleaseDate
 
+## [0.1.0-beta.7](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0-alpha.0...ribir-v0.1.0-beta.7) - 2024-02-02
 
-
-## 0.1.0-alpha.0 - 2024-01-29
-
-🎉🎉🎉 The first version of Ribir. 
+🎉🎉🎉 The first version of Ribir.
 
 ![background](./static/hero-banner.png)
 
@@ -43,26 +41,21 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **widgets compose system**: has four kinds of widgets to support you can implement your own widget in different ways:
   - function widget and `Compose`, from other widgets composition.
   - `Render`, implement your layout and paint anything you want.
-  - `ComposeChild`, control the compose logic between parent and child widgets and specify the template of child widgets.  
+  - `ComposeChild`, control the compose logic between parent and child widgets and specify the template of child widgets.
 - **non-intrusive state**: convert your data to a listenable state, and update the view according to the change of the state.
-- **layout system**: learning and inspired by [Flutter] Sublinear layout, but not the same.
+- **layout system**: learning and inspired by [Flutter](https://flutter.dev/) Sublinear layout, but not the same.
 - **event system**: a composition event system, that supports event bubbling and capture. Allow to compose with any widget, and exists only if you use it.
 - **theme System**: support full and inherit/partial theme, so you can use it to override or dynamically switch the theme of the subtree. Include palette, icons, animate transitions, the decoration widget of the widget, etc. In a very rough state and the API will be redesigned soon.
 - **animations**: based on state but no side effect animation, it's almost stable in concept, but not many predefined animations yet.
 - **painter**： convert the view to the 2D path.
-- **GPU render**: GPU backend for the **painter**, do path tessellation, so that easy to render the triangles in any GPU render engine. A `wgpu` implementation is provided as the default GPU render engine. Tessellation base on [lyon].
+- **GPU render**: GPU backend for the **painter**, do path tessellation, so that easy to render the triangles in any GPU render engine. A `wgpu` implementation is provided as the default GPU render engine. Tessellation base on [lyon](https://github.com/nical/lyon).
 - **text**: support basic text typography and IME input, in a usable but rough stage.
 - **widgets**: the widgets library provides 20+ basic widgets, but all are in a rough stage, and the API is not stable yet.
-- **examples**: counter, storybook, messages, todos, wordle_game, etc.
+- **examples**: counter, storybook, messages, todos, wordle\_game, etc.
 
 ### Documented
 
+<!-- next-url -->
+
 - **introduction**: add `introduction.md` to introduce Ribir and why choose it.
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
-
-
-[Flutter]: https://flutter.dev/
-[lyon]: https://github.com/nical/lyon
-
-<!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.1.0-alpha.0...HEAD
