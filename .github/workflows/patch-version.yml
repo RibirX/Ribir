@@ -44,6 +44,7 @@ jobs:
       level: ${{ needs.release_level.outputs.level }}
       ref: ${{ github.ref }}
       merge_changelog: ${{ needs.release_level.outputs.level == 'patch' }}
+      toolchain: nightly-2023-10-15
     secrets:
       CRATE_RELEASE_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
       GITHUB_RELEASE_TOKEN: ${{ secrets.RIBIR_RELEASE }}
