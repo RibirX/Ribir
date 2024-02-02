@@ -16,11 +16,11 @@ version.workspace = true
 [dependencies]
 dssim-core.workspace = true
 futures.workspace = true
-ribir_geom = {path = "../geom", version = "0.1.0-beta.2" }
-ribir_gpu = {path = "../gpu", version = "0.1.0-beta.2" }
-ribir_painter = {path = "../painter", features = ["png"], version = "0.1.0-beta.2" }
+ribir_geom = {path = "../geom", version = "0.1.0-beta.4" }
+ribir_gpu = {path = "../gpu", version = "0.1.0-beta.4" }
+ribir_painter = {path = "../painter", features = ["png"], version = "0.1.0-beta.4" }
 
 [dev-dependencies]
 colored.workspace = true
 paste.workspace = true
-ribir_core = {path = "../core", version = "0.1.0-beta.2" }
+ribir_core = {path = "../core", version = "0.1.0-beta.4" }
