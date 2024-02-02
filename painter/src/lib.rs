@@ -1,5 +1,3 @@
-#![feature(const_fn_floating_point_arithmetic, test)]
-
 //! A 2d logic painter, generate the paint command
 pub mod color;
 mod painter;
