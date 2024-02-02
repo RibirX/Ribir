@@ -34,7 +34,7 @@ homepage = "https://ribir.org"
 keywords = ["gui", "ui", "declarative", "compose-ui"]
 license = "MIT"
 readme = "README.md"
-version = "0.1.0-alpha.0"
+version = "0.1.0-beta.2"
 
 [workspace.dependencies]
 Inflector = "0.11.4"
