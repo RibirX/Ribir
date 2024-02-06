@@ -34,7 +34,7 @@ sidebar_position: 2
 
 接收 `&BuildCtx` 作为入参并返回 `Widget` 的函数或闭包被称为函数 widget。
 
-在没有外部状态依赖的情况下，通过函数来定义 widget 是最简单的一种方式。在[创建一个应用](./creating_an_application.md)中，你已经见过一个 `Hello world!` 的函数 widget 了。本节中，我们仍通过 `Hello world!` 的例子来展开介绍。
+在没有外部状态依赖的情况下，通过函数来定义 widget 是最简单的一种方式。在[体验 Ribir](./try_it.md)中，你已经见过一个 `Hello world!` 的函数 widget 了。本节中，我们仍通过 `Hello world!` 的例子来展开介绍。
 
 ### 通过函数来定义 widget
 
@@ -151,7 +151,7 @@ fn main() {
     rdl!{ 
       Row {
         rdl!{ FilledButton {
-          rdl! { Label::new("Increment") }
+          rdl!{ Label::new("Increment") }
         }}
         rdl!{ H1 { text: "0" } }
       }
@@ -176,7 +176,7 @@ fn main() {
     rdl!{ 
       $row {
         rdl!{ FilledButton {
-          rdl! { Label::new("Increment") }
+          rdl!{ Label::new("Increment") }
         }}
         rdl!{ Text { text: "0" } }
       }
@@ -199,7 +199,7 @@ fn main() {
 
 ### 表达式创建对象
 
-除了通过结构体字面量创建对象以外，你还可以通过 `rdl! {...}` 包裹任意表达式来创建对象。这种方式的好处是，你可以在 `{...}` 中写任意代码在创建对象。这在嵌套组合中非常有用，也只在嵌套作为孩子时有必要。下面的例子展示如何在 `rdl` 中使用表达式创建对象：
+除了通过结构体字面量创建对象以外，你还可以通过 `rdl!{...}` 包裹任意表达式来创建对象。这种方式的好处是，你可以在 `{...}` 中写任意代码在创建对象。这在嵌套组合中非常有用，也只在嵌套作为孩子时有必要。下面的例子展示如何在 `rdl` 中使用表达式创建对象：
 
 ```rust ignore
 use ribir::prelude::*;

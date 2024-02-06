@@ -8,7 +8,7 @@ use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 fn simplest_leaf_rdl() -> impl WidgetBuilder {
   fn_widget! {
-    rdl! { SizedBox { size: Size::new(500.,500.) } }
+    rdl!{ SizedBox { size: Size::new(500.,500.) } }
   }
 }
 widget_layout_test!(simplest_leaf_rdl, width == 500., height == 500.,);
@@ -26,7 +26,7 @@ widget_layout_test!(with_child_rdl, width == 500., height == 500.,);
 
 fn with_builtin_child_rdl() -> impl WidgetBuilder {
   fn_widget! {
-    rdl! { SizedBox {
+    rdl!{ SizedBox {
       size: Size::new(500.,500.),
       margin: EdgeInsets::all(10.)
     }}
@@ -37,7 +37,7 @@ widget_layout_test!(with_builtin_child_rdl, width == 520., height == 520.,);
 fn rdl_with_child() -> impl WidgetBuilder {
   fn_widget! {
     let single_p = rdl!{ SizedBox { size: Size::new(500.,500.)  }};
-    rdl! { $single_p { rdl! { Void } } }
+    rdl!{ $single_p { rdl!{ Void } } }
   }
 }
 widget_layout_test!(rdl_with_child, width == 500., height == 500.,);
@@ -48,7 +48,7 @@ fn single_rdl_has_builtin_with_child() -> impl WidgetBuilder {
       size: Size::new(500.,500.),
       margin: EdgeInsets::all(10.)
     }};
-    rdl! { $single_p { rdl! { Void } } }
+    rdl!{ $single_p { rdl!{ Void } } }
   }
 }
 widget_layout_test!(
@@ -59,10 +59,10 @@ widget_layout_test!(
 
 fn multi_child_rdl_has_builtin_with_child() -> impl WidgetBuilder {
   fn_widget! {
-    let multi_p = rdl! { Flex {
+    let multi_p = rdl!{ Flex {
       margin: EdgeInsets::all(10.)
     } };
-    rdl! { $multi_p { rdl!{ Void } } }
+    rdl!{ $multi_p { rdl!{ Void } } }
   }
 }
 widget_layout_test!(
@@ -74,7 +74,7 @@ widget_layout_test!(
 fn compose_child_rdl_has_builtin_with_child() -> impl WidgetBuilder {
   fn_widget! {
     let multi_p = rdl!{ Row { margin: EdgeInsets::all(10.) }};
-    rdl! { $multi_p { rdl!{ Void {} }} }
+    rdl!{ $multi_p { rdl!{ Void {} }} }
   }
 }
 widget_layout_test!(
@@ -85,10 +85,10 @@ widget_layout_test!(
 
 fn access_rdl_widget() -> impl WidgetBuilder {
   fn_widget! {
-    let b = rdl! { SizedBox {size: Size::new(500.,500.)}};
-    rdl! { Row {
-      rdl! { SizedBox { size: $b.size } }
-      rdl! { b }
+    let b = rdl!{ SizedBox {size: Size::new(500.,500.)}};
+    rdl!{ Row {
+      rdl!{ SizedBox { size: $b.size } }
+      rdl!{ b }
     }}
   }
 }
@@ -96,20 +96,20 @@ widget_layout_test!(access_rdl_widget, width == 1000., height == 500.,);
 
 fn access_builtin_rdl_widget() -> impl WidgetBuilder {
   fn_widget! {
-    let mut b = rdl! { SizedBox {
+    let mut b = rdl!{ SizedBox {
       size: Size::new(100.,100.),
       margin: EdgeInsets::all(10.)
     }};
 
     rdl!{
       Row {
-        rdl! {
+        rdl!{
           SizedBox {
             size: $b.size,
             margin: $b.margin,
           }
         }
-        rdl! { b }
+        rdl!{ b }
       }
     }
   }
@@ -118,16 +118,16 @@ widget_layout_test!(access_builtin_rdl_widget, width == 240., height == 120.,);
 
 fn dollar_as_rdl_parent() -> impl WidgetBuilder {
   fn_widget! {
-    let b = rdl! {SizedBox { size: Size::new(500.,500.) }};
-    rdl! { $b { rdl! { Void {}} } }
+    let b = rdl!{SizedBox { size: Size::new(500.,500.) }};
+    rdl!{ $b { rdl!{ Void {}} } }
   }
 }
 widget_layout_test!(dollar_as_rdl_parent, width == 500., height == 500.,);
 
 fn dollar_as_middle_parent() -> impl WidgetBuilder {
   fn_widget! {
-    let b = rdl! { SizedBox { size: Size::new(500.,500.) }};
-    rdl! { Row { rdl! { $b { rdl! { Void {} } } } } }
+    let b = rdl!{ SizedBox { size: Size::new(500.,500.) }};
+    rdl!{ Row { rdl!{ $b { rdl!{ Void {} } } } } }
   }
 }
 widget_layout_test!(dollar_as_middle_parent, width == 500., height == 500.,);
@@ -136,7 +136,7 @@ fn pipe_as_field_value() -> impl WidgetBuilder {
   let size = Stateful::new(Size::zero());
   let size2 = size.clone_reader();
   let w = fn_widget! {
-    rdl! { SizedBox { size: pipe!(*$size2) }}
+    rdl!{ SizedBox { size: pipe!(*$size2) }}
   };
   *size.write() = Size::new(100., 100.);
   w
@@ -148,7 +148,7 @@ fn pipe_as_builtin_field_value() -> impl WidgetBuilder {
   let margin2 = margin.clone_reader();
 
   let w = fn_widget! {
-    rdl! { SizedBox {
+    rdl!{ SizedBox {
       size: Size::zero(),
       margin: pipe!(*$margin2)
     }}
@@ -162,7 +162,7 @@ fn pipe_with_ctx() -> impl WidgetBuilder {
   let scale = Stateful::new(1.);
   let scale2 = scale.clone_writer();
   let w = fn_widget! {
-    rdl! { SizedBox {
+    rdl!{ SizedBox {
       size: pipe!(IconSize::of(ctx!()).tiny * *$scale)
     }}
   };
@@ -208,7 +208,7 @@ fn pipe_single_parent() {
         BoxedSingleChild::new(Padding { padding: edges }, ctx!())
       }
     };
-    rdl! {
+    rdl!{
       $blank {
         rdl!{ SizedBox { size: Size::new(100., 100.) } }
       }
@@ -233,13 +233,13 @@ fn pipe_multi_parent() {
   let w = fn_widget! {
     let container = pipe! {
       if *$stack_or_flex {
-        BoxedMultiChild::new(rdl! { Stack { } }, ctx!())
+        BoxedMultiChild::new(rdl!{ Stack { } }, ctx!())
       } else {
-        BoxedMultiChild::new(rdl! { Flex { } }, ctx!())
+        BoxedMultiChild::new(rdl!{ Flex { } }, ctx!())
       }
     };
 
-    rdl! {
+    rdl!{
       $container {
         rdl!{ SizedBox { size: Size::new(100., 100.) } }
         rdl!{ SizedBox { size: Size::new(100., 100.) } }
@@ -264,9 +264,9 @@ fn pipe_as_child() {
   let box_or_not2 = box_or_not.clone_reader();
   let w = fn_widget! {
     let blank = pipe!{
-      $box_or_not2.then(|| rdl! { SizedBox { size: Size::new(100., 100.) } })
+      $box_or_not2.then(|| rdl!{ SizedBox { size: Size::new(100., 100.) } })
     };
-    rdl! { Stack { rdl! { blank } } }
+    rdl!{ Stack { rdl!{ blank } } }
   };
 
   let mut wnd = TestWindow::new(w);
@@ -290,7 +290,7 @@ fn pipe_as_multi_child() {
     let boxes = pipe! {
       (0..*$cnt).map(|_| fix_box.clone()).collect::<Vec<_>>()
     };
-    rdl! { Flex { rdl!{ boxes } } }
+    rdl!{ Flex { rdl!{ boxes } } }
   };
 
   let mut wnd = TestWindow::new(w);
@@ -317,7 +317,7 @@ fn at_as_variable_in_widget() -> impl WidgetBuilder {
       // @ in @
       @SizedBox { size }
       // `rdl!` in @
-      rdl! { SizedBox { size } }
+      rdl!{ SizedBox { size } }
     }
   }
 }
@@ -327,7 +327,7 @@ fn at_as_variable_in_rdl() -> impl WidgetBuilder {
   fn_widget! {
     let size = Size::new(100., 100.);
     let row = @Row {};
-    rdl! {
+    rdl!{
       $row {
         @SizedBox { size }
         @SizedBox { size }
