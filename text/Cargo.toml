@@ -20,9 +20,9 @@ fontdb.workspace = true
 log.workspace = true
 lyon_path.workspace = true
 ordered-float.workspace = true
-ribir_algo = {path = "../algo", version = "0.2.0-alpha.0" }
-ribir_geom = {path = "../geom", version = "0.2.0-alpha.0" }
-ribir_painter = {path = "../painter", version = "0.2.0-alpha.0" }
+ribir_algo = {path = "../algo", version = "0.2.0-alpha.1" }
+ribir_geom = {path = "../geom", version = "0.2.0-alpha.1" }
+ribir_painter = {path = "../painter", version = "0.2.0-alpha.1" }
 rustybuzz.workspace = true
 unicode-bidi.workspace = true
 unicode-script.workspace = true
