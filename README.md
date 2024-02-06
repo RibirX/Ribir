@@ -83,7 +83,7 @@ More [Examples]
 
 ## Architecture overview
 
-![](/static/img/architecture.svg)
+![](./docs/en/assets/architecture.svg)
 
 ## Support Platform 
 

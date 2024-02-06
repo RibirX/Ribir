@@ -20,26 +20,26 @@ use syn::{
 
 pub enum RdlMacro {
   Literal(StructLiteral),
-  /// Declare an expression as a object, like `rdl! { Widget::new(...) }`
+  /// Declare an expression as a object, like `rdl!{ Widget::new(...) }`
   ExprObj {
     span: Span,
     stmts: Vec<Stmt>,
   },
 }
 
-/// Declare a object use struct literal, like `rdl! { Row { ... } }` or
+/// Declare a object use struct literal, like `rdl!{ Row { ... } }` or
 /// `@parent { ... }`
 pub struct StructLiteral {
   pub span: Span,
   pub parent: RdlParent,
   pub fields: Punctuated<DeclareField, Comma>,
   /// Declare a child in `rdl!` can use `rdl!` macro or `@` symbol.
-  /// `rdl! { Row { rdl! { SizedBox {...} } } }`
+  /// `rdl!{ Row { rdl!{ SizedBox {...} } } }`
   /// or
-  /// `rdl! { Row { @ SizedBox{ ... } } }`
+  /// `rdl!{ Row { @ SizedBox{ ... } } }`
   /// and the second case will be instead by
   /// ```ignore
-  /// rdl! { Row { rdl! { SizedBox {...} } } }
+  /// rdl!{ Row { rdl!{ SizedBox {...} } } }
   /// ```
   ///  in preprocessor.
   pub children: Vec<Macro>,

@@ -33,7 +33,7 @@ This chapter will only introduce function widget and `Compose` widget. Because i
 
 The function or closure that accepts `&BuildCtx` as the input parameter and returns the `Widget` is called a function widget.
 
-A function widget is the simplest way to define a widget without external state dependencies. In [Creating an application](./creating_an_application.md), you have seen a function widget of `Hello world!`. In this section, we will continue to introduce it through the example of `Hello world!`.
+A function widget is the simplest way to define a widget without external state dependencies. In [Try Ribir](./try_it.md), you have seen a function widget of `Hello world!`. In this section, we will continue to introduce it through the example of `Hello world!`.
 
 
 ### Define widget through function
@@ -152,7 +152,7 @@ fn main() {
     rdl!{ 
       Row {
         rdl!{ FilledButton {
-          rdl! { Label::new("Increment") }
+          rdl!{ Label::new("Increment") }
         }}
         rdl!{ H1 { text: "0" } }
       }
@@ -177,7 +177,7 @@ fn main() {
     rdl!{ 
       $row {
         rdl!{ FilledButton {
-          rdl! { Label::new("Increment") }
+          rdl!{ Label::new("Increment") }
         }}
         rdl!{ Text { text: "0" } }
       }
@@ -188,7 +188,7 @@ fn main() {
 }
 ```
 
-Do you notice the `rdl! { $row { ... } }`? It is the same as the structure literal syntax, but with `$` in front of it, it means that it is a variable rather than a type, so it will not create a new widget, but directly use this variable to compose with the child.
+Do you notice the `rdl!{ $row { ... } }`? It is the same as the structure literal syntax, but with `$` in front of it, it means that it is a variable rather than a type, so it will not create a new widget, but directly use this variable to compose with the child.
 
 > Tip
 >
@@ -200,7 +200,7 @@ Do you notice the `rdl! { $row { ... } }`? It is the same as the structure liter
 
 ### Creating objects through expressions
 
-Except for creating objects through structure literals, you can also create objects by wrapping any expression with `rdl! {...}`. The advantage of this approach is that you can write any code in `{...}` to create objects. This is very useful in nested composition, and it is only necessary when nesting as a child. The following example shows how to use expressions to create objects in `rdl`:
+Except for creating objects through structure literals, you can also create objects by wrapping any expression with `rdl!{...}`. The advantage of this approach is that you can write any code in `{...}` to create objects. This is very useful in nested composition, and it is only necessary when nesting as a child. The following example shows how to use expressions to create objects in `rdl`:
 
 ```rust ignore
 use ribir::prelude::*;

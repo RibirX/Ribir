@@ -22,7 +22,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
-## [0.2.0-alpha.1](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0-beta.7...ribir-v0.2.0-alpha.1) - 2024-02-06
+### Documented
+
+- fix broken links and format the example code (#526 @M-Adoo)
+
 
 ## [0.1.0-beta.7](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0-alpha.0...ribir-v0.1.0-beta.7) - 2024-02-02
 
