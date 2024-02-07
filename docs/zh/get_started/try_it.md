@@ -17,7 +17,7 @@ sidebar_position: 1
 
 > 提示
 >
-> 目前 Ribir 只支持 Rust nightly 版本。 你可以使用 `rustup override set nightly` 切换到 nightly 通道。如果你还没有安装 nightly 通道，可以查看 [rustup Channels 文档] (https://rust-lang.github.io/rustup/concepts/channels.html)。
+> 目前 Ribir 只支持 Rust nightly 版本。 你可以使用 `rustup override set nightly` 切换到 nightly 通道。如果你还没有安装 nightly 通道，可以查看 [rustup Channels 文档](https://rust-lang.github.io/rustup/concepts/channels.html)。
 
 ## 新建 Ribir 项目
 
