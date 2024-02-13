@@ -22,6 +22,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.2.0-alpha.2] - 2024-02-13
+
 ### Documented
 
 - fix broken links and format the example code (#526 @M-Adoo)
@@ -61,7 +63,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 ### Documented
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.1...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.2...HEAD
+[0.2.0-alpha.2]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.1...ribir-v0.2.0-alpha.2
 
 - **introduction**: add `introduction.md` to introduce Ribir and why choose it.
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
