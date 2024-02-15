@@ -29,23 +29,23 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
     fn_widget! {
     let palette = Palette::of(ctx!());
     @Column {
-        main_axis_gap: 5.,
+        item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Center,
         @Row {
-          main_axis_gap: 5.,
+          item_gap: 5.,
           align_items: Align::Center,
           justify_content: JustifyContent::Center,
           @ { self.chars_key(['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P']) }
         }
         @Row {
-          main_axis_gap: 5.,
+          item_gap: 5.,
           align_items: Align::Center,
           justify_content: JustifyContent::Center,
           @ { self.chars_key(['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ]) }
         }
         @Row {
-          main_axis_gap: 5.,
+          item_gap: 5.,
           align_items: Align::Center,
           justify_content: JustifyContent::Center,
           @FilledButton {
@@ -72,13 +72,13 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
     let this = self.clone_writer();
     fn_widget! {
       @Column {
-        main_axis_gap: 5.,
+        item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Center,
         @ {
           (0..$this.max_rounds()).map(move |row| {
             @Row {
-              main_axis_gap: 5.,
+              item_gap: 5.,
               align_items: Align::Center,
               justify_content: JustifyContent::Center,
               @ {
@@ -192,7 +192,7 @@ impl Compose for Wordle {
           h_align: HAlign::Center,
           align_items: Align::Center,
           justify_content: JustifyContent::Center,
-          main_axis_gap: 5.,
+          item_gap: 5.,
           @H1 { text: "Wordle" }
           @Divider { extent: 20. }
           @ {this.chars_grid()}
@@ -200,7 +200,7 @@ impl Compose for Wordle {
           @ { keyboard }
           @Row {
             margin: EdgeInsets::only_top(10.),
-            main_axis_gap: 15.,
+            item_gap: 15.,
             @ { give_up }
             @ { new_game }
           }

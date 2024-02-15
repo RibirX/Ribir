@@ -1,15 +1,6 @@
 use super::CommonEvent;
-use crate::{
-  impl_all_event, impl_common_event_deref, impl_compose_child_for_listener, impl_listener,
-  impl_multi_event_listener, prelude::*,
-};
-use rxrust::prelude::*;
-use std::{
-  convert::Infallible,
-  time::{Duration, Instant},
-};
+use crate::impl_common_event_deref;
 mod from_mouse;
-const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PointerId(usize);
 
@@ -83,134 +74,11 @@ pub enum PointerType {
   Touch,
 }
 
-impl_multi_event_listener!(
-  "The listener use to fire and listen pointer events.",
-  Pointer,
-  "",
-  PointerDown,
-  "",
-  PointerDownCapture,
-  "",
-  PointerUp,
-  "",
-  PointerUpCapture,
-  "",
-  PointerMove,
-  "",
-  PointerMoveCapture,
-  "",
-  PointerCancel,
-  "",
-  PointerEnter,
-  "",
-  PointerLeave,
-  "",
-  Tap,
-  "",
-  TapCapture
-);
-
 impl_common_event_deref!(PointerEvent);
-
-pub type PointerSubject = MutRefItemSubject<'static, AllPointer, Infallible>;
-
-impl_compose_child_for_listener!(PointerListener);
-
-fn x_times_tap_map_filter(
-  x: usize,
-  dur: Duration,
-  capture: bool,
-) -> impl FnMut(&mut AllPointer) -> Option<&mut PointerEvent> {
-  assert!(x > 0);
-  struct TapInfo {
-    pointer_id: PointerId,
-    stamps: Vec<Instant>,
-  }
-
-  let mut type_info: Option<TapInfo> = None;
-  move |e: &mut AllPointer| {
-    let e = match e {
-      AllPointer::Tap(e) if !capture => e,
-      AllPointer::TapCapture(e) if capture => e,
-      _ => return None,
-    };
-    let now = Instant::now();
-    match &mut type_info {
-      Some(info) if info.pointer_id == e.id => {
-        if info.stamps.len() + 1 == x {
-          if now.duration_since(info.stamps[0]) <= dur {
-            // emit x-tap event and reset the tap info
-            type_info = None;
-            Some(e)
-          } else {
-            // remove the expired tap
-            info.stamps.remove(0);
-            info.stamps.push(now);
-            None
-          }
-        } else {
-          info.stamps.push(now);
-          None
-        }
-      }
-      _ => {
-        type_info = Some(TapInfo { pointer_id: e.id, stamps: vec![now] });
-        None
-      }
-    }
-  }
-}
-
-impl PointerListener {
-  pub fn on_double_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
-    self.on_x_times_tap((2, handler))
-  }
-
-  pub fn on_double_tap_capture(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
-    self.on_x_times_tap_capture((2, handler))
-  }
-
-  pub fn on_triple_tap(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
-    self.on_x_times_tap((3, handler))
-  }
-
-  pub fn on_triple_tap_capture(self, handler: impl FnMut(&mut PointerEvent) + 'static) -> Self {
-    self.on_x_times_tap_capture((3, handler))
-  }
-
-  pub fn on_x_times_tap(
-    self,
-    (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
-  ) -> Self {
-    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler)
-  }
-
-  pub fn on_x_times_tap_capture(
-    self,
-    (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
-  ) -> Self {
-    self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler)
-  }
-
-  fn on_x_times_tap_impl(
-    mut self,
-    times: usize,
-    dur: Duration,
-    capture: bool,
-    handler: impl FnMut(&mut PointerEvent) + 'static,
-  ) -> Self {
-    self
-      .subject()
-      .filter_map(x_times_tap_map_filter(times, dur, capture))
-      .subscribe(handler);
-    self
-  }
-}
-
 #[cfg(test)]
 mod tests {
-  use super::*;
   use crate::{
+    prelude::*,
     reset_test_env,
     test_helper::{MockBox, MockMulti, TestWindow},
   };

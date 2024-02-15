@@ -1,5 +1,6 @@
 use self::dispatcher::DispatchInfo;
 use crate::{
+  builtin_widgets::BuiltinFlags,
   context::{define_widget_context, WidgetCtx, WidgetCtxImpl},
   prelude::AppCtx,
   widget_tree::WidgetId,
@@ -11,8 +12,6 @@ pub(crate) mod dispatcher;
 mod pointers;
 pub use pointers::*;
 use ribir_geom::Point;
-mod focus;
-pub use focus::*;
 mod keyboard;
 pub use keyboard::*;
 mod character;
@@ -21,6 +20,8 @@ mod wheel;
 pub use wheel::*;
 mod ime_pre_edit;
 pub use ime_pre_edit::*;
+mod lifecycle;
+pub use lifecycle::*;
 
 pub(crate) mod focus_mgr;
 mod listener_impl_helper;
@@ -32,6 +33,8 @@ define_widget_context!(
   prevent_default: bool
 );
 
+pub type FocusEvent = CommonEvent;
+pub type FocusBubbleEvent = CommonEvent;
 impl CommonEvent {
   /// The target property of the Event interface is a reference to the object
   /// onto which the event was dispatched. It is different from
@@ -104,9 +107,163 @@ impl CommonEvent {
   pub fn button_num(&self) -> u32 { self.mouse_buttons().bits().count_ones() }
 }
 
-pub trait EventListener {
-  type Event;
-  fn dispatch(&self, event: &mut Self::Event);
+pub enum Event {
+  /// Event fired when the widget is mounted. This event is fired only once.
+  Mounted(LifecycleEvent),
+  /// Event fired when the widget is performed layout. This event may fire
+  /// multiple times in same frame if a widget modified after performed layout.
+  PerformedLayout(LifecycleEvent),
+  /// Event fired when the widget is disposed. This event is fired only once.
+  Disposed(LifecycleEvent),
+  PointerDown(PointerEvent),
+  PointerDownCapture(PointerEvent),
+  PointerUp(PointerEvent),
+  PointerUpCapture(PointerEvent),
+  PointerMove(PointerEvent),
+  PointerMoveCapture(PointerEvent),
+  PointerCancel(PointerEvent),
+  PointerEnter(PointerEvent),
+  PointerLeave(PointerEvent),
+  Tap(PointerEvent),
+  TapCapture(PointerEvent),
+  ImePreEdit(ImePreEditEvent),
+  ImePreEditCapture(ImePreEditEvent),
+  /// Firing the wheel event when the user rotates a wheel button on a pointing
+  /// device (typically a mouse).
+  Wheel(WheelEvent),
+  /// Same as `Wheel` but emit in capture phase.
+  WheelCapture(WheelEvent),
+  Chars(CharsEvent),
+  CharsCapture(CharsEvent),
+  /// The `KeyDown` event is fired when a key is pressed.
+  KeyDown(KeyboardEvent),
+  /// The `KeyDownCapture` event is same as `KeyDown` but emit in capture phase.
+  KeyDownCapture(KeyboardEvent),
+  /// The `KeyUp` event is fired when a key is released.
+  KeyUp(KeyboardEvent),
+  /// The `KeyUpCapture` event is same as `KeyUp` but emit in capture phase.
+  KeyUpCapture(KeyboardEvent),
+  /// The focus event fires when an widget has received focus. The main
+  /// difference between this event and focusin is that focusin bubbles while
+  /// focus does not.
+  Focus(FocusEvent),
+  /// The blur event fires when an widget has lost focus. The main difference
+  /// between this event and focusout is that focusout bubbles while blur does
+  /// not.
+  Blur(FocusEvent),
+  /// The focusin event fires when an widget is about to receive focus. The main
+  /// difference between this event and focus is that focusin bubbles while
+  /// focus does not.
+  FocusIn(FocusEvent),
+  /// The focusin capture event fires when an widget is about to receive focus.
+  /// The main difference between this event and focusin is that focusin emit in
+  /// bubbles phase but this event emit in capture phase.
+  FocusInCapture(FocusEvent),
+  /// The focusout event fires when an widget is about to lose focus. The main
+  /// difference between this event and blur is that focusout bubbles while blur
+  /// does not.
+  FocusOut(FocusEvent),
+  /// The focusout capture event fires when an widget is about to lose focus.
+  /// The main difference between this event and focusout is that focusout emit
+  /// in bubbles phase but this event emit in capture phase.
+  FocusOutCapture(FocusEvent),
+}
+
+impl std::ops::Deref for Event {
+  type Target = CommonEvent;
+
+  fn deref(&self) -> &Self::Target {
+    match self {
+      Event::Mounted(e)
+      | Event::PerformedLayout(e)
+      | Event::Disposed(e)
+      | Event::Focus(e)
+      | Event::Blur(e)
+      | Event::FocusIn(e)
+      | Event::FocusInCapture(e)
+      | Event::FocusOut(e)
+      | Event::FocusOutCapture(e) => e,
+      Event::PointerDown(e)
+      | Event::PointerDownCapture(e)
+      | Event::PointerUp(e)
+      | Event::PointerUpCapture(e)
+      | Event::PointerMove(e)
+      | Event::PointerMoveCapture(e)
+      | Event::PointerCancel(e)
+      | Event::PointerEnter(e)
+      | Event::PointerLeave(e)
+      | Event::Tap(e)
+      | Event::TapCapture(e) => e,
+      Event::ImePreEdit(e) | Event::ImePreEditCapture(e) => e,
+      Event::Wheel(e) | Event::WheelCapture(e) => e,
+      Event::Chars(e) | Event::CharsCapture(e) => e,
+      Event::KeyDown(e) | Event::KeyDownCapture(e) | Event::KeyUp(e) | Event::KeyUpCapture(e) => e,
+    }
+  }
+}
+
+impl std::ops::DerefMut for Event {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    match self {
+      Event::Mounted(e)
+      | Event::PerformedLayout(e)
+      | Event::Disposed(e)
+      | Event::Focus(e)
+      | Event::Blur(e)
+      | Event::FocusIn(e)
+      | Event::FocusInCapture(e)
+      | Event::FocusOut(e)
+      | Event::FocusOutCapture(e) => e,
+      Event::PointerDown(e)
+      | Event::PointerDownCapture(e)
+      | Event::PointerUp(e)
+      | Event::PointerUpCapture(e)
+      | Event::PointerMove(e)
+      | Event::PointerMoveCapture(e)
+      | Event::PointerCancel(e)
+      | Event::PointerEnter(e)
+      | Event::PointerLeave(e)
+      | Event::Tap(e)
+      | Event::TapCapture(e) => e,
+      Event::ImePreEdit(e) | Event::ImePreEditCapture(e) => e,
+      Event::Wheel(e) | Event::WheelCapture(e) => e,
+      Event::Chars(e) | Event::CharsCapture(e) => e,
+      Event::KeyDown(e) | Event::KeyDownCapture(e) | Event::KeyUp(e) | Event::KeyUpCapture(e) => e,
+    }
+  }
+}
+
+impl Event {
+  pub fn flags(&self) -> BuiltinFlags {
+    match self {
+      Event::Mounted(_) | Event::PerformedLayout(_) | Event::Disposed(_) => BuiltinFlags::Lifecycle,
+      Event::PointerDown(_)
+      | Event::PointerDownCapture(_)
+      | Event::PointerUp(_)
+      | Event::PointerUpCapture(_)
+      | Event::PointerMove(_)
+      | Event::PointerMoveCapture(_)
+      | Event::PointerCancel(_)
+      | Event::PointerEnter(_)
+      | Event::PointerLeave(_)
+      | Event::Tap(_)
+      | Event::TapCapture(_) => BuiltinFlags::Pointer,
+      Event::Wheel(_) | Event::WheelCapture(_) => BuiltinFlags::Wheel,
+      Event::ImePreEdit(_)
+      | Event::ImePreEditCapture(_)
+      | Event::Chars(_)
+      | Event::CharsCapture(_)
+      | Event::KeyDown(_)
+      | Event::KeyDownCapture(_)
+      | Event::KeyUp(_)
+      | Event::KeyUpCapture(_) => BuiltinFlags::KeyBoard,
+      Event::Focus(_) | Event::Blur(_) => BuiltinFlags::Focus,
+      Event::FocusIn(_)
+      | Event::FocusInCapture(_)
+      | Event::FocusOut(_)
+      | Event::FocusOutCapture(_) => BuiltinFlags::FocusInOut,
+    }
+  }
 }
 
 impl std::fmt::Debug for CommonEvent {
