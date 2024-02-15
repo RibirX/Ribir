@@ -49,10 +49,10 @@ pub struct Flex {
   pub justify_content: JustifyContent,
   /// Define item between gap in main axis
   #[declare(default)]
-  pub main_axis_gap: f32,
+  pub item_gap: f32,
   /// Define item between gap in cross axis
   #[declare(default)]
-  pub cross_axis_gap: f32,
+  pub line_gap: f32,
 }
 
 /// A type help to declare flex widget as horizontal.
@@ -64,24 +64,6 @@ pub struct Column;
 impl Declare for Row {
   type Builder = FlexDeclarer;
   fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Horizontal) }
-}
-
-impl FlexDeclarer {
-  pub fn item_gap<M, T>(mut self, gap: T) -> Self
-  where
-    DeclareInit<f32>: DeclareFrom<T, M>,
-  {
-    self.main_axis_gap = Some(DeclareInit::declare_from(gap));
-    self
-  }
-
-  pub fn line_gap<M, T>(mut self, gap: T) -> Self
-  where
-    DeclareInit<f32>: DeclareFrom<T, M>,
-  {
-    self.cross_axis_gap = Some(DeclareInit::declare_from(gap));
-    self
-  }
 }
 
 impl Declare for Column {
@@ -108,8 +90,8 @@ impl Render for Flex {
       align_items: self.align_items,
       justify_content: self.justify_content,
       wrap: self.wrap,
-      main_axis_gap: self.main_axis_gap,
-      cross_axis_gap: self.cross_axis_gap,
+      main_axis_gap: self.item_gap,
+      cross_axis_gap: self.line_gap,
       current_line: <_>::default(),
       lines: vec![],
     };
@@ -527,7 +509,7 @@ mod tests {
     fn_widget! {
       @Flex {
         wrap: true,
-        cross_axis_gap: 10.,
+        line_gap: 10.,
         align_items: Align::Center,
         @{ (0..3).map(|_| SizedBox { size }) }
       }

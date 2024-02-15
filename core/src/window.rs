@@ -16,11 +16,9 @@ use futures::{
 use ribir_geom::Point;
 use rxrust::{scheduler::FuturesLocalScheduler, subject::Subject};
 use std::{
-  borrow::BorrowMut,
   cell::{Cell, RefCell},
   collections::VecDeque,
   convert::Infallible,
-  ops::{Deref, DerefMut},
   rc::Rc,
   time::Instant,
 };
@@ -400,12 +398,12 @@ impl Window {
 
       match e {
         DelayEvent::Mounted(id) => {
-          let e = AllLifecycle::Mounted(LifecycleEvent { id, wnd_id: self.id() });
-          self.emit::<LifecycleListener>(id, e);
+          let mut e = Event::Mounted(LifecycleEvent::new(id, self.id()));
+          self.emit(id, &mut e);
         }
         DelayEvent::PerformedLayout(id) => {
-          let e = AllLifecycle::PerformedLayout(LifecycleEvent { id, wnd_id: self.id() });
-          self.emit::<LifecycleListener>(id, e);
+          let mut e = Event::PerformedLayout(LifecycleEvent::new(id, self.id()));
+          self.emit(id, &mut e);
         }
         DelayEvent::Disposed { id, parent } => {
           id.descendants(&self.widget_tree.borrow().arena)
@@ -416,8 +414,8 @@ impl Window {
               if Some(id) == self.focusing() {
                 self.focus_mgr.borrow_mut().blur_on_dispose();
               }
-              let e = AllLifecycle::Disposed(LifecycleEvent { id, wnd_id: self.id() });
-              self.emit::<LifecycleListener>(id, e);
+              let mut e = Event::Disposed(LifecycleEvent::new(id, self.id()));
+              self.emit(id, &mut e);
             });
 
           let delay_drop = id
@@ -434,33 +432,36 @@ impl Window {
           self.widget_tree.borrow_mut().remove_subtree(id);
         }
         DelayEvent::Focus(id) => {
-          let e = AllFocus::Focus(FocusEvent::new(id, self.id()));
-          self.emit::<FocusListener>(id, e);
+          let mut e = Event::Focus(FocusEvent::new(id, self.id()));
+          self.emit(id, &mut e);
         }
         DelayEvent::FocusIn { bottom, up } => {
-          let mut e = AllFocusBubble::FocusInCapture(FocusEvent::new(bottom, self.id()));
-          self.top_down_emit::<FocusBubbleListener>(&mut e, bottom, up);
-          let mut e = AllFocusBubble::FocusIn(e.into_inner());
-          self.bottom_up_emit::<FocusBubbleListener>(&mut e, bottom, up);
+          let mut e = Event::FocusInCapture(FocusEvent::new(bottom, self.id()));
+          self.top_down_emit(&mut e, bottom, up);
+          let mut e = Event::FocusIn(FocusEvent::new(bottom, self.id()));
+          self.bottom_up_emit(&mut e, bottom, up);
         }
         DelayEvent::Blur(id) => {
-          let e = AllFocus::Blur(FocusEvent::new(id, self.id()));
-          self.emit::<FocusListener>(id, e);
+          let mut e = Event::Blur(FocusEvent::new(id, self.id()));
+          self.emit(id, &mut e);
         }
         DelayEvent::FocusOut { bottom, up } => {
-          let mut e = AllFocusBubble::FocusOutCapture(FocusEvent::new(bottom, self.id()));
-          self.top_down_emit::<FocusBubbleListener>(&mut e, bottom, up);
-          let mut e = AllFocusBubble::FocusOut(e.into_inner());
-          self.bottom_up_emit::<FocusBubbleListener>(&mut e, bottom, up);
+          let mut e = Event::FocusOutCapture(FocusEvent::new(bottom, self.id()));
+          self.top_down_emit(&mut e, bottom, up);
+          let mut e = Event::FocusOut(FocusEvent::new(bottom, self.id()));
+          self.bottom_up_emit(&mut e, bottom, up);
         }
         DelayEvent::KeyDown(event) => {
           let id = event.id();
 
-          let mut e = AllKeyboard::KeyDownCapture(event);
-          self.top_down_emit::<KeyboardListener>(&mut e, id, None);
-          let mut e = AllKeyboard::KeyDown(e.into_inner());
-          self.bottom_up_emit::<KeyboardListener>(&mut e, id, None);
-
+          let mut e = Event::KeyDownCapture(event);
+          self.top_down_emit(&mut e, id, None);
+          let Event::KeyDownCapture(e) = e else {
+            unreachable!()
+          };
+          let mut e = Event::KeyDown(e);
+          self.bottom_up_emit(&mut e, id, None);
+          let Event::KeyDown(e) = e else { unreachable!() };
           if !e.is_prevent_default() && *e.key() == VirtualKey::Named(NamedKey::Tab) {
             self.add_delay_event(DelayEvent::TabFocusMove);
           }
@@ -480,95 +481,96 @@ impl Window {
         }
         DelayEvent::KeyUp(event) => {
           let id = event.id();
-          let mut e = AllKeyboard::KeyUpCapture(event);
-          self.top_down_emit::<KeyboardListener>(&mut e, id, None);
-          let mut e = AllKeyboard::KeyUp(e.into_inner());
-          self.bottom_up_emit::<KeyboardListener>(&mut e, id, None);
+          let mut e = Event::KeyUpCapture(event);
+          self.top_down_emit(&mut e, id, None);
+          let Event::KeyUpCapture(e) = e else {
+            unreachable!()
+          };
+          let mut e = Event::KeyUp(e);
+          self.bottom_up_emit(&mut e, id, None);
         }
         DelayEvent::Chars { id, chars } => {
-          let mut e = AllChars::CharsCapture(CharsEvent::new(chars, id, self.id()));
-          self.top_down_emit::<CharsListener>(&mut e, id, None);
-          let mut e = AllChars::Chars(e.into_inner());
-          self.bottom_up_emit::<CharsListener>(&mut e, id, None);
+          let mut e = Event::CharsCapture(CharsEvent::new(chars, id, self.id()));
+          self.top_down_emit(&mut e, id, None);
+          let Event::CharsCapture(e) = e else {
+            unreachable!()
+          };
+          let mut e = Event::Chars(e);
+          self.bottom_up_emit(&mut e, id, None);
         }
         DelayEvent::Wheel { id, delta_x, delta_y } => {
-          let mut e = AllWheel::WheelCapture(WheelEvent::new(delta_x, delta_y, id, self.id()));
-          self.top_down_emit::<WheelListener>(&mut e, id, None);
-          let mut e = AllWheel::Wheel(e.into_inner());
-          self.bottom_up_emit::<WheelListener>(&mut e, id, None);
+          let mut e = Event::WheelCapture(WheelEvent::new(delta_x, delta_y, id, self.id()));
+          self.top_down_emit(&mut e, id, None);
+          let mut e = Event::Wheel(WheelEvent::new(delta_x, delta_y, id, self.id()));
+          self.bottom_up_emit(&mut e, id, None);
         }
         DelayEvent::PointerDown(id) => {
-          let mut e = AllPointer::PointerDownCapture(PointerEvent::from_mouse(id, self));
-          self.top_down_emit::<PointerListener>(&mut e, id, None);
-          let mut e = AllPointer::PointerDown(e.into_inner());
-          self.bottom_up_emit::<PointerListener>(&mut e, id, None);
+          let mut e = Event::PointerDownCapture(PointerEvent::from_mouse(id, self));
+          self.top_down_emit(&mut e, id, None);
+          let mut e = Event::PointerDown(PointerEvent::from_mouse(id, self));
+          self.bottom_up_emit(&mut e, id, None);
           self
             .focus_mgr
             .borrow_mut()
             .refresh_focus(&self.widget_tree.borrow().arena);
         }
         DelayEvent::PointerMove(id) => {
-          let mut e = AllPointer::PointerMoveCapture(PointerEvent::from_mouse(id, self));
-          self.top_down_emit::<PointerListener>(&mut e, id, None);
-          let mut e = AllPointer::PointerMove(e.into_inner());
-          self.bottom_up_emit::<PointerListener>(&mut e, id, None);
+          let mut e = Event::PointerMoveCapture(PointerEvent::from_mouse(id, self));
+          self.top_down_emit(&mut e, id, None);
+          let mut e = Event::PointerMove(PointerEvent::from_mouse(id, self));
+          self.bottom_up_emit(&mut e, id, None);
         }
         DelayEvent::PointerUp(id) => {
-          let mut e = AllPointer::PointerUpCapture(PointerEvent::from_mouse(id, self));
-          self.top_down_emit::<PointerListener>(&mut e, id, None);
-          let mut e = AllPointer::PointerUp(e.into_inner());
-          self.bottom_up_emit::<PointerListener>(&mut e, id, None);
+          let mut e = Event::PointerUpCapture(PointerEvent::from_mouse(id, self));
+          self.top_down_emit(&mut e, id, None);
+          let mut e = Event::PointerUp(PointerEvent::from_mouse(id, self));
+          self.bottom_up_emit(&mut e, id, None);
         }
         DelayEvent::_PointerCancel(id) => {
-          let mut e = AllPointer::PointerCancel(PointerEvent::from_mouse(id, self));
-          self.bottom_up_emit::<PointerListener>(&mut e, id, None);
+          let mut e = Event::PointerCancel(PointerEvent::from_mouse(id, self));
+          self.bottom_up_emit(&mut e, id, None);
         }
         DelayEvent::PointerEnter { bottom, up } => {
-          let mut e = AllPointer::PointerEnter(PointerEvent::from_mouse(bottom, self));
-          self.top_down_emit::<PointerListener>(&mut e, bottom, up);
+          let mut e = Event::PointerEnter(PointerEvent::from_mouse(bottom, self));
+          self.top_down_emit(&mut e, bottom, up);
         }
         DelayEvent::PointerLeave { bottom, up } => {
-          let mut e = AllPointer::PointerLeave(PointerEvent::from_mouse(bottom, self));
-          self.bottom_up_emit::<PointerListener>(&mut e, bottom, up);
+          let mut e = Event::PointerLeave(PointerEvent::from_mouse(bottom, self));
+          self.bottom_up_emit(&mut e, bottom, up);
         }
         DelayEvent::Tap(wid) => {
-          let mut e = AllPointer::TapCapture(PointerEvent::from_mouse(wid, self));
-          self.top_down_emit::<PointerListener>(&mut e, wid, None);
-          let mut e = AllPointer::Tap(e.into_inner());
-          self.bottom_up_emit::<PointerListener>(&mut e, wid, None);
+          let mut e = Event::TapCapture(PointerEvent::from_mouse(wid, self));
+          self.top_down_emit(&mut e, wid, None);
+          let mut e = Event::Tap(PointerEvent::from_mouse(wid, self));
+          self.bottom_up_emit(&mut e, wid, None);
         }
         DelayEvent::ImePreEdit { wid, pre_edit } => {
-          let mut e = AllImePreEdit::ImePreEditCapture(ImePreEditEvent::new(pre_edit, wid, self));
-          self.top_down_emit::<ImePreEditListener>(&mut e, wid, None);
-          let mut e = AllImePreEdit::ImePreEdit(e.into_inner());
-          self.bottom_up_emit::<ImePreEditListener>(&mut e, wid, None);
+          let mut e = Event::ImePreEditCapture(ImePreEditEvent::new(pre_edit, wid, self));
+          self.top_down_emit(&mut e, wid, None);
+          let Event::ImePreEditCapture(e) = e else {
+            unreachable!()
+          };
+          self.bottom_up_emit(&mut Event::ImePreEdit(e), wid, None);
         }
       }
     }
   }
 
-  fn emit<L>(&self, id: WidgetId, mut e: L::Event)
-  where
-    L: EventListener + 'static,
-  {
+  fn emit(&self, id: WidgetId, e: &mut Event) {
     // Safety: we only use tree to query the inner data of a node and dispatch a
     // event by it, and never read or write the node. And in the callback, there is
     // no way to mut access the inner data of node or destroy the node.
     let tree = unsafe { &*(&*self.widget_tree.borrow() as *const WidgetTree) };
-    id.assert_get(&tree.arena).query_type_inside_first(|m: &L| {
-      m.dispatch(&mut e);
-      true
-    });
+    id.assert_get(&tree.arena)
+      .query_type_inside_first(|m: &MixBuiltin| {
+        if m.contain_flag(e.flags()) {
+          m.dispatch(e);
+        }
+        true
+      });
   }
 
-  fn top_down_emit<L>(&self, e: &mut L::Event, bottom: WidgetId, up: Option<WidgetId>)
-  where
-    L: EventListener + 'static,
-    L::Event: DerefMut,
-    <L::Event as Deref>::Target: std::borrow::BorrowMut<CommonEvent>,
-  {
-    use std::borrow::Borrow;
-
+  fn top_down_emit(&self, e: &mut Event, bottom: WidgetId, up: Option<WidgetId>) {
     let tree = self.widget_tree.borrow();
     let path = bottom
       .ancestors(&tree.arena)
@@ -577,23 +579,18 @@ impl Window {
 
     path.iter().rev().all(|id| {
       id.assert_get(&tree.arena)
-        .query_type_outside_first(|m: &L| {
-          (**e).borrow_mut().set_current_target(*id);
-          m.dispatch(e);
-          (**e).borrow_mut().is_propagation()
-        });
-      (**e).borrow().is_propagation()
+        .query_type_outside_first(|m: &MixBuiltin| {
+          if m.contain_flag(e.flags()) {
+            e.set_current_target(*id);
+            m.dispatch(e);
+          }
+          e.is_propagation()
+        })
     });
   }
 
-  fn bottom_up_emit<L>(&self, e: &mut L::Event, bottom: WidgetId, up: Option<WidgetId>)
-  where
-    L: EventListener + 'static,
-    L::Event: DerefMut,
-    <L::Event as Deref>::Target: std::borrow::BorrowMut<CommonEvent>,
-  {
-    use std::borrow::Borrow;
-    if !(**e).borrow().is_propagation() {
+  fn bottom_up_emit(&self, e: &mut Event, bottom: WidgetId, up: Option<WidgetId>) {
+    if !e.is_propagation() {
       return;
     }
 
@@ -602,12 +599,14 @@ impl Window {
       .ancestors(&tree.arena)
       .take_while(|id| Some(*id) != up)
       .all(|id| {
-        id.assert_get(&tree.arena).query_type_inside_first(|m: &L| {
-          (**e).borrow_mut().set_current_target(id);
-          m.dispatch(e);
-          (**e).borrow_mut().is_propagation()
-        });
-        (**e).borrow().is_propagation()
+        id.assert_get(&tree.arena)
+          .query_type_inside_first(|m: &MixBuiltin| {
+            if m.contain_flag(e.flags()) {
+              e.set_current_target(id);
+              m.dispatch(e);
+            }
+            e.is_propagation()
+          })
       });
   }
 

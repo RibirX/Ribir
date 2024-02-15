@@ -32,7 +32,7 @@ pub trait TransitionState: Sized + 'static {
     Self: AnimateState,
   {
     let state = self.clone_setter();
-    let animate: State<Animate<Self>> = Animate::declare_builder()
+    let animate = Animate::declare_builder()
       .transition(transition)
       .from(self.get())
       .state(self)

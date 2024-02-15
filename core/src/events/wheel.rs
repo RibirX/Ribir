@@ -1,9 +1,4 @@
-use crate::{
-  impl_all_event, impl_common_event_deref, impl_compose_child_for_listener, impl_listener,
-  impl_multi_event_listener, prelude::*, window::WindowId,
-};
-use rxrust::prelude::*;
-use std::convert::Infallible;
+use crate::{impl_common_event_deref, prelude::*, window::WindowId};
 
 #[derive(Debug)]
 pub struct WheelEvent {
@@ -12,18 +7,6 @@ pub struct WheelEvent {
   pub common: CommonEvent,
 }
 
-pub type WheelSubject = MutRefItemSubject<'static, AllWheel, Infallible>;
-
-impl_multi_event_listener! {
-  "The listener use to fire and listen wheel events.",
-  Wheel,
-  "Firing the wheel event when the user rotates a wheel button on a pointing \
-  device (typically a mouse).",
-  Wheel,
-  "Same as `Wheel` but emit in capture phase.",
-  WheelCapture
-}
-impl_compose_child_for_listener!(WheelListener);
 impl_common_event_deref!(WheelEvent);
 
 impl WheelEvent {

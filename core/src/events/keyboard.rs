@@ -1,10 +1,4 @@
-use rxrust::prelude::*;
-use std::convert::Infallible;
-
-use crate::{
-  impl_all_event, impl_common_event_deref, impl_compose_child_with_focus_for_listener,
-  impl_listener, impl_multi_event_listener, prelude::*, window::WindowId,
-};
+use crate::{impl_common_event_deref, prelude::*, window::WindowId};
 
 pub use winit::keyboard::{
   Key as VirtualKey, KeyCode, KeyLocation, ModifiersState, NamedKey, PhysicalKey,
@@ -33,24 +27,7 @@ impl KeyboardEvent {
   pub fn location(&self) -> KeyLocation { self.location }
 }
 
-pub type KeyboardSubject = MutRefItemSubject<'static, AllKeyboard, Infallible>;
-
-impl_multi_event_listener! {
-  "The listener use to fire and listen keyboard events.",
-  Keyboard,
-  "The `KeyDown` event is fired when a key is pressed.",
-  KeyDown,
-  "The `KeyDownCapture` event is same as `KeyDown` but emit in capture phase.",
-  KeyDownCapture,
-  "The `KeyUp` event is fired when a key is released.",
-  KeyUp,
-  "The `KeyUpCapture` event is same as `KeyUp` but emit in capture phase.",
-  KeyUpCapture
-}
-
 impl_common_event_deref!(KeyboardEvent);
-
-impl_compose_child_with_focus_for_listener!(KeyboardListener);
 
 impl KeyboardEvent {
   #[inline]

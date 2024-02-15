@@ -72,6 +72,7 @@ pub trait WidgetCtx {
 pub(crate) trait WidgetCtxImpl {
   fn id(&self) -> WidgetId;
 
+  // todo: return sc instead of rc
   fn current_wnd(&self) -> Rc<Window>;
 
   #[inline]

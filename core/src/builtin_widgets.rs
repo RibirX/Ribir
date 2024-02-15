@@ -35,8 +35,6 @@ mod void;
 pub use void::Void;
 mod unconstrained_box;
 pub use unconstrained_box::*;
-mod lifecycle;
-pub use lifecycle::*;
 mod opacity;
 pub use opacity::*;
 mod anchor;
@@ -63,6 +61,8 @@ pub mod focus_scope;
 pub use focus_scope::*;
 pub mod global_anchor;
 pub use global_anchor::*;
+mod mix_builtin;
+pub use mix_builtin::*;
 
 use crate::{
   prelude::*,
@@ -148,16 +148,9 @@ macro_rules! impl_builtin_obj {
 }
 
 impl_builtin_obj!(
-  PointerListener,
-  FocusNode,
+  MixBuiltin,
   RequestFocus,
-  FocusListener,
-  FocusBubbleListener,
   HasFocus,
-  KeyboardListener,
-  CharsListener,
-  ImePreEditListener,
-  WheelListener,
   MouseHover,
   PointerPressed,
   FittedBox,
@@ -174,7 +167,6 @@ impl_builtin_obj!(
   GlobalAnchor,
   Visibility,
   Opacity,
-  LifecycleListener,
   DelayDrop
 );
 

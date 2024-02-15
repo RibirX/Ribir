@@ -69,9 +69,7 @@ impl Dispatcher {
     if let Some(focus_id) = wnd.focusing() {
       let event = KeyboardEvent::new(wnd.id(), focus_id, physical_key, key, is_repeat, location);
       match state {
-        ElementState::Pressed => {
-          wnd.add_delay_event(DelayEvent::KeyDown(event));
-        }
+        ElementState::Pressed => wnd.add_delay_event(DelayEvent::KeyDown(event)),
         ElementState::Released => wnd.add_delay_event(DelayEvent::KeyUp(event)),
       };
     } else if key == VirtualKey::Named(NamedKey::Tab) {
@@ -173,8 +171,14 @@ impl Dispatcher {
 
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(&tree.arena).find(|id| {
-        id.get(&tree.arena)
-          .map_or(false, |w| w.contain_type::<FocusNode>())
+        let mut is_focus_node = false;
+        if let Some(w) = id.get(&tree.arena) {
+          w.query_type_outside_first(|m: &MixBuiltin| {
+            is_focus_node |= m.contain_flag(BuiltinFlags::Focus);
+            !is_focus_node
+          });
+        }
+        is_focus_node
       })
     });
     if let Some(focus_id) = nearest_focus {

@@ -50,8 +50,9 @@ impl<'a> DeclareObj<'a> {
         Ok(())
       } else {
         let mut err_tokens = quote! {};
+
         for f in fields {
-          quote_spanned! { f.member.span() => #err_msg }.to_tokens(&mut err_tokens)
+          quote_spanned! { f.member.span() => compile_error!(#err_msg) }.to_tokens(&mut err_tokens)
         }
         Err(err_tokens)
       }
@@ -73,7 +74,7 @@ impl<'a> DeclareObj<'a> {
       RdlParent::Var(name) => {
         invalid_member_err(
           &self_fields,
-          "only allow to declare builtin fields in a variable parent.",
+          "not allow to declare builtin fields in a variable parent.",
         )?;
         let this = Some(ObjNode::Var(name));
         Ok(Self { this, span, builtin, children })
@@ -179,9 +180,10 @@ impl<'a> ToTokens for ObjNode<'a> {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     match self {
       Self::Obj { ty, span, fields } => {
-        quote_spanned! { *span => #ty::declare_builder() }.to_tokens(tokens);
-        fields.iter().for_each(|f| f.to_tokens(tokens));
-        tokens.extend(quote_spanned! { *span => .build_declare(ctx!()) });
+        quote_spanned! { *span =>
+          #ty::declare_builder() #(#fields)*.build_declare(ctx!())
+        }
+        .to_tokens(tokens);
       }
       Self::Var(var) => var.to_tokens(tokens),
     }

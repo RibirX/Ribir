@@ -23,7 +23,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ## [@Unreleased] - @ReleaseDate
 
 ### Fixed
+
 - Optimization, StateReader auto unsubscribe if not writer(#532 @wjian23)
+
+### Changed
+
+- **core**: Consolidated all listener and `FocusNode` into a `MixBuiltin` widget (#534 @M-Adoo)
+  - The `MixBuiltin` widget reduces memory usage and allows users to utilize all `on_xxx` event handlers, not only during the build declaration but also after the widget has been built.
 
 ## [0.2.0-alpha.3] - 2024-02-20
 

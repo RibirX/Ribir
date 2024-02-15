@@ -1,6 +1,4 @@
-use crate::{impl_all_event, impl_common_event_deref, impl_multi_event_listener, prelude::*};
-use crate::{impl_compose_child_for_listener, impl_listener};
-use std::convert::Infallible;
+use crate::{impl_common_event_deref, prelude::*};
 
 #[derive(Debug)]
 pub enum ImePreEdit {
@@ -44,17 +42,4 @@ impl ImePreEditEvent {
   }
 }
 
-pub type ImePreEditSubject = MutRefItemSubject<'static, AllImePreEdit, Infallible>;
-
-impl_multi_event_listener! {
-  "The listener use to listen ime pre edit events.",
-  ImePreEdit,
-  "",
-  ImePreEdit,
-  "",
-  ImePreEditCapture
-}
-
 impl_common_event_deref!(ImePreEditEvent);
-
-impl_compose_child_for_listener!(ImePreEditListener);
