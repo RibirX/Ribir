@@ -529,13 +529,13 @@ impl FocusManager {
 
     // bubble focus out
     if let Some(old) = old {
-      let ancestor = node.and_then(|w| w.common_ancestors(old, &tree.arena).next());
+      let ancestor = node.and_then(|w| w.lowest_common_ancestor(old, &tree.arena));
       wnd.add_delay_event(DelayEvent::FocusOut { bottom: old, up: ancestor });
     };
 
     if let Some(new) = node {
       wnd.add_delay_event(DelayEvent::Focus(new));
-      let ancestor = old.and_then(|o| o.common_ancestors(new, &tree.arena).next());
+      let ancestor = old.and_then(|o| o.lowest_common_ancestor(new, &tree.arena));
       wnd.add_delay_event(DelayEvent::FocusIn { bottom: new, up: ancestor });
     }
 
@@ -570,7 +570,7 @@ mod tests {
 
     focus_mgr.refresh_focus(&tree.arena);
 
-    let id = tree.root().first_child(&tree.arena);
+    let id = tree.content_root().first_child(&tree.arena);
     assert!(id.is_some());
     assert_eq!(focus_mgr.focusing(), id);
   }
@@ -592,7 +592,7 @@ mod tests {
     let tree = wnd.widget_tree.borrow();
 
     let id = tree
-      .root()
+      .content_root()
       .first_child(&tree.arena)
       .and_then(|p| p.next_sibling(&tree.arena));
     assert!(id.is_some());
@@ -623,7 +623,7 @@ mod tests {
 
     focus_mgr.refresh_focus(arena);
 
-    let negative = widget_tree.root().first_child(arena).unwrap();
+    let negative = widget_tree.content_root().first_child(arena).unwrap();
     let id0 = negative.next_sibling(arena).unwrap();
     let id1 = id0.next_sibling(arena).unwrap();
     let id2 = id1.next_sibling(arena).unwrap();
@@ -713,7 +713,7 @@ mod tests {
     let log = widget.log.clone();
     let mut wnd = TestWindow::new(fn_widget!(widget));
     let tree = wnd.widget_tree.borrow();
-    let parent = tree.root();
+    let parent = tree.content_root();
     let child = parent.first_child(&tree.arena).unwrap();
     drop(tree);
 
@@ -813,7 +813,7 @@ mod tests {
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let tree = wnd.widget_tree.borrow();
 
-    let first_box = tree.root().first_child(&tree.arena);
+    let first_box = tree.content_root().first_child(&tree.arena);
     let focus_scope = first_box.unwrap().next_sibling(&tree.arena);
     focus_mgr.request_focus_to(focus_scope);
 

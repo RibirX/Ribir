@@ -1,4 +1,4 @@
-use ribir_core::prelude::*;
+use crate::prelude::*;
 
 /// Widget with fixed size as a container for its child.
 #[derive(Declare, Query, SingleChild)]
@@ -26,7 +26,7 @@ impl Render for Container {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use ribir_core::test_helper::*;
+  use crate::test_helper::*;
   use ribir_dev_helper::*;
   use ribir_geom::Size;
 

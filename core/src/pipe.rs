@@ -1127,13 +1127,19 @@ mod tests {
     let wnd = TestWindow::new(w);
     let mut tree = wnd.widget_tree.borrow_mut();
     tree.layout(Size::zero());
-    let ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
+    let ids = tree
+      .content_root()
+      .descendants(&tree.arena)
+      .collect::<Vec<_>>();
     assert_eq!(ids.len(), 2);
     {
       *c_size.write() = Size::new(1., 1.);
     }
     tree.layout(Size::zero());
-    let new_ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
+    let new_ids = tree
+      .content_root()
+      .descendants(&tree.arena)
+      .collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 2);
 
     assert_eq!(ids[1], new_ids[1]);
@@ -1157,13 +1163,19 @@ mod tests {
     let wnd = TestWindow::new(w);
     let mut tree = wnd.widget_tree.borrow_mut();
     tree.layout(Size::zero());
-    let ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
+    let ids = tree
+      .content_root()
+      .descendants(&tree.arena)
+      .collect::<Vec<_>>();
     assert_eq!(ids.len(), 3);
     {
       *c_size.write() = Size::new(1., 1.);
     }
     tree.layout(Size::zero());
-    let new_ids = tree.root().descendants(&tree.arena).collect::<Vec<_>>();
+    let new_ids = tree
+      .content_root()
+      .descendants(&tree.arena)
+      .collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 3);
 
     assert_eq!(ids[0], new_ids[0]);
@@ -1199,7 +1211,7 @@ mod tests {
     // the key should still in the root widget after pipe widget updated.
     assert!(
       tree
-        .root()
+        .content_root()
         .assert_get(&tree.arena)
         .contain_type::<Box<dyn AnyKey>>()
     );
@@ -1472,7 +1484,7 @@ mod tests {
 
     fn child_count(wnd: &Window) -> usize {
       let tree = wnd.widget_tree.borrow();
-      let root = tree.root();
+      let root = tree.content_root();
       root.children(&tree.arena).count()
     }
 
@@ -1584,7 +1596,7 @@ mod tests {
 
     let grandson_id = {
       let arena = tree_arena(&wnd);
-      let root = wnd.widget_tree.borrow().root();
+      let root = wnd.widget_tree.borrow().content_root();
       root
         .first_child(&arena)
         .unwrap()

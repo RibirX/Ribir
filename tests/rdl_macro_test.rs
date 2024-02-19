@@ -691,7 +691,8 @@ fn fix_builtin_field_can_declare_as_widget() {
   };
 
   let wnd = TestWindow::new(w);
-  assert_eq!(wnd.widget_count(), 2);
+
+  assert_eq!(wnd.content_count(), 2);
 }
 
 #[test]
@@ -705,7 +706,7 @@ fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
   };
 
   let wnd = TestWindow::new(w);
-  assert_eq!(wnd.widget_count(), 2);
+  assert_eq!(wnd.content_count(), 2);
 }
 
 #[test]

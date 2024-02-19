@@ -23,6 +23,7 @@ pub mod widget;
 pub mod widget_children;
 pub mod window;
 pub use rxrust;
+pub mod overlay;
 
 pub mod prelude {
   pub use crate::animation::*;
@@ -36,6 +37,8 @@ pub mod prelude {
   pub use crate::declare::*;
   #[doc(no_inline)]
   pub use crate::events::*;
+  #[doc(no_inline)]
+  pub use crate::overlay::{Overlay, OverlayCloseHandle};
   #[doc(no_inline)]
   pub use crate::pipe::{BoxPipe, FinalChain, MapPipe, ModifiesPipe, Pipe};
   #[doc(no_inline)]
