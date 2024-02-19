@@ -51,19 +51,15 @@ impl TestWindow {
   /// [0, 1, 2] the first node at the root level (must be 0), then down to its
   /// second child, then down to third child.
   pub fn layout_info_by_path(&self, path: &[usize]) -> Option<LayoutInfo> {
-    assert_eq!(path[0], 0);
     let tree = self.0.widget_tree.borrow();
     let mut node = tree.root();
-    for (level, idx) in path[1..].iter().enumerate() {
+    for (level, idx) in path[..].iter().enumerate() {
       node = node.children(&tree.arena).nth(*idx).unwrap_or_else(|| {
         panic!("node no exist: {:?}", &path[0..level]);
       });
     }
     tree.store.layout_info(node).cloned()
   }
-
-  #[inline]
-  pub fn widget_count(&self) -> usize { self.widget_tree.borrow().count() }
 
   pub fn take_last_frame(&mut self) -> Option<Frame> {
     self
@@ -74,6 +70,13 @@ impl TestWindow {
       .unwrap()
       .last_frame
       .take()
+  }
+
+  pub fn content_count(&self) -> usize {
+    let widget_tree = self.0.widget_tree.borrow();
+    let root = widget_tree.root();
+    let content = root.first_child(&widget_tree.arena).unwrap();
+    widget_tree.count(content)
   }
 
   #[track_caller]

@@ -111,12 +111,7 @@ impl<'a> BuildCtx<'a> {
 
   /// Dispose the whole subtree of `id`, include `id` itself.
   pub(crate) fn dispose_subtree(&self, id: WidgetId) {
-    let mut tree = self.tree.borrow_mut();
-    let parent = id.parent(&tree.arena);
-    tree.detach(id);
-    tree
-      .window()
-      .add_delay_event(DelayEvent::Disposed { id, parent });
+    id.dispose_subtree(&mut self.tree.borrow_mut());
   }
 
   pub(crate) fn mark_dirty(&self, id: WidgetId) { self.tree.borrow_mut().mark_dirty(id); }

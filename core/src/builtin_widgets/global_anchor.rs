@@ -4,7 +4,7 @@ use std::rc::Rc;
 #[derive(Declare, Query, Default)]
 pub struct GlobalAnchor {
   #[declare(builtin, default)]
-  global_anchor: Anchor,
+  pub global_anchor: Anchor,
 }
 
 impl ComposeChild for GlobalAnchor {

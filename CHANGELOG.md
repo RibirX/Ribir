@@ -22,6 +22,12 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- Support the overlay (@wjian23).
+
+   This enhancement simplifies the creation of overlay widgets. It streamlines the addition of any widget to an overlay and offers a more user-friendly API for overlay management
+
 ## [0.2.0-alpha.4] - 2024-02-27
 
 ### Fixed
@@ -40,7 +46,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Documented
 
 - fix broken links and format the example code (#526 @M-Adoo)
-
 
 ## [0.1.0-beta.7](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0-alpha.0...ribir-v0.1.0-beta.7) - 2024-02-02
 

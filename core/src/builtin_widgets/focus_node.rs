@@ -61,7 +61,7 @@ mod tests {
 
     let wnd = TestWindow::new(widget);
     let tree = wnd.widget_tree.borrow();
-    let id = tree.root();
+    let id = tree.content_root();
     let node = id.get(&tree.arena).unwrap();
     let mut cnt = 0;
     node.query_type_inside_first(|b: &MixBuiltin| {

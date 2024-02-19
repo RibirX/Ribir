@@ -72,5 +72,5 @@ cargo run -p counter
 cargo run -p storybook
 cargo run -p messages
 cargo run -p todos
-cargo run -p worle_game
+cargo run -p wordle_game
 ```

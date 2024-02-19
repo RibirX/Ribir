@@ -4,7 +4,6 @@ use indextree::{Arena, Node, NodeId};
 
 use super::WidgetTree;
 use crate::{
-  builtin_widgets::Void,
   context::{PaintingCtx, WidgetCtx},
   prelude::{AnonymousWrapper, DataWidget},
   render_helper::RenderProxy,
@@ -112,6 +111,15 @@ impl WidgetId {
       .for_each(|w| tree.window().add_delay_event(DelayEvent::Mounted(w)));
   }
 
+  /// Dispose the whole subtree of `id`, include `id` itself.
+  pub(crate) fn dispose_subtree(self, tree: &mut WidgetTree) {
+    let parent = self.parent(&tree.arena);
+    tree.detach(self);
+    tree
+      .window()
+      .add_delay_event(DelayEvent::Disposed { id: self, parent });
+  }
+
   pub(crate) fn insert_after(self, next: WidgetId, tree: &mut TreeArena) {
     self.0.insert_after(next.0, tree);
   }
@@ -213,5 +221,3 @@ impl WidgetId {
 pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn Render>) -> WidgetId {
   WidgetId(arena.new_node(node))
 }
-
-pub(crate) fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }

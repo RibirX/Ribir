@@ -10,10 +10,10 @@ pub mod widget_id;
 pub(crate) use widget_id::TreeArena;
 pub use widget_id::WidgetId;
 mod layout_info;
-use crate::prelude::*;
+use crate::{overlay::OverlayRoot, prelude::*};
 pub use layout_info::*;
 
-use self::widget_id::empty_node;
+use self::widget::widget_id::new_node;
 
 pub(crate) type DirtySet = Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
 
@@ -28,8 +28,15 @@ pub(crate) struct WidgetTree {
 impl WidgetTree {
   pub fn init(&mut self, wnd: Weak<Window>) { self.wnd = wnd; }
 
-  pub fn set_root(&mut self, root: WidgetId) {
-    self.root = root;
+  pub fn set_content(&mut self, content: WidgetId) {
+    // dispose the old content.
+    self
+      .root
+      .children(&self.arena)
+      .collect::<Vec<_>>()
+      .into_iter()
+      .for_each(|id| id.dispose_subtree(self));
+    self.root.append(content, &mut self.arena);
     self.mark_dirty(self.root);
     self.root.on_mounted_subtree(self);
   }
@@ -72,7 +79,7 @@ impl WidgetTree {
 
   pub(crate) fn is_dirty(&self) -> bool { !self.dirty_set.borrow().is_empty() }
 
-  pub(crate) fn count(&self) -> usize { self.root().descendants(&self.arena).count() }
+  pub(crate) fn count(&self, wid: WidgetId) -> usize { wid.descendants(&self.arena).count() }
 
   pub(crate) fn window(&self) -> Rc<Window> {
     self
@@ -206,8 +213,9 @@ impl WidgetTree {
 impl Default for WidgetTree {
   fn default() -> Self {
     let mut arena = TreeArena::new();
+
     Self {
-      root: empty_node(&mut arena),
+      root: new_node(&mut arena, Box::new(OverlayRoot {})),
       wnd: Weak::new(),
       arena,
       store: LayoutStore::default(),
@@ -222,11 +230,16 @@ mod tests {
   use crate::{
     reset_test_env,
     test_helper::{MockBox, MockMulti, TestWindow},
-    widget::widget_id::empty_node,
   };
 
   use super::*;
   use test::Bencher;
+
+  impl WidgetTree {
+    pub(crate) fn content_root(&self) -> WidgetId { self.root.first_child(&self.arena).unwrap() }
+  }
+
+  fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }
 
   #[derive(Clone, Debug)]
   pub struct Recursive {
@@ -396,7 +409,7 @@ mod tests {
     let wnd = TestWindow::new(fn_widget!(post));
     let mut tree = wnd.widget_tree.borrow_mut();
     tree.layout(Size::new(512., 512.));
-    assert_eq!(tree.count(), 16);
+    assert_eq!(tree.count(tree.content_root()), 16);
 
     let root = tree.root();
     tree.mark_dirty(root);
