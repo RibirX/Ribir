@@ -1,6 +1,7 @@
 use super::{
   MapReader, ModifyScope, Notifier, ReadRef, StateReader, StateWriter, WriteRef, WriterControl,
 };
+use crate::prelude::AppCtx;
 use crate::{
   context::BuildCtx,
   widget::{Render, RenderBuilder, Widget},
@@ -24,6 +25,21 @@ pub struct SplittedWriter<O, R, W> {
   batched_modify: Sc<Cell<ModifyScope>>,
   create_at: Instant,
   last_modified: Sc<Cell<Instant>>,
+  ref_count: Sc<Cell<usize>>,
+}
+
+impl<O, R, W> Drop for SplittedWriter<O, R, W> {
+  fn drop(&mut self) {
+    if self.ref_count.get() == 1 {
+      let mut notifier = self.notifier.clone();
+      // we use an async task to unsubscribe to wait the batched modifies to be
+      // notified.
+      AppCtx::spawn_local(async move {
+        notifier.unsubscribe();
+      })
+      .unwrap();
+    }
+  }
 }
 
 pub struct SplittedReader<S, F> {
@@ -137,6 +153,7 @@ where
       batched_modify: self.batched_modify.clone(),
       last_modified: self.last_modified.clone(),
       create_at: self.create_at,
+      ref_count: self.ref_count.clone(),
     }
   }
 
@@ -184,6 +201,7 @@ where
       batched_modify: <_>::default(),
       last_modified: Sc::new(Cell::new(create_at)),
       create_at,
+      ref_count: Sc::new(Cell::new(1)),
     }
   }
 
