@@ -722,5 +722,6 @@ mod tests {
     let map_reader = a.map_reader(|a| a as &dyn T);
     map_reader.read().test();
     map_writer.write().test_mut();
+    AppCtx::run_until_stalled();
   }
 }

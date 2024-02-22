@@ -22,6 +22,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+- Optimization, StateReader auto unsubscribe if not writer(#532 @wjian23)
+
 ## [0.2.0-alpha.3] - 2024-02-20
 
 ## [0.2.0-alpha.2] - 2024-02-13

@@ -36,6 +36,10 @@ bitflags! {
   }
 }
 
+impl Notifier {
+  pub(crate) fn unsubscribe(&mut self) { self.0.clone().unsubscribe(); }
+}
+
 struct StatefulInfo {
   notifier: Notifier,
   /// The counter of the writer may be modified the data.
@@ -56,7 +60,11 @@ impl<W: 'static> StateReader for Stateful<W> {
   fn read(&self) -> ReadRef<W> { ReadRef::new(self.data.borrow()) }
 
   #[inline]
-  fn clone_reader(&self) -> Self::Reader { Reader(self.clone()) }
+  fn clone_reader(&self) -> Self::Reader {
+    let this = self.clone();
+    this.dec_writer();
+    Reader(this)
+  }
 
   #[inline]
   fn origin_reader(&self) -> &Self::OriginReader { self }
@@ -362,7 +370,7 @@ impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {
 
 #[cfg(test)]
 mod tests {
-  use std::cell::RefCell;
+  use std::{cell::RefCell, rc::Rc};
 
   use super::*;
   use crate::{test_helper::*, timer::Timer};
@@ -378,6 +386,51 @@ mod tests {
       stateful.write().size = Size::new(100., 100.)
     }
     assert_eq!(stateful.read().size, Size::new(100., 100.));
+  }
+
+  #[test]
+  fn unsubscribe_when_not_writer() {
+    crate::reset_test_env!();
+    struct Guard {
+      drop_cnt: Rc<RefCell<i32>>,
+    }
+    impl Guard {
+      fn _use(&self) {}
+    }
+    impl Drop for Guard {
+      fn drop(&mut self) { *self.drop_cnt.borrow_mut() += 1; }
+    }
+
+    fn drop_writer_subscribe<W: StateWriter>(w: W, drop_cnt: Rc<RefCell<i32>>) {
+      let guard = Guard { drop_cnt: drop_cnt.clone() };
+      let r = w.clone_reader();
+      w.modifies().subscribe(move |_| {
+        guard._use();
+        r.clone_reader();
+      });
+    }
+
+    let drop_cnt = Rc::new(RefCell::new(0));
+    {
+      drop_writer_subscribe(Stateful::new(()), drop_cnt.clone());
+    };
+    AppCtx::run_until_stalled();
+    assert_eq!(*drop_cnt.borrow(), 1);
+
+    {
+      drop_writer_subscribe(Stateful::new(()).map_writer(|v| v, |v| v), drop_cnt.clone());
+    };
+    AppCtx::run_until_stalled();
+    assert_eq!(*drop_cnt.borrow(), 2);
+
+    {
+      drop_writer_subscribe(
+        Stateful::new(()).split_writer(|v| v, |v| v),
+        drop_cnt.clone(),
+      );
+    };
+    AppCtx::run_until_stalled();
+    assert_eq!(*drop_cnt.borrow(), 3);
   }
 
   #[test]
