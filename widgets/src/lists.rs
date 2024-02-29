@@ -288,9 +288,7 @@ impl ComposeChild for ListItem {
             @{
               leading.map(move |w| {
                 let (leading, widget) = w.unzip();
-                let (_, builtin)  = leading.unzip();
-                let leading = widget.compose_with_style(leading_config).widget_build(ctx!());
-                builtin.compose_with_host(leading, ctx!())
+                leading.map(|_| widget.compose_with_style(leading_config))
               })
             }
             @Expanded {
@@ -324,9 +322,7 @@ impl ComposeChild for ListItem {
             }
             @{ trailing.map(|w| {
               let (trailing, widget) = w.unzip();
-              let (_, builtin)  = trailing.unzip();
-              let trailing = widget.compose_with_style(trailing_config).widget_build(ctx!());
-              builtin.compose_with_host(trailing, ctx!())
+              trailing.map(|_| widget.compose_with_style(trailing_config))
             })}
           }
         }
