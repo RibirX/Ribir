@@ -203,9 +203,8 @@ impl<T> FatObj<T> {
 
   pub fn new(host: T, builtin: BuiltinObj) -> Self { Self { host, builtin } }
 
-  pub fn unzip(self) -> (T, BuiltinObj) { (self.host, self.builtin) }
   #[inline]
-  pub(crate) fn map<V>(self, f: impl FnOnce(T) -> V) -> FatObj<V> {
+  pub fn map<V>(self, f: impl FnOnce(T) -> V) -> FatObj<V> {
     let Self { host, builtin } = self;
     FatObj { host: f(host), builtin }
   }
