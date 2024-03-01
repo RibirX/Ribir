@@ -1,13 +1,18 @@
 use crate::prelude::*;
 
-#[derive(PartialEq, Clone, Declare)]
+#[derive(PartialEq, Clone, Default)]
 pub struct MouseHover {
-  #[declare(skip, default)]
   hover: bool,
 }
 
 impl MouseHover {
   pub fn mouse_hover(&self) -> bool { self.hover }
+}
+
+impl Declare for MouseHover {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for MouseHover {

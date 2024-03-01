@@ -1,9 +1,10 @@
 use crate::prelude::*;
 use std::cell::Cell;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Default)]
 pub enum BoxFit {
   /// Widget will not be scale.
+  #[default]
   None,
   /// The entire widget will completely fill its container. If the widget's
   /// aspect ratio does not match the aspect ratio of its box, then the widget
@@ -28,12 +29,20 @@ pub enum BoxFit {
 }
 
 /// Widget set how its child should be scale to fit its box.
-#[derive(Declare, Query, SingleChild)]
+#[derive(Query, SingleChild, Default)]
 pub struct FittedBox {
-  #[declare(builtin)]
   pub box_fit: BoxFit,
-  #[declare(default)]
   scale_cache: Cell<Transform>,
+}
+
+impl Declare for FittedBox {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+}
+
+impl FittedBox {
+  pub fn new(box_fit: BoxFit) -> Self { Self { box_fit, scale_cache: <_>::default() } }
 }
 
 impl Render for FittedBox {

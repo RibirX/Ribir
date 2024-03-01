@@ -16,7 +16,7 @@ pub struct Declarer<'a> {
 
 pub(crate) fn simple_declarer_attr(stt: &mut syn::ItemStruct) -> Result<TokenStream> {
   if stt.fields.is_empty() {
-    return empty_impl(&stt.ident, &stt.fields);
+    return empty_impl(stt);
   }
   let syn::ItemStruct { vis, generics, ident, fields, .. } = stt;
   let declarer = Declarer::new(ident, fields, vis)?;
@@ -58,13 +58,16 @@ pub(crate) fn simple_declarer_attr(stt: &mut syn::ItemStruct) -> Result<TokenStr
   Ok(tokens)
 }
 
-pub fn empty_impl(name: &Ident, fields: &Fields) -> Result<TokenStream> {
+fn empty_impl(stt: &syn::ItemStruct) -> Result<TokenStream> {
+  let syn::ItemStruct { ident: name, fields, .. } = stt;
   let construct = match fields {
     Fields::Named(_) => quote!(#name {}),
     Fields::Unnamed(_) => quote!(#name()),
     Fields::Unit => quote!(#name),
   };
   let tokens = quote! {
+    #stt
+
     impl Declare for #name  {
       type Builder = #name;
       fn declare_builder() -> Self::Builder { #construct }
@@ -120,7 +123,6 @@ impl<'a> Declarer<'a> {
 mod kw {
   use syn::custom_keyword;
   custom_keyword!(rename);
-  custom_keyword!(builtin);
   custom_keyword!(default);
   custom_keyword!(custom);
   custom_keyword!(skip);
@@ -136,7 +138,6 @@ pub(crate) struct DefaultMeta {
 #[derive(Default)]
 pub(crate) struct DeclareAttr {
   pub(crate) rename: Option<syn::Ident>,
-  pub(crate) builtin: Option<kw::builtin>,
   pub(crate) default: Option<DefaultMeta>,
   pub(crate) custom: Option<kw::custom>,
   // field with `skip` attr, will not generate setter method and use default to init value.
@@ -197,9 +198,7 @@ impl Parse for DeclareAttr {
 
       // use input instead of lookahead to peek builtin, because need't complicate in
       // compile error.
-      if input.peek(kw::builtin) {
-        attr.builtin = Some(input.parse()?);
-      } else if lookahead.peek(kw::rename) {
+      if lookahead.peek(kw::rename) {
         input.parse::<kw::rename>()?;
         input.parse::<syn::Token![=]>()?;
         attr.rename = Some(input.parse()?);
@@ -213,14 +212,6 @@ impl Parse for DeclareAttr {
         attr.strict = Some(input.parse()?);
       } else {
         return Err(lookahead.error());
-      }
-      if let (Some(rename), Some(builtin)) = (attr.rename.as_ref(), attr.builtin.as_ref()) {
-        let mut d = Diagnostic::new(
-          Level::Error,
-          "`rename` and `builtin` can not be used in same time.",
-        );
-        d.set_spans(vec![rename.span().unwrap(), builtin.span().unwrap()]);
-        d.emit();
       }
       if let (Some(custom), Some(skip)) = (attr.custom.as_ref(), attr.skip.as_ref()) {
         let mut d = Diagnostic::new(

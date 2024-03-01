@@ -362,7 +362,7 @@ impl FocusManager {
       let wid = self.get(node_id)?.wid?;
       let tree = wnd.widget_tree.borrow();
       let r = wid.get(&tree.arena)?;
-      r.query_most_outside(|s: &MixBuiltin| s.tab_index())
+      r.query_most_outside(|s: &MixBuiltin| s.get_tab_index())
     };
 
     get_index().unwrap_or(0)

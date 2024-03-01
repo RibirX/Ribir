@@ -25,7 +25,7 @@
 //!   let first_fade_in = @Animate {
 //!     transition: transitions::EASE_IN.of(ctx!()),
 //!      state: map_writer!($first.opacity),
-//!   }.into_inner();
+//!   };
 //!
 //!   stagger.write().push_animation(first_fade_in);
 //!   stagger.write().push_state(map_writer!($second.opacity), 0., ctx!());
@@ -103,7 +103,7 @@ impl<T: Transition + 'static> Stagger<T> {
     A: AnimateState + 'static,
   {
     let transition = Box::new(self.transition.clone());
-    let animate = rdl! { Animate { transition, state, from } }.into_inner();
+    let animate = rdl! { Animate { transition, state, from } };
     self.push_animation_with(stagger, animate.clone_writer().into_inner());
     animate
   }
@@ -116,7 +116,7 @@ impl<T: Transition + 'static> Stagger<T> {
   /// Add an animation to the end of the stagger animation with a different
   /// stagger duration.
   ///
-  /// **stagger**： the duration between the previous animation start and this
+  /// **stagger**: the duration between the previous animation start and this
   /// animation start.
   pub fn push_animation_with(
     &mut self,
@@ -237,7 +237,7 @@ mod tests {
         from: 0.,
       };
 
-      stagger.write().push_animation(animate.into_inner());
+      stagger.write().push_animation(animate);
       stagger.write().push_state(
         map_writer!($mock_box.size),
         Size::new(200., 200.),

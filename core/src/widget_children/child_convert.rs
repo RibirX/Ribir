@@ -193,6 +193,6 @@ where
 {
   #[inline]
   fn from_another(value: T1, ctx: &BuildCtx) -> Self {
-    FatObj::from_host(ChildFrom::child_from(value, ctx))
+    FatObj::new(ChildFrom::child_from(value, ctx))
   }
 }

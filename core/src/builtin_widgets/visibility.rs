@@ -1,9 +1,14 @@
 use crate::prelude::*;
 
-#[derive(Declare)]
+#[derive(Default)]
 pub struct Visibility {
-  #[declare(builtin)]
   pub visible: bool,
+}
+
+impl Declare for Visibility {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for Visibility {

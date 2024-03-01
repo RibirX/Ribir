@@ -9,10 +9,15 @@ pub struct EdgeInsets {
 }
 
 /// A widget that create space around its child.
-#[derive(SingleChild, Default, Query, Clone, PartialEq, Declare)]
+#[derive(SingleChild, Default, Query, Clone, PartialEq)]
 pub struct Margin {
-  #[declare(builtin, default)]
   pub margin: EdgeInsets,
+}
+
+impl Declare for Margin {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl Render for Margin {

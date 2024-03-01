@@ -55,7 +55,7 @@ impl ComposeChild for HScrollBar {
         scroll_pos: Point::new($this.offset, 0.),
       };
       let scrollbar = @HRawScrollbar {
-        scrolling: scrolling.get_builtin_scrollable_widget(ctx!()).clone_reader(),
+        scrolling: scrolling.get_scrollable_widget().clone_reader(),
         v_align: VAlign::Bottom,
       };
 
@@ -98,7 +98,7 @@ impl ComposeChild for VScrollBar {
       };
 
       let scrollbar = @VRawScrollbar {
-        scrolling: scrolling.get_builtin_scrollable_widget(ctx!()).clone_reader(),
+        scrolling: scrolling.get_scrollable_widget().clone_reader(),
         h_align: HAlign::Right
       };
 
@@ -139,11 +139,11 @@ impl ComposeChild for BothScrollbar {
         scroll_pos: $this.offset,
       };
       let mut h_bar = @HRawScrollbar {
-        scrolling: scrolling.get_builtin_scrollable_widget(ctx!()).clone_reader(),
+        scrolling: scrolling.get_scrollable_widget().clone_reader(),
         v_align: VAlign::Bottom,
       };
       let mut v_bar = @VRawScrollbar {
-        scrolling: scrolling.get_builtin_scrollable_widget(ctx!()).clone_reader(),
+        scrolling: scrolling.get_scrollable_widget().clone_reader(),
         h_align: HAlign::Right,
         margin: EdgeInsets::only_bottom($h_bar.layout_height())
       };

@@ -1,9 +1,14 @@
 use crate::{events::focus_mgr::FocusHandle, prelude::*};
 
-#[derive(Declare, Query)]
+#[derive(Query, Default)]
 pub struct RequestFocus {
-  #[declare(default)]
   handle: Option<FocusHandle>,
+}
+
+impl Declare for RequestFocus {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for RequestFocus {

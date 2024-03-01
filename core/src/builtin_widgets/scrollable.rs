@@ -15,16 +15,18 @@ pub enum Scrollable {
 }
 
 /// Helper struct for builtin scrollable field.
-#[derive(Declare)]
+#[derive(Default)]
 pub struct ScrollableWidget {
-  #[declare(builtin, default)]
   pub scrollable: Scrollable,
-  #[declare(builtin, default)]
   pub scroll_pos: Point,
-  #[declare(skip)]
   page: Size,
-  #[declare(skip)]
   content_size: Size,
+}
+
+impl Declare for ScrollableWidget {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for ScrollableWidget {

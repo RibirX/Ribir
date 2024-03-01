@@ -152,6 +152,15 @@ impl<W, C> Pair<W, C> {
   pub fn parent(self) -> W { self.parent }
 }
 
+impl<W, C> Pair<FatObj<W>, C> {
+  /// Replace the host of the FatObj in parent with the child, this is useful
+  /// when the host of the `FatObj` is useless.
+  pub fn child_replace_host(self) -> FatObj<C> {
+    let Self { parent, child } = self;
+    parent.map(|_| child)
+  }
+}
+
 pub trait PairWithChild<C> {
   type Target;
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
@@ -196,9 +205,9 @@ mod tests {
 
     #[derive(Template)]
     struct PageTml {
-      _header: WidgetOf<Header>,
-      _content: WidgetOf<Content>,
-      _footer: WidgetOf<Footer>,
+      _header: WidgetOf<FatObj<Header>>,
+      _content: WidgetOf<FatObj<Content>>,
+      _footer: WidgetOf<FatObj<Footer>>,
     }
 
     impl ComposeChild for Page {
@@ -228,7 +237,7 @@ mod tests {
     struct Child;
 
     impl ComposeChild for Parent {
-      type Child = Option<Pair<Child, Widget>>;
+      type Child = Option<Pair<FatObj<Child>, Widget>>;
 
       fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> impl WidgetBuilder {
         fn_widget!(Void)
@@ -341,7 +350,7 @@ mod tests {
     struct X;
 
     impl ComposeChild for P {
-      type Child = WidgetOf<X>;
+      type Child = WidgetOf<FatObj<X>>;
       fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> impl WidgetBuilder {
         fn_widget!(Void)
       }

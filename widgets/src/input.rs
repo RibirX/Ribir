@@ -265,7 +265,7 @@ impl ComposeChild for Input {
       let text = @Text {
         text: pipe!($this.text.clone()),
         text_style: pipe!($this.style.clone()),
-      }.into_inner();
+      };
       @FocusScope {
         @ConstrainedBox {
           clamp: pipe!(size_clamp(&$this.style, Some(1.), $this.size)),
@@ -297,7 +297,7 @@ impl ComposeChild for TextArea {
           true => Overflow::AutoWrap,
           false => Overflow::Clip,
         }),
-      }.into_inner();
+      };
 
       let scroll_dir = pipe!($this.auto_wrap).map(|auto_wrap| match auto_wrap {
         true => Scrollable::Y,
@@ -319,13 +319,13 @@ where
 {
   fn edit_area(
     this: &impl StateWriter<Value = Self>,
-    text: State<Text>,
+    text: FatObj<State<Text>>,
     scroll_dir: impl Pipe<Value = Scrollable> + 'static,
     placeholder: Option<State<Placeholder>>,
   ) -> impl WidgetBuilder {
     fn_widget! {
       let mut text = @$text{};
-      let layout_box = text.get_builtin_layout_box(ctx!()).clone_reader();
+      let layout_box = text.get_layout_box_widget().clone_reader();
       let only_text = text.clone_reader();
 
       let mut stack = @Stack {
@@ -346,7 +346,7 @@ where
           Anchor::left_top(pos.x, pos.y)
         ),
       };
-      let scrollable = stack.get_builtin_scrollable_widget(ctx!());
+      let scrollable = stack.get_scrollable_widget();
       let tick_of_layout_ready = ctx!().window()
         .frame_tick_stream()
         .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));

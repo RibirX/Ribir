@@ -12,10 +12,15 @@ use crate::prelude::*;
 /// dropped.
 ///
 /// It's useful when you need run a leave animation for a widget.
-#[derive(Declare, Query)]
+#[derive(Query, Default)]
 pub struct DelayDrop {
-  #[declare(builtin)]
   pub delay_drop_until: bool,
+}
+
+impl Declare for DelayDrop {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for DelayDrop {
@@ -26,5 +31,50 @@ impl ComposeChild for DelayDrop {
       let modifies = this.raw_modifies();
       child.attach_state_data(this, ctx!()).dirty_subscribe(modifies, ctx!())
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::cell::Ref;
+
+  use super::*;
+  use crate::{reset_test_env, test_helper::*};
+
+  #[test]
+  fn smoke() {
+    reset_test_env!();
+
+    let delay_drop = Stateful::new(false);
+    let c_delay_drop = delay_drop.clone_writer();
+    let remove_widget = Stateful::new(false);
+    let c_remove_widget = remove_widget.clone_writer();
+    let mut wnd = TestWindow::new(fn_widget! {
+      pipe! {
+        if *$remove_widget {
+          Void.widget_build(ctx!())
+        } else {
+          FatObj::new(Void)
+            .delay_drop_until(pipe!(*$delay_drop))
+            .widget_build(ctx!())
+        }
+      }
+    });
+
+    fn tree_arena(wnd: &TestWindow) -> Ref<TreeArena> {
+      let tree = wnd.widget_tree.borrow();
+      Ref::map(tree, |t| &t.arena)
+    }
+
+    let root = wnd.widget_tree.borrow().content_root();
+    wnd.draw_frame();
+
+    *c_remove_widget.write() = true;
+    wnd.draw_frame();
+    assert!(!root.is_dropped(&tree_arena(&wnd)));
+
+    *c_delay_drop.write() = true;
+    wnd.draw_frame();
+    assert!(root.is_dropped(&tree_arena(&wnd)));
   }
 }

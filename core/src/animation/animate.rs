@@ -1,7 +1,7 @@
 use crate::{prelude::*, ticker::FrameMsg, window::WindowId};
 use std::time::Instant;
 
-#[derive(Declare)]
+#[simple_declare]
 pub struct Animate<S>
 where
   S: AnimateState + 'static,

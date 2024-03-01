@@ -1,10 +1,15 @@
 use crate::prelude::*;
 
 /// A widget that insets its child by the given padding.
-#[derive(SingleChild, Query, Clone, Declare)]
+#[derive(SingleChild, Query, Clone, Default)]
 pub struct Padding {
-  #[declare(builtin)]
   pub padding: EdgeInsets,
+}
+
+impl Declare for Padding {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl Render for Padding {

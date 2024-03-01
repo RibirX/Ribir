@@ -1,12 +1,17 @@
 use crate::prelude::*;
-#[derive(PartialEq, Clone, Declare)]
+#[derive(PartialEq, Clone, Default)]
 pub struct HasFocus {
-  #[declare(skip, default)]
   focused: bool,
 }
 
 impl HasFocus {
   pub fn has_focus(&self) -> bool { self.focused }
+}
+
+impl Declare for HasFocus {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for HasFocus {

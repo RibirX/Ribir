@@ -155,10 +155,15 @@ impl Anchor {
 }
 
 /// Widget use to anchor child constraints relative to parent widget.
-#[derive(Declare, Query, SingleChild)]
+#[derive(Query, SingleChild, Default)]
 pub struct RelativeAnchor {
-  #[declare(builtin, default)]
   pub anchor: Anchor,
+}
+
+impl Declare for RelativeAnchor {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl Render for RelativeAnchor {

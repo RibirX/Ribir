@@ -1,9 +1,19 @@
 use crate::prelude::*;
 
-#[derive(Declare, Default, Query, Clone, SingleChild)]
+#[derive(Query, Clone, SingleChild)]
 pub struct Opacity {
-  #[declare(builtin, default = 1.)]
   pub opacity: f32,
+}
+
+impl Declare for Opacity {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+}
+
+impl Default for Opacity {
+  #[inline]
+  fn default() -> Self { Self { opacity: 1.0 } }
 }
 
 impl Render for Opacity {

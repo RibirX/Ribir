@@ -386,11 +386,11 @@ impl ToTokens for DollarRefsScope {
         }
         .to_tokens(tokens),
         (Some(BuiltinInfo { host, member }), false) => quote_spanned! { name.span() =>
-          let #name = #host.#member(ctx!()).clone_reader();
+          let #name = #host.#member().clone_reader();
         }
         .to_tokens(tokens),
         (Some(BuiltinInfo { host, member }), true) => quote_spanned! { name.span() =>
-          let #name = #host.#member(ctx!()).clone_writer();
+          let #name = #host.#member().clone_writer();
         }
         .to_tokens(tokens),
       }
@@ -454,7 +454,7 @@ impl DollarRefsCtx {
       self.current_dollar_scope_mut().used_ctx |= scope.used_ctx();
 
       for r in scope.refs.iter_mut() {
-        if !self.is_local_var(r.host()) {
+        if !self.is_local_var(r.host()) && self.scopes.len() > 1 {
           self.current_dollar_scope_mut().refs.push(r.clone());
           // if ref variable is not a local variable of parent capture level, should
           // remove its builtin info as a normal variable, because parent will capture the
@@ -483,7 +483,7 @@ impl DollarRefsCtx {
     if !self.is_local_var(host) && self.capture_level_heads.len() > 1 {
       name.to_token_stream()
     } else {
-      quote_spanned! { host.span() => #host.#member(ctx!()) }
+      quote_spanned! { host.span() => #host.#member() }
     }
   }
 
@@ -509,7 +509,7 @@ impl DollarRefsCtx {
     // the builtin widget from the `FatObj` so we only capture the builtin part that
     // we used.
     let name = ribir_suffix_variable(&host, builtin_member);
-    let get_builtin_method = Ident::new(&format!("get_builtin_{builtin_member}"), host.span());
+    let get_builtin_method = Ident::new(&format!("get_{builtin_member}_widget"), host.span());
     let builtin = Some(BuiltinInfo { host, member: get_builtin_method });
     let dollar_ref = DollarRef { name, builtin, write };
 
