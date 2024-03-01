@@ -3,10 +3,15 @@ use winit::window::CursorIcon;
 
 /// `Cursor` is an attribute to assign an `cursor` to a widget.
 
-#[derive(Default, Debug, Declare)]
+#[derive(Default, Debug)]
 pub struct Cursor {
-  #[declare(builtin, default)]
   pub cursor: CursorIcon,
+}
+
+impl Declare for Cursor {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for Cursor {

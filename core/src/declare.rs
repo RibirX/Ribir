@@ -52,8 +52,9 @@ impl<V, U: From<V>> DeclareFrom<V, ()> for DeclareInit<U> {
   fn declare_from(value: V) -> Self { Self::Value(value.into()) }
 }
 
-impl<P: Pipe + 'static, V> DeclareFrom<P, &dyn Pipe<Value = ()>> for DeclareInit<V>
+impl<P, V> DeclareFrom<P, &dyn Pipe<Value = ()>> for DeclareInit<V>
 where
+  P: Pipe + 'static,
   V: From<P::Value> + 'static,
 {
   #[inline]

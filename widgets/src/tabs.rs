@@ -118,7 +118,8 @@ pub struct TabItem {
   text: Option<State<Label>>,
 }
 
-#[derive(Declare, PairChild)]
+#[derive(PairChild)]
+#[simple_declare]
 pub struct TabPane;
 
 #[derive(Declare)]

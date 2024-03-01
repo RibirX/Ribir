@@ -24,12 +24,34 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## Features
 
+- **core**: All built-in widget abilities are now exported on `FatObj`. (#535 @M-Adoo)
+  You can directly use `FatObj` to configure built-in widget abilities such as `on_click`, `on_key_down`, etc.
+  ```rust
+  let _ = FatObj::new(Void)
+    .margin(EdgeInsets::all(1.0))
+    .on_click(|_, _| { println!("click"); });
+  ```
+- **macros**: `#[derive(Decalre)]` now generates a `FatObj<State<T>>` instead of `State<T>`, and supports initialization of all built-in widgets on its DeclareBuilder. (#535 @M-Adoo) 
+  All pipes used to initialize the field will be unsubscribed when the FatObj is disposed.
+  ```rust
+  let row = Row::declare_builder()
+    .margin(...)
+    .on_click(...)
+    .build_declare(ctx);
+  ```
 - **macros**: Introduced `simple_declare` macro for types that don't use `Pipe` for initialization. (#535 @M-Adoo)
+
+## Changed
+
 - **macros**: removed crate `ribir_builtin` that is no longer needed. (#535 @M-Adoo)
 
 ## Breaking
 
-- **core**: removed `FatObj::unzip`. (#535 @M-Adoo)
+- **core**: removed `FatObj::unzip` and `FatObj::from_host` (#535 @M-Adoo)
+- **core**: removed `BuiltinObj`. (#535 @M-Adoo)
+- **core**: `FatObj::new(host: T, builtin: BuiltinObj)` -> `FatObj::new(host: T)`
+
+While these are public APIs, they are typically not required for direct use in user code.
 
 
 ## [0.2.0-alpha.5] - 2024-03-05

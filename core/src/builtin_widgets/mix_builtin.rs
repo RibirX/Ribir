@@ -94,13 +94,13 @@ impl MixBuiltin {
     self
   }
 
-  pub fn on_mounted(&self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> &Self {
+  pub fn on_mounted(&self, handler: impl FnOnce(&mut LifecycleEvent) + 'static) -> &Self {
     self.flag_mark(BuiltinFlags::Lifecycle);
     let _ = self
       .subject()
       .filter_map(event_map_filter!(Mounted, LifecycleEvent))
       .take(1)
-      .subscribe(handler);
+      .subscribe(life_fn_once_to_fn_mut(handler));
 
     self
   }
@@ -109,13 +109,13 @@ impl MixBuiltin {
     impl_event_callback!(self, Lifecycle, PerformedLayout, LifecycleEvent, handler)
   }
 
-  pub fn on_disposed(&self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> &Self {
+  pub fn on_disposed(&self, handler: impl FnOnce(&mut LifecycleEvent) + 'static) -> &Self {
     self.flag_mark(BuiltinFlags::Lifecycle);
     let _ = self
       .subject()
       .filter_map(event_map_filter!(Disposed, LifecycleEvent))
       .take(1)
-      .subscribe(handler);
+      .subscribe(life_fn_once_to_fn_mut(handler));
 
     self
   }
@@ -277,50 +277,31 @@ impl MixBuiltin {
   /// sequential keyboard navigation (usually with the Tab key).
   pub fn is_focus_node(&self) -> bool { self.flags.get().contains(BuiltinFlags::Focus) }
 
-  /// It accepts an integer as a value, with different results depending on the
-  /// integer's value:
-  /// - A negative value (usually -1) means that the widget is not reachable via
-  ///   sequential keyboard navigation, but could be focused with API or
-  ///   visually by clicking with the mouse.
-  /// - Zero means that the element should be focusable in sequential keyboard
-  ///   navigation, after any positive tab_index values and its order is defined
-  ///   by the tree's source order.
-  /// - A positive value means the element should be focusable in sequential
-  ///   keyboard navigation, with its order defined by the value of the number.
-  ///   That is, tab_index=4 is focused before tab_index=5 and tab_index=0, but
-  ///   after tab_index=3. If multiple elements share the same positive
-  ///   tab_index value, their order relative to each other follows their
-  ///   position in the tree source. The maximum value for tab_index is 32767.
-  ///   If not specified, it takes the default value 0.
-  pub fn tab_index(&self) -> i16 { (self.flags.get().bits() >> 48) as i16 }
+  pub fn get_tab_index(&self) -> i16 { (self.flags.get().bits() >> 48) as i16 }
 
-  /// Set the tab index of the focus node
-  pub fn set_tab_index(&self, tab_idx: i16) {
+  pub fn set_tab_index(&self, tab_idx: i16) -> &Self {
+    self.flag_mark(BuiltinFlags::Focus);
     let flags = self.flags.get().bits() | ((tab_idx as u64) << 48);
     self.flags.set(BuiltinFlags::from_bits_retain(flags));
+    self
   }
 
-  /// Indicates whether the `widget` should automatically get focus when the
-  /// window loads.
-  ///
-  /// Only one widget should have this attribute specified.  If there are
-  /// several, the widget nearest the root, get the initial
-  /// focus.
-  pub fn auto_focus(&self) -> bool { self.flags.get().contains(BuiltinFlags::AutoFocus) }
+  pub fn is_auto_focus(&self) -> bool { self.flags.get().contains(BuiltinFlags::AutoFocus) }
 
-  pub fn set_auto_focus(&self, v: bool) {
+  pub fn set_auto_focus(&self, v: bool) -> &Self {
     if v {
-      self.flag_mark(BuiltinFlags::AutoFocus);
+      self.flag_mark(BuiltinFlags::AutoFocus | BuiltinFlags::Focus);
     } else {
       let mut flag = self.flags.get();
       flag.remove(BuiltinFlags::AutoFocus);
-      self.flags.set(flag)
+      self.flags.set(flag);
     }
+    self
   }
 
   fn merge(&self, other: Self) {
-    let tab_index = self.tab_index();
-    let other_tab_index = other.tab_index();
+    let tab_index = self.get_tab_index();
+    let other_tab_index = other.get_tab_index();
     self.flags.set(self.flags.get() | other.flags.get());
     if other_tab_index != 0 {
       self.set_tab_index(other_tab_index);
@@ -341,7 +322,7 @@ impl MixBuiltin {
     self
       .on_mounted(move |e| {
         e.query_type(|mix: &MixBuiltin| {
-          let auto_focus = mix.auto_focus();
+          let auto_focus = mix.is_auto_focus();
           e.window().add_focus_node(e.id, auto_focus, FocusType::Node)
         });
       })
@@ -349,42 +330,51 @@ impl MixBuiltin {
   }
 }
 
+fn life_fn_once_to_fn_mut(
+  handler: impl FnOnce(&mut LifecycleEvent),
+) -> impl FnMut(&mut LifecycleEvent) {
+  let mut handler = Some(handler);
+  move |e| {
+    if let Some(h) = handler.take() {
+      h(e);
+    }
+  }
+}
+
 impl MixBuiltinDeclarer {
-  pub fn tab_index<_M, _V>(self, v: _V) -> Self
+  pub fn tab_index<M, V>(self, v: V) -> Self
   where
-    DeclareInit<i16>: DeclareFrom<_V, _M>,
+    DeclareInit<i16>: DeclareFrom<V, M>,
   {
     let inner = self.0.read();
     self.0.read().flag_mark(BuiltinFlags::Focus);
-    let v = DeclareInit::<i16>::declare_from(v);
-    match v {
-      DeclareInit::Value(v) => inner.set_tab_index(v),
-      DeclareInit::Pipe(p) => {
-        let (v, p) = p.into_pipe().unzip();
-        inner.set_tab_index(v);
-        let this = self.0.clone_reader();
-        p.subscribe(move |(_, v)| this.read().set_tab_index(v));
-      }
+    let (v, observable) = DeclareInit::declare_from(v).unzip();
+    inner.set_tab_index(v);
+    if let Some(observable) = observable {
+      let this = self.0.clone_reader();
+      let u = observable.subscribe(move |(_, v)| {
+        this.read().set_tab_index(v);
+      });
+      inner.on_disposed(move |_| u.unsubscribe());
     }
     drop(inner);
     self
   }
 
-  pub fn auto_focus<_M, _V>(self, v: _V) -> Self
+  pub fn auto_focus<M, V>(self, v: V) -> Self
   where
-    DeclareInit<bool>: DeclareFrom<_V, _M>,
+    DeclareInit<bool>: DeclareFrom<V, M>,
   {
     let inner = self.0.read();
     inner.flag_mark(BuiltinFlags::Focus);
-    let v = DeclareInit::<bool>::declare_from(v);
-    match v {
-      DeclareInit::Value(v) => inner.set_auto_focus(v),
-      DeclareInit::Pipe(p) => {
-        let (v, p) = p.into_pipe().unzip();
-        inner.set_auto_focus(v);
-        let this = self.0.clone_reader();
-        p.subscribe(move |(_, v)| this.read().set_auto_focus(v));
-      }
+    let (v, observable) = DeclareInit::declare_from(v).unzip();
+    inner.set_auto_focus(v);
+    if let Some(observable) = observable {
+      let this = self.0.clone_reader();
+      let u = observable.subscribe(move |(_, v)| {
+        this.read().set_auto_focus(v);
+      });
+      inner.on_disposed(move |_| u.unsubscribe());
     }
     drop(inner);
     self
@@ -395,7 +385,7 @@ impl MixBuiltinDeclarer {
     self
   }
 
-  pub fn on_mounted(self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
+  pub fn on_mounted(self, handler: impl FnOnce(&mut LifecycleEvent) + 'static) -> Self {
     self.0.read().on_mounted(handler);
     self
   }
@@ -405,7 +395,7 @@ impl MixBuiltinDeclarer {
     self
   }
 
-  pub fn on_disposed(self, handler: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
+  pub fn on_disposed(self, handler: impl FnOnce(&mut LifecycleEvent) + 'static) -> Self {
     self.0.read().on_disposed(handler);
     self
   }

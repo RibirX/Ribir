@@ -1,18 +1,21 @@
 use crate::prelude::*;
 
 /// The BoxDecoration provides a variety of ways to draw a box.
-#[derive(SingleChild, Default, Clone, Declare, Query)]
+#[derive(SingleChild, Default, Clone, Query)]
 pub struct BoxDecoration {
   /// The background of the box.
-  #[declare(builtin, default)]
   pub background: Option<Brush>,
   /// A border to draw above the background
-  #[declare(builtin, default)]
   pub border: Option<Border>,
   /// The corners of this box are rounded by this `BorderRadius`. The round
   /// corner only work if the two borders beside it are same style.
-  #[declare(builtin, default)]
   pub border_radius: Option<Radius>,
+}
+
+impl Declare for BoxDecoration {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -197,7 +200,8 @@ mod tests {
     let dummy = std::mem::MaybeUninit::uninit();
     // just for test, we know BoxDecoration not use `ctx` to build.
     let ctx: BuildCtx<'static> = unsafe { dummy.assume_init() };
-    let w = BoxDecoration::declare_builder().build_declare(&ctx);
+    let mut w = BoxDecoration::declare_builder().build_declare(&ctx);
+    let w = w.get_box_decoration_widget();
 
     assert_eq!(w.read().border, None);
     assert_eq!(w.read().border_radius, None);

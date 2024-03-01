@@ -284,13 +284,13 @@ mod tests {
         } else {
           MockBox { size: Size::new(10., 10.) }.widget_build(ctx!())
         };
-        @MockMulti {
-          @{ pipe!{
-            (0..$this.width - 1)
-              .map(|_| MockBox { size: Size::new(10., 10.)})
-          }}
-          @{ recursive_child }
-        }
+        let multi = pipe!{
+          (0..$this.width - 1).map(|_| MockBox { size: Size::new(10., 10.)})
+        };
+        MockMulti
+          .with_child(multi, ctx!())
+          .with_child(recursive_child, ctx!())
+
       }
     }
   }

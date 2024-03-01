@@ -1,10 +1,15 @@
 use crate::{prelude::*, ticker::FrameMsg};
 use std::rc::Rc;
 
-#[derive(Declare, Query, Default)]
+#[derive(Query, Default)]
 pub struct GlobalAnchor {
-  #[declare(builtin, default)]
   pub global_anchor: Anchor,
+}
+
+impl Declare for GlobalAnchor {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for GlobalAnchor {
@@ -91,7 +96,7 @@ impl<W> FatObj<W> {
     offset: f32,
     ctx: &BuildCtx,
   ) -> impl Subscription {
-    let this = self.get_builtin_global_anchor(ctx).clone_writer();
+    let this = self.get_global_anchor_widget().clone_writer();
     let wnd = ctx.window();
     let wid = wid.clone();
     let tick_of_layout_ready = wnd
@@ -112,7 +117,7 @@ impl<W> FatObj<W> {
     relative: f32,
     ctx: &BuildCtx,
   ) -> impl Subscription {
-    let this = self.get_builtin_global_anchor(ctx).clone_writer();
+    let this = self.get_global_anchor_widget().clone_writer();
     let wnd = ctx.window();
     let wid = wid.clone();
     let tick_of_layout_ready = wnd
@@ -134,7 +139,7 @@ impl<W> FatObj<W> {
     relative: f32,
     ctx: &BuildCtx,
   ) -> impl Subscription {
-    let this = self.get_builtin_global_anchor(ctx).clone_writer();
+    let this = self.get_global_anchor_widget().clone_writer();
     let wnd = ctx.window();
     let wid = wid.clone();
     let tick_of_layout_ready = wnd
@@ -155,7 +160,7 @@ impl<W> FatObj<W> {
     relative: f32,
     ctx: &BuildCtx,
   ) -> impl Subscription {
-    let this = self.get_builtin_global_anchor(ctx).clone_writer();
+    let this = self.get_global_anchor_widget().clone_writer();
     let wnd = ctx.window();
     let wid = wid.clone();
     let tick_of_layout_ready = wnd

@@ -54,17 +54,27 @@ pub enum VAlign {
 }
 
 /// A widget that align its child in x-axis, base on child's width.
-#[derive(Declare, Query, SingleChild)]
+#[derive(Query, SingleChild, Default)]
 pub struct HAlignWidget {
-  #[declare(default, builtin)]
   pub h_align: HAlign,
 }
 
 /// A widget that align its child in y-axis, base on child's height.
-#[derive(Declare, Query, SingleChild)]
+#[derive(Query, SingleChild, Default)]
 pub struct VAlignWidget {
-  #[declare(default, builtin)]
   pub v_align: VAlign,
+}
+
+impl Declare for HAlignWidget {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+}
+
+impl Declare for VAlignWidget {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl Render for HAlignWidget {

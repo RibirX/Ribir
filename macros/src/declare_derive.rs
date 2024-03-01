@@ -1,8 +1,11 @@
-use crate::simple_declare_attr::*;
-use crate::util::data_struct_unwrap;
+use crate::{
+  simple_declare_attr::*,
+  util::data_struct_unwrap,
+  variable_names::{BuiltinMemberType, BUILTIN_INFOS},
+};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{spanned::Spanned, Ident, Visibility};
+use syn::{spanned::Spanned, Fields, Ident, Visibility};
 
 const DECLARE: &str = "Declare";
 
@@ -28,7 +31,11 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   let (g_impl, g_ty, g_where) = generics.split_for_impl();
   let tokens = quote! {
       #vis struct #name #generics #g_where {
-        #(#builder_f_names : Option<DeclareInit<#builder_f_tys>>,)*
+        #(
+          #[allow(clippy::type_complexity)]
+          #builder_f_names : Option<DeclareInit<#builder_f_tys>>,
+        )*
+        fat_obj: FatObj<()>,
       }
 
       impl #g_impl Declare for #host #g_ty #g_where {
@@ -37,34 +44,413 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         fn declare_builder() -> Self::Builder {
           #name {
             #(#builder_f_names : None ,)*
+            fat_obj: FatObj::new(()),
           }
         }
       }
+
+      impl #g_impl DeclareBuilder for #name #g_ty #g_where {
+        #[allow(clippy::type_complexity)]
+        type Target = FatObj<State<#host #g_ty>>;
+
+        #[inline]
+        fn build_declare(mut self, ctx!(): &BuildCtx) -> Self::Target {
+          #(#field_values)*
+          let mut _this_ಠ_ಠ = State::value(#host {
+            #(#field_names : #field_names.0),*
+          });
+          let mut _fat_ಠ_ಠ = self.fat_obj;
+          #(
+            if let Some(o) = #field_names2.1 {
+              let mut _this_ಠ_ಠ = _this_ಠ_ಠ.clone_writer();
+              let u = o.subscribe(move |(_, v)| _this_ಠ_ಠ.write().#field_names2 = v);
+              _fat_ಠ_ಠ = _fat_ಠ_ಠ.on_disposed(move |_| u.unsubscribe());
+            }
+          );*
+
+          _fat_ಠ_ಠ.map(move |_| _this_ಠ_ಠ)
+        }
+      }
+
 
       impl #g_impl #name #g_ty #g_where {
         #(#set_methods)*
       }
 
-      impl #g_impl DeclareBuilder for #name #g_ty #g_where {
-        type Target = State<#host #g_ty>;
-
-        #[inline]
-        fn build_declare(mut self, ctx!(): &BuildCtx) -> Self::Target {
-          #(#field_values)*
-          let mut _ribir_ಠ_ಠ = State::value(#host {
-            #(#field_names : #field_names.0),*
-          });
-
-          #(
-            if let Some(o) = #field_names2.1 {
-              let mut _ribir2 = _ribir_ಠ_ಠ.clone_writer();
-              let u = o.subscribe(move |(_, v)| _ribir2.write().#field_names2 = v);
-              _ribir_ಠ_ಠ.as_stateful().unsubscribe_on_drop(u);
-            }
-          );*
-
-          _ribir_ಠ_ಠ
+      impl #g_impl #name #g_ty #g_where {
+        #vis fn tab_index<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<i16>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.tab_index(v);
+          self
         }
+
+        #vis fn auto_focus<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<bool>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.auto_focus(v);
+          self
+        }
+
+        #vis fn on_event(mut self, f: impl FnMut(&mut Event) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_event(f);
+          self
+        }
+
+        #vis fn on_mounted(mut self, f: impl FnOnce(&mut LifecycleEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_mounted(f);
+          self
+        }
+
+        #vis fn on_performed_layout(
+          mut self,
+          f: impl FnMut(&mut LifecycleEvent) + 'static
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_performed_layout(f);
+          self
+        }
+
+        #vis fn on_disposed(mut self, f: impl FnOnce(&mut LifecycleEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_disposed(f);
+          self
+        }
+
+        #vis fn on_pointer_down(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_pointer_down(f);
+          self
+        }
+
+        #vis fn on_pointer_down_capture(
+          mut self,
+          f: impl FnMut(&mut PointerEvent) + 'static
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_pointer_down_capture(f);
+          self
+        }
+
+        #vis fn on_pointer_up(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_pointer_up(f);
+          self
+        }
+
+        #vis fn on_pointer_up_capture(
+          mut self,
+          f: impl FnMut(&mut PointerEvent) + 'static
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_pointer_up_capture(f);
+          self
+        }
+
+        #vis fn on_pointer_move(
+          mut self,
+          f: impl FnMut(&mut PointerEvent) + 'static
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_pointer_move(f);
+          self
+        }
+
+        #vis fn on_pointer_move_capture(
+          mut self,
+          f: impl FnMut(&mut PointerEvent) + 'static
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_pointer_move_capture(f);
+          self
+        }
+
+        #vis fn on_pointer_cancel(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_pointer_cancel(f);
+          self
+        }
+
+        #vis fn on_pointer_enter(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_pointer_enter(f);
+          self
+        }
+
+        #vis fn on_pointer_leave(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_pointer_leave(f);
+          self
+        }
+
+        #vis fn on_tap(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_tap(f);
+          self
+        }
+
+        #vis fn on_tap_capture(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_tap_capture(f);
+          self
+        }
+
+        #vis fn on_double_tap(
+          mut self,
+          f: impl FnMut(&mut PointerEvent) + 'static
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_double_tap(f);
+          self
+        }
+
+        #vis fn on_double_tap_capture(
+          mut self,
+          f: impl FnMut(&mut PointerEvent) + 'static
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_double_tap_capture(f);
+          self
+        }
+
+        #vis fn on_triple_tap(
+          mut self,
+          f: impl FnMut(&mut PointerEvent) + 'static
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_triple_tap(f);
+          self
+        }
+
+        #vis fn on_triple_tap_capture(
+          mut self,
+          f: impl FnMut(&mut PointerEvent) + 'static
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_triple_tap_capture(f);
+          self
+        }
+
+        #vis fn on_x_times_tap(
+          mut self,
+          f: (usize, impl FnMut(&mut PointerEvent) + 'static)
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_x_times_tap(f);
+          self
+        }
+
+        #vis fn on_x_times_tap_capture(
+          mut self,
+          f: (usize, impl FnMut(&mut PointerEvent) + 'static),
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_x_times_tap_capture(f);
+          self
+        }
+
+        #vis fn on_wheel(mut self, f: impl FnMut(&mut WheelEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_wheel(f);
+          self
+        }
+
+        #vis fn on_wheel_capture(mut self, f: impl FnMut(&mut WheelEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_wheel_capture(f);
+          self
+        }
+
+        #vis fn on_ime_pre_edit(mut self, f: impl FnMut(&mut ImePreEditEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_ime_pre_edit(f);
+          self
+        }
+
+        #vis fn on_ime_pre_edit_capture(
+          mut self,
+          f: impl FnMut(&mut ImePreEditEvent) + 'static
+        ) -> Self {
+          self.fat_obj = self.fat_obj.on_ime_pre_edit_capture(f);
+          self
+        }
+
+        #vis fn on_chars(mut self, f: impl FnMut(&mut CharsEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_chars(f);
+          self
+        }
+
+        #vis fn on_chars_capture(mut self, f: impl FnMut(&mut CharsEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_chars_capture(f);
+          self
+        }
+
+        #vis fn on_key_down(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_key_down(f);
+          self
+        }
+
+        #vis fn on_key_down_capture(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_key_down_capture(f);
+          self
+        }
+
+        #vis fn on_key_up(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_key_up(f);
+          self
+        }
+
+        #vis fn on_key_up_capture(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_key_up_capture(f);
+          self
+        }
+
+        #vis fn on_focus(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_focus(f);
+          self
+        }
+
+        #vis fn on_blur(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_blur(f);
+          self
+        }
+
+        #vis fn on_focus_in(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_focus_in(f);
+          self
+        }
+
+        #vis fn on_focus_in_capture(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_focus_in_capture(f);
+          self
+        }
+
+        #vis fn on_focus_out(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_focus_out(f);
+          self
+        }
+
+        #vis fn on_focus_out_capture(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+          self.fat_obj = self.fat_obj.on_focus_out_capture(f);
+          self
+        }
+
+        #vis fn box_fit<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<BoxFit>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.box_fit(v);
+          self
+        }
+
+        #vis fn background<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<Option<Brush>>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.background(v);
+          self
+        }
+
+        #vis fn border<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<Option<Border>>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.border(v);
+          self
+        }
+
+        #vis fn border_radius<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<Option<Radius>>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.border_radius(v);
+          self
+        }
+
+        #vis fn padding<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<EdgeInsets>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.padding(v);
+          self
+        }
+
+        #vis fn cursor<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<CursorIcon>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.cursor(v);
+          self
+        }
+
+        #vis fn margin<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<EdgeInsets>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.margin(v);
+          self
+        }
+
+        #vis fn scrollable<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<Scrollable>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.scrollable(v);
+          self
+        }
+
+        #vis fn scroll_pos<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<Point>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.scroll_pos(v);
+          self
+        }
+
+        #vis fn transform<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<Transform>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.transform(v);
+          self
+        }
+
+        #vis fn h_align<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<HAlign>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.h_align(v);
+          self
+        }
+
+        #vis fn v_align<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<VAlign>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.v_align(v);
+          self
+        }
+
+        #vis fn anchor<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<Anchor>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.anchor(v);
+          self
+        }
+
+        #vis fn global_anchor<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<Anchor>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.global_anchor(v);
+          self
+        }
+
+        #vis fn visible<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<bool>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.visible(v);
+          self
+        }
+
+        #vis fn opacity<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<f32>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.opacity(v);
+          self
+        }
+
+        #vis fn delay_drop_until<_M, _V>(mut self, v: _V) -> Self
+        where
+          DeclareInit<bool>: DeclareFrom<_V, _M>,
+        {
+          self.fat_obj = self.fat_obj.delay_drop_until(v);
+          self
+        }
+
       }
   };
 
@@ -90,6 +476,7 @@ fn declarer_set_methods<'a>(
     } else {
       quote! {
         #[inline]
+        #[allow(clippy::type_complexity)]
         #vis fn #set_method<_M, _V>(mut self, v: _V) -> Self
           where DeclareInit<#ty>: DeclareFrom<_V, _M>
         {
@@ -119,30 +506,27 @@ fn field_values<'a>(
         }
       } else {
         let err = format!("Required field `{stt_name}::{f_name}` not set");
-        quote! { self.#f_name.expect(#err).unzip() }
+        quote! { self.#f_name.take().expect(#err).unzip() }
       }
     } else {
       // skip field must have default value.
       let df = f.default_value().unwrap();
       quote! { (#df, None) }
     };
-    quote_spanned! { f.field.span() => let #f_name: (#ty, Option<ValueStream<#ty>>) = #v; }
+    quote_spanned! { f.field.span() =>
+      #[allow(clippy::type_complexity)]
+      let #f_name: (#ty, Option<ValueStream<#ty>>) = #v;
+    }
   })
 }
 
 impl<'a> DeclareField<'a> {
   fn check_reserve(&self) -> syn::Result<()> {
-    // reverse name check.
     let member = self.member();
-    if self
-      .attr
-      .as_ref()
-      .map_or(false, |attr| attr.builtin.is_some())
+    if let Some(r) = BUILTIN_INFOS
+      .get(member.to_string().as_str())
+      .filter(|info| info.mem_ty == BuiltinMemberType::Field)
     {
-      return Ok(());
-    }
-
-    if let Some(r) = crate::variable_names::BUILTIN_INFOS.get(member.to_string().as_str()) {
       let mut field = self.field.clone();
       // not display the attrs in the help code.
       field.attrs.clear();
@@ -164,4 +548,19 @@ To avoid name conflicts during declaration, use the `rename` meta, like so:
       Ok(())
     }
   }
+}
+
+fn empty_impl(name: &Ident, fields: &Fields) -> syn::Result<TokenStream> {
+  let construct = match fields {
+    Fields::Named(_) => quote!(#name {}),
+    Fields::Unnamed(_) => quote!(#name()),
+    Fields::Unit => quote!(#name),
+  };
+  let tokens = quote! {
+    impl Declare for #name  {
+      type Builder = FatObj<#name>;
+      fn declare_builder() -> Self::Builder { FatObj::new(#construct) }
+    }
+  };
+  Ok(tokens)
 }

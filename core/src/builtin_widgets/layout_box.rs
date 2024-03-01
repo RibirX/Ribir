@@ -1,11 +1,16 @@
 use crate::prelude::*;
 
 /// Widget let user to access the layout result of its child.
-#[derive(Declare)]
+#[derive(Default)]
 pub struct LayoutBox {
-  #[declare(skip)]
   /// the rect box of its child and the coordinate is relative to its parent.
   rect: Rect,
+}
+
+impl Declare for LayoutBox {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for LayoutBox {

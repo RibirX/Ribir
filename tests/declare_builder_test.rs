@@ -8,7 +8,7 @@ fn declare_builder_smoke() {
   #[derive(Declare)]
   struct A;
 
-  let _: A = A::declare_builder().build_declare(dummy_ctx());
+  let _: FatObj<A> = A::declare_builder().build_declare(dummy_ctx());
 
   #[derive(Declare)]
   struct B {

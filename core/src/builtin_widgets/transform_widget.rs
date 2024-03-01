@@ -1,9 +1,14 @@
 use crate::{prelude::*, widget::hit_test_impl};
 
-#[derive(SingleChild, Query, Declare, Clone)]
+#[derive(SingleChild, Query, Clone, Default)]
 pub struct TransformWidget {
-  #[declare(builtin, default)]
   pub transform: Transform,
+}
+
+impl Declare for TransformWidget {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declare_builder() -> Self::Builder { FatObj::new(()) }
 }
 
 impl Render for TransformWidget {

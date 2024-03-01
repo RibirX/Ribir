@@ -150,7 +150,7 @@ impl ComposeChild for TextSelectable {
           }
         });
 
-      let layout_box = text.get_builtin_layout_box(ctx!()).clone_reader();
+      let layout_box = text.get_layout_box_widget().clone_reader();
       let only_text = text.clone_reader();
 
       let stack = @Stack {

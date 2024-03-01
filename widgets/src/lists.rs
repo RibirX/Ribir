@@ -174,7 +174,7 @@ pub struct SupportingText(pub Label);
 pub enum EdgeWidget {
   Text(State<Label>),
   Icon(NamedSvg),
-  Avatar(Pair<State<Avatar>, AvatarTemplate>),
+  Avatar(FatObj<Pair<State<Avatar>, AvatarTemplate>>),
   Image(ShareResource<PixelImage>),
   Poster(Poster),
   Custom(CustomEdgeWidget),
