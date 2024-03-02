@@ -60,3 +60,19 @@ fn default_field_with_value() {
   let t = <DefaultWithValue as Declare>::declare_builder().build_declare(dummy_ctx());
   assert_eq!(t.read().text, "hi!");
 }
+
+#[test]
+fn declarer_simple_attr() {
+  #[simple_declare]
+  struct Simple {
+    a: f32,
+    b: i32,
+  }
+
+  let s = Simple::declare_builder()
+    .a(1.)
+    .b(1)
+    .build_declare(dummy_ctx());
+  assert_eq!(s.read().a, 1.);
+  assert_eq!(s.read().b, 1);
+}
