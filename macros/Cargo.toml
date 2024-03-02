@@ -25,7 +25,8 @@ quote.workspace = true
 ribir_builtin = {path = "./builtin", version = "0.2.0-alpha.5" }
 ribir_painter = {path = "../painter", version = "0.2.0-alpha.5" }
 smallvec.workspace = true
-syn = {workspace = true, features = ["fold", "full", "extra-traits"]}
+syn = { workspace = true, features = ["fold", "full", "extra-traits"]}
+phf = { workspace = true, features = ["macros"] }
 
 [build-dependencies]
 ribir_builtin = {path = "./builtin", version = "0.2.0-alpha.5" }

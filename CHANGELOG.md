@@ -22,6 +22,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## Features
+
+- **macros**: Introduced `simple_declare` macro for types that don't use `Pipe` for initialization. (#535 @M-Adoo)
+
+
 ## [0.2.0-alpha.5] - 2024-03-05
 
 ### Features
@@ -32,12 +37,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [0.2.0-alpha.4] - 2024-02-27
 
-### Fixed
-
-- Optimization, StateReader auto unsubscribe if not writer(#532 @wjian23)
-
 ### Changed
 
+- **core**: StateReader now automatically unsubscribes when no writer is present (#532 @wjian23)
 - **core**: Consolidated all listener and `FocusNode` into a `MixBuiltin` widget (#534 @M-Adoo)
   - The `MixBuiltin` widget reduces memory usage and allows users to utilize all `on_xxx` event handlers, not only during the build declaration but also after the widget has been built.
 

@@ -13,6 +13,7 @@ mod child_template;
 mod fn_widget_macro;
 mod pipe_macro;
 mod rdl_macro;
+mod simple_declare_attr;
 pub(crate) mod variable_names;
 mod watch_macro;
 mod writer_map_macro;
@@ -107,8 +108,8 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
     .into()
 }
 
-/// Macro to implement the `Declare` trait. To know how to use it see the
-/// [`declare` mod document](declare)
+/// Macro to implement the `Declare` trait and build a `FatObj<T>`.
+/// To know how to use it see the [`declare` mod document](declare)
 ///
 /// This macro implement a `XXXBuilder` struct with same field type for `XXX`
 /// widget, then
@@ -120,9 +121,20 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
 ///   - implement method with same name of the field and use to init the field.
 ///  [declare]: ../ribir/declare/index.html
 #[proc_macro_derive(Declare, attributes(declare))]
-pub fn declare_trait_macro_derive2(input: TokenStream) -> TokenStream {
+pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
   let mut input = parse_macro_input!(input as DeriveInput);
   declare_derive::declare_derive(&mut input)
+    .unwrap_or_else(|e| e.into_compile_error())
+    .into()
+}
+
+/// Macro attribute implement the `Declare` trait with that only build a
+/// `State<T>` that not extend any built-in ability, and not support `pipe!` to
+/// init the field.
+#[proc_macro_attribute]
+pub fn simple_declare(_attr: TokenStream, item: TokenStream) -> TokenStream {
+  let mut input = parse_macro_input!(item as syn::ItemStruct);
+  simple_declare_attr::simple_declarer_attr(&mut input)
     .unwrap_or_else(|e| e.into_compile_error())
     .into()
 }

@@ -59,8 +59,8 @@ pub mod prelude {
   pub use ribir_geom::*;
   #[doc(no_inline)]
   pub use ribir_macros::{
-    ctx, fn_widget, include_svg, map_writer, pipe, rdl, ribir_expanded_ಠ_ಠ, split_writer, watch,
-    Declare, Lerp, MultiChild, PairChild, Query, SingleChild, Template,
+    ctx, fn_widget, include_svg, map_writer, pipe, rdl, ribir_expanded_ಠ_ಠ, simple_declare,
+    split_writer, watch, Declare, Lerp, MultiChild, PairChild, Query, SingleChild, Template,
   };
   #[doc(no_inline)]
   pub use ribir_painter::*;
