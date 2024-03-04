@@ -37,7 +37,7 @@ pub trait StateReader: 'static {
   /// when use writer or reader in framework macro watch! and pipe!, the
   /// subscribe will not be call if any of the state in used is invalid.
   /// ## An example of an invalid reader
-  /// ```
+  /// ``` should_panic
   /// use ribir::prelude::*;
   /// let src = Stateful::new(vec![1]);
   /// let splitted = src.split_writer(|v| &v[0], |v| &mut v[0]);
@@ -46,11 +46,11 @@ pub trait StateReader: 'static {
   ///   println!("the reader is invalid");
   /// }
   /// // panic when read the splitted which is invalid.
-  /// println!("{}", splitted.read());
+  /// println!("{}", *splitted.read());
   /// ```
   /// ## Example of invalid writer used in watch!
   /// the subscribe in watch! will not be trigger, as splitted has been invalid.
-  /// ``` rust
+  /// ``` ignore
   /// use ribir::prelude::*;
   /// fn_widget! {
   ///   let src = Stateful::new(vec![1]);

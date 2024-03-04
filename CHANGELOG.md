@@ -26,6 +26,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - Add Api to check StateWriter valid (#521 @wjian23)
 
+- Do not trigger subscribe when one of the src state is invalid. (#507 @wjian23)
 
 ## [0.2.0-alpha.4] - 2024-02-27
 

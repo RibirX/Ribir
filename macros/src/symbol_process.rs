@@ -570,7 +570,17 @@ impl DollarRefsScope {
         let upstream = self
           .iter()
           .map(|DollarRef { name, .. }| quote! {  #name.modifies() });
-        quote! { observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
+        let readers = self
+          .iter()
+          .map(|DollarRef { name, .. }| quote! {  let #name = #name.clone_reader(); });
+        let checks = self
+          .iter()
+          .map(|DollarRef { name, .. }| quote! {  #name.is_valid() });
+        quote! { observable::from_iter([#(#upstream),*]).merge_all(usize::MAX).take_while({
+          #(#readers)*
+          move |_| { #(#checks)&&* }
+          })
+        }
       }
     }
   }

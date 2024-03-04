@@ -45,7 +45,7 @@ pub trait SplitChecker<P: ?Sized> {
 /// ### Example of SplittedWriter to Vec item.
 /// the follow example will panic to exposed the unexpected usage to visit to
 /// user Tom.
-/// ``` rust
+/// ``` should_panic
 /// use ribir_core::prelude::*;
 /// #[derive(Debug)]
 /// struct User {
@@ -345,5 +345,39 @@ where
       map: self.map.clone(),
     }
     .widget_build(ctx)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::test_helper::TestWindow;
+  use crate::{prelude::*, reset_test_env};
+  use crate::{state::Stateful, test_helper::split_value};
+
+  #[test]
+  fn ref_invalid_split_writer() {
+    reset_test_env!();
+    let src = Stateful::new(vec![1]);
+    let splitted = src.split_writer(|v| &v[0], |v| &mut v[0]);
+    let (res_reader, res_writer) = split_value(0);
+    let (trigger_reader, trigger_writer) = split_value(0);
+    let w = fn_widget! {
+      watch!(*$splitted + *$trigger_reader)
+        .subscribe(move |v| *res_writer.write() = v);
+      @Void {}
+    };
+
+    let mut wnd = TestWindow::new(w);
+    *trigger_writer.write() += 1;
+    wnd.draw_frame();
+    assert_eq!(*res_reader.read(), 2);
+
+    src.write().pop();
+    wnd.draw_frame();
+    assert_eq!(*res_reader.read(), 2);
+
+    *trigger_writer.write() += 1;
+    wnd.draw_frame();
+    assert_eq!(*res_reader.read(), 2);
   }
 }
