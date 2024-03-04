@@ -60,6 +60,9 @@ impl<W: 'static> StateReader for Stateful<W> {
   fn read(&self) -> ReadRef<W> { ReadRef::new(self.data.borrow()) }
 
   #[inline]
+  fn is_valid(&self) -> bool { true }
+
+  #[inline]
   fn clone_reader(&self) -> Self::Reader {
     let this = self.clone();
     this.dec_writer();
@@ -125,6 +128,9 @@ impl<W: 'static> StateReader for Reader<W> {
   fn origin_reader(&self) -> &Self::OriginReader { self }
 
   #[inline]
+  fn is_valid(&self) -> bool { true }
+
+  #[inline]
   fn time_stamp(&self) -> Instant { self.0.time_stamp() }
 
   #[inline]
@@ -150,6 +156,9 @@ impl<W: 'static> StateReader for Writer<W> {
 
   #[inline]
   fn origin_reader(&self) -> &Self::OriginReader { self }
+
+  #[inline]
+  fn is_valid(&self) -> bool { true }
 
   #[inline]
   fn time_stamp(&self) -> Instant { self.0.time_stamp() }

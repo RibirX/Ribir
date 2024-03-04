@@ -32,6 +32,9 @@ macro_rules! impl_reader_trivial_methods {
     fn read(&self) -> ReadRef<Self::Value> { ReadRef::map(self.origin.read(), &self.map) }
 
     #[inline]
+    fn is_valid(&self) -> bool { self.origin.is_valid() }
+
+    #[inline]
     fn clone_reader(&self) -> Self::Reader {
       MapReader {
         origin: self.origin.clone_reader(),

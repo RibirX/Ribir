@@ -31,6 +31,41 @@ pub trait StateReader: 'static {
   fn read(&self) -> ReadRef<Self::Value>;
   /// get a clone of this state that only can read.
   fn clone_reader(&self) -> Self::Reader;
+
+  /// Return if the Reader is valid, and read to a invalid StateReader will
+  /// cause panic. For check of the valid, see [`SplitChecker`], But normally
+  /// when use writer or reader in framework macro watch! and pipe!, the
+  /// subscribe will not be call if any of the state in used is invalid.
+  /// ## An example of an invalid reader
+  /// ```
+  /// use ribir::prelude::*;
+  /// let src = Stateful::new(vec![1]);
+  /// let splitted = src.split_writer(|v| &v[0], |v| &mut v[0]);
+  /// src.write().pop();
+  /// if !splitted.is_valid() {
+  ///   println!("the reader is invalid");
+  /// }
+  /// // panic when read the splitted which is invalid.
+  /// println!("{}", splitted.read());
+  /// ```
+  /// ## Example of invalid writer used in watch!
+  /// the subscribe in watch! will not be trigger, as splitted has been invalid.
+  /// ``` rust
+  /// use ribir::prelude::*;
+  /// fn_widget! {
+  ///   let src = Stateful::new(vec![1]);
+  ///   let splitted = src.split_writer(|v| &v[0], |v| &mut v[0]);
+  ///   let trigger = Stateful::new(1);
+  ///   
+  ///   $src.write().pop();
+  ///   watch!(*$splitted + *$trigger)
+  ///     .subscribe(|v| println!("{}", v));
+  ///   $trigger.write() += 1;
+  ///   // ...
+  /// }
+  /// ```
+  fn is_valid(&self) -> bool;
+
   /// Maps an reader to another by applying a function to a contained
   /// value. The return reader is just a shortcut to access part of the origin
   /// reader.
@@ -123,13 +158,31 @@ pub trait StateWriter: StateReader {
   ///    panic.
 
   #[inline]
-  fn split_writer<V, R, W>(&self, map: R, mut_map: W) -> SplittedWriter<Self::Writer, R, W>
+  fn split_writer<V, R, W>(
+    &self,
+    map: R,
+    mut_map: W,
+  ) -> SplittedWriter<Self::Writer, R, W, VolatileSplit>
   where
     V: ?Sized,
     R: Fn(&Self::Value) -> &V + Clone + 'static,
     W: Fn(&mut Self::Value) -> &mut V + Clone + 'static,
   {
-    SplittedWriter::new(self.clone_writer(), map, mut_map)
+    SplittedWriter::new(self.clone_writer(), map, mut_map, VolatileSplit::default())
+  }
+
+  fn split_with_checker<C, V, R, W>(
+    &self,
+    map: R,
+    mut_map: W,
+    checker: C,
+  ) -> SplittedWriter<Self::Writer, R, W, C>
+  where
+    R: Fn(&Self::Value) -> &V + Clone + 'static,
+    W: Fn(&mut Self::Value) -> &mut V + Clone + 'static,
+    C: SplitChecker<Self::Value> + 'static,
+  {
+    SplittedWriter::new(self.clone_writer(), map, mut_map, checker)
   }
 
   /// Return a new writer by applying a function to the contained value. The
@@ -196,6 +249,8 @@ impl<T: 'static> StateReader for State<T> {
       InnerState::Stateful(w) => w.read(),
     }
   }
+
+  fn is_valid(&self) -> bool { true }
 
   #[inline]
   fn clone_reader(&self) -> Self::Reader { self.as_stateful().clone_reader() }
@@ -470,7 +525,33 @@ macro_rules! impl_compose_builder {
 }
 
 impl_compose_builder!(MapWriter);
-impl_compose_builder!(SplittedWriter);
+
+impl<C, V, W, RM, WM> ComposeBuilder for SplittedWriter<W, RM, WM, C>
+where
+  W: StateWriter,
+  RM: Fn(&W::Value) -> &V + Clone + 'static,
+  WM: Fn(&mut W::Value) -> &mut V + Clone + 'static,
+  V: Compose + 'static,
+  C: SplitChecker<W::Value> + 'static,
+{
+  fn widget_build(self, ctx: &crate::context::BuildCtx) -> Widget {
+    Compose::compose(self).widget_build(ctx)
+  }
+}
+
+impl<C, V, W, RM, WM, Child> ComposeChildBuilder for SplittedWriter<W, RM, WM, C>
+where
+  W: StateWriter,
+  RM: Fn(&W::Value) -> &V + Clone + 'static,
+  WM: Fn(&mut W::Value) -> &mut V + Clone + 'static,
+  V: ComposeChild<Child = Option<Child>> + 'static,
+  C: SplitChecker<W::Value> + 'static,
+{
+  #[inline]
+  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+    ComposeChild::compose_child(self, None).widget_build(ctx)
+  }
+}
 
 #[cfg(test)]
 mod tests {

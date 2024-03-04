@@ -22,6 +22,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- Add Api to check StateWriter valid (#521 @wjian23)
+
+
 ## [0.2.0-alpha.4] - 2024-02-27
 
 ### Fixed
