@@ -68,7 +68,7 @@ impl ComposeChild for Ripple {
               }
             ),
             from: Path::circle(Point::zero(), 0.)
-          }.into_inner();
+          };
 
           watch!(!$container.pointer_pressed() && !$ripper_enter.is_running())
             .filter(|b| *b)
