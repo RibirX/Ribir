@@ -5,7 +5,6 @@ members = [
   "gpu",
   "painter",
   "macros",
-  "macros/builtin",
   "algo",
   "text",
   "widgets",
@@ -37,7 +36,6 @@ readme = "README.md"
 version = "0.2.0-alpha.5"
 
 [workspace.dependencies]
-Inflector = "0.11.4"
 ahash = "0.8.3"
 arboard = "3.2.0"
 bitflags = "2.0.0"

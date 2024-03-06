@@ -1,12 +1,9 @@
 use crate::fn_widget_macro::FnWidgetMacro;
 use crate::pipe_macro::PipeMacro;
 use crate::rdl_macro::RdlMacro;
+use crate::variable_names::{BuiltinMemberType, BUILTIN_INFOS};
 use crate::writer_map_macro::{gen_map_path_writer, gen_split_path_writer};
-use crate::{
-  variable_names::{ribir_suffix_variable, WIDGET_OF_BUILTIN_FIELD, WIDGET_OF_BUILTIN_METHOD},
-  watch_macro::WatchMacro,
-};
-use inflector::Inflector;
+use crate::{variable_names::ribir_suffix_variable, watch_macro::WatchMacro};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use smallvec::{smallvec, SmallVec};
@@ -259,9 +256,10 @@ impl Fold for DollarRefsCtx {
     let ExprField { base, member, .. } = &mut i;
 
     if let Member::Named(member) = member {
-      let dollar = WIDGET_OF_BUILTIN_FIELD
+      let dollar = BUILTIN_INFOS
         .get(member.to_string().as_str())
-        .and_then(|builtin_ty| self.replace_builtin_ident(&mut *base, &builtin_ty.to_snake_case()));
+        .filter(|info| info.mem_ty == BuiltinMemberType::Field)
+        .and_then(|info| self.replace_builtin_ident(&mut *base, info.var_name));
       if dollar.is_some() {
         return i;
       }
@@ -272,11 +270,10 @@ impl Fold for DollarRefsCtx {
 
   fn fold_expr_method_call(&mut self, mut i: ExprMethodCall) -> ExprMethodCall {
     // fold builtin method on state
-    let dollar = WIDGET_OF_BUILTIN_METHOD
+    let dollar = BUILTIN_INFOS
       .get(i.method.to_string().as_str())
-      .and_then(|builtin_ty| {
-        self.replace_builtin_ident(&mut i.receiver, &builtin_ty.to_snake_case())
-      });
+      .filter(|info| info.mem_ty == BuiltinMemberType::Method)
+      .and_then(|info| self.replace_builtin_ident(&mut i.receiver, info.var_name));
     if dollar.is_some() {
       return i;
     }

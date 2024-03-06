@@ -25,6 +25,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ## Features
 
 - **macros**: Introduced `simple_declare` macro for types that don't use `Pipe` for initialization. (#535 @M-Adoo)
+- **macros**: removed crate `ribir_builtin` that is no longer needed. (#535 @M-Adoo)
 
 
 ## [0.2.0-alpha.5] - 2024-03-05
