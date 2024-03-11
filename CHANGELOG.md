@@ -24,6 +24,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## Features
 
+- ***macros**: Generates documentation for the builder methods of members in `#[derive(Declare)]`, thus improving IDE support.(#538 @M-Adoo)
 - **core**: All built-in widget abilities are now exported on `FatObj`. (#535 @M-Adoo)
   You can directly use `FatObj` to configure built-in widget abilities such as `on_click`, `on_key_down`, etc.
   ```rust

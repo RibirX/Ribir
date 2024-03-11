@@ -431,18 +431,18 @@ impl<T> FatObj<T> {
     on_mixin!(self, on_event, f)
   }
 
-  /// Adds an event handler that runs when the widget is first mounted to the
-  /// tree.
+  /// Attaches an event handler that runs when the widget is first mounted to
+  /// the tree.
   pub fn on_mounted(mut self, f: impl FnOnce(&mut LifecycleEvent) + 'static) -> Self {
     on_mixin!(self, on_mounted, f)
   }
 
-  /// Adds an event handler that runs after the widget is performed layout.
+  /// Attaches an event handler that runs after the widget is performed layout.
   pub fn on_performed_layout(mut self, f: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
     on_mixin!(self, on_performed_layout, f)
   }
 
-  /// Adds an event handler that runs when the widget is disposed.
+  /// Attaches an event handler that runs when the widget is disposed.
   pub fn on_disposed(mut self, f: impl FnOnce(&mut LifecycleEvent) + 'static) -> Self {
     on_mixin!(self, on_disposed, f)
   }

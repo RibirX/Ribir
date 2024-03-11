@@ -78,6 +78,10 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       }
 
       impl #g_impl #name #g_ty #g_where {
+        #[doc="Initializes the widget with a tab index. The tab index is used to \
+          allow or prevent widgets from being sequentially focusable(usually with \
+          the Tab key, hence the name) and determine their relative ordering for \
+          sequential focus navigation"]
         #vis fn tab_index<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<i16>: DeclareFrom<_V, _M>,
@@ -86,6 +90,8 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes whether the `widget` should automatically get focus \
+          when the window loads."]
         #vis fn auto_focus<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<bool>: DeclareFrom<_V, _M>,
@@ -94,16 +100,21 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches an event handler to the widget. It's triggered when any \
+          event or lifecycle change happens."]
         #vis fn on_event(mut self, f: impl FnMut(&mut Event) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_event(f);
           self
         }
 
+        #[doc="Attaches an event handler that runs when the widget is first \
+          mounted to the tree"]
         #vis fn on_mounted(mut self, f: impl FnOnce(&mut LifecycleEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_mounted(f);
           self
         }
 
+        #[doc="Attaches an event handler that runs after the widget is performed layout."]
         #vis fn on_performed_layout(
           mut self,
           f: impl FnMut(&mut LifecycleEvent) + 'static
@@ -112,16 +123,22 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches an event handler that runs when the widget is disposed."]
         #vis fn on_disposed(mut self, f: impl FnOnce(&mut LifecycleEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_disposed(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when a pointer \
+          down occurs."]
         #vis fn on_pointer_down(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_pointer_down(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a pointer down event. This is similar to `on_pointer_down`, but \
+          it's triggered earlier in the event flow."]
         #vis fn on_pointer_down_capture(
           mut self,
           f: impl FnMut(&mut PointerEvent) + 'static
@@ -130,11 +147,16 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when a pointer \
+          up occurs."]
         #vis fn on_pointer_up(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_pointer_up(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a pointer up event. This is similar to `on_pointer_up`, but it's \
+          triggered earlier in the event flow."]
         #vis fn on_pointer_up_capture(
           mut self,
           f: impl FnMut(&mut PointerEvent) + 'static
@@ -143,6 +165,8 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when a pointer \
+          move occurs."]
         #vis fn on_pointer_move(
           mut self,
           f: impl FnMut(&mut PointerEvent) + 'static
@@ -151,6 +175,9 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a pointer move event. This is similar to `on_pointer_move`, but \
+          it's triggered earlier in the event flow."]
         #vis fn on_pointer_move_capture(
           mut self,
           f: impl FnMut(&mut PointerEvent) + 'static
@@ -159,31 +186,42 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when a pointer \
+          event cancels."]
         #vis fn on_pointer_cancel(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_pointer_cancel(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when a pointer device \
+          is moved into the hit test boundaries of an widget or one of its descendants"]
         #vis fn on_pointer_enter(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_pointer_enter(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when a pointer device
+          is moved out of the hit test boundaries of an widget or one of its descendants."]
         #vis fn on_pointer_leave(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_pointer_leave(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when a tap(click) occurs."]
         #vis fn on_tap(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_tap(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture
+          phase of a tap event. This is similar to `on_tap`, but it's triggered
+          earlier in the event flow."]
         #vis fn on_tap_capture(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_tap_capture(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when a double tap occurs."]
         #vis fn on_double_tap(
           mut self,
           f: impl FnMut(&mut PointerEvent) + 'static
@@ -192,6 +230,9 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a double tap event. This is similar to `on_double_tap`, but it's \
+          triggered earlier in the event flow."]
         #vis fn on_double_tap_capture(
           mut self,
           f: impl FnMut(&mut PointerEvent) + 'static
@@ -200,6 +241,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when a triple tap occurs."]
         #vis fn on_triple_tap(
           mut self,
           f: impl FnMut(&mut PointerEvent) + 'static
@@ -208,6 +250,9 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a triple tap event. This is similar to `on_triple_tap`, but it's \
+          triggered earlier in the event flow."]
         #vis fn on_triple_tap_capture(
           mut self,
           f: impl FnMut(&mut PointerEvent) + 'static
@@ -216,6 +261,8 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when a x-times tap
+          occurs."]
         #vis fn on_x_times_tap(
           mut self,
           f: (usize, impl FnMut(&mut PointerEvent) + 'static)
@@ -224,6 +271,9 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a x-times tap event. This is similar to `on_x_times_tap`, but it's \
+          triggered earlier in the event flow."]
         #vis fn on_x_times_tap_capture(
           mut self,
           f: (usize, impl FnMut(&mut PointerEvent) + 'static),
@@ -232,21 +282,31 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when the user rotates a
+          wheel button on a pointing device (typically a mouse)."]
         #vis fn on_wheel(mut self, f: impl FnMut(&mut WheelEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_wheel(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a wheel event. This is similar to `on_wheel`, but it's triggered \
+          earlier in the event flow."]
         #vis fn on_wheel_capture(mut self, f: impl FnMut(&mut WheelEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_wheel_capture(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when the input method
+          pre-edit area is changed."]
         #vis fn on_ime_pre_edit(mut self, f: impl FnMut(&mut ImePreEditEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_ime_pre_edit(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a input method pre-edit event. This is similar to `on_ime_pre_edit`, \
+          but it's triggered earlier in the event flow."]
         #vis fn on_ime_pre_edit_capture(
           mut self,
           f: impl FnMut(&mut ImePreEditEvent) + 'static
@@ -255,66 +315,97 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when the input method
+          commits text or keyboard pressed the text key"]
         #vis fn on_chars(mut self, f: impl FnMut(&mut CharsEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_chars(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a input method commit event. This is similar to `on_chars`, but it's \
+          triggered earlier in the event flow."]
         #vis fn on_chars_capture(mut self, f: impl FnMut(&mut CharsEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_chars_capture(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when the keyboard key
+          is pressed."]
         #vis fn on_key_down(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_key_down(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a key down event. This is similar to `on_key_down`, but it's \
+          triggered earlier in the event flow."]
         #vis fn on_key_down_capture(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_key_down_capture(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when the keyboard key
+          is released."]
         #vis fn on_key_up(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_key_up(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a key up event. This is similar to `on_key_up`, but it's \
+          triggered earlier in the event flow."]
         #vis fn on_key_up_capture(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_key_up_capture(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when the widget is focused."]
         #vis fn on_focus(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_focus(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when the widget \
+          is lost focus."]
         #vis fn on_blur(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_blur(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when the widget or its \
+          descendants are focused. The main difference between this event and focus \
+          is that focusin bubbles while focus does not."]
         #vis fn on_focus_in(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_focus_in(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a focus in event. This is similar to `on_focus_in`, but it's \
+          triggered earlier in the event flow."]
         #vis fn on_focus_in_capture(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_focus_in_capture(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered when the widget\
+          or its descendants are lost focus. The main difference between this event \
+          and focusout is that focusout bubbles while blur does not"]
         #vis fn on_focus_out(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_focus_out(f);
           self
         }
 
+        #[doc="Attaches a handler to the widget that is triggered during the capture \
+          phase of a focus out event. This is similar to `on_focus_out`, but it's \
+          triggered earlier in the event flow."]
         #vis fn on_focus_out_capture(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
           self.fat_obj = self.fat_obj.on_focus_out_capture(f);
           self
         }
 
+        #[doc="Initializes how its child should be scale to fit its box."]
         #vis fn box_fit<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<BoxFit>: DeclareFrom<_V, _M>,
@@ -323,6 +414,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the background of the widget."]
         #vis fn background<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<Option<Brush>>: DeclareFrom<_V, _M>,
@@ -331,6 +423,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the border of the widget."]
         #vis fn border<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<Option<Border>>: DeclareFrom<_V, _M>,
@@ -339,6 +432,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the border radius of the widget."]
         #vis fn border_radius<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<Option<Radius>>: DeclareFrom<_V, _M>,
@@ -347,6 +441,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the extra space within the widget."]
         #vis fn padding<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<EdgeInsets>: DeclareFrom<_V, _M>,
@@ -355,6 +450,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the cursor of the widget."]
         #vis fn cursor<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<CursorIcon>: DeclareFrom<_V, _M>,
@@ -363,6 +459,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the space around the widget."]
         #vis fn margin<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<EdgeInsets>: DeclareFrom<_V, _M>,
@@ -371,6 +468,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes how user can scroll the widget."]
         #vis fn scrollable<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<Scrollable>: DeclareFrom<_V, _M>,
@@ -379,6 +477,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the scroll position of the widget."]
         #vis fn scroll_pos<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<Point>: DeclareFrom<_V, _M>,
@@ -387,6 +486,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the transformation of the widget."]
         #vis fn transform<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<Transform>: DeclareFrom<_V, _M>,
@@ -395,6 +495,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes how the widget should be aligned horizontally."]
         #vis fn h_align<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<HAlign>: DeclareFrom<_V, _M>,
@@ -403,6 +504,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes how the widget should be aligned vertically."]
         #vis fn v_align<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<VAlign>: DeclareFrom<_V, _M>,
@@ -411,6 +513,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the relative anchor to the parent of the widget"]
         #vis fn anchor<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<Anchor>: DeclareFrom<_V, _M>,
@@ -419,6 +522,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the global anchor of the widget."]
         #vis fn global_anchor<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<Anchor>: DeclareFrom<_V, _M>,
@@ -427,6 +531,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the visibility of the widget."]
         #vis fn visible<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<bool>: DeclareFrom<_V, _M>,
@@ -435,6 +540,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the opacity of the widget."]
         #vis fn opacity<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<f32>: DeclareFrom<_V, _M>,
@@ -443,6 +549,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the `delay_drop_until` value of the `DelayDrop` widget."]
         #vis fn delay_drop_until<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<bool>: DeclareFrom<_V, _M>,
@@ -463,11 +570,17 @@ fn declarer_set_methods<'a>(
 ) -> impl Iterator<Item = TokenStream> + 'a {
   fields.iter().filter(|f| f.need_set_method()).map(move |f| {
     let field_name = f.field.ident.as_ref().unwrap();
+    let doc = f
+      .field
+      .attrs
+      .iter()
+      .find(|attr| matches!(&attr.meta, syn::Meta::NameValue(nv) if nv.path.is_ident("doc")));
     let ty = &f.field.ty;
     let set_method = f.set_method_name();
     if f.attr.as_ref().map_or(false, |attr| attr.strict.is_some()) {
       quote! {
         #[inline]
+        #doc
         #vis fn #set_method(mut self, v: #ty) -> Self {
           self.#field_name = Some(DeclareInit::Value(v));
           self
@@ -477,6 +590,7 @@ fn declarer_set_methods<'a>(
       quote! {
         #[inline]
         #[allow(clippy::type_complexity)]
+        #doc
         #vis fn #set_method<_M, _V>(mut self, v: _V) -> Self
           where DeclareInit<#ty>: DeclareFrom<_V, _M>
         {
