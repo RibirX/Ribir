@@ -44,6 +44,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## Changed
 
+- **core**: removed `MixBuiltinDeclarer`, which is no longer needed. (#538 @M-Adoo)
 - **macros**: removed crate `ribir_builtin` that is no longer needed. (#535 @M-Adoo)
 
 ## Documented
