@@ -49,13 +49,11 @@ pub struct AppCtx {
   runtime_waker: Box<dyn RuntimeWaker + Send>,
   scheduler: FuturesLocalScheduler,
   executor: RefCell<LocalPool>,
-  triggers: TriggerMap,
 
   #[cfg(feature = "tokio-async")]
   tokio_runtime: tokio::runtime::Runtime,
 }
 
-type TriggerMap = RefCell<ahash::HashMap<*const (), Box<dyn FnOnce()>>>;
 pub struct AppCtxScopeGuard(MutexGuard<'static, ()>);
 
 static mut INIT_THREAD_ID: Option<ThreadId> = None;
@@ -136,34 +134,6 @@ impl AppCtx {
   /// Get the font database of the application.
   #[track_caller]
   pub fn font_db() -> &'static Rc<RefCell<FontDB>> { &Self::shared().font_db }
-
-  /// Add a trigger task to the application, this task use an pointer address as
-  /// its identity. You can use the identity to trigger this task in a
-  /// deterministic time by calling `AppCtx::trigger_task`.
-  pub fn add_trigger_task(trigger: *const (), task: Box<dyn FnOnce()>) {
-    let mut tasks = AppCtx::shared().triggers.borrow_mut();
-    let task: Box<dyn FnOnce()> = if let Some(t) = tasks.remove(&trigger) {
-      Box::new(move || {
-        t();
-        task();
-      })
-    } else {
-      Box::new(task)
-    };
-    tasks.insert(trigger, Box::new(task));
-  }
-
-  /// Trigger the task by the pointer address identity. Returns true if the task
-  /// is found.
-  pub fn trigger_task(trigger: *const ()) -> bool {
-    let task = Self::shared().triggers.borrow_mut().remove(&trigger);
-    if let Some(task) = task {
-      task();
-      true
-    } else {
-      false
-    }
-  }
 
   /// Runs all tasks in the local(usually means on the main thread) pool and
   /// returns if no more progress can be made on any task.
@@ -303,7 +273,6 @@ impl AppCtx {
         scheduler,
         runtime_waker: Box::new(MockWaker),
         windows: RefCell::new(ahash::HashMap::default()),
-        triggers: RefCell::new(ahash::HashMap::default()),
 
         #[cfg(feature = "tokio-async")]
         tokio_runtime: tokio::runtime::Builder::new_multi_thread()
@@ -437,16 +406,6 @@ pub fn load_font_from_theme(theme: &Theme, font_db: &mut FontDB) {
 
 impl Drop for AppCtxScopeGuard {
   fn drop(&mut self) {
-    let ctx = AppCtx::shared();
-
-    {
-      // clear resources may introduce new triggers, so keep it to delay release.
-      let _windows = std::mem::take(&mut *ctx.windows.borrow_mut());
-      while !ctx.triggers.borrow().is_empty() {
-        let _vec = std::mem::take(&mut *ctx.triggers.borrow_mut());
-      }
-    }
-
     // Safety: this guard guarantee only one thread can access the `AppCtx`.
     unsafe {
       APP_CTX = None;

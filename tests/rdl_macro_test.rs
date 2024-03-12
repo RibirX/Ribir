@@ -731,9 +731,9 @@ fn fix_subscribe_cancel_after_widget_drop() {
   let trigger = Stateful::new(true);
   let c_trigger = trigger.clone_reader();
   let w = fn_widget! {
-    let container = @SizedBox { size: Size::zero() };
+    let mut container = @SizedBox { size: Size::zero() };
     let h = watch!(*$c_trigger).subscribe(move |_| *$cnt.write() +=1 );
-    container.as_stateful().unsubscribe_on_drop(h);
+    container = container.on_disposed(move |_| h.unsubscribe());
 
     @$container {
       @ {

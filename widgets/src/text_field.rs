@@ -360,7 +360,7 @@ fn build_input_area(
       .distinct_until_changed()
       .filter(|state| state == &TextFieldState::Focused)
       .subscribe(move |_| $input.request_focus());
-    input.as_stateful().unsubscribe_on_drop(h);
+    input = input.on_disposed(move|_| h.unsubscribe());
 
     @Row {
       @{
