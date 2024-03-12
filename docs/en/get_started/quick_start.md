@@ -616,14 +616,13 @@ fn main() {
 }
 ```
 
-Refer to [Built-in widget list](../builtin_widget/declare_builtin_fields.md) for a list of all built-in fields and methods that can be used as extensions.
-
+This is extended through the generic type `FatObj`. Refer to the API documentation of [`FatObj`](https://docs.rs/ribir_core/@RIBIR_VERSION/ribir_core/builtin_widgets/struct.FatObj.html) to see all the extended capabilities it provides.
 
 ## Map, Split and trace the original state
 
 From the previous sections, you have learned:
 
-- Modifying the data of the state will cause the dependent view to be updated directly
+- Modifying the state's data will directly update the corresponding view.
 - You can use `Compose` to map the data to view
 
 Suppose `AppData` is the data of your entire application, you can use `Compose` to map it to the view. However, if `AppData` is complex, using only one `Compose` to map the view of the entire application will be a disaster in code organization; and the entire application view only depends on one state, which will cause any modification to `AppData` to update all dynamic parts of the view. In most cases, this will cause your application to not get the best interactive performance.
