@@ -217,13 +217,6 @@ impl<W> Drop for Stateful<W> {
       })
       .unwrap();
     }
-
-    // Declare object may add task to disconnect to upstream, trigger that task if
-    // this is the last reference. We not hold that task in `Stateful` to avoid
-    // cycle reference.
-    if self.data.ref_count() == 1 {
-      AppCtx::trigger_task(self.heap_ptr() as *const ());
-    }
   }
 }
 
@@ -280,22 +273,6 @@ impl<W> Stateful<W> {
       info: Sc::new(StatefulInfo::new()),
     }
   }
-
-  /// Run the `task` when the inner state data will drop.
-  #[inline]
-  pub fn on_state_drop(&self, task: impl FnOnce() + 'static) {
-    AppCtx::add_trigger_task(self.heap_ptr() as *const _, Box::new(task))
-  }
-
-  // unsubscribe the `subscription` when the inner state data will drop.
-  #[inline]
-  pub fn unsubscribe_on_drop(&self, subscription: impl Subscription + 'static) {
-    self.on_state_drop(move || subscription.unsubscribe())
-  }
-
-  /// return the heap pointer of the data.
-  #[inline]
-  fn heap_ptr(&self) -> *const W { self.data.as_ptr() }
 
   fn write_ref(&self, scope: ModifyScope) -> WriteRef<'_, W> {
     let value = self.data.borrow_mut();

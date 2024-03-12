@@ -52,6 +52,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## Breaking
 
+- **core**: removed `Stateful::on_state_drop` and `Stateful::unsubscribe_on_drop` (#539 @M-Adoo)
+- **core**: removed `AppCtx::add_trigger_task` and `AppCtx::trigger_task` (#539 @M-Adoo)
 - **core**: removed `FatObj::unzip` and `FatObj::from_host` (#535 @M-Adoo)
 - **core**: removed `BuiltinObj`. (#535 @M-Adoo)
 - **core**: `FatObj::new(host: T, builtin: BuiltinObj)` -> `FatObj::new(host: T)`
