@@ -45,6 +45,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **macros**: removed crate `ribir_builtin` that is no longer needed. (#535 @M-Adoo)
 
+## Documented
+
+- **ribir**: We no longer auto-generate the built-in list document, as `FatObj` lists all. Its API documentation is sufficient. (#540 @M-Adoo)
+
+
 ## Breaking
 
 - **core**: removed `FatObj::unzip` and `FatObj::from_host` (#535 @M-Adoo)

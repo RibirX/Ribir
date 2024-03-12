@@ -615,7 +615,7 @@ fn main() {
 }
 ```
 
-参考 [内建 widget 列表](../builtin_widget/declare_builtin_fields.md)查看所有可以用来作为扩展的内建字段和方法。
+这是通过泛型类型 `FatObj` 扩展的，参考 [`FatObj`](https://docs.rs/ribir_core/@RIBIR_VERSION/ribir_core/builtin_widgets/struct.FatObj.html) 的 API 文档，查看它提供的所有扩展能力。
 
 
 ## 状态的转换、分离和溯源
