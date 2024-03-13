@@ -24,9 +24,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [0.2.0-alpha.6] - 2024-03-12
 
-## Features
+### Features
 
-- ***macros**: Generates documentation for the builder methods of members in `#[derive(Declare)]`, thus improving IDE support.(#538 @M-Adoo)
+- **macros**: Generates documentation for the builder methods of members in `#[derive(Declare)]`, thus improving IDE support.(#538 @M-Adoo)
 - **core**: All built-in widget abilities are now exported on `FatObj`. (#535 @M-Adoo)
   You can directly use `FatObj` to configure built-in widget abilities such as `on_click`, `on_key_down`, etc.
   ```rust
@@ -44,17 +44,17 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
   ```
 - **macros**: Introduced `simple_declare` macro for types that don't use `Pipe` for initialization. (#535 @M-Adoo)
 
-## Changed
+### Changed
 
 - **core**: removed `MixBuiltinDeclarer`, which is no longer needed. (#538 @M-Adoo)
 - **macros**: removed crate `ribir_builtin` that is no longer needed. (#535 @M-Adoo)
 
-## Documented
+### Documented
 
 - **ribir**: We no longer auto-generate the built-in list document, as `FatObj` lists all. Its API documentation is sufficient. (#540 @M-Adoo)
 
 
-## Breaking
+### Breaking
 
 - **core**: removed `Stateful::on_state_drop` and `Stateful::unsubscribe_on_drop` (#539 @M-Adoo)
 - **core**: removed `AppCtx::add_trigger_task` and `AppCtx::trigger_task` (#539 @M-Adoo)
