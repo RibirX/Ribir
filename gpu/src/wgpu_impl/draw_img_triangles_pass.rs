@@ -80,6 +80,8 @@ impl DrawImgTrianglesPass {
       label: Some(self.label),
       color_attachments: &[Some(color_attachments)],
       depth_stencil_attachment: None,
+      timestamp_writes: None,
+      occlusion_query_set: None,
     });
 
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));

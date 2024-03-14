@@ -48,8 +48,13 @@ struct ClipLayer {
   mask_idx: i32,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub type ImageFuture =
   Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>> + Send + Sync>>;
+
+#[cfg(target_arch = "wasm32")]
+pub type ImageFuture = Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>>>>;
+
 /// Texture use to display.
 pub trait Texture {
   type Host;
@@ -526,11 +531,21 @@ pub fn add_draw_rect_vertices<Attr: Copy>(
 #[cfg(feature = "wgpu")]
 #[cfg(test)]
 mod tests {
+  use crate::WgpuImpl;
+
   use super::*;
+
   use ribir_algo::ShareResource;
   use ribir_dev_helper::*;
   use ribir_geom::*;
   use ribir_painter::{Brush, Painter, Path, Svg};
+
+  pub fn headless() -> (WgpuImpl, std::sync::MutexGuard<'static, ()>) {
+    use futures::executor::block_on;
+    let _guard = SINGLETON_WGPU_GUARD.lock().unwrap();
+    let gpu_impl = block_on(WgpuImpl::headless());
+    (gpu_impl, _guard)
+  }
 
   fn painter(bounds: Size) -> Painter { Painter::new(Rect::from_size(bounds)) }
 

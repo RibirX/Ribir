@@ -1,6 +1,3 @@
-// use arboard::Clipboard;
-
-// use ribir_core::clipboard::Clipboard;
 use std::{
   borrow::Cow,
   io::{Error, ErrorKind},

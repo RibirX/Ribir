@@ -40,6 +40,7 @@ pub mod prelude {
   pub use crate::pipe::{BoxPipe, FinalChain, MapPipe, ModifiesPipe, Pipe};
   #[doc(no_inline)]
   pub use crate::state::*;
+  pub use crate::ticker::{Duration, Instant};
   #[doc(no_inline)]
   pub use crate::widget;
   #[doc(no_inline)]

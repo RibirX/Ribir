@@ -14,7 +14,6 @@ version.workspace = true
 
 [dependencies]
 ahash.workspace = true
-arboard.workspace = true
 bitflags.workspace = true
 blake3 = {workspace = true, features = ["rayon"]}
 futures.workspace = true
@@ -35,6 +34,10 @@ smallvec.workspace = true
 winit.workspace = true
 tokio = { workspace = true, optional = true, features = ["rt-multi-thread", "rt"]}
 priority-queue = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys.workspace = true
+web-time.workspace = true
 
 [dev-dependencies]
 colored.workspace = true

@@ -1,5 +1,4 @@
 use std::mem::replace;
-use std::time::Instant;
 use std::{cell::RefCell, rc::Rc};
 
 use ribir_macros::Query;

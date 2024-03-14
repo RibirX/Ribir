@@ -1,6 +1,8 @@
-use crate::{prelude::*, ticker::FrameMsg, window::WindowId};
-use std::time::Instant;
-
+use crate::{
+  prelude::*,
+  ticker::{FrameMsg, Instant},
+  window::WindowId,
+};
 #[simple_declare]
 pub struct Animate<S>
 where
