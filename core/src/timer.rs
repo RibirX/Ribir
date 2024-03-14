@@ -1,3 +1,4 @@
+use crate::ticker::{Duration, Instant};
 use once_cell::sync::Lazy;
 use rxrust::scheduler::BoxFuture;
 use std::{
@@ -9,7 +10,6 @@ use std::{
     Mutex,
   },
   task::{Poll, Waker},
-  time::{Duration, Instant},
 };
 
 #[derive(Default)]

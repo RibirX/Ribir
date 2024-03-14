@@ -25,10 +25,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+- **ribir**: compile wasm (@wjian23)
+
 ## [0.3.0-alpha.2] - 2024-04-03
 
 
 ### Features
+
 - **ribir**: support stable Rust 1.77.0 (#552 @M-Adoo)
 
 

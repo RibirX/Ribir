@@ -1,15 +1,15 @@
 use crate::{backends::*, prelude::request_redraw};
-
 use ribir_core::{
   prelude::{image::ColorFormat, *},
   window::{ShellWindow, WindowId},
 };
+use std::future::Future;
 use winit::{
   dpi::{LogicalPosition, LogicalSize},
   event_loop::EventLoopWindowTarget,
 };
-pub trait WinitBackend {
-  fn new(window: &winit::window::Window) -> Self;
+pub trait WinitBackend<'a>: Sized {
+  fn new(window: &'a winit::window::Window) -> impl Future<Output = Self>;
 
   fn on_resize(&mut self, size: DeviceSize);
 
@@ -27,7 +27,7 @@ pub trait WinitBackend {
 
 pub struct WinitShellWnd {
   pub(crate) winit_wnd: winit::window::Window,
-  backend: Backend,
+  backend: Backend<'static>,
   cursor: CursorIcon,
 }
 
@@ -177,6 +177,24 @@ pub(crate) fn new_id(id: winit::window::WindowId) -> WindowId {
 }
 
 impl WinitShellWnd {
+  #[cfg(target_family = "wasm")]
+  pub(crate) async fn new_with_canvas<T>(
+    canvas: web_sys::HtmlCanvasElement,
+    window_target: &EventLoopWindowTarget<T>,
+  ) -> Self {
+    use winit::platform::web::WindowBuilderExtWebSys;
+    let wnd_builder = winit::window::WindowBuilder::new().with_canvas(Some(canvas));
+    let winit_wnd = wnd_builder.build(window_target).unwrap();
+
+    let ptr: *const winit::window::Window = &winit_wnd as *const winit::window::Window;
+    let backend = Backend::new(unsafe { &*ptr }).await;
+    WinitShellWnd {
+      backend,
+      winit_wnd,
+      cursor: CursorIcon::Default,
+    }
+  }
+
   pub(crate) fn new<T>(size: Option<Size>, window_target: &EventLoopWindowTarget<T>) -> Self {
     let mut winit_wnd = winit::window::WindowBuilder::new();
     if let Some(size) = size {
@@ -184,8 +202,10 @@ impl WinitShellWnd {
     }
 
     let winit_wnd = winit_wnd.build(window_target).unwrap();
+    let ptr: *const winit::window::Window = &winit_wnd as *const winit::window::Window;
+    let backend = AppCtx::wait_future(Backend::new(unsafe { &*ptr }));
     WinitShellWnd {
-      backend: Backend::new(&winit_wnd),
+      backend,
       winit_wnd,
       cursor: CursorIcon::Default,
     }

@@ -1,22 +1,22 @@
 use ribir_core::prelude::{
-  AntiAliasing, AppCtx, Color, DeviceRect, DeviceSize, PaintCommand, PainterBackend,
+  AntiAliasing, Color, DeviceRect, DeviceSize, PaintCommand, PainterBackend,
 };
 use ribir_gpu::WgpuTexture;
 
 use crate::winit_shell_wnd::WinitBackend;
 
-pub struct WgpuBackend {
+pub struct WgpuBackend<'a> {
   size: DeviceSize,
-  surface: wgpu::Surface,
+  surface: wgpu::Surface<'a>,
   backend: ribir_gpu::GPUBackend<ribir_gpu::WgpuImpl>,
   current_texture: Option<ribir_gpu::WgpuTexture>,
 }
 
-impl WinitBackend for WgpuBackend {
-  fn new(window: &winit::window::Window) -> WgpuBackend {
+impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
+  async fn new(window: &'a winit::window::Window) -> WgpuBackend<'a> {
     let instance = wgpu::Instance::new(<_>::default());
-    let surface = unsafe { instance.create_surface(window).unwrap() };
-    let wgpu = AppCtx::wait_future(ribir_gpu::WgpuImpl::new(instance, Some(&surface)));
+    let surface = instance.create_surface(window).unwrap();
+    let wgpu = ribir_gpu::WgpuImpl::new(instance, Some(&surface)).await;
     let size = window.inner_size();
     surface.configure(
       wgpu.device(),
@@ -73,7 +73,7 @@ impl WinitBackend for WgpuBackend {
   }
 }
 
-impl WgpuBackend {
+impl<'a> WgpuBackend<'a> {
   fn surface_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
     wgpu::SurfaceConfiguration {
       usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -83,6 +83,7 @@ impl WgpuBackend {
       present_mode: wgpu::PresentMode::Fifo,
       alpha_mode: wgpu::CompositeAlphaMode::Auto,
       view_formats: vec![wgpu::TextureFormat::Bgra8Unorm],
+      desired_maximum_frame_latency: 2,
     }
   }
 }

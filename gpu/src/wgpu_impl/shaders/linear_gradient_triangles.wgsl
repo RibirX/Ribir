@@ -1,11 +1,11 @@
 struct Vertex {
   @location(0) pos: vec2<f32>,
-  @location(1) prim_idx: u32,
+  @location(1) @interpolate(flat) prim_idx: u32,
 };
 
 struct FragInput {
   @builtin(position) pos: vec4<f32>,
-  @location(0) prim_idx: u32,
+  @location(0) @interpolate(flat) prim_idx: u32,
 }
 
 @vertex

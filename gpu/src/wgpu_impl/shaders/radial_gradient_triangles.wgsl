@@ -5,7 +5,7 @@ struct Vertex {
 
 struct FragInput {
   @builtin(position) pos: vec4<f32>,
-  @location(0) prim_idx: u32,
+  @location(0) @interpolate(flat) prim_idx: u32,
 }
 
 @vertex

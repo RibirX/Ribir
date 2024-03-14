@@ -9,7 +9,6 @@ use std::{
   convert::Infallible,
   mem::MaybeUninit,
   ops::DerefMut,
-  time::Instant,
 };
 
 use crate::prelude::*;
