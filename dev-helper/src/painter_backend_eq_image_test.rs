@@ -109,6 +109,13 @@ pub fn assert_texture_eq_png(img: PixelImage, file_path: &std::path::Path) {
   }
 }
 
+// todo: Fix me, it looks like a wgpu bug? Windows systems may hang threads when
+// using multiple WgpuImpl in tests.
+// it's a temporary solution: manually lock SINGLETON_WGPU_GUARD to prevent
+// multiple WgpuImpl in your tests.
+pub static SINGLETON_WGPU_GUARD: once_cell::sync::Lazy<std::sync::Mutex<()>> =
+  once_cell::sync::Lazy::new(|| std::sync::Mutex::new(()));
+
 /// Render painter by wgpu backend, and return the image.
 pub fn wgpu_render_commands(
   commands: Vec<ribir_painter::PaintCommand>,
@@ -120,7 +127,9 @@ pub fn wgpu_render_commands(
   use ribir_gpu::{GPUBackend, GPUBackendImpl, Texture};
   use ribir_painter::{AntiAliasing, PainterBackend};
 
+  let _guard = SINGLETON_WGPU_GUARD.lock().unwrap();
   let mut gpu_impl = block_on(ribir_gpu::WgpuImpl::headless());
+
   let rect = DeviceRect::from_size(DeviceSize::new(viewport.max_x() + 2, viewport.max_y() + 2));
   let mut texture = gpu_impl.new_texture(rect.size, AntiAliasing::None, ColorFormat::Rgba8);
   let mut backend = GPUBackend::new(gpu_impl, AntiAliasing::None);

@@ -7,7 +7,7 @@ struct Vertex {
 struct FragInput {
   @builtin(position) pos: vec4<f32>,
   @location(0) color: vec4<f32>,
-  @location(1) mask_head: i32,
+  @location(1) @interpolate(flat) mask_head: i32,
 }
  
 
