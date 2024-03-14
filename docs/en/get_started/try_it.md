@@ -74,3 +74,7 @@ cargo run -p messages
 cargo run -p todos
 cargo run -p wordle_game
 ```
+
+## Next Steps
+
+If you're hesitant about creating UI with "DSL" and prefer to build your UI through direct function calls, before moving on to the next step, you might want to read [Using Ribir without "DSL"](../understanding_ribir/without_dsl.md) first.

@@ -60,7 +60,33 @@ fn main() {
     </tr>
 </table>
 
+**To use Ribir without DSL**:
 
+```rust
+use ribir::prelude::*;
+
+fn main() {
+  let counter = |ctx: &BuildCtx| {
+    let cnt = Stateful::new(0);
+
+    let c_cnt = cnt.clone_writer();
+    let inc_btn = FilledButton::declarer()
+      .on_tap(move |_| *c_cnt.write() += 1)
+      .finish(ctx)
+      .with_child(Label::new("Inc"), ctx);
+
+    let counter = H1::declarer()
+      .text(pipe!($cnt.to_string()))
+      .finish(ctx);
+
+    Row::declarer()
+      .finish(ctx)
+      .with_child(inc_btn, ctx)
+      .with_child(counter, ctx)
+      .widget_build(ctx)
+  };
+}
+```
 
 More [Examples]
 

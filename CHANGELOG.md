@@ -26,9 +26,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
-_ **core**: rename `Declare::declare_builder` to `Declare::declarer` (#545 @M-Adoo)
-- **core**: rename `DeclareBuilder` to `ObjDeclarer` (#545 @M-Adoo)
-- **core**: rename `DeclareBuilder::build_declare` to `ObjDeclarer::finish` (#545 @M-Adoo)
+_ **core**: rename `Declare::declare_builder` to `Declare::declarer` (#547 @M-Adoo)
+- **core**: rename `DeclareBuilder` to `ObjDeclarer` (#547 @M-Adoo)
+- **core**: rename `DeclareBuilder::build_declare` to `ObjDeclarer::finish` (#547 @M-Adoo)
+
+### Documented
+
+- **ribir**: Added guide "Using Ribir without 'DSL'" (#545 @M-Adoo)
 
 ## [0.2.0-alpha.6] - 2024-03-12
 
@@ -130,6 +134,10 @@ We are very happy to share it with you. We hope you can try it out and give us f
 
 ### Documented
 
+- **introduction**: add `introduction.md` to introduce Ribir and why choose it.
+- **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
+
+
 <!-- next-url -->
 [@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.7...HEAD
 [0.2.0-alpha.7]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.6...ribir-v0.2.0-alpha.7
@@ -138,6 +146,3 @@ We are very happy to share it with you. We hope you can try it out and give us f
 [0.2.0-alpha.4]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.3...ribir-v0.2.0-alpha.4
 [0.2.0-alpha.3]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.2...ribir-v0.2.0-alpha.3
 [0.2.0-alpha.2]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.1...ribir-v0.2.0-alpha.2
-
-- **introduction**: add `introduction.md` to introduce Ribir and why choose it.
-- **get started**: add the `get_started` series of tutorials to help users get started with Ribir.

@@ -76,3 +76,7 @@ cargo run -p messages
 cargo run -p todos
 ```
 
+
+## 下一步
+
+如果你更喜欢直接使用函数调用来构建 UI，而不是通过 "DSL"，在进入下一步之前，你可能会想先看看 [如何在不使用 "DSL" 的情况下使用 Ribir](../understanding_ribir/without_dsl.md)。
