@@ -3,6 +3,8 @@ pub use ribir_core as core;
 pub use ribir_widgets as widgets;
 pub mod app;
 mod backends;
+
+#[cfg(not(target_arch = "wasm32"))]
 pub mod clipboard;
 mod winit_shell_wnd;
 #[cfg(feature = "material")]

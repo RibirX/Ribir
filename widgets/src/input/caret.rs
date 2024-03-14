@@ -1,5 +1,4 @@
 use ribir_core::prelude::*;
-use std::time::Duration;
 #[derive(Declare)]
 pub struct Caret {
   pub focused: bool,

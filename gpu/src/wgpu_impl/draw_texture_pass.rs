@@ -3,6 +3,7 @@ use crate::{command_encoder, gpu_backend::Texture, vertices_coord, WgpuImpl, Wgp
 use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::Vertex;
 use std::mem::size_of;
+use wgpu::StoreOp;
 const POOL_SIZE: usize = 256;
 
 pub struct DrawTexturePass {
@@ -191,7 +192,7 @@ impl WgpuImpl {
       resolve_target: None,
       ops: wgpu::Operations {
         load: wgpu::LoadOp::Load,
-        store: true,
+        store: StoreOp::Store,
       },
     };
 
@@ -200,6 +201,8 @@ impl WgpuImpl {
       label: Some("draw texture to texture"),
       color_attachments: &[Some(color_attachments)],
       depth_stencil_attachment: None,
+      timestamp_writes: None,
+      occlusion_query_set: None,
     });
 
     rpass.set_vertex_buffer(0, draw_tex_pass.vertices_pool.buffer().slice(address..));

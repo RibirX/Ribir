@@ -210,9 +210,11 @@ mod tests {
   use super::*;
   use crate::{WgpuImpl, WgpuTexture};
   use futures::executor::block_on;
+  use ribir_core::reset_test_env;
 
   #[test]
   fn atlas_grow_to_alloc() {
+    reset_test_env!();
     let mut gpu_impl = block_on(WgpuImpl::headless());
     let mut atlas =
       Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Alpha8, AntiAliasing::None, &mut gpu_impl);
@@ -224,6 +226,7 @@ mod tests {
 
   #[test]
   fn resource_clear() {
+    reset_test_env!();
     let mut wgpu = block_on(WgpuImpl::headless());
     let mut atlas =
       Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Rgba8, AntiAliasing::None, &mut wgpu);
@@ -239,12 +242,12 @@ mod tests {
 
   #[test]
   fn fix_scale_path_cache_miss() {
+    reset_test_env!();
     let mut wgpu = block_on(WgpuImpl::headless());
     let mut atlas =
       Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Rgba8, AntiAliasing::None, &mut wgpu);
     atlas.allocate(1, (), DeviceSize::new(32, 32), &mut wgpu);
-    atlas.allocate(1, (), DeviceSize::new(512, 512), &mut wgpu);
-    // before the frame end, two allocation for key(1) should keep.
+    atlas.allocate(1, (), DeviceSize::new(512, 512), &mut wgpu); // before the frame end, two allocation for key(1) should keep.
     let mut alloc_count = 0;
     atlas
       .atlas_allocator
@@ -263,6 +266,7 @@ mod tests {
 
   #[test]
   fn fix_atlas_expand_overlap() {
+    reset_test_env!();
     let mut wgpu = block_on(WgpuImpl::headless());
     let mut atlas =
       Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Alpha8, AntiAliasing::None, &mut wgpu);

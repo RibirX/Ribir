@@ -23,7 +23,7 @@ struct ImgPrimitive {
 
 struct VertexOutput {
   @builtin(position) pos: vec4<f32>,
-  @location(0) prim_idx: u32
+  @location(0) @interpolate(flat) prim_idx: u32
 }
 
 @group(0) @binding(0) 

@@ -554,6 +554,7 @@ pub mod tests {
   use crate::{WgpuImpl, WgpuTexture};
   use futures::executor::block_on;
   use ribir_algo::ShareResource;
+  use ribir_core::reset_test_env;
   use ribir_geom::*;
   use ribir_painter::{image::ColorFormat, AntiAliasing, Color, Path};
   use std::borrow::Cow;
@@ -570,6 +571,7 @@ pub mod tests {
 
   #[test]
   fn smoke_store_image() {
+    reset_test_env!();
     let mut wgpu = block_on(WgpuImpl::headless());
     let mut mgr = TexturesMgr::new(&mut wgpu, AntiAliasing::None);
 
@@ -619,6 +621,7 @@ pub mod tests {
 
   #[test]
   fn transform_path_share_cache() {
+    reset_test_env!();
     let mut wgpu = block_on(WgpuImpl::headless());
     let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
 
@@ -636,6 +639,8 @@ pub mod tests {
 
   #[test]
   fn store_clipped_path() {
+    reset_test_env!();
+
     let mut wgpu = block_on(WgpuImpl::headless());
     let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
 
@@ -655,6 +660,7 @@ pub mod tests {
 
   #[test]
   fn fix_resource_address_conflict() {
+    reset_test_env!();
     // because the next resource may allocate at same address of a deallocated
     // address.
 

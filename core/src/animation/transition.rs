@@ -1,7 +1,6 @@
 use super::easing::Easing;
 use crate::prelude::{BuildCtx, *};
 use ribir_algo::Sc;
-use std::time::Duration;
 
 /// Transition use `Easing` trait to calc the rate of change over time.
 #[derive(Clone, Debug)]

@@ -25,6 +25,7 @@ macro_rules! painter_backend_eq_image_test {
     paste::paste! {
       #[test]
       fn [<wgpu_ $painter_fn>]() {
+        ribir_core::reset_test_env!();
         let mut painter = $painter_fn();
         let viewport = painter.viewport().to_i32().cast_unit();
         let img = wgpu_render_commands(painter.finish(), viewport, Color::TRANSPARENT);

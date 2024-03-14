@@ -49,8 +49,13 @@ struct ClipLayer {
   mask_idx: i32,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub type ImageFuture =
   Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>> + Send + Sync>>;
+
+#[cfg(target_arch = "wasm32")]
+pub type ImageFuture = Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>>>>;
+
 /// Texture use to display.
 pub trait Texture {
   type Host;
