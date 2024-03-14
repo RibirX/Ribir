@@ -74,7 +74,7 @@ impl ComposeDecorator for FilledButtonDecorator {
 #[derive(Declare, Default)]
 pub struct FilledButton {
   #[declare(default=Palette::of(ctx!()).primary())]
-  color: Color,
+  pub color: Color,
 }
 
 impl ComposeChild for FilledButton {
