@@ -38,7 +38,7 @@ pub struct FittedBox {
 impl Declare for FittedBox {
   type Builder = FatObj<()>;
   #[inline]
-  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 impl FittedBox {

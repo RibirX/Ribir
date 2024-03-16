@@ -84,19 +84,19 @@ impl<'a> DeclareObj<'a> {
     match node_type {
       ObjType::Type { ty, span } => {
         if fields.is_empty() {
-          quote_spanned! { *span => #ty::declare_builder().build_declare(ctx!())}.to_tokens(tokens);
+          quote_spanned! { *span => #ty::declarer().finish(ctx!())}.to_tokens(tokens);
         } else {
           let fields = fields.iter();
           // we not gen chain call to avoid borrow twice. e.g.
           // ```
           // let mut x = ...;
-          // X::declare_builder().a(&mut x.a).b(&mut x.b).build_declare(ctx!());
+          // X::declarer().a(&mut x.a).b(&mut x.b).finish(ctx!());
           // ```
           // `x` will be borrowed twice, and compile failed, rustc don't process it.
           quote_spanned! { *span => {
-            let mut _ಠ_ಠ = #ty::declare_builder();
+            let mut _ಠ_ಠ = #ty::declarer();
             #(_ಠ_ಠ = _ಠ_ಠ #fields;)*
-            _ಠ_ಠ.build_declare(ctx!())
+            _ಠ_ಠ.finish(ctx!())
           }}
           .to_tokens(tokens);
         }

@@ -8,7 +8,7 @@ pub struct Opacity {
 impl Declare for Opacity {
   type Builder = FatObj<()>;
   #[inline]
-  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 impl Default for Opacity {

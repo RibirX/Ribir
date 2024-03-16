@@ -9,7 +9,7 @@ pub struct Padding {
 impl Declare for Padding {
   type Builder = FatObj<()>;
   #[inline]
-  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 impl Render for Padding {

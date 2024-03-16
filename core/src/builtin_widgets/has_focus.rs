@@ -11,7 +11,7 @@ impl HasFocus {
 impl Declare for HasFocus {
   type Builder = FatObj<()>;
   #[inline]
-  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for HasFocus {

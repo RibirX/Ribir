@@ -32,11 +32,11 @@ pub trait TransitionState: Sized + 'static {
     Self: AnimateState,
   {
     let state = self.clone_setter();
-    let animate = Animate::declare_builder()
+    let animate = Animate::declarer()
       .transition(transition)
       .from(self.get())
       .state(self)
-      .build_declare(ctx);
+      .finish(ctx);
 
     let c_animate = animate.clone_writer();
     let init_value = observable::of(state.get());

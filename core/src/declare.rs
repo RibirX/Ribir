@@ -2,20 +2,19 @@ use crate::{context::BuildCtx, pipe::Pipe, prelude::BoxPipe, state::ModifyScope}
 use rxrust::ops::box_it::BoxOp;
 use std::convert::Infallible;
 
-/// The next version of `Declare` trait. It will replace the `Declare` trait
-/// after it is stable.
+/// Trait used to create a widget declarer that can interact with the `BuildCtx`
+/// to create a widget.
 pub trait Declare {
-  type Builder: DeclareBuilder;
-  fn declare_builder() -> Self::Builder;
+  type Builder: ObjDeclarer;
+  fn declarer() -> Self::Builder;
 }
 
-/// widget builder use to construct a widget in  `widget!`. See the [mod level
-/// document](declare) to know how to use it.
-pub trait DeclareBuilder {
+/// An object declarer is a type that can be used to create a object with the
+/// given context.
+pub trait ObjDeclarer {
   type Target;
-  /// build the object with the given context, return the object and not care
-  /// about if this object is subscribed to other or not.
-  fn build_declare(self, ctx: &BuildCtx) -> Self::Target;
+  /// Finish the object creation with the given context.
+  fn finish(self, ctx: &BuildCtx) -> Self::Target;
 }
 
 /// The type use to store the init value of the field when declare a object.

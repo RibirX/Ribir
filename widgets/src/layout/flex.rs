@@ -63,12 +63,12 @@ pub struct Column;
 
 impl Declare for Row {
   type Builder = FlexDeclarer;
-  fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Horizontal) }
+  fn declarer() -> Self::Builder { Flex::declarer().direction(Direction::Horizontal) }
 }
 
 impl Declare for Column {
   type Builder = FlexDeclarer;
-  fn declare_builder() -> Self::Builder { Flex::declare_builder().direction(Direction::Vertical) }
+  fn declarer() -> Self::Builder { Flex::declarer().direction(Direction::Vertical) }
 }
 
 impl Render for Flex {

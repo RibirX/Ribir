@@ -15,7 +15,7 @@ pub struct BoxDecoration {
 impl Declare for BoxDecoration {
   type Builder = FatObj<()>;
   #[inline]
-  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -200,7 +200,7 @@ mod tests {
     let dummy = std::mem::MaybeUninit::uninit();
     // just for test, we know BoxDecoration not use `ctx` to build.
     let ctx: BuildCtx<'static> = unsafe { dummy.assume_init() };
-    let mut w = BoxDecoration::declare_builder().build_declare(&ctx);
+    let mut w = BoxDecoration::declarer().finish(&ctx);
     let w = w.get_box_decoration_widget();
 
     assert_eq!(w.read().border, None);

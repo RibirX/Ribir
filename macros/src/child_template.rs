@@ -59,13 +59,13 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         impl #g_impl Declare for #name #g_ty #g_where {
           type Builder = #builder #g_ty;
           #[inline]
-          fn declare_builder() -> Self::Builder { #name::builder() }
+          fn declarer() -> Self::Builder { #name::builder() }
         }
 
-        impl #g_impl DeclareBuilder for #builder #g_ty {
+        impl #g_impl ObjDeclarer for #builder #g_ty {
           type Target = Self;
           #[inline]
-          fn build_declare(self, _: &BuildCtx) -> Self { self }
+          fn finish(self, _: &BuildCtx) -> Self { self }
         }
 
 
