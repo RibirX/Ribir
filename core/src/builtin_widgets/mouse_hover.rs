@@ -12,7 +12,7 @@ impl MouseHover {
 impl Declare for MouseHover {
   type Builder = FatObj<()>;
   #[inline]
-  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 impl ComposeChild for MouseHover {

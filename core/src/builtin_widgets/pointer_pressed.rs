@@ -10,7 +10,7 @@ pub struct PointerPressed {
 impl Declare for PointerPressed {
   type Builder = FatObj<()>;
   #[inline]
-  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 impl PointerPressed {

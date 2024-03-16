@@ -35,16 +35,16 @@ pub(crate) fn simple_declarer_attr(stt: &mut syn::ItemStruct) -> Result<TokenStr
     impl #g_impl Declare for #ident #g_ty #g_where {
       type Builder = #name #g_ty;
 
-      fn declare_builder() -> Self::Builder {
+      fn declarer() -> Self::Builder {
         #name { #(#builder_f_names : None ),*}
       }
     }
 
-    impl #g_impl DeclareBuilder for #name #g_ty #g_where {
+    impl #g_impl ObjDeclarer for #name #g_ty #g_where {
       type Target = State<#ident #g_ty>;
 
       #[inline]
-      fn build_declare(mut self, ctx!(): &BuildCtx) -> Self::Target {
+      fn finish(mut self, ctx!(): &BuildCtx) -> Self::Target {
         State::value(#ident {#(#init_pairs),*})
       }
     }
@@ -70,13 +70,13 @@ fn empty_impl(stt: &syn::ItemStruct) -> Result<TokenStream> {
 
     impl Declare for #name  {
       type Builder = #name;
-      fn declare_builder() -> Self::Builder { #construct }
+      fn declarer() -> Self::Builder { #construct }
     }
 
-    impl DeclareBuilder for #name {
+    impl ObjDeclarer for #name {
       type Target = #name;
       #[inline]
-      fn build_declare(self, _: &BuildCtx) -> Self::Target { self }
+      fn finish(self, _: &BuildCtx) -> Self::Target { self }
     }
   };
   Ok(tokens)

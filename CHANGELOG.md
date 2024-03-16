@@ -22,6 +22,12 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Breaking
+
+_ **core**: rename `Declare::declare_builder` to `Declare::declarer` (#545 @M-Adoo)
+- **core**: rename `DeclareBuilder` to `ObjDeclarer` (#545 @M-Adoo)
+- **core**: rename `DeclareBuilder::build_declare` to `ObjDeclarer::finish` (#545 @M-Adoo)
+
 ## [0.2.0-alpha.6] - 2024-03-12
 
 ### Features
@@ -34,13 +40,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
     .margin(EdgeInsets::all(1.0))
     .on_click(|_, _| { println!("click"); });
   ```
-- **macros**: `#[derive(Decalre)]` now generates a `FatObj<State<T>>` instead of `State<T>`, and supports initialization of all built-in widgets on its DeclareBuilder. (#535 @M-Adoo) 
+- **macros**: `#[derive(Decalre)]` now generates a `FatObj<State<T>>` instead of `State<T>`, and supports initialization of all built-in widgets on its ObjBuilder. (#535 @M-Adoo) 
   All pipes used to initialize the field will be unsubscribed when the FatObj is disposed.
   ```rust
-  let row = Row::declare_builder()
+  let row = Row::builder()
     .margin(...)
     .on_click(...)
-    .build_declare(ctx);
+    .finish(ctx);
   ```
 - **macros**: Introduced `simple_declare` macro for types that don't use `Pipe` for initialization. (#535 @M-Adoo)
 

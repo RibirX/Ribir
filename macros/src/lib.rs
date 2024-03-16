@@ -115,7 +115,7 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
 /// widget, then
 ///
 /// - implement `Declare` for `XXX`  mark `XXXBuilder` as its builder type.
-/// - implement `DeclareBuilder` for `XXXBuilder` which build `XXX` and used by
+/// - implement `ObjDeclarer` for `XXXBuilder` which build `XXX` and used by
 ///   `declare!` to build the `XXX` widget.
 /// - for every field of `XXXBuilder`
 ///   - implement method with same name of the field and use to init the field.

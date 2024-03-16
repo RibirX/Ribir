@@ -53,7 +53,7 @@ pub struct MixBuiltin {
 impl Declare for MixBuiltin {
   type Builder = FatObj<()>;
   #[inline]
-  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 macro_rules! event_map_filter {

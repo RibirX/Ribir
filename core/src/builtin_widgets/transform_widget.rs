@@ -8,7 +8,7 @@ pub struct TransformWidget {
 impl Declare for TransformWidget {
   type Builder = FatObj<()>;
   #[inline]
-  fn declare_builder() -> Self::Builder { FatObj::new(()) }
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 impl Render for TransformWidget {

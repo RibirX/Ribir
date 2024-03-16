@@ -978,10 +978,10 @@ impl<T> FatObj<T> {
   }
 }
 
-impl<T> DeclareBuilder for FatObj<T> {
+impl<T> ObjDeclarer for FatObj<T> {
   type Target = Self;
 
-  fn build_declare(self, _: &BuildCtx) -> Self::Target { self }
+  fn finish(self, _: &BuildCtx) -> Self::Target { self }
 }
 
 impl<T: SingleChild> SingleChild for FatObj<T> {}

@@ -41,7 +41,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       impl #g_impl Declare for #host #g_ty #g_where {
         type Builder = #name #g_ty;
 
-        fn declare_builder() -> Self::Builder {
+        fn declarer() -> Self::Builder {
           #name {
             #(#builder_f_names : None ,)*
             fat_obj: FatObj::new(()),
@@ -49,12 +49,12 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         }
       }
 
-      impl #g_impl DeclareBuilder for #name #g_ty #g_where {
+      impl #g_impl ObjDeclarer for #name #g_ty #g_where {
         #[allow(clippy::type_complexity)]
         type Target = FatObj<State<#host #g_ty>>;
 
         #[inline]
-        fn build_declare(mut self, ctx!(): &BuildCtx) -> Self::Target {
+        fn finish(mut self, ctx!(): &BuildCtx) -> Self::Target {
           #(#field_values)*
           let mut _this_ಠ_ಠ = State::value(#host {
             #(#field_names : #field_names.0),*
@@ -673,7 +673,7 @@ fn empty_impl(name: &Ident, fields: &Fields) -> syn::Result<TokenStream> {
   let tokens = quote! {
     impl Declare for #name  {
       type Builder = FatObj<#name>;
-      fn declare_builder() -> Self::Builder { FatObj::new(#construct) }
+      fn declarer() -> Self::Builder { FatObj::new(#construct) }
     }
   };
   Ok(tokens)
