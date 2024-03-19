@@ -1,0 +1,8 @@
+{
+  "label": "Understanding Ribir",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "This guide will walk you through the key concepts and features of the Ribir framework, helping you to build efficient and effective user interfaces."
+  }
+}
