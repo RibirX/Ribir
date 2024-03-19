@@ -15,10 +15,10 @@ version.workspace = true
 [dependencies]
 arboard = "3.2.0"
 once_cell.workspace = true
-ribir_core = { path = "../core", version = "0.2.0-alpha.6" }
-ribir_gpu = { path = "../gpu", version = "0.2.0-alpha.6" }
-ribir_material = { path = "../themes/material", version = "0.2.0-alpha.6", optional = true }
-ribir_widgets = { path = "../widgets", version = "0.2.0-alpha.6", optional = true }
+ribir_core = { path = "../core", version = "0.2.0-alpha.7" }
+ribir_gpu = { path = "../gpu", version = "0.2.0-alpha.7" }
+ribir_material = { path = "../themes/material", version = "0.2.0-alpha.7", optional = true }
+ribir_widgets = { path = "../widgets", version = "0.2.0-alpha.7", optional = true }
 rxrust.workspace = true
 wgpu = { workspace = true, optional = true }
 winit.workspace = true

@@ -22,6 +22,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.2.0-alpha.7] - 2024-03-19
+
 ### Breaking
 
 _ **core**: rename `Declare::declare_builder` to `Declare::declarer` (#545 @M-Adoo)
@@ -129,7 +131,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 ### Documented
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.6...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.7...HEAD
+[0.2.0-alpha.7]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.6...ribir-v0.2.0-alpha.7
 [0.2.0-alpha.6]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.5...ribir-v0.2.0-alpha.6
 [0.2.0-alpha.5]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.4...ribir-v0.2.0-alpha.5
 [0.2.0-alpha.4]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.3...ribir-v0.2.0-alpha.4
