@@ -4,7 +4,14 @@ This document outlines the release process and branch management for the Ribir p
 
 ## Release Schedule
 
-Until Ribir reaches a more stable version, releases are driven by development progress rather than a fixed schedule. However, our goal is to establish a monthly release cycle for minor versions, starting from the `0.3.0` version.
+| Version | Target    | Release Date | Status | Details | Owner   |
+|---------|-----------|--------------|--------|---------|---------|
+| 0.1     | Prototype, Validate our ideas | Feb 2024     | Beta   | [M1](https://github.com/RibirX/Ribir/milestone/1) | @M-Adoo |
+| 0.2     | Improve Core API | March 2024 | Alpha | [M2](https://github.com/RibirX/Ribir/milestone/2) | @M-Adoo |
+| 0.3     | Web Compatibility and Widget System API Stabilization | April-May 2024 | Planning | [M3](https://github.com/RibirX/Ribir/milestone/3) | @wjian23 |
+| 0.4     | Theme API Stabilization and State Provider | May-June 2024 | Planning | TBA | @sologeek |
+| Future  | To be determined | To be determined | Planning | To be determined | To be determined |
+
 
 ### Branch Management
 
