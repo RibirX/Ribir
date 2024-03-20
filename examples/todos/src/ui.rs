@@ -73,14 +73,14 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
                           }
                         }
                       }
-                    }.widget_build(ctx!())
+                    }.build(ctx!())
 
                   } else {
                     let _hint = || $stagger.write();
                     let item = task_item_widget(task.clone_writer(), stagger.clone_writer());
                     @$item {
                       on_double_tap: move |_| *$editing.write() = Some(id)
-                    }.widget_build(ctx!())
+                    }.build(ctx!())
                   }
                 });
 
@@ -153,7 +153,7 @@ where
           watch!($checkbox.checked)
             .distinct_until_changed()
             .subscribe(move |v| $task.write().complete = v);
-          CustomEdgeWidget(checkbox.widget_build(ctx!()))
+          CustomEdgeWidget(checkbox.build(ctx!()))
         }
       }
       @Trailing {

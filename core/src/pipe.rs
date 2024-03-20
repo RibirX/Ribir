@@ -103,7 +103,7 @@ impl<V: 'static> BoxPipe<V> {
 }
 
 pub(crate) trait InnerPipe: Pipe {
-  fn build(
+  fn build_single(
     self,
     ctx: &BuildCtx,
     build: impl Fn(Self::Value, &BuildCtx) -> Widget + 'static,
@@ -159,7 +159,7 @@ pub(crate) trait InnerPipe: Pipe {
     let build_multi = move |widgets: Self::Value, ctx: &BuildCtx| {
       let mut widgets = widgets.into_iter().map(|w| f(w, ctx)).collect::<Vec<_>>();
       if widgets.is_empty() {
-        widgets.push(Void.widget_build(ctx));
+        widgets.push(Void.build(ctx));
       }
       widgets
     };
@@ -474,8 +474,8 @@ crate::widget::multi_build_replace_impl! {
     S::Value: 'static,
     F: FnMut(S::Value) -> V + 'static,
   {
-    fn widget_build(self, ctx: &BuildCtx) -> Widget {
-      self.build(ctx, |w, ctx| w.widget_build(ctx))
+    fn build(self, ctx: &BuildCtx) -> Widget {
+      self.build_single(ctx, |w, ctx| w.build(ctx))
     }
   }
 
@@ -485,15 +485,15 @@ crate::widget::multi_build_replace_impl! {
     S: InnerPipe<Value = V>,
     F: FnOnce(ValueStream<V>) -> ValueStream<V> + 'static,
   {
-    fn widget_build(self, ctx: &BuildCtx) -> Widget {
-      self.build(ctx, |w, ctx| w.widget_build(ctx))
+    fn build(self, ctx: &BuildCtx) -> Widget {
+      self.build_single(ctx, |w, ctx| w.build(ctx))
     }
   }
 
   impl<V: {#} + 'static> {#} for Box<dyn Pipe<Value = V>>
   {
-    fn widget_build(self, ctx: &BuildCtx) -> Widget {
-      self.build(ctx, |w, ctx| w.widget_build(ctx))
+    fn build(self, ctx: &BuildCtx) -> Widget {
+      self.build_single(ctx, |w, ctx| w.build(ctx))
     }
   }
 }
@@ -504,7 +504,7 @@ where
   S::Value: 'static,
   F: FnMut(S::Value) -> Widget + 'static,
 {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.build(ctx, |w, ctx| w.widget_build(ctx)) }
+  fn build(self, ctx: &BuildCtx) -> Widget { self.build_single(ctx, |w, ctx| w.build(ctx)) }
 }
 
 impl<S, F> WidgetBuilder for FinalChain<Widget, S, F>
@@ -512,11 +512,11 @@ where
   S: InnerPipe<Value = Widget>,
   F: FnOnce(ValueStream<Widget>) -> ValueStream<Widget> + 'static,
 {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.build(ctx, |w, ctx| w.widget_build(ctx)) }
+  fn build(self, ctx: &BuildCtx) -> Widget { self.build_single(ctx, |w, ctx| w.build(ctx)) }
 }
 
 impl WidgetBuilder for Box<dyn Pipe<Value = Widget>> {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.build(ctx, |w, ctx| w.widget_build(ctx)) }
+  fn build(self, ctx: &BuildCtx) -> Widget { self.build_single(ctx, |w, ctx| w.build(ctx)) }
 }
 
 macro_rules! pipe_option_to_widget {
@@ -525,13 +525,13 @@ macro_rules! pipe_option_to_widget {
       .map(|w| {
         move |ctx: &BuildCtx| {
           if let Some(w) = w {
-            w.widget_build(ctx)
+            w.build(ctx)
           } else {
-            Void.widget_build(ctx)
+            Void.build(ctx)
           }
         }
       })
-      .widget_build($ctx)
+      .build($ctx)
   };
 }
 
@@ -607,7 +607,7 @@ macro_rules! multi_parent_impl {
           },
         )
       } else {
-        self.widget_build(ctx)
+        self.build(ctx)
       }
     }
   };
@@ -644,7 +644,7 @@ macro_rules! option_single_parent_impl {
         handle
           .with_ctx(|ctx| {
             if let Some(p) = p {
-              BoxedSingleChild::from_id(p.widget_build(ctx))
+              BoxedSingleChild::from_id(p.build(ctx))
             } else {
               BoxedSingleChild::new(Void, ctx)
             }
@@ -1638,7 +1638,7 @@ mod tests {
     reset_test_env!();
     let _ = fn_widget! {
       let v = Stateful::new(true);
-      let w = pipe!(*$v).map(move |_| Void.widget_build(ctx!()));
+      let w = pipe!(*$v).map(move |_| Void.build(ctx!()));
       Widget::child_from(w, ctx!())
     };
   }

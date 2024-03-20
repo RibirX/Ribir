@@ -241,11 +241,11 @@ where
   W: Fn(&mut O::Value) -> &mut V + Clone,
   V: Render,
 {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+  fn build(self, ctx: &BuildCtx) -> Widget {
     MapReader {
       origin: self.origin.clone_reader(),
       map: self.map.clone(),
     }
-    .widget_build(ctx)
+    .build(ctx)
   }
 }

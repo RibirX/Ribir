@@ -349,7 +349,7 @@ where
     @ListItem {
       @{ HeadlineText(Label::new($task.label.clone())) }
       @Leading {
-        @{ CustomEdgeWidget(checkbox.widget_build(ctx!())) }
+        @{ CustomEdgeWidget(checkbox.build(ctx!())) }
       }
       @Trailing {
         cursor: CursorIcon::Pointer,
@@ -441,12 +441,12 @@ fn_widget! {
                           }
                         }
                       }
-                    }.widget_build(ctx!())
+                    }.build(ctx!())
                   } else {
                     let item = task_item(task.clone_writer());
                     @$item {
                       on_double_tap: move |_| *$editing.write() = Some(id)
-                    }.widget_build(ctx!())
+                    }.build(ctx!())
                   }
                 });
               widgets.push(item);
@@ -647,12 +647,12 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
                           }
                         }
                       }
-                    }.widget_build(ctx!())
+                    }.build(ctx!())
                   } else {
                     let item = task_item(task.clone_writer());
                     @$item {
                       on_double_tap: move |_| *$editing.write() = Some(id)
-                    }.widget_build(ctx!())
+                    }.build(ctx!())
                   }
                 });
               widgets.push(item);
@@ -684,7 +684,7 @@ where
     @$item {
       @{ HeadlineText(Label::new($task.label.clone())) }
       @Leading {
-        @{ CustomEdgeWidget(checkbox.widget_build(ctx!())) }
+        @{ CustomEdgeWidget(checkbox.build(ctx!())) }
       }
       @Trailing {
         cursor: CursorIcon::Pointer,

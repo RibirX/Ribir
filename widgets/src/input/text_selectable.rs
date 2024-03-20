@@ -164,7 +164,7 @@ impl ComposeChild for TextSelectable {
           }
         }
       };
-      let text_widget = text.widget_build(ctx!());
+      let text_widget = text.build(ctx!());
       let text_widget = bind_point_listener(
         this.clone_writer(),
         text_widget,

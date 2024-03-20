@@ -22,7 +22,7 @@ impl ComposeChild for FocusScope {
         on_mounted: move |e| e.window().add_focus_node(e.id, false, FocusType::Scope),
         on_disposed: move|e| e.window().remove_focus_node(e.id, FocusType::Scope),
       }
-      .widget_build(ctx!())
+      .build(ctx!())
       .attach_state_data(this, ctx!())
     }
   }

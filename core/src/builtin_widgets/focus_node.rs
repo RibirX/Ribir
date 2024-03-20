@@ -21,7 +21,7 @@ impl ComposeChild for RequestFocus {
           $this.silent().handle = Some(handle);
         }
       }
-      .widget_build(ctx!())
+      .build(ctx!())
       .attach_state_data(this, ctx!())
     }
   }

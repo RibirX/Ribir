@@ -194,7 +194,7 @@ mod tests {
                       size: ZERO_SIZE,
                       @ {
                         *$c_themes.write() = ctx!().themes().clone();
-                        Void.widget_build(ctx!())
+                        Void.build(ctx!())
                       }
                     }
                   })

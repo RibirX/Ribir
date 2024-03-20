@@ -45,7 +45,7 @@ impl ComposeChild for GlobalAnchor {
             $child.write().anchor = anchor;
           }
         });
-      child.widget_build(ctx!())
+      child.build(ctx!())
     }
   }
 }

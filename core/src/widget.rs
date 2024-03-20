@@ -147,10 +147,10 @@ impl<'a> dyn Render + 'a {
 /// A indirect widget is a widget that is not `Compose`, `Render` and
 /// `ComposeChild`,  like function widget and  `Pipe<Widget>`.
 pub trait WidgetBuilder {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget;
+  fn build(self, ctx: &BuildCtx) -> Widget;
 
   /// Convert the widget to named type widget `FnWidget`, this is useful when
-  /// you want store a widget and not want to call `widget_build(ctx!())` to
+  /// you want store a widget and not want to call `build(ctx!())` to
   /// build it into the widget tree.
   ///
   /// # Example
@@ -166,7 +166,7 @@ pub trait WidgetBuilder {
   where
     Self: Sized + 'static,
   {
-    Box::new(move |ctx| self.widget_build(ctx))
+    Box::new(move |ctx| self.build(ctx))
   }
 }
 
@@ -174,14 +174,14 @@ pub trait WidgetBuilder {
 /// build phase. You should not implement this trait directly, implement
 /// `Compose` trait instead.
 pub trait ComposeBuilder {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget;
+  fn build(self, ctx: &BuildCtx) -> Widget;
 }
 
 /// Trait to build a render widget into widget tree with `BuildCtx` in the build
 /// phase. You should not implement this trait directly, implement `Render`
 /// trait instead.
 pub trait RenderBuilder {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget;
+  fn build(self, ctx: &BuildCtx) -> Widget;
 }
 
 /// Trait to build a `ComposeChild` widget without child into widget tree with
@@ -189,12 +189,12 @@ pub trait RenderBuilder {
 /// `Option<>_`  . You should not implement this trait directly,
 /// implement `ComposeChild` trait instead.
 pub trait ComposeChildBuilder {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget;
+  fn build(self, ctx: &BuildCtx) -> Widget;
 }
 
 /// Trait only for `Widget`, you should not implement this trait.
 pub trait SelfBuilder {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget;
+  fn build(self, ctx: &BuildCtx) -> Widget;
 }
 
 impl Widget {
@@ -236,7 +236,7 @@ impl Widget {
 
 impl SelfBuilder for Widget {
   #[inline(always)]
-  fn widget_build(self, _: &BuildCtx) -> Widget { self }
+  fn build(self, _: &BuildCtx) -> Widget { self }
 }
 
 impl<F> WidgetBuilder for F
@@ -244,12 +244,12 @@ where
   F: FnOnce(&BuildCtx) -> Widget,
 {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { self(ctx) }
+  fn build(self, ctx: &BuildCtx) -> Widget { self(ctx) }
 }
 
 impl WidgetBuilder for GenWidget {
   #[inline]
-  fn widget_build(mut self, ctx: &BuildCtx) -> Widget { self.gen_widget(ctx) }
+  fn build(mut self, ctx: &BuildCtx) -> Widget { self.gen_widget(ctx) }
 }
 
 impl GenWidget {
@@ -383,20 +383,18 @@ macro_rules! impl_proxy_render {
 
 impl<C: Compose + 'static> ComposeBuilder for C {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget {
-    Compose::compose(State::value(self)).widget_build(ctx)
-  }
+  fn build(self, ctx: &BuildCtx) -> Widget { Compose::compose(State::value(self)).build(ctx) }
 }
 
 impl<R: Render + 'static> RenderBuilder for R {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { Widget::new(Box::new(self), ctx) }
+  fn build(self, ctx: &BuildCtx) -> Widget { Widget::new(Box::new(self), ctx) }
 }
 
 impl<W: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for W {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget {
-    ComposeChild::compose_child(State::value(self), None).widget_build(ctx)
+  fn build(self, ctx: &BuildCtx) -> Widget {
+    ComposeChild::compose_child(State::value(self), None).build(ctx)
   }
 }
 

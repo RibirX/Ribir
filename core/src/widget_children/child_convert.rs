@@ -31,7 +31,7 @@ pub trait FromAnother<V, M> {
 crate::widget::multi_build_replace_impl! {
   impl<W: {#} > FromAnother<W, &dyn {#}> for Widget {
     #[inline]
-    fn from_another(value: W, ctx: &BuildCtx) -> Self { value.widget_build(ctx) }
+    fn from_another(value: W, ctx: &BuildCtx) -> Self { value.build(ctx) }
   }
 }
 

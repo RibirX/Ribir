@@ -45,7 +45,7 @@ use ribir::prelude::*;
 
 fn hello_world(ctx!(): &BuildCtx) -> Widget {
   rdl!{ Text { text: "Hello World!" } }
-    .widget_build(ctx!())
+    .build(ctx!())
 }
 
 fn main() { 
@@ -57,7 +57,7 @@ At first, you should find the difference in the parameter declaration (`ctx!(): 
   
 Then, you can see the next line `rdl!{ Text { text: "Hello World!" } }`, which creates a `Text` with the content `Hello World!` through `rdl!`. The details of `rdl!` will be put aside for now, and will be introduced in detail in the section [Creating objects using `rdl!`](#creating-objects-using-rdl).
 
-Finally, build `Text` into `Widget` through the `widget_build` method as the return value of the function.
+Finally, build `Text` into `Widget` through the `build` method as the return value of the function.
 
 
 > Tip
@@ -74,7 +74,7 @@ use ribir::prelude::*;
 fn main() {
   let hello_world = |ctx!(): &BuildCtx| {
     rdl!{ Text { text: "Hello World!" } }
-      .widget_build(ctx!())
+      .build(ctx!())
   };
   App::run(hello_world);
 }
@@ -87,7 +87,7 @@ move |ctx!(): &BuildCtx| -> Widget {
   {
     // Your code
   }
-  .widget_build(ctx!())
+  .build(ctx!())
 }
 ```
 

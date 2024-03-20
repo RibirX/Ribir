@@ -108,9 +108,9 @@ where
   Child: From<C>,
 {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+  fn build(self, ctx: &BuildCtx) -> Widget {
     let Self { parent, child } = self;
-    ComposeChild::compose_child(parent, child.into()).widget_build(ctx)
+    ComposeChild::compose_child(parent, child.into()).build(ctx)
   }
 }
 
@@ -202,14 +202,14 @@ mod tests {
   }
 
   #[test]
-  fn template_fill_template() { let _ = |ctx| P.with_child(Void, ctx).widget_build(ctx); }
+  fn template_fill_template() { let _ = |ctx| P.with_child(Void, ctx).build(ctx); }
 
   #[test]
   fn pair_compose_child() {
     let _ = |ctx| -> Widget {
       MockBox { size: ZERO_SIZE }
         .with_child(X.with_child(Void {}, ctx), ctx)
-        .widget_build(ctx)
+        .build(ctx)
     };
   }
 

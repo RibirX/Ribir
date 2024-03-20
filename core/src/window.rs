@@ -286,7 +286,7 @@ impl Window {
 
   pub fn set_content_widget(&self, root: impl WidgetBuilder) {
     let build_ctx = BuildCtx::new(None, &self.widget_tree);
-    let root = root.widget_build(&build_ctx);
+    let root = root.build(&build_ctx);
     self.widget_tree.borrow_mut().set_content(root.consume())
   }
 

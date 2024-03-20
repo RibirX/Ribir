@@ -83,7 +83,7 @@ fn main() {
       .finish(ctx)
       .with_child(inc_btn, ctx)
       .with_child(counter, ctx)
-      .widget_build(ctx)
+      .build(ctx)
   };
 }
 ```

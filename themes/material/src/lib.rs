@@ -274,7 +274,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
 
       thumb
     }
-    .widget_build(ctx)
+    .build(ctx)
   });
   styles.override_compose_decorator::<VScrollBarThumbDecorator>(|this, host, ctx| {
     fn_widget! {
@@ -286,7 +286,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
 
       thumb
     }
-    .widget_build(ctx)
+    .build(ctx)
   });
   styles.override_compose_decorator::<IndicatorDecorator>(|style, host, ctx| {
     fn_widget! {
@@ -323,7 +323,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
 
       indicator
     }
-    .widget_build(ctx)
+    .build(ctx)
   });
   styles.override_compose_decorator::<CheckBoxDecorator>(move |style, host, ctx| {
     fn_widget! {
@@ -341,7 +341,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         }
       }
     }
-    .widget_build(ctx)
+    .build(ctx)
   });
   styles.override_compose_decorator::<FilledButtonDecorator>(move |style, host, ctx| {
     fn_widget! {
@@ -364,7 +364,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         }
       }
     }
-    .widget_build(ctx)
+    .build(ctx)
   });
   styles.override_compose_decorator::<OutlinedButtonDecorator>(move |style, host, ctx| {
     fn_widget! {
@@ -387,7 +387,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         }
       }
     }
-    .widget_build(ctx)
+    .build(ctx)
   });
   styles.override_compose_decorator::<ButtonDecorator>(move |style, host, ctx| {
     fn_widget! {
@@ -410,7 +410,7 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         }
       }
     }
-    .widget_build(ctx)
+    .build(ctx)
   });
   let textfield = TextFieldThemeSuit::from_theme(&theme.palette, &theme.typography_theme);
   theme.custom_styles.set_custom_style(textfield);
