@@ -22,6 +22,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Documented
+
+- **Ribir**: Added a roadmap. (#550, @M-Adoo)
+
+
 ## [0.2.0-alpha.7] - 2024-03-19
 
 ### Breaking

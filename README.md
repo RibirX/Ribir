@@ -15,7 +15,7 @@ Use Rust to build multi-platform applications from a single codebase.
 [![Crates.io](https://img.shields.io/crates/v/ribir)](https://crates.io/crates/ribir)
 [![Crates.io](https://img.shields.io/crates/d/ribir)](https://crates.io/crates/ribir)
 
-[Website] | [Documents] | [中文文档] | [Examples] | [Changelog] | [Releases]
+[Website] | [Documents] | [中文文档] | [Examples] | [Changelog] | [Releases] | [Roadmap]
 </div>
 
 ![](./static/hero-banner.png)
@@ -159,6 +159,7 @@ Ribir is [MIT-licensed](./LICENSE)
 [Website]: https://ribir.org
 [Changelog]: ./CHANGELOG.md
 [Releases]: ./RELEASE.md
+[Roadmap]: ./ROADMAP.md
 [Flutter]: https://flutter.dev/
 [QML]: https://doc.qt.io/qt-6/qtqml-index.html
 [Examples]: ./examples/
