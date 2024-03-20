@@ -256,9 +256,9 @@ mod tests {
               .map(move |(width, depth)| {
                 (0..width).map(move |_| -> Widget {
                   if depth > 1 {
-                    Recursive { width, depth: depth - 1 }.widget_build(ctx!())
+                    Recursive { width, depth: depth - 1 }.build(ctx!())
                   } else {
-                    MockBox { size: Size::new(10., 10.)}.widget_build(ctx!())
+                    MockBox { size: Size::new(10., 10.)}.build(ctx!())
                   }
                 })
               })
@@ -280,9 +280,9 @@ mod tests {
         let recursive_child: Widget = if $this.depth > 1 {
           let width = $this.width;
           let depth = $this.depth - 1;
-          Embed { width, depth }.widget_build(ctx!())
+          Embed { width, depth }.build(ctx!())
         } else {
-          MockBox { size: Size::new(10., 10.) }.widget_build(ctx!())
+          MockBox { size: Size::new(10., 10.) }.build(ctx!())
         };
         let multi = pipe!{
           (0..$this.width - 1).map(|_| MockBox { size: Size::new(10., 10.)})
@@ -358,9 +358,9 @@ mod tests {
             @MockBox {
               size: Size::zero(),
               @ { pipe!($child.then(|| Void)) }
-            }.widget_build(ctx!())
+            }.build(ctx!())
           } else {
-            Void.widget_build(ctx!())
+            Void.build(ctx!())
           }
         })
       }

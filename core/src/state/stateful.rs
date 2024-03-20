@@ -229,13 +229,13 @@ macro_rules! compose_builder_impl {
   ($name: ident) => {
     impl<C: Compose + 'static> ComposeBuilder for $name<C> {
       #[inline]
-      fn widget_build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).widget_build(ctx) }
+      fn build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
     }
 
     impl<R: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for $name<R> {
       #[inline]
-      fn widget_build(self, ctx: &BuildCtx) -> Widget {
-        ComposeChild::compose_child(self, None).widget_build(ctx)
+      fn build(self, ctx: &BuildCtx) -> Widget {
+        ComposeChild::compose_child(self, None).build(ctx)
       }
     }
   };
@@ -245,11 +245,11 @@ compose_builder_impl!(Stateful);
 compose_builder_impl!(Writer);
 
 impl<R: Render> RenderBuilder for Stateful<R> {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+  fn build(self, ctx: &BuildCtx) -> Widget {
     match self.try_into_value() {
-      Ok(r) => r.widget_build(ctx),
+      Ok(r) => r.build(ctx),
       Err(s) => {
-        let w = RenderProxy::new(s.data.clone()).widget_build(ctx);
+        let w = RenderProxy::new(s.data.clone()).build(ctx);
         w.dirty_subscribe(s.raw_modifies(), ctx)
       }
     }
@@ -258,12 +258,12 @@ impl<R: Render> RenderBuilder for Stateful<R> {
 
 impl<R: Render> RenderBuilder for Writer<R> {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.0.widget_build(ctx) }
+  fn build(self, ctx: &BuildCtx) -> Widget { self.0.build(ctx) }
 }
 
 impl<R: Render> RenderBuilder for Reader<R> {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.0.clone_writer().widget_build(ctx) }
+  fn build(self, ctx: &BuildCtx) -> Widget { self.0.clone_writer().build(ctx) }
 }
 
 impl<W> Stateful<W> {
@@ -313,7 +313,7 @@ impl<W: MultiChild> MultiChild for Stateful<W> {}
 
 impl<W: SingleChild + Render> SingleParent for Stateful<W> {
   fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    let p = self.widget_build(ctx);
+    let p = self.build(ctx);
     ctx.append_child(p.id(), child);
     p
   }
@@ -321,7 +321,7 @@ impl<W: SingleChild + Render> SingleParent for Stateful<W> {
 
 impl<W: MultiChild + Render> MultiParent for Stateful<W> {
   fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
-    let p = self.widget_build(ctx);
+    let p = self.build(ctx);
     for c in children {
       ctx.append_child(p.id(), c);
     }

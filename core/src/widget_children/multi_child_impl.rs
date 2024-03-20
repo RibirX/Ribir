@@ -20,7 +20,7 @@ trait FillVec<M: ?Sized> {
 crate::widget::multi_build_replace_impl_include_self! {
   impl<W: {#}> FillVec<dyn {#}> for W {
     #[inline]
-    fn fill_vec(self, vec: &mut Vec<Widget>, ctx: &BuildCtx) { vec.push(self.widget_build(ctx)) }
+    fn fill_vec(self, vec: &mut Vec<Widget>, ctx: &BuildCtx) { vec.push(self.build(ctx)) }
   }
 
   impl<W> FillVec<&dyn {#}> for W
@@ -30,7 +30,7 @@ crate::widget::multi_build_replace_impl_include_self! {
   {
     #[inline]
     fn fill_vec(self, vec: &mut Vec<Widget>, ctx: &BuildCtx) {
-      vec.extend(self.into_iter().map(|w| w.widget_build(ctx)))
+      vec.extend(self.into_iter().map(|w| w.build(ctx)))
     }
   }
 }
@@ -43,7 +43,7 @@ crate::widget::multi_build_replace_impl_include_self! {
     V::Item: {#},
   {
     fn fill_vec(self, vec: &mut Vec<Widget>, ctx: &BuildCtx) {
-      self.build_multi(vec, |v, ctx| v.widget_build(ctx), ctx);
+      self.build_multi(vec, |v, ctx| v.build(ctx), ctx);
     }
   }
 }
@@ -75,7 +75,7 @@ where
 }
 
 impl<P: MultiParent> WidgetBuilder for MultiPair<P> {
-  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+  fn build(self, ctx: &BuildCtx) -> Widget {
     let MultiPair { parent, children } = self;
     parent.compose_children(children.into_iter(), ctx)
   }

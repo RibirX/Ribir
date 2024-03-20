@@ -372,14 +372,12 @@ where
 
 impl<C: Compose + 'static> ComposeBuilder for State<C> {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).widget_build(ctx) }
+  fn build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
 }
 
 impl<P: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for State<P> {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget {
-    ComposeChild::compose_child(self, None).widget_build(ctx)
-  }
+  fn build(self, ctx: &BuildCtx) -> Widget { ComposeChild::compose_child(self, None).build(ctx) }
 }
 
 impl<W: SingleChild> SingleChild for State<W> {}
@@ -387,10 +385,10 @@ impl<W: MultiChild> MultiChild for State<W> {}
 
 impl<R: Render> RenderBuilder for State<R> {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget {
+  fn build(self, ctx: &BuildCtx) -> Widget {
     match self.0.into_inner() {
-      InnerState::Data(w) => w.into_inner().widget_build(ctx),
-      InnerState::Stateful(w) => w.widget_build(ctx),
+      InnerState::Data(w) => w.into_inner().build(ctx),
+      InnerState::Stateful(w) => w.build(ctx),
     }
   }
 }
@@ -449,9 +447,7 @@ macro_rules! impl_compose_builder {
       WM: Fn(&mut W::Value) -> &mut V + Clone + 'static,
       V: Compose + 'static,
     {
-      fn widget_build(self, ctx: &crate::context::BuildCtx) -> Widget {
-        Compose::compose(self).widget_build(ctx)
-      }
+      fn build(self, ctx: &crate::context::BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
     }
 
     impl<V, W, RM, WM, Child> ComposeChildBuilder for $name<W, RM, WM>
@@ -462,8 +458,8 @@ macro_rules! impl_compose_builder {
       V: ComposeChild<Child = Option<Child>> + 'static,
     {
       #[inline]
-      fn widget_build(self, ctx: &BuildCtx) -> Widget {
-        ComposeChild::compose_child(self, None).widget_build(ctx)
+      fn build(self, ctx: &BuildCtx) -> Widget {
+        ComposeChild::compose_child(self, None).build(ctx)
       }
     }
   };

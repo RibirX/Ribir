@@ -45,7 +45,7 @@ use ribir::prelude::*;
 
 fn hello_world(ctx!(): &BuildCtx) -> Widget {
   rdl!{ Text { text: "Hello World!" } }
-    .widget_build(ctx!())
+    .build(ctx!())
 }
 
 fn main() { 
@@ -57,7 +57,7 @@ fn main() {
 
 接下来一行 `rdl!{ Text { text: "Hello World!" } }`，通过 `rdl！` 创建了一个内容为 `Hello World!` 的 `Text`。关于 `rdl!` 的细节，你可以先放到一边，将在小节 [使用 `rdl!` 创建对象](#使用-rdl-创建对象) 中详细介绍。
 
-最后，将 `Text` 通过 `widget_build` 方法构建成 `Widget`，作为函数的返回值。
+最后，将 `Text` 通过 `build` 方法构建成 `Widget`，作为函数的返回值。
 
 > 小提示
 >
@@ -73,7 +73,7 @@ use ribir::prelude::*;
 fn main() {
   let hello_world = |ctx!(): &BuildCtx| {
     rdl!{ Text { text: "Hello World!" } }
-      .widget_build(ctx!())
+      .build(ctx!())
   };
   App::run(hello_world);
 }
@@ -86,7 +86,7 @@ move |ctx!(): &BuildCtx| -> Widget {
   {
     // 你的代码
   }
-  .widget_build(ctx!())
+  .build(ctx!())
 }
 ```
 

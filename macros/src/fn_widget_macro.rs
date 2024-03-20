@@ -16,7 +16,7 @@ impl FnWidgetMacro {
     let stmts: Vec<_> = body.0.into_iter().map(|s| refs_ctx.fold_stmt(s)).collect();
     let _ = refs_ctx.pop_dollar_scope(true);
     quote! {
-      move |ctx!(): &BuildCtx| -> Widget { #(#stmts)*.widget_build(ctx!()) }
+      move |ctx!(): &BuildCtx| -> Widget { #(#stmts)*.build(ctx!()) }
     }
     .into()
   }

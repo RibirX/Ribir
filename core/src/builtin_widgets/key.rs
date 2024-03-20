@@ -124,7 +124,7 @@ impl<V: 'static + Default + Clone + PartialEq> ComposeChild for KeyWidget<V> {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let data: Box<dyn AnyKey> = Box::new(this);
-      child.attach_data(data, ctx!()).widget_build(ctx!())
+      child.attach_data(data, ctx!()).build(ctx!())
     }
   }
 }

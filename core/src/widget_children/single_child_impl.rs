@@ -14,7 +14,7 @@ crate::widget::multi_build_replace_impl_include_self! {
     type Target = Widget;
 
     fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-      self.compose_child(child.widget_build(ctx), ctx)
+      self.compose_child(child.build(ctx), ctx)
     }
   }
 
@@ -29,7 +29,7 @@ crate::widget::multi_build_replace_impl_include_self! {
       if let Some(child) = child {
         self.with_child(child, ctx)
       } else {
-        self.widget_build(ctx)
+        self.build(ctx)
       }
     }
   }
@@ -64,7 +64,7 @@ mod tests {
       mock_box
         .clone()
         .with_child(mock_box.clone().with_child(mock_box, ctx), ctx)
-        .widget_build(ctx)
+        .build(ctx)
     };
   }
 

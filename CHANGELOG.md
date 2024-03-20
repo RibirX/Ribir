@@ -23,8 +23,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ## [@Unreleased] - @ReleaseDate
 
 ### Documented
-
 - **Ribir**: Added a roadmap. (#550, @M-Adoo)
+
+### Breaking 
+- **core**: Renamed the `widget_build` method to `build` for brevity, given its frequent usage. (#549 @M-Adoo)
 
 
 ## [0.2.0-alpha.7] - 2024-03-19
@@ -135,7 +137,7 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **GPU render**: GPU backend for the **painter**, do path tessellation, so that easy to render the triangles in any GPU render engine. A `wgpu` implementation is provided as the default GPU render engine. Tessellation base on [lyon](https://github.com/nical/lyon).
 - **text**: support basic text typography and IME input, in a usable but rough stage.
 - **widgets**: the widgets library provides 20+ basic widgets, but all are in a rough stage, and the API is not stable yet.
-- **examples**: counter, storybook, messages, todos, wordle\_game, etc.
+- **examples**: counter, storybook, messages, todos, wordle_game, etc.
 
 ### Documented
 

@@ -48,7 +48,7 @@ pub type WidgetOf<W> = Pair<W, Widget>;
 
 impl RenderBuilder for BoxedSingleChild {
   #[inline]
-  fn widget_build(self, _: &BuildCtx) -> Widget { self.0 }
+  fn build(self, _: &BuildCtx) -> Widget { self.0 }
 }
 
 impl SingleParent for BoxedSingleChild {
@@ -61,7 +61,7 @@ impl SingleParent for BoxedSingleChild {
 
 impl RenderBuilder for BoxedMultiChild {
   #[inline]
-  fn widget_build(self, _: &BuildCtx) -> Widget { self.0 }
+  fn build(self, _: &BuildCtx) -> Widget { self.0 }
 }
 
 impl MultiParent for BoxedMultiChild {
@@ -89,7 +89,7 @@ pub(crate) trait MultiParent {
 
 impl<T: Render + SingleChild> SingleParent for T {
   fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    let p = self.widget_build(ctx);
+    let p = self.build(ctx);
     ctx.append_child(p.id(), child);
 
     p
@@ -108,7 +108,7 @@ impl<T: SingleParent> SingleParent for Option<T> {
 
 impl<T: Render + MultiChild> MultiParent for T {
   fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
-    let p = self.widget_build(ctx);
+    let p = self.build(ctx);
     for c in children {
       ctx.append_child(p.id(), c);
     }
@@ -119,7 +119,7 @@ impl<T: Render + MultiChild> MultiParent for T {
 impl BoxedSingleChild {
   #[inline]
   pub fn new(widget: impl RenderBuilder + SingleChild, ctx: &BuildCtx) -> Self {
-    Self(widget.widget_build(ctx))
+    Self(widget.build(ctx))
   }
 
   /// Create a `BoxedSingleChild` from a `Widget` and not check the type , the
@@ -131,7 +131,7 @@ impl BoxedSingleChild {
 impl BoxedMultiChild {
   #[inline]
   pub fn new(widget: impl RenderBuilder + MultiChild, ctx: &BuildCtx) -> Self {
-    Self(widget.widget_build(ctx))
+    Self(widget.build(ctx))
   }
 }
 
@@ -378,7 +378,7 @@ mod tests {
 
     let _ = |ctx| -> Widget {
       let child = MockBox { size: ZERO_SIZE }.with_child(Void, ctx);
-      X.with_child(child, ctx).widget_build(ctx)
+      X.with_child(child, ctx).build(ctx)
     };
   }
 

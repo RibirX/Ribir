@@ -133,7 +133,7 @@ where
   V: Render,
 {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { RenderProxy::new(self).widget_build(ctx) }
+  fn build(self, ctx: &BuildCtx) -> Widget { RenderProxy::new(self).build(ctx) }
 }
 
 impl<V, S, RM, WM> RenderBuilder for MapWriter<S, RM, WM>
@@ -145,7 +145,7 @@ where
   V: Render,
 {
   #[inline]
-  fn widget_build(self, ctx: &BuildCtx) -> Widget { self.clone_reader().widget_build(ctx) }
+  fn build(self, ctx: &BuildCtx) -> Widget { self.clone_reader().build(ctx) }
 }
 
 impl<V, S, RM, WM> MapWriter<S, RM, WM>

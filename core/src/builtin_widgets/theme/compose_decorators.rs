@@ -50,7 +50,7 @@ where
     if let Some(style) = style {
       style(Box::new(self), host, ctx)
     } else {
-      ComposeDecorator::compose_decorator(self, host).widget_build(ctx)
+      ComposeDecorator::compose_decorator(self, host).build(ctx)
     }
   }
 }
@@ -103,7 +103,7 @@ mod tests {
             @ { host }
           }
         }
-        .widget_build(ctx)
+        .build(ctx)
       });
 
     let w = fn_widget! {

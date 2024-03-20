@@ -52,11 +52,11 @@ mod tests {
     let mut wnd = TestWindow::new(fn_widget! {
       pipe! {
         if *$remove_widget {
-          Void.widget_build(ctx!())
+          Void.build(ctx!())
         } else {
           FatObj::new(Void)
             .delay_drop_until(pipe!(*$delay_drop))
-            .widget_build(ctx!())
+            .build(ctx!())
         }
       }
     });

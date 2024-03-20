@@ -836,9 +836,9 @@ mod tests {
               auto_focus: true,
               on_chars: move |e| $input_writer.write().push_str(&e.chars),
               size: Size::new(10., 10.),
-            }.widget_build(ctx!())
+            }.build(ctx!())
           } else {
-            Void.widget_build(ctx!())
+            Void.build(ctx!())
           }
         }}
       }
@@ -876,7 +876,7 @@ mod tests {
                   on_chars: move |e| if idx == 2 { $input_writer.write().push_str(&e.chars) },
                   size: Size::new(10., 10.),
                 }
-              }.widget_build(ctx!()))
+              }.build(ctx!()))
             }).collect::<Vec<_>>()
           }
         }
