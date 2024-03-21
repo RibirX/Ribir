@@ -1,4 +1,6 @@
 on:
+  schedule:
+    - cron: "0 0 * * *" # release patch version every day
   workflow_dispatch: # allows manual triggering
     inputs:
       level:
@@ -26,12 +28,17 @@ jobs:
             echo "You should only run this workflow on the release branch."
             exit 1
       - uses: actions/checkout@v3
-        if: ${{ github.event.inputs.level == 'auto' }}
         with:
           fetch-depth: 0
           fetch-tags: true
+      - run: |
+          new_commit=$(git log $(git describe --tags --abbrev=0)..HEAD --oneline | wc -l)
+          if [ $new_commit -eq 0 ]; then
+            echo "No new commits since last version"
+            exit 1
+          fi
       - id: auto_detect
-        if: ${{ github.event.inputs.level == 'auto' }}
+        if: ${{ github.event.inputs.level == 'auto' || github.event.inputs.level == '' }}
         run: echo "level=$(git describe --tags --abbrev=0 | grep -o "rc\|beta")" >> $GITHUB_OUTPUT
       - id: concrete_level
         run: |
