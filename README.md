@@ -14,6 +14,10 @@ Use Rust to build multi-platform applications from a single codebase.
 [![codecov](https://codecov.io/gh/RibirX/Ribir/branch/master/graph/badge.svg)](https://codecov.io/gh/RibirX/ribir)
 [![Crates.io](https://img.shields.io/crates/v/ribir)](https://crates.io/crates/ribir)
 [![Crates.io](https://img.shields.io/crates/d/ribir)](https://crates.io/crates/ribir)
+[![Discord](https://img.shields.io/discord/699900144002269226?label=discord)](https://discord.gg/7p3pSrUvmq)
+[![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/ribir_x
+)](https://twitter.com/intent/user?screen_name=ribir_x)
+
 
 [Website] | [Documents] | [中文文档] | [Examples] | [Changelog] | [Releases] | [Roadmap]
 </div>
