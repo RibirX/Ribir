@@ -15,8 +15,11 @@ There are 5 types of changes:
 Please only add new entries below the [Unreleased](#unreleased---releasedate) header with the following format:
 
 ``` md
-**crate or effect scope**: description of change (#PR @contributor)
+**crate or effect scope**: description of change (#pr @contributor)
 ```
+
+1. When creating a pull request, `#pr` will automatically update with the pull request number. 
+2. Replace `@contributor` with your GitHub username.
 
 <!-- next-header -->
 
@@ -39,7 +42,7 @@ _ **core**: rename `Declare::declare_builder` to `Declare::declarer` (#547 @M-Ad
 
 ### Documented
 
-- **ribir**: Added guide "Using Ribir without 'DSL'" (#545 @M-Adoo)
+- **Ribir**: Added guide "Using Ribir without 'DSL'" (#545 @M-Adoo)
 
 ## [0.2.0-alpha.6] - 2024-03-12
 

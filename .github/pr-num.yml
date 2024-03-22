@@ -1,0 +1,31 @@
+name: pr number
+permissions:
+  contents: write
+on:
+  pull_request:
+    paths:
+      - "CHANGELOG.md"
+
+jobs:
+  replace-pr-number:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Replace pr number in CHANGELOG.md
+        run: |
+          sed -i '/^##/,$ {s/#pr/#${{ github.event.pull_request.number }}/g}' ./CHANGELOG.md
+          if [ $(git status --porcelain | wc -l) -eq 0 ]; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git config --global user.name "RChangelog[bot]"
+          git config --global user.email 155627257+RChangelog[bot]@users.noreply.github.com
+
+          git add .
+          git commit --amend --no-edit
+          git push -f

@@ -11,6 +11,8 @@ Please ensure the following are completed before merging:
 
 ## Additional Information
 
+**The bot will replace `#pr` in `CHANGELOG.md` with your pull request number. If your branch is out of sync, use `git pull --rebase` to update it.**
+
 If you're unsure about which branch to submit your Pull Request to, or when it will be released after being merged, please refer to our [Release Guide](https://github.com/RibirX/Ribir/blob/master/RELEASE.md).
 
 If you're working on a widget and need help writing test cases, we have some macros that can assist you. Please refer to the [Ribir Dev Helper](https://docs.rs/ribir_dev_helper) documentation.
