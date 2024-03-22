@@ -35,6 +35,7 @@ jobs:
     needs: lint
     uses: RibirX/share-workflows/.github/workflows/ribir-win-image-tests.yaml@main
   doc-examples:
+    needs: lint
     name: compile doc examples
     runs-on: ubuntu-latest
     steps:
