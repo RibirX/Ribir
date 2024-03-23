@@ -30,6 +30,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [0.2.0-beta.1](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0...ribir-v0.2.0-beta.1) - 2024-03-26
 
+### Features
+
+- **macros**: Added a `include_crate_svg!` macro to include the svg relative to current crate. (#pr, @M-Adoo)
+- **ribir**: Added a `nightly` feature to enable functionalities that require nightly Rust. (#pr, @M-Adoo)
+  - The `include_crates_svg!` macro can operate without the `nightly` feature.
+  - The `include_svg!` macro requires the `nightly` feature to be enabled.
+
 ### Documented
 
 - fix broken links and format the example code (\#526 @M-Adoo)

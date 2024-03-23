@@ -47,5 +47,6 @@ tokio-stream = { workspace = true }
 [features]
 png = ["ribir_painter/png"]
 tokio-async = ["tokio"]
+nightly = ["ribir_macros/nightly"]
 
 
