@@ -46,6 +46,7 @@ png = ["ribir_core/png"]
 wgpu = ["ribir_gpu/wgpu", "dep:wgpu"]
 widgets = ["ribir_widgets"]
 tokio-async = ["ribir_core/tokio-async"]
+nightly = ["ribir_core/nightly"]
 
 [[test]]
 harness = false

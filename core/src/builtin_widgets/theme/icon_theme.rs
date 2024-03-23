@@ -45,7 +45,7 @@ macro_rules! define_named_svg {
 macro_rules! fill_svgs {
     ($theme: expr, $($name: path: $path: literal),+) => {
       $(
-        let icon = ShareResource::new(include_svg!($path));
+        let icon = ShareResource::new(include_crate_svg!($path));
         $theme.set_svg($name,  icon);
       )+
     };
@@ -66,7 +66,8 @@ impl Compose for NamedSvg {
 
 impl IconTheme {
   pub fn new(icon_size: IconSize) -> Self {
-    let miss_icon = ShareResource::new(include_svg!("./miss_icon.svg"));
+    let svg = include_crate_svg!("./icons/miss_icon.svg");
+    let miss_icon = ShareResource::new(svg);
     let mut icons = HashMap::<_, _, ahash::RandomState>::default();
     icons.insert(MISS_ICON, miss_icon);
 
