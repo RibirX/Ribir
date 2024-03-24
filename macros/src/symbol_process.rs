@@ -63,19 +63,27 @@ pub struct StackGuard<'a>(&'a mut DollarRefsCtx);
 mod tokens_pre_process {
 
   use proc_macro::{TokenTree, *};
-  use quote::quote_spanned;
+  use quote::{quote_spanned, ToTokens};
+  use syn::token::Paren;
 
   use super::KW_DOLLAR_STR;
   use crate::symbol_process::KW_RDL;
 
-  fn rdl_syntax_err<T>(span: Span) -> Result<T, TokenStream> {
-    let err_token = quote_spanned! { span.into() =>
-      compile_error!("Syntax Error: use `@` to declare object, must be: \n \
-        1. `@ XXX { ... }`, declare a new `XXX` type object;\n \
-        2. `@ $parent { ... }`, declare a variable as parent;\n \
-        3. `@ { ... } `, declare an object by an expression.")
+  fn rdl_syntax_err<T>(at: Span, follow: Option<Span>) -> Result<T, TokenStream> {
+    let err_msg = "Syntax Error: use `@` to declare object, must be: \n \
+    1. `@ XXX { ... }`, declare a new `XXX` type object;\n \
+    2. `@ $parent { ... }`, declare a variable as parent;\n \
+    3. `@ { ... } `, declare an object by an expression.";
+
+    let err_tokens = if let Some(follow) = follow {
+      let mut err_tokens = quote_spanned! { at.into() => compile_error! };
+      Paren::<proc_macro2::Span>(follow.into())
+        .surround(&mut err_tokens, |tokens| err_msg.to_tokens(tokens));
+      err_tokens
+    } else {
+      quote_spanned! { at.into() => compile_error!(#err_msg) }
     };
-    Err(err_token.into())
+    Err(err_tokens.into())
   }
 
   fn dollar_err<T>(span: Span) -> Result<T, TokenStream> {
@@ -105,8 +113,12 @@ mod tokens_pre_process {
           let body = match iter.next() {
             // declare a new widget: `@ SizedBox { ... }`
             Some(TokenTree::Ident(name)) => {
-              let Some(TokenTree::Group(body))  =  iter.next() else {
-                return rdl_syntax_err(at.span().join(name.span()).unwrap())
+              let next = iter.next();
+              let Some(TokenTree::Group(body)) = next else {
+                return rdl_syntax_err(
+                  at.span(),
+                  next.map(|n| n.span()).or_else(|| Some(name.span()))
+                )
               };
               let tokens = TokenStream::from_iter([TokenTree::Ident(name), TokenTree::Group(body)]);
               Group::new(Delimiter::Brace, tokens)
@@ -114,9 +126,12 @@ mod tokens_pre_process {
             // declare a variable widget as parent,  `@ $var { ... }`
             Some(TokenTree::Punct(dollar)) if dollar.as_char() == '$' => {
               if let Some(TokenTree::Ident(var)) = iter.next() {
-                let Some(TokenTree::Group(body))  =  iter.next() else {
-                  let span = at.span().join(dollar.span()).unwrap().join(var.span()).unwrap();
-                  return rdl_syntax_err(span)
+                let next = iter.next();
+                let Some(TokenTree::Group(body))  =  next else {
+                  return rdl_syntax_err(
+                    at.span(),
+                    next.map(|n| n.span()).or_else(|| Some(var.span()))
+                  )
                 };
                 let tokens = TokenStream::from_iter([
                   TokenTree::Punct(dollar),
@@ -131,11 +146,7 @@ mod tokens_pre_process {
             // declare a expression widget  `@ { ... }`
             Some(TokenTree::Group(g)) => g,
             n => {
-              let mut span = at.span();
-              if let Some(n) = n {
-                span = span.join(n.span()).unwrap()
-              }
-              return rdl_syntax_err(span);
+              return rdl_syntax_err(at.span(), n.map(|n| n.span()));
             }
           };
           tokens.push(TokenTree::Group(body));

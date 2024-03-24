@@ -1,4 +1,3 @@
-use proc_macro::{Diagnostic, Level};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
@@ -214,12 +213,15 @@ impl Parse for DeclareAttr {
         return Err(lookahead.error());
       }
       if let (Some(custom), Some(skip)) = (attr.custom.as_ref(), attr.skip.as_ref()) {
-        let mut d = Diagnostic::new(
-          Level::Error,
-          "field is marked as `skip` is not allowed to impl `custom` set method.",
+        let mut err = syn::Error::new_spanned(
+          custom,
+          "A field marked as `skip` cannot implement a `custom` set method.",
         );
-        d.set_spans(vec![custom.span().unwrap(), skip.span().unwrap()]);
-        d.emit();
+        err.combine(syn::Error::new_spanned(
+          skip,
+          "A field marked as `custom` cannot also be marked as `skip`.",
+        ));
+        return Err(err);
       }
 
       if !input.is_empty() {
