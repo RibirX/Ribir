@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "nightly", feature(proc_macro_span))]
+
 extern crate proc_macro;
 
 mod declare_derive;

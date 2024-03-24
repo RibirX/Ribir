@@ -1,4 +1,3 @@
-#![feature(decl_macro)]
 #![cfg_attr(test, feature(mutex_unpoison, test))]
 
 #[macro_use]
