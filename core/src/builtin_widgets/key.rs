@@ -158,14 +158,16 @@ where
   fn record_before_value(&mut self, value: V) { self.before_value = Some(value); }
 }
 
-macro from_key_impl($($ty: ty : $name: ident)*) {
-  $(
-    impl From<$ty> for Key {
-      fn from(s: $ty) -> Self {
-        Key::$name(s)
+macro_rules! from_key_impl {
+  ($($ty: ty : $name: ident)*) => {
+    $(
+      impl From<$ty> for Key {
+        fn from(s: $ty) -> Self {
+          Key::$name(s)
+        }
       }
-    }
-  )*
+    )*
+  };
 }
 
 from_key_impl!(
@@ -197,17 +199,17 @@ impl From<&str> for Key {
   }
 }
 
-pub macro complex_key($($k: expr),*) {
-  {
+#[macro_export]
+macro_rules! complex_key {
+  ($($k: expr),*) => {{
     let mut hasher = blake3::Hasher::new();
     $(
       $k.consume(&mut hasher);
     )*
     let bytes: [u8;32] = hasher.finalize().into();
     bytes
-  }
+  }};
 }
-
 trait ConsumeByHasher {
   fn consume(self, hasher: &mut blake3::Hasher);
 }
@@ -222,27 +224,31 @@ impl<'a> ConsumeByHasher for &'a str {
   fn consume(self, hasher: &mut blake3::Hasher) { hasher.update(self.as_bytes()); }
 }
 
-macro impl_as_u8_consume_by_hasher($($t: ty)*) {
-  $(
-    impl ConsumeByHasher for $t {
-      #[inline]
-      fn consume(self, hasher: &mut blake3::Hasher) {
-        hasher.update(&[self as u8]);
+macro_rules! impl_as_u8_consume_by_hasher {
+  ($($t: ty)*) => {
+    $(
+      impl ConsumeByHasher for $t {
+        #[inline]
+        fn consume(self, hasher: &mut blake3::Hasher) {
+          hasher.update(&[self as u8]);
+        }
       }
-    }
-  )*
+    )*
+  };
 }
 impl_as_u8_consume_by_hasher!(bool char);
 
-macro impl_bytes_consume_by_hasher($($ty: ty)*) {
-  $(
-    impl ConsumeByHasher for $ty {
-      #[inline]
-      fn consume(self, hasher: &mut blake3::Hasher) {
-        hasher.update(&self.to_ne_bytes());
+macro_rules! impl_bytes_consume_by_hasher {
+  ($($ty: ty)*) => {
+    $(
+      impl ConsumeByHasher for $ty {
+        #[inline]
+        fn consume(self, hasher: &mut blake3::Hasher) {
+          hasher.update(&self.to_ne_bytes());
+        }
       }
-    }
-  )*
+    )*
+  };
 }
 
 impl_bytes_consume_by_hasher!(
