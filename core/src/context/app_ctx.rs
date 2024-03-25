@@ -226,7 +226,6 @@ impl AppCtx {
 
     let locker = LOCK.lock().unwrap_or_else(|e| {
       // Only clear for test, so we have a clear error message.
-      #[cfg(test)]
       LOCK.clear_poison();
 
       e.into_inner()

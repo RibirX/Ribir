@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(mutex_unpoison, test))]
-
 #[macro_use]
 extern crate bitflags;
 extern crate lazy_static;

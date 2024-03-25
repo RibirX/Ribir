@@ -168,20 +168,3 @@ impl Easing for StepEnd {
   #[inline]
   fn easing(&self, time_rate: f32) -> f32 { ((time_rate / self.0).ceil() * self.0).min(1.) }
 }
-
-#[cfg(test)]
-mod tests {
-  extern crate test;
-  use super::*;
-  use test::Bencher;
-
-  #[bench]
-  fn bench_curve_bezier(b: &mut Bencher) {
-    b.iter(|| {
-      let sum: f32 = (0..1000)
-        .map(|i| CubicBezierEasing::new(0.3, 0.7, 0.4, 0.3).easing(i as f32 / 1001.))
-        .sum();
-      sum
-    })
-  }
-}

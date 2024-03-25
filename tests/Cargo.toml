@@ -18,7 +18,14 @@ paste.workspace = true
 ribir = {path = "../ribir", features = ["material", "widgets"]}
 ribir_dev_helper = {path = "../dev-helper"}
 ribir_geom = {path = "../geom"}
+ribir_text = {path = "../text"}
 winit.workspace = true
+criterion = "0.5.1"
+todos = {path = "../examples/todos"}
+counter = {path = "../examples/counter"}
+messages = {path = "../examples/messages"}
+storybook = {path = "../examples/storybook"}
+wordle_game = {path = "../examples/wordle_game"}
 
 [[test]]
 name = "include_svg"
@@ -39,3 +46,20 @@ path = "declare_builder_test.rs"
 [[test]]
 name = "path_child"
 path = "path_child_test.rs"
+
+
+[[bench]]
+name = "text_bench"
+harness = false
+
+[[bench]]
+name = "example_bench"
+harness = false
+
+[[bench]]
+name = "core_bench"
+harness = false
+
+[[bench]]
+name = "widgets_bench"
+harness = false

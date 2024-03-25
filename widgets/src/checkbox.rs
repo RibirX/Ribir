@@ -126,8 +126,6 @@ mod tests {
   use super::*;
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
-  extern crate test;
-  use test::Bencher;
 
   fn checked() -> impl WidgetBuilder {
     fn_widget! { @Checkbox { checked: true } }

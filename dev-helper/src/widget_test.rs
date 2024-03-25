@@ -29,7 +29,6 @@ macro_rules! widget_test_suit {
       })+
     );
     widget_image_test!($widget_fn, wnd_size = $size,);
-    widget_bench!($widget_fn, wnd_size = $size,);
   };
 
   (
@@ -250,33 +249,6 @@ macro_rules! widget_image_test {
     $widget_fn: ident $(,)?
   ) => {
     widget_image_test!($widget_fn, wnd_size = Size::new(128., 128.),);
-  };
-}
-
-/// This macro accepts a function that returns a widget to generate a benchmark
-/// for the returning widget.
-#[macro_export]
-macro_rules! widget_bench {
-  (
-    $widget_fn: ident,
-    wnd_size = $size: expr $(,)?
-  ) => {
-    paste::paste! {
-      #[cfg(test)]
-      #[bench]
-      fn [<$widget_fn _widget_bench>](b: &mut Bencher) {
-        let _scope = unsafe { AppCtx::new_lock_scope() };
-        // init app context before benchmark
-        let _ = AppCtx::shared();
-        b.iter(move || {
-          let mut wnd = TestWindow::new_with_size($widget_fn(), $size);
-          wnd.draw_frame();
-        });
-      }
-    }
-  };
-  ($widget_fn: ident $(,)?) => {
-    widget_bench!($widget_fn, wnd_size = ribir_geom::Size::new(128., 128.));
   };
 }
 
