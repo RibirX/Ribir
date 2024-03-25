@@ -5,7 +5,6 @@ extern crate proc_macro;
 mod declare_derive;
 mod lerp_derive;
 mod util;
-use fn_widget_macro::FnWidgetMacro;
 use proc_macro::TokenStream;
 use quote::quote;
 use symbol_process::DollarRefsCtx;
@@ -185,7 +184,7 @@ pub fn rdl(input: TokenStream) -> TokenStream {
 /// use to expression a state reference of `name`.
 #[proc_macro]
 pub fn fn_widget(input: TokenStream) -> TokenStream {
-  FnWidgetMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  fn_widget_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// This macro just return the input token stream. It's do nothing but help

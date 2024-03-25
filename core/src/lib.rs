@@ -56,8 +56,7 @@ pub mod prelude {
   pub use ribir_geom::*;
   #[doc(no_inline)]
   pub use ribir_macros::*;
-  #[doc(no_inline)]
-  pub use ribir_painter::*;
+
   #[doc(no_inline)]
   pub use ribir_text::*;
   #[doc(hidden)]

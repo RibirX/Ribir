@@ -112,7 +112,9 @@ impl<T: ?Sized> Sc<T> {
   /// assert!(Sc::ptr_eq(&five, &same_five));
   /// assert!(!Sc::ptr_eq(&five, &other_five));
   /// ```
-  pub fn ptr_eq(this: &Self, other: &Self) -> bool { this.0.as_ptr() == other.0.as_ptr() }
+  pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+    std::ptr::addr_eq(this.0.as_ptr(), other.0.as_ptr())
+  }
 
   fn from_inner(ptr: NonNull<ScBox<T>>) -> Self { Self(ptr) }
 

@@ -210,7 +210,7 @@ macro_rules! complex_key {
     bytes
   }};
 }
-trait ConsumeByHasher {
+pub trait ConsumeByHasher {
   fn consume(self, hasher: &mut blake3::Hasher);
 }
 

@@ -25,6 +25,7 @@ impl ComposeChild for P {
 #[derive(Declare)]
 struct P2;
 
+#[allow(dead_code)]
 #[derive(Template)]
 struct TupleStructTemplate(ChildA, Option<ChildB>, Option<ChildC>);
 

@@ -97,7 +97,6 @@ mod tests {
 
   use super::*;
   use ribir_core::test_helper::*;
-  use ribir_geom::Size;
 
   #[test]
   fn text_clip() {

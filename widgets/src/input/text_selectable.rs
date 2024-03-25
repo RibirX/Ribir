@@ -1,6 +1,3 @@
-use super::caret_state::CaretPosition;
-use super::CaretState;
-
 use super::glyphs_helper::TextGlyphsHelper;
 use crate::input::glyphs_helper::GlyphsHelper;
 use crate::input::selected_text::SelectedHighLight;

@@ -41,12 +41,6 @@ use super::*;
 use crate::prelude::*;
 use ribir_algo::Sc;
 use ribir_macros::rdl;
-use rxrust::{
-  observable,
-  prelude::ObservableItem,
-  scheduler::{NormalReturn, TaskHandle},
-  subscription::Subscription,
-};
 use std::time::{Duration, Instant};
 
 /// The controller of a stagger animation. It's allow you to transition states
@@ -225,7 +219,6 @@ mod tests {
   use super::*;
   use crate::{reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
-  use std::time::Duration;
 
   fn stagger_run_and_stop() -> impl WidgetBuilder {
     fn_widget! {

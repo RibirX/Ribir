@@ -28,7 +28,6 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
   use ribir_dev_helper::*;
-  use ribir_geom::Size;
 
   const SIZE: Size = Size::new(100., 100.);
   fn smoke() -> impl WidgetBuilder {

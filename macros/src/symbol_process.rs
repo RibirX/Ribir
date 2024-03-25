@@ -1,4 +1,4 @@
-use crate::fn_widget_macro::FnWidgetMacro;
+use crate::fn_widget_macro;
 use crate::pipe_macro::PipeMacro;
 use crate::rdl_macro::RdlMacro;
 use crate::variable_names::{BuiltinMemberType, BUILTIN_INFOS};
@@ -62,7 +62,7 @@ pub struct StackGuard<'a>(&'a mut DollarRefsCtx);
 
 mod tokens_pre_process {
 
-  use proc_macro::{TokenTree, *};
+  use proc_macro::*;
   use quote::{quote_spanned, ToTokens};
   use syn::token::Paren;
 
@@ -325,7 +325,7 @@ impl Fold for DollarRefsCtx {
       mac.tokens = RdlMacro::gen_code(mac.tokens, self).into();
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_FN_WIDGET) {
-      mac.tokens = FnWidgetMacro::gen_code(mac.tokens, self).into();
+      mac.tokens = fn_widget_macro::gen_code(mac.tokens, self).into();
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_SPLIT_WRITER) {
       mac.tokens = gen_split_path_writer(mac.tokens, self).into();

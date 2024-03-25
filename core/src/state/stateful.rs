@@ -347,10 +347,10 @@ impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
+  use std::rc::Rc;
 
   use super::*;
-  use crate::{test_helper::*, timer::Timer};
+  use crate::test_helper::*;
 
   #[test]
   fn smoke() {

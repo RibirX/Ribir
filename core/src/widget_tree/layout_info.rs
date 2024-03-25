@@ -305,7 +305,7 @@ mod tests {
   use super::*;
   use crate::{prelude::*, reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
-  use std::{cell::Cell, rc::Rc};
+  use std::cell::Cell;
 
   #[derive(Declare, Clone, Query, SingleChild)]
   struct OffsetBox {
