@@ -10,7 +10,6 @@ const DECLARE_ATTR: &str = "declare";
 pub struct Declarer<'a> {
   pub name: Ident,
   pub fields: Vec<DeclareField<'a>>,
-  pub vis: &'a Visibility,
 }
 
 pub(crate) fn simple_declarer_attr(stt: &mut syn::ItemStruct) -> Result<TokenStream> {
@@ -18,7 +17,7 @@ pub(crate) fn simple_declarer_attr(stt: &mut syn::ItemStruct) -> Result<TokenStr
     return empty_impl(stt);
   }
   let syn::ItemStruct { vis, generics, ident, fields, .. } = stt;
-  let declarer = Declarer::new(ident, fields, vis)?;
+  let declarer = Declarer::new(ident, fields)?;
 
   let name = &declarer.name;
   let init_pairs = init_pairs(&declarer.fields, ident);
@@ -82,7 +81,7 @@ fn empty_impl(stt: &syn::ItemStruct) -> Result<TokenStream> {
 }
 
 impl<'a> Declarer<'a> {
-  pub fn new(host: &'a Ident, stt_fields: &'a mut Fields, vis: &'a Visibility) -> Result<Self> {
+  pub fn new(host: &'a Ident, stt_fields: &'a mut Fields) -> Result<Self> {
     let name = Ident::new(&format!("{host}Declarer"), host.span());
     let mut fields = vec![];
     match stt_fields {
@@ -107,7 +106,7 @@ impl<'a> Declarer<'a> {
         return Err(err);
       }
     }
-    Ok(Declarer { name, fields, vis })
+    Ok(Declarer { name, fields })
   }
 
   pub fn declare_names_tys(&self) -> (Vec<&Ident>, Vec<&syn::Type>) {

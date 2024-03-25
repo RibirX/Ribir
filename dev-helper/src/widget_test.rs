@@ -252,6 +252,7 @@ macro_rules! widget_image_test {
   };
 }
 
+#[allow(clippy::test_attr_in_doctest)]
 /// Macro is used to check if the layout information of a widget is as expected.
 /// At first, it accepts a `TestWindow` that contains the widgets you want to
 /// test. Then use a pair of braces to describe the layout information of a

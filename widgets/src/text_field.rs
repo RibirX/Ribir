@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use ribir_core::prelude::*;
-use std::{collections::HashMap, hash::Hash, ops::Deref};
+use std::{collections::HashMap, hash::Hash};
 
 #[derive(Declare, Default)]
 pub struct TextField {

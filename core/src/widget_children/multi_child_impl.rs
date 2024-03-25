@@ -1,5 +1,5 @@
 use super::*;
-use crate::{pipe::InnerPipe, widget::WidgetBuilder};
+use crate::pipe::InnerPipe;
 
 /// Trait specify what child a multi child widget can have, and the target type
 /// after widget compose its child.

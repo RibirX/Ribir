@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use ribir_geom::{Rect, Size};
 
 impl Render for ShareResource<PixelImage> {
   fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size {

@@ -9,7 +9,6 @@ use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
 use winit::{
   event::{Event, Ime, KeyEvent, StartCause, WindowEvent},
   event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
-  keyboard::KeyCode,
 };
 
 pub struct App {

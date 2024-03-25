@@ -2,12 +2,11 @@ use ribir_algo::Sc;
 
 use crate::{
   prelude::*,
-  widget::{widget_id::new_node, WidgetTree},
+  widget::widget_id::new_node,
   window::{DelayEvent, WindowId},
 };
 use std::{
   cell::{OnceCell, Ref, RefCell},
-  ops::Deref,
   rc::Rc,
 };
 
@@ -152,14 +151,10 @@ impl BuildCtxHandle {
 mod tests {
   use super::*;
   use crate::{reset_test_env, test_helper::*};
-  use std::{cell::RefCell, rc::Rc};
 
   #[test]
   fn themes() {
     reset_test_env!();
-
-    #[derive(Default, Clone)]
-    struct LightDarkThemes(Rc<RefCell<Vec<Theme>>>);
 
     let themes: Stateful<Vec<Sc<Theme>>> = Stateful::new(vec![]);
     let c_themes = themes.clone_writer();
@@ -193,7 +188,7 @@ mod tests {
                     @MockBox {
                       size: ZERO_SIZE,
                       @ {
-                        *$c_themes.write() = ctx!().themes().clone();
+                        Clone::clone_from(&mut *$c_themes.write(), ctx!().themes());
                         Void.build(ctx!())
                       }
                     }

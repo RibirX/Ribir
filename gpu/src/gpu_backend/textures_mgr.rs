@@ -553,9 +553,8 @@ pub mod tests {
   use super::*;
   use crate::{WgpuImpl, WgpuTexture};
   use futures::executor::block_on;
-  use ribir_algo::ShareResource;
   use ribir_geom::*;
-  use ribir_painter::{image::ColorFormat, AntiAliasing, Color, Path};
+  use ribir_painter::Color;
   use std::borrow::Cow;
 
   pub fn color_image(color: Color, width: u32, height: u32) -> ShareResource<PixelImage> {

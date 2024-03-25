@@ -205,7 +205,6 @@ mod tests {
   use crate::{
     prelude::*,
     test_helper::{MockBox, TestWindow},
-    widget::TreeArena,
   };
 
   define_widget_context!(TestCtx);

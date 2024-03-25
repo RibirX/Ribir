@@ -1,12 +1,10 @@
 //! Theme use to share visual config or style compose logic. It can be defined
 //! to app-wide or particular part of the application.
 
-use crate::{fill_svgs, prelude::*, widget::WidgetBuilder};
+use crate::{fill_svgs, prelude::*};
 use ribir_algo::Sc;
 pub use ribir_algo::{CowArc, ShareResource};
-use ribir_geom::Size;
 use ribir_macros::Declare;
-use ribir_text::TextStyle;
 use std::{collections::HashMap, rc::Rc};
 
 mod palette;

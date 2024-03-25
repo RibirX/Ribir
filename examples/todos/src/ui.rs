@@ -1,5 +1,5 @@
 use crate::todos::{Task, Todos};
-use ribir::prelude::{svgs, *};
+use ribir::prelude::*;
 use std::time::Duration;
 
 impl Compose for Todos {
