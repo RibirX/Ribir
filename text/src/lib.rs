@@ -2,7 +2,6 @@
 //! shape and do simple layout for text. It's focus
 //!
 //! Some detail processing learn from [usvg](https://github.com/RazrFalcon/resvg/blob/master/usvg/src/text)
-#![feature(test)]
 pub mod font_db;
 pub mod shaper;
 use derive_more::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};

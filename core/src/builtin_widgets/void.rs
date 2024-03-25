@@ -20,17 +20,3 @@ impl Render for Void {
     HitTest { hit: false, can_hit_child: true }
   }
 }
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::test_helper::*;
-  use ribir_dev_helper::*;
-  extern crate test;
-  use test::Bencher;
-
-  /// Measures the time required to build and layout an `Void` widget, and other
-  /// widget can subtract this time to obtain their own real time
-  fn base() -> impl WidgetBuilder { fn_widget!(Void) }
-  widget_bench!(base);
-}

@@ -365,11 +365,8 @@ impl<'a> FallBackFaceHelper<'a> {
 
 #[cfg(test)]
 mod tests {
-
   use super::*;
   use crate::{FontFace, FontFamily};
-  extern crate test;
-  use test::Bencher;
 
   #[test]
   fn smoke() {
@@ -509,23 +506,6 @@ mod tests {
       assert!(res.glyphs.len() == 8);
       assert!(res.glyphs.iter().all(|glyph| glyph.is_not_miss()));
     }
-  }
-
-  #[bench]
-  fn shape_1k(bencher: &mut Bencher) {
-    let shaper = TextShaper::new(<_>::default());
-    shaper.font_db.borrow_mut().load_system_fonts();
-
-    let ids = shaper.font_db.borrow_mut().select_all_match(&FontFace {
-      families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
-      ..<_>::default()
-    });
-
-    bencher.iter(|| {
-      shaper.shape_cache.borrow_mut().clear();
-      let str = include_str!("../../LICENSE").into();
-      shaper.shape_text(&str, &ids, TextDirection::LeftToRight)
-    })
   }
 
   #[test]
