@@ -1,3 +1,4 @@
+use crate::ticker::Instant;
 use crate::{
   context::AppCtx,
   events::{
@@ -20,7 +21,6 @@ use std::{
   collections::VecDeque,
   convert::Infallible,
   rc::Rc,
-  time::Instant,
 };
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 pub use winit::window::CursorIcon;

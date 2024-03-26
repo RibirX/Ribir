@@ -4,7 +4,6 @@ use rxrust::{ops::box_it::BoxOp, prelude::*};
 use std::{
   cell::{Cell, RefCell},
   convert::Infallible,
-  time::Instant,
 };
 
 use super::WriterControl;

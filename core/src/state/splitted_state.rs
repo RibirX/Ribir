@@ -4,6 +4,7 @@ use super::{
 use crate::prelude::AppCtx;
 use crate::{
   context::BuildCtx,
+  ticker::Instant,
   widget::{Render, RenderBuilder, Widget},
 };
 use ribir_algo::Sc;
@@ -11,10 +12,7 @@ use rxrust::{
   ops::box_it::BoxOp,
   prelude::{BoxIt, ObservableExt},
 };
-use std::{
-  cell::{Cell, RefMut},
-  time::Instant,
-};
+use std::cell::{Cell, RefMut};
 
 /// A writer splitted writer from another writer, and has its own notifier.
 pub struct SplittedWriter<O, R, W> {

@@ -1,12 +1,13 @@
 use crate::{
   context::BuildCtx,
   render_helper::{RenderProxy, RenderTarget},
+  ticker::Instant,
   widget::{Render, RenderBuilder, Widget},
 };
 
 use super::{ModifyScope, ReadRef, StateReader, StateWriter, WriteRef};
 use rxrust::ops::box_it::BoxOp;
-use std::{cell::RefMut, convert::Infallible, time::Instant};
+use std::{cell::RefMut, convert::Infallible};
 
 /// A state reader that map a reader to another by applying a function on the
 /// value. This reader is the same reader with the origin reader, It's also have

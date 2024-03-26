@@ -28,6 +28,9 @@ tiny-skia-path = {workspace = true}
 usvg.workspace = true
 zerocopy = {workspace = true, optional = true, features = ["derive"]}
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom.workspace = true
+
 [features]
 png = ["image/png"]
 tessellation = ["lyon_tessellation", "zerocopy"]

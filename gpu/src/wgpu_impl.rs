@@ -6,14 +6,14 @@ use self::{
   storage::Storage,
 };
 use crate::{
-  gpu_backend::Texture, ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex,
-  ImgPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer,
+  gpu_backend::Texture, ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImageFuture,
+  ImagePrimIndex, ImgPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer,
   RadialGradientPrimIndex, RadialGradientPrimitive,
 };
-use futures::{channel::oneshot, Future};
+use futures::channel::oneshot;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::{image::ColorFormat, AntiAliasing, Color, PixelImage, VertexBuffers};
-use std::{error::Error, num::NonZeroU32, ops::Range, pin::Pin};
+use std::{num::NonZeroU32, ops::Range};
 mod buffer_pool;
 mod storage;
 mod vertex_buffer;
@@ -372,7 +372,7 @@ impl WgpuTexture {
     };
 
     let view = self.view();
-    let ops = wgpu::Operations { load, store: true };
+    let ops = wgpu::Operations { load, store: wgpu::StoreOp::Store };
 
     if let Some(multi_sample) = &self.multisampler_view {
       wgpu::RenderPassColorAttachment {
@@ -481,11 +481,7 @@ impl Texture for WgpuTexture {
     );
   }
 
-  fn copy_as_image(
-    &self,
-    rect: &DeviceRect,
-    backend: &mut Self::Host,
-  ) -> Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>> + Send + Sync>> {
+  fn copy_as_image(&self, rect: &DeviceRect, backend: &mut Self::Host) -> ImageFuture {
     let width = rect.width();
     let height = rect.height();
     let format = self.color_format();
@@ -582,7 +578,7 @@ impl WgpuImpl {
     Self::new(instance, None).await
   }
 
-  pub async fn new(instance: wgpu::Instance, surface: Option<&wgpu::Surface>) -> WgpuImpl {
+  pub async fn new(instance: wgpu::Instance, surface: Option<&wgpu::Surface<'_>>) -> WgpuImpl {
     let adapter = instance
       .request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::default(),
@@ -596,9 +592,9 @@ impl WgpuImpl {
       .request_device(
         &wgpu::DeviceDescriptor {
           label: Some("Request device"),
-          features: wgpu::Features::TEXTURE_BINDING_ARRAY
+          required_features: wgpu::Features::TEXTURE_BINDING_ARRAY
             | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
-          limits: Default::default(),
+          required_limits: Default::default(),
         },
         None,
       )
