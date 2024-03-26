@@ -20,9 +20,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 <!-- next-header -->
 
-## [@Unreleased](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0-beta.7...HEAD) - @ReleaseDate
+## [@Unreleased](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0...HEAD) - @ReleaseDate
 
-## [0.1.0-beta.7](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0-alpha.0...ribir-v0.1.0-beta.7) - 2024-02-02
+## [0.1.0](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0-beta.7...ribir-v0.1.0) - 2024-03-26
 
 🎉🎉🎉 The first version of Ribir.
 
@@ -55,7 +55,7 @@ We are very happy to share it with you. We hope you can try it out and give us f
 
 ### Documented
 
-<!-- next-url -->
-
 - **introduction**: add `introduction.md` to introduce Ribir and why choose it.
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
+
+<!-- next-url -->
