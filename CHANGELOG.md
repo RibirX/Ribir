@@ -111,7 +111,7 @@ While these are public APIs, they are typically not required for direct use in u
 
 - fix broken links and format the example code (#526 @M-Adoo)
 
-## [0.1.0-beta.7](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0-alpha.0...ribir-v0.1.0-beta.7) - 2024-02-02
+## [0.1.0](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.2.0-alpha.7) - 2024-03-26
 
 🎉🎉🎉 The first version of Ribir.
 
@@ -148,7 +148,6 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 
-<!-- next-url -->
 [@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.7...HEAD
 [0.2.0-alpha.7]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.6...ribir-v0.2.0-alpha.7
 [0.2.0-alpha.6]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.5...ribir-v0.2.0-alpha.6
@@ -156,3 +155,5 @@ We are very happy to share it with you. We hope you can try it out and give us f
 [0.2.0-alpha.4]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.3...ribir-v0.2.0-alpha.4
 [0.2.0-alpha.3]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.2...ribir-v0.2.0-alpha.3
 [0.2.0-alpha.2]: https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.1...ribir-v0.2.0-alpha.2
+
+<!-- next-url -->
