@@ -25,16 +25,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased](https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-beta.1...HEAD) - @ReleaseDate
 
-## [0.2.0-beta.1](https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-alpha.7...ribir-v0.2.0-beta.1) - 2024-03-26
+
+## [0.2.0-beta.1](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0...ribir-v0.2.0-beta.1) - 2024-03-26
 
 ### Documented
 
 - fix broken links and format the example code (\#526 @M-Adoo)
-
 - **ribir**: We no longer auto-generate the built-in list document, as `FatObj` lists all. Its API documentation is sufficient. (\#540 @M-Adoo)
-
 - **Ribir**: Added guide "Using Ribir without 'DSL'" (\#545 @M-Adoo)
-
 - **Ribir**: Added a roadmap. (\#550, @M-Adoo)
 
 ### Breaking
@@ -46,18 +44,15 @@ While these are public APIs, they are typically not required for direct use in u
 - **core**: removed `FatObj::unzip` and `FatObj::from_host` (\#535 @M-Adoo)
 - **core**: removed `BuiltinObj`. (\#535 @M-Adoo)
 - **core**: `FatObj::new(host: T, builtin: BuiltinObj)` -\> `FatObj::new(host: T)`
-
 - **core**: rename `DeclareBuilder` to `ObjDeclarer` (\#547 @M-Adoo)
 - **core**: rename `DeclareBuilder::build_declare` to `ObjDeclarer::finish` (\#547 @M-Adoo)
-
-\_ **core**: rename `Declare::declare_builder` to `Declare::declarer` (\#547 @M-Adoo)
-
+- **core**: rename `Declare::declare_builder` to `Declare::declarer` (\#547 @M-Adoo)
 - **core**: Renamed the `widget_build` method to `build` for brevity, given its frequent usage. (\#549 @M-Adoo)
 
 ### Features
 
 - Support the overlay (@wjian23).
-  
+
   This enhancement simplifies the creation of overlay widgets. It streamlines the addition of any widget to an overlay and offers a more user-friendly API for overlay management
 
 - **macros**: Generates documentation for the builder methods of members in `#[derive(Declare)]`, thus improving IDE support.(\#538 @M-Adoo)
@@ -83,11 +78,10 @@ While these are public APIs, they are typically not required for direct use in u
 - **core**: StateReader now automatically unsubscribes when no writer is present (\#532 @wjian23)
 - **core**: Consolidated all listener and `FocusNode` into a `MixBuiltin` widget (\#534 @M-Adoo)
   - The `MixBuiltin` widget reduces memory usage and allows users to utilize all `on_xxx` event handlers, not only during the build declaration but also after the widget has been built.
-
 - **core**: removed `MixBuiltinDeclarer`, which is no longer needed. (\#538 @M-Adoo)
 - **macros**: removed crate `ribir_builtin` that is no longer needed. (\#535 @M-Adoo)
 
-## [0.1.0](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.2.0-alpha.7) - 2024-03-26
+## [0.1.0](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.1.0) - 2024-03-26
 
 🎉🎉🎉 The first version of Ribir.
 
