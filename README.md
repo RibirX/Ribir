@@ -40,7 +40,7 @@ A simple example of a counter:
     <td style="padding:10px">
       <div>
 
-``` rust
+``` rust no_run
 use ribir::prelude::*;
 fn main() {
   let counter = fn_widget! {
@@ -66,7 +66,7 @@ fn main() {
 
 **To use Ribir without DSL**:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
