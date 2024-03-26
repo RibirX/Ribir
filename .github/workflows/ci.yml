@@ -1,6 +1,7 @@
 on:
   merge_group:
   pull_request:
+    types: [synchronize, labeled, reopened, ready_for_review]
   push:
     branches:
       - master
@@ -14,6 +15,7 @@ env:
 name: CI
 jobs:
   lint:
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'B-test')
     name: rust code lint
     runs-on: ubuntu-latest
     steps:
@@ -21,18 +23,23 @@ jobs:
         uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly-2023-10-15
+          # we use nightly for clippy and rustfmt
+          toolchain: nightly-2024-03-25
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: format style check
         run: cargo fmt --all -- --check
       - name: cargo clippy check
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: cargo check
-        run: cargo check
+        run: cargo clippy --all-targets --all-features -- -D warnings\
+      # Check with stable toolchain to ensure stable compilation
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - run: cargo check
   self-host:
     name: Test Suite
     needs: lint
+    # Uses nightly toolchain to test all features, including nightly
     uses: RibirX/share-workflows/.github/workflows/ribir-win-image-tests.yaml@main
   doc-examples:
     needs: lint
@@ -43,7 +50,7 @@ jobs:
         uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly-2023-10-15
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - name: build ribir
         run: cargo build
@@ -52,4 +59,4 @@ jobs:
           {
             echo ./README.md
             find "./docs" -name "*.md"
-          } |  xargs -I {} rustdoc -Z unstable-options --test --no-run  {} -L target/debug/deps/  --edition 2018 --extern ribir=target/debug/libribir.rlib
+          } |  xargs -I {} rustdoc --test {} -L target/debug/deps/  --edition 2018 --extern ribir=target/debug/libribir.rlib
