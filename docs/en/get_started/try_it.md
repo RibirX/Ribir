@@ -13,9 +13,6 @@ sidebar_position: 1
 
 At first, you need to install Rust, you can reference the [official documentation](https://www.rust-lang.org/tools/install).
 
-> Tips
->
-> Currently Ribir only supports Rust nightly channel. You can use `rustup override set nightly` to switch to nightly channel. If you haven't installed nightly channel yet, you can check out [rustup Channels documentation](https://rust-lang.github.io/rustup/concepts/channels.html).
 
 ## Create a new Ribir project
 
@@ -39,7 +36,7 @@ Or you can directly run `cargo add --git "https://github.com/RibirX/Ribir" ribir
 
 Open your editor and modify the `src/main.rs` file to:
 
-```rust
+```rust no_run
 // main.rs
 use ribir::prelude::*;
 

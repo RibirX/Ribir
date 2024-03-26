@@ -25,15 +25,17 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
-## [0.3.0-alpha.1](https://github.com/RibirX/Ribir/compare/ribir-v0.2.0-beta.1...ribir-v0.3.0-alpha.1) - 2024-03-27
+
+### Features
+- **ribir**: support stable Rust 1.77.0 (#552 @M-Adoo)
 
 
 ## [0.2.0-beta.1](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0...ribir-v0.2.0-beta.1) - 2024-03-26
 
 ### Features
 
-- **macros**: Added a `include_crate_svg!` macro to include the svg relative to current crate. (#pr, @M-Adoo)
-- **ribir**: Added a `nightly` feature to enable functionalities that require nightly Rust. (#pr, @M-Adoo)
+- **macros**: Added a `include_crate_svg!` macro to include the svg relative to current crate. (#552, @M-Adoo)
+- **ribir**: Added a `nightly` feature to enable functionalities that require nightly Rust. (#552, @M-Adoo)
   - The `include_crates_svg!` macro can operate without the `nightly` feature.
   - The `include_svg!` macro requires the `nightly` feature to be enabled.
 
@@ -41,8 +43,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - fix broken links and format the example code (\#526 @M-Adoo)
 - **ribir**: We no longer auto-generate the built-in list document, as `FatObj` lists all. Its API documentation is sufficient. (\#540 @M-Adoo)
-- **Ribir**: Added guide "Using Ribir without 'DSL'" (\#545 @M-Adoo)
-- **Ribir**: Added a roadmap. (\#550, @M-Adoo)
+- **ribir**: Added guide "Using Ribir without 'DSL'" (\#545 @M-Adoo)
+- **ribir**: Added a roadmap. (\#550, @M-Adoo)
 
 ### Breaking
 

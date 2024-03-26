@@ -15,10 +15,6 @@ sidebar_position: 1
 
 首先, 你需要安装 Rust，你可以参考 [Rust 官方文档](https://www.rust-lang.org/tools/install).
 
-> 提示
->
-> 目前 Ribir 只支持 Rust nightly 版本。 你可以使用 `rustup override set nightly` 切换到 nightly 通道。如果你还没有安装 nightly 通道，可以查看 [rustup Channels 文档](https://rust-lang.github.io/rustup/concepts/channels.html)。
-
 ## 新建 Ribir 项目
 
 然后，打开你的终端，创建一个新的 Rust 项目:
@@ -41,7 +37,7 @@ ribir = "@RIBIR_VERSION"
 
 打开编辑器, 将 `src/main.rs` 文件修改为:
 
-```rust
+```rust no_run
 // main.rs
 use ribir::prelude::*;
 

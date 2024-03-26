@@ -40,7 +40,7 @@ A function widget is the simplest way to define a widget without external state 
 
 A function widget can be defined directly through a function:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn hello_world(ctx!(): &BuildCtx) -> Widget {
@@ -68,7 +68,7 @@ Finally, build `Text` into `Widget` through the `build` method as the return val
 
 Because `hello_world` is not called by anyone else, you can rewrite it as a closure:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -94,7 +94,7 @@ move |ctx!(): &BuildCtx| -> Widget {
 The `hello_world` example is rewritten with `fn_widget`!`:
 
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -144,7 +144,7 @@ You already know how to create a widget, and now we will compose a simple counte
 You can nest additional `rdl!` instances as children within the widget declared by the structure literal. Please note that child widgets must always be declared after the parent widget's properties. This is a formatting requirement of `rdl!`.
 
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -167,7 +167,7 @@ In the above example, we created a `Row` with two child nodes, `FilledButton` an
 
 `rdl!` also allows you to declare children for widgets that have already been created:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -221,7 +221,7 @@ let _ = fn_widget! {
 
 At this point, let's review the previous example:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -245,7 +245,7 @@ Fortunately, Ribir offers a syntactic sugar, `@`, as an alternative to `rdl!`. I
 
 Now let's rewrite the previous example of Counter using `@`:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -279,7 +279,7 @@ The complete life cycle of an interactive Ribir widget is as follows:
 
 Now, let's improve our example by introducing the state.
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -387,7 +387,7 @@ Suppose you have a counter that doesn't display the count with numbers, but inst
 
 The code:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -452,7 +452,7 @@ The update push of the `Pipe` stream is built on top of the RxRust stream, so th
 
 Let's say you have a simple auto-sum example:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -499,7 +499,7 @@ In short:
 
 Of course, you can also use `watch!` to implement your counter:
   
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -528,7 +528,7 @@ Typically, in complex real-world scenarios, you can't complete all development t
 
 Using the `Compose` widget, the Counter example can be rewritten as:
 
-```rust
+```rust no_run
 use  ribir::prelude::*;
 
 struct Counter(usize);
@@ -569,7 +569,7 @@ Ribir provides a set of built-in widgets that allow you to configure basic style
 Let's take `Margin` as an example. Suppose you want to set a 10-pixel blank margin for a `Text`, the code is as follows:
 
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -585,7 +585,7 @@ fn main() {
 
 But you don't have to explicitly declare a `Margin`, you can write it directly as:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -601,7 +601,7 @@ fn main() {
 
 When you create a widget declaratively, you can directly access the fields of the built-in widget, even if you don't explicitly declare them (if you use them in your code, the corresponding built-in widget will be created). For example:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {

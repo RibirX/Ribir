@@ -34,6 +34,7 @@ keywords = ["gui", "ui", "declarative", "compose-ui"]
 license = "MIT"
 readme = "README.md"
 version = "0.3.0-alpha.1"
+package.rust-version = "1.77.0"
 
 [workspace.dependencies]
 ahash = "0.8.11"
