@@ -33,7 +33,7 @@ homepage = "https://ribir.org"
 keywords = ["gui", "ui", "declarative", "compose-ui"]
 license = "MIT"
 readme = "README.md"
-version = "0.3.0-alpha.0"
+version = "0.3.0-alpha.1"
 
 [workspace.dependencies]
 ahash = "0.8.3"
