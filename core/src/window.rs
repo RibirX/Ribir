@@ -1,20 +1,12 @@
 use crate::{
-  context::AppCtx,
   events::{
     dispatcher::Dispatcher,
     focus_mgr::{FocusManager, FocusType},
   },
   prelude::*,
   ticker::{FrameMsg, FrameTicker},
-  widget::WidgetId,
-  widget_tree::WidgetTree,
 };
-use futures::{
-  task::{LocalSpawnExt, SpawnError},
-  Future,
-};
-use ribir_geom::Point;
-use rxrust::{scheduler::FuturesLocalScheduler, subject::Subject};
+use futures::{task::LocalSpawnExt, Future};
 use std::{
   cell::{Cell, RefCell},
   collections::VecDeque,

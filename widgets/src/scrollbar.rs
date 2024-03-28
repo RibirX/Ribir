@@ -1,4 +1,4 @@
-use crate::layout::{Container, Stack, StackFit};
+use crate::layout::{Stack, StackFit};
 use ribir_core::prelude::*;
 
 /// A control widget that enables the user to access horizontal parts child that
@@ -55,7 +55,7 @@ impl ComposeChild for HScrollBar {
         scroll_pos: Point::new($this.offset, 0.),
       };
       let scrollbar = @HRawScrollbar {
-        scrolling: scrolling.get_scrollable_widget().clone_reader(),
+        scrolling: scrolling.get_scrollable_widget().clone_watcher(),
         v_align: VAlign::Bottom,
       };
 
@@ -98,7 +98,7 @@ impl ComposeChild for VScrollBar {
       };
 
       let scrollbar = @VRawScrollbar {
-        scrolling: scrolling.get_scrollable_widget().clone_reader(),
+        scrolling: scrolling.get_scrollable_widget().clone_watcher(),
         h_align: HAlign::Right
       };
 
@@ -139,11 +139,11 @@ impl ComposeChild for BothScrollbar {
         scroll_pos: $this.offset,
       };
       let mut h_bar = @HRawScrollbar {
-        scrolling: scrolling.get_scrollable_widget().clone_reader(),
+        scrolling: scrolling.get_scrollable_widget().clone_watcher(),
         v_align: VAlign::Bottom,
       };
       let mut v_bar = @VRawScrollbar {
-        scrolling: scrolling.get_scrollable_widget().clone_reader(),
+        scrolling: scrolling.get_scrollable_widget().clone_watcher(),
         h_align: HAlign::Right,
         margin: EdgeInsets::only_bottom($h_bar.layout_height())
       };
@@ -170,14 +170,14 @@ impl ComposeChild for BothScrollbar {
 /// `scrolling` widget.
 #[derive(Declare)]
 pub struct HRawScrollbar {
-  scrolling: Reader<ScrollableWidget>,
+  scrolling: Watcher<Reader<ScrollableWidget>>,
 }
 
 impl Compose for HRawScrollbar {
   fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
     fn_widget! {
       @ {
-        let scrolling = $this.scrolling.clone_reader();
+        let scrolling = $this.scrolling.clone_watcher();
         let ScrollBarStyle {
           thickness,
           thumb_min_size,
@@ -231,14 +231,14 @@ impl Compose for HRawScrollbar {
 /// `scrolling` widget.
 #[derive(Declare)]
 pub struct VRawScrollbar {
-  scrolling: Reader<ScrollableWidget>,
+  scrolling: Watcher<Reader<ScrollableWidget>>,
 }
 
 impl Compose for VRawScrollbar {
   fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
     fn_widget! {
       @ {
-        let scrolling = $this.scrolling.clone_reader();
+        let scrolling = $this.scrolling.clone_watcher();
         let ScrollBarStyle {
           thickness,
           thumb_min_size,

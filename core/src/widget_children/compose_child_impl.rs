@@ -168,9 +168,9 @@ where
 
 #[cfg(test)]
 mod tests {
-
   use super::*;
-  use crate::{pipe::BoxPipe, prelude::*, test_helper::MockBox};
+  use crate::{prelude::*, test_helper::MockBox};
+
   #[derive(Template)]
   struct PTml {
     _child: CTml,

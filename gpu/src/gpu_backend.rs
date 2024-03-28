@@ -1,4 +1,3 @@
-use self::textures_mgr::{TextureID, TexturesMgr};
 use crate::{
   ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex, ImgPrimitive,
   LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, RadialGradientPrimIndex,
@@ -531,7 +530,7 @@ mod tests {
   use ribir_algo::ShareResource;
   use ribir_dev_helper::*;
   use ribir_geom::*;
-  use ribir_painter::{Brush, Color, Painter, Path, PixelImage, Svg};
+  use ribir_painter::{Brush, Painter, Path, Svg};
 
   fn painter(bounds: Size) -> Painter { Painter::new(Rect::from_size(bounds)) }
 

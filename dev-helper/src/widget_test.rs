@@ -29,7 +29,6 @@ macro_rules! widget_test_suit {
       })+
     );
     widget_image_test!($widget_fn, wnd_size = $size,);
-    widget_bench!($widget_fn, wnd_size = $size,);
   };
 
   (
@@ -253,33 +252,7 @@ macro_rules! widget_image_test {
   };
 }
 
-/// This macro accepts a function that returns a widget to generate a benchmark
-/// for the returning widget.
-#[macro_export]
-macro_rules! widget_bench {
-  (
-    $widget_fn: ident,
-    wnd_size = $size: expr $(,)?
-  ) => {
-    paste::paste! {
-      #[cfg(test)]
-      #[bench]
-      fn [<$widget_fn _widget_bench>](b: &mut Bencher) {
-        let _scope = unsafe { AppCtx::new_lock_scope() };
-        // init app context before benchmark
-        let _ = AppCtx::shared();
-        b.iter(move || {
-          let mut wnd = TestWindow::new_with_size($widget_fn(), $size);
-          wnd.draw_frame();
-        });
-      }
-    }
-  };
-  ($widget_fn: ident $(,)?) => {
-    widget_bench!($widget_fn, wnd_size = ribir_geom::Size::new(128., 128.));
-  };
-}
-
+#[allow(clippy::test_attr_in_doctest)]
 /// Macro is used to check if the layout information of a widget is as expected.
 /// At first, it accepts a `TestWindow` that contains the widgets you want to
 /// test. Then use a pair of braces to describe the layout information of a

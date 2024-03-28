@@ -54,6 +54,7 @@ pub struct AppCtx {
   tokio_runtime: tokio::runtime::Runtime,
 }
 
+#[allow(dead_code)]
 pub struct AppCtxScopeGuard(MutexGuard<'static, ()>);
 
 static mut INIT_THREAD_ID: Option<ThreadId> = None;
@@ -226,7 +227,6 @@ impl AppCtx {
 
     let locker = LOCK.lock().unwrap_or_else(|e| {
       // Only clear for test, so we have a clear error message.
-      #[cfg(test)]
       LOCK.clear_poison();
 
       e.into_inner()
@@ -534,14 +534,7 @@ pub mod tokio_async {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use futures::Future;
-  use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::Arc,
-    sync::Mutex,
-    task::{Poll, Waker},
-  };
+  use std::{sync::Arc, task::Poll};
 
   #[derive(Default)]
   struct Trigger {

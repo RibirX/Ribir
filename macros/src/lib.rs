@@ -1,10 +1,10 @@
-#![feature(proc_macro_diagnostic, proc_macro_span)]
+#![cfg_attr(feature = "nightly", feature(proc_macro_span))]
+
 extern crate proc_macro;
 
 mod declare_derive;
 mod lerp_derive;
 mod util;
-use fn_widget_macro::FnWidgetMacro;
 use proc_macro::TokenStream;
 use quote::quote;
 use symbol_process::DollarRefsCtx;
@@ -19,8 +19,6 @@ mod watch_macro;
 mod writer_map_macro;
 pub(crate) use rdl_macro::*;
 
-use crate::pipe_macro::PipeMacro;
-use crate::watch_macro::WatchMacro;
 pub(crate) mod declare_obj;
 pub(crate) mod symbol_process;
 
@@ -184,7 +182,7 @@ pub fn rdl(input: TokenStream) -> TokenStream {
 /// use to expression a state reference of `name`.
 #[proc_macro]
 pub fn fn_widget(input: TokenStream) -> TokenStream {
-  FnWidgetMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  fn_widget_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// This macro just return the input token stream. It's do nothing but help
@@ -209,14 +207,14 @@ pub fn ctx(input: TokenStream) -> TokenStream {
 /// to its modify.
 #[proc_macro]
 pub fn pipe(input: TokenStream) -> TokenStream {
-  PipeMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// `watch!` macro use to convert a expression to a `Observable` stream. Use the
 /// `$` mark the state reference and auto subscribe to its modify.
 #[proc_macro]
 pub fn watch(input: TokenStream) -> TokenStream {
-  WatchMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  watch_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// macro split a new writer from a state writer. For example,
@@ -237,25 +235,57 @@ pub fn map_writer(input: TokenStream) -> TokenStream {
   writer_map_macro::gen_map_path_writer(input.into(), &mut DollarRefsCtx::top_level())
 }
 
+/// Includes an SVG file as an `Svg`.
+
+/// The file is located relative to the current crate (similar to the location
+/// of your `cargo.toml`). The provided path is interpreted in a
+/// platform-specific way at compile time. For example, a Windows path with
+/// backslashes \ would not compile correctly on Unix.
+
+/// This macro returns an expression of type `Svg`.
+#[proc_macro]
+pub fn include_crate_svg(input: TokenStream) -> TokenStream {
+  let file = parse_macro_input! { input as syn::LitStr };
+  let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+  let path = std::path::Path::new(&dir).join(file.value());
+  include_svg_from_path(path)
+}
+
+/// Includes an SVG file as an `Svg`.
+
+/// The file is located relative to the current file (similarly to how modules
+/// are found). The provided path is interpreted in a platform-specific way at
+/// compile time. For example, a Windows path with backslashes \ would not
+/// compile correctly on Unix.
+
+/// This macro returns an expression of type `Svg`.
+#[cfg(feature = "nightly")]
 #[proc_macro]
 pub fn include_svg(input: TokenStream) -> TokenStream {
-  let w = parse_macro_input! { input as syn::LitStr };
+  let rf = parse_macro_input! { input as syn::LitStr };
+
   let mut span = proc_macro::Span::call_site();
   while let Some(p) = span.parent() {
     span = p;
   }
   let mut file = span.source_file().path();
   file.pop();
-  file.push(w.value());
-  let encoded_bytes = ribir_painter::Svg::open(file).and_then(|reader| reader.serialize());
+  file.push(rf.value());
+
+  include_svg_from_path(file)
+}
+
+fn include_svg_from_path(path: std::path::PathBuf) -> TokenStream {
+  let encoded_bytes =
+    ribir_painter::Svg::open(path.as_path()).and_then(|reader| reader.serialize());
   match encoded_bytes {
     Ok(data) => quote! {
       Svg::deserialize(#data).unwrap()
     }
     .into(),
     Err(err) => {
-      let err = format!("{err}");
-      quote! { compile_error!(#err)}.into()
+      let err = format!("{err}({:?})", &path);
+      quote! { compile_error!(#err) }.into()
     }
   }
 }

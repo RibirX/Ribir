@@ -25,3 +25,7 @@ ribir_painter = {path = "../painter", version = "0.3.0-alpha.1" }
 smallvec.workspace = true
 syn = { workspace = true, features = ["fold", "full", "extra-traits"]}
 phf = { workspace = true, features = ["macros"] }
+
+
+[features]
+nightly = []

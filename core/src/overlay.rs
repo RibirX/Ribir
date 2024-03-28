@@ -2,14 +2,9 @@ use std::mem::replace;
 use std::time::Instant;
 use std::{cell::RefCell, rc::Rc};
 
-use ribir_geom::{Size, ZERO_SIZE};
 use ribir_macros::Query;
 
 use crate::prelude::*;
-use crate::{
-  context::{AppCtx, BuildCtx, LayoutCtx},
-  widget::{BoxClamp, Render, WidgetBuilder, WidgetId},
-};
 
 #[derive(Clone)]
 pub struct OverlayStyle {
@@ -314,12 +309,10 @@ impl Render for OverlayRoot {
 
 #[cfg(test)]
 mod tests {
+  use crate::{prelude::*, reset_test_env, test_helper::*};
+  use ribir_dev_helper::assert_layout_result_by_path;
   use std::{cell::RefCell, rc::Rc};
 
-  use crate::{prelude::*, reset_test_env, test_helper::*};
-
-  use ribir_dev_helper::assert_layout_result_by_path;
-  use ribir_geom::Size;
   #[test]
   fn overlay() {
     reset_test_env!();

@@ -597,7 +597,7 @@ impl VisualGlyphs {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{shaper::*, FontFace, FontFamily};
+  use crate::{shaper::*, FontFamily};
 
   fn test_face() -> FontFace {
     FontFace {

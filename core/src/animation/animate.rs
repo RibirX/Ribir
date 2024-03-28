@@ -187,7 +187,7 @@ where
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{animation::easing, reset_test_env, state::Stateful, test_helper::TestWindow};
+  use crate::{reset_test_env, test_helper::TestWindow};
   use std::time::Duration;
 
   #[test]

@@ -319,12 +319,11 @@ where
 {
   fn edit_area(
     this: &impl StateWriter<Value = Self>,
-    text: FatObj<State<Text>>,
+    mut text: FatObj<State<Text>>,
     scroll_dir: impl Pipe<Value = Scrollable> + 'static,
     placeholder: Option<State<Placeholder>>,
   ) -> impl WidgetBuilder {
     fn_widget! {
-      let mut text = @$text{};
       let layout_box = text.get_layout_box_widget().clone_reader();
       let only_text = text.clone_reader();
 
@@ -393,9 +392,7 @@ where
         @OnlySizedByParent {
           @SelectedHighLight {
             visible: pipe!($stack.has_focus()),
-            rects: pipe! {
-              $this.select_text_rect(&$only_text, $text.layout_size())
-            }
+            rects: pipe! { $this.select_text_rect(&$text, $text.layout_size()) }
           }
         }
       };

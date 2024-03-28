@@ -1,10 +1,7 @@
 pub(crate) use crate::widget_tree::*;
-use crate::{
-  context::{build_ctx::BuildCtxHandle, *},
-  prelude::*,
-};
-use ribir_algo::{Sc, ShareResource};
-use rxrust::ops::box_it::BoxOp;
+use crate::{context::*, prelude::*};
+use ribir_algo::Sc;
+use rxrust::ops::box_it::CloneableBoxOp;
 
 #[doc(hidden)]
 pub use std::{
@@ -210,7 +207,7 @@ impl Widget {
   /// `upstream` emit a modify event that contains `ModifyScope::FRAMEWORK`.
   pub(crate) fn dirty_subscribe(
     self,
-    upstream: BoxOp<'static, ModifyScope, Infallible>,
+    upstream: CloneableBoxOp<'static, ModifyScope, Infallible>,
     ctx: &BuildCtx,
   ) -> Self {
     let dirty_set = ctx.tree.borrow().dirty_set.clone();

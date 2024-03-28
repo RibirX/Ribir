@@ -1,10 +1,6 @@
-use crate::{prelude::*, widget_tree::WidgetTree, window::DelayEvent};
-use ribir_text::PIXELS_PER_EM;
+use crate::{prelude::*, window::DelayEvent};
 use std::rc::{Rc, Weak};
-use winit::{
-  event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent},
-  keyboard::ModifiersState,
-};
+use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
 pub(crate) struct Dispatcher {
   wnd: Weak<Window>,
@@ -288,9 +284,7 @@ impl DispatchInfo {
 mod tests {
   use super::*;
   use crate::{reset_test_env, test_helper::*};
-  use std::{cell::RefCell, rc::Rc};
-  use winit::event::WindowEvent;
-  use winit::event::{DeviceId, ElementState, MouseButton};
+  use std::cell::RefCell;
 
   struct Info {
     pos: Point,

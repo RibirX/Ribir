@@ -57,7 +57,8 @@ impl Svg {
               painter
                 .set_brush(brush.clone())
                 .apply_transform(&transform)
-                .fill_path(path.clone().transform(&transform.inverse().unwrap())); //&o_ts.then(&n_ts.inverse().unwrap())));
+                .fill_path(path.clone().transform(&transform.inverse().unwrap()));
+              //&o_ts.then(&n_ts.inverse().unwrap())));
             }
 
             if let Some(ref stroke) = p.stroke {
@@ -234,7 +235,7 @@ fn brush_from_usvg_paint(
   }
 }
 
-fn convert_to_gradient_stops(stops: &Vec<Stop>) -> Vec<GradientStop> {
+fn convert_to_gradient_stops(stops: &[Stop]) -> Vec<GradientStop> {
   assert!(!stops.is_empty());
 
   let mut stops: Vec<_> = stops

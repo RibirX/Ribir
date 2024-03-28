@@ -1,6 +1,5 @@
 use crate::{
   prelude::*,
-  widget_tree::TreeArena,
   window::{DelayEvent, WindowId},
 };
 
@@ -376,11 +375,7 @@ impl FocusManager {
       Skip,          // the node is not in the parent's sub-tree
     }
 
-    fn locate_position(
-      dst: &Vec<WidgetId>,
-      base: &Vec<WidgetId>,
-      arena: &TreeArena,
-    ) -> TreePosition {
+    fn locate_position(dst: &[WidgetId], base: &[WidgetId], arena: &TreeArena) -> TreePosition {
       assert!(dst.len() > 1);
       let cnt = dst
         .iter()
@@ -549,7 +544,7 @@ impl FocusManager {
 mod tests {
   use super::*;
   use crate::{reset_test_env, test_helper::*};
-  use std::{cell::RefCell, rc::Rc};
+  use std::cell::RefCell;
 
   #[test]
   fn two_auto_focus() {

@@ -7,9 +7,8 @@ pub mod key;
 use std::cell::Cell;
 
 pub use key::{Key, KeyWidget};
-pub mod image_widget;
-pub use image_widget::*;
 pub mod delay_drop;
+pub mod image_widget;
 pub use delay_drop::*;
 mod theme;
 use ribir_algo::Sc;
@@ -46,7 +45,7 @@ pub use align::*;
 pub mod fitted_box;
 pub use fitted_box::*;
 pub mod svg;
-pub use svg::*;
+
 pub mod has_focus;
 pub use has_focus::*;
 pub mod mouse_hover;
@@ -66,10 +65,7 @@ pub use mix_builtin::*;
 pub mod container;
 pub use container::*;
 
-use crate::{
-  prelude::*,
-  widget::{Widget, WidgetBuilder},
-};
+use crate::prelude::*;
 
 #[derive(Clone)]
 /// LazyWidgetId is a widget id that will be valid after widget build.

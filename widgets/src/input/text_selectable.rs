@@ -1,6 +1,3 @@
-use super::caret_state::CaretPosition;
-use super::CaretState;
-
 use super::glyphs_helper::TextGlyphsHelper;
 use crate::input::glyphs_helper::GlyphsHelper;
 use crate::input::selected_text::SelectedHighLight;
@@ -160,7 +157,7 @@ impl ComposeChild for TextSelectable {
       let high_light_rect = @ OnlySizedByParent {
         @ SelectedHighLight {
           rects: pipe! {
-            $this.select_text_rect(&$only_text, $text.layout_size())
+            $this.select_text_rect(&$text, $text.layout_size())
           }
         }
       };

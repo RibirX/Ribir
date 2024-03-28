@@ -35,7 +35,7 @@ jobs:
       level: 'alpha'
       ref: ${{ github.ref }}
       merge_changelog: false
-      toolchain: nightly-2023-10-15
+      toolchain: stable
     secrets:
       CRATE_RELEASE_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
       GITHUB_RELEASE_TOKEN: ${{ secrets.RIBIR_RELEASE }}

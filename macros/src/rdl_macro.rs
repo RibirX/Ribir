@@ -56,7 +56,6 @@ pub enum RdlParent {
 pub struct DeclareField {
   /// field member name.
   pub member: Ident,
-  pub colon_tk: Option<Colon>,
   pub value: Expr,
 }
 
@@ -160,14 +159,14 @@ impl Parse for RdlParent {
 impl Parse for DeclareField {
   fn parse(input: ParseStream) -> SynResult<Self> {
     let member: Ident = input.parse()?;
-    let colon_tk: Option<_> = input.parse()?;
+    let colon_tk: Option<Colon> = input.parse()?;
     let value = if colon_tk.is_none() {
       parse_quote!(#member)
     } else {
       input.parse()?
     };
 
-    Ok(DeclareField { member, colon_tk, value })
+    Ok(DeclareField { member, value })
   }
 }
 

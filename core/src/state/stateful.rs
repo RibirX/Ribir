@@ -1,6 +1,6 @@
 use crate::{prelude::*, render_helper::RenderProxy};
 use ribir_algo::Sc;
-use rxrust::{ops::box_it::BoxOp, prelude::*};
+use rxrust::{ops::box_it::CloneableBoxOp, prelude::*};
 use std::{
   cell::{Cell, RefCell},
   convert::Infallible,
@@ -72,11 +72,6 @@ impl<W: 'static> StateReader for Stateful<W> {
   #[inline]
   fn time_stamp(&self) -> Instant { self.info.last_modified.get() }
 
-  #[inline]
-  fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
-    self.info.notifier.raw_modifies()
-  }
-
   fn try_into_value(self) -> Result<W, Self> {
     if self.data.ref_count() == 1 {
       let data = self.data.clone();
@@ -87,6 +82,13 @@ impl<W: 'static> StateReader for Stateful<W> {
     } else {
       Err(self)
     }
+  }
+}
+
+impl<W: 'static> StateWatcher for Stateful<W> {
+  #[inline]
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+    self.info.notifier.raw_modifies()
   }
 }
 
@@ -127,9 +129,6 @@ impl<W: 'static> StateReader for Reader<W> {
   #[inline]
   fn time_stamp(&self) -> Instant { self.0.time_stamp() }
 
-  #[inline]
-  fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.0.raw_modifies() }
-
   fn try_into_value(self) -> Result<Self::Value, Self> {
     let inner = self.0.clone_writer().0;
     drop(self);
@@ -155,10 +154,14 @@ impl<W: 'static> StateReader for Writer<W> {
   fn time_stamp(&self) -> Instant { self.0.time_stamp() }
 
   #[inline]
-  fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.0.raw_modifies() }
-
-  #[inline]
   fn try_into_value(self) -> Result<Self::Value, Self> { self.0.try_into_value().map_err(Writer) }
+}
+
+impl<V: 'static> StateWatcher for Writer<V> {
+  #[inline]
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+    self.0.raw_modifies()
+  }
 }
 
 impl<V: 'static> StateWriter for Writer<V> {
@@ -330,7 +333,7 @@ impl<W: MultiChild + Render> MultiParent for Stateful<W> {
 }
 
 impl Notifier {
-  pub(crate) fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
+  pub(crate) fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
     self.0.clone().box_it()
   }
 
@@ -347,10 +350,10 @@ impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
+  use std::rc::Rc;
 
   use super::*;
-  use crate::{test_helper::*, timer::Timer};
+  use crate::test_helper::*;
 
   #[test]
   fn smoke() {

@@ -200,8 +200,6 @@ impl Lerp for FontSize {
 mod tests {
   use super::*;
 
-  extern crate test;
-  use test::Bencher;
   #[test]
   fn lerp_f32() {
     let eq = |f1: f32, f2: f32| (f1 - f2).abs() < f32::EPSILON;
@@ -250,15 +248,5 @@ mod tests {
   #[test]
   fn fix_avoid_calc_overflow() {
     assert_eq!(255u8.lerp(&0u8, 0.), 255);
-  }
-
-  #[bench]
-  fn bench_lerp_color(b: &mut Bencher) {
-    b.iter(|| {
-      let sum: u32 = (0..100)
-        .map(|i| Lerp::lerp(&Color::from_u32(i), &Color::from_u32(0xff_ff_ff), 0.3).into_u32())
-        .sum();
-      sum
-    })
   }
 }
