@@ -53,7 +53,7 @@ fn gen_path_partial_writer(
   // not use the result of the `$var`, so it ok.
   refs_ctx.new_dollar_scope(true);
   let expr = refs_ctx.fold_expr(expr);
-  let refs = refs_ctx.pop_dollar_scope(true);
+  let refs = refs_ctx.pop_dollar_scope(true, false);
 
   if refs.len() != 1 {
     quote_spanned! { expr.span() =>

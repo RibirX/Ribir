@@ -19,7 +19,6 @@ mod watch_macro;
 mod writer_map_macro;
 pub(crate) use rdl_macro::*;
 
-use crate::{pipe_macro::PipeMacro, watch_macro::WatchMacro};
 pub(crate) mod declare_obj;
 pub(crate) mod symbol_process;
 
@@ -208,14 +207,14 @@ pub fn ctx(input: TokenStream) -> TokenStream {
 /// to its modify.
 #[proc_macro]
 pub fn pipe(input: TokenStream) -> TokenStream {
-  PipeMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// `watch!` macro use to convert a expression to a `Observable` stream. Use the
 /// `$` mark the state reference and auto subscribe to its modify.
 #[proc_macro]
 pub fn watch(input: TokenStream) -> TokenStream {
-  WatchMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  watch_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// macro split a new writer from a state writer. For example,

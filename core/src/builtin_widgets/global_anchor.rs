@@ -27,10 +27,10 @@ impl ComposeChild for GlobalAnchor {
       let wid = child.lazy_id();
       watch!(($this.get_global_anchor(), $child.layout_size()))
         .sample(tick_of_layout_ready)
-        .subscribe(move |_| {
-          let size = $child.layout_size();
+        .subscribe(move |(_, size)| {
           let wnd_size = wnd.size();
           let base = wnd.map_to_global(Point::zero(), wid.assert_id());
+          // The global anchor may change during sampling, so we need to retrieve it again.
           let Anchor {x, y} = $this.get_global_anchor();
           let anchor = Anchor {
             x: x.map(|x| match x {
@@ -46,7 +46,8 @@ impl ComposeChild for GlobalAnchor {
             $child.write().anchor = anchor;
           }
         });
-      child.build(ctx!())
+
+      child
     }
   }
 }
