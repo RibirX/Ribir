@@ -1,7 +1,4 @@
-use crate::{
-  prelude::*,
-  widget::{Widget, WidgetBuilder},
-};
+use crate::{prelude::*, widget::Widget};
 mod compose_child_impl;
 mod multi_child_impl;
 mod single_child_impl;
@@ -384,7 +381,7 @@ mod tests {
 
   const FIX_OPTION_TEMPLATE_EXPECT_SIZE: Size = Size::new(100., 200.);
   fn fix_option_template() -> impl WidgetBuilder {
-    struct Field(String);
+    struct Field;
 
     #[derive(Template, Default)]
     pub struct ConfigTml {
@@ -400,7 +397,7 @@ mod tests {
       }
     }
 
-    fn_widget! { @Host { @{ Field("test".into()) } }}
+    fn_widget! { @Host { @{ Field } }}
   }
   widget_layout_test!(
     fix_option_template,

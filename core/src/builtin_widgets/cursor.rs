@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use winit::window::CursorIcon;
 
 /// `Cursor` is an attribute to assign an `cursor` to a widget.
 

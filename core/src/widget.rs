@@ -1,9 +1,6 @@
 pub(crate) use crate::widget_tree::*;
-use crate::{
-  context::{build_ctx::BuildCtxHandle, *},
-  prelude::*,
-};
-use ribir_algo::{Sc, ShareResource};
+use crate::{context::*, prelude::*};
+use ribir_algo::Sc;
 use rxrust::ops::box_it::BoxOp;
 
 #[doc(hidden)]

@@ -700,7 +700,7 @@ use invisible_return;
 #[cfg(test)]
 mod test {
   use super::*;
-  use ribir_geom::{rect, Size};
+  use ribir_geom::rect;
 
   fn painter() -> Painter { Painter::new(Rect::from_size(Size::new(512., 512.))) }
 

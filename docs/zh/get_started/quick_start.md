@@ -40,7 +40,7 @@ sidebar_position: 2
 
 直接通过函数来定义 widget：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn hello_world(ctx!(): &BuildCtx) -> Widget {
@@ -67,7 +67,7 @@ fn main() {
 
 因为 `hello_world` 并没有被其它人调用，所以你可以将它改写成一个闭包:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -93,7 +93,7 @@ move |ctx!(): &BuildCtx| -> Widget {
 使用 `fn_widget!` 改写 `hello_world` 例子:
 
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -143,7 +143,7 @@ fn use_rdl(ctx!(): &BuildCtx) {
 
 你可以在结构体字面量声明的 widget 中嵌入其它 `rdl!` 作为孩子，注意孩子总是被要求声明在父 widget 属性的后面，这是 `rdl!` 对格式的强制要求。
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -166,7 +166,7 @@ fn main() {
 
 `rdl!` 也允许你为已创建好的 widget 声明孩子: 
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -220,7 +220,7 @@ let _ = fn_widget! {
 
 到这里，回顾前文的例子：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -244,7 +244,7 @@ fn main() {
 
 现在用 `@` 改写上面的计数器的例子:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -279,7 +279,7 @@ fn main() {
 
 现在，让我们引入状态来改造我们的例子。
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -388,7 +388,7 @@ let sum = pipe!(*$a + *$b);
 
 代码：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -452,7 +452,7 @@ pipe!{
 
 假设你有一个简单的自动求和例子：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -500,7 +500,7 @@ fn main() {
 
 你也可以用 `watch!` 来手动实现你的计数器：
   
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -529,7 +529,7 @@ fn main() {
 
 将计数器的例子改写成使用 `Compose` widget 的形式：
 
-```rust
+```rust no_run
 use  ribir::prelude::*;
 
 struct Counter(usize);
@@ -569,7 +569,7 @@ Ribir 提供了一组内建 widget，让你可以配置基础的样式、响应�
 
 拿 `Margin` 举例，假设你要为一个 `Text` 设置 10 像素的空白边距，代码如下：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -585,7 +585,7 @@ fn main() {
 
 你其实不必显示声明一个 `Margin`, 你可以直接写成：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {
@@ -601,7 +601,7 @@ fn main() {
 
 当你通过声明式创建了一个 widget 后，你可以直接访问内建 widget 的字段，即使你并没有显示声明它们（如果你在代码中用到它们，相应的内建 widget 会被创建）。比如：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn main() {

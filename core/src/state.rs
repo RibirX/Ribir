@@ -8,7 +8,7 @@ use std::{
   cell::{Cell, Ref, RefCell, RefMut, UnsafeCell},
   convert::Infallible,
   mem::MaybeUninit,
-  ops::{Deref, DerefMut},
+  ops::DerefMut,
   time::Instant,
 };
 
@@ -470,12 +470,10 @@ impl_compose_builder!(SplittedWriter);
 
 #[cfg(test)]
 mod tests {
-  use std::cell::Cell;
-
   use ribir_algo::Sc;
 
   use super::*;
-  use crate::{context::AppCtx, reset_test_env, timer::Timer};
+  use crate::{reset_test_env, timer::Timer};
 
   struct Origin {
     a: i32,
@@ -692,8 +690,6 @@ mod tests {
       split_writer!($s.0)
     };
   }
-
-  use crate::state::{StateReader, StateWriter};
 
   #[test]
   fn reader_from_trait() {

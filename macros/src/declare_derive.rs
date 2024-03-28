@@ -17,7 +17,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
     return empty_impl(host, &stt.fields);
   }
 
-  let declarer = Declarer::new(host, &mut stt.fields, vis)?;
+  let declarer = Declarer::new(host, &mut stt.fields)?;
   let Declarer { name, fields, .. } = &declarer;
   // reverse name check.
   fields.iter().try_for_each(DeclareField::check_reserve)?;

@@ -1,5 +1,4 @@
-use super::easing::Easing;
-use crate::prelude::{BuildCtx, *};
+use crate::prelude::*;
 use ribir_algo::Sc;
 use std::time::Duration;
 

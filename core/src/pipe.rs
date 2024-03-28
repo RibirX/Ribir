@@ -1,22 +1,16 @@
 use ribir_algo::Sc;
-use rxrust::{
-  ops::box_it::BoxOp,
-  prelude::{BoxIt, ObservableExt, ObservableItem},
-  subscription::Subscription,
-};
+use rxrust::ops::box_it::BoxOp;
 use std::{
   cell::{Cell, RefCell, UnsafeCell},
   convert::Infallible,
-  ops::{Deref, Range, RangeInclusive},
+  ops::{Range, RangeInclusive},
 };
 
 use crate::{
-  builtin_widgets::{key::AnyKey, Void},
-  context::{BuildCtx, BuildCtxHandle},
+  builtin_widgets::key::AnyKey,
   prelude::*,
   render_helper::{RenderProxy, RenderTarget},
   ticker::FrameMsg,
-  widget::{Render, RenderBuilder, Widget, WidgetId},
 };
 
 type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
@@ -1111,7 +1105,6 @@ mod tests {
     prelude::*,
     reset_test_env,
     test_helper::*,
-    widget::TreeArena,
   };
 
   #[test]
@@ -1516,7 +1509,7 @@ mod tests {
 
     // the remove pined widget will paint and no layout when no changed
     let first_layout_cnt = removed[0].read().layout_cnt.get();
-    tasks.read().get(0).unwrap().write().pin = true;
+    tasks.read().first().unwrap().write().pin = true;
     removed.push(tasks.write().remove(0));
     wnd.draw_frame();
     assert_eq!(child_count(&wnd), 1);

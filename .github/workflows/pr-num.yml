@@ -1,6 +1,7 @@
 name: pr number
 permissions:
   contents: write
+  pull-requests: write
 on:
   pull_request:
     paths:
@@ -10,6 +11,16 @@ jobs:
   replace-pr-number:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.RIBIR_RELEASE }}
+          script: |
+            github.rest.issues.removeLabel({
+              issue_number: context.payload.pull_request.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: ['B-test']
+            })
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -29,3 +40,15 @@ jobs:
           git add .
           git commit --amend --no-edit
           git push -f
+      # Wait 3 seconds before adding label to trigger push event
+      - run: sleep 3s
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.RIBIR_RELEASE }}
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.payload.pull_request.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['B-test']
+            })

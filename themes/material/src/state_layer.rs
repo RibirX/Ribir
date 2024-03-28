@@ -1,5 +1,5 @@
 use ribir_core::prelude::*;
-use ribir_widgets::prelude::{Container, StackFit};
+use ribir_widgets::prelude::StackFit;
 use ribir_widgets::{layout::Stack, path::PathPaintKit};
 
 /// Widget that as an visual indicator of material design used to present the
