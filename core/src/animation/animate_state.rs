@@ -1,5 +1,5 @@
 use super::*;
-use crate::state::{ModifyScope, StateReader, StateWriter};
+use crate::state::{ModifyScope, StateWatcher, StateWriter};
 use rxrust::{observable::ObservableExt, ops::box_it::BoxOp, prelude::BoxIt};
 use std::convert::Infallible;
 
@@ -49,7 +49,7 @@ where
 
   #[inline]
   fn animate_state_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
-    StateReader::modifies(self)
+    StateWatcher::modifies(self)
   }
 }
 

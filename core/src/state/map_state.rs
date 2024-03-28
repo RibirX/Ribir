@@ -4,8 +4,8 @@ use crate::{
   widget::{Render, RenderBuilder, Widget},
 };
 
-use super::{ModifyScope, ReadRef, StateReader, StateWriter, WriteRef};
-use rxrust::ops::box_it::BoxOp;
+use super::{ModifyScope, ReadRef, StateReader, StateWatcher, StateWriter, WriteRef};
+use rxrust::ops::box_it::CloneableBoxOp;
 use std::{cell::RefMut, convert::Infallible, time::Instant};
 
 /// A state reader that map a reader to another by applying a function on the
@@ -46,9 +46,6 @@ macro_rules! impl_reader_trivial_methods {
     fn time_stamp(&self) -> Instant { self.origin.time_stamp() }
 
     #[inline]
-    fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> { self.origin.raw_modifies() }
-
-    #[inline]
     fn try_into_value(self) -> Result<Self::Value, Self>
     where
       Self::Value: Sized,
@@ -77,6 +74,20 @@ where
   W: Fn(&mut S::Value) -> &mut V + Clone,
 {
   impl_reader_trivial_methods!();
+}
+
+impl<V, W, RM, WM> StateWatcher for MapWriter<W, RM, WM>
+where
+  Self: 'static,
+  V: ?Sized,
+  W: StateWriter,
+  RM: Fn(&W::Value) -> &V + Clone,
+  WM: Fn(&mut W::Value) -> &mut V + Clone,
+{
+  #[inline]
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+    self.origin.raw_modifies()
+  }
 }
 
 impl<V, W, RM, WM> StateWriter for MapWriter<W, RM, WM>

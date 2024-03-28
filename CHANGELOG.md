@@ -27,7 +27,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 
 ### Features
-- **ribir**: support stable Rust 1.77.0 (#pr @M-Adoo)
+- **ribir**: support stable Rust 1.77.0 (#556 @M-Adoo)
 
 
 ## [0.2.0-beta.1](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0...ribir-v0.2.0-beta.1) - 2024-03-26

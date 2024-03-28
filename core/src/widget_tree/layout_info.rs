@@ -368,7 +368,7 @@ mod tests {
     let layout_order = Stateful::new(vec![]);
     let trigger = Stateful::new(Size::zero());
     let order = layout_order.clone_writer();
-    let size = trigger.clone_reader();
+    let size = trigger.clone_watcher();
     let w = fn_widget! {
       @MockBox {
         size: pipe!(*$size),
@@ -399,7 +399,7 @@ mod tests {
     reset_test_env!();
 
     let trigger = Stateful::new(Size::zero());
-    let size = trigger.clone_reader();
+    let size = trigger.clone_watcher();
     let w = fn_widget! {
       @OffsetBox {
         size: Size::new(100., 100.),
@@ -444,7 +444,7 @@ mod tests {
     let trigger = Stateful::new(Size::zero());
     let cnt = Rc::new(Cell::new(0));
     let cnt2 = cnt.clone();
-    let size = trigger.clone_reader();
+    let size = trigger.clone_watcher();
     let w = fn_widget! {
       @MockBox {
         size: Size::new(50., 50.),
@@ -489,7 +489,7 @@ mod tests {
     let pos = Rc::new(Cell::new(Point::zero()));
     let pos2 = pos.clone();
     let trigger = Stateful::new(Size::zero());
-    let size = trigger.clone_reader();
+    let size = trigger.clone_watcher();
     let w = fn_widget! {
       let w = @MockWidget {
         size: pipe!(*$size),

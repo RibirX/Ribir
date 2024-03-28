@@ -1,9 +1,8 @@
 use crate::fn_widget_macro;
-use crate::pipe_macro::PipeMacro;
 use crate::rdl_macro::RdlMacro;
+use crate::variable_names::ribir_suffix_variable;
 use crate::variable_names::{BuiltinMemberType, BUILTIN_INFOS};
 use crate::writer_map_macro::{gen_map_path_writer, gen_split_path_writer};
-use crate::{variable_names::ribir_suffix_variable, watch_macro::WatchMacro};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use smallvec::{smallvec, SmallVec};
@@ -38,11 +37,18 @@ pub struct BuiltinInfo {
   pub(crate) member: Ident,
 }
 
+#[derive(Hash, PartialEq, Eq, Debug, Clone, PartialOrd, Ord)]
+pub enum DollarUsedInfo {
+  Reader,
+  Watcher,
+  Writer,
+}
+
 #[derive(Hash, PartialEq, Eq, Debug, Clone)]
 pub struct DollarRef {
   pub name: Ident,
   pub builtin: Option<BuiltinInfo>,
-  pub write: bool,
+  pub used: DollarUsedInfo,
 }
 #[derive(Debug)]
 pub struct DollarRefsCtx {
@@ -299,7 +305,11 @@ impl Fold for DollarRefsCtx {
     if let Some(Some((name, mac))) = write_mac {
       mac.tokens = expand_write_method(name.to_token_stream());
       mark_macro_expanded(mac);
-      let dollar_ref = DollarRef { name, builtin: None, write: true };
+      let dollar_ref = DollarRef {
+        name,
+        builtin: None,
+        used: DollarUsedInfo::Writer,
+      };
       self.add_dollar_ref(dollar_ref);
       return i;
     }
@@ -311,14 +321,18 @@ impl Fold for DollarRefsCtx {
     if let Some(DollarMacro { name, .. }) = parse_dollar_macro(&mac) {
       mac.tokens = expand_read(name.to_token_stream());
       mark_macro_expanded(&mut mac);
-      let dollar_ref = DollarRef { name, builtin: None, write: false };
+      let dollar_ref = DollarRef {
+        name,
+        builtin: None,
+        used: DollarUsedInfo::Reader,
+      };
       self.add_dollar_ref(dollar_ref)
     } else if mac.path.is_ident(KW_WATCH) {
-      mac.tokens = WatchMacro::gen_code(mac.tokens, self).into();
+      mac.tokens = crate::watch_macro::gen_code(mac.tokens, self).into();
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PIPE) {
       self.mark_used_ctx();
-      mac.tokens = PipeMacro::gen_code(mac.tokens, self).into();
+      mac.tokens = crate::pipe_macro::gen_code(mac.tokens, self).into();
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_RDL) {
       self.mark_used_ctx();
@@ -346,7 +360,7 @@ impl Fold for DollarRefsCtx {
       Expr::Closure(c) if c.capture.is_some() => {
         self.new_dollar_scope(true);
         let mut c = self.fold_expr_closure(c);
-        let dollar_scope = self.pop_dollar_scope(true);
+        let dollar_scope = self.pop_dollar_scope(true, false);
 
         if dollar_scope.used_ctx() || !dollar_scope.is_empty() {
           if dollar_scope.used_ctx() {
@@ -386,25 +400,22 @@ fn mark_macro_expanded(mac: &mut Macro) {
 
 impl ToTokens for DollarRefsScope {
   fn to_tokens(&self, tokens: &mut TokenStream) {
-    for DollarRef { name, builtin, write } in &self.refs {
-      match (builtin, *write) {
-        (None, true) => quote_spanned! { name.span() =>
-          let #name = #name.clone_writer();
-        }
-        .to_tokens(tokens),
-        (None, false) => quote_spanned! { name.span() =>
-          let #name = #name.clone_reader();
-        }
-        .to_tokens(tokens),
-        (Some(BuiltinInfo { host, member }), false) => quote_spanned! { name.span() =>
-          let #name = #host.#member().clone_reader();
-        }
-        .to_tokens(tokens),
-        (Some(BuiltinInfo { host, member }), true) => quote_spanned! { name.span() =>
-          let #name = #host.#member().clone_writer();
-        }
-        .to_tokens(tokens),
+    for DollarRef { name, builtin, used } in &self.refs {
+      if let Some(BuiltinInfo { host, member }) = builtin {
+        quote_spanned! { name.span() => let #name = #host.#member() }
+      } else {
+        quote_spanned! { name.span() => let #name = #name }
       }
+      .to_tokens(tokens);
+      match used {
+        DollarUsedInfo::Reader => quote_spanned! { name.span() => .clone_reader() },
+        DollarUsedInfo::Watcher => {
+          quote_spanned! { name.span() => .clone_watcher() }
+        }
+        DollarUsedInfo::Writer => quote_spanned! { name.span() => .clone_writer() },
+      }
+      .to_tokens(tokens);
+      syn::token::Semi(name.span()).to_tokens(tokens);
     }
   }
 }
@@ -414,8 +425,8 @@ impl DollarRefsCtx {
   pub fn top_level() -> Self { Self::default() }
 
   #[inline]
-  pub fn new_dollar_scope(&mut self, has_capture: bool) {
-    if has_capture {
+  pub fn new_dollar_scope(&mut self, capture_scope: bool) {
+    if capture_scope {
       self.capture_level_heads.push(self.variable_stacks.len());
       // new scope level, should start a new variables scope, otherwise the local
       // variables will record in its parent level.
@@ -432,20 +443,25 @@ impl DollarRefsCtx {
   /// For example, this generate code not work:
   ///
   /// ```ignore
-  /// let a = a.clone_state();
+  /// let a = a.clone_reader();
   /// // the `a` is shadowed by the before `a` variable.
-  /// let a_margin = a.get_builtin_margin(ctx!());
+  /// let a_margin = a.get_margin_widget(ctx!());
   /// ```
   ///
   /// must generate `a_margin` first:
   ///
   /// ```ignore
-  /// let a_margin = a.get_builtin_margin(ctx!());
-  /// let a = a.clone_state();
+  /// let a_margin = a.get_margin_widget(ctx!());
+  /// let a = a.clone_reader();
   /// ```
+  ///
+  /// - **capture_scope**: if the scope is a capture scope, should pop the
+  ///   variable stack.
+  /// - **watch_scope**: if the scope is a watch scope, should mark all reader
+  ///   as watcher.
   #[inline]
-  pub fn pop_dollar_scope(&mut self, has_capture: bool) -> DollarRefsScope {
-    if has_capture {
+  pub fn pop_dollar_scope(&mut self, capture_scope: bool, watch_scope: bool) -> DollarRefsScope {
+    if capture_scope {
       self.variable_stacks.pop();
       self.capture_level_heads.pop();
     }
@@ -457,7 +473,7 @@ impl DollarRefsCtx {
         .is_none()
         .cmp(&b.builtin.is_none())
         .then_with(|| a.name.cmp(&b.name))
-        .then_with(|| b.write.cmp(&a.write))
+        .then_with(|| b.used.cmp(&a.used))
     });
     scope.refs.dedup_by(|a, b| a.name == b.name);
 
@@ -466,11 +482,15 @@ impl DollarRefsCtx {
 
       for r in scope.refs.iter_mut() {
         if !self.is_local_var(r.host()) && self.scopes.len() > 1 {
-          self.current_dollar_scope_mut().refs.push(r.clone());
+          let mut c_r = r.clone();
+          if watch_scope && c_r.used == DollarUsedInfo::Reader {
+            c_r.used = DollarUsedInfo::Watcher;
+          }
+          self.current_dollar_scope_mut().refs.push(c_r);
           // if ref variable is not a local variable of parent capture level, should
           // remove its builtin info as a normal variable, because parent will capture the
           // builtin object individually.
-          if has_capture {
+          if capture_scope {
             r.builtin.take();
           }
         }
@@ -505,10 +525,14 @@ impl DollarRefsCtx {
     caller: &mut Expr,
     builtin_member: &str,
   ) -> Option<&DollarRef> {
-    let mut write = false;
+    let mut used = DollarUsedInfo::Reader;
     let e = if let Expr::MethodCall(m) = caller {
-      write = is_state_write_method(m);
-      if write { &mut *m.receiver } else { caller }
+      if is_state_write_method(m) {
+        used = DollarUsedInfo::Writer;
+        &mut *m.receiver
+      } else {
+        caller
+      }
     } else {
       caller
     };
@@ -522,10 +546,10 @@ impl DollarRefsCtx {
     let name = ribir_suffix_variable(&host, builtin_member);
     let get_builtin_method = Ident::new(&format!("get_{builtin_member}_widget"), host.span());
     let builtin = Some(BuiltinInfo { host, member: get_builtin_method });
-    let dollar_ref = DollarRef { name, builtin, write };
+    let dollar_ref = DollarRef { name, builtin, used };
 
     let state = self.builtin_host_tokens(&dollar_ref);
-    m.mac.tokens = if write {
+    m.mac.tokens = if dollar_ref.used == DollarUsedInfo::Writer {
       expand_write_method(state)
     } else {
       expand_read(state)
@@ -548,11 +572,11 @@ impl DollarRefsCtx {
     }
   }
 
-  fn current_dollar_scope(&self) -> &DollarRefsScope {
+  pub fn current_dollar_scope(&self) -> &DollarRefsScope {
     self.scopes.last().expect("no dollar refs scope")
   }
 
-  fn current_dollar_scope_mut(&mut self) -> &mut DollarRefsScope {
+  pub fn current_dollar_scope_mut(&mut self) -> &mut DollarRefsScope {
     self.scopes.last_mut().expect("no dollar refs scope")
   }
 
@@ -570,15 +594,12 @@ impl DollarRefsScope {
   pub fn upstream_tokens(&self) -> TokenStream {
     match self.len() {
       0 => quote! {},
-      1 => {
-        let DollarRef { name, .. } = &self.refs[0];
-        quote_spanned! { name.span() => #name.modifies() }
-      }
+      1 => self.refs[0].upstream_tokens(),
       _ => {
-        let upstream = self
-          .iter()
-          .map(|DollarRef { name, .. }| quote! {  #name.modifies() });
-        quote! { observable::from_iter([#(#upstream),*]).merge_all(usize::MAX) }
+        let upstream = self.iter().map(DollarRef::upstream_tokens);
+        quote_spanned! { self.refs[0].name.span() =>
+          observable::from_iter([#(#upstream),*]).merge_all(usize::MAX)
+        }
       }
     }
   }
@@ -590,6 +611,15 @@ impl DollarRef {
       .builtin
       .as_ref()
       .map_or_else(|| &self.name, |b| &b.host)
+  }
+
+  pub fn upstream_tokens(&self) -> TokenStream {
+    let DollarRef { name, builtin, .. } = self;
+    if let Some(BuiltinInfo { host, member }) = builtin {
+      quote_spanned! { name.span() => #host.#member().modifies() }
+    } else {
+      quote_spanned! { name.span() => #name.modifies() }
+    }
   }
 }
 

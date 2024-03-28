@@ -11,7 +11,7 @@ pub(crate) fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> Toke
   let body = parse_macro_input!(input as BodyExpr);
   refs_ctx.new_dollar_scope(true);
   let stmts: Vec<_> = body.0.into_iter().map(|s| refs_ctx.fold_stmt(s)).collect();
-  let _ = refs_ctx.pop_dollar_scope(true);
+  let _ = refs_ctx.pop_dollar_scope(true, false);
   quote! {
     move |ctx!(): &BuildCtx| -> Widget { #(#stmts)*.build(ctx!()) }
   }

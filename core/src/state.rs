@@ -2,7 +2,9 @@ mod map_state;
 mod prior_op;
 mod splitted_state;
 mod stateful;
+mod watcher;
 pub use prior_op::*;
+pub use watcher::*;
 
 use std::{
   cell::{Cell, Ref, RefCell, RefMut, UnsafeCell},
@@ -14,7 +16,7 @@ use std::{
 
 use crate::prelude::*;
 pub use map_state::*;
-use rxrust::ops::box_it::BoxOp;
+use rxrust::ops::box_it::{BoxOp, CloneableBoxOp};
 pub use splitted_state::*;
 pub use stateful::*;
 
@@ -55,6 +57,15 @@ pub trait StateReader: 'static {
   /// Return the time stamp of the last modifies of this state.
   fn time_stamp(&self) -> Instant;
 
+  /// try convert this state into the value, if there is no other share this
+  /// state, otherwise return an error with self.
+  fn try_into_value(self) -> Result<Self::Value, Self>
+  where
+    Self: Sized,
+    Self::Value: Sized;
+}
+
+pub trait StateWatcher: StateReader {
   /// Return a modifies `Rx` stream of the state, user can subscribe it to
   /// response the state changes.
   fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
@@ -66,16 +77,15 @@ pub trait StateReader: 'static {
 
   /// Return a modifies `Rx` stream of the state, including all modifies. Use
   /// `modifies` instead if you only want to response the data changes.
-  fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible>;
-  /// try convert this state into the value, if there is no other share this
-  /// state, otherwise return an error with self.
-  fn try_into_value(self) -> Result<Self::Value, Self>
-  where
-    Self: Sized,
-    Self::Value: Sized;
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible>;
+
+  /// Clone a reader that can be used to observe the modifies of the state.
+  fn clone_watcher(&self) -> Watcher<Self::Reader> {
+    Watcher::new(self.clone_reader(), self.raw_modifies())
+  }
 }
 
-pub trait StateWriter: StateReader {
+pub trait StateWriter: StateWatcher {
   type Writer: StateWriter<Value = Self::Value>;
   type OriginWriter: StateWriter;
 
@@ -206,16 +216,18 @@ impl<T: 'static> StateReader for State<T> {
   #[inline]
   fn time_stamp(&self) -> Instant { self.as_stateful().time_stamp() }
 
-  #[inline]
-  fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
-    self.as_stateful().raw_modifies()
-  }
-
   fn try_into_value(self) -> Result<Self::Value, Self> {
     match self.0.into_inner() {
       InnerState::Data(w) => Ok(w.into_inner()),
       InnerState::Stateful(w) => w.try_into_value().map_err(State::stateful),
     }
+  }
+}
+
+impl<T: 'static> StateWatcher for State<T> {
+  #[inline]
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+    self.as_stateful().raw_modifies()
   }
 }
 
