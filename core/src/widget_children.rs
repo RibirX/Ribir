@@ -284,7 +284,7 @@ mod tests {
     reset_test_env!();
 
     let size = Stateful::new(Size::zero());
-    let c_size = size.clone_reader();
+    let c_size = size.clone_watcher();
     // with single child
     let _e = fn_widget! {
       let p = pipe!{
@@ -306,7 +306,7 @@ mod tests {
       }
     };
 
-    let c_size = size.clone_reader();
+    let c_size = size.clone_watcher();
     // option with single child
     let _e = fn_widget! {
       let p = pipe!(($c_size.area() > 0.).then(|| @MockBox { size: Size::zero() }));

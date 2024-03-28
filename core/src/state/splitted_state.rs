@@ -1,18 +1,21 @@
-use std::cell::{Cell, RefMut};
+use std::{
+  cell::{Cell, RefMut},
+  time::Instant,
+};
 
 use ribir_algo::Sc;
 use rxrust::{
-  ops::box_it::BoxOp,
+  ops::box_it::CloneableBoxOp,
   prelude::{BoxIt, ObservableExt},
 };
 
 use super::{
-  MapReader, ModifyScope, Notifier, ReadRef, StateReader, StateWriter, WriteRef, WriterControl,
+  MapReader, ModifyScope, Notifier, ReadRef, StateReader, StateWatcher, StateWriter, WriteRef,
+  WriterControl,
 };
 use crate::{
   context::BuildCtx,
   prelude::AppCtx,
-  ticker::Instant,
   widget::{Render, RenderBuilder, Widget},
 };
 
@@ -83,17 +86,6 @@ macro_rules! splitted_reader_impl {
     fn time_stamp(&self) -> Instant { self.last_modified.get() }
 
     #[inline]
-    fn raw_modifies(&self) -> BoxOp<'static, ModifyScope, std::convert::Infallible> {
-      let origin = self.origin.clone_reader();
-      let create_at = self.create_at;
-      self
-        .notifier
-        .raw_modifies()
-        .take_while(move |_| origin.time_stamp() < create_at)
-        .box_it()
-    }
-
-    #[inline]
     fn try_into_value(self) -> Result<Self::Value, Self>
     where
       Self::Value: Sized,
@@ -122,6 +114,52 @@ where
   W: Fn(&mut O::Value) -> &mut V + Clone,
 {
   splitted_reader_impl!();
+}
+
+impl<V, O, R, W> StateWatcher for SplittedWriter<O, R, W>
+where
+  Self: 'static,
+  V: ?Sized,
+  O: StateWriter,
+  R: Fn(&O::Value) -> &V + Clone,
+  W: Fn(&mut O::Value) -> &mut V + Clone,
+{
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, std::convert::Infallible> {
+    let origin = self.origin.clone_reader();
+    let create_at = self.create_at;
+
+    // tmp code: we will remove the stamp check after #521 is fixed.
+    struct StampCheck<R> {
+      stamp: Instant,
+      reader: R,
+    }
+
+    impl<R: StateReader> CloneableChecker for StampCheck<R> {
+      fn check(&self) -> bool { self.reader.time_stamp() < self.stamp }
+      fn box_clone(&self) -> Box<dyn CloneableChecker> {
+        Box::new(StampCheck { stamp: self.stamp, reader: self.reader.clone_reader() })
+      }
+    }
+
+    trait CloneableChecker {
+      fn check(&self) -> bool;
+      fn box_clone(&self) -> Box<dyn CloneableChecker>;
+    }
+
+    impl Clone for Box<dyn CloneableChecker> {
+      fn clone(&self) -> Self { self.box_clone() }
+    }
+
+    // create a cloneable checker to check.
+    let checker: Box<dyn CloneableChecker> =
+      Box::new(StampCheck { stamp: create_at, reader: origin.clone_reader() });
+
+    self
+      .notifier
+      .raw_modifies()
+      .take_while(move |_| checker.check())
+      .box_it()
+  }
 }
 
 impl<V, O, R, W> StateWriter for SplittedWriter<O, R, W>

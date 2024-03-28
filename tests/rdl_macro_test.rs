@@ -123,7 +123,7 @@ widget_layout_test!(dollar_as_middle_parent, width == 500., height == 500.,);
 
 fn pipe_as_field_value() -> impl WidgetBuilder {
   let size = Stateful::new(Size::zero());
-  let size2 = size.clone_reader();
+  let size2 = size.clone_watcher();
   let w = fn_widget! {
     rdl!{ SizedBox { size: pipe!(*$size2) }}
   };
@@ -134,7 +134,7 @@ widget_layout_test!(pipe_as_field_value, width == 100., height == 100.,);
 
 fn pipe_as_builtin_field_value() -> impl WidgetBuilder {
   let margin = Stateful::new(EdgeInsets::all(0.));
-  let margin2 = margin.clone_reader();
+  let margin2 = margin.clone_watcher();
 
   let w = fn_widget! {
     rdl!{ SizedBox {
@@ -250,7 +250,7 @@ fn pipe_as_child() {
   reset_test_env!();
 
   let box_or_not = Stateful::new(true);
-  let box_or_not2 = box_or_not.clone_reader();
+  let box_or_not2 = box_or_not.clone_watcher();
   let w = fn_widget! {
     let blank = pipe!{
       $box_or_not2.then(|| rdl!{ SizedBox { size: Size::new(100., 100.) } })
@@ -722,7 +722,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
   let notify_cnt = Stateful::new(0);
   let cnt: Writer<i32> = notify_cnt.clone_writer();
   let trigger = Stateful::new(true);
-  let c_trigger = trigger.clone_reader();
+  let c_trigger = trigger.clone_watcher();
   let w = fn_widget! {
     let mut container = @SizedBox { size: Size::zero() };
     let h = watch!(*$c_trigger).subscribe(move |_| *$cnt.write() +=1 );

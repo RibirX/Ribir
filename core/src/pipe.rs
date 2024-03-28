@@ -1130,7 +1130,7 @@ mod tests {
   fn attach_data_to_pipe_widget() {
     reset_test_env!();
     let trigger = Stateful::new(false);
-    let c_trigger = trigger.clone_reader();
+    let c_trigger = trigger.clone_watcher();
     let w = fn_widget! {
       let p = pipe! {
         // just use to force update the widget, when trigger modified.
@@ -1436,7 +1436,7 @@ mod tests {
       .map(|_| Stateful::new(Task::default()))
       .collect::<Vec<_>>();
     let tasks = Stateful::new(tasks);
-    let c_tasks = tasks.clone_reader();
+    let c_tasks = tasks.clone_watcher();
     let w = fn_widget! {
       @MockMulti {
         @ { pipe!{

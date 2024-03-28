@@ -158,7 +158,7 @@ impl ComposeChild for TextSelectable {
       let high_light_rect = @ OnlySizedByParent {
         @ SelectedHighLight {
           rects: pipe! {
-            $this.select_text_rect(&$only_text, $text.layout_size())
+            $this.select_text_rect(&$text, $text.layout_size())
           }
         }
       };
