@@ -15,7 +15,7 @@ pub struct Stateful<W> {
   info: Sc<StatefulInfo>,
 }
 
-pub struct Reader<W>(Stateful<W>);
+pub struct Reader<W>(Sc<RefCell<W>>);
 
 pub struct Writer<W>(Stateful<W>);
 
@@ -60,11 +60,7 @@ impl<W: 'static> StateReader for Stateful<W> {
   fn read(&self) -> ReadRef<W> { ReadRef::new(self.data.borrow()) }
 
   #[inline]
-  fn clone_reader(&self) -> Self::Reader {
-    let this = self.clone();
-    this.dec_writer();
-    Reader(this)
-  }
+  fn clone_reader(&self) -> Self::Reader { Reader(self.data.clone()) }
 
   #[inline]
   fn origin_reader(&self) -> &Self::OriginReader { self }
@@ -76,7 +72,7 @@ impl<W: 'static> StateReader for Stateful<W> {
     if self.data.ref_count() == 1 {
       let data = self.data.clone();
       drop(self);
-      // SAFETY: `Rc::strong_count(&self.inner) == 1` guarantees unique access.
+      // SAFETY: `self.data.ref_count() == 1` guarantees unique access.
       let data = unsafe { Sc::try_unwrap(data).unwrap_unchecked() };
       Ok(data.into_inner())
     } else {
@@ -118,10 +114,10 @@ impl<W: 'static> StateReader for Reader<W> {
   type Reader = Self;
 
   #[inline]
-  fn read(&self) -> ReadRef<W> { self.0.read() }
+  fn read(&self) -> ReadRef<W> { ReadRef::new(self.0.borrow()) }
 
   #[inline]
-  fn clone_reader(&self) -> Self { self.0.clone_reader() }
+  fn clone_reader(&self) -> Self { Reader(self.0.clone()) }
 
   #[inline]
   fn origin_reader(&self) -> &Self::OriginReader { self }
@@ -130,9 +126,13 @@ impl<W: 'static> StateReader for Reader<W> {
   fn time_stamp(&self) -> Instant { self.0.time_stamp() }
 
   fn try_into_value(self) -> Result<Self::Value, Self> {
-    let inner = self.0.clone_writer().0;
-    drop(self);
-    inner.try_into_value().map_err(Reader)
+    if self.0.ref_count() == 1 {
+      // SAFETY: `self.0.ref_count() == 1` guarantees unique access.
+      let data = unsafe { Sc::try_unwrap(self.0).unwrap_unchecked() };
+      Ok(data.into_inner())
+    } else {
+      Err(self)
+    }
   }
 }
 
@@ -198,15 +198,6 @@ impl WriterControl for Sc<StatefulInfo> {
   fn dyn_clone(&self) -> Box<dyn WriterControl> { Box::new(self.clone()) }
 }
 
-impl<W> Drop for Reader<W> {
-  fn drop(&mut self) {
-    // The `Stateful` is a writer but used as a reader in `Reader` that not
-    // increment the writer count. So we increment the writer count before drop the
-    // `Stateful` to keep its count correct.
-    self.0.inc_writer();
-  }
-}
-
 impl<W> Drop for Stateful<W> {
   fn drop(&mut self) {
     self.dec_writer();
@@ -262,11 +253,6 @@ impl<R: Render> RenderBuilder for Stateful<R> {
 impl<R: Render> RenderBuilder for Writer<R> {
   #[inline]
   fn build(self, ctx: &BuildCtx) -> Widget { self.0.build(ctx) }
-}
-
-impl<R: Render> RenderBuilder for Reader<R> {
-  #[inline]
-  fn build(self, ctx: &BuildCtx) -> Widget { self.0.clone_writer().build(ctx) }
 }
 
 impl<W> Stateful<W> {
@@ -505,5 +491,70 @@ mod tests {
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
     assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH, ModifyScope::DATA]);
+  }
+
+  #[test]
+  fn render_only_hold_data() {
+    crate::reset_test_env!();
+
+    // data + 1, info + 1
+    let v = Stateful::new(1);
+    // data + 1
+    let _r = v.clone_reader();
+
+    AppCtx::run_until_stalled();
+    assert_eq!(v.data.ref_count(), 2);
+    assert_eq!(v.info.ref_count(), 1);
+  }
+
+  #[test]
+  fn pipe_only_hold_data() {
+    crate::reset_test_env!();
+
+    // data + 1, info + 1
+    let v = Stateful::new(1);
+    // data +1
+    let (_, stream) = pipe!(*$v).unzip();
+    let _ = stream.subscribe(|(_, v)| println!("{v}"));
+
+    AppCtx::run_until_stalled();
+    assert_eq!(v.data.ref_count(), 2);
+    assert_eq!(v.info.ref_count(), 1);
+  }
+
+  #[test]
+  fn watch_only_hold_data() {
+    crate::reset_test_env!();
+
+    // data + 1, info + 1
+    let v = Stateful::new(1);
+    // data + 1
+    let _ = watch!(*$v).subscribe(|v| println!("{v}"));
+
+    AppCtx::run_until_stalled();
+    assert_eq!(v.data.ref_count(), 2);
+    assert_eq!(v.info.ref_count(), 1);
+  }
+
+  #[test]
+  fn render_in_downstream_no_circle() {}
+
+  #[test]
+  fn writer_in_downstream_unsubscribe() {
+    crate::reset_test_env!();
+
+    let v = Stateful::new(1);
+    let data = v.data.clone();
+    let info = v.info.clone();
+    {
+      let u = watch!(*$v).subscribe(move |_| *v.write() = 2);
+      u.unsubscribe();
+    }
+
+    AppCtx::run_until_stalled();
+
+    assert_eq!(data.ref_count(), 1);
+    assert!(info.notifier.0.is_closed());
+    assert_eq!(info.ref_count(), 1);
   }
 }
