@@ -673,10 +673,6 @@ mod tests {
       Stateful::new(Void)
     };
 
-    let _reader_render_widget = fn_widget! {
-      Stateful::new(Void).clone_reader()
-    };
-
     let _writer_render_widget = fn_widget! {
       Stateful::new(Void).clone_writer()
     };

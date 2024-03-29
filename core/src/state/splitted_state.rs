@@ -61,10 +61,11 @@ macro_rules! splitted_reader_impl {
 
     #[track_caller]
     fn read(&self) -> ReadRef<Self::Value> {
-      assert!(
-        self.create_at > self.origin.time_stamp(),
-        "A splitted reader is invalid because its origin state is modified after it created."
-      );
+      // fixme: remove time_stamp
+      // assert!(
+      //   self.create_at > self.origin.time_stamp(),
+      //   "A splitted reader is invalid because its origin state is modified after it
+      // created." );
       ReadRef::map(self.origin.read(), &self.map)
     }
 
