@@ -26,7 +26,7 @@ debug = true
 [workspace.package]
 authors = ["RibirX<Adoo@outlook.com>"]
 categories = ["gui"]
-description = "Ribir is a framework for building modern native/wasm cross-platform user interface applications."
+description = "A non-intrusive declarative GUI framework, to build modern native/wasm cross-platform applications."
 documentation = "https://ribir.org/docs"
 edition = "2021"
 homepage = "https://ribir.org"

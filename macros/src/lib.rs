@@ -210,8 +210,47 @@ pub fn pipe(input: TokenStream) -> TokenStream {
   pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
-/// `watch!` macro use to convert a expression to a `Observable` stream. Use the
-/// `$` mark the state reference and auto subscribe to its modify.
+/// The `watch!` macro converts an expression into an `Observable` stream. Use
+/// `$` to mark the state reference, which automatically maps its modifications
+/// to the expression value.
+///
+/// ## Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// let label = Stateful::new(1);
+/// watch!(*$label)
+///   .subscribe(|v| println!("{v}") );
+///
+/// *label.write() = 2;
+/// ```
+/// After subscribing, the subscription remains active until the state is fully
+/// dropped.
+///
+/// ## Notice
+///
+/// If you use the `writer` of the watched state downstream, it introduces a
+/// circular reference, preventing the state from being dropped. You need to
+/// manually call unsubscribe at the appropriate time, typically in the
+/// `on_disposed` method of a widget.
+///
+/// ```
+/// use ribir::prelude::*;
+///
+/// let even = Stateful::new(1);
+/// let u = watch!(*$even).subscribe(move |v| {
+///   if v % 2 == 1 {
+///     *even.write() = (v + 1);
+///   }
+/// });
+///
+/// // ...
+///
+/// // Call unsubscribe at the appropriate time to ensure the state can be dropped.
+/// u.unsubscribe();
+/// ```
+
 #[proc_macro]
 pub fn watch(input: TokenStream) -> TokenStream {
   watch_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())

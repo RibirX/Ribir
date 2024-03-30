@@ -523,6 +523,49 @@ fn main() {
 }
 ```
 
+一旦我们调用了 `subscribe`，就建立了对 `watch!` 中表达式的订阅。这个订阅会一直存在，直到你手动调用 `unsubscribe`，或者 `watch!` 所监听的 State 不再有写入源。
+
+在上述例子中，我们无需调用 `unsubscribe`，因为这个订阅需要在整个应用的生命周期中存在。
+
+通常，有两种情况你需要手动调用 `unsubscribe`：
+
+第一种情况，你希望订阅的生命周期短于所监听的状态。这种情况的典型例子就是使用外部状态来构建 widget，例如：
+
+```rust
+use ribir::prelude::*;
+
+fn show_name(name: State<String>) -> impl WidgetBuilder {
+  fn_widget!{
+    let text = @Text { text: "Hi, Guest!" };
+    let u = watch!($name.to_string()).subscribe(move |name| {
+      $text.write().text = format!("Hi, {}!", name).into();
+    });
+
+    // `name` 是一个可共享的状态，它可能被其他人持有，使它的生命周期长于控件
+    // 所以我们需要在控件销毁时取消订阅
+    @$text { on_disposed: move |_| u.unsubscribe() }
+  }
+}
+```
+
+第二种情况，`watch!` 的下游对所监听的状态进行了写操作。因为 `watch!` 依赖于所监听的状态不再拥有写入源来自动取消订阅，当其下游持有了所监听的状态的写入源时，这就构成了循环引用。这时，必须手动取消订阅，否则会导致内存泄漏。例如：
+
+```rust
+use ribir::prelude::*;
+
+let even_num = State::value(0);
+
+// 响应 even_num 的变更，确保其为偶数，当 even_num 为奇数时，将其加 1 使其变为偶数
+let u = watch!(*$even_num).subscribe(move |v| {
+  if v % 2 == 1 {
+    *even_num.write() = v + 1;
+  }
+});
+
+// 需要在适当的时机调用下面的代码，否则会导致循环引用
+u.unsubscribe();
+```
+
 ## `Compose` widget —— 描述你的数据结构
 
 通常，在复杂的真实场景中，你无法只通过创建一些局部的数据和使用简单的函数 widget 就完成全部开发。你需要自己的数据结构，并通过 `Compose` widget 来完成你的数据结构到视图的映射。

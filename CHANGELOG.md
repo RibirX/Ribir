@@ -42,6 +42,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
+- **core**: Introduced `StateWatcher` for watching state modifies, which was previously the responsibility of `StateReader`. This results in a cleaner and more compact `StateReader` implementation. (#pr, @M-Adoo)
 - **ribir**: Introduced `AppRunGuard` to allow app and window configuration prior to app startup. (#565, @M-Adoo)
   Previously, to configure the app and window before startup, `App::run` couldn't be used:
   ``` rust
@@ -72,6 +73,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **ribir**: Updated `App::new_window` to accept `WindowAttributes` instead of size as the second parameter. (#565, #566, @M-Adoo)
 - **ribir**: The window creation APIs have been updated to use asynchronous methods, improving compatibility with browsers. (#565, @M-Adoo)
+- **core**: The `StateReader` no longer supports watching its modifications. Use the `StateWatcher` trait instead for this functionality. (#pr @M-Adoo)
+
+### Documented
+
+- **core**: Explained when to use `unsubscribe` with `watch!`. (#pr, @M-Adoo)
 
 ## [0.3.0-alpha.4] - 2024-04-17
 
@@ -94,16 +100,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **ribir**: support stable Rust 1.77.0 (#552 @M-Adoo)
-
-
-## [0.2.0-beta.1](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0...ribir-v0.2.0-beta.1) - 2024-03-26
-
-### Features
-
 - **macros**: Added a `include_crate_svg!` macro to include the svg relative to current crate. (#552, @M-Adoo)
 - **ribir**: Added a `nightly` feature to enable functionalities that require nightly Rust. (#552, @M-Adoo)
   - The `include_crates_svg!` macro can operate without the `nightly` feature.
   - The `include_svg!` macro requires the `nightly` feature to be enabled.
+
+
+## [0.2.0-beta.1](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0...ribir-v0.2.0-beta.1) - 2024-03-26
 
 ### Documented
 

@@ -64,7 +64,7 @@ impl ComposeChild for HScrollBar {
       watch!($scrolling.scroll_pos.x)
         .distinct_until_changed()
         .subscribe(move |v| $this.write().offset = v);
-      watch!($this.offset)
+      let u = watch!($this.offset)
         .distinct_until_changed()
         .subscribe(move |v| {
           let y = $scrolling.scroll_pos.y;
@@ -73,6 +73,7 @@ impl ComposeChild for HScrollBar {
 
       @Stack {
         fit: StackFit::Passthrough,
+        on_disposed: move |_| { u.unsubscribe(); },
         @ $scrolling { @{ child } }
         @ { scrollbar }
       }
@@ -107,7 +108,7 @@ impl ComposeChild for VScrollBar {
       watch!($scrolling.scroll_pos.y)
         .distinct_until_changed()
         .subscribe(move |v| $this.write().offset = v);
-      watch!($this.offset)
+      let u = watch!($this.offset)
         .distinct_until_changed()
         .subscribe(move |v| {
           let x = $scrolling.scroll_pos.x;
@@ -116,6 +117,7 @@ impl ComposeChild for VScrollBar {
 
       @Stack {
         fit: StackFit::Passthrough,
+        on_disposed: move |_| { u.unsubscribe(); },
         @ $scrolling { @{ child } }
         @ { scrollbar }
       }
@@ -153,12 +155,13 @@ impl ComposeChild for BothScrollbar {
       watch!($scrolling.scroll_pos)
         .distinct_until_changed()
         .subscribe(move |v| $this.write().offset = v);
-      watch!($this.offset)
+      let u = watch!($this.offset)
         .distinct_until_changed()
         .subscribe(move |v| $scrolling.write().jump_to(v) );
 
       @Stack{
         fit: StackFit::Passthrough,
+        on_disposed: move |_| { u.unsubscribe(); },
         @ $scrolling { @{ child } }
         @ $h_bar{ margin: EdgeInsets::only_right($v_bar.layout_width()) }
         @ { v_bar }

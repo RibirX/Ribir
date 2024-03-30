@@ -1,5 +1,5 @@
 <h1 align="center">
-Ribir - Non-intrusive Declarative GUI Framework
+Ribir - Non-intrusive GUI Framework for Rust
 </h1>
 <p align="center"><a href="https://ribir.org" target="_blank" rel="noopener noreferrer">
 <img src="static/logo.svg" alt="Ribir-logo"  width = "128px">
@@ -96,7 +96,7 @@ More [Examples]
 
 ## Features
 
-- **Declarative language** does not introduce a fully new language but rather provides a set of Rust macros for easy interaction.
+- **Declarative language** It doesn't introduce a completely new language. Instead, it provides a set of Rust macros for easier interaction. You can choose to use it or not.
 - **Widgets compose system** has four kinds of widgets to support you can implement your widget in different ways:
   - function widget and `Compose`, from other widgets composition.
   - `Render`, implement your layout and paint anything you want.
@@ -131,17 +131,6 @@ More [Examples]
 If you like Ribir, give our repo a [⭐ STAR ⬆️](https://github.com/RibirX/Ribir) and [WATCH 👀](https://github.com/RibirX/Ribir/subscription) our repository to stay updated with the latest developments!
 
 Every encouragement and feedback can support us to go further.
-
-## Known Issues
-
-
-The pipe/watch may easily introduce a cycle reference, which will cause a memory leak if you do not manually unsubscribe. We'll resolve this issue in v0.2.0.
-
-In most cases, the framework will be able to avoid cycle reference automatically. Documentation will be updated to explain how to avoid cycle reference in the rest cases, and we will provide an API to help developers resolve it.
-
-
-For a complete list of known issues, please see [Issues](https://github.com/RibirX/Ribir/issues).
-
 
 ## Contributing
 

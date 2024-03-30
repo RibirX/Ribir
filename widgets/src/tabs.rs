@@ -198,11 +198,12 @@ impl Tabs {
               },
             };
 
-            watch!(($tabs.cur_idx == idx, $tab_header.layout_rect()))
+            let u = watch!(($tabs.cur_idx == idx, $tab_header.layout_rect()))
               .filter_map(|(active, rect)| active.then_some(rect))
               .subscribe(move |v| $indicator.write().rect = v);
 
             @TabDecorator {
+              on_disposed: move |_| { u.unsubscribe(); },
               @$tab_header {
                 @Flex {
                   align_items: Align::Center,
