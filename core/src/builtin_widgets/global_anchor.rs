@@ -25,7 +25,7 @@ impl ComposeChild for GlobalAnchor {
 
       let mut child = @$child {};
       let wid = child.lazy_id();
-      watch!(($this.get_global_anchor(), $child.layout_size()))
+      let u = watch!(($this.get_global_anchor(), $child.layout_size()))
         .sample(tick_of_layout_ready)
         .subscribe(move |(_, size)| {
           let wnd_size = wnd.size();
@@ -47,7 +47,7 @@ impl ComposeChild for GlobalAnchor {
           }
         });
 
-      child
+      @ $child { on_disposed: move |_| { u.unsubscribe(); } }
     }
   }
 }

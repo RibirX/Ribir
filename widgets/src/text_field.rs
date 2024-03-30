@@ -340,7 +340,7 @@ fn build_input_area(
       .distinct_until_changed()
       .subscribe(move |val| $this.silent().text = val.clone());
 
-    watch!($this.text.clone())
+    let u = watch!($this.text.clone())
       .distinct_until_changed()
       .subscribe(move |val| $input.write().set_text(&val));
 
@@ -348,7 +348,10 @@ fn build_input_area(
       .distinct_until_changed()
       .filter(|state| state == &TextFieldState::Focused)
       .subscribe(move |_| $input.request_focus());
-    input = input.on_disposed(move|_| h.unsubscribe());
+    input = input.on_disposed(move|_| {
+      h.unsubscribe();
+      u.unsubscribe();
+    });
 
     @Row {
       @{

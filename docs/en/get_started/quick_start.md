@@ -522,6 +522,51 @@ fn main() {
 }
 ```
 
+When we call `subscribe`, we create a subscription to the `watch!` expression. This subscription stays active until you manually call `unsubscribe`, or until the State being watched by `watch!` no longer has a writer.
+
+In the example above, we don't need to call `unsubscribe` because the subscription should last for the entire application lifecycle.
+
+There are two main situations where you'd need to manually call `unsubscribe`:
+
+The first situation is when the subscription's lifecycle should be shorter than the watched State. For instance, when using an external state to build a widget:
+
+```rust
+use ribir::prelude::*;
+
+fn show_name(name: State<String>) -> impl WidgetBuilder {
+  fn_widget!{
+    let text = @Text { text: "Hi, Guest!" };
+    let u = watch!($name.to_string()).subscribe(move |name| {
+      $text.write().text = format!("Hi, {}!", name).into();
+    });
+
+    // `name` is a shareable state, it might be held by others, 
+    // extending its lifecycle beyond the widget. So, we need to 
+    // unsubscribe when the widget is destroyed
+    @$text { on_disposed: move |_| u.unsubscribe() }
+  }
+}
+```
+
+The second situation is  when the `watch!` downstream holds the writer of the watched State. `watch!` automatically unsubscribes when the watched State loses its writer. If the downstream holds the writer, it creates a circular reference. You must manually unsubscribe to prevent a memory leak:
+
+```rust
+use ribir::prelude::*;
+
+let even_num = State::value(0);
+
+// Respond to changes in even_num, ensure it is even. 
+// If even_num is odd, add 1 to make it even
+let u = watch!(*$even_num).subscribe(move |v| {
+  if v % 2 == 1 {
+    *even_num.write() = v + 1;
+  }
+});
+
+// Call the following code at the right time to prevent a memory leak
+u.unsubscribe()
+```
+
 ## `Compose` widget -- describe your data structure
 
 Typically, in complex real-world scenarios, you can't complete all development tasks just by creating some local data and using simple function widgets. You need your own data structures and use `Compose` widgets to map your data structures to the view.

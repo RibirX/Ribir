@@ -38,7 +38,7 @@ This milestone aimed to improve the core API, making it easier for users to crea
 
 This milestone aims to prepare Ribir for the web and stabilize the widget system APIs.
 
-- [ ] Switch to stable Rust
+- [x] Switch to stable Rust
 - [ ] Add support for browsers (WASM + WebGPU/WebGL)
 - [ ] Simplify type conversion.
   We've over-engineered some aspects of type conversion, which has actually increased the learning curve for users and reduced error readability. For instance, the conversion of `DeclareInit` and the nested conversion of `Template`. The downside is that more explicit conversions will be required when using them.

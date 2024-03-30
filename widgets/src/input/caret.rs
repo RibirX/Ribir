@@ -16,7 +16,7 @@ impl Compose for Caret {
         box_fit: BoxFit::CoverY,
       };
       let mut _guard = None;
-      watch!($this.focused)
+      let u = watch!($this.focused)
         .subscribe(move |focused| {
           if focused {
             $caret.write().opacity = 1.;
@@ -29,7 +29,7 @@ impl Compose for Caret {
             _guard = None;
           }
         });
-      @ { caret }
+      @ $caret { on_disposed: move |_| u.unsubscribe() }
     }
   }
 }

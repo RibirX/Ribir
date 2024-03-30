@@ -123,7 +123,11 @@ impl<W: 'static> StateReader for Reader<W> {
   fn origin_reader(&self) -> &Self::OriginReader { self }
 
   #[inline]
-  fn time_stamp(&self) -> Instant { self.0.time_stamp() }
+  fn time_stamp(&self) -> Instant {
+    //fixme: we should remove this method in future, temporary return incorrect
+    // value here.
+    Instant::now()
+  }
 
   fn try_into_value(self) -> Result<Self::Value, Self> {
     if self.0.ref_count() == 1 {
@@ -206,10 +210,7 @@ impl<W> Drop for Stateful<W> {
       let notifier = self.info.notifier.clone();
       // we use an async task to unsubscribe to wait the batched modifies to be
       // notified.
-      AppCtx::spawn_local(async move {
-        notifier.0.unsubscribe();
-      })
-      .unwrap();
+      let _ = AppCtx::spawn_local(async move { notifier.0.unsubscribe() });
     }
   }
 }

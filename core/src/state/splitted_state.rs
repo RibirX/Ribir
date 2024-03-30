@@ -1,7 +1,4 @@
-use std::{
-  cell::{Cell, RefMut},
-  time::Instant,
-};
+use std::cell::{Cell, RefMut};
 
 use ribir_algo::Sc;
 use rxrust::{
@@ -16,6 +13,7 @@ use super::{
 use crate::{
   context::BuildCtx,
   prelude::AppCtx,
+  ticker::Instant,
   widget::{Render, RenderBuilder, Widget},
 };
 
@@ -117,6 +115,28 @@ where
   splitted_reader_impl!();
 }
 
+// fixme: we will remove the stamp check after #521 is fixed.
+struct StampCheck<R> {
+  stamp: Instant,
+  reader: R,
+}
+
+impl<R: StateReader> CloneableChecker for StampCheck<R> {
+  fn check(&self) -> bool { true }
+  fn box_clone(&self) -> Box<dyn CloneableChecker> {
+    Box::new(StampCheck { stamp: self.stamp, reader: self.reader.clone_reader() })
+  }
+}
+
+trait CloneableChecker {
+  fn check(&self) -> bool;
+  fn box_clone(&self) -> Box<dyn CloneableChecker>;
+}
+
+impl Clone for Box<dyn CloneableChecker> {
+  fn clone(&self) -> Self { self.box_clone() }
+}
+
 impl<V, O, R, W> StateWatcher for SplittedWriter<O, R, W>
 where
   Self: 'static,
@@ -128,28 +148,6 @@ where
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, std::convert::Infallible> {
     let origin = self.origin.clone_reader();
     let create_at = self.create_at;
-
-    // tmp code: we will remove the stamp check after #521 is fixed.
-    struct StampCheck<R> {
-      stamp: Instant,
-      reader: R,
-    }
-
-    impl<R: StateReader> CloneableChecker for StampCheck<R> {
-      fn check(&self) -> bool { self.reader.time_stamp() < self.stamp }
-      fn box_clone(&self) -> Box<dyn CloneableChecker> {
-        Box::new(StampCheck { stamp: self.stamp, reader: self.reader.clone_reader() })
-      }
-    }
-
-    trait CloneableChecker {
-      fn check(&self) -> bool;
-      fn box_clone(&self) -> Box<dyn CloneableChecker>;
-    }
-
-    impl Clone for Box<dyn CloneableChecker> {
-      fn clone(&self) -> Self { self.box_clone() }
-    }
 
     // create a cloneable checker to check.
     let checker: Box<dyn CloneableChecker> =

@@ -1,6 +1,8 @@
-use crate::prelude::*;
+use std::convert::Infallible;
+
 use rxrust::ops::box_it::CloneableBoxOp;
-use std::{convert::Infallible, time::Instant};
+
+use crate::prelude::*;
 
 pub struct Watcher<R> {
   reader: R,
@@ -9,8 +11,7 @@ pub struct Watcher<R> {
 
 impl<R> Watcher<R> {
   pub fn new(
-    reader: R,
-    modifies_observable: CloneableBoxOp<'static, ModifyScope, Infallible>,
+    reader: R, modifies_observable: CloneableBoxOp<'static, ModifyScope, Infallible>,
   ) -> Self {
     Self { reader, modifies_observable }
   }
