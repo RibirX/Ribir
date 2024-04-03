@@ -33,7 +33,7 @@ homepage = "https://ribir.org"
 keywords = ["gui", "ui", "declarative", "compose-ui"]
 license = "MIT"
 readme = "README.md"
-version = "0.3.0-alpha.1"
+version = "0.3.0-alpha.2"
 package.rust-version = "1.77.0"
 
 [workspace.dependencies]

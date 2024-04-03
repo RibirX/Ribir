@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.3.0-alpha.2] - 2024-04-03
+
 
 ### Features
 - **ribir**: support stable Rust 1.77.0 (#552 @M-Adoo)
@@ -129,4 +131,5 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.3.0-alpha.1...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.3.0-alpha.2...HEAD
+[0.3.0-alpha.2]: https://github.com/RibirX/Ribir/compare/ribir-v0.3.0-alpha.1...ribir-v0.3.0-alpha.2
