@@ -1,8 +1,4 @@
-use crate::{
-  prelude::*,
-  ticker::{FrameMsg, Instant},
-  window::WindowId,
-};
+use crate::{prelude::*, ticker::FrameMsg, window::WindowId};
 #[simple_declare]
 pub struct Animate<S>
 where
@@ -190,7 +186,6 @@ where
 mod tests {
   use super::*;
   use crate::{reset_test_env, test_helper::TestWindow};
-  use std::time::Duration;
 
   #[test]
   fn fix_animate_circular_mut_borrow() {

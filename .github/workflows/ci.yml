@@ -61,6 +61,7 @@ jobs:
             find "./docs" -name "*.md"
           } |  xargs -I {} rustdoc --test {} -L target/debug/deps/  --edition 2018 --extern ribir=target/debug/libribir.rlib
   wasm-compile:
+    needs: lint
     name: wasm compile
     runs-on: ubuntu-latest
     steps:
@@ -72,5 +73,5 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: compile to wasm
-        run: cargo build -p ribir --target wasm32-unknown-unknown
+        run: cargo build --target wasm32-unknown-unknown
       

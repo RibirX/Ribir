@@ -7,8 +7,8 @@ mod test_single_thread {
   use ribir_core::test_helper::TestWindow;
   use ribir_dev_helper::*;
   use std::cell::Cell;
+  use std::thread::sleep;
   use std::{cell::RefCell, rc::Rc};
-  use std::{thread::sleep, time::Duration};
   use winit::event::{DeviceId, ElementState, MouseButton};
 
   use ribir_core::{prelude::*, test_helper::MockBox};

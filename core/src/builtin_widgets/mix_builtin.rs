@@ -1,10 +1,6 @@
 use crate::prelude::*;
 use rxrust::prelude::*;
-use std::{
-  cell::Cell,
-  convert::Infallible,
-  time::{Duration, Instant},
-};
+use std::{cell::Cell, convert::Infallible};
 
 use self::focus_mgr::FocusType;
 

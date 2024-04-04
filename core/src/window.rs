@@ -1,4 +1,3 @@
-use crate::ticker::Instant;
 use crate::{
   events::{
     dispatcher::Dispatcher,
