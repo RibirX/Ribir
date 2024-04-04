@@ -10,16 +10,13 @@ use winit::{
   event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
 };
 
-#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
-pub struct App {
-  event_loop: EventLoop<AppEvent>,
-  active_wnd: Option<WindowId>,
-  events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
-}
-
-#[cfg(target_family = "wasm")]
 pub struct App {
   event_loop_proxy: EventLoopProxy<AppEvent>,
+  /// The event loop of the application, it's only available on native platform
+  /// after `App::exec` called
+  event_loop: Option<EventLoop<AppEvent>>,
+  #[cfg(not(target_family = "wasm"))]
+  active_wnd: Option<WindowId>,
   events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
 }
 
@@ -171,77 +168,6 @@ impl App {
   }
 }
 
-#[cfg(target_family = "wasm")]
-static mut APP: Option<App> = None;
-
-#[cfg(target_family = "wasm")]
-impl App {
-  /// build the ribir application from the root widget.
-  /// the ribir application will be running at the first canvas with class name
-  /// of ribir_canvas
-  pub async fn exec(root: impl WidgetBuilder + 'static) {
-    const RIBIR_CANVAS: &str = "ribir_canvas";
-    const RIBIR_CANVAS_USED: &str = "ribir_canvas_used";
-
-    use web_sys::wasm_bindgen::JsCast;
-    use winit::platform::web::EventLoopExtWebSys;
-    let document = web_sys::window().unwrap().document().unwrap();
-    let elems = document.get_elements_by_class_name(RIBIR_CANVAS);
-
-    let len = elems.length();
-    for idx in 0..len {
-      if let Some(elem) = elems.get_with_index(idx) {
-        let mut classes_name = elem.class_name();
-        if !classes_name.split(" ").any(|v| v == RIBIR_CANVAS_USED) {
-          let mut canvas = elem.clone().dyn_into::<web_sys::HtmlCanvasElement>();
-          if canvas.is_err() {
-            let child = document.create_element("canvas").unwrap();
-            if elem.append_child(&child).is_ok() {
-              canvas = child.dyn_into::<web_sys::HtmlCanvasElement>();
-            }
-          }
-          if let Ok(canvas) = canvas {
-            classes_name.push_str(&format!(" {}", RIBIR_CANVAS_USED));
-            elem.set_class_name(&classes_name);
-
-            let event_loop = EventLoopBuilder::with_user_event().build().unwrap();
-            App::init(&event_loop);
-            let shell_wnd = WinitShellWnd::new_with_canvas(canvas, &event_loop).await;
-            AppCtx::new_window(Box::new(shell_wnd), root);
-            event_loop.spawn(App::event_loop_handle);
-            return;
-          }
-        }
-      }
-    }
-  }
-
-  /// Get a event sender of the application event loop, you can use this to send
-  /// event.
-  pub fn event_sender() -> EventSender {
-    let proxy = App::shared().event_loop_proxy.clone();
-    EventSender(proxy)
-  }
-
-  fn init(event_loop: &EventLoop<AppEvent>) {
-    let waker = EventWaker(event_loop.create_proxy());
-    unsafe {
-      AppCtx::set_runtime_waker(Box::new(waker));
-    }
-    register_platform_app_events_handlers();
-    unsafe {
-      APP = Some(App {
-        event_loop_proxy: event_loop.create_proxy(),
-        events_stream: <_>::default(),
-      });
-    }
-  }
-
-  #[track_caller]
-  unsafe fn shared_mut() -> &'static mut App { APP.as_mut().unwrap() }
-}
-
-#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 impl App {
   /// Start an application with the `root` widget, this will use the default
   /// theme to create an application and use the `root` widget to create a
@@ -254,24 +180,42 @@ impl App {
 
   /// Get a event sender of the application event loop, you can use this to send
   /// event.
-  pub fn event_sender() -> EventSender {
-    let proxy = App::shared().event_loop.create_proxy();
-    EventSender(proxy)
+  pub fn event_sender() -> EventSender { EventSender(App::shared().event_loop_proxy.clone()) }
+
+  /// Creating a new window using the `root` widget and the specified canvas.
+  /// Note: This is exclusive to the web platform.
+  #[cfg(target_family = "wasm")]
+  pub fn new_with_canvas(
+    root: impl WidgetBuilder,
+    canvas: web_sys::HtmlCanvasElement,
+  ) -> std::rc::Rc<Window> {
+    let app = unsafe { App::shared_mut() };
+    let event_loop = app.event_loop.as_ref().expect(
+      " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
+    );
+    let shell_wnd = WinitShellWnd::new_with_canvas(canvas, &event_loop);
+    let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
+    wnd
   }
 
   /// create a new window with the `root` widget
   #[track_caller]
-  pub fn new_window(root: impl WidgetBuilder + 'static, size: Option<Size>) -> std::rc::Rc<Window> {
+  pub fn new_window(root: impl WidgetBuilder, size: Option<Size>) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
-    let shell_wnd = WinitShellWnd::new(size, &app.event_loop);
+    let event_loop = app.event_loop.as_ref().expect(
+      " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
+    );
+    let shell_wnd = WinitShellWnd::new(size, event_loop);
     let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
 
+    #[cfg(not(target_family = "wasm"))]
     if app.active_wnd.is_none() {
       app.active_wnd = Some(wnd.id());
     }
     wnd
   }
 
+  #[cfg(not(target_family = "wasm"))]
   pub fn active_window() -> std::rc::Rc<Window> {
     App::shared()
       .active_wnd
@@ -281,6 +225,7 @@ impl App {
 
   /// set the window with `id` to be the active window, and the active window.
   #[track_caller]
+  #[cfg(not(target_family = "wasm"))]
   pub fn set_active_window(id: WindowId) {
     let app = unsafe { App::shared_mut() };
     app.active_wnd = Some(id);
@@ -299,10 +244,22 @@ impl App {
   /// thread until the application exit.
   #[track_caller]
   pub fn exec() {
-    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
-    Self::active_window().draw_frame();
-    let event_loop = &mut unsafe { App::shared_mut() }.event_loop;
-    let _ = event_loop.run_on_demand(App::event_loop_handle);
+    #[cfg(not(target_family = "wasm"))]
+    {
+      use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+      Self::active_window().draw_frame();
+      let event_loop = unsafe { App::shared_mut() }.event_loop.as_mut().unwrap();
+      let _ = event_loop.run_on_demand(App::event_loop_handle);
+    }
+
+    #[cfg(target_family = "wasm")]
+    {
+      use winit::platform::web::EventLoopExtWebSys;
+      let event_loop = unsafe { App::shared_mut() }.event_loop.take().expect(
+        "Event loop consumed. You can't exec the application after `App::exec` called in Web platform.",
+      );
+      event_loop.spawn(App::event_loop_handle);
+    }
   }
 
   #[track_caller]
@@ -313,13 +270,16 @@ impl App {
       let event_loop = EventLoopBuilder::with_user_event().build().unwrap();
       let waker = EventWaker(event_loop.create_proxy());
       unsafe {
+        #[cfg(not(target_family = "wasm"))]
         AppCtx::set_clipboard(Box::new(crate::clipboard::Clipboard::new().unwrap()));
         AppCtx::set_runtime_waker(Box::new(waker));
       }
       register_platform_app_events_handlers();
       APP = Some(App {
-        event_loop,
+        event_loop_proxy: event_loop.create_proxy(),
+        event_loop: Some(event_loop),
         events_stream: <_>::default(),
+        #[cfg(not(target_family = "wasm"))]
         active_wnd: None,
       })
     });

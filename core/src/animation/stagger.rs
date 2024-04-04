@@ -41,7 +41,9 @@ use super::*;
 use crate::prelude::*;
 use ribir_algo::Sc;
 use ribir_macros::rdl;
-use std::time::{Duration, Instant};
+// fixme: rxRust not use std::time::Instant in web
+#[cfg(target_family = "wasm")]
+use std::time::Instant;
 
 /// The controller of a stagger animation. It's allow you to transition states
 /// and run animation in a stagger way.

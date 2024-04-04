@@ -1,6 +1,5 @@
 use crate::todos::{Task, Todos};
 use ribir::prelude::*;
-use std::time::Duration;
 
 impl Compose for Todos {
   fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {

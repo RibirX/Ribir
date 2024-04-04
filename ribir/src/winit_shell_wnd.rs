@@ -178,21 +178,17 @@ pub(crate) fn new_id(id: winit::window::WindowId) -> WindowId {
 
 impl WinitShellWnd {
   #[cfg(target_family = "wasm")]
-  pub(crate) async fn new_with_canvas<T>(
+  pub(crate) fn new_with_canvas<T>(
     canvas: web_sys::HtmlCanvasElement,
     window_target: &EventLoopWindowTarget<T>,
   ) -> Self {
     use winit::platform::web::WindowBuilderExtWebSys;
-    let wnd_builder = winit::window::WindowBuilder::new().with_canvas(Some(canvas));
-    let winit_wnd = wnd_builder.build(window_target).unwrap();
+    let wnd = winit::window::WindowBuilder::new()
+      .with_canvas(Some(canvas))
+      .build(window_target)
+      .unwrap();
 
-    let ptr: *const winit::window::Window = &winit_wnd as *const winit::window::Window;
-    let backend = Backend::new(unsafe { &*ptr }).await;
-    WinitShellWnd {
-      backend,
-      winit_wnd,
-      cursor: CursorIcon::Default,
-    }
+    Self::inner_wnd(wnd)
   }
 
   pub(crate) fn new<T>(size: Option<Size>, window_target: &EventLoopWindowTarget<T>) -> Self {
@@ -201,9 +197,49 @@ impl WinitShellWnd {
       winit_wnd = winit_wnd.with_inner_size(LogicalSize::new(size.width, size.height));
     }
 
-    let winit_wnd = winit_wnd.build(window_target).unwrap();
-    let ptr: *const winit::window::Window = &winit_wnd as *const winit::window::Window;
-    let backend = AppCtx::wait_future(Backend::new(unsafe { &*ptr }));
+    // A canvas need configure in web platform.
+    #[cfg(target_family = "wasm")]
+    {
+      use winit::platform::web::WindowBuilderExtWebSys;
+      const RIBIR_CANVAS: &str = "ribir_canvas";
+      const RIBIR_CANVAS_USED: &str = "ribir_canvas_used";
+
+      use web_sys::wasm_bindgen::JsCast;
+      let document = web_sys::window().unwrap().document().unwrap();
+      let elems = document.get_elements_by_class_name(RIBIR_CANVAS);
+
+      let len = elems.length();
+      for idx in 0..len {
+        if let Some(elem) = elems.get_with_index(idx) {
+          let mut classes_name = elem.class_name();
+          if !classes_name.split(" ").any(|v| v == RIBIR_CANVAS_USED) {
+            let mut canvas = elem.clone().dyn_into::<web_sys::HtmlCanvasElement>();
+            if canvas.is_err() {
+              let child = document.create_element("canvas").unwrap();
+              if elem.append_child(&child).is_ok() {
+                canvas = child.dyn_into::<web_sys::HtmlCanvasElement>();
+              }
+            }
+            if let Ok(canvas) = canvas {
+              classes_name.push_str(&format!(" {}", RIBIR_CANVAS_USED));
+              elem.set_class_name(&classes_name);
+              winit_wnd = winit_wnd.with_canvas(Some(canvas));
+            }
+          }
+        }
+      }
+    }
+
+    let wnd = winit_wnd.build(window_target).unwrap();
+    Self::inner_wnd(wnd)
+  }
+
+  fn inner_wnd(winit_wnd: winit::window::Window) -> Self {
+    let ptr = &winit_wnd as *const winit::window::Window;
+    // Safety: a reference to winit_wnd is valid as long as the WinitShellWnd is
+    // alive.
+    let backend = Backend::new(unsafe { &*ptr });
+    let backend = AppCtx::wait_future(backend);
     WinitShellWnd {
       backend,
       winit_wnd,

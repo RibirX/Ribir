@@ -25,7 +25,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
-- **ribir**: compile wasm (@wjian23)
+- **ribir**: compile wasm (#543 @wjian23)
 
 ## [0.3.0-alpha.2] - 2024-04-03
 

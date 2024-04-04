@@ -554,7 +554,6 @@ pub mod tests {
   use crate::gpu_backend::tests::headless;
   use crate::{WgpuImpl, WgpuTexture};
   use futures::executor::block_on;
-  use ribir_algo::ShareResource;
 
   use ribir_geom::*;
   use ribir_painter::Color;
