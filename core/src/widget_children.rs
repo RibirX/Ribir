@@ -167,12 +167,14 @@ impl<W: PairChild, C> PairWithChild<C> for W {
   type Target = Pair<W, C>;
 
   #[inline]
+  #[track_caller]
   fn with_child(self, child: C, _: &BuildCtx) -> Self::Target { Pair { parent: self, child } }
 }
 
 impl<W, C1: PairChild, C2> PairWithChild<C2> for Pair<W, C1> {
   type Target = Pair<W, Pair<C1, C2>>;
 
+  #[track_caller]
   fn with_child(self, c: C2, ctx: &BuildCtx) -> Self::Target {
     let Pair { parent: widget, child } = self;
     Pair {

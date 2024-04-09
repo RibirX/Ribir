@@ -38,6 +38,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
     tokens.extend(quote! {
       impl #g_impl ComposeWithChild<_C, [_M; #f_idx]> for #builder #g_ty #g_where  {
         type Target = Self;
+        #[track_caller]
         fn with_child(mut self, c: _C, ctx: &BuildCtx) -> Self::Target {
           assert!(self.#field_name.is_none(), "Try to fill same type twice.");
           self.#field_name = Some(ChildFrom::child_from(c, ctx));
@@ -71,16 +72,19 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
         impl #g_impl FromAnother<#builder #g_ty, ()> for #name #g_ty #g_where {
           #[inline]
+          #[track_caller]
           fn from_another(value: #builder #g_ty, _: &BuildCtx) -> Self { value.build_tml() }
         }
 
         impl #g_impl std::convert::From<#builder #g_ty> for #name #g_ty #g_where {
           #[inline]
+          #[track_caller]
           fn from(value: #builder #g_ty) -> Self { value.build_tml() }
         }
 
         impl #g_impl std::convert::From<#builder #g_ty> for Option<#name #g_ty> #g_where {
           #[inline]
+          #[track_caller]
           fn from(value: #builder #g_ty) -> Self { Some(value.build_tml()) }
         }
       });
@@ -110,6 +114,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             impl #g_impl TemplateBuilder for #builder #g_ty #g_where {
               type Target = #name #g_ty;
               #[inline]
+              #[track_caller]
               fn build_tml(self) -> Self::Target {#name { #(#init_values),* }}
             }
           });
@@ -133,7 +138,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
           tokens.extend(quote! {
             impl #g_impl TemplateBuilder for #builder #g_ty #g_where {
               type Target = #name #g_ty;
-              #[inline]
+              #[track_caller]
               fn build_tml(self) -> Self::Target {#name(#(#init_values),* ) }
             }
           });
@@ -152,7 +157,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
         impl #g_impl TemplateBuilder for #builder #g_ty #g_where {
           type Target = #name #g_ty;
-          #[inline]
+          #[track_caller]
           fn build_tml(self) -> Self::Target {
             self.0.expect(&#err_str)
           }

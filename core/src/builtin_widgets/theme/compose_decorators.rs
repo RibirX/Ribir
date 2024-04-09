@@ -25,6 +25,7 @@ where
   State<T>: ComposeWithChild<C, M>,
 {
   type Target = <State<T> as ComposeWithChild<C, M>>::Target;
+  #[track_caller]
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
     State::value(self).with_child(child, ctx)
   }
@@ -36,6 +37,7 @@ where
   Widget: ChildFrom<C, M>,
 {
   type Target = Widget;
+  #[track_caller]
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
     let tid = TypeId::of::<W>();
     let style = ctx.find_cfg(|t| match t {
