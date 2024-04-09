@@ -174,6 +174,7 @@ impl<T> FatObj<T> {
   /// Maps an `FatObj<T>` to `FatObj<V>` by applying a function to the host
   /// object.
   #[inline]
+  #[track_caller]
   pub fn map<V>(self, f: impl FnOnce(T) -> V) -> FatObj<V> {
     FatObj {
       host: f(self.host),
@@ -985,6 +986,7 @@ impl<T: MultiChild> MultiChild for FatObj<T> {}
 
 crate::widget::multi_build_replace_impl! {
   impl<T: {#} > {#} for FatObj<T> {
+    #[track_caller]
     fn build(self, ctx: &BuildCtx) -> Widget {
       self.map(|host| host.build(ctx)).build(ctx)
     }
@@ -993,6 +995,7 @@ crate::widget::multi_build_replace_impl! {
 
 impl WidgetBuilder for FatObj<Widget> {
   #[inline]
+  #[track_caller]
   fn build(self, ctx: &BuildCtx) -> Widget {
     let mut host = self.host;
     self.host_id.set(host.id());
@@ -1069,8 +1072,12 @@ impl<T: ComposeWithChild<C, M>, C, M> ComposeWithChild<C, M> for FatObj<T> {
   type Target = FatObj<T::Target>;
 
   #[inline]
+  #[track_caller]
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    self.map(|host| host.with_child(child, ctx))
+    self.map(
+      #[cfg_attr(feature = "nightly", track_caller)]
+      |host| host.with_child(child, ctx),
+    )
   }
 }
 
@@ -1078,6 +1085,7 @@ impl<C> SingleWithChild<C, ()> for FatObj<()> {
   type Target = FatObj<C>;
 
   #[inline]
+  #[track_caller]
   fn with_child(self, child: C, _: &BuildCtx) -> Self::Target { self.map(move |_| child) }
 }
 
@@ -1085,16 +1093,19 @@ impl<T: PairWithChild<C>, C> PairWithChild<C> for FatObj<T> {
   type Target = Pair<FatObj<T>, C>;
 
   #[inline]
+  #[track_caller]
   fn with_child(self, child: C, _: &BuildCtx) -> Self::Target { Pair::new(self, child) }
 }
 
 impl<T: SingleParent + 'static> SingleParent for FatObj<T> {
+  #[track_caller]
   fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
     self.map(|host| host.compose_child(child, ctx)).build(ctx)
   }
 }
 
 impl<T: MultiParent + 'static> MultiParent for FatObj<T> {
+  #[track_caller]
   fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
     self
       .map(|host| host.compose_children(children, ctx))

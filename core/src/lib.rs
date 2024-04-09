@@ -1,3 +1,4 @@
+#![cfg_attr(feature = "nightly", feature(closure_track_caller))]
 #[macro_use]
 extern crate bitflags;
 extern crate lazy_static;

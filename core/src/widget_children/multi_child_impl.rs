@@ -54,7 +54,7 @@ where
   C: FillVec<M>,
 {
   type Target = MultiPair<P>;
-
+  #[track_caller]
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
     let mut children = vec![];
     child.fill_vec(&mut children, ctx);
@@ -68,6 +68,7 @@ where
 {
   type Target = Self;
   #[inline]
+  #[track_caller]
   fn with_child(mut self, child: C, ctx: &BuildCtx) -> Self::Target {
     child.fill_vec(&mut self.children, ctx);
     self

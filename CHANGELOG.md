@@ -29,6 +29,15 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **ribir**: compile wasm (#543 @wjian23)
 
+### Changed
+
+- **core**: Enhanced panic location tracking during widget build (#559 @M-Adoo)
+
+### Fixed
+
+- **examples**: fix crash issue in Storybook (#559 @M-Adoo)
+
+
 ## [0.3.0-alpha.2] - 2024-04-03
 
 

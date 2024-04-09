@@ -180,18 +180,21 @@ fn content() -> impl WidgetBuilder {
             @ { svgs::HOME }
             @ { Label::new("Video") }
           }
+          @TabPane { @ { fn_widget!(Void) } }
         }
         @Tab {
           @TabItem {
             @ { svgs::HOME }
             @ { Label::new("Photos") }
           }
+          @TabPane { @ { fn_widget!(Void) } }
         }
         @Tab {
           @TabItem {
             @ { svgs::HOME }
             @ { Label::new("Audio") }
           }
+          @TabPane { @ { fn_widget!(Void) } }
         }
       }
     }

@@ -19,6 +19,7 @@ impl<T> ChildFrom<T, ()> for T {
 
 impl<C, T: FromAnother<C, M>, M> ChildFrom<C, (M,)> for T {
   #[inline]
+  #[track_caller]
   fn child_from(value: C, ctx: &BuildCtx) -> Self { FromAnother::from_another(value, ctx) }
 }
 

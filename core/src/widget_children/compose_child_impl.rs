@@ -31,6 +31,7 @@ where
   State<T>: ComposeWithChild<C, M>,
 {
   type Target = <State<T> as ComposeWithChild<C, M>>::Target;
+  #[track_caller]
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
     State::value(self).with_child(child, ctx)
   }
@@ -41,7 +42,7 @@ where
   C1: ComposeWithChild<C2, M>,
 {
   type Target = Pair<W, C1::Target>;
-
+  #[track_caller]
   fn with_child(self, c: C2, ctx: &BuildCtx) -> Self::Target {
     let Pair { parent: widget, child } = self;
     Pair {
@@ -60,6 +61,7 @@ where
   type Target = Pair<Self, Child>;
 
   #[inline]
+  #[track_caller]
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
     Pair {
       parent: self,
@@ -78,6 +80,7 @@ where
   type Target = Pair<W, Child::Builder>;
 
   #[inline]
+  #[track_caller]
   fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
     let builder = Child::builder();
     let child = builder.with_child(c, ctx);
@@ -93,7 +96,7 @@ where
   Child::Builder: ComposeWithChild<C, M, Target = Child::Builder>,
 {
   type Target = Pair<W, Child::Builder>;
-
+  #[track_caller]
   fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
     let builder = Child::builder();
     let child = builder.with_child(c, ctx);
@@ -146,6 +149,7 @@ where
   type Target = Self;
 
   #[inline]
+  #[track_caller]
   fn with_child(mut self, child: C, ctx: &BuildCtx) -> Self::Target {
     self.push(ChildFrom::child_from(child, ctx));
     self
@@ -160,6 +164,7 @@ where
   type Target = Self;
 
   #[inline]
+  #[track_caller]
   fn with_child(mut self, child: C, ctx: &BuildCtx) -> Self::Target {
     self.extend(child.into_iter().map(|v| ChildFrom::child_from(v, ctx)));
     self
