@@ -9,10 +9,7 @@ fn widget_bench(b: &mut Bencher, w: impl WidgetBuilder) {
 
 fn widgets_bench_one_by_one(c: &mut Criterion) {
   c.bench_function("checkbox", |b| {
-    widget_bench(
-      b,
-      fn_widget!(@Checkbox { checked: true, indeterminate: true }),
-    );
+    widget_bench(b, fn_widget!(@Checkbox { checked: true, indeterminate: true }));
   });
 }
 

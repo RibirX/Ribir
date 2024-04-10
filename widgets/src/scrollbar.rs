@@ -1,5 +1,6 @@
-use crate::layout::{Stack, StackFit};
 use ribir_core::prelude::*;
+
+use crate::layout::{Stack, StackFit};
 
 /// A control widget that enables the user to access horizontal parts child that
 /// is larger than the box rect.
@@ -301,10 +302,11 @@ impl CustomStyle for ScrollBarStyle {
 
 #[cfg(test)]
 mod test {
-  use super::*;
-  use crate::layout::{Column, ConstrainedBox};
   use ribir_core::{reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
+
+  use super::*;
+  use crate::layout::{Column, ConstrainedBox};
 
   fn content_expand_so_all_view_can_scroll() -> impl WidgetBuilder {
     fn_widget! {

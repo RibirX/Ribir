@@ -1,9 +1,10 @@
-use serde::{Deserialize, Serialize};
 use std::{
   collections::BTreeMap,
   fs::File,
   io::{self, BufWriter, Write},
 };
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Todos {
@@ -26,7 +27,9 @@ impl Todos {
     let id = self.next_id;
     self.next_id = self.next_id.next();
 
-    self.tasks.insert(id, Task { id, label, complete: false });
+    self
+      .tasks
+      .insert(id, Task { id, label, complete: false });
     id
   }
 
@@ -47,10 +50,7 @@ impl Todos {
   pub fn load() -> Self {
     std::fs::read(Self::store_path())
       .map(|v| serde_json::from_slice(v.as_slice()).unwrap())
-      .unwrap_or_else(|_| Todos {
-        tasks: BTreeMap::new(),
-        next_id: TaskId(0),
-      })
+      .unwrap_or_else(|_| Todos { tasks: BTreeMap::new(), next_id: TaskId(0) })
   }
 
   pub fn save(&self) -> Result<(), io::Error> {

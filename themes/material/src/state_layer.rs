@@ -1,6 +1,5 @@
 use ribir_core::prelude::*;
-use ribir_widgets::prelude::StackFit;
-use ribir_widgets::{layout::Stack, path::PathPaintKit};
+use ribir_widgets::{layout::Stack, path::PathPaintKit, prelude::StackFit};
 
 /// Widget that as an visual indicator of material design used to present the
 /// interactive status of its child.

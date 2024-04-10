@@ -5,12 +5,13 @@ pub type LifecycleEvent = CommonEvent;
 
 #[cfg(test)]
 mod tests {
+  use std::collections::HashSet;
+
   use crate::{
     prelude::*,
     reset_test_env,
     test_helper::{split_value, MockBox, MockMulti, TestWindow},
   };
-  use std::collections::HashSet;
 
   #[test]
   fn full_lifecycle() {
@@ -57,12 +58,7 @@ mod tests {
 
     assert_eq!(
       &**c_lc.read(),
-      [
-        "static mounted",
-        "dyn mounted",
-        "dyn performed layout",
-        "static performed layout",
-      ]
+      ["static mounted", "dyn mounted", "dyn performed layout", "static performed layout",]
     );
     {
       *c_trigger.write() += 1;

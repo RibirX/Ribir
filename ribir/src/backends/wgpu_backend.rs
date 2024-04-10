@@ -18,10 +18,7 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
     let surface = instance.create_surface(window).unwrap();
     let wgpu = ribir_gpu::WgpuImpl::new(instance, Some(&surface)).await;
     let size = window.inner_size();
-    surface.configure(
-      wgpu.device(),
-      &Self::surface_config(size.width, size.height),
-    );
+    surface.configure(wgpu.device(), &Self::surface_config(size.width, size.height));
 
     WgpuBackend {
       size: DeviceSize::new(size.width as i32, size.height as i32),
@@ -49,10 +46,7 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
   }
 
   fn draw_commands(
-    &mut self,
-    viewport: DeviceRect,
-    commands: Vec<PaintCommand>,
-    surface_color: Color,
+    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, surface_color: Color,
   ) {
     let surface = self.current_texture.as_mut().unwrap();
 

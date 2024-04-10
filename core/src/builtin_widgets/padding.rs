@@ -64,9 +64,10 @@ impl Padding {
 
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::*;
+
   use super::*;
   use crate::test_helper::*;
-  use ribir_dev_helper::*;
 
   fn smoke() -> impl WidgetBuilder {
     fn_widget! {

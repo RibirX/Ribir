@@ -1,8 +1,9 @@
-use ribir_algo::{FrameCache, Substr};
 use std::{
   ops::Range,
   sync::{Arc, RwLock},
 };
+
+use ribir_algo::{FrameCache, Substr};
 use unicode_bidi::{BidiClass, BidiInfo, Level, LevelRun};
 
 pub struct Paragraph {
@@ -46,17 +47,20 @@ impl TextReorder {
         })
       }
 
-      let result = Arc::new(ReorderResult {
-        original_classes: info.original_classes,
-        paras,
-      });
+      let result = Arc::new(ReorderResult { original_classes: info.original_classes, paras });
       let mut cache = self.cache.write().unwrap();
       cache.put(text.clone(), result.clone());
       result
     })
   }
 
-  pub fn end_frame(&mut self) { self.cache.write().unwrap().end_frame("Text Reorder"); }
+  pub fn end_frame(&mut self) {
+    self
+      .cache
+      .write()
+      .unwrap()
+      .end_frame("Text Reorder");
+  }
 }
 
 #[cfg(test)]
@@ -76,7 +80,10 @@ mod tests {
     let Paragraph { runs, levels, .. } = &result.paras[0];
 
     assert_eq!(
-      &levels.iter().map(|l| l.number()).collect::<Vec<_>>(),
+      &levels
+        .iter()
+        .map(|l| l.number())
+        .collect::<Vec<_>>(),
       &[1, 1, 1, 1, 1, 1, 2, 2, 2]
     );
 

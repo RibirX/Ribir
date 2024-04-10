@@ -1,17 +1,14 @@
-use log::warn;
-use quick_xml::events::attributes::Attribute;
-use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::QName;
-use quick_xml::reader::Reader;
-use ribir_painter::Svg;
-use rustybuzz::ttf_parser::GlyphId;
+use std::{borrow::Cow, collections::BTreeMap, io::prelude::*, ops::RangeInclusive};
 
 use ahash::{HashMap, HashSet};
-use std::borrow::Cow;
-
-use std::collections::BTreeMap;
-use std::io::prelude::*;
-use std::ops::RangeInclusive;
+use log::warn;
+use quick_xml::{
+  events::{attributes::Attribute, BytesStart, Event},
+  name::QName,
+  reader::Reader,
+};
+use ribir_painter::Svg;
+use rustybuzz::ttf_parser::GlyphId;
 
 #[derive(Default)]
 pub struct SvgGlyphCache {
@@ -85,11 +82,16 @@ impl SvgDocument {
     let ascender = face.ascender() as i32;
     let mut writer = std::io::Cursor::new(Vec::new());
 
-    writer.write_all(format!(
-      "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\" width=\"{}\" height=\"{}\" viewBox=\"{},{},{},{}\">",
-       units_per_em, units_per_em,
-       0, -ascender, units_per_em, units_per_em
-      ).as_bytes()).ok()?;
+    writer
+      .write_all(
+        format!(
+          "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" \
+           version=\"1.1\" width=\"{}\" height=\"{}\" viewBox=\"{},{},{},{}\">",
+          units_per_em, units_per_em, 0, -ascender, units_per_em, units_per_em
+        )
+        .as_bytes(),
+      )
+      .ok()?;
     writer.write_all("<defs>".as_bytes()).ok()?;
     for link in all_links {
       if let Some(content) = self.elems.get(&link) {
@@ -133,15 +135,15 @@ impl SvgDocument {
   }
 
   fn collect_named_obj(
-    reader: &mut Reader<&[u8]>,
-    elems: &mut HashMap<String, String>,
-    source: &str,
-    e: &BytesStart,
+    reader: &mut Reader<&[u8]>, elems: &mut HashMap<String, String>, source: &str, e: &BytesStart,
     has_children: bool,
   ) {
     if let Some(id) = e
       .attributes()
-      .find(|a| a.as_ref().map_or(false, |a| a.key == QName(b"id")))
+      .find(|a| {
+        a.as_ref()
+          .map_or(false, |a| a.key == QName(b"id"))
+      })
       .map(|a| a.unwrap().value)
     {
       unsafe {
@@ -152,10 +154,7 @@ impl SvgDocument {
   }
 
   unsafe fn extra_elem(
-    reader: &mut Reader<&[u8]>,
-    e: &BytesStart,
-    source: &str,
-    has_children: bool,
+    reader: &mut Reader<&[u8]>, e: &BytesStart, source: &str, has_children: bool,
   ) -> String {
     let content = if has_children {
       let mut buf = Vec::new();
@@ -170,12 +169,7 @@ impl SvgDocument {
     let name = e.name();
     let name = reader.decoder().decode(name.as_ref()).unwrap();
 
-    format!(
-      "<{}>{}</{}>",
-      std::str::from_utf8_unchecked(e),
-      content,
-      name
-    )
+    format!("<{}>{}</{}>", std::str::from_utf8_unchecked(e), content, name)
   }
 
   fn collect_link(content: &str, all_links: &mut HashSet<String>) -> Vec<String> {
@@ -218,9 +212,7 @@ impl SvgDocument {
   }
 
   fn collect_link_from_attrs(
-    elem: &BytesStart,
-    all_links: &mut HashSet<String>,
-    new_links: &mut Vec<String>,
+    elem: &BytesStart, all_links: &mut HashSet<String>, new_links: &mut Vec<String>,
   ) {
     let attributes = elem.attributes();
 
@@ -241,9 +233,10 @@ impl SvgDocument {
 
 #[cfg(test)]
 mod tests {
+  use rustybuzz::ttf_parser::GlyphId;
+
   use super::{SvgDocument, SvgDocumentCache};
   use crate::font_db::FontDB;
-  use rustybuzz::ttf_parser::GlyphId;
 
   #[test]
   fn test_svg_document() {
@@ -269,14 +262,20 @@ mod tests {
         </svg>"##;
     let doc = super::SvgDocument::new(GlyphId(2428)..=GlyphId(2428), content.as_bytes());
     let mut db = FontDB::default();
-    let dummy_face = db.face_data_or_insert(db.default_fonts()[0]).unwrap();
+    let dummy_face = db
+      .face_data_or_insert(db.default_fonts()[0])
+      .unwrap();
     assert_eq!(doc.elems.len(), 4);
     assert!(
       doc
         .glyph_svg(GlyphId(2428), dummy_face.as_rb_face())
         .is_some()
     );
-    assert!(doc.glyph_svg(GlyphId(0), dummy_face.as_rb_face()).is_none());
+    assert!(
+      doc
+        .glyph_svg(GlyphId(0), dummy_face.as_rb_face())
+        .is_none()
+    );
   }
 
   #[test]
@@ -288,14 +287,23 @@ mod tests {
 
     assert_eq!(
       Some(GlyphId(11)),
-      cache.get(GlyphId(11)).map(|doc| *doc.range.start())
+      cache
+        .get(GlyphId(11))
+        .map(|doc| *doc.range.start())
     );
 
     assert_eq!(
       Some(GlyphId(31)),
-      cache.get(GlyphId(40)).map(|doc| *doc.range.start())
+      cache
+        .get(GlyphId(40))
+        .map(|doc| *doc.range.start())
     );
 
-    assert_eq!(None, cache.get(GlyphId(21)).map(|doc| *doc.range.start()));
+    assert_eq!(
+      None,
+      cache
+        .get(GlyphId(21))
+        .map(|doc| *doc.range.start())
+    );
   }
 }

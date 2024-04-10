@@ -16,7 +16,10 @@ fn declarer_smoke() {
     b: i32,
   }
 
-  let b = <B as Declare>::declarer().a(1.).b(1).finish(dummy_ctx());
+  let b = <B as Declare>::declarer()
+    .a(1.)
+    .b(1)
+    .finish(dummy_ctx());
   assert_eq!(b.read().a, 1.);
   assert_eq!(b.read().b, 1);
 }

@@ -1,20 +1,23 @@
-use crate::fn_widget_macro;
-use crate::pipe_macro::PipeMacro;
-use crate::rdl_macro::RdlMacro;
-use crate::variable_names::{BuiltinMemberType, BUILTIN_INFOS};
-use crate::writer_map_macro::{gen_map_path_writer, gen_split_path_writer};
-use crate::{variable_names::ribir_suffix_variable, watch_macro::WatchMacro};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use smallvec::{smallvec, SmallVec};
 use syn::{
   fold::Fold,
   parse::{Parse, ParseStream},
+  parse_quote, parse_quote_spanned,
   spanned::Spanned,
   token::Dollar,
   Expr, ExprField, ExprMethodCall, Macro, Member,
 };
-use syn::{parse_quote, parse_quote_spanned};
+
+use crate::{
+  fn_widget_macro,
+  pipe_macro::PipeMacro,
+  rdl_macro::RdlMacro,
+  variable_names::{ribir_suffix_variable, BuiltinMemberType, BUILTIN_INFOS},
+  watch_macro::WatchMacro,
+  writer_map_macro::{gen_map_path_writer, gen_split_path_writer},
+};
 
 pub const KW_DOLLAR_STR: &str = "_dollar_ಠ_ಠ";
 pub const KW_CTX: &str = "ctx";
@@ -70,10 +73,9 @@ mod tokens_pre_process {
   use crate::symbol_process::KW_RDL;
 
   fn rdl_syntax_err<T>(at: Span, follow: Option<Span>) -> Result<T, TokenStream> {
-    let err_msg = "Syntax Error: use `@` to declare object, must be: \n \
-    1. `@ XXX { ... }`, declare a new `XXX` type object;\n \
-    2. `@ $parent { ... }`, declare a variable as parent;\n \
-    3. `@ { ... } `, declare an object by an expression.";
+    let err_msg = "Syntax Error: use `@` to declare object, must be: \n 1. `@ XXX { ... }`, \
+                   declare a new `XXX` type object;\n 2. `@ $parent { ... }`, declare a variable \
+                   as parent;\n 3. `@ { ... } `, declare an object by an expression.";
 
     let err_tokens = if let Some(follow) = follow {
       let mut err_tokens = quote_spanned! { at.into() => compile_error! };
@@ -416,7 +418,9 @@ impl DollarRefsCtx {
   #[inline]
   pub fn new_dollar_scope(&mut self, has_capture: bool) {
     if has_capture {
-      self.capture_level_heads.push(self.variable_stacks.len());
+      self
+        .capture_level_heads
+        .push(self.variable_stacks.len());
       // new scope level, should start a new variables scope, otherwise the local
       // variables will record in its parent level.
       self.variable_stacks.push(vec![]);
@@ -466,7 +470,10 @@ impl DollarRefsCtx {
 
       for r in scope.refs.iter_mut() {
         if !self.is_local_var(r.host()) && self.scopes.len() > 1 {
-          self.current_dollar_scope_mut().refs.push(r.clone());
+          self
+            .current_dollar_scope_mut()
+            .refs
+            .push(r.clone());
           // if ref variable is not a local variable of parent capture level, should
           // remove its builtin info as a normal variable, because parent will capture the
           // builtin object individually.
@@ -501,9 +508,7 @@ impl DollarRefsCtx {
   fn mark_used_ctx(&mut self) { self.current_dollar_scope_mut().used_ctx = true; }
 
   fn replace_builtin_ident(
-    &mut self,
-    caller: &mut Expr,
-    builtin_member: &str,
+    &mut self, caller: &mut Expr, builtin_member: &str,
   ) -> Option<&DollarRef> {
     let mut write = false;
     let e = if let Expr::MethodCall(m) = caller {
@@ -525,11 +530,7 @@ impl DollarRefsCtx {
     let dollar_ref = DollarRef { name, builtin, write };
 
     let state = self.builtin_host_tokens(&dollar_ref);
-    m.mac.tokens = if write {
-      expand_write_method(state)
-    } else {
-      expand_read(state)
-    };
+    m.mac.tokens = if write { expand_write_method(state) } else { expand_read(state) };
     mark_macro_expanded(&mut m.mac);
 
     self.add_dollar_ref(dollar_ref);
@@ -537,13 +538,20 @@ impl DollarRefsCtx {
   }
 
   fn new_local_var(&mut self, name: &Ident) {
-    self.variable_stacks.last_mut().unwrap().push(name.clone())
+    self
+      .variable_stacks
+      .last_mut()
+      .unwrap()
+      .push(name.clone())
   }
 
   fn add_dollar_ref(&mut self, dollar_ref: DollarRef) {
     // local variable is not a outside reference.
     if !self.is_local_var(dollar_ref.host()) {
-      let scope = self.scopes.last_mut().expect("no dollar refs scope");
+      let scope = self
+        .scopes
+        .last_mut()
+        .expect("no dollar refs scope");
       scope.refs.push(dollar_ref);
     }
   }
@@ -553,11 +561,18 @@ impl DollarRefsCtx {
   }
 
   fn current_dollar_scope_mut(&mut self) -> &mut DollarRefsScope {
-    self.scopes.last_mut().expect("no dollar refs scope")
+    self
+      .scopes
+      .last_mut()
+      .expect("no dollar refs scope")
   }
 
   fn is_local_var(&self, name: &Ident) -> bool {
-    let stack_idx = self.capture_level_heads.last().copied().unwrap_or(0);
+    let stack_idx = self
+      .capture_level_heads
+      .last()
+      .copied()
+      .unwrap_or(0);
     self.variable_stacks[stack_idx..]
       .iter()
       .any(|stack| stack.contains(name))
@@ -640,11 +655,7 @@ impl<'a> Drop for StackGuard<'a> {
 
 impl Default for DollarRefsCtx {
   fn default() -> Self {
-    Self {
-      scopes: smallvec![],
-      capture_level_heads: smallvec![],
-      variable_stacks: vec![vec![]],
-    }
+    Self { scopes: smallvec![], capture_level_heads: smallvec![], variable_stacks: vec![vec![]] }
   }
 }
 

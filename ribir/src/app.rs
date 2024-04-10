@@ -1,13 +1,14 @@
-use crate::register_platform_app_events_handlers;
-use crate::winit_shell_wnd::{new_id, WinitShellWnd};
-use ribir_core::{prelude::*, timer::Timer, window::WindowId};
 use std::convert::Infallible;
-use winit::event::ElementState;
-use winit::event_loop::EventLoopWindowTarget;
 
+use ribir_core::{prelude::*, timer::Timer, window::WindowId};
 use winit::{
-  event::{Event, Ime, KeyEvent, StartCause, WindowEvent},
-  event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
+  event::{ElementState, Event, Ime, KeyEvent, StartCause, WindowEvent},
+  event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy, EventLoopWindowTarget},
+};
+
+use crate::{
+  register_platform_app_events_handlers,
+  winit_shell_wnd::{new_id, WinitShellWnd},
 };
 
 pub struct App {
@@ -60,15 +61,7 @@ impl App {
     static mut PRE_EDIT_HANDLE: PreEditHandle = PreEditHandle::new();
     match event {
       WindowEvent::KeyboardInput { event, .. } => {
-        let KeyEvent {
-          physical_key,
-          logical_key,
-          text,
-          location,
-          repeat,
-          state,
-          ..
-        } = event;
+        let KeyEvent { physical_key, logical_key, text, location, repeat, state, .. } = event;
         if unsafe { PRE_EDIT_HANDLE.is_in_pre_edit() } {
           return;
         }
@@ -186,8 +179,7 @@ impl App {
   /// Note: This is exclusive to the web platform.
   #[cfg(target_family = "wasm")]
   pub fn new_with_canvas(
-    root: impl WidgetBuilder,
-    canvas: web_sys::HtmlCanvasElement,
+    root: impl WidgetBuilder, canvas: web_sys::HtmlCanvasElement,
   ) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
@@ -248,16 +240,23 @@ impl App {
     {
       use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
       Self::active_window().draw_frame();
-      let event_loop = unsafe { App::shared_mut() }.event_loop.as_mut().unwrap();
+      let event_loop = unsafe { App::shared_mut() }
+        .event_loop
+        .as_mut()
+        .unwrap();
       let _ = event_loop.run_on_demand(App::event_loop_handle);
     }
 
     #[cfg(target_family = "wasm")]
     {
       use winit::platform::web::EventLoopExtWebSys;
-      let event_loop = unsafe { App::shared_mut() }.event_loop.take().expect(
-        "Event loop consumed. You can't exec the application after `App::exec` called in Web platform.",
-      );
+      let event_loop = unsafe { App::shared_mut() }
+        .event_loop
+        .take()
+        .expect(
+          "Event loop consumed. You can't exec the application after `App::exec` called in Web \
+           platform.",
+        );
       event_loop.spawn(App::event_loop_handle);
     }
   }
@@ -267,7 +266,9 @@ impl App {
     static mut INIT_ONCE: std::sync::Once = std::sync::Once::new();
     static mut APP: Option<App> = None;
     INIT_ONCE.call_once(|| {
-      let event_loop = EventLoopBuilder::with_user_event().build().unwrap();
+      let event_loop = EventLoopBuilder::with_user_event()
+        .build()
+        .unwrap();
       let waker = EventWaker(event_loop.create_proxy());
       unsafe {
         #[cfg(not(target_family = "wasm"))]
@@ -307,7 +308,10 @@ unsafe impl Send for EventWaker {}
 
 pub(crate) fn request_redraw(wnd: &Window) {
   let wnd = wnd.shell_wnd().borrow();
-  let shell = wnd.as_any().downcast_ref::<WinitShellWnd>().unwrap();
+  let shell = wnd
+    .as_any()
+    .downcast_ref::<WinitShellWnd>()
+    .unwrap();
   shell.winit_wnd.request_redraw();
 }
 
@@ -356,21 +360,19 @@ impl PreEditHandle {
       wnd.processes_ime_pre_edit(ImePreEdit::Begin);
     }
 
-    wnd.processes_ime_pre_edit(ImePreEdit::PreEdit {
-      value: txt.to_owned(),
-      cursor: *cursor,
-    });
+    wnd.processes_ime_pre_edit(ImePreEdit::PreEdit { value: txt.to_owned(), cursor: *cursor });
     self.0 = Some(txt.to_owned());
   }
 }
 
 #[cfg(test)]
 mod tests {
+  use std::{cell::RefCell, rc::Rc};
+
   use ribir_core::{
     prelude::*,
     test_helper::{MockBox, TestWindow},
   };
-  use std::{cell::RefCell, rc::Rc};
   use winit::event::{Ime, WindowEvent};
 
   use super::App;
@@ -408,26 +410,16 @@ mod tests {
     wnd.draw_frame();
 
     App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Enabled));
-    App::dispatch_wnd_native_event(
-      &wnd,
-      WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)),
-    );
+    App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)));
     App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Disabled));
     wnd.draw_frame();
     assert_eq!(
       &*log.borrow(),
-      &[
-        "on_ime_pre_edit_begin",
-        "on_ime_pre_edit_update hello",
-        "on_ime_pre_edit_end"
-      ]
+      &["on_ime_pre_edit_begin", "on_ime_pre_edit_update hello", "on_ime_pre_edit_end"]
     );
 
     log.borrow_mut().clear();
-    App::dispatch_wnd_native_event(
-      &wnd,
-      WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)),
-    );
+    App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)));
     App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Commit("hello".to_string())));
     wnd.draw_frame();
     assert_eq!(
@@ -441,10 +433,7 @@ mod tests {
     );
 
     log.borrow_mut().clear();
-    App::dispatch_wnd_native_event(
-      &wnd,
-      WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)),
-    );
+    App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)));
     let device_id = unsafe { winit::event::DeviceId::dummy() };
     App::dispatch_wnd_native_event(
       &wnd,

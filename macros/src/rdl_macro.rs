@@ -1,12 +1,8 @@
-use crate::{
-  declare_obj::DeclareObj,
-  ok,
-  symbol_process::{kw, symbol_to_macro, DollarRefsCtx},
-};
+use std::collections::HashSet;
+
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote_spanned, ToTokens};
-use std::collections::HashSet;
 use syn::{
   braced,
   fold::Fold,
@@ -16,6 +12,12 @@ use syn::{
   spanned::Spanned,
   token::{Brace, Colon, Comma, Dollar, Not},
   Expr, Ident, Macro, Path, Result as SynResult, Stmt,
+};
+
+use crate::{
+  declare_obj::DeclareObj,
+  ok,
+  symbol_process::{kw, symbol_to_macro, DollarRefsCtx},
 };
 
 pub enum RdlMacro {
@@ -70,7 +72,11 @@ impl RdlMacro {
           f
         });
         l.fields = fields.collect();
-        l.children = l.children.into_iter().map(|m| refs.fold_macro(m)).collect();
+        l.children = l
+          .children
+          .into_iter()
+          .map(|m| refs.fold_macro(m))
+          .collect();
 
         let obj = ok!(DeclareObj::from_literal(&l));
         obj.to_token_stream().into()
@@ -93,10 +99,7 @@ impl Parse for RdlMacro {
     if fork.parse::<RdlParent>().is_ok() && fork.peek(Brace) {
       Ok(RdlMacro::Literal(input.parse()?))
     } else {
-      Ok(RdlMacro::ExprObj {
-        span: input.span(),
-        stmts: syn::Block::parse_within(input)?,
-      })
+      Ok(RdlMacro::ExprObj { span: input.span(), stmts: syn::Block::parse_within(input)? })
     }
   }
 }
@@ -127,10 +130,7 @@ impl Parse for StructLiteral {
           fields.push_punct(content.parse()?);
         }
       } else {
-        return Err(syn::Error::new(
-          content.span(),
-          "expected a field or a child.",
-        ));
+        return Err(syn::Error::new(content.span(), "expected a field or a child."));
       }
     }
 
@@ -144,12 +144,10 @@ impl Parse for RdlParent {
     if input.peek(kw::_dollar_ಠ_ಠ) && input.peek2(Not) {
       let mac: Macro = input.parse()?;
 
-      Ok(RdlParent::Var(mac.parse_body_with(
-        |input: &ParseBuffer| {
-          input.parse::<Dollar>()?;
-          input.parse()
-        },
-      )?))
+      Ok(RdlParent::Var(mac.parse_body_with(|input: &ParseBuffer| {
+        input.parse::<Dollar>()?;
+        input.parse()
+      })?))
     } else {
       Ok(RdlParent::Type(input.parse()?))
     }
@@ -160,11 +158,7 @@ impl Parse for DeclareField {
   fn parse(input: ParseStream) -> SynResult<Self> {
     let member: Ident = input.parse()?;
     let colon_tk: Option<Colon> = input.parse()?;
-    let value = if colon_tk.is_none() {
-      parse_quote!(#member)
-    } else {
-      input.parse()?
-    };
+    let value = if colon_tk.is_none() { parse_quote!(#member) } else { input.parse()? };
 
     Ok(DeclareField { member, value })
   }

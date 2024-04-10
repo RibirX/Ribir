@@ -1,7 +1,8 @@
+use std::cell::RefCell;
+
 use priority_queue::PriorityQueue;
 use ribir_algo::Sc;
 use rxrust::prelude::*;
-use std::cell::RefCell;
 
 /// A priority queue of tasks. So that tasks with higher priority will be
 /// executed first.
@@ -31,18 +32,12 @@ pub trait PriorityObservable<Item, Err>: ObservableExt<Item, Err> {
   /// Specify the priority queue an Observable should use to collect its values
   /// with a priority. The lower the priority value, the higher the priority.
   fn prior(
-    self,
-    prior: i64,
-    scheduler: PriorityTaskQueue,
+    self, prior: i64, scheduler: PriorityTaskQueue,
   ) -> PriorOp<impl FnMut() -> i64 + 'static, Self>
   where
     Self: Sized,
   {
-    PriorOp {
-      prior_fn: move || prior,
-      source: self,
-      scheduler,
-    }
+    PriorOp { prior_fn: move || prior, source: self, scheduler }
   }
 
   /// Specify the priority queue an Observable should use to collect its values

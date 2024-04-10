@@ -1,13 +1,15 @@
-use crate::{backends::*, prelude::request_redraw};
+use std::future::Future;
+
 use ribir_core::{
   prelude::{image::ColorFormat, *},
   window::{ShellWindow, WindowId},
 };
-use std::future::Future;
 use winit::{
   dpi::{LogicalPosition, LogicalSize},
   event_loop::EventLoopWindowTarget,
 };
+
+use crate::{backends::*, prelude::request_redraw};
 pub trait WinitBackend<'a>: Sized {
   fn new(window: &'a winit::window::Window) -> impl Future<Output = Self>;
 
@@ -16,10 +18,7 @@ pub trait WinitBackend<'a>: Sized {
   fn begin_frame(&mut self);
 
   fn draw_commands(
-    &mut self,
-    viewport: DeviceRect,
-    commands: Vec<PaintCommand>,
-    surface_color: Color,
+    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, surface_color: Color,
   );
 
   fn end_frame(&mut self);
@@ -164,7 +163,9 @@ impl ShellWindow for WinitShellWnd {
       .to_i32()
       .cast_unit();
 
-    self.backend.draw_commands(viewport, commands, surface);
+    self
+      .backend
+      .draw_commands(viewport, commands, surface);
   }
 
   #[inline]
@@ -179,8 +180,7 @@ pub(crate) fn new_id(id: winit::window::WindowId) -> WindowId {
 impl WinitShellWnd {
   #[cfg(target_family = "wasm")]
   pub(crate) fn new_with_canvas<T>(
-    canvas: web_sys::HtmlCanvasElement,
-    window_target: &EventLoopWindowTarget<T>,
+    canvas: web_sys::HtmlCanvasElement, window_target: &EventLoopWindowTarget<T>,
   ) -> Self {
     use winit::platform::web::WindowBuilderExtWebSys;
     let wnd = winit::window::WindowBuilder::new()
@@ -212,8 +212,13 @@ impl WinitShellWnd {
       for idx in 0..len {
         if let Some(elem) = elems.get_with_index(idx) {
           let mut classes_name = elem.class_name();
-          if !classes_name.split(" ").any(|v| v == RIBIR_CANVAS_USED) {
-            let mut canvas = elem.clone().dyn_into::<web_sys::HtmlCanvasElement>();
+          if !classes_name
+            .split(" ")
+            .any(|v| v == RIBIR_CANVAS_USED)
+          {
+            let mut canvas = elem
+              .clone()
+              .dyn_into::<web_sys::HtmlCanvasElement>();
             if canvas.is_err() {
               let child = document.create_element("canvas").unwrap();
               if elem.append_child(&child).is_ok() {
@@ -240,10 +245,6 @@ impl WinitShellWnd {
     // alive.
     let backend = Backend::new(unsafe { &*ptr });
     let backend = AppCtx::wait_future(backend);
-    WinitShellWnd {
-      backend,
-      winit_wnd,
-      cursor: CursorIcon::Default,
-    }
+    WinitShellWnd { backend, winit_wnd, cursor: CursorIcon::Default }
   }
 }

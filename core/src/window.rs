@@ -1,3 +1,14 @@
+use std::{
+  cell::{Cell, RefCell},
+  collections::VecDeque,
+  convert::Infallible,
+  rc::Rc,
+};
+
+use futures::{task::LocalSpawnExt, Future};
+use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
+pub use winit::window::CursorIcon;
+
 use crate::{
   events::{
     dispatcher::Dispatcher,
@@ -6,15 +17,6 @@ use crate::{
   prelude::*,
   ticker::{FrameMsg, FrameTicker},
 };
-use futures::{task::LocalSpawnExt, Future};
-use std::{
-  cell::{Cell, RefCell},
-  collections::VecDeque,
-  convert::Infallible,
-  rc::Rc,
-};
-use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
-pub use winit::window::CursorIcon;
 
 /// Window is the root to represent.
 ///
@@ -92,32 +94,34 @@ impl Window {
   /// processes native events from this native window
   pub fn processes_native_event(&self, event: WindowEvent) {
     let ratio = self.device_pixel_ratio() as f64;
-    self.dispatcher.borrow_mut().dispatch(event, ratio);
+    self
+      .dispatcher
+      .borrow_mut()
+      .dispatch(event, ratio);
   }
 
   pub fn processes_keyboard_event(
-    &self,
-    physical_key: PhysicalKey,
-    key: VirtualKey,
-    is_repeat: bool,
-    location: KeyLocation,
+    &self, physical_key: PhysicalKey, key: VirtualKey, is_repeat: bool, location: KeyLocation,
     state: ElementState,
   ) {
-    self.dispatcher.borrow_mut().dispatch_keyboard_input(
-      physical_key,
-      key,
-      is_repeat,
-      location,
-      state,
-    );
+    self
+      .dispatcher
+      .borrow_mut()
+      .dispatch_keyboard_input(physical_key, key, is_repeat, location, state);
   }
 
   pub fn processes_receive_chars(&self, chars: String) {
-    self.dispatcher.borrow_mut().dispatch_receive_chars(chars)
+    self
+      .dispatcher
+      .borrow_mut()
+      .dispatch_receive_chars(chars)
   }
 
   pub fn processes_ime_pre_edit(&self, ime: ImePreEdit) {
-    self.dispatcher.borrow_mut().dispatch_ime_pre_edit(ime)
+    self
+      .dispatcher
+      .borrow_mut()
+      .dispatch_ime_pre_edit(ime)
   }
 
   pub fn process_mouse_input(&self, device_id: DeviceId, state: ElementState, button: MouseButton) {
@@ -160,15 +164,25 @@ impl Window {
     self.frame_ticker.frame_tick_stream()
   }
 
-  pub fn inc_running_animate(&self) { self.running_animates.set(self.running_animates.get() + 1); }
+  pub fn inc_running_animate(&self) {
+    self
+      .running_animates
+      .set(self.running_animates.get() + 1);
+  }
 
-  pub fn dec_running_animate(&self) { self.running_animates.set(self.running_animates.get() - 1); }
+  pub fn dec_running_animate(&self) {
+    self
+      .running_animates
+      .set(self.running_animates.get() - 1);
+  }
 
   /// Draw an image what current render tree represent.
   #[track_caller]
   pub fn draw_frame(&self) -> bool {
     AppCtx::run_until_stalled();
-    self.frame_ticker.emit(FrameMsg::NewFrame(Instant::now()));
+    self
+      .frame_ticker
+      .emit(FrameMsg::NewFrame(Instant::now()));
     self.run_frame_tasks();
 
     self.update_painter_viewport();
@@ -195,7 +209,9 @@ impl Window {
     }
 
     AppCtx::end_frame();
-    self.frame_ticker.emit(FrameMsg::Finish(Instant::now()));
+    self
+      .frame_ticker
+      .emit(FrameMsg::Finish(Instant::now()));
 
     draw
   }
@@ -268,9 +284,18 @@ impl Window {
       delay_drop_widgets: <_>::default(),
     };
     let window = Rc::new(window);
-    window.dispatcher.borrow_mut().init(Rc::downgrade(&window));
-    window.focus_mgr.borrow_mut().init(Rc::downgrade(&window));
-    window.widget_tree.borrow_mut().init(Rc::downgrade(&window));
+    window
+      .dispatcher
+      .borrow_mut()
+      .init(Rc::downgrade(&window));
+    window
+      .focus_mgr
+      .borrow_mut()
+      .init(Rc::downgrade(&window));
+    window
+      .widget_tree
+      .borrow_mut()
+      .init(Rc::downgrade(&window));
 
     window
   }
@@ -278,7 +303,10 @@ impl Window {
   pub fn set_content_widget(&self, root: impl WidgetBuilder) {
     let build_ctx = BuildCtx::new(None, &self.widget_tree);
     let root = root.build(&build_ctx);
-    self.widget_tree.borrow_mut().set_content(root.consume())
+    self
+      .widget_tree
+      .borrow_mut()
+      .set_content(root.consume())
   }
 
   #[inline]
@@ -305,11 +333,17 @@ impl Window {
   /// Sets location of IME candidate box in window global coordinates relative
   /// to the top left.
   pub fn set_ime_cursor_area(&self, rect: &Rect) {
-    self.shell_wnd.borrow_mut().set_ime_cursor_area(rect);
+    self
+      .shell_wnd
+      .borrow_mut()
+      .set_ime_cursor_area(rect);
   }
 
   pub fn set_ime_allowed(&self, allowed: bool) {
-    self.shell_wnd.borrow_mut().set_ime_allowed(allowed);
+    self
+      .shell_wnd
+      .borrow_mut()
+      .set_ime_allowed(allowed);
   }
 
   pub fn request_resize(&self, size: Size) { self.shell_wnd.borrow_mut().request_resize(size) }
@@ -358,7 +392,9 @@ impl Window {
       } else {
         let mut painter = painter.save_guard();
         if let Some(p) = parent {
-          let offset = tree.store.map_to_global(Point::zero(), *p, &tree.arena);
+          let offset = tree
+            .store
+            .map_to_global(Point::zero(), *p, &tree.arena);
           painter.translate(offset.x, offset.y);
         }
         let mut ctx = PaintingCtx::new(*wid, self.id(), &mut painter);
@@ -414,7 +450,10 @@ impl Window {
             .contain_type::<DelayDrop>();
 
           if delay_drop {
-            self.delay_drop_widgets.borrow_mut().push((parent, id));
+            self
+              .delay_drop_widgets
+              .borrow_mut()
+              .push((parent, id));
           } else {
             self.add_delay_event(DelayEvent::RemoveSubtree(id));
           }
@@ -447,9 +486,7 @@ impl Window {
 
           let mut e = Event::KeyDownCapture(event);
           self.top_down_emit(&mut e, id, None);
-          let Event::KeyDownCapture(e) = e else {
-            unreachable!()
-          };
+          let Event::KeyDownCapture(e) = e else { unreachable!() };
           let mut e = Event::KeyDown(e);
           self.bottom_up_emit(&mut e, id, None);
           let Event::KeyDown(e) = e else { unreachable!() };
@@ -460,7 +497,10 @@ impl Window {
         DelayEvent::TabFocusMove => {
           let pressed_shift = {
             let dispatcher = self.dispatcher.borrow();
-            dispatcher.info.modifiers().contains(ModifiersState::SHIFT)
+            dispatcher
+              .info
+              .modifiers()
+              .contains(ModifiersState::SHIFT)
           };
 
           let mut focus_mgr = self.focus_mgr.borrow_mut();
@@ -474,18 +514,14 @@ impl Window {
           let id = event.id();
           let mut e = Event::KeyUpCapture(event);
           self.top_down_emit(&mut e, id, None);
-          let Event::KeyUpCapture(e) = e else {
-            unreachable!()
-          };
+          let Event::KeyUpCapture(e) = e else { unreachable!() };
           let mut e = Event::KeyUp(e);
           self.bottom_up_emit(&mut e, id, None);
         }
         DelayEvent::Chars { id, chars } => {
           let mut e = Event::CharsCapture(CharsEvent::new(chars, id, self.id()));
           self.top_down_emit(&mut e, id, None);
-          let Event::CharsCapture(e) = e else {
-            unreachable!()
-          };
+          let Event::CharsCapture(e) = e else { unreachable!() };
           let mut e = Event::Chars(e);
           self.bottom_up_emit(&mut e, id, None);
         }
@@ -538,9 +574,7 @@ impl Window {
         DelayEvent::ImePreEdit { wid, pre_edit } => {
           let mut e = Event::ImePreEditCapture(ImePreEditEvent::new(pre_edit, wid, self));
           self.top_down_emit(&mut e, wid, None);
-          let Event::ImePreEditCapture(e) = e else {
-            unreachable!()
-          };
+          let Event::ImePreEditCapture(e) = e else { unreachable!() };
           self.bottom_up_emit(&mut Event::ImePreEdit(e), wid, None);
         }
       }
@@ -628,7 +662,11 @@ impl Window {
   }
 
   pub fn layout_size(&self, id: WidgetId) -> Option<Size> {
-    self.widget_tree.borrow().store.layout_box_size(id)
+    self
+      .widget_tree
+      .borrow()
+      .store
+      .layout_box_size(id)
   }
 }
 
@@ -638,50 +676,25 @@ impl Window {
 pub(crate) enum DelayEvent {
   Mounted(WidgetId),
   PerformedLayout(WidgetId),
-  Disposed {
-    parent: Option<WidgetId>,
-    id: WidgetId,
-  },
+  Disposed { parent: Option<WidgetId>, id: WidgetId },
   RemoveSubtree(WidgetId),
   Focus(WidgetId),
   Blur(WidgetId),
-  FocusIn {
-    bottom: WidgetId,
-    up: Option<WidgetId>,
-  },
-  FocusOut {
-    bottom: WidgetId,
-    up: Option<WidgetId>,
-  },
+  FocusIn { bottom: WidgetId, up: Option<WidgetId> },
+  FocusOut { bottom: WidgetId, up: Option<WidgetId> },
   KeyDown(KeyboardEvent),
   KeyUp(KeyboardEvent),
   TabFocusMove,
-  Chars {
-    id: WidgetId,
-    chars: String,
-  },
-  Wheel {
-    id: WidgetId,
-    delta_x: f32,
-    delta_y: f32,
-  },
+  Chars { id: WidgetId, chars: String },
+  Wheel { id: WidgetId, delta_x: f32, delta_y: f32 },
   PointerDown(WidgetId),
   PointerMove(WidgetId),
   PointerUp(WidgetId),
   _PointerCancel(WidgetId),
-  PointerEnter {
-    bottom: WidgetId,
-    up: Option<WidgetId>,
-  },
-  PointerLeave {
-    bottom: WidgetId,
-    up: Option<WidgetId>,
-  },
+  PointerEnter { bottom: WidgetId, up: Option<WidgetId> },
+  PointerLeave { bottom: WidgetId, up: Option<WidgetId> },
   Tap(WidgetId),
-  ImePreEdit {
-    wid: WidgetId,
-    pre_edit: ImePreEdit,
-  },
+  ImePreEdit { wid: WidgetId, pre_edit: ImePreEdit },
 }
 
 impl From<u64> for WindowId {
@@ -695,9 +708,10 @@ impl From<WindowId> for u64 {
 }
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::assert_layout_result_by_path;
+
   use super::*;
   use crate::{reset_test_env, test_helper::*};
-  use ribir_dev_helper::assert_layout_result_by_path;
 
   #[test]
   fn layout_after_wnd_resize() {

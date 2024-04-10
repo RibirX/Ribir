@@ -1,5 +1,4 @@
-use ribir::prelude::include_crate_svg;
-use ribir::prelude::*;
+use ribir::prelude::{include_crate_svg, *};
 use ribir_dev_helper::*;
 
 #[test]

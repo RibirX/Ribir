@@ -1,7 +1,8 @@
-use crate::util::data_struct_unwrap;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
+
+use crate::util::data_struct_unwrap;
 
 pub(crate) fn lerp_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenStream> {
   let syn::DeriveInput { ident: name, generics, data, .. } = input;

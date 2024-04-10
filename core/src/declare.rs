@@ -1,6 +1,8 @@
-use crate::{context::BuildCtx, pipe::Pipe, prelude::BoxPipe, state::ModifyScope};
-use rxrust::ops::box_it::BoxOp;
 use std::convert::Infallible;
+
+use rxrust::ops::box_it::BoxOp;
+
+use crate::{context::BuildCtx, pipe::Pipe, prelude::BoxPipe, state::ModifyScope};
 
 /// Trait used to create a widget declarer that can interact with the `BuildCtx`
 /// to create a widget.

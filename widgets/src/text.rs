@@ -38,7 +38,11 @@ impl Render for Text {
   #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
     let box_rect = Rect::from_size(ctx.box_size().unwrap());
-    if ctx.painter().intersection_paint_bounds(&box_rect).is_none() {
+    if ctx
+      .painter()
+      .intersection_paint_bounds(&box_rect)
+      .is_none()
+    {
       return;
     };
 
@@ -59,7 +63,7 @@ impl Render for Text {
 }
 
 macro_rules! define_text_with_theme_style {
-  ($name: ident, $style: ident) => {
+  ($name:ident, $style:ident) => {
     #[derive(Declare)]
     pub struct $name {
       pub text: CowArc<str>,
@@ -93,10 +97,10 @@ define_text_with_theme_style!(H6, title_small);
 
 #[cfg(test)]
 mod tests {
-  use crate::layout::SizedBox;
+  use ribir_core::test_helper::*;
 
   use super::*;
-  use ribir_core::test_helper::*;
+  use crate::layout::SizedBox;
 
   #[test]
   fn text_clip() {

@@ -1,8 +1,3 @@
-pub(crate) use crate::widget_tree::*;
-use crate::{context::*, prelude::*};
-use ribir_algo::Sc;
-use rxrust::ops::box_it::BoxOp;
-
 #[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
@@ -10,6 +5,12 @@ pub use std::{
   ops::Deref,
 };
 use std::{cell::RefCell, convert::Infallible};
+
+use ribir_algo::Sc;
+use rxrust::ops::box_it::BoxOp;
+
+pub(crate) use crate::widget_tree::*;
+use crate::{context::*, prelude::*};
 pub trait Compose: Sized {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
@@ -76,18 +77,15 @@ pub trait Query: Any {
   /// Query the type in a outside first order, and apply the callback to it,
   /// return what the callback return, hint if the query should continue.
   fn query_outside_first(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool;
 }
 
 impl<'a> dyn Render + 'a {
   #[inline]
   pub fn query_type_inside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) -> bool {
-    self.query_inside_first(TypeId::of::<T>(), &mut |a| {
-      a.downcast_ref().map_or(true, &mut callback)
-    })
+    self
+      .query_inside_first(TypeId::of::<T>(), &mut |a| a.downcast_ref().map_or(true, &mut callback))
   }
 
   #[inline]
@@ -206,9 +204,7 @@ impl Widget {
   /// Subscribe the modifies `upstream` to mark the widget dirty when the
   /// `upstream` emit a modify event that contains `ModifyScope::FRAMEWORK`.
   pub(crate) fn dirty_subscribe(
-    self,
-    upstream: BoxOp<'static, ModifyScope, Infallible>,
-    ctx: &BuildCtx,
+    self, upstream: BoxOp<'static, ModifyScope, Infallible>, ctx: &BuildCtx,
   ) -> Self {
     let dirty_set = ctx.tree.borrow().dirty_set.clone();
     let id = self.id();
@@ -318,24 +314,16 @@ macro_rules! impl_query_self_only {
   () => {
     #[inline]
     fn query_inside_first(
-      &self,
-      type_id: TypeId,
-      callback: &mut dyn FnMut(&dyn Any) -> bool,
+      &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
     ) -> bool {
       self.query_outside_first(type_id, callback)
     }
 
     #[inline]
     fn query_outside_first(
-      &self,
-      type_id: TypeId,
-      callback: &mut dyn FnMut(&dyn Any) -> bool,
+      &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
     ) -> bool {
-      if type_id == self.type_id() {
-        callback(self)
-      } else {
-        true
-      }
+      if type_id == self.type_id() { callback(self) } else { true }
     }
   };
 }
@@ -407,7 +395,9 @@ impl<T: Query> Query for RefCell<T> {
 impl_proxy_render!(proxy deref(), ShareResource<T>, <T>, where  T: Render + 'static);
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
-  ctx.box_rect().map_or(false, |rect| rect.contains(pos))
+  ctx
+    .box_rect()
+    .map_or(false, |rect| rect.contains(pos))
 }
 
 macro_rules! _replace {
@@ -470,7 +460,7 @@ mod tests {
   use super::*;
 
   macro_rules! impl_wrap_test {
-    ($name: ident) => {
+    ($name:ident) => {
       paste::paste! {
         #[test]
         fn [<$name:lower _support_query>]() {

@@ -1,12 +1,13 @@
-use crate::{
-  prelude::*,
-  window::{DelayEvent, WindowId},
-};
-
-use indextree::{Arena, NodeId};
 use std::{
   cmp::Ordering,
   rc::{Rc, Weak},
+};
+
+use indextree::{Arena, NodeId};
+
+use crate::{
+  prelude::*,
+  window::{DelayEvent, WindowId},
 };
 
 #[derive(Debug)]
@@ -30,7 +31,10 @@ pub struct FocusHandle {
 impl FocusHandle {
   pub(crate) fn request_focus(&self) {
     if let Some(wnd) = AppCtx::get_window(self.wnd_id) {
-      wnd.focus_mgr.borrow_mut().request_focus_to(Some(self.wid));
+      wnd
+        .focus_mgr
+        .borrow_mut()
+        .request_focus_to(Some(self.wid));
     }
   }
 
@@ -57,13 +61,7 @@ pub(crate) struct FocusNodeInfo {
 }
 
 impl FocusNodeInfo {
-  fn new(wid: WidgetId) -> Self {
-    FocusNodeInfo {
-      scope_cnt: 0,
-      node_cnt: 0,
-      wid: Some(wid),
-    }
-  }
+  fn new(wid: WidgetId) -> Self { FocusNodeInfo { scope_cnt: 0, node_cnt: 0, wid: Some(wid) } }
 
   fn has_focus_node(&self) -> bool { self.node_cnt > 0 }
 
@@ -158,7 +156,11 @@ impl FocusManager {
     let next_focus = request_focus
       .into_iter()
       .chain(autos.map(Some))
-      .find(|request| request.as_ref().map_or(true, |id| !id.is_dropped(arena)));
+      .find(|request| {
+        request
+          .as_ref()
+          .map_or(true, |id| !id.is_dropped(arena))
+      });
 
     let focusing = next_focus
       .unwrap_or(self.focusing)
@@ -197,8 +199,12 @@ impl FocusManager {
   }
 
   fn focus_step(&mut self, focusing: Option<WidgetId>, backward: bool) -> Option<WidgetId> {
-    let mut node_id = focusing.and_then(|id| self.node_ids.get(&id)).copied();
-    let mut scope_id = node_id.and_then(|id| self.scope_id(id)).or(Some(self.root));
+    let mut node_id = focusing
+      .and_then(|id| self.node_ids.get(&id))
+      .copied();
+    let mut scope_id = node_id
+      .and_then(|id| self.scope_id(id))
+      .or(Some(self.root));
     loop {
       scope_id?;
       let next = self.focus_step_in_scope(scope_id.unwrap(), node_id, backward);
@@ -212,9 +218,7 @@ impl FocusManager {
   }
 
   fn collect_tab_index_in_scope(
-    &self,
-    scope_id: NodeId,
-    backward: bool,
+    &self, scope_id: NodeId, backward: bool,
   ) -> Vec<(i16, NodeId, FocusType)> {
     let scope_tab_type = |id, has_focus_node: bool| {
       let mut v = vec![];
@@ -231,15 +235,19 @@ impl FocusManager {
     };
     let is_scope = |id| self.assert_get(id).has_focus_scope();
     let node_type = |id| {
-      self.arena.get(id).map(|n| n.get()).map_or(vec![], |node| {
-        if node.has_focus_scope() {
-          scope_tab_type(node.wid, node.has_focus_node())
-        } else if node.has_focus_node() {
-          vec![FocusType::Node]
-        } else {
-          vec![]
-        }
-      })
+      self
+        .arena
+        .get(id)
+        .map(|n| n.get())
+        .map_or(vec![], |node| {
+          if node.has_focus_scope() {
+            scope_tab_type(node.wid, node.has_focus_node())
+          } else if node.has_focus_node() {
+            vec![FocusType::Node]
+          } else {
+            vec![]
+          }
+        })
     };
 
     let next_sibling = |level: &mut u32, mut id| {
@@ -292,10 +300,7 @@ impl FocusManager {
   }
 
   fn focus_step_in_scope(
-    &self,
-    scope_id: NodeId,
-    node_id: Option<NodeId>,
-    backward: bool,
+    &self, scope_id: NodeId, node_id: Option<NodeId>, backward: bool,
   ) -> Option<NodeId> {
     let vec = self.collect_tab_index_in_scope(scope_id, backward);
     let idx = vec
@@ -336,10 +341,12 @@ impl FocusManager {
     self.scope_list(node_id).find(|id| {
       let mut has_ignore = false;
       self.get(*id).and_then(|n| n.wid).map(|wid| {
-        wid.get(arena)?.query_most_inside(|s: &FocusScope| {
-          has_ignore = s.skip_descendants;
-          !has_ignore
-        })
+        wid
+          .get(arena)?
+          .query_most_inside(|s: &FocusScope| {
+            has_ignore = s.skip_descendants;
+            !has_ignore
+          })
       });
       has_ignore
     })
@@ -405,15 +412,16 @@ impl FocusManager {
     }
 
     fn collect_sub_ancestors(
-      wid: WidgetId,
-      pid: Option<WidgetId>,
-      arena: &TreeArena,
+      wid: WidgetId, pid: Option<WidgetId>, arena: &TreeArena,
     ) -> Vec<WidgetId> {
       if wid.is_dropped(arena) {
         return vec![];
       }
       if let Some(pid) = pid {
-        let mut arr: Vec<WidgetId> = wid.ancestors(arena).take_while(|id| *id != pid).collect();
+        let mut arr: Vec<WidgetId> = wid
+          .ancestors(arena)
+          .take_while(|id| *id != pid)
+          .collect();
         arr.push(pid);
         arr
       } else {
@@ -428,7 +436,11 @@ impl FocusManager {
     let mut afrer_sibling = None;
     let mut children = vec![];
     for id in parent.children(&self.arena) {
-      let wid = self.arena.get(id).and_then(|node| node.get().wid).unwrap();
+      let wid = self
+        .arena
+        .get(id)
+        .and_then(|node| node.get().wid)
+        .unwrap();
       let path2 = collect_sub_ancestors(wid, pwid, arena);
 
       match locate_position(&path, &path2, arena) {
@@ -460,7 +472,9 @@ impl FocusManager {
   }
 
   fn assert_get(&self, node_id: NodeId) -> &FocusNodeInfo {
-    self.get(node_id).expect("focus not exists in the `tree`")
+    self
+      .get(node_id)
+      .expect("focus not exists in the `tree`")
   }
 }
 
@@ -542,9 +556,10 @@ impl FocusManager {
 
 #[cfg(test)]
 mod tests {
+  use std::cell::RefCell;
+
   use super::*;
   use crate::{reset_test_env, test_helper::*};
-  use std::cell::RefCell;
 
   #[test]
   fn two_auto_focus() {
@@ -618,7 +633,10 @@ mod tests {
 
     focus_mgr.refresh_focus(arena);
 
-    let negative = widget_tree.content_root().first_child(arena).unwrap();
+    let negative = widget_tree
+      .content_root()
+      .first_child(arena)
+      .unwrap();
     let id0 = negative.next_sibling(arena).unwrap();
     let id1 = id0.next_sibling(arena).unwrap();
     let id2 = id1.next_sibling(arena).unwrap();
@@ -721,10 +739,7 @@ mod tests {
       .borrow_mut()
       .focus(child, &wnd.widget_tree.borrow().arena);
     wnd.draw_frame();
-    assert_eq!(
-      &*log.borrow(),
-      &["focus child", "focusin child", "focusin parent"]
-    );
+    assert_eq!(&*log.borrow(), &["focus child", "focusin child", "focusin parent"]);
     log.borrow_mut().clear();
 
     wnd
@@ -732,10 +747,7 @@ mod tests {
       .borrow_mut()
       .focus_next_widget(&wnd.widget_tree.borrow().arena);
     wnd.run_frame_tasks();
-    assert_eq!(
-      &*log.borrow(),
-      &["blur child", "focusout child", "focus parent",]
-    );
+    assert_eq!(&*log.borrow(), &["blur child", "focusout child", "focus parent",]);
     log.borrow_mut().clear();
 
     wnd

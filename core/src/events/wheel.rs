@@ -12,20 +12,18 @@ impl_common_event_deref!(WheelEvent);
 impl WheelEvent {
   #[inline]
   pub fn new(delta_x: f32, delta_y: f32, id: WidgetId, wnd_id: WindowId) -> Self {
-    Self {
-      delta_x,
-      delta_y,
-      common: CommonEvent::new(id, wnd_id),
-    }
+    Self { delta_x, delta_y, common: CommonEvent::new(id, wnd_id) }
   }
 }
 
 #[cfg(test)]
 mod tests {
+  use std::{cell::RefCell, rc::Rc};
+
+  use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
+
   use super::*;
   use crate::test_helper::{MockBox, TestWindow};
-  use std::{cell::RefCell, rc::Rc};
-  use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
   #[test]
   fn smoke() {

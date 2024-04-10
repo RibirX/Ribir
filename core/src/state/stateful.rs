@@ -1,12 +1,13 @@
-use crate::{prelude::*, render_helper::RenderProxy};
-use ribir_algo::Sc;
-use rxrust::{ops::box_it::BoxOp, prelude::*};
 use std::{
   cell::{Cell, RefCell},
   convert::Infallible,
 };
 
+use ribir_algo::Sc;
+use rxrust::{ops::box_it::BoxOp, prelude::*};
+
 use super::WriterControl;
+use crate::{prelude::*, render_helper::RenderProxy};
 
 /// Stateful object use to watch the modifies of the inner data.
 pub struct Stateful<W> {
@@ -225,7 +226,7 @@ impl<W> Writer<W> {
 }
 
 macro_rules! compose_builder_impl {
-  ($name: ident) => {
+  ($name:ident) => {
     impl<C: Compose + 'static> ComposeBuilder for $name<C> {
       #[inline]
       fn build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
@@ -267,32 +268,31 @@ impl<R: Render> RenderBuilder for Reader<R> {
 
 impl<W> Stateful<W> {
   pub fn new(data: W) -> Self {
-    Self {
-      data: Sc::new(RefCell::new(data)),
-      info: Sc::new(StatefulInfo::new()),
-    }
+    Self { data: Sc::new(RefCell::new(data)), info: Sc::new(StatefulInfo::new()) }
   }
 
   fn write_ref(&self, scope: ModifyScope) -> WriteRef<'_, W> {
     let value = self.data.borrow_mut();
-    WriteRef {
-      value: Some(value),
-      modified: false,
-      modify_scope: scope,
-      control: &self.info,
-    }
+    WriteRef { value: Some(value), modified: false, modify_scope: scope, control: &self.info }
   }
 
   fn writer_count(&self) -> usize { self.info.writer_count.get() }
-  fn inc_writer(&self) { self.info.writer_count.set(self.writer_count() + 1); }
-  fn dec_writer(&self) { self.info.writer_count.set(self.writer_count() - 1); }
+  fn inc_writer(&self) {
+    self
+      .info
+      .writer_count
+      .set(self.writer_count() + 1);
+  }
+  fn dec_writer(&self) {
+    self
+      .info
+      .writer_count
+      .set(self.writer_count() - 1);
+  }
 
   fn clone(&self) -> Self {
     self.inc_writer();
-    Self {
-      data: self.data.clone(),
-      info: self.info.clone(),
-    }
+    Self { data: self.data.clone(), info: self.info.clone() }
   }
 }
 
@@ -400,10 +400,7 @@ mod tests {
     assert_eq!(*drop_cnt.borrow(), 2);
 
     {
-      drop_writer_subscribe(
-        Stateful::new(()).split_writer(|v| v, |v| v),
-        drop_cnt.clone(),
-      );
+      drop_writer_subscribe(Stateful::new(()).split_writer(|v| v, |v| v), drop_cnt.clone());
     };
     AppCtx::run_until_stalled();
     assert_eq!(*drop_cnt.borrow(), 3);
@@ -454,7 +451,13 @@ mod tests {
     let mut wnd = TestWindow::new(fn_widget!(MockBox { size: Size::new(100., 100.) }));
     wnd.draw_frame();
     let tree = wnd.widget_tree.borrow();
-    assert_eq!(tree.content_root().descendants(&tree.arena).count(), 1);
+    assert_eq!(
+      tree
+        .content_root()
+        .descendants(&tree.arena)
+        .count(),
+      1
+    );
   }
 
   #[test]

@@ -2,16 +2,21 @@ use ribir::core::timer::Timer;
 use rxrust::scheduler::NEW_TIMER_FN;
 
 mod test_single_thread {
-  use super::*;
-  use ribir_core::reset_test_env;
-  use ribir_core::test_helper::TestWindow;
+  use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    thread::sleep,
+  };
+
+  use ribir_core::{
+    prelude::*,
+    reset_test_env,
+    test_helper::{MockBox, TestWindow},
+  };
   use ribir_dev_helper::*;
-  use std::cell::Cell;
-  use std::thread::sleep;
-  use std::{cell::RefCell, rc::Rc};
   use winit::event::{DeviceId, ElementState, MouseButton};
 
-  use ribir_core::{prelude::*, test_helper::MockBox};
+  use super::*;
 
   pub fn test_widget_with_timer() {
     let w = fn_widget! {
@@ -84,11 +89,7 @@ mod test_single_thread {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
-        let state = if i % 2 == 0 {
-          ElementState::Pressed
-        } else {
-          ElementState::Released
-        };
+        let state = if i % 2 == 0 { ElementState::Pressed } else { ElementState::Released };
         c_wnd.process_mouse_input(device_id, state, MouseButton::Left);
       });
 
@@ -108,11 +109,7 @@ mod test_single_thread {
       .subscribe(move |i| {
         c_wnd.process_mouse_input(
           device_id,
-          if i % 2 == 0 {
-            ElementState::Pressed
-          } else {
-            ElementState::Released
-          },
+          if i % 2 == 0 { ElementState::Pressed } else { ElementState::Released },
           MouseButton::Left,
         );
       });
@@ -137,11 +134,7 @@ mod test_single_thread {
       .subscribe(move |i| {
         c_wnd.process_mouse_input(
           device_id,
-          if i % 2 == 0 {
-            ElementState::Pressed
-          } else {
-            ElementState::Released
-          },
+          if i % 2 == 0 { ElementState::Pressed } else { ElementState::Released },
           MouseButton::Left,
         );
       });

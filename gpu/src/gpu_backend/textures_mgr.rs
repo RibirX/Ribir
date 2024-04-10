@@ -1,7 +1,9 @@
-use super::atlas::{Atlas, AtlasHandle};
-use super::Texture;
-use crate::add_draw_rect_vertices;
-use crate::{gpu_backend::atlas::ATLAS_MAX_ITEM, GPUBackendImpl};
+use std::{
+  cmp::Ordering,
+  hash::{Hash, Hasher},
+  ops::Range,
+};
+
 use guillotiere::euclid::SideOffsets2D;
 use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use ribir_algo::ShareResource;
@@ -9,8 +11,12 @@ use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize, Point, Trans
 use ribir_painter::{
   image::ColorFormat, AntiAliasing, PaintPath, Path, PathSegment, PixelImage, Vertex, VertexBuffers,
 };
-use std::hash::{Hash, Hasher};
-use std::{cmp::Ordering, ops::Range};
+
+use super::{
+  atlas::{Atlas, AtlasHandle},
+  Texture,
+};
+use crate::{add_draw_rect_vertices, gpu_backend::atlas::ATLAS_MAX_ITEM, GPUBackendImpl};
 const TOLERANCE: f32 = 0.1_f32;
 const PAR_CHUNKS_SIZE: usize = 64;
 
@@ -42,7 +48,7 @@ pub(super) struct TextureSlice {
 }
 
 macro_rules! id_to_texture_mut {
-  ($mgr: ident, $id: expr) => {
+  ($mgr:ident, $id:expr) => {
     match $id {
       TextureID::Alpha(id) => $mgr.alpha_atlas.get_texture_mut(id),
       TextureID::Rgba(id) => $mgr.rgba_atlas.get_texture_mut(id),
@@ -51,7 +57,7 @@ macro_rules! id_to_texture_mut {
 }
 
 macro_rules! id_to_texture {
-  ($mgr: ident, $id: expr) => {
+  ($mgr:ident, $id:expr) => {
     match $id {
       TextureID::Alpha(id) => $mgr.alpha_atlas.get_texture(id),
       TextureID::Rgba(id) => $mgr.rgba_atlas.get_texture(id),
@@ -71,34 +77,25 @@ where
   pub(super) fn new(gpu_impl: &mut T::Host, anti_aliasing: AntiAliasing) -> Self {
     Self {
       alpha_atlas: Atlas::new("Alpha atlas", ColorFormat::Alpha8, anti_aliasing, gpu_impl),
-      rgba_atlas: Atlas::new(
-        "Rgba atlas",
-        ColorFormat::Rgba8,
-        AntiAliasing::None,
-        gpu_impl,
-      ),
+      rgba_atlas: Atlas::new("Rgba atlas", ColorFormat::Rgba8, AntiAliasing::None, gpu_impl),
       fill_task: <_>::default(),
       fill_task_buffers: <_>::default(),
     }
   }
 
   pub(super) fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing, host: &mut T::Host) {
-    self.alpha_atlas.set_anti_aliasing(anti_aliasing, host);
+    self
+      .alpha_atlas
+      .set_anti_aliasing(anti_aliasing, host);
   }
 
   /// Store an alpha path in texture and return the texture and a transform that
   /// can transform the mask to viewport
   pub(super) fn store_alpha_path(
-    &mut self,
-    path: Path,
-    transform: &Transform,
-    gpu_impl: &mut T::Host,
+    &mut self, path: Path, transform: &Transform, gpu_impl: &mut T::Host,
   ) -> (TextureSlice, Transform) {
     fn cache_to_view_matrix(
-      path: &Path,
-      path_ts: &Transform,
-      slice_origin: DevicePoint,
-      cache_scale: f32,
+      path: &Path, path_ts: &Transform, slice_origin: DevicePoint, cache_scale: f32,
     ) -> Transform {
       // scale origin to the cached path, and aligned the pixel, let the view get an
       // integer pixel mask as much as possible.
@@ -141,7 +138,14 @@ where
 
       let ts = Transform::scale(prefer_scale, prefer_scale)
         .then_translate(-scale_bounds.origin.to_vector().cast_unit())
-        .then_translate(mask_slice.rect.origin.to_f32().to_vector().cast_unit());
+        .then_translate(
+          mask_slice
+            .rect
+            .origin
+            .to_f32()
+            .to_vector()
+            .cast_unit(),
+        );
 
       self
         .fill_task
@@ -152,10 +156,7 @@ where
   }
 
   pub(super) fn store_clipped_path(
-    &mut self,
-    clip_view: DeviceRect,
-    path: PaintPath,
-    gpu_impl: &mut T::Host,
+    &mut self, clip_view: DeviceRect, path: PaintPath, gpu_impl: &mut T::Host,
   ) -> (TextureSlice, Transform) {
     let alloc_size: DeviceSize = path_add_edges(clip_view.size);
     let path_ts = path.transform;
@@ -166,7 +167,9 @@ where
       alpha_tex_slice(&self.alpha_atlas, &h).cut_blank_edge()
     } else {
       let path = key.path().clone();
-      let h = self.alpha_atlas.allocate(key, 1., alloc_size, gpu_impl);
+      let h = self
+        .alpha_atlas
+        .allocate(key, 1., alloc_size, gpu_impl);
       let slice = alpha_tex_slice(&self.alpha_atlas, &h);
       let no_blank_slice = slice.cut_blank_edge();
       let clip_rect = Some(slice.rect);
@@ -180,16 +183,11 @@ where
     };
 
     let offset = (clip_view.origin - slice.rect.origin).to_f32();
-    (
-      slice.expand_for_paste(),
-      Transform::translation(offset.x, offset.y),
-    )
+    (slice.expand_for_paste(), Transform::translation(offset.x, offset.y))
   }
 
   pub(super) fn store_image(
-    &mut self,
-    img: &ShareResource<PixelImage>,
-    gpu_impl: &mut T::Host,
+    &mut self, img: &ShareResource<PixelImage>, gpu_impl: &mut T::Host,
   ) -> TextureSlice {
     match img.color_format() {
       ColorFormat::Rgba8 => {
@@ -197,7 +195,9 @@ where
           rgba_tex_slice(&self.rgba_atlas, &h)
         } else {
           let size = DeviceSize::new(img.width() as i32, img.height() as i32);
-          let h = self.rgba_atlas.allocate(img.clone(), (), size, gpu_impl);
+          let h = self
+            .rgba_atlas
+            .allocate(img.clone(), (), size, gpu_impl);
           let slice = rgba_tex_slice(&self.rgba_atlas, &h);
 
           let texture = self.rgba_atlas.get_texture_mut(h.tex_id());
@@ -212,10 +212,7 @@ where
   pub(super) fn texture(&self, tex_id: TextureID) -> &T { id_to_texture!(self, tex_id) }
 
   fn fill_tess(
-    path: &Path,
-    ts: &Transform,
-    tex_size: DeviceSize,
-    slice_bounds: &DeviceRect,
+    path: &Path, ts: &Transform, tex_size: DeviceSize, slice_bounds: &DeviceRect,
     buffer: &mut VertexBuffers<f32>,
   ) -> Range<u32> {
     let start = buffer.indices.len() as u32;
@@ -257,13 +254,8 @@ where
       for f in self.fill_task.iter() {
         let FillTask { slice, path, clip_rect, ts } = f;
         let texture = id_to_texture!(self, slice.tex_id);
-        let rg = Self::fill_tess(
-          path,
-          ts,
-          texture.size(),
-          &slice.rect,
-          &mut self.fill_task_buffers,
-        );
+        let rg =
+          Self::fill_tess(path, ts, texture.size(), &slice.rect, &mut self.fill_task_buffers);
         draw_indices.push((slice.tex_id, rg, clip_rect));
       }
     } else {
@@ -287,15 +279,17 @@ where
         })
         .collect::<Vec<_>>();
 
-      par_tess_res.into_iter().for_each(|(indices, buffer)| {
-        let offset = self.fill_task_buffers.indices.len() as u32;
-        draw_indices.extend(indices.into_iter().map(|(id, mut rg, clip)| {
-          rg.start += offset;
-          rg.end += offset;
-          (id, rg, clip)
-        }));
-        extend_buffer(&mut self.fill_task_buffers, buffer);
-      })
+      par_tess_res
+        .into_iter()
+        .for_each(|(indices, buffer)| {
+          let offset = self.fill_task_buffers.indices.len() as u32;
+          draw_indices.extend(indices.into_iter().map(|(id, mut rg, clip)| {
+            rg.start += offset;
+            rg.end += offset;
+            (id, rg, clip)
+          }));
+          extend_buffer(&mut self.fill_task_buffers, buffer);
+        })
     };
 
     gpu_impl.load_alpha_vertices(&self.fill_task_buffers);
@@ -354,20 +348,14 @@ fn alpha_tex_slice<T, K>(atlas: &Atlas<T, K, f32>, h: &AtlasHandle<f32>) -> Text
 where
   T: Texture,
 {
-  TextureSlice {
-    tex_id: TextureID::Alpha(h.tex_id()),
-    rect: h.tex_rect(atlas),
-  }
+  TextureSlice { tex_id: TextureID::Alpha(h.tex_id()), rect: h.tex_rect(atlas) }
 }
 
 fn rgba_tex_slice<T, K>(atlas: &Atlas<T, K, ()>, h: &AtlasHandle<()>) -> TextureSlice
 where
   T: Texture,
 {
-  TextureSlice {
-    tex_id: TextureID::Rgba(h.tex_id()),
-    rect: h.tex_rect(atlas),
-  }
+  TextureSlice { tex_id: TextureID::Rgba(h.tex_id()), rect: h.tex_rect(atlas) }
 }
 
 pub(crate) fn valid_cache_item(size: &DeviceSize) -> bool { size.lower_than(ATLAS_MAX_ITEM).any() }
@@ -410,19 +398,14 @@ impl TextureSlice {
 
 #[derive(Debug, Clone)]
 enum PathKey {
-  Path {
-    path: Path,
-    hash: u64,
-  },
-  PathWithClip {
-    path: PaintPath,
-    hash: u64,
-    clip_rect: DeviceRect,
-  },
+  Path { path: Path, hash: u64 },
+  PathWithClip { path: PaintPath, hash: u64, clip_rect: DeviceRect },
 }
 
 fn pos_100_device(pos: Point) -> DevicePoint {
-  Point::new(pos.x * 100., pos.y * 100.).to_i32().cast_unit()
+  Point::new(pos.x * 100., pos.y * 100.)
+    .to_i32()
+    .cast_unit()
 }
 
 fn path_inner_pos(pos: Point, path: &Path) -> DevicePoint {
@@ -460,27 +443,25 @@ fn path_eq(a: &Path, b: &Path, pos_adjust: impl Fn(Point, &Path) -> DevicePoint)
   let a_adjust = |pos| pos_adjust(pos, a);
   let b_adjust = |pos| pos_adjust(pos, b);
 
-  a.segments().zip(b.segments()).all(|(a, b)| match (a, b) {
-    (PathSegment::MoveTo(a), PathSegment::MoveTo(b))
-    | (PathSegment::LineTo(a), PathSegment::LineTo(b)) => a_adjust(a) == b_adjust(b),
-    (PathSegment::QuadTo { ctrl, to }, PathSegment::QuadTo { ctrl: ctrl_b, to: to_b }) => {
-      a_adjust(ctrl) == b_adjust(ctrl_b) && a_adjust(to) == b_adjust(to_b)
-    }
-    (
-      PathSegment::CubicTo { to, ctrl1, ctrl2 },
-      PathSegment::CubicTo {
-        to: to_b,
-        ctrl1: ctrl1_b,
-        ctrl2: ctrl2_b,
-      },
-    ) => {
-      a_adjust(to) == b_adjust(to_b)
-        && a_adjust(ctrl1) == b_adjust(ctrl1_b)
-        && a_adjust(ctrl2) == b_adjust(ctrl2_b)
-    }
-    (PathSegment::Close(a), PathSegment::Close(b)) => a == b,
-    _ => false,
-  })
+  a.segments()
+    .zip(b.segments())
+    .all(|(a, b)| match (a, b) {
+      (PathSegment::MoveTo(a), PathSegment::MoveTo(b))
+      | (PathSegment::LineTo(a), PathSegment::LineTo(b)) => a_adjust(a) == b_adjust(b),
+      (PathSegment::QuadTo { ctrl, to }, PathSegment::QuadTo { ctrl: ctrl_b, to: to_b }) => {
+        a_adjust(ctrl) == b_adjust(ctrl_b) && a_adjust(to) == b_adjust(to_b)
+      }
+      (
+        PathSegment::CubicTo { to, ctrl1, ctrl2 },
+        PathSegment::CubicTo { to: to_b, ctrl1: ctrl1_b, ctrl2: ctrl2_b },
+      ) => {
+        a_adjust(to) == b_adjust(to_b)
+          && a_adjust(ctrl1) == b_adjust(ctrl1_b)
+          && a_adjust(ctrl2) == b_adjust(ctrl2_b)
+      }
+      (PathSegment::Close(a), PathSegment::Close(b)) => a == b,
+      _ => false,
+    })
 }
 
 impl PathKey {
@@ -550,14 +531,14 @@ pub fn prefer_cache_size(path: &Path, transform: &Transform) -> DeviceSize {
 #[cfg(feature = "wgpu")]
 #[cfg(test)]
 pub mod tests {
-  use super::*;
-  use crate::gpu_backend::tests::headless;
-  use crate::{WgpuImpl, WgpuTexture};
-  use futures::executor::block_on;
+  use std::borrow::Cow;
 
+  use futures::executor::block_on;
   use ribir_geom::*;
   use ribir_painter::Color;
-  use std::borrow::Cow;
+
+  use super::*;
+  use crate::{gpu_backend::tests::headless, WgpuImpl, WgpuTexture};
 
   pub fn color_image(color: Color, width: u32, height: u32) -> ShareResource<PixelImage> {
     let data = std::iter::repeat(color.into_components())
@@ -599,10 +580,7 @@ pub mod tests {
   }
 
   fn color_img_check(
-    mgr: &TexturesMgr<WgpuTexture>,
-    rect: &TextureSlice,
-    wgpu: &mut WgpuImpl,
-    color: Color,
+    mgr: &TexturesMgr<WgpuTexture>, rect: &TextureSlice, wgpu: &mut WgpuImpl, color: Color,
   ) {
     wgpu.begin_frame();
     let texture = mgr.texture(rect.tex_id);

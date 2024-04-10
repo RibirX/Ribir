@@ -29,7 +29,10 @@ pub trait CustomStyle: Sized + Clone + 'static {
     let tid = TypeId::of::<Self>();
     let c = ctx.find_cfg(|t| match t {
       Theme::Full(t) => t.custom_styles.themes.get(&tid),
-      Theme::Inherit(i) => i.custom_styles.as_ref().and_then(|c| c.themes.get(&tid)),
+      Theme::Inherit(i) => i
+        .custom_styles
+        .as_ref()
+        .and_then(|c| c.themes.get(&tid)),
     });
 
     c.and_then(|c| c.downcast_ref::<Self>())

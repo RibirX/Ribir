@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use std::cell::Cell;
+
+use crate::prelude::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
 pub enum BoxFit {
@@ -58,20 +59,30 @@ impl Render for FittedBox {
     let scale_y = container_size.height / child_size.height;
     match self.box_fit {
       BoxFit::None => self.scale_cache.set(Transform::scale(1., 1.)),
-      BoxFit::Fill => self.scale_cache.set(Transform::scale(scale_x, scale_y)),
+      BoxFit::Fill => self
+        .scale_cache
+        .set(Transform::scale(scale_x, scale_y)),
       BoxFit::Contain => {
         let scale = scale_x.min(scale_y);
-        self.scale_cache.set(Transform::scale(scale, scale));
+        self
+          .scale_cache
+          .set(Transform::scale(scale, scale));
       }
       BoxFit::Cover => {
         let scale = scale_x.max(scale_y);
-        self.scale_cache.set(Transform::scale(scale, scale));
+        self
+          .scale_cache
+          .set(Transform::scale(scale, scale));
       }
       BoxFit::CoverY => {
-        self.scale_cache.set(Transform::scale(scale_y, scale_y));
+        self
+          .scale_cache
+          .set(Transform::scale(scale_y, scale_y));
       }
       BoxFit::CoverX => {
-        self.scale_cache.set(Transform::scale(scale_x, scale_x));
+        self
+          .scale_cache
+          .set(Transform::scale(scale_x, scale_x));
       }
     }
     let Transform { m11: x, m22: y, .. } = self.scale_cache.get();
@@ -100,9 +111,10 @@ impl Render for FittedBox {
 
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::*;
+
   use super::*;
   use crate::test_helper::*;
-  use ribir_dev_helper::*;
 
   const WND_SIZE: Size = Size::new(300., 300.);
 
@@ -115,12 +127,7 @@ mod tests {
 
   impl FitTestCase {
     fn test(self) {
-      let Self {
-        box_fit,
-        size,
-        expect,
-        expected_scale,
-      } = self;
+      let Self { box_fit, size, expect, expected_scale } = self;
       let fit = Stateful::new(FittedBox { box_fit, scale_cache: <_>::default() });
       let c_fit = fit.clone_reader();
       let w = fn_widget! {

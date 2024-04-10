@@ -1,5 +1,6 @@
-use crate::layout::SizedBox;
 use ribir_core::prelude::*;
+
+use crate::layout::SizedBox;
 
 /// Widget that let child paint as a icon with special size. Unlike icon in
 /// classic frameworks, it's not draw anything and not require you to

@@ -198,9 +198,10 @@ impl Render for RelativeAnchor {
 
 #[cfg(test)]
 mod test {
+  use ribir_dev_helper::*;
+
   use super::*;
   use crate::test_helper::*;
-  use ribir_dev_helper::*;
   const CHILD_SIZE: Size = Size::new(50., 50.);
   const WND_SIZE: Size = Size::new(100., 100.);
 

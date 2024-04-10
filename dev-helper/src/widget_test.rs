@@ -211,10 +211,7 @@ macro_rules! widget_layout_test {
 /// ```
 #[macro_export]
 macro_rules! widget_image_test {
-  (
-    $widget_fn: ident,
-    wnd_size = $size: expr $(,)?
-  ) => {
+  ($widget_fn:ident,wnd_size = $size:expr $(,)?) => {
     paste::paste! {
       #[test]
       fn [<$widget_fn _with_default_by_wgpu>]() {
@@ -245,9 +242,7 @@ macro_rules! widget_image_test {
       }
     }
   };
-  (
-    $widget_fn: ident $(,)?
-  ) => {
+  ($widget_fn:ident $(,)?) => {
     widget_image_test!($widget_fn, wnd_size = Size::new(128., 128.),);
   };
 }

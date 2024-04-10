@@ -1,13 +1,12 @@
 use std::{collections::HashMap, time::Duration};
 
+use super::Theme;
 use crate::{
   animation::RocBoxClone,
   context::BuildCtx,
   fill_transition,
   prelude::{easing, EasingTransition, Transition},
 };
-
-use super::Theme;
 
 pub struct TransitionTheme {
   pub transitions: HashMap<TransitionIdent, Box<dyn RocBoxClone>, ahash::RandomState>,
@@ -40,15 +39,7 @@ pub mod transitions {
     }
 
   pub const BEGIN: TransitionIdent = TransitionIdent::new(0);
-  define_transition_ident!(
-    BEGIN,
-    EASE,
-    LINEAR,
-    EASE_IN,
-    EASE_OUT,
-    EASE_IN_OUT,
-    THEME_EXTEND
-  );
+  define_transition_ident!(BEGIN, EASE, LINEAR, EASE_IN, EASE_OUT, EASE_IN_OUT, THEME_EXTEND);
 
   /// The user custom icon identify define start from.
   pub const CUSTOM_START: TransitionIdent = TransitionIdent::new(65536);
@@ -57,9 +48,7 @@ pub mod transitions {
 impl TransitionTheme {
   #[inline]
   pub fn set_transition(
-    &mut self,
-    ident: TransitionIdent,
-    transition: Box<dyn RocBoxClone>,
+    &mut self, ident: TransitionIdent, transition: Box<dyn RocBoxClone>,
   ) -> Option<Box<dyn RocBoxClone>> {
     self.transitions.insert(ident, transition)
   }

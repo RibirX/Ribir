@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum ColorFormat {
@@ -43,8 +44,7 @@ impl PixelImage {
 
   #[cfg(feature = "png")]
   pub fn write_as_png(
-    &self,
-    w: &mut impl std::io::Write,
+    &self, w: &mut impl std::io::Write,
   ) -> Result<(), Box<dyn std::error::Error>> {
     use image::ImageEncoder;
     let png_encoder = ::image::codecs::png::PngEncoder::new(w);

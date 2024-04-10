@@ -1,5 +1,6 @@
-use crate::CharacterCursor;
 use unicode_segmentation::GraphemeCursor as _GraphemeCursor;
+
+use crate::CharacterCursor;
 
 #[derive(Default, Copy, Clone, PartialEq, Eq)]
 pub struct GraphemeCursor(pub usize);

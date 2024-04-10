@@ -1,5 +1,6 @@
-use crate::layout::Direction;
 use ribir_core::prelude::*;
+
+use crate::layout::Direction;
 
 #[derive(MultiChild, Query)]
 pub struct GridView {

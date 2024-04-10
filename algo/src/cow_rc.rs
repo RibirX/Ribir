@@ -2,8 +2,7 @@ use std::{
   borrow::{Borrow, BorrowMut},
   fmt::Debug,
   hash::Hash,
-  ops::{Bound, Range},
-  ops::{Deref, RangeBounds},
+  ops::{Bound, Deref, Range, RangeBounds},
   sync::Arc,
 };
 
@@ -35,10 +34,7 @@ impl CowArc<str> {
       Bound::Excluded(&n) => n,
       Bound::Unbounded => self.len(),
     };
-    Substr {
-      str: self.clone(),
-      rg: Range { start, end },
-    }
+    Substr { str: self.clone(), rg: Range { start, end } }
   }
 }
 
@@ -59,10 +55,7 @@ impl Substr {
     start += offset;
     end = self.rg.end.min(end + offset);
 
-    Substr {
-      str: self.str.clone(),
-      rg: start..end,
-    }
+    Substr { str: self.str.clone(), rg: start..end }
   }
 }
 impl std::ops::Deref for Substr {

@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use std::collections::HashMap;
+
+use crate::prelude::*;
 
 /// The theme of icon, which specify the icon size standard and provide a store
 /// of svg icons to use.
@@ -74,9 +75,7 @@ impl IconTheme {
 
   #[inline]
   pub fn set_svg(
-    &mut self,
-    name: NamedSvg,
-    icon: ShareResource<Svg>,
+    &mut self, name: NamedSvg, icon: ShareResource<Svg>,
   ) -> Option<ShareResource<Svg>> {
     self.svgs.insert(name, icon)
   }
@@ -109,7 +108,10 @@ impl NamedSvg {
           log::info!("Icon({:?})  not init in theme.", self);
           Some(t.icon_theme.svgs.get(&MISS_ICON).unwrap())
         }),
-        Theme::Inherit(i) => i.icons.as_ref().and_then(|icons| icons.get(&self)),
+        Theme::Inherit(i) => i
+          .icons
+          .as_ref()
+          .and_then(|icons| icons.get(&self)),
       })
       .unwrap()
       .clone()
@@ -120,7 +122,10 @@ impl NamedSvg {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(t) => t.icon_theme.svgs.get(&self),
-        Theme::Inherit(i) => i.icons.as_ref().and_then(|icons| icons.get(&self)),
+        Theme::Inherit(i) => i
+          .icons
+          .as_ref()
+          .and_then(|icons| icons.get(&self)),
       })
       .cloned()
   }

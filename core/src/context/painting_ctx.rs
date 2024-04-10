@@ -1,9 +1,10 @@
+use std::rc::Rc;
+
 use super::{AppCtx, WidgetCtxImpl};
 use crate::{
   prelude::{Painter, WidgetId},
   window::{Window, WindowId},
 };
-use std::rc::Rc;
 
 pub struct PaintingCtx<'a> {
   pub(crate) id: WidgetId,

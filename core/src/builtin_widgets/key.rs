@@ -1,8 +1,9 @@
-use crate::prelude::*;
 use std::{
   cmp::{Eq, Ord, PartialOrd},
   fmt::Debug,
 };
+
+use crate::prelude::*;
 
 /// `Key` help `Ribir` to track if two widget is a same widget in two frames.
 /// Abstract all builtin key into a same type.
@@ -110,7 +111,9 @@ where
       log::warn!("Different value type for same key.");
       return;
     };
-    self.write().record_before_value(key.read().value.clone());
+    self
+      .write()
+      .record_before_value(key.read().value.clone());
   }
 
   fn record_next_key_widget(&self, _: &dyn AnyKey) { self.silent().has_successor = true; }

@@ -8,16 +8,15 @@
 /// # Example
 ///
 /// ```
-/// use ribir_dev_helper::unit_test_describe;
 /// use colored::Colorize;
+/// use ribir_dev_helper::unit_test_describe;
 ///
 /// fn test_first() {}
 ///
 /// fn test_second() {}
 ///
 /// fn main() {
-///
-///   unit_test_describe!{
+///   unit_test_describe! {
 ///     run_unit_test(test_first);
 ///     run_unit_test(test_second);
 ///   }

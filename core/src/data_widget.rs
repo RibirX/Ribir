@@ -40,9 +40,7 @@ impl Widget {
   }
 
   pub fn attach_state_data<D: Query>(
-    self,
-    data: impl StateReader<Value = D>,
-    ctx: &BuildCtx,
+    self, data: impl StateReader<Value = D>, ctx: &BuildCtx,
   ) -> Widget {
     match data.try_into_value() {
       Ok(data) => self.attach_data(data, ctx),
@@ -66,18 +64,14 @@ impl<D> RenderTarget for DataWidget<D> {
 
 impl<D: Query> Query for DataWidget<D> {
   fn query_inside_first(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool {
     self.render.query_inside_first(type_id, callback)
       && self.data.query_inside_first(type_id, callback)
   }
 
   fn query_outside_first(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool {
     self.data.query_outside_first(type_id, callback)
       && self.render.query_outside_first(type_id, callback)

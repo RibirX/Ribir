@@ -155,9 +155,9 @@ impl<K: Hash + Eq, V> FrameCache<K, V> {
   /// assert_eq!(None, cache.push(1, "a"));
   ///
   /// cache.end_frame("");
-  ///   
+  ///
   /// assert_eq!(None, cache.push(2, "b"));
-  ///    
+  ///
   /// // This push call returns (2, "b") because that was previously 2's entry in the cache.
   /// assert_eq!(Some((2, "b")), cache.push(2, "beta"));
   /// assert_eq!(None, cache.push(3, "alpha"));
@@ -293,10 +293,10 @@ impl<K: Hash + Eq, V> FrameCache<K, V> {
   /// cache.put(2, "c");
   /// cache.put(3, "d");
   ///
-  /// assert_eq!(cache.get_or_insert(2, ||"a"), &"c");
-  /// assert_eq!(cache.get_or_insert(3, ||"a"), &"d");
-  /// assert_eq!(cache.get_or_insert(1, ||"a"), &"a");
-  /// assert_eq!(cache.get_or_insert(1, ||"b"), &"a");
+  /// assert_eq!(cache.get_or_insert(2, || "a"), &"c");
+  /// assert_eq!(cache.get_or_insert(3, || "a"), &"d");
+  /// assert_eq!(cache.get_or_insert(1, || "a"), &"a");
+  /// assert_eq!(cache.get_or_insert(1, || "b"), &"a");
   /// ```
   pub fn get_or_insert<F>(&mut self, k: K, f: F) -> &V
   where
@@ -336,12 +336,12 @@ impl<K: Hash + Eq, V> FrameCache<K, V> {
   /// cache.put(1, "a");
   /// cache.put(2, "b");
   ///
-  /// let v = cache.get_or_insert_mut(2, ||"c");
+  /// let v = cache.get_or_insert_mut(2, || "c");
   /// assert_eq!(v, &"b");
   /// *v = "d";
-  /// assert_eq!(cache.get_or_insert_mut(2, ||"e"), &mut "d");
-  /// assert_eq!(cache.get_or_insert_mut(3, ||"f"), &mut "f");
-  /// assert_eq!(cache.get_or_insert_mut(3, ||"e"), &mut "f");
+  /// assert_eq!(cache.get_or_insert_mut(2, || "e"), &mut "d");
+  /// assert_eq!(cache.get_or_insert_mut(3, || "f"), &mut "f");
+  /// assert_eq!(cache.get_or_insert_mut(3, || "e"), &mut "f");
   /// ```
   pub fn get_or_insert_mut<F>(&mut self, k: K, f: F) -> &mut V
   where
@@ -715,7 +715,7 @@ impl<K: Hash + Eq, V> FrameCache<K, V> {
   /// cache.put("c", 3);
   ///
   /// for (key, val) in cache.iter() {
-  ///     println!("key: {} val: {}", key, val);
+  ///   println!("key: {} val: {}", key, val);
   /// }
   /// ```
   pub fn iter(&self) -> Iter<'_, K, V> {
@@ -736,21 +736,21 @@ impl<K: Hash + Eq, V> FrameCache<K, V> {
   /// use ribir_algo::FrameCache;
   ///
   /// struct HddBlock {
-  ///     dirty: bool,
-  ///     data: [u8; 512]
+  ///   dirty: bool,
+  ///   data: [u8; 512],
   /// }
   ///
   /// let mut cache = FrameCache::new();
-  /// cache.put(0, HddBlock { dirty: false, data: [0x00; 512]});
-  /// cache.put(1, HddBlock { dirty: true,  data: [0x55; 512]});
-  /// cache.put(2, HddBlock { dirty: true,  data: [0x77; 512]});
+  /// cache.put(0, HddBlock { dirty: false, data: [0x00; 512] });
+  /// cache.put(1, HddBlock { dirty: true, data: [0x55; 512] });
+  /// cache.put(2, HddBlock { dirty: true, data: [0x77; 512] });
   ///
   /// // write dirty blocks to disk.
   /// for (block_id, block) in cache.iter_mut() {
-  ///     if block.dirty {
-  ///         // write block to disk
-  ///         block.dirty = false
-  ///     }
+  ///   if block.dirty {
+  ///     // write block to disk
+  ///     block.dirty = false
+  ///   }
   /// }
   /// ```
   pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
@@ -776,9 +776,7 @@ impl<K: Hash + Eq, V> FrameCache<K, V> {
     let prev;
     unsafe { prev = (*self.tail).prev }
     if prev != self.head {
-      let old_key = KeyRef {
-        k: unsafe { &(*(*(*self.tail).prev).key.as_ptr()) },
-      };
+      let old_key = KeyRef { k: unsafe { &(*(*(*self.tail).prev).key.as_ptr()) } };
       let old_node = self.map.remove(&old_key).unwrap();
       let node_ptr: *mut LruEntry<K, V> = old_node.as_ptr();
       self.detach(node_ptr);
@@ -992,12 +990,7 @@ impl<'a, K, V> FusedIterator for Iter<'a, K, V> {}
 
 impl<'a, K, V> Clone for Iter<'a, K, V> {
   fn clone(&self) -> Iter<'a, K, V> {
-    Iter {
-      len: self.len,
-      ptr: self.ptr,
-      end: self.end,
-      phantom: PhantomData,
-    }
+    Iter { len: self.len, ptr: self.ptr, end: self.end, phantom: PhantomData }
   }
 }
 
@@ -1122,10 +1115,12 @@ impl<K: Hash + Eq, V> Default for FrameCache<K, V> {
 
 #[cfg(test)]
 mod tests {
-  use super::FrameCache;
   use core::fmt::Debug;
-  use scoped_threadpool::Pool;
   use std::sync::atomic::{AtomicUsize, Ordering};
+
+  use scoped_threadpool::Pool;
+
+  use super::FrameCache;
 
   fn assert_opt_eq<V: PartialEq + Debug>(opt: Option<&V>, v: V) {
     assert!(opt.is_some());
@@ -1138,8 +1133,7 @@ mod tests {
   }
 
   fn assert_opt_eq_tuple<K: PartialEq + Debug, V: PartialEq + Debug>(
-    opt: Option<(&K, &V)>,
-    kv: (K, V),
+    opt: Option<(&K, &V)>, kv: (K, V),
   ) {
     assert!(opt.is_some());
     let res = opt.unwrap();
@@ -1148,8 +1142,7 @@ mod tests {
   }
 
   fn assert_opt_eq_mut_tuple<K: PartialEq + Debug, V: PartialEq + Debug>(
-    opt: Option<(&K, &mut V)>,
-    kv: (K, V),
+    opt: Option<(&K, &mut V)>, kv: (K, V),
   ) {
     assert!(opt.is_some());
     let res = opt.unwrap();

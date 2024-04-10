@@ -95,7 +95,10 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             .iter_mut()
             .enumerate()
             .for_each(|(f_idx, f)| with_child_impl(f_idx, f, &mut tokens));
-          let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
+          let builder_fields = fields
+            .clone()
+            .into_pairs()
+            .map(convert_to_builder_pair);
           tokens.extend(quote! {
             #[derive(Default)]
             #vis struct #builder #g_impl #g_where {
@@ -124,7 +127,10 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             .iter_mut()
             .enumerate()
             .for_each(|(f_idx, f)| with_child_impl(f_idx, f, &mut tokens));
-          let builder_fields = fields.clone().into_pairs().map(convert_to_builder_pair);
+          let builder_fields = fields
+            .clone()
+            .into_pairs()
+            .map(convert_to_builder_pair);
           tokens.extend(quote! {
             #[derive(Default)]
             #vis struct #builder #g_impl #g_where(#(#builder_fields)*);

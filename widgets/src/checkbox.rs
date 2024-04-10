@@ -1,8 +1,9 @@
+use ribir_core::prelude::*;
+
 use crate::{
   common_widget::{Leading, Trailing},
   prelude::{Icon, Label, Row, Text},
 };
-use ribir_core::prelude::*;
 
 /// Represents a control that a user can select and clear.
 #[derive(Clone, Declare)]
@@ -123,29 +124,20 @@ impl CustomStyle for CheckBoxStyle {
 }
 #[cfg(test)]
 mod tests {
-  use super::*;
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
+
+  use super::*;
 
   fn checked() -> impl WidgetBuilder {
     fn_widget! { @Checkbox { checked: true } }
   }
-  widget_test_suit!(
-    checked,
-    wnd_size = Size::new(48., 48.),
-    width == 24.,
-    height == 24.,
-  );
+  widget_test_suit!(checked, wnd_size = Size::new(48., 48.), width == 24., height == 24.,);
 
   fn unchecked() -> impl WidgetBuilder {
     fn_widget! { @Checkbox {} }
   }
-  widget_test_suit!(
-    unchecked,
-    wnd_size = Size::new(48., 48.),
-    width == 24.,
-    height == 24.,
-  );
+  widget_test_suit!(unchecked, wnd_size = Size::new(48., 48.), width == 24., height == 24.,);
 
   fn indeterminate() -> impl WidgetBuilder {
     fn_widget! {
@@ -156,10 +148,5 @@ mod tests {
     }
   }
 
-  widget_test_suit!(
-    indeterminate,
-    wnd_size = Size::new(48., 48.),
-    width == 24.,
-    height == 24.,
-  );
+  widget_test_suit!(indeterminate, wnd_size = Size::new(48., 48.), width == 24., height == 24.,);
 }

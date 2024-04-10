@@ -1,13 +1,14 @@
+use std::{cell::RefMut, convert::Infallible};
+
+use rxrust::ops::box_it::BoxOp;
+
+use super::{ModifyScope, ReadRef, StateReader, StateWriter, WriteRef};
 use crate::{
   context::BuildCtx,
   render_helper::{RenderProxy, RenderTarget},
   ticker::Instant,
   widget::{Render, RenderBuilder, Widget},
 };
-
-use super::{ModifyScope, ReadRef, StateReader, StateWriter, WriteRef};
-use rxrust::ops::box_it::BoxOp;
-use std::{cell::RefMut, convert::Infallible};
 
 /// A state reader that map a reader to another by applying a function on the
 /// value. This reader is the same reader with the origin reader, It's also have
@@ -34,10 +35,7 @@ macro_rules! impl_reader_trivial_methods {
 
     #[inline]
     fn clone_reader(&self) -> Self::Reader {
-      MapReader {
-        origin: self.origin.clone_reader(),
-        map: self.map.clone(),
-      }
+      MapReader { origin: self.origin.clone_reader(), map: self.map.clone() }
     }
 
     #[inline]
@@ -166,11 +164,6 @@ where
       .take()
       .map(|orig| RefMut::map(orig, &self.mut_map));
 
-    WriteRef {
-      value,
-      modified: false,
-      modify_scope: orig.modify_scope,
-      control: orig.control,
-    }
+    WriteRef { value, modified: false, modify_scope: orig.modify_scope, control: orig.control }
   }
 }

@@ -126,7 +126,10 @@ mod tests {
     focus_mgr.refresh_focus(&widget_tree.arena);
 
     let arena = &widget_tree.arena;
-    let id0 = widget_tree.content_root().first_child(arena).unwrap();
+    let id0 = widget_tree
+      .content_root()
+      .first_child(arena)
+      .unwrap();
     let scope = id0.next_sibling(arena).unwrap();
     let id1 = scope.next_sibling(arena).unwrap();
 

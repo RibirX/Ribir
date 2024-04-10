@@ -22,10 +22,11 @@ impl Render for ConstrainedBox {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use crate::prelude::*;
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
+
+  use super::*;
+  use crate::prelude::*;
 
   fn outside_fixed_clamp() -> impl WidgetBuilder {
     fn_widget! {

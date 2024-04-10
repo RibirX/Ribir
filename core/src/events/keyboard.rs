@@ -1,8 +1,8 @@
-use crate::{impl_common_event_deref, prelude::*, window::WindowId};
-
 pub use winit::keyboard::{
   Key as VirtualKey, KeyCode, KeyLocation, ModifiersState, NamedKey, PhysicalKey,
 };
+
+use crate::{impl_common_event_deref, prelude::*, window::WindowId};
 
 #[derive(Debug)]
 pub struct KeyboardEvent {
@@ -32,30 +32,21 @@ impl_common_event_deref!(KeyboardEvent);
 impl KeyboardEvent {
   #[inline]
   pub fn new(
-    wnd_id: WindowId,
-    id: WidgetId,
-    physical_key: PhysicalKey,
-    key: VirtualKey,
-    is_repeat: bool,
+    wnd_id: WindowId, id: WidgetId, physical_key: PhysicalKey, key: VirtualKey, is_repeat: bool,
     location: KeyLocation,
   ) -> Self {
-    Self {
-      physical_key,
-      key,
-      is_repeat,
-      location,
-      common: CommonEvent::new(id, wnd_id),
-    }
+    Self { physical_key, key, is_repeat, location, common: CommonEvent::new(id, wnd_id) }
   }
 }
 
 #[cfg(test)]
 mod tests {
+  use std::{cell::RefCell, rc::Rc};
+
   use winit::event::ElementState;
 
   use super::*;
   use crate::test_helper::*;
-  use std::{cell::RefCell, rc::Rc};
 
   #[test]
   fn smoke() {

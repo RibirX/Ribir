@@ -1,17 +1,17 @@
 pub mod error;
+use std::ops::Range;
+
 pub use gpu_backend::Texture;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::{image::ColorFormat, AntiAliasing, Color, GradientStop, VertexBuffers};
-use std::ops::Range;
 mod gpu_backend;
 use zerocopy::AsBytes;
 
 #[cfg(feature = "wgpu")]
 pub mod wgpu_impl;
+pub use gpu_backend::*;
 #[cfg(feature = "wgpu")]
 pub use wgpu_impl::*;
-
-pub use gpu_backend::*;
 
 /// Trait to help implement a gpu backend.
 ///
@@ -66,10 +66,7 @@ pub trait GPUBackendImpl {
 
   /// Create a texture.
   fn new_texture(
-    &mut self,
-    size: DeviceSize,
-    anti_aliasing: AntiAliasing,
-    format: ColorFormat,
+    &mut self, size: DeviceSize, anti_aliasing: AntiAliasing, format: ColorFormat,
   ) -> Self::Texture;
   /// Load the vertices and indices buffer that `draw_alpha_triangles` &
   /// `draw_alpha_triangles_with_scissor` will use.
@@ -82,10 +79,7 @@ pub trait GPUBackendImpl {
   /// gives a clip rectangle for the texture, the path should only painting in
   /// the rectangle.
   fn draw_alpha_triangles_with_scissor(
-    &mut self,
-    indices: &Range<u32>,
-    texture: &mut Self::Texture,
-    scissor: DeviceRect,
+    &mut self, indices: &Range<u32>, texture: &mut Self::Texture, scissor: DeviceRect,
   );
 
   /// load textures that will be use in this draw phase
@@ -121,42 +115,27 @@ pub trait GPUBackendImpl {
   /// Draw pure color triangles in the texture. And use the clear color clear
   /// the texture first if it's a Some-Value
   fn draw_color_triangles(
-    &mut self,
-    texture: &mut Self::Texture,
-    indices: Range<u32>,
-    clear: Option<Color>,
+    &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
   );
   /// Draw triangles fill with image. And use the clear color clear the texture
   /// first if it's a Some-Value
   fn draw_img_triangles(
-    &mut self,
-    texture: &mut Self::Texture,
-    indices: Range<u32>,
-    clear: Option<Color>,
+    &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
   );
   /// Draw triangles fill with color radial gradient. And use the clear color
   /// clear the texture first if it's a Some-Value
   fn draw_radial_gradient_triangles(
-    &mut self,
-    texture: &mut Self::Texture,
-    indices: Range<u32>,
-    clear: Option<Color>,
+    &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
   );
 
   /// Draw triangles fill with color linear gradient. And use the clear color
   /// clear the texture first if it's a Some-Value
   fn draw_linear_gradient_triangles(
-    &mut self,
-    texture: &mut Self::Texture,
-    indices: Range<u32>,
-    clear: Option<Color>,
+    &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
   );
 
   fn copy_texture_from_texture(
-    &mut self,
-    dist_tex: &mut Self::Texture,
-    copy_to: DevicePoint,
-    from_tex: &Self::Texture,
+    &mut self, dist_tex: &mut Self::Texture, copy_to: DevicePoint, from_tex: &Self::Texture,
     from_rect: &DeviceRect,
   );
   /// A frame end, call once per frame

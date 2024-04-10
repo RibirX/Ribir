@@ -1,5 +1,6 @@
-use crate::ui::wordle_game;
 use ribir::prelude::*;
+
+use crate::ui::wordle_game;
 mod ui;
 mod wordle;
 

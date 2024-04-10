@@ -1,11 +1,13 @@
+use std::{error::Error, io::Read};
+
+use ribir_geom::{Point, Rect, Size, Transform};
+use serde::{Deserialize, Serialize};
+use usvg::{Options, Stop, Tree, TreeParsing};
+
 use crate::{
   color::{LinearGradient, RadialGradient},
   Brush, Color, GradientStop, LineCap, LineJoin, PaintCommand, Path, StrokeOptions,
 };
-use ribir_geom::{Point, Rect, Size, Transform};
-use serde::{Deserialize, Serialize};
-use std::{error::Error, io::Read};
-use usvg::{Options, Stop, Tree, TreeParsing};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Svg {
@@ -38,10 +40,8 @@ impl Svg {
     let bound_rect = Rect::from_size(Size::new(f32::MAX, f32::MAX));
     let mut painter = crate::Painter::new(bound_rect);
     painter.apply_transform(
-      &Transform::translation(-view_rect.x(), -view_rect.y()).then_scale(
-        size.width() / fit_size.width(),
-        size.height() / fit_size.height(),
-      ),
+      &Transform::translation(-view_rect.x(), -view_rect.y())
+        .then_scale(size.width() / fit_size.width(), size.height() / fit_size.height()),
     );
     tree.root.traverse().for_each(|edge| match edge {
       rctree::NodeEdge::Start(node) => {
@@ -57,7 +57,11 @@ impl Svg {
               painter
                 .set_brush(brush.clone())
                 .apply_transform(&transform)
-                .fill_path(path.clone().transform(&transform.inverse().unwrap()));
+                .fill_path(
+                  path
+                    .clone()
+                    .transform(&transform.inverse().unwrap()),
+                );
               //&o_ts.then(&n_ts.inverse().unwrap())));
             }
 
@@ -119,10 +123,7 @@ impl Svg {
       }
     });
 
-    Ok(Svg {
-      size: Size::new(size.width(), size.height()),
-      paint_commands: painter.finish(),
-    })
+    Ok(Svg { size: Size::new(size.width(), size.height()), paint_commands: painter.finish() })
   }
 
   pub fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn Error>> {
@@ -150,11 +151,7 @@ fn usvg_path_to_path(path: &usvg::Path) -> Path {
       builder.line_to(point(pt.x, pt.y));
     }
     usvg::tiny_skia_path::PathSegment::CubicTo(pt1, pt2, pt3) => {
-      builder.cubic_bezier_to(
-        point(pt1.x, pt1.y),
-        point(pt2.x, pt2.y),
-        point(pt3.x, pt3.y),
-      );
+      builder.cubic_bezier_to(point(pt1.x, pt1.y), point(pt2.x, pt2.y), point(pt3.x, pt3.y));
     }
     usvg::tiny_skia_path::PathSegment::QuadTo(pt1, pt2) => {
       builder.quadratic_bezier_to(point(pt1.x, pt1.y), point(pt2.x, pt2.y));
@@ -173,9 +170,7 @@ fn matrix_convert(t: usvg::Transform) -> Transform {
 }
 
 fn brush_from_usvg_paint(
-  paint: &usvg::Paint,
-  opacity: usvg::Opacity,
-  size: &usvg::Size,
+  paint: &usvg::Paint, opacity: usvg::Opacity, size: &usvg::Size,
 ) -> (Brush, Transform) {
   match paint {
     usvg::Paint::Color(usvg::Color { red, green, blue }) => (
@@ -197,10 +192,7 @@ fn brush_from_usvg_paint(
         spread_method: linear.spread_method.into(),
       };
 
-      (
-        Brush::LinearGradient(gradient),
-        matrix_convert(linear.transform),
-      )
+      (Brush::LinearGradient(gradient), matrix_convert(linear.transform))
     }
     usvg::Paint::RadialGradient(radial_gradient) => {
       let stops = convert_to_gradient_stops(&radial_gradient.stops);
@@ -223,10 +215,7 @@ fn brush_from_usvg_paint(
         spread_method: radial_gradient.spread_method.into(),
       };
 
-      (
-        Brush::RadialGradient(gradient),
-        matrix_convert(radial_gradient.transform),
-      )
+      (Brush::RadialGradient(gradient), matrix_convert(radial_gradient.transform))
     }
     paint => {
       log::warn!("[painter]: not support `{paint:?}` in svg, use black instead!");

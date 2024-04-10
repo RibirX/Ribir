@@ -1,3 +1,5 @@
+use std::{collections::HashMap, rc::Rc};
+
 use ribir_geom::ZERO_SIZE;
 
 use super::{WidgetId, WidgetTree};
@@ -7,7 +9,6 @@ use crate::{
   widget::TreeArena,
   window::{DelayEvent, Window, WindowId},
 };
-use std::{collections::HashMap, rc::Rc};
 
 /// boundary limit of the render object's layout
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -18,16 +19,12 @@ pub struct BoxClamp {
 
 impl BoxClamp {
   /// clamp use to expand the width to max
-  pub const EXPAND_X: BoxClamp = BoxClamp {
-    min: Size::new(f32::INFINITY, 0.),
-    max: Size::new(f32::INFINITY, f32::INFINITY),
-  };
+  pub const EXPAND_X: BoxClamp =
+    BoxClamp { min: Size::new(f32::INFINITY, 0.), max: Size::new(f32::INFINITY, f32::INFINITY) };
 
   /// clamp use to expand the height to max
-  pub const EXPAND_Y: BoxClamp = BoxClamp {
-    min: Size::new(0., f32::INFINITY),
-    max: Size::new(f32::INFINITY, f32::INFINITY),
-  };
+  pub const EXPAND_Y: BoxClamp =
+    BoxClamp { min: Size::new(0., f32::INFINITY), max: Size::new(f32::INFINITY, f32::INFINITY) };
 
   /// clamp use to expand the size to max
   pub const EXPAND_BOTH: BoxClamp = BoxClamp {
@@ -37,18 +34,12 @@ impl BoxClamp {
 
   /// clamp use fixed width and unfixed height
   pub const fn fixed_width(width: f32) -> Self {
-    BoxClamp {
-      min: Size::new(width, 0.),
-      max: Size::new(width, f32::INFINITY),
-    }
+    BoxClamp { min: Size::new(width, 0.), max: Size::new(width, f32::INFINITY) }
   }
 
   /// clamp use fixed height and unfixed width
   pub const fn fixed_height(height: f32) -> Self {
-    BoxClamp {
-      min: Size::new(0., height),
-      max: Size::new(f32::INFINITY, height),
-    }
+    BoxClamp { min: Size::new(0., height), max: Size::new(f32::INFINITY, height) }
   }
 
   /// clamp use fixed size
@@ -138,22 +129,29 @@ impl LayoutStore {
   }
 
   pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
-    self.layout_box_position(id).map_or(pos, |offset| {
-      let pos = id
-        .assert_get(arena)
-        .get_transform()
-        .map_or(pos, |t| t.transform_point(pos));
-      pos + offset.to_vector()
-    })
+    self
+      .layout_box_position(id)
+      .map_or(pos, |offset| {
+        let pos = id
+          .assert_get(arena)
+          .get_transform()
+          .map_or(pos, |t| t.transform_point(pos));
+        pos + offset.to_vector()
+      })
   }
 
   pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
-    self.layout_box_position(id).map_or(pos, |offset| {
-      let pos = pos - offset.to_vector();
-      id.assert_get(arena)
-        .get_transform()
-        .map_or(pos, |t| t.inverse().map_or(pos, |t| t.transform_point(pos)))
-    })
+    self
+      .layout_box_position(id)
+      .map_or(pos, |offset| {
+        let pos = pos - offset.to_vector();
+        id.assert_get(arena)
+          .get_transform()
+          .map_or(pos, |t| {
+            t.inverse()
+              .map_or(pos, |t| t.transform_point(pos))
+          })
+      })
   }
 
   pub(crate) fn map_to_global(&self, pos: Point, widget: WidgetId, arena: &TreeArena) -> Point {
@@ -204,7 +202,9 @@ impl<'a> Layouter<'a> {
 
         let Self { id, wnd_id, ref tree, .. } = *self;
         let mut ctx = LayoutCtx { id, wnd_id, tree: tree2 };
-        let size = id.assert_get(&tree.arena).perform_layout(clamp, &mut ctx);
+        let size = id
+          .assert_get(&tree.arena)
+          .perform_layout(clamp, &mut ctx);
         // The dynamic widget maybe generate a new widget to instead of self. In that
         // way we needn't add a layout event because it perform layout in another widget
         // and added the event in that widget.
@@ -258,7 +258,11 @@ impl<'a> Layouter<'a> {
   /// parent.
   #[inline]
   pub fn update_position(&mut self, pos: Point) {
-    self.tree.store.layout_info_or_default(self.id).pos = pos;
+    self
+      .tree
+      .store
+      .layout_info_or_default(self.id)
+      .pos = pos;
   }
 
   /// Update the size of layout widget. Use this method to directly change the
@@ -273,10 +277,7 @@ impl<'a> Layouter<'a> {
 
 impl<'a> Layouter<'a> {
   pub(crate) fn new(
-    id: WidgetId,
-    wnd_id: WindowId,
-    is_layout_root: bool,
-    tree: &'a mut WidgetTree,
+    id: WidgetId, wnd_id: WindowId, is_layout_root: bool, tree: &'a mut WidgetTree,
   ) -> Self {
     Self { id, wnd_id, is_layout_root, tree }
   }
@@ -284,10 +285,7 @@ impl<'a> Layouter<'a> {
 
 impl Default for BoxClamp {
   fn default() -> Self {
-    Self {
-      min: Size::new(0., 0.),
-      max: Size::new(f32::INFINITY, f32::INFINITY),
-    }
+    Self { min: Size::new(0., 0.), max: Size::new(f32::INFINITY, f32::INFINITY) }
   }
 }
 
@@ -302,10 +300,12 @@ impl std::ops::DerefMut for LayoutStore {
 
 #[cfg(test)]
 mod tests {
+  use std::cell::Cell;
+
+  use ribir_dev_helper::*;
+
   use super::*;
   use crate::{prelude::*, reset_test_env, test_helper::*};
-  use ribir_dev_helper::*;
-  use std::cell::Cell;
 
   #[derive(Declare, Clone, Query, SingleChild)]
   struct OffsetBox {

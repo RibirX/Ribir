@@ -31,57 +31,36 @@ pub(crate) struct MockClipboard {}
 impl Clipboard for MockClipboard {
   fn read_text(&mut self) -> Result<String, Error> {
     warn!("read text from clipboard");
-    Err(Error::new(
-      std::io::ErrorKind::Unsupported,
-      "clipboard read_text",
-    ))
+    Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard read_text"))
   }
 
   fn write_text(&mut self, _text: &str) -> Result<(), Error> {
     warn!("write text to clipboard");
-    Err(Error::new(
-      std::io::ErrorKind::Unsupported,
-      "clipboard write_text",
-    ))
+    Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard write_text"))
   }
 
   fn read_img(&mut self) -> Result<PixelImage, Error> {
     warn!("read img from clipboard");
-    Err(Error::new(
-      std::io::ErrorKind::Unsupported,
-      "clipboard read_img",
-    ))
+    Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard read_img"))
   }
 
   fn write_img(&mut self, _img: &PixelImage) -> Result<(), Error> {
     warn!("write img to clipboard");
-    Err(Error::new(
-      std::io::ErrorKind::Unsupported,
-      "clipboard write_img",
-    ))
+    Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard write_img"))
   }
 
   fn read(&mut self, format: &str) -> Result<Cow<[u8]>, Error> {
     warn!("read {format} data from clipboard");
-    Err(Error::new(
-      std::io::ErrorKind::Unsupported,
-      "clipboard read format {format}",
-    ))
+    Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard read format {format}"))
   }
 
   fn write(&mut self, format: &str, _data: &[u8]) -> Result<(), Error> {
     warn!("write {format} data to clipboard");
-    Err(Error::new(
-      std::io::ErrorKind::Unsupported,
-      "clipboard write format {format}",
-    ))
+    Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard write format {format}"))
   }
 
   fn clear(&mut self) -> Result<(), Error> {
     warn!("clear content of clipboard");
-    Err(Error::new(
-      std::io::ErrorKind::Unsupported,
-      "clipboard clear",
-    ))
+    Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard clear"))
   }
 }

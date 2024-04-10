@@ -1,9 +1,10 @@
+use ribir_algo::ShareResource;
+use serde::{Deserialize, Serialize};
+
 use crate::{
   color::{LinearGradient, RadialGradient},
   Color, PixelImage,
 };
-use ribir_algo::ShareResource;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Brush {

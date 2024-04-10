@@ -1,13 +1,14 @@
+use std::{
+  cell::{OnceCell, Ref, RefCell},
+  rc::Rc,
+};
+
 use ribir_algo::Sc;
 
 use crate::{
   prelude::*,
   widget::widget_id::new_node,
   window::{DelayEvent, WindowId},
-};
-use std::{
-  cell::{OnceCell, Ref, RefCell},
-  rc::Rc,
 };
 
 /// A context provide during build the widget tree.
@@ -32,30 +33,25 @@ impl<'a> BuildCtx<'a> {
   pub fn window(&self) -> Rc<Window> { self.tree.borrow().window() }
 
   /// Get the widget which this `BuildCtx` is created from.
-  pub fn ctx_from(&self) -> WidgetId { self.ctx_from.unwrap_or_else(|| self.tree.borrow().root()) }
+  pub fn ctx_from(&self) -> WidgetId {
+    self
+      .ctx_from
+      .unwrap_or_else(|| self.tree.borrow().root())
+  }
 
   /// Create a handle of this `BuildCtx` which support `Clone`, `Copy` and
   /// convert back to this `BuildCtx`. This let you can store the `BuildCtx`.
   pub fn handle(&self) -> BuildCtxHandle {
-    BuildCtxHandle {
-      wnd_id: self.window().id(),
-      ctx_from: self.ctx_from,
-    }
+    BuildCtxHandle { wnd_id: self.window().id(), ctx_from: self.ctx_from }
   }
 
   #[inline]
   pub(crate) fn new(from: Option<WidgetId>, tree: &'a RefCell<WidgetTree>) -> Self {
-    Self {
-      themes: OnceCell::new(),
-      ctx_from: from,
-      tree,
-    }
+    Self { themes: OnceCell::new(), ctx_from: from, tree }
   }
 
   pub(crate) fn new_with_data(
-    from: Option<WidgetId>,
-    tree: &'a RefCell<WidgetTree>,
-    data: Vec<Sc<Theme>>,
+    from: Option<WidgetId>, tree: &'a RefCell<WidgetTree>, data: Vec<Sc<Theme>>,
   ) -> Self {
     let themes: OnceCell<Vec<Sc<Theme>>> = OnceCell::new();
     // Safety: we just create the `OnceCell` and it's empty.
@@ -105,7 +101,9 @@ impl<'a> BuildCtx<'a> {
   /// After insert new widget to the widget tree, call this to watch the widget
   /// and fire mount events.
   pub(crate) fn on_widget_mounted(&self, id: WidgetId) {
-    self.window().add_delay_event(DelayEvent::Mounted(id));
+    self
+      .window()
+      .add_delay_event(DelayEvent::Mounted(id));
   }
 
   /// Dispose the whole subtree of `id`, include `id` itself.
@@ -207,7 +205,10 @@ mod tests {
     assert_eq!(themes.len(), 2);
     let mut iter = themes.iter().filter_map(|t| match t.deref() {
       Theme::Full(t) => Some(t.palette.brightness),
-      Theme::Inherit(i) => i.palette.as_ref().map(|palette| palette.brightness),
+      Theme::Inherit(i) => i
+        .palette
+        .as_ref()
+        .map(|palette| palette.brightness),
     });
 
     assert_eq!(iter.next(), Some(Brightness::Light));

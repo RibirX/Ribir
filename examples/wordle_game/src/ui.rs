@@ -1,5 +1,6 @@
-use crate::wordle::{CharHint, Wordle, WordleChar};
 use ribir::prelude::*;
+
+use crate::wordle::{CharHint, Wordle, WordleChar};
 
 pub fn wordle_game() -> impl WidgetBuilder {
   fn_widget! { @ { Wordle::new(5, 5) }  }
@@ -7,8 +8,7 @@ pub fn wordle_game() -> impl WidgetBuilder {
 
 trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
   fn chars_key<const N: usize>(
-    &self,
-    chars: [char; N],
+    &self, chars: [char; N],
   ) -> impl Iterator<Item = impl WidgetBuilder> {
     chars.into_iter().map(|c| self.char_key(c))
   }
@@ -113,10 +113,9 @@ impl Wordle {
     assert!(col < self.len_hint());
     return match row.cmp(&self.guesses.len()) {
       std::cmp::Ordering::Less => Some(*self.guesses[row].char_hint(col)),
-      std::cmp::Ordering::Equal if col < self.guessing.word().len() => Some(WordleChar {
-        char: self.guessing.word().chars().nth(col).unwrap(),
-        hint: None,
-      }),
+      std::cmp::Ordering::Equal if col < self.guessing.word().len() => {
+        Some(WordleChar { char: self.guessing.word().chars().nth(col).unwrap(), hint: None })
+      }
       _ => return None,
     };
   }

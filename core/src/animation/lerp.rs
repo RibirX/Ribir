@@ -217,22 +217,10 @@ mod tests {
         .lower_than(Vector::new(f32::EPSILON, f32::EPSILON))
         .all()
     };
-    assert!(eq(
-      Lerp::lerp(&Point::new(0., 0.), &Point::new(0., 10.), 0.5),
-      Point::new(0., 5.)
-    ));
-    assert!(eq(
-      Lerp::lerp(&Point::new(10., 0.), &Point::new(0., 0.), 0.2),
-      Point::new(8., 0.)
-    ));
-    assert!(eq(
-      Lerp::lerp(&Point::new(20., 0.), &Point::new(0., 10.), 0.2),
-      Point::new(16., 2.)
-    ));
-    assert!(eq(
-      Lerp::lerp(&Point::new(10., 0.), &Point::new(0., 10.), 2.),
-      Point::new(-10., 20.)
-    ));
+    assert!(eq(Lerp::lerp(&Point::new(0., 0.), &Point::new(0., 10.), 0.5), Point::new(0., 5.)));
+    assert!(eq(Lerp::lerp(&Point::new(10., 0.), &Point::new(0., 0.), 0.2), Point::new(8., 0.)));
+    assert!(eq(Lerp::lerp(&Point::new(20., 0.), &Point::new(0., 10.), 0.2), Point::new(16., 2.)));
+    assert!(eq(Lerp::lerp(&Point::new(10., 0.), &Point::new(0., 10.), 2.), Point::new(-10., 20.)));
   }
 
   #[test]

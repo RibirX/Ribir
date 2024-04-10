@@ -161,9 +161,10 @@ impl From<VAlign> for Align {
 
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::*;
+
   use super::*;
   use crate::test_helper::*;
-  use ribir_dev_helper::*;
   const CHILD_SIZE: Size = Size::new(10., 10.);
   const WND_SIZE: Size = Size::new(100., 100.);
 

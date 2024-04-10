@@ -1,8 +1,10 @@
-use super::vertex_buffer::VerticesBuffer;
-use crate::WgpuTexture;
+use std::{mem::size_of, ops::Range};
+
 use ribir_geom::DeviceRect;
 use ribir_painter::{AntiAliasing, Vertex, VertexBuffers};
-use std::{mem::size_of, ops::Range};
+
+use super::vertex_buffer::VerticesBuffer;
+use crate::WgpuTexture;
 
 pub struct DrawAlphaTrianglesPass {
   anti_aliasing: AntiAliasing,
@@ -19,30 +21,20 @@ impl DrawAlphaTrianglesPass {
       source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/alpha_triangles.wgsl").into()),
     });
 
-    Self {
-      anti_aliasing: AntiAliasing::None,
-      vertices_buffer,
-      pipeline: None,
-      shader,
-    }
+    Self { anti_aliasing: AntiAliasing::None, vertices_buffer, pipeline: None, shader }
   }
 
   pub fn load_alpha_vertices(
-    &mut self,
-    buffers: &VertexBuffers<f32>,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
+    &mut self, buffers: &VertexBuffers<f32>, device: &wgpu::Device, queue: &wgpu::Queue,
   ) {
-    self.vertices_buffer.write_buffer(buffers, device, queue);
+    self
+      .vertices_buffer
+      .write_buffer(buffers, device, queue);
   }
 
   pub fn draw_alpha_triangles(
-    &mut self,
-    indices: &Range<u32>,
-    texture: &WgpuTexture,
-    scissor: Option<DeviceRect>,
-    encoder: &mut wgpu::CommandEncoder,
-    device: &wgpu::Device,
+    &mut self, indices: &Range<u32>, texture: &WgpuTexture, scissor: Option<DeviceRect>,
+    encoder: &mut wgpu::CommandEncoder, device: &wgpu::Device,
   ) {
     self.update_pipeline(texture.anti_aliasing, device);
 
@@ -56,10 +48,7 @@ impl DrawAlphaTrianglesPass {
       occlusion_query_set: None,
     });
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
-    rpass.set_index_buffer(
-      self.vertices_buffer.indices().slice(..),
-      wgpu::IndexFormat::Uint32,
-    );
+    rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
 
     if let Some(scissor) = scissor {
       rpass.set_scissor_rect(

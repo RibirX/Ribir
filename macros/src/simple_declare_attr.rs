@@ -151,7 +151,12 @@ pub struct DeclareField<'a> {
 impl<'a> DeclareField<'a> {
   pub fn member(&self) -> &Ident { self.field.ident.as_ref().unwrap() }
 
-  pub fn is_not_skip(&self) -> bool { self.attr.as_ref().map_or(true, |attr| attr.skip.is_none()) }
+  pub fn is_not_skip(&self) -> bool {
+    self
+      .attr
+      .as_ref()
+      .map_or(true, |attr| attr.skip.is_none())
+  }
 
   pub fn is_strict(&self) -> bool {
     self
@@ -249,37 +254,38 @@ impl Parse for DefaultMeta {
 }
 
 fn declarer_set_methods<'a>(
-  fields: &'a [DeclareField],
-  vis: &'a Visibility,
+  fields: &'a [DeclareField], vis: &'a Visibility,
 ) -> impl Iterator<Item = TokenStream> + 'a {
-  fields.iter().filter(|f| f.need_set_method()).map(move |f| {
-    let field_name = f.field.ident.as_ref().unwrap();
-    let ty = &f.field.ty;
-    let set_method = f.set_method_name();
-    if f.is_strict() {
-      quote! {
-        #[inline]
-        #vis fn #set_method(mut self, v: #ty) -> Self {
-          self.#field_name = Some(v);
-          self
+  fields
+    .iter()
+    .filter(|f| f.need_set_method())
+    .map(move |f| {
+      let field_name = f.field.ident.as_ref().unwrap();
+      let ty = &f.field.ty;
+      let set_method = f.set_method_name();
+      if f.is_strict() {
+        quote! {
+          #[inline]
+          #vis fn #set_method(mut self, v: #ty) -> Self {
+            self.#field_name = Some(v);
+            self
+          }
+        }
+      } else {
+        quote! {
+          #[inline]
+          #vis fn #set_method(mut self, v: impl Into<#ty>) -> Self
+          {
+            self.#field_name = Some(v.into());
+            self
+          }
         }
       }
-    } else {
-      quote! {
-        #[inline]
-        #vis fn #set_method(mut self, v: impl Into<#ty>) -> Self
-        {
-          self.#field_name = Some(v.into());
-          self
-        }
-      }
-    }
-  })
+    })
 }
 
 fn init_pairs<'a>(
-  fields: &'a [DeclareField],
-  stt_name: &'a Ident,
+  fields: &'a [DeclareField], stt_name: &'a Ident,
 ) -> impl Iterator<Item = TokenStream> + 'a {
   fields.iter().map(move |f| {
     let f_name = f.member();

@@ -132,12 +132,13 @@ impl Sc<dyn Any> {
   ///
   /// ```
   /// use std::any::Any;
+  ///
   /// use ribir_algo::Sc;
   ///
   /// fn print_if_string(value: Sc<dyn Any>) {
-  ///     if let Ok(string) = value.downcast::<String>() {
-  ///         println!("String ({}): {}", string.len(), string);
-  ///     }
+  ///   if let Ok(string) = value.downcast::<String>() {
+  ///     println!("String ({}): {}", string.len(), string);
+  ///   }
   /// }
   ///
   /// let my_string = "Hello World".to_string();

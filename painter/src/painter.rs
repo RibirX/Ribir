@@ -1,15 +1,15 @@
+use std::ops::{Deref, DerefMut};
+
+use ribir_algo::ShareResource;
+use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
+use serde::{Deserialize, Serialize};
+
 use crate::{
   color::{LinearGradient, RadialGradient},
   path::*,
   path_builder::PathBuilder,
   Brush, Color, PixelImage, Svg,
 };
-use ribir_algo::ShareResource;
-use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
-
-use serde::{Deserialize, Serialize};
-
-use std::ops::{Deref, DerefMut};
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
 /// the right edge of the canvas. Along the Y-axis, values increase towards the
@@ -46,10 +46,7 @@ pub trait PainterBackend {
   /// Paint `commands` to the `output` Texture.
   /// This may be called more than once during a frame.
   fn draw_commands(
-    &mut self,
-    viewport: DeviceRect,
-    commands: Vec<PaintCommand>,
-    surface: Color,
+    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, surface: Color,
     output: &mut Self::Texture,
   );
 
@@ -98,23 +95,10 @@ impl From<usvg::SpreadMethod> for SpreadMethod {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PaintCommand {
-  ColorPath {
-    path: PaintPath,
-    color: Color,
-  },
-  ImgPath {
-    path: PaintPath,
-    img: ShareResource<PixelImage>,
-    opacity: f32,
-  },
-  RadialGradient {
-    path: PaintPath,
-    radial_gradient: RadialGradient,
-  },
-  LinearGradient {
-    path: PaintPath,
-    linear_gradient: LinearGradient,
-  },
+  ColorPath { path: PaintPath, color: Color },
+  ImgPath { path: PaintPath, img: ShareResource<PixelImage>, opacity: f32 },
+  RadialGradient { path: PaintPath, radial_gradient: RadialGradient },
+  LinearGradient { path: PaintPath, linear_gradient: LinearGradient },
   // Todo: keep rectangle clip.
   Clip(PaintPath),
   PopClip,
@@ -251,7 +235,9 @@ impl Painter {
     self.fill_all_pop_clips();
     self.commands.clear();
     self.state_stack.clear();
-    self.state_stack.push(PainterState::new(self.viewport));
+    self
+      .state_stack
+      .push(PainterState::new(self.viewport));
   }
 
   /// Returns the color, gradient, or pattern used for draw. Only `Color`
@@ -313,7 +299,10 @@ impl Painter {
 
   #[inline]
   pub fn set_miter_limit(&mut self, miter_limit: f32) -> &mut Self {
-    self.current_state_mut().stroke_options.miter_limit = miter_limit;
+    self
+      .current_state_mut()
+      .stroke_options
+      .miter_limit = miter_limit;
     self
   }
 
@@ -410,7 +399,9 @@ impl Painter {
   /// * `y` - Distance to move in the vertical direction. Positive values are
   ///   down, and negative are up.
   pub fn translate(&mut self, x: f32, y: f32) -> &mut Self {
-    let t = self.get_transform().pre_translate(Vector::new(x, y));
+    let t = self
+      .get_transform()
+      .pre_translate(Vector::new(x, y));
     self.set_transform(t);
     self
   }
@@ -447,7 +438,9 @@ impl Painter {
   /// Adds a cubic Bezier curve to the current path.
   #[inline]
   pub fn bezier_curve_to(&mut self, ctrl1: Point, ctrl2: Point, to: Point) -> &mut Self {
-    self.path_builder.bezier_curve_to(ctrl1, ctrl2, to);
+    self
+      .path_builder
+      .bezier_curve_to(ctrl1, ctrl2, to);
     self
   }
 
@@ -463,11 +456,7 @@ impl Painter {
   /// point with a straight line, if necessary for the specified
   #[inline]
   pub fn arc_to(
-    &mut self,
-    center: Point,
-    radius: f32,
-    start_angle: Angle,
-    end_angle: Angle,
+    &mut self, center: Point, radius: f32, start_angle: Angle, end_angle: Angle,
   ) -> &mut Self {
     self
       .path_builder
@@ -481,11 +470,7 @@ impl Painter {
   /// clockwise).
   #[inline]
   pub fn ellipse_to(
-    &mut self,
-    center: Point,
-    radius: Vector,
-    start_angle: Angle,
-    end_angle: Angle,
+    &mut self, center: Point, radius: Vector, start_angle: Angle, end_angle: Angle,
   ) -> &mut Self {
     self
       .path_builder
@@ -542,10 +527,7 @@ impl Painter {
   /// otherwise will draw the partial src_rect of the image fitted into
   /// dst_rect.
   pub fn draw_img(
-    &mut self,
-    img: ShareResource<PixelImage>,
-    dst_rect: &Rect,
-    src_rect: &Option<Rect>,
+    &mut self, img: ShareResource<PixelImage>, dst_rect: &Rect, src_rect: &Option<Rect>,
   ) -> &mut Self {
     {
       let mut painter = self.save_guard();
@@ -563,10 +545,7 @@ impl Painter {
         paint_rect = *rc;
       }
       painter
-        .scale(
-          dst_rect.width() / paint_rect.width(),
-          dst_rect.height() / paint_rect.height(),
-        )
+        .scale(dst_rect.width() / paint_rect.width(), dst_rect.height() / paint_rect.height())
         .translate(-paint_rect.min_x(), -paint_rect.min_y())
         .rect(&Rect::from_size(Size::new(m_width, m_height)))
         .set_brush(img)
@@ -606,7 +585,10 @@ impl Painter {
 
   fn fill_all_pop_clips(&mut self) {
     let clip_cnt = self.current_state().clip_cnt;
-    self.state_stack.iter_mut().for_each(|s| s.clip_cnt = 0);
+    self
+      .state_stack
+      .iter_mut()
+      .for_each(|s| s.clip_cnt = 0);
     self.push_n_pop_cmd(clip_cnt);
   }
 
@@ -679,7 +661,9 @@ impl PaintPath {
 
   pub fn transform(&mut self, transform: &Transform) {
     self.transform = self.transform.then(transform);
-    self.paint_bounds = self.transform.outer_transformed_rect(self.path.bounds());
+    self.paint_bounds = self
+      .transform
+      .outer_transformed_rect(self.path.bounds());
   }
 }
 
@@ -689,7 +673,7 @@ fn locatable_bounds(bounds: &Rect) -> bool {
 }
 
 macro_rules! invisible_return {
-  ($this: ident) => {
+  ($this:ident) => {
     if !$this.is_visible_canvas() {
       return $this;
     }
@@ -699,8 +683,9 @@ use invisible_return;
 
 #[cfg(test)]
 mod test {
-  use super::*;
   use ribir_geom::rect;
+
+  use super::*;
 
   fn painter() -> Painter { Painter::new(Rect::from_size(Size::new(512., 512.))) }
 
@@ -720,10 +705,7 @@ mod test {
       }
       assert_eq!(&t, guard.get_transform());
     }
-    assert_eq!(
-      &Transform::new(1., 0., 0., 1., 0., 0.),
-      painter.get_transform()
-    );
+    assert_eq!(&Transform::new(1., 0., 0., 1., 0., 0.), painter.get_transform());
   }
 
   #[test]
@@ -742,14 +724,8 @@ mod test {
 
     assert_eq!(painter.current_state().clip_cnt, 0);
 
-    assert!(matches!(
-      commands[commands.len() - 1],
-      PaintCommand::PopClip
-    ));
-    assert!(matches!(
-      commands[commands.len() - 2],
-      PaintCommand::PopClip
-    ));
+    assert!(matches!(commands[commands.len() - 1], PaintCommand::PopClip));
+    assert!(matches!(commands[commands.len() - 2], PaintCommand::PopClip));
   }
 
   #[test]

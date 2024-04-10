@@ -35,11 +35,7 @@ struct VisibilityRender {
 impl Render for VisibilityRender {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    if self.display {
-      ctx.assert_perform_single_child_layout(clamp)
-    } else {
-      ZERO_SIZE
-    }
+    if self.display { ctx.assert_perform_single_child_layout(clamp) } else { ZERO_SIZE }
   }
 
   #[inline]
@@ -50,10 +46,7 @@ impl Render for VisibilityRender {
   }
 
   fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
-    HitTest {
-      hit: false,
-      can_hit_child: self.display,
-    }
+    HitTest { hit: false, can_hit_child: self.display }
   }
 }
 

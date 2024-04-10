@@ -4,6 +4,8 @@
 //! Some detail processing learn from [usvg](https://github.com/RazrFalcon/resvg/blob/master/usvg/src/text)
 pub mod font_db;
 pub mod shaper;
+use std::hash::Hash;
+
 use derive_more::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 use fontdb::ID;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
@@ -11,7 +13,6 @@ use ribir_algo::CowArc;
 pub use ribir_algo::Substr;
 use ribir_geom::{Rect, Size};
 use rustybuzz::ttf_parser::GlyphId;
-use std::hash::Hash;
 use typography::{PlaceLineDirection, TypographyCfg};
 pub mod text_reorder;
 pub mod typography;
@@ -39,43 +40,16 @@ pub const PIXELS_PER_EM: f32 = 16.;
 
 /// `Pixels is an absolute length unit and relative to the view device
 #[derive(
-  Debug,
-  Default,
-  Clone,
-  Copy,
-  PartialEq,
-  PartialOrd,
-  Add,
-  Sub,
-  Div,
-  AddAssign,
-  Mul,
-  SubAssign,
-  Eq,
-  Ord,
-  Hash,
+  Debug, Default, Clone, Copy, PartialEq, PartialOrd, Add, Sub, Div, AddAssign, Mul, SubAssign, Eq,
+  Ord, Hash
 )]
 pub struct Pixel(pub OrderedFloat<f32>);
 
 ///  `Em` is relative length unit relative to `Pixel`. We stipulate Em(1.) equal
 /// to Pixel(16.)
 #[derive(
-  Debug,
-  Default,
-  Clone,
-  Copy,
-  PartialEq,
-  PartialOrd,
-  Add,
-  Sub,
-  Div,
-  AddAssign,
-  Mul,
-  SubAssign,
-  Eq,
-  Ord,
-  Hash,
-  Neg,
+  Debug, Default, Clone, Copy, PartialEq, PartialOrd, Add, Sub, Div, AddAssign, Mul, SubAssign, Eq,
+  Ord, Hash, Neg
 )]
 pub struct Em(OrderedFloat<f32>);
 
@@ -210,18 +184,12 @@ pub enum TextDirection {
 impl TextDirection {
   #[inline]
   pub fn is_vertical(&self) -> bool {
-    matches!(
-      self,
-      TextDirection::TopToBottom | TextDirection::BottomToTop
-    )
+    matches!(self, TextDirection::TopToBottom | TextDirection::BottomToTop)
   }
 
   #[inline]
   pub fn is_horizontal(&self) -> bool {
-    matches!(
-      self,
-      TextDirection::LeftToRight | TextDirection::RightToLeft
-    )
+    matches!(self, TextDirection::LeftToRight | TextDirection::RightToLeft)
   }
 }
 
@@ -347,15 +315,7 @@ impl<U> Glyph<U> {
   where
     U: Into<T>,
   {
-    let Glyph {
-      face_id,
-      x_advance,
-      y_advance,
-      x_offset,
-      y_offset,
-      glyph_id,
-      cluster,
-    } = self;
+    let Glyph { face_id, x_advance, y_advance, x_offset, y_offset, glyph_id, cluster } = self;
 
     Glyph {
       face_id,
@@ -376,13 +336,7 @@ pub trait VisualText {
   fn overflow(&self) -> Overflow;
 
   fn text_layout(&self, typography_store: &TypographyStore, bound: Size) -> VisualGlyphs {
-    let TextStyle {
-      font_size,
-      letter_space,
-      line_height,
-      ref font_face,
-      ..
-    } = *self.text_style();
+    let TextStyle { font_size, letter_space, line_height, ref font_face, .. } = *self.text_style();
 
     let width: Em = Pixel(bound.width.into()).into();
     let height: Em = Pixel(bound.height.into()).into();

@@ -23,10 +23,9 @@ pub type DeviceVector<T = i32> = euclid::Vector2D<T, PhysicUnit>;
 
 pub const INFINITY_SIZE: Size = Size::new(f32::INFINITY, f32::INFINITY);
 pub const ZERO_SIZE: Size = Size::new(0., 0.);
-pub use euclid::num::Zero;
-
-pub use euclid::rect;
 use std::ops::Add;
+
+pub use euclid::{num::Zero, rect};
 
 /// Return the four corners of a rectangle: [left-top, right-top,
 /// right-bottom, left-bottom]

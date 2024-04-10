@@ -2,8 +2,6 @@ mod map_state;
 mod prior_op;
 mod splitted_state;
 mod stateful;
-pub use prior_op::*;
-
 use std::{
   cell::{Cell, Ref, RefCell, RefMut, UnsafeCell},
   convert::Infallible,
@@ -11,11 +9,13 @@ use std::{
   ops::DerefMut,
 };
 
-use crate::prelude::*;
 pub use map_state::*;
+pub use prior_op::*;
 use rxrust::ops::box_it::BoxOp;
 pub use splitted_state::*;
 pub use stateful::*;
+
+use crate::prelude::*;
 
 /// The `StateReader` trait allows for reading, clone and map the state.
 pub trait StateReader: 'static {
@@ -317,7 +317,10 @@ impl<'a, W: ?Sized> DerefMut for WriteRef<'a, W> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target {
     self.modified = true;
-    self.control.last_modified_stamp().set(Instant::now());
+    self
+      .control
+      .last_modified_stamp()
+      .set(Instant::now());
     // Safety: value always exists except in drop method.
     unsafe { self.value.as_mut().unwrap_unchecked().deref_mut() }
   }
@@ -336,7 +339,9 @@ impl<'a, W: ?Sized> Drop for WriteRef<'a, W> {
 
       let control = control.dyn_clone();
       AppCtx::spawn_local(async move {
-        let scope = control.batched_modifies().replace(ModifyScope::empty());
+        let scope = control
+          .batched_modifies()
+          .replace(ModifyScope::empty());
         control.notifier().next(scope);
       })
       .unwrap();
@@ -416,29 +421,21 @@ where
 {
   #[inline]
   fn query_inside_first(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool {
     self.query_outside_first(type_id, callback)
   }
 
   fn query_outside_first(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool {
     let any: &T::Value = &self.read();
-    if type_id == any.type_id() {
-      callback(any)
-    } else {
-      true
-    }
+    if type_id == any.type_id() { callback(any) } else { true }
   }
 }
 
 macro_rules! impl_compose_builder {
-  ($name: ident) => {
+  ($name:ident) => {
     impl<V, W, RM, WM> ComposeBuilder for $name<W, RM, WM>
     where
       W: StateWriter,
@@ -544,10 +541,7 @@ mod tests {
     origin.write().b = 0;
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
-    assert_eq!(
-      track_origin.get(),
-      ModifyScope::DATA.bits() + ModifyScope::BOTH.bits()
-    );
+    assert_eq!(track_origin.get(), ModifyScope::DATA.bits() + ModifyScope::BOTH.bits());
     // splitted downstream will not be notified.
     assert_eq!(track_split.get(), ModifyScope::BOTH.bits());
   }

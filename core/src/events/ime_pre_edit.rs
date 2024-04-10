@@ -15,10 +15,7 @@ pub enum ImePreEdit {
   /// cleared.
   ///
   /// The cursor position is byte-wise indexed.
-  PreEdit {
-    value: String,
-    cursor: Option<(usize, usize)>,
-  },
+  PreEdit { value: String, cursor: Option<(usize, usize)> },
 
   /// Notifies when the IME PreEdit was finished this round.
   ///
@@ -35,10 +32,7 @@ pub struct ImePreEditEvent {
 
 impl ImePreEditEvent {
   pub(crate) fn new(pre_edit: ImePreEdit, target: WidgetId, wnd: &Window) -> Self {
-    ImePreEditEvent {
-      pre_edit,
-      common: CommonEvent::new(target, wnd.id()),
-    }
+    ImePreEditEvent { pre_edit, common: CommonEvent::new(target, wnd.id()) }
   }
 }
 

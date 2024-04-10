@@ -24,7 +24,17 @@ pub use rxrust;
 pub mod overlay;
 
 pub mod prelude {
-  pub use crate::animation::*;
+  pub use log;
+  #[doc(no_inline)]
+  pub use ribir_algo::CowArc;
+  pub use ribir_geom::*;
+  #[doc(no_inline)]
+  pub use ribir_macros::*;
+  #[doc(no_inline)]
+  pub use ribir_text::*;
+  #[doc(hidden)]
+  pub use rxrust::prelude::*;
+
   #[doc(no_inline)]
   pub use crate::builtin_widgets::*;
   #[doc(no_inline)]
@@ -41,7 +51,6 @@ pub mod prelude {
   pub use crate::pipe::{BoxPipe, FinalChain, MapPipe, ModifiesPipe, Pipe};
   #[doc(no_inline)]
   pub use crate::state::*;
-  pub use crate::ticker::{Duration, Instant};
   #[doc(no_inline)]
   pub use crate::widget;
   #[doc(no_inline)]
@@ -52,17 +61,10 @@ pub mod prelude {
   pub use crate::widget_tree::{BoxClamp, LayoutInfo, Layouter, WidgetId};
   #[doc(no_inline)]
   pub use crate::window::Window;
-  pub use log;
-  #[doc(no_inline)]
-  pub use ribir_algo::CowArc;
-  pub use ribir_geom::*;
-  #[doc(no_inline)]
-  pub use ribir_macros::*;
-
-  #[doc(no_inline)]
-  pub use ribir_text::*;
-  #[doc(hidden)]
-  pub use rxrust::prelude::*;
+  pub use crate::{
+    animation::*,
+    ticker::{Duration, Instant},
+  };
 }
 
 pub mod test_helper;

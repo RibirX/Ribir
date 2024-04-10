@@ -24,13 +24,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           # we use nightly for clippy and rustfmt
-          toolchain: nightly-2024-03-25
+          toolchain: nightly-2024-04-20
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: format style check
         run: cargo fmt --all -- --check
       - name: cargo clippy check
-        run: cargo clippy --all-targets --all-features -- -D warnings\
+        run: cargo clippy --all-targets --all-features -- -D warnings
       # Check with stable toolchain to ensure stable compilation
       - uses: dtolnay/rust-toolchain@stable
         with:

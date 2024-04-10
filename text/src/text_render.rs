@@ -1,7 +1,9 @@
-use crate::{font_db::FontDB, Em, FontFace, FontSize, GlyphBound, Pixel, VisualGlyphs};
+use std::{cell::RefCell, rc::Rc};
+
 use ribir_geom::{Rect, Size};
 use ribir_painter::{Brush, Painter, Path, PathPaintStyle};
-use std::{cell::RefCell, rc::Rc};
+
+use crate::{font_db::FontDB, Em, FontFace, FontSize, GlyphBound, Pixel, VisualGlyphs};
 
 /// Encapsulates the text style for painting.
 #[derive(Clone, Debug, PartialEq)]
@@ -32,13 +34,8 @@ impl Default for TextStyle {
 /// draw the text glyphs within the box_rect, with the given brush font_size and
 /// path style
 pub fn draw_glyphs_in_rect(
-  painter: &mut Painter,
-  visual_glyphs: VisualGlyphs,
-  box_rect: Rect,
-  brush: Brush,
-  font_size: f32,
-  path_style: &PathPaintStyle,
-  font_db: Rc<RefCell<FontDB>>,
+  painter: &mut Painter, visual_glyphs: VisualGlyphs, box_rect: Rect, brush: Brush, font_size: f32,
+  path_style: &PathPaintStyle, font_db: Rc<RefCell<FontDB>>,
 ) {
   let visual_rect = visual_glyphs.visual_rect();
   let Some(paint_rect) = painter.intersection_paint_bounds(&box_rect) else {
@@ -60,12 +57,8 @@ pub fn draw_glyphs_in_rect(
 
 /// draw the glyphs with the given brush, font_size and path style
 pub fn draw_glyphs(
-  painter: &mut Painter,
-  glyphs: impl Iterator<Item = GlyphBound>,
-  brush: Brush,
-  font_size: f32,
-  path_style: &PathPaintStyle,
-  font_db: Rc<RefCell<FontDB>>,
+  painter: &mut Painter, glyphs: impl Iterator<Item = GlyphBound>, brush: Brush, font_size: f32,
+  path_style: &PathPaintStyle, font_db: Rc<RefCell<FontDB>>,
 ) {
   glyphs.for_each(|g| {
     let font_db = font_db.borrow();
@@ -88,7 +81,9 @@ pub fn draw_glyphs(
             painter.fill_path(path);
           }
           PathPaintStyle::Stroke(stroke) => {
-            painter.set_strokes(stroke.clone()).stroke_path(path);
+            painter
+              .set_strokes(stroke.clone())
+              .stroke_path(path);
           }
         }
       } else if let Some(svg) = face.glyph_svg_image(g.glyph_id) {

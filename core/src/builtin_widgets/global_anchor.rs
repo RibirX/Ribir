@@ -1,5 +1,6 @@
-use crate::{prelude::*, ticker::FrameMsg};
 use std::rc::Rc;
+
+use crate::{prelude::*, ticker::FrameMsg};
 
 #[derive(Query, Default)]
 pub struct GlobalAnchor {
@@ -55,10 +56,7 @@ impl GlobalAnchor {
 }
 
 fn bind_h_anchor(
-  this: &impl StateWriter<Value = GlobalAnchor>,
-  wnd: &Rc<Window>,
-  relative: HAnchor,
-  base: f32,
+  this: &impl StateWriter<Value = GlobalAnchor>, wnd: &Rc<Window>, relative: HAnchor, base: f32,
 ) {
   let size = wnd.size();
   let anchor = match relative {
@@ -71,10 +69,7 @@ fn bind_h_anchor(
 }
 
 fn bind_v_anchor(
-  this: &impl StateWriter<Value = GlobalAnchor>,
-  wnd: &Rc<Window>,
-  relative: VAnchor,
-  base: f32,
+  this: &impl StateWriter<Value = GlobalAnchor>, wnd: &Rc<Window>, relative: VAnchor, base: f32,
 ) {
   let size = wnd.size();
   let anchor = match relative {
@@ -91,10 +86,7 @@ impl<W> FatObj<W> {
   /// the left edge of the specified widget (`wid`) with the given relative
   /// pixel value (`relative`).
   pub fn left_align_to(
-    &mut self,
-    wid: &LazyWidgetId,
-    offset: f32,
-    ctx: &BuildCtx,
+    &mut self, wid: &LazyWidgetId, offset: f32, ctx: &BuildCtx,
   ) -> impl Subscription {
     let this = self.get_global_anchor_widget().clone_writer();
     let wnd = ctx.window();
@@ -103,7 +95,9 @@ impl<W> FatObj<W> {
       .frame_tick_stream()
       .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
     tick_of_layout_ready.subscribe(move |_| {
-      let base = wnd.map_to_global(Point::zero(), wid.assert_id()).x;
+      let base = wnd
+        .map_to_global(Point::zero(), wid.assert_id())
+        .x;
       bind_h_anchor(&this, &wnd, HAnchor::Left(offset), base);
     })
   }
@@ -112,10 +106,7 @@ impl<W> FatObj<W> {
   /// the right edge of the specified widget (`wid`) with the given relative
   /// pixel value (`relative`).
   pub fn right_align_to(
-    &mut self,
-    wid: &LazyWidgetId,
-    relative: f32,
-    ctx: &BuildCtx,
+    &mut self, wid: &LazyWidgetId, relative: f32, ctx: &BuildCtx,
   ) -> impl Subscription {
     let this = self.get_global_anchor_widget().clone_writer();
     let wnd = ctx.window();
@@ -124,8 +115,12 @@ impl<W> FatObj<W> {
       .frame_tick_stream()
       .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
     tick_of_layout_ready.subscribe(move |_| {
-      let base = wnd.map_to_global(Point::zero(), wid.assert_id()).x;
-      let size = wnd.layout_size(wid.assert_id()).unwrap_or_default();
+      let base = wnd
+        .map_to_global(Point::zero(), wid.assert_id())
+        .x;
+      let size = wnd
+        .layout_size(wid.assert_id())
+        .unwrap_or_default();
       bind_h_anchor(&this, &wnd, HAnchor::Right(relative), base + size.width);
     })
   }
@@ -134,10 +129,7 @@ impl<W> FatObj<W> {
   /// top edge of the specified widget (`wid`) with the given relative pixel
   /// value (`relative`).
   pub fn top_align_to(
-    &mut self,
-    wid: &LazyWidgetId,
-    relative: f32,
-    ctx: &BuildCtx,
+    &mut self, wid: &LazyWidgetId, relative: f32, ctx: &BuildCtx,
   ) -> impl Subscription {
     let this = self.get_global_anchor_widget().clone_writer();
     let wnd = ctx.window();
@@ -146,7 +138,9 @@ impl<W> FatObj<W> {
       .frame_tick_stream()
       .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
     tick_of_layout_ready.subscribe(move |_| {
-      let base = wnd.map_to_global(Point::zero(), wid.assert_id()).y;
+      let base = wnd
+        .map_to_global(Point::zero(), wid.assert_id())
+        .y;
       bind_v_anchor(&this, &wnd, VAnchor::Top(relative), base);
     })
   }
@@ -155,10 +149,7 @@ impl<W> FatObj<W> {
   /// the bottom edge of the specified widget (`wid`) with the given relative
   /// pixel value (`relative`).
   pub fn bottom_align_to(
-    &mut self,
-    wid: &LazyWidgetId,
-    relative: f32,
-    ctx: &BuildCtx,
+    &mut self, wid: &LazyWidgetId, relative: f32, ctx: &BuildCtx,
   ) -> impl Subscription {
     let this = self.get_global_anchor_widget().clone_writer();
     let wnd = ctx.window();
@@ -167,17 +158,22 @@ impl<W> FatObj<W> {
       .frame_tick_stream()
       .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
     tick_of_layout_ready.subscribe(move |_| {
-      let base = wnd.map_to_global(Point::zero(), wid.assert_id()).y;
-      let size = wnd.layout_size(wid.assert_id()).unwrap_or_default();
+      let base = wnd
+        .map_to_global(Point::zero(), wid.assert_id())
+        .y;
+      let size = wnd
+        .layout_size(wid.assert_id())
+        .unwrap_or_default();
       bind_v_anchor(&this, &wnd, VAnchor::Bottom(relative), base + size.height);
     })
   }
 }
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::*;
+
   use super::*;
   use crate::test_helper::*;
-  use ribir_dev_helper::*;
 
   const WND_SIZE: Size = Size::new(100., 100.);
   fn global_anchor() -> impl WidgetBuilder {

@@ -67,11 +67,11 @@ impl Render for Stack {
 
 #[cfg(test)]
 mod tests {
-  use crate::prelude::*;
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
 
   use super::*;
+  use crate::prelude::*;
   const FIVE: Size = Size::new(5., 5.);
   fn smoke() -> impl WidgetBuilder {
     let one = Size::new(1., 1.);

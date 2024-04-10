@@ -86,12 +86,10 @@ pub struct LazyWidgetId(Sc<Cell<Option<WidgetId>>>);
 /// of `Margin` widget within it.
 ///
 /// ```rust
-/// use ribir_core::prelude::*;
-/// use ribir_core::test_helper::*;
+/// use ribir_core::{prelude::*, test_helper::*};
 ///
 /// let w = |ctx: &BuildCtx| {
-///   let mut multi = FatObj::new(MockMulti::default())
-///     .margin(EdgeInsets::all(10.));
+///   let mut multi = FatObj::new(MockMulti::default()).margin(EdgeInsets::all(10.));
 ///
 ///   let w = multi.get_margin_widget().clone_writer();
 ///   multi
@@ -236,10 +234,7 @@ impl<T> FatObj<T> {
   ///
   /// Panics if the FatObj contains builtin widgets.
   pub fn into_inner(self) -> T {
-    assert!(
-      self.is_empty(),
-      "Unwrap a FatObj with contains builtin widgets is not allowed."
-    );
+    assert!(self.is_empty(), "Unwrap a FatObj with contains builtin widgets is not allowed.");
     self.host
   }
 
@@ -414,8 +409,11 @@ impl<T> FatObj<T> {
 }
 
 macro_rules! on_mixin {
-  ($this: ident, $on_method: ident, $f: ident) => {{
-    $this.get_mix_builtin_widget().read().$on_method($f);
+  ($this:ident, $on_method:ident, $f:ident) => {{
+    $this
+      .get_mix_builtin_widget()
+      .read()
+      .$on_method($f);
     $this
   }};
 }
@@ -551,8 +549,7 @@ impl<T> FatObj<T> {
   /// Attaches a handler to the widget that is triggered when a x-times tap
   /// occurs.
   pub fn on_x_times_tap(
-    mut self,
-    (times, f): (usize, impl FnMut(&mut PointerEvent) + 'static),
+    mut self, (times, f): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> Self {
     self
       .get_mix_builtin_widget()
@@ -566,8 +563,7 @@ impl<T> FatObj<T> {
   /// it's triggered earlier in the event flow. For more information on event
   /// capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
   pub fn on_x_times_tap_capture(
-    mut self,
-    (times, f): (usize, impl FnMut(&mut PointerEvent) + 'static),
+    mut self, (times, f): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> Self {
     self
       .get_mix_builtin_widget()
@@ -728,13 +724,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<bool>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_mix_builtin_widget,
-      |m, v| {
-        m.set_auto_focus(v);
-      },
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_mix_builtin_widget, |m, v| {
+      m.set_auto_focus(v);
+    })
   }
 
   /// Initializes how its child should be scale to fit its box.
@@ -742,11 +734,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<BoxFit>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_fitted_box_widget,
-      |m, v| m.box_fit = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_fitted_box_widget, |m, v| {
+      m.box_fit = v
+    })
   }
 
   /// Initializes the background of the widget.
@@ -790,11 +780,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<EdgeInsets>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_padding_widget,
-      |m, v| m.padding = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_padding_widget, |m, v| {
+      m.padding = v
+    })
   }
 
   /// Initializes the cursor of the widget.
@@ -802,11 +790,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<CursorIcon>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_cursor_widget,
-      |m, v| m.cursor = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_cursor_widget, |m, v| {
+      m.cursor = v
+    })
   }
 
   /// Initializes the space around the widget.
@@ -814,11 +800,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<EdgeInsets>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_margin_widget,
-      |m, v| m.margin = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_margin_widget, |m, v| {
+      m.margin = v
+    })
   }
 
   /// Initializes how user can scroll the widget.
@@ -826,11 +810,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<Scrollable>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_scrollable_widget,
-      |m, v| m.scrollable = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_scrollable_widget, |m, v| {
+      m.scrollable = v
+    })
   }
 
   /// Initializes the position of the widget's scroll.
@@ -838,11 +820,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<Point>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_scrollable_widget,
-      |m, v| m.scroll_pos = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_scrollable_widget, |m, v| {
+      m.scroll_pos = v
+    })
   }
 
   /// Initializes the transformation of the widget.
@@ -850,11 +830,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<Transform>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_transform_widget,
-      |m, v| m.transform = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_transform_widget, |m, v| {
+      m.transform = v
+    })
   }
 
   /// Initializes how the widget should be aligned horizontally.
@@ -862,11 +840,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<HAlign>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_h_align_widget,
-      |m, v| m.h_align = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_h_align_widget, |m, v| {
+      m.h_align = v
+    })
   }
 
   /// Initializes how the widget should be aligned vertically.
@@ -874,11 +850,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<VAlign>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_v_align_widget,
-      |m, v| m.v_align = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_v_align_widget, |m, v| {
+      m.v_align = v
+    })
   }
 
   /// Initializes the relative anchor to the parent of the widget.
@@ -910,11 +884,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<bool>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_visibility_widget,
-      |m, v| m.visible = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_visibility_widget, |m, v| {
+      m.visible = v
+    })
   }
 
   /// Initializes the opacity of the widget.
@@ -922,11 +894,9 @@ impl<T> FatObj<T> {
   where
     DeclareInit<f32>: DeclareFrom<V, M>,
   {
-    self.declare_builtin_init(
-      DeclareFrom::declare_from(v),
-      Self::get_opacity_widget,
-      |m, v| m.opacity = v,
-    )
+    self.declare_builtin_init(DeclareFrom::declare_from(v), Self::get_opacity_widget, |m, v| {
+      m.opacity = v
+    })
   }
 
   /// Initializes the `delay_drop_until` value of the `DelayDrop` widget.
@@ -955,9 +925,7 @@ impl<T> FatObj<T> {
   }
 
   fn declare_builtin_init<V: 'static, B: 'static>(
-    mut self,
-    init: DeclareInit<V>,
-    get_builtin: impl FnOnce(&mut Self) -> &mut State<B>,
+    mut self, init: DeclareInit<V>, get_builtin: impl FnOnce(&mut Self) -> &mut State<B>,
     set_value: fn(&mut B, V),
   ) -> Self {
     let builtin = get_builtin(&mut self);
@@ -1100,7 +1068,9 @@ impl<T: PairWithChild<C>, C> PairWithChild<C> for FatObj<T> {
 impl<T: SingleParent + 'static> SingleParent for FatObj<T> {
   #[track_caller]
   fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    self.map(|host| host.compose_child(child, ctx)).build(ctx)
+    self
+      .map(|host| host.compose_child(child, ctx))
+      .build(ctx)
   }
 }
 

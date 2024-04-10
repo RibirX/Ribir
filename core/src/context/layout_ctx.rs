@@ -1,11 +1,13 @@
+use std::rc::Rc;
+
+use ribir_geom::Size;
+
 use super::{AppCtx, WidgetCtx, WidgetCtxImpl};
 use crate::{
   widget::{BoxClamp, Layouter, WidgetTree},
   widget_tree::WidgetId,
   window::{Window, WindowId},
 };
-use ribir_geom::Size;
-use std::rc::Rc;
 
 /// A place to compute the render object's layout. Rather than holding  children
 /// directly, `Layout` perform layout across `LayoutCtx`. `LayoutCtx` provide
@@ -52,12 +54,16 @@ impl<'a> LayoutCtx<'a> {
 
   /// Return the layouter of the first child.
   pub fn first_child_layouter(&mut self) -> Option<Layouter> {
-    self.first_child().map(|wid| self.new_layouter(wid))
+    self
+      .first_child()
+      .map(|wid| self.new_layouter(wid))
   }
 
   /// Return the layouter of the first child.
   pub fn single_child_layouter(&mut self) -> Option<Layouter> {
-    self.single_child().map(|wid| self.new_layouter(wid))
+    self
+      .single_child()
+      .map(|wid| self.new_layouter(wid))
   }
 
   /// Return the layouter of the first child.

@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use ribir_core::prelude::*;
+
+use crate::prelude::*;
 
 /// Lists usage
 ///
@@ -184,14 +185,7 @@ pub struct CustomEdgeWidget(pub Widget);
 
 impl EdgeWidget {
   fn compose_with_style(self, config: EdgeWidgetStyle) -> impl WidgetBuilder {
-    let EdgeWidgetStyle {
-      icon,
-      text,
-      avatar,
-      image,
-      poster,
-      custom,
-    } = config;
+    let EdgeWidgetStyle { icon, text, avatar, image, poster, custom } = config;
     fn_widget! {
       let w: Widget = match self {
         EdgeWidget::Icon(w) => {
@@ -258,12 +252,7 @@ impl ComposeChild for ListItem {
   type Child = ListItemTml;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
-    let ListItemTml {
-      headline,
-      supporting,
-      leading,
-      trailing,
-    } = child;
+    let ListItemTml { headline, supporting, leading, trailing } = child;
 
     fn_widget! {
       let ListItemStyle {
@@ -355,75 +344,36 @@ impl CustomStyle for ListItemStyle {
     let typography = TypographyTheme::of(ctx);
     let palette = Palette::of(ctx);
     ListItemStyle {
-      padding_style: Some(EdgeInsets {
-        left: 0.,
-        right: 24.,
-        bottom: 8.,
-        top: 8.,
-      }),
+      padding_style: Some(EdgeInsets { left: 0., right: 24., bottom: 8., top: 8. }),
       item_align: |num| {
-        if num >= 2 {
-          Align::Start
-        } else {
-          Align::Center
-        }
+        if num >= 2 { Align::Start } else { Align::Center }
       },
       label_gap: Some(EdgeInsets::only_left(16.)),
       headline_style: typography.body_large.text.clone(),
       supporting_style: typography.body_medium.text.clone(),
       leading_config: EdgeWidgetStyle {
-        icon: EdgeItemStyle {
-          size: Size::splat(24.),
-          gap: Some(EdgeInsets::only_left(16.)),
-        },
+        icon: EdgeItemStyle { size: Size::splat(24.), gap: Some(EdgeInsets::only_left(16.)) },
         text: EdgeTextItemStyle {
           style: typography.label_small.text.clone(),
           foreground: palette.on_surface_variant().into(),
           gap: Some(EdgeInsets::only_left(16.)),
         },
-        avatar: EdgeItemStyle {
-          size: Size::splat(40.),
-          gap: Some(EdgeInsets::only_left(16.)),
-        },
-        image: EdgeItemStyle {
-          size: Size::splat(56.),
-          gap: Some(EdgeInsets::only_left(16.)),
-        },
-        poster: EdgeItemStyle {
-          size: Size::new(120., 64.),
-          gap: None,
-        },
-        custom: EdgeItemStyle {
-          size: Size::splat(40.),
-          gap: Some(EdgeInsets::only_left(16.)),
-        },
+        avatar: EdgeItemStyle { size: Size::splat(40.), gap: Some(EdgeInsets::only_left(16.)) },
+        image: EdgeItemStyle { size: Size::splat(56.), gap: Some(EdgeInsets::only_left(16.)) },
+        poster: EdgeItemStyle { size: Size::new(120., 64.), gap: None },
+        custom: EdgeItemStyle { size: Size::splat(40.), gap: Some(EdgeInsets::only_left(16.)) },
       },
       trailing_config: EdgeWidgetStyle {
-        icon: EdgeItemStyle {
-          size: Size::splat(24.),
-          gap: Some(EdgeInsets::only_left(16.)),
-        },
+        icon: EdgeItemStyle { size: Size::splat(24.), gap: Some(EdgeInsets::only_left(16.)) },
         text: EdgeTextItemStyle {
           style: typography.label_small.text.clone(),
           foreground: palette.on_surface_variant().into(),
           gap: Some(EdgeInsets::only_left(16.)),
         },
-        avatar: EdgeItemStyle {
-          size: Size::splat(40.),
-          gap: Some(EdgeInsets::only_left(16.)),
-        },
-        image: EdgeItemStyle {
-          size: Size::splat(56.),
-          gap: Some(EdgeInsets::only_left(16.)),
-        },
-        poster: EdgeItemStyle {
-          size: Size::new(120., 64.),
-          gap: None,
-        },
-        custom: EdgeItemStyle {
-          size: Size::splat(40.),
-          gap: Some(EdgeInsets::only_left(16.)),
-        },
+        avatar: EdgeItemStyle { size: Size::splat(40.), gap: Some(EdgeInsets::only_left(16.)) },
+        image: EdgeItemStyle { size: Size::splat(56.), gap: Some(EdgeInsets::only_left(16.)) },
+        poster: EdgeItemStyle { size: Size::new(120., 64.), gap: None },
+        custom: EdgeItemStyle { size: Size::splat(40.), gap: Some(EdgeInsets::only_left(16.)) },
       },
     }
   }
