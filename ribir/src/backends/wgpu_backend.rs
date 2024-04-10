@@ -38,21 +38,18 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
     }
   }
 
-  fn begin_frame(&mut self) {
-    self.backend.begin_frame();
+  fn begin_frame(&mut self, surface_color: Color) {
+    self.backend.begin_frame(surface_color);
     assert!(self.current_texture.is_none());
     let surface_tex = self.surface.get_current_texture().unwrap();
     self.current_texture = Some(WgpuTexture::from_surface_tex(surface_tex));
   }
 
-  fn draw_commands(
-    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, surface_color: Color,
-  ) {
+  fn draw_commands(&mut self, viewport: DeviceRect, commands: Vec<PaintCommand>) {
     let surface = self.current_texture.as_mut().unwrap();
-
     self
       .backend
-      .draw_commands(viewport, commands, surface_color, surface);
+      .draw_commands(viewport, commands, surface);
   }
 
   fn end_frame(&mut self) {

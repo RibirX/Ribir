@@ -232,7 +232,7 @@ where
     start..buffer.indices.len() as u32
   }
 
-  pub(crate) fn submit<G: GPUBackendImpl<Texture = T>>(&mut self, gpu_impl: &mut G) {
+  pub(crate) fn draw_alpha_textures<G: GPUBackendImpl<Texture = T>>(&mut self, gpu_impl: &mut G) {
     if self.fill_task.is_empty() {
       return;
     }

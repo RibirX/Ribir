@@ -40,13 +40,20 @@ pub trait PainterBackend {
 
   fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing);
 
-  /// A frame start.
-  fn begin_frame(&mut self);
+  /// Start a new frame, and clear the frame with `surface` color before draw.
+  fn begin_frame(&mut self, surface: Color);
 
-  /// Paint `commands` to the `output` Texture.
-  /// This may be called more than once during a frame.
+  /// Paint `commands` to the `output` Texture.  This may be called more than
+  /// once during a frame.
+  ///
+  /// ## Undefined Behavior
+  ///
+  /// You should guarantee the output be same one in the same frame, otherwise
+  /// it may cause undefined behavior.
   fn draw_commands(
-    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, surface: Color,
+    &mut self,
+    viewport: DeviceRect,
+    commands: Vec<PaintCommand>,
     output: &mut Self::Texture,
   );
 

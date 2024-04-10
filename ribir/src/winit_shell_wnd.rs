@@ -18,11 +18,9 @@ pub trait WinitBackend<'a>: Sized {
 
   fn on_resize(&mut self, size: DeviceSize);
 
-  fn begin_frame(&mut self);
+  fn begin_frame(&mut self, surface_color: Color);
 
-  fn draw_commands(
-    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, surface_color: Color,
-  );
+  fn draw_commands(&mut self, viewport: DeviceRect, commands: Vec<PaintCommand>);
 
   fn end_frame(&mut self);
 }
@@ -146,10 +144,10 @@ impl ShellWindow for WinitShellWnd {
   fn as_any_mut(&mut self) -> &mut dyn Any { self }
 
   #[inline]
-  fn begin_frame(&mut self) { self.backend.begin_frame() }
+  fn begin_frame(&mut self, surface: Color) { self.backend.begin_frame(surface) }
 
   #[inline]
-  fn draw_commands(&mut self, viewport: Rect, mut commands: Vec<PaintCommand>, surface: Color) {
+  fn draw_commands(&mut self, viewport: Rect, mut commands: Vec<PaintCommand>) {
     commands.iter_mut().for_each(|c| match c {
       PaintCommand::ColorPath { path, .. }
       | PaintCommand::ImgPath { path, .. }
@@ -167,10 +165,7 @@ impl ShellWindow for WinitShellWnd {
       .cast_unit();
 
     self.winit_wnd.pre_present_notify();
-
-    self
-      .backend
-      .draw_commands(viewport, commands, surface);
+    self.backend.draw_commands(viewport, commands);
   }
 
   #[inline]
