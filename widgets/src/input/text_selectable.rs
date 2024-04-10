@@ -1,9 +1,12 @@
-use super::glyphs_helper::TextGlyphsHelper;
-use crate::input::glyphs_helper::GlyphsHelper;
-use crate::input::selected_text::SelectedHighLight;
-use crate::prelude::*;
-use ribir_core::prelude::*;
 use std::ops::Range;
+
+use ribir_core::prelude::*;
+
+use super::glyphs_helper::TextGlyphsHelper;
+use crate::{
+  input::{glyphs_helper::GlyphsHelper, selected_text::SelectedHighLight},
+  prelude::*,
+};
 
 #[derive(Declare, Default)]
 pub struct TextSelectable {
@@ -64,9 +67,7 @@ impl TextSelectable {
 }
 
 pub(crate) fn bind_point_listener<T: SelectableText>(
-  this: impl StateWriter<Value = T>,
-  host: Widget,
-  text: Reader<impl VisualText + 'static>,
+  this: impl StateWriter<Value = T>, host: Widget, text: Reader<impl VisualText + 'static>,
   layout_box: Reader<LayoutBox>,
 ) -> impl WidgetBuilder {
   fn_widget! {
@@ -183,10 +184,7 @@ impl ComposeChild for TextSelectable {
 }
 
 pub(crate) fn select_key_handle<F: SelectableText>(
-  this: &impl StateWriter<Value = F>,
-  text: &Text,
-  text_layout: &LayoutBox,
-  event: &KeyboardEvent,
+  this: &impl StateWriter<Value = F>, text: &Text, text_layout: &LayoutBox, event: &KeyboardEvent,
 ) {
   let mut deal = false;
   if event.with_command_key() {
@@ -199,8 +197,7 @@ pub(crate) fn select_key_handle<F: SelectableText>(
 }
 
 fn deal_with_command<F: SelectableText>(
-  this: &impl StateWriter<Value = F>,
-  event: &KeyboardEvent,
+  this: &impl StateWriter<Value = F>, event: &KeyboardEvent,
 ) -> bool {
   // use the physical key to make sure the keyboard with different
   // layout use the same key as shortcut.
@@ -233,10 +230,7 @@ fn is_move_by_word(event: &KeyboardEvent) -> bool {
 }
 
 fn deal_with_selection<F: SelectableText>(
-  this: &impl StateWriter<Value = F>,
-  text: &Text,
-  text_layout: &LayoutBox,
-  event: &KeyboardEvent,
+  this: &impl StateWriter<Value = F>, text: &Text, text_layout: &LayoutBox, event: &KeyboardEvent,
 ) {
   let helper = || {
     TextGlyphsHelper::new(
@@ -282,7 +276,9 @@ fn deal_with_selection<F: SelectableText>(
         | CaretState::Selecting(begin, _) => CaretState::Select(begin, new_caret_position.unwrap()),
       })
     } else {
-      this.write().set_caret(new_caret_position.unwrap().into())
+      this
+        .write()
+        .set_caret(new_caret_position.unwrap().into())
     }
   }
 }

@@ -1,18 +1,20 @@
-use super::{
-  MapReader, ModifyScope, Notifier, ReadRef, StateReader, StateWriter, WriteRef, WriterControl,
-};
-use crate::prelude::AppCtx;
-use crate::{
-  context::BuildCtx,
-  ticker::Instant,
-  widget::{Render, RenderBuilder, Widget},
-};
+use std::cell::{Cell, RefMut};
+
 use ribir_algo::Sc;
 use rxrust::{
   ops::box_it::BoxOp,
   prelude::{BoxIt, ObservableExt},
 };
-use std::cell::{Cell, RefMut};
+
+use super::{
+  MapReader, ModifyScope, Notifier, ReadRef, StateReader, StateWriter, WriteRef, WriterControl,
+};
+use crate::{
+  context::BuildCtx,
+  prelude::AppCtx,
+  ticker::Instant,
+  widget::{Render, RenderBuilder, Widget},
+};
 
 /// A writer splitted writer from another writer, and has its own notifier.
 pub struct SplittedWriter<O, R, W> {
@@ -223,12 +225,7 @@ where
       .take()
       .map(|orig| RefMut::map(orig, &self.mut_map));
 
-    WriteRef {
-      value,
-      modified: false,
-      modify_scope,
-      control: self,
-    }
+    WriteRef { value, modified: false, modify_scope, control: self }
   }
 }
 
@@ -240,10 +237,6 @@ where
   V: Render,
 {
   fn build(self, ctx: &BuildCtx) -> Widget {
-    MapReader {
-      origin: self.origin.clone_reader(),
-      map: self.map.clone(),
-    }
-    .build(ctx)
+    MapReader { origin: self.origin.clone_reader(), map: self.map.clone() }.build(ctx)
   }
 }

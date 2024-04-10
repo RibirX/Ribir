@@ -26,17 +26,17 @@ impl ribir_core::clipboard::Clipboard for Clipboard {
   }
 
   fn write_text(&mut self, text: &str) -> Result<(), Error> {
-    self.clipboard.set_text(text).map_err(error_convert)
+    self
+      .clipboard
+      .set_text(text)
+      .map_err(error_convert)
   }
 
   fn read_img(&mut self) -> Result<PixelImage, Error> {
     match self.clipboard.get_image() {
-      Ok(img) => Ok(PixelImage::new(
-        img.bytes,
-        img.width as u32,
-        img.height as u32,
-        ColorFormat::Rgba8,
-      )),
+      Ok(img) => {
+        Ok(PixelImage::new(img.bytes, img.width as u32, img.height as u32, ColorFormat::Rgba8))
+      }
       Err(e) => Err(error_convert(e)),
     }
   }
@@ -54,18 +54,12 @@ impl ribir_core::clipboard::Clipboard for Clipboard {
 
   fn read(&mut self, format: &str) -> Result<Cow<[u8]>, Error> {
     warn!("read {format} data from clipboard");
-    Err(Error::new(
-      std::io::ErrorKind::Unsupported,
-      "clipboard read format {format}",
-    ))
+    Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard read format {format}"))
   }
 
   fn write(&mut self, format: &str, _data: &[u8]) -> Result<(), Error> {
     warn!("write {format} data to clipboard");
-    Err(Error::new(
-      std::io::ErrorKind::Unsupported,
-      "clipboard write format {format}",
-    ))
+    Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard write format {format}"))
   }
 
   fn clear(&mut self) -> Result<(), Error> { self.clipboard.clear().map_err(error_convert) }

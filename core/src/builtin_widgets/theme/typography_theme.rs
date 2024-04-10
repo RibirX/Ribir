@@ -1,7 +1,8 @@
-use super::Theme;
-use crate::context::BuildCtx;
 use ribir_algo::CowArc;
 use ribir_painter::Brush;
+
+use super::Theme;
+use crate::context::BuildCtx;
 
 /// Use typography to present your design and content as clearly and efficiently
 /// as possible. The names of the TextTheme properties from the [Material Design

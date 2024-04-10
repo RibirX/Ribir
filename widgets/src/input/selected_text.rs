@@ -1,5 +1,6 @@
-use crate::layout::Stack;
 use ribir_core::prelude::*;
+
+use crate::layout::Stack;
 
 #[derive(Declare)]
 pub(crate) struct SelectedHighLight {
@@ -12,9 +13,7 @@ pub struct SelectedHighLightStyle {
 }
 impl CustomStyle for SelectedHighLightStyle {
   fn default_style(_: &BuildCtx) -> Self {
-    SelectedHighLightStyle {
-      brush: Color::from_rgb(181, 215, 254).into(),
-    }
+    SelectedHighLightStyle { brush: Color::from_rgb(181, 215, 254).into() }
   }
 }
 

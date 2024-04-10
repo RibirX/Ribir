@@ -1,5 +1,6 @@
-use ribir_painter::Vertex;
 use std::{any::type_name, marker::PhantomData, mem::size_of};
+
+use ribir_painter::Vertex;
 use zerocopy::AsBytes;
 
 pub struct VerticesBuffer<T: AsBytes> {
@@ -18,10 +19,7 @@ impl<T: AsBytes> VerticesBuffer<T> {
   }
 
   pub fn write_buffer(
-    &mut self,
-    data: &ribir_painter::VertexBuffers<T>,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
+    &mut self, data: &ribir_painter::VertexBuffers<T>, device: &wgpu::Device, queue: &wgpu::Queue,
   ) {
     let vertices_data = data.vertices.as_bytes();
     let indices_data = data.indices.as_bytes();

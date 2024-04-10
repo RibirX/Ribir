@@ -4,16 +4,16 @@ use std::{
   rc::Rc,
 };
 
+use ribir_algo::{FrameCache, Substr};
+pub use rustybuzz::ttf_parser::GlyphId;
+use rustybuzz::{GlyphInfo, UnicodeBuffer};
+
 use crate::{
   font_db::{Face, FontDB, ID},
   Em, Glyph, TextDirection,
 };
-use ribir_algo::{FrameCache, Substr};
 
-pub use rustybuzz::ttf_parser::GlyphId;
-use rustybuzz::{GlyphInfo, UnicodeBuffer};
-
-pub const NEWLINE_GLYPH_ID: GlyphId = GlyphId(core::u16::MAX);
+pub const NEWLINE_GLYPH_ID: GlyphId = GlyphId(u16::MAX);
 /// Shaper to shape the `text` using provided font faces, and will do BIDI
 /// reordering before to shape text.
 ///
@@ -46,15 +46,17 @@ impl TextShaper {
   #[inline]
   pub fn new(font_db: Rc<RefCell<FontDB>>) -> Self { Self { font_db, shape_cache: <_>::default() } }
 
-  pub fn end_frame(&mut self) { self.shape_cache.borrow_mut().end_frame("Text shape"); }
+  pub fn end_frame(&mut self) {
+    self
+      .shape_cache
+      .borrow_mut()
+      .end_frame("Text shape");
+  }
 
   /// Shape text and return the glyphs, caller should do text reorder before
   /// call this method.
   pub fn shape_text(
-    &self,
-    text: &Substr,
-    face_ids: &[ID],
-    direction: TextDirection,
+    &self, text: &Substr, face_ids: &[ID], direction: TextDirection,
   ) -> Rc<ShapeResult> {
     self
       .get_from_cache(text, face_ids, direction)
@@ -73,11 +75,7 @@ impl TextShaper {
 
         let glyphs = Rc::new(ShapeResult { text: text.clone(), glyphs });
         self.shape_cache.borrow_mut().put(
-          ShapeKey {
-            face_ids: face_ids.into(),
-            text: text.clone(),
-            direction,
-          },
+          ShapeKey { face_ids: face_ids.into(), text: text.clone(), direction },
           glyphs.clone(),
         );
         glyphs
@@ -86,10 +84,7 @@ impl TextShaper {
 
   /// Directly shape text without bidi reordering.
   pub fn shape_text_with_fallback(
-    &self,
-    text: &str,
-    dir: TextDirection,
-    face_ids: &[ID],
+    &self, text: &str, dir: TextDirection, face_ids: &[ID],
   ) -> Option<Vec<Glyph<Em>>> {
     let mut font_fallback = FallBackFaceHelper::new(face_ids, &self.font_db);
     let face = font_fallback.next_fallback_face(text)?;
@@ -135,10 +130,7 @@ impl TextShaper {
   }
 
   pub fn get_from_cache(
-    &self,
-    text: &str,
-    face_ids: &[ID],
-    direction: TextDirection,
+    &self, text: &str, face_ids: &[ID], direction: TextDirection,
   ) -> Option<Rc<ShapeResult>> {
     self
       .shape_cache
@@ -151,8 +143,7 @@ impl TextShaper {
 }
 
 fn collect_miss_part<'a>(
-  glyphs: &[Glyph<Em>],
-  new_part: &[(usize, usize, FallBackFaceHelper<'a>)],
+  glyphs: &[Glyph<Em>], new_part: &[(usize, usize, FallBackFaceHelper<'a>)],
 ) -> Vec<(usize, usize, FallBackFaceHelper<'a>)> {
   let mut miss_parts = vec![];
   for (start, end, helper) in new_part {
@@ -191,11 +182,8 @@ fn collect_miss_part<'a>(
 }
 
 fn regen_miss_part<'a>(
-  text: &str,
-  dir: TextDirection,
-  glyphs: &mut Vec<Glyph<Em>>,
-  miss_part: Vec<(usize, usize, FallBackFaceHelper<'a>)>,
-  mut buffer: UnicodeBuffer,
+  text: &str, dir: TextDirection, glyphs: &mut Vec<Glyph<Em>>,
+  miss_part: Vec<(usize, usize, FallBackFaceHelper<'a>)>, mut buffer: UnicodeBuffer,
 ) -> (UnicodeBuffer, Vec<(usize, usize, FallBackFaceHelper<'a>)>) {
   let is_rtl = matches!(dir, TextDirection::RightToLeft | TextDirection::BottomToTop);
   let hb_direction = dir.into();
@@ -374,10 +362,13 @@ mod tests {
     shaper.font_db.borrow_mut().load_system_fonts();
 
     let text: Substr = concat!["א", "ב", "ג", "a", "b", "c",].into();
-    let ids = shaper.font_db.borrow_mut().select_all_match(&FontFace {
-      families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
-      ..<_>::default()
-    });
+    let ids = shaper
+      .font_db
+      .borrow_mut()
+      .select_all_match(&FontFace {
+        families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
+        ..<_>::default()
+      });
     let dir = TextDirection::LeftToRight;
 
     // No cache exists
@@ -406,18 +397,24 @@ mod tests {
       .borrow_mut()
       .load_font_file(path + "/../fonts/NotoSerifSC-Bold.你好世界.otf");
 
-    let ids_latin = shaper.font_db.borrow_mut().select_all_match(&FontFace {
-      families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
-      ..<_>::default()
-    });
+    let ids_latin = shaper
+      .font_db
+      .borrow_mut()
+      .select_all_match(&FontFace {
+        families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
+        ..<_>::default()
+      });
 
-    let ids_all = shaper.font_db.borrow_mut().select_all_match(&FontFace {
-      families: Box::new([
-        FontFamily::Name("DejaVu Sans".into()),
-        FontFamily::Name("Noto Serif SC".into()),
-      ]),
-      ..<_>::default()
-    });
+    let ids_all = shaper
+      .font_db
+      .borrow_mut()
+      .select_all_match(&FontFace {
+        families: Box::new([
+          FontFamily::Name("DejaVu Sans".into()),
+          FontFamily::Name("Noto Serif SC".into()),
+        ]),
+        ..<_>::default()
+      });
 
     let dir = TextDirection::LeftToRight;
     let latin1 = shaper.shape_text(&"hello world! 你好，世界".into(), &ids_latin, dir);
@@ -448,10 +445,7 @@ mod tests {
         .iter()
         .all(|glyph| glyph.is_not_miss())
     );
-    assert_eq!(
-      &clusters,
-      &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 19, 22, 25]
-    );
+    assert_eq!(&clusters, &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 19, 22, 25]);
   }
 
   #[test]
@@ -477,13 +471,16 @@ mod tests {
     let text: Substr = "р҈р҈р҈р҈".into();
 
     {
-      let ids = shaper.font_db.borrow_mut().select_all_match(&FontFace {
-        families: Box::new([
-          FontFamily::Name("GaramondNo8".into()),
-          FontFamily::Name("Nunito".into()),
-        ]),
-        ..<_>::default()
-      });
+      let ids = shaper
+        .font_db
+        .borrow_mut()
+        .select_all_match(&FontFace {
+          families: Box::new([
+            FontFamily::Name("GaramondNo8".into()),
+            FontFamily::Name("Nunito".into()),
+          ]),
+          ..<_>::default()
+        });
       let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
       assert_eq!(res.glyphs.len(), 8);
       assert!(res.glyphs.iter().all(|glyph| glyph.is_miss()));
@@ -493,14 +490,17 @@ mod tests {
       let _ = font_db
         .borrow_mut()
         .load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf");
-      let ids = shaper.font_db.borrow_mut().select_all_match(&FontFace {
-        families: Box::new([
-          FontFamily::Name("GaramondNo8".into()),
-          FontFamily::Name("Nunito".into()),
-          FontFamily::Name("DejaVu Sans".into()),
-        ]),
-        ..<_>::default()
-      });
+      let ids = shaper
+        .font_db
+        .borrow_mut()
+        .select_all_match(&FontFace {
+          families: Box::new([
+            FontFamily::Name("GaramondNo8".into()),
+            FontFamily::Name("Nunito".into()),
+            FontFamily::Name("DejaVu Sans".into()),
+          ]),
+          ..<_>::default()
+        });
       shaper.shape_cache.borrow_mut().clear();
       let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
       assert!(res.glyphs.len() == 8);
@@ -520,13 +520,16 @@ mod tests {
       .font_db
       .borrow_mut()
       .load_font_file(path + "/../fonts/NotoSerifSC-Bold.你好世界.otf");
-    let ids_all = shaper.font_db.borrow_mut().select_all_match(&FontFace {
-      families: Box::new([
-        FontFamily::Name("DejaVu Sans".into()),
-        FontFamily::Name("Noto Serif SC".into()),
-      ]),
-      ..<_>::default()
-    });
+    let ids_all = shaper
+      .font_db
+      .borrow_mut()
+      .select_all_match(&FontFace {
+        families: Box::new([
+          FontFamily::Name("DejaVu Sans".into()),
+          FontFamily::Name("Noto Serif SC".into()),
+        ]),
+        ..<_>::default()
+      });
 
     let res = shaper.shape_text(&"👨‍👩‍👦‍👦".into(), &ids_all, TextDirection::LeftToRight);
     assert!(res.glyphs.len() == 7);

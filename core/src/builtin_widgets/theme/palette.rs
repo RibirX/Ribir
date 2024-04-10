@@ -1,6 +1,7 @@
+use ribir_painter::{Color, LightnessTone};
+
 use super::{Brightness, Theme};
 use crate::prelude::BuildCtx;
-use ribir_painter::{Color, LightnessTone};
 
 /// The palette enables you to modify the color of your application to suit
 /// your brand. `Palette` provide colors base on the 8 key colors with different
@@ -181,11 +182,17 @@ impl Palette {
   pub fn on_error_container(&self) -> Color { self.on_container_of(&self.error) }
 
   #[inline]
-  pub fn background(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg().surface) }
+  pub fn background(&self) -> Color {
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg().surface)
+  }
 
   #[inline]
   pub fn on_background(&self) -> Color {
-    self.neutral.with_lightness(self.lightness_cfg().on_surface)
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg().on_surface)
   }
 
   #[inline]
@@ -285,7 +292,11 @@ impl Palette {
   }
 
   #[inline]
-  pub fn shadow(&self) -> Color { self.neutral.with_lightness(self.lightness_cfg().shadow) }
+  pub fn shadow(&self) -> Color {
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg().shadow)
+  }
 
   #[inline]
   pub fn scrim(&self) -> Color { self.shadow() }

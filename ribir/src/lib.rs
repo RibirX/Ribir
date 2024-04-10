@@ -13,10 +13,11 @@ pub use ribir_material as material;
 mod platform;
 pub use platform::*;
 pub mod prelude {
+  pub use ribir_core::prelude::*;
+
   #[cfg(feature = "material")]
   pub use super::material;
   #[cfg(feature = "widgets")]
   pub use super::widgets::prelude::*;
   pub use crate::app::*;
-  pub use ribir_core::prelude::*;
 }

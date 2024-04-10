@@ -5,10 +5,13 @@ fn shape_1k(c: &mut Criterion) {
   let mut shaper = TextShaper::new(<_>::default());
   shaper.font_db().borrow_mut().load_system_fonts();
 
-  let ids = shaper.font_db().borrow_mut().select_all_match(&FontFace {
-    families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
-    ..<_>::default()
-  });
+  let ids = shaper
+    .font_db()
+    .borrow_mut()
+    .select_all_match(&FontFace {
+      families: Box::new([FontFamily::Serif, FontFamily::Cursive]),
+      ..<_>::default()
+    });
 
   c.bench_function("shape_1k", |b| {
     b.iter(|| {

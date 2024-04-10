@@ -1,5 +1,6 @@
-use super::{ButtonImpl, ButtonTemplate, ButtonType, IconPosition};
 use ribir_core::prelude::*;
+
+use super::{ButtonImpl, ButtonTemplate, ButtonType, IconPosition};
 
 #[derive(Clone)]
 pub struct ButtonStyle {

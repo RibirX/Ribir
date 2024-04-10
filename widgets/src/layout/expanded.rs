@@ -30,10 +30,11 @@ impl ComposeChild for Expanded {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use crate::prelude::*;
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
+
+  use super::*;
+  use crate::prelude::*;
 
   fn expand_child_size_zero() -> impl WidgetBuilder {
     let size = Size::new(100., 50.);

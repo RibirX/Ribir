@@ -49,9 +49,10 @@ impl Cursor {
 
 #[cfg(test)]
 mod tests {
+  use winit::event::{DeviceId, WindowEvent};
+
   use super::*;
   use crate::{reset_test_env, test_helper::*};
-  use winit::event::{DeviceId, WindowEvent};
 
   #[test]
   fn tree_down_up() {
@@ -78,57 +79,42 @@ mod tests {
 
     wnd.draw_frame();
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.borrow_mut().dispatch(
-      WindowEvent::CursorMoved {
-        device_id,
-        position: (1f64, 1.).into(),
-      },
-      1.,
-    );
+    wnd
+      .dispatcher
+      .borrow_mut()
+      .dispatch(WindowEvent::CursorMoved { device_id, position: (1f64, 1.).into() }, 1.);
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Help);
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.borrow_mut().dispatch(
-      WindowEvent::CursorMoved {
-        device_id,
-        position: (101f64, 1.).into(),
-      },
-      1.,
-    );
+    wnd
+      .dispatcher
+      .borrow_mut()
+      .dispatch(WindowEvent::CursorMoved { device_id, position: (101f64, 1.).into() }, 1.);
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Pointer);
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.borrow_mut().dispatch(
-      WindowEvent::CursorMoved {
-        device_id,
-        position: (201f64, 1.).into(),
-      },
-      1.,
-    );
+    wnd
+      .dispatcher
+      .borrow_mut()
+      .dispatch(WindowEvent::CursorMoved { device_id, position: (201f64, 1.).into() }, 1.);
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::AllScroll);
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.borrow_mut().dispatch(
-      WindowEvent::CursorMoved {
-        device_id,
-        position: (101f64, 1.).into(),
-      },
-      1.,
-    );
+    wnd
+      .dispatcher
+      .borrow_mut()
+      .dispatch(WindowEvent::CursorMoved { device_id, position: (101f64, 1.).into() }, 1.);
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Pointer);
 
     let device_id = unsafe { DeviceId::dummy() };
-    wnd.dispatcher.borrow_mut().dispatch(
-      WindowEvent::CursorMoved {
-        device_id,
-        position: (1f64, 1.).into(),
-      },
-      1.,
-    );
+    wnd
+      .dispatcher
+      .borrow_mut()
+      .dispatch(WindowEvent::CursorMoved { device_id, position: (1f64, 1.).into() }, 1.);
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Help);
   }

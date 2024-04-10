@@ -1,10 +1,12 @@
-use crate::{LineCap, LineJoin, Path, Radius, StrokeOptions};
 use lyon_algorithms::path::{
+  builder::BorderRadii,
   geom::{Arc, LineSegment},
   path::Builder as LyonBuilder,
   Event, Path as LyonPath, Winding,
 };
 use ribir_geom::{Angle, Point, Rect, Transform, Vector};
+
+use crate::{LineCap, LineJoin, Path, Radius, StrokeOptions};
 
 #[derive(Default)]
 pub struct PathBuilder {
@@ -65,7 +67,9 @@ impl PathBuilder {
       x_rotation: Angle::zero(),
     };
     arc.for_each_quadratic_bezier(&mut |curve| {
-      self.lyon_builder.quadratic_bezier_to(curve.ctrl, curve.to);
+      self
+        .lyon_builder
+        .quadratic_bezier_to(curve.ctrl, curve.to);
     });
   }
 
@@ -74,11 +78,7 @@ impl PathBuilder {
   /// travels in the direction given by anticlockwise (defaulting to
   /// clockwise).
   pub fn ellipse_to(
-    &mut self,
-    center: Point,
-    radius: Vector,
-    start_angle: Angle,
-    end_angle: Angle,
+    &mut self, center: Point, radius: Vector, start_angle: Angle, end_angle: Angle,
   ) {
     let sweep_angle = end_angle - start_angle;
     let arc = Arc {
@@ -89,16 +89,17 @@ impl PathBuilder {
       x_rotation: Angle::zero(),
     };
     arc.for_each_quadratic_bezier(&mut |curve| {
-      self.lyon_builder.quadratic_bezier_to(curve.ctrl, curve.to);
+      self
+        .lyon_builder
+        .quadratic_bezier_to(curve.ctrl, curve.to);
     });
   }
 
   #[inline]
   pub fn segment(&mut self, from: Point, to: Point) -> &mut Self {
-    self.lyon_builder.add_line_segment(&LineSegment {
-      from: from.to_untyped(),
-      to: to.to_untyped(),
-    });
+    self
+      .lyon_builder
+      .add_line_segment(&LineSegment { from: from.to_untyped(), to: to.to_untyped() });
     self
   }
 
@@ -143,12 +144,12 @@ impl PathBuilder {
   /// Creates a path for a rectangle by `rect` with `radius`.
   /// #[inline]
   pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) -> &mut Self {
-    // Safety, just a unit type convert, it's same type.
-    let rect = unsafe { std::mem::transmute(rect) };
-    let radius = unsafe { std::mem::transmute(radius) };
-    self
-      .lyon_builder
-      .add_rounded_rectangle(rect, radius, Winding::Positive);
+    let radius: &BorderRadii = unsafe { std::mem::transmute(radius) };
+    self.lyon_builder.add_rounded_rectangle(
+      &rect.to_box2d().cast_unit(),
+      radius,
+      Winding::Positive,
+    );
     self
   }
 
@@ -169,9 +170,7 @@ impl PathBuilder {
 }
 
 pub(crate) fn stroke_path(
-  path: &LyonPath,
-  options: &StrokeOptions,
-  ts: Option<&Transform>,
+  path: &LyonPath, options: &StrokeOptions, ts: Option<&Transform>,
 ) -> Option<LyonPath> {
   let mut builder = tiny_skia_path::PathBuilder::default();
   let resolution = ts.map_or(1., |t| {
@@ -210,11 +209,7 @@ pub(crate) fn stroke_path(
       builder.quadratic_bezier_to((c.x, c.y).into(), (t.x, t.y).into());
     }
     tiny_skia_path::PathSegment::CubicTo(c1, c2, to) => {
-      builder.cubic_bezier_to(
-        (c1.x, c1.y).into(),
-        (c2.x, c2.y).into(),
-        (to.x, to.y).into(),
-      );
+      builder.cubic_bezier_to((c1.x, c1.y).into(), (c2.x, c2.y).into(), (to.x, to.y).into());
     }
     tiny_skia_path::PathSegment::Close => builder.close(),
   });
@@ -223,24 +218,12 @@ pub(crate) fn stroke_path(
 
 fn into_tiny_transform(ts: Transform) -> tiny_skia_path::Transform {
   let Transform { m11, m12, m21, m22, m31, m32, .. } = ts;
-  tiny_skia_path::Transform {
-    sx: m11,
-    kx: m21,
-    ky: m12,
-    sy: m22,
-    tx: m31,
-    ty: m32,
-  }
+  tiny_skia_path::Transform { sx: m11, kx: m21, ky: m12, sy: m22, tx: m31, ty: m32 }
 }
 
 impl From<StrokeOptions> for tiny_skia_path::Stroke {
   fn from(value: StrokeOptions) -> Self {
-    let StrokeOptions {
-      width,
-      miter_limit,
-      line_cap,
-      line_join,
-    } = value;
+    let StrokeOptions { width, miter_limit, line_cap, line_join } = value;
     tiny_skia_path::Stroke {
       width,
       miter_limit,

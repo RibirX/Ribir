@@ -1,12 +1,3 @@
-use crate::{
-  builtin_widgets::{FullTheme, InheritTheme, Theme},
-  clipboard::{Clipboard, MockClipboard},
-  timer::Timer,
-  widget::WidgetBuilder,
-  window::{ShellWindow, Window, WindowId},
-};
-use pin_project_lite::pin_project;
-use rxrust::scheduler::NEW_TIMER_FN;
 use std::{
   cell::RefCell,
   rc::Rc,
@@ -15,15 +6,24 @@ use std::{
   thread::ThreadId,
 };
 
-use crate::prelude::FuturesLocalScheduler;
 pub use futures::task::SpawnError;
 use futures::{
   executor::{block_on, LocalPool},
   task::LocalSpawnExt,
   Future,
 };
-use ribir_text::shaper::TextShaper;
-use ribir_text::{font_db::FontDB, TextReorder, TypographyStore};
+use pin_project_lite::pin_project;
+use ribir_text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographyStore};
+use rxrust::scheduler::NEW_TIMER_FN;
+
+use crate::{
+  builtin_widgets::{FullTheme, InheritTheme, Theme},
+  clipboard::{Clipboard, MockClipboard},
+  prelude::FuturesLocalScheduler,
+  timer::Timer,
+  widget::WidgetBuilder,
+  window::{ShellWindow, Window, WindowId},
+};
 
 pub trait RuntimeWaker {
   fn clone_box(&self) -> Box<dyn RuntimeWaker + Send>;
@@ -75,7 +75,10 @@ impl AppCtx {
     let wnd = Window::new(shell_wnd);
     let id = wnd.id();
 
-    Self::shared().windows.borrow_mut().insert(id, wnd.clone());
+    Self::shared()
+      .windows
+      .borrow_mut()
+      .insert(id, wnd.clone());
     wnd.set_content_widget(content);
 
     wnd
@@ -299,10 +302,9 @@ impl AppCtx {
     Fut: Future<Output = ()> + 'static,
   {
     let ctx = AppCtx::shared();
-    ctx.scheduler.spawn_local(WakerFuture {
-      fut: future,
-      waker: ctx.runtime_waker.clone(),
-    })
+    ctx
+      .scheduler
+      .spawn_local(WakerFuture { fut: future, waker: ctx.runtime_waker.clone() })
   }
 }
 
@@ -355,10 +357,7 @@ where
 
     let old_waker = cx.waker().clone();
     let data = Box::new((old_waker, self.waker.clone()));
-    let raw = RawWaker::new(
-      Box::leak(data) as *const RawLocalWaker as *const (),
-      &VTABLE,
-    );
+    let raw = RawWaker::new(Box::leak(data) as *const RawLocalWaker as *const (), &VTABLE);
     unsafe { Waker::from_raw(raw) }
   }
 }
@@ -369,8 +368,7 @@ where
 {
   type Output = F::Output;
   fn poll(
-    self: std::pin::Pin<&mut Self>,
-    cx: &mut std::task::Context<'_>,
+    self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>,
   ) -> std::task::Poll<Self::Output> {
     let waker = self.local_waker(cx);
     let mut cx = Context::from_waker(&waker);
@@ -426,8 +424,9 @@ pub mod tokio_async {
     }
   }
 
-  use super::AppCtx;
   use std::{cell::UnsafeCell, pin::Pin, sync::Arc, task::Poll};
+
+  use super::AppCtx;
 
   /// Compatible with Streams that depend on the tokio runtime.
   /// Stream dependent on the tokio runtime may not work properly when generated
@@ -439,10 +438,7 @@ pub mod tokio_async {
     Self::Item: Send,
   {
     fn to_ribir_stream(self) -> impl Stream<Item = Self::Item> {
-      LocalWaitStream {
-        stream: Arc::new(SyncUnsafeCell::new(self)),
-        receiver: None,
-      }
+      LocalWaitStream { stream: Arc::new(SyncUnsafeCell::new(self)), receiver: None }
     }
   }
 
@@ -501,8 +497,7 @@ pub mod tokio_async {
   {
     type Item = S::Item;
     fn poll_next(
-      self: std::pin::Pin<&mut Self>,
-      cx: &mut std::task::Context<'_>,
+      self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
       let this = Pin::get_mut(self);
       if this.receiver.is_none() {
@@ -533,8 +528,9 @@ pub mod tokio_async {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
   use std::{sync::Arc, task::Poll};
+
+  use super::*;
 
   #[derive(Default)]
   struct Trigger {
@@ -631,10 +627,9 @@ mod tests {
       time::{Duration, Instant},
     };
 
-    use tokio_stream::wrappers::IntervalStream;
+    use tokio_stream::{wrappers::IntervalStream, StreamExt};
 
     use crate::{context::*, reset_test_env};
-    use tokio_stream::StreamExt;
 
     #[derive(Default)]
     struct MockWaker {
@@ -642,7 +637,11 @@ mod tests {
     }
 
     impl RuntimeWaker for MockWaker {
-      fn wake(&self) { self.cnt.fetch_add(1, std::sync::atomic::Ordering::SeqCst); }
+      fn wake(&self) {
+        self
+          .cnt
+          .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+      }
       fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> {
         Box::new(MockWaker { cnt: self.cnt.clone() })
       }

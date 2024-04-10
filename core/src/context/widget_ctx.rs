@@ -1,11 +1,13 @@
+use std::rc::Rc;
+
+use ribir_geom::{Point, Rect, Size};
+
 use crate::{
   prelude::AppCtx,
   widget::{BoxClamp, WidgetTree},
   widget_tree::WidgetId,
   window::{Window, WindowId},
 };
-use ribir_geom::{Point, Rect, Size};
-use std::rc::Rc;
 
 /// common action for all context of widget.
 pub trait WidgetCtx {
@@ -60,9 +62,7 @@ pub trait WidgetCtx {
   /// Query type on the widget back of the `id`, and call the callback if it
   /// found. Return the callback's return value.
   fn query_widget_type<W: 'static, R>(
-    &self,
-    id: WidgetId,
-    callback: impl FnOnce(&W) -> R,
+    &self, id: WidgetId, callback: impl FnOnce(&W) -> R,
   ) -> Option<R>;
   /// Get the window of this context, yous should not store the window, store
   /// its id instead.
@@ -105,22 +105,39 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
 
   #[inline]
   fn box_pos(&self) -> Option<Point> {
-    self.with_tree(|tree| tree.store.layout_info(self.id()).map(|info| info.pos))
+    self.with_tree(|tree| {
+      tree
+        .store
+        .layout_info(self.id())
+        .map(|info| info.pos)
+    })
   }
 
   #[inline]
   fn box_size(&self) -> Option<Size> { self.widget_box_size(self.id()) }
 
   fn layout_clamp(&self) -> Option<BoxClamp> {
-    self.with_tree(|tree| tree.store.layout_info(self.id()).map(|info| info.clamp))
+    self.with_tree(|tree| {
+      tree
+        .store
+        .layout_info(self.id())
+        .map(|info| info.clamp)
+    })
   }
 
   fn single_child_box(&self) -> Option<Rect> {
-    self.single_child().and_then(|c| self.widget_box_rect(c))
+    self
+      .single_child()
+      .and_then(|c| self.widget_box_rect(c))
   }
 
   fn widget_box_size(&self, wid: WidgetId) -> Option<Size> {
-    self.with_tree(|tree| tree.store.layout_info(wid).and_then(|info| info.size))
+    self.with_tree(|tree| {
+      tree
+        .store
+        .layout_info(wid)
+        .and_then(|info| info.size)
+    })
   }
 
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {
@@ -133,19 +150,35 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   fn map_to_global(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.store.map_to_global(pos, self.id(), &tree.arena))
+    self.with_tree(|tree| {
+      tree
+        .store
+        .map_to_global(pos, self.id(), &tree.arena)
+    })
   }
 
   fn map_from_global(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.store.map_from_global(pos, self.id(), &tree.arena))
+    self.with_tree(|tree| {
+      tree
+        .store
+        .map_from_global(pos, self.id(), &tree.arena)
+    })
   }
 
   fn map_to_parent(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.store.map_to_parent(self.id(), pos, &tree.arena))
+    self.with_tree(|tree| {
+      tree
+        .store
+        .map_to_parent(self.id(), pos, &tree.arena)
+    })
   }
 
   fn map_from_parent(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.store.map_from_parent(self.id(), pos, &tree.arena))
+    self.with_tree(|tree| {
+      tree
+        .store
+        .map_from_parent(self.id(), pos, &tree.arena)
+    })
   }
 
   fn map_to(&self, pos: Point, w: WidgetId) -> Point {
@@ -164,11 +197,12 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   fn query_widget_type<W: 'static, R>(
-    &self,
-    id: WidgetId,
-    callback: impl FnOnce(&W) -> R,
+    &self, id: WidgetId, callback: impl FnOnce(&W) -> R,
   ) -> Option<R> {
-    self.with_tree(|tree| id.assert_get(&tree.arena).query_most_outside(callback))
+    self.with_tree(|tree| {
+      id.assert_get(&tree.arena)
+        .query_most_outside(callback)
+    })
   }
 
   fn window(&self) -> Rc<Window> { self.current_wnd() }

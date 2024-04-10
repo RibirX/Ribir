@@ -1,6 +1,8 @@
-use crate::prelude::*;
-use ribir_algo::Sc;
 use std::cell::RefCell;
+
+use ribir_algo::Sc;
+
+use crate::prelude::*;
 
 pub(crate) trait RenderTarget {
   type Target: Render + ?Sized;

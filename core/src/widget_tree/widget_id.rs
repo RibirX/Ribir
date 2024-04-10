@@ -31,18 +31,14 @@ impl WidgetId {
   pub(crate) fn is_dropped(self, tree: &TreeArena) -> bool { self.0.is_removed(tree) }
 
   pub(crate) fn lowest_common_ancestor(
-    self,
-    other: WidgetId,
-    tree: &TreeArena,
+    self, other: WidgetId, tree: &TreeArena,
   ) -> Option<WidgetId> {
     self.common_ancestors(other, tree).last()
   }
 
   // return ancestors from root to lowest common ancestor
   pub(crate) fn common_ancestors(
-    self,
-    other: WidgetId,
-    tree: &TreeArena,
+    self, other: WidgetId, tree: &TreeArena,
   ) -> impl Iterator<Item = WidgetId> + '_ {
     let mut p0 = vec![];
     let mut p1 = vec![];
@@ -106,9 +102,11 @@ impl WidgetId {
   }
 
   pub(crate) fn on_mounted_subtree(self, tree: &WidgetTree) {
-    self
-      .descendants(&tree.arena)
-      .for_each(|w| tree.window().add_delay_event(DelayEvent::Mounted(w)));
+    self.descendants(&tree.arena).for_each(|w| {
+      tree
+        .window()
+        .add_delay_event(DelayEvent::Mounted(w))
+    });
   }
 
   /// Dispose the whole subtree of `id`, include `id` itself.
@@ -130,32 +128,26 @@ impl WidgetId {
 
   /// Return the single child of `widget`, panic if have more than once child.
   pub(crate) fn single_child(&self, tree: &TreeArena) -> Option<WidgetId> {
-    assert_eq!(
-      self.first_child(tree),
-      self.last_child(tree),
-      "Have more than one child."
-    );
+    assert_eq!(self.first_child(tree), self.last_child(tree), "Have more than one child.");
     self.first_child(tree)
   }
 
   fn node_feature(
-    self,
-    tree: &TreeArena,
-    method: impl FnOnce(&Node<Box<dyn Render>>) -> Option<NodeId>,
+    self, tree: &TreeArena, method: impl FnOnce(&Node<Box<dyn Render>>) -> Option<NodeId>,
   ) -> Option<WidgetId> {
     tree.get(self.0).and_then(method).map(WidgetId)
   }
 
   pub(crate) fn assert_get<'a, 'b>(self, tree: &'a TreeArena) -> &'a (dyn Render + 'b) {
-    self.get(tree).expect("Widget not exists in the `tree`")
+    self
+      .get(tree)
+      .expect("Widget not exists in the `tree`")
   }
 
   /// We assume the `f` wrap the widget into a new widget, and keep the old
   /// widget as part of the new widget, otherwise, undefined behavior.
   pub(crate) fn wrap_node(
-    self,
-    tree: &mut TreeArena,
-    f: impl FnOnce(Box<dyn Render>) -> Box<dyn Render>,
+    self, tree: &mut TreeArena, f: impl FnOnce(Box<dyn Render>) -> Box<dyn Render>,
   ) {
     let node = self.get_node_mut(tree).unwrap();
     unsafe {
@@ -196,24 +188,27 @@ impl WidgetId {
         }
       }
 
-      w = id.first_child(arena).filter(|_| need_paint).or_else(|| {
-        let mut node = w;
-        while let Some(p) = node {
-          // self node sub-tree paint finished, goto sibling
-          ctx.painter.restore();
-          node = match p == self {
-            true => None,
-            false => p.next_sibling(arena),
-          };
-          if node.is_some() {
-            break;
-          } else {
-            // if there is no more sibling, back to parent to find sibling.
-            node = p.parent(arena);
+      w = id
+        .first_child(arena)
+        .filter(|_| need_paint)
+        .or_else(|| {
+          let mut node = w;
+          while let Some(p) = node {
+            // self node sub-tree paint finished, goto sibling
+            ctx.painter.restore();
+            node = match p == self {
+              true => None,
+              false => p.next_sibling(arena),
+            };
+            if node.is_some() {
+              break;
+            } else {
+              // if there is no more sibling, back to parent to find sibling.
+              node = p.parent(arena);
+            }
           }
-        }
-        node
-      });
+          node
+        });
     }
   }
 }

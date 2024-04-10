@@ -1,4 +1,5 @@
-use crate::prelude::{App, AppEvent, HotkeyEvent};
+use std::{ptr::NonNull, sync::Once, time::Duration};
+
 use icrate::{
   block2::ConcreteBlock,
   objc2::{
@@ -16,7 +17,7 @@ use ribir_core::prelude::AppCtx;
 use rxrust::prelude::{interval, ObservableExt, ObservableItem};
 use winit::keyboard::{KeyCode, ModifiersState};
 
-use std::{ptr::NonNull, sync::Once, time::Duration};
+use crate::prelude::{App, AppEvent, HotkeyEvent};
 
 extern_class!(
   #[derive(Debug, PartialEq, Eq, Hash)]
@@ -40,11 +41,7 @@ extern_methods!(
 
     #[method(setEventHandler:andSelector:forEventClass:andEventID:)]
     fn set_event_handler(
-      &self,
-      handler: &AnyObject,
-      and_selector: Sel,
-      for_event_class: u32,
-      and_event_id: u32,
+      &self, handler: &AnyObject, and_selector: Sel, for_event_class: u32, and_event_id: u32,
     );
   }
 );
@@ -161,11 +158,7 @@ fn modifier_flag(modifiers: usize) -> Option<ModifiersState> {
     modifiers_state.insert(ModifiersState::ALT);
   }
 
-  if !modifiers_state.is_empty() {
-    Some(modifiers_state)
-  } else {
-    None
-  }
+  if !modifiers_state.is_empty() { Some(modifiers_state) } else { None }
 }
 
 fn scancode_to_key(key_code: u32) -> Option<KeyCode> {

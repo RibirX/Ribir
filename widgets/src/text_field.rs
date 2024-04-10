@@ -1,6 +1,8 @@
-use crate::prelude::*;
-use ribir_core::prelude::*;
 use std::{collections::HashMap, hash::Hash};
+
+use ribir_core::prelude::*;
+
+use crate::prelude::*;
 
 #[derive(Declare, Default)]
 pub struct TextField {
@@ -184,19 +186,9 @@ impl TextFieldThemeSuit {
 
     let mut themes = HashMap::new();
 
-    let input_expand_padding = EdgeInsets {
-      left: 16.,
-      right: 16.,
-      bottom: 16.,
-      top: 16.,
-    };
+    let input_expand_padding = EdgeInsets { left: 16., right: 16., bottom: 16., top: 16. };
 
-    let input_collapse_padding = EdgeInsets {
-      left: 16.,
-      right: 16.,
-      bottom: 8.,
-      top: 8.,
-    };
+    let input_collapse_padding = EdgeInsets { left: 16., right: 16., bottom: 8., top: 8. };
 
     themes.insert(
       TextFieldState::Enabled,
@@ -281,8 +273,7 @@ macro_rules! take_option_field {
 impl ComposeChild for TextField {
   type Child = Option<TextFieldTml>;
   fn compose_child(
-    this: impl StateWriter<Value = Self>,
-    config: Self::Child,
+    this: impl StateWriter<Value = Self>, config: Self::Child,
   ) -> impl WidgetBuilder {
     fn_widget! {
       let mut config = config.unwrap_or_default();
@@ -331,11 +322,8 @@ impl ComposeChild for TextField {
 }
 
 fn build_input_area(
-  this: impl StateWriter<Value = TextField>,
-  theme: State<TextFieldThemeProxy>,
-  prefix: Option<LeadingText>,
-  suffix: Option<TrailingText>,
-  placeholder: Option<Placeholder>,
+  this: impl StateWriter<Value = TextField>, theme: State<TextFieldThemeProxy>,
+  prefix: Option<LeadingText>, suffix: Option<TrailingText>, placeholder: Option<Placeholder>,
 ) -> impl WidgetBuilder {
   fn_widget! {
     let mut input_area = @Row {
@@ -409,8 +397,7 @@ impl Compose for TextFieldLabel {
 }
 
 fn build_content_area(
-  this: impl StateWriter<Value = TextField>,
-  theme: State<TextFieldThemeProxy>,
+  this: impl StateWriter<Value = TextField>, theme: State<TextFieldThemeProxy>,
   mut config: TextFieldTml,
 ) -> impl WidgetBuilder {
   fn_widget! {

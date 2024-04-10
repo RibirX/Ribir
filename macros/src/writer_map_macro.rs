@@ -1,4 +1,3 @@
-use crate::{ok, symbol_process::symbol_to_macro};
 use proc_macro::{TokenStream as TokenStream1, TokenTree};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
@@ -10,7 +9,10 @@ use syn::{
   Expr, ExprMacro, Result,
 };
 
-use crate::symbol_process::DollarRefsCtx;
+use crate::{
+  ok,
+  symbol_process::{symbol_to_macro, DollarRefsCtx},
+};
 
 pub fn gen_map_path_writer(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream1 {
   gen_path_partial_writer(input, "map_writer", refs_ctx)
@@ -21,9 +23,7 @@ pub fn gen_split_path_writer(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -
 }
 
 fn gen_path_partial_writer(
-  input: TokenStream,
-  method_name: &'static str,
-  refs_ctx: &mut DollarRefsCtx,
+  input: TokenStream, method_name: &'static str, refs_ctx: &mut DollarRefsCtx,
 ) -> TokenStream1 {
   fn first_dollar_err(span: Span) -> TokenStream1 {
     quote_spanned! { span =>
@@ -34,10 +34,9 @@ fn gen_path_partial_writer(
 
   let mut input = TokenStream1::from(input).into_iter();
   let first = input.next();
-  let is_first_dollar = first.as_ref().map_or(
-    false,
-    |f| matches!(f, TokenTree::Punct(p) if p.as_char() == '$'),
-  );
+  let is_first_dollar = first
+    .as_ref()
+    .map_or(false, |f| matches!(f, TokenTree::Punct(p) if p.as_char() == '$'));
   if !is_first_dollar {
     first_dollar_err(
       first

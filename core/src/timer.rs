@@ -1,6 +1,3 @@
-use crate::ticker::{Duration, Instant};
-use once_cell::sync::Lazy;
-use rxrust::scheduler::BoxFuture;
 use std::{
   collections::BTreeMap,
   future::Future,
@@ -11,6 +8,11 @@ use std::{
   },
   task::{Poll, Waker},
 };
+
+use once_cell::sync::Lazy;
+use rxrust::scheduler::BoxFuture;
+
+use crate::ticker::{Duration, Instant};
 
 #[derive(Default)]
 pub(crate) struct TimeReactor {
@@ -54,7 +56,10 @@ impl Timer {
 
   pub fn reset(&mut self, timer: Instant) {
     if let Some(id) = self.id.take() {
-      TIME_REACTOR.lock().unwrap().remove_timer(self.when, id)
+      TIME_REACTOR
+        .lock()
+        .unwrap()
+        .remove_timer(self.when, id)
     }
     self.when = timer;
   }
@@ -66,7 +71,10 @@ impl Timer {
   }
 
   pub fn wake_timeout_futures() {
-    let notifies = TIME_REACTOR.lock().unwrap().timeout_wakers(Instant::now());
+    let notifies = TIME_REACTOR
+      .lock()
+      .unwrap()
+      .timeout_wakers(Instant::now());
     notifies.for_each(|waker| waker.wake());
   }
 }
@@ -74,13 +82,15 @@ impl Timer {
 impl Future for Timer {
   type Output = ();
   fn poll(
-    mut self: std::pin::Pin<&mut Self>,
-    cx: &mut std::task::Context<'_>,
+    mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>,
   ) -> std::task::Poll<Self::Output> {
     let now = Instant::now();
     let when = self.as_ref().when;
     if let Some(id) = self.as_mut().id.take() {
-      TIME_REACTOR.lock().unwrap().remove_timer(when, id);
+      TIME_REACTOR
+        .lock()
+        .unwrap()
+        .remove_timer(when, id);
     }
     if now >= when {
       return Poll::Ready(());

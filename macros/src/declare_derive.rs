@@ -1,11 +1,12 @@
+use proc_macro2::TokenStream;
+use quote::{quote, quote_spanned, ToTokens};
+use syn::{spanned::Spanned, Fields, Ident, Visibility};
+
 use crate::{
   simple_declare_attr::*,
   util::data_struct_unwrap,
   variable_names::{BuiltinMemberType, BUILTIN_INFOS},
 };
-use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
-use syn::{spanned::Spanned, Fields, Ident, Visibility};
 
 const DECLARE: &str = "Declare";
 
@@ -20,7 +21,9 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   let declarer = Declarer::new(host, &mut stt.fields)?;
   let Declarer { name, fields, .. } = &declarer;
   // reverse name check.
-  fields.iter().try_for_each(DeclareField::check_reserve)?;
+  fields
+    .iter()
+    .try_for_each(DeclareField::check_reserve)?;
   let set_methods = declarer_set_methods(fields, vis);
 
   let field_names = declarer.fields.iter().map(DeclareField::member);
@@ -565,46 +568,51 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
 }
 
 fn declarer_set_methods<'a>(
-  fields: &'a [DeclareField],
-  vis: &'a Visibility,
+  fields: &'a [DeclareField], vis: &'a Visibility,
 ) -> impl Iterator<Item = TokenStream> + 'a {
-  fields.iter().filter(|f| f.need_set_method()).map(move |f| {
-    let field_name = f.field.ident.as_ref().unwrap();
-    let doc = f
-      .field
-      .attrs
-      .iter()
-      .find(|attr| matches!(&attr.meta, syn::Meta::NameValue(nv) if nv.path.is_ident("doc")));
-    let ty = &f.field.ty;
-    let set_method = f.set_method_name();
-    if f.attr.as_ref().map_or(false, |attr| attr.strict.is_some()) {
-      quote! {
-        #[inline]
-        #doc
-        #vis fn #set_method(mut self, v: #ty) -> Self {
-          self.#field_name = Some(DeclareInit::Value(v));
-          self
+  fields
+    .iter()
+    .filter(|f| f.need_set_method())
+    .map(move |f| {
+      let field_name = f.field.ident.as_ref().unwrap();
+      let doc = f
+        .field
+        .attrs
+        .iter()
+        .find(|attr| matches!(&attr.meta, syn::Meta::NameValue(nv) if nv.path.is_ident("doc")));
+      let ty = &f.field.ty;
+      let set_method = f.set_method_name();
+      if f
+        .attr
+        .as_ref()
+        .map_or(false, |attr| attr.strict.is_some())
+      {
+        quote! {
+          #[inline]
+          #doc
+          #vis fn #set_method(mut self, v: #ty) -> Self {
+            self.#field_name = Some(DeclareInit::Value(v));
+            self
+          }
+        }
+      } else {
+        quote! {
+          #[inline]
+          #[allow(clippy::type_complexity)]
+          #doc
+          #vis fn #set_method<_M, _V>(mut self, v: _V) -> Self
+            where DeclareInit<#ty>: DeclareFrom<_V, _M>
+          {
+            self.#field_name = Some(DeclareInit::declare_from(v));
+            self
+          }
         }
       }
-    } else {
-      quote! {
-        #[inline]
-        #[allow(clippy::type_complexity)]
-        #doc
-        #vis fn #set_method<_M, _V>(mut self, v: _V) -> Self
-          where DeclareInit<#ty>: DeclareFrom<_V, _M>
-        {
-          self.#field_name = Some(DeclareInit::declare_from(v));
-          self
-        }
-      }
-    }
-  })
+    })
 }
 
 fn field_values<'a>(
-  fields: &'a [DeclareField],
-  stt_name: &'a Ident,
+  fields: &'a [DeclareField], stt_name: &'a Ident,
 ) -> impl Iterator<Item = TokenStream> + 'a {
   fields.iter().map(move |f| {
     let f_name = f.member();

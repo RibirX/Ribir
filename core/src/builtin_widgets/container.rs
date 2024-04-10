@@ -25,9 +25,10 @@ impl Render for Container {
 
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::*;
+
   use super::*;
   use crate::test_helper::*;
-  use ribir_dev_helper::*;
 
   const SIZE: Size = Size::new(100., 100.);
   fn smoke() -> impl WidgetBuilder {

@@ -1,14 +1,17 @@
-use crate::symbol_process::{not_subscribe_anything, DollarRefsCtx, DollarRefsScope};
-use crate::{ok, symbol_process::symbol_to_macro};
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::fold::Fold;
 use syn::{
+  fold::Fold,
   parse::{Parse, ParseStream},
   parse_macro_input,
   spanned::Spanned,
   Stmt,
+};
+
+use crate::{
+  ok,
+  symbol_process::{not_subscribe_anything, symbol_to_macro, DollarRefsCtx, DollarRefsScope},
 };
 
 pub(crate) struct BodyExpr(pub(crate) Vec<Stmt>);
@@ -24,7 +27,11 @@ impl PipeMacro {
     let expr = parse_macro_input! { input as BodyExpr };
 
     refs_ctx.new_dollar_scope(true);
-    let expr = expr.0.into_iter().map(|s| refs_ctx.fold_stmt(s)).collect();
+    let expr = expr
+      .0
+      .into_iter()
+      .map(|s| refs_ctx.fold_stmt(s))
+      .collect();
     let refs = refs_ctx.pop_dollar_scope(true);
     if refs.is_empty() {
       not_subscribe_anything(span).into()

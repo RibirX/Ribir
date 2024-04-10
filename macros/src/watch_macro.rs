@@ -1,12 +1,13 @@
+use proc_macro::TokenStream as TokenStream1;
+use proc_macro2::TokenStream;
+use quote::{quote, ToTokens};
+use syn::{fold::Fold, parse_macro_input, spanned::Spanned, Stmt};
+
 use crate::{
   ok,
   pipe_macro::BodyExpr,
   symbol_process::{not_subscribe_anything, symbol_to_macro, DollarRefsCtx, DollarRefsScope},
 };
-use proc_macro::TokenStream as TokenStream1;
-use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{fold::Fold, parse_macro_input, spanned::Spanned, Stmt};
 
 pub(crate) struct WatchMacro {
   refs: DollarRefsScope,
@@ -19,7 +20,11 @@ impl WatchMacro {
     let input = ok!(symbol_to_macro(TokenStream1::from(input)));
     let expr = parse_macro_input! { input as BodyExpr };
     refs_ctx.new_dollar_scope(true);
-    let expr = expr.0.into_iter().map(|s| refs_ctx.fold_stmt(s)).collect();
+    let expr = expr
+      .0
+      .into_iter()
+      .map(|s| refs_ctx.fold_stmt(s))
+      .collect();
     let refs = refs_ctx.pop_dollar_scope(true);
     if refs.is_empty() {
       not_subscribe_anything(span).into()

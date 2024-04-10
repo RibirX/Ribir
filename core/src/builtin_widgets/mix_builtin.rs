@@ -1,8 +1,9 @@
-use crate::prelude::*;
-use rxrust::prelude::*;
 use std::{cell::Cell, convert::Infallible};
 
+use rxrust::prelude::*;
+
 use self::focus_mgr::FocusType;
+use crate::prelude::*;
 
 const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 
@@ -53,7 +54,7 @@ impl Declare for MixBuiltin {
 }
 
 macro_rules! event_map_filter {
-  ($event_name: ident, $event_ty: ident) => {
+  ($event_name:ident, $event_ty:ident) => {
     (|e| match e {
       Event::$event_name(e) => Some(e),
       _ => None,
@@ -62,7 +63,7 @@ macro_rules! event_map_filter {
 }
 
 macro_rules! impl_event_callback {
-  ($this: ident, $listen_type: ident, $event_name: ident, $event_ty: ident, $handler: ident) => {{
+  ($this:ident, $listen_type:ident, $event_name:ident, $event_ty:ident, $handler:ident) => {{
     $this.flag_mark(BuiltinFlags::$listen_type);
     let _ = $this
       .subject()
@@ -180,15 +181,13 @@ impl MixBuiltin {
   }
 
   pub fn on_x_times_tap(
-    &self,
-    (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
+    &self, (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> &Self {
     self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, false, handler)
   }
 
   pub fn on_x_times_tap_capture(
-    &self,
-    (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
+    &self, (times, handler): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> &Self {
     self.on_x_times_tap_impl(times, MULTI_TAP_DURATION, true, handler)
   }
@@ -202,10 +201,7 @@ impl MixBuiltin {
   }
 
   fn on_x_times_tap_impl(
-    &self,
-    times: usize,
-    dur: Duration,
-    capture: bool,
+    &self, times: usize, dur: Duration, capture: bool,
     handler: impl FnMut(&mut PointerEvent) + 'static,
   ) -> &Self {
     self.flag_mark(BuiltinFlags::Pointer);
@@ -281,7 +277,9 @@ impl MixBuiltin {
   pub fn set_tab_index(&self, tab_idx: i16) -> &Self {
     self.flag_mark(BuiltinFlags::Focus);
     let flags = self.flags.get().bits() | ((tab_idx as u64) << 48);
-    self.flags.set(BuiltinFlags::from_bits_retain(flags));
+    self
+      .flags
+      .set(BuiltinFlags::from_bits_retain(flags));
     self
   }
 
@@ -301,7 +299,9 @@ impl MixBuiltin {
   fn merge(&self, other: Self) {
     let tab_index = self.get_tab_index();
     let other_tab_index = other.get_tab_index();
-    self.flags.set(self.flags.get() | other.flags.get());
+    self
+      .flags
+      .set(self.flags.get() | other.flags.get());
     if other_tab_index != 0 {
       self.set_tab_index(other_tab_index);
     } else if tab_index != 0 {
@@ -314,7 +314,9 @@ impl MixBuiltin {
         subject.clone().next(e);
       }
     }
-    self.subject().subscribe(subscribe_fn(other_subject));
+    self
+      .subject()
+      .subscribe(subscribe_fn(other_subject));
   }
 
   fn callbacks_for_focus_node(&self) {
@@ -322,10 +324,14 @@ impl MixBuiltin {
       .on_mounted(move |e| {
         e.query_type(|mix: &MixBuiltin| {
           let auto_focus = mix.is_auto_focus();
-          e.window().add_focus_node(e.id, auto_focus, FocusType::Node)
+          e.window()
+            .add_focus_node(e.id, auto_focus, FocusType::Node)
         });
       })
-      .on_disposed(|e| e.window().remove_focus_node(e.id, FocusType::Node));
+      .on_disposed(|e| {
+        e.window()
+          .remove_focus_node(e.id, FocusType::Node)
+      });
   }
 }
 
@@ -377,9 +383,7 @@ impl ComposeChild for MixBuiltin {
 }
 
 fn x_times_tap_map_filter(
-  x: usize,
-  dur: Duration,
-  capture: bool,
+  x: usize, dur: Duration, capture: bool,
 ) -> impl FnMut(&mut Event) -> Option<&mut PointerEvent> {
   assert!(x > 0);
   struct TapInfo {

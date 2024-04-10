@@ -1,6 +1,8 @@
-use crate::{prelude::*, window::DelayEvent};
 use std::rc::{Rc, Weak};
+
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
+
+use crate::{prelude::*, window::DelayEvent};
 
 pub(crate) struct Dispatcher {
   wnd: Weak<Window>,
@@ -11,12 +13,7 @@ pub(crate) struct Dispatcher {
 
 impl Dispatcher {
   pub fn new() -> Self {
-    Self {
-      wnd: Weak::new(),
-      info: <_>::default(),
-      entered_widgets: vec![],
-      pointer_down_uid: None,
-    }
+    Self { wnd: Weak::new(), info: <_>::default(), entered_widgets: vec![], pointer_down_uid: None }
   }
 
   pub fn init(&mut self, wnd: Weak<Window>) { self.wnd = wnd; }
@@ -54,11 +51,7 @@ impl Dispatcher {
   }
 
   pub fn dispatch_keyboard_input(
-    &mut self,
-    physical_key: PhysicalKey,
-    key: VirtualKey,
-    is_repeat: bool,
-    location: KeyLocation,
+    &mut self, physical_key: PhysicalKey, key: VirtualKey, is_repeat: bool, location: KeyLocation,
     state: ElementState,
   ) {
     let wnd = self.window();
@@ -93,7 +86,9 @@ impl Dispatcher {
     self.info.cursor_pos = position;
     self.pointer_enter_leave_dispatch();
     if let Some(hit) = self.hit_widget() {
-      self.window().add_delay_event(DelayEvent::PointerMove(hit));
+      self
+        .window()
+        .add_delay_event(DelayEvent::PointerMove(hit));
     }
   }
 
@@ -103,10 +98,7 @@ impl Dispatcher {
   }
 
   pub fn dispatch_mouse_input(
-    &mut self,
-    device_id: DeviceId,
-    state: ElementState,
-    button: MouseButton,
+    &mut self, device_id: DeviceId, state: ElementState, button: MouseButton,
   ) {
     // A mouse press/release emit during another mouse's press will ignored.
     if self.info.mouse_button.0.get_or_insert(device_id) == &device_id {
@@ -184,7 +176,9 @@ impl Dispatcher {
         .focus(focus_id, &widget_tree.borrow().arena);
     } else {
       let Window { focus_mgr, widget_tree, .. } = &*wnd;
-      focus_mgr.borrow_mut().blur(&widget_tree.borrow().arena);
+      focus_mgr
+        .borrow_mut()
+        .blur(&widget_tree.borrow().arena);
     }
     if let Some(hit) = hit {
       wnd.add_delay_event(DelayEvent::PointerDown(hit));
@@ -282,9 +276,10 @@ impl DispatchInfo {
 
 #[cfg(test)]
 mod tests {
+  use std::cell::RefCell;
+
   use super::*;
   use crate::{reset_test_env, test_helper::*};
-  use std::cell::RefCell;
 
   struct Info {
     pos: Point,
@@ -292,17 +287,15 @@ mod tests {
   }
 
   fn record_pointer(
-    event_stack: Rc<RefCell<Vec<Info>>>,
-    widget: impl WidgetBuilder,
+    event_stack: Rc<RefCell<Vec<Info>>>, widget: impl WidgetBuilder,
   ) -> impl WidgetBuilder {
     let handler_ctor = move || {
       let stack = event_stack.clone();
 
       move |e: &mut PointerEvent| {
-        stack.borrow_mut().push(Info {
-          pos: e.position(),
-          btns: e.mouse_buttons(),
-        })
+        stack
+          .borrow_mut()
+          .push(Info { pos: e.position(), btns: e.mouse_buttons() })
       }
     };
     fn_widget! {
@@ -320,14 +313,9 @@ mod tests {
     reset_test_env!();
 
     let event_record = Rc::new(RefCell::new(vec![]));
-    let record = record_pointer(
-      event_record.clone(),
-      fn_widget!(MockBox { size: Size::new(100., 30.) }),
-    );
-    let root = record_pointer(
-      event_record.clone(),
-      fn_widget! { @MockMulti { @ { record } } },
-    );
+    let record =
+      record_pointer(event_record.clone(), fn_widget!(MockBox { size: Size::new(100., 30.) }));
+    let root = record_pointer(event_record.clone(), fn_widget! { @MockMulti { @ { record } } });
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
@@ -356,10 +344,8 @@ mod tests {
     reset_test_env!();
 
     let event_record = Rc::new(RefCell::new(vec![]));
-    let root = record_pointer(
-      event_record.clone(),
-      fn_widget! { @MockBox { size: Size::new(100., 30.) } },
-    );
+    let root =
+      record_pointer(event_record.clone(), fn_widget! { @MockBox { size: Size::new(100., 30.) } });
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
@@ -384,10 +370,7 @@ mod tests {
     assert_eq!(records.len(), 3);
 
     assert_eq!(records[0].btns, MouseButtons::PRIMARY);
-    assert_eq!(
-      records[1].btns,
-      MouseButtons::PRIMARY | MouseButtons::SECONDARY
-    );
+    assert_eq!(records[1].btns, MouseButtons::PRIMARY | MouseButtons::SECONDARY);
     assert_eq!(records[2].btns, MouseButtons::default());
   }
 
@@ -398,10 +381,8 @@ mod tests {
     reset_test_env!();
 
     let event_record = Rc::new(RefCell::new(vec![]));
-    let root = record_pointer(
-      event_record.clone(),
-      fn_widget!(MockBox { size: Size::new(100., 30.) }),
-    );
+    let root =
+      record_pointer(event_record.clone(), fn_widget!(MockBox { size: Size::new(100., 30.) }));
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
@@ -469,11 +450,7 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(fn_widget!(root), Size::new(100., 100.));
     wnd.draw_frame();
 
-    wnd.process_mouse_input(
-      unsafe { DeviceId::dummy() },
-      ElementState::Pressed,
-      MouseButton::Left,
-    );
+    wnd.process_mouse_input(unsafe { DeviceId::dummy() }, ElementState::Pressed, MouseButton::Left);
     wnd.run_frame_tasks();
     assert_eq!(event_record.borrow().len(), 1);
   }
@@ -536,10 +513,7 @@ mod tests {
 
     // leave all
     #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
-      position: (999, 999).into(),
-    });
+    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (999, 999).into() });
     wnd.run_frame_tasks();
     assert_eq!(&*leave_event.borrow(), &[1, 2]);
 

@@ -22,10 +22,7 @@ where
   pub fn new(host: &'a mut H) -> Self {
     let cursor = GraphemeCursor(host.caret().cluster());
     let string = host.text().to_string();
-    Self {
-      host,
-      writer: TextWriter::new(string, cursor),
-    }
+    Self { host, writer: TextWriter::new(string, cursor) }
   }
 }
 
@@ -37,10 +34,7 @@ where
     use crate::input::caret_state::CaretPosition;
     let Self { host, writer } = self;
     let text = writer.text().to_string();
-    let caret = CaretPosition {
-      cluster: writer.byte_offset(),
-      position: None,
-    };
+    let caret = CaretPosition { cluster: writer.byte_offset(), position: None };
 
     host.set_text_with_caret(&text, caret.into());
   }
@@ -80,8 +74,7 @@ pub(crate) fn edit_handle<F: EditableText>(this: &impl StateWriter<Value = F>, e
 }
 
 pub(crate) fn edit_key_handle<F: EditableText>(
-  this: &impl StateWriter<Value = F>,
-  event: &KeyboardEvent,
+  this: &impl StateWriter<Value = F>, event: &KeyboardEvent,
 ) {
   let mut deal = false;
   if event.with_command_key() {
@@ -93,8 +86,7 @@ pub(crate) fn edit_key_handle<F: EditableText>(
 }
 
 fn key_with_command<F: EditableText>(
-  this: &impl StateWriter<Value = F>,
-  event: &KeyboardEvent,
+  this: &impl StateWriter<Value = F>, event: &KeyboardEvent,
 ) -> bool {
   if !event.with_command_key() {
     return false;

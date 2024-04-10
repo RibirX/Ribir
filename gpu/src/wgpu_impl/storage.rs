@@ -24,11 +24,8 @@ impl<T: AsBytes> Storage<T> {
       }],
       label: Some(&format!("{} storage layout", type_name::<T>())),
     });
-    let (buffer, bind) = Self::new_bind(
-      device,
-      &layout,
-      (size_of::<T>() * init_count) as wgpu::BufferAddress,
-    );
+    let (buffer, bind) =
+      Self::new_bind(device, &layout, (size_of::<T>() * init_count) as wgpu::BufferAddress);
     let _phantom = PhantomData;
     Self { layout, buffer, bind, _phantom }
   }
@@ -46,9 +43,7 @@ impl<T: AsBytes> Storage<T> {
   pub fn layout(&self) -> &wgpu::BindGroupLayout { &self.layout }
 
   fn new_bind(
-    device: &wgpu::Device,
-    layout: &wgpu::BindGroupLayout,
-    bytes: wgpu::BufferAddress,
+    device: &wgpu::Device, layout: &wgpu::BindGroupLayout, bytes: wgpu::BufferAddress,
   ) -> (wgpu::Buffer, wgpu::BindGroup) {
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
       label: Some(&format!("{} storage buffer", type_name::<T>())),

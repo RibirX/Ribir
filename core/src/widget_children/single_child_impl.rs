@@ -1,6 +1,5 @@
-use crate::pipe::InnerPipe;
-
 use super::*;
+use crate::pipe::InnerPipe;
 
 /// Trait specify what child a widget can have, and the target type is the
 /// result of widget compose its child.
@@ -53,9 +52,8 @@ crate::widget::multi_build_replace_impl_include_self! {
 
 #[cfg(test)]
 mod tests {
-  use crate::test_helper::MockBox;
-
   use super::*;
+  use crate::test_helper::MockBox;
 
   #[test]
   fn pair_with_child() {

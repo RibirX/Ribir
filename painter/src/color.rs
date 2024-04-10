@@ -73,12 +73,7 @@ impl Color {
   #[inline]
   pub fn from_u32(rgba: u32) -> Self {
     let bytes = rgba.to_be_bytes();
-    Self {
-      red: bytes[0],
-      green: bytes[1],
-      blue: bytes[2],
-      alpha: bytes[3],
-    }
+    Self { red: bytes[0], green: bytes[1], blue: bytes[2], alpha: bytes[3] }
   }
 
   #[inline]
@@ -106,12 +101,7 @@ impl Color {
     let mut hct = htc::Hct::from_int([self.alpha, self.red, self.green, self.blue]);
     hct.set_tone((l.0 * 100.).clamp(0., 100.) as f64);
     let argb = hct.to_int();
-    Self {
-      red: argb[1],
-      green: argb[2],
-      blue: argb[3],
-      alpha: argb[0],
-    }
+    Self { red: argb[1], green: argb[2], blue: argb[3], alpha: argb[0] }
   }
 
   #[inline]
@@ -137,7 +127,7 @@ const C23: u32 = 0x4b00_0000;
 fn u8_component_to_f32(v: u8) -> f32 {
   let comp_u = v as u32 + C23;
   let comp_f = f32::from_bits(comp_u) - f32::from_bits(C23);
-  let max_u = core::u8::MAX as u32 + C23;
+  let max_u = u8::MAX as u32 + C23;
   let max_f = (f32::from_bits(max_u) - f32::from_bits(C23)).recip();
   comp_f * max_f
 }

@@ -1,10 +1,11 @@
-use ribir_algo::Sc;
-use rxrust::ops::box_it::BoxOp;
 use std::{
   cell::{Cell, RefCell, UnsafeCell},
   convert::Infallible,
   ops::{Range, RangeInclusive},
 };
+
+use ribir_algo::Sc;
+use rxrust::ops::box_it::BoxOp;
 
 use crate::{
   builtin_widgets::key::AnyKey,
@@ -26,9 +27,7 @@ pub trait Pipe {
   /// to the stream to determine the priority of the downstream to be notified.
   /// This method only for build widget use.
   fn tick_unzip(
-    self,
-    prior_fn: impl FnMut() -> i64 + 'static,
-    ctx: &BuildCtx,
+    self, prior_fn: impl FnMut() -> i64 + 'static, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>)
   where
     Self: Sized;
@@ -36,9 +35,7 @@ pub trait Pipe {
   fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>);
 
   fn box_tick_unzip(
-    self: Box<Self>,
-    prior_fn: Box<dyn FnMut() -> i64>,
-    ctx: &BuildCtx,
+    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>);
 
   /// Maps an `Pipe<Value=T>` to `Pipe<Value=T>` by applying a function to the
@@ -98,18 +95,14 @@ impl<V: 'static> BoxPipe<V> {
 
 pub(crate) trait InnerPipe: Pipe {
   fn build_single(
-    self,
-    ctx: &BuildCtx,
-    build: impl Fn(Self::Value, &BuildCtx) -> Widget + 'static,
+    self, ctx: &BuildCtx, build: impl Fn(Self::Value, &BuildCtx) -> Widget + 'static,
   ) -> Widget
   where
     Self: Sized,
     Self::Value: 'static,
   {
-    let info = Sc::new(Cell::new(SinglePipeInfo {
-      gen_id: ctx.tree.borrow().root(),
-      multi_pos: 0,
-    }));
+    let info =
+      Sc::new(Cell::new(SinglePipeInfo { gen_id: ctx.tree.borrow().root(), multi_pos: 0 }));
     let info2 = info.clone();
     let handle = ctx.handle();
     let (w, modifies) = self.tick_unzip(move || pipe_priority_value(&info2, handle), ctx);
@@ -142,26 +135,24 @@ pub(crate) trait InnerPipe: Pipe {
   }
 
   fn build_multi(
-    self,
-    vec: &mut Vec<Widget>,
-    f: impl Fn(<Self::Value as IntoIterator>::Item, &BuildCtx) -> Widget + 'static,
-    ctx: &BuildCtx,
+    self, vec: &mut Vec<Widget>,
+    f: impl Fn(<Self::Value as IntoIterator>::Item, &BuildCtx) -> Widget + 'static, ctx: &BuildCtx,
   ) where
     Self::Value: IntoIterator,
     Self: Sized,
   {
     let build_multi = move |widgets: Self::Value, ctx: &BuildCtx| {
-      let mut widgets = widgets.into_iter().map(|w| f(w, ctx)).collect::<Vec<_>>();
+      let mut widgets = widgets
+        .into_iter()
+        .map(|w| f(w, ctx))
+        .collect::<Vec<_>>();
       if widgets.is_empty() {
         widgets.push(Void.build(ctx));
       }
       widgets
     };
 
-    let info = Sc::new(RefCell::new(MultiPipeInfo {
-      widgets: vec![],
-      multi_pos: 0,
-    }));
+    let info = Sc::new(RefCell::new(MultiPipeInfo { widgets: vec![], multi_pos: 0 }));
     let info2 = info.clone();
     let handle = ctx.handle();
     let (m, modifies) = self.tick_unzip(move || pipe_priority_value(&info2, handle), ctx);
@@ -190,7 +181,10 @@ pub(crate) trait InnerPipe: Pipe {
 
         update_key_state_multi(old.iter().copied(), new.iter().copied(), ctx);
 
-        new.iter().rev().for_each(|w| ctx.insert_after(old[0], *w));
+        new
+          .iter()
+          .rev()
+          .for_each(|w| ctx.insert_after(old[0], *w));
         old.iter().for_each(|id| ctx.dispose_subtree(*id));
         new.iter().for_each(|w| {
           ctx.on_subtree_mounted(*w);
@@ -202,19 +196,14 @@ pub(crate) trait InnerPipe: Pipe {
   }
 
   fn only_parent_build(
-    self,
-    ctx: &BuildCtx,
-    compose_child: impl FnOnce(Self::Value) -> (Widget, WidgetId),
+    self, ctx: &BuildCtx, compose_child: impl FnOnce(Self::Value) -> (Widget, WidgetId),
     transplant: impl Fn(Self::Value, WidgetId, &BuildCtx) -> WidgetId + 'static,
   ) -> Widget
   where
     Self: Sized,
   {
     let root = ctx.tree.borrow().root();
-    let info = Sc::new(RefCell::new(SingleParentPipeInfo {
-      range: root..=root,
-      multi_pos: 0,
-    }));
+    let info = Sc::new(RefCell::new(SingleParentPipeInfo { range: root..=root, multi_pos: 0 }));
     let info2 = info.clone();
     let handle = ctx.handle();
     let (v, modifies) = self.tick_unzip(move || pipe_priority_value(&info2, handle), ctx);
@@ -229,7 +218,9 @@ pub(crate) trait InnerPipe: Pipe {
       handle.with_ctx(|ctx| {
         let (top, bottom) = info.borrow().range.clone().into_inner();
 
-        let first_child = bottom.first_child(&ctx.tree.borrow().arena).unwrap();
+        let first_child = bottom
+          .first_child(&ctx.tree.borrow().arena)
+          .unwrap();
         let p = transplant(w, bottom, ctx);
         let new_rg = half_to_close_interval(p..first_child, ctx);
 
@@ -273,18 +264,13 @@ impl Pipe for ModifiesPipe {
 
   #[inline]
   fn unzip(self) -> (Self::Value, ValueStream<Self::Value>) {
-    (
-      ModifyScope::empty(),
-      ObservableExt::map(self.0, |s| (s, s)).box_it(),
-    )
+    (ModifyScope::empty(), ObservableExt::map(self.0, |s| (s, s)).box_it())
   }
 
   fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).unzip() }
 
   fn tick_unzip(
-    self,
-    prior_fn: impl FnMut() -> i64 + 'static,
-    ctx: &BuildCtx,
+    self, prior_fn: impl FnMut() -> i64 + 'static, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     let stream = self
       .0
@@ -303,9 +289,7 @@ impl Pipe for ModifiesPipe {
   }
 
   fn box_tick_unzip(
-    self: Box<Self>,
-    prior_fn: Box<dyn FnMut() -> i64>,
-    ctx: &BuildCtx,
+    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     (*self).tick_unzip(prior_fn, ctx)
   }
@@ -324,18 +308,14 @@ impl<V> Pipe for Box<dyn Pipe<Value = V>> {
 
   #[inline]
   fn tick_unzip(
-    self,
-    prior_fn: impl FnMut() -> i64 + 'static,
-    ctx: &BuildCtx,
+    self, prior_fn: impl FnMut() -> i64 + 'static, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     self.box_tick_unzip(Box::new(prior_fn), ctx)
   }
 
   #[inline]
   fn box_tick_unzip(
-    self: Box<Self>,
-    prior_fn: Box<dyn FnMut() -> i64>,
-    ctx: &BuildCtx,
+    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     (*self).box_tick_unzip(prior_fn, ctx)
   }
@@ -360,9 +340,7 @@ where
   fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).unzip() }
 
   fn tick_unzip(
-    self,
-    prior_fn: impl FnMut() -> i64 + 'static,
-    ctx: &BuildCtx,
+    self, prior_fn: impl FnMut() -> i64 + 'static, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     let Self { source, mut f } = self;
     let (v, stream) = source.tick_unzip(prior_fn, ctx);
@@ -371,9 +349,7 @@ where
 
   #[inline]
   fn box_tick_unzip(
-    self: Box<Self>,
-    prior_fn: Box<dyn FnMut() -> i64>,
-    ctx: &BuildCtx,
+    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     (*self).tick_unzip(prior_fn, ctx)
   }
@@ -403,9 +379,7 @@ where
   fn box_unzip(self: Box<Self>) -> (V, ValueStream<V>) { (*self).unzip() }
 
   fn tick_unzip(
-    self,
-    prior_fn: impl FnMut() -> i64 + 'static,
-    ctx: &BuildCtx,
+    self, prior_fn: impl FnMut() -> i64 + 'static, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     let Self { source, f } = self;
     let (v, stream) = source.tick_unzip(prior_fn, ctx);
@@ -414,9 +388,7 @@ where
 
   #[inline]
   fn box_tick_unzip(
-    self: Box<Self>,
-    prior_fn: Box<dyn FnMut() -> i64>,
-    ctx: &BuildCtx,
+    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     (*self).tick_unzip(prior_fn, ctx)
   }
@@ -443,18 +415,14 @@ impl<V> Pipe for ValuePipe<V> {
   fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).unzip() }
 
   fn tick_unzip(
-    self,
-    _: impl FnMut() -> i64 + 'static,
-    _: &BuildCtx,
+    self, _: impl FnMut() -> i64 + 'static, _: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     self.unzip()
   }
 
   #[inline]
   fn box_tick_unzip(
-    self: Box<Self>,
-    prior_fn: Box<dyn FnMut() -> i64>,
-    ctx: &BuildCtx,
+    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     (*self).tick_unzip(prior_fn, ctx)
   }
@@ -514,15 +482,11 @@ impl WidgetBuilder for Box<dyn Pipe<Value = Widget>> {
 }
 
 macro_rules! pipe_option_to_widget {
-  ($name: ident, $ctx: ident) => {
+  ($name:ident, $ctx:ident) => {
     $name
       .map(|w| {
         move |ctx: &BuildCtx| {
-          if let Some(w) = w {
-            w.build(ctx)
-          } else {
-            Void.build(ctx)
-          }
+          if let Some(w) = w { w.build(ctx) } else { Void.build(ctx) }
         }
       })
       .build($ctx)
@@ -542,7 +506,9 @@ macro_rules! single_parent_impl {
           (p, c)
         },
         |new_p, old_p, ctx| {
-          let child = old_p.single_child(&ctx.tree.borrow().arena).unwrap();
+          let child = old_p
+            .single_child(&ctx.tree.borrow().arena)
+            .unwrap();
           let child = Widget::from_id(child, ctx);
           new_p.compose_child(child, ctx).consume()
         },
@@ -577,9 +543,7 @@ impl<V: SingleParent + RenderBuilder + 'static> SingleParent for Box<dyn Pipe<Va
 macro_rules! multi_parent_impl {
   () => {
     fn compose_children(
-      self,
-      mut children: impl Iterator<Item = Widget>,
-      ctx: &BuildCtx,
+      self, mut children: impl Iterator<Item = Widget>, ctx: &BuildCtx,
     ) -> Widget {
       // if children is empty, we can let the pipe parent as the whole subtree.
       let first_child = children.next();
@@ -596,8 +560,12 @@ macro_rules! multi_parent_impl {
             // `old_p` and we know `compose_children` will not modifies the children of
             // `old_p`.
             let arena = unsafe { &(*ctx.tree.as_ptr()).arena };
-            let children = old_p.children(arena).map(|id| Widget::from_id(id, ctx));
-            new_p.compose_children(children.into_iter(), ctx).consume()
+            let children = old_p
+              .children(arena)
+              .map(|id| Widget::from_id(id, ctx));
+            new_p
+              .compose_children(children.into_iter(), ctx)
+              .consume()
           },
         )
       } else {
@@ -683,12 +651,7 @@ fn half_to_close_interval(rg: Range<WidgetId>, ctx: &BuildCtx) -> RangeInclusive
 fn update_children_key_status(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
   let tree = &ctx.tree.borrow().arena;
 
-  match (
-    old.first_child(tree),
-    old.last_child(tree),
-    new.first_child(tree),
-    new.last_child(tree),
-  ) {
+  match (old.first_child(tree), old.last_child(tree), new.first_child(tree), new.last_child(tree)) {
     // old or new children is empty.
     (None, _, _, _) | (_, _, None, _) => {}
     (Some(_), None, _, _) | (_, _, Some(_), None) => {
@@ -744,9 +707,7 @@ fn update_key_status_single(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
 }
 
 fn update_key_state_multi(
-  old: impl Iterator<Item = WidgetId>,
-  new: impl Iterator<Item = WidgetId>,
-  ctx: &BuildCtx,
+  old: impl Iterator<Item = WidgetId>, new: impl Iterator<Item = WidgetId>, ctx: &BuildCtx,
 ) {
   let mut old_key_list = ahash::HashMap::default();
   for o in old {
@@ -759,9 +720,7 @@ fn update_key_state_multi(
     for n in new {
       inspect_key(n, ctx, |new_key| {
         if let Some(o) = old_key_list.get(&new_key.key()).copied() {
-          inspect_key(o, ctx, |old_key| {
-            update_key_states(old_key, o, new_key, n, ctx)
-          });
+          inspect_key(o, ctx, |old_key| update_key_states(old_key, o, new_key, n, ctx));
         }
       });
     }
@@ -775,11 +734,7 @@ fn inspect_key<R>(id: WidgetId, ctx: &BuildCtx, mut cb: impl FnMut(&dyn AnyKey) 
 }
 
 fn update_key_states(
-  old_key: &dyn AnyKey,
-  old: WidgetId,
-  new_key: &dyn AnyKey,
-  new: WidgetId,
-  ctx: &BuildCtx,
+  old_key: &dyn AnyKey, old: WidgetId, new_key: &dyn AnyKey, new: WidgetId, ctx: &BuildCtx,
 ) {
   new_key.record_prev_key_widget(old_key);
   old_key.record_next_key_widget(new_key);
@@ -947,7 +902,9 @@ impl DynWidgetInfo for Sc<RefCell<MultiPipeInfo>> {
         .iter()
         .position(|w| &old[old.len() - 1] == w)
         .expect("must include");
-      this.widgets.splice(from..=to, new.iter().copied());
+      this
+        .widgets
+        .splice(from..=to, new.iter().copied());
     }
   }
 
@@ -1028,10 +985,7 @@ fn set_pos_of_multi(widgets: &[WidgetId], ctx: &BuildCtx) {
 }
 
 fn query_info_outside_until<T: Any>(
-  id: WidgetId,
-  to: &Sc<T>,
-  ctx: &BuildCtx,
-  mut cb: impl FnMut(&DynInfo),
+  id: WidgetId, to: &Sc<T>, ctx: &BuildCtx, mut cb: impl FnMut(&DynInfo),
 ) {
   id.assert_get(&ctx.tree.borrow().arena)
     .query_type_outside_first(|info: &DynInfo| {
@@ -1064,18 +1018,14 @@ where
 
 impl Query for PipeNode {
   fn query_inside_first(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool {
     let p = self.as_ref();
     p.data.query_inside_first(type_id, callback) && p.dyn_info.query_inside_first(type_id, callback)
   }
 
   fn query_outside_first(
-    &self,
-    type_id: TypeId,
-    callback: &mut dyn FnMut(&dyn Any) -> bool,
+    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool {
     let p = self.as_ref();
     p.dyn_info.query_outside_first(type_id, callback)
@@ -1094,11 +1044,12 @@ impl RenderTarget for PipeNode {
 
 #[cfg(test)]
 mod tests {
-  use ribir_dev_helper::assert_layout_result_by_path;
   use std::{
     cell::{Cell, Ref},
     rc::Rc,
   };
+
+  use ribir_dev_helper::assert_layout_result_by_path;
 
   use crate::{
     builtin_widgets::key::{AnyKey, KeyChange},

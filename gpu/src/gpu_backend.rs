@@ -1,14 +1,16 @@
-use crate::{
-  ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex, ImgPrimitive,
-  LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, RadialGradientPrimIndex,
-  RadialGradientPrimitive,
-};
+use std::{error::Error, future::Future, ops::Range, pin::Pin};
+
 use ribir_geom::{rect_corners, DeviceRect, DeviceSize, Point};
 use ribir_painter::{
   image::ColorFormat, AntiAliasing, Color, PaintCommand, PaintPath, PainterBackend, PixelImage,
   Vertex, VertexBuffers,
 };
-use std::{error::Error, future::Future, ops::Range, pin::Pin};
+
+use crate::{
+  ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex, ImgPrimitive,
+  LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, RadialGradientPrimIndex,
+  RadialGradientPrimitive,
+};
 
 mod atlas;
 
@@ -102,10 +104,7 @@ where
   }
 
   fn draw_commands(
-    &mut self,
-    viewport: DeviceRect,
-    commands: Vec<PaintCommand>,
-    surface: Color,
+    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, surface: Color,
     output: &mut Self::Texture,
   ) {
     // todo: batch multi `draw_commands`
@@ -138,9 +137,15 @@ where
     }
     if !self.img_vertices_buffer.indices.is_empty() {
       self.gpu_impl.load_img_primitives(&self.img_prims);
-      self.gpu_impl.load_img_vertices(&self.img_vertices_buffer);
+      self
+        .gpu_impl
+        .load_img_vertices(&self.img_vertices_buffer);
     }
-    if !self.radial_gradient_vertices_buffer.indices.is_empty() {
+    if !self
+      .radial_gradient_vertices_buffer
+      .indices
+      .is_empty()
+    {
       self
         .gpu_impl
         .load_radial_gradient_primitives(&self.radial_gradient_prims);
@@ -151,7 +156,11 @@ where
         .gpu_impl
         .load_radial_gradient_vertices(&self.radial_gradient_vertices_buffer);
     }
-    if !self.linear_gradient_vertices_buffer.indices.is_empty() {
+    if !self
+      .linear_gradient_vertices_buffer
+      .indices
+      .is_empty()
+    {
       self
         .gpu_impl
         .load_linear_gradient_primitives(&self.linear_gradient_prims);
@@ -265,12 +274,7 @@ where
           self.radial_gradient_prims.push(prim);
           let buffer = &mut self.radial_gradient_vertices_buffer;
 
-          add_draw_rect_vertices(
-            rect,
-            output_tex_size,
-            RadialGradientPrimIndex(prim_idx),
-            buffer,
-          );
+          add_draw_rect_vertices(rect, output_tex_size, RadialGradientPrimIndex(prim_idx), buffer);
         }
       }
       PaintCommand::LinearGradient { path, linear_gradient } => {
@@ -295,12 +299,7 @@ where
           let prim_idx = self.linear_gradient_prims.len() as u32;
           self.linear_gradient_prims.push(prim);
           let buffer = &mut self.linear_gradient_vertices_buffer;
-          add_draw_rect_vertices(
-            rect,
-            output_tex_size,
-            LinearGradientPrimIndex(prim_idx),
-            buffer,
-          );
+          add_draw_rect_vertices(rect, output_tex_size, LinearGradientPrimIndex(prim_idx), buffer);
         }
       }
       PaintCommand::Clip(path) => {
@@ -312,7 +311,9 @@ where
             .intersection(self.viewport())
           {
             if let Some((_, mask_idx)) = self.new_mask_layer(path) {
-              self.clip_layer_stack.push(ClipLayer { viewport, mask_idx });
+              self
+                .clip_layer_stack
+                .push(ClipLayer { viewport, mask_idx });
               return;
             }
           }
@@ -342,12 +343,21 @@ where
     self.img_vertices_buffer.indices.clear();
     self.img_prims.clear();
     self.mask_layers.clear();
-    self.radial_gradient_vertices_buffer.indices.clear();
-    self.radial_gradient_vertices_buffer.vertices.clear();
+    self
+      .radial_gradient_vertices_buffer
+      .indices
+      .clear();
+    self
+      .radial_gradient_vertices_buffer
+      .vertices
+      .clear();
     self.radial_gradient_prims.clear();
     self.radial_gradient_stops.clear();
     self.linear_gradient_prims.clear();
-    self.linear_gradient_vertices_buffer.indices.clear();
+    self
+      .linear_gradient_vertices_buffer
+      .indices
+      .clear();
     self.linear_gradient_stops.clear();
   }
 
@@ -355,7 +365,9 @@ where
     if !matches!(self.draw_indices.last(), Some(DrawIndices::Color(_))) {
       self.expand_indices_range();
       let start = self.color_vertices_buffer.indices.len() as u32;
-      self.draw_indices.push(DrawIndices::Color(start..start));
+      self
+        .draw_indices
+        .push(DrawIndices::Color(start..start));
     }
   }
 
@@ -363,15 +375,14 @@ where
     if !matches!(self.draw_indices.last(), Some(DrawIndices::Img(_))) {
       self.expand_indices_range();
       let start = self.img_vertices_buffer.indices.len() as u32;
-      self.draw_indices.push(DrawIndices::Img(start..start));
+      self
+        .draw_indices
+        .push(DrawIndices::Img(start..start));
     }
   }
 
   fn update_to_radial_gradient_indices(&mut self) {
-    if !matches!(
-      self.draw_indices.last(),
-      Some(DrawIndices::RadialGradient(_))
-    ) {
+    if !matches!(self.draw_indices.last(), Some(DrawIndices::RadialGradient(_))) {
       self.expand_indices_range();
       let start = self.radial_gradient_vertices_buffer.indices.len() as u32;
       self
@@ -381,10 +392,7 @@ where
   }
 
   fn update_to_linear_gradient_indices(&mut self) {
-    if !matches!(
-      self.draw_indices.last(),
-      Some(DrawIndices::LinearGradient(_))
-    ) {
+    if !matches!(self.draw_indices.last(), Some(DrawIndices::LinearGradient(_))) {
       self.expand_indices_range();
       let start = self.linear_gradient_vertices_buffer.indices.len() as u32;
       self
@@ -410,7 +418,10 @@ where
   }
 
   fn current_clip_mask_index(&self) -> i32 {
-    self.clip_layer_stack.last().map_or(-1, |l| l.mask_idx)
+    self
+      .clip_layer_stack
+      .last()
+      .map_or(-1, |l| l.mask_idx)
   }
 
   fn viewport(&self) -> &DeviceRect {
@@ -465,8 +476,12 @@ where
         .draw_indices
         .drain(..)
         .for_each(|indices| match indices {
-          DrawIndices::Color(rg) => self.gpu_impl.draw_color_triangles(output, rg, color.take()),
-          DrawIndices::Img(rg) => self.gpu_impl.draw_img_triangles(output, rg, color.take()),
+          DrawIndices::Color(rg) => self
+            .gpu_impl
+            .draw_color_triangles(output, rg, color.take()),
+          DrawIndices::Img(rg) => self
+            .gpu_impl
+            .draw_img_triangles(output, rg, color.take()),
           DrawIndices::RadialGradient(rg) => {
             self
               .gpu_impl
@@ -500,17 +515,11 @@ impl TextureIdxMap {
 }
 
 pub fn vertices_coord(pos: Point, tex_size: DeviceSize) -> [f32; 2] {
-  [
-    pos.x / tex_size.width as f32,
-    pos.y / tex_size.height as f32,
-  ]
+  [pos.x / tex_size.width as f32, pos.y / tex_size.height as f32]
 }
 
 pub fn add_draw_rect_vertices<Attr: Copy>(
-  [lt, rt, rb, lb]: [Point; 4],
-  tex_size: DeviceSize,
-  attr: Attr,
-  buffer: &mut VertexBuffers<Attr>,
+  [lt, rt, rb, lb]: [Point; 4], tex_size: DeviceSize, attr: Attr, buffer: &mut VertexBuffers<Attr>,
 ) {
   let VertexBuffers { vertices, indices } = buffer;
 
@@ -531,14 +540,13 @@ pub fn add_draw_rect_vertices<Attr: Copy>(
 #[cfg(feature = "wgpu")]
 #[cfg(test)]
 mod tests {
-  use crate::WgpuImpl;
-
-  use super::*;
-
   use ribir_algo::ShareResource;
   use ribir_dev_helper::*;
   use ribir_geom::*;
   use ribir_painter::{Brush, Painter, Path, Svg};
+
+  use super::*;
+  use crate::WgpuImpl;
 
   pub fn headless() -> (WgpuImpl, std::sync::MutexGuard<'static, ()>) {
     use futures::executor::block_on;
@@ -575,7 +583,10 @@ mod tests {
 
     painter.translate(260., 0.);
     draw_arrow_path(&mut painter);
-    painter.set_brush(Color::RED).set_line_width(5.).stroke();
+    painter
+      .set_brush(Color::RED)
+      .set_line_width(5.)
+      .stroke();
 
     painter.translate(-260., 250.);
     draw_arrow_path(&mut painter);
@@ -583,7 +594,10 @@ mod tests {
 
     painter.translate(260., 0.);
     draw_arrow_path(&mut painter);
-    painter.set_brush(img_brush).set_line_width(5.).stroke();
+    painter
+      .set_brush(img_brush)
+      .set_line_width(5.)
+      .stroke();
 
     painter
   }

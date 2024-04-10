@@ -1,6 +1,8 @@
 use criterion::{criterion_group, criterion_main, Bencher, Criterion};
-use ribir::core::{reset_test_env, test_helper::*};
-use ribir::prelude::*;
+use ribir::{
+  core::{reset_test_env, test_helper::*},
+  prelude::*,
+};
 
 fn bench_example<F: Fn() -> R, R: WidgetBuilder>(b: &mut Bencher, f: F) {
   let _ = AppCtx::shared();
@@ -20,9 +22,7 @@ fn examples(c: &mut Criterion) {
   g.bench_function("counter", |b| bench_example(b, counter::counter));
   g.bench_function("messages", |b| bench_example(b, messages::messages));
   g.bench_function("storybook", |b| bench_example(b, storybook::storybook));
-  g.bench_function("wordle_game", |b| {
-    bench_example(b, wordle_game::wordle_game)
-  });
+  g.bench_function("wordle_game", |b| bench_example(b, wordle_game::wordle_game));
 }
 
 criterion_group!(example_benches, examples);

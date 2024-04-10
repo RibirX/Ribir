@@ -77,15 +77,17 @@ pub enum PointerType {
 impl_common_event_deref!(PointerEvent);
 #[cfg(test)]
 mod tests {
+  use std::{cell::RefCell, rc::Rc};
+
+  use winit::{
+    dpi::LogicalPosition,
+    event::{DeviceId, ElementState, MouseButton, WindowEvent},
+  };
+
   use crate::{
     prelude::*,
     reset_test_env,
     test_helper::{MockBox, MockMulti, TestWindow},
-  };
-  use std::{cell::RefCell, rc::Rc};
-  use winit::{
-    dpi::LogicalPosition,
-    event::{DeviceId, ElementState, MouseButton, WindowEvent},
   };
 
   fn tap_on(wnd: &Window, x: f32, y: f32) {

@@ -1,5 +1,4 @@
-use std::mem::replace;
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, mem::replace, rc::Rc};
 
 use ribir_macros::Query;
 
@@ -308,9 +307,11 @@ impl Render for OverlayRoot {
 
 #[cfg(test)]
 mod tests {
-  use crate::{prelude::*, reset_test_env, test_helper::*};
-  use ribir_dev_helper::assert_layout_result_by_path;
   use std::{cell::RefCell, rc::Rc};
+
+  use ribir_dev_helper::assert_layout_result_by_path;
+
+  use crate::{prelude::*, reset_test_env, test_helper::*};
 
   #[test]
   fn overlay() {

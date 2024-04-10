@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! impl_common_event_deref {
-  ($event_name: ident) => {
+  ($event_name:ident) => {
     impl std::ops::Deref for $event_name {
       type Target = CommonEvent;
 

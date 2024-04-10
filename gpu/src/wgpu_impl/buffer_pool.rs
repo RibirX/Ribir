@@ -18,10 +18,7 @@ impl<T: AsBytes> BufferPool<T> {
       usage,
     });
 
-    Self {
-      data: Vec::with_capacity(max_size),
-      buffer,
-    }
+    Self { data: Vec::with_capacity(max_size), buffer }
   }
 
   /// Push value to the pool and return the buffer address of the value, return

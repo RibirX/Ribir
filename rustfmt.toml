@@ -1,7 +1,19 @@
 error_on_line_overflow = true
 error_on_unformatted = false
 fn_single_line = true
-struct_lit_width = 36
+use_small_heuristics = "Max"
 tab_spaces = 2
 version = "Two"
 wrap_comments = true
+merge_derives = false
+
+unstable_features = true
+format_code_in_doc_comments = true
+format_macro_bodies = true
+format_macro_matchers = true
+format_strings = true
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+normalize_doc_attributes = true
+fn_params_layout = "Compressed"
+chain_width = 50

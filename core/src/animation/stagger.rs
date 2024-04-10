@@ -11,6 +11,7 @@
 //!
 //! ```rust
 //! use std::time::Duration;
+//!
 //! use ribir::prelude::*;
 //!
 //! let _ = fn_widget! {
@@ -37,13 +38,15 @@
 //! };
 //! ```
 
-use super::*;
-use crate::prelude::*;
-use ribir_algo::Sc;
-use ribir_macros::rdl;
 // fixme: rxRust not use std::time::Instant in web
 #[cfg(target_family = "wasm")]
 use std::time::Instant;
+
+use ribir_algo::Sc;
+use ribir_macros::rdl;
+
+use super::*;
+use crate::prelude::*;
 
 /// The controller of a stagger animation. It's allow you to transition states
 /// and run animation in a stagger way.
@@ -89,11 +92,7 @@ impl<T: Transition + 'static> Stagger<T> {
   /// - **state**: the state you want to transition.
   /// - **from**: the state you want to transition from.
   pub fn push_state_with<A>(
-    &mut self,
-    stagger: Duration,
-    state: A,
-    from: A::Value,
-    ctx!(): &BuildCtx,
+    &mut self, stagger: Duration, state: A, from: A::Value, ctx!(): &BuildCtx,
   ) -> State<Animate<A>>
   where
     A: AnimateState + 'static,
@@ -115,20 +114,16 @@ impl<T: Transition + 'static> Stagger<T> {
   /// **stagger**: the duration between the previous animation start and this
   /// animation start.
   pub fn push_animation_with(
-    &mut self,
-    stagger: Duration,
-    animation: impl Animation + 'static,
+    &mut self, stagger: Duration, animation: impl Animation + 'static,
   ) -> &mut Self {
-    self.animations.push((stagger, Box::new(animation)));
+    self
+      .animations
+      .push((stagger, Box::new(animation)));
     self
   }
 
   fn default_stagger(&self) -> Duration {
-    if self.animations.is_empty() {
-      Duration::ZERO
-    } else {
-      self.stagger
-    }
+    if self.animations.is_empty() { Duration::ZERO } else { self.stagger }
   }
 }
 
@@ -206,7 +201,10 @@ impl<T> Stagger<T> {
   pub fn is_running(&self) -> bool {
     self.running_handle.is_some()
       || self.next_to_run.is_some()
-      || self.animations.iter().any(|(_, a)| a.is_running())
+      || self
+        .animations
+        .iter()
+        .any(|(_, a)| a.is_running())
   }
 
   /// How many times the stagger animation has run.
@@ -218,9 +216,10 @@ impl<T> Stagger<T> {
 
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::*;
+
   use super::*;
   use crate::{reset_test_env, test_helper::*};
-  use ribir_dev_helper::*;
 
   fn stagger_run_and_stop() -> impl WidgetBuilder {
     fn_widget! {
@@ -256,10 +255,7 @@ mod tests {
 
     let stagger = Stagger::new(
       Duration::from_millis(100),
-      EasingTransition {
-        duration: Duration::ZERO,
-        easing: easing::LINEAR,
-      },
+      EasingTransition { duration: Duration::ZERO, easing: easing::LINEAR },
     );
     let c_stagger = stagger.clone_writer().into_inner();
     let w = fn_widget! {

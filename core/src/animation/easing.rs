@@ -127,26 +127,12 @@ pub enum StepsJump {
 pub fn steps(step_cnt: u32, jump: StepsJump) -> Steps {
   let time_step = 1. / step_cnt as f32;
   match jump {
-    StepsJump::JumpStart => Steps {
-      start: time_step,
-      step: time_step,
-      time_step,
-    },
-    StepsJump::JumpEnd => Steps {
-      start: 0.,
-      step: time_step,
-      time_step,
-    },
-    StepsJump::JumpBoth => Steps {
-      start: 1. / (step_cnt + 1) as f32,
-      step: 1. / (step_cnt + 1) as f32,
-      time_step,
-    },
-    StepsJump::JumpNone => Steps {
-      start: 0.,
-      step: 1. / (step_cnt - 1) as f32,
-      time_step,
-    },
+    StepsJump::JumpStart => Steps { start: time_step, step: time_step, time_step },
+    StepsJump::JumpEnd => Steps { start: 0., step: time_step, time_step },
+    StepsJump::JumpBoth => {
+      Steps { start: 1. / (step_cnt + 1) as f32, step: 1. / (step_cnt + 1) as f32, time_step }
+    }
+    StepsJump::JumpNone => Steps { start: 0., step: 1. / (step_cnt - 1) as f32, time_step },
   }
 }
 #[derive(Clone)]

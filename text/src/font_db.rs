@@ -1,3 +1,5 @@
+use std::{cell::RefCell, ops::Deref, sync::Arc};
+
 use ahash::HashMap;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
@@ -5,11 +7,8 @@ use lyon_path::math::Point;
 use ribir_algo::{Sc, ShareResource};
 use ribir_painter::{PixelImage, Svg};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
-use std::cell::RefCell;
-use std::{ops::Deref, sync::Arc};
 
-use crate::svg_glyph_cache::SvgGlyphCache;
-use crate::{FontFace, FontFamily};
+use crate::{svg_glyph_cache::SvgGlyphCache, FontFace, FontFamily};
 /// A wrapper of fontdb and cache font data.
 pub struct FontDB {
   default_fonts: Vec<ID>,
@@ -78,8 +77,7 @@ impl FontDB {
   /// Will load all font faces in case of a font collection.
   #[inline]
   pub fn load_font_file<P: AsRef<std::path::Path>>(
-    &mut self,
-    path: P,
+    &mut self, path: P,
   ) -> Result<(), std::io::Error> {
     self.data_base.load_font_file(path)
   }
@@ -102,7 +100,10 @@ impl FontDB {
   /// Performs a CSS-like query and returns the best matched font face id.
   pub fn select_best_match(&self, face: &FontFace) -> Option<ID> {
     let FontFace { families, stretch, style, weight } = face;
-    let families = families.iter().map(to_db_family).collect::<Vec<_>>();
+    let families = families
+      .iter()
+      .map(to_db_family)
+      .collect::<Vec<_>>();
     self.data_base.query(&Query {
       families: &families,
       weight: *weight,
@@ -253,11 +254,7 @@ impl Default for FontDB {
     let mut data_base = fontdb::Database::new();
     data_base.load_font_data(include_bytes!("../Lato-Regular.ttf").to_vec());
     let default_font = data_base.faces().next().map(|f| f.id).unwrap();
-    let mut this = FontDB {
-      default_fonts: vec![default_font],
-      data_base,
-      cache: <_>::default(),
-    };
+    let mut this = FontDB { default_fonts: vec![default_font], data_base, cache: <_>::default() };
     this.face_data_or_insert(default_font);
     this
   }
@@ -265,9 +262,7 @@ impl Default for FontDB {
 
 impl Face {
   pub fn from_data(
-    face_id: ID,
-    source_data: Arc<dyn AsRef<[u8]> + Sync + Send>,
-    face_index: u32,
+    face_id: ID, source_data: Arc<dyn AsRef<[u8]> + Sync + Send>, face_index: u32,
   ) -> Option<Self> {
     let ptr_data = source_data.as_ref().as_ref() as *const [u8];
     // Safety: we know the ptr_data has some valid lifetime with source data, and
@@ -309,9 +304,7 @@ impl Face {
 
   #[cfg(feature = "raster_png_font")]
   pub fn glyph_raster_image(
-    &self,
-    glyph_id: GlyphId,
-    pixels_per_em: u16,
+    &self, glyph_id: GlyphId, pixels_per_em: u16,
   ) -> Option<ShareResource<PixelImage>> {
     use rustybuzz::ttf_parser::RasterImageFormat;
     self
@@ -439,27 +432,27 @@ where
 }
 
 fn get_or_insert_face<'a>(
-  cache: &'a mut HashMap<ID, Option<Face>>,
-  data_base: &'a Database,
-  id: ID,
+  cache: &'a mut HashMap<ID, Option<Face>>, data_base: &'a Database, id: ID,
 ) -> &'a Option<Face> {
   cache.entry(id).or_insert_with(|| {
-    data_base.face_source(id).and_then(|(src, face_index)| {
-      let source_data = match src {
-        fontdb::Source::Binary(data) => Some(data),
-        fontdb::Source::File(_) => {
-          let mut source_data = None;
-          data_base.with_face_data(id, |data, index| {
-            assert_eq!(face_index, index);
-            let data: Arc<dyn AsRef<[u8]> + Sync + Send> = Arc::new(data.to_owned());
-            source_data = Some(data);
-          });
-          source_data
-        }
-        fontdb::Source::SharedFile(_, data) => Some(data),
-      }?;
-      Face::from_data(id, source_data, face_index)
-    })
+    data_base
+      .face_source(id)
+      .and_then(|(src, face_index)| {
+        let source_data = match src {
+          fontdb::Source::Binary(data) => Some(data),
+          fontdb::Source::File(_) => {
+            let mut source_data = None;
+            data_base.with_face_data(id, |data, index| {
+              assert_eq!(face_index, index);
+              let data: Arc<dyn AsRef<[u8]> + Sync + Send> = Arc::new(data.to_owned());
+              source_data = Some(data);
+            });
+            source_data
+          }
+          fontdb::Source::SharedFile(_, data) => Some(data),
+        }?;
+        Face::from_data(id, source_data, face_index)
+      })
   })
 }
 
@@ -513,11 +506,8 @@ mod tests {
     let _ = fonts.load_font_file(path);
 
     let mut face = FontFace {
-      families: vec![
-        FontFamily::Name("DejaVu Sans".into()),
-        FontFamily::SansSerif,
-      ]
-      .into_boxed_slice(),
+      families: vec![FontFamily::Name("DejaVu Sans".into()), FontFamily::SansSerif]
+        .into_boxed_slice(),
       ..<_>::default()
     };
 

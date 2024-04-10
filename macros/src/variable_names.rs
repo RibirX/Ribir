@@ -26,8 +26,9 @@ pub struct BuiltinMember {
   pub var_name: &'static str,
 }
 
-use self::BuiltinMemberType::*;
 use phf::phf_map;
+
+use self::BuiltinMemberType::*;
 
 pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   // BuiltinObj

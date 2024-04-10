@@ -1,9 +1,11 @@
-use super::buffer_pool::BufferPool;
-use crate::{command_encoder, gpu_backend::Texture, vertices_coord, WgpuImpl, WgpuTexture};
+use std::mem::size_of;
+
 use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::Vertex;
-use std::mem::size_of;
 use wgpu::StoreOp;
+
+use super::buffer_pool::BufferPool;
+use crate::{command_encoder, gpu_backend::Texture, vertices_coord, WgpuImpl, WgpuTexture};
 const POOL_SIZE: usize = 256;
 
 pub struct DrawTexturePass {
@@ -49,19 +51,9 @@ impl DrawTexturePass {
       bind_group_layouts: &[&bind_layout],
       push_constant_ranges: &[],
     });
-    let vertices_pool = BufferPool::new(
-      POOL_SIZE,
-      wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-      device,
-    );
-    Self {
-      pipeline: None,
-      shader,
-      format: None,
-      bind_layout,
-      layout,
-      vertices_pool,
-    }
+    let vertices_pool =
+      BufferPool::new(POOL_SIZE, wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST, device);
+    Self { pipeline: None, shader, format: None, bind_layout, layout, vertices_pool }
   }
 
   pub fn update(&mut self, format: wgpu::TextureFormat, device: &wgpu::Device) {
@@ -132,10 +124,7 @@ impl DrawTexturePass {
 
 impl WgpuImpl {
   pub(crate) fn draw_texture_to_texture(
-    &mut self,
-    dist_tex: &WgpuTexture,
-    dist_at: DevicePoint,
-    from_tex: &WgpuTexture,
+    &mut self, dist_tex: &WgpuTexture, dist_at: DevicePoint, from_tex: &WgpuTexture,
     src_rect: &DeviceRect,
   ) {
     if self.draw_tex_pass.vertices_pool.is_full() {
@@ -155,10 +144,8 @@ impl WgpuImpl {
     let draw_tex_pass = &mut self.draw_tex_pass;
     draw_tex_pass.update(dist_tex.format(), &self.device);
 
-    let [d_lt, d_rt, d_rb, d_lb] = vertices_corners(
-      &DeviceRect::new(dist_at, src_rect.size),
-      Texture::size(dist_tex),
-    );
+    let [d_lt, d_rt, d_rb, d_lb] =
+      vertices_corners(&DeviceRect::new(dist_at, src_rect.size), Texture::size(dist_tex));
 
     let [s_lt, s_rt, s_rb, s_lb] = vertices_corners(src_rect, Texture::size(from_tex));
 
@@ -172,28 +159,27 @@ impl WgpuImpl {
       ])
       .unwrap();
 
-    let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-      layout: &draw_tex_pass.bind_layout,
-      entries: &[
-        wgpu::BindGroupEntry {
-          binding: 0,
-          resource: wgpu::BindingResource::TextureView(from_tex.view()),
-        },
-        wgpu::BindGroupEntry {
-          binding: 1,
-          resource: wgpu::BindingResource::Sampler(&self.sampler),
-        },
-      ],
-      label: Some("Color primitives storage bind group"),
-    });
+    let bind_group = self
+      .device
+      .create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &draw_tex_pass.bind_layout,
+        entries: &[
+          wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::TextureView(from_tex.view()),
+          },
+          wgpu::BindGroupEntry {
+            binding: 1,
+            resource: wgpu::BindingResource::Sampler(&self.sampler),
+          },
+        ],
+        label: Some("Color primitives storage bind group"),
+      });
 
     let color_attachments = wgpu::RenderPassColorAttachment {
       view: dist_tex.view(),
       resolve_target: None,
-      ops: wgpu::Operations {
-        load: wgpu::LoadOp::Load,
-        store: StoreOp::Store,
-      },
+      ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: StoreOp::Store },
     };
 
     let encoder = command_encoder!(self);
@@ -205,7 +191,13 @@ impl WgpuImpl {
       occlusion_query_set: None,
     });
 
-    rpass.set_vertex_buffer(0, draw_tex_pass.vertices_pool.buffer().slice(address..));
+    rpass.set_vertex_buffer(
+      0,
+      draw_tex_pass
+        .vertices_pool
+        .buffer()
+        .slice(address..),
+    );
     rpass.set_bind_group(0, &bind_group, &[]);
 
     rpass.set_scissor_rect(

@@ -49,14 +49,7 @@ impl Margin {
 
 impl EdgeInsets {
   #[inline]
-  pub fn all(value: f32) -> Self {
-    Self {
-      top: value,
-      right: value,
-      bottom: value,
-      left: value,
-    }
-  }
+  pub fn all(value: f32) -> Self { Self { top: value, right: value, bottom: value, left: value } }
 
   pub fn new(top: f32, right: f32, bottom: f32, left: f32) -> Self {
     Self { top, right, bottom, left }
@@ -75,30 +68,17 @@ impl EdgeInsets {
 
   #[inline]
   pub fn symmetrical(vertical: f32, horizontal: f32) -> Self {
-    Self {
-      top: vertical,
-      bottom: vertical,
-      left: horizontal,
-      right: horizontal,
-    }
+    Self { top: vertical, bottom: vertical, left: horizontal, right: horizontal }
   }
 
   #[inline]
   pub fn vertical(vertical: f32) -> Self {
-    Self {
-      top: vertical,
-      bottom: vertical,
-      ..Default::default()
-    }
+    Self { top: vertical, bottom: vertical, ..Default::default() }
   }
 
   #[inline]
   pub fn horizontal(horizontal: f32) -> Self {
-    Self {
-      left: horizontal,
-      right: horizontal,
-      ..Default::default()
-    }
+    Self { left: horizontal, right: horizontal, ..Default::default() }
   }
 
   pub fn thickness(&self) -> Size { Size::new(self.right + self.left, self.bottom + self.top) }
@@ -129,9 +109,10 @@ impl std::ops::AddAssign for EdgeInsets {
 
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::*;
+
   use super::*;
   use crate::test_helper::*;
-  use ribir_dev_helper::*;
 
   fn smoke() -> impl WidgetBuilder {
     fn_widget! {

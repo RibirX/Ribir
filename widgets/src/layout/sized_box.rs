@@ -25,10 +25,11 @@ impl Render for SizedBox {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use crate::prelude::*;
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
+
+  use super::*;
+  use crate::prelude::*;
 
   fn fix_size() -> impl WidgetBuilder {
     let size: Size = Size::new(100., 100.);

@@ -38,7 +38,9 @@ where
     let new_to = this.state.get();
 
     if let Some(AnimateInfo { from, to, last_progress, .. }) = &mut this.running_info {
-      *from = this.state.calc_lerp_value(from, to, last_progress.value());
+      *from = this
+        .state
+        .calc_lerp_value(from, to, last_progress.value());
       *to = new_to;
     } else if let Some(wnd) = AppCtx::get_window(wnd_id) {
       drop(animate_ref);
@@ -51,13 +53,20 @@ where
         .subscribe(move |msg| {
           match msg {
             FrameMsg::NewFrame(time) => {
-              let p = animate.read().running_info.as_ref().unwrap().last_progress;
+              let p = animate
+                .read()
+                .running_info
+                .as_ref()
+                .unwrap()
+                .last_progress;
               // Stop the animate at the next frame of animate finished, to ensure draw the
               // last frame of the animate.
               if matches!(p, AnimateProgress::Finish) {
                 let wnd = AppCtx::get_window(wnd_id).unwrap();
                 let animate = animate.clone_writer();
-                wnd.frame_spawn(async move { animate.stop() }).unwrap();
+                wnd
+                  .frame_spawn(async move { animate.stop() })
+                  .unwrap();
               } else {
                 animate.shallow().advance_to(time);
               }
@@ -132,14 +141,7 @@ where
   ///
   /// Panics if the animation is not running.
   fn advance_to(&mut self, at: Instant) -> AnimateProgress {
-    let AnimateInfo {
-      from,
-      to,
-      start_at,
-      last_progress,
-      already_lerp,
-      ..
-    } = self
+    let AnimateInfo { from, to, start_at, last_progress, already_lerp, .. } = self
       .running_info
       .as_mut()
       .expect("This animation is not running.");

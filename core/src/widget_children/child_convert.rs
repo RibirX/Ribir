@@ -144,10 +144,7 @@ where
   #[inline]
   fn from_another(value: Pair<W2, C2>, ctx: &BuildCtx) -> Self {
     let Pair { parent: widget, child } = value;
-    Pair {
-      parent: W::from_another(widget, ctx),
-      child: C::from_another(child, ctx),
-    }
+    Pair { parent: W::from_another(widget, ctx), child: C::from_another(child, ctx) }
   }
 }
 
@@ -158,10 +155,7 @@ where
   #[inline]
   fn from_another(value: Pair<W2, C>, ctx: &BuildCtx) -> Self {
     let Pair { parent: widget, child } = value;
-    Pair {
-      parent: W::child_from(widget, ctx),
-      child,
-    }
+    Pair { parent: W::child_from(widget, ctx), child }
   }
 }
 
@@ -172,10 +166,7 @@ where
   #[inline]
   fn from_another(value: Pair<W, C2>, ctx: &BuildCtx) -> Self {
     let Pair { parent: widget, child } = value;
-    Pair {
-      parent: widget,
-      child: C::from_another(child, ctx),
-    }
+    Pair { parent: widget, child: C::from_another(child, ctx) }
   }
 }
 

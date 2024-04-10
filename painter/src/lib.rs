@@ -3,12 +3,16 @@ pub mod color;
 mod painter;
 pub mod path;
 pub mod path_builder;
-pub use crate::color::{Color, GradientStop, LightnessTone};
-pub use crate::painter::*;
 pub use path::*;
+
+pub use crate::{
+  color::{Color, GradientStop, LightnessTone},
+  painter::*,
+};
 pub mod image;
 mod style;
-pub use crate::image::PixelImage;
 pub use style::*;
+
+pub use crate::image::PixelImage;
 mod svg;
 pub use svg::Svg;

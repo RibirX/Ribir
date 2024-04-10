@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use ribir_core::prelude::*;
+
+use crate::prelude::*;
 
 /// Tabs usage
 ///
@@ -163,19 +164,12 @@ impl ComposeDecorator for IndicatorDecorator {
 
 impl Tabs {
   fn tab_header(
-    headers: Vec<(Option<NamedSvg>, Option<State<Label>>)>,
-    tabs_style: TabsStyle,
+    headers: Vec<(Option<NamedSvg>, Option<State<Label>>)>, tabs_style: TabsStyle,
     tabs: impl StateWriter<Value = Tabs> + 'static,
     indicator: impl StateWriter<Value = IndicatorDecorator> + 'static,
   ) -> impl Iterator<Item = impl WidgetBuilder> {
-    let TabsStyle {
-      icon_size: size,
-      icon_pos,
-      active_color,
-      foreground,
-      label_style,
-      ..
-    } = tabs_style;
+    let TabsStyle { icon_size: size, icon_pos, active_color, foreground, label_style, .. } =
+      tabs_style;
     headers
       .into_iter()
       .enumerate()

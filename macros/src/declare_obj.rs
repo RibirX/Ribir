@@ -1,7 +1,3 @@
-use crate::{
-  rdl_macro::{DeclareField, RdlParent, StructLiteral},
-  variable_names::BUILTIN_INFOS,
-};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
@@ -9,6 +5,11 @@ use syn::{
   spanned::Spanned,
   token::{Brace, Comma},
   Ident, Macro, Path,
+};
+
+use crate::{
+  rdl_macro::{DeclareField, RdlParent, StructLiteral},
+  variable_names::BUILTIN_INFOS,
 };
 
 pub struct DeclareObj<'a> {

@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use ribir_core::prelude::*;
+
+use crate::prelude::*;
 
 /// Divider is a thin horizontal or vertical line, with padding on either side.
 ///

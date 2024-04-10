@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use ribir_core::prelude::*;
+
+use crate::prelude::*;
 
 /// Avatar usage
 ///

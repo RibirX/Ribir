@@ -57,12 +57,8 @@ pub struct VisualGlyphs {
 
 impl VisualGlyphs {
   pub fn new(
-    scale: f32,
-    line_dir: PlaceLineDirection,
-    order_info: Arc<ReorderResult>,
-    bound_width: Em,
-    bound_height: Em,
-    visual_info: Arc<VisualInfos>,
+    scale: f32, line_dir: PlaceLineDirection, order_info: Arc<ReorderResult>, bound_width: Em,
+    bound_height: Em, visual_info: Arc<VisualInfos>,
   ) -> Self {
     let (mut x, mut y) = text_align_offset(
       visual_info.line_dir.is_horizontal(),
@@ -91,22 +87,19 @@ struct ShapeRun {
 
 impl TypographyStore {
   pub fn new(reorder: TextReorder, font_db: Rc<RefCell<FontDB>>, shaper: TextShaper) -> Self {
-    TypographyStore {
-      reorder,
-      shaper,
-      font_db,
-      cache: <_>::default(),
-    }
+    TypographyStore { reorder, shaper, font_db, cache: <_>::default() }
   }
 
-  pub fn end_frame(&self) { self.cache.write().unwrap().end_frame("Typography"); }
+  pub fn end_frame(&self) {
+    self
+      .cache
+      .write()
+      .unwrap()
+      .end_frame("Typography");
+  }
 
   pub fn typography(
-    &self,
-    text: Substr,
-    font_size: FontSize,
-    face: &FontFace,
-    cfg: TypographyCfg,
+    &self, text: Substr, font_size: FontSize, face: &FontFace, cfg: TypographyCfg,
   ) -> VisualGlyphs {
     let em_font_size = font_size.into_em();
     let bounds = cfg.bounds / em_font_size;
@@ -179,10 +172,7 @@ impl TypographyStore {
   pub fn font_db(&self) -> &Rc<RefCell<FontDB>> { &self.font_db }
 
   fn get_from_cache(
-    &self,
-    text: Substr,
-    font_size: FontSize,
-    cfg: &TypographyCfg,
+    &self, text: Substr, font_size: FontSize, cfg: &TypographyCfg,
   ) -> Option<TypographyResult> {
     let input = Self::key(text, font_size, cfg);
     self.cache.write().unwrap().get(&input).cloned()
@@ -190,13 +180,7 @@ impl TypographyStore {
 
   fn key(text: Substr, font_size: FontSize, cfg: &TypographyCfg) -> TypographyKey {
     let &TypographyCfg {
-      line_height,
-      text_align,
-      line_dir,
-      overflow,
-      letter_space,
-      bounds,
-      ..
+      line_height, text_align, line_dir, overflow, letter_space, bounds, ..
     } = cfg;
     let line_height = line_height.map(|l| l / font_size.into_em());
     let letter_space = letter_space.map(|l| l / font_size.into_pixel());
@@ -215,15 +199,7 @@ impl TypographyStore {
       }
     };
 
-    TypographyKey {
-      line_height,
-      line_width,
-      letter_space,
-      text_align,
-      line_dir,
-      overflow,
-      text,
-    }
+    TypographyKey { line_height, line_width, letter_space, text_align, line_dir, overflow, text }
   }
 }
 
@@ -251,10 +227,7 @@ impl VisualGlyphs {
 
     Rect::new(
       Point::new(self.to_pixel_value(self.x), self.to_pixel_value(self.y)),
-      Size::new(
-        self.to_pixel_value(info.visual_width),
-        self.to_pixel_value(info.visual_height),
-      ),
+      Size::new(self.to_pixel_value(info.visual_width), self.to_pixel_value(info.visual_height)),
     )
   }
 
@@ -296,13 +269,18 @@ impl VisualGlyphs {
 
     impl<'a> RangeLocator<'a> {
       fn from_unorder_ranges(rgs: impl Iterator<Item = &'a Range<usize>>) -> Self {
-        let mut ranges: Vec<_> = rgs.enumerate().map(|(idx, item)| (item, idx)).collect();
+        let mut ranges: Vec<_> = rgs
+          .enumerate()
+          .map(|(idx, item)| (item, idx))
+          .collect();
         ranges.sort_by(|lh, rh| lh.0.start.cmp(&rh.0.start));
         RangeLocator { ranges }
       }
 
       fn range_index(&self, val: usize) -> Option<usize> {
-        let idx = self.ranges.partition_point(|item| item.0.end <= val);
+        let idx = self
+          .ranges
+          .partition_point(|item| item.0.end <= val);
         if idx < self.ranges.len() && self.ranges[idx].0.contains(&val) {
           Some(self.ranges[idx].1)
         } else {
@@ -325,9 +303,7 @@ impl VisualGlyphs {
     let order_info = &self.order_info.paras[para];
     let locator = RangeLocator::from_unorder_ranges(order_info.runs.iter());
     let dst_run = locator.range_index(cluster);
-    let is_ltr = dst_run.map_or(true, |run| {
-      order_info.levels[order_info.runs[run].start].is_ltr()
-    });
+    let is_ltr = dst_run.map_or(true, |run| order_info.levels[order_info.runs[run].start].is_ltr());
     let is_layout_before = |glyph_cluster: usize| {
       if dst_run.is_none() {
         return true;
@@ -356,10 +332,7 @@ impl VisualGlyphs {
         && is_layout_before(l.glyphs.last().map(|g| g.cluster).unwrap() as usize)
     });
     if line_para >= visual_lines.len() {
-      return (
-        visual_lines.len() - 1,
-        visual_lines.last().unwrap().glyphs.len(),
-      );
+      return (visual_lines.len() - 1, visual_lines.last().unwrap().glyphs.len());
     }
     let line = &visual_lines[line_para];
     let offset = line
@@ -377,7 +350,13 @@ impl VisualGlyphs {
       return lines
         .get(row + 1)
         .and_then(|l| l.glyphs.first().map(|g| g.cluster as usize))
-        .unwrap_or_else(|| self.order_info.paras.last().map_or(0, |p| p.range.end));
+        .unwrap_or_else(|| {
+          self
+            .order_info
+            .paras
+            .last()
+            .map_or(0, |p| p.range.end)
+        });
     }
   }
 
@@ -398,17 +377,11 @@ impl VisualGlyphs {
     let mut rc = glyph.map_or_else(
       || match line_dir.is_horizontal() {
         true => Rect::new(
-          Point::new(
-            self.to_pixel_value(line.x),
-            self.to_pixel_value(line.y + line.height),
-          ),
+          Point::new(self.to_pixel_value(line.x), self.to_pixel_value(line.y + line.height)),
           Size::new(self.to_pixel_value(line.width), 0.),
         ),
         false => Rect::new(
-          Point::new(
-            self.to_pixel_value(line.width + line.x),
-            self.to_pixel_value(line.y),
-          ),
+          Point::new(self.to_pixel_value(line.width + line.x), self.to_pixel_value(line.y)),
           Size::new(0., self.to_pixel_value(line.height)),
         ),
       },
@@ -418,14 +391,10 @@ impl VisualGlyphs {
           self.to_pixel_value(glyph.y_offset + line.y),
         );
         let size = match line_dir.is_horizontal() {
-          true => Size::new(
-            self.to_pixel_value(line.width),
-            self.to_pixel_value(glyph.y_advance),
-          ),
-          false => Size::new(
-            self.to_pixel_value(glyph.x_advance),
-            self.to_pixel_value(line.height),
-          ),
+          true => Size::new(self.to_pixel_value(line.width), self.to_pixel_value(glyph.y_advance)),
+          false => {
+            Size::new(self.to_pixel_value(glyph.x_advance), self.to_pixel_value(line.height))
+          }
         };
         Rect::new(orign, size)
       },
@@ -474,10 +443,7 @@ impl VisualGlyphs {
         if rg.contains(&(glyph.cluster as usize)) {
           let glyph = self.scale_to_pixel_glyph(glyph);
           let rc = Rect::new(
-            Point::new(
-              (glyph.x_offset + offset_x).value(),
-              (glyph.y_offset + offset_y).value(),
-            ),
+            Point::new((glyph.x_offset + offset_x).value(), (glyph.y_offset + offset_y).value()),
             Size::new((glyph.x_advance).value(), height.value()),
           );
           jointer.join_x(rc);
@@ -553,15 +519,7 @@ impl VisualGlyphs {
 
   fn scale_to_pixel_glyph(&self, g: &Glyph<Em>) -> Glyph<Pixel> {
     let scale = self.scale;
-    let Glyph {
-      face_id,
-      x_advance,
-      y_advance,
-      x_offset,
-      y_offset,
-      glyph_id,
-      cluster,
-    } = *g;
+    let Glyph { face_id, x_advance, y_advance, x_offset, y_offset, glyph_id, cluster } = *g;
     Glyph {
       face_id,
       x_advance: (x_advance * scale).into(),
@@ -574,21 +532,25 @@ impl VisualGlyphs {
   }
 
   pub fn glyph_count(&self, row: usize, ignore_new_line: bool) -> usize {
-    self.visual_info.visual_lines.get(row).map_or(0, |l| {
-      if ignore_new_line {
-        if l
-          .glyphs
-          .last()
-          .map_or(false, |g| g.glyph_id == NEWLINE_GLYPH_ID)
-        {
-          l.glyphs.len() - 1
+    self
+      .visual_info
+      .visual_lines
+      .get(row)
+      .map_or(0, |l| {
+        if ignore_new_line {
+          if l
+            .glyphs
+            .last()
+            .map_or(false, |g| g.glyph_id == NEWLINE_GLYPH_ID)
+          {
+            l.glyphs.len() - 1
+          } else {
+            l.glyphs.len()
+          }
         } else {
           l.glyphs.len()
         }
-      } else {
-        l.glyphs.len()
-      }
-    })
+      })
   }
 
   pub fn glyph_row_count(&self) -> usize { self.visual_info.visual_lines.len() }
@@ -600,10 +562,7 @@ mod tests {
   use crate::{shaper::*, FontFamily};
 
   fn test_face() -> FontFace {
-    FontFace {
-      families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
-      ..<_>::default()
-    }
+    FontFace { families: Box::new([FontFamily::Name("DejaVu Sans".into())]), ..<_>::default() }
   }
   fn test_store() -> TypographyStore {
     let font_db = Rc::new(RefCell::new(FontDB::default()));
@@ -701,12 +660,7 @@ mod tests {
       let visual_rc = info.visual_rect();
       info
         .glyph_bounds_in_rect(&bound_rc)
-        .map(|g| {
-          (
-            visual_rc.origin.x + g.bound.min_x(),
-            visual_rc.origin.y + g.bound.min_y(),
-          )
-        })
+        .map(|g| (visual_rc.origin.x + g.bound.min_x(), visual_rc.origin.y + g.bound.min_y()))
         .collect()
     }
 
@@ -857,12 +811,8 @@ mod tests {
         .is_none()
     );
 
-    let visual = store.typography(
-      text.clone(),
-      FontSize::Em(Em::absolute(1.0)),
-      &test_face(),
-      cfg.clone(),
-    );
+    let visual =
+      store.typography(text.clone(), FontSize::Em(Em::absolute(1.0)), &test_face(), cfg.clone());
 
     assert_eq!(visual.pixel_glyphs().count(), 3);
 
@@ -875,7 +825,11 @@ mod tests {
     store.end_frame();
     store.end_frame();
 
-    assert!(store.get_from_cache(text, font_size, &cfg).is_none());
+    assert!(
+      store
+        .get_from_cache(text, font_size, &cfg)
+        .is_none()
+    );
   }
 
   #[test]
@@ -908,8 +862,8 @@ mod tests {
       line_dir: PlaceLineDirection::TopToBottom,
       overflow: Overflow::AutoWrap,
     };
-    let text = "WITHIN BOUND\r\
-    LINE WITH LONG WORD LIKE: ABCDEFGHIJKLMNOPQRSTUVWXYZ, WILL AUTO WRAP TO 3 LINES."
+    let text = "WITHIN BOUND\rLINE WITH LONG WORD LIKE: ABCDEFGHIJKLMNOPQRSTUVWXYZ, WILL AUTO \
+                WRAP TO 3 LINES."
       .into();
     let graphys = typography_text(text, FontSize::Em(Em::absolute(1.0)), cfg);
 
@@ -949,12 +903,8 @@ mod tests {
     };
     let text: Substr = "1234".into();
 
-    let graphys1 = store.typography(
-      text.clone(),
-      FontSize::Em(Em::absolute(1.0)),
-      &test_face(),
-      cfg.clone(),
-    );
+    let graphys1 =
+      store.typography(text.clone(), FontSize::Em(Em::absolute(1.0)), &test_face(), cfg.clone());
 
     cfg.bounds = Size::new(Em::absolute(20.0), Em::absolute(2.0));
     let graphys2 = store.typography(text, FontSize::Em(Em::absolute(1.0)), &test_face(), cfg);

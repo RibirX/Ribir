@@ -10,10 +10,10 @@ pub mod widget_id;
 pub(crate) use widget_id::TreeArena;
 pub use widget_id::WidgetId;
 mod layout_info;
-use crate::{overlay::OverlayRoot, prelude::*};
 pub use layout_info::*;
 
 use self::widget::widget_id::new_node;
+use crate::{overlay::OverlayRoot, prelude::*};
 
 pub(crate) type DirtySet = Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
 
@@ -102,11 +102,7 @@ impl WidgetTree {
 
       id.children(tree).for_each(|c| {
         let mut prefix = prefix.clone();
-        let suffix = if Some(c) == id.last_child(tree) {
-          "└─"
-        } else {
-          "├─"
-        };
+        let suffix = if Some(c) == id.last_child(tree) { "└─" } else { "├─" };
         prefix.push_str(suffix);
         display_node(prefix, c, tree, display)
       });
@@ -180,11 +176,7 @@ impl WidgetTree {
   }
 
   pub(crate) fn remove_subtree(&mut self, id: WidgetId) {
-    assert_ne!(
-      id,
-      self.root(),
-      "You should detach the root widget before remove it."
-    );
+    assert_ne!(id, self.root(), "You should detach the root widget before remove it.");
 
     id.descendants(&self.arena).for_each(|id| {
       self.store.remove(id);
@@ -193,15 +185,16 @@ impl WidgetTree {
   }
 
   pub(crate) fn get_many_mut<const N: usize>(
-    &mut self,
-    ids: &[WidgetId; N],
+    &mut self, ids: &[WidgetId; N],
   ) -> [&mut Box<dyn Render>; N] {
     unsafe {
       let mut outs: MaybeUninit<[&mut Box<dyn Render>; N]> = MaybeUninit::uninit();
       let outs_ptr = outs.as_mut_ptr();
       for (idx, wid) in ids.iter().enumerate() {
         let arena = &mut *(&mut self.arena as *mut TreeArena);
-        let cur = wid.get_node_mut(arena).expect("Invalid widget id.");
+        let cur = wid
+          .get_node_mut(arena)
+          .expect("Invalid widget id.");
 
         *(*outs_ptr).get_unchecked_mut(idx) = cur;
       }
@@ -226,12 +219,11 @@ impl Default for WidgetTree {
 
 #[cfg(test)]
 mod tests {
+  use super::*;
   use crate::{
     reset_test_env,
     test_helper::{MockBox, MockMulti, TestWindow},
   };
-
-  use super::*;
 
   impl WidgetTree {
     pub(crate) fn content_root(&self) -> WidgetId { self.root.first_child(&self.arena).unwrap() }
@@ -254,7 +246,11 @@ mod tests {
     };
     let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
     wnd.draw_frame();
-    let size = wnd.layout_info_by_path(&[0, 0]).unwrap().size.unwrap();
+    let size = wnd
+      .layout_info_by_path(&[0, 0])
+      .unwrap()
+      .size
+      .unwrap();
     assert_eq!(size, expect_size);
 
     // when relayout the inner `MockBox`, its clamp should same with its previous
@@ -263,7 +259,11 @@ mod tests {
       *c_size.write() = INFINITY_SIZE;
     }
     wnd.draw_frame();
-    let size = wnd.layout_info_by_path(&[0, 0]).unwrap().size.unwrap();
+    let size = wnd
+      .layout_info_by_path(&[0, 0])
+      .unwrap()
+      .size
+      .unwrap();
     assert_eq!(size, expect_size);
   }
 

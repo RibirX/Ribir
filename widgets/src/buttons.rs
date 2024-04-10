@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use ribir_core::prelude::*;
+
+use crate::prelude::*;
 
 #[derive(Declare)]
 pub struct ButtonImpl {

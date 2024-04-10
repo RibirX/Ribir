@@ -8,7 +8,13 @@ impl<K, V> SingleKeyMap<K, V>
 where
   K: Eq,
 {
-  fn get(&self, key: &K) -> Option<&V> { self.0.as_ref().filter(|(k, _)| k == key).map(|(_, v)| v) }
+  fn get(&self, key: &K) -> Option<&V> {
+    self
+      .0
+      .as_ref()
+      .filter(|(k, _)| k == key)
+      .map(|(_, v)| v)
+  }
 }
 
 struct SingleKeyMap<K, V>(Option<(K, V)>);
@@ -24,9 +30,7 @@ pub(crate) struct TextGlyphsHelper {
 
 impl TextGlyphsHelper {
   pub(crate) fn new(text: CowArc<str>, glyphs: VisualGlyphs) -> Self {
-    Self {
-      helper: SingleKeyMap(Some((text, glyphs))),
-    }
+    Self { helper: SingleKeyMap(Some((text, glyphs))) }
   }
 
   pub(crate) fn line_end(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
@@ -34,9 +38,7 @@ impl TextGlyphsHelper {
   }
 
   pub(crate) fn line_begin(
-    &self,
-    text: &CowArc<str>,
-    caret: CaretPosition,
+    &self, text: &CowArc<str>, caret: CaretPosition,
   ) -> Option<CaretPosition> {
     self.helper.get(text)?.line_begin(caret).into()
   }
@@ -106,10 +108,7 @@ impl GlyphsHelper for VisualGlyphs {
       offset += 1;
     }
     let cluster = self.position_to_cluster(para, offset);
-    CaretPosition {
-      cluster,
-      position: Some((para, offset)),
-    }
+    CaretPosition { cluster, position: Some((para, offset)) }
   }
 
   fn line_end(&self, caret: CaretPosition) -> CaretPosition {
@@ -144,10 +143,7 @@ impl GlyphsHelper for VisualGlyphs {
 
   fn next(&self, caret: CaretPosition) -> CaretPosition {
     let (mut row, mut col) = self.caret_position(caret);
-    (row, col) = match (
-      row + 1 < self.glyph_row_count(),
-      col < self.glyph_count(row, true),
-    ) {
+    (row, col) = match (row + 1 < self.glyph_row_count(), col < self.glyph_count(row, true)) {
       (_, true) => (row, col + 1),
       (true, false) => (row + 1, 0),
       (false, false) => (row, self.glyph_count(row, true)),
@@ -220,9 +216,8 @@ mod tests {
   };
   use ribir_geom::Size;
 
-  use crate::input::caret_state::CaretPosition;
-
   use super::GlyphsHelper;
+  use crate::input::caret_state::CaretPosition;
 
   fn test_store() -> TypographyStore {
     let font_db = Rc::new(RefCell::new(FontDB::default()));
@@ -244,17 +239,11 @@ mod tests {
       overflow: Overflow::AutoWrap,
     };
 
-    let face = FontFace {
-      families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
-      ..<_>::default()
-    };
+    let face =
+      FontFace { families: Box::new([FontFamily::Name("DejaVu Sans".into())]), ..<_>::default() };
 
-    let glyphs = store.typography(
-      "1 23 456 7890\n12345".into(),
-      FontSize::Em(Em::absolute(1.0)),
-      &face,
-      cfg,
-    );
+    let glyphs =
+      store.typography("1 23 456 7890\n12345".into(), FontSize::Em(Em::absolute(1.0)), &face, cfg);
     let helper = glyphs;
     let mut caret = CaretPosition { cluster: 0, position: None };
     caret = helper.prev(caret);

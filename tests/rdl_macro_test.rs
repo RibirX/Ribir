@@ -1,9 +1,10 @@
+use std::{cell::Cell, rc::Rc};
+
 use ribir::{
   core::{reset_test_env, test_helper::*},
   prelude::*,
 };
 use ribir_dev_helper::*;
-use std::{cell::Cell, rc::Rc};
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 fn simplest_leaf_rdl() -> impl WidgetBuilder {
@@ -51,11 +52,7 @@ fn single_rdl_has_builtin_with_child() -> impl WidgetBuilder {
     rdl!{ $single_p { rdl!{ Void } } }
   }
 }
-widget_layout_test!(
-  single_rdl_has_builtin_with_child,
-  width == 520.,
-  height == 520.,
-);
+widget_layout_test!(single_rdl_has_builtin_with_child, width == 520., height == 520.,);
 
 fn multi_child_rdl_has_builtin_with_child() -> impl WidgetBuilder {
   fn_widget! {
@@ -65,11 +62,7 @@ fn multi_child_rdl_has_builtin_with_child() -> impl WidgetBuilder {
     rdl!{ $multi_p { rdl!{ Void } } }
   }
 }
-widget_layout_test!(
-  multi_child_rdl_has_builtin_with_child,
-  width == 20.,
-  height == 20.,
-);
+widget_layout_test!(multi_child_rdl_has_builtin_with_child, width == 20., height == 20.,);
 
 fn compose_child_rdl_has_builtin_with_child() -> impl WidgetBuilder {
   fn_widget! {
@@ -77,11 +70,7 @@ fn compose_child_rdl_has_builtin_with_child() -> impl WidgetBuilder {
     rdl!{ $multi_p { rdl!{ Void {} }} }
   }
 }
-widget_layout_test!(
-  compose_child_rdl_has_builtin_with_child,
-  width == 20.,
-  height == 20.,
-);
+widget_layout_test!(compose_child_rdl_has_builtin_with_child, width == 20., height == 20.,);
 
 fn access_rdl_widget() -> impl WidgetBuilder {
   fn_widget! {
@@ -345,11 +334,7 @@ fn access_builtin_field_by_dollar() -> impl WidgetBuilder {
     @Row { @ { box1 } @{ box2 } }
   }
 }
-widget_layout_test!(
-  access_builtin_field_by_dollar,
-  width == 240.,
-  height == 120.,
-);
+widget_layout_test!(access_builtin_field_by_dollar, width == 240., height == 120.,);
 
 #[test]
 fn closure_in_fn_widget_capture() {
@@ -555,14 +540,22 @@ fn bind_fields() {
   };
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  let size = wnd.layout_info_by_path(&[0]).unwrap().size.unwrap();
+  let size = wnd
+    .layout_info_by_path(&[0])
+    .unwrap()
+    .size
+    .unwrap();
   // data flow not affect on init.
   assert_eq!(size, Size::new(3., 1.));
 
   tap_at(&wnd, (0, 0));
   wnd.draw_frame();
 
-  let size = wnd.layout_info_by_path(&[0]).unwrap().size.unwrap();
+  let size = wnd
+    .layout_info_by_path(&[0])
+    .unwrap()
+    .size
+    .unwrap();
   assert_eq!(size, Size::new(8., 4.));
 }
 
@@ -778,10 +771,7 @@ fn fix_local_assign_tuple() -> impl WidgetBuilder {
     }
   }
 }
-widget_layout_test!(
-  fix_local_assign_tuple,
-  rect == ribir_geom::rect(0., 0., 2., 1.),
-);
+widget_layout_test!(fix_local_assign_tuple, rect == ribir_geom::rect(0., 0., 2., 1.),);
 
 #[test]
 fn fix_silent_not_relayout_dyn_widget() {

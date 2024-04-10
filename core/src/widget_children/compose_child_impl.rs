@@ -1,11 +1,10 @@
+use super::{ComposeChild, Pair};
 use crate::{
   context::BuildCtx,
   prelude::{BoxPipe, ChildFrom},
   state::{State, StateWriter},
   widget::{Widget, WidgetBuilder},
 };
-
-use super::{ComposeChild, Pair};
 
 /// Trait specify what child a compose child widget can have, and the target
 /// type after widget compose its child.
@@ -45,10 +44,7 @@ where
   #[track_caller]
   fn with_child(self, c: C2, ctx: &BuildCtx) -> Self::Target {
     let Pair { parent: widget, child } = self;
-    Pair {
-      parent: widget,
-      child: child.with_child(c, ctx),
-    }
+    Pair { parent: widget, child: child.with_child(c, ctx) }
   }
 }
 
@@ -63,10 +59,7 @@ where
   #[inline]
   #[track_caller]
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    Pair {
-      parent: self,
-      child: ChildFrom::child_from(child, ctx),
-    }
+    Pair { parent: self, child: ChildFrom::child_from(child, ctx) }
   }
 }
 
@@ -166,7 +159,11 @@ where
   #[inline]
   #[track_caller]
   fn with_child(mut self, child: C, ctx: &BuildCtx) -> Self::Target {
-    self.extend(child.into_iter().map(|v| ChildFrom::child_from(v, ctx)));
+    self.extend(
+      child
+        .into_iter()
+        .map(|v| ChildFrom::child_from(v, ctx)),
+    );
     self
   }
 }

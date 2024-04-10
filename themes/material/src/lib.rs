@@ -98,16 +98,20 @@ const ICON_LARGE: Size = Size::new(48., 48.);
 const ICON_HUGE: Size = Size::new(64., 64.);
 
 fn init_custom_style(theme: &mut FullTheme) {
-  theme.custom_styles.set_custom_style(ScrollBarStyle {
-    thumb_min_size: 12.,
-    thickness: 8.,
-    track_brush: theme.palette.primary_container().into(),
-  });
-  theme.custom_styles.set_custom_style(CheckBoxStyle {
-    icon_size: ICON_SMALL,
-    label_style: theme.typography_theme.body_large.text.clone(),
-    label_color: theme.palette.on_surface().into(),
-  });
+  theme
+    .custom_styles
+    .set_custom_style(ScrollBarStyle {
+      thumb_min_size: 12.,
+      thickness: 8.,
+      track_brush: theme.palette.primary_container().into(),
+    });
+  theme
+    .custom_styles
+    .set_custom_style(CheckBoxStyle {
+      icon_size: ICON_SMALL,
+      label_style: theme.typography_theme.body_large.text.clone(),
+      label_color: theme.palette.on_surface().into(),
+    });
   theme
     .custom_styles
     .set_custom_style(InputStyle { size: Some(20.) });
@@ -116,28 +120,30 @@ fn init_custom_style(theme: &mut FullTheme) {
     .set_custom_style(TextAreaStyle { rows: Some(2.), cols: Some(20.) });
   theme
     .custom_styles
-    .set_custom_style(SelectedHighLightStyle {
-      brush: Color::from_rgb(181, 215, 254).into(),
+    .set_custom_style(SelectedHighLightStyle { brush: Color::from_rgb(181, 215, 254).into() });
+  theme
+    .custom_styles
+    .set_custom_style(FilledButtonStyle {
+      height: 40.,
+      icon_size: ICON_TINY,
+      label_gap: LABEL_GAP,
+      icon_pos: IconPosition::Before,
+      label_style: theme.typography_theme.label_large.text.clone(),
+      radius: BUTTON_RADIUS,
+      padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
     });
-  theme.custom_styles.set_custom_style(FilledButtonStyle {
-    height: 40.,
-    icon_size: ICON_TINY,
-    label_gap: LABEL_GAP,
-    icon_pos: IconPosition::Before,
-    label_style: theme.typography_theme.label_large.text.clone(),
-    radius: BUTTON_RADIUS,
-    padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
-  });
-  theme.custom_styles.set_custom_style(OutlinedButtonStyle {
-    height: 40.,
-    icon_size: ICON_TINY,
-    label_gap: LABEL_GAP,
-    icon_pos: IconPosition::Before,
-    label_style: theme.typography_theme.label_large.text.clone(),
-    radius: BUTTON_RADIUS,
-    padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
-    border_width: 1.,
-  });
+  theme
+    .custom_styles
+    .set_custom_style(OutlinedButtonStyle {
+      height: 40.,
+      icon_size: ICON_TINY,
+      label_gap: LABEL_GAP,
+      icon_pos: IconPosition::Before,
+      label_style: theme.typography_theme.label_large.text.clone(),
+      radius: BUTTON_RADIUS,
+      padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
+      border_width: 1.,
+    });
   theme.custom_styles.set_custom_style(ButtonStyle {
     height: 40.,
     icon_size: ICON_TINY,
@@ -146,15 +152,17 @@ fn init_custom_style(theme: &mut FullTheme) {
     label_style: theme.typography_theme.label_large.text.clone(),
     padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
   });
-  theme.custom_styles.set_custom_style(FabButtonStyle {
-    height: 56.,
-    icon_size: ICON_SMALL,
-    label_gap: LABEL_GAP,
-    icon_pos: IconPosition::Before,
-    label_style: theme.typography_theme.label_large.text.clone(),
-    radius: FAB_RADIUS,
-    padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
-  });
+  theme
+    .custom_styles
+    .set_custom_style(FabButtonStyle {
+      height: 56.,
+      icon_size: ICON_SMALL,
+      label_gap: LABEL_GAP,
+      icon_pos: IconPosition::Before,
+      label_style: theme.typography_theme.label_large.text.clone(),
+      radius: FAB_RADIUS,
+      padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
+    });
   theme.custom_styles.set_custom_style(TabsStyle {
     extent_with_both: 64.,
     extent_only_label: 48.,
@@ -164,92 +172,72 @@ fn init_custom_style(theme: &mut FullTheme) {
     active_color: theme.palette.primary().into(),
     foreground: theme.palette.on_surface_variant().into(),
     label_style: theme.typography_theme.title_small.text.clone(),
-    indicator: IndicatorStyle {
-      extent: 3.,
-      measure: Some(INDICATOR_SIZE),
-    },
+    indicator: IndicatorStyle { extent: 3., measure: Some(INDICATOR_SIZE) },
   });
   theme.custom_styles.set_custom_style(AvatarStyle {
     size: Size::splat(AVATAR_SIZE),
     radius: Some(AVATAR_RADIUS),
     text_style: theme.typography_theme.body_large.text.clone(),
   });
-  theme.custom_styles.set_custom_style(ListItemStyle {
-    padding_style: Some(EdgeInsets {
-      left: 0.,
-      right: 24.,
-      bottom: 8.,
-      top: 8.,
-    }),
-    item_align: |num| {
-      if num >= 2 {
-        Align::Start
-      } else {
-        Align::Center
-      }
-    },
-    label_gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-    headline_style: theme.typography_theme.body_large.text.clone(),
-    supporting_style: theme.typography_theme.body_medium.text.clone(),
-    leading_config: EdgeWidgetStyle {
-      icon: EdgeItemStyle {
-        size: ICON_SMALL,
-        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+  theme
+    .custom_styles
+    .set_custom_style(ListItemStyle {
+      padding_style: Some(EdgeInsets { left: 0., right: 24., bottom: 8., top: 8. }),
+      item_align: |num| {
+        if num >= 2 { Align::Start } else { Align::Center }
       },
-      text: EdgeTextItemStyle {
-        style: theme.typography_theme.label_small.text.clone(),
-        foreground: theme.palette.on_surface_variant().into(),
-        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      label_gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      headline_style: theme.typography_theme.body_large.text.clone(),
+      supporting_style: theme.typography_theme.body_medium.text.clone(),
+      leading_config: EdgeWidgetStyle {
+        icon: EdgeItemStyle { size: ICON_SMALL, gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)) },
+        text: EdgeTextItemStyle {
+          style: theme.typography_theme.label_small.text.clone(),
+          foreground: theme.palette.on_surface_variant().into(),
+          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+        },
+        avatar: EdgeItemStyle {
+          size: Size::splat(LIST_ITEM_SIZE),
+          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+        },
+        image: EdgeItemStyle {
+          size: Size::splat(LIST_IMAGE_ITEM_SIZE),
+          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+        },
+        poster: EdgeItemStyle { size: Size::new(120., 64.), gap: None },
+        custom: EdgeItemStyle {
+          size: Size::splat(LIST_ITEM_SIZE),
+          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+        },
       },
-      avatar: EdgeItemStyle {
-        size: Size::splat(LIST_ITEM_SIZE),
-        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+      trailing_config: EdgeWidgetStyle {
+        icon: EdgeItemStyle { size: ICON_SMALL, gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)) },
+        text: EdgeTextItemStyle {
+          style: theme.typography_theme.label_small.text.clone(),
+          foreground: theme.palette.on_surface_variant().into(),
+          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+        },
+        avatar: EdgeItemStyle {
+          size: Size::splat(LIST_ITEM_SIZE),
+          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+        },
+        image: EdgeItemStyle {
+          size: Size::splat(LIST_IMAGE_ITEM_SIZE),
+          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+        },
+        poster: EdgeItemStyle { size: Size::new(120., 64.), gap: None },
+        custom: EdgeItemStyle {
+          size: Size::splat(LIST_ITEM_SIZE),
+          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
+        },
       },
-      image: EdgeItemStyle {
-        size: Size::splat(LIST_IMAGE_ITEM_SIZE),
-        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-      },
-      poster: EdgeItemStyle {
-        size: Size::new(120., 64.),
-        gap: None,
-      },
-      custom: EdgeItemStyle {
-        size: Size::splat(LIST_ITEM_SIZE),
-        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-      },
-    },
-    trailing_config: EdgeWidgetStyle {
-      icon: EdgeItemStyle {
-        size: ICON_SMALL,
-        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-      },
-      text: EdgeTextItemStyle {
-        style: theme.typography_theme.label_small.text.clone(),
-        foreground: theme.palette.on_surface_variant().into(),
-        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-      },
-      avatar: EdgeItemStyle {
-        size: Size::splat(LIST_ITEM_SIZE),
-        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-      },
-      image: EdgeItemStyle {
-        size: Size::splat(LIST_IMAGE_ITEM_SIZE),
-        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-      },
-      poster: EdgeItemStyle {
-        size: Size::new(120., 64.),
-        gap: None,
-      },
-      custom: EdgeItemStyle {
-        size: Size::splat(LIST_ITEM_SIZE),
-        gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-      },
-    },
-  });
-  theme.custom_styles.set_custom_style(PlaceholderStyle {
-    foreground: theme.palette.on_surface_variant().into(),
-    text_style: theme.typography_theme.body_medium.text.clone(),
-  });
+    });
+  theme
+    .custom_styles
+    .set_custom_style(PlaceholderStyle {
+      foreground: theme.palette.on_surface_variant().into(),
+      text_style: theme.typography_theme.body_medium.text.clone(),
+    });
 }
 
 fn override_compose_decorator(theme: &mut FullTheme) {
@@ -461,22 +449,14 @@ fn icon_theme() -> IconTheme {
 /// headline4, headline3, headline2, headline1, and caption. The
 /// `body_style` is applied to the remaining text styles.
 pub fn typography_theme(
-  regular_family: Box<[FontFamily]>,
-  medium_family: Box<[FontFamily]>,
-  decoration: TextDecoration,
+  regular_family: Box<[FontFamily]>, medium_family: Box<[FontFamily]>, decoration: TextDecoration,
   decoration_color: Brush,
 ) -> TypographyTheme {
   let decoration = TextDecorationStyle { decoration, decoration_color };
-  let regular_face = FontFace {
-    families: regular_family.clone(),
-    weight: FontWeight::NORMAL,
-    ..<_>::default()
-  };
-  let medium_face = FontFace {
-    families: medium_family,
-    weight: FontWeight::MEDIUM,
-    ..<_>::default()
-  };
+  let regular_face =
+    FontFace { families: regular_family.clone(), weight: FontWeight::NORMAL, ..<_>::default() };
+  let medium_face =
+    FontFace { families: medium_family, weight: FontWeight::MEDIUM, ..<_>::default() };
 
   TypographyTheme {
     display_large: TextTheme {

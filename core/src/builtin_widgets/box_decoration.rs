@@ -82,16 +82,9 @@ impl BoxDecoration {
   }
 
   fn paint_round_border(
-    &self,
-    painter: &mut Painter,
-    radius: &Radius,
-    border: &Border,
-    content_rect: &Rect,
+    &self, painter: &mut Painter, radius: &Radius, border: &Border, content_rect: &Rect,
   ) {
-    assert!(
-      self.is_border_uniform(),
-      "radius can't be setted with different border"
-    );
+    assert!(self.is_border_uniform(), "radius can't be setted with different border");
     let width_half = border.left.width / 2.;
     let min_x = content_rect.min_x() + width_half;
     let max_x = content_rect.max_x() - width_half;
@@ -108,10 +101,7 @@ impl BoxDecoration {
       .set_line_width(border.top.width)
       .set_brush(border.top.color.clone());
     painter.rect_round(
-      &Rect::new(
-        Point::new(min_x, min_y),
-        Size::new(max_x - min_x, max_y - min_y),
-      ),
+      &Rect::new(Point::new(min_x, min_y), Size::new(max_x - min_x, max_y - min_y)),
       &radius,
     );
     painter.stroke();
@@ -165,12 +155,7 @@ impl BorderSide {
 impl Border {
   #[inline]
   pub fn all(side: BorderSide) -> Self {
-    Self {
-      left: side.clone(),
-      right: side.clone(),
-      top: side.clone(),
-      bottom: side,
-    }
+    Self { left: side.clone(), right: side.clone(), top: side.clone(), bottom: side }
   }
 
   #[inline]

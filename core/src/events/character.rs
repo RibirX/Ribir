@@ -11,19 +11,16 @@ impl_common_event_deref!(CharsEvent);
 impl CharsEvent {
   #[inline]
   pub fn new(chars: String, id: WidgetId, wnd_id: WindowId) -> Self {
-    Self {
-      chars,
-      common: CommonEvent::new(id, wnd_id),
-    }
+    Self { chars, common: CommonEvent::new(id, wnd_id) }
   }
 }
 
 #[cfg(test)]
 mod tests {
+  use std::{cell::RefCell, rc::Rc};
+
   use super::*;
   use crate::{reset_test_env, test_helper::*, window::DelayEvent};
-
-  use std::{cell::RefCell, rc::Rc};
 
   #[test]
   fn smoke() {

@@ -10,9 +10,7 @@ impl WinitBackend for MockBackend {
   fn begin_frame(&mut self) {}
 
   fn draw_commands(
-    &mut self,
-    _: ribir_core::prelude::DeviceRect,
-    _: Vec<ribir_core::prelude::PaintCommand>,
+    &mut self, _: ribir_core::prelude::DeviceRect, _: Vec<ribir_core::prelude::PaintCommand>,
     _: ribir_core::prelude::Color,
   ) {
   }

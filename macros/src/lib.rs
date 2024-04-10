@@ -19,13 +19,12 @@ mod watch_macro;
 mod writer_map_macro;
 pub(crate) use rdl_macro::*;
 
-use crate::pipe_macro::PipeMacro;
-use crate::watch_macro::WatchMacro;
+use crate::{pipe_macro::PipeMacro, watch_macro::WatchMacro};
 pub(crate) mod declare_obj;
 pub(crate) mod symbol_process;
 
 macro_rules! ok {
-  ($e: expr) => {
+  ($e:expr) => {
     match $e {
       Ok(ok) => ok,
       Err(err) => return err.into(),

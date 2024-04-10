@@ -1,5 +1,6 @@
-use super::{Direction, Expanded};
 use ribir_core::prelude::{log::warn, *};
+
+use super::{Direction, Expanded};
 
 /// How the children should be placed along the main axis in a flex layout.
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
@@ -129,10 +130,7 @@ impl FlexSize {
 impl std::ops::Sub for FlexSize {
   type Output = Self;
   fn sub(self, rhs: Self) -> Self::Output {
-    FlexSize {
-      main: self.main - rhs.main,
-      cross: self.cross - rhs.cross,
-    }
+    FlexSize { main: self.main - rhs.main, cross: self.cross - rhs.cross }
   }
 }
 
@@ -156,20 +154,24 @@ impl FlexLayouter {
     self.flex_children_layout(ctx);
 
     // cross direction need calculate cross_axis_gap but last line don't need.
-    let cross = self.lines.iter().fold(-self.cross_axis_gap, |sum, l| {
-      sum + l.cross_line_height + self.cross_axis_gap
-    });
+    let cross = self
+      .lines
+      .iter()
+      .fold(-self.cross_axis_gap, |sum, l| sum + l.cross_line_height + self.cross_axis_gap);
     let main = match self.justify_content {
-      JustifyContent::Start | JustifyContent::Center | JustifyContent::End => {
-        self.lines.iter().fold(0f32, |max, l| max.max(l.main_width))
-      }
+      JustifyContent::Start | JustifyContent::Center | JustifyContent::End => self
+        .lines
+        .iter()
+        .fold(0f32, |max, l| max.max(l.main_width)),
       JustifyContent::SpaceBetween | JustifyContent::SpaceAround | JustifyContent::SpaceEvenly => {
         self.max.main
       }
     };
     let size = FlexSize { cross, main };
     let &mut Self { max, min, dir, .. } = self;
-    let size = size.to_size(dir).clamp(min.to_size(dir), max.to_size(dir));
+    let size = size
+      .to_size(dir)
+      .clamp(min.to_size(dir), max.to_size(dir));
     self.update_children_position(FlexSize::from_size(size, dir), ctx);
     size
   }
@@ -190,10 +192,7 @@ impl FlexLayouter {
         max.main -= self.current_line.main_width;
       }
 
-      let clamp = BoxClamp {
-        max: max.to_size(dir),
-        min: min.to_size(dir),
-      };
+      let clamp = BoxClamp { max: max.to_size(dir), min: min.to_size(dir) };
 
       let size = l.perform_widget_layout(clamp);
       let size = FlexSize::from_size(size, dir);
@@ -256,10 +255,7 @@ impl FlexLayouter {
             let main = flex_unit * flex;
             max.main = main;
             min.main = main;
-            let clamp = BoxClamp {
-              max: max.to_size(dir),
-              min: min.to_size(dir),
-            };
+            let clamp = BoxClamp { max: max.to_size(dir), min: min.to_size(dir) };
             let size = l.perform_widget_layout(clamp);
             info.size = FlexSize::from_size(size, dir);
             line.main_width += info.size.main;
@@ -273,22 +269,12 @@ impl FlexLayouter {
   }
 
   fn update_children_position(&mut self, bound: FlexSize, ctx: &mut LayoutCtx) {
-    let Self {
-      reverse,
-      dir,
-      align_items,
-      justify_content,
-      lines,
-      ..
-    } = self;
+    let Self { reverse, dir, align_items, justify_content, lines, .. } = self;
 
     let cross_size = lines.iter().map(|l| l.cross_line_height).sum();
     // cross gap don't use calc offset
-    let cross_gap_count = if !lines.is_empty() {
-      (lines.len() - 1) as f32 * self.cross_axis_gap
-    } else {
-      0.
-    };
+    let cross_gap_count =
+      if !lines.is_empty() { (lines.len() - 1) as f32 * self.cross_axis_gap } else { 0. };
     let cross_offset = align_items.align_value(cross_size, bound.cross - cross_gap_count);
 
     macro_rules! update_position {
@@ -326,7 +312,9 @@ impl FlexLayouter {
 
   fn place_line(&mut self) {
     if !self.current_line.is_empty() {
-      self.lines.push(std::mem::take(&mut self.current_line));
+      self
+        .lines
+        .push(std::mem::take(&mut self.current_line));
     }
   }
 }
@@ -376,10 +364,11 @@ impl MainLineInfo {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use crate::prelude::*;
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
+
+  use super::*;
+  use crate::prelude::*;
 
   fn horizontal_line() -> impl WidgetBuilder {
     fn_widget! {

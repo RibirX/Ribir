@@ -1,8 +1,11 @@
+use std::{
+  collections::{HashMap, HashSet},
+  io::{self, BufRead},
+  sync::OnceLock,
+};
+
 use rand::prelude::*;
 use ribir::prelude::*;
-use std::collections::{HashMap, HashSet};
-use std::io::{self, BufRead};
-use std::sync::OnceLock;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CharHint {
@@ -70,13 +73,7 @@ pub struct WordleGuessing {
 }
 
 impl WordleGuessing {
-  pub fn new(max_len: usize) -> Self {
-    Self {
-      max_len,
-      word: "".into(),
-      disable: false,
-    }
-  }
+  pub fn new(max_len: usize) -> Self { Self { max_len, word: "".into(), disable: false } }
 
   pub fn word(&self) -> &str { self.word.as_str() }
 
@@ -110,7 +107,11 @@ impl Wordle {
   pub fn new(max_rounds: usize, word_len: usize) -> Self {
     loop {
       let idx = random::<usize>() % Self::word_dict().len();
-      let word = Self::word_dict().iter().nth(idx).cloned().unwrap();
+      let word = Self::word_dict()
+        .iter()
+        .nth(idx)
+        .cloned()
+        .unwrap();
       if word.len() == word_len {
         return Self {
           word,
@@ -162,7 +163,9 @@ impl Wordle {
 
   fn is_win(&self) -> bool {
     self.guesses.last().map_or(false, |g| {
-      g.0.iter().all(|c| c.hint() == Some(CharHint::Correct))
+      g.0
+        .iter()
+        .all(|c| c.hint() == Some(CharHint::Correct))
     })
   }
 
@@ -202,7 +205,9 @@ impl Wordle {
           .entry(ele.char())
           .or_insert(CharHint::WrongPosition);
       } else {
-        self.char_hints.insert(ele.char(), ele.hint().unwrap());
+        self
+          .char_hints
+          .insert(ele.char(), ele.hint().unwrap());
       }
     }
     guess

@@ -1,11 +1,13 @@
-use crate::path_builder::{stroke_path, PathBuilder};
+use std::ops::Range;
+
 use lyon_algorithms::{
   measure::{PathMeasurements, SampleType},
   path::{Event, Path as LyonPath},
 };
 use ribir_geom::{Point, Rect, Transform};
 use serde::{Deserialize, Serialize};
-use std::ops::Range;
+
+use crate::path_builder::{stroke_path, PathBuilder};
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -83,15 +85,8 @@ pub enum LineJoin {
 pub enum PathSegment {
   MoveTo(Point),
   LineTo(Point),
-  QuadTo {
-    ctrl: Point,
-    to: Point,
-  },
-  CubicTo {
-    to: Point,
-    ctrl1: Point,
-    ctrl2: Point,
-  },
+  QuadTo { ctrl: Point, to: Point },
+  CubicTo { to: Point, ctrl1: Point, ctrl2: Point },
   Close(bool),
 }
 
@@ -170,20 +165,16 @@ impl Path {
   /// path.
   pub fn sampler(&self) -> PathSampler {
     let measurements = PathMeasurements::from_path(&self.lyon_path, 1e-3);
-    PathSampler {
-      path: self.lyon_path.clone(),
-      measurements,
-    }
+    PathSampler { path: self.lyon_path.clone(), measurements }
   }
 
   pub fn segments(&self) -> impl Iterator<Item = PathSegment> + '_ {
     self.lyon_path.iter().map(|e| match e {
       Event::Begin { at } => PathSegment::MoveTo(at.cast_unit()),
       Event::Line { to, .. } => PathSegment::LineTo(to.cast_unit()),
-      Event::Quadratic { ctrl, to, .. } => PathSegment::QuadTo {
-        ctrl: ctrl.cast_unit(),
-        to: to.cast_unit(),
-      },
+      Event::Quadratic { ctrl, to, .. } => {
+        PathSegment::QuadTo { ctrl: ctrl.cast_unit(), to: to.cast_unit() }
+      }
       Event::Cubic { ctrl1, ctrl2, to, .. } => PathSegment::CubicTo {
         to: to.cast_unit(),
         ctrl1: ctrl1.cast_unit(),
@@ -195,9 +186,7 @@ impl Path {
 
   #[cfg(feature = "tessellation")]
   pub fn tessellate<Attr>(
-    &self,
-    tolerance: f32,
-    buffer: &mut VertexBuffers<Attr>,
+    &self, tolerance: f32, buffer: &mut VertexBuffers<Attr>,
     vertex_ctor: impl Fn(Point) -> Vertex<Attr>,
   ) {
     use lyon_tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex};
@@ -256,12 +245,7 @@ impl PathSampler {
 impl Radius {
   #[inline]
   pub const fn new(top_left: f32, top_right: f32, bottom_left: f32, bottom_right: f32) -> Radius {
-    Radius {
-      top_left,
-      top_right,
-      bottom_left,
-      bottom_right,
-    }
+    Radius { top_left, top_right, bottom_left, bottom_right }
   }
 
   /// Creates a radius where all radii are radius.
@@ -292,42 +276,22 @@ impl Radius {
 
   #[inline]
   pub const fn top_left(top_left: f32) -> Self {
-    Radius {
-      top_left,
-      top_right: 0.,
-      bottom_left: 0.,
-      bottom_right: 0.,
-    }
+    Radius { top_left, top_right: 0., bottom_left: 0., bottom_right: 0. }
   }
 
   #[inline]
   pub const fn top_right(top_right: f32) -> Self {
-    Radius {
-      top_right,
-      top_left: 0.,
-      bottom_left: 0.,
-      bottom_right: 0.,
-    }
+    Radius { top_right, top_left: 0., bottom_left: 0., bottom_right: 0. }
   }
 
   #[inline]
   pub const fn bottom_left(bottom_left: f32) -> Self {
-    Radius {
-      bottom_left,
-      top_left: 0.,
-      top_right: 0.,
-      bottom_right: 0.,
-    }
+    Radius { bottom_left, top_left: 0., top_right: 0., bottom_right: 0. }
   }
 
   #[inline]
   pub const fn bottom_right(bottom_right: f32) -> Self {
-    Radius {
-      bottom_right,
-      top_left: 0.,
-      top_right: 0.,
-      bottom_left: 0.,
-    }
+    Radius { bottom_right, top_left: 0., top_right: 0., bottom_left: 0. }
   }
 }
 

@@ -5,6 +5,12 @@ mod glyphs_helper;
 mod handle;
 mod selected_text;
 mod text_selectable;
+use std::{ops::Range, rc::Rc};
+
+pub use caret_state::{CaretPosition, CaretState};
+pub use selected_text::SelectedHighLightStyle;
+pub use text_selectable::TextSelectable;
+
 use crate::{
   input::{
     caret::Caret,
@@ -15,10 +21,6 @@ use crate::{
   layout::{ConstrainedBox, OnlySizedByParent, Stack, StackFit},
   prelude::Text,
 };
-pub use caret_state::{CaretPosition, CaretState};
-pub use selected_text::SelectedHighLightStyle;
-use std::{ops::Range, rc::Rc};
-pub use text_selectable::TextSelectable;
 
 pub struct Placeholder(CowArc<str>);
 
@@ -170,13 +172,7 @@ where
   H: StateWriter<Value = E>,
 {
   fn new(window: Rc<Window>, host: H, caret_id: LazyWidgetId) -> Self {
-    Self {
-      window,
-      host,
-      pre_edit: None,
-      guard: None,
-      caret_id,
-    }
+    Self { window, host, pre_edit: None, guard: None, caret_id }
   }
   fn ime_allowed(&mut self) {
     self.window.set_ime_allowed(true);
@@ -233,7 +229,9 @@ where
     let wid = self.caret_id.clone();
 
     let pos = window.map_to_global(Point::zero(), wid.assert_id());
-    let size = window.layout_size(wid.assert_id()).unwrap_or_default();
+    let size = window
+      .layout_size(wid.assert_id())
+      .unwrap_or_default();
     window.set_ime_cursor_area(&Rect::new(pos, size));
 
     let tick_of_layout_ready = window
@@ -247,7 +245,9 @@ where
         .box_it()
         .subscribe(move |_| {
           let pos = window.map_to_global(Point::zero(), wid.assert_id());
-          let size = window.layout_size(wid.assert_id()).unwrap_or_default();
+          let size = window
+            .layout_size(wid.assert_id())
+            .unwrap_or_default();
           window.set_ime_cursor_area(&Rect::new(pos, size));
         })
         .unsubscribe_when_dropped(),
@@ -258,8 +258,7 @@ where
 impl ComposeChild for Input {
   type Child = Option<State<Placeholder>>;
   fn compose_child(
-    this: impl StateWriter<Value = Self>,
-    placeholder: Self::Child,
+    this: impl StateWriter<Value = Self>, placeholder: Self::Child,
   ) -> impl WidgetBuilder {
     fn_widget! {
       let text = @Text {
@@ -286,8 +285,7 @@ impl ComposeChild for Input {
 impl ComposeChild for TextArea {
   type Child = Option<State<Placeholder>>;
   fn compose_child(
-    this: impl StateWriter<Value = Self>,
-    placeholder: Self::Child,
+    this: impl StateWriter<Value = Self>, placeholder: Self::Child,
   ) -> impl WidgetBuilder {
     fn_widget! {
       let text = @Text {
@@ -318,10 +316,8 @@ where
   Self: 'static,
 {
   fn edit_area(
-    this: &impl StateWriter<Value = Self>,
-    text: FatObj<State<Text>>,
-    scroll_dir: impl Pipe<Value = Scrollable> + 'static,
-    placeholder: Option<State<Placeholder>>,
+    this: &impl StateWriter<Value = Self>, text: FatObj<State<Text>>,
+    scroll_dir: impl Pipe<Value = Scrollable> + 'static, placeholder: Option<State<Placeholder>>,
   ) -> impl WidgetBuilder {
     fn_widget! {
       let mut text = @$text{};
@@ -433,10 +429,8 @@ impl EditableTextExtraWidget for TextArea {}
 impl EditableTextExtraWidget for Input {}
 
 fn size_clamp(style: &TextStyle, rows: Option<f32>, cols: Option<f32>) -> BoxClamp {
-  let mut clamp: BoxClamp = BoxClamp {
-    min: Size::new(0., 0.),
-    max: Size::new(f32::INFINITY, f32::INFINITY),
-  };
+  let mut clamp: BoxClamp =
+    BoxClamp { min: Size::new(0., 0.), max: Size::new(f32::INFINITY, f32::INFINITY) };
   if let Some(cols) = cols {
     let width = cols * style.font_size.into_pixel().value();
     clamp = clamp.with_fixed_width(width);
@@ -482,14 +476,15 @@ fn auto_scroll_pos(container: &ScrollableWidget, before: Point, after: Point, si
 
 #[cfg(test)]
 mod tests {
-  use super::{EditableText, Input};
-  use crate::layout::SizedBox;
   use ribir_core::{
     prelude::*,
     reset_test_env,
     test_helper::{split_value, TestWindow},
   };
   use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
+
+  use super::{EditableText, Input};
+  use crate::layout::SizedBox;
 
   #[test]
   fn input_edit() {
@@ -538,10 +533,7 @@ mod tests {
 
     let device_id = unsafe { DeviceId::dummy() };
     #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
-      position: (50., 10.).into(),
-    });
+    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (50., 10.).into() });
 
     wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
     wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);

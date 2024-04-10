@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use std::any::type_name;
+
+use crate::prelude::*;
 
 type ComposeDecoratorFn = dyn Fn(Box<dyn Any>, Widget, &BuildCtx) -> Widget;
 /// Compose style is a compose child widget to decoration its child.
@@ -60,17 +61,13 @@ where
 impl ComposeDecorators {
   #[inline]
   pub fn override_compose_decorator<W: ComposeDecorator + 'static>(
-    &mut self,
-    compose_decorator: impl Fn(State<W>, Widget, &BuildCtx) -> Widget + 'static,
+    &mut self, compose_decorator: impl Fn(State<W>, Widget, &BuildCtx) -> Widget + 'static,
   ) {
     self.styles.insert(
       TypeId::of::<W>(),
       Box::new(move |this: Box<dyn Any>, host: Widget, ctx: &BuildCtx| {
         let this = this.downcast().unwrap_or_else(|_| {
-          panic!(
-            "Caller should guarantee the boxed type is Stateful<{}>.",
-            type_name::<W>()
-          )
+          panic!("Caller should guarantee the boxed type is Stateful<{}>.", type_name::<W>())
         });
 
         compose_decorator(*this, host, ctx)
@@ -81,8 +78,9 @@ impl ComposeDecorators {
 
 #[cfg(test)]
 mod tests {
-  use crate::{prelude::*, reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
+
+  use crate::{prelude::*, reset_test_env, test_helper::*};
 
   #[test]
   fn compose_decorator_smoke() {

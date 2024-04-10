@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use ribir_algo::Sc;
+
+use crate::prelude::*;
 
 /// Transition use `Easing` trait to calc the rate of change over time.
 #[derive(Clone, Debug)]
@@ -56,10 +57,7 @@ impl<S: AnimateState + 'static> TransitionState for S {}
 /// Transition the state with a lerp function.
 pub trait TransitionWithFn: AnimateStateSetter + Sized {
   fn transition_with<F>(
-    self,
-    transition: Box<dyn Transition>,
-    lerp_fn: F,
-    ctx: &BuildCtx,
+    self, transition: Box<dyn Transition>, lerp_fn: F, ctx: &BuildCtx,
   ) -> Writer<Animate<LerpFnState<Self, F>>>
   where
     F: FnMut(&Self::Value, &Self::Value, f32) -> Self::Value + 'static,

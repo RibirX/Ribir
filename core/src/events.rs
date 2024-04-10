@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use self::dispatcher::DispatchInfo;
 use crate::{
   builtin_widgets::BuiltinFlags,
@@ -6,7 +8,6 @@ use crate::{
   widget_tree::WidgetId,
   window::{Window, WindowId},
 };
-use std::rc::Rc;
 
 pub(crate) mod dispatcher;
 mod pointers;
@@ -283,13 +284,7 @@ impl CommonEvent {
   /// it because in most case the event create in a environment that the
   /// `Dispatcher` already borrowed.
   pub(crate) fn new(target: WidgetId, wnd_id: WindowId) -> Self {
-    Self {
-      target,
-      wnd_id,
-      id: target,
-      propagation: true,
-      prevent_default: false,
-    }
+    Self { target, wnd_id, id: target, propagation: true, prevent_default: false }
   }
 
   pub(crate) fn set_current_target(&mut self, id: WidgetId) { self.id = id; }

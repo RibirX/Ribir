@@ -1,9 +1,9 @@
-pub use crate::timer::Timer;
 use std::{
   rc::Rc,
   sync::atomic::{AtomicU64, Ordering},
 };
 
+pub use crate::timer::Timer;
 use crate::{
   prelude::*,
   window::{ShellWindow, WindowId},
@@ -54,9 +54,12 @@ impl TestWindow {
     let tree = self.0.widget_tree.borrow();
     let mut node = tree.root();
     for (level, idx) in path[..].iter().enumerate() {
-      node = node.children(&tree.arena).nth(*idx).unwrap_or_else(|| {
-        panic!("node no exist: {:?}", &path[0..level]);
-      });
+      node = node
+        .children(&tree.arena)
+        .nth(*idx)
+        .unwrap_or_else(|| {
+          panic!("node no exist: {:?}", &path[0..level]);
+        });
     }
     tree.store.layout_info(node).cloned()
   }

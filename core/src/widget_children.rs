@@ -95,11 +95,7 @@ impl<T: Render + SingleChild> SingleParent for T {
 
 impl<T: SingleParent> SingleParent for Option<T> {
   fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    if let Some(this) = self {
-      this.compose_child(child, ctx)
-    } else {
-      child
-    }
+    if let Some(this) = self { this.compose_child(child, ctx) } else { child }
   }
 }
 
@@ -177,18 +173,16 @@ impl<W, C1: PairChild, C2> PairWithChild<C2> for Pair<W, C1> {
   #[track_caller]
   fn with_child(self, c: C2, ctx: &BuildCtx) -> Self::Target {
     let Pair { parent: widget, child } = self;
-    Pair {
-      parent: widget,
-      child: child.with_child(c, ctx),
-    }
+    Pair { parent: widget, child: child.with_child(c, ctx) }
   }
 }
 
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::*;
+
   use super::*;
   use crate::{reset_test_env, test_helper::*};
-  use ribir_dev_helper::*;
 
   #[test]
   fn compose_template_child() {
@@ -368,8 +362,7 @@ mod tests {
     impl ComposeChild for X {
       type Child = Widget;
       fn compose_child(
-        _: impl StateWriter<Value = Self>,
-        child: Self::Child,
+        _: impl StateWriter<Value = Self>, child: Self::Child,
       ) -> impl WidgetBuilder {
         fn_widget!(child)
       }

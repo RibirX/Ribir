@@ -1,11 +1,13 @@
-use super::Texture;
-use crate::GPUBackendImpl;
+use std::hash::Hash;
+
 use guillotiere::{Allocation, AtlasAllocator};
 use ribir_algo::FrameCache;
 use ribir_geom::{DeviceRect, DeviceSize};
 use ribir_painter::{image::ColorFormat, AntiAliasing};
 use slab::Slab;
-use std::hash::Hash;
+
+use super::Texture;
+use crate::GPUBackendImpl;
 
 pub const ATLAS_MAX_ITEM: DeviceSize = DeviceSize::new(512, 512);
 pub const ATLAS_MIN_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
@@ -33,7 +35,7 @@ pub(crate) struct Atlas<T: Texture, K, Attr> {
 }
 
 macro_rules! release_handle {
-  ($this: ident, $handle: ident) => {
+  ($this:ident, $handle:ident) => {
     match $handle.atlas_dist {
       AtlasDist::Atlas(alloc) => {
         $this.atlas_allocator.deallocate(alloc.id);
@@ -51,10 +53,7 @@ where
   K: Hash + Eq,
 {
   pub fn new(
-    label: &'static str,
-    format: ColorFormat,
-    anti_aliasing: AntiAliasing,
-    gpu_impl: &mut T::Host,
+    label: &'static str, format: ColorFormat, anti_aliasing: AntiAliasing, gpu_impl: &mut T::Host,
   ) -> Self {
     let texture = gpu_impl.new_texture(ATLAS_MIN_SIZE, anti_aliasing, format);
     Self {
@@ -71,7 +70,9 @@ where
 
   pub fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing, host: &mut T::Host) {
     if self.texture.anti_aliasing() != anti_aliasing {
-      self.texture.set_anti_aliasing(anti_aliasing, host);
+      self
+        .texture
+        .set_anti_aliasing(anti_aliasing, host);
       self.clear();
     }
   }
@@ -79,11 +80,7 @@ where
   /// Allocate a rect in the atlas the caller should draw stull in the
   /// rect. Check if a cache exist before allocate.
   pub fn allocate(
-    &mut self,
-    key: K,
-    attr: Attr,
-    size: DeviceSize,
-    gpu_impl: &mut T::Host,
+    &mut self, key: K, attr: Attr, size: DeviceSize, gpu_impl: &mut T::Host,
   ) -> AtlasHandle<Attr>
   where
     Attr: Copy,
@@ -93,7 +90,9 @@ where
     let mut alloc = self.atlas_allocator.allocate(alloc_size);
 
     if alloc.is_none() {
-      let expand_size = (current_size * 2).max(current_size).min(ATLAS_MAX_SIZE);
+      let expand_size = (current_size * 2)
+        .max(current_size)
+        .min(ATLAS_MAX_SIZE);
       if expand_size != self.texture.size() {
         self.atlas_allocator.grow(expand_size.cast_unit());
         let mut new_tex = gpu_impl.new_texture(
@@ -125,11 +124,8 @@ where
     let atlas_dist = if let Some(alloc) = alloc {
       AtlasDist::Atlas(alloc)
     } else {
-      let texture = gpu_impl.new_texture(
-        size,
-        self.texture.anti_aliasing(),
-        self.texture.color_format(),
-      );
+      let texture =
+        gpu_impl.new_texture(size, self.texture.anti_aliasing(), self.texture.color_format());
       let id = self.extras.insert(texture);
       AtlasDist::Extra(id)
     };
@@ -148,21 +144,13 @@ where
   /// Get a mut reference of a texture that `id` point to. The `id` get from
   /// `AtlasHandle::tex_id`
   pub fn get_texture_mut(&mut self, id: usize) -> &mut T {
-    if id == 0 {
-      &mut self.texture
-    } else {
-      &mut self.extras[id - 1]
-    }
+    if id == 0 { &mut self.texture } else { &mut self.extras[id - 1] }
   }
 
   /// Get a reference of a texture that `id` point to. The `id` get from
   /// `AtlasHandle::tex_id`
   pub fn get_texture(&self, id: usize) -> &T {
-    if id == 0 {
-      &self.texture
-    } else {
-      &self.extras[id - 1]
-    }
+    if id == 0 { &self.texture } else { &self.extras[id - 1] }
   }
 
   pub fn size(&self) -> DeviceSize { self.texture.size() }
@@ -210,8 +198,7 @@ mod tests {
   use futures::executor::block_on;
 
   use super::*;
-  use crate::gpu_backend::tests::headless;
-  use crate::WgpuTexture;
+  use crate::{gpu_backend::tests::headless, WgpuTexture};
   #[test]
   fn atlas_grow_to_alloc() {
     let (mut gpu_impl, _guard) = headless();
@@ -289,7 +276,11 @@ mod tests {
 
     // check sum of the texture.
     assert_eq!(
-      img.pixel_bytes().iter().map(|v| *v as usize).sum::<usize>(),
+      img
+        .pixel_bytes()
+        .iter()
+        .map(|v| *v as usize)
+        .sum::<usize>(),
       icon.area() as usize + SECOND_AREA * 2
     )
   }

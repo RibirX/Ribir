@@ -1,11 +1,13 @@
 //! Theme use to share visual config or style compose logic. It can be defined
 //! to app-wide or particular part of the application.
 
-use crate::{fill_svgs, prelude::*};
+use std::{collections::HashMap, rc::Rc};
+
 use ribir_algo::Sc;
 pub use ribir_algo::{CowArc, ShareResource};
 use ribir_macros::Declare;
-use std::{collections::HashMap, rc::Rc};
+
+use crate::{fill_svgs, prelude::*};
 
 mod palette;
 pub use palette::*;
@@ -19,7 +21,6 @@ mod compose_decorators;
 pub use compose_decorators::*;
 mod custom_styles;
 pub use custom_styles::*;
-
 pub use ribir_painter::*;
 pub use ribir_text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
 
@@ -75,8 +76,7 @@ impl ComposeChild for ThemeWidget {
   type Child = GenWidget;
   #[inline]
   fn compose_child(
-    this: impl StateWriter<Value = Self>,
-    mut child: Self::Child,
+    this: impl StateWriter<Value = Self>, mut child: Self::Child,
   ) -> impl WidgetBuilder {
     use crate::prelude::*;
     fn_widget! {
@@ -171,22 +171,14 @@ impl Default for FullTheme {
 }
 
 fn typography_theme(
-  regular_family: Box<[FontFamily]>,
-  medium_family: Box<[FontFamily]>,
-  decoration: TextDecoration,
+  regular_family: Box<[FontFamily]>, medium_family: Box<[FontFamily]>, decoration: TextDecoration,
   decoration_color: Brush,
 ) -> TypographyTheme {
   let decoration = TextDecorationStyle { decoration, decoration_color };
-  let regular_face = FontFace {
-    families: regular_family.clone(),
-    weight: FontWeight::NORMAL,
-    ..<_>::default()
-  };
-  let medium_face = FontFace {
-    families: medium_family,
-    weight: FontWeight::MEDIUM,
-    ..<_>::default()
-  };
+  let regular_face =
+    FontFace { families: regular_family.clone(), weight: FontWeight::NORMAL, ..<_>::default() };
+  let medium_face =
+    FontFace { families: medium_family, weight: FontWeight::MEDIUM, ..<_>::default() };
 
   TypographyTheme {
     display_large: TextTheme {

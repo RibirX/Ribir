@@ -1,5 +1,6 @@
-use ribir_geom::{Size, Zero};
 use std::ops::Range;
+
+use ribir_geom::{Size, Zero};
 use unicode_script::{Script, UnicodeScript};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -97,13 +98,7 @@ where
   Runs::Item: InputRun,
 {
   pub fn new(inputs: Inputs, cfg: TypographyCfg) -> Self {
-    Self {
-      cfg,
-      inputs,
-      inline_cursor: Em::zero(),
-      visual_lines: vec![],
-      over_bounds: false,
-    }
+    Self { cfg, inputs, inline_cursor: Em::zero(), visual_lines: vec![], over_bounds: false }
   }
 
   pub fn typography_all(mut self) -> VisualInfos {
@@ -199,9 +194,7 @@ where
   }
 
   fn consume_run_with_letter_space_cursor(
-    &mut self,
-    run: &Runs::Item,
-    inner_cursor: &mut impl InlineCursor,
+    &mut self, run: &Runs::Item, inner_cursor: &mut impl InlineCursor,
   ) {
     let letter_space = run
       .letter_space()
@@ -216,8 +209,7 @@ where
   }
 
   fn split_word<'a>(
-    &self,
-    run: &'a Runs::Item,
+    &self, run: &'a Runs::Item,
   ) -> impl Iterator<Item = impl Iterator<Item = &'a Glyph<Em>> + 'a> + 'a {
     let text = run.text();
     let mut reorder_text = String::new();
@@ -226,10 +218,14 @@ where
     // and reorder_text may smaller then src text when have composited glyph,
     // like '👨‍👩‍👦‍👦'
     reorder_text.reserve(text.len());
-    run
-      .glyphs()
-      .iter()
-      .for_each(|gh| reorder_text.push(text[gh.cluster as usize..].chars().next().unwrap()));
+    run.glyphs().iter().for_each(|gh| {
+      reorder_text.push(
+        text[gh.cluster as usize..]
+          .chars()
+          .next()
+          .unwrap(),
+      )
+    });
 
     let mut it = reorder_text.split_word_bounds();
     let mut base = 0;
@@ -441,7 +437,10 @@ impl<'a, I: InlineCursor> InlineCursor for LetterSpaceCursor<'a, I> {
     let cursor = &mut self.inner_cursor;
     cursor.advance_glyph(g, line_offset, origin_text);
 
-    let c = origin_text[g.cluster as usize..].chars().next().unwrap();
+    let c = origin_text[g.cluster as usize..]
+      .chars()
+      .next()
+      .unwrap();
     if letter_spacing_char(c) {
       cursor.advance(self.letter_space);
     }
@@ -470,36 +469,22 @@ impl<'a, I: InlineCursor> InlineCursor for LetterSpaceCursor<'a, I> {
 
 impl PlaceLineDirection {
   pub fn is_horizontal(&self) -> bool {
-    matches!(
-      self,
-      PlaceLineDirection::LeftToRight | PlaceLineDirection::RightToLeft
-    )
+    matches!(self, PlaceLineDirection::LeftToRight | PlaceLineDirection::RightToLeft)
   }
 
   pub fn is_reverse(&self) -> bool {
-    matches!(
-      self,
-      PlaceLineDirection::RightToLeft | PlaceLineDirection::BottomToTop
-    )
+    matches!(self, PlaceLineDirection::RightToLeft | PlaceLineDirection::BottomToTop)
   }
 }
 
 impl VisualLine {
   pub fn line_height(&self, line_dir: PlaceLineDirection) -> Em {
-    if line_dir.is_horizontal() {
-      self.width
-    } else {
-      self.height
-    }
+    if line_dir.is_horizontal() { self.width } else { self.height }
   }
 }
 
 pub(crate) fn text_align_offset(
-  is_horizontal: bool,
-  text_align: TextAlign,
-  bound_width: Em,
-  bound_height: Em,
-  visual_width: Em,
+  is_horizontal: bool, text_align: TextAlign, bound_width: Em, bound_height: Em, visual_width: Em,
   visual_height: Em,
 ) -> (Em, Em) {
   let zero = Em::zero();

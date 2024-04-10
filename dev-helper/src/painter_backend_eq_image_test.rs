@@ -21,7 +21,7 @@ use ribir_painter::{image::ColorFormat, PixelImage};
 /// RIBIR_IMG_TEST=overwrite cargo test -- smoke
 #[macro_export]
 macro_rules! painter_backend_eq_image_test {
-  ($painter_fn: ident) => {
+  ($painter_fn:ident) => {
     paste::paste! {
       #[test]
       fn [<wgpu_ $painter_fn>]() {
@@ -38,7 +38,7 @@ macro_rules! painter_backend_eq_image_test {
 
 #[macro_export]
 macro_rules! test_case_name {
-  ($name: ident, $format: literal) => {{
+  ($name:ident, $format:literal) => {{
     let mut path_buffer = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
     let module_path = std::module_path!();
     let path = module_path.replace("::", "/");
@@ -79,11 +79,7 @@ pub fn assert_texture_eq_png(img: PixelImage, file_path: &std::path::Path) {
       std::slice::from_raw_parts(ptr, expected.pixel_bytes().len() / 4)
     };
     let expected = dssim
-      .create_image_rgba(
-        rgba_expected,
-        expected.width() as usize,
-        expected.height() as usize,
-      )
+      .create_image_rgba(rgba_expected, expected.width() as usize, expected.height() as usize)
       .unwrap();
 
     const TOLERANCE: f64 = 0.0000085;
@@ -93,11 +89,16 @@ pub fn assert_texture_eq_png(img: PixelImage, file_path: &std::path::Path) {
     let mut tmp_file = std::env::temp_dir();
 
     if TOLERANCE <= v {
-      let dur = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+      let dur = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap();
       tmp_file.push(format!(
         "{:?}_{}",
         dur,
-        file_path.file_name().and_then(|f| f.to_str()).unwrap()
+        file_path
+          .file_name()
+          .and_then(|f| f.to_str())
+          .unwrap()
       ));
       let mut file = std::fs::File::create(tmp_file.clone()).unwrap();
       img.write_as_png(&mut file).unwrap();
@@ -118,8 +119,7 @@ pub static SINGLETON_WGPU_GUARD: once_cell::sync::Lazy<std::sync::Mutex<()>> =
 
 /// Render painter by wgpu backend, and return the image.
 pub fn wgpu_render_commands(
-  commands: Vec<ribir_painter::PaintCommand>,
-  viewport: ribir_geom::DeviceRect,
+  commands: Vec<ribir_painter::PaintCommand>, viewport: ribir_geom::DeviceRect,
   surface: ribir_painter::Color,
 ) -> PixelImage {
   use futures::executor::block_on;

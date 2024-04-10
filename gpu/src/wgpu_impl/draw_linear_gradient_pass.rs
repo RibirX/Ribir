@@ -1,10 +1,12 @@
+use std::{mem::size_of, ops::Range};
+
+use ribir_painter::{AntiAliasing, Color, Vertex, VertexBuffers};
+
 use super::{storage::Storage, vertex_buffer::VerticesBuffer};
 use crate::{
   GradientStopPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, TexturesBind,
   WgpuTexture,
 };
-use ribir_painter::{AntiAliasing, Color, Vertex, VertexBuffers};
-use std::{mem::size_of, ops::Range};
 
 pub struct DrawLinearGradientTrianglesPass {
   label: &'static str,
@@ -45,41 +47,34 @@ impl DrawLinearGradientTrianglesPass {
   }
 
   pub fn load_triangles_vertices(
-    &mut self,
-    buffers: &VertexBuffers<LinearGradientPrimIndex>,
-    device: &wgpu::Device,
+    &mut self, buffers: &VertexBuffers<LinearGradientPrimIndex>, device: &wgpu::Device,
     queue: &wgpu::Queue,
   ) {
-    self.vertices_buffer.write_buffer(buffers, device, queue);
+    self
+      .vertices_buffer
+      .write_buffer(buffers, device, queue);
   }
 
   pub fn load_linear_gradient_primitives(
-    &mut self,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    primitives: &[LinearGradientPrimitive],
+    &mut self, device: &wgpu::Device, queue: &wgpu::Queue, primitives: &[LinearGradientPrimitive],
   ) {
-    self.prims_storage.write_buffer(device, queue, primitives);
+    self
+      .prims_storage
+      .write_buffer(device, queue, primitives);
   }
 
   pub fn load_gradient_stops(
-    &mut self,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    stops: &[GradientStopPrimitive],
+    &mut self, device: &wgpu::Device, queue: &wgpu::Queue, stops: &[GradientStopPrimitive],
   ) {
-    self.stops_storage.write_buffer(device, queue, stops);
+    self
+      .stops_storage
+      .write_buffer(device, queue, stops);
   }
 
   #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
-    &mut self,
-    texture: &WgpuTexture,
-    indices: Range<u32>,
-    clear: Option<Color>,
-    device: &wgpu::Device,
-    encoder: &mut wgpu::CommandEncoder,
-    textures_bind: &TexturesBind,
+    &mut self, texture: &WgpuTexture, indices: Range<u32>, clear: Option<Color>,
+    device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, textures_bind: &TexturesBind,
     mask_layer_storage: &Storage<MaskLayer>,
   ) {
     self.update(
@@ -101,10 +96,7 @@ impl DrawLinearGradientTrianglesPass {
     });
 
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
-    rpass.set_index_buffer(
-      self.vertices_buffer.indices().slice(..),
-      wgpu::IndexFormat::Uint32,
-    );
+    rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
     rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
     rpass.set_bind_group(1, self.stops_storage.bind_group(), &[]);
     rpass.set_bind_group(2, self.prims_storage.bind_group(), &[]);
@@ -115,12 +107,8 @@ impl DrawLinearGradientTrianglesPass {
   }
 
   fn update(
-    &mut self,
-    format: wgpu::TextureFormat,
-    anti_aliasing: AntiAliasing,
-    device: &wgpu::Device,
-    textures_bind: &TexturesBind,
-    mask_bind_layout: &wgpu::BindGroupLayout,
+    &mut self, format: wgpu::TextureFormat, anti_aliasing: AntiAliasing, device: &wgpu::Device,
+    textures_bind: &TexturesBind, mask_bind_layout: &wgpu::BindGroupLayout,
   ) {
     if self.format != Some(format)
       || textures_bind.textures_count() != self.textures_count

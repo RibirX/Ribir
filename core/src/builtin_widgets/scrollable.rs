@@ -117,10 +117,10 @@ impl ScrollableWidget {
 
 #[cfg(test)]
 mod tests {
-  use crate::test_helper::{MockBox, TestWindow};
+  use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
   use super::*;
-  use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
+  use crate::test_helper::{MockBox, TestWindow};
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
     let w = fn_widget! {
@@ -142,7 +142,10 @@ mod tests {
     });
 
     wnd.draw_frame();
-    let pos = wnd.layout_info_by_path(&[0, 0, 0, 0]).unwrap().pos;
+    let pos = wnd
+      .layout_info_by_path(&[0, 0, 0, 0])
+      .unwrap()
+      .pos;
     assert_eq!(pos, Point::new(expect_x, expect_y));
   }
 

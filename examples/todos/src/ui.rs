@@ -1,5 +1,6 @@
-use crate::todos::{Task, Todos};
 use ribir::prelude::*;
+
+use crate::todos::{Task, Todos};
 
 impl Compose for Todos {
   fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
@@ -95,8 +96,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
 }
 
 fn input(
-  text: Option<String>,
-  mut on_submit: impl FnMut(CowArc<str>) + 'static,
+  text: Option<String>, mut on_submit: impl FnMut(CowArc<str>) + 'static,
 ) -> impl WidgetBuilder {
   fn_widget! {
     let input = @Input { };
