@@ -25,6 +25,16 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **gpu**: Introduced `GPUBackendImpl::max_textures_per_draw` to set a limit on textures per draw phase (#pr @M-Adoo)
+
+
+### Breaking
+
+- **painter**: Changes to `BackendPainter` APIs. This only affects you if you've implemented a custom painter. (#pr @M-Adoo)
+
+
 ## [0.3.0-alpha.5] - 2024-05-01
 
 

@@ -84,8 +84,8 @@ pub trait ShellWindow {
   /// resolution in physical pixels to the logic pixels for the current display
   /// device.
   fn device_pixel_ratio(&self) -> f32;
-  fn begin_frame(&mut self);
-  fn draw_commands(&mut self, viewport: Rect, commands: Vec<PaintCommand>, surface: Color);
+  fn begin_frame(&mut self, surface_color: Color);
+  fn draw_commands(&mut self, viewport: Rect, commands: Vec<PaintCommand>);
   fn end_frame(&mut self);
 }
 
@@ -189,22 +189,21 @@ impl Window {
     self.update_painter_viewport();
     let draw = self.need_draw() && !self.size().is_empty();
     if draw {
-      self.shell_wnd.borrow_mut().begin_frame();
+      let surface = match AppCtx::app_theme() {
+        Theme::Full(theme) => theme.palette.surface(),
+        Theme::Inherit(_) => unreachable!(),
+      };
+      self.shell_wnd.borrow_mut().begin_frame(surface);
 
       self.layout();
 
       self.widget_tree.borrow().draw();
       self.draw_delay_drop_widgets();
 
-      let surface = match AppCtx::app_theme() {
-        Theme::Full(theme) => theme.palette.surface(),
-        Theme::Inherit(_) => unreachable!(),
-      };
-
       let mut shell = self.shell_wnd.borrow_mut();
       let inner_size = shell.inner_size();
       let paint_cmds = self.painter.borrow_mut().finish();
-      shell.draw_commands(Rect::from_size(inner_size), paint_cmds, surface);
+      shell.draw_commands(Rect::from_size(inner_size), paint_cmds);
 
       shell.end_frame();
     }

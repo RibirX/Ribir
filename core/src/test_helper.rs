@@ -101,6 +101,7 @@ pub struct TestShellWindow {
   pub size: Size,
   pub cursor: CursorIcon,
   pub id: WindowId,
+  pub surface_color: Color,
   pub last_frame: Option<Frame>,
 }
 
@@ -150,10 +151,14 @@ impl ShellWindow for TestShellWindow {
 
   fn as_any_mut(&mut self) -> &mut dyn Any { self }
 
-  fn begin_frame(&mut self) {}
+  fn begin_frame(&mut self, surface: Color) { self.surface_color = surface; }
 
-  fn draw_commands(&mut self, viewport: Rect, commands: Vec<PaintCommand>, surface: Color) {
-    self.last_frame = Some(Frame { commands, viewport, surface });
+  fn draw_commands(&mut self, viewport: Rect, commands: Vec<PaintCommand>) {
+    self.last_frame = Some(Frame {
+      commands,
+      viewport,
+      surface: self.surface_color,
+    });
   }
 
   fn end_frame(&mut self) {}
@@ -172,6 +177,7 @@ impl TestShellWindow {
       cursor: CursorIcon::Default,
       id: ID.fetch_add(1, Ordering::Relaxed).into(),
       last_frame: None,
+      surface_color: Color::WHITE,
     }
   }
 }

@@ -1,4 +1,4 @@
-use std::{error::Error, ops::Range};
+use std::error::Error;
 
 use ribir_geom::{rect_corners, DeviceRect, DeviceSize, Point};
 use ribir_painter::{
@@ -29,20 +29,22 @@ pub struct GPUBackend<Impl: GPUBackendImpl> {
   linear_gradient_prims: Vec<LinearGradientPrimitive>,
   linear_gradient_stops: Vec<GradientStopPrimitive>,
   linear_gradient_vertices_buffer: VertexBuffers<LinearGradientPrimIndex>,
-  draw_indices: Vec<DrawIndices>,
+  current_phase: CurrentPhase,
   tex_ids_map: TextureIdxMap,
   viewport: DeviceRect,
   mask_layers: Vec<MaskLayer>,
   clip_layer_stack: Vec<ClipLayer>,
   skip_clip_cnt: usize,
+  surface_color: Option<Color>,
 }
 
-#[derive(Clone)]
-enum DrawIndices {
-  Color(Range<u32>),
-  Img(Range<u32>),
-  RadialGradient(Range<u32>),
-  LinearGradient(Range<u32>),
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum CurrentPhase {
+  None,
+  Color,
+  Img,
+  RadialGradient,
+  LinearGradient,
 }
 
 struct ClipLayer {
@@ -93,87 +95,52 @@ where
       .set_anti_aliasing(anti_aliasing, &mut self.gpu_impl);
   }
 
-  fn begin_frame(&mut self) {
-    self.tex_mgr.end_frame();
+  fn begin_frame(&mut self, surface: Color) {
+    self.surface_color = Some(surface);
     self.gpu_impl.begin_frame();
   }
 
   fn draw_commands(
-    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, surface: Color,
-    output: &mut Self::Texture,
+    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, output: &mut Self::Texture,
   ) {
-    // todo: batch multi `draw_commands`
-    self.begin_draw_phase(viewport);
-
-    let mut commands = commands.into_iter();
+    self.viewport = viewport;
+    self.begin_draw_phase();
     let output_size = output.size();
-    loop {
-      let Some(cmd) = commands.next() else {
-        break;
+    for cmd in commands.into_iter() {
+      let maybe_used = match cmd {
+        PaintCommand::ImgPath { .. } => 2,
+        PaintCommand::PopClip => 0,
+        _ => 1,
       };
+      if self.tex_ids_map.all_textures().len() + maybe_used
+        >= self.gpu_impl.load_tex_limit_per_draw()
+        || !self.continues_cmd(&cmd)
+      {
+        // if the next command may hit the texture limit, submit the current draw phase.
+        // And start a new draw phase.
+        self.draw_triangles(output);
+        self.end_draw_phase();
+        self.begin_draw_phase();
+
+        assert!(
+          self.tex_ids_map.all_textures().len() + maybe_used
+            < self.gpu_impl.load_tex_limit_per_draw(),
+          "The GPUBackend implementation does not provide a sufficient texture limit per draw."
+        )
+      }
       self.draw_command(cmd, output_size);
     }
-    self.expand_indices_range();
+    self.draw_triangles(output);
+    self.end_draw_phase();
 
     assert!(self.clip_layer_stack.is_empty());
-
-    self.gpu_impl.load_mask_layers(&self.mask_layers);
-    let all_tex_ids = self.tex_ids_map.all_textures();
-    let mut textures = Vec::with_capacity(all_tex_ids.len());
-    for id in all_tex_ids {
-      textures.push(self.tex_mgr.texture(*id));
-    }
-
-    self.gpu_impl.load_textures(&textures);
-    if !self.color_vertices_buffer.indices.is_empty() {
-      self
-        .gpu_impl
-        .load_color_vertices(&self.color_vertices_buffer);
-    }
-    if !self.img_vertices_buffer.indices.is_empty() {
-      self.gpu_impl.load_img_primitives(&self.img_prims);
-      self
-        .gpu_impl
-        .load_img_vertices(&self.img_vertices_buffer);
-    }
-    if !self
-      .radial_gradient_vertices_buffer
-      .indices
-      .is_empty()
-    {
-      self
-        .gpu_impl
-        .load_radial_gradient_primitives(&self.radial_gradient_prims);
-      self
-        .gpu_impl
-        .load_radial_gradient_stops(&self.radial_gradient_stops);
-      self
-        .gpu_impl
-        .load_radial_gradient_vertices(&self.radial_gradient_vertices_buffer);
-    }
-    if !self
-      .linear_gradient_vertices_buffer
-      .indices
-      .is_empty()
-    {
-      self
-        .gpu_impl
-        .load_linear_gradient_primitives(&self.linear_gradient_prims);
-      self
-        .gpu_impl
-        .load_linear_gradient_stops(&self.linear_gradient_stops);
-      self
-        .gpu_impl
-        .load_linear_gradient_vertices(&self.linear_gradient_vertices_buffer);
-    }
-
-    self.tex_mgr.submit(&mut self.gpu_impl);
-    self.layers_submit(output, surface);
-
-    self.end_draw_phase();
   }
 
-  fn end_frame(&mut self) { self.gpu_impl.end_frame(); }
+  fn end_frame(&mut self) {
+    self.mask_layers.clear();
+    self.tex_mgr.end_frame();
+    self.gpu_impl.end_frame();
+  }
 }
 
 impl<Impl: GPUBackendImpl> GPUBackend<Impl>
@@ -198,8 +165,9 @@ where
       linear_gradient_stops: vec![],
       linear_gradient_prims: vec![],
       img_prims: vec![],
-      draw_indices: vec![],
+      current_phase: CurrentPhase::None,
       viewport: DeviceRect::zero(),
+      surface_color: Some(Color::WHITE),
     }
   }
 
@@ -213,18 +181,16 @@ where
     match cmd {
       PaintCommand::ColorPath { path, color } => {
         if let Some((rect, mask_head)) = self.new_mask_layer(path) {
-          self.update_to_color_indices();
           let color = color.into_components();
           let color_attr = ColorAttr { color, mask_head };
           let buffer = &mut self.color_vertices_buffer;
           add_draw_rect_vertices(rect, output_tex_size, color_attr, buffer);
+          self.current_phase = CurrentPhase::Color;
         }
       }
       PaintCommand::ImgPath { path, img, opacity } => {
         let ts = path.transform;
         if let Some((rect, mask_head)) = self.new_mask_layer(path) {
-          self.update_to_img_indices();
-
           let img_slice = self.tex_mgr.store_image(&img, &mut self.gpu_impl);
           let img_start = img_slice.rect.origin.to_f32().to_array();
           let img_size = img_slice.rect.size.to_f32().to_array();
@@ -242,12 +208,12 @@ where
           self.img_prims.push(prim);
           let buffer = &mut self.img_vertices_buffer;
           add_draw_rect_vertices(rect, output_tex_size, ImagePrimIndex(prim_idx), buffer);
+          self.current_phase = CurrentPhase::Img;
         }
       }
       PaintCommand::RadialGradient { path, radial_gradient } => {
         let ts = path.transform;
         if let Some((rect, mask_head)) = self.new_mask_layer(path) {
-          self.update_to_radial_gradient_indices();
           let prim: RadialGradientPrimitive = RadialGradientPrimitive {
             transform: ts.inverse().unwrap().to_array(),
             stop_start: self.radial_gradient_stops.len() as u32,
@@ -270,12 +236,12 @@ where
           let buffer = &mut self.radial_gradient_vertices_buffer;
 
           add_draw_rect_vertices(rect, output_tex_size, RadialGradientPrimIndex(prim_idx), buffer);
+          self.current_phase = CurrentPhase::RadialGradient;
         }
       }
       PaintCommand::LinearGradient { path, linear_gradient } => {
         let ts = path.transform;
         if let Some((rect, mask_head)) = self.new_mask_layer(path) {
-          self.update_to_linear_gradient_indices();
           let prim: LinearGradientPrimitive = LinearGradientPrimitive {
             transform: ts.inverse().unwrap().to_array(),
             stop_start: self.linear_gradient_stops.len() as u32,
@@ -295,6 +261,7 @@ where
           self.linear_gradient_prims.push(prim);
           let buffer = &mut self.linear_gradient_vertices_buffer;
           add_draw_rect_vertices(rect, output_tex_size, LinearGradientPrimIndex(prim_idx), buffer);
+          self.current_phase = CurrentPhase::LinearGradient;
         }
       }
       PaintCommand::Clip(path) => {
@@ -325,10 +292,31 @@ where
     }
   }
 
-  fn begin_draw_phase(&mut self, viewport: DeviceRect) {
-    self.tex_ids_map.new_phase();
-    self.viewport = viewport;
-    self.tex_ids_map.tex_idx(TextureID::Alpha(0));
+  fn begin_draw_phase(&mut self) {
+    self.current_phase = CurrentPhase::None;
+    if !self.clip_layer_stack.is_empty() {
+      // clear unused mask layers and update mask index.
+      let mut retain_masks = Vec::with_capacity(self.clip_layer_stack.len());
+      for s in self.clip_layer_stack.iter_mut() {
+        retain_masks.push(s.mask_idx);
+        s.mask_idx = retain_masks.len() as i32 - 1;
+      }
+      self.mask_layers = retain_masks
+        .iter()
+        .map(|&idx| self.mask_layers[idx as usize].clone())
+        .collect();
+
+      // update the texture index of mask layers in new draw phase.
+      let tex_map = self.tex_ids_map.textures.clone();
+      self.tex_ids_map.reset();
+      for l in self.mask_layers.iter_mut() {
+        let tex_id = tex_map[l.mask_tex_idx as usize];
+        l.mask_tex_idx = self.tex_ids_map.tex_idx(tex_id);
+      }
+    } else {
+      self.tex_ids_map.reset();
+      self.mask_layers.clear();
+    }
   }
 
   fn end_draw_phase(&mut self) {
@@ -337,7 +325,6 @@ where
     self.img_vertices_buffer.vertices.clear();
     self.img_vertices_buffer.indices.clear();
     self.img_prims.clear();
-    self.mask_layers.clear();
     self
       .radial_gradient_vertices_buffer
       .indices
@@ -356,60 +343,17 @@ where
     self.linear_gradient_stops.clear();
   }
 
-  fn update_to_color_indices(&mut self) {
-    if !matches!(self.draw_indices.last(), Some(DrawIndices::Color(_))) {
-      self.expand_indices_range();
-      let start = self.color_vertices_buffer.indices.len() as u32;
-      self
-        .draw_indices
-        .push(DrawIndices::Color(start..start));
+  fn continues_cmd(&self, cmd: &PaintCommand) -> bool {
+    match (self.current_phase, cmd) {
+      (CurrentPhase::None, _) => true,
+      (_, PaintCommand::Clip(_))
+      | (_, PaintCommand::PopClip)
+      | (CurrentPhase::Color, PaintCommand::ColorPath { .. })
+      | (CurrentPhase::Img, PaintCommand::ImgPath { .. })
+      | (CurrentPhase::RadialGradient, PaintCommand::RadialGradient { .. })
+      | (CurrentPhase::LinearGradient, PaintCommand::LinearGradient { .. }) => true,
+      _ => false,
     }
-  }
-
-  fn update_to_img_indices(&mut self) {
-    if !matches!(self.draw_indices.last(), Some(DrawIndices::Img(_))) {
-      self.expand_indices_range();
-      let start = self.img_vertices_buffer.indices.len() as u32;
-      self
-        .draw_indices
-        .push(DrawIndices::Img(start..start));
-    }
-  }
-
-  fn update_to_radial_gradient_indices(&mut self) {
-    if !matches!(self.draw_indices.last(), Some(DrawIndices::RadialGradient(_))) {
-      self.expand_indices_range();
-      let start = self.radial_gradient_vertices_buffer.indices.len() as u32;
-      self
-        .draw_indices
-        .push(DrawIndices::RadialGradient(start..start));
-    }
-  }
-
-  fn update_to_linear_gradient_indices(&mut self) {
-    if !matches!(self.draw_indices.last(), Some(DrawIndices::LinearGradient(_))) {
-      self.expand_indices_range();
-      let start = self.linear_gradient_vertices_buffer.indices.len() as u32;
-      self
-        .draw_indices
-        .push(DrawIndices::LinearGradient(start..start));
-    }
-  }
-
-  fn expand_indices_range(&mut self) -> Option<&DrawIndices> {
-    let cmd = self.draw_indices.last_mut()?;
-    match cmd {
-      DrawIndices::Color(rg) => rg.end = self.color_vertices_buffer.indices.len() as u32,
-      DrawIndices::Img(rg) => rg.end = self.img_vertices_buffer.indices.len() as u32,
-      DrawIndices::RadialGradient(rg) => {
-        rg.end = self.radial_gradient_vertices_buffer.indices.len() as u32
-      }
-      DrawIndices::LinearGradient(rg) => {
-        rg.end = self.linear_gradient_vertices_buffer.indices.len() as u32
-      }
-    };
-
-    Some(&*cmd)
   }
 
   fn current_clip_mask_index(&self) -> i32 {
@@ -460,44 +404,57 @@ where
     Some((points, index as i32))
   }
 
-  fn layers_submit(&mut self, output: &mut Impl::Texture, surface: Color) {
-    let mut color = Some(surface);
-    if self.draw_indices.is_empty() {
-      self
-        .gpu_impl
-        .draw_color_triangles(output, 0..0, color.take())
-    } else {
-      self
-        .draw_indices
-        .drain(..)
-        .for_each(|indices| match indices {
-          DrawIndices::Color(rg) => self
-            .gpu_impl
-            .draw_color_triangles(output, rg, color.take()),
-          DrawIndices::Img(rg) => self
-            .gpu_impl
-            .draw_img_triangles(output, rg, color.take()),
-          DrawIndices::RadialGradient(rg) => {
-            self
-              .gpu_impl
-              .draw_radial_gradient_triangles(output, rg, color.take())
-          }
-          DrawIndices::LinearGradient(rg) => {
-            self
-              .gpu_impl
-              .draw_linear_gradient_triangles(output, rg, color.take())
-          }
-        });
+  fn draw_triangles(&mut self, output: &mut Impl::Texture) {
+    let mut color = self.surface_color.take();
+    let gpu_impl = &mut self.gpu_impl;
+
+    self.tex_mgr.draw_alpha_textures(gpu_impl);
+    gpu_impl.load_mask_layers(&self.mask_layers);
+
+    let textures = self.tex_ids_map.all_textures();
+    let max_textures = gpu_impl.load_tex_limit_per_draw();
+    let mut tex_buffer = Vec::with_capacity(max_textures);
+    textures
+      .into_iter()
+      .take(max_textures)
+      .for_each(|id| {
+        tex_buffer.push(self.tex_mgr.texture(*id));
+      });
+
+    gpu_impl.load_textures(&tex_buffer);
+
+    match self.current_phase {
+      CurrentPhase::None => gpu_impl.draw_color_triangles(output, 0..0, color.take()),
+      CurrentPhase::Color => {
+        gpu_impl.load_color_vertices(&self.color_vertices_buffer);
+        let rg = 0..self.color_vertices_buffer.indices.len() as u32;
+        gpu_impl.draw_color_triangles(output, rg, color.take())
+      }
+      CurrentPhase::Img => {
+        gpu_impl.load_img_primitives(&self.img_prims);
+        gpu_impl.load_img_vertices(&self.img_vertices_buffer);
+        let rg = 0..self.img_vertices_buffer.indices.len() as u32;
+        gpu_impl.draw_img_triangles(output, rg, color.take())
+      }
+      CurrentPhase::RadialGradient => {
+        gpu_impl.load_radial_gradient_primitives(&self.radial_gradient_prims);
+        gpu_impl.load_radial_gradient_stops(&self.radial_gradient_stops);
+        gpu_impl.load_radial_gradient_vertices(&self.radial_gradient_vertices_buffer);
+        let rg = 0..self.radial_gradient_vertices_buffer.indices.len() as u32;
+        gpu_impl.draw_radial_gradient_triangles(output, rg, color.take())
+      }
+      CurrentPhase::LinearGradient => {
+        gpu_impl.load_linear_gradient_primitives(&self.linear_gradient_prims);
+        gpu_impl.load_linear_gradient_stops(&self.linear_gradient_stops);
+        gpu_impl.load_linear_gradient_vertices(&self.linear_gradient_vertices_buffer);
+        let rg = 0..self.linear_gradient_vertices_buffer.indices.len() as u32;
+        gpu_impl.draw_linear_gradient_triangles(output, rg, color.take())
+      }
     }
   }
 }
 
 impl TextureIdxMap {
-  fn new_phase(&mut self) {
-    self.texture_map.clear();
-    self.textures.clear();
-  }
-
   fn tex_idx(&mut self, id: TextureID) -> u32 {
     *self.texture_map.entry(id).or_insert_with(|| {
       let idx = self.textures.len();
@@ -507,6 +464,11 @@ impl TextureIdxMap {
   }
 
   fn all_textures(&self) -> &[TextureID] { &self.textures }
+
+  fn reset(&mut self) {
+    self.texture_map.clear();
+    self.textures.clear();
+  }
 }
 
 pub fn vertices_coord(pos: Point, tex_size: DeviceSize) -> [f32; 2] {
@@ -538,7 +500,7 @@ mod tests {
   use ribir_algo::ShareResource;
   use ribir_dev_helper::*;
   use ribir_geom::*;
-  use ribir_painter::{Brush, Painter, Path, Svg};
+  use ribir_painter::{Brush, Painter, Path, Radius, Svg};
 
   use super::*;
 
@@ -693,4 +655,21 @@ mod tests {
     painter.draw_svg(&svg);
     painter
   }
+
+  fn multi_draw_phase() -> Painter {
+    let mut painter = painter(Size::new(1048., 1048.));
+
+    let rect = Rect::from_size(Size::new(1024., 1024.));
+    for i in 0..100 {
+      let mut painter = painter.save_guard();
+      painter.translate(i as f32 * 10., i as f32 * 10.);
+      let color = if i % 2 == 0 { Color::GREEN } else { Color::RED };
+      painter
+        .set_brush(color)
+        .rect_round(&rect, &Radius::all(i as f32))
+        .fill();
+    }
+    painter
+  }
+  painter_backend_eq_image_test!(multi_draw_phase);
 }

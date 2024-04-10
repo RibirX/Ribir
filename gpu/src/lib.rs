@@ -19,31 +19,49 @@ pub use wgpu_impl::*;
 ///
 /// -- begin_frame()
 
-///   |
-///   |    +->- new_texture()----+                          
-///   |    +-<-------<------<----+
-///   |
-///   | -> load_alpha_vertices()
-///   |
-///   | -> + draw_alpha_triangles_with_scissor()--+    
-///   |    ^                                      v
-///   |    ^----<-----------<---------------------+    
-///   |                                                
-///   | -> + draw_alpha_triangles()---------------+    
-///   |    ^                                      v
-///   |    +----<-----------<---------------------+  
-///   |
-///   | -> load_mask_layers()
-///   | -> load_textures()                             
-///   | -> load_img_primitives()
-///   | -> load_color_vertices()                   
-///   | -> load_image_vertices()                     
-///   |                                                                
-///   |         +--- draw_color_triangles()----+            
-///   |      +->+                              +---+        
-///   |      |  +--- draw_img_triangles()------+   |        
-///   |      +------<------------------------------+        
-///   |
+///   +--->-------- Draw Phase --------------------------+
+///   |                                                  |
+///   |    +->- new_texture()----+                       |   
+///   |    +-<-------<------<----+                       |
+///   |                                                  v
+///   | -> load_alpha_vertices()                         |
+///   |                                                  |
+///   | -> + draw_alpha_triangles_with_scissor()--+      |
+///   |    ^                                      v      |
+///   |    ^----<-----------<---------------------+      |
+///   |                                                  |
+///   | -> + draw_alpha_triangles()---------------+      |
+///   |    ^                                      v      |
+///   |    +----<-----------<---------------------+      |
+///   |                                                  |
+///   | -> load_textures()                               |
+///   | -> load_mask_layers()                            |
+///   |                                                  |    
+///   |        +--------------------------+              |
+///   |        |  load_color_vertices()   |              |
+///   |     +->|  draw_color_triangles()  |              |
+///   |     |  +--------------------------+              |
+///   |     |                                            |
+///   |     |  +--------------------------+              |
+///   |     |  | load_img_primitives()    |              |
+///   |     +->| load_image_vertices()    |              |
+///   |     |  | draw_img_triangles()     |              |
+///   |     |  +--------------------------+              |
+///   |     |                                            |
+///   | ->  |  +------------------------------------+    |
+///   |     |  | load_radial_gradient_primitives()  |    v
+///   |     +->| load_radial_gradient_stops()       |    |
+///   |     |  | load_radial_gradient_vertices()    |    |
+///   |     |  | draw_radial_gradient_triangles()   |    |
+///   |     |  +------------------------------------+    |
+///   |     |                                            |
+///   |     |  +------------------------------------+    |
+///   |     |  | load_linear_gradient_primitives()  |    |
+///   |     +->| load_linear_gradient_stops()       |    |
+///   |        | load_linear_gradient_vertices()    |    |
+///   |        | draw_linear_gradient_triangles()   |    |
+///   |        +------------------------------------+    |
+///   +---<----------------------------------------------+
 ///
 /// -+ ->- end_frame()
 ///
@@ -63,6 +81,11 @@ pub trait GPUBackendImpl {
 
   /// A frame start, call once per frame
   fn begin_frame(&mut self);
+
+  /// Returns the maximum number of textures that the backend can load in a
+  /// single draw phase.
+  #[inline]
+  fn load_tex_limit_per_draw(&self) -> usize { 8 }
 
   /// Create a texture.
   fn new_texture(
@@ -242,7 +265,7 @@ pub struct ImgPrimitive {
   pub img_start: [f32; 2],
   /// The size of the image image.
   pub img_size: [f32; 2],
-  /// The index of texture, `load_color_primitives` method provide all textures
+  /// The index of texture, `load_textures` method provide all textures
   /// a draw phase need.
   pub img_tex_idx: u32,
   /// The index of the head mask layer.
@@ -255,7 +278,7 @@ pub struct ImgPrimitive {
 
 /// The mask layer describes an alpha channel layer that is used in the fragment
 /// shader to sample the alpha channel and apply it to the color.
-#[derive(AsBytes)]
+#[derive(AsBytes, Clone)]
 #[repr(packed)]
 pub struct MaskLayer {
   /// A 2x3 column-major matrix, transform a vertex position to its mask texture
@@ -266,7 +289,7 @@ pub struct MaskLayer {
   /// max min position this layer in the texture.
   pub max: [f32; 2],
   /// The index of the texture(alpha) that contained this layer,
-  /// `load_color_primitives` method provide all textures a draw phase need.
+  /// `load_textures` method provide all textures a draw phase need.
   pub mask_tex_idx: u32,
   /// The index of the previous mask layer needs to continue to be applied. The
   /// negative value means there isn't any more mask layer that needs to be

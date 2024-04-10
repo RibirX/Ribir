@@ -126,8 +126,8 @@ pub fn wgpu_render_commands(
   let mut texture = gpu_impl.new_texture(rect.size, AntiAliasing::None, ColorFormat::Rgba8);
   let mut backend = GPUBackend::new(gpu_impl, AntiAliasing::None);
 
-  backend.begin_frame();
-  backend.draw_commands(rect, commands, surface, &mut texture);
+  backend.begin_frame(surface);
+  backend.draw_commands(rect, commands, &mut texture);
   let img = texture.copy_as_image(&rect, backend.get_impl_mut());
   backend.end_frame();
   block_on(img).unwrap()
