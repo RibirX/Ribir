@@ -124,6 +124,6 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "visible" => BuiltinMember { host_ty: "Visibility", mem_ty: Field, var_name: "visibility" },
   // Opacity
   "opacity" => BuiltinMember { host_ty: "Opacity", mem_ty: Field, var_name: "opacity" },
-  // DelayDrop
-  "delay_drop_until" => BuiltinMember { host_ty: "DelayDrop", mem_ty: Field, var_name: "delay_drop" },
+  // KeepAlive
+  "keep_alive" => BuiltinMember { host_ty: "KeepAlive", mem_ty: Field, var_name: "keep_alive" },
 };

@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+- **core**: rename builtin field of delay_drop_until to keep_alive (#561 @wjian23)
+
 ## [0.3.0-alpha.4] - 2024-04-17
 
 ## [0.3.0-alpha.3] - 2024-04-10

@@ -46,7 +46,7 @@ pub struct Window {
   priority_task_queue: PriorityTaskQueue<'static>,
   shell_wnd: RefCell<Box<dyn ShellWindow>>,
   /// A vector store the widget id pair of (parent, child). The child need to
-  /// drop after its `DelayDrop::delay_drop_until` be false or its parent
+  /// drop after its `KeepAlive::keep_alive` be false or its parent
   /// is dropped.
   ///
   /// This widgets it's detached from its parent, but still need to paint.
@@ -380,7 +380,7 @@ impl Window {
       let tree = self.widget_tree.borrow();
       let drop_conditional = wid
         .assert_get(&self.widget_tree.borrow().arena)
-        .query_most_outside(|d: &DelayDrop| d.delay_drop_until)
+        .query_most_outside(|d: &KeepAlive| !d.keep_alive)
         .unwrap_or(true);
       let parent_dropped = parent.map_or(false, |p| {
         p.is_dropped(&tree.arena) || p.ancestors(&tree.arena).last() != Some(tree.root())
@@ -445,11 +445,11 @@ impl Window {
               self.emit(id, &mut e);
             });
 
-          let delay_drop = id
+          let keep_alive = id
             .assert_get(&self.widget_tree.borrow().arena)
-            .contain_type::<DelayDrop>();
+            .contain_type::<KeepAlive>();
 
-          if delay_drop {
+          if keep_alive {
             self
               .delay_drop_widgets
               .borrow_mut()

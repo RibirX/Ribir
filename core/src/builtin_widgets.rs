@@ -7,9 +7,9 @@ pub mod key;
 use std::cell::Cell;
 
 pub use key::{Key, KeyWidget};
-pub mod delay_drop;
 pub mod image_widget;
-pub use delay_drop::*;
+pub mod keep_alive;
+pub use keep_alive::*;
 mod theme;
 use ribir_algo::Sc;
 pub use theme::*;
@@ -120,8 +120,8 @@ pub struct FatObj<T> {
   global_anchor: Option<State<GlobalAnchor>>,
   visibility: Option<State<Visibility>>,
   opacity: Option<State<Opacity>>,
-  delay_drop: Option<State<DelayDrop>>,
-  delay_drop_unsubscribe_handle: Option<Box<dyn Any>>,
+  keep_alive: Option<State<KeepAlive>>,
+  keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
 }
 
 impl LazyWidgetId {
@@ -164,8 +164,8 @@ impl<T> FatObj<T> {
       global_anchor: None,
       visibility: None,
       opacity: None,
-      delay_drop: None,
-      delay_drop_unsubscribe_handle: None,
+      keep_alive: None,
+      keep_alive_unsubscribe_handle: None,
     }
   }
 
@@ -197,8 +197,8 @@ impl<T> FatObj<T> {
       global_anchor: self.global_anchor,
       visibility: self.visibility,
       opacity: self.opacity,
-      delay_drop: self.delay_drop,
-      delay_drop_unsubscribe_handle: self.delay_drop_unsubscribe_handle,
+      keep_alive: self.keep_alive,
+      keep_alive_unsubscribe_handle: self.keep_alive_unsubscribe_handle,
     }
   }
 
@@ -225,7 +225,7 @@ impl<T> FatObj<T> {
       && self.global_anchor.is_none()
       && self.visibility.is_none()
       && self.opacity.is_none()
-      && self.delay_drop.is_none()
+      && self.keep_alive.is_none()
   }
 
   /// Return the host object of the FatObj.
@@ -399,11 +399,11 @@ impl<T> FatObj<T> {
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 
-  /// Returns the `State<DelayDrop>` widget from the FatObj. If it doesn't
+  /// Returns the `State<KeepAlive>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_delay_drop_widget(&mut self) -> &mut State<DelayDrop> {
+  pub fn get_keep_alive_widget(&mut self) -> &mut State<KeepAlive> {
     self
-      .delay_drop
+      .keep_alive
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 }
@@ -899,27 +899,27 @@ impl<T> FatObj<T> {
     })
   }
 
-  /// Initializes the `delay_drop_until` value of the `DelayDrop` widget.
-  pub fn delay_drop_until<V, M>(mut self, v: V) -> Self
+  /// Initializes the `keep_alive` value of the `KeepAlive` widget.
+  pub fn keep_alive<V, M>(mut self, v: V) -> Self
   where
     DeclareInit<bool>: DeclareFrom<V, M>,
   {
     let (v, o) = DeclareInit::declare_from(v).unzip();
-    let d = self.get_delay_drop_widget();
-    d.write().delay_drop_until = v;
+    let d = self.get_keep_alive_widget();
+    d.write().keep_alive = v;
     if let Some(o) = o {
       let c_delay = d.clone_writer();
 
-      // DelayDropWidget may continue to exist after `on_disposed` is fired. It needs
+      // KeepAliveWidget may continue to exist after `on_disposed` is fired. It needs
       // to accept value changes to determine when to drop. So instead of
       // unsubscribing in `on_disposed`, we unsubscribe when the widget node is
       // dropped.
       let u = o
         .subscribe(move |(_, v)| {
-          c_delay.write().delay_drop_until = v;
+          c_delay.write().keep_alive = v;
         })
         .unsubscribe_when_dropped();
-      self.delay_drop_unsubscribe_handle = Some(Box::new(u));
+      self.keep_alive_unsubscribe_handle = Some(Box::new(u));
     }
     self
   }
@@ -1024,10 +1024,10 @@ impl WidgetBuilder for FatObj<Widget> {
     if let Some(opacity) = self.opacity {
       host = opacity.with_child(host, ctx).build(ctx);
     }
-    if let Some(delay_drop) = self.delay_drop {
-      host = delay_drop.with_child(host, ctx).build(ctx);
+    if let Some(keep_alive) = self.keep_alive {
+      host = keep_alive.with_child(host, ctx).build(ctx);
     }
-    if let Some(h) = self.delay_drop_unsubscribe_handle {
+    if let Some(h) = self.keep_alive_unsubscribe_handle {
       let arena = &mut ctx.tree.borrow_mut().arena;
       host.id().attach_anonymous_data(h, arena);
     }
