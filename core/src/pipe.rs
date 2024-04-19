@@ -1394,7 +1394,7 @@ mod tests {
     fn build(task: Writer<Task>) -> impl WidgetBuilder {
       fn_widget! {
        @TaskWidget {
-          delay_drop_until: pipe!(!$task.pin),
+          keep_alive: pipe!($task.pin),
           layout_cnt: pipe!($task.layout_cnt.clone()),
           paint_cnt: pipe!($task.paint_cnt.clone()),
           trigger: pipe!($task.trigger),
@@ -1519,10 +1519,10 @@ mod tests {
       @MockMulti {
         @ { pipe!(*$child).map(move |_| {
           @MockMulti {
-            delay_drop_until: pipe!(*$child_destroy_until),
+            keep_alive: pipe!(!*$child_destroy_until),
             @ { pipe!(*$grandson).map(move |_| {
               @MockBox {
-                delay_drop_until: pipe!(*$grandson_destroy_until),
+                keep_alive: pipe!(!*$grandson_destroy_until),
                 size: Size::zero(),
               }
             })}

@@ -95,7 +95,7 @@ impl ComposeChild for Ripple {
           });
 
           Some(@IgnorePointer {
-            delay_drop_until: pipe!(!$ripper_fade_out.is_running()),
+            keep_alive: pipe!($ripper_fade_out.is_running()),
             on_disposed: move |_| $ripple.write().opacity = 0.,
             on_mounted: move |_| { ripper_enter.run(); },
             @Container {

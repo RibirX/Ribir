@@ -552,12 +552,12 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
-        #[doc="Initializes the `delay_drop_until` value of the `DelayDrop` widget."]
-        #vis fn delay_drop_until<_M, _V>(mut self, v: _V) -> Self
+        #[doc="Initializes the `keep_alive` value of the `KeepAlive` widget."]
+        #vis fn keep_alive<_M, _V>(mut self, v: _V) -> Self
         where
           DeclareInit<bool>: DeclareFrom<_V, _M>,
         {
-          self.fat_obj = self.fat_obj.delay_drop_until(v);
+          self.fat_obj = self.fat_obj.keep_alive(v);
           self
         }
 
