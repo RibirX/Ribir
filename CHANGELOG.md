@@ -27,16 +27,18 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **gpu**: Introduced `GPUBackendImpl::max_textures_per_draw` to set a limit on textures per draw phase (#pr @M-Adoo)
+- **gpu**: Introduced `GPUBackendImpl::max_textures_per_draw` to set a limit on textures per draw phase (#562 @M-Adoo)
 
+### Changed
+
+- **gpu**: Removed dependency on the texture array feature of wgpu. (#562, @M-Adoo)
 
 ### Breaking
 
-- **painter**: Changes to `BackendPainter` APIs. This only affects you if you've implemented a custom painter. (#pr @M-Adoo)
+- **painter**: Changes to `BackendPainter` APIs. This only affects you if you've implemented a custom painter. (#562 @M-Adoo)
 
 
 ## [0.3.0-alpha.5] - 2024-05-01
-
 
 ### Features
 

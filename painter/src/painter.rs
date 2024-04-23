@@ -51,10 +51,7 @@ pub trait PainterBackend {
   /// You should guarantee the output be same one in the same frame, otherwise
   /// it may cause undefined behavior.
   fn draw_commands(
-    &mut self,
-    viewport: DeviceRect,
-    commands: Vec<PaintCommand>,
-    output: &mut Self::Texture,
+    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, output: &mut Self::Texture,
   );
 
   /// A frame end.

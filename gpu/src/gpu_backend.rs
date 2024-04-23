@@ -344,16 +344,16 @@ where
   }
 
   fn continues_cmd(&self, cmd: &PaintCommand) -> bool {
-    match (self.current_phase, cmd) {
-      (CurrentPhase::None, _) => true,
-      (_, PaintCommand::Clip(_))
-      | (_, PaintCommand::PopClip)
-      | (CurrentPhase::Color, PaintCommand::ColorPath { .. })
-      | (CurrentPhase::Img, PaintCommand::ImgPath { .. })
-      | (CurrentPhase::RadialGradient, PaintCommand::RadialGradient { .. })
-      | (CurrentPhase::LinearGradient, PaintCommand::LinearGradient { .. }) => true,
-      _ => false,
-    }
+    matches!(
+      (self.current_phase, cmd),
+      (CurrentPhase::None, _)
+        | (_, PaintCommand::Clip(_))
+        | (_, PaintCommand::PopClip)
+        | (CurrentPhase::Color, PaintCommand::ColorPath { .. })
+        | (CurrentPhase::Img, PaintCommand::ImgPath { .. })
+        | (CurrentPhase::RadialGradient, PaintCommand::RadialGradient { .. })
+        | (CurrentPhase::LinearGradient, PaintCommand::LinearGradient { .. })
+    )
   }
 
   fn current_clip_mask_index(&self) -> i32 {
@@ -414,12 +414,9 @@ where
     let textures = self.tex_ids_map.all_textures();
     let max_textures = gpu_impl.load_tex_limit_per_draw();
     let mut tex_buffer = Vec::with_capacity(max_textures);
-    textures
-      .into_iter()
-      .take(max_textures)
-      .for_each(|id| {
-        tex_buffer.push(self.tex_mgr.texture(*id));
-      });
+    textures.iter().take(max_textures).for_each(|id| {
+      tex_buffer.push(self.tex_mgr.texture(*id));
+    });
 
     gpu_impl.load_textures(&tex_buffer);
 
