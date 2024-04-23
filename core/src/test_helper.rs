@@ -154,11 +154,7 @@ impl ShellWindow for TestShellWindow {
   fn begin_frame(&mut self, surface: Color) { self.surface_color = surface; }
 
   fn draw_commands(&mut self, viewport: Rect, commands: Vec<PaintCommand>) {
-    self.last_frame = Some(Frame {
-      commands,
-      viewport,
-      surface: self.surface_color,
-    });
+    self.last_frame = Some(Frame { commands, viewport, surface: self.surface_color });
   }
 
   fn end_frame(&mut self) {}

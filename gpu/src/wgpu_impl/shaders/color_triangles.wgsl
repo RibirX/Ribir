@@ -35,9 +35,23 @@ struct MaskLayer {
 var<storage> mask_layers: array<MaskLayer>;
 
 @group(1) @binding(0)
-var textures: binding_array<texture_2d<f32>>;
+var s_sampler: sampler;
 @group(1) @binding(1)
-var samplers: binding_array<sampler>;
+var tex_0: texture_2d<f32>;
+@group(1) @binding(2)
+var tex_1: texture_2d<f32>;
+@group(1) @binding(3)
+var tex_2: texture_2d<f32>;
+@group(1) @binding(4)
+var tex_3: texture_2d<f32>;
+@group(1) @binding(5)
+var tex_4: texture_2d<f32>;
+@group(1) @binding(6)
+var tex_5: texture_2d<f32>;
+@group(1) @binding(7)
+var tex_6: texture_2d<f32>;
+@group(1) @binding(8)
+var tex_7: texture_2d<f32>;
 
 
 @fragment
@@ -56,13 +70,51 @@ fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
             break;
         }
 
-        let mask_tex_idx = mask.mask_tex_idx;
-        let texture = textures[mask_tex_idx];
-        let s_sampler = samplers[mask_tex_idx];
+        var alpha = 0.;
+        switch mask.mask_tex_idx {
+            case 0u: {
+                let tex_size = textureDimensions(tex_0);
+                mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
+                alpha = textureSampleLevel(tex_0, s_sampler, mask_pos, 0.).r;
+            }
+            case 1u: {
+                let tex_size = textureDimensions(tex_1);
+                mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
+                alpha = textureSampleLevel(tex_1, s_sampler, mask_pos, 0.).r;
+            }
+            case 2u: {
+                let tex_size = textureDimensions(tex_2);
+                mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
+                alpha = textureSampleLevel(tex_2, s_sampler, mask_pos, 0.).r;
+            }
+            case 3u: {
+                let tex_size = textureDimensions(tex_3);
+                mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
+                alpha = textureSampleLevel(tex_3, s_sampler, mask_pos, 0.).r;
+            }
+            case 4u: {
+                let tex_size = textureDimensions(tex_4);
+                mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
+                alpha = textureSampleLevel(tex_4, s_sampler, mask_pos, 0.).r;
+            }
+            case 5u: {
+                let tex_size = textureDimensions(tex_5);
+                mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
+                alpha = textureSampleLevel(tex_5, s_sampler, mask_pos, 0.).r;
+            }
+            case 6u: {
+                let tex_size = textureDimensions(tex_6);
+                mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
+                alpha = textureSampleLevel(tex_6, s_sampler, mask_pos, 0.).r;
+            }
+            case 7u: {
+                let tex_size = textureDimensions(tex_7);
+                mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
+                alpha = textureSampleLevel(tex_7, s_sampler, mask_pos, 0.).r;
+            }
+            default: { alpha = 0.; }
+        };
 
-        let tex_size = textureDimensions(texture);
-        mask_pos = mask_pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
-        let alpha = textureSampleLevel(texture, s_sampler, mask_pos, 0.).r;
         if alpha == 0. {
             color.a = 0.;
             break;

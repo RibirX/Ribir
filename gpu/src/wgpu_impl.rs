@@ -1,4 +1,4 @@
-use std::{error::Error, num::NonZeroU32, ops::Range};
+use std::{error::Error, mem::MaybeUninit, ops::Range};
 
 use futures::channel::oneshot;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
@@ -41,16 +41,9 @@ pub struct WgpuImpl {
   img_triangles_pass: DrawImgTrianglesPass,
   radial_gradient_pass: DrawRadialGradientTrianglesPass,
   linear_gradient_pass: DrawLinearGradientTrianglesPass,
-
-  textures_bind: TexturesBind,
-  mask_layers_storage: Storage<MaskLayer>,
-}
-
-#[derive(Default)]
-pub struct TexturesBind {
-  texture_cnt: usize,
+  texs_layout: wgpu::BindGroupLayout,
   textures_bind: Option<wgpu::BindGroup>,
-  textures_layout: Option<wgpu::BindGroupLayout>,
+  mask_layers_storage: Storage<MaskLayer>,
 }
 
 macro_rules! command_encoder {
@@ -64,8 +57,12 @@ macro_rules! command_encoder {
 }
 pub(crate) use command_encoder;
 
+const TEX_PER_DRAW: usize = 8;
+
 impl GPUBackendImpl for WgpuImpl {
   type Texture = WgpuTexture;
+
+  fn load_tex_limit_per_draw(&self) -> usize { TEX_PER_DRAW }
 
   fn begin_frame(&mut self) {
     if self.command_encoder.is_none() {
@@ -107,9 +104,8 @@ impl GPUBackendImpl for WgpuImpl {
   }
 
   fn load_textures(&mut self, textures: &[&Self::Texture]) {
-    self
-      .textures_bind
-      .load_textures(&self.device, &self.sampler, textures);
+    self.textures_bind =
+      Some(textures_bind(&self.device, &self.sampler, &self.texs_layout, textures));
   }
 
   fn load_alpha_vertices(&mut self, buffers: &VertexBuffers<f32>) {
@@ -137,11 +133,9 @@ impl GPUBackendImpl for WgpuImpl {
   }
 
   fn load_radial_gradient_primitives(&mut self, primitives: &[RadialGradientPrimitive]) {
-    self.radial_gradient_pass.load_radial_gradient_primitives(
-      &self.device,
-      &self.queue,
-      primitives,
-    );
+    self
+      .radial_gradient_pass
+      .load_radial_gradient_primitives(&self.device, &self.queue, primitives);
   }
 
   fn load_radial_gradient_stops(&mut self, stops: &[GradientStopPrimitive]) {
@@ -157,11 +151,9 @@ impl GPUBackendImpl for WgpuImpl {
   }
 
   fn load_linear_gradient_primitives(&mut self, primitives: &[LinearGradientPrimitive]) {
-    self.linear_gradient_pass.load_linear_gradient_primitives(
-      &self.device,
-      &self.queue,
-      primitives,
-    );
+    self
+      .linear_gradient_pass
+      .load_linear_gradient_primitives(&self.device, &self.queue, primitives);
   }
 
   fn load_linear_gradient_stops(&mut self, stops: &[GradientStopPrimitive]) {
@@ -200,7 +192,7 @@ impl GPUBackendImpl for WgpuImpl {
       clear,
       &self.device,
       encoder,
-      &self.textures_bind,
+      self.textures_bind.as_ref().unwrap(),
       &self.mask_layers_storage,
     );
 
@@ -218,7 +210,7 @@ impl GPUBackendImpl for WgpuImpl {
       clear,
       &self.device,
       encoder,
-      &self.textures_bind,
+      self.textures_bind.as_ref().unwrap(),
       &self.mask_layers_storage,
     );
 
@@ -248,7 +240,7 @@ impl GPUBackendImpl for WgpuImpl {
       clear,
       &self.device,
       encoder,
-      &self.textures_bind,
+      self.textures_bind.as_ref().unwrap(),
       &self.mask_layers_storage,
     );
     self.submit()
@@ -264,7 +256,7 @@ impl GPUBackendImpl for WgpuImpl {
       clear,
       &self.device,
       encoder,
-      &self.textures_bind,
+      self.textures_bind.as_ref().unwrap(),
       &self.mask_layers_storage,
     );
     self.submit()
@@ -550,12 +542,7 @@ impl WgpuImpl {
 
     let (device, queue) = adapter
       .request_device(
-        &wgpu::DeviceDescriptor {
-          label: Some("Request device"),
-          required_features: wgpu::Features::TEXTURE_BINDING_ARRAY
-            | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
-          required_limits: Default::default(),
-        },
+        &wgpu::DeviceDescriptor { label: Some("Request device"), ..Default::default() },
         None,
       )
       .await
@@ -575,13 +562,18 @@ impl WgpuImpl {
     });
 
     let draw_tex_pass = DrawTexturePass::new(&device);
-    let draw_alpha_triangles_pass = DrawAlphaTrianglesPass::new(&device);
+    let alpha_triangles_pass = DrawAlphaTrianglesPass::new(&device);
 
-    let draw_color_triangles_pass = DrawColorTrianglesPass::new(&device);
-    let draw_img_triangles_pass = DrawImgTrianglesPass::new(&device);
-    let draw_radial_gradient_pass = DrawRadialGradientTrianglesPass::new(&device);
-    let draw_linear_gradient_pass = DrawLinearGradientTrianglesPass::new(&device);
     let mask_layers_storage = Storage::new(&device, wgpu::ShaderStages::FRAGMENT, 512);
+    let texs_layout = textures_layout(&device);
+    let color_triangles_pass =
+      DrawColorTrianglesPass::new(&device, mask_layers_storage.layout(), &texs_layout);
+    let img_triangles_pass =
+      DrawImgTrianglesPass::new(&device, mask_layers_storage.layout(), &texs_layout);
+    let radial_gradient_pass =
+      DrawRadialGradientTrianglesPass::new(&device, mask_layers_storage.layout(), &texs_layout);
+    let linear_gradient_pass =
+      DrawLinearGradientTrianglesPass::new(&device, mask_layers_storage.layout(), &texs_layout);
     WgpuImpl {
       device,
       queue,
@@ -590,12 +582,13 @@ impl WgpuImpl {
       sampler,
 
       draw_tex_pass,
-      alpha_triangles_pass: draw_alpha_triangles_pass,
-      color_triangles_pass: draw_color_triangles_pass,
-      img_triangles_pass: draw_img_triangles_pass,
-      radial_gradient_pass: draw_radial_gradient_pass,
-      linear_gradient_pass: draw_linear_gradient_pass,
-      textures_bind: TexturesBind::default(),
+      alpha_triangles_pass,
+      color_triangles_pass,
+      img_triangles_pass,
+      radial_gradient_pass,
+      linear_gradient_pass,
+      texs_layout,
+      textures_bind: None,
       mask_layers_storage,
     }
   }
@@ -651,70 +644,6 @@ impl WgpuImpl {
   }
 }
 
-impl TexturesBind {
-  pub fn textures_count(&self) -> usize { self.texture_cnt }
-
-  pub fn assert_layout(&self) -> &wgpu::BindGroupLayout { self.textures_layout.as_ref().unwrap() }
-
-  pub fn assert_bind(&self) -> &wgpu::BindGroup { self.textures_bind.as_ref().unwrap() }
-
-  fn load_textures(
-    &mut self, device: &wgpu::Device, sampler: &wgpu::Sampler, textures: &[&WgpuTexture],
-  ) {
-    let mut views = Vec::with_capacity(textures.len());
-    for t in textures.iter() {
-      views.push(t.view());
-    }
-
-    if self.texture_cnt != views.len() {
-      self.texture_cnt = views.len();
-      let texture_size = NonZeroU32::new(self.texture_cnt as u32);
-      let textures_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        entries: &[
-          wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Texture {
-              sample_type: wgpu::TextureSampleType::Float { filterable: true },
-              view_dimension: wgpu::TextureViewDimension::D2,
-              multisampled: false,
-            },
-            count: texture_size,
-          },
-          wgpu::BindGroupLayoutEntry {
-            binding: 1,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-            count: texture_size,
-          },
-        ],
-        label: Some("Textures layout"),
-      });
-
-      self.textures_layout = Some(textures_layout);
-    }
-
-    let samplers = vec![sampler; views.len()];
-
-    let texture_bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
-      layout: self.textures_layout.as_ref().unwrap(),
-      entries: &[
-        wgpu::BindGroupEntry {
-          binding: 0,
-          resource: wgpu::BindingResource::TextureViewArray(&views),
-        },
-        wgpu::BindGroupEntry {
-          binding: 1,
-          resource: wgpu::BindingResource::SamplerArray(&samplers),
-        },
-      ],
-      label: Some("textures bind group"),
-    });
-
-    self.textures_bind = Some(texture_bind);
-  }
-}
-
 fn into_wgpu_format(format: ColorFormat) -> wgpu::TextureFormat {
   match format {
     ColorFormat::Rgba8 => wgpu::TextureFormat::Rgba8Unorm,
@@ -727,4 +656,63 @@ fn align(width: u32, align: u32) -> u32 {
     0 => width,
     other => width - other + align,
   }
+}
+
+fn textures_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+  let mut entries: [MaybeUninit<wgpu::BindGroupLayoutEntry>; 1 + TEX_PER_DRAW] =
+    unsafe { MaybeUninit::uninit().assume_init() };
+  entries[0].write(wgpu::BindGroupLayoutEntry {
+    binding: 0,
+    visibility: wgpu::ShaderStages::FRAGMENT,
+    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+    count: None,
+  });
+
+  for (i, entry) in entries.iter_mut().enumerate().skip(1) {
+    entry.write(wgpu::BindGroupLayoutEntry {
+      binding: i as u32,
+      visibility: wgpu::ShaderStages::FRAGMENT,
+      ty: wgpu::BindingType::Texture {
+        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+        view_dimension: wgpu::TextureViewDimension::D2,
+        multisampled: false,
+      },
+      count: None,
+    });
+  }
+  let entries: [wgpu::BindGroupLayoutEntry; 1 + TEX_PER_DRAW] =
+    unsafe { std::mem::transmute(entries) };
+
+  device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    entries: &entries,
+    label: Some("Textures layout"),
+  })
+}
+
+fn textures_bind(
+  device: &wgpu::Device, sampler: &wgpu::Sampler, layout: &wgpu::BindGroupLayout,
+  textures: &[&WgpuTexture],
+) -> wgpu::BindGroup {
+  assert!(!textures.is_empty());
+  assert!(textures.len() <= TEX_PER_DRAW);
+
+  let mut entries: [MaybeUninit<wgpu::BindGroupEntry>; 1 + TEX_PER_DRAW] =
+    unsafe { MaybeUninit::uninit().assume_init() };
+  entries[0]
+    .write(wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Sampler(sampler) });
+  for (i, entry) in entries.iter_mut().enumerate().skip(1) {
+    // if the texture is not enough, use the first texture to fill the gap
+    let view = textures.get(i - 1).unwrap_or(&textures[0]).view();
+    entry.write(wgpu::BindGroupEntry {
+      binding: i as u32,
+      resource: wgpu::BindingResource::TextureView(view),
+    });
+  }
+  let entries: [wgpu::BindGroupEntry; 1 + TEX_PER_DRAW] = unsafe { std::mem::transmute(entries) };
+
+  device.create_bind_group(&wgpu::BindGroupDescriptor {
+    layout,
+    entries: &entries,
+    label: Some("textures bind group"),
+  })
 }

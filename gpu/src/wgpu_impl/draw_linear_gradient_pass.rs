@@ -1,48 +1,53 @@
 use std::{mem::size_of, ops::Range};
 
-use ribir_painter::{AntiAliasing, Color, Vertex, VertexBuffers};
+use ribir_painter::{Color, Vertex, VertexBuffers};
 
 use super::{storage::Storage, vertex_buffer::VerticesBuffer};
 use crate::{
-  GradientStopPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, TexturesBind,
-  WgpuTexture,
+  GradientStopPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, WgpuTexture,
 };
 
 pub struct DrawLinearGradientTrianglesPass {
-  label: &'static str,
   vertices_buffer: VerticesBuffer<LinearGradientPrimIndex>,
   pipeline: Option<wgpu::RenderPipeline>,
   shader: wgpu::ShaderModule,
   format: Option<wgpu::TextureFormat>,
   prims_storage: Storage<LinearGradientPrimitive>,
   stops_storage: Storage<GradientStopPrimitive>,
-  textures_count: usize,
-  anti_aliasing: AntiAliasing,
+  layout: wgpu::PipelineLayout,
 }
 
 impl DrawLinearGradientTrianglesPass {
-  pub fn new(device: &wgpu::Device) -> Self {
+  pub fn new(
+    device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout, texs_layout: &wgpu::BindGroupLayout,
+  ) -> Self {
     let vertices_buffer = VerticesBuffer::new(512, 1024, device);
-    let label = "linear gradient triangles pass";
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-      label: Some(label),
+      label: Some("Linear triangles shader"),
       source: wgpu::ShaderSource::Wgsl(
         include_str!("./shaders/linear_gradient_triangles.wgsl").into(),
       ),
     });
     let prims_storage = Storage::new(device, wgpu::ShaderStages::FRAGMENT, 64);
     let stops_storage = Storage::new(device, wgpu::ShaderStages::FRAGMENT, 64);
-
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+      label: Some("update triangles pipeline layout"),
+      bind_group_layouts: &[
+        mask_layout,
+        stops_storage.layout(),
+        prims_storage.layout(),
+        texs_layout,
+      ],
+      push_constant_ranges: &[],
+    });
     Self {
-      label,
       vertices_buffer,
       pipeline: None,
       shader,
       format: None,
-      textures_count: 0,
       prims_storage,
       stops_storage,
-      anti_aliasing: AntiAliasing::None,
+      layout,
     }
   }
 
@@ -74,21 +79,15 @@ impl DrawLinearGradientTrianglesPass {
   #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
     &mut self, texture: &WgpuTexture, indices: Range<u32>, clear: Option<Color>,
-    device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, textures_bind: &TexturesBind,
+    device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, textures_bind: &wgpu::BindGroup,
     mask_layer_storage: &Storage<MaskLayer>,
   ) {
-    self.update(
-      texture.format(),
-      texture.anti_aliasing,
-      device,
-      textures_bind,
-      mask_layer_storage.layout(),
-    );
+    self.update(texture.format(), device);
     let pipeline = self.pipeline.as_ref().unwrap();
 
     let color_attachments = texture.color_attachments(clear);
     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-      label: Some(self.label),
+      label: Some("Linear triangles render pass"),
       color_attachments: &[Some(color_attachments)],
       depth_stencil_attachment: None,
       timestamp_writes: None,
@@ -100,40 +99,22 @@ impl DrawLinearGradientTrianglesPass {
     rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
     rpass.set_bind_group(1, self.stops_storage.bind_group(), &[]);
     rpass.set_bind_group(2, self.prims_storage.bind_group(), &[]);
-    rpass.set_bind_group(3, textures_bind.assert_bind(), &[]);
+    rpass.set_bind_group(3, textures_bind, &[]);
 
     rpass.set_pipeline(pipeline);
     rpass.draw_indexed(indices, 0, 0..1);
   }
 
-  fn update(
-    &mut self, format: wgpu::TextureFormat, anti_aliasing: AntiAliasing, device: &wgpu::Device,
-    textures_bind: &TexturesBind, mask_bind_layout: &wgpu::BindGroupLayout,
-  ) {
-    if self.format != Some(format)
-      || textures_bind.textures_count() != self.textures_count
-      || anti_aliasing != self.anti_aliasing
-    {
+  fn update(&mut self, format: wgpu::TextureFormat, device: &wgpu::Device) {
+    if self.format != Some(format) {
       self.pipeline.take();
       self.format = Some(format);
-      self.textures_count = textures_bind.textures_count();
-      self.anti_aliasing = anti_aliasing;
     }
 
     if self.pipeline.is_none() {
-      let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("update triangles pipeline layout"),
-        bind_group_layouts: &[
-          mask_bind_layout,
-          self.stops_storage.layout(),
-          self.prims_storage.layout(),
-          textures_bind.assert_layout(),
-        ],
-        push_constant_ranges: &[],
-      });
       let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(self.label),
-        layout: Some(&pipeline_layout),
+        label: Some("Linear triangles pipeline"),
+        layout: Some(&self.layout),
         vertex: wgpu::VertexState {
           module: &self.shader,
           entry_point: "vs_main",
@@ -178,7 +159,7 @@ impl DrawLinearGradientTrianglesPass {
         },
         depth_stencil: None,
         multisample: wgpu::MultisampleState {
-          count: anti_aliasing as u32,
+          count: 1,
           mask: !0,
           alpha_to_coverage_enabled: false,
         },
