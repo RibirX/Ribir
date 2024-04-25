@@ -191,51 +191,48 @@ impl WinitShellWnd {
     Self::inner_wnd(wnd)
   }
 
-  pub(crate) fn new<T>(size: Option<Size>, window_target: &EventLoopWindowTarget<T>) -> Self {
-    let mut winit_wnd = winit::window::WindowBuilder::new();
-    if let Some(size) = size {
-      winit_wnd = winit_wnd.with_inner_size(LogicalSize::new(size.width, size.height));
-    }
+  #[cfg(target_family = "wasm")]
+  pub(crate) fn new<T>(window_target: &EventLoopWindowTarget<T>) -> Self {
+    const RIBIR_CANVAS: &str = "ribir_canvas";
+    const RIBIR_CANVAS_USED: &str = "ribir_canvas_used";
 
-    // A canvas need configure in web platform.
-    #[cfg(target_family = "wasm")]
-    {
-      use winit::platform::web::WindowBuilderExtWebSys;
-      const RIBIR_CANVAS: &str = "ribir_canvas";
-      const RIBIR_CANVAS_USED: &str = "ribir_canvas_used";
+    use web_sys::{wasm_bindgen::JsCast, HtmlCanvasElement};
+    let document = web_sys::window().unwrap().document().unwrap();
+    let elems = document.get_elements_by_class_name(RIBIR_CANVAS);
 
-      use web_sys::wasm_bindgen::JsCast;
-      let document = web_sys::window().unwrap().document().unwrap();
-      let elems = document.get_elements_by_class_name(RIBIR_CANVAS);
-
-      let len = elems.length();
-      for idx in 0..len {
-        if let Some(elem) = elems.get_with_index(idx) {
-          let mut classes_name = elem.class_name();
-          if !classes_name
-            .split(" ")
-            .any(|v| v == RIBIR_CANVAS_USED)
-          {
-            let mut canvas = elem
-              .clone()
-              .dyn_into::<web_sys::HtmlCanvasElement>();
-            if canvas.is_err() {
-              let child = document.create_element("canvas").unwrap();
-              if elem.append_child(&child).is_ok() {
-                canvas = child.dyn_into::<web_sys::HtmlCanvasElement>();
-              }
-            }
-            if let Ok(canvas) = canvas {
-              classes_name.push_str(&format!(" {}", RIBIR_CANVAS_USED));
-              elem.set_class_name(&classes_name);
-              winit_wnd = winit_wnd.with_canvas(Some(canvas));
-            }
+    let mut canvas = None;
+    let len = elems.length();
+    for idx in 0..len {
+      if let Some(elem) = elems.get_with_index(idx) {
+        let mut classes_name = elem.class_name();
+        if !classes_name
+          .split(" ")
+          .any(|v| v == RIBIR_CANVAS_USED)
+        {
+          if let Ok(c) = elem.clone().dyn_into::<HtmlCanvasElement>() {
+            classes_name.push_str(&format!(" {}", RIBIR_CANVAS_USED));
+            elem.set_class_name(&classes_name);
+            canvas = Some(c);
+          } else {
+            let child = document.create_element("canvas").unwrap();
+            elem.append_child(&child).unwrap();
+            canvas = Some(child.dyn_into::<HtmlCanvasElement>().unwrap())
           }
+          break;
         }
       }
     }
 
-    let wnd = winit_wnd.build(window_target).unwrap();
+    let canvas = canvas.expect("No unused 'ribir_canvas' class element found.");
+
+    return Self::new_with_canvas(canvas, window_target);
+  }
+
+  #[cfg(not(target_family = "wasm"))]
+  pub(crate) fn new<T>(window_target: &EventLoopWindowTarget<T>) -> Self {
+    let wnd = winit::window::WindowBuilder::new()
+      .build(window_target)
+      .unwrap();
     Self::inner_wnd(wnd)
   }
 

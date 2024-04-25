@@ -65,8 +65,7 @@ impl Overlay {
   ///     @{ Label::new("Click to show overlay") }
   ///   }
   ///  };
-  ///  App::new_window(w, None);
-  ///  App::exec();
+  ///  App::run(w);
   /// ```
   pub fn new<M>(widget: M) -> Self
   where
@@ -104,8 +103,8 @@ impl Overlay {
   ///     @{ Label::new("Click to show overlay") }
   ///   }
   /// };
-  /// App::new_window(w, Some(Size::new(200., 200.)));
-  /// App::exec();
+  ///
+  /// App::run(w).on_window(|wnd| wnd.request_resize(Size::new(200., 200.)));
   /// ```
   pub fn new_with_handle<O, M>(builder: M) -> Self
   where
@@ -168,8 +167,7 @@ impl Overlay {
   ///     @{ Label::new("Click to show overlay") }
   ///   }
   /// };
-  /// App::new_window(w, None);
-  /// App::exec();
+  /// App::run(w);
   /// ```
   pub fn show_map<O, F>(&self, f: F, wnd: Rc<Window>)
   where

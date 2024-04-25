@@ -161,14 +161,20 @@ impl App {
   }
 }
 
+/// A guard returned by `App::run` that allows you to configure the application
+/// before it starts up.
+///
+/// This will call `App::exec` when it's dropped.
+pub struct AppRunGuard(std::rc::Rc<Window>);
+
 impl App {
   /// Start an application with the `root` widget, this will use the default
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run(root: impl WidgetBuilder + 'static) {
-    Self::new_window(root, None);
-    App::exec()
+  pub fn run(root: impl WidgetBuilder) -> AppRunGuard {
+    let wnd = Self::new_window(root);
+    AppRunGuard::new(wnd)
   }
 
   /// Get a event sender of the application event loop, you can use this to send
@@ -192,12 +198,12 @@ impl App {
 
   /// create a new window with the `root` widget
   #[track_caller]
-  pub fn new_window(root: impl WidgetBuilder, size: Option<Size>) -> std::rc::Rc<Window> {
+  pub fn new_window(root: impl WidgetBuilder) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
       " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
     );
-    let shell_wnd = WinitShellWnd::new(size, event_loop);
+    let shell_wnd = WinitShellWnd::new(event_loop);
     let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
 
     #[cfg(not(target_family = "wasm"))]
@@ -290,6 +296,31 @@ impl App {
   }
 }
 
+impl AppRunGuard {
+  fn new(wnd: std::rc::Rc<Window>) -> Self {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    assert!(!ONCE.is_completed(), "App::run can only be called once.");
+    Self(wnd)
+  }
+
+  /// Set the application theme, this will apply to whole application.
+  pub fn set_app_theme(&mut self, theme: FullTheme) -> &mut Self {
+    // Safety: AppRunGuard is only created once and should be always used
+    // before the application startup.
+    unsafe { AppCtx::set_app_theme(theme) }
+    self
+  }
+
+  /// Config the current window with the `f` function.
+  pub fn on_window(&mut self, f: impl FnOnce(&Window)) -> &mut Self {
+    f(&self.0);
+    self
+  }
+}
+
+impl Drop for AppRunGuard {
+  fn drop(&mut self) { App::exec() }
+}
 impl EventSender {
   pub fn send(&self, e: AppEvent) {
     if let Err(err) = self.0.send_event(e) {

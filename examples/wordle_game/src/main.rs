@@ -5,12 +5,11 @@ mod ui;
 mod wordle;
 
 fn main() {
-  unsafe {
-    AppCtx::set_app_theme(material::purple::light());
-  }
-
-  App::new_window(wordle_game(), Some(Size::new(700., 620.))).set_title("Messages");
-  App::exec();
+  App::run(wordle_game())
+    .set_app_theme(material::purple::light())
+    .on_window(|wnd| {
+      wnd.set_title("Wordle Game");
+    });
 }
 
 #[cfg(test)]

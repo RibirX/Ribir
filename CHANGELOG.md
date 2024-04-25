@@ -25,7 +25,33 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Changed
+
 - **core**: rename builtin field of delay_drop_until to keep_alive (#561 @wjian23)
+
+### Features
+
+- **ribir**: Introduced `AppRunGuard` to allow app and window configuration prior to app startup. (#pr, @M-Adoo)
+  Previously, to configure the app and window before startup, `App::run` couldn't be used:
+  ``` rust
+  unsafe {
+    AppCtx::set_app_theme(material::purple::light());
+  }
+
+  App::new_window(root, None).set_title("Counter");
+  App::exec();
+  ```
+  Now, with AppRunGuard, you can use `App::run` and chain the configuration methods:
+
+  ``` rust
+  App::run(root)
+    .set_app_theme(material::purple::light())
+    .on_window(|wnd| { wnd.set_title("Counter"); });
+  ```
+
+### Breaking
+
+- **ribir**: `App::new_window` not accept window size as the second parameter. (#pr, @M-Adoo)
 
 ## [0.3.0-alpha.4] - 2024-04-17
 

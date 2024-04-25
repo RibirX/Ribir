@@ -3,12 +3,11 @@ use counter::counter;
 use ribir::prelude::*;
 
 fn main() {
-  unsafe {
-    AppCtx::set_app_theme(material::purple::light());
-  }
-
-  App::new_window(counter(), None).set_title("Counter");
-  App::exec();
+  App::run(counter())
+    .set_app_theme(material::purple::light())
+    .on_window(|wnd| {
+      wnd.set_title("Counter");
+    });
 }
 
 #[cfg(test)]
