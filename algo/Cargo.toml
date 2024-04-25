@@ -13,6 +13,7 @@ repository = "https://github.com/RibirX/Ribir/algo"
 version.workspace = true
 
 [dependencies]
+triomphe.workspace = true
 ahash.workspace = true
 log.workspace = true
 serde = {workspace = true, features = ["derive", "rc"]}

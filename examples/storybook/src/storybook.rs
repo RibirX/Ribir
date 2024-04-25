@@ -252,7 +252,7 @@ fn content() -> impl WidgetBuilder {
             line_number: 2usize,
             @Leading {
               @Avatar {
-                @ { ShareResource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png"))) }
+                @ { Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png"))) }
               }
             }
             @ { HeadlineText(Label::new("Two lines list item")) }
@@ -277,7 +277,7 @@ fn content() -> impl WidgetBuilder {
           @Divider { indent: 16. }
           @ListItem {
             @Leading {
-              @ { Poster(ShareResource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png")))) }
+              @ { Poster(Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png")))) }
             }
             @ { HeadlineText(Label::new("One lines list item")) }
             @ { SupportingText(Label::new("One lines supporting text")) }

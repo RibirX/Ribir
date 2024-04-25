@@ -55,7 +55,7 @@ impl ComposeDecorator for AvatarDecorator {
 #[derive(Template)]
 pub enum AvatarTemplate {
   Text(State<Label>),
-  Image(ShareResource<PixelImage>),
+  Image(Resource<PixelImage>),
 }
 
 impl ComposeChild for Avatar {

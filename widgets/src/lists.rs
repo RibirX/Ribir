@@ -166,7 +166,7 @@ pub struct EdgeWidgetStyle {
   pub custom: EdgeItemStyle,
 }
 
-pub struct Poster(pub ShareResource<PixelImage>);
+pub struct Poster(pub Resource<PixelImage>);
 
 pub struct HeadlineText(pub Label);
 pub struct SupportingText(pub Label);
@@ -176,7 +176,7 @@ pub enum EdgeWidget {
   Text(State<Label>),
   Icon(NamedSvg),
   Avatar(FatObj<Pair<State<Avatar>, AvatarTemplate>>),
-  Image(ShareResource<PixelImage>),
+  Image(Resource<PixelImage>),
   Poster(Poster),
   Custom(CustomEdgeWidget),
 }

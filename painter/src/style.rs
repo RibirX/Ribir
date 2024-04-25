@@ -1,4 +1,4 @@
-use ribir_algo::ShareResource;
+use ribir_algo::Resource;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 pub enum Brush {
   Color(Color),
   /// Image brush always use a repeat mode to brush the path.
-  Image(ShareResource<PixelImage>),
+  Image(Resource<PixelImage>),
   RadialGradient(RadialGradient),
   LinearGradient(LinearGradient),
 }
@@ -34,14 +34,14 @@ impl From<Color> for Option<Brush> {
   fn from(c: Color) -> Self { Some(c.into()) }
 }
 
-impl From<ShareResource<PixelImage>> for Brush {
+impl From<Resource<PixelImage>> for Brush {
   #[inline]
-  fn from(img: ShareResource<PixelImage>) -> Self { Brush::Image(img) }
+  fn from(img: Resource<PixelImage>) -> Self { Brush::Image(img) }
 }
 
 impl From<PixelImage> for Brush {
   #[inline]
-  fn from(img: PixelImage) -> Self { ShareResource::new(img).into() }
+  fn from(img: PixelImage) -> Self { Resource::new(img).into() }
 }
 
 impl Default for Brush {

@@ -4,7 +4,7 @@ use ahash::HashMap;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use lyon_path::math::Point;
-use ribir_algo::{Sc, ShareResource};
+use ribir_algo::{Resource, Sc};
 use ribir_painter::{PixelImage, Svg};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 
@@ -24,7 +24,7 @@ pub struct Face {
   pub face_data_index: u32,
   pub rb_face: rustybuzz::Face<'static>,
   #[cfg(feature = "raster_png_font")]
-  raster_image_glyphs: FontGlyphCache<GlyphId, ShareResource<PixelImage>>,
+  raster_image_glyphs: FontGlyphCache<GlyphId, Resource<PixelImage>>,
   outline_glyphs: FontGlyphCache<GlyphId, lyon_path::Path>,
   svg_glyphs: Sc<RefCell<SvgGlyphCache>>,
 }
@@ -305,7 +305,7 @@ impl Face {
   #[cfg(feature = "raster_png_font")]
   pub fn glyph_raster_image(
     &self, glyph_id: GlyphId, pixels_per_em: u16,
-  ) -> Option<ShareResource<PixelImage>> {
+  ) -> Option<Resource<PixelImage>> {
     use rustybuzz::ttf_parser::RasterImageFormat;
     self
       .raster_image_glyphs
@@ -317,7 +317,7 @@ impl Face {
           .glyph_raster_image(glyph_id, pixels_per_em)
           .and_then(|img| {
             if img.format == RasterImageFormat::PNG {
-              Some(ShareResource::new(PixelImage::from_png(img.data)))
+              Some(Resource::new(PixelImage::from_png(img.data)))
             } else {
               None
             }

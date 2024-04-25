@@ -91,7 +91,7 @@ impl Compose for MessageList {
                                     let name = message.avatar.to_string();
                                     let avatar = format!("{}/examples/attachments/3DDD-{name}.png", env!("CARGO_WORKSPACE_DIR"));
                                     let img = PixelImage::from_png(&std::fs::read(avatar).unwrap());
-                                    ShareResource::new(img)
+                                    Resource::new(img)
                                   }
                                 }
                               }

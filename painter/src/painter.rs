@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use ribir_algo::ShareResource;
+use ribir_algo::Resource;
 use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
 
@@ -100,7 +100,7 @@ impl From<usvg::SpreadMethod> for SpreadMethod {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PaintCommand {
   ColorPath { path: PaintPath, color: Color },
-  ImgPath { path: PaintPath, img: ShareResource<PixelImage>, opacity: f32 },
+  ImgPath { path: PaintPath, img: Resource<PixelImage>, opacity: f32 },
   RadialGradient { path: PaintPath, radial_gradient: RadialGradient },
   LinearGradient { path: PaintPath, linear_gradient: LinearGradient },
   // Todo: keep rectangle clip.
@@ -531,7 +531,7 @@ impl Painter {
   /// otherwise will draw the partial src_rect of the image fitted into
   /// dst_rect.
   pub fn draw_img(
-    &mut self, img: ShareResource<PixelImage>, dst_rect: &Rect, src_rect: &Option<Rect>,
+    &mut self, img: Resource<PixelImage>, dst_rect: &Rect, src_rect: &Option<Rect>,
   ) -> &mut Self {
     {
       let mut painter = self.save_guard();

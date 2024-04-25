@@ -35,6 +35,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **macros**: polish the compile error message of invalid filed in `@$var {}` (#556 @M-Adoo)
 - **gpu**: Removed dependency on the texture array feature of wgpu. (#562, @M-Adoo)
+- **algo**: removed `Resource` and rename `ShareResource` to `Resource`. (#564, @M-Adoo)
 
 ### Documented
 
