@@ -4,7 +4,7 @@
 use std::{collections::HashMap, rc::Rc};
 
 use ribir_algo::Sc;
-pub use ribir_algo::{CowArc, ShareResource};
+pub use ribir_algo::{CowArc, Resource};
 use ribir_macros::Declare;
 
 use crate::{fill_svgs, prelude::*};
@@ -53,7 +53,7 @@ pub struct InheritTheme {
   /// icon size standard
   pub icon_size: Option<IconSize>,
   /// a collection of icons.
-  pub icons: Option<HashMap<NamedSvg, ShareResource<Svg>, ahash::RandomState>>,
+  pub icons: Option<HashMap<NamedSvg, Resource<Svg>, ahash::RandomState>>,
   pub transitions_theme: Option<TransitionTheme>,
   pub compose_decorators: Option<ComposeDecorators>,
   pub custom_styles: Option<CustomStyles>,

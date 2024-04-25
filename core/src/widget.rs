@@ -383,7 +383,7 @@ impl<W: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for W 
   }
 }
 
-impl<T: Query> Query for ShareResource<T> {
+impl<T: Query> Query for Resource<T> {
   impl_proxy_and_self_query!(deref());
 }
 impl<T: Query> Query for Sc<T> {
@@ -397,7 +397,7 @@ impl<T: Query> Query for StateCell<T> {
   impl_proxy_and_self_query!(read());
 }
 
-impl_proxy_render!(proxy deref(), ShareResource<T>, <T>, where  T: Render + 'static);
+impl_proxy_render!(proxy deref(), Resource<T>, <T>, where  T: Render + 'static);
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
   ctx
@@ -492,5 +492,5 @@ mod tests {
   }
   impl_wrap_test!(Sc);
   impl_wrap_test!(RefCell);
-  impl_wrap_test!(ShareResource);
+  impl_wrap_test!(Resource);
 }

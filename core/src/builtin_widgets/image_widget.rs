@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-impl Render for ShareResource<PixelImage> {
+impl Render for Resource<PixelImage> {
   fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size {
     Size::new(self.width() as f32, self.height() as f32)
   }
@@ -16,6 +16,6 @@ impl Render for ShareResource<PixelImage> {
   }
 }
 
-impl Query for ShareResource<PixelImage> {
+impl Query for Resource<PixelImage> {
   crate::widget::impl_query_self_only!();
 }

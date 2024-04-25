@@ -6,7 +6,7 @@ use std::{
 
 use guillotiere::euclid::SideOffsets2D;
 use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
-use ribir_algo::ShareResource;
+use ribir_algo::Resource;
 use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize, Point, Transform};
 use ribir_painter::{
   image::ColorFormat, AntiAliasing, PaintPath, Path, PathSegment, PixelImage, Vertex, VertexBuffers,
@@ -28,7 +28,7 @@ pub(super) enum TextureID {
 
 pub(super) struct TexturesMgr<T: Texture> {
   alpha_atlas: Atlas<T, PathKey, f32>,
-  rgba_atlas: Atlas<T, ShareResource<PixelImage>, ()>,
+  rgba_atlas: Atlas<T, Resource<PixelImage>, ()>,
   fill_task: Vec<FillTask>,
   fill_task_buffers: VertexBuffers<f32>,
 }
@@ -187,7 +187,7 @@ where
   }
 
   pub(super) fn store_image(
-    &mut self, img: &ShareResource<PixelImage>, gpu_impl: &mut T::Host,
+    &mut self, img: &Resource<PixelImage>, gpu_impl: &mut T::Host,
   ) -> TextureSlice {
     match img.color_format() {
       ColorFormat::Rgba8 => {
@@ -540,14 +540,14 @@ pub mod tests {
   use super::*;
   use crate::{WgpuImpl, WgpuTexture};
 
-  pub fn color_image(color: Color, width: u32, height: u32) -> ShareResource<PixelImage> {
+  pub fn color_image(color: Color, width: u32, height: u32) -> Resource<PixelImage> {
     let data = std::iter::repeat(color.into_components())
       .take(width as usize * height as usize)
       .flatten()
       .collect::<Vec<_>>();
 
     let img = PixelImage::new(Cow::Owned(data), width, height, ColorFormat::Rgba8);
-    ShareResource::new(img)
+    Resource::new(img)
   }
 
   #[test]

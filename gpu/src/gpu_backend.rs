@@ -494,7 +494,7 @@ pub fn add_draw_rect_vertices<Attr: Copy>(
 #[cfg(feature = "wgpu")]
 #[cfg(test)]
 mod tests {
-  use ribir_algo::ShareResource;
+  use ribir_algo::Resource;
   use ribir_dev_helper::*;
   use ribir_geom::*;
   use ribir_painter::{Brush, Painter, Path, Radius, Svg};
@@ -520,7 +520,7 @@ mod tests {
     let mut painter = painter(Size::new(512., 512.));
 
     let img = PixelImage::from_png(include_bytes!("../imgs/leaves.png"));
-    let share_img = ShareResource::new(img);
+    let share_img = Resource::new(img);
 
     let img_brush = Brush::Image(share_img);
 
@@ -560,8 +560,7 @@ mod tests {
       .rect(&rect)
       .fill();
 
-    let leaves_brush =
-      ShareResource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
+    let leaves_brush = Resource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
 
     painter
       .set_brush(leaves_brush)
@@ -626,7 +625,7 @@ mod tests {
 
   painter_backend_eq_image_test!(draw_partial_img);
   fn draw_partial_img() -> Painter {
-    let img = ShareResource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
+    let img = Resource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
     let m_width = img.width() as f32;
     let m_height = img.height() as f32;
     let mut painter = painter(Size::new(m_width * 2., m_height * 2.));
