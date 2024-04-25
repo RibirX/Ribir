@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use std::{convert::Infallible, future::Future, pin::Pin};
 
 use ribir_core::{prelude::*, timer::Timer, window::WindowId};
 use winit::{
@@ -165,16 +165,16 @@ impl App {
 /// before it starts up.
 ///
 /// This will call `App::exec` when it's dropped.
-pub struct AppRunGuard(std::rc::Rc<Window>);
+pub struct AppRunGuard(Option<Pin<Box<dyn Future<Output = std::rc::Rc<Window>>>>>);
 
 impl App {
   /// Start an application with the `root` widget, this will use the default
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run(root: impl WidgetBuilder) -> AppRunGuard {
+  pub fn run(root: impl WidgetBuilder + 'static) -> AppRunGuard {
     let wnd = Self::new_window(root);
-    AppRunGuard::new(wnd)
+    AppRunGuard::new(Box::pin(wnd))
   }
 
   /// Get a event sender of the application event loop, you can use this to send
@@ -184,26 +184,25 @@ impl App {
   /// Creating a new window using the `root` widget and the specified canvas.
   /// Note: This is exclusive to the web platform.
   #[cfg(target_family = "wasm")]
-  pub fn new_with_canvas(
+  pub async fn new_with_canvas(
     root: impl WidgetBuilder, canvas: web_sys::HtmlCanvasElement,
   ) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
       " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
     );
-    let shell_wnd = WinitShellWnd::new_with_canvas(canvas, &event_loop);
+    let shell_wnd = WinitShellWnd::new_with_canvas(canvas, &event_loop).await;
     let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
     wnd
   }
 
   /// create a new window with the `root` widget
-  #[track_caller]
-  pub fn new_window(root: impl WidgetBuilder) -> std::rc::Rc<Window> {
+  pub async fn new_window(root: impl WidgetBuilder) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
       " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
     );
-    let shell_wnd = WinitShellWnd::new(event_loop);
+    let shell_wnd = WinitShellWnd::new(event_loop).await;
     let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
 
     #[cfg(not(target_family = "wasm"))]
@@ -297,10 +296,10 @@ impl App {
 }
 
 impl AppRunGuard {
-  fn new(wnd: std::rc::Rc<Window>) -> Self {
+  fn new(wnd: Pin<Box<dyn Future<Output = std::rc::Rc<Window>>>>) -> Self {
     static ONCE: std::sync::Once = std::sync::Once::new();
     assert!(!ONCE.is_completed(), "App::run can only be called once.");
-    Self(wnd)
+    Self(Some(wnd))
   }
 
   /// Set the application theme, this will apply to whole application.
@@ -312,15 +311,33 @@ impl AppRunGuard {
   }
 
   /// Config the current window with the `f` function.
-  pub fn on_window(&mut self, f: impl FnOnce(&Window)) -> &mut Self {
-    f(&self.0);
+  pub fn on_window(&mut self, f: impl FnOnce(&Window) + 'static) -> &mut Self {
+    let wnd = self.0.take().unwrap();
+    self.0 = Some(Box::pin(async move {
+      let wnd = wnd.await;
+      f(&wnd);
+      wnd
+    }));
     self
   }
 }
 
 impl Drop for AppRunGuard {
-  fn drop(&mut self) { App::exec() }
+  fn drop(&mut self) {
+    let wnd = self.0.take().unwrap();
+    #[cfg(target_family = "wasm")]
+    wasm_bindgen_futures::spawn_local(async move {
+      let _ = wnd.await;
+      App::exec();
+    });
+    #[cfg(not(target_family = "wasm"))]
+    {
+      AppCtx::wait_future(wnd);
+      App::exec();
+    }
+  }
 }
+
 impl EventSender {
   pub fn send(&self, e: AppEvent) {
     if let Err(err) = self.0.send_event(e) {

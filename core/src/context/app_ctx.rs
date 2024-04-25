@@ -7,11 +7,7 @@ use std::{
 };
 
 pub use futures::task::SpawnError;
-use futures::{
-  executor::{block_on, LocalPool},
-  task::LocalSpawnExt,
-  Future,
-};
+use futures::{executor::LocalPool, task::LocalSpawnExt, Future};
 use pin_project_lite::pin_project;
 use ribir_text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographyStore};
 use rxrust::scheduler::NEW_TIMER_FN;
@@ -294,7 +290,8 @@ impl AppCtx {
 }
 
 impl AppCtx {
-  pub fn wait_future<F: Future>(f: F) -> F::Output { block_on(f) }
+  #[cfg(not(target_family = "wasm"))]
+  pub fn wait_future<F: Future>(f: F) -> F::Output { futures::executor::block_on(f) }
 
   #[inline]
   pub fn spawn_local<Fut>(future: Fut) -> Result<(), SpawnError>

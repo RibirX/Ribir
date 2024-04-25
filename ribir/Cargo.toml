@@ -27,6 +27,7 @@ arboard.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true
+wasm-bindgen-futures.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 icrate = { workspace = true, features = [

@@ -31,7 +31,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **ribir**: Introduced `AppRunGuard` to allow app and window configuration prior to app startup. (#pr, @M-Adoo)
+- **ribir**: Introduced `AppRunGuard` to allow app and window configuration prior to app startup. (#565, @M-Adoo)
   Previously, to configure the app and window before startup, `App::run` couldn't be used:
   ``` rust
   unsafe {
@@ -51,7 +51,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
-- **ribir**: `App::new_window` not accept window size as the second parameter. (#pr, @M-Adoo)
+- **ribir**: `App::new_window` not accept window size as the second parameter. (#565, @M-Adoo)
+- **ribir**: The window creation APIs have been updated to use asynchronous methods, improving compatibility with browsers. (#565, @M-Adoo)
 
 ## [0.3.0-alpha.4] - 2024-04-17
 
