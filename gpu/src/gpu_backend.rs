@@ -546,14 +546,6 @@ mod tests {
   use ribir_painter::{Brush, Painter, Path, Svg};
 
   use super::*;
-  use crate::WgpuImpl;
-
-  pub fn headless() -> (WgpuImpl, std::sync::MutexGuard<'static, ()>) {
-    use futures::executor::block_on;
-    let _guard = SINGLETON_WGPU_GUARD.lock().unwrap();
-    let gpu_impl = block_on(WgpuImpl::headless());
-    (gpu_impl, _guard)
-  }
 
   fn painter(bounds: Size) -> Painter { Painter::new(Rect::from_size(bounds)) }
 
