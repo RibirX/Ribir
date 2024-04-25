@@ -1,4 +1,4 @@
-use std::{num::NonZeroU32, ops::Range};
+use std::{error::Error, num::NonZeroU32, ops::Range};
 
 use futures::channel::oneshot;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
@@ -12,8 +12,8 @@ use self::{
   storage::Storage,
 };
 use crate::{
-  gpu_backend::Texture, ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImageFuture,
-  ImagePrimIndex, ImgPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer,
+  gpu_backend::Texture, ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex,
+  ImgPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer,
   RadialGradientPrimIndex, RadialGradientPrimitive,
 };
 mod buffer_pool;
@@ -441,7 +441,9 @@ impl Texture for WgpuTexture {
     );
   }
 
-  fn copy_as_image(&self, rect: &DeviceRect, backend: &mut Self::Host) -> ImageFuture {
+  fn copy_as_image(
+    &self, rect: &DeviceRect, backend: &mut Self::Host,
+  ) -> impl std::future::Future<Output = Result<PixelImage, Box<dyn Error>>> + 'static {
     let width = rect.width();
     let height = rect.height();
     let format = self.color_format();
@@ -487,7 +489,7 @@ impl Texture for WgpuTexture {
     let slice = buffer.slice(..);
     slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
 
-    let res = async move {
+    async move {
       let _ = receiver.await?;
 
       let row_bytes = width as usize * pixel_bytes as usize;
@@ -502,9 +504,7 @@ impl Texture for WgpuTexture {
       });
 
       Ok(PixelImage::new(data.into(), width as u32, height as u32, format))
-    };
-
-    Box::pin(res)
+    }
   }
 
   fn color_format(&self) -> ColorFormat {

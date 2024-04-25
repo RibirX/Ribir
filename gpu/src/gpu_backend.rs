@@ -1,4 +1,4 @@
-use std::{error::Error, future::Future, ops::Range, pin::Pin};
+use std::{error::Error, ops::Range};
 
 use ribir_geom::{rect_corners, DeviceRect, DeviceSize, Point};
 use ribir_painter::{
@@ -50,13 +50,6 @@ struct ClipLayer {
   mask_idx: i32,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub type ImageFuture =
-  Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>> + Send + Sync>>;
-
-#[cfg(target_arch = "wasm32")]
-pub type ImageFuture = Pin<Box<dyn Future<Output = Result<PixelImage, Box<dyn Error>>>>>;
-
 /// Texture use to display.
 pub trait Texture {
   type Host;
@@ -72,7 +65,9 @@ pub trait Texture {
   /// - you should poll the image future after the `end_frame` is called to
   ///   ensure all content had been submitted, because the PainterBackend does
   ///   not be required to draw synchronization
-  fn copy_as_image(&self, rect: &DeviceRect, host: &mut Self::Host) -> ImageFuture;
+  fn copy_as_image(
+    &self, rect: &DeviceRect, host: &mut Self::Host,
+  ) -> impl std::future::Future<Output = Result<PixelImage, Box<dyn Error>>> + 'static;
 
   fn color_format(&self) -> ColorFormat;
 
