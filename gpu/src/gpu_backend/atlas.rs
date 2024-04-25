@@ -198,10 +198,10 @@ mod tests {
   use futures::executor::block_on;
 
   use super::*;
-  use crate::{gpu_backend::tests::headless, WgpuTexture};
+  use crate::{WgpuImpl, WgpuTexture};
   #[test]
   fn atlas_grow_to_alloc() {
-    let (mut gpu_impl, _guard) = headless();
+    let mut gpu_impl = block_on(WgpuImpl::headless());
     let mut atlas =
       Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Alpha8, AntiAliasing::None, &mut gpu_impl);
     let size = DeviceSize::new(ATLAS_MIN_SIZE.width + 1, 16);
@@ -212,7 +212,7 @@ mod tests {
 
   #[test]
   fn resource_clear() {
-    let (mut wgpu, _guard) = headless();
+    let mut wgpu = block_on(WgpuImpl::headless());
     let mut atlas =
       Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Rgba8, AntiAliasing::None, &mut wgpu);
     atlas.allocate(1, (), DeviceSize::new(32, 32), &mut wgpu);
@@ -227,7 +227,7 @@ mod tests {
 
   #[test]
   fn fix_scale_path_cache_miss() {
-    let (mut wgpu, _guard) = headless();
+    let mut wgpu = block_on(WgpuImpl::headless());
     let mut atlas =
       Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Rgba8, AntiAliasing::None, &mut wgpu);
     atlas.allocate(1, (), DeviceSize::new(32, 32), &mut wgpu);
@@ -250,7 +250,7 @@ mod tests {
 
   #[test]
   fn fix_atlas_expand_overlap() {
-    let (mut wgpu, _guard) = headless();
+    let mut wgpu = block_on(WgpuImpl::headless());
     let mut atlas =
       Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Alpha8, AntiAliasing::None, &mut wgpu);
     let icon = DeviceSize::new(32, 32);

@@ -538,7 +538,7 @@ pub mod tests {
   use ribir_painter::Color;
 
   use super::*;
-  use crate::{gpu_backend::tests::headless, WgpuImpl, WgpuTexture};
+  use crate::{WgpuImpl, WgpuTexture};
 
   pub fn color_image(color: Color, width: u32, height: u32) -> ShareResource<PixelImage> {
     let data = std::iter::repeat(color.into_components())
@@ -552,7 +552,7 @@ pub mod tests {
 
   #[test]
   fn smoke_store_image() {
-    let (mut wgpu, _guard) = headless();
+    let mut wgpu = block_on(WgpuImpl::headless());
     let mut mgr = TexturesMgr::new(&mut wgpu, AntiAliasing::None);
 
     let red_img = color_image(Color::RED, 32, 32);
@@ -598,7 +598,7 @@ pub mod tests {
 
   #[test]
   fn transform_path_share_cache() {
-    let (mut wgpu, _guard) = headless();
+    let mut wgpu = block_on(WgpuImpl::headless());
     let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
 
     let path1 = Path::rect(&rect(0., 0., 300., 300.));
@@ -615,7 +615,7 @@ pub mod tests {
 
   #[test]
   fn store_clipped_path() {
-    let (mut wgpu, _guard) = headless();
+    let mut wgpu = block_on(WgpuImpl::headless());
     let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
 
     let path = PaintPath::new(
@@ -637,7 +637,7 @@ pub mod tests {
     // because the next resource may allocate at same address of a deallocated
     // address.
 
-    let (mut wgpu, _guard) = headless();
+    let mut wgpu = block_on(WgpuImpl::headless());
     let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
     {
       let red_img = color_image(Color::RED, 32, 32);
