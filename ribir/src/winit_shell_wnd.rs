@@ -179,7 +179,7 @@ pub(crate) fn new_id(id: winit::window::WindowId) -> WindowId {
 
 impl WinitShellWnd {
   #[cfg(target_family = "wasm")]
-  pub(crate) fn new_with_canvas<T>(
+  pub(crate) async fn new_with_canvas<T>(
     canvas: web_sys::HtmlCanvasElement, window_target: &EventLoopWindowTarget<T>,
   ) -> Self {
     use winit::platform::web::WindowBuilderExtWebSys;
@@ -188,11 +188,11 @@ impl WinitShellWnd {
       .build(window_target)
       .unwrap();
 
-    Self::inner_wnd(wnd)
+    Self::inner_wnd(wnd).await
   }
 
   #[cfg(target_family = "wasm")]
-  pub(crate) fn new<T>(window_target: &EventLoopWindowTarget<T>) -> Self {
+  pub(crate) async fn new<T>(window_target: &EventLoopWindowTarget<T>) -> Self {
     const RIBIR_CANVAS: &str = "ribir_canvas";
     const RIBIR_CANVAS_USED: &str = "ribir_canvas_used";
 
@@ -225,23 +225,22 @@ impl WinitShellWnd {
 
     let canvas = canvas.expect("No unused 'ribir_canvas' class element found.");
 
-    return Self::new_with_canvas(canvas, window_target);
+    return Self::new_with_canvas(canvas, window_target).await;
   }
 
   #[cfg(not(target_family = "wasm"))]
-  pub(crate) fn new<T>(window_target: &EventLoopWindowTarget<T>) -> Self {
+  pub(crate) async fn new<T>(window_target: &EventLoopWindowTarget<T>) -> Self {
     let wnd = winit::window::WindowBuilder::new()
       .build(window_target)
       .unwrap();
-    Self::inner_wnd(wnd)
+    Self::inner_wnd(wnd).await
   }
 
-  fn inner_wnd(winit_wnd: winit::window::Window) -> Self {
+  async fn inner_wnd(winit_wnd: winit::window::Window) -> Self {
     let ptr = &winit_wnd as *const winit::window::Window;
     // Safety: a reference to winit_wnd is valid as long as the WinitShellWnd is
     // alive.
-    let backend = Backend::new(unsafe { &*ptr });
-    let backend = AppCtx::wait_future(backend);
+    let backend = Backend::new(unsafe { &*ptr }).await;
     WinitShellWnd { backend, winit_wnd, cursor: CursorIcon::Default }
   }
 }
