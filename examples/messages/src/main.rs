@@ -3,12 +3,11 @@ use messages::messages;
 use ribir::prelude::*;
 
 fn main() {
-  unsafe {
-    AppCtx::set_app_theme(material::purple::light());
-  }
-
-  App::new_window(messages(), None).set_title("Messages");
-  App::exec();
+  App::run(messages())
+    .set_app_theme(material::purple::light())
+    .on_window(|wnd| {
+      wnd.set_title("Messages");
+    });
 }
 
 #[cfg(test)]

@@ -4,12 +4,11 @@ mod ui;
 use ui::todos;
 
 fn main() {
-  unsafe {
-    AppCtx::set_app_theme(material::purple::light());
-  }
-
-  App::new_window(todos(), Some(Size::new(400., 640.))).set_title("Todos");
-  App::exec();
+  App::run(todos())
+    .set_app_theme(material::purple::light())
+    .on_window(|wnd| {
+      wnd.set_title("Todos");
+    });
 }
 
 #[cfg(test)]

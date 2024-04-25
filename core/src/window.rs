@@ -300,13 +300,14 @@ impl Window {
     window
   }
 
-  pub fn set_content_widget(&self, root: impl WidgetBuilder) {
+  pub fn set_content_widget(&self, root: impl WidgetBuilder) -> &Self {
     let build_ctx = BuildCtx::new(None, &self.widget_tree);
     let root = root.build(&build_ctx);
     self
       .widget_tree
       .borrow_mut()
-      .set_content(root.consume())
+      .set_content(root.consume());
+    self
   }
 
   #[inline]
@@ -320,37 +321,51 @@ impl Window {
   /// device.
   pub fn device_pixel_ratio(&self) -> f32 { self.shell_wnd.borrow().device_pixel_ratio() }
 
-  pub fn set_title(&self, title: &str) { self.shell_wnd.borrow_mut().set_title(title); }
+  pub fn set_title(&self, title: &str) -> &Self {
+    self.shell_wnd.borrow_mut().set_title(title);
+    self
+  }
 
-  pub fn set_icon(&self, icon: &PixelImage) { self.shell_wnd.borrow_mut().set_icon(icon); }
+  pub fn set_icon(&self, icon: &PixelImage) -> &Self {
+    self.shell_wnd.borrow_mut().set_icon(icon);
+    self
+  }
 
   /// Returns the cursor icon of the window.
   pub fn get_cursor(&self) -> CursorIcon { self.shell_wnd.borrow().cursor() }
 
   /// Modifies the cursor icon of the window.
-  pub fn set_cursor(&self, cursor: CursorIcon) { self.shell_wnd.borrow_mut().set_cursor(cursor); }
+  pub fn set_cursor(&self, cursor: CursorIcon) -> &Self {
+    self.shell_wnd.borrow_mut().set_cursor(cursor);
+    self
+  }
 
   /// Sets location of IME candidate box in window global coordinates relative
   /// to the top left.
-  pub fn set_ime_cursor_area(&self, rect: &Rect) {
+  pub fn set_ime_cursor_area(&self, rect: &Rect) -> &Self {
     self
       .shell_wnd
       .borrow_mut()
       .set_ime_cursor_area(rect);
+    self
   }
 
-  pub fn set_ime_allowed(&self, allowed: bool) {
+  pub fn set_ime_allowed(&self, allowed: bool) -> &Self {
     self
       .shell_wnd
       .borrow_mut()
       .set_ime_allowed(allowed);
+    self
   }
 
   pub fn request_resize(&self, size: Size) { self.shell_wnd.borrow_mut().request_resize(size) }
 
   pub fn size(&self) -> Size { self.shell_wnd.borrow().inner_size() }
 
-  pub fn set_min_size(&self, size: Size) { self.shell_wnd.borrow_mut().set_min_size(size); }
+  pub fn set_min_size(&self, size: Size) -> &Self {
+    self.shell_wnd.borrow_mut().set_min_size(size);
+    self
+  }
 
   pub fn shell_wnd(&self) -> &RefCell<Box<dyn ShellWindow>> { &self.shell_wnd }
 

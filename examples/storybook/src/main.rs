@@ -3,12 +3,13 @@ use ribir::prelude::*;
 use storybook::storybook;
 
 fn main() {
-  unsafe {
-    AppCtx::set_app_theme(material::purple::light());
-  }
-
-  App::new_window(storybook(), Some(Size::new(1024., 768.))).set_title("Storybook");
-  App::exec();
+  App::run(storybook())
+    .set_app_theme(material::purple::light())
+    .on_window(|wnd| {
+      wnd
+        .set_title("Storybook")
+        .request_resize(Size::new(1024., 768.))
+    });
 }
 
 #[cfg(test)]
