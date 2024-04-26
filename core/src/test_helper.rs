@@ -130,6 +130,8 @@ impl ShellWindow for TestShellWindow {
 
   fn set_visible(&mut self, _: bool) {}
 
+  fn is_visible(&self) -> Option<bool> { Some(true) }
+
   fn set_resizable(&mut self, _: bool) {}
 
   fn is_resizable(&self) -> bool { true }

@@ -119,10 +119,13 @@ impl App {
           }
           WindowEvent::RedrawRequested => {
             if let Some(wnd) = AppCtx::get_window(wnd_id) {
-              // if this frame is really draw, request another redraw. To make sure the draw
-              // always end with a empty draw and emit an extra tick cycle message.
-              if wnd.draw_frame() {
-                request_redraw(&wnd);
+              // if the window is not visible, don't draw it./
+              if wnd.is_visible() != Some(false) {
+                // if this frame is really draw, request another redraw. To make sure the draw
+                // always end with a empty draw and emit an extra tick cycle message.
+                if wnd.draw_frame() {
+                  request_redraw(&wnd);
+                }
               }
             }
           }
@@ -264,7 +267,6 @@ impl App {
     #[cfg(not(target_family = "wasm"))]
     {
       use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
-      Self::active_window().draw_frame();
       let event_loop = unsafe { App::shared_mut() }
         .event_loop
         .as_mut()

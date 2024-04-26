@@ -25,9 +25,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
-### Changed
-
-- **core**: rename builtin field of delay_drop_until to keep_alive (#561 @wjian23)
 
 ### Features
 
@@ -49,9 +46,17 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
     .with_title("Counter");
   ```
 
+### Changed
+
+- **core**: rename builtin field of delay_drop_until to keep_alive (#561 @wjian23)
+
+### Fixed
+
+- **ribir**: Resolved the issue causing a black screen on the first frame. (#566, @M-Adoo)
+
 ### Breaking
 
-- **ribir**: `App::new_window` not accept window size as the second parameter. (#565, @M-Adoo)
+- **ribir**: Updated `App::new_window` to accept `WindowAttributes` instead of size as the second parameter. (#565, #566, @M-Adoo)
 - **ribir**: The window creation APIs have been updated to use asynchronous methods, improving compatibility with browsers. (#565, @M-Adoo)
 
 ## [0.3.0-alpha.4] - 2024-04-17
