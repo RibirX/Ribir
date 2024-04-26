@@ -268,8 +268,7 @@ impl Window {
     let widget_tree = RefCell::new(WidgetTree::default());
     let dispatcher = RefCell::new(Dispatcher::new());
     let size = shell_wnd.inner_size();
-    let mut painter = Painter::new(Rect::from_size(size));
-    painter.set_viewport(Rect::from_size(size));
+    let painter = Painter::new(Rect::from_size(size));
     let window = Self {
       dispatcher,
       widget_tree,

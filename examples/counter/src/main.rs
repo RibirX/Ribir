@@ -4,10 +4,8 @@ use ribir::prelude::*;
 
 fn main() {
   App::run(counter())
-    .set_app_theme(material::purple::light())
-    .on_window(|wnd| {
-      wnd.set_title("Counter");
-    });
+    .with_title("Counter")
+    .with_app_theme(material::purple::light());
 }
 
 #[cfg(test)]

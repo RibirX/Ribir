@@ -104,7 +104,7 @@ impl Overlay {
   ///   }
   /// };
   ///
-  /// App::run(w).on_window(|wnd| wnd.request_resize(Size::new(200., 200.)));
+  /// App::run(w).with_size(Size::new(200., 200.));
   /// ```
   pub fn new_with_handle<O, M>(builder: M) -> Self
   where
