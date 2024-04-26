@@ -70,6 +70,7 @@ pub trait ShellWindow {
   fn set_cursor(&mut self, cursor: CursorIcon);
   fn set_title(&mut self, str: &str);
   fn set_icon(&mut self, icon: &PixelImage);
+  fn is_visible(&self) -> Option<bool>;
   fn set_visible(&mut self, visible: bool);
   fn is_resizable(&self) -> bool;
   fn set_resizable(&mut self, resizable: bool);
@@ -311,60 +312,6 @@ impl Window {
 
   #[inline]
   pub fn id(&self) -> WindowId { self.shell_wnd.borrow().id() }
-
-  /// Return the current focused widget id.
-  pub fn focusing(&self) -> Option<WidgetId> { self.focus_mgr.borrow().focusing() }
-
-  /// The device pixel ratio of Window interface returns the ratio of the
-  /// resolution in physical pixels to the logic pixels for the current display
-  /// device.
-  pub fn device_pixel_ratio(&self) -> f32 { self.shell_wnd.borrow().device_pixel_ratio() }
-
-  pub fn set_title(&self, title: &str) -> &Self {
-    self.shell_wnd.borrow_mut().set_title(title);
-    self
-  }
-
-  pub fn set_icon(&self, icon: &PixelImage) -> &Self {
-    self.shell_wnd.borrow_mut().set_icon(icon);
-    self
-  }
-
-  /// Returns the cursor icon of the window.
-  pub fn get_cursor(&self) -> CursorIcon { self.shell_wnd.borrow().cursor() }
-
-  /// Modifies the cursor icon of the window.
-  pub fn set_cursor(&self, cursor: CursorIcon) -> &Self {
-    self.shell_wnd.borrow_mut().set_cursor(cursor);
-    self
-  }
-
-  /// Sets location of IME candidate box in window global coordinates relative
-  /// to the top left.
-  pub fn set_ime_cursor_area(&self, rect: &Rect) -> &Self {
-    self
-      .shell_wnd
-      .borrow_mut()
-      .set_ime_cursor_area(rect);
-    self
-  }
-
-  pub fn set_ime_allowed(&self, allowed: bool) -> &Self {
-    self
-      .shell_wnd
-      .borrow_mut()
-      .set_ime_allowed(allowed);
-    self
-  }
-
-  pub fn request_resize(&self, size: Size) { self.shell_wnd.borrow_mut().request_resize(size) }
-
-  pub fn size(&self) -> Size { self.shell_wnd.borrow().inner_size() }
-
-  pub fn set_min_size(&self, size: Size) -> &Self {
-    self.shell_wnd.borrow_mut().set_min_size(size);
-    self
-  }
 
   pub fn shell_wnd(&self) -> &RefCell<Box<dyn ShellWindow>> { &self.shell_wnd }
 
@@ -681,6 +628,70 @@ impl Window {
       .borrow()
       .store
       .layout_box_size(id)
+  }
+}
+
+/// Window attributes configuration.
+impl Window {
+  /// Return the current focused widget id.
+  pub fn focusing(&self) -> Option<WidgetId> { self.focus_mgr.borrow().focusing() }
+
+  /// The device pixel ratio of Window interface returns the ratio of the
+  /// resolution in physical pixels to the logic pixels for the current display
+  /// device.
+  pub fn device_pixel_ratio(&self) -> f32 { self.shell_wnd.borrow().device_pixel_ratio() }
+
+  pub fn set_title(&self, title: &str) -> &Self {
+    self.shell_wnd.borrow_mut().set_title(title);
+    self
+  }
+
+  pub fn set_icon(&self, icon: &PixelImage) -> &Self {
+    self.shell_wnd.borrow_mut().set_icon(icon);
+    self
+  }
+
+  /// Returns the cursor icon of the window.
+  pub fn get_cursor(&self) -> CursorIcon { self.shell_wnd.borrow().cursor() }
+
+  /// Modifies the cursor icon of the window.
+  pub fn set_cursor(&self, cursor: CursorIcon) -> &Self {
+    self.shell_wnd.borrow_mut().set_cursor(cursor);
+    self
+  }
+
+  /// Sets location of IME candidate box in window global coordinates relative
+  /// to the top left.
+  pub fn set_ime_cursor_area(&self, rect: &Rect) -> &Self {
+    self
+      .shell_wnd
+      .borrow_mut()
+      .set_ime_cursor_area(rect);
+    self
+  }
+
+  pub fn set_ime_allowed(&self, allowed: bool) -> &Self {
+    self
+      .shell_wnd
+      .borrow_mut()
+      .set_ime_allowed(allowed);
+    self
+  }
+
+  pub fn is_visible(&self) -> Option<bool> { self.shell_wnd.borrow().is_visible() }
+
+  pub fn set_visible(&self, visible: bool) -> &Self {
+    self.shell_wnd.borrow_mut().set_visible(visible);
+    self
+  }
+
+  pub fn request_resize(&self, size: Size) { self.shell_wnd.borrow_mut().request_resize(size) }
+
+  pub fn size(&self) -> Size { self.shell_wnd.borrow().inner_size() }
+
+  pub fn set_min_size(&self, size: Size) -> &Self {
+    self.shell_wnd.borrow_mut().set_min_size(size);
+    self
   }
 }
 

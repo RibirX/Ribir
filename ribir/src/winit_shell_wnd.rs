@@ -106,6 +106,9 @@ impl ShellWindow for WinitShellWnd {
   }
 
   #[inline]
+  fn is_visible(&self) -> Option<bool> { self.winit_wnd.is_visible() }
+
+  #[inline]
   fn set_visible(&mut self, visible: bool) { self.winit_wnd.set_visible(visible) }
 
   #[inline]
@@ -162,6 +165,8 @@ impl ShellWindow for WinitShellWnd {
       .round_out()
       .to_i32()
       .cast_unit();
+
+    self.winit_wnd.pre_present_notify();
 
     self
       .backend
@@ -243,7 +248,8 @@ impl WinitShellWnd {
       .with_title(attrs.title)
       .with_maximized(attrs.maximized)
       .with_resizable(attrs.resizable)
-      .with_visible(attrs.visible)
+      // hide the window until the render backend is ready
+      .with_visible(false)
       .with_decorations(attrs.decorations);
 
     if let Some(size) = attrs.size {
@@ -267,6 +273,11 @@ impl WinitShellWnd {
     // Safety: a reference to winit_wnd is valid as long as the WinitShellWnd is
     // alive.
     let backend = Backend::new(unsafe { &*ptr }).await;
+
+    // show the window after the render backend is ready
+    if attrs.visible {
+      winit_wnd.set_visible(attrs.visible);
+    }
     WinitShellWnd { backend, winit_wnd, cursor: CursorIcon::Default }
   }
 }
