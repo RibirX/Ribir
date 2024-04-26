@@ -4,12 +4,9 @@ use storybook::storybook;
 
 fn main() {
   App::run(storybook())
-    .set_app_theme(material::purple::light())
-    .on_window(|wnd| {
-      wnd
-        .set_title("Storybook")
-        .request_resize(Size::new(1024., 768.))
-    });
+    .with_app_theme(material::purple::light())
+    .with_title("Storybook")
+    .with_size(Size::new(1024., 768.));
 }
 
 #[cfg(test)]

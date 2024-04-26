@@ -6,10 +6,8 @@ mod wordle;
 
 fn main() {
   App::run(wordle_game())
-    .set_app_theme(material::purple::light())
-    .on_window(|wnd| {
-      wnd.set_title("Wordle Game");
-    });
+    .with_app_theme(material::purple::light())
+    .with_title("Wordle Game");
 }
 
 #[cfg(test)]

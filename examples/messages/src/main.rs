@@ -4,10 +4,8 @@ use ribir::prelude::*;
 
 fn main() {
   App::run(messages())
-    .set_app_theme(material::purple::light())
-    .on_window(|wnd| {
-      wnd.set_title("Messages");
-    });
+    .with_app_theme(material::purple::light())
+    .with_title("Messages");
 }
 
 #[cfg(test)]

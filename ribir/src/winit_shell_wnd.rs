@@ -9,7 +9,10 @@ use winit::{
   event_loop::EventLoopWindowTarget,
 };
 
-use crate::{backends::*, prelude::request_redraw};
+use crate::{
+  backends::*,
+  prelude::{request_redraw, WindowAttributes},
+};
 pub trait WinitBackend<'a>: Sized {
   fn new(window: &'a winit::window::Window) -> impl Future<Output = Self>;
 
@@ -89,13 +92,10 @@ impl ShellWindow for WinitShellWnd {
   #[inline]
   fn set_title(&mut self, title: &str) { self.winit_wnd.set_title(title) }
 
-  #[inline]
   fn set_icon(&mut self, icon: &PixelImage) {
-    assert!(icon.color_format() == ColorFormat::Rgba8);
-    let win_icon =
-      winit::window::Icon::from_rgba(icon.pixel_bytes().to_vec(), icon.width(), icon.height())
-        .unwrap();
-    self.winit_wnd.set_window_icon(Some(win_icon));
+    self
+      .winit_wnd
+      .set_window_icon(Some(img_to_winit_icon(icon)));
   }
 
   #[inline]
@@ -181,18 +181,18 @@ impl WinitShellWnd {
   #[cfg(target_family = "wasm")]
   pub(crate) async fn new_with_canvas<T>(
     canvas: web_sys::HtmlCanvasElement, window_target: &EventLoopWindowTarget<T>,
+    attrs: WindowAttributes,
   ) -> Self {
     use winit::platform::web::WindowBuilderExtWebSys;
-    let wnd = winit::window::WindowBuilder::new()
-      .with_canvas(Some(canvas))
-      .build(window_target)
-      .unwrap();
+    let builder = winit::window::WindowBuilder::new().with_canvas(Some(canvas));
 
-    Self::inner_wnd(wnd).await
+    Self::inner_wnd(builder, window_target, attrs).await
   }
 
   #[cfg(target_family = "wasm")]
-  pub(crate) async fn new<T>(window_target: &EventLoopWindowTarget<T>) -> Self {
+  pub(crate) async fn new<T>(
+    window_target: &EventLoopWindowTarget<T>, attrs: WindowAttributes,
+  ) -> Self {
     const RIBIR_CANVAS: &str = "ribir_canvas";
     const RIBIR_CANVAS_USED: &str = "ribir_canvas_used";
 
@@ -225,22 +225,53 @@ impl WinitShellWnd {
 
     let canvas = canvas.expect("No unused 'ribir_canvas' class element found.");
 
-    return Self::new_with_canvas(canvas, window_target).await;
+    return Self::new_with_canvas(canvas, window_target, attrs).await;
   }
 
   #[cfg(not(target_family = "wasm"))]
-  pub(crate) async fn new<T>(window_target: &EventLoopWindowTarget<T>) -> Self {
-    let wnd = winit::window::WindowBuilder::new()
-      .build(window_target)
-      .unwrap();
-    Self::inner_wnd(wnd).await
+  pub(crate) async fn new<T>(
+    window_target: &EventLoopWindowTarget<T>, attrs: WindowAttributes,
+  ) -> Self {
+    Self::inner_wnd(winit::window::WindowBuilder::new(), window_target, attrs).await
   }
 
-  async fn inner_wnd(winit_wnd: winit::window::Window) -> Self {
+  async fn inner_wnd<T>(
+    mut builder: winit::window::WindowBuilder, window_target: &EventLoopWindowTarget<T>,
+    attrs: WindowAttributes,
+  ) -> Self {
+    builder = builder
+      .with_title(attrs.title)
+      .with_maximized(attrs.maximized)
+      .with_resizable(attrs.resizable)
+      .with_visible(attrs.visible)
+      .with_decorations(attrs.decorations);
+
+    if let Some(size) = attrs.size {
+      builder = builder.with_inner_size(LogicalSize::new(size.width, size.height));
+    }
+    if let Some(min_size) = attrs.min_size {
+      builder = builder.with_min_inner_size(LogicalSize::new(min_size.width, min_size.height));
+    }
+    if let Some(max_size) = attrs.max_size {
+      builder = builder.with_max_inner_size(LogicalSize::new(max_size.width, max_size.height));
+    }
+    if let Some(pos) = attrs.position {
+      builder = builder.with_position(LogicalPosition::new(pos.x, pos.y));
+    }
+    if let Some(icon) = attrs.icon {
+      builder = builder.with_window_icon(Some(img_to_winit_icon(&icon)));
+    }
+
+    let winit_wnd: winit::window::Window = builder.build(window_target).unwrap();
     let ptr = &winit_wnd as *const winit::window::Window;
     // Safety: a reference to winit_wnd is valid as long as the WinitShellWnd is
     // alive.
     let backend = Backend::new(unsafe { &*ptr }).await;
     WinitShellWnd { backend, winit_wnd, cursor: CursorIcon::Default }
   }
+}
+
+fn img_to_winit_icon(icon: &PixelImage) -> winit::window::Icon {
+  assert!(icon.color_format() == ColorFormat::Rgba8);
+  winit::window::Icon::from_rgba(icon.pixel_bytes().to_vec(), icon.width(), icon.height()).unwrap()
 }

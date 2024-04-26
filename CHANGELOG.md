@@ -45,8 +45,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
   ``` rust
   App::run(root)
-    .set_app_theme(material::purple::light())
-    .on_window(|wnd| { wnd.set_title("Counter"); });
+    .with_app_theme(material::purple::light())
+    .with_title("Counter");
   ```
 
 ### Breaking

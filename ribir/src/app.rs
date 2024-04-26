@@ -1,5 +1,6 @@
-use std::{convert::Infallible, future::Future, pin::Pin};
+use std::convert::Infallible;
 
+use ribir_algo::Resource;
 use ribir_core::{prelude::*, timer::Timer, window::WindowId};
 use winit::{
   event::{ElementState, Event, Ime, KeyEvent, StartCause, WindowEvent},
@@ -19,6 +20,20 @@ pub struct App {
   #[cfg(not(target_family = "wasm"))]
   active_wnd: Option<WindowId>,
   events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
+}
+
+/// Attributes for creating a new window.
+pub struct WindowAttributes {
+  pub resizable: bool,
+  pub maximized: bool,
+  pub visible: bool,
+  pub decorations: bool,
+  pub title: String,
+  pub size: Option<Size>,
+  pub min_size: Option<Size>,
+  pub max_size: Option<Size>,
+  pub position: Option<Point>,
+  pub icon: Option<Resource<PixelImage>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -161,21 +176,24 @@ impl App {
   }
 }
 
-/// A guard returned by `App::run` that allows you to configure the application
-/// before it starts up.
+/// A guard returned by `App::run` that enables application configuration
+/// and window creation before startup.
 ///
-/// This will call `App::exec` when it's dropped.
-pub struct AppRunGuard(Option<Pin<Box<dyn Future<Output = std::rc::Rc<Window>>>>>);
+/// It dereferences to `WindowAttributes` for window attribute configuration.
+///
+/// Upon being dropped, it creates a new window with the `root` widget and
+/// then calls `App::exec`.
+pub struct AppRunGuard<W: WidgetBuilder + 'static> {
+  root: Option<W>,
+  wnd_attrs: Option<WindowAttributes>,
+}
 
 impl App {
   /// Start an application with the `root` widget, this will use the default
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run(root: impl WidgetBuilder + 'static) -> AppRunGuard {
-    let wnd = Self::new_window(root);
-    AppRunGuard::new(Box::pin(wnd))
-  }
+  pub fn run<W: WidgetBuilder + 'static>(root: W) -> AppRunGuard<W> { AppRunGuard::new(root) }
 
   /// Get a event sender of the application event loop, you can use this to send
   /// event.
@@ -185,24 +203,26 @@ impl App {
   /// Note: This is exclusive to the web platform.
   #[cfg(target_family = "wasm")]
   pub async fn new_with_canvas(
-    root: impl WidgetBuilder, canvas: web_sys::HtmlCanvasElement,
+    root: impl WidgetBuilder, canvas: web_sys::HtmlCanvasElement, attrs: WindowAttributes,
   ) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
       " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
     );
-    let shell_wnd = WinitShellWnd::new_with_canvas(canvas, &event_loop).await;
+    let shell_wnd = WinitShellWnd::new_with_canvas(canvas, &event_loop, attrs).await;
     let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
     wnd
   }
 
   /// create a new window with the `root` widget
-  pub async fn new_window(root: impl WidgetBuilder) -> std::rc::Rc<Window> {
+  pub async fn new_window(
+    root: impl WidgetBuilder, attrs: WindowAttributes,
+  ) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
       " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
     );
-    let shell_wnd = WinitShellWnd::new(event_loop).await;
+    let shell_wnd = WinitShellWnd::new(event_loop, attrs).await;
     let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
 
     #[cfg(not(target_family = "wasm"))]
@@ -295,36 +315,97 @@ impl App {
   }
 }
 
-impl AppRunGuard {
-  fn new(wnd: Pin<Box<dyn Future<Output = std::rc::Rc<Window>>>>) -> Self {
+impl<W: WidgetBuilder> AppRunGuard<W> {
+  fn new(root: W) -> Self {
     static ONCE: std::sync::Once = std::sync::Once::new();
     assert!(!ONCE.is_completed(), "App::run can only be called once.");
-    Self(Some(wnd))
+    Self { root: Some(root), wnd_attrs: Some(Default::default()) }
   }
 
   /// Set the application theme, this will apply to whole application.
-  pub fn set_app_theme(&mut self, theme: FullTheme) -> &mut Self {
+  pub fn with_app_theme(&mut self, theme: FullTheme) -> &mut Self {
     // Safety: AppRunGuard is only created once and should be always used
     // before the application startup.
     unsafe { AppCtx::set_app_theme(theme) }
     self
   }
 
-  /// Config the current window with the `f` function.
-  pub fn on_window(&mut self, f: impl FnOnce(&Window) + 'static) -> &mut Self {
-    let wnd = self.0.take().unwrap();
-    self.0 = Some(Box::pin(async move {
-      let wnd = wnd.await;
-      f(&wnd);
-      wnd
-    }));
+  /// Sets the initial title of the window in the title bar.
+  ///
+  /// The default is `"Ribir App"`.
+  pub fn with_title(&mut self, title: impl Into<String>) -> &mut Self {
+    self.wnd_attr().title = title.into();
     self
+  }
+
+  /// Sets whether the window should be resizable or not. The default is `true`.
+  pub fn with_resizable(&mut self, resizable: bool) -> &mut Self {
+    self.wnd_attr().resizable = resizable;
+    self
+  }
+
+  /// Sets the initial size of the window client area, window excluding the
+  /// title bar and borders.
+  pub fn with_size(&mut self, size: Size) -> &mut Self {
+    self.wnd_attr().size = Some(size);
+    self
+  }
+
+  /// Sets the minimum size of the window client area
+  pub fn with_min_size(&mut self, size: Size) -> &mut Self {
+    self.wnd_attr().min_size = Some(size);
+    self
+  }
+
+  /// Sets the maximum size of the window client area
+  pub fn with_max_size(&mut self, size: Size) -> &mut Self {
+    self.wnd_attr().max_size = Some(size);
+    self
+  }
+
+  /// Sets the initial position of the window in screen coordinates.
+  pub fn with_position(&mut self, position: Point) -> &mut Self {
+    self.wnd_attr().position = Some(position);
+    self
+  }
+
+  /// Sets whether the window should be maximized when it is first shown.
+  pub fn with_maximized(&mut self, maximized: bool) -> &mut Self {
+    self.wnd_attr().maximized = maximized;
+    self
+  }
+
+  /// Sets whether the window should be visible when it is first shown.
+  pub fn with_visible(&mut self, visible: bool) -> &mut Self {
+    self.wnd_attr().visible = visible;
+    self
+  }
+
+  /// Sets whether the window should have a border, a title bar, etc.
+  pub fn with_decorations(&mut self, decorations: bool) -> &mut Self {
+    self.wnd_attr().decorations = decorations;
+    self
+  }
+
+  /// Sets the icon of the window.
+  pub fn with_icon(&mut self, icon: Resource<PixelImage>) -> &mut Self {
+    self.wnd_attr().icon = Some(icon);
+    self
+  }
+
+  fn wnd_attr(&mut self) -> &mut WindowAttributes {
+    // Should be safe to unwrap because `wnd_attrs` is always `Some` before
+    // drop.
+    unsafe { self.wnd_attrs.as_mut().unwrap_unchecked() }
   }
 }
 
-impl Drop for AppRunGuard {
+impl<W: WidgetBuilder + 'static> Drop for AppRunGuard<W> {
   fn drop(&mut self) {
-    let wnd = self.0.take().unwrap();
+    let root = self.root.take().unwrap();
+    let attr = self.wnd_attrs.take().unwrap();
+    let wnd = App::new_window(root, attr);
+
     #[cfg(target_family = "wasm")]
     wasm_bindgen_futures::spawn_local(async move {
       let _ = wnd.await;
@@ -413,6 +494,88 @@ impl PreEditHandle {
   }
 }
 
+impl WindowAttributes {
+  /// Sets the initial title of the window in the title bar.
+  ///
+  /// The default is `"Ribir App"`.
+  pub fn with_title(&mut self, title: impl Into<String>) -> &mut Self {
+    self.title = title.into();
+    self
+  }
+
+  /// Sets whether the window should be resizable or not. The default is `true`.
+  pub fn with_resizable(&mut self, resizable: bool) -> &mut Self {
+    self.resizable = resizable;
+    self
+  }
+
+  /// Sets the initial size of the window client area, window excluding the
+  /// title bar and borders.
+  pub fn with_size(&mut self, size: Size) -> &mut Self {
+    self.size = Some(size);
+    self
+  }
+
+  /// Sets the minimum size of the window client area
+  pub fn with_min_size(&mut self, size: Size) -> &mut Self {
+    self.min_size = Some(size);
+    self
+  }
+
+  /// Sets the maximum size of the window client area
+  pub fn with_max_size(&mut self, size: Size) -> &mut Self {
+    self.max_size = Some(size);
+    self
+  }
+
+  /// Sets the initial position of the window in screen coordinates.
+  pub fn with_position(&mut self, position: Point) -> &mut Self {
+    self.position = Some(position);
+    self
+  }
+
+  /// Sets whether the window should be maximized when it is first shown.
+  pub fn with_maximized(&mut self, maximized: bool) -> &mut Self {
+    self.maximized = maximized;
+    self
+  }
+
+  /// Sets whether the window should be visible when it is first shown.
+  pub fn with_visible(&mut self, visible: bool) -> &mut Self {
+    self.visible = visible;
+    self
+  }
+
+  /// Sets whether the window should have a border, a title bar, etc.
+  pub fn with_decorations(&mut self, decorations: bool) -> &mut Self {
+    self.decorations = decorations;
+    self
+  }
+
+  /// Sets the icon of the window.
+  pub fn with_icon(&mut self, icon: Resource<PixelImage>) -> &mut Self {
+    self.icon = Some(icon);
+    self
+  }
+}
+
+impl Default for WindowAttributes {
+  fn default() -> Self {
+    Self {
+      resizable: true,
+      size: None,
+      min_size: None,
+      max_size: None,
+      position: None,
+      title: "Ribir App".to_string(),
+      maximized: false,
+      visible: true,
+      decorations: true,
+      icon: None,
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use std::{cell::RefCell, rc::Rc};
@@ -452,7 +615,7 @@ mod tests {
     let w = Stateful::new(LogImeEvent::default());
     let log = w.read().log.clone();
 
-    let w = fn_widget! { @ {w} };
+    let w = fn_widget! { w };
     let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
 
     wnd.draw_frame();

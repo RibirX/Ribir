@@ -5,10 +5,8 @@ use ui::todos;
 
 fn main() {
   App::run(todos())
-    .set_app_theme(material::purple::light())
-    .on_window(|wnd| {
-      wnd.set_title("Todos");
-    });
+    .with_app_theme(material::purple::light())
+    .with_title("Todos");
 }
 
 #[cfg(test)]
