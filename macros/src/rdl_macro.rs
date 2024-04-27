@@ -79,7 +79,11 @@ impl RdlMacro {
           .collect();
 
         let obj = ok!(DeclareObj::from_literal(&l));
-        obj.to_token_stream().into()
+        if let Err(err) = obj.error_check() {
+          err.to_compile_error().into()
+        } else {
+          obj.to_token_stream().into()
+        }
       }
       RdlMacro::ExprObj { span, stmts } => {
         let stmts = stmts.into_iter().map(|s| refs.fold_stmt(s));

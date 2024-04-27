@@ -27,14 +27,21 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
+- **core**: Introduced `StateWatcher` for watching state modifies, which was previously the responsibility of `StateReader`. This results in a cleaner and more compact `StateReader` implementation. (#556, @M-Adoo)
 - **gpu**: Introduced `GPUBackendImpl::max_textures_per_draw` to set a limit on textures per draw phase (#562 @M-Adoo)
 
 ### Changed
 
+- **macros**: polish the compile error message of invalid filed in `@$var {}` (#556 @M-Adoo)
 - **gpu**: Removed dependency on the texture array feature of wgpu. (#562, @M-Adoo)
+
+### Documented
+
+- **core**: Explained when to use `unsubscribe` with `watch!`. (#556, @M-Adoo)
 
 ### Breaking
 
+- **core**: The `StateReader` no longer supports watching its modifications. Use the `StateWatcher` trait instead for this functionality. (#556 @M-Adoo)
 - **painter**: Changes to `BackendPainter` APIs. This only affects you if you've implemented a custom painter. (#562 @M-Adoo)
 
 
@@ -42,7 +49,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Introduced `StateWatcher` for watching state modifies, which was previously the responsibility of `StateReader`. This results in a cleaner and more compact `StateReader` implementation. (#pr, @M-Adoo)
 - **ribir**: Introduced `AppRunGuard` to allow app and window configuration prior to app startup. (#565, @M-Adoo)
   Previously, to configure the app and window before startup, `App::run` couldn't be used:
   ``` rust
@@ -73,11 +79,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **ribir**: Updated `App::new_window` to accept `WindowAttributes` instead of size as the second parameter. (#565, #566, @M-Adoo)
 - **ribir**: The window creation APIs have been updated to use asynchronous methods, improving compatibility with browsers. (#565, @M-Adoo)
-- **core**: The `StateReader` no longer supports watching its modifications. Use the `StateWatcher` trait instead for this functionality. (#pr @M-Adoo)
 
-### Documented
-
-- **core**: Explained when to use `unsubscribe` with `watch!`. (#pr, @M-Adoo)
 
 ## [0.3.0-alpha.4] - 2024-04-17
 
