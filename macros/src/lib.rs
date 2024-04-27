@@ -18,8 +18,8 @@ pub(crate) mod variable_names;
 mod watch_macro;
 mod writer_map_macro;
 pub(crate) use rdl_macro::*;
-
 pub(crate) mod declare_obj;
+pub(crate) mod error;
 pub(crate) mod symbol_process;
 
 macro_rules! ok {

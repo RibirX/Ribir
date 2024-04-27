@@ -8,6 +8,7 @@ use syn::{
 };
 
 use crate::{
+  error::Error,
   rdl_macro::{DeclareField, RdlParent, StructLiteral},
   variable_names::BUILTIN_INFOS,
 };
@@ -69,6 +70,22 @@ impl<'a> ToTokens for DeclareObj<'a> {
 }
 
 impl<'a> DeclareObj<'a> {
+  pub fn error_check(&self) -> Result<(), Error> {
+    if let ObjType::Var(_) = self.this.node_type {
+      let invalid_fields = self
+        .this
+        .fields
+        .iter()
+        .filter(|f| !BUILTIN_INFOS.contains_key(&f.member.to_string()))
+        .collect::<Vec<_>>();
+      if !invalid_fields.is_empty() {
+        return Err(Error::InvalidFieldInVar(invalid_fields.into()));
+      }
+    }
+
+    Ok(())
+  }
+
   fn declare_children_and_compose_it(&self, var: &Ident, tokens: &mut TokenStream) {
     let mut children = vec![];
     for (i, c) in self.children.iter().enumerate() {
@@ -103,21 +120,6 @@ impl<'a> DeclareObj<'a> {
         }
       }
       ObjType::Var(var) => {
-        let invalid_fields = fields
-          .iter()
-          .filter(|f| !BUILTIN_INFOS.contains_key(&f.member.to_string()))
-          .collect::<Vec<_>>();
-        if !invalid_fields.is_empty() {
-          Brace(var.span()).surround(tokens, |tokens| {
-            for f in invalid_fields.iter() {
-              quote_spanned! { f.member.span() =>
-                compile_error!("Only allow to declare builtin fields in a variable parent.");
-              }
-              .to_tokens(tokens);
-            }
-          });
-          return;
-        }
         if !self.children.is_empty() && fields.is_empty() {
           // If a variable node is declared with children, it cannot be used by others.
           // Therefore, there's no need to extend the built-in ability to it.
