@@ -32,9 +32,6 @@ impl<R: StateReader> StateReader for Watcher<R> {
   fn origin_reader(&self) -> &Self::OriginReader { self.reader.origin_reader() }
 
   #[inline]
-  fn time_stamp(&self) -> Instant { self.reader.time_stamp() }
-
-  #[inline]
   fn try_into_value(self) -> Result<Self::Value, Self>
   where
     Self::Value: Sized,

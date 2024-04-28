@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 
 use ribir_algo::Sc;
+use state_cell::StateCell;
 
 use crate::prelude::*;
 
@@ -58,6 +59,11 @@ impl<R: RenderTarget + Query> Query for RenderProxy<R> {
 impl<R: Render> RenderTarget for RefCell<R> {
   type Target = R;
   fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(&*self.borrow()) }
+}
+
+impl<R: Render> RenderTarget for StateCell<R> {
+  type Target = R;
+  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(&*self.read()) }
 }
 
 impl<R: RenderTarget> RenderTarget for Sc<R> {

@@ -16,7 +16,6 @@ mod rdl_macro;
 mod simple_declare_attr;
 pub(crate) mod variable_names;
 mod watch_macro;
-mod writer_map_macro;
 pub(crate) use rdl_macro::*;
 pub(crate) mod declare_obj;
 pub(crate) mod error;
@@ -254,24 +253,6 @@ pub fn pipe(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn watch(input: TokenStream) -> TokenStream {
   watch_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
-}
-
-/// macro split a new writer from a state writer. For example,
-/// `split_writer!($label.visible);` will return a writer of `bool` that is
-/// partial of the `Visibility`. This macros is a convenient way for
-/// `StateWriter::split_writer`
-#[proc_macro]
-pub fn split_writer(input: TokenStream) -> TokenStream {
-  writer_map_macro::gen_split_path_writer(input.into(), &mut DollarRefsCtx::top_level())
-}
-
-/// macro map a write to another state write. For example,
-/// `map_writer!($label.visible);` will return a writer of `bool` that is
-/// partial of the `Visibility`. This macros is a convenient way for
-/// `StateWriter::map_writer`
-#[proc_macro]
-pub fn map_writer(input: TokenStream) -> TokenStream {
-  writer_map_macro::gen_map_path_writer(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// Includes an SVG file as an `Svg`.

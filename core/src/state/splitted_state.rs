@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefMut};
+use std::cell::Cell;
 
 use ribir_algo::Sc;
 use rxrust::{
@@ -7,21 +7,21 @@ use rxrust::{
 };
 
 use super::{
-  MapReader, ModifyScope, Notifier, ReadRef, StateReader, StateWatcher, StateWriter, WriteRef,
-  WriterControl,
+  state_cell::PartData, MapWriterAsReader, ModifyScope, Notifier, ReadRef, StateReader,
+  StateWatcher, StateWriter, WriteRef, WriterControl,
 };
 use crate::{
   context::BuildCtx,
   prelude::AppCtx,
+  state::state_cell::ValueMutRef,
   ticker::Instant,
   widget::{Render, RenderBuilder, Widget},
 };
 
 /// A writer splitted writer from another writer, and has its own notifier.
-pub struct SplittedWriter<O, R, W> {
+pub struct SplittedWriter<O, W> {
   origin: O,
-  map: R,
-  mut_map: W,
+  splitter: W,
   notifier: Notifier,
   batched_modify: Sc<Cell<ModifyScope>>,
   create_at: Instant,
@@ -29,90 +29,49 @@ pub struct SplittedWriter<O, R, W> {
   ref_count: Sc<Cell<usize>>,
 }
 
-impl<O, R, W> Drop for SplittedWriter<O, R, W> {
+impl<O, W> Drop for SplittedWriter<O, W> {
   fn drop(&mut self) {
     if self.ref_count.get() == 1 {
       let mut notifier = self.notifier.clone();
       // we use an async task to unsubscribe to wait the batched modifies to be
       // notified.
-      AppCtx::spawn_local(async move {
+      let _ = AppCtx::spawn_local(async move {
         notifier.unsubscribe();
-      })
-      .unwrap();
+      });
     }
   }
 }
 
-pub struct SplittedReader<S, F> {
-  origin: S,
-  map: F,
-  notifier: Notifier,
-  create_at: Instant,
-  last_modified: Sc<Cell<Instant>>,
-}
-
-macro_rules! splitted_reader_impl {
-  () => {
-    type Value = V;
-    type OriginReader = O;
-    type Reader = SplittedReader<O::Reader, R>;
-
-    #[track_caller]
-    fn read(&self) -> ReadRef<Self::Value> {
-      // fixme: remove time_stamp
-      // assert!(
-      //   self.create_at > self.origin.time_stamp(),
-      //   "A splitted reader is invalid because its origin state is modified after it
-      // created." );
-      ReadRef::map(self.origin.read(), &self.map)
-    }
-
-    #[inline]
-    fn clone_reader(&self) -> Self::Reader {
-      SplittedReader {
-        origin: self.origin.clone_reader(),
-        map: self.map.clone(),
-        notifier: self.notifier.clone(),
-        create_at: self.create_at,
-        last_modified: self.last_modified.clone(),
-      }
-    }
-
-    #[inline]
-    fn origin_reader(&self) -> &Self::OriginReader { &self.origin }
-
-    #[inline]
-    fn time_stamp(&self) -> Instant { self.last_modified.get() }
-
-    #[inline]
-    fn try_into_value(self) -> Result<Self::Value, Self>
-    where
-      Self::Value: Sized,
-    {
-      Err(self)
-    }
-  };
-}
-
-impl<V, O, R> StateReader for SplittedReader<O, R>
+impl<V, O, W> StateReader for SplittedWriter<O, W>
 where
   Self: 'static,
-  V: ?Sized,
-  O: StateReader,
-  R: Fn(&O::Value) -> &V + Clone,
-{
-  splitted_reader_impl!();
-}
-
-impl<V, O, R, W> StateReader for SplittedWriter<O, R, W>
-where
-  Self: 'static,
-  V: ?Sized,
   O: StateWriter,
-  R: Fn(&O::Value) -> &V + Clone,
-  W: Fn(&mut O::Value) -> &mut V + Clone,
+  W: Fn(&mut O::Value) -> PartData<V> + Clone,
 {
-  splitted_reader_impl!();
+  type Value = V;
+  type OriginReader = O;
+  type Reader = MapWriterAsReader<O::Reader, W>;
+
+  #[track_caller]
+  fn read(&self) -> ReadRef<Self::Value> {
+    ReadRef::mut_as_ref_map(self.origin.read(), &self.splitter)
+  }
+
+  #[inline]
+  fn clone_reader(&self) -> Self::Reader {
+    MapWriterAsReader { origin: self.origin.clone_reader(), part_map: self.splitter.clone() }
+  }
+
+  #[inline]
+  fn origin_reader(&self) -> &Self::OriginReader { &self.origin }
+
+  #[inline]
+  fn try_into_value(self) -> Result<Self::Value, Self>
+  where
+    Self::Value: Sized,
+  {
+    Err(self)
+  }
 }
 
 // fixme: we will remove the stamp check after #521 is fixed.
@@ -137,13 +96,11 @@ impl Clone for Box<dyn CloneableChecker> {
   fn clone(&self) -> Self { self.box_clone() }
 }
 
-impl<V, O, R, W> StateWatcher for SplittedWriter<O, R, W>
+impl<V, O, W> StateWatcher for SplittedWriter<O, W>
 where
   Self: 'static,
-  V: ?Sized,
   O: StateWriter,
-  R: Fn(&O::Value) -> &V + Clone,
-  W: Fn(&mut O::Value) -> &mut V + Clone,
+  W: Fn(&mut O::Value) -> PartData<V> + Clone,
 {
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, std::convert::Infallible> {
     let origin = self.origin.clone_reader();
@@ -161,15 +118,13 @@ where
   }
 }
 
-impl<V, O, R, W> StateWriter for SplittedWriter<O, R, W>
+impl<V, O, W> StateWriter for SplittedWriter<O, W>
 where
   Self: 'static,
-  V: ?Sized,
   O: StateWriter,
-  R: Fn(&O::Value) -> &V + Clone,
-  W: Fn(&mut O::Value) -> &mut V + Clone,
+  W: Fn(&mut O::Value) -> PartData<V> + Clone,
 {
-  type Writer = SplittedWriter<O::Writer, R, W>;
+  type Writer = SplittedWriter<O::Writer, W>;
   type OriginWriter = O;
 
   #[inline]
@@ -184,8 +139,7 @@ where
   fn clone_writer(&self) -> Self::Writer {
     SplittedWriter {
       origin: self.origin.clone_writer(),
-      map: self.map.clone(),
-      mut_map: self.mut_map.clone(),
+      splitter: self.splitter.clone(),
       notifier: self.notifier.clone(),
       batched_modify: self.batched_modify.clone(),
       last_modified: self.last_modified.clone(),
@@ -198,17 +152,12 @@ where
   fn origin_writer(&self) -> &Self::OriginWriter { &self.origin }
 }
 
-impl<V, O, R, W> WriterControl for SplittedWriter<O, R, W>
+impl<V, O, W> WriterControl for SplittedWriter<O, W>
 where
   Self: 'static,
-  V: ?Sized,
   O: StateWriter,
-  R: Fn(&O::Value) -> &V + Clone,
-  W: Fn(&mut O::Value) -> &mut V + Clone,
+  W: Fn(&mut O::Value) -> PartData<V> + Clone,
 {
-  #[inline]
-  fn last_modified_stamp(&self) -> &Cell<Instant> { &self.last_modified }
-
   #[inline]
   fn batched_modifies(&self) -> &Cell<ModifyScope> { &self.batched_modify }
 
@@ -219,21 +168,18 @@ where
   fn dyn_clone(&self) -> Box<dyn WriterControl> { Box::new(self.clone_writer()) }
 }
 
-impl<V, O, R, W> SplittedWriter<O, R, W>
+impl<V, O, W> SplittedWriter<O, W>
 where
   Self: 'static,
   O: StateWriter,
-  R: Fn(&O::Value) -> &V + Clone,
-  W: Fn(&mut O::Value) -> &mut V + Clone,
-  V: ?Sized,
+  W: Fn(&mut O::Value) -> PartData<V> + Clone,
 {
-  pub(super) fn new(origin: O, map: R, mut_map: W) -> Self {
+  pub(super) fn new(origin: O, mut_map: W) -> Self {
     let create_at = Instant::now();
 
     Self {
       origin,
-      map,
-      mut_map,
+      splitter: mut_map,
       notifier: Notifier::default(),
       batched_modify: <_>::default(),
       last_modified: Sc::new(Cell::new(create_at)),
@@ -244,11 +190,6 @@ where
 
   #[track_caller]
   fn split_ref<'a>(&'a self, mut orig: WriteRef<'a, O::Value>) -> WriteRef<'a, V> {
-    assert!(
-      self.create_at > self.origin.time_stamp(),
-      "A splitted writer is invalid because its origin state is modified after it created."
-    );
-
     let modify_scope = orig.modify_scope;
 
     // the origin mark as a silent write, because split writer not effect the origin
@@ -256,24 +197,21 @@ where
     assert!(!orig.modified);
     orig.modify_scope.remove(ModifyScope::FRAMEWORK);
     orig.modified = true;
-
-    let value = orig
-      .value
-      .take()
-      .map(|orig| RefMut::map(orig, &self.mut_map));
+    let value =
+      ValueMutRef { value: (self.splitter)(&mut orig.value), borrow: orig.value.borrow.clone() };
 
     WriteRef { value, modified: false, modify_scope, control: self }
   }
 }
 
-impl<V, O, R, W> RenderBuilder for SplittedWriter<O, R, W>
+impl<V, O, W> RenderBuilder for SplittedWriter<O, W>
 where
   O: StateWriter,
-  R: Fn(&O::Value) -> &V + Clone + 'static,
-  W: Fn(&mut O::Value) -> &mut V + Clone,
+  W: Fn(&mut O::Value) -> PartData<V> + Clone + 'static,
   V: Render,
 {
   fn build(self, ctx: &BuildCtx) -> Widget {
-    MapReader { origin: self.origin.clone_reader(), map: self.map.clone() }.build(ctx)
+    MapWriterAsReader { origin: self.origin.clone_reader(), part_map: self.splitter.clone() }
+      .build(ctx)
   }
 }

@@ -676,7 +676,7 @@ fn main() {
 
 **转换**是将一个父状态转换为子状态，父子状态共享同样的数据，修改父状态等同于修改子状态，反之亦然。它仅仅是缩减了数据的可见范围，方便你只想使用和传递传递部分状态。
 
-**分离**是从一个父状态中分离出子状态，父子状态共享同样的数据。不同的是，通过子状态修改数据不会触发父状态的依赖视图更新，而通过父状态修改数据则会导致分离子状态失效。
+**分离**是从一个父状态中分离出子状态，父子状态共享同样的数据。不同的是，通过子状态修改数据不会触发父状态的依赖视图更新。
 
 你要注意的是，不论是转换还是分离，父子状态共享的都是同一份数据。因此，它们对数据的修改会影响到彼此，但它们所推送的数据变更的范围可能不同。
 
@@ -690,8 +690,8 @@ struct AppData {
 }
 
 let state = State::value(AppData { count: 0 });
-let map_count = state.map_writer(|d| &d.count, |d| &mut d.count);
-let split_count = state.split_writer(|d| &d.count, |d| &mut d.count);
+let map_count = state.map_writer(|d| PartData::from_ref(&mut d.count));
+let split_count = state.split_writer(|d| PartData::from_ref(&mut d.count));
 
 watch!($state.count).subscribe(|_| println!("父状态数据"));
 watch!(*$map_count).subscribe(|_| println!("子状态（转换）数据"));
@@ -741,14 +741,6 @@ AppCtx::run_until_stalled();
 
 因为 Ribir 的数据修改通知是异步批量发出的，所以在例子中为了方便理解，我们每次数据修改都调用了 `AppCtx::run_until_stalled()` 来强制理解发送，但这不应该出现在你真实的代码中。
 
-如果你的状态读写器转换或分离自同一个路径，你可以使用 Ribir 提供的 `map_writer!` 和 `split_writer!` 来简化你的代码：
-
-```rust ignore
-// let map_count = state.map_writer(|d| &d.count, |d| &mut d.count)
-let map_count = map_writer!($state.count);
-// let split_count = state.split_writer(|d| &d.count, |d| &mut d.count);
-let split_count = split_writer!($state.count);
-```
 
 如果你仅是想获得一个只读的子状态，那么可以通过 `map_reader` 来转换：
 
@@ -771,7 +763,7 @@ struct AppData {
 }
 
 let state: State<AppData> = State::value(AppData { count: 0 });
-let split_count = split_writer!($state.count);
+let split_count = state.split_writer(|d| PartData::from_ref(&mut d.count));
 
 // 根状态的源状态是它自己
 let _: &State<AppData> = state.origin_reader();

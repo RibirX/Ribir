@@ -1,6 +1,7 @@
-//! A stagger animation is a series of animations that run one by one.
-//! The next animation will start after a delay after the previous animation
-//! starts and not care about if the previous animation ends.
+//! A stagger animation consists of a sequence of animations that execute
+//! consecutively. Each subsequent animation commences following a delay from
+//! the start of the preceding animation, regardless of whether the preceding
+//! animation has concluded.
 //!
 //! # Example
 //!
@@ -22,14 +23,21 @@
 //!
 //!   let mut first = @Text { text: "first" };
 //!   let mut second = @Text { text: "second" };
+//!   let first_opacity = first
+//!     .get_opacity_widget()
+//!     .map_writer(|w| PartData::from_ref_mut(&mut w.opacity));
+//!   let second_opacity = second
+//!     .get_opacity_widget()
+//!     .map_writer(|w| PartData::from_ref_mut(&mut w.opacity));
+//!
 //!
 //!   let first_fade_in = @Animate {
 //!     transition: transitions::EASE_IN.of(ctx!()),
-//!      state: map_writer!($first.opacity),
+//!      state: first_opacity,
 //!   };
 //!
 //!   stagger.write().push_animation(first_fade_in);
-//!   stagger.write().push_state(map_writer!($second.opacity), 0., ctx!());
+//!   stagger.write().push_state(second_opacity, 0., ctx!());
 //!
 //!   @Column {
 //!     on_mounted: move |_| stagger.run(),
@@ -225,15 +233,18 @@ mod tests {
     fn_widget! {
       let stagger = Stagger::new(Duration::from_millis(100), transitions::EASE_IN.of(ctx!()));
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };
+      let opacity = mock_box
+        .get_opacity_widget()
+        .map_writer(|w| PartData::from_ref_mut(&mut w.opacity));
       let animate = @Animate {
         transition: transitions::EASE_IN.of(ctx!()),
-        state: map_writer!($mock_box.opacity),
+        state: opacity,
         from: 0.,
       };
 
       stagger.write().push_animation(animate);
       stagger.write().push_state(
-        map_writer!($mock_box.size),
+        mock_box.map_writer(|w| PartData::from_ref_mut(&mut w.size)),
         Size::new(200., 200.),
         ctx!()
       );
@@ -260,7 +271,13 @@ mod tests {
     let c_stagger = stagger.clone_writer().into_inner();
     let w = fn_widget! {
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };
-      $stagger.write().push_state(map_writer!($mock_box.opacity), 0., ctx!());
+      $stagger.write().push_state(
+        mock_box
+          .get_opacity_widget()
+          .map_writer(|w| PartData::from_ref_mut(&mut w.opacity)),
+        0.,
+        ctx!()
+      );
       stagger.run();
 
       mock_box
