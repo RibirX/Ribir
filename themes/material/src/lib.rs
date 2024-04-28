@@ -256,10 +256,10 @@ fn override_compose_decorator(theme: &mut FullTheme) {
     fn_widget! {
       let host = scrollbar_thumb(host, EdgeInsets::vertical(1.));
       let mut thumb = @ $host { anchor: pipe!($this.offset).map(Anchor::left) };
-
-      map_writer!($thumb.anchor)
+      thumb
+        .get_relative_anchor_widget()
+        .map_writer(|w| PartData::from_ref_mut(&mut w.anchor))
         .transition(transitions::LINEAR.of(ctx!()), ctx!());
-
       thumb
     }
     .build(ctx)
@@ -268,8 +268,9 @@ fn override_compose_decorator(theme: &mut FullTheme) {
     fn_widget! {
       let host = scrollbar_thumb(host, EdgeInsets::vertical(1.));
       let mut thumb = @ $host { anchor: pipe!($this.offset).map(Anchor::top) };
-
-      map_writer!($thumb.anchor)
+      thumb
+        .get_relative_anchor_widget()
+        .map_writer(|w| PartData::from_ref_mut(&mut w.anchor))
         .transition(transitions::LINEAR.of(ctx!()), ctx!());
 
       thumb
@@ -297,18 +298,10 @@ fn override_compose_decorator(theme: &mut FullTheme) {
         },
       };
 
-      let ease_in = transitions::EASE_IN.of(ctx!());
-      match $style.pos {
-        Position::Top | Position::Bottom => {
-          map_writer!($indicator.anchor)
-            .transition(ease_in, ctx!());
-        }
-        Position::Left | Position::Right => {
-          map_writer!($indicator.anchor)
-            .transition(ease_in, ctx!());
-        }
-      }
-
+      indicator
+        .get_relative_anchor_widget()
+        .map_writer(|w| PartData::from_ref_mut(&mut w.anchor))
+        .transition(transitions::EASE_IN.of(ctx!()), ctx!());
       indicator
     }
     .build(ctx)

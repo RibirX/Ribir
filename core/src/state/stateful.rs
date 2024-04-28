@@ -1,21 +1,18 @@
-use std::{
-  cell::{Cell, RefCell},
-  convert::Infallible,
-};
+use std::{cell::Cell, convert::Infallible};
 
 use ribir_algo::Sc;
 use rxrust::{ops::box_it::CloneableBoxOp, prelude::*};
 
-use super::WriterControl;
+use super::{state_cell::StateCell, WriterControl};
 use crate::{prelude::*, render_helper::RenderProxy};
 
 /// Stateful object use to watch the modifies of the inner data.
 pub struct Stateful<W> {
-  data: Sc<RefCell<W>>,
+  data: Sc<StateCell<W>>,
   info: Sc<StatefulInfo>,
 }
 
-pub struct Reader<W>(Sc<RefCell<W>>);
+pub struct Reader<W>(Sc<StateCell<W>>);
 
 pub struct Writer<W>(Stateful<W>);
 
@@ -46,9 +43,6 @@ struct StatefulInfo {
   writer_count: Cell<usize>,
   /// The batched modifies of the `State` which will be notified.
   batch_modified: Cell<ModifyScope>,
-  /// The timestamp of the last modify of the data, not record the modify from
-  /// the splitted or mapped state.
-  last_modified: Cell<Instant>,
 }
 
 impl<W: 'static> StateReader for Stateful<W> {
@@ -57,16 +51,13 @@ impl<W: 'static> StateReader for Stateful<W> {
   type Reader = Reader<W>;
 
   #[inline]
-  fn read(&self) -> ReadRef<W> { ReadRef::new(self.data.borrow()) }
+  fn read(&self) -> ReadRef<Self::Value> { ReadRef::new(self.data.read()) }
 
   #[inline]
   fn clone_reader(&self) -> Self::Reader { Reader(self.data.clone()) }
 
   #[inline]
   fn origin_reader(&self) -> &Self::OriginReader { self }
-
-  #[inline]
-  fn time_stamp(&self) -> Instant { self.info.last_modified.get() }
 
   fn try_into_value(self) -> Result<W, Self> {
     if self.data.ref_count() == 1 {
@@ -114,20 +105,13 @@ impl<W: 'static> StateReader for Reader<W> {
   type Reader = Self;
 
   #[inline]
-  fn read(&self) -> ReadRef<W> { ReadRef::new(self.0.borrow()) }
+  fn read(&self) -> ReadRef<W> { ReadRef::new(self.0.read()) }
 
   #[inline]
   fn clone_reader(&self) -> Self { Reader(self.0.clone()) }
 
   #[inline]
   fn origin_reader(&self) -> &Self::OriginReader { self }
-
-  #[inline]
-  fn time_stamp(&self) -> Instant {
-    //fixme: we should remove this method in future, temporary return incorrect
-    // value here.
-    Instant::now()
-  }
 
   fn try_into_value(self) -> Result<Self::Value, Self> {
     if self.0.ref_count() == 1 {
@@ -153,9 +137,6 @@ impl<W: 'static> StateReader for Writer<W> {
 
   #[inline]
   fn origin_reader(&self) -> &Self::OriginReader { self }
-
-  #[inline]
-  fn time_stamp(&self) -> Instant { self.0.time_stamp() }
 
   #[inline]
   fn try_into_value(self) -> Result<Self::Value, Self> { self.0.try_into_value().map_err(Writer) }
@@ -189,9 +170,6 @@ impl<V: 'static> StateWriter for Writer<V> {
 }
 
 impl WriterControl for Sc<StatefulInfo> {
-  #[inline]
-  fn last_modified_stamp(&self) -> &Cell<Instant> { &self.last_modified }
-
   #[inline]
   fn batched_modifies(&self) -> &Cell<ModifyScope> { &self.batch_modified }
 
@@ -258,12 +236,12 @@ impl<R: Render> RenderBuilder for Writer<R> {
 
 impl<W> Stateful<W> {
   pub fn new(data: W) -> Self {
-    Self { data: Sc::new(RefCell::new(data)), info: Sc::new(StatefulInfo::new()) }
+    Self { data: Sc::new(StateCell::new(data)), info: Sc::new(StatefulInfo::new()) }
   }
 
   fn write_ref(&self, scope: ModifyScope) -> WriteRef<'_, W> {
-    let value = self.data.borrow_mut();
-    WriteRef { value: Some(value), modified: false, modify_scope: scope, control: &self.info }
+    let value = self.data.write();
+    WriteRef { value, modified: false, modify_scope: scope, control: &self.info }
   }
 
   fn writer_count(&self) -> usize { self.info.writer_count.get() }
@@ -292,7 +270,6 @@ impl StatefulInfo {
       batch_modified: <_>::default(),
       writer_count: Cell::new(1),
       notifier: <_>::default(),
-      last_modified: Cell::new(Instant::now()),
     }
   }
 }
@@ -329,14 +306,14 @@ impl Notifier {
 impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_tuple("Stateful")
-      .field(&*self.data.borrow())
+      .field(&*self.data.read())
       .finish()
   }
 }
 
 #[cfg(test)]
 mod tests {
-  use std::rc::Rc;
+  use std::{cell::RefCell, rc::Rc};
 
   use super::*;
   use crate::test_helper::*;
@@ -384,13 +361,21 @@ mod tests {
     assert_eq!(*drop_cnt.borrow(), 1);
 
     {
-      drop_writer_subscribe(Stateful::new(()).map_writer(|v| v, |v| v), drop_cnt.clone());
+      drop_writer_subscribe(
+        #[allow(clippy::redundant_closure)]
+        Stateful::new(()).map_writer(|v| PartData::from_ref_mut(v)),
+        drop_cnt.clone(),
+      );
     };
     AppCtx::run_until_stalled();
     assert_eq!(*drop_cnt.borrow(), 2);
 
     {
-      drop_writer_subscribe(Stateful::new(()).split_writer(|v| v, |v| v), drop_cnt.clone());
+      drop_writer_subscribe(
+        #[allow(clippy::redundant_closure)]
+        Stateful::new(()).split_writer(|v| PartData::from_ref_mut(v)),
+        drop_cnt.clone(),
+      );
     };
     AppCtx::run_until_stalled();
     assert_eq!(*drop_cnt.borrow(), 3);

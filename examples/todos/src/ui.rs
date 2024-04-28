@@ -50,10 +50,11 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
           for id in $this.all_tasks() {
             if $this.get_task(id).map_or(false, cond) {
               let task = this.split_writer(
-                move |todos| todos.get_task(id).unwrap(),
-                move |todos| todos.get_task_mut(id).unwrap(),
+                // task will always exist, if the task is removed,
+                // sthe widgets list will be rebuild.
+                move |todos| PartData::from_ref_mut(todos.get_task_mut(id).unwrap()),
               );
-              let item = pipe!(*$editing == Some($task.id()))
+              let item = pipe!(*$editing == Some(id))
                 .value_chain(|s| s.distinct_until_changed().box_it())
                 .map(move |b|{
                   if b {
@@ -133,8 +134,14 @@ where
     let mut stagger = $stagger.write();
     if !stagger.has_ever_run() {
       $item.write().opacity = 0.;
+      let transform = item
+        .get_transform_widget()
+        .map_writer(|w| PartData::from_ref_mut(&mut w.transform));
+      let opacity = item
+        .get_opacity_widget()
+        .map_writer(|w| PartData::from_ref_mut(&mut w.opacity));
       let fly_in = stagger.push_state(
-        (map_writer!($item.transform), map_writer!($item.opacity)),
+        (transform, opacity),
         (Transform::translation(0., 64.), 0.),
         ctx!()
       );

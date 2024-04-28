@@ -392,6 +392,11 @@ impl<T: Query> Query for Sc<T> {
 impl<T: Query> Query for RefCell<T> {
   impl_proxy_and_self_query!(borrow());
 }
+
+impl<T: Query> Query for StateCell<T> {
+  impl_proxy_and_self_query!(read());
+}
+
 impl_proxy_render!(proxy deref(), ShareResource<T>, <T>, where  T: Render + 'static);
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
@@ -445,6 +450,8 @@ pub(crate) use _replace;
 pub(crate) use multi_build_replace_impl;
 pub(crate) use multi_build_replace_impl_include_self;
 pub(crate) use repeat_and_replace;
+
+use self::state_cell::StateCell;
 
 impl Drop for Widget {
   fn drop(&mut self) {

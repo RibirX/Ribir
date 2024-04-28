@@ -14,7 +14,6 @@ use crate::{
   fn_widget_macro,
   rdl_macro::RdlMacro,
   variable_names::{ribir_suffix_variable, BuiltinMemberType, BUILTIN_INFOS},
-  writer_map_macro::{gen_map_path_writer, gen_split_path_writer},
 };
 
 pub const KW_DOLLAR_STR: &str = "_dollar_ಠ_ಠ";
@@ -23,8 +22,6 @@ pub const KW_RDL: &str = "rdl";
 pub const KW_PIPE: &str = "pipe";
 pub const KW_WATCH: &str = "watch";
 pub const KW_FN_WIDGET: &str = "fn_widget";
-pub const KW_SPLIT_WRITER: &str = "split_writer";
-pub const KW_MAP_WRITER: &str = "map_writer";
 
 pub use tokens_pre_process::*;
 
@@ -333,12 +330,6 @@ impl Fold for DollarRefsCtx {
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_FN_WIDGET) {
       mac.tokens = fn_widget_macro::gen_code(mac.tokens, self).into();
-      mark_macro_expanded(&mut mac);
-    } else if mac.path.is_ident(KW_SPLIT_WRITER) {
-      mac.tokens = gen_split_path_writer(mac.tokens, self).into();
-      mark_macro_expanded(&mut mac);
-    } else if mac.path.is_ident(KW_MAP_WRITER) {
-      mac.tokens = gen_map_path_writer(mac.tokens, self).into();
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_CTX) {
       self.mark_used_ctx();

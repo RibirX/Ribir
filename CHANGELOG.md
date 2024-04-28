@@ -27,6 +27,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
+- **core**: The split functions in `StateReader::map_reader`, `StateWriter::map_writer`, and `StateWriter::split_writer` no longer need to return a reference. (#568 @M-Adoo)
 - **core**: Introduced `StateWatcher` for watching state modifies, which was previously the responsibility of `StateReader`. This results in a cleaner and more compact `StateReader` implementation. (#556, @M-Adoo)
 - **gpu**: Introduced `GPUBackendImpl::max_textures_per_draw` to set a limit on textures per draw phase (#562 @M-Adoo)
 
@@ -41,6 +42,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
+- **macros**: removed `map_writer!` and `split_writer!` macros. (#568, @M-Adoo)
+- **ribir**: `StateWriter::map_writer` and `StateWriter::split_writer` now only require a writer split function, enhancing both reader and writer split operations. (#568, @M-Adoo)
 - **core**: The `StateReader` no longer supports watching its modifications. Use the `StateWatcher` trait instead for this functionality. (#556 @M-Adoo)
 - **painter**: Changes to `BackendPainter` APIs. This only affects you if you've implemented a custom painter. (#562 @M-Adoo)
 

@@ -62,7 +62,7 @@ impl ComposeChild for Ripple {
           let ripper_enter = @Animate {
             transition: transitions::LINEAR.of(ctx!()),
             state: LerpFnState::new(
-              map_writer!($ripple.path),
+              ripple.map_writer(|w| PartData::from_ref_mut(&mut w.path)),
               move |_, _, rate| {
                 let radius = Lerp::lerp(&0., &radius, rate);
                 Path::circle(launch_at, radius)
@@ -79,8 +79,9 @@ impl ComposeChild for Ripple {
               $ripple_at.write().take();
             });
 
-
-          let ripper_fade_out = map_writer!($ripple.opacity)
+          let ripper_fade_out = ripple
+            .get_opacity_widget()
+            .map_writer(|w| PartData::from_ref_mut(&mut w.opacity))
             .transition(transitions::EASE_OUT.of(ctx!()), ctx!());
 
           let bounded = $this.bounded;

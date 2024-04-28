@@ -678,7 +678,7 @@ Fortunately, for state management, Ribir provides a mechanism for transformation
 
 The **map** is to transform a parent state into a sub-state, and the sub-state has the same data as the parent state. Modifying the parent state is equivalent to modifying the sub-state, and vice versa. It only reduces the visible scope of the data, making it easier for you to use or pass only part of the state.
 
-The **split** is to separate a sub-state from a parent state. The parent and child state also share the same data. The difference is that modifying data through the sub-state will not trigger the views dependent on the parent state to update, and modifying data through the parent state will cause the split sub-state to be invalidated.
+The **split** is to separate a sub-state from a parent state. The parent and child state also share the same data. The difference is that modifying data through the sub-state will not trigger the views dependent on the parent state to update.
 
 What you need to note is that whether it's **map** or **split**, the parent and child state share the same data. Therefore, their modifications to the data will affect each other, but the scope of data modifications they push may be different.
 
@@ -692,8 +692,8 @@ struct AppData {
 }
 
 let state = State::value(AppData { count: 0 });
-let map_count = state.map_writer(|d| &d.count, |d| &mut d.count);
-let split_count = state.split_writer(|d| &d.count, |d| &mut d.count);
+let map_count = state.map_writer(|d| PartData::from_ref_mut(&mut d.count));
+let split_count = state.split_writer(|d| PartData::from_ref_mut(&mut d.count));
 
 watch!($state.count).subscribe(|_| println!("Parent data"));
 watch!(*$map_count).subscribe(|_| println!("Child(map) data"));
@@ -743,20 +743,10 @@ AppCtx::run_until_stalled();
 
 Because data modification notifications are sent out asynchronously in batches, in the example, for ease of understanding, we call `AppCtx::run_until_stalled()` after each data modification to force the notifications to be sent. However, this should not appear in your actual code.
 
-
-If the reader and writer that you map or split from are on the same path, you can use `map_writer!` and `split_writer!` provided by Ribir to simplify your code:
-
-```rust ignore
-// let map_count = state.map_writer(|d| &d.count, |d| &mut d.count)
-let map_count = map_writer!($state.count);
-// let split_count = state.split_writer(|d| &d.count, |d| &mut d.count);
-let split_count = split_writer!($state.count);
-```
-
 If you only want to get a read-only sub-state, you can use `map_reader` to convert:
 
 ```rust ignore
-let count_reader = state.map_reader(|d| &d.count);
+let count_reader = state.map_reader(|d| PartData::from_ref(&d.count));
 ```
 
 However, Ribir does not provide a `split_reader`, because splitting a read-only sub-state is equivalent to converting a read-only sub-state.
@@ -774,7 +764,7 @@ struct AppData {
 }
 
 let state: State<AppData> = State::value(AppData { count: 0 });
-let split_count = split_writer!($state.count);
+let split_count = state.split_writer(|d| PartData::from_ref_mut(&mut d.count));
 
 // the root state's origin state is itself
 let _: &State<AppData> = state.origin_reader();

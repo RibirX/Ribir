@@ -403,6 +403,7 @@ impl Drop for AppCtxScopeGuard {
   fn drop(&mut self) {
     // Safety: this guard guarantee only one thread can access the `AppCtx`.
     unsafe {
+      AppCtx::shared_mut().windows.borrow_mut().clear();
       APP_CTX = None;
       INIT_THREAD_ID = None;
       APP_CTX_INIT = Once::new();
