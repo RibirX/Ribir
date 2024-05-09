@@ -1,6 +1,4 @@
 on:
-  schedule:
-    - cron: "0 0 * * *" # release patch version every day
   workflow_dispatch: # allows manual triggering
     inputs:
       level:

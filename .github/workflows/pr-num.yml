@@ -3,7 +3,10 @@ permissions:
   contents: write
   pull-requests: write
 on:
-  pull_request:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches:
+      - master
     paths:
       - "CHANGELOG.md"
 
@@ -35,8 +38,8 @@ jobs:
             exit 0
           fi
 
-          git config --global user.name "RChangelog[bot]"
-          git config --global user.email 155627257+RChangelog[bot]@users.noreply.github.com
+          git config user.name "RChangelog[bot]"
+          git config user.email 155627257+RChangelog[bot]@users.noreply.github.com
 
           git add .
           git commit --amend --no-edit

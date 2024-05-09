@@ -161,12 +161,9 @@ impl App {
           loop_handle.set_control_flow(ControlFlow::Wait);
         };
       }
-      Event::NewEvents(cause) => match cause {
-        StartCause::Poll | StartCause::ResumeTimeReached { start: _, requested_resume: _ } => {
-          Timer::wake_timeout_futures();
-        }
-        _ => (),
-      },
+      Event::NewEvents(StartCause::Poll | StartCause::ResumeTimeReached { .. }) => {
+        Timer::wake_timeout_futures()
+      }
       Event::UserEvent(mut event) => {
         AppCtx::spawn_local(async move {
           let app = unsafe { App::shared_mut() };

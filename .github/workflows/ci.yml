@@ -250,5 +250,5 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: compile to wasm
-        run: cargo build --target wasm32-unknown-unknown
+        run: cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper
       

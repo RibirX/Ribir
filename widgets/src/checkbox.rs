@@ -132,12 +132,24 @@ mod tests {
   fn checked() -> impl WidgetBuilder {
     fn_widget! { @Checkbox { checked: true } }
   }
-  widget_test_suit!(checked, wnd_size = Size::new(48., 48.), width == 24., height == 24.,);
+  widget_test_suit!(
+    checked,
+    wnd_size = Size::new(48., 48.),
+    width == 24.,
+    height == 24.,
+    comparison = 0.001
+  );
 
   fn unchecked() -> impl WidgetBuilder {
     fn_widget! { @Checkbox {} }
   }
-  widget_test_suit!(unchecked, wnd_size = Size::new(48., 48.), width == 24., height == 24.,);
+  widget_test_suit!(
+    unchecked,
+    wnd_size = Size::new(48., 48.),
+    width == 24.,
+    height == 24.,
+    comparison = 0.001
+  );
 
   fn indeterminate() -> impl WidgetBuilder {
     fn_widget! {
@@ -148,5 +160,11 @@ mod tests {
     }
   }
 
-  widget_test_suit!(indeterminate, wnd_size = Size::new(48., 48.), width == 24., height == 24.,);
+  widget_test_suit!(
+    indeterminate,
+    wnd_size = Size::new(48., 48.),
+    width == 24.,
+    height == 24.,
+    comparison = 0.001
+  );
 }

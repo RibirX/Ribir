@@ -85,6 +85,7 @@ impl DrawTexturePass {
               },
             ],
           }],
+          compilation_options: Default::default(),
         },
         fragment: Some(wgpu::FragmentState {
           module: &self.shader,
@@ -94,6 +95,7 @@ impl DrawTexturePass {
             blend: Some(wgpu::BlendState::REPLACE),
             write_mask: wgpu::ColorWrites::all(),
           })],
+          compilation_options: Default::default(),
         }),
         primitive: wgpu::PrimitiveState {
           topology: wgpu::PrimitiveTopology::TriangleStrip,

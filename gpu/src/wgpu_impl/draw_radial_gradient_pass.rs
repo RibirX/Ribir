@@ -137,6 +137,7 @@ impl DrawRadialGradientTrianglesPass {
               },
             ],
           }],
+          compilation_options: Default::default(),
         },
         fragment: Some(wgpu::FragmentState {
           module: &self.shader,
@@ -146,6 +147,7 @@ impl DrawRadialGradientTrianglesPass {
             blend: Some(wgpu::BlendState::ALPHA_BLENDING),
             write_mask: wgpu::ColorWrites::all(),
           })],
+          compilation_options: Default::default(),
         }),
         primitive: wgpu::PrimitiveState {
           topology: wgpu::PrimitiveTopology::TriangleList,

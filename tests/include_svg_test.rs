@@ -14,4 +14,4 @@ fn fix_draw_svg_not_apply_alpha() -> Painter {
   painter
 }
 
-painter_backend_eq_image_test!(fix_draw_svg_not_apply_alpha);
+painter_backend_eq_image_test!(fix_draw_svg_not_apply_alpha, comparison = 0.002);

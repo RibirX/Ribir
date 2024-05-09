@@ -41,8 +41,8 @@ jobs:
         run: npm install -g semver
       - name: new release branch & alpha version
         run: |
-          git config --global user.name "RChangelog[bot]"
-          git config --global user.email 155627257+RChangelog[bot]@users.noreply.github.com
+          git config user.name "RChangelog[bot]"
+          git config user.email 155627257+RChangelog[bot]@users.noreply.github.com
 
           # need a pull, release a beta version before
           git pull --rebase

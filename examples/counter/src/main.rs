@@ -15,4 +15,4 @@ use ribir::material as ribir_material;
 #[cfg(test)]
 use ribir_dev_helper::*;
 #[cfg(test)]
-widget_image_test!(counter, wnd_size = Size::new(400., 600.),);
+widget_image_test!(counter, wnd_size = Size::new(400., 600.), comparison = 0.001);

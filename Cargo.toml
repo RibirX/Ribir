@@ -43,7 +43,7 @@ bitflags = "2.0.0"
 blake3 = "1.3.3"
 colored = "2.0.0"
 derive_more = "0.99.17"
-dssim-core = "3.2.6"
+nv-flip = "0.1.2"
 env_logger = "0.7.1"
 euclid = "0.22.6"
 fontdb = "0.16.0"
@@ -82,7 +82,7 @@ unicode-script = "0.5.4"
 unicode-segmentation = "1.9.0"
 usvg = { version= "0.36.0", default-features = false }
 webbrowser = "0.8.8"
-wgpu = {version = "0.19.3", features=["webgl"]}
+wgpu = {version = "0.20.0", features=["webgl"]}
 winit = { version="0.29.5", default-features = false, features = ["x11", "wayland", "wayland-dlopen", "rwh_06"]}
 zerocopy = "0.7.3"
 quick-xml = "0.31.0"
