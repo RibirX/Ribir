@@ -7,3 +7,7 @@ You can run with:
 ``` sh
 cargo run -p counter
 ```
+or run in web:
+``` sh
+cargo run-wasm -p counter
+```
