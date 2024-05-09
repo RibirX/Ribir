@@ -82,7 +82,7 @@ pub fn assert_texture_eq_png(img: PixelImage, file_path: &std::path::Path) {
       .create_image_rgba(rgba_expected, expected.width() as usize, expected.height() as usize)
       .unwrap();
 
-    const TOLERANCE: f64 = 0.0000085;
+    const TOLERANCE: f64 = 0.00001;
     let (v, _) = dssim.compare(&expected, dissim_mig);
     let v: f64 = v.into();
 
@@ -124,7 +124,7 @@ pub fn wgpu_render_commands(
 
   let rect = DeviceRect::from_size(DeviceSize::new(viewport.max_x() + 2, viewport.max_y() + 2));
   let mut texture = gpu_impl.new_texture(rect.size, AntiAliasing::None, ColorFormat::Rgba8);
-  let mut backend = GPUBackend::new(gpu_impl, AntiAliasing::None);
+  let mut backend = GPUBackend::new(gpu_impl, AntiAliasing::Msaa4X);
 
   backend.begin_frame(surface);
   backend.draw_commands(rect, commands, &mut texture);
