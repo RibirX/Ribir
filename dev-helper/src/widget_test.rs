@@ -14,6 +14,7 @@ macro_rules! widget_test_suit {
       $(rect == $rect_expect: expr,)?
       $(size == $size_expect: expr,)?
     })+
+    $(comparison = $comparison: expr)?
   ) => {
     widget_layout_test!(
       $widget_fn,
@@ -28,7 +29,7 @@ macro_rules! widget_test_suit {
         $(size == $size_expect,)?
       })+
     );
-    widget_image_test!($widget_fn, wnd_size = $size,);
+    widget_image_test!($widget_fn, wnd_size = $size $(,comparison = $comparison)?);
   };
 
   (
@@ -40,6 +41,7 @@ macro_rules! widget_test_suit {
     $(height == $height_expect: expr,)?
     $(rect == $rect_expect: expr,)?
     $(size == $size_expect: expr,)?
+    $(comparison = $comparison: expr)?
   ) =>{
     widget_test_suit!(
       $widget_fn,
@@ -53,6 +55,7 @@ macro_rules! widget_test_suit {
         $(rect == $rect_expect,)?
         $(size == $size_expect,)?
       }
+      $(comparison = $comparison)?
     );
   };
   (
@@ -211,7 +214,7 @@ macro_rules! widget_layout_test {
 /// ```
 #[macro_export]
 macro_rules! widget_image_test {
-  ($widget_fn:ident,wnd_size = $size:expr $(,)?) => {
+  ($widget_fn:ident, wnd_size = $size:expr $(,comparison = $comparison:expr)?) => {
     paste::paste! {
       #[test]
       fn [<$widget_fn _with_default_by_wgpu>]() {
@@ -223,7 +226,9 @@ macro_rules! widget_image_test {
         let img = wgpu_render_commands(commands, viewport, surface);
         let name = format!("{}_with_default_by_wgpu", std::stringify!($widget_fn));
         let file_path = test_case_name!(name, "png");
-        assert_texture_eq_png(img, &file_path);
+        ImageTest::new(img, &file_path)
+          $(.with_comparison($comparison))?
+          .test();
       }
 
       #[test]
@@ -238,7 +243,9 @@ macro_rules! widget_image_test {
         let img = wgpu_render_commands(commands, viewport, surface);
         let name = format!("{}_with_material_by_wgpu", std::stringify!($widget_fn));
         let file_path = test_case_name!(name, "png");
-        assert_texture_eq_png(img, &file_path);
+        ImageTest::new(img, &file_path)
+          $(.with_comparison($comparison))?
+          .test();
       }
     }
   };

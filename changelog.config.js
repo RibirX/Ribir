@@ -4,8 +4,7 @@ module.exports = {
     "test",
     "feat",
     "fix",
-    "deps",
-    "chore",
+    "build",
     "docs",
     "refactor",
     "perf",
@@ -33,18 +32,15 @@ module.exports = {
     "ribir",
     "theme",
     "geom",
-    "examples"
+    "examples",
+    "deps",
+    "dev-helper"
   ],
   "types": {
-    "chore": {
+    "build": {
       "description": "Build process or auxiliary tool changes",
       "emoji": "🤖",
-      "value": "chore"
-    },
-    "deps": {
-      "description": "Changes that affect the build system or external dependencies",
-      "emoji": "🎡",
-      "value": "deps"
+      "value": "build"
     },
     "docs": {
       "description": "Documentation only changes",

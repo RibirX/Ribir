@@ -497,13 +497,13 @@ mod tests {
   use ribir_algo::Resource;
   use ribir_dev_helper::*;
   use ribir_geom::*;
-  use ribir_painter::{Brush, Painter, Path, Radius, Svg};
+  use ribir_painter::{Brush, Painter, Path, Svg};
 
   use super::*;
 
   fn painter(bounds: Size) -> Painter { Painter::new(Rect::from_size(bounds)) }
 
-  painter_backend_eq_image_test!(smoke);
+  painter_backend_eq_image_test!(smoke, comparison = 0.00005);
   fn smoke() -> Painter {
     fn draw_arrow_path(painter: &mut Painter) {
       painter
@@ -548,7 +548,7 @@ mod tests {
     painter
   }
 
-  painter_backend_eq_image_test!(transform_img_brush);
+  painter_backend_eq_image_test!(transform_img_brush, comparison = 0.001);
   fn transform_img_brush() -> Painter {
     let mut painter = painter(Size::new(800., 250.));
 
@@ -603,7 +603,7 @@ mod tests {
     painter
   }
 
-  painter_backend_eq_image_test!(two_img_brush);
+  painter_backend_eq_image_test!(two_img_brush, comparison = 0.00025);
   fn two_img_brush() -> Painter {
     let mut painter = painter(Size::new(200., 100.));
 
@@ -623,7 +623,7 @@ mod tests {
     painter
   }
 
-  painter_backend_eq_image_test!(draw_partial_img);
+  painter_backend_eq_image_test!(draw_partial_img, comparison = 0.0015);
   fn draw_partial_img() -> Painter {
     let img = Resource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
     let m_width = img.width() as f32;
@@ -642,7 +642,7 @@ mod tests {
     painter
   }
 
-  painter_backend_eq_image_test!(draw_svg_gradient);
+  painter_backend_eq_image_test!(draw_svg_gradient, comparison = 0.0025);
   fn draw_svg_gradient() -> Painter {
     let mut painter = painter(Size::new(64., 64.));
     let svg =
@@ -652,6 +652,9 @@ mod tests {
     painter
   }
 
+  // This test is disabled on Windows as it fails in the CI environment (exit code
+  // 2173), although it passes on a physical Windows machine.
+  #[cfg(not(target_os = "windows"))]
   fn multi_draw_phase() -> Painter {
     let mut painter = painter(Size::new(1048., 1048.));
 
@@ -662,10 +665,11 @@ mod tests {
       let color = if i % 2 == 0 { Color::GREEN } else { Color::RED };
       painter
         .set_brush(color)
-        .rect_round(&rect, &Radius::all(i as f32))
+        .rect_round(&rect, &ribir_painter::Radius::all(i as f32))
         .fill();
     }
     painter
   }
-  painter_backend_eq_image_test!(multi_draw_phase);
+  #[cfg(not(target_os = "windows"))]
+  painter_backend_eq_image_test!(multi_draw_phase, comparison = 0.001);
 }

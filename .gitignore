@@ -20,3 +20,5 @@ Cargo.lock
 
 **/.DS_Store
 **/.log/**
+/test_cases/**/*_actual.png
+/test_cases/**/*_diff.png

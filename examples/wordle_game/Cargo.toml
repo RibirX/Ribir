@@ -15,10 +15,12 @@ version.workspace = true
 [dependencies]
 paste.workspace = true
 ribir = {path = "../../ribir", features = ["material", "widgets"]}
-ribir_dev_helper = {path = "../../dev-helper"}
 csv = "1.3.0"
 rand = "0.8.5"
 getrandom = { workspace = true }
+
+[dev-dependencies]
+ribir_dev_helper = {path = "../../dev-helper"}
 
 [features]
 wgpu = ["ribir/wgpu"]

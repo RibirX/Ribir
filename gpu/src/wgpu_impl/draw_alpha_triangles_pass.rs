@@ -92,6 +92,7 @@ impl DrawAlphaTrianglesPass {
               },
             ],
           }],
+          compilation_options: Default::default(),
         },
         fragment: Some(wgpu::FragmentState {
           module: &self.shader,
@@ -101,6 +102,7 @@ impl DrawAlphaTrianglesPass {
             blend: Some(wgpu::BlendState::REPLACE),
             write_mask: wgpu::ColorWrites::RED,
           })],
+          compilation_options: Default::default(),
         }),
         primitive: wgpu::PrimitiveState {
           topology: wgpu::PrimitiveTopology::TriangleList,

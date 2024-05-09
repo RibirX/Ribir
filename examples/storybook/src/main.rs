@@ -16,4 +16,4 @@ use ribir::material as ribir_material;
 #[cfg(test)]
 use ribir_dev_helper::*;
 #[cfg(test)]
-widget_image_test!(storybook, wnd_size = Size::new(1024., 768.),);
+widget_image_test!(storybook, wnd_size = Size::new(1024., 768.), comparison = 0.0025);

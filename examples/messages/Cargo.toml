@@ -15,6 +15,8 @@ version.workspace = true
 paste.workspace = true
 # we disable `default-features`, because we want more control over testing.
 ribir = {path = "../../ribir", features = ["material", "widgets"]}
+
+[dev-dependencies]
 ribir_dev_helper = {path = "../../dev-helper"}
 
 [features]

@@ -1,13 +1,15 @@
-# Dev helper
+# Development Helper
 
-This library provides macros to write tests for `Ribir`.
+This library offers macros to facilitate testing for `Ribir`.
 
 ## Dependencies
- 
-To use these macros add `paste` and `ribir_dev_helper` in `[dev-dependencies]` section of your `Cargo.toml`. For the detail see the macros documents.
 
-## Test case files
+To utilize these macros, include `paste` and `ribir_dev_helper` in the `[dev-dependencies]` section of your `Cargo.toml`. For more details, refer to the macro documentation.
 
-These macros may read files to test, all those files are read from the `test_cases` in the workspace root of your project. 
+## Test Case Files
 
-Use `RIBIR_IMG_TEST=overwrite` environment variant to overwrite or generate the files. For example, you can use `RIBIR_IMG_TEST=overwrite cargo test` to overwrite all test case files. Or special test `RIBIR_IMG_TEST=overwrite cargo test -- test_name`.
+These macros may require reading files for testing. All such files are sourced from the `test_cases` directory located at the root of your workspace.
+
+Use the `RIBIR_IMG_TEST=overwrite` environment variable to overwrite or generate the files. For instance, `RIBIR_IMG_TEST=overwrite cargo test` can be used to overwrite all test case files. For a specific test, use `RIBIR_IMG_TEST=overwrite cargo test -- test_name`.
+
+For image tests, if the actual image differs from the expected one, both the actual image and the difference image are saved alongside the expected image. The difference image represents the discrepancies between the actual and expected images.

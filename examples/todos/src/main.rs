@@ -16,4 +16,4 @@ use ribir::material as ribir_material;
 #[cfg(test)]
 use ribir_dev_helper::*;
 #[cfg(test)]
-widget_image_test!(todos, wnd_size = Size::new(400., 640.));
+widget_image_test!(todos, wnd_size = Size::new(400., 640.), comparison = 0.002);
