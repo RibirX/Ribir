@@ -39,6 +39,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **dev-helper**: Support specific the comparison of image tests. (#573 @M-Adoo)
 - **dev-helper**: If test images differ, both actual and difference images are saved with the expected image. (#573 @M-Adoo)
 
+- **example**: run example in web wasm (#571 @wjian23)
+
 ### Documented
 
 - **core**: Explained when to use `unsubscribe` with `watch!`. (#556, @M-Adoo)

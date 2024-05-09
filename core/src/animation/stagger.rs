@@ -46,10 +46,6 @@
 //! };
 //! ```
 
-// fixme: rxRust not use std::time::Instant in web
-#[cfg(target_family = "wasm")]
-use std::time::Instant;
-
 use ribir_algo::Sc;
 use ribir_macros::rdl;
 

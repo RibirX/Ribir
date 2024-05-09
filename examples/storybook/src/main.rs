@@ -1,18 +1,15 @@
-mod storybook;
-use ribir::prelude::*;
-use storybook::storybook;
+use ::storybook::run;
 
-fn main() {
-  App::run(storybook())
-    .with_app_theme(material::purple::light())
-    .with_title("Storybook")
-    .with_size(Size::new(1024., 768.));
-}
+fn main() { run() }
 
 #[cfg(test)]
-use ribir::core::test_helper::*;
+use ::storybook::storybook;
 #[cfg(test)]
-use ribir::material as ribir_material;
+use ribir::{
+  core::test_helper::*,
+  material as ribir_material,
+  prelude::{AppCtx, Size},
+};
 #[cfg(test)]
 use ribir_dev_helper::*;
 #[cfg(test)]

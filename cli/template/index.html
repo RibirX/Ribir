@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Ribir</title>
+</head>
+
+<body>
+    <canvas class="ribir_canvas" style="width: 400px;height: 600px;" width="800" height="1200"></canvas>
+    <script type="module">
+        import init, { run } from "./web_wasm.js";
+        async function startup() {
+            await init();
+            run();
+        }
+        await startup()
+    </script>
+</body>
+
+</html>

@@ -8,6 +8,11 @@ You can run with:
 cargo run -p wordle_game
 ```
 
+or run in web:
+``` sh
+cargo run-wasm -p wordle_game
+```
+
 ## How to play
 
 You have to guess the hidden word in 5 tries and the color of the letters hints how close you are.

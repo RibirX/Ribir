@@ -172,18 +172,22 @@ where
 }
 
 pub fn todos() -> impl WidgetBuilder {
-  let todos = State::value(Todos::load());
-
-  // save changes to disk every 5 seconds .
-  let save_todos = todos.clone_reader();
-  todos
-    .modifies()
-    .debounce(Duration::from_secs(5), AppCtx::scheduler())
-    .subscribe(move |_| {
-      if let Err(err) = save_todos.read().save() {
-        log::error!("Save tasks failed: {}", err);
-      }
-    });
+  let todos = if cfg!(not(target_arch = "wasm32")) {
+    let todos = State::value(Todos::load());
+    // save changes to disk every 5 seconds .
+    let save_todos = todos.clone_reader();
+    todos
+      .modifies()
+      .debounce(Duration::from_secs(5), AppCtx::scheduler())
+      .subscribe(move |_| {
+        if let Err(err) = save_todos.read().save() {
+          log::error!("Save tasks failed: {}", err);
+        }
+      });
+    todos
+  } else {
+    State::value(Todos::default())
+  };
 
   fn_widget! { todos }
 }
