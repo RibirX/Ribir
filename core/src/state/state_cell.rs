@@ -49,7 +49,10 @@ impl<W> StateCell<W> {
     if !is_reading(b) {
       // If a borrow occurred, then we must already have an outstanding borrow,
       // so `borrowed_at` will be `Some`
-      panic!("already mutably borrowed: {:?}", self.borrowed_at.get().unwrap())
+      #[cfg(debug_assertions)]
+      panic!("Already mutably borrowed: {:?}", self.borrowed_at.get().unwrap());
+      #[cfg(not(debug_assertions))]
+      panic!("Already mutably borrowed");
     }
 
     // SAFETY: `BorrowRef` ensures that there is only immutable access
@@ -65,7 +68,10 @@ impl<W> StateCell<W> {
     // we explicitly only allow going from UNUSED to UNUSED - 1.
     let borrow = &self.borrow_flag;
     if borrow.get() != UNUSED {
-      panic!("already borrowed: {:?}", self.borrowed_at.get().unwrap())
+      #[cfg(debug_assertions)]
+      panic!("Already borrowed at: {:?}", self.borrowed_at.get().unwrap());
+      #[cfg(not(debug_assertions))]
+      panic!("Already borrowed");
     }
     #[cfg(debug_assertions)]
     {
