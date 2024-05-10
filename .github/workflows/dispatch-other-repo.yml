@@ -1,4 +1,4 @@
-name: "Dispatch other repo"
+name: "Call Website To Sync Docs"
 
 on:
   workflow_dispatch:
@@ -8,6 +8,8 @@ on:
       - release-*
 jobs:
   dispatch:
+    # Prevent this job from running on forked repositories
+    if: github.repository == 'RibirX/Ribir'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/github-script@v7
