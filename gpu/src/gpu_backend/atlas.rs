@@ -9,10 +9,6 @@ use slab::Slab;
 use super::Texture;
 use crate::GPUBackendImpl;
 
-pub const ATLAS_MAX_ITEM: DeviceSize = DeviceSize::new(512, 512);
-pub const ATLAS_MIN_SIZE: DeviceSize = DeviceSize::new(1024, 1024);
-pub const ATLAS_MAX_SIZE: DeviceSize = DeviceSize::new(4096, 4096);
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum AtlasDist {
   Atlas(Allocation),
@@ -25,10 +21,16 @@ pub struct AtlasHandle<Attr> {
   atlas_dist: AtlasDist,
 }
 
+pub(crate) struct AtlasConfig {
+  label: &'static str,
+  min_size: DeviceSize,
+  max_size: DeviceSize,
+}
+
 pub(crate) struct Atlas<T: Texture, K, Attr> {
+  config: AtlasConfig,
   atlas_allocator: AtlasAllocator,
   texture: T,
-  label: &'static str,
   cache: FrameCache<K, AtlasHandle<Attr>>,
   extras: Slab<T>,
   islands: Vec<AtlasHandle<Attr>>,
@@ -53,13 +55,14 @@ where
   K: Hash + Eq,
 {
   pub fn new(
-    label: &'static str, format: ColorFormat, anti_aliasing: AntiAliasing, gpu_impl: &mut T::Host,
+    config: AtlasConfig, format: ColorFormat, anti_aliasing: AntiAliasing, gpu_impl: &mut T::Host,
   ) -> Self {
-    let texture = gpu_impl.new_texture(ATLAS_MIN_SIZE, anti_aliasing, format);
+    let min_size = config.min_size;
+    let texture = gpu_impl.new_texture(min_size, anti_aliasing, format);
     Self {
-      label,
+      config,
       texture,
-      atlas_allocator: AtlasAllocator::new(ATLAS_MIN_SIZE.cast_unit()),
+      atlas_allocator: AtlasAllocator::new(min_size.cast_unit()),
       cache: FrameCache::new(),
       extras: Slab::default(),
       islands: vec![],
@@ -92,7 +95,7 @@ where
     if alloc.is_none() {
       let expand_size = (current_size * 2)
         .max(current_size)
-        .min(ATLAS_MAX_SIZE);
+        .min(self.config.max_size);
       if expand_size != self.texture.size() {
         self.atlas_allocator.grow(expand_size.cast_unit());
         let mut new_tex = gpu_impl.new_texture(
@@ -161,15 +164,26 @@ where
     self.extras.clear();
   }
 
+  pub fn is_good_size_to_alloc(&self, size: DeviceSize) -> bool {
+    (!size.greater_than(self.config.max_size).any())
+      && size.area() <= self.config.max_size.area() / 4
+  }
+
   pub(crate) fn end_frame(&mut self) {
     self
       .cache
-      .end_frame(self.label)
+      .end_frame(&self.config.label)
       .for_each(|h| release_handle!(self, h));
     self
       .islands
       .drain(..)
       .for_each(|h| release_handle!(self, h))
+  }
+}
+
+impl AtlasConfig {
+  pub fn new(label: &'static str, max_size: DeviceSize) -> Self {
+    Self { label, min_size: max_size / 4, max_size }
   }
 }
 
@@ -202,9 +216,14 @@ mod tests {
   #[test]
   fn atlas_grow_to_alloc() {
     let mut gpu_impl = block_on(WgpuImpl::headless());
-    let mut atlas =
-      Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Alpha8, AntiAliasing::None, &mut gpu_impl);
-    let size = DeviceSize::new(ATLAS_MIN_SIZE.width + 1, 16);
+    let mut atlas = Atlas::<WgpuTexture, _, _>::new(
+      AtlasConfig::new("", DeviceSize::new(4096, 4096)),
+      ColorFormat::Alpha8,
+      AntiAliasing::None,
+      &mut gpu_impl,
+    );
+
+    let size = DeviceSize::new(atlas.config.min_size.width + 1, 16);
     let h = atlas.allocate(1, (), size, &mut gpu_impl);
     gpu_impl.end_frame();
     assert_eq!(h.tex_id(), 0);
@@ -213,8 +232,12 @@ mod tests {
   #[test]
   fn resource_clear() {
     let mut wgpu = block_on(WgpuImpl::headless());
-    let mut atlas =
-      Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Rgba8, AntiAliasing::None, &mut wgpu);
+    let mut atlas = Atlas::<WgpuTexture, _, _>::new(
+      AtlasConfig::new("", DeviceSize::new(4096, 4096)),
+      ColorFormat::Rgba8,
+      AntiAliasing::None,
+      &mut wgpu,
+    );
     atlas.allocate(1, (), DeviceSize::new(32, 32), &mut wgpu);
     atlas.allocate(2, (), DeviceSize::new(4097, 16), &mut wgpu);
     atlas.end_frame();
@@ -228,8 +251,12 @@ mod tests {
   #[test]
   fn fix_scale_path_cache_miss() {
     let mut wgpu = block_on(WgpuImpl::headless());
-    let mut atlas =
-      Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Rgba8, AntiAliasing::None, &mut wgpu);
+    let mut atlas = Atlas::<WgpuTexture, _, _>::new(
+      AtlasConfig::new("", DeviceSize::new(4096, 4096)),
+      ColorFormat::Rgba8,
+      AntiAliasing::None,
+      &mut wgpu,
+    );
     atlas.allocate(1, (), DeviceSize::new(32, 32), &mut wgpu);
     atlas.allocate(1, (), DeviceSize::new(512, 512), &mut wgpu); // before the frame end, two allocation for key(1) should keep.
     let mut alloc_count = 0;
@@ -251,8 +278,12 @@ mod tests {
   #[test]
   fn fix_atlas_expand_overlap() {
     let mut wgpu = block_on(WgpuImpl::headless());
-    let mut atlas =
-      Atlas::<WgpuTexture, _, _>::new("_", ColorFormat::Alpha8, AntiAliasing::None, &mut wgpu);
+    let mut atlas = Atlas::<WgpuTexture, _, _>::new(
+      AtlasConfig::new("", DeviceSize::new(4096, 4096)),
+      ColorFormat::Alpha8,
+      AntiAliasing::None,
+      &mut wgpu,
+    );
     let icon = DeviceSize::new(32, 32);
     atlas.allocate(1, (), icon, &mut wgpu);
 
@@ -260,13 +291,14 @@ mod tests {
       .texture
       .write_data(&DeviceRect::from_size(icon), &[1; 32 * 32], &mut wgpu);
 
+    let min_size = atlas.config.min_size;
     // force atlas to expand
-    let h = atlas.allocate(2, (), ATLAS_MIN_SIZE, &mut wgpu);
+    let h = atlas.allocate(2, (), min_size, &mut wgpu);
     let second_rect = h.tex_rect(&atlas);
-    const SECOND_AREA: usize = (ATLAS_MIN_SIZE.width * ATLAS_MIN_SIZE.height) as usize;
+    let second_area: usize = (min_size.width * min_size.height) as usize;
     atlas
       .texture
-      .write_data(&second_rect, &[2; SECOND_AREA], &mut wgpu);
+      .write_data(&second_rect, &vec![2; second_area], &mut wgpu);
     let img = atlas
       .texture
       .copy_as_image(&DeviceRect::from_size(atlas.size()), &mut wgpu);
@@ -281,7 +313,7 @@ mod tests {
         .iter()
         .map(|v| *v as usize)
         .sum::<usize>(),
-      icon.area() as usize + SECOND_AREA * 2
+      icon.area() as usize + second_area * 2
     )
   }
 }

@@ -376,7 +376,7 @@ where
     let prefer_cache_size = prefer_cache_size(&path.path, &path.transform);
 
     let (mask, mask_to_view) =
-      if valid_cache_item(&prefer_cache_size) || view.contains_rect(&paint_bounds) {
+      if self.tex_mgr.is_good_for_cache(prefer_cache_size) || view.contains_rect(&paint_bounds) {
         self
           .tex_mgr
           .store_alpha_path(path.path, &path.transform, &mut self.gpu_impl)
