@@ -27,18 +27,23 @@ struct MaskLayer {
   prev_mask_idx: i32,
 }
 
+// A pair of stops. This arrangement aligns the stops with 16 bytes, minimizing excessive padding.
+struct StopPair {
+    color1: u32,
+    offset1: f32,
+    color2: u32,
+    offset2: f32,
+}
+
 struct Stop {
-    red: f32,
-    green: f32,
-    blue: f32,
-    alpha: f32,
+    color: vec4<f32>,
     offset: f32,
 }
 
 struct Primitive {
   transform: mat3x2<f32>,
-  stop_start: i32,
-  stop_cnt: i32,
+  stop_start: u32,
+  stop_cnt: u32,
   start_center: vec2<f32>,
   end_center: vec2<f32>,
   start_radius: f32,
@@ -51,7 +56,7 @@ struct Primitive {
 var<storage> mask_layers: array<MaskLayer>;
 
 @group(1) @binding(0)
-var<storage> stops: array<Stop>;
+var<storage> stops: array<StopPair>;
 
 @group(2) @binding(0)
 var<storage> prims: array<Primitive>;
@@ -74,6 +79,25 @@ var tex_5: texture_2d<f32>;
 var tex_6: texture_2d<f32>;
 @group(3) @binding(8)
 var tex_7: texture_2d<f32>;
+
+fn unpackUnorm4x8(packed: u32) -> vec4<f32> {
+    return vec4<f32>(
+        f32((packed & 0xff000000) >> 24) / 255.0,
+        f32((packed & 0x00ff0000) >> 16) / 255.0,
+        f32((packed & 0x0000ff00) >> 8) / 255.0,
+        f32((packed & 0x000000ff) >> 0) / 255.0
+    );
+}
+
+
+fn get_stop(idx: u32)  -> Stop {
+    let pair = stops[idx / 2];
+    if idx % 2 == 0 {
+        return Stop(unpackUnorm4x8(pair.color1), pair.offset1);
+    } else {
+        return Stop(unpackUnorm4x8(pair.color2), pair.offset2);
+    }
+}
 
 @fragment
 fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
@@ -161,19 +185,17 @@ fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
         offset = fract(offset);
     }
 
-    var prev = stops[prim.stop_start];
-    var next = stops[prim.stop_start + 1];
-    for (var i = 2; i < prim.stop_cnt && next.offset < offset; i++) {
+    var prev = get_stop(prim.stop_start);
+    var next = get_stop(prim.stop_start + 1);
+    for (var i = 2u; i < prim.stop_cnt && next.offset < offset; i++) {
         prev = next;
-        next = stops[prim.stop_start + i];
+        next = get_stop(prim.stop_start + i);
     }
 
     offset = max(prev.offset, min(next.offset, offset));
     let weight1 = (next.offset - offset) / (next.offset - prev.offset);
     let weight2 = 1. - weight1;
-    let prev_color = vec4<f32>(prev.red, prev.green, prev.blue, prev.alpha);
-    let next_color = vec4<f32>(next.red, next.green, next.blue, next.alpha);
-    return (prev_color * weight1 + next_color * weight2) * vec4<f32>(1., 1., 1., alpha);
+    return (prev.color * weight1 + next.color * weight2) * vec4<f32>(1., 1., 1., alpha);
 }
 // input the center and radius of the circles, return the tag of resolvable (1. mean resolvable and -1. unresolvable) and the offset if tag is resolvable.
 fn calc_offset(x: f32, y: f32, x_0: f32, y_0: f32, r_0: f32, x_1: f32, y_1: f32, r_1: f32) -> vec2<f32> {

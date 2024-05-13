@@ -10,15 +10,12 @@ struct ImgPrimitive {
   img_start: vec2<f32>,
   /// The size of the image image.
   img_size: vec2<f32>,
-  /// The index of texture, `load_color_primitives` method provide all textures
-  /// a draw phase need.
-  img_tex_idx: u32,
-  /// The index of the head mask layer.
-  mask_head: i32,
+  /// This is a mix field,
+  /// - the high 16 bits is the index of head mask layer, as a i16 type.
+  /// - the low 16 bits is the index of texture, as a u16 type.
+  mask_head_and_tex_idx: i32,
   /// extra alpha apply to current vertex
   opacity: f32,
-  /// keep align to 8 bytes.
-  dummy: u32,
 }
 
 struct VertexOutput {
@@ -79,43 +76,43 @@ fn fs_main(f: VertexOutput) -> @location(0) vec4<f32> {
     var color: vec4<f32>;
     let pos = prim.transform * f.pos.xyz;
     var img_pos = pos.xy % prim.img_size + prim.img_start;
-    switch prim.img_tex_idx {
-        case 0u: {
+    switch abs(prim.mask_head_and_tex_idx & 0x0000FFFF) {
+        case 0: {
             let img_tex_size = textureDimensions(tex_0);
             img_pos = img_pos / vec2<f32>(f32(img_tex_size.x), f32(img_tex_size.y));
             color = textureSample(tex_0, s_sampler, img_pos);
         }
-        case 1u: {
+        case 1: {
             let img_tex_size = textureDimensions(tex_1);
             img_pos = img_pos / vec2<f32>(f32(img_tex_size.x), f32(img_tex_size.y));
             color = textureSample(tex_1, s_sampler, img_pos);
         }
-        case 2u: {
+        case 2: {
             let img_tex_size = textureDimensions(tex_2);
             img_pos = img_pos / vec2<f32>(f32(img_tex_size.x), f32(img_tex_size.y));
             color = textureSample(tex_2, s_sampler, img_pos);
         }
-        case 3u: {
+        case 3: {
             let img_tex_size = textureDimensions(tex_3);
             img_pos = img_pos / vec2<f32>(f32(img_tex_size.x), f32(img_tex_size.y));
             color = textureSample(tex_3, s_sampler, img_pos);
         }
-        case 4u: {
+        case 4: {
             let img_tex_size = textureDimensions(tex_4);
             img_pos = img_pos / vec2<f32>(f32(img_tex_size.x), f32(img_tex_size.y));
             color = textureSample(tex_4, s_sampler, img_pos);
         }
-        case 5u: {
+        case 5: {
             let img_tex_size = textureDimensions(tex_5);
             img_pos = img_pos / vec2<f32>(f32(img_tex_size.x), f32(img_tex_size.y));
             color = textureSample(tex_5, s_sampler, img_pos);
         }
-        case 6u: {
+        case 6: {
             let img_tex_size = textureDimensions(tex_6);
             img_pos = img_pos / vec2<f32>(f32(img_tex_size.x), f32(img_tex_size.y));
             color = textureSample(tex_6, s_sampler, img_pos);
         }
-        case 7u: {
+        case 7: {
             let img_tex_size = textureDimensions(tex_7);
             img_pos = img_pos / vec2<f32>(f32(img_tex_size.x), f32(img_tex_size.y));
             color = textureSample(tex_7, s_sampler, img_pos);
@@ -123,8 +120,7 @@ fn fs_main(f: VertexOutput) -> @location(0) vec4<f32> {
         default: { color = vec4<f32>(1., 0., 0., 1.); }
       };
 
-
-    var mask_idx = prim.mask_head;
+    var mask_idx = prim.mask_head_and_tex_idx >> 16 ;
     loop {
         if mask_idx < 0 {
             break;
