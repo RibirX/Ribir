@@ -194,16 +194,15 @@ where
           let img_slice = self.tex_mgr.store_image(&img, &mut self.gpu_impl);
           let img_start = img_slice.rect.origin.to_f32().to_array();
           let img_size = img_slice.rect.size.to_f32().to_array();
-          let img_tex_idx = self.tex_ids_map.tex_idx(img_slice.tex_id);
+          let mask_head_and_tex_idx =
+            (mask_head as i32) << 16 | self.tex_ids_map.tex_idx(img_slice.tex_id) as i32;
           let prim_idx = self.img_prims.len() as u32;
           let prim = ImgPrimitive {
             transform: ts.inverse().unwrap().to_array(),
             img_start,
             img_size,
-            img_tex_idx,
-            mask_head,
+            mask_head_and_tex_idx,
             opacity,
-            _dummy: 0,
           };
           self.img_prims.push(prim);
           let buffer = &mut self.img_vertices_buffer;
@@ -242,14 +241,15 @@ where
       PaintCommand::LinearGradient { path, linear_gradient } => {
         let ts = path.transform;
         if let Some((rect, mask_head)) = self.new_mask_layer(path) {
+          let stop = (self.linear_gradient_stops.len() << 16 | linear_gradient.stops.len()) as u32;
+          let mask_head_and_spread =
+            (mask_head as i32) << 16 | linear_gradient.spread_method as i32;
           let prim: LinearGradientPrimitive = LinearGradientPrimitive {
             transform: ts.inverse().unwrap().to_array(),
-            stop_start: self.linear_gradient_stops.len() as u32,
-            stop_cnt: linear_gradient.stops.len() as u32,
+            stop,
             start_position: linear_gradient.start.to_array(),
             end_position: linear_gradient.end.to_array(),
-            mask_head,
-            spread: linear_gradient.spread_method as u32,
+            mask_head_and_spread,
           };
           self.linear_gradient_stops.extend(
             linear_gradient

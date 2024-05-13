@@ -191,23 +191,13 @@ pub struct LinearGradientPrimIndex(u32);
 #[repr(packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
 pub struct GradientStopPrimitive {
-  pub red: f32,
-  pub green: f32,
-  pub blue: f32,
-  pub alpha: f32,
+  pub color: u32,
   pub offset: f32,
 }
 
 impl From<GradientStop> for GradientStopPrimitive {
   fn from(stop: GradientStop) -> Self {
-    let color = stop.color.into_f32_components();
-    GradientStopPrimitive {
-      red: color[0],
-      green: color[1],
-      blue: color[2],
-      alpha: color[3],
-      offset: stop.offset,
-    }
+    GradientStopPrimitive { color: stop.color.into_u32(), offset: stop.offset }
   }
 }
 
@@ -242,19 +232,19 @@ pub struct LinearGradientPrimitive {
   /// A 2x3 column-major matrix, transform a vertex position to the texture
   /// position
   pub transform: [f32; 6],
-  /// The color stop's start index
-  pub stop_start: u32,
-  /// The size of the color stop
-  pub stop_cnt: u32,
   /// position of the start center
   pub start_position: [f32; 2],
   /// position of the end center
   pub end_position: [f32; 2],
-  /// The index of the head mask layer.
-  pub mask_head: i32,
-  /// the spread method of the gradient. 0 for pad, 1 for reflect and 2
-  /// for repeat
-  pub spread: u32,
+  /// The color stop information, there are two parts:
+  /// - The high 16-bit index represents the start index of the color stop.
+  /// - The low 16-bit index represents the size of the color stop.
+  pub stop: u32,
+  /// A mix of two 16-bit values:
+  /// - The high 16-bit index represents the head mask layer.
+  /// - The low 16-bit represents the spread method of the gradient. 0 for pad,
+  ///   1 for reflect and 2 for repeat
+  pub mask_head_and_spread: i32,
 }
 
 #[repr(packed)]
@@ -267,15 +257,12 @@ pub struct ImgPrimitive {
   pub img_start: [f32; 2],
   /// The size of the image image.
   pub img_size: [f32; 2],
-  /// The index of texture, `load_textures` method provide all textures
-  /// a draw phase need.
-  pub img_tex_idx: u32,
-  /// The index of the head mask layer.
-  pub mask_head: i32,
+  /// This represents a mix of two 16-bit indices:
+  /// - The high 16-bit index represents the head mask layer. It is an i16.
+  /// - The low 16-bit index represents the texture. It is a u16.
+  pub mask_head_and_tex_idx: i32,
   /// extra alpha apply to current vertex
   pub opacity: f32,
-  /// keep align to 8 bytes.
-  _dummy: u32,
 }
 
 /// The mask layer describes an alpha channel layer that is used in the fragment
