@@ -171,7 +171,6 @@ impl<T> FatObj<T> {
 
   /// Maps an `FatObj<T>` to `FatObj<V>` by applying a function to the host
   /// object.
-  #[inline]
   #[track_caller]
   pub fn map<V>(self, f: impl FnOnce(T) -> V) -> FatObj<V> {
     FatObj {

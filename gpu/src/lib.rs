@@ -87,6 +87,8 @@ pub trait GPUBackendImpl {
   #[inline]
   fn load_tex_limit_per_draw(&self) -> usize { 8 }
 
+  fn texture_size_limit(&self) -> DeviceSize;
+
   /// Create a texture.
   fn new_texture(
     &mut self, size: DeviceSize, anti_aliasing: AntiAliasing, format: ColorFormat,

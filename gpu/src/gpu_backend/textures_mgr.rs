@@ -13,10 +13,10 @@ use ribir_painter::{
 };
 
 use super::{
-  atlas::{Atlas, AtlasHandle},
+  atlas::{Atlas, AtlasConfig, AtlasHandle},
   Texture,
 };
-use crate::{add_draw_rect_vertices, gpu_backend::atlas::ATLAS_MAX_ITEM, GPUBackendImpl};
+use crate::{add_draw_rect_vertices, GPUBackendImpl};
 const TOLERANCE: f32 = 0.1_f32;
 const PAR_CHUNKS_SIZE: usize = 64;
 
@@ -75,12 +75,28 @@ where
   T::Host: GPUBackendImpl<Texture = T>,
 {
   pub(super) fn new(gpu_impl: &mut T::Host, anti_aliasing: AntiAliasing) -> Self {
+    let max_size = gpu_impl.texture_size_limit();
+
     Self {
-      alpha_atlas: Atlas::new("Alpha atlas", ColorFormat::Alpha8, anti_aliasing, gpu_impl),
-      rgba_atlas: Atlas::new("Rgba atlas", ColorFormat::Rgba8, AntiAliasing::None, gpu_impl),
+      alpha_atlas: Atlas::new(
+        AtlasConfig::new("Alpha atlas", max_size),
+        ColorFormat::Alpha8,
+        anti_aliasing,
+        gpu_impl,
+      ),
+      rgba_atlas: Atlas::new(
+        AtlasConfig::new("Rgba atlas", max_size),
+        ColorFormat::Rgba8,
+        AntiAliasing::None,
+        gpu_impl,
+      ),
       fill_task: <_>::default(),
       fill_task_buffers: <_>::default(),
     }
+  }
+
+  pub(super) fn is_good_for_cache(&self, size: DeviceSize) -> bool {
+    self.alpha_atlas.is_good_size_to_alloc(size)
   }
 
   pub(super) fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing, host: &mut T::Host) {
@@ -357,8 +373,6 @@ where
 {
   TextureSlice { tex_id: TextureID::Rgba(h.tex_id()), rect: h.tex_rect(atlas) }
 }
-
-pub(crate) fn valid_cache_item(size: &DeviceSize) -> bool { size.lower_than(ATLAS_MAX_ITEM).any() }
 
 fn extend_buffer<V>(dist: &mut VertexBuffers<V>, from: VertexBuffers<V>) {
   if dist.vertices.is_empty() {

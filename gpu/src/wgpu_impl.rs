@@ -62,6 +62,11 @@ const TEX_PER_DRAW: usize = 8;
 impl GPUBackendImpl for WgpuImpl {
   type Texture = WgpuTexture;
 
+  fn texture_size_limit(&self) -> DeviceSize {
+    let limits = self.device.limits();
+    DeviceSize::new(limits.max_texture_dimension_2d as i32, limits.max_texture_dimension_2d as i32)
+  }
+
   fn load_tex_limit_per_draw(&self) -> usize { TEX_PER_DRAW }
 
   fn begin_frame(&mut self) {
@@ -538,7 +543,7 @@ impl WgpuImpl {
         force_fallback_adapter: false,
       })
       .await
-      .unwrap();
+      .expect("No suitable GPU adapters found on the system!");
 
     let (device, queue) = adapter
       .request_device(
@@ -546,7 +551,7 @@ impl WgpuImpl {
         None,
       )
       .await
-      .unwrap();
+      .expect("Unable to find a suitable GPU adapter!");
 
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
       address_mode_u: wgpu::AddressMode::ClampToEdge,
