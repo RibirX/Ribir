@@ -1,4 +1,8 @@
-use std::{error::Error, mem::MaybeUninit, ops::Range};
+use std::{
+  error::Error,
+  mem::{size_of, MaybeUninit},
+  ops::Range,
+};
 
 use futures::channel::oneshot;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
@@ -9,15 +13,15 @@ use self::{
   draw_color_triangles_pass::DrawColorTrianglesPass, draw_img_triangles_pass::DrawImgTrianglesPass,
   draw_linear_gradient_pass::DrawLinearGradientTrianglesPass,
   draw_radial_gradient_pass::DrawRadialGradientTrianglesPass, draw_texture_pass::DrawTexturePass,
-  storage::Storage,
+  uniform::Uniform,
 };
 use crate::{
-  gpu_backend::Texture, ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex,
-  ImgPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer,
+  gpu_backend::Texture, ColorAttr, DrawPhaseLimits, GPUBackendImpl, GradientStopPrimitive,
+  ImagePrimIndex, ImgPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer,
   RadialGradientPrimIndex, RadialGradientPrimitive,
 };
 mod buffer_pool;
-mod storage;
+mod uniform;
 mod vertex_buffer;
 
 mod draw_alpha_triangles_pass;
@@ -26,6 +30,13 @@ mod draw_img_triangles_pass;
 mod draw_linear_gradient_pass;
 mod draw_radial_gradient_pass;
 mod draw_texture_pass;
+
+pub const TEX_PER_DRAW: usize = 8;
+const MAX_IMG_PRIMS: usize = 1024;
+const MAX_RADIAL_GRADIENT_PRIMS: usize = 512;
+const MAX_LINEAR_GRADIENT_PRIMS: usize = 512;
+const MAX_GRADIENT_STOP_PRIMS: usize = 512;
+const MAX_MASK_LAYERS: usize = (64 << 10) / size_of::<MaskLayer>(); // around 64KB
 
 pub struct WgpuImpl {
   device: wgpu::Device,
@@ -43,7 +54,8 @@ pub struct WgpuImpl {
   linear_gradient_pass: DrawLinearGradientTrianglesPass,
   texs_layout: wgpu::BindGroupLayout,
   textures_bind: Option<wgpu::BindGroup>,
-  mask_layers_storage: Storage<MaskLayer>,
+  mask_layers_uniform: Uniform<MaskLayer>,
+  limits: DrawPhaseLimits,
 }
 
 macro_rules! command_encoder {
@@ -57,17 +69,10 @@ macro_rules! command_encoder {
 }
 pub(crate) use command_encoder;
 
-const TEX_PER_DRAW: usize = 8;
-
 impl GPUBackendImpl for WgpuImpl {
   type Texture = WgpuTexture;
 
-  fn texture_size_limit(&self) -> DeviceSize {
-    let limits = self.device.limits();
-    DeviceSize::new(limits.max_texture_dimension_2d as i32, limits.max_texture_dimension_2d as i32)
-  }
-
-  fn load_tex_limit_per_draw(&self) -> usize { TEX_PER_DRAW }
+  fn limits(&self) -> &DrawPhaseLimits { &self.limits }
 
   fn begin_frame(&mut self) {
     if self.command_encoder.is_none() {
@@ -134,19 +139,19 @@ impl GPUBackendImpl for WgpuImpl {
   fn load_img_primitives(&mut self, primitives: &[ImgPrimitive]) {
     self
       .img_triangles_pass
-      .load_img_primitives(&self.device, &self.queue, primitives);
+      .load_img_primitives(&self.queue, primitives);
   }
 
   fn load_radial_gradient_primitives(&mut self, primitives: &[RadialGradientPrimitive]) {
     self
       .radial_gradient_pass
-      .load_radial_gradient_primitives(&self.device, &self.queue, primitives);
+      .load_radial_gradient_primitives(&self.queue, primitives);
   }
 
   fn load_radial_gradient_stops(&mut self, stops: &[GradientStopPrimitive]) {
     self
       .radial_gradient_pass
-      .load_gradient_stops(&self.device, &self.queue, stops);
+      .load_gradient_stops(&self.queue, stops);
   }
 
   fn load_radial_gradient_vertices(&mut self, buffers: &VertexBuffers<RadialGradientPrimIndex>) {
@@ -158,13 +163,13 @@ impl GPUBackendImpl for WgpuImpl {
   fn load_linear_gradient_primitives(&mut self, primitives: &[LinearGradientPrimitive]) {
     self
       .linear_gradient_pass
-      .load_linear_gradient_primitives(&self.device, &self.queue, primitives);
+      .load_linear_gradient_primitives(&self.queue, primitives);
   }
 
   fn load_linear_gradient_stops(&mut self, stops: &[GradientStopPrimitive]) {
     self
       .linear_gradient_pass
-      .load_gradient_stops(&self.device, &self.queue, stops);
+      .load_gradient_stops(&self.queue, stops);
   }
 
   fn load_linear_gradient_vertices(&mut self, buffers: &VertexBuffers<LinearGradientPrimIndex>) {
@@ -175,8 +180,8 @@ impl GPUBackendImpl for WgpuImpl {
 
   fn load_mask_layers(&mut self, layers: &[crate::MaskLayer]) {
     self
-      .mask_layers_storage
-      .write_buffer(&self.device, &self.queue, layers);
+      .mask_layers_uniform
+      .write_buffer(&self.queue, layers);
   }
 
   fn draw_alpha_triangles(&mut self, indices: &Range<u32>, texture: &mut Self::Texture) {
@@ -198,7 +203,7 @@ impl GPUBackendImpl for WgpuImpl {
       &self.device,
       encoder,
       self.textures_bind.as_ref().unwrap(),
-      &self.mask_layers_storage,
+      &self.mask_layers_uniform,
     );
 
     self.submit()
@@ -216,7 +221,7 @@ impl GPUBackendImpl for WgpuImpl {
       &self.device,
       encoder,
       self.textures_bind.as_ref().unwrap(),
-      &self.mask_layers_storage,
+      &self.mask_layers_uniform,
     );
 
     self.submit()
@@ -246,7 +251,7 @@ impl GPUBackendImpl for WgpuImpl {
       &self.device,
       encoder,
       self.textures_bind.as_ref().unwrap(),
-      &self.mask_layers_storage,
+      &self.mask_layers_uniform,
     );
     self.submit()
   }
@@ -262,7 +267,7 @@ impl GPUBackendImpl for WgpuImpl {
       &self.device,
       encoder,
       self.textures_bind.as_ref().unwrap(),
-      &self.mask_layers_storage,
+      &self.mask_layers_uniform,
     );
     self.submit()
   }
@@ -547,7 +552,10 @@ impl WgpuImpl {
 
     let (device, queue) = adapter
       .request_device(
-        &wgpu::DeviceDescriptor { label: Some("Request device"), ..Default::default() },
+        &wgpu::DeviceDescriptor {
+          required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
+          ..Default::default()
+        },
         None,
       )
       .await
@@ -569,16 +577,39 @@ impl WgpuImpl {
     let draw_tex_pass = DrawTexturePass::new(&device);
     let alpha_triangles_pass = DrawAlphaTrianglesPass::new(&device);
 
-    let mask_layers_storage = Storage::new(&device, wgpu::ShaderStages::FRAGMENT, 512);
+    let limits = device.limits();
+    let max_uniform_bytes = limits.max_uniform_buffer_binding_size as usize;
+    assert!(max_uniform_bytes >= size_of::<MaskLayer>() * MAX_MASK_LAYERS);
+    assert!(max_uniform_bytes >= size_of::<ImgPrimitive>() * MAX_IMG_PRIMS);
+    assert!(max_uniform_bytes >= size_of::<RadialGradientPrimitive>() * MAX_RADIAL_GRADIENT_PRIMS);
+    assert!(max_uniform_bytes >= size_of::<LinearGradientPrimitive>() * MAX_LINEAR_GRADIENT_PRIMS);
+    assert!(max_uniform_bytes >= size_of::<GradientStopPrimitive>() * MAX_GRADIENT_STOP_PRIMS);
+
+    let texture_size_limit = DeviceSize::new(
+      limits.max_texture_dimension_2d as i32,
+      limits.max_texture_dimension_2d as i32,
+    );
+
+    let limits = DrawPhaseLimits {
+      texture_size: texture_size_limit,
+      max_tex_load: 8,
+      max_image_primitives: MAX_IMG_PRIMS,
+      max_radial_gradient_primitives: MAX_RADIAL_GRADIENT_PRIMS,
+      max_linear_gradient_primitives: MAX_LINEAR_GRADIENT_PRIMS,
+      max_gradient_stop_primitives: MAX_GRADIENT_STOP_PRIMS,
+      max_mask_layers: MAX_MASK_LAYERS,
+    };
+
+    let mask_layers_uniform = Uniform::new(&device, wgpu::ShaderStages::FRAGMENT, MAX_MASK_LAYERS);
     let texs_layout = textures_layout(&device);
     let color_triangles_pass =
-      DrawColorTrianglesPass::new(&device, mask_layers_storage.layout(), &texs_layout);
+      DrawColorTrianglesPass::new(&device, mask_layers_uniform.layout(), &texs_layout);
     let img_triangles_pass =
-      DrawImgTrianglesPass::new(&device, mask_layers_storage.layout(), &texs_layout);
+      DrawImgTrianglesPass::new(&device, mask_layers_uniform.layout(), &texs_layout);
     let radial_gradient_pass =
-      DrawRadialGradientTrianglesPass::new(&device, mask_layers_storage.layout(), &texs_layout);
+      DrawRadialGradientTrianglesPass::new(&device, mask_layers_uniform.layout(), &texs_layout);
     let linear_gradient_pass =
-      DrawLinearGradientTrianglesPass::new(&device, mask_layers_storage.layout(), &texs_layout);
+      DrawLinearGradientTrianglesPass::new(&device, mask_layers_uniform.layout(), &texs_layout);
     WgpuImpl {
       device,
       queue,
@@ -594,7 +625,8 @@ impl WgpuImpl {
       linear_gradient_pass,
       texs_layout,
       textures_bind: None,
-      mask_layers_storage,
+      mask_layers_uniform,
+      limits,
     }
   }
 

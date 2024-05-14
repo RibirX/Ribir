@@ -18,9 +18,12 @@ fn vs_main(v: Vertex) -> FragInput {
     return input;
 }
 
-
+// Since a the different alignment between WebGPU and WebGL, we not use 
+// mat3x2<f32> in the struct, but use vec2<f32> instead. Then, we compose it.
 struct MaskLayer {
-  transform: mat3x2<f32>,
+  t0: vec2<f32>,
+  t1: vec2<f32>,
+  t2: vec2<f32>,
   min: vec2<f32>,
   max: vec2<f32>,
   mask_tex_idx: u32,
@@ -40,8 +43,12 @@ struct Stop {
     offset: f32,
 }
 
+// Since a the different alignment between WebGPU and WebGL, we not use 
+// mat3x2<f32> in the struct, but use vec2<f32> instead. Then, we compose it.
 struct Primitive {
-  transform: mat3x2<f32>,
+  t0: vec2<f32>,
+  t1: vec2<f32>,
+  t2: vec2<f32>,
   stop_start: u32,
   stop_cnt: u32,
   start_center: vec2<f32>,
@@ -53,13 +60,13 @@ struct Primitive {
 }
 
 @group(0) @binding(0) 
-var<storage> mask_layers: array<MaskLayer>;
+var<uniform> mask_layers: array<MaskLayer, 1365>;
 
 @group(1) @binding(0)
-var<storage> stops: array<StopPair>;
+var<uniform> stops: array<StopPair, 256>;
 
 @group(2) @binding(0)
-var<storage> prims: array<Primitive>;
+var<uniform> prims: array<Primitive, 512>;
 
 @group(3) @binding(0)
 var s_sampler: sampler;
@@ -99,10 +106,19 @@ fn get_stop(idx: u32)  -> Stop {
     }
 }
 
+fn mask_matrix(mask: MaskLayer) -> mat3x2<f32> {
+  return mat3x2(mask.t0, mask.t1, mask.t2);
+}
+
+fn prim_matrix(img: Primitive) -> mat3x2<f32> {
+  return mat3x2(img.t0, img.t1, img.t2);
+}
+
+
 @fragment
 fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
     let prim = prims[input.prim_idx];
-    let pos = prim.transform * vec3(input.pos.xy, 1.);
+    let pos = prim_matrix(prim) * vec3(input.pos.xy, 1.);
 
     var alpha = 1.;
     var mask_idx = prim.mask_head;
@@ -112,7 +128,7 @@ fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
         }
         let mask = mask_layers[u32(mask_idx)];
 
-        var mask_pos = mask.transform * vec3(input.pos.xy, 1.);
+        var mask_pos = mask_matrix(mask) * vec3(input.pos.xy, 1.);
         if any(mask_pos < mask.min) || any(mask.max < mask_pos) {
             alpha = 0.;
             break;

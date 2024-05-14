@@ -1,8 +1,9 @@
 use std::{mem::size_of, ops::Range};
 
 use ribir_painter::{Color, Vertex, VertexBuffers};
+use wgpu::include_wgsl;
 
-use super::{storage::Storage, vertex_buffer::VerticesBuffer};
+use super::{uniform::Uniform, vertex_buffer::VerticesBuffer};
 use crate::{ColorAttr, MaskLayer, WgpuTexture};
 
 pub struct DrawColorTrianglesPass {
@@ -18,10 +19,8 @@ impl DrawColorTrianglesPass {
     device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout, texs_layout: &wgpu::BindGroupLayout,
   ) -> Self {
     let vertices_buffer = VerticesBuffer::new(512, 1024, device);
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-      label: Some("Color triangles shader"),
-      source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/color_triangles.wgsl").into()),
-    });
+
+    let shader = device.create_shader_module(include_wgsl!("shaders/color_triangles.wgsl"));
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("update triangles pipeline layout"),
       bind_group_layouts: &[mask_layout, texs_layout],
@@ -43,7 +42,7 @@ impl DrawColorTrianglesPass {
   pub fn draw_triangles(
     &mut self, texture: &WgpuTexture, indices: Range<u32>, clear: Option<Color>,
     device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, textures_bind: &wgpu::BindGroup,
-    mask_layer_storage: &Storage<MaskLayer>,
+    mask_layer_storage: &Uniform<MaskLayer>,
   ) {
     self.update(texture.format(), device);
     let pipeline = self.pipeline.as_ref().unwrap();

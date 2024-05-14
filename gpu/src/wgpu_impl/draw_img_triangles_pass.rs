@@ -1,8 +1,9 @@
 use std::{mem::size_of, ops::Range};
 
 use ribir_painter::{Color, Vertex, VertexBuffers};
+use wgpu::include_wgsl;
 
-use super::{storage::Storage, vertex_buffer::VerticesBuffer};
+use super::{uniform::Uniform, vertex_buffer::VerticesBuffer, MAX_IMG_PRIMS};
 use crate::{ImagePrimIndex, ImgPrimitive, MaskLayer, WgpuTexture};
 
 pub struct DrawImgTrianglesPass {
@@ -10,7 +11,7 @@ pub struct DrawImgTrianglesPass {
   layout: wgpu::PipelineLayout,
   pipeline: Option<wgpu::RenderPipeline>,
   shader: wgpu::ShaderModule,
-  prims_storage: Storage<ImgPrimitive>,
+  prims_uniform: Uniform<ImgPrimitive>,
   format: Option<wgpu::TextureFormat>,
 }
 
@@ -18,7 +19,7 @@ impl DrawImgTrianglesPass {
   pub fn new(
     device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout, texs_layout: &wgpu::BindGroupLayout,
   ) -> Self {
-    let prims_storage = Storage::new(device, wgpu::ShaderStages::FRAGMENT, 64);
+    let prims_storage = Uniform::new(device, wgpu::ShaderStages::FRAGMENT, MAX_IMG_PRIMS);
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Image pipeline layout"),
       bind_group_layouts: &[mask_layout, prims_storage.layout(), texs_layout],
@@ -26,12 +27,16 @@ impl DrawImgTrianglesPass {
     });
 
     let vertices_buffer = VerticesBuffer::new(128, 512, device);
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-      label: Some("Image triangles shader"),
-      source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/img_triangles.wgsl").into()),
-    });
+    let shader = device.create_shader_module(include_wgsl!("./shaders/img_triangles.wgsl"));
 
-    Self { vertices_buffer, layout, pipeline: None, shader, prims_storage, format: None }
+    Self {
+      vertices_buffer,
+      layout,
+      pipeline: None,
+      shader,
+      prims_uniform: prims_storage,
+      format: None,
+    }
   }
 
   pub fn load_triangles_vertices(
@@ -42,19 +47,15 @@ impl DrawImgTrianglesPass {
       .write_buffer(buffers, device, queue);
   }
 
-  pub fn load_img_primitives(
-    &mut self, device: &wgpu::Device, queue: &wgpu::Queue, primitives: &[ImgPrimitive],
-  ) {
-    self
-      .prims_storage
-      .write_buffer(device, queue, primitives);
+  pub fn load_img_primitives(&mut self, queue: &wgpu::Queue, primitives: &[ImgPrimitive]) {
+    self.prims_uniform.write_buffer(queue, primitives);
   }
 
   #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
     &mut self, texture: &WgpuTexture, indices: Range<u32>, clear: Option<Color>,
     device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, textures_bind: &wgpu::BindGroup,
-    mask_layer_storage: &Storage<MaskLayer>,
+    mask_layer_storage: &Uniform<MaskLayer>,
   ) {
     self.update(texture.format(), device);
     let pipeline = self.pipeline.as_ref().unwrap();
@@ -70,7 +71,7 @@ impl DrawImgTrianglesPass {
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
     rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
     rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
-    rpass.set_bind_group(1, self.prims_storage.bind_group(), &[]);
+    rpass.set_bind_group(1, self.prims_uniform.bind_group(), &[]);
     rpass.set_bind_group(2, textures_bind, &[]);
 
     rpass.set_pipeline(pipeline);

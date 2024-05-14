@@ -2,7 +2,7 @@ use std::mem::size_of;
 
 use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::Vertex;
-use wgpu::StoreOp;
+use wgpu::{include_wgsl, StoreOp};
 
 use super::buffer_pool::BufferPool;
 use crate::{command_encoder, gpu_backend::Texture, vertices_coord, WgpuImpl, WgpuTexture};
@@ -19,10 +19,7 @@ pub struct DrawTexturePass {
 
 impl DrawTexturePass {
   pub fn new(device: &wgpu::Device) -> Self {
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-      label: Some("Draw texture to texture"),
-      source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/tex_2_tex.wgsl").into()),
-    });
+    let shader = device.create_shader_module(include_wgsl!("./shaders/tex_2_tex.wgsl"));
 
     let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
       entries: &[
