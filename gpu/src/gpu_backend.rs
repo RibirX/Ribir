@@ -107,15 +107,13 @@ where
     self.begin_draw_phase();
     let output_size = output.size();
     for cmd in commands.into_iter() {
+      let max_tex_per_draw = self.gpu_impl.limits().max_tex_load;
       let maybe_used = match cmd {
         PaintCommand::ImgPath { .. } => 2,
         PaintCommand::PopClip => 0,
         _ => 1,
       };
-      if self.tex_ids_map.all_textures().len() + maybe_used
-        >= self.gpu_impl.load_tex_limit_per_draw()
-        || !self.continues_cmd(&cmd)
-      {
+      if !self.can_batch(&cmd) {
         // if the next command may hit the texture limit, submit the current draw phase.
         // And start a new draw phase.
         self.draw_triangles(output);
@@ -123,8 +121,7 @@ where
         self.begin_draw_phase();
 
         assert!(
-          self.tex_ids_map.all_textures().len() + maybe_used
-            < self.gpu_impl.load_tex_limit_per_draw(),
+          self.tex_ids_map.all_textures().len() + maybe_used < max_tex_per_draw,
           "The GPUBackend implementation does not provide a sufficient texture limit per draw."
         )
       }
@@ -195,7 +192,7 @@ where
           let img_start = img_slice.rect.origin.to_f32().to_array();
           let img_size = img_slice.rect.size.to_f32().to_array();
           let mask_head_and_tex_idx =
-            (mask_head as i32) << 16 | self.tex_ids_map.tex_idx(img_slice.tex_id) as i32;
+            mask_head << 16 | self.tex_ids_map.tex_idx(img_slice.tex_id) as i32;
           let prim_idx = self.img_prims.len() as u32;
           let prim = ImgPrimitive {
             transform: ts.inverse().unwrap().to_array(),
@@ -242,8 +239,7 @@ where
         let ts = path.transform;
         if let Some((rect, mask_head)) = self.new_mask_layer(path) {
           let stop = (self.linear_gradient_stops.len() << 16 | linear_gradient.stops.len()) as u32;
-          let mask_head_and_spread =
-            (mask_head as i32) << 16 | linear_gradient.spread_method as i32;
+          let mask_head_and_spread = mask_head << 16 | linear_gradient.spread_method as i32;
           let prim: LinearGradientPrimitive = LinearGradientPrimitive {
             transform: ts.inverse().unwrap().to_array(),
             stop,
@@ -343,17 +339,29 @@ where
     self.linear_gradient_stops.clear();
   }
 
-  fn continues_cmd(&self, cmd: &PaintCommand) -> bool {
-    matches!(
-      (self.current_phase, cmd),
-      (CurrentPhase::None, _)
-        | (_, PaintCommand::Clip(_))
-        | (_, PaintCommand::PopClip)
-        | (CurrentPhase::Color, PaintCommand::ColorPath { .. })
-        | (CurrentPhase::Img, PaintCommand::ImgPath { .. })
-        | (CurrentPhase::RadialGradient, PaintCommand::RadialGradient { .. })
-        | (CurrentPhase::LinearGradient, PaintCommand::LinearGradient { .. })
-    )
+  fn can_batch(&self, cmd: &PaintCommand) -> bool {
+    let limits = self.gpu_impl.limits();
+    let tex_used = self.tex_ids_map.all_textures().len();
+    match (self.current_phase, cmd) {
+      (CurrentPhase::None, _) | (_, PaintCommand::PopClip) => true,
+      (_, PaintCommand::Clip(_)) | (CurrentPhase::Color, PaintCommand::ColorPath { .. }) => {
+        tex_used < limits.max_tex_load
+      }
+      (CurrentPhase::Img, PaintCommand::ImgPath { .. }) => {
+        tex_used < limits.max_tex_load - 1 && self.img_prims.len() < limits.max_image_primitives
+      }
+      (CurrentPhase::RadialGradient, PaintCommand::RadialGradient { .. }) => {
+        tex_used < limits.max_tex_load
+          && self.radial_gradient_prims.len() < limits.max_radial_gradient_primitives
+          && self.radial_gradient_stops.len() < limits.max_gradient_stop_primitives
+      }
+      (CurrentPhase::LinearGradient, PaintCommand::LinearGradient { .. }) => {
+        tex_used < limits.max_tex_load
+          && self.linear_gradient_prims.len() < limits.max_linear_gradient_primitives
+          && self.linear_gradient_stops.len() < limits.max_gradient_stop_primitives
+      }
+      _ => false,
+    }
   }
 
   fn current_clip_mask_index(&self) -> i32 {
@@ -412,7 +420,7 @@ where
     gpu_impl.load_mask_layers(&self.mask_layers);
 
     let textures = self.tex_ids_map.all_textures();
-    let max_textures = gpu_impl.load_tex_limit_per_draw();
+    let max_textures = gpu_impl.limits().max_tex_load;
     let mut tex_buffer = Vec::with_capacity(max_textures);
     textures.iter().take(max_textures).for_each(|id| {
       tex_buffer.push(self.tex_mgr.texture(*id));

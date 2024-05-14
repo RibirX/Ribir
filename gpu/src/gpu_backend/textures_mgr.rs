@@ -75,7 +75,7 @@ where
   T::Host: GPUBackendImpl<Texture = T>,
 {
   pub(super) fn new(gpu_impl: &mut T::Host, anti_aliasing: AntiAliasing) -> Self {
-    let max_size = gpu_impl.texture_size_limit();
+    let max_size = gpu_impl.limits().texture_size;
 
     Self {
       alpha_atlas: Atlas::new(

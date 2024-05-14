@@ -22,7 +22,9 @@ resolver = "2"
 debug = true
 
 [profile.release]
-debug = true
+lto = true
+strip = true  
+codegen-units = 1
 
 [workspace.package]
 authors = ["RibirX<Adoo@outlook.com>"]

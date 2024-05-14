@@ -1,8 +1,12 @@
 use std::{mem::size_of, ops::Range};
 
 use ribir_painter::{Color, Vertex, VertexBuffers};
+use wgpu::include_wgsl;
 
-use super::{storage::Storage, vertex_buffer::VerticesBuffer};
+use super::{
+  uniform::Uniform, vertex_buffer::VerticesBuffer, MAX_GRADIENT_STOP_PRIMS,
+  MAX_RADIAL_GRADIENT_PRIMS,
+};
 use crate::{
   GradientStopPrimitive, MaskLayer, RadialGradientPrimIndex, RadialGradientPrimitive, WgpuTexture,
 };
@@ -12,8 +16,8 @@ pub struct DrawRadialGradientTrianglesPass {
   pipeline: Option<wgpu::RenderPipeline>,
   shader: wgpu::ShaderModule,
   format: Option<wgpu::TextureFormat>,
-  prims_storage: Storage<RadialGradientPrimitive>,
-  stops_storage: Storage<GradientStopPrimitive>,
+  prims_uniform: Uniform<RadialGradientPrimitive>,
+  stops_uniform: Uniform<GradientStopPrimitive>,
   layout: wgpu::PipelineLayout,
 }
 
@@ -22,14 +26,11 @@ impl DrawRadialGradientTrianglesPass {
     device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout, texs_layout: &wgpu::BindGroupLayout,
   ) -> Self {
     let vertices_buffer = VerticesBuffer::new(512, 1024, device);
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-      label: Some("Radial triangles pass"),
-      source: wgpu::ShaderSource::Wgsl(
-        include_str!("./shaders/radial_gradient_triangles.wgsl").into(),
-      ),
-    });
-    let prims_storage = Storage::new(device, wgpu::ShaderStages::FRAGMENT, 64);
-    let stops_storage = Storage::new(device, wgpu::ShaderStages::FRAGMENT, 64);
+    let shader =
+      device.create_shader_module(include_wgsl!("./shaders/radial_gradient_triangles.wgsl"));
+    let prims_storage =
+      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, MAX_RADIAL_GRADIENT_PRIMS);
+    let stops_storage = Uniform::new(device, wgpu::ShaderStages::FRAGMENT, MAX_GRADIENT_STOP_PRIMS);
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("update triangles pipeline layout"),
       bind_group_layouts: &[
@@ -46,8 +47,8 @@ impl DrawRadialGradientTrianglesPass {
       pipeline: None,
       shader,
       format: None,
-      prims_storage,
-      stops_storage,
+      prims_uniform: prims_storage,
+      stops_uniform: stops_storage,
       layout,
     }
   }
@@ -60,28 +61,21 @@ impl DrawRadialGradientTrianglesPass {
       .vertices_buffer
       .write_buffer(buffers, device, queue);
   }
-
   pub fn load_radial_gradient_primitives(
-    &mut self, device: &wgpu::Device, queue: &wgpu::Queue, primitives: &[RadialGradientPrimitive],
+    &mut self, queue: &wgpu::Queue, primitives: &[RadialGradientPrimitive],
   ) {
-    self
-      .prims_storage
-      .write_buffer(device, queue, primitives);
+    self.prims_uniform.write_buffer(queue, primitives);
   }
 
-  pub fn load_gradient_stops(
-    &mut self, device: &wgpu::Device, queue: &wgpu::Queue, stops: &[GradientStopPrimitive],
-  ) {
-    self
-      .stops_storage
-      .write_buffer(device, queue, stops);
+  pub fn load_gradient_stops(&mut self, queue: &wgpu::Queue, stops: &[GradientStopPrimitive]) {
+    self.stops_uniform.write_buffer(queue, stops);
   }
 
   #[allow(clippy::too_many_arguments)]
   pub fn draw_triangles(
     &mut self, texture: &WgpuTexture, indices: Range<u32>, clear: Option<Color>,
     device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, textures_bind: &wgpu::BindGroup,
-    mask_layer_storage: &Storage<MaskLayer>,
+    mask_layer_storage: &Uniform<MaskLayer>,
   ) {
     self.update(texture.format(), device);
     let pipeline = self.pipeline.as_ref().unwrap();
@@ -98,8 +92,8 @@ impl DrawRadialGradientTrianglesPass {
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
     rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
     rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
-    rpass.set_bind_group(1, self.stops_storage.bind_group(), &[]);
-    rpass.set_bind_group(2, self.prims_storage.bind_group(), &[]);
+    rpass.set_bind_group(1, self.stops_uniform.bind_group(), &[]);
+    rpass.set_bind_group(2, self.prims_uniform.bind_group(), &[]);
     rpass.set_bind_group(3, textures_bind, &[]);
 
     rpass.set_pipeline(pipeline);

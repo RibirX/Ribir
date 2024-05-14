@@ -2,6 +2,7 @@ use std::{mem::size_of, ops::Range};
 
 use ribir_geom::DeviceRect;
 use ribir_painter::{AntiAliasing, Vertex, VertexBuffers};
+use wgpu::include_wgsl;
 
 use super::vertex_buffer::VerticesBuffer;
 use crate::WgpuTexture;
@@ -16,10 +17,7 @@ pub struct DrawAlphaTrianglesPass {
 impl DrawAlphaTrianglesPass {
   pub fn new(device: &wgpu::Device) -> Self {
     let vertices_buffer = VerticesBuffer::new(2048, 4096, device);
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-      label: Some("Alpha triangles"),
-      source: wgpu::ShaderSource::Wgsl(include_str!("./shaders/alpha_triangles.wgsl").into()),
-    });
+    let shader = device.create_shader_module(include_wgsl!("./shaders/alpha_triangles.wgsl"));
 
     Self { anti_aliasing: AntiAliasing::None, vertices_buffer, pipeline: None, shader }
   }

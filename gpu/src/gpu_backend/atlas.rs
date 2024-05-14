@@ -172,7 +172,7 @@ where
   pub(crate) fn end_frame(&mut self) {
     self
       .cache
-      .end_frame(&self.config.label)
+      .end_frame(self.config.label)
       .for_each(|h| release_handle!(self, h));
     self
       .islands
@@ -232,14 +232,15 @@ mod tests {
   #[test]
   fn resource_clear() {
     let mut wgpu = block_on(WgpuImpl::headless());
+    let size = wgpu.limits().texture_size;
     let mut atlas = Atlas::<WgpuTexture, _, _>::new(
-      AtlasConfig::new("", DeviceSize::new(4096, 4096)),
+      AtlasConfig::new("", size),
       ColorFormat::Rgba8,
       AntiAliasing::None,
       &mut wgpu,
     );
     atlas.allocate(1, (), DeviceSize::new(32, 32), &mut wgpu);
-    atlas.allocate(2, (), DeviceSize::new(4097, 16), &mut wgpu);
+    atlas.allocate(2, (), size, &mut wgpu);
     atlas.end_frame();
     atlas.end_frame();
     wgpu.end_frame();

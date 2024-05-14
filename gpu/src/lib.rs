@@ -82,12 +82,8 @@ pub trait GPUBackendImpl {
   /// A frame start, call once per frame
   fn begin_frame(&mut self);
 
-  /// Returns the maximum number of textures that the backend can load in a
-  /// single draw phase.
-  #[inline]
-  fn load_tex_limit_per_draw(&self) -> usize { 8 }
-
-  fn texture_size_limit(&self) -> DeviceSize;
+  /// Returns the limits of the GPU backend.
+  fn limits(&self) -> &DrawPhaseLimits;
 
   /// Create a texture.
   fn new_texture(
@@ -165,6 +161,28 @@ pub trait GPUBackendImpl {
   );
   /// A frame end, call once per frame
   fn end_frame(&mut self);
+}
+
+/// Represents the sets of limits an GPU backend can provide in a single draw
+pub struct DrawPhaseLimits {
+  /// The maximum size of the texture that the backend can create.
+  pub texture_size: DeviceSize,
+  /// The maximum number of textures that the backend can load in a single draw
+  pub max_tex_load: usize,
+  /// The maximum number of mask layers that the backend can load in a single
+  /// draw phase
+  pub max_image_primitives: usize,
+  /// The maximum number of radial gradient primitives that the backend can load
+  /// in a single draw
+  pub max_radial_gradient_primitives: usize,
+  /// The maximum number of linear gradient primitives that the backend can load
+  /// in a single draw
+  pub max_linear_gradient_primitives: usize,
+  /// The maximum number of gradient stops that the backend can load in a single
+  /// draw phase
+  pub max_gradient_stop_primitives: usize,
+  /// The maximum number of mask layers that the backend can load in a single
+  pub max_mask_layers: usize,
 }
 
 #[repr(packed)]
