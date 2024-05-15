@@ -158,6 +158,9 @@ where
 
   pub fn size(&self) -> DeviceSize { self.texture.size() }
 
+  /// The max size of the atlas can be.
+  pub fn max_size(&self) -> DeviceSize { self.config.max_size }
+
   pub fn clear(&mut self) {
     self.cache.clear();
     self.atlas_allocator.clear();
