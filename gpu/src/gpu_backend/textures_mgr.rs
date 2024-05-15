@@ -65,9 +65,17 @@ macro_rules! id_to_texture {
   };
 }
 
-fn get_transform_pref_scale(transform: &Transform) -> f32 {
+fn get_prefer_scale(transform: &Transform, size: DeviceSize, max_size: DeviceSize) -> f32 {
+  // 2 * BLANK_EDGE is the blank edge for each side.
+  let max_width = (max_size.width - 2 * BLANK_EDGE) as f32;
+  let max_height = (max_size.height - 2 * BLANK_EDGE) as f32;
+
+  let max_scale = (max_width / size.width as f32).min(max_height / size.height as f32);
+
   let Transform { m11, m12, m21, m22, .. } = *transform;
-  (m11.abs() + m12.abs()).max(m21.abs() + m22.abs())
+  (m11.abs() + m12.abs())
+    .max(m21.abs() + m22.abs())
+    .min(max_scale)
 }
 
 impl<T: Texture> TexturesMgr<T>
@@ -127,7 +135,11 @@ where
         .then(path_ts)
     }
 
-    let prefer_scale: f32 = get_transform_pref_scale(transform);
+    let prefer_scale: f32 = get_prefer_scale(
+      transform,
+      path.bounds().size.to_i32().cast_unit(),
+      self.alpha_atlas.max_size(),
+    );
     let key = PathKey::from_path(path);
 
     if let Some(h) = self
@@ -142,7 +154,7 @@ where
     } else {
       let path = key.path().clone();
       let scale_bounds = path.bounds().scale(prefer_scale, prefer_scale);
-      let prefer_cache_size = path_add_edges(scale_bounds.round_out().size.to_i32().cast_unit());
+      let prefer_cache_size = add_blank_edges(scale_bounds.round_out().size.to_i32().cast_unit());
 
       let h = self
         .alpha_atlas
@@ -174,7 +186,7 @@ where
   pub(super) fn store_clipped_path(
     &mut self, clip_view: DeviceRect, path: PaintPath, gpu_impl: &mut T::Host,
   ) -> (TextureSlice, Transform) {
-    let alloc_size: DeviceSize = path_add_edges(clip_view.size);
+    let alloc_size: DeviceSize = add_blank_edges(clip_view.size);
     let path_ts = path.transform;
 
     let key = PathKey::from_path_with_clip(path, clip_view);
@@ -229,7 +241,7 @@ where
 
   fn fill_tess(
     path: &Path, ts: &Transform, tex_size: DeviceSize, slice_bounds: &DeviceRect,
-    buffer: &mut VertexBuffers<f32>,
+    buffer: &mut VertexBuffers<f32>, max_size: DeviceSize,
   ) -> Range<u32> {
     let start = buffer.indices.len() as u32;
 
@@ -239,7 +251,7 @@ where
     let tex_width = tex_size.width as f32;
     let tex_height = tex_size.height as f32;
 
-    let scale = get_transform_pref_scale(ts);
+    let scale = get_prefer_scale(ts, tex_size, max_size);
 
     path.tessellate(TOLERANCE / scale, buffer, |pos| {
       let pos = ts.transform_point(pos);
@@ -270,8 +282,14 @@ where
       for f in self.fill_task.iter() {
         let FillTask { slice, path, clip_rect, ts } = f;
         let texture = id_to_texture!(self, slice.tex_id);
-        let rg =
-          Self::fill_tess(path, ts, texture.size(), &slice.rect, &mut self.fill_task_buffers);
+        let rg = Self::fill_tess(
+          path,
+          ts,
+          texture.size(),
+          &slice.rect,
+          &mut self.fill_task_buffers,
+          self.alpha_atlas.max_size(),
+        );
         draw_indices.push((slice.tex_id, rg, clip_rect));
       }
     } else {
@@ -281,14 +299,14 @@ where
         let texture = id_to_texture!(self, slice.tex_id);
         tasks.push((slice, ts, texture.size(), slice.rect, path, clip_rect));
       }
-
+      let max_size = self.alpha_atlas.max_size();
       let par_tess_res = tasks
         .par_chunks(PAR_CHUNKS_SIZE)
         .map(|tasks| {
           let mut buffer = VertexBuffers::default();
           let mut indices = Vec::with_capacity(tasks.len());
           for (slice, ts, tex_size, slice_bounds, path, clip_rect) in tasks.iter() {
-            let rg = Self::fill_tess(path, ts, *tex_size, slice_bounds, &mut buffer);
+            let rg = Self::fill_tess(path, ts, *tex_size, slice_bounds, &mut buffer, max_size);
             indices.push((slice.tex_id, rg, *clip_rect));
           }
           (indices, buffer)
@@ -389,7 +407,7 @@ fn extend_buffer<V>(dist: &mut VertexBuffers<V>, from: VertexBuffers<V>) {
 
 const BLANK_EDGE: i32 = 2;
 
-fn path_add_edges(mut size: DeviceSize) -> DeviceSize {
+fn add_blank_edges(mut size: DeviceSize) -> DeviceSize {
   size.width += BLANK_EDGE * 2;
   size.height += BLANK_EDGE * 2;
   size
@@ -529,18 +547,6 @@ impl PartialEq for PathKey {
 }
 
 impl Eq for PathKey {}
-
-pub fn prefer_cache_size(path: &Path, transform: &Transform) -> DeviceSize {
-  let prefer_scale: f32 = get_transform_pref_scale(transform);
-  let prefer_cache_size = path
-    .bounds()
-    .scale(prefer_scale, prefer_scale)
-    .round_out()
-    .size
-    .to_i32()
-    .cast_unit();
-  path_add_edges(prefer_cache_size)
-}
 
 #[cfg(feature = "wgpu")]
 #[cfg(test)]

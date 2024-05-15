@@ -381,18 +381,20 @@ where
   fn new_mask_layer(&mut self, path: PaintPath) -> Option<([Point; 4], i32)> {
     let paint_bounds = path.paint_bounds.round_out().to_i32().cast_unit();
     let view = paint_bounds.intersection(self.viewport())?;
-    let prefer_cache_size = prefer_cache_size(&path.path, &path.transform);
 
-    let (mask, mask_to_view) =
-      if self.tex_mgr.is_good_for_cache(prefer_cache_size) || view.contains_rect(&paint_bounds) {
-        self
-          .tex_mgr
-          .store_alpha_path(path.path, &path.transform, &mut self.gpu_impl)
-      } else {
-        self
-          .tex_mgr
-          .store_clipped_path(view, path, &mut self.gpu_impl)
-      };
+    let (mask, mask_to_view) = if self
+      .tex_mgr
+      .is_good_for_cache(path.paint_bounds.size.to_i32().cast_unit())
+      || view.contains_rect(&paint_bounds)
+    {
+      self
+        .tex_mgr
+        .store_alpha_path(path.path, &path.transform, &mut self.gpu_impl)
+    } else {
+      self
+        .tex_mgr
+        .store_clipped_path(view, path, &mut self.gpu_impl)
+    };
 
     let mut points = rect_corners(&mask.rect.to_f32().cast_unit());
     for p in points.iter_mut() {
