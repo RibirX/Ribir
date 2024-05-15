@@ -27,6 +27,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
+- just test (#pr @M-Adoo)
+
 - **core**: The split functions in `StateReader::map_reader`, `StateWriter::map_writer`, and `StateWriter::split_writer` no longer need to return a reference. (#568 @M-Adoo)
 - **core**: Introduced `StateWatcher` for watching state modifies, which was previously the responsibility of `StateReader`. This results in a cleaner and more compact `StateReader` implementation. (#556, @M-Adoo)
 - **gpu**: Introduced `GPUBackendImpl::max_textures_per_draw` to set a limit on textures per draw phase (#562 @M-Adoo)
