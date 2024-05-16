@@ -9,7 +9,7 @@ use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use ribir_algo::Resource;
 use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize, Point, Transform};
 use ribir_painter::{
-  image::ColorFormat, AntiAliasing, PaintPath, Path, PathSegment, PixelImage, Vertex, VertexBuffers,
+  image::ColorFormat, PaintPath, Path, PathSegment, PixelImage, Vertex, VertexBuffers,
 };
 
 use super::{
@@ -82,20 +82,18 @@ impl<T: Texture> TexturesMgr<T>
 where
   T::Host: GPUBackendImpl<Texture = T>,
 {
-  pub(super) fn new(gpu_impl: &mut T::Host, anti_aliasing: AntiAliasing) -> Self {
+  pub(super) fn new(gpu_impl: &mut T::Host) -> Self {
     let max_size = gpu_impl.limits().texture_size;
 
     Self {
       alpha_atlas: Atlas::new(
         AtlasConfig::new("Alpha atlas", max_size),
         ColorFormat::Alpha8,
-        anti_aliasing,
         gpu_impl,
       ),
       rgba_atlas: Atlas::new(
         AtlasConfig::new("Rgba atlas", max_size),
         ColorFormat::Rgba8,
-        AntiAliasing::None,
         gpu_impl,
       ),
       fill_task: <_>::default(),
@@ -105,12 +103,6 @@ where
 
   pub(super) fn is_good_for_cache(&self, size: DeviceSize) -> bool {
     self.alpha_atlas.is_good_size_to_alloc(size)
-  }
-
-  pub(super) fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing, host: &mut T::Host) {
-    self
-      .alpha_atlas
-      .set_anti_aliasing(anti_aliasing, host);
   }
 
   /// Store an alpha path in texture and return the texture and a transform that
@@ -573,7 +565,7 @@ pub mod tests {
   #[test]
   fn smoke_store_image() {
     let mut wgpu = block_on(WgpuImpl::headless());
-    let mut mgr = TexturesMgr::new(&mut wgpu, AntiAliasing::None);
+    let mut mgr = TexturesMgr::new(&mut wgpu);
 
     let red_img = color_image(Color::RED, 32, 32);
     let red_rect = mgr.store_image(&red_img, &mut wgpu);
@@ -619,7 +611,7 @@ pub mod tests {
   #[test]
   fn transform_path_share_cache() {
     let mut wgpu = block_on(WgpuImpl::headless());
-    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
+    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu);
 
     let path1 = Path::rect(&rect(0., 0., 300., 300.));
     let path2 = Path::rect(&rect(100., 100., 300., 300.));
@@ -636,7 +628,7 @@ pub mod tests {
   #[test]
   fn store_clipped_path() {
     let mut wgpu = block_on(WgpuImpl::headless());
-    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
+    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu);
 
     let path = PaintPath::new(
       Path::rect(&rect(20., 20., 300., 300.)),
@@ -658,7 +650,7 @@ pub mod tests {
     // address.
 
     let mut wgpu = block_on(WgpuImpl::headless());
-    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu, AntiAliasing::None);
+    let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu);
     {
       let red_img = color_image(Color::RED, 32, 32);
       mgr.store_image(&red_img, &mut wgpu);

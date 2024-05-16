@@ -2,8 +2,8 @@ use std::error::Error;
 
 use ribir_geom::{rect_corners, DeviceRect, DeviceSize, Point};
 use ribir_painter::{
-  image::ColorFormat, AntiAliasing, Color, PaintCommand, PaintPath, PainterBackend, PixelImage,
-  Vertex, VertexBuffers,
+  image::ColorFormat, Color, PaintCommand, PaintPath, PainterBackend, PixelImage, Vertex,
+  VertexBuffers,
 };
 
 use crate::{
@@ -56,10 +56,6 @@ struct ClipLayer {
 pub trait Texture {
   type Host;
 
-  fn anti_aliasing(&self) -> AntiAliasing;
-
-  fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing, host: &mut Self::Host);
-
   /// write data to the texture.
   fn write_data(&mut self, dist: &DeviceRect, data: &[u8], host: &mut Self::Host);
 
@@ -88,12 +84,6 @@ where
   Impl::Texture: Texture<Host = Impl>,
 {
   type Texture = Impl::Texture;
-
-  fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing) {
-    self
-      .tex_mgr
-      .set_anti_aliasing(anti_aliasing, &mut self.gpu_impl);
-  }
 
   fn begin_frame(&mut self, surface: Color) {
     self.surface_color = Some(surface);
@@ -144,8 +134,8 @@ impl<Impl: GPUBackendImpl> GPUBackend<Impl>
 where
   Impl::Texture: Texture<Host = Impl>,
 {
-  pub fn new(mut gpu_impl: Impl, anti_aliasing: AntiAliasing) -> Self {
-    let tex_mgr = TexturesMgr::new(&mut gpu_impl, anti_aliasing);
+  pub fn new(mut gpu_impl: Impl) -> Self {
+    let tex_mgr = TexturesMgr::new(&mut gpu_impl);
     Self {
       gpu_impl,
       tex_mgr,

@@ -6,7 +6,7 @@ use std::{
 
 use futures::channel::oneshot;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
-use ribir_painter::{image::ColorFormat, AntiAliasing, Color, PixelImage, VertexBuffers};
+use ribir_painter::{image::ColorFormat, Color, PixelImage, VertexBuffers};
 
 use self::{
   draw_alpha_triangles_pass::DrawAlphaTrianglesPass,
@@ -147,9 +147,7 @@ impl GPUBackendImpl for WgpuImpl {
     }
   }
 
-  fn new_texture(
-    &mut self, size: DeviceSize, anti_aliasing: AntiAliasing, format: ColorFormat,
-  ) -> Self::Texture {
+  fn new_texture(&mut self, size: DeviceSize, format: ColorFormat) -> Self::Texture {
     let format = into_wgpu_format(format);
     let size = wgpu::Extent3d {
       width: size.width as u32,
@@ -170,9 +168,7 @@ impl GPUBackendImpl for WgpuImpl {
       view_formats: &[],
     };
     let tex = self.device.create_texture(texture_descriptor);
-    let mut tex = WgpuTexture::from_tex(tex);
-    tex.set_anti_aliasing(anti_aliasing, self);
-    tex
+    WgpuTexture::from_tex(tex)
   }
 
   fn load_textures(&mut self, textures: &[&Self::Texture]) {
@@ -232,7 +228,7 @@ impl GPUBackendImpl for WgpuImpl {
     let encoder = command_encoder!(self);
     self
       .alpha_triangles_pass
-      .draw_alpha_triangles(indices, texture, None, encoder, &self.device);
+      .draw_alpha_triangles(indices, texture, None, encoder);
   }
 
   fn draw_radial_gradient_triangles(
@@ -275,13 +271,9 @@ impl GPUBackendImpl for WgpuImpl {
     &mut self, indices: &Range<u32>, texture: &mut Self::Texture, scissor: DeviceRect,
   ) {
     let encoder = command_encoder!(self);
-    self.alpha_triangles_pass.draw_alpha_triangles(
-      indices,
-      texture,
-      Some(scissor),
-      encoder,
-      &self.device,
-    );
+    self
+      .alpha_triangles_pass
+      .draw_alpha_triangles(indices, texture, Some(scissor), encoder);
   }
 
   fn draw_color_triangles(
@@ -327,13 +319,6 @@ impl GPUBackendImpl for WgpuImpl {
         from_tex.inner_tex.texture(),
         from_rect,
       );
-      if let Some(multi_sampler) = dist_tex.multisampler.as_ref() {
-        let from = from_tex
-          .multisampler
-          .as_ref()
-          .expect("multisampler texture must copy from a multismapler texture.");
-        self.copy_same_format_texture(multi_sampler, dist_pos, from, from_rect);
-      }
     } else {
       self.draw_texture_to_texture(dist_tex, dist_pos, from_tex, from_rect)
     }
@@ -382,9 +367,6 @@ impl<'a> Surface<'a> {
 pub struct WgpuTexture {
   inner_tex: InnerTexture,
   view: wgpu::TextureView,
-  anti_aliasing: AntiAliasing,
-  multisampler: Option<wgpu::Texture>,
-  multisampler_view: Option<wgpu::TextureView>,
 }
 
 enum InnerTexture {
@@ -415,28 +397,17 @@ impl WgpuTexture {
 
     let view = self.view();
     let ops = wgpu::Operations { load, store: wgpu::StoreOp::Store };
-
-    if let Some(multi_sample) = &self.multisampler_view {
-      wgpu::RenderPassColorAttachment { view: multi_sample, resolve_target: Some(view), ops }
-    } else {
-      wgpu::RenderPassColorAttachment { view, resolve_target: None, ops }
-    }
+    wgpu::RenderPassColorAttachment { view, resolve_target: None, ops }
   }
 
   fn new(inner_tex: InnerTexture) -> Self {
     let view = inner_tex.texture().create_view(&<_>::default());
-    Self {
-      inner_tex,
-      view,
-      anti_aliasing: AntiAliasing::None,
-      multisampler: None,
-      multisampler_view: None,
-    }
+    Self { inner_tex, view }
   }
 
-  fn width(&self) -> u32 { self.inner_tex.texture().width() }
+  pub fn width(&self) -> u32 { self.inner_tex.texture().width() }
 
-  fn height(&self) -> u32 { self.inner_tex.texture().height() }
+  pub fn height(&self) -> u32 { self.inner_tex.texture().height() }
 
   fn size(&self) -> DeviceSize {
     let size = self.inner_tex.texture().size();
@@ -450,43 +421,6 @@ impl WgpuTexture {
 
 impl Texture for WgpuTexture {
   type Host = WgpuImpl;
-
-  fn anti_aliasing(&self) -> AntiAliasing { self.anti_aliasing }
-
-  fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing, host: &mut Self::Host) {
-    if anti_aliasing == self.anti_aliasing {
-      return;
-    }
-    self.anti_aliasing = anti_aliasing;
-
-    if anti_aliasing == AntiAliasing::None {
-      self.multisampler.take();
-      return;
-    }
-
-    if self.multisampler.is_none() {
-      let m_desc = &wgpu::TextureDescriptor {
-        size: wgpu::Extent3d {
-          width: self.width(),
-          height: self.height(),
-          depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: anti_aliasing as u32,
-        dimension: wgpu::TextureDimension::D2,
-        format: self.format(),
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-          | wgpu::TextureUsages::COPY_SRC
-          | wgpu::TextureUsages::COPY_DST,
-        label: None,
-        view_formats: &[],
-      };
-      let m_sampler = host.device.create_texture(m_desc);
-      self.anti_aliasing = anti_aliasing;
-      self.multisampler_view = Some(m_sampler.create_view(&<_>::default()));
-      self.multisampler = Some(m_sampler);
-    }
-  }
 
   fn write_data(&mut self, dist: &DeviceRect, data: &[u8], backend: &mut Self::Host) {
     let size = wgpu::Extent3d {

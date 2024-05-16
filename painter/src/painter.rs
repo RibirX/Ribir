@@ -38,8 +38,6 @@ pub struct Painter {
 pub trait PainterBackend {
   type Texture;
 
-  fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing);
-
   /// Start a new frame, and clear the frame with `surface` color before draw.
   fn begin_frame(&mut self, surface: Color);
 
@@ -56,15 +54,6 @@ pub trait PainterBackend {
 
   /// A frame end.
   fn end_frame(&mut self);
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum AntiAliasing {
-  None = 1,
-  Msaa2X = 2,
-  Msaa4X = 4,
-  Msaa8X = 8,
-  Msaa16X = 16,
 }
 
 /// A path and its geometry information are friendly to paint and cache.

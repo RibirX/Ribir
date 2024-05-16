@@ -3,7 +3,7 @@ use std::ops::Range;
 
 pub use gpu_backend::Texture;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
-use ribir_painter::{image::ColorFormat, AntiAliasing, Color, GradientStop, VertexBuffers};
+use ribir_painter::{image::ColorFormat, Color, GradientStop, VertexBuffers};
 mod gpu_backend;
 use zerocopy::AsBytes;
 
@@ -86,9 +86,7 @@ pub trait GPUBackendImpl {
   fn limits(&self) -> &DrawPhaseLimits;
 
   /// Create a texture.
-  fn new_texture(
-    &mut self, size: DeviceSize, anti_aliasing: AntiAliasing, format: ColorFormat,
-  ) -> Self::Texture;
+  fn new_texture(&mut self, size: DeviceSize, format: ColorFormat) -> Self::Texture;
   /// Load the vertices and indices buffer that `draw_alpha_triangles` &
   /// `draw_alpha_triangles_with_scissor` will use.
   fn load_alpha_vertices(&mut self, buffers: &VertexBuffers<f32>);
