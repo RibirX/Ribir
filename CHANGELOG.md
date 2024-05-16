@@ -41,6 +41,12 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **example**: run example in web wasm (#571 @wjian23)
 
+
+### Fixed
+
+- **ribir**: fixed the crash issue when the shell window is zero-sized at startup. (#582, @M-Adoo)
+
+
 ### Documented
 
 - **core**: Explained when to use `unsubscribe` with `watch!`. (#556, @M-Adoo)
