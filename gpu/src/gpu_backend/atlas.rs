@@ -3,7 +3,7 @@ use std::hash::Hash;
 use guillotiere::{Allocation, AtlasAllocator};
 use ribir_algo::FrameCache;
 use ribir_geom::{DeviceRect, DeviceSize};
-use ribir_painter::{image::ColorFormat, AntiAliasing};
+use ribir_painter::image::ColorFormat;
 use slab::Slab;
 
 use super::Texture;
@@ -54,11 +54,9 @@ where
   T::Host: GPUBackendImpl<Texture = T>,
   K: Hash + Eq,
 {
-  pub fn new(
-    config: AtlasConfig, format: ColorFormat, anti_aliasing: AntiAliasing, gpu_impl: &mut T::Host,
-  ) -> Self {
+  pub fn new(config: AtlasConfig, format: ColorFormat, gpu_impl: &mut T::Host) -> Self {
     let min_size = config.min_size;
-    let texture = gpu_impl.new_texture(min_size, anti_aliasing, format);
+    let texture = gpu_impl.new_texture(min_size, format);
     Self {
       config,
       texture,
@@ -70,15 +68,6 @@ where
   }
 
   pub fn get(&mut self, key: &K) -> Option<&AtlasHandle<Attr>> { self.cache.get(key) }
-
-  pub fn set_anti_aliasing(&mut self, anti_aliasing: AntiAliasing, host: &mut T::Host) {
-    if self.texture.anti_aliasing() != anti_aliasing {
-      self
-        .texture
-        .set_anti_aliasing(anti_aliasing, host);
-      self.clear();
-    }
-  }
 
   /// Allocate a rect in the atlas the caller should draw stull in the
   /// rect. Check if a cache exist before allocate.
@@ -98,11 +87,7 @@ where
         .min(self.config.max_size);
       if expand_size != self.texture.size() {
         self.atlas_allocator.grow(expand_size.cast_unit());
-        let mut new_tex = gpu_impl.new_texture(
-          expand_size,
-          self.texture.anti_aliasing(),
-          self.texture.color_format(),
-        );
+        let mut new_tex = gpu_impl.new_texture(expand_size, self.texture.color_format());
         // Copy old texture to new texture item by item, not copy whole texture. Because
         // the new texture will overlap with the old texture. And we promise to the
         // gpu backend implementation that our operations not overlap in one texture in
@@ -127,8 +112,7 @@ where
     let atlas_dist = if let Some(alloc) = alloc {
       AtlasDist::Atlas(alloc)
     } else {
-      let texture =
-        gpu_impl.new_texture(size, self.texture.anti_aliasing(), self.texture.color_format());
+      let texture = gpu_impl.new_texture(size, self.texture.color_format());
       let id = self.extras.insert(texture);
       AtlasDist::Extra(id)
     };
@@ -160,12 +144,6 @@ where
 
   /// The max size of the atlas can be.
   pub fn max_size(&self) -> DeviceSize { self.config.max_size }
-
-  pub fn clear(&mut self) {
-    self.cache.clear();
-    self.atlas_allocator.clear();
-    self.extras.clear();
-  }
 
   pub fn is_good_size_to_alloc(&self, size: DeviceSize) -> bool {
     (!size.greater_than(self.config.max_size).any())
@@ -222,7 +200,6 @@ mod tests {
     let mut atlas = Atlas::<WgpuTexture, _, _>::new(
       AtlasConfig::new("", DeviceSize::new(4096, 4096)),
       ColorFormat::Alpha8,
-      AntiAliasing::None,
       &mut gpu_impl,
     );
 
@@ -236,12 +213,8 @@ mod tests {
   fn resource_clear() {
     let mut wgpu = block_on(WgpuImpl::headless());
     let size = wgpu.limits().texture_size;
-    let mut atlas = Atlas::<WgpuTexture, _, _>::new(
-      AtlasConfig::new("", size),
-      ColorFormat::Rgba8,
-      AntiAliasing::None,
-      &mut wgpu,
-    );
+    let mut atlas =
+      Atlas::<WgpuTexture, _, _>::new(AtlasConfig::new("", size), ColorFormat::Rgba8, &mut wgpu);
     atlas.allocate(1, (), DeviceSize::new(32, 32), &mut wgpu);
     atlas.allocate(2, (), size, &mut wgpu);
     atlas.end_frame();
@@ -258,7 +231,6 @@ mod tests {
     let mut atlas = Atlas::<WgpuTexture, _, _>::new(
       AtlasConfig::new("", DeviceSize::new(4096, 4096)),
       ColorFormat::Rgba8,
-      AntiAliasing::None,
       &mut wgpu,
     );
     atlas.allocate(1, (), DeviceSize::new(32, 32), &mut wgpu);
@@ -285,7 +257,6 @@ mod tests {
     let mut atlas = Atlas::<WgpuTexture, _, _>::new(
       AtlasConfig::new("", DeviceSize::new(4096, 4096)),
       ColorFormat::Alpha8,
-      AntiAliasing::None,
       &mut wgpu,
     );
     let icon = DeviceSize::new(32, 32);

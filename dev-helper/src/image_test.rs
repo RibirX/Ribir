@@ -155,13 +155,13 @@ pub fn wgpu_render_commands(
   use futures::executor::block_on;
   use ribir_geom::{DeviceRect, DeviceSize};
   use ribir_gpu::{GPUBackend, GPUBackendImpl, Texture};
-  use ribir_painter::{AntiAliasing, PainterBackend};
+  use ribir_painter::PainterBackend;
 
   let mut gpu_impl = block_on(ribir_gpu::WgpuImpl::headless());
 
   let rect = DeviceRect::from_size(DeviceSize::new(viewport.max_x() + 2, viewport.max_y() + 2));
-  let mut texture = gpu_impl.new_texture(rect.size, AntiAliasing::None, ColorFormat::Rgba8);
-  let mut backend = GPUBackend::new(gpu_impl, AntiAliasing::None);
+  let mut texture = gpu_impl.new_texture(rect.size, ColorFormat::Rgba8);
+  let mut backend = GPUBackend::new(gpu_impl);
 
   backend.begin_frame(surface);
   backend.draw_commands(rect, commands, &mut texture);

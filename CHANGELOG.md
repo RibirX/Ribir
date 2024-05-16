@@ -45,7 +45,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **algo**: removed `Resource` and rename `ShareResource` to `Resource`. (#564, @M-Adoo)
 - **dev-helper**: Support specific the comparison of image tests. (#573 @M-Adoo)
 - **dev-helper**: If test images differ, both actual and difference images are saved with the expected image. (#573 @M-Adoo)
-
+- **painter**: Removed the AntiAliasing feature from the `painter` package, This responsibility now lies with the painter backend. (#pr @M-Adoo)
+- **gpu**: The GPU backend no longer relies on MSAA, which is dependent on the graphics API. Instead, it uses the alpha atlas to provide a solution similar to SSAA.(#pr, @M-Adoo)
 - **example**: run example in web wasm (#571 @wjian23)
 
 

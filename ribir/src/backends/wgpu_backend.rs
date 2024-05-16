@@ -1,6 +1,4 @@
-use ribir_core::prelude::{
-  AntiAliasing, Color, DeviceRect, DeviceSize, PaintCommand, PainterBackend,
-};
+use ribir_core::prelude::{Color, DeviceRect, DeviceSize, PaintCommand, PainterBackend};
 use ribir_gpu::Surface;
 
 use crate::winit_shell_wnd::WinitBackend;
@@ -16,8 +14,7 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
     let size = window.inner_size();
     let size = DeviceSize::new(size.width as i32, size.height as i32);
 
-    let mut wgpu =
-      WgpuBackend { surface, backend: ribir_gpu::GPUBackend::new(wgpu, AntiAliasing::Msaa4X) };
+    let mut wgpu = WgpuBackend { surface, backend: ribir_gpu::GPUBackend::new(wgpu) };
     wgpu.on_resize(size);
 
     wgpu
