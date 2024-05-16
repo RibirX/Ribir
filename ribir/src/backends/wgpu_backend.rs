@@ -18,14 +18,17 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
     let surface = instance.create_surface(window).unwrap();
     let wgpu = ribir_gpu::WgpuImpl::new(instance, Some(&surface)).await;
     let size = window.inner_size();
-    surface.configure(wgpu.device(), &Self::surface_config(size.width, size.height));
+    let size = DeviceSize::new(size.width as i32, size.height as i32);
 
-    WgpuBackend {
-      size: DeviceSize::new(size.width as i32, size.height as i32),
+    let mut wgpu = WgpuBackend {
+      size: DeviceSize::zero(),
       surface,
       backend: ribir_gpu::GPUBackend::new(wgpu, AntiAliasing::Msaa4X),
       current_texture: None,
-    }
+    };
+    wgpu.on_resize(size);
+
+    wgpu
   }
 
   fn on_resize(&mut self, size: DeviceSize) {
