@@ -69,6 +69,12 @@ macro_rules! command_encoder {
 }
 pub(crate) use command_encoder;
 
+pub struct Surface<'a> {
+  surface: wgpu::Surface<'a>,
+  config: wgpu::SurfaceConfiguration,
+  current_texture: Option<WgpuTexture>,
+}
+
 impl GPUBackendImpl for WgpuImpl {
   type Texture = WgpuTexture;
 
@@ -303,6 +309,38 @@ impl GPUBackendImpl for WgpuImpl {
   }
 }
 
+impl<'a> Surface<'a> {
+  /// Resize the surface to the given size.
+  pub fn resize(&mut self, size: DeviceSize, backend: &WgpuImpl) {
+    self.config.width = size.width as u32;
+    self.config.height = size.height as u32;
+    if !size.is_empty() {
+      self
+        .surface
+        .configure(backend.device(), &self.config);
+    }
+  }
+
+  /// Get the size of the surface.
+  pub fn size(&self) -> DeviceSize {
+    DeviceSize::new(self.config.width as i32, self.config.height as i32)
+  }
+
+  pub fn get_current_texture(&mut self) -> &mut WgpuTexture {
+    self.current_texture.get_or_insert_with(|| {
+      let tex = self.surface.get_current_texture().unwrap();
+      WgpuTexture::new(InnerTexture::SurfaceTexture(tex))
+    })
+  }
+
+  /// Present the current texture to the surface.
+  pub fn present(&mut self) {
+    if let Some(tex) = self.current_texture.take() {
+      let InnerTexture::SurfaceTexture(tex) = tex.inner_tex else { unreachable!() };
+      tex.present()
+    }
+  }
+}
 pub struct WgpuTexture {
   inner_tex: InnerTexture,
   view: wgpu::TextureView,
@@ -326,25 +364,7 @@ impl InnerTexture {
 }
 
 impl WgpuTexture {
-  pub fn from_tex(tex: wgpu::Texture) -> Self { Self::new(InnerTexture::Texture(tex)) }
-
-  pub fn from_surface_tex(tex: wgpu::SurfaceTexture) -> Self {
-    Self::new(InnerTexture::SurfaceTexture(tex))
-  }
-
-  pub fn into_texture(self) -> Option<wgpu::Texture> {
-    match self.inner_tex {
-      InnerTexture::Texture(texture) => Some(texture),
-      InnerTexture::SurfaceTexture(_) => None,
-    }
-  }
-
-  pub fn into_surface_texture(self) -> Option<wgpu::SurfaceTexture> {
-    match self.inner_tex {
-      InnerTexture::Texture(_) => None,
-      InnerTexture::SurfaceTexture(tex) => Some(tex),
-    }
-  }
+  fn from_tex(tex: wgpu::Texture) -> Self { Self::new(InnerTexture::Texture(tex)) }
 
   pub(crate) fn color_attachments(&self, clear: Option<Color>) -> wgpu::RenderPassColorAttachment {
     let load = match clear {
@@ -535,16 +555,43 @@ impl Texture for WgpuTexture {
 }
 
 impl WgpuImpl {
-  pub async fn headless() -> Self {
-    let instance = wgpu::Instance::new(<_>::default());
-    Self::new(instance, None).await
+  /// Create a new instance of `WgpuImpl` with a headless surface.
+  pub async fn headless() -> Self { Self::create(None).await.0 }
+
+  /// Create a new instance of `WgpuImpl` with a surface target and also return
+  /// the surface.
+  pub async fn new<'a>(target: impl Into<wgpu::SurfaceTarget<'a>>) -> (Self, Surface<'a>) {
+    let (gpu_impl, surface) = Self::create(Some(target.into())).await;
+    (gpu_impl, surface.unwrap())
   }
 
-  pub async fn new(instance: wgpu::Instance, surface: Option<&wgpu::Surface<'_>>) -> WgpuImpl {
+  #[allow(clippy::needless_lifetimes)]
+  async fn create<'a>(target: Option<wgpu::SurfaceTarget<'a>>) -> (WgpuImpl, Option<Surface<'a>>) {
+    let mut instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+      backends: wgpu::Backends::PRIMARY,
+      ..<_>::default()
+    });
+
+    // This detection mechanism might be deprecated in the future. Ideally, we
+    // should be able to create instances with `wgpu::Backends::all()`. However,
+    // this currently may not correctly on browsers when WebGPU is insufficient.
+    // See https://github.com/gfx-rs/wgpu/issues/5332 for more details.
+    if instance
+      .request_adapter(&<_>::default())
+      .await
+      .is_none()
+    {
+      instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::SECONDARY,
+        ..<_>::default()
+      });
+    }
+
+    let surface = target.map(|t| instance.create_surface(t).unwrap());
     let adapter = instance
       .request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::default(),
-        compatible_surface: surface,
+        compatible_surface: surface.as_ref(),
         force_fallback_adapter: false,
       })
       .await
@@ -552,10 +599,7 @@ impl WgpuImpl {
 
     let (device, queue) = adapter
       .request_device(
-        &wgpu::DeviceDescriptor {
-          required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
-          ..Default::default()
-        },
+        &wgpu::DeviceDescriptor { required_limits: adapter.limits(), ..Default::default() },
         None,
       )
       .await
@@ -610,13 +654,12 @@ impl WgpuImpl {
       DrawRadialGradientTrianglesPass::new(&device, mask_layers_uniform.layout(), &texs_layout);
     let linear_gradient_pass =
       DrawLinearGradientTrianglesPass::new(&device, mask_layers_uniform.layout(), &texs_layout);
-    WgpuImpl {
+    let gpu_impl = WgpuImpl {
       device,
       queue,
       command_encoder: None,
       command_buffers: vec![],
       sampler,
-
       draw_tex_pass,
       alpha_triangles_pass,
       color_triangles_pass,
@@ -627,7 +670,32 @@ impl WgpuImpl {
       textures_bind: None,
       mask_layers_uniform,
       limits,
-    }
+    };
+
+    let surface = surface.map(|surface| {
+      use wgpu::TextureFormat::*;
+      let format = surface
+        .get_capabilities(&adapter)
+        .formats
+        .into_iter()
+        .find(|&f| f == Rgba8Unorm || f == Bgra8Unorm)
+        .expect("No suitable format found for the surface!");
+
+      let config = wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        format,
+        width: 0,
+        height: 0,
+        present_mode: wgpu::PresentMode::Fifo,
+        alpha_mode: wgpu::CompositeAlphaMode::Auto,
+        view_formats: vec![format],
+        desired_maximum_frame_latency: 2,
+      };
+
+      Surface { surface, config, current_texture: None }
+    });
+
+    (gpu_impl, surface)
   }
 
   pub fn start_capture(&self) { self.device.start_capture(); }
