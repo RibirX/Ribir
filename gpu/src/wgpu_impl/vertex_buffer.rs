@@ -40,7 +40,7 @@ impl<T: AsBytes> VerticesBuffer<T> {
   pub fn indices(&self) -> &wgpu::Buffer { &self.indices }
 }
 
-fn new_vertices<T>(device: &wgpu::Device, len: usize) -> wgpu::Buffer {
+pub(crate) fn new_vertices<T>(device: &wgpu::Device, len: usize) -> wgpu::Buffer {
   let label = format!("{} vertices buffer", type_name::<T>());
   device.create_buffer(&wgpu::BufferDescriptor {
     label: Some(&label),

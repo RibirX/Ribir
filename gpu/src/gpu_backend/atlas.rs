@@ -36,19 +36,6 @@ pub(crate) struct Atlas<T: Texture, K, Attr> {
   islands: Vec<AtlasHandle<Attr>>,
 }
 
-macro_rules! release_handle {
-  ($this:ident, $handle:ident) => {
-    match $handle.atlas_dist {
-      AtlasDist::Atlas(alloc) => {
-        $this.atlas_allocator.deallocate(alloc.id);
-      }
-      AtlasDist::Extra(id) => {
-        $this.extras.remove(id);
-      }
-    }
-  };
-}
-
 impl<K, Attr, T: Texture> Atlas<T, K, Attr>
 where
   T::Host: GPUBackendImpl<Texture = T>,
@@ -150,15 +137,22 @@ where
       && size.area() <= self.config.max_size.area() / 4
   }
 
-  pub(crate) fn end_frame(&mut self) {
+  pub(crate) fn end_frame(&mut self) { self.end_frame_with(|_| {}) }
+
+  pub(crate) fn end_frame_with(&mut self, mut on_deallocate: impl FnMut(DeviceRect)) {
     self
       .cache
       .end_frame(self.config.label)
-      .for_each(|h| release_handle!(self, h));
-    self
-      .islands
-      .drain(..)
-      .for_each(|h| release_handle!(self, h))
+      .chain(self.islands.drain(..))
+      .for_each(|h| match h.atlas_dist {
+        AtlasDist::Atlas(alloc) => {
+          on_deallocate(alloc.rectangle.to_rect().cast_unit());
+          self.atlas_allocator.deallocate(alloc.id);
+        }
+        AtlasDist::Extra(id) => {
+          self.extras.remove(id);
+        }
+      });
   }
 }
 

@@ -10,9 +10,11 @@ use ribir_painter::{image::ColorFormat, Color, PixelImage, VertexBuffers};
 
 use self::{
   draw_alpha_triangles_pass::DrawAlphaTrianglesPass,
-  draw_color_triangles_pass::DrawColorTrianglesPass, draw_img_triangles_pass::DrawImgTrianglesPass,
+  draw_color_triangles_pass::DrawColorTrianglesPass,
+  draw_img_triangles_pass::DrawImgTrianglesPass,
   draw_linear_gradient_pass::DrawLinearGradientTrianglesPass,
-  draw_radial_gradient_pass::DrawRadialGradientTrianglesPass, draw_texture_pass::DrawTexturePass,
+  draw_radial_gradient_pass::DrawRadialGradientTrianglesPass,
+  texture_pass::{ClearTexturePass, CopyTexturePass},
   uniform::Uniform,
 };
 use crate::{
@@ -20,7 +22,7 @@ use crate::{
   ImagePrimIndex, ImgPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer,
   RadialGradientPrimIndex, RadialGradientPrimitive,
 };
-mod buffer_pool;
+mod shaders;
 mod uniform;
 mod vertex_buffer;
 
@@ -29,14 +31,9 @@ mod draw_color_triangles_pass;
 mod draw_img_triangles_pass;
 mod draw_linear_gradient_pass;
 mod draw_radial_gradient_pass;
-mod draw_texture_pass;
+mod texture_pass;
 
 pub const TEX_PER_DRAW: usize = 8;
-const MAX_IMG_PRIMS: usize = 1024;
-const MAX_RADIAL_GRADIENT_PRIMS: usize = 512;
-const MAX_LINEAR_GRADIENT_PRIMS: usize = 512;
-const MAX_GRADIENT_STOP_PRIMS: usize = 512;
-const MAX_MASK_LAYERS: usize = (64 << 10) / size_of::<MaskLayer>(); // around 64KB
 
 pub struct WgpuImpl {
   device: wgpu::Device,
@@ -46,8 +43,9 @@ pub struct WgpuImpl {
   command_buffers: Vec<wgpu::CommandBuffer>,
 
   sampler: wgpu::Sampler,
-  draw_tex_pass: DrawTexturePass,
+  clear_tex_pass: ClearTexturePass,
   alpha_triangles_pass: DrawAlphaTrianglesPass,
+  copy_tex_pass: Option<CopyTexturePass>,
   color_triangles_pass: Option<DrawColorTrianglesPass>,
   img_triangles_pass: Option<DrawImgTrianglesPass>,
   radial_gradient_pass: Option<DrawRadialGradientTrianglesPass>,
@@ -76,6 +74,7 @@ macro_rules! color_pass {
           &$backend.device,
           $backend.mask_layers_uniform.layout(),
           &$backend.texs_layout,
+          $backend.limits.max_mask_layers,
         )
       })
   };
@@ -90,6 +89,7 @@ macro_rules! img_pass {
           &$backend.device,
           $backend.mask_layers_uniform.layout(),
           &$backend.texs_layout,
+          &$backend.limits,
         )
       })
   };
@@ -104,6 +104,7 @@ macro_rules! radial_gradient_pass {
           &$backend.device,
           $backend.mask_layers_uniform.layout(),
           &$backend.texs_layout,
+          &$backend.limits,
         )
       })
   };
@@ -118,6 +119,7 @@ macro_rules! linear_gradient_pass {
           &$backend.device,
           $backend.mask_layers_uniform.layout(),
           &$backend.texs_layout,
+          &$backend.limits,
         )
       })
   };
@@ -138,10 +140,6 @@ impl GPUBackendImpl for WgpuImpl {
 
   fn begin_frame(&mut self) {
     if self.command_encoder.is_none() {
-      let encoder = self
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Frame Encoder") });
-      self.command_encoder = Some(encoder);
       #[cfg(debug_assertions)]
       self.start_capture();
     }
@@ -176,7 +174,7 @@ impl GPUBackendImpl for WgpuImpl {
       Some(textures_bind(&self.device, &self.sampler, &self.texs_layout, textures));
   }
 
-  fn load_alpha_vertices(&mut self, buffers: &VertexBuffers<f32>) {
+  fn load_alpha_vertices(&mut self, buffers: &VertexBuffers<()>) {
     self
       .alpha_triangles_pass
       .load_alpha_vertices(buffers, &self.device, &self.queue);
@@ -228,7 +226,7 @@ impl GPUBackendImpl for WgpuImpl {
     let encoder = command_encoder!(self);
     self
       .alpha_triangles_pass
-      .draw_alpha_triangles(indices, texture, None, encoder);
+      .draw_alpha_triangles(indices, texture, None, &self.queue, encoder);
   }
 
   fn draw_radial_gradient_triangles(
@@ -271,9 +269,13 @@ impl GPUBackendImpl for WgpuImpl {
     &mut self, indices: &Range<u32>, texture: &mut Self::Texture, scissor: DeviceRect,
   ) {
     let encoder = command_encoder!(self);
-    self
-      .alpha_triangles_pass
-      .draw_alpha_triangles(indices, texture, Some(scissor), encoder);
+    self.alpha_triangles_pass.draw_alpha_triangles(
+      indices,
+      texture,
+      Some(scissor),
+      &self.queue,
+      encoder,
+    );
   }
 
   fn draw_color_triangles(
@@ -524,6 +526,10 @@ impl Texture for WgpuTexture {
   }
 
   fn size(&self) -> DeviceSize { self.size() }
+
+  fn clear_areas(&mut self, areas: &[DeviceRect], backend: &mut Self::Host) {
+    backend.clear_tex_areas(areas, self);
+  }
 }
 
 impl WgpuImpl {
@@ -571,7 +577,11 @@ impl WgpuImpl {
 
     let (device, queue) = adapter
       .request_device(
-        &wgpu::DeviceDescriptor { required_limits: adapter.limits(), ..Default::default() },
+        &wgpu::DeviceDescriptor {
+          required_limits: adapter.limits(),
+          required_features: wgpu::Features::CLEAR_TEXTURE,
+          ..Default::default()
+        },
         None,
       )
       .await
@@ -590,33 +600,30 @@ impl WgpuImpl {
       ..Default::default()
     });
 
-    let draw_tex_pass = DrawTexturePass::new(&device);
     let alpha_triangles_pass = DrawAlphaTrianglesPass::new(&device);
 
     let limits = device.limits();
-    let max_uniform_bytes = limits.max_uniform_buffer_binding_size as usize;
-    assert!(max_uniform_bytes >= size_of::<MaskLayer>() * MAX_MASK_LAYERS);
-    assert!(max_uniform_bytes >= size_of::<ImgPrimitive>() * MAX_IMG_PRIMS);
-    assert!(max_uniform_bytes >= size_of::<RadialGradientPrimitive>() * MAX_RADIAL_GRADIENT_PRIMS);
-    assert!(max_uniform_bytes >= size_of::<LinearGradientPrimitive>() * MAX_LINEAR_GRADIENT_PRIMS);
-    assert!(max_uniform_bytes >= size_of::<GradientStopPrimitive>() * MAX_GRADIENT_STOP_PRIMS);
-
+    let uniform_bytes = limits
+      .max_uniform_buffer_binding_size
+      .min(1024 * 1024) as usize;
     let texture_size_limit = DeviceSize::new(
       limits.max_texture_dimension_2d as i32,
       limits.max_texture_dimension_2d as i32,
     );
 
     let limits = DrawPhaseLimits {
+      max_tex_load: TEX_PER_DRAW,
       texture_size: texture_size_limit,
-      max_tex_load: 8,
-      max_image_primitives: MAX_IMG_PRIMS,
-      max_radial_gradient_primitives: MAX_RADIAL_GRADIENT_PRIMS,
-      max_linear_gradient_primitives: MAX_LINEAR_GRADIENT_PRIMS,
-      max_gradient_stop_primitives: MAX_GRADIENT_STOP_PRIMS,
-      max_mask_layers: MAX_MASK_LAYERS,
+      max_image_primitives: uniform_bytes / size_of::<ImgPrimitive>(),
+      max_radial_gradient_primitives: uniform_bytes / size_of::<RadialGradientPrimitive>(),
+      max_linear_gradient_primitives: uniform_bytes / size_of::<LinearGradientPrimitive>(),
+      max_gradient_stop_primitives: uniform_bytes / size_of::<GradientStopPrimitive>(),
+      max_mask_layers: uniform_bytes / size_of::<MaskLayer>(),
     };
 
-    let mask_layers_uniform = Uniform::new(&device, wgpu::ShaderStages::FRAGMENT, MAX_MASK_LAYERS);
+    let mask_layers_uniform =
+      Uniform::new(&device, wgpu::ShaderStages::FRAGMENT, limits.max_mask_layers);
+    let clear_tex_pass = ClearTexturePass::new(&device);
     let texs_layout = textures_layout(&device);
     let gpu_impl = WgpuImpl {
       device,
@@ -624,8 +631,9 @@ impl WgpuImpl {
       command_encoder: None,
       command_buffers: vec![],
       sampler,
-      draw_tex_pass,
       alpha_triangles_pass,
+      clear_tex_pass,
+      copy_tex_pass: None,
       color_triangles_pass: None,
       img_triangles_pass: None,
       radial_gradient_pass: None,
@@ -668,15 +676,10 @@ impl WgpuImpl {
 
   pub fn device(&self) -> &wgpu::Device { &self.device }
 
-  pub(crate) fn submit(&mut self) {
-    if let Some(encoder) = self.command_encoder.take() {
-      self.command_buffers.push(encoder.finish());
-    }
+  fn submit(&mut self) {
+    self.finish_command();
     if !self.command_buffers.is_empty() {
-      self.draw_tex_pass.submit(&self.queue);
       self.queue.submit(self.command_buffers.drain(..));
-    } else {
-      self.draw_tex_pass.clear();
     }
   }
 
@@ -710,6 +713,12 @@ impl WgpuImpl {
       },
       copy_size,
     );
+  }
+
+  pub(crate) fn finish_command(&mut self) {
+    if let Some(encoder) = self.command_encoder.take() {
+      self.command_buffers.push(encoder.finish());
+    }
   }
 }
 

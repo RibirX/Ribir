@@ -55,6 +55,8 @@ struct ClipLayer {
 /// Texture use to display.
 pub trait Texture {
   type Host;
+  /// clear a list of areas in the texture with zero.
+  fn clear_areas(&mut self, areas: &[DeviceRect], backend: &mut Self::Host);
 
   /// write data to the texture.
   fn write_data(&mut self, dist: &DeviceRect, data: &[u8], host: &mut Self::Host);
@@ -171,7 +173,7 @@ where
           let color = color.into_components();
           let color_attr = ColorAttr { color, mask_head };
           let buffer = &mut self.color_vertices_buffer;
-          add_draw_rect_vertices(rect, output_tex_size, color_attr, buffer);
+          add_rect_vertices(rect, output_tex_size, color_attr, buffer);
           self.current_phase = CurrentPhase::Color;
         }
       }
@@ -193,7 +195,7 @@ where
           };
           self.img_prims.push(prim);
           let buffer = &mut self.img_vertices_buffer;
-          add_draw_rect_vertices(rect, output_tex_size, ImagePrimIndex(prim_idx), buffer);
+          add_rect_vertices(rect, output_tex_size, ImagePrimIndex(prim_idx), buffer);
           self.current_phase = CurrentPhase::Img;
         }
       }
@@ -221,7 +223,7 @@ where
           self.radial_gradient_prims.push(prim);
           let buffer = &mut self.radial_gradient_vertices_buffer;
 
-          add_draw_rect_vertices(rect, output_tex_size, RadialGradientPrimIndex(prim_idx), buffer);
+          add_rect_vertices(rect, output_tex_size, RadialGradientPrimIndex(prim_idx), buffer);
           self.current_phase = CurrentPhase::RadialGradient;
         }
       }
@@ -246,7 +248,7 @@ where
           let prim_idx = self.linear_gradient_prims.len() as u32;
           self.linear_gradient_prims.push(prim);
           let buffer = &mut self.linear_gradient_vertices_buffer;
-          add_draw_rect_vertices(rect, output_tex_size, LinearGradientPrimIndex(prim_idx), buffer);
+          add_rect_vertices(rect, output_tex_size, LinearGradientPrimIndex(prim_idx), buffer);
           self.current_phase = CurrentPhase::LinearGradient;
         }
       }
@@ -472,7 +474,7 @@ pub fn vertices_coord(pos: Point, tex_size: DeviceSize) -> [f32; 2] {
   [pos.x / tex_size.width as f32, pos.y / tex_size.height as f32]
 }
 
-pub fn add_draw_rect_vertices<Attr: Copy>(
+pub fn add_rect_vertices<Attr: Copy>(
   [lt, rt, rb, lb]: [Point; 4], tex_size: DeviceSize, attr: Attr, buffer: &mut VertexBuffers<Attr>,
 ) {
   let VertexBuffers { vertices, indices } = buffer;

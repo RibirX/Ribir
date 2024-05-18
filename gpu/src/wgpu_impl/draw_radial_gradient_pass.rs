@@ -1,14 +1,11 @@
 use std::{mem::size_of, ops::Range};
 
 use ribir_painter::{Color, Vertex, VertexBuffers};
-use wgpu::include_wgsl;
 
-use super::{
-  uniform::Uniform, vertex_buffer::VerticesBuffer, MAX_GRADIENT_STOP_PRIMS,
-  MAX_RADIAL_GRADIENT_PRIMS,
-};
+use super::{shaders::radial_gradient_shader, uniform::Uniform, vertex_buffer::VerticesBuffer};
 use crate::{
-  GradientStopPrimitive, MaskLayer, RadialGradientPrimIndex, RadialGradientPrimitive, WgpuTexture,
+  DrawPhaseLimits, GradientStopPrimitive, MaskLayer, RadialGradientPrimIndex,
+  RadialGradientPrimitive, WgpuTexture,
 };
 
 pub struct DrawRadialGradientTrianglesPass {
@@ -23,21 +20,25 @@ pub struct DrawRadialGradientTrianglesPass {
 
 impl DrawRadialGradientTrianglesPass {
   pub fn new(
-    device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout, texs_layout: &wgpu::BindGroupLayout,
+    device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout,
+    texs_layout: &wgpu::BindGroupLayout, limits: &DrawPhaseLimits,
   ) -> Self {
     let vertices_buffer = VerticesBuffer::new(512, 1024, device);
-    let shader =
-      device.create_shader_module(include_wgsl!("./shaders/radial_gradient_triangles.wgsl"));
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+      label: Some("Radial gradient triangles shader"),
+      source: wgpu::ShaderSource::Wgsl(radial_gradient_shader(limits).into()),
+    });
     let prims_storage =
-      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, MAX_RADIAL_GRADIENT_PRIMS);
-    let stops_storage = Uniform::new(device, wgpu::ShaderStages::FRAGMENT, MAX_GRADIENT_STOP_PRIMS);
+      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, limits.max_radial_gradient_primitives);
+    let stops_storage =
+      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, limits.max_gradient_stop_primitives);
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("update triangles pipeline layout"),
       bind_group_layouts: &[
         mask_layout,
-        stops_storage.layout(),
-        prims_storage.layout(),
         texs_layout,
+        prims_storage.layout(),
+        stops_storage.layout(),
       ],
       push_constant_ranges: &[],
     });
@@ -92,9 +93,9 @@ impl DrawRadialGradientTrianglesPass {
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
     rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
     rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
-    rpass.set_bind_group(1, self.stops_uniform.bind_group(), &[]);
+    rpass.set_bind_group(1, textures_bind, &[]);
     rpass.set_bind_group(2, self.prims_uniform.bind_group(), &[]);
-    rpass.set_bind_group(3, textures_bind, &[]);
+    rpass.set_bind_group(3, self.stops_uniform.bind_group(), &[]);
 
     rpass.set_pipeline(pipeline);
     rpass.draw_indexed(indices, 0, 0..1);

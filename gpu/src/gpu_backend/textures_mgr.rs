@@ -7,7 +7,7 @@ use std::{
 use guillotiere::euclid::SideOffsets2D;
 use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use ribir_algo::Resource;
-use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize, Point, Transform};
+use ribir_geom::{DevicePoint, DeviceRect, DeviceSize, Point, Transform};
 use ribir_painter::{
   image::ColorFormat, PaintPath, Path, PathSegment, PixelImage, Vertex, VertexBuffers,
 };
@@ -16,7 +16,7 @@ use super::{
   atlas::{Atlas, AtlasConfig, AtlasHandle},
   Texture,
 };
-use crate::{add_draw_rect_vertices, GPUBackendImpl};
+use crate::GPUBackendImpl;
 const TOLERANCE: f32 = 0.1_f32;
 const PAR_CHUNKS_SIZE: usize = 64;
 
@@ -30,7 +30,8 @@ pub(super) struct TexturesMgr<T: Texture> {
   alpha_atlas: Atlas<T, PathKey, f32>,
   rgba_atlas: Atlas<T, Resource<PixelImage>, ()>,
   fill_task: Vec<FillTask>,
-  fill_task_buffers: VertexBuffers<f32>,
+  fill_task_buffers: VertexBuffers<()>,
+  need_clear_areas: Vec<DeviceRect>,
 }
 
 struct FillTask {
@@ -66,16 +67,20 @@ macro_rules! id_to_texture {
 }
 
 fn get_prefer_scale(transform: &Transform, size: DeviceSize, max_size: DeviceSize) -> f32 {
-  // 2 * BLANK_EDGE is the blank edge for each side.
-  let max_width = (max_size.width - 2 * BLANK_EDGE) as f32;
-  let max_height = (max_size.height - 2 * BLANK_EDGE) as f32;
-
-  let max_scale = (max_width / size.width as f32).min(max_height / size.height as f32);
-
   let Transform { m11, m12, m21, m22, .. } = *transform;
-  (m11.abs() + m12.abs())
-    .max(m21.abs() + m22.abs())
-    .min(max_scale)
+  let scale = (m11.abs() + m12.abs()).max(m21.abs() + m22.abs());
+
+  let dis = size.width.max(size.height) as f32;
+  if dis * scale < 32. {
+    // If the path is too small, set a minimum tessellation size of 32 pixels.
+    32. / dis
+  } else {
+    // 2 * BLANK_EDGE is the blank edge for each side.
+    let max_width = (max_size.width - 2 * BLANK_EDGE) as f32;
+    let max_height = (max_size.height - 2 * BLANK_EDGE) as f32;
+    let max_scale = (max_width / size.width as f32).min(max_height / size.height as f32);
+    scale.min(max_scale)
+  }
 }
 
 impl<T: Texture> TexturesMgr<T>
@@ -83,7 +88,8 @@ where
   T::Host: GPUBackendImpl<Texture = T>,
 {
   pub(super) fn new(gpu_impl: &mut T::Host) -> Self {
-    let max_size = gpu_impl.limits().texture_size;
+    let limits = gpu_impl.limits();
+    let max_size = limits.texture_size;
 
     Self {
       alpha_atlas: Atlas::new(
@@ -98,6 +104,7 @@ where
       ),
       fill_task: <_>::default(),
       fill_task_buffers: <_>::default(),
+      need_clear_areas: vec![],
     }
   }
 
@@ -113,9 +120,8 @@ where
     fn cache_to_view_matrix(
       path: &Path, path_ts: &Transform, slice_origin: DevicePoint, cache_scale: f32,
     ) -> Transform {
-      // scale origin to the cached path, and aligned the pixel, let the view get an
-      // integer pixel mask as much as possible.
-      let aligned_origin = (path.bounds().origin * cache_scale).round();
+      // scale origin to the cached path
+      let aligned_origin = path.bounds().origin * cache_scale;
 
       // back to slice origin
       Transform::translation(-slice_origin.x as f32, -slice_origin.y as f32)
@@ -232,29 +238,32 @@ where
   pub(super) fn texture(&self, tex_id: TextureID) -> &T { id_to_texture!(self, tex_id) }
 
   fn fill_tess(
-    path: &Path, ts: &Transform, tex_size: DeviceSize, slice_bounds: &DeviceRect,
-    buffer: &mut VertexBuffers<f32>, max_size: DeviceSize,
+    path: &Path, ts: &Transform, tex_size: DeviceSize, buffer: &mut VertexBuffers<()>,
+    max_size: DeviceSize,
   ) -> Range<u32> {
     let start = buffer.indices.len() as u32;
-
-    let rect = rect_corners(&slice_bounds.to_f32().cast_unit());
-    add_draw_rect_vertices(rect, tex_size, 0., buffer);
-
-    let tex_width = tex_size.width as f32;
-    let tex_height = tex_size.height as f32;
 
     let scale = get_prefer_scale(ts, tex_size, max_size);
 
     path.tessellate(TOLERANCE / scale, buffer, |pos| {
       let pos = ts.transform_point(pos);
-      Vertex::new([pos.x / tex_width, pos.y / tex_height], 1.)
+      Vertex::new([pos.x, pos.y], ())
     });
     start..buffer.indices.len() as u32
   }
 
-  pub(crate) fn draw_alpha_textures<G: GPUBackendImpl<Texture = T>>(&mut self, gpu_impl: &mut G) {
+  pub(crate) fn draw_alpha_textures<G: GPUBackendImpl<Texture = T>>(&mut self, gpu_impl: &mut G)
+  where
+    T: Texture<Host = G>,
+  {
     if self.fill_task.is_empty() {
       return;
+    }
+
+    if !self.need_clear_areas.is_empty() {
+      let tex = self.alpha_atlas.get_texture_mut(0);
+      tex.clear_areas(&self.need_clear_areas, gpu_impl);
+      self.need_clear_areas.clear();
     }
 
     self.fill_task.sort_by(|a, b| {
@@ -274,11 +283,11 @@ where
       for f in self.fill_task.iter() {
         let FillTask { slice, path, clip_rect, ts } = f;
         let texture = id_to_texture!(self, slice.tex_id);
+
         let rg = Self::fill_tess(
           path,
           ts,
           texture.size(),
-          &slice.rect,
           &mut self.fill_task_buffers,
           self.alpha_atlas.max_size(),
         );
@@ -289,7 +298,7 @@ where
       for f in self.fill_task.iter() {
         let FillTask { slice, path, clip_rect, ts } = f;
         let texture = id_to_texture!(self, slice.tex_id);
-        tasks.push((slice, ts, texture.size(), slice.rect, path, clip_rect));
+        tasks.push((slice, ts, texture.size(), path, clip_rect));
       }
       let max_size = self.alpha_atlas.max_size();
       let par_tess_res = tasks
@@ -297,8 +306,8 @@ where
         .map(|tasks| {
           let mut buffer = VertexBuffers::default();
           let mut indices = Vec::with_capacity(tasks.len());
-          for (slice, ts, tex_size, slice_bounds, path, clip_rect) in tasks.iter() {
-            let rg = Self::fill_tess(path, ts, *tex_size, slice_bounds, &mut buffer, max_size);
+          for (slice, ts, tex_size, path, clip_rect) in tasks.iter() {
+            let rg = Self::fill_tess(path, ts, *tex_size, &mut buffer, max_size);
             indices.push((slice.tex_id, rg, *clip_rect));
           }
           (indices, buffer)
@@ -365,7 +374,9 @@ where
   }
 
   pub(crate) fn end_frame(&mut self) {
-    self.alpha_atlas.end_frame();
+    self.alpha_atlas.end_frame_with(|rect| {
+      self.need_clear_areas.push(rect);
+    });
     self.rgba_atlas.end_frame();
   }
 }
