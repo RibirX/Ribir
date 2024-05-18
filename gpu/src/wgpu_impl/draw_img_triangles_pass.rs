@@ -1,10 +1,9 @@
 use std::{mem::size_of, ops::Range};
 
 use ribir_painter::{Color, Vertex, VertexBuffers};
-use wgpu::include_wgsl;
 
-use super::{uniform::Uniform, vertex_buffer::VerticesBuffer, MAX_IMG_PRIMS};
-use crate::{ImagePrimIndex, ImgPrimitive, MaskLayer, WgpuTexture};
+use super::{shaders::img_triangles_shader, uniform::Uniform, vertex_buffer::VerticesBuffer};
+use crate::{DrawPhaseLimits, ImagePrimIndex, ImgPrimitive, MaskLayer, WgpuTexture};
 
 pub struct DrawImgTrianglesPass {
   vertices_buffer: VerticesBuffer<ImagePrimIndex>,
@@ -17,17 +16,22 @@ pub struct DrawImgTrianglesPass {
 
 impl DrawImgTrianglesPass {
   pub fn new(
-    device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout, texs_layout: &wgpu::BindGroupLayout,
+    device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout,
+    texs_layout: &wgpu::BindGroupLayout, limits: &DrawPhaseLimits,
   ) -> Self {
-    let prims_storage = Uniform::new(device, wgpu::ShaderStages::FRAGMENT, MAX_IMG_PRIMS);
+    let prims_storage =
+      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, limits.max_image_primitives);
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Image pipeline layout"),
-      bind_group_layouts: &[mask_layout, prims_storage.layout(), texs_layout],
+      bind_group_layouts: &[mask_layout, texs_layout, prims_storage.layout()],
       push_constant_ranges: &[],
     });
 
     let vertices_buffer = VerticesBuffer::new(128, 512, device);
-    let shader = device.create_shader_module(include_wgsl!("./shaders/img_triangles.wgsl"));
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+      label: Some("Image triangles shader"),
+      source: wgpu::ShaderSource::Wgsl(img_triangles_shader(limits).into()),
+    });
 
     Self {
       vertices_buffer,
@@ -71,8 +75,8 @@ impl DrawImgTrianglesPass {
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
     rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
     rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
-    rpass.set_bind_group(1, self.prims_uniform.bind_group(), &[]);
-    rpass.set_bind_group(2, textures_bind, &[]);
+    rpass.set_bind_group(1, textures_bind, &[]);
+    rpass.set_bind_group(2, self.prims_uniform.bind_group(), &[]);
 
     rpass.set_pipeline(pipeline);
     rpass.draw_indexed(indices, 0, 0..1);

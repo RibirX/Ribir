@@ -89,7 +89,7 @@ pub trait GPUBackendImpl {
   fn new_texture(&mut self, size: DeviceSize, format: ColorFormat) -> Self::Texture;
   /// Load the vertices and indices buffer that `draw_alpha_triangles` &
   /// `draw_alpha_triangles_with_scissor` will use.
-  fn load_alpha_vertices(&mut self, buffers: &VertexBuffers<f32>);
+  fn load_alpha_vertices(&mut self, buffers: &VertexBuffers<()>);
   /// Draw triangles only alpha channel with 1.0. Caller guarantee the texture
   /// format is `ColorFormat::Alpha8`, caller will try to batch as much as
   /// possible, but also possibly call multi times in a frame.

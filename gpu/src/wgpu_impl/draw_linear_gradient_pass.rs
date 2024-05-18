@@ -1,14 +1,11 @@
 use std::{mem::size_of, ops::Range};
 
 use ribir_painter::{Color, Vertex, VertexBuffers};
-use wgpu::include_wgsl;
 
-use super::{
-  uniform::Uniform, vertex_buffer::VerticesBuffer, MAX_GRADIENT_STOP_PRIMS,
-  MAX_LINEAR_GRADIENT_PRIMS,
-};
+use super::{shaders::linear_gradient_shader, uniform::Uniform, vertex_buffer::VerticesBuffer};
 use crate::{
-  GradientStopPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, WgpuTexture,
+  DrawPhaseLimits, GradientStopPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive,
+  MaskLayer, WgpuTexture,
 };
 
 pub struct DrawLinearGradientTrianglesPass {
@@ -23,21 +20,26 @@ pub struct DrawLinearGradientTrianglesPass {
 
 impl DrawLinearGradientTrianglesPass {
   pub fn new(
-    device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout, texs_layout: &wgpu::BindGroupLayout,
+    device: &wgpu::Device, mask_layout: &wgpu::BindGroupLayout,
+    texs_layout: &wgpu::BindGroupLayout, limits: &DrawPhaseLimits,
   ) -> Self {
     let vertices_buffer = VerticesBuffer::new(512, 1024, device);
-    let shader =
-      device.create_shader_module(include_wgsl!("./shaders/linear_gradient_triangles.wgsl"));
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+      label: Some("Linear gradient triangles shader"),
+      source: wgpu::ShaderSource::Wgsl(linear_gradient_shader(limits).into()),
+    });
+
     let prims_uniform =
-      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, MAX_LINEAR_GRADIENT_PRIMS);
-    let stops_unifrom = Uniform::new(device, wgpu::ShaderStages::FRAGMENT, MAX_GRADIENT_STOP_PRIMS);
+      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, limits.max_linear_gradient_primitives);
+    let stops_unifrom =
+      Uniform::new(device, wgpu::ShaderStages::FRAGMENT, limits.max_gradient_stop_primitives);
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("update triangles pipeline layout"),
       bind_group_layouts: &[
         mask_layout,
-        stops_unifrom.layout(),
-        prims_uniform.layout(),
         texs_layout,
+        prims_uniform.layout(),
+        stops_unifrom.layout(),
       ],
       push_constant_ranges: &[],
     });
@@ -75,7 +77,7 @@ impl DrawLinearGradientTrianglesPass {
   pub fn draw_triangles(
     &mut self, texture: &WgpuTexture, indices: Range<u32>, clear: Option<Color>,
     device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, textures_bind: &wgpu::BindGroup,
-    mask_layer_storage: &Uniform<MaskLayer>,
+    mask_layer_uniform: &Uniform<MaskLayer>,
   ) {
     self.update(texture.format(), device);
     let pipeline = self.pipeline.as_ref().unwrap();
@@ -91,10 +93,10 @@ impl DrawLinearGradientTrianglesPass {
 
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
     rpass.set_index_buffer(self.vertices_buffer.indices().slice(..), wgpu::IndexFormat::Uint32);
-    rpass.set_bind_group(0, mask_layer_storage.bind_group(), &[]);
-    rpass.set_bind_group(1, self.stops_uniform.bind_group(), &[]);
+    rpass.set_bind_group(0, mask_layer_uniform.bind_group(), &[]);
+    rpass.set_bind_group(1, textures_bind, &[]);
     rpass.set_bind_group(2, self.prims_uniform.bind_group(), &[]);
-    rpass.set_bind_group(3, textures_bind, &[]);
+    rpass.set_bind_group(3, self.stops_uniform.bind_group(), &[]);
 
     rpass.set_pipeline(pipeline);
     rpass.draw_indexed(indices, 0, 0..1);
