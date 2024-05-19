@@ -212,6 +212,7 @@ macro_rules! widget_layout_test {
 /// file, for example ```
 /// RIBIR_IMG_TEST=overwrite cargo test -- smoke
 /// ```
+#[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
 macro_rules! widget_image_test {
   ($widget_fn:ident, wnd_size = $size:expr $(,comparison = $comparison:expr)?) => {

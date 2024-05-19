@@ -17,6 +17,7 @@ use ribir_painter::{image::ColorFormat, PixelImage};
 /// You can run the test with `RIBIR_IMG_TEST=overwrite` to overwrite the image
 /// file, for example ```
 /// RIBIR_IMG_TEST=overwrite cargo test -- smoke
+#[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
 macro_rules! painter_backend_eq_image_test {
   ($painter_fn:ident $(, comparison = $comparison:expr)?) => {
@@ -48,12 +49,14 @@ macro_rules! test_case_name {
   }};
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub struct ImageTest<'a> {
   test_img: PixelImage,
   ref_path: &'a std::path::Path,
   comparison: f32,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl<'a> ImageTest<'a> {
   pub fn new(test_img: PixelImage, ref_path: &'a std::path::Path) -> Self {
     Self { test_img, ref_path, comparison: 0.000001 }
@@ -138,6 +141,7 @@ impl<'a> ImageTest<'a> {
   }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[track_caller]
 pub fn assert_texture_eq_png(test_img: PixelImage, ref_path: &std::path::Path) {
   ImageTest::new(test_img, ref_path).test();

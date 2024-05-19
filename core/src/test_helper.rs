@@ -3,6 +3,14 @@ use std::{
   sync::atomic::{AtomicU64, Ordering},
 };
 
+#[cfg(test)]
+#[cfg(target_family = "wasm")]
+pub use wasm_bindgen_test::wasm_bindgen_test;
+
+#[cfg(test)]
+#[cfg(target_family = "wasm")]
+wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+
 pub use crate::timer::Timer;
 use crate::{
   prelude::*,

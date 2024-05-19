@@ -220,6 +220,8 @@ impl Default for WidgetTree {
 #[cfg(test)]
 mod tests {
   use super::*;
+  #[cfg(target_arch = "wasm32")]
+  use crate::test_helper::wasm_bindgen_test;
   use crate::{
     reset_test_env,
     test_helper::{MockBox, MockMulti, TestWindow},
@@ -231,6 +233,7 @@ mod tests {
 
   fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn fix_relayout_incorrect_clamp() {
     reset_test_env!();
@@ -325,6 +328,8 @@ mod tests {
     // generator lifetime should bind to its generator widget instead of parent.
     wnd.draw_frame();
   }
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn drop_info_clear() {
     reset_test_env!();
@@ -354,6 +359,7 @@ mod tests {
     assert_eq!(tree.layout_list(), Some(vec![new_root]));
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn perf_silent_ref_should_not_dirty_expr_widget() {
     reset_test_env!();
@@ -383,6 +389,7 @@ mod tests {
     assert!(!tree.is_dirty())
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn draw_clip() {
     reset_test_env!();

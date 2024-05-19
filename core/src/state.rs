@@ -503,6 +503,8 @@ mod tests {
   use ribir_algo::Sc;
 
   use super::*;
+  #[cfg(target_arch = "wasm32")]
+  use crate::test_helper::wasm_bindgen_test;
   use crate::{reset_test_env, timer::Timer};
 
   struct Origin {
@@ -510,6 +512,7 @@ mod tests {
     b: i32,
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn map_same_with_origin() {
     reset_test_env!();
@@ -545,6 +548,7 @@ mod tests {
     assert_eq!(track_map.get(), 2);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn split_not_notify_origin() {
     reset_test_env!();
@@ -588,6 +592,7 @@ mod tests {
     }
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn state_writer_compose_builder() {
     reset_test_env!();
@@ -622,6 +627,7 @@ mod tests {
     }
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn state_writer_compose_child_builder() {
     reset_test_env!();
@@ -676,6 +682,7 @@ mod tests {
     };
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn state_reader_builder() {
     reset_test_env!();

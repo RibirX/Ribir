@@ -1058,6 +1058,7 @@ mod tests {
     test_helper::*,
   };
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn pipe_widget_as_root() {
     reset_test_env!();
@@ -1089,6 +1090,7 @@ mod tests {
     assert_eq!(ids[1], new_ids[1]);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn expr_widget_with_declare_child() {
     reset_test_env!();
@@ -1126,6 +1128,7 @@ mod tests {
     assert_eq!(ids[2], new_ids[2]);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn attach_data_to_pipe_widget() {
     reset_test_env!();
@@ -1161,6 +1164,7 @@ mod tests {
     );
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn pipe_widget_mounted_new() {
     reset_test_env!();
@@ -1204,6 +1208,7 @@ mod tests {
     assert_eq!(*c_drop_cnt.read(), 7);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn pipe_widget_in_pipe() {
     reset_test_env!();
@@ -1251,6 +1256,7 @@ mod tests {
     assert_eq!(*mnt_cnt2.read(), 6);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn pipe_widgets_with_key() {
     reset_test_env!();
@@ -1377,6 +1383,7 @@ mod tests {
     update_list.write().clear();
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn delay_drop_widgets() {
     reset_test_env!();
@@ -1504,6 +1511,7 @@ mod tests {
     assert_eq!(removed[1].read().layout_cnt.get(), second_layout_cnt + 1,);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn remove_delay_drop_widgets() {
     reset_test_env!();
@@ -1560,6 +1568,7 @@ mod tests {
     assert!(grandson_id.is_dropped(&tree_arena(&wnd)));
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn value_pipe() {
     reset_test_env!();
@@ -1619,6 +1628,7 @@ mod tests {
     assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(4., 1.), });
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn multi_pipe_gen_pipe_parent_pipe_only() {
     reset_test_env!();
@@ -1683,6 +1693,7 @@ mod tests {
     assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(1., 1.), });
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn single_pipe_gen_parent_pipe_only() {
     reset_test_env!();
@@ -1715,6 +1726,7 @@ mod tests {
     assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(1., 1.), });
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn parent_pipe_only_gen_single_pipe() {
     reset_test_env!();
@@ -1782,6 +1794,7 @@ mod tests {
     assert_eq!(*c_hit_count.read(), 3);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn two_pipe_gen_same_render_widget() {
     reset_test_env!();
@@ -1815,6 +1828,7 @@ mod tests {
     wnd.draw_frame();
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn multi_pipe_gen_pipe_in_order() {
     reset_test_env!();

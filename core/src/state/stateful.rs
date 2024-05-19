@@ -318,6 +318,7 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn smoke() {
     crate::reset_test_env!();
@@ -331,6 +332,7 @@ mod tests {
     assert_eq!(stateful.read().size, Size::new(100., 100.));
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn unsubscribe_when_not_writer() {
     crate::reset_test_env!();
@@ -381,6 +383,7 @@ mod tests {
     assert_eq!(*drop_cnt.borrow(), 3);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn state_notify_and_relayout() {
     crate::reset_test_env!();
@@ -419,6 +422,7 @@ mod tests {
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn fix_pin_widget_node() {
     crate::reset_test_env!();
@@ -435,6 +439,7 @@ mod tests {
     );
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn change_notify() {
     crate::reset_test_env!();
@@ -479,6 +484,7 @@ mod tests {
     assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH, ModifyScope::DATA]);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn render_only_hold_data() {
     crate::reset_test_env!();
@@ -493,6 +499,7 @@ mod tests {
     assert_eq!(v.info.ref_count(), 1);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn pipe_only_hold_data() {
     crate::reset_test_env!();
@@ -508,6 +515,7 @@ mod tests {
     assert_eq!(v.info.ref_count(), 1);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn watch_only_hold_data() {
     crate::reset_test_env!();
@@ -522,9 +530,11 @@ mod tests {
     assert_eq!(v.info.ref_count(), 1);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn render_in_downstream_no_circle() {}
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn writer_in_downstream_unsubscribe() {
     crate::reset_test_env!();
