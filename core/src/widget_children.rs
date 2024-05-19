@@ -184,6 +184,7 @@ mod tests {
   use super::*;
   use crate::{reset_test_env, test_helper::*};
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn compose_template_child() {
     reset_test_env!();
@@ -220,6 +221,7 @@ mod tests {
     };
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn compose_option_child() {
     reset_test_env!();
@@ -243,7 +245,7 @@ mod tests {
       }
     };
   }
-
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn compose_option_dyn_parent() {
     reset_test_env!();
@@ -254,6 +256,7 @@ mod tests {
     };
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn tuple_as_vec() {
     reset_test_env!();
@@ -279,6 +282,7 @@ mod tests {
     };
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn expr_with_child() {
     reset_test_env!();
@@ -320,6 +324,7 @@ mod tests {
     };
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn compose_expr_option_widget() {
     reset_test_env!();
@@ -332,6 +337,7 @@ mod tests {
     };
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn pair_to_pair() {
     reset_test_env!();
@@ -353,7 +359,7 @@ mod tests {
       @P { @X { @Void {} } }
     };
   }
-
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn fix_multi_fill_for_pair() {
     reset_test_env!();

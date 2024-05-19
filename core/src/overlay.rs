@@ -311,6 +311,7 @@ mod tests {
 
   use crate::{prelude::*, reset_test_env, test_helper::*};
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn overlay() {
     reset_test_env!();

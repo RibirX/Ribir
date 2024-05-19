@@ -159,7 +159,10 @@ impl<'a> PriorityTask<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  #[cfg(target_arch = "wasm32")]
+  use crate::test_helper::wasm_bindgen_test;
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn prior_smoke() {
     let result = RefCell::new(Vec::new());
@@ -184,6 +187,7 @@ mod tests {
     assert_eq!(*result.borrow(), vec![1, 2, 3]);
   }
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn prior_by_smoke() {
     let result = RefCell::new(Vec::new());

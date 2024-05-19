@@ -737,6 +737,7 @@ mod tests {
   use super::*;
   use crate::{reset_test_env, test_helper::*};
 
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn layout_after_wnd_resize() {
     reset_test_env!();
