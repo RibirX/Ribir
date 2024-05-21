@@ -19,14 +19,16 @@ csv = "1.3.0"
 rand = "0.8.5"
 getrandom = { workspace = true }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.6"
+wasm-bindgen = "0.2.92"
+
 [dev-dependencies]
 ribir_dev_helper = {path = "../../dev-helper"}
 
 [features]
 wgpu = ["ribir/wgpu"]
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2.92"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

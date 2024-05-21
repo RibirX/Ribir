@@ -1,6 +1,5 @@
 use std::convert::Infallible;
 
-use ribir_algo::Resource;
 use ribir_core::{prelude::*, timer::Timer, window::WindowId};
 use winit::{
   event::{ElementState, Event, Ime, KeyEvent, StartCause, WindowEvent},

@@ -53,16 +53,16 @@ macro_rules! test_case_name {
 pub struct ImageTest<'a> {
   test_img: PixelImage,
   ref_path: &'a std::path::Path,
-  comparison: f32,
+  comparison: f64,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl<'a> ImageTest<'a> {
   pub fn new(test_img: PixelImage, ref_path: &'a std::path::Path) -> Self {
-    Self { test_img, ref_path, comparison: 0.000001 }
+    Self { test_img, ref_path, comparison: 0.00001 }
   }
 
-  pub fn with_comparison(mut self, comparison: f32) -> Self {
+  pub fn with_comparison(mut self, comparison: f64) -> Self {
     self.comparison = comparison;
     self
   }
@@ -90,40 +90,41 @@ impl<'a> ImageTest<'a> {
       assert_eq!(test_img.color_format(), ColorFormat::Rgba8);
       assert_eq!(ref_img.color_format(), ColorFormat::Rgba8);
 
-      let test_filp = nv_flip::FlipImageRgb8::with_data(
-        test_img.width(),
-        test_img.height(),
-        &Self::rgba_2_rgb_pixels(test_img.pixel_bytes()),
-      );
+      let mut dssim = dssim_core::Dssim::new();
+      dssim.set_save_ssim_maps(1);
+      let test_data = unsafe {
+        let ptr = test_img.pixel_bytes().as_ptr() as *const _;
+        std::slice::from_raw_parts(ptr, test_img.pixel_bytes().len() / 4)
+      };
+      let d_test = dssim
+        .create_image_rgba(test_data, test_img.width() as usize, test_img.height() as usize)
+        .unwrap();
+      let ref_dat = unsafe {
+        let ptr = ref_img.pixel_bytes().as_ptr() as *const _;
+        std::slice::from_raw_parts(ptr, ref_img.pixel_bytes().len() / 4)
+      };
+      let d_ref = dssim
+        .create_image_rgba(ref_dat, ref_img.width() as usize, ref_img.height() as usize)
+        .unwrap();
 
-      let ref_flip = nv_flip::FlipImageRgb8::with_data(
-        ref_img.width(),
-        ref_img.height(),
-        &Self::rgba_2_rgb_pixels(ref_img.pixel_bytes()),
-      );
-      let error_map = nv_flip::flip(ref_flip, test_filp, nv_flip::DEFAULT_PIXELS_PER_DEGREE);
-      let visualized = error_map.apply_color_lut(&nv_flip::magma_lut());
+      let (v, mut diffs) = dssim.compare(&d_ref, d_test);
+      let dssim: f64 = v.into();
 
-      let pool = nv_flip::FlipPool::from_image(&error_map);
-      let mean = pool.mean();
       let diff_path = dir.join(format!("{stem}_diff.png"));
       let actual_path = dir.join(format!("{stem}_actual.png"));
-      if mean > f32::EPSILON {
+      if dssim > f64::EPSILON {
         // write the actual image to the same folder
         test_img
           .write_as_png(&mut File::create(&actual_path).unwrap())
           .unwrap();
 
         // write the diff image to the same folder
-        image::RgbImage::from_raw(visualized.width(), visualized.height(), visualized.to_vec())
-          .unwrap()
-          .save(&diff_path)
-          .unwrap();
+        Self::write_ssim_maps(diffs.pop().unwrap(), &diff_path);
       }
 
       assert!(
-        mean < comparison,
-        "Image test failed. Expected Mean({mean}) to be less than {comparison}. The actual image \
+        dssim < comparison,
+        "Image test failed. Expected Diff({dssim}) to be less than {comparison}. The actual image \
          and difference image have been saved next to the expected image.
       Expected image location: {ref_path:?}
       Actual image location: {actual_path:?}
@@ -132,12 +133,36 @@ impl<'a> ImageTest<'a> {
     }
   }
 
-  fn rgba_2_rgb_pixels(data: &[u8]) -> Vec<u8> {
-    let mut res = Vec::with_capacity(data.len() / 4 * 3);
-    for chunk in data.chunks(4) {
-      res.extend_from_slice(&chunk[..3]);
+  #[track_caller]
+  fn write_ssim_maps(ssim_map: dssim_core::SsimMap, out_file: &std::path::Path) {
+    fn to_byte(i: f32) -> u8 {
+      if i <= 0.0 {
+        0
+      } else if i >= 255.0 / 256.0 {
+        255
+      } else {
+        (i * 256.0) as u8
+      }
     }
-    res
+
+    let avgssim = ssim_map.ssim as f32;
+    let out = ssim_map
+      .map
+      .pixels()
+      .flat_map(|ssim| {
+        let max = 1_f32 - ssim;
+        let maxsq = max * max;
+        [to_byte(maxsq * 16.0), to_byte(max * 3.0), to_byte(max / ((1_f32 - avgssim) * 4_f32)), 255]
+      })
+      .collect();
+    PixelImage::new(
+      out,
+      ssim_map.map.width() as u32,
+      ssim_map.map.height() as u32,
+      ColorFormat::Rgba8,
+    )
+    .write_as_png(&mut std::fs::File::create(out_file).unwrap())
+    .unwrap();
   }
 }
 

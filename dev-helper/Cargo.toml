@@ -20,10 +20,7 @@ ribir_geom = {path = "../geom", version = "0.3.0-alpha.5" }
 ribir_gpu = {path = "../gpu", version = "0.3.0-alpha.5" }
 ribir_painter = {path = "../painter", features = ["png"], version = "0.3.0-alpha.5" }
 image.workspace = true
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies] 
-nv-flip.workspace = true
-
+dssim-core.workspace = true
 
 
 [dev-dependencies]

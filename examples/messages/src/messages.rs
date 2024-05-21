@@ -120,3 +120,13 @@ impl Compose for MessageList {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use ribir::{core::test_helper::*, material as ribir_material};
+  use ribir_dev_helper::*;
+
+  use super::*;
+
+  widget_image_test!(messages, wnd_size = Size::new(400., 600.), comparison = 0.004);
+}
