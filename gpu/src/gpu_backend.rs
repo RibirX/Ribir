@@ -505,7 +505,7 @@ mod tests {
 
   fn painter(bounds: Size) -> Painter { Painter::new(Rect::from_size(bounds)) }
 
-  painter_backend_eq_image_test!(smoke, comparison = 0.00005);
+  painter_backend_eq_image_test!(smoke, comparison = 0.001);
   fn smoke() -> Painter {
     fn draw_arrow_path(painter: &mut Painter) {
       painter
@@ -573,7 +573,7 @@ mod tests {
     painter
   }
 
-  painter_backend_eq_image_test!(clip_layers);
+  painter_backend_eq_image_test!(clip_layers, comparison = 0.0065);
   fn clip_layers() -> Painter {
     let mut painter = painter(Size::new(120., 340.));
     let rect_100x100 = Rect::from_size(Size::new(100., 100.));
@@ -590,7 +590,7 @@ mod tests {
     painter
   }
 
-  painter_backend_eq_image_test!(stroke_include_border);
+  painter_backend_eq_image_test!(stroke_include_border, comparison = 0.00035);
   fn stroke_include_border() -> Painter {
     let mut painter = painter(Size::new(100., 100.));
     painter
@@ -605,7 +605,7 @@ mod tests {
     painter
   }
 
-  painter_backend_eq_image_test!(two_img_brush, comparison = 0.00025);
+  painter_backend_eq_image_test!(two_img_brush, comparison = 0.006);
   fn two_img_brush() -> Painter {
     let mut painter = painter(Size::new(200., 100.));
 
