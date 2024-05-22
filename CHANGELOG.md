@@ -32,6 +32,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **gpu**: Introduced `GPUBackendImpl::max_textures_per_draw` to set a limit on textures per draw phase (#562 @M-Adoo)
 - **gpu**: Updated the `wgpu` implementation of the GPU backend to support WebGL. (#578, @M-Adoo)
 - **ci**: add wasm test (#583 @wjian23)
+- **ci**: wasm server watch file change (#586 @wjian23)
 
 ### Fixed
 
