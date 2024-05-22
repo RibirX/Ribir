@@ -212,6 +212,12 @@ jobs:
           set -e
 
           cargo llvm-cov report --lcov --output-path lcov.info
+      
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-cases-${{ matrix.os }}
+          path: ./test_cases
 
       - name: upload coverage report to codecov
         uses: codecov/codecov-action@v3
