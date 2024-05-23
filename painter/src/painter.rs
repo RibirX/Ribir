@@ -56,15 +56,23 @@ pub trait PainterBackend {
   fn end_frame(&mut self);
 }
 
-/// A path and its geometry information are friendly to paint and cache.
+/// The enum of path types, which can be either shared or owned. This suggests
+/// that if the path is shared among multiple commands, it can be cached for
+/// efficiency.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaintPath {
-  /// The path to painting, and its axis is relative to the `bounds`.
-  pub path: Path,
-  /// The bounds after path applied transform.
-  pub paint_bounds: Rect,
-  // The transform need to apply to the path.
-  pub transform: Transform,
+pub enum PaintPath {
+  Share(Resource<Path>),
+  Own(Path),
+}
+
+/// The action to apply to the path, such as fill color, image, gradient, etc.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PaintPathAction {
+  Color(Color),
+  Image { img: Resource<PixelImage>, opacity: f32 },
+  Radial(RadialGradient),
+  Linear(LinearGradient),
+  Clip,
 }
 
 #[repr(u32)]
@@ -86,50 +94,31 @@ impl From<usvg::SpreadMethod> for SpreadMethod {
   }
 }
 
+/// A path and its geometry information are friendly to paint and cache.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PaintCommand {
-  ColorPath { path: PaintPath, color: Color },
-  ImgPath { path: PaintPath, img: Resource<PixelImage>, opacity: f32 },
-  RadialGradient { path: PaintPath, radial_gradient: RadialGradient },
-  LinearGradient { path: PaintPath, linear_gradient: LinearGradient },
-  // Todo: keep rectangle clip.
-  Clip(PaintPath),
-  PopClip,
+pub struct PathCommand {
+  /// The path to painting, and its axis is relative to the `bounds`.
+  pub path: PaintPath,
+  /// The bounds after path applied transform.
+  pub paint_bounds: Rect,
+  // The transform need to apply to the path.
+  pub transform: Transform,
+  // The action to apply to the path.
+  pub action: PaintPathAction,
 }
 
-impl PaintCommand {
-  pub fn transform(&mut self, transform: &Transform) -> &mut Self {
-    match self {
-      PaintCommand::ColorPath { path, .. }
-      | PaintCommand::ImgPath { path, .. }
-      | PaintCommand::RadialGradient { path, .. }
-      | PaintCommand::LinearGradient { path, .. }
-      | PaintCommand::Clip(path) => path.transform(transform),
-      PaintCommand::PopClip => {}
-    }
-    self
-  }
-
-  pub fn apply_alpha(&mut self, alpha: f32) -> &mut Self {
-    match self {
-      PaintCommand::ColorPath { color, .. } => *color = color.apply_alpha(alpha),
-      PaintCommand::ImgPath { opacity, .. } => *opacity *= alpha,
-      PaintCommand::RadialGradient { radial_gradient, .. } => {
-        radial_gradient
-          .stops
-          .iter_mut()
-          .for_each(|s| s.color = s.color.apply_alpha(alpha));
-      }
-      PaintCommand::LinearGradient { linear_gradient, .. } => {
-        linear_gradient
-          .stops
-          .iter_mut()
-          .for_each(|s| s.color = s.color.apply_alpha(alpha));
-      }
-      PaintCommand::Clip(_) | PaintCommand::PopClip => {}
-    }
-    self
-  }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PaintCommand {
+  Path(PathCommand),
+  PopClip,
+  // /// A Bundle of paint commands that can be assumed as a single command, that
+  // /// means the backend can cache it.
+  // Bundle {
+  //   transform: Transform,
+  //   opacity: f32,
+  //   paint_bounds: Rect,
+  //   cmds: Resource<Box<[PaintCommand]>>,
+  // },
 }
 
 #[derive(Clone)]
@@ -319,16 +308,15 @@ impl Painter {
     self
   }
 
-  pub fn clip(&mut self, path: Path) -> &mut Self {
+  pub fn clip(&mut self, path: impl Into<PaintPath>) -> &mut Self {
     invisible_return!(self);
-
+    let path = path.into();
     if locatable_bounds(&path.bounds) {
       if let Some(bounds) = self.intersection_paint_bounds(&path.bounds) {
         let s = self.current_state_mut();
         s.bounds = s.transform.outer_transformed_rect(&bounds);
-
-        let paint_path = PaintPath::new(path, s.transform);
-        self.commands.push(PaintCommand::Clip(paint_path));
+        let cmd = PathCommand::new(path, PaintPathAction::Clip, s.transform);
+        self.commands.push(PaintCommand::Path(cmd));
         self.current_state_mut().clip_cnt += 1;
       }
     }
@@ -337,27 +325,24 @@ impl Painter {
   }
 
   /// Fill a path with its style.
-  pub fn fill_path(&mut self, p: Path) -> &mut Self {
+  pub fn fill_path(&mut self, p: impl Into<PaintPath>) -> &mut Self {
     invisible_return!(self);
 
-    if locatable_bounds(&p.bounds)
-      && self.intersect_paint_bounds(&p.bounds)
+    let path = p.into();
+    if locatable_bounds(&path.bounds)
+      && self.intersect_paint_bounds(&path.bounds)
       && self.is_visible_brush()
     {
-      let ts = *self.get_transform();
-      let path = PaintPath::new(p, ts);
-      let mut cmd = match self.current_state().brush.clone() {
-        Brush::Color(color) => PaintCommand::ColorPath { path, color },
-        Brush::Image(img) => PaintCommand::ImgPath { path, img, opacity: 1. },
-        Brush::RadialGradient(radial_gradient) => {
-          PaintCommand::RadialGradient { path, radial_gradient }
-        }
-        Brush::LinearGradient(linear_gradient) => {
-          PaintCommand::LinearGradient { path, linear_gradient }
-        }
+      let mut action = match self.current_state().brush.clone() {
+        Brush::Color(color) => PaintPathAction::Color(color),
+        Brush::Image(img) => PaintPathAction::Image { img, opacity: 1. },
+        Brush::RadialGradient(radial_gradient) => PaintPathAction::Radial(radial_gradient),
+        Brush::LinearGradient(linear_gradient) => PaintPathAction::Linear(linear_gradient),
       };
-      cmd.apply_alpha(self.alpha());
-      self.commands.push(cmd);
+      action.apply_alpha(self.alpha());
+      let ts = *self.get_transform();
+      let cmd = PathCommand::new(path, action, ts);
+      self.commands.push(PaintCommand::Path(cmd));
     }
 
     self
@@ -506,8 +491,14 @@ impl Painter {
     let alpha = self.alpha();
 
     for cmd in svg.paint_commands.iter() {
-      let mut cmd = cmd.clone();
-      cmd.transform(&transform).apply_alpha(alpha);
+      let cmd = match cmd.clone() {
+        PaintCommand::Path(mut path) => {
+          path.transform(&transform);
+          path.action.apply_alpha(alpha);
+          PaintCommand::Path(path)
+        }
+        PaintCommand::PopClip => PaintCommand::PopClip,
+      };
       self.commands.push(cmd);
     }
 
@@ -568,7 +559,10 @@ impl Painter {
 
   fn push_n_pop_cmd(&mut self, n: usize) {
     for _ in 0..n {
-      if matches!(self.commands.last(), Some(PaintCommand::Clip(_))) {
+      if matches!(
+        self.commands.last(),
+        Some(PaintCommand::Path(PathCommand { action: PaintPathAction::Clip, .. }))
+      ) {
         self.commands.pop();
       } else {
         self.commands.push(PaintCommand::PopClip)
@@ -634,8 +628,26 @@ impl<'a> DerefMut for PainterGuard<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.0 }
 }
 
-impl PaintPath {
-  pub fn new(path: Path, transform: Transform) -> Self {
+impl Deref for PaintPath {
+  type Target = Path;
+  fn deref(&self) -> &Self::Target {
+    match self {
+      PaintPath::Share(p) => p.deref(),
+      PaintPath::Own(p) => p,
+    }
+  }
+}
+
+impl From<Path> for PaintPath {
+  fn from(p: Path) -> Self { PaintPath::Own(p) }
+}
+
+impl From<Resource<Path>> for PaintPath {
+  fn from(p: Resource<Path>) -> Self { PaintPath::Share(p) }
+}
+
+impl PathCommand {
+  pub fn new(path: PaintPath, action: PaintPathAction, transform: Transform) -> Self {
     if transform
       .outer_transformed_rect(path.bounds())
       .width()
@@ -644,7 +656,7 @@ impl PaintPath {
       println!("paint_bounds.width().is_nan()");
     }
     let paint_bounds = transform.outer_transformed_rect(path.bounds());
-    PaintPath { path, transform, paint_bounds }
+    Self { path, transform, paint_bounds, action }
   }
 
   pub fn scale(&mut self, scale: f32) {
@@ -660,6 +672,20 @@ impl PaintPath {
   }
 }
 
+impl PaintPathAction {
+  pub fn apply_alpha(&mut self, alpha: f32) -> &mut Self {
+    match self {
+      PaintPathAction::Color(color) => *color = color.apply_alpha(alpha),
+      PaintPathAction::Image { opacity, .. } => *opacity *= alpha,
+      PaintPathAction::Radial(RadialGradient { stops, .. })
+      | PaintPathAction::Linear(LinearGradient { stops, .. }) => stops
+        .iter_mut()
+        .for_each(|s| s.color = s.color.apply_alpha(alpha)),
+      PaintPathAction::Clip => {}
+    }
+    self
+  }
+}
 // bounds that has a limited location and size
 fn locatable_bounds(bounds: &Rect) -> bool {
   bounds.origin.is_finite() && !bounds.width().is_nan() && !bounds.height().is_nan()

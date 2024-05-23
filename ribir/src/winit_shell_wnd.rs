@@ -148,14 +148,11 @@ impl ShellWindow for WinitShellWnd {
 
   #[inline]
   fn draw_commands(&mut self, viewport: Rect, mut commands: Vec<PaintCommand>) {
-    commands.iter_mut().for_each(|c| match c {
-      PaintCommand::ColorPath { path, .. }
-      | PaintCommand::ImgPath { path, .. }
-      | PaintCommand::RadialGradient { path, .. }
-      | PaintCommand::LinearGradient { path, .. }
-      | PaintCommand::Clip(path) => path.scale(self.winit_wnd.scale_factor() as f32),
-      PaintCommand::PopClip => {}
-    });
+    for c in &mut commands {
+      if let PaintCommand::Path(path) = c {
+        path.scale(self.winit_wnd.scale_factor() as f32);
+      }
+    }
 
     let scale = self.winit_wnd.scale_factor() as f32;
     let viewport: DeviceRect = viewport

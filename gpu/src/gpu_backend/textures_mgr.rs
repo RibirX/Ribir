@@ -115,7 +115,7 @@ where
   /// Store an alpha path in texture and return the texture and a transform that
   /// can transform the mask to viewport
   pub(super) fn store_alpha_path(
-    &mut self, path: Path, transform: &Transform, gpu_impl: &mut T::Host,
+    &mut self, path: PaintPath, transform: &Transform, gpu_impl: &mut T::Host,
   ) -> (TextureSlice, Transform) {
     fn cache_to_view_matrix(
       path: &Path, path_ts: &Transform, slice_origin: DevicePoint, cache_scale: f32,
@@ -182,12 +182,10 @@ where
   }
 
   pub(super) fn store_clipped_path(
-    &mut self, clip_view: DeviceRect, path: PaintPath, gpu_impl: &mut T::Host,
+    &mut self, clip_view: DeviceRect, path: PaintPath, ts: &Transform, gpu_impl: &mut T::Host,
   ) -> (TextureSlice, Transform) {
     let alloc_size: DeviceSize = add_blank_edges(clip_view.size);
-    let path_ts = path.transform;
-
-    let key = PathKey::from_path_with_clip(path, clip_view);
+    let key = PathKey::from_path_with_clip(path, *ts, clip_view);
 
     let slice = if let Some(h) = self.alpha_atlas.get(&key).copied() {
       alpha_tex_slice(&self.alpha_atlas, &h).cut_blank_edge()
@@ -202,7 +200,7 @@ where
       let offset = (no_blank_slice.rect.origin - clip_view.origin)
         .to_f32()
         .cast_unit();
-      let ts = path_ts.then_translate(offset);
+      let ts = ts.then_translate(offset);
       let task = FillTask { slice, ts, path, clip_rect };
       self.fill_task.push(task);
       no_blank_slice
@@ -433,8 +431,8 @@ impl TextureSlice {
 
 #[derive(Debug, Clone)]
 enum PathKey {
-  Path { path: Path, hash: u64 },
-  PathWithClip { path: PaintPath, hash: u64, clip_rect: DeviceRect },
+  Path { path: PaintPath, hash: u64 },
+  PathWithClip { path: PaintPath, ts: Transform, hash: u64, clip_rect: DeviceRect },
 }
 
 fn pos_100_device(pos: Point) -> DevicePoint {
@@ -500,20 +498,20 @@ fn path_eq(a: &Path, b: &Path, pos_adjust: impl Fn(Point, &Path) -> DevicePoint)
 }
 
 impl PathKey {
-  fn from_path(value: Path) -> Self {
+  fn from_path(value: PaintPath) -> Self {
     let hash = path_hash(&value, |pos| path_inner_pos(pos, &value));
     PathKey::Path { path: value, hash }
   }
 
-  fn from_path_with_clip(path: PaintPath, clip_rect: DeviceRect) -> Self {
-    let hash = path_hash(&path.path, pos_100_device);
-    PathKey::PathWithClip { path, hash, clip_rect }
+  fn from_path_with_clip(path: PaintPath, ts: Transform, clip_rect: DeviceRect) -> Self {
+    let hash = path_hash(&path, pos_100_device);
+    PathKey::PathWithClip { path, hash, ts, clip_rect }
   }
 
   fn path(&self) -> &Path {
     match self {
       PathKey::Path { path, .. } => path,
-      PathKey::PathWithClip { path, .. } => &path.path,
+      PathKey::PathWithClip { path, .. } => path,
     }
   }
 }
@@ -537,13 +535,9 @@ impl PartialEq for PathKey {
         path_eq(a, b, path_inner_pos)
       }
       (
-        PathKey::PathWithClip { path: a, clip_rect: view_rect_a, .. },
-        PathKey::PathWithClip { path: b, clip_rect: view_rect_b, .. },
-      ) => {
-        view_rect_a == view_rect_b
-          && a.transform == b.transform
-          && path_eq(&a.path, &b.path, move |p, _| pos_100_device(p))
-      }
+        PathKey::PathWithClip { path: p_a, ts: t_a, hash: h_a, clip_rect: r_a },
+        PathKey::PathWithClip { path: p_b, ts: t_b, hash: h_b, clip_rect: r_b },
+      ) => h_a == h_b && r_a == r_b && t_a == t_b && path_eq(p_a, p_b, |p, _| pos_100_device(p)),
       _ => false,
     }
   }
@@ -624,8 +618,8 @@ pub mod tests {
     let mut wgpu = block_on(WgpuImpl::headless());
     let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu);
 
-    let path1 = Path::rect(&rect(0., 0., 300., 300.));
-    let path2 = Path::rect(&rect(100., 100., 300., 300.));
+    let path1 = PaintPath::Own(Path::rect(&rect(0., 0., 300., 300.)));
+    let path2 = PaintPath::Own(Path::rect(&rect(100., 100., 300., 300.)));
     let ts = Transform::scale(2., 2.);
 
     let (slice1, ts1) = mgr.store_alpha_path(path1, &ts, &mut wgpu);
@@ -641,14 +635,12 @@ pub mod tests {
     let mut wgpu = block_on(WgpuImpl::headless());
     let mut mgr = TexturesMgr::<WgpuTexture>::new(&mut wgpu);
 
-    let path = PaintPath::new(
-      Path::rect(&rect(20., 20., 300., 300.)),
-      Transform::new(2., 0., 0., 2., -10., -10.),
-    );
+    let path = PaintPath::Own(Path::rect(&rect(20., 20., 300., 300.)));
+    let ts = Transform::new(2., 0., 0., 2., -10., -10.);
     let clip_view = ribir_geom::rect(10, 10, 100, 100);
 
-    let (slice1, ts1) = mgr.store_clipped_path(clip_view, path.clone(), &mut wgpu);
-    let (slice2, ts2) = mgr.store_clipped_path(clip_view, path, &mut wgpu);
+    let (slice1, ts1) = mgr.store_clipped_path(clip_view, path.clone(), &ts, &mut wgpu);
+    let (slice2, ts2) = mgr.store_clipped_path(clip_view, path, &ts, &mut wgpu);
     assert_eq!(slice1, slice2);
     assert_eq!(ts1, ts2);
     assert_eq!(slice1.rect, ribir_geom::rect(1, 1, 102, 102));
