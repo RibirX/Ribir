@@ -103,7 +103,7 @@ fn main() {
   });
 }
 ```
-Do you notice that except for not using `@`, this example is already the same as what you saw in [Creating an application](./creating_an_application.md).
+Do you notice that except for not using `@`, this example is already the same as what you saw in [Try Ribir](./try_it.md).
 
 ## Creating objects using `rdl!`
 
