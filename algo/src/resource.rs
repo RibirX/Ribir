@@ -1,4 +1,5 @@
 use std::{
+  any::Any,
   hash::{Hash, Hasher},
   ops::Deref,
 };
@@ -11,38 +12,55 @@ use serde::{Deserialize, Serialize};
 /// # Notice
 /// Compare two `Resource` just compare if it come form same resource not
 /// compare its content.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Resource<T>(triomphe::Arc<T>);
+#[derive(Debug, Deserialize)]
+pub struct Resource<T: ?Sized>(triomphe::Arc<T>);
 
-impl<T> Resource<T> {
+impl<T: Sized> Resource<T> {
   #[inline]
   pub fn new(v: T) -> Self { Resource(triomphe::Arc::new(v)) }
 
   #[inline]
+  pub fn into_any(self) -> Resource<dyn Any>
+  where
+    T: Sized + Any,
+  {
+    let ptr = triomphe::Arc::into_raw(self.0) as *const dyn Any;
+    let ptr: triomphe::Arc<dyn Any> = unsafe { triomphe::Arc::from_raw(ptr) };
+    Resource(ptr)
+  }
+}
+impl<T: ?Sized> Resource<T> {
+  #[inline]
   pub fn as_ptr(this: &Self) -> *const () { triomphe::Arc::as_ptr(&this.0) as *const () }
 }
 
-impl<T> Clone for Resource<T> {
+impl<T: ?Sized> Clone for Resource<T> {
   #[inline]
   fn clone(&self) -> Self { Self(self.0.clone()) }
 }
 
-impl<T> Deref for Resource<T> {
+impl<T: ?Sized> Deref for Resource<T> {
   type Target = T;
 
   fn deref(&self) -> &Self::Target { self.0.deref() }
 }
 
-impl<T> PartialEq for Resource<T> {
+impl<T: ?Sized> PartialEq for Resource<T> {
   #[inline]
   fn eq(&self, other: &Self) -> bool { triomphe::Arc::ptr_eq(&self.0, &other.0) }
 }
 
-impl<T> Eq for Resource<T> {}
+impl<T: ?Sized> Eq for Resource<T> {}
 
-impl<T> Hash for Resource<T> {
+impl<T: ?Sized> Hash for Resource<T> {
   #[inline]
   fn hash<H: Hasher>(&self, state: &mut H) { triomphe::Arc::as_ptr(&self.0).hash(state); }
+}
+
+impl<T: Serialize> Serialize for Resource<T> {
+  fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    self.0.serialize(serializer)
+  }
 }
 
 #[cfg(test)]
