@@ -1,8 +1,8 @@
 use std::error::Error;
 
-use ribir_geom::{rect_corners, DeviceRect, DeviceSize, Point, Transform};
+use ribir_geom::{rect_corners, DeviceRect, DeviceSize, Point};
 use ribir_painter::{
-  image::ColorFormat, Color, PaintCommand, PaintPath, PaintPathAction, PainterBackend, PathCommand,
+  image::ColorFormat, Color, PaintCommand, PaintPathAction, PainterBackend, PathCommand,
   PixelImage, Vertex, VertexBuffers,
 };
 
@@ -178,8 +178,7 @@ where
         }
 
         let bounds = path.paint_bounds.round_out().to_i32().cast_unit();
-        let Some((rect, mask_head)) = self.new_mask_layer(path.path, &bounds, &path.transform)
-        else {
+        let Some((rect, mask_head)) = self.new_mask_layer(&path) else {
           if matches!(path.action, PaintPathAction::Clip) {
             self.skip_clip_cnt += 1;
           }
@@ -371,21 +370,13 @@ where
       .map_or(&self.viewport, |l| &l.viewport)
   }
 
-  fn new_mask_layer(
-    &mut self, path: PaintPath, paint_bounds: &DeviceRect, matrix: &Transform,
-  ) -> Option<([Point; 4], i32)> {
+  fn new_mask_layer(&mut self, path: &PathCommand) -> Option<([Point; 4], i32)> {
+    let paint_bounds = path.paint_bounds.round_out().to_i32().cast_unit();
     let view = paint_bounds.intersection(self.viewport())?;
 
-    let (mask, mask_to_view) =
-      if self.tex_mgr.is_good_for_cache(paint_bounds.size) || view.contains_rect(paint_bounds) {
-        self
-          .tex_mgr
-          .store_alpha_path(path, matrix, &mut self.gpu_impl)
-      } else {
-        self
-          .tex_mgr
-          .store_clipped_path(view, path, matrix, &mut self.gpu_impl)
-      };
+    let (mask, mask_to_view) = self
+      .tex_mgr
+      .store_alpha_path(path, view, &mut self.gpu_impl);
 
     let mut points = rect_corners(&mask.rect.to_f32().cast_unit());
     for p in points.iter_mut() {

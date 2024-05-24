@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ribir_geom::DeviceSize;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -62,6 +63,8 @@ impl PixelImage {
   pub fn width(&self) -> u32 { self.width }
   #[inline]
   pub fn height(&self) -> u32 { self.height }
+
+  pub fn size(&self) -> DeviceSize { DeviceSize::new(self.width as i32, self.height as i32) }
   #[inline]
   pub fn pixel_bytes(&self) -> &[u8] { &self.data }
 }
