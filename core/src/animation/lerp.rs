@@ -174,8 +174,8 @@ impl Lerp for Transform {
 impl Lerp for Pixel {
   #[inline]
   fn lerp(&self, to: &Self, factor: f32) -> Self {
-    let v = self.0.lerp(&to.0, factor);
-    Pixel(v.into())
+    let v = (**self).lerp(to, factor);
+    v.into()
   }
 }
 

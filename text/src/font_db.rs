@@ -3,9 +3,9 @@ use std::{cell::RefCell, ops::Deref, sync::Arc};
 use ahash::HashMap;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
-use lyon_path::math::Point;
 use ribir_algo::{Resource, Sc};
-use ribir_painter::{PixelImage, Svg};
+use ribir_geom::{rect, Point, Rect};
+use ribir_painter::{path_builder::PathBuilder, Path, PathStyle, PixelImage, Svg};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 
 use crate::{svg_glyph_cache::SvgGlyphCache, FontFace, FontFamily};
@@ -25,7 +25,7 @@ pub struct Face {
   pub rb_face: rustybuzz::Face<'static>,
   #[cfg(feature = "raster_png_font")]
   raster_image_glyphs: FontGlyphCache<GlyphId, Resource<PixelImage>>,
-  outline_glyphs: FontGlyphCache<GlyphId, lyon_path::Path>,
+  outline_glyphs: FontGlyphCache<(GlyphId, PathStyle), Resource<Path>>,
   svg_glyphs: Sc<RefCell<SvgGlyphCache>>,
 }
 
@@ -286,17 +286,23 @@ impl Face {
   pub fn as_rb_face(&self) -> &rustybuzz::Face { &self.rb_face }
 
   // todo: should return its tight bounds
-  pub fn outline_glyph(&self, glyph_id: GlyphId) -> Option<lyon_path::Path> {
+  pub fn outline_glyph(&self, glyph_id: GlyphId, style: &PathStyle) -> Option<Resource<Path>> {
     self
       .outline_glyphs
       .borrow_mut()
-      .entry(glyph_id)
+      .entry((glyph_id, style.clone()))
       .or_insert_with(|| {
         let mut builder = GlyphOutlineBuilder::default();
-        let rect = self
+        let bounds = self
           .rb_face
           .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder);
-        rect.map(move |_| builder.into_path())
+        bounds.and_then(move |b| {
+          let mut path = builder.build(rect(b.x_min, b.y_min, b.width(), b.height()).to_f32());
+          if let PathStyle::Stroke(options) = style {
+            path = path.stroke(&options, None)?;
+          }
+          Some(Resource::new(path))
+        })
       })
       .as_ref()
       .cloned()
@@ -351,23 +357,23 @@ fn to_db_family(f: &FontFamily) -> Family {
 
 #[derive(Default)]
 struct GlyphOutlineBuilder {
-  builder: lyon_path::path::Builder,
+  builder: PathBuilder,
   closed: bool,
 }
 
 impl GlyphOutlineBuilder {
-  fn into_path(mut self) -> lyon_path::Path {
+  fn build(mut self, bounds: Rect) -> Path {
     if !self.closed {
-      self.builder.end(false);
+      self.builder.end_path(false);
     }
-    self.builder.build()
+    self.builder.build_with_bounds(bounds)
   }
 }
 
 impl OutlineBuilder for GlyphOutlineBuilder {
   fn move_to(&mut self, x: f32, y: f32) {
     self.closed = false;
-    self.builder.begin(Point::new(x, y));
+    self.builder.begin_path(Point::new(x, y));
   }
 
   fn line_to(&mut self, x: f32, y: f32) {
@@ -379,20 +385,20 @@ impl OutlineBuilder for GlyphOutlineBuilder {
     self.closed = false;
     self
       .builder
-      .quadratic_bezier_to(Point::new(x1, y1), Point::new(x, y));
+      .quadratic_curve_to(Point::new(x1, y1), Point::new(x, y));
   }
 
   fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
     self.closed = false;
     self
       .builder
-      .cubic_bezier_to(Point::new(x1, y1), Point::new(x2, y2), Point::new(x, y));
+      .bezier_curve_to(Point::new(x1, y1), Point::new(x2, y2), Point::new(x, y));
   }
 
   fn close(&mut self) {
     if !self.closed {
       self.closed = true;
-      self.builder.close()
+      self.builder.end_path(true)
     }
   }
 }

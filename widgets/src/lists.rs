@@ -296,7 +296,7 @@ impl ComposeChild for ListItem {
                         let line_height = line_height.map_or(*font_size, FontSize::Em).into_pixel();
                         pipe!{
                           let text_height = line_height * $this.line_number as f32;
-                          BoxClamp::fixed_height(*text_height.0)
+                          BoxClamp::fixed_height(*text_height)
                         }
                       } ,
                       @Text {

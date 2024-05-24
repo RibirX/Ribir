@@ -5,7 +5,6 @@ use std::{
   sync::{Arc, RwLock},
 };
 
-use lyon_path::geom::euclid::num::Zero;
 use ribir_algo::{FrameCache, Substr};
 use ribir_geom::{Point, Rect, Size};
 
@@ -232,8 +231,8 @@ impl VisualGlyphs {
   }
 
   pub fn nearest_glyph(&self, offset_x: f32, offset_y: f32) -> (usize, usize) {
-    let x: Em = -self.x + Pixel((offset_x / self.scale).into()).into();
-    let y: Em = -self.y + Pixel((offset_y / self.scale).into()).into();
+    let x: Em = -self.x + Pixel(offset_x / self.scale).into();
+    let y: Em = -self.y + Pixel(offset_y / self.scale).into();
     let mut bottom = self.visual_info.visual_height;
 
     let mut iter = self
@@ -253,7 +252,7 @@ impl VisualGlyphs {
         .iter()
         .enumerate()
         .rev()
-        .find(|(_, g)| Em::zero() < g.x_advance && g.x_offset <= x)
+        .find(|(_, g)| Em::ZERO < g.x_advance && g.x_offset <= x)
         .map(|(i, _)| i)
         .unwrap_or(0);
       return (row, idx);
@@ -481,10 +480,10 @@ impl VisualGlyphs {
     let visual_rect = self.visual_rect();
     let mut rc = visual_rect.intersection(rc).unwrap_or_default();
     rc.origin -= visual_rect.origin.to_vector();
-    let min_x: Em = Pixel((rc.min_x() / self.scale).into()).into();
-    let min_y: Em = Pixel((rc.min_y() / self.scale).into()).into();
-    let max_x: Em = Pixel((rc.max_x() / self.scale).into()).into();
-    let max_y: Em = Pixel((rc.max_y() / self.scale).into()).into();
+    let min_x: Em = Pixel(rc.min_x() / self.scale).into();
+    let min_y: Em = Pixel(rc.min_y() / self.scale).into();
+    let max_x: Em = Pixel(rc.max_x() / self.scale).into();
+    let max_y: Em = Pixel(rc.max_y() / self.scale).into();
     let is_hline = !self.visual_info.line_dir.is_horizontal();
     self
       .visual_info
@@ -702,7 +701,7 @@ mod tests {
     );
 
     cfg.text_align = TextAlign::End;
-    cfg.bounds.width = Pixel(100.0.into()).into();
+    cfg.bounds.width = Pixel(100.0).into();
     let r_align = glyphs(cfg.clone());
     assert_eq!(
       &r_align,
@@ -733,7 +732,7 @@ mod tests {
 
     cfg.text_align = TextAlign::Start;
     cfg.line_dir = PlaceLineDirection::BottomToTop;
-    cfg.bounds.height = Pixel(100.0.into()).into();
+    cfg.bounds.height = Pixel(100.0).into();
     let bottom = glyphs(cfg.clone());
 
     assert_eq!(

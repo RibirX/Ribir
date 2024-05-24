@@ -7,7 +7,7 @@ pub struct PathPaintKit {
   pub path: Path,
   pub brush: Brush,
   #[declare(default)]
-  pub style: PathPaintStyle,
+  pub style: PathStyle,
 }
 
 macro_rules! paint_method {
@@ -16,8 +16,8 @@ macro_rules! paint_method {
       let painter = ctx.painter();
       painter.set_brush(self.brush.clone());
       match &self.style {
-        PathPaintStyle::Fill => painter.fill_path(self.path.clone()),
-        PathPaintStyle::Stroke(strokes) => painter
+        PathStyle::Fill => painter.fill_path(self.path.clone()),
+        PathStyle::Stroke(strokes) => painter
           .set_strokes(strokes.clone())
           .stroke_path(self.path.clone()),
       };
@@ -46,7 +46,7 @@ pub struct PathWidget {
   pub path: Path,
   pub brush: Brush,
   #[declare(default)]
-  pub style: PathPaintStyle,
+  pub style: PathStyle,
 }
 
 /// Path widget just use as a paint kit for a path and not care about its size.
