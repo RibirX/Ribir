@@ -161,11 +161,20 @@ impl PathBuilder {
     stroke_path(&path, options, ts).map(Into::into)
   }
 
-  /// Build a fill path, witch should fill with `style`
+  /// Construct a path from the current state of the builder.
   #[inline]
   pub fn build(self) -> Path {
     // todo: we can store an anti-aliasing flag for the path.
     self.lyon_builder.build().into()
+  }
+
+  /// Construct a path from the current state of the builder, and use the given
+  /// bounds as the bounds of the path.
+  ///
+  /// Caller must ensure that the bounds are correct.
+  pub fn build_with_bounds(self, bounds: Rect) -> Path {
+    let path = self.lyon_builder.build();
+    Path { lyon_path: path, bounds }
   }
 }
 

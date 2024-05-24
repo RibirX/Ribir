@@ -348,7 +348,17 @@ impl Painter {
     self
   }
 
-  /// Fill a path with its style.
+  /// Outlines the current path with the current brush and `StrokeOptions`.
+  ///
+  /// ## Note
+  ///
+  /// Unlike `fill_path`, `stroke_path` accepts a `Path` instead of a
+  /// `PaintPath`. Therefore, the path will not be cached across `stroke_path`
+  /// calls, as the actual path depends on the current `StrokeOptions` of the
+  /// painter.
+  ///
+  /// If you want to stroke a path using `Resource<Path>`, you should retain the
+  /// result of `Path::stroke` with `Resource<Path>` and pass it to `fill_path`.
   pub fn stroke_path(&mut self, path: Path) -> &mut Self {
     if let Some(stroke_path) = path.stroke(self.stroke_options(), Some(self.get_transform())) {
       self.fill_path(stroke_path);

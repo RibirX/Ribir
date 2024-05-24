@@ -18,7 +18,6 @@ version.workspace = true
 derive_more.workspace = true
 fontdb.workspace = true
 log.workspace = true
-lyon_path.workspace = true
 ordered-float.workspace = true
 ribir_algo = {path = "../algo", version = "0.3.0-alpha.5" }
 ribir_geom = {path = "../geom", version = "0.3.0-alpha.5" }

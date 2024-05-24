@@ -27,6 +27,7 @@ serde_json.workspace = true
 tiny-skia-path = {workspace = true}
 usvg.workspace = true
 zerocopy = {workspace = true, optional = true, features = ["derive"]}
+ordered-float = {workspace = true, features = ["serde"]}
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom.workspace = true

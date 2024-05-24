@@ -4,7 +4,10 @@
 //! Some detail processing learn from [usvg](https://github.com/RazrFalcon/resvg/blob/master/usvg/src/text)
 pub mod font_db;
 pub mod shaper;
-use std::hash::Hash;
+use std::{
+  hash::Hash,
+  ops::{Deref, DerefMut},
+};
 
 use derive_more::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 use fontdb::ID;
@@ -39,19 +42,13 @@ pub mod unicode_help;
 pub const PIXELS_PER_EM: f32 = 16.;
 
 /// `Pixels is an absolute length unit and relative to the view device
-#[derive(
-  Debug, Default, Clone, Copy, PartialEq, PartialOrd, Add, Sub, Div, AddAssign, Mul, SubAssign, Eq,
-  Ord, Hash
-)]
-pub struct Pixel(pub OrderedFloat<f32>);
+#[derive(Debug, Default, Clone, Copy, Add, Sub, Div, AddAssign, Mul, SubAssign, Neg)]
+pub struct Pixel(f32);
 
 ///  `Em` is relative length unit relative to `Pixel`. We stipulate Em(1.) equal
 /// to Pixel(16.)
-#[derive(
-  Debug, Default, Clone, Copy, PartialEq, PartialOrd, Add, Sub, Div, AddAssign, Mul, SubAssign, Eq,
-  Ord, Hash, Neg
-)]
-pub struct Em(OrderedFloat<f32>);
+#[derive(Debug, Default, Clone, Copy, Add, Sub, Div, AddAssign, Mul, SubAssign, Neg)]
+pub struct Em(f32);
 
 /// The size of font. `Pixels is an absolute length unit and relative to the
 /// view device, and `Em` is relative length unit relative to `Pixel`. We
@@ -193,9 +190,67 @@ impl TextDirection {
   }
 }
 
+impl Hash for Pixel {
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) { OrderedFloat(self.0).hash(state); }
+}
+
+impl PartialEq for Pixel {
+  fn eq(&self, other: &Self) -> bool { OrderedFloat(self.0).eq(&OrderedFloat(other.0)) }
+}
+
+impl Eq for Pixel {}
+
+impl PartialOrd for Pixel {
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
+}
+
+impl Ord for Pixel {
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    OrderedFloat(self.0).cmp(&OrderedFloat(other.0))
+  }
+}
+
+impl Hash for Em {
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) { OrderedFloat(self.0).hash(state); }
+}
+
+impl PartialEq for Em {
+  fn eq(&self, other: &Self) -> bool { OrderedFloat(self.0).eq(&OrderedFloat(other.0)) }
+}
+
+impl Eq for Em {}
+
+impl PartialOrd for Em {
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
+}
+
+impl Ord for Em {
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    OrderedFloat(self.0).cmp(&OrderedFloat(other.0))
+  }
+}
+
+impl Deref for Pixel {
+  type Target = f32;
+  fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl Deref for Em {
+  type Target = f32;
+  fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl DerefMut for Pixel {
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
+
+impl DerefMut for Em {
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
+
 impl From<f32> for Pixel {
   #[inline]
-  fn from(v: f32) -> Self { Pixel(v.into()) }
+  fn from(v: f32) -> Self { Pixel(v) }
 }
 
 impl From<Pixel> for Em {
@@ -251,32 +306,29 @@ impl PartialEq for FontSize {
   fn eq(&self, other: &Self) -> bool { self.into_pixel() == other.into_pixel() }
 }
 
-impl lyon_path::geom::euclid::num::Zero for Em {
-  #[inline]
-  fn zero() -> Self { Em(f32::zero().into()) }
-}
-
-impl lyon_path::geom::euclid::num::Zero for Pixel {
-  #[inline]
-  fn zero() -> Self { Pixel(f32::zero().into()) }
-}
-
 impl Em {
-  pub const MAX: Em = Em(OrderedFloat(f32::MAX));
+  pub const ZERO: Em = Em(0.);
+
+  pub const MAX: Em = Em(f32::MAX);
 
   #[inline]
-  pub fn value(self) -> f32 { self.0.into() }
+  pub fn value(self) -> f32 { self.0 }
 
   #[inline]
-  pub fn absolute(em: f32) -> Self { Self(em.into()) }
+  pub fn absolute(em: f32) -> Self { Self(em) }
 
   #[inline]
   pub fn relative_to(em: f32, font_size: FontSize) -> Self { font_size.relative_em(em) }
+
+  #[inline]
+  pub fn from_pixel(p: Pixel) -> Self { p.into() }
 }
 
 impl Pixel {
+  pub const ZERO: Pixel = Pixel(0.);
+
   #[inline]
-  pub fn value(self) -> f32 { *self.0 }
+  pub fn value(self) -> f32 { self.0 }
 }
 
 impl std::ops::Mul<Em> for Em {
@@ -338,8 +390,8 @@ pub trait VisualText {
   fn text_layout(&self, typography_store: &TypographyStore, bound: Size) -> VisualGlyphs {
     let TextStyle { font_size, letter_space, line_height, ref font_face, .. } = *self.text_style();
 
-    let width: Em = Pixel(bound.width.into()).into();
-    let height: Em = Pixel(bound.height.into()).into();
+    let width: Em = Pixel(bound.width).into();
+    let height: Em = Pixel(bound.height).into();
     typography_store.typography(
       self.text().substr(..),
       font_size,

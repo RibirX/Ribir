@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use ribir_geom::{Rect, Size};
-use ribir_painter::{Brush, Painter, Path, PathPaintStyle};
+use ribir_painter::{Brush, Painter, Path, PathStyle};
 
 use crate::{font_db::FontDB, Em, FontFace, FontSize, GlyphBound, Pixel, VisualGlyphs};
 
@@ -35,7 +35,7 @@ impl Default for TextStyle {
 /// path style
 pub fn draw_glyphs_in_rect(
   painter: &mut Painter, visual_glyphs: VisualGlyphs, box_rect: Rect, brush: Brush, font_size: f32,
-  path_style: &PathPaintStyle, font_db: Rc<RefCell<FontDB>>,
+  path_style: &PathStyle, font_db: Rc<RefCell<FontDB>>,
 ) {
   let visual_rect = visual_glyphs.visual_rect();
   let Some(paint_rect) = painter.intersection_paint_bounds(&box_rect) else {
@@ -58,7 +58,7 @@ pub fn draw_glyphs_in_rect(
 /// draw the glyphs with the given brush, font_size and path style
 pub fn draw_glyphs(
   painter: &mut Painter, glyphs: impl Iterator<Item = GlyphBound>, brush: Brush, font_size: f32,
-  path_style: &PathPaintStyle, font_db: Rc<RefCell<FontDB>>,
+  path_style: &PathStyle, font_db: Rc<RefCell<FontDB>>,
 ) {
   glyphs.for_each(|g| {
     let font_db = font_db.borrow();
@@ -67,25 +67,14 @@ pub fn draw_glyphs(
     if let Some(face) = face {
       let unit = face.units_per_em() as f32;
       let scale = font_size / unit;
-      if let Some(path) = face.outline_glyph(g.glyph_id) {
+      if let Some(path) = face.outline_glyph(g.glyph_id, path_style) {
         let mut painter = painter.save_guard();
         painter
           .translate(g.bound.min_x(), g.bound.min_y())
           .scale(scale, -scale)
           .translate(0., -unit);
 
-        painter.set_brush(brush.clone());
-        let path = Path::from(path);
-        match path_style {
-          PathPaintStyle::Fill => {
-            painter.fill_path(path);
-          }
-          PathPaintStyle::Stroke(stroke) => {
-            painter
-              .set_strokes(stroke.clone())
-              .stroke_path(path);
-          }
-        }
+        painter.set_brush(brush.clone()).fill_path(path);
       } else if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
         let mut painter = painter.save_guard();
 

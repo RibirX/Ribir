@@ -18,8 +18,8 @@ pub struct Path {
 }
 
 /// Describe how to paint path, fill or stroke.
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, Default)]
-pub enum PathPaintStyle {
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize, Default)]
+pub enum PathStyle {
   /// Fill the path.
   #[default]
   Fill,
@@ -28,7 +28,7 @@ pub enum PathPaintStyle {
 }
 
 /// Stroke properties.
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StrokeOptions {
   /// A stroke thickness.
   ///
@@ -56,7 +56,7 @@ pub struct StrokeOptions {
 }
 
 /// Draws at the beginning and end of an open path contour.
-#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize, Default, Hash)]
 pub enum LineCap {
   /// No stroke extension.
   #[default]
@@ -67,7 +67,7 @@ pub enum LineCap {
   Square,
 }
 
-#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize, Default, Hash)]
 pub enum LineJoin {
   /// Extends to miter limit.
   #[default]
@@ -314,6 +314,28 @@ impl Default for StrokeOptions {
     }
   }
 }
+
+use ordered_float::OrderedFloat;
+
+impl std::hash::Hash for StrokeOptions {
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    OrderedFloat(self.width).hash(state);
+    OrderedFloat(self.miter_limit).hash(state);
+    self.line_cap.hash(state);
+    self.line_join.hash(state);
+  }
+}
+
+impl PartialEq for StrokeOptions {
+  fn eq(&self, other: &Self) -> bool {
+    OrderedFloat(self.width).eq(&OrderedFloat(other.width))
+      && OrderedFloat(self.miter_limit).eq(&OrderedFloat(other.miter_limit))
+      && self.line_cap.eq(&other.line_cap)
+      && self.line_join.eq(&other.line_join)
+  }
+}
+
+impl Eq for StrokeOptions {}
 
 #[cfg(feature = "tessellation")]
 impl<Attr> Vertex<Attr> {

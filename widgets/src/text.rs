@@ -9,7 +9,7 @@ pub struct Text {
   #[declare(default = TypographyTheme::of(ctx!()).body_medium.text.clone())]
   pub text_style: CowArc<TextStyle>,
   #[declare(default)]
-  pub path_style: PathPaintStyle,
+  pub path_style: PathStyle,
   #[declare(default)]
   pub overflow: Overflow,
   #[declare(default = TextAlign::Start)]

@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use ribir_geom::{Size, Zero};
+use ribir_geom::Size;
 use unicode_script::{Script, UnicodeScript};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -98,7 +98,7 @@ where
   Runs::Item: InputRun,
 {
   pub fn new(inputs: Inputs, cfg: TypographyCfg) -> Self {
-    Self { cfg, inputs, inline_cursor: Em::zero(), visual_lines: vec![], over_bounds: false }
+    Self { cfg, inputs, inline_cursor: Em::ZERO, visual_lines: vec![], over_bounds: false }
   }
 
   pub fn typography_all(mut self) -> VisualInfos {
@@ -158,8 +158,8 @@ where
   }
 
   fn visual_size(&self) -> (Em, Em) {
-    let mut width = Em::zero();
-    let mut height = Em::zero();
+    let mut width = Em::ZERO;
+    let mut height = Em::ZERO;
     if self.cfg.line_dir.is_horizontal() {
       self.visual_lines.iter().for_each(|l| {
         width += l.width;
@@ -199,8 +199,8 @@ where
     let letter_space = run
       .letter_space()
       .or(self.cfg.letter_space)
-      .unwrap_or_else(Pixel::zero);
-    if letter_space != Em::zero() {
+      .unwrap_or(Pixel::ZERO);
+    if letter_space != Em::ZERO {
       let mut cursor = LetterSpaceCursor::new(inner_cursor, letter_space.into());
       self.consume_run(run, &mut cursor);
     } else {
@@ -275,7 +275,7 @@ where
         let word = it.collect::<Vec<_>>();
         let width = word
           .iter()
-          .fold(Em::zero(), |acc, glyph| acc + cursor.measure(glyph, text));
+          .fold(Em::ZERO, |acc, glyph| acc + cursor.measure(glyph, text));
         (width, word)
       })
       .collect::<Vec<_>>();
@@ -283,7 +283,7 @@ where
     (verify_line_height)(self);
     for (width, word) in words {
       if is_auto_wrap
-        && self.inline_cursor != Em::zero()
+        && self.inline_cursor != Em::ZERO
         && self.is_over_line_bound(width + self.inline_cursor)
       {
         new_line(self, cursor);
@@ -298,7 +298,7 @@ where
 
         at.cluster += base;
 
-        if self.inline_cursor == Em::zero()
+        if self.inline_cursor == Em::ZERO
           || !is_auto_wrap
           || !self.is_over_line_bound(cursor.position())
         {
@@ -336,7 +336,7 @@ where
 
     self.over_bounds |= self.is_over_line_bound(self.inline_cursor);
     self.over_bounds |= self.is_last_line_over();
-    self.inline_cursor = Em::zero();
+    self.inline_cursor = Em::ZERO;
   }
 
   fn is_over_line_bound(&self, position: Em) -> bool {
@@ -344,7 +344,7 @@ where
       return false;
     }
 
-    let eps: Em = Em(0.00001_f32.into());
+    let eps: Em = Em(0.00001_f32);
     if self.cfg.line_dir.is_horizontal() {
       self.cfg.bounds.height + eps <= position
     } else {
@@ -358,13 +358,13 @@ where
         < self
           .visual_lines
           .iter()
-          .fold(Em::zero(), |acc, l| acc + l.width)
+          .fold(Em::ZERO, |acc, l| acc + l.width)
     } else {
       self.cfg.bounds.height
         < self
           .visual_lines
           .iter()
-          .fold(Em::zero(), |acc, l| acc + l.height)
+          .fold(Em::ZERO, |acc, l| acc + l.height)
     }
   }
 }
@@ -413,7 +413,7 @@ impl InlineCursor for HInlineCursor {
 
   fn position(&self) -> Em { self.pos }
 
-  fn reset(&mut self) { self.pos = Em::zero(); }
+  fn reset(&mut self) { self.pos = Em::ZERO; }
 }
 
 impl InlineCursor for VInlineCursor {
@@ -429,7 +429,7 @@ impl InlineCursor for VInlineCursor {
 
   fn position(&self) -> Em { self.pos }
 
-  fn reset(&mut self) { self.pos = Em::zero(); }
+  fn reset(&mut self) { self.pos = Em::ZERO; }
 }
 
 impl<'a, I: InlineCursor> InlineCursor for LetterSpaceCursor<'a, I> {
@@ -487,13 +487,12 @@ pub(crate) fn text_align_offset(
   is_horizontal: bool, text_align: TextAlign, bound_width: Em, bound_height: Em, visual_width: Em,
   visual_height: Em,
 ) -> (Em, Em) {
-  let zero = Em::zero();
   match (text_align, is_horizontal) {
-    (TextAlign::Start, _) => (zero, zero),
-    (TextAlign::Center, true) => (zero, (bound_height - visual_height) / 2.),
-    (TextAlign::Center, false) => ((bound_width - visual_width) / 2., zero),
-    (TextAlign::End, true) => (zero, bound_height - visual_height),
-    (TextAlign::End, false) => (bound_width - visual_width, zero),
+    (TextAlign::Start, _) => (Em::ZERO, Em::ZERO),
+    (TextAlign::Center, true) => (Em::ZERO, (bound_height - visual_height) / 2.),
+    (TextAlign::Center, false) => ((bound_width - visual_width) / 2., Em::ZERO),
+    (TextAlign::End, true) => (Em::ZERO, bound_height - visual_height),
+    (TextAlign::End, false) => (bound_width - visual_width, Em::ZERO),
   }
 }
 
