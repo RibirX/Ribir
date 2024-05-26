@@ -1,5 +1,6 @@
 use std::{error::Error, io::Read};
 
+use ribir_algo::Resource;
 use ribir_geom::{Point, Rect, Size, Transform};
 use serde::{Deserialize, Serialize};
 use usvg::{Options, Stop, Tree, TreeParsing};
@@ -12,7 +13,7 @@ use crate::{
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Svg {
   pub size: Size,
-  pub paint_commands: Vec<PaintCommand>,
+  pub commands: Resource<Box<[PaintCommand]>>,
 }
 
 /// Fits size into a viewbox. copy from resvg
@@ -54,14 +55,13 @@ impl Svg {
             if let Some(ref fill) = p.fill {
               let (brush, transform) = brush_from_usvg_paint(&fill.paint, fill.opacity, &size);
               let mut painter = painter.save_guard();
+
+              let inverse_ts = transform.inverse().unwrap();
+              let path = Resource::new(path.clone().transform(&inverse_ts));
               painter
                 .set_brush(brush.clone())
                 .apply_transform(&transform)
-                .fill_path(
-                  path
-                    .clone()
-                    .transform(&transform.inverse().unwrap()),
-                );
+                .fill_path(path);
               //&o_ts.then(&n_ts.inverse().unwrap())));
             }
 
@@ -86,11 +86,18 @@ impl Svg {
 
               let (brush, transform) = brush_from_usvg_paint(&stroke.paint, stroke.opacity, &size);
               let mut painter = painter.save_guard();
+
               painter
                 .set_brush(brush.clone())
-                .apply_transform(&transform)
-                .set_strokes(options)
-                .stroke_path(path.transform(&transform.inverse().unwrap()));
+                .apply_transform(&transform);
+
+              let path = path
+                .transform(&transform.inverse().unwrap())
+                .stroke(&options, Some(painter.get_transform()));
+
+              if let Some(p) = path {
+                painter.fill_path(Resource::new(p));
+              }
             };
           }
           NodeKind::Image(_) => {
@@ -123,7 +130,12 @@ impl Svg {
       }
     });
 
-    Ok(Svg { size: Size::new(size.width(), size.height()), paint_commands: painter.finish() })
+    let paint_commands = painter.finish().to_owned().into_boxed_slice();
+
+    Ok(Svg {
+      size: Size::new(size.width(), size.height()),
+      commands: Resource::new(paint_commands),
+    })
   }
 
   pub fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn Error>> {

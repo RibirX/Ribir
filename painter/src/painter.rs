@@ -22,6 +22,8 @@ pub struct Painter {
   path_builder: PathBuilder,
 }
 
+pub struct PainterResult<'a>(&'a mut Vec<PaintCommand>);
+
 /// `PainterBackend` use to draw textures for every frame, All `draw_commands`
 /// will called between `begin_frame` and `end_frame`
 ///
@@ -49,9 +51,9 @@ pub trait PainterBackend {
   /// You should guarantee the output be same one in the same frame, otherwise
   /// it may cause undefined behavior.
   fn draw_commands(
-    &mut self, viewport: DeviceRect, commands: Vec<PaintCommand>, output: &mut Self::Texture,
+    &mut self, viewport: DeviceRect, commands: &[PaintCommand], global_matrix: &Transform,
+    output: &mut Self::Texture,
   );
-
   /// A frame end.
   fn end_frame(&mut self);
 }
@@ -111,14 +113,16 @@ pub struct PathCommand {
 pub enum PaintCommand {
   Path(PathCommand),
   PopClip,
-  // /// A Bundle of paint commands that can be assumed as a single command, that
-  // /// means the backend can cache it.
-  // Bundle {
-  //   transform: Transform,
-  //   opacity: f32,
-  //   paint_bounds: Rect,
-  //   cmds: Resource<Box<[PaintCommand]>>,
-  // },
+  /// A Bundle of paint commands that can be assumed as a single command, that
+  /// means the backend can cache it.
+  Bundle {
+    transform: Transform,
+    opacity: f32,
+    /// the bounds of the bundle commands. This is the union of all paint
+    /// command
+    bounds: Rect,
+    cmds: Resource<Box<[PaintCommand]>>,
+  },
 }
 
 #[derive(Clone)]
@@ -180,11 +184,9 @@ impl Painter {
   }
 
   #[inline]
-  pub fn finish(&mut self) -> Vec<PaintCommand> {
+  pub fn finish(&mut self) -> PainterResult {
     self.fill_all_pop_clips();
-    let commands = self.commands.clone();
-    self.commands.clear();
-    commands
+    PainterResult(&mut self.commands)
   }
 
   /// Saves the entire state and return a guard to auto restore the state when
@@ -494,22 +496,58 @@ impl Painter {
     self
   }
 
+  /// Draws a bundle of paint commands that can be treated as a single command.
+  /// This allows the backend to cache it.
+  ///
+  /// - **bounds** - The bounds of the bundle commands. This is the union of all
+  ///   paint command bounds. It does not configure where the bundle is placed.
+  ///   If you want to change the position of the bundle, you should call
+  ///   `Painter::translate` before calling this method.
+  /// - **cmds** - The list of paint commands to draw.
+  pub fn draw_bundle_commands(
+    &mut self, bounds: Rect, cmds: Resource<Box<[PaintCommand]>>,
+  ) -> &mut Self {
+    invisible_return!(self);
+    let transform = *self.get_transform();
+    let opacity = self.alpha();
+    let cmd = PaintCommand::Bundle { transform, opacity, bounds, cmds };
+    self.commands.push(cmd);
+    self
+  }
+
   pub fn draw_svg(&mut self, svg: &Svg) -> &mut Self {
     invisible_return!(self);
 
-    let transform = *self.get_transform();
-    let alpha = self.alpha();
+    // For a large number of path commands (more than 16), bundle them
+    // together as a single resource. This allows the backend to cache
+    // them collectively.
+    // For a small number of path commands (less than 16), store them
+    // individually as multiple resources. This means the backend doesn't
+    // need to perform a single draw operation for an SVG.
+    if svg.commands.len() <= 16 {
+      let transform = *self.get_transform();
+      let alpha = self.alpha();
 
-    for cmd in svg.paint_commands.iter() {
-      let cmd = match cmd.clone() {
-        PaintCommand::Path(mut path) => {
-          path.transform(&transform);
-          path.action.apply_alpha(alpha);
-          PaintCommand::Path(path)
-        }
-        PaintCommand::PopClip => PaintCommand::PopClip,
-      };
-      self.commands.push(cmd);
+      for cmd in svg.commands.iter() {
+        let cmd = match cmd.clone() {
+          PaintCommand::Path(mut path) => {
+            path.transform(&transform);
+            path.action.apply_alpha(alpha);
+            PaintCommand::Path(path)
+          }
+          PaintCommand::PopClip => PaintCommand::PopClip,
+          PaintCommand::Bundle { transform: b_ts, opacity, bounds, cmds } => PaintCommand::Bundle {
+            transform: transform.then(&b_ts),
+            opacity: alpha * opacity,
+            bounds,
+            cmds,
+          },
+        };
+        self.commands.push(cmd);
+      }
+    } else {
+      let rect = Rect::from_size(svg.size);
+      self.draw_bundle_commands(rect, svg.commands.clone());
     }
 
     self
@@ -611,6 +649,19 @@ impl Painter {
       }
     }
   }
+}
+
+impl Drop for PainterResult<'_> {
+  fn drop(&mut self) { self.0.clear() }
+}
+
+impl<'a> Deref for PainterResult<'a> {
+  type Target = [PaintCommand];
+  fn deref(&self) -> &Self::Target { self.0 }
+}
+
+impl<'a> DerefMut for PainterResult<'a> {
+  fn deref_mut(&mut self) -> &mut Self::Target { self.0 }
 }
 
 /// An RAII implementation of a "scoped state" of the render layer. When this
@@ -751,10 +802,12 @@ mod test {
       .fill()
       .finish();
 
-    assert_eq!(painter.current_state().clip_cnt, 0);
-
     assert!(matches!(commands[commands.len() - 1], PaintCommand::PopClip));
     assert!(matches!(commands[commands.len() - 2], PaintCommand::PopClip));
+
+    std::mem::drop(commands);
+
+    assert_eq!(painter.current_state().clip_cnt, 0);
   }
 
   #[test]

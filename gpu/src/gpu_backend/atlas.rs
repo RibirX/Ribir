@@ -32,7 +32,9 @@ pub(crate) struct Atlas<T: Texture> {
   atlas_allocator: AtlasAllocator,
   texture: T,
   cache: FrameCache<Resource<dyn Any>, AtlasHandle>,
+  /// Extra textures which store only single allocation.
   extras: Slab<T>,
+  /// All allocations in the current frame and not cached.
   islands: ahash::HashSet<AtlasDist>,
 }
 
@@ -184,7 +186,7 @@ where
 
 impl AtlasConfig {
   pub fn new(label: &'static str, max_size: DeviceSize) -> Self {
-    Self { label, min_size: max_size / 4, max_size }
+    Self { label, min_size: max_size / 8, max_size }
   }
 }
 

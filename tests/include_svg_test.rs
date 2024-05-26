@@ -4,7 +4,7 @@ use ribir_dev_helper::*;
 #[test]
 fn include_svg() {
   let svg: Svg = include_crate_svg!("./assets/test1.svg");
-  assert_eq!(svg.paint_commands.len(), 2);
+  assert_eq!(svg.commands.len(), 2);
 }
 
 fn fix_draw_svg_not_apply_alpha() -> Painter {

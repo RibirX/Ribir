@@ -1,12 +1,10 @@
-use std::{cmp::Ordering, hash::Hash, ops::Range};
+use std::{any::Any, cmp::Ordering, hash::Hash, ops::Range};
 
 use guillotiere::euclid::SideOffsets2D;
 use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use ribir_algo::Resource;
-use ribir_geom::{DeviceRect, DeviceSize, Transform};
-use ribir_painter::{
-  image::ColorFormat, PaintPath, Path, PathCommand, PixelImage, Vertex, VertexBuffers,
-};
+use ribir_geom::{transform_to_device_rect, DeviceRect, DeviceSize, Size, Transform};
+use ribir_painter::{image::ColorFormat, PaintPath, Path, PixelImage, Vertex, VertexBuffers};
 
 use super::{
   atlas::{Atlas, AtlasConfig, AtlasDist},
@@ -20,11 +18,19 @@ const PAR_CHUNKS_SIZE: usize = 64;
 pub(super) enum TextureID {
   Alpha(usize),
   Rgba(usize),
+  Bundle(usize),
 }
 
 pub(super) struct TexturesMgr<T: Texture> {
   alpha_atlas: Atlas<T>,
   rgba_atlas: Atlas<T>,
+  /// Similar to the `rgba_atlas`, this is used to allocate the target texture
+  /// for drawing commands.
+  ///
+  /// We keep it separate from `rgba_atlas` because the backend may not permit a
+  /// texture to be used both as a target and as a sampled resource in the same
+  /// draw call.
+  target_atlas: Atlas<T>,
   fill_task: Vec<FillTask>,
   fill_task_buffers: VertexBuffers<()>,
   need_clear_areas: Vec<DeviceRect>,
@@ -49,6 +55,7 @@ macro_rules! id_to_texture_mut {
     match $id {
       TextureID::Alpha(id) => $mgr.alpha_atlas.get_texture_mut(id),
       TextureID::Rgba(id) => $mgr.rgba_atlas.get_texture_mut(id),
+      TextureID::Bundle(id) => $mgr.target_atlas.get_texture_mut(id),
     }
   };
 }
@@ -58,6 +65,7 @@ macro_rules! id_to_texture {
     match $id {
       TextureID::Alpha(id) => $mgr.alpha_atlas.get_texture(id),
       TextureID::Rgba(id) => $mgr.rgba_atlas.get_texture(id),
+      TextureID::Bundle(id) => $mgr.target_atlas.get_texture(id),
     }
   };
 }
@@ -81,6 +89,11 @@ where
         ColorFormat::Rgba8,
         gpu_impl,
       ),
+      target_atlas: Atlas::new(
+        AtlasConfig::new("Bundle atlas", max_size),
+        ColorFormat::Rgba8,
+        gpu_impl,
+      ),
       fill_task: <_>::default(),
       fill_task_buffers: <_>::default(),
       need_clear_areas: vec![],
@@ -90,28 +103,25 @@ where
   /// Store an alpha path in texture and return the texture and a transform that
   /// can transform the mask to viewport
   pub(super) fn store_alpha_path(
-    &mut self, path: &PathCommand, viewport: DeviceRect, gpu: &mut T::Host,
+    &mut self, path: &PaintPath, matrix: &Transform, viewport: &DeviceRect, gpu: &mut T::Host,
   ) -> (TextureSlice, Transform) {
-    match &path.path {
+    match path {
       PaintPath::Share(p) => {
-        let cache_scale: f32 = self.alpha_cache_path_scale(path);
+        let cache_scale: f32 = self.cache_scale(&path.bounds().size, matrix);
         let key = p.clone().into_any();
         let (slice, scale) = if let Some(h) = self.alpha_atlas.get(&key, cache_scale).copied() {
           let mask_slice = self.alpha_atlas_dist_to_tex_silice(&h.dist);
           (mask_slice, h.scale)
         } else {
-          let scale_bounds = p
-            .bounds()
-            .scale(cache_scale, cache_scale)
-            .round_out();
-          let (dist, slice) = self.alpha_allocate(scale_bounds.size.to_i32().cast_unit(), gpu);
+          let scale_bounds = p.bounds().scale(cache_scale, cache_scale);
+          let (dist, slice) =
+            self.alpha_allocate(scale_bounds.round_out().size.to_i32().cast_unit(), gpu);
           let _ = self.alpha_atlas.cache(key, cache_scale, dist);
           let offset = slice.rect.origin.to_f32().cast_unit() - scale_bounds.origin;
           let transform = Transform::scale(cache_scale, cache_scale).then_translate(offset);
-          let path = path.path.clone();
           self
             .fill_task
-            .push(FillTask { slice, path, transform, clip_rect: None });
+            .push(FillTask { slice, path: path.clone(), transform, clip_rect: None });
           (slice, cache_scale)
         };
 
@@ -119,17 +129,17 @@ where
         let slice_origin = slice.rect.origin.to_vector().to_f32();
         // back to slice origin
         let matrix = Transform::translation(-slice_origin.x, -slice_origin.y)
-          // move to cachedc path axis.
+          // move to cached path axis.
           .then_translate(path_origin.to_vector().cast_unit())
           // scale back to path axis.
           .then_scale(1. / scale, 1. / scale)
           // apply path transform matrix to view.
-          .then(&path.transform);
+          .then(matrix);
 
         (slice.expand_for_paste(), matrix)
       }
       PaintPath::Own(_) => {
-        let paint_bounds = path.paint_bounds.round_out().to_i32().cast_unit();
+        let paint_bounds = transform_to_device_rect(path.bounds(), matrix);
         let alloc_size = size_expand_blank(paint_bounds.size);
 
         let (visual_rect, clip_rect) = if self.alpha_atlas.is_good_size_to_alloc(alloc_size) {
@@ -137,7 +147,7 @@ where
         } else {
           // We intersect the path bounds with the viewport to reduce the number of pixels
           // drawn for large paths.
-          let visual_rect = paint_bounds.intersection(&viewport).unwrap();
+          let visual_rect = paint_bounds.intersection(viewport).unwrap();
           (visual_rect, Some(visual_rect))
         };
 
@@ -145,8 +155,8 @@ where
         let offset = (slice.rect.origin - visual_rect.origin)
           .to_f32()
           .cast_unit();
-        let ts = path.transform.then_translate(offset);
-        let task = FillTask { slice, transform: ts, path: path.path.clone(), clip_rect };
+        let ts = matrix.then_translate(offset);
+        let task = FillTask { slice, transform: ts, path: path.clone(), clip_rect };
         self.fill_task.push(task);
 
         let offset = (visual_rect.origin - slice.rect.origin).to_f32();
@@ -171,6 +181,22 @@ where
     TextureSlice { tex_id: TextureID::Rgba(h.tex_id()), rect: h.tex_rect(atlas) }
   }
 
+  pub(super) fn store_commands(
+    &mut self, size: DeviceSize, target: Resource<dyn Any>, scale: f32, gpu: &mut T::Host,
+    init: impl FnOnce(&DeviceRect, &mut T, &mut T::Host),
+  ) -> (f32, TextureSlice) {
+    let dist = self
+      .target_atlas
+      .get_or_cache(target, scale, size, gpu, init);
+    (
+      dist.scale,
+      TextureSlice {
+        tex_id: TextureID::Bundle(dist.tex_id()),
+        rect: dist.tex_rect(&self.target_atlas),
+      },
+    )
+  }
+
   pub(super) fn texture(&self, tex_id: TextureID) -> &T { id_to_texture!(self, tex_id) }
 
   fn alpha_allocate(
@@ -191,18 +217,17 @@ where
     TextureSlice { tex_id: TextureID::Alpha(dist.tex_id()), rect: rect.inner_rect(blank_side) }
   }
 
-  fn alpha_cache_path_scale(&self, path: &PathCommand) -> f32 {
-    let Transform { m11, m12, m21, m22, .. } = path.transform;
+  pub(super) fn cache_scale(&self, size: &Size, matrix: &Transform) -> f32 {
+    let Transform { m11, m12, m21, m22, .. } = matrix;
     let scale = (m11.abs() + m12.abs()).max(m21.abs() + m22.abs());
-    let path_size = path.path.bounds().size;
-    let dis = path_size.width.max(path_size.height);
+    let dis = size.width.max(size.height);
     if dis * scale < 32. {
       // If the path is too small, set a minimum tessellation size of 32 pixels.
       32. / dis
     } else {
       // 2 * BLANK_EDGE is the blank edge for each side.
       let max_size = size_shrink_blank(self.alpha_atlas.max_size()).to_f32();
-      let max_scale = (max_size.width / path_size.width).min(max_size.width / path_size.height);
+      let max_scale = (max_size.width / size.width).min(max_size.width / size.height);
       scale.min(max_scale)
     }
   }
@@ -338,6 +363,7 @@ where
       self.need_clear_areas.push(rect);
     });
     self.rgba_atlas.end_frame();
+    self.target_atlas.end_frame();
   }
 }
 
@@ -384,7 +410,7 @@ pub mod tests {
 
   use futures::executor::block_on;
   use ribir_geom::*;
-  use ribir_painter::{Color, PaintPathAction};
+  use ribir_painter::Color;
 
   use super::*;
   use crate::{WgpuImpl, WgpuTexture};
@@ -452,15 +478,12 @@ pub mod tests {
 
     let p = Resource::new(Path::rect(&rect(0., 0., 300., 300.)));
     let p = PaintPath::Share(p.clone());
-    let path1 =
-      PathCommand::new(p.clone(), PaintPathAction::Color(Color::RED), Transform::scale(2., 2.));
-    let path2 =
-      PathCommand::new(p, PaintPathAction::Color(Color::BLUE), Transform::translation(100., 100.));
 
     let viewport = rect(0, 0, 1024, 1024);
-    let (slice1, ts1) = mgr.store_alpha_path(&path1, viewport, &mut wgpu);
+    let (slice1, ts1) = mgr.store_alpha_path(&p, &Transform::scale(2., 2.), &viewport, &mut wgpu);
 
-    let (slice2, ts2) = mgr.store_alpha_path(&path2, viewport, &mut wgpu);
+    let (slice2, ts2) =
+      mgr.store_alpha_path(&p, &Transform::translation(100., 100.), &viewport, &mut wgpu);
     assert_eq!(slice1, slice2);
 
     assert_eq!(ts1, Transform::new(1., 0., 0., 1., -2., -2.));

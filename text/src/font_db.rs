@@ -299,7 +299,7 @@ impl Face {
         bounds.and_then(move |b| {
           let mut path = builder.build(rect(b.x_min, b.y_min, b.width(), b.height()).to_f32());
           if let PathStyle::Stroke(options) = style {
-            path = path.stroke(&options, None)?;
+            path = path.stroke(options, None)?;
           }
           Some(Resource::new(path))
         })

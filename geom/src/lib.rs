@@ -42,3 +42,12 @@ where
     Point2D::new(rect.min_x(), rect.max_y()),
   ]
 }
+
+/// Apply the transform to the rect and return the new rect as device unit.
+pub fn transform_to_device_rect(rect: &Rect, matrix: &Transform) -> DeviceRect {
+  matrix
+    .outer_transformed_rect(rect)
+    .round_out()
+    .to_i32()
+    .cast_unit()
+}

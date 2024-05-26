@@ -211,8 +211,8 @@ pub struct GradientStopPrimitive {
   pub offset: f32,
 }
 
-impl From<GradientStop> for GradientStopPrimitive {
-  fn from(stop: GradientStop) -> Self {
+impl GradientStopPrimitive {
+  fn new(stop: &GradientStop) -> Self {
     GradientStopPrimitive { color: stop.color.into_u32(), offset: stop.offset }
   }
 }
