@@ -224,7 +224,7 @@ macro_rules! widget_image_test {
         wnd.draw_frame();
         let Frame { commands, viewport, surface} = wnd.take_last_frame().unwrap();
         let viewport = viewport.to_i32().cast_unit();
-        let img = wgpu_render_commands(commands, viewport, surface);
+        let img = wgpu_render_commands(&commands, viewport, surface);
         let name = format!("{}_with_default_by_wgpu", std::stringify!($widget_fn));
         let file_path = test_case_name!(name, "png");
         ImageTest::new(img, &file_path)
@@ -241,7 +241,7 @@ macro_rules! widget_image_test {
         wnd.draw_frame();
         let Frame { commands, viewport, surface} = wnd.take_last_frame().unwrap();
         let viewport = viewport.to_i32().cast_unit();
-        let img = wgpu_render_commands(commands, viewport, surface);
+        let img = wgpu_render_commands(&commands, viewport, surface);
         let name = format!("{}_with_material_by_wgpu", std::stringify!($widget_fn));
         let file_path = test_case_name!(name, "png");
         ImageTest::new(img, &file_path)

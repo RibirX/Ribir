@@ -85,7 +85,7 @@ pub trait ShellWindow {
   /// device.
   fn device_pixel_ratio(&self) -> f32;
   fn begin_frame(&mut self, surface_color: Color);
-  fn draw_commands(&mut self, viewport: Rect, commands: Vec<PaintCommand>);
+  fn draw_commands(&mut self, viewport: Rect, commands: &[PaintCommand]);
   fn end_frame(&mut self);
 }
 
@@ -202,8 +202,8 @@ impl Window {
 
       let mut shell = self.shell_wnd.borrow_mut();
       let inner_size = shell.inner_size();
-      let paint_cmds = self.painter.borrow_mut().finish();
-      shell.draw_commands(Rect::from_size(inner_size), paint_cmds);
+      let mut painter = self.painter.borrow_mut();
+      shell.draw_commands(Rect::from_size(inner_size), &painter.finish());
 
       shell.end_frame();
     }

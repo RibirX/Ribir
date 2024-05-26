@@ -1,4 +1,4 @@
-use ribir_core::prelude::{Color, DeviceRect, DeviceSize, PaintCommand, PainterBackend};
+use ribir_core::prelude::{Color, DeviceRect, DeviceSize, PaintCommand, PainterBackend, Transform};
 use ribir_gpu::Surface;
 
 use crate::winit_shell_wnd::WinitBackend;
@@ -28,10 +28,15 @@ impl<'a> WinitBackend<'a> for WgpuBackend<'a> {
 
   fn begin_frame(&mut self, surface_color: Color) { self.backend.begin_frame(surface_color); }
 
-  fn draw_commands(&mut self, viewport: DeviceRect, commands: Vec<PaintCommand>) {
-    self
-      .backend
-      .draw_commands(viewport, commands, self.surface.get_current_texture());
+  fn draw_commands(
+    &mut self, viewport: DeviceRect, global_matrix: &Transform, commands: &[PaintCommand],
+  ) {
+    self.backend.draw_commands(
+      viewport,
+      commands,
+      global_matrix,
+      self.surface.get_current_texture(),
+    );
   }
 
   fn end_frame(&mut self) {
