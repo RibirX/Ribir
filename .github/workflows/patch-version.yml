@@ -31,12 +31,6 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - run: |
-          new_commit=$(git log $(git describe --tags --abbrev=0)..HEAD --oneline | wc -l)
-          if [ $new_commit -eq 0 ]; then
-            echo "No new commits since last version"
-            exit 1
-          fi
       - id: auto_detect
         if: ${{ github.event.inputs.level == 'auto' || github.event.inputs.level == '' }}
         run: echo "level=$(git describe --tags --abbrev=0 | grep -o "rc\|beta")" >> $GITHUB_OUTPUT
