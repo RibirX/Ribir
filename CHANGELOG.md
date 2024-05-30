@@ -130,7 +130,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
   - The `include_svg!` macro requires the `nightly` feature to be enabled.
 
 
-## [0.2.0-beta.1](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0...ribir-v0.2.0-beta.1) - 2024-03-26
+## [0.2.0](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0...ribir-v0.2.0) - 2024-05-29
 
 ### Documented
 
