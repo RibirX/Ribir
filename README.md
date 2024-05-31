@@ -19,7 +19,7 @@ Use Rust to build multi-platform applications from a single codebase.
 )](https://twitter.com/intent/user?screen_name=ribir_x)
 
 
-[Website] | [Documents] | [中文文档] | [Examples] | [Changelog] | [Releases] | [Roadmap]
+[Website] | [Documents] | [中文文档] | [Web Demo]| [Examples] | [Changelog] | [Releases] | [Roadmap]
 </div>
 
 ![](./static/hero-banner.png)
@@ -89,6 +89,8 @@ fn main() {
       .with_child(counter, ctx)
       .build(ctx)
   };
+
+  App::run(counter);
 }
 ```
 
@@ -124,8 +126,12 @@ More [Examples]
 |macOS|✅|
 |iOS|🚧 Not yet|
 |Android|🚧 Not yet|
-|Web|🚧 Not yet|
+|Web|✅|
 
+Ribir is actively being developed and tested on desktop platforms, with both desktop and web platforms integrated into our CI/CD pipeline.
+
+While the framework can compile and run on mobile platforms, we haven't fully tested or adapted the user interface for them yet. We plan to focus on mobile support once the core framework is stable and a production-ready widget library is released.
+ 
 ## Love Ribir?
 
 If you like Ribir, give our repo a [⭐ STAR ⬆️](https://github.com/RibirX/Ribir) and [WATCH 👀](https://github.com/RibirX/Ribir/subscription) our repository to stay updated with the latest developments!
@@ -185,3 +191,4 @@ Ribir is [MIT-licensed](./LICENSE)
 [Documents]: https://ribir.org/docs/introduction
 [中文文档]: https://ribir.org/zh/docs/introduction
 [wgpu]: https://github.com/gfx-rs/wgpu
+[Web Demo]: https://ribir.org/wordle_game/

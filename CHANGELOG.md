@@ -25,6 +25,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+We're thrilled to announce that Ribir now supports the Web platform! 🎉🎉🎉 
+
+Experience the power of compiling Rust code to wasm and rendering it with WebGPU or WebGL.
+
+Check out our Wordle game demo, now running smoothly in your browser!
+
+[![Wordle Game](./static/wordle-wasm.png)](https://ribir.org/wordle_game/)
+
 ### Features
 
 - **core**: The split functions in `StateReader::map_reader`, `StateWriter::map_writer`, and `StateWriter::split_writer` no longer need to return a reference. (#568 @M-Adoo)
