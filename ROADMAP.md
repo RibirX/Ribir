@@ -39,23 +39,31 @@ This milestone aimed to improve the core API, making it easier for users to crea
 This milestone aims to prepare Ribir for the web and stabilize the widget system APIs.
 
 - [x] Switch to stable Rust
-- [ ] Add support for browsers (WASM + WebGPU/WebGL)
+- [x] Add support for browsers (WASM + WebGPU/WebGL)
+- [x] Make state splitter support any type with a lifetime. Ribir will implement `&T`, `Option<&T>`, and `Result<&T, E>` by default.
+- [x] Ensure only `watch!` need to be manually unsubscribed and provide a guide on how to do so
+
+## Theme API Stabilization and State Provider (v0.4, June 2024)
+
+This milestone aims to stabilize the theme API, simplify type conversion, and facilitate the development of widgets with dynamic themes.
+
 - [ ] Simplify type conversion.
   We've over-engineered some aspects of type conversion, which has actually increased the learning curve for users and reduced error readability. For instance, the conversion of `DeclareInit` and the nested conversion of `Template`. The downside is that more explicit conversions will be required when using them.
-- [ ] Make state splitter support any type with a lifetime. Ribir will implement `&T`, `Option<&T>`, and `Result<&T, E>` by default.
-- [ ] Ensure only `watch!` need to be manually unsubscribed and provide a guide on how to do so
 - [ ] In-depth widget guide, explaining how widgets work and how to create custom widgets.
-
-## Theme API Stabilization and State Provider (v0.4)
-
 - [ ] Implement a provider widget that can exports a state to its subtree, allowing widgets in its subtree to query the state using context.
 - [ ] Simplify the theme system API to enhance user-friendliness.
+
+### Widgets Library And Storybook (v0.5, July 2024)
+
+- [ ] Production level widgets library with the basic widgets
+- [ ] Complete the basic and material themes
+- [ ] storybook to display all widgets, allowing user interaction
+- [ ] mobile platform basic support (iOS, Android)
 
 ## Backlog
 
 The following tasks are in no particular order. When we start the next milestone, we will decide its content based on current needs and progress.
 
-- [ ] Production level widgets library
 - [ ] Mobile platform support (iOS, Android)
   - Compiling should be straightforward, but usability will depend on multi-touch and gesture support.
 - [ ] Multi-touch and gesture support.
@@ -68,4 +76,3 @@ The following tasks are in no particular order. When we start the next milestone
 - [ ] Text testing - bidi, rtl, vertical text, etc.
 - [ ] Drag and drop support
 - [ ] Provide more animations and attractive demos to showcase them
-- [ ] Storybook to display all widgets, allowing user interaction
