@@ -18,9 +18,9 @@ futures = {workspace = true, optional = true}
 guillotiere.workspace = true
 log.workspace = true
 rayon.workspace = true
-ribir_algo = {path = "../algo", version = "0.3.0-alpha.5" }
-ribir_geom = {path = "../geom", version = "0.3.0-alpha.5" }
-ribir_painter = {path = "../painter", features = ["tessellation"], version = "0.3.0-alpha.5" }
+ribir_algo = {path = "../algo", version = "0.3.0-beta.1" }
+ribir_geom = {path = "../geom", version = "0.3.0-beta.1" }
+ribir_painter = {path = "../painter", features = ["tessellation"], version = "0.3.0-beta.1" }
 slab = "0.4.9"
 wgpu = {workspace = true, optional = true}
 zerocopy = {workspace=true, features = ["derive"]}
