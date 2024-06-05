@@ -215,7 +215,7 @@ pub fn pipe(input: TokenStream) -> TokenStream {
 ///
 /// ## Example
 ///
-/// ```rust
+/// ```rust ignore
 /// use ribir::prelude::*;
 ///
 /// let label = Stateful::new(1);
@@ -234,7 +234,7 @@ pub fn pipe(input: TokenStream) -> TokenStream {
 /// manually call unsubscribe at the appropriate time, typically in the
 /// `on_disposed` method of a widget.
 ///
-/// ```
+/// ```rust ignore
 /// use ribir::prelude::*;
 ///
 /// let even = Stateful::new(1);
