@@ -1,10 +1,7 @@
 use std::cell::Cell;
 
 use ribir_algo::Sc;
-use rxrust::{
-  ops::box_it::CloneableBoxOp,
-  prelude::{BoxIt, ObservableExt},
-};
+use rxrust::{ops::box_it::CloneableBoxOp, prelude::BoxIt};
 
 use super::{
   state_cell::PartData, MapWriterAsReader, ModifyScope, Notifier, ReadRef, StateReader,
@@ -14,7 +11,6 @@ use crate::{
   context::BuildCtx,
   prelude::AppCtx,
   state::state_cell::ValueMutRef,
-  ticker::Instant,
   widget::{Render, RenderBuilder, Widget},
 };
 
@@ -24,8 +20,6 @@ pub struct SplittedWriter<O, W> {
   splitter: W,
   notifier: Notifier,
   batched_modify: Sc<Cell<ModifyScope>>,
-  create_at: Instant,
-  last_modified: Sc<Cell<Instant>>,
   ref_count: Sc<Cell<usize>>,
 }
 
@@ -74,28 +68,6 @@ where
   }
 }
 
-// fixme: we will remove the stamp check after #521 is fixed.
-struct StampCheck<R> {
-  stamp: Instant,
-  reader: R,
-}
-
-impl<R: StateReader> CloneableChecker for StampCheck<R> {
-  fn check(&self) -> bool { true }
-  fn box_clone(&self) -> Box<dyn CloneableChecker> {
-    Box::new(StampCheck { stamp: self.stamp, reader: self.reader.clone_reader() })
-  }
-}
-
-trait CloneableChecker {
-  fn check(&self) -> bool;
-  fn box_clone(&self) -> Box<dyn CloneableChecker>;
-}
-
-impl Clone for Box<dyn CloneableChecker> {
-  fn clone(&self) -> Self { self.box_clone() }
-}
-
 impl<V, O, W> StateWatcher for SplittedWriter<O, W>
 where
   Self: 'static,
@@ -103,18 +75,7 @@ where
   W: Fn(&mut O::Value) -> PartData<V> + Clone,
 {
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, std::convert::Infallible> {
-    let origin = self.origin.clone_reader();
-    let create_at = self.create_at;
-
-    // create a cloneable checker to check.
-    let checker: Box<dyn CloneableChecker> =
-      Box::new(StampCheck { stamp: create_at, reader: origin.clone_reader() });
-
-    self
-      .notifier
-      .raw_modifies()
-      .take_while(move |_| checker.check())
-      .box_it()
+    self.notifier.raw_modifies().box_it()
   }
 }
 
@@ -142,8 +103,6 @@ where
       splitter: self.splitter.clone(),
       notifier: self.notifier.clone(),
       batched_modify: self.batched_modify.clone(),
-      last_modified: self.last_modified.clone(),
-      create_at: self.create_at,
       ref_count: self.ref_count.clone(),
     }
   }
@@ -175,15 +134,11 @@ where
   W: Fn(&mut O::Value) -> PartData<V> + Clone,
 {
   pub(super) fn new(origin: O, mut_map: W) -> Self {
-    let create_at = Instant::now();
-
     Self {
       origin,
       splitter: mut_map,
       notifier: Notifier::default(),
       batched_modify: <_>::default(),
-      last_modified: Sc::new(Cell::new(create_at)),
-      create_at,
       ref_count: Sc::new(Cell::new(1)),
     }
   }
