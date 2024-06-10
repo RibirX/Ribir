@@ -30,7 +30,7 @@ pub enum BoxFit {
 }
 
 /// Widget set how its child should be scale to fit its box.
-#[derive(Query, SingleChild, Default)]
+#[derive(SingleChild, Default)]
 pub struct FittedBox {
   pub box_fit: BoxFit,
   scale_cache: Cell<Transform>,

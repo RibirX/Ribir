@@ -5,7 +5,7 @@ use super::ConstrainedBox;
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
-#[derive(Clone, PartialEq, Query, Declare)]
+#[derive(Clone, PartialEq, Declare)]
 pub struct Expanded {
   #[declare(default = 1.)]
   pub flex: f32,
@@ -23,7 +23,7 @@ impl ComposeChild for Expanded {
         },
         @{ child }
       }
-      .attach_state_data(this, ctx!())
+      .try_unwrap_state_and_attach(this, ctx!())
     }
   }
 }

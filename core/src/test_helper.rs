@@ -187,7 +187,7 @@ impl TestShellWindow {
   }
 }
 
-#[derive(Declare, Query, MultiChild)]
+#[derive(Declare, MultiChild)]
 pub struct MockStack {
   child_pos: Vec<Point>,
 }
@@ -216,10 +216,10 @@ impl Render for MockStack {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-#[derive(Declare, Query, MultiChild, Default)]
+#[derive(Declare, MultiChild, Default)]
 pub struct MockMulti;
 
-#[derive(Declare, Query, Clone, SingleChild)]
+#[derive(Declare, Clone, SingleChild)]
 pub struct MockBox {
   pub size: Size,
 }

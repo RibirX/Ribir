@@ -6,11 +6,12 @@ use std::{
 
 use ribir_algo::Sc;
 use rxrust::ops::box_it::BoxOp;
+use widget_id::RenderQueryable;
 
 use crate::{
   builtin_widgets::key::AnyKey,
   prelude::*,
-  render_helper::{RenderProxy, RenderTarget},
+  render_helper::{PureRender, RenderProxy},
   ticker::FrameMsg,
 };
 
@@ -773,7 +774,7 @@ impl<V: MultiChild> MultiChild for Box<dyn Pipe<Value = V>> {}
 struct PipeNode(Sc<UnsafeCell<InnerPipeNode>>);
 
 struct InnerPipeNode {
-  data: Box<dyn Render>,
+  data: Box<dyn RenderQueryable>,
   dyn_info: Box<dyn DynWidgetInfo>,
 }
 trait DynWidgetInfo: Any {
@@ -929,7 +930,7 @@ impl PipeNode {
       let inner_node = InnerPipeNode { data: r, dyn_info };
       let p = Self(Sc::new(UnsafeCell::new(inner_node)));
       pipe_node = Some(p.clone());
-      Box::new(RenderProxy::new(p))
+      Box::new(p)
     });
 
     // Safety: init before.
@@ -964,7 +965,7 @@ impl PipeNode {
     // if the subscription is closed, we can cancel and unwrap the `PipeNode`
     // immediately.
     if u.is_closed() {
-      let v = std::mem::replace(&mut self.as_mut().data, Box::new(Void));
+      let v = std::mem::replace(&mut self.as_mut().data, Box::new(PureRender(Void)));
       *id.get_node_mut(tree).unwrap() = v;
     } else {
       id.attach_anonymous_data(u.unsubscribe_when_dropped(), tree)
@@ -1021,25 +1022,31 @@ impl Query for PipeNode {
     &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool {
     let p = self.as_ref();
-    p.data.query_inside_first(type_id, callback) && p.dyn_info.query_inside_first(type_id, callback)
+    if !p.data.query_inside_first(type_id, callback) {
+      return false;
+    }
+    if type_id == TypeId::of::<DynInfo>() { callback(&p.dyn_info) } else { true }
   }
 
   fn query_outside_first(
     &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool {
     let p = self.as_ref();
-    p.dyn_info.query_outside_first(type_id, callback)
-      && p.data.query_outside_first(type_id, callback)
+    if type_id == TypeId::of::<DynInfo>() && !callback(&p.dyn_info) {
+      return false;
+    }
+    p.data.query_outside_first(type_id, callback)
   }
 }
 
-impl Query for Box<dyn DynWidgetInfo> {
-  crate::widget::impl_query_self_only!();
-}
+impl RenderProxy for PipeNode {
+  type R = dyn RenderQueryable;
 
-impl RenderTarget for PipeNode {
-  type Target = dyn Render;
-  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(&*self.as_ref().data) }
+  type Target<'r> = &'r dyn RenderQueryable
+    where
+      Self: 'r;
+
+  fn proxy<'r>(&'r self) -> Self::Target<'r> { &*self.as_ref().data }
 }
 
 #[cfg(test)]
@@ -1417,7 +1424,7 @@ mod tests {
       }
     }
 
-    #[derive(Declare, Query)]
+    #[derive(Declare)]
     struct TaskWidget {
       trigger: u32,
       paint_cnt: Rc<Cell<u32>>,

@@ -176,7 +176,7 @@ mod tests {
     test_assert(Scrollable::Both, 100., 100., 0., 0.);
   }
 
-  #[derive(SingleChild, Query, Declare, Clone)]
+  #[derive(SingleChild, Declare, Clone)]
   pub struct FixedBox {
     pub size: Size,
   }

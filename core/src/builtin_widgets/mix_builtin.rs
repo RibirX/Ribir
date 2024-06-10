@@ -3,7 +3,7 @@ use std::{cell::Cell, convert::Infallible};
 use rxrust::prelude::*;
 
 use self::focus_mgr::FocusType;
-use crate::prelude::*;
+use crate::{data_widget::Queryable, prelude::*};
 
 const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 
@@ -41,7 +41,7 @@ bitflags! {
 
 pub type EventSubject = MutRefItemSubject<'static, Event, Infallible>;
 
-#[derive(Default, Query)]
+#[derive(Default)]
 pub struct MixBuiltin {
   flags: Cell<BuiltinFlags>,
   subject: EventSubject,
@@ -367,7 +367,7 @@ impl ComposeChild for MixBuiltin {
           if this.contain_flag(BuiltinFlags::Focus) {
             this.callbacks_for_focus_node();
           }
-          child.attach_data(this, ctx)
+          child.attach_data(Queryable(this), ctx)
         } else {
           child
         }

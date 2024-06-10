@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(SingleChild, Query, Clone, Default)]
+#[derive(SingleChild, Clone, Default)]
 pub struct TransformWidget {
   pub transform: Transform,
 }

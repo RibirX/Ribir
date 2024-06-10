@@ -1,6 +1,6 @@
 use crate::{events::focus_mgr::FocusHandle, prelude::*};
 
-#[derive(Query, Default)]
+#[derive(Default)]
 pub struct RequestFocus {
   handle: Option<FocusHandle>,
 }
@@ -22,7 +22,7 @@ impl ComposeChild for RequestFocus {
         }
       }
       .build(ctx!())
-      .attach_state_data(this, ctx!())
+      .try_unwrap_state_and_attach(this, ctx!())
     }
   }
 }

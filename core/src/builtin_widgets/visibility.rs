@@ -27,7 +27,7 @@ impl ComposeChild for Visibility {
   }
 }
 
-#[derive(SingleChild, Query, Declare, Clone)]
+#[derive(SingleChild, Declare, Clone)]
 struct VisibilityRender {
   display: bool,
 }

@@ -155,7 +155,7 @@ impl Anchor {
 }
 
 /// Widget use to anchor child constraints relative to parent widget.
-#[derive(Query, SingleChild, Default)]
+#[derive(SingleChild, Default)]
 pub struct RelativeAnchor {
   pub anchor: Anchor,
 }

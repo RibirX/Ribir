@@ -32,7 +32,7 @@ macro_rules! ok {
 pub(crate) use ok;
 
 #[proc_macro_derive(SingleChild)]
-pub fn single_marco_derive(input: TokenStream) -> TokenStream {
+pub fn single_child_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
   let name = input.ident;
@@ -42,41 +42,8 @@ pub fn single_marco_derive(input: TokenStream) -> TokenStream {
   .into()
 }
 
-#[proc_macro_derive(Query)]
-pub fn query_derive(input: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(input as DeriveInput);
-  let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-  let name = input.ident;
-  quote! {
-    impl #impl_generics Query for #name #ty_generics #where_clause {
-      #[inline]
-      fn query_inside_first(
-        &self,
-        type_id: TypeId,
-        callback: &mut dyn FnMut(&dyn Any) -> bool
-      )-> bool {
-        self.query_outside_first(type_id, callback)
-      }
-
-      #[inline]
-      fn query_outside_first(
-        &self,
-        type_id: TypeId,
-        callback: &mut dyn FnMut(&dyn Any) -> bool
-      ) -> bool{
-        if type_id == self.type_id() {
-          callback(self)
-        } else {
-          true
-        }
-      }
-    }
-  }
-  .into()
-}
-
 #[proc_macro_derive(MultiChild)]
-pub fn multi_macro_derive(input: TokenStream) -> TokenStream {
+pub fn multi_child_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
   let name = input.ident;

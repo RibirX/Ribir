@@ -40,8 +40,6 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::context::*;
   #[doc(no_inline)]
-  pub use crate::data_widget::{AnonymousWrapper, DataWidget};
-  #[doc(no_inline)]
   pub use crate::declare::*;
   #[doc(no_inline)]
   pub use crate::events::*;

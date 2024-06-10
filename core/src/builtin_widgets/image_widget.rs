@@ -15,7 +15,3 @@ impl Render for Resource<PixelImage> {
     }
   }
 }
-
-impl Query for Resource<PixelImage> {
-  crate::widget::impl_query_self_only!();
-}

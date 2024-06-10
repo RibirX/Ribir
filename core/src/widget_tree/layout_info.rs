@@ -307,7 +307,7 @@ mod tests {
   use super::*;
   use crate::{prelude::*, reset_test_env, test_helper::*};
 
-  #[derive(Declare, Clone, Query, SingleChild)]
+  #[derive(Declare, Clone, SingleChild)]
   struct OffsetBox {
     pub offset: Point,
     pub size: Size,
@@ -468,7 +468,7 @@ mod tests {
   fn layout_visit_prev_position() {
     reset_test_env!();
 
-    #[derive(Declare, Query)]
+    #[derive(Declare)]
     struct MockWidget {
       pos: Cell<Point>,
       size: Size,

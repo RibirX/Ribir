@@ -29,7 +29,7 @@ pub enum JustifyContent {
   SpaceEvenly,
 }
 
-#[derive(Default, MultiChild, Declare, Query, Clone, PartialEq)]
+#[derive(Default, MultiChild, Declare, Clone, PartialEq)]
 pub struct Flex {
   /// Reverse the main axis.
   #[declare(default)]
