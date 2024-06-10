@@ -1,72 +1,89 @@
 use std::cell::RefCell;
 
 use ribir_algo::Sc;
-use state_cell::StateCell;
+use state_cell::{StateCell, ValueRef};
 
 use crate::prelude::*;
 
-pub(crate) trait RenderTarget {
-  type Target: Render + ?Sized;
-  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V;
+pub trait RenderProxy {
+  type R: ?Sized + Render;
+  type Target<'r>: Deref<Target = Self::R>
+  where
+    Self: 'r;
+
+  fn proxy<'r>(&'r self) -> Self::Target<'r>;
 }
 
-pub(crate) struct RenderProxy<R: RenderTarget>(R);
+pub(crate) struct PureRender<R: Render>(pub R);
 
-impl<R: RenderTarget + Query> RenderProxy<R> {
-  #[inline]
-  pub fn new(render: R) -> Self { Self(render) }
+impl<R: Render> Query for PureRender<R> {
+  fn query_inside_first(&self, _: TypeId, _: &mut dyn FnMut(&dyn Any) -> bool) -> bool { true }
+
+  fn query_outside_first(&self, _: TypeId, _: &mut dyn FnMut(&dyn Any) -> bool) -> bool { true }
 }
 
-impl<R> SingleChild for RenderProxy<R>
-where
-  R: RenderTarget,
-  R::Target: SingleChild,
-{
+impl<R: Render> RenderProxy for PureRender<R> {
+  type R = R;
+  type Target<'r> =&'r R where Self: 'r;
+
+  fn proxy<'r>(&'r self) -> Self::Target<'r> { &self.0 }
 }
 
-impl<R> MultiChild for RenderProxy<R>
-where
-  R: RenderTarget,
-  R::Target: MultiChild,
-{
-}
-
-impl<R: RenderTarget + Query> Render for RenderProxy<R> {
+impl<T: RenderProxy + 'static> Render for T {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    self.0.proxy(|r| r.perform_layout(clamp, ctx))
+    self.proxy().perform_layout(clamp, ctx)
   }
 
   #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { self.0.proxy(|r| r.paint(ctx)) }
+  fn paint(&self, ctx: &mut PaintingCtx) { self.proxy().paint(ctx) }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.0.proxy(|r| r.only_sized_by_parent()) }
+  fn only_sized_by_parent(&self) -> bool { self.proxy().only_sized_by_parent() }
 
   #[inline]
-  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
-    self.0.proxy(|r| r.hit_test(ctx, pos))
-  }
+  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { self.proxy().hit_test(ctx, pos) }
 
   #[inline]
-  fn get_transform(&self) -> Option<Transform> { self.0.proxy(|r| r.get_transform()) }
+  fn get_transform(&self) -> Option<Transform> { self.proxy().get_transform() }
 }
 
-impl<R: RenderTarget + Query> Query for RenderProxy<R> {
-  crate::widget::impl_proxy_query!(0);
+impl<R: Render> RenderProxy for RefCell<R> {
+  type R = R;
+
+  type Target<'r>  = std::cell::Ref<'r, R>
+    where
+      Self: 'r;
+
+  fn proxy<'r>(&'r self) -> Self::Target<'r> { self.borrow() }
 }
 
-impl<R: Render> RenderTarget for RefCell<R> {
-  type Target = R;
-  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(&*self.borrow()) }
+impl<R: Render> RenderProxy for StateCell<R> {
+  type R = R;
+
+  type Target<'r> = ValueRef<'r, R>
+    where
+      Self: 'r;
+
+  fn proxy<'r>(&'r self) -> Self::Target<'r> { self.read() }
 }
 
-impl<R: Render> RenderTarget for StateCell<R> {
-  type Target = R;
-  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { f(&*self.read()) }
+impl<R: Render> RenderProxy for Sc<R> {
+  type R = R;
+
+  type Target<'r> = &'r R
+    where
+      Self: 'r;
+
+  fn proxy<'r>(&'r self) -> Self::Target<'r> { self }
 }
 
-impl<R: RenderTarget> RenderTarget for Sc<R> {
-  type Target = R::Target;
-  fn proxy<V>(&self, f: impl FnOnce(&Self::Target) -> V) -> V { self.deref().proxy(f) }
+impl<R: Render> RenderProxy for Resource<R> {
+  type R = R;
+
+  type Target<'r> = &'r R
+    where
+      Self: 'r;
+
+  fn proxy<'r>(&'r self) -> Self::Target<'r> { self }
 }

@@ -4,7 +4,7 @@ use ribir_algo::Sc;
 use rxrust::{ops::box_it::CloneableBoxOp, prelude::*};
 
 use super::{state_cell::StateCell, WriterControl};
-use crate::{prelude::*, render_helper::RenderProxy};
+use crate::prelude::*;
 
 /// Stateful object use to watch the modifies of the inner data.
 pub struct Stateful<W> {
@@ -222,7 +222,7 @@ impl<R: Render> RenderBuilder for Stateful<R> {
     match self.try_into_value() {
       Ok(r) => r.build(ctx),
       Err(s) => {
-        let w = RenderProxy::new(s.data.clone()).build(ctx);
+        let w = s.data.clone().build(ctx);
         w.dirty_subscribe(s.raw_modifies(), ctx)
       }
     }

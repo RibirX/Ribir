@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
   context::BuildCtx,
-  render_helper::{RenderProxy, RenderTarget},
+  render_helper::RenderProxy,
   widget::{Render, RenderBuilder, Widget},
 };
 
@@ -163,52 +163,36 @@ where
   fn origin_writer(&self) -> &Self::OriginWriter { &self.origin }
 }
 
-impl<V, S, F> RenderTarget for MapReader<S, F>
+impl<V, S, F> RenderProxy for MapReader<S, F>
 where
   S: StateReader,
   F: Fn(&S::Value) -> PartData<V> + Clone + 'static,
   V: Render,
 {
-  type Target = V;
+  type R = V;
 
-  fn proxy<T>(&self, f: impl FnOnce(&Self::Target) -> T) -> T {
-    let v = self.read();
-    f(&*v)
-  }
+  type Target<'r> = ReadRef<'r, V>
+  where
+    Self: 'r;
+
+  #[inline]
+  fn proxy<'r>(&'r self) -> Self::Target<'r> { self.read() }
 }
 
-impl<V, S, F> RenderTarget for MapWriterAsReader<S, F>
+impl<V, S, F> RenderProxy for MapWriterAsReader<S, F>
 where
   S: StateReader,
   F: Fn(&mut S::Value) -> PartData<V> + Clone + 'static,
   V: Render,
 {
-  type Target = V;
+  type R = V;
 
-  fn proxy<T>(&self, f: impl FnOnce(&Self::Target) -> T) -> T {
-    let v = self.read();
-    f(&*v)
-  }
-}
+  type Target<'r> = ReadRef<'r, V>
+  
+  where
+    Self: 'r;
 
-impl<V, S, F> RenderBuilder for MapReader<S, F>
-where
-  S: StateReader,
-  F: Fn(&S::Value) -> PartData<V> + Clone + 'static,
-  V: Render,
-{
-  #[inline]
-  fn build(self, ctx: &BuildCtx) -> Widget { RenderProxy::new(self).build(ctx) }
-}
-
-impl<V, S, F> RenderBuilder for MapWriterAsReader<S, F>
-where
-  S: StateReader,
-  F: Fn(&mut S::Value) -> PartData<V> + Clone + 'static,
-  V: Render,
-{
-  #[inline]
-  fn build(self, ctx: &BuildCtx) -> Widget { RenderProxy::new(self).build(ctx) }
+  fn proxy<'r>(&'r self) -> Self::Target<'r> { self.read() }
 }
 
 impl<V, S, WM> RenderBuilder for MapWriter<S, WM>

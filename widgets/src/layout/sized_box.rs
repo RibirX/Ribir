@@ -4,7 +4,7 @@ use ribir_core::prelude::*;
 ///
 /// This widget forces its child to have a specific width and/or height
 /// (assuming values are permitted by the parent of this widget).
-#[derive(SingleChild, Query, Declare, Clone)]
+#[derive(SingleChild, Declare, Clone)]
 pub struct SizedBox {
   /// The specified size of the box.
   pub size: Size,

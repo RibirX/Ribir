@@ -1,7 +1,7 @@
 use ribir_core::prelude::*;
 
 /// The text widget display text with a single style.
-#[derive(Debug, Declare, Query, Clone, PartialEq)]
+#[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
   pub text: CowArc<str>,
   #[declare(default = Palette::of(ctx!()).on_surface_variant())]

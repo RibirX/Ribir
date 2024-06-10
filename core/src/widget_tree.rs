@@ -7,13 +7,14 @@ use std::{
 };
 
 pub mod widget_id;
+use widget_id::RenderQueryable;
 pub(crate) use widget_id::TreeArena;
 pub use widget_id::WidgetId;
 mod layout_info;
 pub use layout_info::*;
 
 use self::widget::widget_id::new_node;
-use crate::{overlay::OverlayRoot, prelude::*};
+use crate::{overlay::OverlayRoot, prelude::*, render_helper::PureRender};
 
 pub(crate) type DirtySet = Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
 
@@ -186,9 +187,9 @@ impl WidgetTree {
 
   pub(crate) fn get_many_mut<const N: usize>(
     &mut self, ids: &[WidgetId; N],
-  ) -> [&mut Box<dyn Render>; N] {
+  ) -> [&mut Box<dyn RenderQueryable>; N] {
     unsafe {
-      let mut outs: MaybeUninit<[&mut Box<dyn Render>; N]> = MaybeUninit::uninit();
+      let mut outs: MaybeUninit<[&mut Box<dyn RenderQueryable>; N]> = MaybeUninit::uninit();
       let outs_ptr = outs.as_mut_ptr();
       for (idx, wid) in ids.iter().enumerate() {
         let arena = &mut *(&mut self.arena as *mut TreeArena);
@@ -208,7 +209,7 @@ impl Default for WidgetTree {
     let mut arena = TreeArena::new();
 
     Self {
-      root: new_node(&mut arena, Box::new(OverlayRoot {})),
+      root: new_node(&mut arena, Box::new(PureRender(OverlayRoot {}))),
       wnd: Weak::new(),
       arena,
       store: LayoutStore::default(),
@@ -231,7 +232,7 @@ mod tests {
     pub(crate) fn content_root(&self) -> WidgetId { self.root.first_child(&self.arena).unwrap() }
   }
 
-  fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(Void)) }
+  fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(PureRender(Void))) }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]

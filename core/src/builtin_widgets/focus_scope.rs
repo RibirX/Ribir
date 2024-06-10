@@ -1,6 +1,6 @@
 use crate::{events::focus_mgr::FocusType, prelude::*};
 
-#[derive(Declare, Query, Clone, Default)]
+#[derive(Declare, Clone, Default)]
 pub struct FocusScope {
   /// If true, the descendants can not be focused.
   /// Default value is false, then the hold FocusScope subtree can be focused
@@ -23,7 +23,7 @@ impl ComposeChild for FocusScope {
         on_disposed: move|e| e.window().remove_focus_node(e.id, FocusType::Scope),
       }
       .build(ctx!())
-      .attach_state_data(this, ctx!())
+      .try_unwrap_state_and_attach(this, ctx!())
     }
   }
 }

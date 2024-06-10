@@ -4,6 +4,7 @@ use std::{
 };
 
 use ribir_algo::Sc;
+use widget_id::RenderQueryable;
 
 use crate::{
   prelude::*,
@@ -73,11 +74,11 @@ impl<'a> BuildCtx<'a> {
   }
 
   /// Get the widget back of `id`, panic if not exist.
-  pub(crate) fn assert_get(&self, id: WidgetId) -> Ref<dyn Render> {
+  pub(crate) fn assert_get(&self, id: WidgetId) -> Ref<dyn RenderQueryable> {
     Ref::map(self.tree.borrow(), |tree| id.assert_get(&tree.arena))
   }
 
-  pub(crate) fn alloc_widget(&self, widget: Box<dyn Render>) -> WidgetId {
+  pub(crate) fn alloc_widget(&self, widget: Box<dyn RenderQueryable>) -> WidgetId {
     new_node(&mut self.tree.borrow_mut().arena, widget)
   }
 

@@ -10,7 +10,3 @@ impl Render for Svg {
     painter.draw_svg(self);
   }
 }
-
-impl Query for Svg {
-  crate::widget::impl_query_self_only!();
-}

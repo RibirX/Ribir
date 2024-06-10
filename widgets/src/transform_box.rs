@@ -1,6 +1,6 @@
 use ribir_core::prelude::*;
 
-#[derive(SingleChild, Query, Declare, Clone)]
+#[derive(SingleChild, Declare, Clone)]
 pub struct TransformBox {
   pub matrix: Transform,
 }

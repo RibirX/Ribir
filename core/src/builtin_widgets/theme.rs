@@ -7,7 +7,7 @@ use ribir_algo::Sc;
 pub use ribir_algo::{CowArc, Resource};
 use ribir_macros::Declare;
 
-use crate::{fill_svgs, prelude::*};
+use crate::{data_widget::Queryable, fill_svgs, prelude::*};
 
 mod palette;
 pub use palette::*;
@@ -61,7 +61,6 @@ pub struct InheritTheme {
   pub font_files: Option<Vec<String>>,
 }
 
-#[derive(Query)]
 pub enum Theme {
   Full(FullTheme),
   Inherit(InheritTheme),
@@ -92,7 +91,7 @@ impl ComposeChild for ThemeWidget {
       // node, because the subtree may be hold its id.
       //
       // A `Void` is cheap for a theme.
-      let p = Void.build(ctx!()).attach_data(theme, ctx!());
+      let p = Void.build(ctx!()).attach_data(Queryable(theme), ctx!());
       // shadow the context with the theme.
       let ctx = BuildCtx::new_with_data(Some(p.id()), ctx!().tree, themes);
       let child = child.gen_widget(&ctx);

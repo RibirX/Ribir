@@ -54,13 +54,13 @@ pub enum VAlign {
 }
 
 /// A widget that align its child in x-axis, base on child's width.
-#[derive(Query, SingleChild, Default)]
+#[derive(SingleChild, Default)]
 pub struct HAlignWidget {
   pub h_align: HAlign,
 }
 
 /// A widget that align its child in y-axis, base on child's height.
-#[derive(Query, SingleChild, Default)]
+#[derive(SingleChild, Default)]
 pub struct VAlignWidget {
   pub v_align: VAlign,
 }

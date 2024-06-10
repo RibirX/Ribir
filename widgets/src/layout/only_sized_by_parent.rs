@@ -3,7 +3,7 @@ use ribir_core::prelude::*;
 /// OnlySizedByParent implies that the parent is the only input into determining
 /// the widget's size, so layout changes to the subtree do not trigger a parent
 /// relayout.
-#[derive(SingleChild, Query, Declare)]
+#[derive(SingleChild, Declare)]
 pub struct OnlySizedByParent {}
 
 impl Render for OnlySizedByParent {

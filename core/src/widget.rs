@@ -8,9 +8,10 @@ use std::{cell::RefCell, convert::Infallible};
 
 use ribir_algo::Sc;
 use rxrust::ops::box_it::CloneableBoxOp;
+use widget_id::RenderQueryable;
 
 pub(crate) use crate::widget_tree::*;
-use crate::{context::*, prelude::*};
+use crate::{context::*, prelude::*, render_helper::PureRender};
 pub trait Compose: Sized {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
@@ -24,7 +25,7 @@ pub struct HitTest {
 
 /// RenderWidget is a widget which want to paint something or do a layout to
 /// calc itself size and update children positions.
-pub trait Render: Query {
+pub trait Render: 'static {
   /// Do the work of computing the layout for this widget, and return the
   /// size it need.
   ///
@@ -79,60 +80,6 @@ pub trait Query: Any {
   fn query_outside_first(
     &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
   ) -> bool;
-}
-
-impl<'a> dyn Render + 'a {
-  #[inline]
-  pub fn query_type_inside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) -> bool {
-    self
-      .query_inside_first(TypeId::of::<T>(), &mut |a| a.downcast_ref().map_or(true, &mut callback))
-  }
-
-  #[inline]
-  pub fn query_type_outside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) -> bool {
-    Query::query_outside_first(self, TypeId::of::<T>(), &mut |a| {
-      a.downcast_ref().map_or(true, &mut callback)
-    })
-  }
-
-  /// Query the most inside type match `T`, and apply the callback to it, return
-  /// what the callback return.
-  pub fn query_most_inside<T: Any, R>(&self, callback: impl FnOnce(&T) -> R) -> Option<R> {
-    let mut callback = Some(callback);
-    let mut res = None;
-    self.query_type_inside_first(|a| {
-      let cb = callback.take().expect("should only call once");
-      res = Some(cb(a));
-      false
-    });
-    res
-  }
-
-  /// Query the most outside type match `T`, and apply the callback to it,
-  /// return what the callback return.
-  pub fn query_most_outside<T: Any, R>(&self, callback: impl FnOnce(&T) -> R) -> Option<R> {
-    let mut callback = Some(callback);
-    let mut res = None;
-    self.query_type_outside_first(|a| {
-      let cb = callback.take().expect("should only call once");
-      res = Some(cb(a));
-      false
-    });
-    res
-  }
-
-  /// return if this object contain type `T`
-  pub fn contain_type<T: Any>(&self) -> bool {
-    let mut hit = false;
-    self.query_type_outside_first(|_: &T| {
-      hit = true;
-      false
-    });
-    hit
-  }
-
-  /// return if this object is type `T`
-  pub fn is<T: Any>(&self) -> bool { self.type_id() == TypeId::of::<T>() }
 }
 
 /// Trait to build a indirect widget into widget tree with `BuildCtx` in the
@@ -220,7 +167,7 @@ impl Widget {
 
   pub(crate) fn id(&self) -> WidgetId { self.id }
 
-  pub(crate) fn new(w: Box<dyn Render>, ctx: &BuildCtx) -> Self {
+  pub(crate) fn new(w: Box<dyn RenderQueryable>, ctx: &BuildCtx) -> Self {
     Self::from_id(ctx.alloc_widget(w), ctx)
   }
 
@@ -258,29 +205,6 @@ impl<F: FnMut(&BuildCtx) -> Widget + 'static> From<F> for GenWidget {
   fn from(f: F) -> Self { Self::new(f) }
 }
 
-/// only query the inner object, not query self.
-macro_rules! impl_proxy_query {
-  ($($t:tt)*) => {
-    #[inline]
-    fn query_inside_first(
-      &self,
-      type_id: TypeId,
-      callback: &mut dyn FnMut(&dyn Any) -> bool,
-    ) -> bool {
-      self.$($t)*.query_inside_first(type_id, callback)
-    }
-
-    #[inline]
-    fn query_outside_first(
-      &self,
-      type_id: TypeId,
-      callback: &mut dyn FnMut(&dyn Any) -> bool,
-    ) -> bool {
-      self.$($t)*.query_outside_first(type_id, callback)
-    }
-  }
-}
-
 /// query self and proxy to the inner object.
 macro_rules! impl_proxy_and_self_query {
   ($($t:tt)*) => {
@@ -309,62 +233,7 @@ macro_rules! impl_proxy_and_self_query {
   }
 }
 
-/// query self only.
-macro_rules! impl_query_self_only {
-  () => {
-    #[inline]
-    fn query_inside_first(
-      &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-    ) -> bool {
-      self.query_outside_first(type_id, callback)
-    }
-
-    #[inline]
-    fn query_outside_first(
-      &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-    ) -> bool {
-      if type_id == self.type_id() { callback(self) } else { true }
-    }
-  };
-}
 pub(crate) use impl_proxy_and_self_query;
-pub(crate) use impl_proxy_query;
-pub(crate) use impl_query_self_only;
-
-macro_rules! impl_proxy_render {
-  (
-    proxy $($mem: tt $(($($args: ident),*))?).*,
-    $name: ty $(,<$($($lf: lifetime)? $($p: ident)?), *>)?
-    $(,where $($w:tt)*)?
-  ) => {
-    impl $(<$($($lf)? $($p)?),*>)? Render for $name $(where $($w)*)? {
-      #[inline]
-      fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-        self.$($mem $(($($args),*))?).*.perform_layout(clamp, ctx)
-      }
-
-      #[inline]
-      fn paint(&self, ctx: &mut PaintingCtx) {
-        self.$($mem $(($($args),*))?).*.paint(ctx)
-      }
-
-      #[inline]
-      fn only_sized_by_parent(&self) -> bool {
-        self.$($mem $(($($args),*))?).*.only_sized_by_parent()
-      }
-
-      #[inline]
-      fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
-        self.$($mem $(($($args),*))?).*.hit_test(ctx, pos)
-      }
-
-      #[inline]
-      fn get_transform(&self) -> Option<Transform> {
-        self.$($mem $(($($args),*))?).*.get_transform()
-      }
-    }
-  };
-}
 
 impl<C: Compose + 'static> ComposeBuilder for C {
   #[inline]
@@ -372,8 +241,7 @@ impl<C: Compose + 'static> ComposeBuilder for C {
 }
 
 impl<R: Render + 'static> RenderBuilder for R {
-  #[inline]
-  fn build(self, ctx: &BuildCtx) -> Widget { Widget::new(Box::new(self), ctx) }
+  fn build(self, ctx: &BuildCtx) -> Widget { Widget::new(Box::new(PureRender(self)), ctx) }
 }
 
 impl<W: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for W {
@@ -396,8 +264,6 @@ impl<T: Query> Query for RefCell<T> {
 impl<T: Query> Query for StateCell<T> {
   impl_proxy_and_self_query!(read());
 }
-
-impl_proxy_render!(proxy deref(), Resource<T>, <T>, where  T: Render + 'static);
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
   ctx
@@ -466,13 +332,29 @@ impl Drop for Widget {
 mod tests {
   use super::*;
 
+  struct X;
+
+  impl Query for X {
+    fn query_inside_first(
+      &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
+    ) -> bool {
+      if type_id == TypeId::of::<X>() { callback(self) } else { true }
+    }
+
+    fn query_outside_first(
+      &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
+    ) -> bool {
+      self.query_inside_first(type_id, callback)
+    }
+  }
+
   macro_rules! impl_wrap_test {
     ($name:ident) => {
       paste::paste! {
         #[test]
         fn [<$name:lower _support_query>]() {
-          let warp = $name::new(Void);
-          let void_tid = Void.type_id();
+          let warp = $name::new(X);
+          let x_tid = X.type_id();
           let w_tid = warp.type_id();
           let mut hit = 0;
 
@@ -481,8 +363,8 @@ mod tests {
             true
           };
 
-          warp.query_inside_first(void_tid, &mut hit_fn);
-          warp.query_outside_first(void_tid, &mut hit_fn);
+          warp.query_inside_first(x_tid, &mut hit_fn);
+          warp.query_outside_first(x_tid, &mut hit_fn);
           warp.query_inside_first(w_tid, &mut hit_fn);
           warp.query_outside_first(w_tid, &mut hit_fn);
           assert_eq!(hit, 4);

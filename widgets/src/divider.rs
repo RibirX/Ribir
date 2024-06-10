@@ -37,7 +37,7 @@ use crate::prelude::*;
 ///   }
 /// };
 /// ```
-#[derive(Default, Query, Declare)]
+#[derive(Default, Declare)]
 pub struct Divider {
   #[declare(default = 1.)]
   // Extent of divider

@@ -12,7 +12,7 @@ use crate::prelude::*;
 /// dropped.
 ///
 /// It's useful when you need run a leave animation for a widget.
-#[derive(Query, Default)]
+#[derive(Default)]
 pub struct KeepAlive {
   pub keep_alive: bool,
 }
@@ -29,7 +29,7 @@ impl ComposeChild for KeepAlive {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       let modifies = this.raw_modifies();
-      child.attach_state_data(this, ctx!()).dirty_subscribe(modifies, ctx!())
+      child.try_unwrap_state_and_attach(this, ctx!()).dirty_subscribe(modifies, ctx!())
     }
   }
 }

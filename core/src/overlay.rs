@@ -1,7 +1,5 @@
 use std::{cell::RefCell, mem::replace, rc::Rc};
 
-use ribir_macros::Query;
-
 use crate::prelude::*;
 
 #[derive(Clone)]
@@ -285,7 +283,6 @@ impl OverlayState {
   fn close_handle(&self) -> OverlayCloseHandle { OverlayCloseHandle(self.clone()) }
 }
 
-#[derive(Query)]
 pub(crate) struct OverlayRoot {}
 
 impl Render for OverlayRoot {

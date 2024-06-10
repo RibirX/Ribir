@@ -1,12 +1,11 @@
-use std::any::Any;
+use std::any::{Any, TypeId};
 
 use indextree::{Arena, Node, NodeId};
 
 use super::WidgetTree;
 use crate::{
   context::{PaintingCtx, WidgetCtx},
-  prelude::{AnonymousWrapper, DataWidget},
-  render_helper::RenderProxy,
+  data_widget::{AnonymousAttacher, DataAttacher},
   widget::{Query, Render},
   window::DelayEvent,
 };
@@ -15,15 +14,19 @@ use crate::{
 
 pub struct WidgetId(pub(crate) NodeId);
 
-pub(crate) type TreeArena = Arena<Box<dyn Render>>;
+pub trait RenderQueryable: Render + Query {}
+
+impl<T: Render + Query> RenderQueryable for T {}
+
+pub(crate) type TreeArena = Arena<Box<dyn RenderQueryable>>;
 
 impl WidgetId {
   /// Returns a reference to the node data.
-  pub(crate) fn get<'a, 'b>(self, tree: &'a TreeArena) -> Option<&'a (dyn Render + 'b)> {
+  pub(crate) fn get<'a, 'b>(self, tree: &'a TreeArena) -> Option<&'a (dyn RenderQueryable + 'b)> {
     tree.get(self.0).map(|n| &**n.get())
   }
 
-  pub(crate) fn get_node_mut(self, tree: &mut TreeArena) -> Option<&mut Box<dyn Render>> {
+  pub(crate) fn get_node_mut(self, tree: &mut TreeArena) -> Option<&mut Box<dyn RenderQueryable>> {
     tree.get_mut(self.0).map(|n| n.get_mut())
   }
 
@@ -133,12 +136,12 @@ impl WidgetId {
   }
 
   fn node_feature(
-    self, tree: &TreeArena, method: impl FnOnce(&Node<Box<dyn Render>>) -> Option<NodeId>,
+    self, tree: &TreeArena, method: impl FnOnce(&Node<Box<dyn RenderQueryable>>) -> Option<NodeId>,
   ) -> Option<WidgetId> {
     tree.get(self.0).and_then(method).map(WidgetId)
   }
 
-  pub(crate) fn assert_get<'a, 'b>(self, tree: &'a TreeArena) -> &'a (dyn Render + 'b) {
+  pub(crate) fn assert_get<'a, 'b>(self, tree: &'a TreeArena) -> &'a (dyn RenderQueryable + 'b) {
     self
       .get(tree)
       .expect("Widget not exists in the `tree`")
@@ -147,7 +150,8 @@ impl WidgetId {
   /// We assume the `f` wrap the widget into a new widget, and keep the old
   /// widget as part of the new widget, otherwise, undefined behavior.
   pub(crate) fn wrap_node(
-    self, tree: &mut TreeArena, f: impl FnOnce(Box<dyn Render>) -> Box<dyn Render>,
+    self, tree: &mut TreeArena,
+    f: impl FnOnce(Box<dyn RenderQueryable>) -> Box<dyn RenderQueryable>,
   ) {
     let node = self.get_node_mut(tree).unwrap();
     unsafe {
@@ -158,14 +162,11 @@ impl WidgetId {
   }
 
   pub(crate) fn attach_data(self, data: impl Query, tree: &mut TreeArena) {
-    self.wrap_node(tree, |node| DataWidget::attach(node, data));
+    self.wrap_node(tree, |node| Box::new(DataAttacher::new(node, data)));
   }
 
-  pub fn attach_anonymous_data(self, data: impl Any, tree: &mut TreeArena) {
-    self.wrap_node(tree, |render| {
-      let r = RenderProxy::new(AnonymousWrapper::new(render, Box::new(data)));
-      Box::new(r)
-    });
+  pub(crate) fn attach_anonymous_data(self, data: impl Any, tree: &mut TreeArena) {
+    self.wrap_node(tree, |render| Box::new(AnonymousAttacher::new(render, Box::new(data))));
   }
 
   pub(crate) fn paint_subtree(self, ctx: &mut PaintingCtx) {
@@ -213,6 +214,56 @@ impl WidgetId {
   }
 }
 
-pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn Render>) -> WidgetId {
+pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn RenderQueryable>) -> WidgetId {
   WidgetId(arena.new_node(node))
+}
+
+impl<'a> dyn RenderQueryable + 'a {
+  #[inline]
+  pub fn query_type_inside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) -> bool {
+    self
+      .query_inside_first(TypeId::of::<T>(), &mut |a| a.downcast_ref().map_or(true, &mut callback))
+  }
+
+  #[inline]
+  pub fn query_type_outside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) -> bool {
+    self
+      .query_outside_first(TypeId::of::<T>(), &mut |a| a.downcast_ref().map_or(true, &mut callback))
+  }
+
+  /// Query the most inside type match `T`, and apply the callback to it, return
+  /// what the callback return.
+  pub fn query_most_inside<T: Any, R>(&self, callback: impl FnOnce(&T) -> R) -> Option<R> {
+    let mut callback = Some(callback);
+    let mut res = None;
+    self.query_type_inside_first(|a| {
+      let cb = callback.take().expect("should only call once");
+      res = Some(cb(a));
+      false
+    });
+    res
+  }
+
+  /// Query the most outside type match `T`, and apply the callback to it,
+  /// return what the callback return.
+  pub fn query_most_outside<T: Any, R>(&self, callback: impl FnOnce(&T) -> R) -> Option<R> {
+    let mut callback = Some(callback);
+    let mut res = None;
+    self.query_type_outside_first(|a| {
+      let cb = callback.take().expect("should only call once");
+      res = Some(cb(a));
+      false
+    });
+    res
+  }
+
+  /// return if this object contain type `T`
+  pub fn contain_type<T: Any>(&self) -> bool {
+    let mut hit = false;
+    self.query_type_outside_first(|_: &T| {
+      hit = true;
+      false
+    });
+    hit
+  }
 }

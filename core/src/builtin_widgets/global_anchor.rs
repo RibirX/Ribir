@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::{prelude::*, ticker::FrameMsg};
 
-#[derive(Query, Default)]
+#[derive(Default)]
 pub struct GlobalAnchor {
   pub global_anchor: Anchor,
 }

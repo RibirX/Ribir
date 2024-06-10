@@ -5,7 +5,6 @@ use std::{
 };
 
 use rand::prelude::*;
-use ribir::prelude::*;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CharHint {
@@ -30,7 +29,7 @@ impl GameStatus {
   }
 }
 
-#[derive(Debug, Query, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct WordleChar {
   pub char: char,
   pub hint: Option<CharHint>,
@@ -93,7 +92,6 @@ impl WordleGuessing {
   }
 }
 
-#[derive(Query)]
 pub struct Wordle {
   word: String,
   max_rounds: usize,
