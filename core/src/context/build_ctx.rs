@@ -123,11 +123,13 @@ impl<'a> BuildCtx<'a> {
 
       let arena = &self.tree.borrow().arena;
       p.ancestors(arena).any(|p| {
-        p.assert_get(arena)
-          .query_type_inside_first(|t: &Sc<Theme>| {
-            themes.push(t.clone());
-            matches!(t.deref(), Theme::Inherit(_))
-          });
+        for t in p.assert_get(arena).query_all_iter::<Sc<Theme>>() {
+          themes.push(t.clone());
+          if matches!(&**t, Theme::Full(_)) {
+            break;
+          }
+        }
+
         matches!(themes.last().map(Sc::deref), Some(Theme::Full(_)))
       });
       themes

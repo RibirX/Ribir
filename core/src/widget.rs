@@ -1,12 +1,11 @@
+use std::convert::Infallible;
 #[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
   marker::PhantomData,
   ops::Deref,
 };
-use std::{cell::RefCell, convert::Infallible};
 
-use ribir_algo::Sc;
 use rxrust::ops::box_it::CloneableBoxOp;
 use widget_id::RenderQueryable;
 
@@ -65,22 +64,6 @@ pub type BoxedWidget = Box<dyn for<'a, 'b> FnOnce(&'a BuildCtx<'b>) -> Widget>;
 /// A boxed function widget that can be called multiple times to regenerate
 /// widget.
 pub struct GenWidget(Box<dyn for<'a, 'b> FnMut(&'a BuildCtx<'b>) -> Widget>);
-
-/// A type can composed by many types, this trait help us to query the type and
-/// the inner type by its type id, and call the callback one by one with a `&
-/// dyn Any` of the target type. You can control if you want to continue query
-/// by return `true` or `false` in the callback.
-pub trait Query: Any {
-  /// Query the type in a inside first order, and apply the callback to it.
-  /// return what the callback return, hint if the query should continue.
-  fn query_inside_first(&self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool)
-  -> bool;
-  /// Query the type in a outside first order, and apply the callback to it,
-  /// return what the callback return, hint if the query should continue.
-  fn query_outside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool;
-}
 
 /// Trait to build a indirect widget into widget tree with `BuildCtx` in the
 /// build phase. You should not implement this trait directly, framework will
@@ -205,36 +188,6 @@ impl<F: FnMut(&BuildCtx) -> Widget + 'static> From<F> for GenWidget {
   fn from(f: F) -> Self { Self::new(f) }
 }
 
-/// query self and proxy to the inner object.
-macro_rules! impl_proxy_and_self_query {
-  ($($t:tt)*) => {
-    fn query_inside_first(
-      &self,
-      type_id: TypeId,
-      callback: &mut dyn FnMut(&dyn Any) -> bool,
-    ) -> bool {
-      if !self.$($t)*.query_inside_first(type_id, callback) {
-        return false
-      }
-
-      type_id != self.type_id() || callback(self)
-    }
-
-    fn query_outside_first(
-      &self,
-      type_id: TypeId,
-      callback: &mut dyn FnMut(&dyn Any) -> bool,
-    ) -> bool {
-      if type_id == self.type_id() && !callback(self) {
-        return false
-      }
-      self.$($t)*.query_outside_first(type_id, callback)
-    }
-  }
-}
-
-pub(crate) use impl_proxy_and_self_query;
-
 impl<C: Compose + 'static> ComposeBuilder for C {
   #[inline]
   fn build(self, ctx: &BuildCtx) -> Widget { Compose::compose(State::value(self)).build(ctx) }
@@ -249,20 +202,6 @@ impl<W: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for W 
   fn build(self, ctx: &BuildCtx) -> Widget {
     ComposeChild::compose_child(State::value(self), None).build(ctx)
   }
-}
-
-impl<T: Query> Query for Resource<T> {
-  impl_proxy_and_self_query!(deref());
-}
-impl<T: Query> Query for Sc<T> {
-  impl_proxy_and_self_query!(deref());
-}
-impl<T: Query> Query for RefCell<T> {
-  impl_proxy_and_self_query!(borrow());
-}
-
-impl<T: Query> Query for StateCell<T> {
-  impl_proxy_and_self_query!(read());
 }
 
 pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
@@ -317,8 +256,6 @@ pub(crate) use multi_build_replace_impl;
 pub(crate) use multi_build_replace_impl_include_self;
 pub(crate) use repeat_and_replace;
 
-use self::state_cell::StateCell;
-
 impl Drop for Widget {
   fn drop(&mut self) {
     log::warn!("widget allocated but never used: {:?}", self.id);
@@ -326,53 +263,4 @@ impl Drop for Widget {
       .handle
       .with_ctx(|ctx| ctx.tree.borrow_mut().remove_subtree(self.id));
   }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  struct X;
-
-  impl Query for X {
-    fn query_inside_first(
-      &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-    ) -> bool {
-      if type_id == TypeId::of::<X>() { callback(self) } else { true }
-    }
-
-    fn query_outside_first(
-      &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-    ) -> bool {
-      self.query_inside_first(type_id, callback)
-    }
-  }
-
-  macro_rules! impl_wrap_test {
-    ($name:ident) => {
-      paste::paste! {
-        #[test]
-        fn [<$name:lower _support_query>]() {
-          let warp = $name::new(X);
-          let x_tid = X.type_id();
-          let w_tid = warp.type_id();
-          let mut hit = 0;
-
-          let mut hit_fn = |_: &dyn Any| {
-            hit += 1;
-            true
-          };
-
-          warp.query_inside_first(x_tid, &mut hit_fn);
-          warp.query_outside_first(x_tid, &mut hit_fn);
-          warp.query_inside_first(w_tid, &mut hit_fn);
-          warp.query_outside_first(w_tid, &mut hit_fn);
-          assert_eq!(hit, 4);
-        }
-      }
-    };
-  }
-  impl_wrap_test!(Sc);
-  impl_wrap_test!(RefCell);
-  impl_wrap_test!(Resource);
 }

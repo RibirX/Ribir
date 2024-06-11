@@ -339,16 +339,11 @@ impl FocusManager {
       .find_map(|wid| self.node_ids.get(&wid).copied())?;
 
     self.scope_list(node_id).find(|id| {
-      let mut has_ignore = false;
-      self.get(*id).and_then(|n| n.wid).map(|wid| {
-        wid
-          .get(arena)?
-          .query_most_inside(|s: &FocusScope| {
-            has_ignore = s.skip_descendants;
-            !has_ignore
-          })
-      });
-      has_ignore
+      self
+        .get(*id)
+        .and_then(|n| n.wid)
+        .and_then(|wid| wid.get(arena)?.query_ref::<FocusScope>())
+        .map_or(false, |s| s.skip_descendants)
     })
   }
 
@@ -357,21 +352,22 @@ impl FocusManager {
     let tree = wnd.widget_tree.borrow();
     scope_id
       .and_then(|id| id.get(&tree.arena))
-      .and_then(|r| r.query_most_inside(|s: &FocusScope| s.clone()))
+      .and_then(|r| r.query_ref::<FocusScope>().map(|s| s.clone()))
       .unwrap_or_default()
   }
 
   fn tab_index(&self, node_id: NodeId) -> i16 {
     let wnd = self.window();
 
-    let get_index = || {
-      let wid = self.get(node_id)?.wid?;
-      let tree = wnd.widget_tree.borrow();
-      let r = wid.get(&tree.arena)?;
-      r.query_most_outside(|s: &MixBuiltin| s.get_tab_index())
-    };
-
-    get_index().unwrap_or(0)
+    self
+      .get(node_id)
+      .and_then(|n| n.wid)
+      .and_then(|wid| {
+        let tree = wnd.widget_tree.borrow();
+        let m = wid.get(&tree.arena)?.query_ref::<MixBuiltin>()?;
+        Some(m.get_tab_index())
+      })
+      .unwrap_or_default()
   }
 
   fn insert_node(&mut self, parent: NodeId, node_id: NodeId, wid: WidgetId, arena: &TreeArena) {

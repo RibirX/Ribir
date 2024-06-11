@@ -176,7 +176,7 @@ where
     Self: 'r;
 
   #[inline]
-  fn proxy<'r>(&'r self) -> Self::Target<'r> { self.read() }
+  fn proxy(&self) -> Self::Target<'_> { self.read() }
 }
 
 impl<V, S, F> RenderProxy for MapWriterAsReader<S, F>
@@ -188,11 +188,11 @@ where
   type R = V;
 
   type Target<'r> = ReadRef<'r, V>
-  
+
   where
     Self: 'r;
 
-  fn proxy<'r>(&'r self) -> Self::Target<'r> { self.read() }
+  fn proxy(&self) -> Self::Target<'_> { self.read() }
 }
 
 impl<V, S, WM> RenderBuilder for MapWriter<S, WM>

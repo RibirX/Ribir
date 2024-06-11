@@ -51,7 +51,7 @@ impl<W: 'static> StateReader for Stateful<W> {
   type Reader = Reader<W>;
 
   #[inline]
-  fn read(&self) -> ReadRef<Self::Value> { ReadRef::new(self.data.read()) }
+  fn read(&self) -> ReadRef<Self::Value> { self.data.read() }
 
   #[inline]
   fn clone_reader(&self) -> Self::Reader { Reader(self.data.clone()) }
@@ -105,7 +105,7 @@ impl<W: 'static> StateReader for Reader<W> {
   type Reader = Self;
 
   #[inline]
-  fn read(&self) -> ReadRef<W> { ReadRef::new(self.0.read()) }
+  fn read(&self) -> ReadRef<W> { self.0.read() }
 
   #[inline]
   fn clone_reader(&self) -> Self { Reader(self.0.clone()) }

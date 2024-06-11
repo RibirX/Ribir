@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use ribir_algo::Sc;
-use state_cell::{StateCell, ValueRef};
+use state_cell::{ReadRef, StateCell};
 
 use crate::prelude::*;
 
@@ -11,22 +11,24 @@ pub trait RenderProxy {
   where
     Self: 'r;
 
-  fn proxy<'r>(&'r self) -> Self::Target<'r>;
+  fn proxy(&self) -> Self::Target<'_>;
 }
 
 pub(crate) struct PureRender<R: Render>(pub R);
 
 impl<R: Render> Query for PureRender<R> {
-  fn query_inside_first(&self, _: TypeId, _: &mut dyn FnMut(&dyn Any) -> bool) -> bool { true }
+  fn query_all(&self, _: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
+    smallvec::SmallVec::new()
+  }
 
-  fn query_outside_first(&self, _: TypeId, _: &mut dyn FnMut(&dyn Any) -> bool) -> bool { true }
+  fn query(&self, _: TypeId) -> Option<QueryHandle> { None }
 }
 
 impl<R: Render> RenderProxy for PureRender<R> {
   type R = R;
   type Target<'r> =&'r R where Self: 'r;
 
-  fn proxy<'r>(&'r self) -> Self::Target<'r> { &self.0 }
+  fn proxy(&self) -> Self::Target<'_> { &self.0 }
 }
 
 impl<T: RenderProxy + 'static> Render for T {
@@ -55,17 +57,17 @@ impl<R: Render> RenderProxy for RefCell<R> {
     where
       Self: 'r;
 
-  fn proxy<'r>(&'r self) -> Self::Target<'r> { self.borrow() }
+  fn proxy(&self) -> Self::Target<'_> { self.borrow() }
 }
 
 impl<R: Render> RenderProxy for StateCell<R> {
   type R = R;
 
-  type Target<'r> = ValueRef<'r, R>
+  type Target<'r> = ReadRef<'r, R>
     where
       Self: 'r;
 
-  fn proxy<'r>(&'r self) -> Self::Target<'r> { self.read() }
+  fn proxy(&self) -> Self::Target<'_> { self.read() }
 }
 
 impl<R: Render> RenderProxy for Sc<R> {
@@ -75,7 +77,7 @@ impl<R: Render> RenderProxy for Sc<R> {
     where
       Self: 'r;
 
-  fn proxy<'r>(&'r self) -> Self::Target<'r> { self }
+  fn proxy(&self) -> Self::Target<'_> { self }
 }
 
 impl<R: Render> RenderProxy for Resource<R> {
@@ -85,5 +87,5 @@ impl<R: Render> RenderProxy for Resource<R> {
     where
       Self: 'r;
 
-  fn proxy<'r>(&'r self) -> Self::Target<'r> { self }
+  fn proxy(&self) -> Self::Target<'_> { self }
 }

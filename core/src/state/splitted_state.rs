@@ -153,7 +153,7 @@ where
     orig.modify_scope.remove(ModifyScope::FRAMEWORK);
     orig.modified = true;
     let value =
-      ValueMutRef { value: (self.splitter)(&mut orig.value), borrow: orig.value.borrow.clone() };
+      ValueMutRef { inner: (self.splitter)(&mut orig.value), borrow: orig.value.borrow.clone() };
 
     WriteRef { value, modified: false, modify_scope, control: self }
   }

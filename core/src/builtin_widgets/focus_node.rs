@@ -69,13 +69,11 @@ mod tests {
     let id = tree.content_root();
     let node = id.get(&tree.arena).unwrap();
     let mut cnt = 0;
-    node.query_type_inside_first(|b: &MixBuiltin| {
+    node.query_all_iter::<MixBuiltin>().for_each(|b| {
       if b.contain_flag(BuiltinFlags::Focus) {
         cnt += 1;
       }
-      true
     });
-
     assert_eq!(cnt, 1);
   }
 }

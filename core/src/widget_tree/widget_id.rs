@@ -2,11 +2,11 @@ use std::any::{Any, TypeId};
 
 use indextree::{Arena, Node, NodeId};
 
-use super::WidgetTree;
+use super::{Query, QueryHandle, QueryRef, WidgetTree, WriteRef};
 use crate::{
   context::{PaintingCtx, WidgetCtx},
   data_widget::{AnonymousAttacher, DataAttacher},
-  widget::{Query, Render},
+  widget::Render,
   window::DelayEvent,
 };
 
@@ -219,51 +219,36 @@ pub(crate) fn new_node(arena: &mut TreeArena, node: Box<dyn RenderQueryable>) ->
 }
 
 impl<'a> dyn RenderQueryable + 'a {
-  #[inline]
-  pub fn query_type_inside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) -> bool {
+  /// Return a iterator of all reference of type `T` in this node.
+  pub fn query_all_iter<T: Any>(&self) -> impl DoubleEndedIterator<Item = QueryRef<T>> {
     self
-      .query_inside_first(TypeId::of::<T>(), &mut |a| a.downcast_ref().map_or(true, &mut callback))
+      .query_all(TypeId::of::<T>())
+      .into_iter()
+      .filter_map(QueryHandle::into_ref)
   }
 
-  #[inline]
-  pub fn query_type_outside_first<T: Any>(&self, mut callback: impl FnMut(&T) -> bool) -> bool {
+  /// Return a iterator of all mutable reference of type `T` in this node.
+  pub fn query_all_iter_write<T: Any>(&self) -> impl DoubleEndedIterator<Item = WriteRef<T>> {
     self
-      .query_outside_first(TypeId::of::<T>(), &mut |a| a.downcast_ref().map_or(true, &mut callback))
+      .query_all(TypeId::of::<T>())
+      .into_iter()
+      .filter_map(QueryHandle::into_mut)
   }
 
-  /// Query the most inside type match `T`, and apply the callback to it, return
-  /// what the callback return.
-  pub fn query_most_inside<T: Any, R>(&self, callback: impl FnOnce(&T) -> R) -> Option<R> {
-    let mut callback = Some(callback);
-    let mut res = None;
-    self.query_type_inside_first(|a| {
-      let cb = callback.take().expect("should only call once");
-      res = Some(cb(a));
-      false
-    });
-    res
+  /// Query the outermost of reference of type `T` in this node.
+  pub fn query_write<T: Any>(&self) -> Option<WriteRef<T>> {
+    self
+      .query(TypeId::of::<T>())
+      .and_then(QueryHandle::into_mut)
   }
 
-  /// Query the most outside type match `T`, and apply the callback to it,
-  /// return what the callback return.
-  pub fn query_most_outside<T: Any, R>(&self, callback: impl FnOnce(&T) -> R) -> Option<R> {
-    let mut callback = Some(callback);
-    let mut res = None;
-    self.query_type_outside_first(|a| {
-      let cb = callback.take().expect("should only call once");
-      res = Some(cb(a));
-      false
-    });
-    res
+  /// Query the outermost of reference of type `T` in this node.
+  pub fn query_ref<T: Any>(&self) -> Option<QueryRef<T>> {
+    self
+      .query(TypeId::of::<T>())
+      .and_then(QueryHandle::into_ref)
   }
 
   /// return if this object contain type `T`
-  pub fn contain_type<T: Any>(&self) -> bool {
-    let mut hit = false;
-    self.query_type_outside_first(|_: &T| {
-      hit = true;
-      false
-    });
-    hit
-  }
+  pub fn contain_type<T: Any>(&self) -> bool { self.query(TypeId::of::<T>()).is_some() }
 }
