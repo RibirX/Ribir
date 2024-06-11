@@ -662,34 +662,42 @@ fn update_children_key_status(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
       match (o_first == o_last, n_first == n_last) {
         (true, true) => update_key_status_single(o_first, n_first, ctx),
         (true, false) => {
-          inspect_key(o_first, ctx, |old_key| {
+          if let Some(old_key) = ctx
+            .assert_get(o_first)
+            .query_ref::<Box<dyn AnyKey>>()
+          {
             let o_key = old_key.key();
             new.children(tree).any(|n| {
-              inspect_key(n, ctx, |new_key| {
+              if let Some(new_key) = ctx.assert_get(n).query_ref::<Box<dyn AnyKey>>() {
                 let same_key = o_key == new_key.key();
                 if same_key {
-                  update_key_states(old_key, o_first, new_key, n, ctx);
+                  update_key_states(&**old_key, o_first, &**new_key, n, ctx);
                 }
                 same_key
-              })
-              .unwrap_or(false)
+              } else {
+                false
+              }
             });
-          });
+          }
         }
         (false, true) => {
-          inspect_key(n_first, ctx, |new_key| {
+          if let Some(new_key) = ctx
+            .assert_get(n_first)
+            .query_ref::<Box<dyn AnyKey>>()
+          {
             let n_key = new_key.key();
             old.children(tree).any(|o| {
-              inspect_key(o, ctx, |old_key| {
+              if let Some(old_key) = ctx.assert_get(o).query_ref::<Box<dyn AnyKey>>() {
                 let same_key = old_key.key() == n_key;
                 if same_key {
-                  update_key_states(old_key, o, new_key, n_first, ctx);
+                  update_key_states(&**old_key, o, &**new_key, n_first, ctx);
                 }
                 same_key
-              })
-              .unwrap_or(false)
-            })
-          });
+              } else {
+                false
+              }
+            });
+          }
         }
         (false, false) => update_key_state_multi(old.children(tree), new.children(tree), ctx),
       }
@@ -698,13 +706,13 @@ fn update_children_key_status(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
 }
 
 fn update_key_status_single(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
-  inspect_key(old, ctx, |old_key| {
-    inspect_key(new, ctx, |new_key| {
+  if let Some(old_key) = ctx.assert_get(old).query_ref::<Box<dyn AnyKey>>() {
+    if let Some(new_key) = ctx.assert_get(new).query_ref::<Box<dyn AnyKey>>() {
       if old_key.key() == new_key.key() {
-        update_key_states(old_key, old, new_key, new, ctx)
+        update_key_states(&**old_key, old, &**new_key, new, ctx);
       }
-    })
-  });
+    }
+  }
 }
 
 fn update_key_state_multi(
@@ -712,26 +720,22 @@ fn update_key_state_multi(
 ) {
   let mut old_key_list = ahash::HashMap::default();
   for o in old {
-    inspect_key(o, ctx, |old_key: &dyn AnyKey| {
+    if let Some(old_key) = ctx.assert_get(o).query_ref::<Box<dyn AnyKey>>() {
       old_key_list.insert(old_key.key(), o);
-    });
+    }
   }
 
   if !old_key_list.is_empty() {
     for n in new {
-      inspect_key(n, ctx, |new_key| {
+      if let Some(new_key) = ctx.assert_get(n).query_ref::<Box<dyn AnyKey>>() {
         if let Some(o) = old_key_list.get(&new_key.key()).copied() {
-          inspect_key(o, ctx, |old_key| update_key_states(old_key, o, new_key, n, ctx));
+          if let Some(old_key) = ctx.assert_get(o).query_ref::<Box<dyn AnyKey>>() {
+            update_key_states(&**old_key, o, &**new_key, n, ctx);
+          }
         }
-      });
+      }
     }
   }
-}
-
-fn inspect_key<R>(id: WidgetId, ctx: &BuildCtx, mut cb: impl FnMut(&dyn AnyKey) -> R) -> Option<R> {
-  ctx
-    .assert_get(id)
-    .query_most_outside::<Box<dyn AnyKey>, _>(|key_widget| cb(key_widget.deref()))
 }
 
 fn update_key_states(
@@ -978,25 +982,29 @@ fn set_pos_of_multi(widgets: &[WidgetId], ctx: &BuildCtx) {
   widgets.iter().enumerate().for_each(|(pos, wid)| {
     wid
       .assert_get(arena)
-      .query_type_outside_first(|info: &DynInfo| {
-        info.set_pos_of_multi(pos);
-        true
-      });
+      .query_all_iter::<DynInfo>()
+      .for_each(|info| info.set_pos_of_multi(pos))
   });
 }
 
 fn query_info_outside_until<T: Any>(
   id: WidgetId, to: &Sc<T>, ctx: &BuildCtx, mut cb: impl FnMut(&DynInfo),
 ) {
-  id.assert_get(&ctx.tree.borrow().arena)
-    .query_type_outside_first(|info: &DynInfo| {
-      cb(info);
+  for info in id
+    .assert_get(&ctx.tree.borrow().arena)
+    .query_all_iter::<DynInfo>()
+    .rev()
+  {
+    cb(&info);
 
-      info
-        .as_any()
-        .downcast_ref::<Sc<T>>()
-        .map_or(true, |info| !Sc::ptr_eq(info, to))
-    });
+    if info
+      .as_any()
+      .downcast_ref::<Sc<T>>()
+      .map_or(false, |info| Sc::ptr_eq(info, to))
+    {
+      break;
+    }
+  }
 }
 
 fn pipe_priority_value<T: Any>(info: &Sc<T>, handle: BuildCtxHandle) -> i64
@@ -1018,24 +1026,23 @@ where
 }
 
 impl Query for PipeNode {
-  fn query_inside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool {
+  fn query_all(&self, type_id: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
     let p = self.as_ref();
-    if !p.data.query_inside_first(type_id, callback) {
-      return false;
+    let mut types = p.data.query_all(type_id);
+    if type_id == TypeId::of::<DynInfo>() {
+      types.push(QueryHandle::new(&p.dyn_info));
     }
-    if type_id == TypeId::of::<DynInfo>() { callback(&p.dyn_info) } else { true }
+
+    types
   }
 
-  fn query_outside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool {
+  fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
     let p = self.as_ref();
-    if type_id == TypeId::of::<DynInfo>() && !callback(&p.dyn_info) {
-      return false;
+    if type_id == TypeId::of::<DynInfo>() {
+      Some(QueryHandle::new(&p.dyn_info))
+    } else {
+      p.data.query(type_id)
     }
-    p.data.query_outside_first(type_id, callback)
   }
 }
 
@@ -1046,7 +1053,7 @@ impl RenderProxy for PipeNode {
     where
       Self: 'r;
 
-  fn proxy<'r>(&'r self) -> Self::Target<'r> { &*self.as_ref().data }
+  fn proxy(&self) -> Self::Target<'_> { &*self.as_ref().data }
 }
 
 #[cfg(test)]

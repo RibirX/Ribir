@@ -15,8 +15,8 @@ pub use map_state::*;
 pub use prior_op::*;
 use rxrust::ops::box_it::{BoxOp, CloneableBoxOp};
 pub use splitted_state::*;
-pub use state_cell::PartData;
-use state_cell::{StateCell, ValueMutRef, ValueRef};
+pub use state_cell::{PartData, ReadRef};
+use state_cell::{StateCell, ValueMutRef};
 pub use stateful::*;
 pub use watcher::*;
 
@@ -148,10 +148,6 @@ pub trait StateWriter: StateWatcher {
   }
 }
 
-/// Wraps a borrowed reference to a value in a state.
-/// A wrapper type for an immutably borrowed value from a `StateReader`.
-pub struct ReadRef<'a, V>(ValueRef<'a, V>);
-
 pub struct WriteRef<'a, V> {
   value: ValueMutRef<'a, V>,
   control: &'a dyn WriterControl,
@@ -180,7 +176,7 @@ impl<T: 'static> StateReader for State<T> {
 
   fn read(&self) -> ReadRef<T> {
     match self.inner_ref() {
-      InnerState::Data(w) => ReadRef::new(w.read()),
+      InnerState::Data(w) => w.read(),
       InnerState::Stateful(w) => w.read(),
     }
   }
@@ -266,51 +262,14 @@ impl<W> State<W> {
   }
 }
 
-impl<'a, V> ReadRef<'a, V> {
-  pub(crate) fn new(r: ValueRef<'a, V>) -> ReadRef<'a, V> { ReadRef(r) }
-
-  /// Make a new `ReadRef` by mapping the value of the current `ReadRef`.
-  pub fn map<U>(mut r: ReadRef<'a, V>, f: impl FnOnce(&V) -> PartData<U>) -> ReadRef<'a, U> {
-    ReadRef(ValueRef { value: f(&mut r.0.value), borrow: r.0.borrow })
-  }
-
-  /// Split the current `ReadRef` into two `ReadRef`s by mapping the value to
-  /// two parts.
-  pub fn map_split<U, W>(
-    orig: ReadRef<'a, V>, f: impl FnOnce(&V) -> (PartData<U>, PartData<W>),
-  ) -> (ReadRef<'a, U>, ReadRef<'a, W>) {
-    let (a, b) = f(&*orig);
-    let borrow = orig.0.borrow.clone();
-
-    (ReadRef(ValueRef { value: a, borrow: borrow.clone() }), ReadRef(ValueRef { value: b, borrow }))
-  }
-
-  pub(crate) fn mut_as_ref_map<U>(
-    orig: ReadRef<'a, V>, f: impl FnOnce(&mut V) -> PartData<U>,
-  ) -> ReadRef<'a, U> {
-    let ValueRef { value, borrow } = orig.0;
-    let value = match value {
-      PartData::PartRef(mut ptr) => unsafe {
-        // Safety: This method is used to map a state to a part of it. Although a `&mut
-        // T` is passed to the closure, it is the user's responsibility to
-        // ensure that the closure does not modify the state.
-        f(ptr.as_mut())
-      },
-      PartData::PartData(mut data) => f(&mut data),
-    };
-
-    ReadRef(ValueRef { value, borrow })
-  }
-}
-
 impl<'a, V> WriteRef<'a, V> {
   pub fn map<U, M>(mut orig: WriteRef<'a, V>, part_map: M) -> WriteRef<'a, U>
   where
     M: Fn(&mut V) -> PartData<U>,
   {
-    let value = part_map(&mut orig.value);
+    let inner = part_map(&mut orig.value);
     let borrow = orig.value.borrow.clone();
-    let value = ValueMutRef { value, borrow };
+    let value = ValueMutRef { inner, borrow };
 
     WriteRef { value, modified: false, modify_scope: orig.modify_scope, control: orig.control }
   }
@@ -324,8 +283,8 @@ impl<'a, V> WriteRef<'a, V> {
     let WriteRef { control, modify_scope, modified, .. } = orig;
     let (a, b) = f(&mut *orig.value);
     let borrow = orig.value.borrow.clone();
-    let a = ValueMutRef { value: a, borrow: borrow.clone() };
-    let b = ValueMutRef { value: b, borrow };
+    let a = ValueMutRef { inner: a, borrow: borrow.clone() };
+    let b = ValueMutRef { inner: b, borrow };
     (
       WriteRef { value: a, modified, modify_scope, control },
       WriteRef { value: b, modified, modify_scope, control },
@@ -337,14 +296,6 @@ impl<'a, V> WriteRef<'a, V> {
   /// is any modifies on this reference.
   #[inline]
   pub fn forget_modifies(&mut self) -> bool { std::mem::replace(&mut self.modified, false) }
-}
-
-impl<'a, W> Deref for ReadRef<'a, W> {
-  type Target = W;
-
-  #[track_caller]
-  #[inline]
-  fn deref(&self) -> &Self::Target { &self.0 }
 }
 
 impl<'a, W> Deref for WriteRef<'a, W> {
@@ -448,25 +399,6 @@ impl<W: MultiChild + Render> MultiParent for State<W> {
       InnerState::Data(w) => w.into_inner().compose_children(children, ctx),
       InnerState::Stateful(w) => w.compose_children(children, ctx),
     }
-  }
-}
-
-impl<T: StateReader + 'static> Query for T
-where
-  T::Value: 'static + Sized,
-{
-  #[inline]
-  fn query_inside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool {
-    self.query_outside_first(type_id, callback)
-  }
-
-  fn query_outside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool {
-    let any: &T::Value = &self.read();
-    if type_id == any.type_id() { callback(any) } else { true }
   }
 }
 

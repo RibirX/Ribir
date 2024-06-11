@@ -340,8 +340,8 @@ impl Window {
       let tree = self.widget_tree.borrow();
       let drop_conditional = wid
         .assert_get(&self.widget_tree.borrow().arena)
-        .query_most_outside(|d: &KeepAlive| !d.keep_alive)
-        .unwrap_or(true);
+        .query_ref::<KeepAlive>()
+        .map_or(true, |d| !d.keep_alive);
       let parent_dropped = parent.map_or(false, |p| {
         p.is_dropped(&tree.arena) || p.ancestors(&tree.arena).last() != Some(tree.root())
       });
@@ -547,12 +547,12 @@ impl Window {
     // no way to mut access the inner data of node or destroy the node.
     let tree = unsafe { &*(&*self.widget_tree.borrow() as *const WidgetTree) };
     id.assert_get(&tree.arena)
-      .query_type_inside_first(|m: &MixBuiltin| {
+      .query_all_iter::<MixBuiltin>()
+      .for_each(|m| {
         if m.contain_flag(e.flags()) {
           m.dispatch(e);
         }
-        true
-      });
+      })
   }
 
   fn top_down_emit(&self, e: &mut Event, bottom: WidgetId, up: Option<WidgetId>) {
@@ -564,7 +564,9 @@ impl Window {
 
     path.iter().rev().all(|id| {
       id.assert_get(&tree.arena)
-        .query_type_outside_first(|m: &MixBuiltin| {
+        .query_all_iter::<MixBuiltin>()
+        .rev()
+        .all(|m| {
           if m.contain_flag(e.flags()) {
             e.set_current_target(*id);
             m.dispatch(e);
@@ -585,7 +587,8 @@ impl Window {
       .take_while(|id| Some(*id) != up)
       .all(|id| {
         id.assert_get(&tree.arena)
-          .query_type_inside_first(|m: &MixBuiltin| {
+          .query_all_iter::<MixBuiltin>()
+          .all(|m| {
             if m.contain_flag(e.flags()) {
               e.set_current_target(id);
               m.dispatch(e);

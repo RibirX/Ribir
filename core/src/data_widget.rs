@@ -47,7 +47,7 @@ impl Widget {
   ///
   /// User can query the state or its value type.
   pub fn try_unwrap_state_and_attach<D: Any>(
-    self, data: impl StateReader<Value = D>, ctx: &BuildCtx,
+    self, data: impl StateWriter<Value = D>, ctx: &BuildCtx,
   ) -> Widget {
     match data.try_into_value() {
       Ok(data) => self.attach_data(Queryable(data), ctx),
@@ -70,37 +70,32 @@ impl<D: Query> RenderProxy for DataAttacher<D> {
   where
     Self: 'r;
 
-  fn proxy<'r>(&'r self) -> Self::Target<'r> { self.render.as_ref() }
+  fn proxy(&self) -> Self::Target<'_> { self.render.as_ref() }
 }
 
 impl<D: Query> Query for DataAttacher<D> {
-  fn query_inside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool {
-    self.render.query_inside_first(type_id, callback)
-      && self.data.query_inside_first(type_id, callback)
+  fn query_all(&self, type_id: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
+    let mut types = self.render.query_all(type_id);
+    types.extend(self.data.query_all(type_id));
+    types
   }
 
-  fn query_outside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool {
-    self.data.query_outside_first(type_id, callback)
-      && self.render.query_outside_first(type_id, callback)
+  fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
+    self
+      .data
+      .query(type_id)
+      .or_else(|| self.render.query(type_id))
   }
 }
 
 impl Query for AnonymousAttacher {
-  fn query_inside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool {
-    self.render.query_inside_first(type_id, callback)
+  #[inline]
+  fn query_all(&self, type_id: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
+    self.render.query_all(type_id)
   }
 
-  fn query_outside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool {
-    self.render.query_outside_first(type_id, callback)
-  }
+  #[inline]
+  fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.render.query(type_id) }
 }
 
 impl RenderProxy for AnonymousAttacher {
@@ -110,21 +105,15 @@ impl RenderProxy for AnonymousAttacher {
   where
     Self: 'r;
 
-  fn proxy<'r>(&'r self) -> Self::Target<'r> { self.render.as_ref() }
+  fn proxy(&self) -> Self::Target<'_> { self.render.as_ref() }
 }
 
 impl<T: Any> Query for Queryable<T> {
-  #[inline]
-  fn query_inside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool {
-    self.query_outside_first(type_id, callback)
+  fn query_all(&self, type_id: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
+    self.query(type_id).into_iter().collect()
   }
 
-  #[inline]
-  fn query_outside_first(
-    &self, type_id: TypeId, callback: &mut dyn FnMut(&dyn Any) -> bool,
-  ) -> bool {
-    if type_id == TypeId::of::<T>() { callback(&self.0) } else { true }
+  fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
+    (type_id == self.0.type_id()).then(|| QueryHandle::new(&self.0))
   }
 }

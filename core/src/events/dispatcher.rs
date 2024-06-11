@@ -159,14 +159,9 @@ impl Dispatcher {
 
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(&tree.arena).find(|id| {
-        let mut is_focus_node = false;
-        if let Some(w) = id.get(&tree.arena) {
-          w.query_type_outside_first(|m: &MixBuiltin| {
-            is_focus_node |= m.contain_flag(BuiltinFlags::Focus);
-            !is_focus_node
-          });
-        }
-        is_focus_node
+        id.get(&tree.arena)
+          .and_then(|w| w.query_ref::<MixBuiltin>())
+          .map_or(false, |m| m.contain_flag(BuiltinFlags::Focus))
       })
     });
     if let Some(focus_id) = nearest_focus {

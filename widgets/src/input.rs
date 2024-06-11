@@ -359,7 +359,7 @@ where
       let placeholder = @ {
         placeholder.map(move |holder| @Text {
           visible: pipe!(SelectableText::text(&*$this).is_empty()),
-          text: pipe!((*$holder).0.clone()),
+          text: pipe!($holder.0.clone()),
         })
       };
 

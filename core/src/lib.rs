@@ -22,6 +22,7 @@ pub mod widget_children;
 pub mod window;
 pub use rxrust;
 pub mod overlay;
+pub mod query;
 
 pub mod prelude {
   pub use log;
@@ -34,6 +35,7 @@ pub mod prelude {
   pub use ribir_text::*;
   #[doc(hidden)]
   pub use rxrust::prelude::*;
+  pub use smallvec;
 
   #[doc(no_inline)]
   pub use crate::builtin_widgets::*;
@@ -61,6 +63,7 @@ pub mod prelude {
   pub use crate::window::Window;
   pub use crate::{
     animation::*,
+    query::*,
     ticker::{Duration, Instant},
   };
 }

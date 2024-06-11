@@ -33,7 +33,7 @@ impl<W> StateCell<W> {
   }
 
   #[track_caller]
-  pub(crate) fn read(&self) -> ValueRef<W> {
+  pub(crate) fn read(&self) -> ReadRef<W> {
     let borrow = &self.borrow_flag;
     let b = borrow.get().wrapping_add(1);
     borrow.set(b);
@@ -57,8 +57,8 @@ impl<W> StateCell<W> {
 
     // SAFETY: `BorrowRef` ensures that there is only immutable access
     // to the value while borrowed.
-    let value = PartData::PartRef(unsafe { NonNull::new_unchecked(self.data.get()) });
-    ValueRef { value, borrow: BorrowRef { borrow } }
+    let inner = PartData::PartRef(unsafe { NonNull::new_unchecked(self.data.get()) });
+    ReadRef { inner, borrow: BorrowRef { borrow } }
   }
 
   pub(crate) fn write(&self) -> ValueMutRef<'_, W> {
@@ -84,8 +84,8 @@ impl<W> StateCell<W> {
 
     borrow.set(UNUSED - 1);
     let v_ref = BorrowRefMut { borrow };
-    let value = PartData::PartRef(unsafe { NonNull::new_unchecked(self.data.get()) });
-    ValueMutRef { value, borrow: v_ref }
+    let inner = PartData::PartRef(unsafe { NonNull::new_unchecked(self.data.get()) });
+    ValueMutRef { inner, borrow: v_ref }
   }
 
   pub(crate) fn is_unused(&self) -> bool { self.borrow_flag.get() == UNUSED }
@@ -114,13 +114,13 @@ impl<T> PartData<T> {
   /// Caller should ensure that the data is not a copy.
   pub fn from_data(ptr_data: T) -> Self { PartData::PartData(ptr_data) }
 }
-pub(crate) struct ValueRef<'a, T> {
-  pub(crate) value: PartData<T>,
+pub struct ReadRef<'a, T> {
+  pub(crate) inner: PartData<T>,
   pub(crate) borrow: BorrowRef<'a>,
 }
 
 pub(crate) struct ValueMutRef<'a, T> {
-  pub(crate) value: PartData<T>,
+  pub(crate) inner: PartData<T>,
   pub(crate) borrow: BorrowRefMut<'a>,
 }
 
@@ -201,19 +201,54 @@ impl BorrowRef<'_> {
   }
 }
 
-impl<'a, T> Deref for ValueRef<'a, T> {
+impl<'a, V> ReadRef<'a, V> {
+  /// Make a new `ReadRef` by mapping the value of the current `ReadRef`.
+  pub fn map<U>(mut r: ReadRef<'a, V>, f: impl FnOnce(&V) -> PartData<U>) -> ReadRef<'a, U> {
+    ReadRef { inner: f(&mut r.inner), borrow: r.borrow }
+  }
+
+  /// Split the current `ReadRef` into two `ReadRef`s by mapping the value to
+  /// two parts.
+  pub fn map_split<U, W>(
+    orig: ReadRef<'a, V>, f: impl FnOnce(&V) -> (PartData<U>, PartData<W>),
+  ) -> (ReadRef<'a, U>, ReadRef<'a, W>) {
+    let (a, b) = f(&*orig);
+    let borrow = orig.borrow.clone();
+
+    (ReadRef { inner: a, borrow: borrow.clone() }, ReadRef { inner: b, borrow })
+  }
+
+  pub(crate) fn mut_as_ref_map<U>(
+    orig: ReadRef<'a, V>, f: impl FnOnce(&mut V) -> PartData<U>,
+  ) -> ReadRef<'a, U> {
+    let ReadRef { inner: value, borrow } = orig;
+    let value = match value {
+      PartData::PartRef(mut ptr) => unsafe {
+        // Safety: This method is used to map a state to a part of it. Although a `&mut
+        // T` is passed to the closure, it is the user's responsibility to
+        // ensure that the closure does not modify the state.
+        f(ptr.as_mut())
+      },
+      PartData::PartData(mut data) => f(&mut data),
+    };
+
+    ReadRef { inner: value, borrow }
+  }
+}
+
+impl<'a, T> Deref for ReadRef<'a, T> {
   type Target = T;
   #[inline]
-  fn deref(&self) -> &Self::Target { &self.value }
+  fn deref(&self) -> &Self::Target { &self.inner }
 }
 
 impl<'a, T> Deref for ValueMutRef<'a, T> {
   type Target = T;
   #[inline]
-  fn deref(&self) -> &Self::Target { &self.value }
+  fn deref(&self) -> &Self::Target { &self.inner }
 }
 
 impl<'a, T> DerefMut for ValueMutRef<'a, T> {
   #[inline]
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.value }
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.inner }
 }

@@ -72,7 +72,6 @@ pub trait WidgetCtx {
 pub(crate) trait WidgetCtxImpl {
   fn id(&self) -> WidgetId;
 
-  // todo: return sc instead of rc
   fn current_wnd(&self) -> Rc<Window>;
 
   #[inline]
@@ -201,7 +200,8 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   ) -> Option<R> {
     self.with_tree(|tree| {
       id.assert_get(&tree.arena)
-        .query_most_outside(callback)
+        .query_ref::<W>()
+        .map(|r| callback(&r))
     })
   }
 
