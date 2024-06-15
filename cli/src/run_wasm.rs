@@ -7,11 +7,7 @@ use std::{
 
 use anyhow::Result;
 use clap::{command, CommandFactory, FromArgMatches, Parser};
-use notify_debouncer_mini::{
-  new_debouncer,
-  notify::{RecommendedWatcher, *},
-  DebounceEventResult, Debouncer,
-};
+use notify_debouncer_mini::{new_debouncer, notify::*, DebounceEventResult, Debouncer};
 
 use crate::{
   program_check::{check_all_programs, Program},

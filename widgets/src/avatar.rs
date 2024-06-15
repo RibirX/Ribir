@@ -54,7 +54,7 @@ impl ComposeDecorator for AvatarDecorator {
 
 #[derive(Template)]
 pub enum AvatarTemplate {
-  Text(State<Label>),
+  Text(Label),
   Image(Resource<PixelImage>),
 }
 
@@ -78,7 +78,7 @@ impl ComposeChild for Avatar {
               @Text {
                 h_align: HAlign::Center,
                 v_align: VAlign::Center,
-                text: $text.0.clone(),
+                text: text.0,
                 text_style,
                 foreground: pipe!(Brush::from(palette2.on_of(&palette2.base_of(&$this.color)))),
               }

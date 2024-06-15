@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use ribir_algo::Sc;
-use state_cell::{ReadRef, StateCell};
+use state_cell::StateCell;
 
 use crate::prelude::*;
 

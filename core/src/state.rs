@@ -338,29 +338,6 @@ impl<'a, W> Drop for WriteRef<'a, W> {
   }
 }
 
-// todo: We should use `BoxPipe<T>` to replace `State<T>` as the dynamic child.
-// remove it after no widget use `State<T>` Child.
-pub(crate) trait StateFrom<V> {
-  fn state_from(value: V) -> Self;
-}
-
-impl<W> StateFrom<W> for State<W> {
-  #[inline]
-  fn state_from(value: W) -> State<W> { State::value(value) }
-}
-
-impl<W> StateFrom<Stateful<W>> for State<W> {
-  #[inline]
-  fn state_from(value: Stateful<W>) -> State<W> { State::stateful(value) }
-}
-
-impl<W, T> From<T> for State<W>
-where
-  Self: StateFrom<T>,
-{
-  fn from(value: T) -> Self { StateFrom::state_from(value) }
-}
-
 impl<C: Compose + 'static> ComposeBuilder for State<C> {
   #[inline]
   fn build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }

@@ -116,7 +116,7 @@ pub struct Tab {
 #[derive(Template)]
 pub struct TabItem {
   icon: Option<NamedSvg>,
-  text: Option<State<Label>>,
+  text: Option<Label>,
 }
 
 #[derive(PairChild)]
@@ -164,7 +164,7 @@ impl ComposeDecorator for IndicatorDecorator {
 
 impl Tabs {
   fn tab_header(
-    headers: Vec<(Option<NamedSvg>, Option<State<Label>>)>, tabs_style: TabsStyle,
+    headers: Vec<(Option<NamedSvg>, Option<Label>)>, tabs_style: TabsStyle,
     tabs: impl StateWriter<Value = Tabs> + 'static,
     indicator: impl StateWriter<Value = IndicatorDecorator> + 'static,
   ) -> impl Iterator<Item = impl WidgetBuilder> {
@@ -183,7 +183,7 @@ impl Tabs {
           let icon_widget = icon.map(|icon| @Icon { size, @ { icon }});
           let label_widget = label.map(|label| {
             @Text {
-              text: pipe!($label.0.clone()),
+              text: label.0,
               foreground: pipe!(match $tabs.cur_idx == idx {
                 true => active_color.clone(),
                 false => foreground.clone(),

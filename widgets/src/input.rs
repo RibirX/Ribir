@@ -22,11 +22,16 @@ use crate::{
   prelude::Text,
 };
 
-pub struct Placeholder(CowArc<str>);
+pub struct Placeholder(DeclareInit<CowArc<str>>);
 
 impl Placeholder {
   #[inline]
-  pub fn new(str: impl Into<CowArc<str>>) -> Self { Self(str.into()) }
+  pub fn new<M, V>(str: V) -> Self
+  where
+    DeclareInit<CowArc<str>>: DeclareFrom<V, M>,
+  {
+    Self(DeclareFrom::declare_from(str))
+  }
 }
 
 #[derive(Clone)]
@@ -256,7 +261,7 @@ where
 }
 
 impl ComposeChild for Input {
-  type Child = Option<State<Placeholder>>;
+  type Child = Option<Placeholder>;
   fn compose_child(
     this: impl StateWriter<Value = Self>, placeholder: Self::Child,
   ) -> impl WidgetBuilder {
@@ -283,7 +288,7 @@ impl ComposeChild for Input {
 }
 
 impl ComposeChild for TextArea {
-  type Child = Option<State<Placeholder>>;
+  type Child = Option<Placeholder>;
   fn compose_child(
     this: impl StateWriter<Value = Self>, placeholder: Self::Child,
   ) -> impl WidgetBuilder {
@@ -317,7 +322,7 @@ where
 {
   fn edit_area(
     this: &impl StateWriter<Value = Self>, mut text: FatObj<State<Text>>,
-    scroll_dir: impl Pipe<Value = Scrollable> + 'static, placeholder: Option<State<Placeholder>>,
+    scroll_dir: impl Pipe<Value = Scrollable> + 'static, placeholder: Option<Placeholder>,
   ) -> impl WidgetBuilder {
     fn_widget! {
       let layout_box = text.get_layout_box_widget().clone_reader();
@@ -359,7 +364,7 @@ where
       let placeholder = @ {
         placeholder.map(move |holder| @Text {
           visible: pipe!(SelectableText::text(&*$this).is_empty()),
-          text: pipe!($holder.0.clone()),
+          text: holder.0,
         })
       };
 
