@@ -19,6 +19,17 @@ pub trait ObjDeclarer {
   fn finish(self, ctx: &BuildCtx) -> Self::Target;
 }
 
+/// Used to do conversion from a value to the `DeclareInit` type.
+pub trait DeclareFrom<V, const M: u8> {
+  fn declare_from(value: V) -> Self;
+}
+
+/// A value-to-value conversion that consumes the input value. The
+/// opposite of [`DeclareFrom`].
+pub trait DeclareInto<V, const M: u8> {
+  fn declare_into(self) -> DeclareInit<V>;
+}
+
 /// The type use to store the init value of the field when declare a object.
 pub enum DeclareInit<V> {
   Value(V),
@@ -44,16 +55,17 @@ impl<T: Default> Default for DeclareInit<T> {
   fn default() -> Self { Self::Value(T::default()) }
 }
 
-pub trait DeclareFrom<V, M> {
-  fn declare_from(value: V) -> Self;
+impl<V> DeclareFrom<DeclareInit<V>, 0> for DeclareInit<V> {
+  #[inline]
+  fn declare_from(value: DeclareInit<V>) -> Self { value }
 }
 
-impl<V, U: From<V>> DeclareFrom<V, ()> for DeclareInit<U> {
+impl<V, U: From<V>> DeclareFrom<V, 1> for DeclareInit<U> {
   #[inline]
   fn declare_from(value: V) -> Self { Self::Value(value.into()) }
 }
 
-impl<P, V> DeclareFrom<P, &dyn Pipe<Value = ()>> for DeclareInit<V>
+impl<P, V> DeclareFrom<P, 2> for DeclareInit<V>
 where
   P: Pipe + 'static,
   V: From<P::Value> + 'static,
@@ -65,7 +77,10 @@ where
   }
 }
 
-impl<V> DeclareFrom<DeclareInit<V>, [(); 2]> for DeclareInit<V> {
+impl<T, V, const M: u8> DeclareInto<V, M> for T
+where
+  DeclareInit<V>: DeclareFrom<T, M>,
+{
   #[inline]
-  fn declare_from(value: DeclareInit<V>) -> Self { value }
+  fn declare_into(self) -> DeclareInit<V> { DeclareInit::declare_from(self) }
 }
