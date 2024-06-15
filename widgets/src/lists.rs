@@ -173,7 +173,7 @@ pub struct SupportingText(pub Label);
 
 #[derive(Template)]
 pub enum EdgeWidget {
-  Text(State<Label>),
+  Text(Label),
   Icon(NamedSvg),
   Avatar(FatObj<Pair<State<Avatar>, AvatarTemplate>>),
   Image(Resource<PixelImage>),
@@ -201,7 +201,7 @@ impl EdgeWidget {
           let margin =  text.gap.map(|margin| Margin { margin });
           @ $margin {
             @Text {
-              text: $label.0.clone(),
+              text: label.0,
               text_style: text.style.clone(),
               foreground: text.foreground.clone(),
             }
@@ -242,8 +242,8 @@ impl EdgeWidget {
 
 #[derive(Template)]
 pub struct ListItemTml {
-  headline: State<HeadlineText>,
-  supporting: Option<State<SupportingText>>,
+  headline: HeadlineText,
+  supporting: Option<SupportingText>,
   leading: Option<Pair<FatObj<Leading>, EdgeWidget>>,
   trailing: Option<Pair<FatObj<Trailing>, EdgeWidget>>,
 }
@@ -285,7 +285,7 @@ impl ComposeChild for ListItem {
               @ $label_gap {
                 @Column {
                   @Text {
-                    text: pipe!($headline.0.0.clone()),
+                    text: headline.0.0,
                     foreground: Palette::of(ctx!()).on_surface(),
                     text_style: headline_style,
                   }
@@ -300,7 +300,7 @@ impl ComposeChild for ListItem {
                         }
                       } ,
                       @Text {
-                        text: pipe!($supporting.0.0.clone()),
+                        text: supporting.0.0,
                         foreground:  Palette::of(ctx!()).on_surface_variant(),
                         text_style: supporting_style,
                       }

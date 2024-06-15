@@ -200,7 +200,7 @@ mod tests {
   use crate::{
     data_widget::Queryable,
     reset_test_env,
-    state::{PartData, State, StateReader, StateWriter},
+    state::{PartData, State},
   };
 
   #[test]

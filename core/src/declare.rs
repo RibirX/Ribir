@@ -64,3 +64,8 @@ where
     Self::Pipe(BoxPipe::pipe(pipe))
   }
 }
+
+impl<V> DeclareFrom<DeclareInit<V>, [(); 2]> for DeclareInit<V> {
+  #[inline]
+  fn declare_from(value: DeclareInit<V>) -> Self { value }
+}

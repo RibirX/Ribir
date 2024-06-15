@@ -3,7 +3,6 @@ use crate::{
   builtin_widgets::{FatObj, Void},
   context::BuildCtx,
   pipe::{BoxPipe, InnerPipe, Pipe},
-  state::{State, StateFrom},
   widget::*,
 };
 
@@ -102,17 +101,6 @@ where
   F: FnMut(&BuildCtx) -> Widget + 'static,
 {
   fn from_another(value: F, _: &BuildCtx) -> Self { Self::new(value) }
-}
-
-// W -> State<W>
-// Stateful<W> -> State<W>
-// Stateful<DynWidget<W>> -> State<W>
-impl<W, T> FromAnother<T, ()> for State<W>
-where
-  State<W>: StateFrom<T>,
-{
-  #[inline]
-  fn from_another(value: T, _: &BuildCtx) -> Self { Self::state_from(value) }
 }
 
 // W --- C ---> Option<C>

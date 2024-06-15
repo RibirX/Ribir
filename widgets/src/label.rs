@@ -4,10 +4,14 @@ use ribir_core::prelude::*;
 /// individual widget and user can specify its style, but `Label` only can used
 /// with its purpose widget, and its style is detected by its purpose widget not
 /// user.
-#[derive(Clone)]
-pub struct Label(pub CowArc<str>);
+pub struct Label(pub DeclareInit<CowArc<str>>);
 
 impl Label {
   #[inline]
-  pub fn new(str: impl Into<CowArc<str>>) -> Self { Label(str.into()) }
+  pub fn new<M, V>(str: V) -> Self
+  where
+    DeclareInit<CowArc<str>>: DeclareFrom<V, M>,
+  {
+    Self(DeclareFrom::declare_from(str))
+  }
 }

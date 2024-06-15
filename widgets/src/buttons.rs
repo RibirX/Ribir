@@ -40,7 +40,7 @@ pub enum ButtonType {
 
 #[derive(Template)]
 pub struct ButtonTemplate {
-  pub label: Option<State<Label>>,
+  pub label: Option<Label>,
   pub icon: Option<NamedSvg>,
 }
 
@@ -64,7 +64,7 @@ impl ComposeChild for ButtonImpl {
           });
           let label = label.map(|label| @Text {
             margin: pipe!(EdgeInsets::horizontal($this.label_gap)),
-            text: pipe!($label.0.clone()),
+            text: label.0,
             foreground: pipe!($this.foreground_color.clone()),
             text_style: pipe!($this.label_style.clone())
           });

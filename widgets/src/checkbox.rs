@@ -45,8 +45,8 @@ impl Checkbox {
 
 #[derive(Template)]
 pub enum CheckboxTemplate {
-  Before(Pair<FatObj<Leading>, State<Label>>),
-  After(Pair<FatObj<Trailing>, State<Label>>),
+  Before(Pair<FatObj<Leading>, Label>),
+  After(Pair<FatObj<Trailing>, Label>),
 }
 
 impl ComposeDecorator for CheckBoxDecorator {
@@ -80,8 +80,8 @@ impl ComposeChild for Checkbox {
       }.build(ctx!());
 
       let checkbox = if let Some(child) = child  {
-        let label = |label: State<Label>| @Text {
-          text: $label.0.clone(),
+        let label = |label: Label| @Text {
+          text: label.0,
           foreground: label_color,
           text_style: label_style,
         };
