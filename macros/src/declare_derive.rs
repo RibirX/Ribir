@@ -85,20 +85,14 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           allow or prevent widgets from being sequentially focusable(usually with \
           the Tab key, hence the name) and determine their relative ordering for \
           sequential focus navigation"]
-        #vis fn tab_index<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<i16>: DeclareFrom<_V, _M>,
-        {
+        #vis fn tab_index<const _M: u8>(mut self, v: impl DeclareInto<i16, _M>) -> Self {
           self.fat_obj = self.fat_obj.tab_index(v);
           self
         }
 
         #[doc="Initializes whether the `widget` should automatically get focus \
           when the window loads."]
-        #vis fn auto_focus<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<bool>: DeclareFrom<_V, _M>,
-        {
+        #vis fn auto_focus<const _M: u8>(mut self, v: impl DeclareInto<bool, _M>) -> Self {
           self.fat_obj = self.fat_obj.auto_focus(v);
           self
         }
@@ -409,158 +403,112 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         }
 
         #[doc="Initializes how its child should be scale to fit its box."]
-        #vis fn box_fit<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<BoxFit>: DeclareFrom<_V, _M>,
-        {
+        #vis fn box_fit<const _M: u8>(mut self, v: impl DeclareInto<BoxFit, _M>) -> Self {
           self.fat_obj = self.fat_obj.box_fit(v);
           self
         }
 
         #[doc="Initializes the background of the widget."]
-        #vis fn background<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<Option<Brush>>: DeclareFrom<_V, _M>,
-        {
+        #vis fn background<const _M: u8>(mut self, v: impl DeclareInto<Option<Brush>, _M>) -> Self {
           self.fat_obj = self.fat_obj.background(v);
           self
         }
 
         #[doc="Initializes the border of the widget."]
-        #vis fn border<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<Option<Border>>: DeclareFrom<_V, _M>,
-        {
+        #vis fn border<const _M: u8>(mut self, v: impl DeclareInto<Option<Border>, _M>) -> Self {
           self.fat_obj = self.fat_obj.border(v);
           self
         }
 
         #[doc="Initializes the border radius of the widget."]
-        #vis fn border_radius<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<Option<Radius>>: DeclareFrom<_V, _M>,
-        {
+        #vis fn border_radius<const _M: u8>(
+          mut self, v: impl DeclareInto<Option<Radius>, _M>
+        ) -> Self {
           self.fat_obj = self.fat_obj.border_radius(v);
           self
         }
 
         #[doc="Initializes the extra space within the widget."]
-        #vis fn padding<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<EdgeInsets>: DeclareFrom<_V, _M>,
+        #vis fn padding<const _M: u8>(mut self, v: impl DeclareInto<EdgeInsets, _M>) -> Self
         {
           self.fat_obj = self.fat_obj.padding(v);
           self
         }
 
         #[doc="Initializes the cursor of the widget."]
-        #vis fn cursor<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<CursorIcon>: DeclareFrom<_V, _M>,
-        {
+        #vis fn cursor<const _M: u8>(mut self, v: impl DeclareInto<CursorIcon, _M>) -> Self {
           self.fat_obj = self.fat_obj.cursor(v);
           self
         }
 
         #[doc="Initializes the space around the widget."]
-        #vis fn margin<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<EdgeInsets>: DeclareFrom<_V, _M>,
-        {
+        #vis fn margin<const _M: u8>(mut self, v: impl DeclareInto<EdgeInsets, _M>) -> Self {
           self.fat_obj = self.fat_obj.margin(v);
           self
         }
 
         #[doc="Initializes how user can scroll the widget."]
-        #vis fn scrollable<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<Scrollable>: DeclareFrom<_V, _M>,
-        {
+        #vis fn scrollable<const _M: u8>(mut self, v: impl DeclareInto<Scrollable, _M>) -> Self {
           self.fat_obj = self.fat_obj.scrollable(v);
           self
         }
 
         #[doc="Initializes the scroll position of the widget."]
-        #vis fn scroll_pos<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<Point>: DeclareFrom<_V, _M>,
-        {
+        #vis fn scroll_pos<const _M: u8>(mut self, v: impl DeclareInto<Point, _M>) -> Self {
           self.fat_obj = self.fat_obj.scroll_pos(v);
           self
         }
 
         #[doc="Initializes the transformation of the widget."]
-        #vis fn transform<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<Transform>: DeclareFrom<_V, _M>,
-        {
+        #vis fn transform<const _M: u8>(mut self, v: impl DeclareInto<Transform, _M>) -> Self {
           self.fat_obj = self.fat_obj.transform(v);
           self
         }
 
         #[doc="Initializes how the widget should be aligned horizontally."]
-        #vis fn h_align<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<HAlign>: DeclareFrom<_V, _M>,
-        {
+        #vis fn h_align<const _M: u8>(mut self, v: impl DeclareInto<HAlign, _M>) -> Self {
           self.fat_obj = self.fat_obj.h_align(v);
           self
         }
 
         #[doc="Initializes how the widget should be aligned vertically."]
-        #vis fn v_align<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<VAlign>: DeclareFrom<_V, _M>,
-        {
+        #vis fn v_align<const _M: u8>(mut self, v: impl DeclareInto<VAlign, _M>) -> Self {
           self.fat_obj = self.fat_obj.v_align(v);
           self
         }
 
         #[doc="Initializes the relative anchor to the parent of the widget"]
-        #vis fn anchor<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<Anchor>: DeclareFrom<_V, _M>,
-        {
+        #vis fn anchor<const _M: u8>(mut self, v: impl DeclareInto<Anchor, _M>) -> Self {
           self.fat_obj = self.fat_obj.anchor(v);
           self
         }
 
         #[doc="Initializes the global anchor of the widget."]
-        #vis fn global_anchor<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<Anchor>: DeclareFrom<_V, _M>,
-        {
+        #vis fn global_anchor<const _M: u8>(mut self, v: impl DeclareInto<Anchor, _M>) -> Self {
           self.fat_obj = self.fat_obj.global_anchor(v);
           self
         }
 
         #[doc="Initializes the visibility of the widget."]
-        #vis fn visible<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<bool>: DeclareFrom<_V, _M>,
+        #vis fn visible<const _M: u8>(mut self, v: impl DeclareInto<bool, _M>) -> Self
         {
           self.fat_obj = self.fat_obj.visible(v);
           self
         }
 
         #[doc="Initializes the opacity of the widget."]
-        #vis fn opacity<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<f32>: DeclareFrom<_V, _M>,
+        #vis fn opacity<const _M: u8>(mut self, v: impl DeclareInto<f32, _M>) -> Self
         {
           self.fat_obj = self.fat_obj.opacity(v);
           self
         }
 
         #[doc="Initializes the `keep_alive` value of the `KeepAlive` widget."]
-        #vis fn keep_alive<_M, _V>(mut self, v: _V) -> Self
-        where
-          DeclareInit<bool>: DeclareFrom<_V, _M>,
+        #vis fn keep_alive<const _M: u8>(mut self, v: impl DeclareInto<bool, _M>) -> Self
         {
           self.fat_obj = self.fat_obj.keep_alive(v);
           self
         }
-
       }
   };
 
@@ -600,10 +548,8 @@ fn declarer_set_methods<'a>(
           #[inline]
           #[allow(clippy::type_complexity)]
           #doc
-          #vis fn #set_method<_M, _V>(mut self, v: _V) -> Self
-            where DeclareInit<#ty>: DeclareFrom<_V, _M>
-          {
-            self.#field_name = Some(DeclareInit::declare_from(v));
+          #vis fn #set_method<const _M: u8>(mut self, v: impl DeclareInto<#ty, _M>) -> Self {
+            self.#field_name = Some(v.declare_into());
             self
           }
         }

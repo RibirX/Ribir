@@ -26,11 +26,8 @@ pub struct Placeholder(DeclareInit<CowArc<str>>);
 
 impl Placeholder {
   #[inline]
-  pub fn new<M, V>(str: V) -> Self
-  where
-    DeclareInit<CowArc<str>>: DeclareFrom<V, M>,
-  {
-    Self(DeclareFrom::declare_from(str))
+  pub fn new<const M: u8>(str: impl DeclareInto<CowArc<str>, M>) -> Self {
+    Self(str.declare_into())
   }
 }
 
