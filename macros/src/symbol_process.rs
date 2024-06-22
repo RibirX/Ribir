@@ -113,47 +113,40 @@ mod tokens_pre_process {
         {
           tokens.push(TokenTree::Ident(Ident::new(KW_RDL, at.span())));
           tokens.push(not_token(at.span()));
-
-          let body = match iter.next() {
-            // declare a new widget: `@ SizedBox { ... }`
-            Some(TokenTree::Ident(name)) => {
-              let next = iter.next();
-              let Some(TokenTree::Group(body)) = next else {
-                return rdl_syntax_err(
-                  at.span(),
-                  next.map(|n| n.span()).or_else(|| Some(name.span()))
-                )
-              };
-              let tokens = TokenStream::from_iter([TokenTree::Ident(name), TokenTree::Group(body)]);
-              Group::new(Delimiter::Brace, tokens)
-            }
+          let mut rdl_group = smallvec::SmallVec::<[TokenTree; 3]>::default();
+           match iter.next() {
             // declare a variable widget as parent,  `@ $var { ... }`
             Some(TokenTree::Punct(dollar)) if dollar.as_char() == '$' => {
               if let Some(TokenTree::Ident(var)) = iter.next() {
-                let next = iter.next();
-                let Some(TokenTree::Group(body))  =  next else {
-                  return rdl_syntax_err(
-                    at.span(),
-                    next.map(|n| n.span()).or_else(|| Some(var.span()))
-                  )
+                rdl_group.push(TokenTree::Punct(dollar));
+                rdl_group.push(TokenTree::Ident(var));
+                if let Some(g)  = iter.next()  {
+                 rdl_group.push(g);
                 };
-                let tokens = TokenStream::from_iter([
-                  TokenTree::Punct(dollar),
-                  TokenTree::Ident(var),
-                  TokenTree::Group(body),
-                ]);
-                Group::new(Delimiter::Brace, tokens)
               } else {
                 return dollar_err(dollar.span());
               }
             }
             // declare a expression widget  `@ { ... }`
-            Some(TokenTree::Group(g)) => g,
-            n => {
-              return rdl_syntax_err(at.span(), n.map(|n| n.span()));
-            }
+            Some(TokenTree::Group(g)) => rdl_group.push(TokenTree::Group(g)) ,
+            // declare a new widget: `@ SizedBox { ... }`
+            mut n => {
+              while let Some(t) = n.take() {
+                let is_group = matches!(t, TokenTree::Group(_));
+                rdl_group.push(t);
+                if is_group {
+                  break
+                }
+                n = iter.next();
+              };
+            },
           };
-          tokens.push(TokenTree::Group(body));
+          if let Some(TokenTree::Group(_)) = rdl_group.last()  {
+            let rdl_group = TokenStream::from_iter(rdl_group);
+            tokens.push(TokenTree::Group(Group::new(Delimiter::Brace, rdl_group)));
+          } else {
+            return rdl_syntax_err(at.span(), rdl_group.last().map(|n| n.span()));
+          }
         }
         Some(TokenTree::Punct(p)) if p.as_char() == '$' => {
           match iter.next() {

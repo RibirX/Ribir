@@ -31,6 +31,23 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Added support to query a `WriteRef` from a state, enabling users to modify the state after attaching it to a widget. (#601 @M-Adoo)
 - **core**: Introduced the `DeclareInto` trait for any type that implements `DeclareFrom`. (#604 @M-Adoo)
+- **macros**: Improved widget declaration to allow specifying widget types via path. (#606 @M-Adoo)
+  ```rust
+    // Previously, a widget type could only be specified using an identifier, requiring prior import of `Row`.
+    use ribir::prelude::*;
+    fn_widget! {
+      @Row {
+        ...
+      }
+    }
+
+    // Now, the widget type can be specified using a path, removing the need for a prior import.
+    fn_widget! {
+      @ribir::prelude::Row {
+        ...
+      }
+    }
+```
 
 ### Changed
 

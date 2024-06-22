@@ -9,15 +9,13 @@ impl Compose for Todos {
         align_items: Align::Center,
         item_gap: 12.,
         @H1 { text: "Todo" }
-        @ {
-          input(None, move |text| {
-            $this.write().new_task(text.to_string());
-          })
-        }
+        @input(None, move |text| {
+          $this.write().new_task(text.to_string());
+        })
         @Tabs {
           @Tab {
-            @TabItem { @{ Label::new("ALL") } }
-            @TabPane { @{ task_lists(&this, |_| true) } }
+            @TabItem { @Label::new("ALL") }
+            @TabPane { @task_lists(&this, |_| true) }
           }
           @Tab {
             @TabItem { @{ Label::new("ACTIVE") } }
