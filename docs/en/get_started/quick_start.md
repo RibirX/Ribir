@@ -259,6 +259,18 @@ fn main() {
   });
 }
 ```
+For expression widgets that are simple function calls, the `{}` can be omitted for brevity:
+
+```rust ignore
+fn_widget! {
+  // Instead of using braces:
+  let label = @ { Label::new("Increment") };
+  // You can directly write:
+  let label = @Label::new("Increment");
+  ...
+};
+```
+
 ## State -- make data watchable and shareable
 
 Although we have created a counter, it always shows `0` and does not respond to the button. In this section, you will learn how to make your counter work through state.
