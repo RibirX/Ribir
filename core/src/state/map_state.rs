@@ -1,15 +1,5 @@
-use std::convert::Infallible;
-
-use rxrust::ops::box_it::CloneableBoxOp;
-
-use super::{
-  state_cell::PartData, ModifyScope, ReadRef, StateReader, StateWatcher, StateWriter, WriteRef,
-};
-use crate::{
-  context::BuildCtx,
-  render_helper::RenderProxy,
-  widget::{Render, RenderBuilder, Widget},
-};
+use super::*;
+use crate::{render_helper::RenderProxy, widget::*};
 
 /// A state reader that map a reader to another by applying a function on the
 /// value. This reader is the same reader with the origin reader.
@@ -204,4 +194,30 @@ where
 {
   #[inline]
   fn build(self, ctx: &BuildCtx) -> Widget { self.clone_reader().build(ctx) }
+}
+
+impl<S, F> IntoWidgetStrict<RENDER> for MapWriter<S, F>
+where
+  Self: StateReader,
+  <Self as StateReader>::Reader: IntoWidget<RENDER>,
+{
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.clone_reader().into_widget(ctx) }
+}
+
+impl<S, F> IntoWidgetStrict<COMPOSE> for MapWriter<S, F>
+where
+  Self: StateWriter,
+  <Self as StateReader>::Value: Compose,
+{
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
+}
+
+impl<S, F, C> IntoWidgetStrict<COMPOSE_CHILD> for MapWriter<S, F>
+where
+  Self: StateWriter,
+  <Self as StateReader>::Value: ComposeChild<Child = Option<C>>,
+{
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    ComposeChild::compose_child(self, None).build(ctx)
+  }
 }

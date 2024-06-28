@@ -277,6 +277,46 @@ impl StatefulInfo {
 impl<W: SingleChild> SingleChild for Stateful<W> {}
 impl<W: MultiChild> MultiChild for Stateful<W> {}
 
+impl<W: Render> IntoWidgetStrict<RENDER> for Stateful<W> {
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    match self.try_into_value() {
+      Ok(r) => r.into_widget(ctx),
+      Err(s) => {
+        let w = s.data.clone().into_widget(ctx);
+        w.dirty_subscribe(s.raw_modifies(), ctx)
+      }
+    }
+  }
+}
+
+impl<W: Compose + 'static> IntoWidgetStrict<COMPOSE> for Stateful<W> {
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
+}
+
+impl<W: ComposeChild<Child = Option<C>> + 'static, C> IntoWidgetStrict<COMPOSE_CHILD>
+  for Stateful<W>
+{
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    ComposeChild::compose_child(self, None).build(ctx)
+  }
+}
+
+impl<W: Render> IntoWidgetStrict<RENDER> for Reader<W> {
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    match Sc::try_unwrap(self.0) {
+      Ok(r) => r.into_inner().into_widget(ctx),
+      Err(s) => s.into_widget(ctx),
+    }
+  }
+}
+
+impl<W, const M: usize> IntoWidgetStrict<M> for Writer<W>
+where
+  Stateful<W>: IntoWidget<M>,
+{
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.0.into_widget(ctx) }
+}
+
 impl<W: SingleChild + Render> SingleParent for Stateful<W> {
   fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
     let p = self.build(ctx);

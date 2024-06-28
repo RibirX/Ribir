@@ -1,18 +1,7 @@
-use std::cell::Cell;
-
 use ribir_algo::Sc;
-use rxrust::{ops::box_it::CloneableBoxOp, prelude::BoxIt};
 
-use super::{
-  state_cell::PartData, MapWriterAsReader, ModifyScope, Notifier, ReadRef, StateReader,
-  StateWatcher, StateWriter, WriteRef, WriterControl,
-};
-use crate::{
-  context::BuildCtx,
-  prelude::AppCtx,
-  state::state_cell::ValueMutRef,
-  widget::{Render, RenderBuilder, Widget},
-};
+use super::*;
+use crate::widget::*;
 
 /// A writer splitted writer from another writer, and has its own notifier.
 pub struct SplittedWriter<O, W> {
@@ -168,5 +157,23 @@ where
   fn build(self, ctx: &BuildCtx) -> Widget {
     MapWriterAsReader { origin: self.origin.clone_reader(), part_map: self.splitter.clone() }
       .build(ctx)
+  }
+}
+
+impl<S, F> IntoWidgetStrict<COMPOSE> for SplittedWriter<S, F>
+where
+  Self: StateWriter,
+  <Self as StateReader>::Value: Compose,
+{
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
+}
+
+impl<S, F, C> IntoWidgetStrict<COMPOSE_CHILD> for SplittedWriter<S, F>
+where
+  Self: StateWriter,
+  <Self as StateReader>::Value: ComposeChild<Child = Option<C>>,
+{
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    ComposeChild::compose_child(self, None).build(ctx)
   }
 }

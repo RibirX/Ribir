@@ -361,6 +361,27 @@ impl<R: Render> RenderBuilder for State<R> {
   }
 }
 
+impl<R: Render> IntoWidgetStrict<RENDER> for State<R> {
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    match self.0.into_inner() {
+      InnerState::Data(w) => w.into_inner().into_widget(ctx),
+      InnerState::Stateful(w) => w.into_widget(ctx),
+    }
+  }
+}
+
+impl<W: Compose + 'static> IntoWidgetStrict<COMPOSE> for State<W> {
+  #[inline]
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
+}
+
+impl<W: ComposeChild<Child = Option<C>> + 'static, C> IntoWidgetStrict<COMPOSE_CHILD> for State<W> {
+  #[inline]
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    ComposeChild::compose_child(self, None).build(ctx)
+  }
+}
+
 impl<W: SingleChild + Render> SingleParent for State<W> {
   fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
     match self.0.into_inner() {
