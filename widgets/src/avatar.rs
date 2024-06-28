@@ -82,7 +82,7 @@ impl ComposeChild for Avatar {
                 text_style,
                 foreground: pipe!(Brush::from(palette2.on_of(&palette2.base_of(&$this.color)))),
               }
-            }
+            }.into_widget(ctx!())
           },
           AvatarTemplate::Image(image) => {
             let clip = radius.map(|radius| {

@@ -9,11 +9,11 @@ pub fn wordle_game() -> impl WidgetBuilder {
 trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
   fn chars_key<const N: usize>(
     &self, chars: [char; N],
-  ) -> impl Iterator<Item = impl WidgetBuilder> {
+  ) -> impl Iterator<Item = impl IntoWidgetStrict<FN>> {
     chars.into_iter().map(|c| self.char_key(c))
   }
 
-  fn char_key(&self, key: char) -> impl WidgetBuilder {
+  fn char_key(&self, key: char) -> impl IntoWidgetStrict<FN> {
     let this = self.clone_writer();
     fn_widget! {
       @FilledButton {
@@ -24,7 +24,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
     }
   }
 
-  fn keyboard(&self, state_bar: impl StateWriter<Value = Text>) -> impl WidgetBuilder {
+  fn keyboard(&self, state_bar: impl StateWriter<Value = Text>) -> impl IntoWidgetStrict<FN> {
     let this = self.clone_writer();
     fn_widget! {
     let palette = Palette::of(ctx!());
@@ -68,7 +68,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
     }
   }
 
-  fn chars_grid(&self) -> impl WidgetBuilder {
+  fn chars_grid(&self) -> impl IntoWidgetStrict<FN> {
     let this = self.clone_writer();
     fn_widget! {
       @Column {
@@ -120,7 +120,7 @@ impl Wordle {
     };
   }
 
-  fn char_grid(&self, row: usize, col: usize) -> impl WidgetBuilder {
+  fn char_grid(&self, row: usize, col: usize) -> impl WidgetBuilder + IntoWidget<FN> {
     let char_hint = self.char_hint(row, col);
     let c = char_hint.map(|c| c.char).unwrap_or('\0');
     let hint = char_hint.and_then(|c| c.hint);

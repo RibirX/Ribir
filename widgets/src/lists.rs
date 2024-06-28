@@ -132,12 +132,12 @@ impl ComposeDecorator for ListsDecorator {
 }
 
 impl ComposeChild for Lists {
-  type Child = BoxPipe<Vec<Widget>>;
+  type Child = Vec<Widget>;
 
   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
     fn_widget! {
       @ListsDecorator {
-        @Column { @ { child.into_pipe() } }
+        @Column { @ { child } }
       }
     }
   }
@@ -175,7 +175,7 @@ pub struct SupportingText(pub Label);
 pub enum EdgeWidget {
   Text(Label),
   Icon(NamedSvg),
-  Avatar(FatObj<Pair<State<Avatar>, AvatarTemplate>>),
+  Avatar(FatObj<Pair<State<Avatar>, AvatarTemplateBuilder>>),
   Image(Resource<PixelImage>),
   Poster(Poster),
   Custom(CustomEdgeWidget),
@@ -184,7 +184,7 @@ pub enum EdgeWidget {
 pub struct CustomEdgeWidget(pub Widget);
 
 impl EdgeWidget {
-  fn compose_with_style(self, config: EdgeWidgetStyle) -> impl WidgetBuilder {
+  fn compose_with_style(self, config: EdgeWidgetStyle) -> impl IntoWidget<FN> {
     let EdgeWidgetStyle { icon, text, avatar, image, poster, custom } = config;
     fn_widget! {
       let w: Widget = match self {

@@ -86,13 +86,9 @@ impl Compose for MessageList {
                               @HeadlineText(Label::new(message.nick_name.clone()))
                               @SupportingText(Label::new(message.content.clone()))
                               @Leading {
-                                @Avatar {
-                                  @{
-                                    message.img.clone()
-                                  }
-                                }
+                                @EdgeWidget::Avatar(@Avatar { @{ message.img.clone() } })
                               }
-                              @Trailing { @{ svgs::MORE_HORIZ } }
+                              @Trailing { @EdgeWidget::Icon(svgs::MORE_HORIZ) }
                             }
                             @Divider {}
                           }
@@ -102,7 +98,7 @@ impl Compose for MessageList {
                       }
                     }
                   }
-                }
+                }.into()
               }
             }
           }
@@ -112,7 +108,7 @@ impl Compose for MessageList {
               @{ Label::new("Person") }
             }
             @TabPane {
-              @{ fn_widget!(@Text { text: "Person" }) }
+              @{ fn_widget!(@Text { text: "Person" }).into() }
             }
           }
         }

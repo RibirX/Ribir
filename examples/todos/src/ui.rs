@@ -40,8 +40,8 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
 
     @VScrollBar {
       on_mounted: move |_| c_stagger.run(),
-      @Lists {
-        @ { pipe!($this;).map(move |_| {
+      @ {
+        pipe!($this;).map(move |_| {
           let _hint_capture_this = || $this.write();
           let mut widgets = vec![];
 
@@ -72,7 +72,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
                           }
                         }
                       }
-                    }.build(ctx!())
+                    }.into_widget(ctx!())
 
                   } else {
                     let _hint = || $stagger.write();
@@ -86,8 +86,8 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
               widgets.push(item);
             }
           }
-          widgets
-        }) }
+          @Lists { @ { widgets } }
+        })
       }
     }
   }
@@ -96,7 +96,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
 
 fn input(
   text: Option<String>, mut on_submit: impl FnMut(CowArc<str>) + 'static,
-) -> impl WidgetBuilder {
+) -> impl WidgetBuilder + IntoWidgetStrict<FN> {
   fn_widget! {
     let input = @Input { };
     if let  Some(text) = text {
@@ -152,18 +152,18 @@ where
     @$item {
       @{ HeadlineText(Label::new($task.label.clone())) }
       @Leading {
-        @{
+        @EdgeWidget::Custom({
           let checkbox = @Checkbox { checked: pipe!($task.complete) };
           watch!($checkbox.checked)
             .distinct_until_changed()
             .subscribe(move |v| $task.write().complete = v);
           CustomEdgeWidget(checkbox.build(ctx!()))
-        }
+        })
       }
       @Trailing {
         cursor: CursorIcon::Pointer,
         on_tap: move |_| $todos.write().remove(id),
-        @{ svgs::CLOSE }
+        @EdgeWidget::Icon(svgs::CLOSE)
       }
     }
   }

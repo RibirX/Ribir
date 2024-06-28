@@ -845,9 +845,6 @@ impl<T> ObjDeclarer for FatObj<T> {
   fn finish(self, _: &BuildCtx) -> Self::Target { self }
 }
 
-impl<T: SingleChild> SingleChild for FatObj<T> {}
-impl<T: MultiChild> MultiChild for FatObj<T> {}
-
 crate::widget::multi_build_replace_impl! {
   impl<T: {#} > {#} for FatObj<T> {
     #[track_caller]
@@ -887,13 +884,15 @@ where
       host = pointer_pressed.with_child(host, ctx).build(ctx);
     }
     if let Some(fitted_box) = self.fitted_box {
-      host = fitted_box.with_child(host, ctx).build(ctx);
+      host = fitted_box.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(box_decoration) = self.box_decoration {
-      host = box_decoration.with_child(host, ctx).build(ctx);
+      host = box_decoration
+        .with_child(host, ctx)
+        .into_widget(ctx);
     }
     if let Some(padding) = self.padding {
-      host = padding.with_child(host, ctx).build(ctx);
+      host = padding.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(layout_box) = self.layout_box {
       host = layout_box.with_child(host, ctx).build(ctx);
@@ -902,22 +901,24 @@ where
       host = cursor.with_child(host, ctx).build(ctx);
     }
     if let Some(margin) = self.margin {
-      host = margin.with_child(host, ctx).build(ctx);
+      host = margin.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(scrollable) = self.scrollable {
       host = scrollable.with_child(host, ctx).build(ctx);
     }
     if let Some(transform) = self.transform {
-      host = transform.with_child(host, ctx).build(ctx);
+      host = transform.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(h_align) = self.h_align {
-      host = h_align.with_child(host, ctx).build(ctx);
+      host = h_align.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(v_align) = self.v_align {
-      host = v_align.with_child(host, ctx).build(ctx);
+      host = v_align.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(relative_anchor) = self.relative_anchor {
-      host = relative_anchor.with_child(host, ctx).build(ctx);
+      host = relative_anchor
+        .with_child(host, ctx)
+        .into_widget(ctx);
     }
     if let Some(global_anchor) = self.global_anchor {
       host = global_anchor.with_child(host, ctx).build(ctx);
@@ -926,7 +927,7 @@ where
       host = visibility.with_child(host, ctx).build(ctx);
     }
     if let Some(opacity) = self.opacity {
-      host = opacity.with_child(host, ctx).build(ctx);
+      host = opacity.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(keep_alive) = self.keep_alive {
       host = keep_alive.with_child(host, ctx).build(ctx);
@@ -940,25 +941,10 @@ where
   }
 }
 
-impl<T: ComposeWithChild<C, M>, C, M> ComposeWithChild<C, M> for FatObj<T> {
-  type Target = FatObj<T::Target>;
-
+impl FatObj<()> {
   #[inline]
   #[track_caller]
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    self.map(
-      #[cfg_attr(feature = "nightly", track_caller)]
-      |host| host.with_child(child, ctx),
-    )
-  }
-}
-
-impl<C> SingleWithChild<C, ()> for FatObj<()> {
-  type Target = FatObj<C>;
-
-  #[inline]
-  #[track_caller]
-  fn with_child(self, child: C, _: &BuildCtx) -> Self::Target { self.map(move |_| child) }
+  pub fn with_child<C>(self, child: C, _: &BuildCtx) -> FatObj<C> { self.map(move |_| child) }
 }
 
 impl<T: PairWithChild<C>, C> PairWithChild<C> for FatObj<T> {
@@ -967,24 +953,6 @@ impl<T: PairWithChild<C>, C> PairWithChild<C> for FatObj<T> {
   #[inline]
   #[track_caller]
   fn with_child(self, child: C, _: &BuildCtx) -> Self::Target { Pair::new(self, child) }
-}
-
-impl<T: SingleParent + 'static> SingleParent for FatObj<T> {
-  #[track_caller]
-  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    self
-      .map(|host| host.compose_child(child, ctx))
-      .build(ctx)
-  }
-}
-
-impl<T: MultiParent + 'static> MultiParent for FatObj<T> {
-  #[track_caller]
-  fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
-    self
-      .map(|host| host.compose_children(children, ctx))
-      .build(ctx)
-  }
 }
 
 impl<T> std::ops::Deref for FatObj<T> {

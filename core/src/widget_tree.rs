@@ -286,9 +286,9 @@ mod tests {
             @MockBox {
               size: Size::zero(),
               @ { pipe!($child.then(|| Void)) }
-            }.build(ctx!())
+            }.into_widget(ctx!())
           } else {
-            Void.build(ctx!())
+            Void.into_widget(ctx!())
           }
         })
       }

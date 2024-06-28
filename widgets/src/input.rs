@@ -320,7 +320,7 @@ where
   fn edit_area(
     this: &impl StateWriter<Value = Self>, mut text: FatObj<State<Text>>,
     scroll_dir: impl Pipe<Value = Scrollable> + 'static, placeholder: Option<Placeholder>,
-  ) -> impl WidgetBuilder {
+  ) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let layout_box = text.get_layout_box_widget().clone_reader();
       let only_text = text.clone_reader();

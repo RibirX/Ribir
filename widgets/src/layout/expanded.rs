@@ -23,6 +23,7 @@ impl ComposeChild for Expanded {
         },
         @{ child }
       }
+      .into_widget(ctx!())
       .try_unwrap_state_and_attach(this, ctx!())
     }
   }

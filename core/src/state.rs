@@ -348,9 +348,6 @@ impl<P: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for St
   fn build(self, ctx: &BuildCtx) -> Widget { ComposeChild::compose_child(self, None).build(ctx) }
 }
 
-impl<W: SingleChild> SingleChild for State<W> {}
-impl<W: MultiChild> MultiChild for State<W> {}
-
 impl<R: Render> RenderBuilder for State<R> {
   #[inline]
   fn build(self, ctx: &BuildCtx) -> Widget {
@@ -382,22 +379,18 @@ impl<W: ComposeChild<Child = Option<C>> + 'static, C> IntoWidgetStrict<COMPOSE_C
   }
 }
 
-impl<W: SingleChild + Render> SingleParent for State<W> {
-  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    match self.0.into_inner() {
-      InnerState::Data(w) => w.into_inner().compose_child(child, ctx),
-      InnerState::Stateful(w) => w.compose_child(child, ctx),
-    }
-  }
+impl<T> MultiChild for T
+where
+  T: StateReader,
+  T::Value: MultiChild,
+{
 }
 
-impl<W: MultiChild + Render> MultiParent for State<W> {
-  fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
-    match self.0.into_inner() {
-      InnerState::Data(w) => w.into_inner().compose_children(children, ctx),
-      InnerState::Stateful(w) => w.compose_children(children, ctx),
-    }
-  }
+impl<T> SingleChild for T
+where
+  T: StateReader,
+  T::Value: SingleChild,
+{
 }
 
 macro_rules! impl_compose_builder {

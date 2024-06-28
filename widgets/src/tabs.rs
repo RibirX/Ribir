@@ -167,7 +167,7 @@ impl Tabs {
     headers: Vec<(Option<NamedSvg>, Option<Label>)>, tabs_style: TabsStyle,
     tabs: impl StateWriter<Value = Tabs> + 'static,
     indicator: impl StateWriter<Value = IndicatorDecorator> + 'static,
-  ) -> impl Iterator<Item = impl WidgetBuilder> {
+  ) -> impl Iterator<Item = impl IntoWidgetStrict<FN>> {
     let TabsStyle { icon_size: size, icon_pos, active_color, foreground, label_style, .. } =
       tabs_style;
     headers
@@ -319,7 +319,8 @@ impl ComposeChild for Tabs {
         };
 
       @TabsDecorator {
-        @Flex {
+        @{
+          @Flex {
           direction: pipe!(match  $this.pos {
             Position::Left | Position::Right => Direction::Horizontal,
             Position::Top | Position::Bottom => Direction::Vertical,
@@ -332,7 +333,8 @@ impl ComposeChild for Tabs {
           @Expanded {
             @ { pipe!($this.cur_idx).map(move |idx| panes[idx].gen_widget(ctx!())) }
           }
-        }
+        }.into_widget(ctx!())
+      }
       }
     }
   }
