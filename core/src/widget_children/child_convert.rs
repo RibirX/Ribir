@@ -2,9 +2,59 @@ use super::Pair;
 use crate::{
   builtin_widgets::{FatObj, Void},
   context::BuildCtx,
-  pipe::{BoxPipe, InnerPipe, Pipe},
+  pipe::*,
   widget::*,
 };
+
+pub trait IntoChild<C, const M: usize> {
+  fn into_child(self, ctx: &BuildCtx) -> C;
+}
+
+pub const INTO_CONVERT: usize = 0;
+
+impl<T: Into<C>, C> IntoChild<C, INTO_CONVERT> for T {
+  #[inline(always)]
+  fn into_child(self, _: &BuildCtx) -> C { self.into() }
+}
+
+macro_rules! impl_into_widget_child {
+  ($($m:ident),*) => {
+    $(
+      // `IntoWidgetStrict` is utilized here to prevent conflicts with the `Into` trait bounds.
+      impl<T: IntoWidgetStrict<$m>> IntoChild<Widget, $m> for T {
+        #[inline(always)]
+        fn into_child(self, ctx: &BuildCtx) -> Widget { self.into_widget_strict(ctx) }
+      }
+    )*
+  };
+}
+
+impl_into_widget_child!(COMPOSE, RENDER, COMPOSE_CHILD, FN);
+
+impl<V, S, F, const M: usize> IntoChild<Widget, M> for MapPipe<Option<V>, S, F>
+where
+  V: IntoWidget<M> + 'static,
+  S: InnerPipe,
+  S::Value: 'static,
+  F: FnMut(S::Value) -> Option<V> + 'static,
+{
+  fn into_child(self, ctx: &BuildCtx) -> Widget { self.into_widget(ctx) }
+}
+
+impl<V, S, F, const M: usize> IntoChild<Widget, M> for FinalChain<Option<V>, S, F>
+where
+  V: IntoWidget<M> + 'static,
+  S: InnerPipe<Value = Option<V>>,
+  F: FnOnce(ValueStream<Option<V>>) -> ValueStream<Option<V>> + 'static,
+{
+  fn into_child(self, ctx: &BuildCtx) -> Widget { self.into_widget(ctx) }
+}
+
+impl<const M: usize, V: IntoWidget<M> + 'static> IntoChild<Widget, M>
+  for Box<dyn Pipe<Value = Option<V>>>
+{
+  fn into_child(self, ctx: &BuildCtx) -> Widget { self.into_widget(ctx) }
+}
 
 /// Trait for conversions type as a compose child.
 pub trait ChildFrom<V, M> {

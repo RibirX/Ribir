@@ -860,8 +860,16 @@ crate::widget::multi_build_replace_impl! {
 impl WidgetBuilder for FatObj<Widget> {
   #[inline]
   #[track_caller]
-  fn build(self, ctx: &BuildCtx) -> Widget {
-    let mut host = self.host;
+  fn build(self, ctx: &BuildCtx) -> Widget { self.into_widget_strict(ctx) }
+}
+
+impl<T, const M: usize> IntoWidgetStrict<M> for FatObj<T>
+where
+  T: IntoWidget<M>,
+{
+  #[inline]
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    let mut host = self.host.into_widget(ctx);
     self.host_id.set(host.id());
     if let Some(mix_builtin) = self.mix_builtin {
       host = mix_builtin.with_child(host, ctx).build(ctx)

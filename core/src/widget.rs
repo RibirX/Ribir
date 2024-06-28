@@ -65,6 +65,74 @@ pub type BoxedWidget = Box<dyn for<'a, 'b> FnOnce(&'a BuildCtx<'b>) -> Widget>;
 /// widget.
 pub struct GenWidget(Box<dyn for<'a, 'b> FnMut(&'a BuildCtx<'b>) -> Widget>);
 
+// The widget type marker.
+pub const COMPOSE: usize = 1;
+pub const RENDER: usize = 2;
+pub const COMPOSE_CHILD: usize = 3;
+pub const FN: usize = 4;
+
+/// Defines a trait for converting any widget into a `Widget` type. Direct
+/// implementation of this trait is not recommended as it is automatically
+/// implemented by the framework.
+///
+/// Instead, focus on implementing `Compose`, `Render`, or `ComposeChild`.
+pub trait IntoWidget<const M: usize> {
+  fn into_widget(self, ctx: &BuildCtx) -> Widget;
+}
+
+/// A trait used by the framework to implement `IntoWidget`. Unlike
+/// `IntoWidget`, this trait is not implemented for `Widget` itself. This design
+/// choice allows the framework to use either `IntoWidget` or `IntoWidgetStrict`
+/// as a generic bound, preventing implementation conflicts.
+// fixme: should be pub(crate)
+pub trait IntoWidgetStrict<const M: usize> {
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget;
+}
+
+impl IntoWidget<FN> for Widget {
+  #[inline(always)]
+  fn into_widget(self, _: &BuildCtx) -> Widget { self }
+}
+
+impl<const M: usize, T: IntoWidgetStrict<M>> IntoWidget<M> for T {
+  #[inline(always)]
+  fn into_widget(self, ctx: &BuildCtx) -> Widget { self.into_widget_strict(ctx) }
+}
+
+impl<C: Compose + 'static> IntoWidgetStrict<COMPOSE> for C {
+  #[inline]
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    Compose::compose(State::value(self)).build(ctx)
+  }
+}
+
+impl<R: Render + 'static> IntoWidgetStrict<RENDER> for R {
+  #[inline]
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    Widget::new(Box::new(PureRender(self)), ctx)
+  }
+}
+
+impl<W: ComposeChild<Child = Option<C>> + 'static, C> IntoWidgetStrict<COMPOSE_CHILD> for W {
+  #[inline]
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+    ComposeChild::compose_child(State::value(self), None).build(ctx)
+  }
+}
+
+impl<F> IntoWidgetStrict<FN> for F
+where
+  F: FnOnce(&BuildCtx) -> Widget,
+{
+  #[inline]
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self(ctx) }
+}
+
+impl IntoWidgetStrict<FN> for GenWidget {
+  #[inline]
+  fn into_widget_strict(mut self, ctx: &BuildCtx) -> Widget { self.gen_widget(ctx) }
+}
+
 /// Trait to build a indirect widget into widget tree with `BuildCtx` in the
 /// build phase. You should not implement this trait directly, framework will
 /// auto implement this.

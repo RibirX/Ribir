@@ -25,6 +25,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Introduced `IntoWidget` and `IntoChild`. (@M-Adoo #pr)
+
+  The `IntoWidget` trait allows for the conversion of any widget to the type `Widget`.
+  The `IntoChild` trait provides a way to convert a more general widget into a child of `ComposeChild`.
+
+
 ## [0.4.0-alpha.3] - 2024-06-26
 
 ## [0.4.0-alpha.2] - 2024-06-19

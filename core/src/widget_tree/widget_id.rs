@@ -129,6 +129,15 @@ impl WidgetId {
     self.0.append(child.0, tree);
   }
 
+  /// Traverses to the leaf widget in the widget tree, returning it. Panics if
+  /// there is more than one child in the path.
+  pub(crate) fn single_leaf(self, tree: &TreeArena) -> WidgetId {
+    let mut leaf = self;
+    while let Some(child) = leaf.single_child(tree) {
+      leaf = child;
+    }
+    leaf
+  }
   /// Return the single child of `widget`, panic if have more than once child.
   pub(crate) fn single_child(&self, tree: &TreeArena) -> Option<WidgetId> {
     assert_eq!(self.first_child(tree), self.last_child(tree), "Have more than one child.");
