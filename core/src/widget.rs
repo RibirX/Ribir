@@ -58,9 +58,6 @@ pub struct Widget {
   handle: BuildCtxHandle,
 }
 
-/// A boxed function widget.
-pub type BoxedWidget = Box<dyn for<'a, 'b> FnOnce(&'a BuildCtx<'b>) -> Widget>;
-
 /// A boxed function widget that can be called multiple times to regenerate
 /// widget.
 pub struct GenWidget(Box<dyn for<'a, 'b> FnMut(&'a BuildCtx<'b>) -> Widget>);
@@ -141,26 +138,6 @@ impl IntoWidgetStrict<FN> for GenWidget {
 /// `ComposeChild`,  like function widget and  `Pipe<Widget>`.
 pub trait WidgetBuilder {
   fn build(self, ctx: &BuildCtx) -> Widget;
-
-  /// Convert the widget to named type widget `FnWidget`, this is useful when
-  /// you want store a widget and not want to call `build(ctx!())` to
-  /// build it into the widget tree.
-  ///
-  /// # Example
-  ///
-  /// ```ignore
-  /// let w = if xxx {
-  ///   fn_widget! { ... }.box_it()
-  /// else {
-  ///   fn_widget! { ... }.box_it()
-  /// };
-  /// ```
-  fn box_it(self) -> BoxedWidget
-  where
-    Self: Sized + 'static,
-  {
-    Box::new(move |ctx| self.build(ctx))
-  }
 }
 
 /// Trait to build a compose widget into widget tree with `BuildCtx` in the

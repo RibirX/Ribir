@@ -34,13 +34,13 @@ impl OverlayCloseHandle {
 }
 
 struct OverlayData {
-  builder: Box<dyn Fn(OverlayCloseHandle) -> BoxedWidget>,
-  style: RefCell<Option<OverlayStyle>>,
+  builder: Box<dyn FnMut(OverlayCloseHandle, &BuildCtx) -> Widget>,
+  style: Option<OverlayStyle>,
   state: OverlayState,
 }
 
 #[derive(Clone)]
-pub struct Overlay(Rc<OverlayData>);
+pub struct Overlay(Rc<RefCell<OverlayData>>);
 
 impl Overlay {
   /// Create overlay from Clone able widget.
@@ -65,15 +65,9 @@ impl Overlay {
   ///  };
   ///  App::run(w);
   /// ```
-  pub fn new<M>(widget: M) -> Self
-  where
-    M: WidgetBuilder + 'static + Clone,
-  {
-    Self(Rc::new(OverlayData {
-      builder: Box::new(move |_| widget.clone().box_it()),
-      style: RefCell::new(None),
-      state: OverlayState::default(),
-    }))
+  pub fn new(gen: impl Into<GenWidget>) -> Self {
+    let mut gen = gen.into();
+    Self::new_with_handle(move |_, ctx| gen.gen_widget(ctx))
   }
 
   /// Create overlay from a builder with a close_handle
@@ -104,21 +98,19 @@ impl Overlay {
   ///
   /// App::run(w).with_size(Size::new(200., 200.));
   /// ```
-  pub fn new_with_handle<O, M>(builder: M) -> Self
-  where
-    M: Fn(OverlayCloseHandle) -> O + 'static,
-    O: WidgetBuilder + 'static,
-  {
-    Self(Rc::new(OverlayData {
-      builder: Box::new(move |ctrl| builder(ctrl).box_it()),
-      style: RefCell::new(None),
+  pub fn new_with_handle(
+    mut builder: impl FnMut(OverlayCloseHandle, &BuildCtx) -> Widget + 'static,
+  ) -> Self {
+    Self(Rc::new(RefCell::new(OverlayData {
+      builder: Box::new(move |ctrl, ctx| builder(ctrl, ctx)),
+      style: None,
       state: OverlayState::default(),
-    }))
+    })))
   }
 
   /// Overlay will show with the given style, if the overlay have not been set
   /// with style, the default style will be get from the theme.
-  pub fn with_style(&self, style: OverlayStyle) { *self.0.style.borrow_mut() = Some(style); }
+  pub fn with_style(&self, style: OverlayStyle) { self.0.borrow_mut().style = Some(style); }
 
   /// the Overlay widget will be show at the top level of all widget.
   /// if the overlay is showing, nothing will happen.
@@ -126,9 +118,12 @@ impl Overlay {
     if self.is_show() {
       return;
     }
-    let w = (self.0.builder)(self.0.state.close_handle());
-    let style = self.0.style.borrow().clone();
-    self.0.state.show(w, style, wnd);
+    let ctx = BuildCtx::new(None, &wnd.widget_tree);
+    let mut inner = self.0.borrow_mut();
+    let handle = inner.state.close_handle();
+    let w = (inner.builder)(handle, &ctx);
+    let style = inner.style.clone();
+    inner.state.show(w, style, wnd);
   }
 
   /// User can make transform before the widget show at the top level of all
@@ -167,19 +162,24 @@ impl Overlay {
   /// };
   /// App::run(w);
   /// ```
-  pub fn show_map<O, F>(&self, f: F, wnd: Rc<Window>)
+  pub fn show_map<F, O>(&self, f: F, wnd: Rc<Window>)
   where
-    F: Fn(BoxedWidget, OverlayCloseHandle) -> O + 'static,
-    O: WidgetBuilder + 'static,
+    F: FnOnce(Widget, OverlayCloseHandle) -> O + 'static,
+    O: IntoWidget<FN>,
   {
     if self.is_show() {
       return;
     }
 
-    let close_handle = self.0.state.close_handle();
-    let w = f((self.0.builder)(close_handle.clone()), close_handle);
-    let style = self.0.style.borrow().clone();
-    self.0.state.show(w, style, wnd);
+    let ctx = BuildCtx::new(None, &wnd.widget_tree);
+    let mut inner = self.0.borrow_mut();
+    let close_handle = inner.state.close_handle();
+    let overlay = (inner.builder)(close_handle.clone(), &ctx);
+    let overlay = f(overlay, close_handle);
+    let style = inner.style.clone();
+    inner
+      .state
+      .show(overlay.into_widget(&ctx), style, wnd);
   }
 
   /// Show the widget at the give position.
@@ -199,10 +199,10 @@ impl Overlay {
   }
 
   /// return whether the overlay is show.
-  pub fn is_show(&self) -> bool { self.0.state.is_show() }
+  pub fn is_show(&self) -> bool { self.0.borrow().state.is_show() }
 
   /// remove the showing overlay.
-  pub fn close(&self) { self.0.state.close() }
+  pub fn close(&self) { self.0.borrow().state.close() }
 }
 
 enum OverlayInnerState {
@@ -231,7 +231,7 @@ impl OverlayState {
 
   fn is_show(&self) -> bool { !matches!(*self.0.borrow(), OverlayInnerState::Hided) }
 
-  fn show(&self, w: impl WidgetBuilder + 'static, style: Option<OverlayStyle>, wnd: Rc<Window>) {
+  fn show(&self, w: Widget, style: Option<OverlayStyle>, wnd: Rc<Window>) {
     if self.is_show() {
       return;
     }
@@ -255,7 +255,7 @@ impl OverlayState {
     });
   }
 
-  fn wrap_style(&self, w: impl WidgetBuilder, style: OverlayStyle) -> impl WidgetBuilder {
+  fn wrap_style(&self, w: Widget, style: OverlayStyle) -> impl WidgetBuilder {
     let this = self.clone();
     fn_widget! {
       let OverlayStyle { close_policy, mask_brush } = style;
@@ -275,7 +275,7 @@ impl OverlayState {
             this2.close();
           }
         },
-        @$w {}
+        @ { w }
       }
     }
   }
@@ -330,7 +330,10 @@ mod tests {
           let w_log = w_log.clone();
           move |_| { w_log.borrow_mut().push("mounted");}
         },
-        on_disposed: move |_| { w_log.borrow_mut().push("disposed");}
+        on_disposed: {
+          let w_log = w_log.clone();
+          move |_| { w_log.borrow_mut().push("disposed");}
+        }
       }
     });
     wnd.draw_frame();

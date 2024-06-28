@@ -274,9 +274,6 @@ impl StatefulInfo {
   }
 }
 
-impl<W: SingleChild> SingleChild for Stateful<W> {}
-impl<W: MultiChild> MultiChild for Stateful<W> {}
-
 impl<W: Render> IntoWidgetStrict<RENDER> for Stateful<W> {
   fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
     match self.try_into_value() {
@@ -315,24 +312,6 @@ where
   Stateful<W>: IntoWidget<M>,
 {
   fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.0.into_widget(ctx) }
-}
-
-impl<W: SingleChild + Render> SingleParent for Stateful<W> {
-  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    let p = self.build(ctx);
-    ctx.append_child(p.id(), child);
-    p
-  }
-}
-
-impl<W: MultiChild + Render> MultiParent for Stateful<W> {
-  fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
-    let p = self.build(ctx);
-    for c in children {
-      ctx.append_child(p.id(), c);
-    }
-    p
-  }
 }
 
 impl Notifier {

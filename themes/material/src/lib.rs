@@ -241,7 +241,7 @@ fn init_custom_style(theme: &mut FullTheme) {
 }
 
 fn override_compose_decorator(theme: &mut FullTheme) {
-  fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> impl WidgetBuilder {
+  fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @$host {
         margin,

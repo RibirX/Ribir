@@ -160,6 +160,14 @@ where
   }
 }
 
+impl<S, F> IntoWidgetStrict<RENDER> for SplittedWriter<S, F>
+where
+  Self: StateWriter,
+  <Self as StateReader>::Reader: IntoWidget<RENDER>,
+{
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.clone_reader().into_widget(ctx) }
+}
+
 impl<S, F> IntoWidgetStrict<COMPOSE> for SplittedWriter<S, F>
 where
   Self: StateWriter,

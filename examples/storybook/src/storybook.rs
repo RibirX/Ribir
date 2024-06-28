@@ -2,7 +2,7 @@ use ribir::{material::material_svgs, prelude::*};
 
 static NORMAL_BUTTON_SIZE: Size = Size::new(120., 40.);
 
-fn header() -> impl WidgetBuilder {
+fn header() -> impl IntoWidgetStrict<FN> {
   static HEADER_HEIGHT: f32 = 64.;
   static TITLE: &str = "Material Design";
   fn_widget! {
@@ -19,7 +19,7 @@ fn header() -> impl WidgetBuilder {
   }
 }
 
-fn content() -> impl WidgetBuilder {
+fn content() -> impl WidgetBuilder + IntoWidgetStrict<FN> {
   fn actions_show() -> GenWidget {
     fn_widget! {
       @VScrollBar {
@@ -180,21 +180,21 @@ fn content() -> impl WidgetBuilder {
             @ { svgs::HOME }
             @ { Label::new("Video") }
           }
-          @TabPane { @ { fn_widget!(Void) } }
+          @TabPane { @ { fn_widget!(Void).into() } }
         }
         @Tab {
           @TabItem {
             @ { svgs::HOME }
             @ { Label::new("Photos") }
           }
-          @TabPane { @ { fn_widget!(Void) } }
+          @TabPane { @ { fn_widget!(Void).into() } }
         }
         @Tab {
           @TabItem {
             @ { svgs::HOME }
             @ { Label::new("Audio") }
           }
-          @TabPane { @ { fn_widget!(Void) } }
+          @TabPane { @ { fn_widget!(Void).into() } }
         }
       }
     }
@@ -231,7 +231,7 @@ fn content() -> impl WidgetBuilder {
             url: "https://ribir.org",
             @ListItem {
               @Leading {
-                @ { svgs::CHECK_BOX_OUTLINE_BLANK }
+                @EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK)
               }
               @ { HeadlineText(Label::new("One line list item")) }
               @ { SupportingText(Label::new("One line supporting text")) }
@@ -240,49 +240,51 @@ fn content() -> impl WidgetBuilder {
           @Divider { indent: 16. }
           @ListItem {
             @Leading {
-              @ { svgs::MENU }
+              @EdgeWidget::Icon(svgs::MENU)
             }
             @ { HeadlineText(Label::new("One line list item")) }
             @Trailing {
-              @ { Label::new("100+") }
+              @EdgeWidget::Text(Label::new("100+"))
             }
           }
           @Divider { indent: 16. }
           @ListItem {
             line_number: 2usize,
             @Leading {
-              @Avatar {
-                @ { Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png"))) }
-              }
+              @EdgeWidget::Avatar(
+                @Avatar {
+                  @ { Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png"))) }
+                }
+              )
             }
             @ { HeadlineText(Label::new("Two lines list item")) }
             @ { SupportingText(Label::new("Two lines supporting text \rTwo lines supporting text")) }
             @Trailing {
-              @ { svgs::CHECK_BOX_OUTLINE_BLANK }
+              @EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK)
             }
           }
           @Divider { indent: 16. }
           @ListItem {
             @Leading {
-              @Avatar {
-                @ { Label::new("A") }
-              }
+              @EdgeWidget::Avatar(@Avatar { @Label::new("A") })
             }
             @ { HeadlineText(Label::new("One lines list item")) }
             @ { SupportingText(Label::new("One lines supporting text")) }
             @Trailing {
-              @ { Label::new("100+") }
+              @EdgeWidget::Text(Label::new("100+"))
             }
           }
           @Divider { indent: 16. }
           @ListItem {
             @Leading {
-              @ { Poster(Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png")))) }
+              @EdgeWidget::Poster(
+                Poster(Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png"))))
+              )
             }
             @ { HeadlineText(Label::new("One lines list item")) }
             @ { SupportingText(Label::new("One lines supporting text")) }
             @Trailing {
-              @ { Label::new("100+") }
+              @EdgeWidget::Text(Label::new("100+"))
             }
           }
         }

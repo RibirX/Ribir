@@ -74,7 +74,7 @@ impl ComposeChild for ButtonImpl {
               justify_content: JustifyContent::Center,
               align_items: Align::Center,
               @ { icon }
-              @{ label }
+              @ { label }
             }
           }
         }

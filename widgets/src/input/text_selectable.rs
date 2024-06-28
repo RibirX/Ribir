@@ -69,7 +69,7 @@ impl TextSelectable {
 pub(crate) fn bind_point_listener<T: SelectableText>(
   this: impl StateWriter<Value = T>, host: Widget, text: Reader<impl VisualText + 'static>,
   layout_box: Reader<LayoutBox>,
-) -> impl WidgetBuilder {
+) -> impl IntoWidgetStrict<FN> {
   fn_widget! {
     @$host {
       on_pointer_down: move |e| {

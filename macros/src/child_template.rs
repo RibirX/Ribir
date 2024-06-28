@@ -3,18 +3,49 @@ use quote::quote;
 use syn::{
   parse_quote, punctuated::Pair, spanned::Spanned, token::Comma, AngleBracketedGenericArguments,
   DataEnum, Field, Fields, FieldsNamed, FieldsUnnamed, GenericArgument, Index, PathArguments,
-  PathSegment,
+  PathSegment, Type,
 };
 
 const BUILDER: &str = "Builder";
 const ASSOCIATED_TEMPLATE: &str = "AssociatedTemplate";
+
+fn with_child_generics(generics: &syn::Generics, child_ty: &Type, m: usize) -> syn::Generics {
+  let mut gen = generics.clone();
+  gen.params.push(parse_quote!(_C));
+
+  gen
+    .where_clause
+    .get_or_insert_with(|| parse_quote! { where })
+    .predicates
+    .push(parse_quote!(_C: IntoChild<#child_ty, #m>));
+  gen
+}
 
 pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result<TokenStream> {
   let syn::DeriveInput { vis, ident: name, generics, data, .. } = input;
   let (g_impl, g_ty, g_where) = generics.split_for_impl();
   let builder = Ident::new(&format!("{name}{BUILDER}"), name.span());
 
-  let mut tokens = quote! {};
+  let mut tokens = quote! {
+    impl #g_impl Template for #name #g_ty #g_where {
+      type Builder = #builder #g_ty;
+
+      #[inline]
+      fn builder() -> Self::Builder {  <_>::default() }
+    }
+
+    impl #g_impl std::convert::From<#builder #g_ty> for #name #g_ty #g_where {
+      #[inline]
+      #[track_caller]
+      fn from(value: #builder #g_ty) -> Self { value.build_tml() }
+    }
+
+    impl #g_impl std::convert::From<#builder #g_ty> for Option<#name #g_ty> #g_where {
+      #[inline]
+      #[track_caller]
+      fn from(value: #builder #g_ty) -> Self { Some(value.build_tml()) }
+    }
+  };
 
   let with_child_impl = |f_idx: usize, f: &mut Field, tokens: &mut TokenStream| {
     let field_name = if let Some(name) = f.ident.as_ref() {
@@ -25,38 +56,26 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
     };
     let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
 
-    let mut fill_gen = generics.clone();
-    fill_gen.params.push(parse_quote!(_M));
-    fill_gen.params.push(parse_quote!(_C));
-    fill_gen
-      .where_clause
-      .get_or_insert_with(|| parse_quote! { where })
-      .predicates
-      .push(parse_quote!(#ty: ChildFrom<_C, _M>));
-
-    let (g_impl, _, g_where) = fill_gen.split_for_impl();
-    tokens.extend(quote! {
-      impl #g_impl ComposeWithChild<_C, [_M; #f_idx]> for #builder #g_ty #g_where  {
-        type Target = Self;
-        #[track_caller]
-        fn with_child(mut self, c: _C, ctx: &BuildCtx) -> Self::Target {
-          assert!(self.#field_name.is_none(), "Try to fill same type twice.");
-          self.#field_name = Some(ChildFrom::child_from(c, ctx));
-          self
+    for m in 0..5 {
+      let with_m = 5 * f_idx + m;
+      let gen = with_child_generics(generics, ty, m);
+      let (g_impl, _, g_where) = gen.split_for_impl();
+      tokens.extend(quote! {
+        impl #g_impl WithChild<_C, 2, #with_m> for #builder #g_ty #g_where  {
+          type Target = Self;
+          #[track_caller]
+          fn with_child(mut self, c: _C, ctx: &BuildCtx) -> Self::Target {
+            assert!(self.#field_name.is_none(), "Try to fill same type twice.");
+            self.#field_name = Some(c.into_child(ctx));
+            self
+          }
         }
-      }
-    });
+      });
+    }
   };
   match data {
     syn::Data::Struct(stt) => {
       tokens.extend(quote! {
-        impl #g_impl Template for #name #g_ty #g_where {
-          type Builder = #builder #g_ty;
-
-          #[inline]
-          fn builder() -> Self::Builder {  <_>::default() }
-        }
-
         impl #g_impl Declare for #name #g_ty #g_where {
           type Builder = #builder #g_ty;
           #[inline]
@@ -67,25 +86,6 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
           type Target = Self;
           #[inline]
           fn finish(self, _: &BuildCtx) -> Self { self }
-        }
-
-
-        impl #g_impl FromAnother<#builder #g_ty, ()> for #name #g_ty #g_where {
-          #[inline]
-          #[track_caller]
-          fn from_another(value: #builder #g_ty, _: &BuildCtx) -> Self { value.build_tml() }
-        }
-
-        impl #g_impl std::convert::From<#builder #g_ty> for #name #g_ty #g_where {
-          #[inline]
-          #[track_caller]
-          fn from(value: #builder #g_ty) -> Self { value.build_tml() }
-        }
-
-        impl #g_impl std::convert::From<#builder #g_ty> for Option<#name #g_ty> #g_where {
-          #[inline]
-          #[track_caller]
-          fn from(value: #builder #g_ty) -> Self { Some(value.build_tml()) }
         }
       });
 
@@ -170,31 +170,30 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         }
       });
 
-      variants.iter().enumerate().for_each(|(idx, v)| {
+      variants.iter().enumerate().for_each(|(i, v)| {
         if let Fields::Unnamed(FieldsUnnamed { unnamed, .. }) = &v.fields {
           // only the enum variant has a single type need to implement fill convert.
           if unnamed.len() == 1 {
             let f = unnamed.first().unwrap();
             let ty = &f.ty;
             let v_name = &v.ident;
-            let mut fill_gen = generics.clone();
-            fill_gen.params.push(parse_quote!(_M));
-            fill_gen.params.push(parse_quote!(_V));
-            fill_gen
-              .where_clause
-              .get_or_insert_with(|| parse_quote! { where})
-              .predicates
-              .push(parse_quote!(#ty: ChildFrom<_V, _M>));
-
-            let (g_impl, _, g_where) = fill_gen.split_for_impl();
-            let idx = Index::from(idx);
-            tokens.extend(quote! {
-              impl #g_impl FromAnother<_V, [_M; #idx]> for #name #g_ty #g_where  {
-                fn from_another(value: _V,  ctx: &BuildCtx) -> Self {
-                  #name::#v_name(ChildFrom::child_from(value, ctx))
+            for m in 0..5 {
+              let with_m = 5 * i + m;
+              let gen = with_child_generics(generics, ty, m);
+              let (g_impl, _, g_where) = gen.split_for_impl();
+              tokens.extend(quote! {
+                impl #g_impl WithChild<_C, 2, #with_m> for #builder #g_ty #g_where
+                {
+                  type Target = Self;
+                  #[track_caller]
+                  fn with_child(mut self, c: _C, ctx: &BuildCtx) -> Self::Target {
+                    assert!(self.0.is_none(), "Try to fill same type twice.");
+                    self.0 = Some(#name::#v_name(c.into_child(ctx)));
+                    self
+                  }
                 }
-              }
-            });
+              });
+            }
           }
         }
       });

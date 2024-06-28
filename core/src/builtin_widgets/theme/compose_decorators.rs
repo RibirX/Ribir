@@ -6,7 +6,7 @@ type ComposeDecoratorFn = dyn Fn(Box<dyn Any>, Widget, &BuildCtx) -> Widget;
 /// Compose style is a compose child widget to decoration its child.
 #[derive(Default)]
 pub struct ComposeDecorators {
-  styles: ahash::HashMap<TypeId, Box<ComposeDecoratorFn>>,
+  pub(crate) styles: ahash::HashMap<TypeId, Box<ComposeDecoratorFn>>,
 }
 
 /// `ComposeDecorator` is a trait let you can convert your host widget to
@@ -15,47 +15,6 @@ pub struct ComposeDecorators {
 /// no overwrite function in `Theme`.
 pub trait ComposeDecorator: Sized {
   fn compose_decorator(this: State<Self>, host: Widget) -> impl WidgetBuilder;
-}
-
-// todo: remove it, keep it for backward compatibility.
-// `ComposeDecorator` without share state should not implement as a
-// `ComposeDecorator`.
-impl<M, T, C> ComposeWithChild<C, [M; 100]> for T
-where
-  T: ComposeDecorator,
-  State<T>: ComposeWithChild<C, M>,
-{
-  type Target = <State<T> as ComposeWithChild<C, M>>::Target;
-  #[track_caller]
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    State::value(self).with_child(child, ctx)
-  }
-}
-
-impl<M, W, C> ComposeWithChild<C, [M; 101]> for State<W>
-where
-  W: ComposeDecorator + 'static,
-  Widget: ChildFrom<C, M>,
-{
-  type Target = Widget;
-  #[track_caller]
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    let tid = TypeId::of::<W>();
-    let style = ctx.find_cfg(|t| match t {
-      Theme::Full(t) => t.compose_decorators.styles.get(&tid),
-      Theme::Inherit(i) => i
-        .compose_decorators
-        .as_ref()
-        .and_then(|s| s.styles.get(&tid)),
-    });
-
-    let host = ChildFrom::child_from(child, ctx);
-    if let Some(style) = style {
-      style(Box::new(self), host, ctx)
-    } else {
-      ComposeDecorator::compose_decorator(self, host).build(ctx)
-    }
-  }
 }
 
 impl ComposeDecorators {

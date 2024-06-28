@@ -6,18 +6,37 @@ pub use compose_child_impl::*;
 pub use multi_child_impl::*;
 pub use single_child_impl::*;
 pub mod child_convert;
-pub use child_convert::{ChildFrom, FromAnother};
+pub use child_convert::{ChildFrom, FromAnother, IntoChild};
 
-/// Trait to mark a widget can have one child.
+/// Trait to mark a widget can have one widget as child.
 pub trait SingleChild {}
 /// Trait to tell Ribir a object that has multi children.
 pub trait MultiChild {}
 /// A boxed render widget that support accept one child.
+#[derive(SingleChild)]
 pub struct BoxedSingleChild(Widget);
 
 /// A boxed render widget that support accept multi children.
+#[derive(MultiChild)]
 pub struct BoxedMultiChild(Widget);
 
+/// This trait specifies the type of child a widget can have, and the target
+/// type represents the result of the widget composing its child.
+///
+/// The N and M markers are used to avoid implementation conflicts. If Rust
+/// supports generic specialization, we could avoid using them.
+///
+/// The M marker is used for child conversion.
+/// The N marker is used to distinguish the parent type:
+/// - 0 for SingleChild
+/// - 1 for MultiChild
+/// - 2..9 for ComposeChild
+pub trait WithChild<C, const N: usize, const M: usize> {
+  type Target;
+  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
+}
+
+// todo: remove it.
 /// Trait to mark an object that it should compose with its child as a
 /// `SinglePair` and the parent and child keep their type.
 pub trait PairChild {}
@@ -46,12 +65,14 @@ impl RenderBuilder for BoxedSingleChild {
   fn build(self, _: &BuildCtx) -> Widget { self.0 }
 }
 
-impl SingleParent for BoxedSingleChild {
+impl IntoWidgetStrict<RENDER> for BoxedMultiChild {
   #[inline]
-  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    ctx.append_child(self.0.id(), child);
-    self.0
-  }
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.build(ctx) }
+}
+
+impl IntoWidgetStrict<RENDER> for BoxedSingleChild {
+  #[inline]
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.build(ctx) }
 }
 
 impl RenderBuilder for BoxedMultiChild {
@@ -59,71 +80,16 @@ impl RenderBuilder for BoxedMultiChild {
   fn build(self, _: &BuildCtx) -> Widget { self.0 }
 }
 
-impl MultiParent for BoxedMultiChild {
-  fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
-    for c in children {
-      ctx.append_child(self.0.id(), c)
-    }
-    self.0
-  }
-}
-
-/// The trait to help `SingleChild` to compose child so the `SingleChild` no
-/// need to expose the compose logic. If user want have its own compose logic,
-/// use `ComposeChild` instead.
-pub(crate) trait SingleParent {
-  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget;
-}
-
-/// The trait to help `MultiParent` to compose child so the `MultiParent` no
-/// need to expose the compose logic. If user want have its own compose logic,
-/// use `ComposeChild` instead.
-pub(crate) trait MultiParent {
-  fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget;
-}
-
-impl<T: Render + SingleChild> SingleParent for T {
-  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    let p = self.build(ctx);
-    ctx.append_child(p.id(), child);
-
-    p
-  }
-}
-
-impl<T: SingleParent> SingleParent for Option<T> {
-  fn compose_child(self, child: Widget, ctx: &BuildCtx) -> Widget {
-    if let Some(this) = self { this.compose_child(child, ctx) } else { child }
-  }
-}
-
-impl<T: Render + MultiChild> MultiParent for T {
-  fn compose_children(self, children: impl Iterator<Item = Widget>, ctx: &BuildCtx) -> Widget {
-    let p = self.build(ctx);
-    for c in children {
-      ctx.append_child(p.id(), c);
-    }
-    p
-  }
-}
-
 impl BoxedSingleChild {
   #[inline]
-  pub fn new(widget: impl RenderBuilder + SingleChild, ctx: &BuildCtx) -> Self {
-    Self(widget.build(ctx))
+  pub fn new(widget: impl SingleIntoParent, ctx: &BuildCtx) -> Self {
+    Self(widget.into_parent(ctx))
   }
-
-  /// Create a `BoxedSingleChild` from a `Widget` and not check the type , the
-  /// caller should make sure the `w` is build from a `SingleChild`.
-  #[inline]
-  pub(crate) fn from_id(w: Widget) -> Self { Self(w) }
 }
 
 impl BoxedMultiChild {
   #[inline]
-  pub fn new(widget: impl RenderBuilder + MultiChild, ctx: &BuildCtx) -> Self {
-    Self(widget.build(ctx))
-  }
+  pub fn new(widget: impl MultiIntoParent, ctx: &BuildCtx) -> Self { Self(widget.into_parent(ctx)) }
 }
 
 impl<W, C> Pair<W, C> {
@@ -141,19 +107,6 @@ impl<W, C> Pair<W, C> {
 
   #[inline]
   pub fn parent(self) -> W { self.parent }
-}
-
-impl<W, C> IntoWidgetStrict<COMPOSE_CHILD> for Pair<W, C>
-where
-  W: StateWriter,
-  W::Value: ComposeChild,
-  <W::Value as ComposeChild>::Child: From<C>,
-{
-  #[inline]
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
-    let Self { parent, child } = self;
-    ComposeChild::compose_child(parent, child.into()).build(ctx)
-  }
 }
 
 impl<W, C> Pair<FatObj<W>, C> {
@@ -201,11 +154,11 @@ mod tests {
     reset_test_env!();
     #[derive(Declare)]
     struct Page;
-    #[derive(Declare, PairChild)]
+    #[derive(Declare, SingleChild)]
     struct Header;
-    #[derive(Declare, PairChild)]
+    #[derive(Declare, SingleChild)]
     struct Content;
-    #[derive(Declare, PairChild)]
+    #[derive(Declare, SingleChild)]
     struct Footer;
 
     #[derive(Template)]
@@ -239,7 +192,7 @@ mod tests {
 
     #[derive(Declare)]
     struct Parent;
-    #[derive(Declare, PairChild)]
+    #[derive(Declare, SingleChild)]
     struct Child;
 
     impl ComposeChild for Parent {
@@ -356,7 +309,7 @@ mod tests {
     #[derive(Declare)]
     struct P;
 
-    #[derive(Declare, PairChild)]
+    #[derive(Declare, SingleChild)]
     struct X;
 
     impl ComposeChild for P {

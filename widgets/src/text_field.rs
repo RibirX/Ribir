@@ -324,7 +324,7 @@ impl ComposeChild for TextField {
 fn build_input_area(
   this: impl StateWriter<Value = TextField>, theme: State<TextFieldThemeProxy>,
   prefix: Option<LeadingText>, suffix: Option<TrailingText>, placeholder: Option<Placeholder>,
-) -> impl WidgetBuilder {
+) -> impl IntoWidgetStrict<FN> {
   fn_widget! {
     let mut input_area = @Row {
       visible: pipe!(!$this.text.is_empty() || $theme.state == TextFieldState::Focused),
@@ -402,7 +402,7 @@ impl Compose for TextFieldLabel {
 fn build_content_area(
   this: impl StateWriter<Value = TextField>, theme: State<TextFieldThemeProxy>,
   mut config: TextFieldTml,
-) -> impl WidgetBuilder {
+) -> impl WidgetBuilder + IntoWidgetStrict<FN> {
   fn_widget! {
     take_option_field!({label, prefix, suffix, placeholder}, config);
     let mut content_area = @Column {
