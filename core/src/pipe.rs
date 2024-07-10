@@ -11,6 +11,7 @@ use widget_id::RenderQueryable;
 
 use crate::{
   builtin_widgets::key::AnyKey,
+  data_widget::Queryable,
   prelude::*,
   render_helper::{PureRender, RenderProxy},
   ticker::FrameMsg,
@@ -143,7 +144,6 @@ pub(crate) trait InnerPipe: Pipe {
     <Self::Value as IntoIterator>::Item: IntoWidget<M>,
     Self: Sized,
   {
-    // fixme: child maybe a pipe, but not replace parent pipe info
     let collect_widgets = move |widgets: Self::Value, ctx: &BuildCtx| {
       let mut widgets = widgets
         .into_iter()
@@ -163,7 +163,22 @@ pub(crate) trait InnerPipe: Pipe {
     let widgets = collect_widgets(m, ctx);
     let pipe_node = PipeNode::share_capture(widgets[0].id(), Box::new(info.clone()), ctx);
     let ids = widgets.iter().map(|w| w.id()).collect::<Vec<_>>();
+
     set_pos_of_multi(&ids, ctx);
+
+    // We need to associate the parent information with the children pipe so that
+    // when the child pipe is regenerated, it can update the parent pipe information
+    // accordingly.
+    {
+      let arena = &mut ctx.tree.borrow_mut().arena;
+      for id in &ids[1..] {
+        if id.assert_get(arena).contain_type::<DynInfo>() {
+          let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
+          id.attach_data(Queryable(info), arena);
+        };
+      }
+    }
+
     info.borrow_mut().widgets = ids;
 
     let c_pipe_node = pipe_node.clone();
@@ -203,8 +218,6 @@ pub(crate) trait InnerPipe: Pipe {
     Self: Sized,
     Self::Value: IntoWidget<M>,
   {
-    // fixme: child maybe a pipe, but when it regen, not replace parent pipe info
-
     let root = ctx.tree.borrow().root();
     let info = Sc::new(RefCell::new(SingleParentPipeInfo { range: root..=root, multi_pos: 0 }));
     let info2 = info.clone();
@@ -213,8 +226,19 @@ pub(crate) trait InnerPipe: Pipe {
     let p = v.into_widget(ctx);
 
     let pipe_node = PipeNode::share_capture(p.id(), Box::new(info.clone()), ctx);
+    let leaf = p.id().single_leaf(&ctx.tree.borrow().arena);
+    info.borrow_mut().range = p.id()..=leaf;
 
-    info.borrow_mut().range = p.id()..=p.id().single_leaf(&ctx.tree.borrow().arena);
+    // We need to associate the parent information with the pipe of leaf widget,
+    // when the leaf pipe is regenerated, it can update the parent pipe information
+    // accordingly.
+    {
+      let arena = &mut ctx.tree.borrow_mut().arena;
+      if leaf.assert_get(arena).contain_type::<DynInfo>() {
+        let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
+        leaf.attach_data(Queryable(info), arena);
+      };
+    }
 
     let c_pipe_node = pipe_node.clone();
 
@@ -480,7 +504,6 @@ impl<const M: usize, V: IntoWidget<M> + 'static> IntoWidgetStrict<M> for Box<dyn
   }
 }
 
-// todo: does impl Pipe<Value = Option<Widget>> is a widget ?
 impl<V, S, F, const M: usize> IntoWidget<M> for MapPipe<Option<V>, S, F>
 where
   V: IntoWidget<M> + 'static,
@@ -1755,5 +1778,62 @@ mod tests {
     w2.write().clear();
     wnd.draw_frame();
     assert_eq!(&*w2.read(), &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  }
+
+  #[test]
+  fn fix_pipe_in_multi_pipe_not_first() {
+    reset_test_env!();
+    let (m_watcher, m_writer) = split_value(0);
+    let (son_watcher, son_writer) = split_value(0);
+
+    let widget = fn_widget! {
+      @MockMulti {
+        @ {
+          pipe!($m_watcher;).map(move |_| [
+            @ { Void.into_widget(ctx!()) },
+            @ { pipe!($son_watcher;).map(|_| Void).into_widget(ctx!()) }
+          ])
+        }
+      }
+    };
+
+    let mut wnd = TestWindow::new(widget);
+    wnd.draw_frame();
+    *son_writer.write() += 1;
+    wnd.draw_frame();
+    // If the parent pipe is not correctly collected, it may cause a panic when
+    // refreshing the child widget of the pipe.
+    *m_writer.write() += 1;
+    wnd.draw_frame();
+  }
+
+  #[test]
+  fn fix_pipe_in_parent_only_pipe_at_end() {
+    reset_test_env!();
+    let (m_watcher, m_writer) = split_value(0);
+    let (son_watcher, son_writer) = split_value(0);
+
+    let widget = fn_widget! {
+      let p = @ {
+        pipe!($m_watcher;).map(move |_| {
+          // margin is static, but its child MockBox is a pipe.
+          let p = pipe!($son_watcher;).map(|_| MockBox { size: Size::zero() });
+          @$p { margin: EdgeInsets::all(1.) }
+        })
+      };
+      @ $p {
+        @{ Void }
+      }
+    };
+
+    let mut wnd = TestWindow::new(widget);
+    wnd.draw_frame();
+    *son_writer.write() += 1;
+    wnd.draw_frame();
+
+    // If the parent pipe is not correctly collected, it may cause a panic when
+    // refreshing the child widget of the pipe.
+    *m_writer.write() += 1;
+    wnd.draw_frame();
   }
 }

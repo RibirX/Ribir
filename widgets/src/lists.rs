@@ -174,7 +174,7 @@ pub struct SupportingText(pub Label);
 #[derive(Template)]
 pub enum EdgeWidget {
   Text(Label),
-  Icon(NamedSvg),
+  Icon(Widget),
   Avatar(FatObj<Pair<State<Avatar>, AvatarTemplateBuilder>>),
   Image(Resource<PixelImage>),
   Poster(Poster),
@@ -244,8 +244,8 @@ impl EdgeWidget {
 pub struct ListItemTml {
   headline: HeadlineText,
   supporting: Option<SupportingText>,
-  leading: Option<Pair<FatObj<Leading>, EdgeWidget>>,
-  trailing: Option<Pair<FatObj<Trailing>, EdgeWidget>>,
+  leading: Option<Leading<EdgeWidget>>,
+  trailing: Option<Trailing<EdgeWidget>>,
 }
 
 impl ComposeChild for ListItem {
@@ -274,12 +274,7 @@ impl ComposeChild for ListItem {
         @ $padding {
           @Row {
             align_items: pipe!(item_align($this.line_number)),
-            @{
-              leading.map(move |w| {
-                let (leading, widget) = w.unzip();
-                leading.map(|_| widget.compose_with_style(leading_config))
-              })
-            }
+            @{ leading.map(move |w| w.0.compose_with_style(leading_config)) }
             @Expanded {
               flex: 1.,
               @ $label_gap {
@@ -309,10 +304,7 @@ impl ComposeChild for ListItem {
                 }
               }
             }
-            @{ trailing.map(|w| {
-              let (trailing, widget) = w.unzip();
-              trailing.map(|_| widget.compose_with_style(trailing_config))
-            })}
+            @{ trailing.map(|w| w.0.compose_with_style(trailing_config))}
           }
         }
       }

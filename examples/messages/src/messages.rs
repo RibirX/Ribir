@@ -73,43 +73,39 @@ impl Compose for MessageList {
               @{ material_svgs::SMS }
               @{ Label::new("Messages") }
             }
-            @TabPane {
-              @ {
-                fn_widget! {
-                  @VScrollBar {
-                    @Lists {
-                      @{
-                        let message_gen = move |message: Message| {
-                          @Column {
-                            @ListItem {
-                              line_number: 1usize,
-                              @HeadlineText(Label::new(message.nick_name.clone()))
-                              @SupportingText(Label::new(message.content.clone()))
-                              @Leading {
-                                @EdgeWidget::Avatar(@Avatar { @{ message.img.clone() } })
-                              }
-                              @Trailing { @EdgeWidget::Icon(svgs::MORE_HORIZ) }
-                            }
-                            @Divider {}
+            @TabPane(
+              fn_widget! {
+                @VScrollBar {
+                  @Lists {
+                    @{
+                      let message_gen = move |message: Message| {
+                        @Column {
+                          @ListItem {
+                            line_number: 1usize,
+                            @HeadlineText(Label::new(message.nick_name.clone()))
+                            @SupportingText(Label::new(message.content.clone()))
+                            @Leading(
+                              EdgeWidget::Avatar(@Avatar { @{ message.img.clone() } })
+                            )
+                            @Trailing(EdgeWidget::Icon(svgs::MORE_HORIZ.into_widget(ctx!())))
                           }
-                        };
+                          @Divider {}
+                        }
+                      };
 
-                        $this.messages.clone().into_iter().map(message_gen)
-                      }
+                      $this.messages.clone().into_iter().map(message_gen)
                     }
                   }
-                }.into()
-              }
-            }
+                }
+              }.into()
+            )
           }
           @Tab {
             @TabItem {
               @{ material_svgs::ACCOUNT_CIRCLE }
               @{ Label::new("Person") }
             }
-            @TabPane {
-              @{ fn_widget!(@Text { text: "Person" }).into() }
-            }
+            @TabPane(fn_widget!(@Text { text: "Person" }).into())
           }
         }
       }

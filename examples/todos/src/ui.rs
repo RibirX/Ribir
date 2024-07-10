@@ -15,15 +15,15 @@ impl Compose for Todos {
         @Tabs {
           @Tab {
             @TabItem { @Label::new("ALL") }
-            @TabPane { @task_lists(&this, |_| true) }
+            @TabPane(task_lists(&this, |_| true))
           }
           @Tab {
             @TabItem { @{ Label::new("ACTIVE") } }
-            @TabPane { @{ task_lists(&this, |t| !t.complete )} }
+            @TabPane(task_lists(&this, |t| !t.complete ))
           }
           @Tab {
             @TabItem { @{ Label::new("DONE") } }
-            @TabPane { @{ task_lists(&this, |t| t.complete )} }
+            @TabPane(task_lists(&this, |t| t.complete ))
           }
         }
       }
@@ -151,20 +151,20 @@ where
 
     @$item {
       @{ HeadlineText(Label::new($task.label.clone())) }
-      @Leading {
-        @EdgeWidget::Custom({
-          let checkbox = @Checkbox { checked: pipe!($task.complete) };
-          watch!($checkbox.checked)
-            .distinct_until_changed()
-            .subscribe(move |v| $task.write().complete = v);
-          CustomEdgeWidget(checkbox.build(ctx!()))
-        })
-      }
-      @Trailing {
-        cursor: CursorIcon::Pointer,
-        on_tap: move |_| $todos.write().remove(id),
-        @EdgeWidget::Icon(svgs::CLOSE)
-      }
+      @Leading(EdgeWidget::Custom({
+        let checkbox = @Checkbox { checked: pipe!($task.complete) };
+        watch!($checkbox.checked)
+          .distinct_until_changed()
+          .subscribe(move |v| $task.write().complete = v);
+        CustomEdgeWidget(checkbox.build(ctx!()))
+      }))
+      @Trailing(EdgeWidget::Icon({
+        let icon = svgs::CLOSE;
+        @ $icon {
+          cursor: CursorIcon::Pointer,
+          on_tap: move |_| $todos.write().remove(id),
+        }.into_widget(ctx!())
+      }))
     }
   }
 }

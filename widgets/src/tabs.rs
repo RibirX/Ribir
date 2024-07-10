@@ -110,7 +110,7 @@ impl ComposeDecorator for TabsDecorator {
 #[derive(Template)]
 pub struct Tab {
   label: TabItem,
-  child: Pair<TabPane, GenWidget>,
+  child: TabPane,
 }
 
 #[derive(Template)]
@@ -119,9 +119,7 @@ pub struct TabItem {
   text: Option<Label>,
 }
 
-#[derive(PairChild)]
-#[simple_declare]
-pub struct TabPane;
+pub struct TabPane(pub GenWidget);
 
 #[derive(Declare)]
 pub struct TabDecorator {}
@@ -234,7 +232,7 @@ impl ComposeChild for Tabs {
     for tab in child.into_iter() {
       let Tab { label: header, child: pane } = tab;
       headers.push((header.icon, header.text));
-      panes.push(pane.child())
+      panes.push(pane.0)
     }
 
     fn_widget! {
