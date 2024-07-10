@@ -45,8 +45,8 @@ impl Checkbox {
 
 #[derive(Template)]
 pub enum CheckboxTemplate {
-  Before(Pair<FatObj<Leading>, Label>),
-  After(Pair<FatObj<Trailing>, Label>),
+  Before(Leading<Label>),
+  After(Trailing<Label>),
 }
 
 impl ComposeDecorator for CheckBoxDecorator {
@@ -90,10 +90,10 @@ impl ComposeChild for Checkbox {
           @ {
             match child {
               CheckboxTemplate::Before(w) => {
-                [w.child_replace_host().map(label).build(ctx!()), icon]
+                [(label(w.0)).into_widget(ctx!()), icon]
               },
               CheckboxTemplate::After(w) => {
-                [icon, w.child_replace_host().map(label).build(ctx!())]
+                [icon, label(w.0).into_widget(ctx!())]
               },
             }
           }

@@ -947,14 +947,6 @@ impl FatObj<()> {
   pub fn with_child<C>(self, child: C, _: &BuildCtx) -> FatObj<C> { self.map(move |_| child) }
 }
 
-impl<T: PairWithChild<C>, C> PairWithChild<C> for FatObj<T> {
-  type Target = Pair<FatObj<T>, C>;
-
-  #[inline]
-  #[track_caller]
-  fn with_child(self, child: C, _: &BuildCtx) -> Self::Target { Pair::new(self, child) }
-}
-
 impl<T> std::ops::Deref for FatObj<T> {
   type Target = T;
   #[inline]

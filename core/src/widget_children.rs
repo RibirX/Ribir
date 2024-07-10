@@ -36,11 +36,6 @@ pub trait WithChild<C, const N: usize, const M: usize> {
   fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
 }
 
-// todo: remove it.
-/// Trait to mark an object that it should compose with its child as a
-/// `SinglePair` and the parent and child keep their type.
-pub trait PairChild {}
-
 /// Trait mark widget can have one child and also have compose logic for widget
 /// and its child.
 pub trait ComposeChild: Sized {
@@ -107,38 +102,6 @@ impl<W, C> Pair<W, C> {
 
   #[inline]
   pub fn parent(self) -> W { self.parent }
-}
-
-impl<W, C> Pair<FatObj<W>, C> {
-  /// Replace the host of the FatObj in parent with the child, this is useful
-  /// when the host of the `FatObj` is useless.
-  pub fn child_replace_host(self) -> FatObj<C> {
-    let Self { parent, child } = self;
-    parent.map(|_| child)
-  }
-}
-
-pub trait PairWithChild<C> {
-  type Target;
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
-}
-
-impl<W: PairChild, C> PairWithChild<C> for W {
-  type Target = Pair<W, C>;
-
-  #[inline]
-  #[track_caller]
-  fn with_child(self, child: C, _: &BuildCtx) -> Self::Target { Pair { parent: self, child } }
-}
-
-impl<W, C1: PairChild, C2> PairWithChild<C2> for Pair<W, C1> {
-  type Target = Pair<W, Pair<C1, C2>>;
-
-  #[track_caller]
-  fn with_child(self, c: C2, ctx: &BuildCtx) -> Self::Target {
-    let Pair { parent: widget, child } = self;
-    Pair { parent: widget, child: child.with_child(c, ctx) }
-  }
 }
 
 #[cfg(test)]

@@ -29,18 +29,18 @@ pub struct TextFieldTml {
   /// Use prefix text before the editable text to show symbols or abbreviations
   /// that help users enter the right type of information in a form’s text
   /// input
-  prefix: Option<LeadingText>,
+  prefix: Option<Leading<Label>>,
 
   /// Use suffix text after the editable text to show symbols or abbreviations
   /// that help users enter the right type of information in a form’s text
   /// input
-  suffix: Option<TrailingText>,
+  suffix: Option<Trailing<Label>>,
 
   /// An icon that appears before the editable part of the text field
-  leading_icon: Option<WidgetOf<Leading>>,
+  leading_icon: Option<Leading<Widget>>,
 
   /// An icon that appears after the editable part of the text field
-  trailing_icon: Option<WidgetOf<Trailing>>,
+  trailing_icon: Option<Trailing<Widget>>,
 }
 
 #[derive(Clone)]
@@ -297,7 +297,7 @@ impl ComposeChild for TextField {
           @{
             leading_icon.map(|t| @Icon {
               size: IconSize::of(ctx!()).small,
-              @{ t.child() }
+              @{ t.0 }
             })
           }
           @Expanded {
@@ -307,7 +307,7 @@ impl ComposeChild for TextField {
           @{
             trailing_icon.map(|t| @Icon {
               size: IconSize::of(ctx!()).small,
-              @{ t.child() }
+              @{ t.0 }
             })
           }
         }
@@ -323,7 +323,8 @@ impl ComposeChild for TextField {
 
 fn build_input_area(
   this: impl StateWriter<Value = TextField>, theme: State<TextFieldThemeProxy>,
-  prefix: Option<LeadingText>, suffix: Option<TrailingText>, placeholder: Option<Placeholder>,
+  prefix: Option<Leading<Label>>, suffix: Option<Trailing<Label>>,
+  placeholder: Option<Placeholder>,
 ) -> impl IntoWidgetStrict<FN> {
   fn_widget! {
     let mut input_area = @Row {
@@ -356,7 +357,7 @@ fn build_input_area(
     @Row {
       @{
         prefix.map(|p| @Text{
-          text: p.child(),
+          text: p.0.0,
           foreground: pipe!($theme.foreground.clone()),
           text_style: pipe!($theme.text.clone()),
         })
@@ -367,7 +368,7 @@ fn build_input_area(
       }
       @{
         suffix.map(|s| @Text{
-          text: s.child(),
+          text: s.0.0,
           foreground: pipe!($theme.foreground.clone()),
           text_style: pipe!($theme.text.clone()),
         })

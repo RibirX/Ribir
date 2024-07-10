@@ -180,21 +180,21 @@ fn content() -> impl WidgetBuilder + IntoWidgetStrict<FN> {
             @ { svgs::HOME }
             @ { Label::new("Video") }
           }
-          @TabPane { @ { fn_widget!(Void).into() } }
+          @TabPane(fn_widget!(Void).into())
         }
         @Tab {
           @TabItem {
             @ { svgs::HOME }
             @ { Label::new("Photos") }
           }
-          @TabPane { @ { fn_widget!(Void).into() } }
+          @TabPane(fn_widget!(Void).into())
         }
         @Tab {
           @TabItem {
             @ { svgs::HOME }
             @ { Label::new("Audio") }
           }
-          @TabPane { @ { fn_widget!(Void).into() } }
+          @TabPane(fn_widget!(Void).into())
         }
       }
     }
@@ -230,62 +230,46 @@ fn content() -> impl WidgetBuilder + IntoWidgetStrict<FN> {
           @Link {
             url: "https://ribir.org",
             @ListItem {
-              @Leading {
-                @EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK)
-              }
+              @Leading(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget(ctx!())))
               @ { HeadlineText(Label::new("One line list item")) }
               @ { SupportingText(Label::new("One line supporting text")) }
             }
           }
           @Divider { indent: 16. }
           @ListItem {
-            @Leading {
-              @EdgeWidget::Icon(svgs::MENU)
-            }
+            @Leading(EdgeWidget::Icon(svgs::MENU.into_widget(ctx!())))
             @ { HeadlineText(Label::new("One line list item")) }
-            @Trailing {
-              @EdgeWidget::Text(Label::new("100+"))
-            }
+            @Trailing(EdgeWidget::Text(Label::new("100+")))
           }
           @Divider { indent: 16. }
           @ListItem {
             line_number: 2usize,
-            @Leading {
-              @EdgeWidget::Avatar(
+            @Leading(
+              EdgeWidget::Avatar(
                 @Avatar {
                   @ { Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png"))) }
                 }
               )
-            }
+            )
             @ { HeadlineText(Label::new("Two lines list item")) }
             @ { SupportingText(Label::new("Two lines supporting text \rTwo lines supporting text")) }
-            @Trailing {
-              @EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK)
-            }
+            @Trailing(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget(ctx!())))
           }
           @Divider { indent: 16. }
           @ListItem {
-            @Leading {
-              @EdgeWidget::Avatar(@Avatar { @Label::new("A") })
-            }
+            @Leading(EdgeWidget::Avatar(@Avatar { @Label::new("A") }))
             @ { HeadlineText(Label::new("One lines list item")) }
             @ { SupportingText(Label::new("One lines supporting text")) }
-            @Trailing {
-              @EdgeWidget::Text(Label::new("100+"))
-            }
+            @Trailing(EdgeWidget::Text(Label::new("100+")))
           }
           @Divider { indent: 16. }
           @ListItem {
-            @Leading {
-              @EdgeWidget::Poster(
-                Poster(Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png"))))
-              )
-            }
+            @Leading(EdgeWidget::Poster(
+              Poster(Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png"))))
+            ))
             @ { HeadlineText(Label::new("One lines list item")) }
             @ { SupportingText(Label::new("One lines supporting text")) }
-            @Trailing {
-              @EdgeWidget::Text(Label::new("100+"))
-            }
+            @Trailing(@EdgeWidget::Text(Label::new("100+")))
           }
         }
       }
@@ -298,19 +282,13 @@ fn content() -> impl WidgetBuilder + IntoWidgetStrict<FN> {
         margin: EdgeInsets::all(20.),
         @Lists {
           @Checkbox {
-            @Leading {
-              @ { Label::new("Option1") }
-            }
+            @Leading(Label::new("Option1"))
           }
           @Checkbox {
-            @Leading {
-              @ { Label::new("Option2") }
-            }
+            @Leading(Label::new("Option2"))
           }
           @Checkbox {
-            @Leading {
-              @ { Label::new("Option3") }
-            }
+            @Leading(Label::new("Option3"))
           }
         }
       }
@@ -325,41 +303,31 @@ fn content() -> impl WidgetBuilder + IntoWidgetStrict<FN> {
         @TabItem {
           @ { Label::new("Actions") }
         }
-        @TabPane {
-           @ { actions_show() }
-        }
+        @TabPane(actions_show())
       }
       @Tab {
         @TabItem {
           @ { Label::new("Tabs") }
         }
-        @TabPane {
-          @ { tabs_show() }
-        }
+        @TabPane(tabs_show())
       }
       @Tab {
         @TabItem {
           @ { Label::new("Containment") }
         }
-        @TabPane {
-          @ { containment_show() }
-        }
+        @TabPane(containment_show())
       }
       @Tab {
         @TabItem {
           @ { Label::new("Lists") }
         }
-        @TabPane {
-          @ { lists_show() }
-        }
+        @TabPane(lists_show())
       }
       @Tab {
         @TabItem {
           @ { Label::new("Selections") }
         }
-        @TabPane {
-          @ { checkbox_show() }
-        }
+        @TabPane(checkbox_show())
       }
     }
   }

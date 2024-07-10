@@ -32,6 +32,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
   The `IntoWidget` trait allows for the conversion of any widget to the type `Widget`.
   The `IntoChild` trait provides a way to convert a more general widget into a child of `ComposeChild`.
 
+### Fixed
+
+**core**: The generation of a pipe widget from another pipe widget may potentially result in a crash. (#pr, @M-Adoo)
+
 ### Changed
 
 - **core**: Simplify the implementation of parent composition with child widgets. (#pr, @M-Adoo)
@@ -42,6 +46,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - Remove `ChildFrom` and `FromAnother` traits (#pr, @M-Adoo)
 - Remove `SingleParent` and `MultiParent` traits. (#pr, @M-Adoo)
+- Remove `PairChild` and `PairWithChild` traits. User can use a generic type instead. (#pr, @M-Adoo)
 - Allow only the child to be converted to a widget or a type that implements the Into trait. (#pr, @M-Adoo)
 
 
