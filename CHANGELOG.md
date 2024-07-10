@@ -40,7 +40,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
-- Remove SingleParent and MultiParent traits. (#pr, @M-Adoo)
+- Remove `ChildFrom` and `FromAnother` traits (#pr, @M-Adoo)
+- Remove `SingleParent` and `MultiParent` traits. (#pr, @M-Adoo)
 - Allow only the child to be converted to a widget or a type that implements the Into trait. (#pr, @M-Adoo)
 
 

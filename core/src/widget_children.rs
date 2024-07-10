@@ -6,7 +6,7 @@ pub use compose_child_impl::*;
 pub use multi_child_impl::*;
 pub use single_child_impl::*;
 pub mod child_convert;
-pub use child_convert::{ChildFrom, FromAnother, IntoChild};
+pub use child_convert::IntoChild;
 
 /// Trait to mark a widget can have one widget as child.
 pub trait SingleChild {}
