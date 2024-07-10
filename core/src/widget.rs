@@ -279,14 +279,6 @@ macro_rules! multi_build_replace_impl {
   };
 }
 
-macro_rules! multi_build_replace_impl_include_self {
-  ($($rest:tt)*) => {
-    $crate::widget::multi_build_replace_impl!($($rest)*);
-    $crate::widget::_replace!(@replace($crate::widget::SelfBuilder) $($rest)*);
-  };
-  ({} $($rest:tt)*) => {}
-}
-
 macro_rules! repeat_and_replace {
   ([$first: path $(,$n: path)*] $($rest:tt)*) => {
     $crate::widget::_replace!(@replace($first) $($rest)*);
@@ -298,7 +290,6 @@ macro_rules! repeat_and_replace {
 
 pub(crate) use _replace;
 pub(crate) use multi_build_replace_impl;
-pub(crate) use multi_build_replace_impl_include_self;
 pub(crate) use repeat_and_replace;
 
 impl Drop for Widget {

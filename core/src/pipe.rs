@@ -540,20 +540,6 @@ impl WidgetBuilder for Box<dyn Pipe<Value = Widget>> {
   fn build(self, ctx: &BuildCtx) -> Widget { self.build_single(ctx, |w, ctx| w.build(ctx)) }
 }
 
-macro_rules! pipe_option_to_widget {
-  ($name:ident, $ctx:ident) => {
-    $name
-      .map(|w| {
-        move |ctx: &BuildCtx| {
-          if let Some(w) = w { w.build(ctx) } else { Void.build(ctx) }
-        }
-      })
-      .build($ctx)
-  };
-}
-
-pub(crate) use pipe_option_to_widget;
-
 fn update_children_key_status(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
   let tree = &ctx.tree.borrow().arena;
 
@@ -1503,7 +1489,7 @@ mod tests {
     let _ = fn_widget! {
       let v = Stateful::new(true);
       let w = pipe!(*$v).map(move |_| Void.build(ctx!()));
-      Widget::child_from(w, ctx!())
+      w.into_widget(ctx!())
     };
   }
 
