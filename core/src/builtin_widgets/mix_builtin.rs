@@ -351,7 +351,7 @@ impl ComposeChild for MixBuiltin {
   #[inline]
   fn compose_child(
     this: impl StateWriter<Value = Self>, mut child: Self::Child,
-  ) -> impl WidgetBuilder {
+  ) -> impl IntoWidgetStrict<FN> {
     move |ctx: &BuildCtx| match this.try_into_value() {
       Ok(this) => {
         let mut this = Some(this);

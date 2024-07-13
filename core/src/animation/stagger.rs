@@ -225,7 +225,7 @@ mod tests {
   use super::*;
   use crate::{reset_test_env, test_helper::*};
 
-  fn stagger_run_and_stop() -> impl WidgetBuilder {
+  fn stagger_run_and_stop() -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let stagger = Stagger::new(Duration::from_millis(100), transitions::EASE_IN.of(ctx!()));
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };

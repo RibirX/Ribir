@@ -76,7 +76,7 @@ impl ComposeChild for ThemeWidget {
   #[inline]
   fn compose_child(
     this: impl StateWriter<Value = Self>, mut child: Self::Child,
-  ) -> impl WidgetBuilder {
+  ) -> impl IntoWidgetStrict<FN> {
     use crate::prelude::*;
     fn_widget! {
       let theme = this.read().theme.clone();
@@ -91,7 +91,7 @@ impl ComposeChild for ThemeWidget {
       // node, because the subtree may be hold its id.
       //
       // A `Void` is cheap for a theme.
-      let p = Void.build(ctx!()).attach_data(Queryable(theme), ctx!());
+      let p = Void.into_widget(ctx!()).attach_data(Queryable(theme), ctx!());
       // shadow the context with the theme.
       let ctx = BuildCtx::new_with_data(Some(p.id()), ctx!().tree, themes);
       let child = child.gen_widget(&ctx);

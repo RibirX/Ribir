@@ -545,7 +545,7 @@ The first situation is when the subscription's lifecycle should be shorter than 
 ```rust
 use ribir::prelude::*;
 
-fn show_name(name: State<String>) -> impl WidgetBuilder {
+fn show_name(name: State<String>) -> impl IntoWidgetStrict<FN> {
   fn_widget!{
     let text = @Text { text: "Hi, Guest!" };
     let u = watch!($name.to_string()).subscribe(move |name| {
@@ -597,7 +597,7 @@ impl Counter {
 }
 
 impl Compose for Counter {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @Row {
         @FilledButton {

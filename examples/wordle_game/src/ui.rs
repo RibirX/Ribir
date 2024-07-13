@@ -2,7 +2,7 @@ use ribir::prelude::*;
 
 use crate::wordle::{CharHint, Wordle, WordleChar};
 
-pub fn wordle_game() -> impl WidgetBuilder {
+pub fn wordle_game() -> impl IntoWidgetStrict<FN> {
   fn_widget! { @ { Wordle::new(5, 5) }  }
 }
 
@@ -120,7 +120,7 @@ impl Wordle {
     };
   }
 
-  fn char_grid(&self, row: usize, col: usize) -> impl WidgetBuilder + IntoWidget<FN> {
+  fn char_grid(&self, row: usize, col: usize) -> impl IntoWidgetStrict<FN> + IntoWidget<FN> {
     let char_hint = self.char_hint(row, col);
     let c = char_hint.map(|c| c.char).unwrap_or('\0');
     let hint = char_hint.and_then(|c| c.hint);
@@ -148,7 +148,7 @@ impl Wordle {
 }
 
 impl Compose for Wordle {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let state_bar = @Text { text: "" };
       let keyboard = this.keyboard(state_bar.clone_writer());

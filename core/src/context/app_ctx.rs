@@ -17,7 +17,7 @@ use crate::{
   clipboard::{Clipboard, MockClipboard},
   prelude::FuturesLocalScheduler,
   timer::Timer,
-  widget::WidgetBuilder,
+  widget::IntoWidget,
   window::{ShellWindow, Window, WindowId},
 };
 
@@ -67,7 +67,9 @@ impl AppCtx {
   #[track_caller]
   pub fn app_theme() -> &'static Theme { &Self::shared().app_theme }
 
-  pub fn new_window(shell_wnd: Box<dyn ShellWindow>, content: impl WidgetBuilder) -> Rc<Window> {
+  pub fn new_window<const M: usize>(
+    shell_wnd: Box<dyn ShellWindow>, content: impl IntoWidget<M>,
+  ) -> Rc<Window> {
     let wnd = Window::new(shell_wnd);
     let id = wnd.id();
 

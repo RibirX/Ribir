@@ -13,7 +13,7 @@ impl Declare for RequestFocus {
 
 impl ComposeChild for RequestFocus {
   type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @$child {
         on_mounted: move |e| {
@@ -21,7 +21,7 @@ impl ComposeChild for RequestFocus {
           $this.silent().handle = Some(handle);
         }
       }
-      .build(ctx!())
+      .into_widget(ctx!())
       .try_unwrap_state_and_attach(this, ctx!())
     }
   }

@@ -19,7 +19,7 @@ fn header() -> impl IntoWidgetStrict<FN> {
   }
 }
 
-fn content() -> impl WidgetBuilder + IntoWidgetStrict<FN> {
+fn content() -> impl IntoWidgetStrict<FN> + IntoWidgetStrict<FN> {
   fn actions_show() -> GenWidget {
     fn_widget! {
       @VScrollBar {
@@ -333,7 +333,7 @@ fn content() -> impl WidgetBuilder + IntoWidgetStrict<FN> {
   }
 }
 
-pub fn storybook() -> impl WidgetBuilder {
+pub fn storybook() -> impl IntoWidgetStrict<FN> {
   fn_widget! {
     @Column {
       background: Palette::of(ctx!()).surface_container_low(),

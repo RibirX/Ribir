@@ -182,7 +182,7 @@ impl App {
 ///
 /// Upon being dropped, it creates a new window with the `root` widget and
 /// then calls `App::exec`.
-pub struct AppRunGuard<W: WidgetBuilder + 'static> {
+pub struct AppRunGuard<const M: usize, W: IntoWidget<M>> {
   root: Option<W>,
   wnd_attrs: Option<WindowAttributes>,
 }
@@ -192,7 +192,9 @@ impl App {
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run<W: WidgetBuilder + 'static>(root: W) -> AppRunGuard<W> { AppRunGuard::new(root) }
+  pub fn run<const M: usize, W: IntoWidget<M>>(root: W) -> AppRunGuard<M, W> {
+    AppRunGuard::new(root)
+  }
 
   /// Get a event sender of the application event loop, you can use this to send
   /// event.
@@ -202,7 +204,7 @@ impl App {
   /// Note: This is exclusive to the web platform.
   #[cfg(target_family = "wasm")]
   pub async fn new_with_canvas(
-    root: impl WidgetBuilder, canvas: web_sys::HtmlCanvasElement, attrs: WindowAttributes,
+    root: impl IntoWidgetStrict<FN>, canvas: web_sys::HtmlCanvasElement, attrs: WindowAttributes,
   ) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
@@ -214,8 +216,8 @@ impl App {
   }
 
   /// create a new window with the `root` widget
-  pub async fn new_window(
-    root: impl WidgetBuilder, attrs: WindowAttributes,
+  pub async fn new_window<const M: usize>(
+    root: impl IntoWidget<M>, attrs: WindowAttributes,
   ) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
@@ -313,7 +315,7 @@ impl App {
   }
 }
 
-impl<W: WidgetBuilder> AppRunGuard<W> {
+impl<const M: usize, W: IntoWidget<M>> AppRunGuard<M, W> {
   fn new(root: W) -> Self {
     static ONCE: std::sync::Once = std::sync::Once::new();
     assert!(!ONCE.is_completed(), "App::run can only be called once.");
@@ -398,7 +400,7 @@ impl<W: WidgetBuilder> AppRunGuard<W> {
   }
 }
 
-impl<W: WidgetBuilder + 'static> Drop for AppRunGuard<W> {
+impl<const M: usize, W: IntoWidget<M>> Drop for AppRunGuard<M, W> {
   fn drop(&mut self) {
     let root = self.root.take().unwrap();
     let attr = self.wnd_attrs.take().unwrap();
@@ -590,7 +592,7 @@ mod tests {
     log: Rc<RefCell<Vec<String>>>,
   }
   impl Compose for LogImeEvent {
-    fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+    fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
       fn_widget! {
         @MockBox {
           size: INFINITY_SIZE,

@@ -94,7 +94,7 @@ pub struct LazyWidgetId(Sc<Cell<Option<WidgetId>>>);
 ///   let w = multi.get_margin_widget().clone_writer();
 ///   multi
 ///     .on_tap(move |_| w.write().margin = EdgeInsets::all(20.))
-///     .build(ctx)
+///     .into_widget(ctx)
 /// };
 /// ```
 pub struct FatObj<T> {
@@ -845,21 +845,6 @@ impl<T> ObjDeclarer for FatObj<T> {
   fn finish(self, _: &BuildCtx) -> Self::Target { self }
 }
 
-crate::widget::multi_build_replace_impl! {
-  impl<T: {#} > {#} for FatObj<T> {
-    #[track_caller]
-    fn build(self, ctx: &BuildCtx) -> Widget {
-      self.map(|host| host.build(ctx)).build(ctx)
-    }
-  }
-}
-
-impl WidgetBuilder for FatObj<Widget> {
-  #[inline]
-  #[track_caller]
-  fn build(self, ctx: &BuildCtx) -> Widget { self.into_widget_strict(ctx) }
-}
-
 impl<T, const M: usize> IntoWidgetStrict<M> for FatObj<T>
 where
   T: IntoWidget<M>,
@@ -869,19 +854,23 @@ where
     let mut host = self.host.into_widget(ctx);
     self.host_id.set(host.id());
     if let Some(mix_builtin) = self.mix_builtin {
-      host = mix_builtin.with_child(host, ctx).build(ctx)
+      host = mix_builtin.with_child(host, ctx).into_widget(ctx)
     }
     if let Some(request_focus) = self.request_focus {
-      host = request_focus.with_child(host, ctx).build(ctx);
+      host = request_focus
+        .with_child(host, ctx)
+        .into_widget(ctx);
     }
     if let Some(has_focus) = self.has_focus {
-      host = has_focus.with_child(host, ctx).build(ctx);
+      host = has_focus.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(mouse_hover) = self.mouse_hover {
-      host = mouse_hover.with_child(host, ctx).build(ctx);
+      host = mouse_hover.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(pointer_pressed) = self.pointer_pressed {
-      host = pointer_pressed.with_child(host, ctx).build(ctx);
+      host = pointer_pressed
+        .with_child(host, ctx)
+        .into_widget(ctx);
     }
     if let Some(fitted_box) = self.fitted_box {
       host = fitted_box.with_child(host, ctx).into_widget(ctx);
@@ -895,16 +884,16 @@ where
       host = padding.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(layout_box) = self.layout_box {
-      host = layout_box.with_child(host, ctx).build(ctx);
+      host = layout_box.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(cursor) = self.cursor {
-      host = cursor.with_child(host, ctx).build(ctx);
+      host = cursor.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(margin) = self.margin {
       host = margin.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(scrollable) = self.scrollable {
-      host = scrollable.with_child(host, ctx).build(ctx);
+      host = scrollable.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(transform) = self.transform {
       host = transform.with_child(host, ctx).into_widget(ctx);
@@ -921,16 +910,18 @@ where
         .into_widget(ctx);
     }
     if let Some(global_anchor) = self.global_anchor {
-      host = global_anchor.with_child(host, ctx).build(ctx);
+      host = global_anchor
+        .with_child(host, ctx)
+        .into_widget(ctx);
     }
     if let Some(visibility) = self.visibility {
-      host = visibility.with_child(host, ctx).build(ctx);
+      host = visibility.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(opacity) = self.opacity {
       host = opacity.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(keep_alive) = self.keep_alive {
-      host = keep_alive.with_child(host, ctx).build(ctx);
+      host = keep_alive.with_child(host, ctx).into_widget(ctx);
     }
     if let Some(h) = self.keep_alive_unsubscribe_handle {
       let arena = &mut ctx.tree.borrow_mut().arena;

@@ -45,7 +45,7 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  fn smoke() -> impl WidgetBuilder {
+  fn smoke() -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @TransformWidget {
         transform: Transform::new(2., 0., 0., 2., 0., 0.),

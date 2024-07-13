@@ -7,8 +7,7 @@ use syn::{
 };
 
 const BUILDER: &str = "Builder";
-const ASSOCIATED_TEMPLATE: &str = "AssociatedTemplate";
-
+const TEMPLATE: &str = "Template";
 fn with_child_generics(generics: &syn::Generics, child_ty: &Type, m: usize) -> syn::Generics {
   let mut gen = generics.clone();
   gen.params.push(parse_quote!(_C));
@@ -34,6 +33,16 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       fn builder() -> Self::Builder {  <_>::default() }
     }
 
+    impl #g_impl IntoChild<#name #g_ty, 0> for #builder #g_ty {
+      #[inline]
+      fn into_child(self, _: &BuildCtx) -> #name #g_ty { self.build_tml()  }
+    }
+
+    impl #g_impl IntoChild<Option<#name #g_ty>, 0> for #builder #g_ty {
+      #[inline]
+      fn into_child(self, _: &BuildCtx) -> Option<#name #g_ty> { Some(self.build_tml())  }
+    }
+
     impl #g_impl std::convert::From<#builder #g_ty> for #name #g_ty #g_where {
       #[inline]
       #[track_caller]
@@ -56,8 +65,8 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
     };
     let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
 
-    for m in 0..5 {
-      let with_m = 5 * f_idx + m;
+    for m in 0..4 {
+      let with_m = 4 * f_idx + m;
       let gen = with_child_generics(generics, ty, m);
       let (g_impl, _, g_where) = gen.split_for_impl();
       tokens.extend(quote! {
@@ -150,7 +159,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
           });
         }
         Fields::Unit => {
-          let err_str = format!("Can't derive `{ASSOCIATED_TEMPLATE}` for a empty template.",);
+          let err_str = format!("Can't derive `{TEMPLATE}` for a empty template.",);
           return Err(syn::Error::new(Span::call_site(), err_str));
         }
       }
@@ -177,8 +186,8 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             let f = unnamed.first().unwrap();
             let ty = &f.ty;
             let v_name = &v.ident;
-            for m in 0..5 {
-              let with_m = 5 * i + m;
+            for m in 0..4 {
+              let with_m = 4 * i + m;
               let gen = with_child_generics(generics, ty, m);
               let (g_impl, _, g_where) = gen.split_for_impl();
               tokens.extend(quote! {
@@ -199,7 +208,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       });
     }
     syn::Data::Union(u) => {
-      let err_str = format!("`{ASSOCIATED_TEMPLATE}` not support for Union");
+      let err_str = format!("`{TEMPLATE}` not support for Union");
       return Err(syn::Error::new(u.union_token.span(), err_str));
     }
   }

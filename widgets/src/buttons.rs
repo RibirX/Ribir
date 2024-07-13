@@ -47,7 +47,7 @@ pub struct ButtonTemplate {
 impl ComposeChild for ButtonImpl {
   type Child = ButtonTemplate;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
     let ButtonTemplate { icon, label } = child;
     fn_widget! {
       @ConstrainedBox {

@@ -682,7 +682,7 @@ mod tests {
     }
 
     impl Compose for EmbedFocus {
-      fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+      fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
         fn_widget! {
           @MockBox {
             size: INFINITY_SIZE,
@@ -839,9 +839,9 @@ mod tests {
               auto_focus: true,
               on_chars: move |e| $input_writer.write().push_str(&e.chars),
               size: Size::new(10., 10.),
-            }.build(ctx!())
+            }.into_widget(ctx!())
           } else {
-            Void.build(ctx!())
+            Void.into_widget(ctx!())
           }
         }}
       }
@@ -879,7 +879,7 @@ mod tests {
                   on_chars: move |e| if idx == 2 { $input_writer.write().push_str(&e.chars) },
                   size: Size::new(10., 10.),
                 }
-              }.build(ctx!()))
+              }.into_widget(ctx!()))
             }).collect::<Vec<_>>()
           }
         }

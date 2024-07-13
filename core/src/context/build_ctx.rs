@@ -190,7 +190,7 @@ mod tests {
                       size: ZERO_SIZE,
                       @ {
                         Clone::clone_from(&mut *$c_themes.write(), ctx!().themes());
-                        Void.build(ctx!())
+                        Void
                       }
                     }
                   })

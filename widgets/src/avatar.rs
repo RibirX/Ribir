@@ -49,7 +49,7 @@ impl CustomStyle for AvatarStyle {
 pub struct AvatarDecorator;
 
 impl ComposeDecorator for AvatarDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> { fn_widget!(host) }
 }
 
 #[derive(Template)]
@@ -61,7 +61,7 @@ pub enum AvatarTemplate {
 impl ComposeChild for Avatar {
   type Child = AvatarTemplate;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @ {
         let AvatarStyle {

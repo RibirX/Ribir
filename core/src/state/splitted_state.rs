@@ -148,18 +148,6 @@ where
   }
 }
 
-impl<V, O, W> RenderBuilder for SplittedWriter<O, W>
-where
-  O: StateWriter,
-  W: Fn(&mut O::Value) -> PartData<V> + Clone + 'static,
-  V: Render,
-{
-  fn build(self, ctx: &BuildCtx) -> Widget {
-    MapWriterAsReader { origin: self.origin.clone_reader(), part_map: self.splitter.clone() }
-      .build(ctx)
-  }
-}
-
 impl<S, F> IntoWidgetStrict<RENDER> for SplittedWriter<S, F>
 where
   Self: StateWriter,
@@ -173,15 +161,5 @@ where
   Self: StateWriter,
   <Self as StateReader>::Value: Compose,
 {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
-}
-
-impl<S, F, C> IntoWidgetStrict<COMPOSE_CHILD> for SplittedWriter<S, F>
-where
-  Self: StateWriter,
-  <Self as StateReader>::Value: ComposeChild<Child = Option<C>>,
-{
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
-    ComposeChild::compose_child(self, None).build(ctx)
-  }
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).into_widget(ctx) }
 }

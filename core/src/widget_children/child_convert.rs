@@ -8,19 +8,28 @@ pub trait IntoChild<C, const M: usize> {
   fn into_child(self, ctx: &BuildCtx) -> C;
 }
 
-pub const INTO_CONVERT: usize = 0;
+pub const SELF: usize = 0;
 
-// `Into` conversion.
-impl<T: Into<C>, C> IntoChild<C, INTO_CONVERT> for T {
+impl<C> IntoChild<C, SELF> for C {
   #[inline(always)]
-  fn into_child(self, _: &BuildCtx) -> C { self.into() }
+  fn into_child(self, _: &BuildCtx) -> C { self }
+}
+
+impl<C> IntoChild<Option<C>, SELF> for C {
+  #[inline(always)]
+  fn into_child(self, _: &BuildCtx) -> Option<C> { Some(self) }
+}
+
+impl<F: FnMut(&BuildCtx) -> Widget + 'static> IntoChild<GenWidget, 0> for F {
+  #[inline]
+  fn into_child(self, _: &BuildCtx) -> GenWidget { GenWidget::new(self) }
 }
 
 // All possible widget conversions.
 macro_rules! impl_into_widget_child {
   ($($m:ident),*) => {
     $(
-      // `IntoWidgetStrict` is utilized here to prevent conflicts with the `Into` trait bounds.
+      // `IntoWidgetStrict` is utilized here to prevent conflicts with the `Self`
       impl<T: IntoWidgetStrict<$m>> IntoChild<Widget, $m> for T {
         #[inline(always)]
         fn into_child(self, ctx: &BuildCtx) -> Widget { self.into_widget_strict(ctx) }
@@ -29,12 +38,11 @@ macro_rules! impl_into_widget_child {
   };
 }
 
-impl_into_widget_child!(COMPOSE, RENDER, COMPOSE_CHILD, FN);
+impl_into_widget_child!(COMPOSE, RENDER, FN);
 
 macro_rules! impl_into_option_widget_child {
   ($($m: ident), *) => {
     $(
-      // `IntoWidgetStrict` is utilized here to prevent conflicts with the `Into` trait bounds.
       impl<T: IntoWidgetStrict<$m>> IntoChild<Option<Widget>, $m> for Option<T> {
         #[inline(always)]
         fn into_child(self, ctx: &BuildCtx) -> Option<Widget> {
@@ -42,7 +50,6 @@ macro_rules! impl_into_option_widget_child {
         }
       }
 
-      // `IntoWidgetStrict` is utilized here to prevent conflicts with the `Into` trait bounds.
       impl<T: IntoWidgetStrict<$m>> IntoChild<Option<Widget>, $m> for T {
         #[inline(always)]
         fn into_child(self, ctx: &BuildCtx) -> Option<Widget> {
@@ -53,7 +60,7 @@ macro_rules! impl_into_option_widget_child {
   };
 }
 
-impl_into_option_widget_child!(COMPOSE, RENDER, COMPOSE_CHILD, FN);
+impl_into_option_widget_child!(COMPOSE, RENDER, FN);
 
 impl<V, S, F, const M: usize> IntoChild<Widget, M> for MapPipe<Option<V>, S, F>
 where
@@ -80,6 +87,6 @@ impl<const M: usize, V: IntoWidget<M> + 'static> IntoChild<Widget, M>
   fn into_child(self, ctx: &BuildCtx) -> Widget { self.into_widget(ctx) }
 }
 
-impl<T: 'static> IntoChild<BoxPipe<T>, FN> for T {
-  fn into_child(self, _: &BuildCtx) -> BoxPipe<T> { BoxPipe::value(self) }
+impl<P: Pipe + 'static> IntoChild<BoxPipe<P::Value>, 0> for P {
+  fn into_child(self, _: &BuildCtx) -> BoxPipe<P::Value> { BoxPipe::pipe(Box::new(self)) }
 }

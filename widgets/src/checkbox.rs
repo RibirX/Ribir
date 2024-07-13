@@ -50,13 +50,17 @@ pub enum CheckboxTemplate {
 }
 
 impl ComposeDecorator for CheckBoxDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> impl WidgetBuilder { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> {
+    fn_widget!(host)
+  }
 }
 
 impl ComposeChild for Checkbox {
   type Child = Option<CheckboxTemplate>;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(
+    this: impl StateWriter<Value = Self>, child: Self::Child,
+  ) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let CheckBoxStyle {
         icon_size,
@@ -77,7 +81,7 @@ impl ComposeChild for Checkbox {
             }
           }}
         }
-      }.build(ctx!());
+      }.into_widget(ctx!());
 
       let checkbox = if let Some(child) = child  {
         let label = |label: Label| @Text {
@@ -97,7 +101,7 @@ impl ComposeChild for Checkbox {
               },
             }
           }
-        }.build(ctx!())
+        }.into_widget(ctx!())
       } else {
         icon
       };
@@ -129,7 +133,7 @@ mod tests {
 
   use super::*;
 
-  fn checked() -> impl WidgetBuilder {
+  fn checked() -> impl IntoWidgetStrict<FN> {
     fn_widget! { @Checkbox { checked: true } }
   }
   widget_test_suit!(
@@ -140,7 +144,7 @@ mod tests {
     comparison = 0.001
   );
 
-  fn unchecked() -> impl WidgetBuilder {
+  fn unchecked() -> impl IntoWidgetStrict<FN> {
     fn_widget! { @Checkbox {} }
   }
   widget_test_suit!(
@@ -151,7 +155,7 @@ mod tests {
     comparison = 0.001
   );
 
-  fn indeterminate() -> impl WidgetBuilder {
+  fn indeterminate() -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @Checkbox {
         checked: true,

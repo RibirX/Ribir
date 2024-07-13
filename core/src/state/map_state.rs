@@ -185,17 +185,6 @@ where
   fn proxy(&self) -> Self::Target<'_> { self.read() }
 }
 
-impl<V, S, WM> RenderBuilder for MapWriter<S, WM>
-where
-  Self: 'static,
-  S: StateWriter,
-  WM: Fn(&mut S::Value) -> PartData<V> + Clone,
-  V: Render,
-{
-  #[inline]
-  fn build(self, ctx: &BuildCtx) -> Widget { self.clone_reader().build(ctx) }
-}
-
 impl<S, F> IntoWidgetStrict<RENDER> for MapWriter<S, F>
 where
   Self: StateReader,
@@ -209,15 +198,5 @@ where
   Self: StateWriter,
   <Self as StateReader>::Value: Compose,
 {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
-}
-
-impl<S, F, C> IntoWidgetStrict<COMPOSE_CHILD> for MapWriter<S, F>
-where
-  Self: StateWriter,
-  <Self as StateReader>::Value: ComposeChild<Child = Option<C>>,
-{
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
-    ComposeChild::compose_child(self, None).build(ctx)
-  }
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).into_widget(ctx) }
 }

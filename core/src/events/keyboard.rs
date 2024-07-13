@@ -56,7 +56,7 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl Compose for Keys {
-      fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+      fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
         fn_widget! {
           @MockBox {
             size: Size::zero(),

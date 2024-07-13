@@ -73,9 +73,9 @@ macro_rules! impl_pipe_iter_widget_child {
   };
 }
 
-impl_widget_child!(COMPOSE, RENDER, COMPOSE_CHILD, FN);
-impl_iter_widget_child!(COMPOSE, RENDER, COMPOSE_CHILD, FN);
-impl_pipe_iter_widget_child!(COMPOSE, RENDER, COMPOSE_CHILD, FN);
+impl_widget_child!(COMPOSE, RENDER, FN);
+impl_iter_widget_child!(COMPOSE, RENDER, FN);
+impl_pipe_iter_widget_child!(COMPOSE, RENDER, FN);
 
 impl<C, T, const M: usize> WithChild<C, 1, M> for T
 where
@@ -99,11 +99,7 @@ impl WithChild<Widget, 1, FN> for MultiPair {
   }
 }
 
-impl WidgetBuilder for MultiPair {
-  fn build(self, ctx: &BuildCtx) -> Widget { self.into_widget_strict(ctx) }
-}
-
-impl IntoWidgetStrict<COMPOSE_CHILD> for MultiPair {
+impl IntoWidgetStrict<COMPOSE> for MultiPair {
   fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
     let MultiPair { parent, children } = self;
     let leaf = parent.id().single_leaf(&ctx.tree.borrow().arena);
