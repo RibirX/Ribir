@@ -29,7 +29,7 @@ pub struct HScrollBarThumbDecorator {
 }
 
 impl ComposeDecorator for HScrollBarThumbDecorator {
-  fn compose_decorator(this: State<Self>, host: Widget) -> impl WidgetBuilder {
+  fn compose_decorator(this: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> {
     fn_widget! { @$host { anchor: pipe!($this.offset).map(Anchor::left) } }
   }
 }
@@ -42,14 +42,14 @@ pub struct VScrollBarThumbDecorator {
 }
 
 impl ComposeDecorator for VScrollBarThumbDecorator {
-  fn compose_decorator(this: State<Self>, host: Widget) -> impl WidgetBuilder {
+  fn compose_decorator(this: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> {
     fn_widget! { @$host { anchor: pipe!($this.offset).map(Anchor::top) } }
   }
 }
 
 impl ComposeChild for HScrollBar {
   type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let mut scrolling = @ScrollableWidget {
         scrollable: Scrollable::X,
@@ -92,7 +92,7 @@ pub struct VScrollBar {
 
 impl ComposeChild for VScrollBar {
   type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let mut scrolling = @ScrollableWidget {
         scrollable: Scrollable::Y,
@@ -135,7 +135,7 @@ pub struct BothScrollbar {
 
 impl ComposeChild for BothScrollbar {
   type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let mut scrolling = @ScrollableWidget {
         scrollable: Scrollable::Both,
@@ -178,7 +178,7 @@ pub struct HRawScrollbar {
 }
 
 impl Compose for HRawScrollbar {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @ {
         let scrolling = $this.scrolling.clone_watcher();
@@ -239,7 +239,7 @@ pub struct VRawScrollbar {
 }
 
 impl Compose for VRawScrollbar {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @ {
         let scrolling = $this.scrolling.clone_watcher();
@@ -311,7 +311,7 @@ mod test {
   use super::*;
   use crate::layout::{Column, ConstrainedBox};
 
-  fn content_expand_so_all_view_can_scroll() -> impl WidgetBuilder {
+  fn content_expand_so_all_view_can_scroll() -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @ConstrainedBox {
         clamp: BoxClamp::EXPAND_BOTH,

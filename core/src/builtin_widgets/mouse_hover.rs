@@ -17,7 +17,7 @@ impl Declare for MouseHover {
 
 impl ComposeChild for MouseHover {
   type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @ $child {
         on_pointer_enter: move |_| $this.write().hover = true,

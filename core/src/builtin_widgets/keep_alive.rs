@@ -26,7 +26,9 @@ impl Declare for KeepAlive {
 impl ComposeChild for KeepAlive {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(
+    this: impl StateWriter<Value = Self>, child: Self::Child,
+  ) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let modifies = this.raw_modifies();
       child.try_unwrap_state_and_attach(this, ctx!()).dirty_subscribe(modifies, ctx!())
@@ -52,11 +54,11 @@ mod tests {
     let mut wnd = TestWindow::new(fn_widget! {
       pipe! {
         if *$remove_widget {
-          Void.build(ctx!())
+          Void.into_widget(ctx!())
         } else {
           FatObj::new(Void)
             .keep_alive(pipe!(*$keep_alive))
-            .build(ctx!())
+            .into_widget(ctx!())
         }
       }
     });

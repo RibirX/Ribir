@@ -245,7 +245,7 @@ impl OverlayState {
       };
       let build_ctx = BuildCtx::new(None, &wnd.widget_tree);
       let style = style.unwrap_or_else(|| OverlayStyle::of(&build_ctx));
-      let w = this.wrap_style(w, style).build(&build_ctx);
+      let w = this.wrap_style(w, style).into_widget(&build_ctx);
       let wid = w.id();
       *this.0.borrow_mut() = OverlayInnerState::Showing(wid, wnd.clone());
       let root = wnd.widget_tree.borrow().root();
@@ -255,7 +255,7 @@ impl OverlayState {
     });
   }
 
-  fn wrap_style(&self, w: Widget, style: OverlayStyle) -> impl WidgetBuilder {
+  fn wrap_style(&self, w: Widget, style: OverlayStyle) -> impl IntoWidgetStrict<FN> {
     let this = self.clone();
     fn_widget! {
       let OverlayStyle { close_policy, mask_brush } = style;

@@ -18,7 +18,7 @@ impl CustomStyle for SelectedHighLightStyle {
 }
 
 impl Compose for SelectedHighLight {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let color = SelectedHighLightStyle::of(ctx!()).brush;
       @Stack {

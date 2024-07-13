@@ -44,11 +44,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
-- Remove `ChildFrom` and `FromAnother` traits (#pr, @M-Adoo)
-- Remove `SingleParent` and `MultiParent` traits. (#pr, @M-Adoo)
-- Remove `PairChild` and `PairWithChild` traits. User can use a generic type instead. (#pr, @M-Adoo)
-- Allow only the child to be converted to a widget or a type that implements the Into trait. (#pr, @M-Adoo)
-
+- Removed `ChildFrom` and `FromAnother` traits (#pr @M-Adoo)
+- Removed `SingleParent` and `MultiParent` traits. (#pr @M-Adoo)
+- Removed `PairChild` and `PairWithChild` traits. User can use a generic type instead. (#pr @M-Adoo)
+- Allow only the child to be converted to a widget or a type that implements the Into trait. (#pr @M-Adoo)
+- Removed the all builder traits such as WidgetBuilder and ComposeBuilder and so on. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.3] - 2024-06-26
 

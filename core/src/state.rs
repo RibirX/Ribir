@@ -338,26 +338,6 @@ impl<'a, W> Drop for WriteRef<'a, W> {
   }
 }
 
-impl<C: Compose + 'static> ComposeBuilder for State<C> {
-  #[inline]
-  fn build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
-}
-
-impl<P: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for State<P> {
-  #[inline]
-  fn build(self, ctx: &BuildCtx) -> Widget { ComposeChild::compose_child(self, None).build(ctx) }
-}
-
-impl<R: Render> RenderBuilder for State<R> {
-  #[inline]
-  fn build(self, ctx: &BuildCtx) -> Widget {
-    match self.0.into_inner() {
-      InnerState::Data(w) => w.into_inner().build(ctx),
-      InnerState::Stateful(w) => w.build(ctx),
-    }
-  }
-}
-
 impl<R: Render> IntoWidgetStrict<RENDER> for State<R> {
   fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
     match self.0.into_inner() {
@@ -369,14 +349,7 @@ impl<R: Render> IntoWidgetStrict<RENDER> for State<R> {
 
 impl<W: Compose + 'static> IntoWidgetStrict<COMPOSE> for State<W> {
   #[inline]
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
-}
-
-impl<W: ComposeChild<Child = Option<C>> + 'static, C> IntoWidgetStrict<COMPOSE_CHILD> for State<W> {
-  #[inline]
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
-    ComposeChild::compose_child(self, None).build(ctx)
-  }
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).into_widget(ctx) }
 }
 
 impl<T> MultiChild for T
@@ -392,34 +365,6 @@ where
   T::Value: SingleChild,
 {
 }
-
-macro_rules! impl_compose_builder {
-  ($name:ident) => {
-    impl<V, W, WM> ComposeBuilder for $name<W, WM>
-    where
-      W: StateWriter,
-      WM: Fn(&mut W::Value) -> PartData<V> + Clone + 'static,
-      V: Compose + 'static,
-    {
-      fn build(self, ctx: &crate::context::BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
-    }
-
-    impl<V, W, WM, Child> ComposeChildBuilder for $name<W, WM>
-    where
-      W: StateWriter,
-      WM: Fn(&mut W::Value) -> PartData<V> + Clone + 'static,
-      V: ComposeChild<Child = Option<Child>> + 'static,
-    {
-      #[inline]
-      fn build(self, ctx: &BuildCtx) -> Widget {
-        ComposeChild::compose_child(self, None).build(ctx)
-      }
-    }
-  };
-}
-
-impl_compose_builder!(MapWriter);
-impl_compose_builder!(SplittedWriter);
 
 #[cfg(test)]
 mod tests {
@@ -510,7 +455,7 @@ mod tests {
   struct C;
 
   impl Compose for C {
-    fn compose(_: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+    fn compose(_: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
       fn_widget! { Void }
     }
   }
@@ -545,7 +490,9 @@ mod tests {
   struct CC;
   impl ComposeChild for CC {
     type Child = Option<Widget>;
-    fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> impl WidgetBuilder {
+    fn compose_child(
+      _: impl StateWriter<Value = Self>, _: Self::Child,
+    ) -> impl IntoWidgetStrict<FN> {
       fn_widget! { @{ Void } }
     }
   }

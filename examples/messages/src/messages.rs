@@ -13,7 +13,7 @@ struct MessageList {
   messages: Vec<Message>,
 }
 
-pub fn messages() -> impl WidgetBuilder {
+pub fn messages() -> impl IntoWidgetStrict<FN> {
   fn_widget! {
     MessageList {
       messages: vec![
@@ -43,7 +43,7 @@ pub fn messages() -> impl WidgetBuilder {
 }
 
 impl Compose for MessageList {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @Column {
         background: Palette::of(ctx!()).surface(),

@@ -124,10 +124,12 @@ where
 impl<V: 'static + Default + Clone + PartialEq> ComposeChild for KeyWidget<V> {
   type Child = Widget;
   #[inline]
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(
+    this: impl StateWriter<Value = Self>, child: Self::Child,
+  ) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let data: Box<dyn AnyKey> = Box::new(this);
-      child.attach_data(Queryable(data), ctx!()).build(ctx!())
+      child.attach_data(Queryable(data), ctx!()).into_widget(ctx!())
     }
   }
 }

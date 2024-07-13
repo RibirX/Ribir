@@ -73,7 +73,7 @@ mod tests {
   use super::*;
   use crate::prelude::*;
   const FIVE: Size = Size::new(5., 5.);
-  fn smoke() -> impl WidgetBuilder {
+  fn smoke() -> impl IntoWidgetStrict<FN> {
     let one = Size::new(1., 1.);
     let five = Size::new(5., 5.);
     fn_widget! {

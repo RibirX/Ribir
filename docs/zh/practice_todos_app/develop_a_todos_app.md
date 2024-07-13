@@ -186,7 +186,7 @@ fn main() {
 use ribir::prelude::*;
 
 impl Compose for Todos {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @Column {
         align_items: Align::Center,
@@ -335,7 +335,7 @@ let _hint_capture_writer = || $this.write();
 
 ...
 
-fn task_item<S>(task: S) -> impl WidgetBuilder
+fn task_item<S>(task: S) -> impl IntoWidgetStrict<FN>
 where
   S: StateWriter<Value = Task> + 'static,
   S::OriginWriter: StateWriter<Value = Todos>,
@@ -576,7 +576,7 @@ use ribir::prelude::{svgs, *};
 use std::time::Duration;
 
 impl Compose for Todos {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl WidgetBuilder {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @Column {
         align_items: Align::Center,
@@ -669,7 +669,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
   .into()
 }
 
-fn task_item<S>(task: S) -> impl WidgetBuilder
+fn task_item<S>(task: S) -> impl IntoWidgetStrict<FN>
 where
   S::OriginWriter: StateWriter<Value = Todos>,
 {

@@ -28,7 +28,7 @@ mod tests {
   use super::*;
   use crate::prelude::*;
 
-  fn outside_fixed_clamp() -> impl WidgetBuilder {
+  fn outside_fixed_clamp() -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @SizedBox {
         size: Size::new(50., 50.),
@@ -44,7 +44,7 @@ mod tests {
     {path =[0,0,0], width == 50., height == 50.,}
   );
 
-  fn expand_one_axis() -> impl WidgetBuilder {
+  fn expand_one_axis() -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @Container {
         size: Size::new(256., 50.),
@@ -62,7 +62,7 @@ mod tests {
     { path = [0, 0], width==256., height == 20. ,}
   );
 
-  fn expand_both() -> impl WidgetBuilder {
+  fn expand_both() -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @Container {
         size: Size::new(256., 50.),

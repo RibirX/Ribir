@@ -15,7 +15,7 @@ impl Declare for Cursor {
 
 impl ComposeChild for Cursor {
   type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let save_cursor: Stateful<Option<CursorIcon>> = Stateful::new(None);
       @$child {

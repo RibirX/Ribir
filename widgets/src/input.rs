@@ -261,7 +261,7 @@ impl ComposeChild for Input {
   type Child = Option<Placeholder>;
   fn compose_child(
     this: impl StateWriter<Value = Self>, placeholder: Self::Child,
-  ) -> impl WidgetBuilder {
+  ) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let text = @Text {
         text: pipe!($this.text.clone()),
@@ -288,7 +288,7 @@ impl ComposeChild for TextArea {
   type Child = Option<Placeholder>;
   fn compose_child(
     this: impl StateWriter<Value = Self>, placeholder: Self::Child,
-  ) -> impl WidgetBuilder {
+  ) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let text = @Text {
         text: pipe!($this.text.clone()),
@@ -404,7 +404,7 @@ where
         }
       };
 
-      let text_widget = text.build(ctx!());
+      let text_widget = text.into_widget(ctx!());
       let text_widget = bind_point_listener(
         this.clone_writer(),
         text_widget,

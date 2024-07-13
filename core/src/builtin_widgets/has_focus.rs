@@ -16,7 +16,7 @@ impl Declare for HasFocus {
 
 impl ComposeChild for HasFocus {
   type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @ $child {
         on_focus_in: move|_| $this.write().focused = true,

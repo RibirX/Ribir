@@ -15,8 +15,9 @@ impl Declare for GlobalAnchor {
 
 impl ComposeChild for GlobalAnchor {
   type Child = Widget;
-  #[inline]
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(
+    this: impl StateWriter<Value = Self>, child: Self::Child,
+  ) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let wnd = ctx!().window();
       let tick_of_layout_ready = wnd
@@ -177,7 +178,7 @@ mod tests {
   use crate::test_helper::*;
 
   const WND_SIZE: Size = Size::new(100., 100.);
-  fn global_anchor() -> impl WidgetBuilder {
+  fn global_anchor() -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       let parent = @MockBox {
         anchor: Anchor::left_top(10., 10.),

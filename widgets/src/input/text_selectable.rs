@@ -135,7 +135,9 @@ pub(crate) fn bind_point_listener<T: SelectableText>(
 
 impl ComposeChild for TextSelectable {
   type Child = FatObj<State<Text>>;
-  fn compose_child(this: impl StateWriter<Value = Self>, text: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(
+    this: impl StateWriter<Value = Self>, text: Self::Child,
+  ) -> impl IntoWidgetStrict<FN> {
     let src = text.into_inner();
 
     fn_widget! {
@@ -162,7 +164,7 @@ impl ComposeChild for TextSelectable {
           }
         }
       };
-      let text_widget = text.build(ctx!());
+      let text_widget = text.into_widget(ctx!());
       let text_widget = bind_point_listener(
         this.clone_writer(),
         text_widget,

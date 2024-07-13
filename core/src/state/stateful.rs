@@ -198,42 +198,6 @@ impl<W> Writer<W> {
   pub fn into_inner(self) -> Stateful<W> { self.0 }
 }
 
-macro_rules! compose_builder_impl {
-  ($name:ident) => {
-    impl<C: Compose + 'static> ComposeBuilder for $name<C> {
-      #[inline]
-      fn build(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
-    }
-
-    impl<R: ComposeChild<Child = Option<C>> + 'static, C> ComposeChildBuilder for $name<R> {
-      #[inline]
-      fn build(self, ctx: &BuildCtx) -> Widget {
-        ComposeChild::compose_child(self, None).build(ctx)
-      }
-    }
-  };
-}
-
-compose_builder_impl!(Stateful);
-compose_builder_impl!(Writer);
-
-impl<R: Render> RenderBuilder for Stateful<R> {
-  fn build(self, ctx: &BuildCtx) -> Widget {
-    match self.try_into_value() {
-      Ok(r) => r.build(ctx),
-      Err(s) => {
-        let w = s.data.clone().build(ctx);
-        w.dirty_subscribe(s.raw_modifies(), ctx)
-      }
-    }
-  }
-}
-
-impl<R: Render> RenderBuilder for Writer<R> {
-  #[inline]
-  fn build(self, ctx: &BuildCtx) -> Widget { self.0.build(ctx) }
-}
-
 impl<W> Stateful<W> {
   pub fn new(data: W) -> Self {
     Self { data: Sc::new(StateCell::new(data)), info: Sc::new(StatefulInfo::new()) }
@@ -287,15 +251,7 @@ impl<W: Render> IntoWidgetStrict<RENDER> for Stateful<W> {
 }
 
 impl<W: Compose + 'static> IntoWidgetStrict<COMPOSE> for Stateful<W> {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).build(ctx) }
-}
-
-impl<W: ComposeChild<Child = Option<C>> + 'static, C> IntoWidgetStrict<COMPOSE_CHILD>
-  for Stateful<W>
-{
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
-    ComposeChild::compose_child(self, None).build(ctx)
-  }
+  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).into_widget(ctx) }
 }
 
 impl<W: Render> IntoWidgetStrict<RENDER> for Reader<W> {

@@ -13,7 +13,7 @@ pub struct Link {
 
 impl ComposeChild for Link {
   type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl WidgetBuilder {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
     fn_widget! {
       @ $child {
         on_tap: move |_| {
