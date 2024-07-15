@@ -114,7 +114,7 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  fn smoke() -> impl IntoWidgetStrict<FN> {
+  fn smoke() -> impl IntoWidget<'static, FN> {
     fn_widget! {
       @MockBox {
         margin: EdgeInsets::symmetrical(1., 1.),

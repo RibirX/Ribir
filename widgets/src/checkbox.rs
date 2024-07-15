@@ -50,17 +50,13 @@ pub enum CheckboxTemplate {
 }
 
 impl ComposeDecorator for CheckBoxDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> {
-    fn_widget!(host)
-  }
+  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
 }
 
-impl ComposeChild for Checkbox {
+impl ComposeChild<'static> for Checkbox {
   type Child = Option<CheckboxTemplate>;
 
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, child: Self::Child,
-  ) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fn_widget! {
       let CheckBoxStyle {
         icon_size,
@@ -81,7 +77,7 @@ impl ComposeChild for Checkbox {
             }
           }}
         }
-      }.into_widget(ctx!());
+      }.into_widget();
 
       let checkbox = if let Some(child) = child  {
         let label = |label: Label| @Text {
@@ -94,14 +90,14 @@ impl ComposeChild for Checkbox {
           @ {
             match child {
               CheckboxTemplate::Before(w) => {
-                [(label(w.0)).into_widget(ctx!()), icon]
+                [(label(w.0)).into_widget(), icon]
               },
               CheckboxTemplate::After(w) => {
-                [icon, label(w.0).into_widget(ctx!())]
+                [icon, label(w.0).into_widget()]
               },
             }
           }
-        }.into_widget(ctx!())
+        }.into_widget()
       } else {
         icon
       };
@@ -114,6 +110,7 @@ impl ComposeChild for Checkbox {
         }
       }
     }
+    .into_widget()
   }
 }
 
@@ -133,9 +130,7 @@ mod tests {
 
   use super::*;
 
-  fn checked() -> impl IntoWidgetStrict<FN> {
-    fn_widget! { @Checkbox { checked: true } }
-  }
+  fn checked() -> Widget<'static> { fn_widget! { @Checkbox { checked: true } }.into_widget() }
   widget_test_suit!(
     checked,
     wnd_size = Size::new(48., 48.),
@@ -144,9 +139,7 @@ mod tests {
     comparison = 0.001
   );
 
-  fn unchecked() -> impl IntoWidgetStrict<FN> {
-    fn_widget! { @Checkbox {} }
-  }
+  fn unchecked() -> Widget<'static> { fn_widget! { @Checkbox {} }.into_widget() }
   widget_test_suit!(
     unchecked,
     wnd_size = Size::new(48., 48.),
@@ -155,13 +148,14 @@ mod tests {
     comparison = 0.001
   );
 
-  fn indeterminate() -> impl IntoWidgetStrict<FN> {
+  fn indeterminate() -> Widget<'static> {
     fn_widget! {
       @Checkbox {
         checked: true,
         indeterminate: true,
       }
     }
+    .into_widget()
   }
 
   widget_test_suit!(

@@ -45,13 +45,14 @@ mod tests {
   use super::*;
   use crate::prelude::*;
 
-  fn smoke() -> impl IntoWidgetStrict<FN> {
+  fn smoke() -> Widget<'static> {
     fn_widget! {
       @TransformBox {
         matrix: Transform::new(2., 0., 0., 2., 0., 0.),
         @SizedBox { size: Size::new(100., 100.) }
       }
     }
+    .into_widget()
   }
   widget_layout_test!(smoke, width == 200., height == 200.,);
 }

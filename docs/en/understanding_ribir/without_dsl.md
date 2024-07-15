@@ -162,16 +162,16 @@ Here's an example of a text button and an icon button:
 ```rust
 use ribir::prelude::*;
 
-fn button_demo(ctx: &BuildCtx){
+fn button_demo(ctx: &BuildCtx) {
   let text_btn = FilledButton::declarer()
     .color(Color::RED)
     .finish(ctx)
-    .with_child(Label::new("Text Button"), ctx);
+    .with_child(Label::new("Text Button"));
 
   let icon_btn = FilledButton::declarer()
     .color(Color::RED)
     .finish(ctx)
-    .with_child(svgs::ADD, ctx);
+    .with_child(svgs::ADD);
 }
 ```
 
@@ -187,7 +187,7 @@ let counter = fn_widget! {
   let btn = FilledButton::declarer()
     .on_tap(move |_| *$cnt.write() += 1)
     .finish(ctx!())
-    .with_child(Label::new("Inc"), ctx!());
+    .with_child(Label::new("Inc"));
 
   let label = H1::declarer()
     .text(pipe!($cnt.to_string()))

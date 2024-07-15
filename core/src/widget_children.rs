@@ -14,11 +14,11 @@ pub trait SingleChild {}
 pub trait MultiChild {}
 /// A boxed render widget that support accept one child.
 #[derive(SingleChild)]
-pub struct BoxedSingleChild(Widget);
+pub struct BoxedSingleChild(Widget<'static>);
 
 /// A boxed render widget that support accept multi children.
 #[derive(MultiChild)]
-pub struct BoxedMultiChild(Widget);
+pub struct BoxedMultiChild(Widget<'static>);
 
 /// This trait specifies the type of child a widget can have, and the target
 /// type represents the result of the widget composing its child.
@@ -31,18 +31,16 @@ pub struct BoxedMultiChild(Widget);
 /// - 0 for SingleChild
 /// - 1 for MultiChild
 /// - 2..9 for ComposeChild
-pub trait WithChild<C, const N: usize, const M: usize> {
-  type Target;
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target;
+pub trait WithChild<'w, C, const N: usize, const M: usize> {
+  type Target: 'w;
+  fn with_child(self, child: C) -> Self::Target;
 }
 
-/// Trait mark widget can have one child and also have compose logic for widget
-/// and its child.
-pub trait ComposeChild: Sized {
-  type Child;
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, child: Self::Child,
-  ) -> impl IntoWidgetStrict<FN>;
+/// Trait for specifying the child type and implementing how to compose the
+/// child.
+pub trait ComposeChild<'c>: Sized {
+  type Child: 'c;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c>;
 }
 
 /// A pair of object and its child without compose, this keep the type
@@ -55,28 +53,26 @@ pub struct Pair<W, C> {
 
 /// A alias of `Pair<W, Widget>`, means `Widget` is the child of the generic
 /// type.
-pub type WidgetOf<W> = Pair<W, Widget>;
+pub type WidgetOf<'a, W> = Pair<W, Widget<'a>>;
 
-impl IntoWidgetStrict<RENDER> for BoxedMultiChild {
+impl IntoWidgetStrict<'static, RENDER> for BoxedMultiChild {
   #[inline]
-  fn into_widget_strict(self, _: &BuildCtx) -> Widget { self.0 }
+  fn into_widget_strict(self) -> Widget<'static> { self.0 }
 }
 
-impl IntoWidgetStrict<RENDER> for BoxedSingleChild {
+impl IntoWidgetStrict<'static, RENDER> for BoxedSingleChild {
   #[inline]
-  fn into_widget_strict(self, _: &BuildCtx) -> Widget { self.0 }
+  fn into_widget_strict(self) -> Widget<'static> { self.0 }
 }
 
 impl BoxedSingleChild {
   #[inline]
-  pub fn new(widget: impl SingleIntoParent, ctx: &BuildCtx) -> Self {
-    Self(widget.into_parent(ctx))
-  }
+  pub fn new(widget: impl SingleIntoParent) -> Self { Self(widget.into_parent()) }
 }
 
 impl BoxedMultiChild {
   #[inline]
-  pub fn new(widget: impl MultiIntoParent, ctx: &BuildCtx) -> Self { Self(widget.into_parent(ctx)) }
+  pub fn new(widget: impl MultiIntoParent) -> Self { Self(widget.into_parent()) }
 }
 
 impl<W, C> Pair<W, C> {
@@ -117,19 +113,17 @@ mod tests {
     struct Footer;
 
     #[derive(Template)]
-    struct PageTml {
-      _header: WidgetOf<FatObj<Header>>,
-      _content: WidgetOf<FatObj<Content>>,
-      _footer: WidgetOf<FatObj<Footer>>,
+    struct PageTml<'w> {
+      _header: WidgetOf<'w, FatObj<Header>>,
+      _content: WidgetOf<'w, FatObj<Content>>,
+      _footer: WidgetOf<'w, FatObj<Footer>>,
     }
 
-    impl ComposeChild for Page {
-      type Child = PageTml;
+    impl<'c> ComposeChild<'c> for Page {
+      type Child = PageTml<'c>;
 
-      fn compose_child(
-        _: impl StateWriter<Value = Self>, _: Self::Child,
-      ) -> impl IntoWidgetStrict<FN> {
-        fn_widget!(Void)
+      fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
+        Void.into_widget()
       }
     }
 
@@ -152,13 +146,11 @@ mod tests {
     #[derive(Declare, SingleChild)]
     struct Child;
 
-    impl ComposeChild for Parent {
-      type Child = Option<Pair<FatObj<Child>, Widget>>;
+    impl<'c> ComposeChild<'c> for Parent {
+      type Child = Option<Pair<FatObj<Child>, Widget<'c>>>;
 
-      fn compose_child(
-        _: impl StateWriter<Value = Self>, _: Self::Child,
-      ) -> impl IntoWidgetStrict<FN> {
-        fn_widget!(Void)
+      fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
+        Void.into_widget()
       }
     }
 
@@ -189,13 +181,11 @@ mod tests {
     #[derive(Declare)]
     struct B;
 
-    impl ComposeChild for A {
+    impl ComposeChild<'static> for A {
       type Child = Vec<B>;
 
-      fn compose_child(
-        _: impl StateWriter<Value = Self>, _: Self::Child,
-      ) -> impl IntoWidgetStrict<FN> {
-        fn_widget!(Void)
+      fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
+        Void.into_widget()
       }
     }
     let a = A;
@@ -273,12 +263,10 @@ mod tests {
     #[derive(Declare, SingleChild)]
     struct X;
 
-    impl ComposeChild for P {
-      type Child = WidgetOf<FatObj<X>>;
-      fn compose_child(
-        _: impl StateWriter<Value = Self>, _: Self::Child,
-      ) -> impl IntoWidgetStrict<FN> {
-        fn_widget!(Void)
+    impl<'c> ComposeChild<'c> for P {
+      type Child = WidgetOf<'c, FatObj<X>>;
+      fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
+        Void.into_widget()
       }
     }
 
@@ -292,23 +280,21 @@ mod tests {
     reset_test_env!();
 
     struct X;
-    impl ComposeChild for X {
-      type Child = Widget;
-      fn compose_child(
-        _: impl StateWriter<Value = Self>, child: Self::Child,
-      ) -> impl IntoWidgetStrict<FN> {
-        fn_widget!(child)
+    impl<'c> ComposeChild<'c> for X {
+      type Child = Widget<'c>;
+      fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+        child
       }
     }
 
-    let _ = |ctx| -> Widget {
-      let child = MockBox { size: ZERO_SIZE }.with_child(Void, ctx);
-      X.with_child(child, ctx).into_widget(ctx)
+    let _ = |_: &BuildCtx| -> Widget {
+      let child = MockBox { size: ZERO_SIZE }.with_child(Void);
+      X.with_child(child).into_widget()
     };
   }
 
   const FIX_OPTION_TEMPLATE_EXPECT_SIZE: Size = Size::new(100., 200.);
-  fn fix_option_template() -> impl IntoWidgetStrict<FN> {
+  fn fix_option_template() -> impl IntoWidget<'static, FN> {
     struct Field;
 
     #[derive(Template, Default)]
@@ -318,12 +304,10 @@ mod tests {
     #[derive(Declare)]
     struct Host {}
 
-    impl ComposeChild for Host {
+    impl ComposeChild<'static> for Host {
       type Child = Option<ConfigTml>;
-      fn compose_child(
-        _: impl StateWriter<Value = Self>, _: Self::Child,
-      ) -> impl IntoWidgetStrict<FN> {
-        fn_widget! { @MockBox { size: FIX_OPTION_TEMPLATE_EXPECT_SIZE } }
+      fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
+        fn_widget! { @MockBox { size: FIX_OPTION_TEMPLATE_EXPECT_SIZE } }.into_widget()
       }
     }
 

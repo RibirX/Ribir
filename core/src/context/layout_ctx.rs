@@ -79,7 +79,7 @@ impl<'a> LayoutCtx<'a> {
   /// information with same input.
   #[inline]
   pub fn force_child_relayout(&mut self, child: WidgetId) -> bool {
-    assert_eq!(child.parent(&self.tree.arena), Some(self.id));
+    assert_eq!(child.parent(self.tree), Some(self.id));
     self.tree.store.force_layout(child).is_some()
   }
 

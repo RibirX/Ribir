@@ -27,28 +27,31 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Introduced `IntoWidget` and `IntoChild`. (@M-Adoo #pr)
+- **core**: Introduced `IntoWidget` and `IntoChild`. (@M-Adoo #612)
 
   The `IntoWidget` trait allows for the conversion of any widget to the type `Widget`.
-  The `IntoChild` trait provides a way to convert a more general widget into a child of `ComposeChild`.
+  The `IntoChild` trait provides a way to convert a more general type into a child of `ComposeChild`.
 
 ### Fixed
 
-**core**: The generation of a pipe widget from another pipe widget may potentially result in a crash. (#pr, @M-Adoo)
+**core**: The generation of a pipe widget from another pipe widget may potentially result in a crash. (#612, @M-Adoo)
 
 ### Changed
 
-- **core**: Simplify the implementation of parent composition with child widgets. (#pr, @M-Adoo)
+- **core**: Lazy build the widget tree. (#612, @M-Adoo)
+- **core**: Simplify the implementation of parent composition with child widgets. (#612, @M-Adoo)
   
   Merge `SingleWithChild`, `MultiWithChild`, and `ComposeWithChild` into a single trait called WithChild.
 
 ### Breaking
 
-- Removed `ChildFrom` and `FromAnother` traits (#pr @M-Adoo)
-- Removed `SingleParent` and `MultiParent` traits. (#pr @M-Adoo)
-- Removed `PairChild` and `PairWithChild` traits. User can use a generic type instead. (#pr @M-Adoo)
-- Allow only the child to be converted to a widget or a type that implements the Into trait. (#pr @M-Adoo)
-- Removed the all builder traits such as WidgetBuilder and ComposeBuilder and so on. (#pr @M-Adoo)
+- Removed `ChildFrom` and `FromAnother` traits (#612 @M-Adoo)
+- Removed `SingleParent` and `MultiParent` traits. (#612 @M-Adoo)
+- Removed `PairChild` and `PairWithChild` traits. User can use a generic type instead. (#612 @M-Adoo)
+- Allow only the child to be converted to a widget or a type that implements the Into trait. (#612 @M-Adoo)
+- Removed the all builder traits such as WidgetBuilder and ComposeBuilder and so on. (#612 @M-Adoo)
+- All implicit child conversions have been removed, except for conversions to Widget. (#612 @M-Adoo)
+
 
 ## [0.4.0-alpha.3] - 2024-06-26
 

@@ -1,5 +1,6 @@
 use std::{
   cell::RefCell,
+  convert::Infallible,
   rc::Rc,
   sync::{Mutex, MutexGuard, Once},
   task::{Context, RawWaker, RawWakerVTable, Waker},
@@ -10,12 +11,12 @@ pub use futures::task::SpawnError;
 use futures::{executor::LocalPool, task::LocalSpawnExt, Future};
 use pin_project_lite::pin_project;
 use ribir_text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographyStore};
-use rxrust::scheduler::NEW_TIMER_FN;
+use rxrust::{scheduler::NEW_TIMER_FN, subject::Subject};
 
 use crate::{
   builtin_widgets::{FullTheme, InheritTheme, Theme},
   clipboard::{Clipboard, MockClipboard},
-  prelude::FuturesLocalScheduler,
+  prelude::{FuturesLocalScheduler, Instant},
   timer::Timer,
   widget::IntoWidget,
   window::{ShellWindow, Window, WindowId},
@@ -45,6 +46,7 @@ pub struct AppCtx {
   runtime_waker: Box<dyn RuntimeWaker + Send>,
   scheduler: FuturesLocalScheduler,
   executor: RefCell<LocalPool>,
+  frame_ticks: Subject<'static, Instant, Infallible>,
 
   #[cfg(feature = "tokio-async")]
   tokio_runtime: tokio::runtime::Runtime,
@@ -67,8 +69,8 @@ impl AppCtx {
   #[track_caller]
   pub fn app_theme() -> &'static Theme { &Self::shared().app_theme }
 
-  pub fn new_window<const M: usize>(
-    shell_wnd: Box<dyn ShellWindow>, content: impl IntoWidget<M>,
+  pub fn new_window<'w, const M: usize>(
+    shell_wnd: Box<dyn ShellWindow>, content: impl IntoWidget<'w, M>,
   ) -> Rc<Window> {
     let wnd = Window::new(shell_wnd);
     let id = wnd.id();
@@ -136,6 +138,12 @@ impl AppCtx {
   /// Get the font database of the application.
   #[track_caller]
   pub fn font_db() -> &'static Rc<RefCell<FontDB>> { &Self::shared().font_db }
+
+  /// This function returns a stream of app ticks, where each frame of the app
+  /// will emit a tick notification.
+  pub fn frame_ticks() -> &'static Subject<'static, Instant, Infallible> {
+    &Self::shared().frame_ticks
+  }
 
   /// Runs all tasks in the local(usually means on the main thread) pool and
   /// returns if no more progress can be made on any task.
@@ -274,6 +282,7 @@ impl AppCtx {
         scheduler,
         runtime_waker: Box::new(MockWaker),
         windows: RefCell::new(ahash::HashMap::default()),
+        frame_ticks: <_>::default(),
 
         #[cfg(feature = "tokio-async")]
         tokio_runtime: tokio::runtime::Builder::new_multi_thread()

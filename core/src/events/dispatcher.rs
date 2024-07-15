@@ -123,7 +123,7 @@ impl Dispatcher {
               let tap_on = self
                 .pointer_down_uid
                 .take()?
-                .lowest_common_ancestor(hit, &tree.arena)?;
+                .lowest_common_ancestor(hit, tree)?;
               wnd.add_delay_event(DelayEvent::Tap(tap_on));
               Some(())
             };
@@ -158,22 +158,16 @@ impl Dispatcher {
     let tree = wnd.widget_tree.borrow();
 
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
-      wid.ancestors(&tree.arena).find(|id| {
-        id.get(&tree.arena)
+      wid.ancestors(&tree).find(|id| {
+        id.get(&tree)
           .and_then(|w| w.query_ref::<MixBuiltin>())
           .map_or(false, |m| m.contain_flag(BuiltinFlags::Focus))
       })
     });
     if let Some(focus_id) = nearest_focus {
-      let Window { focus_mgr, widget_tree, .. } = &*wnd;
-      focus_mgr
-        .borrow_mut()
-        .focus(focus_id, &widget_tree.borrow().arena);
+      wnd.focus_mgr.borrow_mut().focus(focus_id, &tree);
     } else {
-      let Window { focus_mgr, widget_tree, .. } = &*wnd;
-      focus_mgr
-        .borrow_mut()
-        .blur(&widget_tree.borrow().arena);
+      wnd.focus_mgr.borrow_mut().blur(&tree);
     }
     if let Some(hit) = hit {
       wnd.add_delay_event(DelayEvent::PointerDown(hit));
@@ -188,63 +182,62 @@ impl Dispatcher {
     let old = self
       .entered_widgets
       .iter()
-      .find(|wid| !(*wid).is_dropped(&tree.arena))
+      .find(|wid| !(*wid).is_dropped(&tree))
       .copied();
 
     if let Some(old) = old {
-      let ancestor = new_hit.and_then(|w| w.lowest_common_ancestor(old, &tree.arena));
+      let ancestor = new_hit.and_then(|w| w.lowest_common_ancestor(old, &tree));
       wnd.add_delay_event(DelayEvent::PointerLeave { bottom: old, up: ancestor });
     };
 
     if let Some(new) = new_hit {
-      let ancestor = old.and_then(|o| o.lowest_common_ancestor(new, &tree.arena));
+      let ancestor = old.and_then(|o| o.lowest_common_ancestor(new, &tree));
       wnd.add_delay_event(DelayEvent::PointerEnter { bottom: new, up: ancestor });
     }
 
-    self.entered_widgets =
-      new_hit.map_or(vec![], |wid| wid.ancestors(&tree.arena).collect::<Vec<_>>());
+    self.entered_widgets = new_hit.map_or(vec![], |wid| wid.ancestors(&tree).collect::<Vec<_>>());
   }
 
   fn hit_widget(&self) -> Option<WidgetId> {
     let mut hit_target = None;
     let wnd = self.window();
-    let tree = wnd.widget_tree.borrow();
-    let arena = &tree.arena;
+    let tree = &wnd.widget_tree.borrow();
+
     let store = &tree.store;
 
     let mut w = Some(tree.root());
     let mut pos = self.info.cursor_pos;
     while let Some(id) = w {
-      let r = id.assert_get(arena);
+      let r = id.assert_get(tree);
       let ctx = HitTestCtx { id, wnd_id: wnd.id() };
       let HitTest { hit, can_hit_child } = r.hit_test(&ctx, pos);
 
-      pos = tree.store.map_from_parent(id, pos, arena);
+      pos = tree.store.map_from_parent(id, pos, tree);
 
       if hit {
         hit_target = w;
       }
 
       w = id
-        .last_child(&tree.arena)
+        .last_child(tree)
         .filter(|_| can_hit_child)
         .or_else(|| {
           if hit {
             return None;
           }
 
-          pos = store.map_to_parent(id, pos, arena);
+          pos = store.map_to_parent(id, pos, tree);
 
           let mut node = w;
           while let Some(p) = node {
-            node = p.previous_sibling(&tree.arena);
+            node = p.previous_sibling(tree);
             if node.is_some() {
               break;
             } else {
-              node = p.parent(&tree.arena);
+              node = p.parent(tree);
 
               if let Some(id) = node {
-                pos = store.map_to_parent(id, pos, arena);
+                pos = store.map_to_parent(id, pos, tree);
                 if node == hit_target {
                   node = None;
                 }
@@ -281,9 +274,9 @@ mod tests {
     btns: MouseButtons,
   }
 
-  fn record_pointer(
-    event_stack: Rc<RefCell<Vec<Info>>>, widget: impl IntoWidgetStrict<FN>,
-  ) -> impl IntoWidgetStrict<FN> + IntoWidgetStrict<FN> {
+  fn record_pointer<'w>(
+    event_stack: Rc<RefCell<Vec<Info>>>, widget: impl IntoWidgetStrict<'w, FN>,
+  ) -> impl IntoWidgetStrict<'w, FN> {
     let handler_ctor = move || {
       let stack = event_stack.clone();
 
@@ -421,7 +414,7 @@ mod tests {
     #[derive(Default)]
     struct EventRecord(Rc<RefCell<Vec<WidgetId>>>);
     impl Compose for EventRecord {
-      fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+      fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
         fn_widget! {
           @MockBox {
             size: INFINITY_SIZE,
@@ -436,6 +429,7 @@ mod tests {
             }
           }
         }
+        .into_widget()
       }
     }
 
@@ -461,7 +455,7 @@ mod tests {
     }
 
     impl Compose for EnterLeave {
-      fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+      fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
         fn_widget! {
           @MockBox {
             size: INFINITY_SIZE,
@@ -475,6 +469,7 @@ mod tests {
             }
           }
         }
+        .into_widget()
       }
     }
 

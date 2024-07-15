@@ -10,13 +10,16 @@ const BUILDER: &str = "Builder";
 const TEMPLATE: &str = "Template";
 fn with_child_generics(generics: &syn::Generics, child_ty: &Type, m: usize) -> syn::Generics {
   let mut gen = generics.clone();
+  gen.params.push(parse_quote!('_c));
   gen.params.push(parse_quote!(_C));
 
-  gen
+  let predicates = &mut gen
     .where_clause
     .get_or_insert_with(|| parse_quote! { where })
-    .predicates
-    .push(parse_quote!(_C: IntoChild<#child_ty, #m>));
+    .predicates;
+  predicates.push(parse_quote!(_C: IntoChild<#child_ty, #m>));
+  predicates.push(parse_quote!(#child_ty: '_c));
+  predicates.push(parse_quote!(Self: '_c));
   gen
 }
 
@@ -35,12 +38,12 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
     impl #g_impl IntoChild<#name #g_ty, 0> for #builder #g_ty {
       #[inline]
-      fn into_child(self, _: &BuildCtx) -> #name #g_ty { self.build_tml()  }
+      fn into_child(self) -> #name #g_ty { self.build_tml()  }
     }
 
     impl #g_impl IntoChild<Option<#name #g_ty>, 0> for #builder #g_ty {
       #[inline]
-      fn into_child(self, _: &BuildCtx) -> Option<#name #g_ty> { Some(self.build_tml())  }
+      fn into_child(self) -> Option<#name #g_ty> { Some(self.build_tml())  }
     }
 
     impl #g_impl std::convert::From<#builder #g_ty> for #name #g_ty #g_where {
@@ -70,12 +73,12 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       let gen = with_child_generics(generics, ty, m);
       let (g_impl, _, g_where) = gen.split_for_impl();
       tokens.extend(quote! {
-        impl #g_impl WithChild<_C, 2, #with_m> for #builder #g_ty #g_where  {
+        impl #g_impl WithChild<'_c, _C, 2, #with_m> for #builder #g_ty #g_where  {
           type Target = Self;
           #[track_caller]
-          fn with_child(mut self, c: _C, ctx: &BuildCtx) -> Self::Target {
+          fn with_child(mut self, c: _C) -> Self::Target {
             assert!(self.#field_name.is_none(), "Try to fill same type twice.");
-            self.#field_name = Some(c.into_child(ctx));
+            self.#field_name = Some(c.into_child());
             self
           }
         }
@@ -191,13 +194,13 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
               let gen = with_child_generics(generics, ty, m);
               let (g_impl, _, g_where) = gen.split_for_impl();
               tokens.extend(quote! {
-                impl #g_impl WithChild<_C, 2, #with_m> for #builder #g_ty #g_where
+                impl #g_impl WithChild<'_c, _C, 2, #with_m> for #builder #g_ty #g_where
                 {
                   type Target = Self;
                   #[track_caller]
-                  fn with_child(mut self, c: _C, ctx: &BuildCtx) -> Self::Target {
+                  fn with_child(mut self, c: _C) -> Self::Target {
                     assert!(self.0.is_none(), "Try to fill same type twice.");
-                    self.0 = Some(#name::#v_name(c.into_child(ctx)));
+                    self.0 = Some(#name::#v_name(c.into_child()));
                     self
                   }
                 }

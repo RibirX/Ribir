@@ -17,7 +17,7 @@ impl TextField {
 }
 
 #[derive(Template, Default)]
-pub struct TextFieldTml {
+pub struct TextFieldTml<'w> {
   /// Label text is used to inform users as to what information is requested for
   /// a text field.
   label: Option<Label>,
@@ -37,10 +37,10 @@ pub struct TextFieldTml {
   suffix: Option<Trailing<Label>>,
 
   /// An icon that appears before the editable part of the text field
-  leading_icon: Option<Leading<Widget>>,
+  leading_icon: Option<Leading<Widget<'w>>>,
 
   /// An icon that appears after the editable part of the text field
-  trailing_icon: Option<Trailing<Widget>>,
+  trailing_icon: Option<Trailing<Widget<'w>>>,
 }
 
 #[derive(Clone)]
@@ -102,9 +102,9 @@ where
 
 type TextFieldThemeProxy = ThemeSuitProxy<TextFieldState, TextFieldTheme>;
 
-impl ComposeChild for TextFieldThemeProxy {
-  type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+impl<'c> ComposeChild<'c> for TextFieldThemeProxy {
+  type Child = Widget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       @ $child {
         on_tap: move |_| {
@@ -129,6 +129,7 @@ impl ComposeChild for TextFieldThemeProxy {
         },
       }
     }
+    .into_widget()
   }
 }
 
@@ -270,11 +271,9 @@ macro_rules! take_option_field {
   }
 }
 
-impl ComposeChild for TextField {
-  type Child = Option<TextFieldTml>;
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, config: Self::Child,
-  ) -> impl IntoWidgetStrict<FN> {
+impl<'c> ComposeChild<'c> for TextField {
+  type Child = Option<TextFieldTml<'c>>;
+  fn compose_child(this: impl StateWriter<Value = Self>, config: Self::Child) -> Widget<'c> {
     fn_widget! {
       let mut config = config.unwrap_or_default();
       take_option_field!({leading_icon, trailing_icon}, config);
@@ -318,14 +317,15 @@ impl ComposeChild for TextField {
         }
       }
     }
+    .into_widget()
   }
 }
 
 fn build_input_area(
-  this: impl StateWriter<Value = TextField>, theme: State<TextFieldThemeProxy>,
+  this: impl StateWriter<Value = TextField> + 'static, theme: State<TextFieldThemeProxy>,
   prefix: Option<Leading<Label>>, suffix: Option<Trailing<Label>>,
   placeholder: Option<Placeholder>,
-) -> impl IntoWidgetStrict<FN> {
+) -> Widget<'static> {
   fn_widget! {
     let mut input_area = @Row {
       visible: pipe!(!$this.text.is_empty() || $theme.state == TextFieldState::Focused),
@@ -375,6 +375,7 @@ fn build_input_area(
       }
     }
   }
+  .into_widget()
 }
 
 #[derive(Declare)]
@@ -384,7 +385,7 @@ struct TextFieldLabel {
 }
 
 impl Compose for TextFieldLabel {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       let label = @Text {
         v_align: VAlign::Top,
@@ -397,13 +398,14 @@ impl Compose for TextFieldLabel {
 
       label
     }
+    .into_widget()
   }
 }
 
 fn build_content_area(
-  this: impl StateWriter<Value = TextField>, theme: State<TextFieldThemeProxy>,
+  this: impl StateWriter<Value = TextField> + 'static, theme: State<TextFieldThemeProxy>,
   mut config: TextFieldTml,
-) -> impl IntoWidgetStrict<FN> + IntoWidgetStrict<FN> {
+) -> Widget<'static> {
   fn_widget! {
     take_option_field!({label, prefix, suffix, placeholder}, config);
     let mut content_area = @Column {
@@ -428,4 +430,5 @@ fn build_content_area(
       @ { build_input_area(this, theme, prefix, suffix, placeholder)}
     }
   }
+  .into_widget()
 }

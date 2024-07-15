@@ -49,7 +49,7 @@ impl CustomStyle for AvatarStyle {
 pub struct AvatarDecorator;
 
 impl ComposeDecorator for AvatarDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
 }
 
 #[derive(Template)]
@@ -58,10 +58,10 @@ pub enum AvatarTemplate {
   Image(Resource<PixelImage>),
 }
 
-impl ComposeChild for Avatar {
+impl ComposeChild<'static> for Avatar {
   type Child = AvatarTemplate;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fn_widget! {
       @ {
         let AvatarStyle {
@@ -82,7 +82,7 @@ impl ComposeChild for Avatar {
                 text_style,
                 foreground: pipe!(Brush::from(palette2.on_of(&palette2.base_of(&$this.color)))),
               }
-            }.into_widget(ctx!())
+            }.into_widget()
           },
           AvatarTemplate::Image(image) => {
             let clip = radius.map(|radius| {
@@ -109,5 +109,6 @@ impl ComposeChild for Avatar {
         }
       }
     }
+    .into_widget()
   }
 }

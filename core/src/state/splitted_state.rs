@@ -1,5 +1,3 @@
-use ribir_algo::Sc;
-
 use super::*;
 use crate::widget::*;
 
@@ -7,22 +5,11 @@ use crate::widget::*;
 pub struct SplittedWriter<O, W> {
   origin: O,
   splitter: W,
-  notifier: Notifier,
-  batched_modify: Sc<Cell<ModifyScope>>,
-  ref_count: Sc<Cell<usize>>,
+  info: Sc<WriterInfo>,
 }
 
 impl<O, W> Drop for SplittedWriter<O, W> {
-  fn drop(&mut self) {
-    if self.ref_count.get() == 1 {
-      let mut notifier = self.notifier.clone();
-      // we use an async task to unsubscribe to wait the batched modifies to be
-      // notified.
-      let _ = AppCtx::spawn_local(async move {
-        notifier.unsubscribe();
-      });
-    }
-  }
+  fn drop(&mut self) { self.info.dec_writer() }
 }
 
 impl<V, O, W> StateReader for SplittedWriter<O, W>
@@ -64,7 +51,7 @@ where
   W: Fn(&mut O::Value) -> PartData<V> + Clone,
 {
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, std::convert::Infallible> {
-    self.notifier.raw_modifies().box_it()
+    self.info.notifier.raw_modifies().box_it()
   }
 }
 
@@ -87,12 +74,11 @@ where
   fn shallow(&self) -> WriteRef<Self::Value> { self.split_ref(self.origin.shallow()) }
 
   fn clone_writer(&self) -> Self::Writer {
+    self.info.inc_writer();
     SplittedWriter {
       origin: self.origin.clone_writer(),
       splitter: self.splitter.clone(),
-      notifier: self.notifier.clone(),
-      batched_modify: self.batched_modify.clone(),
-      ref_count: self.ref_count.clone(),
+      info: self.info.clone(),
     }
   }
 
@@ -100,36 +86,13 @@ where
   fn origin_writer(&self) -> &Self::OriginWriter { &self.origin }
 }
 
-impl<V, O, W> WriterControl for SplittedWriter<O, W>
-where
-  Self: 'static,
-  O: StateWriter,
-  W: Fn(&mut O::Value) -> PartData<V> + Clone,
-{
-  #[inline]
-  fn batched_modifies(&self) -> &Cell<ModifyScope> { &self.batched_modify }
-
-  #[inline]
-  fn notifier(&self) -> &Notifier { &self.notifier }
-
-  #[inline]
-  fn dyn_clone(&self) -> Box<dyn WriterControl> { Box::new(self.clone_writer()) }
-}
-
 impl<V, O, W> SplittedWriter<O, W>
 where
-  Self: 'static,
   O: StateWriter,
   W: Fn(&mut O::Value) -> PartData<V> + Clone,
 {
   pub(super) fn new(origin: O, mut_map: W) -> Self {
-    Self {
-      origin,
-      splitter: mut_map,
-      notifier: Notifier::default(),
-      batched_modify: <_>::default(),
-      ref_count: Sc::new(Cell::new(1)),
-    }
+    Self { origin, splitter: mut_map, info: Sc::new(WriterInfo::new()) }
   }
 
   #[track_caller]
@@ -144,22 +107,22 @@ where
     let value =
       ValueMutRef { inner: (self.splitter)(&mut orig.value), borrow: orig.value.borrow.clone() };
 
-    WriteRef { value, modified: false, modify_scope, control: self }
+    WriteRef { value, modified: false, modify_scope, info: &self.info }
   }
 }
 
-impl<S, F> IntoWidgetStrict<RENDER> for SplittedWriter<S, F>
+impl<'w, S, F> IntoWidgetStrict<'w, RENDER> for SplittedWriter<S, F>
 where
-  Self: StateWriter,
-  <Self as StateReader>::Reader: IntoWidget<RENDER>,
+  Self: StateWriter + 'w,
+  <Self as StateReader>::Reader: IntoWidget<'w, RENDER>,
 {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.clone_reader().into_widget(ctx) }
+  fn into_widget_strict(self) -> Widget<'w> { self.clone_reader().into_widget() }
 }
 
-impl<S, F> IntoWidgetStrict<COMPOSE> for SplittedWriter<S, F>
+impl<S, F> IntoWidgetStrict<'static, COMPOSE> for SplittedWriter<S, F>
 where
-  Self: StateWriter,
+  Self: StateWriter + 'static,
   <Self as StateReader>::Value: Compose,
 {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).into_widget(ctx) }
+  fn into_widget_strict(self) -> Widget<'static> { Compose::compose(self) }
 }

@@ -67,9 +67,9 @@ impl TextSelectable {
 }
 
 pub(crate) fn bind_point_listener<T: SelectableText>(
-  this: impl StateWriter<Value = T>, host: Widget, text: Reader<impl VisualText + 'static>,
-  layout_box: Reader<LayoutBox>,
-) -> impl IntoWidgetStrict<FN> {
+  this: impl StateWriter<Value = T> + 'static, host: Widget,
+  text: Reader<impl VisualText + 'static>, layout_box: Reader<LayoutBox>,
+) -> Widget {
   fn_widget! {
     @$host {
       on_pointer_down: move |e| {
@@ -131,13 +131,12 @@ pub(crate) fn bind_point_listener<T: SelectableText>(
       }
     }
   }
+  .into_widget()
 }
 
-impl ComposeChild for TextSelectable {
+impl ComposeChild<'static> for TextSelectable {
   type Child = FatObj<State<Text>>;
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, text: Self::Child,
-  ) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(this: impl StateWriter<Value = Self>, text: Self::Child) -> Widget<'static> {
     let src = text.into_inner();
 
     fn_widget! {
@@ -164,7 +163,7 @@ impl ComposeChild for TextSelectable {
           }
         }
       };
-      let text_widget = text.into_widget(ctx!());
+      let text_widget = text.into_widget();
       let text_widget = bind_point_listener(
         this.clone_writer(),
         text_widget,
@@ -182,6 +181,7 @@ impl ComposeChild for TextSelectable {
         @ $text_widget {}
       }
     }
+    .into_widget()
   }
 }
 

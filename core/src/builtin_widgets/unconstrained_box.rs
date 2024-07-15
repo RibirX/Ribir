@@ -78,7 +78,7 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  fn smoke() -> impl IntoWidgetStrict<FN> {
+  fn smoke() -> impl IntoWidget<'static, FN> {
     let size = Size::new(200., 200.);
     fn_widget! {
       @MockMulti {

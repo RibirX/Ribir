@@ -73,7 +73,7 @@ mod tests {
   use super::*;
   use crate::prelude::*;
   const FIVE: Size = Size::new(5., 5.);
-  fn smoke() -> impl IntoWidgetStrict<FN> {
+  fn smoke() -> Widget<'static> {
     let one = Size::new(1., 1.);
     let five = Size::new(5., 5.);
     fn_widget! {
@@ -82,6 +82,7 @@ mod tests {
         @SizedBox { size: five}
       }
     }
+    .into_widget()
   }
 
   widget_layout_test!(smoke, size == FIVE,);

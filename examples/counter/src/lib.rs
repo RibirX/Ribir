@@ -1,6 +1,6 @@
 use ribir::prelude::*;
 
-pub fn counter() -> impl IntoWidgetStrict<FN> {
+pub fn counter() -> Widget<'static> {
   fn_widget! {
     let cnt = Stateful::new(0);
     @Row {
@@ -11,6 +11,7 @@ pub fn counter() -> impl IntoWidgetStrict<FN> {
       @H1 { text: pipe!($cnt.to_string()) }
     }
   }
+  .into_widget()
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen::prelude::wasm_bindgen)]

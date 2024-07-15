@@ -71,18 +71,17 @@ pub struct ThemeWidget {
   pub theme: Sc<Theme>,
 }
 
-impl ComposeChild for ThemeWidget {
+impl ComposeChild<'static> for ThemeWidget {
   type Child = GenWidget;
-  #[inline]
   fn compose_child(
     this: impl StateWriter<Value = Self>, mut child: Self::Child,
-  ) -> impl IntoWidgetStrict<FN> {
+  ) -> Widget<'static> {
     use crate::prelude::*;
-    fn_widget! {
+    let f = move |ctx: &BuildCtx| {
       let theme = this.read().theme.clone();
       AppCtx::load_font_from_theme(&theme);
 
-      let mut themes = ctx!().themes().clone();
+      let mut themes = ctx.themes().clone();
       themes.push(theme.clone());
 
       // Keep the empty node, because the subtree may be hold its id.
@@ -91,14 +90,17 @@ impl ComposeChild for ThemeWidget {
       // node, because the subtree may be hold its id.
       //
       // A `Void` is cheap for a theme.
-      let p = Void.into_widget(ctx!()).attach_data(Queryable(theme), ctx!());
+      let p = Void.into_widget().build(ctx);
+      p.attach_data(Queryable(theme), &mut ctx.tree.borrow_mut());
+
       // shadow the context with the theme.
-      let ctx = BuildCtx::new_with_data(Some(p.id()), ctx!().tree, themes);
-      let child = child.gen_widget(&ctx);
-      ctx.append_child(p.id(), child);
+      let ctx = BuildCtx::new_with_data(Some(p), ctx.tree, themes);
+      let child = child.gen_widget(&ctx).build(&ctx);
+      p.append(child, &mut ctx.tree.borrow_mut());
 
       p
-    }
+    };
+    InnerWidget::LazyBuild(Box::new(f)).into()
   }
 }
 

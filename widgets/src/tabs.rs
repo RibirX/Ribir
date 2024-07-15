@@ -16,18 +16,14 @@ use crate::prelude::*;
 ///         @ { svgs::HOME }
 ///         @ { Label::new("Home") }
 ///       }
-///       @TabPane {
-///         @{ fn_widget!{ @Text { text: "content" } } }
-///       }
+///       @TabPane(fn_widget!{ @Text { text: "content" } }.into())
 ///     }
 ///     @Tab {
 ///       @TabItem {
 ///         @ { svgs::HOME }
 ///         @ { Label::new("Home") }
 ///       }
-///       @TabPane {
-///         @{ fn_widget!{ @Text { text: "content" } } }
-///       }
+///       @TabPane(fn_widget!{ @Text { text: "content" } }.into())
 ///     }
 ///   }
 /// };
@@ -41,18 +37,14 @@ use crate::prelude::*;
 ///         @ { svgs::HOME }
 ///         @ { Label::new("Home") }
 ///       }
-///       @TabPane {
-///         @{ fn_widget!{ @Text { text: "content" } } }
-///       }
+///       @TabPane(fn_widget!{ @Text { text: "content" } }.into())
 ///     }
 ///     @Tab {
 ///       @TabItem {
 ///         @ { svgs::HOME }
 ///         @ { Label::new("Home") }
 ///       }
-///       @TabPane {
-///         @{ fn_widget!{ @Text { text: "content" } } }
-///       }
+///       @TabPane(fn_widget!{ @Text { text: "content" } }.into())
 ///     }
 ///   }
 /// };
@@ -104,7 +96,7 @@ impl CustomStyle for TabsStyle {
 pub struct TabsDecorator {}
 
 impl ComposeDecorator for TabsDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
 }
 
 #[derive(Template)]
@@ -125,7 +117,7 @@ pub struct TabPane(pub GenWidget);
 pub struct TabDecorator {}
 
 impl ComposeDecorator for TabDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
 }
 
 #[derive(Declare)]
@@ -136,7 +128,7 @@ pub struct IndicatorDecorator {
 }
 
 impl ComposeDecorator for IndicatorDecorator {
-  fn compose_decorator(this: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> {
+  fn compose_decorator(this: State<Self>, host: Widget) -> Widget {
     fn_widget! {
       @ $host{
         anchor: pipe!{
@@ -157,6 +149,7 @@ impl ComposeDecorator for IndicatorDecorator {
         },
       }
     }
+    .into_widget()
   }
 }
 
@@ -165,7 +158,7 @@ impl Tabs {
     headers: Vec<(Option<NamedSvg>, Option<Label>)>, tabs_style: TabsStyle,
     tabs: impl StateWriter<Value = Tabs> + 'static,
     indicator: impl StateWriter<Value = IndicatorDecorator> + 'static,
-  ) -> impl Iterator<Item = impl IntoWidgetStrict<FN>> {
+  ) -> impl Iterator<Item = impl IntoWidget<'static, FN>> {
     let TabsStyle { icon_size: size, icon_pos, active_color, foreground, label_style, .. } =
       tabs_style;
     headers
@@ -222,10 +215,10 @@ impl Tabs {
   }
 }
 
-impl ComposeChild for Tabs {
+impl ComposeChild<'static> for Tabs {
   type Child = Vec<Tab>;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     let mut headers = vec![];
     let mut panes = vec![];
 
@@ -289,13 +282,11 @@ impl ComposeChild for Tabs {
               Position::Left | Position::Right => BoxClamp::fixed_width(extent),
             }),
             @ $flex {
-              @{
-                  Tabs::tab_header(
-                    headers, tabs_style,
-                    this.clone_writer(),
-                    indicator_decorator.clone_writer()
-                  )
-              }
+              @Tabs::tab_header(
+                headers, tabs_style,
+                this.clone_writer(),
+                indicator_decorator.clone_writer()
+              )
             }
           }
           @ { divider }
@@ -317,8 +308,7 @@ impl ComposeChild for Tabs {
         };
 
       @TabsDecorator {
-        @{
-          @Flex {
+        @Flex {
           direction: pipe!(match  $this.pos {
             Position::Left | Position::Right => Direction::Horizontal,
             Position::Top | Position::Bottom => Direction::Vertical,
@@ -331,9 +321,9 @@ impl ComposeChild for Tabs {
           @Expanded {
             @ { pipe!($this.cur_idx).map(move |idx| panes[idx].gen_widget(ctx!())) }
           }
-        }.into_widget(ctx!())
-      }
+        }
       }
     }
+    .into_widget()
   }
 }

@@ -82,22 +82,16 @@ pub(crate) trait WidgetCtxImpl {
 
 impl<T: WidgetCtxImpl> WidgetCtx for T {
   #[inline]
-  fn parent(&self) -> Option<WidgetId> { self.with_tree(|tree| self.id().parent(&tree.arena)) }
+  fn parent(&self) -> Option<WidgetId> { self.with_tree(|tree| self.id().parent(tree)) }
 
   #[inline]
-  fn widget_parent(&self, w: WidgetId) -> Option<WidgetId> {
-    self.with_tree(|tree| w.parent(&tree.arena))
-  }
+  fn widget_parent(&self, w: WidgetId) -> Option<WidgetId> { self.with_tree(|tree| w.parent(tree)) }
 
   #[inline]
-  fn single_child(&self) -> Option<WidgetId> {
-    self.with_tree(|tree| self.id().single_child(&tree.arena))
-  }
+  fn single_child(&self) -> Option<WidgetId> { self.with_tree(|tree| self.id().single_child(tree)) }
 
   #[inline]
-  fn first_child(&self) -> Option<WidgetId> {
-    self.with_tree(|tree| self.id().first_child(&tree.arena))
-  }
+  fn first_child(&self) -> Option<WidgetId> { self.with_tree(|tree| self.id().first_child(tree)) }
 
   #[inline]
   fn box_rect(&self) -> Option<Rect> { self.widget_box_rect(self.id()) }
@@ -149,44 +143,28 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   fn map_to_global(&self, pos: Point) -> Point {
-    self.with_tree(|tree| {
-      tree
-        .store
-        .map_to_global(pos, self.id(), &tree.arena)
-    })
+    self.with_tree(|tree| tree.store.map_to_global(pos, self.id(), tree))
   }
 
   fn map_from_global(&self, pos: Point) -> Point {
-    self.with_tree(|tree| {
-      tree
-        .store
-        .map_from_global(pos, self.id(), &tree.arena)
-    })
+    self.with_tree(|tree| tree.store.map_from_global(pos, self.id(), tree))
   }
 
   fn map_to_parent(&self, pos: Point) -> Point {
-    self.with_tree(|tree| {
-      tree
-        .store
-        .map_to_parent(self.id(), pos, &tree.arena)
-    })
+    self.with_tree(|tree| tree.store.map_to_parent(self.id(), pos, tree))
   }
 
   fn map_from_parent(&self, pos: Point) -> Point {
-    self.with_tree(|tree| {
-      tree
-        .store
-        .map_from_parent(self.id(), pos, &tree.arena)
-    })
+    self.with_tree(|tree| tree.store.map_from_parent(self.id(), pos, tree))
   }
 
   fn map_to(&self, pos: Point, w: WidgetId) -> Point {
     let global = self.map_to_global(pos);
-    self.with_tree(|tree| tree.store.map_from_global(global, w, &tree.arena))
+    self.with_tree(|tree| tree.store.map_from_global(global, w, tree))
   }
 
   fn map_from(&self, pos: Point, w: WidgetId) -> Point {
-    let global = self.with_tree(|tree| tree.store.map_to_global(pos, w, &tree.arena));
+    let global = self.with_tree(|tree| tree.store.map_to_global(pos, w, tree));
     self.map_from_global(global)
   }
 
@@ -199,7 +177,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     &self, id: WidgetId, callback: impl FnOnce(&W) -> R,
   ) -> Option<R> {
     self.with_tree(|tree| {
-      id.assert_get(&tree.arena)
+      id.assert_get(tree)
         .query_ref::<W>()
         .map(|r| callback(&r))
     })
@@ -259,7 +237,7 @@ mod tests {
     let tree = &wnd.widget_tree.borrow();
     let root = tree.root();
     let pos = Point::zero();
-    let child = root.single_child(&tree.arena).unwrap();
+    let child = root.single_child(tree).unwrap();
 
     let w_ctx = TestCtx { id: child, wnd_id: wnd.id() };
     assert_eq!(w_ctx.map_from(pos, child), pos);
@@ -285,7 +263,7 @@ mod tests {
     wnd.draw_frame();
 
     let root = wnd.widget_tree.borrow().root();
-    let child = get_single_child_by_depth(root, &wnd.widget_tree.borrow().arena, 3);
+    let child = get_single_child_by_depth(root, &wnd.widget_tree.borrow(), 3);
     let w_ctx = TestCtx { id: root, wnd_id: wnd.id() };
     let from_pos = Point::new(30., 30.);
     assert_eq!(w_ctx.map_from(from_pos, child), Point::new(45., 45.));
@@ -293,7 +271,7 @@ mod tests {
     assert_eq!(w_ctx.map_to(to_pos, child), Point::new(40., 40.));
   }
 
-  fn get_single_child_by_depth(id: WidgetId, tree: &TreeArena, mut depth: u32) -> WidgetId {
+  fn get_single_child_by_depth(id: WidgetId, tree: &WidgetTree, mut depth: u32) -> WidgetId {
     let mut child = id;
     while depth > 0 {
       child = child.single_child(tree).unwrap();

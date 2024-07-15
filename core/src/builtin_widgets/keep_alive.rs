@@ -23,22 +23,23 @@ impl Declare for KeepAlive {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl ComposeChild for KeepAlive {
-  type Child = Widget;
-  #[inline]
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, child: Self::Child,
-  ) -> impl IntoWidgetStrict<FN> {
-    fn_widget! {
+impl<'c> ComposeChild<'c> for KeepAlive {
+  type Child = Widget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    let f = move |ctx: &BuildCtx| {
       let modifies = this.raw_modifies();
-      child.try_unwrap_state_and_attach(this, ctx!()).dirty_subscribe(modifies, ctx!())
-    }
+      let child = child.try_unwrap_state_and_attach(this);
+      let c = child.build(ctx);
+      c.dirty_subscribe(modifies, ctx);
+      c
+    };
+
+    InnerWidget::LazyBuild(Box::new(f)).into()
   }
 }
 
 #[cfg(test)]
 mod tests {
-  use std::cell::Ref;
 
   use super::*;
   use crate::{reset_test_env, test_helper::*};
@@ -54,29 +55,24 @@ mod tests {
     let mut wnd = TestWindow::new(fn_widget! {
       pipe! {
         if *$remove_widget {
-          Void.into_widget(ctx!())
+          Void.into_widget()
         } else {
           FatObj::new(Void)
             .keep_alive(pipe!(*$keep_alive))
-            .into_widget(ctx!())
+            .into_widget()
         }
       }
     });
-
-    fn tree_arena(wnd: &TestWindow) -> Ref<TreeArena> {
-      let tree = wnd.widget_tree.borrow();
-      Ref::map(tree, |t| &t.arena)
-    }
 
     let root = wnd.widget_tree.borrow().content_root();
     wnd.draw_frame();
 
     *c_remove_widget.write() = true;
     wnd.draw_frame();
-    assert!(!root.is_dropped(&tree_arena(&wnd)));
+    assert!(!root.is_dropped(&wnd.widget_tree.borrow()));
 
     *c_keep_alive.write() = false;
     wnd.draw_frame();
-    assert!(root.is_dropped(&tree_arena(&wnd)));
+    assert!(root.is_dropped(&wnd.widget_tree.borrow()));
   }
 }

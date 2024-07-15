@@ -7,8 +7,8 @@ use std::{
 };
 
 pub mod widget_id;
+use indextree::Arena;
 use widget_id::RenderQueryable;
-pub(crate) use widget_id::TreeArena;
 pub use widget_id::WidgetId;
 mod layout_info;
 pub use layout_info::*;
@@ -26,6 +26,8 @@ pub(crate) struct WidgetTree {
   pub(crate) dirty_set: DirtySet,
 }
 
+type TreeArena = Arena<Box<dyn RenderQueryable>>;
+
 impl WidgetTree {
   pub fn init(&mut self, wnd: Weak<Window>) { self.wnd = wnd; }
 
@@ -33,11 +35,11 @@ impl WidgetTree {
     // dispose the old content.
     self
       .root
-      .children(&self.arena)
+      .children(self)
       .collect::<Vec<_>>()
       .into_iter()
       .for_each(|id| id.dispose_subtree(self));
-    self.root.append(content, &mut self.arena);
+    self.root.append(content, self);
     self.mark_dirty(self.root);
     self.root.on_mounted_subtree(self);
   }
@@ -60,7 +62,7 @@ impl WidgetTree {
         break;
       };
       while let Some(wid) = needs_layout.pop() {
-        if wid.is_dropped(&self.arena) {
+        if wid.is_dropped(self) {
           continue;
         }
 
@@ -80,7 +82,7 @@ impl WidgetTree {
 
   pub(crate) fn is_dirty(&self) -> bool { !self.dirty_set.borrow().is_empty() }
 
-  pub(crate) fn count(&self, wid: WidgetId) -> usize { wid.descendants(&self.arena).count() }
+  pub(crate) fn count(&self, wid: WidgetId) -> usize { wid.descendants(self).count() }
 
   pub(crate) fn window(&self) -> Rc<Window> {
     self
@@ -91,28 +93,28 @@ impl WidgetTree {
 
   #[allow(unused)]
   pub fn display_tree(&self, sub_tree: WidgetId) -> String {
-    fn display_node(mut prefix: String, id: WidgetId, tree: &TreeArena, display: &mut String) {
-      display.push_str(&format!("{prefix}{:?}\n", id.0));
-
-      prefix.pop();
-      match prefix.pop() {
-        Some('├') => prefix.push_str("│ "),
-        Some(_) => prefix.push_str("  "),
-        _ => {}
-      }
-
-      id.children(tree).for_each(|c| {
-        let mut prefix = prefix.clone();
-        let suffix = if Some(c) == id.last_child(tree) { "└─" } else { "├─" };
-        prefix.push_str(suffix);
-        display_node(prefix, c, tree, display)
-      });
-    }
     let mut display = String::new();
-    display_node("".to_string(), sub_tree, &self.arena, &mut display);
+    self.display_node("".to_string(), sub_tree, &mut display);
     display
   }
 
+  fn display_node(&self, mut prefix: String, id: WidgetId, display: &mut String) {
+    display.push_str(&format!("{prefix}{:?}\n", id.0));
+
+    prefix.pop();
+    match prefix.pop() {
+      Some('├') => prefix.push_str("│ "),
+      Some(_) => prefix.push_str("  "),
+      _ => {}
+    }
+
+    id.children(self).for_each(|c| {
+      let mut prefix = prefix.clone();
+      let suffix = if Some(c) == id.last_child(self) { "└─" } else { "├─" };
+      prefix.push_str(suffix);
+      self.display_node(prefix, c, display)
+    });
+  }
   pub(crate) fn layout_list(&mut self) -> Option<Vec<WidgetId>> {
     if self.dirty_set.borrow().is_empty() {
       return None;
@@ -128,7 +130,7 @@ impl WidgetTree {
     };
 
     for id in dirty_widgets.iter() {
-      if id.is_dropped(&self.arena) {
+      if id.is_dropped(self) {
         continue;
       }
 
@@ -149,7 +151,7 @@ impl WidgetTree {
           info.size.take();
         }
 
-        let r = p.assert_get(&self.arena);
+        let r = p.assert_get(self);
         if r.only_sized_by_parent() {
           break;
         }
@@ -158,7 +160,7 @@ impl WidgetTree {
     }
 
     (!needs_layout.is_empty()).then(|| {
-      needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(&self.arena).count()));
+      needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(self).count()));
       needs_layout
     })
   }
@@ -167,8 +169,8 @@ impl WidgetTree {
     if self.root() == id {
       let root = self.root();
       let new_root = root
-        .next_sibling(&self.arena)
-        .or_else(|| root.prev_sibling(&self.arena))
+        .next_sibling(self)
+        .or_else(|| root.prev_sibling(self))
         .expect("Try to remove the root and there is no other widget can be the new root.");
       self.root = new_root;
     }
@@ -179,8 +181,8 @@ impl WidgetTree {
   pub(crate) fn remove_subtree(&mut self, id: WidgetId) {
     assert_ne!(id, self.root(), "You should detach the root widget before remove it.");
 
-    id.descendants(&self.arena).for_each(|id| {
-      self.store.remove(id);
+    id.0.descendants(&self.arena).for_each(|id| {
+      self.store.remove(WidgetId(id));
     });
     id.0.remove_subtree(&mut self.arena);
   }
@@ -192,9 +194,9 @@ impl WidgetTree {
       let mut outs: MaybeUninit<[&mut Box<dyn RenderQueryable>; N]> = MaybeUninit::uninit();
       let outs_ptr = outs.as_mut_ptr();
       for (idx, wid) in ids.iter().enumerate() {
-        let arena = &mut *(&mut self.arena as *mut TreeArena);
+        let tree = &mut *(self as *mut Self);
         let cur = wid
-          .get_node_mut(arena)
+          .get_node_mut(tree)
           .expect("Invalid widget id.");
 
         *(*outs_ptr).get_unchecked_mut(idx) = cur;
@@ -229,7 +231,7 @@ mod tests {
   };
 
   impl WidgetTree {
-    pub(crate) fn content_root(&self) -> WidgetId { self.root.first_child(&self.arena).unwrap() }
+    pub(crate) fn content_root(&self) -> WidgetId { self.root.first_child(self).unwrap() }
   }
 
   fn empty_node(arena: &mut TreeArena) -> WidgetId { new_node(arena, Box::new(PureRender(Void))) }
@@ -286,9 +288,9 @@ mod tests {
             @MockBox {
               size: Size::zero(),
               @ { pipe!($child.then(|| Void)) }
-            }.into_widget(ctx!())
+            }.into_widget()
           } else {
-            Void.into_widget(ctx!())
+            Void.into_widget()
           }
         })
       }
@@ -352,7 +354,7 @@ mod tests {
     let root = tree.root();
     tree.mark_dirty(root);
     let new_root = empty_node(&mut tree.arena);
-    root.insert_after(new_root, &mut tree.arena);
+    root.insert_after(new_root, &mut tree);
     tree.mark_dirty(new_root);
     tree.detach(root);
     tree.remove_subtree(root);

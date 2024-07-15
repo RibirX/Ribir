@@ -43,9 +43,9 @@ sidebar_position: 2
 ```rust no_run
 use ribir::prelude::*;
 
-fn hello_world(ctx!(): &BuildCtx) -> Widget {
+fn hello_world(ctx!(): &BuildCtx) -> Widget<'static> {
   rdl!{ Text { text: "Hello World!" } }
-    .build(ctx!())
+    .into_widget()
 }
 
 fn main() { 
@@ -73,7 +73,7 @@ use ribir::prelude::*;
 fn main() {
   let hello_world = |ctx!(): &BuildCtx| {
     rdl!{ Text { text: "Hello World!" } }
-      .build(ctx!())
+      .into_widget()
   };
   App::run(hello_world);
 }
@@ -86,7 +86,7 @@ move |ctx!(): &BuildCtx| -> Widget {
   {
     // 你的代码
   }
-  .build(ctx!())
+  .into_widget()
 }
 ```
 
@@ -546,7 +546,7 @@ fn main() {
 ```rust
 use ribir::prelude::*;
 
-fn show_name(name: State<String>) -> impl IntoWidgetStrict<FN> {
+fn show_name(name: State<String>) -> Widget<'static> {
   fn_widget!{
     let text = @Text { text: "Hi, Guest!" };
     let u = watch!($name.to_string()).subscribe(move |name| {
@@ -557,6 +557,7 @@ fn show_name(name: State<String>) -> impl IntoWidgetStrict<FN> {
     // 所以我们需要在控件销毁时取消订阅
     @$text { on_disposed: move |_| u.unsubscribe() }
   }
+  .into_widget()
 }
 ```
 
@@ -596,7 +597,7 @@ impl Counter {
 }
 
 impl Compose for Counter {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       @Row {
         @FilledButton {
@@ -606,11 +607,12 @@ impl Compose for Counter {
         @H1 { text: pipe!($this.0.to_string()) }
       }
     }
+    .into_widget()
   }
 }
 
 fn main() { 
-  App::run(fn_widget!{ Counter(0) }); 
+  App::run(Counter(0)); 
 }
 
 ```

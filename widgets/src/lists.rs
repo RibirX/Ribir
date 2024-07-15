@@ -49,24 +49,26 @@ use crate::prelude::*;
 ///   @Lists {
 ///     // use leading icon
 ///     @ListItem {
-///       @Leading { @{ svgs::CHECK_BOX_OUTLINE_BLANK } }
+///       @Leading(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
 ///       @HeadlineText(Label::new("headline text"))
 ///     }
 ///     // use leading label
 ///     @ListItem {
-///       @Leading { @{ Label::new("A") } }
+///       @Leading(EdgeWidget::Text(Label::new("A")))
 ///       @HeadlineText(Label::new("headline text"))
 ///     }
 ///     // use leading custom widget
 ///     @ListItem {
-///       @Leading {
-///         @CustomEdgeWidget(
-///           @Container {
-///             size: Size::splat(40.),
-///             background: Color::YELLOW,
-///           }.build(ctx!())
+///       @Leading(
+///         EdgeWidget::Custom(
+///           @CustomEdgeWidget(
+///              @Container {
+///                size: Size::splat(40.),
+///                background: Color::YELLOW,
+///              }.into_widget()
+///           )
 ///         )
-///       }
+///       )
 ///     }
 ///   }
 /// };
@@ -82,24 +84,26 @@ use crate::prelude::*;
 ///     // use trailing icon
 ///     @ListItem {
 ///       @HeadlineText(Label::new("headline text"))
-///       @Trailing { @{ svgs::CHECK_BOX_OUTLINE_BLANK } }
+///       @Trailing(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
 ///     }
 ///     // use trailing label
 ///     @ListItem {
 ///       @HeadlineText(Label::new("headline text"))
-///       @Trailing { @{ Label::new("A") } }
+///       @Trailing(EdgeWidget::Text(Label::new("A")))
 ///     }
 ///     // use trailing custom widget
 ///     @ListItem {
 ///       @HeadlineText(Label::new("headline text"))
-///       @Trailing {
-///         @CustomEdgeWidget(
-///           @Container {
-///             size: Size::splat(40.),
-///             background: Color::YELLOW,
-///           }.build(ctx!())
+///       @Trailing(
+///         EdgeWidget::Custom(
+///           @CustomEdgeWidget(
+///             @Container {
+///               size: Size::splat(40.),
+///               background: Color::YELLOW,
+///             }.into_widget()
+///           )
 ///         )
-///       }
+///       )
 ///     }
 ///   }
 /// };
@@ -128,18 +132,19 @@ pub struct Lists;
 #[derive(Declare)]
 pub struct ListsDecorator {}
 impl ComposeDecorator for ListsDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
 }
 
-impl ComposeChild for Lists {
-  type Child = Vec<Widget>;
+impl<'c> ComposeChild<'c> for Lists {
+  type Child = Vec<Widget<'c>>;
 
-  fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       @ListsDecorator {
         @Column { @ { child } }
       }
     }
+    .into_widget()
   }
 }
 
@@ -172,19 +177,19 @@ pub struct HeadlineText(pub Label);
 pub struct SupportingText(pub Label);
 
 #[derive(Template)]
-pub enum EdgeWidget {
+pub enum EdgeWidget<'w> {
   Text(Label),
-  Icon(Widget),
+  Icon(Widget<'w>),
   Avatar(FatObj<Pair<State<Avatar>, AvatarTemplateBuilder>>),
   Image(Resource<PixelImage>),
   Poster(Poster),
-  Custom(CustomEdgeWidget),
+  Custom(CustomEdgeWidget<'w>),
 }
 
-pub struct CustomEdgeWidget(pub Widget);
+pub struct CustomEdgeWidget<'w>(pub Widget<'w>);
 
-impl EdgeWidget {
-  fn compose_with_style(self, config: EdgeWidgetStyle) -> impl IntoWidget<FN> {
+impl<'w> EdgeWidget<'w> {
+  fn compose_with_style(self, config: EdgeWidgetStyle) -> impl IntoWidget<'w, FN> {
     let EdgeWidgetStyle { icon, text, avatar, image, poster, custom } = config;
     fn_widget! {
       let w: Widget = match self {
@@ -241,17 +246,17 @@ impl EdgeWidget {
 }
 
 #[derive(Template)]
-pub struct ListItemTml {
+pub struct ListItemTml<'w> {
   headline: HeadlineText,
   supporting: Option<SupportingText>,
-  leading: Option<Leading<EdgeWidget>>,
-  trailing: Option<Trailing<EdgeWidget>>,
+  leading: Option<Leading<EdgeWidget<'w>>>,
+  trailing: Option<Trailing<EdgeWidget<'w>>>,
 }
 
-impl ComposeChild for ListItem {
-  type Child = ListItemTml;
+impl<'c> ComposeChild<'c> for ListItem {
+  type Child = ListItemTml<'c>;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     let ListItemTml { headline, supporting, leading, trailing } = child;
 
     fn_widget! {
@@ -309,6 +314,7 @@ impl ComposeChild for ListItem {
         }
       }
     }
+    .into_widget()
   }
 }
 
@@ -378,7 +384,5 @@ pub struct ListItemDecorator {
 }
 
 impl ComposeDecorator for ListItemDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> {
-    fn_widget! { host }
-  }
+  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
 }

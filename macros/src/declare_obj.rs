@@ -94,7 +94,7 @@ impl<'a> DeclareObj<'a> {
       children.push(child)
     }
 
-    quote_spanned! { self.span => #var #(.with_child(#children, ctx!()))* }.to_tokens(tokens)
+    quote_spanned! { self.span => #var #(.with_child(#children))* }.to_tokens(tokens)
   }
 
   fn gen_node_tokens(&self, tokens: &mut TokenStream) {

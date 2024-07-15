@@ -11,10 +11,10 @@ pub struct Expanded {
   pub flex: f32,
 }
 
-impl ComposeChild for Expanded {
-  type Child = Widget;
+impl<'c> ComposeChild<'c> for Expanded {
+  type Child = Widget<'c>;
   #[inline]
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       @ConstrainedBox {
         clamp: BoxClamp {
@@ -23,9 +23,10 @@ impl ComposeChild for Expanded {
         },
         @{ child }
       }
-      .into_widget(ctx!())
-      .try_unwrap_state_and_attach(this, ctx!())
+      .into_widget()
+      .try_unwrap_state_and_attach(this)
     }
+    .into_widget()
   }
 }
 
@@ -37,7 +38,7 @@ mod tests {
   use super::*;
   use crate::prelude::*;
 
-  fn expand_child_size_zero() -> impl IntoWidgetStrict<FN> {
+  fn expand_child_size_zero() -> Widget<'static> {
     let size = Size::new(100., 50.);
     fn_widget! {
       @Row {
@@ -52,6 +53,7 @@ mod tests {
         }
       }
     }
+    .into_widget()
   }
   widget_layout_test!(
     expand_child_size_zero,
@@ -60,7 +62,7 @@ mod tests {
     { path = [0, 2], width == 0., height == 50.,}
   );
 
-  fn one_line_expanded() -> impl IntoWidgetStrict<FN> {
+  fn one_line_expanded() -> Widget<'static> {
     let size = Size::new(100., 50.);
     fn_widget! {
       @Row {
@@ -76,6 +78,7 @@ mod tests {
         }
       }
     }
+    .into_widget()
   }
   widget_layout_test!(
     one_line_expanded,
@@ -87,7 +90,7 @@ mod tests {
     { path = [0, 3], rect == ribir_geom::rect(300., 0., 200., 50.),}
   );
 
-  fn wrap_expanded() -> impl IntoWidgetStrict<FN> {
+  fn wrap_expanded() -> Widget<'static> {
     let size = Size::new(100., 50.);
     fn_widget! {
       @Row {
@@ -110,6 +113,7 @@ mod tests {
         }
       }
     }
+    .into_widget()
   }
   widget_layout_test!(
     wrap_expanded,

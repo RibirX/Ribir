@@ -35,7 +35,7 @@ pub struct FilledButtonDecorator {
 }
 
 impl ComposeDecorator for FilledButtonDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
 }
 
 /// FilledButton usage
@@ -78,10 +78,10 @@ pub struct FilledButton {
   pub color: Color,
 }
 
-impl ComposeChild for FilledButton {
+impl ComposeChild<'static> for FilledButton {
   type Child = ButtonTemplate;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     let ButtonTemplate { icon, label } = &child;
     let button_type = match (&icon, &label) {
       (Some(_), Some(_)) => ButtonType::BOTH,
@@ -125,5 +125,6 @@ impl ComposeChild for FilledButton {
         }
       }
     }
+    .into_widget()
   }
 }

@@ -69,7 +69,7 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  fn smoke() -> impl IntoWidgetStrict<FN> {
+  fn smoke() -> impl IntoWidget<'static, FN> {
     fn_widget! {
       @MockMulti {
         padding: EdgeInsets::only_left(1.),

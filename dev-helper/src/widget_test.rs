@@ -92,7 +92,7 @@ macro_rules! widget_test_suit {
 /// use ribir_core::{ prelude::*, test_helper::* };
 /// use ribir_dev_helper::*;
 ///
-/// fn my_widget() -> impl IntoWidgetStrict<FN> {
+/// fn my_widget() -> Widget<'static> {
 ///   fn_widget!{
 ///     @MockBox {
 ///       size: Size::new(100., 100.),
@@ -101,15 +101,16 @@ macro_rules! widget_test_suit {
 ///       }
 ///     }
 ///   }
+///   .into_widget()
 /// }
 ///
 /// // only use to avoid conflict.
-/// fn my_widget_a() -> impl IntoWidgetStrict<FN> { my_widget() }
+/// fn my_widget_a() -> Widget<'static> { my_widget() }
 ///
 /// // Only test the whole widget size.
 /// widget_layout_test!(my_widget_a, width == 100., height == 100.,);
 ///
-/// fn my_widget_b() -> impl IntoWidgetStrict<FN> { my_widget() }
+/// fn my_widget_b() -> Widget<'static> { my_widget() }
 /// // Only test the whole widget size but with a window size.
 /// widget_layout_test!(
 ///   my_widget_b,
@@ -118,7 +119,7 @@ macro_rules! widget_test_suit {
 ///   height == 10.,
 /// );
 ///
-/// fn my_widget_c() -> impl IntoWidgetStrict<FN> { my_widget() }
+/// fn my_widget_c() -> Widget<'static> { my_widget() }
 /// // Test two widget layout information.
 /// widget_layout_test!(
 ///   my_widget_c,

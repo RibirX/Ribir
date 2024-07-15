@@ -257,11 +257,11 @@ where
   }
 }
 
-impl ComposeChild for Input {
+impl ComposeChild<'static> for Input {
   type Child = Option<Placeholder>;
   fn compose_child(
     this: impl StateWriter<Value = Self>, placeholder: Self::Child,
-  ) -> impl IntoWidgetStrict<FN> {
+  ) -> Widget<'static> {
     fn_widget! {
       let text = @Text {
         text: pipe!($this.text.clone()),
@@ -272,7 +272,7 @@ impl ComposeChild for Input {
           clamp: pipe!(size_clamp(&$this.style, Some(1.), $this.size)),
           @ {
             EditableTextExtraWidget::edit_area(
-              &this,
+              this.clone_writer(),
               text,
               BoxPipe::value(Scrollable::X).into_pipe(),
               placeholder
@@ -281,14 +281,15 @@ impl ComposeChild for Input {
         }
       }
     }
+    .into_widget()
   }
 }
 
-impl ComposeChild for TextArea {
+impl ComposeChild<'static> for TextArea {
   type Child = Option<Placeholder>;
   fn compose_child(
     this: impl StateWriter<Value = Self>, placeholder: Self::Child,
-  ) -> impl IntoWidgetStrict<FN> {
+  ) -> Widget<'static> {
     fn_widget! {
       let text = @Text {
         text: pipe!($this.text.clone()),
@@ -306,10 +307,16 @@ impl ComposeChild for TextArea {
       @FocusScope {
         @ConstrainedBox {
           clamp: pipe!(size_clamp(&$this.style, $this.rows, $this.cols)),
-          @ { EditableTextExtraWidget::edit_area(&this, text, scroll_dir, placeholder) }
+          @EditableTextExtraWidget::edit_area(
+            this.clone_writer(),
+            text,
+            scroll_dir,
+            placeholder
+          )
         }
       }
     }
+    .into_widget()
   }
 }
 
@@ -318,9 +325,9 @@ where
   Self: 'static,
 {
   fn edit_area(
-    this: &impl StateWriter<Value = Self>, mut text: FatObj<State<Text>>,
-    scroll_dir: impl Pipe<Value = Scrollable> + 'static, placeholder: Option<Placeholder>,
-  ) -> impl IntoWidgetStrict<FN> {
+    this: impl StateWriter<Value = Self>, mut text: FatObj<State<Text>>,
+    scroll_dir: impl Pipe<Value = Scrollable>, placeholder: Option<Placeholder>,
+  ) -> Widget<'static> {
     fn_widget! {
       let layout_box = text.get_layout_box_widget().clone_reader();
       let only_text = text.clone_reader();
@@ -404,7 +411,7 @@ where
         }
       };
 
-      let text_widget = text.into_widget(ctx!());
+      let text_widget = text.into_widget();
       let text_widget = bind_point_listener(
         this.clone_writer(),
         text_widget,
@@ -420,6 +427,7 @@ where
         @ { text_widget }
       }
     }
+    .into_widget()
   }
 }
 

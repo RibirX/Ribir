@@ -2,7 +2,7 @@ use ribir::{material::material_svgs, prelude::*};
 
 static NORMAL_BUTTON_SIZE: Size = Size::new(120., 40.);
 
-fn header() -> impl IntoWidgetStrict<FN> {
+fn header() -> Widget<'static> {
   static HEADER_HEIGHT: f32 = 64.;
   static TITLE: &str = "Material Design";
   fn_widget! {
@@ -17,9 +17,10 @@ fn header() -> impl IntoWidgetStrict<FN> {
       }
     }
   }
+  .into_widget()
 }
 
-fn content() -> impl IntoWidgetStrict<FN> + IntoWidgetStrict<FN> {
+fn content() -> Widget<'static> {
   fn actions_show() -> GenWidget {
     fn_widget! {
       @VScrollBar {
@@ -167,7 +168,7 @@ fn content() -> impl IntoWidgetStrict<FN> + IntoWidgetStrict<FN> {
             }
           }
         }
-      }
+      }.into_widget()
     }
     .into()
   }
@@ -230,14 +231,14 @@ fn content() -> impl IntoWidgetStrict<FN> + IntoWidgetStrict<FN> {
           @Link {
             url: "https://ribir.org",
             @ListItem {
-              @Leading(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget(ctx!())))
+              @Leading(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
               @ { HeadlineText(Label::new("One line list item")) }
               @ { SupportingText(Label::new("One line supporting text")) }
             }
           }
           @Divider { indent: 16. }
           @ListItem {
-            @Leading(EdgeWidget::Icon(svgs::MENU.into_widget(ctx!())))
+            @Leading(EdgeWidget::Icon(svgs::MENU.into_widget()))
             @ { HeadlineText(Label::new("One line list item")) }
             @Trailing(EdgeWidget::Text(Label::new("100+")))
           }
@@ -253,7 +254,7 @@ fn content() -> impl IntoWidgetStrict<FN> + IntoWidgetStrict<FN> {
             )
             @ { HeadlineText(Label::new("Two lines list item")) }
             @ { SupportingText(Label::new("Two lines supporting text \rTwo lines supporting text")) }
-            @Trailing(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget(ctx!())))
+            @Trailing(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
           }
           @Divider { indent: 16. }
           @ListItem {
@@ -331,9 +332,10 @@ fn content() -> impl IntoWidgetStrict<FN> + IntoWidgetStrict<FN> {
       }
     }
   }
+  .into_widget()
 }
 
-pub fn storybook() -> impl IntoWidgetStrict<FN> {
+pub fn storybook() -> Widget<'static> {
   fn_widget! {
     @Column {
       background: Palette::of(ctx!()).surface_container_low(),
@@ -343,4 +345,5 @@ pub fn storybook() -> impl IntoWidgetStrict<FN> {
       }
     }
   }
+  .into_widget()
 }

@@ -2,7 +2,7 @@ use std::any::type_name;
 
 use crate::prelude::*;
 
-type ComposeDecoratorFn = dyn Fn(Box<dyn Any>, Widget, &BuildCtx) -> Widget;
+type ComposeDecoratorFn = dyn for<'r> Fn(Box<dyn Any>, Widget<'r>, &BuildCtx) -> Widget<'r>;
 /// Compose style is a compose child widget to decoration its child.
 #[derive(Default)]
 pub struct ComposeDecorators {
@@ -14,13 +14,14 @@ pub struct ComposeDecorators {
 /// `Theme` by a function. The trait implementation only as a default logic if
 /// no overwrite function in `Theme`.
 pub trait ComposeDecorator: Sized {
-  fn compose_decorator(this: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN>;
+  fn compose_decorator(this: State<Self>, host: Widget) -> Widget;
 }
 
 impl ComposeDecorators {
   #[inline]
   pub fn override_compose_decorator<W: ComposeDecorator + 'static>(
-    &mut self, compose_decorator: impl Fn(State<W>, Widget, &BuildCtx) -> Widget + 'static,
+    &mut self,
+    compose_decorator: impl for<'r> Fn(State<W>, Widget<'r>, &BuildCtx) -> Widget<'r> + 'static,
   ) {
     self.styles.insert(
       TypeId::of::<W>(),
@@ -51,20 +52,18 @@ mod tests {
     struct Size100Style;
 
     impl ComposeDecorator for Size100Style {
-      fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> {
-        fn_widget!(host)
-      }
+      fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
     }
     theme
       .compose_decorators
-      .override_compose_decorator::<Size100Style>(|_, host, ctx| {
+      .override_compose_decorator::<Size100Style>(|_, host, _| {
         fn_widget! {
           @MockBox {
             size: Size::new(100., 100.),
             @ { host }
           }
         }
-        .into_widget(ctx)
+        .into_widget()
       });
 
     let w = fn_widget! {

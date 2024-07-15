@@ -43,7 +43,7 @@ impl<V: 'static> DeclareInit<V> {
     match self {
       Self::Value(v) => (v, None),
       Self::Pipe(v) => {
-        let (v, pipe) = v.into_pipe().unzip();
+        let (v, pipe) = v.into_pipe().unzip(ModifyScope::DATA, None);
         (v, Some(pipe))
       }
     }
@@ -67,7 +67,7 @@ impl<V, U: From<V>> DeclareFrom<V, 1> for DeclareInit<U> {
 
 impl<P, V> DeclareFrom<P, 2> for DeclareInit<V>
 where
-  P: Pipe + 'static,
+  P: Pipe,
   V: From<P::Value> + 'static,
 {
   #[inline]
