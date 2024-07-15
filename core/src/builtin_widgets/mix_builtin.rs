@@ -346,42 +346,43 @@ fn life_fn_once_to_fn_mut(
   }
 }
 
-impl ComposeChild for MixBuiltin {
-  type Child = Widget;
-  #[inline]
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, mut child: Self::Child,
-  ) -> impl IntoWidgetStrict<FN> {
-    move |ctx: &BuildCtx| match this.try_into_value() {
-      Ok(this) => {
-        let mut this = Some(this);
-        if let Some(m) = child
-          .id()
-          .assert_get(&ctx.tree.borrow().arena)
-          .query_ref::<MixBuiltin>()
-        {
-          let this = unsafe { this.take().unwrap_unchecked() };
-          if !m.contain_flag(BuiltinFlags::Focus) && this.contain_flag(BuiltinFlags::Focus) {
-            this.callbacks_for_focus_node();
+impl<'c> ComposeChild<'c> for MixBuiltin {
+  type Child = Widget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    let f = move |ctx: &BuildCtx| {
+      let child = child.build(ctx);
+      match this.try_into_value() {
+        Ok(this) => {
+          let mut this = Some(this);
+          if let Some(m) = child
+            .assert_get(&ctx.tree.borrow())
+            .query_ref::<MixBuiltin>()
+          {
+            let this = unsafe { this.take().unwrap_unchecked() };
+            if !m.contain_flag(BuiltinFlags::Focus) && this.contain_flag(BuiltinFlags::Focus) {
+              this.callbacks_for_focus_node();
+            }
+            m.merge(this);
           }
-          m.merge(this);
-        }
-        // We do not use an else branch here, due to the borrow conflict of the `ctx`.
-        if let Some(this) = this {
-          if this.contain_flag(BuiltinFlags::Focus) {
-            this.callbacks_for_focus_node();
+          // We do not use an else branch here, due to the borrow conflict of the `ctx`.
+          if let Some(this) = this {
+            if this.contain_flag(BuiltinFlags::Focus) {
+              this.callbacks_for_focus_node();
+            }
+            child.attach_data(Queryable(this), &mut ctx.tree.borrow_mut());
           }
-          child = child.attach_data(Queryable(this), ctx);
         }
-        child
-      }
-      Err(this) => {
-        if this.read().contain_flag(BuiltinFlags::Focus) {
-          this.read().callbacks_for_focus_node();
+        Err(this) => {
+          if this.read().contain_flag(BuiltinFlags::Focus) {
+            this.read().callbacks_for_focus_node();
+          }
+          child.attach_data(this, &mut ctx.tree.borrow_mut())
         }
-        child.attach_data(this, ctx)
       }
-    }
+
+      child
+    };
+    InnerWidget::LazyBuild(Box::new(f)).into()
   }
 }
 

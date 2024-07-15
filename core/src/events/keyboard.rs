@@ -56,7 +56,7 @@ mod tests {
     struct Keys(Rc<RefCell<Vec<String>>>);
 
     impl Compose for Keys {
-      fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+      fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
         fn_widget! {
           @MockBox {
             size: Size::zero(),
@@ -80,6 +80,7 @@ mod tests {
             }
           }
         }
+        .into_widget()
       }
     }
 

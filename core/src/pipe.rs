@@ -14,32 +14,14 @@ use crate::{
   data_widget::Queryable,
   prelude::*,
   render_helper::{PureRender, RenderProxy},
-  ticker::FrameMsg,
+  window::WindowId,
 };
 
 pub type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
 
 /// A trait for a value that can be subscribed its continuous modifies.
-pub trait Pipe {
+pub trait Pipe: 'static {
   type Value;
-  /// Unzip the `Pipe` into its inner value and the changes stream of the
-  /// value.
-  fn unzip(self) -> (Self::Value, ValueStream<Self::Value>);
-
-  /// unzip the pipe value stream with a tick sample, and give a priority value
-  /// to the stream to determine the priority of the downstream to be notified.
-  /// This method only for build widget use.
-  fn tick_unzip(
-    self, prior_fn: impl FnMut() -> i64 + 'static, ctx: &BuildCtx,
-  ) -> (Self::Value, ValueStream<Self::Value>)
-  where
-    Self: Sized;
-
-  fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>);
-
-  fn box_tick_unzip(
-    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
-  ) -> (Self::Value, ValueStream<Self::Value>);
 
   /// Maps an `Pipe<Value=T>` to `Pipe<Value=T>` by applying a function to the
   /// continuous value
@@ -58,8 +40,23 @@ pub trait Pipe {
     Self: Sized,
     F: FnOnce(ValueStream<Self::Value>) -> ValueStream<Self::Value> + 'static,
   {
-    FinalChain { source: self, f }
+    FinalChain { source: self, f, _marker: PhantomData }
   }
+
+  /// Unzip the `Pipe` into its inner value and the stream of changes for that
+  /// value.
+  ///
+  /// - *scope*: specifies the scope of the modifications to be emitted by the
+  ///   stream.
+  /// - *priority*: defines the priority of the emitted values if it is a
+  ///   Some-value.
+  fn unzip(
+    self, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
+  ) -> (Self::Value, ValueStream<Self::Value>);
+
+  fn box_unzip(
+    self: Box<Self>, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
+  ) -> (Self::Value, ValueStream<Self::Value>);
 }
 
 /// A trait object type for `Pipe`, help to store a concrete `Pipe`
@@ -71,18 +68,16 @@ pub trait Pipe {
 /// Call `into_pipe` to convert it to a `Pipe` type.
 pub struct BoxPipe<V>(Box<dyn Pipe<Value = V>>);
 
-pub struct MapPipe<V, S: Pipe, F: FnMut(S::Value) -> V> {
+pub struct MapPipe<V, S, F> {
   source: S,
   f: F,
+  _marker: PhantomData<V>,
 }
 
-pub struct FinalChain<V, S, F>
-where
-  S: Pipe<Value = V>,
-  F: FnOnce(ValueStream<V>) -> ValueStream<V>,
-{
+pub struct FinalChain<V, S, F> {
   source: S,
   f: F,
+  _marker: PhantomData<V>,
 }
 
 impl<V: 'static> BoxPipe<V> {
@@ -96,201 +91,214 @@ impl<V: 'static> BoxPipe<V> {
   pub fn into_pipe(self) -> Box<dyn Pipe<Value = V>> { self.0 }
 }
 
-pub(crate) trait InnerPipe: Pipe {
-  fn build_single<const M: usize>(self, ctx: &BuildCtx) -> Widget
+pub(crate) trait InnerPipe: Pipe + Sized {
+  fn build_single<'w, const M: usize>(self) -> Widget<'static>
   where
-    Self: Sized,
-    Self::Value: IntoWidget<M> + 'static,
+    Self::Value: IntoWidget<'w, M>,
   {
-    let info =
-      Sc::new(Cell::new(SinglePipeInfo { gen_id: ctx.tree.borrow().root(), multi_pos: 0 }));
-    let info2 = info.clone();
-    let handle = ctx.handle();
-    let (w, modifies) = self.tick_unzip(move || pipe_priority_value(&info2, handle), ctx);
-    let w = w.into_widget(ctx);
-    info.set(SinglePipeInfo { gen_id: w.id(), multi_pos: 0 });
+    let f = move |ctx: &BuildCtx| {
+      let info =
+        Sc::new(Cell::new(SinglePipeInfo { gen_id: ctx.tree.borrow().root(), multi_pos: 0 }));
 
-    let pipe_node = PipeNode::share_capture(w.id(), Box::new(info.clone()), ctx);
-    let c_pipe_node = pipe_node.clone();
+      let priority = fn_priority(info.clone(), ctx.window().id());
+      let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
+      let w = w.into_widget().build(ctx);
+      info.set(SinglePipeInfo { gen_id: w, multi_pos: 0 });
 
-    let u = modifies.subscribe(move |(_, w)| {
-      handle.with_ctx(|ctx| {
-        let id = info.host_id();
+      let pipe_node = PipeNode::share_capture(w, Box::new(info.clone()), ctx);
+      let c_pipe_node = pipe_node.clone();
 
-        let new_id = w.into_widget(ctx).consume();
+      let handle = ctx.handle();
+      let u = modifies.subscribe(move |(_, w)| {
+        handle.with_ctx(|ctx| {
+          let id = info.host_id();
 
-        query_info_outside_until(id, &info, ctx, |info| info.single_replace(id, new_id));
-        pipe_node.primary_transplant(id, new_id, ctx);
+          let new_id = w.into_widget().build(ctx);
+          let mut tree = ctx.tree.borrow_mut();
 
-        update_key_status_single(id, new_id, ctx);
+          query_info_outside_until(id, &info, &tree, |info| info.single_replace(id, new_id));
 
-        ctx.insert_after(id, new_id);
-        ctx.dispose_subtree(id);
-        ctx.on_subtree_mounted(new_id);
+          pipe_node.primary_transplant(id, new_id, &mut tree);
 
-        ctx.mark_dirty(new_id);
-      });
-    });
-    c_pipe_node.own_subscription(u, ctx);
-    w
-  }
+          update_key_status_single(id, new_id, &tree);
+          id.insert_after(new_id, &mut tree);
+          id.dispose_subtree(&mut tree);
+          new_id.on_mounted_subtree(&tree);
 
-  fn build_multi<const M: usize>(self, ctx: &BuildCtx) -> SmallVec<[Widget; 1]>
-  where
-    Self::Value: IntoIterator,
-    <Self::Value as IntoIterator>::Item: IntoWidget<M>,
-    Self: Sized,
-  {
-    let collect_widgets = move |widgets: Self::Value, ctx: &BuildCtx| {
-      let mut widgets = widgets
-        .into_iter()
-        .map(|w| w.into_widget(ctx))
-        .collect::<SmallVec<[Widget; 1]>>();
-      if widgets.is_empty() {
-        widgets.push(Void.into_widget(ctx));
-      }
-      widgets
-    };
-
-    let info = Sc::new(RefCell::new(MultiPipeInfo { widgets: vec![], multi_pos: 0 }));
-    let info2 = info.clone();
-    let handle = ctx.handle();
-    let (m, modifies) = self.tick_unzip(move || pipe_priority_value(&info2, handle), ctx);
-
-    let widgets = collect_widgets(m, ctx);
-    let pipe_node = PipeNode::share_capture(widgets[0].id(), Box::new(info.clone()), ctx);
-    let ids = widgets.iter().map(|w| w.id()).collect::<Vec<_>>();
-
-    set_pos_of_multi(&ids, ctx);
-
-    // We need to associate the parent information with the children pipe so that
-    // when the child pipe is regenerated, it can update the parent pipe information
-    // accordingly.
-    {
-      let arena = &mut ctx.tree.borrow_mut().arena;
-      for id in &ids[1..] {
-        if id.assert_get(arena).contain_type::<DynInfo>() {
-          let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
-          id.attach_data(Queryable(info), arena);
-        };
-      }
-    }
-
-    info.borrow_mut().widgets = ids;
-
-    let c_pipe_node = pipe_node.clone();
-    let u = modifies.subscribe(move |(_, m)| {
-      handle.with_ctx(|ctx| {
-        let old = info.borrow().widgets.clone();
-
-        let new = collect_widgets(m, ctx)
-          .into_iter()
-          .map(Widget::consume)
-          .collect::<Vec<_>>();
-
-        set_pos_of_multi(&new, ctx);
-        query_info_outside_until(old[0], &info, ctx, |info| info.multi_replace(&old, &new));
-        pipe_node.primary_transplant(old[0], new[0], ctx);
-
-        update_key_state_multi(old.iter().copied(), new.iter().copied(), ctx);
-
-        new
-          .iter()
-          .rev()
-          .for_each(|w| ctx.insert_after(old[0], *w));
-        old.iter().for_each(|id| ctx.dispose_subtree(*id));
-        new.iter().for_each(|w| {
-          ctx.on_subtree_mounted(*w);
-          ctx.mark_dirty(*w)
+          tree.mark_dirty(new_id);
         });
       });
-    });
-    c_pipe_node.own_subscription(u, ctx);
+      c_pipe_node.own_subscription(u, ctx);
+      w
+    };
+    InnerWidget::LazyBuild(Box::new(f)).into()
+  }
+
+  fn build_multi<'w, const M: usize>(self) -> Vec<Widget<'w>>
+  where
+    Self::Value: IntoIterator,
+    <Self::Value as IntoIterator>::Item: IntoWidget<'w, M>,
+  {
+    let info = Sc::new(RefCell::new(MultiPipeInfo { widgets: vec![], multi_pos: 0 }));
+    let priority = MultiUpdatePriority::new(info.clone());
+    let (m, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority.clone())));
+    let mut iter = m.into_iter();
+
+    let first = iter
+      .next()
+      .map_or_else(|| Void.into_widget(), IntoWidget::into_widget);
+
+    let info2 = info.clone();
+    let first = move |ctx: &BuildCtx| {
+      let id = first.build(ctx);
+      info2.borrow_mut().widgets.push(id);
+      priority.set_wnd(ctx.window().id());
+      let pipe_node = PipeNode::share_capture(id, Box::new(info2.clone()), ctx);
+      let c_pipe_node = pipe_node.clone();
+      let handle = ctx.handle();
+      let u = modifies.subscribe(move |(_, m)| {
+        handle.with_ctx(|ctx| {
+          let old = info2.borrow().widgets.clone();
+          let mut new = vec![];
+          for (idx, w) in m.into_iter().enumerate() {
+            let id = w.into_widget().build(ctx);
+            new.push(id);
+            set_pos_of_multi(id, idx, &ctx.tree.borrow());
+          }
+          if new.is_empty() {
+            new.push(Void.into_widget().build(ctx));
+          }
+
+          let mut tree = ctx.tree.borrow_mut();
+          query_info_outside_until(old[0], &info2, &tree, |info| info.multi_replace(&old, &new));
+          pipe_node.primary_transplant(old[0], new[0], &mut tree);
+
+          update_key_state_multi(old.iter().copied(), new.iter().copied(), &tree);
+
+          new
+            .iter()
+            .rev()
+            .for_each(|w| old[0].insert_after(*w, &mut tree));
+          old
+            .iter()
+            .for_each(|id| id.dispose_subtree(&mut tree));
+          new.iter().for_each(|w| {
+            w.on_mounted_subtree(&tree);
+            tree.mark_dirty(*w)
+          });
+        });
+      });
+
+      c_pipe_node.own_subscription(u, ctx);
+      id
+    };
+
+    let mut widgets = vec![InnerWidget::LazyBuild(Box::new(first)).into()];
+    for (idx, w) in iter.enumerate() {
+      let info = info.clone();
+      let f = move |ctx: &BuildCtx| {
+        let id = w.into_widget().build(ctx);
+        info.borrow_mut().widgets.push(id);
+
+        let tree = &mut ctx.tree.borrow_mut();
+        if set_pos_of_multi(id, idx + 1, tree) {
+          // We need to associate the parent information with the children pipe so that
+          // when the child pipe is regenerated, it can update the parent pipe information
+          // accordingly.
+          let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
+          id.attach_data(Queryable(info), tree);
+        }
+        id
+      };
+
+      widgets.push(InnerWidget::LazyBuild(Box::new(f)).into());
+    }
 
     widgets
   }
 
-  fn into_parent_widget<const M: usize>(self, ctx: &BuildCtx) -> Widget
+  fn into_parent_widget<'w, const M: usize>(self) -> Widget<'static>
   where
     Self: Sized,
-    Self::Value: IntoWidget<M>,
+    Self::Value: IntoWidget<'w, M>,
   {
-    let root = ctx.tree.borrow().root();
-    let info = Sc::new(RefCell::new(SingleParentPipeInfo { range: root..=root, multi_pos: 0 }));
-    let info2 = info.clone();
-    let handle = ctx.handle();
-    let (v, modifies) = self.tick_unzip(move || pipe_priority_value(&info2, handle), ctx);
-    let p = v.into_widget(ctx);
+    let f = move |ctx: &BuildCtx| {
+      let root = ctx.tree.borrow().root();
+      let info = Sc::new(RefCell::new(SingleParentPipeInfo { range: root..=root, multi_pos: 0 }));
 
-    let pipe_node = PipeNode::share_capture(p.id(), Box::new(info.clone()), ctx);
-    let leaf = p.id().single_leaf(&ctx.tree.borrow().arena);
-    info.borrow_mut().range = p.id()..=leaf;
+      let priority = fn_priority(info.clone(), ctx.window().id());
+      let (v, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
 
-    // We need to associate the parent information with the pipe of leaf widget,
-    // when the leaf pipe is regenerated, it can update the parent pipe information
-    // accordingly.
-    {
-      let arena = &mut ctx.tree.borrow_mut().arena;
-      if leaf.assert_get(arena).contain_type::<DynInfo>() {
-        let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
-        leaf.attach_data(Queryable(info), arena);
-      };
-    }
+      let p = v.into_widget().build(ctx);
 
-    let c_pipe_node = pipe_node.clone();
+      let pipe_node = PipeNode::share_capture(p, Box::new(info.clone()), ctx);
+      let leaf = p.single_leaf(&ctx.tree.borrow());
+      info.borrow_mut().range = p..=leaf;
 
-    let u = modifies.subscribe(move |(_, w)| {
-      handle.with_ctx(|ctx| {
-        let (top, bottom) = info.borrow().range.clone().into_inner();
+      // We need to associate the parent information with the pipe of leaf widget,
+      // when the leaf pipe is regenerated, it can update the parent pipe information
+      // accordingly.
+      {
+        let tree = &mut ctx.tree.borrow_mut();
+        if leaf.assert_get(tree).contain_type::<DynInfo>() {
+          let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
+          leaf.attach_data(Queryable(info), tree);
+        };
+      }
 
-        let p = w.into_widget(ctx).consume();
-        let mut tree = ctx.tree.borrow_mut();
-        let new_rg = p..=p.single_leaf(&tree.arena);
-        let children: SmallVec<[WidgetId; 1]> = bottom.children(&tree.arena).collect();
-        for c in children {
-          new_rg.end().append(c, &mut tree.arena);
-        }
+      let c_pipe_node = pipe_node.clone();
+      let handle = ctx.handle();
+      let u = modifies.subscribe(move |(_, w)| {
+        handle.with_ctx(|ctx| {
+          let (top, bottom) = info.borrow().range.clone().into_inner();
 
-        drop(tree);
+          let p = w.into_widget().build(ctx);
+          let mut tree = ctx.tree.borrow_mut();
+          let new_rg = p..=p.single_leaf(&tree);
+          let children: SmallVec<[WidgetId; 1]> = bottom.children(&tree).collect();
+          for c in children {
+            new_rg.end().append(c, &mut tree);
+          }
 
-        query_info_outside_until(top, &info, ctx, |info| {
-          info.single_range_replace(&(top..=bottom), &new_rg);
+          query_info_outside_until(top, &info, &tree, |info| {
+            info.single_range_replace(&(top..=bottom), &new_rg);
+          });
+          pipe_node.primary_transplant(top, p, &mut tree);
+
+          update_key_status_single(top, p, &tree);
+          top.insert_after(p, &mut tree);
+          top.dispose_subtree(&mut tree);
+
+          let mut w = p;
+          loop {
+            w.on_widget_mounted(&tree);
+            if w == *new_rg.end() {
+              break;
+            }
+            if let Some(c) = w.first_child(&tree) {
+              w = c;
+            } else {
+              break;
+            }
+          }
+
+          tree.mark_dirty(p);
         });
-        pipe_node.primary_transplant(top, p, ctx);
-
-        update_key_status_single(top, p, ctx);
-
-        ctx.insert_after(top, p);
-        ctx.dispose_subtree(top);
-        let mut w = p;
-        let tree = ctx.tree.borrow();
-        loop {
-          ctx.on_widget_mounted(w);
-          if w == *new_rg.end() {
-            break;
-          }
-          if let Some(c) = w.first_child(&tree.arena) {
-            w = c;
-          } else {
-            break;
-          }
-        }
-
-        drop(tree);
-        ctx.mark_dirty(p);
       });
-    });
-    c_pipe_node.own_subscription(u, ctx);
-    p
+      c_pipe_node.own_subscription(u, ctx);
+      p
+    };
+    InnerWidget::LazyBuild(Box::new(f)).into()
   }
 }
 
-impl<S: Pipe, V, F: FnMut(S::Value) -> V + 'static> MapPipe<V, S, F> {
+impl<S: Pipe, V, F: FnMut(S::Value) -> V> MapPipe<V, S, F> {
   #[inline]
-  pub fn new(source: S, f: F) -> Self { Self { source, f } }
+  pub fn new(source: S, f: F) -> Self { Self { source, f, _marker: PhantomData } }
 }
 
 pub struct ModifiesPipe(BoxOp<'static, ModifyScope, Infallible>);
+
 impl ModifiesPipe {
   #[inline]
   pub fn new(modifies: BoxOp<'static, ModifyScope, Infallible>) -> Self { Self(modifies) }
@@ -300,219 +308,177 @@ impl Pipe for ModifiesPipe {
   type Value = ModifyScope;
 
   #[inline]
-  fn unzip(self) -> (Self::Value, ValueStream<Self::Value>) {
-    (ModifyScope::empty(), ObservableExt::map(self.0, |s| (s, s)).box_it())
-  }
-
-  fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).unzip() }
-
-  fn tick_unzip(
-    self, prior_fn: impl FnMut() -> i64 + 'static, ctx: &BuildCtx,
+  fn unzip(
+    self, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     let stream = self
       .0
-      .filter(|s| s.contains(ModifyScope::FRAMEWORK))
-      .sample(
-        ctx
-          .window()
-          .frame_tick_stream()
-          .filter(|f| matches!(f, FrameMsg::NewFrame(_))),
-      )
-      .prior_by(prior_fn, ctx.window().priority_task_queue().clone())
-      .map(|s| (s, s))
-      .box_it();
+      .filter(move |s| s.contains(scope))
+      .map(|s| (s, s));
+
+    let stream = if let Some(priority) = priority {
+      stream
+        .sample(AppCtx::frame_ticks().clone())
+        .priority(priority)
+        .box_it()
+    } else {
+      stream.box_it()
+    };
 
     (ModifyScope::empty(), stream)
   }
 
-  fn box_tick_unzip(
-    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
+  #[inline]
+  fn box_unzip(
+    self: Box<Self>, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
-    (*self).tick_unzip(prior_fn, ctx)
+    (*self).unzip(scope, priority)
   }
 }
 
-impl<V> Pipe for Box<dyn Pipe<Value = V>> {
+impl<V: 'static> Pipe for Box<dyn Pipe<Value = V>> {
   type Value = V;
 
   #[inline]
-  fn unzip(self) -> (Self::Value, ValueStream<Self::Value>) { self.box_unzip() }
-
-  #[inline]
-  fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).box_unzip() }
-
-  #[inline]
-  fn tick_unzip(
-    self, prior_fn: impl FnMut() -> i64 + 'static, ctx: &BuildCtx,
+  fn unzip(
+    self, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
-    self.box_tick_unzip(Box::new(prior_fn), ctx)
+    self.box_unzip(scope, priority)
   }
 
   #[inline]
-  fn box_tick_unzip(
-    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
+  fn box_unzip(
+    self: Box<Self>, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
-    (*self).box_tick_unzip(prior_fn, ctx)
+    (*self).box_unzip(scope, priority)
   }
 }
 
-impl<V: 'static, S: Pipe, F> Pipe for MapPipe<V, S, F>
+impl<V, S, F> Pipe for MapPipe<V, S, F>
 where
-  S::Value: 'static,
-  F: FnMut(S::Value) -> V + 'static,
+  Self: 'static,
+  S: Pipe,
+  F: FnMut(S::Value) -> V,
 {
   type Value = V;
 
-  fn unzip(self) -> (Self::Value, ValueStream<Self::Value>) {
-    let Self { source, mut f } = self;
-    let (v, stream) = source.unzip();
+  fn unzip(
+    self, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
+  ) -> (Self::Value, ValueStream<Self::Value>) {
+    let Self { source, mut f, .. } = self;
+    let (v, stream) = source.unzip(scope, priority);
     (f(v), stream.map(move |(s, v)| (s, f(v))).box_it())
   }
 
   #[inline]
-  fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).unzip() }
-
-  fn tick_unzip(
-    self, prior_fn: impl FnMut() -> i64 + 'static, ctx: &BuildCtx,
+  fn box_unzip(
+    self: Box<Self>, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
-    let Self { source, mut f } = self;
-    let (v, stream) = source.tick_unzip(prior_fn, ctx);
-    (f(v), stream.map(move |(s, v)| (s, f(v))).box_it())
-  }
-
-  #[inline]
-  fn box_tick_unzip(
-    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
-  ) -> (Self::Value, ValueStream<Self::Value>) {
-    (*self).tick_unzip(prior_fn, ctx)
+    (*self).unzip(scope, priority)
   }
 }
 
 impl<V, S, F> Pipe for FinalChain<V, S, F>
 where
+  Self: 'static,
   S: Pipe<Value = V>,
-  F: FnOnce(ValueStream<V>) -> ValueStream<V> + 'static,
+  F: FnOnce(ValueStream<V>) -> ValueStream<V>,
 {
   type Value = V;
 
-  fn unzip(self) -> (V, ValueStream<V>) {
-    let Self { source, f } = self;
-    let (v, stream) = source.unzip();
+  fn unzip(
+    self, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
+  ) -> (Self::Value, ValueStream<Self::Value>) {
+    let Self { source, f, .. } = self;
+    let (v, stream) = source.unzip(scope, priority);
     (v, f(stream))
   }
 
   #[inline]
-  fn box_unzip(self: Box<Self>) -> (V, ValueStream<V>) { (*self).unzip() }
-
-  fn tick_unzip(
-    self, prior_fn: impl FnMut() -> i64 + 'static, ctx: &BuildCtx,
+  fn box_unzip(
+    self: Box<Self>, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
-    let Self { source, f } = self;
-    let (v, stream) = source.tick_unzip(prior_fn, ctx);
-    (v, f(stream))
-  }
-
-  #[inline]
-  fn box_tick_unzip(
-    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
-  ) -> (Self::Value, ValueStream<Self::Value>) {
-    (*self).tick_unzip(prior_fn, ctx)
+    (*self).unzip(scope, priority)
   }
 }
 
 /// A pipe that never changes, help to construct a pipe from a value.
 struct ValuePipe<V>(V);
 
-impl<V> Pipe for ValuePipe<V> {
+impl<V: 'static> Pipe for ValuePipe<V> {
   type Value = V;
 
-  fn unzip(self) -> (Self::Value, ValueStream<Self::Value>) {
+  #[inline]
+  fn unzip(
+    self, _: ModifyScope, _: Option<Box<dyn Priority>>,
+  ) -> (Self::Value, ValueStream<Self::Value>) {
     (self.0, observable::empty().box_it())
   }
 
   #[inline]
-  fn box_unzip(self: Box<Self>) -> (Self::Value, ValueStream<Self::Value>) { (*self).unzip() }
-
-  fn tick_unzip(
-    self, _: impl FnMut() -> i64 + 'static, _: &BuildCtx,
+  fn box_unzip(
+    self: Box<Self>, scope: ModifyScope, priority: Option<Box<dyn Priority>>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
-    self.unzip()
-  }
-
-  #[inline]
-  fn box_tick_unzip(
-    self: Box<Self>, prior_fn: Box<dyn FnMut() -> i64>, ctx: &BuildCtx,
-  ) -> (Self::Value, ValueStream<Self::Value>) {
-    (*self).tick_unzip(prior_fn, ctx)
+    self.unzip(scope, priority)
   }
 }
 
 impl<T: Pipe> InnerPipe for T {}
 
-impl<V, S, F, const M: usize> IntoWidgetStrict<M> for MapPipe<V, S, F>
+impl<'w, V, S, F, const M: usize> IntoWidgetStrict<'static, M> for MapPipe<V, S, F>
 where
-  V: IntoWidget<M> + 'static,
-  S: InnerPipe,
-  S::Value: 'static,
-  F: FnMut(S::Value) -> V + 'static,
+  Self: InnerPipe<Value = V>,
+  V: IntoWidget<'w, M>,
 {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.build_single(ctx) }
+  fn into_widget_strict(self) -> Widget<'static> { self.build_single() }
 }
 
-impl<V, S, F, const M: usize> IntoWidgetStrict<M> for FinalChain<V, S, F>
+impl<'w, V, S, F, const M: usize> IntoWidgetStrict<'static, M> for FinalChain<V, S, F>
 where
-  V: IntoWidget<M> + 'static,
-  S: InnerPipe<Value = V>,
-  F: FnOnce(ValueStream<V>) -> ValueStream<V> + 'static,
+  Self: InnerPipe<Value = V>,
+  V: IntoWidget<'w, M>,
 {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.build_single(ctx) }
+  fn into_widget_strict(self) -> Widget<'static> { self.build_single() }
 }
 
-impl<const M: usize, V: IntoWidget<M> + 'static> IntoWidgetStrict<M> for Box<dyn Pipe<Value = V>> {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.build_single(ctx) }
-}
-
-impl<V, S, F, const M: usize> IntoWidget<M> for MapPipe<Option<V>, S, F>
+impl<'w, const M: usize, V> IntoWidgetStrict<'static, M> for Box<dyn Pipe<Value = V>>
 where
-  V: IntoWidget<M> + 'static,
-  S: InnerPipe,
-  S::Value: 'static,
-  F: FnMut(S::Value) -> Option<V> + 'static,
+  V: IntoWidget<'w, M> + 'static,
 {
-  fn into_widget(self, ctx: &BuildCtx) -> Widget { option_into_widget(self, ctx) }
+  fn into_widget_strict(self) -> Widget<'static> { self.build_single() }
 }
 
-impl<V, S, F, const M: usize> IntoWidget<M> for FinalChain<Option<V>, S, F>
+impl<'w, V, S, F, const M: usize> IntoWidget<'static, M> for MapPipe<Option<V>, S, F>
 where
-  V: IntoWidget<M> + 'static,
-  S: InnerPipe<Value = Option<V>>,
-  F: FnOnce(ValueStream<Option<V>>) -> ValueStream<Option<V>> + 'static,
+  Self: InnerPipe<Value = Option<V>>,
+  V: IntoWidget<'w, M>,
 {
-  #[inline]
-  fn into_widget(self, ctx: &BuildCtx) -> Widget { option_into_widget(self, ctx) }
+  fn into_widget(self) -> Widget<'static> { option_into_widget(self) }
 }
 
-impl<const M: usize, V: IntoWidget<M> + 'static> IntoWidget<M>
-  for Box<dyn Pipe<Value = Option<V>>>
+impl<'w, V, S, F, const M: usize> IntoWidget<'static, M> for FinalChain<Option<V>, S, F>
+where
+  Self: InnerPipe<Value = Option<V>>,
+  V: IntoWidget<'w, M>,
 {
-  #[inline]
-  fn into_widget(self, ctx: &BuildCtx) -> Widget { option_into_widget(self, ctx) }
+  fn into_widget(self) -> Widget<'static> { option_into_widget(self) }
 }
 
-fn option_into_widget<const M: usize>(
-  p: impl InnerPipe<Value = Option<impl IntoWidget<M> + 'static>>, ctx: &BuildCtx,
-) -> Widget {
-  p.map(|w| {
-    move |ctx: &BuildCtx| {
-      if let Some(w) = w { w.into_widget(ctx) } else { Void.into_widget(ctx) }
-    }
-  })
-  .build_single(ctx)
+impl<'w, const M: usize, V> IntoWidget<'static, M> for Box<dyn Pipe<Value = Option<V>>>
+where
+  V: IntoWidget<'w, M> + 'static,
+{
+  fn into_widget(self) -> Widget<'static> { option_into_widget(self) }
 }
 
-fn update_children_key_status(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
-  let tree = &ctx.tree.borrow().arena;
+fn option_into_widget<'w, const M: usize>(
+  p: impl InnerPipe<Value = Option<impl IntoWidget<'w, M> + 'static>>,
+) -> Widget<'static> {
+  p.map(|w| move |_: &BuildCtx| w.map_or_else(|| Void.into_widget(), IntoWidget::into_widget))
+    .build_single()
+}
 
+fn update_children_key_status(old: WidgetId, new: WidgetId, tree: &WidgetTree) {
   match (old.first_child(tree), old.last_child(tree), new.first_child(tree), new.last_child(tree)) {
     // old or new children is empty.
     (None, _, _, _) | (_, _, None, _) => {}
@@ -521,18 +487,18 @@ fn update_children_key_status(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
     }
     (Some(o_first), Some(o_last), Some(n_first), Some(n_last)) => {
       match (o_first == o_last, n_first == n_last) {
-        (true, true) => update_key_status_single(o_first, n_first, ctx),
+        (true, true) => update_key_status_single(o_first, n_first, tree),
         (true, false) => {
-          if let Some(old_key) = ctx
-            .assert_get(o_first)
+          if let Some(old_key) = o_first
+            .assert_get(tree)
             .query_ref::<Box<dyn AnyKey>>()
           {
             let o_key = old_key.key();
             new.children(tree).any(|n| {
-              if let Some(new_key) = ctx.assert_get(n).query_ref::<Box<dyn AnyKey>>() {
+              if let Some(new_key) = n.assert_get(tree).query_ref::<Box<dyn AnyKey>>() {
                 let same_key = o_key == new_key.key();
                 if same_key {
-                  update_key_states(&**old_key, o_first, &**new_key, n, ctx);
+                  update_key_states(&**old_key, o_first, &**new_key, n, tree);
                 }
                 same_key
               } else {
@@ -542,16 +508,16 @@ fn update_children_key_status(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
           }
         }
         (false, true) => {
-          if let Some(new_key) = ctx
-            .assert_get(n_first)
+          if let Some(new_key) = n_first
+            .assert_get(tree)
             .query_ref::<Box<dyn AnyKey>>()
           {
             let n_key = new_key.key();
             old.children(tree).any(|o| {
-              if let Some(old_key) = ctx.assert_get(o).query_ref::<Box<dyn AnyKey>>() {
+              if let Some(old_key) = o.assert_get(tree).query_ref::<Box<dyn AnyKey>>() {
                 let same_key = old_key.key() == n_key;
                 if same_key {
-                  update_key_states(&**old_key, o, &**new_key, n_first, ctx);
+                  update_key_states(&**old_key, o, &**new_key, n_first, tree);
                 }
                 same_key
               } else {
@@ -560,38 +526,44 @@ fn update_children_key_status(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
             });
           }
         }
-        (false, false) => update_key_state_multi(old.children(tree), new.children(tree), ctx),
+        (false, false) => update_key_state_multi(old.children(tree), new.children(tree), tree),
       }
     }
   }
 }
 
-fn update_key_status_single(old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
-  if let Some(old_key) = ctx.assert_get(old).query_ref::<Box<dyn AnyKey>>() {
-    if let Some(new_key) = ctx.assert_get(new).query_ref::<Box<dyn AnyKey>>() {
+fn update_key_status_single(old: WidgetId, new: WidgetId, tree: &WidgetTree) {
+  if let Some(old_key) = old
+    .assert_get(tree)
+    .query_ref::<Box<dyn AnyKey>>()
+  {
+    if let Some(new_key) = new
+      .assert_get(tree)
+      .query_ref::<Box<dyn AnyKey>>()
+    {
       if old_key.key() == new_key.key() {
-        update_key_states(&**old_key, old, &**new_key, new, ctx);
+        update_key_states(&**old_key, old, &**new_key, new, tree);
       }
     }
   }
 }
 
 fn update_key_state_multi(
-  old: impl Iterator<Item = WidgetId>, new: impl Iterator<Item = WidgetId>, ctx: &BuildCtx,
+  old: impl Iterator<Item = WidgetId>, new: impl Iterator<Item = WidgetId>, tree: &WidgetTree,
 ) {
   let mut old_key_list = ahash::HashMap::default();
   for o in old {
-    if let Some(old_key) = ctx.assert_get(o).query_ref::<Box<dyn AnyKey>>() {
+    if let Some(old_key) = o.assert_get(tree).query_ref::<Box<dyn AnyKey>>() {
       old_key_list.insert(old_key.key(), o);
     }
   }
 
   if !old_key_list.is_empty() {
     for n in new {
-      if let Some(new_key) = ctx.assert_get(n).query_ref::<Box<dyn AnyKey>>() {
+      if let Some(new_key) = n.assert_get(tree).query_ref::<Box<dyn AnyKey>>() {
         if let Some(o) = old_key_list.get(&new_key.key()).copied() {
-          if let Some(old_key) = ctx.assert_get(o).query_ref::<Box<dyn AnyKey>>() {
-            update_key_states(&**old_key, o, &**new_key, n, ctx);
+          if let Some(old_key) = o.assert_get(tree).query_ref::<Box<dyn AnyKey>>() {
+            update_key_states(&**old_key, o, &**new_key, n, tree);
           }
         }
       }
@@ -600,11 +572,11 @@ fn update_key_state_multi(
 }
 
 fn update_key_states(
-  old_key: &dyn AnyKey, old: WidgetId, new_key: &dyn AnyKey, new: WidgetId, ctx: &BuildCtx,
+  old_key: &dyn AnyKey, old: WidgetId, new_key: &dyn AnyKey, new: WidgetId, tree: &WidgetTree,
 ) {
   new_key.record_prev_key_widget(old_key);
   old_key.record_next_key_widget(new_key);
-  update_children_key_status(old, new, ctx)
+  update_children_key_status(old, new, tree)
 }
 
 /// `PipeNode` just use to wrap a `Box<dyn Render>`, and provide a choice to
@@ -773,7 +745,7 @@ impl DynWidgetInfo for Sc<RefCell<MultiPipeInfo>> {
 
 impl PipeNode {
   fn share_capture(id: WidgetId, dyn_info: Box<dyn DynWidgetInfo>, ctx: &BuildCtx) -> Self {
-    let tree = &mut ctx.tree.borrow_mut().arena;
+    let tree = &mut ctx.tree.borrow_mut();
     let mut pipe_node = None;
 
     id.wrap_node(tree, |r| {
@@ -788,8 +760,7 @@ impl PipeNode {
   }
 
   // update the primary `PipeNode`.
-  fn primary_transplant(&self, old: WidgetId, new: WidgetId, ctx: &BuildCtx) {
-    let mut tree = ctx.tree.borrow_mut();
+  fn primary_transplant(&self, old: WidgetId, new: WidgetId, tree: &mut WidgetTree) {
     let [old_node, new_node] = tree.get_many_mut(&[old, new]);
     std::mem::swap(&mut self.as_mut().data, new_node);
     std::mem::swap(old_node, new_node);
@@ -811,7 +782,7 @@ impl PipeNode {
   fn own_subscription(self, u: impl Subscription + 'static, ctx: &BuildCtx) {
     let node = self.as_mut();
     let id = node.dyn_info.host_id();
-    let tree = &mut ctx.tree.borrow_mut().arena;
+    let tree = &mut ctx.tree.borrow_mut();
     // if the subscription is closed, we can cancel and unwrap the `PipeNode`
     // immediately.
     if u.is_closed() {
@@ -823,21 +794,20 @@ impl PipeNode {
   }
 }
 
-fn set_pos_of_multi(widgets: &[WidgetId], ctx: &BuildCtx) {
-  let arena = &ctx.tree.borrow().arena;
-  widgets.iter().enumerate().for_each(|(pos, wid)| {
-    wid
-      .assert_get(arena)
-      .query_all_iter::<DynInfo>()
-      .for_each(|info| info.set_pos_of_multi(pos))
-  });
+fn set_pos_of_multi(w: WidgetId, pos: usize, tree: &WidgetTree) -> bool {
+  let mut b = false;
+  for info in w.assert_get(tree).query_all_iter::<DynInfo>() {
+    info.set_pos_of_multi(pos);
+    b = true;
+  }
+  b
 }
 
 fn query_info_outside_until<T: Any>(
-  id: WidgetId, to: &Sc<T>, ctx: &BuildCtx, mut cb: impl FnMut(&DynInfo),
+  id: WidgetId, to: &Sc<T>, tree: &WidgetTree, mut cb: impl FnMut(&DynInfo),
 ) {
   for info in id
-    .assert_get(&ctx.tree.borrow().arena)
+    .assert_get(tree)
     .query_all_iter::<DynInfo>()
     .rev()
   {
@@ -853,22 +823,28 @@ fn query_info_outside_until<T: Any>(
   }
 }
 
-fn pipe_priority_value<T: Any>(info: &Sc<T>, handle: BuildCtxHandle) -> i64
+fn pipe_priority_value<T: Any>(info: &Sc<T>, wnd: &Window) -> i64
 where
   Sc<T>: DynWidgetInfo,
 {
-  handle
-    .with_ctx(|ctx| {
-      let id = info.host_id();
-      let depth = id.ancestors(&ctx.tree.borrow().arena).count() as i64;
-      let mut embed = 0;
-      query_info_outside_until(id, info, ctx, |_| {
-        embed += 1;
-      });
-      let pos = info.pos_of_multi() as i64;
-      depth << 60 | pos << 40 | embed
-    })
-    .unwrap_or(-1)
+  let id = info.host_id();
+  let tree = wnd.widget_tree.borrow();
+  let depth = id.ancestors(&tree).count() as i64;
+  let mut embed = 0;
+  query_info_outside_until(id, info, &tree, |_| {
+    embed += 1;
+  });
+  let pos = info.pos_of_multi() as i64;
+  depth << 60 | pos << 40 | embed
+}
+
+fn fn_priority<T: Any>(info: Sc<T>, wnd_id: WindowId) -> WindowPriority<impl Fn() -> i64 + 'static>
+where
+  Sc<T>: DynWidgetInfo + 'static,
+{
+  WindowPriority::new(wnd_id, move || {
+    AppCtx::get_window(wnd_id).map_or(-1, |wnd| pipe_priority_value(&info, &wnd))
+  })
 }
 
 impl Query for PipeNode {
@@ -900,6 +876,44 @@ impl RenderProxy for PipeNode {
       Self: 'r;
 
   fn proxy(&self) -> Self::Target<'_> { &*self.as_ref().data }
+}
+
+#[derive(Clone)]
+struct MultiUpdatePriority {
+  wnd_id: Sc<Cell<Option<WindowId>>>,
+  multi_info: Sc<RefCell<MultiPipeInfo>>,
+}
+
+impl MultiUpdatePriority {
+  fn new(multi_info: Sc<RefCell<MultiPipeInfo>>) -> Self {
+    Self { wnd_id: <_>::default(), multi_info }
+  }
+
+  fn set_wnd(&self, wnd_id: WindowId) {
+    assert!(self.wnd_id.get().is_none());
+    self.wnd_id.set(Some(wnd_id));
+  }
+}
+
+impl Priority for MultiUpdatePriority {
+  fn priority(&mut self) -> i64 {
+    self
+      .wnd_id
+      .get()
+      .and_then(|wnd_id| AppCtx::get_window(wnd_id))
+      .map_or(-1, |wnd| pipe_priority_value(&self.multi_info, &wnd))
+  }
+
+  fn queue(&mut self) -> Option<&PriorityTaskQueue> {
+    self.wnd_id.get().and_then(|wnd_id| {
+      AppCtx::get_window(wnd_id).map(|wnd| {
+        let queue = wnd.priority_task_queue();
+        // Safety: This trait is only used within this crate, and we can ensure that
+        // the window is valid when utilizing the `PriorityTaskQueue`.
+        unsafe { std::mem::transmute(queue) }
+      })
+    })
+  }
 }
 
 #[cfg(test)]
@@ -934,7 +948,7 @@ mod tests {
     tree.layout(Size::zero());
     let ids = tree
       .content_root()
-      .descendants(&tree.arena)
+      .descendants(&tree)
       .collect::<Vec<_>>();
     assert_eq!(ids.len(), 2);
     {
@@ -943,7 +957,7 @@ mod tests {
     tree.layout(Size::zero());
     let new_ids = tree
       .content_root()
-      .descendants(&tree.arena)
+      .descendants(&tree)
       .collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 2);
 
@@ -971,7 +985,7 @@ mod tests {
     tree.layout(Size::zero());
     let ids = tree
       .content_root()
-      .descendants(&tree.arena)
+      .descendants(&tree)
       .collect::<Vec<_>>();
     assert_eq!(ids.len(), 3);
     {
@@ -980,7 +994,7 @@ mod tests {
     tree.layout(Size::zero());
     let new_ids = tree
       .content_root()
-      .descendants(&tree.arena)
+      .descendants(&tree)
       .collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 3);
 
@@ -1019,7 +1033,7 @@ mod tests {
     assert!(
       tree
         .content_root()
-        .assert_get(&tree.arena)
+        .assert_get(&tree)
         .contain_type::<Box<dyn AnyKey>>()
     );
   }
@@ -1258,7 +1272,7 @@ mod tests {
       wid: Option<WidgetId>,
     }
 
-    fn build(task: Writer<Task>) -> impl IntoWidget<FN> {
+    fn build(task: Writer<Task>) -> impl IntoWidget<'static, FN> {
       fn_widget! {
        @TaskWidget {
           keep_alive: pipe!($task.pin),
@@ -1296,7 +1310,7 @@ mod tests {
     fn child_count(wnd: &Window) -> usize {
       let tree = wnd.widget_tree.borrow();
       let root = tree.content_root();
-      root.children(&tree.arena).count()
+      root.children(&tree).count()
     }
 
     let tasks = (0..3)
@@ -1401,31 +1415,28 @@ mod tests {
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
-    fn tree_arena(wnd: &TestWindow) -> Ref<TreeArena> {
-      let tree = wnd.widget_tree.borrow();
-      Ref::map(tree, |t| &t.arena)
-    }
+    fn tree(wnd: &TestWindow) -> Ref<WidgetTree> { wnd.widget_tree.borrow() }
 
     let grandson_id = {
-      let arena = tree_arena(&wnd);
+      let tree = tree(&wnd);
       let root = wnd.widget_tree.borrow().content_root();
       root
-        .first_child(&arena)
+        .first_child(&tree)
         .unwrap()
-        .first_child(&arena)
+        .first_child(&tree)
         .unwrap()
     };
 
     wnd.draw_frame();
-    assert!(!grandson_id.is_dropped(&tree_arena(&wnd)));
+    assert!(!grandson_id.is_dropped(&tree(&wnd)));
 
     c_child.write().take();
     wnd.draw_frame();
-    assert!(!grandson_id.is_dropped(&tree_arena(&wnd)));
+    assert!(!grandson_id.is_dropped(&tree(&wnd)));
 
     *c_child_destroy_until.write() = true;
     wnd.draw_frame();
-    assert!(grandson_id.is_dropped(&tree_arena(&wnd)));
+    assert!(grandson_id.is_dropped(&tree(&wnd)));
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -1435,7 +1446,7 @@ mod tests {
     let hit = State::value(-1);
 
     let v = BoxPipe::value(0);
-    let (v, s) = v.into_pipe().unzip();
+    let (v, s) = v.into_pipe().unzip(ModifyScope::all(), None);
 
     assert_eq!(v, 0);
 
@@ -1451,8 +1462,8 @@ mod tests {
     reset_test_env!();
     let _ = fn_widget! {
       let v = Stateful::new(true);
-      let w = pipe!(*$v).map(move |_| Void.into_widget(ctx!()));
-      w.into_widget(ctx!())
+      let w = pipe!(*$v).map(move |_| Void.into_widget());
+      w.into_widget()
     };
   }
 
@@ -1730,8 +1741,8 @@ mod tests {
       @MockMulti {
         @ {
           pipe!($m_watcher;).map(move |_| [
-            @ { Void.into_widget(ctx!()) },
-            @ { pipe!($son_watcher;).map(|_| Void).into_widget(ctx!()) }
+            @ { Void.into_widget() },
+            @ { pipe!($son_watcher;).map(|_| Void).into_widget() }
           ])
         }
       }

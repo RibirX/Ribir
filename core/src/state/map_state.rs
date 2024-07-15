@@ -22,7 +22,7 @@ impl<S, V, M> StateReader for MapReader<S, M>
 where
   Self: 'static,
   S: StateReader,
-  M: Fn(&S::Value) -> PartData<V> + Clone + 'static,
+  M: Fn(&S::Value) -> PartData<V> + Clone,
 {
   type Value = V;
   type OriginReader = S;
@@ -155,8 +155,9 @@ where
 
 impl<V, S, F> RenderProxy for MapReader<S, F>
 where
+  Self: 'static,
   S: StateReader,
-  F: Fn(&S::Value) -> PartData<V> + Clone + 'static,
+  F: Fn(&S::Value) -> PartData<V> + Clone,
   V: Render,
 {
   type R = V;
@@ -171,8 +172,9 @@ where
 
 impl<V, S, F> RenderProxy for MapWriterAsReader<S, F>
 where
+  Self: 'static,
   S: StateReader,
-  F: Fn(&mut S::Value) -> PartData<V> + Clone + 'static,
+  F: Fn(&mut S::Value) -> PartData<V> + Clone,
   V: Render,
 {
   type R = V;
@@ -185,18 +187,19 @@ where
   fn proxy(&self) -> Self::Target<'_> { self.read() }
 }
 
-impl<S, F> IntoWidgetStrict<RENDER> for MapWriter<S, F>
+impl<'w, S, F> IntoWidgetStrict<'w, RENDER> for MapWriter<S, F>
 where
-  Self: StateReader,
-  <Self as StateReader>::Reader: IntoWidget<RENDER>,
+  Self: 'static,
+  Self: StateReader + 'w,
+  <Self as StateReader>::Reader: IntoWidget<'w, RENDER>,
 {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.clone_reader().into_widget(ctx) }
+  fn into_widget_strict(self) -> Widget<'w> { self.clone_reader().into_widget() }
 }
 
-impl<S, F> IntoWidgetStrict<COMPOSE> for MapWriter<S, F>
+impl<S, F> IntoWidgetStrict<'static, COMPOSE> for MapWriter<S, F>
 where
-  Self: StateWriter,
+  Self: StateWriter + 'static,
   <Self as StateReader>::Value: Compose,
 {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).into_widget(ctx) }
+  fn into_widget_strict(self) -> Widget<'static> { Compose::compose(self) }
 }

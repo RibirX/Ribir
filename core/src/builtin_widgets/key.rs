@@ -121,16 +121,11 @@ where
   fn as_any(&self) -> &dyn Any { self }
 }
 
-impl<V: 'static + Default + Clone + PartialEq> ComposeChild for KeyWidget<V> {
-  type Child = Widget;
-  #[inline]
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, child: Self::Child,
-  ) -> impl IntoWidgetStrict<FN> {
-    fn_widget! {
-      let data: Box<dyn AnyKey> = Box::new(this);
-      child.attach_data(Queryable(data), ctx!()).into_widget(ctx!())
-    }
+impl<'c, V: 'static + Default + Clone + PartialEq> ComposeChild<'c> for KeyWidget<V> {
+  type Child = Widget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    let data: Box<dyn AnyKey> = Box::new(this);
+    child.attach_data(Queryable(data)).into_widget()
   }
 }
 

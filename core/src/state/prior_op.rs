@@ -4,114 +4,161 @@ use priority_queue::PriorityQueue;
 use ribir_algo::Sc;
 use rxrust::prelude::*;
 
+use super::AppCtx;
+use crate::window::WindowId;
+
 /// A priority queue of tasks. So that tasks with higher priority will be
 /// executed first.
-#[derive(Clone, Default)]
-pub struct PriorityTaskQueue<'a>(
-  Sc<RefCell<PriorityQueue<PriorityTask<'a>, i64, ahash::RandomState>>>,
-);
+#[derive(Default)]
+pub struct PriorityTaskQueue(RefCell<PriorityQueue<PriorityTask, i64, ahash::RandomState>>);
 
-pub struct PriorOp<'a, P, S> {
-  prior_fn: P,
+pub struct PriorOp<S, P> {
   source: S,
-  scheduler: PriorityTaskQueue<'a>,
+  priority: P,
 }
 
-pub struct PriorityTask<'a>(Box<dyn FnOnce() + 'a>);
+pub struct PriorityTask(Box<dyn FnOnce()>);
 
-pub struct PriorObserver<'a, O, F> {
+pub struct PriorObserver<O, P> {
   observer: Sc<RefCell<Option<O>>>,
-  prior_fn: F,
-  scheduler: PriorityTaskQueue<'a>,
+  priority: P,
 }
 
-/// A trait for Observable that can be assigned a priority queue to collect its
-/// value with a priority. The values will be emitted in order when the
-/// `PriorityTaskQueue::run` method is called.
+/// This trait defines an Observable that can be assigned a priority. The
+/// `Priority` will collect the values and emitted in order by the priority.
 pub trait PriorityObservable<Item, Err>: ObservableExt<Item, Err> {
-  /// Specify the priority queue an Observable should use to collect its values
-  /// with a priority. The lower the priority value, the higher the priority.
-  fn prior(
-    self, prior: i64, scheduler: PriorityTaskQueue,
-  ) -> PriorOp<impl FnMut() -> i64 + 'static, Self>
-  where
-    Self: Sized,
-  {
-    PriorOp { prior_fn: move || prior, source: self, scheduler }
+  /// This method specifies a static priority to the Observable in the priority
+  /// queue of the window. A lower priority value indicates higher priority.
+  fn value_priority(
+    self, priority: i64, wnd_id: WindowId,
+  ) -> PriorOp<Self, WindowPriority<impl FnMut() -> i64>> {
+    self.fn_priority(move || priority, wnd_id)
   }
 
-  /// Specify the priority queue an Observable should use to collect its values
-  /// and every value will be assigned a priority by the given function. The
-  /// lower the priority value, the higher the priority.
-  fn prior_by<P>(self, prior_fn: P, scheduler: PriorityTaskQueue) -> PriorOp<P, Self>
-  where
-    Self: Sized,
-    P: FnMut() -> i64,
-  {
-    PriorOp { prior_fn, source: self, scheduler }
+  /// The method defines the priority for the Observable in the window's
+  /// priority queue. The priority value is calculated for each emitted value by
+  /// the function `f`, with lower values indicating higher priority.
+  fn fn_priority(
+    self, f: impl FnMut() -> i64, wnd_id: WindowId,
+  ) -> PriorOp<Self, WindowPriority<impl FnMut() -> i64>> {
+    PriorOp { source: self, priority: WindowPriority { wnd_id, priority: f } }
   }
+
+  fn priority<P: Priority>(self, priority: P) -> PriorOp<Self, P> {
+    PriorOp { source: self, priority }
+  }
+}
+
+/// This trait is used to determine the priority of a task and the queue used to
+/// collect these tasks.
+pub trait Priority {
+  fn priority(&mut self) -> i64;
+
+  fn queue(&mut self) -> Option<&PriorityTaskQueue>;
+}
+
+pub struct WindowPriority<P> {
+  wnd_id: WindowId,
+  priority: P,
+}
+
+impl<P> WindowPriority<P> {
+  pub fn new(wnd_id: WindowId, priority: P) -> Self { Self { wnd_id, priority } }
+}
+
+impl<P: FnMut() -> i64> Priority for WindowPriority<P> {
+  fn priority(&mut self) -> i64 { (self.priority)() }
+
+  fn queue(&mut self) -> Option<&PriorityTaskQueue> {
+    AppCtx::get_window(self.wnd_id).map(|wnd| {
+      let queue = wnd.priority_task_queue();
+      // Safety: This trait is only used within this module, and we can ensure that
+      // the window is valid when utilizing the `PriorityTaskQueue`.
+      unsafe { std::mem::transmute(queue) }
+    })
+  }
+}
+
+impl Priority for Box<dyn Priority> {
+  fn priority(&mut self) -> i64 { (**self).priority() }
+
+  fn queue(&mut self) -> Option<&PriorityTaskQueue> { (**self).queue() }
 }
 
 impl<Item, Err, T> PriorityObservable<Item, Err> for T where T: ObservableExt<Item, Err> {}
 
-impl<'a, Item: 'a, Err: 'a, O, S, P> Observable<Item, Err, O> for PriorOp<'a, P, S>
+impl<Item: 'static, Err: 'static, O, S, P> Observable<Item, Err, O> for PriorOp<S, P>
 where
-  O: Observer<Item, Err> + 'a,
-  S: Observable<Item, Err, PriorObserver<'a, O, P>>,
-  P: FnMut() -> i64,
+  O: Observer<Item, Err> + 'static,
+  S: Observable<Item, Err, PriorObserver<O, P>> + 'static,
+  P: Priority + 'static,
 {
   type Unsub = ZipSubscription<S::Unsub, PrioritySubscription<O>>;
 
   fn actual_subscribe(self, observer: O) -> Self::Unsub {
-    let Self { prior_fn, source, scheduler } = self;
+    let Self { source, priority } = self;
     let observer = Sc::new(RefCell::new(Some(observer)));
     let o2 = observer.clone();
-    let u = source.actual_subscribe(PriorObserver { observer, prior_fn, scheduler });
+    let u = source.actual_subscribe(PriorObserver { observer, priority });
     ZipSubscription::new(u, PrioritySubscription(o2))
   }
 }
 
-impl<'a, Item: 'a, Err: 'a, S, P> ObservableExt<Item, Err> for PriorOp<'a, P, S>
+impl<Item, Err, S, P> ObservableExt<Item, Err> for PriorOp<S, P>
 where
   S: ObservableExt<Item, Err>,
-  P: FnMut() -> i64,
+  P: Priority,
 {
 }
 
-impl<'a, Item: 'a, Err: 'a, O, F> Observer<Item, Err> for PriorObserver<'a, O, F>
+impl<Item: 'static, Err: 'static, O, P> Observer<Item, Err> for PriorObserver<O, P>
 where
-  O: Observer<Item, Err> + 'a,
-  F: FnMut() -> i64,
+  O: Observer<Item, Err> + 'static,
+  P: Priority + 'static,
 {
   fn next(&mut self, value: Item) {
-    let priority = (self.prior_fn)();
-    let observer = self.observer.clone();
-    let task = PriorityTask(Box::new(move || {
-      if let Some(o) = observer.borrow_mut().as_mut() {
-        o.next(value)
-      }
-    }));
-    self.scheduler.add(task, priority)
+    let priority = self.priority.priority();
+    if let Some(queue) = self.priority.queue() {
+      let observer = self.observer.clone();
+      let task: Box<dyn FnOnce()> = Box::new(move || {
+        if let Some(o) = observer.borrow_mut().as_mut() {
+          o.next(value)
+        }
+      });
+      queue.add(PriorityTask(task), priority);
+    } else if let Some(o) = self.observer.borrow_mut().as_mut() {
+      o.next(value)
+    }
   }
 
   fn error(mut self, err: Err) {
-    let priority = (self.prior_fn)();
-    let task = PriorityTask(Box::new(move || {
-      if let Some(o) = self.observer.borrow_mut().take() {
-        o.error(err)
-      }
-    }));
-    self.scheduler.add(task, priority + 1)
+    let priority = self.priority.priority();
+    if let Some(queue) = self.priority.queue() {
+      let observer = self.observer.clone();
+      let task: Box<dyn FnOnce()> = Box::new(move || {
+        if let Some(o) = observer.borrow_mut().take() {
+          o.error(err)
+        }
+      });
+      queue.add(PriorityTask(task), priority + 1);
+    } else if let Some(o) = self.observer.borrow_mut().take() {
+      o.error(err)
+    }
   }
 
   fn complete(mut self) {
-    let priority = (self.prior_fn)();
-    let task = PriorityTask(Box::new(move || {
-      if let Some(o) = self.observer.borrow_mut().take() {
-        o.complete()
-      }
-    }));
-    self.scheduler.add(task, priority + 1)
+    let priority = self.priority.priority();
+    if let Some(queue) = self.priority.queue() {
+      let observer = self.observer.clone();
+      let task: Box<dyn FnOnce()> = Box::new(move || {
+        if let Some(o) = observer.borrow_mut().take() {
+          o.complete()
+        }
+      });
+      queue.add(PriorityTask(task), priority + 1);
+    } else if let Some(o) = self.observer.borrow_mut().take() {
+      o.complete()
+    }
   }
 
   fn is_finished(&self) -> bool { self.observer.borrow().is_none() }
@@ -125,31 +172,31 @@ impl<O> Subscription for PrioritySubscription<O> {
   fn is_closed(&self) -> bool { self.0.borrow().is_none() }
 }
 
-impl<'a> PartialEq for PriorityTask<'a> {
+impl PartialEq for PriorityTask {
   fn eq(&self, _: &Self) -> bool {
     // Three isn't two task that are equal.
     false
   }
 }
 
-impl<'a> Eq for PriorityTask<'a> {}
+impl Eq for PriorityTask {}
 
-impl<'a> std::hash::Hash for PriorityTask<'a> {
+impl std::hash::Hash for PriorityTask {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) { std::ptr::hash(&*self.0, state) }
 }
 
-impl<'a> PriorityTaskQueue<'a> {
+impl PriorityTaskQueue {
   pub fn is_empty(&self) -> bool { self.0.borrow().is_empty() }
 
-  pub fn pop(&self) -> Option<(PriorityTask<'a>, i64)> { self.0.borrow_mut().pop() }
+  pub fn pop(&self) -> Option<(PriorityTask, i64)> { self.0.borrow_mut().pop() }
 
   /// Add a task to the queue with a priority.
-  pub fn add(&self, task: PriorityTask<'a>, priority: i64) {
+  pub fn add(&self, task: PriorityTask, priority: i64) {
     self.0.borrow_mut().push(task, -priority);
   }
 }
 
-impl<'a> PriorityTask<'a> {
+impl PriorityTask {
   /// Create a new task.
   pub fn new(f: impl FnOnce() + 'static) -> Self { PriorityTask(Box::new(f)) }
 
@@ -161,51 +208,66 @@ mod tests {
   use super::*;
   #[cfg(target_arch = "wasm32")]
   use crate::test_helper::wasm_bindgen_test;
+  use crate::{
+    prelude::Void,
+    reset_test_env,
+    state::{StateReader, StateWriter, Stateful},
+    test_helper::TestWindow,
+  };
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn prior_smoke() {
-    let result = RefCell::new(Vec::new());
-    let queue = PriorityTaskQueue::default();
+    reset_test_env!();
 
+    let mut wnd = TestWindow::new(Void);
+    let wnd_id = wnd.id();
+
+    let r = Stateful::new(Vec::new());
+
+    let result = r.clone_writer();
     observable::of(2)
-      .prior(2, queue.clone())
-      .subscribe(|v| result.borrow_mut().push(v));
+      .value_priority(2, wnd_id)
+      .subscribe(move |v: i32| result.write().push(v));
 
+    let result = r.clone_writer();
     observable::of(1)
-      .prior(1, queue.clone())
-      .subscribe(|v| result.borrow_mut().push(v));
+      .value_priority(1, wnd_id)
+      .subscribe(move |v| result.write().push(v));
 
+    let result = r.clone_writer();
     observable::of(3)
-      .prior(3, queue.clone())
-      .subscribe(|v| result.borrow_mut().push(v));
+      .value_priority(3, wnd_id)
+      .subscribe(move |v| result.write().push(v));
 
-    while let Some((task, _p)) = queue.pop() {
-      task.run()
-    }
+    wnd.draw_frame();
 
-    assert_eq!(*result.borrow(), vec![1, 2, 3]);
+    assert_eq!(*r.read(), vec![1, 2, 3]);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn prior_by_smoke() {
-    let result = RefCell::new(Vec::new());
-    let queue = PriorityTaskQueue::default();
+    reset_test_env!();
 
+    let r = Stateful::new(Vec::new());
+    let mut wnd = TestWindow::new(Void);
+    let wnd_id = wnd.id();
+
+    let result = r.clone_writer();
     observable::of(2)
-      .prior_by(|| 2, queue.clone())
-      .subscribe(|v| result.borrow_mut().push(v));
+      .fn_priority(|| 2, wnd_id)
+      .subscribe(move |v| result.write().push(v));
+    let result = r.clone_writer();
     observable::of(1)
-      .prior_by(|| 1, queue.clone())
-      .subscribe(|v| result.borrow_mut().push(v));
+      .fn_priority(|| 1, wnd_id)
+      .subscribe(move |v| result.write().push(v));
+    let result = r.clone_writer();
     observable::of(3)
-      .prior_by(|| 3, queue.clone())
-      .subscribe(|v| result.borrow_mut().push(v));
+      .fn_priority(|| 3, wnd_id)
+      .subscribe(move |v| result.write().push(v));
 
-    while let Some((task, _p)) = queue.pop() {
-      task.run()
-    }
-    assert_eq!(*result.borrow(), vec![1, 2, 3]);
+    wnd.draw_frame();
+    assert_eq!(*r.read(), vec![1, 2, 3]);
   }
 }

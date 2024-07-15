@@ -3,16 +3,12 @@ mod prior_op;
 mod splitted_state;
 mod stateful;
 mod watcher;
-use std::{
-  cell::{Cell, UnsafeCell},
-  convert::Infallible,
-  mem::MaybeUninit,
-  ops::DerefMut,
-};
+use std::{cell::UnsafeCell, convert::Infallible, mem::MaybeUninit, ops::DerefMut};
 pub mod state_cell;
 
 pub use map_state::*;
 pub use prior_op::*;
+use ribir_algo::Sc;
 use rxrust::ops::box_it::{BoxOp, CloneableBoxOp};
 pub use splitted_state::*;
 pub use state_cell::{PartData, ReadRef};
@@ -122,7 +118,7 @@ pub trait StateWriter: StateWatcher {
   #[inline]
   fn split_writer<V, W>(&self, mut_map: W) -> SplittedWriter<Self::Writer, W>
   where
-    W: Fn(&mut Self::Value) -> PartData<V> + Clone + 'static,
+    W: Fn(&mut Self::Value) -> PartData<V> + Clone,
   {
     SplittedWriter::new(self.clone_writer(), mut_map)
   }
@@ -150,7 +146,7 @@ pub trait StateWriter: StateWatcher {
 
 pub struct WriteRef<'a, V> {
   value: ValueMutRef<'a, V>,
-  control: &'a dyn WriterControl,
+  info: &'a Sc<WriterInfo>,
   modify_scope: ModifyScope,
   modified: bool,
 }
@@ -161,12 +157,6 @@ pub struct State<W>(pub(crate) UnsafeCell<InnerState<W>>);
 pub(crate) enum InnerState<W> {
   Data(StateCell<W>),
   Stateful(Stateful<W>),
-}
-
-trait WriterControl {
-  fn batched_modifies(&self) -> &Cell<ModifyScope>;
-  fn notifier(&self) -> &Notifier;
-  fn dyn_clone(&self) -> Box<dyn WriterControl>;
 }
 
 impl<T: 'static> StateReader for State<T> {
@@ -271,7 +261,7 @@ impl<'a, V> WriteRef<'a, V> {
     let borrow = orig.value.borrow.clone();
     let value = ValueMutRef { inner, borrow };
 
-    WriteRef { value, modified: false, modify_scope: orig.modify_scope, control: orig.control }
+    WriteRef { value, modified: false, modify_scope: orig.modify_scope, info: orig.info }
   }
 
   pub fn map_split<U1, U2, F>(
@@ -280,14 +270,14 @@ impl<'a, V> WriteRef<'a, V> {
   where
     F: FnOnce(&mut V) -> (PartData<U1>, PartData<U2>),
   {
-    let WriteRef { control, modify_scope, modified, .. } = orig;
+    let WriteRef { info, modify_scope, modified, .. } = orig;
     let (a, b) = f(&mut *orig.value);
     let borrow = orig.value.borrow.clone();
     let a = ValueMutRef { inner: a, borrow: borrow.clone() };
     let b = ValueMutRef { inner: b, borrow };
     (
-      WriteRef { value: a, modified, modify_scope, control },
-      WriteRef { value: b, modified, modify_scope, control },
+      WriteRef { value: a, modified, modify_scope, info },
+      WriteRef { value: b, modified, modify_scope, info },
     )
   }
 
@@ -316,21 +306,21 @@ impl<'a, W> DerefMut for WriteRef<'a, W> {
 
 impl<'a, W> Drop for WriteRef<'a, W> {
   fn drop(&mut self) {
-    let Self { control, modify_scope, modified, .. } = self;
+    let Self { info, modify_scope, modified, .. } = self;
     if !*modified {
       return;
     }
 
-    let batched_modifies = control.batched_modifies();
+    let batched_modifies = &info.batched_modifies;
     if batched_modifies.get().is_empty() && !modify_scope.is_empty() {
       batched_modifies.set(*modify_scope);
 
-      let control = control.dyn_clone();
+      let info = info.clone();
       let _ = AppCtx::spawn_local(async move {
-        let scope = control
-          .batched_modifies()
+        let scope = info
+          .batched_modifies
           .replace(ModifyScope::empty());
-        control.notifier().next(scope);
+        info.notifier.next(scope);
       });
     } else {
       batched_modifies.set(*modify_scope | batched_modifies.get());
@@ -338,18 +328,18 @@ impl<'a, W> Drop for WriteRef<'a, W> {
   }
 }
 
-impl<R: Render> IntoWidgetStrict<RENDER> for State<R> {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+impl<R: Render> IntoWidgetStrict<'static, RENDER> for State<R> {
+  fn into_widget_strict(self) -> Widget<'static> {
     match self.0.into_inner() {
-      InnerState::Data(w) => w.into_inner().into_widget(ctx),
-      InnerState::Stateful(w) => w.into_widget(ctx),
+      InnerState::Data(w) => w.into_inner().into_widget(),
+      InnerState::Stateful(w) => w.into_widget(),
     }
   }
 }
 
-impl<W: Compose + 'static> IntoWidgetStrict<COMPOSE> for State<W> {
+impl<W: Compose + 'static> IntoWidgetStrict<'static, COMPOSE> for State<W> {
   #[inline]
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).into_widget(ctx) }
+  fn into_widget_strict(self) -> Widget<'static> { Compose::compose(self) }
 }
 
 impl<T> MultiChild for T
@@ -368,7 +358,7 @@ where
 
 #[cfg(test)]
 mod tests {
-  use ribir_algo::Sc;
+  use std::cell::Cell;
 
   use super::*;
   #[cfg(target_arch = "wasm32")]
@@ -455,9 +445,7 @@ mod tests {
   struct C;
 
   impl Compose for C {
-    fn compose(_: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
-      fn_widget! { Void }
-    }
+    fn compose(_: impl StateWriter<Value = Self>) -> Widget<'static> { Void.into_widget() }
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -488,12 +476,10 @@ mod tests {
   }
 
   struct CC;
-  impl ComposeChild for CC {
-    type Child = Option<Widget>;
-    fn compose_child(
-      _: impl StateWriter<Value = Self>, _: Self::Child,
-    ) -> impl IntoWidgetStrict<FN> {
-      fn_widget! { @{ Void } }
+  impl<'c> ComposeChild<'c> for CC {
+    type Child = Option<Widget<'c>>;
+    fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
+      Void.into_widget()
     }
   }
 

@@ -117,6 +117,8 @@ impl App {
             }
           }
           WindowEvent::RedrawRequested => {
+            AppCtx::frame_ticks().clone().next(Instant::now());
+
             if let Some(wnd) = AppCtx::get_window(wnd_id) {
               // if the window is not visible, don't draw it./
               if wnd.is_visible() != Some(false) {
@@ -182,8 +184,8 @@ impl App {
 ///
 /// Upon being dropped, it creates a new window with the `root` widget and
 /// then calls `App::exec`.
-pub struct AppRunGuard<const M: usize, W: IntoWidget<M>> {
-  root: Option<W>,
+pub struct AppRunGuard {
+  root: Option<Widget<'static>>,
   wnd_attrs: Option<WindowAttributes>,
 }
 
@@ -192,8 +194,8 @@ impl App {
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run<const M: usize, W: IntoWidget<M>>(root: W) -> AppRunGuard<M, W> {
-    AppRunGuard::new(root)
+  pub fn run<const M: usize>(root: impl IntoWidget<'static, M>) -> AppRunGuard {
+    AppRunGuard::new(root.into_widget())
   }
 
   /// Get a event sender of the application event loop, you can use this to send
@@ -203,8 +205,8 @@ impl App {
   /// Creating a new window using the `root` widget and the specified canvas.
   /// Note: This is exclusive to the web platform.
   #[cfg(target_family = "wasm")]
-  pub async fn new_with_canvas(
-    root: impl IntoWidgetStrict<FN>, canvas: web_sys::HtmlCanvasElement, attrs: WindowAttributes,
+  pub async fn new_with_canvas<'w, const M: usize>(
+    root: impl IntoWidget<'w, M>, canvas: web_sys::HtmlCanvasElement, attrs: WindowAttributes,
   ) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
@@ -216,8 +218,8 @@ impl App {
   }
 
   /// create a new window with the `root` widget
-  pub async fn new_window<const M: usize>(
-    root: impl IntoWidget<M>, attrs: WindowAttributes,
+  pub async fn new_window<'w, const M: usize>(
+    root: impl IntoWidget<'w, M>, attrs: WindowAttributes,
   ) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
@@ -315,11 +317,11 @@ impl App {
   }
 }
 
-impl<const M: usize, W: IntoWidget<M>> AppRunGuard<M, W> {
-  fn new(root: W) -> Self {
+impl AppRunGuard {
+  fn new(root: Widget<'static>) -> Self {
     static ONCE: std::sync::Once = std::sync::Once::new();
     assert!(!ONCE.is_completed(), "App::run can only be called once.");
-    Self { root: Some(root), wnd_attrs: Some(Default::default()) }
+    Self { root: Some(root.into_widget()), wnd_attrs: Some(Default::default()) }
   }
 
   /// Set the application theme, this will apply to whole application.
@@ -400,7 +402,7 @@ impl<const M: usize, W: IntoWidget<M>> AppRunGuard<M, W> {
   }
 }
 
-impl<const M: usize, W: IntoWidget<M>> Drop for AppRunGuard<M, W> {
+impl Drop for AppRunGuard {
   fn drop(&mut self) {
     let root = self.root.take().unwrap();
     let attr = self.wnd_attrs.take().unwrap();
@@ -592,7 +594,7 @@ mod tests {
     log: Rc<RefCell<Vec<String>>>,
   }
   impl Compose for LogImeEvent {
-    fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+    fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
       fn_widget! {
         @MockBox {
           size: INFINITY_SIZE,
@@ -607,7 +609,7 @@ mod tests {
           on_chars: move|e| $this.log.borrow_mut().push(format!("on_chars {}", e.chars)),
           on_tap: move |_| $this.log.borrow_mut().push("on_tap".to_string()),
         }
-      }
+      }.into_widget()
     }
   }
   #[test]

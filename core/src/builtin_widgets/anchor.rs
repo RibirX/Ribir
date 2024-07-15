@@ -205,7 +205,7 @@ mod test {
   const CHILD_SIZE: Size = Size::new(50., 50.);
   const WND_SIZE: Size = Size::new(100., 100.);
 
-  fn pixel_left_top() -> impl IntoWidgetStrict<FN> {
+  fn pixel_left_top() -> impl IntoWidget<'static, FN> {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -220,7 +220,7 @@ mod test {
     { path = [0, 0], x == 1., }
   );
 
-  fn pixel_left_bottom() -> impl IntoWidgetStrict<FN> {
+  fn pixel_left_bottom() -> impl IntoWidget<'static, FN> {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -235,7 +235,7 @@ mod test {
     { path = [0, 0], x == 1., }
   );
 
-  fn pixel_top_right() -> impl IntoWidgetStrict<FN> {
+  fn pixel_top_right() -> impl IntoWidget<'static, FN> {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
@@ -250,7 +250,7 @@ mod test {
     { path = [0, 0], x == 49.,}
   );
 
-  fn pixel_bottom_right() -> impl IntoWidgetStrict<FN> {
+  fn pixel_bottom_right() -> impl IntoWidget<'static, FN> {
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,

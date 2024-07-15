@@ -189,7 +189,7 @@ mod tests {
     .test();
   }
 
-  fn as_builtin_field() -> impl IntoWidgetStrict<FN> {
+  fn as_builtin_field() -> impl IntoWidget<'static, FN> {
     fn_widget! {
       @MockBox {
         size: Size::new(200., 200.),

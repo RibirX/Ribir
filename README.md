@@ -77,7 +77,7 @@ fn main() {
     let inc_btn = FilledButton::declarer()
       .on_tap(move |_| *c_cnt.write() += 1)
       .finish(ctx)
-      .with_child(Label::new("Inc"), ctx);
+      .with_child(Label::new("Inc"));
 
     let counter = H1::declarer()
       .text(pipe!($cnt.to_string()))
@@ -85,9 +85,9 @@ fn main() {
 
     Row::declarer()
       .finish(ctx)
-      .with_child(inc_btn, ctx)
-      .with_child(counter, ctx)
-      .build(ctx)
+      .with_child(inc_btn)
+      .with_child(counter)
+      .into_widget()
   };
 
   App::run(counter);

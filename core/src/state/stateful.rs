@@ -3,13 +3,13 @@ use std::{cell::Cell, convert::Infallible};
 use ribir_algo::Sc;
 use rxrust::{ops::box_it::CloneableBoxOp, prelude::*};
 
-use super::{state_cell::StateCell, WriterControl};
+use super::state_cell::StateCell;
 use crate::prelude::*;
 
 /// Stateful object use to watch the modifies of the inner data.
 pub struct Stateful<W> {
   data: Sc<StateCell<W>>,
-  info: Sc<StatefulInfo>,
+  info: Sc<WriterInfo>,
 }
 
 pub struct Reader<W>(Sc<StateCell<W>>);
@@ -37,12 +37,12 @@ impl Notifier {
   pub(crate) fn unsubscribe(&mut self) { self.0.clone().unsubscribe(); }
 }
 
-struct StatefulInfo {
-  notifier: Notifier,
+pub(crate) struct WriterInfo {
+  pub(crate) notifier: Notifier,
   /// The counter of the writer may be modified the data.
-  writer_count: Cell<usize>,
+  pub(crate) writer_count: Cell<usize>,
   /// The batched modifies of the `State` which will be notified.
-  batch_modified: Cell<ModifyScope>,
+  pub(crate) batched_modifies: Cell<ModifyScope>,
 }
 
 impl<W: 'static> StateReader for Stateful<W> {
@@ -169,26 +169,17 @@ impl<V: 'static> StateWriter for Writer<V> {
   fn origin_writer(&self) -> &Self::OriginWriter { self }
 }
 
-impl WriterControl for Sc<StatefulInfo> {
-  #[inline]
-  fn batched_modifies(&self) -> &Cell<ModifyScope> { &self.batch_modified }
-
-  #[inline]
-  fn notifier(&self) -> &Notifier { &self.notifier }
-
-  #[inline]
-  fn dyn_clone(&self) -> Box<dyn WriterControl> { Box::new(self.clone()) }
+impl<W> Drop for Stateful<W> {
+  fn drop(&mut self) { self.info.dec_writer(); }
 }
 
-impl<W> Drop for Stateful<W> {
+impl Drop for WriterInfo {
   fn drop(&mut self) {
-    self.dec_writer();
-    // can cancel the notifier, because no one will modify the data.
-    if self.writer_count() == 0 {
-      let notifier = self.info.notifier.clone();
+    if self.writer_count.get() == 0 {
+      let mut notifier = self.notifier.clone();
       // we use an async task to unsubscribe to wait the batched modifies to be
       // notified.
-      let _ = AppCtx::spawn_local(async move { notifier.0.unsubscribe() });
+      let _ = AppCtx::spawn_local(async move { notifier.unsubscribe() });
     }
   }
 }
@@ -200,74 +191,68 @@ impl<W> Writer<W> {
 
 impl<W> Stateful<W> {
   pub fn new(data: W) -> Self {
-    Self { data: Sc::new(StateCell::new(data)), info: Sc::new(StatefulInfo::new()) }
+    Self { data: Sc::new(StateCell::new(data)), info: Sc::new(WriterInfo::new()) }
   }
 
   fn write_ref(&self, scope: ModifyScope) -> WriteRef<'_, W> {
     let value = self.data.write();
-    WriteRef { value, modified: false, modify_scope: scope, control: &self.info }
-  }
-
-  fn writer_count(&self) -> usize { self.info.writer_count.get() }
-  fn inc_writer(&self) {
-    self
-      .info
-      .writer_count
-      .set(self.writer_count() + 1);
-  }
-  fn dec_writer(&self) {
-    self
-      .info
-      .writer_count
-      .set(self.writer_count() - 1);
+    WriteRef { value, modified: false, modify_scope: scope, info: &self.info }
   }
 
   fn clone(&self) -> Self {
-    self.inc_writer();
+    self.info.inc_writer();
     Self { data: self.data.clone(), info: self.info.clone() }
   }
 }
 
-impl StatefulInfo {
-  fn new() -> Self {
-    StatefulInfo {
-      batch_modified: <_>::default(),
+impl WriterInfo {
+  pub(crate) fn new() -> Self {
+    WriterInfo {
+      batched_modifies: <_>::default(),
       writer_count: Cell::new(1),
       notifier: <_>::default(),
     }
   }
+
+  pub(crate) fn inc_writer(&self) { self.writer_count.set(self.writer_count.get() + 1); }
+
+  pub(crate) fn dec_writer(&self) { self.writer_count.set(self.writer_count.get() - 1); }
 }
 
-impl<W: Render> IntoWidgetStrict<RENDER> for Stateful<W> {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+impl<W: Render + 'static> IntoWidgetStrict<'static, RENDER> for Stateful<W> {
+  fn into_widget_strict(self) -> Widget<'static> {
     match self.try_into_value() {
-      Ok(r) => r.into_widget(ctx),
+      Ok(r) => r.into_widget(),
       Err(s) => {
-        let w = s.data.clone().into_widget(ctx);
-        w.dirty_subscribe(s.raw_modifies(), ctx)
+        let f = move |ctx: &BuildCtx| {
+          let w = s.data.clone().into_widget().build(ctx);
+          w.dirty_subscribe(s.raw_modifies(), ctx);
+          w
+        };
+        InnerWidget::LazyBuild(Box::new(f)).into()
       }
     }
   }
 }
 
-impl<W: Compose + 'static> IntoWidgetStrict<COMPOSE> for Stateful<W> {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { Compose::compose(self).into_widget(ctx) }
+impl<W: Compose + 'static> IntoWidgetStrict<'static, COMPOSE> for Stateful<W> {
+  fn into_widget_strict(self) -> Widget<'static> { Compose::compose(self) }
 }
 
-impl<W: Render> IntoWidgetStrict<RENDER> for Reader<W> {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+impl<W: Render> IntoWidgetStrict<'static, RENDER> for Reader<W> {
+  fn into_widget_strict(self) -> Widget<'static> {
     match Sc::try_unwrap(self.0) {
-      Ok(r) => r.into_inner().into_widget(ctx),
-      Err(s) => s.into_widget(ctx),
+      Ok(r) => r.into_inner().into_widget(),
+      Err(s) => s.into_widget(),
     }
   }
 }
 
-impl<W, const M: usize> IntoWidgetStrict<M> for Writer<W>
+impl<'w, W, const M: usize> IntoWidgetStrict<'w, M> for Writer<W>
 where
-  Stateful<W>: IntoWidget<M>,
+  Stateful<W>: IntoWidget<'w, M>,
 {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self.0.into_widget(ctx) }
+  fn into_widget_strict(self) -> Widget<'w> { self.0.into_widget() }
 }
 
 impl Notifier {
@@ -405,13 +390,7 @@ mod tests {
     let mut wnd = TestWindow::new(fn_widget!(MockBox { size: Size::new(100., 100.) }));
     wnd.draw_frame();
     let tree = wnd.widget_tree.borrow();
-    assert_eq!(
-      tree
-        .content_root()
-        .descendants(&tree.arena)
-        .count(),
-      1
-    );
+    assert_eq!(tree.content_root().descendants(&tree).count(), 1);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -482,7 +461,7 @@ mod tests {
     // data + 1, info + 1
     let v = Stateful::new(1);
     // data +1
-    let (_, stream) = pipe!(*$v).unzip();
+    let (_, stream) = pipe!(*$v).unzip(ModifyScope::all(), None);
     let _ = stream.subscribe(|(_, v)| println!("{v}"));
 
     AppCtx::run_until_stalled();
@@ -516,16 +495,17 @@ mod tests {
 
     let v = Stateful::new(1);
     let data = v.data.clone();
-    let info = v.info.clone();
+    let notifier = v.info.notifier.0.clone();
     {
+      let info = v.info.clone();
       let u = watch!(*$v).subscribe(move |_| *v.write() = 2);
       u.unsubscribe();
+      assert_eq!(info.ref_count(), 1);
     }
 
     AppCtx::run_until_stalled();
 
     assert_eq!(data.ref_count(), 1);
-    assert!(info.notifier.0.is_closed());
-    assert_eq!(info.ref_count(), 1);
+    assert!(notifier.is_closed());
   }
 }

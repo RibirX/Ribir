@@ -11,9 +11,9 @@ impl Declare for Visibility {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl ComposeChild for Visibility {
-  type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+impl<'c> ComposeChild<'c> for Visibility {
+  type Child = Widget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       @FocusScope {
         skip_descendants: pipe!(!$this.get_visible()),
@@ -24,6 +24,7 @@ impl ComposeChild for Visibility {
         }
       }
     }
+    .into_widget()
   }
 }
 

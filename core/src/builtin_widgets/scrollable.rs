@@ -29,11 +29,9 @@ impl Declare for ScrollableWidget {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl ComposeChild for ScrollableWidget {
-  type Child = Widget;
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, child: Self::Child,
-  ) -> impl IntoWidgetStrict<FN> {
+impl<'c> ComposeChild<'c> for ScrollableWidget {
+  type Child = Widget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       let mut view = @UnconstrainedBox {
         dir: pipe!(match $this.get_scrollable() {
@@ -62,6 +60,7 @@ impl ComposeChild for ScrollableWidget {
         }
       }
     }
+    .into_widget()
   }
 }
 

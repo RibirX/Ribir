@@ -44,10 +44,10 @@ pub struct ButtonTemplate {
   pub icon: Option<NamedSvg>,
 }
 
-impl ComposeChild for ButtonImpl {
+impl ComposeChild<'static> for ButtonImpl {
   type Child = ButtonTemplate;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     let ButtonTemplate { icon, label } = child;
     fn_widget! {
       @ConstrainedBox {
@@ -80,6 +80,7 @@ impl ComposeChild for ButtonImpl {
         }
       }
     }
+    .into_widget()
   }
 }
 

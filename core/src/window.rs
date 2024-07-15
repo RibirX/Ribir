@@ -43,7 +43,7 @@ pub struct Window {
   frame_pool: RefCell<FuturesLocalSchedulerPool>,
   /// A priority queue of tasks. So that tasks with lower priority value will be
   /// executed first.
-  priority_task_queue: PriorityTaskQueue<'static>,
+  priority_task_queue: PriorityTaskQueue,
   shell_wnd: RefCell<Box<dyn ShellWindow>>,
   /// A vector store the widget id pair of (parent, child). The child need to
   /// drop after its `KeepAlive::keep_alive` be false or its parent
@@ -137,7 +137,7 @@ impl Window {
     self
       .focus_mgr
       .borrow_mut()
-      .focus_next_widget(&self.widget_tree.borrow().arena);
+      .focus_next_widget(&self.widget_tree.borrow());
   }
 
   /// Request switch the focus to prev widget.
@@ -145,7 +145,7 @@ impl Window {
     self
       .focus_mgr
       .borrow_mut()
-      .focus_prev_widget(&self.widget_tree.borrow().arena);
+      .focus_prev_widget(&self.widget_tree.borrow());
   }
 
   /// Return an `rxRust` Scheduler, which will guarantee all task add to the
@@ -159,7 +159,7 @@ impl Window {
     self.frame_scheduler().spawn_local(f)
   }
 
-  pub fn priority_task_queue(&self) -> &PriorityTaskQueue<'static> { &self.priority_task_queue }
+  pub fn priority_task_queue(&self) -> &PriorityTaskQueue { &self.priority_task_queue }
 
   pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, Infallible> {
     self.frame_ticker.frame_tick_stream()
@@ -230,7 +230,7 @@ impl Window {
         self
           .focus_mgr
           .borrow_mut()
-          .refresh_focus(&self.widget_tree.borrow().arena);
+          .refresh_focus(&self.widget_tree.borrow());
         self.run_frame_tasks();
       }
 
@@ -299,13 +299,10 @@ impl Window {
     window
   }
 
-  pub fn set_content_widget<const M: usize>(&self, root: impl IntoWidget<M>) -> &Self {
+  pub fn set_content_widget<'w, const M: usize>(&self, root: impl IntoWidget<'w, M>) -> &Self {
     let build_ctx = BuildCtx::new(None, &self.widget_tree);
-    let root = root.into_widget(&build_ctx);
-    self
-      .widget_tree
-      .borrow_mut()
-      .set_content(root.consume());
+    let root = root.into_widget().build(&build_ctx);
+    self.widget_tree.borrow_mut().set_content(root);
     self
   }
 
@@ -339,12 +336,11 @@ impl Window {
     delay_widgets.retain(|(parent, wid)| {
       let tree = self.widget_tree.borrow();
       let drop_conditional = wid
-        .assert_get(&self.widget_tree.borrow().arena)
+        .assert_get(&tree)
         .query_ref::<KeepAlive>()
         .map_or(true, |d| !d.keep_alive);
-      let parent_dropped = parent.map_or(false, |p| {
-        p.is_dropped(&tree.arena) || p.ancestors(&tree.arena).last() != Some(tree.root())
-      });
+      let parent_dropped = parent
+        .map_or(false, |p| p.is_dropped(&tree) || p.ancestors(&tree).last() != Some(tree.root()));
       let need_drop = drop_conditional || parent_dropped;
       if need_drop {
         drop(tree);
@@ -352,9 +348,7 @@ impl Window {
       } else {
         let mut painter = painter.save_guard();
         if let Some(p) = parent {
-          let offset = tree
-            .store
-            .map_to_global(Point::zero(), *p, &tree.arena);
+          let offset = tree.store.map_to_global(Point::zero(), *p, &tree);
           painter.translate(offset.x, offset.y);
         }
         let mut ctx = PaintingCtx::new(*wid, self.id(), &mut painter);
@@ -393,7 +387,7 @@ impl Window {
           self.emit(id, &mut e);
         }
         DelayEvent::Disposed { id, parent } => {
-          id.descendants(&self.widget_tree.borrow().arena)
+          id.descendants(&self.widget_tree.borrow())
             .collect::<Vec<_>>()
             .into_iter()
             .rev()
@@ -406,7 +400,7 @@ impl Window {
             });
 
           let keep_alive = id
-            .assert_get(&self.widget_tree.borrow().arena)
+            .assert_get(&self.widget_tree.borrow())
             .contain_type::<KeepAlive>();
 
           if keep_alive {
@@ -465,9 +459,9 @@ impl Window {
 
           let mut focus_mgr = self.focus_mgr.borrow_mut();
           if pressed_shift {
-            focus_mgr.focus_prev_widget(&self.widget_tree.borrow().arena);
+            focus_mgr.focus_prev_widget(&self.widget_tree.borrow());
           } else {
-            focus_mgr.focus_next_widget(&self.widget_tree.borrow().arena);
+            focus_mgr.focus_next_widget(&self.widget_tree.borrow());
           }
         }
         DelayEvent::KeyUp(event) => {
@@ -499,7 +493,7 @@ impl Window {
           self
             .focus_mgr
             .borrow_mut()
-            .refresh_focus(&self.widget_tree.borrow().arena);
+            .refresh_focus(&self.widget_tree.borrow());
         }
         DelayEvent::PointerMove(id) => {
           let mut e = Event::PointerMoveCapture(PointerEvent::from_mouse(id, self));
@@ -546,7 +540,7 @@ impl Window {
     // event by it, and never read or write the node. And in the callback, there is
     // no way to mut access the inner data of node or destroy the node.
     let tree = unsafe { &*(&*self.widget_tree.borrow() as *const WidgetTree) };
-    id.assert_get(&tree.arena)
+    id.assert_get(tree)
       .query_all_iter::<MixBuiltin>()
       .for_each(|m| {
         if m.contain_flag(e.flags()) {
@@ -558,12 +552,12 @@ impl Window {
   fn top_down_emit(&self, e: &mut Event, bottom: WidgetId, up: Option<WidgetId>) {
     let tree = self.widget_tree.borrow();
     let path = bottom
-      .ancestors(&tree.arena)
+      .ancestors(&tree)
       .take_while(|id| Some(*id) != up)
       .collect::<Vec<_>>();
 
     path.iter().rev().all(|id| {
-      id.assert_get(&tree.arena)
+      id.assert_get(&tree)
         .query_all_iter::<MixBuiltin>()
         .rev()
         .all(|m| {
@@ -583,10 +577,10 @@ impl Window {
 
     let tree = self.widget_tree.borrow();
     bottom
-      .ancestors(&tree.arena)
+      .ancestors(&tree)
       .take_while(|id| Some(*id) != up)
       .all(|id| {
-        id.assert_get(&tree.arena)
+        id.assert_get(&tree)
           .query_all_iter::<MixBuiltin>()
           .all(|m| {
             if m.contain_flag(e.flags()) {
@@ -621,7 +615,7 @@ impl Window {
       .widget_tree
       .borrow()
       .store
-      .map_to_global(point, id, &self.widget_tree.borrow().arena)
+      .map_to_global(point, id, &self.widget_tree.borrow())
   }
 
   pub fn layout_size(&self, id: WidgetId) -> Option<Size> {

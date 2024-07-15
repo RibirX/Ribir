@@ -36,10 +36,10 @@ pub enum RippleBound {
   Radius(Radius),
 }
 
-impl ComposeChild for Ripple {
-  type Child = Widget;
+impl<'c> ComposeChild<'c> for Ripple {
+  type Child = Widget<'c>;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       let mut container = @Stack { fit: StackFit::Passthrough };
       let ripple_at = $this.ripple_at.clone_writer();
@@ -117,6 +117,7 @@ impl ComposeChild for Ripple {
         @{ ripple_widget }
       }
     }
+    .into_widget()
   }
 }
 

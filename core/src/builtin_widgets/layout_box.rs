@@ -13,9 +13,9 @@ impl Declare for LayoutBox {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl ComposeChild for LayoutBox {
-  type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+impl<'c> ComposeChild<'c> for LayoutBox {
+  type Child = Widget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       @ $child {
         on_performed_layout: move |e| {
@@ -26,6 +26,7 @@ impl ComposeChild for LayoutBox {
         }
       }
     }
+    .into_widget()
   }
 }
 
@@ -66,7 +67,7 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  fn smoke() -> impl IntoWidgetStrict<FN> {
+  fn smoke() -> impl IntoWidget<'static, FN> {
     fn_widget! {
       let mut first_box = @MockBox { size: Size::new(100., 200.) };
       let second_box = @MockBox { size: pipe!($first_box.layout_size()) };

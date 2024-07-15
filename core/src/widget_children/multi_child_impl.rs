@@ -1,15 +1,13 @@
-use smallvec::SmallVec;
-
 use super::*;
 use crate::pipe::InnerPipe;
 
-pub struct MultiPair {
-  pub parent: Widget,
-  pub children: SmallVec<[Widget; 1]>,
+pub struct MultiPair<'a> {
+  pub parent: Widget<'static>,
+  pub children: Vec<Widget<'a>>,
 }
 
-pub trait MultiIntoParent: IntoWidget<RENDER> {
-  fn into_parent(self, ctx: &BuildCtx) -> Widget;
+pub trait MultiIntoParent: 'static {
+  fn into_parent(self) -> Widget<'static>;
 }
 
 macro_rules! impl_widget_child {
@@ -22,12 +20,14 @@ macro_rules! impl_widget_child {
       // - As a single widget child, satisfy the `IntoWidget` requirement, albeit not
       //   `IntoWidget`.
       // - As a `Pipe` that facilitates iteration over multiple widgets.
-      impl< C: IntoWidgetStrict<$m>> WithChild<C, 1, { 100 + $m }> for MultiPair
+      impl<'w, 'c:'w, C> WithChild<'w, C, 1, { 100 + $m }> for MultiPair<'w>
+      where
+        C: IntoWidgetStrict<'c, $m>
       {
-        type Target = MultiPair;
+        type Target = MultiPair<'w>;
         #[inline]
-        fn with_child(mut self, child: C, ctx: &BuildCtx) -> MultiPair{
-          self.children.push(child.into_widget_strict(ctx));
+        fn with_child(mut self, child: C) -> Self::Target {
+          self.children.push(child.into_widget_strict());
           self
         }
       }
@@ -38,15 +38,15 @@ macro_rules! impl_widget_child {
 macro_rules! impl_iter_widget_child {
   ($($m: ident), *) => {
     $(
-      impl<C> WithChild<C, 1, { 110 + $m }> for MultiPair
+      impl<'w, 'v: 'w, C> WithChild<'w, C, 1, { 110 + $m }> for MultiPair<'w>
       where
         C:IntoIterator,
-        C::Item: IntoWidget<$m>,
+        C::Item: IntoWidget<'v, $m>,
       {
-        type Target = MultiPair;
+        type Target = MultiPair<'w>;
         #[inline]
-        fn with_child(mut self, child: C, ctx: &BuildCtx) -> MultiPair {
-          self.children.extend(child.into_iter().map(|w| w.into_widget(ctx)));
+        fn with_child(mut self, child: C) -> Self::Target {
+          self.children.extend(child.into_iter().map(|w| w.into_widget()));
           self
         }
       }
@@ -57,15 +57,16 @@ macro_rules! impl_iter_widget_child {
 macro_rules! impl_pipe_iter_widget_child {
   ($($m: ident), *) => {
     $(
-      impl<C, V> WithChild<C, 1, { 120 + $m }> for MultiPair
+      impl<'w, 'v:'w, C> WithChild<'w, C, 1, { 120 + $m }> for MultiPair<'w>
       where
-        C:InnerPipe<Value=V>,
-        V:IntoIterator,
-        V::Item: IntoWidget<$m>,
+        C:InnerPipe,
+        C::Value: IntoIterator,
+        <C::Value as IntoIterator>::Item: IntoWidget<'v, $m>,
       {
-        type Target = MultiPair;
-        fn with_child(mut self, child: C, ctx: &BuildCtx) -> MultiPair {
-          self.children.extend(child.build_multi(ctx));
+        type Target = MultiPair<'w>;
+
+        fn with_child(mut self, child: C) -> Self::Target {
+          self.children.extend(child.build_multi());
           self
         }
       }
@@ -77,70 +78,65 @@ impl_widget_child!(COMPOSE, RENDER, FN);
 impl_iter_widget_child!(COMPOSE, RENDER, FN);
 impl_pipe_iter_widget_child!(COMPOSE, RENDER, FN);
 
-impl<C, T, const M: usize> WithChild<C, 1, M> for T
+impl<'w, C, T, const M: usize> WithChild<'w, C, 1, M> for T
 where
   T: MultiIntoParent,
-  MultiPair: WithChild<C, 1, M>,
+  MultiPair<'w>: WithChild<'w, C, 1, M>,
 {
-  type Target = <MultiPair as WithChild<C, 1, M>>::Target;
+  type Target = <MultiPair<'w> as WithChild<'w, C, 1, M>>::Target;
+
   #[inline]
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    MultiPair { parent: self.into_parent(ctx), children: SmallVec::new() }.with_child(child, ctx)
+  fn with_child(self, child: C) -> Self::Target {
+    MultiPair { parent: self.into_parent(), children: vec![] }.with_child(child)
   }
 }
 
-impl WithChild<Widget, 1, FN> for MultiPair {
-  type Target = MultiPair;
+impl<'w> WithChild<'w, Widget<'w>, 1, FN> for MultiPair<'w> {
+  type Target = MultiPair<'w>;
 
   #[inline]
-  fn with_child(mut self, child: Widget, _: &BuildCtx) -> MultiPair {
+  fn with_child(mut self, child: Widget<'w>) -> Self::Target {
     self.children.push(child);
     self
   }
 }
 
-impl IntoWidgetStrict<COMPOSE> for MultiPair {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+impl<'w> IntoWidgetStrict<'w, FN> for MultiPair<'w> {
+  fn into_widget_strict(self) -> Widget<'w> {
     let MultiPair { parent, children } = self;
-    let leaf = parent.id().single_leaf(&ctx.tree.borrow().arena);
-    for c in children {
-      ctx.append_child(leaf, c);
-    }
-    parent
+    InnerWidget::SubTree { node: Box::new(parent), children }.into()
   }
 }
 
 // Implementation `IntoParent`
-impl<P: MultiChild + IntoWidget<RENDER>> MultiIntoParent for P {
+impl<P: MultiChild + IntoWidget<'static, RENDER>> MultiIntoParent for P {
   #[inline]
-  fn into_parent(self, ctx: &BuildCtx) -> Widget { self.into_widget(ctx) }
+  fn into_parent(self) -> Widget<'static> { self.into_widget() }
 }
 
-impl<S, V, F> MultiIntoParent for MapPipe<V, S, F>
+impl<'w, S, V, F> MultiIntoParent for MapPipe<V, S, F>
 where
-  S: Pipe,
-  V: MultiIntoParent + 'static,
-  S::Value: 'static,
-  F: FnMut(S::Value) -> V + 'static,
+  Self: InnerPipe<Value = V>,
+  V: MultiIntoParent + IntoWidget<'w, RENDER>,
 {
-  fn into_parent(self, ctx: &BuildCtx) -> Widget { self.into_parent_widget(ctx) }
+  fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
 }
 
-impl<S, V, F> MultiIntoParent for FinalChain<V, S, F>
+impl<'w, S, V, F> MultiIntoParent for FinalChain<V, S, F>
 where
-  S: Pipe<Value = V>,
-  F: FnOnce(ValueStream<V>) -> ValueStream<V> + 'static,
-  V: MultiIntoParent + 'static,
+  Self: InnerPipe<Value = V>,
+  V: MultiIntoParent + IntoWidget<'w, RENDER>,
 {
-  fn into_parent(self, ctx: &BuildCtx) -> Widget { self.into_parent_widget(ctx) }
+  fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
 }
 
-impl<V: MultiIntoParent + 'static> MultiIntoParent for Box<dyn Pipe<Value = V>> {
-  fn into_parent(self, ctx: &BuildCtx) -> Widget { self.into_parent_widget(ctx) }
+impl<'w, V> MultiIntoParent for Box<dyn Pipe<Value = V>>
+where
+  V: MultiIntoParent + IntoWidget<'w, RENDER>,
+{
+  fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
 }
 
 impl<P: MultiIntoParent> MultiIntoParent for FatObj<P> {
-  fn into_parent(self, ctx: &BuildCtx) -> Widget {
-    self.map(|p| p.into_parent(ctx)).into_widget(ctx)
-  }
+  fn into_parent(self) -> Widget<'static> { self.map(|p| p.into_parent()).into_widget() }
 }

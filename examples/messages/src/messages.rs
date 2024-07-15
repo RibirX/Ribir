@@ -13,7 +13,7 @@ struct MessageList {
   messages: Vec<Message>,
 }
 
-pub fn messages() -> impl IntoWidgetStrict<FN> {
+pub fn messages() -> Widget<'static> {
   fn_widget! {
     MessageList {
       messages: vec![
@@ -40,10 +40,11 @@ pub fn messages() -> impl IntoWidgetStrict<FN> {
       ],
     }
   }
+  .into_widget()
 }
 
 impl Compose for MessageList {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       @Column {
         background: Palette::of(ctx!()).surface(),
@@ -87,7 +88,7 @@ impl Compose for MessageList {
                             @Leading(
                               EdgeWidget::Avatar(@Avatar { @{ message.img.clone() } })
                             )
-                            @Trailing(EdgeWidget::Icon(svgs::MORE_HORIZ.into_widget(ctx!())))
+                            @Trailing(EdgeWidget::Icon(svgs::MORE_HORIZ.into_widget()))
                           }
                           @Divider {}
                         }
@@ -110,6 +111,7 @@ impl Compose for MessageList {
         }
       }
     }
+    .into_widget()
   }
 }
 

@@ -8,23 +8,23 @@ pub struct Embed {
 }
 
 impl Compose for Embed {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       let recursive_child: Widget = if $this.depth > 1 {
         let width = $this.width;
         let depth = $this.depth - 1;
-        Embed { width, depth }.build(ctx!())
+        Embed { width, depth }.into_widget()
       } else {
-        MockBox { size: Size::new(10., 10.) }.build(ctx!())
+        MockBox { size: Size::new(10., 10.) }.into_widget()
       };
       let multi = pipe!{
         (0..$this.width - 1).map(|_| MockBox { size: Size::new(10., 10.)})
       };
       MockMulti
-        .with_child(multi, ctx!())
-        .with_child(recursive_child, ctx!())
-
+        .with_child(multi)
+        .with_child(recursive_child)
     }
+    .into_widget()
   }
 }
 
@@ -35,7 +35,7 @@ pub struct Recursive {
 }
 
 impl Compose for Recursive {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       @MockMulti {
         @{
@@ -43,15 +43,16 @@ impl Compose for Recursive {
             .map(move |(width, depth)| {
               (0..width).map(move |_| -> Widget {
                 if depth > 1 {
-                  Recursive { width, depth: depth - 1 }.build(ctx!())
+                  Recursive { width, depth: depth - 1 }.into_widget()
                 } else {
-                  MockBox { size: Size::new(10., 10.)}.build(ctx!())
+                  MockBox { size: Size::new(10., 10.)}.into_widget()
                 }
               })
             })
         }
-       }
+      }
     }
+    .into_widget()
   }
 }
 

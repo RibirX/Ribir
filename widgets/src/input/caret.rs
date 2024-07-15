@@ -7,7 +7,7 @@ pub struct Caret {
 }
 
 impl Compose for Caret {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     let blink_interval = Duration::from_millis(500);
     fn_widget! {
       let icon = $this.icon;
@@ -31,5 +31,6 @@ impl Compose for Caret {
         });
       @ $caret { on_disposed: move |_| u.unsubscribe() }
     }
+    .into_widget()
   }
 }

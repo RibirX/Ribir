@@ -5,34 +5,33 @@ use crate::{context::BuildCtx, pipe::*, widget::*};
 /// without implementing conflicts.  So you should not directly implement this
 /// trait. Implement `Into` instead.
 pub trait IntoChild<C, const M: usize> {
-  fn into_child(self, ctx: &BuildCtx) -> C;
+  fn into_child(self) -> C;
 }
 
 pub const SELF: usize = 0;
 
 impl<C> IntoChild<C, SELF> for C {
   #[inline(always)]
-  fn into_child(self, _: &BuildCtx) -> C { self }
+  fn into_child(self) -> C { self }
 }
 
 impl<C> IntoChild<Option<C>, SELF> for C {
   #[inline(always)]
-  fn into_child(self, _: &BuildCtx) -> Option<C> { Some(self) }
+  fn into_child(self) -> Option<C> { Some(self) }
 }
 
-impl<F: FnMut(&BuildCtx) -> Widget + 'static> IntoChild<GenWidget, 0> for F {
+impl<F: FnMut(&BuildCtx) -> Widget<'static> + 'static> IntoChild<GenWidget, 0> for F {
   #[inline]
-  fn into_child(self, _: &BuildCtx) -> GenWidget { GenWidget::new(self) }
+  fn into_child(self) -> GenWidget { GenWidget::new(self) }
 }
 
 // All possible widget conversions.
 macro_rules! impl_into_widget_child {
   ($($m:ident),*) => {
     $(
-      // `IntoWidgetStrict` is utilized here to prevent conflicts with the `Self`
-      impl<T: IntoWidgetStrict<$m>> IntoChild<Widget, $m> for T {
+      impl<'a, T: IntoWidgetStrict<'a, $m> + 'a> IntoChild<Widget<'a>, $m> for T {
         #[inline(always)]
-        fn into_child(self, ctx: &BuildCtx) -> Widget { self.into_widget_strict(ctx) }
+        fn into_child(self) -> Widget<'a> { self.into_widget_strict() }
       }
     )*
   };
@@ -43,17 +42,17 @@ impl_into_widget_child!(COMPOSE, RENDER, FN);
 macro_rules! impl_into_option_widget_child {
   ($($m: ident), *) => {
     $(
-      impl<T: IntoWidgetStrict<$m>> IntoChild<Option<Widget>, $m> for Option<T> {
+      impl<'a, T: IntoWidgetStrict<'a, $m> + 'a> IntoChild<Option<Widget<'a>>, $m> for Option<T> {
         #[inline(always)]
-        fn into_child(self, ctx: &BuildCtx) -> Option<Widget> {
-          self.map(|v| v.into_widget_strict(ctx))
+        fn into_child(self) -> Option<Widget<'a>> {
+          self.map(|v| v.into_widget_strict())
         }
       }
 
-      impl<T: IntoWidgetStrict<$m>> IntoChild<Option<Widget>, $m> for T {
+      impl<'a, T: IntoWidgetStrict<'a, $m> + 'a> IntoChild<Option<Widget<'a>>, $m> for T {
         #[inline(always)]
-        fn into_child(self, ctx: &BuildCtx) -> Option<Widget> {
-          Some(self.into_widget_strict(ctx))
+        fn into_child(self) -> Option<Widget<'a>> {
+          Some(self.into_widget_strict())
         }
       }
     )*
@@ -62,31 +61,27 @@ macro_rules! impl_into_option_widget_child {
 
 impl_into_option_widget_child!(COMPOSE, RENDER, FN);
 
-impl<V, S, F, const M: usize> IntoChild<Widget, M> for MapPipe<Option<V>, S, F>
+impl<V, S, F, const M: usize> IntoChild<Widget<'static>, M> for MapPipe<Option<V>, S, F>
 where
-  V: IntoWidget<M> + 'static,
-  S: InnerPipe,
-  S::Value: 'static,
-  F: FnMut(S::Value) -> Option<V> + 'static,
+  Self: IntoWidget<'static, M>,
 {
-  fn into_child(self, ctx: &BuildCtx) -> Widget { self.into_widget(ctx) }
+  fn into_child(self) -> Widget<'static> { self.into_widget() }
 }
 
-impl<V, S, F, const M: usize> IntoChild<Widget, M> for FinalChain<Option<V>, S, F>
+impl<V, S, F, const M: usize> IntoChild<Widget<'static>, M> for FinalChain<Option<V>, S, F>
 where
-  V: IntoWidget<M> + 'static,
-  S: InnerPipe<Value = Option<V>>,
-  F: FnOnce(ValueStream<Option<V>>) -> ValueStream<Option<V>> + 'static,
+  Self: IntoWidget<'static, M>,
 {
-  fn into_child(self, ctx: &BuildCtx) -> Widget { self.into_widget(ctx) }
+  fn into_child(self) -> Widget<'static> { self.into_widget() }
 }
 
-impl<const M: usize, V: IntoWidget<M> + 'static> IntoChild<Widget, M>
-  for Box<dyn Pipe<Value = Option<V>>>
+impl<V, const M: usize> IntoChild<Widget<'static>, M> for Box<dyn Pipe<Value = Option<V>>>
+where
+  Self: IntoWidget<'static, M>,
 {
-  fn into_child(self, ctx: &BuildCtx) -> Widget { self.into_widget(ctx) }
+  fn into_child(self) -> Widget<'static> { self.into_widget() }
 }
 
-impl<P: Pipe + 'static> IntoChild<BoxPipe<P::Value>, 0> for P {
-  fn into_child(self, _: &BuildCtx) -> BoxPipe<P::Value> { BoxPipe::pipe(Box::new(self)) }
+impl<P: Pipe> IntoChild<BoxPipe<P::Value>, 0> for P {
+  fn into_child(self) -> BoxPipe<P::Value> { BoxPipe::pipe(Box::new(self)) }
 }

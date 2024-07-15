@@ -3,7 +3,7 @@ use ribir::prelude::*;
 use crate::todos::{Task, Todos};
 
 impl Compose for Todos {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       @Column {
         align_items: Align::Center,
@@ -15,24 +15,26 @@ impl Compose for Todos {
         @Tabs {
           @Tab {
             @TabItem { @Label::new("ALL") }
-            @TabPane(task_lists(&this, |_| true))
+            @TabPane(task_lists(this.clone_writer(), |_| true))
           }
           @Tab {
             @TabItem { @{ Label::new("ACTIVE") } }
-            @TabPane(task_lists(&this, |t| !t.complete ))
+            @TabPane(task_lists(this.clone_writer(), |t| !t.complete ))
           }
           @Tab {
             @TabItem { @{ Label::new("DONE") } }
-            @TabPane(task_lists(&this, |t| t.complete ))
+            @TabPane(task_lists(this, |t| t.complete ))
           }
         }
       }
     }
+    .into_widget()
   }
 }
 
-fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -> GenWidget {
-  let this = this.clone_writer();
+fn task_lists(
+  this: impl StateWriter<Value = Todos> + 'static, cond: fn(&Task) -> bool,
+) -> GenWidget {
   fn_widget! {
     let editing = Stateful::new(None);
     let stagger = Stagger::new(Duration::from_millis(100), transitions::EASE_IN_OUT.of(ctx!()));
@@ -72,14 +74,14 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
                           }
                         }
                       }
-                    }.into_widget(ctx!())
+                    }.into_widget()
 
                   } else {
                     let _hint = || $stagger.write();
                     let item = task_item_widget(task.clone_writer(), stagger.clone_writer());
                     @$item {
                       on_double_tap: move |_| *$editing.write() = Some(id)
-                    }.into_widget(ctx!())
+                    }.into_widget()
                   }
                 });
 
@@ -96,7 +98,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
 
 fn input(
   text: Option<String>, mut on_submit: impl FnMut(CowArc<str>) + 'static,
-) -> impl IntoWidgetStrict<FN> + IntoWidgetStrict<FN> {
+) -> Widget<'static> {
   fn_widget! {
     let input = @Input { };
     if let  Some(text) = text {
@@ -119,10 +121,9 @@ fn input(
       @{ Placeholder::new("What do you want to do ?") }
     }
   }
+  .into_widget()
 }
-fn task_item_widget<S>(
-  task: S, stagger: Writer<Stagger<Box<dyn Transition>>>,
-) -> impl IntoWidgetStrict<FN>
+fn task_item_widget<S>(task: S, stagger: Writer<Stagger<Box<dyn Transition>>>) -> Widget<'static>
 where
   S: StateWriter<Value = Task> + 'static,
   S::OriginWriter: StateWriter<Value = Todos>,
@@ -158,20 +159,21 @@ where
         watch!($checkbox.checked)
           .distinct_until_changed()
           .subscribe(move |v| $task.write().complete = v);
-        CustomEdgeWidget(checkbox.into_widget(ctx!()))
+        CustomEdgeWidget(checkbox.into_widget())
       }))
       @Trailing(EdgeWidget::Icon({
         let icon = svgs::CLOSE;
         @ $icon {
           cursor: CursorIcon::Pointer,
           on_tap: move |_| $todos.write().remove(id),
-        }.into_widget(ctx!())
+        }.into_widget()
       }))
     }
   }
+  .into_widget()
 }
 
-pub fn todos() -> impl IntoWidgetStrict<FN> {
+pub fn todos() -> State<Todos> {
   let todos = if cfg!(not(target_arch = "wasm32")) {
     let todos = State::value(Todos::load());
     // save changes to disk every 5 seconds .
@@ -189,5 +191,5 @@ pub fn todos() -> impl IntoWidgetStrict<FN> {
     State::value(Todos::default())
   };
 
-  fn_widget! { todos }
+  todos
 }

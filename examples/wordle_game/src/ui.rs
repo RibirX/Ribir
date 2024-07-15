@@ -2,18 +2,18 @@ use ribir::prelude::*;
 
 use crate::wordle::{CharHint, Wordle, WordleChar};
 
-pub fn wordle_game() -> impl IntoWidgetStrict<FN> {
-  fn_widget! { @ { Wordle::new(5, 5) }  }
-}
+pub fn wordle_game() -> Wordle { Wordle::new(5, 5) }
 
-trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
+trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
   fn chars_key<const N: usize>(
-    &self, chars: [char; N],
-  ) -> impl Iterator<Item = impl IntoWidgetStrict<FN>> {
-    chars.into_iter().map(|c| self.char_key(c))
+    self, chars: [char; N],
+  ) -> impl Iterator<Item = Widget<'static>> + 'static {
+    chars
+      .into_iter()
+      .map(move |c| self.clone_writer().char_key(c))
   }
 
-  fn char_key(&self, key: char) -> impl IntoWidgetStrict<FN> {
+  fn char_key(self, key: char) -> Widget<'static> {
     let this = self.clone_writer();
     fn_widget! {
       @FilledButton {
@@ -22,10 +22,11 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
         @ { Label::new(key.to_string()) }
       }
     }
+    .into_widget()
   }
 
-  fn keyboard(&self, state_bar: impl StateWriter<Value = Text>) -> impl IntoWidgetStrict<FN> {
-    let this = self.clone_writer();
+  fn keyboard(self, state_bar: impl StateWriter<Value = Text> + 'static) -> Widget<'static> {
+    let this: <Self as StateWriter>::Writer = self.clone_writer();
     fn_widget! {
     let palette = Palette::of(ctx!());
     @Column {
@@ -36,13 +37,13 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
           item_gap: 5.,
           align_items: Align::Center,
           justify_content: JustifyContent::Center,
-          @ { self.chars_key(['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P']) }
+          @ { this.clone_writer().chars_key(['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P']) }
         }
         @Row {
           item_gap: 5.,
           align_items: Align::Center,
           justify_content: JustifyContent::Center,
-          @ { self.chars_key(['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ]) }
+          @ { this.clone_writer().chars_key(['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ]) }
         }
         @Row {
           item_gap: 5.,
@@ -66,9 +67,10 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
         }
       }
     }
+    .into_widget()
   }
 
-  fn chars_grid(&self) -> impl IntoWidgetStrict<FN> {
+  fn chars_grid(self) -> Widget<'static> {
     let this = self.clone_writer();
     fn_widget! {
       @Column {
@@ -91,10 +93,11 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized {
         }
       }
     }
+    .into_widget()
   }
 }
 
-impl<T: StateWriter<Value = Wordle>> WordleExtraWidgets for T {}
+impl<T: StateWriter<Value = Wordle> + 'static> WordleExtraWidgets for T {}
 
 fn hint_color(hint: Option<CharHint>, ctx: &BuildCtx) -> Color {
   let palette = Palette::of(ctx);
@@ -120,7 +123,7 @@ impl Wordle {
     };
   }
 
-  fn char_grid(&self, row: usize, col: usize) -> impl IntoWidgetStrict<FN> + IntoWidget<FN> {
+  fn char_grid(&self, row: usize, col: usize) -> Widget<'static> {
     let char_hint = self.char_hint(row, col);
     let c = char_hint.map(|c| c.char).unwrap_or('\0');
     let hint = char_hint.and_then(|c| c.hint);
@@ -144,14 +147,15 @@ impl Wordle {
         }
       }
     }
+    .into_widget()
   }
 }
 
 impl Compose for Wordle {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       let state_bar = @Text { text: "" };
-      let keyboard = this.keyboard(state_bar.clone_writer());
+      let keyboard = this.clone_writer().keyboard(state_bar.clone_writer());
 
       let give_up = @OutlinedButton {
         on_tap: move |_| {
@@ -194,7 +198,7 @@ impl Compose for Wordle {
           item_gap: 5.,
           @H1 { text: "Wordle" }
           @Divider { extent: 20. }
-          @ {this.chars_grid()}
+          @ { this.chars_grid() }
           @ { state_bar }
           @ { keyboard }
           @Row {
@@ -206,5 +210,6 @@ impl Compose for Wordle {
         }
       }
     }
+    .into_widget()
   }
 }

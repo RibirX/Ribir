@@ -35,7 +35,7 @@ pub struct FabButtonDecorator {
 }
 
 impl ComposeDecorator for FabButtonDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> impl IntoWidgetStrict<FN> { fn_widget!(host) }
+  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
 }
 
 /// FabButton usage
@@ -78,10 +78,10 @@ pub struct FabButton {
   color: Color,
 }
 
-impl ComposeChild for FabButton {
+impl ComposeChild<'static> for FabButton {
   type Child = ButtonTemplate;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     let ButtonTemplate { icon, label } = &child;
     let button_type = match (&icon, &label) {
       (Some(_), Some(_)) => ButtonType::BOTH,
@@ -124,5 +124,6 @@ impl ComposeChild for FabButton {
         }
       }
     }
+    .into_widget()
   }
 }

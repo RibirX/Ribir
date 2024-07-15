@@ -43,9 +43,9 @@ A function widget can be defined directly through a function:
 ```rust no_run
 use ribir::prelude::*;
 
-fn hello_world(ctx!(): &BuildCtx) -> Widget {
+fn hello_world(ctx!(): &BuildCtx) -> Widget<'static> {
   rdl!{ Text { text: "Hello World!" } }
-    .build(ctx!())
+    .into_widget()
 }
 
 fn main() { 
@@ -74,7 +74,7 @@ use ribir::prelude::*;
 fn main() {
   let hello_world = |ctx!(): &BuildCtx| {
     rdl!{ Text { text: "Hello World!" } }
-      .build(ctx!())
+      .into_widget()
   };
   App::run(hello_world);
 }
@@ -87,7 +87,7 @@ move |ctx!(): &BuildCtx| -> Widget {
   {
     // Your code
   }
-  .build(ctx!())
+  .into_widget()
 }
 ```
 
@@ -545,7 +545,7 @@ The first situation is when the subscription's lifecycle should be shorter than 
 ```rust
 use ribir::prelude::*;
 
-fn show_name(name: State<String>) -> impl IntoWidgetStrict<FN> {
+fn show_name(name: State<String>) -> Widget<'static> {
   fn_widget!{
     let text = @Text { text: "Hi, Guest!" };
     let u = watch!($name.to_string()).subscribe(move |name| {
@@ -557,6 +557,7 @@ fn show_name(name: State<String>) -> impl IntoWidgetStrict<FN> {
     // unsubscribe when the widget is destroyed
     @$text { on_disposed: move |_| u.unsubscribe() }
   }
+  .into_widget()
 }
 ```
 
@@ -597,7 +598,7 @@ impl Counter {
 }
 
 impl Compose for Counter {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       @Row {
         @FilledButton {
@@ -607,11 +608,12 @@ impl Compose for Counter {
         @H1 { text: pipe!($this.0.to_string()) }
       }
     }
+    .into_widget()
   }
 }
 
 fn main() { 
-  App::run(fn_widget!{ Counter(0) }); 
+  App::run(Counter(0)); 
 }
 
 ```

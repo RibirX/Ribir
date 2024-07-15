@@ -33,33 +33,39 @@ impl AnonymousAttacher {
   }
 }
 
-// fixme: These APIs should be private, use Provide instead.
-impl Widget {
+// fixme: These APIs should be removed, use Provide instead.
+impl<'a> Widget<'a> {
   /// Attach data to a widget and user can query it.
-  pub fn attach_data<D: Query>(self, data: D, ctx: &BuildCtx) -> Widget {
-    let arena = &mut ctx.tree.borrow_mut().arena;
-    self.id().attach_data(data, arena);
-
-    self
+  pub fn attach_data<D: Query>(self, data: D) -> Widget<'a> {
+    let f = move |ctx: &BuildCtx| {
+      let w = self.build(ctx);
+      w.attach_data(data, &mut ctx.tree.borrow_mut());
+      w
+    };
+    InnerWidget::LazyBuild(Box::new(f)).into()
   }
 
   /// Attach a state to a widget and try to unwrap it before attaching.
   ///
   /// User can query the state or its value type.
   pub fn try_unwrap_state_and_attach<D: Any>(
-    self, data: impl StateWriter<Value = D>, ctx: &BuildCtx,
-  ) -> Widget {
+    self, data: impl StateWriter<Value = D> + 'static,
+  ) -> Widget<'a> {
     match data.try_into_value() {
-      Ok(data) => self.attach_data(Queryable(data), ctx),
-      Err(data) => self.attach_data(data, ctx),
+      Ok(data) => self.attach_data(Queryable(data)),
+      Err(data) => self.attach_data(data),
     }
   }
 
   /// Attach anonymous data to a widget and user can't query it.
-  pub fn attach_anonymous_data(self, data: impl Any, ctx: &BuildCtx) -> Widget {
-    let arena = &mut ctx.tree.borrow_mut().arena;
-    self.id().attach_anonymous_data(data, arena);
-    self
+  pub fn attach_anonymous_data(self, data: impl Any) -> Widget<'a> {
+    let f = move |ctx: &BuildCtx| {
+      let w = self.build(ctx);
+      w.attach_anonymous_data(data, &mut ctx.tree.borrow_mut());
+      w
+    };
+
+    InnerWidget::LazyBuild(Box::new(f)).into()
   }
 }
 

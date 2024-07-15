@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 #[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
@@ -6,15 +5,14 @@ pub use std::{
   ops::Deref,
 };
 
-use rxrust::ops::box_it::CloneableBoxOp;
-use widget_id::RenderQueryable;
+use widget_id::{new_node, RenderQueryable};
 
 pub(crate) use crate::widget_tree::*;
 use crate::{context::*, prelude::*, render_helper::PureRender};
 pub trait Compose: Sized {
   /// Describes the part of the user interface represented by this widget.
   /// Called by framework, should never directly call it.
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN>;
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static>;
 }
 
 pub struct HitTest {
@@ -53,14 +51,38 @@ pub trait Render: 'static {
 }
 
 /// The common type of all widget can convert to.
-pub struct Widget {
-  id: WidgetId,
-  handle: BuildCtxHandle,
+pub struct Widget<'w>(InnerWidget<'w>);
+pub(crate) enum InnerWidget<'w> {
+  Leaf(Box<dyn RenderQueryable>),
+  Lazy(LazyWidget<'w>),
+  LazyBuild(Box<dyn FnOnce(&BuildCtx) -> WidgetId + 'w>),
+  SubTree { node: Box<Widget<'w>>, children: Vec<Widget<'w>> },
+}
+/// This serves as a wrapper for `Box<dyn FnOnce(&BuildCtx) -> Widget<'w> +
+/// 'w>`, but does not utilize the 'w in the return type to prevent the
+/// `LazyWidget` from becoming **invariant**. This approach allows `Widget<'w>`
+/// to remain **covariant** with the lifetime `'w`.
+
+/// This approach should be acceptable since `LazyWidget` is private and not
+/// accessed externally. Additionally, the lifetime will shorten once we consume
+/// it to obtain the `Widget<'w>`.
+pub(crate) struct LazyWidget<'w>(Box<dyn FnOnce(&BuildCtx) -> Widget<'static> + 'w>);
+
+impl<'w> LazyWidget<'w> {
+  pub(crate) fn new(f: impl FnOnce(&BuildCtx) -> Widget<'w> + 'w) -> Self {
+    let f: Box<dyn FnOnce(&BuildCtx) -> Widget<'w> + 'w> = Box::new(f);
+    // Safety: the lifetime will shorten once we consume it to obtain the
+    // `Widget<'w>`.
+    let f: Box<dyn FnOnce(&BuildCtx) -> Widget<'static> + 'w> = unsafe { std::mem::transmute(f) };
+    Self(f)
+  }
+
+  fn consume(self, ctx: &BuildCtx) -> Widget<'w> { (self.0)(ctx) }
 }
 
 /// A boxed function widget that can be called multiple times to regenerate
 /// widget.
-pub struct GenWidget(Box<dyn for<'a, 'b> FnMut(&'a BuildCtx<'b>) -> Widget>);
+pub struct GenWidget(Box<dyn FnMut(&BuildCtx) -> Widget<'static>>);
 
 // The widget type marker.
 pub const COMPOSE: usize = 1;
@@ -72,108 +94,99 @@ pub const FN: usize = 3;
 /// implemented by the framework.
 ///
 /// Instead, focus on implementing `Compose`, `Render`, or `ComposeChild`.
-pub trait IntoWidget<const M: usize> {
-  fn into_widget(self, ctx: &BuildCtx) -> Widget;
+pub trait IntoWidget<'w, const M: usize>: 'w {
+  fn into_widget(self) -> Widget<'w>;
 }
 
 /// A trait used by the framework to implement `IntoWidget`. Unlike
 /// `IntoWidget`, this trait is not implemented for `Widget` itself. This design
 /// choice allows the framework to use either `IntoWidget` or `IntoWidgetStrict`
 /// as a generic bound, preventing implementation conflicts.
-// fixme: should be pub(crate)
-pub trait IntoWidgetStrict<const M: usize> {
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget;
+pub(crate) trait IntoWidgetStrict<'w, const M: usize>: 'w {
+  fn into_widget_strict(self) -> Widget<'w>;
 }
 
-impl IntoWidget<FN> for Widget {
+impl<'w> IntoWidget<'w, FN> for Widget<'w> {
   #[inline(always)]
-  fn into_widget(self, _: &BuildCtx) -> Widget { self }
+  fn into_widget(self) -> Widget<'w> { self }
 }
 
-impl<const M: usize, T: IntoWidgetStrict<M>> IntoWidget<M> for T {
+impl<'w, const M: usize, T: IntoWidgetStrict<'w, M>> IntoWidget<'w, M> for T {
   #[inline(always)]
-  fn into_widget(self, ctx: &BuildCtx) -> Widget { self.into_widget_strict(ctx) }
+  fn into_widget(self) -> Widget<'w> { self.into_widget_strict() }
 }
 
-impl<C: Compose + 'static> IntoWidgetStrict<COMPOSE> for C {
+impl<C: Compose + 'static> IntoWidgetStrict<'static, COMPOSE> for C {
   #[inline]
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
-    Compose::compose(State::value(self)).into_widget(ctx)
+  fn into_widget_strict(self) -> Widget<'static> {
+    Compose::compose(State::value(self)).into_widget()
   }
 }
 
-impl<R: Render + 'static> IntoWidgetStrict<RENDER> for R {
-  #[inline]
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
-    Widget::new(Box::new(PureRender(self)), ctx)
+impl<R: Render + 'static> IntoWidgetStrict<'static, RENDER> for R {
+  fn into_widget_strict(self) -> Widget<'static> {
+    InnerWidget::Leaf(Box::new(PureRender(self))).into()
   }
 }
 
-impl<W: ComposeChild<Child = Option<C>>, C> Compose for W {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
-    fn_widget! {
-      ComposeChild::compose_child(this, None)
+impl<W: ComposeChild<'static, Child = Option<C>>, C> Compose for W {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
+    ComposeChild::compose_child(this, None)
+  }
+}
+
+impl<'w, F> IntoWidgetStrict<'w, FN> for F
+where
+  F: FnOnce(&BuildCtx) -> Widget<'w> + 'w,
+{
+  fn into_widget_strict(self) -> Widget<'w> {
+    let lazy = LazyWidget::new(self);
+    InnerWidget::Lazy(lazy).into()
+  }
+}
+
+impl IntoWidgetStrict<'static, FN> for GenWidget {
+  #[inline]
+  fn into_widget_strict(self) -> Widget<'static> { self.0.into_widget_strict() }
+}
+
+impl<'a> Widget<'a> {
+  pub(crate) fn build(self, ctx: &BuildCtx) -> WidgetId {
+    // fixme: restore the state of `&BuildCtx`, wait for provider.
+    let mut subtrees = vec![];
+    let root = self.inner_build(&mut subtrees, ctx);
+    while let Some((p, child)) = subtrees.pop() {
+      let c = child.inner_build(&mut subtrees, ctx);
+      p.append(c, &mut ctx.tree.borrow_mut());
+    }
+    root
+  }
+
+  fn inner_build(self, subtrees: &mut Vec<(WidgetId, Widget<'a>)>, ctx: &BuildCtx) -> WidgetId {
+    match self.0 {
+      InnerWidget::Leaf(r) => new_node(&mut ctx.tree.borrow_mut().arena, r),
+      InnerWidget::LazyBuild(f) => f(ctx),
+      InnerWidget::Lazy(l) => l.consume(ctx).inner_build(subtrees, ctx),
+      InnerWidget::SubTree { node, children } => {
+        let p = node.inner_build(subtrees, ctx);
+        let leaf = p.single_leaf(&ctx.tree.borrow());
+        for c in children.into_iter().rev() {
+          subtrees.push((leaf, c))
+        }
+        p
+      }
     }
   }
 }
-
-impl<F> IntoWidgetStrict<FN> for F
-where
-  F: FnOnce(&BuildCtx) -> Widget,
-{
-  #[inline]
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget { self(ctx) }
-}
-
-impl IntoWidgetStrict<FN> for GenWidget {
-  #[inline]
-  fn into_widget_strict(mut self, ctx: &BuildCtx) -> Widget { self.gen_widget(ctx) }
-}
-
-impl Widget {
-  /// Consume the widget, and return its id. This means this widget already be
-  /// append into its parent.
-  pub(crate) fn consume(self) -> WidgetId {
-    let id = self.id;
-    std::mem::forget(self);
-    id
-  }
-
-  /// Subscribe the modifies `upstream` to mark the widget dirty when the
-  /// `upstream` emit a modify event that contains `ModifyScope::FRAMEWORK`.
-  pub(crate) fn dirty_subscribe(
-    self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>, ctx: &BuildCtx,
-  ) -> Self {
-    let dirty_set = ctx.tree.borrow().dirty_set.clone();
-    let id = self.id();
-    let h = upstream
-      .filter(|b| b.contains(ModifyScope::FRAMEWORK))
-      .subscribe(move |_| {
-        dirty_set.borrow_mut().insert(id);
-      })
-      .unsubscribe_when_dropped();
-
-    self.attach_anonymous_data(h, ctx)
-  }
-
-  pub(crate) fn id(&self) -> WidgetId { self.id }
-
-  pub(crate) fn new(w: Box<dyn RenderQueryable>, ctx: &BuildCtx) -> Self {
-    Self::from_id(ctx.alloc_widget(w), ctx)
-  }
-
-  pub(crate) fn from_id(id: WidgetId, ctx: &BuildCtx) -> Self { Self { id, handle: ctx.handle() } }
-}
-
 impl GenWidget {
   #[inline]
-  pub fn new(f: impl FnMut(&BuildCtx) -> Widget + 'static) -> Self { Self(Box::new(f)) }
+  pub fn new(f: impl FnMut(&BuildCtx) -> Widget<'static> + 'static) -> Self { Self(Box::new(f)) }
 
   #[inline]
-  pub fn gen_widget(&mut self, ctx: &BuildCtx) -> Widget { (self.0)(ctx) }
+  pub fn gen_widget(&mut self, ctx: &BuildCtx) -> Widget<'static> { (self.0)(ctx) }
 }
 
-impl<F: FnMut(&BuildCtx) -> Widget + 'static> From<F> for GenWidget {
+impl<F: FnMut(&BuildCtx) -> Widget<'static> + 'static> From<F> for GenWidget {
   #[inline]
   fn from(f: F) -> Self { Self::new(f) }
 }
@@ -184,11 +197,6 @@ pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
     .map_or(false, |rect| rect.contains(pos))
 }
 
-impl Drop for Widget {
-  fn drop(&mut self) {
-    log::warn!("widget allocated but never used: {:?}", self.id);
-    self
-      .handle
-      .with_ctx(|ctx| ctx.tree.borrow_mut().remove_subtree(self.id));
-  }
+impl<'w> From<InnerWidget<'w>> for Widget<'w> {
+  fn from(value: InnerWidget<'w>) -> Self { Widget(value) }
 }

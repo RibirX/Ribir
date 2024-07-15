@@ -196,7 +196,7 @@ mod tests {
   }
 
   const SIZE: Size = Size::new(100., 100.);
-  fn with_border() -> impl IntoWidgetStrict<FN> {
+  fn with_border() -> impl IntoWidget<'static, FN> {
     fn_widget! {
       @MockBox {
         size: SIZE,

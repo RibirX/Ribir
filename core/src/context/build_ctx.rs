@@ -1,16 +1,11 @@
 use std::{
-  cell::{OnceCell, Ref, RefCell},
+  cell::{OnceCell, RefCell},
   rc::Rc,
 };
 
 use ribir_algo::Sc;
-use widget_id::RenderQueryable;
 
-use crate::{
-  prelude::*,
-  widget::widget_id::new_node,
-  window::{DelayEvent, WindowId},
-};
+use crate::{prelude::*, window::WindowId};
 
 /// A context provide during build the widget tree.
 pub struct BuildCtx<'a> {
@@ -73,47 +68,6 @@ impl<'a> BuildCtx<'a> {
     f(AppCtx::app_theme())
   }
 
-  /// Get the widget back of `id`, panic if not exist.
-  pub(crate) fn assert_get(&self, id: WidgetId) -> Ref<dyn RenderQueryable> {
-    Ref::map(self.tree.borrow(), |tree| id.assert_get(&tree.arena))
-  }
-
-  pub(crate) fn alloc_widget(&self, widget: Box<dyn RenderQueryable>) -> WidgetId {
-    new_node(&mut self.tree.borrow_mut().arena, widget)
-  }
-
-  pub(crate) fn append_child(&self, parent: WidgetId, child: Widget) {
-    parent.append(child.consume(), &mut self.tree.borrow_mut().arena);
-  }
-
-  /// Insert `next` after `prev`
-  pub(crate) fn insert_after(&self, prev: WidgetId, next: WidgetId) {
-    prev.insert_after(next, &mut self.tree.borrow_mut().arena);
-  }
-
-  /// After insert new subtree to the widget tree, call this to watch the
-  /// subtree and fire mount events.
-  pub(crate) fn on_subtree_mounted(&self, id: WidgetId) {
-    id.descendants(&self.tree.borrow().arena)
-      .for_each(|w| self.on_widget_mounted(w));
-    self.tree.borrow_mut().mark_dirty(id);
-  }
-
-  /// After insert new widget to the widget tree, call this to watch the widget
-  /// and fire mount events.
-  pub(crate) fn on_widget_mounted(&self, id: WidgetId) {
-    self
-      .window()
-      .add_delay_event(DelayEvent::Mounted(id));
-  }
-
-  /// Dispose the whole subtree of `id`, include `id` itself.
-  pub(crate) fn dispose_subtree(&self, id: WidgetId) {
-    id.dispose_subtree(&mut self.tree.borrow_mut());
-  }
-
-  pub(crate) fn mark_dirty(&self, id: WidgetId) { self.tree.borrow_mut().mark_dirty(id); }
-
   pub(crate) fn themes(&self) -> &Vec<Sc<Theme>> {
     self.themes.get_or_init(|| {
       let mut themes = vec![];
@@ -121,9 +75,9 @@ impl<'a> BuildCtx<'a> {
         return themes;
       };
 
-      let arena = &self.tree.borrow().arena;
-      p.ancestors(arena).any(|p| {
-        for t in p.assert_get(arena).query_all_iter::<Sc<Theme>>() {
+      let tree = &self.tree.borrow();
+      p.ancestors(tree).any(|p| {
+        for t in p.assert_get(tree).query_all_iter::<Sc<Theme>>() {
           themes.push(t.clone());
           if matches!(&**t, Theme::Full(_)) {
             break;

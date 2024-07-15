@@ -41,13 +41,13 @@ macro_rules! reset_test_env {
 
 impl TestWindow {
   /// Create a 1024x1024 window for test
-  pub fn new(root: impl IntoWidgetStrict<FN>) -> Self { Self::new_wnd(root, None) }
+  pub fn new<'w, const M: usize>(root: impl IntoWidget<'w, M>) -> Self { Self::new_wnd(root, None) }
 
-  pub fn new_with_size(root: impl IntoWidgetStrict<FN>, size: Size) -> Self {
+  pub fn new_with_size<'w, const M: usize>(root: impl IntoWidget<'w, M>, size: Size) -> Self {
     Self::new_wnd(root, Some(size))
   }
 
-  fn new_wnd(root: impl IntoWidgetStrict<FN>, size: Option<Size>) -> Self {
+  fn new_wnd<'w, const M: usize>(root: impl IntoWidget<'w, M>, size: Option<Size>) -> Self {
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
     let wnd = AppCtx::new_window(Box::new(TestShellWindow::new(size)), root);
     wnd.run_frame_tasks();
@@ -62,12 +62,9 @@ impl TestWindow {
     let tree = self.0.widget_tree.borrow();
     let mut node = tree.root();
     for (level, idx) in path[..].iter().enumerate() {
-      node = node
-        .children(&tree.arena)
-        .nth(*idx)
-        .unwrap_or_else(|| {
-          panic!("node no exist: {:?}", &path[0..level]);
-        });
+      node = node.children(&tree).nth(*idx).unwrap_or_else(|| {
+        panic!("node no exist: {:?}", &path[0..level]);
+      });
     }
     tree.store.layout_info(node).cloned()
   }
@@ -86,7 +83,7 @@ impl TestWindow {
   pub fn content_count(&self) -> usize {
     let widget_tree = self.0.widget_tree.borrow();
     let root = widget_tree.root();
-    let content = root.first_child(&widget_tree.arena).unwrap();
+    let content = root.first_child(&widget_tree).unwrap();
     widget_tree.count(content)
   }
 
@@ -95,6 +92,8 @@ impl TestWindow {
     // Test window not have a eventloop, manually wake-up every frame.
     Timer::wake_timeout_futures();
     self.run_frame_tasks();
+
+    AppCtx::frame_ticks().clone().next(Instant::now());
     self.0.draw_frame();
   }
 }

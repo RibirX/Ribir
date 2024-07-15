@@ -4,7 +4,7 @@ use ribir::{
   prelude::*,
 };
 
-fn bench_example<F: Fn() -> R, R: WidgetBuilder>(b: &mut Bencher, f: F) {
+fn bench_example<const M: usize, W: IntoWidget<'static, M>>(b: &mut Bencher, f: impl Fn() -> W) {
   let _ = AppCtx::shared();
   b.iter(|| {
     let mut wnd = TestWindow::new(f());

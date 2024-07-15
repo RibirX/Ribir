@@ -12,50 +12,48 @@ pub trait TemplateBuilder: Sized {
   fn build_tml(self) -> Self::Target;
 }
 
-impl<T, C, Child, const M: usize> WithChild<C, 2, M> for T
+impl<'w, T, C, const M: usize> WithChild<'w, C, 2, M> for T
 where
-  T: StateWriter,
-  T::Value: ComposeChild<Child = Child>,
-  C: IntoChild<Child, M>,
+  T: StateWriter + 'static,
+  T::Value: ComposeChild<'w>,
+  C: IntoChild<<T::Value as ComposeChild<'w>>::Child, M> + 'w,
 {
-  type Target = Pair<T, Child>;
+  type Target = Pair<T, <T::Value as ComposeChild<'w>>::Child>;
 
-  #[track_caller]
-  fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
-    Pair { parent: self, child: c.into_child(ctx) }
-  }
+  #[inline]
+  fn with_child(self, c: C) -> Self::Target { Pair { parent: self, child: c.into_child() } }
 }
 
 stateless_with_child!(3);
 
-impl<P, T, C, const M: usize> WithChild<C, 4, M> for P
+impl<'w, P, T, C, const M: usize> WithChild<'w, C, 4, M> for P
 where
-  P: StateWriter,
-  P::Value: ComposeChild<Child = T>,
+  P: StateWriter + 'static,
+  P::Value: ComposeChild<'w, Child = T>,
   T: Template,
-  T::Builder: WithChild<C, 2, M, Target = T::Builder>,
+  T::Builder: WithChild<'w, C, 2, M>,
 {
-  type Target = Pair<Self, T::Builder>;
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    let child = T::builder().with_child(child, ctx);
+  type Target = Pair<Self, <T::Builder as WithChild<'w, C, 2, M>>::Target>;
+
+  fn with_child(self, child: C) -> Self::Target {
+    let child = T::builder().with_child(child);
     Pair { parent: self, child }
   }
 }
 
 stateless_with_child!(5);
 
-impl<W, C, T, const M: usize> WithChild<C, 6, M> for W
+impl<'w, W, C, T, const M: usize> WithChild<'w, C, 6, M> for W
 where
-  W: StateWriter,
-  W::Value: ComposeChild<Child = Option<T>>,
+  W: StateWriter + 'static,
+  W::Value: ComposeChild<'w, Child = Option<T>>,
   T: Template,
-  T::Builder: WithChild<C, 2, M, Target = T::Builder>,
+  T::Builder: WithChild<'w, C, 2, M>,
 {
-  type Target = Pair<W, T::Builder>;
-  #[track_caller]
-  fn with_child(self, c: C, ctx: &BuildCtx) -> Self::Target {
+  type Target = Pair<Self, <T::Builder as WithChild<'w, C, 2, M>>::Target>;
+  fn with_child(self, c: C) -> Self::Target {
     let builder = T::builder();
-    let child = builder.with_child(c, ctx);
+    let child = builder.with_child(c);
     Pair { parent: self, child }
   }
 }
@@ -63,28 +61,28 @@ stateless_with_child!(7);
 
 fat_obj_with_child!(2, 3, 4, 5, 6, 7);
 
-impl<const M: usize, W, const N: usize, C1, C2> WithChild<C2, N, M> for Pair<W, C1>
+impl<'w, const M: usize, W: 'w, const N: usize, C1, C2: 'w> WithChild<'w, C2, N, M> for Pair<W, C1>
 where
-  C1: WithChild<C2, N, M>,
+  C1: WithChild<'w, C2, N, M>,
 {
   type Target = Pair<W, C1::Target>;
-  #[track_caller]
-  fn with_child(self, c: C2, ctx: &BuildCtx) -> Self::Target {
+
+  fn with_child(self, c: C2) -> Self::Target {
     let Pair { parent: widget, child } = self;
-    Pair { parent: widget, child: child.with_child(c, ctx) }
+    Pair { parent: widget, child: child.with_child(c) }
   }
 }
 
-impl<W, C> IntoWidgetStrict<FN> for Pair<W, C>
+impl<'w, W, C> IntoWidgetStrict<'w, FN> for Pair<W, C>
 where
-  W: StateWriter,
-  W::Value: ComposeChild,
-  C: IntoChild<<W::Value as ComposeChild>::Child, 0>,
+  W: StateWriter + 'static,
+  W::Value: ComposeChild<'w>,
+  C: IntoChild<<W::Value as ComposeChild<'w>>::Child, 0> + 'w,
 {
   #[inline]
-  fn into_widget_strict(self, ctx: &BuildCtx) -> Widget {
+  fn into_widget_strict(self) -> Widget<'w> {
     let Self { parent, child } = self;
-    ComposeChild::compose_child(parent, child.into_child(ctx)).into_widget(ctx)
+    ComposeChild::compose_child(parent, child.into_child()).into_widget()
   }
 }
 
@@ -105,16 +103,15 @@ impl<T> TemplateBuilder for Vec<T> {
 macro_rules! vec_with_child {
   ($($m:ident),*) => {
     $(
-      impl<C, T> WithChild<C, 2, $m> for Vec<T>
+      impl<'w, C:'w, T:'w> WithChild<'w, C, 2, $m> for Vec<T>
       where
         C: IntoChild<T, $m>,
       {
         type Target = Self;
 
         #[inline]
-        #[track_caller]
-        fn with_child(mut self, child: C, ctx: &BuildCtx) -> Self::Target {
-          self.push(child.into_child(ctx));
+        fn with_child<>(mut self, child: C) -> Self::Target {
+          self.push(child.into_child());
           self
         }
       }
@@ -125,7 +122,7 @@ macro_rules! vec_with_child {
 macro_rules! vec_with_iter_child {
   ($($m:ident),*) => {
     $(
-      impl<C, T> WithChild<C, 2, {5 + $m}> for Vec<T>
+      impl<'w, C:'w, T:'w> WithChild<'w, C, 2, {5 + $m}> for Vec<T>
       where
         C: IntoIterator,
         C::Item: IntoChild<T, $m>,
@@ -133,9 +130,8 @@ macro_rules! vec_with_iter_child {
         type Target = Self;
 
         #[inline]
-        #[track_caller]
-        fn with_child(mut self, child: C, ctx: &BuildCtx) -> Self::Target {
-          self.extend(child.into_iter().map(|v| v.into_child(ctx)));
+        fn with_child(mut self, child: C) -> Self::Target {
+          self.extend(child.into_iter().map(|v| v.into_child()));
           self
         }
       }
@@ -146,59 +142,57 @@ vec_with_child!(SELF, COMPOSE, RENDER, FN);
 vec_with_iter_child!(SELF, COMPOSE, RENDER, FN);
 
 // todo: remove it, keep it for backward compatibility.
-impl<W, C, const M: usize> WithChild<C, 8, M> for State<W>
+impl<'w, W, C, const M: usize> WithChild<'w, C, 8, M> for State<W>
 where
   W: ComposeDecorator + 'static,
-  C: IntoWidget<M>,
+  C: IntoWidget<'w, M>,
 {
-  type Target = Widget;
+  type Target = Widget<'w>;
 
-  #[track_caller]
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Widget {
-    let tid = TypeId::of::<W>();
-    let style = ctx.find_cfg(|t| match t {
-      Theme::Full(t) => t.compose_decorators.styles.get(&tid),
-      Theme::Inherit(i) => i
-        .compose_decorators
-        .as_ref()
-        .and_then(|s| s.styles.get(&tid)),
-    });
+  fn with_child(self, child: C) -> Self::Target {
+    let f = move |ctx: &BuildCtx| {
+      let tid = TypeId::of::<W>();
+      let style = ctx.find_cfg(|t| match t {
+        Theme::Full(t) => t.compose_decorators.styles.get(&tid),
+        Theme::Inherit(i) => i
+          .compose_decorators
+          .as_ref()
+          .and_then(|s| s.styles.get(&tid)),
+      });
 
-    let host = child.into_widget(ctx);
-    if let Some(style) = style {
-      style(Box::new(self), host, ctx)
-    } else {
-      ComposeDecorator::compose_decorator(self, host).into_widget(ctx)
-    }
+      let host = child.into_widget();
+      if let Some(style) = style {
+        style(Box::new(self), host, ctx)
+      } else {
+        ComposeDecorator::compose_decorator(self, host).into_widget()
+      }
+    };
+    f.into_widget()
   }
 }
 
-impl<T: 'static, C, const M: usize> WithChild<C, 9, M> for T
+impl<'w, T, C, const M: usize> WithChild<'w, C, 9, M> for T
 where
-  T: ComposeDecorator,
-  C: IntoWidget<M>,
+  T: ComposeDecorator + 'static,
+  C: IntoWidget<'w, M>,
 {
-  type Target = Widget;
-  #[track_caller]
-  fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-    State::value(self).with_child(child, ctx)
-  }
+  type Target = Widget<'w>;
+
+  fn with_child(self, child: C) -> Self::Target { State::value(self).with_child(child) }
 }
 
 fat_obj_with_child!(8, 9);
 
 macro_rules! stateless_with_child {
   ($n:literal) => {
-    impl<P, C, const M: usize> WithChild<C, $n, M> for P
+    impl<'w, P, C: 'w, const M: usize> WithChild<'w, C, $n, M> for P
     where
-      P: ComposeChild,
-      State<P>: WithChild<C, { $n - 1 }, M>,
+      P: ComposeChild<'w>,
+      State<P>: WithChild<'w, C, { $n - 1 }, M>,
     {
-      type Target = <State<P> as WithChild<C, { $n - 1 }, M>>::Target;
+      type Target = <State<P> as WithChild<'w, C, { $n - 1 }, M>>::Target;
 
-      fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-        State::value(self).with_child(child, ctx)
-      }
+      fn with_child(self, child: C) -> Self::Target { State::value(self).with_child(child) }
     }
   };
 }
@@ -206,14 +200,14 @@ macro_rules! stateless_with_child {
 macro_rules! fat_obj_with_child {
   ($($n:literal),*) => {
     $(
-      impl<W, C, const M: usize> WithChild<C, $n, M> for FatObj<W>
+      impl<'w, W, C: 'w, const M: usize> WithChild<'w, C, $n, M> for FatObj<W>
       where
-        W: WithChild<C, $n, M>,
+        W: WithChild<'w, C, $n, M>,
       {
         type Target = FatObj<W::Target>;
 
-        fn with_child(self, child: C, ctx: &BuildCtx) -> Self::Target {
-          self.map(|host| host.with_child(child, ctx))
+        fn with_child(self, child: C) -> Self::Target {
+          self.map(|host| host.with_child(child))
         }
       }
     )*
@@ -235,50 +229,44 @@ mod tests {
 
   struct P;
 
-  impl ComposeChild for P {
+  impl ComposeChild<'static> for P {
     type Child = PTml;
-    fn compose_child(
-      _: impl StateWriter<Value = Self>, _: Self::Child,
-    ) -> impl IntoWidgetStrict<FN> {
-      fn_widget!(Void)
+    fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
+      Void.into_widget()
     }
   }
 
   #[derive(Declare)]
   struct X;
 
-  impl ComposeChild for X {
-    type Child = Widget;
+  impl<'c> ComposeChild<'c> for X {
+    type Child = Widget<'c>;
 
-    fn compose_child(
-      _: impl StateWriter<Value = Self>, _: Self::Child,
-    ) -> impl IntoWidgetStrict<FN> {
-      fn_widget!(Void)
+    fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
+      Void.into_widget()
     }
   }
 
   #[test]
-  fn template_fill_template() { let _ = |ctx| P.with_child(Void, ctx).into_widget(ctx); }
+  fn template_fill_template() { let _ = |_: &BuildCtx| P.with_child(Void).into_widget(); }
 
   #[test]
   fn pair_compose_child() {
-    let _ = |ctx| -> Widget {
+    let _ = |_: &BuildCtx| -> Widget {
       MockBox { size: ZERO_SIZE }
-        .with_child(X.with_child(Void {}, ctx), ctx)
-        .into_widget(ctx)
+        .with_child(X.with_child(Void {}))
+        .into_widget()
     };
   }
 
   #[derive(Declare)]
   struct PipeParent;
 
-  impl ComposeChild for PipeParent {
+  impl ComposeChild<'static> for PipeParent {
     type Child = BoxPipe<usize>;
 
-    fn compose_child(
-      _: impl StateWriter<Value = Self>, _: Self::Child,
-    ) -> impl IntoWidgetStrict<FN> {
-      fn_widget!(Void)
+    fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
+      Void.into_widget()
     }
   }
 

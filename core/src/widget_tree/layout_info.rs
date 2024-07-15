@@ -6,7 +6,6 @@ use super::{WidgetId, WidgetTree};
 use crate::{
   context::{AppCtx, LayoutCtx, WidgetCtx, WidgetCtxImpl},
   prelude::{Point, Size, INFINITY_SIZE},
-  widget::TreeArena,
   window::{DelayEvent, Window, WindowId},
 };
 
@@ -128,24 +127,24 @@ impl LayoutStore {
     self.data.entry(id).or_default()
   }
 
-  pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
+  pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point, tree: &WidgetTree) -> Point {
     self
       .layout_box_position(id)
       .map_or(pos, |offset| {
         let pos = id
-          .assert_get(arena)
+          .assert_get(tree)
           .get_transform()
           .map_or(pos, |t| t.transform_point(pos));
         pos + offset.to_vector()
       })
   }
 
-  pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point, arena: &TreeArena) -> Point {
+  pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point, tree: &WidgetTree) -> Point {
     self
       .layout_box_position(id)
       .map_or(pos, |offset| {
         let pos = pos - offset.to_vector();
-        id.assert_get(arena)
+        id.assert_get(tree)
           .get_transform()
           .map_or(pos, |t| {
             t.inverse()
@@ -154,18 +153,18 @@ impl LayoutStore {
       })
   }
 
-  pub(crate) fn map_to_global(&self, pos: Point, widget: WidgetId, arena: &TreeArena) -> Point {
+  pub(crate) fn map_to_global(&self, pos: Point, widget: WidgetId, tree: &WidgetTree) -> Point {
     widget
-      .ancestors(arena)
-      .fold(pos, |pos, p| self.map_to_parent(p, pos, arena))
+      .ancestors(tree)
+      .fold(pos, |pos, p| self.map_to_parent(p, pos, tree))
   }
 
-  pub(crate) fn map_from_global(&self, pos: Point, widget: WidgetId, arena: &TreeArena) -> Point {
-    let stack = widget.ancestors(arena).collect::<Vec<_>>();
+  pub(crate) fn map_from_global(&self, pos: Point, widget: WidgetId, tree: &WidgetTree) -> Point {
+    let stack = widget.ancestors(tree).collect::<Vec<_>>();
     stack
       .iter()
       .rev()
-      .fold(pos, |pos, p| self.map_from_parent(*p, pos, arena))
+      .fold(pos, |pos, p| self.map_from_parent(*p, pos, tree))
   }
 }
 
@@ -203,7 +202,7 @@ impl<'a> Layouter<'a> {
         let Self { id, wnd_id, ref tree, .. } = *self;
         let mut ctx = LayoutCtx { id, wnd_id, tree: tree2 };
         let size = id
-          .assert_get(&tree.arena)
+          .assert_get(tree)
           .perform_layout(clamp, &mut ctx);
         // The dynamic widget maybe generate a new widget to instead of self. In that
         // way we needn't add a layout event because it perform layout in another widget
@@ -238,7 +237,7 @@ impl<'a> Layouter<'a> {
       self.box_rect().is_some(),
       "Before try to layout next sibling, self must performed layout."
     );
-    let next = self.id.next_sibling(&self.tree.arena);
+    let next = self.id.next_sibling(self.tree);
     next.map(move |sibling| {
       self.id = sibling;
       self
@@ -343,9 +342,9 @@ mod tests {
       @MockMulti {
         on_performed_layout: move |_| *$root_layout_cnt.write() += 1,
         @ { pipe!($child_box.size.is_empty()).map(move|b| if b {
-            MockBox { size: Size::new(1., 1.) }.into_widget(ctx!())
+            MockBox { size: Size::new(1., 1.) }.into_widget()
           } else {
-            child_box.clone_writer().into_inner().into_widget(ctx!())
+            child_box.clone_writer().into_inner().into_widget()
           })
         }
       }

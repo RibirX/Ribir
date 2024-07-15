@@ -15,14 +15,15 @@ impl Declare for MouseHover {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl ComposeChild for MouseHover {
-  type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+impl<'c> ComposeChild<'c> for MouseHover {
+  type Child = Widget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       @ $child {
         on_pointer_enter: move |_| $this.write().hover = true,
         on_pointer_leave: move |_| $this.write().hover = false,
       }
     }
+    .into_widget()
   }
 }

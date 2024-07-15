@@ -11,9 +11,9 @@ impl Declare for RequestFocus {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl ComposeChild for RequestFocus {
-  type Child = Widget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> impl IntoWidgetStrict<FN> {
+impl<'c> ComposeChild<'c> for RequestFocus {
+  type Child = Widget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       @$child {
         on_mounted: move |e| {
@@ -21,9 +21,10 @@ impl ComposeChild for RequestFocus {
           $this.silent().handle = Some(handle);
         }
       }
-      .into_widget(ctx!())
-      .try_unwrap_state_and_attach(this, ctx!())
+      .into_widget()
+      .try_unwrap_state_and_attach(this)
     }
+    .into_widget()
   }
 }
 impl RequestFocus {
@@ -67,7 +68,7 @@ mod tests {
     let wnd = TestWindow::new(widget);
     let tree = wnd.widget_tree.borrow();
     let id = tree.content_root();
-    let node = id.get(&tree.arena).unwrap();
+    let node = id.get(&tree).unwrap();
     let mut cnt = 0;
     node.query_all_iter::<MixBuiltin>().for_each(|b| {
       if b.contain_flag(BuiltinFlags::Focus) {
