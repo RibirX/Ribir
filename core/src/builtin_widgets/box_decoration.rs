@@ -184,7 +184,7 @@ mod tests {
   fn default_value_is_none() {
     let dummy = std::mem::MaybeUninit::uninit();
     // just for test, we know BoxDecoration not use `ctx` to build.
-    let ctx: BuildCtx<'static> = unsafe { dummy.assume_init() };
+    let ctx: BuildCtx = unsafe { dummy.assume_init() };
     let mut w = BoxDecoration::declarer().finish(&ctx);
     let w = w.get_box_decoration_widget();
 

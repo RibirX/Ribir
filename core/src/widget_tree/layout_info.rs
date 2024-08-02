@@ -126,25 +126,29 @@ impl LayoutStore {
   pub(crate) fn layout_info_or_default(&mut self, id: WidgetId) -> &mut LayoutInfo {
     self.data.entry(id).or_default()
   }
+}
 
-  pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point, tree: &WidgetTree) -> Point {
+impl WidgetTree {
+  pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point) -> Point {
     self
+      .store
       .layout_box_position(id)
       .map_or(pos, |offset| {
         let pos = id
-          .assert_get(tree)
+          .assert_get(self)
           .get_transform()
           .map_or(pos, |t| t.transform_point(pos));
         pos + offset.to_vector()
       })
   }
 
-  pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point, tree: &WidgetTree) -> Point {
+  pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point) -> Point {
     self
+      .store
       .layout_box_position(id)
       .map_or(pos, |offset| {
         let pos = pos - offset.to_vector();
-        id.assert_get(tree)
+        id.assert_get(self)
           .get_transform()
           .map_or(pos, |t| {
             t.inverse()
@@ -153,18 +157,18 @@ impl LayoutStore {
       })
   }
 
-  pub(crate) fn map_to_global(&self, pos: Point, widget: WidgetId, tree: &WidgetTree) -> Point {
+  pub(crate) fn map_to_global(&self, pos: Point, widget: WidgetId) -> Point {
     widget
-      .ancestors(tree)
-      .fold(pos, |pos, p| self.map_to_parent(p, pos, tree))
+      .ancestors(self)
+      .fold(pos, |pos, p| self.map_to_parent(p, pos))
   }
 
-  pub(crate) fn map_from_global(&self, pos: Point, widget: WidgetId, tree: &WidgetTree) -> Point {
-    let stack = widget.ancestors(tree).collect::<Vec<_>>();
+  pub(crate) fn map_from_global(&self, pos: Point, widget: WidgetId) -> Point {
+    let stack = widget.ancestors(self).collect::<Vec<_>>();
     stack
       .iter()
       .rev()
-      .fold(pos, |pos, p| self.map_from_parent(*p, pos, tree))
+      .fold(pos, |pos, p| self.map_from_parent(*p, pos))
   }
 }
 

@@ -242,7 +242,7 @@ impl<'w> Widget<'w> {
     let root = self.into_node(ctx).build(&mut subtrees, ctx);
     while let Some((p, child)) = subtrees.pop() {
       let c = child.into_node(ctx).build(&mut subtrees, ctx);
-      p.append(c, &mut ctx.tree.borrow_mut());
+      p.append(c, ctx.tree_mut());
     }
     root
   }
@@ -307,7 +307,7 @@ impl<'w> Node<'w> {
       PureNode::Render(r) => PureNode::Render(f(r)),
       PureNode::LazyBuild(l) => PureNode::LazyBuild(Box::new(|ctx| {
         let id = l(ctx);
-        id.wrap_node(&mut ctx.tree.borrow_mut(), f);
+        id.wrap_node(&mut ctx.tree_mut(), f);
         id
       })),
     };
@@ -322,7 +322,7 @@ impl<'w> PureNode<'w> {
   pub(crate) fn on_build(self, f: impl FnOnce(WidgetId, &BuildCtx) + 'w) -> Self {
     let lazy = move |ctx: &BuildCtx| {
       let id = match self {
-        PureNode::Render(r) => new_node(&mut ctx.tree.borrow_mut().arena, r),
+        PureNode::Render(r) => new_node(&mut ctx.tree_mut().arena, r),
         PureNode::LazyBuild(l) => l(ctx),
       };
       f(id, ctx);
@@ -334,7 +334,7 @@ impl<'w> PureNode<'w> {
 
   fn alloc(self, ctx: &BuildCtx) -> WidgetId {
     match self {
-      PureNode::Render(r) => new_node(&mut ctx.tree.borrow_mut().arena, r),
+      PureNode::Render(r) => new_node(&mut ctx.tree_mut().arena, r),
       PureNode::LazyBuild(l) => l(ctx),
     }
   }

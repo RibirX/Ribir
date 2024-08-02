@@ -28,7 +28,7 @@ impl WidgetId {
   pub(crate) fn dirty_subscribe(
     self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>, ctx: &BuildCtx,
   ) {
-    let dirty_set = ctx.tree.borrow().dirty_set.clone();
+    let dirty_set = ctx.tree().dirty_set.clone();
     let h = upstream
       .filter(|b| b.contains(ModifyScope::FRAMEWORK))
       .subscribe(move |_| {
@@ -36,7 +36,7 @@ impl WidgetId {
       })
       .unsubscribe_when_dropped();
 
-    self.attach_anonymous_data(h, &mut ctx.tree.borrow_mut());
+    self.attach_anonymous_data(h, ctx.tree_mut());
   }
 
   pub(crate) fn get_node_mut(self, tree: &mut WidgetTree) -> Option<&mut Box<dyn RenderQueryable>> {
@@ -208,7 +208,7 @@ impl WidgetId {
       ctx.id = id;
       ctx.painter.save();
       let wnd = ctx.window();
-      let tree = &wnd.widget_tree.borrow();
+      let tree = wnd.tree();
 
       let mut need_paint = false;
       if ctx.painter.alpha() != 0. {

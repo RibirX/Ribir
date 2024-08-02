@@ -353,7 +353,7 @@ impl<'c> ComposeChild<'c> for MixBuiltin {
       match this.try_into_value() {
         Ok(this) => {
           let mut this = Some(this);
-          if let Some(m) = id.query_ref::<MixBuiltin>(&ctx.tree.borrow()) {
+          if let Some(m) = id.query_ref::<MixBuiltin>(ctx.tree()) {
             let this = unsafe { this.take().unwrap_unchecked() };
             if !m.contain_flag(BuiltinFlags::Focus) && this.contain_flag(BuiltinFlags::Focus) {
               this.callbacks_for_focus_node();
@@ -365,14 +365,14 @@ impl<'c> ComposeChild<'c> for MixBuiltin {
             if this.contain_flag(BuiltinFlags::Focus) {
               this.callbacks_for_focus_node();
             }
-            id.attach_data(Box::new(Queryable(this)), &mut ctx.tree.borrow_mut());
+            id.attach_data(Box::new(Queryable(this)), ctx.tree_mut());
           }
         }
         Err(this) => {
           if this.read().contain_flag(BuiltinFlags::Focus) {
             this.read().callbacks_for_focus_node();
           }
-          id.attach_data(Box::new(this), &mut ctx.tree.borrow_mut())
+          id.attach_data(Box::new(this), ctx.tree_mut())
         }
       }
     })

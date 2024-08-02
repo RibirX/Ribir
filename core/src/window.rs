@@ -2,6 +2,7 @@ use std::{
   cell::{Cell, RefCell},
   collections::VecDeque,
   convert::Infallible,
+  ptr::NonNull,
   rc::Rc,
 };
 
@@ -26,9 +27,9 @@ use crate::{
 /// dispatch the event, but user may access the `Window` to change the title in
 /// event callback.
 pub struct Window {
+  pub(crate) tree: NonNull<WidgetTree>,
   pub(crate) painter: RefCell<Painter>,
   pub(crate) dispatcher: RefCell<Dispatcher>,
-  pub(crate) widget_tree: RefCell<WidgetTree>,
   pub(crate) frame_ticker: FrameTicker,
   pub(crate) focus_mgr: RefCell<FocusManager>,
   pub(crate) running_animates: Rc<Cell<u32>>,
@@ -137,7 +138,7 @@ impl Window {
     self
       .focus_mgr
       .borrow_mut()
-      .focus_next_widget(&self.widget_tree.borrow());
+      .focus_next_widget(self.tree());
   }
 
   /// Request switch the focus to prev widget.
@@ -145,7 +146,7 @@ impl Window {
     self
       .focus_mgr
       .borrow_mut()
-      .focus_prev_widget(&self.widget_tree.borrow());
+      .focus_prev_widget(self.tree());
   }
 
   /// Return an `rxRust` Scheduler, which will guarantee all task add to the
@@ -197,7 +198,7 @@ impl Window {
 
       self.layout();
 
-      self.widget_tree.borrow().draw();
+      self.tree().draw();
       self.draw_delay_drop_widgets();
 
       let mut shell = self.shell_wnd.borrow_mut();
@@ -220,27 +221,22 @@ impl Window {
     loop {
       self.run_frame_tasks();
 
-      self
-        .widget_tree
-        .borrow_mut()
-        .layout(self.shell_wnd.borrow().inner_size());
+      let tree = self.tree_mut();
+      tree.layout(self.shell_wnd.borrow().inner_size());
       self.run_frame_tasks();
 
-      if !self.widget_tree.borrow().is_dirty() {
-        self
-          .focus_mgr
-          .borrow_mut()
-          .refresh_focus(&self.widget_tree.borrow());
+      if !tree.is_dirty() {
+        self.focus_mgr.borrow_mut().refresh_focus(tree);
         self.run_frame_tasks();
       }
 
-      if !self.widget_tree.borrow().is_dirty() {
+      if !tree.is_dirty() {
         let ready = FrameMsg::LayoutReady(Instant::now());
         self.frame_ticker.emit(ready);
         self.run_frame_tasks();
       }
 
-      if !self.widget_tree.borrow().is_dirty() {
+      if !tree.is_dirty() {
         break;
       }
     }
@@ -249,7 +245,7 @@ impl Window {
   pub fn update_painter_viewport(&self) {
     let size = self.shell_wnd.borrow().inner_size();
     if self.painter.borrow().viewport().size != size {
-      let mut tree = self.widget_tree.borrow_mut();
+      let tree = self.tree_mut();
       let root = tree.root();
       tree.mark_dirty(root);
       tree.store.remove(root);
@@ -259,19 +255,17 @@ impl Window {
     }
   }
 
-  pub fn need_draw(&self) -> bool {
-    self.widget_tree.borrow().is_dirty() || self.running_animates.get() > 0
-  }
+  pub fn need_draw(&self) -> bool { self.tree().is_dirty() || self.running_animates.get() > 0 }
 
   pub fn new(shell_wnd: Box<dyn ShellWindow>) -> Rc<Self> {
     let focus_mgr = RefCell::new(FocusManager::new());
-    let widget_tree = RefCell::new(WidgetTree::default());
+    let tree = Box::new(WidgetTree::default());
     let dispatcher = RefCell::new(Dispatcher::new());
     let size = shell_wnd.inner_size();
     let painter = Painter::new(Rect::from_size(size));
     let window = Self {
+      tree: NonNull::new(Box::into_raw(tree)).unwrap(),
       dispatcher,
-      widget_tree,
       painter: RefCell::new(painter),
       focus_mgr,
       delay_emitter: <_>::default(),
@@ -291,18 +285,16 @@ impl Window {
       .focus_mgr
       .borrow_mut()
       .init(Rc::downgrade(&window));
-    window
-      .widget_tree
-      .borrow_mut()
-      .init(Rc::downgrade(&window));
+    let tree = window.tree_mut();
+    tree.init(Rc::downgrade(&window));
 
     window
   }
 
   pub fn set_content_widget<'w, const M: usize>(&self, root: impl IntoWidget<'w, M>) -> &Self {
-    let build_ctx = BuildCtx::new(None, &self.widget_tree);
+    let build_ctx = BuildCtx::new(None, self.tree);
     let root = root.into_widget().build(&build_ctx);
-    self.widget_tree.borrow_mut().set_content(root);
+    self.tree_mut().set_content(root);
     self
   }
 
@@ -334,20 +326,19 @@ impl Window {
     let mut painter = self.painter.borrow_mut();
 
     delay_widgets.retain(|(parent, wid)| {
-      let tree = self.widget_tree.borrow();
+      let tree = self.tree();
       let drop_conditional = wid
-        .query_ref::<KeepAlive>(&tree)
+        .query_ref::<KeepAlive>(tree)
         .map_or(true, |d| !d.keep_alive);
       let parent_dropped = parent
-        .map_or(false, |p| p.is_dropped(&tree) || p.ancestors(&tree).last() != Some(tree.root()));
+        .map_or(false, |p| p.is_dropped(tree) || p.ancestors(tree).last() != Some(tree.root()));
       let need_drop = drop_conditional || parent_dropped;
       if need_drop {
-        drop(tree);
-        self.widget_tree.borrow_mut().remove_subtree(*wid);
+        self.tree_mut().remove_subtree(*wid);
       } else {
         let mut painter = painter.save_guard();
         if let Some(p) = parent {
-          let offset = tree.store.map_to_global(Point::zero(), *p, &tree);
+          let offset = tree.map_to_global(Point::zero(), *p);
           painter.translate(offset.x, offset.y);
         }
         let mut ctx = PaintingCtx::new(*wid, self.id(), &mut painter);
@@ -386,7 +377,7 @@ impl Window {
           self.emit(id, &mut e);
         }
         DelayEvent::Disposed { id, parent } => {
-          id.descendants(&self.widget_tree.borrow())
+          id.descendants(self.tree())
             .collect::<Vec<_>>()
             .into_iter()
             .rev()
@@ -398,7 +389,7 @@ impl Window {
               self.emit(id, &mut e);
             });
 
-          let keep_alive = id.contain_type::<KeepAlive>(&self.widget_tree.borrow());
+          let keep_alive = id.contain_type::<KeepAlive>(self.tree());
 
           if keep_alive {
             self
@@ -410,7 +401,7 @@ impl Window {
           }
         }
         DelayEvent::RemoveSubtree(id) => {
-          self.widget_tree.borrow_mut().remove_subtree(id);
+          self.tree_mut().remove_subtree(id);
         }
         DelayEvent::Focus(id) => {
           let mut e = Event::Focus(FocusEvent::new(id, self.id()));
@@ -456,9 +447,9 @@ impl Window {
 
           let mut focus_mgr = self.focus_mgr.borrow_mut();
           if pressed_shift {
-            focus_mgr.focus_prev_widget(&self.widget_tree.borrow());
+            focus_mgr.focus_prev_widget(self.tree());
           } else {
-            focus_mgr.focus_next_widget(&self.widget_tree.borrow());
+            focus_mgr.focus_next_widget(self.tree());
           }
         }
         DelayEvent::KeyUp(event) => {
@@ -490,7 +481,7 @@ impl Window {
           self
             .focus_mgr
             .borrow_mut()
-            .refresh_focus(&self.widget_tree.borrow());
+            .refresh_focus(self.tree());
         }
         DelayEvent::PointerMove(id) => {
           let mut e = Event::PointerMoveCapture(PointerEvent::from_mouse(id, self));
@@ -533,11 +524,7 @@ impl Window {
   }
 
   fn emit(&self, id: WidgetId, e: &mut Event) {
-    // Safety: we only use tree to query the inner data of a node and dispatch a
-    // event by it, and never read or write the node. And in the callback, there is
-    // no way to mut access the inner data of node or destroy the node.
-    let tree = unsafe { &*(&*self.widget_tree.borrow() as *const WidgetTree) };
-    id.query_all_iter::<MixBuiltin>(tree)
+    id.query_all_iter::<MixBuiltin>(self.tree())
       .for_each(|m| {
         if m.contain_flag(e.flags()) {
           m.dispatch(e);
@@ -546,14 +533,14 @@ impl Window {
   }
 
   fn top_down_emit(&self, e: &mut Event, bottom: WidgetId, up: Option<WidgetId>) {
-    let tree = self.widget_tree.borrow();
+    let tree = self.tree();
     let path = bottom
-      .ancestors(&tree)
+      .ancestors(tree)
       .take_while(|id| Some(*id) != up)
       .collect::<Vec<_>>();
 
     path.iter().rev().all(|id| {
-      id.query_all_iter::<MixBuiltin>(&tree)
+      id.query_all_iter::<MixBuiltin>(tree)
         .rev()
         .all(|m| {
           if m.contain_flag(e.flags()) {
@@ -570,12 +557,12 @@ impl Window {
       return;
     }
 
-    let tree = self.widget_tree.borrow();
+    let tree = self.tree();
     bottom
-      .ancestors(&tree)
+      .ancestors(tree)
       .take_while(|id| Some(*id) != up)
       .all(|id| {
-        id.query_all_iter::<MixBuiltin>(&tree).all(|m| {
+        id.query_all_iter::<MixBuiltin>(tree).all(|m| {
           if m.contain_flag(e.flags()) {
             e.set_current_target(id);
             m.dispatch(e);
@@ -604,19 +591,25 @@ impl Window {
   }
 
   pub fn map_to_global(&self, point: Point, id: WidgetId) -> Point {
-    self
-      .widget_tree
-      .borrow()
-      .store
-      .map_to_global(point, id, &self.widget_tree.borrow())
+    self.tree().map_to_global(point, id)
   }
 
-  pub fn layout_size(&self, id: WidgetId) -> Option<Size> {
-    self
-      .widget_tree
-      .borrow()
-      .store
-      .layout_box_size(id)
+  pub fn layout_size(&self, id: WidgetId) -> Option<Size> { self.tree().store.layout_box_size(id) }
+
+  pub(crate) fn tree(&self) -> &WidgetTree {
+    // Safety: Please refer to the comments in `WidgetTree::tree_mut` for more
+    // information.
+    unsafe { self.tree.as_ref() }
+  }
+
+  #[allow(clippy::mut_from_ref)]
+  pub(crate) fn tree_mut(&self) -> &mut WidgetTree {
+    let mut tree = self.tree;
+    // Safety:
+    // The widget tree is solely utilized for building, layout, and painting, which
+    // all follow a downward flow within the tree. Therefore, even if numerous
+    // mutable references exist, they only modify distinct parts of the tree.
+    unsafe { tree.as_mut() }
   }
 }
 
@@ -682,6 +675,12 @@ impl Window {
     self.shell_wnd.borrow_mut().set_min_size(size);
     self
   }
+}
+
+impl Drop for Window {
+  // Safety: We retain ownership of the box in the constructor and release it
+  // here.
+  fn drop(&mut self) { let _release_tree = unsafe { Box::from_raw(self.tree.as_ptr()) }; }
 }
 
 /// Event that delay to emit, emit it when the window is not busy(nobody borrow

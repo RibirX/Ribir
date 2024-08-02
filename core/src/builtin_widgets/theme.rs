@@ -89,12 +89,12 @@ impl ComposeChild<'static> for ThemeWidget {
       //
       // A `Void` is cheap for a theme.
       let p = Void.into_widget().build(ctx);
-      p.attach_data(Box::new(Queryable(theme)), &mut ctx.tree.borrow_mut());
+      p.attach_data(Box::new(Queryable(theme)), ctx.tree_mut());
 
       // shadow the context with the theme.
       let ctx = BuildCtx::new_with_data(Some(p), ctx.tree, themes);
       let child = child.gen_widget().build(&ctx);
-      p.append(child, &mut ctx.tree.borrow_mut());
+      p.append(child, ctx.tree_mut());
 
       p
     };

@@ -62,7 +62,7 @@ mod tests {
 
     let wnd = TestWindow::new(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
-    let tree = &wnd.widget_tree.borrow();
+    let tree = wnd.tree();
 
     focus_mgr.refresh_focus(tree);
 
@@ -122,7 +122,7 @@ mod tests {
 
     let wnd = TestWindow::new(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
-    let tree = &wnd.widget_tree.borrow();
+    let tree = wnd.tree_mut();
     focus_mgr.refresh_focus(tree);
 
     let id0 = tree.content_root().first_child(tree).unwrap();

@@ -66,11 +66,11 @@ mod tests {
     };
 
     let wnd = TestWindow::new(widget);
-    let tree = wnd.widget_tree.borrow();
+    let tree = wnd.tree();
     let id = tree.content_root();
 
     let mut cnt = 0;
-    id.query_all_iter::<MixBuiltin>(&tree)
+    id.query_all_iter::<MixBuiltin>(tree)
       .for_each(|b| {
         if b.contain_flag(BuiltinFlags::Focus) {
           cnt += 1;

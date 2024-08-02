@@ -128,7 +128,7 @@ impl Dispatcher {
               Some(())
             };
 
-            dispatch(&wnd.widget_tree.borrow());
+            dispatch(wnd.tree());
           }
         }
       };
@@ -155,18 +155,18 @@ impl Dispatcher {
     let hit = self.hit_widget();
     self.pointer_down_uid = hit;
     let wnd = self.window();
-    let tree = wnd.widget_tree.borrow();
+    let tree = wnd.tree();
 
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
-      wid.ancestors(&tree).find(|id| {
-        id.query_ref::<MixBuiltin>(&tree)
+      wid.ancestors(tree).find(|id| {
+        id.query_ref::<MixBuiltin>(tree)
           .map_or(false, |m| m.contain_flag(BuiltinFlags::Focus))
       })
     });
     if let Some(focus_id) = nearest_focus {
-      wnd.focus_mgr.borrow_mut().focus(focus_id, &tree);
+      wnd.focus_mgr.borrow_mut().focus(focus_id, tree);
     } else {
-      wnd.focus_mgr.borrow_mut().blur(&tree);
+      wnd.focus_mgr.borrow_mut().blur(tree);
     }
     if let Some(hit) = hit {
       wnd.add_delay_event(DelayEvent::PointerDown(hit));
@@ -176,33 +176,31 @@ impl Dispatcher {
   fn pointer_enter_leave_dispatch(&mut self) {
     let new_hit = self.hit_widget();
     let wnd = self.window();
-    let tree = wnd.widget_tree.borrow();
+    let tree = wnd.tree();
 
     let old = self
       .entered_widgets
       .iter()
-      .find(|wid| !(*wid).is_dropped(&tree))
+      .find(|wid| !(*wid).is_dropped(tree))
       .copied();
 
     if let Some(old) = old {
-      let ancestor = new_hit.and_then(|w| w.lowest_common_ancestor(old, &tree));
+      let ancestor = new_hit.and_then(|w| w.lowest_common_ancestor(old, tree));
       wnd.add_delay_event(DelayEvent::PointerLeave { bottom: old, up: ancestor });
     };
 
     if let Some(new) = new_hit {
-      let ancestor = old.and_then(|o| o.lowest_common_ancestor(new, &tree));
+      let ancestor = old.and_then(|o| o.lowest_common_ancestor(new, tree));
       wnd.add_delay_event(DelayEvent::PointerEnter { bottom: new, up: ancestor });
     }
 
-    self.entered_widgets = new_hit.map_or(vec![], |wid| wid.ancestors(&tree).collect::<Vec<_>>());
+    self.entered_widgets = new_hit.map_or(vec![], |wid| wid.ancestors(tree).collect::<Vec<_>>());
   }
 
   fn hit_widget(&self) -> Option<WidgetId> {
     let mut hit_target = None;
     let wnd = self.window();
-    let tree = &wnd.widget_tree.borrow();
-
-    let store = &tree.store;
+    let tree = wnd.tree();
 
     let mut w = Some(tree.root());
     let mut pos = self.info.cursor_pos;
@@ -211,7 +209,7 @@ impl Dispatcher {
       let ctx = HitTestCtx { id, wnd_id: wnd.id() };
       let HitTest { hit, can_hit_child } = r.hit_test(&ctx, pos);
 
-      pos = tree.store.map_from_parent(id, pos, tree);
+      pos = tree.map_from_parent(id, pos);
 
       if hit {
         hit_target = w;
@@ -225,7 +223,7 @@ impl Dispatcher {
             return None;
           }
 
-          pos = store.map_to_parent(id, pos, tree);
+          pos = tree.map_to_parent(id, pos);
 
           let mut node = w;
           while let Some(p) = node {
@@ -236,7 +234,7 @@ impl Dispatcher {
               node = p.parent(tree);
 
               if let Some(id) = node {
-                pos = store.map_to_parent(id, pos, tree);
+                pos = tree.map_to_parent(id, pos);
                 if node == hit_target {
                   node = None;
                 }

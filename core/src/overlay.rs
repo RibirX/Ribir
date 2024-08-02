@@ -115,7 +115,6 @@ impl Overlay {
     if self.is_show() {
       return;
     }
-
     let mut inner = self.0.borrow_mut();
     let handle = inner.state.close_handle();
     let w = (inner.builder)(handle);
@@ -226,9 +225,10 @@ impl OverlayState {
     let state = replace(&mut *self.0.borrow_mut(), OverlayInnerState::Hided);
     if let OverlayInnerState::Showing(wid, wnd) = state {
       let _ = AppCtx::spawn_local(async move {
-        let root = wnd.widget_tree.borrow().root();
-        wid.dispose_subtree(&mut wnd.widget_tree.borrow_mut());
-        wnd.widget_tree.borrow_mut().mark_dirty(root);
+        let tree = wnd.tree_mut();
+        let root = tree.root();
+        wid.dispose_subtree(tree);
+        tree.mark_dirty(root);
       });
     }
   }
@@ -247,16 +247,16 @@ impl OverlayState {
         (instant, OverlayInnerState::ToShow(crate_at, wnd)) if &instant == crate_at => wnd.clone(),
         _ => return,
       };
-      let build_ctx = BuildCtx::new(None, &wnd.widget_tree);
+      let build_ctx = BuildCtx::new(None, wnd.tree);
       let style = style.unwrap_or_else(|| OverlayStyle::of(&build_ctx));
       let wid = this
         .wrap_style(w, style)
         .into_widget()
         .build(&build_ctx);
       *this.0.borrow_mut() = OverlayInnerState::Showing(wid, wnd.clone());
-      let mut tree = wnd.widget_tree.borrow_mut();
-      tree.root().append(wid, &mut tree);
-      wid.on_mounted_subtree(&tree);
+      let tree = wnd.tree_mut();
+      tree.root().append(wid, tree);
+      wid.on_mounted_subtree(tree);
       tree.mark_dirty(wid);
     });
   }
@@ -344,8 +344,8 @@ mod tests {
     });
     wnd.draw_frame();
 
-    let root = wnd.widget_tree.borrow().root();
-    assert_eq!(wnd.widget_tree.borrow().count(root), 3);
+    let root = wnd.tree().root();
+    assert_eq!(wnd.tree().count(root), 3);
 
     overlay.show(wnd.0.clone());
     overlay.close();
@@ -359,6 +359,6 @@ mod tests {
     overlay.close();
     wnd.draw_frame();
     assert_eq!(*r_log.borrow(), &["mounted", "disposed"]);
-    assert_eq!(wnd.widget_tree.borrow().count(root), 3);
+    assert_eq!(wnd.tree().count(root), 3);
   }
 }

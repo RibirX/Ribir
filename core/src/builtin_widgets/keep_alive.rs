@@ -59,15 +59,15 @@ mod tests {
       }
     });
 
-    let root = wnd.widget_tree.borrow().content_root();
+    let root = wnd.tree().content_root();
     wnd.draw_frame();
 
     *c_remove_widget.write() = true;
     wnd.draw_frame();
-    assert!(!root.is_dropped(&wnd.widget_tree.borrow()));
+    assert!(!root.is_dropped(wnd.tree()));
 
     *c_keep_alive.write() = false;
     wnd.draw_frame();
-    assert!(root.is_dropped(&wnd.widget_tree.borrow()));
+    assert!(root.is_dropped(wnd.tree()));
   }
 }

@@ -1,19 +1,16 @@
-use std::{
-  cell::{OnceCell, RefCell},
-  rc::Rc,
-};
+use std::{cell::OnceCell, ptr::NonNull, rc::Rc};
 
 use ribir_algo::Sc;
 
 use crate::{prelude::*, window::WindowId};
 
 /// A context provide during build the widget tree.
-pub struct BuildCtx<'a> {
+pub struct BuildCtx {
   pub(crate) themes: OnceCell<Vec<Sc<Theme>>>,
   /// The widget which this `BuildCtx` is created from. It's not means this
   /// is the parent of the widget which is builded by this `BuildCtx`.
   ctx_from: Option<WidgetId>,
-  pub(crate) tree: &'a RefCell<WidgetTree>,
+  pub(crate) tree: NonNull<WidgetTree>,
 }
 
 /// A handle of `BuildCtx` that you can store it and access the `BuildCtx` later
@@ -24,15 +21,15 @@ pub struct BuildCtxHandle {
   wnd_id: WindowId,
 }
 
-impl<'a> BuildCtx<'a> {
+impl BuildCtx {
   /// Return the window of this context is created from.
-  pub fn window(&self) -> Rc<Window> { self.tree.borrow().window() }
+  pub fn window(&self) -> Rc<Window> { self.tree().window() }
 
   /// Get the widget which this `BuildCtx` is created from.
   pub fn ctx_from(&self) -> WidgetId {
     self
       .ctx_from
-      .unwrap_or_else(|| self.tree.borrow().root())
+      .unwrap_or_else(|| self.tree().root())
   }
 
   /// Create a handle of this `BuildCtx` which support `Clone`, `Copy` and
@@ -42,12 +39,12 @@ impl<'a> BuildCtx<'a> {
   }
 
   #[inline]
-  pub(crate) fn new(from: Option<WidgetId>, tree: &'a RefCell<WidgetTree>) -> Self {
+  pub(crate) fn new(from: Option<WidgetId>, tree: NonNull<WidgetTree>) -> Self {
     Self { themes: OnceCell::new(), ctx_from: from, tree }
   }
 
   pub(crate) fn new_with_data(
-    from: Option<WidgetId>, tree: &'a RefCell<WidgetTree>, data: Vec<Sc<Theme>>,
+    from: Option<WidgetId>, tree: NonNull<WidgetTree>, data: Vec<Sc<Theme>>,
   ) -> Self {
     let themes: OnceCell<Vec<Sc<Theme>>> = OnceCell::new();
     // Safety: we just create the `OnceCell` and it's empty.
@@ -74,8 +71,7 @@ impl<'a> BuildCtx<'a> {
       let Some(p) = self.ctx_from else {
         return themes;
       };
-
-      let tree = &self.tree.borrow();
+      let tree = self.tree();
       p.ancestors(tree).any(|p| {
         for t in p.query_all_iter::<Sc<Theme>>(tree) {
           themes.push(t.clone());
@@ -89,6 +85,22 @@ impl<'a> BuildCtx<'a> {
       themes
     })
   }
+
+  pub(crate) fn tree(&self) -> &WidgetTree {
+    // Safety: Please refer to the comments in `WidgetTree::tree_mut` for more
+    // information.
+    unsafe { self.tree.as_ref() }
+  }
+
+  #[allow(clippy::mut_from_ref)]
+  pub(crate) fn tree_mut(&self) -> &mut WidgetTree {
+    let mut tree = self.tree;
+    // Safety:
+    // The widget tree is solely utilized for building, layout, and painting, which
+    // all follow a downward flow within the tree. Therefore, even if numerous
+    // mutable references exist, they only modify distinct parts of the tree.
+    unsafe { tree.as_mut() }
+  }
 }
 
 impl BuildCtxHandle {
@@ -96,8 +108,8 @@ impl BuildCtxHandle {
   /// the window is closed or widget is removed.
   pub fn with_ctx<R>(self, f: impl FnOnce(&BuildCtx) -> R) -> Option<R> {
     AppCtx::get_window(self.wnd_id).map(|wnd| {
-      let mut ctx = BuildCtx::new(self.ctx_from, &wnd.widget_tree);
-      f(&mut ctx)
+      let ctx = BuildCtx::new(self.ctx_from, wnd.tree);
+      f(&ctx)
     })
   }
 }
