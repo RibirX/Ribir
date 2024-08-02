@@ -159,8 +159,7 @@ impl Dispatcher {
 
     let nearest_focus = self.pointer_down_uid.and_then(|wid| {
       wid.ancestors(&tree).find(|id| {
-        id.get(&tree)
-          .and_then(|w| w.query_ref::<MixBuiltin>())
+        id.query_ref::<MixBuiltin>(&tree)
           .map_or(false, |m| m.contain_flag(BuiltinFlags::Focus))
       })
     });

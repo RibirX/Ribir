@@ -253,10 +253,13 @@ pub(crate) fn new_node(
   WidgetId(arena.new_node(node))
 }
 
-impl<'a> dyn RenderQueryable + 'a {
+impl WidgetId {
   /// Return a iterator of all reference of type `T` in this node.
-  pub fn query_all_iter<T: Any>(&self) -> impl DoubleEndedIterator<Item = QueryRef<T>> {
+  pub(crate) fn query_all_iter<T: Any>(
+    self, tree: &WidgetTree,
+  ) -> impl DoubleEndedIterator<Item = QueryRef<T>> {
     self
+      .assert_get(tree)
       .query_all(TypeId::of::<T>())
       .into_iter()
       .filter_map(QueryHandle::into_ref)
@@ -264,8 +267,11 @@ impl<'a> dyn RenderQueryable + 'a {
 
   #[allow(unused)]
   /// Return a iterator of all mutable reference of type `T` in this node.
-  pub fn query_all_iter_write<T: Any>(&self) -> impl DoubleEndedIterator<Item = WriteRef<T>> {
+  pub(crate) fn query_all_iter_write<T: Any>(
+    self, tree: &WidgetTree,
+  ) -> impl DoubleEndedIterator<Item = WriteRef<T>> {
     self
+      .assert_get(tree)
       .query_all(TypeId::of::<T>())
       .into_iter()
       .filter_map(QueryHandle::into_mut)
@@ -273,20 +279,26 @@ impl<'a> dyn RenderQueryable + 'a {
 
   #[allow(unused)]
   /// Query the outermost of reference of type `T` in this node.
-  pub fn query_write<T: Any>(&self) -> Option<WriteRef<T>> {
+  pub(crate) fn query_write<T: Any>(self, tree: &WidgetTree) -> Option<WriteRef<T>> {
     self
+      .assert_get(tree)
       .query(TypeId::of::<T>())
       .and_then(QueryHandle::into_mut)
   }
 
-  #[allow(unused)]
   /// Query the outermost of reference of type `T` in this node.
-  pub fn query_ref<T: Any>(&self) -> Option<QueryRef<T>> {
+  pub(crate) fn query_ref<T: Any>(self, tree: &WidgetTree) -> Option<QueryRef<T>> {
     self
+      .assert_get(tree)
       .query(TypeId::of::<T>())
       .and_then(QueryHandle::into_ref)
   }
 
   /// return if this object contain type `T`
-  pub fn contain_type<T: Any>(&self) -> bool { self.query(TypeId::of::<T>()).is_some() }
+  pub(crate) fn contain_type<T: Any>(self, tree: &WidgetTree) -> bool {
+    self
+      .assert_get(tree)
+      .query(TypeId::of::<T>())
+      .is_some()
+  }
 }

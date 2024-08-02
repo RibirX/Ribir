@@ -353,10 +353,7 @@ impl<'c> ComposeChild<'c> for MixBuiltin {
       match this.try_into_value() {
         Ok(this) => {
           let mut this = Some(this);
-          if let Some(m) = id
-            .assert_get(&ctx.tree.borrow())
-            .query_ref::<MixBuiltin>()
-          {
+          if let Some(m) = id.query_ref::<MixBuiltin>(&ctx.tree.borrow()) {
             let this = unsafe { this.take().unwrap_unchecked() };
             if !m.contain_flag(BuiltinFlags::Focus) && this.contain_flag(BuiltinFlags::Focus) {
               this.callbacks_for_focus_node();

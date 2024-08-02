@@ -77,7 +77,7 @@ impl<'a> BuildCtx<'a> {
 
       let tree = &self.tree.borrow();
       p.ancestors(tree).any(|p| {
-        for t in p.assert_get(tree).query_all_iter::<Sc<Theme>>() {
+        for t in p.query_all_iter::<Sc<Theme>>(tree) {
           themes.push(t.clone());
           if matches!(&**t, Theme::Full(_)) {
             break;
