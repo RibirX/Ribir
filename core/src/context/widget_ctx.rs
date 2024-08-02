@@ -176,11 +176,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   fn query_widget_type<W: 'static, R>(
     &self, id: WidgetId, callback: impl FnOnce(&W) -> R,
   ) -> Option<R> {
-    self.with_tree(|tree| {
-      id.assert_get(tree)
-        .query_ref::<W>()
-        .map(|r| callback(&r))
-    })
+    self.with_tree(|tree| id.query_ref::<W>(tree).map(|r| callback(&r)))
   }
 
   fn window(&self) -> Rc<Window> { self.current_wnd() }

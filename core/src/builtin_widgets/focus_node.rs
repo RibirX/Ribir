@@ -68,13 +68,14 @@ mod tests {
     let wnd = TestWindow::new(widget);
     let tree = wnd.widget_tree.borrow();
     let id = tree.content_root();
-    let node = id.get(&tree).unwrap();
+
     let mut cnt = 0;
-    node.query_all_iter::<MixBuiltin>().for_each(|b| {
-      if b.contain_flag(BuiltinFlags::Focus) {
-        cnt += 1;
-      }
-    });
+    id.query_all_iter::<MixBuiltin>(&tree)
+      .for_each(|b| {
+        if b.contain_flag(BuiltinFlags::Focus) {
+          cnt += 1;
+        }
+      });
     assert_eq!(cnt, 1);
   }
 }

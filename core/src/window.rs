@@ -336,8 +336,7 @@ impl Window {
     delay_widgets.retain(|(parent, wid)| {
       let tree = self.widget_tree.borrow();
       let drop_conditional = wid
-        .assert_get(&tree)
-        .query_ref::<KeepAlive>()
+        .query_ref::<KeepAlive>(&tree)
         .map_or(true, |d| !d.keep_alive);
       let parent_dropped = parent
         .map_or(false, |p| p.is_dropped(&tree) || p.ancestors(&tree).last() != Some(tree.root()));
@@ -399,9 +398,7 @@ impl Window {
               self.emit(id, &mut e);
             });
 
-          let keep_alive = id
-            .assert_get(&self.widget_tree.borrow())
-            .contain_type::<KeepAlive>();
+          let keep_alive = id.contain_type::<KeepAlive>(&self.widget_tree.borrow());
 
           if keep_alive {
             self
@@ -540,8 +537,7 @@ impl Window {
     // event by it, and never read or write the node. And in the callback, there is
     // no way to mut access the inner data of node or destroy the node.
     let tree = unsafe { &*(&*self.widget_tree.borrow() as *const WidgetTree) };
-    id.assert_get(tree)
-      .query_all_iter::<MixBuiltin>()
+    id.query_all_iter::<MixBuiltin>(tree)
       .for_each(|m| {
         if m.contain_flag(e.flags()) {
           m.dispatch(e);
@@ -557,8 +553,7 @@ impl Window {
       .collect::<Vec<_>>();
 
     path.iter().rev().all(|id| {
-      id.assert_get(&tree)
-        .query_all_iter::<MixBuiltin>()
+      id.query_all_iter::<MixBuiltin>(&tree)
         .rev()
         .all(|m| {
           if m.contain_flag(e.flags()) {
@@ -580,15 +575,13 @@ impl Window {
       .ancestors(&tree)
       .take_while(|id| Some(*id) != up)
       .all(|id| {
-        id.assert_get(&tree)
-          .query_all_iter::<MixBuiltin>()
-          .all(|m| {
-            if m.contain_flag(e.flags()) {
-              e.set_current_target(id);
-              m.dispatch(e);
-            }
-            e.is_propagation()
-          })
+        id.query_all_iter::<MixBuiltin>(&tree).all(|m| {
+          if m.contain_flag(e.flags()) {
+            e.set_current_target(id);
+            m.dispatch(e);
+          }
+          e.is_propagation()
+        })
       });
   }
 

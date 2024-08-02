@@ -234,7 +234,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         // accordingly.
         {
           let tree = &mut ctx.tree.borrow_mut();
-          if leaf.assert_get(tree).contain_type::<DynInfo>() {
+          if leaf.contain_type::<DynInfo>(tree) {
             let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
             leaf.attach_data(Box::new(Queryable(info)), tree);
           };
@@ -483,13 +483,10 @@ fn update_children_key_status(old: WidgetId, new: WidgetId, tree: &WidgetTree) {
       match (o_first == o_last, n_first == n_last) {
         (true, true) => update_key_status_single(o_first, n_first, tree),
         (true, false) => {
-          if let Some(old_key) = o_first
-            .assert_get(tree)
-            .query_ref::<Box<dyn AnyKey>>()
-          {
+          if let Some(old_key) = o_first.query_ref::<Box<dyn AnyKey>>(tree) {
             let o_key = old_key.key();
             new.children(tree).any(|n| {
-              if let Some(new_key) = n.assert_get(tree).query_ref::<Box<dyn AnyKey>>() {
+              if let Some(new_key) = n.query_ref::<Box<dyn AnyKey>>(tree) {
                 let same_key = o_key == new_key.key();
                 if same_key {
                   update_key_states(&**old_key, o_first, &**new_key, n, tree);
@@ -502,13 +499,10 @@ fn update_children_key_status(old: WidgetId, new: WidgetId, tree: &WidgetTree) {
           }
         }
         (false, true) => {
-          if let Some(new_key) = n_first
-            .assert_get(tree)
-            .query_ref::<Box<dyn AnyKey>>()
-          {
+          if let Some(new_key) = n_first.query_ref::<Box<dyn AnyKey>>(tree) {
             let n_key = new_key.key();
             old.children(tree).any(|o| {
-              if let Some(old_key) = o.assert_get(tree).query_ref::<Box<dyn AnyKey>>() {
+              if let Some(old_key) = o.query_ref::<Box<dyn AnyKey>>(tree) {
                 let same_key = old_key.key() == n_key;
                 if same_key {
                   update_key_states(&**old_key, o, &**new_key, n_first, tree);
@@ -527,14 +521,8 @@ fn update_children_key_status(old: WidgetId, new: WidgetId, tree: &WidgetTree) {
 }
 
 fn update_key_status_single(old: WidgetId, new: WidgetId, tree: &WidgetTree) {
-  if let Some(old_key) = old
-    .assert_get(tree)
-    .query_ref::<Box<dyn AnyKey>>()
-  {
-    if let Some(new_key) = new
-      .assert_get(tree)
-      .query_ref::<Box<dyn AnyKey>>()
-    {
+  if let Some(old_key) = old.query_ref::<Box<dyn AnyKey>>(tree) {
+    if let Some(new_key) = new.query_ref::<Box<dyn AnyKey>>(tree) {
       if old_key.key() == new_key.key() {
         update_key_states(&**old_key, old, &**new_key, new, tree);
       }
@@ -547,16 +535,16 @@ fn update_key_state_multi(
 ) {
   let mut old_key_list = ahash::HashMap::default();
   for o in old {
-    if let Some(old_key) = o.assert_get(tree).query_ref::<Box<dyn AnyKey>>() {
+    if let Some(old_key) = o.query_ref::<Box<dyn AnyKey>>(tree) {
       old_key_list.insert(old_key.key(), o);
     }
   }
 
   if !old_key_list.is_empty() {
     for n in new {
-      if let Some(new_key) = n.assert_get(tree).query_ref::<Box<dyn AnyKey>>() {
+      if let Some(new_key) = n.query_ref::<Box<dyn AnyKey>>(tree) {
         if let Some(o) = old_key_list.get(&new_key.key()).copied() {
-          if let Some(old_key) = o.assert_get(tree).query_ref::<Box<dyn AnyKey>>() {
+          if let Some(old_key) = o.query_ref::<Box<dyn AnyKey>>(tree) {
             update_key_states(&**old_key, o, &**new_key, n, tree);
           }
         }
@@ -790,7 +778,7 @@ impl PipeNode {
 
 fn set_pos_of_multi(w: WidgetId, pos: usize, tree: &WidgetTree) -> bool {
   let mut b = false;
-  for info in w.assert_get(tree).query_all_iter::<DynInfo>() {
+  for info in w.query_all_iter::<DynInfo>(tree) {
     info.set_pos_of_multi(pos);
     b = true;
   }
@@ -800,11 +788,7 @@ fn set_pos_of_multi(w: WidgetId, pos: usize, tree: &WidgetTree) -> bool {
 fn query_info_outside_until<T: Any>(
   id: WidgetId, to: &Sc<T>, tree: &WidgetTree, mut cb: impl FnMut(&DynInfo),
 ) {
-  for info in id
-    .assert_get(tree)
-    .query_all_iter::<DynInfo>()
-    .rev()
-  {
+  for info in id.query_all_iter::<DynInfo>(tree).rev() {
     cb(&info);
 
     if info
@@ -1027,8 +1011,7 @@ mod tests {
     assert!(
       tree
         .content_root()
-        .assert_get(&tree)
-        .contain_type::<Box<dyn AnyKey>>()
+        .contain_type::<Box<dyn AnyKey>>(&tree)
     );
   }
 

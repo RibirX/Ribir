@@ -342,7 +342,8 @@ impl FocusManager {
       self
         .get(*id)
         .and_then(|n| n.wid)
-        .and_then(|wid| wid.get(tree)?.query_ref::<FocusScope>())
+        .filter(|wid| !wid.is_dropped(tree))
+        .and_then(|wid| wid.query_ref::<FocusScope>(tree))
         .map_or(false, |s| s.skip_descendants)
     })
   }
@@ -351,21 +352,25 @@ impl FocusManager {
     let wnd = self.window();
     let tree = wnd.widget_tree.borrow();
     scope_id
-      .and_then(|id| id.get(&tree))
-      .and_then(|r| r.query_ref::<FocusScope>().map(|s| s.clone()))
+      .filter(|wid| !wid.is_dropped(&tree))
+      .and_then(|id| {
+        id.query_ref::<FocusScope>(&tree)
+          .map(|s| s.clone())
+      })
       .unwrap_or_default()
   }
 
   fn tab_index(&self, node_id: NodeId) -> i16 {
     let wnd = self.window();
-
+    let tree = &wnd.widget_tree.borrow();
     self
       .get(node_id)
       .and_then(|n| n.wid)
+      .filter(|wid| !wid.is_dropped(&tree))
       .and_then(|wid| {
-        let tree = wnd.widget_tree.borrow();
-        let m = wid.get(&tree)?.query_ref::<MixBuiltin>()?;
-        Some(m.get_tab_index())
+        wid
+          .query_ref::<MixBuiltin>(tree)
+          .map(|m| m.get_tab_index())
       })
       .unwrap_or_default()
   }
