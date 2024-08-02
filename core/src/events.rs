@@ -1,12 +1,10 @@
-use std::rc::Rc;
+use std::ptr::NonNull;
 
 use self::dispatcher::DispatchInfo;
 use crate::{
   builtin_widgets::BuiltinFlags,
   context::{define_widget_context, WidgetCtx, WidgetCtxImpl},
-  prelude::AppCtx,
-  widget_tree::WidgetId,
-  window::{Window, WindowId},
+  widget_tree::{WidgetId, WidgetTree},
 };
 
 pub(crate) mod dispatcher;
@@ -283,8 +281,8 @@ impl CommonEvent {
   /// Although the `dispatcher` is contained in the `wnd`, we still need to pass
   /// it because in most case the event create in a environment that the
   /// `Dispatcher` already borrowed.
-  pub(crate) fn new(target: WidgetId, wnd_id: WindowId) -> Self {
-    Self { target, wnd_id, id: target, propagation: true, prevent_default: false }
+  pub(crate) fn new(target: WidgetId, tree: NonNull<WidgetTree>) -> Self {
+    Self { target, tree, id: target, propagation: true, prevent_default: false }
   }
 
   pub(crate) fn set_current_target(&mut self, id: WidgetId) { self.id = id; }

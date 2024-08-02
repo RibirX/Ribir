@@ -1,12 +1,13 @@
-use std::rc::Rc;
+use std::{ptr::NonNull, rc::Rc};
 
 use ribir_geom::{Point, Rect, Size};
 
 use crate::{
-  prelude::AppCtx,
+  query::QueryRef,
+  state::WriteRef,
   widget::{BoxClamp, WidgetTree},
   widget_tree::WidgetId,
-  window::{Window, WindowId},
+  window::Window,
 };
 
 /// common action for all context of widget.
@@ -56,64 +57,64 @@ pub trait WidgetCtx {
   /// Translates the widget pos from the coordinate system of `w` to this widget
   /// system.
   fn map_from(&self, pos: Point, w: WidgetId) -> Point;
-  /// Query type on the widget back of this context, and call the callback if it
-  /// found. Return the callback's return value.
-  fn query_type<W: 'static, R>(&self, callback: impl FnOnce(&W) -> R) -> Option<R>;
-  /// Query type on the widget back of the `id`, and call the callback if it
-  /// found. Return the callback's return value.
-  fn query_widget_type<W: 'static, R>(
-    &self, id: WidgetId, callback: impl FnOnce(&W) -> R,
-  ) -> Option<R>;
-  /// Get the window of this context, yous should not store the window, store
-  /// its id instead.
+  /// Query a reference to the `T` if it is shared within the widget represented
+  /// by this context.
+  fn query<T: 'static>(&self) -> Option<QueryRef<T>>;
+  /// Query a write reference to the `T` if a writer of `T` is shared within the
+  /// widget represented by this context.
+  fn query_write<T: 'static>(&self) -> Option<WriteRef<T>>;
+  /// Query a reference to the `T` if it is shared within the widget `w`.
+  fn query_of_widget<T: 'static>(&self, w: WidgetId) -> Option<QueryRef<T>>;
+  // Query a write reference to the `T` if a writer of `T` is shared within the
+  // widget `w`.
+  fn query_write_of_widget<T: 'static>(&self, w: WidgetId) -> Option<WriteRef<T>>;
+  /// Retrieve the window associated with this context.
   fn window(&self) -> Rc<Window>;
 }
 
 pub(crate) trait WidgetCtxImpl {
   fn id(&self) -> WidgetId;
 
-  fn current_wnd(&self) -> Rc<Window>;
+  fn tree(&self) -> &WidgetTree;
 
   #[inline]
-  fn with_tree<F: FnOnce(&WidgetTree) -> R, R>(&self, f: F) -> R { f(self.current_wnd().tree()) }
+  fn current_wnd(&self) -> Rc<Window> { self.tree().window() }
 }
 
 impl<T: WidgetCtxImpl> WidgetCtx for T {
   #[inline]
-  fn parent(&self) -> Option<WidgetId> { self.with_tree(|tree| self.id().parent(tree)) }
+  fn parent(&self) -> Option<WidgetId> { self.id().parent(self.tree()) }
 
   #[inline]
-  fn widget_parent(&self, w: WidgetId) -> Option<WidgetId> { self.with_tree(|tree| w.parent(tree)) }
+  fn widget_parent(&self, w: WidgetId) -> Option<WidgetId> { w.parent(self.tree()) }
 
   #[inline]
-  fn single_child(&self) -> Option<WidgetId> { self.with_tree(|tree| self.id().single_child(tree)) }
+  fn single_child(&self) -> Option<WidgetId> { self.id().single_child(self.tree()) }
 
   #[inline]
-  fn first_child(&self) -> Option<WidgetId> { self.with_tree(|tree| self.id().first_child(tree)) }
+  fn first_child(&self) -> Option<WidgetId> { self.id().first_child(self.tree()) }
 
   #[inline]
   fn box_rect(&self) -> Option<Rect> { self.widget_box_rect(self.id()) }
 
   #[inline]
   fn box_pos(&self) -> Option<Point> {
-    self.with_tree(|tree| {
-      tree
-        .store
-        .layout_info(self.id())
-        .map(|info| info.pos)
-    })
+    self
+      .tree()
+      .store
+      .layout_info(self.id())
+      .map(|info| info.pos)
   }
 
   #[inline]
   fn box_size(&self) -> Option<Size> { self.widget_box_size(self.id()) }
 
   fn layout_clamp(&self) -> Option<BoxClamp> {
-    self.with_tree(|tree| {
-      tree
-        .store
-        .layout_info(self.id())
-        .map(|info| info.clamp)
-    })
+    self
+      .tree()
+      .store
+      .layout_info(self.id())
+      .map(|info| info.clamp)
   }
 
   fn single_child_box(&self) -> Option<Rect> {
@@ -123,58 +124,53 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   fn widget_box_size(&self, wid: WidgetId) -> Option<Size> {
-    self.with_tree(|tree| {
-      tree
-        .store
-        .layout_info(wid)
-        .and_then(|info| info.size)
-    })
+    self
+      .tree()
+      .store
+      .layout_info(wid)
+      .and_then(|info| info.size)
   }
 
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {
-    self.with_tree(|tree| {
-      tree
-        .store
-        .layout_info(wid)
-        .and_then(|info| info.size.map(|size| Rect::new(info.pos, size)))
-    })
+    self
+      .tree()
+      .store
+      .layout_info(wid)
+      .and_then(|info| info.size.map(|size| Rect::new(info.pos, size)))
   }
 
-  fn map_to_global(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.map_to_global(pos, self.id()))
-  }
+  fn map_to_global(&self, pos: Point) -> Point { self.tree().map_to_global(pos, self.id()) }
 
-  fn map_from_global(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.map_from_global(pos, self.id()))
-  }
+  fn map_from_global(&self, pos: Point) -> Point { self.tree().map_from_global(pos, self.id()) }
 
-  fn map_to_parent(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.map_to_parent(self.id(), pos))
-  }
+  fn map_to_parent(&self, pos: Point) -> Point { self.tree().map_to_parent(self.id(), pos) }
 
-  fn map_from_parent(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.map_from_parent(self.id(), pos))
-  }
+  fn map_from_parent(&self, pos: Point) -> Point { self.tree().map_from_parent(self.id(), pos) }
 
   fn map_to(&self, pos: Point, w: WidgetId) -> Point {
     let global = self.map_to_global(pos);
-    self.with_tree(|tree| tree.map_from_global(global, w))
+    self.tree().map_from_global(global, w)
   }
 
   fn map_from(&self, pos: Point, w: WidgetId) -> Point {
-    let global = self.with_tree(|tree| tree.map_to_global(pos, w));
+    let global = self.tree().map_to_global(pos, w);
     self.map_from_global(global)
   }
 
   #[inline]
-  fn query_type<W: 'static, R>(&self, callback: impl FnOnce(&W) -> R) -> Option<R> {
-    self.query_widget_type(self.id(), callback)
+  fn query<Q: 'static>(&self) -> Option<QueryRef<Q>> { self.query_of_widget::<Q>(self.id()) }
+
+  #[inline]
+  fn query_write<Q: 'static>(&self) -> Option<WriteRef<Q>> {
+    self.query_write_of_widget::<Q>(self.id())
   }
 
-  fn query_widget_type<W: 'static, R>(
-    &self, id: WidgetId, callback: impl FnOnce(&W) -> R,
-  ) -> Option<R> {
-    self.with_tree(|tree| id.query_ref::<W>(tree).map(|r| callback(&r)))
+  fn query_of_widget<Q: 'static>(&self, w: WidgetId) -> Option<QueryRef<Q>> {
+    w.query_ref::<Q>(self.tree())
+  }
+
+  fn query_write_of_widget<Q: 'static>(&self, w: WidgetId) -> Option<WriteRef<Q>> {
+    w.query_write(self.tree())
   }
 
   fn window(&self) -> Rc<Window> { self.current_wnd() }
@@ -188,7 +184,7 @@ macro_rules! define_widget_context {
     $(#[$outer])*
     pub struct $name {
       pub(crate) id: WidgetId,
-      pub(crate) wnd_id: WindowId,
+      pub(crate) tree: NonNull<WidgetTree>,
       $(pub(crate) $extra_name: $extra_ty,)*
     }
 
@@ -196,8 +192,9 @@ macro_rules! define_widget_context {
       #[inline]
       fn id(&self) -> WidgetId { self.id }
 
-      #[inline]
-      fn current_wnd(&self) -> Rc<Window> { AppCtx::get_window_assert(self.wnd_id) }
+      fn tree(&self) -> &WidgetTree {
+        unsafe {self.tree.as_ref()}
+      }
     }
   };
 }
@@ -233,7 +230,7 @@ mod tests {
     let pos = Point::zero();
     let child = root.single_child(tree).unwrap();
 
-    let w_ctx = TestCtx { id: child, wnd_id: wnd.id() };
+    let w_ctx = TestCtx { id: child, tree: wnd.tree };
     assert_eq!(w_ctx.map_from(pos, child), pos);
     assert_eq!(w_ctx.map_to(pos, child), pos);
   }
@@ -258,7 +255,7 @@ mod tests {
 
     let root = wnd.tree().root();
     let child = get_single_child_by_depth(root, wnd.tree(), 3);
-    let w_ctx = TestCtx { id: root, wnd_id: wnd.id() };
+    let w_ctx = TestCtx { id: root, tree: wnd.tree };
     let from_pos = Point::new(30., 30.);
     assert_eq!(w_ctx.map_from(from_pos, child), Point::new(45., 45.));
     let to_pos = Point::new(50., 50.);

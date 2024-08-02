@@ -2,7 +2,7 @@ pub use winit::keyboard::{
   Key as VirtualKey, KeyCode, KeyLocation, ModifiersState, NamedKey, PhysicalKey,
 };
 
-use crate::{impl_common_event_deref, prelude::*, window::WindowId};
+use crate::{impl_common_event_deref, prelude::*};
 
 #[derive(Debug)]
 pub struct KeyboardEvent {
@@ -32,10 +32,10 @@ impl_common_event_deref!(KeyboardEvent);
 impl KeyboardEvent {
   #[inline]
   pub fn new(
-    wnd_id: WindowId, id: WidgetId, physical_key: PhysicalKey, key: VirtualKey, is_repeat: bool,
+    wnd: &Window, id: WidgetId, physical_key: PhysicalKey, key: VirtualKey, is_repeat: bool,
     location: KeyLocation,
   ) -> Self {
-    Self { physical_key, key, is_repeat, location, common: CommonEvent::new(id, wnd_id) }
+    Self { physical_key, key, is_repeat, location, common: CommonEvent::new(id, wnd.tree) }
   }
 }
 

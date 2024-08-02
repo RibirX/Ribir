@@ -1,14 +1,12 @@
-use std::rc::Rc;
-
-use super::{AppCtx, WidgetCtxImpl};
+use super::WidgetCtxImpl;
 use crate::{
   prelude::{Painter, WidgetId},
-  window::{Window, WindowId},
+  widget::WidgetTree,
 };
 
 pub struct PaintingCtx<'a> {
   pub(crate) id: WidgetId,
-  pub(crate) wnd_id: WindowId,
+  pub(crate) tree: &'a WidgetTree,
   pub(crate) painter: &'a mut Painter,
 }
 
@@ -17,12 +15,12 @@ impl<'a> WidgetCtxImpl for PaintingCtx<'a> {
   fn id(&self) -> WidgetId { self.id }
 
   #[inline]
-  fn current_wnd(&self) -> Rc<Window> { AppCtx::get_window_assert(self.wnd_id) }
+  fn tree(&self) -> &WidgetTree { self.tree }
 }
 
 impl<'a> PaintingCtx<'a> {
-  pub fn new(id: WidgetId, wnd_id: WindowId, painter: &'a mut Painter) -> Self {
-    Self { id, wnd_id, painter }
+  pub(crate) fn new(id: WidgetId, tree: &'a WidgetTree, painter: &'a mut Painter) -> Self {
+    Self { id, tree, painter }
   }
   /// Return the 2d painter to draw 2d things.
   #[inline]

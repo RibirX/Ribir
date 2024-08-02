@@ -22,7 +22,7 @@ impl PointerEvent {
       twist: 0.,
       point_type: PointerType::Mouse,
       is_primary: true,
-      common: CommonEvent::new(target, wnd.id()),
+      common: CommonEvent::new(target, wnd.tree),
     }
   }
 }

@@ -1,4 +1,4 @@
-use crate::{impl_common_event_deref, prelude::*, window::WindowId};
+use crate::{impl_common_event_deref, prelude::*};
 
 #[derive(Debug)]
 pub struct WheelEvent {
@@ -11,8 +11,8 @@ impl_common_event_deref!(WheelEvent);
 
 impl WheelEvent {
   #[inline]
-  pub fn new(delta_x: f32, delta_y: f32, id: WidgetId, wnd_id: WindowId) -> Self {
-    Self { delta_x, delta_y, common: CommonEvent::new(id, wnd_id) }
+  pub fn new(delta_x: f32, delta_y: f32, id: WidgetId, wnd: &Window) -> Self {
+    Self { delta_x, delta_y, common: CommonEvent::new(id, wnd.tree) }
   }
 }
 

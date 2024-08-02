@@ -44,6 +44,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
+- **core**: Added `WidgetCtx::query`, `WidgetCtx::query_write`, `WidgetCtx::query_of_widget` and  `WidgetCtx::query_write_of_widget`. (#pr @M-Adoo)
+    
 - **core**: Introduced `IntoWidget` and `IntoChild`. (@M-Adoo #612)
 
   The `IntoWidget` trait allows for the conversion of any widget to the type `Widget`.
@@ -62,6 +64,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
+- Removed `WidgetCtx::query_widget_type` and `WidgetCtx::query_type` (#pr @M-Adoo)
 - Removed `ChildFrom` and `FromAnother` traits (#612 @M-Adoo)
 - Removed `SingleParent` and `MultiParent` traits. (#612 @M-Adoo)
 - Removed `PairChild` and `PairWithChild` traits. User can use a generic type instead. (#612 @M-Adoo)

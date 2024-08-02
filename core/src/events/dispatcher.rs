@@ -56,7 +56,7 @@ impl Dispatcher {
   ) {
     let wnd = self.window();
     if let Some(focus_id) = wnd.focusing() {
-      let event = KeyboardEvent::new(wnd.id(), focus_id, physical_key, key, is_repeat, location);
+      let event = KeyboardEvent::new(&wnd, focus_id, physical_key, key, is_repeat, location);
       match state {
         ElementState::Pressed => wnd.add_delay_event(DelayEvent::KeyDown(event)),
         ElementState::Released => wnd.add_delay_event(DelayEvent::KeyUp(event)),
@@ -206,7 +206,7 @@ impl Dispatcher {
     let mut pos = self.info.cursor_pos;
     while let Some(id) = w {
       let r = id.assert_get(tree);
-      let ctx = HitTestCtx { id, wnd_id: wnd.id() };
+      let ctx = HitTestCtx { id, tree: wnd.tree };
       let HitTest { hit, can_hit_child } = r.hit_test(&ctx, pos);
 
       pos = tree.map_from_parent(id, pos);

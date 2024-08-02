@@ -322,11 +322,11 @@ impl MixBuiltin {
   fn callbacks_for_focus_node(&self) {
     self
       .on_mounted(move |e| {
-        e.query_type(|mix: &MixBuiltin| {
+        if let Some(mix) = e.query::<MixBuiltin>() {
           let auto_focus = mix.is_auto_focus();
           e.window()
             .add_focus_node(e.id, auto_focus, FocusType::Node)
-        });
+        }
       })
       .on_disposed(|e| {
         e.window()
