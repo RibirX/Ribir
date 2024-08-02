@@ -1,12 +1,12 @@
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use ribir_geom::ZERO_SIZE;
 
 use super::{WidgetId, WidgetTree};
 use crate::{
-  context::{AppCtx, LayoutCtx, WidgetCtx, WidgetCtxImpl},
+  context::{LayoutCtx, WidgetCtx, WidgetCtxImpl},
   prelude::{Point, Size, INFINITY_SIZE},
-  window::{DelayEvent, Window, WindowId},
+  window::DelayEvent,
 };
 
 /// boundary limit of the render object's layout
@@ -92,7 +92,6 @@ pub(crate) struct LayoutStore {
 
 pub struct Layouter<'a> {
   pub(crate) id: WidgetId,
-  pub(crate) wnd_id: WindowId,
   pub(crate) is_layout_root: bool,
   pub(crate) tree: &'a mut WidgetTree,
 }
@@ -100,9 +99,9 @@ pub struct Layouter<'a> {
 impl<'a> WidgetCtxImpl for Layouter<'a> {
   #[inline]
   fn id(&self) -> WidgetId { self.id }
+
   #[inline]
-  fn current_wnd(&self) -> Rc<Window> { AppCtx::get_window_assert(self.wnd_id) }
-  fn with_tree<F: FnOnce(&WidgetTree) -> R, R>(&self, f: F) -> R { f(self.tree) }
+  fn tree(&self) -> &WidgetTree { self.tree }
 }
 
 impl LayoutStore {
@@ -203,8 +202,8 @@ impl<'a> Layouter<'a> {
         // or modify it during perform layout.
         let tree2 = unsafe { &mut *(self.tree as *mut WidgetTree) };
 
-        let Self { id, wnd_id, ref tree, .. } = *self;
-        let mut ctx = LayoutCtx { id, wnd_id, tree: tree2 };
+        let Self { id, ref tree, .. } = *self;
+        let mut ctx = LayoutCtx { id, tree: tree2 };
         let size = id
           .assert_get(tree)
           .perform_layout(clamp, &mut ctx);
@@ -279,10 +278,8 @@ impl<'a> Layouter<'a> {
 }
 
 impl<'a> Layouter<'a> {
-  pub(crate) fn new(
-    id: WidgetId, wnd_id: WindowId, is_layout_root: bool, tree: &'a mut WidgetTree,
-  ) -> Self {
-    Self { id, wnd_id, is_layout_root, tree }
+  pub(crate) fn new(id: WidgetId, is_layout_root: bool, tree: &'a mut WidgetTree) -> Self {
+    Self { id, is_layout_root, tree }
   }
 }
 
@@ -303,7 +300,7 @@ impl std::ops::DerefMut for LayoutStore {
 
 #[cfg(test)]
 mod tests {
-  use std::cell::Cell;
+  use std::{cell::Cell, rc::Rc};
 
   use ribir_dev_helper::*;
 

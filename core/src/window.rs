@@ -326,7 +326,7 @@ impl Window {
     let mut painter = self.painter.borrow_mut();
 
     delay_widgets.retain(|(parent, wid)| {
-      let tree = self.tree();
+      let tree = self.tree_mut();
       let drop_conditional = wid
         .query_ref::<KeepAlive>(tree)
         .map_or(true, |d| !d.keep_alive);
@@ -334,14 +334,14 @@ impl Window {
         .map_or(false, |p| p.is_dropped(tree) || p.ancestors(tree).last() != Some(tree.root()));
       let need_drop = drop_conditional || parent_dropped;
       if need_drop {
-        self.tree_mut().remove_subtree(*wid);
+        tree.remove_subtree(*wid);
       } else {
         let mut painter = painter.save_guard();
         if let Some(p) = parent {
           let offset = tree.map_to_global(Point::zero(), *p);
           painter.translate(offset.x, offset.y);
         }
-        let mut ctx = PaintingCtx::new(*wid, self.id(), &mut painter);
+        let mut ctx = PaintingCtx::new(*wid, tree, &mut painter);
         wid.paint_subtree(&mut ctx);
       }
       !need_drop
@@ -369,11 +369,11 @@ impl Window {
 
       match e {
         DelayEvent::Mounted(id) => {
-          let mut e = Event::Mounted(LifecycleEvent::new(id, self.id()));
+          let mut e = Event::Mounted(LifecycleEvent::new(id, self.tree));
           self.emit(id, &mut e);
         }
         DelayEvent::PerformedLayout(id) => {
-          let mut e = Event::PerformedLayout(LifecycleEvent::new(id, self.id()));
+          let mut e = Event::PerformedLayout(LifecycleEvent::new(id, self.tree));
           self.emit(id, &mut e);
         }
         DelayEvent::Disposed { id, parent } => {
@@ -385,7 +385,7 @@ impl Window {
               if Some(id) == self.focusing() {
                 self.focus_mgr.borrow_mut().blur_on_dispose();
               }
-              let mut e = Event::Disposed(LifecycleEvent::new(id, self.id()));
+              let mut e = Event::Disposed(LifecycleEvent::new(id, self.tree));
               self.emit(id, &mut e);
             });
 
@@ -404,23 +404,23 @@ impl Window {
           self.tree_mut().remove_subtree(id);
         }
         DelayEvent::Focus(id) => {
-          let mut e = Event::Focus(FocusEvent::new(id, self.id()));
+          let mut e = Event::Focus(FocusEvent::new(id, self.tree));
           self.emit(id, &mut e);
         }
         DelayEvent::FocusIn { bottom, up } => {
-          let mut e = Event::FocusInCapture(FocusEvent::new(bottom, self.id()));
+          let mut e = Event::FocusInCapture(FocusEvent::new(bottom, self.tree));
           self.top_down_emit(&mut e, bottom, up);
-          let mut e = Event::FocusIn(FocusEvent::new(bottom, self.id()));
+          let mut e = Event::FocusIn(FocusEvent::new(bottom, self.tree));
           self.bottom_up_emit(&mut e, bottom, up);
         }
         DelayEvent::Blur(id) => {
-          let mut e = Event::Blur(FocusEvent::new(id, self.id()));
+          let mut e = Event::Blur(FocusEvent::new(id, self.tree));
           self.emit(id, &mut e);
         }
         DelayEvent::FocusOut { bottom, up } => {
-          let mut e = Event::FocusOutCapture(FocusEvent::new(bottom, self.id()));
+          let mut e = Event::FocusOutCapture(FocusEvent::new(bottom, self.tree));
           self.top_down_emit(&mut e, bottom, up);
-          let mut e = Event::FocusOut(FocusEvent::new(bottom, self.id()));
+          let mut e = Event::FocusOut(FocusEvent::new(bottom, self.tree));
           self.bottom_up_emit(&mut e, bottom, up);
         }
         DelayEvent::KeyDown(event) => {
@@ -461,16 +461,16 @@ impl Window {
           self.bottom_up_emit(&mut e, id, None);
         }
         DelayEvent::Chars { id, chars } => {
-          let mut e = Event::CharsCapture(CharsEvent::new(chars, id, self.id()));
+          let mut e = Event::CharsCapture(CharsEvent::new(chars, id, self));
           self.top_down_emit(&mut e, id, None);
           let Event::CharsCapture(e) = e else { unreachable!() };
           let mut e = Event::Chars(e);
           self.bottom_up_emit(&mut e, id, None);
         }
         DelayEvent::Wheel { id, delta_x, delta_y } => {
-          let mut e = Event::WheelCapture(WheelEvent::new(delta_x, delta_y, id, self.id()));
+          let mut e = Event::WheelCapture(WheelEvent::new(delta_x, delta_y, id, self));
           self.top_down_emit(&mut e, id, None);
-          let mut e = Event::Wheel(WheelEvent::new(delta_x, delta_y, id, self.id()));
+          let mut e = Event::Wheel(WheelEvent::new(delta_x, delta_y, id, self));
           self.bottom_up_emit(&mut e, id, None);
         }
         DelayEvent::PointerDown(id) => {

@@ -197,8 +197,9 @@ impl FlexLayouter {
       let size = l.perform_widget_layout(clamp);
       let size = FlexSize::from_size(size, dir);
 
-      let mut flex = None;
-      l.query_type(|expanded: &Expanded| flex = Some(expanded.flex));
+      let flex = l
+        .query::<Expanded>()
+        .map(|expanded| expanded.flex);
 
       // flex-item need use empty space to resize after all fixed widget performed
       // layout.
