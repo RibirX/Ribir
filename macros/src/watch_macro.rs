@@ -31,7 +31,7 @@ pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream
         .map({
             #refs
             let _ctx_handle_ಠ_ಠ = ctx!().handle();
-            move |_| _ctx_handle_ಠ_ಠ.with_ctx(|ctx!(): &BuildCtx<'_>| { #(#expr)* })
+            move |_| _ctx_handle_ಠ_ಠ.with_ctx(|ctx!(): &BuildCtx| { #(#expr)* })
           })
       }
     } else {

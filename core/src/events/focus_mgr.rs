@@ -120,7 +120,7 @@ impl FocusManager {
       self.node_ids.insert(wid, node_id);
 
       let wnd = self.window();
-      let tree = &wnd.widget_tree.borrow();
+      let tree = wnd.tree();
       let mut it = wid.ancestors(tree).skip(1);
       let parent = it
         .find_map(|id| self.node_ids.get(&id))
@@ -333,7 +333,7 @@ impl FocusManager {
   fn ignore_scope_id(&self, wid: WidgetId) -> Option<NodeId> {
     let wnd = self.window();
 
-    let tree = &wnd.widget_tree.borrow();
+    let tree = wnd.tree();
     let node_id = wid
       .ancestors(tree)
       .find_map(|wid| self.node_ids.get(&wid).copied())?;
@@ -350,11 +350,11 @@ impl FocusManager {
 
   fn scope_property(&self, scope_id: Option<WidgetId>) -> FocusScope {
     let wnd = self.window();
-    let tree = wnd.widget_tree.borrow();
+    let tree = wnd.tree();
     scope_id
-      .filter(|wid| !wid.is_dropped(&tree))
+      .filter(|wid| !wid.is_dropped(tree))
       .and_then(|id| {
-        id.query_ref::<FocusScope>(&tree)
+        id.query_ref::<FocusScope>(tree)
           .map(|s| s.clone())
       })
       .unwrap_or_default()
@@ -362,11 +362,11 @@ impl FocusManager {
 
   fn tab_index(&self, node_id: NodeId) -> i16 {
     let wnd = self.window();
-    let tree = &wnd.widget_tree.borrow();
+    let tree = wnd.tree();
     self
       .get(node_id)
       .and_then(|n| n.wid)
-      .filter(|wid| !wid.is_dropped(&tree))
+      .filter(|wid| !wid.is_dropped(tree))
       .and_then(|wid| {
         wid
           .query_ref::<MixBuiltin>(tree)
@@ -524,7 +524,7 @@ impl FocusManager {
 
   fn change_focusing_to(&mut self, node: Option<WidgetId>) -> Option<WidgetId> {
     let wnd = self.window();
-    let tree = wnd.widget_tree.borrow();
+    let tree = wnd.tree();
 
     // dispatch blur event
     if let Some(wid) = self.focusing() {
@@ -534,22 +534,22 @@ impl FocusManager {
     let old = self
       .focus_widgets
       .iter()
-      .find(|wid| !(*wid).is_dropped(&tree))
+      .find(|wid| !(*wid).is_dropped(tree))
       .copied();
 
     // bubble focus out
     if let Some(old) = old {
-      let ancestor = node.and_then(|w| w.lowest_common_ancestor(old, &tree));
+      let ancestor = node.and_then(|w| w.lowest_common_ancestor(old, tree));
       wnd.add_delay_event(DelayEvent::FocusOut { bottom: old, up: ancestor });
     };
 
     if let Some(new) = node {
       wnd.add_delay_event(DelayEvent::Focus(new));
-      let ancestor = old.and_then(|o| o.lowest_common_ancestor(new, &tree));
+      let ancestor = old.and_then(|o| o.lowest_common_ancestor(new, tree));
       wnd.add_delay_event(DelayEvent::FocusIn { bottom: new, up: ancestor });
     }
 
-    self.focus_widgets = node.map_or(vec![], |wid| wid.ancestors(&tree).collect::<Vec<_>>());
+    self.focus_widgets = node.map_or(vec![], |wid| wid.ancestors(tree).collect::<Vec<_>>());
     self.focusing = node;
     old
   }
@@ -577,11 +577,11 @@ mod tests {
 
     let wnd = TestWindow::new(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
-    let tree = wnd.widget_tree.borrow();
+    let tree = wnd.tree();
 
-    focus_mgr.refresh_focus(&tree);
+    focus_mgr.refresh_focus(tree);
 
-    let id = tree.content_root().first_child(&tree);
+    let id = tree.content_root().first_child(tree);
     assert!(id.is_some());
     assert_eq!(focus_mgr.focusing(), id);
   }
@@ -600,14 +600,14 @@ mod tests {
 
     let wnd = TestWindow::new(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
-    let tree = wnd.widget_tree.borrow();
+    let tree = wnd.tree();
 
     let id = tree
       .content_root()
-      .first_child(&tree)
-      .and_then(|p| p.next_sibling(&tree));
+      .first_child(tree)
+      .and_then(|p| p.next_sibling(tree));
     assert!(id.is_some());
-    focus_mgr.refresh_focus(&tree);
+    focus_mgr.refresh_focus(tree);
     assert_eq!(focus_mgr.focusing(), id);
   }
 
@@ -630,7 +630,7 @@ mod tests {
     let wnd = TestWindow::new(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
 
-    let tree = &wnd.widget_tree.borrow();
+    let tree = wnd.tree();
 
     focus_mgr.refresh_focus(tree);
 
@@ -724,19 +724,18 @@ mod tests {
     let widget = EmbedFocus::default();
     let log = widget.log.clone();
     let mut wnd = TestWindow::new(fn_widget!(widget));
-    let tree = wnd.widget_tree.borrow();
-    let parent = tree.content_root();
-    let child = parent.first_child(&tree).unwrap();
-    drop(tree);
+
+    let parent = wnd.tree().content_root();
+    let child = parent.first_child(wnd.tree()).unwrap();
 
     wnd
       .focus_mgr
       .borrow_mut()
-      .refresh_focus(&wnd.widget_tree.borrow());
+      .refresh_focus(wnd.tree());
     wnd
       .focus_mgr
       .borrow_mut()
-      .focus(child, &wnd.widget_tree.borrow());
+      .focus(child, wnd.tree());
     wnd.draw_frame();
     assert_eq!(&*log.borrow(), &["focus child", "focusin child", "focusin parent"]);
     log.borrow_mut().clear();
@@ -744,15 +743,12 @@ mod tests {
     wnd
       .focus_mgr
       .borrow_mut()
-      .focus_next_widget(&wnd.widget_tree.borrow());
+      .focus_next_widget(wnd.tree());
     wnd.run_frame_tasks();
     assert_eq!(&*log.borrow(), &["blur child", "focusout child", "focus parent",]);
     log.borrow_mut().clear();
 
-    wnd
-      .focus_mgr
-      .borrow_mut()
-      .blur(&wnd.widget_tree.borrow());
+    wnd.focus_mgr.borrow_mut().blur(wnd.tree());
     wnd.run_frame_tasks();
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
   }
@@ -817,7 +813,7 @@ mod tests {
     wnd.draw_frame();
 
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
-    let tree = &wnd.widget_tree.borrow();
+    let tree = wnd.tree();
 
     let first_box = tree.content_root().first_child(tree);
     let focus_scope = first_box.unwrap().next_sibling(tree);

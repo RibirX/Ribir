@@ -87,7 +87,7 @@ impl IconTheme {
 
 impl IconSize {
   #[inline]
-  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self {
+  pub fn of(ctx: &BuildCtx) -> &Self {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(t) => Some(&t.icon_theme.icon_size),

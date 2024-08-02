@@ -100,7 +100,7 @@ pub struct LightnessCfg {
 
 impl Palette {
   #[inline]
-  pub fn of<'a>(ctx: &'a BuildCtx) -> &'a Self {
+  pub fn of(ctx: &BuildCtx) -> &Self {
     ctx
       .find_cfg(|t| match t {
         Theme::Full(f) => Some(&f.palette),

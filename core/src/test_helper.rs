@@ -59,10 +59,10 @@ impl TestWindow {
   /// [0, 1, 2] the first node at the root level (must be 0), then down to its
   /// second child, then down to third child.
   pub fn layout_info_by_path(&self, path: &[usize]) -> Option<LayoutInfo> {
-    let tree = self.0.widget_tree.borrow();
+    let tree = self.0.tree();
     let mut node = tree.root();
     for (level, idx) in path[..].iter().enumerate() {
-      node = node.children(&tree).nth(*idx).unwrap_or_else(|| {
+      node = node.children(tree).nth(*idx).unwrap_or_else(|| {
         panic!("node no exist: {:?}", &path[0..level]);
       });
     }
@@ -81,10 +81,10 @@ impl TestWindow {
   }
 
   pub fn content_count(&self) -> usize {
-    let widget_tree = self.0.widget_tree.borrow();
-    let root = widget_tree.root();
-    let content = root.first_child(&widget_tree).unwrap();
-    widget_tree.count(content)
+    let tree = self.0.tree();
+    let root = tree.root();
+    let content = root.first_child(tree).unwrap();
+    tree.count(content)
   }
 
   #[track_caller]

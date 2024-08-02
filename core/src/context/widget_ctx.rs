@@ -75,9 +75,7 @@ pub(crate) trait WidgetCtxImpl {
   fn current_wnd(&self) -> Rc<Window>;
 
   #[inline]
-  fn with_tree<F: FnOnce(&WidgetTree) -> R, R>(&self, f: F) -> R {
-    f(&self.current_wnd().widget_tree.borrow())
-  }
+  fn with_tree<F: FnOnce(&WidgetTree) -> R, R>(&self, f: F) -> R { f(self.current_wnd().tree()) }
 }
 
 impl<T: WidgetCtxImpl> WidgetCtx for T {
@@ -143,28 +141,28 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   fn map_to_global(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.store.map_to_global(pos, self.id(), tree))
+    self.with_tree(|tree| tree.map_to_global(pos, self.id()))
   }
 
   fn map_from_global(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.store.map_from_global(pos, self.id(), tree))
+    self.with_tree(|tree| tree.map_from_global(pos, self.id()))
   }
 
   fn map_to_parent(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.store.map_to_parent(self.id(), pos, tree))
+    self.with_tree(|tree| tree.map_to_parent(self.id(), pos))
   }
 
   fn map_from_parent(&self, pos: Point) -> Point {
-    self.with_tree(|tree| tree.store.map_from_parent(self.id(), pos, tree))
+    self.with_tree(|tree| tree.map_from_parent(self.id(), pos))
   }
 
   fn map_to(&self, pos: Point, w: WidgetId) -> Point {
     let global = self.map_to_global(pos);
-    self.with_tree(|tree| tree.store.map_from_global(global, w, tree))
+    self.with_tree(|tree| tree.map_from_global(global, w))
   }
 
   fn map_from(&self, pos: Point, w: WidgetId) -> Point {
-    let global = self.with_tree(|tree| tree.store.map_to_global(pos, w, tree));
+    let global = self.with_tree(|tree| tree.map_to_global(pos, w));
     self.map_from_global(global)
   }
 
@@ -230,7 +228,7 @@ mod tests {
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
-    let tree = &wnd.widget_tree.borrow();
+    let tree = wnd.tree();
     let root = tree.root();
     let pos = Point::zero();
     let child = root.single_child(tree).unwrap();
@@ -258,8 +256,8 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    let root = wnd.widget_tree.borrow().root();
-    let child = get_single_child_by_depth(root, &wnd.widget_tree.borrow(), 3);
+    let root = wnd.tree().root();
+    let child = get_single_child_by_depth(root, wnd.tree(), 3);
     let w_ctx = TestCtx { id: root, wnd_id: wnd.id() };
     let from_pos = Point::new(30., 30.);
     assert_eq!(w_ctx.map_from(from_pos, child), Point::new(45., 45.));

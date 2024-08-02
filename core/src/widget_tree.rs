@@ -347,14 +347,14 @@ mod tests {
         }
       }
     });
-    let mut tree = wnd.widget_tree.borrow_mut();
+    let tree = wnd.tree_mut();
     tree.layout(Size::new(512., 512.));
     assert_eq!(tree.count(tree.content_root()), 11);
 
     let root = tree.root();
     tree.mark_dirty(root);
     let new_root = empty_node(&mut tree.arena);
-    root.insert_after(new_root, &mut tree);
+    root.insert_after(new_root, tree);
     tree.mark_dirty(new_root);
     tree.detach(root);
     tree.remove_subtree(root);
@@ -385,7 +385,7 @@ mod tests {
     };
 
     let wnd = TestWindow::new(widget);
-    let mut tree = wnd.widget_tree.borrow_mut();
+    let tree = wnd.tree_mut();
     tree.layout(Size::new(100., 100.));
 
     *c_trigger.write() = 2;

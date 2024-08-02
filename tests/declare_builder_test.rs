@@ -1,6 +1,6 @@
 use ribir::prelude::*;
 
-fn dummy_ctx() -> &'static BuildCtx<'static> { unsafe { std::mem::transmute(&0) } }
+fn dummy_ctx() -> &'static BuildCtx { unsafe { std::mem::transmute(&0) } }
 
 #[test]
 fn declarer_smoke() {

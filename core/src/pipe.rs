@@ -96,8 +96,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     Self::Value: IntoWidget<'static, M>,
   {
     let f = move |ctx: &BuildCtx| {
-      let info =
-        Sc::new(Cell::new(SinglePipeInfo { gen_id: ctx.tree.borrow().root(), multi_pos: 0 }));
+      let info = Sc::new(Cell::new(SinglePipeInfo { gen_id: ctx.tree().root(), multi_pos: 0 }));
 
       let priority = fn_priority(info.clone(), ctx.window().id());
       let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
@@ -113,16 +112,16 @@ pub(crate) trait InnerPipe: Pipe + Sized {
             let id = info.host_id();
 
             let new_id = w.into_widget().build(ctx);
-            let mut tree = ctx.tree.borrow_mut();
+            let tree = ctx.tree_mut();
 
-            query_info_outside_until(id, &info, &tree, |info| info.single_replace(id, new_id));
+            query_info_outside_until(id, &info, tree, |info| info.single_replace(id, new_id));
 
-            pipe_node.primary_transplant(id, new_id, &mut tree);
+            pipe_node.primary_transplant(id, new_id, tree);
 
-            update_key_status_single(id, new_id, &tree);
-            id.insert_after(new_id, &mut tree);
-            id.dispose_subtree(&mut tree);
-            new_id.on_mounted_subtree(&tree);
+            update_key_status_single(id, new_id, tree);
+            id.insert_after(new_id, tree);
+            id.dispose_subtree(tree);
+            new_id.on_mounted_subtree(tree);
 
             tree.mark_dirty(new_id);
           });
@@ -156,32 +155,30 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       let handle = ctx.handle();
       let u = modifies.subscribe(move |(_, m)| {
         handle.with_ctx(|ctx| {
+          let tree = ctx.tree_mut();
           let old = info2.borrow().widgets.clone();
           let mut new = vec![];
           for (idx, w) in m.into_iter().enumerate() {
             let id = w.into_widget().build(ctx);
             new.push(id);
-            set_pos_of_multi(id, idx, &ctx.tree.borrow());
+            set_pos_of_multi(id, idx, tree);
           }
           if new.is_empty() {
             new.push(Void.into_widget().build(ctx));
           }
 
-          let mut tree = ctx.tree.borrow_mut();
-          query_info_outside_until(old[0], &info2, &tree, |info| info.multi_replace(&old, &new));
-          pipe_node.primary_transplant(old[0], new[0], &mut tree);
+          query_info_outside_until(old[0], &info2, tree, |info| info.multi_replace(&old, &new));
+          pipe_node.primary_transplant(old[0], new[0], tree);
 
-          update_key_state_multi(old.iter().copied(), new.iter().copied(), &tree);
+          update_key_state_multi(old.iter().copied(), new.iter().copied(), tree);
 
           new
             .iter()
             .rev()
-            .for_each(|w| old[0].insert_after(*w, &mut tree));
-          old
-            .iter()
-            .for_each(|id| id.dispose_subtree(&mut tree));
+            .for_each(|w| old[0].insert_after(*w, tree));
+          old.iter().for_each(|id| id.dispose_subtree(tree));
           new.iter().for_each(|w| {
-            w.on_mounted_subtree(&tree);
+            w.on_mounted_subtree(tree);
             tree.mark_dirty(*w)
           });
         });
@@ -196,7 +193,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       let w = w.into_widget().on_build(move |id, ctx| {
         info.borrow_mut().widgets.push(id);
 
-        let tree = &mut ctx.tree.borrow_mut();
+        let tree = ctx.tree_mut();
         if set_pos_of_multi(id, idx + 1, tree) {
           // We need to associate the parent information with the children pipe so that
           // when the child pipe is regenerated, it can update the parent pipe information
@@ -218,27 +215,25 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     Self::Value: IntoWidget<'static, M>,
   {
     let f = move |ctx: &BuildCtx| {
-      let root = ctx.tree.borrow().root();
+      let root = ctx.tree().root();
       let info = Sc::new(RefCell::new(SingleParentPipeInfo { range: root..=root, multi_pos: 0 }));
 
       let priority = fn_priority(info.clone(), ctx.window().id());
       let (v, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
 
       v.into_widget().on_build(|p, ctx| {
+        let tree = ctx.tree_mut();
         let pipe_node = PipeNode::share_capture(p, Box::new(info.clone()), ctx);
-        let leaf = p.single_leaf(&ctx.tree.borrow());
+        let leaf = p.single_leaf(tree);
         info.borrow_mut().range = p..=leaf;
 
         // We need to associate the parent information with the pipe of leaf widget,
         // when the leaf pipe is regenerated, it can update the parent pipe information
         // accordingly.
-        {
-          let tree = &mut ctx.tree.borrow_mut();
-          if leaf.contain_type::<DynInfo>(tree) {
-            let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
-            leaf.attach_data(Box::new(Queryable(info)), tree);
-          };
-        }
+        if leaf.contain_type::<DynInfo>(tree) {
+          let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
+          leaf.attach_data(Box::new(Queryable(info)), tree);
+        };
 
         let c_pipe_node = pipe_node.clone();
         let handle = ctx.handle();
@@ -247,29 +242,29 @@ pub(crate) trait InnerPipe: Pipe + Sized {
             let (top, bottom) = info.borrow().range.clone().into_inner();
 
             let p = w.into_widget().build(ctx);
-            let mut tree = ctx.tree.borrow_mut();
-            let new_rg = p..=p.single_leaf(&tree);
-            let children: SmallVec<[WidgetId; 1]> = bottom.children(&tree).collect();
+            let tree = ctx.tree_mut();
+            let new_rg = p..=p.single_leaf(tree);
+            let children: SmallVec<[WidgetId; 1]> = bottom.children(tree).collect();
             for c in children {
-              new_rg.end().append(c, &mut tree);
+              new_rg.end().append(c, tree);
             }
 
-            query_info_outside_until(top, &info, &tree, |info| {
+            query_info_outside_until(top, &info, tree, |info| {
               info.single_range_replace(&(top..=bottom), &new_rg);
             });
-            pipe_node.primary_transplant(top, p, &mut tree);
+            pipe_node.primary_transplant(top, p, tree);
 
-            update_key_status_single(top, p, &tree);
-            top.insert_after(p, &mut tree);
-            top.dispose_subtree(&mut tree);
+            update_key_status_single(top, p, tree);
+            top.insert_after(p, tree);
+            top.dispose_subtree(tree);
 
             let mut w = p;
             loop {
-              w.on_widget_mounted(&tree);
+              w.on_widget_mounted(tree);
               if w == *new_rg.end() {
                 break;
               }
-              if let Some(c) = w.first_child(&tree) {
+              if let Some(c) = w.first_child(tree) {
                 w = c;
               } else {
                 break;
@@ -727,10 +722,9 @@ impl DynWidgetInfo for Sc<RefCell<MultiPipeInfo>> {
 
 impl PipeNode {
   fn share_capture(id: WidgetId, dyn_info: Box<dyn DynWidgetInfo>, ctx: &BuildCtx) -> Self {
-    let tree = &mut ctx.tree.borrow_mut();
     let mut pipe_node = None;
 
-    id.wrap_node(tree, |r| {
+    id.wrap_node(ctx.tree_mut(), |r| {
       let inner_node = InnerPipeNode { data: r, dyn_info };
       let p = Self(Sc::new(UnsafeCell::new(inner_node)));
       pipe_node = Some(p.clone());
@@ -764,7 +758,7 @@ impl PipeNode {
   fn own_subscription(self, u: impl Subscription + 'static, ctx: &BuildCtx) {
     let node = self.as_mut();
     let id = node.dyn_info.host_id();
-    let tree = &mut ctx.tree.borrow_mut();
+    let tree = ctx.tree_mut();
     // if the subscription is closed, we can cancel and unwrap the `PipeNode`
     // immediately.
     if u.is_closed() {
@@ -806,10 +800,10 @@ where
   Sc<T>: DynWidgetInfo,
 {
   let id = info.host_id();
-  let tree = wnd.widget_tree.borrow();
-  let depth = id.ancestors(&tree).count() as i64;
+  let tree = wnd.tree();
+  let depth = id.ancestors(tree).count() as i64;
   let mut embed = 0;
-  query_info_outside_until(id, info, &tree, |_| {
+  query_info_outside_until(id, info, tree, |_| {
     embed += 1;
   });
   let pos = info.pos_of_multi() as i64;
@@ -896,10 +890,7 @@ impl Priority for MultiUpdatePriority {
 
 #[cfg(test)]
 mod tests {
-  use std::{
-    cell::{Cell, Ref},
-    rc::Rc,
-  };
+  use std::{cell::Cell, rc::Rc};
 
   use ribir_dev_helper::assert_layout_result_by_path;
 
@@ -922,11 +913,11 @@ mod tests {
       @$p { @Void {} }
     };
     let wnd = TestWindow::new(w);
-    let mut tree = wnd.widget_tree.borrow_mut();
+    let tree = wnd.tree_mut();
     tree.layout(Size::zero());
     let ids = tree
       .content_root()
-      .descendants(&tree)
+      .descendants(tree)
       .collect::<Vec<_>>();
     assert_eq!(ids.len(), 2);
     {
@@ -935,7 +926,7 @@ mod tests {
     tree.layout(Size::zero());
     let new_ids = tree
       .content_root()
-      .descendants(&tree)
+      .descendants(tree)
       .collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 2);
 
@@ -959,11 +950,11 @@ mod tests {
       }
     };
     let wnd = TestWindow::new(w);
-    let mut tree = wnd.widget_tree.borrow_mut();
+    let tree = wnd.tree_mut();
     tree.layout(Size::zero());
     let ids = tree
       .content_root()
-      .descendants(&tree)
+      .descendants(tree)
       .collect::<Vec<_>>();
     assert_eq!(ids.len(), 3);
     {
@@ -972,7 +963,7 @@ mod tests {
     tree.layout(Size::zero());
     let new_ids = tree
       .content_root()
-      .descendants(&tree)
+      .descendants(tree)
       .collect::<Vec<_>>();
     assert_eq!(new_ids.len(), 3);
 
@@ -1005,13 +996,13 @@ mod tests {
       *trigger.write() = true;
     }
     wnd.draw_frame();
-    let tree = wnd.widget_tree.borrow();
+    let tree = wnd.tree();
 
     // the key should still in the root widget after pipe widget updated.
     assert!(
       tree
         .content_root()
-        .contain_type::<Box<dyn AnyKey>>(&tree)
+        .contain_type::<Box<dyn AnyKey>>(tree)
     );
   }
 
@@ -1285,9 +1276,9 @@ mod tests {
     }
 
     fn child_count(wnd: &Window) -> usize {
-      let tree = wnd.widget_tree.borrow();
+      let tree = wnd.tree();
       let root = tree.content_root();
-      root.children(&tree).count()
+      root.children(tree).count()
     }
 
     let tasks = (0..3)
@@ -1391,29 +1382,26 @@ mod tests {
     };
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-
-    fn tree(wnd: &TestWindow) -> Ref<WidgetTree> { wnd.widget_tree.borrow() }
-
     let grandson_id = {
-      let tree = tree(&wnd);
-      let root = wnd.widget_tree.borrow().content_root();
+      let tree = wnd.tree();
+      let root = tree.content_root();
       root
-        .first_child(&tree)
+        .first_child(tree)
         .unwrap()
-        .first_child(&tree)
+        .first_child(tree)
         .unwrap()
     };
 
     wnd.draw_frame();
-    assert!(!grandson_id.is_dropped(&tree(&wnd)));
+    assert!(!grandson_id.is_dropped(wnd.tree()));
 
     c_child.write().take();
     wnd.draw_frame();
-    assert!(!grandson_id.is_dropped(&tree(&wnd)));
+    assert!(!grandson_id.is_dropped(wnd.tree()));
 
     *c_child_destroy_until.write() = true;
     wnd.draw_frame();
-    assert!(grandson_id.is_dropped(&tree(&wnd)));
+    assert!(grandson_id.is_dropped(wnd.tree()));
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]

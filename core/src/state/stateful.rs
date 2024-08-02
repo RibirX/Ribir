@@ -308,7 +308,7 @@ mod tests {
     let mut wnd = TestWindow::new(fn_widget! {sized_box});
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 0);
-    assert!(!wnd.widget_tree.borrow().is_dirty());
+    assert!(!wnd.tree().is_dirty());
     assert_eq!(&*changed_size.borrow(), &Size::new(0., 0.));
 
     {
@@ -316,7 +316,7 @@ mod tests {
     }
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
-    assert!(wnd.widget_tree.borrow().is_dirty());
+    assert!(wnd.tree().is_dirty());
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 1);
     assert_eq!(&*changed_size.borrow(), &Size::new(1., 1.));
@@ -329,8 +329,8 @@ mod tests {
 
     let mut wnd = TestWindow::new(fn_widget!(MockBox { size: Size::new(100., 100.) }));
     wnd.draw_frame();
-    let tree = wnd.widget_tree.borrow();
-    assert_eq!(tree.content_root().descendants(&tree).count(), 1);
+    let tree = wnd.tree();
+    assert_eq!(tree.content_root().descendants(tree).count(), 1);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
