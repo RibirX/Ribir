@@ -42,7 +42,7 @@ pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream
             let _ctx_handle_ಠ_ಠ = ctx!().handle();
             move |_: ModifyScope| {
               _ctx_handle_ಠ_ಠ
-                .with_ctx(|ctx!(): &BuildCtx| { #(#expr)* })
+                .with_ctx(|ctx!(): &mut BuildCtx| { #(#expr)* })
                 .expect("ctx is not available")
             }
           }

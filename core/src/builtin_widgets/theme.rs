@@ -75,7 +75,7 @@ impl ComposeChild<'static> for ThemeWidget {
   type Child = GenWidget;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     use crate::prelude::*;
-    let f = move |ctx: &BuildCtx| {
+    let f = move |ctx: &mut BuildCtx| {
       let theme = this.read().theme.clone();
       AppCtx::load_font_from_theme(&theme);
 
@@ -92,8 +92,8 @@ impl ComposeChild<'static> for ThemeWidget {
       p.attach_data(Box::new(Queryable(theme)), ctx.tree_mut());
 
       // shadow the context with the theme.
-      let ctx = BuildCtx::new_with_data(Some(p), ctx.tree, themes);
-      let child = child.gen_widget().build(&ctx);
+      let mut ctx = BuildCtx::new_with_data(p, ctx.tree, themes);
+      let child = child.gen_widget().build(&mut ctx);
       p.append(child, ctx.tree_mut());
 
       p

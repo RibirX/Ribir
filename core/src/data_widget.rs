@@ -53,6 +53,8 @@ impl Query for DataAttacher {
       .query(type_id)
       .or_else(|| self.render.query(type_id))
   }
+
+  fn queryable(&self) -> bool { true }
 }
 
 impl Query for AnonymousAttacher {
@@ -63,6 +65,8 @@ impl Query for AnonymousAttacher {
 
   #[inline]
   fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.render.query(type_id) }
+
+  fn queryable(&self) -> bool { self.render.queryable() }
 }
 
 impl RenderProxy for AnonymousAttacher {

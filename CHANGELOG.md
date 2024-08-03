@@ -25,6 +25,32 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Added `Provider` widget to share data between sub-tree. (#pr @M-Adoo)
+  ```rust
+  Provider::new(Box::new(State::value(0i32))).with_child(fn_widget! {
+    @SizedBox {
+      size: Size::new(1.,1.),
+      on_tap: |e| {
+        // Access the provider in a callback.
+        let mut v = Provider::write_of::<i32>(e).unwrap();
+        *v += 1;
+      },
+      @Text {
+        text: {
+          // Access the provider in any descendants
+          let v = Provider::of::<Stateful<i32>>(ctx!());
+          let v = v.unwrap().clone_writer();
+          pipe!($v.to_string())
+        }
+      }
+    }
+  });
+  ```
+
+- **core**: Added `WidgetCtx::query`, `WidgetCtx::query_write`, `WidgetCtx::query_of_widget` and  `WidgetCtx::query_write_of_widget`. (#pr @M-Adoo)
+
 ### Breaking
 
 - **core**: `GenWidget::gen_widget` no longer requires a `&mut BuildCtx` parameter. (#616 @M-Adoo)
@@ -44,8 +70,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Added `WidgetCtx::query`, `WidgetCtx::query_write`, `WidgetCtx::query_of_widget` and  `WidgetCtx::query_write_of_widget`. (#pr @M-Adoo)
-    
 - **core**: Introduced `IntoWidget` and `IntoChild`. (@M-Adoo #612)
 
   The `IntoWidget` trait allows for the conversion of any widget to the type `Widget`.
@@ -68,7 +92,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - Removed `ChildFrom` and `FromAnother` traits (#612 @M-Adoo)
 - Removed `SingleParent` and `MultiParent` traits. (#612 @M-Adoo)
 - Removed `PairChild` and `PairWithChild` traits. User can use a generic type instead. (#612 @M-Adoo)
-- Allow only the child to be converted to a widget or a type that implements the Into trait. (#612 @M-Adoo)
 - Removed the all builder traits such as WidgetBuilder and ComposeBuilder and so on. (#612 @M-Adoo)
 - All implicit child conversions have been removed, except for conversions to Widget. (#612 @M-Adoo)
 

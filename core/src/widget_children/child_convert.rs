@@ -20,7 +20,7 @@ impl<C> IntoChild<Option<C>, SELF> for C {
   fn into_child(self) -> Option<C> { Some(self) }
 }
 
-impl<F: FnMut(&BuildCtx) -> Widget<'static> + 'static> IntoChild<GenWidget, 0> for F {
+impl<F: FnMut(&mut BuildCtx) -> Widget<'static> + 'static> IntoChild<GenWidget, 0> for F {
   #[inline]
   fn into_child(self) -> GenWidget { GenWidget::new(self) }
 }
@@ -84,4 +84,12 @@ where
 
 impl<P: Pipe> IntoChild<BoxPipe<P::Value>, 0> for P {
   fn into_child(self) -> BoxPipe<P::Value> { BoxPipe::pipe(Box::new(self)) }
+}
+
+impl<'w, F> IntoChild<FnWidget<'w>, FN> for F
+where
+  F: FnOnce(&mut BuildCtx) -> Widget<'w> + 'w,
+{
+  #[inline]
+  fn into_child(self) -> FnWidget<'w> { Box::new(self) }
 }

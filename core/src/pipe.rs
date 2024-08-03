@@ -95,7 +95,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
   where
     Self::Value: IntoWidget<'static, M>,
   {
-    let f = move |ctx: &BuildCtx| {
+    let f = move |ctx: &mut BuildCtx| {
       let info = Sc::new(Cell::new(SinglePipeInfo { gen_id: ctx.tree().root(), multi_pos: 0 }));
 
       let priority = fn_priority(info.clone(), ctx.window().id());
@@ -106,26 +106,26 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         let pipe_node = PipeNode::share_capture(w, Box::new(info.clone()), ctx);
         let c_pipe_node = pipe_node.clone();
 
-        let handle = ctx.handle();
+        let tree = ctx.tree;
         let u = modifies.subscribe(move |(_, w)| {
-          handle.with_ctx(|ctx| {
-            let id = info.host_id();
+          let id = info.host_id();
+          let mut ctx = BuildCtx::new(id, tree);
 
-            let new_id = w.into_widget().build(ctx);
-            let tree = ctx.tree_mut();
+          let new_id = w.into_widget().build(&mut ctx);
+          let tree = ctx.tree_mut();
 
-            query_info_outside_until(id, &info, tree, |info| info.single_replace(id, new_id));
+          query_info_outside_until(id, &info, tree, |info| info.single_replace(id, new_id));
 
-            pipe_node.primary_transplant(id, new_id, tree);
+          pipe_node.primary_transplant(id, new_id, tree);
 
-            update_key_status_single(id, new_id, tree);
-            id.insert_after(new_id, tree);
-            id.dispose_subtree(tree);
-            new_id.on_mounted_subtree(tree);
+          update_key_status_single(id, new_id, tree);
+          id.insert_after(new_id, tree);
+          id.dispose_subtree(tree);
+          new_id.on_mounted_subtree(tree);
 
-            tree.mark_dirty(new_id);
-          });
+          tree.mark_dirty(new_id);
         });
+
         c_pipe_node.own_subscription(u, ctx);
       })
     };
@@ -152,35 +152,37 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       priority.set_wnd(ctx.window().id());
       let pipe_node = PipeNode::share_capture(id, Box::new(info2.clone()), ctx);
       let c_pipe_node = pipe_node.clone();
-      let handle = ctx.handle();
+
+      let tree = ctx.tree;
       let u = modifies.subscribe(move |(_, m)| {
-        handle.with_ctx(|ctx| {
-          let tree = ctx.tree_mut();
-          let old = info2.borrow().widgets.clone();
-          let mut new = vec![];
-          for (idx, w) in m.into_iter().enumerate() {
-            let id = w.into_widget().build(ctx);
-            new.push(id);
-            set_pos_of_multi(id, idx, tree);
-          }
-          if new.is_empty() {
-            new.push(Void.into_widget().build(ctx));
-          }
+        let host_id = info2.host_id();
+        let mut ctx = BuildCtx::new(host_id, tree);
 
-          query_info_outside_until(old[0], &info2, tree, |info| info.multi_replace(&old, &new));
-          pipe_node.primary_transplant(old[0], new[0], tree);
+        let old = info2.borrow().widgets.clone();
+        let mut new = vec![];
+        for (idx, w) in m.into_iter().enumerate() {
+          let id = w.into_widget().build(&mut ctx);
+          new.push(id);
+          set_pos_of_multi(id, idx, ctx.tree());
+        }
+        if new.is_empty() {
+          new.push(Void.into_widget().build(&mut ctx));
+        }
 
-          update_key_state_multi(old.iter().copied(), new.iter().copied(), tree);
+        let tree = ctx.tree_mut();
+        query_info_outside_until(old[0], &info2, tree, |info| info.multi_replace(&old, &new));
+        pipe_node.primary_transplant(old[0], new[0], tree);
 
-          new
-            .iter()
-            .rev()
-            .for_each(|w| old[0].insert_after(*w, tree));
-          old.iter().for_each(|id| id.dispose_subtree(tree));
-          new.iter().for_each(|w| {
-            w.on_mounted_subtree(tree);
-            tree.mark_dirty(*w)
-          });
+        update_key_state_multi(old.iter().copied(), new.iter().copied(), tree);
+
+        new
+          .iter()
+          .rev()
+          .for_each(|w| old[0].insert_after(*w, tree));
+        old.iter().for_each(|id| id.dispose_subtree(tree));
+        new.iter().for_each(|w| {
+          w.on_mounted_subtree(tree);
+          tree.mark_dirty(*w)
         });
       });
 
@@ -214,7 +216,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     Self: Sized,
     Self::Value: IntoWidget<'static, M>,
   {
-    let f = move |ctx: &BuildCtx| {
+    let f = move |ctx: &mut BuildCtx| {
       let root = ctx.tree().root();
       let info = Sc::new(RefCell::new(SingleParentPipeInfo { range: root..=root, multi_pos: 0 }));
 
@@ -222,8 +224,8 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       let (v, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
 
       v.into_widget().on_build(|p, ctx| {
-        let tree = ctx.tree_mut();
         let pipe_node = PipeNode::share_capture(p, Box::new(info.clone()), ctx);
+        let tree = ctx.tree_mut();
         let leaf = p.single_leaf(tree);
         info.borrow_mut().range = p..=leaf;
 
@@ -236,44 +238,44 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         };
 
         let c_pipe_node = pipe_node.clone();
-        let handle = ctx.handle();
+        let tree = ctx.tree;
         let u = modifies.subscribe(move |(_, w)| {
-          handle.with_ctx(|ctx| {
-            let (top, bottom) = info.borrow().range.clone().into_inner();
+          let (top, bottom) = info.borrow().range.clone().into_inner();
+          let mut ctx = BuildCtx::new(top, tree);
 
-            let p = w.into_widget().build(ctx);
-            let tree = ctx.tree_mut();
-            let new_rg = p..=p.single_leaf(tree);
-            let children: SmallVec<[WidgetId; 1]> = bottom.children(tree).collect();
-            for c in children {
-              new_rg.end().append(c, tree);
-            }
+          let p = w.into_widget().build(&mut ctx);
+          let tree = ctx.tree_mut();
+          let new_rg = p..=p.single_leaf(tree);
+          let children: SmallVec<[WidgetId; 1]> = bottom.children(tree).collect();
+          for c in children {
+            new_rg.end().append(c, tree);
+          }
 
-            query_info_outside_until(top, &info, tree, |info| {
-              info.single_range_replace(&(top..=bottom), &new_rg);
-            });
-            pipe_node.primary_transplant(top, p, tree);
-
-            update_key_status_single(top, p, tree);
-            top.insert_after(p, tree);
-            top.dispose_subtree(tree);
-
-            let mut w = p;
-            loop {
-              w.on_widget_mounted(tree);
-              if w == *new_rg.end() {
-                break;
-              }
-              if let Some(c) = w.first_child(tree) {
-                w = c;
-              } else {
-                break;
-              }
-            }
-
-            tree.mark_dirty(p);
+          query_info_outside_until(top, &info, tree, |info| {
+            info.single_range_replace(&(top..=bottom), &new_rg);
           });
+          pipe_node.primary_transplant(top, p, tree);
+
+          update_key_status_single(top, p, tree);
+          top.insert_after(p, tree);
+          top.dispose_subtree(tree);
+
+          let mut w = p;
+          loop {
+            w.on_widget_mounted(tree);
+            if w == *new_rg.end() {
+              break;
+            }
+            if let Some(c) = w.first_child(tree) {
+              w = c;
+            } else {
+              break;
+            }
+          }
+
+          tree.mark_dirty(p);
         });
+
         c_pipe_node.own_subscription(u, ctx);
       })
     };
@@ -463,7 +465,7 @@ where
 fn option_into_widget<const M: usize>(
   p: impl InnerPipe<Value = Option<impl IntoWidget<'static, M>>>,
 ) -> Widget<'static> {
-  p.map(|w| move |_: &BuildCtx| w.map_or_else(|| Void.into_widget(), IntoWidget::into_widget))
+  p.map(|w| move |_: &mut BuildCtx| w.map_or_else(|| Void.into_widget(), IntoWidget::into_widget))
     .build_single()
 }
 
@@ -721,7 +723,7 @@ impl DynWidgetInfo for Sc<RefCell<MultiPipeInfo>> {
 }
 
 impl PipeNode {
-  fn share_capture(id: WidgetId, dyn_info: Box<dyn DynWidgetInfo>, ctx: &BuildCtx) -> Self {
+  fn share_capture(id: WidgetId, dyn_info: Box<dyn DynWidgetInfo>, ctx: &mut BuildCtx) -> Self {
     let mut pipe_node = None;
 
     id.wrap_node(ctx.tree_mut(), |r| {
@@ -755,7 +757,7 @@ impl PipeNode {
 
   /// Attach a subscription to host widget of the `PipeNode`, and the
   /// subscription will be unsubscribed when the `PipeNode` dropped.
-  fn own_subscription(self, u: impl Subscription + 'static, ctx: &BuildCtx) {
+  fn own_subscription(self, u: impl Subscription + 'static, ctx: &mut BuildCtx) {
     let node = self.as_mut();
     let id = node.dyn_info.host_id();
     let tree = ctx.tree_mut();
@@ -838,6 +840,8 @@ impl Query for PipeNode {
       p.data.query(type_id)
     }
   }
+
+  fn queryable(&self) -> bool { true }
 }
 
 impl RenderProxy for PipeNode {

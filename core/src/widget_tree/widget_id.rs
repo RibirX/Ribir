@@ -26,7 +26,7 @@ impl WidgetId {
   /// Subscribe the modifies `upstream` to mark the widget dirty when the
   /// `upstream` emit a modify event that contains `ModifyScope::FRAMEWORK`.
   pub(crate) fn dirty_subscribe(
-    self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>, ctx: &BuildCtx,
+    self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>, ctx: &mut BuildCtx,
   ) {
     let dirty_set = ctx.tree().dirty_set.clone();
     let h = upstream
@@ -301,4 +301,6 @@ impl WidgetId {
       .query(TypeId::of::<T>())
       .is_some()
   }
+
+  pub(crate) fn queryable(&self, tree: &WidgetTree) -> bool { self.assert_get(tree).queryable() }
 }
