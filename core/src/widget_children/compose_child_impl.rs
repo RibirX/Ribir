@@ -150,7 +150,7 @@ where
   type Target = Widget<'w>;
 
   fn with_child(self, child: C) -> Self::Target {
-    let f = move |ctx: &BuildCtx| {
+    let f = move |ctx: &mut BuildCtx| {
       let tid = TypeId::of::<W>();
       let style = ctx.find_cfg(|t| match t {
         Theme::Full(t) => t.compose_decorators.styles.get(&tid),

@@ -64,10 +64,12 @@ mod mix_builtin;
 pub use mix_builtin::*;
 pub mod container;
 pub use container::*;
+mod provider;
+pub use provider::*;
 
 use crate::prelude::*;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 /// LazyWidgetId is a widget id that will be valid after widget build.
 pub struct LazyWidgetId(Sc<Cell<Option<WidgetId>>>);
 
@@ -151,10 +153,6 @@ impl LazyWidgetId {
   }
 
   fn ref_count(&self) -> usize { self.0.ref_count() }
-}
-
-impl Default for LazyWidgetId {
-  fn default() -> Self { Self(Sc::new(Cell::new(None))) }
 }
 
 impl<T> FatObj<T> {

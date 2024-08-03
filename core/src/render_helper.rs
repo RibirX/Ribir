@@ -22,6 +22,8 @@ impl<R: Render> Query for PureRender<R> {
   }
 
   fn query(&self, _: TypeId) -> Option<QueryHandle> { None }
+
+  fn queryable(&self) -> bool { false }
 }
 
 impl<R: Render> RenderProxy for PureRender<R> {

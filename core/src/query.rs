@@ -7,7 +7,7 @@ use crate::state::{
 };
 
 /// A type can composed by many types, this trait help us to query the type and
-/// the inner type by its type id
+/// the inner type by type id.
 pub trait Query: Any {
   /// Queries all types that match the provided type id, returning their handles
   /// in an inside-to-outside order.
@@ -16,9 +16,18 @@ pub trait Query: Any {
   /// Queries the type that matches the provided type id, returning its handle.
   /// This method always returns the outermost type.
   fn query(&self, type_id: TypeId) -> Option<QueryHandle>;
+
+  /// Hint this is a non-queryable type.
+  fn queryable(&self) -> bool { true }
 }
 
-/// This is a wrapper for a data that makes it queryable.
+/// This wrapper transforms a non-queryable type into a queryable one, limiting
+/// query access to its own type only.
+///
+/// If a state writer, such as `State<i32>`, is provided, the `State<i32>` can
+/// be queried, but the `i32` cannot. Typically, there is no need to wrap
+/// a state writer with `Queryable` since the state writer is already inherently
+/// queryable.
 pub struct Queryable<T: Any>(pub T);
 
 /// A dynamic handle to a query result of a data, so we can use it in a trait
@@ -55,7 +64,7 @@ impl<'a> QueryHandle<'a> {
       return None;
     };
     (o.query_type() == TypeId::of::<WriteRef<'static, T>>()).then(|| {
-      // SAFETY: the creater guarantees that the query type is `WriteRef<T>`,
+      // SAFETY: the creator guarantees that the query type is `WriteRef<T>`,
       unsafe { &mut **(o.as_mut() as *mut dyn QueryResult as *mut WriteRef<'a, T>) }
     })
   }
@@ -81,7 +90,7 @@ impl<'a> QueryHandle<'a> {
       return None;
     };
     (o.query_type() == TypeId::of::<WriteRef<'static, T>>()).then(|| {
-      // SAFETY: the creater guarantees that the query type is `WriteRef<T>`,
+      // SAFETY: the creator guarantees that the query type is `WriteRef<T>`,
       let w_r = unsafe {
         let ptr = Box::into_raw(o);
         Box::from_raw(ptr as *mut WriteRef<'a, T>)
@@ -94,15 +103,15 @@ impl<'a> QueryHandle<'a> {
 fn query_downcast_ref<'a, T: Any>(q: &(dyn QueryResult + 'a)) -> Option<&'a T> {
   let q_type = q.query_type();
   if q_type == TypeId::of::<T>() {
-    // SAFETY: the creater guarantees that the query type is `T`,
+    // SAFETY: the creator guarantees that the query type is `T`,
     let t = unsafe { &*(q as *const dyn QueryResult as *const T) };
     Some(t)
   } else if q_type == TypeId::of::<WriteRef<'static, T>>() {
-    // SAFETY: the creater guarantees that the query type is `WriteRef<T>`,
+    // SAFETY: the creator guarantees that the query type is `WriteRef<T>`,
     let wr = unsafe { &*(q as *const dyn QueryResult as *const WriteRef<'a, T>) };
     Some(wr)
   } else if q_type == TypeId::of::<ReadRef<'static, T>>() {
-    // SAFETY: the creater guarantees that the query type is `WriteRef<T>`,
+    // SAFETY: the creator guarantees that the query type is `WriteRef<T>`,
     let rr = unsafe { &*(q as *const dyn QueryResult as *const ReadRef<'a, T>) };
     Some(rr)
   } else {
@@ -144,6 +153,8 @@ impl<T: Any> Query for Queryable<T> {
   fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
     (type_id == self.0.type_id()).then(|| QueryHandle::new(&self.0))
   }
+
+  fn queryable(&self) -> bool { true }
 }
 
 impl<T: StateWriter + 'static> Query for T
@@ -165,6 +176,8 @@ where
       None
     }
   }
+
+  fn queryable(&self) -> bool { true }
 }
 
 macro_rules! impl_query_for_reader {
@@ -184,6 +197,8 @@ macro_rules! impl_query_for_reader {
         None
       }
     }
+
+    fn queryable(&self) -> bool { true }
   };
 }
 

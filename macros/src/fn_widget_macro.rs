@@ -20,7 +20,7 @@ pub(crate) fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> Toke
     .collect();
   let _ = refs_ctx.pop_dollar_scope(true, false);
   quote! {
-    move |ctx!(): &BuildCtx| -> Widget { #(#stmts)*.into_widget() }
+    move |ctx!(): &mut BuildCtx| -> Widget { #(#stmts)*.into_widget() }
   }
   .into()
 }

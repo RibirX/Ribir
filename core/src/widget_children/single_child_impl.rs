@@ -50,7 +50,7 @@ where
 
 impl<'w, W: SingleIntoParent> IntoWidgetStrict<'w, RENDER> for WidgetOf<'w, W> {
   fn into_widget_strict(self) -> Widget<'w> {
-    let f = move |ctx: &BuildCtx| {
+    let f = move |ctx: &mut BuildCtx| {
       let Pair { parent, child } = self;
 
       parent
@@ -152,7 +152,7 @@ where
 fn option_pipe_into_parent<const M: usize>(
   p: impl InnerPipe<Value = Option<impl IntoWidget<'static, M>>>,
 ) -> Widget<'static> {
-  p.map(|w| move |_: &BuildCtx| w.map_or_else(|| Void.into_widget(), IntoWidget::into_widget))
+  p.map(|w| move |_: &mut BuildCtx| w.map_or_else(|| Void.into_widget(), IntoWidget::into_widget))
     .into_parent_widget()
 }
 #[cfg(test)]

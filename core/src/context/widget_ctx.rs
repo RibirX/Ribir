@@ -12,6 +12,8 @@ use crate::{
 
 /// common action for all context of widget.
 pub trait WidgetCtx {
+  /// This indicates the widget ID represented by the context.
+  fn widget_id(&self) -> WidgetId;
   /// Return parent of widget of this context.
   fn parent(&self) -> Option<WidgetId>;
   /// Return parent of widget `w`.
@@ -57,11 +59,19 @@ pub trait WidgetCtx {
   /// Translates the widget pos from the coordinate system of `w` to this widget
   /// system.
   fn map_from(&self, pos: Point, w: WidgetId) -> Point;
-  /// Query a reference to the `T` if it is shared within the widget represented
-  /// by this context.
+  /// Query a reference to the `T` if it is shared within the widget
+  /// represented by this context.
+  ///
+  /// This method differs from `Provider::of`, as `Provider::of` searches in all
+  /// ancestors of the widget, whereas this method only searches within the
+  /// current widget.
   fn query<T: 'static>(&self) -> Option<QueryRef<T>>;
   /// Query a write reference to the `T` if a writer of `T` is shared within the
   /// widget represented by this context.
+  ///
+  /// This method differs from `Provider::write_of`, as `Provider::write_of`
+  /// searches in all ancestors of the widget, whereas this method only
+  /// searches within the current widget.
   fn query_write<T: 'static>(&self) -> Option<WriteRef<T>>;
   /// Query a reference to the `T` if it is shared within the widget `w`.
   fn query_of_widget<T: 'static>(&self, w: WidgetId) -> Option<QueryRef<T>>;
@@ -82,6 +92,9 @@ pub(crate) trait WidgetCtxImpl {
 }
 
 impl<T: WidgetCtxImpl> WidgetCtx for T {
+  #[inline]
+  fn widget_id(&self) -> WidgetId { self.id() }
+
   #[inline]
   fn parent(&self) -> Option<WidgetId> { self.id().parent(self.tree()) }
 

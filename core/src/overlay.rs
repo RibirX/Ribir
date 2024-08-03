@@ -247,12 +247,12 @@ impl OverlayState {
         (instant, OverlayInnerState::ToShow(crate_at, wnd)) if &instant == crate_at => wnd.clone(),
         _ => return,
       };
-      let build_ctx = BuildCtx::new(None, wnd.tree);
+      let mut build_ctx = BuildCtx::new(wnd.tree().root(), wnd.tree);
       let style = style.unwrap_or_else(|| OverlayStyle::of(&build_ctx));
       let wid = this
         .wrap_style(w, style)
         .into_widget()
-        .build(&build_ctx);
+        .build(&mut build_ctx);
       *this.0.borrow_mut() = OverlayInnerState::Showing(wid, wnd.clone());
       let tree = wnd.tree_mut();
       tree.root().append(wid, tree);

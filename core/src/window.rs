@@ -292,8 +292,8 @@ impl Window {
   }
 
   pub fn set_content_widget<'w, const M: usize>(&self, root: impl IntoWidget<'w, M>) -> &Self {
-    let build_ctx = BuildCtx::new(None, self.tree);
-    let root = root.into_widget().build(&build_ctx);
+    let mut build_ctx = BuildCtx::new(self.tree().root(), self.tree);
+    let root = root.into_widget().build(&mut build_ctx);
     self.tree_mut().set_content(root);
     self
   }
