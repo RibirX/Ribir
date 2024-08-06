@@ -194,7 +194,7 @@ impl WidgetId {
     }
   }
 
-  pub(crate) fn attach_data(self, data: impl Query, tree: &mut WidgetTree) {
+  pub(crate) fn attach_data(self, data: Box<dyn Query>, tree: &mut WidgetTree) {
     self.wrap_node(tree, |node| Box::new(DataAttacher::new(node, data)));
   }
 

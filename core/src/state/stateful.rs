@@ -172,12 +172,11 @@ impl<W: Render + 'static> IntoWidgetStrict<'static, RENDER> for Stateful<W> {
     match self.try_into_value() {
       Ok(r) => r.into_widget(),
       Err(s) => {
-        let f = move |ctx: &BuildCtx| {
-          let w = s.data.clone().into_widget().build(ctx);
-          w.dirty_subscribe(s.raw_modifies(), ctx);
-          w
-        };
-        InnerWidget::LazyBuild(Box::new(f)).into()
+        let modifies = s.raw_modifies();
+        let w = s.data.clone().into_widget();
+        w.on_build(move |id, ctx| {
+          id.dirty_subscribe(modifies, ctx);
+        })
       }
     }
   }

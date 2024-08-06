@@ -3,7 +3,7 @@ use std::{
   fmt::Debug,
 };
 
-use crate::{data_widget::Queryable, prelude::*};
+use crate::prelude::*;
 
 /// `Key` help `Ribir` to track if two widget is a same widget in two frames.
 /// Abstract all builtin key into a same type.
@@ -125,7 +125,7 @@ impl<'c, V: 'static + Default + Clone + PartialEq> ComposeChild<'c> for KeyWidge
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     let data: Box<dyn AnyKey> = Box::new(this);
-    child.attach_data(Queryable(data)).into_widget()
+    child.attach_data(Box::new(Queryable(data)))
   }
 }
 

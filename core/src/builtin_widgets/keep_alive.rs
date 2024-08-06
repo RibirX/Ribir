@@ -26,15 +26,10 @@ impl Declare for KeepAlive {
 impl<'c> ComposeChild<'c> for KeepAlive {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let f = move |ctx: &BuildCtx| {
-      let modifies = this.raw_modifies();
-      let child = child.try_unwrap_state_and_attach(this);
-      let c = child.build(ctx);
-      c.dirty_subscribe(modifies, ctx);
-      c
-    };
-
-    InnerWidget::LazyBuild(Box::new(f)).into()
+    let modifies = this.raw_modifies();
+    child
+      .try_unwrap_state_and_attach(this)
+      .on_build(|id, ctx| id.dirty_subscribe(modifies, ctx))
   }
 }
 

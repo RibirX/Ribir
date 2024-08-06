@@ -3,7 +3,7 @@ use std::{cell::Cell, convert::Infallible};
 use rxrust::prelude::*;
 
 use self::focus_mgr::FocusType;
-use crate::{data_widget::Queryable, prelude::*};
+use crate::prelude::*;
 
 const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 
@@ -349,12 +349,11 @@ fn life_fn_once_to_fn_mut(
 impl<'c> ComposeChild<'c> for MixBuiltin {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let f = move |ctx: &BuildCtx| {
-      let child = child.build(ctx);
+    child.on_build(move |id, ctx| {
       match this.try_into_value() {
         Ok(this) => {
           let mut this = Some(this);
-          if let Some(m) = child
+          if let Some(m) = id
             .assert_get(&ctx.tree.borrow())
             .query_ref::<MixBuiltin>()
           {
@@ -369,20 +368,17 @@ impl<'c> ComposeChild<'c> for MixBuiltin {
             if this.contain_flag(BuiltinFlags::Focus) {
               this.callbacks_for_focus_node();
             }
-            child.attach_data(Queryable(this), &mut ctx.tree.borrow_mut());
+            id.attach_data(Box::new(Queryable(this)), &mut ctx.tree.borrow_mut());
           }
         }
         Err(this) => {
           if this.read().contain_flag(BuiltinFlags::Focus) {
             this.read().callbacks_for_focus_node();
           }
-          child.attach_data(this, &mut ctx.tree.borrow_mut())
+          id.attach_data(Box::new(this), &mut ctx.tree.borrow_mut())
         }
       }
-
-      child
-    };
-    InnerWidget::LazyBuild(Box::new(f)).into()
+    })
   }
 }
 

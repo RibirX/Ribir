@@ -7,7 +7,7 @@ use ribir_algo::Sc;
 pub use ribir_algo::{CowArc, Resource};
 use ribir_macros::Declare;
 
-use crate::{data_widget::Queryable, fill_svgs, prelude::*};
+use crate::{fill_svgs, prelude::*};
 
 mod palette;
 pub use palette::*;
@@ -89,7 +89,7 @@ impl ComposeChild<'static> for ThemeWidget {
       //
       // A `Void` is cheap for a theme.
       let p = Void.into_widget().build(ctx);
-      p.attach_data(Queryable(theme), &mut ctx.tree.borrow_mut());
+      p.attach_data(Box::new(Queryable(theme)), &mut ctx.tree.borrow_mut());
 
       // shadow the context with the theme.
       let ctx = BuildCtx::new_with_data(Some(p), ctx.tree, themes);
@@ -98,7 +98,8 @@ impl ComposeChild<'static> for ThemeWidget {
 
       p
     };
-    InnerWidget::LazyBuild(Box::new(f)).into()
+
+    Widget::lazy_build(Box::new(f))
   }
 }
 
