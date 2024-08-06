@@ -57,11 +57,11 @@ macro_rules! impl_iter_widget_child {
 macro_rules! impl_pipe_iter_widget_child {
   ($($m: ident), *) => {
     $(
-      impl<'w, 'v:'w, C> WithChild<'w, C, 1, { 120 + $m }> for MultiPair<'w>
+      impl<'w, C> WithChild<'w, C, 1, { 120 + $m }> for MultiPair<'w>
       where
         C:InnerPipe,
         C::Value: IntoIterator,
-        <C::Value as IntoIterator>::Item: IntoWidget<'v, $m>,
+        <C::Value as IntoIterator>::Item: IntoWidget<'static, $m>,
       {
         type Target = MultiPair<'w>;
 
@@ -103,8 +103,12 @@ impl<'w> WithChild<'w, Widget<'w>, 1, FN> for MultiPair<'w> {
 
 impl<'w> IntoWidgetStrict<'w, FN> for MultiPair<'w> {
   fn into_widget_strict(self) -> Widget<'w> {
-    let MultiPair { parent, children } = self;
-    InnerWidget::SubTree { node: Box::new(parent), children }.into()
+    let f = move |ctx: &BuildCtx| {
+      let MultiPair { parent, children } = self;
+      parent.directly_compose_children(children, ctx)
+    };
+
+    f.into_widget()
   }
 }
 
@@ -114,25 +118,25 @@ impl<P: MultiChild + IntoWidget<'static, RENDER>> MultiIntoParent for P {
   fn into_parent(self) -> Widget<'static> { self.into_widget() }
 }
 
-impl<'w, S, V, F> MultiIntoParent for MapPipe<V, S, F>
+impl<S, V, F> MultiIntoParent for MapPipe<V, S, F>
 where
   Self: InnerPipe<Value = V>,
-  V: MultiIntoParent + IntoWidget<'w, RENDER>,
+  V: MultiIntoParent + IntoWidget<'static, RENDER>,
 {
   fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
 }
 
-impl<'w, S, V, F> MultiIntoParent for FinalChain<V, S, F>
+impl<S, V, F> MultiIntoParent for FinalChain<V, S, F>
 where
   Self: InnerPipe<Value = V>,
-  V: MultiIntoParent + IntoWidget<'w, RENDER>,
+  V: MultiIntoParent + IntoWidget<'static, RENDER>,
 {
   fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
 }
 
-impl<'w, V> MultiIntoParent for Box<dyn Pipe<Value = V>>
+impl<V> MultiIntoParent for Box<dyn Pipe<Value = V>>
 where
-  V: MultiIntoParent + IntoWidget<'w, RENDER>,
+  V: MultiIntoParent + IntoWidget<'static, RENDER>,
 {
   fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
 }

@@ -50,8 +50,15 @@ where
 
 impl<'w, W: SingleIntoParent> IntoWidgetStrict<'w, RENDER> for WidgetOf<'w, W> {
   fn into_widget_strict(self) -> Widget<'w> {
-    let Pair { parent, child } = self;
-    InnerWidget::SubTree { node: Box::new(parent.into_parent()), children: vec![child] }.into()
+    let f = move |ctx: &BuildCtx| {
+      let Pair { parent, child } = self;
+
+      parent
+        .into_parent()
+        .directly_compose_children(vec![child], ctx)
+    };
+
+    f.into_widget()
   }
 }
 
@@ -96,41 +103,41 @@ impl<P: SingleIntoParent> SingleIntoParent for FatObj<P> {
   fn into_parent(self) -> Widget<'static> { self.map(|p| p.into_parent()).into_widget() }
 }
 
-impl<'v, S, V, F> SingleIntoParent for MapPipe<V, S, F>
+impl<S, V, F> SingleIntoParent for MapPipe<V, S, F>
 where
   Self: InnerPipe<Value = V>,
-  V: SingleIntoParent + IntoWidget<'v, RENDER>,
+  V: SingleIntoParent + IntoWidget<'static, RENDER>,
 {
   fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
 }
 
-impl<'v, S, V, F> SingleIntoParent for FinalChain<V, S, F>
+impl<S, V, F> SingleIntoParent for FinalChain<V, S, F>
 where
   Self: InnerPipe<Value = V>,
-  V: SingleIntoParent + IntoWidget<'v, RENDER>,
+  V: SingleIntoParent + IntoWidget<'static, RENDER>,
 {
   fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
 }
 
-impl<'v, V> SingleIntoParent for Box<dyn Pipe<Value = V>>
+impl<V> SingleIntoParent for Box<dyn Pipe<Value = V>>
 where
-  V: SingleIntoParent + IntoWidget<'v, RENDER>,
+  V: SingleIntoParent + IntoWidget<'static, RENDER>,
 {
   fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
 }
 
-impl<'v, S, V, F> SingleIntoParent for MapPipe<Option<V>, S, F>
+impl<S, V, F> SingleIntoParent for MapPipe<Option<V>, S, F>
 where
   Self: InnerPipe<Value = Option<V>>,
-  V: SingleIntoParent + IntoWidget<'v, RENDER>,
+  V: SingleIntoParent + IntoWidget<'static, RENDER>,
 {
   fn into_parent(self) -> Widget<'static> { option_pipe_into_parent(self) }
 }
 
-impl<'v, S, V, F> SingleIntoParent for FinalChain<Option<V>, S, F>
+impl<S, V, F> SingleIntoParent for FinalChain<Option<V>, S, F>
 where
   Self: InnerPipe<Value = Option<V>>,
-  V: SingleIntoParent + IntoWidget<'v, RENDER>,
+  V: SingleIntoParent + IntoWidget<'static, RENDER>,
 {
   fn into_parent(self) -> Widget<'static> { option_pipe_into_parent(self) }
 }
@@ -142,8 +149,8 @@ where
   fn into_parent(self) -> Widget<'static> { option_pipe_into_parent(self) }
 }
 
-fn option_pipe_into_parent<'w, const M: usize>(
-  p: impl InnerPipe<Value = Option<impl IntoWidget<'w, M> + 'static>>,
+fn option_pipe_into_parent<const M: usize>(
+  p: impl InnerPipe<Value = Option<impl IntoWidget<'static, M>>>,
 ) -> Widget<'static> {
   p.map(|w| move |_: &BuildCtx| w.map_or_else(|| Void.into_widget(), IntoWidget::into_widget))
     .into_parent_widget()

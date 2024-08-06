@@ -18,6 +18,9 @@ pub trait Query: Any {
   fn query(&self, type_id: TypeId) -> Option<QueryHandle>;
 }
 
+/// This is a wrapper for a data that makes it queryable.
+pub struct Queryable<T: Any>(pub T);
+
 /// A dynamic handle to a query result of a data, so we can use it in a trait
 /// object.
 pub struct QueryHandle<'a>(InnerHandle<'a>);
@@ -133,6 +136,16 @@ impl<'a, T> std::ops::Deref for QueryRef<'a, T> {
   fn deref(&self) -> &Self::Target { self.type_ref }
 }
 
+impl<T: Any> Query for Queryable<T> {
+  fn query_all(&self, type_id: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
+    self.query(type_id).into_iter().collect()
+  }
+
+  fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
+    (type_id == self.0.type_id()).then(|| QueryHandle::new(&self.0))
+  }
+}
+
 impl<T: StateWriter + 'static> Query for T
 where
   T::Value: 'static + Sized,
@@ -198,7 +211,6 @@ impl<V: Any> Query for Reader<V> {
 mod tests {
   use super::*;
   use crate::{
-    data_widget::Queryable,
     reset_test_env,
     state::{PartData, State},
   };

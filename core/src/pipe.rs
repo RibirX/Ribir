@@ -11,7 +11,6 @@ use widget_id::RenderQueryable;
 
 use crate::{
   builtin_widgets::key::AnyKey,
-  data_widget::Queryable,
   prelude::*,
   render_helper::{PureRender, RenderProxy},
   window::WindowId,
@@ -92,9 +91,9 @@ impl<V: 'static> BoxPipe<V> {
 }
 
 pub(crate) trait InnerPipe: Pipe + Sized {
-  fn build_single<'w, const M: usize>(self) -> Widget<'static>
+  fn build_single<const M: usize>(self) -> Widget<'static>
   where
-    Self::Value: IntoWidget<'w, M>,
+    Self::Value: IntoWidget<'static, M>,
   {
     let f = move |ctx: &BuildCtx| {
       let info =
@@ -102,42 +101,42 @@ pub(crate) trait InnerPipe: Pipe + Sized {
 
       let priority = fn_priority(info.clone(), ctx.window().id());
       let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
-      let w = w.into_widget().build(ctx);
-      info.set(SinglePipeInfo { gen_id: w, multi_pos: 0 });
+      w.into_widget().on_build(|w, ctx| {
+        info.set(SinglePipeInfo { gen_id: w, multi_pos: 0 });
 
-      let pipe_node = PipeNode::share_capture(w, Box::new(info.clone()), ctx);
-      let c_pipe_node = pipe_node.clone();
+        let pipe_node = PipeNode::share_capture(w, Box::new(info.clone()), ctx);
+        let c_pipe_node = pipe_node.clone();
 
-      let handle = ctx.handle();
-      let u = modifies.subscribe(move |(_, w)| {
-        handle.with_ctx(|ctx| {
-          let id = info.host_id();
+        let handle = ctx.handle();
+        let u = modifies.subscribe(move |(_, w)| {
+          handle.with_ctx(|ctx| {
+            let id = info.host_id();
 
-          let new_id = w.into_widget().build(ctx);
-          let mut tree = ctx.tree.borrow_mut();
+            let new_id = w.into_widget().build(ctx);
+            let mut tree = ctx.tree.borrow_mut();
 
-          query_info_outside_until(id, &info, &tree, |info| info.single_replace(id, new_id));
+            query_info_outside_until(id, &info, &tree, |info| info.single_replace(id, new_id));
 
-          pipe_node.primary_transplant(id, new_id, &mut tree);
+            pipe_node.primary_transplant(id, new_id, &mut tree);
 
-          update_key_status_single(id, new_id, &tree);
-          id.insert_after(new_id, &mut tree);
-          id.dispose_subtree(&mut tree);
-          new_id.on_mounted_subtree(&tree);
+            update_key_status_single(id, new_id, &tree);
+            id.insert_after(new_id, &mut tree);
+            id.dispose_subtree(&mut tree);
+            new_id.on_mounted_subtree(&tree);
 
-          tree.mark_dirty(new_id);
+            tree.mark_dirty(new_id);
+          });
         });
-      });
-      c_pipe_node.own_subscription(u, ctx);
-      w
+        c_pipe_node.own_subscription(u, ctx);
+      })
     };
-    InnerWidget::LazyBuild(Box::new(f)).into()
+    f.into_widget()
   }
 
-  fn build_multi<'w, const M: usize>(self) -> Vec<Widget<'w>>
+  fn build_multi<const M: usize>(self) -> Vec<Widget<'static>>
   where
     Self::Value: IntoIterator,
-    <Self::Value as IntoIterator>::Item: IntoWidget<'w, M>,
+    <Self::Value as IntoIterator>::Item: IntoWidget<'static, M>,
   {
     let info = Sc::new(RefCell::new(MultiPipeInfo { widgets: vec![], multi_pos: 0 }));
     let priority = MultiUpdatePriority::new(info.clone());
@@ -149,8 +148,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       .map_or_else(|| Void.into_widget(), IntoWidget::into_widget);
 
     let info2 = info.clone();
-    let first = move |ctx: &BuildCtx| {
-      let id = first.build(ctx);
+    let first = first.on_build(move |id, ctx| {
       info2.borrow_mut().widgets.push(id);
       priority.set_wnd(ctx.window().id());
       let pipe_node = PipeNode::share_capture(id, Box::new(info2.clone()), ctx);
@@ -190,14 +188,12 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       });
 
       c_pipe_node.own_subscription(u, ctx);
-      id
-    };
+    });
 
-    let mut widgets = vec![InnerWidget::LazyBuild(Box::new(first)).into()];
+    let mut widgets = vec![first];
     for (idx, w) in iter.enumerate() {
       let info = info.clone();
-      let f = move |ctx: &BuildCtx| {
-        let id = w.into_widget().build(ctx);
+      let w = w.into_widget().on_build(move |id, ctx| {
         info.borrow_mut().widgets.push(id);
 
         let tree = &mut ctx.tree.borrow_mut();
@@ -206,21 +202,20 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           // when the child pipe is regenerated, it can update the parent pipe information
           // accordingly.
           let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
-          id.attach_data(Queryable(info), tree);
+          id.attach_data(Box::new(Queryable(info)), tree);
         }
-        id
-      };
+      });
 
-      widgets.push(InnerWidget::LazyBuild(Box::new(f)).into());
+      widgets.push(w);
     }
 
     widgets
   }
 
-  fn into_parent_widget<'w, const M: usize>(self) -> Widget<'static>
+  fn into_parent_widget<const M: usize>(self) -> Widget<'static>
   where
     Self: Sized,
-    Self::Value: IntoWidget<'w, M>,
+    Self::Value: IntoWidget<'static, M>,
   {
     let f = move |ctx: &BuildCtx| {
       let root = ctx.tree.borrow().root();
@@ -229,66 +224,65 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       let priority = fn_priority(info.clone(), ctx.window().id());
       let (v, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
 
-      let p = v.into_widget().build(ctx);
+      v.into_widget().on_build(|p, ctx| {
+        let pipe_node = PipeNode::share_capture(p, Box::new(info.clone()), ctx);
+        let leaf = p.single_leaf(&ctx.tree.borrow());
+        info.borrow_mut().range = p..=leaf;
 
-      let pipe_node = PipeNode::share_capture(p, Box::new(info.clone()), ctx);
-      let leaf = p.single_leaf(&ctx.tree.borrow());
-      info.borrow_mut().range = p..=leaf;
+        // We need to associate the parent information with the pipe of leaf widget,
+        // when the leaf pipe is regenerated, it can update the parent pipe information
+        // accordingly.
+        {
+          let tree = &mut ctx.tree.borrow_mut();
+          if leaf.assert_get(tree).contain_type::<DynInfo>() {
+            let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
+            leaf.attach_data(Box::new(Queryable(info)), tree);
+          };
+        }
 
-      // We need to associate the parent information with the pipe of leaf widget,
-      // when the leaf pipe is regenerated, it can update the parent pipe information
-      // accordingly.
-      {
-        let tree = &mut ctx.tree.borrow_mut();
-        if leaf.assert_get(tree).contain_type::<DynInfo>() {
-          let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
-          leaf.attach_data(Queryable(info), tree);
-        };
-      }
+        let c_pipe_node = pipe_node.clone();
+        let handle = ctx.handle();
+        let u = modifies.subscribe(move |(_, w)| {
+          handle.with_ctx(|ctx| {
+            let (top, bottom) = info.borrow().range.clone().into_inner();
 
-      let c_pipe_node = pipe_node.clone();
-      let handle = ctx.handle();
-      let u = modifies.subscribe(move |(_, w)| {
-        handle.with_ctx(|ctx| {
-          let (top, bottom) = info.borrow().range.clone().into_inner();
+            let p = w.into_widget().build(ctx);
+            let mut tree = ctx.tree.borrow_mut();
+            let new_rg = p..=p.single_leaf(&tree);
+            let children: SmallVec<[WidgetId; 1]> = bottom.children(&tree).collect();
+            for c in children {
+              new_rg.end().append(c, &mut tree);
+            }
 
-          let p = w.into_widget().build(ctx);
-          let mut tree = ctx.tree.borrow_mut();
-          let new_rg = p..=p.single_leaf(&tree);
-          let children: SmallVec<[WidgetId; 1]> = bottom.children(&tree).collect();
-          for c in children {
-            new_rg.end().append(c, &mut tree);
-          }
+            query_info_outside_until(top, &info, &tree, |info| {
+              info.single_range_replace(&(top..=bottom), &new_rg);
+            });
+            pipe_node.primary_transplant(top, p, &mut tree);
 
-          query_info_outside_until(top, &info, &tree, |info| {
-            info.single_range_replace(&(top..=bottom), &new_rg);
+            update_key_status_single(top, p, &tree);
+            top.insert_after(p, &mut tree);
+            top.dispose_subtree(&mut tree);
+
+            let mut w = p;
+            loop {
+              w.on_widget_mounted(&tree);
+              if w == *new_rg.end() {
+                break;
+              }
+              if let Some(c) = w.first_child(&tree) {
+                w = c;
+              } else {
+                break;
+              }
+            }
+
+            tree.mark_dirty(p);
           });
-          pipe_node.primary_transplant(top, p, &mut tree);
-
-          update_key_status_single(top, p, &tree);
-          top.insert_after(p, &mut tree);
-          top.dispose_subtree(&mut tree);
-
-          let mut w = p;
-          loop {
-            w.on_widget_mounted(&tree);
-            if w == *new_rg.end() {
-              break;
-            }
-            if let Some(c) = w.first_child(&tree) {
-              w = c;
-            } else {
-              break;
-            }
-          }
-
-          tree.mark_dirty(p);
         });
-      });
-      c_pipe_node.own_subscription(u, ctx);
-      p
+        c_pipe_node.own_subscription(u, ctx);
+      })
     };
-    InnerWidget::LazyBuild(Box::new(f)).into()
+    f.into_widget()
   }
 }
 
@@ -425,54 +419,54 @@ impl<V: 'static> Pipe for ValuePipe<V> {
 
 impl<T: Pipe> InnerPipe for T {}
 
-impl<'w, V, S, F, const M: usize> IntoWidgetStrict<'static, M> for MapPipe<V, S, F>
+impl<V, S, F, const M: usize> IntoWidgetStrict<'static, M> for MapPipe<V, S, F>
 where
   Self: InnerPipe<Value = V>,
-  V: IntoWidget<'w, M>,
+  V: IntoWidget<'static, M>,
 {
   fn into_widget_strict(self) -> Widget<'static> { self.build_single() }
 }
 
-impl<'w, V, S, F, const M: usize> IntoWidgetStrict<'static, M> for FinalChain<V, S, F>
+impl<V, S, F, const M: usize> IntoWidgetStrict<'static, M> for FinalChain<V, S, F>
 where
   Self: InnerPipe<Value = V>,
-  V: IntoWidget<'w, M>,
+  V: IntoWidget<'static, M>,
 {
   fn into_widget_strict(self) -> Widget<'static> { self.build_single() }
 }
 
-impl<'w, const M: usize, V> IntoWidgetStrict<'static, M> for Box<dyn Pipe<Value = V>>
+impl<const M: usize, V> IntoWidgetStrict<'static, M> for Box<dyn Pipe<Value = V>>
 where
-  V: IntoWidget<'w, M> + 'static,
+  V: IntoWidget<'static, M>,
 {
   fn into_widget_strict(self) -> Widget<'static> { self.build_single() }
 }
 
-impl<'w, V, S, F, const M: usize> IntoWidget<'static, M> for MapPipe<Option<V>, S, F>
+impl<V, S, F, const M: usize> IntoWidget<'static, M> for MapPipe<Option<V>, S, F>
 where
   Self: InnerPipe<Value = Option<V>>,
-  V: IntoWidget<'w, M>,
+  V: IntoWidget<'static, M>,
 {
   fn into_widget(self) -> Widget<'static> { option_into_widget(self) }
 }
 
-impl<'w, V, S, F, const M: usize> IntoWidget<'static, M> for FinalChain<Option<V>, S, F>
+impl<V, S, F, const M: usize> IntoWidget<'static, M> for FinalChain<Option<V>, S, F>
 where
   Self: InnerPipe<Value = Option<V>>,
-  V: IntoWidget<'w, M>,
+  V: IntoWidget<'static, M>,
 {
   fn into_widget(self) -> Widget<'static> { option_into_widget(self) }
 }
 
-impl<'w, const M: usize, V> IntoWidget<'static, M> for Box<dyn Pipe<Value = Option<V>>>
+impl<const M: usize, V> IntoWidget<'static, M> for Box<dyn Pipe<Value = Option<V>>>
 where
-  V: IntoWidget<'w, M> + 'static,
+  V: IntoWidget<'static, M>,
 {
   fn into_widget(self) -> Widget<'static> { option_into_widget(self) }
 }
 
-fn option_into_widget<'w, const M: usize>(
-  p: impl InnerPipe<Value = Option<impl IntoWidget<'w, M> + 'static>>,
+fn option_into_widget<const M: usize>(
+  p: impl InnerPipe<Value = Option<impl IntoWidget<'static, M>>>,
 ) -> Widget<'static> {
   p.map(|w| move |_: &BuildCtx| w.map_or_else(|| Void.into_widget(), IntoWidget::into_widget))
     .build_single()

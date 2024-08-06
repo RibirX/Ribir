@@ -3,9 +3,9 @@
 //! declare syntax, so other objects can use the builtin fields and methods like
 //! self fields and methods.
 
-pub mod key;
 use std::cell::Cell;
 
+pub mod key;
 pub use key::{Key, KeyWidget};
 pub mod image_widget;
 pub mod keep_alive;
@@ -136,14 +136,10 @@ impl LazyWidgetId {
   /// Bind a widget to the LazyWidgetId, and return a widget that will set the
   /// id to the LazyWidgetId after build.
   pub fn bind(self, widget: Widget) -> Widget {
-    let f = move |ctx: &BuildCtx| {
-      let id = widget.build(ctx);
+    widget.on_build(move |id, _| {
       assert!(self.id().is_none(), "The LazyWidgetID only allows binding to one widget.");
       self.0.set(Some(id));
-      id
-    };
-
-    InnerWidget::LazyBuild(Box::new(f)).into()
+    })
   }
 
   pub fn id(&self) -> Option<WidgetId> { self.0.get() }
@@ -878,7 +874,9 @@ where
 impl<'a> FatObj<Widget<'a>> {
   fn compose(self) -> Widget<'a> {
     let mut host = self.host;
-    host = self.host_id.clone().bind(host);
+    if self.host_id.0.ref_count() > 1 {
+      host = self.host_id.clone().bind(host);
+    }
     if let Some(mix_builtin) = self.mix_builtin {
       host = mix_builtin.with_child(host).into_widget()
     }
@@ -942,7 +940,9 @@ impl<'a> FatObj<Widget<'a>> {
     if let Some(h) = self.keep_alive_unsubscribe_handle {
       host = host.attach_anonymous_data(h);
     }
-    let host = self.id.clone().bind(host);
+    if self.id.0.ref_count() > 1 {
+      host = self.id.clone().bind(host);
+    }
     host
   }
 }
