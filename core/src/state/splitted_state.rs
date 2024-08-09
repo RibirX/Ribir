@@ -12,7 +12,7 @@ impl<O, W> Drop for SplittedWriter<O, W> {
   fn drop(&mut self) { self.info.dec_writer() }
 }
 
-impl<V, O, W> StateReader for SplittedWriter<O, W>
+impl<V: ?Sized, O, W> StateReader for SplittedWriter<O, W>
 where
   Self: 'static,
   O: StateWriter,
@@ -44,7 +44,7 @@ where
   }
 }
 
-impl<V, O, W> StateWatcher for SplittedWriter<O, W>
+impl<V: ?Sized, O, W> StateWatcher for SplittedWriter<O, W>
 where
   Self: 'static,
   O: StateWriter,
@@ -55,7 +55,7 @@ where
   }
 }
 
-impl<V, O, W> StateWriter for SplittedWriter<O, W>
+impl<V: ?Sized, O, W> StateWriter for SplittedWriter<O, W>
 where
   Self: 'static,
   O: StateWriter,
@@ -86,7 +86,7 @@ where
   fn origin_writer(&self) -> &Self::OriginWriter { &self.origin }
 }
 
-impl<V, O, W> SplittedWriter<O, W>
+impl<V: ?Sized, O, W> SplittedWriter<O, W>
 where
   O: StateWriter,
   W: Fn(&mut O::Value) -> PartData<V> + Clone,

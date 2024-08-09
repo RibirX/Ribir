@@ -21,7 +21,7 @@ use crate::prelude::*;
 /// The `StateReader` trait allows for reading, clone and map the state.
 pub trait StateReader: 'static {
   /// The value type of this state.
-  type Value;
+  type Value: ?Sized;
   /// The origin state type that this state map or split from . Otherwise
   /// return itself.
   type OriginReader: StateReader;
@@ -40,7 +40,7 @@ pub trait StateReader: 'static {
   /// original data, not a cloned portion. Otherwise, the returned reader will
   /// not respond to state changes.
   #[inline]
-  fn map_reader<U, F>(&self, map: F) -> MapReader<Self::Reader, F>
+  fn map_reader<U: ?Sized, F>(&self, map: F) -> MapReader<Self::Reader, F>
   where
     F: Fn(&Self::Value) -> PartData<U> + Clone,
   {
@@ -116,7 +116,7 @@ pub trait StateWriter: StateWatcher {
   /// modified within this function. Therefore, if the original data is
   /// modified, no downstream will be notified.
   #[inline]
-  fn split_writer<V, W>(&self, mut_map: W) -> SplittedWriter<Self::Writer, W>
+  fn split_writer<V: ?Sized, W>(&self, mut_map: W) -> SplittedWriter<Self::Writer, W>
   where
     W: Fn(&mut Self::Value) -> PartData<V> + Clone,
   {
@@ -135,7 +135,7 @@ pub trait StateWriter: StateWatcher {
   /// modified within this function. Therefore, if the original data is
   /// modified, no downstream will be notified.
   #[inline]
-  fn map_writer<V, M>(&self, part_map: M) -> MapWriter<Self::Writer, M>
+  fn map_writer<V: ?Sized, M>(&self, part_map: M) -> MapWriter<Self::Writer, M>
   where
     M: Fn(&mut Self::Value) -> PartData<V> + Clone,
   {
@@ -144,7 +144,7 @@ pub trait StateWriter: StateWatcher {
   }
 }
 
-pub struct WriteRef<'a, V> {
+pub struct WriteRef<'a, V: ?Sized> {
   value: ValueMutRef<'a, V>,
   info: &'a Sc<WriterInfo>,
   modify_scope: ModifyScope,
@@ -252,8 +252,8 @@ impl<W> State<W> {
   }
 }
 
-impl<'a, V> WriteRef<'a, V> {
-  pub fn map<U, M>(mut orig: WriteRef<'a, V>, part_map: M) -> WriteRef<'a, U>
+impl<'a, V: ?Sized> WriteRef<'a, V> {
+  pub fn map<U: ?Sized, M>(mut orig: WriteRef<'a, V>, part_map: M) -> WriteRef<'a, U>
   where
     M: Fn(&mut V) -> PartData<U>,
   {
@@ -264,7 +264,7 @@ impl<'a, V> WriteRef<'a, V> {
     WriteRef { value, modified: false, modify_scope: orig.modify_scope, info: orig.info }
   }
 
-  pub fn map_split<U1, U2, F>(
+  pub fn map_split<U1: ?Sized, U2: ?Sized, F>(
     mut orig: WriteRef<'a, V>, f: F,
   ) -> (WriteRef<'a, U1>, WriteRef<'a, U2>)
   where
@@ -288,14 +288,14 @@ impl<'a, V> WriteRef<'a, V> {
   pub fn forget_modifies(&mut self) -> bool { std::mem::replace(&mut self.modified, false) }
 }
 
-impl<'a, W> Deref for WriteRef<'a, W> {
+impl<'a, W: ?Sized> Deref for WriteRef<'a, W> {
   type Target = W;
   #[track_caller]
   #[inline]
   fn deref(&self) -> &Self::Target { self.value.deref() }
 }
 
-impl<'a, W> DerefMut for WriteRef<'a, W> {
+impl<'a, W: ?Sized> DerefMut for WriteRef<'a, W> {
   #[track_caller]
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target {
@@ -304,7 +304,7 @@ impl<'a, W> DerefMut for WriteRef<'a, W> {
   }
 }
 
-impl<'a, W> Drop for WriteRef<'a, W> {
+impl<'a, W: ?Sized> Drop for WriteRef<'a, W> {
   fn drop(&mut self) {
     let Self { info, modify_scope, modified, .. } = self;
     if !*modified {
@@ -568,5 +568,19 @@ mod tests {
       Stateful::new((Void, 0))
         .split_writer(|v| PartData::from_ref_mut(&mut v.0))
     };
+  }
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  #[test]
+  fn trait_object_part_data() {
+    reset_test_env!();
+    let s = State::value(0);
+    let m = s.split_writer(|v| PartData::from_ref(v as &mut dyn Any));
+    let v: ReadRef<dyn Any> = m.read();
+    assert_eq!(*v.downcast_ref::<i32>().unwrap(), 0);
+
+    let s = s.map_writer(|v| PartData::from_ref(v as &mut dyn Any));
+    let v: ReadRef<dyn Any> = s.read();
+    assert_eq!(*v.downcast_ref::<i32>().unwrap(), 0);
   }
 }

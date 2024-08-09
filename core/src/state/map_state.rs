@@ -18,7 +18,7 @@ pub struct MapWriterAsReader<W, M> {
   pub(super) part_map: M,
 }
 
-impl<S, V, M> StateReader for MapReader<S, M>
+impl<S, V: ?Sized, M> StateReader for MapReader<S, M>
 where
   Self: 'static,
   S: StateReader,
@@ -48,7 +48,7 @@ where
   }
 }
 
-impl<S, V, M> StateReader for MapWriterAsReader<S, M>
+impl<S, V: ?Sized, M> StateReader for MapWriterAsReader<S, M>
 where
   Self: 'static,
   S: StateReader,
@@ -80,7 +80,7 @@ where
   }
 }
 
-impl<V, S, M> StateReader for MapWriter<S, M>
+impl<V: ?Sized, S, M> StateReader for MapWriter<S, M>
 where
   Self: 'static,
   S: StateWriter,
@@ -112,7 +112,7 @@ where
   }
 }
 
-impl<V, W, M> StateWatcher for MapWriter<W, M>
+impl<V: ?Sized, W, M> StateWatcher for MapWriter<W, M>
 where
   Self: 'static,
   W: StateWriter,
@@ -124,7 +124,7 @@ where
   }
 }
 
-impl<V, W, M> StateWriter for MapWriter<W, M>
+impl<V: ?Sized, W, M> StateWriter for MapWriter<W, M>
 where
   Self: 'static,
   W: StateWriter,
@@ -153,7 +153,7 @@ where
   fn origin_writer(&self) -> &Self::OriginWriter { &self.origin }
 }
 
-impl<V, S, F> RenderProxy for MapReader<S, F>
+impl<V: ?Sized, S, F> RenderProxy for MapReader<S, F>
 where
   Self: 'static,
   S: StateReader,
@@ -170,7 +170,7 @@ where
   fn proxy(&self) -> Self::Target<'_> { self.read() }
 }
 
-impl<V, S, F> RenderProxy for MapWriterAsReader<S, F>
+impl<V: ?Sized, S, F> RenderProxy for MapWriterAsReader<S, F>
 where
   Self: 'static,
   S: StateReader,
