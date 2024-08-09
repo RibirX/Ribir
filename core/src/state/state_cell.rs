@@ -96,30 +96,33 @@ impl<W> StateCell<W> {
 /// A partial data of a state, which should be point to the part data of the
 /// state.
 #[derive(Clone)]
-pub enum PartData<T> {
+pub enum PartData<T: ?Sized> {
   PartRef(NonNull<T>),
-  PartData(T),
+  PartData(Box<T>),
 }
 
-impl<T> PartData<T> {
+impl<T: ?Sized> PartData<T> {
   /// Create a `PartData` from a reference.
   pub fn from_ref(v: &T) -> Self { PartData::PartRef(NonNull::from(v)) }
 
   /// Create a `PartData` from a mutable reference.
   pub fn from_ref_mut(v: &mut T) -> Self { PartData::PartRef(NonNull::from(v)) }
+}
 
+impl<T> PartData<T> {
   /// Create a `PartData` from a type that should be point to the part data not
   /// a copy. E.g. Option<&T>, `Box`, `Arc`, `Rc`, etc.
   ///
   /// Caller should ensure that the data is not a copy.
-  pub fn from_data(ptr_data: T) -> Self { PartData::PartData(ptr_data) }
+  pub fn from_data(ptr_data: T) -> Self { PartData::PartData(Box::new(ptr_data)) }
 }
-pub struct ReadRef<'a, T> {
+
+pub struct ReadRef<'a, T: ?Sized> {
   pub(crate) inner: PartData<T>,
   pub(crate) borrow: BorrowRef<'a>,
 }
 
-pub(crate) struct ValueMutRef<'a, T> {
+pub(crate) struct ValueMutRef<'a, T: ?Sized> {
   pub(crate) inner: PartData<T>,
   pub(crate) borrow: BorrowRefMut<'a>,
 }
@@ -132,7 +135,7 @@ pub(crate) struct BorrowRef<'b> {
   borrow: &'b Cell<BorrowFlag>,
 }
 
-impl<T> Deref for PartData<T> {
+impl<T: ?Sized> Deref for PartData<T> {
   type Target = T;
   fn deref(&self) -> &Self::Target {
     match self {
@@ -142,7 +145,7 @@ impl<T> Deref for PartData<T> {
   }
 }
 
-impl<T> DerefMut for PartData<T> {
+impl<T: ?Sized> DerefMut for PartData<T> {
   fn deref_mut(&mut self) -> &mut Self::Target {
     match self {
       PartData::PartRef(ptr) => unsafe { ptr.as_mut() },
@@ -201,15 +204,17 @@ impl BorrowRef<'_> {
   }
 }
 
-impl<'a, V> ReadRef<'a, V> {
+impl<'a, V: ?Sized> ReadRef<'a, V> {
   /// Make a new `ReadRef` by mapping the value of the current `ReadRef`.
-  pub fn map<U>(mut r: ReadRef<'a, V>, f: impl FnOnce(&V) -> PartData<U>) -> ReadRef<'a, U> {
+  pub fn map<U: ?Sized>(
+    mut r: ReadRef<'a, V>, f: impl FnOnce(&V) -> PartData<U>,
+  ) -> ReadRef<'a, U> {
     ReadRef { inner: f(&mut r.inner), borrow: r.borrow }
   }
 
   /// Split the current `ReadRef` into two `ReadRef`s by mapping the value to
   /// two parts.
-  pub fn map_split<U, W>(
+  pub fn map_split<U: ?Sized, W: ?Sized>(
     orig: ReadRef<'a, V>, f: impl FnOnce(&V) -> (PartData<U>, PartData<W>),
   ) -> (ReadRef<'a, U>, ReadRef<'a, W>) {
     let (a, b) = f(&*orig);
@@ -218,7 +223,7 @@ impl<'a, V> ReadRef<'a, V> {
     (ReadRef { inner: a, borrow: borrow.clone() }, ReadRef { inner: b, borrow })
   }
 
-  pub(crate) fn mut_as_ref_map<U>(
+  pub(crate) fn mut_as_ref_map<U: ?Sized>(
     orig: ReadRef<'a, V>, f: impl FnOnce(&mut V) -> PartData<U>,
   ) -> ReadRef<'a, U> {
     let ReadRef { inner: value, borrow } = orig;
@@ -236,19 +241,19 @@ impl<'a, V> ReadRef<'a, V> {
   }
 }
 
-impl<'a, T> Deref for ReadRef<'a, T> {
+impl<'a, T: ?Sized> Deref for ReadRef<'a, T> {
   type Target = T;
   #[inline]
   fn deref(&self) -> &Self::Target { &self.inner }
 }
 
-impl<'a, T> Deref for ValueMutRef<'a, T> {
+impl<'a, T: ?Sized> Deref for ValueMutRef<'a, T> {
   type Target = T;
   #[inline]
   fn deref(&self) -> &Self::Target { &self.inner }
 }
 
-impl<'a, T> DerefMut for ValueMutRef<'a, T> {
+impl<'a, T: ?Sized> DerefMut for ValueMutRef<'a, T> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.inner }
 }
