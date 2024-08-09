@@ -264,6 +264,43 @@ impl<'a, V: ?Sized> WriteRef<'a, V> {
     WriteRef { value, modified: false, modify_scope: orig.modify_scope, info: orig.info }
   }
 
+  /// Makes a new `WriteRef` for an optional component of the borrowed data. The
+  /// original guard is returned as an `Err(..)` if the closure returns
+  /// `None`.
+  ///
+  /// This is an associated function that needs to be used as
+  /// `WriteRef::filter_map(...)`. A method would interfere with methods of the
+  /// same name on `T` used through `Deref`.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let c = Stateful::new(vec![1, 2, 3]);
+  /// let b1: WriteRef<'_, Vec<u32>> = c.write();
+  /// let b2: Result<WriteRef<'_, u32>, _> =
+  ///   WriteRef::filter_map(b1, |v| v.get(1).map(PartData::from_ref));
+  /// assert_eq!(*b2.unwrap(), 2);
+  /// ```
+  pub fn filter_map<U: ?Sized, M>(
+    mut orig: WriteRef<'a, V>, part_map: M,
+  ) -> Result<WriteRef<'a, U>, Self>
+  where
+    M: Fn(&mut V) -> Option<PartData<U>>,
+  {
+    match part_map(&mut orig.value) {
+      Some(inner) => {
+        let borrow = orig.value.borrow.clone();
+        let value = ValueMutRef { inner, borrow };
+        let WriteRef { modify_scope, info, .. } = orig;
+
+        Ok(WriteRef { value, modified: false, modify_scope, info })
+      }
+      None => Err(orig),
+    }
+  }
+
   pub fn map_split<U1: ?Sized, U2: ?Sized, F>(
     mut orig: WriteRef<'a, V>, f: F,
   ) -> (WriteRef<'a, U1>, WriteRef<'a, U2>)

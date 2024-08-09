@@ -257,3 +257,19 @@ impl<'a, T: ?Sized> DerefMut for ValueMutRef<'a, T> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.inner }
 }
+
+use std::fmt::*;
+
+use super::{QueryRef, WriteRef};
+
+impl<T: ?Sized + Debug> Debug for ReadRef<'_, T> {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result { Debug::fmt(&**self, f) }
+}
+
+impl<T: ?Sized + Debug> Debug for WriteRef<'_, T> {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result { Debug::fmt(&**self, f) }
+}
+
+impl<T: ?Sized + Debug> Debug for QueryRef<'_, T> {
+  fn fmt(&self, f: &mut Formatter<'_>) -> Result { Debug::fmt(&**self, f) }
+}
