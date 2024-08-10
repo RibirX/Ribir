@@ -29,6 +29,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: `PartData<T>` now supports `T: ?Sized`, allowing us to separate trait objects from `State`.(#614 @M-Adoo)
 
+### Breaking
+
+- **core**: Removed unnecessary `Writer` since it has the same capabilities as `Stateful`. (#615 @M-Adoo)
+
+
 ## [0.4.0-alpha.4] - 2024-08-07
 
 ### Features

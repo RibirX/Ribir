@@ -193,7 +193,7 @@ impl<T: 'static> StateWatcher for State<T> {
 }
 
 impl<T: 'static> StateWriter for State<T> {
-  type Writer = Writer<T>;
+  type Writer = Stateful<T>;
   type OriginWriter = Self;
 
   #[inline]

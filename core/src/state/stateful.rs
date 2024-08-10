@@ -14,8 +14,6 @@ pub struct Stateful<W> {
 
 pub struct Reader<W>(Sc<StateCell<W>>);
 
-pub struct Writer<W>(Stateful<W>);
-
 /// The notifier is a `RxRust` stream that emit notification when the state
 /// changed.
 #[derive(Default, Clone)]
@@ -80,7 +78,7 @@ impl<W: 'static> StateWatcher for Stateful<W> {
 }
 
 impl<W: 'static> StateWriter for Stateful<W> {
-  type Writer = Writer<W>;
+  type Writer = Self;
   type OriginWriter = Self;
 
   #[inline]
@@ -93,7 +91,7 @@ impl<W: 'static> StateWriter for Stateful<W> {
   fn shallow(&self) -> WriteRef<W> { self.write_ref(ModifyScope::FRAMEWORK) }
 
   #[inline]
-  fn clone_writer(&self) -> Self::Writer { Writer(self.clone()) }
+  fn clone_writer(&self) -> Self::Writer { self.clone() }
 
   #[inline]
   fn origin_writer(&self) -> &Self::OriginWriter { self }
@@ -124,51 +122,6 @@ impl<W: 'static> StateReader for Reader<W> {
   }
 }
 
-impl<W: 'static> StateReader for Writer<W> {
-  type Value = W;
-  type OriginReader = Self;
-  type Reader = Reader<W>;
-
-  #[inline]
-  fn read(&'_ self) -> ReadRef<W> { self.0.read() }
-
-  #[inline]
-  fn clone_reader(&self) -> Self::Reader { self.0.clone_reader() }
-
-  #[inline]
-  fn origin_reader(&self) -> &Self::OriginReader { self }
-
-  #[inline]
-  fn try_into_value(self) -> Result<Self::Value, Self> { self.0.try_into_value().map_err(Writer) }
-}
-
-impl<V: 'static> StateWatcher for Writer<V> {
-  #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
-    self.0.raw_modifies()
-  }
-}
-
-impl<V: 'static> StateWriter for Writer<V> {
-  type Writer = Self;
-  type OriginWriter = Self;
-
-  #[inline]
-  fn write(&self) -> WriteRef<V> { self.0.write() }
-
-  #[inline]
-  fn silent(&self) -> WriteRef<V> { self.0.silent() }
-
-  #[inline]
-  fn shallow(&self) -> WriteRef<V> { self.0.shallow() }
-
-  #[inline]
-  fn clone_writer(&self) -> Self { self.0.clone_writer() }
-
-  #[inline]
-  fn origin_writer(&self) -> &Self::OriginWriter { self }
-}
-
 impl<W> Drop for Stateful<W> {
   fn drop(&mut self) { self.info.dec_writer(); }
 }
@@ -182,11 +135,6 @@ impl Drop for WriterInfo {
       let _ = AppCtx::spawn_local(async move { notifier.unsubscribe() });
     }
   }
-}
-
-impl<W> Writer<W> {
-  #[inline]
-  pub fn into_inner(self) -> Stateful<W> { self.0 }
 }
 
 impl<W> Stateful<W> {
@@ -246,13 +194,6 @@ impl<W: Render> IntoWidgetStrict<'static, RENDER> for Reader<W> {
       Err(s) => s.into_widget(),
     }
   }
-}
-
-impl<'w, W, const M: usize> IntoWidgetStrict<'w, M> for Writer<W>
-where
-  Stateful<W>: IntoWidget<'w, M>,
-{
-  fn into_widget_strict(self) -> Widget<'w> { self.0.into_widget() }
 }
 
 impl Notifier {

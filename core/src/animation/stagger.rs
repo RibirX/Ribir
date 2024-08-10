@@ -103,7 +103,7 @@ impl<T: Transition + 'static> Stagger<T> {
   {
     let transition = Box::new(self.transition.clone());
     let animate = rdl! { Animate { transition, state, from } };
-    self.push_animation_with(stagger, animate.clone_writer().into_inner());
+    self.push_animation_with(stagger, animate.clone_writer());
     animate
   }
 
@@ -168,7 +168,7 @@ impl<T: Transition + 'static> Animation for Stateful<Stagger<T>> {
   }
 
   fn box_clone(&self) -> Box<dyn Animation> {
-    let c = self.clone_writer().into_inner();
+    let c = self.clone_writer();
     Box::new(c)
   }
 }
@@ -187,7 +187,7 @@ impl<T: Transition + 'static> Stateful<Stagger<T>> {
         this.forget_modifies();
         drop(this);
 
-        let this = self.clone_writer().into_inner();
+        let this = self.clone_writer();
         let h = observable::timer_at((), at, AppCtx::scheduler()).subscribe(move |_| {
           next.run();
           this.trigger_next();
@@ -265,7 +265,7 @@ mod tests {
       Duration::from_millis(100),
       EasingTransition { duration: Duration::ZERO, easing: easing::LINEAR },
     );
-    let c_stagger = stagger.clone_writer().into_inner();
+    let c_stagger = stagger.clone_writer();
     let w = fn_widget! {
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };
       $stagger.write().push_state(

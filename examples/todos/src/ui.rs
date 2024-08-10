@@ -38,7 +38,7 @@ fn task_lists(
   fn_widget! {
     let editing = Stateful::new(None);
     let stagger = Stagger::new(Duration::from_millis(100), transitions::EASE_IN_OUT.of(ctx!()));
-    let c_stagger = stagger.clone_writer().into_inner();
+    let c_stagger = stagger.clone_writer();
 
     @VScrollBar {
       on_mounted: move |_| c_stagger.run(),
@@ -123,7 +123,7 @@ fn input(
   }
   .into_widget()
 }
-fn task_item_widget<S>(task: S, stagger: Writer<Stagger<Box<dyn Transition>>>) -> Widget<'static>
+fn task_item_widget<S>(task: S, stagger: Stateful<Stagger<Box<dyn Transition>>>) -> Widget<'static>
 where
   S: StateWriter<Value = Task> + 'static,
   S::OriginWriter: StateWriter<Value = Todos>,

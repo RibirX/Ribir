@@ -344,7 +344,7 @@ mod tests {
         @ { pipe!($child_box.size.is_empty()).map(move|b| if b {
             MockBox { size: Size::new(1., 1.) }.into_widget()
           } else {
-            child_box.clone_writer().into_inner().into_widget()
+            child_box.clone_writer().into_widget()
           })
         }
       }

@@ -739,7 +739,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
   reset_test_env!();
 
   let notify_cnt = Stateful::new(0);
-  let cnt: Writer<i32> = notify_cnt.clone_writer();
+  let cnt = notify_cnt.clone_writer();
   let trigger = Stateful::new(true);
   let c_trigger = trigger.clone_watcher();
   let w = fn_widget! {
