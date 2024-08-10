@@ -784,8 +784,8 @@ let _: &State<AppData> = state.origin_reader();
 let _: &State<AppData> = state.origin_writer();
 
 // 子状态的源状态是它的父亲
-let _: &Writer<AppData> = split_count.origin_reader();
-let _: &Writer<AppData> = split_count.origin_writer();
+let _: &Stateful<AppData> = split_count.origin_reader();
+let _: &Stateful<AppData> = split_count.origin_writer();
 ```
 
 ## 下一步

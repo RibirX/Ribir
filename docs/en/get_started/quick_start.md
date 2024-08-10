@@ -785,8 +785,8 @@ let _: &State<AppData> = state.origin_reader();
 let _: &State<AppData> = state.origin_writer();
 
 // the sub-state's origin state is where it splits from
-let _: &Writer<AppData> = split_count.origin_reader();
-let _: &Writer<AppData> = split_count.origin_writer();
+let _: &Stateful<AppData> = split_count.origin_reader();
+let _: &Stateful<AppData> = split_count.origin_writer();
 ```
 
 ## The next step

@@ -26,7 +26,7 @@ pub struct RepeatTransition<T> {
 /// Trait help to transition the state.
 pub trait TransitionState: Sized + 'static {
   /// Use an animate to transition the state after it modified.
-  fn transition(self, transition: Box<dyn Transition>, ctx: &BuildCtx) -> Writer<Animate<Self>>
+  fn transition(self, transition: Box<dyn Transition>, ctx: &BuildCtx) -> Stateful<Animate<Self>>
   where
     Self: AnimateState,
   {
@@ -58,7 +58,7 @@ impl<S: AnimateState + 'static> TransitionState for S {}
 pub trait TransitionWithFn: AnimateStateSetter + Sized {
   fn transition_with<F>(
     self, transition: Box<dyn Transition>, lerp_fn: F, ctx: &BuildCtx,
-  ) -> Writer<Animate<LerpFnState<Self, F>>>
+  ) -> Stateful<Animate<LerpFnState<Self, F>>>
   where
     F: FnMut(&Self::Value, &Self::Value, f32) -> Self::Value + 'static,
   {

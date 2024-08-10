@@ -1272,7 +1272,7 @@ mod tests {
       wid: Option<WidgetId>,
     }
 
-    fn build(task: Writer<Task>) -> impl IntoWidget<'static, FN> {
+    fn build(task: Stateful<Task>) -> impl IntoWidget<'static, FN> {
       fn_widget! {
        @TaskWidget {
           keep_alive: pipe!($task.pin),
