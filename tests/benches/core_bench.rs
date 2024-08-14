@@ -60,7 +60,7 @@ fn bench_widget_inflate(b: &mut Bencher, w: impl Compose + Clone + 'static) {
   let mut wnd = TestWindow::new(fn_widget!(Void));
   b.iter(|| {
     let w = w.clone();
-    wnd.set_content_widget(fn_widget! { w });
+    wnd.0.init(fn_widget! { w.clone() }.into());
     wnd.draw_frame();
   });
   AppCtx::remove_wnd(wnd.id());
@@ -76,7 +76,7 @@ fn bench_widget_inflate_x(width: usize, depth: usize, b: &mut Bencher) {
 
 fn bench_widget_repair(b: &mut Bencher, w: State<impl Compose + 'static>) {
   let trigger = w.clone_writer();
-  let mut wnd = TestWindow::new(fn_widget!(w));
+  let mut wnd = TestWindow::new(fn_widget!(w.clone_writer()));
   let id = wnd.id();
   b.iter(move || {
     {

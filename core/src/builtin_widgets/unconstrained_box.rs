@@ -78,9 +78,10 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  fn smoke() -> impl IntoWidget<'static, FN> {
-    let size = Size::new(200., 200.);
+  widget_layout_test!(
+    smoke,
     fn_widget! {
+      let size = Size::new(200., 200.);
       @MockMulti {
         @UnconstrainedBox {
           @MockBox { size}
@@ -94,10 +95,7 @@ mod tests {
           @MockBox { size }
         }
       }
-    }
-  }
-  widget_layout_test!(
-    smoke,
+    },
     wnd_size = Size::new(100., 100.),
     { path = [0, 0, 0],width == 200., height == 200.,}
     { path = [0, 1, 0],width == 200., height == 100.,}

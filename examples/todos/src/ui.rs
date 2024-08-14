@@ -173,7 +173,7 @@ where
   .into_widget()
 }
 
-pub fn todos() -> State<Todos> {
+pub fn todos(_: &mut BuildCtx) -> Widget<'static> {
   let todos = if cfg!(not(target_arch = "wasm32")) {
     let todos = State::value(Todos::load());
     // save changes to disk every 5 seconds .
@@ -191,5 +191,5 @@ pub fn todos() -> State<Todos> {
     State::value(Todos::default())
   };
 
-  todos
+  todos.into_widget()
 }

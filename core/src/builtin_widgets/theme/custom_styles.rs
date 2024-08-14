@@ -1,10 +1,4 @@
-use std::{
-  any::{Any, TypeId},
-  collections::HashMap,
-};
-
-use super::Theme;
-use crate::context::BuildCtx;
+use super::*;
 
 /// A map can store any type of config, useful for widget which the common
 /// information of theme mod not enough and need have itself theme.
@@ -22,21 +16,19 @@ macro_rules! fill_custom_style {
 }
 
 pub trait CustomStyle: Sized + Clone + 'static {
-  fn default_style(ctx: &BuildCtx) -> Self;
+  fn default_style(ctx: &impl ProviderCtx) -> Self;
 
   #[inline]
-  fn of(ctx: &BuildCtx) -> Self {
+  fn of(ctx: &impl ProviderCtx) -> Self {
     let tid = TypeId::of::<Self>();
-    let c = ctx.find_cfg(|t| match t {
-      Theme::Full(t) => t.custom_styles.themes.get(&tid),
-      Theme::Inherit(i) => i
-        .custom_styles
-        .as_ref()
-        .and_then(|c| c.themes.get(&tid)),
-    });
-
-    c.and_then(|c| c.downcast_ref::<Self>())
-      .cloned()
+    ctx
+      .all_providers::<CustomStyles>()
+      .find_map(|t| {
+        t.themes
+          .get(&tid)
+          .and_then(|c| c.downcast_ref::<Self>())
+          .cloned()
+      })
       .unwrap_or_else(|| Self::default_style(ctx))
   }
 }

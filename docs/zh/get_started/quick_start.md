@@ -43,7 +43,7 @@ sidebar_position: 2
 ```rust no_run
 use ribir::prelude::*;
 
-fn hello_world(ctx!(): &BuildCtx) -> Widget<'static> {
+fn hello_world(ctx!(): &mut BuildCtx) -> Widget<'static> {
   rdl!{ Text { text: "Hello World!" } }
     .into_widget()
 }
@@ -71,7 +71,7 @@ fn main() {
 use ribir::prelude::*;
 
 fn main() {
-  let hello_world = |ctx!(): &BuildCtx| {
+  let hello_world = |ctx!(): &mut BuildCtx| {
     rdl!{ Text { text: "Hello World!" } }
       .into_widget()
   };
@@ -612,7 +612,7 @@ impl Compose for Counter {
 }
 
 fn main() { 
-  App::run(Counter(0)); 
+  App::run(fn_widget!(Counter(0))); 
 }
 
 ```

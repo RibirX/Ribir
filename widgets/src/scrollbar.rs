@@ -298,7 +298,7 @@ fn safe_recip(v: f32) -> f32 {
 }
 
 impl CustomStyle for ScrollBarStyle {
-  fn default_style(ctx: &BuildCtx) -> Self {
+  fn default_style(ctx: &impl ProviderCtx) -> Self {
     ScrollBarStyle {
       thumb_min_size: 12.,
       thickness: 8.,
@@ -315,7 +315,8 @@ mod test {
   use super::*;
   use crate::layout::{Column, ConstrainedBox};
 
-  fn content_expand_so_all_view_can_scroll() -> Widget<'static> {
+  widget_layout_test!(
+    content_expand_so_all_view_can_scroll,
     fn_widget! {
       @ConstrainedBox {
         clamp: BoxClamp::EXPAND_BOTH,
@@ -332,11 +333,7 @@ mod test {
           }
         }
       }
-    }
-    .into_widget()
-  }
-  widget_layout_test!(
-    content_expand_so_all_view_can_scroll,
+    },
     wnd_size = Size::new(200., 200.),
     { path = [0, 0, 0], width == 200., height == 200., }
     { path = [0, 0, 1], width == 200., height == 200., }

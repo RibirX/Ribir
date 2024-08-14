@@ -43,7 +43,7 @@ A function widget can be defined directly through a function:
 ```rust no_run
 use ribir::prelude::*;
 
-fn hello_world(ctx!(): &BuildCtx) -> Widget<'static> {
+fn hello_world(ctx!(): &mut BuildCtx) -> Widget<'static> {
   rdl!{ Text { text: "Hello World!" } }
     .into_widget()
 }
@@ -72,7 +72,7 @@ Because `hello_world` is not called by anyone else, you can rewrite it as a clos
 use ribir::prelude::*;
 
 fn main() {
-  let hello_world = |ctx!(): &BuildCtx| {
+  let hello_world = |ctx!(): &mut BuildCtx| {
     rdl!{ Text { text: "Hello World!" } }
       .into_widget()
   };
@@ -613,7 +613,7 @@ impl Compose for Counter {
 }
 
 fn main() { 
-  App::run(Counter(0)); 
+  App::run(fn_widget!(Counter(0))); 
 }
 
 ```

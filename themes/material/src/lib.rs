@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use ribir_core::{fill_svgs, prelude::*};
 use ribir_widgets::prelude::*;
 pub mod ripple;
@@ -10,7 +8,7 @@ mod styles_sheet;
 pub use styles_sheet::*;
 
 /// Crate a material theme with palette.
-fn new(palette: Palette) -> FullTheme {
+fn new(palette: Palette) -> Theme {
   let regular_family = Box::new([FontFamily::Name("Roboto".into()), FontFamily::Serif]);
   let medium_family = Box::new([FontFamily::Name("Roboto Medium".into()), FontFamily::Serif]);
 
@@ -21,8 +19,8 @@ fn new(palette: Palette) -> FullTheme {
     Color::BLACK.with_alpha(0.87).into(),
   );
 
-  let mut theme = FullTheme {
-    palette: Rc::new(palette),
+  let mut theme = Theme {
+    palette,
     typography_theme,
     icon_theme: icon_theme(),
     transitions_theme: TransitionTheme::default(),
@@ -97,7 +95,7 @@ const ICON_MEDIUM: Size = Size::new(36., 36.);
 const ICON_LARGE: Size = Size::new(48., 48.);
 const ICON_HUGE: Size = Size::new(64., 64.);
 
-fn init_custom_style(theme: &mut FullTheme) {
+fn init_custom_style(theme: &mut Theme) {
   theme
     .custom_styles
     .set_custom_style(ScrollBarStyle {
@@ -240,7 +238,7 @@ fn init_custom_style(theme: &mut FullTheme) {
     });
 }
 
-fn override_compose_decorator(theme: &mut FullTheme) {
+fn override_compose_decorator(theme: &mut Theme) {
   fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
     fn_widget! {
       @$host {
@@ -418,10 +416,10 @@ pub mod purple {
   }
 
   /// A default light blue theme. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-  pub fn light() -> FullTheme { new(palette(Brightness::Light)) }
+  pub fn light() -> Theme { new(palette(Brightness::Light)) }
 
   /// A default dark theme with a teal accent color. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
-  pub fn dark() -> FullTheme { new(palette(Brightness::Dark)) }
+  pub fn dark() -> Theme { new(palette(Brightness::Dark)) }
 }
 
 fn icon_theme() -> IconTheme {

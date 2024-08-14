@@ -29,19 +29,33 @@ pub(crate) struct WidgetTree {
 type TreeArena = Arena<Box<dyn RenderQueryable>>;
 
 impl WidgetTree {
-  pub fn init(&mut self, wnd: Weak<Window>) { self.wnd = wnd; }
+  pub fn init(&mut self, wnd: &Rc<Window>, content: GenWidget) {
+    self.wnd = Rc::downgrade(wnd);
+    let root_id = self.root;
+    let mut ctx = BuildCtx::create(self.root, wnd.tree);
+    ctx.pre_alloc = Some(root_id);
 
-  pub fn set_content(&mut self, content: WidgetId) {
-    // dispose the old content.
-    self
-      .root
-      .children(self)
-      .collect::<Vec<_>>()
-      .into_iter()
-      .for_each(|id| id.dispose_subtree(self));
-    self.root.append(content, self);
-    self.mark_dirty(self.root);
-    self.root.on_mounted_subtree(self);
+    let theme = AppCtx::app_theme().clone_writer();
+    let overlays = Queryable(Overlays::default());
+    let id = Provider::new(Box::new(overlays))
+      .with_child(fn_widget! {
+        theme.with_child(fn_widget!{
+          @Root {
+            @{ content.gen_widget() }
+            @{
+              let overlays = Provider::of::<Overlays>(ctx!()).unwrap();
+              overlays.rebuild()
+            }
+          }
+        })
+      })
+      .into_widget()
+      .build(&mut ctx);
+
+    assert_eq!(root_id, id);
+
+    self.mark_dirty(root_id);
+    root_id.on_mounted_subtree(self);
   }
 
   pub(crate) fn root(&self) -> WidgetId { self.root }
@@ -219,6 +233,38 @@ impl Default for WidgetTree {
       dirty_set: Rc::new(RefCell::new(HashSet::default())),
     }
   }
+}
+
+#[simple_declare]
+#[derive(MultiChild)]
+pub(crate) struct Root;
+
+impl Render for Root {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let mut size = ZERO_SIZE;
+    let mut layouter = ctx.first_child_layouter();
+    while let Some(mut l) = layouter {
+      let child_size = l.perform_widget_layout(clamp);
+      size = size.max(child_size);
+      layouter = l.into_next_sibling();
+    }
+    size
+  }
+
+  fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+pub(crate) struct Overlays(Stateful<Vec<Overlay>>);
+
+impl Overlays {
+  fn rebuild(&self) -> Vec<Widget<'static>> {
+    // todo: drop the old overlay subtree, create a new one for new theme
+    vec![]
+  }
+}
+
+impl Default for Overlays {
+  fn default() -> Self { Self(Stateful::new(vec![])) }
 }
 
 #[cfg(test)]

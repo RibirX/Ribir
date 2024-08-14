@@ -1,14 +1,25 @@
-use ribir_painter::{Color, LightnessTone};
-
-use super::{Brightness, Theme};
-use crate::prelude::BuildCtx;
+use super::*;
 
 /// The palette enables you to modify the color of your application to suit
-/// your brand. `Palette` provide colors base on the 8 key colors with different
-/// light tone.
+/// your brand. `Palette` provide base colors with different light tone.
 ///
 /// Note: `Palette` mainly learn from Material design color system
 /// Reference https://m3.material.io/styles/color/
+///
+/// # Examples
+///
+///
+/// ```rust
+/// use ribir_core::prelude::*;
+
+/// let _w = Palette::default().with_child(
+///   fn_widget! {
+///     // Every widget created in this scope can access the `Palette`.
+///     let _primary = Palette::of(ctx!()).primary();
+///     Void
+///   }
+/// );
+/// ```
 #[derive(Clone, Debug)]
 pub struct Palette {
   // Accent colors: primary, secondary, and tertiary
@@ -98,15 +109,31 @@ pub struct LightnessCfg {
   pub shadow: LightnessTone,
 }
 
-impl Palette {
-  #[inline]
-  pub fn of(ctx: &BuildCtx) -> &Self {
-    ctx
-      .find_cfg(|t| match t {
-        Theme::Full(f) => Some(&f.palette),
-        Theme::Inherit(i) => i.palette.as_ref(),
+impl ComposeChild<'static> for Palette {
+  type Child = GenWidget;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
+    Provider::new(Box::new(this.clone_writer()))
+      .with_child(fn_widget! {
+        pipe!($this;).map(move |_| child.gen_widget())
       })
-      .unwrap()
+      .into_widget()
+  }
+}
+
+impl Palette {
+  /// Retrieve the nearest `Palette` from the context among its ancestors
+  #[inline]
+  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Self> {
+    // At least one application theme exists
+    Provider::of::<Self>(ctx).unwrap()
+  }
+
+  /// Retrieve the nearest `Palette` from the context among its ancestors and
+  /// return a write reference to the theme.
+  #[inline]
+  pub fn write_of(ctx: &impl ProviderCtx) -> WriteRef<Self> {
+    // At least one application theme exists
+    Provider::write_of::<Self>(ctx).unwrap()
   }
 
   #[inline]

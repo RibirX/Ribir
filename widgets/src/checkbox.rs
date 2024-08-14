@@ -115,7 +115,7 @@ impl ComposeChild<'static> for Checkbox {
 }
 
 impl CustomStyle for CheckBoxStyle {
-  fn default_style(ctx: &BuildCtx) -> Self {
+  fn default_style(ctx: &impl ProviderCtx) -> Self {
     CheckBoxStyle {
       icon_size: Size::splat(24.),
       label_style: TypographyTheme::of(ctx).body_large.text.clone(),
@@ -130,36 +130,32 @@ mod tests {
 
   use super::*;
 
-  fn checked() -> Widget<'static> { fn_widget! { @Checkbox { checked: true } }.into_widget() }
   widget_test_suit!(
     checked,
+    fn_widget! { @Checkbox { checked: true } },
     wnd_size = Size::new(48., 48.),
     width == 24.,
     height == 24.,
     comparison = 0.001
   );
 
-  fn unchecked() -> Widget<'static> { fn_widget! { @Checkbox {} }.into_widget() }
   widget_test_suit!(
     unchecked,
+    fn_widget! { @Checkbox {} },
     wnd_size = Size::new(48., 48.),
     width == 24.,
     height == 24.,
     comparison = 0.001
   );
 
-  fn indeterminate() -> Widget<'static> {
+  widget_test_suit!(
+    indeterminate,
     fn_widget! {
       @Checkbox {
         checked: true,
         indeterminate: true,
       }
-    }
-    .into_widget()
-  }
-
-  widget_test_suit!(
-    indeterminate,
+    },
     wnd_size = Size::new(48., 48.),
     width == 24.,
     height == 24.,

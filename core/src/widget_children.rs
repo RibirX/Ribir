@@ -294,27 +294,24 @@ mod tests {
   }
 
   const FIX_OPTION_TEMPLATE_EXPECT_SIZE: Size = Size::new(100., 200.);
-  fn fix_option_template() -> impl IntoWidget<'static, FN> {
-    struct Field;
+  struct Field;
 
-    #[derive(Template, Default)]
-    pub struct ConfigTml {
-      _field: Option<Field>,
-    }
-    #[derive(Declare)]
-    struct Host {}
-
-    impl ComposeChild<'static> for Host {
-      type Child = Option<ConfigTml>;
-      fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
-        fn_widget! { @MockBox { size: FIX_OPTION_TEMPLATE_EXPECT_SIZE } }.into_widget()
-      }
-    }
-
-    fn_widget! { @Host { @{ Field } }}
+  #[derive(Template, Default)]
+  pub struct ConfigTml {
+    _field: Option<Field>,
   }
+  #[derive(Declare)]
+  struct Host {}
+
+  impl ComposeChild<'static> for Host {
+    type Child = Option<ConfigTml>;
+    fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
+      fn_widget! { @MockBox { size: FIX_OPTION_TEMPLATE_EXPECT_SIZE } }.into_widget()
+    }
+  }
+
   widget_layout_test!(
-    fix_option_template,
+    fix_option_template, fn_widget! { @Host { @{ Field } }},
     { path = [0], size == FIX_OPTION_TEMPLATE_EXPECT_SIZE, }
   );
 }

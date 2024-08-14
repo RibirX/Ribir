@@ -73,17 +73,15 @@ mod tests {
   use super::*;
   use crate::prelude::*;
   const FIVE: Size = Size::new(5., 5.);
-  fn smoke() -> Widget<'static> {
-    let one = Size::new(1., 1.);
-    let five = Size::new(5., 5.);
+
+  widget_layout_test!(
+    smoke,
     fn_widget! {
       @Stack {
-        @SizedBox { size: one}
-        @SizedBox { size: five}
+        @SizedBox { size: Size::new(1., 1.) }
+        @SizedBox { size: FIVE }
       }
-    }
-    .into_widget()
-  }
-
-  widget_layout_test!(smoke, size == FIVE,);
+    },
+    size == FIVE,
+  );
 }

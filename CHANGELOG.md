@@ -27,6 +27,32 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
+- **core**: Support for modifying the theme at runtime. (#pr @M-Adoo)
+  <img src="./static/theme-switch.gif" style="transform:scale(0.5);"/>
+
+  The code:
+
+  ```rust
+  use ribir::prelude::*;
+
+  let w = fn_widget! {
+    @Text {
+      on_tap: |e| {
+        // Query the `Palette` of the application theme.
+        let mut p = Palette::write_of(e);
+        if p.brightness == Brightness::Light {
+          p.brightness = Brightness::Dark;
+        } else {
+          p.brightness = Brightness::Light;
+        }
+      },
+      text : "Click me!"
+    }
+  };
+
+  App::run(w);
+  ```
+
 - **core**: Added `Provider` widget to share data between sub-tree. (#pr @M-Adoo)
   ```rust
   Provider::new(Box::new(State::value(0i32))).with_child(fn_widget! {
@@ -54,6 +80,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Breaking
 
 - **core**: `GenWidget::gen_widget` no longer requires a `&mut BuildCtx` parameter. (#616 @M-Adoo)
+- **core**: Removed `FullTheme` and `InheritTheme`, now only using `Theme`. Any part of the theme, such as `Palette`, can be directly used to overwrite its corresponding theme component. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.5] - 2024-08-14
 
@@ -120,7 +147,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
         ...
       }
     }
-```
+   ```
 
 ### Changed
 

@@ -1,98 +1,77 @@
-use std::{cell::OnceCell, ptr::NonNull, rc::Rc};
+use std::{ptr::NonNull, rc::Rc};
 
-use ribir_algo::Sc;
 use smallvec::SmallVec;
+use widget_id::{new_node, RenderQueryable};
 
-use crate::{prelude::*, window::WindowId};
+use crate::{pipe::DynInfo, prelude::*, render_helper::PureRender, window::WindowId};
 
 /// A context provide during build the widget tree.
 pub struct BuildCtx {
-  pub(crate) themes: OnceCell<Vec<Sc<Theme>>>,
-  /// The widget ID from which the context originates is typically the parent of
-  /// the upcoming node to be created, or the ID of the node itself if its
-  /// parent is a provider.
-  pub(crate) startup: WidgetId,
-  /// Widgets from the current widget up to the root widget supply data that the
+  /// Widgets from the root widget to the current widget provide data that the
   /// descendants can access.
   pub(crate) providers: SmallVec<[WidgetId; 1]>,
+  /// Providers are available for the preallocated widget but have not been
+  /// attached yet.
+  pub(crate) current_providers: SmallVec<[Box<dyn Query>; 1]>,
   /// A node ID has already been allocated for the current building node.
-  pub(crate) pre_alloc_id: Option<WidgetId>,
+  pub(crate) pre_alloc: Option<WidgetId>,
   pub(crate) tree: NonNull<WidgetTree>,
+  // Todo: Since `Theme`, `Palette`, and `TypographyTheme` are frequently queried during the
+  // building process, we should cache the closest one.
 }
 
 /// A handle of `BuildCtx` that you can store it and access the `BuildCtx` later
 /// in anywhere.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct BuildCtxHandle {
-  startup: WidgetId,
+  startup: StartUpWidget,
   wnd_id: WindowId,
+}
+
+/// The widget from which to start creating the build context.
+#[derive(Debug, Clone)]
+enum StartUpWidget {
+  // The static widget ID.
+  Id(WidgetId),
+  // The pipe node info contains the widget ID. Since widgets may be regenerated,
+  // we use a lazy approach to retrieve it.
+  PipeNode(DynInfo),
 }
 
 impl BuildCtx {
   /// Return the window of this context is created from.
   pub fn window(&self) -> Rc<Window> { self.tree().window() }
 
-  /// Create a handle of this `BuildCtx` which support `Clone`, `Copy` and
-  /// convert back to this `BuildCtx`. This let you can store the `BuildCtx`.
+  /// Generate a handle for this `BuildCtx` that supports `Clone`, and
+  /// can be converted back to this `BuildCtx`. This allows you to store the
+  /// `BuildCtx`.
   pub fn handle(&self) -> BuildCtxHandle {
-    BuildCtxHandle { wnd_id: self.window().id(), startup: self.startup }
+    // When the current widget is a pipe node. This widget ID may be updated in the
+    // future, so we store the pipe info to ensure we always retrieve the correct
+    // widget ID when using the handle.
+    //
+    // If the handle in the pipe subtree but not the pipe node (root), even
+    // though it will be regenerated, we can store the static widget ID because the
+    // handle will also be regenerated.
+    let id = *self.providers.last().unwrap();
+    let startup = if let Some(info) = self
+      .current_providers
+      .iter()
+      .find_map(|p| p.query(TypeId::of::<DynInfo>()))
+      .and_then(|h| h.into_ref())
+      .or_else(|| id.query_ref::<DynInfo>(self.tree()))
+    {
+      StartUpWidget::PipeNode(info.clone())
+    } else {
+      StartUpWidget::Id(id)
+    };
+
+    BuildCtxHandle { wnd_id: self.window().id(), startup }
   }
 
   #[inline]
-  pub(crate) fn new(startup: WidgetId, tree: NonNull<WidgetTree>) -> Self {
-    // Safety: caller guarantee.
-    let t = unsafe { tree.as_ref() };
-    let providers = startup
-      .ancestors(t)
-      .filter(|id| id.queryable(t))
-      .collect();
-    Self { themes: OnceCell::new(), startup, tree, providers, pre_alloc_id: None }
-  }
-
-  pub(crate) fn new_with_data(
-    startup: WidgetId, tree: NonNull<WidgetTree>, data: Vec<Sc<Theme>>,
-  ) -> Self {
-    // Safety: caller guarantee.
-    let t = unsafe { tree.as_ref() };
-    let providers = startup
-      .ancestors(t)
-      .filter(|id| id.queryable(t))
-      .collect();
-    let themes: OnceCell<Vec<Sc<Theme>>> = OnceCell::new();
-    // Safety: we just create the `OnceCell` and it's empty.
-    unsafe { themes.set(data).unwrap_unchecked() };
-
-    Self { themes, startup, providers, tree, pre_alloc_id: None }
-  }
-
-  pub(crate) fn find_cfg<T>(&self, f: impl Fn(&Theme) -> Option<&T>) -> Option<&T> {
-    for t in self.themes().iter() {
-      let v = f(t);
-      if v.is_some() {
-        return v;
-      } else if matches!(t.deref(), Theme::Full(_)) {
-        return None;
-      }
-    }
-    f(AppCtx::app_theme())
-  }
-
-  pub(crate) fn themes(&self) -> &Vec<Sc<Theme>> {
-    self.themes.get_or_init(|| {
-      let mut themes = vec![];
-      let tree = self.tree();
-      self.startup.ancestors(tree).any(|p| {
-        for t in p.query_all_iter::<Sc<Theme>>(tree) {
-          themes.push(t.clone());
-          if matches!(&**t, Theme::Full(_)) {
-            break;
-          }
-        }
-
-        matches!(themes.last().map(Sc::deref), Some(Theme::Full(_)))
-      });
-      themes
-    })
+  pub(crate) fn create(startup: WidgetId, tree: NonNull<WidgetTree>) -> BuildCtxGuard {
+    BuildCtxGuard::new(startup, tree)
   }
 
   pub(crate) fn tree(&self) -> &WidgetTree {
@@ -109,86 +88,139 @@ impl BuildCtx {
     // parts of the tree.
     unsafe { tree.as_mut() }
   }
+
+  pub(crate) fn alloc(&mut self, node: Box<dyn RenderQueryable>) -> WidgetId {
+    if let Some(id) = self.pre_alloc.take() {
+      *id.get_node_mut(self.tree_mut()).unwrap() = node;
+      id
+    } else {
+      new_node(&mut self.tree_mut().arena, node)
+    }
+  }
+
+  pub(crate) fn pre_alloc(&mut self) -> WidgetId {
+    if let Some(id) = self.pre_alloc {
+      id
+    } else {
+      let id = new_node(&mut self.tree_mut().arena, Box::new(PureRender(Void)));
+      self.pre_alloc = Some(id);
+      id
+    }
+  }
+
+  pub(crate) fn consume_root_with_provider<'w>(
+    &mut self, w: Widget<'w>, provider: Box<dyn Query>,
+  ) -> (Widget<'w>, Box<dyn Query>) {
+    self.current_providers.push(provider);
+    let w = w.consume_root(self);
+    let provider = self.current_providers.pop().unwrap();
+    (w, provider)
+  }
 }
 
 impl BuildCtxHandle {
   /// Acquires a reference to the `BuildCtx` in this handle, maybe not exist if
   /// the window is closed or widget is removed.
-  pub fn with_ctx<R>(self, f: impl FnOnce(&mut BuildCtx) -> R) -> Option<R> {
+  ///
+  /// # Panic
+  ///
+  /// Panics if the widget node of the handle is removed.
+  pub fn with_ctx<R>(&self, f: impl FnOnce(&mut BuildCtx) -> R) -> Option<R> {
     AppCtx::get_window(self.wnd_id).map(|wnd: Rc<Window>| {
-      let mut ctx = BuildCtx::new(self.startup, wnd.tree);
+      let id = match &self.startup {
+        StartUpWidget::Id(id) => *id,
+        StartUpWidget::PipeNode(p) => p.borrow().host_id(),
+      };
+      let mut ctx = BuildCtx::create(id, wnd.tree);
       f(&mut ctx)
     })
   }
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use crate::{reset_test_env, test_helper::*};
+/// During widget building, if a subtree uses a handle to create a BuildCtx, it
+/// may lack current context information because the building subtree has not
+/// been added to the tree yet.
+///
+/// For example, when constructing subtree A, where B is a sub-tree of A, and
+/// during the building of B and its widget, it utilizes
+/// `BuildCtxHandle::with_handle` to retrieve the `BuildCtx`. At that moment, B
+/// is not yet a sub-tree of A, resulting in the inability to access the
+/// providers of its intended ancestors.
+///
+/// # Safety
+///
+/// We use the build context in a single thread and utilize it to
+/// construct the widget tree in a top-first manner. There may be simultaneous
+/// borrowing and mutation of the CURRENT_CTX, but this occurs during the
+/// construction of different parts of the tree. By breaking the borrow checker
+/// here, we achieve clearer logic.
+static mut CURRENT_CTX: Option<BuildCtx> = None;
 
-  #[test]
-  fn themes() {
-    reset_test_env!();
+enum CtxRestore {
+  None,
+  Info { providers_len: usize, current_providers_len: usize },
+}
+pub(crate) struct BuildCtxGuard {
+  ctx: &'static mut BuildCtx,
+  restore: CtxRestore,
+}
 
-    let themes: Stateful<Vec<Sc<Theme>>> = Stateful::new(vec![]);
-    let c_themes = themes.clone_writer();
+impl BuildCtxGuard {
+  pub(crate) fn new(startup: WidgetId, tree: NonNull<WidgetTree>) -> Self {
+    // Safety: The caller guarantees a valid tree structure.
+    let t = unsafe { tree.as_ref() };
+    let providers_list = startup.ancestors(t).filter(|id| id.queryable(t));
 
-    let light_dark = fn_widget! {
-      let light_palette = Palette {
-        brightness: Brightness::Light,
-        ..Default::default()
-      };
-      @ThemeWidget {
-        theme: Sc::new(Theme::Inherit(InheritTheme {
-          palette: Some(Rc::new(light_palette)),
-          ..<_>::default()
-        })),
-        @ {
-          Box::new(fn_widget!{
-            let c_themes = c_themes.clone_writer();
-            let dark_palette = Palette {
-              brightness: Brightness::Dark,
-              ..Default::default()
-            };
-            @MockBox {
-              size: INFINITY_SIZE,
-              @ThemeWidget {
-                theme: Sc::new(Theme::Inherit(InheritTheme {
-                  palette: Some(Rc::new(dark_palette)),
-                  ..<_>::default()
-                })),
-                @ {
-                  Box::new(fn_widget!{
-                    @MockBox {
-                      size: ZERO_SIZE,
-                      @ {
-                        Clone::clone_from(&mut *$c_themes.write(), ctx!().themes());
-                        Void
-                      }
-                    }
-                  })
-                }
-              }
-            }
-          })
-        }
+    if let Some(ctx) = unsafe { CURRENT_CTX.as_mut() } {
+      let last = ctx.providers.last().copied();
+      let providers: SmallVec<[WidgetId; 1]> = providers_list
+        .take_while(|id| Some(*id) != last)
+        .collect();
+
+      let providers_len = ctx.providers.len();
+      let current_providers_len = ctx.current_providers.len();
+      ctx
+        .providers
+        .extend(providers.iter().rev().copied());
+
+      BuildCtxGuard { ctx, restore: CtxRestore::Info { providers_len, current_providers_len } }
+    } else {
+      let mut providers: SmallVec<[WidgetId; 1]> = providers_list.collect();
+      providers.reverse();
+
+      unsafe {
+        CURRENT_CTX =
+          Some(BuildCtx { tree, providers, pre_alloc: None, current_providers: <_>::default() });
+
+        BuildCtxGuard { ctx: CURRENT_CTX.as_mut().unwrap(), restore: CtxRestore::None }
       }
-    };
+    }
+  }
+}
 
-    let wnd = TestWindow::new(light_dark);
-    wnd.layout();
-    let themes = themes.read();
-    assert_eq!(themes.len(), 2);
-    let mut iter = themes.iter().filter_map(|t| match t.deref() {
-      Theme::Full(t) => Some(t.palette.brightness),
-      Theme::Inherit(i) => i
-        .palette
-        .as_ref()
-        .map(|palette| palette.brightness),
-    });
+impl std::ops::Deref for BuildCtxGuard {
+  type Target = BuildCtx;
 
-    assert_eq!(iter.next(), Some(Brightness::Light));
-    assert_eq!(iter.next(), Some(Brightness::Dark));
+  fn deref(&self) -> &Self::Target { &*self.ctx }
+}
+
+impl std::ops::DerefMut for BuildCtxGuard {
+  fn deref_mut(&mut self) -> &mut Self::Target { self.ctx }
+}
+
+impl Drop for BuildCtxGuard {
+  fn drop(&mut self) {
+    match self.restore {
+      CtxRestore::None => unsafe { CURRENT_CTX = None },
+      CtxRestore::Info { providers_len, current_providers_len } => {
+        assert!(self.ctx.providers.len() >= providers_len);
+        assert!(self.ctx.current_providers.len() >= current_providers_len);
+        self.ctx.providers.drain(providers_len..);
+        self
+          .ctx
+          .current_providers
+          .drain(current_providers_len..);
+      }
+    }
   }
 }

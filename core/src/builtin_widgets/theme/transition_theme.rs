@@ -1,15 +1,8 @@
-use std::{collections::HashMap, time::Duration};
-
-use super::Theme;
-use crate::{
-  animation::RocBoxClone,
-  context::BuildCtx,
-  fill_transition,
-  prelude::{easing, EasingTransition, Transition},
-};
+use super::*;
+use crate::fill_transition;
 
 pub struct TransitionTheme {
-  pub transitions: HashMap<TransitionIdent, Box<dyn RocBoxClone>, ahash::RandomState>,
+  pub transitions: ahash::HashMap<TransitionIdent, Box<dyn RocBoxClone>>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -54,28 +47,45 @@ impl TransitionTheme {
   }
 }
 
+impl TransitionTheme {
+  /// Retrieve the nearest `TransitionTheme` from the context among its
+  /// ancestors
+  #[inline]
+  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Self> {
+    // At least one application theme exists
+    Provider::of::<Self>(ctx).unwrap()
+  }
+
+  /// Retrieve the nearest `TransitionTheme` from the context among its
+  /// ancestors and return a write reference to the theme.
+  #[inline]
+  pub fn write_of(ctx: &impl ProviderCtx) -> WriteRef<Self> {
+    // At least one application theme exists
+    Provider::write_of::<Self>(ctx).unwrap()
+  }
+}
+
 impl TransitionIdent {
   pub const fn new(idx: usize) -> Self { Self(idx) }
 
   /// get transition of the transition identify from the context if it have or
   /// return linear transition.
-  pub fn of(self, ctx: &BuildCtx) -> Box<dyn Transition> {
+  pub fn of(self, ctx: &impl ProviderCtx) -> Box<dyn Transition> {
+    let panic_msg = format!(
+      "Neither `Transition({:?})` nor `transitions::LINEAR` are initialized in all \
+       `TransitionTheme` instances.",
+      self
+    );
+    self
+      .find(ctx)
+      .or(transitions::LINEAR.find(ctx))
+      .expect(&panic_msg)
+  }
+
+  pub fn find(self, ctx: &impl ProviderCtx) -> Option<Box<dyn Transition>> {
     ctx
-      .find_cfg(|t| match t {
-        Theme::Full(t) => {
-          let transitions = &t.transitions_theme.transitions;
-          transitions.get(&self).or_else(|| {
-            log::info!("Transition({:?}) not init in theme.", self);
-            transitions.get(&transitions::LINEAR)
-          })
-        }
-        Theme::Inherit(i) => i
-          .transitions_theme
-          .as_ref()
-          .and_then(|t| t.transitions.get(&self)),
-      })
-      .unwrap()
-      .box_clone()
+      .all_providers::<TransitionTheme>()
+      .find_map(|t| t.transitions.get(&self).map(|t| t.box_clone()))
   }
 }
 

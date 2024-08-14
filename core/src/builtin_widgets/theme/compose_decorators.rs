@@ -46,7 +46,7 @@ mod tests {
   fn compose_decorator_smoke() {
     reset_test_env!();
 
-    let mut theme = FullTheme::default();
+    let mut theme = Theme::default();
 
     #[derive(Declare)]
     struct Size100Style;

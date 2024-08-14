@@ -7,7 +7,7 @@ pub fn run() {
   #[cfg(target_arch = "wasm32")]
   std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-  App::run(messages())
+  App::run(messages)
     .with_app_theme(material::purple::light())
     .with_size(Size::new(400., 600.))
     .with_title("Messages");

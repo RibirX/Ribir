@@ -8,7 +8,7 @@ pub fn run() {
   #[cfg(target_arch = "wasm32")]
   std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-  App::run(todos())
+  App::run(todos)
     .with_app_theme(material::purple::light())
     .with_title("Todos");
 }
@@ -20,5 +20,5 @@ mod tests {
 
   use super::*;
 
-  widget_image_test!(todos, wnd_size = Size::new(400., 640.), comparison = 0.002);
+  widget_image_test!(todos, todos, wnd_size = Size::new(400., 640.), comparison = 0.002);
 }

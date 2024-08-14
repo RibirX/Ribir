@@ -7,7 +7,7 @@ pub fn run() {
   #[cfg(target_arch = "wasm32")]
   std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-  App::run(storybook())
+  App::run(storybook)
     .with_app_theme(material::purple::light())
     .with_title("Storybook")
     .with_size(Size::new(1024., 768.));
@@ -20,5 +20,5 @@ mod tests {
 
   use super::*;
 
-  widget_image_test!(storybook, wnd_size = Size::new(1024., 768.), comparison = 0.0025);
+  widget_image_test!(storybook, storybook, wnd_size = Size::new(1024., 768.), comparison = 0.0025);
 }

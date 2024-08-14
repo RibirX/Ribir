@@ -1,11 +1,10 @@
 //! Theme use to share visual config or style compose logic. It can be defined
 //! to app-wide or particular part of the application.
 
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
-use ribir_algo::Sc;
 pub use ribir_algo::{CowArc, Resource};
-use ribir_macros::Declare;
+use smallvec::SmallVec;
 
 use crate::{fill_svgs, prelude::*};
 
@@ -30,11 +29,55 @@ pub enum Brightness {
   Light,
 }
 
-/// A full theme means all config have be defined in it. Everything of parent
-/// theme are overriding here, if anything that you can't find means it be
-/// override as undefine, should not continue find in parent theme.
-pub struct FullTheme {
-  pub palette: Rc<Palette>,
+/// A `Theme` widget is used to share design configurations among its
+/// descendants. This includes palettes, font styles, animation transitions, and
+/// icons. An app theme is always present, but you can also use a different
+/// theme for parts of your sub-tree. You can customize parts of the theme using
+/// `Palette`, `TypographyTheme`, and `IconTheme`.
+///
+/// # Examples
+///
+/// Every descendant widget of the theme can query it or its parts.
+///
+/// ```
+/// use ribir::prelude::*;
+///
+/// let w = fn_widget! {
+///   @Text {
+///     on_tap: |e| {
+///       // Query the `Palette` of the application theme.
+///       let mut p = Palette::write_of(e);
+///        if p.brightness == Brightness::Light {
+///           p.brightness = Brightness::Dark;
+///        } else {
+///           p.brightness = Brightness::Light;
+///        }
+///     },
+///     text : "Click me!"
+///   }
+/// };
+///
+/// App::run(w);
+/// ```
+///
+/// You can provide a theme for a widget:
+///
+/// ```
+/// use ribir::prelude::*;
+///
+/// let w = Theme::default().with_child(fn_widget! {
+///   // Feel free to use a different theme here.
+///   Void
+/// });
+/// ```
+///
+/// # Todo
+///
+/// Simplify the theme by eliminating the need for `TransitionTheme`,
+// `CustomStyles`, and `ComposeDecorators` if we can find a more elegant way to
+// handle widget theme styles.
+pub struct Theme {
+  pub palette: Palette,
   pub typography_theme: TypographyTheme,
   pub icon_theme: IconTheme,
   pub transitions_theme: TransitionTheme,
@@ -44,70 +87,121 @@ pub struct FullTheme {
   pub font_files: Option<Vec<String>>,
 }
 
-/// Inherit theme override part of parent theme, if anything not found in here,
-/// should query in parent theme until meet a `FullTheme`.
-#[derive(Default)]
-pub struct InheritTheme {
-  pub palette: Option<Rc<Palette>>,
-  pub typography_theme: Option<TypographyTheme>,
-  /// icon size standard
-  pub icon_size: Option<IconSize>,
-  /// a collection of icons.
-  pub icons: Option<HashMap<NamedSvg, Resource<Svg>, ahash::RandomState>>,
-  pub transitions_theme: Option<TransitionTheme>,
-  pub compose_decorators: Option<ComposeDecorators>,
-  pub custom_styles: Option<CustomStyles>,
-  pub font_bytes: Option<Vec<Vec<u8>>>,
-  pub font_files: Option<Vec<String>>,
-}
+impl Theme {
+  /// Retrieve the nearest `Theme` from the context among its ancestors
+  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Theme> {
+    // At least one application theme exists
+    Provider::of(ctx).unwrap()
+  }
 
-pub enum Theme {
-  Full(FullTheme),
-  Inherit(InheritTheme),
-}
+  /// Retrieve the nearest `Theme` from the context among its ancestors and
+  /// return a write reference to the theme.
+  pub fn write_of(ctx: &impl ProviderCtx) -> WriteRef<Theme> {
+    // At least one application theme exists
+    Provider::write_of(ctx).unwrap()
+  }
 
-#[derive(Declare)]
-pub struct ThemeWidget {
-  pub theme: Sc<Theme>,
-}
-
-impl ComposeChild<'static> for ThemeWidget {
-  type Child = GenWidget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
-    use crate::prelude::*;
-    let f = move |ctx: &mut BuildCtx| {
-      let theme = this.read().theme.clone();
-      AppCtx::load_font_from_theme(&theme);
-
-      let mut themes = ctx.themes().clone();
-      themes.push(theme.clone());
-
-      // Keep the empty node, because the subtree may be hold its id.
-      //
-      // And not try to swap child and the empty node, and remove the child
-      // node, because the subtree may be hold its id.
-      //
-      // A `Void` is cheap for a theme.
-      let p = Void.into_widget().build(ctx);
-      p.attach_data(Box::new(Queryable(theme)), ctx.tree_mut());
-
-      // shadow the context with the theme.
-      let mut ctx = BuildCtx::new_with_data(p, ctx.tree, themes);
-      let child = child.gen_widget().build(&mut ctx);
-      p.append(child, ctx.tree_mut());
-
-      p
-    };
-
-    Widget::lazy_build(Box::new(f))
+  /// Loads the fonts specified in the theme configuration.
+  fn load_fonts(&mut self) {
+    let mut font_db = AppCtx::font_db().borrow_mut();
+    let Theme { font_bytes, font_files, .. } = self;
+    if let Some(font_bytes) = font_bytes {
+      font_bytes
+        .iter()
+        .for_each(|data| font_db.load_from_bytes(data.clone()));
+    }
+    if let Some(font_files) = font_files {
+      font_files.iter().for_each(|path| {
+        let _ = font_db.load_font_file(path);
+      });
+    }
   }
 }
 
-impl Default for Theme {
-  fn default() -> Self { Theme::Full(<_>::default()) }
+impl ComposeChild<'static> for Theme {
+  /// The child should be a `GenWidget` so that when the theme is modified, we
+  /// can regenerate its sub-tree.
+  type Child = GenWidget;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
+    use crate::prelude::*;
+
+    this.silent().load_fonts();
+    let w = this.clone_watcher();
+    let theme = ThemeQuerier(this.clone_writer());
+
+    Provider::new(Box::new(theme))
+      .with_child(fn_widget! {
+        pipe!($w;).map(move |_| child.gen_widget())
+      })
+      .into_widget()
+  }
 }
 
-impl Default for FullTheme {
+struct ThemeQuerier<T: StateWriter<Value = Theme>>(T);
+
+impl<T: StateWriter<Value = Theme>> Query for ThemeQuerier<T> {
+  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    // The value of the writer and the writer itself cannot be queried
+    // at the same time.
+    if let Some(h) = self.query(type_id) {
+      out.push(h)
+    }
+  }
+
+  fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
+    ReadRef::filter_map(self.0.read(), |v: &mut Theme| {
+      let w: Option<&mut dyn Any> = if TypeId::of::<Theme>() == type_id {
+        Some(v)
+      } else if TypeId::of::<Palette>() == type_id {
+        Some(&mut v.palette)
+      } else if TypeId::of::<TypographyTheme>() == type_id {
+        Some(&mut v.typography_theme)
+      } else if TypeId::of::<IconTheme>() == type_id {
+        Some(&mut v.icon_theme)
+      } else if TypeId::of::<TransitionTheme>() == type_id {
+        Some(&mut v.transitions_theme)
+      } else if TypeId::of::<ComposeDecorators>() == type_id {
+        Some(&mut v.compose_decorators)
+      } else if TypeId::of::<CustomStyles>() == type_id {
+        Some(&mut v.custom_styles)
+      } else {
+        None
+      };
+      w.map(PartData::from_ref_mut)
+    })
+    .ok()
+    .map(QueryHandle::from_read_ref)
+  }
+
+  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
+    WriteRef::filter_map(self.0.write(), |v: &mut Theme| {
+      let w: Option<&mut dyn Any> = if TypeId::of::<Theme>() == type_id {
+        Some(v)
+      } else if TypeId::of::<Palette>() == type_id {
+        Some(&mut v.palette)
+      } else if TypeId::of::<TypographyTheme>() == type_id {
+        Some(&mut v.typography_theme)
+      } else if TypeId::of::<IconTheme>() == type_id {
+        Some(&mut v.icon_theme)
+      } else if TypeId::of::<TransitionTheme>() == type_id {
+        Some(&mut v.transitions_theme)
+      } else if TypeId::of::<ComposeDecorators>() == type_id {
+        Some(&mut v.compose_decorators)
+      } else if TypeId::of::<CustomStyles>() == type_id {
+        Some(&mut v.custom_styles)
+      } else {
+        None
+      };
+      w.map(PartData::from_ref_mut)
+    })
+    .ok()
+    .map(QueryHandle::from_write_ref)
+  }
+
+  fn queryable(&self) -> bool { true }
+}
+
+impl Default for Theme {
   fn default() -> Self {
     let icon_size = IconSize {
       tiny: Size::new(18., 18.),
@@ -157,7 +251,7 @@ impl Default for FullTheme {
       svgs::TEXT_CARET: "./icons/text_caret.svg"
     };
 
-    FullTheme {
+    Theme {
       palette: Default::default(),
       typography_theme,
       icon_theme,
@@ -319,12 +413,40 @@ fn typography_theme(
   }
 }
 
-impl From<FullTheme> for Theme {
-  #[inline]
-  fn from(value: FullTheme) -> Self { Theme::Full(value) }
-}
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::{reset_test_env, test_helper::*};
 
-impl From<InheritTheme> for Theme {
-  #[inline]
-  fn from(value: InheritTheme) -> Self { Theme::Inherit(value) }
+  #[test]
+  fn themes() {
+    reset_test_env!();
+
+    let (watcher, writer) = split_value(vec![]);
+
+    let w = fn_widget! {
+      let writer = writer.clone_writer();
+      let mut theme = Theme::default();
+      theme.palette.brightness = Brightness::Light;
+      theme.with_child(fn_widget! {
+        $writer.write().push(Palette::of(ctx!()).brightness);
+        let writer = writer.clone_writer();
+        Palette { brightness: Brightness::Dark, ..Default::default() }
+          .with_child(fn_widget!{
+            $writer.write().push(Palette::of(ctx!()).brightness);
+            let writer = writer.clone_writer();
+            Palette { brightness: Brightness::Light, ..Default::default() }
+              .with_child(fn_widget!{
+                $writer.write().push(Palette::of(ctx!()).brightness);
+                Void
+            })
+        })
+      })
+    };
+
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+
+    assert_eq!(*watcher.read(), [Brightness::Light, Brightness::Dark, Brightness::Light]);
+  }
 }

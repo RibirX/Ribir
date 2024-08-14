@@ -1,5 +1,3 @@
-use std::{cell::Cell, rc::Rc};
-
 use ribir::{
   core::{reset_test_env, test_helper::*},
   prelude::*,
@@ -7,91 +5,100 @@ use ribir::{
 use ribir_dev_helper::*;
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
-fn simplest_leaf_rdl() -> Widget<'static> {
+widget_layout_test!(
+  simplest_leaf_rdl,
   fn_widget! {
     rdl!{ SizedBox { size: Size::new(500.,500.) } }
-  }
-  .into_widget()
-}
-widget_layout_test!(simplest_leaf_rdl, width == 500., height == 500.,);
+  },
+  width == 500.,
+  height == 500.,
+);
 
-fn with_child_rdl() -> Widget<'static> {
+widget_layout_test!(
+  with_child_rdl,
   fn_widget! {
     rdl!{
       Row {
         rdl!{ SizedBox { size: Size::new(500.,500.)  } }
       }
     }
-  }
-  .into_widget()
-}
-widget_layout_test!(with_child_rdl, width == 500., height == 500.,);
+  },
+  width == 500.,
+  height == 500.,
+);
 
-fn with_builtin_child_rdl() -> Widget<'static> {
+widget_layout_test!(
+  with_builtin_child_rdl,
   fn_widget! {
     rdl!{ SizedBox {
       size: Size::new(500.,500.),
       margin: EdgeInsets::all(10.)
     }}
-  }
-  .into_widget()
-}
-widget_layout_test!(with_builtin_child_rdl, width == 520., height == 520.,);
+  },
+  width == 520.,
+  height == 520.,
+);
 
-fn rdl_with_child() -> Widget<'static> {
+widget_layout_test!(
+  rdl_with_child,
   fn_widget! {
     let single_p = rdl!{ SizedBox { size: Size::new(500.,500.)  }};
     rdl!{ $single_p { rdl!{ Void } } }
-  }
-  .into_widget()
-}
-widget_layout_test!(rdl_with_child, width == 500., height == 500.,);
+  },
+  width == 500.,
+  height == 500.,
+);
 
-fn single_rdl_has_builtin_with_child() -> Widget<'static> {
+widget_layout_test!(
+  single_rdl_has_builtin_with_child,
   fn_widget! {
     let single_p = rdl!{ SizedBox {
       size: Size::new(500.,500.),
       margin: EdgeInsets::all(10.)
     }};
     rdl!{ $single_p { rdl!{ Void } } }
-  }
-  .into_widget()
-}
-widget_layout_test!(single_rdl_has_builtin_with_child, width == 520., height == 520.,);
+  },
+  width == 520.,
+  height == 520.,
+);
 
-fn multi_child_rdl_has_builtin_with_child() -> Widget<'static> {
+widget_layout_test!(
+  multi_child_rdl_has_builtin_with_child,
   fn_widget! {
     let multi_p = rdl!{ Flex {
       margin: EdgeInsets::all(10.)
     } };
     rdl!{ $multi_p { rdl!{ Void } } }
-  }
-  .into_widget()
-}
-widget_layout_test!(multi_child_rdl_has_builtin_with_child, width == 20., height == 20.,);
+  },
+  width == 20.,
+  height == 20.,
+);
 
-fn compose_child_rdl_has_builtin_with_child() -> Widget<'static> {
+widget_layout_test!(
+  compose_child_rdl_has_builtin_with_child,
   fn_widget! {
     let multi_p = rdl!{ Row { margin: EdgeInsets::all(10.) }};
     rdl!{ $multi_p { rdl!{ Void {} }} }
-  }
-  .into_widget()
-}
-widget_layout_test!(compose_child_rdl_has_builtin_with_child, width == 20., height == 20.,);
+  },
+  width == 20.,
+  height == 20.,
+);
 
-fn access_rdl_widget() -> Widget<'static> {
+widget_layout_test!(
+  access_rdl_widget,
   fn_widget! {
     let b = rdl!{ SizedBox {size: Size::new(500.,500.)}};
     rdl!{ Row {
       rdl!{ SizedBox { size: $b.size } }
       rdl!{ b }
     }}
-  }
-  .into_widget()
-}
-widget_layout_test!(access_rdl_widget, width == 1000., height == 500.,);
+  },
+  width == 1000.,
+  height == 500.,
+);
 
-fn access_builtin_rdl_widget() -> Widget<'static> {
+widget_layout_test!(
+  access_builtin_rdl_widget,
   fn_widget! {
     let mut b = rdl!{ SizedBox {
       size: Size::new(100.,100.),
@@ -109,69 +116,81 @@ fn access_builtin_rdl_widget() -> Widget<'static> {
         rdl!{ b }
       }
     }
-  }
-  .into_widget()
-}
-widget_layout_test!(access_builtin_rdl_widget, width == 240., height == 120.,);
+  },
+  width == 240.,
+  height == 120.,
+);
 
-fn dollar_as_rdl_parent() -> Widget<'static> {
+widget_layout_test!(
+  dollar_as_rdl_parent,
   fn_widget! {
     let b = rdl!{SizedBox { size: Size::new(500.,500.) }};
     rdl!{ $b { rdl!{ Void {}} } }
-  }
-  .into_widget()
-}
-widget_layout_test!(dollar_as_rdl_parent, width == 500., height == 500.,);
+  },
+  width == 500.,
+  height == 500.,
+);
 
-fn dollar_as_middle_parent() -> Widget<'static> {
+widget_layout_test!(
+  dollar_as_middle_parent,
   fn_widget! {
     let b = rdl!{ SizedBox { size: Size::new(500.,500.) }};
     rdl!{ Row { rdl!{ $b { rdl!{ Void {} } } } } }
-  }
-  .into_widget()
-}
-widget_layout_test!(dollar_as_middle_parent, width == 500., height == 500.,);
+  },
+  width == 500.,
+  height == 500.,
+);
 
-fn pipe_as_field_value() -> Widget<'static> {
-  let size = Stateful::new(Size::zero());
-  let size2 = size.clone_watcher();
-  let w = fn_widget! {
-    rdl!{ SizedBox { size: pipe!(*$size2) }}
-  };
-  *size.write() = Size::new(100., 100.);
-  w.into_widget()
-}
-widget_layout_test!(pipe_as_field_value, width == 100., height == 100.,);
+widget_layout_test!(
+  pipe_as_field_value,
+  {
+    let (size, w_size) = split_value(Size::zero());
+    let w = fn_widget! {
+      rdl!{ SizedBox { size: pipe!(*$size) }}
+    };
+    *w_size.write() = Size::new(100., 100.);
+    w
+  },
+  width == 100.,
+  height == 100.,
+);
 
-fn pipe_as_builtin_field_value() -> Widget<'static> {
-  let margin = Stateful::new(EdgeInsets::all(0.));
-  let margin2 = margin.clone_watcher();
+widget_layout_test!(
+  pipe_as_builtin_field_value,
+  {
+    let (margin, w_margin) = split_value(EdgeInsets::all(0.));
+    let w = fn_widget! {
+      rdl!{ SizedBox {
+        size: Size::zero(),
+        margin: pipe!(*$margin)
+      }}
+    };
+    *w_margin.write() = EdgeInsets::all(50.);
 
-  let w = fn_widget! {
-    rdl!{ SizedBox {
-      size: Size::zero(),
-      margin: pipe!(*$margin2)
-    }}
-  };
-  *margin.write() = EdgeInsets::all(50.);
-  w.into_widget()
-}
-widget_layout_test!(pipe_as_builtin_field_value, width == 100., height == 100.,);
+    w
+  },
+  width == 100.,
+  height == 100.,
+);
 
-fn pipe_with_ctx() -> Widget<'static> {
-  let scale = Stateful::new(1.);
-  let scale2 = scale.clone_writer();
-  let w = fn_widget! {
-    rdl!{ SizedBox {
-      size: pipe!(IconSize::of(ctx!()).tiny * *$scale)
-    }}
-  };
-  *scale2.write() = 2.;
-  w.into_widget()
-}
-widget_layout_test!(pipe_with_ctx, width == 36., height == 36.,);
+widget_layout_test!(
+  pipe_with_ctx,
+  {
+    let (scale, w_scale) = split_value(1.);
+    let w = fn_widget! {
+      rdl!{ SizedBox {
+        size: pipe!(IconSize::of(ctx!()).tiny * *$scale)
+      }}
+    };
+    *w_scale.write() = 2.;
+    w
+  },
+  width == 36.,
+  height == 36.,
+);
 
-fn pipe_with_builtin_field() -> Widget<'static> {
+widget_layout_test!(
+  pipe_with_builtin_field,
   fn_widget! {
     let mut box1 = @SizedBox { size: Size::zero(), margin: EdgeInsets::all(1.) };
     let box2 = @SizedBox { size: $box1.size, margin: pipe!($box1.margin) };
@@ -179,21 +198,22 @@ fn pipe_with_builtin_field() -> Widget<'static> {
       @{ box1 }
       @{ box2 }
     }
-  }
-  .into_widget()
-}
-widget_layout_test!(pipe_with_builtin_field, width == 4., height == 2.,);
+  },
+  width == 4.,
+  height == 2.,
+);
 
-fn capture_closure_used_ctx() -> Widget<'static> {
+widget_layout_test!(
+  capture_closure_used_ctx,
   fn_widget! {
     let size_box = @SizedBox { size: ZERO_SIZE };
     @ $size_box {
       on_mounted: move |_| $size_box.write().size = IconSize::of(ctx!()).tiny
     }
-  }
-  .into_widget()
-}
-widget_layout_test!(capture_closure_used_ctx, width == 18., height == 18.,);
+  },
+  width == 18.,
+  height == 18.,
+);
 
 #[test]
 fn pipe_single_parent() {
@@ -284,11 +304,10 @@ fn pipe_as_child() {
 #[test]
 fn pipe_as_multi_child() {
   reset_test_env!();
+  let (cnt, w_cnt) = split_value(0);
 
-  let fix_box = SizedBox { size: Size::new(100., 100.) };
-  let cnt = Stateful::new(0);
-  let cnt2 = cnt.clone_writer();
   let w = fn_widget! {
+    let fix_box = SizedBox { size: Size::new(100., 100.) };
     let boxes = pipe! {
       (0..*$cnt).map(|_| fix_box.clone()).collect::<Vec<_>>()
     };
@@ -299,20 +318,22 @@ fn pipe_as_multi_child() {
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 0., height == 0., });
 
-  *cnt2.write() = 3;
+  *w_cnt.write() = 3;
   wnd.draw_frame();
   assert_layout_result_by_path!(wnd, { path = [0], width == 300., height == 100., });
 }
 
-fn at_in_widget_macro() -> Widget<'static> {
+widget_layout_test!(
+  at_in_widget_macro,
   fn_widget! {
     @SizedBox { size: Size::new(100., 100.) }
-  }
-  .into_widget()
-}
-widget_layout_test!(at_in_widget_macro, width == 100., height == 100.,);
+  },
+  width == 100.,
+  height == 100.,
+);
 
-fn at_as_variable_in_widget() -> Widget<'static> {
+widget_layout_test!(
+  at_as_variable_in_widget,
   fn_widget! {
     let size = Size::new(100., 100.);
     let row = @Row {};
@@ -322,12 +343,13 @@ fn at_as_variable_in_widget() -> Widget<'static> {
       // `rdl!` in @
       rdl!{ SizedBox { size } }
     }
-  }
-  .into_widget()
-}
-widget_layout_test!(at_as_variable_in_widget, width == 200., height == 100.,);
+  },
+  width == 200.,
+  height == 100.,
+);
 
-fn at_as_variable_in_rdl() -> Widget<'static> {
+widget_layout_test!(
+  at_as_variable_in_rdl,
   fn_widget! {
     let size = Size::new(100., 100.);
     let row = @Row {};
@@ -337,21 +359,22 @@ fn at_as_variable_in_rdl() -> Widget<'static> {
         @SizedBox { size }
       }
     }
-  }
-  .into_widget()
-}
-widget_layout_test!(at_as_variable_in_rdl, width == 200., height == 100.,);
+  },
+  width == 200.,
+  height == 100.,
+);
 
-fn access_builtin_field_by_dollar() -> Widget<'static> {
+widget_layout_test!(
+  access_builtin_field_by_dollar,
   fn_widget! {
     let size = Size::new(100., 100.);
     let mut box1 = @SizedBox { size, margin: EdgeInsets::all(10.) };
     let box2 = @SizedBox { size, margin: $box1.margin };
     @Row { @ { box1 } @{ box2 } }
-  }
-  .into_widget()
-}
-widget_layout_test!(access_builtin_field_by_dollar, width == 240., height == 120.,);
+  },
+  width == 240.,
+  height == 120.,
+);
 
 #[test]
 fn closure_in_fn_widget_capture() {
@@ -371,17 +394,18 @@ fn closure_in_fn_widget_capture() {
   assert_eq!(&**hi_res2.read(), "hi");
 }
 
-fn at_embed_in_expression() -> Widget<'static> {
+widget_layout_test!(
+  at_embed_in_expression,
   fn_widget! {
     @Row {
       @{ (0..3).map(|_| {
         @SizedBox { size: Size::new(100., 100.) }
       })}
     }
-  }
-  .into_widget()
-}
-widget_layout_test!(at_embed_in_expression, width == 300., height == 100.,);
+  },
+  width == 300.,
+  height == 100.,
+);
 
 #[test]
 fn declare_smoke() {
@@ -577,10 +601,11 @@ fn bind_fields() {
   assert_eq!(size, Size::new(8., 4.));
 }
 
-fn local_var_not_bind() -> Widget<'static> {
-  const EXPECT_SIZE: Size = Size::new(5., 5.);
-  const BE_CLIPPED_SIZE: Size = Size::new(500., 500.);
+const EXPECT_SIZE: Size = Size::new(5., 5.);
+const BE_CLIPPED_SIZE: Size = Size::new(500., 500.);
 
+widget_layout_test!(
+  local_var_not_bind,
   fn_widget! {
     let _size_box = @SizedBox { size: BE_CLIPPED_SIZE };
     @SizedBox {
@@ -591,11 +616,7 @@ fn local_var_not_bind() -> Widget<'static> {
       },
       @{ _size_box }
     }
-  }
-  .into_widget()
-}
-widget_layout_test!(
-  local_var_not_bind,
+  },
   { path = [0], width == 10., height == 10. ,}
   { path = [0, 0], width == 10., height == 10. ,}
 );
@@ -605,8 +626,7 @@ widget_layout_test!(
 fn builtin_ref() {
   reset_test_env!();
 
-  let icon_track = Rc::new(Cell::new(CursorIcon::default()));
-  let c_icon_track = icon_track.clone();
+  let (icon, w_icon) = split_value(CursorIcon::default());
 
   let w = fn_widget! {
     let mut tap_box = @SizedBox {
@@ -618,7 +638,7 @@ fn builtin_ref() {
       @$tap_box {
         on_tap: move |_| {
           $tap_box.write().cursor = CursorIcon::AllScroll;
-          c_icon_track.set($tap_box.cursor);
+          *$w_icon.write() = $tap_box.cursor;
         }
       }
     }
@@ -629,16 +649,16 @@ fn builtin_ref() {
 
   tap_at(&wnd, (1, 1));
   wnd.draw_frame();
-  assert_eq!(icon_track.get(), CursorIcon::AllScroll);
+  assert_eq!(*icon.read(), CursorIcon::AllScroll);
 }
 
 #[test]
 fn builtin_bind_to_self() {
   reset_test_env!();
 
-  let icon_track = Rc::new(Cell::new(CursorIcon::default()));
-  let c_icon_track = icon_track.clone();
+  let (icon, w_icon) = split_value(CursorIcon::default());
   let w = fn_widget! {
+    let w_icon = w_icon.clone_writer();
     let sized_box = @SizedBox { size: Size::new(5., 5.) };
     @$sized_box {
       cursor: pipe!{
@@ -647,7 +667,7 @@ fn builtin_bind_to_self() {
         } else {
           CursorIcon::Help
         };
-        c_icon_track.set(icon);
+        *w_icon.silent() = icon;
         icon
       },
       on_tap: move |_| $sized_box.write().size = Size::new(20.,20.),
@@ -658,7 +678,7 @@ fn builtin_bind_to_self() {
   wnd.draw_frame();
   tap_at(&wnd, (1, 1));
   wnd.draw_frame();
-  assert_eq!(icon_track.get(), CursorIcon::Help);
+  assert_eq!(*icon.read(), CursorIcon::Help);
 }
 
 fn tap_at(wnd: &TestWindow, pos: (i32, i32)) {
@@ -775,7 +795,8 @@ fn fix_subscribe_cancel_after_widget_drop() {
   assert_eq!(*notify_cnt.read(), 3);
 }
 
-fn fix_local_assign_tuple() -> Widget<'static> {
+widget_layout_test!(
+  fix_local_assign_tuple,
   fn_widget! {
     let _sized = @SizedBox { size: Size::new(1., 1.) };
     let sized_box2 = @SizedBox {
@@ -788,10 +809,9 @@ fn fix_local_assign_tuple() -> Widget<'static> {
       @ { _sized }
       @ { sized_box2 }
     }
-  }
-  .into_widget()
-}
-widget_layout_test!(fix_local_assign_tuple, rect == ribir_geom::rect(0., 0., 2., 1.),);
+  },
+  rect == ribir_geom::rect(0., 0., 2., 1.),
+);
 
 #[test]
 fn fix_silent_not_relayout_dyn_widget() {

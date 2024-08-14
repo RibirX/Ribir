@@ -1,6 +1,7 @@
 //! Data widget help attach data to a widget and get a new widget which behavior
 //! is same as origin widget.
 
+use smallvec::SmallVec;
 use widget_id::RenderQueryable;
 
 use crate::{prelude::*, render_helper::RenderProxy};
@@ -31,8 +32,6 @@ impl AnonymousAttacher {
 }
 
 impl RenderProxy for DataAttacher {
-  type R = dyn RenderQueryable;
-
   type Target<'r> = &'r dyn RenderQueryable
   where
     Self: 'r;
@@ -41,17 +40,25 @@ impl RenderProxy for DataAttacher {
 }
 
 impl Query for DataAttacher {
-  fn query_all(&self, type_id: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
-    let mut types = self.render.query_all(type_id);
-    types.extend(self.data.query_all(type_id));
-    types
+  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    self.render.query_all(type_id, out);
+    if let Some(h) = self.data.query(type_id) {
+      out.push(h)
+    }
   }
 
   fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
     self
-      .data
+      .render
       .query(type_id)
-      .or_else(|| self.render.query(type_id))
+      .or_else(|| self.data.query(type_id))
+  }
+
+  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
+    self
+      .render
+      .query_write(type_id)
+      .or_else(|| self.data.query_write(type_id))
   }
 
   fn queryable(&self) -> bool { true }
@@ -59,19 +66,19 @@ impl Query for DataAttacher {
 
 impl Query for AnonymousAttacher {
   #[inline]
-  fn query_all(&self, type_id: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
-    self.render.query_all(type_id)
+  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    self.render.query_all(type_id, out)
   }
 
   #[inline]
   fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.render.query(type_id) }
 
+  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> { self.render.query_write(type_id) }
+
   fn queryable(&self) -> bool { self.render.queryable() }
 }
 
 impl RenderProxy for AnonymousAttacher {
-  type R = dyn RenderQueryable;
-
   type Target<'r> = &'r dyn RenderQueryable
   where
     Self: 'r;

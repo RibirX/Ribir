@@ -300,7 +300,7 @@ impl std::ops::DerefMut for LayoutStore {
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::Cell, rc::Rc};
+  use std::cell::Cell;
 
   use ribir_dev_helper::*;
 
@@ -335,30 +335,34 @@ mod tests {
     // Can't use layout info of dirty widget to detect if the ancestors path have
     // in relayout list. Because new widget insert by `DynWidget` not have layout
     // info, but its parent have.
+
     let child_box = Stateful::new(MockBox { size: Size::zero() });
-    let root_layout_cnt = Stateful::new(0);
     let c_child_box = child_box.clone_writer();
-    let c_root_layout_cnt = root_layout_cnt.clone_reader();
+    let (layout_cnt, w_layout_cnt) = split_value(0);
+
     let w = fn_widget! {
+      let child_box = child_box.clone_writer();
       @MockMulti {
-        on_performed_layout: move |_| *$root_layout_cnt.write() += 1,
-        @ { pipe!($child_box.size.is_empty()).map(move|b| if b {
-            MockBox { size: Size::new(1., 1.) }.into_widget()
-          } else {
-            child_box.clone_writer().into_widget()
-          })
+        on_performed_layout: move |_| *$w_layout_cnt.write() += 1,
+        @ {
+          pipe!($child_box.size.is_empty())
+            .map(move|b| if b {
+                MockBox { size: Size::new(1., 1.) }.into_widget()
+              } else {
+                child_box.clone_writer().into_widget()
+            })
         }
       }
     };
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_eq!(*c_root_layout_cnt.read(), 1);
+    assert_eq!(*layout_cnt.read(), 1);
     {
       c_child_box.write().size = Size::new(2., 2.);
     }
     wnd.draw_frame();
-    assert_eq!(*c_root_layout_cnt.read(), 2);
+    assert_eq!(*layout_cnt.read(), 2);
   }
 
   #[test]
@@ -441,27 +445,24 @@ mod tests {
   fn relayout_from_parent() {
     reset_test_env!();
 
-    let trigger = Stateful::new(Size::zero());
-    let cnt = Rc::new(Cell::new(0));
-    let cnt2 = cnt.clone();
-    let size = trigger.clone_watcher();
+    let (cnt, w_cnt) = split_value(0);
+    let (size, w_size) = split_value(Size::zero());
     let w = fn_widget! {
       @MockBox {
         size: Size::new(50., 50.),
-        on_performed_layout: move |_| cnt2.set(cnt2.get() + 1),
+        on_performed_layout: move |_| *$w_cnt.write() += 1,
         @MockBox { size: pipe!(*$size) }
       }
     };
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_eq!(cnt.get(), 1);
+    assert_eq!(*cnt.read(), 1);
 
-    {
-      *trigger.write() = Size::new(10., 10.);
-    }
+    *w_size.write() = Size::new(10., 10.);
+
     wnd.draw_frame();
-    assert_eq!(cnt.get(), 2);
+    assert_eq!(*cnt.read(), 2);
   }
 
   #[test]
@@ -486,10 +487,9 @@ mod tests {
       fn paint(&self, _: &mut PaintingCtx) {}
     }
 
-    let pos = Rc::new(Cell::new(Point::zero()));
-    let pos2 = pos.clone();
-    let trigger = Stateful::new(Size::zero());
-    let size = trigger.clone_watcher();
+    let (pos, w_pos) = split_value(Point::zero());
+    let (size, w_size) = split_value(Size::zero());
+
     let w = fn_widget! {
       let w = @MockWidget {
         size: pipe!(*$size),
@@ -498,15 +498,15 @@ mod tests {
       @MockMulti {
         @MockBox{ size: Size::new(50., 50.) }
         @$w {
-          on_performed_layout: move |_| pos2.set($w.pos.get())
+          on_performed_layout: move |_| *$w_pos.write() = $w.pos.get()
         }
       }
     };
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
 
-    *trigger.write() = Size::new(1., 1.);
+    *w_size.write() = Size::new(1., 1.);
     wnd.draw_frame();
-    assert_eq!(pos.get(), Point::new(50., 0.));
+    assert_eq!(*pos.read(), Point::new(50., 0.));
   }
 }

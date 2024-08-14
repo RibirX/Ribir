@@ -2,6 +2,7 @@ use std::convert::Infallible;
 
 use indextree::{Node, NodeId};
 use rxrust::ops::box_it::CloneableBoxOp;
+use smallvec::smallvec;
 
 use super::*;
 use crate::{
@@ -258,23 +259,11 @@ impl WidgetId {
   pub(crate) fn query_all_iter<T: Any>(
     self, tree: &WidgetTree,
   ) -> impl DoubleEndedIterator<Item = QueryRef<T>> {
+    let mut out = smallvec![];
     self
       .assert_get(tree)
-      .query_all(TypeId::of::<T>())
-      .into_iter()
-      .filter_map(QueryHandle::into_ref)
-  }
-
-  #[allow(unused)]
-  /// Return a iterator of all mutable reference of type `T` in this node.
-  pub(crate) fn query_all_iter_write<T: Any>(
-    self, tree: &WidgetTree,
-  ) -> impl DoubleEndedIterator<Item = WriteRef<T>> {
-    self
-      .assert_get(tree)
-      .query_all(TypeId::of::<T>())
-      .into_iter()
-      .filter_map(QueryHandle::into_mut)
+      .query_all(TypeId::of::<T>(), &mut out);
+    out.into_iter().filter_map(QueryHandle::into_ref)
   }
 
   #[allow(unused)]
@@ -282,7 +271,7 @@ impl WidgetId {
   pub(crate) fn query_write<T: Any>(self, tree: &WidgetTree) -> Option<WriteRef<T>> {
     self
       .assert_get(tree)
-      .query(TypeId::of::<T>())
+      .query_write(TypeId::of::<T>())
       .and_then(QueryHandle::into_mut)
   }
 

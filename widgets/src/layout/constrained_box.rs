@@ -28,7 +28,8 @@ mod tests {
   use super::*;
   use crate::prelude::*;
 
-  fn outside_fixed_clamp() -> Widget<'static> {
+  widget_layout_test! (
+    outside_fixed_clamp,
     fn_widget! {
       @SizedBox {
         size: Size::new(50., 50.),
@@ -37,15 +38,12 @@ mod tests {
           @Void {}
         }
       }
-    }
-    .into_widget()
-  }
-  widget_layout_test! (
-    outside_fixed_clamp,
+    },
     {path =[0,0,0], width == 50., height == 50.,}
   );
 
-  fn expand_one_axis() -> Widget<'static> {
+  widget_layout_test!(
+    expand_one_axis,
     fn_widget! {
       @Container {
         size: Size::new(256., 50.),
@@ -56,15 +54,12 @@ mod tests {
           }
         }
       }
-    }
-    .into_widget()
-  }
-  widget_layout_test!(
-    expand_one_axis,
+    },
     { path = [0, 0], width==256., height == 20. ,}
   );
 
-  fn expand_both() -> Widget<'static> {
+  widget_layout_test!(
+    expand_both,
     fn_widget! {
       @Container {
         size: Size::new(256., 50.),
@@ -75,11 +70,7 @@ mod tests {
           }
         }
       }
-    }
-    .into_widget()
-  }
-  widget_layout_test!(
-    expand_both,
+    },
     { path = [0, 0], width == 256., height == 50.,}
   );
 }

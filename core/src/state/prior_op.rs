@@ -208,19 +208,14 @@ mod tests {
   use super::*;
   #[cfg(target_arch = "wasm32")]
   use crate::test_helper::wasm_bindgen_test;
-  use crate::{
-    prelude::Void,
-    reset_test_env,
-    state::{StateReader, StateWriter, Stateful},
-    test_helper::TestWindow,
-  };
+  use crate::{prelude::*, reset_test_env, test_helper::TestWindow};
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn prior_smoke() {
     reset_test_env!();
 
-    let mut wnd = TestWindow::new(Void);
+    let mut wnd = TestWindow::new(fn_widget!(Void));
     let wnd_id = wnd.id();
 
     let r = Stateful::new(Vec::new());
@@ -251,7 +246,7 @@ mod tests {
     reset_test_env!();
 
     let r = Stateful::new(Vec::new());
-    let mut wnd = TestWindow::new(Void);
+    let mut wnd = TestWindow::new(fn_widget!(Void));
     let wnd_id = wnd.id();
 
     let result = r.clone_writer();

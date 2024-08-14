@@ -41,19 +41,17 @@ impl KeyboardEvent {
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
 
   use winit::event::ElementState;
 
   use super::*;
-  use crate::test_helper::*;
+  use crate::{reset_test_env, test_helper::*};
 
   #[test]
   fn smoke() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
-    #[derive(Default)]
-    struct Keys(Rc<RefCell<Vec<String>>>);
+    struct Keys(Stateful<Vec<String>>);
 
     impl Compose for Keys {
       fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
@@ -61,21 +59,21 @@ mod tests {
           @MockBox {
             size: Size::zero(),
             on_key_down_capture: move |key| {
-              $this.0.borrow_mut().push(format!("key down capture {:?}", key.key));
+              $this.0.write().push(format!("key down capture {:?}", key.key));
             },
             on_key_up_capture: move |key| {
-              $this.0.borrow_mut().push(format!("key up capture {:?}", key.key));
+              $this.0.write().push(format!("key up capture {:?}", key.key));
             },
             @MockBox {
               size: Size::zero(),
               auto_focus: true,
               on_key_down: move |key| {
                 $this.0
-                  .borrow_mut()
+                  .write()
                   .push(format!("key down {:?}", key.key));
               },
               on_key_up: move |key| {
-                $this.0.borrow_mut().push(format!("key up {:?}", key.key));
+                $this.0.write().push(format!("key up {:?}", key.key));
               }
             }
           }
@@ -84,10 +82,12 @@ mod tests {
       }
     }
 
-    let w = Keys::default();
-    let keys = w.0.clone();
+    let keys = Stateful::new(vec![]);
+    let k2 = keys.clone_reader();
 
-    let mut wnd = TestWindow::new(fn_widget!(w));
+    let mut wnd = TestWindow::new(fn_widget! {
+      Keys(keys.clone_writer())
+    });
     wnd.draw_frame();
 
     wnd.processes_keyboard_event(
@@ -124,7 +124,7 @@ mod tests {
 
     wnd.run_frame_tasks();
     assert_eq!(
-      &*keys.borrow(),
+      &*k2.read(),
       &[
         "key down capture Character(\"0\")",
         "key down Character(\"0\")",

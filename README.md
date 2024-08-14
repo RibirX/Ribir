@@ -70,7 +70,7 @@ fn main() {
 use ribir::prelude::*;
 
 fn main() {
-  let counter = |ctx: &BuildCtx| {
+  let counter = |ctx: &mut BuildCtx| {
     let cnt = Stateful::new(0);
 
     let c_cnt = cnt.clone_writer();
@@ -106,8 +106,7 @@ More [Examples]
 - **Non-intrusive state** converts your data to a listenable state and updates the view according to the change of the state.
 - **Layout system** learning and inspired by [Flutter] Sublinear layout, but not the same.
 - **Event system** is a composition event system, that supports event bubbling and capture. Allow to compose with any widget, and exists only if you use it.
-- **Theme system** supports full and inherit/partial themes, so you can use it to override or dynamically switch the theme of the subtree. Include palette, icons, animate transitions, the decoration widget of the widget, etc. In a very rough state and the API will be redesigned soon.
-- **Animations** based on the state but no side effect, it's almost stable in concept, but not many predefined animations yet.
+- **Theme System**: Supports using different themes for various parts of the sub-tree and enables theme modifications at runtime.
 - **Painter** converts the view to 2D paths.
 - **GPU render** is a backend of the **Painter**, do path tessellation so that you can easily render the triangles in any GPU render engine. A [wgpu] implementation is provided as the default GPU render engine. Tessellation base on [lyon].
 - **Text** support basic text typography and IME input, in a usable but rough stage.

@@ -76,6 +76,21 @@ impl IconTheme {
     Self { icon_size, svgs: icons }
   }
 
+  /// Retrieve the nearest `IconTheme` from the context among its ancestors
+  #[inline]
+  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Self> {
+    // At least one application theme exists
+    Provider::of::<Self>(ctx).unwrap()
+  }
+
+  /// Retrieve the nearest `IconTheme` from the context among its ancestors and
+  /// return a write reference to the theme.
+  #[inline]
+  pub fn write_of(ctx: &impl ProviderCtx) -> WriteRef<Self> {
+    // At least one application theme exists
+    Provider::write_of::<Self>(ctx).unwrap()
+  }
+
   #[inline]
   pub fn set_svg(&mut self, name: NamedSvg, icon: Resource<Svg>) -> Option<Resource<Svg>> {
     self.svgs.insert(name, icon)
@@ -86,14 +101,8 @@ impl IconTheme {
 }
 
 impl IconSize {
-  #[inline]
-  pub fn of(ctx: &BuildCtx) -> &Self {
-    ctx
-      .find_cfg(|t| match t {
-        Theme::Full(t) => Some(&t.icon_theme.icon_size),
-        Theme::Inherit(i) => i.icon_size.as_ref(),
-      })
-      .unwrap()
+  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Self> {
+    QueryRef::map(IconTheme::of(ctx), |i| &i.icon_size)
   }
 }
 
@@ -102,33 +111,17 @@ impl NamedSvg {
 
   /// get the svg icon of the ident from the context if it have otherwise return
   /// a default icon.
-  pub fn of_or_miss(self, ctx: &BuildCtx) -> Resource<Svg> {
-    ctx
-      .find_cfg(|t| match t {
-        Theme::Full(t) => t.icon_theme.svgs.get(&self).or_else(|| {
-          log::info!("Icon({:?})  not init in theme.", self);
-          Some(t.icon_theme.svgs.get(&MISS_ICON).unwrap())
-        }),
-        Theme::Inherit(i) => i
-          .icons
-          .as_ref()
-          .and_then(|icons| icons.get(&self)),
-      })
-      .unwrap()
-      .clone()
+  pub fn of_or_miss(self, ctx: &impl ProviderCtx) -> Resource<Svg> {
+    NamedSvg::of(self, ctx)
+      .or_else(|| MISS_ICON.of(ctx))
+      .expect("Neither Icon({:?}) nor 'MISS_ICON' are initialized in all `IconTheme` instances.")
   }
 
   /// get the svg icon of the ident from the context if it have.
-  pub fn of(self, ctx: &BuildCtx) -> Option<Resource<Svg>> {
+  pub fn of(self, ctx: &impl ProviderCtx) -> Option<Resource<Svg>> {
     ctx
-      .find_cfg(|t| match t {
-        Theme::Full(t) => t.icon_theme.svgs.get(&self),
-        Theme::Inherit(i) => i
-          .icons
-          .as_ref()
-          .and_then(|icons| icons.get(&self)),
-      })
-      .cloned()
+      .all_providers::<IconTheme>()
+      .find_map(|t| t.svgs.get(&self).cloned())
   }
 }
 
