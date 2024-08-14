@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.5] - 2024-08-14
+
 ### Features
 
 - **core**: `PartData<T>` now supports `T: ?Sized`, allowing us to separate trait objects from `State`.(#614 @M-Adoo)
@@ -291,7 +293,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.4...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.5...HEAD
+[0.4.0-alpha.5]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.4...ribir-v0.4.0-alpha.5
 [0.4.0-alpha.4]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.3...ribir-v0.4.0-alpha.4
 [0.4.0-alpha.3]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.2...ribir-v0.4.0-alpha.3
 [0.4.0-alpha.2]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.1...ribir-v0.4.0-alpha.2
