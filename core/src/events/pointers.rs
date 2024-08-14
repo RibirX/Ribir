@@ -77,18 +77,13 @@ pub enum PointerType {
 impl_common_event_deref!(PointerEvent);
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
 
   use winit::{
     dpi::LogicalPosition,
     event::{DeviceId, ElementState, MouseButton, WindowEvent},
   };
 
-  use crate::{
-    prelude::*,
-    reset_test_env,
-    test_helper::{MockBox, MockMulti, TestWindow},
-  };
+  use crate::{prelude::*, reset_test_env, test_helper::*};
 
   fn tap_on(wnd: &Window, x: f32, y: f32) {
     let device_id = unsafe { DeviceId::dummy() };
@@ -108,25 +103,22 @@ mod tests {
   fn tap_focus() {
     reset_test_env!();
 
-    let tap_cnt = Rc::new(RefCell::new(0));
-    let is_focused = Rc::new(RefCell::new(false));
+    let (tap, w_tap) = split_value(0);
+    let (focused, w_focused) = split_value(false);
 
-    let tap_cnt1 = tap_cnt.clone();
-    let tap_cnt2 = tap_cnt.clone();
-    let is_focused2 = is_focused.clone();
     let w = fn_widget! {
       let mut host = @MockMulti {};
       watch!($host.has_focus())
-        .subscribe(move |v| *is_focused2.borrow_mut() = v);
+        .subscribe(move |v| *$w_focused.write() = v);
 
       @$host {
         @MockBox {
           size: Size::new(50., 50.,),
-          on_tap: move |_| *tap_cnt1.borrow_mut() += 1,
+          on_tap: move |_| *$w_tap.write() += 1,
         }
         @MockBox {
           size: Size::new(50., 50.,),
-          on_tap: move |_| *tap_cnt2.borrow_mut() += 1,
+          on_tap: move |_| *$w_tap.write() += 1,
           on_key_down: move |_| println!("dummy code"),
         }
       }
@@ -136,12 +128,12 @@ mod tests {
 
     tap_on(&wnd, 25., 25.);
     wnd.draw_frame();
-    assert_eq!(*tap_cnt.borrow(), 1);
-    assert!(!*is_focused.borrow());
+    assert_eq!(*tap.read(), 1);
+    assert!(!*focused.read());
 
     tap_on(&wnd, 75., 25.);
     wnd.draw_frame();
-    assert_eq!(*tap_cnt.borrow(), 2);
-    assert!(*is_focused.borrow());
+    assert_eq!(*tap.read(), 2);
+    assert!(*focused.read());
   }
 }

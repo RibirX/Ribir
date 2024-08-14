@@ -206,10 +206,39 @@ impl BorrowRef<'_> {
 
 impl<'a, V: ?Sized> ReadRef<'a, V> {
   /// Make a new `ReadRef` by mapping the value of the current `ReadRef`.
-  pub fn map<U: ?Sized>(
-    mut r: ReadRef<'a, V>, f: impl FnOnce(&V) -> PartData<U>,
-  ) -> ReadRef<'a, U> {
-    ReadRef { inner: f(&mut r.inner), borrow: r.borrow }
+  pub fn map<U: ?Sized>(r: ReadRef<'a, V>, f: impl FnOnce(&V) -> PartData<U>) -> ReadRef<'a, U> {
+    ReadRef { inner: f(&r.inner), borrow: r.borrow }
+  }
+
+  /// Makes a new `WriteRef` for an optional component of the borrowed data. The
+  /// original guard is returned as an `Err(..)` if the closure returns
+  /// `None`.
+  ///
+  /// This is an associated function that needs to be used as
+  /// `WriteRef::filter_map(...)`. A method would interfere with methods of the
+  /// same name on `T` used through `Deref`.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let c = Stateful::new(vec![1, 2, 3]);
+  /// let b1: ReadRef<'_, Vec<u32>> = c.read();
+  /// let b2: Result<ReadRef<'_, u32>, _> =
+  ///   ReadRef::filter_map(b1, |v| v.get(1).map(PartData::from_ref));
+  /// assert_eq!(*b2.unwrap(), 2);
+  /// ```
+  pub fn filter_map<U: ?Sized, M>(
+    mut orig: ReadRef<'a, V>, part_map: M,
+  ) -> std::result::Result<ReadRef<'a, U>, Self>
+  where
+    M: Fn(&mut V) -> Option<PartData<U>>,
+  {
+    match part_map(&mut orig.inner) {
+      Some(inner) => Ok(ReadRef { inner, borrow: orig.borrow }),
+      None => Err(orig),
+    }
   }
 
   /// Split the current `ReadRef` into two `ReadRef`s by mapping the value to

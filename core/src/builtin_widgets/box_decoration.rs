@@ -196,7 +196,9 @@ mod tests {
   }
 
   const SIZE: Size = Size::new(100., 100.);
-  fn with_border() -> impl IntoWidget<'static, FN> {
+
+  widget_layout_test!(
+    with_border,
     fn_widget! {
       @MockBox {
         size: SIZE,
@@ -207,10 +209,7 @@ mod tests {
           bottom: BorderSide::new(4., Color::BLACK.into()),
         },
       }
-    }
-  }
-  widget_layout_test!(
-    with_border,
+    },
     { path = [0],  width == 100., height == 100., }
     { path = [0, 0], rect == ribir_geom::rect(0., 0., 100., 100.), }
   );

@@ -1,5 +1,7 @@
 use std::{cell::RefCell, mem::replace, rc::Rc};
 
+use ribir_algo::Sc;
+
 use crate::prelude::*;
 
 #[derive(Clone)]
@@ -18,7 +20,7 @@ bitflags! {
 }
 
 impl CustomStyle for OverlayStyle {
-  fn default_style(_: &BuildCtx) -> Self {
+  fn default_style(_: &impl ProviderCtx) -> Self {
     Self {
       close_policy: ClosePolicy::ESC | ClosePolicy::TAP_OUTSIDE,
       mask_brush: Some(Color::from_f32_rgba(0.3, 0.3, 0.3, 0.3).into()),
@@ -40,8 +42,13 @@ struct OverlayData {
   state: OverlayState,
 }
 
+// Todo:
+// 1. The overlay should be regenerated if the window theme changes.
+// 2. We don't need to use `new_with_handle`; we can utilize the provider to
+//    query the overlay to which the current widget belongs.
+
 #[derive(Clone)]
-pub struct Overlay(Rc<RefCell<OverlayData>>);
+pub struct Overlay(Sc<RefCell<OverlayData>>);
 
 impl Overlay {
   /// Create overlay from Clone able widget.
@@ -126,8 +133,10 @@ impl Overlay {
   /// widget. if the overlay is showing, nothing will happen.
   ///
   /// ### Example
+  ///
   /// Overlay widget which auto align horizontal position to the src button even
   /// when window's size changed
+  ///
   /// ``` no_run
   /// use ribir::prelude::*;
   /// let w = fn_widget! {
@@ -200,7 +209,7 @@ impl Overlay {
   pub fn close(&self) { self.0.borrow().state.close() }
 
   fn inner_new(builder: Builder) -> Self {
-    Self(Rc::new(RefCell::new(OverlayData {
+    Self(Sc::new(RefCell::new(OverlayData {
       builder,
       style: None,
       state: OverlayState::default(),
@@ -247,8 +256,8 @@ impl OverlayState {
         (instant, OverlayInnerState::ToShow(crate_at, wnd)) if &instant == crate_at => wnd.clone(),
         _ => return,
       };
-      let mut build_ctx = BuildCtx::new(wnd.tree().root(), wnd.tree);
-      let style = style.unwrap_or_else(|| OverlayStyle::of(&build_ctx));
+      let mut build_ctx = BuildCtx::create(wnd.tree().root(), wnd.tree);
+      let style = style.unwrap_or_else(|| OverlayStyle::of(build_ctx.deref()));
       let wid = this
         .wrap_style(w, style)
         .into_widget()

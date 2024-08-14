@@ -69,7 +69,8 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  fn smoke() -> impl IntoWidget<'static, FN> {
+  widget_layout_test!(
+    smoke,
     fn_widget! {
       @MockMulti {
         padding: EdgeInsets::only_left(1.),
@@ -77,10 +78,7 @@ mod tests {
            size: Size::new(100., 100.),
         }
       }
-    }
-  }
-  widget_layout_test!(
-    smoke,
+    },
     // padding widget
     { path = [0], width == 101., height == 100.,}
     // MockMulti widget

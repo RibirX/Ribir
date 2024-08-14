@@ -177,7 +177,9 @@ mod tests {
   use crate::test_helper::*;
 
   const WND_SIZE: Size = Size::new(100., 100.);
-  fn global_anchor() -> impl IntoWidget<'static, FN> {
+
+  widget_layout_test!(
+    global_anchor,
     fn_widget! {
       let parent = @MockBox {
         anchor: Anchor::left_top(10., 10.),
@@ -202,11 +204,7 @@ mod tests {
           @ { bottom_right }
         }
       }
-    }
-  }
-
-  widget_layout_test!(
-    global_anchor,
+    },
     wnd_size = WND_SIZE,
     { path = [0, 0, 0, 0, 0], x == 20.,}
     { path = [0, 0, 0, 0, 0], y == 10.,}

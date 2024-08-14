@@ -16,7 +16,7 @@ impl Dispatcher {
     Self { wnd: Weak::new(), info: <_>::default(), entered_widgets: vec![], pointer_down_uid: None }
   }
 
-  pub fn init(&mut self, wnd: Weak<Window>) { self.wnd = wnd; }
+  pub fn init(&mut self, wnd: &Rc<Window>) { self.wnd = Rc::downgrade(wnd); }
 
   pub fn window(&self) -> Rc<Window> {
     self
@@ -261,7 +261,6 @@ impl DispatchInfo {
 
 #[cfg(test)]
 mod tests {
-  use std::cell::RefCell;
 
   use super::*;
   use crate::{reset_test_env, test_helper::*};
@@ -271,36 +270,42 @@ mod tests {
     btns: MouseButtons,
   }
 
-  fn record_pointer<'w>(
-    event_stack: Rc<RefCell<Vec<Info>>>, widget: impl IntoWidgetStrict<'w, FN>,
-  ) -> impl IntoWidgetStrict<'w, FN> {
-    let handler_ctor = move || {
-      let stack = event_stack.clone();
+  impl Info {
+    fn new(e: &PointerEvent) -> Self { Info { pos: e.position(), btns: e.mouse_buttons() } }
+  }
 
-      move |e: &mut PointerEvent| {
-        stack
-          .borrow_mut()
-          .push(Info { pos: e.position(), btns: e.mouse_buttons() })
+  fn record_pointer() -> (GenWidget, Stateful<Vec<Info>>) {
+    let events = Stateful::new(vec![]);
+    let e2 = events.clone_writer();
+
+    let w = fn_widget! {
+      @MockBox {
+        size: Size::new(100., 30.),
+        on_pointer_down : move |e| $events.write().push(Info::new(e)),
+        on_pointer_move: move |e| $events.write().push(Info::new(e)),
+        on_pointer_up: move |e| $events.write().push(Info::new(e)),
+        on_pointer_cancel: move |e| $events.write().push(Info::new(e)),
       }
     };
-    fn_widget! {
-      @$widget {
-        on_pointer_down : handler_ctor(),
-        on_pointer_move: handler_ctor(),
-        on_pointer_up: handler_ctor(),
-        on_pointer_cancel: handler_ctor(),
-      }
-    }
+    (w.into(), e2)
   }
 
   #[test]
   fn mouse_pointer_bubble() {
     reset_test_env!();
 
-    let event_record = Rc::new(RefCell::new(vec![]));
-    let record =
-      record_pointer(event_record.clone(), fn_widget!(MockBox { size: Size::new(100., 30.) }));
-    let root = record_pointer(event_record.clone(), fn_widget! { @MockMulti { @ { record } } });
+    let (gen, records) = record_pointer();
+    let events = records.clone_writer();
+    let root = fn_widget! {
+      @MockMulti {
+        on_pointer_down : move |e| $events.write().push(Info::new(e)),
+        on_pointer_move: move |e| $events.write().push(Info::new(e)),
+        on_pointer_up: move |e| $events.write().push(Info::new(e)),
+        on_pointer_cancel: move |e| $events.write().push(Info::new(e)),
+        @ { gen.gen_widget() }
+      }
+    };
+
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
@@ -308,17 +313,16 @@ mod tests {
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (1., 1.).into() });
     wnd.run_frame_tasks();
-    {
-      let mut records = event_record.borrow_mut();
-      assert_eq!(records.len(), 2);
-      assert_eq!(records[0].btns.bits().count_ones(), 0);
-      records.clear();
-    }
+
+    assert_eq!(records.read().len(), 2);
+    assert_eq!(records.read()[0].btns.bits().count_ones(), 0);
+    records.write().clear();
+
     wnd.run_frame_tasks();
 
     wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
     wnd.run_frame_tasks();
-    let mut records = event_record.borrow_mut();
+    let mut records = records.write();
     assert_eq!(records[0].btns.bits().count_ones(), 1);
     assert_eq!(records[0].pos, (1., 1.).into());
     records.clear();
@@ -328,9 +332,7 @@ mod tests {
   fn mouse_buttons() {
     reset_test_env!();
 
-    let event_record = Rc::new(RefCell::new(vec![]));
-    let root =
-      record_pointer(event_record.clone(), fn_widget! { @MockBox { size: Size::new(100., 30.) } });
+    let (root, records) = record_pointer();
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
@@ -351,7 +353,7 @@ mod tests {
 
     wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Right);
     wnd.run_frame_tasks();
-    let records = event_record.borrow();
+    let records = records.read();
     assert_eq!(records.len(), 3);
 
     assert_eq!(records[0].btns, MouseButtons::PRIMARY);
@@ -365,9 +367,7 @@ mod tests {
   fn different_device_mouse() {
     reset_test_env!();
 
-    let event_record = Rc::new(RefCell::new(vec![]));
-    let root =
-      record_pointer(event_record.clone(), fn_widget!(MockBox { size: Size::new(100., 30.) }));
+    let (root, record) = record_pointer();
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
@@ -375,7 +375,7 @@ mod tests {
 
     wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
     wnd.run_frame_tasks();
-    assert_eq!(event_record.borrow().len(), 1);
+    assert_eq!(record.read().len(), 1);
 
     // A mouse press/release emit during another mouse's press will be ignored.
     let device_id_2 = unsafe {
@@ -387,7 +387,7 @@ mod tests {
     wnd.process_mouse_input(device_id_2, ElementState::Pressed, MouseButton::Left);
     wnd.process_mouse_input(device_id_2, ElementState::Released, MouseButton::Left);
     wnd.run_frame_tasks();
-    assert_eq!(event_record.borrow().len(), 1);
+    assert_eq!(record.read().len(), 1);
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
@@ -396,85 +396,65 @@ mod tests {
     });
     wnd.run_frame_tasks();
     // but cursor move processed.
-    assert_eq!(event_record.borrow().len(), 2);
-    assert_eq!(event_record.borrow().len(), 2);
-    assert_eq!(event_record.borrow()[1].btns, MouseButtons::PRIMARY);
+    assert_eq!(record.read().len(), 2);
+    assert_eq!(record.read().len(), 2);
+    assert_eq!(record.read()[1].btns, MouseButtons::PRIMARY);
 
     wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
     wnd.run_frame_tasks();
-    assert_eq!(event_record.borrow().len(), 3);
+    assert_eq!(record.read().len(), 3);
   }
 
   #[test]
   fn cancel_bubble() {
     reset_test_env!();
-    #[derive(Default)]
-    struct EventRecord(Rc<RefCell<Vec<WidgetId>>>);
-    impl Compose for EventRecord {
-      fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-        fn_widget! {
-          @MockBox {
-            size: INFINITY_SIZE,
-            on_pointer_down: move |e| { $this.0.borrow_mut().push(e.current_target()); },
 
-            @MockBox {
-              size: Size::new(100., 30.),
-              on_pointer_down: move |e| {
-                $this.0.borrow_mut().push(e.current_target());
-                e.stop_propagation();
-              }
-            }
+    let (record, writer) = split_value(vec![]);
+    let w = fn_widget! {
+      @MockBox {
+        size: INFINITY_SIZE,
+        on_pointer_down: move |e| { $writer.write().push(e.current_target()); },
+
+        @MockBox {
+          size: Size::new(100., 30.),
+          on_pointer_down: move |e| {
+            $writer.write().push(e.current_target());
+            e.stop_propagation();
           }
         }
-        .into_widget()
       }
-    }
+    };
 
-    let root = EventRecord::default();
-    let event_record = root.0.clone();
-
-    let mut wnd = TestWindow::new_with_size(fn_widget!(root), Size::new(100., 100.));
+    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     wnd.process_mouse_input(unsafe { DeviceId::dummy() }, ElementState::Pressed, MouseButton::Left);
     wnd.run_frame_tasks();
-    assert_eq!(event_record.borrow().len(), 1);
+    assert_eq!(record.read().len(), 1);
   }
 
   #[test]
   fn enter_leave() {
     reset_test_env!();
 
-    #[derive(Default)]
-    struct EnterLeave {
-      enter: Rc<RefCell<Vec<i32>>>,
-      leave: Rc<RefCell<Vec<i32>>>,
-    }
+    let (enter, e_writer) = split_value(vec![]);
+    let (leave, l_writer) = split_value(vec![]);
 
-    impl Compose for EnterLeave {
-      fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-        fn_widget! {
-          @MockBox {
-            size: INFINITY_SIZE,
-            on_pointer_enter: move |_| { $this.enter.borrow_mut().push(2); },
-            on_pointer_leave: move |_| { $this.leave.borrow_mut().push(2); },
-            @MockBox {
-              margin: EdgeInsets::all(4.),
-              size: INFINITY_SIZE,
-              on_pointer_enter: move |_| { $this.enter.borrow_mut().push(1); },
-              on_pointer_leave: move |_| { $this.leave.borrow_mut().push(1); }
-            }
-          }
+    let w = fn_widget! {
+      @MockBox {
+        size: INFINITY_SIZE,
+        on_pointer_enter: move |_| { $e_writer.write().push(2); },
+        on_pointer_leave: move |_| { $l_writer.write().push(2); },
+        @MockBox {
+          margin: EdgeInsets::all(4.),
+          size: INFINITY_SIZE,
+          on_pointer_enter: move |_| { $e_writer.write().push(1); },
+          on_pointer_leave: move |_| { $l_writer.write().push(1); }
         }
-        .into_widget()
       }
-    }
+    };
 
-    let w = EnterLeave::default();
-    let enter_event = w.enter.clone();
-    let leave_event = w.leave.clone();
-
-    let mut wnd = TestWindow::new_with_size(fn_widget!(w), Size::new(100., 100.));
+    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     let device_id = unsafe { DeviceId::dummy() };
@@ -482,36 +462,35 @@ mod tests {
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (10, 10).into() });
     wnd.run_frame_tasks();
-    assert_eq!(&*enter_event.borrow(), &[2, 1]);
+    assert_eq!(&*enter.read(), &[2, 1]);
 
     // leave to parent
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (99, 99).into() });
     wnd.run_frame_tasks();
-    assert_eq!(&*leave_event.borrow(), &[1]);
+    assert_eq!(&*leave.read(), &[1]);
 
     // move in same widget,
     // check if duplicate event fired.
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (99, 99).into() });
     wnd.run_frame_tasks();
-    assert_eq!(&*enter_event.borrow(), &[2, 1]);
-    assert_eq!(&*leave_event.borrow(), &[1]);
+    assert_eq!(&*enter.read(), &[2, 1]);
+    assert_eq!(&*leave.read(), &[1]);
 
     // leave all
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (999, 999).into() });
     wnd.run_frame_tasks();
-    assert_eq!(&*leave_event.borrow(), &[1, 2]);
+    assert_eq!(&*leave.read(), &[1, 2]);
 
     // leave event trigger by window left.
-    leave_event.borrow_mut().clear();
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (10, 10).into() });
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorLeft { device_id });
     wnd.run_frame_tasks();
-    assert_eq!(&*leave_event.borrow(), &[1, 2]);
+    assert_eq!(&*leave.read(), &[1, 2, 1, 2]);
   }
 
   #[test]
@@ -652,8 +631,7 @@ mod tests {
   fn fix_hit_out_window() {
     reset_test_env!();
 
-    let w = MockBox { size: INFINITY_SIZE };
-    let mut wnd = TestWindow::new(fn_widget!(w));
+    let mut wnd = TestWindow::new(fn_widget!(MockBox { size: INFINITY_SIZE }));
     wnd.draw_frame();
     let mut dispatcher = wnd.dispatcher.borrow_mut();
     dispatcher.info.cursor_pos = Point::new(-1., -1.);
@@ -663,54 +641,47 @@ mod tests {
   }
 
   #[test]
-  fn hit_test_case() {
+  fn normal_mode_search() {
     reset_test_env!();
+    struct T {
+      pub wid1: Option<WidgetId>,
+      pub wid2: Option<WidgetId>,
+    }
+    let (data, writer) = split_value(T { wid1: None, wid2: None });
 
-    fn normal_mode_search() {
-      struct T {
-        pub wid1: Option<WidgetId>,
-        pub wid2: Option<WidgetId>,
-      }
-      let data = Rc::new(RefCell::new(T { wid1: None, wid2: None }));
-      let data1 = data.clone();
-      let data2 = data.clone();
-
-      let w = fn_widget! {
-        @MockBox {
-          size: Size::new(200., 200.),
-          @MockStack {
-            child_pos: vec![
-              Point::new(50., 50.),
-              Point::new(100., 100.),
-            ],
-            @MockBox {
-              on_mounted: move |ctx| {
-                data1.borrow_mut().wid1 = Some(ctx.id);
-              },
-              size: Size::new(100., 100.),
-            }
-            @MockBox {
-              on_mounted: move |ctx| {
-                data2.borrow_mut().wid2 = Some(ctx.id);
-              },
-              size: Size::new(50., 150.),
-            }
+    let w = fn_widget! {
+      @MockBox {
+        size: Size::new(200., 200.),
+        @MockStack {
+          child_pos: vec![
+            Point::new(50., 50.),
+            Point::new(100., 100.),
+          ],
+          @MockBox {
+            on_mounted: move |ctx| {
+              $writer.write().wid1 = Some(ctx.id);
+            },
+            size: Size::new(100., 100.),
+          }
+          @MockBox {
+            on_mounted: move |ctx| {
+              $writer.write().wid2 = Some(ctx.id);
+            },
+            size: Size::new(50., 150.),
           }
         }
-      };
+      }
+    };
 
-      let mut wnd = TestWindow::new_with_size(w, Size::new(500., 500.));
-      wnd.draw_frame();
-      let mut dispatcher = wnd.dispatcher.borrow_mut();
-      dispatcher.info.cursor_pos = Point::new(125., 125.);
-      let hit_2 = dispatcher.hit_widget();
-      assert_eq!(hit_2, data.borrow().wid2);
+    let mut wnd = TestWindow::new_with_size(w, Size::new(500., 500.));
+    wnd.draw_frame();
+    let mut dispatcher = wnd.dispatcher.borrow_mut();
+    dispatcher.info.cursor_pos = Point::new(125., 125.);
+    let hit_2 = dispatcher.hit_widget();
+    assert_eq!(hit_2, data.read().wid2);
 
-      dispatcher.info.cursor_pos = Point::new(80., 80.);
-      let hit_1 = dispatcher.hit_widget();
-      assert_eq!(hit_1, data.borrow().wid1);
-    }
-
-    normal_mode_search();
+    dispatcher.info.cursor_pos = Point::new(80., 80.);
+    let hit_1 = dispatcher.hit_widget();
+    assert_eq!(hit_1, data.read().wid1);
   }
 }

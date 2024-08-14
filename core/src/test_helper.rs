@@ -23,7 +23,7 @@ pub struct Frame {
   pub surface: Color,
 }
 
-pub fn split_value<T: 'static>(v: T) -> (Watcher<Reader<T>>, impl StateWriter<Value = T>) {
+pub fn split_value<T: 'static>(v: T) -> (Watcher<Reader<T>>, Stateful<T>) {
   let src = Stateful::new(v);
   (src.clone_watcher(), src.clone_writer())
 }
@@ -41,15 +41,15 @@ macro_rules! reset_test_env {
 
 impl TestWindow {
   /// Create a 1024x1024 window for test
-  pub fn new<'w, const M: usize>(root: impl IntoWidget<'w, M>) -> Self { Self::new_wnd(root, None) }
+  pub fn new(root: impl Into<GenWidget>) -> Self { Self::new_wnd(root, None) }
 
-  pub fn new_with_size<'w, const M: usize>(root: impl IntoWidget<'w, M>, size: Size) -> Self {
+  pub fn new_with_size(root: impl Into<GenWidget>, size: Size) -> Self {
     Self::new_wnd(root, Some(size))
   }
 
-  fn new_wnd<'w, const M: usize>(root: impl IntoWidget<'w, M>, size: Option<Size>) -> Self {
+  fn new_wnd(root: impl Into<GenWidget>, size: Option<Size>) -> Self {
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-    let wnd = AppCtx::new_window(Box::new(TestShellWindow::new(size)), root);
+    let wnd = AppCtx::new_window(Box::new(TestShellWindow::new(size)), root.into());
     wnd.run_frame_tasks();
     Self(wnd)
   }

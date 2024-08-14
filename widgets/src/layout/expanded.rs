@@ -41,9 +41,10 @@ mod tests {
   use super::*;
   use crate::prelude::*;
 
-  fn expand_child_size_zero() -> Widget<'static> {
-    let size = Size::new(100., 50.);
+  widget_layout_test!(
+    expand_child_size_zero,
     fn_widget! {
+      let size = Size::new(100., 50.);
       @Row {
         @Expanded {
           flex: 1.,
@@ -55,19 +56,16 @@ mod tests {
           @SizedBox { size: Size::new(0., 50.) }
         }
       }
-    }
-    .into_widget()
-  }
-  widget_layout_test!(
-    expand_child_size_zero,
+    },
     wnd_size = Size::new(500., 500.),
     { path = [0, 0], width == 400., height == 50.,}
     { path = [0, 2], width == 0., height == 50.,}
   );
 
-  fn one_line_expanded() -> Widget<'static> {
-    let size = Size::new(100., 50.);
+  widget_layout_test!(
+    one_line_expanded,
     fn_widget! {
+      let size = Size::new(100., 50.);
       @Row {
         @Expanded {
           flex: 1.,
@@ -80,11 +78,7 @@ mod tests {
           @SizedBox { size }
         }
       }
-    }
-    .into_widget()
-  }
-  widget_layout_test!(
-    one_line_expanded,
+    },
     wnd_size = Size::new(500., 500.),
     { path = [0], width == 500., height == 50.,}
     { path = [0, 0], width == 100., height == 50., }
@@ -93,9 +87,10 @@ mod tests {
     { path = [0, 3], rect == ribir_geom::rect(300., 0., 200., 50.),}
   );
 
-  fn wrap_expanded() -> Widget<'static> {
-    let size = Size::new(100., 50.);
+  widget_layout_test!(
+    wrap_expanded,
     fn_widget! {
+      let size = Size::new(100., 50.);
       @Row {
         wrap: true,
         @Expanded {
@@ -115,11 +110,7 @@ mod tests {
           @SizedBox { size, }
         }
       }
-    }
-    .into_widget()
-  }
-  widget_layout_test!(
-    wrap_expanded,
+    },
     wnd_size = Size::new(350., 500.),
     { path = [0], rect == ribir_geom::rect(0., 0., 350., 100.),}
     { path = [0, 0], rect == ribir_geom::rect(0., 0., 50., 50.),}

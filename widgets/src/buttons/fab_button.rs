@@ -14,7 +14,7 @@ pub struct FabButtonStyle {
 }
 
 impl CustomStyle for FabButtonStyle {
-  fn default_style(ctx: &BuildCtx) -> Self {
+  fn default_style(ctx: &impl ProviderCtx) -> Self {
     FabButtonStyle {
       height: 56.,
       icon_size: Size::splat(24.),

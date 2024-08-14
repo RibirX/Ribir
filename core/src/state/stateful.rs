@@ -305,7 +305,7 @@ mod tests {
     });
 
     let state = sized_box.clone_writer();
-    let mut wnd = TestWindow::new(fn_widget! {sized_box});
+    let mut wnd = TestWindow::new(fn_widget! { sized_box.clone_writer() });
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 0);
     assert!(!wnd.tree().is_dirty());

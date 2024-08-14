@@ -190,9 +190,11 @@ impl Window {
     self.update_painter_viewport();
     let draw = self.need_draw() && !self.size().is_empty();
     if draw {
-      let surface = match AppCtx::app_theme() {
-        Theme::Full(theme) => theme.palette.surface(),
-        Theme::Inherit(_) => unreachable!(),
+      let root = self.tree().root();
+
+      let surface = {
+        let ctx = BuildCtx::create(root, self.tree);
+        Palette::of(&*ctx).surface()
       };
       self.shell_wnd.borrow_mut().begin_frame(surface);
 
@@ -277,26 +279,13 @@ impl Window {
       delay_drop_widgets: <_>::default(),
     };
     let window = Rc::new(window);
-    window
-      .dispatcher
-      .borrow_mut()
-      .init(Rc::downgrade(&window));
-    window
-      .focus_mgr
-      .borrow_mut()
-      .init(Rc::downgrade(&window));
-    let tree = window.tree_mut();
-    tree.init(Rc::downgrade(&window));
+    window.dispatcher.borrow_mut().init(&window);
+    window.focus_mgr.borrow_mut().init(&window);
 
     window
   }
 
-  pub fn set_content_widget<'w, const M: usize>(&self, root: impl IntoWidget<'w, M>) -> &Self {
-    let mut build_ctx = BuildCtx::new(self.tree().root(), self.tree);
-    let root = root.into_widget().build(&mut build_ctx);
-    self.tree_mut().set_content(root);
-    self
-  }
+  pub fn init(self: &Rc<Window>, content: GenWidget) { self.tree_mut().init(self, content) }
 
   #[inline]
   pub fn id(&self) -> WindowId { self.shell_wnd.borrow().id() }

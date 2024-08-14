@@ -23,11 +23,14 @@ mod tests {
   use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
   use super::*;
-  use crate::test_helper::{MockBox, TestWindow};
+  use crate::{
+    reset_test_env,
+    test_helper::{MockBox, TestWindow},
+  };
 
   #[test]
   fn smoke() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let source_receive_for_bubble = Rc::new(RefCell::new((0., 0.)));
     let bubble_receive = source_receive_for_bubble.clone();
@@ -55,7 +58,8 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(widget, Size::new(100., 100.));
+    let mut wnd =
+      TestWindow::new_with_size(fn_widget! { widget.clone()(ctx!()) }, Size::new(100., 100.));
 
     wnd.draw_frame();
     let device_id = unsafe { DeviceId::dummy() };

@@ -15,7 +15,7 @@ pub struct OutlinedButtonStyle {
 }
 
 impl CustomStyle for OutlinedButtonStyle {
-  fn default_style(ctx: &BuildCtx) -> Self {
+  fn default_style(ctx: &impl ProviderCtx) -> Self {
     OutlinedButtonStyle {
       height: 40.,
       icon_size: Size::splat(18.),

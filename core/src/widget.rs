@@ -8,7 +8,7 @@ pub use std::{
 
 use ribir_algo::Sc;
 use smallvec::SmallVec;
-use widget_id::{new_node, RenderQueryable};
+use widget_id::RenderQueryable;
 
 pub(crate) use crate::widget_tree::*;
 use crate::{context::*, prelude::*, render_helper::PureRender};
@@ -199,20 +199,13 @@ impl<'w> Widget<'w> {
     })
   }
 
-  /// Build the root node of the widget only, and return its id
-  pub(crate) fn build_root(self, ctx: &mut BuildCtx) -> (WidgetId, Self) {
-    let mut id = None;
+  /// Build the root node of the widget only.
+  pub(crate) fn consume_root(self, ctx: &mut BuildCtx) -> Self {
     let node = self.into_node(ctx).wrap_root(|n| {
-      id = Some(n.alloc(ctx));
-      PureNode::LazyBuild(Box::new(move |_| id.unwrap()))
+      let id = n.alloc(ctx);
+      PureNode::LazyBuild(Box::new(move |_| id))
     });
 
-    (id.unwrap(), Widget(InnerWidget::Node(node)))
-  }
-
-  // fixme: Temporary solution for ThemeWidget
-  pub(crate) fn lazy_build(f: Box<dyn FnOnce(&mut BuildCtx) -> WidgetId + 'w>) -> Widget<'w> {
-    let node = Node::Leaf(PureNode::LazyBuild(f));
     Widget(InnerWidget::Node(node))
   }
 
@@ -247,7 +240,6 @@ impl<'w> Widget<'w> {
       } else if ctx.providers.last() != Some(&p) && p.queryable(ctx.tree()) {
         ctx.providers.push(p);
       }
-      ctx.startup = p;
       let c = child.into_node(ctx).build(&mut subtrees, ctx);
       p.append(c, ctx.tree_mut());
     }
@@ -327,14 +319,7 @@ impl<'w> Node<'w> {
 impl<'w> PureNode<'w> {
   fn alloc(self, ctx: &mut BuildCtx) -> WidgetId {
     match self {
-      PureNode::Render(r) => {
-        if let Some(id) = ctx.pre_alloc_id.take() {
-          let _ = std::mem::replace(id.get_node_mut(ctx.tree_mut()).unwrap(), r);
-          id
-        } else {
-          new_node(&mut ctx.tree_mut().arena, r)
-        }
-      }
+      PureNode::Render(r) => ctx.alloc(r),
       PureNode::LazyBuild(l) => l(ctx),
     }
   }

@@ -843,7 +843,7 @@ impl<T> FatObj<T> {
   ) -> Self {
     let builtin = get_builtin(&mut self);
     let (v, o) = init.declare_into().unzip();
-    set_value(&mut *builtin.write(), v);
+    set_value(&mut *builtin.silent(), v);
     if let Some(o) = o {
       let c_builtin = builtin.clone_writer();
       let u = o.subscribe(move |(_, v)| {

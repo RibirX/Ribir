@@ -185,7 +185,7 @@ impl App {
 /// Upon being dropped, it creates a new window with the `root` widget and
 /// then calls `App::exec`.
 pub struct AppRunGuard {
-  root: Option<Widget<'static>>,
+  root: Option<GenWidget>,
   wnd_attrs: Option<WindowAttributes>,
 }
 
@@ -194,9 +194,7 @@ impl App {
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run<const M: usize>(root: impl IntoWidget<'static, M>) -> AppRunGuard {
-    AppRunGuard::new(root.into_widget())
-  }
+  pub fn run(root: impl Into<GenWidget>) -> AppRunGuard { AppRunGuard::new(root.into()) }
 
   /// Get a event sender of the application event loop, you can use this to send
   /// event.
@@ -205,8 +203,8 @@ impl App {
   /// Creating a new window using the `root` widget and the specified canvas.
   /// Note: This is exclusive to the web platform.
   #[cfg(target_family = "wasm")]
-  pub async fn new_with_canvas<'w, const M: usize>(
-    root: impl IntoWidget<'w, M>, canvas: web_sys::HtmlCanvasElement, attrs: WindowAttributes,
+  pub async fn new_with_canvas(
+    root: GenWidget, canvas: web_sys::HtmlCanvasElement, attrs: WindowAttributes,
   ) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
@@ -218,9 +216,7 @@ impl App {
   }
 
   /// create a new window with the `root` widget
-  pub async fn new_window<'w, const M: usize>(
-    root: impl IntoWidget<'w, M>, attrs: WindowAttributes,
-  ) -> std::rc::Rc<Window> {
+  pub async fn new_window(root: GenWidget, attrs: WindowAttributes) -> std::rc::Rc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
       " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
@@ -318,14 +314,16 @@ impl App {
 }
 
 impl AppRunGuard {
-  fn new(root: Widget<'static>) -> Self {
+  fn new(root: GenWidget) -> Self {
     static ONCE: std::sync::Once = std::sync::Once::new();
     assert!(!ONCE.is_completed(), "App::run can only be called once.");
-    Self { root: Some(root.into_widget()), wnd_attrs: Some(Default::default()) }
+    ONCE.call_once(|| {});
+
+    Self { root: Some(root), wnd_attrs: Some(Default::default()) }
   }
 
   /// Set the application theme, this will apply to whole application.
-  pub fn with_app_theme(&mut self, theme: FullTheme) -> &mut Self {
+  pub fn with_app_theme(&mut self, theme: Theme) -> &mut Self {
     // Safety: AppRunGuard is only created once and should be always used
     // before the application startup.
     unsafe { AppCtx::set_app_theme(theme) }
@@ -580,7 +578,6 @@ impl Default for WindowAttributes {
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
 
   use ribir_core::{
     prelude::*,
@@ -589,36 +586,30 @@ mod tests {
   use winit::event::{Ime, WindowEvent};
 
   use super::App;
-  #[derive(Debug, Default)]
-  struct LogImeEvent {
-    log: Rc<RefCell<Vec<String>>>,
-  }
-  impl Compose for LogImeEvent {
-    fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
+
+  #[test]
+  fn ime_pre_edit() {
+    let log = Stateful::new(vec![]);
+    let log2 = log.clone_writer();
+
+    let mut wnd = TestWindow::new_with_size(
       fn_widget! {
         @MockBox {
           size: INFINITY_SIZE,
           auto_focus: true,
           on_ime_pre_edit: move |e| {
             match &e.pre_edit {
-              ImePreEdit::Begin => $this.log.borrow_mut().push("on_ime_pre_edit_begin".to_string()),
-              ImePreEdit::PreEdit { value, .. } => $this.log.borrow_mut().push(format!("on_ime_pre_edit_update {value}")),
-              ImePreEdit::End => $this.log.borrow_mut().push("on_ime_pre_edit_end".to_string()),
+              ImePreEdit::Begin => $log2.write().push("on_ime_pre_edit_begin".to_string()),
+              ImePreEdit::PreEdit { value, .. } => $log2.write().push(format!("on_ime_pre_edit_update {value}")),
+              ImePreEdit::End => $log2.write().push("on_ime_pre_edit_end".to_string()),
             }
           },
-          on_chars: move|e| $this.log.borrow_mut().push(format!("on_chars {}", e.chars)),
-          on_tap: move |_| $this.log.borrow_mut().push("on_tap".to_string()),
+          on_chars: move|e| $log2.write().push(format!("on_chars {}", e.chars)),
+          on_tap: move |_| $log2.write().push("on_tap".to_string()),
         }
-      }.into_widget()
-    }
-  }
-  #[test]
-  fn ime_pre_edit() {
-    let w = Stateful::new(LogImeEvent::default());
-    let log = w.read().log.clone();
-
-    let w = fn_widget! { w };
-    let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
+      },
+      Size::new(200., 200.),
+    );
 
     wnd.draw_frame();
 
@@ -627,16 +618,16 @@ mod tests {
     App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Disabled));
     wnd.draw_frame();
     assert_eq!(
-      &*log.borrow(),
+      &*log.read(),
       &["on_ime_pre_edit_begin", "on_ime_pre_edit_update hello", "on_ime_pre_edit_end"]
     );
 
-    log.borrow_mut().clear();
+    log.write().clear();
     App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)));
     App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Commit("hello".to_string())));
     wnd.draw_frame();
     assert_eq!(
-      &*log.borrow(),
+      &*log.read(),
       &[
         "on_ime_pre_edit_begin",
         "on_ime_pre_edit_update hello",
@@ -645,7 +636,7 @@ mod tests {
       ]
     );
 
-    log.borrow_mut().clear();
+    log.write().clear();
     App::dispatch_wnd_native_event(&wnd, WindowEvent::Ime(Ime::Preedit("hello".to_string(), None)));
     let device_id = unsafe { winit::event::DeviceId::dummy() };
     App::dispatch_wnd_native_event(
@@ -666,7 +657,7 @@ mod tests {
     );
     wnd.draw_frame();
     assert_eq!(
-      &*log.borrow(),
+      &*log.read(),
       &[
         "on_ime_pre_edit_begin",
         "on_ime_pre_edit_update hello",

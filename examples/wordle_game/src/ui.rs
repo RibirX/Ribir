@@ -2,7 +2,7 @@ use ribir::prelude::*;
 
 use crate::wordle::{CharHint, Wordle, WordleChar};
 
-pub fn wordle_game() -> Wordle { Wordle::new(5, 5) }
+pub fn wordle_game(_: &mut BuildCtx) -> Widget<'static> { Wordle::new(5, 5).into_widget() }
 
 trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
   fn chars_key<const N: usize>(

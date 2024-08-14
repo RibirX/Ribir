@@ -2,16 +2,12 @@ use ribir::core::timer::Timer;
 use rxrust::scheduler::NEW_TIMER_FN;
 
 mod test_single_thread {
-  use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-    thread::sleep,
-  };
+  use std::{cell::RefCell, rc::Rc, thread::sleep};
 
   use ribir_core::{
     prelude::*,
     reset_test_env,
-    test_helper::{MockBox, TestWindow},
+    test_helper::{split_value, MockBox, TestWindow},
   };
   use ribir_dev_helper::*;
   use winit::event::{DeviceId, ElementState, MouseButton};
@@ -46,14 +42,14 @@ mod test_single_thread {
     assert_layout_result_by_path!(wnd, {path = [0], width == 10., height == 10.,});
   }
 
-  fn env(times: usize) -> (TestWindow, Rc<Cell<usize>>) {
+  fn env(times: usize) -> (TestWindow, Watcher<Reader<i32>>) {
     let size = Size::new(400., 400.);
-    let count = Rc::new(Cell::new(0));
-    let c_count = count.clone();
+    let (count, w_count) = split_value(0);
+
     let w = fn_widget! {
       @MockBox {
         size,
-        on_x_times_tap: (times, move |_| c_count.set(c_count.get() + 1))
+        on_x_times_tap: (times, move |_| *$w_count.write() +=1 )
       }
     };
     let mut wnd = TestWindow::new_with_size(w, size);
@@ -94,7 +90,7 @@ mod test_single_thread {
       });
 
     run_until(&wnd, || *is_complete2.borrow());
-    assert_eq!(count.get(), 2);
+    assert_eq!(*count.read(), 2);
 
     let (wnd, count) = env(2);
     let c_wnd = wnd.clone();
@@ -115,7 +111,7 @@ mod test_single_thread {
       });
 
     run_until(&wnd, || *is_complete2.borrow());
-    assert_eq!(count.get(), 0);
+    assert_eq!(*count.read(), 0);
   }
 
   pub fn test_tripe_tap() {
@@ -141,7 +137,7 @@ mod test_single_thread {
 
     run_until(&wnd, || *is_complete2.borrow());
 
-    assert_eq!(count.get(), 2);
+    assert_eq!(*count.read(), 2);
   }
 }
 

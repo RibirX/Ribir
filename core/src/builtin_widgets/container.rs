@@ -31,8 +31,5 @@ mod tests {
   use crate::test_helper::*;
 
   const SIZE: Size = Size::new(100., 100.);
-  fn smoke() -> impl IntoWidget<'static, FN> {
-    fn_widget! { @Container { size: SIZE }}
-  }
-  widget_layout_test!(smoke, size == SIZE,);
+  widget_layout_test!(smoke, fn_widget! { @Container { size: SIZE }}, size == SIZE,);
 }

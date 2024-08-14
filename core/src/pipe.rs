@@ -96,36 +96,43 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     Self::Value: IntoWidget<'static, M>,
   {
     let f = move |ctx: &mut BuildCtx| {
-      let info = Sc::new(Cell::new(SinglePipeInfo { gen_id: ctx.tree().root(), multi_pos: 0 }));
+      let info = DynWidgetsInfo::new(GenRange::Single(ctx.tree().root()));
 
-      let priority = fn_priority(info.clone(), ctx.window().id());
+      let priority = UpdatePriority::new_with_wnd(info.clone(), ctx.window().id());
       let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
-      w.into_widget().on_build(|w, ctx| {
-        info.set(SinglePipeInfo { gen_id: w, multi_pos: 0 });
 
-        let pipe_node = PipeNode::share_capture(w, Box::new(info.clone()), ctx);
+      let provider = Box::new(Queryable(info.clone()));
+      let (w, _) = ctx.consume_root_with_provider(w.into_widget(), provider);
+
+      w.on_build(|w, ctx| {
+        info
+          .borrow_mut()
+          .set_gen_range(GenRange::Single(w));
+
+        let pipe_node = PipeNode::share_capture(w, info, ctx);
         let c_pipe_node = pipe_node.clone();
 
         let tree = ctx.tree;
         let u = modifies.subscribe(move |(_, w)| {
-          let id = info.host_id();
-          let mut ctx = BuildCtx::new(id, tree);
+          let info = pipe_node.dyn_info();
+          let old = info.borrow().host_id();
+          let mut ctx = BuildCtx::create(old, tree);
 
-          let new_id = w.into_widget().build(&mut ctx);
+          let old_node = pipe_node.remove_old_data();
+          let new = w.into_widget().build(&mut ctx);
           let tree = ctx.tree_mut();
+          pipe_node.transplant_to_new(old_node, new, tree);
 
-          query_info_outside_until(id, &info, tree, |info| info.single_replace(id, new_id));
+          query_outside_infos(new, &info, tree)
+            .for_each(|info| info.borrow_mut().single_replace(old, new));
 
-          pipe_node.primary_transplant(id, new_id, tree);
+          update_key_status_single(old, new, tree);
+          old.insert_after(new, tree);
+          old.dispose_subtree(tree);
+          new.on_mounted_subtree(tree);
 
-          update_key_status_single(id, new_id, tree);
-          id.insert_after(new_id, tree);
-          id.dispose_subtree(tree);
-          new_id.on_mounted_subtree(tree);
-
-          tree.mark_dirty(new_id);
+          tree.mark_dirty(new);
         });
-
         c_pipe_node.own_subscription(u, ctx);
       })
     };
@@ -137,8 +144,9 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     Self::Value: IntoIterator,
     <Self::Value as IntoIterator>::Item: IntoWidget<'static, M>,
   {
-    let info = Sc::new(RefCell::new(MultiPipeInfo { widgets: vec![], multi_pos: 0 }));
-    let priority = MultiUpdatePriority::new(info.clone());
+    let info = DynWidgetsInfo::new(GenRange::Multi(vec![]));
+
+    let priority = UpdatePriority::new(info.clone());
     let (m, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority.clone())));
     let mut iter = m.into_iter();
 
@@ -146,19 +154,34 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       .next()
       .map_or_else(|| Void.into_widget(), IntoWidget::into_widget);
 
+    let provider = Box::new(Queryable(info.clone()));
+    let first = fn_widget! {
+      let (w, _) = ctx!().consume_root_with_provider(first, provider);
+      w
+    };
+
     let info2 = info.clone();
-    let first = first.on_build(move |id, ctx| {
-      info2.borrow_mut().widgets.push(id);
+    let first = first.into_widget().on_build(move |id, ctx| {
+      match &mut info2.borrow_mut().gen_range {
+        GenRange::Multi(m) => m.push(id),
+        _ => unreachable!(),
+      };
+
       priority.set_wnd(ctx.window().id());
-      let pipe_node = PipeNode::share_capture(id, Box::new(info2.clone()), ctx);
+      let pipe_node = PipeNode::share_capture(id, info2, ctx);
       let c_pipe_node = pipe_node.clone();
 
       let tree = ctx.tree;
       let u = modifies.subscribe(move |(_, m)| {
-        let host_id = info2.host_id();
-        let mut ctx = BuildCtx::new(host_id, tree);
+        let info = pipe_node.dyn_info();
+        let old = match &info.borrow().gen_range {
+          GenRange::Multi(m) => m.clone(),
+          _ => unreachable!(),
+        };
 
-        let old = info2.borrow().widgets.clone();
+        let mut ctx = BuildCtx::create(old[0], tree);
+
+        let old_node = pipe_node.remove_old_data();
         let mut new = vec![];
         for (idx, w) in m.into_iter().enumerate() {
           let id = w.into_widget().build(&mut ctx);
@@ -170,8 +193,10 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         }
 
         let tree = ctx.tree_mut();
-        query_info_outside_until(old[0], &info2, tree, |info| info.multi_replace(&old, &new));
-        pipe_node.primary_transplant(old[0], new[0], tree);
+        pipe_node.transplant_to_new(old_node, new[0], tree);
+
+        query_outside_infos(new[0], &info, tree)
+          .for_each(|info| info.borrow_mut().multi_replace(&old, &new));
 
         update_key_state_multi(old.iter().copied(), new.iter().copied(), tree);
 
@@ -193,15 +218,17 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     for (idx, w) in iter.enumerate() {
       let info = info.clone();
       let w = w.into_widget().on_build(move |id, ctx| {
-        info.borrow_mut().widgets.push(id);
+        match &mut info.borrow_mut().gen_range {
+          GenRange::Multi(m) => m.push(id),
+          _ => unreachable!(),
+        };
 
         let tree = ctx.tree_mut();
         if set_pos_of_multi(id, idx + 1, tree) {
           // We need to associate the parent information with the children pipe so that
           // when the child pipe is regenerated, it can update the parent pipe information
           // accordingly.
-          let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
-          id.attach_data(Box::new(Queryable(info)), tree);
+          id.attach_data(Box::new(Queryable(info.clone())), tree);
         }
       });
 
@@ -218,43 +245,55 @@ pub(crate) trait InnerPipe: Pipe + Sized {
   {
     let f = move |ctx: &mut BuildCtx| {
       let root = ctx.tree().root();
-      let info = Sc::new(RefCell::new(SingleParentPipeInfo { range: root..=root, multi_pos: 0 }));
+      let info = DynWidgetsInfo::new(GenRange::ParentOnly(root..=root));
 
-      let priority = fn_priority(info.clone(), ctx.window().id());
-      let (v, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
+      let priority = UpdatePriority::new_with_wnd(info.clone(), ctx.window().id());
+      let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
 
-      v.into_widget().on_build(|p, ctx| {
-        let pipe_node = PipeNode::share_capture(p, Box::new(info.clone()), ctx);
+      let provider = Box::new(Queryable(info.clone()));
+      let (w, _) = ctx.consume_root_with_provider(w.into_widget(), provider);
+      w.on_build(|p, ctx| {
+        let pipe_node = PipeNode::share_capture(p, info.clone(), ctx);
         let tree = ctx.tree_mut();
         let leaf = p.single_leaf(tree);
-        info.borrow_mut().range = p..=leaf;
+        info
+          .borrow_mut()
+          .set_gen_range(GenRange::ParentOnly(p..=leaf));
 
         // We need to associate the parent information with the pipe of leaf widget,
         // when the leaf pipe is regenerated, it can update the parent pipe information
         // accordingly.
         if leaf.contain_type::<DynInfo>(tree) {
-          let info: Box<dyn DynWidgetInfo> = Box::new(info.clone());
           leaf.attach_data(Box::new(Queryable(info)), tree);
         };
 
         let c_pipe_node = pipe_node.clone();
         let tree = ctx.tree;
         let u = modifies.subscribe(move |(_, w)| {
-          let (top, bottom) = info.borrow().range.clone().into_inner();
-          let mut ctx = BuildCtx::new(top, tree);
+          let info = pipe_node.dyn_info();
+          let (top, bottom) = match &info.borrow().gen_range {
+            GenRange::ParentOnly(p) => p.clone().into_inner(),
+            _ => unreachable!(),
+          };
 
+          let mut ctx = BuildCtx::create(top, tree);
+
+          let old_node = pipe_node.remove_old_data();
           let p = w.into_widget().build(&mut ctx);
           let tree = ctx.tree_mut();
+          pipe_node.transplant_to_new(old_node, p, tree);
+
           let new_rg = p..=p.single_leaf(tree);
           let children: SmallVec<[WidgetId; 1]> = bottom.children(tree).collect();
           for c in children {
             new_rg.end().append(c, tree);
           }
 
-          query_info_outside_until(top, &info, tree, |info| {
-            info.single_range_replace(&(top..=bottom), &new_rg);
+          query_outside_infos(p, &info, tree).for_each(|info| {
+            info
+              .borrow_mut()
+              .single_range_replace(&(top..=bottom), &new_rg);
           });
-          pipe_node.primary_transplant(top, p, tree);
 
           update_key_status_single(top, p, tree);
           top.insert_after(p, tree);
@@ -576,154 +615,108 @@ struct PipeNode(Sc<UnsafeCell<InnerPipeNode>>);
 
 struct InnerPipeNode {
   data: Box<dyn RenderQueryable>,
-  dyn_info: Box<dyn DynWidgetInfo>,
-}
-trait DynWidgetInfo: Any {
-  fn single_replace(&self, old: WidgetId, new: WidgetId);
-  fn single_range_replace(&self, old: &RangeInclusive<WidgetId>, new: &RangeInclusive<WidgetId>);
-  fn multi_replace(&self, old: &[WidgetId], new: &[WidgetId]);
-  fn as_any(&self) -> &dyn Any;
-  fn host_id(&self) -> WidgetId;
-  // return the position of the pipe node if it generated by a multi pipe.
-  fn pos_of_multi(&self) -> usize;
-  fn set_pos_of_multi(&self, pos: usize);
+  dyn_info: DynInfo,
 }
 
-type DynInfo = Box<dyn DynWidgetInfo>;
-
-#[derive(Clone, Copy)]
-struct SinglePipeInfo {
-  gen_id: WidgetId,
+#[derive(Debug)]
+pub(crate) struct DynWidgetsInfo {
   multi_pos: usize,
+  gen_range: GenRange,
 }
 
-impl DynWidgetInfo for Sc<Cell<SinglePipeInfo>> {
-  fn single_replace(&self, old: WidgetId, new: WidgetId) {
-    let mut v = self.get();
-    assert_eq!(
-      v.gen_id, old,
-      "For single pipe node, the logic pipe child must be same `PipeNode`."
-    );
-    v.gen_id = new;
-    self.set(v);
-  }
+pub(crate) type DynInfo = Sc<RefCell<DynWidgetsInfo>>;
 
-  fn single_range_replace(&self, old: &RangeInclusive<WidgetId>, new: &RangeInclusive<WidgetId>) {
-    let mut v = self.get();
-    if *old.start() == v.gen_id {
-      v.gen_id = *new.start();
-      self.set(v)
-    }
-  }
-
-  fn multi_replace(&self, _: &[WidgetId], _: &[WidgetId]) {
-    unreachable!("Single pipe node never have multi pipe child.");
-  }
-
-  fn as_any(&self) -> &dyn Any { self }
-
-  fn host_id(&self) -> WidgetId { self.get().gen_id }
-
-  fn pos_of_multi(&self) -> usize { self.get().multi_pos }
-
-  fn set_pos_of_multi(&self, pos: usize) {
-    let mut v = self.get();
-    v.multi_pos = pos;
-    self.set(v);
-  }
+#[derive(Debug)]
+enum GenRange {
+  Single(WidgetId),
+  Multi(Vec<WidgetId>),
+  ParentOnly(RangeInclusive<WidgetId>),
 }
 
-#[derive(Clone)]
-struct SingleParentPipeInfo {
-  range: RangeInclusive<WidgetId>,
-  multi_pos: usize,
-}
-
-impl DynWidgetInfo for Sc<RefCell<SingleParentPipeInfo>> {
-  fn single_replace(&self, old: WidgetId, new: WidgetId) {
-    let mut v = self.borrow_mut();
-    if v.range.start() == &old {
-      v.range = new..=*v.range.end();
-    }
-    if v.range.end() == &old {
-      v.range = *v.range.start()..=new;
-    }
+impl DynWidgetsInfo {
+  fn new(range: GenRange) -> DynInfo {
+    Sc::new(RefCell::new(DynWidgetsInfo { gen_range: range, multi_pos: 0 }))
   }
 
-  fn single_range_replace(&self, old: &RangeInclusive<WidgetId>, new: &RangeInclusive<WidgetId>) {
-    let mut this = self.borrow_mut();
-    if this.range.start() == old.start() {
-      this.range = *new.start()..=*this.range.end();
-    }
-    if this.range.end() == old.end() {
-      this.range = *this.range.start()..=*new.end();
-    }
-  }
+  fn set_gen_range(&mut self, range: GenRange) { self.gen_range = range; }
 
-  fn multi_replace(&self, _: &[WidgetId], _: &[WidgetId]) {
-    unreachable!("Single parent node never have multi pipe child.");
-  }
-
-  fn as_any(&self) -> &dyn Any { self }
-
-  fn host_id(&self) -> WidgetId { *self.borrow().range.start() }
-
-  fn pos_of_multi(&self) -> usize { self.borrow().multi_pos }
-
-  fn set_pos_of_multi(&self, pos: usize) {
-    let mut v = self.borrow_mut();
-    v.multi_pos = pos;
-  }
-}
-
-struct MultiPipeInfo {
-  widgets: Vec<WidgetId>,
-  multi_pos: usize,
-}
-impl DynWidgetInfo for Sc<RefCell<MultiPipeInfo>> {
-  fn single_replace(&self, old: WidgetId, new: WidgetId) {
-    let mut this = self.borrow_mut();
-    if let Some(idx) = this.widgets.iter().position(|w| *w == old) {
-      this.widgets[idx] = new;
+  fn single_replace(&mut self, old: WidgetId, new: WidgetId) {
+    match &mut self.gen_range {
+      GenRange::Single(id) => {
+        assert_eq!(*id, old, "For single pipe node, the logic pipe child must be same `PipeNode`.");
+        *id = new;
+      }
+      GenRange::Multi(m) => {
+        if let Some(idx) = m.iter().position(|w| *w == old) {
+          m[idx] = new;
+        }
+      }
+      GenRange::ParentOnly(p) => {
+        if p.start() == &old {
+          *p = new..=*p.end();
+        }
+        if p.end() == &old {
+          *p = *p.start()..=new;
+        }
+      }
     }
   }
 
-  fn single_range_replace(&self, old: &RangeInclusive<WidgetId>, new: &RangeInclusive<WidgetId>) {
-    let mut this = self.borrow_mut();
-    let p = *old.start();
-    if let Some(idx) = this.widgets.iter().position(|w| *w == p) {
-      this.widgets[idx] = *new.start();
+  fn single_range_replace(
+    &mut self, old: &RangeInclusive<WidgetId>, new: &RangeInclusive<WidgetId>,
+  ) {
+    match &mut self.gen_range {
+      GenRange::Single(id) => *id = *new.start(),
+      GenRange::Multi(m) => {
+        let p = *old.start();
+        if let Some(idx) = m.iter().position(|w| *w == p) {
+          m[idx] = *new.start();
+        }
+      }
+      GenRange::ParentOnly(p) => {
+        if p.start() == old.start() {
+          *p = *new.start()..=*p.end();
+        }
+        if p.end() == old.end() {
+          *p = *p.start()..=*new.end();
+        }
+      }
     }
   }
 
-  fn multi_replace(&self, old: &[WidgetId], new: &[WidgetId]) {
-    let mut this = self.borrow_mut();
-    if let Some(from) = this.widgets.iter().position(|w| &old[0] == w) {
-      let to = this
-        .widgets
-        .iter()
-        .position(|w| &old[old.len() - 1] == w)
-        .expect("must include");
-      this
-        .widgets
-        .splice(from..=to, new.iter().copied());
+  fn multi_replace(&mut self, old: &[WidgetId], new: &[WidgetId]) {
+    match &mut self.gen_range {
+      GenRange::Single(_) => unreachable!("Single pipe node never have multi pipe child."),
+      GenRange::Multi(m) => {
+        if let Some(from) = m.iter().position(|w| &old[0] == w) {
+          let to = m
+            .iter()
+            .position(|w| &old[old.len() - 1] == w)
+            .expect("must include");
+          m.splice(from..=to, new.iter().copied());
+        }
+      }
+      GenRange::ParentOnly(_) => {
+        unreachable!("Single parent node never have multi pipe child.")
+      }
     }
   }
 
-  fn as_any(&self) -> &dyn Any { self }
-
-  fn host_id(&self) -> WidgetId { *self.borrow().widgets.first().unwrap() }
-
-  fn pos_of_multi(&self) -> usize { self.borrow().multi_pos }
-
-  fn set_pos_of_multi(&self, pos: usize) {
-    let mut v = self.borrow_mut();
-    v.multi_pos = pos;
+  pub(crate) fn host_id(&self) -> WidgetId {
+    match &self.gen_range {
+      GenRange::Single(id) => *id,
+      GenRange::Multi(m) => *m.first().unwrap(),
+      GenRange::ParentOnly(p) => *p.start(),
+    }
   }
+
+  fn set_pos_of_multi(&mut self, pos: usize) { self.multi_pos = pos; }
+
+  fn pos_of_multi(&self) -> usize { self.multi_pos }
 }
 
 impl PipeNode {
-  fn share_capture(id: WidgetId, dyn_info: Box<dyn DynWidgetInfo>, ctx: &mut BuildCtx) -> Self {
+  fn share_capture(id: WidgetId, dyn_info: DynInfo, ctx: &mut BuildCtx) -> Self {
     let mut pipe_node = None;
 
     id.wrap_node(ctx.tree_mut(), |r| {
@@ -737,11 +730,23 @@ impl PipeNode {
     unsafe { pipe_node.unwrap_unchecked() }
   }
 
-  // update the primary `PipeNode`.
-  fn primary_transplant(&self, old: WidgetId, new: WidgetId, tree: &mut WidgetTree) {
-    let [old_node, new_node] = tree.get_many_mut(&[old, new]);
-    std::mem::swap(&mut self.as_mut().data, new_node);
-    std::mem::swap(old_node, new_node);
+  fn dyn_info(&self) -> DynInfo { self.as_ref().dyn_info.clone() }
+
+  // Remove the old widget so that the new widget build logic cannot access it
+  // anymore.
+  fn remove_old_data(&self) -> Box<dyn RenderQueryable> {
+    std::mem::replace(&mut self.as_mut().data, Box::new(PureRender(Void)))
+  }
+
+  fn transplant_to_new(
+    &self, old_node: Box<dyn RenderQueryable>, new: WidgetId, tree: &mut WidgetTree,
+  ) {
+    let old = self.as_ref().dyn_info.borrow().host_id();
+    let [old, new] = tree.get_many_mut(&[old, new]);
+    std::mem::swap(&mut self.as_mut().data, new);
+
+    std::mem::swap(old, new);
+    *old = old_node;
   }
 
   fn as_ref(&self) -> &InnerPipeNode {
@@ -759,12 +764,12 @@ impl PipeNode {
   /// subscription will be unsubscribed when the `PipeNode` dropped.
   fn own_subscription(self, u: impl Subscription + 'static, ctx: &mut BuildCtx) {
     let node = self.as_mut();
-    let id = node.dyn_info.host_id();
+    let id = node.dyn_info.borrow().host_id();
     let tree = ctx.tree_mut();
     // if the subscription is closed, we can cancel and unwrap the `PipeNode`
     // immediately.
     if u.is_closed() {
-      let v = std::mem::replace(&mut self.as_mut().data, Box::new(PureRender(Void)));
+      let v = std::mem::replace(&mut node.data, Box::new(PureRender(Void)));
       *id.get_node_mut(tree).unwrap() = v;
     } else {
       id.attach_anonymous_data(u.unsubscribe_when_dropped(), tree)
@@ -773,80 +778,61 @@ impl PipeNode {
 }
 
 fn set_pos_of_multi(w: WidgetId, pos: usize, tree: &WidgetTree) -> bool {
-  let mut b = false;
-  for info in w.query_all_iter::<DynInfo>(tree) {
-    info.set_pos_of_multi(pos);
-    b = true;
-  }
-  b
+  w.query_all_iter::<DynInfo>(tree)
+    .inspect(|info| info.borrow_mut().set_pos_of_multi(pos))
+    .count()
+    > 0
+}
+fn query_outside_infos<'l>(
+  id: WidgetId, to: &'l DynInfo, tree: &'l WidgetTree,
+) -> impl Iterator<Item = QueryRef<'l, DynInfo>> {
+  let mut hit = false;
+  id.query_all_iter::<DynInfo>(tree)
+    .rev()
+    .take_while(move |info| {
+      if hit {
+        false
+      } else {
+        hit = Sc::ptr_eq(info, to);
+        true
+      }
+    })
 }
 
-fn query_info_outside_until<T: Any>(
-  id: WidgetId, to: &Sc<T>, tree: &WidgetTree, mut cb: impl FnMut(&DynInfo),
-) {
-  for info in id.query_all_iter::<DynInfo>(tree).rev() {
-    cb(&info);
-
-    if info
-      .as_any()
-      .downcast_ref::<Sc<T>>()
-      .map_or(false, |info| Sc::ptr_eq(info, to))
-    {
-      break;
-    }
-  }
-}
-
-fn pipe_priority_value<T: Any>(info: &Sc<T>, wnd: &Window) -> i64
-where
-  Sc<T>: DynWidgetInfo,
-{
-  let id = info.host_id();
+fn pipe_priority_value(info: &DynInfo, wnd: &Window) -> i64 {
+  let id = info.borrow().host_id();
   let tree = wnd.tree();
   let depth = id.ancestors(tree).count() as i64;
-  let mut embed = 0;
-  query_info_outside_until(id, info, tree, |_| {
-    embed += 1;
-  });
-  let pos = info.pos_of_multi() as i64;
+  let embed = query_outside_infos(id, info, tree).count() as i64;
+
+  let pos = info.borrow_mut().pos_of_multi() as i64;
   depth << 60 | pos << 40 | embed
 }
 
-fn fn_priority<T: Any>(info: Sc<T>, wnd_id: WindowId) -> WindowPriority<impl Fn() -> i64 + 'static>
-where
-  Sc<T>: DynWidgetInfo + 'static,
-{
-  WindowPriority::new(wnd_id, move || {
-    AppCtx::get_window(wnd_id).map_or(-1, |wnd| pipe_priority_value(&info, &wnd))
-  })
-}
-
 impl Query for PipeNode {
-  fn query_all(&self, type_id: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
+  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
     let p = self.as_ref();
-    let mut types = p.data.query_all(type_id);
+    p.data.query_all(type_id, out);
     if type_id == TypeId::of::<DynInfo>() {
-      types.push(QueryHandle::new(&p.dyn_info));
+      out.push(QueryHandle::new(&p.dyn_info))
     }
-
-    types
   }
 
   fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
     let p = self.as_ref();
-    if type_id == TypeId::of::<DynInfo>() {
-      Some(QueryHandle::new(&p.dyn_info))
-    } else {
-      p.data.query(type_id)
-    }
+    p.data
+      .query(type_id)
+      .or_else(|| (type_id == TypeId::of::<DynInfo>()).then(|| QueryHandle::new(&p.dyn_info)))
+  }
+
+  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
+    self.as_ref().data.query_write(type_id)
   }
 
   fn queryable(&self) -> bool { true }
 }
 
 impl RenderProxy for PipeNode {
-  type R = dyn RenderQueryable;
-
   type Target<'r> = &'r dyn RenderQueryable
     where
       Self: 'r;
@@ -855,15 +841,19 @@ impl RenderProxy for PipeNode {
 }
 
 #[derive(Clone)]
-struct MultiUpdatePriority {
+struct UpdatePriority {
   wnd_id: Sc<Cell<Option<WindowId>>>,
-  multi_info: Sc<RefCell<MultiPipeInfo>>,
+  dyn_info: DynInfo,
 }
 
-impl MultiUpdatePriority {
-  fn new(multi_info: Sc<RefCell<MultiPipeInfo>>) -> Self {
-    Self { wnd_id: <_>::default(), multi_info }
+impl UpdatePriority {
+  fn new_with_wnd(multi_info: DynInfo, wnd_id: WindowId) -> Self {
+    let p = Self::new(multi_info);
+    p.set_wnd(wnd_id);
+    p
   }
+
+  fn new(multi_info: DynInfo) -> Self { Self { wnd_id: <_>::default(), dyn_info: multi_info } }
 
   fn set_wnd(&self, wnd_id: WindowId) {
     assert!(self.wnd_id.get().is_none());
@@ -871,13 +861,13 @@ impl MultiUpdatePriority {
   }
 }
 
-impl Priority for MultiUpdatePriority {
+impl Priority for UpdatePriority {
   fn priority(&mut self) -> i64 {
     self
       .wnd_id
       .get()
       .and_then(|wnd_id| AppCtx::get_window(wnd_id))
-      .map_or(-1, |wnd| pipe_priority_value(&self.multi_info, &wnd))
+      .map_or(-1, |wnd| pipe_priority_value(&self.dyn_info, &wnd))
   }
 
   fn queue(&mut self) -> Option<&PriorityTaskQueue> {
@@ -1058,23 +1048,20 @@ mod tests {
   #[test]
   fn pipe_widget_in_pipe() {
     reset_test_env!();
-    let p_trigger = Stateful::new(false);
-    let c_trigger = Stateful::new(false);
-    let mnt_cnt = Stateful::new(0);
-    let c_p_trigger = p_trigger.clone_writer();
-    let c_c_trigger = c_trigger.clone_writer();
-    let mnt_cnt2 = mnt_cnt.clone_reader();
+    let (p, w_p) = split_value(false);
+    let (c, w_c) = split_value(false);
+    let (mnt_cnt, w_mnt_cnt) = split_value(0);
 
     let w = fn_widget! {
-      pipe!(*$p_trigger).map(move |_| {
+      pipe!(*$p).map(move |_| {
         @MockBox {
           size: Size::zero(),
-          on_mounted: move |_| *$mnt_cnt.write() +=1,
+          on_mounted: move |_| *$w_mnt_cnt.write() +=1,
           @{
-            pipe!(*$c_trigger).map(move |_| {
+            pipe!(*$c).map(move |_| {
               @MockBox {
                 size: Size::zero(),
-                on_mounted: move |_| *$mnt_cnt.write() +=1,
+                on_mounted: move |_| *$w_mnt_cnt.write() +=1,
               }
             })
           }
@@ -1084,22 +1071,21 @@ mod tests {
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_eq!(*mnt_cnt2.read(), 2);
+    assert_eq!(*mnt_cnt.read(), 2);
 
-    {
-      // trigger the parent update
-      *c_p_trigger.write() = true;
-      // then trigger the child update.
-      *c_c_trigger.write() = true;
-    }
+    // trigger the parent update
+    *w_p.write() = true;
+    // then trigger the child update.
+    *w_c.write() = true;
+
     wnd.draw_frame();
-    assert_eq!(*mnt_cnt2.read(), 4);
+    assert_eq!(*mnt_cnt.read(), 4);
 
     // old pipe should be unsubscribed.
-    *c_p_trigger.write() = true;
-    *c_c_trigger.write() = true;
+    *w_p.write() = true;
+    *w_c.write() = true;
     wnd.draw_frame();
-    assert_eq!(*mnt_cnt2.read(), 6);
+    assert_eq!(*mnt_cnt.read(), 6);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -1537,15 +1523,14 @@ mod tests {
   #[test]
   fn single_pipe_gen_parent_pipe_only() {
     reset_test_env!();
-    let pipe_trigger = Stateful::new(0);
-    let inner_pipe_trigger = Stateful::new(0);
-    let c_pipe_trigger = pipe_trigger.clone_writer();
-    let c_inner_pipe_trigger = inner_pipe_trigger.clone_writer();
+    let (inner, w_inner) = split_value(0);
+    let (outer, w_outer) = split_value(0);
+
     let w = fn_widget! {
       @MockMulti {
         @ {
-          pipe!(*$pipe_trigger).map(move |w| {
-            let pipe_parent = pipe!(*$inner_pipe_trigger)
+          pipe!(*$outer).map(move |w| {
+            let pipe_parent = pipe!(*$inner)
               .map(move |h| @MockBox { size: Size::new(w as f32, h as f32) });
             @$pipe_parent { @Void {} }
           })
@@ -1557,11 +1542,13 @@ mod tests {
     wnd.draw_frame();
     assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(0., 0.), });
 
-    *c_inner_pipe_trigger.write() += 1;
+    println!("Inner pipe update:");
+    *w_inner.write() += 1;
     wnd.draw_frame();
     assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(0., 1.), });
 
-    *c_pipe_trigger.write() += 1;
+    println!("Outter pipe update:");
+    *w_outer.write() += 1;
     wnd.draw_frame();
     assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(1., 1.), });
   }

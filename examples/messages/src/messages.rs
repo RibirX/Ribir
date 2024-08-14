@@ -13,8 +13,8 @@ struct MessageList {
   messages: Vec<Message>,
 }
 
-pub fn messages() -> Widget<'static> {
-  fn_widget! {
+pub fn messages(ctx: &mut BuildCtx) -> Widget<'static> {
+  let f = fn_widget! {
     MessageList {
       messages: vec![
         Message {
@@ -39,8 +39,8 @@ pub fn messages() -> Widget<'static> {
         },
       ],
     }
-  }
-  .into_widget()
+  };
+  f(ctx)
 }
 
 impl Compose for MessageList {
@@ -122,5 +122,5 @@ mod tests {
 
   use super::*;
 
-  widget_image_test!(messages, wnd_size = Size::new(400., 600.), comparison = 0.004);
+  widget_image_test!(messages, messages, wnd_size = Size::new(400., 600.), comparison = 0.004);
 }

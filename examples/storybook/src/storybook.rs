@@ -335,8 +335,8 @@ fn content() -> Widget<'static> {
   .into_widget()
 }
 
-pub fn storybook() -> Widget<'static> {
-  fn_widget! {
+pub fn storybook(ctx: &mut BuildCtx) -> Widget<'static> {
+  let f = fn_widget! {
     @Column {
       background: Palette::of(ctx!()).surface_container_low(),
       @ { header() }
@@ -344,6 +344,6 @@ pub fn storybook() -> Widget<'static> {
         @ { content() }
       }
     }
-  }
-  .into_widget()
+  };
+  f(ctx)
 }

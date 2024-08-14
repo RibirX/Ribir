@@ -168,82 +168,85 @@ mod tests {
   const CHILD_SIZE: Size = Size::new(10., 10.);
   const WND_SIZE: Size = Size::new(100., 100.);
 
-  fn h_align(h_align: HAlign) -> impl IntoWidget<'static, FN> {
+  fn h_align(h_align: HAlign) -> GenWidget {
     fn_widget! {
       @HAlignWidget {
         h_align,
         @MockBox { size: CHILD_SIZE }
       }
     }
+    .into()
   }
-  fn left_align() -> impl IntoWidget<'static, FN> { h_align(HAlign::Left) }
+
   widget_layout_test!(
     left_align,
+    h_align(HAlign::Left),
     wnd_size = WND_SIZE,
     { path = [0], width == 100., height == 10.,}
     { path = [0, 0], size == CHILD_SIZE, }
   );
 
-  fn h_center_align() -> impl IntoWidget<'static, FN> { h_align(HAlign::Center) }
   widget_layout_test!(
     h_center_align,
+    h_align(HAlign::Center),
     wnd_size = WND_SIZE,
     { path = [0], width == 100., height == 10.,}
     { path = [0, 0], x == 45., size == CHILD_SIZE,}
   );
 
-  fn right_align() -> impl IntoWidget<'static, FN> { h_align(HAlign::Right) }
   widget_layout_test!(
     right_align,
+    h_align(HAlign::Right),
     wnd_size = WND_SIZE,
     { path = [0], width == 100., height == 10.,}
     { path = [0, 0], x == 90., size == CHILD_SIZE,}
   );
 
-  fn h_stretch_algin() -> impl IntoWidget<'static, FN> { h_align(HAlign::Stretch) }
   widget_layout_test!(
     h_stretch_algin,
+    h_align(HAlign::Stretch),
     wnd_size = WND_SIZE,
     { path = [0], width == 100., height == 10.,}
     { path = [0, 0], x == 0., width == 100., height == 10.,}
   );
 
-  fn v_align(v_align: VAlign) -> impl IntoWidget<'static, FN> {
+  fn v_align(v_align: VAlign) -> GenWidget {
     fn_widget! {
       @VAlignWidget {
         v_align,
         @MockBox { size: CHILD_SIZE }
       }
     }
+    .into()
   }
 
-  fn top_align() -> impl IntoWidget<'static, FN> { v_align(VAlign::Top) }
   widget_layout_test!(
     top_align,
+    v_align(VAlign::Top),
     wnd_size = WND_SIZE,
     { path = [0], width == 10., height == 100.,}
     { path = [0, 0], size == CHILD_SIZE,}
   );
 
-  fn v_center_align() -> impl IntoWidget<'static, FN> { v_align(VAlign::Center) }
   widget_layout_test!(
     v_center_align,
+    v_align(VAlign::Center),
     wnd_size = WND_SIZE,
     { path = [0], width == 10., height == 100.,}
     { path = [0, 0], y == 45., size == CHILD_SIZE,}
   );
 
-  fn bottom_align() -> impl IntoWidget<'static, FN> { v_align(VAlign::Bottom) }
   widget_layout_test!(
     bottom_align,
+    v_align(VAlign::Bottom),
     wnd_size = WND_SIZE,
     { path = [0], width == 10., height == 100.,}
     { path = [0, 0], y == 90., size == CHILD_SIZE,}
   );
 
-  fn v_stretch_align() -> impl IntoWidget<'static, FN> { v_align(VAlign::Stretch) }
   widget_layout_test!(
     v_stretch_align,
+    v_align(VAlign::Stretch),
     wnd_size = WND_SIZE,
     { path = [0], width == 10., height == 100.,}
     { path = [0, 0], width == 10., height == 100.,}

@@ -25,16 +25,17 @@ mod tests {
   #[test]
   fn smoke() {
     reset_test_env!();
-    let receive = Rc::new(RefCell::new("".to_string()));
-    let c_receive = receive.clone();
+    let (watcher, writer) = split_value("".to_string());
 
     let widget = fn_widget! {
+      let writer = writer.clone_writer();
       @MockBox {
         size: ZERO_SIZE,
         auto_focus: true,
-        on_chars: move |event| c_receive.borrow_mut().push_str(&event.chars)
+        on_chars: move |event| writer.write().push_str(&event.chars)
       }
     };
+
     let mut wnd = TestWindow::new(widget);
 
     let test_text_case = "Hello 世界！";
@@ -47,7 +48,7 @@ mod tests {
     });
     wnd.run_frame_tasks();
 
-    assert_eq!(&*receive.borrow(), test_text_case);
+    assert_eq!(*watcher.read(), test_text_case);
   }
 
   #[test]
@@ -73,7 +74,9 @@ mod tests {
         }
       }
     };
-    let mut wnd = TestWindow::new(widget);
+    let mut wnd = TestWindow::new(fn_widget! {
+      widget.clone()(ctx!())
+    });
 
     let test_text_case = "123";
     wnd.draw_frame();

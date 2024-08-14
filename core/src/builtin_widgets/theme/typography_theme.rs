@@ -1,8 +1,4 @@
-use ribir_algo::CowArc;
-use ribir_painter::Brush;
-
-use super::Theme;
-use crate::context::BuildCtx;
+use super::*;
 
 /// Use typography to present your design and content as clearly and efficiently
 /// as possible. The names of the TextTheme properties from the [Material Design
@@ -56,13 +52,28 @@ bitflags! {
 }
 
 impl TypographyTheme {
-  #[inline]
-  pub fn of(ctx: &BuildCtx) -> &Self {
-    ctx
-      .find_cfg(|t| match t {
-        Theme::Full(t) => Some(&t.typography_theme),
-        Theme::Inherit(i) => i.typography_theme.as_ref(),
+  /// Retrieve the nearest `TypographyTheme` from the context among its
+  /// ancestors
+  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Self> {
+    // At least one application theme exists
+    Provider::of(ctx).unwrap()
+  }
+
+  /// Retrieve the nearest `TypographyTheme` from the context among its
+  /// ancestors and return a write reference to the theme.
+  pub fn write_of(ctx: &impl ProviderCtx) -> WriteRef<Self> {
+    // At least one application theme exists
+    Provider::write_of(ctx).unwrap()
+  }
+}
+
+impl ComposeChild<'static> for TypographyTheme {
+  type Child = GenWidget;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
+    Provider::new(Box::new(this.clone_writer()))
+      .with_child(fn_widget! {
+        pipe!($this;).map(move |_| child.gen_widget())
       })
-      .unwrap()
+      .into_widget()
   }
 }

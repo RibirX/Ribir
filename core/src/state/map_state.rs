@@ -160,8 +160,6 @@ where
   F: Fn(&S::Value) -> PartData<V> + Clone,
   V: Render,
 {
-  type R = V;
-
   type Target<'r> = ReadRef<'r, V>
   where
     Self: 'r;
@@ -177,8 +175,6 @@ where
   F: Fn(&mut S::Value) -> PartData<V> + Clone,
   V: Render,
 {
-  type R = V;
-
   type Target<'r> = ReadRef<'r, V>
 
   where

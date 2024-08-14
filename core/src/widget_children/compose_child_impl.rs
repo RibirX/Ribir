@@ -150,18 +150,15 @@ where
   type Target = Widget<'w>;
 
   fn with_child(self, child: C) -> Self::Target {
+    let host = child.into_widget();
+
     let f = move |ctx: &mut BuildCtx| {
       let tid = TypeId::of::<W>();
-      let style = ctx.find_cfg(|t| match t {
-        Theme::Full(t) => t.compose_decorators.styles.get(&tid),
-        Theme::Inherit(i) => i
-          .compose_decorators
-          .as_ref()
-          .and_then(|s| s.styles.get(&tid)),
-      });
+      let decor = ctx
+        .all_providers::<ComposeDecorators>()
+        .find_map(|t| QueryRef::filter_map(t, |t| t.styles.get(&tid)).ok());
 
-      let host = child.into_widget();
-      if let Some(style) = style {
+      if let Some(style) = decor {
         style(Box::new(self), host, ctx)
       } else {
         ComposeDecorator::compose_decorator(self, host).into_widget()

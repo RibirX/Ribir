@@ -31,51 +31,47 @@ mod tests {
   use super::*;
   use crate::prelude::*;
 
-  fn fix_size() -> Widget<'static> {
-    let size: Size = Size::new(100., 100.);
+  widget_layout_test!(
+    fix_size,
     fn_widget! {
+      let size: Size = Size::new(100., 100.);
       @SizedBox {
         size,
         @Text { text: "" }
       }
-    }
-    .into_widget()
-  }
-  widget_layout_test!(fix_size, width == 100., height == 100.,);
+    },
+    width == 100.,
+    height == 100.,
+  );
 
-  fn shrink_size() -> Widget<'static> {
-    fn_widget! {
+  widget_layout_test!(
+    shrink_size,fn_widget! {
       @SizedBox {
         size: ZERO_SIZE,
         @Text { text: "" }
       }
-    }
-    .into_widget()
-  }
-  widget_layout_test!(
-    shrink_size,
+    },
     { path = [0], size == ZERO_SIZE,}
     { path = [0, 0], size == ZERO_SIZE,}
   );
 
-  fn expanded_size() -> Widget<'static> {
+  widget_layout_test!(
+    expanded_size,
     fn_widget! {
       @SizedBox {
         size: INFINITY_SIZE,
         @Text { text: "" }
       }
-    }
-    .into_widget()
-  }
-  widget_layout_test!(
-    expanded_size,
+    },
     wnd_size = Size::new(500., 500.),
     { path = [0], size == Size::new(500., 500.),}
     { path = [0, 0], size == INFINITY_SIZE,}
   );
 
-  fn empty_box() -> Widget<'static> {
-    fn_widget!(SizedBox { size: Size::new(10., 10.) }).into_widget()
-  }
-  widget_layout_test!(empty_box, width == 10., height == 10.,);
+  widget_layout_test!(
+    empty_box,
+    fn_widget!(SizedBox { size: Size::new(10., 10.) }),
+    width == 10.,
+    height == 10.,
+  );
 }

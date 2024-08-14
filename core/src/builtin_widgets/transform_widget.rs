@@ -45,7 +45,8 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  fn smoke() -> impl IntoWidget<'static, FN> {
+  widget_layout_test!(
+    smoke,
     fn_widget! {
       @TransformWidget {
         transform: Transform::new(2., 0., 0., 2., 0., 0.),
@@ -53,7 +54,8 @@ mod tests {
           size: Size::new(100., 100.)
         }
       }
-    }
-  }
-  widget_layout_test!(smoke, width == 100., height == 100.,);
+    },
+    width == 100.,
+    height == 100.,
+  );
 }

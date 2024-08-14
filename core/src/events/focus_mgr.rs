@@ -100,7 +100,7 @@ impl FocusManager {
     }
   }
 
-  pub(crate) fn init(&mut self, wnd: Weak<Window>) { self.wnd = wnd }
+  pub(crate) fn init(&mut self, wnd: &Rc<Window>) { self.wnd = Rc::downgrade(wnd) }
 
   pub(crate) fn window(&self) -> Rc<Window> {
     self
@@ -678,7 +678,7 @@ mod tests {
   fn focus_event() {
     reset_test_env!();
 
-    #[derive(Debug, Default)]
+    #[derive(Debug, Default, Clone)]
     struct EmbedFocus {
       log: Rc<RefCell<Vec<&'static str>>>,
     }
@@ -722,8 +722,10 @@ mod tests {
     }
 
     let widget = EmbedFocus::default();
-    let log = widget.log.clone();
-    let mut wnd = TestWindow::new(fn_widget!(widget));
+    let log: Rc<RefCell<Vec<&str>>> = widget.log.clone();
+    let mut wnd = TestWindow::new(fn_widget! {
+      widget.clone()
+    });
 
     let parent = wnd.tree().content_root();
     let child = parent.first_child(wnd.tree()).unwrap();

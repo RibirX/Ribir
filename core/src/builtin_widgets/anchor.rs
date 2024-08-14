@@ -205,61 +205,53 @@ mod test {
   const CHILD_SIZE: Size = Size::new(50., 50.);
   const WND_SIZE: Size = Size::new(100., 100.);
 
-  fn pixel_left_top() -> impl IntoWidget<'static, FN> {
+  widget_layout_test!(
+    pixel_left_top,
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
         anchor: Anchor::left_top(1., 1.),
       }
-    }
-  }
-  widget_layout_test!(
-    pixel_left_top,
+    },
     wnd_size = WND_SIZE,
     { path = [0, 0], y == 1., }
     { path = [0, 0], x == 1., }
   );
 
-  fn pixel_left_bottom() -> impl IntoWidget<'static, FN> {
+  widget_layout_test!(
+    pixel_left_bottom,
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
         anchor: Anchor::left_bottom(1., 1.),
       }
-    }
-  }
-  widget_layout_test!(
-    pixel_left_bottom,
+    },
     wnd_size = WND_SIZE,
     { path = [0, 0], y == 49.,}
     { path = [0, 0], x == 1., }
   );
 
-  fn pixel_top_right() -> impl IntoWidget<'static, FN> {
+  widget_layout_test!(
+    pixel_top_right,
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
         anchor: Anchor::right_top(1., 1.),
       }
-    }
-  }
-  widget_layout_test!(
-    pixel_top_right,
+    },
     wnd_size = WND_SIZE,
     { path = [0, 0], y == 1.,}
     { path = [0, 0], x == 49.,}
   );
 
-  fn pixel_bottom_right() -> impl IntoWidget<'static, FN> {
+  widget_layout_test!(
+    pixel_bottom_right,
     fn_widget! {
       @MockBox {
         size: CHILD_SIZE,
         anchor: Anchor::right_bottom(1., 1.)
       }
-    }
-  }
-  widget_layout_test!(
-    pixel_bottom_right,
+    },
     wnd_size = WND_SIZE,
     { path = [0, 0], y == 49.,}
     { path = [0, 0], x == 49.,}

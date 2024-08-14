@@ -38,7 +38,7 @@ pub struct PlaceholderStyle {
 }
 
 impl CustomStyle for PlaceholderStyle {
-  fn default_style(ctx: &BuildCtx) -> Self {
+  fn default_style(ctx: &impl ProviderCtx) -> Self {
     Self {
       foreground: Palette::of(ctx).on_surface_variant().into(),
       text_style: TypographyTheme::of(ctx).body_medium.text.clone(),
@@ -52,7 +52,7 @@ pub struct InputStyle {
 }
 
 impl CustomStyle for InputStyle {
-  fn default_style(_: &BuildCtx) -> Self { InputStyle { size: Some(20.) } }
+  fn default_style(_: &impl ProviderCtx) -> Self { InputStyle { size: Some(20.) } }
 }
 
 #[derive(Clone, PartialEq)]
@@ -62,7 +62,9 @@ pub struct TextAreaStyle {
 }
 
 impl CustomStyle for TextAreaStyle {
-  fn default_style(_: &BuildCtx) -> Self { TextAreaStyle { rows: Some(2.), cols: Some(20.) } }
+  fn default_style(_: &impl ProviderCtx) -> Self {
+    TextAreaStyle { rows: Some(2.), cols: Some(20.) }
+  }
 }
 
 pub trait EditableText: Sized {
@@ -496,37 +498,31 @@ mod tests {
   #[test]
   fn input_edit() {
     reset_test_env!();
-    let (input_value, input_value_writer) = split_value(String::default());
+    let (value, w_value) = split_value(String::default());
     let w = fn_widget! {
-      let input = @Input {
-        auto_focus: true,
-      };
+      let input = @Input { auto_focus: true };
       watch!($input.text().clone())
-        .subscribe(move |text| {
-          *input_value_writer.write() = text.to_string();
-        });
-      @ { input }
+        .subscribe(move |text| *$w_value.write() = text.to_string());
+      input
     };
 
     let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
     wnd.draw_frame();
-    assert_eq!(*input_value.read(), "");
+    assert_eq!(*value.read(), "");
 
     wnd.processes_receive_chars("hello\nworld".into());
     wnd.draw_frame();
-    assert_eq!(*input_value.read(), "hello world");
+    assert_eq!(*value.read(), "hello world");
   }
 
   #[test]
   fn input_tap_focus() {
     reset_test_env!();
-    let (input_value, input_value_writer) = split_value(String::default());
+    let (value, w_value) = split_value(String::default());
     let w = fn_widget! {
       let input = @Input { size: None };
       watch!($input.text().clone())
-        .subscribe(move |text| {
-          *input_value_writer.write() = text.to_string();
-        });
+        .subscribe(move |text| *$w_value.write() = text.to_string());
 
       @SizedBox {
         size: Size::new(200., 24.),
@@ -536,7 +532,7 @@ mod tests {
 
     let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
     wnd.draw_frame();
-    assert_eq!(*input_value.read(), "");
+    assert_eq!(*value.read(), "");
 
     let device_id = unsafe { DeviceId::dummy() };
     #[allow(deprecated)]
@@ -548,6 +544,6 @@ mod tests {
 
     wnd.processes_receive_chars("hello".into());
     wnd.draw_frame();
-    assert_eq!(*input_value.read(), "hello");
+    assert_eq!(*value.read(), "hello");
   }
 }

@@ -114,7 +114,7 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::test_helper::*;
+  use crate::{reset_test_env, test_helper::*};
 
   const WND_SIZE: Size = Size::new(300., 300.);
 
@@ -128,22 +128,24 @@ mod tests {
   impl FitTestCase {
     fn test(self) {
       let Self { box_fit, size, expect, expected_scale } = self;
-      let fit = Stateful::new(FittedBox { box_fit, scale_cache: <_>::default() });
-      let c_fit = fit.clone_reader();
+
+      let (fit, w_fit) = split_value(FittedBox { box_fit, scale_cache: <_>::default() });
+
       let w = fn_widget! {
-        @$fit { @MockBox { size } }
+        let w_fit = w_fit.clone_writer();
+        @$w_fit { @MockBox { size } }
       };
       let mut wnd = TestWindow::new_with_size(w, WND_SIZE);
       wnd.draw_frame();
 
       assert_layout_result_by_path!(wnd, {path = [0], size == expect,} );
-      assert_eq!(c_fit.read().scale_cache.get(), expected_scale);
+      assert_eq!(fit.read().scale_cache.get(), expected_scale);
     }
   }
 
   #[test]
   fn fit_test() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let small_size: Size = Size::new(100., 150.);
 
@@ -189,13 +191,15 @@ mod tests {
     .test();
   }
 
-  fn as_builtin_field() -> impl IntoWidget<'static, FN> {
+  widget_layout_test!(
+    as_builtin_field,
     fn_widget! {
       @MockBox {
         size: Size::new(200., 200.),
         box_fit: BoxFit::Fill,
       }
-    }
-  }
-  widget_layout_test!(as_builtin_field, wnd_size = WND_SIZE, size == WND_SIZE,);
+    },
+    wnd_size = WND_SIZE,
+    size == WND_SIZE,
+  );
 }

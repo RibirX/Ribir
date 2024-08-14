@@ -1,13 +1,13 @@
 use std::cell::RefCell;
 
 use ribir_algo::Sc;
+use smallvec::SmallVec;
 use state_cell::StateCell;
 
 use crate::prelude::*;
 
 pub trait RenderProxy {
-  type R: ?Sized + Render;
-  type Target<'r>: Deref<Target = Self::R>
+  type Target<'r>: Deref
   where
     Self: 'r;
 
@@ -17,23 +17,26 @@ pub trait RenderProxy {
 pub(crate) struct PureRender<R: Render>(pub R);
 
 impl<R: Render> Query for PureRender<R> {
-  fn query_all(&self, _: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
-    smallvec::SmallVec::new()
-  }
+  fn query_all<'q>(&'q self, _: TypeId, _: &mut SmallVec<[QueryHandle<'q>; 1]>) {}
 
   fn query(&self, _: TypeId) -> Option<QueryHandle> { None }
+
+  fn query_write(&self, _: TypeId) -> Option<QueryHandle> { None }
 
   fn queryable(&self) -> bool { false }
 }
 
 impl<R: Render> RenderProxy for PureRender<R> {
-  type R = R;
   type Target<'r> =&'r R where Self: 'r;
 
   fn proxy(&self) -> Self::Target<'_> { &self.0 }
 }
 
-impl<T: RenderProxy + 'static> Render for T {
+impl<T> Render for T
+where
+  T: RenderProxy + 'static,
+  for<'r> <T::Target<'r> as Deref>::Target: Render,
+{
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     self.proxy().perform_layout(clamp, ctx)
@@ -53,8 +56,6 @@ impl<T: RenderProxy + 'static> Render for T {
 }
 
 impl<R: Render> RenderProxy for RefCell<R> {
-  type R = R;
-
   type Target<'r>  = std::cell::Ref<'r, R>
     where
       Self: 'r;
@@ -63,8 +64,6 @@ impl<R: Render> RenderProxy for RefCell<R> {
 }
 
 impl<R: Render> RenderProxy for StateCell<R> {
-  type R = R;
-
   type Target<'r> = ReadRef<'r, R>
     where
       Self: 'r;
@@ -73,8 +72,6 @@ impl<R: Render> RenderProxy for StateCell<R> {
 }
 
 impl<R: Render> RenderProxy for Sc<R> {
-  type R = R;
-
   type Target<'r> = &'r R
     where
       Self: 'r;
@@ -83,8 +80,6 @@ impl<R: Render> RenderProxy for Sc<R> {
 }
 
 impl<R: Render> RenderProxy for Resource<R> {
-  type R = R;
-
   type Target<'r> = &'r R
     where
       Self: 'r;

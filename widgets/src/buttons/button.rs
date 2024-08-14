@@ -13,7 +13,7 @@ pub struct ButtonStyle {
 }
 
 impl CustomStyle for ButtonStyle {
-  fn default_style(ctx: &BuildCtx) -> Self {
+  fn default_style(ctx: &impl ProviderCtx) -> Self {
     ButtonStyle {
       height: 40.,
       icon_size: Size::splat(18.),

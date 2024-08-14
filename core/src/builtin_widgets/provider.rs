@@ -1,7 +1,6 @@
-use ribir_algo::Sc;
-use widget_id::{new_node, RenderQueryable};
+use smallvec::SmallVec;
 
-use crate::{prelude::*, render_helper::PureRender};
+use crate::prelude::*;
 
 /// This widget enables its descendants to access the data it provides,
 /// streamlining data sharing throughout the widget tree. Descendants have the
@@ -128,29 +127,24 @@ impl<'c> ComposeChild<'c> for Provider {
       .provider;
 
     let f = move |ctx: &mut BuildCtx| {
-      if ctx.pre_alloc_id.is_none() {
-        let node: Box<dyn RenderQueryable> = Box::new(PureRender(Void));
-        let id = new_node(&mut ctx.tree_mut().arena, node);
-        ctx.pre_alloc_id = Some(id);
+      let id = ctx.pre_alloc();
+
+      // We need to push the `id` to providers; the build logic must create context
+      // from here if it captures the context.
+      let pushed = ctx.providers.last() == Some(&id);
+      if !pushed {
+        ctx.providers.push(id);
       }
-      let alloc_id = ctx.pre_alloc_id.clone().unwrap();
-      ctx.startup = alloc_id;
 
-      // This provider needs to be visible to the child, so we must attach it to the
-      // pre-allocated node first, allowing its build logic to access this provider.
-      let provider = PreAttachedProvider::new(provider);
-      alloc_id.attach_data(Box::new(provider.clone()), ctx.tree_mut());
-      ctx.providers.push(alloc_id);
+      // We need to consume the root widget keep its build logic can access the
+      // provider.
+      // Allow the building logic to access the provider.
+      let (child, provider) = ctx.consume_root_with_provider(child.into_widget(), provider);
+      id.attach_data(provider, ctx.tree_mut());
 
-      // We need to consume the root widget first and attach it after the entire
-      // widget build is finished. Otherwise, the provider may be attached more
-      // internally than it should be.
-      let (id, child) = child(ctx).build_root(ctx);
-
-      ctx.providers.pop();
-      assert_eq!(alloc_id, id);
-      id.attach_data(provider.into_inner(), ctx.tree_mut());
-
+      if !pushed {
+        assert_eq!(ctx.providers.pop(), Some(id));
+      }
       child
     };
     f.into_widget()
@@ -161,39 +155,62 @@ impl<'c> ComposeChild<'c> for Provider {
 /// `BuildCtx` and other widget contexts such as `LayoutCtx`, `PaintCtx`, and
 /// event objects.
 pub trait ProviderCtx {
-  fn provider_of<Q: 'static>(&self) -> Option<QueryRef<Q>>;
-  fn provider_write_of<Q: 'static>(&self) -> Option<WriteRef<Q>>;
+  fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>>;
+
+  fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>>;
+
+  fn provider_of<Q: 'static>(&self) -> Option<QueryRef<Q>> { self.all_providers().next() }
+
+  fn provider_write_of<Q: 'static>(&self) -> Option<WriteRef<Q>> {
+    self.all_write_providers().next()
+  }
 }
 
-// todo:
-// - System theme attach to every root of window.
-
 impl ProviderCtx for BuildCtx {
-  fn provider_of<T: 'static>(&self) -> Option<QueryRef<T>> {
+  fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
     self
-      .providers
+      .current_providers
       .iter()
-      .find_map(|id| id.query_ref(self.tree()))
+      .rev()
+      .filter_map(|p| p.query(TypeId::of::<Q>()))
+      .filter_map(QueryHandle::into_ref)
+      .chain(
+        self
+          .providers
+          .iter()
+          .rev()
+          .filter_map(|id| id.query_ref(self.tree())),
+      )
   }
 
-  fn provider_write_of<T: 'static>(&self) -> Option<WriteRef<T>> {
+  fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
     self
-      .providers
+      .current_providers
       .iter()
-      .find_map(|id| id.query_write(self.tree()))
+      .rev()
+      .filter_map(|p| p.query_write(TypeId::of::<Q>()))
+      .filter_map(QueryHandle::into_mut)
+      .chain(
+        self
+          .providers
+          .iter()
+          .rev()
+          .filter_map(|id| id.query_write(self.tree())),
+      )
   }
 }
 
 impl<T: Deref<Target: WidgetCtxImpl>> ProviderCtx for T {
-  fn provider_of<Q: 'static>(&self) -> Option<QueryRef<Q>> {
-    widget_ctx_queryable_ancestors(self).find_map(|id| id.query_ref(self.tree()))
+  fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
+    queryable_ancestors(self).filter_map(|id| id.query_ref(self.tree()))
   }
-  fn provider_write_of<Q: 'static>(&self) -> Option<WriteRef<Q>> {
-    widget_ctx_queryable_ancestors(self).find_map(|id| id.query_write(self.tree()))
+
+  fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
+    queryable_ancestors(self).filter_map(|id| id.query_write(self.tree()))
   }
 }
 
-fn widget_ctx_queryable_ancestors(
+fn queryable_ancestors(
   ctx: &impl Deref<Target: WidgetCtxImpl>,
 ) -> impl Iterator<Item = WidgetId> + '_ {
   let tree = ctx.tree();
@@ -204,41 +221,23 @@ fn widget_ctx_queryable_ancestors(
 }
 
 impl<const M: usize> Query for [Box<dyn Query>; M] {
-  fn query_all(&self, type_id: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
+  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
     self
       .iter()
-      .flat_map(|q| q.query_all(type_id).into_iter())
-      .collect()
+      .for_each(|q| q.query_all(type_id, out))
   }
 
   fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
     self.iter().find_map(|q| q.query(type_id))
   }
 
+  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
+    self.iter().find_map(|q| q.query_write(type_id))
+  }
+
   fn queryable(&self) -> bool { true }
 }
 
-#[derive(Clone)]
-struct PreAttachedProvider(Sc<Box<dyn Query>>);
-
-impl PreAttachedProvider {
-  fn new(p: Box<dyn Query>) -> Self { Self(Sc::new(p)) }
-
-  fn into_inner(self) -> Box<dyn Query> {
-    Sc::try_unwrap(self.0)
-      .unwrap_or_else(|_| panic!("The pre-attached provider needs to be released."))
-  }
-}
-
-impl Query for PreAttachedProvider {
-  fn query_all(&self, type_id: TypeId) -> smallvec::SmallVec<[QueryHandle; 1]> {
-    self.0.query_all(type_id)
-  }
-
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.0.query(type_id) }
-
-  fn queryable(&self) -> bool { true }
-}
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -247,13 +246,16 @@ mod tests {
   #[test]
   fn direct_pass() {
     reset_test_env!();
-    let value = Stateful::new(0);
-    let c_v = value.clone_writer();
-    let w = Provider::new(Box::new(Queryable(1i32))).with_child(fn_widget! {
-      let v = Provider::of::<i32>(ctx!()).unwrap();
-      *c_v.write() = *v;
-      Void
-    });
+    let (value, w_value) = split_value(0);
+
+    let w = fn_widget! {
+      let w_value = w_value.clone_writer();
+      Provider::new(Box::new(Queryable(1i32))).with_child(fn_widget! {
+        let v = Provider::of::<i32>(ctx!()).unwrap();
+        *w_value.write() = *v;
+        Void
+      })
+    };
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
@@ -263,18 +265,21 @@ mod tests {
   #[test]
   fn indirect_pass() {
     reset_test_env!();
-    let value = Stateful::new(0);
-    let c_v = value.clone_writer();
-    let w = Provider::new(Box::new(Queryable(1i32))).with_child(fn_widget! {
-      @MockBox {
-        size: Size::new(1.,1.),
-        @ {
-          let v = Provider::of::<i32>(ctx!()).unwrap();
-          *c_v.write() = *v;
-          Void
+
+    let (value, w_value) = split_value(0);
+    let w = fn_widget! {
+      let w_value = w_value.clone_writer();
+      Provider::new(Box::new(Queryable(1i32))).with_child(fn_widget! {
+        @MockBox {
+          size: Size::new(1.,1.),
+          @ {
+            let v = Provider::of::<i32>(ctx!()).unwrap();
+            *$w_value.write() = *v;
+            Void
+          }
         }
-      }
-    });
+      })
+    };
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
@@ -285,23 +290,27 @@ mod tests {
   #[test]
   fn provider_for_pipe() {
     reset_test_env!();
-    let (watcher, writer) = split_value(0);
-    let (t_watcher, t_writer) = split_value(true);
+    let (value, w_value) = split_value(0);
+    let (trigger, w_trigger) = split_value(true);
 
-    let w = Provider::new(Box::new(writer.clone_writer())).with_child(fn_widget! {
-      pipe!(*$t_watcher).map(move |_| {
-        let mut v = Provider::write_of::<i32>(ctx!()).unwrap();
-        *v += 1;
-        Void
-      })
-    });
+    let w = fn_widget! {
+      let trigger = trigger.clone_watcher();
+      Provider::new(Box::new(w_value.clone_writer()))
+        .with_child(fn_widget! {
+          pipe!(*$trigger).map(move |_| {
+            let mut v = Provider::write_of::<i32>(ctx!()).unwrap();
+            *v += 1;
+            Void
+          })
+        })
+    };
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_eq!(*watcher.read(), 1);
+    assert_eq!(*value.read(), 1);
 
-    *t_writer.write() = false;
+    *w_trigger.write() = false;
     wnd.draw_frame();
-    assert_eq!(*watcher.read(), 2);
+    assert_eq!(*value.read(), 2);
   }
 }

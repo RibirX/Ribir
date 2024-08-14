@@ -14,11 +14,12 @@ use ribir_text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographySto
 use rxrust::{scheduler::NEW_TIMER_FN, subject::Subject};
 
 use crate::{
-  builtin_widgets::{FullTheme, InheritTheme, Theme},
+  builtin_widgets::Theme,
   clipboard::{Clipboard, MockClipboard},
   prelude::{FuturesLocalScheduler, Instant},
+  state::Stateful,
   timer::Timer,
-  widget::IntoWidget,
+  widget::GenWidget,
   window::{ShellWindow, Window, WindowId},
 };
 
@@ -36,7 +37,7 @@ pub trait RuntimeWaker {
 /// application running is dangerous. Because the reference of "AppCtx" maybe
 /// already hold by others.
 pub struct AppCtx {
-  app_theme: Theme,
+  app_theme: Stateful<Theme>,
   windows: RefCell<ahash::HashMap<WindowId, Rc<Window>>>,
   font_db: Rc<RefCell<FontDB>>,
   shaper: TextShaper,
@@ -67,11 +68,9 @@ impl AppCtx {
 
   /// Get the theme of the application.
   #[track_caller]
-  pub fn app_theme() -> &'static Theme { &Self::shared().app_theme }
+  pub fn app_theme() -> &'static Stateful<Theme> { &Self::shared().app_theme }
 
-  pub fn new_window<'w, const M: usize>(
-    shell_wnd: Box<dyn ShellWindow>, content: impl IntoWidget<'w, M>,
-  ) -> Rc<Window> {
+  pub fn new_window(shell_wnd: Box<dyn ShellWindow>, content: GenWidget) -> Rc<Window> {
     let wnd = Window::new(shell_wnd);
     let id = wnd.id();
 
@@ -79,7 +78,8 @@ impl AppCtx {
       .windows
       .borrow_mut()
       .insert(id, wnd.clone());
-    wnd.set_content_widget(content);
+
+    wnd.init(content);
 
     wnd
   }
@@ -157,13 +157,6 @@ impl AppCtx {
     count
   }
 
-  /// Loads the font from the theme config and import it into the font database.
-  #[track_caller]
-  pub fn load_font_from_theme(theme: &Theme) {
-    let mut font_db = Self::shared().font_db.borrow_mut();
-    load_font_from_theme(theme, &mut font_db);
-  }
-
   /// Check if the calling thread is the thread that initializes the `AppCtx`,
   /// you needn't use this method manually, it's called automatically when you
   /// use the methods of `AppCtx`. But it's useful when you want your code to
@@ -188,10 +181,7 @@ impl AppCtx {
   /// This should be only called before application startup. The behavior is
   /// undefined if you call it in a running application.
   #[track_caller]
-  pub unsafe fn set_app_theme(theme: FullTheme) {
-    Self::shared_mut().app_theme = Theme::Full(theme);
-    load_font_from_theme(Self::app_theme(), &mut Self::font_db().borrow_mut());
-  }
+  pub unsafe fn set_app_theme(theme: Theme) { Self::shared_mut().app_theme = Stateful::new(theme); }
 
   /// Set the shared clipboard of the application, this should be called before
   /// application startup.
@@ -257,12 +247,12 @@ impl AppCtx {
   #[track_caller]
   unsafe fn shared_mut() -> &'static mut Self {
     APP_CTX_INIT.call_once(|| {
-      let app_theme = Theme::Full(<_>::default());
+      let app_theme = Stateful::new(Theme::default());
       let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
 
       let mut font_db = FontDB::default();
       font_db.load_system_fonts();
-      load_font_from_theme(&app_theme, &mut font_db);
+
       let font_db = Rc::new(RefCell::new(font_db));
       let shaper = TextShaper::new(font_db.clone());
       let reorder = TextReorder::default();
@@ -390,24 +380,6 @@ pub struct MockWaker;
 impl RuntimeWaker for MockWaker {
   fn wake(&self) {}
   fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> { Box::new(MockWaker) }
-}
-
-pub fn load_font_from_theme(theme: &Theme, font_db: &mut FontDB) {
-  match theme {
-    Theme::Full(FullTheme { font_bytes, font_files, .. })
-    | Theme::Inherit(InheritTheme { font_bytes, font_files, .. }) => {
-      if let Some(font_bytes) = font_bytes {
-        font_bytes
-          .iter()
-          .for_each(|data| font_db.load_from_bytes(data.clone()));
-      }
-      if let Some(font_files) = font_files {
-        font_files.iter().for_each(|path| {
-          let _ = font_db.load_font_file(path);
-        });
-      }
-    }
-  }
 }
 
 impl Drop for AppCtxScopeGuard {

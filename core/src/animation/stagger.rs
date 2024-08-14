@@ -225,7 +225,8 @@ mod tests {
   use super::*;
   use crate::{reset_test_env, test_helper::*};
 
-  fn stagger_run_and_stop() -> Widget<'static> {
+  widget_layout_test!(
+    stagger_run_and_stop,
     fn_widget! {
       let stagger = Stagger::new(Duration::from_millis(100), transitions::EASE_IN.of(ctx!()));
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };
@@ -252,10 +253,10 @@ mod tests {
       assert!(!stagger.is_running());
 
       mock_box
-    }
-    .into_widget()
-  }
-  widget_layout_test!(stagger_run_and_stop, width == 100., height == 100.,);
+    },
+    width == 100.,
+    height == 100.,
+  );
 
   #[test]
   fn stagger_not_running_after_all_animation_end() {

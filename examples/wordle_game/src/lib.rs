@@ -8,7 +8,7 @@ pub fn run() {
   #[cfg(target_arch = "wasm32")]
   std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-  App::run(wordle_game())
+  App::run(wordle_game)
     .with_app_theme(material::purple::light())
     .with_size(Size::new(700., 620.));
 }
@@ -20,5 +20,10 @@ mod tests {
 
   use super::*;
 
-  widget_image_test!(wordle_game, wnd_size = Size::new(700., 620.), comparison = 0.008);
+  widget_image_test!(
+    wordle_game,
+    wordle_game,
+    wnd_size = Size::new(700., 620.),
+    comparison = 0.008
+  );
 }

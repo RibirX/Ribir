@@ -4,10 +4,11 @@ use ribir::{
   prelude::*,
 };
 
-fn bench_example<const M: usize, W: IntoWidget<'static, M>>(b: &mut Bencher, f: impl Fn() -> W) {
+fn bench_example(b: &mut Bencher, f: impl Into<GenWidget>) {
   let _ = AppCtx::shared();
+  let f: GenWidget = f.into();
   b.iter(|| {
-    let mut wnd = TestWindow::new(f());
+    let mut wnd = TestWindow::new(f.clone());
     wnd.draw_frame();
     AppCtx::remove_wnd(wnd.id())
   })

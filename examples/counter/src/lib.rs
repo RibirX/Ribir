@@ -1,8 +1,8 @@
 use ribir::prelude::*;
 
-pub fn counter() -> Widget<'static> {
-  fn_widget! {
-    let cnt = Stateful::new(0);
+pub fn counter(ctx: &mut BuildCtx) -> Widget<'static> {
+  let cnt = Stateful::new(0);
+  let f = fn_widget! {
     @Row {
       @FilledButton {
         on_tap: move |_| *$cnt.write() += 1,
@@ -10,8 +10,8 @@ pub fn counter() -> Widget<'static> {
       }
       @H1 { text: pipe!($cnt.to_string()) }
     }
-  }
-  .into_widget()
+  };
+  f(ctx)
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen::prelude::wasm_bindgen)]
@@ -19,10 +19,10 @@ pub fn run() {
   #[cfg(target_arch = "wasm32")]
   std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-  App::run(counter())
+  App::run(counter)
     .with_app_theme(material::purple::light())
     .with_size(Size::new(300., 150.))
-    .with_title("Counter ribir");
+    .with_title("Counter");
 }
 
 #[cfg(test)]
@@ -32,5 +32,5 @@ mod tests {
 
   use super::*;
 
-  widget_image_test!(counter, wnd_size = Size::new(400., 600.), comparison = 0.001);
+  widget_image_test!(counter, counter, wnd_size = Size::new(400., 600.), comparison = 0.001);
 }

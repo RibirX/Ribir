@@ -14,7 +14,7 @@ pub struct FilledButtonStyle {
 }
 
 impl CustomStyle for FilledButtonStyle {
-  fn default_style(ctx: &BuildCtx) -> Self {
+  fn default_style(ctx: &impl ProviderCtx) -> Self {
     FilledButtonStyle {
       height: 40.,
       icon_size: Size::splat(18.),
