@@ -73,9 +73,7 @@ pub struct ThemeWidget {
 
 impl ComposeChild<'static> for ThemeWidget {
   type Child = GenWidget;
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, mut child: Self::Child,
-  ) -> Widget<'static> {
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     use crate::prelude::*;
     let f = move |ctx: &BuildCtx| {
       let theme = this.read().theme.clone();
@@ -95,7 +93,7 @@ impl ComposeChild<'static> for ThemeWidget {
 
       // shadow the context with the theme.
       let ctx = BuildCtx::new_with_data(Some(p), ctx.tree, themes);
-      let child = child.gen_widget(&ctx).build(&ctx);
+      let child = child.gen_widget().build(&ctx);
       p.append(child, &mut ctx.tree.borrow_mut());
 
       p

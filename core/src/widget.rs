@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 #[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
@@ -5,6 +6,7 @@ pub use std::{
   ops::Deref,
 };
 
+use ribir_algo::Sc;
 use widget_id::{new_node, RenderQueryable};
 
 pub(crate) use crate::widget_tree::*;
@@ -82,7 +84,8 @@ impl<'w> LazyWidget<'w> {
 
 /// A boxed function widget that can be called multiple times to regenerate
 /// widget.
-pub struct GenWidget(Box<dyn FnMut(&BuildCtx) -> Widget<'static>>);
+pub struct GenWidget(InnerGenWidget);
+type InnerGenWidget = Sc<RefCell<Box<dyn FnMut(&BuildCtx) -> Widget<'static>>>>;
 
 // The widget type marker.
 pub const COMPOSE: usize = 1;
@@ -147,7 +150,7 @@ where
 
 impl IntoWidgetStrict<'static, FN> for GenWidget {
   #[inline]
-  fn into_widget_strict(self) -> Widget<'static> { self.0.into_widget_strict() }
+  fn into_widget_strict(self) -> Widget<'static> { self.gen_widget() }
 }
 
 impl<'a> Widget<'a> {
@@ -180,10 +183,15 @@ impl<'a> Widget<'a> {
 }
 impl GenWidget {
   #[inline]
-  pub fn new(f: impl FnMut(&BuildCtx) -> Widget<'static> + 'static) -> Self { Self(Box::new(f)) }
+  pub fn new(f: impl FnMut(&BuildCtx) -> Widget<'static> + 'static) -> Self {
+    Self(Sc::new(RefCell::new(Box::new(f))))
+  }
 
   #[inline]
-  pub fn gen_widget(&mut self, ctx: &BuildCtx) -> Widget<'static> { (self.0)(ctx) }
+  pub fn gen_widget(&self) -> Widget<'static> {
+    let f = self.0.clone();
+    fn_widget! { f.borrow_mut()(ctx!()) }.into_widget()
+  }
 }
 
 impl<F: FnMut(&BuildCtx) -> Widget<'static> + 'static> From<F> for GenWidget {

@@ -319,7 +319,7 @@ impl ComposeChild<'static> for Tabs {
           },
           @ { header }
           @Expanded {
-            @ { pipe!($this.cur_idx).map(move |idx| panes[idx].gen_widget(ctx!())) }
+            @ { pipe!($this.cur_idx).map(move |idx| panes[idx].gen_widget()) }
           }
         }
       }
