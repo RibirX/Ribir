@@ -33,7 +33,7 @@ impl OverlayCloseHandle {
   pub fn close(&self) { self.0.close() }
 }
 
-type Builder = Box<dyn FnMut(OverlayCloseHandle, &BuildCtx) -> Widget<'static>>;
+type Builder = Box<dyn FnMut(OverlayCloseHandle) -> Widget<'static>>;
 struct OverlayData {
   builder: Builder,
   style: Option<OverlayStyle>,
@@ -67,8 +67,8 @@ impl Overlay {
   ///  App::run(w);
   /// ```
   pub fn new(gen: impl Into<GenWidget>) -> Self {
-    let mut gen = gen.into();
-    Self::inner_new(Box::new(move |_, ctx| gen.gen_widget(ctx)))
+    let gen = gen.into();
+    Self::inner_new(Box::new(move |_| gen.gen_widget()))
   }
 
   /// Create overlay from a builder with a close_handle
@@ -100,9 +100,9 @@ impl Overlay {
   /// App::run(w).with_size(Size::new(200., 200.));
   /// ```
   pub fn new_with_handle(
-    mut builder: impl FnMut(OverlayCloseHandle) -> Widget<'static> + 'static,
+    builder: impl FnMut(OverlayCloseHandle) -> Widget<'static> + 'static,
   ) -> Self {
-    Self::inner_new(Box::new(move |ctrl, _| builder(ctrl)))
+    Self::inner_new(Box::new(builder))
   }
 
   /// Overlay will show with the given style, if the overlay have not been set
@@ -115,10 +115,10 @@ impl Overlay {
     if self.is_show() {
       return;
     }
-    let ctx = BuildCtx::new(None, &wnd.widget_tree);
+
     let mut inner = self.0.borrow_mut();
     let handle = inner.state.close_handle();
-    let w = (inner.builder)(handle, &ctx);
+    let w = (inner.builder)(handle);
     let style = inner.style.clone();
     inner.state.show(w, style, wnd);
   }
@@ -168,10 +168,9 @@ impl Overlay {
       return;
     }
 
-    let ctx = BuildCtx::new(None, &wnd.widget_tree);
     let mut inner = self.0.borrow_mut();
     let close_handle = inner.state.close_handle();
-    let overlay = (inner.builder)(close_handle.clone(), &ctx);
+    let overlay = (inner.builder)(close_handle.clone());
     let overlay = f(overlay, close_handle);
     let style = inner.style.clone();
     inner

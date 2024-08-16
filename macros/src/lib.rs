@@ -72,7 +72,8 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
 ///   `declare!` to build the `XXX` widget.
 /// - for every field of `XXXBuilder`
 ///   - implement method with same name of the field and use to init the field.
-///  [declare]: ../ribir/declare/index.html
+///
+/// [declare]: ../ribir/declare/index.html
 #[proc_macro_derive(Declare, attributes(declare))]
 pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
   let mut input = parse_macro_input!(input as DeriveInput);

@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Breaking
+
+- **core**: `GenWidget::gen_widget` no longer requires a `&mut BuildCtx` parameter. (#616 @M-Adoo)
+
 ## [0.4.0-alpha.5] - 2024-08-14
 
 ### Features
