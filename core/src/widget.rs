@@ -96,6 +96,7 @@ impl<'w> LazyNode<'w> {
 
 /// A boxed function widget that can be called multiple times to regenerate
 /// widget.
+#[derive(Clone)]
 pub struct GenWidget(InnerGenWidget);
 type InnerGenWidget = Sc<RefCell<Box<dyn FnMut(&mut BuildCtx) -> Widget<'static>>>>;
 

@@ -16,6 +16,10 @@ pub trait WidgetCtx {
   fn widget_id(&self) -> WidgetId;
   /// Return parent of widget of this context.
   fn parent(&self) -> Option<WidgetId>;
+  // Determine if the current widget in the context is an ancestor of `w`.
+  fn ancestor_of(&self, w: WidgetId) -> bool;
+  // Determine if the current widget in the context is an successor of `w`.
+  fn successor_of(&self, w: WidgetId) -> bool;
   /// Return parent of widget `w`.
   fn widget_parent(&self, w: WidgetId) -> Option<WidgetId>;
   /// Return the single child of `widget`.
@@ -97,6 +101,12 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
 
   #[inline]
   fn parent(&self) -> Option<WidgetId> { self.id().parent(self.tree()) }
+
+  #[inline]
+  fn ancestor_of(&self, w: WidgetId) -> bool { self.id().ancestor_of(w, self.tree()) }
+
+  #[inline]
+  fn successor_of(&self, w: WidgetId) -> bool { w.ancestor_of(self.id(), self.tree()) }
 
   #[inline]
   fn widget_parent(&self, w: WidgetId) -> Option<WidgetId> { w.parent(self.tree()) }

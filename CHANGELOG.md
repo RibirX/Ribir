@@ -27,7 +27,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Support for modifying the theme at runtime. (#pr @M-Adoo)
+- **core**: Support for modifying the theme at runtime. (#618 @M-Adoo)
   <img src="./static/theme-switch.gif" style="transform:scale(0.5);"/>
 
   The code:
@@ -53,7 +53,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
   App::run(w);
   ```
 
-- **core**: Added `Provider` widget to share data between sub-tree. (#pr @M-Adoo)
+- **core**: Added `Provider` widget to share data between sub-tree. (#618 @M-Adoo)
   ```rust
   Provider::new(Box::new(State::value(0i32))).with_child(fn_widget! {
     @SizedBox {
@@ -75,12 +75,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
   });
   ```
 
-- **core**: Added `WidgetCtx::query`, `WidgetCtx::query_write`, `WidgetCtx::query_of_widget` and  `WidgetCtx::query_write_of_widget`. (#pr @M-Adoo)
+- **core**: Added `Overlay::of` to allow querying the overlay in event callbacks. (#618 @M-Adoo)
+- **core**: Added `WidgetCtx::query`, `WidgetCtx::query_write`, `WidgetCtx::query_of_widget` and  `WidgetCtx::query_write_of_widget`. (#618 @M-Adoo)
 
 ### Breaking
 
+- **core**: Removed `Overlay::new_with_handle` and `OverlayCloseHandle`. (#618 @M-Adoo)
 - **core**: `GenWidget::gen_widget` no longer requires a `&mut BuildCtx` parameter. (#616 @M-Adoo)
-- **core**: Removed `FullTheme` and `InheritTheme`, now only using `Theme`. Any part of the theme, such as `Palette`, can be directly used to overwrite its corresponding theme component. (#pr @M-Adoo)
+- **core**: Removed `FullTheme` and `InheritTheme`, now only using `Theme`. Any part of the theme, such as `Palette`, can be directly used to overwrite its corresponding theme component. (#618 @M-Adoo)
 
 ## [0.4.0-alpha.5] - 2024-08-14
 
@@ -115,7 +117,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
-- Removed `WidgetCtx::query_widget_type` and `WidgetCtx::query_type` (#pr @M-Adoo)
+- Removed `WidgetCtx::query_widget_type` and `WidgetCtx::query_type` (#618 @M-Adoo)
 - Removed `ChildFrom` and `FromAnother` traits (#612 @M-Adoo)
 - Removed `SingleParent` and `MultiParent` traits. (#612 @M-Adoo)
 - Removed `PairChild` and `PairWithChild` traits. User can use a generic type instead. (#612 @M-Adoo)

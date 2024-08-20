@@ -46,7 +46,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::events::*;
   #[doc(no_inline)]
-  pub use crate::overlay::{Overlay, OverlayCloseHandle};
+  pub use crate::overlay::Overlay;
   #[doc(no_inline)]
   pub use crate::pipe::{BoxPipe, FinalChain, MapPipe, ModifiesPipe, Pipe};
   #[doc(no_inline)]
