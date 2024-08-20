@@ -145,6 +145,10 @@ impl App {
           }
         }
         wnd.emit_events();
+
+        if wnd.need_draw() {
+          request_redraw(&wnd)
+        }
       }
       Event::AboutToWait => {
         let run_count = AppCtx::run_until_stalled();

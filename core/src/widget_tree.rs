@@ -14,7 +14,7 @@ mod layout_info;
 pub use layout_info::*;
 
 use self::widget::widget_id::new_node;
-use crate::{overlay::OverlayRoot, prelude::*, render_helper::PureRender};
+use crate::{overlay::ShowingOverlays, prelude::*, render_helper::PureRender};
 
 pub(crate) type DirtySet = Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
 
@@ -36,16 +36,15 @@ impl WidgetTree {
     ctx.pre_alloc = Some(root_id);
 
     let theme = AppCtx::app_theme().clone_writer();
-    let overlays = Queryable(Overlays::default());
+    let overlays = Queryable(ShowingOverlays::default());
     let id = Provider::new(Box::new(overlays))
       .with_child(fn_widget! {
         theme.with_child(fn_widget!{
+          let ctx = unsafe { &*(ctx!() as *mut BuildCtx) };
+          let overlays = Provider::of::<ShowingOverlays>(ctx).unwrap();
+          overlays.rebuild(ctx!());
           @Root {
             @{ content.gen_widget() }
-            @{
-              let overlays = Provider::of::<Overlays>(ctx!()).unwrap();
-              overlays.rebuild()
-            }
           }
         })
       })
@@ -93,6 +92,7 @@ impl WidgetTree {
     }
   }
 
+  // todo: split layout and paint dirty.
   pub(crate) fn mark_dirty(&self, id: WidgetId) { self.dirty_set.borrow_mut().insert(id); }
 
   pub(crate) fn is_dirty(&self) -> bool { !self.dirty_set.borrow().is_empty() }
@@ -226,7 +226,7 @@ impl Default for WidgetTree {
     let mut arena = TreeArena::new();
 
     Self {
-      root: new_node(&mut arena, Box::new(PureRender(OverlayRoot {}))),
+      root: new_node(&mut arena, Box::new(PureRender(Void))),
       wnd: Weak::new(),
       arena,
       store: LayoutStore::default(),
@@ -252,19 +252,6 @@ impl Render for Root {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
-}
-
-pub(crate) struct Overlays(Stateful<Vec<Overlay>>);
-
-impl Overlays {
-  fn rebuild(&self) -> Vec<Widget<'static>> {
-    // todo: drop the old overlay subtree, create a new one for new theme
-    vec![]
-  }
-}
-
-impl Default for Overlays {
-  fn default() -> Self { Self(Stateful::new(vec![])) }
 }
 
 #[cfg(test)]

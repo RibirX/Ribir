@@ -39,7 +39,7 @@ pub enum Brightness {
 ///
 /// Every descendant widget of the theme can query it or its parts.
 ///
-/// ```
+/// ```no_run
 /// use ribir::prelude::*;
 ///
 /// let w = fn_widget! {

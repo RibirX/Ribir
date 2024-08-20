@@ -86,6 +86,7 @@ impl<W> FatObj<W> {
   /// Anchor the widget's horizontal position by placing its left edge right to
   /// the left edge of the specified widget (`wid`) with the given relative
   /// pixel value (`relative`).
+  // Todo: Should we control the subscription in the inner part?
   pub fn left_align_to(
     &mut self, wid: &LazyWidgetId, offset: f32, ctx: &BuildCtx,
   ) -> impl Subscription {
