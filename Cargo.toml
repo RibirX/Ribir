@@ -52,7 +52,7 @@ euclid = "0.22.6"
 fontdb = "0.16.0"
 futures = "0.3.26"
 guillotiere = "0.6.0"
-image = { version = "0.24.5", default-features = false }
+image = { version = "0.25.2", default-features = false }
 indextree = "4.5.0"
 lazy_static = "1.4.0"
 log = "0.4.14"
