@@ -47,18 +47,20 @@ This milestone aims to prepare Ribir for the web and stabilize the widget system
 
 This milestone aims to stabilize the theme API, simplify type conversion, and facilitate the development of widgets with dynamic themes.
 
-- [ ] Simplify type conversion.
+- [x] Simplify type conversion.
   We've over-engineered some aspects of type conversion, which has actually increased the learning curve for users and reduced error readability. For instance, the conversion of `DeclareInit` and the nested conversion of `Template`. The downside is that more explicit conversions will be required when using them.
+- [x] Implement a provider widget that can exports a state to its subtree, allowing widgets in its subtree to query the state using context.
+- [x] Simplify the theme system API to enhance user-friendliness.
+- [ ] Include additional built-in paint style widgets that will be inherited by descendants, such as `TextStyle` and `Foreground`.
+- [ ] Implement a mechanism to enable sharing styles between widgets, akin to the `class` attribute in HTML.
+
+## Widgets Library And Storybook (v0.5)
+
 - [ ] In-depth widget guide, explaining how widgets work and how to create custom widgets.
-- [ ] Implement a provider widget that can exports a state to its subtree, allowing widgets in its subtree to query the state using context.
-- [ ] Simplify the theme system API to enhance user-friendliness.
-
-### Widgets Library And Storybook (v0.5, July 2024)
-
 - [ ] Production level widgets library with the basic widgets
 - [ ] Complete the basic and material themes
 - [ ] storybook to display all widgets, allowing user interaction
-- [ ] mobile platform basic support (iOS, Android)
+
 
 ## Backlog
 
