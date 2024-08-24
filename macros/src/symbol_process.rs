@@ -278,27 +278,27 @@ impl Fold for DollarRefsCtx {
 
   fn fold_expr_method_call(&mut self, mut i: ExprMethodCall) -> ExprMethodCall {
     // fold builtin method on state
-    let dollar = BUILTIN_INFOS
-      .get(i.method.to_string().as_str())
+    if BUILTIN_INFOS
+      .get(&i.method.to_string())
       .filter(|info| info.mem_ty == BuiltinMemberType::Method)
-      .and_then(|info| self.replace_builtin_ident(&mut i.receiver, info.var_name));
-    if dollar.is_some() {
+      .and_then(|info| self.replace_builtin_ident(&mut i.receiver, info.var_name))
+      .is_some()
+    {
       return i;
     }
 
     // fold if write on state.
-    let write_mac = is_state_write_method(&i).then(|| {
-      let Expr::Macro(m) = &mut *i.receiver else {
-        return None;
-      };
-      parse_dollar_macro(&m.mac).map(|d| (d.name, &mut m.mac))
-    });
-    if let Some(Some((name, mac))) = write_mac {
-      mac.tokens = expand_write_method(name.to_token_stream());
-      mark_macro_expanded(mac);
-      let dollar_ref = DollarRef { name, builtin: None, used: DollarUsedInfo::Writer };
-      self.add_dollar_ref(dollar_ref);
-      return i;
+    if let Expr::Macro(m) = &mut *i.receiver {
+      if is_state_write_method(&i.method) {
+        if let Some(d) = parse_dollar_macro(&m.mac) {
+          let name = d.name;
+          m.mac.tokens = expand_write_method(name.to_token_stream());
+          mark_macro_expanded(&mut m.mac);
+          let dollar_ref = DollarRef { name, builtin: None, used: DollarUsedInfo::Writer };
+          self.add_dollar_ref(dollar_ref);
+          return i;
+        }
+      }
     }
 
     syn::fold::fold_expr_method_call(self, i)
@@ -504,7 +504,7 @@ impl DollarRefsCtx {
   ) -> Option<&DollarRef> {
     let mut used = DollarUsedInfo::Reader;
     let e = if let Expr::MethodCall(m) = caller {
-      if is_state_write_method(m) {
+      if is_state_write_method(&m.method) {
         used = DollarUsedInfo::Writer;
         &mut *m.receiver
       } else {
@@ -671,9 +671,7 @@ pub fn not_subscribe_anything(span: Span) -> TokenStream {
   )
 }
 
-fn is_state_write_method(m: &ExprMethodCall) -> bool {
-  m.method == "write" || m.method == "silent" || m.method == "shallow"
-}
+fn is_state_write_method(m: &Ident) -> bool { m == "write" || m == "silent" || m == "shallow" }
 
 fn expand_write_method(host: TokenStream) -> TokenStream { host }
 
