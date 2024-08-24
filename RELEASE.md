@@ -8,8 +8,8 @@ This document outlines the release process and branch management for the Ribir p
 |---------|-----------|--------------|--------|---------|---------|
 | 0.1     | Prototype, Validate our ideas | Feb 2024     | Stable   | [M1](https://github.com/RibirX/Ribir/milestone/1) | @M-Adoo |
 | 0.2     | Improve Core API | March 2024 | Stable | [M2](https://github.com/RibirX/Ribir/milestone/2) | @M-Adoo |
-| 0.3     | Web Compatibility and Widget System API Stabilization | May 2024 | Beta | [M3](https://github.com/RibirX/Ribir/milestone/3) | @wjian23 |
-| 0.4     | Simplified Theme and Widget Development | June 2024 | Alpha | [M4](https://github.com/RibirX/Ribir/milestone/3) | @sologeek |
+| 0.3     | Web Compatibility and Widget System API Stabilization | Aug 2024 | Beta | [M3](https://github.com/RibirX/Ribir/milestone/3) | @wjian23 |
+| 0.4     | Simplified Theme and Widget Development | Sep 2024 | Alpha | [M4](https://github.com/RibirX/Ribir/milestone/3) | @sologeek |
 | 0.5  | Widgets and Storybook | To be determined | Planning | To be determined | To be determined |
 | Future  | To be determined | To be determined | Planning | To be determined | To be determined |
 
