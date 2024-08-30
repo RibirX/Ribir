@@ -63,7 +63,7 @@ pub mod prelude {
   pub use crate::window::Window;
   pub use crate::{
     animation::*,
-    providers,
+    class_names, multi_class, providers,
     query::*,
     ticker::{Duration, Instant},
   };

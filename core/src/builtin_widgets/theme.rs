@@ -79,6 +79,7 @@ pub enum Brightness {
 pub struct Theme {
   pub palette: Palette,
   pub typography_theme: TypographyTheme,
+  pub classes: Classes,
   pub icon_theme: IconTheme,
   pub transitions_theme: TransitionTheme,
   pub compose_decorators: ComposeDecorators,
@@ -149,25 +150,27 @@ impl<T: StateWriter<Value = Theme>> Query for ThemeQuerier<T> {
   }
 
   fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
-    ReadRef::filter_map(self.0.read(), |v: &mut Theme| {
-      let w: Option<&mut dyn Any> = if TypeId::of::<Theme>() == type_id {
+    ReadRef::filter_map(self.0.read(), |v: &Theme| {
+      let w: Option<&dyn Any> = if TypeId::of::<Theme>() == type_id {
         Some(v)
       } else if TypeId::of::<Palette>() == type_id {
-        Some(&mut v.palette)
+        Some(&v.palette)
       } else if TypeId::of::<TypographyTheme>() == type_id {
-        Some(&mut v.typography_theme)
+        Some(&v.typography_theme)
+      } else if TypeId::of::<Classes>() == type_id {
+        Some(&v.classes)
       } else if TypeId::of::<IconTheme>() == type_id {
-        Some(&mut v.icon_theme)
+        Some(&v.icon_theme)
       } else if TypeId::of::<TransitionTheme>() == type_id {
-        Some(&mut v.transitions_theme)
+        Some(&v.transitions_theme)
       } else if TypeId::of::<ComposeDecorators>() == type_id {
-        Some(&mut v.compose_decorators)
+        Some(&v.compose_decorators)
       } else if TypeId::of::<CustomStyles>() == type_id {
-        Some(&mut v.custom_styles)
+        Some(&v.custom_styles)
       } else {
         None
       };
-      w.map(PartData::from_ref_mut)
+      w.map(PartData::from_ref)
     })
     .ok()
     .map(QueryHandle::from_read_ref)
@@ -254,6 +257,7 @@ impl Default for Theme {
     Theme {
       palette: Default::default(),
       typography_theme,
+      classes: <_>::default(),
       icon_theme,
       transitions_theme: Default::default(),
       compose_decorators: Default::default(),

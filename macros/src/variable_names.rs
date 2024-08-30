@@ -34,6 +34,8 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   // BuiltinObj
   "lazy_host_id" => BuiltinMember { host_ty: "BuiltinObj", mem_ty: Method, var_name: "lazy"},
   "lazy_id" => BuiltinMember { host_ty: "BuiltinObj", mem_ty: Method, var_name: "lazy"},
+  // Class
+  "class" => BuiltinMember { host_ty: "Class", mem_ty: Field, var_name: "class" },
   // MixBuiltin
   "auto_focus" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Field, var_name: "mix_builtin" },
   "tab_index" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Field, var_name: "mix_builtin" },

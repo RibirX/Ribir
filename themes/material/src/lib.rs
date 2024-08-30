@@ -19,9 +19,11 @@ fn new(palette: Palette) -> Theme {
     Color::BLACK.with_alpha(0.87).into(),
   );
 
+  let classes = Classes::default();
   let mut theme = Theme {
     palette,
     typography_theme,
+    classes,
     icon_theme: icon_theme(),
     transitions_theme: TransitionTheme::default(),
     compose_decorators: <_>::default(),

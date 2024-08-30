@@ -81,6 +81,12 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
       }
 
       impl #g_impl #name #g_ty #g_where {
+        #[doc="Specify the `Class` that should be applied to the widget."]
+        #vis fn class<const _M: u8>(mut self, v: impl DeclareInto<ClassName, _M>) -> Self {
+          self.fat_obj = self.fat_obj.class(v);
+          self
+        }
+
         #[doc="Initializes the widget with a tab index. The tab index is used to \
           allow or prevent widgets from being sequentially focusable(usually with \
           the Tab key, hence the name) and determine their relative ordering for \

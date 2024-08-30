@@ -640,7 +640,7 @@ impl DynWidgetsInfo {
 
   fn set_gen_range(&mut self, range: GenRange) { self.gen_range = range; }
 
-  fn single_replace(&mut self, old: WidgetId, new: WidgetId) {
+  pub(crate) fn single_replace(&mut self, old: WidgetId, new: WidgetId) {
     match &mut self.gen_range {
       GenRange::Single(id) => {
         assert_eq!(*id, old, "For single pipe node, the logic pipe child must be same `PipeNode`.");
@@ -662,7 +662,7 @@ impl DynWidgetsInfo {
     }
   }
 
-  fn single_range_replace(
+  pub(crate) fn single_range_replace(
     &mut self, old: &RangeInclusive<WidgetId>, new: &RangeInclusive<WidgetId>,
   ) {
     match &mut self.gen_range {
