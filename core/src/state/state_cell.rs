@@ -210,12 +210,12 @@ impl<'a, V: ?Sized> ReadRef<'a, V> {
     ReadRef { inner: f(&r.inner), borrow: r.borrow }
   }
 
-  /// Makes a new `WriteRef` for an optional component of the borrowed data. The
+  /// Makes a new `ReadRef` for an optional component of the borrowed data. The
   /// original guard is returned as an `Err(..)` if the closure returns
   /// `None`.
   ///
   /// This is an associated function that needs to be used as
-  /// `WriteRef::filter_map(...)`. A method would interfere with methods of the
+  /// `ReadRef::filter_map(...)`. A method would interfere with methods of the
   /// same name on `T` used through `Deref`.
   ///
   /// # Examples
@@ -230,12 +230,12 @@ impl<'a, V: ?Sized> ReadRef<'a, V> {
   /// assert_eq!(*b2.unwrap(), 2);
   /// ```
   pub fn filter_map<U: ?Sized, M>(
-    mut orig: ReadRef<'a, V>, part_map: M,
+    orig: ReadRef<'a, V>, part_map: M,
   ) -> std::result::Result<ReadRef<'a, U>, Self>
   where
-    M: Fn(&mut V) -> Option<PartData<U>>,
+    M: Fn(&V) -> Option<PartData<U>>,
   {
-    match part_map(&mut orig.inner) {
+    match part_map(&orig.inner) {
       Some(inner) => Ok(ReadRef { inner, borrow: orig.borrow }),
       None => Err(orig),
     }

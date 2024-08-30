@@ -112,7 +112,7 @@ impl BuildCtx {
     &mut self, w: Widget<'w>, provider: Box<dyn Query>,
   ) -> (Widget<'w>, Box<dyn Query>) {
     self.current_providers.push(provider);
-    let w = w.consume_root(self);
+    let (w, _) = w.consume_root(self);
     let provider = self.current_providers.pop().unwrap();
     (w, provider)
   }

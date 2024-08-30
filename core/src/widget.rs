@@ -201,13 +201,15 @@ impl<'w> Widget<'w> {
   }
 
   /// Build the root node of the widget only.
-  pub(crate) fn consume_root(self, ctx: &mut BuildCtx) -> Self {
+  pub(crate) fn consume_root(self, ctx: &mut BuildCtx) -> (Self, WidgetId) {
+    let mut root_id = None;
     let node = self.into_node(ctx).wrap_root(|n| {
       let id = n.alloc(ctx);
+      root_id = Some(id);
       PureNode::LazyBuild(Box::new(move |_| id))
     });
 
-    Widget(InnerWidget::Node(node))
+    (Widget(InnerWidget::Node(node)), root_id.unwrap())
   }
 
   /// Attach anonymous data to a widget and user can't query it.
@@ -271,6 +273,19 @@ impl<'w> Widget<'w> {
     }
 
     node.into_widget()
+  }
+
+  /// Convert an ID back to a widget.
+  ///
+  /// # Note
+  ///
+  /// It's important to remember that we construct the tree lazily. In most
+  /// cases, you should avoid using this method to create a widget unless you
+  /// are certain that the entire logic is suitable for creating this widget
+  /// from an ID.
+  pub(crate) fn from_id(id: WidgetId) -> Widget<'static> {
+    let node = Node::Leaf(PureNode::LazyBuild(Box::new(move |_| id)));
+    Widget(InnerWidget::Node(node))
   }
 
   fn into_node(self, ctx: &mut BuildCtx) -> Node<'w> {

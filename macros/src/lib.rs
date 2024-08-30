@@ -166,6 +166,19 @@ pub fn pipe(input: TokenStream) -> TokenStream {
   pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
+/// Macro used to define a class to override for a `ClassName`, this is a
+/// shorthand if you only want to compose builtin widgets with your host widget.
+#[proc_macro]
+pub fn style_class(input: TokenStream) -> TokenStream {
+  let input: proc_macro2::TokenStream = input.into();
+  quote! {
+    move |widget: Widget| {
+      fn_widget! { @ $widget { #input } }.into_widget()
+    }
+  }
+  .into()
+}
+
 /// The `watch!` macro converts an expression into an `Observable` stream. Use
 /// `$` to mark the state reference, which automatically maps its modifications
 /// to the expression value.

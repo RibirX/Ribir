@@ -66,6 +66,8 @@ pub mod container;
 pub use container::*;
 mod provider;
 pub use provider::*;
+mod class;
+pub use class::*;
 
 use crate::prelude::*;
 
@@ -103,6 +105,7 @@ pub struct FatObj<T> {
   host: T,
   host_id: LazyWidgetId,
   id: LazyWidgetId,
+  class: Option<State<Class>>,
   mix_builtin: Option<State<MixBuiltin>>,
   request_focus: Option<State<RequestFocus>>,
   has_focus: Option<State<HasFocus>>,
@@ -162,6 +165,7 @@ impl<T> FatObj<T> {
       host,
       host_id: LazyWidgetId::default(),
       id: LazyWidgetId::default(),
+      class: None,
       mix_builtin: None,
       request_focus: None,
       has_focus: None,
@@ -211,6 +215,7 @@ impl<T> FatObj<T> {
       v_align: self.v_align,
       relative_anchor: self.relative_anchor,
       global_anchor: self.global_anchor,
+      class: self.class,
       visibility: self.visibility,
       opacity: self.opacity,
       keep_alive: self.keep_alive,
@@ -265,6 +270,14 @@ impl<T> FatObj<T> {
 
 // builtin widgets accessors
 impl<T> FatObj<T> {
+  /// Returns the `State<Class>` widget from the FatObj. If it doesn't exist, a
+  /// new one is created.
+  pub fn get_class_widget(&mut self) -> &mut State<Class> {
+    self
+      .class
+      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+
   pub fn get_mix_builtin_widget(&mut self) -> &mut State<MixBuiltin> {
     self
       .mix_builtin
@@ -724,6 +737,11 @@ impl<T> FatObj<T> {
     })
   }
 
+  /// Initializes the `Class` that should be applied to the widget.
+  pub fn class<const M: u8>(self, cls: impl DeclareInto<ClassName, M>) -> Self {
+    self.declare_builtin_init(cls, Self::get_class_widget, |c, cls| c.class = Some(cls))
+  }
+
   /// Initializes whether the `widget` should automatically get focus when the
   /// window loads.
   ///
@@ -874,6 +892,9 @@ impl<'a> FatObj<Widget<'a>> {
     let mut host = self.host;
     if self.host_id.0.ref_count() > 1 {
       host = self.host_id.clone().bind(host);
+    }
+    if let Some(class) = self.class {
+      host = class.with_child(host).into_widget();
     }
     if let Some(mix_builtin) = self.mix_builtin {
       host = mix_builtin.with_child(host).into_widget()
