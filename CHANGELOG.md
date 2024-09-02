@@ -28,6 +28,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: The built-in widget `Class` has been added to enable the sharing of consistent styles across multiple elements and to allow widgets to have different actions and styles in different themes. (#pr, @M-Adoo)
+- **core**: The widget `ConstrainedBox` has been added as a built-in widget; now `clamp` can be used as a built-in field. (#pr @M-Adoo)
+
+### Breaking
+
+- **widgets**: `ConstrainedBox` has been relocated to `core`. (#pr, @M-Adoo)
 
 ### Fixed
 
@@ -38,6 +43,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Fixed
 
 - **widgets**: Flex may not decrease the gap for the second child during layout. (#622 @M-Adoo)
+
 
 ## [0.4.0-alpha.6] - 2024-08-21
 

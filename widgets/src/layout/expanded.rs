@@ -1,7 +1,5 @@
 use ribir_core::prelude::*;
 
-use super::ConstrainedBox;
-
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.

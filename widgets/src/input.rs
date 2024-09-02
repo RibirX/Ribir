@@ -18,7 +18,7 @@ use crate::{
     selected_text::SelectedHighLight,
     text_selectable::{bind_point_listener, select_key_handle, SelectableText},
   },
-  layout::{ConstrainedBox, OnlySizedByParent, Stack, StackFit},
+  layout::{OnlySizedByParent, Stack, StackFit},
   prelude::Text,
 };
 
@@ -339,7 +339,8 @@ where
         scrollable: scroll_dir,
       };
 
-      let caret_box = @ConstrainedBox {
+      let caret_box = @Caret {
+        focused: pipe!($stack.has_focus()),
         clamp: pipe!(
             $this.current_line_height(&$text, $text.layout_size()).unwrap_or(0.)
           ).map(BoxClamp::fixed_height),
@@ -406,11 +407,7 @@ where
 
       let caret = @UnconstrainedBox {
         clamp_dim: ClampDim::MIN_SIZE,
-        @OnlySizedByParent {
-          @$caret_box {
-            @Caret { focused: pipe!($stack.has_focus()) }
-          }
-        }
+        @OnlySizedByParent { @ {caret_box } }
       };
 
       let text_widget = text.into_widget();

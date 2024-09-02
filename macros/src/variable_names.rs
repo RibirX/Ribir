@@ -114,6 +114,8 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "scroll_view_size" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},
   "scroll_content_size" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},
   "jump_to" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},
+  // ConstrainedBox
+  "clamp" => BuiltinMember { host_ty: "ConstrainedBox", mem_ty: Field, var_name: "constrained_box"},
   // TransformWidget
   "transform" => BuiltinMember { host_ty: "TransformWidget", mem_ty: Field, var_name: "transform" },
   // HAlignWidget

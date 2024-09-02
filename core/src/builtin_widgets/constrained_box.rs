@@ -1,9 +1,15 @@
-use ribir_core::prelude::*;
+use crate::prelude::*;
 
 /// a widget that imposes additional constraints clamp on its child.
-#[derive(SingleChild, Declare, Clone)]
+#[derive(SingleChild, Clone, Default)]
 pub struct ConstrainedBox {
   pub clamp: BoxClamp,
+}
+
+impl Declare for ConstrainedBox {
+  type Builder = FatObj<()>;
+  #[inline]
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 impl Render for ConstrainedBox {
@@ -22,20 +28,18 @@ impl Render for ConstrainedBox {
 
 #[cfg(test)]
 mod tests {
-  use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::prelude::*;
+  use crate::test_helper::*;
 
   widget_layout_test! (
     outside_fixed_clamp,
     fn_widget! {
-      @SizedBox {
-        size: Size::new(50., 50.),
-        @ConstrainedBox {
-          clamp: BoxClamp::fixed_size(Size::new(40., 40.)),
-          @Void {}
+      @ConstrainedBox {
+        clamp: BoxClamp::fixed_size(Size::new(50., 50.)),
+        @Void {
+          clamp: BoxClamp::fixed_size(Size::new(40., 40.))
         }
       }
     },

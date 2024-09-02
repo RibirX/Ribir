@@ -100,12 +100,11 @@ fn input(
   text: Option<String>, mut on_submit: impl FnMut(CowArc<str>) + 'static,
 ) -> Widget<'static> {
   fn_widget! {
-    let input = @Input { };
+    let input = @Input { auto_focus: true };
     if let  Some(text) = text {
       $input.write().set_text(&text);
     }
     @$input {
-      auto_focus: true,
       margin: EdgeInsets::horizontal(24.),
       h_align: HAlign::Stretch,
       border: {
