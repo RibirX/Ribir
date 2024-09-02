@@ -43,23 +43,15 @@ impl Render for UnconstrainedBox {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     if self.clamp_dim.contains(ClampDim::MIN_SIZE) {
       match self.dir {
-        UnconstrainedDir::X => {
-          clamp.min.width = 0.;
-        }
-        UnconstrainedDir::Y => {
-          clamp.min.height = 0.;
-        }
+        UnconstrainedDir::X => clamp.min.width = 0.,
+        UnconstrainedDir::Y => clamp.min.height = 0.,
         UnconstrainedDir::Both => clamp = clamp.loose(),
       };
     }
     if self.clamp_dim.contains(ClampDim::MAX_SIZE) {
       match self.dir {
-        UnconstrainedDir::X => {
-          clamp.max.width = f32::INFINITY;
-        }
-        UnconstrainedDir::Y => {
-          clamp.max.height = f32::INFINITY;
-        }
+        UnconstrainedDir::X => clamp.max.width = f32::INFINITY,
+        UnconstrainedDir::Y => clamp.max.height = f32::INFINITY,
         UnconstrainedDir::Both => clamp = clamp.expand(),
       };
     }

@@ -68,6 +68,8 @@ mod provider;
 pub use provider::*;
 mod class;
 pub use class::*;
+mod constrained_box;
+pub use constrained_box::*;
 
 use crate::prelude::*;
 
@@ -101,11 +103,11 @@ pub struct LazyWidgetId(Sc<Cell<Option<WidgetId>>>);
 ///     .into_widget()
 /// };
 /// ```
+#[derive(Default)]
 pub struct FatObj<T> {
   host: T,
   host_id: LazyWidgetId,
   id: LazyWidgetId,
-  class: Option<State<Class>>,
   mix_builtin: Option<State<MixBuiltin>>,
   request_focus: Option<State<RequestFocus>>,
   has_focus: Option<State<HasFocus>>,
@@ -118,6 +120,7 @@ pub struct FatObj<T> {
   cursor: Option<State<Cursor>>,
   margin: Option<State<Margin>>,
   scrollable: Option<State<ScrollableWidget>>,
+  constrained_box: Option<State<ConstrainedBox>>,
   transform: Option<State<TransformWidget>>,
   h_align: Option<State<HAlignWidget>>,
   v_align: Option<State<VAlignWidget>>,
@@ -125,6 +128,7 @@ pub struct FatObj<T> {
   global_anchor: Option<State<GlobalAnchor>>,
   visibility: Option<State<Visibility>>,
   opacity: Option<State<Opacity>>,
+  class: Option<State<Class>>,
   keep_alive: Option<State<KeepAlive>>,
   keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
 }
@@ -160,35 +164,7 @@ impl LazyWidgetId {
 
 impl<T> FatObj<T> {
   /// Create a new `FatObj` with the given host object.
-  pub fn new(host: T) -> Self {
-    Self {
-      host,
-      host_id: LazyWidgetId::default(),
-      id: LazyWidgetId::default(),
-      class: None,
-      mix_builtin: None,
-      request_focus: None,
-      has_focus: None,
-      mouse_hover: None,
-      pointer_pressed: None,
-      fitted_box: None,
-      box_decoration: None,
-      padding: None,
-      layout_box: None,
-      cursor: None,
-      margin: None,
-      scrollable: None,
-      transform: None,
-      h_align: None,
-      v_align: None,
-      relative_anchor: None,
-      global_anchor: None,
-      visibility: None,
-      opacity: None,
-      keep_alive: None,
-      keep_alive_unsubscribe_handle: None,
-    }
-  }
+  pub fn new(host: T) -> Self { FatObj::<()>::default().with_child(host) }
 
   /// Maps an `FatObj<T>` to `FatObj<V>` by applying a function to the host
   /// object.
@@ -210,6 +186,7 @@ impl<T> FatObj<T> {
       cursor: self.cursor,
       margin: self.margin,
       scrollable: self.scrollable,
+      constrained_box: self.constrained_box,
       transform: self.transform,
       h_align: self.h_align,
       v_align: self.v_align,
@@ -361,6 +338,12 @@ impl<T> FatObj<T> {
   pub fn get_margin_widget(&mut self) -> &mut State<Margin> {
     self
       .margin
+      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+
+  pub fn get_constrained_box_widget(&mut self) -> &mut State<ConstrainedBox> {
+    self
+      .constrained_box
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 
@@ -788,6 +771,11 @@ impl<T> FatObj<T> {
     self.declare_builtin_init(v, Self::get_margin_widget, |m, v| m.margin = v)
   }
 
+  /// Initializes the constraints clamp of the widget.
+  pub fn clamp<const M: u8>(self, v: impl DeclareInto<BoxClamp, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_constrained_box_widget, |m, v| m.clamp = v)
+  }
+
   /// Initializes how user can scroll the widget.
   pub fn scrollable<const M: u8>(self, v: impl DeclareInto<Scrollable, M>) -> Self {
     self.declare_builtin_init(v, Self::get_scrollable_widget, |m, v| m.scrollable = v)
@@ -889,73 +877,47 @@ where
 
 impl<'a> FatObj<Widget<'a>> {
   fn compose(self) -> Widget<'a> {
+    macro_rules! compose_builtin_widgets {
+      ($host: ident + [$($field: ident),*]) => {
+        $(
+          if let Some($field) = self.$field {
+            $host = $field.with_child($host).into_widget();
+          }
+        )*
+      };
+    }
     let mut host = self.host;
     if self.host_id.0.ref_count() > 1 {
       host = self.host_id.clone().bind(host);
     }
-    if let Some(class) = self.class {
-      host = class.with_child(host).into_widget();
-    }
-    if let Some(mix_builtin) = self.mix_builtin {
-      host = mix_builtin.with_child(host).into_widget()
-    }
-    if let Some(request_focus) = self.request_focus {
-      host = request_focus.with_child(host).into_widget();
-    }
-    if let Some(has_focus) = self.has_focus {
-      host = has_focus.with_child(host).into_widget();
-    }
-    if let Some(mouse_hover) = self.mouse_hover {
-      host = mouse_hover.with_child(host).into_widget();
-    }
-    if let Some(pointer_pressed) = self.pointer_pressed {
-      host = pointer_pressed.with_child(host).into_widget();
-    }
-    if let Some(fitted_box) = self.fitted_box {
-      host = fitted_box.with_child(host).into_widget();
-    }
-    if let Some(box_decoration) = self.box_decoration {
-      host = box_decoration.with_child(host).into_widget();
-    }
-    if let Some(padding) = self.padding {
-      host = padding.with_child(host).into_widget();
-    }
-    if let Some(layout_box) = self.layout_box {
-      host = layout_box.with_child(host).into_widget();
-    }
-    if let Some(cursor) = self.cursor {
-      host = cursor.with_child(host).into_widget();
-    }
-    if let Some(margin) = self.margin {
-      host = margin.with_child(host).into_widget();
-    }
-    if let Some(scrollable) = self.scrollable {
-      host = scrollable.with_child(host).into_widget();
-    }
-    if let Some(transform) = self.transform {
-      host = transform.with_child(host).into_widget();
-    }
-    if let Some(h_align) = self.h_align {
-      host = h_align.with_child(host).into_widget();
-    }
-    if let Some(v_align) = self.v_align {
-      host = v_align.with_child(host).into_widget();
-    }
-    if let Some(relative_anchor) = self.relative_anchor {
-      host = relative_anchor.with_child(host).into_widget();
-    }
-    if let Some(global_anchor) = self.global_anchor {
-      host = global_anchor.with_child(host).into_widget();
-    }
-    if let Some(visibility) = self.visibility {
-      host = visibility.with_child(host).into_widget();
-    }
-    if let Some(opacity) = self.opacity {
-      host = opacity.with_child(host).into_widget();
-    }
-    if let Some(keep_alive) = self.keep_alive {
-      host = keep_alive.with_child(host).into_widget();
-    }
+    compose_builtin_widgets!(
+      host
+        + [
+          padding,
+          fitted_box,
+          constrained_box,
+          box_decoration,
+          scrollable,
+          layout_box,
+          mix_builtin,
+          request_focus,
+          has_focus,
+          mouse_hover,
+          pointer_pressed,
+          cursor,
+          margin,
+          transform,
+          visibility,
+          opacity,
+          class,
+          h_align,
+          v_align,
+          relative_anchor,
+          global_anchor,
+          keep_alive
+        ]
+    );
+
     if let Some(h) = self.keep_alive_unsubscribe_handle {
       host = host.attach_anonymous_data(h);
     }

@@ -313,7 +313,7 @@ mod test {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::layout::{Column, ConstrainedBox};
+  use crate::layout::Column;
 
   widget_layout_test!(
     content_expand_so_all_view_can_scroll,

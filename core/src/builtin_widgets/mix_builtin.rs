@@ -310,9 +310,7 @@ impl MixBuiltin {
 
     let other_subject = other.subject();
     fn subscribe_fn(subject: EventSubject) -> impl FnMut(&mut Event) {
-      move |e: &mut Event| {
-        subject.clone().next(e);
-      }
+      move |e: &mut Event| subject.clone().next(e)
     }
     self
       .subject()
