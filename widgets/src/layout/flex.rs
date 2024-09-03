@@ -185,7 +185,7 @@ impl FlexLayouter {
     } else {
       FlexSize::zero()
     };
-    let mut gap = 0.;
+
     while let Some(mut l) = layouter {
       let mut max = max;
       if !wrap {
@@ -200,6 +200,13 @@ impl FlexLayouter {
       let flex = l
         .query::<Expanded>()
         .map(|expanded| expanded.flex);
+
+      layouter = l.into_next_sibling();
+      let gap = if layouter.is_some() && !FlexLayouter::is_space_layout(self.justify_content) {
+        self.main_axis_gap
+      } else {
+        0.
+      };
 
       // flex-item need use empty space to resize after all fixed widget performed
       // layout.
@@ -226,13 +233,6 @@ impl FlexLayouter {
         .current_line
         .items_info
         .push(FlexLayoutInfo { size, flex, pos: <_>::default() });
-
-      layouter = l.into_next_sibling();
-      if layouter.is_some() && !FlexLayouter::is_space_layout(self.justify_content) {
-        gap = self.main_axis_gap;
-      } else {
-        gap = 0.;
-      }
     }
     self.place_line();
   }
@@ -653,5 +653,20 @@ mod tests {
     { path = [0, 0], rect == ribir_geom::rect(0., 0., 500., 25.),}
     { path = [0, 0, 0], rect == ribir_geom::rect(0., 0., 100., 25.),}
     { path = [0, 0, 2], rect == ribir_geom::rect(200., 0., 300., 25.),}
+  );
+
+  widget_layout_test!(
+    fix_flex_gap,
+    fn_widget! {
+      @Column {
+        item_gap: 50.,
+        @SizedBox { size: Size::new(100., 100.) }
+        @SizedBox { size: Size::new(100., 500.) }
+      }
+    },
+    wnd_size = Size::new(500., 500.),
+    { path =[0], height == 500.,}
+    { path =[0, 0], y == 0., height == 100.,}
+    { path =[0, 1], y == 150., height == 350.,}
   );
 }
