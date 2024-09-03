@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **widgets**: Flex may not decrease the gap for the second child during layout. (#622 @M-Adoo)
+
 ## [0.4.0-alpha.6] - 2024-08-21
 
 ### Features
