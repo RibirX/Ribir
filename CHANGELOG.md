@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **macros**: Declaring the variable parent with built-in fields as immutable is incorrect if its child uses it as mutable. (#623 @M-Adoo)
+
 ## [0.4.0-alpha.7] - 2024-09-04
 
 ### Fixed
