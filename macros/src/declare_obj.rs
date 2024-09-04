@@ -3,7 +3,7 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{
   punctuated::Punctuated,
   spanned::Spanned,
-  token::{Brace, Comma},
+  token::{Brace, Comma, Semi},
   Ident, Macro, Path,
 };
 
@@ -47,23 +47,37 @@ impl<'a> ToTokens for DeclareObj<'a> {
       self.gen_node_tokens(tokens);
     } else {
       Brace(*span).surround(tokens, |tokens| {
-        let mut node = quote! {};
-        self.gen_node_tokens(&mut node);
-        match &self.this.node_type {
-          ObjType::Type { span, .. } => {
-            // declare the host widget before  children. So that we can use variable if it
-            // moved in children. This is consistent with the user's declaration.
-            let name = Ident::new("_ribir_ಠ_ಠ", self.span);
-            quote_spanned! { *span => let _ribir_ಠ_ಠ = #node; }.to_tokens(tokens);
-            self.declare_children_and_compose_it(&name, tokens);
-          }
-          ObjType::Var(var) => {
-            if !this.fields.is_empty() {
-              quote_spanned! { var.span() => let #var = #node; }.to_tokens(tokens);
-            }
-            self.declare_children_and_compose_it(var, tokens)
-          }
+        let name = match &this.node_type {
+          ObjType::Type { span, .. } => Ident::new("_ribir_ಠ_ಠ", *span),
+          ObjType::Var(var) => (*var).clone(),
         };
+
+        // Declare the host widget before its children. This way, we can use variables
+        // if they are moved within the children, aligning with the user's declaration
+        // style.
+        if !matches!(this.node_type, ObjType::Var(_) if this.fields.is_empty()) {
+          if matches!(this.node_type, ObjType::Var(_) if !self.children.is_empty()) {
+            // If the object is a variable, after composing it with built-in objects, we
+            // should keep it mutable so that the children can utilize it.
+            quote! {
+              #[allow(unused_mut)]
+              let mut #name =
+            }
+            .to_tokens(tokens);
+          } else {
+            quote! { let #name = }.to_tokens(tokens);
+          }
+          self.gen_node_tokens(tokens);
+          Semi(self.span).to_tokens(tokens);
+        }
+
+        let mut children = Vec::with_capacity(self.children.len());
+        for (i, c) in self.children.iter().enumerate() {
+          let child = Ident::new(&format!("_child_{i}_ಠ_ಠ"), c.span());
+          quote_spanned! { c.span() => let #child = #c; }.to_tokens(tokens);
+          children.push(child)
+        }
+        quote_spanned! { self.span => #name #(.with_child(#children))* }.to_tokens(tokens)
       })
     }
   }
@@ -84,17 +98,6 @@ impl<'a> DeclareObj<'a> {
     }
 
     Ok(())
-  }
-
-  fn declare_children_and_compose_it(&self, var: &Ident, tokens: &mut TokenStream) {
-    let mut children = vec![];
-    for (i, c) in self.children.iter().enumerate() {
-      let child = Ident::new(&format!("_child_{i}_ಠ_ಠ"), c.span());
-      quote_spanned! { c.span() => let #child = #c; }.to_tokens(tokens);
-      children.push(child)
-    }
-
-    quote_spanned! { self.span => #var #(.with_child(#children))* }.to_tokens(tokens)
   }
 
   fn gen_node_tokens(&self, tokens: &mut TokenStream) {
@@ -129,11 +132,11 @@ impl<'a> DeclareObj<'a> {
         } else {
           let fields = fields.iter();
           // move `var` last, so that we can use it in the fields.
-          quote_spanned! { var.span() => {
-            let mut _ಠ_ಠ = FatObj::new(());
-            #(_ಠ_ಠ = _ಠ_ಠ #fields;)*
-            _ಠ_ಠ.map(move |_| #var)
-          }}
+          quote_spanned! { var.span() =>
+            FatObj::new(())
+              #(#fields)*
+              .with_child(#var)
+          }
           .to_tokens(tokens);
         }
       }

@@ -872,3 +872,15 @@ fn fix_direct_use_map_writer_with_builtin() {
       .map_writer(|w| PartData::from_ref_mut(&mut w.anchor));
   }
 }
+
+#[test]
+fn fix_use_var_in_children() {
+  let _w = fn_widget! {
+    let p = @MockBox { size: Size::zero() };
+    @ $p {
+      opacity: 1.,
+      // Use layout size query write of `p`
+      @MockBox { opacity: $p.opacity }
+    }
+  };
+}
