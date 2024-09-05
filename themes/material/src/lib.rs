@@ -6,6 +6,7 @@ pub use ripple::*;
 pub use state_layer::*;
 mod styles_sheet;
 pub use styles_sheet::*;
+pub mod md;
 
 /// Crate a material theme with palette.
 fn new(palette: Palette) -> Theme {
