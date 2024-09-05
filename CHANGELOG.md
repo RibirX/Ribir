@@ -29,6 +29,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: The built-in widget `Class` has been added to enable the sharing of consistent styles across multiple elements and to allow widgets to have different actions and styles in different themes. (#pr, @M-Adoo)
 - **core**: The widget `ConstrainedBox` has been added as a built-in widget; now `clamp` can be used as a built-in field. (#pr @M-Adoo)
+- **theme/material**: Define the constant variables of motion. (#pr, @M-Adoo)
 
 ### Breaking
 
