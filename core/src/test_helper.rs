@@ -47,6 +47,12 @@ impl TestWindow {
     Self::new_wnd(root, Some(size))
   }
 
+  #[track_caller]
+  pub fn assert_root_size(&self, size: Size) {
+    let info = self.layout_info_by_path(&[0]).unwrap();
+    assert_eq!(info.size.unwrap(), size);
+  }
+
   fn new_wnd(root: impl Into<GenWidget>, size: Option<Size>) -> Self {
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
     let wnd = AppCtx::new_window(Box::new(TestShellWindow::new(size)), root.into());
@@ -253,4 +259,156 @@ impl Render for MockBox {
 
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}
+}
+
+/// The layout case describes the expected position and size of a widget node
+/// based on its index path.
+///
+/// In terms of the index path:
+///   - [0, 1] indicates the second child of the root, where the root level is
+///     denoted as 0.
+///   - [0, 1, 2] signifies the first node at the root level (which is 0),
+///     followed by its second child, and then the third child below that.
+pub struct LayoutCase {
+  path: &'static [usize],
+  x: Option<f32>,
+  y: Option<f32>,
+  width: Option<f32>,
+  height: Option<f32>,
+}
+
+impl LayoutCase {
+  #[track_caller]
+  pub fn expect_x(wnd: &TestWindow, path: &'static [usize], x: f32) {
+    LayoutCase::new(path).with_x(x).check(wnd);
+  }
+
+  #[track_caller]
+  pub fn expect_y(wnd: &TestWindow, path: &'static [usize], y: f32) {
+    LayoutCase::new(path).with_y(y).check(wnd);
+  }
+
+  #[track_caller]
+  pub fn expect_size(wnd: &TestWindow, path: &'static [usize], size: Size) {
+    LayoutCase::new(path).with_size(size).check(wnd);
+  }
+
+  #[track_caller]
+  pub fn expect_pos(wnd: &TestWindow, path: &'static [usize], pos: Point) {
+    LayoutCase::new(path).with_pos(pos).check(wnd);
+  }
+
+  #[track_caller]
+  pub fn expect_rect(wnd: &TestWindow, path: &'static [usize], rect: Rect) {
+    LayoutCase::new(path)
+      .with_pos(rect.origin)
+      .with_size(rect.size)
+      .check(wnd);
+  }
+
+  pub fn new(path: &'static [usize]) -> Self { LayoutCase { path, ..<_>::default() } }
+
+  pub fn with_pos(mut self, pos: Point) -> Self {
+    self.x = Some(pos.x);
+    self.y = Some(pos.y);
+    self
+  }
+  pub fn with_x(mut self, x: f32) -> Self {
+    self.x = Some(x);
+    self
+  }
+
+  pub fn with_y(mut self, y: f32) -> Self {
+    self.y = Some(y);
+    self
+  }
+
+  pub fn with_width(mut self, width: f32) -> Self {
+    self.width = Some(width);
+    self
+  }
+
+  pub fn with_height(mut self, height: f32) -> Self {
+    self.height = Some(height);
+    self
+  }
+
+  pub fn with_size(mut self, size: Size) -> Self {
+    self.width = Some(size.width);
+    self.height = Some(size.height);
+    self
+  }
+
+  pub fn with_rect(self, rect: Rect) -> Self { self.with_pos(rect.origin).with_size(rect.size) }
+
+  #[track_caller]
+  pub fn check(&self, wnd: &TestWindow) {
+    let Self { path, x, y, width, height } = self;
+
+    let info = wnd.layout_info_by_path(path).unwrap();
+    if let Some(x) = x {
+      assert_eq!(info.pos.x, *x, "unexpected x");
+    }
+    if let Some(y) = y {
+      assert_eq!(info.pos.y, *y, "unexpected y");
+    }
+    if let Some(w) = width {
+      assert_eq!(info.size.unwrap().width, *w, "unexpected width");
+    }
+    if let Some(h) = height {
+      assert_eq!(info.size.unwrap().height, *h, "unexpected height");
+    }
+  }
+}
+
+pub struct WidgetTester {
+  pub widget: GenWidget,
+  pub wnd_size: Option<Size>,
+  pub on_initd: Option<InitdFn>,
+  pub comparison: Option<f64>,
+}
+
+type InitdFn = Box<dyn Fn(&mut TestWindow)>;
+
+impl WidgetTester {
+  pub fn new(widget: impl Into<GenWidget>) -> Self {
+    Self { wnd_size: None, widget: widget.into(), on_initd: None, comparison: None }
+  }
+
+  /// This callback runs after creating the window and drawing the first frame.
+  pub fn on_initd(mut self, on_initd: impl Fn(&mut TestWindow) + 'static) -> Self {
+    self.on_initd = Some(Box::new(on_initd));
+    self
+  }
+
+  pub fn with_wnd_size(mut self, size: Size) -> Self {
+    self.wnd_size = Some(size);
+    self
+  }
+
+  pub fn with_comparison(mut self, comparison: f64) -> Self {
+    self.comparison = Some(comparison);
+    self
+  }
+
+  pub fn create_wnd(&self) -> TestWindow {
+    let wnd_size = self.wnd_size.unwrap_or(Size::new(1024., 1024.));
+    let mut wnd = TestWindow::new_with_size(self.widget.clone(), wnd_size);
+    wnd.draw_frame();
+    if let Some(initd) = self.on_initd.as_ref() {
+      initd(&mut wnd);
+      wnd.draw_frame();
+    }
+    wnd
+  }
+
+  #[track_caller]
+  pub fn layout_check(&self, cases: &[LayoutCase]) {
+    let wnd = self.create_wnd();
+    cases.iter().for_each(|c| c.check(&wnd));
+  }
+}
+
+impl Default for LayoutCase {
+  fn default() -> Self { Self { path: &[0], x: None, y: None, width: None, height: None } }
 }

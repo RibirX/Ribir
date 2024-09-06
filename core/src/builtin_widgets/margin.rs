@@ -116,14 +116,14 @@ mod tests {
 
   widget_layout_test!(
     smoke,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @MockBox {
         margin: EdgeInsets::symmetrical(1., 1.),
         size: Size::new(100., 100.)
       }
-    },
-    wnd_size = Size::new(200., 200.),
-    { path = [0], width == 102., height == 102.,}
-    { path = [0, 0], rect == ribir_geom::rect(1., 1.0, 100., 100.),}
+    })
+    .with_wnd_size(Size::new(200., 200.)),
+    LayoutCase::default().with_size(Size::new(102., 102.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(1., 1.0, 100., 100.))
   );
 }

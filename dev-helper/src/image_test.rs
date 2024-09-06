@@ -40,7 +40,7 @@ macro_rules! painter_backend_eq_image_test {
 
 #[macro_export]
 macro_rules! test_case_name {
-  ($name:ident, $format:literal) => {{
+  ($name:expr, $format:literal) => {{
     let mut path_buffer = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
     let module_path = std::module_path!();
     let path = module_path.replace("::", "/");

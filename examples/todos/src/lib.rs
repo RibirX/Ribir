@@ -20,5 +20,10 @@ mod tests {
 
   use super::*;
 
-  widget_image_test!(todos, todos, wnd_size = Size::new(400., 640.), comparison = 0.002);
+  widget_image_tests!(
+    todos,
+    WidgetTester::new(todos)
+      .with_wnd_size(Size::new(400., 640.))
+      .with_comparison(0.002)
+  );
 }

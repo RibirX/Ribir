@@ -122,5 +122,10 @@ mod tests {
 
   use super::*;
 
-  widget_image_test!(messages, messages, wnd_size = Size::new(400., 600.), comparison = 0.004);
+  widget_image_tests!(
+    messages,
+    WidgetTester::new(messages)
+      .with_wnd_size(Size::new(400., 600.))
+      .with_comparison(0.004)
+  );
 }

@@ -181,7 +181,7 @@ mod tests {
 
   widget_layout_test!(
     global_anchor,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       let parent = @MockBox {
         anchor: Anchor::left_top(10., 10.),
         size: Size::new(50., 50.),
@@ -205,12 +205,9 @@ mod tests {
           @ { bottom_right }
         }
       }
-    },
-    wnd_size = WND_SIZE,
-    { path = [0, 0, 0, 0, 0], x == 20.,}
-    { path = [0, 0, 0, 0, 0], y == 10.,}
-
-    { path = [0, 0, 0, 1, 0], x == 30.,}
-    { path = [0, 0, 0, 1, 0], y == 20.,}
+    })
+    .with_wnd_size(WND_SIZE),
+    LayoutCase::new(&[0, 0, 0, 0, 0]).with_pos(Point::new(20., 10.)),
+    LayoutCase::new(&[0, 0, 0, 1, 0]).with_pos(Point::new(30., 20.))
   );
 }

@@ -32,5 +32,10 @@ mod tests {
 
   use super::*;
 
-  widget_image_test!(counter, counter, wnd_size = Size::new(400., 600.), comparison = 0.001);
+  widget_image_tests!(
+    counter,
+    WidgetTester::new(counter)
+      .with_wnd_size(Size::new(400., 600.))
+      .with_comparison(0.001)
+  );
 }

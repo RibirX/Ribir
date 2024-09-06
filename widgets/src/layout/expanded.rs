@@ -41,7 +41,7 @@ mod tests {
 
   widget_layout_test!(
     expand_child_size_zero,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       let size = Size::new(100., 50.);
       @Row {
         @Expanded {
@@ -54,15 +54,15 @@ mod tests {
           @SizedBox { size: Size::new(0., 50.) }
         }
       }
-    },
-    wnd_size = Size::new(500., 500.),
-    { path = [0, 0], width == 400., height == 50.,}
-    { path = [0, 2], width == 0., height == 50.,}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(400., 50.)),
+    LayoutCase::new(&[0, 2]).with_size(Size::new(0., 50.))
   );
 
   widget_layout_test!(
     one_line_expanded,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       let size = Size::new(100., 50.);
       @Row {
         @Expanded {
@@ -76,18 +76,18 @@ mod tests {
           @SizedBox { size }
         }
       }
-    },
-    wnd_size = Size::new(500., 500.),
-    { path = [0], width == 500., height == 50.,}
-    { path = [0, 0], width == 100., height == 50., }
-    { path = [0, 1], rect == ribir_geom::rect(100., 0., 100., 50.),}
-    { path = [0, 2], rect == ribir_geom::rect(200., 0., 100., 50.),}
-    { path = [0, 3], rect == ribir_geom::rect(300., 0., 200., 50.),}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::default().with_size(Size::new(500., 50.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(100., 50.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 0., 100., 50.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 50.)),
+    LayoutCase::new(&[0, 3]).with_rect(ribir_geom::rect(300., 0., 200., 50.))
   );
 
   widget_layout_test!(
     wrap_expanded,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       let size = Size::new(100., 50.);
       @Row {
         wrap: true,
@@ -108,15 +108,15 @@ mod tests {
           @SizedBox { size, }
         }
       }
-    },
-    wnd_size = Size::new(350., 500.),
-    { path = [0], rect == ribir_geom::rect(0., 0., 350., 100.),}
-    { path = [0, 0], rect == ribir_geom::rect(0., 0., 50., 50.),}
-    { path = [0, 1], rect == ribir_geom::rect(50., 0., 100., 50.),}
-    { path = [0, 2], rect == ribir_geom::rect(150., 0., 100., 50.),}
-    { path = [0, 3], rect == ribir_geom::rect(250., 0., 100., 50.),}
-    { path = [0, 4], rect == ribir_geom::rect(0., 50., 100., 50.),}
-    { path = [0, 5], rect == ribir_geom::rect(100., 50., 50., 50.),}
-    { path = [0, 6], rect == ribir_geom::rect(150., 50., 200., 50.),}
+    })
+    .with_wnd_size(Size::new(350., 500.)),
+    LayoutCase::default().with_rect(ribir_geom::rect(0., 0., 350., 100.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 50., 50.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(50., 0., 100., 50.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(150., 0., 100., 50.)),
+    LayoutCase::new(&[0, 3]).with_rect(ribir_geom::rect(250., 0., 100., 50.)),
+    LayoutCase::new(&[0, 4]).with_rect(ribir_geom::rect(0., 50., 100., 50.)),
+    LayoutCase::new(&[0, 5]).with_rect(ribir_geom::rect(100., 50., 50., 50.)),
+    LayoutCase::new(&[0, 6]).with_rect(ribir_geom::rect(150., 50., 200., 50.))
   );
 }

@@ -48,9 +48,8 @@ impl Compose for TupleBox {
 
 widget_layout_test!(
   tuple_widget,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     TupleBox(Size::new(1., 1.))
-  },
-  width == 1.,
-  height == 1.,
+  }),
+  LayoutCase::default().with_size(Size::new(1., 1.))
 );

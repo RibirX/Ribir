@@ -7,99 +7,91 @@ use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
 widget_layout_test!(
   simplest_leaf_rdl,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     rdl!{ SizedBox { size: Size::new(500.,500.) } }
-  },
-  width == 500.,
-  height == 500.,
+  }),
+  LayoutCase::default().with_size(Size::new(500., 500.))
 );
 
 widget_layout_test!(
   with_child_rdl,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     rdl!{
       Row {
         rdl!{ SizedBox { size: Size::new(500.,500.)  } }
       }
     }
-  },
-  width == 500.,
-  height == 500.,
+  }),
+  LayoutCase::default().with_size(Size::new(500., 500.))
 );
 
 widget_layout_test!(
   with_builtin_child_rdl,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     rdl!{ SizedBox {
       size: Size::new(500.,500.),
       margin: EdgeInsets::all(10.)
     }}
-  },
-  width == 520.,
-  height == 520.,
+  }),
+  LayoutCase::default().with_size(Size::new(520., 520.))
 );
 
 widget_layout_test!(
   rdl_with_child,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let single_p = rdl!{ SizedBox { size: Size::new(500.,500.)  }};
     rdl!{ $single_p { rdl!{ Void } } }
-  },
-  width == 500.,
-  height == 500.,
+  }),
+  LayoutCase::default().with_size(Size::new(500., 500.))
 );
 
 widget_layout_test!(
   single_rdl_has_builtin_with_child,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let single_p = rdl!{ SizedBox {
       size: Size::new(500.,500.),
       margin: EdgeInsets::all(10.)
     }};
     rdl!{ $single_p { rdl!{ Void } } }
-  },
-  width == 520.,
-  height == 520.,
+  }),
+  LayoutCase::default().with_size(Size::new(520., 520.))
 );
 
 widget_layout_test!(
   multi_child_rdl_has_builtin_with_child,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let multi_p = rdl!{ Flex {
       margin: EdgeInsets::all(10.)
     } };
     rdl!{ $multi_p { rdl!{ Void } } }
-  },
-  width == 20.,
-  height == 20.,
+  }),
+  LayoutCase::default().with_size(Size::new(20., 20.))
 );
 
 widget_layout_test!(
   compose_child_rdl_has_builtin_with_child,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let multi_p = rdl!{ Row { margin: EdgeInsets::all(10.) }};
     rdl!{ $multi_p { rdl!{ Void {} }} }
-  },
-  width == 20.,
-  height == 20.,
+  }),
+  LayoutCase::default().with_size(Size::new(20., 20.))
 );
 
 widget_layout_test!(
   access_rdl_widget,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let b = rdl!{ SizedBox {size: Size::new(500.,500.)}};
     rdl!{ Row {
       rdl!{ SizedBox { size: $b.size } }
       rdl!{ b }
     }}
-  },
-  width == 1000.,
-  height == 500.,
+  }),
+  LayoutCase::default().with_size(Size::new(1000., 500.))
 );
 
 widget_layout_test!(
   access_builtin_rdl_widget,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let mut b = rdl!{ SizedBox {
       size: Size::new(100.,100.),
       margin: EdgeInsets::all(10.)
@@ -116,48 +108,44 @@ widget_layout_test!(
         rdl!{ b }
       }
     }
-  },
-  width == 240.,
-  height == 120.,
+  }),
+  LayoutCase::default().with_size(Size::new(240., 120.))
 );
 
 widget_layout_test!(
   dollar_as_rdl_parent,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let b = rdl!{SizedBox { size: Size::new(500.,500.) }};
     rdl!{ $b { rdl!{ Void {}} } }
-  },
-  width == 500.,
-  height == 500.,
+  }),
+  LayoutCase::default().with_size(Size::new(500., 500.))
 );
 
 widget_layout_test!(
   dollar_as_middle_parent,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let b = rdl!{ SizedBox { size: Size::new(500.,500.) }};
     rdl!{ Row { rdl!{ $b { rdl!{ Void {} } } } } }
-  },
-  width == 500.,
-  height == 500.,
+  }),
+  LayoutCase::default().with_size(Size::new(500., 500.))
 );
 
 widget_layout_test!(
   pipe_as_field_value,
-  {
+  WidgetTester::new({
     let (size, w_size) = split_value(Size::zero());
     let w = fn_widget! {
       rdl!{ SizedBox { size: pipe!(*$size) }}
     };
     *w_size.write() = Size::new(100., 100.);
     w
-  },
-  width == 100.,
-  height == 100.,
+  }),
+  LayoutCase::default().with_size(Size::new(100., 100.))
 );
 
 widget_layout_test!(
   pipe_as_builtin_field_value,
-  {
+  WidgetTester::new({
     let (margin, w_margin) = split_value(EdgeInsets::all(0.));
     let w = fn_widget! {
       rdl!{ SizedBox {
@@ -168,14 +156,13 @@ widget_layout_test!(
     *w_margin.write() = EdgeInsets::all(50.);
 
     w
-  },
-  width == 100.,
-  height == 100.,
+  }),
+  LayoutCase::default().with_size(Size::new(100., 100.))
 );
 
 widget_layout_test!(
   pipe_with_ctx,
-  {
+  WidgetTester::new({
     let (scale, w_scale) = split_value(1.);
     let w = fn_widget! {
       rdl!{ SizedBox {
@@ -184,35 +171,32 @@ widget_layout_test!(
     };
     *w_scale.write() = 2.;
     w
-  },
-  width == 36.,
-  height == 36.,
+  }),
+  LayoutCase::default().with_size(Size::new(36., 36.))
 );
 
 widget_layout_test!(
   pipe_with_builtin_field,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let mut box1 = @SizedBox { size: Size::zero(), margin: EdgeInsets::all(1.) };
     let box2 = @SizedBox { size: $box1.size, margin: pipe!($box1.margin) };
     @Row {
       @{ box1 }
       @{ box2 }
     }
-  },
-  width == 4.,
-  height == 2.,
+  }),
+  LayoutCase::default().with_size(Size::new(4., 2.))
 );
 
 widget_layout_test!(
   capture_closure_used_ctx,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let size_box = @SizedBox { size: ZERO_SIZE };
     @ $size_box {
       on_mounted: move |_| $size_box.write().size = IconSize::of(ctx!()).tiny
     }
-  },
-  width == 18.,
-  height == 18.,
+  }),
+  LayoutCase::default().with_size(Size::new(18., 18.))
 );
 
 #[test]
@@ -239,11 +223,11 @@ fn pipe_single_parent() {
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 110., height == 110., });
+  wnd.assert_root_size(Size::new(110., 110.));
 
   *outside_blank2.write() = false;
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 100., height == 100., });
+  wnd.assert_root_size(Size::new(100., 100.));
 }
 
 #[test]
@@ -271,11 +255,11 @@ fn pipe_multi_parent() {
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 100., height == 100., });
+  wnd.assert_root_size((100., 100.).into());
 
   *stack_or_flex2.write() = false;
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 200., height == 100., });
+  wnd.assert_root_size((200., 100.).into());
 }
 
 #[test]
@@ -293,12 +277,12 @@ fn pipe_as_child() {
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 100., height == 100., });
+  wnd.assert_root_size((100., 100.).into());
 
   *box_or_not.write() = false;
 
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 0., height == 0., });
+  wnd.assert_root_size(Size::zero());
 }
 
 #[test]
@@ -316,25 +300,24 @@ fn pipe_as_multi_child() {
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 0., height == 0., });
+  wnd.assert_root_size(Size::zero());
 
   *w_cnt.write() = 3;
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 300., height == 100., });
+  wnd.assert_root_size((300., 100.).into());
 }
 
 widget_layout_test!(
   at_in_widget_macro,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     @SizedBox { size: Size::new(100., 100.) }
-  },
-  width == 100.,
-  height == 100.,
+  }),
+  LayoutCase::default().with_size(Size::new(100., 100.))
 );
 
 widget_layout_test!(
   at_as_variable_in_widget,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let size = Size::new(100., 100.);
     let row = @Row {};
     @ $row {
@@ -343,14 +326,13 @@ widget_layout_test!(
       // `rdl!` in @
       rdl!{ SizedBox { size } }
     }
-  },
-  width == 200.,
-  height == 100.,
+  }),
+  LayoutCase::default().with_size(Size::new(200., 100.))
 );
 
 widget_layout_test!(
   at_as_variable_in_rdl,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let size = Size::new(100., 100.);
     let row = @Row {};
     rdl!{
@@ -359,21 +341,19 @@ widget_layout_test!(
         @SizedBox { size }
       }
     }
-  },
-  width == 200.,
-  height == 100.,
+  }),
+  LayoutCase::default().with_size(Size::new(200., 100.))
 );
 
 widget_layout_test!(
   access_builtin_field_by_dollar,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let size = Size::new(100., 100.);
     let mut box1 = @SizedBox { size, margin: EdgeInsets::all(10.) };
     let box2 = @SizedBox { size, margin: $box1.margin };
     @Row { @ { box1 } @{ box2 } }
-  },
-  width == 240.,
-  height == 120.,
+  }),
+  LayoutCase::default().with_size(Size::new(240., 120.))
 );
 
 #[test]
@@ -396,15 +376,14 @@ fn closure_in_fn_widget_capture() {
 
 widget_layout_test!(
   at_embed_in_expression,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     @Row {
       @{ (0..3).map(|_| {
         @SizedBox { size: Size::new(100., 100.) }
       })}
     }
-  },
-  width == 300.,
-  height == 100.,
+  }),
+  LayoutCase::default().with_size(Size::new(300., 100.))
 );
 
 #[test]
@@ -438,12 +417,12 @@ fn simple_ref_bind_work() {
   let flex_size = Size::new(200., 100.);
   let mut wnd = TestWindow::new(w);
   wnd.layout();
-  assert_layout_result_by_path!(wnd, { path = [0], size == flex_size, });
+  wnd.assert_root_size(flex_size);
 
   tap_at(&wnd, (1, 1));
 
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], size == flex_size * 2., });
+  wnd.assert_root_size(flex_size * 2.);
 }
 
 #[test]
@@ -464,14 +443,14 @@ fn event_attr_sugar_work() {
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
 
-  assert_layout_result_by_path!(wnd, { path = [0], size == BEFORE_SIZE, });
-  assert_layout_result_by_path!(wnd, { path = [0, 0], size == BEFORE_SIZE, });
+  wnd.assert_root_size(BEFORE_SIZE);
+  LayoutCase::expect_size(&wnd, &[0, 0], BEFORE_SIZE);
 
   tap_at(&wnd, (25, 25));
 
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], size == AFTER_TAP_SIZE, });
-  assert_layout_result_by_path!(wnd, { path = [0, 0], size == AFTER_TAP_SIZE, });
+  wnd.assert_root_size(AFTER_TAP_SIZE);
+  LayoutCase::expect_size(&wnd, &[0, 0], AFTER_TAP_SIZE);
 }
 
 #[test]
@@ -495,12 +474,11 @@ fn widget_wrap_bind_work() {
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 104., height == 52.,});
-
+  wnd.assert_root_size(Size::new(104., 52.));
   tap_at(&wnd, (60, 1));
 
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 70., height == 60.,});
+  wnd.assert_root_size(Size::new(70., 60.));
 }
 
 #[test]
@@ -525,21 +503,21 @@ fn expression_for_children() {
 
   let mut wnd = TestWindow::new(embed_expr);
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 4., height == 1.,});
-  assert_layout_result_by_path!(wnd, { path = [0, 0], size == size_one,});
-  assert_layout_result_by_path!(wnd, { path = [0, 1], size == size_one,});
-  assert_layout_result_by_path!(wnd, { path = [0, 2], size == size_one,});
-  assert_layout_result_by_path!(wnd, { path = [0, 3], size == size_one,});
-  assert_layout_result_by_path!(wnd, { path = [0, 4], size == ZERO_SIZE,});
+  wnd.assert_root_size(Size::new(4., 1.));
+  LayoutCase::expect_size(&wnd, &[0, 0], size_one);
+  LayoutCase::expect_size(&wnd, &[0, 1], size_one);
+  LayoutCase::expect_size(&wnd, &[0, 2], size_one);
+  LayoutCase::expect_size(&wnd, &[0, 3], size_one);
+  LayoutCase::expect_size(&wnd, &[0, 4], ZERO_SIZE);
 
   tap_at(&wnd, (0, 0));
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 25., height == 5.,});
-  assert_layout_result_by_path!(wnd, { path = [0, 0], size == size_five,});
-  assert_layout_result_by_path!(wnd, { path = [0, 1], size == size_five,});
-  assert_layout_result_by_path!(wnd, { path = [0, 2], size == size_five,});
-  assert_layout_result_by_path!(wnd, { path = [0, 3], size == size_five,});
-  assert_layout_result_by_path!(wnd, { path = [0, 4], size == size_five,});
+  wnd.assert_root_size(Size::new(25., 5.));
+  LayoutCase::expect_size(&wnd, &[0, 0], size_five);
+  LayoutCase::expect_size(&wnd, &[0, 1], size_five);
+  LayoutCase::expect_size(&wnd, &[0, 2], size_five);
+  LayoutCase::expect_size(&wnd, &[0, 3], size_five);
+  LayoutCase::expect_size(&wnd, &[0, 4], size_five);
 }
 
 #[test]
@@ -557,11 +535,11 @@ fn embed_widget_ref_outside() {
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 4., height == 1.,});
+  wnd.assert_root_size(Size::new(4., 1.));
 
   tap_at(&wnd, (0, 0));
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], width == 8., height == 2.,});
+  wnd.assert_root_size(Size::new(8., 2.));
 }
 
 #[test]
@@ -606,7 +584,7 @@ const BE_CLIPPED_SIZE: Size = Size::new(500., 500.);
 
 widget_layout_test!(
   local_var_not_bind,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let _size_box = @SizedBox { size: BE_CLIPPED_SIZE };
     @SizedBox {
       size: {
@@ -616,9 +594,9 @@ widget_layout_test!(
       },
       @{ _size_box }
     }
-  },
-  { path = [0], width == 10., height == 10. ,}
-  { path = [0, 0], width == 10., height == 10. ,}
+  }),
+  LayoutCase::default().with_size(Size::new(10., 10.)),
+  LayoutCase::new(&[0, 0]).with_size(Size::new(10., 10.))
 );
 
 #[test]
@@ -797,7 +775,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
 
 widget_layout_test!(
   fix_local_assign_tuple,
-  fn_widget! {
+  WidgetTester::new(fn_widget! {
     let _sized = @SizedBox { size: Size::new(1., 1.) };
     let sized_box2 = @SizedBox {
       size: {
@@ -809,8 +787,8 @@ widget_layout_test!(
       @ { _sized }
       @ { sized_box2 }
     }
-  },
-  rect == ribir_geom::rect(0., 0., 2., 1.),
+  }),
+  LayoutCase::default().with_rect(ribir_geom::rect(0., 0., 2., 1.))
 );
 
 #[test]
@@ -831,13 +809,13 @@ fn fix_silent_not_relayout_dyn_widget() {
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
+  wnd.assert_root_size(ZERO_SIZE);
   {
     *c_trigger_size.silent() = Size::new(100., 100.);
   }
   // after silent modified, dyn widget not rebuild.
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
+  wnd.assert_root_size(ZERO_SIZE);
 }
 
 #[test]
@@ -852,13 +830,13 @@ fn no_watch() {
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
+  wnd.assert_root_size(ZERO_SIZE);
 
   {
     *size.write() = Size::new(100., 100.)
   }
   wnd.draw_frame();
-  assert_layout_result_by_path!(wnd, { path = [0], size == ZERO_SIZE,});
+  wnd.assert_root_size(ZERO_SIZE);
 }
 
 #[test]

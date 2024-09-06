@@ -180,34 +180,36 @@ mod tests {
 
   widget_layout_test!(
     left_align,
-    h_align(HAlign::Left),
-    wnd_size = WND_SIZE,
-    { path = [0], width == 100., height == 10.,}
-    { path = [0, 0], size == CHILD_SIZE, }
+    WidgetTester::new(h_align(HAlign::Left)).with_wnd_size(WND_SIZE),
+    LayoutCase::default().with_size(Size::new(100., 10.)),
+    LayoutCase::new(&[0, 0]).with_size(CHILD_SIZE)
   );
 
   widget_layout_test!(
     h_center_align,
-    h_align(HAlign::Center),
-    wnd_size = WND_SIZE,
-    { path = [0], width == 100., height == 10.,}
-    { path = [0, 0], x == 45., size == CHILD_SIZE,}
+    WidgetTester::new(h_align(HAlign::Center)).with_wnd_size(WND_SIZE),
+    LayoutCase::default().with_size(Size::new(100., 10.)),
+    LayoutCase::new(&[0, 0])
+      .with_size(CHILD_SIZE)
+      .with_x(45.)
   );
 
   widget_layout_test!(
     right_align,
-    h_align(HAlign::Right),
-    wnd_size = WND_SIZE,
-    { path = [0], width == 100., height == 10.,}
-    { path = [0, 0], x == 90., size == CHILD_SIZE,}
+    WidgetTester::new(h_align(HAlign::Right)).with_wnd_size(WND_SIZE),
+    LayoutCase::default().with_size(Size::new(100., 10.)),
+    LayoutCase::new(&[0, 0])
+      .with_size(CHILD_SIZE)
+      .with_x(90.)
   );
 
   widget_layout_test!(
     h_stretch_algin,
-    h_align(HAlign::Stretch),
-    wnd_size = WND_SIZE,
-    { path = [0], width == 100., height == 10.,}
-    { path = [0, 0], x == 0., width == 100., height == 10.,}
+    WidgetTester::new(h_align(HAlign::Stretch)).with_wnd_size(WND_SIZE),
+    LayoutCase::default().with_size(Size::new(100., 10.)),
+    LayoutCase::new(&[0, 0])
+      .with_size(Size::new(100., 10.))
+      .with_x(0.)
   );
 
   fn v_align(v_align: VAlign) -> GenWidget {
@@ -222,33 +224,35 @@ mod tests {
 
   widget_layout_test!(
     top_align,
-    v_align(VAlign::Top),
-    wnd_size = WND_SIZE,
-    { path = [0], width == 10., height == 100.,}
-    { path = [0, 0], size == CHILD_SIZE,}
+    WidgetTester::new(v_align(VAlign::Top)).with_wnd_size(WND_SIZE),
+    LayoutCase::default().with_size(Size::new(10., 100.)),
+    LayoutCase::new(&[0, 0])
+      .with_size(CHILD_SIZE)
+      .with_y(0.)
   );
 
   widget_layout_test!(
     v_center_align,
-    v_align(VAlign::Center),
-    wnd_size = WND_SIZE,
-    { path = [0], width == 10., height == 100.,}
-    { path = [0, 0], y == 45., size == CHILD_SIZE,}
+    WidgetTester::new(v_align(VAlign::Center)).with_wnd_size(WND_SIZE),
+    LayoutCase::default().with_size(Size::new(10., 100.)),
+    LayoutCase::new(&[0, 0])
+      .with_size(CHILD_SIZE)
+      .with_y(45.)
   );
 
   widget_layout_test!(
     bottom_align,
-    v_align(VAlign::Bottom),
-    wnd_size = WND_SIZE,
-    { path = [0], width == 10., height == 100.,}
-    { path = [0, 0], y == 90., size == CHILD_SIZE,}
+    WidgetTester::new(v_align(VAlign::Bottom)).with_wnd_size(WND_SIZE),
+    LayoutCase::default().with_size(Size::new(10., 100.)),
+    LayoutCase::new(&[0, 0])
+      .with_size(CHILD_SIZE)
+      .with_y(90.)
   );
 
   widget_layout_test!(
     v_stretch_align,
-    v_align(VAlign::Stretch),
-    wnd_size = WND_SIZE,
-    { path = [0], width == 10., height == 100.,}
-    { path = [0, 0], width == 10., height == 100.,}
+    WidgetTester::new(v_align(VAlign::Stretch)).with_wnd_size(WND_SIZE),
+    LayoutCase::default().with_size(Size::new(10., 100.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(10., 100.))
   );
 }

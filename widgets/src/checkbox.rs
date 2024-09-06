@@ -132,33 +132,30 @@ mod tests {
 
   widget_test_suit!(
     checked,
-    fn_widget! { @Checkbox { checked: true } },
-    wnd_size = Size::new(48., 48.),
-    width == 24.,
-    height == 24.,
-    comparison = 0.001
+    WidgetTester::new(fn_widget! { @Checkbox { checked: true } })
+      .with_wnd_size(Size::new(48., 48.))
+      .with_comparison(0.001),
+    LayoutCase::default().with_size(Size::new(24., 24.))
   );
 
   widget_test_suit!(
     unchecked,
-    fn_widget! { @Checkbox {} },
-    wnd_size = Size::new(48., 48.),
-    width == 24.,
-    height == 24.,
-    comparison = 0.001
+    WidgetTester::new(fn_widget! { @Checkbox {} })
+      .with_wnd_size(Size::new(48., 48.))
+      .with_comparison(0.001),
+    LayoutCase::default().with_size(Size::new(24., 24.))
   );
 
   widget_test_suit!(
     indeterminate,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Checkbox {
         checked: true,
         indeterminate: true,
       }
-    },
-    wnd_size = Size::new(48., 48.),
-    width == 24.,
-    height == 24.,
-    comparison = 0.001
+    })
+    .with_wnd_size(Size::new(48., 48.))
+    .with_comparison(0.001),
+    LayoutCase::default().with_size(Size::new(24., 24.))
   );
 }

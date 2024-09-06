@@ -302,8 +302,6 @@ impl std::ops::DerefMut for LayoutStore {
 mod tests {
   use std::cell::Cell;
 
-  use ribir_dev_helper::*;
-
   use super::*;
   use crate::{prelude::*, reset_test_env, test_helper::*};
 
@@ -415,30 +413,25 @@ mod tests {
       }
     };
 
+    #[track_caller]
+    fn assert_rect_by_path(wnd: &TestWindow, path: &[usize], rect: Rect) {
+      let info = wnd.layout_info_by_path(path).unwrap();
+      assert_eq!(info.pos, rect.origin);
+      assert_eq!(info.size.unwrap(), rect.size);
+    }
+
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_layout_result_by_path!(
-      wnd,
-      { path = [0, 0], rect == ribir_geom::rect(50., 50., 50., 50.),}
-    );
-    assert_layout_result_by_path!(
-      wnd,
-      {path = [0, 0, 0], rect == ribir_geom::rect(0., 0., 0., 0.),}
-    );
+    assert_rect_by_path(&wnd, &[0, 0], ribir_geom::rect(50., 50., 50., 50.));
+    assert_rect_by_path(&wnd, &[0, 0, 0], ribir_geom::rect(0., 0., 0., 0.));
 
     {
       *trigger.write() = Size::new(10., 10.);
     }
 
     wnd.draw_frame();
-    assert_layout_result_by_path!(
-      wnd,
-      {path = [0, 0], rect == ribir_geom::rect(50., 50., 50., 50.),}
-    );
-    assert_layout_result_by_path!(
-      wnd,
-      {path = [0, 0, 0], rect == ribir_geom::rect(0., 0., 10., 10.),}
-    );
+    assert_rect_by_path(&wnd, &[0, 0], ribir_geom::rect(50., 50., 50., 50.));
+    assert_rect_by_path(&wnd, &[0, 0, 0], ribir_geom::rect(0., 0., 10., 10.));
   }
 
   #[test]
