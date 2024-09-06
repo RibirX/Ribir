@@ -6,6 +6,7 @@ pub use ripple::*;
 pub use state_layer::*;
 mod styles_sheet;
 pub use styles_sheet::*;
+mod classes;
 pub mod md;
 
 /// Crate a material theme with palette.
@@ -20,7 +21,7 @@ fn new(palette: Palette) -> Theme {
     Color::BLACK.with_alpha(0.87).into(),
   );
 
-  let classes = Classes::default();
+  let classes = classes::initd_classes();
   let mut theme = Theme {
     palette,
     typography_theme,
@@ -99,13 +100,6 @@ const ICON_LARGE: Size = Size::new(48., 48.);
 const ICON_HUGE: Size = Size::new(64., 64.);
 
 fn init_custom_style(theme: &mut Theme) {
-  theme
-    .custom_styles
-    .set_custom_style(ScrollBarStyle {
-      thumb_min_size: 12.,
-      thickness: 8.,
-      track_brush: theme.palette.primary_container().into(),
-    });
   theme
     .custom_styles
     .set_custom_style(CheckBoxStyle {
@@ -242,43 +236,8 @@ fn init_custom_style(theme: &mut Theme) {
 }
 
 fn override_compose_decorator(theme: &mut Theme) {
-  fn scrollbar_thumb(host: Widget, margin: EdgeInsets) -> Widget {
-    fn_widget! {
-      @$host {
-        margin,
-        border_radius: Radius::all(4.),
-        background: Palette::of(ctx!()).primary(),
-      }
-    }
-    .into_widget()
-  }
-
   let styles = &mut theme.compose_decorators;
-  styles.override_compose_decorator::<HScrollBarThumbDecorator>(|this, host, _| {
-    fn_widget! {
-      let host = scrollbar_thumb(host, EdgeInsets::vertical(1.));
-      let mut thumb = @ $host { anchor: pipe!($this.offset).map(Anchor::left) };
-      thumb
-        .get_relative_anchor_widget()
-        .map_writer(|w| PartData::from_ref_mut(&mut w.anchor))
-        .transition(transitions::LINEAR.of(ctx!()), ctx!());
-      thumb
-    }
-    .into_widget()
-  });
-  styles.override_compose_decorator::<VScrollBarThumbDecorator>(|this, host, _| {
-    fn_widget! {
-      let host = scrollbar_thumb(host, EdgeInsets::vertical(1.));
-      let mut thumb = @ $host { anchor: pipe!($this.offset).map(Anchor::top) };
-      thumb
-        .get_relative_anchor_widget()
-        .map_writer(|w| PartData::from_ref_mut(&mut w.anchor))
-        .transition(transitions::LINEAR.of(ctx!()), ctx!());
 
-      thumb
-    }
-    .into_widget()
-  });
   styles.override_compose_decorator::<IndicatorDecorator>(|style, host, _| {
     fn_widget! {
       let mut indicator = @ $host {

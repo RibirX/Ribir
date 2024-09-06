@@ -23,7 +23,7 @@ fn header() -> Widget<'static> {
 fn content() -> Widget<'static> {
   fn actions_show() -> GenWidget {
     fn_widget! {
-      @VScrollBar {
+      @Scrollbar {
         @Column {
           @Column {
             align_items: Align::Center,

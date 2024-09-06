@@ -76,7 +76,7 @@ impl Compose for MessageList {
             }
             @TabPane(
               fn_widget! {
-                @VScrollBar {
+                @Scrollbar {
                   @Lists {
                     @{
                       let message_gen = move |message: Message| {

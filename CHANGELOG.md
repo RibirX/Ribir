@@ -32,9 +32,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **theme/material**: Define the constant variables of motion. (#pr, @M-Adoo)
 - **dev_helper**: Refine the widget test macros. (#pr, @M-Adoo)
 
+### Changed
+
+- **widgets**: Utilize `Class` to implement the `Scrollbar`. (#pr, @M-Adoo)
+
 ### Breaking
 
 - **widgets**: `ConstrainedBox` has been relocated to `core`. (#pr, @M-Adoo)
+- **widgets**: Utilize `Scrollbar` instead of both `HScrollbar`, `VScrollbar`, and `BothScrollbar`. (#pr, @M-Adoo)
 
 ### Fixed
 

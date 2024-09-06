@@ -20,6 +20,7 @@ pub const KW_DOLLAR_STR: &str = "_dollar_ಠ_ಠ";
 pub const KW_CTX: &str = "ctx";
 pub const KW_RDL: &str = "rdl";
 pub const KW_PIPE: &str = "pipe";
+pub const KW_DISTINCT_PIPE: &str = "distinct_pipe";
 pub const KW_WATCH: &str = "watch";
 pub const KW_FN_WIDGET: &str = "fn_widget";
 
@@ -60,7 +61,7 @@ pub struct DollarRefsCtx {
 #[derive(Debug, Default)]
 pub struct DollarRefsScope {
   refs: SmallVec<[DollarRef; 1]>,
-  used_ctx: bool,
+  pub(crate) used_ctx: bool,
 }
 
 pub struct StackGuard<'a>(&'a mut DollarRefsCtx);
@@ -314,8 +315,10 @@ impl Fold for DollarRefsCtx {
       mac.tokens = crate::watch_macro::gen_code(mac.tokens, self).into();
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PIPE) {
-      self.mark_used_ctx();
       mac.tokens = crate::pipe_macro::gen_code(mac.tokens, self).into();
+      mark_macro_expanded(&mut mac);
+    } else if mac.path.is_ident(KW_DISTINCT_PIPE) {
+      mac.tokens = crate::distinct_pipe_macro::gen_code(mac.tokens, self).into();
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_RDL) {
       self.mark_used_ctx();
@@ -384,12 +387,11 @@ impl ToTokens for DollarRefsScope {
         quote_spanned! { name.span() => let #name = #name }
       }
       .to_tokens(tokens);
+      let span = name.span();
       match used {
-        DollarUsedInfo::Reader => quote_spanned! { name.span() => .clone_reader() },
-        DollarUsedInfo::Watcher => {
-          quote_spanned! { name.span() => .clone_watcher() }
-        }
-        DollarUsedInfo::Writer => quote_spanned! { name.span() => .clone_writer() },
+        DollarUsedInfo::Reader => quote_spanned! { span => .clone_reader() },
+        DollarUsedInfo::Watcher => quote_spanned! { span => .clone_watcher() },
+        DollarUsedInfo::Writer => quote_spanned! { span => .clone_writer() },
       }
       .to_tokens(tokens);
       syn::token::Semi(name.span()).to_tokens(tokens);
@@ -460,7 +462,7 @@ impl DollarRefsCtx {
       self.current_dollar_scope_mut().used_ctx |= scope.used_ctx();
 
       for r in scope.refs.iter_mut() {
-        if !self.is_local_var(r.host()) && self.scopes.len() > 1 {
+        if !self.is_local_var(r.host()) && !self.scopes.is_empty() {
           let mut c_r = r.clone();
           if watch_scope && c_r.used == DollarUsedInfo::Reader {
             c_r.used = DollarUsedInfo::Watcher;
@@ -469,7 +471,7 @@ impl DollarRefsCtx {
           // if ref variable is not a local variable of parent capture level, should
           // remove its builtin info as a normal variable, because parent will capture the
           // builtin object individually.
-          if capture_scope {
+          if self.scopes.len() > 1 && capture_scope {
             r.builtin.take();
           }
         }

@@ -26,13 +26,15 @@ pub struct RepeatTransition<T> {
 /// Trait help to transition the state.
 pub trait TransitionState: Sized + 'static {
   /// Use an animate to transition the state after it modified.
-  fn transition(self, transition: Box<dyn Transition>, ctx: &BuildCtx) -> Stateful<Animate<Self>>
+  fn transition(
+    self, transition: impl Transition + 'static, ctx: &BuildCtx,
+  ) -> Stateful<Animate<Self>>
   where
     Self: AnimateState,
   {
     let state = self.clone_setter();
     let animate = Animate::declarer()
-      .transition(transition)
+      .transition(Box::new(transition))
       .from(self.get())
       .state(self)
       .finish(ctx);
