@@ -38,7 +38,6 @@ impl ComposeDecorators {
 
 #[cfg(test)]
 mod tests {
-  use ribir_dev_helper::*;
 
   use crate::{prelude::*, reset_test_env, test_helper::*};
 
@@ -76,9 +75,6 @@ mod tests {
 
     let mut wnd = TestWindow::new_with_size(w, Size::new(500., 500.));
     wnd.draw_frame();
-    assert_layout_result_by_path!(
-      wnd,
-      { path = [0], width == 100., height == 100., }
-    );
+    wnd.assert_root_size(Size::new(100., 100.));
   }
 }

@@ -47,13 +47,12 @@ mod tests {
 
   widget_layout_test!(
     smoke,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @TransformBox {
         matrix: Transform::new(2., 0., 0., 2., 0., 0.),
         @SizedBox { size: Size::new(100., 100.) }
       }
-    },
-    width == 200.,
-    height == 200.,
+    }),
+    LayoutCase::default().with_size(Size::new(200., 200.))
   );
 }

@@ -311,7 +311,8 @@ mod tests {
   }
 
   widget_layout_test!(
-    fix_option_template, fn_widget! { @Host { @{ Field } }},
-    { path = [0], size == FIX_OPTION_TEMPLATE_EXPECT_SIZE, }
+    fix_option_template,
+    WidgetTester::new(fn_widget! { @Host { @{ Field } }}),
+    LayoutCase::default().with_size(FIX_OPTION_TEMPLATE_EXPECT_SIZE)
   );
 }

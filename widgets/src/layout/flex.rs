@@ -373,79 +373,79 @@ mod tests {
 
   widget_layout_test!(
     horizontal_line,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Flex {
         @{
           (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
         }
       }
-    },
-    width == 100.,
-    height == 20.,
+    }),
+    LayoutCase::default().with_size(Size::new(100., 20.))
   );
 
   widget_layout_test!(
     vertical_line,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Flex {
         direction: Direction::Vertical,
         @{ (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })}
       }
-    },
-    width == 10.,
-    height == 200.,
+    }),
+    LayoutCase::default().with_size(Size::new(10., 200.))
   );
 
   widget_layout_test!(
     row_wrap,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Flex {
         wrap: true,
         @{ (0..3).map(|_| SizedBox { size: Size::new(200., 20.) }) }
       }
-    },
-    wnd_size = Size::new(500., 500.),
-    {path = [0], width == 400., height == 40.,}
-    {path = [0, 0], width == 200., height == 20.,}
-    {path = [0, 1], x == 200., width == 200., height == 20.,}
-    {path = [0, 2], rect == ribir_geom::rect(0., 20., 200., 20.),}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::default().with_size(Size::new(400., 40.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(200., 20.)),
+    LayoutCase::new(&[0, 1])
+      .with_size(Size::new(200., 20.))
+      .with_x(200.),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(0., 20., 200., 20.))
   );
 
   widget_layout_test!(
     reverse_row_wrap,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Flex {
         wrap: true,
         reverse: true,
         @{ (0..3).map(|_| SizedBox { size: Size::new(200., 20.) }) }
       }
-    },
-    wnd_size = Size::new(500., 500.),
-    { path = [0], size == Size::new(400., 40.),}
-    { path = [0,0], rect == ribir_geom::rect(200., 20., 200., 20.),}
-    { path = [0, 1], rect == ribir_geom::rect(0., 20., 200., 20.),}
-    { path = [0, 2], rect == ribir_geom::rect(0., 0., 200., 20.),}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::default().with_size(Size::new(400., 40.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(200., 20., 200., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(0., 20., 200., 20.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(0., 0., 200., 20.))
   );
 
   widget_layout_test!(
     main_axis_gap,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Row {
         item_gap: 15.,
         @SizedBox { size: Size::new(120., 20.) }
         @SizedBox { size: Size::new(80., 20.) }
         @SizedBox { size: Size::new(30., 20.) }
       }
-    },
-    wnd_size = Size::new(500., 40.),
-    { path = [0, 0], rect == ribir_geom::rect(0., 0., 120., 20.),}
-    { path = [0, 1], rect == ribir_geom::rect(135., 0., 80., 20.),}
-    { path = [0, 2], rect == ribir_geom::rect(230., 0., 30., 20.),}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 120., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(135., 0., 80., 20.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(230., 0., 30., 20.))
   );
 
   widget_layout_test!(
     main_axis_reverse_gap,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Row {
         item_gap: 15.,
         reverse: true,
@@ -453,16 +453,16 @@ mod tests {
         @SizedBox { size: Size::new(80., 20.) }
         @SizedBox { size: Size::new(30., 20.) }
       }
-    },
-    wnd_size = Size::new(500., 40.),
-    { path = [0, 0], rect == ribir_geom::rect(140., 0., 120., 20.),}
-    { path = [0, 1], rect == ribir_geom::rect(45., 0., 80., 20.),}
-    { path = [0, 2], rect == ribir_geom::rect(0., 0., 30., 20.),}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(140., 0., 120., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(45., 0., 80., 20.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(0., 0., 30., 20.))
   );
 
   widget_layout_test!(
     main_axis_expand,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Row {
         item_gap: 15.,
         @SizedBox { size: Size::new(120., 20.) }
@@ -477,83 +477,83 @@ mod tests {
         }
         @SizedBox { size: Size::new(30., 20.) }
       }
-    },
-    wnd_size = Size::new(500., 40.),
-    { path = [0, 0], rect == ribir_geom::rect(0., 0., 120., 20.),}
-    { path = [0, 1], rect == ribir_geom::rect(135., 0., 70., 20.),}
-    { path = [0, 2], rect == ribir_geom::rect(220., 0., 80., 20.),}
-    { path = [0, 3], rect == ribir_geom::rect(315., 0., 140., 20.),}
-    { path = [0, 4], rect == ribir_geom::rect(470., 0., 30., 20.),}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 120., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(135., 0., 70., 20.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(220., 0., 80., 20.)),
+    LayoutCase::new(&[0, 3]).with_rect(ribir_geom::rect(315., 0., 140., 20.)),
+    LayoutCase::new(&[0, 4]).with_rect(ribir_geom::rect(470., 0., 30., 20.))
   );
 
   widget_layout_test!(
     cross_axis_gap,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Flex {
         wrap: true,
         line_gap: 10.,
         align_items: Align::Center,
         @{ (0..3).map(|_| SizedBox { size: Size::new(200., 20.) }) }
       }
-    },
-    wnd_size = Size::new(500., 500.),
-    { path = [0], rect == ribir_geom::rect(0., 0., 400., 50.),}
-    { path = [0, 0], rect == ribir_geom::rect(0., 0., 200., 20.),}
-    { path = [0, 1], rect == ribir_geom::rect(200., 0., 200., 20.),}
-    { path = [0, 2], rect == ribir_geom::rect(0., 30., 200., 20.),}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::default().with_rect(ribir_geom::rect(0., 0., 400., 50.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 200., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(200., 0., 200., 20.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(0., 30., 200., 20.))
   );
 
-  fn cross_align(align: Align) -> GenWidget {
-    fn_widget! {
+  fn cross_align(align: Align) -> WidgetTester {
+    WidgetTester::new(fn_widget! {
       @Row {
         align_items: align,
         @SizedBox { size: Size::new(100., 20.) }
         @SizedBox { size: Size::new(100., 30.) }
         @SizedBox { size: Size::new(100., 40.) }
       }
-    }
-    .into()
+    })
+    .with_wnd_size(Size::new(500., 40.))
   }
 
   widget_layout_test!(
     start_cross_align,
     cross_align(Align::Start),
-    { path =[0],  width == 300., height == 40., }
-    { path =[0, 0],  rect == ribir_geom::rect(0., 0., 100., 20.),}
-    { path =[0, 1],  rect == ribir_geom::rect(100., 0., 100., 30.),}
-    { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
+    LayoutCase::default().with_size(Size::new(300., 40.)),
+    LayoutCase::default().with_size(Size::new(300., 40.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 0., 100., 30.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 40.))
   );
 
   widget_layout_test!(
     center_cross_align,
     cross_align(Align::Center),
-    { path =[0],  width == 300., height == 40., }
-    { path =[0, 0],  rect == ribir_geom::rect(0., 10., 100., 20.),}
-    { path =[0, 1],  rect == ribir_geom::rect(100., 5., 100., 30.),}
-    { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
+    LayoutCase::default().with_size(Size::new(300., 40.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 10., 100., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 5., 100., 30.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 40.))
   );
 
   widget_layout_test!(
     end_cross_align,
     cross_align(Align::End),
-    { path =[0],  width == 300., height == 40., }
-    { path =[0, 0],  rect == ribir_geom::rect(0., 20., 100., 20.),}
-    { path =[0, 1],  rect == ribir_geom::rect(100., 10., 100., 30.),}
-    { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
+    LayoutCase::default().with_size(Size::new(300., 40.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 20., 100., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 10., 100., 30.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 40.))
   );
 
   widget_layout_test!(
     stretch_cross_align,
     cross_align(Align::Stretch),
-    wnd_size = Size::new(500., 40.),
-    { path =[0],  width == 300., height == 40., }
-    { path =[0, 0],  rect == ribir_geom::rect(0., 0., 100., 40.),}
-    { path =[0, 1],  rect == ribir_geom::rect(100., 0., 100., 40.),}
-    { path =[0, 2],  rect == ribir_geom::rect(200., 0., 100., 40.),}
+    LayoutCase::default().with_size(Size::new(300., 40.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 40.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 0., 100., 40.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 40.))
   );
 
-  fn main_align(justify_content: JustifyContent) -> GenWidget {
-    fn_widget! {
+  fn main_align(justify_content: JustifyContent) -> WidgetTester {
+    WidgetTester::new(fn_widget! {
       let item_size = Size::new(100., 20.);
       @SizedBox {
         size: Size::new(500., 500.),
@@ -565,74 +565,68 @@ mod tests {
           @SizedBox { size: item_size }
         }
       }
-    }
-    .into()
+    })
+    .with_wnd_size(Size::new(500., 500.))
   }
 
   widget_layout_test!(
     start_main_align,
     main_align(JustifyContent::Start),
-    wnd_size = Size::new(500., 500.),
-    { path =[0, 0], width == 500., height == 500.,}
-    { path =[0, 0, 0], x == 0.,}
-    { path =[0, 0, 1], x == 100.,}
-    { path =[0, 0, 2], x == 200.,}
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0, 0]).with_x(0.),
+    LayoutCase::new(&[0, 0, 1]).with_x(100.),
+    LayoutCase::new(&[0, 0, 2]).with_x(200.)
   );
 
   widget_layout_test!(
     center_main_align,
     main_align(JustifyContent::Center),
-    wnd_size = Size::new(500., 500.),
-    { path =[0, 0], width == 500., height == 500.,}
-    { path =[0, 0, 0], x == 100.,}
-    { path =[0, 0, 1], x == 200.,}
-    { path =[0, 0, 2], x == 300.,}
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0, 0]).with_x(100.),
+    LayoutCase::new(&[0, 0, 1]).with_x(200.),
+    LayoutCase::new(&[0, 0, 2]).with_x(300.)
   );
 
   widget_layout_test!(
     end_main_align,
     main_align(JustifyContent::End),
-    wnd_size = Size::new(500., 500.),
-    { path =[0, 0], width == 500., height == 500.,}
-    { path =[0, 0, 0], x == 200.,}
-    { path =[0, 0, 1], x == 300.,}
-    { path =[0, 0, 2], x == 400.,}
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0, 0]).with_x(200.),
+    LayoutCase::new(&[0, 0, 1]).with_x(300.),
+    LayoutCase::new(&[0, 0, 2]).with_x(400.)
   );
 
   widget_layout_test!(
     space_between_align,
     main_align(JustifyContent::SpaceBetween),
-    wnd_size = Size::new(500., 500.),
-    { path =[0, 0], width == 500., height == 500.,}
-    { path =[0, 0, 0], x == 0.,}
-    { path =[0, 0, 1], x == 200.,}
-    { path =[0, 0, 2], x == 400.,}
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0, 0]).with_x(0.),
+    LayoutCase::new(&[0, 0, 1]).with_x(200.),
+    LayoutCase::new(&[0, 0, 2]).with_x(400.)
   );
 
   const AROUND_SPACE: f32 = 200.0 / 3.0;
   widget_layout_test!(
     space_around_align,
     main_align(JustifyContent::SpaceAround),
-    wnd_size = Size::new(500., 500.),
-    { path =[0, 0], width == 500., height == 500.,}
-    { path =[0, 0, 0], x == 0.5 * AROUND_SPACE,}
-    { path =[0, 0, 1], x == 100. + AROUND_SPACE * 1.5,}
-    { path =[0, 0, 2], x == 2.5 * AROUND_SPACE+ 200.,}
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0, 0]).with_x(0.5 * AROUND_SPACE),
+    LayoutCase::new(&[0, 0, 1]).with_x(100. + AROUND_SPACE * 1.5),
+    LayoutCase::new(&[0, 0, 2]).with_x(2.5 * AROUND_SPACE + 200.)
   );
 
   widget_layout_test!(
     space_evenly_align,
     main_align(JustifyContent::SpaceEvenly),
-    wnd_size = Size::new(500., 500.),
-    { path =[0, 0], width == 500., height == 500.,}
-    { path =[0, 0, 0], x == 50.,}
-    { path =[0, 0, 1], x == 200.,}
-    { path =[0, 0, 2], x == 350.,}
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0, 0]).with_x(50.),
+    LayoutCase::new(&[0, 0, 1]).with_x(200.),
+    LayoutCase::new(&[0, 0, 2]).with_x(350.)
   );
 
   widget_layout_test!(
     flex_expand,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @SizedBox {
         size: Size::new(500., 25.),
         @Flex {
@@ -648,25 +642,29 @@ mod tests {
           }
         }
       }
-    },
-    wnd_size = Size::new(500., 500.),
-    { path = [0, 0], rect == ribir_geom::rect(0., 0., 500., 25.),}
-    { path = [0, 0, 0], rect == ribir_geom::rect(0., 0., 100., 25.),}
-    { path = [0, 0, 2], rect == ribir_geom::rect(200., 0., 300., 25.),}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 500., 25.)),
+    LayoutCase::new(&[0, 0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 25.)),
+    LayoutCase::new(&[0, 0, 2]).with_rect(ribir_geom::rect(200., 0., 300., 25.))
   );
 
   widget_layout_test!(
     fix_flex_gap,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Column {
         item_gap: 50.,
         @SizedBox { size: Size::new(100., 100.) }
         @SizedBox { size: Size::new(100., 500.) }
       }
-    },
-    wnd_size = Size::new(500., 500.),
-    { path =[0], height == 500.,}
-    { path =[0, 0], y == 0., height == 100.,}
-    { path =[0, 1], y == 150., height == 350.,}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::default().with_height(500.),
+    LayoutCase::new(&[0, 0])
+      .with_y(0.)
+      .with_height(100.),
+    LayoutCase::new(&[0, 1])
+      .with_y(150.)
+      .with_height(350.)
   );
 }

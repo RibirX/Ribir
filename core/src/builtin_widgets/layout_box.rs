@@ -69,15 +69,15 @@ mod tests {
 
   widget_layout_test!(
     smoke,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       let mut first_box = @MockBox { size: Size::new(100., 200.) };
       let second_box = @MockBox { size: pipe!($first_box.layout_size()) };
       @MockMulti {
         @ { [first_box, second_box  ] }
       }
-    },
-    { path = [0], width == 200., height == 200.,}
-    { path = [0, 0], width == 100., height == 200.,}
-    { path = [0, 1], width == 100., height == 200.,}
+    }),
+    LayoutCase::default().with_size(Size::new(200., 200.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(100., 200.)),
+    LayoutCase::new(&[0, 1]).with_size(Size::new(100., 200.))
   );
 }

@@ -199,7 +199,7 @@ mod tests {
 
   widget_layout_test!(
     with_border,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @MockBox {
         size: SIZE,
         border: Border {
@@ -209,8 +209,8 @@ mod tests {
           bottom: BorderSide::new(4., Color::BLACK.into()),
         },
       }
-    },
-    { path = [0],  width == 100., height == 100., }
-    { path = [0, 0], rect == ribir_geom::rect(0., 0., 100., 100.), }
+    }),
+    LayoutCase::default().with_size(Size::new(100., 100.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 100.))
   );
 }

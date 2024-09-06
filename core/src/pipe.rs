@@ -886,8 +886,6 @@ impl Priority for UpdatePriority {
 mod tests {
   use std::{cell::Cell, rc::Rc};
 
-  use ribir_dev_helper::assert_layout_result_by_path;
-
   use crate::{
     builtin_widgets::key::{AnyKey, KeyChange},
     prelude::*,
@@ -1443,15 +1441,15 @@ mod tests {
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(1., 1.), });
+    wnd.assert_root_size(Size::new(1., 1.));
 
     *c_child_size.write() = Size::new(2., 1.);
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(2., 1.), });
+    wnd.assert_root_size(Size::new(2., 1.));
 
     *c_box_count.write() = 2;
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(4., 1.), });
+    wnd.assert_root_size(Size::new(4., 1.));
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -1477,15 +1475,15 @@ mod tests {
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(1., 1.), });
+    wnd.assert_root_size(Size::new(1., 1.));
 
     *c_child_size.write() = Size::new(2., 1.);
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(2., 1.), });
+    wnd.assert_root_size(Size::new(2., 1.));
 
     *c_box_count.write() = 2;
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(4., 1.), });
+    wnd.assert_root_size(Size::new(4., 1.));
   }
 
   #[test]
@@ -1508,15 +1506,15 @@ mod tests {
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(0., 0.), });
+    wnd.assert_root_size(Size::new(0., 0.));
 
     *c_inner_pipe_trigger.write() += 1;
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(0., 1.), });
+    wnd.assert_root_size(Size::new(0., 1.));
 
     *c_pipe_trigger.write() += 1;
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(1., 1.), });
+    wnd.assert_root_size(Size::new(1., 1.));
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -1540,17 +1538,17 @@ mod tests {
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(0., 0.), });
+    wnd.assert_root_size(Size::new(0., 0.));
 
     println!("Inner pipe update:");
     *w_inner.write() += 1;
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(0., 1.), });
+    wnd.assert_root_size(Size::new(0., 1.));
 
     println!("Outter pipe update:");
     *w_outer.write() += 1;
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(1., 1.), });
+    wnd.assert_root_size(Size::new(1., 1.));
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -1576,15 +1574,15 @@ mod tests {
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(0., 0.), });
+    wnd.assert_root_size(Size::new(0., 0.));
 
     *c_inner_pipe_trigger.write() += 1;
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(0., 1.), });
+    wnd.assert_root_size(Size::new(0., 1.));
 
     *c_pipe_trigger.write() += 1;
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(1., 1.), });
+    wnd.assert_root_size(Size::new(1., 1.));
   }
 
   #[test]

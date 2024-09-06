@@ -72,7 +72,7 @@ mod tests {
 
   widget_layout_test!(
     smoke,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       let size = Size::new(200., 200.);
       @MockMulti {
         @UnconstrainedBox {
@@ -87,10 +87,10 @@ mod tests {
           @MockBox { size }
         }
       }
-    },
-    wnd_size = Size::new(100., 100.),
-    { path = [0, 0, 0],width == 200., height == 200.,}
-    { path = [0, 1, 0],width == 200., height == 100.,}
-    { path = [0, 2, 0],width == 100., height == 200.,}
+    })
+    .with_wnd_size(Size::new(100., 100.)),
+    LayoutCase::new(&[0, 0, 0]).with_size(Size::new(200., 200.)),
+    LayoutCase::new(&[0, 1, 0]).with_size(Size::new(200., 100.)),
+    LayoutCase::new(&[0, 2, 0]).with_size(Size::new(100., 200.))
   );
 }

@@ -33,45 +33,44 @@ mod tests {
 
   widget_layout_test!(
     fix_size,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       let size: Size = Size::new(100., 100.);
       @SizedBox {
         size,
         @Text { text: "" }
       }
-    },
-    width == 100.,
-    height == 100.,
+    }),
+    LayoutCase::default().with_size(Size::new(100., 100.))
   );
 
   widget_layout_test!(
-    shrink_size,fn_widget! {
+    shrink_size,
+    WidgetTester::new(fn_widget! {
       @SizedBox {
         size: ZERO_SIZE,
         @Text { text: "" }
       }
-    },
-    { path = [0], size == ZERO_SIZE,}
-    { path = [0, 0], size == ZERO_SIZE,}
+    }),
+    LayoutCase::default().with_size(ZERO_SIZE),
+    LayoutCase::new(&[0, 0]).with_size(ZERO_SIZE)
   );
 
   widget_layout_test!(
     expanded_size,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @SizedBox {
         size: INFINITY_SIZE,
         @Text { text: "" }
       }
-    },
-    wnd_size = Size::new(500., 500.),
-    { path = [0], size == Size::new(500., 500.),}
-    { path = [0, 0], size == INFINITY_SIZE,}
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::default().with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_size(INFINITY_SIZE)
   );
 
   widget_layout_test!(
     empty_box,
-    fn_widget!(SizedBox { size: Size::new(10., 10.) }),
-    width == 10.,
-    height == 10.,
+    WidgetTester::new(fn_widget!(SizedBox { size: Size::new(10., 10.) })),
+    LayoutCase::default().with_size(Size::new(10., 10.))
   );
 }

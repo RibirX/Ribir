@@ -71,19 +71,21 @@ mod tests {
 
   widget_layout_test!(
     smoke,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @MockMulti {
         padding: EdgeInsets::only_left(1.),
         @MockBox {
            size: Size::new(100., 100.),
         }
       }
-    },
+    }),
     // padding widget
-    { path = [0], width == 101., height == 100.,}
+    LayoutCase::default().with_size(Size::new(101., 100.)),
     // MockMulti widget
-    { path = [0, 0], width == 101., height == 100., }
+    LayoutCase::new(&[0, 0]).with_size(Size::new(101., 100.)),
     // MockBox
-    { path = [0, 0, 0], x == 1., width == 100., height == 100.,}
+    LayoutCase::new(&[0, 0, 0])
+      .with_size(Size::new(100., 100.))
+      .with_x(1.)
   );
 }

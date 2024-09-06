@@ -33,22 +33,22 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  widget_layout_test! (
+  widget_layout_test!(
     outside_fixed_clamp,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @ConstrainedBox {
         clamp: BoxClamp::fixed_size(Size::new(50., 50.)),
         @Void {
           clamp: BoxClamp::fixed_size(Size::new(40., 40.))
         }
       }
-    },
-    {path =[0,0,0], width == 50., height == 50.,}
+    }),
+    LayoutCase::new(&[0, 0, 0]).with_size(Size::new(50., 50.))
   );
 
   widget_layout_test!(
     expand_one_axis,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Container {
         size: Size::new(256., 50.),
         @ConstrainedBox {
@@ -58,13 +58,13 @@ mod tests {
           }
         }
       }
-    },
-    { path = [0, 0], width==256., height == 20. ,}
+    },),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(256., 20.))
   );
 
   widget_layout_test!(
     expand_both,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Container {
         size: Size::new(256., 50.),
         @ConstrainedBox {
@@ -74,7 +74,7 @@ mod tests {
           }
         }
       }
-    },
-    { path = [0, 0], width == 256., height == 50.,}
+    }),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(256., 50.))
   );
 }

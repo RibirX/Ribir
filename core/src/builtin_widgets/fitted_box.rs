@@ -137,8 +137,7 @@ mod tests {
       };
       let mut wnd = TestWindow::new_with_size(w, WND_SIZE);
       wnd.draw_frame();
-
-      assert_layout_result_by_path!(wnd, {path = [0], size == expect,} );
+      wnd.assert_root_size(expect);
       assert_eq!(fit.read().scale_cache.get(), expected_scale);
     }
   }
@@ -193,13 +192,13 @@ mod tests {
 
   widget_layout_test!(
     as_builtin_field,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @MockBox {
         size: Size::new(200., 200.),
         box_fit: BoxFit::Fill,
       }
-    },
-    wnd_size = WND_SIZE,
-    size == WND_SIZE,
+    })
+    .with_wnd_size(WND_SIZE),
+    LayoutCase::default().with_size(WND_SIZE)
   );
 }

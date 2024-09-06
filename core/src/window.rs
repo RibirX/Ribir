@@ -710,7 +710,6 @@ impl From<WindowId> for u64 {
 }
 #[cfg(test)]
 mod tests {
-  use ribir_dev_helper::assert_layout_result_by_path;
 
   use super::*;
   use crate::{reset_test_env, test_helper::*};
@@ -723,12 +722,12 @@ mod tests {
     let size = Size::new(100., 100.);
     let mut wnd = TestWindow::new_with_size(fn_widget! { MockBox { size: INFINITY_SIZE } }, size);
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == size, });
+    wnd.assert_root_size(size);
 
     let new_size = Size::new(200., 200.);
     wnd.request_resize(new_size);
 
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == new_size, });
+    wnd.assert_root_size(new_size);
   }
 }

@@ -20,10 +20,10 @@ mod tests {
 
   use super::*;
 
-  widget_image_test!(
+  widget_image_tests!(
     wordle_game,
-    wordle_game,
-    wnd_size = Size::new(700., 620.),
-    comparison = 0.008
+    WidgetTester::new(wordle_game)
+      .with_wnd_size(Size::new(700., 620.))
+      .with_comparison(0.008)
   );
 }

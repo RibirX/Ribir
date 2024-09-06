@@ -336,7 +336,6 @@ impl Query for ClassChild {
 
 #[cfg(test)]
 mod tests {
-  use ribir_dev_helper::assert_layout_result_by_path;
 
   use super::*;
   use crate::{
@@ -377,10 +376,10 @@ mod tests {
     });
 
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(120., 120.),});
+    wnd.assert_root_size(Size::new(120., 120.));
 
     *w_cls.write() = SCALE_2X;
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, { path = [0], size == Size::new(200., 200.),});
+    wnd.assert_root_size(Size::new(200., 200.));
   }
 }

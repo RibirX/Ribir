@@ -205,55 +205,33 @@ mod test {
   const CHILD_SIZE: Size = Size::new(50., 50.);
   const WND_SIZE: Size = Size::new(100., 100.);
 
+  fn widget_tester(anchor: Anchor) -> WidgetTester {
+    WidgetTester::new(fn_widget! {
+      @MockBox { size: CHILD_SIZE, anchor }
+    })
+    .with_wnd_size(WND_SIZE)
+  }
   widget_layout_test!(
     pixel_left_top,
-    fn_widget! {
-      @MockBox {
-        size: CHILD_SIZE,
-        anchor: Anchor::left_top(1., 1.),
-      }
-    },
-    wnd_size = WND_SIZE,
-    { path = [0, 0], y == 1., }
-    { path = [0, 0], x == 1., }
+    widget_tester(Anchor::left_top(1., 1.)),
+    LayoutCase::new(&[0, 0]).with_pos(Point::new(1., 1.))
   );
 
   widget_layout_test!(
     pixel_left_bottom,
-    fn_widget! {
-      @MockBox {
-        size: CHILD_SIZE,
-        anchor: Anchor::left_bottom(1., 1.),
-      }
-    },
-    wnd_size = WND_SIZE,
-    { path = [0, 0], y == 49.,}
-    { path = [0, 0], x == 1., }
+    widget_tester(Anchor::left_bottom(1., 1.)),
+    LayoutCase::new(&[0, 0]).with_pos((1., 49.).into())
   );
 
   widget_layout_test!(
     pixel_top_right,
-    fn_widget! {
-      @MockBox {
-        size: CHILD_SIZE,
-        anchor: Anchor::right_top(1., 1.),
-      }
-    },
-    wnd_size = WND_SIZE,
-    { path = [0, 0], y == 1.,}
-    { path = [0, 0], x == 49.,}
+    widget_tester(Anchor::right_top(1., 1.)),
+    LayoutCase::new(&[0, 0]).with_pos((49., 1.).into())
   );
 
   widget_layout_test!(
     pixel_bottom_right,
-    fn_widget! {
-      @MockBox {
-        size: CHILD_SIZE,
-        anchor: Anchor::right_bottom(1., 1.)
-      }
-    },
-    wnd_size = WND_SIZE,
-    { path = [0, 0], y == 49.,}
-    { path = [0, 0], x == 49.,}
+    widget_tester(Anchor::right_bottom(1., 1.)),
+    LayoutCase::new(&[0, 0]).with_pos((49., 49.).into())
   );
 }

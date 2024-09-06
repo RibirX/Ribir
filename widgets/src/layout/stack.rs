@@ -76,12 +76,12 @@ mod tests {
 
   widget_layout_test!(
     smoke,
-    fn_widget! {
+    WidgetTester::new(fn_widget! {
       @Stack {
         @SizedBox { size: Size::new(1., 1.) }
         @SizedBox { size: FIVE }
       }
-    },
-    size == FIVE,
+    }),
+    LayoutCase::default().with_size(FIVE)
   );
 }

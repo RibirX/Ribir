@@ -31,5 +31,10 @@ mod tests {
   use crate::test_helper::*;
 
   const SIZE: Size = Size::new(100., 100.);
-  widget_layout_test!(smoke, fn_widget! { @Container { size: SIZE }}, size == SIZE,);
+
+  widget_layout_test!(
+    smoke,
+    WidgetTester::new(fn_widget! { @Container { size: SIZE }}),
+    LayoutCase::default().with_size(SIZE)
+  );
 }

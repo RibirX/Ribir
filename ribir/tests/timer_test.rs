@@ -9,7 +9,6 @@ mod test_single_thread {
     reset_test_env,
     test_helper::{split_value, MockBox, TestWindow},
   };
-  use ribir_dev_helper::*;
   use winit::event::{DeviceId, ElementState, MouseButton};
 
   use super::*;
@@ -26,12 +25,12 @@ mod test_single_thread {
     let mut wnd = TestWindow::new(w);
     // init size
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, {path = [0], width == 20., height == 20.,});
+    wnd.assert_root_size((20., 20.).into());
 
     // keep same
     AppCtx::run_until_stalled();
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, {path = [0], width == 20., height == 20.,});
+    wnd.assert_root_size((20., 20.).into());
 
     sleep(Duration::from_millis(10));
 
@@ -39,7 +38,7 @@ mod test_single_thread {
     super::Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
     wnd.draw_frame();
-    assert_layout_result_by_path!(wnd, {path = [0], width == 10., height == 10.,});
+    wnd.assert_root_size((10., 10.).into());
   }
 
   fn env(times: usize) -> (TestWindow, Watcher<Reader<i32>>) {

@@ -281,8 +281,6 @@ impl Default for ShowingOverlays {
 mod tests {
   use std::{cell::RefCell, rc::Rc};
 
-  use ribir_dev_helper::assert_layout_result_by_path;
-
   use crate::{prelude::*, reset_test_env, test_helper::*};
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -323,7 +321,14 @@ mod tests {
     assert_eq!(*r_log.borrow(), &["mounted"]);
     // the path [1, 0, 0, 0] is from root to anchor,
     // Root -> BoxDecoration-> Container -> Anchor
-    assert_layout_result_by_path!(wnd, {path = [1, 0, 0, 0], x == 50., y == 30.,});
+
+    assert_eq!(
+      wnd
+        .layout_info_by_path(&[1, 0, 0, 0])
+        .unwrap()
+        .pos,
+      Point::new(50., 30.)
+    );
 
     overlay.close();
     wnd.draw_frame();
