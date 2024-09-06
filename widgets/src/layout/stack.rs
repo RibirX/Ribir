@@ -7,7 +7,7 @@ pub struct Stack {
   fit: StackFit,
 }
 
-/// How to size the non-positioned children of a [Stack]. (same as flutter)
+/// How to size the non-positioned children of a [Stack].
 #[derive(Default)]
 pub enum StackFit {
   /// The constraints passed to the stack from its parent are loosened.
@@ -15,13 +15,6 @@ pub enum StackFit {
   /// For example, if the stack has constraints that force it to 350x600, then
   /// this would allow the non-positioned children of the stack to have any
   /// width from zero to 350 and any height from zero to 600.
-  ///
-  /// See also:
-  ///
-  ///  * [Center], which loosens the constraints passed to its child and then
-  ///    centers the child in itself.
-  ///  * [BoxConstraints.loosen], which implements the loosening of box
-  ///    constraints.
   #[default]
   Loose,
 

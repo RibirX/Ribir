@@ -459,12 +459,6 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
-        #[doc="Initializes the scroll position of the widget."]
-        #vis fn scroll_pos<const _M: u8>(mut self, v: impl DeclareInto<Point, _M>) -> Self {
-          self.fat_obj = self.fat_obj.scroll_pos(v);
-          self
-        }
-
         #[doc="Initializes the constraints clamp of the widget."]
         #vis fn clamp<const _M: u8>(mut self, v: impl DeclareInto<BoxClamp, _M>) -> Self {
           self.fat_obj = self.fat_obj.clamp(v);

@@ -18,6 +18,7 @@ pub(crate) mod variable_names;
 mod watch_macro;
 pub(crate) use rdl_macro::*;
 pub(crate) mod declare_obj;
+pub(crate) mod distinct_pipe_macro;
 pub(crate) mod error;
 pub(crate) mod symbol_process;
 
@@ -158,9 +159,9 @@ pub fn ctx(input: TokenStream) -> TokenStream {
   tokens.into()
 }
 
-/// `pipe` macro use to create `Pipe` object that continuous trace the
-/// expression modify. Use the `$` mark the state reference and auto subscribe
-/// to its modify.
+/// The macro is used to create a `Pipe` object that continuously tracks
+/// modifications to the expression. The `$` symbol is used to mark the state
+/// reference and automatically subscribe to its modifications.
 #[proc_macro]
 pub fn pipe(input: TokenStream) -> TokenStream {
   pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
@@ -177,6 +178,15 @@ pub fn style_class(input: TokenStream) -> TokenStream {
     }
   }
   .into()
+}
+
+/// This macro is used to create a `Pipe` object that continuously tracks the
+/// expression result, triggering when the new result differs from the previous
+/// one. The `$` symbol marks the state reference, automatically subscribing to
+/// its modifications.
+#[proc_macro]
+pub fn distinct_pipe(input: TokenStream) -> TokenStream {
+  distinct_pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// The `watch!` macro converts an expression into an `Observable` stream. Use

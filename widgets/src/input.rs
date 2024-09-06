@@ -455,7 +455,7 @@ fn size_clamp(style: &TextStyle, rows: Option<f32>, cols: Option<f32>) -> BoxCla
 fn auto_scroll_pos(container: &ScrollableWidget, before: Point, after: Point, size: Size) -> Point {
   let view_size = container.scroll_view_size();
   let content_size = container.scroll_content_size();
-  let current = container.scroll_pos;
+  let current = container.get_scroll_pos();
   if view_size.contains(content_size) {
     return current;
   }

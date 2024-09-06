@@ -40,7 +40,7 @@ fn task_lists(
     let stagger = Stagger::new(Duration::from_millis(100), transitions::EASE_IN_OUT.of(ctx!()));
     let c_stagger = stagger.clone_writer();
 
-    @VScrollBar {
+    @Scrollbar {
       on_mounted: move |_| c_stagger.run(),
       @ {
         pipe!($this;).map(move |_| {

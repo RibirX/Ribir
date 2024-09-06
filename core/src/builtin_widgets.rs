@@ -781,11 +781,6 @@ impl<T> FatObj<T> {
     self.declare_builtin_init(v, Self::get_scrollable_widget, |m, v| m.scrollable = v)
   }
 
-  /// Initializes the position of the widget's scroll.
-  pub fn scroll_pos<const M: u8>(self, v: impl DeclareInto<Point, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_scrollable_widget, |m, v| m.scroll_pos = v)
-  }
-
   /// Initializes the transformation of the widget.
   pub fn transform<const M: u8>(self, v: impl DeclareInto<Transform, M>) -> Self {
     self.declare_builtin_init(v, Self::get_transform_widget, |m, v| m.transform = v)

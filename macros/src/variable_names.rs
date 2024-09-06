@@ -110,7 +110,7 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "margin" => BuiltinMember { host_ty: "Margin", mem_ty: Field, var_name: "margin" },
   // ScrollableWidget
   "scrollable" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Field, var_name: "scrollable"},
-  "scroll_pos" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Field, var_name: "scrollable"},
+  "get_scroll_pos" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},
   "scroll_view_size" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},
   "scroll_content_size" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},
   "jump_to" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},

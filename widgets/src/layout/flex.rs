@@ -247,18 +247,23 @@ impl FlexLayouter {
   fn flex_children_layout(&mut self, ctx: &mut LayoutCtx) {
     let mut layouter = ctx.first_child_layouter();
     self.lines.iter_mut().for_each(|line| {
-      let flex_unit = (self.max.main - line.main_width) / line.flex_sum;
+      let flex_sum = if line.flex_sum.is_normal() { line.flex_sum } else { 1. };
+      let flex_unit = (self.max.main - line.main_width) / flex_sum;
       line.items_info.iter_mut().for_each(|info| {
         let mut l = layouter.take().unwrap();
         if info.size.main > 0. {
           if let Some(flex) = info.flex {
             let &mut Self { mut max, mut min, dir, .. } = self;
-            let main = flex_unit * flex;
-            max.main = main;
-            min.main = main;
-            let clamp = BoxClamp { max: max.to_size(dir), min: min.to_size(dir) };
-            let size = l.perform_widget_layout(clamp);
-            info.size = FlexSize::from_size(size, dir);
+            // If the maximum size is not specified, we are unable to calculate the flex
+            // size.
+            if flex_unit.is_normal() {
+              let main = flex_unit * flex;
+              max.main = main;
+              min.main = main;
+              let clamp = BoxClamp { max: max.to_size(dir), min: min.to_size(dir) };
+              let size = l.perform_widget_layout(clamp);
+              info.size = FlexSize::from_size(size, dir);
+            }
             line.main_width += info.size.main;
             line.cross_line_height = line.cross_line_height.max(info.size.cross);
           }

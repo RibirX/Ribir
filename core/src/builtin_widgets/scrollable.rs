@@ -4,10 +4,10 @@ use crate::prelude::*;
 pub enum Scrollable {
   /// let child widget horizontal scrollable and the scroll view is as large as
   /// its parent allow.
-  #[default]
   X,
   /// Let child widget vertical scrollable and the scroll view is as large  as
   /// its parent allow.
+  #[default]
   Y,
   /// Let child widget both scrollable in horizontal and vertical, and the
   /// scroll view is as large as its parent allow.
@@ -18,7 +18,7 @@ pub enum Scrollable {
 #[derive(Default)]
 pub struct ScrollableWidget {
   pub scrollable: Scrollable,
-  pub scroll_pos: Point,
+  scroll_pos: Point,
   page: Size,
   content_size: Size,
 }
@@ -34,16 +34,23 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       let mut view = @UnconstrainedBox {
-        dir: pipe!(match $this.get_scrollable() {
-          Scrollable::X => UnconstrainedDir::X,
-          Scrollable::Y => UnconstrainedDir::Y,
-          Scrollable::Both => UnconstrainedDir::Both,
-        }),
+        dir: pipe!{
+          let this = $this;
+          match this.scrollable {
+            Scrollable::X => UnconstrainedDir::X,
+            Scrollable::Y => UnconstrainedDir::Y,
+            Scrollable::Both => UnconstrainedDir::Both,
+          }
+        },
         clamp_dim: ClampDim::MAX_SIZE,
       };
 
       let mut child = @ $child {
-        anchor: pipe!($this.get_scroll_pos()).map(|pos| Anchor::left_top(pos.x, pos.y)),
+        anchor: pipe!{
+          let this = $this;
+          let pos = this.get_scroll_pos();
+          Anchor::left_top(-pos.x, -pos.y)
+        }
       };
 
       watch!($child.layout_size())
@@ -55,7 +62,7 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
 
       @Clip {
         @ $view {
-          on_wheel: move |e| $this.write().validate_scroll(Point::new(e.delta_x, e.delta_y)),
+          on_wheel: move |e| $this.write().scroll(-e.delta_x, -e.delta_y),
           @ { child }
         }
       }
@@ -65,55 +72,66 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
 }
 
 impl ScrollableWidget {
-  #[inline]
-  pub fn jump_to(&mut self, top_left: Point) {
-    let min = self.scroll_view_size() - self.scroll_content_size();
-    self.scroll_pos = top_left.clamp(min.to_vector().to_point(), Point::zero());
+  pub fn scroll(&mut self, x: f32, y: f32) {
+    let mut new = self.scroll_pos;
+    if self.scrollable != Scrollable::X {
+      new.y += y;
+    }
+    if self.scrollable != Scrollable::Y {
+      new.x += x;
+    }
+    self.jump_to(new);
   }
+
+  pub fn jump_to(&mut self, top_left: Point) {
+    let max = self.max_scrollable();
+    self.scroll_pos = top_left.clamp(Point::zero(), max.to_vector().to_point());
+  }
+
   #[inline]
   pub fn scroll_view_size(&self) -> Size { self.page }
 
   #[inline]
   pub fn scroll_content_size(&self) -> Size { self.content_size }
 
-  /// return if the content greater than the view.
-  pub fn can_scroll(&self) -> bool {
-    match self.scrollable {
-      Scrollable::X => self.scroll_content_size().width > self.scroll_view_size().width,
-      Scrollable::Y => self.scroll_content_size().height > self.scroll_view_size().height,
-      Scrollable::Both => self
-        .scroll_content_size()
-        .greater_than(self.scroll_view_size())
-        .any(),
-    }
+  pub fn is_x_scrollable(&self) -> bool {
+    self.scrollable != Scrollable::Y && self.content_size.width > self.page.width
   }
 
-  fn validate_scroll(&mut self, delta: Point) {
-    let mut new = self.scroll_pos;
-    if self.scrollable != Scrollable::X {
-      new.y += delta.y;
-    }
-    if self.scrollable != Scrollable::Y {
-      new.x += delta.x;
-    }
-    self.jump_to(new);
+  pub fn is_y_scrollable(&self) -> bool {
+    self.scrollable != Scrollable::X && self.content_size.height > self.page.height
   }
 
-  pub fn set_content_size(&mut self, content_size: Size) {
+  pub fn max_scrollable(&self) -> Point {
+    let max = self.scroll_content_size() - self.scroll_view_size();
+    max.to_vector().to_point().max(Point::zero())
+  }
+
+  /// Return the pixel along the axis of the scrollable widget that you want
+  /// displayed in the upper left.
+  pub fn get_scroll_pos(&self) -> Point { self.scroll_pos }
+
+  pub fn get_x_scroll_rate(&self) -> f32 {
+    let content = self.content_size.width;
+    if content.is_infinite() || content.is_nan() { 0. } else { self.scroll_pos.x / content }
+  }
+
+  pub fn get_y_scroll_rate(&self) -> f32 {
+    let content = self.content_size.height;
+    if content.is_infinite() || content.is_nan() { 0. } else { self.scroll_pos.y / content }
+  }
+
+  fn sync_pos(&mut self) { self.jump_to(self.scroll_pos) }
+
+  fn set_content_size(&mut self, content_size: Size) {
     self.content_size = content_size;
     self.sync_pos()
   }
 
-  pub fn set_page(&mut self, page: Size) {
+  fn set_page(&mut self, page: Size) {
     self.page = page;
     self.sync_pos()
   }
-
-  fn get_scrollable(&self) -> Scrollable { self.scrollable }
-
-  fn get_scroll_pos(&self) -> Point { self.scroll_pos }
-
-  fn sync_pos(&mut self) { self.jump_to(self.scroll_pos) }
 }
 
 #[cfg(test)]
