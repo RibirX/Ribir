@@ -52,6 +52,20 @@ pub struct Window {
   ///
   /// This widgets it's detached from its parent, but still need to paint.
   delay_drop_widgets: RefCell<Vec<(Option<WidgetId>, WidgetId)>>,
+
+  flags: Cell<WindowFlags>,
+}
+
+bitflags! {
+  #[derive(Clone, Copy)]
+  #[doc="A set of flags to control the window behavior."]
+  pub struct WindowFlags: u32 {
+    #[doc="If this window enables animation, set this flag to true to \
+    activate all animations; if this flag is not marked, all animations\
+    will not run."]
+    const ANIMATIONS = 1 << 0;
+    const DEFAULT = Self::ANIMATIONS.bits();
+  }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
@@ -277,6 +291,7 @@ impl Window {
       priority_task_queue: PriorityTaskQueue::default(),
       shell_wnd: RefCell::new(shell_wnd),
       delay_drop_widgets: <_>::default(),
+      flags: Cell::new(WindowFlags::DEFAULT),
     };
     let window = Rc::new(window);
     window.dispatcher.borrow_mut().init(&window);
@@ -291,6 +306,10 @@ impl Window {
   pub fn id(&self) -> WindowId { self.shell_wnd.borrow().id() }
 
   pub fn shell_wnd(&self) -> &RefCell<Box<dyn ShellWindow>> { &self.shell_wnd }
+
+  pub fn flags(&self) -> WindowFlags { self.flags.get() }
+
+  pub fn set_flags(&self, flags: WindowFlags) { self.flags.set(flags) }
 
   pub(crate) fn add_focus_node(&self, wid: WidgetId, auto_focus: bool, focus_type: FocusType) {
     self

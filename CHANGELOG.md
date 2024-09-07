@@ -27,19 +27,20 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: The built-in widget `Class` has been added to enable the sharing of consistent styles across multiple elements and to allow widgets to have different actions and styles in different themes. (#pr, @M-Adoo)
-- **core**: The widget `ConstrainedBox` has been added as a built-in widget; now `clamp` can be used as a built-in field. (#pr @M-Adoo)
-- **theme/material**: Define the constant variables of motion. (#pr, @M-Adoo)
-- **dev_helper**: Refine the widget test macros. (#pr, @M-Adoo)
+- **core**: The built-in widget `Class` has been added to enable the sharing of consistent styles across multiple elements and to allow widgets to have different actions and styles in different themes. (#624, @M-Adoo)
+- **core**: The widget `ConstrainedBox` has been added as a built-in widget; now `clamp` can be used as a built-in field. (#624 @M-Adoo)
+- **core**: Added `WindowFlags` to regulate the window behavior, with the option of utilizing `WindowFlags::ANIMATIONS` to toggle animations on or off. (#624 @M-Adoo)
+- **theme/material**: Define the constant variables of motion. (#624, @M-Adoo)
+- **dev_helper**: Refine the widget test macros. (#624, @M-Adoo)
 
 ### Changed
 
-- **widgets**: Utilize `Class` to implement the `Scrollbar`. (#pr, @M-Adoo)
+- **widgets**: Utilize `Class` to implement the `Scrollbar`. (#624, @M-Adoo)
 
 ### Breaking
 
-- **widgets**: `ConstrainedBox` has been relocated to `core`. (#pr, @M-Adoo)
-- **widgets**: Utilize `Scrollbar` instead of both `HScrollbar`, `VScrollbar`, and `BothScrollbar`. (#pr, @M-Adoo)
+- **widgets**: `ConstrainedBox` has been relocated to `core`. (#624, @M-Adoo)
+- **widgets**: Utilize `Scrollbar` instead of both `HScrollbar`, `VScrollbar`, and `BothScrollbar`. (#624, @M-Adoo)
 
 ### Fixed
 
