@@ -1,4 +1,8 @@
-use crate::{prelude::*, ticker::FrameMsg, window::WindowId};
+use crate::{
+  prelude::*,
+  ticker::FrameMsg,
+  window::{WindowFlags, WindowId},
+};
 #[simple_declare]
 pub struct Animate<S>
 where
@@ -35,6 +39,12 @@ where
     let mut animate_ref = self.write();
     let this = &mut *animate_ref;
     let wnd_id = this.window_id;
+    let Some(wnd) = AppCtx::get_window(this.window_id) else { return };
+
+    if !wnd.flags().contains(WindowFlags::ANIMATIONS) {
+      return;
+    }
+
     let new_to = this.state.get();
 
     if let Some(AnimateInfo { from, to, last_progress, .. }) = &mut this.running_info {
@@ -42,7 +52,7 @@ where
         .state
         .calc_lerp_value(from, to, last_progress.value());
       *to = new_to;
-    } else if let Some(wnd) = AppCtx::get_window(wnd_id) {
+    } else {
       drop(animate_ref);
 
       let animate = self.clone_writer();

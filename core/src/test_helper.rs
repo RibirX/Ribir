@@ -14,7 +14,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 pub use crate::timer::Timer;
 use crate::{
   prelude::*,
-  window::{ShellWindow, WindowId},
+  window::{ShellWindow, WindowFlags, WindowId},
 };
 
 pub struct Frame {
@@ -28,6 +28,8 @@ pub fn split_value<T: 'static>(v: T) -> (Watcher<Reader<T>>, Stateful<T>) {
   (src.clone_watcher(), src.clone_writer())
 }
 
+/// The Window assists in writing unit tests; animations are disabled by
+/// default.
 #[derive(Clone)]
 pub struct TestWindow(pub Rc<Window>);
 
@@ -56,6 +58,9 @@ impl TestWindow {
   fn new_wnd(root: impl Into<GenWidget>, size: Option<Size>) -> Self {
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
     let wnd = AppCtx::new_window(Box::new(TestShellWindow::new(size)), root.into());
+    let mut flags = wnd.flags();
+    flags.remove(WindowFlags::ANIMATIONS);
+    wnd.set_flags(flags);
     wnd.run_frame_tasks();
     Self(wnd)
   }
