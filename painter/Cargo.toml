@@ -20,8 +20,8 @@ lyon_algorithms = {version = "1.0.3", features = ["serialization"]}
 lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional = true}
 material-color-utilities-rs = {workspace = true}
 rctree.workspace = true
-ribir_algo = {path = "../algo", version = "0.4.0-alpha.7" }
-ribir_geom = {path = "../geom", version = "0.4.0-alpha.7" }
+ribir_algo = {path = "../algo", version = "0.4.0-alpha.8" }
+ribir_geom = {path = "../geom", version = "0.4.0-alpha.8" }
 serde = {version = "1.0", features = ["derive"]}
 serde_json.workspace = true
 tiny-skia-path = {workspace = true}
