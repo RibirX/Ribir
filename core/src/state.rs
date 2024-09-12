@@ -16,7 +16,7 @@ use state_cell::{StateCell, ValueMutRef};
 pub use stateful::*;
 pub use watcher::*;
 
-use crate::prelude::*;
+use crate::{prelude::*, render_helper::RenderProxy};
 
 /// The `StateReader` trait allows for reading, clone and map the state.
 pub trait StateReader: 'static {
@@ -81,6 +81,11 @@ pub trait StateWatcher: StateReader {
 pub trait StateWriter: StateWatcher {
   type Writer: StateWriter<Value = Self::Value>;
   type OriginWriter: StateWriter;
+
+  /// Convert the writer to a reader if no other writers exist.
+  fn into_reader(self) -> Result<Self::Reader, Self>
+  where
+    Self: Sized;
 
   /// Return a write reference of this state.
   fn write(&self) -> WriteRef<Self::Value>;
@@ -195,6 +200,16 @@ impl<T: 'static> StateWatcher for State<T> {
 impl<T: 'static> StateWriter for State<T> {
   type Writer = Stateful<T>;
   type OriginWriter = Self;
+
+  fn into_reader(self) -> Result<Self::Reader, Self>
+  where
+    Self: Sized,
+  {
+    match self.0.into_inner() {
+      InnerState::Data(d) => Ok(Reader(Sc::new(d))),
+      InnerState::Stateful(s) => s.into_reader().map_err(State::stateful),
+    }
+  }
 
   #[inline]
   fn write(&self) -> WriteRef<T> { self.as_stateful().write() }
@@ -365,13 +380,47 @@ impl<'a, W: ?Sized> Drop for WriteRef<'a, W> {
   }
 }
 
-impl<R: Render> IntoWidgetStrict<'static, RENDER> for State<R> {
-  fn into_widget_strict(self) -> Widget<'static> {
-    match self.0.into_inner() {
-      InnerState::Data(w) => w.into_inner().into_widget(),
-      InnerState::Stateful(w) => w.into_widget(),
+pub struct WriterRender<T>(pub(crate) T);
+
+pub struct ReaderRender<T>(pub(crate) T);
+
+impl<T> WriterRender<T>
+where
+  T: StateWriter,
+  T::Value: Render + Sized,
+{
+  pub fn into_widget(self) -> Widget<'static> {
+    match self.0.try_into_value() {
+      Ok(r) => r.into_widget(),
+      Err(this) => match this.into_reader() {
+        Ok(r) => ReaderRender(r).into_widget(),
+        Err(s) => {
+          let modifies = s.raw_modifies();
+          let w = ReaderRender(s.clone_reader()).into_widget();
+          w.on_build(move |id, ctx| {
+            id.dirty_subscribe(modifies, ctx);
+          })
+        }
+      },
     }
   }
+}
+
+impl<R> RenderProxy for ReaderRender<R>
+where
+  R: StateReader,
+  R::Value: Render,
+{
+  type Target<'r> = ReadRef<'r, R::Value>
+      where
+        Self: 'r;
+
+  #[inline(always)]
+  fn proxy(&self) -> Self::Target<'_> { self.0.read() }
+}
+
+impl<R: Render> IntoWidgetStrict<'static, RENDER> for State<R> {
+  fn into_widget_strict(self) -> Widget<'static> { WriterRender(self).into_widget() }
 }
 
 impl<W: Compose + 'static> IntoWidgetStrict<'static, COMPOSE> for State<W> {

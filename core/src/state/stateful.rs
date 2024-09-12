@@ -12,7 +12,7 @@ pub struct Stateful<W> {
   info: Sc<WriterInfo>,
 }
 
-pub struct Reader<W>(Sc<StateCell<W>>);
+pub struct Reader<W>(pub(crate) Sc<StateCell<W>>);
 
 /// The notifier is a `RxRust` stream that emit notification when the state
 /// changed.
@@ -80,6 +80,13 @@ impl<W: 'static> StateWatcher for Stateful<W> {
 impl<W: 'static> StateWriter for Stateful<W> {
   type Writer = Self;
   type OriginWriter = Self;
+
+  fn into_reader(self) -> Result<Self::Reader, Self>
+  where
+    Self: Sized,
+  {
+    if self.info.writer_count.get() == 1 { Ok(self.clone_reader()) } else { Err(self) }
+  }
 
   #[inline]
   fn write(&self) -> WriteRef<W> { self.write_ref(ModifyScope::BOTH) }
@@ -168,18 +175,7 @@ impl WriterInfo {
 }
 
 impl<W: Render + 'static> IntoWidgetStrict<'static, RENDER> for Stateful<W> {
-  fn into_widget_strict(self) -> Widget<'static> {
-    match self.try_into_value() {
-      Ok(r) => r.into_widget(),
-      Err(s) => {
-        let modifies = s.raw_modifies();
-        let w = s.data.clone().into_widget();
-        w.on_build(move |id, ctx| {
-          id.dirty_subscribe(modifies, ctx);
-        })
-      }
-    }
-  }
+  fn into_widget_strict(self) -> Widget<'static> { WriterRender(self).into_widget() }
 }
 
 impl<W: Compose + 'static> IntoWidgetStrict<'static, COMPOSE> for Stateful<W> {

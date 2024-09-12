@@ -133,6 +133,14 @@ where
   type Writer = MapWriter<W::Writer, M>;
   type OriginWriter = W;
 
+  fn into_reader(self) -> Result<Self::Reader, Self> {
+    let Self { origin, part_map } = self;
+    match origin.into_reader() {
+      Ok(origin) => Ok(MapWriterAsReader { origin, part_map }),
+      Err(origin) => Err(Self { origin, part_map }),
+    }
+  }
+
   #[inline]
   fn write(&self) -> WriteRef<Self::Value> { WriteRef::map(self.origin.write(), &self.part_map) }
 
@@ -185,11 +193,9 @@ where
 
 impl<'w, S, F> IntoWidgetStrict<'w, RENDER> for MapWriter<S, F>
 where
-  Self: 'static,
-  Self: StateReader + 'w,
-  <Self as StateReader>::Reader: IntoWidget<'w, RENDER>,
+  Self: StateWriter<Value: Render + Sized>,
 {
-  fn into_widget_strict(self) -> Widget<'w> { self.clone_reader().into_widget() }
+  fn into_widget_strict(self) -> Widget<'w> { WriterRender(self).into_widget() }
 }
 
 impl<S, F> IntoWidgetStrict<'static, COMPOSE> for MapWriter<S, F>

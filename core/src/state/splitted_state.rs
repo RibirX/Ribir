@@ -64,6 +64,10 @@ where
   type Writer = SplittedWriter<O::Writer, W>;
   type OriginWriter = O;
 
+  fn into_reader(self) -> Result<Self::Reader, Self> {
+    if self.info.writer_count.get() == 1 { Ok(self.clone_reader()) } else { Err(self) }
+  }
+
   #[inline]
   fn write(&self) -> WriteRef<Self::Value> { self.split_ref(self.origin.write()) }
 
@@ -113,10 +117,9 @@ where
 
 impl<'w, S, F> IntoWidgetStrict<'w, RENDER> for SplittedWriter<S, F>
 where
-  Self: StateWriter + 'w,
-  <Self as StateReader>::Reader: IntoWidget<'w, RENDER>,
+  Self: StateWriter<Value: Render + Sized> + 'w,
 {
-  fn into_widget_strict(self) -> Widget<'w> { self.clone_reader().into_widget() }
+  fn into_widget_strict(self) -> Widget<'w> { WriterRender(self).into_widget() }
 }
 
 impl<S, F> IntoWidgetStrict<'static, COMPOSE> for SplittedWriter<S, F>
