@@ -25,6 +25,15 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core:: Added `StateWriter::into_render` to covert writer to reader if no other writer exist. (#pr @M-Adoo)
+
+### Fixed
+
+- **core**: The `SplitWriter` and `MapWriter` of the render widget may not be flagged as dirty. (#626, @M-Adoo)
+
+
 ## [0.4.0-alpha.9] - 2024-09-18
 
 ### Changed

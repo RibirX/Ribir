@@ -157,11 +157,7 @@ impl<C: Compose + 'static> IntoWidgetStrict<'static, COMPOSE> for C {
 }
 
 impl<R: Render + 'static> IntoWidgetStrict<'static, RENDER> for R {
-  fn into_widget_strict(self) -> Widget<'static> {
-    let n = PureNode::Render(Box::new(PureRender(self)));
-    let node = Node::Leaf(n);
-    Widget(InnerWidget::Node(node))
-  }
+  fn into_widget_strict(self) -> Widget<'static> { Widget::from_render(Box::new(PureRender(self))) }
 }
 
 impl<W: ComposeChild<'static, Child = Option<C>>, C> Compose for W {
@@ -210,6 +206,10 @@ impl<'w> Widget<'w> {
     });
 
     (Widget(InnerWidget::Node(node)), root_id.unwrap())
+  }
+
+  pub(crate) fn from_render(r: Box<dyn RenderQueryable>) -> Widget<'static> {
+    Widget(InnerWidget::Node(Node::Leaf(PureNode::Render(r))))
   }
 
   /// Attach anonymous data to a widget and user can't query it.
