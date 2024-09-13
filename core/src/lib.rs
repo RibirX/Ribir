@@ -58,7 +58,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget_children::*;
   #[doc(no_inline)]
-  pub use crate::widget_tree::{BoxClamp, LayoutInfo, Layouter, WidgetId};
+  pub use crate::widget_tree::{BoxClamp, LayoutInfo, WidgetId};
   #[doc(no_inline)]
   pub use crate::window::Window;
   pub use crate::{

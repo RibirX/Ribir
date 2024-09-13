@@ -8,11 +8,9 @@ pub struct OnlySizedByParent {}
 
 impl Render for OnlySizedByParent {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    if let Some(mut l) = ctx.first_child_layouter() {
-      l.perform_widget_layout(clamp)
-    } else {
-      ZERO_SIZE
-    }
+    ctx
+      .perform_single_child_layout(clamp)
+      .unwrap_or(ZERO_SIZE)
   }
 
   fn only_sized_by_parent(&self) -> bool { true }

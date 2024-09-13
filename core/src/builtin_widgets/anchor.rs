@@ -168,8 +168,8 @@ impl Declare for RelativeAnchor {
 
 impl Render for RelativeAnchor {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let mut layouter = ctx.assert_single_child_layouter();
-    let child_size = layouter.perform_widget_layout(clamp);
+    let child = ctx.assert_single_child();
+    let child_size = ctx.perform_child_layout(child, clamp);
 
     let Anchor { x, y } = self.anchor;
     let x = x
@@ -185,7 +185,7 @@ impl Render for RelativeAnchor {
       })
       .unwrap_or_default();
 
-    layouter.update_position(Point::new(x, y));
+    ctx.update_position(child, Point::new(x, y));
     child_size
   }
 

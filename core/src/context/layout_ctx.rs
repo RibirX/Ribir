@@ -1,9 +1,10 @@
-use ribir_geom::Size;
+use ribir_geom::{Point, Size};
 
 use super::{WidgetCtx, WidgetCtxImpl};
 use crate::{
-  widget::{BoxClamp, Layouter, WidgetTree},
+  widget::{BoxClamp, WidgetTree},
   widget_tree::WidgetId,
+  window::DelayEvent,
 };
 
 /// A place to compute the render object's layout. Rather than holding  children
@@ -26,6 +27,68 @@ impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
 }
 
 impl<'a> LayoutCtx<'a> {
+  /// Perform layout of the child widget referenced, resetting the widget
+  /// position to (0, 0) relative to the parent if its position is not set by
+  /// its layout logic, and return the resulting size after layout.
+  pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
+    let info = self.tree.store.layout_info(child);
+    let size = info
+      .filter(|info| info.clamp == clamp)
+      .and_then(|info| info.size)
+      .unwrap_or_else(|| {
+        // Safety: the `tree` just use to get the widget of `id`, and `tree2` not drop
+        // or modify it during perform layout.
+        let tree2 = unsafe { &mut *(self.tree as *mut WidgetTree) };
+        let mut ctx = LayoutCtx { id: child, tree: tree2 };
+        let size = child
+          .assert_get(self.tree)
+          .perform_layout(clamp, &mut ctx);
+
+        self
+          .window()
+          .add_delay_event(DelayEvent::PerformedLayout(child));
+
+        let info = tree2.store.layout_info_or_default(child);
+        let size = clamp.clamp(size);
+        info.clamp = clamp;
+        info.size = Some(size);
+
+        size
+      });
+
+    if child != self.tree.root() && self.widget_box_pos(child).is_none() {
+      self.update_position(child, Point::zero())
+    }
+
+    size
+  }
+
+  /// Adjust the position of the widget where it should be placed relative to
+  /// its parent.
+  #[inline]
+  pub fn update_position(&mut self, child: WidgetId, pos: Point) {
+    self.tree.store.layout_info_or_default(child).pos = pos;
+  }
+
+  /// Adjust the size of the layout widget. Use this method to directly modify
+  /// the size of a widget. In most cases, it is unnecessary to call this
+  /// method; using clamp to constrain the child size is typically sufficient.
+  /// Only use this method if you are certain of its effects.
+  #[inline]
+  pub fn update_size(&mut self, child: WidgetId, size: Size) {
+    self.tree.store.layout_info_or_default(child).size = Some(size);
+  }
+
+  /// Split a children iterator from the context, returning a tuple of `&mut
+  /// LayoutCtx` and the iterator of the children.
+  pub fn split_children(&mut self) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
+    // Safety: The widget tree structure is immutable during the layout phase, so we
+    // can safely split an iterator of children from the layout.
+    let tree = unsafe { &*(self.tree as *mut WidgetTree) };
+    let id = self.id;
+    (self, id.children(tree))
+  }
+
   /// Quick method to do the work of computing the layout for the single child,
   /// and return its size it should have.
   ///
@@ -33,8 +96,8 @@ impl<'a> LayoutCtx<'a> {
   /// panic if there are more than one child it have.
   pub fn perform_single_child_layout(&mut self, clamp: BoxClamp) -> Option<Size> {
     self
-      .single_child_layouter()
-      .map(|mut l| l.perform_widget_layout(clamp))
+      .single_child()
+      .map(|child| self.perform_child_layout(child, clamp))
   }
 
   /// Quick method to do the work of computing the layout for the single child,
@@ -43,31 +106,8 @@ impl<'a> LayoutCtx<'a> {
   /// # Panic
   /// panic if there is not only one child it have.
   pub fn assert_perform_single_child_layout(&mut self, clamp: BoxClamp) -> Size {
-    self
-      .assert_single_child_layouter()
-      .perform_widget_layout(clamp)
-  }
-
-  /// Return the layouter of the first child.
-  pub fn first_child_layouter(&mut self) -> Option<Layouter> {
-    self
-      .first_child()
-      .map(|wid| self.new_layouter(wid))
-  }
-
-  /// Return the layouter of the first child.
-  pub fn single_child_layouter(&mut self) -> Option<Layouter> {
-    self
-      .single_child()
-      .map(|wid| self.new_layouter(wid))
-  }
-
-  /// Return the layouter of the first child.
-  /// # Panic
-  /// panic if there is not only one child it have.
-  pub fn assert_single_child_layouter(&mut self) -> Layouter {
-    let wid = self.assert_single_child();
-    self.new_layouter(wid)
+    let child = self.assert_single_child();
+    self.perform_child_layout(child, clamp)
   }
 
   /// Clear the child layout information, so the `child` will be force layout
@@ -77,10 +117,5 @@ impl<'a> LayoutCtx<'a> {
   pub fn force_child_relayout(&mut self, child: WidgetId) -> bool {
     assert_eq!(child.parent(self.tree), Some(self.id));
     self.tree.store.force_layout(child).is_some()
-  }
-
-  pub(crate) fn new_layouter(&mut self, id: WidgetId) -> Layouter {
-    let LayoutCtx { tree, .. } = self;
-    Layouter::new(id, false, tree)
   }
 }

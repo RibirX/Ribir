@@ -3,11 +3,7 @@ use std::collections::HashMap;
 use ribir_geom::ZERO_SIZE;
 
 use super::{WidgetId, WidgetTree};
-use crate::{
-  context::{LayoutCtx, WidgetCtx, WidgetCtxImpl},
-  prelude::{Point, Size, INFINITY_SIZE},
-  window::DelayEvent,
-};
+use crate::prelude::{Point, Size, INFINITY_SIZE};
 
 /// boundary limit of the render object's layout
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -88,20 +84,6 @@ pub struct LayoutInfo {
 #[derive(Default)]
 pub(crate) struct LayoutStore {
   data: HashMap<WidgetId, LayoutInfo, ahash::RandomState>,
-}
-
-pub struct Layouter<'a> {
-  pub(crate) id: WidgetId,
-  pub(crate) is_layout_root: bool,
-  pub(crate) tree: &'a mut WidgetTree,
-}
-
-impl<'a> WidgetCtxImpl for Layouter<'a> {
-  #[inline]
-  fn id(&self) -> WidgetId { self.id }
-
-  #[inline]
-  fn tree(&self) -> &WidgetTree { self.tree }
 }
 
 impl LayoutStore {
@@ -188,101 +170,6 @@ impl BoxClamp {
   }
 }
 
-impl<'a> Layouter<'a> {
-  /// perform layout of the widget this `ChildLayouter` represent,
-  /// reset the widget position back to (0, 0) relative to parent, return the
-  /// size result after layout
-  pub fn perform_widget_layout(&mut self, clamp: BoxClamp) -> Size {
-    let info = self.tree.store.layout_info(self.id);
-    let size = info
-      .filter(|info| info.clamp == clamp)
-      .and_then(|info| info.size)
-      .unwrap_or_else(|| {
-        // Safety: the `tree` just use to get the widget of `id`, and `tree2` not drop
-        // or modify it during perform layout.
-        let tree2 = unsafe { &mut *(self.tree as *mut WidgetTree) };
-
-        let Self { id, ref tree, .. } = *self;
-        let mut ctx = LayoutCtx { id, tree: tree2 };
-        let size = id
-          .assert_get(tree)
-          .perform_layout(clamp, &mut ctx);
-        // The dynamic widget maybe generate a new widget to instead of self. In that
-        // way we needn't add a layout event because it perform layout in another widget
-        // and added the event in that widget.
-        if id == ctx.id {
-          self
-            .window()
-            .add_delay_event(DelayEvent::PerformedLayout(id));
-        } else {
-          self.id = ctx.id;
-        }
-
-        let info = tree2.store.layout_info_or_default(id);
-        let size = clamp.clamp(size);
-        info.clamp = clamp;
-        info.size = Some(size);
-
-        size
-      });
-
-    if !self.is_layout_root {
-      self.update_position(Point::zero())
-    }
-
-    size
-  }
-
-  /// Get layouter of the next sibling of this layouter, panic if self is not
-  /// performed layout.
-  pub fn into_next_sibling(mut self) -> Option<Self> {
-    assert!(
-      self.box_rect().is_some(),
-      "Before try to layout next sibling, self must performed layout."
-    );
-    let next = self.id.next_sibling(self.tree);
-    next.map(move |sibling| {
-      self.id = sibling;
-      self
-    })
-  }
-
-  /// Return layouter of the first child of this widget.
-  #[inline]
-  pub fn into_first_child_layouter(mut self) -> Option<Self> {
-    self.first_child().map(|id| {
-      self.id = id;
-      self
-    })
-  }
-
-  /// Update the position of the child render object should place. Relative to
-  /// parent.
-  #[inline]
-  pub fn update_position(&mut self, pos: Point) {
-    self
-      .tree
-      .store
-      .layout_info_or_default(self.id)
-      .pos = pos;
-  }
-
-  /// Update the size of layout widget. Use this method to directly change the
-  /// size of a widget, in most cast you needn't call this method, use clamp to
-  /// limit the child size is enough. Use this method only it you know what you
-  /// are doing.
-  #[inline]
-  pub fn update_size(&mut self, child: WidgetId, size: Size) {
-    self.tree.store.layout_info_or_default(child).size = Some(size);
-  }
-}
-
-impl<'a> Layouter<'a> {
-  pub(crate) fn new(id: WidgetId, is_layout_root: bool, tree: &'a mut WidgetTree) -> Self {
-    Self { id, is_layout_root, tree }
-  }
-}
-
 impl Default for BoxClamp {
   fn default() -> Self {
     Self { min: Size::new(0., 0.), max: Size::new(f32::INFINITY, f32::INFINITY) }
@@ -314,11 +201,12 @@ mod tests {
   impl Render for OffsetBox {
     fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
       clamp.max = clamp.max.min(self.size);
-      let mut layouter = ctx.assert_single_child_layouter();
-      layouter.perform_widget_layout(clamp);
-      layouter.update_position(self.offset);
+      let child = ctx.assert_single_child();
+      ctx.perform_child_layout(child, clamp);
+      ctx.update_position(child, self.offset);
       self.size
     }
+
     #[inline]
     fn only_sized_by_parent(&self) -> bool { true }
 

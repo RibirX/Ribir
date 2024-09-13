@@ -49,6 +49,8 @@ pub trait WidgetCtx {
   fn widget_box_size(&self, wid: WidgetId) -> Option<Size>;
   /// Return the box rect of the widget `wid` point to.
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect>;
+  /// Return the position of the widget that `wid` references.
+  fn widget_box_pos(&self, wid: WidgetId) -> Option<Point>;
   /// Translates the global window coordinate pos to widget coordinates.
   fn map_to_global(&self, pos: Point) -> Point;
   /// Translates the global screen coordinate pos to widget coordinates.
@@ -121,13 +123,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   fn box_rect(&self) -> Option<Rect> { self.widget_box_rect(self.id()) }
 
   #[inline]
-  fn box_pos(&self) -> Option<Point> {
-    self
-      .tree()
-      .store
-      .layout_info(self.id())
-      .map(|info| info.pos)
-  }
+  fn box_pos(&self) -> Option<Point> { self.widget_box_pos(self.id()) }
 
   #[inline]
   fn box_size(&self) -> Option<Size> { self.widget_box_size(self.id()) }
@@ -152,6 +148,14 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
       .store
       .layout_info(wid)
       .and_then(|info| info.size)
+  }
+
+  fn widget_box_pos(&self, wid: WidgetId) -> Option<Point> {
+    self
+      .tree()
+      .store
+      .layout_info(wid)
+      .map(|info| info.pos)
   }
 
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {

@@ -177,16 +177,15 @@ impl FlexLayouter {
   }
 
   fn perform_children_layout(&mut self, ctx: &mut LayoutCtx) {
-    // All children perform layout.
-    let mut layouter = ctx.first_child_layouter();
+    let (ctx, children) = ctx.split_children();
     let &mut Self { max, min, wrap, dir, .. } = self;
     let min = if self.align_items == Align::Stretch {
       FlexSize { main: 0., cross: min.cross }
     } else {
       FlexSize::zero()
     };
-
-    while let Some(mut l) = layouter {
+    let mut children = children.peekable();
+    while let Some(c) = children.next() {
       let mut max = max;
       if !wrap {
         max.main -= self.current_line.main_width;
@@ -194,15 +193,16 @@ impl FlexLayouter {
 
       let clamp = BoxClamp { max: max.to_size(dir), min: min.to_size(dir) };
 
-      let size = l.perform_widget_layout(clamp);
-      let size = FlexSize::from_size(size, dir);
+      let mut info = FlexLayoutInfo {
+        flex: ctx
+          .query_of_widget::<Expanded>(c)
+          .map(|expanded| expanded.flex),
+        pos: <_>::default(),
+        size: <_>::default(),
+      };
 
-      let flex = l
-        .query::<Expanded>()
-        .map(|expanded| expanded.flex);
-
-      layouter = l.into_next_sibling();
-      let gap = if layouter.is_some() && !FlexLayouter::is_space_layout(self.justify_content) {
+      let gap = if children.peek().is_some() && !FlexLayouter::is_space_layout(self.justify_content)
+      {
         self.main_axis_gap
       } else {
         0.
@@ -211,13 +211,14 @@ impl FlexLayouter {
       // flex-item need use empty space to resize after all fixed widget performed
       // layout.
       let line = &mut self.current_line;
-      if let Some(flex) = flex {
-        // expanded child size is zero, it don't need calculate
-        if size.main > 0. {
-          line.flex_sum += flex;
-        }
+      if let Some(flex) = info.flex {
+        line.flex_sum += flex;
         line.main_width += gap;
       } else {
+        let size = ctx.perform_child_layout(c, clamp);
+        let size = FlexSize::from_size(size, dir);
+        info.size = size;
+
         if wrap && !line.is_empty() && line.main_width + size.main > max.main {
           self.place_line();
         } else {
@@ -229,11 +230,9 @@ impl FlexLayouter {
         line.cross_line_height = line.cross_line_height.max(size.cross);
       }
 
-      self
-        .current_line
-        .items_info
-        .push(FlexLayoutInfo { size, flex, pos: <_>::default() });
+      self.current_line.items_info.push(info);
     }
+
     self.place_line();
   }
 
@@ -245,31 +244,27 @@ impl FlexLayouter {
   }
 
   fn flex_children_layout(&mut self, ctx: &mut LayoutCtx) {
-    let mut layouter = ctx.first_child_layouter();
+    let (ctx, mut children) = ctx.split_children();
     self.lines.iter_mut().for_each(|line| {
       let flex_sum = if line.flex_sum.is_normal() { line.flex_sum } else { 1. };
       let flex_unit = (self.max.main - line.main_width) / flex_sum;
       line.items_info.iter_mut().for_each(|info| {
-        let mut l = layouter.take().unwrap();
-        if info.size.main > 0. {
-          if let Some(flex) = info.flex {
-            let &mut Self { mut max, mut min, dir, .. } = self;
-            // If the maximum size is not specified, we are unable to calculate the flex
-            // size.
-            if flex_unit.is_normal() {
-              let main = flex_unit * flex;
-              max.main = main;
-              min.main = main;
-              let clamp = BoxClamp { max: max.to_size(dir), min: min.to_size(dir) };
-              let size = l.perform_widget_layout(clamp);
-              info.size = FlexSize::from_size(size, dir);
-            }
-            line.main_width += info.size.main;
-            line.cross_line_height = line.cross_line_height.max(info.size.cross);
-          }
+        let child = children.next().unwrap();
+        if let Some(flex) = info.flex {
+          let &mut Self { mut max, mut min, dir, .. } = self;
+          // If the maximum size is not specified, we are unable to calculate the flex
+          // size.
+          if flex_unit.is_normal() {
+            let main = flex_unit * flex;
+            max.main = main;
+            min.main = main;
+          };
+          let clamp = BoxClamp { max: max.to_size(dir), min: min.to_size(dir) };
+          let size = ctx.perform_child_layout(child, clamp);
+          info.size = FlexSize::from_size(size, dir);
+          line.main_width += info.size.main;
+          line.cross_line_height = line.cross_line_height.max(info.size.cross);
         }
-
-        layouter = l.into_next_sibling();
       });
     });
   }
@@ -306,14 +301,22 @@ impl FlexLayouter {
       update_position!();
     }
 
-    let mut layouter = ctx.first_child_layouter();
+    let (ctx, mut children) = ctx.split_children();
+
     self.lines.iter_mut().for_each(|line| {
       line.items_info.iter_mut().for_each(|info| {
-        let mut l = layouter.take().unwrap();
-        l.update_position(info.pos.to_size(*dir).to_vector().to_point());
-        layouter = l.into_next_sibling();
+        let child = children.next().unwrap();
+        ctx.update_position(child, info.pos.to_size(*dir).to_vector().to_point());
       })
     });
+
+    for child in children {
+      self.lines.iter_mut().for_each(|line| {
+        line.items_info.iter_mut().for_each(|info| {
+          ctx.update_position(child, info.pos.to_size(*dir).to_vector().to_point());
+        })
+      });
+    }
   }
 
   fn place_line(&mut self) {
