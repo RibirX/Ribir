@@ -85,11 +85,11 @@ impl Render for HAlignWidget {
     } else {
       clamp.min.width = 0.;
     }
+    let child = ctx.assert_single_child();
+    let child_size = ctx.perform_child_layout(child, clamp);
     let box_width = clamp.max.width;
-    let mut layouter = ctx.assert_single_child_layouter();
-    let child_size = layouter.perform_widget_layout(clamp);
     let x = align.align_value(child_size.width, box_width);
-    layouter.update_position(Point::new(x, 0.));
+    ctx.update_position(child, Point::new(x, 0.));
     Size::new(box_width, child_size.height)
   }
 
@@ -103,17 +103,17 @@ impl Render for HAlignWidget {
 
 impl Render for VAlignWidget {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let mut layouter = ctx.assert_single_child_layouter();
     let align: Align = self.v_align.into();
     if align == Align::Stretch {
       clamp.min.height = clamp.max.height;
     } else {
       clamp.min.height = 0.;
     }
+    let child = ctx.assert_single_child();
+    let child_size = ctx.perform_child_layout(child, clamp);
     let box_height = clamp.max.height;
-    let child_size = layouter.perform_widget_layout(clamp);
     let y = align.align_value(child_size.height, box_height);
-    layouter.update_position(Point::new(0., y));
+    ctx.update_position(child, Point::new(0., y));
     Size::new(child_size.width, box_height)
   }
 

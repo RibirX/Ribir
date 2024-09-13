@@ -204,21 +204,17 @@ pub struct MockStack {
 
 impl Render for MockStack {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let mut layouter = ctx.first_child_layouter();
     let mut size = ZERO_SIZE;
-    let mut i = 0;
-    while let Some(mut l) = layouter {
-      let mut child_size = l.perform_widget_layout(clamp);
+    let (ctx, children) = ctx.split_children();
+    for (i, c) in children.enumerate() {
+      let mut child_size = ctx.perform_child_layout(c, clamp);
       if let Some(offset) = self.child_pos.get(i) {
-        l.update_position(*offset);
+        ctx.update_position(c, *offset);
         child_size = Size::new(offset.x + child_size.width, offset.y + child_size.height);
       } else {
-        l.update_position(Point::zero());
+        ctx.update_position(c, Point::zero());
       }
       size = size.max(child_size);
-      layouter = l.into_next_sibling();
-
-      i += 1;
     }
 
     size
@@ -236,14 +232,13 @@ pub struct MockBox {
 
 impl Render for MockMulti {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let mut layouter = ctx.first_child_layouter();
     let mut size = ZERO_SIZE;
-    while let Some(mut l) = layouter {
-      let child_size = l.perform_widget_layout(clamp);
-      l.update_position(Point::new(size.width, 0.));
+    let (ctx, children) = ctx.split_children();
+    for c in children {
+      let child_size = ctx.perform_child_layout(c, clamp);
+      ctx.update_position(c, Point::new(size.width, 0.));
       size.width += child_size.width;
       size.height = size.height.max(child_size.height);
-      layouter = l.into_next_sibling();
     }
 
     size

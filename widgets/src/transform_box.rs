@@ -19,8 +19,7 @@ impl Render for TransformBox {
 
         let child_clamp = BoxClamp { min, max };
 
-        let mut layouter = ctx.assert_single_child_layouter();
-        let size = layouter.perform_widget_layout(child_clamp);
+        let size = ctx.assert_perform_single_child_layout(child_clamp);
         let rect = self
           .matrix
           .outer_transformed_rect(&Rect::from_size(size));

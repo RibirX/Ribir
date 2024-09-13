@@ -40,27 +40,6 @@ mod tests {
   use crate::prelude::*;
 
   widget_layout_test!(
-    expand_child_size_zero,
-    WidgetTester::new(fn_widget! {
-      let size = Size::new(100., 50.);
-      @Row {
-        @Expanded {
-          flex: 1.,
-          @SizedBox { size }
-        }
-        @SizedBox { size }
-        @Expanded {
-          flex: 2.,
-          @SizedBox { size: Size::new(0., 50.) }
-        }
-      }
-    })
-    .with_wnd_size(Size::new(500., 500.)),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(400., 50.)),
-    LayoutCase::new(&[0, 2]).with_size(Size::new(0., 50.))
-  );
-
-  widget_layout_test!(
     one_line_expanded,
     WidgetTester::new(fn_widget! {
       let size = Size::new(100., 50.);

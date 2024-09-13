@@ -44,12 +44,12 @@ impl Render for Stack {
     };
 
     let mut size = ZERO_SIZE;
-    let mut layouter = ctx.first_child_layouter();
-    while let Some(mut l) = layouter {
-      let child_size = l.perform_widget_layout(clamp);
+    let (ctx, children) = ctx.split_children();
+    for c in children {
+      let child_size = ctx.perform_child_layout(c, clamp);
       size = size.max(child_size);
-      layouter = l.into_next_sibling();
     }
+
     size
   }
 

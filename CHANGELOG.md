@@ -25,6 +25,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Changed
+
+- **core**: Refactor the `LayoutCtx` to eliminate the need for performing layout based on children order. (#625 @M-Adoo)
+
+### Breaking
+
+- **core**: The `Layouter` has been removed, so the render widget needs to adjust the APIs used accordingly. (#625, @M-Adoo)
+
 ## [0.4.0-alpha.8] - 2024-09-11
 
 ### Features
