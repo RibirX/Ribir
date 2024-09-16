@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, wrap_render::WrapRender};
 
 /// Specifies the horizontal position you want to anchor the widget.
 #[derive(Debug, Clone, Copy)]
@@ -154,8 +154,11 @@ impl Anchor {
   pub fn right_bottom(x: f32, y: f32) -> Self { Self::new(HAnchor::Right(x), VAnchor::Bottom(y)) }
 }
 
-/// Widget use to anchor child constraints relative to parent widget.
-#[derive(SingleChild, Default)]
+/// This widget is used to anchor child constraints relative to the parent
+/// widget. It's important to note that if you anchor the child widget outside
+/// of its parent, it may become unable to click, so ensure there is ample space
+/// within the parent.
+#[derive(Default)]
 pub struct RelativeAnchor {
   pub anchor: Anchor,
 }
@@ -166,10 +169,17 @@ impl Declare for RelativeAnchor {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl Render for RelativeAnchor {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = ctx.assert_single_child();
-    let child_size = ctx.perform_child_layout(child, clamp);
+impl<'c> ComposeChild<'c> for RelativeAnchor {
+  type Child = Widget<'c>;
+
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
+  }
+}
+
+impl WrapRender for RelativeAnchor {
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    let child_size = host.perform_layout(clamp, ctx);
 
     let Anchor { x, y } = self.anchor;
     let x = x
@@ -185,14 +195,14 @@ impl Render for RelativeAnchor {
       })
       .unwrap_or_default();
 
-    ctx.update_position(child, Point::new(x, y));
+    ctx.update_position(ctx.widget_id(), Point::new(x, y));
     child_size
   }
+}
 
-  fn paint(&self, _: &mut PaintingCtx) {}
-
-  fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
-    HitTest { hit: false, can_hit_child: true }
+impl From<Point> for Anchor {
+  fn from(value: Point) -> Self {
+    Anchor { x: Some(HAnchor::Left(value.x)), y: Some(VAnchor::Top(value.y)) }
   }
 }
 
@@ -214,24 +224,24 @@ mod test {
   widget_layout_test!(
     pixel_left_top,
     widget_tester(Anchor::left_top(1., 1.)),
-    LayoutCase::new(&[0, 0]).with_pos(Point::new(1., 1.))
+    LayoutCase::default().with_pos(Point::new(1., 1.))
   );
 
   widget_layout_test!(
     pixel_left_bottom,
     widget_tester(Anchor::left_bottom(1., 1.)),
-    LayoutCase::new(&[0, 0]).with_pos((1., 49.).into())
+    LayoutCase::default().with_pos((1., 49.).into())
   );
 
   widget_layout_test!(
     pixel_top_right,
     widget_tester(Anchor::right_top(1., 1.)),
-    LayoutCase::new(&[0, 0]).with_pos((49., 1.).into())
+    LayoutCase::default().with_pos((49., 1.).into())
   );
 
   widget_layout_test!(
     pixel_bottom_right,
     widget_tester(Anchor::right_bottom(1., 1.)),
-    LayoutCase::new(&[0, 0]).with_pos((49., 49.).into())
+    LayoutCase::default().with_pos((49., 49.).into())
   );
 }

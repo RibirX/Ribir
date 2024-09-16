@@ -96,7 +96,7 @@ impl LayoutStore {
     self.layout_info(id).and_then(|info| info.size)
   }
 
-  pub(crate) fn layout_box_position(&self, id: WidgetId) -> Option<Point> {
+  pub(crate) fn layout_box_pos(&self, id: WidgetId) -> Option<Point> {
     self.layout_info(id).map(|info| info.pos)
   }
 
@@ -113,7 +113,7 @@ impl WidgetTree {
   pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point) -> Point {
     self
       .store
-      .layout_box_position(id)
+      .layout_box_pos(id)
       .map_or(pos, |offset| {
         let pos = id
           .assert_get(self)
@@ -126,7 +126,7 @@ impl WidgetTree {
   pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point) -> Point {
     self
       .store
-      .layout_box_position(id)
+      .layout_box_pos(id)
       .map_or(pos, |offset| {
         let pos = pos - offset.to_vector();
         id.assert_get(self)

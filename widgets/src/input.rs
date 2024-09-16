@@ -234,7 +234,7 @@ where
 
     let pos = window.map_to_global(Point::zero(), wid.assert_id());
     let size = window
-      .layout_size(wid.assert_id())
+      .widget_size(wid.assert_id())
       .unwrap_or_default();
     window.set_ime_cursor_area(&Rect::new(pos, size));
 
@@ -250,7 +250,7 @@ where
         .subscribe(move |_| {
           let pos = window.map_to_global(Point::zero(), wid.assert_id());
           let size = window
-            .layout_size(wid.assert_id())
+            .widget_size(wid.assert_id())
             .unwrap_or_default();
           window.set_ime_cursor_area(&Rect::new(pos, size));
         })
@@ -270,6 +270,7 @@ impl ComposeChild<'static> for Input {
         text_style: pipe!($this.style.clone()),
       };
       @FocusScope {
+        can_focus: true,
         @ConstrainedBox {
           clamp: pipe!(size_clamp(&$this.style, Some(1.), $this.size)),
           @ {
@@ -307,6 +308,7 @@ impl ComposeChild<'static> for TextArea {
         false => Scrollable::Both,
       });
       @FocusScope {
+        can_focus: true,
         @ConstrainedBox {
           clamp: pipe!(size_clamp(&$this.style, $this.rows, $this.cols)),
           @EditableTextExtraWidget::edit_area(

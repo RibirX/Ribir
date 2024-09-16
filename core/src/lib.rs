@@ -23,7 +23,7 @@ pub mod window;
 pub use rxrust;
 pub mod overlay;
 pub mod query;
-
+pub mod wrap_render;
 pub mod prelude {
   pub use log;
   #[doc(no_inline)]

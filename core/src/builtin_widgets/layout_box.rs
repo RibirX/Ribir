@@ -73,7 +73,7 @@ mod tests {
       let mut first_box = @MockBox { size: Size::new(100., 200.) };
       let second_box = @MockBox { size: pipe!($first_box.layout_size()) };
       @MockMulti {
-        @ { [first_box, second_box  ] }
+        @ { [first_box, second_box ] }
       }
     }),
     LayoutCase::default().with_size(Size::new(200., 200.)),

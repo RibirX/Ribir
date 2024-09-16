@@ -37,7 +37,7 @@ pub enum StackFit {
 
 impl Render for Stack {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let clamp = match self.fit {
+    let stack_clamp = match self.fit {
       StackFit::Loose => clamp.loose(),
       StackFit::Expand => BoxClamp { min: clamp.max, max: clamp.max },
       StackFit::Passthrough => clamp,
@@ -46,11 +46,10 @@ impl Render for Stack {
     let mut size = ZERO_SIZE;
     let (ctx, children) = ctx.split_children();
     for c in children {
-      let child_size = ctx.perform_child_layout(c, clamp);
+      let child_size = ctx.perform_child_layout(c, stack_clamp);
       size = size.max(child_size);
     }
-
-    size
+    clamp.clamp(size)
   }
 
   fn paint(&self, _: &mut PaintingCtx) {

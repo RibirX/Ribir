@@ -33,22 +33,18 @@ pub trait Render: 'static {
   /// children's perform_layout across the `LayoutCtx`
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size;
 
-  /// `paint` is a low level trait to help you draw your widget to paint device
-  /// across `PaintingCtx::painter` by itself coordinate system. Not care
-  /// about children's paint in this method, framework will call children's
-  /// paint individual. And framework guarantee always paint parent before
-  /// children.
-  fn paint(&self, ctx: &mut PaintingCtx);
+  /// Draw the widget on the paint device using `PaintingCtx::painter` within
+  /// its own coordinate system. This method should not handle painting of
+  /// children; the framework will handle painting of children individually. The
+  /// framework ensures that the parent is always painted before its children.
+  fn paint(&self, _: &mut PaintingCtx) {}
 
   /// Whether the constraints from parent are the only input to detect the
   /// widget size, and child nodes' size not affect its size.
   fn only_sized_by_parent(&self) -> bool { false }
 
   /// Determines the set of render widgets located at the given position.
-  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
-    let is_hit = hit_test_impl(ctx, pos);
-    HitTest { hit: is_hit, can_hit_child: is_hit }
-  }
+  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { ctx.box_hit_test(pos) }
 
   fn get_transform(&self) -> Option<Transform> { None }
 }
@@ -343,10 +339,4 @@ impl<'w> PureNode<'w> {
 impl<F: FnMut(&mut BuildCtx) -> Widget<'static> + 'static> From<F> for GenWidget {
   #[inline]
   fn from(f: F) -> Self { Self::new(f) }
-}
-
-pub(crate) fn hit_test_impl(ctx: &HitTestCtx, pos: Point) -> bool {
-  ctx
-    .box_rect()
-    .map_or(false, |rect| rect.contains(pos))
 }

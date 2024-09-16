@@ -28,9 +28,11 @@ impl<'c> ComposeChild<'c> for GlobalAnchor {
         .sample(tick_of_layout_ready)
         .subscribe(move |(_, size)| {
           let wnd_size = wnd.size();
-          let base = wnd.map_to_global(Point::zero(), wid.assert_id());
-          // The global anchor may change during sampling, so we need to retrieve it again.
           let Anchor {x, y} = $this.get_global_anchor();
+          // The global anchor may change during sampling, so we need to retrieve it again.
+          let cid = wid.assert_id();
+          let offset = wnd.widget_pos(cid).unwrap_or_else(Point::zero);
+          let base = wnd.map_to_global(Point::zero(), cid) - offset;
           let anchor = Anchor {
             x: x.map(|x| match x {
               HAnchor::Left(x) => x - base.x,
@@ -121,7 +123,7 @@ impl<W> FatObj<W> {
         .map_to_global(Point::zero(), wid.assert_id())
         .x;
       let size = wnd
-        .layout_size(wid.assert_id())
+        .widget_size(wid.assert_id())
         .unwrap_or_default();
       bind_h_anchor(&this, &wnd, HAnchor::Right(relative), base + size.width);
     })
@@ -164,7 +166,7 @@ impl<W> FatObj<W> {
         .map_to_global(Point::zero(), wid.assert_id())
         .y;
       let size = wnd
-        .layout_size(wid.assert_id())
+        .widget_size(wid.assert_id())
         .unwrap_or_default();
       bind_v_anchor(&this, &wnd, VAnchor::Bottom(relative), base + size.height);
     })
@@ -200,14 +202,13 @@ mod tests {
       bottom_right.bottom_align_to(&wid, 20., ctx!());
       @ $parent {
         @MockStack {
-          child_pos: vec![Point::new(0., 0.), Point::new(0., 0.)],
           @ { top_left }
           @ { bottom_right }
         }
       }
     })
     .with_wnd_size(WND_SIZE),
-    LayoutCase::new(&[0, 0, 0, 0, 0]).with_pos(Point::new(20., 10.)),
-    LayoutCase::new(&[0, 0, 0, 1, 0]).with_pos(Point::new(30., 20.))
+    LayoutCase::new(&[0, 0, 0]).with_pos(Point::new(20., 10.)),
+    LayoutCase::new(&[0, 0, 1]).with_pos(Point::new(30., 20.))
   );
 }

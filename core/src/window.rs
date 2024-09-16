@@ -602,7 +602,13 @@ impl Window {
     self.tree().map_to_global(point, id)
   }
 
-  pub fn layout_size(&self, id: WidgetId) -> Option<Size> { self.tree().store.layout_box_size(id) }
+  pub fn map_from_global(&self, point: Point, id: WidgetId) -> Point {
+    self.tree().map_from_global(point, id)
+  }
+
+  pub fn widget_size(&self, id: WidgetId) -> Option<Size> { self.tree().store.layout_box_size(id) }
+
+  pub fn widget_pos(&self, id: WidgetId) -> Option<Point> { self.tree().store.layout_box_pos(id) }
 
   pub(crate) fn tree(&self) -> &WidgetTree {
     // Safety: Please refer to the comments in `WidgetTree::tree_mut` for more

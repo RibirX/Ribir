@@ -1,22 +1,27 @@
-use crate::prelude::*;
+use crate::{prelude::*, wrap_render::WrapRender};
 
-#[derive(Declare, SingleChild, Clone)]
+#[derive(Declare, Clone)]
 pub struct IgnorePointer {
   #[declare(default = true)]
   pub ignore: bool,
 }
 
-impl Render for IgnorePointer {
+impl<'c> ComposeChild<'c> for IgnorePointer {
+  type Child = Widget<'c>;
+
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
+  }
+}
+
+impl WrapRender for IgnorePointer {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.assert_perform_single_child_layout(clamp)
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    host.perform_layout(clamp, ctx)
   }
 
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
-
-  fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
-    HitTest { hit: false, can_hit_child: !self.ignore }
+  fn hit_test(&self, host: &dyn Render, ctx: &HitTestCtx, pos: Point) -> HitTest {
+    if self.ignore { HitTest { hit: false, can_hit_child: false } } else { host.hit_test(ctx, pos) }
   }
 }
 

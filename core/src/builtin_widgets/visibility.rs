@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, wrap_render::WrapRender};
 
 #[derive(Default)]
 pub struct Visibility {
@@ -28,26 +28,37 @@ impl<'c> ComposeChild<'c> for Visibility {
   }
 }
 
-#[derive(SingleChild, Declare, Clone)]
+#[derive(Declare, Clone)]
 struct VisibilityRender {
   display: bool,
 }
 
-impl Render for VisibilityRender {
+impl<'c> ComposeChild<'c> for VisibilityRender {
+  type Child = Widget<'c>;
+
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
+  }
+}
+
+impl WrapRender for VisibilityRender {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    if self.display { ctx.assert_perform_single_child_layout(clamp) } else { ZERO_SIZE }
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    if self.display { host.perform_layout(clamp, ctx) } else { clamp.min }
   }
 
-  #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) {
-    if !self.display {
-      ctx.painter().apply_alpha(0.);
+  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
+    if self.display {
+      host.paint(ctx)
     }
   }
 
-  fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
-    HitTest { hit: false, can_hit_child: self.display }
+  fn hit_test(&self, host: &dyn Render, ctx: &HitTestCtx, pos: Point) -> HitTest {
+    if self.display {
+      host.hit_test(ctx, pos)
+    } else {
+      HitTest { hit: false, can_hit_child: false }
+    }
   }
 }
 

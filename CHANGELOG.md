@@ -27,7 +27,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core:: Added `StateWriter::into_render` to covert writer to reader if no other writer exist. (#pr @M-Adoo)
+- **core**: Added `WrapRender` for a render widget that combines with its child as a single widget tree node. (#626 @M-Adoo)
+- **core:: Added `StateWriter::into_render` to covert writer to reader if no other writer exist. (#626 @M-Adoo)
+
+### Changed
+
+- **core**: Reimplemented `HAlignWidget`, `VAlignWidget`, `RelativeAnchor`, `BoxDecoration`, `ConstrainedBox`, `IgnorePoint`, `Opacity`, `Padding`, `TransformWidget`, and `VisibilityRender` as `WrapRender`. (#626 @M-Adoo)
+
 
 ### Fixed
 

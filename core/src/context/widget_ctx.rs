@@ -5,7 +5,7 @@ use ribir_geom::{Point, Rect, Size};
 use crate::{
   query::QueryRef,
   state::WriteRef,
-  widget::{BoxClamp, WidgetTree},
+  widget::{BoxClamp, HitTest, WidgetTree},
   widget_tree::WidgetId,
   window::Window,
 };
@@ -229,6 +229,15 @@ pub(crate) use define_widget_context;
 
 define_widget_context!(HitTestCtx);
 
+impl HitTestCtx {
+  pub fn box_hit_test(&self, pos: Point) -> HitTest {
+    let is_hit = self
+      .box_rect()
+      .map_or(false, |rect| rect.contains(pos));
+    HitTest { hit: is_hit, can_hit_child: is_hit }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -281,7 +290,7 @@ mod tests {
     wnd.draw_frame();
 
     let root = wnd.tree().root();
-    let child = get_single_child_by_depth(root, wnd.tree(), 3);
+    let child = get_single_child_by_depth(root, wnd.tree(), 2);
     let w_ctx = TestCtx { id: root, tree: wnd.tree };
     let from_pos = Point::new(30., 30.);
     assert_eq!(w_ctx.map_from(from_pos, child), Point::new(45., 45.));

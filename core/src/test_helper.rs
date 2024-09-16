@@ -198,22 +198,14 @@ impl TestShellWindow {
 }
 
 #[derive(Declare, MultiChild)]
-pub struct MockStack {
-  child_pos: Vec<Point>,
-}
+pub struct MockStack {}
 
 impl Render for MockStack {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let mut size = ZERO_SIZE;
     let (ctx, children) = ctx.split_children();
-    for (i, c) in children.enumerate() {
-      let mut child_size = ctx.perform_child_layout(c, clamp);
-      if let Some(offset) = self.child_pos.get(i) {
-        ctx.update_position(c, *offset);
-        child_size = Size::new(offset.x + child_size.width, offset.y + child_size.height);
-      } else {
-        ctx.update_position(c, Point::zero());
-      }
+    for c in children {
+      let child_size = ctx.perform_child_layout(c, clamp);
       size = size.max(child_size);
     }
 
@@ -347,16 +339,16 @@ impl LayoutCase {
 
     let info = wnd.layout_info_by_path(path).unwrap();
     if let Some(x) = x {
-      assert_eq!(info.pos.x, *x, "unexpected x");
+      assert_eq!(*x, info.pos.x, "unexpected x");
     }
     if let Some(y) = y {
-      assert_eq!(info.pos.y, *y, "unexpected y");
+      assert_eq!(*y, info.pos.y, "unexpected y");
     }
     if let Some(w) = width {
-      assert_eq!(info.size.unwrap().width, *w, "unexpected width");
+      assert_eq!(*w, info.size.unwrap().width, "unexpected width");
     }
     if let Some(h) = height {
-      assert_eq!(info.size.unwrap().height, *h, "unexpected height");
+      assert_eq!(*h, info.size.unwrap().height, "unexpected height");
     }
   }
 }

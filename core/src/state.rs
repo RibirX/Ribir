@@ -380,9 +380,9 @@ impl<'a, W: ?Sized> Drop for WriteRef<'a, W> {
   }
 }
 
-pub struct WriterRender<T>(pub(crate) T);
+pub(crate) struct WriterRender<T>(pub(crate) T);
 
-pub struct ReaderRender<T>(pub(crate) T);
+struct ReaderRender<T>(pub(crate) T);
 
 impl<T> WriterRender<T>
 where

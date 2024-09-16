@@ -650,25 +650,21 @@ mod tests {
     let (data, writer) = split_value(T { wid1: None, wid2: None });
 
     let w = fn_widget! {
-      @MockBox {
-        size: Size::new(200., 200.),
-        @MockStack {
-          child_pos: vec![
-            Point::new(50., 50.),
-            Point::new(100., 100.),
-          ],
-          @MockBox {
-            on_mounted: move |ctx| {
-              $writer.write().wid1 = Some(ctx.id);
-            },
-            size: Size::new(100., 100.),
-          }
-          @MockBox {
-            on_mounted: move |ctx| {
-              $writer.write().wid2 = Some(ctx.id);
-            },
-            size: Size::new(50., 150.),
-          }
+      @MockStack {
+        clamp: BoxClamp::EXPAND_BOTH,
+        @MockBox {
+          anchor: Point::new(50., 50.),
+          on_mounted: move |ctx| {
+            $writer.write().wid1 = Some(ctx.id);
+          },
+          size: Size::new(100., 100.),
+        }
+        @MockBox {
+          on_mounted: move |ctx| {
+            $writer.write().wid2 = Some(ctx.id);
+          },
+          size: Size::new(50., 150.),
+          anchor: Point::new(100., 100.),
         }
       }
     };

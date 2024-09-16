@@ -24,6 +24,31 @@ where
   fn with_child(self, c: C) -> Self::Target { Pair { parent: self, child: c.into_child() } }
 }
 
+impl<'w, T, C, const M: usize> WithChild<'w, C, 2, M> for Option<T>
+where
+  T: StateWriter + 'static,
+  T::Value: ComposeChild<'w, Child = Widget<'w>>,
+  C: IntoChild<Widget<'w>, M> + 'w,
+{
+  type Target = Widget<'w>;
+
+  fn with_child(self, c: C) -> Self::Target {
+    if let Some(p) = self { p.with_child(c).into_widget() } else { c.into_child() }
+  }
+}
+
+impl<'w, T, C, const M: usize> WithChild<'w, C, 3, M> for Option<T>
+where
+  T: ComposeChild<'w, Child = Widget<'w>> + 'static,
+  C: IntoChild<Widget<'w>, M> + 'w,
+{
+  type Target = Widget<'w>;
+
+  fn with_child(self, c: C) -> Self::Target {
+    if let Some(p) = self { p.with_child(c).into_widget() } else { c.into_child() }
+  }
+}
+
 stateless_with_child!(3);
 
 impl<'w, P, T, C, const M: usize> WithChild<'w, C, 4, M> for P

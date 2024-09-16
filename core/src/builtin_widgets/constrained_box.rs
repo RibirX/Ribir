@@ -1,7 +1,7 @@
-use crate::prelude::*;
+use crate::{prelude::*, wrap_render::WrapRender};
 
 /// a widget that imposes additional constraints clamp on its child.
-#[derive(SingleChild, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct ConstrainedBox {
   pub clamp: BoxClamp,
 }
@@ -12,18 +12,20 @@ impl Declare for ConstrainedBox {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl Render for ConstrainedBox {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+impl<'c> ComposeChild<'c> for ConstrainedBox {
+  type Child = Widget<'c>;
+
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
+  }
+}
+
+impl WrapRender for ConstrainedBox {
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
     let max = clamp.clamp(self.clamp.max);
     let min = clamp.clamp(self.clamp.min);
-    ctx.assert_perform_single_child_layout(BoxClamp { min, max })
+    host.perform_layout(BoxClamp { min, max }, ctx)
   }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { false }
-
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 #[cfg(test)]
@@ -43,7 +45,7 @@ mod tests {
         }
       }
     }),
-    LayoutCase::new(&[0, 0, 0]).with_size(Size::new(50., 50.))
+    LayoutCase::new(&[0]).with_size(Size::new(50., 50.))
   );
 
   widget_layout_test!(
