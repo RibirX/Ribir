@@ -1,6 +1,6 @@
-use crate::prelude::*;
+use crate::{prelude::*, wrap_render::WrapRender};
 
-#[derive(SingleChild, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct TransformWidget {
   pub transform: Transform,
 }
@@ -11,26 +11,41 @@ impl Declare for TransformWidget {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl Render for TransformWidget {
+impl<'c> ComposeChild<'c> for TransformWidget {
+  type Child = Widget<'c>;
+
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
+  }
+}
+
+impl WrapRender for TransformWidget {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.assert_perform_single_child_layout(clamp)
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    host.perform_layout(clamp, ctx)
   }
 
-  #[inline]
-  fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().apply_transform(&self.transform); }
-
-  #[inline]
-  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
-    let is_hit = self
-      .transform
-      .inverse()
-      .map_or(false, |transform| hit_test_impl(ctx, transform.transform_point(pos)));
-
-    HitTest { hit: is_hit, can_hit_child: is_hit }
+  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
+    ctx.painter().apply_transform(&self.transform);
+    host.paint(ctx)
   }
 
-  fn get_transform(&self) -> Option<Transform> { Some(self.transform) }
+  fn hit_test(&self, host: &dyn Render, ctx: &HitTestCtx, pos: Point) -> HitTest {
+    if let Some(t) = self.transform.inverse() {
+      let pos = t.transform_point(pos);
+      host.hit_test(ctx, pos)
+    } else {
+      HitTest { hit: false, can_hit_child: false }
+    }
+  }
+
+  fn get_transform(&self, host: &dyn Render) -> Option<Transform> {
+    if let Some(t) = host.get_transform() {
+      Some(self.transform.then(&t))
+    } else {
+      Some(self.transform)
+    }
+  }
 }
 
 impl TransformWidget {

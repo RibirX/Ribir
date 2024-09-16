@@ -40,23 +40,24 @@ impl Default for ClampDim {
 
 impl Render for UnconstrainedBox {
   #[inline]
-  fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let mut child_clamp = clamp;
     if self.clamp_dim.contains(ClampDim::MIN_SIZE) {
       match self.dir {
-        UnconstrainedDir::X => clamp.min.width = 0.,
-        UnconstrainedDir::Y => clamp.min.height = 0.,
-        UnconstrainedDir::Both => clamp = clamp.loose(),
+        UnconstrainedDir::X => child_clamp.min.width = 0.,
+        UnconstrainedDir::Y => child_clamp.min.height = 0.,
+        UnconstrainedDir::Both => child_clamp = child_clamp.loose(),
       };
     }
     if self.clamp_dim.contains(ClampDim::MAX_SIZE) {
       match self.dir {
-        UnconstrainedDir::X => clamp.max.width = f32::INFINITY,
-        UnconstrainedDir::Y => clamp.max.height = f32::INFINITY,
-        UnconstrainedDir::Both => clamp = clamp.expand(),
+        UnconstrainedDir::X => child_clamp.max.width = f32::INFINITY,
+        UnconstrainedDir::Y => child_clamp.max.height = f32::INFINITY,
+        UnconstrainedDir::Both => child_clamp = child_clamp.expand(),
       };
     }
-
-    ctx.assert_perform_single_child_layout(clamp)
+    let size = ctx.assert_perform_single_child_layout(child_clamp);
+    clamp.clamp(size)
   }
 
   #[inline]

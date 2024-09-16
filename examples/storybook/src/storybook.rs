@@ -3,18 +3,11 @@ use ribir::{material::material_svgs, prelude::*};
 static NORMAL_BUTTON_SIZE: Size = Size::new(120., 40.);
 
 fn header() -> Widget<'static> {
-  static HEADER_HEIGHT: f32 = 64.;
   static TITLE: &str = "Material Design";
   fn_widget! {
-    @ConstrainedBox {
-      clamp: BoxClamp::fixed_height(HEADER_HEIGHT),
-      @Row {
-        v_align: VAlign::Center,
-        justify_content: JustifyContent::SpaceAround,
-        @Text {
-          text: TITLE,
-        }
-      }
+    @Text {
+      margin: EdgeInsets::vertical(22.),
+      text: TITLE
     }
   }
   .into_widget()
@@ -25,17 +18,16 @@ fn content() -> Widget<'static> {
     fn_widget! {
       @Scrollbar {
         @Column {
+          clamp: BoxClamp::EXPAND_X,
+          align_items: Align::Center,
           @Column {
             align_items: Align::Center,
-            @ConstrainedBox {
+            @Row {
               clamp: BoxClamp::fixed_height(30.),
-              @Row {
-                h_align: HAlign::Center,
-                @Text { text: "Common buttons" }
-                @Icon {
-                  size: Size::splat(16.),
-                  @ { material_svgs::INFO }
-                }
+              @Text { text: "Common buttons" }
+              @Icon {
+                size: Size::splat(16.),
+                @ { material_svgs::INFO }
               }
             }
             @Column {
@@ -102,7 +94,6 @@ fn content() -> Widget<'static> {
             @ConstrainedBox {
               clamp: BoxClamp::fixed_height(30.),
               @Row {
-                h_align: HAlign::Center,
                 @Text { text: "Floating action buttons" }
                 @Icon {
                   size: Size::splat(16.),
@@ -136,7 +127,6 @@ fn content() -> Widget<'static> {
             @ConstrainedBox {
               clamp: BoxClamp::fixed_height(30.),
               @Row {
-                h_align: HAlign::Center,
                 @Text { text: "Icon buttons" }
                 @Icon {
                   size: Size::splat(16.),
@@ -338,6 +328,8 @@ fn content() -> Widget<'static> {
 pub fn storybook(ctx: &mut BuildCtx) -> Widget<'static> {
   let f = fn_widget! {
     @Column {
+      clamp: BoxClamp::EXPAND_X,
+      align_items: Align::Center,
       background: Palette::of(ctx!()).surface_container_low(),
       @ { header() }
       @Expanded {

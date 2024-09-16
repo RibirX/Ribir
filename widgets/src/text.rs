@@ -25,11 +25,12 @@ impl VisualText for Text {
 
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
-    self
+    let size = self
       .text_layout(AppCtx::typography_store(), clamp.max)
       .visual_rect()
       .size
-      .cast_unit()
+      .cast_unit();
+    clamp.clamp(size)
   }
 
   #[inline]

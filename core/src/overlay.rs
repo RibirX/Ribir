@@ -319,16 +319,8 @@ mod tests {
     overlay.show_at(Point::new(50., 30.), wnd.0.clone());
     wnd.draw_frame();
     assert_eq!(*r_log.borrow(), &["mounted"]);
-    // the path [1, 0, 0, 0] is from root to anchor,
-    // Root -> BoxDecoration-> Container -> Anchor
 
-    assert_eq!(
-      wnd
-        .layout_info_by_path(&[1, 0, 0, 0])
-        .unwrap()
-        .pos,
-      Point::new(50., 30.)
-    );
+    assert_eq!(wnd.layout_info_by_path(&[1, 0]).unwrap().pos, Point::new(50., 30.));
 
     overlay.close();
     wnd.draw_frame();

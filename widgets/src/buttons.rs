@@ -57,7 +57,7 @@ impl ComposeChild<'static> for ButtonImpl {
         clamp: pipe!(BoxClamp::min_width($this.min_width)
           .with_fixed_height($this.height)),
         @{
-          let padding = pipe!($this.padding_style.map(|padding| Padding { padding }));
+          let padding = $this.padding_style.map(Padding::new);
           let icon = icon.map(|icon| @Icon {
             size: pipe!($this.icon_size),
             @{ icon }

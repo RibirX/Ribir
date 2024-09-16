@@ -149,14 +149,17 @@ impl WidgetTree {
         continue;
       }
 
-      let mut relayout_root = *id;
       if let Some(info) = self.store.get_mut(id) {
         info.size.take();
       }
 
+      let mut relayout_root = *id;
       // All ancestors of this render widget should relayout until the one which only
       // sized by parent.
       for p in id.0.ancestors(&self.arena).skip(1).map(WidgetId) {
+        // The first one may be a pipe that is newly generated. Otherwise, if there
+        // isn't layout information, it indicates that the ancestor marked for relayout
+        // already.
         if self.store.layout_box_size(p).is_none() {
           break;
         }
@@ -166,8 +169,7 @@ impl WidgetTree {
           info.size.take();
         }
 
-        let r = p.assert_get(self);
-        if r.only_sized_by_parent() {
+        if p.assert_get(self).only_sized_by_parent() {
           break;
         }
       }

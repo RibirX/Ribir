@@ -10,10 +10,7 @@ use smallvec::SmallVec;
 use widget_id::RenderQueryable;
 
 use crate::{
-  builtin_widgets::key::AnyKey,
-  prelude::*,
-  render_helper::{PureRender, RenderProxy},
-  window::WindowId,
+  builtin_widgets::key::AnyKey, prelude::*, render_helper::PureRender, window::WindowId,
 };
 
 pub type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
@@ -832,12 +829,23 @@ impl Query for PipeNode {
   fn queryable(&self) -> bool { true }
 }
 
-impl RenderProxy for PipeNode {
-  type Target<'r> = &'r dyn RenderQueryable
-    where
-      Self: 'r;
+impl Render for PipeNode {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    self.as_ref().data.perform_layout(clamp, ctx)
+  }
 
-  fn proxy(&self) -> Self::Target<'_> { &*self.as_ref().data }
+  fn paint(&self, ctx: &mut PaintingCtx) { self.as_ref().data.paint(ctx) }
+
+  fn only_sized_by_parent(&self) -> bool {
+    // A pipe node is always sized by its parent because it can generate any widget.
+    false
+  }
+
+  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
+    self.as_ref().data.hit_test(ctx, pos)
+  }
+
+  fn get_transform(&self) -> Option<Transform> { self.as_ref().data.get_transform() }
 }
 
 #[derive(Clone)]

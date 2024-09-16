@@ -270,8 +270,8 @@ impl<'c> ComposeChild<'c> for ListItem {
         item_align,
       } = ListItemStyle::of(ctx!());
 
-      let padding = padding_style.map(|padding| Padding { padding });
-      let label_gap = label_gap.map(|padding| Padding { padding });
+      let padding = padding_style.map(Padding::new);
+      let label_gap = label_gap.map(Padding::new );
 
       @ListItemDecorator {
         color: pipe!($this.active_background),

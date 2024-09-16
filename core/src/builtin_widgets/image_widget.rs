@@ -1,8 +1,9 @@
 use crate::prelude::*;
 
 impl Render for Resource<PixelImage> {
-  fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size {
-    Size::new(self.width() as f32, self.height() as f32)
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
+    let size = Size::new(self.width() as f32, self.height() as f32);
+    clamp.clamp(size)
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {

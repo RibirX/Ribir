@@ -1,7 +1,7 @@
-use crate::prelude::*;
+use crate::{prelude::*, wrap_render::WrapRender};
 
 /// The BoxDecoration provides a variety of ways to draw a box.
-#[derive(SingleChild, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct BoxDecoration {
   /// The background of the box.
   pub background: Option<Brush>,
@@ -32,18 +32,26 @@ pub struct BorderSide {
   pub width: f32,
 }
 
+impl<'c> ComposeChild<'c> for BoxDecoration {
+  type Child = Widget<'c>;
+
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
+  }
+}
+
 impl BorderSide {
   #[inline]
   pub fn new(width: f32, color: Brush) -> Self { Self { width, color } }
 }
 
-impl Render for BoxDecoration {
+impl WrapRender for BoxDecoration {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.assert_perform_single_child_layout(clamp)
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    host.perform_layout(clamp, ctx)
   }
 
-  fn paint(&self, ctx: &mut PaintingCtx) {
+  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     let size = ctx.box_size().unwrap();
     if !size.is_empty() {
       let rect = Rect::from_size(size);
@@ -58,6 +66,7 @@ impl Render for BoxDecoration {
         painter.fill();
       }
       self.paint_border(painter, &rect);
+      host.paint(ctx)
     }
   }
 }
@@ -211,6 +220,6 @@ mod tests {
       }
     }),
     LayoutCase::default().with_size(Size::new(100., 100.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 100.))
+    LayoutCase::new(&[0]).with_rect(ribir_geom::rect(0., 0., 100., 100.))
   );
 }

@@ -1,7 +1,7 @@
-use crate::prelude::*;
+use crate::{prelude::*, wrap_render::WrapRender};
 
 /// A widget that insets its child by the given padding.
-#[derive(SingleChild, Clone, Default)]
+#[derive(Default)]
 pub struct Padding {
   pub padding: EdgeInsets,
 }
@@ -12,48 +12,44 @@ impl Declare for Padding {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl Render for Padding {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let child = match ctx.single_child() {
-      Some(c) => c,
-      None => return Size::zero(),
-    };
+impl<'c> ComposeChild<'c> for Padding {
+  type Child = Widget<'c>;
 
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
+  }
+}
+
+impl WrapRender for Padding {
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
     let thickness = self.padding.thickness();
     let zero = Size::zero();
+    // Reset children position before layout
+    let (ctx, children) = ctx.split_children();
+    for c in children {
+      ctx.update_position(c, Point::zero());
+    }
+
     let min = (clamp.min - thickness).max(zero);
     let max = (clamp.max - thickness).max(zero);
     // Shrink the clamp of child.
     let child_clamp = BoxClamp { min, max };
-    ctx.force_child_relayout(child);
-    let child = ctx.assert_single_child();
+    let mut size = host.perform_layout(child_clamp, ctx);
 
-    let mut size = ctx.perform_child_layout(child, child_clamp);
-    if child.first_child(ctx.tree).is_some() {
-      // Expand the size, so the child have padding.
-      size = clamp.clamp(size + thickness);
-      ctx.update_size(child, size);
+    size = clamp.clamp(size + thickness);
 
-      // Update child's children position, let they have a correct position after
-      // expanded with padding. padding.
-      let mut ctx = LayoutCtx { id: child, tree: ctx.tree };
-      let (ctx, grandson) = ctx.split_children();
-      for g in grandson {
-        if let Some(pos) = ctx.widget_box_pos(g) {
-          let pos = pos + Vector::new(self.padding.left, self.padding.top);
-          ctx.update_position(g, pos);
-        }
+    let (ctx, children) = ctx.split_children();
+    // Update the children's positions to ensure they are correctly positioned after
+    // expansion with padding.
+    for c in children {
+      if let Some(pos) = ctx.widget_box_pos(c) {
+        let pos = pos + Vector::new(self.padding.left, self.padding.top);
+        ctx.update_position(c, pos);
       }
     }
 
     size
   }
-
-  #[inline]
-  fn only_sized_by_parent(&self) -> bool { false }
-
-  #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl Padding {
@@ -80,10 +76,8 @@ mod tests {
     }),
     // padding widget
     LayoutCase::default().with_size(Size::new(101., 100.)),
-    // MockMulti widget
-    LayoutCase::new(&[0, 0]).with_size(Size::new(101., 100.)),
     // MockBox
-    LayoutCase::new(&[0, 0, 0])
+    LayoutCase::new(&[0, 0])
       .with_size(Size::new(100., 100.))
       .with_x(1.)
   );

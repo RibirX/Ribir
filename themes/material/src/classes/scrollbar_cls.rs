@@ -80,7 +80,6 @@ fn base_track(w: Widget) -> Widget {
         let color = Palette::of(ctx!()).primary_container();
         pipe!(if $w.mouse_hover() { color } else { color.with_alpha(0.)})
       },
-      h_align: HAlign::Right,
       on_disposed: move |_| u.unsubscribe(),
     };
     // Smoothly display the background.

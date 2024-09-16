@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, wrap_render::WrapRender};
 
 /// A enum that describe how widget align to its box.
 #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -54,13 +54,13 @@ pub enum VAlign {
 }
 
 /// A widget that align its child in x-axis, base on child's width.
-#[derive(SingleChild, Default)]
+#[derive(Default)]
 pub struct HAlignWidget {
   pub h_align: HAlign,
 }
 
 /// A widget that align its child in y-axis, base on child's height.
-#[derive(SingleChild, Default)]
+#[derive(Default)]
 pub struct VAlignWidget {
   pub v_align: VAlign,
 }
@@ -77,51 +77,50 @@ impl Declare for VAlignWidget {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl Render for HAlignWidget {
-  fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+impl<'c> ComposeChild<'c> for HAlignWidget {
+  type Child = Widget<'c>;
+
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
+  }
+}
+
+impl<'c> ComposeChild<'c> for VAlignWidget {
+  type Child = Widget<'c>;
+
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
+  }
+}
+
+impl WrapRender for HAlignWidget {
+  fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
     let align: Align = self.h_align.into();
     if align == Align::Stretch {
       clamp.min.width = clamp.max.width;
     } else {
       clamp.min.width = 0.;
     }
-    let child = ctx.assert_single_child();
-    let child_size = ctx.perform_child_layout(child, clamp);
-    let box_width = clamp.max.width;
-    let x = align.align_value(child_size.width, box_width);
-    ctx.update_position(child, Point::new(x, 0.));
-    Size::new(box_width, child_size.height)
-  }
 
-  fn paint(&self, _: &mut PaintingCtx) {}
-
-  #[inline]
-  fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
-    HitTest { hit: false, can_hit_child: true }
+    let child_size = host.perform_layout(clamp, ctx);
+    let x = align.align_value(child_size.width, clamp.max.width);
+    ctx.update_position(ctx.widget_id(), Point::new(x, 0.));
+    clamp.clamp(child_size)
   }
 }
 
-impl Render for VAlignWidget {
-  fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+impl WrapRender for VAlignWidget {
+  fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
     let align: Align = self.v_align.into();
     if align == Align::Stretch {
       clamp.min.height = clamp.max.height;
     } else {
       clamp.min.height = 0.;
     }
-    let child = ctx.assert_single_child();
-    let child_size = ctx.perform_child_layout(child, clamp);
-    let box_height = clamp.max.height;
-    let y = align.align_value(child_size.height, box_height);
-    ctx.update_position(child, Point::new(0., y));
-    Size::new(child_size.width, box_height)
-  }
-
-  fn paint(&self, _: &mut PaintingCtx) {}
-
-  #[inline]
-  fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
-    HitTest { hit: false, can_hit_child: true }
+    let child_size = host.perform_layout(clamp, ctx);
+    let y = align.align_value(child_size.height, clamp.max.height);
+    ctx.update_position(ctx.widget_id(), Point::new(0., y));
+    clamp.clamp(child_size)
   }
 }
 
@@ -181,15 +180,15 @@ mod tests {
   widget_layout_test!(
     left_align,
     WidgetTester::new(h_align(HAlign::Left)).with_wnd_size(WND_SIZE),
-    LayoutCase::default().with_size(Size::new(100., 10.)),
-    LayoutCase::new(&[0, 0]).with_size(CHILD_SIZE)
+    LayoutCase::default()
+      .with_size(CHILD_SIZE)
+      .with_x(0.)
   );
 
   widget_layout_test!(
     h_center_align,
     WidgetTester::new(h_align(HAlign::Center)).with_wnd_size(WND_SIZE),
-    LayoutCase::default().with_size(Size::new(100., 10.)),
-    LayoutCase::new(&[0, 0])
+    LayoutCase::default()
       .with_size(CHILD_SIZE)
       .with_x(45.)
   );
@@ -197,8 +196,7 @@ mod tests {
   widget_layout_test!(
     right_align,
     WidgetTester::new(h_align(HAlign::Right)).with_wnd_size(WND_SIZE),
-    LayoutCase::default().with_size(Size::new(100., 10.)),
-    LayoutCase::new(&[0, 0])
+    LayoutCase::default()
       .with_size(CHILD_SIZE)
       .with_x(90.)
   );
@@ -206,9 +204,8 @@ mod tests {
   widget_layout_test!(
     h_stretch_algin,
     WidgetTester::new(h_align(HAlign::Stretch)).with_wnd_size(WND_SIZE),
-    LayoutCase::default().with_size(Size::new(100., 10.)),
-    LayoutCase::new(&[0, 0])
-      .with_size(Size::new(100., 10.))
+    LayoutCase::default()
+      .with_size(Size::new(WND_SIZE.width, 10.))
       .with_x(0.)
   );
 
@@ -225,8 +222,7 @@ mod tests {
   widget_layout_test!(
     top_align,
     WidgetTester::new(v_align(VAlign::Top)).with_wnd_size(WND_SIZE),
-    LayoutCase::default().with_size(Size::new(10., 100.)),
-    LayoutCase::new(&[0, 0])
+    LayoutCase::default()
       .with_size(CHILD_SIZE)
       .with_y(0.)
   );
@@ -234,8 +230,7 @@ mod tests {
   widget_layout_test!(
     v_center_align,
     WidgetTester::new(v_align(VAlign::Center)).with_wnd_size(WND_SIZE),
-    LayoutCase::default().with_size(Size::new(10., 100.)),
-    LayoutCase::new(&[0, 0])
+    LayoutCase::default()
       .with_size(CHILD_SIZE)
       .with_y(45.)
   );
@@ -243,8 +238,7 @@ mod tests {
   widget_layout_test!(
     bottom_align,
     WidgetTester::new(v_align(VAlign::Bottom)).with_wnd_size(WND_SIZE),
-    LayoutCase::default().with_size(Size::new(10., 100.)),
-    LayoutCase::new(&[0, 0])
+    LayoutCase::default()
       .with_size(CHILD_SIZE)
       .with_y(90.)
   );
@@ -252,7 +246,6 @@ mod tests {
   widget_layout_test!(
     v_stretch_align,
     WidgetTester::new(v_align(VAlign::Stretch)).with_wnd_size(WND_SIZE),
-    LayoutCase::default().with_size(Size::new(10., 100.)),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(10., 100.))
+    LayoutCase::default().with_size(Size::new(10., WND_SIZE.height))
   );
 }

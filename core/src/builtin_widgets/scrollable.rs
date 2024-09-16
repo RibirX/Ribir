@@ -161,10 +161,7 @@ mod tests {
     });
 
     wnd.draw_frame();
-    let pos = wnd
-      .layout_info_by_path(&[0, 0, 0, 0])
-      .unwrap()
-      .pos;
+    let pos = wnd.layout_info_by_path(&[0, 0, 0]).unwrap().pos;
     assert_eq!(pos, Point::new(expect_x, expect_y));
   }
 

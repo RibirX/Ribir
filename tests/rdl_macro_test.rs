@@ -211,7 +211,7 @@ fn pipe_single_parent() {
       if *$outside_blank {
         BoxedSingleChild::new(Margin { margin: edges })
       } else {
-        BoxedSingleChild::new(Padding { padding: edges })
+        BoxedSingleChild::new(Void { })
       }
     };
     rdl!{

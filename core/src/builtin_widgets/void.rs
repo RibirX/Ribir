@@ -10,8 +10,8 @@ pub struct Void;
 impl Render for Void {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     ctx
-      .single_child()
-      .map_or_else(Size::zero, |c| ctx.perform_child_layout(c, clamp))
+      .perform_single_child_layout(clamp)
+      .unwrap_or(clamp.min)
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}

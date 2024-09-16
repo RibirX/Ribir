@@ -14,9 +14,13 @@ use crate::{
 
 pub struct WidgetId(pub(crate) NodeId);
 
-pub trait RenderQueryable: Render + Query {}
+pub trait RenderQueryable: Render + Query {
+  fn as_render(&self) -> &dyn Render;
+}
 
-impl<T: Render + Query> RenderQueryable for T {}
+impl<T: Render + Query> RenderQueryable for T {
+  fn as_render(&self) -> &dyn Render { self }
+}
 
 impl WidgetId {
   /// Returns a reference to the node data.

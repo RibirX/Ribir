@@ -1,6 +1,6 @@
-use crate::prelude::*;
+use crate::{prelude::*, wrap_render::WrapRender};
 
-#[derive(Clone, SingleChild)]
+#[derive(Clone)]
 pub struct Opacity {
   pub opacity: f32,
 }
@@ -16,17 +16,21 @@ impl Default for Opacity {
   fn default() -> Self { Self { opacity: 1.0 } }
 }
 
-impl Render for Opacity {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.assert_perform_single_child_layout(clamp)
+impl<'c> ComposeChild<'c> for Opacity {
+  type Child = Widget<'c>;
+
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
+  }
+}
+
+impl WrapRender for Opacity {
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    host.perform_layout(clamp, ctx)
   }
 
-  fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().apply_alpha(self.opacity); }
-
-  fn only_sized_by_parent(&self) -> bool { false }
-
-  fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
-    HitTest { hit: false, can_hit_child: true }
+  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
+    ctx.painter().apply_alpha(self.opacity);
+    host.paint(ctx)
   }
 }
