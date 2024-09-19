@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use smallvec::{smallvec, SmallVec};
@@ -13,7 +15,7 @@ use syn::{
 use crate::{
   fn_widget_macro,
   rdl_macro::RdlMacro,
-  variable_names::{ribir_suffix_variable, BuiltinMemberType, BUILTIN_INFOS},
+  variable_names::{ribir_suffix_variable, BuiltinMember, BuiltinMemberType, BUILTIN_INFOS},
 };
 
 pub const KW_DOLLAR_STR: &str = "_dollar_ಠ_ಠ";
@@ -34,7 +36,8 @@ pub mod kw {
 #[derive(Hash, PartialEq, Eq, Debug, Clone)]
 pub struct BuiltinInfo {
   pub(crate) host: Ident,
-  pub(crate) member: Ident,
+  pub(crate) get_builtin: Ident,
+  pub(crate) run_before_clone: SmallVec<[Ident; 1]>,
 }
 
 #[derive(Hash, PartialEq, Eq, Debug, Clone, PartialOrd, Ord)]
@@ -268,7 +271,7 @@ impl Fold for DollarRefsCtx {
       let dollar = BUILTIN_INFOS
         .get(member.to_string().as_str())
         .filter(|info| info.mem_ty == BuiltinMemberType::Field)
-        .and_then(|info| self.replace_builtin_ident(&mut *base, info.var_name));
+        .and_then(|info| self.replace_builtin_ident(&mut *base, info));
       if dollar.is_some() {
         return i;
       }
@@ -282,7 +285,7 @@ impl Fold for DollarRefsCtx {
     if BUILTIN_INFOS
       .get(&i.method.to_string())
       .filter(|info| info.mem_ty == BuiltinMemberType::Method)
-      .and_then(|info| self.replace_builtin_ident(&mut i.receiver, info.var_name))
+      .and_then(|info| self.replace_builtin_ident(&mut i.receiver, info))
       .is_some()
     {
       return i;
@@ -381,8 +384,10 @@ fn mark_macro_expanded(mac: &mut Macro) {
 impl ToTokens for DollarRefsScope {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     for DollarRef { name, builtin, used } in &self.refs {
-      if let Some(BuiltinInfo { host, member }) = builtin {
-        quote_spanned! { name.span() => let #name = #host.#member() }
+      if let Some(BuiltinInfo { host, get_builtin: member, run_before_clone }) = builtin {
+        quote_spanned! { name.span() =>
+          let #name = #host #(.#run_before_clone())* .#member()
+        }
       } else {
         quote_spanned! { name.span() => let #name = #name }
       }
@@ -448,15 +453,12 @@ impl DollarRefsCtx {
     }
     let mut scope = self.scopes.pop().unwrap();
 
-    // sort and remove duplicate
-    scope.refs.sort_by(|a, b| {
-      a.builtin
-        .is_none()
-        .cmp(&b.builtin.is_none())
-        .then_with(|| a.name.cmp(&b.name))
-        .then_with(|| b.used.cmp(&a.used))
-    });
-    scope.refs.dedup_by(|a, b| a.name == b.name);
+    // To maintain the order, ensure that the builtin widget precedes its host.
+    // Otherwise, the host might only clone a reader that cannot create a
+    // builtin widget.
+    scope
+      .refs
+      .sort_by(|a, b| a.builtin.is_none().cmp(&b.builtin.is_none()));
 
     if !self.scopes.is_empty() {
       self.current_dollar_scope_mut().used_ctx |= scope.used_ctx();
@@ -467,7 +469,8 @@ impl DollarRefsCtx {
           if watch_scope && c_r.used == DollarUsedInfo::Reader {
             c_r.used = DollarUsedInfo::Watcher;
           }
-          self.current_dollar_scope_mut().refs.push(c_r);
+          self.add_dollar_ref(c_r);
+
           // if ref variable is not a local variable of parent capture level, should
           // remove its builtin info as a normal variable, because parent will capture the
           // builtin object individually.
@@ -477,6 +480,7 @@ impl DollarRefsCtx {
         }
       }
     }
+
     scope
   }
 
@@ -487,7 +491,7 @@ impl DollarRefsCtx {
 
   pub fn builtin_host_tokens(&self, dollar_ref: &DollarRef) -> TokenStream {
     let DollarRef { name, builtin, .. } = dollar_ref;
-    let BuiltinInfo { host, member } = builtin.as_ref().unwrap();
+    let BuiltinInfo { host, get_builtin: member, run_before_clone } = builtin.as_ref().unwrap();
 
     // if used in embedded closure, we directly use the builtin variable, the
     // variable that capture by the closure is already a separate builtin variable.
@@ -495,14 +499,14 @@ impl DollarRefsCtx {
     if !self.is_local_var(host) && self.capture_level_heads.len() > 1 {
       name.to_token_stream()
     } else {
-      quote_spanned! { host.span() => #host.#member() }
+      quote_spanned! { host.span() => #host #(.#run_before_clone())*.#member() }
     }
   }
 
   fn mark_used_ctx(&mut self) { self.current_dollar_scope_mut().used_ctx = true; }
 
   fn replace_builtin_ident(
-    &mut self, caller: &mut Expr, builtin_member: &str,
+    &mut self, caller: &mut Expr, info: &BuiltinMember,
   ) -> Option<&DollarRef> {
     let mut used = DollarUsedInfo::Reader;
     let e = if let Expr::MethodCall(m) = caller {
@@ -522,9 +526,14 @@ impl DollarRefsCtx {
     // When a builtin widget captured by a `move |_| {...}` closure, we need split
     // the builtin widget from the `FatObj` so we only capture the builtin part that
     // we used.
-    let name = ribir_suffix_variable(&host, builtin_member);
-    let get_builtin_method = Ident::new(&format!("get_{builtin_member}_widget"), host.span());
-    let builtin = Some(BuiltinInfo { host, member: get_builtin_method });
+    let name = ribir_suffix_variable(&host, info.var_name);
+    let get_builtin = Ident::new(&format!("get_{}_widget", info.var_name), host.span());
+    let mut run_before_clone = SmallVec::default();
+    if let Some(method) = info.run_before_clone {
+      run_before_clone.push(Ident::new(method, host.span()));
+    }
+    Ident::new(&format!("get_{}_widget", info.var_name), host.span());
+    let builtin = Some(BuiltinInfo { host, get_builtin, run_before_clone });
     let dollar_ref = DollarRef { name, builtin, used };
 
     let state = self.builtin_host_tokens(&dollar_ref);
@@ -550,11 +559,25 @@ impl DollarRefsCtx {
   fn add_dollar_ref(&mut self, dollar_ref: DollarRef) {
     // local variable is not a outside reference.
     if !self.is_local_var(dollar_ref.host()) {
-      let scope = self
-        .scopes
-        .last_mut()
-        .expect("no dollar refs scope");
-      scope.refs.push(dollar_ref);
+      let scope = self.current_dollar_scope_mut();
+      let r = scope
+        .refs
+        .iter_mut()
+        .find(|v| v.name == dollar_ref.name);
+      if let Some(r) = r {
+        if r.used.cmp(&dollar_ref.used) == Ordering::Less {
+          r.used = dollar_ref.used
+        }
+        if let (Some(this), Some(other)) = (r.builtin.as_mut(), dollar_ref.builtin) {
+          for e in other.run_before_clone {
+            if this.run_before_clone.iter().any(|e2| &e == e2) {
+              this.run_before_clone.push(e);
+            }
+          }
+        }
+      } else {
+        scope.refs.push(dollar_ref);
+      }
     }
   }
 
@@ -608,7 +631,7 @@ impl DollarRef {
 
   pub fn upstream_tokens(&self) -> TokenStream {
     let DollarRef { name, builtin, .. } = self;
-    if let Some(BuiltinInfo { host, member }) = builtin {
+    if let Some(BuiltinInfo { host, get_builtin: member, .. }) = builtin {
       quote_spanned! { name.span() => #host.#member().modifies() }
     } else {
       quote_spanned! { name.span() => #name.modifies() }

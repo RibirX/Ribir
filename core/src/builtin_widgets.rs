@@ -46,14 +46,8 @@ pub mod fitted_box;
 pub use fitted_box::*;
 pub mod svg;
 
-pub mod has_focus;
-pub use has_focus::*;
-pub mod mouse_hover;
-pub use mouse_hover::*;
 pub mod clip;
 pub use clip::*;
-pub mod pointer_pressed;
-pub use pointer_pressed::*;
 pub mod focus_node;
 pub use focus_node::*;
 pub mod focus_scope;
@@ -108,11 +102,8 @@ pub struct FatObj<T> {
   host: T,
   host_id: LazyWidgetId,
   id: LazyWidgetId,
-  mix_builtin: Option<State<MixBuiltin>>,
+  mix_builtin: Option<MixBuiltin>,
   request_focus: Option<State<RequestFocus>>,
-  has_focus: Option<State<HasFocus>>,
-  mouse_hover: Option<State<MouseHover>>,
-  pointer_pressed: Option<State<PointerPressed>>,
   fitted_box: Option<State<FittedBox>>,
   box_decoration: Option<State<BoxDecoration>>,
   padding: Option<State<Padding>>,
@@ -176,9 +167,6 @@ impl<T> FatObj<T> {
       id: self.id,
       mix_builtin: self.mix_builtin,
       request_focus: self.request_focus,
-      has_focus: self.has_focus,
-      mouse_hover: self.mouse_hover,
-      pointer_pressed: self.pointer_pressed,
       fitted_box: self.fitted_box,
       box_decoration: self.box_decoration,
       padding: self.padding,
@@ -206,9 +194,6 @@ impl<T> FatObj<T> {
       && self.id.ref_count() == 1
       && self.mix_builtin.is_none()
       && self.request_focus.is_none()
-      && self.has_focus.is_none()
-      && self.mouse_hover.is_none()
-      && self.pointer_pressed.is_none()
       && self.fitted_box.is_none()
       && self.box_decoration.is_none()
       && self.padding.is_none()
@@ -249,53 +234,55 @@ impl<T> FatObj<T> {
 impl<T> FatObj<T> {
   /// Returns the `State<Class>` widget from the FatObj. If it doesn't exist, a
   /// new one is created.
-  pub fn get_class_widget(&mut self) -> &mut State<Class> {
+  pub fn get_class_widget(&mut self) -> &State<Class> {
     self
       .class
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 
-  pub fn get_mix_builtin_widget(&mut self) -> &mut State<MixBuiltin> {
+  pub fn get_mix_builtin_widget(&mut self) -> &MixBuiltin {
     self
       .mix_builtin
-      .get_or_insert_with(|| State::value(<_>::default()))
+      .get_or_insert_with(MixBuiltin::default)
   }
 
   /// Returns the `State<RequestFocus>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_request_focus_widget(&mut self) -> &mut State<RequestFocus> {
+  pub fn get_request_focus_widget(&mut self) -> &State<RequestFocus> {
     self
       .request_focus
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 
-  /// Returns the `State<HasFocus>` widget from the FatObj. If it doesn't exist,
-  /// a new one is created.
-  pub fn get_has_focus_widget(&mut self) -> &mut State<HasFocus> {
-    self
-      .has_focus
-      .get_or_insert_with(|| State::value(<_>::default()))
+  /// Return the `State<MixFlags>` from the `MixBuiltin`. If the `MixBuiltin`
+  /// does not exist in the `FatObj`, a new one is created.
+  pub fn get_mix_flags_widget(&mut self) -> &State<MixFlags> {
+    self.get_mix_builtin_widget().mix_flags()
   }
 
-  /// Returns the `State<MouseHover>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
-  pub fn get_mouse_hover_widget(&mut self) -> &mut State<MouseHover> {
+  /// Begin tracing the focus status of this widget.
+  pub fn trace_focus(&mut self) -> &mut Self {
+    self.get_mix_builtin_widget().trace_focus();
     self
-      .mouse_hover
-      .get_or_insert_with(|| State::value(<_>::default()))
   }
 
-  /// Returns the `State<PointerPressed>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
-  pub fn get_pointer_pressed_widget(&mut self) -> &mut State<PointerPressed> {
+  /// Begin tracing the hover status of this widget.
+  pub fn trace_hover(&mut self) -> &mut Self {
+    self.get_mix_builtin_widget().trace_hover();
     self
-      .pointer_pressed
-      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+
+  /// Begin tracing if the pointer pressed on this widget
+  pub fn trace_pointer_pressed(&mut self) -> &mut Self {
+    self
+      .get_mix_builtin_widget()
+      .trace_pointer_pressed();
+    self
   }
 
   /// Returns the `State<FittedBox>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_fitted_box_widget(&mut self) -> &mut State<FittedBox> {
+  pub fn get_fitted_box_widget(&mut self) -> &State<FittedBox> {
     self
       .fitted_box
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -303,7 +290,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<BoxDecoration>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_box_decoration_widget(&mut self) -> &mut State<BoxDecoration> {
+  pub fn get_box_decoration_widget(&mut self) -> &State<BoxDecoration> {
     self
       .box_decoration
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -311,7 +298,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<Padding>` widget from the FatObj. If it doesn't exist,
   /// a new one is created.
-  pub fn get_padding_widget(&mut self) -> &mut State<Padding> {
+  pub fn get_padding_widget(&mut self) -> &State<Padding> {
     self
       .padding
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -319,7 +306,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<LayoutBox>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_layout_box_widget(&mut self) -> &mut State<LayoutBox> {
+  pub fn get_layout_box_widget(&mut self) -> &State<LayoutBox> {
     self
       .layout_box
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -327,7 +314,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<Cursor>` widget from the FatObj. If it doesn't exist, a
   /// new one is created.
-  pub fn get_cursor_widget(&mut self) -> &mut State<Cursor> {
+  pub fn get_cursor_widget(&mut self) -> &State<Cursor> {
     self
       .cursor
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -335,13 +322,13 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<Margin>` widget from the FatObj. If it doesn't exist, a
   /// new one is created.
-  pub fn get_margin_widget(&mut self) -> &mut State<Margin> {
+  pub fn get_margin_widget(&mut self) -> &State<Margin> {
     self
       .margin
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 
-  pub fn get_constrained_box_widget(&mut self) -> &mut State<ConstrainedBox> {
+  pub fn get_constrained_box_widget(&mut self) -> &State<ConstrainedBox> {
     self
       .constrained_box
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -349,7 +336,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<ScrollableWidget>` widget from the FatObj. If it
   /// doesn't exist, a new one is created.
-  pub fn get_scrollable_widget(&mut self) -> &mut State<ScrollableWidget> {
+  pub fn get_scrollable_widget(&mut self) -> &State<ScrollableWidget> {
     self
       .scrollable
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -357,7 +344,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<TransformWidget>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_transform_widget(&mut self) -> &mut State<TransformWidget> {
+  pub fn get_transform_widget(&mut self) -> &State<TransformWidget> {
     self
       .transform
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -365,7 +352,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<HAlignWidget>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_h_align_widget(&mut self) -> &mut State<HAlignWidget> {
+  pub fn get_h_align_widget(&mut self) -> &State<HAlignWidget> {
     self
       .h_align
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -373,7 +360,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<VAlignWidget>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_v_align_widget(&mut self) -> &mut State<VAlignWidget> {
+  pub fn get_v_align_widget(&mut self) -> &State<VAlignWidget> {
     self
       .v_align
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -381,7 +368,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<RelativeAnchor>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_relative_anchor_widget(&mut self) -> &mut State<RelativeAnchor> {
+  pub fn get_relative_anchor_widget(&mut self) -> &State<RelativeAnchor> {
     self
       .relative_anchor
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -389,7 +376,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<GlobalAnchor>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_global_anchor_widget(&mut self) -> &mut State<GlobalAnchor> {
+  pub fn get_global_anchor_widget(&mut self) -> &State<GlobalAnchor> {
     self
       .global_anchor
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -397,7 +384,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<Visibility>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_visibility_widget(&mut self) -> &mut State<Visibility> {
+  pub fn get_visibility_widget(&mut self) -> &State<Visibility> {
     self
       .visibility
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -405,7 +392,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<Opacity>` widget from the FatObj. If it doesn't exist,
   /// a new one is created.
-  pub fn get_opacity_widget(&mut self) -> &mut State<Opacity> {
+  pub fn get_opacity_widget(&mut self) -> &State<Opacity> {
     self
       .opacity
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -413,7 +400,7 @@ impl<T> FatObj<T> {
 
   /// Returns the `State<KeepAlive>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn get_keep_alive_widget(&mut self) -> &mut State<KeepAlive> {
+  pub fn get_keep_alive_widget(&mut self) -> &State<KeepAlive> {
     self
       .keep_alive
       .get_or_insert_with(|| State::value(<_>::default()))
@@ -422,10 +409,7 @@ impl<T> FatObj<T> {
 
 macro_rules! on_mixin {
   ($this:ident, $on_method:ident, $f:ident) => {{
-    $this
-      .get_mix_builtin_widget()
-      .read()
-      .$on_method($f);
+    $this.get_mix_builtin_widget().$on_method($f);
     $this
   }};
 }
@@ -565,7 +549,6 @@ impl<T> FatObj<T> {
   ) -> Self {
     self
       .get_mix_builtin_widget()
-      .read()
       .on_x_times_tap((times, f));
     self
   }
@@ -579,7 +562,6 @@ impl<T> FatObj<T> {
   ) -> Self {
     self
       .get_mix_builtin_widget()
-      .read()
       .on_x_times_tap_capture((times, f));
     self
   }
@@ -715,9 +697,11 @@ impl<T> FatObj<T> {
   ///   position in the tree source. The maximum value for tab_index is 32767.
   ///   If not specified, it takes the default value 0.
   pub fn tab_index<const M: u8>(self, tab_idx: impl DeclareInto<i16, M>) -> Self {
-    self.declare_builtin_init(tab_idx, Self::get_mix_builtin_widget, |mixin, v| {
-      mixin.set_tab_index(v);
-    })
+    self.declare_builtin_init(
+      tab_idx,
+      |this| this.get_mix_builtin_widget().mix_flags(),
+      |m, v| m.set_tab_index(v),
+    )
   }
 
   /// Initializes the `Class` that should be applied to the widget.
@@ -731,9 +715,11 @@ impl<T> FatObj<T> {
   /// Only one widget should have this attribute specified.  If there are
   /// several, the widget nearest the root, get the initial focus.
   pub fn auto_focus<const M: u8>(self, v: impl DeclareInto<bool, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_mix_builtin_widget, |m, v| {
-      m.set_auto_focus(v);
-    })
+    self.declare_builtin_init(
+      v,
+      |this| this.get_mix_builtin_widget().mix_flags(),
+      |m, v| m.set_auto_focus(v),
+    )
   }
 
   /// Initializes how its child should be scale to fit its box.
@@ -839,7 +825,7 @@ impl<T> FatObj<T> {
   }
 
   fn declare_builtin_init<V: 'static, B: 'static, const M: u8>(
-    mut self, init: impl DeclareInto<V, M>, get_builtin: impl FnOnce(&mut Self) -> &mut State<B>,
+    mut self, init: impl DeclareInto<V, M>, get_builtin: impl FnOnce(&mut Self) -> &State<B>,
     set_value: fn(&mut B, V),
   ) -> Self {
     let builtin = get_builtin(&mut self);
@@ -847,9 +833,7 @@ impl<T> FatObj<T> {
     set_value(&mut *builtin.silent(), v);
     if let Some(o) = o {
       let c_builtin = builtin.clone_writer();
-      let u = o.subscribe(move |(_, v)| {
-        set_value(&mut *c_builtin.write(), v);
-      });
+      let u = o.subscribe(move |(_, v)| set_value(&mut *c_builtin.write(), v));
       self.on_disposed(move |_| u.unsubscribe())
     } else {
       self
@@ -896,9 +880,6 @@ impl<'a> FatObj<Widget<'a>> {
           layout_box,
           mix_builtin,
           request_focus,
-          has_focus,
-          mouse_hover,
-          pointer_pressed,
           cursor,
           margin,
           transform,

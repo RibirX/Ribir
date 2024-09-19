@@ -32,6 +32,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Changed
 
+- **core**: Merged boolean status widgets into a single widget `MixFlags`, including `HasFocus`, `MouseHover` and `PointerPressed`. (#627 @M-Adoo)
 - **core**: Reimplemented `HAlignWidget`, `VAlignWidget`, `RelativeAnchor`, `BoxDecoration`, `ConstrainedBox`, `IgnorePoint`, `Opacity`, `Padding`, `TransformWidget`, and `VisibilityRender` as `WrapRender`. (#626 @M-Adoo)
 
 
