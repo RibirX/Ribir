@@ -71,7 +71,7 @@ impl<'c> ComposeChild<'c> for Ripple {
             from: Path::circle(Point::zero(), 0.)
           };
 
-          watch!(!$container.pointer_pressed() && !$ripper_enter.is_running())
+          watch!(!$container.is_pointer_pressed() && !$ripper_enter.is_running())
             .filter(|b| *b)
             // the ripple used only once, so we unsubscribe it after the animate finished.
             .take(1)

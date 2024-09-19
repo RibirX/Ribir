@@ -2,7 +2,7 @@ use std::ptr::NonNull;
 
 use self::dispatcher::DispatchInfo;
 use crate::{
-  builtin_widgets::BuiltinFlags,
+  builtin_widgets::MixFlags,
   context::{define_widget_context, WidgetCtx, WidgetCtxImpl},
   widget_tree::{WidgetId, WidgetTree},
 };
@@ -233,9 +233,9 @@ impl std::ops::DerefMut for Event {
 }
 
 impl Event {
-  pub fn flags(&self) -> BuiltinFlags {
+  pub(crate) fn flags(&self) -> MixFlags {
     match self {
-      Event::Mounted(_) | Event::PerformedLayout(_) | Event::Disposed(_) => BuiltinFlags::Lifecycle,
+      Event::Mounted(_) | Event::PerformedLayout(_) | Event::Disposed(_) => MixFlags::Lifecycle,
       Event::PointerDown(_)
       | Event::PointerDownCapture(_)
       | Event::PointerUp(_)
@@ -246,8 +246,8 @@ impl Event {
       | Event::PointerEnter(_)
       | Event::PointerLeave(_)
       | Event::Tap(_)
-      | Event::TapCapture(_) => BuiltinFlags::Pointer,
-      Event::Wheel(_) | Event::WheelCapture(_) => BuiltinFlags::Wheel,
+      | Event::TapCapture(_) => MixFlags::Pointer,
+      Event::Wheel(_) | Event::WheelCapture(_) => MixFlags::Wheel,
       Event::ImePreEdit(_)
       | Event::ImePreEditCapture(_)
       | Event::Chars(_)
@@ -255,12 +255,12 @@ impl Event {
       | Event::KeyDown(_)
       | Event::KeyDownCapture(_)
       | Event::KeyUp(_)
-      | Event::KeyUpCapture(_) => BuiltinFlags::KeyBoard,
-      Event::Focus(_) | Event::Blur(_) => BuiltinFlags::Focus,
+      | Event::KeyUpCapture(_) => MixFlags::KeyBoard,
+      Event::Focus(_) | Event::Blur(_) => MixFlags::Focus,
       Event::FocusIn(_)
       | Event::FocusInCapture(_)
       | Event::FocusOut(_)
-      | Event::FocusOutCapture(_) => BuiltinFlags::FocusInOut,
+      | Event::FocusOutCapture(_) => MixFlags::FocusInOut,
     }
   }
 }

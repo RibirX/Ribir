@@ -370,7 +370,7 @@ impl FocusManager {
       .and_then(|wid| {
         wid
           .query_ref::<MixBuiltin>(tree)
-          .map(|m| m.get_tab_index())
+          .map(|m| m.mix_flags().read().tab_index())
       })
       .unwrap_or_default()
   }

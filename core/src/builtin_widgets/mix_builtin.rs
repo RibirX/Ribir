@@ -1,4 +1,4 @@
-use std::{cell::Cell, convert::Infallible};
+use std::convert::Infallible;
 
 use rxrust::prelude::*;
 
@@ -9,21 +9,21 @@ const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 
 bitflags! {
   #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-  pub struct BuiltinFlags: u64 {
+  pub struct MixFlags: u64 {
     // Listener flags, the flags are used to indicate what
     // kind of events the widget are listening to.
     const Lifecycle = 1 << 0;
-    /// Pointer listener flag, hint the widget is listening to pointer events
+    #[doc="Pointer listener flag, hint the widget is listening to pointer events"]
     const Pointer = 1 << 1;
-    /// Wheel listener flag, hint the widget is listening to wheel events
+    #[doc="Wheel listener flag, hint the widget is listening to wheel events"]
     const Wheel = 1 << 2;
-    /// Keyboard listener flag, hint the widget is listening to keyboard events
+    #[doc="Keyboard listener flag, hint the widget is listening to keyboard events"]
     const KeyBoard = 1 << 3 | Self::Focus.bits();
-    /// Whether the widget is a focus node also hint the widget
-    /// is listening to focus/blur events
+    #[doc="Whether the widget is a focus node also hint the widget \
+    is listening to focus/blur events"]
     const Focus = 1 << 4;
-    /// Bubble focus event listener flag, hint the widget is listening to
-    /// FocusIn/FocusOut and their capture events
+    #[doc="Bubble focus event listener flag, hint the widget is listening to \
+     FocusIn/FocusOut and their capture events"]
     const FocusInOut = 1 << 5;
 
     const AllListeners = Self::Lifecycle.bits()
@@ -34,16 +34,29 @@ bitflags! {
       | Self::FocusInOut.bits();
     // listener end
 
+    #[doc="Indicates whether this widget is tracing its focus status."]
+    const TraceFocus = 1 << 16;
+    #[doc="Indicates whether the focus is on this widget (including its descendants)."]
+    const Focused = 1 << 17;
+    #[doc="Indicates whether this widget is tracing the hover status."]
+    const TraceHover = 1 << 18;
+    #[doc="Indicates whether the mouse is hover on this widget (including its descendants)."]
+    const Hovered = 1 << 19;
+    #[doc="Indicates whether this widget is tracing the pressed status of pointer."]
+    const TracePointerPressed = 1 << 20;
+    #[doc="Indicates whether the pointer is pressed on this widget."]
+    const PointerPressed = 1 << 21;
+
+    #[doc="Indicates whether this widget has auto-focus functionality."]
     const AutoFocus = 1 << 47;
-    // 16 bits keep for tab index
+    // The last 16 bits keep for tab index
   }
 }
 
 pub type EventSubject = MutRefItemSubject<'static, Event, Infallible>;
 
-#[derive(Default)]
 pub struct MixBuiltin {
-  flags: Cell<BuiltinFlags>,
+  flags: State<MixFlags>,
   subject: EventSubject,
 }
 
@@ -64,7 +77,7 @@ macro_rules! event_map_filter {
 
 macro_rules! impl_event_callback {
   ($this:ident, $listen_type:ident, $event_name:ident, $event_ty:ident, $handler:ident) => {{
-    $this.flag_mark(BuiltinFlags::$listen_type);
+    $this.silent_mark(MixFlags::$listen_type);
     let _ = $this
       .subject()
       .filter_map(event_map_filter!($event_name, $event_ty))
@@ -74,28 +87,68 @@ macro_rules! impl_event_callback {
   }};
 }
 
-impl MixBuiltin {
-  #[inline]
-  pub fn contain_flag(&self, t: BuiltinFlags) -> bool { self.flags.get().contains(t) }
+impl MixFlags {
+  /// Indicates whether the focus is on this widget (including its children).
+  ///
+  /// By default, the focus status is not traced. You need to call
+  /// `MixBuiltin::trace_focus` to start recording the focus status of
+  /// this widget. If you do not call `MixBuiltin::trace_focus` when
+  /// this widget is created, this method will always return `false`, even if it
+  /// has focus.
+  pub fn has_focus(&self) -> bool { self.contains(MixFlags::Focused) }
 
-  pub fn flag_mark(&self, t: BuiltinFlags) {
-    let t = self.flags.get() | t;
-    self.flags.set(t)
+  /// Indicates whether the mouse is hovering over this widget (including its
+  /// children).
+  ///
+  /// By default, the hover status is not traced. You need to call
+  /// `MixBuiltin::trace_hover` to start tracking the focus status of
+  /// this widget. If you do not call `MixBuiltin::trace_hover` when this
+  /// widget is created, this method will always return false, even if the mouse
+  /// is hovering over it.
+  pub fn is_hover(&self) -> bool { self.contains(MixFlags::Hovered) }
+
+  /// Indicates whether the the pointer is pressed on this widget.
+  ///
+  /// By default, the pressed status is not traced. You need to call
+  /// `MixBuiltin::trace_pointer_pressed` to start tracking the focus status of
+  /// this widget. If you do not call `MixBuiltin::trace_pointer_pressed` when
+  /// this widget is created, this method will always return false, even if
+  /// the mouse is hovering over it.
+  pub fn is_pointer_pressed(&self) -> bool { self.contains(MixFlags::PointerPressed) }
+
+  pub fn is_auto_focus(&self) -> bool { self.contains(MixFlags::AutoFocus) }
+
+  pub fn set_auto_focus(&mut self, v: bool) {
+    if v {
+      self.insert(MixFlags::AutoFocus | MixFlags::Focus);
+    } else {
+      self.remove(MixFlags::AutoFocus);
+    }
   }
+
+  pub fn tab_index(&self) -> i16 { (self.bits() >> 48) as i16 }
+
+  pub fn set_tab_index(&mut self, tab_idx: i16) {
+    self.insert(MixFlags::Focus);
+    let flags = self.bits() | ((tab_idx as u64) << 48);
+    *self = MixFlags::from_bits_retain(flags);
+  }
+}
+
+impl MixBuiltin {
+  pub fn mix_flags(&self) -> &State<MixFlags> { &self.flags }
 
   pub fn dispatch(&self, event: &mut Event) { self.subject.clone().next(event) }
 
-  pub fn subject(&self) -> EventSubject { self.subject.clone() }
-
   /// Listen to all events
   pub fn on_event(&self, handler: impl FnMut(&mut Event) + 'static) -> &Self {
-    self.flag_mark(BuiltinFlags::AllListeners);
+    self.silent_mark(MixFlags::AllListeners);
     let _ = self.subject().subscribe(handler);
     self
   }
 
   pub fn on_mounted(&self, handler: impl FnOnce(&mut LifecycleEvent) + 'static) -> &Self {
-    self.flag_mark(BuiltinFlags::Lifecycle);
+    self.silent_mark(MixFlags::Lifecycle);
     let _ = self
       .subject()
       .filter_map(event_map_filter!(Mounted, LifecycleEvent))
@@ -110,7 +163,7 @@ impl MixBuiltin {
   }
 
   pub fn on_disposed(&self, handler: impl FnOnce(&mut LifecycleEvent) + 'static) -> &Self {
-    self.flag_mark(BuiltinFlags::Lifecycle);
+    self.silent_mark(MixFlags::Lifecycle);
     let _ = self
       .subject()
       .filter_map(event_map_filter!(Disposed, LifecycleEvent))
@@ -204,7 +257,7 @@ impl MixBuiltin {
     &self, times: usize, dur: Duration, capture: bool,
     handler: impl FnMut(&mut PointerEvent) + 'static,
   ) -> &Self {
-    self.flag_mark(BuiltinFlags::Pointer);
+    self.silent_mark(MixFlags::Pointer);
     self
       .subject()
       .filter_map(x_times_tap_map_filter(times, dur, capture))
@@ -268,60 +321,78 @@ impl MixBuiltin {
     impl_event_callback!(self, FocusInOut, FocusOutCapture, FocusEvent, f)
   }
 
-  /// Indicates that `widget` can be focused, and where it participates in
-  /// sequential keyboard navigation (usually with the Tab key).
-  pub fn is_focus_node(&self) -> bool { self.flags.get().contains(BuiltinFlags::Focus) }
-
-  pub fn get_tab_index(&self) -> i16 { (self.flags.get().bits() >> 48) as i16 }
-
-  pub fn set_tab_index(&self, tab_idx: i16) -> &Self {
-    self.flag_mark(BuiltinFlags::Focus);
-    let flags = self.flags.get().bits() | ((tab_idx as u64) << 48);
-    self
-      .flags
-      .set(BuiltinFlags::from_bits_retain(flags));
-    self
+  /// Begin tracing the focus status of this widget.
+  pub fn trace_focus(&self) {
+    if !self.contain_flag(MixFlags::TraceFocus) {
+      self.silent_mark(MixFlags::TraceFocus);
+      let flags = self.flags.clone_writer();
+      self.on_focus_in(move |_| flags.write().insert(MixFlags::Focused));
+      let flags = self.flags.clone_writer();
+      self.on_focus_out(move |_| flags.write().remove(MixFlags::Focused));
+    }
   }
 
-  pub fn is_auto_focus(&self) -> bool { self.flags.get().contains(BuiltinFlags::AutoFocus) }
-
-  pub fn set_auto_focus(&self, v: bool) -> &Self {
-    if v {
-      self.flag_mark(BuiltinFlags::AutoFocus | BuiltinFlags::Focus);
-    } else {
-      let mut flag = self.flags.get();
-      flag.remove(BuiltinFlags::AutoFocus);
-      self.flags.set(flag);
+  /// Begin tracing the hover status of this widget.
+  pub fn trace_hover(&self) {
+    if !self.contain_flag(MixFlags::TraceHover) {
+      self.silent_mark(MixFlags::TraceHover);
+      let flags = self.flags.clone_writer();
+      self.on_pointer_enter(move |_| flags.write().insert(MixFlags::Hovered));
+      let flags = self.flags.clone_writer();
+      self.on_pointer_leave(move |_| flags.write().remove(MixFlags::Hovered));
     }
-    self
+  }
+
+  /// Begin tracing if the pointer pressed on this widget
+  pub fn trace_pointer_pressed(&self) {
+    if !self.contain_flag(MixFlags::TracePointerPressed) {
+      self.silent_mark(MixFlags::TracePointerPressed);
+      let flags = self.flags.clone_writer();
+      self.on_pointer_down(move |_| flags.write().insert(MixFlags::PointerPressed));
+      let flags = self.flags.clone_writer();
+      self.on_pointer_up(move |_| flags.write().remove(MixFlags::PointerPressed));
+    }
   }
 
   fn merge(&self, other: Self) {
-    let tab_index = self.get_tab_index();
-    let other_tab_index = other.get_tab_index();
-    self
-      .flags
-      .set(self.flags.get() | other.flags.get());
+    let tab_index = self.flags.read().tab_index();
+    let other_tab_index = other.flags.read().tab_index();
+    let mut this_flags = self.flags.write();
+    this_flags.insert(*other.flags.read());
     if other_tab_index != 0 {
-      self.set_tab_index(other_tab_index);
+      this_flags.set_tab_index(other_tab_index);
     } else if tab_index != 0 {
-      self.set_tab_index(tab_index);
+      this_flags.set_tab_index(tab_index);
+    }
+    drop(this_flags);
+    let Self { flags, subject } = other;
+
+    // if the other `MixFlags` is a writer, we need to subscribe it.
+    if let Err(other) = flags.into_reader() {
+      let this_flags = self.flags.clone_writer();
+      let u = other
+        .modifies()
+        .distinct_until_changed()
+        .subscribe(move |_| {
+          let flags = *other.read();
+          let mut this = this_flags.write();
+          this.insert(flags);
+          this.set_tab_index(flags.tab_index());
+        });
+      self.on_disposed(|_| u.unsubscribe());
     }
 
-    let other_subject = other.subject();
     fn subscribe_fn(subject: EventSubject) -> impl FnMut(&mut Event) {
       move |e: &mut Event| subject.clone().next(e)
     }
-    self
-      .subject()
-      .subscribe(subscribe_fn(other_subject));
+    self.subject().subscribe(subscribe_fn(subject));
   }
 
   fn callbacks_for_focus_node(&self) {
     self
       .on_mounted(move |e| {
         if let Some(mix) = e.query::<MixBuiltin>() {
-          let auto_focus = mix.is_auto_focus();
+          let auto_focus = mix.flags.read().is_auto_focus();
           e.window()
             .add_focus_node(e.id, auto_focus, FocusType::Node)
         }
@@ -330,6 +401,16 @@ impl MixBuiltin {
         e.window()
           .remove_focus_node(e.id, FocusType::Node)
       });
+  }
+
+  fn subject(&self) -> EventSubject { self.subject.clone() }
+
+  pub(crate) fn contain_flag(&self, t: MixFlags) -> bool { self.flags.read().contains(t) }
+
+  fn silent_mark(&self, t: MixFlags) {
+    let mut w = self.flags.write();
+    w.insert(t);
+    w.forget_modifies();
   }
 }
 
@@ -347,31 +428,25 @@ fn life_fn_once_to_fn_mut(
 impl<'c> ComposeChild<'c> for MixBuiltin {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    child.on_build(move |id, ctx| {
-      match this.try_into_value() {
-        Ok(this) => {
-          let mut this = Some(this);
-          if let Some(m) = id.query_ref::<MixBuiltin>(ctx.tree()) {
-            let this = unsafe { this.take().unwrap_unchecked() };
-            if !m.contain_flag(BuiltinFlags::Focus) && this.contain_flag(BuiltinFlags::Focus) {
-              this.callbacks_for_focus_node();
-            }
-            m.merge(this);
+    child.on_build(move |id, ctx| match this.try_into_value() {
+      Ok(this) => {
+        if let Some(m) = id.query_ref::<MixBuiltin>(ctx.tree()) {
+          if !m.contain_flag(MixFlags::Focus) && this.contain_flag(MixFlags::Focus) {
+            this.callbacks_for_focus_node();
           }
-          // We do not use an else branch here, due to the borrow conflict of the `ctx`.
-          if let Some(this) = this {
-            if this.contain_flag(BuiltinFlags::Focus) {
-              this.callbacks_for_focus_node();
-            }
-            id.attach_data(Box::new(Queryable(this)), ctx.tree_mut());
+          m.merge(this);
+        } else {
+          if this.contain_flag(MixFlags::Focus) {
+            this.callbacks_for_focus_node();
           }
+          id.attach_data(Box::new(Queryable(this)), ctx.tree_mut());
         }
-        Err(this) => {
-          if this.read().contain_flag(BuiltinFlags::Focus) {
-            this.read().callbacks_for_focus_node();
-          }
-          id.attach_data(Box::new(this), ctx.tree_mut())
+      }
+      Err(this) => {
+        if this.read().contain_flag(MixFlags::Focus) {
+          this.read().callbacks_for_focus_node();
         }
+        id.attach_data(Box::new(this), ctx.tree_mut())
       }
     })
   }
@@ -417,5 +492,18 @@ fn x_times_tap_map_filter(
         None
       }
     }
+  }
+}
+
+impl Default for MixBuiltin {
+  fn default() -> Self {
+    Self { flags: State::value(MixFlags::default()), subject: Default::default() }
+  }
+}
+
+impl Clone for MixBuiltin {
+  fn clone(&self) -> Self {
+    let flags = State::stateful(self.flags.clone_writer());
+    Self { flags, subject: self.subject.clone() }
   }
 }

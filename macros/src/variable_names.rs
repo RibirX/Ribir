@@ -24,110 +24,130 @@ pub struct BuiltinMember {
   pub host_ty: &'static str,
   pub mem_ty: BuiltinMemberType,
   pub var_name: &'static str,
+  pub run_before_clone: Option<&'static str>,
 }
 
 use phf::phf_map;
 
 use self::BuiltinMemberType::*;
 
+macro_rules! builtin_member {
+  ($host_ty:literal, $mem_ty:ident, $var_name:literal, $run_before_clone:literal) => {
+    BuiltinMember {
+      host_ty: $host_ty,
+      mem_ty: $mem_ty,
+      var_name: $var_name,
+      run_before_clone: Some($run_before_clone),
+    }
+  };
+  ($host_ty:literal, $mem_ty:ident, $var_name:literal) => {
+    BuiltinMember {
+      host_ty: $host_ty,
+      mem_ty: $mem_ty,
+      var_name: $var_name,
+      run_before_clone: None,
+    }
+  };
+}
 pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   // BuiltinObj
-  "lazy_host_id" => BuiltinMember { host_ty: "BuiltinObj", mem_ty: Method, var_name: "lazy"},
-  "lazy_id" => BuiltinMember { host_ty: "BuiltinObj", mem_ty: Method, var_name: "lazy"},
+  "lazy_host_id" => builtin_member!{"BuiltinObj", Method, "lazy"},
+  "lazy_id" => builtin_member!{"BuiltinObj", Method, "lazy"},
   // Class
-  "class" => BuiltinMember { host_ty: "Class", mem_ty: Field, var_name: "class" },
+  "class" => builtin_member!{"Class", Field, "class"},
+  // MixFlags
+  "has_focus" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_focus" },
+  "is_hover" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_hover" },
+  "is_pointer_pressed" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_pointer_pressed" },
+  "is_auto_focus" => builtin_member!{"MixFlags", Method, "mix_flags"},
+  "set_auto_focus" => builtin_member!{"MixFlags", Method, "mix_flags"},
+  "tab_index" => builtin_member!{"MixFlags", Method, "mix_flags"},
+  "set_tab_index" => builtin_member!{"MixFlags", Method, "mix_flags"},
   // MixBuiltin
-  "auto_focus" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Field, var_name: "mix_builtin" },
-  "tab_index" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Field, var_name: "mix_builtin" },
-  "on_event" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_mounted" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_disposed" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_performed_layout" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_pointer_down" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_pointer_down_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_pointer_up" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_pointer_up_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_pointer_move" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_pointer_move_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_pointer_cancel" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_pointer_enter" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_pointer_leave" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_tap" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_tap_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_double_tap" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_double_tap_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_triple_tap" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_triple_tap_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_x_times_tap" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_x_times_tap_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_ime_pre_edit" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_ime_pre_edit_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_wheel" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_wheel_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_chars" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_chars_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_key_down" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_key_down_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_key_up" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_key_up_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_focus" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_blur" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_focus_in" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_focus_in_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_focus_out" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "on_focus_out_capture" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "mix_builtin" },
-  "events_stream" => BuiltinMember { host_ty: "MixBuiltin", mem_ty: Method, var_name: "request_focus" },
+  "on_event" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_mounted" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_disposed" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_performed_layout" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_pointer_down" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_pointer_down_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_pointer_up" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_pointer_up_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_pointer_move" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_pointer_move_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_pointer_cancel" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_pointer_enter" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_pointer_leave" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_tap" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_tap_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_double_tap" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_double_tap_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_triple_tap" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_triple_tap_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_x_times_tap" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_x_times_tap_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_ime_pre_edit" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_ime_pre_edit_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_wheel" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_wheel_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_chars" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_chars_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_key_down" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_key_down_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_key_up" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_key_up_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_focus" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_blur" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_focus_in" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_focus_in_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_focus_out" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_focus_out_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "events_stream" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+
   // RequestFocus
-  "request_focus" => BuiltinMember { host_ty: "RequestFocus", mem_ty: Method, var_name: "request_focus" },
-  "unfocus" => BuiltinMember { host_ty: "RequestFocus", mem_ty: Method, var_name: "request_focus" },
-  // HasFocus
-  "has_focus" => BuiltinMember { host_ty: "HasFocus", mem_ty: Method, var_name: "has_focus" },
-  // MouseHover
-  "mouse_hover" => BuiltinMember { host_ty: "MouseHover", mem_ty: Method, var_name: "mouse_hover" },
-  // PointerPressed
-  "pointer_pressed" => BuiltinMember { host_ty: "PointerPressed", mem_ty: Method, var_name: "pointer_pressed" },
+  "request_focus" => builtin_member!{"RequestFocus", Method, "request_focus"},
+  "unfocus" => builtin_member!{"RequestFocus", Method, "request_focus"},
   // FittedBox
-  "box_fit" => BuiltinMember { host_ty: "FittedBox", mem_ty: Field, var_name: "fitted_box" },
+  "box_fit" => builtin_member!{"FittedBox", Field, "fitted_box"},
   // BoxDecoration
-  "background" => BuiltinMember { host_ty: "BoxDecoration", mem_ty: Field, var_name: "box_decoration" },
-  "border" => BuiltinMember { host_ty: "BoxDecoration", mem_ty: Field, var_name: "box_decoration" },
-  "border_radius" => BuiltinMember { host_ty: "BoxDecoration", mem_ty: Field, var_name: "box_decoration" },
+  "background" => builtin_member!{"BoxDecoration", Field, "box_decoration"},
+  "border" => builtin_member!{"BoxDecoration", Field, "box_decoration"},
+  "border_radius" => builtin_member!{"BoxDecoration", Field, "box_decoration"},
   // Padding
-  "padding" => BuiltinMember { host_ty: "Padding", mem_ty: Field, var_name: "padding" },
+  "padding" => builtin_member!{"Padding", Field, "padding"},
   // LayoutBox
-  "layout_rect" => BuiltinMember { host_ty: "LayoutBox", mem_ty: Method, var_name: "layout_box"},
-  "layout_pos" => BuiltinMember { host_ty: "LayoutBox", mem_ty: Method, var_name: "layout_box"},
-  "layout_size" => BuiltinMember { host_ty: "LayoutBox", mem_ty: Method, var_name: "layout_box"},
-  "layout_left" => BuiltinMember { host_ty: "LayoutBox", mem_ty: Method, var_name: "layout_box"},
-  "layout_top" => BuiltinMember { host_ty: "LayoutBox", mem_ty: Method, var_name: "layout_box"},
-  "layout_width" => BuiltinMember { host_ty: "LayoutBox", mem_ty: Method, var_name: "layout_box"},
-  "layout_height" => BuiltinMember { host_ty: "LayoutBox", mem_ty: Method, var_name: "layout_box"},
+  "layout_rect" => builtin_member!{"LayoutBox", Method, "layout_box"},
+  "layout_pos" => builtin_member!{"LayoutBox", Method, "layout_box"},
+  "layout_size" => builtin_member!{"LayoutBox", Method, "layout_box"},
+  "layout_left" => builtin_member!{"LayoutBox", Method, "layout_box"},
+  "layout_top" => builtin_member!{"LayoutBox", Method, "layout_box"},
+  "layout_width" => builtin_member!{"LayoutBox", Method, "layout_box"},
+  "layout_height" => builtin_member!{"LayoutBox", Method, "layout_box"},
   // GlobalAnchor
-  "global_anchor" => BuiltinMember { host_ty: "GlobalAnchor", mem_ty: Field, var_name: "global_anchor" },
+  "global_anchor" => builtin_member!{"GlobalAnchor", Field, "global_anchor"},
   // Cursor
-  "cursor" => BuiltinMember { host_ty: "Cursor", mem_ty: Field, var_name: "cursor" },
+  "cursor" => builtin_member!{"Cursor", Field, "cursor"},
   // Margin
-  "margin" => BuiltinMember { host_ty: "Margin", mem_ty: Field, var_name: "margin" },
+  "margin" => builtin_member!{"Margin", Field, "margin"},
   // ScrollableWidget
-  "scrollable" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Field, var_name: "scrollable"},
-  "get_scroll_pos" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},
-  "scroll_view_size" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},
-  "scroll_content_size" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},
-  "jump_to" => BuiltinMember { host_ty: "ScrollableWidget", mem_ty: Method, var_name: "scrollable"},
+  "scrollable" => builtin_member!{"ScrollableWidget", Field, "scrollable"},
+  "get_scroll_pos" => builtin_member!{"ScrollableWidget", Method, "scrollable"},
+  "scroll_view_size" => builtin_member!{"ScrollableWidget", Method, "scrollable"},
+  "scroll_content_size" => builtin_member!{"ScrollableWidget", Method, "scrollable"},
+  "jump_to" => builtin_member!{"ScrollableWidget", Method, "scrollable"},
   // ConstrainedBox
-  "clamp" => BuiltinMember { host_ty: "ConstrainedBox", mem_ty: Field, var_name: "constrained_box"},
+  "clamp" => builtin_member!{"ConstrainedBox", Field, "constrained_box"},
   // TransformWidget
-  "transform" => BuiltinMember { host_ty: "TransformWidget", mem_ty: Field, var_name: "transform" },
+  "transform" => builtin_member!{"TransformWidget", Field, "transform"},
   // HAlignWidget
-  "h_align" => BuiltinMember { host_ty: "HAlignWidget", mem_ty: Field, var_name: "h_align" },
+  "h_align" => builtin_member!{"HAlignWidget", Field, "h_align"},
   // VAlignWidget
-  "v_align" => BuiltinMember { host_ty: "VAlignWidget", mem_ty: Field, var_name: "v_align" },
+  "v_align" => builtin_member!{"VAlignWidget", Field, "v_align"},
   // RelativeAnchor
-  "anchor" => BuiltinMember { host_ty: "RelativeAnchor", mem_ty: Field, var_name: "relative_anchor" },
+  "anchor" => builtin_member!{"RelativeAnchor", Field, "relative_anchor"},
   // Visibility
-  "visible" => BuiltinMember { host_ty: "Visibility", mem_ty: Field, var_name: "visibility" },
+  "visible" => builtin_member!{"Visibility", Field, "visibility"},
   // Opacity
-  "opacity" => BuiltinMember { host_ty: "Opacity", mem_ty: Field, var_name: "opacity" },
+  "opacity" => builtin_member!{"Opacity", Field, "opacity"},
   // KeepAlive
-  "keep_alive" => BuiltinMember { host_ty: "KeepAlive", mem_ty: Field, var_name: "keep_alive" },
+  "keep_alive" => builtin_member!{"KeepAlive", Field, "keep_alive"},
 };

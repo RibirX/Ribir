@@ -61,7 +61,7 @@ fn base_track(w: Widget) -> Widget {
           f.unsubscribe();
         }
         let u = observable::timer((), Duration::from_secs(3), AppCtx::scheduler())
-          .filter(move |_| !$w.mouse_hover())
+          .filter(move |_| !$w.is_hover())
           .subscribe(move |_| $w.write().opacity = 0.);
         fade = Some(u);
       });
@@ -78,7 +78,7 @@ fn base_track(w: Widget) -> Widget {
     let mut w = @ $w {
       background: {
         let color = Palette::of(ctx!()).primary_container();
-        pipe!(if $w.mouse_hover() { color } else { color.with_alpha(0.)})
+        pipe!(if $w.is_hover() { color } else { color.with_alpha(0.)})
       },
       on_disposed: move |_| u.unsubscribe(),
     };

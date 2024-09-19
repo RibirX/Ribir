@@ -72,7 +72,7 @@ mod tests {
     let mut cnt = 0;
     id.query_all_iter::<MixBuiltin>(tree)
       .for_each(|b| {
-        if b.contain_flag(BuiltinFlags::Focus) {
+        if b.contain_flag(MixFlags::Focus) {
           cnt += 1;
         }
       });

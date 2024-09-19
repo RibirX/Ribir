@@ -45,11 +45,11 @@ impl<'c> ComposeChild<'c> for InteractiveLayer {
           @StateLayer {
             color: pipe!($this.color),
             path: pipe!(Path::rect_round(&$host.layout_rect(), &$this.border_radii)),
-            role: pipe!(if $host.pointer_pressed() {
+            role: pipe!(if $host.is_pointer_pressed() {
               StateRole::pressed()
             } else if $host.has_focus() {
               StateRole::focus()
-            } else if $host.mouse_hover() {
+            } else if $host.is_hover() {
               StateRole::hover()
             } else {
               // todo: not support drag & drop now
