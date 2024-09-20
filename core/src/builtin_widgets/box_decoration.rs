@@ -1,6 +1,10 @@
 use crate::{prelude::*, wrap_render::WrapRender};
 
-/// The BoxDecoration provides a variety of ways to draw a box.
+/// The BoxDecoration provides configuration options to draw the background and
+/// border of a box.
+///
+/// If a background color is specified, a derived foreground calculation from
+/// the background will be applied to its children.
 #[derive(Default, Clone)]
 pub struct BoxDecoration {
   /// The background of the box.
@@ -66,6 +70,14 @@ impl WrapRender for BoxDecoration {
         painter.fill();
       }
       self.paint_border(painter, &rect);
+
+      if let Some(Brush::Color(ref background)) = self.background {
+        let foreground = Palette::of(&ctx).on_container_of(background);
+        ctx
+          .painter()
+          .set_fill_brush(foreground)
+          .set_stroke_brush(foreground);
+      }
       host.paint(ctx)
     }
   }

@@ -28,8 +28,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: Added `WrapRender` for a render widget that combines with its child as a single widget tree node. (#626 @M-Adoo)
-- **core:: Added `StateWriter::into_render` to covert writer to reader if no other writer exist. (#626 @M-Adoo)
-- **painter**: Distinguishes between fill and stroke brushes, allowing the painter to have two default brushes. (#pr, @M-Adoo)
+- **core**: Added `StateWriter::into_render` to covert writer to reader if no other writer exist. (#626 @M-Adoo)
+- **core**: Added the built-in widget `Foreground`, enabling any widget to directly utilize `foreground` for configuring the painter brush. (#628, @M-Adoo)
+- **painter**: Distinguishes between fill and stroke brushes, allowing the painter to have two default brushes. (#628, @M-Adoo)
 
 ### Changed
 
@@ -43,7 +44,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
-- **painter**: Removed `Painter::get_brush` and `Painter::set_brush`, now using `get_fill_brush`, `get_stroke_brush`, `set_fill_brush`, and `set_stroke_brush` methods instead. (#pr @M-Adoo)
+- **painter**: Removed `Painter::get_brush` and `Painter::set_brush`, now using `get_fill_brush`, `get_stroke_brush`, `set_fill_brush`, and `set_stroke_brush` methods instead. (#628 @M-Adoo)
 
 
 ## [0.4.0-alpha.9] - 2024-09-18

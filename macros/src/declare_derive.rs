@@ -434,6 +434,12 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the foreground of the widget."]
+        #vis fn foreground<const _M: u8>(mut self, v: impl DeclareInto<Brush, _M>) -> Self {
+          self.fat_obj = self.fat_obj.foreground(v);
+          self
+        }
+
         #[doc="Initializes the extra space within the widget."]
         #vis fn padding<const _M: u8>(mut self, v: impl DeclareInto<EdgeInsets, _M>) -> Self
         {

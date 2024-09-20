@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use ribir_geom::{Rect, Size};
-use ribir_painter::{Brush, Painter, Path, PathStyle};
+use ribir_painter::{Painter, Path, PathStyle};
 
 use crate::{font_db::FontDB, Em, FontFace, FontSize, GlyphBound, Pixel, VisualGlyphs};
 
@@ -34,7 +34,7 @@ impl Default for TextStyle {
 /// draw the text glyphs within the box_rect, with the given brush font_size and
 /// path style
 pub fn draw_glyphs_in_rect(
-  painter: &mut Painter, visual_glyphs: VisualGlyphs, box_rect: Rect, brush: Brush, font_size: f32,
+  painter: &mut Painter, visual_glyphs: VisualGlyphs, box_rect: Rect, font_size: f32,
   path_style: &PathStyle, font_db: Rc<RefCell<FontDB>>,
 ) {
   let visual_rect = visual_glyphs.visual_rect();
@@ -48,7 +48,6 @@ pub fn draw_glyphs_in_rect(
   draw_glyphs(
     painter,
     visual_glyphs.glyph_bounds_in_rect(&paint_rect),
-    brush,
     font_size,
     path_style,
     font_db,
@@ -57,7 +56,7 @@ pub fn draw_glyphs_in_rect(
 
 /// draw the glyphs with the given brush, font_size and path style
 pub fn draw_glyphs(
-  painter: &mut Painter, glyphs: impl Iterator<Item = GlyphBound>, brush: Brush, font_size: f32,
+  painter: &mut Painter, glyphs: impl Iterator<Item = GlyphBound>, font_size: f32,
   path_style: &PathStyle, font_db: Rc<RefCell<FontDB>>,
 ) {
   glyphs.for_each(|g| {
@@ -67,19 +66,15 @@ pub fn draw_glyphs(
     if let Some(face) = face {
       let unit = face.units_per_em() as f32;
       let scale = font_size / unit;
+      let mut painter = painter.save_guard();
       if let Some(path) = face.outline_glyph(g.glyph_id, path_style) {
-        let mut painter = painter.save_guard();
         painter
           .translate(g.bound.min_x(), g.bound.min_y())
           .scale(scale, -scale)
           .translate(0., -unit);
 
-        painter
-          .set_fill_brush(brush.clone())
-          .fill_path(path.into());
+        painter.fill_path(path.into());
       } else if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
-        let mut painter = painter.save_guard();
-
         let grid_scale = face
           .vertical_height()
           .map(|h| h as f32 / face.units_per_em() as f32)
@@ -100,7 +95,7 @@ pub fn draw_glyphs(
 
         let x_offset = g.bound.min_x() + (g.bound.width() - (m_width * scale)) / 2.;
         let y_offset = g.bound.min_y() + (g.bound.height() - (m_height * scale)) / 2.;
-        let mut painter = painter.save_guard();
+
         painter
           .translate(x_offset, y_offset)
           .scale(scale, scale)

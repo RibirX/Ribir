@@ -4,8 +4,6 @@ use ribir_core::prelude::*;
 #[derive(Debug, Declare, Clone, PartialEq)]
 pub struct Text {
   pub text: CowArc<str>,
-  #[declare(default = Palette::of(ctx!()).on_surface_variant())]
-  pub foreground: Brush,
   #[declare(default = TypographyTheme::of(ctx!()).body_medium.text.clone())]
   pub text_style: CowArc<TextStyle>,
   #[declare(default)]
@@ -55,7 +53,6 @@ impl Render for Text {
       ctx.painter(),
       visual_glyphs,
       box_rect,
-      self.foreground.clone(),
       font_size,
       &self.path_style,
       font_db,
@@ -68,8 +65,6 @@ macro_rules! define_text_with_theme_style {
     #[derive(Declare)]
     pub struct $name {
       pub text: CowArc<str>,
-      #[declare(default = Palette::of(ctx!()).on_surface_variant())]
-      pub foreground: Brush,
       #[declare(default)]
       pub overflow: Overflow,
     }
@@ -79,7 +74,6 @@ macro_rules! define_text_with_theme_style {
         fn_widget! {
           @Text {
             text: pipe!($this.text.clone()),
-            foreground: pipe!($this.foreground.clone()),
             text_style: TypographyTheme::of(ctx!()).$style.text.clone(),
             overflow: pipe!($this.overflow),
           }
