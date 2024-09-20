@@ -29,6 +29,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Added `WrapRender` for a render widget that combines with its child as a single widget tree node. (#626 @M-Adoo)
 - **core:: Added `StateWriter::into_render` to covert writer to reader if no other writer exist. (#626 @M-Adoo)
+- **painter**: Distinguishes between fill and stroke brushes, allowing the painter to have two default brushes. (#pr, @M-Adoo)
 
 ### Changed
 
@@ -39,6 +40,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Fixed
 
 - **core**: The `SplitWriter` and `MapWriter` of the render widget may not be flagged as dirty. (#626, @M-Adoo)
+
+### Breaking
+
+- **painter**: Removed `Painter::get_brush` and `Painter::set_brush`, now using `get_fill_brush`, `get_stroke_brush`, `set_fill_brush`, and `set_stroke_brush` methods instead. (#pr @M-Adoo)
 
 
 ## [0.4.0-alpha.9] - 2024-09-18

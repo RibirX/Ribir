@@ -39,6 +39,7 @@ impl Svg {
     let fit_size = fit_view_box(size, &tree.view_box);
 
     let bound_rect = Rect::from_size(Size::new(f32::MAX, f32::MAX));
+
     let mut painter = crate::Painter::new(bound_rect);
     painter.apply_transform(
       &Transform::translation(-view_rect.x(), -view_rect.y())
@@ -59,9 +60,9 @@ impl Svg {
               let inverse_ts = transform.inverse().unwrap();
               let path = Resource::new(path.clone().transform(&inverse_ts));
               painter
-                .set_brush(brush.clone())
+                .set_fill_brush(brush.clone())
                 .apply_transform(&transform)
-                .fill_path(path);
+                .fill_path(path.into());
               //&o_ts.then(&n_ts.inverse().unwrap())));
             }
 
@@ -88,7 +89,7 @@ impl Svg {
               let mut painter = painter.save_guard();
 
               painter
-                .set_brush(brush.clone())
+                .set_stroke_brush(brush.clone())
                 .apply_transform(&transform);
 
               let path = path
@@ -96,7 +97,7 @@ impl Svg {
                 .stroke(&options, Some(painter.get_transform()));
 
               if let Some(p) = path {
-                painter.fill_path(Resource::new(p));
+                painter.fill_path(Resource::new(p).into());
               }
             };
           }

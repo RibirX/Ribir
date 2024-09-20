@@ -29,11 +29,11 @@ pub(crate) struct WidgetTree {
 type TreeArena = Arena<Box<dyn RenderQueryable>>;
 
 impl WidgetTree {
-  pub fn init(&mut self, wnd: &Rc<Window>, content: GenWidget) {
+  pub fn init(&mut self, wnd: &Rc<Window>, content: GenWidget) -> WidgetId {
     self.wnd = Rc::downgrade(wnd);
-    let root_id = self.root;
-    let mut ctx = BuildCtx::create(self.root, wnd.tree);
-    ctx.pre_alloc = Some(root_id);
+    let root = self.root;
+    let mut ctx = BuildCtx::create(root, wnd.tree);
+    ctx.pre_alloc = Some(root);
 
     let theme = AppCtx::app_theme().clone_writer();
     let overlays = Queryable(ShowingOverlays::default());
@@ -51,10 +51,11 @@ impl WidgetTree {
       .into_widget()
       .build(&mut ctx);
 
-    assert_eq!(root_id, id);
+    assert_eq!(root, id);
 
-    self.mark_dirty(root_id);
-    root_id.on_mounted_subtree(self);
+    self.mark_dirty(root);
+    root.on_mounted_subtree(self);
+    root
   }
 
   pub(crate) fn root(&self) -> WidgetId { self.root }

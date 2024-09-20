@@ -17,6 +17,7 @@ use crate::{
 // #[derive(Default, Debug, Clone)]
 pub struct Painter {
   viewport: Rect,
+  init_state: PainterState,
   state_stack: Vec<PainterState>,
   commands: Vec<PaintCommand>,
   path_builder: PathBuilder,
@@ -129,7 +130,8 @@ pub enum PaintCommand {
 struct PainterState {
   /// The line width use to stroke path.
   stroke_options: StrokeOptions,
-  brush: Brush,
+  stroke_brush: Brush,
+  fill_brush: Brush,
   transform: Transform,
   opacity: f32,
   clip_cnt: usize,
@@ -139,11 +141,12 @@ struct PainterState {
 }
 
 impl PainterState {
-  fn new(bounds: Rect) -> PainterState {
+  fn new(bounds: Rect, stroke_brush: Brush, fill_brush: Brush) -> PainterState {
     PainterState {
       bounds,
       stroke_options: <_>::default(),
-      brush: Color::BLACK.into(),
+      stroke_brush,
+      fill_brush,
       transform: Transform::identity(),
       clip_cnt: 0,
       opacity: 1.,
@@ -154,12 +157,21 @@ impl PainterState {
 impl Painter {
   pub fn new(viewport: Rect) -> Self {
     assert!(viewport.is_finite(), "viewport must be finite!");
+    let init_state = PainterState::new(viewport, Color::BLACK.into(), Color::GRAY.into());
     Self {
-      state_stack: vec![PainterState::new(viewport)],
+      state_stack: vec![init_state.clone()],
+      init_state,
       commands: vec![],
       path_builder: Path::builder(),
       viewport,
     }
+  }
+
+  /// Set the default brush of the painter, and then reset the painter state.
+  pub fn set_default_brush(&mut self, stroke_brush: Brush, fill_brush: Brush) {
+    self.init_state.fill_brush = fill_brush;
+    self.init_state.stroke_brush = stroke_brush;
+    self.reset();
   }
 
   pub fn viewport(&self) -> &Rect { &self.viewport }
@@ -219,20 +231,28 @@ impl Painter {
     self.fill_all_pop_clips();
     self.commands.clear();
     self.state_stack.clear();
-    self
-      .state_stack
-      .push(PainterState::new(self.viewport));
+    self.state_stack.push(self.init_state.clone());
   }
 
-  /// Returns the color, gradient, or pattern used for draw. Only `Color`
-  /// support now.
+  /// Return the brush used to stroke paths.
   #[inline]
-  pub fn get_brush(&self) -> &Brush { &self.current_state().brush }
+  pub fn get_stroke_brush(&self) -> &Brush { &self.current_state().stroke_brush }
 
-  /// Change the style of pen that used to draw path.
+  /// Return the brush used to fill shapes.
   #[inline]
-  pub fn set_brush<S: Into<Brush>>(&mut self, brush: S) -> &mut Self {
-    self.current_state_mut().brush = brush.into();
+  pub fn get_fill_brush(&self) -> &Brush { &self.current_state().fill_brush }
+
+  /// Set the brush used to stroke paths.
+  #[inline]
+  pub fn set_stroke_brush(&mut self, brush: impl Into<Brush>) -> &mut Self {
+    self.current_state_mut().stroke_brush = brush.into();
+    self
+  }
+
+  /// Set the brush used to fill shapes.
+  #[inline]
+  pub fn set_fill_brush(&mut self, brush: impl Into<Brush>) -> &mut Self {
+    self.current_state_mut().fill_brush = brush.into();
     self
   }
 
@@ -310,9 +330,8 @@ impl Painter {
     self
   }
 
-  pub fn clip(&mut self, path: impl Into<PaintPath>) -> &mut Self {
+  pub fn clip(&mut self, path: PaintPath) -> &mut Self {
     invisible_return!(self);
-    let path = path.into();
     if locatable_bounds(&path.bounds) {
       if let Some(bounds) = self.intersection_paint_bounds(&path.bounds) {
         let s = self.current_state_mut();
@@ -327,15 +346,15 @@ impl Painter {
   }
 
   /// Fill a path with its style.
-  pub fn fill_path(&mut self, p: impl Into<PaintPath>) -> &mut Self {
+  pub fn fill_path(&mut self, path: PaintPath) -> &mut Self {
     invisible_return!(self);
 
-    let path = p.into();
+    let brush = self.get_fill_brush().clone();
     if locatable_bounds(&path.bounds)
       && self.intersect_paint_bounds(&path.bounds)
-      && self.is_visible_brush()
+      && brush.is_visible()
     {
-      let mut action = match self.current_state().brush.clone() {
+      let mut action = match brush {
         Brush::Color(color) => PaintPathAction::Color(color),
         Brush::Image(img) => PaintPathAction::Image { img, opacity: 1. },
         Brush::RadialGradient(radial_gradient) => PaintPathAction::Radial(radial_gradient),
@@ -363,7 +382,9 @@ impl Painter {
   /// result of `Path::stroke` with `Resource<Path>` and pass it to `fill_path`.
   pub fn stroke_path(&mut self, path: Path) -> &mut Self {
     if let Some(stroke_path) = path.stroke(self.stroke_options(), Some(self.get_transform())) {
-      self.fill_path(stroke_path);
+      self.swap_brush();
+      self.fill_path(stroke_path.into());
+      self.swap_brush();
     }
     self
   }
@@ -377,7 +398,7 @@ impl Painter {
   /// Fill the current path with current brush.
   pub fn fill(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    self.fill_path(builder.build())
+    self.fill_path(builder.build().into())
   }
 
   /// Adds a translation transformation to the current matrix by moving the
@@ -572,7 +593,7 @@ impl Painter {
         assert!(paint_rect.contains_rect(rc));
 
         if paint_rect.width() != rc.width() || paint_rect.height() != rc.height() {
-          painter.clip(Path::rect(&Rect::from_size(dst_rect.size)));
+          painter.clip(Path::rect(&Rect::from_size(dst_rect.size)).into());
         }
         paint_rect = *rc;
       }
@@ -580,11 +601,16 @@ impl Painter {
         .scale(dst_rect.width() / paint_rect.width(), dst_rect.height() / paint_rect.height())
         .translate(-paint_rect.min_x(), -paint_rect.min_y())
         .rect(&Rect::from_size(Size::new(m_width, m_height)))
-        .set_brush(img)
+        .set_fill_brush(img)
         .fill();
     }
 
     self
+  }
+
+  fn swap_brush(&mut self) {
+    let state = self.current_state_mut();
+    std::mem::swap(&mut state.fill_brush, &mut state.stroke_brush);
   }
 }
 
@@ -637,17 +663,6 @@ impl Painter {
       && t.m22.is_finite()
       && t.m31.is_finite()
       && t.m32.is_finite()
-  }
-
-  fn is_visible_brush(&self) -> bool {
-    match self.current_state().brush {
-      Brush::Color(c) => c.alpha > 0,
-      Brush::Image(_) => true,
-      Brush::RadialGradient(RadialGradient { ref stops, .. })
-      | Brush::LinearGradient(LinearGradient { ref stops, .. }) => {
-        stops.iter().any(|s| s.color.alpha > 0)
-      }
-    }
   }
 }
 
@@ -793,11 +808,11 @@ mod test {
     let mut painter = painter();
     let commands = painter
       .save()
-      .clip(Path::rect(&rect(0., 0., 100., 100.)))
+      .clip(Path::rect(&rect(0., 0., 100., 100.)).into())
       .rect(&rect(0., 0., 10., 10.))
       .fill()
       .save()
-      .clip(Path::rect(&rect(0., 0., 50., 50.)))
+      .clip(Path::rect(&rect(0., 0., 50., 50.)).into())
       .rect(&rect(0., 0., 10., 10.))
       .fill()
       .finish();
@@ -817,7 +832,7 @@ mod test {
     painter
       .save()
       .set_transform(Transform::translation(f32::NAN, f32::INFINITY))
-      .clip(Path::rect(&rect(0., 0., 10., 10.)));
+      .clip(Path::rect(&rect(0., 0., 10., 10.)).into());
     assert_eq!(painter.commands.len(), 0);
   }
 
@@ -848,7 +863,7 @@ mod test {
 
     painter
       .save()
-      .clip(Path::rect(&rect(0., 0., 100., 100.)))
+      .clip(Path::rect(&rect(0., 0., 100., 100.)).into())
       .set_transform(Transform::translation(500., 500.))
       .rect(&rect(-500., -500., 10., 10.))
       .fill();

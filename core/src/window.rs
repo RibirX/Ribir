@@ -300,7 +300,15 @@ impl Window {
     window
   }
 
-  pub fn init(self: &Rc<Window>, content: GenWidget) { self.tree_mut().init(self, content) }
+  pub fn init(self: &Rc<Window>, content: GenWidget) {
+    let root = self.tree_mut().init(self, content);
+    let ctx = BuildCtx::create(root, self.tree);
+    let brush = Palette::of(&*ctx).on_surface_variant();
+    self
+      .painter
+      .borrow_mut()
+      .set_default_brush(brush.into(), brush.into());
+  }
 
   #[inline]
   pub fn id(&self) -> WindowId { self.shell_wnd.borrow().id() }

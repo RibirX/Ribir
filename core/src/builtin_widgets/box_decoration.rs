@@ -57,7 +57,7 @@ impl WrapRender for BoxDecoration {
       let rect = Rect::from_size(size);
       let painter = ctx.painter();
       if let Some(ref background) = self.background {
-        painter.set_brush(background.clone());
+        painter.set_fill_brush(background.clone());
         if let Some(radius) = &self.border_radius {
           painter.rect_round(&rect, radius);
         } else {
@@ -108,7 +108,7 @@ impl BoxDecoration {
 
     painter
       .set_line_width(border.top.width)
-      .set_brush(border.top.color.clone());
+      .set_stroke_brush(border.top.color.clone());
     painter.rect_round(
       &Rect::new(Point::new(min_x, min_y), Size::new(max_x - min_x, max_y - min_y)),
       &radius,
@@ -143,7 +143,7 @@ impl BoxDecoration {
         if border.is_visible() {
           painter
             .set_line_width(border.width)
-            .set_brush(border.color.clone());
+            .set_stroke_brush(border.color.clone());
           painter.begin_path(vertexs[edge.0] + *offset);
           painter.line_to(vertexs[edge.1] + *offset);
           painter.end_path(false).stroke();
@@ -153,12 +153,7 @@ impl BoxDecoration {
 }
 
 impl BorderSide {
-  fn is_visible(&self) -> bool {
-    match self.color {
-      Brush::Color(color) => color.alpha > 0 && self.width > 0.,
-      _ => true,
-    }
-  }
+  fn is_visible(&self) -> bool { self.width > f32::EPSILON && self.color.is_visible() }
 }
 
 impl Border {

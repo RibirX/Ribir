@@ -82,7 +82,7 @@ impl Render for Divider {
       (Point::new(x, self.indent), size)
     };
     let painter = ctx.painter();
-    painter.set_brush(self.color.clone());
+    painter.set_fill_brush(self.color.clone());
     painter.rect(&Rect::new(origin, size));
     painter.fill();
   }

@@ -6,6 +6,7 @@ use crate::{
   Color, PixelImage,
 };
 
+/// The brush is used to fill or stroke shapes with color, image, or gradient.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Brush {
   Color(Color),
@@ -20,6 +21,17 @@ impl Brush {
     match self {
       Brush::Color(color) => f(color).into(),
       _ => panic!("Need Color!"),
+    }
+  }
+
+  pub fn is_visible(&self) -> bool {
+    match self {
+      Brush::Color(c) => c.alpha > 0,
+      Brush::Image(_) => true,
+      Brush::RadialGradient(RadialGradient { ref stops, .. })
+      | Brush::LinearGradient(LinearGradient { ref stops, .. }) => {
+        stops.iter().any(|s| s.color.alpha > 0)
+      }
     }
   }
 }
