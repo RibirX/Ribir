@@ -625,23 +625,23 @@ mod tests {
     let img_brush = Brush::Image(share_img);
 
     draw_arrow_path(&mut painter);
-    painter.set_brush(Color::RED).fill();
+    painter.set_fill_brush(Color::RED).fill();
 
     painter.translate(260., 0.);
     draw_arrow_path(&mut painter);
     painter
-      .set_brush(Color::RED)
+      .set_stroke_brush(Color::RED)
       .set_line_width(5.)
       .stroke();
 
     painter.translate(-260., 250.);
     draw_arrow_path(&mut painter);
-    painter.set_brush(img_brush.clone()).fill();
+    painter.set_fill_brush(img_brush.clone()).fill();
 
     painter.translate(260., 0.);
     draw_arrow_path(&mut painter);
     painter
-      .set_brush(img_brush)
+      .set_stroke_brush(img_brush)
       .set_line_width(5.)
       .stroke();
 
@@ -655,7 +655,7 @@ mod tests {
     let transform = Transform::new(1., 1., 2., 1., 0., 0.);
     let rect: Rect = Rect::new(Point::new(10., 10.), Size::new(100., 100.));
     painter
-      .set_brush(Color::RED)
+      .set_fill_brush(Color::RED)
       .set_transform(transform)
       .rect(&rect)
       .fill();
@@ -663,7 +663,7 @@ mod tests {
     let leaves_brush = Resource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
 
     painter
-      .set_brush(leaves_brush)
+      .set_fill_brush(leaves_brush)
       .set_transform(transform.then_translate((400., 0.).into()))
       .rect(&rect)
       .fill();
@@ -676,12 +676,12 @@ mod tests {
     let mut painter = painter(Size::new(120., 340.));
     let rect_100x100 = Rect::from_size(Size::new(100., 100.));
     painter
-      .set_brush(Color::RED)
+      .set_fill_brush(Color::RED)
       .translate(10., 20.)
       .rect(&rect_100x100)
       .fill()
       .translate(0., 200.)
-      .clip(Path::circle(Point::new(50., 50.), 50.))
+      .clip(Path::circle(Point::new(50., 50.), 50.).into())
       .rect(&rect_100x100)
       .fill();
 
@@ -692,7 +692,7 @@ mod tests {
   fn stroke_include_border() -> Painter {
     let mut painter = painter(Size::new(100., 100.));
     painter
-      .set_brush(Color::RED)
+      .set_stroke_brush(Color::RED)
       .begin_path(Point::new(50., 5.))
       .line_to(Point::new(95., 50.))
       .line_to(Point::new(50., 95.))
@@ -711,12 +711,12 @@ mod tests {
     let brush2 = PixelImage::from_png(include_bytes!("../../examples/attachments/3DDD-1.png"));
     let rect = rect(0., 0., 100., 100.);
     painter
-      .set_brush(brush1)
+      .set_fill_brush(brush1)
       .rect(&rect)
       .fill()
-      .set_brush(brush2)
+      .set_fill_brush(brush2)
       .translate(100., 0.)
-      .clip(Path::circle(Point::new(50., 50.), 50.))
+      .clip(Path::circle(Point::new(50., 50.), 50.).into())
       .rect(&rect)
       .fill();
 
@@ -764,7 +764,7 @@ mod tests {
       painter.translate(i as f32 * 10., i as f32 * 10.);
       let color = if i % 2 == 0 { Color::GREEN } else { Color::RED };
       painter
-        .set_brush(color)
+        .set_fill_brush(color)
         .rect_round(&rect, &ribir_painter::Radius::all(i as f32))
         .fill();
     }

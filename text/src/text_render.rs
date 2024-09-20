@@ -42,7 +42,7 @@ pub fn draw_glyphs_in_rect(
     return;
   };
   if !paint_rect.contains_rect(&visual_rect) {
-    painter.clip(Path::rect(&paint_rect));
+    painter.clip(Path::rect(&paint_rect).into());
   }
   painter.translate(visual_rect.origin.x, visual_rect.origin.y);
   draw_glyphs(
@@ -74,7 +74,9 @@ pub fn draw_glyphs(
           .scale(scale, -scale)
           .translate(0., -unit);
 
-        painter.set_brush(brush.clone()).fill_path(path);
+        painter
+          .set_fill_brush(brush.clone())
+          .fill_path(path.into());
       } else if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
         let mut painter = painter.save_guard();
 

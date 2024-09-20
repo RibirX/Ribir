@@ -37,6 +37,6 @@ impl Render for Clip {
       }
       ClipType::Path(path) => path.clone(),
     };
-    ctx.painter().clip(path);
+    ctx.painter().clip(path.into());
   }
 }

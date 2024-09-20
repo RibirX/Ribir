@@ -14,12 +14,15 @@ macro_rules! paint_method {
   () => {
     fn paint(&self, ctx: &mut PaintingCtx) {
       let painter = ctx.painter();
-      painter.set_brush(self.brush.clone());
+      let brush = self.brush.clone();
       match &self.style {
-        PathStyle::Fill => painter.fill_path(self.path.clone()),
+        PathStyle::Fill => painter
+          .set_fill_brush(brush)
+          .fill_path(self.path.clone().into()),
         PathStyle::Stroke(strokes) => painter
+          .set_stroke_brush(brush)
           .set_strokes(strokes.clone())
-          .stroke_path(self.path.clone()),
+          .stroke_path(self.path.clone().into()),
       };
     }
   };
