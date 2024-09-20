@@ -55,7 +55,7 @@ impl<'c> ComposeChild<'c> for Ripple {
           });
 
           let mut ripple = @PathPaintKit {
-            brush: pipe!(StateRole::pressed().calc_color($this.color)),
+            foreground: pipe!(StateRole::pressed().calc_color($this.color)),
             path: Path::circle(launch_at, radius),
           };
 

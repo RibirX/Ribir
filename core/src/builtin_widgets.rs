@@ -18,7 +18,9 @@ pub use cursor::*;
 pub use winit::window::CursorIcon;
 mod margin;
 pub use margin::*;
+mod foreground;
 mod padding;
+pub use foreground::*;
 pub use padding::*;
 mod box_decoration;
 pub use box_decoration::*;
@@ -106,6 +108,7 @@ pub struct FatObj<T> {
   request_focus: Option<State<RequestFocus>>,
   fitted_box: Option<State<FittedBox>>,
   box_decoration: Option<State<BoxDecoration>>,
+  foreground: Option<State<Foreground>>,
   padding: Option<State<Padding>>,
   layout_box: Option<State<LayoutBox>>,
   cursor: Option<State<Cursor>>,
@@ -169,6 +172,7 @@ impl<T> FatObj<T> {
       request_focus: self.request_focus,
       fitted_box: self.fitted_box,
       box_decoration: self.box_decoration,
+      foreground: self.foreground,
       padding: self.padding,
       layout_box: self.layout_box,
       cursor: self.cursor,
@@ -247,7 +251,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<RequestFocus>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_request_focus_widget(&mut self) -> &State<RequestFocus> {
     self
       .request_focus
@@ -255,7 +259,7 @@ impl<T> FatObj<T> {
   }
 
   /// Return the `State<MixFlags>` from the `MixBuiltin`. If the `MixBuiltin`
-  /// does not exist in the `FatObj`, a new one is created.
+  /// does not exist in the `FatObj`, a new one will be created..
   pub fn get_mix_flags_widget(&mut self) -> &State<MixFlags> {
     self.get_mix_builtin_widget().mix_flags()
   }
@@ -281,7 +285,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<FittedBox>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_fitted_box_widget(&mut self) -> &State<FittedBox> {
     self
       .fitted_box
@@ -289,15 +293,23 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<BoxDecoration>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_box_decoration_widget(&mut self) -> &State<BoxDecoration> {
     self
       .box_decoration
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 
+  /// Returns the `State<Foreground>` widget from the FatObj. If it does not
+  /// exist, a new one will be created.
+  pub fn get_foreground_widget(&mut self) -> &State<Foreground> {
+    self
+      .foreground
+      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+
   /// Returns the `State<Padding>` widget from the FatObj. If it doesn't exist,
-  /// a new one is created.
+  /// a new one will be created.
   pub fn get_padding_widget(&mut self) -> &State<Padding> {
     self
       .padding
@@ -305,7 +317,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<LayoutBox>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_layout_box_widget(&mut self) -> &State<LayoutBox> {
     self
       .layout_box
@@ -335,7 +347,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<ScrollableWidget>` widget from the FatObj. If it
-  /// doesn't exist, a new one is created.
+  /// doesn't exist, a new one will be created.
   pub fn get_scrollable_widget(&mut self) -> &State<ScrollableWidget> {
     self
       .scrollable
@@ -343,7 +355,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<TransformWidget>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_transform_widget(&mut self) -> &State<TransformWidget> {
     self
       .transform
@@ -351,7 +363,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<HAlignWidget>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_h_align_widget(&mut self) -> &State<HAlignWidget> {
     self
       .h_align
@@ -359,7 +371,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<VAlignWidget>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_v_align_widget(&mut self) -> &State<VAlignWidget> {
     self
       .v_align
@@ -367,7 +379,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<RelativeAnchor>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_relative_anchor_widget(&mut self) -> &State<RelativeAnchor> {
     self
       .relative_anchor
@@ -375,7 +387,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<GlobalAnchor>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_global_anchor_widget(&mut self) -> &State<GlobalAnchor> {
     self
       .global_anchor
@@ -383,7 +395,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<Visibility>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_visibility_widget(&mut self) -> &State<Visibility> {
     self
       .visibility
@@ -391,7 +403,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<Opacity>` widget from the FatObj. If it doesn't exist,
-  /// a new one is created.
+  /// a new one will be created.
   pub fn get_opacity_widget(&mut self) -> &State<Opacity> {
     self
       .opacity
@@ -399,7 +411,7 @@ impl<T> FatObj<T> {
   }
 
   /// Returns the `State<KeepAlive>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
+  /// exist, a new one will be created.
   pub fn get_keep_alive_widget(&mut self) -> &State<KeepAlive> {
     self
       .keep_alive
@@ -732,6 +744,11 @@ impl<T> FatObj<T> {
     self.declare_builtin_init(v, Self::get_box_decoration_widget, |m, v| m.background = v)
   }
 
+  /// Initializes the foreground of the widget.
+  pub fn foreground<const M: u8>(self, v: impl DeclareInto<Brush, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_foreground_widget, |m, v| m.foreground = v)
+  }
+
   /// Initializes the border of the widget.
   pub fn border<const M: u8>(self, v: impl DeclareInto<Option<Border>, M>) -> Self {
     self.declare_builtin_init(v, Self::get_box_decoration_widget, |m, v| m.border = v)
@@ -876,6 +893,7 @@ impl<'a> FatObj<Widget<'a>> {
           fitted_box,
           constrained_box,
           box_decoration,
+          foreground,
           scrollable,
           layout_box,
           mix_builtin,

@@ -112,6 +112,8 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "background" => builtin_member!{"BoxDecoration", Field, "box_decoration"},
   "border" => builtin_member!{"BoxDecoration", Field, "box_decoration"},
   "border_radius" => builtin_member!{"BoxDecoration", Field, "box_decoration"},
+  // Foreground
+  "foreground" => builtin_member! { "Foreground", Field, "foreground"},
   // Padding
   "padding" => builtin_member!{"Padding", Field, "padding"},
   // LayoutBox

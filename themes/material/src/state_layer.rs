@@ -26,7 +26,7 @@ impl Compose for StateLayer {
     fn_widget! {
       @PathPaintKit {
         path: pipe!($this.path.clone()),
-        brush: pipe!($this.role.calc_color($this.color)),
+        foreground: pipe!($this.role.calc_color($this.color)),
       }
     }
     .into_widget()

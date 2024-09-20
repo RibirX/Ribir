@@ -46,7 +46,7 @@ pub struct TextFieldTml<'w> {
 #[derive(Clone)]
 pub struct TextFieldTheme {
   /// text foreground.
-  pub foreground: Brush,
+  pub text_brush: Brush,
   /// textfield input's text style
   pub text: CowArc<TextStyle>,
 
@@ -194,7 +194,7 @@ impl TextFieldThemeSuit {
     themes.insert(
       TextFieldState::Enabled,
       TextFieldTheme {
-        foreground: palette.on_surface().into(),
+        text_brush: palette.on_surface().into(),
         text: body.clone(),
         container_color: palette.surface_variant(),
         indicator: palette.on_surface_variant(),
@@ -212,7 +212,7 @@ impl TextFieldThemeSuit {
     themes.insert(
       TextFieldState::Focused,
       TextFieldTheme {
-        foreground: palette.on_surface().into(),
+        text_brush: palette.on_surface().into(),
         text: body.clone(),
         container_color: palette.surface_variant(),
         indicator: palette.primary(),
@@ -230,7 +230,7 @@ impl TextFieldThemeSuit {
     themes.insert(
       TextFieldState::Hovered,
       TextFieldTheme {
-        foreground: palette.on_surface().into(),
+        text_brush: palette.on_surface().into(),
         text: body.clone(),
         container_color: palette.surface_variant(),
         indicator: palette.on_surface(),
@@ -358,7 +358,7 @@ fn build_input_area(
       @{
         prefix.map(|p| @Text{
           text: p.0.0,
-          foreground: pipe!($theme.foreground.clone()),
+          foreground: pipe!($theme.text_brush.clone()),
           text_style: pipe!($theme.text.clone()),
         })
       }
@@ -369,7 +369,7 @@ fn build_input_area(
       @{
         suffix.map(|s| @Text{
           text: s.0.0,
-          foreground: pipe!($theme.foreground.clone()),
+          foreground: pipe!($theme.text_brush.clone()),
           text_style: pipe!($theme.text.clone()),
         })
       }

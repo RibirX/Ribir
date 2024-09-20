@@ -5,7 +5,6 @@ use ribir_core::prelude::*;
 #[derive(Declare, Clone)]
 pub struct PathPaintKit {
   pub path: Path,
-  pub brush: Brush,
   #[declare(default)]
   pub style: PathStyle,
 }
@@ -14,13 +13,9 @@ macro_rules! paint_method {
   () => {
     fn paint(&self, ctx: &mut PaintingCtx) {
       let painter = ctx.painter();
-      let brush = self.brush.clone();
       match &self.style {
-        PathStyle::Fill => painter
-          .set_fill_brush(brush)
-          .fill_path(self.path.clone().into()),
+        PathStyle::Fill => painter.fill_path(self.path.clone().into()),
         PathStyle::Stroke(strokes) => painter
-          .set_stroke_brush(brush)
           .set_strokes(strokes.clone())
           .stroke_path(self.path.clone().into()),
       };
@@ -47,7 +42,6 @@ impl Render for PathPaintKit {
 /// the path self, not its size cover area.
 pub struct PathWidget {
   pub path: Path,
-  pub brush: Brush,
   #[declare(default)]
   pub style: PathStyle,
 }
@@ -61,4 +55,40 @@ impl Render for PathWidget {
   }
 
   paint_method!();
+}
+
+#[cfg(test)]
+mod tests {
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
+
+  use super::*;
+
+  fn circle40() -> Path { Path::circle(Point::new(20., 20.), 20.) }
+  const WND_SIZE: Size = Size::new(48., 48.);
+  widget_test_suit!(
+    circle40_kit,
+    WidgetTester::new(fn_widget! {
+      @PathPaintKit {
+        path: circle40(),
+        foreground: Color::BLACK,
+      }
+    })
+    .with_wnd_size(WND_SIZE)
+    .with_comparison(0.000025),
+    LayoutCase::default().with_size(WND_SIZE)
+  );
+
+  widget_test_suit!(
+    circle40,
+    WidgetTester::new(fn_widget! {
+      @PathWidget {
+        path: circle40(),
+        foreground: Color::BLACK,
+      }
+    })
+    .with_wnd_size(WND_SIZE)
+    .with_comparison(0.000025),
+    LayoutCase::default().with_size(Size::new(40., 40.))
+  );
 }
