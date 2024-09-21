@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Changed
+
+- **text**: Merge the `overflow` field to the `TexStyle` structure. (#pr @M-Adoo)
+
 ## [0.4.0-alpha.10] - 2024-09-25
 
 ### Features

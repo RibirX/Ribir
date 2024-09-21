@@ -21,11 +21,10 @@ pub mod text_reorder;
 pub mod typography;
 use ordered_float::OrderedFloat;
 pub use text_reorder::TextReorder;
-pub use typography::Overflow;
 mod typography_store;
 pub use typography_store::{TypographyStore, VisualGlyphs};
 mod text_render;
-pub use text_render::{draw_glyphs, draw_glyphs_in_rect, TextStyle};
+pub use text_render::{draw_glyphs, draw_glyphs_in_rect};
 mod svg_glyph_cache;
 
 mod text_writer;
@@ -109,6 +108,34 @@ pub struct FontFace {
   ///
   /// [font-weight](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#font-weight-prop) in CSS.
   pub weight: FontWeight,
+}
+
+/// Encapsulates the text style for painting.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextStyle {
+  /// The size of fonts (in logical pixels) to use when painting the text.
+  pub font_size: FontSize,
+  /// The font face to use when painting the text.
+  // todo: use ids instead of
+  pub font_face: FontFace,
+  /// Not support now.
+  pub letter_space: Option<Pixel>,
+  /// The factor use to multiplied by the font size to specify the text line
+  /// height.
+  pub line_height: Option<Em>,
+  /// How to handle the visual overflow.
+  pub overflow: Overflow,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Debug)]
+pub enum Overflow {
+  #[default]
+  Clip,
+  AutoWrap,
+}
+
+impl Overflow {
+  fn is_auto_wrap(&self) -> bool { matches!(self, Overflow::AutoWrap) }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -298,7 +325,7 @@ impl FontSize {
 
   /// Em scale by font size.
   #[inline]
-  pub fn relative_em(self, em: f32) -> Em { self.into_em() * em }
+  pub fn relative_em(self, font_size: f32) -> Em { self.into_em() * font_size }
 }
 
 impl PartialEq for FontSize {
@@ -385,10 +412,10 @@ pub trait VisualText {
   fn text(&self) -> CowArc<str>;
   fn text_style(&self) -> &TextStyle;
   fn text_align(&self) -> TextAlign;
-  fn overflow(&self) -> Overflow;
 
   fn text_layout(&self, typography_store: &TypographyStore, bound: Size) -> VisualGlyphs {
-    let TextStyle { font_size, letter_space, line_height, ref font_face, .. } = *self.text_style();
+    let TextStyle { font_size, letter_space, line_height, ref font_face, overflow } =
+      *self.text_style();
 
     let width: Em = Pixel(bound.width).into();
     let height: Em = Pixel(bound.height).into();
@@ -402,8 +429,20 @@ pub trait VisualText {
         text_align: self.text_align(),
         bounds: (width, height).into(),
         line_dir: PlaceLineDirection::TopToBottom,
-        overflow: self.overflow(),
+        overflow,
       },
     )
+  }
+}
+
+impl Default for TextStyle {
+  fn default() -> Self {
+    Self {
+      font_size: FontSize::Pixel(14.0.into()),
+      font_face: Default::default(),
+      letter_space: None,
+      line_height: None,
+      overflow: <_>::default(),
+    }
   }
 }

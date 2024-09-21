@@ -3,33 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use ribir_geom::{Rect, Size};
 use ribir_painter::{Painter, Path, PathStyle};
 
-use crate::{font_db::FontDB, Em, FontFace, FontSize, GlyphBound, Pixel, VisualGlyphs};
-
-/// Encapsulates the text style for painting.
-#[derive(Clone, Debug, PartialEq)]
-pub struct TextStyle {
-  /// The size of glyphs (in logical pixels) to use when painting the text.
-  pub font_size: FontSize,
-  /// The font face to use when painting the text.
-  // todo: use ids instead of
-  pub font_face: FontFace,
-  /// Not support now.
-  pub letter_space: Option<Pixel>,
-  /// The factor use to multiplied by the font size to specify the text line
-  /// height.
-  pub line_height: Option<Em>,
-}
-
-impl Default for TextStyle {
-  fn default() -> Self {
-    Self {
-      font_size: FontSize::Pixel(14.0.into()),
-      font_face: Default::default(),
-      letter_space: None,
-      line_height: None,
-    }
-  }
-}
+use crate::{font_db::FontDB, GlyphBound, VisualGlyphs};
 
 /// draw the text glyphs within the box_rect, with the given brush font_size and
 /// path style
