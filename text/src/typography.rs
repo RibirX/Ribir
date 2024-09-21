@@ -4,18 +4,7 @@ use ribir_geom::Size;
 use unicode_script::{Script, UnicodeScript};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::{Em, FontSize, Glyph, Pixel, TextAlign};
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Debug)]
-pub enum Overflow {
-  #[default]
-  Clip,
-  AutoWrap,
-}
-
-impl Overflow {
-  fn is_auto_wrap(&self) -> bool { matches!(self, Overflow::AutoWrap) }
-}
+use crate::{Em, FontSize, Glyph, Overflow, Pixel, TextAlign};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PlaceLineDirection {

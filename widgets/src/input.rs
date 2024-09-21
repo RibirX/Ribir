@@ -296,11 +296,18 @@ impl ComposeChild<'static> for TextArea {
     fn_widget! {
       let text = @Text {
         text: pipe!($this.text.clone()),
-        text_style: pipe!($this.style.clone()),
-        overflow: pipe!($this.auto_wrap).map(|auto_wrap| match auto_wrap {
-          true => Overflow::AutoWrap,
-          false => Overflow::Clip,
-        }),
+        text_style: pipe!{
+          let this = $this;
+          let mut style = this.style.clone();
+          let overflow = match this.auto_wrap {
+            true => Overflow::AutoWrap,
+            false => Overflow::Clip,
+          };
+          if style.overflow != overflow {
+            style.overflow = overflow;
+          }
+          style
+        },
       };
 
       let scroll_dir = pipe!($this.auto_wrap).map(|auto_wrap| match auto_wrap {

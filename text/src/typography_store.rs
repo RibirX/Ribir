@@ -9,14 +9,10 @@ use ribir_algo::{FrameCache, Substr};
 use ribir_geom::{Point, Rect, Size};
 
 use crate::{
-  font_db::FontDB,
-  shaper::{ShapeResult, TextShaper, NEWLINE_GLYPH_ID},
-  text_reorder::ReorderResult,
-  typography::{
-    text_align_offset, InputParagraph, InputRun, Overflow, PlaceLineDirection, TypographyCfg,
-    TypographyMan, VisualInfos,
-  },
-  Em, FontFace, FontSize, Glyph, GlyphBound, Pixel, TextAlign, TextDirection, TextReorder,
+  font_db::FontDB, shaper::{ShapeResult, TextShaper, NEWLINE_GLYPH_ID}, text_reorder::ReorderResult, typography::{
+    text_align_offset, InputParagraph, InputRun, PlaceLineDirection, TypographyCfg, TypographyMan,
+    VisualInfos,
+  }, Em, FontFace, FontSize, Glyph, GlyphBound, Overflow, Pixel, TextAlign, TextDirection, TextReorder
 };
 
 /// Typography `text` relative to 1em.

@@ -8,8 +8,6 @@ pub struct Text {
   pub text_style: CowArc<TextStyle>,
   #[declare(default)]
   pub path_style: PathStyle,
-  #[declare(default)]
-  pub overflow: Overflow,
   #[declare(default = TextAlign::Start)]
   pub text_align: TextAlign,
 }
@@ -18,7 +16,6 @@ impl VisualText for Text {
   fn text(&self) -> CowArc<str> { self.text.clone() }
   fn text_style(&self) -> &TextStyle { &self.text_style }
   fn text_align(&self) -> TextAlign { self.text_align }
-  fn overflow(&self) -> Overflow { self.overflow }
 }
 
 impl Render for Text {
@@ -75,7 +72,6 @@ macro_rules! define_text_with_theme_style {
           @Text {
             text: pipe!($this.text.clone()),
             text_style: TypographyTheme::of(ctx!()).$style.text.clone(),
-            overflow: pipe!($this.overflow),
           }
         }
         .into_widget()
