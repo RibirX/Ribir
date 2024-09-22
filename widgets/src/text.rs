@@ -21,7 +21,7 @@ impl VisualText for Text {
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
     let size = self
-      .text_layout(AppCtx::typography_store(), clamp.max)
+      .text_layout(&mut AppCtx::typography_store().borrow_mut(), clamp.max)
       .visual_rect()
       .size
       .cast_unit();
@@ -43,7 +43,7 @@ impl Render for Text {
     };
 
     let bounds = ctx.layout_clamp().map(|b| b.max).unwrap();
-    let visual_glyphs = self.text_layout(AppCtx::typography_store(), bounds);
+    let visual_glyphs = self.text_layout(&mut AppCtx::typography_store().borrow_mut(), bounds);
     let font_db = AppCtx::font_db().clone();
     let font_size = self.text_style.font_size.into_pixel().value();
     draw_glyphs_in_rect(

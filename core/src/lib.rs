@@ -27,7 +27,7 @@ pub mod wrap_render;
 pub mod prelude {
   pub use log;
   #[doc(no_inline)]
-  pub use ribir_algo::CowArc;
+  pub use ribir_algo::*;
   pub use ribir_geom::*;
   #[doc(no_inline)]
   pub use ribir_macros::*;

@@ -32,7 +32,7 @@ pub trait SelectableText {
   fn set_caret(&mut self, caret: CaretState);
 
   fn select_text_rect(&self, text: &Text, text_size: Size) -> Vec<Rect> {
-    let glyphs = text.text_layout(AppCtx::typography_store(), text_size);
+    let glyphs = text.text_layout(&mut AppCtx::typography_store().borrow_mut(), text_size);
     let helper = TextGlyphsHelper::new(text.text.clone(), glyphs);
     helper
       .selection(self.text(), &self.select_range())
@@ -40,13 +40,13 @@ pub trait SelectableText {
   }
 
   fn caret_position(&self, text: &Text, text_size: Size) -> Option<Point> {
-    let glyphs = text.text_layout(AppCtx::typography_store(), text_size);
+    let glyphs = text.text_layout(&mut AppCtx::typography_store().borrow_mut(), text_size);
     let helper = TextGlyphsHelper::new(text.text.clone(), glyphs);
     helper.cursor(self.text(), self.caret().caret_position())
   }
 
   fn current_line_height(&self, text: &Text, text_size: Size) -> Option<f32> {
-    let glyphs = text.text_layout(AppCtx::typography_store(), text_size);
+    let glyphs = text.text_layout(&mut AppCtx::typography_store().borrow_mut(), text_size);
     let helper = TextGlyphsHelper::new(text.text.clone(), glyphs);
     helper.line_height(self.text(), self.caret().caret_position())
   }
@@ -77,7 +77,7 @@ pub(crate) fn bind_point_listener<T: SelectableText>(
         let mut this = $this.write();
         let position = e.position();
         let layout_size = layout_box.read().layout_size();
-        let helper = $text.text_layout(AppCtx::typography_store(), layout_size);
+        let helper = $text.text_layout(&mut AppCtx::typography_store().borrow_mut(), layout_size);
         let end = helper.caret_position_from_pos(position.x, position.y);
         let begin = if e.with_shift_key() {
           match this.caret() {
@@ -98,7 +98,7 @@ pub(crate) fn bind_point_listener<T: SelectableText>(
             && e.mouse_buttons() == MouseButtons::PRIMARY {
             let position = e.position();
             let layout_size = layout_box.read().layout_size();
-            let helper = $text.text_layout(AppCtx::typography_store(), layout_size);
+            let helper = $text.text_layout(&mut AppCtx::typography_store().borrow_mut(), layout_size);
             let end = helper.caret_position_from_pos(position.x, position.y);
             this.set_caret(CaretState::Selecting(begin, end));
           }
@@ -121,7 +121,7 @@ pub(crate) fn bind_point_listener<T: SelectableText>(
         let position = e.position();
 
         let layout_size = layout_box.read().layout_size();
-        let helper = $text.text_layout(AppCtx::typography_store(), layout_size);
+        let helper = $text.text_layout(&mut AppCtx::typography_store().borrow_mut(), layout_size);
         let caret = helper.caret_position_from_pos(position.x, position.y);
         let rg = select_word(&$text.text(), caret.cluster);
         $this.write().set_caret(CaretState::Select(
@@ -237,7 +237,7 @@ fn deal_with_selection<F: SelectableText>(
   let helper = || {
     TextGlyphsHelper::new(
       text.text.clone(),
-      text.text_layout(AppCtx::typography_store(), text_layout.layout_size()),
+      text.text_layout(&mut AppCtx::typography_store().borrow_mut(), text_layout.layout_size()),
     )
   };
   let old_caret = this.read().caret();

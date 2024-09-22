@@ -1,9 +1,6 @@
-use std::{
-  ops::Range,
-  sync::{Arc, RwLock},
-};
+use std::ops::Range;
 
-use ribir_algo::{FrameCache, Substr};
+use ribir_algo::{FrameCache, Sc, Substr};
 use unicode_bidi::{BidiClass, BidiInfo, Level, LevelRun};
 
 pub struct Paragraph {
@@ -17,19 +14,19 @@ pub struct ReorderResult {
 }
 
 // unnecessary cache
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct TextReorder {
-  cache: Arc<RwLock<FrameCache<Substr, Arc<ReorderResult>>>>,
+  cache: FrameCache<Substr, Sc<ReorderResult>>,
 }
 
 impl TextReorder {
-  pub fn get_from_cache(&self, text: &Substr) -> Option<Arc<ReorderResult>> {
-    self.cache.write().unwrap().get(text).cloned()
+  pub fn get_cache(&mut self, text: &Substr) -> Option<Sc<ReorderResult>> {
+    self.cache.get(text).cloned()
   }
 
-  pub fn reorder_text(&self, text: &Substr) -> Arc<ReorderResult> {
-    self.get_from_cache(text).unwrap_or_else(|| {
-      let info = BidiInfo::new(text, None);
+  pub fn reorder_text(&mut self, text: &Substr) -> &Sc<ReorderResult> {
+    self.cache.get_or_insert(text.clone(), || {
+      let info = BidiInfo::new(&text, None);
       let mut paras: Vec<Paragraph> = info
         .paragraphs
         .iter()
@@ -47,20 +44,11 @@ impl TextReorder {
         })
       }
 
-      let result = Arc::new(ReorderResult { original_classes: info.original_classes, paras });
-      let mut cache = self.cache.write().unwrap();
-      cache.put(text.clone(), result.clone());
-      result
+      Sc::new(ReorderResult { original_classes: info.original_classes, paras })
     })
   }
 
-  pub fn end_frame(&mut self) {
-    self
-      .cache
-      .write()
-      .unwrap()
-      .end_frame("Text Reorder");
-  }
+  pub fn end_frame(&mut self) { self.cache.end_frame("Text Reorder"); }
 }
 
 #[cfg(test)]
@@ -72,7 +60,7 @@ mod tests {
     let mut reorder = TextReorder::default();
     let text: Substr = concat!["א", "ב", "ג", "a", "b", "c",].into();
     // No cache exists
-    assert!(reorder.get_from_cache(&text).is_none());
+    assert!(reorder.get_cache(&text).is_none());
 
     let result = reorder.reorder_text(&text);
     assert_eq!(result.paras.len(), 1);
@@ -91,10 +79,10 @@ mod tests {
     assert_eq!(runs[0], 6..9);
     assert_eq!(runs[1], 0..6);
 
-    assert!(reorder.get_from_cache(&text).is_some());
+    assert!(reorder.get_cache(&text).is_some());
 
     reorder.end_frame();
     reorder.end_frame();
-    assert!(reorder.get_from_cache(&text).is_none());
+    assert!(reorder.get_cache(&text).is_none());
   }
 }

@@ -1,10 +1,9 @@
 use std::{
   cell::RefCell,
   hash::{Hash, Hasher},
-  rc::Rc,
 };
 
-use ribir_algo::{FrameCache, Substr};
+use ribir_algo::{FrameCache, Sc, Substr};
 pub use rustybuzz::ttf_parser::GlyphId;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
 
@@ -18,10 +17,10 @@ pub const NEWLINE_GLYPH_ID: GlyphId = GlyphId(u16::MAX);
 /// reordering before to shape text.
 ///
 /// This shaper will cache shaper result for per frame.
-#[derive(Clone)]
+
 pub struct TextShaper {
-  font_db: Rc<RefCell<FontDB>>,
-  shape_cache: Rc<RefCell<FrameCache<ShapeKey, Rc<ShapeResult>>>>,
+  font_db: Sc<RefCell<FontDB>>,
+  shape_cache: FrameCache<ShapeKey, Sc<ShapeResult>>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,42 +43,36 @@ struct GlyphsWithoutFallback {
 
 impl TextShaper {
   #[inline]
-  pub fn new(font_db: Rc<RefCell<FontDB>>) -> Self { Self { font_db, shape_cache: <_>::default() } }
+  pub fn new(font_db: Sc<RefCell<FontDB>>) -> Self { Self { font_db, shape_cache: <_>::default() } }
 
-  pub fn end_frame(&mut self) {
-    self
-      .shape_cache
-      .borrow_mut()
-      .end_frame("Text shape");
-  }
+  pub fn end_frame(&mut self) { self.shape_cache.end_frame("Text shape"); }
 
   /// Shape text and return the glyphs, caller should do text reorder before
   /// call this method.
   pub fn shape_text(
-    &self, text: &Substr, face_ids: &[ID], direction: TextDirection,
-  ) -> Rc<ShapeResult> {
-    self
-      .get_from_cache(text, face_ids, direction)
-      .unwrap_or_else(|| {
-        let mut glyphs = self
-          .shape_text_with_fallback(text, direction, face_ids)
-          .unwrap_or_default();
+    &mut self, text: &Substr, face_ids: &[ID], direction: TextDirection,
+  ) -> Sc<ShapeResult> {
+    if let Some(res) = self.get_cache(text, face_ids, direction) {
+      res.clone()
+    } else {
+      let mut glyphs = self
+        .shape_text_with_fallback(text, direction, face_ids)
+        .unwrap_or_default();
 
-        if let Some(last_char) = text.bytes().last() {
-          if last_char == b'\r' || last_char == b'\n' {
-            if let Some(g) = glyphs.last_mut() {
-              g.glyph_id = NEWLINE_GLYPH_ID;
-            }
+      if let Some(last_char) = text.bytes().last() {
+        if last_char == b'\r' || last_char == b'\n' {
+          if let Some(g) = glyphs.last_mut() {
+            g.glyph_id = NEWLINE_GLYPH_ID;
           }
         }
+      }
 
-        let glyphs = Rc::new(ShapeResult { text: text.clone(), glyphs });
-        self.shape_cache.borrow_mut().put(
-          ShapeKey { face_ids: face_ids.into(), text: text.clone(), direction },
-          glyphs.clone(),
-        );
-        glyphs
-      })
+      let glyphs = Sc::new(ShapeResult { text: text.clone(), glyphs });
+      self
+        .shape_cache
+        .put(ShapeKey { face_ids: face_ids.into(), text: text.clone(), direction }, glyphs.clone());
+      glyphs
+    }
   }
 
   /// Directly shape text without bidi reordering.
@@ -129,17 +122,16 @@ impl TextShaper {
     GlyphsWithoutFallback { glyphs, buffer: output.clear() }
   }
 
-  pub fn get_from_cache(
-    &self, text: &str, face_ids: &[ID], direction: TextDirection,
-  ) -> Option<Rc<ShapeResult>> {
+  pub fn get_cache(
+    &mut self, text: &str, face_ids: &[ID], direction: TextDirection,
+  ) -> Option<Sc<ShapeResult>> {
     self
       .shape_cache
-      .borrow_mut()
       .get(&(face_ids, text, direction) as &(dyn ShapeKeySlice))
       .cloned()
   }
 
-  pub fn font_db(&self) -> &Rc<RefCell<FontDB>> { &self.font_db }
+  pub fn font_db(&self) -> &Sc<RefCell<FontDB>> { &self.font_db }
 }
 
 fn collect_miss_part<'a>(
@@ -372,21 +364,21 @@ mod tests {
     let dir = TextDirection::LeftToRight;
 
     // No cache exists
-    assert!(shaper.get_from_cache(&text, &ids, dir).is_none());
+    assert!(shaper.get_cache(&text, &ids, dir).is_none());
 
     let result = shaper.shape_text(&text, &ids, dir);
     assert_eq!(result.glyphs.len(), 6);
 
-    assert!(shaper.get_from_cache(&text, &ids, dir).is_some());
+    assert!(shaper.get_cache(&text, &ids, dir).is_some());
 
     shaper.end_frame();
     shaper.end_frame();
-    assert!(shaper.get_from_cache(&text, &ids, dir).is_none());
+    assert!(shaper.get_cache(&text, &ids, dir).is_none());
   }
 
   #[test]
   fn font_fallback() {
-    let shaper = TextShaper::new(<_>::default());
+    let mut shaper = TextShaper::new(<_>::default());
     let path = env!("CARGO_MANIFEST_DIR").to_owned();
     let _ = shaper
       .font_db
@@ -450,7 +442,7 @@ mod tests {
 
   #[test]
   fn shape_miss_font() {
-    let shaper = TextShaper::new(<_>::default());
+    let mut shaper = TextShaper::new(<_>::default());
 
     let dir = TextDirection::LeftToRight;
     let result = shaper.shape_text(&"你好世界".into(), &[], dir);
@@ -459,14 +451,14 @@ mod tests {
 
   #[test]
   fn partiall_glyphs() {
-    let font_db = Rc::new(RefCell::new(FontDB::default()));
+    let font_db = Sc::new(RefCell::new(FontDB::default()));
     let _ = font_db
       .borrow_mut()
       .load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/GaramondNo8-Reg.ttf");
     let _ = font_db.borrow_mut().load_font_file(
       env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/Nunito-VariableFont_wght.ttf",
     );
-    let shaper = TextShaper::new(font_db.clone());
+    let mut shaper = TextShaper::new(font_db.clone());
 
     let text: Substr = "р҈р҈р҈р҈".into();
 
@@ -501,7 +493,7 @@ mod tests {
           ]),
           ..<_>::default()
         });
-      shaper.shape_cache.borrow_mut().clear();
+      shaper.shape_cache.clear();
       let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
       assert!(res.glyphs.len() == 8);
       assert!(res.glyphs.iter().all(|glyph| glyph.is_not_miss()));
@@ -510,7 +502,7 @@ mod tests {
 
   #[test]
   fn shape_compose_emoji() {
-    let shaper = TextShaper::new(<_>::default());
+    let mut shaper = TextShaper::new(<_>::default());
     let path = env!("CARGO_MANIFEST_DIR").to_owned();
     let _ = shaper
       .font_db

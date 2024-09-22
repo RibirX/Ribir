@@ -206,13 +206,12 @@ impl GlyphsHelper for VisualGlyphs {
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
+  use std::cell::RefCell;
 
   use ribir_core::prelude::{
     font_db::FontDB,
-    shaper::TextShaper,
     typography::{PlaceLineDirection, TypographyCfg},
-    Em, FontFace, FontFamily, FontSize, Overflow, TextAlign, TypographyStore,
+    *,
   };
   use ribir_geom::Size;
 
@@ -220,15 +219,14 @@ mod tests {
   use crate::input::caret_state::CaretPosition;
 
   fn test_store() -> TypographyStore {
-    let font_db = Rc::new(RefCell::new(FontDB::default()));
+    let font_db = Sc::new(RefCell::new(FontDB::default()));
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
     let _ = font_db.borrow_mut().load_font_file(path);
-    let shaper = TextShaper::new(font_db.clone());
-    TypographyStore::new(<_>::default(), font_db, shaper)
+    TypographyStore::new(font_db)
   }
   #[test]
   fn glyph_move() {
-    let store = test_store();
+    let mut store = test_store();
 
     let cfg = TypographyCfg {
       line_height: None,
