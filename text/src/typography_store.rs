@@ -1,18 +1,14 @@
-use std::{
-  cell::RefCell,
-  ops::Range,
-  rc::Rc,
-  sync::{Arc, RwLock},
-};
+use std::{cell::RefCell, ops::Range};
 
-use ribir_algo::{FrameCache, Substr};
+use ribir_algo::{FrameCache, Sc, Substr};
 use ribir_geom::{Point, Rect, Size};
 
 use crate::{
-  font_db::FontDB, shaper::{ShapeResult, TextShaper, NEWLINE_GLYPH_ID}, text_reorder::ReorderResult, typography::{
-    text_align_offset, InputParagraph, InputRun, PlaceLineDirection, TypographyCfg, TypographyMan,
-    VisualInfos,
-  }, Em, FontFace, FontSize, Glyph, GlyphBound, Overflow, Pixel, TextAlign, TextDirection, TextReorder
+  font_db::FontDB,
+  shaper::{TextShaper, NEWLINE_GLYPH_ID},
+  text_reorder::ReorderResult,
+  typography::*,
+  *,
 };
 
 /// Typography `text` relative to 1em.
@@ -29,31 +25,25 @@ pub struct TypographyKey {
   pub text: Substr,
 }
 
-#[derive(Clone)]
-struct TypographyResult {
-  pub infos: Arc<VisualInfos>,
-}
-
 /// Do simple text typography and cache it.
-#[derive(Clone)]
 pub struct TypographyStore {
   reorder: TextReorder,
   shaper: TextShaper,
-  font_db: Rc<RefCell<FontDB>>,
-  cache: Arc<RwLock<FrameCache<TypographyKey, TypographyResult>>>,
+  font_db: Sc<RefCell<FontDB>>,
+  cache: FrameCache<TypographyKey, Sc<VisualInfos>>,
 }
 pub struct VisualGlyphs {
   scale: f32,
   x: Em,
   y: Em,
-  visual_info: Arc<VisualInfos>,
-  order_info: Arc<ReorderResult>,
+  visual_info: Sc<VisualInfos>,
+  order_info: Sc<ReorderResult>,
 }
 
 impl VisualGlyphs {
   pub fn new(
-    scale: f32, line_dir: PlaceLineDirection, order_info: Arc<ReorderResult>, bound_width: Em,
-    bound_height: Em, visual_info: Arc<VisualInfos>,
+    scale: f32, line_dir: PlaceLineDirection, order_info: Sc<ReorderResult>, bound_width: Em,
+    bound_height: Em, visual_info: Sc<VisualInfos>,
   ) -> Self {
     let (mut x, mut y) = text_align_offset(
       visual_info.line_dir.is_horizontal(),
@@ -73,68 +63,61 @@ impl VisualGlyphs {
   }
 }
 
-struct ShapeRun {
-  shape_result: Rc<ShapeResult>,
-  font_size: FontSize,
-  letter_space: Option<Pixel>,
-  range: Range<usize>,
-}
-
 impl TypographyStore {
-  pub fn new(reorder: TextReorder, font_db: Rc<RefCell<FontDB>>, shaper: TextShaper) -> Self {
+  pub fn new(font_db: Sc<RefCell<FontDB>>) -> Self {
+    let reorder = TextReorder::default();
+    let shaper = TextShaper::new(font_db.clone());
     TypographyStore { reorder, shaper, font_db, cache: <_>::default() }
   }
 
-  pub fn end_frame(&self) {
-    self
-      .cache
-      .write()
-      .unwrap()
-      .end_frame("Typography");
+  pub fn end_frame(&mut self) {
+    self.reorder.end_frame();
+    self.shaper.end_frame();
+    self.cache.end_frame("Typography");
   }
 
   pub fn typography(
-    &self, text: Substr, font_size: FontSize, face: &FontFace, cfg: TypographyCfg,
+    &mut self, text: Substr, font_size: FontSize, face: &FontFace, cfg: TypographyCfg,
   ) -> VisualGlyphs {
     let em_font_size = font_size.into_em();
     let bounds = cfg.bounds / em_font_size;
 
-    if let Some(res) = self.get_from_cache(text.clone(), font_size, &cfg) {
+    if let Some(infos) = self.get_cache(text.clone(), font_size, &cfg) {
       return VisualGlyphs::new(
         font_size.into_em().value(),
         cfg.line_dir,
-        self.reorder.reorder_text(&text),
+        self.reorder.reorder_text(&text).clone(),
         bounds.width,
         bounds.height,
-        res.infos,
+        infos,
       );
     }
 
     let input = Self::key(text, font_size, &cfg);
 
-    let info = self.reorder.reorder_text(&input.text);
+    let info = self.reorder.reorder_text(&input.text).clone();
     let ids = self.font_db.borrow_mut().select_all_match(face);
     let inputs = info.paras.iter().map(|p| {
-      let runs = p.runs.iter().map(|r| {
-        let dir = if r.is_empty() || p.levels[r.start].is_ltr() {
-          TextDirection::LeftToRight
-        } else {
-          TextDirection::RightToLeft
-        };
+      p.runs
+        .iter()
+        .map(|r| {
+          let dir = if r.is_empty() || p.levels[r.start].is_ltr() {
+            TextDirection::LeftToRight
+          } else {
+            TextDirection::RightToLeft
+          };
 
-        let shape_result = self
-          .shaper
-          .shape_text(&input.text.substr(r.clone()), &ids, dir);
-
-        ShapeRun {
-          shape_result,
-          font_size: FontSize::Em(Em::absolute(1.0)),
-          letter_space: input.letter_space,
-          range: r.clone(),
-        }
-      });
-
-      InputParagraph { runs }
+          let shape_result = self
+            .shaper
+            .shape_text(&input.text.substr(r.clone()), &ids, dir);
+          InputRun {
+            shape_result,
+            font_size: FontSize::Em(Em::absolute(1.0)),
+            letter_space: input.letter_space,
+            range: r.clone(),
+          }
+        })
+        .collect()
     });
 
     let t_cfg = TypographyCfg {
@@ -147,12 +130,8 @@ impl TypographyStore {
     };
     let t_man = TypographyMan::new(inputs, t_cfg);
     let visual_info = t_man.typography_all();
-    let visual_info = Arc::new(visual_info);
-    self
-      .cache
-      .write()
-      .unwrap()
-      .put(input, TypographyResult { infos: visual_info.clone() });
+    let visual_info = Sc::new(visual_info);
+    self.cache.put(input, visual_info.clone());
 
     VisualGlyphs::new(
       font_size.into_em().value(),
@@ -164,13 +143,13 @@ impl TypographyStore {
     )
   }
 
-  pub fn font_db(&self) -> &Rc<RefCell<FontDB>> { &self.font_db }
+  pub fn font_db(&self) -> &Sc<RefCell<FontDB>> { &self.font_db }
 
-  fn get_from_cache(
-    &self, text: Substr, font_size: FontSize, cfg: &TypographyCfg,
-  ) -> Option<TypographyResult> {
+  fn get_cache(
+    &mut self, text: Substr, font_size: FontSize, cfg: &TypographyCfg,
+  ) -> Option<Sc<VisualInfos>> {
     let input = Self::key(text, font_size, cfg);
-    self.cache.write().unwrap().get(&input).cloned()
+    self.cache.get(&input).cloned()
   }
 
   fn key(text: Substr, font_size: FontSize, cfg: &TypographyCfg) -> TypographyKey {
@@ -196,23 +175,6 @@ impl TypographyStore {
 
     TypographyKey { line_height, line_width, letter_space, text_align, line_dir, overflow, text }
   }
-}
-
-impl InputRun for ShapeRun {
-  #[inline]
-  fn text(&self) -> &str { &self.shape_result.text }
-
-  #[inline]
-  fn glyphs(&self) -> &[Glyph<Em>] { &self.shape_result.glyphs }
-
-  #[inline]
-  fn font_size(&self) -> FontSize { self.font_size }
-
-  #[inline]
-  fn letter_space(&self) -> Option<Pixel> { self.letter_space }
-
-  #[inline]
-  fn range(&self) -> Range<usize> { self.range.clone() }
 }
 
 impl VisualGlyphs {
@@ -554,21 +516,20 @@ impl VisualGlyphs {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{shaper::*, FontFamily};
+  use crate::FontFamily;
 
   fn test_face() -> FontFace {
     FontFace { families: Box::new([FontFamily::Name("DejaVu Sans".into())]), ..<_>::default() }
   }
   fn test_store() -> TypographyStore {
-    let font_db = Rc::new(RefCell::new(FontDB::default()));
+    let font_db = Sc::new(RefCell::new(FontDB::default()));
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
     let _ = font_db.borrow_mut().load_font_file(path);
-    let shaper = TextShaper::new(font_db.clone());
-    TypographyStore::new(<_>::default(), font_db, shaper)
+    TypographyStore::new(font_db)
   }
 
   fn typography_text(text: Substr, font_size: FontSize, cfg: TypographyCfg) -> VisualGlyphs {
-    let store = test_store();
+    let mut store = test_store();
 
     store.typography(text, font_size, &test_face(), cfg)
   }
@@ -789,7 +750,7 @@ mod tests {
 
   #[test]
   fn cache_test() {
-    let store = test_store();
+    let mut store = test_store();
     let cfg = TypographyCfg {
       line_height: None,
       letter_space: None,
@@ -802,7 +763,7 @@ mod tests {
     let font_size = FontSize::Em(Em::absolute(1.));
     assert!(
       store
-        .get_from_cache(text.clone(), font_size, &cfg)
+        .get_cache(text.clone(), font_size, &cfg)
         .is_none()
     );
 
@@ -813,18 +774,14 @@ mod tests {
 
     assert!(
       store
-        .get_from_cache(text.clone(), font_size, &cfg)
+        .get_cache(text.clone(), font_size, &cfg)
         .is_some()
     );
 
     store.end_frame();
     store.end_frame();
 
-    assert!(
-      store
-        .get_from_cache(text, font_size, &cfg)
-        .is_none()
-    );
+    assert!(store.get_cache(text, font_size, &cfg).is_none());
   }
 
   #[test]
@@ -886,7 +843,7 @@ mod tests {
 
   #[test]
   fn text_in_different_bounds() {
-    let store = test_store();
+    let mut store = test_store();
 
     let mut cfg = TypographyCfg {
       line_height: None,
@@ -909,6 +866,6 @@ mod tests {
       graphys2.visual_rect().origin - graphys1.visual_rect().origin,
       ribir_geom::Vector::new(offset_x.value(), 0.)
     );
-    assert_eq!(1, store.cache.read().unwrap().len());
+    assert_eq!(1, store.cache.len());
   }
 }

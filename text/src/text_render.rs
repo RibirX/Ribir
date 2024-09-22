@@ -1,5 +1,6 @@
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
 
+use ribir_algo::Sc;
 use ribir_geom::{Rect, Size};
 use ribir_painter::{Painter, Path, PathStyle};
 
@@ -9,7 +10,7 @@ use crate::{font_db::FontDB, GlyphBound, VisualGlyphs};
 /// path style
 pub fn draw_glyphs_in_rect(
   painter: &mut Painter, visual_glyphs: VisualGlyphs, box_rect: Rect, font_size: f32,
-  path_style: &PathStyle, font_db: Rc<RefCell<FontDB>>,
+  path_style: &PathStyle, font_db: Sc<RefCell<FontDB>>,
 ) {
   let visual_rect = visual_glyphs.visual_rect();
   let Some(paint_rect) = painter.intersection_paint_bounds(&box_rect) else {
@@ -31,7 +32,7 @@ pub fn draw_glyphs_in_rect(
 /// draw the glyphs with the given brush, font_size and path style
 pub fn draw_glyphs(
   painter: &mut Painter, glyphs: impl Iterator<Item = GlyphBound>, font_size: f32,
-  path_style: &PathStyle, font_db: Rc<RefCell<FontDB>>,
+  path_style: &PathStyle, font_db: Sc<RefCell<FontDB>>,
 ) {
   glyphs.for_each(|g| {
     let font_db = font_db.borrow();

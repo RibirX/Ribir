@@ -44,8 +44,8 @@ pub const PIXELS_PER_EM: f32 = 16.;
 #[derive(Debug, Default, Clone, Copy, Add, Sub, Div, AddAssign, Mul, SubAssign, Neg)]
 pub struct Pixel(f32);
 
-///  `Em` is relative length unit relative to `Pixel`. We stipulate Em(1.) equal
-/// to Pixel(16.)
+/// `Em` is a relative length unit with respect to `Pixel`. We define 1 Em as
+/// equivalent to 16 Pixels.
 #[derive(Debug, Default, Clone, Copy, Add, Sub, Div, AddAssign, Mul, SubAssign, Neg)]
 pub struct Em(f32);
 
@@ -413,7 +413,7 @@ pub trait VisualText {
   fn text_style(&self) -> &TextStyle;
   fn text_align(&self) -> TextAlign;
 
-  fn text_layout(&self, typography_store: &TypographyStore, bound: Size) -> VisualGlyphs {
+  fn text_layout(&self, typography_store: &mut TypographyStore, bound: Size) -> VisualGlyphs {
     let TextStyle { font_size, letter_space, line_height, ref font_face, overflow } =
       *self.text_style();
 

@@ -10,7 +10,8 @@ use std::{
 pub use futures::task::SpawnError;
 use futures::{executor::LocalPool, task::LocalSpawnExt, Future};
 use pin_project_lite::pin_project;
-use ribir_text::{font_db::FontDB, shaper::TextShaper, TextReorder, TypographyStore};
+use ribir_algo::Sc;
+use ribir_text::{font_db::FontDB, TypographyStore};
 use rxrust::{scheduler::NEW_TIMER_FN, subject::Subject};
 
 use crate::{
@@ -39,10 +40,8 @@ pub trait RuntimeWaker {
 pub struct AppCtx {
   app_theme: Stateful<Theme>,
   windows: RefCell<ahash::HashMap<WindowId, Rc<Window>>>,
-  font_db: Rc<RefCell<FontDB>>,
-  shaper: TextShaper,
-  reorder: TextReorder,
-  typography_store: TypographyStore,
+  font_db: Sc<RefCell<FontDB>>,
+  typography_store: RefCell<TypographyStore>,
   clipboard: RefCell<Box<dyn Clipboard>>,
   runtime_waker: Box<dyn RuntimeWaker + Send>,
   scheduler: FuturesLocalScheduler,
@@ -133,11 +132,13 @@ impl AppCtx {
 
   /// Get the typography store of the application.
   #[track_caller]
-  pub fn typography_store() -> &'static TypographyStore { &Self::shared().typography_store }
+  pub fn typography_store() -> &'static RefCell<TypographyStore> {
+    &Self::shared().typography_store
+  }
 
   /// Get the font database of the application.
   #[track_caller]
-  pub fn font_db() -> &'static Rc<RefCell<FontDB>> { &Self::shared().font_db }
+  pub fn font_db() -> &'static Sc<RefCell<FontDB>> { &Self::shared().font_db }
 
   /// This function returns a stream of app ticks, where each frame of the app
   /// will emit a tick notification.
@@ -239,9 +240,7 @@ impl AppCtx {
     // todo: frame cache is not a good algorithm? because not every text will
     // relayout in every frame.
     let ctx = unsafe { Self::shared_mut() };
-    ctx.shaper.end_frame();
-    ctx.reorder.end_frame();
-    ctx.typography_store.end_frame();
+    ctx.typography_store.borrow_mut().end_frame();
   }
 
   #[track_caller]
@@ -253,10 +252,8 @@ impl AppCtx {
       let mut font_db = FontDB::default();
       font_db.load_system_fonts();
 
-      let font_db = Rc::new(RefCell::new(font_db));
-      let shaper = TextShaper::new(font_db.clone());
-      let reorder = TextReorder::default();
-      let typography_store = TypographyStore::new(reorder.clone(), font_db.clone(), shaper.clone());
+      let font_db = Sc::new(RefCell::new(font_db));
+      let typography_store = RefCell::new(TypographyStore::new(font_db.clone()));
 
       let executor = LocalPool::new();
       let scheduler = executor.spawner();
@@ -264,8 +261,6 @@ impl AppCtx {
       let ctx = AppCtx {
         font_db,
         app_theme,
-        shaper,
-        reorder,
         typography_store,
         clipboard: RefCell::new(Box::new(MockClipboard {})),
         executor: RefCell::new(executor),

@@ -1,10 +1,12 @@
 use std::ops::Range;
 
+use ribir_algo::Sc;
 use ribir_geom::Size;
+use smallvec::{smallvec, SmallVec};
 use unicode_script::{Script, UnicodeScript};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::{Em, FontSize, Glyph, Overflow, Pixel, TextAlign};
+use crate::{shaper::ShapeResult, Em, FontSize, Glyph, Overflow, Pixel, TextAlign};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PlaceLineDirection {
@@ -59,7 +61,7 @@ pub struct VisualLine {
 }
 
 pub struct VisualInfos {
-  pub visual_lines: Vec<VisualLine>,
+  pub visual_lines: SmallVec<[VisualLine; 1]>,
   pub text_align: TextAlign,
   /// if the typography result over the bounds provide by caller.
   pub over_bounds: bool,
@@ -69,25 +71,23 @@ pub struct VisualInfos {
 }
 
 /// Typography the glyphs in a bounds.
-pub struct TypographyMan<Inputs> {
+pub struct TypographyMan<Paras> {
   cfg: TypographyCfg,
   /// Not directly use text as inputs, but accept glyphs after text shape
   /// because both simple text and rich text can custom compose its glyph runs
   /// by text reorder result and its style .
-  inputs: Inputs,
+  inputs: Paras,
   inline_cursor: Em,
-  visual_lines: Vec<VisualLine>,
+  visual_lines: SmallVec<[VisualLine; 1]>,
   over_bounds: bool,
 }
 
-impl<Inputs, Runs> TypographyMan<Inputs>
+impl<Paras> TypographyMan<Paras>
 where
-  Inputs: DoubleEndedIterator<Item = InputParagraph<Runs>>,
-  Runs: DoubleEndedIterator,
-  Runs::Item: InputRun,
+  Paras: DoubleEndedIterator<Item = SmallVec<[InputRun; 1]>>,
 {
-  pub fn new(inputs: Inputs, cfg: TypographyCfg) -> Self {
-    Self { cfg, inputs, inline_cursor: Em::ZERO, visual_lines: vec![], over_bounds: false }
+  pub fn new(inputs: Paras, cfg: TypographyCfg) -> Self {
+    Self { cfg, inputs, inline_cursor: Em::ZERO, visual_lines: smallvec![], over_bounds: false }
   }
 
   pub fn typography_all(mut self) -> VisualInfos {
@@ -165,16 +165,18 @@ where
   }
 
   /// consume paragraph and return if early break because over boundary.
-  fn consume_paragraph(&mut self, p: InputParagraph<Runs>) -> bool {
+  fn consume_paragraph(&mut self, runs: SmallVec<[InputRun; 1]>) -> bool {
     self.begin_line();
 
     if self.cfg.line_dir.is_horizontal() {
       let mut cursor = VInlineCursor { pos: self.inline_cursor };
-      p.runs
+      runs
+        .iter()
         .for_each(|r| self.consume_run_with_letter_space_cursor(&r, &mut cursor));
     } else {
       let mut cursor = HInlineCursor { pos: self.inline_cursor };
-      p.runs
+      runs
+        .iter()
         .for_each(|r| self.consume_run_with_letter_space_cursor(&r, &mut cursor));
     }
     self.end_line();
@@ -183,10 +185,10 @@ where
   }
 
   fn consume_run_with_letter_space_cursor(
-    &mut self, run: &Runs::Item, inner_cursor: &mut impl InlineCursor,
+    &mut self, run: &InputRun, inner_cursor: &mut impl InlineCursor,
   ) {
     let letter_space = run
-      .letter_space()
+      .letter_space
       .or(self.cfg.letter_space)
       .unwrap_or(Pixel::ZERO);
     if letter_space != Em::ZERO {
@@ -198,7 +200,7 @@ where
   }
 
   fn split_word<'a>(
-    &self, run: &'a Runs::Item,
+    &self, run: &'a InputRun,
   ) -> impl Iterator<Item = impl Iterator<Item = &'a Glyph<Em>> + 'a> + 'a {
     let text = run.text();
     let mut reorder_text = String::new();
@@ -230,10 +232,10 @@ where
     })
   }
 
-  fn consume_run(&mut self, run: &Runs::Item, cursor: &mut impl InlineCursor) {
-    let font_size = run.font_size().into_em();
+  fn consume_run(&mut self, run: &InputRun, cursor: &mut impl InlineCursor) {
+    let font_size = run.font_size.into_em();
     let text = run.text();
-    let base = run.range().start as u32;
+    let base = run.range.start as u32;
     let line_offset = (font_size - Em::absolute(1.)) / 2.;
     let is_auto_wrap = self.cfg.overflow.is_auto_wrap();
 
@@ -358,16 +360,11 @@ where
   }
 }
 
-pub struct InputParagraph<Runs> {
-  pub runs: Runs,
-}
-
-pub trait InputRun {
-  fn text(&self) -> &str;
-  fn glyphs(&self) -> &[Glyph<Em>];
-  fn font_size(&self) -> FontSize;
-  fn letter_space(&self) -> Option<Pixel>;
-  fn range(&self) -> Range<usize>;
+pub struct InputRun {
+  pub(crate) shape_result: Sc<ShapeResult>,
+  pub(crate) font_size: FontSize,
+  pub(crate) letter_space: Option<Pixel>,
+  pub(crate) range: Range<usize>,
 }
 
 pub struct HInlineCursor {
@@ -508,4 +505,12 @@ fn letter_spacing_char(c: char) -> bool {
       | Script::Tirhuta
       | Script::Ogham
   )
+}
+
+impl InputRun {
+  #[inline]
+  fn text(&self) -> &str { &self.shape_result.text }
+
+  #[inline]
+  fn glyphs(&self) -> &[Glyph<Em>] { &self.shape_result.glyphs }
 }
