@@ -27,7 +27,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Changed
 
-- **text**: Merge the `overflow` field to the `TexStyle` structure. (#pr @M-Adoo)
+- **text**: Merge the `overflow` field to the `TexStyle` structure. (#629 @M-Adoo)
+
+### Breaking
+
+- **text**: Enhance the typography APIs by eliminating `FontSize`, `Pixel`, and `Em`, and directly utilize only logical pixels represented by `f32`.  (#629 @M-Adoo)
 
 ## [0.4.0-alpha.10] - 2024-09-25
 

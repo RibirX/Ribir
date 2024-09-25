@@ -21,7 +21,7 @@ pub use compose_decorators::*;
 mod custom_styles;
 pub use custom_styles::*;
 pub use ribir_painter::*;
-pub use ribir_text::{FontFace, FontFamily, FontSize, FontWeight, Pixel};
+pub use ribir_text::{FontFace, FontFamily, FontWeight};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Brightness {
@@ -281,9 +281,9 @@ fn typography_theme(
   TypographyTheme {
     display_large: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(64.0.into())),
-        font_size: FontSize::Pixel(57.0.into()),
-        letter_space: Some(0.0.into()),
+        line_height: 64.,
+        font_size: 57.,
+        letter_space: 0.,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -291,9 +291,9 @@ fn typography_theme(
     },
     display_medium: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(52.0.into())),
-        font_size: FontSize::Pixel(45.0.into()),
-        letter_space: Some(0.0.into()),
+        line_height: 52.,
+        font_size: 45.,
+        letter_space: 0.,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -301,9 +301,9 @@ fn typography_theme(
     },
     display_small: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(44.0.into())),
-        font_size: FontSize::Pixel(36.0.into()),
-        letter_space: Some(0.0.into()),
+        line_height: 44.,
+        font_size: 36.,
+        letter_space: 0.0,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -311,9 +311,9 @@ fn typography_theme(
     },
     headline_large: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(40.0.into())),
-        font_size: FontSize::Pixel(32.0.into()),
-        letter_space: Some(0.0.into()),
+        line_height: 40.,
+        font_size: 32.,
+        letter_space: 0.0,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -321,9 +321,9 @@ fn typography_theme(
     },
     headline_medium: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(36.0.into())),
-        font_size: FontSize::Pixel(28.0.into()),
-        letter_space: Some(0.0.into()),
+        line_height: 36.,
+        font_size: 28.,
+        letter_space: 0.,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -331,9 +331,9 @@ fn typography_theme(
     },
     headline_small: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(32.0.into())),
-        font_size: FontSize::Pixel(24.0.into()),
-        letter_space: Some(0.0.into()),
+        line_height: 32.,
+        font_size: 24.,
+        letter_space: 0.0,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -341,9 +341,9 @@ fn typography_theme(
     },
     title_large: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(28.0.into())),
-        font_size: FontSize::Pixel(22.0.into()),
-        letter_space: Some(0.0.into()),
+        line_height: 28.,
+        font_size: 22.,
+        letter_space: 0.0,
         font_face: medium_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -351,9 +351,9 @@ fn typography_theme(
     },
     title_medium: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(24.0.into())),
-        font_size: FontSize::Pixel(16.0.into()),
-        letter_space: Some(0.15.into()),
+        line_height: 24.,
+        font_size: 16.,
+        letter_space: 0.15,
         font_face: medium_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -361,9 +361,9 @@ fn typography_theme(
     },
     title_small: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(20.0.into())),
-        font_size: FontSize::Pixel(14.0.into()),
-        letter_space: Some(0.1.into()),
+        line_height: 20.,
+        font_size: 14.,
+        letter_space: 0.1,
         font_face: medium_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -371,9 +371,9 @@ fn typography_theme(
     },
     label_large: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(20.0.into())),
-        font_size: FontSize::Pixel(14.0.into()),
-        letter_space: Some(0.1.into()),
+        line_height: 20.0,
+        font_size: 14.0,
+        letter_space: 0.1,
         font_face: medium_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -381,9 +381,9 @@ fn typography_theme(
     },
     label_medium: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(16.0.into())),
-        font_size: FontSize::Pixel(12.0.into()),
-        letter_space: Some(0.5.into()),
+        line_height: 16.,
+        font_size: 12.,
+        letter_space: 0.5,
         font_face: medium_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -391,9 +391,9 @@ fn typography_theme(
     },
     label_small: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(16.0.into())),
-        font_size: FontSize::Pixel(11.0.into()),
-        letter_space: Some(0.5.into()),
+        line_height: 16.0,
+        font_size: 11.,
+        letter_space: 0.5,
         font_face: medium_face,
         overflow: Overflow::Clip,
       }),
@@ -401,9 +401,9 @@ fn typography_theme(
     },
     body_large: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(24.0.into())),
-        font_size: FontSize::Pixel(16.0.into()),
-        letter_space: Some(0.5.into()),
+        line_height: 24.0,
+        font_size: 16.0,
+        letter_space: 0.5,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -411,9 +411,9 @@ fn typography_theme(
     },
     body_medium: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(20.0.into())),
-        font_size: FontSize::Pixel(14.0.into()),
-        letter_space: Some(0.25.into()),
+        line_height: 20.0,
+        font_size: 14.,
+        letter_space: 0.25,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
       }),
@@ -421,9 +421,9 @@ fn typography_theme(
     },
     body_small: TextTheme {
       text: CowArc::owned(TextStyle {
-        line_height: Some(Em::from_pixel(16.0.into())),
-        font_size: FontSize::Pixel(12.0.into()),
-        letter_space: Some(0.4.into()),
+        line_height: 16.,
+        font_size: 12.,
+        letter_space: 0.4,
         font_face: regular_face,
         overflow: Overflow::Clip,
       }),

@@ -4,22 +4,19 @@
 //! Some detail processing learn from [usvg](https://github.com/RazrFalcon/resvg/blob/master/usvg/src/text)
 pub mod font_db;
 pub mod shaper;
-use std::{
-  hash::Hash,
-  ops::{Deref, DerefMut},
-};
+use std::hash::Hash;
 
-use derive_more::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
+use derive_more::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
+use font_db::Face;
 use fontdb::ID;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 use ribir_algo::CowArc;
 pub use ribir_algo::Substr;
 use ribir_geom::{Rect, Size};
-use rustybuzz::ttf_parser::GlyphId;
-use typography::{PlaceLineDirection, TypographyCfg};
+use rustybuzz::{ttf_parser::GlyphId, GlyphPosition};
+use typography::PlaceLineDirection;
 pub mod text_reorder;
 pub mod typography;
-use ordered_float::OrderedFloat;
 pub use text_reorder::TextReorder;
 mod typography_store;
 pub use typography_store::{TypographyStore, VisualGlyphs};
@@ -36,27 +33,6 @@ mod grapheme_cursor;
 pub use grapheme_cursor::GraphemeCursor;
 
 pub mod unicode_help;
-
-/// Unit for convert between pixel and em.
-pub const PIXELS_PER_EM: f32 = 16.;
-
-/// `Pixels is an absolute length unit and relative to the view device
-#[derive(Debug, Default, Clone, Copy, Add, Sub, Div, AddAssign, Mul, SubAssign, Neg)]
-pub struct Pixel(f32);
-
-/// `Em` is a relative length unit with respect to `Pixel`. We define 1 Em as
-/// equivalent to 16 Pixels.
-#[derive(Debug, Default, Clone, Copy, Add, Sub, Div, AddAssign, Mul, SubAssign, Neg)]
-pub struct Em(f32);
-
-/// The size of font. `Pixels is an absolute length unit and relative to the
-/// view device, and `Em` is relative length unit relative to `Pixel`. We
-/// stipulate FontSize::Em(1.) equal to FontSize::Pixel(16.)
-#[derive(Debug, Clone, Copy, Add)]
-pub enum FontSize {
-  Pixel(Pixel),
-  Em(Em),
-}
 
 // Enum value descriptions are from the CSS spec.
 /// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
@@ -114,15 +90,13 @@ pub struct FontFace {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
   /// The size of fonts (in logical pixels) to use when painting the text.
-  pub font_size: FontSize,
+  pub font_size: f32,
   /// The font face to use when painting the text.
-  // todo: use ids instead of
   pub font_face: FontFace,
-  /// Not support now.
-  pub letter_space: Option<Pixel>,
-  /// The factor use to multiplied by the font size to specify the text line
-  /// height.
-  pub line_height: Option<Em>,
+  /// The space between characters in logical pixel units.
+  pub letter_space: f32,
+  /// The line height of the text in logical pixels.
+  pub line_height: f32,
   /// How to handle the visual overflow.
   pub overflow: Overflow,
 }
@@ -138,27 +112,33 @@ impl Overflow {
   fn is_auto_wrap(&self) -> bool { matches!(self, Overflow::AutoWrap) }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Glyph<Unit> {
+#[derive(Debug, Clone, PartialEq)]
+pub struct Glyph {
   /// The font face id of the glyph.
   pub face_id: ID,
   /// How many units the line advances after drawing this glyph when setting
   /// text in horizontal direction.
-  pub x_advance: Unit,
+  pub x_advance: GlyphUnit,
   /// How many units the line advances after drawing this glyph when setting
   /// text in vertical direction.
-  pub y_advance: Unit,
+  pub y_advance: GlyphUnit,
   /// How many units the glyph moves on the X-axis before drawing it, this
   /// should not affect how many the line advances.
-  pub x_offset: Unit,
+  pub x_offset: GlyphUnit,
   /// How many units the glyph moves on the Y-axis before drawing it, this
   /// should not affect how many the line advances.
-  pub y_offset: Unit,
+  pub y_offset: GlyphUnit,
   /// The id of the glyph.
   pub glyph_id: GlyphId,
   /// An cluster of origin text as byte index.
   pub cluster: u32,
 }
+
+#[derive(
+  Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Add, Sub, AddAssign, Mul, SubAssign,
+  Neg, Hash
+)]
+pub struct GlyphUnit(i32);
 
 #[derive(Debug, Clone)]
 pub struct GlyphBound {
@@ -217,195 +197,69 @@ impl TextDirection {
   }
 }
 
-impl Hash for Pixel {
-  fn hash<H: std::hash::Hasher>(&self, state: &mut H) { OrderedFloat(self.0).hash(state); }
-}
+impl GlyphUnit {
+  /// Specifies the standard units per EM of the glyph.
+  pub const UNITS_PER_EM: u16 = 16384;
+  /// Specifies the pixels for a standard EM.
+  pub const PIXELS_PER_EM: u16 = 16;
+  /// Specifies the units of a pixel of a standard EM.
+  pub const UNITS_PER_PIXEL: u16 = Self::UNITS_PER_EM / Self::PIXELS_PER_EM;
 
-impl PartialEq for Pixel {
-  fn eq(&self, other: &Self) -> bool { OrderedFloat(self.0).eq(&OrderedFloat(other.0)) }
-}
+  pub const ZERO: Self = Self(0);
+  pub const MAX: Self = Self(i32::MAX);
+  pub const STANDARD_EM: Self = Self(Self::UNITS_PER_EM as i32);
 
-impl Eq for Pixel {}
+  pub fn from_pixel(pos: f32) -> Self { Self(f32::ceil(pos * Self::UNITS_PER_PIXEL as f32) as i32) }
 
-impl PartialOrd for Pixel {
-  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
-}
+  pub fn max(&self, other: Self) -> Self { Self(self.0.max(other.0)) }
 
-impl Ord for Pixel {
-  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    OrderedFloat(self.0).cmp(&OrderedFloat(other.0))
-  }
-}
+  pub fn min(&self, other: Self) -> Self { Self(self.0.min(other.0)) }
 
-impl Hash for Em {
-  fn hash<H: std::hash::Hasher>(&self, state: &mut H) { OrderedFloat(self.0).hash(state); }
-}
-
-impl PartialEq for Em {
-  fn eq(&self, other: &Self) -> bool { OrderedFloat(self.0).eq(&OrderedFloat(other.0)) }
-}
-
-impl Eq for Em {}
-
-impl PartialOrd for Em {
-  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
-}
-
-impl Ord for Em {
-  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    OrderedFloat(self.0).cmp(&OrderedFloat(other.0))
-  }
-}
-
-impl Deref for Pixel {
-  type Target = f32;
-  fn deref(&self) -> &Self::Target { &self.0 }
-}
-
-impl Deref for Em {
-  type Target = f32;
-  fn deref(&self) -> &Self::Target { &self.0 }
-}
-
-impl DerefMut for Pixel {
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
-}
-
-impl DerefMut for Em {
-  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
-}
-
-impl From<f32> for Pixel {
-  #[inline]
-  fn from(v: f32) -> Self { Pixel(v) }
-}
-
-impl From<Pixel> for Em {
-  #[inline]
-  fn from(p: Pixel) -> Self { Em(p.0 / PIXELS_PER_EM) }
-}
-
-impl From<Em> for Pixel {
-  #[inline]
-  fn from(e: Em) -> Self { Pixel(e.0 * PIXELS_PER_EM) }
-}
-
-impl PartialEq<Em> for Pixel {
-  #[inline]
-  fn eq(&self, other: &Em) -> bool {
-    let p: Pixel = (*other).into();
-    *self == p
-  }
-}
-
-impl PartialEq<Pixel> for Em {
-  #[inline]
-  fn eq(&self, other: &Pixel) -> bool {
-    let p: Pixel = (*self).into();
-    p == *other
-  }
-}
-
-impl FontSize {
-  #[inline]
-  pub fn into_pixel(self) -> Pixel {
-    match self {
-      FontSize::Pixel(p) => p,
-      FontSize::Em(e) => e.into(),
-    }
+  /// Render a standard font glyph at a different font size.
+  pub fn cast_to(self, pixel_per_em: f32) -> Self {
+    let scale = pixel_per_em / GlyphUnit::PIXELS_PER_EM as f32;
+    cast(self.0, scale)
   }
 
-  #[inline]
-  pub fn into_em(self) -> Em {
-    match self {
-      FontSize::Pixel(p) => p.into(),
-      FontSize::Em(e) => e,
-    }
-  }
-
-  /// Em scale by font size.
-  #[inline]
-  pub fn relative_em(self, font_size: f32) -> Em { self.into_em() * font_size }
+  pub fn into_pixel(self) -> f32 { self.0 as f32 / Self::UNITS_PER_PIXEL as f32 }
 }
+fn cast(pos: i32, scale: f32) -> GlyphUnit { GlyphUnit(f32::ceil(pos as f32 * scale) as i32) }
 
-impl PartialEq for FontSize {
-  #[inline]
-  fn eq(&self, other: &Self) -> bool { self.into_pixel() == other.into_pixel() }
-}
-
-impl Em {
-  pub const ZERO: Em = Em(0.);
-
-  pub const MAX: Em = Em(f32::MAX);
-
-  #[inline]
-  pub fn value(self) -> f32 { self.0 }
-
-  #[inline]
-  pub fn absolute(em: f32) -> Self { Self(em) }
-
-  #[inline]
-  pub fn relative_to(em: f32, font_size: FontSize) -> Self { font_size.relative_em(em) }
-
-  #[inline]
-  pub fn from_pixel(p: Pixel) -> Self { p.into() }
-}
-
-impl Pixel {
-  pub const ZERO: Pixel = Pixel(0.);
-
-  #[inline]
-  pub fn value(self) -> f32 { self.0 }
-}
-
-impl std::ops::Mul<Em> for Em {
-  type Output = Em;
-  #[inline]
-  fn mul(self, rhs: Em) -> Self::Output { Em(self.0 * rhs.0) }
-}
-
-impl std::ops::Mul<Pixel> for Pixel {
-  type Output = Pixel;
-  #[inline]
-  fn mul(self, rhs: Pixel) -> Self::Output { Pixel(self.0 * rhs.0) }
-}
-
-impl std::ops::MulAssign<f32> for Em {
-  #[inline]
-  fn mul_assign(&mut self, rhs: f32) { self.0 *= rhs; }
-}
-
-impl std::ops::Div<Em> for Em {
-  type Output = Em;
-
-  #[inline]
-  fn div(self, rhs: Em) -> Self::Output { Em(self.0 / rhs.0) }
-}
-
-impl std::ops::Div<Pixel> for Pixel {
-  type Output = Pixel;
-
-  #[inline]
-  fn div(self, rhs: Pixel) -> Self::Output { Pixel(self.0 / rhs.0) }
-}
-
-impl<U> Glyph<U> {
-  pub fn cast<T>(self) -> Glyph<T>
-  where
-    U: Into<T>,
-  {
-    let Glyph { face_id, x_advance, y_advance, x_offset, y_offset, glyph_id, cluster } = self;
-
+impl Glyph {
+  fn new(glyph_id: GlyphId, cluster: u32, pos: &GlyphPosition, face: &Face) -> Self {
+    let scale = GlyphUnit::UNITS_PER_EM as f32 / face.units_per_em() as f32;
     Glyph {
-      face_id,
-      x_advance: x_advance.into(),
-      y_advance: y_advance.into(),
-      x_offset: x_offset.into(),
-      y_offset: y_offset.into(),
+      face_id: face.face_id,
+      x_advance: cast(pos.x_advance, scale),
+      y_advance: cast(pos.y_advance, scale),
+      x_offset: cast(pos.x_offset, scale),
+      y_offset: cast(pos.y_offset, scale),
       glyph_id,
       cluster,
     }
   }
+  pub fn is_miss(&self) -> bool { self.glyph_id.0 == 0 }
+
+  #[allow(unused)]
+  pub fn is_not_miss(&self) -> bool { !self.is_miss() }
+
+  /// Cast the standard font size glyph to the specify font size.
+  pub fn cast_to(mut self, pixel_per_em: f32) -> Self {
+    let scale = pixel_per_em / GlyphUnit::PIXELS_PER_EM as f32;
+
+    self.x_advance = cast(self.x_advance.0, scale);
+    self.y_advance = cast(self.y_advance.0, scale);
+    self.x_offset = cast(self.x_offset.0, scale);
+    self.y_offset = cast(self.y_offset.0, scale);
+    self
+  }
+}
+
+impl std::ops::Div<f32> for GlyphUnit {
+  type Output = GlyphUnit;
+
+  #[inline]
+  fn div(self, rhs: f32) -> Self::Output { cast(self.0, 1. / rhs) }
 }
 
 pub trait VisualText {
@@ -413,24 +267,13 @@ pub trait VisualText {
   fn text_style(&self) -> &TextStyle;
   fn text_align(&self) -> TextAlign;
 
-  fn text_layout(&self, typography_store: &mut TypographyStore, bound: Size) -> VisualGlyphs {
-    let TextStyle { font_size, letter_space, line_height, ref font_face, overflow } =
-      *self.text_style();
-
-    let width: Em = Pixel(bound.width).into();
-    let height: Em = Pixel(bound.height).into();
+  fn text_layout(&self, typography_store: &mut TypographyStore, bounds: Size) -> VisualGlyphs {
     typography_store.typography(
       self.text().substr(..),
-      font_size,
-      font_face,
-      TypographyCfg {
-        line_height,
-        letter_space,
-        text_align: self.text_align(),
-        bounds: (width, height).into(),
-        line_dir: PlaceLineDirection::TopToBottom,
-        overflow,
-      },
+      self.text_style(),
+      bounds,
+      self.text_align(),
+      PlaceLineDirection::TopToBottom,
     )
   }
 }
@@ -438,10 +281,10 @@ pub trait VisualText {
 impl Default for TextStyle {
   fn default() -> Self {
     Self {
-      font_size: FontSize::Pixel(14.0.into()),
+      font_size: 14.,
       font_face: Default::default(),
-      letter_space: None,
-      line_height: None,
+      letter_space: 0.,
+      line_height: 16.,
       overflow: <_>::default(),
     }
   }

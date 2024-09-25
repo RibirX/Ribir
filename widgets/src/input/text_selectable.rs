@@ -98,7 +98,8 @@ pub(crate) fn bind_point_listener<T: SelectableText>(
             && e.mouse_buttons() == MouseButtons::PRIMARY {
             let position = e.position();
             let layout_size = layout_box.read().layout_size();
-            let helper = $text.text_layout(&mut AppCtx::typography_store().borrow_mut(), layout_size);
+            let store = AppCtx::typography_store();
+            let helper = $text.text_layout(&mut store.borrow_mut(), layout_size);
             let end = helper.caret_position_from_pos(position.x, position.y);
             this.set_caret(CaretState::Selecting(begin, end));
           }

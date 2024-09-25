@@ -26,7 +26,7 @@ impl TextReorder {
 
   pub fn reorder_text(&mut self, text: &Substr) -> &Sc<ReorderResult> {
     self.cache.get_or_insert(text.clone(), || {
-      let info = BidiInfo::new(&text, None);
+      let info = BidiInfo::new(text, None);
       let mut paras: Vec<Paragraph> = info
         .paragraphs
         .iter()

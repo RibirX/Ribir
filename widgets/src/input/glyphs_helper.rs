@@ -208,11 +208,7 @@ impl GlyphsHelper for VisualGlyphs {
 mod tests {
   use std::cell::RefCell;
 
-  use ribir_core::prelude::{
-    font_db::FontDB,
-    typography::{PlaceLineDirection, TypographyCfg},
-    *,
-  };
+  use ribir_core::prelude::{font_db::FontDB, typography::PlaceLineDirection, *};
   use ribir_geom::Size;
 
   use super::GlyphsHelper;
@@ -228,20 +224,24 @@ mod tests {
   fn glyph_move() {
     let mut store = test_store();
 
-    let cfg = TypographyCfg {
-      line_height: None,
-      letter_space: None,
-      text_align: TextAlign::Start,
-      bounds: Size::new(Em::absolute(5.0), Em::absolute(3.0)),
-      line_dir: PlaceLineDirection::TopToBottom,
+    let style = TextStyle {
+      font_size: 16.,
+      font_face: FontFace {
+        families: Box::new([FontFamily::Name("DejaVu Sans".into())]),
+        ..<_>::default()
+      },
+      letter_space: 0.,
+      line_height: 16.,
       overflow: Overflow::AutoWrap,
     };
+    let glyphs = store.typography(
+      "1 23 456 7890\n12345".into(),
+      &style,
+      Size::new(GlyphUnit::PIXELS_PER_EM as f32 * 5.0, GlyphUnit::PIXELS_PER_EM as f32 * 3.0),
+      TextAlign::Start,
+      PlaceLineDirection::TopToBottom,
+    );
 
-    let face =
-      FontFace { families: Box::new([FontFamily::Name("DejaVu Sans".into())]), ..<_>::default() };
-
-    let glyphs =
-      store.typography("1 23 456 7890\n12345".into(), FontSize::Em(Em::absolute(1.0)), &face, cfg);
     let helper = glyphs;
     let mut caret = CaretPosition { cluster: 0, position: None };
     caret = helper.prev(caret);
