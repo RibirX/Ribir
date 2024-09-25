@@ -11,18 +11,24 @@ use crate::{
   *,
 };
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct RunKey {
+  pub ids: Box<[ID]>,
+  pub line_height: GlyphUnit,
+  pub letter_space: GlyphUnit,
+  pub text: Substr,
+}
+
 /// Typography `text` relative to 1em.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct TypographyKey {
-  pub line_height: Option<Em>,
-  /// The max width of a line can be used to place glyph, we can use this to
-  /// detect if a cache can be reuse even if its bounds is different.
-  pub line_width: Em,
-  pub letter_space: Option<Pixel>,
-  pub text_align: TextAlign,
-  pub line_dir: PlaceLineDirection,
-  pub overflow: Overflow,
-  pub text: Substr,
+  runs: Box<[RunKey]>,
+  /// The maximum width of a line can be utilized to position glyphs, enabling
+  /// us to determine if a cache can be reused even if its bounds are different.
+  line_width: GlyphUnit,
+  text_align: TextAlign,
+  line_dir: PlaceLineDirection,
+  overflow: Overflow,
 }
 
 /// Do simple text typography and cache it.
@@ -33,33 +39,33 @@ pub struct TypographyStore {
   cache: FrameCache<TypographyKey, Sc<VisualInfos>>,
 }
 pub struct VisualGlyphs {
-  scale: f32,
-  x: Em,
-  y: Em,
+  font_size: f32,
+  x: GlyphUnit,
+  y: GlyphUnit,
   visual_info: Sc<VisualInfos>,
   order_info: Sc<ReorderResult>,
 }
 
 impl VisualGlyphs {
   pub fn new(
-    scale: f32, line_dir: PlaceLineDirection, order_info: Sc<ReorderResult>, bound_width: Em,
-    bound_height: Em, visual_info: Sc<VisualInfos>,
+    font_size: f32, line_dir: PlaceLineDirection, order_info: Sc<ReorderResult>,
+    bound_width: GlyphUnit, bound_height: GlyphUnit, visual_info: Sc<VisualInfos>,
   ) -> Self {
-    let (mut x, mut y) = text_align_offset(
-      visual_info.line_dir.is_horizontal(),
-      visual_info.text_align,
-      bound_width,
-      bound_height,
-      visual_info.visual_width,
-      visual_info.visual_height,
-    );
+    let (mut x, mut y) = <_>::default();
+
+    if line_dir.is_horizontal() {
+      y += text_align_offset(visual_info.visual_height, bound_height, visual_info.text_align);
+    } else {
+      x += text_align_offset(visual_info.visual_width, bound_width, visual_info.text_align);
+    }
+
     if line_dir == PlaceLineDirection::RightToLeft {
       x += bound_width - visual_info.visual_width
     }
     if line_dir == PlaceLineDirection::BottomToTop {
       y += bound_height - visual_info.visual_height
     }
-    Self { scale, x, y, visual_info, order_info }
+    Self { font_size, x, y, visual_info, order_info }
   }
 }
 
@@ -76,105 +82,66 @@ impl TypographyStore {
     self.cache.end_frame("Typography");
   }
 
+  /// Do a simply typography that only support single style.
   pub fn typography(
-    &mut self, text: Substr, font_size: FontSize, face: &FontFace, cfg: TypographyCfg,
+    &mut self, text: Substr, style: &TextStyle, bounds: Size, text_align: TextAlign,
+    line_dir: PlaceLineDirection,
   ) -> VisualGlyphs {
-    let em_font_size = font_size.into_em();
-    let bounds = cfg.bounds / em_font_size;
+    let TextStyle { font_size, ref font_face, letter_space, line_height, overflow } = *style;
+    // Since we cache the result of the standard font size, we must ensure that all
+    // variables are cast relative to this standard font size.
+    let scale = font_size / GlyphUnit::PIXELS_PER_EM as f32;
+    let bounds = Size::new(
+      GlyphUnit::from_pixel(bounds.width / scale),
+      GlyphUnit::from_pixel(bounds.height / scale),
+    );
+    let letter_space =
+      GlyphUnit::from_pixel(letter_space / font_size * GlyphUnit::PIXELS_PER_EM as f32);
+    let line_height =
+      GlyphUnit::from_pixel(line_height / font_size * GlyphUnit::PIXELS_PER_EM as f32);
 
-    if let Some(infos) = self.get_cache(text.clone(), font_size, &cfg) {
-      return VisualGlyphs::new(
-        font_size.into_em().value(),
-        cfg.line_dir,
-        self.reorder.reorder_text(&text).clone(),
-        bounds.width,
-        bounds.height,
-        infos,
-      );
-    }
+    let info = self.reorder.reorder_text(&text).clone();
+    let ids = self
+      .font_db
+      .borrow_mut()
+      .select_all_match(font_face)
+      .into_boxed_slice();
+    let runs = [RunKey { ids, line_height, letter_space, text }].into();
+    let key = TypographyKey::new(runs, bounds, text_align, line_dir, overflow);
+    let infos = if let Some(infos) = self.cache.get(&key).cloned() {
+      infos
+    } else {
+      let ids = &key.runs[0].ids;
+      let text = &key.runs[0].text;
+      let inputs = info.paras.iter().map(|p| {
+        p.runs
+          .iter()
+          .map(|r| {
+            let dir = if r.is_empty() || p.levels[r.start].is_ltr() {
+              TextDirection::LeftToRight
+            } else {
+              TextDirection::RightToLeft
+            };
 
-    let input = Self::key(text, font_size, &cfg);
+            let shape_result = self
+              .shaper
+              .shape_text(&text.substr(r.clone()), ids, dir);
+            InputRun::new(shape_result, 1., letter_space, r.clone())
+          })
+          .collect()
+      });
 
-    let info = self.reorder.reorder_text(&input.text).clone();
-    let ids = self.font_db.borrow_mut().select_all_match(face);
-    let inputs = info.paras.iter().map(|p| {
-      p.runs
-        .iter()
-        .map(|r| {
-          let dir = if r.is_empty() || p.levels[r.start].is_ltr() {
-            TextDirection::LeftToRight
-          } else {
-            TextDirection::RightToLeft
-          };
-
-          let shape_result = self
-            .shaper
-            .shape_text(&input.text.substr(r.clone()), &ids, dir);
-          InputRun {
-            shape_result,
-            font_size: FontSize::Em(Em::absolute(1.0)),
-            letter_space: input.letter_space,
-            range: r.clone(),
-          }
-        })
-        .collect()
-    });
-
-    let t_cfg = TypographyCfg {
-      line_height: input.line_height,
-      letter_space: input.letter_space,
-      text_align: cfg.text_align,
-      bounds,
-      line_dir: input.line_dir,
-      overflow: input.overflow,
+      let t_man = TypographyMan::new(inputs, line_dir, text_align, line_height, bounds, overflow);
+      let visual_info = t_man.typography_all();
+      let infos = Sc::new(visual_info);
+      self.cache.put(key, infos.clone());
+      infos
     };
-    let t_man = TypographyMan::new(inputs, t_cfg);
-    let visual_info = t_man.typography_all();
-    let visual_info = Sc::new(visual_info);
-    self.cache.put(input, visual_info.clone());
 
-    VisualGlyphs::new(
-      font_size.into_em().value(),
-      cfg.line_dir,
-      info,
-      bounds.width,
-      bounds.height,
-      visual_info,
-    )
+    VisualGlyphs::new(font_size, line_dir, info, bounds.width, bounds.height, infos.clone())
   }
 
   pub fn font_db(&self) -> &Sc<RefCell<FontDB>> { &self.font_db }
-
-  fn get_cache(
-    &mut self, text: Substr, font_size: FontSize, cfg: &TypographyCfg,
-  ) -> Option<Sc<VisualInfos>> {
-    let input = Self::key(text, font_size, cfg);
-    self.cache.get(&input).cloned()
-  }
-
-  fn key(text: Substr, font_size: FontSize, cfg: &TypographyCfg) -> TypographyKey {
-    let &TypographyCfg {
-      line_height, text_align, line_dir, overflow, letter_space, bounds, ..
-    } = cfg;
-    let line_height = line_height.map(|l| l / font_size.into_em());
-    let letter_space = letter_space.map(|l| l / font_size.into_pixel());
-
-    let line_width = match overflow {
-      // line width is not so important in clip mode, the cache can be use even with difference line
-      // width. The wider one can use for the narrower one. S
-      Overflow::Clip => Em::absolute(f32::MAX),
-
-      Overflow::AutoWrap => {
-        if line_dir.is_horizontal() {
-          bounds.height / font_size.into_em()
-        } else {
-          bounds.width / font_size.into_em()
-        }
-      }
-    };
-
-    TypographyKey { line_height, line_width, letter_space, text_align, line_dir, overflow, text }
-  }
 }
 
 impl VisualGlyphs {
@@ -189,8 +156,9 @@ impl VisualGlyphs {
   }
 
   pub fn nearest_glyph(&self, offset_x: f32, offset_y: f32) -> (usize, usize) {
-    let x: Em = -self.x + Pixel(offset_x / self.scale).into();
-    let y: Em = -self.y + Pixel(offset_y / self.scale).into();
+    let scale = self.font_size / GlyphUnit::PIXELS_PER_EM as f32;
+    let x = GlyphUnit::from_pixel(offset_x / scale) - self.x;
+    let y = GlyphUnit::from_pixel(offset_y / scale) - self.y;
     let mut bottom = self.visual_info.visual_height;
 
     let mut iter = self
@@ -210,7 +178,7 @@ impl VisualGlyphs {
         .iter()
         .enumerate()
         .rev()
-        .find(|(_, g)| Em::ZERO < g.x_advance && g.x_offset <= x)
+        .find(|(_, g)| GlyphUnit::ZERO < g.x_advance && g.x_offset <= x)
         .map(|(i, _)| i)
         .unwrap_or(0);
       return (row, idx);
@@ -393,15 +361,18 @@ impl VisualGlyphs {
     }
     let mut jointer = TypoRectJointer::new();
     for line in &self.visual_info.visual_lines {
-      let height: Pixel = (line.height * self.scale).into();
-      let offset_x = self.to_pixel_value(self.x + line.x).into();
-      let offset_y = self.to_pixel_value(self.y + line.y).into();
+      let height = self.to_pixel_value(line.height);
+      let offset_x = self.x + line.x;
+      let offset_y = self.y + line.y;
       for glyph in &line.glyphs {
         if rg.contains(&(glyph.cluster as usize)) {
-          let glyph = self.scale_to_pixel_glyph(glyph);
+          let glyph = glyph.clone().cast_to(self.font_size);
           let rc = Rect::new(
-            Point::new((glyph.x_offset + offset_x).value(), (glyph.y_offset + offset_y).value()),
-            Size::new((glyph.x_advance).value(), height.value()),
+            Point::new(
+              self.to_pixel_value(glyph.x_offset + offset_x),
+              self.to_pixel_value(glyph.y_offset + offset_y),
+            ),
+            Size::new(self.to_pixel_value(glyph.x_advance), height),
           );
           jointer.join_x(rc);
         } else {
@@ -413,12 +384,9 @@ impl VisualGlyphs {
     jointer.rects()
   }
 
-  fn to_pixel_value(&self, v: Em) -> f32 {
-    let p: Pixel = (v * self.scale).into();
-    p.value()
-  }
+  fn to_pixel_value(&self, v: GlyphUnit) -> f32 { v.cast_to(self.font_size).into_pixel() }
 
-  pub fn pixel_glyphs(&self) -> impl Iterator<Item = Glyph<Pixel>> + '_ {
+  pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + '_ {
     self
       .visual_info
       .visual_lines
@@ -431,17 +399,18 @@ impl VisualGlyphs {
           g
         })
       })
-      .map(move |g| self.scale_to_pixel_glyph(&g))
+      .map(move |g| g.cast_to(self.font_size))
   }
 
   pub fn glyph_bounds_in_rect(&self, rc: &Rect) -> impl Iterator<Item = GlyphBound> + '_ {
     let visual_rect = self.visual_rect();
     let mut rc = visual_rect.intersection(rc).unwrap_or_default();
     rc.origin -= visual_rect.origin.to_vector();
-    let min_x: Em = Pixel(rc.min_x() / self.scale).into();
-    let min_y: Em = Pixel(rc.min_y() / self.scale).into();
-    let max_x: Em = Pixel(rc.max_x() / self.scale).into();
-    let max_y: Em = Pixel(rc.max_y() / self.scale).into();
+    let scale = self.font_size / GlyphUnit::PIXELS_PER_EM as f32;
+    let min_x = GlyphUnit::from_pixel(rc.min_x() / scale);
+    let min_y = GlyphUnit::from_pixel(rc.min_y() / scale);
+    let max_x = GlyphUnit::from_pixel(rc.max_x() / scale);
+    let max_y = GlyphUnit::from_pixel(rc.max_y() / scale);
     let is_hline = !self.visual_info.line_dir.is_horizontal();
     self
       .visual_info
@@ -462,30 +431,16 @@ impl VisualGlyphs {
         })
       })
       .filter(move |g| !(g.x_offset + g.x_advance < min_x || max_x < g.x_offset))
-      .map(move |g| self.scale_to_pixel_glyph(&g))
+      .map(move |g| g.cast_to(self.font_size))
       .map(|g| GlyphBound {
         face_id: g.face_id,
         bound: Rect::new(
-          Point::new(g.x_offset.value(), g.y_offset.value()),
-          ribir_geom::Size::new(g.x_advance.value(), g.y_advance.value()),
+          Point::new(g.x_offset.into_pixel(), g.y_offset.into_pixel()),
+          ribir_geom::Size::new(g.x_advance.into_pixel(), g.y_advance.into_pixel()),
         ),
         glyph_id: g.glyph_id,
         cluster: g.cluster,
       })
-  }
-
-  fn scale_to_pixel_glyph(&self, g: &Glyph<Em>) -> Glyph<Pixel> {
-    let scale = self.scale;
-    let Glyph { face_id, x_advance, y_advance, x_offset, y_offset, glyph_id, cluster } = *g;
-    Glyph {
-      face_id,
-      x_advance: (x_advance * scale).into(),
-      y_advance: (y_advance * scale).into(),
-      x_offset: (x_offset * scale).into(),
-      y_offset: (y_offset * scale).into(),
-      glyph_id,
-      cluster,
-    }
   }
 
   pub fn glyph_count(&self, row: usize, ignore_new_line: bool) -> usize {
@@ -513,14 +468,36 @@ impl VisualGlyphs {
   pub fn glyph_row_count(&self) -> usize { self.visual_info.visual_lines.len() }
 }
 
+impl TypographyKey {
+  fn new(
+    runs: Box<[RunKey]>, bounds: Size<GlyphUnit>, text_align: TextAlign,
+    line_dir: PlaceLineDirection, overflow: Overflow,
+  ) -> Self {
+    let line_width = match overflow {
+      // line width is not so important in clip mode, the cache can be use even with difference line
+      // width. The wider one can use for the narrower one. S
+      Overflow::Clip => GlyphUnit::MAX,
+
+      Overflow::AutoWrap => {
+        if line_dir.is_horizontal() {
+          bounds.height
+        } else {
+          bounds.width
+        }
+      }
+    };
+
+    Self { runs, line_width, text_align, line_dir, overflow }
+  }
+}
+
 #[cfg(test)]
 mod tests {
+  use core::f32;
+
   use super::*;
   use crate::FontFamily;
 
-  fn test_face() -> FontFace {
-    FontFace { families: Box::new([FontFamily::Name("DejaVu Sans".into())]), ..<_>::default() }
-  }
   fn test_store() -> TypographyStore {
     let font_db = Sc::new(RefCell::new(FontDB::default()));
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
@@ -528,10 +505,22 @@ mod tests {
     TypographyStore::new(font_db)
   }
 
-  fn typography_text(text: Substr, font_size: FontSize, cfg: TypographyCfg) -> VisualGlyphs {
-    let mut store = test_store();
+  fn test_face() -> FontFace {
+    FontFace { families: Box::new([FontFamily::Name("DejaVu Sans".into())]), ..<_>::default() }
+  }
+  fn text_style(font_size: f32, overflow: Overflow, letter_space: f32) -> TextStyle {
+    TextStyle { font_size, font_face: test_face(), letter_space, line_height: font_size, overflow }
+  }
+  fn zero_letter_space_style(font_size: f32, overflow: Overflow) -> TextStyle {
+    text_style(font_size, overflow, 0.)
+  }
 
-    store.typography(text, font_size, &test_face(), cfg)
+  fn typography_text(
+    text: Substr, style: &TextStyle, bounds: Size, text_align: TextAlign,
+    line_dir: PlaceLineDirection,
+  ) -> VisualGlyphs {
+    let mut store = test_store();
+    store.typography(text, style, bounds, text_align, line_dir)
   }
 
   #[test]
@@ -543,17 +532,13 @@ mod tests {
     world!"
       .into();
 
+    let style = zero_letter_space_style(14., Overflow::Clip);
     let visual = typography_text(
       text,
-      FontSize::Pixel(14.0.into()),
-      TypographyCfg {
-        letter_space: None,
-        text_align: TextAlign::Start,
-        line_height: None,
-        bounds: (Em::MAX, Em::MAX).into(),
-        line_dir: PlaceLineDirection::TopToBottom,
-        overflow: Overflow::Clip,
-      },
+      &style,
+      (f32::MAX, f32::MAX).into(),
+      TextAlign::Start,
+      PlaceLineDirection::TopToBottom,
     );
 
     assert_eq!(visual.visual_rect().size, Size::new(61.960938, 70.));
@@ -563,17 +548,13 @@ mod tests {
   fn empty_text_bounds() {
     let text = "".into();
 
+    let style = zero_letter_space_style(14., Overflow::Clip);
     let visual = typography_text(
       text,
-      FontSize::Pixel(14.0.into()),
-      TypographyCfg {
-        letter_space: None,
-        text_align: TextAlign::Start,
-        line_height: None,
-        bounds: (Em::MAX, Em::MAX).into(),
-        line_dir: PlaceLineDirection::TopToBottom,
-        overflow: Overflow::Clip,
-      },
+      &style,
+      (f32::MAX, f32::MAX).into(),
+      TextAlign::Start,
+      PlaceLineDirection::TopToBottom,
     );
 
     assert_eq!(visual.visual_rect().size, Size::new(0., 14.0));
@@ -582,168 +563,159 @@ mod tests {
   #[test]
   fn new_line_bounds() {
     let text = "123\n".into();
-
+    let style = zero_letter_space_style(14., Overflow::Clip);
     let visual = typography_text(
       text,
-      FontSize::Pixel(14.0.into()),
-      TypographyCfg {
-        letter_space: None,
-        text_align: TextAlign::Start,
-        line_height: None,
-        bounds: (Em::MAX, Em::MAX).into(),
-        line_dir: PlaceLineDirection::TopToBottom,
-        overflow: Overflow::Clip,
-      },
+      &style,
+      (f32::MAX, f32::MAX).into(),
+      TextAlign::Start,
+      PlaceLineDirection::TopToBottom,
     );
 
-    assert_eq!(visual.visual_rect().size, Size::new(34.162678, 28.));
+    assert_eq!(visual.visual_rect().size, Size::new(34.164063, 28.));
   }
 
   #[test]
   fn simple_typography_text() {
-    fn glyphs(cfg: TypographyCfg) -> Vec<(f32, f32)> {
+    fn glyphs(
+      overflow: Overflow, bounds: Size, text_align: TextAlign, line_dir: PlaceLineDirection,
+    ) -> Vec<(f32, f32)> {
       let text = "Hello--------\nworld!".into();
-      fn em_to_pixel_val(v: &Em) -> f32 {
-        let p: Pixel = (*v).into();
-        p.value()
-      }
-      let bound_rc = Rect::from_size(Size::new(
-        em_to_pixel_val(&cfg.bounds.width),
-        em_to_pixel_val(&cfg.bounds.height),
-      ));
+      let style = text_style(10., overflow, 2.);
 
-      let info = typography_text(text, FontSize::Pixel(10.0.into()), cfg);
+      let info = typography_text(text, &style, bounds, text_align, line_dir);
       let visual_rc = info.visual_rect();
       info
-        .glyph_bounds_in_rect(&bound_rc)
+        .glyph_bounds_in_rect(&Rect::from_size(bounds))
         .map(|g| (visual_rc.origin.x + g.bound.min_x(), visual_rc.origin.y + g.bound.min_y()))
         .collect()
     }
 
-    let mut cfg = TypographyCfg {
-      letter_space: Some(Pixel::from(2.)),
-      line_height: None,
-      text_align: TextAlign::Start,
-      bounds: (Em::MAX, Em::MAX).into(),
-      line_dir: PlaceLineDirection::TopToBottom,
-      overflow: Overflow::Clip,
-    };
-
-    let not_bounds = glyphs(cfg.clone());
+    let not_bounds = glyphs(
+      Overflow::Clip,
+      Size::new(f32::MAX, f32::MAX),
+      TextAlign::Start,
+      PlaceLineDirection::TopToBottom,
+    );
     assert_eq!(
       &not_bounds,
       &[
         (0.0, 0.0),
-        (7.6445313, 0.0),
-        (13.921876, 0.0),
-        (16.825197, 0.0),
-        (19.728518, 0.0),
-        (26.157228, 0.0),
-        (29.890629, 0.0),
-        (33.624027, 0.0),
-        (37.357426, 0.0),
-        (41.09082, 0.0),
-        (44.82422, 0.0),
-        (48.557617, 0.0),
-        (52.29101, 0.0),
-        (56.024406, 0.0),
+        (9.520508, 0.0),
+        (17.672852, 0.0),
+        (22.451172, 0.0),
+        (27.229492, 0.0),
+        (35.533203, 0.0),
+        (41.1416, 0.0),
+        (46.75, 0.0),
+        (52.3584, 0.0),
+        (57.967773, 0.0),
+        (63.57617, 0.0),
+        (69.18457, 0.0),
+        (74.79297, 0.0),
+        (80.40137, 0.0),
         // second line
-        (0.0, 10.),
-        (8.303711, 10.),
-        (14.546876, 10.),
-        (18.783205, 10.),
-        (21.686525, 10.),
-        (28.159182, 10.)
+        (0.0, 10.0),
+        (10.1796875, 10.0),
+        (18.297852, 10.0),
+        (24.40918, 10.0),
+        (29.1875, 10.0),
+        (37.535156, 10.0)
       ]
     );
 
-    cfg.text_align = TextAlign::End;
-    cfg.bounds.width = Pixel(100.0).into();
-    let r_align = glyphs(cfg.clone());
+    let r_align = glyphs(
+      Overflow::Clip,
+      Size::new(100., f32::MAX),
+      TextAlign::End,
+      PlaceLineDirection::TopToBottom,
+    );
     assert_eq!(
       &r_align,
       &[
-        (38.535595, 0.0),
-        (46.180126, 0.0),
-        (52.45747, 0.0),
-        (55.360794, 0.0),
-        (58.264114, 0.0),
-        (64.692825, 0.0),
-        (68.42622, 0.0),
-        (72.15962, 0.0),
-        (75.89302, 0.0),
-        (79.62642, 0.0),
-        (83.35982, 0.0),
-        (87.093216, 0.0),
-        (90.82661, 0.0),
-        (94.56, 0.0),
+        (12.28418, 0.0),
+        (21.804688, 0.0),
+        (29.957031, 0.0),
+        (34.73535, 0.0),
+        (39.51367, 0.0),
+        (47.817383, 0.0),
+        (53.42578, 0.0),
+        (59.03418, 0.0),
+        (64.64258, 0.0),
+        (70.25195, 0.0),
+        (75.86035, 0.0),
+        (81.46875, 0.0),
+        (87.07715, 0.0),
+        (92.68555, 0.0),
         // second line
-        (67.70703, 10.0),
-        (76.01074, 10.0),
-        (82.25391, 10.0),
-        (86.490234, 10.0),
-        (89.393555, 10.0),
-        (95.86621, 10.0)
+        (56.458008, 10.0),
+        (66.63672, 10.0),
+        (74.75488, 10.0),
+        (80.86621, 10.0),
+        (85.64453, 10.0),
+        (93.99219, 10.0)
       ],
     );
 
-    cfg.text_align = TextAlign::Start;
-    cfg.line_dir = PlaceLineDirection::BottomToTop;
-    cfg.bounds.height = Pixel(100.0).into();
-    let bottom = glyphs(cfg.clone());
+    let bottom = glyphs(
+      Overflow::Clip,
+      Size::new(100., 100.),
+      TextAlign::Start,
+      PlaceLineDirection::BottomToTop,
+    );
 
     assert_eq!(
       &bottom,
       &[
         // first line
-        (0.0, 80.),
-        (8.303711, 80.),
-        (14.546876, 80.),
-        (18.783205, 80.),
-        (21.686525, 80.),
-        (28.159182, 80.),
+        (0.0, 80.0),
+        (10.1796875, 80.0),
+        (18.297852, 80.0),
+        (24.40918, 80.0),
+        (29.1875, 80.0),
+        (37.535156, 80.0),
         // second line
-        (0.0, 90.),
-        (7.6445313, 90.),
-        (13.921876, 90.),
-        (16.825197, 90.),
-        (19.728518, 90.),
-        (26.157228, 90.),
-        (29.890629, 90.),
-        (33.624027, 90.),
-        (37.357426, 90.),
-        (41.09082, 90.),
-        (44.82422, 90.),
-        (48.557617, 90.),
-        (52.29101, 90.),
-        (56.024406, 90.)
+        (0.0, 90.0),
+        (9.520508, 90.0),
+        (17.672852, 90.0),
+        (22.451172, 90.0),
+        (27.229492, 90.0),
+        (35.533203, 90.0),
+        (41.1416, 90.0),
+        (46.75, 90.0),
+        (52.3584, 90.0),
+        (57.967773, 90.0),
+        (63.57617, 90.0),
+        (69.18457, 90.0),
+        (74.79297, 90.0),
+        (80.40137, 90.0)
       ],
     );
 
-    cfg.text_align = TextAlign::Center;
-    cfg.line_dir = PlaceLineDirection::TopToBottom;
-    cfg.bounds = Size::new(Pixel::from(40.).into(), Pixel::from(15.).into());
-    let center_clip = glyphs(cfg);
+    let center_clip = glyphs(
+      Overflow::Clip,
+      Size::new(40., 15.),
+      TextAlign::Center,
+      PlaceLineDirection::TopToBottom,
+    );
+
     assert_eq!(
       &center_clip,
       &[
-        (-3.0876713, 0.0),
-        (3.1896734, 0.0),
-        (6.0929947, 0.0),
-        (8.996315, 0.0),
-        (15.425026, 0.0),
-        (19.158426, 0.0),
-        (22.891825, 0.0),
-        (26.625223, 0.0),
-        (30.358618, 0.0),
-        (34.09202, 0.0),
-        (37.825417, 0.0),
-        (3.8535137, 10.0),
-        (12.157225, 10.0),
-        (18.40039, 10.0),
-        (22.636717, 10.0),
-        (25.540041, 10.0),
-        (32.012695, 10.0)
+        (-1.40625, 0.0),
+        (3.3720703, 0.0),
+        (11.675781, 0.0),
+        (17.28418, 0.0),
+        (22.892578, 0.0),
+        (28.500977, 0.0),
+        (34.11035, 0.0),
+        (39.71875, 0.0),
+        (-1.7705078, 10.0),
+        (8.408203, 10.0),
+        (16.527344, 10.0),
+        (22.638672, 10.0),
+        (27.416992, 10.0),
+        (35.76465, 10.0)
       ],
     );
   }
@@ -751,73 +723,73 @@ mod tests {
   #[test]
   fn cache_test() {
     let mut store = test_store();
-    let cfg = TypographyCfg {
-      line_height: None,
-      letter_space: None,
-      text_align: TextAlign::Start,
-      bounds: (Em::MAX, Em::MAX).into(),
-      line_dir: PlaceLineDirection::TopToBottom,
-      overflow: Overflow::Clip,
-    };
+
     let text: Substr = "hi!".into();
-    let font_size = FontSize::Em(Em::absolute(1.));
-    assert!(
-      store
-        .get_cache(text.clone(), font_size, &cfg)
-        .is_none()
+
+    let style = zero_letter_space_style(16., Overflow::Clip);
+
+    assert!(store.cache.is_empty());
+
+    let visual = store.typography(
+      text.clone(),
+      &style,
+      Size::new(f32::MAX, f32::MAX),
+      TextAlign::Start,
+      PlaceLineDirection::TopToBottom,
     );
 
-    let visual =
-      store.typography(text.clone(), FontSize::Em(Em::absolute(1.0)), &test_face(), cfg.clone());
+    assert_eq!(visual.glyphs().count(), 3);
 
-    assert_eq!(visual.pixel_glyphs().count(), 3);
+    assert_eq!(store.cache.len(), 1);
 
-    assert!(
-      store
-        .get_cache(text.clone(), font_size, &cfg)
-        .is_some()
+    store.typography(
+      text.clone(),
+      &style,
+      Size::new(f32::MAX, f32::MAX),
+      TextAlign::Start,
+      PlaceLineDirection::TopToBottom,
     );
+
+    assert_eq!(store.cache.len(), 1);
 
     store.end_frame();
     store.end_frame();
 
-    assert!(store.get_cache(text, font_size, &cfg).is_none());
+    assert!(store.cache.is_empty());
   }
 
   #[test]
   fn cluster_position() {
-    let cfg = TypographyCfg {
-      line_height: None,
-      letter_space: None,
-      text_align: TextAlign::Start,
-      bounds: (Em::MAX, Em::MAX).into(),
-      line_dir: PlaceLineDirection::TopToBottom,
-      overflow: Overflow::Clip,
-    };
+    let style = zero_letter_space_style(15., Overflow::Clip);
     let text =
       "abcd \u{202e} right_to_left_1 \u{202d} embed \u{202c} right_to_left_2 \u{202c} end".into();
-    let graphys = typography_text(text, FontSize::Em(Em::absolute(1.0)), cfg);
-    assert!((0, 4) == graphys.position_by_cluster(4));
-    assert!((0, 35) == graphys.position_by_cluster(22));
-    assert!((0, 27) == graphys.position_by_cluster(31));
-    assert!((0, 8) == graphys.position_by_cluster(53));
+    let glyphs = typography_text(
+      text,
+      &style,
+      Size::new(f32::MAX, f32::MAX),
+      TextAlign::Start,
+      PlaceLineDirection::TopToBottom,
+    );
+
+    assert!((0, 4) == glyphs.position_by_cluster(4));
+    assert!((0, 35) == glyphs.position_by_cluster(22));
+    assert!((0, 27) == glyphs.position_by_cluster(31));
+    assert!((0, 8) == glyphs.position_by_cluster(53));
   }
 
   #[test]
   fn auto_wrap_position() {
-    let bounds = Size::new(Em::absolute(14.0), Em::absolute(2.0));
-    let cfg = TypographyCfg {
-      line_height: None,
-      letter_space: None,
-      text_align: TextAlign::Start,
-      bounds,
-      line_dir: PlaceLineDirection::TopToBottom,
-      overflow: Overflow::AutoWrap,
-    };
+    let style = zero_letter_space_style(16., Overflow::AutoWrap);
     let text = "WITHIN BOUND\rLINE WITH LONG WORD LIKE: ABCDEFGHIJKLMNOPQRSTUVWXYZ, WILL AUTO \
                 WRAP TO 3 LINES."
       .into();
-    let graphys = typography_text(text, FontSize::Em(Em::absolute(1.0)), cfg);
+    let glyphs = typography_text(
+      text,
+      &style,
+      Size::new(GlyphUnit::PIXELS_PER_EM as f32 * 14.0, GlyphUnit::PIXELS_PER_EM as f32 * 2.0),
+      TextAlign::Start,
+      PlaceLineDirection::TopToBottom,
+    );
 
     // text will auto wrap layout to 5 line as follow:
     let line1 = "WITHIN BOUND\r";
@@ -828,15 +800,15 @@ mod tests {
     let _line6 = "TO 3 LINES.";
 
     // check auto wrap
-    assert!((1, 0) == graphys.position_by_cluster(line1.len()));
-    assert!((2, 0) == graphys.position_by_cluster(line1.len() + line2.len()));
-    assert!((3, 0) == graphys.position_by_cluster(line1.len() + line2.len() + line3.len()));
+    assert!((1, 0) == glyphs.position_by_cluster(line1.len()));
+    assert!((2, 0) == glyphs.position_by_cluster(line1.len() + line2.len()));
+    assert!((3, 0) == glyphs.position_by_cluster(line1.len() + line2.len() + line3.len()));
     assert!(
-      (4, 0) == graphys.position_by_cluster(line1.len() + line2.len() + line3.len() + line4.len())
+      (4, 0) == glyphs.position_by_cluster(line1.len() + line2.len() + line3.len() + line4.len())
     );
     assert!(
       (5, 0)
-        == graphys
+        == glyphs
           .position_by_cluster(line1.len() + line2.len() + line3.len() + line4.len() + line5.len())
     );
   }
@@ -844,27 +816,29 @@ mod tests {
   #[test]
   fn text_in_different_bounds() {
     let mut store = test_store();
-
-    let mut cfg = TypographyCfg {
-      line_height: None,
-      letter_space: None,
-      text_align: TextAlign::Center,
-      bounds: Size::new(Em::absolute(10.0), Em::absolute(2.0)),
-      line_dir: PlaceLineDirection::TopToBottom,
-      overflow: Overflow::Clip,
-    };
     let text: Substr = "1234".into();
 
-    let graphys1 =
-      store.typography(text.clone(), FontSize::Em(Em::absolute(1.0)), &test_face(), cfg.clone());
+    let style = zero_letter_space_style(16., Overflow::Clip);
+    let glyphs1 = store.typography(
+      text.clone(),
+      &style,
+      Size::new(10. * GlyphUnit::PIXELS_PER_EM as f32, 2. * GlyphUnit::PIXELS_PER_EM as f32),
+      TextAlign::Center,
+      PlaceLineDirection::TopToBottom,
+    );
 
-    cfg.bounds = Size::new(Em::absolute(20.0), Em::absolute(2.0));
-    let graphys2 = store.typography(text, FontSize::Em(Em::absolute(1.0)), &test_face(), cfg);
+    let glyphs2 = store.typography(
+      text,
+      &style,
+      Size::new(20.0 * GlyphUnit::PIXELS_PER_EM as f32, 2.0 * GlyphUnit::PIXELS_PER_EM as f32),
+      TextAlign::Center,
+      PlaceLineDirection::TopToBottom,
+    );
 
-    let offset_x: Pixel = Em::absolute(5.).into();
+    let offset_x = 5. * GlyphUnit::PIXELS_PER_EM as f32;
     assert_eq!(
-      graphys2.visual_rect().origin - graphys1.visual_rect().origin,
-      ribir_geom::Vector::new(offset_x.value(), 0.)
+      glyphs2.visual_rect().origin - glyphs1.visual_rect().origin,
+      ribir_geom::Vector::new(offset_x, 0.)
     );
     assert_eq!(1, store.cache.len());
   }

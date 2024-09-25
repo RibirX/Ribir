@@ -138,7 +138,7 @@ impl Dispatcher {
   pub fn dispatch_wheel(&mut self, delta: MouseScrollDelta, wnd_factor: f64) {
     if let Some(wid) = self.hit_widget() {
       let (delta_x, delta_y) = match delta {
-        MouseScrollDelta::LineDelta(x, y) => (x * PIXELS_PER_EM, y * PIXELS_PER_EM),
+        MouseScrollDelta::LineDelta(x, y) => (x * 16., y * 16.),
         MouseScrollDelta::PixelDelta(delta) => {
           let winit::dpi::LogicalPosition { x, y } = delta.to_logical(wnd_factor);
           (x, y)

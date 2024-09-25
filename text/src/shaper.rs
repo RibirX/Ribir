@@ -9,7 +9,7 @@ use rustybuzz::{GlyphInfo, UnicodeBuffer};
 
 use crate::{
   font_db::{Face, FontDB, ID},
-  Em, Glyph, TextDirection,
+  Glyph, TextDirection,
 };
 
 pub const NEWLINE_GLYPH_ID: GlyphId = GlyphId(u16::MAX);
@@ -26,7 +26,7 @@ pub struct TextShaper {
 #[derive(Debug, Clone)]
 pub struct ShapeResult {
   pub text: Substr,
-  pub glyphs: Vec<Glyph<Em>>,
+  pub glyphs: Vec<Glyph>,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
@@ -37,7 +37,7 @@ struct ShapeKey {
 }
 
 struct GlyphsWithoutFallback {
-  glyphs: Vec<Glyph<Em>>,
+  glyphs: Vec<Glyph>,
   buffer: UnicodeBuffer,
 }
 
@@ -78,7 +78,7 @@ impl TextShaper {
   /// Directly shape text without bidi reordering.
   pub fn shape_text_with_fallback(
     &self, text: &str, dir: TextDirection, face_ids: &[ID],
-  ) -> Option<Vec<Glyph<Em>>> {
+  ) -> Option<Vec<Glyph>> {
     let mut font_fallback = FallBackFaceHelper::new(face_ids, &self.font_db);
     let face = font_fallback.next_fallback_face(text)?;
     let mut buffer = UnicodeBuffer::new();
@@ -104,19 +104,11 @@ impl TextShaper {
 
     let infos = output.glyph_infos();
     let positions = output.glyph_positions();
-    let units_per_em = face.units_per_em() as f32;
+
     (0..output.len()).for_each(|idx| {
       let &GlyphInfo { glyph_id, cluster, .. } = &infos[idx];
       let p = &positions[idx];
-      glyphs.push(Glyph {
-        face_id: face.face_id,
-        x_advance: Em::absolute(p.x_advance as f32 / units_per_em),
-        y_advance: Em::absolute(p.y_advance as f32 / units_per_em),
-        x_offset: Em::absolute(p.x_offset as f32 / units_per_em),
-        y_offset: Em::absolute(p.y_offset as f32 / units_per_em),
-        glyph_id: GlyphId(glyph_id as u16),
-        cluster,
-      })
+      glyphs.push(Glyph::new(GlyphId(glyph_id as u16), cluster, p, face))
     });
 
     GlyphsWithoutFallback { glyphs, buffer: output.clear() }
@@ -135,7 +127,7 @@ impl TextShaper {
 }
 
 fn collect_miss_part<'a>(
-  glyphs: &[Glyph<Em>], new_part: &[(usize, usize, FallBackFaceHelper<'a>)],
+  glyphs: &[Glyph], new_part: &[(usize, usize, FallBackFaceHelper<'a>)],
 ) -> Vec<(usize, usize, FallBackFaceHelper<'a>)> {
   let mut miss_parts = vec![];
   for (start, end, helper) in new_part {
@@ -174,13 +166,13 @@ fn collect_miss_part<'a>(
 }
 
 fn regen_miss_part<'a>(
-  text: &str, dir: TextDirection, glyphs: &mut Vec<Glyph<Em>>,
+  text: &str, dir: TextDirection, glyphs: &mut Vec<Glyph>,
   miss_part: Vec<(usize, usize, FallBackFaceHelper<'a>)>, mut buffer: UnicodeBuffer,
 ) -> (UnicodeBuffer, Vec<(usize, usize, FallBackFaceHelper<'a>)>) {
   let is_rtl = matches!(dir, TextDirection::RightToLeft | TextDirection::BottomToTop);
   let hb_direction = dir.into();
 
-  let cluster_to_range_byte = |glyphs: &Vec<Glyph<Em>>, idx: usize| -> usize {
+  let cluster_to_range_byte = |glyphs: &Vec<Glyph>, idx: usize| -> usize {
     let is_end = (is_rtl && 0 == idx) || (!is_rtl && idx == glyphs.len());
     match (is_end, is_rtl) {
       (true, _) => text.len(),
@@ -262,21 +254,6 @@ impl ShapeKeySlice for (&[ID], &str, TextDirection) {
   fn direction(&self) -> TextDirection { self.2 }
 }
 
-fn is_miss_glyph_id(id: u16) -> bool { id == 0 }
-
-impl<U: std::ops::MulAssign<f32>> Glyph<U> {
-  fn is_miss(&self) -> bool { is_miss_glyph_id(self.glyph_id.0) }
-
-  #[allow(unused)]
-  fn is_not_miss(&self) -> bool { !self.is_miss() }
-
-  pub fn scale(&mut self, scale: f32) {
-    self.x_advance *= scale;
-    self.y_advance *= scale;
-    self.x_offset *= scale;
-    self.y_offset *= scale;
-  }
-}
 impl From<TextDirection> for rustybuzz::Direction {
   fn from(dir: TextDirection) -> Self {
     match dir {

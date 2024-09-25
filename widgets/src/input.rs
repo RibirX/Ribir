@@ -447,16 +447,11 @@ fn size_clamp(style: &TextStyle, rows: Option<f32>, cols: Option<f32>) -> BoxCla
   let mut clamp: BoxClamp =
     BoxClamp { min: Size::new(0., 0.), max: Size::new(f32::INFINITY, f32::INFINITY) };
   if let Some(cols) = cols {
-    let width = cols * style.font_size.into_pixel().value();
+    let width = cols * style.font_size;
     clamp = clamp.with_fixed_width(width);
   }
   if let Some(rows) = rows {
-    let height: Pixel = style
-      .line_height
-      .unwrap_or(style.font_size.into_em())
-      .into();
-
-    clamp = clamp.with_fixed_height(rows * height.value());
+    clamp = clamp.with_fixed_height(rows * style.line_height);
   }
   clamp
 }

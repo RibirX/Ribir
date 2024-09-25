@@ -292,11 +292,10 @@ impl<'c> ComposeChild<'c> for ListItem {
                   @{ supporting.map(|supporting|  {
                     @ConstrainedBox {
                       clamp: {
-                        let TextStyle { line_height, font_size, .. } = &*supporting_style;
-                        let line_height = line_height.map_or(*font_size, FontSize::Em).into_pixel();
+                        let line_height = supporting_style.line_height;
                         pipe!{
                           let text_height = line_height * $this.line_number as f32;
-                          BoxClamp::fixed_height(*text_height)
+                          BoxClamp::fixed_height(text_height)
                         }
                       } ,
                       @Text {

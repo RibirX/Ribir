@@ -19,7 +19,6 @@ derive_more.workspace = true
 smallvec.workspace = true
 fontdb.workspace = true
 log.workspace = true
-ordered-float.workspace = true
 ribir_algo = {path = "../algo", version = "0.4.0-alpha.10" }
 ribir_geom = {path = "../geom", version = "0.4.0-alpha.10" }
 ribir_painter = {path = "../painter", version = "0.4.0-alpha.10" }

@@ -45,7 +45,7 @@ impl Render for Text {
     let bounds = ctx.layout_clamp().map(|b| b.max).unwrap();
     let visual_glyphs = self.text_layout(&mut AppCtx::typography_store().borrow_mut(), bounds);
     let font_db = AppCtx::font_db().clone();
-    let font_size = self.text_style.font_size.into_pixel().value();
+    let font_size = self.text_style.font_size;
     draw_glyphs_in_rect(
       ctx.painter(),
       visual_glyphs,
@@ -62,8 +62,6 @@ macro_rules! define_text_with_theme_style {
     #[derive(Declare)]
     pub struct $name {
       pub text: CowArc<str>,
-      #[declare(default)]
-      pub overflow: Overflow,
     }
 
     impl Compose for $name {
