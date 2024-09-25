@@ -14,11 +14,11 @@ version.workspace = true
 
 [dependencies]
 once_cell.workspace = true
-ribir_algo = { path = "../algo", version = "0.4.0-alpha.9" }
-ribir_core = { path = "../core", version = "0.4.0-alpha.9" }
-ribir_gpu = { path = "../gpu", version = "0.4.0-alpha.9" }
-ribir_material = { path = "../themes/material", version = "0.4.0-alpha.9", optional = true }
-ribir_widgets = { path = "../widgets", version = "0.4.0-alpha.9", optional = true }
+ribir_algo = { path = "../algo", version = "0.4.0-alpha.10" }
+ribir_core = { path = "../core", version = "0.4.0-alpha.10" }
+ribir_gpu = { path = "../gpu", version = "0.4.0-alpha.10" }
+ribir_material = { path = "../themes/material", version = "0.4.0-alpha.10", optional = true }
+ribir_widgets = { path = "../widgets", version = "0.4.0-alpha.10", optional = true }
 rxrust.workspace = true
 wgpu = { workspace = true, optional = true }
 winit.workspace = true
