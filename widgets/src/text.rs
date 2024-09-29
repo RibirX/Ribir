@@ -6,8 +6,6 @@ pub struct Text {
   pub text: CowArc<str>,
   #[declare(default = TypographyTheme::of(ctx!()).body_medium.text.clone())]
   pub text_style: CowArc<TextStyle>,
-  #[declare(default)]
-  pub path_style: PathStyle,
   #[declare(default = TextAlign::Start)]
   pub text_align: TextAlign,
 }
@@ -46,14 +44,8 @@ impl Render for Text {
     let visual_glyphs = self.text_layout(&mut AppCtx::typography_store().borrow_mut(), bounds);
     let font_db = AppCtx::font_db().clone();
     let font_size = self.text_style.font_size;
-    draw_glyphs_in_rect(
-      ctx.painter(),
-      visual_glyphs,
-      box_rect,
-      font_size,
-      &self.path_style,
-      font_db,
-    );
+
+    draw_glyphs_in_rect(ctx.painter(), visual_glyphs, box_rect, font_size, font_db);
   }
 }
 

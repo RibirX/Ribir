@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::prelude::*;
+use crate::{prelude::*, render_helper::RenderProxy};
 
 /// The theme of icon, which specify the icon size standard and provide a store
 /// of svg icons to use.
@@ -157,4 +157,8 @@ pub mod svgs {
     TEXT_CARET,
     THEME_EXTEND
   );
+}
+
+impl RenderProxy for Resource<Svg> {
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { &**self }
 }

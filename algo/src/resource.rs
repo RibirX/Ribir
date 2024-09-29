@@ -29,9 +29,15 @@ impl<T: Sized> Resource<T> {
     Resource(ptr)
   }
 }
+
 impl<T: ?Sized> Resource<T> {
   #[inline]
   pub fn as_ptr(this: &Self) -> *const () { triomphe::Arc::as_ptr(&this.0) as *const () }
+}
+
+impl<T> From<T> for Resource<T> {
+  #[inline]
+  fn from(value: T) -> Self { Self::new(value) }
 }
 
 impl<T: ?Sized> Clone for Resource<T> {

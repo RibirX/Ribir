@@ -94,7 +94,7 @@ impl Svg {
 
               let path = path
                 .transform(&transform.inverse().unwrap())
-                .stroke(&options, Some(painter.get_transform()));
+                .stroke(&options, Some(painter.transform()));
 
               if let Some(p) = path {
                 painter.fill_path(Resource::new(p).into());

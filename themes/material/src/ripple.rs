@@ -65,7 +65,7 @@ impl<'c> ComposeChild<'c> for Ripple {
               ripple.map_writer(|w| PartData::from_ref_mut(&mut w.path)),
               move |_, _, rate| {
                 let radius = Lerp::lerp(&0., &radius, rate);
-                Path::circle(launch_at, radius)
+                Path::circle(launch_at, radius).into()
               }
             ),
             from: Path::circle(Point::zero(), 0.)

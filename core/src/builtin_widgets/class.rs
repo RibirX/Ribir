@@ -283,54 +283,48 @@ impl OrigChild {
   }
 
   fn attach_subscription(&mut self, guard: impl Any) {
-    let inner = self.node();
+    let inner = self.node_mut();
     let child = unsafe { Box::from_raw(inner.as_mut()) };
     let child = Box::new(AnonymousAttacher::new(child, Box::new(guard)));
     let tmp = std::mem::replace(inner, child);
     std::mem::forget(tmp);
   }
 
+  fn node(&self) -> &dyn RenderQueryable { unsafe { &*(*self.0.get()) } }
+
   #[allow(clippy::mut_from_ref)]
-  fn node(&self) -> &mut Box<dyn RenderQueryable> { unsafe { &mut (*self.0.get()) } }
+  fn node_mut(&self) -> &mut Box<dyn RenderQueryable> { unsafe { &mut (*self.0.get()) } }
 }
 
 impl RenderProxy for OrigChild {
-  type Target<'r> = &'r dyn RenderQueryable
-      where
-        Self: 'r;
-
-  fn proxy(&self) -> Self::Target<'_> { unsafe { &**self.0.get() } }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.node() }
 }
 
 impl RenderProxy for ClassChild {
-  type Target<'r> = &'r dyn RenderQueryable
-      where
-        Self: 'r;
-
-  fn proxy(&self) -> Self::Target<'_> { self.inner().child.as_ref() }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.inner().child.as_ref() }
 }
 
 impl Query for OrigChild {
   fn query_all<'q>(&'q self, type_id: TypeId, out: &mut smallvec::SmallVec<[QueryHandle<'q>; 1]>) {
-    self.proxy().query_all(type_id, out)
+    self.node().query_all(type_id, out)
   }
 
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.proxy().query(type_id) }
+  fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.node().query(type_id) }
 
   fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
-    self.proxy().query_write(type_id)
+    self.node_mut().query_write(type_id)
   }
 }
 
 impl Query for ClassChild {
   fn query_all<'q>(&'q self, type_id: TypeId, out: &mut smallvec::SmallVec<[QueryHandle<'q>; 1]>) {
-    self.proxy().query_all(type_id, out)
+    self.inner().child.query_all(type_id, out)
   }
 
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.proxy().query(type_id) }
+  fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.inner().child.query(type_id) }
 
   fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
-    self.proxy().query_write(type_id)
+    self.inner().child.query_write(type_id)
   }
 }
 

@@ -168,12 +168,8 @@ where
   F: Fn(&S::Value) -> PartData<V> + Clone,
   V: Render,
 {
-  type Target<'r> = ReadRef<'r, V>
-  where
-    Self: 'r;
-
   #[inline]
-  fn proxy(&self) -> Self::Target<'_> { self.read() }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.read() }
 }
 
 impl<V: ?Sized, S, F> RenderProxy for MapWriterAsReader<S, F>
@@ -183,12 +179,7 @@ where
   F: Fn(&mut S::Value) -> PartData<V> + Clone,
   V: Render,
 {
-  type Target<'r> = ReadRef<'r, V>
-
-  where
-    Self: 'r;
-
-  fn proxy(&self) -> Self::Target<'_> { self.read() }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.read() }
 }
 
 impl<'w, S, F> IntoWidgetStrict<'w, RENDER> for MapWriter<S, F>

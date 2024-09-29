@@ -4,9 +4,10 @@
 //! self fields and methods.
 
 use std::cell::Cell;
-
 pub mod key;
+mod painting_style;
 pub use key::{Key, KeyWidget};
+pub use painting_style::*;
 pub mod image_widget;
 pub mod keep_alive;
 pub use keep_alive::*;
@@ -123,6 +124,7 @@ pub struct FatObj<T> {
   visibility: Option<State<Visibility>>,
   opacity: Option<State<Opacity>>,
   class: Option<State<Class>>,
+  painting_style: Option<State<PaintingStyleWidget>>,
   keep_alive: Option<State<KeepAlive>>,
   keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
 }
@@ -185,6 +187,7 @@ impl<T> FatObj<T> {
       relative_anchor: self.relative_anchor,
       global_anchor: self.global_anchor,
       class: self.class,
+      painting_style: self.painting_style,
       visibility: self.visibility,
       opacity: self.opacity,
       keep_alive: self.keep_alive,
@@ -391,6 +394,14 @@ impl<T> FatObj<T> {
   pub fn get_global_anchor_widget(&mut self) -> &State<GlobalAnchor> {
     self
       .global_anchor
+      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+
+  /// Returns the `State<PaintingStyleWidget>` widget from the FatObj. If it
+  /// doesn't exist, a new one will be created.
+  pub fn get_painting_style_widget(&mut self) -> &State<PaintingStyleWidget> {
+    self
+      .painting_style
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 
@@ -739,6 +750,11 @@ impl<T> FatObj<T> {
     self.declare_builtin_init(v, Self::get_fitted_box_widget, |m, v| m.box_fit = v)
   }
 
+  /// Initializes the painting style of this widget.
+  pub fn painting_style<const M: u8>(self, v: impl DeclareInto<PaintingStyle, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_painting_style_widget, |m, v| m.painting_style = v)
+  }
+
   /// Initializes the background of the widget.
   pub fn background<const M: u8>(self, v: impl DeclareInto<Option<Brush>, M>) -> Self {
     self.declare_builtin_init(v, Self::get_box_decoration_widget, |m, v| m.background = v)
@@ -908,6 +924,7 @@ impl<'a> FatObj<Widget<'a>> {
           v_align,
           relative_anchor,
           global_anchor,
+          painting_style,
           keep_alive
         ]
     );

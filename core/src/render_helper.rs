@@ -7,13 +7,8 @@ use state_cell::StateCell;
 use crate::prelude::*;
 
 pub trait RenderProxy {
-  type Target<'r>: Deref
-  where
-    Self: 'r;
-
-  fn proxy(&self) -> Self::Target<'_>;
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized>;
 }
-
 pub(crate) struct PureRender<R: Render>(pub R);
 
 impl<R: Render> Query for PureRender<R> {
@@ -27,15 +22,12 @@ impl<R: Render> Query for PureRender<R> {
 }
 
 impl<R: Render> RenderProxy for PureRender<R> {
-  type Target<'r> =&'r R where Self: 'r;
-
-  fn proxy(&self) -> Self::Target<'_> { &self.0 }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { &self.0 }
 }
 
 impl<T> Render for T
 where
   T: RenderProxy + 'static,
-  for<'r> <T::Target<'r> as Deref>::Target: Render,
 {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
@@ -56,33 +48,28 @@ where
 }
 
 impl<R: Render> RenderProxy for RefCell<R> {
-  type Target<'r>  = std::cell::Ref<'r, R>
-    where
-      Self: 'r;
-
-  fn proxy(&self) -> Self::Target<'_> { self.borrow() }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.borrow() }
 }
 
 impl<R: Render> RenderProxy for StateCell<R> {
-  type Target<'r> = ReadRef<'r, R>
-    where
-      Self: 'r;
-
-  fn proxy(&self) -> Self::Target<'_> { self.read() }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.read() }
 }
 
 impl<R: Render> RenderProxy for Sc<R> {
-  type Target<'r> = &'r R
-    where
-      Self: 'r;
-
-  fn proxy(&self) -> Self::Target<'_> { self }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self }
 }
 
-impl<R: Render> RenderProxy for Resource<R> {
-  type Target<'r> = &'r R
-    where
-      Self: 'r;
+impl Render for Resource<Path> {
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
+    let size = self.bounds().max().to_vector().to_size();
+    clamp.clamp(size)
+  }
 
-  fn proxy(&self) -> Self::Target<'_> { self }
+  #[inline]
+  fn only_sized_by_parent(&self) -> bool { true }
+
+  fn paint(&self, ctx: &mut PaintingCtx) {
+    let path = PaintPath::Share(self.clone());
+    ctx.painter().draw_path(path);
+  }
 }

@@ -1,3 +1,4 @@
+<!-- A template learn from `Yew`, welcome to help use improve it. -->
 ---
 name: Bug report
 about: Create a report to help us improve Ribir
@@ -32,7 +33,7 @@ If applicable, add screenshots to help explain your problem.
  - Browser and version, if relevant: [e.g. Chrome v83]
 
 **Questionnaire**
-<!-- Developing Yew is a community effort! -->
+<!-- Developing Ribir is a community effort! -->
 <!-- If you feel up to the challenge, please check one of the boxes below: -->
 - [ ] I'm interested in fixing this myself but don't know where to start
 - [ ] I would like to fix and I have a solution
