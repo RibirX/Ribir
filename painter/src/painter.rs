@@ -110,6 +110,15 @@ pub struct PathCommand {
   pub action: PaintPathAction,
 }
 
+/// Define the default method for the painter to render paths, including filling
+/// or stroking them.
+#[derive(Debug, Clone, Copy, Default)]
+pub enum PathStyle {
+  #[default]
+  Fill,
+  Stroke,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PaintCommand {
   Path(PathCommand),
@@ -132,6 +141,7 @@ struct PainterState {
   stroke_options: StrokeOptions,
   stroke_brush: Brush,
   fill_brush: Brush,
+  style: PathStyle,
   transform: Transform,
   opacity: f32,
   clip_cnt: usize,
@@ -150,6 +160,7 @@ impl PainterState {
       transform: Transform::identity(),
       clip_cnt: 0,
       opacity: 1.,
+      style: PathStyle::Fill,
     }
   }
 }
@@ -236,11 +247,11 @@ impl Painter {
 
   /// Return the brush used to stroke paths.
   #[inline]
-  pub fn get_stroke_brush(&self) -> &Brush { &self.current_state().stroke_brush }
+  pub fn stroke_brush(&self) -> &Brush { &self.current_state().stroke_brush }
 
   /// Return the brush used to fill shapes.
   #[inline]
-  pub fn get_fill_brush(&self) -> &Brush { &self.current_state().fill_brush }
+  pub fn fill_brush(&self) -> &Brush { &self.current_state().fill_brush }
 
   /// Set the brush used to stroke paths.
   #[inline]
@@ -253,6 +264,15 @@ impl Painter {
   #[inline]
   pub fn set_fill_brush(&mut self, brush: impl Into<Brush>) -> &mut Self {
     self.current_state_mut().fill_brush = brush.into();
+    self
+  }
+
+  /// return the style for drawing the path.
+  pub fn style(&self) -> PathStyle { self.current_state().style }
+
+  /// Define the default style for drawing the path.
+  pub fn set_style(&mut self, style: PathStyle) -> &mut Self {
+    self.current_state_mut().style = style;
     self
   }
 
@@ -271,7 +291,7 @@ impl Painter {
 
   /// Return the line width of the stroke pen.
   #[inline]
-  pub fn get_line_width(&self) -> f32 { self.stroke_options().width }
+  pub fn line_width(&self) -> f32 { self.stroke_options().width }
 
   /// Set the line width of the stroke pen with `line_width`
   #[inline]
@@ -281,7 +301,7 @@ impl Painter {
   }
 
   #[inline]
-  pub fn get_line_join(&self) -> LineJoin { self.stroke_options().line_join }
+  pub fn line_join(&self) -> LineJoin { self.stroke_options().line_join }
 
   #[inline]
   pub fn set_line_join(&mut self, line_join: LineJoin) -> &mut Self {
@@ -290,7 +310,7 @@ impl Painter {
   }
 
   #[inline]
-  pub fn get_line_cap(&mut self) -> LineCap { self.stroke_options().line_cap }
+  pub fn line_cap(&mut self) -> LineCap { self.stroke_options().line_cap }
 
   #[inline]
   pub fn set_line_cap(&mut self, line_cap: LineCap) -> &mut Self {
@@ -299,7 +319,7 @@ impl Painter {
   }
 
   #[inline]
-  pub fn get_miter_limit(&self) -> f32 { self.stroke_options().miter_limit }
+  pub fn miter_limit(&self) -> f32 { self.stroke_options().miter_limit }
 
   #[inline]
   pub fn set_miter_limit(&mut self, miter_limit: f32) -> &mut Self {
@@ -312,7 +332,7 @@ impl Painter {
 
   /// Return the current transformation matrix being applied to the layer.
   #[inline]
-  pub fn get_transform(&self) -> &Transform { &self.current_state().transform }
+  pub fn transform(&self) -> &Transform { &self.current_state().transform }
 
   /// Resets (overrides) the current transformation to the identity matrix, and
   /// then invokes a transformation described by the arguments of this method.
@@ -325,7 +345,7 @@ impl Painter {
 
   /// Apply this matrix to all subsequent paint commands。
   pub fn apply_transform(&mut self, transform: &Transform) -> &mut Self {
-    let t = transform.then(self.get_transform());
+    let t = transform.then(self.transform());
     self.set_transform(t);
     self
   }
@@ -345,11 +365,11 @@ impl Painter {
     self
   }
 
-  /// Fill a path with its style.
+  /// Fill a path with fill brush.
   pub fn fill_path(&mut self, path: PaintPath) -> &mut Self {
     invisible_return!(self);
 
-    let brush = self.get_fill_brush().clone();
+    let brush = self.fill_brush().clone();
     if locatable_bounds(&path.bounds)
       && self.intersect_paint_bounds(&path.bounds)
       && brush.is_visible()
@@ -361,12 +381,23 @@ impl Painter {
         Brush::LinearGradient(linear_gradient) => PaintPathAction::Linear(linear_gradient),
       };
       action.apply_alpha(self.alpha());
-      let ts = *self.get_transform();
+      let ts = *self.transform();
       let cmd = PathCommand::new(path, action, ts);
       self.commands.push(PaintCommand::Path(cmd));
     }
 
     self
+  }
+
+  /// Draw a path with the default style.
+  pub fn draw_path(&mut self, path: PaintPath) -> &mut Self {
+    match &self.current_state().style {
+      PathStyle::Fill => self.fill_path(path),
+      PathStyle::Stroke => {
+        let path = path.deref().clone();
+        self.stroke_path(path)
+      }
+    }
   }
 
   /// Outlines the current path with the current brush and `StrokeOptions`.
@@ -381,7 +412,7 @@ impl Painter {
   /// If you want to stroke a path using `Resource<Path>`, you should retain the
   /// result of `Path::stroke` with `Resource<Path>` and pass it to `fill_path`.
   pub fn stroke_path(&mut self, path: Path) -> &mut Self {
-    if let Some(stroke_path) = path.stroke(self.stroke_options(), Some(self.get_transform())) {
+    if let Some(stroke_path) = path.stroke(self.stroke_options(), Some(self.transform())) {
       self.swap_brush();
       self.fill_path(stroke_path.into());
       self.swap_brush();
@@ -410,15 +441,13 @@ impl Painter {
   /// * `y` - Distance to move in the vertical direction. Positive values are
   ///   down, and negative are up.
   pub fn translate(&mut self, x: f32, y: f32) -> &mut Self {
-    let t = self
-      .get_transform()
-      .pre_translate(Vector::new(x, y));
+    let t = self.transform().pre_translate(Vector::new(x, y));
     self.set_transform(t);
     self
   }
 
   pub fn scale(&mut self, x: f32, y: f32) -> &mut Self {
-    let t = self.get_transform().pre_scale(x, y);
+    let t = self.transform().pre_scale(x, y);
     self.set_transform(t);
     self
   }
@@ -529,7 +558,7 @@ impl Painter {
     &mut self, bounds: Rect, cmds: Resource<Box<[PaintCommand]>>,
   ) -> &mut Self {
     invisible_return!(self);
-    let transform = *self.get_transform();
+    let transform = *self.transform();
     let opacity = self.alpha();
     let cmd = PaintCommand::Bundle { transform, opacity, bounds, cmds };
     self.commands.push(cmd);
@@ -546,7 +575,7 @@ impl Painter {
     // individually as multiple resources. This means the backend doesn't
     // need to perform a single draw operation for an SVG.
     if svg.commands.len() <= 16 {
-      let transform = *self.get_transform();
+      let transform = *self.transform();
       let alpha = self.alpha();
 
       for cmd in svg.commands.iter() {
@@ -791,16 +820,16 @@ mod test {
       let mut guard = painter.save_guard();
       let t = Transform::new(1., 1., 1., 1., 1., 1.);
       guard.set_transform(t);
-      assert_eq!(&t, guard.get_transform());
+      assert_eq!(&t, guard.transform());
       {
         let mut p2 = guard.save_guard();
         let t2 = Transform::new(2., 2., 2., 2., 2., 2.);
         p2.set_transform(t2);
-        assert_eq!(&t2, p2.get_transform());
+        assert_eq!(&t2, p2.transform());
       }
-      assert_eq!(&t, guard.get_transform());
+      assert_eq!(&t, guard.transform());
     }
-    assert_eq!(&Transform::new(1., 0., 0., 1., 0., 0.), painter.get_transform());
+    assert_eq!(&Transform::new(1., 0., 0., 1., 0., 0.), painter.transform());
   }
 
   #[test]

@@ -5,7 +5,7 @@ use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use ribir_algo::{Resource, Sc};
 use ribir_geom::{rect, Point, Rect};
-use ribir_painter::{path_builder::PathBuilder, Path, PathStyle, PixelImage, Svg};
+use ribir_painter::{path_builder::PathBuilder, Path, PixelImage, Svg};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 
 use crate::{svg_glyph_cache::SvgGlyphCache, FontFace, FontFamily};
@@ -25,7 +25,7 @@ pub struct Face {
   pub rb_face: rustybuzz::Face<'static>,
   #[cfg(feature = "raster_png_font")]
   raster_image_glyphs: FontGlyphCache<GlyphId, Resource<PixelImage>>,
-  outline_glyphs: FontGlyphCache<(GlyphId, PathStyle), Resource<Path>>,
+  outline_glyphs: FontGlyphCache<GlyphId, Resource<Path>>,
   svg_glyphs: Sc<RefCell<SvgGlyphCache>>,
 }
 
@@ -285,23 +285,19 @@ impl Face {
 
   pub fn as_rb_face(&self) -> &rustybuzz::Face { &self.rb_face }
 
-  // todo: should return its tight bounds
-  pub fn outline_glyph(&self, glyph_id: GlyphId, style: &PathStyle) -> Option<Resource<Path>> {
+  pub fn outline_glyph(&self, glyph_id: GlyphId) -> Option<Resource<Path>> {
     self
       .outline_glyphs
       .borrow_mut()
-      .entry((glyph_id, style.clone()))
+      .entry(glyph_id)
       .or_insert_with(|| {
         let mut builder = GlyphOutlineBuilder::default();
         let bounds = self
           .rb_face
           .outline_glyph(glyph_id, &mut builder as &mut dyn OutlineBuilder);
-        bounds.and_then(move |b| {
-          let mut path = builder.build(rect(b.x_min, b.y_min, b.width(), b.height()).to_f32());
-          if let PathStyle::Stroke(options) = style {
-            path = path.stroke(options, None)?;
-          }
-          Some(Resource::new(path))
+        bounds.map(move |b| {
+          let path = builder.build(rect(b.x_min, b.y_min, b.width(), b.height()).to_f32());
+          Resource::new(path)
         })
       })
       .as_ref()

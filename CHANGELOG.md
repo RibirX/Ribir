@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Added the `PaintingStyle` built-in widget, enabling any widget to utilize `painting_style` to specify how shapes and paths should be painted within its descendants. (#633 @M-Adoo)
+
 ### Changed
 
 - **text**: Merge the `overflow` field to the `TexStyle` structure. (#629 @M-Adoo)
@@ -54,7 +58,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
-- **painter**: Removed `Painter::get_brush` and `Painter::set_brush`, now using `get_fill_brush`, `get_stroke_brush`, `set_fill_brush`, and `set_stroke_brush` methods instead. (#628 @M-Adoo)
+- **painter**: Removed `Painter::brush` and `Painter::set_brush`, now using `fill_brush`, `stroke_brush`, `set_fill_brush`, and `set_stroke_brush` methods instead. (#628 @M-Adoo)
 
 
 ## [0.4.0-alpha.9] - 2024-09-18

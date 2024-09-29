@@ -411,12 +411,8 @@ where
   R: StateReader,
   R::Value: Render,
 {
-  type Target<'r> = ReadRef<'r, R::Value>
-      where
-        Self: 'r;
-
   #[inline(always)]
-  fn proxy(&self) -> Self::Target<'_> { self.0.read() }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.0.read() }
 }
 
 impl<R: Render> IntoWidgetStrict<'static, RENDER> for State<R> {

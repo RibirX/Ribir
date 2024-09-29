@@ -17,16 +17,6 @@ pub struct Path {
   pub(crate) bounds: Rect,
 }
 
-/// Describe how to paint path, fill or stroke.
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize, Default)]
-pub enum PathStyle {
-  /// Fill the path.
-  #[default]
-  Fill,
-  /// Stroke path with line width.
-  Stroke(StrokeOptions),
-}
-
 /// Stroke properties.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StrokeOptions {

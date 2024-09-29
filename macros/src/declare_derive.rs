@@ -440,6 +440,15 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the painting style for shapes and paths."]
+        #vis fn painting_style<const _M: u8>(mut self, v: impl DeclareInto<PaintingStyle, _M>)
+          -> Self
+        {
+          self.fat_obj = self.fat_obj.painting_style(v);
+          self
+        }
+
+
         #[doc="Initializes the extra space within the widget."]
         #vis fn padding<const _M: u8>(mut self, v: impl DeclareInto<EdgeInsets, _M>) -> Self
         {

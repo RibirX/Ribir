@@ -32,11 +32,7 @@ impl AnonymousAttacher {
 }
 
 impl RenderProxy for DataAttacher {
-  type Target<'r> = &'r dyn RenderQueryable
-  where
-    Self: 'r;
-
-  fn proxy(&self) -> Self::Target<'_> { self.render.as_ref() }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.render.as_ref() }
 }
 
 impl Query for DataAttacher {
@@ -79,9 +75,5 @@ impl Query for AnonymousAttacher {
 }
 
 impl RenderProxy for AnonymousAttacher {
-  type Target<'r> = &'r dyn RenderQueryable
-  where
-    Self: 'r;
-
-  fn proxy(&self) -> Self::Target<'_> { self.render.as_ref() }
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.render.as_ref() }
 }
