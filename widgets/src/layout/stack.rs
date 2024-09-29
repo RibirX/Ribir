@@ -46,8 +46,9 @@ impl Render for Stack {
     let mut size = ZERO_SIZE;
     let (ctx, children) = ctx.split_children();
     for c in children {
-      let child_size = ctx.perform_child_layout(c, stack_clamp);
-      size = size.max(child_size);
+      ctx.perform_child_layout(c, stack_clamp);
+      let rect = ctx.widget_box_rect(c).unwrap();
+      size = size.max(rect.max().to_vector().to_size());
     }
     clamp.clamp(size)
   }

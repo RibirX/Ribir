@@ -84,10 +84,10 @@ macro_rules! class_names {
   ($(
     $(#[$outer:meta])?
     $name:ident
-  ),*) => {
+  ),* $(,)?) => {
     $(
       $(#[$outer])?
-      pub const $name: ClassName = ClassName::new(stringify!($name:snake));
+      pub const $name: ClassName = ClassName::new(stringify!($name));
     )*
 
   };
@@ -169,7 +169,7 @@ impl Class {
 /// This macro is used to define a class implementation by combining multiple
 /// other class implementations.
 #[macro_export]
-macro_rules! multi_class {
+macro_rules! multi_class_impl {
   ($($class: expr),*) => {
     move |mut w: Widget| {
       $(w = $class(w);)*

@@ -55,6 +55,7 @@ pub trait Transition {
   }
 }
 
+// todo: remove it after `TransitionTheme` is removed
 pub trait RocBoxClone: Transition {
   fn box_clone(&self) -> Box<dyn Transition>;
 }

@@ -16,7 +16,7 @@ pub(crate) fn lerp_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenStre
         impl #g_impl Lerp for #name #g_ty #g_impl #g_where {
           fn lerp(&self, to: &Self, factor: f32) -> Self {
             #name {
-              #(#fields: self.#fields.lerp(&to.#fields, factor)),*
+              #(#fields: Lerp::lerp(&self.#fields, &to.#fields, factor)),*
             }
           }
         }
@@ -31,7 +31,7 @@ pub(crate) fn lerp_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenStre
       quote! {
         impl #g_impl Lerp for #name #g_ty #g_impl #g_where {
           fn lerp(&self, to: &Self, factor: f32) -> Self {
-            #name( #(self.#indexes.lerp(&to.#indexes, factor)) ,*)
+            #name(#(Lerp::lerp(&self.#indexes, &to.#indexes, factor)) ,*)
           }
         }
       }

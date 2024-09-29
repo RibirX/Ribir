@@ -447,6 +447,12 @@ impl Painter {
     self.fill_path(builder.build().into())
   }
 
+  /// Draw the current path with the current paint style and brush.
+  pub fn draw(&mut self) -> &mut Self {
+    let builder = std::mem::take(&mut self.path_builder);
+    self.draw_path(builder.build().into())
+  }
+
   /// Adds a translation transformation to the current matrix by moving the
   /// canvas and its origin x units horizontally and y units vertically on the
   /// grid.

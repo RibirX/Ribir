@@ -119,6 +119,7 @@ where
         _tick_msg_guard: Some(Box::new((tick_handle, state_handle))),
         already_lerp: false,
       });
+      this.advance_to(Instant::now());
       wnd.inc_running_animate();
     }
   }

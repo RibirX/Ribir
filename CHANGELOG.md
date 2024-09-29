@@ -29,6 +29,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: The `keyframes!` macro has been introduced to manage the intermediate steps of animation states. (#653 @M-Adoo)
 - **core**: Added `QueryId` as a replacement for `TypeId` to facilitate querying types by Provider across different binaries. (#656 @M-Adoo)
+- **widgets**: Added `LinearProgress` and `SpinnerProgress` widgets along with their respective material themes. (#pr @wjian23 @M-Adoo)
 
 ### Fixed
 

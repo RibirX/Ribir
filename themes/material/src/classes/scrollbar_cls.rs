@@ -36,8 +36,8 @@ pub(super) fn init(classes: &mut Classes) {
     h_align: HAlign::Right
   };
 
-  classes.insert(H_SCROLL_TRACK, multi_class![base_track, H_TRACK]);
-  classes.insert(V_SCROLL_TRACK, multi_class![base_track, V_TRACK]);
+  classes.insert(H_SCROLL_TRACK, multi_class_impl![base_track, H_TRACK]);
+  classes.insert(V_SCROLL_TRACK, multi_class_impl![base_track, V_TRACK]);
 }
 
 fn base_track(w: Widget) -> Widget {
