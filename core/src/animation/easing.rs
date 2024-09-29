@@ -25,6 +25,7 @@ pub struct QuadraticBezierEasing(QuadraticBezierSegment<f32>);
 #[derive(Clone)]
 pub struct LinearEasing;
 
+// Task: Remove the constants; they should be in the theme instead.
 // Some const easing cubic bezier provide.
 // reference: https://developer.mozilla.org/en-US/docs/Web/CSS/animation-timing-function
 

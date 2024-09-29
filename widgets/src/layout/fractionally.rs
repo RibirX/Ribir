@@ -7,7 +7,9 @@ use ribir_core::{prelude::*, wrap_render::WrapRender};
 /// total available space.
 #[derive(Declare)]
 pub struct FractionallySizedBox {
+  #[declare(default = 1.0)]
   pub width_factor: f32,
+  #[declare(default = 1.0)]
   pub height_factor: f32,
 }
 
@@ -18,6 +20,7 @@ pub struct FractionallySizedBox {
 /// x-axis space while extending along the y-axis.
 #[derive(Declare)]
 pub struct FractionallyWidthBox {
+  #[declare(default = 1.0)]
   pub factor: f32,
 }
 
@@ -28,6 +31,7 @@ pub struct FractionallyWidthBox {
 /// y-axis space while extending along the x-axis.
 #[derive(Declare)]
 pub struct FractionallyHeightBox {
+  #[declare(default = 1.0)]
   pub factor: f32,
 }
 

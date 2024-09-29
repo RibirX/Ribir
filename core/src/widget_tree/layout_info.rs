@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use ribir_geom::ZERO_SIZE;
 
-use super::{WidgetId, WidgetTree};
+use super::{Lerp, WidgetId, WidgetTree};
 use crate::prelude::{INFINITY_SIZE, Point, Size};
 
 /// boundary limit of the render object's layout
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq, Copy, Lerp)]
 pub struct BoxClamp {
   pub min: Size,
   pub max: Size,
