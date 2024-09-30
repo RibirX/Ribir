@@ -32,7 +32,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use ribir_macros::*;
   #[doc(no_inline)]
-  pub use ribir_text::*;
+  pub use ribir_painter::*;
   #[doc(hidden)]
   pub use rxrust::prelude::*;
   pub use smallvec;

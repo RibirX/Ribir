@@ -143,7 +143,7 @@ pub fn select_prev_word(text: &str, cluster: usize, skip_whitespace: bool) -> Ra
 
 #[cfg(test)]
 mod tests {
-  use crate::text_writer::select_prev_word;
+  use crate::text::select_prev_word;
 
   #[test]
   fn test_select_word() {

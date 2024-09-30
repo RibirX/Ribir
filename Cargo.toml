@@ -6,7 +6,6 @@ members = [
   "painter",
   "macros",
   "algo",
-  "text",
   "widgets",
   "ribir",
   "themes/material",

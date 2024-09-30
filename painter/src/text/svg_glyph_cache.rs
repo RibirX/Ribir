@@ -7,8 +7,9 @@ use quick_xml::{
   name::QName,
   reader::Reader,
 };
-use ribir_painter::Svg;
 use rustybuzz::ttf_parser::GlyphId;
+
+use crate::Svg;
 
 #[derive(Default)]
 pub struct SvgGlyphCache {

@@ -5,10 +5,13 @@ use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use ribir_algo::{Resource, Sc};
 use ribir_geom::{rect, Point, Rect};
-use ribir_painter::{path_builder::PathBuilder, Path, PixelImage, Svg};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 
-use crate::{svg_glyph_cache::SvgGlyphCache, FontFace, FontFamily};
+use crate::{
+  path_builder::PathBuilder,
+  text::{svg_glyph_cache::SvgGlyphCache, FontFace, FontFamily},
+  Path, PixelImage, Svg,
+};
 /// A wrapper of fontdb and cache font data.
 pub struct FontDB {
   default_fonts: Vec<ID>,
@@ -23,7 +26,6 @@ pub struct Face {
   pub source_data: Arc<dyn AsRef<[u8]> + Sync + Send>,
   pub face_data_index: u32,
   pub rb_face: rustybuzz::Face<'static>,
-  #[cfg(feature = "raster_png_font")]
   raster_image_glyphs: FontGlyphCache<GlyphId, Resource<PixelImage>>,
   outline_glyphs: FontGlyphCache<GlyphId, Resource<Path>>,
   svg_glyphs: Sc<RefCell<SvgGlyphCache>>,
@@ -252,7 +254,7 @@ impl FontDB {
 impl Default for FontDB {
   fn default() -> FontDB {
     let mut data_base = fontdb::Database::new();
-    data_base.load_font_data(include_bytes!("../Lato-Regular.ttf").to_vec());
+    data_base.load_font_data(include_bytes!("./Lato-Regular.ttf").to_vec());
     let default_font = data_base.faces().next().map(|f| f.id).unwrap();
     let mut this = FontDB { default_fonts: vec![default_font], data_base, cache: <_>::default() };
     this.face_data_or_insert(default_font);
@@ -274,7 +276,6 @@ impl Face {
       rb_face,
       face_id,
       outline_glyphs: <_>::default(),
-      #[cfg(feature = "raster_png_font")]
       raster_image_glyphs: <_>::default(),
       svg_glyphs: <_>::default(),
     })
@@ -304,11 +305,9 @@ impl Face {
       .cloned()
   }
 
-  #[cfg(feature = "raster_png_font")]
   pub fn glyph_raster_image(
     &self, glyph_id: GlyphId, pixels_per_em: u16,
   ) -> Option<Resource<PixelImage>> {
-    use rustybuzz::ttf_parser::RasterImageFormat;
     self
       .raster_image_glyphs
       .borrow_mut()
@@ -317,12 +316,12 @@ impl Face {
         self
           .rb_face
           .glyph_raster_image(glyph_id, pixels_per_em)
-          .and_then(|img| {
-            if img.format == RasterImageFormat::PNG {
+          .and_then(|img| match img.format {
+            #[cfg(feature = "png")]
+            rustybuzz::ttf_parser::RasterImageFormat::PNG => {
               Some(Resource::new(PixelImage::from_png(img.data)))
-            } else {
-              None
             }
+            _ => None,
           })
       })
       .clone()
@@ -483,7 +482,7 @@ mod tests {
   #[test]
   fn load_font_from_bytes() {
     let mut db = FontDB::default();
-    let bytes = include_bytes!("../../fonts/GaramondNo8-Reg.ttf");
+    let bytes = include_bytes!("../../../fonts/GaramondNo8-Reg.ttf");
     db.load_from_bytes(bytes.to_vec());
 
     let face_id = db.select_best_match(&FontFace {

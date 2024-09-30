@@ -21,7 +21,6 @@ pub use compose_decorators::*;
 mod custom_styles;
 pub use custom_styles::*;
 pub use ribir_painter::*;
-pub use ribir_text::{FontFace, FontFamily, FontWeight};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Brightness {
