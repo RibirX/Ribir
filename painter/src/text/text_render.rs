@@ -2,12 +2,8 @@ use std::{cell::RefCell, ops::Deref};
 
 use ribir_algo::Sc;
 use ribir_geom::{Rect, Size};
-use ribir_painter::{Painter, Path};
 
-use crate::{
-  font_db::{Face, FontDB},
-  GlyphBound, VisualGlyphs,
-};
+use crate::{font_db::FontDB, GlyphBound, Painter, Path, VisualGlyphs};
 
 /// draw the text glyphs within the box_rect, with the given brush font_size and
 /// path style
@@ -45,8 +41,8 @@ pub fn draw_glyphs(
           .scale(scale, -scale)
           .translate(0., -unit);
         match painter.style() {
-          ribir_painter::PathStyle::Fill => painter.fill_path(path.into()),
-          ribir_painter::PathStyle::Stroke => painter.stroke_path(path.deref().clone()),
+          crate::PathStyle::Fill => painter.fill_path(path.into()),
+          crate::PathStyle::Stroke => painter.stroke_path(path.deref().clone()),
         };
       } else if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
         let grid_scale = face

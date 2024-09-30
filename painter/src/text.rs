@@ -8,8 +8,7 @@ use std::hash::Hash;
 
 use derive_more::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
 use font_db::Face;
-use fontdb::ID;
-pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
+pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight, ID};
 use ribir_algo::CowArc;
 pub use ribir_algo::Substr;
 use ribir_geom::{Rect, Size};

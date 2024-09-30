@@ -340,3 +340,4 @@ impl<F: FnMut(&mut BuildCtx) -> Widget<'static> + 'static> From<F> for GenWidget
   #[inline]
   fn from(f: F) -> Self { Self::new(f) }
 }
+

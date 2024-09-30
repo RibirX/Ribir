@@ -28,6 +28,15 @@ tiny-skia-path = {workspace = true}
 usvg.workspace = true
 zerocopy = {workspace = true, optional = true, features = ["derive"]}
 ordered-float = {workspace = true, features = ["serde"]}
+derive_more.workspace = true
+smallvec.workspace = true
+fontdb.workspace = true
+rustybuzz.workspace = true
+unicode-bidi.workspace = true
+unicode-script.workspace = true
+unicode-segmentation.workspace = true
+quick-xml.workspace = true
+ahash.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom.workspace = true

@@ -11,7 +11,7 @@ pub use futures::task::SpawnError;
 use futures::{executor::LocalPool, task::LocalSpawnExt, Future};
 use pin_project_lite::pin_project;
 use ribir_algo::Sc;
-use ribir_text::{font_db::FontDB, TypographyStore};
+use ribir_painter::{font_db::FontDB, TypographyStore};
 use rxrust::{scheduler::NEW_TIMER_FN, subject::Subject};
 
 use crate::{

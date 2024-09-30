@@ -4,6 +4,8 @@ mod painter;
 pub mod path;
 pub mod path_builder;
 pub use path::*;
+mod text;
+pub use text::*;
 
 pub use crate::{
   color::{Color, GradientStop, LightnessTone},
