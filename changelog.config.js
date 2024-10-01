@@ -26,7 +26,6 @@ module.exports = {
     "painter",
     "macros",
     "gpu",
-    "text",
     "algo",
     "widgets",
     "ribir",

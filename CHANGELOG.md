@@ -25,11 +25,19 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Added the built-in widget `TextStyleWidgetWidget`, allowing any widget to easily configure the text style within it using `text_style`. (#635, @M-Adoo)
+
+### Breaking
+
+- **text**: Removed the `ribir_text` crate and integrated it into the `ribir_painter` crate. (#635 @M-Adoo)
+
 ## [0.4.0-alpha.11] - 2024-10-02
 
 ### Features
 
-- **core**: Added the `PaintingStyle` built-in widget, enabling any widget to utilize `painting_style` to specify how shapes and paths should be painted within its descendants. (#633 @M-Adoo)
+- **core**: Added the `PaintingStyleWidget` built-in widget, enabling any widget to utilize `painting_style` to specify how shapes and paths should be painted within its descendants. (#633 @M-Adoo)
 
 ### Changed
 
@@ -38,7 +46,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Breaking
 
 - **text**: Enhance the typography APIs by eliminating `FontSize`, `Pixel`, and `Em`, and directly utilize only logical pixels represented by `f32`.  (#629 @M-Adoo)
-- **text**: Removed the `ribir_text` crate and integrated it into the `ribir_painter` crate. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.10] - 2024-09-25
 

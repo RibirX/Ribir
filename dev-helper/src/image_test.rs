@@ -180,18 +180,45 @@ pub fn wgpu_render_commands(
 ) -> PixelImage {
   use futures::executor::block_on;
   use ribir_geom::{DeviceRect, DeviceSize};
-  use ribir_gpu::{GPUBackend, GPUBackendImpl, Texture};
+  use ribir_gpu::{GPUBackend, GPUBackendImpl, Texture, WgpuImpl};
   use ribir_painter::PainterBackend;
 
-  let mut gpu_impl = block_on(ribir_gpu::WgpuImpl::headless());
+  let draw_img = |backend: &mut GPUBackend<WgpuImpl>| {
+    let rect = DeviceRect::from_size(DeviceSize::new(viewport.max_x() + 2, viewport.max_y() + 2));
+    let mut texture = backend
+      .get_impl_mut()
+      .new_texture(rect.size, ColorFormat::Rgba8);
+    backend.begin_frame(surface);
+    backend.draw_commands(rect, commands, &Transform::identity(), &mut texture);
+    let img = texture.copy_as_image(&rect, backend.get_impl_mut());
+    backend.end_frame();
+    block_on(img).unwrap()
+  };
 
-  let rect = DeviceRect::from_size(DeviceSize::new(viewport.max_x() + 2, viewport.max_y() + 2));
-  let mut texture = gpu_impl.new_texture(rect.size, ColorFormat::Rgba8);
-  let mut backend = GPUBackend::new(gpu_impl);
+  #[cfg(not(target_family = "wasm"))]
+  {
+    use std::sync::Mutex;
 
-  backend.begin_frame(surface);
-  backend.draw_commands(rect, commands, &Transform::identity(), &mut texture);
-  let img = texture.copy_as_image(&rect, backend.get_impl_mut());
-  backend.end_frame();
-  block_on(img).unwrap()
+    // Let's ensure that the GPU tests run in single threads and reuse the
+    // `WgpuImpl`. This is to account for the limited resources of the CI machine,
+    // which may not support multiple tests simultaneously.
+    static WGPU_IMPL: Mutex<Option<WgpuImpl>> = Mutex::new(None);
+
+    let mut container = WGPU_IMPL.lock().unwrap();
+    let wgpu_impl = container
+      .take()
+      .unwrap_or_else(|| block_on(ribir_gpu::WgpuImpl::headless()));
+    let mut backend = GPUBackend::new(wgpu_impl);
+    let img = draw_img(&mut backend);
+    *container = Some(backend.into_impl());
+
+    img
+  }
+
+  #[cfg(target_family = "wasm")]
+  {
+    let wgpu_impl = block_on(ribir_gpu::WgpuImpl::headless());
+    let mut backend = GPUBackend::new(wgpu_impl);
+    draw_img(&mut backend)
+  }
 }

@@ -8,7 +8,7 @@ pub struct OutlinedButtonStyle {
   pub icon_size: Size,
   pub label_gap: f32,
   pub icon_pos: IconPosition,
-  pub label_style: CowArc<TextStyle>,
+  pub label_style: TextStyle,
   pub radius: f32,
   pub padding_style: EdgeInsets,
   pub border_width: f32,

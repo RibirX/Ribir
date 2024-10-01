@@ -31,24 +31,28 @@ pub trait SelectableText {
 
   fn set_caret(&mut self, caret: CaretState);
 
-  fn select_text_rect(&self, text: &Text, text_size: Size) -> Vec<Rect> {
-    let glyphs = text.text_layout(&mut AppCtx::typography_store().borrow_mut(), text_size);
-    let helper = TextGlyphsHelper::new(text.text.clone(), glyphs);
-    helper
-      .selection(self.text(), &self.select_range())
+  fn select_text_rect(&self, text: &Text) -> Vec<Rect> {
+    text
+      .glyphs()
+      .and_then(|glyphs| {
+        let helper = TextGlyphsHelper::new(text.text.clone(), glyphs.clone());
+        helper.selection(self.text(), &self.select_range())
+      })
       .unwrap_or_default()
   }
 
-  fn caret_position(&self, text: &Text, text_size: Size) -> Option<Point> {
-    let glyphs = text.text_layout(&mut AppCtx::typography_store().borrow_mut(), text_size);
-    let helper = TextGlyphsHelper::new(text.text.clone(), glyphs);
-    helper.cursor(self.text(), self.caret().caret_position())
+  fn caret_position(&self, text: &Text) -> Option<Point> {
+    text.glyphs().and_then(|glyphs| {
+      let helper = TextGlyphsHelper::new(text.text.clone(), glyphs.clone());
+      helper.cursor(self.text(), self.caret().caret_position())
+    })
   }
 
-  fn current_line_height(&self, text: &Text, text_size: Size) -> Option<f32> {
-    let glyphs = text.text_layout(&mut AppCtx::typography_store().borrow_mut(), text_size);
-    let helper = TextGlyphsHelper::new(text.text.clone(), glyphs);
-    helper.line_height(self.text(), self.caret().caret_position())
+  fn current_line_height(&self, text: &Text) -> Option<f32> {
+    text.glyphs().and_then(|glyphs| {
+      let helper = TextGlyphsHelper::new(text.text.clone(), glyphs.clone());
+      helper.line_height(self.text(), self.caret().caret_position())
+    })
   }
 }
 
@@ -67,41 +71,37 @@ impl TextSelectable {
 }
 
 pub(crate) fn bind_point_listener<T: SelectableText>(
-  this: impl StateWriter<Value = T> + 'static, host: Widget,
-  text: Reader<impl VisualText + 'static>, layout_box: Reader<LayoutBox>,
+  this: impl StateWriter<Value = T> + 'static, host: Widget, text: Reader<Text>,
 ) -> Widget {
   fn_widget! {
     @$host {
       on_pointer_down: move |e| {
-        let _hint_capture_reader = || $layout_box;
         let mut this = $this.write();
         let position = e.position();
-        let layout_size = layout_box.read().layout_size();
-        let helper = $text.text_layout(&mut AppCtx::typography_store().borrow_mut(), layout_size);
-        let end = helper.caret_position_from_pos(position.x, position.y);
-        let begin = if e.with_shift_key() {
-          match this.caret() {
-            CaretState::Caret(begin) |
-            CaretState::Select(begin, _) |
-            CaretState::Selecting(begin, _) => begin,
-          }
-        } else {
-          end
-        };
-        this.set_caret(CaretState::Selecting(begin, end));
+        if let Some(helper) = $text.glyphs() {
+          let end = helper.caret_position_from_pos(position.x, position.y);
+          let begin = if e.with_shift_key() {
+            match this.caret() {
+              CaretState::Caret(begin) |
+              CaretState::Select(begin, _) |
+              CaretState::Selecting(begin, _) => begin,
+            }
+          } else {
+            end
+          };
+          this.set_caret(CaretState::Selecting(begin, end));
+        }
       },
       on_pointer_move: move |e| {
-        let _hint_capture_reader = || $layout_box;
         let mut this = $this.write();
         if let CaretState::Selecting(begin, _) = this.caret() {
           if e.point_type == PointerType::Mouse
             && e.mouse_buttons() == MouseButtons::PRIMARY {
-            let position = e.position();
-            let layout_size = layout_box.read().layout_size();
-            let store = AppCtx::typography_store();
-            let helper = $text.text_layout(&mut store.borrow_mut(), layout_size);
-            let end = helper.caret_position_from_pos(position.x, position.y);
-            this.set_caret(CaretState::Selecting(begin, end));
+              if let Some(glyphs) = $text.glyphs() {
+                let position = e.position();
+                let end = glyphs.caret_position_from_pos(position.x, position.y);
+                this.set_caret(CaretState::Selecting(begin, end));
+              }
           }
         }
       },
@@ -118,17 +118,15 @@ pub(crate) fn bind_point_listener<T: SelectableText>(
         }
       },
       on_double_tap: move |e| {
-        let _hint_capture_reader = || $layout_box;
-        let position = e.position();
-
-        let layout_size = layout_box.read().layout_size();
-        let helper = $text.text_layout(&mut AppCtx::typography_store().borrow_mut(), layout_size);
-        let caret = helper.caret_position_from_pos(position.x, position.y);
-        let rg = select_word(&$text.text(), caret.cluster);
-        $this.write().set_caret(CaretState::Select(
-          CaretPosition { cluster: rg.start, position: None },
-          CaretPosition { cluster: rg.end, position: None }
-        ));
+        if let Some(glyphs) = $text.glyphs() {
+          let position = e.position();
+          let caret = glyphs.caret_position_from_pos(position.x, position.y);
+          let rg = select_word(&$text.text, caret.cluster);
+          $this.write().set_caret(CaretState::Select(
+            CaretPosition { cluster: rg.start, position: None },
+            CaretPosition { cluster: rg.end, position: None }
+          ));
+        }
       }
     }
   }
@@ -141,7 +139,7 @@ impl ComposeChild<'static> for TextSelectable {
     let src = text.into_inner();
 
     fn_widget! {
-      let mut text = @ $src {};
+      let  text = @ $src {};
       $this.silent().text = $text.text.clone();
       watch!($text.text.clone())
         .subscribe(move |v| {
@@ -150,7 +148,6 @@ impl ComposeChild<'static> for TextSelectable {
           }
         });
 
-      let layout_box = text.get_layout_box_widget().clone_reader();
       let only_text = text.clone_reader();
 
       let stack = @Stack {
@@ -159,9 +156,7 @@ impl ComposeChild<'static> for TextSelectable {
 
       let high_light_rect = @ OnlySizedByParent {
         @ SelectedHighLight {
-          rects: pipe! {
-            $this.select_text_rect(&$text, $text.layout_size())
-          }
+          rects: pipe! { $this.select_text_rect(&$text)}
         }
       };
       let text_widget = text.into_widget();
@@ -169,14 +164,13 @@ impl ComposeChild<'static> for TextSelectable {
         this.clone_writer(),
         text_widget,
         only_text.clone_reader(),
-        layout_box.clone_reader()
       );
 
       @ $stack {
         tab_index: -1_i16,
         on_blur: move |_| { $this.write().set_caret(CaretState::default()); },
         on_key_down: move |k| {
-          select_key_handle(&this, &$only_text, &$layout_box, k);
+          select_key_handle(&this, &$only_text,  k);
         },
         @ $high_light_rect { }
         @ $text_widget {}
@@ -187,7 +181,7 @@ impl ComposeChild<'static> for TextSelectable {
 }
 
 pub(crate) fn select_key_handle<F: SelectableText>(
-  this: &impl StateWriter<Value = F>, text: &Text, text_layout: &LayoutBox, event: &KeyboardEvent,
+  this: &impl StateWriter<Value = F>, text: &Text, event: &KeyboardEvent,
 ) {
   let mut deal = false;
   if event.with_command_key() {
@@ -195,7 +189,7 @@ pub(crate) fn select_key_handle<F: SelectableText>(
   }
 
   if !deal {
-    deal_with_selection(this, text, text_layout, event);
+    deal_with_selection(this, text, event);
   }
 }
 
@@ -233,14 +227,11 @@ fn is_move_by_word(event: &KeyboardEvent) -> bool {
 }
 
 fn deal_with_selection<F: SelectableText>(
-  this: &impl StateWriter<Value = F>, text: &Text, text_layout: &LayoutBox, event: &KeyboardEvent,
+  this: &impl StateWriter<Value = F>, text: &Text, event: &KeyboardEvent,
 ) {
-  let helper = || {
-    TextGlyphsHelper::new(
-      text.text.clone(),
-      text.text_layout(&mut AppCtx::typography_store().borrow_mut(), text_layout.layout_size()),
-    )
-  };
+  let Some(glyphs) = text.glyphs() else { return };
+  let helper = TextGlyphsHelper::new(text.text.clone(), glyphs.clone());
+
   let old_caret = this.read().caret();
   let text = this.read().text().clone();
   let new_caret_position = match event.key() {
@@ -249,9 +240,9 @@ fn deal_with_selection<F: SelectableText>(
         let cluster = select_prev_word(&text, old_caret.cluster(), false).start;
         Some(CaretPosition { cluster, position: None })
       } else if event.with_command_key() {
-        helper().line_begin(&text, old_caret.caret_position())
+        helper.line_begin(&text, old_caret.caret_position())
       } else {
-        helper().prev(&text, old_caret.caret_position())
+        helper.prev(&text, old_caret.caret_position())
       }
     }
     VirtualKey::Named(NamedKey::ArrowRight) => {
@@ -259,15 +250,15 @@ fn deal_with_selection<F: SelectableText>(
         let cluster = select_next_word(&text, old_caret.cluster(), true).end;
         Some(CaretPosition { cluster, position: None })
       } else if event.with_command_key() {
-        helper().line_end(&text, old_caret.caret_position())
+        helper.line_end(&text, old_caret.caret_position())
       } else {
-        helper().next(&text, old_caret.caret_position())
+        helper.next(&text, old_caret.caret_position())
       }
     }
-    VirtualKey::Named(NamedKey::ArrowUp) => helper().up(&text, old_caret.caret_position()),
-    VirtualKey::Named(NamedKey::ArrowDown) => helper().down(&text, old_caret.caret_position()),
-    VirtualKey::Named(NamedKey::Home) => helper().line_begin(&text, old_caret.caret_position()),
-    VirtualKey::Named(NamedKey::End) => helper().line_end(&text, old_caret.caret_position()),
+    VirtualKey::Named(NamedKey::ArrowUp) => helper.up(&text, old_caret.caret_position()),
+    VirtualKey::Named(NamedKey::ArrowDown) => helper.down(&text, old_caret.caret_position()),
+    VirtualKey::Named(NamedKey::Home) => helper.line_begin(&text, old_caret.caret_position()),
+    VirtualKey::Named(NamedKey::End) => helper.line_end(&text, old_caret.caret_position()),
     _ => None,
   };
 

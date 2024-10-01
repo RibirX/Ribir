@@ -72,7 +72,7 @@ pub struct TabsStyle {
   pub icon_pos: Position,
   pub active_color: Brush,
   pub foreground: Brush,
-  pub label_style: CowArc<TextStyle>,
+  pub label_style: TextStyle,
   pub indicator: IndicatorStyle,
 }
 

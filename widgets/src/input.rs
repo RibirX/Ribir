@@ -33,7 +33,7 @@ impl Placeholder {
 
 #[derive(Clone)]
 pub struct PlaceholderStyle {
-  pub text_style: CowArc<TextStyle>,
+  pub text_style: TextStyle,
   pub foreground: Brush,
 }
 
@@ -80,7 +80,7 @@ pub trait EditableText: Sized {
 #[derive(Declare)]
 pub struct Input {
   #[declare(default = TypographyTheme::of(ctx!()).body_large.text.clone())]
-  pub style: CowArc<TextStyle>,
+  pub style: TextStyle,
   #[declare(skip)]
   text: CowArc<str>,
   #[declare(skip)]
@@ -92,7 +92,7 @@ pub struct Input {
 #[derive(Declare)]
 pub struct TextArea {
   #[declare(default = TypographyTheme::of(ctx!()).body_large.text.clone())]
-  pub style: CowArc<TextStyle>,
+  pub style: TextStyle,
   #[declare(default = true)]
   pub auto_wrap: bool,
   #[declare(skip)]
@@ -336,11 +336,10 @@ where
   Self: 'static,
 {
   fn edit_area(
-    this: impl StateWriter<Value = Self>, mut text: FatObj<State<Text>>,
+    this: impl StateWriter<Value = Self>, text: FatObj<State<Text>>,
     scroll_dir: impl Pipe<Value = Scrollable>, placeholder: Option<Placeholder>,
   ) -> Widget<'static> {
     fn_widget! {
-      let layout_box = text.get_layout_box_widget().clone_reader();
       let only_text = text.clone_reader();
 
       let mut stack = @Stack {
@@ -351,14 +350,14 @@ where
       let caret_box = @Caret {
         focused: pipe!($stack.has_focus()),
         clamp: pipe!(
-            $this.current_line_height(&$text, $text.layout_size()).unwrap_or(0.)
+            $this.current_line_height(&$text).unwrap_or(0.)
           ).map(BoxClamp::fixed_height),
       };
 
       let caret_box_id = caret_box.lazy_host_id();
       let mut caret_box = @$caret_box {
         anchor: pipe!(
-          let pos = $this.caret_position(&$text, $text.layout_size()).unwrap_or_default();
+          let pos = $this.caret_position(&$text).unwrap_or_default();
           Anchor::left_top(pos.x, pos.y)
         ),
       };
@@ -369,7 +368,7 @@ where
       watch!(SelectableText::caret(&*$this))
         .distinct_until_changed()
         .sample(tick_of_layout_ready)
-        .map(move |_| $this.caret_position(&$text, $text.layout_size()).unwrap_or_default())
+        .map(move |_| $this.caret_position(&$text).unwrap_or_default())
         .scan_initial((Point::zero(), Point::zero()), |pair, v| (pair.1, v))
         .subscribe(move |(before, after)| {
           let mut scrollable = $scrollable.silent();
@@ -396,7 +395,7 @@ where
         },
         on_key_down: move |k| {
           let _hint_capture_writer = || $this.write();
-          select_key_handle(&this, &$only_text, &$layout_box, k);
+          select_key_handle(&this, &$only_text, k);
           edit_key_handle(&this, k);
         },
         on_ime_pre_edit: move |e| {
@@ -409,7 +408,7 @@ where
         @OnlySizedByParent {
           @SelectedHighLight {
             visible: pipe!($stack.has_focus()),
-            rects: pipe! { $this.select_text_rect(&$text, $text.layout_size()) }
+            rects: pipe! { $this.select_text_rect(&$text) }
           }
         }
       };
@@ -423,8 +422,7 @@ where
       let text_widget = bind_point_listener(
         this.clone_writer(),
         text_widget,
-        only_text,
-        layout_box
+        only_text
       );
 
       @ $stack {

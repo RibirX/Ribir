@@ -16,8 +16,8 @@ pub struct BuildCtx {
   /// A node ID has already been allocated for the current building node.
   pub(crate) pre_alloc: Option<WidgetId>,
   pub(crate) tree: NonNull<WidgetTree>,
-  // Todo: Since `Theme`, `Palette`, and `TypographyTheme` are frequently queried during the
-  // building process, we should cache the closest one.
+  // Todo: Since `Theme`, `Palette`, `TypographyTheme` and `TextStyle` are frequently queried
+  // during the building process, layout and paint. we should cache the closest one.
 }
 
 /// A handle of `BuildCtx` that you can store it and access the `BuildCtx` later

@@ -21,7 +21,7 @@ pub struct CheckBoxStyle {
   /// The size of the checkbox icon.
   pub icon_size: Size,
   /// The text style of the checkbox label.
-  pub label_style: CowArc<TextStyle>,
+  pub label_style: TextStyle,
   /// The checkbox foreground
   pub label_color: Brush,
 }

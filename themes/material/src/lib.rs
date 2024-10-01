@@ -414,153 +414,153 @@ pub fn typography_theme(
 
   TypographyTheme {
     display_large: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 64.,
         font_size: 57.,
         letter_space: 0.,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     display_medium: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 52.0,
         font_size: 45.0,
         letter_space: 0.,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     display_small: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 44.0,
         font_size: 36.0,
         letter_space: 0.,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     headline_large: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 40.0,
         font_size: 32.0,
         letter_space: 0.,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     headline_medium: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 36.0,
         font_size: 28.0,
         letter_space: 0.,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     headline_small: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 32.0,
         font_size: 24.0,
         letter_space: 0.,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     title_large: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 28.0,
         font_size: 22.0,
         letter_space: 0.,
         font_face: medium_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     title_medium: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 24.0,
         font_size: 16.0,
         letter_space: 0.15,
         font_face: medium_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     title_small: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 20.0,
         font_size: 14.0,
         letter_space: 0.1,
         font_face: medium_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     label_large: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 20.0,
         font_size: 14.0,
         letter_space: 0.1,
         font_face: medium_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     label_medium: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 16.0,
         font_size: 12.0,
         letter_space: 0.5,
         font_face: medium_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     label_small: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 16.0,
         font_size: 11.0,
         letter_space: 0.5,
         font_face: medium_face,
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     body_large: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 24.0,
         font_size: 16.0,
         letter_space: 0.5,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     body_medium: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 20.0,
         font_size: 14.0,
         letter_space: 0.25,
         font_face: regular_face.clone(),
         overflow: Overflow::Clip,
-      }),
+      },
       decoration: decoration.clone(),
     },
     body_small: TextTheme {
-      text: CowArc::owned(TextStyle {
+      text: TextStyle {
         line_height: 16.0,
         font_size: 12.0,
         letter_space: 0.4,
         font_face: regular_face,
         overflow: Overflow::Clip,
-      }),
+      },
       decoration,
     },
   }

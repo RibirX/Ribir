@@ -24,7 +24,7 @@ pub struct TypographyTheme {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextTheme {
-  pub text: CowArc<ribir_painter::TextStyle>,
+  pub text: ribir_painter::TextStyle,
   pub decoration: TextDecorationStyle,
 }
 

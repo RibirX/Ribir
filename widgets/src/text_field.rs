@@ -48,7 +48,7 @@ pub struct TextFieldTheme {
   /// text foreground.
   pub text_brush: Brush,
   /// textfield input's text style
-  pub text: CowArc<TextStyle>,
+  pub text: TextStyle,
 
   /// textfield's background color
   pub container_color: Color,
@@ -64,10 +64,10 @@ pub struct TextFieldTheme {
   pub label_color: Color,
 
   /// label's text style when collapse
-  pub label_collapse: CowArc<TextStyle>,
+  pub label_collapse: TextStyle,
 
   /// label's text style when expand
-  pub label_expand: CowArc<TextStyle>,
+  pub label_expand: TextStyle,
 
   /// edit area's padding when collapse
   pub input_collapse_padding: EdgeInsets,
@@ -136,7 +136,7 @@ impl<'c> ComposeChild<'c> for TextFieldThemeProxy {
 impl TextFieldThemeProxy {
   fn theme(&self) -> Option<&TextFieldTheme> { self.suit.get(self.state) }
 
-  fn label_style(&self, is_text_empty: bool) -> CowArc<TextStyle> {
+  fn label_style(&self, is_text_empty: bool) -> TextStyle {
     if self.is_collapse(is_text_empty) {
       self.label_collapse.clone()
     } else {
@@ -181,7 +181,7 @@ impl CustomStyle for TextFieldThemeSuit {
 
 impl TextFieldThemeSuit {
   pub fn from_theme(palette: &Palette, typo_theme: &TypographyTheme) -> Self {
-    let body: &CowArc<TextStyle> = &typo_theme.body_large.text;
+    let body: &TextStyle = &typo_theme.body_large.text;
     let header = &typo_theme.title_large.text;
     let caption = &typo_theme.label_small.text;
 
@@ -381,7 +381,7 @@ fn build_input_area(
 #[derive(Declare)]
 struct TextFieldLabel {
   text: CowArc<str>,
-  style: CowArc<TextStyle>,
+  style: TextStyle,
 }
 
 impl Compose for TextFieldLabel {
