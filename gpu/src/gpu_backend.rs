@@ -153,6 +153,9 @@ where
   #[inline]
   pub fn get_impl_mut(&mut self) -> &mut Impl { &mut self.gpu_impl }
 
+  #[inline]
+  pub fn into_impl(self) -> Impl { self.gpu_impl }
+
   fn draw_command(
     &mut self, cmd: &PaintCommand, global_matrix: &Transform, output_tex_size: DeviceSize,
     output: &mut Impl::Texture,

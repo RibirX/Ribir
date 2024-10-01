@@ -9,18 +9,14 @@ use std::hash::Hash;
 use derive_more::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
 use font_db::Face;
 pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight, ID};
-use ribir_algo::CowArc;
 pub use ribir_algo::Substr;
-use ribir_geom::{Rect, Size};
+use ribir_geom::{rect, Rect};
 use rustybuzz::{ttf_parser::GlyphId, GlyphPosition};
-use typography::PlaceLineDirection;
 pub mod text_reorder;
 pub mod typography;
 pub use text_reorder::TextReorder;
 mod typography_store;
 pub use typography_store::{TypographyStore, VisualGlyphs};
-mod text_render;
-pub use text_render::{draw_glyphs, draw_glyphs_in_rect};
 mod svg_glyph_cache;
 
 mod text_writer;
@@ -37,7 +33,6 @@ pub mod unicode_help;
 /// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum FontFamily {
-  // todo: no need cow? or directly face ids
   /// The name of a font family of choice.
   Name(std::borrow::Cow<'static, str>),
 
@@ -138,18 +133,6 @@ pub struct Glyph {
   Neg, Hash
 )]
 pub struct GlyphUnit(i32);
-
-#[derive(Debug, Clone)]
-pub struct GlyphBound {
-  /// The font face id of the glyph.
-  pub face_id: ID,
-  /// The pixel bound rect of the glyph.
-  pub bound: Rect,
-  /// The id of the glyph.
-  pub glyph_id: GlyphId,
-  /// An cluster of origin text as byte index.
-  pub cluster: u32,
-}
 
 impl Default for FontFace {
   fn default() -> Self {
@@ -252,6 +235,15 @@ impl Glyph {
     self.y_offset = cast(self.y_offset.0, scale);
     self
   }
+
+  pub fn bounds(&self) -> Rect {
+    rect(
+      self.x_offset.into_pixel(),
+      self.y_offset.into_pixel(),
+      self.x_advance.into_pixel(),
+      self.y_advance.into_pixel(),
+    )
+  }
 }
 
 impl std::ops::Div<f32> for GlyphUnit {
@@ -259,22 +251,6 @@ impl std::ops::Div<f32> for GlyphUnit {
 
   #[inline]
   fn div(self, rhs: f32) -> Self::Output { cast(self.0, 1. / rhs) }
-}
-
-pub trait VisualText {
-  fn text(&self) -> CowArc<str>;
-  fn text_style(&self) -> &TextStyle;
-  fn text_align(&self) -> TextAlign;
-
-  fn text_layout(&self, typography_store: &mut TypographyStore, bounds: Size) -> VisualGlyphs {
-    typography_store.typography(
-      self.text().substr(..),
-      self.text_style(),
-      bounds,
-      self.text_align(),
-      PlaceLineDirection::TopToBottom,
-    )
-  }
 }
 
 impl Default for TextStyle {

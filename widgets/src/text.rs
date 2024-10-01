@@ -1,35 +1,40 @@
+use std::cell::{Ref, RefCell};
+
 use ribir_core::prelude::*;
+use typography::PlaceLineDirection;
 
 /// The text widget display text with a single style.
-#[derive(Debug, Declare, Clone, PartialEq)]
+#[derive(Declare)]
 pub struct Text {
   pub text: CowArc<str>,
-  #[declare(default = TypographyTheme::of(ctx!()).body_medium.text.clone())]
-  pub text_style: CowArc<TextStyle>,
   #[declare(default = TextAlign::Start)]
   pub text_align: TextAlign,
-}
-
-impl VisualText for Text {
-  fn text(&self) -> CowArc<str> { self.text.clone() }
-  fn text_style(&self) -> &TextStyle { &self.text_style }
-  fn text_align(&self) -> TextAlign { self.text_align }
+  #[declare(default)]
+  glyphs: RefCell<Option<VisualGlyphs>>,
 }
 
 impl Render for Text {
-  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
-    let size = self
-      .text_layout(&mut AppCtx::typography_store().borrow_mut(), clamp.max)
-      .visual_rect()
-      .size
-      .cast_unit();
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let style = Provider::of::<TextStyle>(&ctx).unwrap();
+    let info = AppCtx::typography_store()
+      .borrow_mut()
+      .typography(
+        self.text.substr(..),
+        &style,
+        clamp.max,
+        self.text_align,
+        PlaceLineDirection::TopToBottom,
+      );
+
+    let size = info.visual_rect().size;
+    *self.glyphs.borrow_mut() = Some(info);
+
     clamp.clamp(size)
   }
 
   #[inline]
   fn only_sized_by_parent(&self) -> bool { false }
 
-  #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) {
     let box_rect = Rect::from_size(ctx.box_size().unwrap());
     if ctx
@@ -40,12 +45,17 @@ impl Render for Text {
       return;
     };
 
-    let bounds = ctx.layout_clamp().map(|b| b.max).unwrap();
-    let visual_glyphs = self.text_layout(&mut AppCtx::typography_store().borrow_mut(), bounds);
+    let visual_glyphs = self.glyphs().unwrap();
     let font_db = AppCtx::font_db().clone();
-    let font_size = self.text_style.font_size;
+    ctx
+      .painter()
+      .draw_glyphs_in_rect(&visual_glyphs, box_rect, &font_db.borrow());
+  }
+}
 
-    draw_glyphs_in_rect(ctx.painter(), visual_glyphs, box_rect, font_size, font_db);
+impl Text {
+  pub fn glyphs(&self) -> Option<Ref<VisualGlyphs>> {
+    Ref::filter_map(self.glyphs.borrow(), |v| v.as_ref()).ok()
   }
 }
 
@@ -80,23 +90,42 @@ define_text_with_theme_style!(H6, title_small);
 #[cfg(test)]
 mod tests {
   use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
 
   use super::*;
   use crate::layout::SizedBox;
+  const WND_SIZE: Size = Size::new(164., 64.);
 
-  #[test]
-  fn text_clip() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
-
-    let w = fn_widget! {
+  widget_test_suit!(
+    text_clip,
+    WidgetTester::new(fn_widget! {
       @SizedBox {
         size: Size::new(50., 45.),
         @Text {
           text: "hello world,\rnice to meet you.",
         }
       }
-    };
-    let wnd = TestWindow::new_with_size(w, Size::new(120., 80.));
-    wnd.layout();
-  }
+    })
+    .with_wnd_size(WND_SIZE)
+    .with_comparison(0.000025),
+    LayoutCase::default().with_size(Size::new(50., 45.))
+  );
+
+  widget_image_tests!(
+    default_text,
+    WidgetTester::new(fn_widget! {
+      @Text { text: "Hello ribir!"}
+    })
+    .with_wnd_size(WND_SIZE)
+    .with_comparison(0.000025)
+  );
+
+  widget_image_tests!(
+    h1,
+    WidgetTester::new(fn_widget! {
+      @H1 { text: "Hello ribir!" }
+    })
+    .with_wnd_size(WND_SIZE)
+    .with_comparison(0.000025)
+  );
 }

@@ -258,6 +258,7 @@ jobs:
       - name: compile to wasm
         run: cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper
   wasm-test:
+    needs: lint
     name: wasm test
     runs-on: ubuntu-latest
     steps:

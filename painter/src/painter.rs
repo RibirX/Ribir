@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
   color::{LinearGradient, RadialGradient},
+  font_db::FontDB,
   path::*,
   path_builder::PathBuilder,
-  Brush, Color, PixelImage, Svg,
+  Brush, Color, Glyph, PixelImage, Svg, TextStyle, VisualGlyphs,
 };
 /// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
 /// upper-left corner of the canvas. Along the X-axis, values increase towards
@@ -142,6 +143,7 @@ struct PainterState {
   stroke_brush: Brush,
   fill_brush: Brush,
   style: PathStyle,
+  text_style: TextStyle,
   transform: Transform,
   opacity: f32,
   clip_cnt: usize,
@@ -151,12 +153,13 @@ struct PainterState {
 }
 
 impl PainterState {
-  fn new(bounds: Rect, stroke_brush: Brush, fill_brush: Brush) -> PainterState {
+  fn new(bounds: Rect) -> PainterState {
     PainterState {
       bounds,
       stroke_options: <_>::default(),
-      stroke_brush,
-      fill_brush,
+      stroke_brush: Color::BLACK.into(),
+      fill_brush: Color::GRAY.into(),
+      text_style: TextStyle::default(),
       transform: Transform::identity(),
       clip_cnt: 0,
       opacity: 1.,
@@ -168,7 +171,7 @@ impl PainterState {
 impl Painter {
   pub fn new(viewport: Rect) -> Self {
     assert!(viewport.is_finite(), "viewport must be finite!");
-    let init_state = PainterState::new(viewport, Color::BLACK.into(), Color::GRAY.into());
+    let init_state = PainterState::new(viewport);
     Self {
       state_stack: vec![init_state.clone()],
       init_state,
@@ -178,10 +181,12 @@ impl Painter {
     }
   }
 
-  /// Set the default brush of the painter, and then reset the painter state.
-  pub fn set_default_brush(&mut self, stroke_brush: Brush, fill_brush: Brush) {
-    self.init_state.fill_brush = fill_brush;
-    self.init_state.stroke_brush = stroke_brush;
+  /// Change the default brush and text style of the painter, and then reset
+  /// the painter state.
+  pub fn set_init_state(&mut self, brush: Brush, text_style: TextStyle) {
+    self.init_state.fill_brush = brush.clone();
+    self.init_state.stroke_brush = brush;
+    self.init_state.text_style = text_style;
     self.reset();
   }
 
@@ -249,10 +254,6 @@ impl Painter {
   #[inline]
   pub fn stroke_brush(&self) -> &Brush { &self.current_state().stroke_brush }
 
-  /// Return the brush used to fill shapes.
-  #[inline]
-  pub fn fill_brush(&self) -> &Brush { &self.current_state().fill_brush }
-
   /// Set the brush used to stroke paths.
   #[inline]
   pub fn set_stroke_brush(&mut self, brush: impl Into<Brush>) -> &mut Self {
@@ -260,10 +261,25 @@ impl Painter {
     self
   }
 
+  /// Return the brush used to fill shapes.
+  #[inline]
+  pub fn fill_brush(&self) -> &Brush { &self.current_state().fill_brush }
+
   /// Set the brush used to fill shapes.
   #[inline]
   pub fn set_fill_brush(&mut self, brush: impl Into<Brush>) -> &mut Self {
     self.current_state_mut().fill_brush = brush.into();
+    self
+  }
+
+  /// Return the current text style used by the painter.
+  #[inline]
+  pub fn text_style(&self) -> &TextStyle { &self.current_state().text_style }
+
+  /// Set the text style for the painter.
+  #[inline]
+  pub fn set_text_style(&mut self, text_style: TextStyle) -> &mut Self {
+    self.current_state_mut().text_style = text_style;
     self
   }
 
@@ -632,6 +648,75 @@ impl Painter {
         .rect(&Rect::from_size(Size::new(m_width, m_height)))
         .set_fill_brush(img)
         .fill();
+    }
+
+    self
+  }
+
+  pub fn draw_glyph(&mut self, g: &Glyph, font_db: &FontDB) -> &mut Self {
+    let Some(face) = font_db.try_get_face_data(g.face_id) else { return self };
+
+    let unit = face.units_per_em() as f32;
+    let scale = self.text_style().font_size / unit;
+
+    let matrix = *self.transform();
+
+    let bounds = g.bounds();
+    if let Some(path) = face.outline_glyph(g.glyph_id) {
+      self
+        .translate(bounds.min_x(), bounds.min_y())
+        .scale(scale, -scale)
+        .translate(0., -unit)
+        .draw_path(path.into());
+    } else if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
+      let grid_scale = face
+        .vertical_height()
+        .map(|h| h as f32 / face.units_per_em() as f32)
+        .unwrap_or(1.)
+        .max(1.);
+      let size = svg.size;
+      let bound_size = bounds.size;
+      let scale = (bound_size.width / size.width).min(bound_size.height / size.height) / grid_scale;
+      self
+        .translate(bounds.min_x(), bounds.min_y())
+        .scale(scale, scale)
+        .draw_svg(&svg);
+    } else if let Some(img) =
+      face.glyph_raster_image(g.glyph_id, (unit / self.text_style().font_size) as u16)
+    {
+      let m_width = img.width() as f32;
+      let m_height = img.height() as f32;
+      let scale = (bounds.width() / m_width).min(bounds.height() / m_height);
+
+      let x_offset = bounds.min_x() + (bounds.width() - (m_width * scale)) / 2.;
+      let y_offset = bounds.min_y() + (bounds.height() - (m_height * scale)) / 2.;
+
+      self
+        .translate(x_offset, y_offset)
+        .scale(scale, scale)
+        .draw_img(img, &Rect::from_size(Size::new(m_width, m_height)), &None);
+    }
+
+    self.set_transform(matrix);
+
+    self
+  }
+
+  /// draw the text glyphs within the box_rect
+  pub fn draw_glyphs_in_rect(
+    self: &mut Painter, visual_glyphs: &VisualGlyphs, box_rect: Rect, font_db: &FontDB,
+  ) -> &mut Self {
+    let visual_rect = visual_glyphs.visual_rect();
+    let Some(paint_rect) = self.intersection_paint_bounds(&box_rect) else {
+      return self;
+    };
+    if !paint_rect.contains_rect(&visual_rect) {
+      self.clip(Path::rect(&paint_rect).into());
+    }
+    self.translate(visual_rect.origin.x, visual_rect.origin.y);
+
+    for g in visual_glyphs.glyphs_in_bounds(&paint_rect) {
+      self.draw_glyph(&g, font_db);
     }
 
     self

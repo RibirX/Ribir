@@ -11,7 +11,7 @@ pub struct ButtonImpl {
   pub label_gap: f32,
   #[allow(unused)]
   pub icon_pos: IconPosition,
-  pub label_style: CowArc<TextStyle>,
+  pub label_style: TextStyle,
   pub foreground_color: Brush,
   pub background_color: Option<Brush>,
   pub radius: Option<f32>,

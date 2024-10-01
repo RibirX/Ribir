@@ -38,6 +38,8 @@ pub struct TypographyStore {
   font_db: Sc<RefCell<FontDB>>,
   cache: FrameCache<TypographyKey, Sc<VisualInfos>>,
 }
+
+#[derive(Clone)]
 pub struct VisualGlyphs {
   font_size: f32,
   x: GlyphUnit,
@@ -402,7 +404,7 @@ impl VisualGlyphs {
       .map(move |g| g.cast_to(self.font_size))
   }
 
-  pub fn glyph_bounds_in_rect(&self, rc: &Rect) -> impl Iterator<Item = GlyphBound> + '_ {
+  pub fn glyphs_in_bounds(&self, rc: &Rect) -> impl Iterator<Item = Glyph> + '_ {
     let visual_rect = self.visual_rect();
     let mut rc = visual_rect.intersection(rc).unwrap_or_default();
     rc.origin -= visual_rect.origin.to_vector();
@@ -432,15 +434,6 @@ impl VisualGlyphs {
       })
       .filter(move |g| !(g.x_offset + g.x_advance < min_x || max_x < g.x_offset))
       .map(move |g| g.cast_to(self.font_size))
-      .map(|g| GlyphBound {
-        face_id: g.face_id,
-        bound: Rect::new(
-          Point::new(g.x_offset.into_pixel(), g.y_offset.into_pixel()),
-          ribir_geom::Size::new(g.x_advance.into_pixel(), g.y_advance.into_pixel()),
-        ),
-        glyph_id: g.glyph_id,
-        cluster: g.cluster,
-      })
   }
 
   pub fn glyph_count(&self, row: usize, ignore_new_line: bool) -> usize {
@@ -586,8 +579,11 @@ mod tests {
       let info = typography_text(text, &style, bounds, text_align, line_dir);
       let visual_rc = info.visual_rect();
       info
-        .glyph_bounds_in_rect(&Rect::from_size(bounds))
-        .map(|g| (visual_rc.origin.x + g.bound.min_x(), visual_rc.origin.y + g.bound.min_y()))
+        .glyphs_in_bounds(&Rect::from_size(bounds))
+        .map(|g| {
+          let bounds = g.bounds();
+          (visual_rc.origin.x + bounds.min_x(), visual_rc.origin.y + bounds.min_y())
+        })
         .collect()
     }
 

@@ -156,7 +156,7 @@ pub struct EdgeItemStyle {
 
 #[derive(Clone)]
 pub struct EdgeTextItemStyle {
-  pub style: CowArc<TextStyle>,
+  pub style: TextStyle,
   pub gap: Option<EdgeInsets>,
   pub foreground: Brush,
 }
@@ -330,8 +330,8 @@ pub struct ListItemStyle {
   pub padding_style: Option<EdgeInsets>,
   pub label_gap: Option<EdgeInsets>,
   pub item_align: fn(usize) -> Align,
-  pub headline_style: CowArc<TextStyle>,
-  pub supporting_style: CowArc<TextStyle>,
+  pub headline_style: TextStyle,
+  pub supporting_style: TextStyle,
   pub leading_config: EdgeWidgetStyle,
   pub trailing_config: EdgeWidgetStyle,
 }

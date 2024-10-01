@@ -67,6 +67,8 @@ mod class;
 pub use class::*;
 mod constrained_box;
 pub use constrained_box::*;
+mod text_style;
+pub use text_style::*;
 
 use crate::prelude::*;
 
@@ -125,6 +127,7 @@ pub struct FatObj<T> {
   opacity: Option<State<Opacity>>,
   class: Option<State<Class>>,
   painting_style: Option<State<PaintingStyleWidget>>,
+  text_style: Option<State<TextStyleWidget>>,
   keep_alive: Option<State<KeepAlive>>,
   keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
 }
@@ -188,6 +191,7 @@ impl<T> FatObj<T> {
       global_anchor: self.global_anchor,
       class: self.class,
       painting_style: self.painting_style,
+      text_style: self.text_style,
       visibility: self.visibility,
       opacity: self.opacity,
       keep_alive: self.keep_alive,
@@ -203,6 +207,7 @@ impl<T> FatObj<T> {
       && self.request_focus.is_none()
       && self.fitted_box.is_none()
       && self.box_decoration.is_none()
+      && self.foreground.is_none()
       && self.padding.is_none()
       && self.layout_box.is_none()
       && self.cursor.is_none()
@@ -213,6 +218,9 @@ impl<T> FatObj<T> {
       && self.v_align.is_none()
       && self.relative_anchor.is_none()
       && self.global_anchor.is_none()
+      && self.class.is_none()
+      && self.painting_style.is_none()
+      && self.text_style.is_none()
       && self.visibility.is_none()
       && self.opacity.is_none()
       && self.keep_alive.is_none()
@@ -402,6 +410,14 @@ impl<T> FatObj<T> {
   pub fn get_painting_style_widget(&mut self) -> &State<PaintingStyleWidget> {
     self
       .painting_style
+      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+
+  /// Returns the `State<TextStyleWidget>` widget from the FatObj. If it
+  /// doesn't exist, a new one will be created.
+  pub fn get_text_style_widget(&mut self) -> &State<TextStyleWidget> {
+    self
+      .text_style
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 
@@ -755,6 +771,11 @@ impl<T> FatObj<T> {
     self.declare_builtin_init(v, Self::get_painting_style_widget, |m, v| m.painting_style = v)
   }
 
+  /// Initializes the text style of this widget.
+  pub fn text_style<const M: u8>(self, v: impl DeclareInto<TextStyle, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style = v)
+  }
+
   /// Initializes the background of the widget.
   pub fn background<const M: u8>(self, v: impl DeclareInto<Option<Brush>, M>) -> Self {
     self.declare_builtin_init(v, Self::get_box_decoration_widget, |m, v| m.background = v)
@@ -925,6 +946,7 @@ impl<'a> FatObj<Widget<'a>> {
           relative_anchor,
           global_anchor,
           painting_style,
+          text_style,
           keep_alive
         ]
     );

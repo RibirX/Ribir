@@ -33,7 +33,7 @@ pub struct Avatar {
 pub struct AvatarStyle {
   pub size: Size,
   pub radius: Option<f32>,
-  pub text_style: CowArc<TextStyle>,
+  pub text_style: TextStyle,
 }
 
 impl CustomStyle for AvatarStyle {

@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use ribir_text::{shaper::*, *};
+use ribir_painter::{shaper::*, *};
 
 fn shape_1k(c: &mut Criterion) {
   let mut shaper = TextShaper::new(<_>::default());
