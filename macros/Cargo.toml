@@ -21,7 +21,7 @@ bitflags.workspace = true
 lazy_static.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
-ribir_painter = {path = "../painter", version = "0.4.0-alpha.10" }
+ribir_painter = {path = "../painter", version = "0.4.0-alpha.11" }
 smallvec.workspace = true
 syn = { workspace = true, features = ["fold", "full", "extra-traits"]}
 phf = { workspace = true, features = ["macros"] }

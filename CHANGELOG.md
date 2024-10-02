@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.11] - 2024-10-02
+
 ### Features
 
 - **core**: Added the `PaintingStyle` built-in widget, enabling any widget to utilize `painting_style` to specify how shapes and paths should be painted within its descendants. (#633 @M-Adoo)
@@ -430,7 +432,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.10...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.11...HEAD
+[0.4.0-alpha.11]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.10...ribir-v0.4.0-alpha.11
 [0.4.0-alpha.10]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.9...ribir-v0.4.0-alpha.10
 [0.4.0-alpha.9]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.8...ribir-v0.4.0-alpha.9
 [0.4.0-alpha.8]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.7...ribir-v0.4.0-alpha.8
