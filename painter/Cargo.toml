@@ -37,6 +37,7 @@ unicode-script.workspace = true
 unicode-segmentation.workspace = true
 quick-xml.workspace = true
 ahash.workspace = true
+triomphe.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom.workspace = true

@@ -5,7 +5,7 @@ mod glyphs_helper;
 mod handle;
 mod selected_text;
 mod text_selectable;
-use std::{ops::Range, rc::Rc};
+use std::ops::Range;
 
 pub use caret_state::{CaretPosition, CaretState};
 pub use selected_text::SelectedHighLightStyle;
@@ -166,7 +166,7 @@ struct ImeHandle<H> {
   host: H,
   pre_edit: Option<PreEditState>,
   guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
-  window: Rc<Window>,
+  window: Sc<Window>,
   caret_id: LazyWidgetId,
 }
 
@@ -175,7 +175,7 @@ where
   E: EditableText + 'static,
   H: StateWriter<Value = E>,
 {
-  fn new(window: Rc<Window>, host: H, caret_id: LazyWidgetId) -> Self {
+  fn new(window: Sc<Window>, host: H, caret_id: LazyWidgetId) -> Self {
     Self { window, host, pre_edit: None, guard: None, caret_id }
   }
   fn ime_allowed(&mut self) {

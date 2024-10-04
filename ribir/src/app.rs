@@ -220,7 +220,7 @@ impl App {
   }
 
   /// create a new window with the `root` widget
-  pub async fn new_window(root: GenWidget, attrs: WindowAttributes) -> std::rc::Rc<Window> {
+  pub async fn new_window(root: GenWidget, attrs: WindowAttributes) -> Sc<Window> {
     let app = unsafe { App::shared_mut() };
     let event_loop = app.event_loop.as_ref().expect(
       " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
@@ -236,7 +236,7 @@ impl App {
   }
 
   #[cfg(not(target_family = "wasm"))]
-  pub fn active_window() -> std::rc::Rc<Window> {
+  pub fn active_window() -> Sc<Window> {
     App::shared()
       .active_wnd
       .and_then(AppCtx::get_window)

@@ -1,10 +1,4 @@
-use std::{
-  cell::RefCell,
-  cmp::Reverse,
-  collections::HashSet,
-  mem::MaybeUninit,
-  rc::{Rc, Weak},
-};
+use std::{cell::RefCell, cmp::Reverse, collections::HashSet, mem::MaybeUninit};
 
 pub mod widget_id;
 use indextree::Arena;
@@ -14,13 +8,13 @@ mod layout_info;
 pub use layout_info::*;
 
 use self::widget::widget_id::new_node;
-use crate::{overlay::ShowingOverlays, prelude::*, render_helper::PureRender};
+use crate::{overlay::ShowingOverlays, prelude::*, render_helper::PureRender, window::WindowId};
 
-pub(crate) type DirtySet = Rc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
+pub(crate) type DirtySet = Sc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
 
 pub(crate) struct WidgetTree {
   pub(crate) root: WidgetId,
-  wnd: Weak<Window>,
+  pub(crate) wnd_id: WindowId,
   pub(crate) arena: TreeArena,
   pub(crate) store: LayoutStore,
   pub(crate) dirty_set: DirtySet,
@@ -29,8 +23,7 @@ pub(crate) struct WidgetTree {
 type TreeArena = Arena<Box<dyn RenderQueryable>>;
 
 impl WidgetTree {
-  pub fn init(&mut self, wnd: &Rc<Window>, content: GenWidget) -> WidgetId {
-    self.wnd = Rc::downgrade(wnd);
+  pub fn init(&mut self, wnd: &Window, content: GenWidget) -> WidgetId {
     let root = self.root;
     let mut ctx = BuildCtx::create(root, wnd.tree);
     ctx.pre_alloc = Some(root);
@@ -100,11 +93,8 @@ impl WidgetTree {
 
   pub(crate) fn count(&self, wid: WidgetId) -> usize { wid.descendants(self).count() }
 
-  pub(crate) fn window(&self) -> Rc<Window> {
-    self
-      .wnd
-      .upgrade()
-      .expect("Must initialize the widget tree before use it.")
+  pub(crate) fn window(&self) -> Sc<Window> {
+    AppCtx::get_window(self.wnd_id).expect("Must initialize the widget tree before use it.")
   }
 
   #[allow(unused)]
@@ -224,16 +214,16 @@ impl WidgetTree {
   }
 }
 
-impl Default for WidgetTree {
-  fn default() -> Self {
+impl WidgetTree {
+  pub fn new(wnd_id: WindowId) -> Self {
     let mut arena = TreeArena::new();
 
     Self {
       root: new_node(&mut arena, Box::new(PureRender(Void))),
-      wnd: Weak::new(),
+      wnd_id,
       arena,
       store: LayoutStore::default(),
-      dirty_set: Rc::new(RefCell::new(HashSet::default())),
+      dirty_set: Sc::new(RefCell::new(HashSet::default())),
     }
   }
 }
