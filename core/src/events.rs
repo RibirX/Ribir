@@ -288,6 +288,6 @@ impl CommonEvent {
   pub(crate) fn set_current_target(&mut self, id: WidgetId) { self.id = id; }
 
   fn pick_info<R>(&self, f: impl FnOnce(&DispatchInfo) -> R) -> R {
-    f(&self.current_wnd().dispatcher.borrow().info)
+    f(&self.window().dispatcher.borrow().info)
   }
 }

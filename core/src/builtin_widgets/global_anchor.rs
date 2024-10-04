@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::{prelude::*, ticker::FrameMsg};
 
 #[derive(Default)]
@@ -59,7 +57,7 @@ impl GlobalAnchor {
 }
 
 fn bind_h_anchor(
-  this: &impl StateWriter<Value = GlobalAnchor>, wnd: &Rc<Window>, relative: HAnchor, base: f32,
+  this: &impl StateWriter<Value = GlobalAnchor>, wnd: &Sc<Window>, relative: HAnchor, base: f32,
 ) {
   let size = wnd.size();
   let anchor = match relative {
@@ -72,7 +70,7 @@ fn bind_h_anchor(
 }
 
 fn bind_v_anchor(
-  this: &impl StateWriter<Value = GlobalAnchor>, wnd: &Rc<Window>, relative: VAnchor, base: f32,
+  this: &impl StateWriter<Value = GlobalAnchor>, wnd: &Sc<Window>, relative: VAnchor, base: f32,
 ) {
   let size = wnd.size();
   let anchor = match relative {

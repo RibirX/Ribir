@@ -3,8 +3,9 @@ use std::{
   fmt::Debug,
   hash::Hash,
   ops::{Bound, Deref, Range, RangeBounds},
-  sync::Arc,
 };
+
+use triomphe::Arc;
 
 #[derive(Eq)]
 /// A copy on write smart pointer shared value without deep clone .

@@ -1,5 +1,6 @@
-use std::{ptr::NonNull, rc::Rc};
+use std::ptr::NonNull;
 
+use ribir_algo::Sc;
 use ribir_geom::{Point, Rect, Size};
 
 use crate::{
@@ -85,16 +86,13 @@ pub trait WidgetCtx {
   // widget `w`.
   fn query_write_of_widget<T: 'static>(&self, w: WidgetId) -> Option<WriteRef<T>>;
   /// Retrieve the window associated with this context.
-  fn window(&self) -> Rc<Window>;
+  fn window(&self) -> Sc<Window>;
 }
 
 pub(crate) trait WidgetCtxImpl {
   fn id(&self) -> WidgetId;
 
   fn tree(&self) -> &WidgetTree;
-
-  #[inline]
-  fn current_wnd(&self) -> Rc<Window> { self.tree().window() }
 }
 
 impl<T: WidgetCtxImpl> WidgetCtx for T {
@@ -200,7 +198,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     w.query_write(self.tree())
   }
 
-  fn window(&self) -> Rc<Window> { self.current_wnd() }
+  fn window(&self) -> Sc<Window> { self.tree().window() }
 }
 
 macro_rules! define_widget_context {

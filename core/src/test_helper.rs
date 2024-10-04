@@ -1,7 +1,4 @@
-use std::{
-  rc::Rc,
-  sync::atomic::{AtomicU64, Ordering},
-};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg(test)]
 #[cfg(target_family = "wasm")]
@@ -31,7 +28,7 @@ pub fn split_value<T: 'static>(v: T) -> (Watcher<Reader<T>>, Stateful<T>) {
 /// The Window assists in writing unit tests; animations are disabled by
 /// default.
 #[derive(Clone)]
-pub struct TestWindow(pub Rc<Window>);
+pub struct TestWindow(pub Sc<Window>);
 
 #[macro_export]
 macro_rules! reset_test_env {

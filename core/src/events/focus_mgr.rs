@@ -1,7 +1,4 @@
-use std::{
-  cmp::Ordering,
-  rc::{Rc, Weak},
-};
+use std::cmp::Ordering;
 
 use indextree::{Arena, NodeId};
 
@@ -20,7 +17,7 @@ pub(crate) struct FocusManager {
   node_ids: ahash::HashMap<WidgetId, NodeId>,
   arena: Arena<FocusNodeInfo>,
   root: NodeId,
-  wnd: Weak<Window>,
+  wnd_id: WindowId,
 }
 
 pub struct FocusHandle {
@@ -85,11 +82,11 @@ impl FocusNodeInfo {
 }
 
 impl FocusManager {
-  pub(crate) fn new() -> Self {
+  pub(crate) fn new(wnd_id: WindowId) -> Self {
     let mut arena = Arena::new();
     let root = arena.new_node(FocusNodeInfo { node_cnt: 0, scope_cnt: 1, wid: None });
     Self {
-      wnd: Weak::new(),
+      wnd_id,
       focus_widgets: Vec::new(),
       frame_auto_focus: vec![],
       request_focusing: None,
@@ -100,13 +97,8 @@ impl FocusManager {
     }
   }
 
-  pub(crate) fn init(&mut self, wnd: &Rc<Window>) { self.wnd = Rc::downgrade(wnd) }
-
-  pub(crate) fn window(&self) -> Rc<Window> {
-    self
-      .wnd
-      .upgrade()
-      .expect("The window of `FocusManager` has already dropped.")
+  pub(crate) fn window(&self) -> Sc<Window> {
+    AppCtx::get_window(self.wnd_id).expect("The window of `FocusManager` has already dropped.")
   }
 
   pub(crate) fn add_focus_node(&mut self, wid: WidgetId, auto_focus: bool, focus_type: FocusType) {
@@ -680,7 +672,7 @@ mod tests {
 
     #[derive(Debug, Default, Clone)]
     struct EmbedFocus {
-      log: Rc<RefCell<Vec<&'static str>>>,
+      log: Sc<RefCell<Vec<&'static str>>>,
     }
 
     impl Compose for EmbedFocus {
@@ -722,7 +714,7 @@ mod tests {
     }
 
     let widget = EmbedFocus::default();
-    let log: Rc<RefCell<Vec<&str>>> = widget.log.clone();
+    let log: Sc<RefCell<Vec<&str>>> = widget.log.clone();
     let mut wnd = TestWindow::new(fn_widget! {
       widget.clone()
     });
