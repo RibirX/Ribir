@@ -1,7 +1,6 @@
 use std::{
   cell::RefCell,
   convert::Infallible,
-  rc::Rc,
   sync::{Mutex, MutexGuard, Once},
   task::{Context, RawWaker, RawWakerVTable, Waker},
   thread::ThreadId,
@@ -39,7 +38,7 @@ pub trait RuntimeWaker {
 /// already hold by others.
 pub struct AppCtx {
   app_theme: Stateful<Theme>,
-  windows: RefCell<ahash::HashMap<WindowId, Rc<Window>>>,
+  windows: RefCell<ahash::HashMap<WindowId, Sc<Window>>>,
   font_db: Sc<RefCell<FontDB>>,
   typography_store: RefCell<TypographyStore>,
   clipboard: RefCell<Box<dyn Clipboard>>,
@@ -69,7 +68,7 @@ impl AppCtx {
   #[track_caller]
   pub fn app_theme() -> &'static Stateful<Theme> { &Self::shared().app_theme }
 
-  pub fn new_window(shell_wnd: Box<dyn ShellWindow>, content: GenWidget) -> Rc<Window> {
+  pub fn new_window(shell_wnd: Box<dyn ShellWindow>, content: GenWidget) -> Sc<Window> {
     let wnd = Window::new(shell_wnd);
     let id = wnd.id();
 
@@ -91,7 +90,7 @@ impl AppCtx {
   /// belongs to `Window`.
   #[track_caller]
   #[inline]
-  pub fn get_window(id: WindowId) -> Option<Rc<Window>> {
+  pub fn get_window(id: WindowId) -> Option<Sc<Window>> {
     Self::shared().windows.borrow().get(&id).cloned()
   }
 
@@ -99,12 +98,12 @@ impl AppCtx {
   /// the window not found.
   #[track_caller]
   #[inline]
-  pub fn get_window_assert(id: WindowId) -> Rc<Window> {
+  pub fn get_window_assert(id: WindowId) -> Sc<Window> {
     Self::get_window(id).expect("Window not found!")
   }
 
   /// Return the windows collection of the application.
-  pub fn windows() -> &'static RefCell<ahash::HashMap<WindowId, Rc<Window>>> {
+  pub fn windows() -> &'static RefCell<ahash::HashMap<WindowId, Sc<Window>>> {
     &Self::shared().windows
   }
 
@@ -391,7 +390,10 @@ impl Drop for AppCtxScopeGuard {
 
 #[cfg(feature = "tokio-async")]
 pub mod tokio_async {
+  use std::{cell::UnsafeCell, pin::Pin, task::Poll};
+
   use futures::{future::RemoteHandle, Future, FutureExt, Stream, StreamExt};
+  use triomphe::Arc;
 
   impl AppCtx {
     pub fn tokio_runtime() -> &'static tokio::runtime::Runtime {
@@ -399,8 +401,6 @@ pub mod tokio_async {
       &ctx.tokio_runtime
     }
   }
-
-  use std::{cell::UnsafeCell, pin::Pin, sync::Arc, task::Poll};
 
   use super::AppCtx;
 
@@ -504,7 +504,9 @@ pub mod tokio_async {
 
 #[cfg(test)]
 mod tests {
-  use std::{sync::Arc, task::Poll};
+  use std::task::Poll;
+
+  use triomphe::Arc;
 
   use super::*;
 
@@ -529,7 +531,7 @@ mod tests {
   }
 
   struct ManualFuture {
-    trigger: Rc<RefCell<Trigger>>,
+    trigger: Sc<RefCell<Trigger>>,
     cnt: usize,
   }
 
@@ -560,14 +562,14 @@ mod tests {
     unsafe { AppCtx::set_runtime_waker(Box::new(WakerCnt(wake_cnt))) }
 
     let triggers = (0..3)
-      .map(|_| Rc::new(RefCell::new(Trigger::default())))
+      .map(|_| Sc::new(RefCell::new(Trigger::default())))
       .collect::<Vec<_>>();
     let futs = triggers
       .clone()
       .into_iter()
       .map(|trigger| ManualFuture { trigger, cnt: 1 });
 
-    let acc = Rc::new(RefCell::new(0));
+    let acc = Sc::new(RefCell::new(0));
     let sum = acc.clone();
     let _ = AppCtx::spawn_local(async move {
       for fut in futs {

@@ -1,4 +1,4 @@
-use std::{ptr::NonNull, rc::Rc};
+use std::ptr::NonNull;
 
 use smallvec::SmallVec;
 use widget_id::{new_node, RenderQueryable};
@@ -40,7 +40,7 @@ enum StartUpWidget {
 
 impl BuildCtx {
   /// Return the window of this context is created from.
-  pub fn window(&self) -> Rc<Window> { self.tree().window() }
+  pub fn window(&self) -> Sc<Window> { self.tree().window() }
 
   /// Generate a handle for this `BuildCtx` that supports `Clone`, and
   /// can be converted back to this `BuildCtx`. This allows you to store the
@@ -126,7 +126,7 @@ impl BuildCtxHandle {
   ///
   /// Panics if the widget node of the handle is removed.
   pub fn with_ctx<R>(&self, f: impl FnOnce(&mut BuildCtx) -> R) -> Option<R> {
-    AppCtx::get_window(self.wnd_id).map(|wnd: Rc<Window>| {
+    AppCtx::get_window(self.wnd_id).map(|wnd| {
       let id = match &self.startup {
         StartUpWidget::Id(id) => *id,
         StartUpWidget::PipeNode(p) => p.borrow().host_id(),

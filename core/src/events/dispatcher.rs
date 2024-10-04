@@ -1,28 +1,24 @@
-use std::rc::{Rc, Weak};
-
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
-use crate::{prelude::*, window::DelayEvent};
+use crate::{
+  prelude::*,
+  window::{DelayEvent, WindowId},
+};
 
 pub(crate) struct Dispatcher {
-  wnd: Weak<Window>,
+  wnd_id: WindowId,
   pub(crate) info: DispatchInfo,
   pub(crate) entered_widgets: Vec<WidgetId>,
   pub(crate) pointer_down_uid: Option<WidgetId>,
 }
 
 impl Dispatcher {
-  pub fn new() -> Self {
-    Self { wnd: Weak::new(), info: <_>::default(), entered_widgets: vec![], pointer_down_uid: None }
+  pub fn new(wnd_id: WindowId) -> Self {
+    Self { wnd_id, info: <_>::default(), entered_widgets: vec![], pointer_down_uid: None }
   }
 
-  pub fn init(&mut self, wnd: &Rc<Window>) { self.wnd = Rc::downgrade(wnd); }
-
-  pub fn window(&self) -> Rc<Window> {
-    self
-      .wnd
-      .upgrade()
-      .expect("The window of the `Dispatcher` already dropped")
+  fn window(&self) -> Sc<Window> {
+    AppCtx::get_window(self.wnd_id).expect("The window of the `Dispatcher` already dropped")
   }
 }
 #[derive(Default)]

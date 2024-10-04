@@ -3,10 +3,10 @@ use std::{
   collections::VecDeque,
   convert::Infallible,
   ptr::NonNull,
-  rc::Rc,
 };
 
 use futures::{task::LocalSpawnExt, Future};
+use ribir_algo::Sc;
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 pub use winit::window::CursorIcon;
 
@@ -32,7 +32,7 @@ pub struct Window {
   pub(crate) dispatcher: RefCell<Dispatcher>,
   pub(crate) frame_ticker: FrameTicker,
   pub(crate) focus_mgr: RefCell<FocusManager>,
-  pub(crate) running_animates: Rc<Cell<u32>>,
+  pub(crate) running_animates: Sc<Cell<u32>>,
   /// This vector store the task to emit events. When perform layout, dispatch
   /// event and so on, some part of window may be already mutable borrowed and
   /// the user event callback may also query borrow that part, so we can't emit
@@ -273,10 +273,11 @@ impl Window {
 
   pub fn need_draw(&self) -> bool { self.tree().is_dirty() || self.running_animates.get() > 0 }
 
-  pub fn new(shell_wnd: Box<dyn ShellWindow>) -> Rc<Self> {
-    let focus_mgr = RefCell::new(FocusManager::new());
-    let tree = Box::new(WidgetTree::default());
-    let dispatcher = RefCell::new(Dispatcher::new());
+  pub fn new(shell_wnd: Box<dyn ShellWindow>) -> Sc<Self> {
+    let wnd_id = shell_wnd.id();
+    let focus_mgr = RefCell::new(FocusManager::new(wnd_id));
+    let tree = Box::new(WidgetTree::new(wnd_id));
+    let dispatcher = RefCell::new(Dispatcher::new(wnd_id));
     let size = shell_wnd.inner_size();
     let painter = Painter::new(Rect::from_size(size));
     let window = Self {
@@ -293,14 +294,11 @@ impl Window {
       delay_drop_widgets: <_>::default(),
       flags: Cell::new(WindowFlags::DEFAULT),
     };
-    let window = Rc::new(window);
-    window.dispatcher.borrow_mut().init(&window);
-    window.focus_mgr.borrow_mut().init(&window);
 
-    window
+    Sc::new(window)
   }
 
-  pub fn init(self: &Rc<Window>, content: GenWidget) {
+  pub fn init(&self, content: GenWidget) {
     let root = self.tree_mut().init(self, content);
     let ctx = BuildCtx::create(root, self.tree);
     let brush = Palette::of(&*ctx).on_surface_variant();

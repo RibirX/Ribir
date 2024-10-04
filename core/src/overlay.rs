@@ -1,11 +1,8 @@
-use std::{
-  cell::RefCell,
-  rc::{Rc, Weak},
-};
+use std::cell::RefCell;
 
 use ribir_algo::Sc;
 
-use crate::prelude::*;
+use crate::{prelude::*, window::WindowId};
 
 /// Overlay let independent the widget "float" visual elements on top of
 /// other widgets by inserting them into the root stack of the widget stack.
@@ -52,7 +49,7 @@ struct InnerOverlay {
 
 struct ShowingInfo {
   id: WidgetId,
-  wnd: Weak<Window>,
+  wnd_id: WindowId,
   generator: GenWidget,
 }
 
@@ -95,7 +92,7 @@ impl Overlay {
   pub fn mask(&self) -> Option<Brush> { self.0.borrow().mask.clone() }
 
   /// Show the overlay.
-  pub fn show(&self, wnd: Rc<Window>) {
+  pub fn show(&self, wnd: Sc<Window>) {
     if self.is_showing() {
       return;
     }
@@ -140,7 +137,7 @@ impl Overlay {
   /// };
   /// App::run(w);
   /// ```
-  pub fn show_map<F>(&self, mut f: F, wnd: Rc<Window>)
+  pub fn show_map<F>(&self, mut f: F, wnd: Sc<Window>)
   where
     F: FnMut(Widget<'static>) -> Widget + 'static,
   {
@@ -154,7 +151,7 @@ impl Overlay {
 
   /// Show the widget at the give position.
   /// if the overlay is showing, nothing will happen.
-  pub fn show_at(&self, pos: Point, wnd: Rc<Window>) {
+  pub fn show_at(&self, pos: Point, wnd: Sc<Window>) {
     if self.is_showing() {
       return;
     }
@@ -176,8 +173,8 @@ impl Overlay {
   pub fn close(&self) {
     let showing = self.0.borrow_mut().showing.take();
     if let Some(showing) = showing {
-      let ShowingInfo { id, wnd, .. } = showing;
-      if let Some(wnd) = wnd.upgrade() {
+      let ShowingInfo { id, wnd_id, .. } = showing;
+      if let Some(wnd) = AppCtx::get_window(wnd_id) {
         let ctx = BuildCtx::create(wnd.tree().root(), wnd.tree);
         let showing_overlays = Provider::of::<ShowingOverlays>(&*ctx).unwrap();
         showing_overlays.remove(self);
@@ -190,7 +187,7 @@ impl Overlay {
     }
   }
 
-  fn inner_show(&self, content: GenWidget, wnd: Rc<Window>) {
+  fn inner_show(&self, content: GenWidget, wnd: Sc<Window>) {
     let background = self.mask();
     let gen = fn_widget! {
       @Container {
@@ -220,8 +217,7 @@ impl Overlay {
 
     let mut ctx = BuildCtx::create(wnd.tree().root(), wnd.tree);
     let id = gen(&mut ctx).build(&mut ctx);
-    self.0.borrow_mut().showing =
-      Some(ShowingInfo { id, generator: gen.into(), wnd: Rc::downgrade(&wnd) });
+    self.0.borrow_mut().showing = Some(ShowingInfo { id, generator: gen.into(), wnd_id: wnd.id() });
 
     let showing_overlays = Provider::of::<ShowingOverlays>(&*ctx).unwrap();
     showing_overlays.add(self.clone());
