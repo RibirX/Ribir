@@ -1,7 +1,9 @@
 use super::*;
 
 /// Use typography to present your design and content as clearly and efficiently
-/// as possible. The names of the TextTheme properties from the [Material Design
+/// as possible.
+///
+/// The names of the TextTheme properties from the [Material Design
 /// spec](https://m3.material.io/styles/typography/type-scale-tokens)
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypographyTheme {

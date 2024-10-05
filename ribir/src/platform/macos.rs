@@ -1,20 +1,20 @@
 use std::{ptr::NonNull, sync::Once, time::Duration};
 
 use icrate::{
+  AppKit::{
+    NSEvent, NSEventMaskKeyDown, NSEventModifierFlagCommand, NSEventModifierFlagControl,
+    NSEventModifierFlagOption, NSEventModifierFlagShift,
+  },
+  Foundation::NSObject,
   block2::ConcreteBlock,
   objc2::{
     rc::Id,
     runtime::{AnyObject, Sel},
     *,
   },
-  AppKit::{
-    NSEvent, NSEventMaskKeyDown, NSEventModifierFlagCommand, NSEventModifierFlagControl,
-    NSEventModifierFlagOption, NSEventModifierFlagShift,
-  },
-  Foundation::NSObject,
 };
 use ribir_core::prelude::AppCtx;
-use rxrust::prelude::{interval, ObservableExt, ObservableItem};
+use rxrust::prelude::{ObservableExt, ObservableItem, interval};
 use winit::keyboard::{KeyCode, ModifiersState};
 
 use crate::prelude::{App, AppEvent, HotkeyEvent};

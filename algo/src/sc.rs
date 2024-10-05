@@ -6,6 +6,7 @@ use std::{
 };
 
 /// A single-thread smart pointer with strong reference count only.
+///
 /// This is a simplified version of `std::rc::Sc` with the weak reference count.
 /// Use it when you are sure that there is no cycle in the reference graph or in
 /// a inner resource manage that will break the cycle by itself.

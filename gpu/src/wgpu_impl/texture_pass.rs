@@ -1,12 +1,12 @@
 use std::mem::size_of;
 
-use ribir_geom::{rect_corners, DevicePoint, DeviceRect, DeviceSize};
+use ribir_geom::{DevicePoint, DeviceRect, DeviceSize, rect_corners};
 use ribir_painter::Vertex;
-use wgpu::{include_wgsl, StoreOp};
+use wgpu::{StoreOp, include_wgsl};
 use zerocopy::AsBytes;
 
 use super::vertex_buffer::new_vertices;
-use crate::{command_encoder, gpu_backend::Texture, vertices_coord, WgpuImpl, WgpuTexture};
+use crate::{WgpuImpl, WgpuTexture, command_encoder, gpu_backend::Texture, vertices_coord};
 
 pub struct CopyTexturePass {
   pipeline: Option<wgpu::RenderPipeline>,

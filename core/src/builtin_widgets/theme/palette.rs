@@ -11,14 +11,12 @@ use super::*;
 ///
 /// ```rust
 /// use ribir_core::prelude::*;
-
-/// let _w = Palette::default().with_child(
-///   fn_widget! {
-///     // Every widget created in this scope can access the `Palette`.
-///     let _primary = Palette::of(ctx!()).primary();
-///     Void
-///   }
-/// );
+///
+/// let _w = Palette::default().with_child(fn_widget! {
+///   // Every widget created in this scope can access the `Palette`.
+///   let _primary = Palette::of(ctx!()).primary();
+///   Void
+/// });
 /// ```
 #[derive(Clone, Debug)]
 pub struct Palette {

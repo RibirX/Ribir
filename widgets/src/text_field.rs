@@ -191,59 +191,50 @@ impl TextFieldThemeSuit {
 
     let input_collapse_padding = EdgeInsets { left: 16., right: 16., bottom: 8., top: 8. };
 
-    themes.insert(
-      TextFieldState::Enabled,
-      TextFieldTheme {
-        text_brush: palette.on_surface().into(),
-        text: body.clone(),
-        container_color: palette.surface_variant(),
-        indicator: palette.on_surface_variant(),
-        indicator_height: 1.,
-        label_color: palette.on_surface_variant(),
+    themes.insert(TextFieldState::Enabled, TextFieldTheme {
+      text_brush: palette.on_surface().into(),
+      text: body.clone(),
+      container_color: palette.surface_variant(),
+      indicator: palette.on_surface_variant(),
+      indicator_height: 1.,
+      label_color: palette.on_surface_variant(),
 
-        container_height: 56.,
-        label_collapse: caption.clone(),
-        label_expand: header.clone(),
-        input_collapse_padding,
-        input_expand_padding,
-      },
-    );
+      container_height: 56.,
+      label_collapse: caption.clone(),
+      label_expand: header.clone(),
+      input_collapse_padding,
+      input_expand_padding,
+    });
 
-    themes.insert(
-      TextFieldState::Focused,
-      TextFieldTheme {
-        text_brush: palette.on_surface().into(),
-        text: body.clone(),
-        container_color: palette.surface_variant(),
-        indicator: palette.primary(),
-        indicator_height: 2.,
-        label_color: palette.primary(),
+    themes.insert(TextFieldState::Focused, TextFieldTheme {
+      text_brush: palette.on_surface().into(),
+      text: body.clone(),
+      container_color: palette.surface_variant(),
+      indicator: palette.primary(),
+      indicator_height: 2.,
+      label_color: palette.primary(),
 
-        container_height: 56.,
-        label_collapse: caption.clone(),
-        label_expand: header.clone(),
-        input_collapse_padding,
-        input_expand_padding,
-      },
-    );
+      container_height: 56.,
+      label_collapse: caption.clone(),
+      label_expand: header.clone(),
+      input_collapse_padding,
+      input_expand_padding,
+    });
 
-    themes.insert(
-      TextFieldState::Hovered,
-      TextFieldTheme {
-        text_brush: palette.on_surface().into(),
-        text: body.clone(),
-        container_color: palette.surface_variant(),
-        indicator: palette.on_surface(),
-        indicator_height: 2.,
-        label_color: palette.on_surface(),
+    themes.insert(TextFieldState::Hovered, TextFieldTheme {
+      text_brush: palette.on_surface().into(),
+      text: body.clone(),
+      container_color: palette.surface_variant(),
+      indicator: palette.on_surface(),
+      indicator_height: 2.,
+      label_color: palette.on_surface(),
 
-        container_height: 56.,
-        label_collapse: caption.clone(),
-        label_expand: header.clone(),
-        input_collapse_padding,
-        input_expand_padding,
-      },
-    );
+      container_height: 56.,
+      label_collapse: caption.clone(),
+      label_expand: header.clone(),
+      input_collapse_padding,
+      input_expand_padding,
+    });
 
     // themes.insert(
     //   TextFieldState::Disabled,

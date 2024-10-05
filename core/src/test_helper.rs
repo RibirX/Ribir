@@ -34,7 +34,7 @@ pub struct TestWindow(pub Sc<Window>);
 macro_rules! reset_test_env {
   () => {
     let _ = $crate::prelude::NEW_TIMER_FN.set($crate::timer::Timer::new_timer_future);
-    let _guard = unsafe { $crate::prelude::AppCtx::new_lock_scope() };
+    let _guard = $crate::prelude::AppCtx::new_lock_scope();
   };
 }
 

@@ -2,16 +2,16 @@ use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::TokenStream;
 use quote::quote_spanned;
 use syn::{
+  Stmt,
   fold::Fold,
   parse::{Parse, ParseStream},
   parse_macro_input,
   spanned::Spanned,
-  Stmt,
 };
 
 use crate::{
   ok,
-  symbol_process::{not_subscribe_anything, symbol_to_macro, DollarRefsCtx},
+  symbol_process::{DollarRefsCtx, not_subscribe_anything, symbol_to_macro},
 };
 
 pub(crate) struct BodyExpr(pub(crate) Vec<Stmt>);

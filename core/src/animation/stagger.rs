@@ -261,10 +261,10 @@ mod tests {
   fn stagger_not_running_after_all_animation_end() {
     reset_test_env!();
 
-    let stagger = Stagger::new(
-      Duration::from_millis(100),
-      EasingTransition { duration: Duration::ZERO, easing: easing::LINEAR },
-    );
+    let stagger = Stagger::new(Duration::from_millis(100), EasingTransition {
+      duration: Duration::ZERO,
+      easing: easing::LINEAR,
+    });
     let c_stagger = stagger.clone_writer();
     let w = fn_widget! {
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };

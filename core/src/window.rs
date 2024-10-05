@@ -5,7 +5,7 @@ use std::{
   ptr::NonNull,
 };
 
-use futures::{task::LocalSpawnExt, Future};
+use futures::{Future, task::LocalSpawnExt};
 use ribir_algo::Sc;
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 pub use winit::window::CursorIcon;
@@ -33,6 +33,7 @@ pub struct Window {
   pub(crate) frame_ticker: FrameTicker,
   pub(crate) focus_mgr: RefCell<FocusManager>,
   pub(crate) running_animates: Sc<Cell<u32>>,
+  pre_edit: RefCell<Option<String>>,
   /// This vector store the task to emit events. When perform layout, dispatch
   /// event and so on, some part of window may be already mutable borrowed and
   /// the user event callback may also query borrow that part, so we can't emit
@@ -293,6 +294,7 @@ impl Window {
       shell_wnd: RefCell::new(shell_wnd),
       delay_drop_widgets: <_>::default(),
       flags: Cell::new(WindowFlags::DEFAULT),
+      pre_edit: <_>::default(),
     };
 
     Sc::new(window)
@@ -698,6 +700,35 @@ impl Window {
   pub fn set_min_size(&self, size: Size) -> &Self {
     self.shell_wnd.borrow_mut().set_min_size(size);
     self
+  }
+
+  pub fn is_pre_editing(&self) -> bool { self.pre_edit.borrow().is_some() }
+
+  pub fn force_exit_pre_edit(&self) {
+    if self.is_pre_editing() {
+      self.set_ime_allowed(false);
+      self.processes_ime_pre_edit(ImePreEdit::End);
+      if let Some(s) = self.pre_edit.borrow_mut().take() {
+        self.processes_receive_chars(s);
+      }
+      self.set_ime_allowed(true);
+    }
+  }
+
+  pub fn exit_pre_edit(&self) {
+    if self.is_pre_editing() {
+      self.processes_ime_pre_edit(ImePreEdit::End);
+      self.pre_edit.borrow_mut().take();
+    }
+  }
+
+  pub fn update_pre_edit(&self, txt: &str, cursor: &Option<(usize, usize)>) {
+    if !self.is_pre_editing() {
+      self.processes_ime_pre_edit(ImePreEdit::Begin);
+    }
+
+    self.processes_ime_pre_edit(ImePreEdit::PreEdit { value: txt.to_owned(), cursor: *cursor });
+    *self.pre_edit.borrow_mut() = Some(txt.to_owned());
   }
 }
 

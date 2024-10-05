@@ -14,9 +14,9 @@ pub use text_selectable::TextSelectable;
 use crate::{
   input::{
     caret::Caret,
-    handle::{edit_handle, edit_key_handle, TextCaretWriter},
+    handle::{TextCaretWriter, edit_handle, edit_key_handle},
     selected_text::SelectedHighLight,
-    text_selectable::{bind_point_listener, select_key_handle, SelectableText},
+    text_selectable::{SelectableText, bind_point_listener, select_key_handle},
   },
   layout::{OnlySizedByParent, Stack, StackFit},
   prelude::Text,
@@ -487,7 +487,7 @@ mod tests {
   use ribir_core::{
     prelude::*,
     reset_test_env,
-    test_helper::{split_value, TestWindow},
+    test_helper::{TestWindow, split_value},
   };
   use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 

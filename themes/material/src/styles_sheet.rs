@@ -1,7 +1,7 @@
 pub mod material_svgs {
   use ribir_core::{
     define_named_svg,
-    prelude::{NamedSvg, CUSTOM_ICON_START},
+    prelude::{CUSTOM_ICON_START, NamedSvg},
   };
 
   define_named_svg!(

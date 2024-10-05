@@ -1,6 +1,6 @@
 use log::warn;
 use ribir_core::prelude::*;
-use webbrowser::{open_browser as open, Browser};
+use webbrowser::{Browser, open_browser as open};
 
 #[derive(Declare)]
 pub struct Link {

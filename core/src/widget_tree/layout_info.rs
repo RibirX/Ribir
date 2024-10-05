@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use ribir_geom::ZERO_SIZE;
 
 use super::{WidgetId, WidgetTree};
-use crate::prelude::{Point, Size, INFINITY_SIZE};
+use crate::prelude::{INFINITY_SIZE, Point, Size};
 
 /// boundary limit of the render object's layout
 #[derive(Debug, Clone, PartialEq, Copy)]

@@ -2,7 +2,7 @@ use crate::{prelude::*, wrap_render::WrapRender};
 
 /// Explain the method for rendering shapes and paths, including filling or
 /// stroking them.
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub enum PaintingStyle {
   /// Fill the path.
   #[default]

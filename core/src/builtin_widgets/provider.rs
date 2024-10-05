@@ -3,23 +3,24 @@ use smallvec::SmallVec;
 use crate::prelude::*;
 
 /// This widget enables its descendants to access the data it provides,
-/// streamlining data sharing throughout the widget tree. Descendants have the
-/// ability to inquire about the type of data provided by their ancestors. If
-/// the ancestor is a writer, descendants can also access the write reference
-/// (`WriteRef`) for that data.
-
+/// streamlining data sharing throughout the widget tree.
+///
+/// Descendants have the ability to inquire about the type of data provided by
+/// their ancestors. If the ancestor is a writer, descendants can also access
+/// the write reference (`WriteRef`) for that data.
+///
 /// Its child must be a function widget, which enforces its subtree to utilize
 /// the build context it provides for construction.
 ///
 /// Data querying occurs from the bottom to the top of the widget tree. In cases
 /// where there are two providers of the same type in one path, the closer
 /// provider will be queried.
-
+///
 /// The system theme should serve as a global provider by default.
 ///
 /// You can utilize the provider with `BuildCtx`, the event object, `LayoutCtx`,
 /// and `PaintCtx`.
-
+///
 /// ## Example
 ///
 /// Any type can be wrapped with `Queryable` for providing data.

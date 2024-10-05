@@ -3,7 +3,7 @@ error_on_unformatted = false
 fn_single_line = true
 use_small_heuristics = "Max"
 tab_spaces = 2
-version = "Two"
+style_edition = "2024"
 wrap_comments = true
 merge_derives = false
 

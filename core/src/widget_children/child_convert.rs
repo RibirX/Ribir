@@ -1,9 +1,10 @@
 use crate::{context::BuildCtx, pipe::*, widget::*};
 
-/// Trait for conversions type as a child of widget, it is similar to `Into` but
-/// with a const marker to automatically implement all possible conversions
-/// without implementing conflicts.  So you should not directly implement this
-/// trait. Implement `Into` instead.
+/// Trait for conversions type as a child of widget.
+///
+/// It is similar to `Into` but with a const marker to automatically implement
+/// all possible conversions without implementing conflicts.  So you should not
+/// directly implement this trait. Implement `Into` instead.
 pub trait IntoChild<C, const M: usize> {
   fn into_child(self) -> C;
 }

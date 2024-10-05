@@ -1,9 +1,9 @@
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-  parse::{discouraged::Speculative, Parse},
-  spanned::Spanned,
   Fields, Ident, Result, Visibility,
+  parse::{Parse, discouraged::Speculative},
+  spanned::Spanned,
 };
 const DECLARE_ATTR: &str = "declare";
 

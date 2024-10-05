@@ -6,7 +6,7 @@ use syn::{fold::Fold, parse_macro_input, spanned::Spanned};
 use crate::{
   ok,
   pipe_macro::BodyExpr,
-  symbol_process::{not_subscribe_anything, symbol_to_macro, DollarRefsCtx},
+  symbol_process::{DollarRefsCtx, not_subscribe_anything, symbol_to_macro},
 };
 
 pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream1 {
