@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 //! A 2d logic painter, generate the paint command
 pub mod color;
 mod painter;

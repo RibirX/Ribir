@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Bencher, Criterion};
+use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 use ribir::core::{animation::easing::*, prelude::*, reset_test_env, test_helper::*};
 
 #[derive(Clone, Debug)]

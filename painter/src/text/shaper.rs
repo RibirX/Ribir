@@ -8,8 +8,8 @@ pub use rustybuzz::ttf_parser::GlyphId;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
 
 use crate::{
-  font_db::{Face, FontDB, ID},
   Glyph, TextDirection,
+  font_db::{Face, FontDB, ID},
 };
 
 pub const NEWLINE_GLYPH_ID: GlyphId = GlyphId(u16::MAX);
@@ -17,7 +17,6 @@ pub const NEWLINE_GLYPH_ID: GlyphId = GlyphId(u16::MAX);
 /// reordering before to shape text.
 ///
 /// This shaper will cache shaper result for per frame.
-
 pub struct TextShaper {
   font_db: Sc<RefCell<FontDB>>,
   shape_cache: FrameCache<ShapeKey, Sc<ShapeResult>>,

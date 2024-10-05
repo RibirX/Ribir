@@ -2,22 +2,21 @@ use std::collections::HashSet;
 
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote_spanned, ToTokens};
+use quote::{ToTokens, quote_spanned};
 use syn::{
-  braced,
+  Expr, Ident, Macro, Path, Result as SynResult, Stmt, braced,
   fold::Fold,
   parse::{Parse, ParseBuffer, ParseStream},
   parse_macro_input, parse_quote,
   punctuated::Punctuated,
   spanned::Spanned,
   token::{Brace, Colon, Comma, Dollar, Not},
-  Expr, Ident, Macro, Path, Result as SynResult, Stmt,
 };
 
 use crate::{
   declare_obj::DeclareObj,
   ok,
-  symbol_process::{kw, symbol_to_macro, DollarRefsCtx},
+  symbol_process::{DollarRefsCtx, kw, symbol_to_macro},
 };
 
 pub enum RdlMacro {

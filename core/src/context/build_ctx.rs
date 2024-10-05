@@ -1,7 +1,8 @@
+#![allow(static_mut_refs)]
 use std::ptr::NonNull;
 
 use smallvec::SmallVec;
-use widget_id::{new_node, RenderQueryable};
+use widget_id::{RenderQueryable, new_node};
 
 use crate::{pipe::DynInfo, prelude::*, render_helper::PureRender, window::WindowId};
 

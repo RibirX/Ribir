@@ -33,7 +33,6 @@ pub(crate) struct DispatchInfo {
 
 impl Dispatcher {
   pub fn dispatch(&mut self, event: WindowEvent, wnd_factor: f64) {
-    log::info!("Dispatch winit event {:?}", event);
     match event {
       WindowEvent::ModifiersChanged(s) => self.info.modifiers = s.state(),
       WindowEvent::CursorMoved { position, .. } => {

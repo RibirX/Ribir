@@ -155,9 +155,11 @@ impl Anchor {
 }
 
 /// This widget is used to anchor child constraints relative to the parent
-/// widget. It's important to note that if you anchor the child widget outside
-/// of its parent, it may become unable to click, so ensure there is ample space
-/// within the parent.
+/// widget.
+///
+/// It's important to note that if you anchor the child widget outside of its
+/// parent, it may become unable to click, so ensure there is ample space within
+/// the parent.
 #[derive(Default)]
 pub struct RelativeAnchor {
   pub anchor: Anchor,

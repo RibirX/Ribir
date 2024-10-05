@@ -139,7 +139,10 @@ mod tests {
   use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
   use super::*;
-  use crate::test_helper::{MockBox, TestWindow};
+  use crate::{
+    reset_test_env,
+    test_helper::{MockBox, TestWindow},
+  };
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
     let w = fn_widget! {
@@ -167,7 +170,7 @@ mod tests {
 
   #[test]
   fn x_scroll() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     test_assert(Scrollable::X, -10., -10., -10., 0.);
     test_assert(Scrollable::X, -10000., -10., -900., 0.);
@@ -176,7 +179,7 @@ mod tests {
 
   #[test]
   fn y_scroll() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     test_assert(Scrollable::Y, -10., -10., 0., -10.);
     test_assert(Scrollable::Y, -10., -10000., 0., -900.);
@@ -185,7 +188,7 @@ mod tests {
 
   #[test]
   fn both_scroll() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     test_assert(Scrollable::Both, -10., -10., -10., -10.);
     test_assert(Scrollable::Both, -10000., -10000., -900., -900.);
@@ -210,7 +213,7 @@ mod tests {
 
   #[test]
   fn scroll_content_expand() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let w = fn_widget! {
       @FixedBox {

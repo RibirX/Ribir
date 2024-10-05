@@ -1,4 +1,4 @@
-/// for platform specific code
+//! For platform-specific code.
 
 #[cfg(target_os = "macos")]
 mod macos;

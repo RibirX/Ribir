@@ -2,11 +2,11 @@ use std::error::Error;
 
 use guillotiere::euclid::Vector2D;
 use ribir_geom::{
-  rect_corners, transform_to_device_rect, DeviceRect, DeviceSize, Point, Transform,
+  DeviceRect, DeviceSize, Point, Transform, rect_corners, transform_to_device_rect,
 };
 use ribir_painter::{
-  image::ColorFormat, Color, PaintCommand, PaintPath, PaintPathAction, PainterBackend, PathCommand,
-  PixelImage, Vertex, VertexBuffers,
+  Color, PaintCommand, PaintPath, PaintPathAction, PainterBackend, PathCommand, PixelImage, Vertex,
+  VertexBuffers, image::ColorFormat,
 };
 
 use crate::{

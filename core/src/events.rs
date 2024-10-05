@@ -3,7 +3,7 @@ use std::ptr::NonNull;
 use self::dispatcher::DispatchInfo;
 use crate::{
   builtin_widgets::MixFlags,
-  context::{define_widget_context, WidgetCtx, WidgetCtxImpl},
+  context::{WidgetCtx, WidgetCtxImpl, define_widget_context},
   widget_tree::{WidgetId, WidgetTree},
 };
 

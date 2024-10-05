@@ -5,17 +5,18 @@ use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+  Brush, Color, Glyph, PixelImage, Svg, TextStyle, VisualGlyphs,
   color::{LinearGradient, RadialGradient},
   font_db::FontDB,
   path::*,
   path_builder::PathBuilder,
-  Brush, Color, Glyph, PixelImage, Svg, TextStyle, VisualGlyphs,
 };
-/// The painter is a two-dimensional grid. The coordinate (0, 0) is at the
-/// upper-left corner of the canvas. Along the X-axis, values increase towards
-/// the right edge of the canvas. Along the Y-axis, values increase towards the
-/// bottom edge of the canvas.
-// #[derive(Default, Debug, Clone)]
+/// The Painter provides you the ability to render 2D elements on a
+/// two-dimensional canvas.
+///
+/// The coordinate (0, 0) is positioned at the upper-left corner of the canvas.
+/// X-axis values progress toward the right edge of the canvas, while Y-axis
+/// values increase towards the bottom edge of the canvas.
 pub struct Painter {
   viewport: Rect,
   init_state: PainterState,
@@ -793,10 +794,11 @@ impl<'a> DerefMut for PainterResult<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target { self.0 }
 }
 
-/// An RAII implementation of a "scoped state" of the render layer. When this
-/// structure is dropped (falls out of scope), changed state will auto restore.
-/// The data can be accessed through this guard via its Deref and DerefMut
-/// implementations.
+/// An RAII implementation of a "scoped state" of the render layer.
+///
+/// When this structure is dropped (falls out of scope), changed state will auto
+/// restore. The data can be accessed through this guard via its Deref and
+/// DerefMut implementations.
 pub struct PainterGuard<'a>(&'a mut Painter);
 
 impl<'a> Drop for PainterGuard<'a> {

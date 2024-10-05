@@ -241,6 +241,7 @@ mod tests {
   use super::*;
   use crate::{
     prelude::*,
+    reset_test_env,
     test_helper::{MockBox, TestWindow},
   };
 
@@ -248,7 +249,7 @@ mod tests {
 
   #[test]
   fn map_self_eq_self() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let w = fn_widget! {
       @MockBox {
@@ -271,7 +272,7 @@ mod tests {
 
   #[test]
   fn map_transform_test() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let w = fn_widget! {
       @MockBox {

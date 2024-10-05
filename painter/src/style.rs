@@ -2,8 +2,8 @@ use ribir_algo::Resource;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-  color::{LinearGradient, RadialGradient},
   Color, PixelImage,
+  color::{LinearGradient, RadialGradient},
 };
 
 /// The brush is used to fill or stroke shapes with color, image, or gradient.

@@ -1,10 +1,12 @@
 use ribir_geom::Transform;
-use ribir_painter::{image::ColorFormat, PixelImage};
+use ribir_painter::{PixelImage, image::ColorFormat};
 
-/// This macro generates image tests for the painter with every backend. Accept
-/// a function returning a painter. The generated test name is the function name
-/// composed a prefix(the backend name). The test will check if the backend
-/// renders the painter result to generate the same content as the image file.
+/// This macro generates image tests for the painter with every backend.
+///
+/// Accept a function returning a painter. The generated test name is the
+/// function name composed a prefix(the backend name). The test will check if
+/// the backend renders the painter result to generate the same content as the
+/// image file.
 ///
 /// The image file is read from the `test_cases` folder in the workspace root,
 /// and its path relative to the `test_cases` is `{module path}\{backend

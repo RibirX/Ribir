@@ -1,23 +1,23 @@
 use std::{
   cell::RefCell,
   convert::Infallible,
-  sync::{Mutex, MutexGuard, Once},
+  sync::{LazyLock, Mutex, MutexGuard},
   task::{Context, RawWaker, RawWakerVTable, Waker},
-  thread::ThreadId,
 };
 
 pub use futures::task::SpawnError;
-use futures::{executor::LocalPool, task::LocalSpawnExt, Future};
+use futures::{Future, executor::LocalPool, task::LocalSpawnExt};
 use pin_project_lite::pin_project;
 use ribir_algo::Sc;
-use ribir_painter::{font_db::FontDB, TypographyStore};
+use ribir_painter::{TypographyStore, font_db::FontDB};
 use rxrust::{scheduler::NEW_TIMER_FN, subject::Subject};
 
 use crate::{
   builtin_widgets::Theme,
   clipboard::{Clipboard, MockClipboard},
+  local_sender::LocalSender,
   prelude::{FuturesLocalScheduler, Instant},
-  state::Stateful,
+  state::{StateWriter, Stateful},
   timer::Timer,
   widget::GenWidget,
   window::{ShellWindow, Window, WindowId},
@@ -42,7 +42,7 @@ pub struct AppCtx {
   font_db: Sc<RefCell<FontDB>>,
   typography_store: RefCell<TypographyStore>,
   clipboard: RefCell<Box<dyn Clipboard>>,
-  runtime_waker: Box<dyn RuntimeWaker + Send>,
+  runtime_waker: RefCell<Box<dyn RuntimeWaker + Send>>,
   scheduler: FuturesLocalScheduler,
   executor: RefCell<LocalPool>,
   frame_ticks: Subject<'static, Instant, Infallible>,
@@ -54,15 +54,17 @@ pub struct AppCtx {
 #[allow(dead_code)]
 pub struct AppCtxScopeGuard(MutexGuard<'static, ()>);
 
-static mut INIT_THREAD_ID: Option<ThreadId> = None;
-static mut APP_CTX_INIT: Once = Once::new();
-static mut APP_CTX: Option<AppCtx> = None;
+static APP_CTX: LazyLock<LocalSender<AppCtx>> = LazyLock::new(|| {
+  let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
+  LocalSender::new(AppCtx::default())
+});
 
 impl AppCtx {
-  /// Get the global application context, it's not thread safe, you can only use
-  /// it in the first thread that uses it.
+  /// Obtain the global application context. Please note that it is not
+  /// thread-safe and should only be accessed in the initial thread that
+  /// utilizes it.
   #[track_caller]
-  pub fn shared() -> &'static Self { unsafe { Self::shared_mut() } }
+  pub fn shared() -> &'static Self { &APP_CTX }
 
   /// Get the theme of the application.
   #[track_caller]
@@ -157,31 +159,13 @@ impl AppCtx {
     count
   }
 
-  /// Check if the calling thread is the thread that initializes the `AppCtx`,
-  /// you needn't use this method manually, it's called automatically when you
-  /// use the methods of `AppCtx`. But it's useful when you want your code to
-  /// keep same behavior like `AppCtx`.
-  #[track_caller]
-  pub fn thread_check() {
-    let current_thread = std::thread::current().id();
-    unsafe {
-      if Some(current_thread) != INIT_THREAD_ID {
-        panic!(
-          "AppCtx::shared() should be called only in one thread {:?} != {:?}.",
-          Some(current_thread),
-          INIT_THREAD_ID
-        );
-      }
-    }
-  }
-
   /// Set the theme of the application
   ///
   /// # Safety
   /// This should be only called before application startup. The behavior is
   /// undefined if you call it in a running application.
   #[track_caller]
-  pub unsafe fn set_app_theme(theme: Theme) { Self::shared_mut().app_theme = Stateful::new(theme); }
+  pub fn set_app_theme(theme: Theme) { *Self::shared().app_theme.write() = theme; }
 
   /// Set the shared clipboard of the application, this should be called before
   /// application startup.
@@ -190,8 +174,8 @@ impl AppCtx {
   /// This should be only called before application startup. The behavior is
   /// undefined if you call it in a running application.
   #[track_caller]
-  pub unsafe fn set_clipboard(clipboard: Box<dyn Clipboard>) {
-    Self::shared_mut().clipboard = RefCell::new(clipboard);
+  pub fn set_clipboard(clipboard: Box<dyn Clipboard>) {
+    *Self::shared().clipboard.borrow_mut() = clipboard;
   }
 
   /// Set the runtime waker of the application, this should be called before
@@ -200,8 +184,8 @@ impl AppCtx {
   /// This should be only called before application startup. The behavior is
   /// undefined if you call it in a running application.
   #[track_caller]
-  pub unsafe fn set_runtime_waker(waker: Box<dyn RuntimeWaker + Send>) {
-    Self::shared_mut().runtime_waker = waker;
+  pub fn set_runtime_waker(waker: Box<dyn RuntimeWaker + Send>) {
+    *Self::shared().runtime_waker.borrow_mut() = waker;
   }
 
   /// Start a new scope to mock a new application startup for `AppCtx`, this
@@ -221,15 +205,18 @@ impl AppCtx {
   /// If your application want create multi `AppCtx` instances, hold a scope for
   /// every instance. Otherwise, the behavior is undefined.
   #[track_caller]
-  pub unsafe fn new_lock_scope() -> AppCtxScopeGuard {
+  pub fn new_lock_scope() -> AppCtxScopeGuard {
     static LOCK: Mutex<()> = Mutex::new(());
 
     let locker = LOCK.lock().unwrap_or_else(|e| {
       // Only clear for test, so we have a clear error message.
+      #[cfg(test)]
       LOCK.clear_poison();
 
       e.into_inner()
     });
+
+    APP_CTX.reset();
 
     AppCtxScopeGuard(locker)
   }
@@ -238,49 +225,10 @@ impl AppCtx {
   pub(crate) fn end_frame() {
     // todo: frame cache is not a good algorithm? because not every text will
     // relayout in every frame.
-    let ctx = unsafe { Self::shared_mut() };
-    ctx.typography_store.borrow_mut().end_frame();
-  }
-
-  #[track_caller]
-  unsafe fn shared_mut() -> &'static mut Self {
-    APP_CTX_INIT.call_once(|| {
-      let app_theme = Stateful::new(Theme::default());
-      let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-
-      let mut font_db = FontDB::default();
-      font_db.load_system_fonts();
-
-      let font_db = Sc::new(RefCell::new(font_db));
-      let typography_store = RefCell::new(TypographyStore::new(font_db.clone()));
-
-      let executor = LocalPool::new();
-      let scheduler = executor.spawner();
-
-      let ctx = AppCtx {
-        font_db,
-        app_theme,
-        typography_store,
-        clipboard: RefCell::new(Box::new(MockClipboard {})),
-        executor: RefCell::new(executor),
-        scheduler,
-        runtime_waker: Box::new(MockWaker),
-        windows: RefCell::new(ahash::HashMap::default()),
-        frame_ticks: <_>::default(),
-
-        #[cfg(feature = "tokio-async")]
-        tokio_runtime: tokio::runtime::Builder::new_multi_thread()
-          .enable_all()
-          .build()
-          .unwrap(),
-      };
-
-      INIT_THREAD_ID = Some(std::thread::current().id());
-      APP_CTX = Some(ctx);
-    });
-
-    Self::thread_check();
-    APP_CTX.as_mut().unwrap_unchecked()
+    Self::shared()
+      .typography_store
+      .borrow_mut()
+      .end_frame();
   }
 }
 
@@ -296,7 +244,7 @@ impl AppCtx {
     let ctx = AppCtx::shared();
     ctx
       .scheduler
-      .spawn_local(WakerFuture { fut: future, waker: ctx.runtime_waker.clone() })
+      .spawn_local(WakerFuture { fut: future, waker: ctx.runtime_waker.borrow().clone() })
   }
 }
 
@@ -377,22 +325,14 @@ impl RuntimeWaker for MockWaker {
 }
 
 impl Drop for AppCtxScopeGuard {
-  fn drop(&mut self) {
-    // Safety: this guard guarantee only one thread can access the `AppCtx`.
-    unsafe {
-      AppCtx::shared_mut().windows.borrow_mut().clear();
-      APP_CTX = None;
-      INIT_THREAD_ID = None;
-      APP_CTX_INIT = Once::new();
-    }
-  }
+  fn drop(&mut self) { APP_CTX.take(); }
 }
 
 #[cfg(feature = "tokio-async")]
 pub mod tokio_async {
   use std::{cell::UnsafeCell, pin::Pin, task::Poll};
 
-  use futures::{future::RemoteHandle, Future, FutureExt, Stream, StreamExt};
+  use futures::{Future, FutureExt, Stream, StreamExt, future::RemoteHandle};
   use triomphe::Arc;
 
   impl AppCtx {
@@ -405,6 +345,7 @@ pub mod tokio_async {
   use super::AppCtx;
 
   /// Compatible with Streams that depend on the tokio runtime.
+  ///
   /// Stream dependent on the tokio runtime may not work properly when generated
   /// using in the ribir runtime(AppCtx::spawn_local()), you should call
   /// to_ribir_stream() to convert it.
@@ -419,6 +360,7 @@ pub mod tokio_async {
   }
 
   /// Compatible with futures that depend on the tokio runtime.
+  ///
   /// future dependent on the tokio runtime may not work properly when generated
   /// using the ribir runtime (AppCtx::spawn_local()), you should call
   /// to_ribir_future() to convert it.
@@ -502,6 +444,38 @@ pub mod tokio_async {
   }
 }
 
+impl Default for AppCtx {
+  fn default() -> Self {
+    let app_theme = Stateful::new(Theme::default());
+
+    let mut font_db = FontDB::default();
+    font_db.load_system_fonts();
+
+    let font_db = Sc::new(RefCell::new(font_db));
+    let typography_store = RefCell::new(TypographyStore::new(font_db.clone()));
+
+    let executor = LocalPool::new();
+    let scheduler = executor.spawner();
+    AppCtx {
+      font_db,
+      app_theme,
+      typography_store,
+      clipboard: RefCell::new(Box::new(MockClipboard {})),
+      executor: RefCell::new(executor),
+      scheduler,
+      runtime_waker: RefCell::new(Box::new(MockWaker)),
+      windows: RefCell::new(ahash::HashMap::default()),
+      frame_ticks: <_>::default(),
+
+      #[cfg(feature = "tokio-async")]
+      tokio_runtime: tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap(),
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use std::task::Poll;
@@ -509,6 +483,7 @@ mod tests {
   use triomphe::Arc;
 
   use super::*;
+  use crate::reset_test_env;
 
   #[derive(Default)]
   struct Trigger {
@@ -549,7 +524,7 @@ mod tests {
 
   #[test]
   fn local_future_smoke() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     struct WakerCnt(Arc<Mutex<usize>>);
     impl RuntimeWaker for WakerCnt {
@@ -559,7 +534,7 @@ mod tests {
 
     let ctx_wake_cnt = Arc::new(Mutex::new(0));
     let wake_cnt = ctx_wake_cnt.clone();
-    unsafe { AppCtx::set_runtime_waker(Box::new(WakerCnt(wake_cnt))) }
+    AppCtx::set_runtime_waker(Box::new(WakerCnt(wake_cnt)));
 
     let triggers = (0..3)
       .map(|_| Sc::new(RefCell::new(Trigger::default())))
@@ -599,13 +574,13 @@ mod tests {
   mod tokio_tests {
     use std::{
       sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
       },
       time::{Duration, Instant},
     };
 
-    use tokio_stream::{wrappers::IntervalStream, StreamExt};
+    use tokio_stream::{StreamExt, wrappers::IntervalStream};
 
     use crate::{context::*, reset_test_env};
 
@@ -629,7 +604,7 @@ mod tests {
     fn tokio_runtime() {
       reset_test_env!();
       let waker = MockWaker::default();
-      unsafe { AppCtx::set_runtime_waker(waker.clone_box()) }
+      AppCtx::set_runtime_waker(waker.clone_box());
 
       let _ = AppCtx::spawn_local(
         async {

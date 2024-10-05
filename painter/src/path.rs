@@ -7,7 +7,7 @@ use lyon_algorithms::{
 use ribir_geom::{Point, Rect, Transform};
 use serde::{Deserialize, Serialize};
 
-use crate::path_builder::{stroke_path, PathBuilder};
+use crate::path_builder::{PathBuilder, stroke_path};
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -304,28 +304,6 @@ impl Default for StrokeOptions {
     }
   }
 }
-
-use ordered_float::OrderedFloat;
-
-impl std::hash::Hash for StrokeOptions {
-  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-    OrderedFloat(self.width).hash(state);
-    OrderedFloat(self.miter_limit).hash(state);
-    self.line_cap.hash(state);
-    self.line_join.hash(state);
-  }
-}
-
-impl PartialEq for StrokeOptions {
-  fn eq(&self, other: &Self) -> bool {
-    OrderedFloat(self.width).eq(&OrderedFloat(other.width))
-      && OrderedFloat(self.miter_limit).eq(&OrderedFloat(other.miter_limit))
-      && self.line_cap.eq(&other.line_cap)
-      && self.line_join.eq(&other.line_join)
-  }
-}
-
-impl Eq for StrokeOptions {}
 
 #[cfg(feature = "tessellation")]
 impl<Attr> Vertex<Attr> {

@@ -4,7 +4,7 @@ use std::{
 };
 
 use arboard::ImageData;
-use ribir_core::prelude::{image::ColorFormat, log::warn, PixelImage};
+use ribir_core::prelude::{PixelImage, image::ColorFormat, log::warn};
 
 pub struct Clipboard {
   pub clipboard: arboard::Clipboard,

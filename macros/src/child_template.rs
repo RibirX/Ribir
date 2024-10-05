@@ -1,9 +1,9 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{
-  parse_quote, punctuated::Pair, spanned::Spanned, token::Comma, AngleBracketedGenericArguments,
-  DataEnum, Field, Fields, FieldsNamed, FieldsUnnamed, GenericArgument, Index, PathArguments,
-  PathSegment, Type,
+  AngleBracketedGenericArguments, DataEnum, Field, Fields, FieldsNamed, FieldsUnnamed,
+  GenericArgument, Index, PathArguments, PathSegment, Type, parse_quote, punctuated::Pair,
+  spanned::Spanned, token::Comma,
 };
 
 const BUILDER: &str = "Builder";

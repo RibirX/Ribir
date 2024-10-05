@@ -27,7 +27,7 @@ mod tests {
   use ribir_core::{
     prelude::*,
     reset_test_env,
-    test_helper::{split_value, MockBox, MockMulti, TestWindow},
+    test_helper::{MockBox, MockMulti, TestWindow, split_value},
   };
 
   use crate::layout::OnlySizedByParent;

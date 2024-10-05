@@ -37,11 +37,11 @@ mod tests {
   };
 
   use super::*;
-  use crate::test_helper::*;
+  use crate::{reset_test_env, test_helper::*};
 
   #[test]
   fn tab_scope() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let size = Size::zero();
     let widget = fn_widget! {
@@ -100,7 +100,7 @@ mod tests {
 
   #[test]
   fn tab_scope_self_only() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let size = Size::zero();
     let widget = fn_widget! {
@@ -148,7 +148,7 @@ mod tests {
 
   #[test]
   fn focus_scope() {
-    let _guard = unsafe { AppCtx::new_lock_scope() };
+    reset_test_env!();
 
     let size = Size::new(50., 50.);
     let tap_cnt = Stateful::new(0);
