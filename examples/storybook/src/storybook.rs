@@ -264,7 +264,8 @@ fn content() -> Widget<'static> {
           }
         }
       }
-    }.into()
+    }
+    .into()
   }
 
   fn checkbox_show() -> GenWidget {

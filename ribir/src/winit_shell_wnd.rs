@@ -11,7 +11,7 @@ use winit::{
 
 use crate::{
   backends::*,
-  prelude::{request_redraw, WindowAttributes},
+  prelude::{WindowAttributes, request_redraw},
 };
 pub trait WinitBackend<'a>: Sized {
   fn new(window: &'a winit::window::Window) -> impl Future<Output = Self>;
@@ -191,7 +191,7 @@ impl WinitShellWnd {
     const RIBIR_CANVAS: &str = "ribir_canvas";
     const RIBIR_CANVAS_USED: &str = "ribir_canvas_used";
 
-    use web_sys::{wasm_bindgen::JsCast, HtmlCanvasElement};
+    use web_sys::{HtmlCanvasElement, wasm_bindgen::JsCast};
     let document = web_sys::window().unwrap().document().unwrap();
     let elems = document.get_elements_by_class_name(RIBIR_CANVAS);
 

@@ -27,8 +27,7 @@ serde_json.workspace = true
 tiny-skia-path = {workspace = true}
 usvg.workspace = true
 zerocopy = {workspace = true, optional = true, features = ["derive"]}
-ordered-float = {workspace = true, features = ["serde"]}
-derive_more.workspace = true
+derive_more= {workspace = true, features = ["add", "add_assign", "not", "mul"]} 
 smallvec.workspace = true
 fontdb.workspace = true
 rustybuzz.workspace = true

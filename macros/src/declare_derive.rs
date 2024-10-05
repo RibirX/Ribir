@@ -1,11 +1,11 @@
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
-use syn::{spanned::Spanned, Fields, Ident, Visibility};
+use quote::{ToTokens, quote, quote_spanned};
+use syn::{Fields, Ident, Visibility, spanned::Spanned};
 
 use crate::{
   simple_declare_attr::*,
   util::data_struct_unwrap,
-  variable_names::{BuiltinMemberType, BUILTIN_INFOS},
+  variable_names::{BUILTIN_INFOS, BuiltinMemberType},
 };
 
 const DECLARE: &str = "Declare";

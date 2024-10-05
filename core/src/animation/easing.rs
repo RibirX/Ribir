@@ -118,12 +118,13 @@ pub enum StepsJump {
 }
 
 /// Displays an animation iteration along n stops along the transition,
-/// displaying each stop for equal lengths of time. For example, if n is 5,
-/// there are 5 steps. Whether the animation holds temporarily at 0%, 20%, 40%,
-/// 60% and 80%, on the 20%, 40%, 60%, 80% and 100%, or makes 5 stops between
-/// the 0% and 100% along the animation, or makes 5 stops including the 0% and
-/// 100% marks (on the 0%, 25%, 50%, 75%, and 100%) depends on which of the
-/// following jump terms is used
+/// displaying each stop for equal lengths of time.
+///
+/// For example, if n is 5, there are 5 steps. Whether the animation holds
+/// temporarily at 0%, 20%, 40%, 60% and 80%, on the 20%, 40%, 60%, 80% and
+/// 100%, or makes 5 stops between the 0% and 100% along the animation, or makes
+/// 5 stops including the 0% and 100% marks (on the 0%, 25%, 50%, 75%, and 100%)
+/// depends on which of the following jump terms is used
 pub fn steps(step_cnt: u32, jump: StepsJump) -> Steps {
   let time_step = 1. / step_cnt as f32;
   match jump {

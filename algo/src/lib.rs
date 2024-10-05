@@ -1,3 +1,5 @@
+#![allow(clippy::needless_lifetimes)]
+
 mod cow_rc;
 mod frame_cache;
 pub use cow_rc::{CowArc, Substr};

@@ -1,3 +1,4 @@
+#![allow(clippy::needless_lifetimes)]
 use std::ops::{Deref, DerefMut};
 
 use ribir_core::prelude::{

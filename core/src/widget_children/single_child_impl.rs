@@ -63,12 +63,13 @@ impl<'w, W: SingleIntoParent> IntoWidgetStrict<'w, RENDER> for WidgetOf<'w, W> {
 }
 
 /// This trait indicates that a type can serve as a parent widget for another
-/// widget. It is similar to the `SingleChild` trait but includes the concept of
+/// widget.
+///
+/// It is similar to the `SingleChild` trait but includes the concept of
 /// a pipe for `SingleChild`. The reason for this distinction is that the logic
 /// for being a parent widget with a pipe differs from that of a regular render
 /// widget. Therefore, the pipe does not implement the `SingleChild` trait but
 /// instead utilizes the `Parent` trait to distinguish between the two.
-
 trait Parent {}
 
 impl<T: SingleChild> Parent for T {}

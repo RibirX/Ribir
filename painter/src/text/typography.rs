@@ -2,11 +2,11 @@ use std::ops::Range;
 
 use ribir_algo::Sc;
 use ribir_geom::Size;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use unicode_script::{Script, UnicodeScript};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::{shaper::ShapeResult, Glyph, GlyphUnit, Overflow, TextAlign};
+use crate::{Glyph, GlyphUnit, Overflow, TextAlign, shaper::ShapeResult};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PlaceLineDirection {

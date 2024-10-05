@@ -1,21 +1,21 @@
 use std::cmp::Ordering;
 
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
-use smallvec::{smallvec, SmallVec};
+use quote::{ToTokens, quote, quote_spanned};
+use smallvec::{SmallVec, smallvec};
 use syn::{
+  Expr, ExprField, ExprMethodCall, Macro, Member,
   fold::Fold,
   parse::{Parse, ParseStream},
   parse_quote, parse_quote_spanned,
   spanned::Spanned,
   token::Dollar,
-  Expr, ExprField, ExprMethodCall, Macro, Member,
 };
 
 use crate::{
   fn_widget_macro,
   rdl_macro::RdlMacro,
-  variable_names::{ribir_suffix_variable, BuiltinMember, BuiltinMemberType, BUILTIN_INFOS},
+  variable_names::{BUILTIN_INFOS, BuiltinMember, BuiltinMemberType, ribir_suffix_variable},
 };
 
 pub const KW_DOLLAR_STR: &str = "_dollar_ಠ_ಠ";
@@ -72,7 +72,7 @@ pub struct StackGuard<'a>(&'a mut DollarRefsCtx);
 mod tokens_pre_process {
 
   use proc_macro::*;
-  use quote::{quote_spanned, ToTokens};
+  use quote::{ToTokens, quote_spanned};
   use syn::token::Paren;
 
   use super::KW_DOLLAR_STR;

@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use usvg::{Options, Stop, Tree, TreeParsing};
 
 use crate::{
-  color::{LinearGradient, RadialGradient},
   Brush, Color, GradientStop, LineCap, LineJoin, PaintCommand, Path, StrokeOptions,
+  color::{LinearGradient, RadialGradient},
 };
 
 #[derive(Serialize, Deserialize, Clone)]

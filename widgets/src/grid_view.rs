@@ -58,13 +58,10 @@ impl Render for GridView {
     let mut idx = 0;
     let (ctx, children) = ctx.split_children();
     for c in children {
-      ctx.perform_child_layout(
-        c,
-        BoxClamp {
-          min: Size::new(self.child_x_extent, self.child_y_extent),
-          max: Size::new(self.child_x_extent, self.child_y_extent),
-        },
-      );
+      ctx.perform_child_layout(c, BoxClamp {
+        min: Size::new(self.child_x_extent, self.child_y_extent),
+        max: Size::new(self.child_x_extent, self.child_y_extent),
+      });
       ctx.update_position(c, self.calc_child_pos(idx));
       idx += 1;
     }

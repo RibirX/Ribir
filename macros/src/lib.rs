@@ -1,3 +1,4 @@
+#![allow(clippy::needless_lifetimes)]
 #![cfg_attr(feature = "nightly", feature(proc_macro_span))]
 
 extern crate proc_macro;
@@ -8,7 +9,7 @@ mod util;
 use proc_macro::TokenStream;
 use quote::quote;
 use symbol_process::DollarRefsCtx;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{DeriveInput, parse_macro_input};
 mod child_template;
 mod fn_widget_macro;
 mod pipe_macro;
@@ -102,6 +103,7 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
     .into()
 }
 
+#[allow(clippy::doc_lazy_continuation)]
 /// A macro use to declare an object. This macro will use `ctx!()` to access
 /// the `BuildCtx`, so it can only use in a scope that has a `BuildCtx` named as
 /// `ctx!()`.
@@ -133,10 +135,12 @@ pub fn rdl(input: TokenStream) -> TokenStream {
   RdlMacro::gen_code(input.into(), &mut refs)
 }
 
-/// The `fn_widget` is a macro that create a widget from a function widget from
-/// a expression. Its syntax is extended from rust syntax, you can use `@` and
-/// `$` in the expression, the `@` is a short hand of `rdl` macro, and `$name`
-/// use to expression a state reference of `name`.
+/// The `fn_widget` macro generates a widget from a function widget based on an
+/// expression.
+///
+/// Its syntax extends the Rust syntax, allowing the use of `@` and `$` within
+/// the expression. The `@` serves as a shorthand for the `rdl` macro, while
+/// `$name` is used to express a state reference to `name`.
 #[proc_macro]
 pub fn fn_widget(input: TokenStream) -> TokenStream {
   fn_widget_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
@@ -159,9 +163,11 @@ pub fn ctx(input: TokenStream) -> TokenStream {
   tokens.into()
 }
 
-/// The macro is used to create a `Pipe` object that continuously tracks
-/// modifications to the expression. The `$` symbol is used to mark the state
-/// reference and automatically subscribe to its modifications.
+/// This macro is utilized for generating a `Pipe` object that actively monitors
+/// the expression's result.
+///
+/// The `$` symbol denotes the state reference and automatically subscribes to
+/// any changes made to it. It triggers when the `$` state modifies.
 #[proc_macro]
 pub fn pipe(input: TokenStream) -> TokenStream {
   pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
@@ -180,10 +186,12 @@ pub fn style_class(input: TokenStream) -> TokenStream {
   .into()
 }
 
-/// This macro is used to create a `Pipe` object that continuously tracks the
-/// expression result, triggering when the new result differs from the previous
-/// one. The `$` symbol marks the state reference, automatically subscribing to
-/// its modifications.
+/// This macro is utilized for generating a `Pipe` object that actively monitors
+/// the expression's result.
+///
+/// It triggers when the new result differs from the previous one. The `$`
+/// symbol denotes the state reference and automatically subscribes to any
+/// changes made to it.
 #[proc_macro]
 pub fn distinct_pipe(input: TokenStream) -> TokenStream {
   distinct_pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
@@ -229,19 +237,18 @@ pub fn distinct_pipe(input: TokenStream) -> TokenStream {
 /// // Call unsubscribe at the appropriate time to ensure the state can be dropped.
 /// u.unsubscribe();
 /// ```
-
 #[proc_macro]
 pub fn watch(input: TokenStream) -> TokenStream {
   watch_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// Includes an SVG file as an `Svg`.
-
+///
 /// The file is located relative to the current crate (similar to the location
 /// of your `cargo.toml`). The provided path is interpreted in a
 /// platform-specific way at compile time. For example, a Windows path with
 /// backslashes \ would not compile correctly on Unix.
-
+///
 /// This macro returns an expression of type `Svg`.
 #[proc_macro]
 pub fn include_crate_svg(input: TokenStream) -> TokenStream {
@@ -252,12 +259,12 @@ pub fn include_crate_svg(input: TokenStream) -> TokenStream {
 }
 
 /// Includes an SVG file as an `Svg`.
-
+///
 /// The file is located relative to the current file (similarly to how modules
 /// are found). The provided path is interpreted in a platform-specific way at
 /// compile time. For example, a Windows path with backslashes \ would not
 /// compile correctly on Unix.
-
+///
 /// This macro returns an expression of type `Svg`.
 #[cfg(feature = "nightly")]
 #[proc_macro]

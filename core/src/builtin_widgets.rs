@@ -1,5 +1,7 @@
 //! Built-in widgets is a set of minimal widgets that describes the most common
-//! UI elements. The most of them can be used to extend other object in the
+//! UI elements.
+//!
+//! The most of them can be used to extend other object in the
 //! declare syntax, so other objects can use the builtin fields and methods like
 //! self fields and methods.
 
@@ -76,9 +78,10 @@ use crate::prelude::*;
 /// LazyWidgetId is a widget id that will be valid after widget build.
 pub struct LazyWidgetId(Sc<Cell<Option<WidgetId>>>);
 
-/// A fat object that extend the `T` object with all builtin widgets ability. A
-/// `FatObj` will create during the compose phase, and compose with the builtin
-/// widgets it actually use, and drop after composed.
+/// A fat object that extend the `T` object with all builtin widgets ability.
+///
+/// A `FatObj` will create during the compose phase, and compose with the
+/// builtin widgets it actually use, and drop after composed.
 ///
 /// It's important to understand that `FatObj` is a temporary mixin object. It
 /// doesn't persist in the final widget tree. Therefore, you can only clone a

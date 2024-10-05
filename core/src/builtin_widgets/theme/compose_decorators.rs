@@ -9,10 +9,6 @@ pub struct ComposeDecorators {
   pub(crate) styles: ahash::HashMap<TypeId, Box<ComposeDecoratorFn>>,
 }
 
-/// `ComposeDecorator` is a trait let you can convert your host widget to
-/// another, it has same signature of `ComposeChild`, but it can be overwrote in
-/// `Theme` by a function. The trait implementation only as a default logic if
-/// no overwrite function in `Theme`.
 pub trait ComposeDecorator: Sized {
   fn compose_decorator(this: State<Self>, host: Widget) -> Widget;
 }
@@ -71,8 +67,7 @@ mod tests {
       }}
     };
 
-    unsafe { AppCtx::set_app_theme(theme) };
-
+    AppCtx::set_app_theme(theme);
     let mut wnd = TestWindow::new_with_size(w, Size::new(500., 500.));
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(100., 100.));

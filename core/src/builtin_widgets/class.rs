@@ -17,12 +17,9 @@
 //!
 //! let mut theme = Theme::default();
 //! // Define how `RED_BORDER` transforms a widget.
-//! theme.classes.insert(
-//!   RED_BORDER,
-//!   style_class! {
-//!     border: Border::all(BorderSide::new(2., Color::RED.into()))
-//!   },
-//! );
+//! theme.classes.insert(RED_BORDER, style_class! {
+//!   border: Border::all(BorderSide::new(2., Color::RED.into()))
+//! });
 //!
 //! let w = fn_widget! {
 //!   @Container {
@@ -334,7 +331,7 @@ mod tests {
   use super::*;
   use crate::{
     reset_test_env,
-    test_helper::{split_value, MockBox, TestWindow},
+    test_helper::{MockBox, TestWindow, split_value},
   };
 
   #[test]
@@ -358,7 +355,7 @@ mod tests {
       .into_widget()
     });
 
-    unsafe { AppCtx::set_app_theme(theme) };
+    AppCtx::set_app_theme(theme);
 
     let (cls, w_cls) = split_value(MARGIN);
 

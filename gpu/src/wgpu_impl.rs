@@ -1,12 +1,12 @@
 use std::{
   error::Error,
-  mem::{size_of, MaybeUninit},
+  mem::{MaybeUninit, size_of},
   ops::Range,
 };
 
 use futures::channel::oneshot;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
-use ribir_painter::{image::ColorFormat, Color, PixelImage, VertexBuffers};
+use ribir_painter::{Color, PixelImage, VertexBuffers, image::ColorFormat};
 
 use self::{
   draw_alpha_triangles_pass::DrawAlphaTrianglesPass,
@@ -18,9 +18,9 @@ use self::{
   uniform::Uniform,
 };
 use crate::{
-  gpu_backend::Texture, ColorAttr, DrawPhaseLimits, GPUBackendImpl, GradientStopPrimitive,
-  ImagePrimIndex, ImgPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer,
-  RadialGradientPrimIndex, RadialGradientPrimitive,
+  ColorAttr, DrawPhaseLimits, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex, ImgPrimitive,
+  LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, RadialGradientPrimIndex,
+  RadialGradientPrimitive, gpu_backend::Texture,
 };
 mod shaders;
 mod uniform;

@@ -38,9 +38,10 @@ impl<V: Default> Default for KeyChange<V> {
 }
 
 /// A widget that can be used to track if the widget is the same widget in two
-/// frames by its key. If two widget has same parent and key in two frames, the
-/// new widget in the next frame will be treated as the same widget in the last
-/// frame.
+/// frames by its key.
+///
+/// If two widget has same parent and key in two frames, the new widget in the
+/// next frame will be treated as the same widget in the last frame.
 ///
 /// ## Notice
 ///

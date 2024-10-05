@@ -1,4 +1,4 @@
-use syn::{spanned::Spanned, Data};
+use syn::{Data, spanned::Spanned};
 
 pub fn data_struct_unwrap<'a>(
   data: &'a mut syn::Data, derive_trait: &'static str,

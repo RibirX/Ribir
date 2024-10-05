@@ -139,7 +139,7 @@ impl Overlay {
   /// ```
   pub fn show_map<F>(&self, mut f: F, wnd: Sc<Window>)
   where
-    F: FnMut(Widget<'static>) -> Widget + 'static,
+    F: FnMut(Widget) -> Widget + 'static,
   {
     if self.is_showing() {
       return;
