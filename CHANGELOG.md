@@ -39,6 +39,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Added the `PaintingStyleWidget` built-in widget, enabling any widget to utilize `painting_style` to specify how shapes and paths should be painted within its descendants. (#633 @M-Adoo)
 
+- **widgetes**: Added the Progress widget (#630 @wjian23)
+
 ### Changed
 
 - **text**: Merge the `overflow` field to the `TexStyle` structure. (#629 @M-Adoo)
