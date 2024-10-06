@@ -3,7 +3,7 @@ use std::ptr::NonNull;
 use self::dispatcher::DispatchInfo;
 use crate::{
   builtin_widgets::MixFlags,
-  context::{define_widget_context, WidgetCtx, WidgetCtxImpl},
+  context::{WidgetCtx, WidgetCtxImpl, define_widget_context},
   widget_tree::{WidgetId, WidgetTree},
 };
 
@@ -288,6 +288,6 @@ impl CommonEvent {
   pub(crate) fn set_current_target(&mut self, id: WidgetId) { self.id = id; }
 
   fn pick_info<R>(&self, f: impl FnOnce(&DispatchInfo) -> R) -> R {
-    f(&self.current_wnd().dispatcher.borrow().info)
+    f(&self.window().dispatcher.borrow().info)
   }
 }

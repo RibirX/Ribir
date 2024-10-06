@@ -1,10 +1,10 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
+  Ident, Macro, Path,
   punctuated::Punctuated,
   spanned::Spanned,
   token::{Brace, Comma, Semi},
-  Ident, Macro, Path,
 };
 
 use crate::{

@@ -114,13 +114,13 @@ fn hint_color(hint: Option<CharHint>, ctx: &BuildCtx) -> Color {
 impl Wordle {
   fn char_hint(&self, row: usize, col: usize) -> Option<WordleChar> {
     assert!(col < self.len_hint());
-    return match row.cmp(&self.guesses.len()) {
+    match row.cmp(&self.guesses.len()) {
       std::cmp::Ordering::Less => Some(*self.guesses[row].char_hint(col)),
       std::cmp::Ordering::Equal if col < self.guessing.word().len() => {
         Some(WordleChar { char: self.guessing.word().chars().nth(col).unwrap(), hint: None })
       }
-      _ => return None,
-    };
+      _ => None,
+    }
   }
 
   fn char_grid(&self, row: usize, col: usize) -> Widget<'static> {

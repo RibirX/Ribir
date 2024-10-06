@@ -7,7 +7,7 @@ mod test_single_thread {
   use ribir_core::{
     prelude::*,
     reset_test_env,
-    test_helper::{split_value, MockBox, TestWindow},
+    test_helper::{MockBox, TestWindow, split_value},
   };
   use winit::event::{DeviceId, ElementState, MouseButton};
 

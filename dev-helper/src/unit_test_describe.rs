@@ -1,7 +1,8 @@
-/// A unit test macro to help describe the test flow. This macro provide ability
-/// to pack many unit tests, and print the result like official. Should always
-/// use official test harness first, use it only when you need execute test by
-/// self.
+/// A unit test macro to help describe the test flow.
+///
+/// This macro provide ability to pack many unit tests, and print the result
+/// like official. Should always use official test harness first, use it only
+/// when you need execute test by self.
 ///
 /// This macro depends on crate `colored`.
 ///
@@ -22,7 +23,6 @@
 ///   }
 /// }
 /// ```
-
 #[macro_export]
 macro_rules! unit_test_describe {
   ($(run_unit_test($name: path);)* ) => {{

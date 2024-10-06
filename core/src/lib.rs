@@ -1,24 +1,24 @@
+#![allow(clippy::needless_lifetimes)]
 #![cfg_attr(feature = "nightly", feature(closure_track_caller))]
 #[macro_use]
 extern crate bitflags;
-extern crate lazy_static;
 
 pub mod animation;
 pub mod builtin_widgets;
+pub mod clipboard;
 mod context;
 pub mod data_widget;
-pub(crate) mod render_helper;
-mod state;
-pub(crate) mod widget_tree;
-
-pub mod clipboard;
 pub mod declare;
 pub mod events;
+pub mod local_sender;
 pub mod pipe;
+pub(crate) mod render_helper;
+mod state;
 pub mod ticker;
 pub mod timer;
 pub mod widget;
 pub mod widget_children;
+pub(crate) mod widget_tree;
 pub mod window;
 pub use rxrust;
 pub mod overlay;

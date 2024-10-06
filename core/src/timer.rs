@@ -3,13 +3,12 @@ use std::{
   future::Future,
   mem::swap,
   sync::{
+    LazyLock, Mutex,
     atomic::{AtomicUsize, Ordering},
-    Mutex,
   },
   task::{Poll, Waker},
 };
 
-use once_cell::sync::Lazy;
 use rxrust::scheduler::BoxFuture;
 
 use crate::ticker::{Duration, Instant};
@@ -43,8 +42,8 @@ impl TimeReactor {
   fn remove_timer(&mut self, when: Instant, id: usize) { self.timers.remove(&(when, id)); }
 }
 
-pub(crate) static TIME_REACTOR: Lazy<Mutex<TimeReactor>> =
-  Lazy::new(|| Mutex::new(TimeReactor::default()));
+pub(crate) static TIME_REACTOR: LazyLock<Mutex<TimeReactor>> =
+  LazyLock::new(|| Mutex::new(TimeReactor::default()));
 
 pub struct Timer {
   id: Option<usize>,

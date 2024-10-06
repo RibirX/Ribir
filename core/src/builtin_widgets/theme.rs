@@ -29,8 +29,10 @@ pub enum Brightness {
 }
 
 /// A `Theme` widget is used to share design configurations among its
-/// descendants. This includes palettes, font styles, animation transitions, and
-/// icons. An app theme is always present, but you can also use a different
+/// descendants.
+///
+/// This includes palettes, font styles, animation transitions, and icons. An
+/// app theme is always present, but you can also use a different
 /// theme for parts of your sub-tree. You can customize parts of the theme using
 /// `Palette`, `TypographyTheme`, and `IconTheme`.
 ///

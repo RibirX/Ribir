@@ -8,10 +8,10 @@ use std::hash::Hash;
 
 use derive_more::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
 use font_db::Face;
-pub use fontdb::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight, ID};
+pub use fontdb::{ID, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 pub use ribir_algo::Substr;
-use ribir_geom::{rect, Rect};
-use rustybuzz::{ttf_parser::GlyphId, GlyphPosition};
+use ribir_geom::{Rect, rect};
+use rustybuzz::{GlyphPosition, ttf_parser::GlyphId};
 pub mod text_reorder;
 pub mod typography;
 pub use text_reorder::TextReorder;
@@ -21,7 +21,7 @@ mod svg_glyph_cache;
 
 mod text_writer;
 pub use text_writer::{
-  select_next_word, select_prev_word, select_word, CharacterCursor, TextWriter,
+  CharacterCursor, TextWriter, select_next_word, select_prev_word, select_word,
 };
 
 mod grapheme_cursor;

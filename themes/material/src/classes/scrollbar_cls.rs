@@ -16,24 +16,18 @@ pub(super) fn init(classes: &mut Classes) {
   // inheriting the ancestor class implementation of `SCROLL_CLIENT_AREA`.
   classes.insert(SCROLL_CLIENT_AREA, |w| w);
 
-  classes.insert(
-    H_SCROLL_THUMB,
-    style_class! {
-      background: Palette::of(ctx!()).primary(),
-      border_radius: RADIUS,
-      margin: EdgeInsets::vertical(1.),
-      clamp: BoxClamp::min_width(THUMB_MIN_SIZE).with_fixed_height(THICKNESS)
-    },
-  );
-  classes.insert(
-    V_SCROLL_THUMB,
-    style_class! {
-      background: Palette::of(ctx!()).primary(),
-      border_radius: RADIUS,
-      margin: EdgeInsets::horizontal(1.),
-      clamp: BoxClamp::min_height(THUMB_MIN_SIZE).with_fixed_width(THICKNESS)
-    },
-  );
+  classes.insert(H_SCROLL_THUMB, style_class! {
+    background: Palette::of(ctx!()).primary(),
+    border_radius: RADIUS,
+    margin: EdgeInsets::vertical(1.),
+    clamp: BoxClamp::min_width(THUMB_MIN_SIZE).with_fixed_height(THICKNESS)
+  });
+  classes.insert(V_SCROLL_THUMB, style_class! {
+    background: Palette::of(ctx!()).primary(),
+    border_radius: RADIUS,
+    margin: EdgeInsets::horizontal(1.),
+    clamp: BoxClamp::min_height(THUMB_MIN_SIZE).with_fixed_width(THICKNESS)
+  });
 
   const H_TRACK: ClassImpl = style_class! {
     v_align: VAlign::Bottom

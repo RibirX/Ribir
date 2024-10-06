@@ -18,11 +18,10 @@ bitflags.workspace = true
 blake3 = {workspace = true, features = ["rayon"]}
 futures.workspace = true
 indextree.workspace = true
-lazy_static.workspace = true
 log.workspace = true
 lyon_geom.workspace = true
-once_cell.workspace = true
 paste.workspace = true
+triomphe.workspace = true
 pin-project-lite.workspace = true
 ribir_algo = {path = "../algo", version = "0.4.0-alpha.11" }
 ribir_geom = {path = "../geom", version = "0.4.0-alpha.11" }

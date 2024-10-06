@@ -10,7 +10,7 @@ mod tests {
   use crate::{
     prelude::*,
     reset_test_env,
-    test_helper::{split_value, MockBox, MockMulti, TestWindow},
+    test_helper::{MockBox, MockMulti, TestWindow, split_value},
   };
 
   #[test]
@@ -56,47 +56,43 @@ mod tests {
 
     wnd.draw_frame();
 
-    assert_eq!(
-      &**c_lc.read(),
-      ["static mounted", "dyn mounted", "dyn performed layout", "static performed layout",]
-    );
+    assert_eq!(&**c_lc.read(), [
+      "static mounted",
+      "dyn mounted",
+      "dyn performed layout",
+      "static performed layout",
+    ]);
     {
       *c_trigger.write() += 1;
     }
     wnd.draw_frame();
-    assert_eq!(
-      &**c_lc.read(),
-      [
-        "static mounted",
-        "dyn mounted",
-        "dyn performed layout",
-        "static performed layout",
-        "dyn disposed",
-        "dyn mounted",
-        "dyn performed layout",
-        "static performed layout",
-      ]
-    );
+    assert_eq!(&**c_lc.read(), [
+      "static mounted",
+      "dyn mounted",
+      "dyn performed layout",
+      "static performed layout",
+      "dyn disposed",
+      "dyn mounted",
+      "dyn performed layout",
+      "static performed layout",
+    ]);
 
     {
       *clean_trigger.write() = true;
     }
     wnd.draw_frame();
-    assert_eq!(
-      &**c_lc.read(),
-      [
-        "static mounted",
-        "dyn mounted",
-        "dyn performed layout",
-        "static performed layout",
-        "dyn disposed",
-        "dyn mounted",
-        "dyn performed layout",
-        "static performed layout",
-        "dyn disposed",
-        "static disposed",
-      ]
-    );
+    assert_eq!(&**c_lc.read(), [
+      "static mounted",
+      "dyn mounted",
+      "dyn performed layout",
+      "static performed layout",
+      "dyn disposed",
+      "dyn mounted",
+      "dyn performed layout",
+      "static performed layout",
+      "dyn disposed",
+      "static disposed",
+    ]);
   }
 
   #[test]

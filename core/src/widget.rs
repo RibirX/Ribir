@@ -71,7 +71,7 @@ enum PureNode<'w> {
 /// 'w>`, but does not utilize the `'w` in the return type to prevent the
 /// `LazyWidget` from becoming **invariant**. This approach allows `Widget<'w>`
 /// to remain **covariant** with the lifetime `'w`.
-
+///
 /// This approach should be acceptable since `LazyWidget` is private and not
 /// accessed externally. Additionally, the lifetime will shorten once we consume
 /// it to obtain the `Widget<'w>`.
@@ -97,9 +97,11 @@ pub struct GenWidget(InnerGenWidget);
 type InnerGenWidget = Sc<RefCell<Box<dyn FnMut(&mut BuildCtx) -> Widget<'static>>>>;
 
 /// The `FnWidget<'w>` is a type alias that denotes a boxed trait object of a
-/// function widget. It already implements `IntoChild`, allowing any function
-/// widget to be converted to `FnWidget`. Therefore, using `FnWidget` as the
-/// child type of `ComposeChild` enables the acceptance of all function widgets.
+/// function widget.
+///
+/// It already implements `IntoChild`, allowing any function widget to be
+/// converted to `FnWidget`. Therefore, using `FnWidget` as the child type of
+/// `ComposeChild` enables the acceptance of all function widgets.
 pub type FnWidget<'w> = Box<dyn FnOnce(&mut BuildCtx) -> Widget<'w> + 'w>;
 
 // The widget type marker.

@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::BTreeMap, io::prelude::*, ops::RangeInclusiv
 use ahash::{HashMap, HashSet};
 use log::warn;
 use quick_xml::{
-  events::{attributes::Attribute, BytesStart, Event},
+  events::{BytesStart, Event, attributes::Attribute},
   name::QName,
   reader::Reader,
 };

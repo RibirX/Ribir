@@ -1,9 +1,10 @@
+#![allow(clippy::needless_lifetimes)]
 pub mod error;
 use std::ops::Range;
 
 pub use gpu_backend::Texture;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
-use ribir_painter::{image::ColorFormat, Color, GradientStop, VertexBuffers};
+use ribir_painter::{Color, GradientStop, VertexBuffers, image::ColorFormat};
 mod gpu_backend;
 use zerocopy::AsBytes;
 
@@ -18,7 +19,7 @@ pub use wgpu_impl::*;
 /// The call graph:
 ///
 /// -- begin_frame()
-
+///
 ///   +--->-------- Draw Phase --------------------------+
 ///   |                                                  |
 ///   |    +->- new_texture()----+                       |   
@@ -75,7 +76,6 @@ pub use wgpu_impl::*;
 ///     +---------+            +----------+
 ///     v                      v
 ///     1                     height
-
 pub trait GPUBackendImpl {
   type Texture: Texture;
 

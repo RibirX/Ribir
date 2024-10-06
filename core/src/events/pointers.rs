@@ -5,12 +5,13 @@ mod from_mouse;
 pub struct PointerId(usize);
 
 /// The pointer is a hardware-agnostic device that can target a specific set of
-/// screen coordinates. Having a single event model for pointers can simplify
-/// creating Web sites and applications and provide a good user experience
-/// regardless of the user's hardware. However, for scenarios when
-/// device-specific handling is desired, pointer events defines a pointerType
-/// property to inspect the device type which produced the event.
-/// Reference: <https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#term_pointer_event>
+/// screen coordinates.
+///
+/// Having a single event model for pointers can simplify creating Web sites and
+/// applications and provide a good user experience regardless of the user's
+/// hardware. However, for scenarios when device-specific handling is desired,
+/// pointer events defines a pointerType property to inspect the device type
+/// which produced the event. Reference: <https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#term_pointer_event>
 #[derive(Debug)]
 pub struct PointerEvent {
   /// A unique identifier for the pointer causing the event.

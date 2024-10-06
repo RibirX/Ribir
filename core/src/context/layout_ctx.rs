@@ -7,10 +7,11 @@ use crate::{
   window::DelayEvent,
 };
 
-/// A place to compute the render object's layout. Rather than holding  children
-/// directly, `Layout` perform layout across `LayoutCtx`. `LayoutCtx` provide
-/// method to perform child layout and also provides methods to update
-/// descendants position.
+/// A place to compute the render object's layout.
+///
+/// Rather than holding children directly, `Layout` perform layout across
+/// `LayoutCtx`. `LayoutCtx` provide method to perform child layout and also
+/// provides methods to update descendants position.
 pub struct LayoutCtx<'a> {
   pub(crate) id: WidgetId,
   /// The widget tree of the window, not borrow it from `wnd` is because a

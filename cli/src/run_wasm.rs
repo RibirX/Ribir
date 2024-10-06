@@ -6,12 +6,12 @@ use std::{
 };
 
 use anyhow::Result;
-use clap::{command, CommandFactory, FromArgMatches, Parser};
-use notify_debouncer_mini::{new_debouncer, notify::*, DebounceEventResult, Debouncer};
+use clap::{CommandFactory, FromArgMatches, Parser, command};
+use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer, notify::*};
 
 use crate::{
-  program_check::{check_all_programs, Program},
   CliCommand,
+  program_check::{Program, check_all_programs},
 };
 
 const WATCH_DEBOUNCE_GAP: Duration = Duration::from_secs(2);

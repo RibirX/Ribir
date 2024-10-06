@@ -4,13 +4,13 @@ use ahash::HashMap;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
 use ribir_algo::{Resource, Sc};
-use ribir_geom::{rect, Point, Rect};
+use ribir_geom::{Point, Rect, rect};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 
 use crate::{
-  path_builder::PathBuilder,
-  text::{svg_glyph_cache::SvgGlyphCache, FontFace, FontFamily},
   Path, PixelImage, Svg,
+  path_builder::PathBuilder,
+  text::{FontFace, FontFamily, svg_glyph_cache::SvgGlyphCache},
 };
 /// A wrapper of fontdb and cache font data.
 pub struct FontDB {

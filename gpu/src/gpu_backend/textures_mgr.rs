@@ -3,12 +3,12 @@ use std::{any::Any, cmp::Ordering, hash::Hash, ops::Range};
 use guillotiere::euclid::SideOffsets2D;
 use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use ribir_algo::Resource;
-use ribir_geom::{transform_to_device_rect, DeviceRect, DeviceSize, Size, Transform};
-use ribir_painter::{image::ColorFormat, PaintPath, Path, PixelImage, Vertex, VertexBuffers};
+use ribir_geom::{DeviceRect, DeviceSize, Size, Transform, transform_to_device_rect};
+use ribir_painter::{PaintPath, Path, PixelImage, Vertex, VertexBuffers, image::ColorFormat};
 
 use super::{
-  atlas::{Atlas, AtlasConfig, AtlasDist},
   Texture,
+  atlas::{Atlas, AtlasConfig, AtlasDist},
 };
 use crate::GPUBackendImpl;
 const TOLERANCE: f32 = 0.1_f32;
@@ -188,13 +188,10 @@ where
     let dist = self
       .target_atlas
       .get_or_cache(target, scale, size, gpu, init);
-    (
-      dist.scale,
-      TextureSlice {
-        tex_id: TextureID::Bundle(dist.tex_id()),
-        rect: dist.tex_rect(&self.target_atlas),
-      },
-    )
+    (dist.scale, TextureSlice {
+      tex_id: TextureID::Bundle(dist.tex_id()),
+      rect: dist.tex_rect(&self.target_atlas),
+    })
   }
 
   pub(super) fn texture(&self, tex_id: TextureID) -> &T { id_to_texture!(self, tex_id) }

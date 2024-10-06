@@ -3,10 +3,10 @@ use std::{
   collections::VecDeque,
   convert::Infallible,
   ptr::NonNull,
-  rc::Rc,
 };
 
-use futures::{task::LocalSpawnExt, Future};
+use futures::{Future, task::LocalSpawnExt};
+use ribir_algo::Sc;
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 pub use winit::window::CursorIcon;
 
@@ -32,7 +32,8 @@ pub struct Window {
   pub(crate) dispatcher: RefCell<Dispatcher>,
   pub(crate) frame_ticker: FrameTicker,
   pub(crate) focus_mgr: RefCell<FocusManager>,
-  pub(crate) running_animates: Rc<Cell<u32>>,
+  pub(crate) running_animates: Sc<Cell<u32>>,
+  pre_edit: RefCell<Option<String>>,
   /// This vector store the task to emit events. When perform layout, dispatch
   /// event and so on, some part of window may be already mutable borrowed and
   /// the user event callback may also query borrow that part, so we can't emit
@@ -273,10 +274,11 @@ impl Window {
 
   pub fn need_draw(&self) -> bool { self.tree().is_dirty() || self.running_animates.get() > 0 }
 
-  pub fn new(shell_wnd: Box<dyn ShellWindow>) -> Rc<Self> {
-    let focus_mgr = RefCell::new(FocusManager::new());
-    let tree = Box::new(WidgetTree::default());
-    let dispatcher = RefCell::new(Dispatcher::new());
+  pub fn new(shell_wnd: Box<dyn ShellWindow>) -> Sc<Self> {
+    let wnd_id = shell_wnd.id();
+    let focus_mgr = RefCell::new(FocusManager::new(wnd_id));
+    let tree = Box::new(WidgetTree::new(wnd_id));
+    let dispatcher = RefCell::new(Dispatcher::new(wnd_id));
     let size = shell_wnd.inner_size();
     let painter = Painter::new(Rect::from_size(size));
     let window = Self {
@@ -292,15 +294,13 @@ impl Window {
       shell_wnd: RefCell::new(shell_wnd),
       delay_drop_widgets: <_>::default(),
       flags: Cell::new(WindowFlags::DEFAULT),
+      pre_edit: <_>::default(),
     };
-    let window = Rc::new(window);
-    window.dispatcher.borrow_mut().init(&window);
-    window.focus_mgr.borrow_mut().init(&window);
 
-    window
+    Sc::new(window)
   }
 
-  pub fn init(self: &Rc<Window>, content: GenWidget) {
+  pub fn init(&self, content: GenWidget) {
     let root = self.tree_mut().init(self, content);
     let ctx = BuildCtx::create(root, self.tree);
     let brush = Palette::of(&*ctx).on_surface_variant();
@@ -700,6 +700,35 @@ impl Window {
   pub fn set_min_size(&self, size: Size) -> &Self {
     self.shell_wnd.borrow_mut().set_min_size(size);
     self
+  }
+
+  pub fn is_pre_editing(&self) -> bool { self.pre_edit.borrow().is_some() }
+
+  pub fn force_exit_pre_edit(&self) {
+    if self.is_pre_editing() {
+      self.set_ime_allowed(false);
+      self.processes_ime_pre_edit(ImePreEdit::End);
+      if let Some(s) = self.pre_edit.borrow_mut().take() {
+        self.processes_receive_chars(s);
+      }
+      self.set_ime_allowed(true);
+    }
+  }
+
+  pub fn exit_pre_edit(&self) {
+    if self.is_pre_editing() {
+      self.processes_ime_pre_edit(ImePreEdit::End);
+      self.pre_edit.borrow_mut().take();
+    }
+  }
+
+  pub fn update_pre_edit(&self, txt: &str, cursor: &Option<(usize, usize)>) {
+    if !self.is_pre_editing() {
+      self.processes_ime_pre_edit(ImePreEdit::Begin);
+    }
+
+    self.processes_ime_pre_edit(ImePreEdit::PreEdit { value: txt.to_owned(), cursor: *cursor });
+    *self.pre_edit.borrow_mut() = Some(txt.to_owned());
   }
 }
 

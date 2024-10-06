@@ -1,8 +1,8 @@
 use lyon_algorithms::path::{
+  Event, Path as LyonPath, Winding,
   builder::BorderRadii,
   geom::{Arc, LineSegment},
   path::Builder as LyonBuilder,
-  Event, Path as LyonPath, Winding,
 };
 use ribir_geom::{Angle, Point, Rect, Transform, Vector};
 
