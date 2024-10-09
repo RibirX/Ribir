@@ -24,10 +24,10 @@ lyon_geom.workspace = true
 once_cell.workspace = true
 paste.workspace = true
 pin-project-lite.workspace = true
-ribir_algo = {path = "../algo", version = "0.4.0-alpha.11" }
-ribir_geom = {path = "../geom", version = "0.4.0-alpha.11" }
-ribir_macros = {path = "../macros", version = "0.4.0-alpha.11" }
-ribir_painter = {path = "../painter", version = "0.4.0-alpha.11" }
+ribir_algo = {path = "../algo", version = "0.4.0-alpha.12" }
+ribir_geom = {path = "../geom", version = "0.4.0-alpha.12" }
+ribir_macros = {path = "../macros", version = "0.4.0-alpha.12" }
+ribir_painter = {path = "../painter", version = "0.4.0-alpha.12" }
 rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true

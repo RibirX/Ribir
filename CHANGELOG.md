@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.12] - 2024-10-09
+
 ### Features
 
 - **core**: Added the built-in widget `TextStyleWidgetWidget`, allowing any widget to easily configure the text style within it using `text_style`. (#635, @M-Adoo)
@@ -440,7 +442,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.11...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.12...HEAD
+[0.4.0-alpha.12]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.11...ribir-v0.4.0-alpha.12
 [0.4.0-alpha.11]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.10...ribir-v0.4.0-alpha.11
 [0.4.0-alpha.10]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.9...ribir-v0.4.0-alpha.10
 [0.4.0-alpha.9]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.8...ribir-v0.4.0-alpha.9
