@@ -52,7 +52,8 @@ fontdb = "0.22.0"
 futures = "0.3.26"
 guillotiere = "0.6.0"
 image = { version = "0.24.5", default-features = false }
-indextree = "4.5.0"
+# Version 4.7.2 of the iterator contains a bug. We are awaiting the release of patch #117 to address this issue.
+indextree = { git = "https://github.com/saschagrunert/indextree.git", rev = "f75bdbb1dfbd5c63519fabedd0127dcbc8130052"}
 log = "0.4.14"
 lyon_algorithms = "1.0.1"
 lyon_geom = "1.0.1"

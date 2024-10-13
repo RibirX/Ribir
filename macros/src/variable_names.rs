@@ -50,9 +50,6 @@ macro_rules! builtin_member {
   };
 }
 pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
-  // BuiltinObj
-  "lazy_host_id" => builtin_member!{"BuiltinObj", Method, "lazy"},
-  "lazy_id" => builtin_member!{"BuiltinObj", Method, "lazy"},
   // Class
   "class" => builtin_member!{"Class", Field, "class"},
   // MixFlags

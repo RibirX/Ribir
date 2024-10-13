@@ -36,7 +36,7 @@ pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream
     if refs.used_ctx() {
       quote_spanned! {span =>
         MapPipe::new(
-          ModifiesPipe::new(#upstream.filter(|s| s.contains(ModifyScope::FRAMEWORK)).box_it()),
+          ModifiesPipe::new(#upstream.box_it()),
           {
             #refs
             let _ctx_handle_ಠ_ಠ = ctx!().handle();
