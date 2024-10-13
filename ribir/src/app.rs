@@ -195,6 +195,7 @@ impl App {
 pub struct AppRunGuard {
   root: Option<GenWidget>,
   wnd_attrs: Option<WindowAttributes>,
+  theme_initd: bool,
 }
 
 impl App {
@@ -325,12 +326,13 @@ impl AppRunGuard {
     assert!(!ONCE.is_completed(), "App::run can only be called once.");
     ONCE.call_once(|| {});
 
-    Self { root: Some(root), wnd_attrs: Some(Default::default()) }
+    Self { root: Some(root), wnd_attrs: Some(Default::default()), theme_initd: false }
   }
 
   /// Set the application theme, this will apply to whole application.
   pub fn with_app_theme(&mut self, theme: Theme) -> &mut Self {
     AppCtx::set_app_theme(theme);
+    self.theme_initd = true;
     self
   }
 
@@ -407,6 +409,10 @@ impl AppRunGuard {
 impl Drop for AppRunGuard {
   fn drop(&mut self) {
     AppCtx::run_until_stalled();
+    #[cfg(feature = "ribir_material")]
+    if !self.theme_initd {
+      AppCtx::set_app_theme(ribir_material::purple::light());
+    }
 
     let root = self.root.take().unwrap();
     let attr = self.wnd_attrs.take().unwrap();

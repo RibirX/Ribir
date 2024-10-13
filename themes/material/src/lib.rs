@@ -11,20 +11,10 @@ pub mod md;
 
 /// Crate a material theme with palette.
 fn new(palette: Palette) -> Theme {
-  let regular_family = Box::new([FontFamily::Name("Roboto".into()), FontFamily::Serif]);
-  let medium_family = Box::new([FontFamily::Name("Roboto Medium".into()), FontFamily::Serif]);
-
-  let typography_theme = typography_theme(
-    regular_family,
-    medium_family,
-    TextDecoration::NONE,
-    Color::BLACK.with_alpha(0.87).into(),
-  );
-
   let classes = classes::initd_classes();
   let mut theme = Theme {
     palette,
-    typography_theme,
+    typography_theme: typography_theme(),
     classes,
     icon_theme: icon_theme(),
     transitions_theme: TransitionTheme::default(),
@@ -405,166 +395,45 @@ fn icon_theme() -> IconTheme {
 /// applied to body and caption. The `display_style` is applied to
 /// headline4, headline3, headline2, headline1, and caption. The
 /// `body_style` is applied to the remaining text styles.
-pub fn typography_theme(
-  regular_family: Box<[FontFamily]>, medium_family: Box<[FontFamily]>, decoration: TextDecoration,
-  decoration_color: Brush,
-) -> TypographyTheme {
-  let decoration = TextDecorationStyle { decoration, decoration_color };
-  let regular_face =
-    FontFace { families: regular_family.clone(), weight: FontWeight::NORMAL, ..<_>::default() };
-  let medium_face =
-    FontFace { families: medium_family, weight: FontWeight::MEDIUM, ..<_>::default() };
+pub fn typography_theme() -> TypographyTheme {
+  let regular_face = FontFace {
+    families: Box::new([FontFamily::Name("Roboto".into()), FontFamily::Serif]),
+    weight: FontWeight::NORMAL,
+    ..<_>::default()
+  };
+  let medium_face = FontFace {
+    families: Box::new([FontFamily::Name("Roboto Medium".into()), FontFamily::Serif]),
+    weight: FontWeight::MEDIUM,
+    ..<_>::default()
+  };
+
+  fn text_theme(
+    line_height: f32, font_size: f32, letter_space: f32, font_face: FontFace,
+  ) -> TextTheme {
+    TextTheme {
+      text: TextStyle { line_height, font_size, letter_space, font_face, overflow: Overflow::Clip },
+      decoration: TextDecorationStyle {
+        decoration: TextDecoration::NONE,
+        decoration_color: Color::BLACK.with_alpha(0.87).into(),
+      },
+    }
+  }
 
   TypographyTheme {
-    display_large: TextTheme {
-      text: TextStyle {
-        line_height: 64.,
-        font_size: 57.,
-        letter_space: 0.,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    display_medium: TextTheme {
-      text: TextStyle {
-        line_height: 52.0,
-        font_size: 45.0,
-        letter_space: 0.,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    display_small: TextTheme {
-      text: TextStyle {
-        line_height: 44.0,
-        font_size: 36.0,
-        letter_space: 0.,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    headline_large: TextTheme {
-      text: TextStyle {
-        line_height: 40.0,
-        font_size: 32.0,
-        letter_space: 0.,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    headline_medium: TextTheme {
-      text: TextStyle {
-        line_height: 36.0,
-        font_size: 28.0,
-        letter_space: 0.,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    headline_small: TextTheme {
-      text: TextStyle {
-        line_height: 32.0,
-        font_size: 24.0,
-        letter_space: 0.,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    title_large: TextTheme {
-      text: TextStyle {
-        line_height: 28.0,
-        font_size: 22.0,
-        letter_space: 0.,
-        font_face: medium_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    title_medium: TextTheme {
-      text: TextStyle {
-        line_height: 24.0,
-        font_size: 16.0,
-        letter_space: 0.15,
-        font_face: medium_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    title_small: TextTheme {
-      text: TextStyle {
-        line_height: 20.0,
-        font_size: 14.0,
-        letter_space: 0.1,
-        font_face: medium_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    label_large: TextTheme {
-      text: TextStyle {
-        line_height: 20.0,
-        font_size: 14.0,
-        letter_space: 0.1,
-        font_face: medium_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    label_medium: TextTheme {
-      text: TextStyle {
-        line_height: 16.0,
-        font_size: 12.0,
-        letter_space: 0.5,
-        font_face: medium_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    label_small: TextTheme {
-      text: TextStyle {
-        line_height: 16.0,
-        font_size: 11.0,
-        letter_space: 0.5,
-        font_face: medium_face,
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    body_large: TextTheme {
-      text: TextStyle {
-        line_height: 24.0,
-        font_size: 16.0,
-        letter_space: 0.5,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    body_medium: TextTheme {
-      text: TextStyle {
-        line_height: 20.0,
-        font_size: 14.0,
-        letter_space: 0.25,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    body_small: TextTheme {
-      text: TextStyle {
-        line_height: 16.0,
-        font_size: 12.0,
-        letter_space: 0.4,
-        font_face: regular_face,
-        overflow: Overflow::Clip,
-      },
-      decoration,
-    },
+    display_large: text_theme(64., 57., 0., regular_face.clone()),
+    display_medium: text_theme(52.0, 45.0, 0., regular_face.clone()),
+    display_small: text_theme(44.0, 36.0, 0., regular_face.clone()),
+    headline_large: text_theme(40.0, 32.0, 0., regular_face.clone()),
+    headline_medium: text_theme(36.0, 28.0, 0., regular_face.clone()),
+    headline_small: text_theme(32.0, 24.0, 0., regular_face.clone()),
+    title_large: text_theme(28.0, 22.0, 0., medium_face.clone()),
+    title_medium: text_theme(24.0, 16.0, 0.15, medium_face.clone()),
+    title_small: text_theme(20.0, 14.0, 0.1, medium_face.clone()),
+    label_large: text_theme(20.0, 14.0, 0.1, medium_face.clone()),
+    label_medium: text_theme(16.0, 12.0, 0.5, medium_face.clone()),
+    label_small: text_theme(16.0, 11.0, 0.5, medium_face),
+    body_large: text_theme(24.0, 16.0, 0.5, regular_face.clone()),
+    body_medium: text_theme(20.0, 14.0, 0.25, regular_face.clone()),
+    body_small: text_theme(16.0, 12.0, 0.4, regular_face),
   }
 }

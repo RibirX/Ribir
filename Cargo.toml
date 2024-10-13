@@ -8,7 +8,7 @@ members = [
   "algo",
   "widgets",
   "ribir",
-  "themes/material",
+  "themes/*",
   "geom",
   "tests",
   "dev-helper",
