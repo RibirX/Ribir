@@ -68,7 +68,7 @@ impl Compose for NamedSvg {
 
 impl IconTheme {
   pub fn new(icon_size: IconSize) -> Self {
-    let svg = include_crate_svg!("./icons/miss_icon.svg");
+    let svg = include_crate_svg!("../themes/ribir_slim/icons/miss_icon.svg");
     let miss_icon = Resource::new(svg);
     let mut icons = HashMap::<_, _, ahash::RandomState>::default();
     icons.insert(MISS_ICON, miss_icon);

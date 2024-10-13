@@ -1,0 +1,18 @@
+[package]
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "ribir_slim"
+readme.workspace = true
+repository = "https://github.com/RibirX/Ribir/themes/ribir_slim"
+version.workspace = true
+publish = false
+
+[dependencies]
+ribir_core = {path = "../../core", version = "0.4.0-alpha.11" }
+ribir_widgets = {path = "../../widgets", version = "0.4.0-alpha.11" }

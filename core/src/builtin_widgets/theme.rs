@@ -6,7 +6,7 @@ use std::collections::HashMap;
 pub use ribir_algo::{CowArc, Resource};
 use smallvec::SmallVec;
 
-use crate::{fill_svgs, prelude::*};
+use crate::prelude::*;
 
 mod palette;
 pub use palette::*;
@@ -217,49 +217,11 @@ impl Default for Theme {
       huge: Size::new(64., 64.),
     };
 
-    let regular_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato"))]);
-    let medium_family = Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato"))]);
-
-    let typography_theme = typography_theme(
-      regular_family,
-      medium_family,
-      TextDecoration::NONE,
-      Color::BLACK.with_alpha(0.87).into(),
-    );
-
-    let mut icon_theme = IconTheme::new(icon_size);
-    fill_svgs! {
-      icon_theme,
-      svgs::ADD: "./icons/add_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::ARROW_BACK: "./icons/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::ARROW_DROP_DOWN: "./icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::ARROW_FORWARD: "./icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::CANCEL: "./icons/cancel_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::CHECK_BOX: "./icons/check_box_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::CHECK_BOX_OUTLINE_BLANK: "./icons/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::CHEVRON_RIGHT: "./icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::CLOSE: "./icons/close_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::DELETE: "./icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::DONE: "./icons/done_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::EXPAND_MORE: "./icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::FAVORITE: "./icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::HOME: "./icons/home_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::INDETERMINATE_CHECK_BOX: "./icons/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::LOGIN: "./icons/login_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::LOGOUT: "./icons/logout_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::MENU: "./icons/menu_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::MORE_HORIZ: "./icons/more_horiz_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::MORE_VERT: "./icons/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::OPEN_IN_NEW: "./icons/open_in_new_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::SEARCH: "./icons/search_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::SETTINGS: "./icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::STAR: "./icons/star_FILL0_wght400_GRAD0_opsz48.svg",
-      svgs::TEXT_CARET: "./icons/text_caret.svg"
-    };
+    let icon_theme = IconTheme::new(icon_size);
 
     Theme {
-      palette: Default::default(),
-      typography_theme,
+      palette: Palette::default(),
+      typography_theme: typography_theme(),
       classes: <_>::default(),
       icon_theme,
       transitions_theme: Default::default(),
@@ -271,167 +233,39 @@ impl Default for Theme {
   }
 }
 
-fn typography_theme(
-  regular_family: Box<[FontFamily]>, medium_family: Box<[FontFamily]>, decoration: TextDecoration,
-  decoration_color: Brush,
-) -> TypographyTheme {
-  let decoration = TextDecorationStyle { decoration, decoration_color };
-  let regular_face =
-    FontFace { families: regular_family.clone(), weight: FontWeight::NORMAL, ..<_>::default() };
-  let medium_face =
-    FontFace { families: medium_family, weight: FontWeight::MEDIUM, ..<_>::default() };
+fn typography_theme() -> TypographyTheme {
+  fn text_theme(line_height: f32, font_size: f32, letter_space: f32) -> TextTheme {
+    let font_face = FontFace {
+      families: Box::new([FontFamily::Name(std::borrow::Cow::Borrowed("Lato")), FontFamily::Serif]),
+      weight: FontWeight::NORMAL,
+      ..<_>::default()
+    };
+    let overflow = Overflow::Clip;
+    TextTheme {
+      text: TextStyle { line_height, font_size, letter_space, font_face, overflow },
+      decoration: TextDecorationStyle {
+        decoration: TextDecoration::NONE,
+        decoration_color: Color::BLACK.with_alpha(0.87).into(),
+      },
+    }
+  }
 
   TypographyTheme {
-    display_large: TextTheme {
-      text: TextStyle {
-        line_height: 64.,
-        font_size: 57.,
-        letter_space: 0.,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    display_medium: TextTheme {
-      text: TextStyle {
-        line_height: 52.,
-        font_size: 45.,
-        letter_space: 0.,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    display_small: TextTheme {
-      text: TextStyle {
-        line_height: 44.,
-        font_size: 36.,
-        letter_space: 0.0,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    headline_large: TextTheme {
-      text: TextStyle {
-        line_height: 40.,
-        font_size: 32.,
-        letter_space: 0.0,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    headline_medium: TextTheme {
-      text: TextStyle {
-        line_height: 36.,
-        font_size: 28.,
-        letter_space: 0.,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    headline_small: TextTheme {
-      text: TextStyle {
-        line_height: 32.,
-        font_size: 24.,
-        letter_space: 0.0,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    title_large: TextTheme {
-      text: TextStyle {
-        line_height: 28.,
-        font_size: 22.,
-        letter_space: 0.0,
-        font_face: medium_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    title_medium: TextTheme {
-      text: TextStyle {
-        line_height: 24.,
-        font_size: 16.,
-        letter_space: 0.15,
-        font_face: medium_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    title_small: TextTheme {
-      text: TextStyle {
-        line_height: 20.,
-        font_size: 14.,
-        letter_space: 0.1,
-        font_face: medium_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    label_large: TextTheme {
-      text: TextStyle {
-        line_height: 20.0,
-        font_size: 14.0,
-        letter_space: 0.1,
-        font_face: medium_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    label_medium: TextTheme {
-      text: TextStyle {
-        line_height: 16.,
-        font_size: 12.,
-        letter_space: 0.5,
-        font_face: medium_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    label_small: TextTheme {
-      text: TextStyle {
-        line_height: 16.0,
-        font_size: 11.,
-        letter_space: 0.5,
-        font_face: medium_face,
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    body_large: TextTheme {
-      text: TextStyle {
-        line_height: 24.0,
-        font_size: 16.0,
-        letter_space: 0.5,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    body_medium: TextTheme {
-      text: TextStyle {
-        line_height: 20.0,
-        font_size: 14.,
-        letter_space: 0.25,
-        font_face: regular_face.clone(),
-        overflow: Overflow::Clip,
-      },
-      decoration: decoration.clone(),
-    },
-    body_small: TextTheme {
-      text: TextStyle {
-        line_height: 16.,
-        font_size: 12.,
-        letter_space: 0.4,
-        font_face: regular_face,
-        overflow: Overflow::Clip,
-      },
-      decoration,
-    },
+    display_large: text_theme(64., 57., 0.),
+    display_medium: text_theme(52., 45., 0.),
+    display_small: text_theme(44., 36., 0.),
+    headline_large: text_theme(40., 32., 0.),
+    headline_medium: text_theme(36., 28., 0.),
+    headline_small: text_theme(32., 24., 0.),
+    title_large: text_theme(28., 22., 0.),
+    title_medium: text_theme(24., 16., 0.15),
+    title_small: text_theme(20., 14., 0.1),
+    label_large: text_theme(20., 14., 0.1),
+    label_medium: text_theme(16., 12., 0.5),
+    label_small: text_theme(16., 11., 0.5),
+    body_large: text_theme(24., 16., 0.5),
+    body_medium: text_theme(20., 14., 0.25),
+    body_small: text_theme(16., 12., 0.4),
   }
 }
 
