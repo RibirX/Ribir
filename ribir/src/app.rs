@@ -406,6 +406,8 @@ impl AppRunGuard {
 
 impl Drop for AppRunGuard {
   fn drop(&mut self) {
+    AppCtx::run_until_stalled();
+
     let root = self.root.take().unwrap();
     let attr = self.wnd_attrs.take().unwrap();
     let wnd = App::new_window(root, attr);

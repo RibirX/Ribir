@@ -25,6 +25,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+
+### Fixed
+
+- **core**: Setting the theme before running the app results in the tree being constructed twice. (#637, @M-Adoo)
+
 ## [0.4.0-alpha.12] - 2024-10-09
 
 ### Features

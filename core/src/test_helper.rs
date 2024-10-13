@@ -54,6 +54,8 @@ impl TestWindow {
 
   fn new_wnd(root: impl Into<GenWidget>, size: Option<Size>) -> Self {
     let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
+    AppCtx::run_until_stalled();
+
     let wnd = AppCtx::new_window(Box::new(TestShellWindow::new(size)), root.into());
     let mut flags = wnd.flags();
     flags.remove(WindowFlags::ANIMATIONS);

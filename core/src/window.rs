@@ -796,4 +796,24 @@ mod tests {
     wnd.draw_frame();
     wnd.assert_root_size(new_size);
   }
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  #[test]
+  fn fire_tasks_before_new_window() {
+    reset_test_env!();
+
+    let theme = Theme::default();
+    AppCtx::set_app_theme(theme);
+
+    let mut wnd = TestWindow::new(fn_widget! {
+      @MockBox {
+        on_disposed: move |_| panic!("MockBox should not be disposed.\
+          Since a theme is set before the window creation, \
+          it should not trigger a regeneration."),
+        size: Size::zero(),
+      }
+    });
+
+    wnd.draw_frame();
+  }
 }
