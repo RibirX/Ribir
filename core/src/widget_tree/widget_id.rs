@@ -111,7 +111,9 @@ impl WidgetId {
   }
 
   #[inline]
-  pub(crate) fn children(self, tree: &WidgetTree) -> impl Iterator<Item = WidgetId> + '_ {
+  pub(crate) fn children(
+    self, tree: &WidgetTree,
+  ) -> impl DoubleEndedIterator<Item = WidgetId> + '_ {
     // `IndexTree` not check if is a freed id when create iterator, we may iterate
     assert!(!self.is_dropped(tree));
     self.0.children(&tree.arena).map(WidgetId)
