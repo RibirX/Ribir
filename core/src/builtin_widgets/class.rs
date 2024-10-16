@@ -351,7 +351,7 @@ mod tests {
     let mut theme = Theme::default();
     theme
       .classes
-      .insert(MARGIN, |w| fn_widget! { @ $w{ margin: EdgeInsets::all(10.) } }.into_widget());
+      .insert(MARGIN, style_class!(margin: EdgeInsets::all(10.)));
     theme.classes.insert(SCALE_2X, |w| {
       fn_widget! {
         @MockBox {

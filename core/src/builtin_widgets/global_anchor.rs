@@ -20,7 +20,7 @@ impl<'c> ComposeChild<'c> for GlobalAnchor {
         .frame_tick_stream()
         .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
 
-      let mut child = @$child {};
+      let mut child = FatObj::new(child);
       let wid = child.lazy_id();
       let u = watch!(($this.get_global_anchor(), $child.layout_size()))
         .sample(tick_of_layout_ready)

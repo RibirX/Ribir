@@ -17,14 +17,12 @@ impl<'c> ComposeChild<'c> for LayoutBox {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      @ $child {
-        on_performed_layout: move |e| {
-          let new_rect = e.box_rect().unwrap();
-          if $this.rect != new_rect {
-            $this.silent().rect = new_rect;
-          }
+      FatObj::new(child).on_performed_layout(move |e| {
+        let new_rect = e.box_rect().unwrap();
+        if $this.rect != new_rect {
+          $this.silent().rect = new_rect;
         }
-      }
+      })
     }
     .into_widget()
   }

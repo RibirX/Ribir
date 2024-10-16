@@ -110,25 +110,25 @@ pub struct FatObj<T> {
   host: T,
   host_id: LazyWidgetId,
   id: LazyWidgetId,
-  mix_builtin: Option<MixBuiltin>,
-  request_focus: Option<State<RequestFocus>>,
+  padding: Option<State<Padding>>,
   fitted_box: Option<State<FittedBox>>,
+  constrained_box: Option<State<ConstrainedBox>>,
   box_decoration: Option<State<BoxDecoration>>,
   foreground: Option<State<Foreground>>,
-  padding: Option<State<Padding>>,
+  scrollable: Option<State<ScrollableWidget>>,
   layout_box: Option<State<LayoutBox>>,
+  mix_builtin: Option<MixBuiltin>,
+  request_focus: Option<State<RequestFocus>>,
   cursor: Option<State<Cursor>>,
   margin: Option<State<Margin>>,
-  scrollable: Option<State<ScrollableWidget>>,
-  constrained_box: Option<State<ConstrainedBox>>,
   transform: Option<State<TransformWidget>>,
+  opacity: Option<State<Opacity>>,
+  visibility: Option<State<Visibility>>,
+  class: Option<State<Class>>,
   h_align: Option<State<HAlignWidget>>,
   v_align: Option<State<VAlignWidget>>,
   relative_anchor: Option<State<RelativeAnchor>>,
   global_anchor: Option<State<GlobalAnchor>>,
-  visibility: Option<State<Visibility>>,
-  opacity: Option<State<Opacity>>,
-  class: Option<State<Class>>,
   painting_style: Option<State<PaintingStyleWidget>>,
   text_style: Option<State<TextStyleWidget>>,
   keep_alive: Option<State<KeepAlive>>,
@@ -170,7 +170,6 @@ impl<T> FatObj<T> {
 
   /// Maps an `FatObj<T>` to `FatObj<V>` by applying a function to the host
   /// object.
-  #[track_caller]
   pub fn map<V>(self, f: impl FnOnce(T) -> V) -> FatObj<V> {
     FatObj {
       host: f(self.host),
@@ -216,6 +215,7 @@ impl<T> FatObj<T> {
       && self.cursor.is_none()
       && self.margin.is_none()
       && self.scrollable.is_none()
+      && self.constrained_box.is_none()
       && self.transform.is_none()
       && self.h_align.is_none()
       && self.v_align.is_none()
@@ -941,8 +941,8 @@ impl<'a> FatObj<Widget<'a>> {
           cursor,
           margin,
           transform,
-          visibility,
           opacity,
+          visibility,
           class,
           h_align,
           v_align,

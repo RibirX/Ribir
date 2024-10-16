@@ -120,7 +120,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
           }
         }));
 
-
+      let scroll = FatObj::new(scroll);
       @Stack {
         @ $scroll {
           class: SCROLL_CLIENT_AREA,

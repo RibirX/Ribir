@@ -1548,12 +1548,12 @@ mod tests {
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(0., 0.));
 
-    println!("Inner pipe update:");
+    // Inner pipe update
     *w_inner.write() += 1;
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(0., 1.));
 
-    println!("Outter pipe update:");
+    // Outer pipe update
     *w_outer.write() += 1;
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(1., 1.));
@@ -1731,7 +1731,7 @@ mod tests {
         pipe!($m_watcher;).map(move |_| {
           // margin is static, but its child MockBox is a pipe.
           let p = pipe!($son_watcher;).map(|_| MockBox { size: Size::zero() });
-          @$p { margin: EdgeInsets::all(1.) }
+          FatObj::new(p).margin(EdgeInsets::all(1.))
         })
       };
       @ $p {

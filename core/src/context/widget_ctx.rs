@@ -66,6 +66,9 @@ pub trait WidgetCtx {
   /// Translates the widget pos from the coordinate system of `w` to this widget
   /// system.
   fn map_from(&self, pos: Point, w: WidgetId) -> Point;
+  /// Query all references to the `T` if it is shared within the widget
+  /// represented by this context.
+  fn query_all_iter<T: 'static>(&self) -> impl DoubleEndedIterator<Item = QueryRef<T>>;
   /// Query a reference to the `T` if it is shared within the widget
   /// represented by this context.
   ///
@@ -182,7 +185,10 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     self.map_from_global(global)
   }
 
-  #[inline]
+  fn query_all_iter<Q: 'static>(&self) -> impl DoubleEndedIterator<Item = QueryRef<Q>> {
+    self.id().query_all_iter(self.tree())
+  }
+
   fn query<Q: 'static>(&self) -> Option<QueryRef<Q>> { self.query_of_widget::<Q>(self.id()) }
 
   #[inline]

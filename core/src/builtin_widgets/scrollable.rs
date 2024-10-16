@@ -45,6 +45,7 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
         clamp_dim: ClampDim::MAX_SIZE,
       };
 
+      let child = FatObj::new(child);
       let mut child = @ $child {
         anchor: pipe!{
           let this = $this;

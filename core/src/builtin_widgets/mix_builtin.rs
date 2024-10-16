@@ -126,7 +126,11 @@ impl MixFlags {
     }
   }
 
-  pub fn tab_index(&self) -> i16 { (self.bits() >> 48) as i16 }
+  pub fn tab_index(&self) -> Option<i16> {
+    self
+      .contains(MixFlags::Focus)
+      .then(|| (self.bits() >> 48) as i16)
+  }
 
   pub fn set_tab_index(&mut self, tab_idx: i16) {
     self.insert(MixFlags::Focus);
@@ -354,45 +358,12 @@ impl MixBuiltin {
     }
   }
 
-  fn merge(&self, other: Self) {
-    let tab_index = self.flags.read().tab_index();
-    let other_tab_index = other.flags.read().tab_index();
-    let mut this_flags = self.flags.write();
-    this_flags.insert(*other.flags.read());
-    if other_tab_index != 0 {
-      this_flags.set_tab_index(other_tab_index);
-    } else if tab_index != 0 {
-      this_flags.set_tab_index(tab_index);
-    }
-    drop(this_flags);
-    let Self { flags, subject } = other;
-
-    // if the other `MixFlags` is a writer, we need to subscribe it.
-    if let Err(other) = flags.into_reader() {
-      let this_flags = self.flags.clone_writer();
-      let u = other
-        .modifies()
-        .distinct_until_changed()
-        .subscribe(move |_| {
-          let flags = *other.read();
-          let mut this = this_flags.write();
-          this.insert(flags);
-          this.set_tab_index(flags.tab_index());
-        });
-      self.on_disposed(|_| u.unsubscribe());
-    }
-
-    fn subscribe_fn(subject: EventSubject) -> impl FnMut(&mut Event) {
-      move |e: &mut Event| subject.clone().next(e)
-    }
-    self.subject().subscribe(subscribe_fn(subject));
-  }
-
   fn callbacks_for_focus_node(&self) {
     self
       .on_mounted(move |e| {
-        if let Some(mix) = e.query::<MixBuiltin>() {
-          let auto_focus = mix.flags.read().is_auto_focus();
+        let mut all_mix = e.query_all_iter::<MixBuiltin>().peekable();
+        if all_mix.peek().is_some() {
+          let auto_focus = all_mix.any(|mix| mix.flags.read().is_auto_focus());
           e.window()
             .add_focus_node(e.id, auto_focus, FocusType::Node)
         }
@@ -428,27 +399,10 @@ fn life_fn_once_to_fn_mut(
 impl<'c> ComposeChild<'c> for MixBuiltin {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    child.on_build(move |id, ctx| match this.try_into_value() {
-      Ok(this) => {
-        if let Some(m) = id.query_ref::<MixBuiltin>(ctx.tree()) {
-          if !m.contain_flag(MixFlags::Focus) && this.contain_flag(MixFlags::Focus) {
-            this.callbacks_for_focus_node();
-          }
-          m.merge(this);
-        } else {
-          if this.contain_flag(MixFlags::Focus) {
-            this.callbacks_for_focus_node();
-          }
-          id.attach_data(Box::new(Queryable(this)), ctx.tree_mut());
-        }
-      }
-      Err(this) => {
-        if this.read().contain_flag(MixFlags::Focus) {
-          this.read().callbacks_for_focus_node();
-        }
-        id.attach_data(Box::new(this), ctx.tree_mut())
-      }
-    })
+    if this.read().contain_flag(MixFlags::Focus) {
+      this.read().callbacks_for_focus_node();
+    }
+    child.try_unwrap_state_and_attach(this)
   }
 }
 
@@ -505,5 +459,39 @@ impl Clone for MixBuiltin {
   fn clone(&self) -> Self {
     let flags = State::stateful(self.flags.clone_writer());
     Self { flags, subject: self.subject.clone() }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::{reset_test_env, test_helper::*};
+
+  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+  #[test]
+  fn mix_should_not_merge() {
+    reset_test_env!();
+
+    let (trigger, w_trigger) = split_value(0);
+    let (outer_layout, w_outer_layout) = split_value(0);
+    let mix_keep = fn_widget! {
+      let pipe_w = FatObj::new( pipe! {
+        $trigger;
+        @Void { on_performed_layout: move |_| {} }
+      });
+
+      @ $pipe_w {
+        on_performed_layout: move |_| *$w_outer_layout.write() +=1 ,
+      }
+    };
+
+    let mut wnd = TestWindow::new(mix_keep);
+    wnd.draw_frame();
+    assert_eq!(*outer_layout.read(), 1);
+
+    *w_trigger.write() = 1;
+
+    wnd.draw_frame();
+    assert_eq!(*outer_layout.read(), 2);
   }
 }

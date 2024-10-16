@@ -124,7 +124,7 @@ impl Overlay {
   ///       overlay.show_map(move |w| {
   ///         let wid = wid.clone();
   ///         fn_widget! {
-  ///           let mut w = @$w {};
+  ///           let mut w = FatObj::new(w);
   ///           w.left_align_to(&wid, 0., ctx!());
   ///           w
   ///         }.into_widget()
@@ -157,10 +157,9 @@ impl Overlay {
     }
     self.show_map(
       move |w| {
-        fn_widget! {
-          @$w { anchor: Anchor::from_point(pos) }
-        }
-        .into_widget()
+        FatObj::new(w)
+          .anchor(Anchor::from_point(pos))
+          .into_widget()
       },
       wnd,
     );

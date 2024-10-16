@@ -3,14 +3,7 @@ use syn::Ident;
 pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ಠ_ಠ";
 
 pub fn ribir_suffix_variable(from: &Ident, suffix: &str) -> Ident {
-  let name_str = from.to_string();
-  let prefix_size = if name_str.ends_with(AVOID_CONFLICT_SUFFIX) {
-    name_str.len() - AVOID_CONFLICT_SUFFIX.len() - 1
-  } else {
-    name_str.len()
-  };
-  let prefix = &name_str[..prefix_size];
-  let name = format!("{prefix}_{suffix}_{AVOID_CONFLICT_SUFFIX}");
+  let name = format!("{}_{suffix}_{AVOID_CONFLICT_SUFFIX}", from);
   Ident::new(&name, from.span())
 }
 

@@ -130,9 +130,7 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
 ///   like: `let row = rdl!{ Widget::new(Void) };`
 #[proc_macro]
 pub fn rdl(input: TokenStream) -> TokenStream {
-  let mut refs = DollarRefsCtx::top_level();
-  refs.new_dollar_scope(false);
-  RdlMacro::gen_code(input.into(), &mut refs)
+  RdlMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
 }
 
 /// The `fn_widget` macro generates a widget from a function widget based on an
@@ -180,7 +178,10 @@ pub fn style_class(input: TokenStream) -> TokenStream {
   let input: proc_macro2::TokenStream = input.into();
   quote! {
     move |widget: Widget| {
-      fn_widget! { @ $widget { #input } }.into_widget()
+      fn_widget! {
+        let widget = FatObj::new(widget);
+        @ $widget { #input }
+      }.into_widget()
     }
   }
   .into()

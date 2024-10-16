@@ -18,6 +18,7 @@ impl<'c> ComposeChild<'c> for FocusScope {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
+      let child = FatObj::new(child);
       @ $child {
         on_mounted: move |e| e.window().add_focus_node(e.id, false, FocusType::Scope),
         on_disposed: move|e| e.window().remove_focus_node(e.id, FocusType::Scope),

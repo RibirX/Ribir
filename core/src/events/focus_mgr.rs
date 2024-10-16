@@ -361,8 +361,8 @@ impl FocusManager {
       .filter(|wid| !wid.is_dropped(tree))
       .and_then(|wid| {
         wid
-          .query_ref::<MixBuiltin>(tree)
-          .map(|m| m.mix_flags().read().tab_index())
+          .query_all_iter::<MixBuiltin>(tree)
+          .find_map(|m| m.mix_flags().read().tab_index())
       })
       .unwrap_or_default()
   }

@@ -240,6 +240,7 @@ fn override_compose_decorator(theme: &mut Theme) {
 
   styles.override_compose_decorator::<IndicatorDecorator>(|style, host, _| {
     fn_widget! {
+      let host = FatObj::new(host);
       let mut indicator = @ $host {
         anchor: pipe!{
           let style = $style;
@@ -269,6 +270,7 @@ fn override_compose_decorator(theme: &mut Theme) {
   });
   styles.override_compose_decorator::<CheckBoxDecorator>(move |style, host, _| {
     fn_widget! {
+      let host = FatObj::new(host);
       @Ripple {
         center: true,
         color: pipe!($style.color),
@@ -277,9 +279,7 @@ fn override_compose_decorator(theme: &mut Theme) {
         @InteractiveLayer {
           color: pipe!($style.color),
           border_radii: Radius::all(24.),
-          @$host {
-            margin: EdgeInsets::all(12.)
-          }
+          @ $host { margin: EdgeInsets::all(12.) }
         }
       }
     }
@@ -287,6 +287,7 @@ fn override_compose_decorator(theme: &mut Theme) {
   });
   styles.override_compose_decorator::<FilledButtonDecorator>(move |style, host, _| {
     fn_widget! {
+      let host = FatObj::new(host);
       @Ripple {
         center: false,
         color: {
@@ -310,6 +311,7 @@ fn override_compose_decorator(theme: &mut Theme) {
   });
   styles.override_compose_decorator::<OutlinedButtonDecorator>(move |style, host, _| {
     fn_widget! {
+      let host = FatObj::new(host);
       @Ripple {
         center: false,
         color: {
@@ -323,7 +325,7 @@ fn override_compose_decorator(theme: &mut Theme) {
             let palette = Palette::of(ctx!()).clone();
             pipe!(palette.base_of(&$style.color))
           },
-          @$host {
+          @ $host {
             margin: EdgeInsets::all(0.)
           }
         }
@@ -332,6 +334,7 @@ fn override_compose_decorator(theme: &mut Theme) {
     .into_widget()
   });
   styles.override_compose_decorator::<ButtonDecorator>(move |style, host, _| {
+    let host = FatObj::new(host);
     fn_widget! {
       @Ripple {
         center: false,
@@ -346,7 +349,7 @@ fn override_compose_decorator(theme: &mut Theme) {
             let palette = Palette::of(ctx!()).clone();
             pipe!(palette.on_of(&palette.base_of(&$style.color)))
           },
-          @$host {
+          @ $host {
             margin: EdgeInsets::all(0.)
           }
         }
