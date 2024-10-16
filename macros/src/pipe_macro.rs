@@ -21,13 +21,13 @@ pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream
   let input = ok!(symbol_to_macro(TokenStream1::from(input)));
   let expr = parse_macro_input! { input as BodyExpr };
 
-  refs_ctx.new_dollar_scope(true);
+  refs_ctx.new_dollar_scope(None);
   let expr = expr
     .0
     .into_iter()
     .map(|s| refs_ctx.fold_stmt(s))
     .collect::<Vec<Stmt>>();
-  let refs = refs_ctx.pop_dollar_scope(true, true);
+  let refs = refs_ctx.pop_dollar_scope(true);
   if refs.is_empty() {
     not_subscribe_anything(span)
   } else {

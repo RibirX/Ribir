@@ -38,7 +38,7 @@ impl<'c> ComposeChild<'c> for InteractiveLayer {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      let mut host = @$child { };
+      let mut host = FatObj::new(child);
       let layer = @IgnorePointer {
         @Container {
           size: pipe!($host.layout_size()),

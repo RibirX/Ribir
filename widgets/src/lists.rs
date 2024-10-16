@@ -217,6 +217,7 @@ impl<'w> EdgeWidget<'w> {
           @ $margin { @ { w }}
         },
         EdgeWidget::Image(w) => {
+          let w = FatObj::new(w);
           let margin = image.gap.map(|margin| Margin { margin });
           @ $margin {
             @SizedBox {
@@ -227,7 +228,7 @@ impl<'w> EdgeWidget<'w> {
         },
         EdgeWidget::Poster(w) => {
           let margin = poster.gap.map(|margin| Margin { margin });
-          let w = w.0;
+          let w = FatObj::new(w.0);
           @ $margin {
             @ SizedBox {
               size: poster.size,

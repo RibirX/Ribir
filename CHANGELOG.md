@@ -30,6 +30,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Setting the theme before running the app results in the tree being constructed twice. (#637, @M-Adoo)
 - **core**: Resolve a crash occurring in a class implementation with multiple children. (#637 @M-Adoo)
 - **core**: Nodes created by a class implementation may not be disposed of when switching to another class. (#637 @M-Adoo)
+- **core**: When merge multiple `MixBuiltin` widgets, there may be a premature dropping of the outer `MixBuiltin` before it should occur. (#639 @M-Adoo)
+
+### Breaking
+
+- **macros**: Using `@ $w { ... }` will no longer automatically wrap a `FatObj` for `w`. (#639 @M-Adoo)
 
 ## [0.4.0-alpha.12] - 2024-10-09
 

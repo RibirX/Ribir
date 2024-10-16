@@ -51,8 +51,7 @@ mod tests {
   widget_test_suit!(
     circle40,
     WidgetTester::new(fn_widget! {
-      let path = circle40();
-      @ $path { foreground: Color::BLACK }
+      FatObj::new(circle40()).foreground(Color::BLACK)
     })
     .with_wnd_size(WND_SIZE)
     .with_comparison(0.000025),
@@ -62,7 +61,7 @@ mod tests {
   widget_test_suit!(
     fill_circle40,
     WidgetTester::new(fn_widget! {
-      let path = circle40();
+      let path = FatObj::new( circle40());
       @ $path {
         painting_style: PaintingStyle::Fill,
         foreground: Color::BLACK,
@@ -76,11 +75,9 @@ mod tests {
   widget_test_suit!(
     stroke_circle40,
     WidgetTester::new(fn_widget! {
-      let path = circle40();
-      @ $path {
-        painting_style: PaintingStyle::Stroke(StrokeOptions::default()),
-        foreground: Color::BLACK,
-      }
+      FatObj::new(circle40())
+        .painting_style(PaintingStyle::Stroke(StrokeOptions::default()))
+        .foreground(Color::BLACK)
     })
     .with_wnd_size(WND_SIZE)
     .with_comparison(0.000025),

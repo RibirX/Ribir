@@ -1,91 +1,111 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote, quote_spanned};
+use smallvec::SmallVec;
 use syn::{
   Ident, Macro, Path,
+  fold::Fold,
   punctuated::Punctuated,
   spanned::Spanned,
-  token::{Brace, Comma, Semi},
+  token::{Brace, Comma},
 };
 
 use crate::{
   error::Error,
   rdl_macro::{DeclareField, RdlParent, StructLiteral},
+  symbol_process::{DollarRefsCtx, DollarRefsScope},
   variable_names::BUILTIN_INFOS,
 };
 
-pub struct DeclareObj<'a> {
+pub struct DeclareObj {
   span: Span,
-  this: ObjNode<'a>,
-  children: &'a Vec<Macro>,
+  this: ObjNode,
+  children: SmallVec<[Macro; 1]>,
 }
-enum ObjType<'a> {
-  Type { span: Span, ty: &'a Path },
-  Var(&'a Ident),
+enum ObjType {
+  Type {
+    span: Span,
+    ty: Path,
+  },
+  Var {
+    var: Ident,
+    /// All references that used this var in the whole `DeclareObj`
+    used_me: DollarRefsScope,
+  },
 }
-struct ObjNode<'a> {
-  node_type: ObjType<'a>,
-  fields: &'a Punctuated<DeclareField, Comma>,
+struct ObjNode {
+  node_type: ObjType,
+  fields: Punctuated<DeclareField, Comma>,
 }
 
-impl<'a> DeclareObj<'a> {
-  pub fn from_literal(mac: &'a StructLiteral) -> Result<Self, TokenStream> {
-    let StructLiteral { span, parent, fields, children } = mac;
-    let span = *span;
+impl DeclareObj {
+  pub fn from_literal(stl: StructLiteral, refs: &mut DollarRefsCtx) -> Self {
+    fn fold_fields(
+      fields: Punctuated<DeclareField, Comma>, refs: &mut DollarRefsCtx,
+    ) -> Punctuated<DeclareField, Comma> {
+      fields
+        .into_iter()
+        .map(|mut f| {
+          f.value = refs.fold_expr(f.value);
+          f
+        })
+        .collect()
+    }
+
+    let StructLiteral { span, parent, mut fields, mut children } = stl;
+
     let node_type = match parent {
-      RdlParent::Type(ty) => ObjType::Type { ty, span },
-      RdlParent::Var(name) => ObjType::Var(name),
+      RdlParent::Type(ty) => {
+        fields = fold_fields(fields, refs);
+        ObjType::Type { ty, span }
+      }
+      RdlParent::Var(var) => {
+        // Collect all dollar references to this var in its fields.
+        refs.new_dollar_scope(Some(var.clone()));
+        fields = fold_fields(fields, refs);
+        let used_me = refs.pop_dollar_scope(false);
+
+        ObjType::Var { var, used_me }
+      }
     };
+    children = children
+      .into_iter()
+      .map(|m| refs.fold_macro(m))
+      .collect();
     let this = ObjNode { node_type, fields };
-    Ok(Self { this, span, children })
+    DeclareObj { this, span, children }
   }
 }
 
-impl<'a> ToTokens for DeclareObj<'a> {
+impl ToTokens for DeclareObj {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     let Self { this, span, children } = self;
-    if children.is_empty() {
+    if self.is_one_line_node() && children.is_empty() {
       self.gen_node_tokens(tokens);
     } else {
       Brace(*span).surround(tokens, |tokens| {
-        let name = match &this.node_type {
-          ObjType::Type { span, .. } => Ident::new("_ribir_ಠ_ಠ", *span),
-          ObjType::Var(var) => (*var).clone(),
-        };
+        self.gen_node_tokens(tokens);
 
-        // Declare the host widget before its children. This way, we can use variables
-        // if they are moved within the children, aligning with the user's declaration
-        // style.
-        if !matches!(this.node_type, ObjType::Var(_) if this.fields.is_empty()) {
-          if matches!(this.node_type, ObjType::Var(_) if !self.children.is_empty()) {
-            // If the object is a variable, after composing it with built-in objects, we
-            // should keep it mutable so that the children can utilize it.
-            quote! {
-              #[allow(unused_mut)]
-              let mut #name =
-            }
-            .to_tokens(tokens);
-          } else {
-            quote! { let #name = }.to_tokens(tokens);
+        if !children.is_empty() {
+          let mut children = Vec::with_capacity(self.children.len());
+          for (i, c) in self.children.iter().enumerate() {
+            let child = Ident::new(&format!("_child_{i}_ಠ_ಠ"), c.span());
+            quote_spanned! { c.span() => let #child = #c; }.to_tokens(tokens);
+            children.push(child)
           }
-          self.gen_node_tokens(tokens);
-          Semi(self.span).to_tokens(tokens);
+          match &this.node_type {
+            ObjType::Type { span, .. } => quote_spanned! { *span => _ಠ_ಠ }.to_tokens(tokens),
+            ObjType::Var { var, .. } => var.to_tokens(tokens),
+          };
+          quote_spanned! { self.span => #(.with_child(#children))* }.to_tokens(tokens)
         }
-
-        let mut children = Vec::with_capacity(self.children.len());
-        for (i, c) in self.children.iter().enumerate() {
-          let child = Ident::new(&format!("_child_{i}_ಠ_ಠ"), c.span());
-          quote_spanned! { c.span() => let #child = #c; }.to_tokens(tokens);
-          children.push(child)
-        }
-        quote_spanned! { self.span => #name #(.with_child(#children))* }.to_tokens(tokens)
       })
     }
   }
 }
 
-impl<'a> DeclareObj<'a> {
+impl DeclareObj {
   pub fn error_check(&self) -> Result<(), Error> {
-    if let ObjType::Var(_) = self.this.node_type {
+    if matches!(self.this.node_type, ObjType::Var { .. }) {
       let invalid_fields = self
         .this
         .fields
@@ -100,44 +120,107 @@ impl<'a> DeclareObj<'a> {
     Ok(())
   }
 
+  fn is_one_line_node(&self) -> bool {
+    let this = &self.this;
+    match &this.node_type {
+      ObjType::Type { .. } => this.fields.len() <= 1,
+      ObjType::Var { used_me, .. } => used_me.is_empty() && this.fields.len() <= 1,
+    }
+  }
+
   fn gen_node_tokens(&self, tokens: &mut TokenStream) {
-    let ObjNode { node_type, fields } = &self.this;
-    match node_type {
+    match &self.this.node_type {
       ObjType::Type { ty, span } => {
-        if fields.is_empty() {
-          quote_spanned! { *span => #ty::declarer().finish(ctx!())}.to_tokens(tokens);
+        let name = Ident::new("_ಠ_ಠ", *span);
+        self.gen_fields_tokens(
+          &name,
+          quote! { #ty::declarer() },
+          quote! { .finish(ctx!()) },
+          tokens,
+        );
+      }
+      ObjType::Var { var, used_me } => {
+        // if has capture self, rename to `_ಠ_ಠ` avoid conflict name.
+        let self_ref = used_me.iter().find(|r| r.builtin.is_none());
+        if let Some(mut self_ref) = self_ref.cloned() {
+          used_me
+            .iter()
+            .filter(|r| r.builtin.is_some())
+            .for_each(|r| r.to_tokens(tokens));
+
+          let name = Ident::new("_ಠ_ಠ", var.span());
+          quote_spanned! { var.span() =>  let #name = #var;}.to_tokens(tokens);
+          let orig = std::mem::replace(&mut self_ref.name, name.clone());
+          self_ref.capture_state(&orig, tokens);
+
+          self.gen_fields_tokens(&name, name.to_token_stream(), quote! {}, tokens);
+          // If a child exist, revert the variable name to compose children.
+          if !self.children.is_empty() {
+            quote_spanned! { var.span() =>
+              #[allow(unused_mut)]
+              let mut #var = #name;
+            }
+            .to_tokens(tokens);
+          }
         } else {
-          let fields = fields.iter();
-          // we not gen chain call to avoid borrow twice. e.g.
-          // ```
-          // let mut x = ...;
-          // X::declarer().a(&mut x.a).b(&mut x.b).finish(ctx!());
-          // ```
-          // `x` will be borrowed twice, and compile failed, rustc don't process it.
-          quote_spanned! { *span => {
-            let mut _ಠ_ಠ = #ty::declarer();
-            #(_ಠ_ಠ = _ಠ_ಠ #fields;)*
-            _ಠ_ಠ.finish(ctx!())
-          }}
-          .to_tokens(tokens);
+          used_me.to_tokens(tokens);
+          self.gen_fields_tokens(var, var.to_token_stream(), quote! {}, tokens);
         }
       }
-      ObjType::Var(var) => {
-        if !self.children.is_empty() && fields.is_empty() {
-          // If a variable node is declared with children, it cannot be used by others.
-          // Therefore, there's no need to extend the built-in ability to it.
-          var.to_tokens(tokens);
-        } else if fields.is_empty() {
-          quote_spanned! { var.span() => FatObj::new(#var) }.to_tokens(tokens);
-        } else {
-          let fields = fields.iter();
-          // move `var` last, so that we can use it in the fields.
-          quote_spanned! { var.span() =>
-            FatObj::new(())
-              #(#fields)*
-              .with_child(#var)
+    }
+  }
+
+  fn gen_fields_tokens(
+    &self, var: &Ident, head: TokenStream, tail: TokenStream, tokens: &mut TokenStream,
+  ) {
+    let fields = &self.this.fields;
+
+    // If there are multiple fields, we avoid generating a chained call to prevent
+    // borrowing twice. For example:
+    //
+    // ```
+    // let mut x = ...;
+    // X::declarer().a(&mut x.a).b(&mut x.b).finish(ctx!());
+    // ```
+    //
+    // In this scenario, `x` would be borrowed twice, causing a compilation failure
+    // as Rust does not handle this.
+    //
+    // If there are existing children, we define a variable to interact with them.
+    if fields.len() <= 1 {
+      let fields = fields.iter();
+      if self.children.is_empty() {
+        quote_spanned! { var.span() => #head #(#fields)* #tail }
+      } else {
+        quote_spanned! { var.span() =>
+          #[allow(unused_mut)]
+          let mut #var = #head #(#fields)* #tail;
+        }
+      }
+      .to_tokens(tokens);
+    } else {
+      let mut fields = fields.iter().peekable();
+
+      let first = fields.next().unwrap();
+      quote_spanned! { var.span() =>
+        #[allow(unused_mut)]
+        let mut #var = #head #first;
+      }
+      .to_tokens(tokens);
+
+      while let Some(f) = fields.next() {
+        if fields.peek().is_none() {
+          if self.children.is_empty() {
+            quote_spanned! { var.span() => #var #f #tail }
+          } else {
+            quote_spanned! { var.span() =>
+              #[allow(unused_mut)]
+              let mut #var = #var #f #tail;
+            }
           }
           .to_tokens(tokens);
+        } else {
+          quote_spanned! { var.span() => #var = #var #f; }.to_tokens(tokens);
         }
       }
     }

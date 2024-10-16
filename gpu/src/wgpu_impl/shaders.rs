@@ -190,7 +190,6 @@ fn unpackUnorm4x8(packed: u32) -> vec4<f32> {
 }
 
 pub fn linear_gradient_shader(limits: &DrawPhaseLimits) -> String {
-  println!("mask layer limits: {}", limits.max_mask_layers);
   basic_template(limits.max_mask_layers)
     + &format!(
       r#"

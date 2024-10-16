@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote_spanned};
+use smallvec::SmallVec;
 use syn::{
   Expr, Ident, Macro, Path, Result as SynResult, Stmt, braced,
   fold::Fold,
@@ -43,7 +44,7 @@ pub struct StructLiteral {
   /// rdl!{ Row { rdl!{ SizedBox {...} } } }
   /// ```
   ///  in preprocessor.
-  pub children: Vec<Macro>,
+  pub children: SmallVec<[Macro; 1]>,
 }
 
 pub enum RdlParent {
@@ -65,19 +66,8 @@ impl RdlMacro {
     let input = ok!(symbol_to_macro(TokenStream1::from(input)));
 
     match parse_macro_input! { input as RdlMacro } {
-      RdlMacro::Literal(mut l) => {
-        let fields = l.fields.into_iter().map(|mut f: DeclareField| {
-          f.value = refs.fold_expr(f.value);
-          f
-        });
-        l.fields = fields.collect();
-        l.children = l
-          .children
-          .into_iter()
-          .map(|m| refs.fold_macro(m))
-          .collect();
-
-        let obj = ok!(DeclareObj::from_literal(&l));
+      RdlMacro::Literal(stl) => {
+        let obj = DeclareObj::from_literal(stl, refs);
         if let Err(err) = obj.error_check() {
           err.to_compile_error().into()
         } else {
@@ -113,7 +103,7 @@ impl Parse for StructLiteral {
     let parent = input.parse()?;
     let content;
     let _ = braced!(content in input);
-    let mut children = vec![];
+    let mut children = SmallVec::default();
     let mut fields = Punctuated::default();
     loop {
       if content.is_empty() {

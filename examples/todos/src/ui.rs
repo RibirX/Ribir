@@ -65,7 +65,8 @@ fn task_lists(
                           $task.write().label = text.to_string();
                           *$editing.write() = None;
                         });
-                        @$input {
+                        let input = FatObj::new(input);
+                        @ $input {
                           v_align: VAlign::Center,
                           on_key_down: move |e| {
                             if e.key_code() == &PhysicalKey::Code(KeyCode::Escape) {
@@ -79,7 +80,8 @@ fn task_lists(
                   } else {
                     let _hint = || $stagger.write();
                     let item = task_item_widget(task.clone_writer(), stagger.clone_writer());
-                    @$item {
+                    let item = FatObj::new(item);
+                    @ $item {
                       on_double_tap: move |_| *$editing.write() = Some(id)
                     }.into_widget()
                   }
@@ -101,10 +103,10 @@ fn input(
 ) -> Widget<'static> {
   fn_widget! {
     let input = @Input { auto_focus: true };
-    if let  Some(text) = text {
+    if let Some(text) = text {
       $input.write().set_text(&text);
     }
-    @$input {
+    @ $input {
       margin: EdgeInsets::horizontal(24.),
       h_align: HAlign::Stretch,
       border: {
@@ -122,6 +124,7 @@ fn input(
   }
   .into_widget()
 }
+
 fn task_item_widget<S>(task: S, stagger: Stateful<Stagger<Box<dyn Transition>>>) -> Widget<'static>
 where
   S: StateWriter<Value = Task> + 'static,
@@ -162,6 +165,7 @@ where
       }))
       @Trailing(EdgeWidget::Icon({
         let icon = svgs::CLOSE;
+        let icon = FatObj::new(icon);
         @ $icon {
           cursor: CursorIcon::Pointer,
           on_tap: move |_| $todos.write().remove(id),

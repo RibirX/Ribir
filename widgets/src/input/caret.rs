@@ -10,7 +10,7 @@ impl Compose for Caret {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     let blink_interval = Duration::from_millis(500);
     fn_widget! {
-      let icon = $this.icon;
+      let icon = FatObj::new($this.icon);
       let mut caret = @ $icon {
         opacity: 0.,
         box_fit: BoxFit::CoverY,

@@ -56,8 +56,6 @@ pub struct DollarRef {
 #[derive(Debug)]
 pub struct DollarRefsCtx {
   scopes: SmallVec<[DollarRefsScope; 1]>,
-  // the head stack index of the variable stack for every capture level.
-  capture_level_heads: SmallVec<[usize; 1]>,
   variable_stacks: Vec<Vec<Ident>>,
 }
 
@@ -65,6 +63,12 @@ pub struct DollarRefsCtx {
 pub struct DollarRefsScope {
   refs: SmallVec<[DollarRef; 1]>,
   pub(crate) used_ctx: bool,
+  /// The index of the head of this scope in the variable stack.
+  variable_stack_head: usize,
+  /// This scope will exclusively capture the specified variable and will not be
+  /// treated as a real scope. If set to `None`, it will capture all dollar
+  /// references used.
+  only_capture: Option<Ident>,
 }
 
 pub struct StackGuard<'a>(&'a mut DollarRefsCtx);
@@ -341,9 +345,9 @@ impl Fold for DollarRefsCtx {
   fn fold_expr(&mut self, i: Expr) -> Expr {
     match i {
       Expr::Closure(c) if c.capture.is_some() => {
-        self.new_dollar_scope(true);
+        self.new_dollar_scope(None);
         let mut c = self.fold_expr_closure(c);
-        let dollar_scope = self.pop_dollar_scope(true, false);
+        let dollar_scope = self.pop_dollar_scope(false);
 
         if dollar_scope.used_ctx() || !dollar_scope.is_empty() {
           if dollar_scope.used_ctx() {
@@ -383,24 +387,34 @@ fn mark_macro_expanded(mac: &mut Macro) {
 
 impl ToTokens for DollarRefsScope {
   fn to_tokens(&self, tokens: &mut TokenStream) {
-    for DollarRef { name, builtin, used } in &self.refs {
-      if let Some(BuiltinInfo { host, get_builtin: member, run_before_clone }) = builtin {
-        quote_spanned! { name.span() =>
-          let #name = #host #(.#run_before_clone())* .#member()
-        }
-      } else {
-        quote_spanned! { name.span() => let #name = #name }
+    self.refs.iter().for_each(|d| d.to_tokens(tokens))
+  }
+}
+
+impl ToTokens for DollarRef {
+  fn to_tokens(&self, tokens: &mut TokenStream) { self.capture_state(&self.name, tokens); }
+}
+
+impl DollarRef {
+  pub fn capture_state(&self, var_name: &Ident, tokens: &mut TokenStream) {
+    let Self { name, builtin, used } = self;
+
+    if let Some(BuiltinInfo { host, get_builtin: member, run_before_clone }) = builtin {
+      quote_spanned! { name.span() =>
+        let #var_name = #host #(.#run_before_clone())* .#member()
       }
-      .to_tokens(tokens);
-      let span = name.span();
-      match used {
-        DollarUsedInfo::Reader => quote_spanned! { span => .clone_reader() },
-        DollarUsedInfo::Watcher => quote_spanned! { span => .clone_watcher() },
-        DollarUsedInfo::Writer => quote_spanned! { span => .clone_writer() },
-      }
-      .to_tokens(tokens);
-      syn::token::Semi(name.span()).to_tokens(tokens);
+    } else {
+      quote_spanned! { name.span() => let #var_name = #name }
     }
+    .to_tokens(tokens);
+    let span = name.span();
+    match used {
+      DollarUsedInfo::Reader => quote_spanned! { span => .clone_reader() },
+      DollarUsedInfo::Watcher => quote_spanned! { span => .clone_watcher() },
+      DollarUsedInfo::Writer => quote_spanned! { span => .clone_writer() },
+    }
+    .to_tokens(tokens);
+    syn::token::Semi(name.span()).to_tokens(tokens);
   }
 }
 
@@ -408,17 +422,22 @@ impl DollarRefsCtx {
   #[inline]
   pub fn top_level() -> Self { Self::default() }
 
+  /// Begin a new scope to track dollar reference information.
   #[inline]
-  pub fn new_dollar_scope(&mut self, capture_scope: bool) {
-    if capture_scope {
-      self
-        .capture_level_heads
-        .push(self.variable_stacks.len());
-      // new scope level, should start a new variables scope, otherwise the local
-      // variables will record in its parent level.
+  pub fn new_dollar_scope(&mut self, only_capture: Option<Ident>) {
+    let variable_stack_head = if only_capture.is_some() {
+      self.current_dollar_scope().variable_stack_head
+    } else {
       self.variable_stacks.push(vec![]);
-    }
-    self.scopes.push(<_>::default());
+      self.variable_stacks.len() - 1
+    };
+
+    self.scopes.push(DollarRefsScope {
+      only_capture,
+      refs: <_>::default(),
+      used_ctx: false,
+      variable_stack_head,
+    });
   }
 
   /// Pop the last dollar scope, and removes duplicate elements in it and make
@@ -441,17 +460,13 @@ impl DollarRefsCtx {
   /// let a = a.clone_reader();
   /// ```
   ///
-  /// - **capture_scope**: if the scope is a capture scope, should pop the
-  ///   variable stack.
-  /// - **watch_scope**: if the scope is a watch scope, should mark all reader
-  ///   as watcher.
-  #[inline]
-  pub fn pop_dollar_scope(&mut self, capture_scope: bool, watch_scope: bool) -> DollarRefsScope {
-    if capture_scope {
-      self.variable_stacks.pop();
-      self.capture_level_heads.pop();
-    }
+  /// - **watch_scope**: A watch scope that should designate all readers as
+  ///   watchers.
+  pub fn pop_dollar_scope(&mut self, watch_scope: bool) -> DollarRefsScope {
     let mut scope = self.scopes.pop().unwrap();
+    if scope.only_capture.is_none() {
+      self.variable_stacks.pop();
+    }
 
     // To maintain the order, ensure that the builtin widget precedes its host.
     // Otherwise, the host might only clone a reader that cannot create a
@@ -464,23 +479,23 @@ impl DollarRefsCtx {
       self.current_dollar_scope_mut().used_ctx |= scope.used_ctx();
 
       for r in scope.refs.iter_mut() {
-        if !self.is_local_var(r.host()) && !self.scopes.is_empty() {
+        if self.is_capture_var(r.host()) {
           let mut c_r = r.clone();
           if watch_scope && c_r.used == DollarUsedInfo::Reader {
             c_r.used = DollarUsedInfo::Watcher;
           }
           self.add_dollar_ref(c_r);
 
-          // if ref variable is not a local variable of parent capture level, should
-          // remove its builtin info as a normal variable, because parent will capture the
-          // builtin object individually.
-          if self.scopes.len() > 1 && capture_scope {
-            r.builtin.take();
-          }
+          // If a built-in widget is captured by the parent scope and treated as a regular
+          // variable, the child scope does not need to capture it from the host variable.
+          r.builtin.take();
         }
       }
     }
 
+    if let Some(c) = scope.only_capture.as_ref() {
+      scope.refs.drain_filter(|r| r.host() != c);
+    }
     scope
   }
 
@@ -495,8 +510,7 @@ impl DollarRefsCtx {
 
     // if used in embedded closure, we directly use the builtin variable, the
     // variable that capture by the closure is already a separate builtin variable.
-
-    if !self.is_local_var(host) && self.capture_level_heads.len() > 1 {
+    if !self.is_local_var(host) {
       name.to_token_stream()
     } else {
       quote_spanned! { host.span() => #host #(.#run_before_clone())*.#member() }
@@ -558,7 +572,7 @@ impl DollarRefsCtx {
 
   fn add_dollar_ref(&mut self, dollar_ref: DollarRef) {
     // local variable is not a outside reference.
-    if !self.is_local_var(dollar_ref.host()) {
+    if self.is_capture_var(dollar_ref.host()) {
       let scope = self.current_dollar_scope_mut();
       let r = scope
         .refs
@@ -592,13 +606,17 @@ impl DollarRefsCtx {
       .expect("no dollar refs scope")
   }
 
+  fn is_only_capture(&self, name: &Ident) -> bool {
+    self.current_dollar_scope().only_capture.as_ref() == Some(name)
+  }
+
+  fn is_capture_var(&self, name: &Ident) -> bool {
+    self.is_only_capture(name) || !self.is_local_var(name)
+  }
+
   fn is_local_var(&self, name: &Ident) -> bool {
-    let stack_idx = self
-      .capture_level_heads
-      .last()
-      .copied()
-      .unwrap_or(0);
-    self.variable_stacks[stack_idx..]
+    let head = self.current_dollar_scope().variable_stack_head;
+    self.variable_stacks[head..]
       .iter()
       .any(|stack| stack.contains(name))
   }
@@ -685,9 +703,7 @@ impl<'a> Drop for StackGuard<'a> {
 }
 
 impl Default for DollarRefsCtx {
-  fn default() -> Self {
-    Self { scopes: smallvec![], capture_level_heads: smallvec![], variable_stacks: vec![vec![]] }
-  }
+  fn default() -> Self { Self { scopes: smallvec![], variable_stacks: vec![vec![]] } }
 }
 
 pub fn not_subscribe_anything(span: Span) -> TokenStream {

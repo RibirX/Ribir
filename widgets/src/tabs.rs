@@ -130,6 +130,7 @@ pub struct IndicatorDecorator {
 impl ComposeDecorator for IndicatorDecorator {
   fn compose_decorator(this: State<Self>, host: Widget) -> Widget {
     fn_widget! {
+      let host = FatObj::new(host);
       @ $host{
         anchor: pipe!{
           let this = $this;

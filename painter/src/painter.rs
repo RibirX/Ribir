@@ -840,13 +840,6 @@ impl From<Resource<Path>> for PaintPath {
 
 impl PathCommand {
   pub fn new(path: PaintPath, action: PaintPathAction, transform: Transform) -> Self {
-    if transform
-      .outer_transformed_rect(path.bounds())
-      .width()
-      .is_nan()
-    {
-      println!("paint_bounds.width().is_nan()");
-    }
     let paint_bounds = transform.outer_transformed_rect(path.bounds());
     Self { path, transform, paint_bounds, action }
   }

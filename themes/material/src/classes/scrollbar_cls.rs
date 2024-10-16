@@ -43,7 +43,7 @@ pub(super) fn init(classes: &mut Classes) {
 fn base_track(w: Widget) -> Widget {
   fn_widget! {
     let scroll = &*Provider::of::<Stateful<ScrollableWidget>>(ctx!()).unwrap();
-    let mut w = @ $w { opacity: 0. };
+    let mut w = FatObj::new(w).opacity(0.);
 
     // Show the scrollbar when scrolling.
     let mut fade: Option<TaskHandle<_>> = None;

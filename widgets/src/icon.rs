@@ -18,6 +18,7 @@ impl<'c> ComposeChild<'c> for Icon {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
+      let child = FatObj::new(child);
       @SizedBox {
         size: pipe!($this.size),
         @ $child {

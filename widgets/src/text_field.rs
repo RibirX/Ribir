@@ -106,6 +106,7 @@ impl<'c> ComposeChild<'c> for TextFieldThemeProxy {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
+      let child = FatObj::new(child);
       @ $child {
         on_tap: move |_| {
           let mut this = $this.write();

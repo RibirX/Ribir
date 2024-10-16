@@ -85,6 +85,7 @@ impl ComposeChild<'static> for Avatar {
             }.into_widget()
           },
           AvatarTemplate::Image(image) => {
+            let image = FatObj::new(image);
             let clip = radius.map(|radius| {
               let path = Path::rect_round(
                 &Rect::from_size(size),

@@ -102,6 +102,7 @@ impl ComposeChild<'static> for Checkbox {
         icon
       };
 
+      let checkbox = FatObj::new(checkbox);
       @ $checkbox {
         cursor: CursorIcon::Pointer,
         on_tap: move |_| $this.write().switch_check(),

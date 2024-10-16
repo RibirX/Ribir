@@ -74,7 +74,8 @@ pub(crate) fn bind_point_listener<T: SelectableText>(
   this: impl StateWriter<Value = T> + 'static, host: Widget, text: Reader<Text>,
 ) -> Widget {
   fn_widget! {
-    @$host {
+    let host = FatObj::new(host);
+    @ $host {
       on_pointer_down: move |e| {
         let mut this = $this.write();
         let position = e.position();
