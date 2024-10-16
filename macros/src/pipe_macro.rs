@@ -10,8 +10,9 @@ use syn::{
 };
 
 use crate::{
+  error::Error,
   ok,
-  symbol_process::{DollarRefsCtx, not_subscribe_anything, symbol_to_macro},
+  symbol_process::{DollarRefsCtx, symbol_to_macro},
 };
 
 pub(crate) struct BodyExpr(pub(crate) Vec<Stmt>);
@@ -29,7 +30,9 @@ pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream
     .collect::<Vec<Stmt>>();
   let refs = refs_ctx.pop_dollar_scope(true);
   if refs.is_empty() {
-    not_subscribe_anything(span)
+    Error::WatchNothing(span)
+      .to_compile_error()
+      .into()
   } else {
     let upstream = refs.upstream_tokens();
 
