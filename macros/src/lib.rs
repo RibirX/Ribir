@@ -27,7 +27,7 @@ macro_rules! ok {
   ($e:expr) => {
     match $e {
       Ok(ok) => ok,
-      Err(err) => return err.into(),
+      Err(err) => return err.to_compile_error().into(),
     }
   };
 }

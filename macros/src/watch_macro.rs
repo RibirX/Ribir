@@ -4,9 +4,10 @@ use quote::quote_spanned;
 use syn::{fold::Fold, parse_macro_input, spanned::Spanned};
 
 use crate::{
+  error::Error,
   ok,
   pipe_macro::BodyExpr,
-  symbol_process::{DollarRefsCtx, not_subscribe_anything, symbol_to_macro},
+  symbol_process::{DollarRefsCtx, symbol_to_macro},
 };
 
 pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream1 {
@@ -21,7 +22,9 @@ pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream
     .collect::<Vec<_>>();
   let refs = refs_ctx.pop_dollar_scope(true);
   if refs.is_empty() {
-    not_subscribe_anything(span).into()
+    Error::WatchNothing(span)
+      .to_compile_error()
+      .into()
   } else {
     let upstream = refs.upstream_tokens();
 

@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, quote, quote_spanned};
 use smallvec::{SmallVec, smallvec};
 use syn::{
@@ -76,40 +76,15 @@ pub struct StackGuard<'a>(&'a mut DollarRefsCtx);
 mod tokens_pre_process {
 
   use proc_macro::*;
-  use quote::{ToTokens, quote_spanned};
-  use syn::token::Paren;
 
   use super::KW_DOLLAR_STR;
-  use crate::symbol_process::KW_RDL;
-
-  fn rdl_syntax_err<T>(at: Span, follow: Option<Span>) -> Result<T, TokenStream> {
-    let err_msg = "Syntax Error: use `@` to declare object, must be: \n 1. `@ XXX { ... }`, \
-                   declare a new `XXX` type object;\n 2. `@ $parent { ... }`, declare a variable \
-                   as parent;\n 3. `@ { ... } `, declare an object by an expression.";
-
-    let err_tokens = if let Some(follow) = follow {
-      let mut err_tokens = quote_spanned! { at.into() => compile_error! };
-      Paren::<proc_macro2::Span>(follow.into())
-        .surround(&mut err_tokens, |tokens| err_msg.to_tokens(tokens));
-      err_tokens
-    } else {
-      quote_spanned! { at.into() => compile_error!(#err_msg) }
-    };
-    Err(err_tokens.into())
-  }
-
-  fn dollar_err<T>(span: Span) -> Result<T, TokenStream> {
-    let err_token = quote_spanned! { span.into() =>
-      compile_error!("Syntax error: expected an identifier after `$`")
-    };
-    Err(err_token.into())
-  }
+  use crate::{error::*, symbol_process::KW_RDL};
 
   /// Convert `@` and `$` symbol to a `rdl!` or `_dollar_ಠ_ಠ!` macro, make it
   /// conform to Rust syntax
   pub fn symbol_to_macro(
     input: impl IntoIterator<Item = TokenTree>,
-  ) -> Result<TokenStream, TokenStream> {
+  ) -> Result<'static, TokenStream> {
     let mut iter = input.into_iter();
     let mut tokens = vec![];
 
@@ -132,7 +107,7 @@ mod tokens_pre_process {
                  rdl_group.push(g);
                 };
               } else {
-                return dollar_err(dollar.span());
+                return Err(Error::IdentNotFollowDollar(dollar.span().into()));
               }
             }
             // declare a expression widget  `@ { ... }`
@@ -153,7 +128,8 @@ mod tokens_pre_process {
             let rdl_group = TokenStream::from_iter(rdl_group);
             tokens.push(TokenTree::Group(Group::new(Delimiter::Brace, rdl_group)));
           } else {
-            return rdl_syntax_err(at.span(), rdl_group.last().map(|n| n.span()));
+            let follow = rdl_group.last().map(|n| n.span().into());
+            return Err(Error::RdlAtSyntax{at: at.span().into(), follow});
           }
         }
         Some(TokenTree::Punct(p)) if p.as_char() == '$' => {
@@ -169,8 +145,8 @@ mod tokens_pre_process {
               g.set_span(span);
               tokens.push(TokenTree::Group(g));
             }
-            Some(t) => return dollar_err(t.span()),
-            None => return dollar_err(p.span()),
+            Some(t) =>     return Err(Error::IdentNotFollowDollar(t.span().into())),
+            None =>   return Err(Error::IdentNotFollowDollar(p.span().into())),
           };
         }
         Some(TokenTree::Group(mut g)) => {
@@ -704,12 +680,6 @@ impl<'a> Drop for StackGuard<'a> {
 
 impl Default for DollarRefsCtx {
   fn default() -> Self { Self { scopes: smallvec![], variable_stacks: vec![vec![]] } }
-}
-
-pub fn not_subscribe_anything(span: Span) -> TokenStream {
-  quote_spanned!(span =>
-    compile_error!("expression not subscribe anything, it must contain at least one $")
-  )
 }
 
 fn is_state_write_method(m: &Ident) -> bool { m == "write" || m == "silent" || m == "shallow" }
