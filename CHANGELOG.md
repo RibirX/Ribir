@@ -31,6 +31,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Resolve a crash occurring in a class implementation with multiple children. (#637 @M-Adoo)
 - **core**: Nodes created by a class implementation may not be disposed of when switching to another class. (#637 @M-Adoo)
 - **core**: When merge multiple `MixBuiltin` widgets, there may be a premature dropping of the outer `MixBuiltin` before it should occur. (#639 @M-Adoo)
+- **core**: `watch!` does not notify the initial value. (#640 @M-Adoo)
 
 ### Breaking
 

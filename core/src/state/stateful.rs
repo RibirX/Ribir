@@ -436,12 +436,13 @@ mod tests {
       let info = v.info.clone();
       let u = watch!(*$v).subscribe(move |_| *v.write() = 2);
       u.unsubscribe();
+      AppCtx::run_until_stalled();
       assert_eq!(info.ref_count(), 1);
     }
 
     AppCtx::run_until_stalled();
-
     assert_eq!(data.ref_count(), 1);
+    assert_eq!(*data.read(), 2);
     assert!(notifier.is_closed());
   }
 }

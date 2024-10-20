@@ -1,50 +1,49 @@
-use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::TokenStream;
-use quote::quote_spanned;
-use syn::{fold::Fold, parse_macro_input, spanned::Spanned};
+use quote::{quote, quote_spanned};
+use syn::{fold::Fold, spanned::Spanned};
 
 use crate::{
-  error::Error,
-  ok,
+  error::{Error, Result, result_to_token_stream},
   pipe_macro::BodyExpr,
   symbol_process::{DollarRefsCtx, symbol_to_macro},
 };
 
-pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream1 {
+pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
   let span = input.span();
-  let input = ok!(symbol_to_macro(TokenStream1::from(input)));
-  let expr = parse_macro_input! { input as BodyExpr };
+  let res = process_watch_body(input, refs_ctx)
+    .map(|(upstream, map_handler)| quote_spanned! { span => #upstream.map(#map_handler) });
+  result_to_token_stream(res)
+}
+
+pub fn process_watch_body(
+  input: TokenStream, refs_ctx: &mut DollarRefsCtx,
+) -> Result<(TokenStream, TokenStream)> {
+  let span = input.span();
+  let input = symbol_to_macro(input)?;
+  let body = syn::parse2::<BodyExpr>(input)?;
+
   refs_ctx.new_dollar_scope(None);
-  let expr = expr
+  let expr = body
     .0
     .into_iter()
     .map(|s| refs_ctx.fold_stmt(s))
     .collect::<Vec<_>>();
   let refs = refs_ctx.pop_dollar_scope(true);
+  let map_handler = if refs.used_ctx() {
+    quote! {
+      let _ctx_handle_ಠ_ಠ = ctx!().handle();
+      move |_: ModifyScope| _ctx_handle_ಠ_ಠ
+        .with_ctx(|ctx!(): &mut BuildCtx| { #(#expr)* })
+        .expect("ctx is not available")
+    }
+  } else {
+    quote! { move |_: ModifyScope| { #(#expr)* } }
+  };
+
   if refs.is_empty() {
-    Error::WatchNothing(span)
-      .to_compile_error()
-      .into()
+    Err(Error::WatchNothing(span))
   } else {
     let upstream = refs.upstream_tokens();
-
-    if refs.used_ctx() {
-      quote_spanned! { span =>
-        #upstream
-        .map({
-            #refs
-            let _ctx_handle_ಠ_ಠ = ctx!().handle();
-            move |_| _ctx_handle_ಠ_ಠ.with_ctx(|ctx!(): &mut BuildCtx| { #(#expr)* })
-          })
-      }
-    } else {
-      quote_spanned! { span =>
-        #upstream.map({
-          #refs
-          move |_| { #(#expr)* }
-        })
-      }
-    }
-    .into()
+    Ok((upstream, quote! {{ #refs  #map_handler }}))
   }
 }

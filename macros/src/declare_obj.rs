@@ -113,7 +113,11 @@ impl DeclareObj {
         .filter(|f| !BUILTIN_INFOS.contains_key(&f.member.to_string()))
         .collect::<Vec<_>>();
       if !invalid_fields.is_empty() {
-        return Err(Error::InvalidFieldInVar(invalid_fields.into()));
+        let spans = invalid_fields
+          .iter()
+          .map(|f| f.member.span())
+          .collect();
+        return Err(Error::InvalidFieldInVar(spans));
       }
     }
 

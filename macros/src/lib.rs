@@ -23,16 +23,6 @@ pub(crate) mod distinct_pipe_macro;
 pub(crate) mod error;
 pub(crate) mod symbol_process;
 
-macro_rules! ok {
-  ($e:expr) => {
-    match $e {
-      Ok(ok) => ok,
-      Err(err) => return err.to_compile_error().into(),
-    }
-  };
-}
-pub(crate) use ok;
-
 #[proc_macro_derive(SingleChild)]
 pub fn single_child_derive(input: TokenStream) -> TokenStream {
   let input = parse_macro_input!(input as DeriveInput);
@@ -130,7 +120,7 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
 ///   like: `let row = rdl!{ Widget::new(Void) };`
 #[proc_macro]
 pub fn rdl(input: TokenStream) -> TokenStream {
-  RdlMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  RdlMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
 }
 
 /// The `fn_widget` macro generates a widget from a function widget based on an
@@ -141,7 +131,7 @@ pub fn rdl(input: TokenStream) -> TokenStream {
 /// `$name` is used to express a state reference to `name`.
 #[proc_macro]
 pub fn fn_widget(input: TokenStream) -> TokenStream {
-  fn_widget_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  fn_widget_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
 }
 
 /// This macro just return the input token stream. It's do nothing but help
@@ -168,7 +158,7 @@ pub fn ctx(input: TokenStream) -> TokenStream {
 /// any changes made to it. It triggers when the `$` state modifies.
 #[proc_macro]
 pub fn pipe(input: TokenStream) -> TokenStream {
-  pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
 }
 
 /// Macro used to define a class to override for a `ClassName`, this is a
@@ -240,7 +230,7 @@ pub fn distinct_pipe(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn watch(input: TokenStream) -> TokenStream {
-  watch_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  watch_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
 }
 
 /// Includes an SVG file as an `Svg`.

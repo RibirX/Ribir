@@ -74,17 +74,14 @@ pub struct DollarRefsScope {
 pub struct StackGuard<'a>(&'a mut DollarRefsCtx);
 
 mod tokens_pre_process {
-
-  use proc_macro::*;
+  use proc_macro2::*;
 
   use super::KW_DOLLAR_STR;
   use crate::{error::*, symbol_process::KW_RDL};
 
   /// Convert `@` and `$` symbol to a `rdl!` or `_dollar_ಠ_ಠ!` macro, make it
   /// conform to Rust syntax
-  pub fn symbol_to_macro(
-    input: impl IntoIterator<Item = TokenTree>,
-  ) -> Result<'static, TokenStream> {
+  pub fn symbol_to_macro(input: TokenStream) -> Result<TokenStream> {
     let mut iter = input.into_iter();
     let mut tokens = vec![];
 
@@ -107,7 +104,7 @@ mod tokens_pre_process {
                  rdl_group.push(g);
                 };
               } else {
-                return Err(Error::IdentNotFollowDollar(dollar.span().into()));
+                return Err(Error::IdentNotFollowDollar(dollar.span()));
               }
             }
             // declare a expression widget  `@ { ... }`
@@ -128,8 +125,8 @@ mod tokens_pre_process {
             let rdl_group = TokenStream::from_iter(rdl_group);
             tokens.push(TokenTree::Group(Group::new(Delimiter::Brace, rdl_group)));
           } else {
-            let follow = rdl_group.last().map(|n| n.span().into());
-            return Err(Error::RdlAtSyntax{at: at.span().into(), follow});
+            let follow = rdl_group.last().map(|n| n.span());
+            return Err(Error::RdlAtSyntax{at: at.span(), follow});
           }
         }
         Some(TokenTree::Punct(p)) if p.as_char() == '$' => {
@@ -145,8 +142,8 @@ mod tokens_pre_process {
               g.set_span(span);
               tokens.push(TokenTree::Group(g));
             }
-            Some(t) =>     return Err(Error::IdentNotFollowDollar(t.span().into())),
-            None =>   return Err(Error::IdentNotFollowDollar(p.span().into())),
+            Some(t) =>     return Err(Error::IdentNotFollowDollar(t.span())),
+            None =>   return Err(Error::IdentNotFollowDollar(p.span())),
           };
         }
         Some(TokenTree::Group(mut g)) => {
@@ -295,20 +292,20 @@ impl Fold for DollarRefsCtx {
       let dollar_ref = DollarRef { name, builtin: None, used: DollarUsedInfo::Reader };
       self.add_dollar_ref(dollar_ref)
     } else if mac.path.is_ident(KW_WATCH) {
-      mac.tokens = crate::watch_macro::gen_code(mac.tokens, self).into();
+      mac.tokens = crate::watch_macro::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PIPE) {
-      mac.tokens = crate::pipe_macro::gen_code(mac.tokens, self).into();
+      mac.tokens = crate::pipe_macro::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_DISTINCT_PIPE) {
       mac.tokens = crate::distinct_pipe_macro::gen_code(mac.tokens, self).into();
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_RDL) {
       self.mark_used_ctx();
-      mac.tokens = RdlMacro::gen_code(mac.tokens, self).into();
+      mac.tokens = RdlMacro::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_FN_WIDGET) {
-      mac.tokens = fn_widget_macro::gen_code(mac.tokens, self).into();
+      mac.tokens = fn_widget_macro::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_CTX) {
       self.mark_used_ctx();
@@ -604,11 +601,15 @@ impl DollarRefsScope {
   pub fn upstream_tokens(&self) -> TokenStream {
     match self.len() {
       0 => quote! {},
-      1 => self.refs[0].upstream_tokens(),
+      1 => {
+        let upstream = self.refs[0].upstream_tokens();
+        quote! { observable::of(ModifyScope::DATA).merge(#upstream) }
+      }
       _ => {
         let upstream = self.iter().map(DollarRef::upstream_tokens);
         quote_spanned! { self.refs[0].name.span() =>
-          observable::from_iter([#(#upstream),*]).merge_all(usize::MAX)
+          observable::of(ModifyScope::DATA)
+            .merge(observable::from_iter([#(#upstream),*]).merge_all(usize::MAX))
         }
       }
     }
