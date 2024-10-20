@@ -1,22 +1,21 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote_spanned};
 
-use crate::DeclareField;
-
-pub enum Error<'a> {
-  InvalidFieldInVar(Box<[&'a DeclareField]>),
+pub enum Error {
+  InvalidFieldInVar(Box<[Span]>),
   WatchNothing(Span),
   RdlAtSyntax { at: Span, follow: Option<Span> },
   IdentNotFollowDollar(Span),
+  Syn(syn::Error),
 }
 
-impl<'a> Error<'a> {
+impl Error {
   pub fn to_compile_error(&self) -> TokenStream {
     match self {
       Error::InvalidFieldInVar(fields) => {
         let mut tokens = TokenStream::new();
-        for f in fields.iter() {
-          quote_spanned! { f.member.span() =>
+        for span in fields.iter() {
+          quote_spanned! { *span =>
             compile_error!("Only allow to declare builtin fields in a variable parent.");
           }
           .to_tokens(&mut tokens);
@@ -35,15 +34,20 @@ impl<'a> Error<'a> {
       Error::IdentNotFollowDollar(span) => {
         quote_spanned! { *span => compile_error!("Syntax error: expected an identifier after `$`"); }
       }
+      Error::Syn(err) => err.to_compile_error(),
     }
   }
 }
 
-pub type Result<'a, T> = std::result::Result<T, Error<'a>>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn result_to_token_stream<T: ToTokens>(res: Result<T>) -> TokenStream {
   match res {
     Ok(value) => value.to_token_stream(),
     Err(err) => err.to_compile_error(),
   }
+}
+
+impl From<syn::Error> for Error {
+  fn from(value: syn::Error) -> Self { Error::Syn(value) }
 }

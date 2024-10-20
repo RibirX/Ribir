@@ -565,8 +565,7 @@ fn bind_fields() {
     .unwrap()
     .size
     .unwrap();
-  // data flow not affect on init.
-  assert_eq!(size, Size::new(3., 1.));
+  assert_eq!(size, Size::new(4., 2.));
 
   tap_at(&wnd, (0, 0));
   wnd.draw_frame();
@@ -736,18 +735,16 @@ fn fix_access_builtin_with_gap() {
 fn fix_subscribe_cancel_after_widget_drop() {
   reset_test_env!();
 
-  let notify_cnt = Stateful::new(0);
-  let cnt = notify_cnt.clone_writer();
-  let trigger = Stateful::new(true);
-  let c_trigger = trigger.clone_watcher();
+  let (cnt, w_cnt) = split_value(0);
+  let (trigger, w_trigger) = split_value(true);
   let w = fn_widget! {
     let mut container = @SizedBox { size: Size::zero() };
-    let h = watch!(*$c_trigger).subscribe(move |_| *$cnt.write() +=1 );
+    let h = watch!(*$trigger).subscribe(move |_| *$w_cnt.write() +=1 );
     container = container.on_disposed(move |_| h.unsubscribe());
 
     @$container {
       @ {
-        pipe!{$c_trigger.then(|| {
+        pipe!{$trigger.then(|| {
           @SizedBox { size: Size::zero() }
         })}
       }
@@ -756,21 +753,16 @@ fn fix_subscribe_cancel_after_widget_drop() {
 
   let mut wnd = TestWindow::new(w);
   wnd.draw_frame();
-  {
-    *trigger.write() = true
-  }
+  assert_eq!(*cnt.read(), 1);
+  *w_trigger.write() = true;
   wnd.draw_frame();
-  assert_eq!(*notify_cnt.read(), 1);
-  {
-    *trigger.write() = true
-  }
+  assert_eq!(*cnt.read(), 2);
+  *w_trigger.write() = true;
   wnd.draw_frame();
-  assert_eq!(*notify_cnt.read(), 2);
-  {
-    *trigger.write() = true
-  }
+  assert_eq!(*cnt.read(), 3);
+  *w_trigger.write() = true;
   wnd.draw_frame();
-  assert_eq!(*notify_cnt.read(), 3);
+  assert_eq!(*cnt.read(), 4);
 }
 
 widget_layout_test!(

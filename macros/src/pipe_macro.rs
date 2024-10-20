@@ -1,69 +1,28 @@
-use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::TokenStream;
 use quote::quote_spanned;
 use syn::{
   Stmt,
-  fold::Fold,
   parse::{Parse, ParseStream},
-  parse_macro_input,
   spanned::Spanned,
 };
 
 use crate::{
-  error::Error,
-  ok,
-  symbol_process::{DollarRefsCtx, symbol_to_macro},
+  error::result_to_token_stream, symbol_process::DollarRefsCtx, watch_macro::process_watch_body,
 };
 
 pub(crate) struct BodyExpr(pub(crate) Vec<Stmt>);
 
-pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream1 {
+pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
   let span = input.span();
-  let input = ok!(symbol_to_macro(TokenStream1::from(input)));
-  let expr = parse_macro_input! { input as BodyExpr };
-
-  refs_ctx.new_dollar_scope(None);
-  let expr = expr
-    .0
-    .into_iter()
-    .map(|s| refs_ctx.fold_stmt(s))
-    .collect::<Vec<Stmt>>();
-  let refs = refs_ctx.pop_dollar_scope(true);
-  if refs.is_empty() {
-    Error::WatchNothing(span)
-      .to_compile_error()
-      .into()
-  } else {
-    let upstream = refs.upstream_tokens();
-
-    if refs.used_ctx() {
-      quote_spanned! {span =>
-        MapPipe::new(
-          ModifiesPipe::new(#upstream.box_it()),
-          {
-            #refs
-            let _ctx_handle_ಠ_ಠ = ctx!().handle();
-            move |_: ModifyScope| {
-              _ctx_handle_ಠ_ಠ
-                .with_ctx(|ctx!(): &mut BuildCtx| { #(#expr)* })
-                .expect("ctx is not available")
-            }
-          }
-        )
-      }
-    } else {
-      quote_spanned! {span =>
-        MapPipe::new(
-          ModifiesPipe::new(#upstream.box_it()),
-          {
-            #refs
-            move |_: ModifyScope| { #(#expr)* }
-          }
-        )
-      }
-    }
-  }
-  .into()
+  let res = process_watch_body(input, refs_ctx).map(|(upstream, map_handler)| {
+    quote_spanned! {span =>
+    MapPipe::new(
+      // Since the pipe has an initial value, we skip the initial notification.
+      ModifiesPipe::new(#upstream.skip(1).box_it()),
+      #map_handler
+    )}
+  });
+  result_to_token_stream(res)
 }
 
 impl Parse for BodyExpr {
