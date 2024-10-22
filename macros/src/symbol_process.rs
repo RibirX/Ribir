@@ -557,7 +557,7 @@ impl DollarRefsCtx {
         }
         if let (Some(this), Some(other)) = (r.builtin.as_mut(), dollar_ref.builtin) {
           for e in other.run_before_clone {
-            if this.run_before_clone.iter().any(|e2| &e == e2) {
+            if this.run_before_clone.iter().any(|e2| &e != e2) {
               this.run_before_clone.push(e);
             }
           }
