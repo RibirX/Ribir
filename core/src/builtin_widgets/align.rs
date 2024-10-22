@@ -104,7 +104,8 @@ impl WrapRender for HAlignWidget {
 
     let child_size = host.perform_layout(clamp, ctx);
     let x = align.align_value(child_size.width, clamp.max.width);
-    ctx.update_position(ctx.widget_id(), Point::new(x, 0.));
+    let pos = ctx.position(ctx.widget_id()).unwrap_or_default();
+    ctx.update_position(ctx.widget_id(), Point::new(x, pos.y));
     clamp.clamp(child_size)
   }
 }
@@ -119,7 +120,8 @@ impl WrapRender for VAlignWidget {
     }
     let child_size = host.perform_layout(clamp, ctx);
     let y = align.align_value(child_size.height, clamp.max.height);
-    ctx.update_position(ctx.widget_id(), Point::new(0., y));
+    let pos = ctx.position(ctx.widget_id()).unwrap_or_default();
+    ctx.update_position(ctx.widget_id(), Point::new(pos.x, y));
     clamp.clamp(child_size)
   }
 }
@@ -247,5 +249,25 @@ mod tests {
     v_stretch_align,
     WidgetTester::new(v_align(VAlign::Stretch)).with_wnd_size(WND_SIZE),
     LayoutCase::default().with_size(Size::new(10., WND_SIZE.height))
+  );
+
+  fn all_align() -> GenWidget {
+    fn_widget! {
+        @MockBox {
+          h_align: HAlign::Center,
+          v_align: VAlign::Center,
+          size: CHILD_SIZE
+        }
+    }
+    .into()
+  }
+
+  widget_layout_test!(
+    all_align,
+    WidgetTester::new(all_align()).with_wnd_size(WND_SIZE),
+    LayoutCase::default()
+      .with_size(CHILD_SIZE)
+      .with_x(45.)
+      .with_y(45.)
   );
 }

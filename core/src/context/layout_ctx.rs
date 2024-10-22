@@ -71,6 +71,16 @@ impl<'a> LayoutCtx<'a> {
     self.tree.store.layout_info_or_default(child).pos = pos;
   }
 
+  /// Return the position of the widget relative to its parent.
+  #[inline]
+  pub fn position(&mut self, child: WidgetId) -> Option<Point> {
+    self
+      .tree
+      .store
+      .layout_info(child)
+      .map(|info| info.pos)
+  }
+
   /// Adjust the size of the layout widget. Use this method to directly modify
   /// the size of a widget. In most cases, it is unnecessary to call this
   /// method; using clamp to constrain the child size is typically sufficient.
