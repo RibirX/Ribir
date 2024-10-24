@@ -1,3 +1,4 @@
+use proc_macro2::Span;
 use syn::Ident;
 
 pub(crate) const AVOID_CONFLICT_SUFFIX: &str = "ಠ_ಠ";
@@ -18,6 +19,19 @@ pub struct BuiltinMember {
   pub mem_ty: BuiltinMemberType,
   pub var_name: &'static str,
   pub run_before_clone: Option<&'static str>,
+}
+
+impl BuiltinMember {
+  pub fn get_builtin_widget_method(&self, span: Span) -> Ident {
+    Ident::new(&format!("get_{}_widget", self.var_name), span)
+  }
+
+  pub fn run_before_clone_method(&self, span: Span) -> Option<Ident> {
+    self
+      .run_before_clone
+      .as_ref()
+      .map(|method| Ident::new(method, span))
+  }
 }
 
 use phf::phf_map;

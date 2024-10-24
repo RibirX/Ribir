@@ -230,18 +230,16 @@ mod tests {
     WidgetTester::new(fn_widget! {
       let stagger = Stagger::new(Duration::from_millis(100), transitions::EASE_IN.of(ctx!()));
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };
-      let opacity = mock_box
-        .get_opacity_widget()
-        .map_writer(|w| PartData::from_ref_mut(&mut w.opacity));
+
       let animate = @Animate {
         transition: transitions::EASE_IN.of(ctx!()),
-        state: opacity,
+        state: part_writer!(&mut mock_box.opacity),
         from: 0.,
       };
 
       stagger.write().push_animation(animate);
       stagger.write().push_state(
-        mock_box.map_writer(|w| PartData::from_ref_mut(&mut w.size)),
+        part_writer!(&mut mock_box.size),
         Size::new(200., 200.),
         ctx!()
       );
