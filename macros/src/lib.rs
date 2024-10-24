@@ -5,6 +5,7 @@ extern crate proc_macro;
 
 mod declare_derive;
 mod lerp_derive;
+mod part_writer;
 mod util;
 use proc_macro::TokenStream;
 use quote::quote;
@@ -177,8 +178,8 @@ pub fn style_class(input: TokenStream) -> TokenStream {
   .into()
 }
 
-/// This macro is utilized for generating a `Pipe` object that actively monitors
-/// the expression's result.
+/// A shorthand macro for `pipe!` can be utilized as follows:
+/// `pipe!(...).value_chain(|s| s.distinct_until_changed().box_it())`.
 ///
 /// It triggers when the new result differs from the previous one. The `$`
 /// symbol denotes the state reference and automatically subscribes to any
@@ -231,6 +232,22 @@ pub fn distinct_pipe(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn watch(input: TokenStream) -> TokenStream {
   watch_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
+}
+
+/// The `part_writer` macro creates a partial writer from a mutable reference of
+/// a writer.
+///
+/// This macro specifically accepts simple expressions to indicate the partial
+/// of the writer, as shown in the following patterns:
+///
+/// - For a field: `part_writer!(&mut writer.xxx)`
+/// - For a method returning a mutable reference: `part_writer!(writer.xxx())`.
+///
+/// Since it operates on a writer and not a state reference of the writer, the
+/// use of `$` is unnecessary.
+#[proc_macro]
+pub fn part_writer(input: TokenStream) -> TokenStream {
+  part_writer::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
 }
 
 /// Includes an SVG file as an `Svg`.
