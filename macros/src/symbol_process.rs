@@ -24,6 +24,7 @@ pub const KW_RDL: &str = "rdl";
 pub const KW_PIPE: &str = "pipe";
 pub const KW_DISTINCT_PIPE: &str = "distinct_pipe";
 pub const KW_WATCH: &str = "watch";
+pub const KW_PART_WRITER: &str = "part_writer";
 pub const KW_FN_WIDGET: &str = "fn_widget";
 
 pub use tokens_pre_process::*;
@@ -245,11 +246,10 @@ impl Fold for DollarRefsCtx {
     let ExprField { base, member, .. } = &mut i;
 
     if let Member::Named(member) = member {
-      let dollar = BUILTIN_INFOS
-        .get(member.to_string().as_str())
-        .filter(|info| info.mem_ty == BuiltinMemberType::Field)
-        .and_then(|info| self.replace_builtin_ident(&mut *base, info));
-      if dollar.is_some() {
+      let info = BUILTIN_INFOS.get(&member.to_string());
+      if info.map_or(false, |info| {
+        info.mem_ty == BuiltinMemberType::Field && self.replace_builtin_host(&mut *base, info)
+      }) {
         return i;
       }
     }
@@ -259,12 +259,10 @@ impl Fold for DollarRefsCtx {
 
   fn fold_expr_method_call(&mut self, mut i: ExprMethodCall) -> ExprMethodCall {
     // fold builtin method on state
-    if BUILTIN_INFOS
-      .get(&i.method.to_string())
-      .filter(|info| info.mem_ty == BuiltinMemberType::Method)
-      .and_then(|info| self.replace_builtin_ident(&mut i.receiver, info))
-      .is_some()
-    {
+    let info = BUILTIN_INFOS.get(&i.method.to_string());
+    if info.map_or(false, |info| {
+      info.mem_ty == BuiltinMemberType::Method && self.replace_builtin_host(&mut i.receiver, info)
+    }) {
       return i;
     }
 
@@ -293,6 +291,9 @@ impl Fold for DollarRefsCtx {
       self.add_dollar_ref(dollar_ref)
     } else if mac.path.is_ident(KW_WATCH) {
       mac.tokens = crate::watch_macro::gen_code(mac.tokens, self);
+      mark_macro_expanded(&mut mac);
+    } else if mac.path.is_ident(KW_PART_WRITER) {
+      mac.tokens = crate::part_writer::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PIPE) {
       mac.tokens = crate::pipe_macro::gen_code(mac.tokens, self);
@@ -490,38 +491,38 @@ impl DollarRefsCtx {
     }
   }
 
-  fn mark_used_ctx(&mut self) { self.current_dollar_scope_mut().used_ctx = true; }
-
-  fn replace_builtin_ident(
-    &mut self, caller: &mut Expr, info: &BuiltinMember,
-  ) -> Option<&DollarRef> {
-    let mut used = DollarUsedInfo::Reader;
-    let e = if let Expr::MethodCall(m) = caller {
-      if is_state_write_method(&m.method) {
-        used = DollarUsedInfo::Writer;
-        &mut *m.receiver
-      } else {
-        caller
-      }
-    } else {
-      caller
-    };
-
-    let Expr::Macro(m) = e else { return None };
-    let DollarMacro { name: host, .. } = parse_dollar_macro(&m.mac)?;
-
+  pub fn builtin_dollar_ref(
+    &self, host: Ident, info: &BuiltinMember, used: DollarUsedInfo,
+  ) -> DollarRef {
     // When a builtin widget captured by a `move |_| {...}` closure, we need split
     // the builtin widget from the `FatObj` so we only capture the builtin part that
     // we used.
     let name = ribir_suffix_variable(&host, info.var_name);
-    let get_builtin = Ident::new(&format!("get_{}_widget", info.var_name), host.span());
-    let mut run_before_clone = SmallVec::default();
-    if let Some(method) = info.run_before_clone {
-      run_before_clone.push(Ident::new(method, host.span()));
-    }
-    Ident::new(&format!("get_{}_widget", info.var_name), host.span());
+    let get_builtin = info.get_builtin_widget_method(host.span());
+    let run_before_clone = info
+      .run_before_clone_method(host.span())
+      .into_iter()
+      .collect();
+
     let builtin = Some(BuiltinInfo { host, get_builtin, run_before_clone });
-    let dollar_ref = DollarRef { name, builtin, used };
+    DollarRef { name, builtin, used }
+  }
+
+  fn mark_used_ctx(&mut self) { self.current_dollar_scope_mut().used_ctx = true; }
+
+  fn replace_builtin_host(&mut self, caller: &mut Expr, info: &BuiltinMember) -> bool {
+    let mut used = DollarUsedInfo::Reader;
+    let e = match caller {
+      Expr::MethodCall(m) if is_state_write_method(&m.method) => {
+        used = DollarUsedInfo::Writer;
+        &mut *m.receiver
+      }
+      e => e,
+    };
+    let Expr::Macro(m) = e else { return false };
+
+    let Some(DollarMacro { name: host, .. }) = parse_dollar_macro(&m.mac) else { return false };
+    let dollar_ref = self.builtin_dollar_ref(host, info, used);
 
     let state = self.builtin_host_tokens(&dollar_ref);
     m.mac.tokens = if dollar_ref.used == DollarUsedInfo::Writer {
@@ -530,9 +531,9 @@ impl DollarRefsCtx {
       expand_read(state)
     };
     mark_macro_expanded(&mut m.mac);
-
     self.add_dollar_ref(dollar_ref);
-    self.current_dollar_scope().last()
+
+    true
   }
 
   fn new_local_var(&mut self, name: &Ident) {
@@ -543,7 +544,7 @@ impl DollarRefsCtx {
       .push(name.clone())
   }
 
-  fn add_dollar_ref(&mut self, dollar_ref: DollarRef) {
+  pub fn add_dollar_ref(&mut self, dollar_ref: DollarRef) {
     // local variable is not a outside reference.
     if self.is_capture_var(dollar_ref.host()) {
       let scope = self.current_dollar_scope_mut();
@@ -680,7 +681,7 @@ impl<'a> Drop for StackGuard<'a> {
 }
 
 impl Default for DollarRefsCtx {
-  fn default() -> Self { Self { scopes: smallvec![], variable_stacks: vec![vec![]] } }
+  fn default() -> Self { Self { scopes: smallvec![<_>::default()], variable_stacks: vec![vec![]] } }
 }
 
 fn is_state_write_method(m: &Ident) -> bool { m == "write" || m == "silent" || m == "shallow" }

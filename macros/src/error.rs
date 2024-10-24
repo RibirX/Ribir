@@ -6,6 +6,7 @@ pub enum Error {
   WatchNothing(Span),
   RdlAtSyntax { at: Span, follow: Option<Span> },
   IdentNotFollowDollar(Span),
+
   Syn(syn::Error),
 }
 
@@ -34,6 +35,7 @@ impl Error {
       Error::IdentNotFollowDollar(span) => {
         quote_spanned! { *span => compile_error!("Syntax error: expected an identifier after `$`"); }
       }
+
       Error::Syn(err) => err.to_compile_error(),
     }
   }
