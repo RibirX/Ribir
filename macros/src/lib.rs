@@ -186,7 +186,7 @@ pub fn style_class(input: TokenStream) -> TokenStream {
 /// changes made to it.
 #[proc_macro]
 pub fn distinct_pipe(input: TokenStream) -> TokenStream {
-  distinct_pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level())
+  distinct_pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
 }
 
 /// The `watch!` macro converts an expression into an `Observable` stream. Use
