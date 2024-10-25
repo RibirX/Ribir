@@ -30,6 +30,8 @@ struct PartWriter {
   writer: Ident,
   dot: Token![.],
   part_expr: PartExpr,
+  tail_dot: Option<Token![.]>,
+  tail_expr: Option<Expr>,
 }
 
 enum PartExpr {
@@ -46,31 +48,35 @@ impl Parse for PartWriter {
   fn parse(input: ParseStream) -> Result<Self> {
     let and_token = input.parse()?;
     let mutability = input.parse()?;
-    let writer = input.parse()?;
+    let writer = if input.peek(Token![self]) {
+      let this = input.parse::<Token![self]>()?;
+      Ident::from(this)
+    } else {
+      input.parse()?
+    };
     let dot = input.parse()?;
 
-    let part_expr = if input.peek(syn::LitInt) {
-      PartExpr::Member(input.parse()?)
-    } else {
-      let name = input.parse::<Ident>()?;
-      if input.is_empty() {
-        PartExpr::Member(Member::Named(name))
+    let part_expr = if input.peek2(Token![::]) || input.peek2(Paren) {
+      let method = input.parse()?;
+      let turbofish = if input.peek(Token![::]) {
+        Some(AngleBracketedGenericArguments::parse_turbofish(input)?)
       } else {
-        let turbofish = if input.peek(Token![::]) {
-          Some(AngleBracketedGenericArguments::parse_turbofish(input)?)
-        } else {
-          None
-        };
-        let content;
-        PartExpr::Method {
-          method: name,
-          turbofish,
-          paren_token: parenthesized!(content in input),
-          args: content.parse_terminated(Expr::parse, Token![,])?,
-        }
+        None
+      };
+      let content;
+      PartExpr::Method {
+        method,
+        turbofish,
+        paren_token: parenthesized!(content in input),
+        args: content.parse_terminated(Expr::parse, Token![,])?,
       }
+    } else {
+      PartExpr::Member(input.parse()?)
     };
-    Ok(Self { and_token, mutability, writer, dot, part_expr })
+
+    let tail_dot = input.parse()?;
+    let tail_expr = if input.is_empty() { None } else { Some(input.parse()?) };
+    Ok(Self { and_token, mutability, writer, dot, part_expr, tail_dot, tail_expr })
   }
 }
 
@@ -93,7 +99,7 @@ impl PartWriter {
   }
 
   fn gen_tokens(&self, writer_info: &DollarRef, refs_ctx: &DollarRefsCtx) -> TokenStream {
-    let Self { and_token, mutability, writer, dot, part_expr } = self;
+    let Self { and_token, mutability, writer, dot, part_expr, tail_dot, tail_expr } = self;
     let part_expr = match part_expr {
       PartExpr::Member(member) => member.to_token_stream(),
       PartExpr::Method { method, turbofish, paren_token, args } => {
@@ -111,7 +117,9 @@ impl PartWriter {
     };
 
     quote_spanned! { writer.span() =>
-      #host #dot map_writer(|w| PartData::from_ref_mut(#and_token #mutability w #dot #part_expr))
+      #host #dot map_writer(
+        |w| PartData::from_ref_mut(#and_token #mutability w #dot #part_expr #tail_dot #tail_expr)
+      )
     }
   }
 }
