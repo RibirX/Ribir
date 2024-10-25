@@ -299,7 +299,7 @@ impl Fold for DollarRefsCtx {
       mac.tokens = crate::pipe_macro::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_DISTINCT_PIPE) {
-      mac.tokens = crate::distinct_pipe_macro::gen_code(mac.tokens, self).into();
+      mac.tokens = crate::distinct_pipe_macro::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_RDL) {
       self.mark_used_ctx();
