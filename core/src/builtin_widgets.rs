@@ -110,6 +110,7 @@ pub struct FatObj<T> {
   host: T,
   host_id: LazyWidgetId,
   id: LazyWidgetId,
+  class: Option<State<Class>>,
   padding: Option<State<Padding>>,
   fitted_box: Option<State<FittedBox>>,
   constrained_box: Option<State<ConstrainedBox>>,
@@ -124,7 +125,6 @@ pub struct FatObj<T> {
   transform: Option<State<TransformWidget>>,
   opacity: Option<State<Opacity>>,
   visibility: Option<State<Visibility>>,
-  class: Option<State<Class>>,
   h_align: Option<State<HAlignWidget>>,
   v_align: Option<State<VAlignWidget>>,
   relative_anchor: Option<State<RelativeAnchor>>,
@@ -175,6 +175,7 @@ impl<T> FatObj<T> {
       host: f(self.host),
       host_id: self.host_id,
       id: self.id,
+      class: self.class,
       mix_builtin: self.mix_builtin,
       request_focus: self.request_focus,
       fitted_box: self.fitted_box,
@@ -191,7 +192,6 @@ impl<T> FatObj<T> {
       v_align: self.v_align,
       relative_anchor: self.relative_anchor,
       global_anchor: self.global_anchor,
-      class: self.class,
       painting_style: self.painting_style,
       text_style: self.text_style,
       visibility: self.visibility,
@@ -929,6 +929,7 @@ impl<'a> FatObj<Widget<'a>> {
     compose_builtin_widgets!(
       host
         + [
+          class,
           padding,
           fitted_box,
           constrained_box,
@@ -943,7 +944,6 @@ impl<'a> FatObj<Widget<'a>> {
           transform,
           opacity,
           visibility,
-          class,
           h_align,
           v_align,
           relative_anchor,
