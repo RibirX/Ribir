@@ -18,7 +18,6 @@ use crate::{
 /// X-axis values progress toward the right edge of the canvas, while Y-axis
 /// values increase towards the bottom edge of the canvas.
 pub struct Painter {
-  viewport: Rect,
   init_state: PainterState,
   state_stack: Vec<PainterState>,
   commands: Vec<PaintCommand>,
@@ -178,7 +177,6 @@ impl Painter {
       init_state,
       commands: vec![],
       path_builder: Path::builder(),
-      viewport,
     }
   }
 
@@ -191,11 +189,11 @@ impl Painter {
     self.reset();
   }
 
-  pub fn viewport(&self) -> &Rect { &self.viewport }
+  pub fn viewport(&self) -> &Rect { &self.init_state.bounds }
 
   /// Change the bounds of the painter can draw.But it won't take effect until
   /// the next time you call [`Painter::reset`]!.
-  pub fn set_viewport(&mut self, bounds: Rect) { self.viewport = bounds; }
+  pub fn set_viewport(&mut self, bounds: Rect) { self.init_state.bounds = bounds; }
 
   pub fn intersection_paint_bounds(&self, rect: &Rect) -> Option<Rect> {
     self.paint_bounds().intersection(rect)

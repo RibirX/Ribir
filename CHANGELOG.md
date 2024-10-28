@@ -36,10 +36,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Nodes created by a class implementation may not be disposed of when switching to another class. (#637 @M-Adoo)
 - **core**: When merge multiple `MixBuiltin` widgets, there may be a premature dropping of the outer `MixBuiltin` before it should occur. (#639 @M-Adoo)
 - **core**: `watch!` does not notify the initial value. (#640 @M-Adoo)
-
 - **core**: fix watch multi builtin events not work (#641 @wjian23)
-
 - **core**: fix widget layout when h_algin and v_align are embedded in each other (#641 @wjian23)
+- **painter**: fix elements may not be painted after window resize. (#644 @M-Adoo)
 
 ### Breaking
 
