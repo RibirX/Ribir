@@ -1,4 +1,4 @@
-use crate::{prelude::*, wrap_render::WrapRender};
+use crate::{prelude::*, wrap_render::*};
 
 #[derive(Clone, Default)]
 pub struct TransformWidget {
@@ -11,13 +11,7 @@ impl Declare for TransformWidget {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl<'c> ComposeChild<'c> for TransformWidget {
-  type Child = Widget<'c>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child)
-  }
-}
+impl_compose_child_for_wrap_render!(TransformWidget);
 
 impl WrapRender for TransformWidget {
   #[inline]

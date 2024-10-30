@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Added the smooth widgets for transitioning the layout position and size. (#645 @M-Adoo)
+
 ## [0.4.0-alpha.14] - 2024-10-30
 
 ### Features

@@ -71,6 +71,8 @@ mod constrained_box;
 pub use constrained_box::*;
 mod text_style;
 pub use text_style::*;
+mod smooth_layout;
+pub use smooth_layout::*;
 
 use crate::prelude::*;
 

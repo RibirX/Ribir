@@ -1,4 +1,4 @@
-use crate::{prelude::*, wrap_render::WrapRender};
+use crate::{prelude::*, wrap_render::*};
 
 #[derive(Default)]
 pub struct Visibility {
@@ -33,13 +33,7 @@ struct VisibilityRender {
   display: bool,
 }
 
-impl<'c> ComposeChild<'c> for VisibilityRender {
-  type Child = Widget<'c>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child)
-  }
-}
+impl_compose_child_for_wrap_render!(VisibilityRender);
 
 impl WrapRender for VisibilityRender {
   #[inline]

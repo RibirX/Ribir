@@ -1,4 +1,4 @@
-use crate::{prelude::*, wrap_render::WrapRender};
+use crate::{prelude::*, wrap_render::*};
 
 /// Specifies the horizontal position you want to anchor the widget.
 #[derive(Debug, Clone, Copy)]
@@ -171,13 +171,7 @@ impl Declare for RelativeAnchor {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl<'c> ComposeChild<'c> for RelativeAnchor {
-  type Child = Widget<'c>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child)
-  }
-}
+impl_compose_child_for_wrap_render!(RelativeAnchor);
 
 impl WrapRender for RelativeAnchor {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {

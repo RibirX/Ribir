@@ -1,4 +1,4 @@
-use crate::{prelude::*, wrap_render::WrapRender};
+use crate::{prelude::*, wrap_render::*};
 
 /// The BoxDecoration provides configuration options to draw the background and
 /// border of a box.
@@ -36,18 +36,12 @@ pub struct BorderSide {
   pub width: f32,
 }
 
-impl<'c> ComposeChild<'c> for BoxDecoration {
-  type Child = Widget<'c>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child)
-  }
-}
-
 impl BorderSide {
   #[inline]
   pub fn new(width: f32, color: Brush) -> Self { Self { width, color } }
 }
+
+impl_compose_child_for_wrap_render!(BoxDecoration);
 
 impl WrapRender for BoxDecoration {
   #[inline]
