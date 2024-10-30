@@ -15,9 +15,9 @@ version.workspace = true
 
 [dependencies]
 futures.workspace = true
-ribir_geom = {path = "../geom", version = "0.4.0-alpha.13" }
-ribir_gpu = {path = "../gpu", version = "0.4.0-alpha.13" }
-ribir_painter = {path = "../painter", features = ["png"], version = "0.4.0-alpha.13" }
+ribir_geom = {path = "../geom", version = "0.4.0-alpha.14" }
+ribir_gpu = {path = "../gpu", version = "0.4.0-alpha.14" }
+ribir_painter = {path = "../painter", features = ["png"], version = "0.4.0-alpha.14" }
 image.workspace = true
 dssim-core.workspace = true
 
