@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use rxrust::{observable::ObservableExt, ops::box_it::BoxOp, prelude::BoxIt};
 
 use super::*;
-use crate::state::{ModifyScope, StateWatcher, StateWriter};
+use crate::prelude::*;
 
 /// Trait to help animate update the state.
 pub trait AnimateStateSetter {
@@ -19,6 +19,36 @@ pub trait AnimateStateSetter {
 /// Trait to help animate calc the lerp value.
 pub trait AnimateState: AnimateStateSetter {
   fn calc_lerp_value(&mut self, from: &Self::Value, to: &Self::Value, rate: f32) -> Self::Value;
+
+  /// Use an animate to transition the state after it modified.
+  fn transition(
+    self, transition: impl Transition + 'static, ctx: &BuildCtx,
+  ) -> Stateful<Animate<Self>>
+  where
+    Self: Sized,
+    Self::Value: PartialEq,
+  {
+    let state = self.clone_setter();
+    let animate = Animate::declarer()
+      .transition(Box::new(transition))
+      .from(self.get())
+      .state(self)
+      .finish(ctx);
+
+    let c_animate = animate.clone_writer();
+    let init_value = observable::of(state.get());
+    state
+      .animate_state_modifies()
+      .map(move |_| state.get())
+      .merge(init_value)
+      .distinct_until_changed()
+      .pairwise()
+      .subscribe(move |(old, _)| {
+        animate.write().from = old;
+        animate.run();
+      });
+    c_animate
+  }
 }
 
 /// A state with a lerp function as an animation state that use the `lerp_fn`

@@ -207,6 +207,10 @@ impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {
   }
 }
 
+impl<W: Default> Default for Stateful<W> {
+  fn default() -> Self { Self::new(W::default()) }
+}
+
 #[cfg(test)]
 mod tests {
   use std::{cell::RefCell, rc::Rc};

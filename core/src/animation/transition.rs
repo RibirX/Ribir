@@ -23,54 +23,6 @@ pub struct RepeatTransition<T> {
   pub transition: T,
 }
 
-/// Trait help to transition the state.
-pub trait TransitionState: Sized + 'static {
-  /// Use an animate to transition the state after it modified.
-  fn transition(
-    self, transition: impl Transition + 'static, ctx: &BuildCtx,
-  ) -> Stateful<Animate<Self>>
-  where
-    Self: AnimateState,
-  {
-    let state = self.clone_setter();
-    let animate = Animate::declarer()
-      .transition(Box::new(transition))
-      .from(self.get())
-      .state(self)
-      .finish(ctx);
-
-    let c_animate = animate.clone_writer();
-    let init_value = observable::of(state.get());
-    state
-      .animate_state_modifies()
-      .map(move |_| state.get())
-      .merge(init_value)
-      .pairwise()
-      .subscribe(move |(old, _)| {
-        animate.write().from = old;
-        animate.run();
-      });
-    c_animate
-  }
-}
-
-impl<S: AnimateState + 'static> TransitionState for S {}
-
-/// Transition the state with a lerp function.
-pub trait TransitionWithFn: AnimateStateSetter + Sized {
-  fn transition_with<F>(
-    self, transition: Box<dyn Transition>, lerp_fn: F, ctx: &BuildCtx,
-  ) -> Stateful<Animate<LerpFnState<Self, F>>>
-  where
-    F: FnMut(&Self::Value, &Self::Value, f32) -> Self::Value + 'static,
-  {
-    let animate_state = LerpFnState::new(self, lerp_fn);
-    animate_state.transition(transition, ctx)
-  }
-}
-
-impl<S> TransitionWithFn for S where S: AnimateStateSetter {}
-
 /// Transition is a trait to help you calc the rate of change over time.
 pub trait Transition {
   /// Calc the rate of change of the duration from animation start.
