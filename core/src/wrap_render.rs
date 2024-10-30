@@ -121,3 +121,16 @@ where
     self.read().get_transform(host)
   }
 }
+
+macro_rules! impl_compose_child_for_wrap_render {
+  ($name:ty) => {
+    impl<'c> ComposeChild<'c> for $name {
+      type Child = Widget<'c>;
+      fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+        WrapRender::combine_child(this, child)
+      }
+    }
+  };
+}
+
+pub(crate) use impl_compose_child_for_wrap_render;

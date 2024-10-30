@@ -1,4 +1,4 @@
-use crate::{prelude::*, wrap_render::WrapRender};
+use crate::{prelude::*, wrap_render::*};
 
 #[derive(Clone)]
 pub struct Opacity {
@@ -16,13 +16,7 @@ impl Default for Opacity {
   fn default() -> Self { Self { opacity: 1.0 } }
 }
 
-impl<'c> ComposeChild<'c> for Opacity {
-  type Child = Widget<'c>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child)
-  }
-}
+impl_compose_child_for_wrap_render!(Opacity);
 
 impl WrapRender for Opacity {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {

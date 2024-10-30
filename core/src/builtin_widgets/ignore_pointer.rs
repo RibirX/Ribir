@@ -1,4 +1,4 @@
-use crate::{prelude::*, wrap_render::WrapRender};
+use crate::{prelude::*, wrap_render::*};
 
 #[derive(Declare, Clone)]
 pub struct IgnorePointer {
@@ -6,13 +6,7 @@ pub struct IgnorePointer {
   pub ignore: bool,
 }
 
-impl<'c> ComposeChild<'c> for IgnorePointer {
-  type Child = Widget<'c>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child)
-  }
-}
+impl_compose_child_for_wrap_render!(IgnorePointer);
 
 impl WrapRender for IgnorePointer {
   #[inline]

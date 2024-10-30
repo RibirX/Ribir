@@ -1,4 +1,4 @@
-use crate::{prelude::*, wrap_render::WrapRender};
+use crate::{prelude::*, wrap_render::*};
 
 /// A enum that describe how widget align to its box.
 #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -77,21 +77,8 @@ impl Declare for VAlignWidget {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl<'c> ComposeChild<'c> for HAlignWidget {
-  type Child = Widget<'c>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child)
-  }
-}
-
-impl<'c> ComposeChild<'c> for VAlignWidget {
-  type Child = Widget<'c>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child)
-  }
-}
+impl_compose_child_for_wrap_render!(HAlignWidget);
+impl_compose_child_for_wrap_render!(VAlignWidget);
 
 impl WrapRender for HAlignWidget {
   fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {

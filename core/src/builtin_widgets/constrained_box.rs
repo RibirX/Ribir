@@ -1,4 +1,4 @@
-use crate::{prelude::*, wrap_render::WrapRender};
+use crate::{prelude::*, wrap_render::*};
 
 /// a widget that imposes additional constraints clamp on its child.
 #[derive(Clone, Default)]
@@ -12,13 +12,7 @@ impl Declare for ConstrainedBox {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl<'c> ComposeChild<'c> for ConstrainedBox {
-  type Child = Widget<'c>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child)
-  }
-}
+impl_compose_child_for_wrap_render!(ConstrainedBox);
 
 impl WrapRender for ConstrainedBox {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
