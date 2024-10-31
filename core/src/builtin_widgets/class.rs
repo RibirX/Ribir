@@ -113,9 +113,7 @@ impl ComposeChild<'static> for Classes {
   type Child = GenWidget;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     Provider::new(Box::new(this.clone_writer()))
-      .with_child(fn_widget! {
-        pipe!($this;).map(move |_| child.gen_widget())
-      })
+      .with_child(fn_widget! { pipe!($this;).map(move |_| child.gen_widget())})
       .into_widget()
   }
 }
@@ -127,33 +125,31 @@ impl<'c> ComposeChild<'c> for Class {
     let f = move |ctx: &mut BuildCtx| match this.try_into_value() {
       Ok(c) => c.apply_style(child, ctx),
       Err(this) => {
-        let (child, orig_id) = child.consume_root(ctx);
-        let mut orig_child = OrigChild::from_id(orig_id, ctx);
-        let cls_child = ClassChild::new(orig_id);
-
-        let handle = ctx.handle();
-        let reader = this.clone_reader();
+        let this2 = this.clone_watcher();
+        let cls_child = ClassChild::new(ctx.tree().dummy_id());
         // Reapply the class when it is updated.
         let cls_child2 = cls_child.clone();
-        let orig_child2 = orig_child.clone();
+        let child = child.on_build(move |orig_id, ctx| {
+          let mut orig_child = OrigChild::from_id(orig_id, ctx);
+          cls_child2.inner().orig_id = orig_id;
+          let orig_child2 = orig_child.clone();
+          let handle = ctx.handle();
 
-        let u = this
-          .raw_modifies()
-          .filter(|s| s.contains(ModifyScope::FRAMEWORK))
-          .sample(AppCtx::frame_ticks().clone())
-          .subscribe(move |_| {
-            handle.with_ctx(|ctx| cls_child2.update(&orig_child2, &reader.read(), ctx));
-          });
-        orig_child.attach_subscription(u);
+          let u = this2
+            .raw_modifies()
+            .filter(|s| s.contains(ModifyScope::FRAMEWORK))
+            .sample(AppCtx::frame_ticks().clone())
+            .subscribe(move |_| {
+              handle.with_ctx(|ctx| cls_child2.update(&orig_child2, &this2.read(), ctx));
+            })
+            .unsubscribe_when_dropped();
+          orig_child.attach_subscription(u);
+        });
 
-        let (child, child_id) = this
+        this
           .read()
           .apply_style(child, ctx)
-          .consume_root(ctx);
-
-        cls_child.set_child_id(child_id, ctx);
-
-        child
+          .on_build(move |child_id, ctx| cls_child.set_child_id(child_id, ctx))
       }
     };
     f.into_widget()
@@ -455,5 +451,33 @@ mod tests {
     *w_cls.write() = MULTI;
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(300., 200.));
+  }
+
+  #[test]
+  #[should_panic(expected = "0")]
+  fn fix_provider_in_pipe_class() {
+    reset_test_env!();
+
+    class_names!(PROVIDER_CLS);
+
+    let mut wnd = TestWindow::new(fn_widget! {
+      let trigger = Stateful::new(true);
+      let mut classes = Classes::default();
+      classes.insert(PROVIDER_CLS, |w| {
+        Provider::new(Box::new(Queryable(0)))
+          .with_child(fn_widget! { w })
+          .into_widget()
+      });
+      classes.with_child(fn_widget! {
+        @Container {
+          size: Size::new(100., 100.),
+          class: pipe!($trigger; PROVIDER_CLS),
+          on_performed_layout: |e| {
+            panic!("{}", *e.query::<i32>().unwrap());
+          }
+        }
+      })
+    });
+    wnd.draw_frame();
   }
 }
