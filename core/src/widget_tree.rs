@@ -18,6 +18,7 @@ pub(crate) struct WidgetTree {
   pub(crate) arena: TreeArena,
   pub(crate) store: LayoutStore,
   pub(crate) dirty_set: DirtySet,
+  pub(crate) dummy_id: WidgetId,
 }
 
 type TreeArena = Arena<Box<dyn RenderQueryable>>;
@@ -52,6 +53,8 @@ impl WidgetTree {
   }
 
   pub(crate) fn root(&self) -> WidgetId { self.root }
+
+  pub(crate) fn dummy_id(&self) -> WidgetId { self.dummy_id }
 
   /// Draw current tree by painter.
   pub(crate) fn draw(&self) {
@@ -217,14 +220,11 @@ impl WidgetTree {
 impl WidgetTree {
   pub fn new(wnd_id: WindowId) -> Self {
     let mut arena = TreeArena::new();
+    let root = new_node(&mut arena, Box::new(PureRender(Void)));
+    let dummy_id = new_node(&mut arena, Box::new(PureRender(Void)));
+    dummy_id.0.remove(&mut arena);
 
-    Self {
-      root: new_node(&mut arena, Box::new(PureRender(Void))),
-      wnd_id,
-      arena,
-      store: LayoutStore::default(),
-      dirty_set: Sc::new(RefCell::new(HashSet::default())),
-    }
+    Self { root, dummy_id, wnd_id, arena, store: <_>::default(), dirty_set: <_>::default() }
   }
 }
 

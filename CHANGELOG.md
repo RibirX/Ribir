@@ -23,11 +23,15 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 <!-- next-header -->
 
-## [@Unreleased] - @ReleaseDate
+## [@Unreleased] - @ReleaseDat
 
 ### Features
 
 - **core**: Added the smooth widgets for transitioning the layout position and size. (#645 @M-Adoo)
+
+### Fixed
+
+- **core**: The `Provider` might be missing in a pipe class. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.14] - 2024-10-30
 
