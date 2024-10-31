@@ -122,6 +122,7 @@ where
   }
 }
 
+#[macro_export]
 macro_rules! impl_compose_child_for_wrap_render {
   ($name:ty) => {
     impl<'c> ComposeChild<'c> for $name {
