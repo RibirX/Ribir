@@ -27,7 +27,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Added the smooth widgets for transitioning the layout position and size. (#pr @M-Adoo)
+- **core**: Added the smooth widgets for transitioning the layout position and size. (#646 @M-Adoo)
+- **widgets**: Added three widgets `FractionallyWidthBox`, `FractionallyHeightBox`, and `FractionallySizedBox` to enable fractional sizing of widgets. (#646 @M-Adoo)
 
 ## [0.4.0-alpha.14] - 2024-10-30
 

@@ -32,3 +32,5 @@ pub use stack::*;
 pub mod only_sized_by_parent;
 pub use only_sized_by_parent::OnlySizedByParent;
 pub use ribir_core::builtin_widgets::container::Container;
+mod fractionally;
+pub use fractionally::*;
