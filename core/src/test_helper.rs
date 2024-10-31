@@ -338,16 +338,16 @@ impl LayoutCase {
 
     let info = wnd.layout_info_by_path(path).unwrap();
     if let Some(x) = x {
-      assert_eq!(*x, info.pos.x, "unexpected x");
+      assert_eq!(info.pos.x, *x, "unexpected x");
     }
     if let Some(y) = y {
-      assert_eq!(*y, info.pos.y, "unexpected y");
+      assert_eq!(info.pos.y, *y, "unexpected y");
     }
     if let Some(w) = width {
-      assert_eq!(*w, info.size.unwrap().width, "unexpected width");
+      assert_eq!(info.size.unwrap().width, *w, "unexpected width");
     }
     if let Some(h) = height {
-      assert_eq!(*h, info.size.unwrap().height, "unexpected height");
+      assert_eq!(info.size.unwrap().height, *h, "unexpected height");
     }
   }
 }
