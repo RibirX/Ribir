@@ -553,11 +553,7 @@ fn declarer_set_methods<'a>(
     .filter(|f| f.need_set_method())
     .map(move |f| {
       let field_name = f.field.ident.as_ref().unwrap();
-      let doc = f
-        .field
-        .attrs
-        .iter()
-        .find(|attr| matches!(&attr.meta, syn::Meta::NameValue(nv) if nv.path.is_ident("doc")));
+      let doc = f.doc_attr();
       let ty = &f.field.ty;
       let set_method = f.set_method_name();
       if f

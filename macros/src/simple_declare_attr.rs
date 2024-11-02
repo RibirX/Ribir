@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-  Fields, Ident, Result, Visibility,
+  Attribute, Fields, Ident, Result, Visibility,
   parse::{Parse, discouraged::Speculative},
   spanned::Spanned,
 };
@@ -191,6 +191,14 @@ impl<'a> DeclareField<'a> {
       .as_ref()
       .map_or(true, |attr| attr.custom.is_none() && attr.skip.is_none())
   }
+
+  pub fn doc_attr(&self) -> Option<&Attribute> {
+    self
+      .field
+      .attrs
+      .iter()
+      .find(|attr| matches!(&attr.meta, syn::Meta::NameValue(nv) if nv.path.is_ident("doc")))
+  }
 }
 
 impl Parse for DeclareAttr {
@@ -253,7 +261,7 @@ impl Parse for DefaultMeta {
   }
 }
 
-fn declarer_set_methods<'a>(
+pub fn declarer_set_methods<'a>(
   fields: &'a [DeclareField], vis: &'a Visibility,
 ) -> impl Iterator<Item = TokenStream> + 'a {
   fields
@@ -261,11 +269,13 @@ fn declarer_set_methods<'a>(
     .filter(|f| f.need_set_method())
     .map(move |f| {
       let field_name = f.field.ident.as_ref().unwrap();
+      let doc_attr = f.doc_attr();
       let ty = &f.field.ty;
       let set_method = f.set_method_name();
       if f.is_strict() {
         quote! {
           #[inline]
+          #doc_attr
           #vis fn #set_method(mut self, v: #ty) -> Self {
             self.#field_name = Some(v);
             self
@@ -274,6 +284,7 @@ fn declarer_set_methods<'a>(
       } else {
         quote! {
           #[inline]
+          #doc_attr
           #vis fn #set_method(mut self, v: impl Into<#ty>) -> Self
           {
             self.#field_name = Some(v.into());
