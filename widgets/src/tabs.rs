@@ -184,27 +184,26 @@ impl Tabs {
             }
           });
           @ {
-            let mut tab_header = @Expanded {
+            let mut tab_header = @Flex {
+              align_items: Align::Center,
+              justify_content: JustifyContent::Center,
+              direction: match icon_pos {
+                Position::Left | Position::Right => Direction::Horizontal,
+                Position::Top | Position::Bottom => Direction::Vertical,
+              },
+              reverse: matches!(icon_pos, Position::Right | Position::Bottom),
               on_tap: move |_| if $tabs.cur_idx != idx {
                 $tabs.write().cur_idx = idx;
               },
             };
-
             let u = watch!(($tabs.cur_idx == idx, $tab_header.layout_rect()))
               .filter_map(|(active, rect)| active.then_some(rect))
               .subscribe(move |v| $indicator.write().rect = v);
 
             @TabDecorator {
               on_disposed: move |_| { u.unsubscribe(); },
-              @$tab_header {
-                @Flex {
-                  align_items: Align::Center,
-                  justify_content: JustifyContent::Center,
-                  direction: match icon_pos {
-                    Position::Left | Position::Right => Direction::Horizontal,
-                    Position::Top | Position::Bottom => Direction::Vertical,
-                  },
-                  reverse: matches!(icon_pos, Position::Right | Position::Bottom),
+              @Expanded {
+                @$tab_header {
                   @ { icon_widget }
                   @ { label_widget }
                 }
