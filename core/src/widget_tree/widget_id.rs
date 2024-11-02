@@ -14,6 +14,13 @@ use crate::{
 
 pub struct WidgetId(pub(crate) NodeId);
 
+// A place holder get from a `WidgetId`, you can use it to insert a widget
+// replace the `WidgetId` you get this place holder.
+pub(crate) enum PlaceHolder {
+  PrevSibling(WidgetId),
+  Parent(WidgetId),
+}
+
 pub trait RenderQueryable: Render + Query {
   fn as_render(&self) -> &dyn Render;
 }
@@ -73,6 +80,14 @@ impl WidgetId {
       .zip(p1.into_iter().rev())
       .take_while(|(a, b)| a == b)
       .map(|(a, _)| a)
+  }
+
+  pub(crate) fn place_holder(self, tree: &WidgetTree) -> PlaceHolder {
+    if let Some(prev) = self.prev_sibling(tree) {
+      PlaceHolder::PrevSibling(prev)
+    } else {
+      PlaceHolder::Parent(self.parent(tree).unwrap())
+    }
   }
 
   pub(crate) fn parent(self, tree: &WidgetTree) -> Option<WidgetId> {
@@ -298,4 +313,13 @@ impl WidgetId {
   }
 
   pub(crate) fn queryable(&self, tree: &WidgetTree) -> bool { self.assert_get(tree).queryable() }
+}
+
+impl PlaceHolder {
+  pub(crate) fn replace(self, widget: WidgetId, tree: &mut WidgetTree) {
+    match self {
+      PlaceHolder::PrevSibling(prev) => prev.insert_after(widget, tree),
+      PlaceHolder::Parent(parent) => parent.append(widget, tree),
+    }
+  }
 }
