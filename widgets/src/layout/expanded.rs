@@ -3,7 +3,11 @@ use ribir_core::prelude::*;
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
-#[derive(Clone, PartialEq, Declare)]
+#[derive(Clone, PartialEq)]
+// `Expand` should not support `FatObj`, as this may cause the `Expanded` to be invisible to its
+// parent. `@Expanded { margin: EdgeInsets::all(10.) }` actually expands as `@Margin { @Expanded {
+// .. } }`.
+#[simple_declare]
 pub struct Expanded {
   #[declare(default = 1.)]
   pub flex: f32,
@@ -13,21 +17,7 @@ impl<'c> ComposeChild<'c> for Expanded {
   type Child = Widget<'c>;
   #[inline]
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let data: Box<dyn Query> = match this.try_into_value() {
-      Ok(data) => Box::new(Queryable(data)),
-      Err(data) => Box::new(data),
-    };
-    Provider::new(data)
-      .with_child(fn_widget! {
-        @ConstrainedBox {
-          clamp: BoxClamp {
-            min: Size::new(0., 0.),
-            max: Size::new(f32::INFINITY, f32::INFINITY)
-          },
-          @{ child }
-        }
-      })
-      .into_widget()
+    child.try_unwrap_state_and_attach(this)
   }
 }
 

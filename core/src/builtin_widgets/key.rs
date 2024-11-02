@@ -69,15 +69,21 @@ impl<V: Default> Default for KeyChange<V> {
 /// // generate `KeyWidget`, because the root of generated widget is `Margin`.
 /// fn_widget!{
 ///   @ {
-///     pipe!($trigger;).map(move |_| @KeyWidget {
+///     pipe!($trigger;).map(move |_|
+///     @Margin {
 ///       margin: EdgeInsets::all(10.),
-///       key: "key",
-///       value: (),
-///       @Void {}
-///     })
+///       @KeyWidget {
+///         key: "key",
+///         value: (),
+///         @Void {}
+///     }})
 ///   }
 /// };
-#[derive(Declare)]
+// `KeyWidget` should not support `FatObj`, as this may cause the `KeyWidget` to be invisible to its
+// parent. `@KeyWidget { margin: EdgeInsets::all(10.) }` actually expands as `@Margin { @KeyWidget {
+// .. } }`.
+#[simple_declare]
+
 pub struct KeyWidget<V: 'static> {
   pub key: Key,
   #[declare(strict)]

@@ -69,7 +69,6 @@ use crate::prelude::*;
 /// ```
 #[simple_declare]
 pub struct Provider {
-  #[declare(custom)]
   pub provider: Box<dyn Query>,
 }
 
@@ -104,13 +103,6 @@ impl Provider {
   #[inline]
   pub fn write_of<T: 'static>(ctx: &impl ProviderCtx) -> Option<WriteRef<T>> {
     ctx.provider_write_of()
-  }
-}
-
-impl ProviderDeclarer {
-  pub fn provider(mut self, p: impl Query) -> Self {
-    self.provider = Some(Box::new(p));
-    self
   }
 }
 

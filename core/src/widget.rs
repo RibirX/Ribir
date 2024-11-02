@@ -222,7 +222,7 @@ impl<'w> Widget<'w> {
   /// Attach a state to a widget and try to unwrap it before attaching.
   ///
   /// User can query the state or its value type.
-  pub(crate) fn try_unwrap_state_and_attach<D: Any>(
+  pub fn try_unwrap_state_and_attach<D: Any>(
     self, data: impl StateWriter<Value = D> + 'static,
   ) -> Self {
     let data: Box<dyn Query> = match data.try_into_value() {
