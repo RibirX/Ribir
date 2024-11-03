@@ -97,7 +97,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         impl #g_impl ObjDeclarer for #builder #g_ty {
           type Target = Self;
           #[inline]
-          fn finish(self, _: &BuildCtx) -> Self { self }
+          fn finish(self) -> Self { self }
         }
       });
 

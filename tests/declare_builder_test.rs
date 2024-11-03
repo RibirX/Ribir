@@ -1,14 +1,12 @@
 use ribir::prelude::*;
 
-fn dummy_ctx() -> &'static BuildCtx { unsafe { std::mem::transmute(&0) } }
-
 #[test]
 fn declarer_smoke() {
   // empty struct
   #[derive(Declare)]
   struct A;
 
-  let _: FatObj<A> = A::declarer().finish(dummy_ctx());
+  let _: FatObj<A> = A::declarer().finish();
 
   #[derive(Declare)]
   struct B {
@@ -16,10 +14,7 @@ fn declarer_smoke() {
     b: i32,
   }
 
-  let b = <B as Declare>::declarer()
-    .a(1.)
-    .b(1)
-    .finish(dummy_ctx());
+  let b = <B as Declare>::declarer().a(1.).b(1).finish();
   assert_eq!(b.read().a, 1.);
   assert_eq!(b.read().b, 1);
 }
@@ -32,7 +27,7 @@ fn panic_if_miss_require_field() {
     _a: f32,
   }
 
-  let _ = <T as Declare>::declarer().finish(dummy_ctx());
+  let _ = <T as Declare>::declarer().finish();
 }
 
 #[test]
@@ -44,7 +39,7 @@ fn default_field() {
     a: f32,
   }
 
-  let t = <DefaultDeclare as Declare>::declarer().finish(dummy_ctx());
+  let t = <DefaultDeclare as Declare>::declarer().finish();
   assert_eq!(t.read().a, 0.);
 }
 
@@ -57,7 +52,7 @@ fn default_field_with_value() {
     text: &'static str,
   }
 
-  let t = <DefaultWithValue as Declare>::declarer().finish(dummy_ctx());
+  let t = <DefaultWithValue as Declare>::declarer().finish();
   assert_eq!(t.read().text, "hi!");
 }
 
@@ -69,7 +64,7 @@ fn declarer_simple_attr() {
     b: i32,
   }
 
-  let s = Simple::declarer().a(1.).b(1).finish(dummy_ctx());
+  let s = Simple::declarer().a(1.).b(1).finish();
   assert_eq!(s.read().a, 1.);
   assert_eq!(s.read().b, 1);
 }

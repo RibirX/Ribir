@@ -19,13 +19,10 @@
 //!     // Create a smooth widget that operates on both the x-axis and y-axis.
 //!     let smooth = SmoothPos::default();
 //!     // Enable the transition
-//!     let _animate = smooth.transition(
-//!         EasingTransition {
-//!             easing: easing::LinearEasing,
-//!             duration: Duration::from_millis(1000),
-//!         },
-//!         ctx!(),
-//!     );
+//!     let _animate = smooth.transition(EasingTransition {
+//!        easing: easing::LinearEasing,
+//!        duration: Duration::from_millis(1000),
+//!     });
 //!
 //!     // Apply the smooth widget to the desired widget.
 //!     @ $smooth {
@@ -55,12 +52,12 @@ struct SmoothImpl<T> {
 
 impl<T: Copy + PartialEq + 'static> Stateful<SmoothImpl<T>> {
   fn transition(
-    &self, transition: impl Transition + 'static, ctx: &BuildCtx,
+    &self, transition: impl Transition + 'static,
   ) -> Stateful<Animate<impl AnimateState + 'static>>
   where
     T: Lerp,
   {
-    let animate = part_writer!(&mut self.value).transition(transition, ctx);
+    let animate = part_writer!(&mut self.value).transition(transition);
     let this = self.clone_writer();
     watch!($animate.is_running())
       .distinct_until_changed()
@@ -111,10 +108,10 @@ macro_rules! smooth_size_widget_impl {
 
     impl $name {
       #[doc = "Enable the transition with the provided argument and return the animation of the transition."]
-      pub fn transition(&self, transition: impl Transition + 'static, ctx: &BuildCtx)
+      pub fn transition(&self, transition: impl Transition + 'static)
         -> Stateful< Animate<impl AnimateState + 'static>>
       {
-        self.0.transition(transition, ctx)
+        self.0.transition(transition, )
       }
     }
   };
@@ -161,10 +158,10 @@ macro_rules! smooth_pos_widget_impl {
 
     impl $name {
       #[doc = "Enable the transition with the provided argument and return the animation of the transition."]
-      pub fn transition(&self, transition: impl Transition + 'static, ctx: &BuildCtx)
+      pub fn transition(&self, transition: impl Transition + 'static)
         -> Stateful< Animate<impl AnimateState + 'static>>
       {
-        self.0.transition(transition, ctx)
+        self.0.transition(transition)
       }
     }
   };

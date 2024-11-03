@@ -21,9 +21,7 @@ pub trait AnimateState: AnimateStateSetter {
   fn calc_lerp_value(&mut self, from: &Self::Value, to: &Self::Value, rate: f32) -> Self::Value;
 
   /// Use an animate to transition the state after it modified.
-  fn transition(
-    self, transition: impl Transition + 'static, ctx: &BuildCtx,
-  ) -> Stateful<Animate<Self>>
+  fn transition(self, transition: impl Transition + 'static) -> Stateful<Animate<Self>>
   where
     Self: Sized,
     Self::Value: PartialEq,
@@ -33,7 +31,7 @@ pub trait AnimateState: AnimateStateSetter {
       .transition(Box::new(transition))
       .from(self.get())
       .state(self)
-      .finish(ctx);
+      .finish();
 
     let c_animate = animate.clone_writer();
     let init_value = observable::of(state.get());

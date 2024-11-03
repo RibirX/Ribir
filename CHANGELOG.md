@@ -40,6 +40,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Breaking
 
 - **core**: `Expanded` and `KeyWidget` are not declared with `FatObj`, so they do not currently support built-in widgets. (#648 @M-Adoo)
+- **core**: `DeclareObj::finish` does not accept a `BuildCtx` parameter. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.14] - 2024-10-30
 

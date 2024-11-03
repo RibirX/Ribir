@@ -903,7 +903,7 @@ impl<T> FatObj<T> {
 impl<T> ObjDeclarer for FatObj<T> {
   type Target = Self;
 
-  fn finish(self, _: &BuildCtx) -> Self::Target { self }
+  fn finish(self) -> Self::Target { self }
 }
 
 impl<'w, T, const M: usize> IntoWidgetStrict<'w, M> for FatObj<T>

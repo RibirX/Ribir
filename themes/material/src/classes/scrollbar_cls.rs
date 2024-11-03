@@ -65,9 +65,7 @@ fn base_track(w: Widget) -> Widget {
       duration: md::easing::duration::MEDIUM2
     };
     // Smoothly fade in and out the scrollbar.
-    w.get_opacity_widget()
-      .map_writer(|w|  PartData::from_ref_mut(&mut w.opacity))
-      .transition(trans.clone(), ctx!());
+    part_writer!(&mut w.opacity).transition(trans.clone());
 
     let mut w = @ $w {
       background: {
@@ -77,9 +75,7 @@ fn base_track(w: Widget) -> Widget {
       on_disposed: move |_| u.unsubscribe(),
     };
     // Smoothly display the background.
-    w.get_box_decoration_widget()
-      .map_writer(|w|  PartData::from_ref_mut(&mut w.background))
-      .transition(trans, ctx!());
+    part_writer!(&mut w.background).transition(trans);
 
     w
   }

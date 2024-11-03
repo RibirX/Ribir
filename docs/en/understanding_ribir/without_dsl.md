@@ -67,7 +67,7 @@ fn button_demo(ctx: &BuildCtx) {
   let btn: FatObj<State<FilledButton>> = FilledButton::declarer()
     .color(Color::RED)
     .on_tap(|_| println!("Button clicked"))
-    .finish(ctx);
+    .finish();
 }
 ```
 
@@ -101,10 +101,10 @@ Another thing to note is that we're creating `FatObj<State<FilledButton>>`, not 
 ```rust
 use ribir::prelude::*;
 
-fn button_demo(ctx: &BuildCtx){
+fn button_demo(_: &BuildCtx){
   let mut btn: FatObj<State<FilledButton>> = FilledButton::declarer()
     .color(Color::RED)
-    .finish(ctx);
+    .finish();
 
   let w = btn.clone_writer();
   btn = btn.on_tap(move |_| w.write().color = Color::BLUE);
@@ -121,11 +121,11 @@ Another benefit of using `Declare` to create widgets is that it allows for prope
 use ribir::prelude::*;
 
 fn button_demo(ctx: &BuildCtx){
-  let btn1 = FilledButton::declarer().color(Color::RED).finish(ctx);
+  let btn1 = FilledButton::declarer().color(Color::RED).finish();
 
   let btn2 = FilledButton::declarer()
     .color(pipe!($btn1.color))
-    .finish(ctx);
+    .finish();
 
   btn1.write().color = Color::BLUE;
 }
@@ -143,7 +143,7 @@ use ribir::prelude::*;
 fn button_demo(ctx: &BuildCtx){
   let mut btn = FilledButton::declarer()
     .color(Color::RED)
-    .finish(ctx);
+    .finish();
 
   let m = btn.get_margin_widget().clone_writer();
   btn = btn.on_tap(move |_| m.write().margin = EdgeInsets::all(10.0));
@@ -165,12 +165,12 @@ use ribir::prelude::*;
 fn button_demo(ctx: &BuildCtx) {
   let text_btn = FilledButton::declarer()
     .color(Color::RED)
-    .finish(ctx)
+    .finish()
     .with_child(Label::new("Text Button"));
 
   let icon_btn = FilledButton::declarer()
     .color(Color::RED)
-    .finish(ctx)
+    .finish()
     .with_child(svgs::ADD);
 }
 ```

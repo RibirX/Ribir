@@ -250,10 +250,8 @@ fn override_compose_decorator(theme: &mut Theme) {
         },
       };
 
-      indicator
-        .get_relative_anchor_widget()
-        .map_writer(|w| PartData::from_ref_mut(&mut w.anchor))
-        .transition(transitions::EASE_IN.of(ctx!()), ctx!());
+      part_writer!(&mut indicator.anchor)
+        .transition(transitions::EASE_IN.of(ctx!()));
       indicator
     }
     .into_widget()

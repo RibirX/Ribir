@@ -322,7 +322,7 @@ impl<'c> ComposeChild<'c> for ListItem {
 pub struct ListItem {
   #[declare(default = 1usize)]
   pub line_number: usize,
-  #[declare(default = Palette::of(ctx!()).primary())]
+  #[declare(default = Palette::of(BuildCtx::get()).primary())]
   pub active_background: Color,
 }
 

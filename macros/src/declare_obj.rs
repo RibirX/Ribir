@@ -139,7 +139,7 @@ impl DeclareObj {
         self.gen_fields_tokens(
           &name,
           quote! { #ty::declarer() },
-          quote! { .finish(ctx!()) },
+          quote! { .finish() },
           tokens,
         );
       }
@@ -184,7 +184,7 @@ impl DeclareObj {
     //
     // ```
     // let mut x = ...;
-    // X::declarer().a(&mut x.a).b(&mut x.b).finish(ctx!());
+    // X::declarer().a(&mut x.a).b(&mut x.b).finish();
     // ```
     //
     // In this scenario, `x` would be borrowed twice, causing a compilation failure

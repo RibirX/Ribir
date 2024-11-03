@@ -10,7 +10,7 @@ use crate::layout::SizedBox;
 /// a icon.
 #[derive(Declare, Default, Clone, Copy)]
 pub struct Icon {
-  #[declare(default = IconSize::of(ctx!()).small)]
+  #[declare(default = IconSize::of(BuildCtx::get()).small)]
   pub size: Size,
 }
 

@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use rxrust::ops::box_it::BoxOp;
 
-use crate::{context::BuildCtx, pipe::Pipe, prelude::BoxPipe, state::ModifyScope};
+use crate::{pipe::Pipe, prelude::BoxPipe, state::ModifyScope};
 
 /// Trait used to create a widget declarer that can interact with the `BuildCtx`
 /// to create a widget.
@@ -16,7 +16,7 @@ pub trait Declare {
 pub trait ObjDeclarer {
   type Target;
   /// Finish the object creation with the given context.
-  fn finish(self, ctx: &BuildCtx) -> Self::Target;
+  fn finish(self) -> Self::Target;
 }
 
 /// Used to do conversion from a value to the `DeclareInit` type.
