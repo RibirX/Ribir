@@ -4,7 +4,9 @@ use std::ptr::NonNull;
 use smallvec::SmallVec;
 use widget_id::{RenderQueryable, new_node};
 
-use crate::{pipe::DynInfo, prelude::*, render_helper::PureRender, window::WindowId};
+use crate::{
+  local_sender::LocalSender, pipe::DynInfo, prelude::*, render_helper::PureRender, window::WindowId,
+};
 
 /// A context provide during build the widget tree.
 pub struct BuildCtx {
@@ -156,6 +158,36 @@ impl BuildCtxHandle {
 /// construction of different parts of the tree. By breaking the borrow checker
 /// here, we achieve clearer logic.
 static mut CURRENT_CTX: Option<BuildCtx> = None;
+
+static mut CTX: Option<LocalSender<BuildCtx>> = None;
+
+impl BuildCtx {
+  pub fn get() -> &'static BuildCtx { unsafe { CURRENT_CTX.as_ref().unwrap() } }
+
+  pub(crate) fn get_mut() -> &'static mut BuildCtx { unsafe { CURRENT_CTX.as_mut().unwrap() } }
+
+  pub(crate) fn init_ctx(startup: WidgetId, tree: NonNull<WidgetTree>) -> BuildCtxInitdGuard {
+    let t = unsafe { tree.as_ref() };
+    let providers_list = startup.ancestors(t).filter(|id| id.queryable(t));
+
+    let mut providers: SmallVec<[WidgetId; 1]> = providers_list.collect();
+    providers.reverse();
+    let ctx = BuildCtx { tree, providers, pre_alloc: None, current_providers: <_>::default() };
+
+    unsafe {
+      assert!(CTX.is_none(), "Build context is already initialized");
+      CTX = Some(LocalSender::new(ctx));
+    }
+
+    BuildCtxInitdGuard
+  }
+}
+
+pub(crate) struct BuildCtxInitdGuard;
+
+impl Drop for BuildCtxInitdGuard {
+  fn drop(&mut self) { unsafe { CTX = None } }
+}
 
 enum CtxRestore {
   None,

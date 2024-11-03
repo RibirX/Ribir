@@ -114,6 +114,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           let info = pipe_node.dyn_info();
           let old = info.borrow().host_id();
           let mut ctx = BuildCtx::create(old, tree);
+          let _guard = BuildCtx::init_ctx(old, tree);
 
           let old_node = pipe_node.remove_old_data();
           let new = w.into_widget().build(&mut ctx);
@@ -177,6 +178,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         };
 
         let mut ctx = BuildCtx::create(old[0], tree);
+        let _guard = BuildCtx::init_ctx(old[0], tree);
 
         let old_node = pipe_node.remove_old_data();
         let mut new = vec![];
@@ -274,6 +276,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           };
 
           let mut ctx = BuildCtx::create(top, tree);
+          let _guard = BuildCtx::init_ctx(top, tree);
 
           let old_node = pipe_node.remove_old_data();
           let p = w.into_widget().build(&mut ctx);

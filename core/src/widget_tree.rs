@@ -27,6 +27,7 @@ impl WidgetTree {
   pub fn init(&mut self, wnd: &Window, content: GenWidget) -> WidgetId {
     let root = self.root;
     let mut ctx = BuildCtx::create(root, wnd.tree);
+    let _guard = BuildCtx::init_ctx(root, wnd.tree);
     ctx.pre_alloc = Some(root);
 
     let theme = AppCtx::app_theme().clone_writer();

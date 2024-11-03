@@ -28,6 +28,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: Added the smooth widgets for transitioning the layout position and size. (#645 @M-Adoo)
+- **core**: `BuildCtx::get()` and `BuildCtx::get_mut()` have been added to facilitate access from anywhere within a build context. (#680 @M-Adoo)
 
 ### Fixed
 
@@ -36,7 +37,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
-- **core**: `Expanded` and `KeyWidget` are not declared with `FatObj`, so they do not currently support built-in widgets. (#pr @M-Adoo)
+- **core**: `Expanded` and `KeyWidget` are not declared with `FatObj`, so they do not currently support built-in widgets. (#680 @M-Adoo)
 
 ## [0.4.0-alpha.14] - 2024-10-30
 
