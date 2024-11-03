@@ -30,6 +30,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Added the smooth widgets for transitioning the layout position and size. (#645 @M-Adoo)
 - **widgets**: Added three widgets `FractionallyWidthBox`, `FractionallyHeightBox`, and `FractionallySizedBox` to enable fractional sizing of widgets. (#647 @M-Adoo)
 - **widgets**: Add widget of radio button (#649 @wjian23)
+- **core**: `BuildCtx::get()` and `BuildCtx::get_mut()` have been added to facilitate access from anywhere within a build context. (#pr @M-Adoo)
 
 ### Fixed
 

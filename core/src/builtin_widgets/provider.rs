@@ -119,7 +119,8 @@ impl<'c> ComposeChild<'c> for Provider {
       })
       .provider;
 
-    let f = move |ctx: &mut BuildCtx| {
+    let f = move |_: &mut BuildCtx| {
+      let ctx = BuildCtx::get_mut();
       let id = ctx.pre_alloc();
 
       // We need to push the `id` to providers; the build logic must create context
