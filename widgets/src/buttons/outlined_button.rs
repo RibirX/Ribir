@@ -76,7 +76,7 @@ impl ComposeDecorator for OutlinedButtonDecorator {
 /// ```
 #[derive(Default, Declare)]
 pub struct OutlinedButton {
-  #[declare(default=Palette::of(ctx!()).primary())]
+  #[declare(default=Palette::of(BuildCtx::get()).primary())]
   color: Color,
 }
 

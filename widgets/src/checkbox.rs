@@ -12,7 +12,7 @@ pub struct Checkbox {
   pub checked: bool,
   #[declare(default)]
   pub indeterminate: bool,
-  #[declare(default=Palette::of(ctx!()).primary())]
+  #[declare(default=Palette::of(BuildCtx::get() ).primary())]
   pub color: Color,
 }
 
@@ -28,7 +28,7 @@ pub struct CheckBoxStyle {
 
 #[derive(Clone, Declare)]
 pub struct CheckBoxDecorator {
-  #[declare(default=Palette::of(ctx!()).primary())]
+  #[declare(default=Palette::of(BuildCtx::get()).primary())]
   pub color: Color,
 }
 

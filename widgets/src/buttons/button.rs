@@ -63,7 +63,7 @@ impl ComposeDecorator for ButtonDecorator {
 /// ```
 #[derive(Default, Declare)]
 pub struct Button {
-  #[declare(default=Palette::of(ctx!()).primary())]
+  #[declare(default=Palette::of(BuildCtx::get()).primary())]
   color: Color,
 }
 

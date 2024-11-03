@@ -70,21 +70,21 @@ fn main() {
 use ribir::prelude::*;
 
 fn main() {
-  let counter = |ctx: &mut BuildCtx| {
+  let counter = |_: &mut BuildCtx| {
     let cnt = Stateful::new(0);
 
     let c_cnt = cnt.clone_writer();
     let inc_btn = FilledButton::declarer()
       .on_tap(move |_| *c_cnt.write() += 1)
-      .finish(ctx)
+      .finish()
       .with_child(Label::new("Inc"));
 
     let counter = H1::declarer()
       .text(pipe!($cnt.to_string()))
-      .finish(ctx);
+      .finish();
 
     Row::declarer()
-      .finish(ctx)
+      .finish()
       .with_child(inc_btn)
       .with_child(counter)
       .into_widget()

@@ -57,7 +57,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         type Target = FatObj<State<#host #g_ty>>;
 
         #[inline]
-        fn finish(mut self, ctx!(): &BuildCtx) -> Self::Target {
+        fn finish(mut self) -> Self::Target {
           #(#field_values)*
           let mut _this_ಠ_ಠ = State::value(#host {
             #(#field_names : #field_names.0),*

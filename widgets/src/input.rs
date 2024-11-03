@@ -79,19 +79,19 @@ pub trait EditableText: Sized {
 
 #[derive(Declare)]
 pub struct Input {
-  #[declare(default = TypographyTheme::of(ctx!()).body_large.text.clone())]
+  #[declare(default = TypographyTheme::of(BuildCtx::get()).body_large.text.clone())]
   pub style: TextStyle,
   #[declare(skip)]
   text: CowArc<str>,
   #[declare(skip)]
   caret: CaretState,
-  #[declare(default = InputStyle::of(ctx!()).size)]
+  #[declare(default = InputStyle::of(BuildCtx::get()).size)]
   size: Option<f32>,
 }
 
 #[derive(Declare)]
 pub struct TextArea {
-  #[declare(default = TypographyTheme::of(ctx!()).body_large.text.clone())]
+  #[declare(default = TypographyTheme::of(BuildCtx::get()).body_large.text.clone())]
   pub style: TextStyle,
   #[declare(default = true)]
   pub auto_wrap: bool,
@@ -99,9 +99,9 @@ pub struct TextArea {
   text: CowArc<str>,
   #[declare(skip)]
   caret: CaretState,
-  #[declare(default = TextAreaStyle::of(ctx!()).rows)]
+  #[declare(default = TextAreaStyle::of(BuildCtx::get()).rows)]
   rows: Option<f32>,
-  #[declare(default = TextAreaStyle::of(ctx!()).cols)]
+  #[declare(default = TextAreaStyle::of(BuildCtx::get()).cols)]
   cols: Option<f32>,
 }
 

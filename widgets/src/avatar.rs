@@ -25,7 +25,7 @@ use crate::prelude::*;
 /// ```
 #[derive(Declare, Default, Clone)]
 pub struct Avatar {
-  #[declare(default=Palette::of(ctx!()).primary())]
+  #[declare(default=Palette::of(BuildCtx::get()).primary())]
   pub color: Color,
 }
 

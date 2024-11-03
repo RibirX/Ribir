@@ -195,7 +195,7 @@ mod tests {
     let dummy = std::mem::MaybeUninit::uninit();
     // just for test, we know BoxDecoration not use `ctx` to build.
     let ctx: BuildCtx = unsafe { dummy.assume_init() };
-    let mut w = BoxDecoration::declarer().finish(&ctx);
+    let mut w = BoxDecoration::declarer().finish();
     let w = w.get_box_decoration_widget();
 
     assert_eq!(w.read().border, None);

@@ -82,7 +82,7 @@ impl<'c> ComposeChild<'c> for Ripple {
           let ripper_fade_out = ripple
             .get_opacity_widget()
             .map_writer(|w| PartData::from_ref_mut(&mut w.opacity))
-            .transition(transitions::EASE_OUT.of(ctx!()), ctx!());
+            .transition(transitions::EASE_OUT.of(ctx!()));
 
           let bounded = $this.bounded;
           let clipper = (bounded != RippleBound::Unbounded).then(|| {

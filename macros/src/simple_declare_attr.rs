@@ -42,7 +42,7 @@ pub(crate) fn simple_declarer_attr(stt: &mut syn::ItemStruct) -> Result<TokenStr
       type Target = State<#ident #g_ty>;
 
       #[inline]
-      fn finish(mut self, ctx!(): &BuildCtx) -> Self::Target {
+      fn finish(mut self) -> Self::Target {
         State::value(#ident {#(#init_pairs),*})
       }
     }
@@ -74,7 +74,7 @@ fn empty_impl(stt: &syn::ItemStruct) -> Result<TokenStream> {
     impl ObjDeclarer for #name {
       type Target = #name;
       #[inline]
-      fn finish(self, _: &BuildCtx) -> Self::Target { self }
+      fn finish(self) -> Self::Target { self }
     }
   };
   Ok(tokens)

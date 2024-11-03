@@ -8,14 +8,14 @@ pub struct Animate<S>
 where
   S: AnimateState + 'static,
 {
-  #[declare(strict, default = transitions::LINEAR.of(ctx!()))]
+  #[declare(strict, default = transitions::LINEAR.of(BuildCtx::get()))]
   pub transition: Box<dyn Transition>,
   #[declare(strict)]
   pub state: S,
   pub from: S::Value,
   #[declare(skip)]
   running_info: Option<AnimateInfo<S::Value>>,
-  #[declare(skip, default = ctx!().window().id())]
+  #[declare(skip, default = BuildCtx::get().window().id())]
   window_id: WindowId,
 }
 
