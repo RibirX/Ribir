@@ -26,7 +26,8 @@ type TreeArena = Arena<Box<dyn RenderQueryable>>;
 impl WidgetTree {
   pub fn init(&mut self, wnd: &Window, content: GenWidget) -> WidgetId {
     let root = self.root;
-    let mut ctx = BuildCtx::create(root, wnd.tree);
+    let _guard = BuildCtx::init_ctx(root, wnd.tree);
+    let ctx = BuildCtx::get_mut();
     ctx.pre_alloc = Some(root);
 
     let theme = AppCtx::app_theme().clone_writer();
@@ -43,7 +44,7 @@ impl WidgetTree {
         })
       })
       .into_widget()
-      .build(&mut ctx);
+      .build(ctx);
 
     assert_eq!(root, id);
 

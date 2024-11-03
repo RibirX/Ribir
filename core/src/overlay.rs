@@ -174,8 +174,8 @@ impl Overlay {
     if let Some(showing) = showing {
       let ShowingInfo { id, wnd_id, .. } = showing;
       if let Some(wnd) = AppCtx::get_window(wnd_id) {
-        let ctx = BuildCtx::create(wnd.tree().root(), wnd.tree);
-        let showing_overlays = Provider::of::<ShowingOverlays>(&*ctx).unwrap();
+        let _guard = BuildCtx::init_ctx(wnd.tree().root(), wnd.tree);
+        let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
         showing_overlays.remove(self);
 
         let tree = wnd.tree_mut();
@@ -214,8 +214,9 @@ impl Overlay {
       }
     };
 
-    let mut ctx = BuildCtx::create(wnd.tree().root(), wnd.tree);
-    let id = gen(&mut ctx).build(&mut ctx);
+    let _guard = BuildCtx::init_ctx(wnd.tree().root(), wnd.tree);
+    let ctx = BuildCtx::get_mut();
+    let id = gen(ctx).build(ctx);
     self.0.borrow_mut().showing = Some(ShowingInfo { id, generator: gen.into(), wnd_id: wnd.id() });
 
     let showing_overlays = Provider::of::<ShowingOverlays>(&*ctx).unwrap();

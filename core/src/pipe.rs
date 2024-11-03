@@ -113,10 +113,11 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         let u = modifies.subscribe(move |(_, w)| {
           let info = pipe_node.dyn_info();
           let old = info.borrow().host_id();
-          let mut ctx = BuildCtx::create(old, tree);
+          let _guard = BuildCtx::init_ctx(old, tree);
 
+          let ctx = BuildCtx::get_mut();
           let old_node = pipe_node.remove_old_data();
-          let new = w.into_widget().build(&mut ctx);
+          let new = w.into_widget().build(ctx);
           let tree = ctx.tree_mut();
           pipe_node.transplant_to_new(old_node, new, tree);
 
@@ -176,17 +177,18 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           _ => unreachable!(),
         };
 
-        let mut ctx = BuildCtx::create(old[0], tree);
+        let _guard = BuildCtx::init_ctx(old[0], tree);
+        let ctx = BuildCtx::get_mut();
 
         let old_node = pipe_node.remove_old_data();
         let mut new = vec![];
         for (idx, w) in m.into_iter().enumerate() {
-          let id = w.into_widget().build(&mut ctx);
+          let id = w.into_widget().build(ctx);
           new.push(id);
           set_pos_of_multi(id, idx, ctx.tree());
         }
         if new.is_empty() {
-          new.push(Void.into_widget().build(&mut ctx));
+          new.push(Void.into_widget().build(ctx));
         }
 
         let tree = ctx.tree_mut();
@@ -273,10 +275,11 @@ pub(crate) trait InnerPipe: Pipe + Sized {
             _ => unreachable!(),
           };
 
-          let mut ctx = BuildCtx::create(top, tree);
+          let _guard = BuildCtx::init_ctx(top, tree);
+          let ctx = BuildCtx::get_mut();
 
           let old_node = pipe_node.remove_old_data();
-          let p = w.into_widget().build(&mut ctx);
+          let p = w.into_widget().build(ctx);
           let tree = ctx.tree_mut();
           pipe_node.transplant_to_new(old_node, p, tree);
 

@@ -4,7 +4,9 @@ use std::ptr::NonNull;
 use smallvec::SmallVec;
 use widget_id::{RenderQueryable, new_node};
 
-use crate::{pipe::DynInfo, prelude::*, render_helper::PureRender, window::WindowId};
+use crate::{
+  local_sender::LocalSender, pipe::DynInfo, prelude::*, render_helper::PureRender, window::WindowId,
+};
 
 /// A context provide during build the widget tree.
 pub struct BuildCtx {
@@ -138,24 +140,57 @@ impl BuildCtxHandle {
   }
 }
 
-/// During widget building, if a subtree uses a handle to create a BuildCtx, it
-/// may lack current context information because the building subtree has not
-/// been added to the tree yet.
+/// The global variable that stores the build context is only accessible within
+/// a single thread. Accessing it from another thread will result in a panic.
 ///
-/// For example, when constructing subtree A, where B is a sub-tree of A, and
-/// during the building of B and its widget, it utilizes
-/// `BuildCtxHandle::with_handle` to retrieve the `BuildCtx`. At that moment, B
-/// is not yet a sub-tree of A, resulting in the inability to access the
-/// providers of its intended ancestors.
-///
-/// # Safety
-///
-/// We use the build context in a single thread and utilize it to
-/// construct the widget tree in a top-first manner. There may be simultaneous
-/// borrowing and mutation of the CURRENT_CTX, but this occurs during the
-/// construction of different parts of the tree. By breaking the borrow checker
-/// here, we achieve clearer logic.
-static mut CURRENT_CTX: Option<BuildCtx> = None;
+/// Before the building phase starts, the framework initializes it, and the
+/// `BuildCtx` can be accessed from anywhere by calling `BuildCtx::get`. After
+/// the build phase is finished, it will be set to `None`.
+static mut CTX: Option<LocalSender<BuildCtx>> = None;
+
+impl BuildCtx {
+  /// Return the build context if the caller is currently in the building
+  /// process.
+  pub fn try_get() -> Option<&'static BuildCtx> { unsafe { CTX.as_deref() } }
+
+  /// Return the context of the current build process. If the caller is not in
+  /// the build process, a panic will occur.
+  pub fn get() -> &'static BuildCtx {
+    BuildCtx::try_get().expect("Not during the widget building process.")
+  }
+
+  /// Return the mutable context of the current build process. If the caller is
+  /// not in the build process, a panic will occur.
+  pub(crate) fn get_mut() -> &'static mut BuildCtx {
+    unsafe {
+      CTX
+        .as_deref_mut()
+        .expect("Not during the widget building process.")
+    }
+  }
+
+  pub(crate) fn init_ctx(startup: WidgetId, tree: NonNull<WidgetTree>) -> BuildCtxInitdGuard {
+    let t = unsafe { tree.as_ref() };
+    let providers_list = startup.ancestors(t).filter(|id| id.queryable(t));
+
+    let mut providers: SmallVec<[WidgetId; 1]> = providers_list.collect();
+    providers.reverse();
+    let ctx = BuildCtx { tree, providers, pre_alloc: None, current_providers: <_>::default() };
+
+    unsafe {
+      assert!(CTX.is_none(), "Build context is already initialized");
+      CTX = Some(LocalSender::new(ctx));
+    }
+
+    BuildCtxInitdGuard
+  }
+}
+
+pub(crate) struct BuildCtxInitdGuard;
+
+impl Drop for BuildCtxInitdGuard {
+  fn drop(&mut self) { unsafe { CTX = None } }
+}
 
 enum CtxRestore {
   None,

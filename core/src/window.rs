@@ -208,8 +208,8 @@ impl Window {
       let root = self.tree().root();
 
       let surface = {
-        let ctx = BuildCtx::create(root, self.tree);
-        Palette::of(&*ctx).surface()
+        let _guard = BuildCtx::init_ctx(root, self.tree);
+        Palette::of(BuildCtx::get()).surface()
       };
       self.shell_wnd.borrow_mut().begin_frame(surface);
 
@@ -302,7 +302,8 @@ impl Window {
 
   pub fn init(&self, content: GenWidget) {
     let root = self.tree_mut().init(self, content);
-    let ctx = BuildCtx::create(root, self.tree);
+    let _guard = BuildCtx::init_ctx(root, self.tree);
+    let ctx = BuildCtx::get();
     let brush = Palette::of(&*ctx).on_surface_variant();
     let text_style = TypographyTheme::of(&*ctx)
       .body_medium
