@@ -1,6 +1,6 @@
 use smallvec::SmallVec;
 
-use crate::prelude::*;
+use crate::{prelude::*, window::WindowId};
 
 /// This widget enables its descendants to access the data it provides,
 /// streamlining data sharing throughout the widget tree.
@@ -106,6 +106,12 @@ impl Provider {
   }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct ProviderHandle {
+  pub(crate) widget: WidgetId,
+  pub(crate) wnd_id: WindowId,
+}
+
 impl<'c> ComposeChild<'c> for Provider {
   type Child = FnWidget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
@@ -114,31 +120,22 @@ impl<'c> ComposeChild<'c> for Provider {
       .unwrap_or_else(|_| {
         panic!(
           "Provider should not be treated as a shared object to be held onto; instead, utilize \
-           Provider::xxx_of to access its content.",
-        );
+           `Provider::xxx_of` to access its content."
+        )
       })
       .provider;
 
     let f = move |_: &mut BuildCtx| {
       let ctx = BuildCtx::get_mut();
-      let id = ctx.pre_alloc();
-
-      // We need to push the `id` to providers; the build logic must create context
-      // from here if it captures the context.
-      let pushed = ctx.providers.last() == Some(&id);
-      if !pushed {
-        ctx.providers.push(id);
-      }
 
       // We need to consume the root widget keep its build logic can access the
       // provider.
       // Allow the building logic to access the provider.
-      let (child, provider) = ctx.consume_root_with_provider(child.into_widget(), provider);
-      id.attach_data(provider, ctx.tree_mut());
+      ctx.current_providers.push(provider);
+      let (child, child_id) = child.into_widget().consume_root();
+      let provider = ctx.current_providers.pop().unwrap();
+      child_id.attach_data(provider, ctx.tree_mut());
 
-      if !pushed {
-        assert_eq!(ctx.providers.pop(), Some(id));
-      }
       child
     };
     f.into_widget()
@@ -160,58 +157,100 @@ pub trait ProviderCtx {
   }
 }
 
-impl ProviderCtx for BuildCtx {
-  fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
+impl BuildCtx {
+  fn current_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
     self
       .current_providers
       .iter()
       .rev()
       .filter_map(|p| p.query(TypeId::of::<Q>()))
       .filter_map(QueryHandle::into_ref)
-      .chain(
-        self
-          .providers
-          .iter()
-          .rev()
-          .filter_map(|id| id.query_ref(self.tree())),
-      )
   }
 
-  fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
+  fn current_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
     self
       .current_providers
       .iter()
       .rev()
       .filter_map(|p| p.query_write(TypeId::of::<Q>()))
       .filter_map(QueryHandle::into_mut)
-      .chain(
-        self
-          .providers
-          .iter()
-          .rev()
-          .filter_map(|id| id.query_write(self.tree())),
-      )
+  }
+}
+
+impl ProviderCtx for BuildCtx {
+  fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
+    self.current_providers::<Q>().chain(
+      self
+        .providers
+        .iter()
+        .rev()
+        .filter_map(|id| id.query_ref(self.tree())),
+    )
+  }
+
+  fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
+    self.current_write_providers::<Q>().chain(
+      self
+        .providers
+        .iter()
+        .rev()
+        .filter_map(|id| id.query_write(self.tree())),
+    )
   }
 }
 
 impl<T: Deref<Target: WidgetCtxImpl>> ProviderCtx for T {
   fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
-    queryable_ancestors(self).filter_map(|id| id.query_ref(self.tree()))
+    let tree = self.tree();
+    self
+      .id()
+      .ancestors(tree)
+      .filter_map(|id| id.query_ref(tree))
   }
 
   fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
-    queryable_ancestors(self).filter_map(|id| id.query_write(self.tree()))
+    let tree = self.tree();
+    self
+      .id()
+      .ancestors(tree)
+      .filter_map(|id| id.query_write(tree))
   }
 }
 
-fn queryable_ancestors(
-  ctx: &impl Deref<Target: WidgetCtxImpl>,
-) -> impl Iterator<Item = WidgetId> + '_ {
-  let tree = ctx.tree();
-  ctx
-    .id()
-    .ancestors(tree)
-    .filter(|id| id.queryable(tree))
+impl ProviderCtx for ProviderHandle {
+  fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
+    AppCtx::get_window(self.wnd_id)
+      .into_iter()
+      .flat_map(|wnd| {
+        BuildCtx::try_get()
+          .into_iter()
+          .flat_map(|ctx| ctx.current_providers::<Q>())
+          .chain({
+            let tree = unsafe { wnd.tree.as_ref() };
+            self
+              .widget
+              .ancestors(tree)
+              .filter_map(|id| id.query_ref(tree))
+          })
+      })
+  }
+
+  fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
+    AppCtx::get_window(self.wnd_id)
+      .into_iter()
+      .flat_map(|wnd| {
+        BuildCtx::try_get()
+          .into_iter()
+          .flat_map(|ctx| ctx.current_write_providers::<Q>())
+          .chain({
+            let tree = unsafe { wnd.tree.as_ref() };
+            self
+              .widget
+              .ancestors(tree)
+              .filter_map(|id| id.query_write(tree))
+          })
+      })
+  }
 }
 
 impl<const M: usize> Query for [Box<dyn Query>; M] {
@@ -291,9 +330,11 @@ mod tests {
       let trigger = trigger.clone_watcher();
       Provider::new(Box::new(w_value.clone_writer()))
         .with_child(fn_widget! {
+          // We do not allow the use of the build context in the pipe at the moment.
+          let value = Provider::of::<Stateful<i32>>(BuildCtx::get())
+            .unwrap().clone_writer();
           pipe!(*$trigger).map(move |_| {
-            let mut v = Provider::write_of::<i32>(ctx!()).unwrap();
-            *v += 1;
+            *value.write() += 1;
             Void
           })
         })

@@ -7,7 +7,7 @@ use syn::{
   Expr, ExprField, ExprMethodCall, Macro, Member,
   fold::Fold,
   parse::{Parse, ParseStream},
-  parse_quote, parse_quote_spanned,
+  parse_quote_spanned,
   spanned::Spanned,
   token::Dollar,
 };
@@ -19,7 +19,6 @@ use crate::{
 };
 
 pub const KW_DOLLAR_STR: &str = "_dollar_ಠ_ಠ";
-pub const KW_CTX: &str = "ctx";
 pub const KW_RDL: &str = "rdl";
 pub const KW_PIPE: &str = "pipe";
 pub const KW_DISTINCT_PIPE: &str = "distinct_pipe";
@@ -63,7 +62,6 @@ pub struct DollarRefsCtx {
 #[derive(Debug, Default)]
 pub struct DollarRefsScope {
   refs: SmallVec<[DollarRef; 1]>,
-  pub(crate) used_ctx: bool,
   /// The index of the head of this scope in the variable stack.
   variable_stack_head: usize,
   /// This scope will exclusively capture the specified variable and will not be
@@ -302,14 +300,11 @@ impl Fold for DollarRefsCtx {
       mac.tokens = crate::distinct_pipe_macro::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_RDL) {
-      self.mark_used_ctx();
       mac.tokens = RdlMacro::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_FN_WIDGET) {
       mac.tokens = fn_widget_macro::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
-    } else if mac.path.is_ident(KW_CTX) {
-      self.mark_used_ctx();
     } else {
       mac = syn::fold::fold_macro(self, mac);
     }
@@ -320,30 +315,13 @@ impl Fold for DollarRefsCtx {
     match i {
       Expr::Closure(c) if c.capture.is_some() => {
         self.new_dollar_scope(None);
-        let mut c = self.fold_expr_closure(c);
+        let c = self.fold_expr_closure(c);
         let dollar_scope = self.pop_dollar_scope(false);
 
-        if dollar_scope.used_ctx() || !dollar_scope.is_empty() {
-          if dollar_scope.used_ctx() {
-            let body = &mut *c.body;
-            let body_with_ctx = quote_spanned! { body.span() =>
-              _ctx_handle.with_ctx(|ctx!()| #body).expect("ctx is not available")
-            };
-
-            if matches!(c.output, syn::ReturnType::Default) {
-              *body = parse_quote! { #body_with_ctx };
-            } else {
-              *body = parse_quote_spanned! { body.span() => { #body_with_ctx }};
-            }
-          }
-
-          let handle = dollar_scope
-            .used_ctx()
-            .then(|| quote_spanned! { c.span() => let _ctx_handle = ctx!().handle(); });
-
+        if !dollar_scope.is_empty() {
           Expr::Verbatim(quote_spanned!(c.span() => {
             #dollar_scope
-            #handle
+
             #c
           }))
         } else {
@@ -406,12 +384,9 @@ impl DollarRefsCtx {
       self.variable_stacks.len() - 1
     };
 
-    self.scopes.push(DollarRefsScope {
-      only_capture,
-      refs: <_>::default(),
-      used_ctx: false,
-      variable_stack_head,
-    });
+    self
+      .scopes
+      .push(DollarRefsScope { only_capture, refs: <_>::default(), variable_stack_head });
   }
 
   /// Pop the last dollar scope, and removes duplicate elements in it and make
@@ -450,8 +425,6 @@ impl DollarRefsCtx {
       .sort_by(|a, b| a.builtin.is_none().cmp(&b.builtin.is_none()));
 
     if !self.scopes.is_empty() {
-      self.current_dollar_scope_mut().used_ctx |= scope.used_ctx();
-
       for r in scope.refs.iter_mut() {
         if self.is_capture_var(r.host()) {
           let mut c_r = r.clone();
@@ -507,8 +480,6 @@ impl DollarRefsCtx {
     let builtin = Some(BuiltinInfo { host, get_builtin, run_before_clone });
     DollarRef { name, builtin, used }
   }
-
-  fn mark_used_ctx(&mut self) { self.current_dollar_scope_mut().used_ctx = true; }
 
   fn replace_builtin_host(&mut self, caller: &mut Expr, info: &BuiltinMember) -> bool {
     let mut used = DollarUsedInfo::Reader;
@@ -597,8 +568,6 @@ impl DollarRefsCtx {
 }
 
 impl DollarRefsScope {
-  pub fn used_ctx(&self) -> bool { self.used_ctx }
-
   pub fn upstream_tokens(&self) -> TokenStream {
     match self.len() {
       0 => quote! {},

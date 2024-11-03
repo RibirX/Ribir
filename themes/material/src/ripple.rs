@@ -60,7 +60,7 @@ impl<'c> ComposeChild<'c> for Ripple {
           };
 
           let ripper_enter = @Animate {
-            transition: transitions::LINEAR.of(ctx!()),
+            transition: transitions::LINEAR.of(BuildCtx::get()),
             state: LerpFnState::new(
               ripple.map_writer(|w| PartData::from_ref_mut(&mut w.path)),
               move |_, _, rate| {
@@ -82,7 +82,7 @@ impl<'c> ComposeChild<'c> for Ripple {
           let ripper_fade_out = ripple
             .get_opacity_widget()
             .map_writer(|w| PartData::from_ref_mut(&mut w.opacity))
-            .transition(transitions::EASE_OUT.of(ctx!()));
+            .transition(transitions::EASE_OUT.of(BuildCtx::get()));
 
           let bounded = $this.bounded;
           let clipper = (bounded != RippleBound::Unbounded).then(|| {

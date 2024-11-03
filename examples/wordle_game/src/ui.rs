@@ -18,7 +18,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
     fn_widget! {
       @FilledButton {
         on_tap: move |_| $this.write().guessing.enter_char(key),
-        color: pipe!{ hint_color($this.key_hint(key), ctx!()) },
+        color: pipe!{ hint_color($this.key_hint(key)) },
         @ { Label::new(key.to_string()) }
       }
     }
@@ -99,8 +99,8 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
 
 impl<T: StateWriter<Value = Wordle> + 'static> WordleExtraWidgets for T {}
 
-fn hint_color(hint: Option<CharHint>, ctx: &BuildCtx) -> Color {
-  let palette = Palette::of(ctx);
+fn hint_color(hint: Option<CharHint>) -> Color {
+  let palette = Palette::of(BuildCtx::get());
   hint.map_or_else(
     || palette.surface_variant(),
     |s| match s {
@@ -129,7 +129,7 @@ impl Wordle {
     let hint = char_hint.and_then(|c| c.hint);
 
     fn_widget! {
-      let color = hint_color(hint, ctx!());
+      let color = hint_color(hint);
       let palette = Palette::of(ctx!());
 
       let color = palette.container_of(&color);

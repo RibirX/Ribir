@@ -111,9 +111,9 @@ impl ComposeChild<'static> for FilledButton {
             label_gap,
             icon_pos,
             label_style,
-            background_color: pipe!(Palette::of(ctx!()).base_of(&$this.color)),
+            background_color: pipe!(Palette::of(BuildCtx::get()).base_of(&$this.color)),
             foreground_color: pipe! {
-              let palette = Palette::of(ctx!());
+              let palette = Palette::of(BuildCtx::get());
               palette.on_of(&palette.base_of(&$this.color))
             },
             radius,

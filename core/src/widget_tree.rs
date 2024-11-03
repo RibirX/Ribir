@@ -25,14 +25,18 @@ type TreeArena = Arena<Box<dyn RenderQueryable>>;
 
 impl WidgetTree {
   pub fn init(&mut self, wnd: &Window, content: GenWidget) -> WidgetId {
-    let root = self.root;
-    let _guard = BuildCtx::init_ctx(root, wnd.tree);
+    self.root.0.remove_subtree(&mut self.arena);
+    let _guard = BuildCtx::set_ctx(BuildCtx {
+      tree: wnd.tree,
+      providers: <_>::default(),
+      current_providers: <_>::default(),
+    });
+
     let ctx = BuildCtx::get_mut();
-    ctx.pre_alloc = Some(root);
 
     let theme = AppCtx::app_theme().clone_writer();
     let overlays = Queryable(ShowingOverlays::default());
-    let id = Provider::new(Box::new(overlays))
+    let root = Provider::new(Box::new(overlays))
       .with_child(fn_widget! {
         theme.with_child(fn_widget!{
           let ctx = unsafe { &*(ctx!() as *mut BuildCtx) };
@@ -46,8 +50,7 @@ impl WidgetTree {
       .into_widget()
       .build(ctx);
 
-    assert_eq!(root, id);
-
+    self.root = root;
     self.mark_dirty(root);
     root.on_mounted_subtree(self);
     root

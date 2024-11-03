@@ -195,7 +195,8 @@ impl<'w> Widget<'w> {
   }
 
   /// Build the root node of the widget only.
-  pub(crate) fn consume_root(self, ctx: &mut BuildCtx) -> (Self, WidgetId) {
+  pub(crate) fn consume_root(self) -> (Self, WidgetId) {
+    let ctx = BuildCtx::get_mut();
     let mut root_id = None;
     let node = self.into_node(ctx).wrap_root(|n| {
       let id = n.alloc(ctx);
