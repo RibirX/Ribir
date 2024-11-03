@@ -136,12 +136,7 @@ impl DeclareObj {
     match &self.this.node_type {
       ObjType::Type { ty, span } => {
         let name = Ident::new("_ಠ_ಠ", *span);
-        self.gen_fields_tokens(
-          &name,
-          quote! { #ty::declarer() },
-          quote! { .finish() },
-          tokens,
-        );
+        self.gen_fields_tokens(&name, quote! { #ty::declarer() }, quote! { .finish() }, tokens);
       }
       ObjType::Var { var, used_me } => {
         // if has capture self, rename to `_ಠ_ಠ` avoid conflict name.

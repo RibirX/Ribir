@@ -98,10 +98,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       let priority = UpdatePriority::new_with_wnd(info.clone(), ctx.window().id());
       let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
 
-      let provider = Box::new(Queryable(info.clone()));
-      let (w, _) = ctx.consume_root_with_provider(w.into_widget(), provider);
-
-      w.on_build(|w, ctx| {
+      w.into_widget().on_build(|w, ctx| {
         info
           .borrow_mut()
           .set_gen_range(GenRange::Single(w));
@@ -113,7 +110,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         let u = modifies.subscribe(move |(_, w)| {
           let info = pipe_node.dyn_info();
           let old = info.borrow().host_id();
-          let _guard = BuildCtx::init_ctx(old, tree);
+          let _guard = BuildCtx::set_ctx_for(old, tree);
 
           let ctx = BuildCtx::get_mut();
           let old_node = pipe_node.remove_old_data();
@@ -152,12 +149,6 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       .next()
       .map_or_else(|| Void.into_widget(), IntoWidget::into_widget);
 
-    let provider = Box::new(Queryable(info.clone()));
-    let first = fn_widget! {
-      let (w, _) = ctx!().consume_root_with_provider(first, provider);
-      w
-    };
-
     let info2 = info.clone();
     let first = first.into_widget().on_build(move |id, ctx| {
       match &mut info2.borrow_mut().gen_range {
@@ -177,7 +168,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           _ => unreachable!(),
         };
 
-        let _guard = BuildCtx::init_ctx(old[0], tree);
+        let _guard = BuildCtx::set_ctx_for(old[0], tree);
         let ctx = BuildCtx::get_mut();
 
         let old_node = pipe_node.remove_old_data();
@@ -249,9 +240,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       let priority = UpdatePriority::new_with_wnd(info.clone(), ctx.window().id());
       let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(Box::new(priority)));
 
-      let provider = Box::new(Queryable(info.clone()));
-      let (w, _) = ctx.consume_root_with_provider(w.into_widget(), provider);
-      w.on_build(|p, ctx| {
+      w.into_widget().on_build(|p, ctx| {
         let pipe_node = PipeNode::share_capture(p, info.clone(), ctx);
         let tree = ctx.tree_mut();
         let leaf = p.single_leaf(tree);
@@ -275,7 +264,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
             _ => unreachable!(),
           };
 
-          let _guard = BuildCtx::init_ctx(top, tree);
+          let _guard = BuildCtx::set_ctx_for(top, tree);
           let ctx = BuildCtx::get_mut();
 
           let old_node = pipe_node.remove_old_data();

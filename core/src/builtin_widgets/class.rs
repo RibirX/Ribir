@@ -42,6 +42,7 @@ use crate::{
   pipe::DynInfo,
   prelude::*,
   render_helper::{PureRender, RenderProxy},
+  window::WindowId,
 };
 
 /// A collection comprises the implementations of the `ClassName`, offering the
@@ -133,15 +134,12 @@ impl<'c> ComposeChild<'c> for Class {
           let mut orig_child = OrigChild::from_id(orig_id, ctx);
           cls_child2.inner().orig_id = orig_id;
           let orig_child2 = orig_child.clone();
-          let handle = ctx.handle();
-
+          let wnd_id = ctx.window().id();
           let u = this2
             .raw_modifies()
             .filter(|s| s.contains(ModifyScope::FRAMEWORK))
             .sample(AppCtx::frame_ticks().clone())
-            .subscribe(move |_| {
-              handle.with_ctx(|ctx| cls_child2.update(&orig_child2, &this2.read(), ctx));
-            })
+            .subscribe(move |_| cls_child2.update(&orig_child2, &this2.read(), wnd_id))
             .unsubscribe_when_dropped();
           orig_child.attach_subscription(u);
         });
@@ -206,9 +204,12 @@ impl ClassChild {
     });
   }
 
-  fn update(&self, orig: &OrigChild, class: &Class, ctx: &mut BuildCtx) {
+  fn update(&self, orig: &OrigChild, class: &Class, wnd_id: WindowId) {
+    let wnd =
+      AppCtx::get_window(wnd_id).expect("This handle is not valid because the window is closed");
     let InnerClassChild { child, child_id, orig_id } = self.inner();
-    eprintln!("old tree\n {}", ctx.tree().display_tree(ctx.tree().root()));
+    let _guard = BuildCtx::set_ctx_for(*child_id, wnd.tree);
+    let ctx = BuildCtx::get_mut();
     let cls_holder = child_id.place_holder(ctx.tree());
 
     // Extract the child from this node, retaining only the external information
@@ -269,7 +270,6 @@ impl ClassChild {
     *child_id = new_id;
     tree.mark_dirty(new_id);
     tree.mark_dirty(*orig_id);
-    eprintln!("new tree\n {}", ctx.tree().display_tree(ctx.tree().root()));
   }
 
   #[allow(clippy::mut_from_ref)]

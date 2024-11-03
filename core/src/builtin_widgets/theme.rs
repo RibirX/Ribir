@@ -285,15 +285,15 @@ mod tests {
       let mut theme = Theme::default();
       theme.palette.brightness = Brightness::Light;
       theme.with_child(fn_widget! {
-        $writer.write().push(Palette::of(ctx!()).brightness);
+        $writer.write().push(Palette::of(BuildCtx::get()).brightness);
         let writer = writer.clone_writer();
         Palette { brightness: Brightness::Dark, ..Default::default() }
           .with_child(fn_widget!{
-            $writer.write().push(Palette::of(ctx!()).brightness);
+            $writer.write().push(Palette::of(BuildCtx::get()).brightness);
             let writer = writer.clone_writer();
             Palette { brightness: Brightness::Light, ..Default::default() }
               .with_child(fn_widget!{
-                $writer.write().push(Palette::of(ctx!()).brightness);
+                $writer.write().push(Palette::of(BuildCtx::get()).brightness);
                 Void
             })
         })

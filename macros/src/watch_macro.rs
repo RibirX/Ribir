@@ -29,17 +29,7 @@ pub fn process_watch_body(
     .map(|s| refs_ctx.fold_stmt(s))
     .collect::<Vec<_>>();
   let refs = refs_ctx.pop_dollar_scope(true);
-  let map_handler = if refs.used_ctx() {
-    quote! {
-      let _ctx_handle_ಠ_ಠ = ctx!().handle();
-      move |_: ModifyScope| _ctx_handle_ಠ_ಠ
-        .with_ctx(|ctx!(): &mut BuildCtx| { #(#expr)* })
-        .expect("ctx is not available")
-    }
-  } else {
-    quote! { move |_: ModifyScope| { #(#expr)* } }
-  };
-
+  let map_handler = quote! { move |_: ModifyScope| { #(#expr)* } };
   if refs.is_empty() {
     Err(Error::WatchNothing(span))
   } else {

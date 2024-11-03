@@ -166,7 +166,7 @@ widget_layout_test!(
     let (scale, w_scale) = split_value(1.);
     let w = fn_widget! {
       rdl!{ SizedBox {
-        size: pipe!(IconSize::of(ctx!()).tiny * *$scale)
+        size: pipe!(IconSize::of(BuildCtx::get()).tiny * *$scale)
       }}
     };
     *w_scale.write() = 2.;
@@ -193,7 +193,7 @@ widget_layout_test!(
   WidgetTester::new(fn_widget! {
     let size_box = @SizedBox { size: ZERO_SIZE };
     @ $size_box {
-      on_mounted: move |_| $size_box.write().size = IconSize::of(ctx!()).tiny
+      on_mounted: move |e| $size_box.write().size = IconSize::of(&e).tiny
     }
   }),
   LayoutCase::default().with_size(Size::new(18., 18.))

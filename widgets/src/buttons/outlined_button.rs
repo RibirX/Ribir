@@ -115,11 +115,11 @@ impl ComposeChild<'static> for OutlinedButton {
             icon_pos,
             label_style,
             background_color: None,
-            foreground_color: pipe!(Palette::of(ctx!()).base_of(&$this.color)),
+            foreground_color: pipe!(Palette::of(BuildCtx::get()).base_of(&$this.color)),
             radius,
             border_style: pipe!(Border::all(BorderSide {
               width: border_width,
-              color: Palette::of(ctx!()).base_of(&$this.color).into()
+              color: Palette::of(BuildCtx::get()).base_of(&$this.color).into()
             })),
             padding_style,
 
