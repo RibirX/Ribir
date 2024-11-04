@@ -55,7 +55,7 @@ impl<'w, W: SingleIntoParent> IntoWidgetStrict<'w, RENDER> for WidgetOf<'w, W> {
 
       parent
         .into_parent()
-        .directly_compose_children(vec![child], ctx)
+        .directly_compose_children(vec![child])
     };
 
     f.into_widget()

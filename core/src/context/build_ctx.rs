@@ -4,7 +4,7 @@ use std::ptr::NonNull;
 use smallvec::SmallVec;
 use widget_id::{RenderQueryable, new_node};
 
-use crate::{local_sender::LocalSender, prelude::*, render_helper::PureRender};
+use crate::{local_sender::LocalSender, prelude::*};
 
 /// A context provide during build the widget tree.
 pub struct BuildCtx {
