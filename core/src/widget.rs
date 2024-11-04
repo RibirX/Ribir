@@ -64,7 +64,7 @@ enum Node<'w> {
 
 enum PureNode<'w> {
   Render(Box<dyn RenderQueryable>),
-  LazyBuild(Box<dyn FnOnce(&mut BuildCtx) -> WidgetId + 'w>),
+  LazyBuild(Box<dyn FnOnce() -> WidgetId + 'w>),
 }
 
 /// This serves as a wrapper for `Box<dyn FnOnce(&BuildCtx) -> Node<'w> +
@@ -87,7 +87,7 @@ impl<'w> LazyNode<'w> {
     Self(f)
   }
 
-  fn consume(self, ctx: &mut BuildCtx) -> Widget<'w> { (self.0)(ctx) }
+  fn consume(self) -> Widget<'w> { (self.0)(BuildCtx::get_mut()) }
 }
 
 /// A boxed function widget that can be called multiple times to regenerate
@@ -184,8 +184,9 @@ impl<'w> Widget<'w> {
   /// ID and build context as parameters.
   pub fn on_build(self, f: impl FnOnce(WidgetId, &mut BuildCtx) + 'w) -> Self {
     self.wrap_root(move |n: PureNode<'_>| {
-      let lazy = move |ctx: &mut BuildCtx| {
-        let id = n.alloc(ctx);
+      let lazy = move || {
+        let ctx = BuildCtx::get_mut();
+        let id = n.alloc();
         f(id, ctx);
         id
       };
@@ -196,12 +197,11 @@ impl<'w> Widget<'w> {
 
   /// Build the root node of the widget only.
   pub(crate) fn consume_root(self) -> (Self, WidgetId) {
-    let ctx = BuildCtx::get_mut();
     let mut root_id = None;
-    let node = self.into_node(ctx).wrap_root(|n| {
-      let id = n.alloc(ctx);
+    let node = self.into_node().wrap_root(|n| {
+      let id = n.alloc();
       root_id = Some(id);
-      PureNode::LazyBuild(Box::new(move |_| id))
+      PureNode::LazyBuild(Box::new(move || id))
     });
 
     (Widget(InnerWidget::Node(node)), root_id.unwrap())
@@ -233,28 +233,27 @@ impl<'w> Widget<'w> {
     self.attach_data(data)
   }
 
-  pub(crate) fn build(self, ctx: &mut BuildCtx) -> WidgetId {
+  pub(crate) fn build(self) -> WidgetId {
     let mut subtrees = vec![];
-    let root = self.into_node(ctx).build(&mut subtrees, ctx);
+    let root = self.into_node().build(&mut subtrees);
+    let ctx = BuildCtx::get_mut();
     while let Some((p, child)) = subtrees.pop() {
       if ctx.providers.last() == Some(&p) && subtrees.last().map(|(p, _)| p) != Some(&p) {
         ctx.providers.pop();
       } else if ctx.providers.last() != Some(&p) && p.queryable(ctx.tree()) {
         ctx.providers.push(p);
       }
-      let c = child.into_node(ctx).build(&mut subtrees, ctx);
+      let c = child.into_node().build(&mut subtrees);
       p.append(c, ctx.tree_mut());
     }
     root
   }
 
-  pub(crate) fn directly_compose_children(
-    self, children: Vec<Widget<'w>>, ctx: &mut BuildCtx,
-  ) -> Widget<'w> {
+  pub(crate) fn directly_compose_children(self, children: Vec<Widget<'w>>) -> Widget<'w> {
     let mut list: SmallVec<[PureNode<'w>; 1]> = SmallVec::default();
     let mut node = Some(self);
     while let Some(n) = node.take() {
-      match n.into_node(ctx) {
+      match n.into_node() {
         Node::Leaf(r) => list.push(r),
         Node::Tree { parent, mut children } => {
           list.push(parent);
@@ -283,23 +282,23 @@ impl<'w> Widget<'w> {
   /// are certain that the entire logic is suitable for creating this widget
   /// from an ID.
   pub(crate) fn from_id(id: WidgetId) -> Widget<'static> {
-    let node = Node::Leaf(PureNode::LazyBuild(Box::new(move |_| id)));
+    let node = Node::Leaf(PureNode::LazyBuild(Box::new(move || id)));
     Widget(InnerWidget::Node(node))
   }
 
-  fn into_node(self, ctx: &mut BuildCtx) -> Node<'w> {
+  fn into_node(self) -> Node<'w> {
     let mut w = self;
     loop {
       match w.0 {
         InnerWidget::Node(node) => break node,
-        InnerWidget::Lazy(l) => w = l.consume(ctx),
+        InnerWidget::Lazy(l) => w = l.consume(),
       }
     }
   }
 
   fn wrap_root(self, f: impl FnOnce(PureNode<'w>) -> PureNode<'w> + 'w) -> Self {
     let lazy = move |ctx: &mut BuildCtx| {
-      let node = self.into_node(ctx).wrap_root(f);
+      let node = self.into_node().wrap_root(f);
       Widget(InnerWidget::Node(node))
     };
 
@@ -308,11 +307,11 @@ impl<'w> Widget<'w> {
 }
 
 impl<'w> Node<'w> {
-  fn build(self, subtrees: &mut Vec<(WidgetId, Widget<'w>)>, ctx: &mut BuildCtx) -> WidgetId {
+  fn build(self, subtrees: &mut Vec<(WidgetId, Widget<'w>)>) -> WidgetId {
     match self {
-      Node::Leaf(r) => r.alloc(ctx),
+      Node::Leaf(r) => r.alloc(),
       Node::Tree { parent, children } => {
-        let p = parent.alloc(ctx);
+        let p = parent.alloc();
         for c in children.into_iter().rev() {
           subtrees.push((p, c))
         }
@@ -332,10 +331,10 @@ impl<'w> Node<'w> {
 }
 
 impl<'w> PureNode<'w> {
-  fn alloc(self, ctx: &mut BuildCtx) -> WidgetId {
+  fn alloc(self) -> WidgetId {
     match self {
-      PureNode::Render(r) => ctx.alloc(r),
-      PureNode::LazyBuild(l) => l(ctx),
+      PureNode::Render(r) => BuildCtx::get_mut().alloc(r),
+      PureNode::LazyBuild(l) => l(),
     }
   }
 }

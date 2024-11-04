@@ -32,23 +32,20 @@ impl WidgetTree {
       current_providers: <_>::default(),
     });
 
-    let ctx = BuildCtx::get_mut();
-
     let theme = AppCtx::app_theme().clone_writer();
     let overlays = Queryable(ShowingOverlays::default());
     let root = Provider::new(Box::new(overlays))
       .with_child(fn_widget! {
         theme.with_child(fn_widget!{
-          let ctx = unsafe { &*(ctx!() as *mut BuildCtx) };
-          let overlays = Provider::of::<ShowingOverlays>(ctx).unwrap();
-          overlays.rebuild(ctx!());
+          let overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
+          overlays.rebuild();
           @Root {
             @{ content.gen_widget() }
           }
         })
       })
       .into_widget()
-      .build(ctx);
+      .build();
 
     self.root = root;
     self.mark_dirty(root);

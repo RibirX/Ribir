@@ -124,7 +124,7 @@ impl<'c> ComposeChild<'c> for Class {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     let f = move |ctx: &mut BuildCtx| match this.try_into_value() {
-      Ok(c) => c.apply_style(child, ctx),
+      Ok(c) => c.apply_style(child),
       Err(this) => {
         let this2 = this.clone_watcher();
         let cls_child = ClassChild::new(ctx.tree().dummy_id());
@@ -146,7 +146,7 @@ impl<'c> ComposeChild<'c> for Class {
 
         this
           .read()
-          .apply_style(child, ctx)
+          .apply_style(child)
           .on_build(move |child_id, ctx| cls_child.set_child_id(child_id, ctx))
       }
     };
@@ -155,9 +155,9 @@ impl<'c> ComposeChild<'c> for Class {
 }
 
 impl Class {
-  pub fn apply_style<'a>(&self, w: Widget<'a>, ctx: &BuildCtx) -> Widget<'a> {
+  pub fn apply_style<'a>(&self, w: Widget<'a>) -> Widget<'a> {
     let class = self.class.and_then(|cls| {
-      ctx
+      BuildCtx::get()
         .all_providers::<Classes>()
         .find_map(|c| QueryRef::filter_map(c, |c| c.store.get(&cls)).ok())
     });
@@ -209,17 +209,14 @@ impl ClassChild {
       AppCtx::get_window(wnd_id).expect("This handle is not valid because the window is closed");
     let InnerClassChild { child, child_id, orig_id } = self.inner();
     let _guard = BuildCtx::set_ctx_for(*child_id, wnd.tree);
-    let ctx = BuildCtx::get_mut();
-    let cls_holder = child_id.place_holder(ctx.tree());
+    let n_orig = BuildCtx::get_mut().alloc(Box::new(orig.clone()));
+    let tree = BuildCtx::get_mut().tree_mut();
+    let cls_holder = child_id.place_holder(tree);
 
     // Extract the child from this node, retaining only the external information
     // linked from the parent to create a clean context for applying the class.
     let child_node = self.take_inner();
-    let n_orig = ctx.alloc(Box::new(orig.clone()));
-    let new_id = class
-      .apply_style(Widget::from_id(n_orig), ctx)
-      .build(ctx);
-    let tree = ctx.tree_mut();
+    let new_id = class.apply_style(Widget::from_id(n_orig)).build();
     // Place the inner child node within the old ID for disposal, then utilize the
     // class node to wrap the new child in the new ID.
     // This action should be taken before modifying the `orig_id`, as the `orig_id`

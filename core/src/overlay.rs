@@ -215,11 +215,10 @@ impl Overlay {
     };
 
     let _guard = BuildCtx::set_ctx_for(wnd.tree().root(), wnd.tree);
-    let ctx = BuildCtx::get_mut();
-    let id = gen(ctx).build(ctx);
+    let id = gen(BuildCtx::get_mut()).build();
     self.0.borrow_mut().showing = Some(ShowingInfo { id, generator: gen.into(), wnd_id: wnd.id() });
 
-    let showing_overlays = Provider::of::<ShowingOverlays>(&*ctx).unwrap();
+    let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
     showing_overlays.add(self.clone());
 
     let tree = wnd.tree_mut();
@@ -234,14 +233,14 @@ impl Overlay {
 pub(crate) struct ShowingOverlays(RefCell<Vec<Overlay>>);
 
 impl ShowingOverlays {
-  pub(crate) fn rebuild(&self, ctx: &mut BuildCtx) {
+  pub(crate) fn rebuild(&self) {
     for o in self.0.borrow().iter() {
       let mut o = o.0.borrow_mut();
       let ShowingInfo { id, generator, .. } = o.showing.as_mut().unwrap();
 
-      id.dispose_subtree(ctx.tree_mut());
-      *id = generator.gen_widget().build(ctx);
-      let tree = ctx.tree_mut();
+      let tree = BuildCtx::get_mut().tree_mut();
+      id.dispose_subtree(tree);
+      *id = generator.gen_widget().build();
       tree.root().append(*id, tree);
       id.on_mounted_subtree(tree);
     }
