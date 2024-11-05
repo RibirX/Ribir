@@ -261,6 +261,7 @@ impl<'c> ComposeChild<'c> for ListItem {
     let ListItemTml { headline, supporting, leading, trailing } = child;
 
     fn_widget! {
+      let ctx = BuildCtx::get();
       let ListItemStyle {
         padding_style,
         label_gap,
@@ -269,7 +270,7 @@ impl<'c> ComposeChild<'c> for ListItem {
         leading_config,
         trailing_config,
         item_align,
-      } = ListItemStyle::of(ctx!());
+      } = ListItemStyle::of(ctx);
 
       let padding = padding_style.map(Padding::new);
       let label_gap = label_gap.map(Padding::new );
@@ -287,7 +288,7 @@ impl<'c> ComposeChild<'c> for ListItem {
                 @Column {
                   @Text {
                     text: headline.0.0,
-                    foreground: Palette::of(ctx!()).on_surface(),
+                    foreground: Palette::of(ctx).on_surface(),
                     text_style: headline_style,
                   }
                   @{ supporting.map(|supporting|  {
@@ -301,7 +302,7 @@ impl<'c> ComposeChild<'c> for ListItem {
                       } ,
                       @Text {
                         text: supporting.0.0,
-                        foreground:  Palette::of(ctx!()).on_surface_variant(),
+                        foreground:  Palette::of(ctx).on_surface_variant(),
                         text_style: supporting_style,
                       }
                     }

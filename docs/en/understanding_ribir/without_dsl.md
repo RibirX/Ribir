@@ -84,12 +84,12 @@ use ribir::prelude::*;
 
 #[derive(Declare, Default)]
 pub struct FilledButton {
-  #[declare(default=Palette::of(ctx!()).primary())]
+  #[declare(default=Palette::of(BuildCtx::get()).primary())]
   pub color: Color,
 }
 ```
 
-Note the attribute `#[declare(default=Palette::of(ctx!()).primary())]`. This means that if you don't set a `color` value when creating `FilledButton` with `Declare`, it will use the primary color from the palette as the default.
+Note the attribute `#[declare(default=Palette::of(BuildCtx::get()).primary())]`. This means that if you don't set a `color` value when creating `FilledButton` with `Declare`, it will use the primary color from the palette as the default.
 
 This is the main reason we use `Declare` to create widgets: it allows widgets to access `BuildCtx` when they're created. This lets widgets automatically configure themselves based on the context, like changing dynamically with the theme.
 
@@ -186,12 +186,12 @@ let counter = fn_widget! {
   let cnt = Stateful::new(0);
   let btn = FilledButton::declarer()
     .on_tap(move |_| *$cnt.write() += 1)
-    .finish(ctx!())
+    .finish()
     .with_child(Label::new("Inc"));
 
   let label = H1::declarer()
     .text(pipe!($cnt.to_string()))
-    .finish(ctx!());
+    .finish();
 
   @Row {
     @ { btn }

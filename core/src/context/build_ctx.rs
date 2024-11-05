@@ -76,7 +76,19 @@ impl BuildCtx {
     }
   }
 
-  pub(crate) fn set_ctx_for(startup: WidgetId, tree: NonNull<WidgetTree>) -> BuildCtxInitdGuard {
+  #[must_use]
+  pub(crate) fn init_for(startup: WidgetId, tree: NonNull<WidgetTree>) -> BuildCtxInitdGuard {
+    Self::set_for(startup, tree);
+    BuildCtxInitdGuard
+  }
+
+  #[must_use]
+  pub(crate) fn init(ctx: BuildCtx) -> BuildCtxInitdGuard {
+    BuildCtx::set(ctx);
+    BuildCtxInitdGuard
+  }
+
+  pub(crate) fn set_for(startup: WidgetId, tree: NonNull<WidgetTree>) {
     let t = unsafe { tree.as_ref() };
     let mut providers: SmallVec<[WidgetId; 1]> = startup
       .ancestors(t)
@@ -84,22 +96,16 @@ impl BuildCtx {
       .collect();
     providers.reverse();
     let ctx = BuildCtx { tree, providers, current_providers: <_>::default() };
-
-    BuildCtx::set_ctx(ctx)
+    BuildCtx::set(ctx);
   }
 
-  pub(crate) fn set_ctx(ctx: BuildCtx) -> BuildCtxInitdGuard {
-    unsafe {
-      assert!(CTX.is_none(), "Build context is already initialized");
-      CTX = Some(LocalSender::new(ctx));
-    }
+  pub(crate) fn set(ctx: BuildCtx) { unsafe { CTX = Some(LocalSender::new(ctx)) } }
 
-    BuildCtxInitdGuard
-  }
+  pub(crate) fn clear() { unsafe { CTX = None } }
 }
 
 pub(crate) struct BuildCtxInitdGuard;
 
 impl Drop for BuildCtxInitdGuard {
-  fn drop(&mut self) { unsafe { CTX = None } }
+  fn drop(&mut self) { BuildCtx::clear() }
 }

@@ -140,18 +140,6 @@ pub fn fn_widget(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn ribir_expanded_ಠ_ಠ(input: TokenStream) -> TokenStream { input }
 
-/// The `ctx!` macro is a special name that use to share the `BuildCtx` between
-/// macros.
-#[proc_macro]
-pub fn ctx(input: TokenStream) -> TokenStream {
-  let tokens = if !input.is_empty() {
-    quote!(compile_error!("ctx! macro does not accept any argument"))
-  } else {
-    quote! { _ctx_ಠ_ಠ }
-  };
-  tokens.into()
-}
-
 /// This macro is utilized for generating a `Pipe` object that actively monitors
 /// the expression's result.
 ///

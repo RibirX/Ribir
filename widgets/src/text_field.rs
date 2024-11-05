@@ -270,7 +270,8 @@ impl<'c> ComposeChild<'c> for TextField {
       let mut config = config.unwrap_or_default();
       take_option_field!({leading_icon, trailing_icon}, config);
 
-      let theme_suit = TextFieldThemeSuit::of(ctx!());
+      let ctx = BuildCtx::get();
+      let theme_suit = TextFieldThemeSuit::of(ctx);
       let theme = @TextFieldThemeProxy {
         suit: theme_suit,
         state: TextFieldState::default(),
@@ -287,7 +288,7 @@ impl<'c> ComposeChild<'c> for TextField {
           align_items: Align::Stretch,
           @{
             leading_icon.map(|t| @Icon {
-              size: IconSize::of(ctx!()).small,
+              size: IconSize::of(ctx).small,
               @{ t.0 }
             })
           }
@@ -297,7 +298,7 @@ impl<'c> ComposeChild<'c> for TextField {
           }
           @{
             trailing_icon.map(|t| @Icon {
-              size: IconSize::of(ctx!()).small,
+              size: IconSize::of(ctx).small,
               @{ t.0 }
             })
           }
@@ -324,7 +325,7 @@ fn build_input_area(
     };
     input_area.get_visibility_widget()
       .map_writer(|w| PartData::from_ref(&w.visible))
-      .transition(transitions::LINEAR.of(ctx!()));
+      .transition(transitions::LINEAR.of(BuildCtx::get()));
 
     let mut input = @Input{ style: pipe!($theme.text.clone()) };
     $input.write().set_text(&$this.text);
@@ -386,7 +387,7 @@ impl Compose for TextFieldLabel {
       };
 
       this.map_writer(|w| PartData::from_ref(&w.style.font_size))
-        .transition(transitions::LINEAR.of(ctx!()));
+        .transition(transitions::LINEAR.of(BuildCtx::get()));
 
       label
     }
@@ -407,7 +408,7 @@ fn build_content_area(
     content_area
       .get_padding_widget()
       .map_writer(|w| PartData::from_ref(&w.padding))
-      .transition(transitions::LINEAR.of(ctx!()));
+      .transition(transitions::LINEAR.of(BuildCtx::get()));
 
     @ $content_area {
       @ {

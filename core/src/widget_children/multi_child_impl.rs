@@ -103,7 +103,7 @@ impl<'w> WithChild<'w, Widget<'w>, 1, FN> for MultiPair<'w> {
 
 impl<'w> IntoWidgetStrict<'w, FN> for MultiPair<'w> {
   fn into_widget_strict(self) -> Widget<'w> {
-    let f = move |ctx: &mut BuildCtx| {
+    let f = move || {
       let MultiPair { parent, children } = self;
       parent.directly_compose_children(children)
     };

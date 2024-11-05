@@ -15,7 +15,7 @@ impl<'c> ComposeChild<'c> for GlobalAnchor {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      let wnd = ctx!().window();
+      let wnd = BuildCtx::get().window();
       let tick_of_layout_ready = wnd
         .frame_tick_stream()
         .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
@@ -87,11 +87,9 @@ impl<W> FatObj<W> {
   /// the left edge of the specified widget (`wid`) with the given relative
   /// pixel value (`relative`).
   // Todo: Should we control the subscription in the inner part?
-  pub fn left_align_to(
-    &mut self, wid: &LazyWidgetId, offset: f32, ctx: &BuildCtx,
-  ) -> impl Subscription {
+  pub fn left_align_to(&mut self, wid: &LazyWidgetId, offset: f32) -> impl Subscription {
     let this = self.get_global_anchor_widget().clone_writer();
-    let wnd = ctx.window();
+    let wnd = BuildCtx::get().window();
     let wid = wid.clone();
     let tick_of_layout_ready = wnd
       .frame_tick_stream()
@@ -107,11 +105,9 @@ impl<W> FatObj<W> {
   /// Anchor the widget's horizontal position by placing its right edge left to
   /// the right edge of the specified widget (`wid`) with the given relative
   /// pixel value (`relative`).
-  pub fn right_align_to(
-    &mut self, wid: &LazyWidgetId, relative: f32, ctx: &BuildCtx,
-  ) -> impl Subscription {
+  pub fn right_align_to(&mut self, wid: &LazyWidgetId, relative: f32) -> impl Subscription {
     let this = self.get_global_anchor_widget().clone_writer();
-    let wnd = ctx.window();
+    let wnd = BuildCtx::get().window();
     let wid = wid.clone();
     let tick_of_layout_ready = wnd
       .frame_tick_stream()
@@ -130,11 +126,9 @@ impl<W> FatObj<W> {
   /// Anchors the widget's vertical position by placing its top edge below the
   /// top edge of the specified widget (`wid`) with the given relative pixel
   /// value (`relative`).
-  pub fn top_align_to(
-    &mut self, wid: &LazyWidgetId, relative: f32, ctx: &BuildCtx,
-  ) -> impl Subscription {
+  pub fn top_align_to(&mut self, wid: &LazyWidgetId, relative: f32) -> impl Subscription {
     let this = self.get_global_anchor_widget().clone_writer();
-    let wnd = ctx.window();
+    let wnd = BuildCtx::get().window();
     let wid = wid.clone();
     let tick_of_layout_ready = wnd
       .frame_tick_stream()
@@ -150,11 +144,9 @@ impl<W> FatObj<W> {
   /// Anchors the widget's vertical position by placing its bottom edge above
   /// the bottom edge of the specified widget (`wid`) with the given relative
   /// pixel value (`relative`).
-  pub fn bottom_align_to(
-    &mut self, wid: &LazyWidgetId, relative: f32, ctx: &BuildCtx,
-  ) -> impl Subscription {
+  pub fn bottom_align_to(&mut self, wid: &LazyWidgetId, relative: f32) -> impl Subscription {
     let this = self.get_global_anchor_widget().clone_writer();
-    let wnd = ctx.window();
+    let wnd = BuildCtx::get().window();
     let wid = wid.clone();
     let tick_of_layout_ready = wnd
       .frame_tick_stream()
@@ -190,14 +182,14 @@ mod tests {
       let mut top_left = @MockBox {
         size: Size::new(10., 10.),
       };
-      top_left.left_align_to(&wid, 20., ctx!());
-      top_left.top_align_to(&wid, 10., ctx!());
+      top_left.left_align_to(&wid, 20.);
+      top_left.top_align_to(&wid, 10.);
 
       let mut bottom_right = @MockBox {
         size: Size::new(10., 10.),
       };
-      bottom_right.right_align_to(&wid, 10.,  ctx!());
-      bottom_right.bottom_align_to(&wid, 20., ctx!());
+      bottom_right.right_align_to(&wid, 10.);
+      bottom_right.bottom_align_to(&wid, 20.);
       @ $parent {
         @MockStack {
           @ { top_left }

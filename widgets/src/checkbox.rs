@@ -62,7 +62,7 @@ impl ComposeChild<'static> for Checkbox {
         icon_size,
         label_style,
         label_color,
-      } = CheckBoxStyle::of(ctx!());
+      } = CheckBoxStyle::of(BuildCtx::get());
 
       let icon = @CheckBoxDecorator {
         color: pipe!($this.color),

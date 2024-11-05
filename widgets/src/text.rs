@@ -71,7 +71,7 @@ macro_rules! define_text_with_theme_style {
         fn_widget! {
           @Text {
             text: pipe!($this.text.clone()),
-            text_style: TypographyTheme::of(ctx!()).$style.text.clone(),
+            text_style: TypographyTheme::of(BuildCtx::get()).$style.text.clone(),
           }
         }
         .into_widget()

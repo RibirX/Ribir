@@ -43,7 +43,7 @@ sidebar_position: 2
 ```rust no_run
 use ribir::prelude::*;
 
-fn hello_world(ctx!(): &mut BuildCtx) -> Widget<'static> {
+fn hello_world() -> Widget<'static> {
   rdl!{ Text { text: "Hello World!" } }
     .into_widget()
 }
@@ -53,9 +53,7 @@ fn main() {
 }
 ```
 
-首先，你应该发现了在函数签名中参数声明（`ctx!(): &BuildCtx`）的不同之处，我们用 `ctx!()` 来作为参数名字，而不是直接给一个名字。这是因为 `rdl!` 内部会统一通过 `ctx!()` 作为变量名来引用 `&BuildCtx`。
-
-接下来一行 `rdl!{ Text { text: "Hello World!" } }`，通过 `rdl！` 创建了一个内容为 `Hello World!` 的 `Text`。关于 `rdl!` 的细节，你可以先放到一边，将在小节 [使用 `rdl!` 创建对象](#使用-rdl-创建对象) 中详细介绍。
+`rdl!{ Text { text: "Hello World!" } }`，通过 `rdl！` 创建了一个内容为 `Hello World!` 的 `Text`。关于 `rdl!` 的细节，你可以先放到一边，将在小节 [使用 `rdl!` 创建对象](#使用-rdl-创建对象) 中详细介绍。
 
 最后，将 `Text` 通过 `build` 方法构建成 `Widget`，作为函数的返回值。
 
@@ -71,7 +69,7 @@ fn main() {
 use ribir::prelude::*;
 
 fn main() {
-  let hello_world = |ctx!(): &mut BuildCtx| {
+  let hello_world = || {
     rdl!{ Text { text: "Hello World!" } }
       .into_widget()
   };
@@ -82,7 +80,7 @@ fn main() {
 对于通过闭包创建函数控件，Ribir 提供了一个 `fn_widget!` 宏来简化这个过程，`fn_widget!` 除了支持我们本章接下来要讲到的两个语法糖 `@` 和 `$` 之外，你可以简单认为它会这样展开代码：
 
 ``` rust ignore
-move |ctx!(): &BuildCtx| -> Widget {
+move || -> Widget {
   {
     // 你的代码
   }
@@ -128,9 +126,7 @@ pub struct Counter {
   count: usize,
 }
 
-// `rdl!` 需要在一个有可访问的 `ctx!(): &BuildCtx` 的上下文中使用,
-// 所以我们用一个带 `ctx!()` 参数的函数来提供这个上下文。
-fn use_rdl(ctx!(): &BuildCtx) {
+fn use_rdl() {
   let _ = rdl!{ Counter { } };
 }
 ```

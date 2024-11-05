@@ -399,9 +399,7 @@ where
         Err(s) => {
           let modifies = s.raw_modifies();
           let w = ReaderRender(s.clone_reader()).into_widget();
-          w.on_build(move |id, ctx| {
-            id.dirty_subscribe(modifies, ctx);
-          })
+          w.on_build(move |id| id.dirty_subscribe(modifies, BuildCtx::get_mut().tree_mut()))
         }
       },
     }

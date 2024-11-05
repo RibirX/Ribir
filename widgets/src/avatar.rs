@@ -63,51 +63,48 @@ impl ComposeChild<'static> for Avatar {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fn_widget! {
-      @ {
-        let AvatarStyle {
-          size, radius, text_style,
-        } = AvatarStyle::of(ctx!());
-        let palette1 = Palette::of(ctx!()).clone();
-        let palette2 = Palette::of(ctx!()).clone();
-        let w: Widget = match child {
-          AvatarTemplate::Text(text) => {
+      let ctx = BuildCtx::get();
+      let AvatarStyle { size, radius, text_style } = AvatarStyle::of(ctx);
+      let palette1 = Palette::of(ctx).clone();
+      let palette2 = Palette::of(ctx).clone();
+      let w: Widget = match child {
+        AvatarTemplate::Text(text) => {
+          @Container {
+            size,
+            border_radius: radius.map(Radius::all),
+            background: pipe!(Brush::from(palette1.base_of(&$this.color))),
+            @Text {
+              h_align: HAlign::Center,
+              v_align: VAlign::Center,
+              text: text.0,
+              text_style,
+              foreground: pipe!(Brush::from(palette2.on_of(&palette2.base_of(&$this.color)))),
+            }
+          }.into_widget()
+        },
+        AvatarTemplate::Image(image) => {
+          let image = FatObj::new(image);
+          let clip = radius.map(|radius| {
+            let path = Path::rect_round(
+              &Rect::from_size(size),
+              &Radius::all(radius),
+            );
+            Clip { clip: ClipType::Path(path) }
+          });
+          @$clip {
             @Container {
               size,
-              border_radius: radius.map(Radius::all),
-              background: pipe!(Brush::from(palette1.base_of(&$this.color))),
-              @Text {
-                h_align: HAlign::Center,
-                v_align: VAlign::Center,
-                text: text.0,
-                text_style,
-                foreground: pipe!(Brush::from(palette2.on_of(&palette2.base_of(&$this.color)))),
-              }
-            }.into_widget()
-          },
-          AvatarTemplate::Image(image) => {
-            let image = FatObj::new(image);
-            let clip = radius.map(|radius| {
-              let path = Path::rect_round(
-                &Rect::from_size(size),
-                &Radius::all(radius),
-              );
-              Clip { clip: ClipType::Path(path) }
-            });
-            @$clip {
-              @Container {
-                size,
-                @$image {
-                  box_fit: BoxFit::Contain,
-                }
+              @$image {
+                box_fit: BoxFit::Contain,
               }
             }
           }
-        };
-
-        @SizedBox {
-          size,
-          @ { w }
         }
+      };
+
+      @SizedBox {
+        size,
+        @ { w }
       }
     }
     .into_widget()

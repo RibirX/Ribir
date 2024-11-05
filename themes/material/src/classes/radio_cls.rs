@@ -11,9 +11,10 @@ const BORDER_SIZE: f32 = 2.;
 pub(super) fn init(classes: &mut Classes) {
   classes.insert(RADIO_SELECTED, |_w| {
     fn_widget! {
+      let ctx = BuildCtx::get();
       @InteractiveLayer {
         border_radii: Radius::all(TOTAL_SIZE / 2.),
-        color: Palette::of(ctx!()).primary(),
+        color: Palette::of(ctx).primary(),
         @Container {
           size: Size::new(TOTAL_SIZE, TOTAL_SIZE),
           cursor: CursorIcon::Pointer,
@@ -23,14 +24,14 @@ pub(super) fn init(classes: &mut Classes) {
             size: Size::new(CONTAINER_SIZE, CONTAINER_SIZE),
             border_radius: Radius::all(CONTAINER_SIZE / 2.),
             border: Border::all(
-              BorderSide::new(BORDER_SIZE, Palette::of(ctx!()).primary().into())
+              BorderSide::new(BORDER_SIZE, Palette::of(ctx).primary().into())
             ),
             @Container {
               v_align: VAlign::Center,
               h_align: HAlign::Center,
               size: Size::new(INDICATOR_SIZE, INDICATOR_SIZE),
               border_radius: Radius::all(INDICATOR_SIZE / 2.),
-              background: Palette::of(ctx!()).primary(),
+              background: Palette::of(ctx).primary(),
             }
           }
         }
@@ -41,9 +42,10 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(RADIO_UNSELECTED, |_w| {
     fn_widget! {
+      let ctx = BuildCtx::get();
       @InteractiveLayer {
         border_radii: Radius::all(TOTAL_SIZE / 2.),
-        color: Palette::of(ctx!()).primary(),
+        color: Palette::of(ctx).primary(),
         @Container {
           cursor: CursorIcon::Pointer,
           size: Size::new(TOTAL_SIZE, TOTAL_SIZE),
@@ -53,7 +55,7 @@ pub(super) fn init(classes: &mut Classes) {
             size: Size::new(CONTAINER_SIZE, CONTAINER_SIZE),
             border_radius: Radius::all(CONTAINER_SIZE / 2.),
             border: Border::all(
-              BorderSide::new(BORDER_SIZE, Palette::of(ctx!()).on_surface_variant().into())
+              BorderSide::new(BORDER_SIZE, Palette::of(ctx).on_surface_variant().into())
             ),
           }
         }

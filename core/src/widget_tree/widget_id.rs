@@ -38,9 +38,9 @@ impl WidgetId {
   /// Subscribe the modifies `upstream` to mark the widget dirty when the
   /// `upstream` emit a modify event that contains `ModifyScope::FRAMEWORK`.
   pub(crate) fn dirty_subscribe(
-    self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>, ctx: &mut BuildCtx,
+    self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>, tree: &mut WidgetTree,
   ) {
-    let dirty_set = ctx.tree().dirty_set.clone();
+    let dirty_set = tree.dirty_set.clone();
     let h = upstream
       .filter(|b| b.contains(ModifyScope::FRAMEWORK))
       .subscribe(move |_| {
@@ -48,7 +48,7 @@ impl WidgetId {
       })
       .unsubscribe_when_dropped();
 
-    self.attach_anonymous_data(h, ctx.tree_mut());
+    self.attach_anonymous_data(h, tree);
   }
 
   pub(crate) fn get_node_mut(self, tree: &mut WidgetTree) -> Option<&mut Box<dyn RenderQueryable>> {

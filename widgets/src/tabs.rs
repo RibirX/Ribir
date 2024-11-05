@@ -229,7 +229,7 @@ impl ComposeChild<'static> for Tabs {
     }
 
     fn_widget! {
-      let tabs_style = TabsStyle::of(ctx!());
+      let tabs_style = TabsStyle::of(BuildCtx::get());
         let TabsStyle {
           extent_only_icon,
           extent_only_label,

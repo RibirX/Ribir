@@ -123,18 +123,19 @@ impl<'c> ComposeChild<'c> for Class {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let f = move |ctx: &mut BuildCtx| match this.try_into_value() {
+    let f = move || match this.try_into_value() {
       Ok(c) => c.apply_style(child),
       Err(this) => {
         let this2 = this.clone_watcher();
-        let cls_child = ClassChild::new(ctx.tree().dummy_id());
+        let cls_child = ClassChild::new(BuildCtx::get().tree().dummy_id());
         // Reapply the class when it is updated.
         let cls_child2 = cls_child.clone();
-        let child = child.on_build(move |orig_id, ctx| {
-          let mut orig_child = OrigChild::from_id(orig_id, ctx);
+        let child = child.on_build(move |orig_id| {
+          let tree = BuildCtx::get_mut().tree_mut();
+          let mut orig_child = OrigChild::from_id(orig_id, tree);
           cls_child2.inner().orig_id = orig_id;
           let orig_child2 = orig_child.clone();
-          let wnd_id = ctx.window().id();
+          let wnd_id = tree.window().id();
           let u = this2
             .raw_modifies()
             .filter(|s| s.contains(ModifyScope::FRAMEWORK))
@@ -147,7 +148,7 @@ impl<'c> ComposeChild<'c> for Class {
         this
           .read()
           .apply_style(child)
-          .on_build(move |child_id, ctx| cls_child.set_child_id(child_id, ctx))
+          .on_build(move |child_id| cls_child.set_child_id(child_id))
       }
     };
     f.into_widget()
@@ -195,10 +196,10 @@ impl ClassChild {
     Self(Sc::new(UnsafeCell::new(inner)))
   }
 
-  fn set_child_id(&self, id: WidgetId, ctx: &mut BuildCtx) {
+  fn set_child_id(&self, id: WidgetId) {
     let inner = self.inner();
     inner.child_id = id;
-    id.wrap_node(ctx.tree_mut(), |node| {
+    id.wrap_node(BuildCtx::get_mut().tree_mut(), |node| {
       inner.child = node;
       Box::new(self.clone())
     });
@@ -208,7 +209,7 @@ impl ClassChild {
     let wnd =
       AppCtx::get_window(wnd_id).expect("This handle is not valid because the window is closed");
     let InnerClassChild { child, child_id, orig_id } = self.inner();
-    let _guard = BuildCtx::set_ctx_for(*child_id, wnd.tree);
+    let _guard = BuildCtx::init_for(*child_id, wnd.tree);
     let n_orig = BuildCtx::get_mut().alloc(Box::new(orig.clone()));
     let tree = BuildCtx::get_mut().tree_mut();
     let cls_holder = child_id.place_holder(tree);
@@ -278,9 +279,9 @@ impl ClassChild {
 }
 
 impl OrigChild {
-  fn from_id(id: WidgetId, ctx: &mut BuildCtx) -> Self {
+  fn from_id(id: WidgetId, tree: &mut WidgetTree) -> Self {
     let mut orig = None;
-    id.wrap_node(ctx.tree_mut(), |node| {
+    id.wrap_node(tree, |node| {
       let c = OrigChild(Sc::new(UnsafeCell::new(node)));
       orig = Some(c.clone());
       Box::new(c)

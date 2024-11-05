@@ -362,7 +362,8 @@ where
         ),
       };
       let scrollable = stack.get_scrollable_widget();
-      let tick_of_layout_ready = ctx!().window()
+      let wnd = BuildCtx::get().window();
+      let tick_of_layout_ready = wnd
         .frame_tick_stream()
         .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
       watch!(SelectableText::caret(&*$this))
@@ -384,7 +385,7 @@ where
       };
 
       let ime_handle = Stateful::new(
-        ImeHandle::new(ctx!().window(), this.clone_writer(), caret_box_id)
+        ImeHandle::new(wnd, this.clone_writer(), caret_box_id)
       );
       let mut stack = @ $stack {
         on_focus: move |_| $ime_handle.write().ime_allowed(),

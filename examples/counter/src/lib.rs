@@ -1,6 +1,6 @@
 use ribir::prelude::*;
 
-pub fn counter(ctx: &mut BuildCtx) -> Widget<'static> {
+pub fn counter() -> Widget<'static> {
   let cnt = Stateful::new(0);
   let f = fn_widget! {
     @Row {
@@ -11,7 +11,7 @@ pub fn counter(ctx: &mut BuildCtx) -> Widget<'static> {
       @H1 { text: pipe!($cnt.to_string()) }
     }
   };
-  f(ctx)
+  f()
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen::prelude::wasm_bindgen)]

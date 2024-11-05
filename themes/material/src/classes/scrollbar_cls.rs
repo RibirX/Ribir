@@ -17,13 +17,13 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(SCROLL_CLIENT_AREA, |w| w);
 
   classes.insert(H_SCROLL_THUMB, style_class! {
-    background: Palette::of(ctx!()).primary(),
+    background: Palette::of(BuildCtx::get()).primary(),
     border_radius: RADIUS,
     margin: EdgeInsets::vertical(1.),
     clamp: BoxClamp::min_width(THUMB_MIN_SIZE).with_fixed_height(THICKNESS)
   });
   classes.insert(V_SCROLL_THUMB, style_class! {
-    background: Palette::of(ctx!()).primary(),
+    background: Palette::of(BuildCtx::get()).primary(),
     border_radius: RADIUS,
     margin: EdgeInsets::horizontal(1.),
     clamp: BoxClamp::min_height(THUMB_MIN_SIZE).with_fixed_width(THICKNESS)
@@ -42,7 +42,7 @@ pub(super) fn init(classes: &mut Classes) {
 
 fn base_track(w: Widget) -> Widget {
   fn_widget! {
-    let scroll = &*Provider::of::<Stateful<ScrollableWidget>>(ctx!()).unwrap();
+    let scroll = &*Provider::of::<Stateful<ScrollableWidget>>(BuildCtx::get()).unwrap();
     let mut w = FatObj::new(w).opacity(0.);
 
     // Show the scrollbar when scrolling.
@@ -69,7 +69,7 @@ fn base_track(w: Widget) -> Widget {
 
     let mut w = @ $w {
       background: {
-        let color = Palette::of(ctx!()).primary_container();
+        let color = Palette::of(BuildCtx::get()).primary_container();
         pipe!(if $w.is_hover() { color } else { color.with_alpha(0.)})
       },
       on_disposed: move |_| u.unsubscribe(),

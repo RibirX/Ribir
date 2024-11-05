@@ -20,7 +20,7 @@ impl CustomStyle for SelectedHighLightStyle {
 impl Compose for SelectedHighLight {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      let color = SelectedHighLightStyle::of(ctx!()).brush;
+      let color = SelectedHighLightStyle::of(BuildCtx::get()).brush;
       @Stack {
         @ { pipe!{
           let color = color.clone();

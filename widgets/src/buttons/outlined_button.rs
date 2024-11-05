@@ -103,7 +103,7 @@ impl ComposeChild<'static> for OutlinedButton {
           radius,
           padding_style,
           border_width,
-        } = OutlinedButtonStyle::of(ctx!());
+        } = OutlinedButtonStyle::of(BuildCtx::get());
 
         @OutlinedButtonDecorator {
           button_type,

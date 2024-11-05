@@ -23,14 +23,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 <!-- next-header -->
 
-## [@Unreleased] - @ReleaseDat
+## [@Unreleased] - @ReleaseDate
 
 ### Features
 
 - **core**: Added the smooth widgets for transitioning the layout position and size. (#645 @M-Adoo)
 - **widgets**: Added three widgets `FractionallyWidthBox`, `FractionallyHeightBox`, and `FractionallySizedBox` to enable fractional sizing of widgets. (#647 @M-Adoo)
 - **widgets**: Add widget of radio button (#649 @wjian23)
-- **core**: `BuildCtx::get()` and `BuildCtx::get_mut()` have been added to facilitate access from anywhere within a build context. (#pr @M-Adoo)
+- **core**: `BuildCtx::get()` and `BuildCtx::get_mut()` have been added to facilitate access from anywhere within a build context. (#650 @M-Adoo)
 
 ### Fixed
 
@@ -40,7 +40,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Breaking
 
 - **core**: `Expanded` and `KeyWidget` are not declared with `FatObj`, so they do not currently support built-in widgets. (#648 @M-Adoo)
-- **core**: `DeclareObj::finish` does not accept a `BuildCtx` parameter. (#pr @M-Adoo)
+- **core**: `DeclareObj::finish` does not accept a `BuildCtx` parameter. (#650 @M-Adoo)
+- **core**: function widget no longer requires a `&mut BuildCtx` parameter. (#650 @M-Adoo)
+- **macros**: Removed the `ctx!` macro. (#650 @M-Adoo)
 
 ## [0.4.0-alpha.14] - 2024-10-30
 

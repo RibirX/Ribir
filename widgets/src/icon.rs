@@ -44,7 +44,7 @@ macro_rules! define_fixed_size_icon {
           -> Widget<'c>
         {
           fn_widget! {
-            let icon = @Icon { size: IconSize::of(ctx!()).$field };
+            let icon = @Icon { size: IconSize::of(BuildCtx::get()).$field };
             @ $icon { @ { child } }
           }.into_widget()
         }
