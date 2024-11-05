@@ -833,7 +833,7 @@ fn no_watch() {
 
 #[test]
 fn fix_direct_use_map_writer_with_builtin() {
-  fn _x(mut host: FatObj<Void>, ctx!(): &BuildCtx) {
+  fn _x(mut host: FatObj<Void>) {
     let _anchor = host
       .get_relative_anchor_widget()
       .map_writer(|w| PartData::from_ref_mut(&mut w.anchor));

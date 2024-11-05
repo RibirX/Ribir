@@ -251,7 +251,7 @@ fn override_compose_decorator(theme: &mut Theme) {
       };
 
       part_writer!(&mut indicator.anchor)
-        .transition(transitions::EASE_IN.of(ctx!()));
+        .transition(transitions::EASE_IN.of(BuildCtx::get()));
       indicator
     }
     .into_widget()
@@ -279,14 +279,14 @@ fn override_compose_decorator(theme: &mut Theme) {
       @Ripple {
         center: false,
         color: {
-          let palette = Palette::of(ctx!()).clone();
+          let palette = Palette::of(BuildCtx::get()).clone();
           pipe!(palette.on_of(&palette.base_of(&$style.color)))
         },
         bounded: RippleBound::Radius(Radius::all(20.)),
         @InteractiveLayer {
           border_radii: Radius::all(20.),
           color: {
-            let palette = Palette::of(ctx!()).clone();
+            let palette = Palette::of(BuildCtx::get()).clone();
             pipe!(palette.on_of(&palette.base_of(&$style.color)))
           },
           @$host {
@@ -303,14 +303,14 @@ fn override_compose_decorator(theme: &mut Theme) {
       @Ripple {
         center: false,
         color: {
-          let palette = Palette::of(ctx!()).clone();
+          let palette = Palette::of(BuildCtx::get()).clone();
           pipe!(palette.base_of(&$style.color))
         },
         bounded: RippleBound::Radius(Radius::all(20.)),
         @InteractiveLayer {
           border_radii: Radius::all(20.),
           color: {
-            let palette = Palette::of(ctx!()).clone();
+            let palette = Palette::of(BuildCtx::get()).clone();
             pipe!(palette.base_of(&$style.color))
           },
           @ $host {
@@ -327,14 +327,14 @@ fn override_compose_decorator(theme: &mut Theme) {
       @Ripple {
         center: false,
         color: {
-          let palette = Palette::of(ctx!()).clone();
+          let palette = Palette::of(BuildCtx::get()).clone();
           pipe!(palette.on_of(&palette.base_of(&$style.color)))
         },
         bounded: RippleBound::Radius(Radius::all(20.)),
         @InteractiveLayer {
           border_radii: Radius::all(20.),
           color: {
-            let palette = Palette::of(ctx!()).clone();
+            let palette = Palette::of(BuildCtx::get()).clone();
             pipe!(palette.on_of(&palette.base_of(&$style.color)))
           },
           @ $host {

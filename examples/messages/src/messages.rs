@@ -13,41 +13,40 @@ struct MessageList {
   messages: Vec<Message>,
 }
 
-pub fn messages(ctx: &mut BuildCtx) -> Widget<'static> {
-  let f = fn_widget! {
-    MessageList {
-      messages: vec![
-        Message {
-          nick_name: "James Harden".to_string(),
-          content: "Coming soon!".to_string(),
-          img:  Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-2.png"))),
-        },
-        Message {
-          nick_name: "Allen Iverson".to_string(),
-          content: "You are welcome!".to_string(),
-          img:  Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png"))),
-        },
-        Message {
-          nick_name: "Kyrie Irving".to_string(),
-          content: "See you next week!".to_string(),
-          img:  Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png"))),
-        },
-        Message {
-          nick_name: "Jaylon Lee".to_string(),
-          content: "Fighting!".to_string(),
-          img:  Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-4.png"))),
-        },
-      ],
-    }
-  };
-  f(ctx)
+pub fn messages() -> Widget<'static> {
+  MessageList {
+    messages: vec![
+      Message {
+        nick_name: "James Harden".to_string(),
+        content: "Coming soon!".to_string(),
+        img: Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-2.png"))),
+      },
+      Message {
+        nick_name: "Allen Iverson".to_string(),
+        content: "You are welcome!".to_string(),
+        img: Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png"))),
+      },
+      Message {
+        nick_name: "Kyrie Irving".to_string(),
+        content: "See you next week!".to_string(),
+        img: Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png"))),
+      },
+      Message {
+        nick_name: "Jaylon Lee".to_string(),
+        content: "Fighting!".to_string(),
+        img: Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-4.png"))),
+      },
+    ],
+  }
+  .into_widget()
 }
 
 impl Compose for MessageList {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
+      let palette = Palette::of(BuildCtx::get());
       @Column {
-        background: Palette::of(ctx!()).surface(),
+        background: palette.surface(),
         @Row {
           justify_content: JustifyContent::SpaceBetween,
           padding: EdgeInsets::new(8., 16., 8., 16.),
@@ -57,8 +56,8 @@ impl Compose for MessageList {
             @TinyIcon { @{ svgs::MENU } }
             @Text {
               text: "Message",
-              foreground: Palette::of(ctx!()).on_surface(),
-              text_style: TypographyTheme::of(ctx!()).title_large.text.clone(),
+              foreground: palette.on_surface(),
+              text_style: TypographyTheme::of(BuildCtx::get()).title_large.text.clone(),
             }
           }
           @Row {

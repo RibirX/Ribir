@@ -16,28 +16,22 @@
 //! use ribir::prelude::*;
 //!
 //! let _ = fn_widget! {
+//!   let ctx = BuildCtx::get();
 //!   let mut stagger = Stagger::new(
 //!     Duration::from_millis(100),
-//!     transitions::EASE_IN.of(ctx!())
+//!     transitions::EASE_IN.of(ctx)
 //!   );
 //!
 //!   let mut first = @Text { text: "first" };
 //!   let mut second = @Text { text: "second" };
-//!   let first_opacity = first
-//!     .get_opacity_widget()
-//!     .map_writer(|w| PartData::from_ref_mut(&mut w.opacity));
-//!   let second_opacity = second
-//!     .get_opacity_widget()
-//!     .map_writer(|w| PartData::from_ref_mut(&mut w.opacity));
-//!
 //!
 //!   let first_fade_in = @Animate {
-//!     transition: transitions::EASE_IN.of(ctx!()),
-//!      state: first_opacity,
+//!     transition: transitions::EASE_IN.of(ctx),
+//!      state: part_writer!(&mut first.opacity),
 //!   };
 //!
 //!   stagger.write().push_animation(first_fade_in);
-//!   stagger.write().push_state(second_opacity, 0., ctx!());
+//!   stagger.write().push_state(part_writer!(&mut second.opacity), 0.);
 //!
 //!   @Column {
 //!     on_mounted: move |_| stagger.run(),
@@ -81,11 +75,11 @@ impl<T: Transition + 'static> Stagger<T> {
   ///
   /// **state**: the state you want to transition.
   /// **from**: the state you want to transition from.
-  pub fn push_state<A>(&mut self, state: A, from: A::Value, ctx: &BuildCtx) -> State<Animate<A>>
+  pub fn push_state<A>(&mut self, state: A, from: A::Value) -> State<Animate<A>>
   where
     A: AnimateState + 'static,
   {
-    self.push_state_with(self.default_stagger(), state, from, ctx)
+    self.push_state_with(self.default_stagger(), state, from)
   }
 
   /// Add an new state as animation to the end of the stagger animation with a
@@ -96,7 +90,7 @@ impl<T: Transition + 'static> Stagger<T> {
   /// - **state**: the state you want to transition.
   /// - **from**: the state you want to transition from.
   pub fn push_state_with<A>(
-    &mut self, stagger: Duration, state: A, from: A::Value, ctx!(): &BuildCtx,
+    &mut self, stagger: Duration, state: A, from: A::Value,
   ) -> State<Animate<A>>
   where
     A: AnimateState + 'static,
@@ -228,11 +222,14 @@ mod tests {
   widget_layout_test!(
     stagger_run_and_stop,
     WidgetTester::new(fn_widget! {
-      let stagger = Stagger::new(Duration::from_millis(100), transitions::EASE_IN.of(ctx!()));
+      let stagger = Stagger::new(
+        Duration::from_millis(100),
+        transitions::EASE_IN.of(BuildCtx::get())
+      );
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };
 
       let animate = @Animate {
-        transition: transitions::EASE_IN.of(ctx!()),
+        transition: transitions::EASE_IN.of(BuildCtx::get()),
         state: part_writer!(&mut mock_box.opacity),
         from: 0.,
       };
@@ -241,7 +238,6 @@ mod tests {
       stagger.write().push_state(
         part_writer!(&mut mock_box.size),
         Size::new(200., 200.),
-        ctx!()
       );
 
 
@@ -271,7 +267,6 @@ mod tests {
           .get_opacity_widget()
           .map_writer(|w| PartData::from_ref_mut(&mut w.opacity)),
         0.,
-        ctx!()
       );
       stagger.run();
 

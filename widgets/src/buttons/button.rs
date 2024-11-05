@@ -80,6 +80,7 @@ impl ComposeChild<'static> for Button {
     };
 
     fn_widget! {
+      let ctx = BuildCtx::get();
       @ {
         let ButtonStyle {
           height,
@@ -88,8 +89,8 @@ impl ComposeChild<'static> for Button {
           icon_pos,
           label_style,
           padding_style,
-        } = ButtonStyle::of(ctx!());
-        let palette = Palette::of(ctx!()).clone();
+        } = ButtonStyle::of(ctx);
+        let palette = Palette::of(ctx).clone();
 
         @ButtonDecorator {
           button_type,

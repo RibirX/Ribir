@@ -149,7 +149,7 @@ impl LazyWidgetId {
   /// Bind a widget to the LazyWidgetId, and return a widget that will set the
   /// id to the LazyWidgetId after build.
   pub fn bind(self, widget: Widget) -> Widget {
-    widget.on_build(move |id, _| {
+    widget.on_build(move |id| {
       assert!(self.id().is_none(), "The LazyWidgetID only allows binding to one widget.");
       self.0.set(Some(id));
     })

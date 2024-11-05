@@ -31,10 +31,10 @@ use crate::{prelude::*, window::WindowId};
 /// Provider::new(Box::new(Queryable(1i32)))
 ///   // Provider only accepts function widgets as its child.
 ///   .with_child(fn_widget! {
-///     let value = Provider::of::<i32>(ctx!()).unwrap();
+///     let value = Provider::of::<i32>(BuildCtx::get()).unwrap();
 ///     assert_eq!(*value, 1);
 ///
-///     let value = Provider::write_of::<i32>(ctx!());
+///     let value = Provider::write_of::<i32>(BuildCtx::get());
 ///     // We not share a writer.
 ///     assert!(value.is_none());
 ///     @Text { text: "Good!" }
@@ -49,20 +49,21 @@ use crate::{prelude::*, window::WindowId};
 ///
 /// Provider::new(Box::new(Stateful::new(0i32))).with_child(fn_widget! {
 ///   // we can query the type of the data.
+///   let ctx = BuildCtx::get();
 ///   {
-///     let cnt = Provider::of::<Stateful<i32>>(ctx!()).unwrap();
+///     let cnt = Provider::of::<Stateful<i32>>(ctx).unwrap();
 ///     assert_eq!(*cnt.read(), 0);
 ///   }
 ///
 ///   // the write ref of the value
 ///   {
-///     let mut cnt: WriteRef<i32> = Provider::write_of::<i32>(ctx!()).unwrap();
+///     let mut cnt: WriteRef<i32> = Provider::write_of::<i32>(ctx).unwrap();
 ///     assert_eq!(*cnt, 0);
 ///     *cnt = 1;
 ///   }
 ///
 ///   // The value type of the state.
-///   let cnt = Provider::of::<i32>(ctx!()).unwrap();
+///   let cnt = Provider::of::<i32>(ctx).unwrap();
 ///   assert_eq!(*cnt, 1);
 ///   @Text { text: "Good!" }
 /// });
@@ -78,7 +79,7 @@ pub struct Provider {
 /// use ribir::prelude::*;
 ///
 /// providers![State::value(0), Queryable("Hello!")].with_child(fn_widget! {
-///   let hi = Provider::of::<&'static str>(ctx!()).unwrap();
+///   let hi = Provider::of::<&'static str>(BuildCtx::get()).unwrap();
 ///   @Text { text: *hi }
 /// });
 /// ```
@@ -125,20 +126,14 @@ impl<'c> ComposeChild<'c> for Provider {
       })
       .provider;
 
-    let f = move |_: &mut BuildCtx| {
-      let ctx = BuildCtx::get_mut();
-
-      // We need to consume the root widget keep its build logic can access the
-      // provider.
-      // Allow the building logic to access the provider.
-      ctx.current_providers.push(provider);
-      let (child, child_id) = child.into_widget().consume_root();
+    // We push the provider into the build context to ensure that the widget build
+    // logic can access this provider.
+    let ctx = BuildCtx::get_mut();
+    ctx.current_providers.push(provider);
+    child.into_widget().on_build(|id| {
       let provider = ctx.current_providers.pop().unwrap();
-      child_id.attach_data(provider, ctx.tree_mut());
-
-      child
-    };
-    f.into_widget()
+      id.attach_data(provider, ctx.tree_mut());
+    })
   }
 }
 
@@ -284,7 +279,7 @@ mod tests {
     let w = fn_widget! {
       let w_value = w_value.clone_writer();
       Provider::new(Box::new(Queryable(1i32))).with_child(fn_widget! {
-        let v = Provider::of::<i32>(ctx!()).unwrap();
+        let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
         *w_value.write() = *v;
         Void
       })
@@ -306,7 +301,7 @@ mod tests {
         @MockBox {
           size: Size::new(1.,1.),
           @ {
-            let v = Provider::of::<i32>(ctx!()).unwrap();
+            let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
             *$w_value.write() = *v;
             Void
           }

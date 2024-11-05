@@ -1,4 +1,4 @@
-use crate::{context::BuildCtx, pipe::*, widget::*};
+use crate::{pipe::*, widget::*};
 
 /// Trait for conversions type as a child of widget.
 ///
@@ -21,7 +21,7 @@ impl<C> IntoChild<Option<C>, SELF> for C {
   fn into_child(self) -> Option<C> { Some(self) }
 }
 
-impl<F: FnMut(&mut BuildCtx) -> Widget<'static> + 'static> IntoChild<GenWidget, 0> for F {
+impl<F: FnMut() -> Widget<'static> + 'static> IntoChild<GenWidget, 0> for F {
   #[inline]
   fn into_child(self) -> GenWidget { GenWidget::new(self) }
 }
@@ -89,7 +89,7 @@ impl<P: Pipe> IntoChild<BoxPipe<P::Value>, 0> for P {
 
 impl<'w, F> IntoChild<FnWidget<'w>, FN> for F
 where
-  F: FnOnce(&mut BuildCtx) -> Widget<'w> + 'w,
+  F: FnOnce() -> Widget<'w> + 'w,
 {
   #[inline]
   fn into_child(self) -> FnWidget<'w> { Box::new(self) }

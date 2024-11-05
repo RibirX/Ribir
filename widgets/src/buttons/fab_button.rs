@@ -92,6 +92,7 @@ impl ComposeChild<'static> for FabButton {
 
     fn_widget! {
       @ {
+        let ctx = BuildCtx::get();
         let FabButtonStyle {
           height,
           icon_size,
@@ -100,9 +101,9 @@ impl ComposeChild<'static> for FabButton {
           label_style,
           radius,
           padding_style,
-        } = FabButtonStyle::of(ctx!());
-        let palette1 = Palette::of(ctx!()).clone();
-        let palette2 = Palette::of(ctx!()).clone();
+        } = FabButtonStyle::of(ctx);
+        let palette1 = Palette::of(ctx).clone();
+        let palette2 = Palette::of(ctx).clone();
 
         @FabButtonDecorator {
           button_type,

@@ -2,7 +2,7 @@ use ribir::prelude::*;
 
 use crate::wordle::{CharHint, Wordle, WordleChar};
 
-pub fn wordle_game(_: &mut BuildCtx) -> Widget<'static> { Wordle::new(5, 5).into_widget() }
+pub fn wordle_game() -> Widget<'static> { Wordle::new(5, 5).into_widget() }
 
 trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
   fn chars_key<const N: usize>(
@@ -28,7 +28,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
   fn keyboard(self, state_bar: impl StateWriter<Value = Text> + 'static) -> Widget<'static> {
     let this: <Self as StateWriter>::Writer = self.clone_writer();
     fn_widget! {
-    let palette = Palette::of(ctx!());
+    let palette = Palette::of(BuildCtx::get());
     @Column {
         item_gap: 5.,
         align_items: Align::Center,
@@ -130,7 +130,7 @@ impl Wordle {
 
     fn_widget! {
       let color = hint_color(hint);
-      let palette = Palette::of(ctx!());
+      let palette = Palette::of(BuildCtx::get());
 
       let color = palette.container_of(&color);
       let font_color = palette.on_container_of(&color);
@@ -139,7 +139,7 @@ impl Wordle {
         background: color,
         border_radius: Radius::all(4.),
         @Text {
-          text_style: TypographyTheme::of(ctx!()).display_small.text.clone(),
+          text_style: TypographyTheme::of(BuildCtx::get()).display_small.text.clone(),
           foreground: font_color,
           h_align: HAlign::Center,
           v_align: VAlign::Center,

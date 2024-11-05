@@ -84,12 +84,12 @@ use ribir::prelude::*;
 
 #[derive(Declare, Default)]
 pub struct FilledButton {
-  #[declare(default=Palette::of(ctx!()).primary())]
+  #[declare(default=Palette::of(BuildCtx::get()).primary())]
   pub color: Color,
 }
 ```
 
-需要注意的是，它有一个 attribute：`#[declare(default=Palette::of(ctx!()).primary())]`。这意味着，如果在使用 `Declare` 创建 `FilledButton` 时，没有设置 `color` 值，那么将使用调色板的主色作为默认值。
+需要注意的是，它有一个 attribute：`#[declare(default=Palette::of(BuildCtx::get()).primary())]`。这意味着，如果在使用 `Declare` 创建 `FilledButton` 时，没有设置 `color` 值，那么将使用调色板的主色作为默认值。
 
 这就是我们为何要通过 `Declare` 创建控件的首要原因：它允许控件在创建时访问 `BuildCtx`，使得控件能够根据上下文自动配置，例如，随着主题的变化而动态变化。
 
@@ -119,7 +119,7 @@ fn button_demo(ctx: &BuildCtx){
 ```rust
 use ribir::prelude::*;
 
-fn button_demo(ctx: &BuildCtx){
+fn button_demo(){
   let btn1 = FilledButton::declarer().color(Color::RED).finish();
 
   let btn2 = FilledButton::declarer()
@@ -139,7 +139,7 @@ fn button_demo(ctx: &BuildCtx){
 ```rust
 use ribir::prelude::*;
 
-fn button_demo(ctx: &BuildCtx){
+fn button_demo(){
   let mut btn = FilledButton::declarer()
     .color(Color::RED)
     .finish();
@@ -161,15 +161,15 @@ fn button_demo(ctx: &BuildCtx){
 ```rust
 use ribir::prelude::*;
 
-fn button_demo(ctx: &BuildCtx){
+fn button_demo(){
   let text_btn = FilledButton::declarer()
     .color(Color::RED)
-    .finish(ctx)
+    .finish()
     .with_child(Label::new("Text Button"));
 
   let icon_btn = FilledButton::declarer()
     .color(Color::RED)
-    .finish(ctx)
+    .finish()
     .with_child(svgs::ADD);
 }
 ```
@@ -185,12 +185,12 @@ let counter = fn_widget! {
   let cnt = Stateful::new(0);
   let btn = FilledButton::declarer()
     .on_tap(move |_| *$cnt.write() += 1)
-    .finish(ctx!())
+    .finish()
     .with_child(Label::new("Inc"));
 
   let label = H1::declarer()
     .text(pipe!($cnt.to_string()))
-    .finish(ctx!());
+    .finish();
 
   @Row {
     @ { btn }

@@ -59,7 +59,7 @@ mod tests {
     };
 
     let mut wnd =
-      TestWindow::new_with_size(fn_widget! { widget.clone()(ctx!()) }, Size::new(100., 100.));
+      TestWindow::new_with_size(move || widget.clone().into_widget(), Size::new(100., 100.));
 
     wnd.draw_frame();
     let device_id = unsafe { DeviceId::dummy() };

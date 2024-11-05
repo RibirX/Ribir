@@ -43,7 +43,7 @@ A function widget can be defined directly through a function:
 ```rust no_run
 use ribir::prelude::*;
 
-fn hello_world(ctx!(): &mut BuildCtx) -> Widget<'static> {
+fn hello_world() -> Widget<'static> {
   rdl!{ Text { text: "Hello World!" } }
     .into_widget()
 }
@@ -72,7 +72,7 @@ Because `hello_world` is not called by anyone else, you can rewrite it as a clos
 use ribir::prelude::*;
 
 fn main() {
-  let hello_world = |ctx!(): &mut BuildCtx| {
+  let hello_world = || {
     rdl!{ Text { text: "Hello World!" } }
       .into_widget()
   };
@@ -128,9 +128,8 @@ pub struct Counter {
   #[declare(default = 1usize)]
   count: usize,
 }
-// `rdl!` only allow to be used in a context with `ctx!(): &BuildCtx` accessible.
-// So we use a function with `ctx!()` parameter to provide this context.
-fn use_rdl(ctx!(): &BuildCtx) {
+
+fn use_rdl() {
   let _ = rdl!{ Counter { } };
 }
 ```

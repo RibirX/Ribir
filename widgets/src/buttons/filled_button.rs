@@ -92,6 +92,7 @@ impl ComposeChild<'static> for FilledButton {
 
     fn_widget! {
       @ {
+        let ctx = BuildCtx::get();
         let FilledButtonStyle {
           height,
           icon_size,
@@ -100,7 +101,7 @@ impl ComposeChild<'static> for FilledButton {
           label_style,
           radius,
           padding_style,
-        } = FilledButtonStyle::of(ctx!());
+        } = FilledButtonStyle::of(ctx);
 
         @FilledButtonDecorator {
           button_type,

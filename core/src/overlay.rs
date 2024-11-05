@@ -123,11 +123,9 @@ impl Overlay {
   ///       let wid = wid.clone();
   ///       overlay.show_map(move |w| {
   ///         let wid = wid.clone();
-  ///         fn_widget! {
-  ///           let mut w = FatObj::new(w);
-  ///           w.left_align_to(&wid, 0., ctx!());
-  ///           w
-  ///         }.into_widget()
+  ///         let mut w = FatObj::new(w);
+  ///         w.left_align_to(&wid, 0.);
+  ///         w.into_widget()
   ///        },
   ///        e.window()
   ///       );
@@ -145,7 +143,7 @@ impl Overlay {
       return;
     }
     let gen = self.0.borrow().gen.clone();
-    let gen = move |_: &mut BuildCtx| f(gen.gen_widget());
+    let gen = move || f(gen.gen_widget());
     self.inner_show(gen.into(), wnd);
   }
 
@@ -174,7 +172,7 @@ impl Overlay {
     if let Some(showing) = showing {
       let ShowingInfo { id, wnd_id, .. } = showing;
       if let Some(wnd) = AppCtx::get_window(wnd_id) {
-        let _guard = BuildCtx::set_ctx_for(wnd.tree().root(), wnd.tree);
+        let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
         let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
         showing_overlays.remove(self);
 
@@ -214,8 +212,8 @@ impl Overlay {
       }
     };
 
-    let _guard = BuildCtx::set_ctx_for(wnd.tree().root(), wnd.tree);
-    let id = gen(BuildCtx::get_mut()).build();
+    let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
+    let id = gen().build();
     self.0.borrow_mut().showing = Some(ShowingInfo { id, generator: gen.into(), wnd_id: wnd.id() });
 
     let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();

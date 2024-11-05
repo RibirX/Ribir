@@ -36,24 +36,15 @@ mod tests {
 
   use super::*;
 
-  fn radio_widget(_: &mut BuildCtx) -> Widget<'static> {
-    fn_widget! {
-      @MockMulti {
-        @Radio {
-          checked: false,
-        }
-        @Radio {
-          checked: true,
-        }
-      }
-    }
-    .into_widget()
-  }
-
   widget_image_tests!(
     radio_widget,
-    WidgetTester::new(radio_widget)
-      .with_wnd_size(Size::new(150., 80.))
-      .with_comparison(0.002)
+    WidgetTester::new(fn_widget! {
+      @MockMulti {
+        @Radio { checked: false }
+        @Radio { checked: true }
+      }
+    })
+    .with_wnd_size(Size::new(150., 80.))
+    .with_comparison(0.002)
   );
 }

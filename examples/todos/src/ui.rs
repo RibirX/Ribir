@@ -37,7 +37,10 @@ fn task_lists(
 ) -> GenWidget {
   fn_widget! {
     let editing = Stateful::new(None);
-    let stagger = Stagger::new(Duration::from_millis(100), transitions::EASE_IN_OUT.of(ctx!()));
+    let stagger = Stagger::new(
+      Duration::from_millis(100),
+      transitions::EASE_IN_OUT.of(BuildCtx::get())
+    );
     let c_stagger = stagger.clone_writer();
 
     @Scrollbar {
@@ -76,7 +79,6 @@ fn task_lists(
                         }
                       }
                     }.into_widget()
-
                   } else {
                     let _hint = || $stagger.write();
                     let item = task_item_widget(task.clone_writer(), stagger.clone_writer());
@@ -110,7 +112,7 @@ fn input(
       margin: EdgeInsets::horizontal(24.),
       h_align: HAlign::Stretch,
       border: {
-        let color = Palette::of(ctx!()).surface_variant().into();
+        let color = Palette::of(BuildCtx::get()).surface_variant().into();
         Border::only_bottom(BorderSide { width: 2., color })
       },
       on_key_down: move |e| {
@@ -146,7 +148,6 @@ where
       let fly_in = stagger.push_state(
         (transform, opacity),
         (Transform::translation(0., 64.), 0.),
-        ctx!()
       );
       // items not displayed until the stagger animation is started.
       watch!($fly_in.is_running()).filter(|v| *v).first().subscribe(move |_| {
@@ -176,7 +177,7 @@ where
   .into_widget()
 }
 
-pub fn todos(_: &mut BuildCtx) -> Widget<'static> {
+pub fn todos() -> Widget<'static> {
   let todos = if cfg!(not(target_arch = "wasm32")) {
     let todos = State::value(Todos::load());
     // save changes to disk every 5 seconds .

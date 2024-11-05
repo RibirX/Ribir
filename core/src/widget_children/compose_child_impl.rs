@@ -177,8 +177,9 @@ where
   fn with_child(self, child: C) -> Self::Target {
     let host = child.into_widget();
 
-    let f = move |ctx: &mut BuildCtx| {
+    let f = move || {
       let tid = TypeId::of::<W>();
+      let ctx = BuildCtx::get();
       let decor = ctx
         .all_providers::<ComposeDecorators>()
         .find_map(|t| QueryRef::filter_map(t, |t| t.styles.get(&tid)).ok());

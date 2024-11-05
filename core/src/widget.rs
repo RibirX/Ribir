@@ -58,13 +58,8 @@ enum InnerWidget<'w> {
 }
 
 enum Node<'w> {
-  Leaf(PureNode<'w>),
-  Tree { parent: PureNode<'w>, children: Vec<Widget<'w>> },
-}
-
-enum PureNode<'w> {
-  Render(Box<dyn RenderQueryable>),
-  LazyBuild(Box<dyn FnOnce() -> WidgetId + 'w>),
+  Leaf(Box<dyn FnOnce() -> WidgetId + 'w>),
+  Tree { parent: Box<dyn FnOnce() -> WidgetId + 'w>, children: Vec<Widget<'w>> },
 }
 
 /// This serves as a wrapper for `Box<dyn FnOnce(&BuildCtx) -> Node<'w> +
@@ -75,26 +70,25 @@ enum PureNode<'w> {
 /// This approach should be acceptable since `LazyWidget` is private and not
 /// accessed externally. Additionally, the lifetime will shorten once we consume
 /// it to obtain the `Widget<'w>`.
-struct LazyNode<'w>(Box<dyn FnOnce(&mut BuildCtx) -> Widget<'static> + 'w>);
+struct LazyNode<'w>(Box<dyn FnOnce() -> Widget<'static> + 'w>);
 
 impl<'w> LazyNode<'w> {
-  fn new(f: impl FnOnce(&mut BuildCtx) -> Widget<'w> + 'w) -> Self {
-    let f: Box<dyn FnOnce(&mut BuildCtx) -> Widget<'w> + 'w> = Box::new(f);
+  fn new(f: impl FnOnce() -> Widget<'w> + 'w) -> Self {
+    let f: Box<dyn FnOnce() -> Widget<'w> + 'w> = Box::new(f);
     // Safety: the lifetime will shorten once we consume it to obtain the
     // `Widget<'w>`.
-    let f: Box<dyn FnOnce(&mut BuildCtx) -> Widget<'static> + 'w> =
-      unsafe { std::mem::transmute(f) };
+    let f: Box<dyn FnOnce() -> Widget<'static> + 'w> = unsafe { std::mem::transmute(f) };
     Self(f)
   }
 
-  fn consume(self) -> Widget<'w> { (self.0)(BuildCtx::get_mut()) }
+  fn consume(self) -> Widget<'w> { (self.0)() }
 }
 
 /// A boxed function widget that can be called multiple times to regenerate
 /// widget.
 #[derive(Clone)]
 pub struct GenWidget(InnerGenWidget);
-type InnerGenWidget = Sc<RefCell<Box<dyn FnMut(&mut BuildCtx) -> Widget<'static>>>>;
+type InnerGenWidget = Sc<RefCell<Box<dyn FnMut() -> Widget<'static>>>>;
 
 /// The `FnWidget<'w>` is a type alias that denotes a boxed trait object of a
 /// function widget.
@@ -102,7 +96,7 @@ type InnerGenWidget = Sc<RefCell<Box<dyn FnMut(&mut BuildCtx) -> Widget<'static>
 /// It already implements `IntoChild`, allowing any function widget to be
 /// converted to `FnWidget`. Therefore, using `FnWidget` as the child type of
 /// `ComposeChild` enables the acceptance of all function widgets.
-pub type FnWidget<'w> = Box<dyn FnOnce(&mut BuildCtx) -> Widget<'w> + 'w>;
+pub type FnWidget<'w> = Box<dyn FnOnce() -> Widget<'w> + 'w>;
 
 // The widget type marker.
 pub const COMPOSE: usize = 1;
@@ -127,14 +121,11 @@ pub(crate) trait IntoWidgetStrict<'w, const M: usize>: 'w {
 }
 
 impl GenWidget {
-  pub fn new(f: impl FnMut(&mut BuildCtx) -> Widget<'static> + 'static) -> Self {
+  pub fn new(f: impl FnMut() -> Widget<'static> + 'static) -> Self {
     Self(Sc::new(RefCell::new(Box::new(f))))
   }
 
-  pub fn gen_widget(&self) -> Widget<'static> {
-    let f = self.0.clone();
-    fn_widget! { f.borrow_mut()(ctx!()) }.into_widget()
-  }
+  pub fn gen_widget(&self) -> Widget<'static> { self.0.borrow_mut()() }
 }
 
 impl<'w> IntoWidget<'w, FN> for Widget<'w> {
@@ -166,7 +157,7 @@ impl<W: ComposeChild<'static, Child = Option<C>>, C> Compose for W {
 
 impl<'w, F> IntoWidgetStrict<'w, FN> for F
 where
-  F: FnOnce(&mut BuildCtx) -> Widget<'w> + 'w,
+  F: FnOnce() -> Widget<'w> + 'w,
 {
   fn into_widget_strict(self) -> Widget<'w> {
     let lazy = LazyNode::new(self);
@@ -182,42 +173,26 @@ impl IntoWidgetStrict<'static, FN> for GenWidget {
 impl<'w> Widget<'w> {
   /// Invoke a function when the root node of the widget is built, passing its
   /// ID and build context as parameters.
-  pub fn on_build(self, f: impl FnOnce(WidgetId, &mut BuildCtx) + 'w) -> Self {
-    self.wrap_root(move |n: PureNode<'_>| {
-      let lazy = move || {
-        let ctx = BuildCtx::get_mut();
-        let id = n.alloc();
-        f(id, ctx);
-        id
-      };
+  pub fn on_build(self, f: impl FnOnce(WidgetId) + 'w) -> Self {
+    let lazy = move || {
+      let node = self.into_node().on_build(f);
+      Widget(InnerWidget::Node(node))
+    };
 
-      PureNode::LazyBuild(Box::new(lazy))
-    })
-  }
-
-  /// Build the root node of the widget only.
-  pub(crate) fn consume_root(self) -> (Self, WidgetId) {
-    let mut root_id = None;
-    let node = self.into_node().wrap_root(|n| {
-      let id = n.alloc();
-      root_id = Some(id);
-      PureNode::LazyBuild(Box::new(move || id))
-    });
-
-    (Widget(InnerWidget::Node(node)), root_id.unwrap())
+    Widget(InnerWidget::Lazy(LazyNode::new(lazy)))
   }
 
   pub(crate) fn from_render(r: Box<dyn RenderQueryable>) -> Widget<'static> {
-    Widget(InnerWidget::Node(Node::Leaf(PureNode::Render(r))))
+    Widget(InnerWidget::Node(Node::Leaf(Box::new(|| BuildCtx::get_mut().alloc(r)))))
   }
 
   /// Attach anonymous data to a widget and user can't query it.
   pub fn attach_anonymous_data(self, data: impl Any) -> Self {
-    self.on_build(|id, ctx| id.attach_anonymous_data(data, ctx.tree_mut()))
+    self.on_build(|id| id.attach_anonymous_data(data, BuildCtx::get_mut().tree_mut()))
   }
 
   pub(crate) fn attach_data(self, data: Box<dyn Query>) -> Self {
-    self.on_build(|id, ctx| id.attach_data(data, ctx.tree_mut()))
+    self.on_build(|id| id.attach_data(data, BuildCtx::get_mut().tree_mut()))
   }
 
   /// Attach a state to a widget and try to unwrap it before attaching.
@@ -250,7 +225,7 @@ impl<'w> Widget<'w> {
   }
 
   pub(crate) fn directly_compose_children(self, children: Vec<Widget<'w>>) -> Widget<'w> {
-    let mut list: SmallVec<[PureNode<'w>; 1]> = SmallVec::default();
+    let mut list: SmallVec<[_; 1]> = SmallVec::default();
     let mut node = Some(self);
     while let Some(n) = node.take() {
       match n.into_node() {
@@ -282,7 +257,7 @@ impl<'w> Widget<'w> {
   /// are certain that the entire logic is suitable for creating this widget
   /// from an ID.
   pub(crate) fn from_id(id: WidgetId) -> Widget<'static> {
-    let node = Node::Leaf(PureNode::LazyBuild(Box::new(move || id)));
+    let node = Node::Leaf(Box::new(move || id));
     Widget(InnerWidget::Node(node))
   }
 
@@ -295,23 +270,14 @@ impl<'w> Widget<'w> {
       }
     }
   }
-
-  fn wrap_root(self, f: impl FnOnce(PureNode<'w>) -> PureNode<'w> + 'w) -> Self {
-    let lazy = move |ctx: &mut BuildCtx| {
-      let node = self.into_node().wrap_root(f);
-      Widget(InnerWidget::Node(node))
-    };
-
-    Widget(InnerWidget::Lazy(LazyNode::new(lazy)))
-  }
 }
 
 impl<'w> Node<'w> {
   fn build(self, subtrees: &mut Vec<(WidgetId, Widget<'w>)>) -> WidgetId {
     match self {
-      Node::Leaf(r) => r.alloc(),
+      Node::Leaf(r) => r(),
       Node::Tree { parent, children } => {
-        let p = parent.alloc();
+        let p = parent();
         for c in children.into_iter().rev() {
           subtrees.push((p, c))
         }
@@ -322,23 +288,24 @@ impl<'w> Node<'w> {
 
   fn into_widget(self) -> Widget<'w> { Widget(InnerWidget::Node(self)) }
 
-  fn wrap_root(self, f: impl FnOnce(PureNode<'w>) -> PureNode<'w>) -> Self {
+  fn on_build(self, f: impl FnOnce(WidgetId) + 'w) -> Self {
+    let on_build_node = |node: Box<dyn FnOnce() -> WidgetId + 'w>| {
+      let new_node = move || {
+        let id = node();
+        f(id);
+        id
+      };
+      Box::new(new_node)
+    };
+
     match self {
-      Node::Leaf(n) => Node::Leaf(f(n)),
-      Node::Tree { parent, children } => Node::Tree { parent: f(parent), children },
+      Node::Leaf(n) => Node::Leaf(on_build_node(n)),
+      Node::Tree { parent, children } => Node::Tree { parent: on_build_node(parent), children },
     }
   }
 }
 
-impl<'w> PureNode<'w> {
-  fn alloc(self) -> WidgetId {
-    match self {
-      PureNode::Render(r) => BuildCtx::get_mut().alloc(r),
-      PureNode::LazyBuild(l) => l(),
-    }
-  }
-}
-impl<F: FnMut(&mut BuildCtx) -> Widget<'static> + 'static> From<F> for GenWidget {
+impl<F: FnMut() -> Widget<'static> + 'static> From<F> for GenWidget {
   #[inline]
   fn from(f: F) -> Self { Self::new(f) }
 }

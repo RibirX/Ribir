@@ -74,9 +74,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = TestWindow::new(fn_widget! {
-      widget.clone()(ctx!())
-    });
+    let mut wnd = TestWindow::new(move || widget.clone().into_widget());
 
     let test_text_case = "123";
     wnd.draw_frame();

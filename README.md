@@ -70,7 +70,7 @@ fn main() {
 use ribir::prelude::*;
 
 fn main() {
-  let counter = |_: &mut BuildCtx| {
+  let counter = || {
     let cnt = Stateful::new(0);
 
     let c_cnt = cnt.clone_writer();

@@ -26,7 +26,7 @@ type TreeArena = Arena<Box<dyn RenderQueryable>>;
 impl WidgetTree {
   pub fn init(&mut self, wnd: &Window, content: GenWidget) -> WidgetId {
     self.root.0.remove_subtree(&mut self.arena);
-    let _guard = BuildCtx::set_ctx(BuildCtx {
+    let _guard = BuildCtx::init(BuildCtx {
       tree: wnd.tree,
       providers: <_>::default(),
       current_providers: <_>::default(),
