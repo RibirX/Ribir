@@ -3,7 +3,7 @@ use ribir_core::prelude::*;
 use webbrowser::{Browser, open_browser as open};
 
 #[derive(Declare)]
-pub struct Link {
+pub struct UrlLink {
   /// Want to open url
   url: CowArc<str>,
   /// Select the browser software you expect to open
@@ -11,7 +11,7 @@ pub struct Link {
   browser: Browser,
 }
 
-impl<'c> ComposeChild<'c> for Link {
+impl<'c> ComposeChild<'c> for UrlLink {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     FatObj::new(child)

@@ -260,9 +260,9 @@ mod tests {
   }
 
   #[derive(Declare)]
-  struct X;
+  struct XX;
 
-  impl<'c> ComposeChild<'c> for X {
+  impl<'c> ComposeChild<'c> for XX {
     type Child = Widget<'c>;
 
     fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
@@ -277,7 +277,7 @@ mod tests {
   fn pair_compose_child() {
     let _ = |_: &BuildCtx| -> Widget {
       MockBox { size: ZERO_SIZE }
-        .with_child(X.with_child(Void {}))
+        .with_child(XX.with_child(Void {}))
         .into_widget()
     };
   }

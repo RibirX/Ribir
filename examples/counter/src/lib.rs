@@ -2,16 +2,14 @@ use ribir::prelude::*;
 
 pub fn counter() -> Widget<'static> {
   let cnt = Stateful::new(0);
-  let f = fn_widget! {
-    @Row {
-      @FilledButton {
-        on_tap: move |_| *$cnt.write() += 1,
-        @{ Label::new("Inc") }
-      }
-      @H1 { text: pipe!($cnt.to_string()) }
+  row! {
+    @FilledButton {
+      on_tap: move |_| *$cnt.write() += 1,
+      @{ Label::new("Inc") }
     }
-  };
-  f()
+    @H1 { text: pipe!($cnt.to_string()) }
+  }
+  .into_widget()
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen::prelude::wasm_bindgen)]

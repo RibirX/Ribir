@@ -62,6 +62,19 @@ pub struct Row;
 /// A type help to declare flex widget as Vertical.
 pub struct Column;
 
+#[macro_export]
+macro_rules! row {
+  ($($t: tt)*) => { fn_widget! { @Row { $($t)* } } };
+}
+
+#[macro_export]
+macro_rules! column {
+  ($($t: tt)*) => { fn_widget! { @Column { $($t)* } } };
+}
+
+pub use column;
+pub use row;
+
 impl Declare for Row {
   type Builder = FlexDeclarer;
   fn declarer() -> Self::Builder { Flex::declarer().direction(Direction::Horizontal) }
