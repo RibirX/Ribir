@@ -27,6 +27,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
+- **macros**: Every widget that derives `Declare` will automatically implement a macro with the same name to declare a function widget using it as the root widget. (#651 @M-Adoo)
 - **core**: Added the smooth widgets for transitioning the layout position and size. (#645 @M-Adoo)
 - **widgets**: Added three widgets `FractionallyWidthBox`, `FractionallyHeightBox`, and `FractionallySizedBox` to enable fractional sizing of widgets. (#647 @M-Adoo)
 - **widgets**: Add widget of radio button (#649 @wjian23)

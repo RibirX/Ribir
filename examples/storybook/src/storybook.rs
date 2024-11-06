@@ -218,7 +218,7 @@ fn content() -> Widget<'static> {
         margin: EdgeInsets::all(20.),
         @Lists {
           margin: EdgeInsets::only_top(20.),
-          @Link {
+          @UrlLink {
             url: "https://ribir.org",
             @ListItem {
               @Leading(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))

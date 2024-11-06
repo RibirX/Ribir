@@ -80,7 +80,7 @@ fn button_demo(ctx: &BuildCtx) {
 首先，我们来看一下 `FillButton` 的完整定义：
 
 ```rust
-use ribir::prelude::*;
+use ribir::core::prelude::*;
 
 #[derive(Declare, Default)]
 pub struct FilledButton {

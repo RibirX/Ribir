@@ -80,7 +80,7 @@ In the previous example, we used a method similar to the Builder pattern to crea
 First, let's look at the complete definition of `FillButton`:
 
 ```rust
-use ribir::prelude::*;
+use ribir::core::prelude::*;
 
 #[derive(Declare, Default)]
 pub struct FilledButton {

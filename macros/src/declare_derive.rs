@@ -1,3 +1,4 @@
+use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{Fields, Ident, Visibility, spanned::Spanned};
@@ -14,25 +15,24 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   let syn::DeriveInput { vis, ident: host, generics, data, .. } = input;
   let stt = data_struct_unwrap(data, DECLARE)?;
 
-  if stt.fields.is_empty() {
-    return empty_impl(host, &stt.fields);
-  }
+  let mut tokens = if stt.fields.is_empty() {
+    empty_impl(host, &stt.fields)
+  } else {
+    let declarer = Declarer::new(host, &mut stt.fields)?;
+    let Declarer { name, fields, .. } = &declarer;
+    // reverse name check.
+    fields
+      .iter()
+      .try_for_each(DeclareField::check_reserve)?;
+    let set_methods = declarer_set_methods(fields, vis);
 
-  let declarer = Declarer::new(host, &mut stt.fields)?;
-  let Declarer { name, fields, .. } = &declarer;
-  // reverse name check.
-  fields
-    .iter()
-    .try_for_each(DeclareField::check_reserve)?;
-  let set_methods = declarer_set_methods(fields, vis);
+    let field_names = declarer.fields.iter().map(DeclareField::member);
+    let field_names2 = field_names.clone();
 
-  let field_names = declarer.fields.iter().map(DeclareField::member);
-  let field_names2 = field_names.clone();
-
-  let (builder_f_names, builder_f_tys) = declarer.declare_names_tys();
-  let field_values = field_values(&declarer.fields, host);
-  let (g_impl, g_ty, g_where) = generics.split_for_impl();
-  let tokens = quote! {
+    let (builder_f_names, builder_f_tys) = declarer.declare_names_tys();
+    let field_values = field_values(&declarer.fields, host);
+    let (g_impl, g_ty, g_where) = generics.split_for_impl();
+    quote! {
       #vis struct #name #generics #g_where {
         #(
           #[allow(clippy::type_complexity)]
@@ -540,9 +540,36 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
       }
+    }
   };
 
+  widget_macro_to_tokens(host, vis, &mut tokens);
+
   Ok(tokens)
+}
+
+fn widget_macro_to_tokens(name: &Ident, vis: &Visibility, tokens: &mut TokenStream) {
+  let macro_name = name.to_string().to_snake_case();
+  let doc =
+    format!("Macro used to generate a function widget using `{}` as the root widget.", macro_name);
+  let macro_name = Ident::new(&macro_name, name.span());
+  let export_attr = if matches!(vis, Visibility::Public(_)) {
+    quote! { #[macro_export] }
+  } else {
+    quote! { #[allow(unused_macros)] }
+  };
+  tokens.extend(quote! {
+    #[allow(unused_macros)]
+    #export_attr
+    #[doc = #doc]
+    macro_rules! #macro_name {
+      ($($t: tt)*) => {
+        fn_widget! { @ #name { $($t)* } }
+      };
+    }
+    #[allow(unused_imports)]
+    #vis use #macro_name;
+  })
 }
 
 fn declarer_set_methods<'a>(
@@ -644,17 +671,16 @@ To avoid name conflicts during declaration, use the `rename` meta, like so:
   }
 }
 
-fn empty_impl(name: &Ident, fields: &Fields) -> syn::Result<TokenStream> {
+fn empty_impl(name: &Ident, fields: &Fields) -> TokenStream {
   let construct = match fields {
     Fields::Named(_) => quote!(#name {}),
     Fields::Unnamed(_) => quote!(#name()),
     Fields::Unit => quote!(#name),
   };
-  let tokens = quote! {
+  quote! {
     impl Declare for #name  {
       type Builder = FatObj<#name>;
       fn declarer() -> Self::Builder { FatObj::new(#construct) }
     }
-  };
-  Ok(tokens)
+  }
 }

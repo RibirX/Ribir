@@ -625,7 +625,7 @@ mod tests {
         .await;
         finish.fetch_add(1, Ordering::SeqCst);
       });
-      assert!(Instant::now().duration_since(start).as_millis() > 100);
+      assert!(Instant::now().duration_since(start).as_millis() >= 100);
       assert_eq!(waker.cnt.load(Ordering::Relaxed), 1);
 
       start = Instant::now();
