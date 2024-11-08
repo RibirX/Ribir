@@ -16,14 +16,23 @@ pub struct Expanded {
 impl<'c> ComposeChild<'c> for Expanded {
   type Child = Widget<'c>;
   #[inline]
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    child.try_unwrap_state_and_attach(this)
+  fn compose_child(this: impl StateWriter<Value = Self>, mut child: Self::Child) -> Widget<'c> {
+    let data: Box<dyn Query> = match this.try_into_value() {
+      Ok(this) => Box::new(Queryable(this)),
+      Err(this) => {
+        let modifies = this.raw_modifies();
+        child = child.on_build(|id| id.dirty_on(modifies));
+        Box::new(this)
+      }
+    };
+
+    child.attach_data(data)
   }
 }
 
 #[cfg(test)]
 mod tests {
-  use ribir_core::test_helper::*;
+  use ribir_core::{reset_test_env, test_helper::*};
   use ribir_dev_helper::*;
 
   use super::*;
@@ -88,4 +97,31 @@ mod tests {
     LayoutCase::new(&[0, 5]).with_rect(ribir_geom::rect(100., 50., 50., 50.)),
     LayoutCase::new(&[0, 6]).with_rect(ribir_geom::rect(150., 50., 200., 50.))
   );
+
+  #[test]
+  fn modifies_flex() {
+    reset_test_env!();
+
+    let (flex, w_flex) = split_value(1f32);
+    let widget = fn_widget! {
+      let expanded = @Expanded { flex: 1. };
+      watch!(*$flex).subscribe(move |val| $expanded.write().flex = val);
+
+      @Row {
+        @ $expanded { @ { Void } }
+        @Expanded {
+          flex: 1.,
+          @ { Void }
+        }
+        @SizedBox { size: Size::new(100., 100.) }
+      }
+    };
+
+    let mut wnd = TestWindow::new_with_size(widget, Size::new(400., 100.));
+    wnd.draw_frame();
+    LayoutCase::expect_size(&wnd, &[0, 0], Size::new(150., 0.));
+    *w_flex.write() = 2.;
+    wnd.draw_frame();
+    LayoutCase::expect_size(&wnd, &[0, 0], Size::new(200., 0.));
+  }
 }

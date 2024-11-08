@@ -36,7 +36,6 @@ pub trait WrapRender {
     Self: Sized + 'static,
   {
     child.on_build(move |id| {
-      let mut modifies = None;
       let tree = BuildCtx::get_mut().tree_mut();
       id.wrap_node(tree, |r| match this.try_into_value() {
         Ok(this) => Box::new(RenderPair { wrapper: Box::new(this), host: r }),
@@ -44,16 +43,13 @@ pub trait WrapRender {
           let reader = match this.into_reader() {
             Ok(r) => r,
             Err(s) => {
-              modifies = Some(s.raw_modifies());
+              id.dirty_on(s.raw_modifies());
               s.clone_reader()
             }
           };
           Box::new(RenderPair { wrapper: Box::new(reader), host: r })
         }
       });
-      if let Some(modifies) = modifies {
-        id.dirty_subscribe(modifies, tree);
-      }
     })
   }
 }
