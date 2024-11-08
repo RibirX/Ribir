@@ -29,7 +29,7 @@ impl<'c> ComposeChild<'c> for KeepAlive {
     let modifies = this.raw_modifies();
     child
       .try_unwrap_state_and_attach(this)
-      .on_build(|id| id.dirty_subscribe(modifies, BuildCtx::get_mut().tree_mut()))
+      .on_build(|id| id.dirty_on(modifies))
   }
 }
 

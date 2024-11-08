@@ -191,7 +191,7 @@ impl<'w> Widget<'w> {
     self.on_build(|id| id.attach_anonymous_data(data, BuildCtx::get_mut().tree_mut()))
   }
 
-  pub(crate) fn attach_data(self, data: Box<dyn Query>) -> Self {
+  pub fn attach_data(self, data: Box<dyn Query>) -> Self {
     self.on_build(|id| id.attach_data(data, BuildCtx::get_mut().tree_mut()))
   }
 

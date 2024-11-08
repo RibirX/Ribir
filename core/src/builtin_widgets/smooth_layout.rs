@@ -101,7 +101,7 @@ macro_rules! smooth_size_widget_impl {
         fn_widget!{
           let modifies = this.read().0.raw_modifies();
           WrapRender::combine_child(this, child)
-            .on_build(move |id, | id.dirty_subscribe(modifies, BuildCtx::get_mut().tree_mut()) )
+            .on_build(move |id, | id.dirty_on(modifies) )
         }.into_widget()
       }
     }

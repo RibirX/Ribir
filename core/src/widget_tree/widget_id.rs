@@ -35,11 +35,14 @@ impl WidgetId {
     tree.arena.get(self.0).map(|n| &**n.get())
   }
 
-  /// Subscribe the modifies `upstream` to mark the widget dirty when the
-  /// `upstream` emit a modify event that contains `ModifyScope::FRAMEWORK`.
-  pub(crate) fn dirty_subscribe(
-    self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>, tree: &mut WidgetTree,
-  ) {
+  /// Subscribe to the modified `upstream` to mark the widget as dirty when the
+  /// `upstream` emits a modify event containing `ModifyScope::FRAMEWORK`.
+  ///
+  /// # Panic
+  /// This method only works within a build process; otherwise, it will
+  /// result in a panic.
+  pub fn dirty_on(self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>) {
+    let tree = BuildCtx::get_mut().tree_mut();
     let dirty_set = tree.dirty_set.clone();
     let h = upstream
       .filter(|b| b.contains(ModifyScope::FRAMEWORK))
