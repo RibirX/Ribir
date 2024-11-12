@@ -12,6 +12,8 @@ mod animate_state;
 pub use animate_state::*;
 mod stagger;
 pub use stagger::Stagger;
+mod keyframes;
+pub use keyframes::*;
 
 ///  Trait to describe how to control the animation.
 pub trait Animation {
