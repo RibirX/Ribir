@@ -25,6 +25,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: The `keyframes!` macro has been introduced to manage the intermediate steps of animation states. (#653 @M-Adoo)
+
+
 ## [0.4.0-alpha.15] - 2024-11-13
 
 ### Features
