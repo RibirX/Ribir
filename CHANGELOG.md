@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.15] - 2024-11-13
+
 ### Features
 
 - **macros**: Every widget that derives `Declare` will automatically implement a macro with the same name to declare a function widget using it as the root widget. (#651 @M-Adoo)
@@ -484,7 +486,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.14...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.15...HEAD
+[0.4.0-alpha.15]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.14...ribir-v0.4.0-alpha.15
 [0.4.0-alpha.14]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.12...ribir-v0.4.0-alpha.14
 [0.4.0-alpha.12]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.11...ribir-v0.4.0-alpha.12
 [0.4.0-alpha.11]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.10...ribir-v0.4.0-alpha.11
