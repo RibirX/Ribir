@@ -235,14 +235,12 @@ pub(crate) struct Root;
 
 impl Render for Root {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let mut size = ZERO_SIZE;
     let (ctx, children) = ctx.split_children();
     for c in children {
-      let child_size = ctx.perform_child_layout(c, clamp);
-      size = size.max(child_size);
+      ctx.perform_child_layout(c, clamp);
     }
 
-    size
+    clamp.max
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}

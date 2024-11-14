@@ -43,7 +43,8 @@ pub trait Render: 'static {
   /// widget size, and child nodes' size not affect its size.
   fn only_sized_by_parent(&self) -> bool { false }
 
-  /// Determines the set of render widgets located at the given position.
+  /// Verify if the provided position is within this widget and return whether
+  /// its child can be hit if the widget itself is not hit.
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { ctx.box_hit_test(pos) }
 
   fn get_transform(&self) -> Option<Transform> { None }
