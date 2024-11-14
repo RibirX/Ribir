@@ -677,7 +677,7 @@ mod tests {
   }
 
   #[test]
-  fn fix_align_test() {
+  fn fix_align_hit_test() {
     reset_test_env!();
     let (expect_hit, w_hit) = split_value(None);
     let mut wnd = TestWindow::new_with_size(
@@ -694,6 +694,28 @@ mod tests {
     wnd.draw_frame();
     let mut dispatcher = wnd.dispatcher.borrow_mut();
     dispatcher.info.cursor_pos = Point::new(250., 250.);
+    assert!(expect_hit.read().is_some());
+    assert_eq!(dispatcher.hit_widget(), *expect_hit.read());
+  }
+
+  #[test]
+  fn fix_transform_hit() {
+    reset_test_env!();
+    let (expect_hit, w_hit) = split_value(None);
+    let mut wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @MockBox {
+          anchor: Point::new(50., 50.),
+          transform: Transform::rotation(Angle::degrees(45.)),
+          size: Size::new(100., 100.),
+          on_mounted: move |ctx| *$w_hit.write() = Some(ctx.id),
+        }
+      },
+      Size::new(500., 500.),
+    );
+    wnd.draw_frame();
+    let mut dispatcher = wnd.dispatcher.borrow_mut();
+    dispatcher.info.cursor_pos = Point::new(51., 51.);
     assert!(expect_hit.read().is_some());
     assert_eq!(dispatcher.hit_widget(), *expect_hit.read());
   }
