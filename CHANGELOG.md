@@ -31,7 +31,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Fixed
 
-- **core**: The size of the `Root` container is too small, which could lead to potential missed hits. (#pr @M-Adoo)
+- **core**: The size of the `Root` container is too small, which could lead to potential missed hits. (#654 @M-Adoo)
+- **core**: The hit test for the `TransformWidget` is not applied at the correct position. (#654 @M-Adoo)
 
 
 ## [0.4.0-alpha.15] - 2024-11-13
