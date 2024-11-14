@@ -23,10 +23,6 @@ impl BuildCtx {
   /// Return the window of this context is created from.
   pub fn window(&self) -> Sc<Window> { self.tree().window() }
 
-  pub fn provider_handle(&self) -> ProviderHandle {
-    ProviderHandle { wnd_id: self.window().id(), widget: *self.providers.last().unwrap() }
-  }
-
   pub(crate) fn tree(&self) -> &WidgetTree {
     // Safety: Please refer to the comments in `WidgetTree::tree_mut` for more
     // information.
