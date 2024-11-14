@@ -675,4 +675,26 @@ mod tests {
     let hit_1 = dispatcher.hit_widget();
     assert_eq!(hit_1, data.read().wid1);
   }
+
+  #[test]
+  fn fix_align_test() {
+    reset_test_env!();
+    let (expect_hit, w_hit) = split_value(None);
+    let mut wnd = TestWindow::new_with_size(
+      fn_widget! {
+        @MockBox {
+          h_align: HAlign::Center,
+          v_align: VAlign::Center,
+          size: Size::new(100., 100.),
+          on_mounted: move |ctx| *$w_hit.write() = Some(ctx.id),
+        }
+      },
+      Size::new(500., 500.),
+    );
+    wnd.draw_frame();
+    let mut dispatcher = wnd.dispatcher.borrow_mut();
+    dispatcher.info.cursor_pos = Point::new(250., 250.);
+    assert!(expect_hit.read().is_some());
+    assert_eq!(dispatcher.hit_widget(), *expect_hit.read());
+  }
 }

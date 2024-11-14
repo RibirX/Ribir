@@ -29,6 +29,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: The `keyframes!` macro has been introduced to manage the intermediate steps of animation states. (#653 @M-Adoo)
 
+### Fixed
+
+- **core**: The size of the `Root` container is too small, which could lead to potential missed hits. (#pr @M-Adoo)
+
 
 ## [0.4.0-alpha.15] - 2024-11-13
 

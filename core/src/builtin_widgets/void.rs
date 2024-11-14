@@ -16,10 +16,6 @@ impl Render for Void {
   }
 
   fn paint(&self, _: &mut PaintingCtx) {}
-
-  fn hit_test(&self, _: &HitTestCtx, _: Point) -> HitTest {
-    HitTest { hit: false, can_hit_child: true }
-  }
 }
 
 impl<'c> ComposeChild<'c> for Void {
