@@ -1,6 +1,6 @@
 use smallvec::SmallVec;
 
-use crate::{prelude::*, window::WindowId};
+use crate::prelude::*;
 
 /// This widget enables its descendants to access the data it provides,
 /// streamlining data sharing throughout the widget tree.
@@ -107,12 +107,6 @@ impl Provider {
   }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct ProviderHandle {
-  pub(crate) widget: WidgetId,
-  pub(crate) wnd_id: WindowId,
-}
-
 impl<'c> ComposeChild<'c> for Provider {
   type Child = FnWidget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
@@ -209,42 +203,6 @@ impl<T: Deref<Target: WidgetCtxImpl>> ProviderCtx for T {
       .id()
       .ancestors(tree)
       .filter_map(|id| id.query_write(tree))
-  }
-}
-
-impl ProviderCtx for ProviderHandle {
-  fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
-    AppCtx::get_window(self.wnd_id)
-      .into_iter()
-      .flat_map(|wnd| {
-        BuildCtx::try_get()
-          .into_iter()
-          .flat_map(|ctx| ctx.current_providers::<Q>())
-          .chain({
-            let tree = unsafe { wnd.tree.as_ref() };
-            self
-              .widget
-              .ancestors(tree)
-              .filter_map(|id| id.query_ref(tree))
-          })
-      })
-  }
-
-  fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
-    AppCtx::get_window(self.wnd_id)
-      .into_iter()
-      .flat_map(|wnd| {
-        BuildCtx::try_get()
-          .into_iter()
-          .flat_map(|ctx| ctx.current_write_providers::<Q>())
-          .chain({
-            let tree = unsafe { wnd.tree.as_ref() };
-            self
-              .widget
-              .ancestors(tree)
-              .filter_map(|id| id.query_write(tree))
-          })
-      })
   }
 }
 
