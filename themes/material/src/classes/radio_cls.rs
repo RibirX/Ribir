@@ -1,37 +1,30 @@
 use ribir_core::prelude::*;
 use ribir_widgets::prelude::*;
 
-use crate::InteractiveLayer;
-
-const TOTAL_SIZE: f32 = 40.;
-const CONTAINER_SIZE: f32 = 20.;
-const INDICATOR_SIZE: f32 = 10.;
-const BORDER_SIZE: f32 = 2.;
+use crate::{InteractiveLayer, md};
 
 pub(super) fn init(classes: &mut Classes) {
   classes.insert(RADIO_SELECTED, |_w| {
     fn_widget! {
-      let ctx = BuildCtx::get();
+      let primary = Palette::of(BuildCtx::get()).primary();
       @InteractiveLayer {
-        border_radii: Radius::all(TOTAL_SIZE / 2.),
-        color: Palette::of(ctx).primary(),
+        border_radii: md::RADIUS_20,
+        color: primary,
         @Container {
-          size: Size::new(TOTAL_SIZE, TOTAL_SIZE),
+          size: md::SIZE_40,
           cursor: CursorIcon::Pointer,
           @Container {
             h_align: HAlign::Center,
             v_align: VAlign::Center,
-            size: Size::new(CONTAINER_SIZE, CONTAINER_SIZE),
-            border_radius: Radius::all(CONTAINER_SIZE / 2.),
-            border: Border::all(
-              BorderSide::new(BORDER_SIZE, Palette::of(ctx).primary().into())
-            ),
+            size: md::SIZE_20,
+            border_radius: md::RADIUS_10,
+            border: md::border_primary_2(),
             @Container {
               v_align: VAlign::Center,
               h_align: HAlign::Center,
-              size: Size::new(INDICATOR_SIZE, INDICATOR_SIZE),
-              border_radius: Radius::all(INDICATOR_SIZE / 2.),
-              background: Palette::of(ctx).primary(),
+              size: md::SIZE_10,
+              border_radius: md::RADIUS_5,
+              background: primary,
             }
           }
         }
@@ -44,19 +37,17 @@ pub(super) fn init(classes: &mut Classes) {
     fn_widget! {
       let ctx = BuildCtx::get();
       @InteractiveLayer {
-        border_radii: Radius::all(TOTAL_SIZE / 2.),
+        border_radii: md::RADIUS_20,
         color: Palette::of(ctx).primary(),
         @Container {
           cursor: CursorIcon::Pointer,
-          size: Size::new(TOTAL_SIZE, TOTAL_SIZE),
+          size: md::SIZE_40,
           @Container {
             h_align: HAlign::Center,
             v_align: VAlign::Center,
-            size: Size::new(CONTAINER_SIZE, CONTAINER_SIZE),
-            border_radius: Radius::all(CONTAINER_SIZE / 2.),
-            border: Border::all(
-              BorderSide::new(BORDER_SIZE, Palette::of(ctx).on_surface_variant().into())
-            ),
+            size: md::SIZE_20,
+            border_radius: md::RADIUS_10,
+            border: md::border_on_surface_variant_2(),
           }
         }
       }

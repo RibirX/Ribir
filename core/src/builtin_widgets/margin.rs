@@ -48,44 +48,49 @@ impl Margin {
 }
 
 impl EdgeInsets {
-  #[inline]
-  pub fn all(value: f32) -> Self { Self { top: value, right: value, bottom: value, left: value } }
+  pub const ZERO: Self = Self { top: 0., right: 0., bottom: 0., left: 0. };
 
-  pub fn new(top: f32, right: f32, bottom: f32, left: f32) -> Self {
+  #[inline]
+  pub const fn all(value: f32) -> Self { Self::new(value, value, value, value) }
+
+  #[inline]
+  pub const fn new(top: f32, right: f32, bottom: f32, left: f32) -> Self {
     Self { top, right, bottom, left }
   }
 
   #[inline]
-  pub fn only_left(left: f32) -> Self { Self { left, ..Default::default() } }
+  pub const fn only_left(left: f32) -> Self { Self { left, ..Self::ZERO } }
 
   #[inline]
-  pub fn only_right(right: f32) -> Self { Self { right, ..Default::default() } }
+  pub const fn only_right(right: f32) -> Self { Self { right, ..Self::ZERO } }
   #[inline]
-  pub fn only_bottom(bottom: f32) -> Self { Self { bottom, ..Default::default() } }
+  pub const fn only_bottom(bottom: f32) -> Self { Self { bottom, ..Self::ZERO } }
 
   #[inline]
-  pub fn only_top(top: f32) -> Self { Self { top, ..Default::default() } }
+  pub const fn only_top(top: f32) -> Self { Self { top, ..Self::ZERO } }
 
   #[inline]
-  pub fn symmetrical(vertical: f32, horizontal: f32) -> Self {
+  pub const fn symmetrical(vertical: f32, horizontal: f32) -> Self {
     Self { top: vertical, bottom: vertical, left: horizontal, right: horizontal }
   }
 
   #[inline]
-  pub fn vertical(vertical: f32) -> Self {
-    Self { top: vertical, bottom: vertical, ..Default::default() }
+  pub const fn vertical(vertical: f32) -> Self {
+    Self { top: vertical, bottom: vertical, ..Self::ZERO }
   }
 
   #[inline]
-  pub fn horizontal(horizontal: f32) -> Self {
-    Self { left: horizontal, right: horizontal, ..Default::default() }
+  pub const fn horizontal(horizontal: f32) -> Self {
+    Self { left: horizontal, right: horizontal, ..Self::ZERO }
   }
 
-  pub fn thickness(&self) -> Size { Size::new(self.right + self.left, self.bottom + self.top) }
+  pub const fn thickness(&self) -> Size {
+    Size::new(self.right + self.left, self.bottom + self.top)
+  }
 
   /// Convert to an array by the top, right, bottom, left order.
   #[inline]
-  pub fn to_array(&self) -> [f32; 4] { [self.top, self.right, self.bottom, self.left] }
+  pub const fn to_array(&self) -> [f32; 4] { [self.top, self.right, self.bottom, self.left] }
 }
 
 impl std::ops::Add for EdgeInsets {

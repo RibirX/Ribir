@@ -3,6 +3,8 @@
 //!
 //! See: https://m3.material.io
 
+use ribir_core::prelude::*;
+
 // The motion variables
 // See https://m3.material.io/styles/motion/overview
 pub mod easing {
@@ -58,4 +60,45 @@ pub mod easing {
     pub const EXR_LONG3: Duration = Duration::from_millis(900);
     pub const EXR_LONG4: Duration = Duration::from_millis(1000);
   }
+}
+
+// These are the constant variables commonly used in the material theme.
+
+pub const RADIUS_5: Radius = Radius::all(5.);
+pub const RADIUS_10: Radius = Radius::all(10.);
+pub const RADIUS_20: Radius = Radius::all(20.);
+
+pub const RADIUS_2: Radius = Radius::all(2.);
+pub const RADIUS_4: Radius = Radius::all(4.);
+pub const RADIUS_8: Radius = Radius::all(8.);
+
+pub const THICKNESS_4: f32 = 4.;
+pub const THICKNESS_8: f32 = 8.;
+
+pub const SIZE_10: Size = Size::new(10., 10.);
+pub const SIZE_20: Size = Size::new(20., 20.);
+pub const SIZE_40: Size = Size::new(40., 40.);
+
+pub const SIZE_18: Size = Size::new(18., 18.);
+pub const SIZE_24: Size = Size::new(24., 24.);
+pub const SIZE_36: Size = Size::new(36., 36.);
+pub const SIZE_48: Size = Size::new(48., 48.);
+pub const SIZE_64: Size = Size::new(64., 64.);
+
+pub const EDGES_4: EdgeInsets = EdgeInsets::all(4.);
+pub const EDGES_HOR_4: EdgeInsets = EdgeInsets::horizontal(4.);
+pub const EDGES_VER_4: EdgeInsets = EdgeInsets::vertical(4.);
+pub const EDGES_LEFT_4: EdgeInsets = EdgeInsets::only_left(4.);
+pub const EDGES_RIGHT_4: EdgeInsets = EdgeInsets::only_right(4.);
+pub const EDGES_TOP_4: EdgeInsets = EdgeInsets::only_top(4.);
+pub const EDGES_BOTTOM_4: EdgeInsets = EdgeInsets::only_bottom(4.);
+
+// Borders
+pub fn border_primary_2() -> Border {
+  let primary = Palette::of(BuildCtx::get()).primary();
+  Border::all(BorderSide::new(2., primary.into()))
+}
+pub fn border_on_surface_variant_2() -> Border {
+  let surface_variant = Palette::of(BuildCtx::get()).on_surface_variant();
+  Border::all(BorderSide::new(2., surface_variant.into()))
 }

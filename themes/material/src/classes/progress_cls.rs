@@ -4,11 +4,6 @@ use ribir_widgets::prelude::*;
 
 use crate::md;
 
-const LINEAR_RADIUS: Radius = Radius::all(2.);
-const LINEAR_THICKNESS: f32 = 4.;
-const SPINNER_SIZE: Size = Size::new(48., 48.);
-const CIRCLE_THICKNESS: f32 = 4.;
-
 const DETERMINATE_TRANS: EasingTransition<CubicBezierEasing> = EasingTransition {
   easing: md::easing::EMPHASIZED_DECELERATE,
   duration: md::easing::duration::LONG4,
@@ -22,9 +17,9 @@ fn indeterminate_trans() -> Box<dyn Transition> {
 
 class_names! {
   MD_BASE_LINEAR_INDICATOR,
-MD_BASE_SPINNER,
-MD_BASE_SPINNER_INDICATOR,
-MD_BASE_SPINNER_TRACK
+  MD_BASE_SPINNER,
+  MD_BASE_SPINNER_INDICATOR,
+  MD_BASE_SPINNER_TRACK
 }
 
 fn lerp_angle(from: &Angle, to: &Angle, rate: f32) -> Angle {
@@ -34,12 +29,12 @@ fn lerp_angle(from: &Angle, to: &Angle, rate: f32) -> Angle {
 pub(super) fn init(classes: &mut Classes) {
   classes.insert(MD_BASE_LINEAR_INDICATOR, style_class! {
     background: Palette::of(BuildCtx::get()).primary(),
-    border_radius: LINEAR_RADIUS,
+    border_radius: md::RADIUS_2,
   });
   classes.insert(MD_BASE_SPINNER, style_class! {
-    clamp: BoxClamp::fixed_size(SPINNER_SIZE),
+    clamp: BoxClamp::fixed_size(md::SIZE_48),
     painting_style: PaintingStyle::Stroke(StrokeOptions {
-      width: CIRCLE_THICKNESS,
+      width: md::THICKNESS_4,
       line_cap: LineCap::Round,
       ..Default::default()
     }),
@@ -54,12 +49,12 @@ pub(super) fn init(classes: &mut Classes) {
   });
   classes.insert(LINEAR_INDETERMINATE_TRACK, style_class! {
     background: Palette::of(BuildCtx::get()).secondary_container(),
-    border_radius: LINEAR_RADIUS,
-    margin: EdgeInsets::only_left(4.),
+    border_radius: md::RADIUS_2,
+    margin: md::EDGES_LEFT_4,
   });
   classes.insert(LINEAR_PROGRESS, style_class! {
-    margin: EdgeInsets::horizontal(4.),
-    clamp: BoxClamp::EXPAND_X.with_fixed_height(LINEAR_THICKNESS)
+    margin: md::EDGES_HOR_4,
+    clamp: BoxClamp::EXPAND_X.with_fixed_height(md::THICKNESS_4)
   });
   classes.insert(LINEAR_DETERMINATE_TRACK, |w| {
     let w = FatObj::new(w);
@@ -70,7 +65,7 @@ pub(super) fn init(classes: &mut Classes) {
       @Container {
         h_align: HAlign::Right,
         class: MD_BASE_LINEAR_INDICATOR,
-        size: Size::new(LINEAR_THICKNESS, LINEAR_THICKNESS),
+        size: Size::new(md::THICKNESS_4, md::THICKNESS_4),
       }
     }
     .into_widget()
@@ -155,7 +150,7 @@ pub(super) fn init(classes: &mut Classes) {
         .transition(DETERMINATE_TRANS);
       LerpFnState::new(part_writer!(&mut track.start), lerp_angle)
         .transition(DETERMINATE_TRANS);
-      let center = SPINNER_SIZE / 2.;
+      let center = md::SIZE_48 / 2.;
       @Stack {
         transform: Transform::translation(-center.width, -center.height)
           .then_rotate(margin_angle / 2.)

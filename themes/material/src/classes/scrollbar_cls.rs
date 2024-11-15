@@ -3,9 +3,7 @@ use ribir_widgets::prelude::*;
 
 use crate::md;
 
-const THICKNESS: f32 = 8.;
 const THUMB_MIN_SIZE: f32 = 12.;
-const RADIUS: Radius = Radius::all(4.);
 
 pub(super) fn init(classes: &mut Classes) {
   // In this theme, the scrollbar is positioned floating on the scroll content
@@ -18,15 +16,15 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(H_SCROLL_THUMB, style_class! {
     background: Palette::of(BuildCtx::get()).primary(),
-    border_radius: RADIUS,
+    border_radius: md::RADIUS_4,
     margin: EdgeInsets::vertical(1.),
-    clamp: BoxClamp::min_width(THUMB_MIN_SIZE).with_fixed_height(THICKNESS)
+    clamp: BoxClamp::min_width(THUMB_MIN_SIZE).with_fixed_height(md::THICKNESS_8)
   });
   classes.insert(V_SCROLL_THUMB, style_class! {
     background: Palette::of(BuildCtx::get()).primary(),
-    border_radius: RADIUS,
+    border_radius: md::RADIUS_4,
     margin: EdgeInsets::horizontal(1.),
-    clamp: BoxClamp::min_height(THUMB_MIN_SIZE).with_fixed_width(THICKNESS)
+    clamp: BoxClamp::min_height(THUMB_MIN_SIZE).with_fixed_width(md::THICKNESS_8)
   });
 
   const H_TRACK: ClassImpl = style_class! {
