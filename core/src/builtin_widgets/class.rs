@@ -217,7 +217,8 @@ impl ClassChild {
     // Extract the child from this node, retaining only the external information
     // linked from the parent to create a clean context for applying the class.
     let child_node = self.take_inner();
-    let new_id = class.apply_style(Widget::from_id(n_orig)).build();
+    let mut new_id = class.apply_style(Widget::from_id(n_orig)).build();
+
     // Place the inner child node within the old ID for disposal, then utilize the
     // class node to wrap the new child in the new ID.
     // This action should be taken before modifying the `orig_id`, as the `orig_id`
@@ -227,8 +228,14 @@ impl ClassChild {
     // Retain the original widget ID.
     let [new, old] = tree.get_many_mut(&[n_orig, *orig_id]);
     std::mem::swap(new, old);
-    n_orig.insert_after(*orig_id, tree);
-    n_orig.dispose_subtree(tree);
+    if new_id == n_orig {
+      // If applying the class does not generate additional widgets, the original
+      // widget ID will include all new elements after the swap.
+      new_id = *orig_id;
+    } else {
+      n_orig.insert_after(*orig_id, tree);
+      n_orig.dispose_subtree(tree);
+    }
 
     new_id.wrap_node(tree, |node| {
       *child = node;
@@ -344,7 +351,7 @@ mod tests {
     reset_test_env,
     test_helper::{MockBox, MockMulti, TestWindow, split_value},
   };
-  class_names!(MARGIN, BOX_200, EMPTY);
+  class_names!(MARGIN, BOX_200, CLAMP_50, EMPTY);
 
   fn initd_classes() -> Classes {
     let mut classes = Classes::default();
@@ -357,6 +364,9 @@ mod tests {
         }
       }
       .into_widget()
+    });
+    classes.insert(CLAMP_50, style_class! {
+      clamp: BoxClamp::fixed_size(Size::new(50., 50.))
     });
     classes
   }
@@ -505,5 +515,28 @@ mod tests {
     *w_cls.write() = BOX_200;
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(200., 200.));
+  }
+
+  #[test]
+  fn fix_style_class_switch() {
+    reset_test_env!();
+
+    let (cls, w_cls) = split_value(EMPTY);
+    let mut wnd = TestWindow::new(fn_widget! {
+      let cls = cls.clone_watcher();
+      initd_classes().with_child(fn_widget! {
+        @Container {
+          size: Size::new(100., 100.),
+          class: pipe!(*$cls),
+        }
+      })
+    });
+
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(100., 100.));
+
+    *w_cls.write() = CLAMP_50;
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(50., 50.));
   }
 }
