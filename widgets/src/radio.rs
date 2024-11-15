@@ -14,16 +14,12 @@ pub struct Radio {
 
 impl Compose for Radio {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    fn_widget! {
-      @ pipe!($this.checked).map(move |checked| {
-        fn_widget! {
-          let class = match checked {
-            true => RADIO_SELECTED,
-            false => RADIO_UNSELECTED,
-          };
-          @ Void { class: class }
-        }
-      })
+    pipe! {
+      let class = match $this.checked {
+        true => RADIO_SELECTED,
+        false => RADIO_UNSELECTED,
+      };
+      @ Void { class: class }
     }
     .into_widget()
   }

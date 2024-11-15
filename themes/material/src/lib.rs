@@ -83,17 +83,11 @@ const AVATAR_SIZE: f32 = 40.;
 const AVATAR_RADIUS: f32 = 20.;
 const LIST_IMAGE_ITEM_SIZE: f32 = 56.;
 
-const ICON_TINY: Size = Size::new(18., 18.);
-const ICON_SMALL: Size = Size::new(24., 24.);
-const ICON_MEDIUM: Size = Size::new(36., 36.);
-const ICON_LARGE: Size = Size::new(48., 48.);
-const ICON_HUGE: Size = Size::new(64., 64.);
-
 fn init_custom_style(theme: &mut Theme) {
   theme
     .custom_styles
     .set_custom_style(CheckBoxStyle {
-      icon_size: ICON_SMALL,
+      icon_size: md::SIZE_24,
       label_style: theme.typography_theme.body_large.text.clone(),
       label_color: theme.palette.on_surface().into(),
     });
@@ -110,7 +104,7 @@ fn init_custom_style(theme: &mut Theme) {
     .custom_styles
     .set_custom_style(FilledButtonStyle {
       height: 40.,
-      icon_size: ICON_TINY,
+      icon_size: md::SIZE_18,
       label_gap: LABEL_GAP,
       icon_pos: IconPosition::Before,
       label_style: theme.typography_theme.label_large.text.clone(),
@@ -121,7 +115,7 @@ fn init_custom_style(theme: &mut Theme) {
     .custom_styles
     .set_custom_style(OutlinedButtonStyle {
       height: 40.,
-      icon_size: ICON_TINY,
+      icon_size: md::SIZE_18,
       label_gap: LABEL_GAP,
       icon_pos: IconPosition::Before,
       label_style: theme.typography_theme.label_large.text.clone(),
@@ -131,7 +125,7 @@ fn init_custom_style(theme: &mut Theme) {
     });
   theme.custom_styles.set_custom_style(ButtonStyle {
     height: 40.,
-    icon_size: ICON_TINY,
+    icon_size: md::SIZE_18,
     label_gap: LABEL_GAP,
     icon_pos: IconPosition::Before,
     label_style: theme.typography_theme.label_large.text.clone(),
@@ -141,7 +135,7 @@ fn init_custom_style(theme: &mut Theme) {
     .custom_styles
     .set_custom_style(FabButtonStyle {
       height: 56.,
-      icon_size: ICON_SMALL,
+      icon_size: md::SIZE_24,
       label_gap: LABEL_GAP,
       icon_pos: IconPosition::Before,
       label_style: theme.typography_theme.label_large.text.clone(),
@@ -175,7 +169,7 @@ fn init_custom_style(theme: &mut Theme) {
       headline_style: theme.typography_theme.body_large.text.clone(),
       supporting_style: theme.typography_theme.body_medium.text.clone(),
       leading_config: EdgeWidgetStyle {
-        icon: EdgeItemStyle { size: ICON_SMALL, gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)) },
+        icon: EdgeItemStyle { size: md::SIZE_24, gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)) },
         text: EdgeTextItemStyle {
           style: theme.typography_theme.label_small.text.clone(),
           foreground: theme.palette.on_surface_variant().into(),
@@ -196,7 +190,7 @@ fn init_custom_style(theme: &mut Theme) {
         },
       },
       trailing_config: EdgeWidgetStyle {
-        icon: EdgeItemStyle { size: ICON_SMALL, gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)) },
+        icon: EdgeItemStyle { size: md::SIZE_24, gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)) },
         text: EdgeTextItemStyle {
           style: theme.typography_theme.label_small.text.clone(),
           foreground: theme.palette.on_surface_variant().into(),
@@ -377,11 +371,11 @@ pub mod purple {
 
 fn icon_theme() -> IconTheme {
   let icon_size = IconSize {
-    tiny: ICON_TINY,
-    small: ICON_SMALL,
-    medium: ICON_MEDIUM,
-    large: ICON_LARGE,
-    huge: ICON_HUGE,
+    tiny: md::SIZE_18,
+    small: md::SIZE_24,
+    medium: md::SIZE_36,
+    large: md::SIZE_48,
+    huge: md::SIZE_64,
   };
   IconTheme::new(icon_size)
 }
