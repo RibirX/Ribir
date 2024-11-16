@@ -97,14 +97,12 @@ impl Provider {
 
   /// Query a reference of type `T` if it was provided by the ancestors.
   #[inline]
-  pub fn of<T: 'static>(ctx: &impl ProviderCtx) -> Option<QueryRef<T>> { ctx.provider_of() }
+  pub fn of<T: 'static>(ctx: &impl ProviderCtx) -> Option<QueryRef<T>> { ctx.of() }
 
   /// Query a write reference of type `T` if the ancestor provided a writer of
   /// type `T`.
   #[inline]
-  pub fn write_of<T: 'static>(ctx: &impl ProviderCtx) -> Option<WriteRef<T>> {
-    ctx.provider_write_of()
-  }
+  pub fn write_of<T: 'static>(ctx: &impl ProviderCtx) -> Option<WriteRef<T>> { ctx.write_of() }
 }
 
 impl<'c> ComposeChild<'c> for Provider {
@@ -135,74 +133,47 @@ impl<'c> ComposeChild<'c> for Provider {
 /// `BuildCtx` and other widget contexts such as `LayoutCtx`, `PaintCtx`, and
 /// event objects.
 pub trait ProviderCtx {
-  fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>>;
-
-  fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>>;
-
-  fn provider_of<Q: 'static>(&self) -> Option<QueryRef<Q>> { self.all_providers().next() }
-
-  fn provider_write_of<Q: 'static>(&self) -> Option<WriteRef<Q>> {
-    self.all_write_providers().next()
-  }
-}
-
-impl BuildCtx {
-  fn current_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
+  fn all_of<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
     self
-      .current_providers
-      .iter()
-      .rev()
+      .all_providers()
       .filter_map(|p| p.query(&QueryId::of::<Q>()))
       .filter_map(QueryHandle::into_ref)
   }
 
-  fn current_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
+  fn all_write_of<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
+    self
+      .all_providers()
+      .filter_map(|p| p.query_write(&QueryId::of::<Q>()))
+      .filter_map(QueryHandle::into_mut)
+  }
+
+  fn of<Q: 'static>(&self) -> Option<QueryRef<Q>> { self.all_of().next() }
+
+  fn write_of<Q: 'static>(&self) -> Option<WriteRef<Q>> { self.all_write_of().next() }
+
+  fn all_providers(&self) -> impl Iterator<Item = &dyn Query>;
+}
+
+impl ProviderCtx for BuildCtx {
+  fn all_providers(&self) -> impl Iterator<Item = &dyn Query> {
     self
       .current_providers
       .iter()
       .rev()
-      .filter_map(|p| p.query_write(&QueryId::of::<Q>()))
-      .filter_map(QueryHandle::into_mut)
-  }
-}
-
-impl ProviderCtx for BuildCtx {
-  fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
-    self.current_providers::<Q>().chain(
-      self
-        .providers
-        .iter()
-        .rev()
-        .filter_map(|id| id.query_ref(self.tree())),
-    )
-  }
-
-  fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
-    self.current_write_providers::<Q>().chain(
-      self
-        .providers
-        .iter()
-        .rev()
-        .filter_map(|id| id.query_write(self.tree())),
-    )
+      .map(|q| &**q)
+      .chain(self.providers.iter().rev().filter_map(|id| {
+        let r = id.assert_get(self.tree());
+        r.queryable().then(|| r.as_query())
+      }))
   }
 }
 
 impl<T: Deref<Target: WidgetCtxImpl>> ProviderCtx for T {
-  fn all_providers<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
-    let tree = self.tree();
-    self
-      .id()
-      .ancestors(tree)
-      .filter_map(|id| id.query_ref(tree))
-  }
-
-  fn all_write_providers<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
-    let tree = self.tree();
-    self
-      .id()
-      .ancestors(tree)
-      .filter_map(|id| id.query_write(tree))
+  fn all_providers(&self) -> impl Iterator<Item = &dyn Query> {
+    self.id().ancestors(self.tree()).filter_map(|id| {
+      let r = id.assert_get(self.tree());
+      r.queryable().then(|| r.as_query())
+    })
   }
 }
 

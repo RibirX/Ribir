@@ -23,10 +23,13 @@ pub(crate) enum PlaceHolder {
 
 pub trait RenderQueryable: Render + Query {
   fn as_render(&self) -> &dyn Render;
+  fn as_query(&self) -> &dyn Query;
 }
 
 impl<T: Render + Query> RenderQueryable for T {
   fn as_render(&self) -> &dyn Render { self }
+
+  fn as_query(&self) -> &dyn Query { self }
 }
 
 impl WidgetId {

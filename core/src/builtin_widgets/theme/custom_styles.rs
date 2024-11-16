@@ -22,7 +22,7 @@ pub trait CustomStyle: Sized + Clone + 'static {
   fn of(ctx: &impl ProviderCtx) -> Self {
     let tid = TypeId::of::<Self>();
     ctx
-      .all_providers::<CustomStyles>()
+      .all_of::<CustomStyles>()
       .find_map(|t| {
         t.themes
           .get(&tid)

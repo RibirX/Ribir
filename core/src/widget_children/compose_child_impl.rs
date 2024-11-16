@@ -181,7 +181,7 @@ where
       let tid = TypeId::of::<W>();
       let ctx = BuildCtx::get();
       let decor = ctx
-        .all_providers::<ComposeDecorators>()
+        .all_of::<ComposeDecorators>()
         .find_map(|t| QueryRef::filter_map(t, |t| t.styles.get(&tid)).ok());
 
       if let Some(style) = decor {
