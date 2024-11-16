@@ -11,14 +11,14 @@ use crate::state::{
 pub trait Query: Any {
   /// Queries all types that match the provided type id, returning their handles
   /// in an inside-to-outside order.
-  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>);
+  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>);
 
   /// Queries the type that matches the provided type id, returning its handle.
   /// This method always returns the outermost type.
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle>;
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle>;
 
   /// Queries the reference of the writer that matches the provided type id.
-  fn query_write(&self, _: TypeId) -> Option<QueryHandle>;
+  fn query_write(&self, _: &QueryId) -> Option<QueryHandle>;
 
   /// Hint this is a non-queryable type.
   fn queryable(&self) -> bool { true }
@@ -40,7 +40,7 @@ pub struct QueryHandle<'a>(InnerHandle<'a>);
 /// A reference to a query result of a data, it's similar to `&T`.
 pub struct QueryRef<'a, T: ?Sized> {
   pub(crate) type_ref: &'a T,
-  pub(crate) data: Option<Box<dyn Any>>,
+  pub(crate) data: Option<Box<dyn QueryAny>>,
 }
 
 impl<'a> QueryHandle<'a> {
@@ -48,13 +48,13 @@ impl<'a> QueryHandle<'a> {
   /// return `None` if the type not match
   pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
     match self.0 {
-      InnerHandle::Ref(r) => r.downcast_ref::<T>(),
+      InnerHandle::Ref(r) => r.q_downcast_ref::<T>(),
       InnerHandle::Owned(ref o) => o
-        .downcast_ref::<ReadRef<'static, dyn Any>>()
-        .and_then(|r| r.downcast_ref::<T>())
+        .q_downcast_ref::<ReadRef<'static, dyn QueryAny>>()
+        .and_then(|r| r.q_downcast_ref::<T>())
         .or_else(|| {
-          o.downcast_ref::<WriteRef<'static, dyn Any>>()
-            .and_then(|w| w.downcast_ref::<T>())
+          o.q_downcast_ref::<WriteRef<'static, dyn QueryAny>>()
+            .and_then(|w| w.q_downcast_ref::<T>())
         }),
     }
   }
@@ -71,43 +71,42 @@ impl<'a> QueryHandle<'a> {
       return None;
     };
 
-    o.downcast_mut::<WriteRef<'static, dyn Any>>()?
-      .downcast_mut::<T>()
+    o.q_downcast_mut::<WriteRef<'static, dyn QueryAny>>()?
+      .q_downcast_mut::<T>()
   }
 
-  pub(crate) fn new(r: &'a dyn Any) -> Self { QueryHandle(InnerHandle::Ref(r)) }
+  pub(crate) fn new(r: &'a dyn QueryAny) -> Self { QueryHandle(InnerHandle::Ref(r)) }
 
-  pub(crate) fn from_read_ref(r: ReadRef<'a, dyn Any>) -> Self {
+  pub(crate) fn from_read_ref(r: ReadRef<'a, dyn QueryAny>) -> Self {
     // Safety: The lifetime is maintained in the return handle and will be shortened
     // once the handle is downcast.
-    let r: ReadRef<'static, dyn Any> = unsafe { std::mem::transmute(r) };
+    let r: ReadRef<'static, dyn QueryAny> = unsafe { std::mem::transmute(r) };
     QueryHandle(InnerHandle::Owned(Box::new(r)))
   }
 
-  pub(crate) fn from_write_ref(w: WriteRef<'a, dyn Any>) -> Self {
+  pub(crate) fn from_write_ref(w: WriteRef<'a, dyn QueryAny>) -> Self {
     // Safety: The lifetime is maintained in the return handle and will be shortened
     // once the handle is downcast.
-    let w: WriteRef<'static, dyn Any> = unsafe { std::mem::transmute(w) };
+    let w: WriteRef<'static, dyn QueryAny> = unsafe { std::mem::transmute(w) };
     QueryHandle(InnerHandle::Owned(Box::new(w)))
   }
 
   pub fn into_ref<T: Any>(self) -> Option<QueryRef<'a, T>> {
     match self.0 {
-      InnerHandle::Ref(r) if r.type_id() == TypeId::of::<T>() => {
-        Some(QueryRef { type_ref: r.downcast_ref::<T>().unwrap(), data: None })
-      }
+      InnerHandle::Ref(r) => r
+        .q_downcast_ref::<T>()
+        .map(|type_ref| QueryRef { type_ref, data: None }),
       InnerHandle::Owned(o) => {
         let inner = o
-          .downcast_ref::<ReadRef<'static, dyn Any>>()
-          .and_then(|r| r.downcast_ref::<T>())
+          .q_downcast_ref::<ReadRef<'static, dyn QueryAny>>()
+          .and_then(|r| r.q_downcast_ref::<T>())
           .or_else(|| {
-            o.downcast_ref::<WriteRef<'static, dyn Any>>()
-              .and_then(|w| w.downcast_ref::<T>())
+            o.q_downcast_ref::<WriteRef<'static, dyn QueryAny>>()
+              .and_then(|w| w.q_downcast_ref::<T>())
           })?;
         let type_ref = unsafe { &*(inner as *const T) };
         Some(QueryRef { type_ref, data: Some(o) })
       }
-      _ => None,
     }
   }
 
@@ -116,8 +115,12 @@ impl<'a> QueryHandle<'a> {
       return None;
     };
 
-    let w = *o.downcast::<WriteRef<'static, dyn Any>>().ok()?;
-    WriteRef::filter_map(w, |v| v.downcast_mut::<T>().map(PartData::from_ref_mut)).ok()
+    let w = *q_downcast::<WriteRef<'static, dyn QueryAny>>(o).ok()?;
+    WriteRef::filter_map(w, |v| {
+      v.q_downcast_mut::<T>()
+        .map(PartData::from_ref_mut)
+    })
+    .ok()
   }
 }
 
@@ -135,7 +138,7 @@ impl<'q, T: ?Sized> QueryRef<'q, T> {
   ///
   /// let data = Queryable((5u32, 'b'));
   /// let q1 = data
-  ///   .query(TypeId::of::<(u32, char)>())
+  ///   .query(&QueryId::of::<(u32, char)>())
   ///   .and_then(|h| h.into_ref::<(u32, char)>())
   ///   .unwrap();
   ///
@@ -163,7 +166,7 @@ impl<'q, T: ?Sized> QueryRef<'q, T> {
   ///
   /// let q = Queryable(vec![1u32, 2, 3]);
   /// let q1: QueryRef<'_, Vec<u32>> = q
-  ///   .query(TypeId::of::<Vec<u32>>())
+  ///   .query(&QueryId::of::<Vec<u32>>())
   ///   .and_then(|h| h.into_ref::<Vec<u32>>())
   ///   .unwrap();
   /// let q2: Result<QueryRef<'_, u32>, _> = QueryRef::filter_map(q1, |v: &Vec<u32>| v.get(1));
@@ -180,8 +183,8 @@ impl<'q, T: ?Sized> QueryRef<'q, T> {
   }
 }
 enum InnerHandle<'a> {
-  Ref(&'a dyn Any),
-  Owned(Box<dyn Any>),
+  Ref(&'a dyn QueryAny),
+  Owned(Box<dyn QueryAny>),
 }
 
 impl<'a, T: ?Sized> std::ops::Deref for QueryRef<'a, T> {
@@ -191,17 +194,17 @@ impl<'a, T: ?Sized> std::ops::Deref for QueryRef<'a, T> {
 }
 
 impl<T: Any> Query for Queryable<T> {
-  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
-    if let Some(h) = self.query(type_id) {
+  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    if let Some(h) = self.query(query_id) {
       out.push(h)
     }
   }
 
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
-    (type_id == self.0.type_id()).then(|| QueryHandle::new(&self.0))
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    (query_id == &QueryId::of::<T>()).then(|| QueryHandle::new(&self.0))
   }
 
-  fn query_write(&self, _: TypeId) -> Option<QueryHandle> { None }
+  fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
 
   fn queryable(&self) -> bool { true }
 }
@@ -210,30 +213,30 @@ impl<T: StateWriter> Query for T
 where
   T::Value: 'static + Sized,
 {
-  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
     // The value of the writer and the writer itself cannot be queried
     // at the same time.
-    if let Some(h) = self.query(type_id) {
+    if let Some(h) = self.query(query_id) {
       out.push(h)
     }
   }
 
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
-    if type_id == TypeId::of::<T::Value>() {
-      let w = ReadRef::map(self.read(), |v| PartData::from_ref(v as &dyn Any));
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    if query_id == &QueryId::of::<T::Value>() {
+      let w = ReadRef::map(self.read(), |v| PartData::from_ref(v as &dyn QueryAny));
       Some(QueryHandle::from_read_ref(w))
-    } else if type_id == self.type_id() {
+    } else if query_id == &QueryId::of::<T>() {
       Some(QueryHandle::new(self))
     } else {
       None
     }
   }
 
-  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
-    if type_id == TypeId::of::<T::Value>() {
-      let w = WriteRef::map(self.write(), |v| PartData::from_ref(v as &dyn Any));
+  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    if query_id == &QueryId::of::<T::Value>() {
+      let w = WriteRef::map(self.write(), |v| PartData::from_ref(v as &dyn QueryAny));
       Some(QueryHandle::from_write_ref(w))
-    } else if type_id == self.type_id() {
+    } else if query_id == &QueryId::of::<T>() {
       Some(QueryHandle::new(self))
     } else {
       None
@@ -247,24 +250,24 @@ macro_rules! impl_query_for_reader {
   () => {
     // The value of the reader and the reader itself cannot be queried
     // at the same time.
-    fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
-      if let Some(h) = self.query(type_id) {
+    fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+      if let Some(h) = self.query(query_id) {
         out.push(h)
       }
     }
 
-    fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
-      if type_id == TypeId::of::<V>() {
-        let r = ReadRef::map(self.read(), |v| PartData::from_ref(v as &dyn Any));
+    fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+      if query_id == &QueryId::of::<V>() {
+        let r = ReadRef::map(self.read(), |v| PartData::from_ref(v as &dyn QueryAny));
         Some(QueryHandle::from_read_ref(r))
-      } else if type_id == self.type_id() {
+      } else if query_id == &QueryId::of::<Self>() {
         Some(QueryHandle::new(self))
       } else {
         None
       }
     }
 
-    fn query_write(&self, _: TypeId) -> Option<QueryHandle> { None }
+    fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
 
     fn queryable(&self) -> bool { true }
   };
@@ -290,6 +293,93 @@ impl<V: Any> Query for Reader<V> {
   impl_query_for_reader!();
 }
 
+/// This type is used to identify a queryable type.
+///
+/// Instead of directly using `TypeId`, we utilize its name and memory layout
+/// for a secondary check as `TypeId` is not unique between binaries.
+///
+/// Retain the `TypeId` for efficient comparisons.
+#[derive(Debug, Eq)]
+pub struct QueryId {
+  type_id: TypeId,
+  info: fn() -> TypeInfo,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct TypeInfo {
+  name: String,
+  layout: std::alloc::Layout,
+}
+
+impl QueryId {
+  pub fn of<T: 'static>() -> Self {
+    QueryId {
+      type_id: TypeId::of::<T>(),
+      info: || {
+        let layout = std::alloc::Layout::new::<T>();
+        let name =
+          format!("{}+{}", std::any::type_name::<T>(), env!("CARGO_PKG_VERSION")).to_string();
+        TypeInfo { name, layout }
+      },
+    }
+  }
+
+  pub fn is_same(&self, other: &QueryId) -> bool {
+    if self.type_id == other.type_id { true } else { (self.info)() == (other.info)() }
+  }
+}
+
+impl PartialEq for QueryId {
+  fn eq(&self, other: &Self) -> bool { self.is_same(other) }
+}
+
+pub(crate) trait QueryAny: Any {
+  fn query_id(&self) -> QueryId;
+}
+
+impl<T: Any> QueryAny for T {
+  fn query_id(&self) -> QueryId { QueryId::of::<T>() }
+}
+
+impl dyn QueryAny {
+  fn is<T: QueryAny>(&self) -> bool { self.query_id() == QueryId::of::<T>() }
+
+  fn q_downcast_ref<T: QueryAny>(&self) -> Option<&T> {
+    if self.is::<T>() {
+      // SAFETY: just checked whether we are pointing to the correct type, and we can
+      // rely on that check for memory safety because we have implemented Any
+      // for all types; no other impls can exist as they would conflict with our
+      // impl.
+      unsafe { Some(&*(self as *const dyn QueryAny as *const T)) }
+    } else {
+      None
+    }
+  }
+
+  fn q_downcast_mut<T: QueryAny>(&mut self) -> Option<&mut T> {
+    if self.is::<T>() {
+      // SAFETY: just checked whether we are pointing to the correct type, and we can
+      // rely on that check for memory safety because we have implemented Any
+      // for all types; no other impls can exist as they would conflict with our
+      // impl.
+      Some(unsafe { &mut *(self as *mut dyn QueryAny as *mut T) })
+    } else {
+      None
+    }
+  }
+}
+
+fn q_downcast<T: QueryAny>(any: Box<dyn QueryAny>) -> Result<Box<T>, Box<dyn QueryAny>> {
+  if any.is::<T>() {
+    unsafe {
+      let raw = Box::into_raw(any);
+      Ok(Box::from_raw(raw as *mut T))
+    }
+  } else {
+    Err(any)
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -301,11 +391,11 @@ mod tests {
 
     struct X;
     let x = Queryable(X);
-    let mut h = x.query(TypeId::of::<X>()).unwrap();
+    let mut h = x.query(&QueryId::of::<X>()).unwrap();
     assert!(h.downcast_ref::<X>().is_some());
     assert!(h.downcast_mut::<X>().is_none());
     assert!(h.into_ref::<X>().is_some());
-    let h = x.query(TypeId::of::<X>()).unwrap();
+    let h = x.query(&QueryId::of::<X>()).unwrap();
     assert!(h.into_mut::<X>().is_none());
   }
 
@@ -315,10 +405,10 @@ mod tests {
 
     let x = State::value(0i32);
     {
-      let h = x.query(TypeId::of::<i32>()).unwrap();
+      let h = x.query(&QueryId::of::<i32>()).unwrap();
       assert!(h.downcast_ref::<i32>().is_some());
     }
-    let mut h = x.query_write(TypeId::of::<i32>()).unwrap();
+    let mut h = x.query_write(&QueryId::of::<i32>()).unwrap();
     assert!(h.downcast_mut::<i32>().is_some());
     assert!(h.into_mut::<i32>().is_some());
   }
@@ -335,10 +425,10 @@ mod tests {
     let x = State::value(X { a: 0, _b: 1 });
     let y = x.split_writer(|x| PartData::from_ref_mut(&mut x.a));
     {
-      let h = y.query(TypeId::of::<i32>()).unwrap();
+      let h = y.query(&QueryId::of::<i32>()).unwrap();
       assert!(h.downcast_ref::<i32>().is_some());
     }
-    let mut h = y.query_write(TypeId::of::<i32>()).unwrap();
+    let mut h = y.query_write(&QueryId::of::<i32>()).unwrap();
     assert!(h.downcast_mut::<i32>().is_some());
   }
 
@@ -347,7 +437,7 @@ mod tests {
     reset_test_env!();
 
     let x = State::value(0i32).clone_reader();
-    let mut h = x.query(TypeId::of::<i32>()).unwrap();
+    let mut h = x.query(&QueryId::of::<i32>()).unwrap();
     assert!(h.downcast_ref::<i32>().is_some());
     assert!(h.downcast_mut::<i32>().is_none());
     assert!(h.into_mut::<i32>().is_none());

@@ -12,11 +12,11 @@ pub trait RenderProxy {
 pub(crate) struct PureRender<R: Render>(pub R);
 
 impl<R: Render> Query for PureRender<R> {
-  fn query_all<'q>(&'q self, _: TypeId, _: &mut SmallVec<[QueryHandle<'q>; 1]>) {}
+  fn query_all<'q>(&'q self, _: &QueryId, _: &mut SmallVec<[QueryHandle<'q>; 1]>) {}
 
-  fn query(&self, _: TypeId) -> Option<QueryHandle> { None }
+  fn query(&self, _: &QueryId) -> Option<QueryHandle> { None }
 
-  fn query_write(&self, _: TypeId) -> Option<QueryHandle> { None }
+  fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
 
   fn queryable(&self) -> bool { false }
 }

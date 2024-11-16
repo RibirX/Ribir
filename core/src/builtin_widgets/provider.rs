@@ -152,7 +152,7 @@ impl BuildCtx {
       .current_providers
       .iter()
       .rev()
-      .filter_map(|p| p.query(TypeId::of::<Q>()))
+      .filter_map(|p| p.query(&QueryId::of::<Q>()))
       .filter_map(QueryHandle::into_ref)
   }
 
@@ -161,7 +161,7 @@ impl BuildCtx {
       .current_providers
       .iter()
       .rev()
-      .filter_map(|p| p.query_write(TypeId::of::<Q>()))
+      .filter_map(|p| p.query_write(&QueryId::of::<Q>()))
       .filter_map(QueryHandle::into_mut)
   }
 }
@@ -207,18 +207,18 @@ impl<T: Deref<Target: WidgetCtxImpl>> ProviderCtx for T {
 }
 
 impl<const M: usize> Query for [Box<dyn Query>; M] {
-  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
     self
       .iter()
-      .for_each(|q| q.query_all(type_id, out))
+      .for_each(|q| q.query_all(query_id, out))
   }
 
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
-    self.iter().find_map(|q| q.query(type_id))
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    self.iter().find_map(|q| q.query(query_id))
   }
 
-  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
-    self.iter().find_map(|q| q.query_write(type_id))
+  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    self.iter().find_map(|q| q.query_write(query_id))
   }
 
   fn queryable(&self) -> bool { true }

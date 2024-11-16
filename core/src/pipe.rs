@@ -801,23 +801,23 @@ fn pipe_priority_value(info: &DynInfo, tree: &WidgetTree) -> i64 {
 }
 
 impl Query for PipeNode {
-  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
     let p = self.as_ref();
-    p.data.query_all(type_id, out);
-    if type_id == TypeId::of::<DynInfo>() {
+    p.data.query_all(query_id, out);
+    if query_id == &QueryId::of::<DynInfo>() {
       out.push(QueryHandle::new(&p.dyn_info))
     }
   }
 
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
     let p = self.as_ref();
     p.data
-      .query(type_id)
-      .or_else(|| (type_id == TypeId::of::<DynInfo>()).then(|| QueryHandle::new(&p.dyn_info)))
+      .query(query_id)
+      .or_else(|| (query_id == &QueryId::of::<DynInfo>()).then(|| QueryHandle::new(&p.dyn_info)))
   }
 
-  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
-    self.as_ref().data.query_write(type_id)
+  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    self.as_ref().data.query_write(query_id)
   }
 
   fn queryable(&self) -> bool { true }

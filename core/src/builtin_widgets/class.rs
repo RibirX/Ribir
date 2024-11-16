@@ -320,25 +320,29 @@ impl RenderProxy for ClassChild {
 }
 
 impl Query for OrigChild {
-  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut smallvec::SmallVec<[QueryHandle<'q>; 1]>) {
+  fn query_all<'q>(
+    &'q self, type_id: &QueryId, out: &mut smallvec::SmallVec<[QueryHandle<'q>; 1]>,
+  ) {
     self.node().query_all(type_id, out)
   }
 
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.node().query(type_id) }
+  fn query(&self, type_id: &QueryId) -> Option<QueryHandle> { self.node().query(type_id) }
 
-  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
+  fn query_write(&self, type_id: &QueryId) -> Option<QueryHandle> {
     self.node_mut().query_write(type_id)
   }
 }
 
 impl Query for ClassChild {
-  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut smallvec::SmallVec<[QueryHandle<'q>; 1]>) {
+  fn query_all<'q>(
+    &'q self, type_id: &QueryId, out: &mut smallvec::SmallVec<[QueryHandle<'q>; 1]>,
+  ) {
     self.inner().child.query_all(type_id, out)
   }
 
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.inner().child.query(type_id) }
+  fn query(&self, type_id: &QueryId) -> Option<QueryHandle> { self.inner().child.query(type_id) }
 
-  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
+  fn query_write(&self, type_id: &QueryId) -> Option<QueryHandle> {
     self.inner().child.query_write(type_id)
   }
 }
