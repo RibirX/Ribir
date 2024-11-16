@@ -192,6 +192,14 @@ impl<const M: usize> Query for [Box<dyn Query>; M] {
     self.iter().find_map(|q| q.query_write(query_id))
   }
 
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    self
+      .iter()
+      .find_map(|q| q.query_match(ids, filter))
+  }
+
   fn queryable(&self) -> bool { true }
 }
 

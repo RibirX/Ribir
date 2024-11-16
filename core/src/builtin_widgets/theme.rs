@@ -204,6 +204,16 @@ impl<T: StateWriter<Value = Theme>> Query for ThemeQuerier<T> {
     .map(QueryHandle::from_write_ref)
   }
 
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    ids.iter().find_map(|id| {
+      self
+        .query(id)
+        .filter(|h| filter(id, h))
+        .map(|h| (*id, h))
+    })
+  }
   fn queryable(&self) -> bool { true }
 }
 

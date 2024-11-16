@@ -18,7 +18,16 @@ pub trait Query: Any {
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle>;
 
   /// Queries the reference of the writer that matches the provided type id.
-  fn query_write(&self, _: &QueryId) -> Option<QueryHandle>;
+  fn query_write(&self, id: &QueryId) -> Option<QueryHandle>;
+
+  /// Query multiple types sequentially from inside to outside and return the
+  /// first one that matches the `filter` function.
+  ///
+  /// It's not equivalent to query the id one by one, it query all types level
+  /// by level.
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)>;
 
   /// Hint this is a non-queryable type.
   fn queryable(&self) -> bool { true }
@@ -206,6 +215,17 @@ impl<T: Any> Query for Queryable<T> {
 
   fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
 
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    ids.iter().find_map(|id| {
+      self
+        .query(id)
+        .filter(|h| filter(id, h))
+        .map(|h| (*id, h))
+    })
+  }
+
   fn queryable(&self) -> bool { true }
 }
 
@@ -243,6 +263,16 @@ where
     }
   }
 
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    ids.iter().find_map(|id| {
+      self
+        .query(id)
+        .filter(|h| filter(id, h))
+        .map(|h| (*id, h))
+    })
+  }
   fn queryable(&self) -> bool { true }
 }
 
@@ -268,6 +298,17 @@ macro_rules! impl_query_for_reader {
     }
 
     fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
+
+    fn query_match(
+      &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+    ) -> Option<(QueryId, QueryHandle)> {
+      ids.iter().find_map(|id| {
+        self
+          .query(id)
+          .filter(|h| filter(id, h))
+          .map(move |q| (*id, q))
+      })
+    }
 
     fn queryable(&self) -> bool { true }
   };
@@ -299,7 +340,7 @@ impl<V: Any> Query for Reader<V> {
 /// for a secondary check as `TypeId` is not unique between binaries.
 ///
 /// Retain the `TypeId` for efficient comparisons.
-#[derive(Debug, Eq)]
+#[derive(Debug, Eq, Clone, Copy)]
 pub struct QueryId {
   type_id: TypeId,
   info: fn() -> TypeInfo,
