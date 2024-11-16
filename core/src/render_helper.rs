@@ -18,6 +18,12 @@ impl<R: Render> Query for PureRender<R> {
 
   fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
 
+  fn query_match(
+    &self, _: &[QueryId], _: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    None
+  }
+
   fn queryable(&self) -> bool { false }
 }
 

@@ -68,6 +68,12 @@ impl Query for RenderPair {
     self.host.query_write(query_id)
   }
 
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    self.host.query_match(ids, filter)
+  }
+
   fn queryable(&self) -> bool { self.host.queryable() }
 }
 

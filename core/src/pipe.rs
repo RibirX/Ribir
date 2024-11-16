@@ -820,6 +820,21 @@ impl Query for PipeNode {
     self.as_ref().data.query_write(query_id)
   }
 
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    let p = self.as_ref();
+    p.data.query_match(ids, filter).or_else(|| {
+      let dyn_info_id = QueryId::of::<DynInfo>();
+      (ids.contains(&dyn_info_id))
+        .then(|| {
+          let h = QueryHandle::new(&p.dyn_info);
+          filter(&dyn_info_id, &h).then_some((dyn_info_id, h))
+        })
+        .flatten()
+    })
+  }
+
   fn queryable(&self) -> bool { true }
 }
 

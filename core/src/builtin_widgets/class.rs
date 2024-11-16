@@ -31,7 +31,10 @@
 //! App::run(w).with_app_theme(theme);
 //! ```
 
-use std::cell::UnsafeCell;
+use std::{
+  cell::UnsafeCell,
+  hash::{Hash, Hasher},
+};
 
 use ribir_algo::Sc;
 use smallvec::{SmallVec, smallvec};
@@ -77,6 +80,16 @@ pub struct Class {
   pub class: Option<ClassName>,
 }
 
+/// This widget overrides the class implementation of a `ClassName`, offering a
+/// lighter alternative to `Classes` when you only need to override a single
+/// class.
+#[simple_declare]
+#[derive(Eq)]
+pub struct OverrideClass {
+  pub name: ClassName,
+  pub class_impl: ClassImpl,
+}
+
 /// This macro is utilized to define class names; ensure that your name is
 /// unique within the application.
 #[macro_export]
@@ -119,6 +132,19 @@ impl ComposeChild<'static> for Classes {
   }
 }
 
+impl<'c> ComposeChild<'c> for OverrideClass {
+  type Child = FnWidget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    let cls_override = this.try_into_value().unwrap_or_else(|_| {
+      panic!("Attempting to use `OverrideClass` as a reader or writer is not allowed.")
+    });
+
+    Provider::new(Box::new(Queryable(cls_override)))
+      .with_child(child)
+      .into_widget()
+  }
+}
+
 impl<'c> ComposeChild<'c> for Class {
   type Child = Widget<'c>;
 
@@ -157,12 +183,34 @@ impl<'c> ComposeChild<'c> for Class {
 
 impl Class {
   pub fn apply_style<'a>(&self, w: Widget<'a>) -> Widget<'a> {
-    let class = self.class.and_then(|cls| {
-      BuildCtx::get()
-        .all_providers::<Classes>()
-        .find_map(|c| QueryRef::filter_map(c, |c| c.store.get(&cls)).ok())
-    });
-    if let Some(c) = class { c(w) } else { w }
+    if let Some(cls_impl) = self.class_impl() { cls_impl(w) } else { w }
+  }
+
+  fn class_impl(&self) -> Option<QueryRef<ClassImpl>> {
+    let cls = self.class?;
+    let override_cls_id = QueryId::of::<OverrideClass>();
+    let classes_id = QueryId::of::<Classes>();
+
+    let (id, handle) = BuildCtx::get().all_providers().find_map(|p| {
+      p.query_match(&[override_cls_id, classes_id], &|id, h| {
+        if id == &override_cls_id {
+          h.downcast_ref::<OverrideClass>()
+            .map_or(false, |c| c.name == cls)
+        } else {
+          h.downcast_ref::<Classes>()
+            .map_or(false, |c| c.store.contains_key(&cls))
+        }
+      })
+    })?;
+
+    if id == override_cls_id {
+      handle
+        .into_ref::<OverrideClass>()
+        .map(|cls| QueryRef::map(cls, |c| &c.class_impl))
+    } else {
+      let classes = handle.into_ref::<Classes>()?;
+      QueryRef::filter_map(classes, |c| c.store.get(&cls)).ok()
+    }
   }
 }
 
@@ -328,6 +376,12 @@ impl Query for OrigChild {
 
   fn query(&self, type_id: &QueryId) -> Option<QueryHandle> { self.node().query(type_id) }
 
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    self.node().query_match(ids, filter)
+  }
+
   fn query_write(&self, type_id: &QueryId) -> Option<QueryHandle> {
     self.node_mut().query_write(type_id)
   }
@@ -342,14 +396,26 @@ impl Query for ClassChild {
 
   fn query(&self, type_id: &QueryId) -> Option<QueryHandle> { self.inner().child.query(type_id) }
 
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    self.inner().child.query_match(ids, filter)
+  }
+
   fn query_write(&self, type_id: &QueryId) -> Option<QueryHandle> {
     self.inner().child.query_write(type_id)
   }
 }
 
+impl PartialEq for OverrideClass {
+  fn eq(&self, other: &Self) -> bool { self.name == other.name }
+}
+
+impl Hash for OverrideClass {
+  fn hash<H: Hasher>(&self, state: &mut H) { self.name.hash(state); }
+}
 #[cfg(test)]
 mod tests {
-
   use super::*;
   use crate::{
     reset_test_env,
@@ -542,5 +608,28 @@ mod tests {
     *w_cls.write() = CLAMP_50;
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(50., 50.));
+  }
+
+  #[test]
+  fn override_class() {
+    reset_test_env!();
+
+    let mut wnd = TestWindow::new(fn_widget! {
+      initd_classes().with_child(fn_widget! {
+        @OverrideClass {
+          name: MARGIN,
+          class_impl: style_class! {
+            clamp: BoxClamp::fixed_size(Size::new(66., 66.))
+          } as ClassImpl,
+          @container! {
+            size: Size::new(100., 100.),
+            class: MARGIN,
+          }
+        }
+      })
+    });
+
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::new(66., 66.));
   }
 }

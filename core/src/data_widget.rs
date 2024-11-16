@@ -58,6 +58,15 @@ impl Query for DataAttacher {
   }
 
   fn queryable(&self) -> bool { true }
+
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    self
+      .render
+      .query_match(ids, filter)
+      .or_else(|| self.data.query_match(ids, filter))
+  }
 }
 
 impl Query for AnonymousAttacher {
@@ -74,6 +83,12 @@ impl Query for AnonymousAttacher {
   }
 
   fn queryable(&self) -> bool { self.render.queryable() }
+
+  fn query_match(
+    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
+  ) -> Option<(QueryId, QueryHandle)> {
+    self.render.query_match(ids, filter)
+  }
 }
 
 impl RenderProxy for AnonymousAttacher {
