@@ -92,5 +92,5 @@ where
   F: FnOnce() -> Widget<'w> + 'w,
 {
   #[inline]
-  fn into_child(self) -> FnWidget<'w> { Box::new(self) }
+  fn into_child(self) -> FnWidget<'w> { FnWidget::new(self) }
 }

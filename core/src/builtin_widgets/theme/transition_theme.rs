@@ -84,7 +84,7 @@ impl TransitionIdent {
 
   pub fn find(self, ctx: &impl ProviderCtx) -> Option<Box<dyn Transition>> {
     ctx
-      .all_providers::<TransitionTheme>()
+      .all_of::<TransitionTheme>()
       .find_map(|t| t.transitions.get(&self).map(|t| t.box_clone()))
   }
 }

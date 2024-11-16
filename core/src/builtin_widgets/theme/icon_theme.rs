@@ -120,7 +120,7 @@ impl NamedSvg {
   /// get the svg icon of the ident from the context if it have.
   pub fn of(self, ctx: &impl ProviderCtx) -> Option<Resource<Svg>> {
     ctx
-      .all_providers::<IconTheme>()
+      .all_of::<IconTheme>()
       .find_map(|t| t.svgs.get(&self).cloned())
   }
 }

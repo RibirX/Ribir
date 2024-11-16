@@ -97,7 +97,7 @@ type InnerGenWidget = Sc<RefCell<Box<dyn FnMut() -> Widget<'static>>>>;
 /// It already implements `IntoChild`, allowing any function widget to be
 /// converted to `FnWidget`. Therefore, using `FnWidget` as the child type of
 /// `ComposeChild` enables the acceptance of all function widgets.
-pub type FnWidget<'w> = Box<dyn FnOnce() -> Widget<'w> + 'w>;
+pub struct FnWidget<'w>(Box<dyn FnOnce() -> Widget<'w> + 'w>);
 
 // The widget type marker.
 pub const COMPOSE: usize = 1;
@@ -127,6 +127,10 @@ impl GenWidget {
   }
 
   pub fn gen_widget(&self) -> Widget<'static> { self.0.borrow_mut()() }
+}
+
+impl<'w> FnWidget<'w> {
+  pub fn new(f: impl FnOnce() -> Widget<'w> + 'w) -> Self { Self(Box::new(f)) }
 }
 
 impl<'w> IntoWidget<'w, FN> for Widget<'w> {
@@ -164,6 +168,11 @@ where
     let lazy = LazyNode::new(self);
     Widget(InnerWidget::Lazy(lazy))
   }
+}
+
+impl<'w> IntoWidgetStrict<'w, FN> for FnWidget<'w> {
+  #[inline]
+  fn into_widget_strict(self) -> Widget<'w> { self.0.into_widget_strict() }
 }
 
 impl IntoWidgetStrict<'static, FN> for GenWidget {
