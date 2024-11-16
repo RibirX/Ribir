@@ -142,33 +142,33 @@ impl ComposeChild<'static> for Theme {
 struct ThemeQuerier<T: StateWriter<Value = Theme>>(T);
 
 impl<T: StateWriter<Value = Theme>> Query for ThemeQuerier<T> {
-  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
     // The value of the writer and the writer itself cannot be queried
     // at the same time.
-    if let Some(h) = self.query(type_id) {
+    if let Some(h) = self.query(query_id) {
       out.push(h)
     }
   }
 
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> {
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
     ReadRef::filter_map(self.0.read(), |v: &Theme| {
-      let w: Option<&dyn Any> = if TypeId::of::<Theme>() == type_id {
+      let w: Option<&dyn QueryAny> = if &QueryId::of::<Theme>() == query_id {
         Some(v)
-      } else if TypeId::of::<Palette>() == type_id {
+      } else if &QueryId::of::<Palette>() == query_id {
         Some(&v.palette)
-      } else if TypeId::of::<TypographyTheme>() == type_id {
+      } else if &QueryId::of::<TypographyTheme>() == query_id {
         Some(&v.typography_theme)
-      } else if TypeId::of::<TextStyle>() == type_id {
+      } else if &QueryId::of::<TextStyle>() == query_id {
         Some(&v.typography_theme.body_medium.text)
-      } else if TypeId::of::<Classes>() == type_id {
+      } else if &QueryId::of::<Classes>() == query_id {
         Some(&v.classes)
-      } else if TypeId::of::<IconTheme>() == type_id {
+      } else if &QueryId::of::<IconTheme>() == query_id {
         Some(&v.icon_theme)
-      } else if TypeId::of::<TransitionTheme>() == type_id {
+      } else if &QueryId::of::<TransitionTheme>() == query_id {
         Some(&v.transitions_theme)
-      } else if TypeId::of::<ComposeDecorators>() == type_id {
+      } else if &QueryId::of::<ComposeDecorators>() == query_id {
         Some(&v.compose_decorators)
-      } else if TypeId::of::<CustomStyles>() == type_id {
+      } else if &QueryId::of::<CustomStyles>() == query_id {
         Some(&v.custom_styles)
       } else {
         None
@@ -179,21 +179,21 @@ impl<T: StateWriter<Value = Theme>> Query for ThemeQuerier<T> {
     .map(QueryHandle::from_read_ref)
   }
 
-  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> {
+  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
     WriteRef::filter_map(self.0.write(), |v: &mut Theme| {
-      let w: Option<&mut dyn Any> = if TypeId::of::<Theme>() == type_id {
+      let w: Option<&mut dyn QueryAny> = if &QueryId::of::<Theme>() == query_id {
         Some(v)
-      } else if TypeId::of::<Palette>() == type_id {
+      } else if &QueryId::of::<Palette>() == query_id {
         Some(&mut v.palette)
-      } else if TypeId::of::<TypographyTheme>() == type_id {
+      } else if &QueryId::of::<TypographyTheme>() == query_id {
         Some(&mut v.typography_theme)
-      } else if TypeId::of::<IconTheme>() == type_id {
+      } else if &QueryId::of::<IconTheme>() == query_id {
         Some(&mut v.icon_theme)
-      } else if TypeId::of::<TransitionTheme>() == type_id {
+      } else if &QueryId::of::<TransitionTheme>() == query_id {
         Some(&mut v.transitions_theme)
-      } else if TypeId::of::<ComposeDecorators>() == type_id {
+      } else if &QueryId::of::<ComposeDecorators>() == query_id {
         Some(&mut v.compose_decorators)
-      } else if TypeId::of::<CustomStyles>() == type_id {
+      } else if &QueryId::of::<CustomStyles>() == query_id {
         Some(&mut v.custom_styles)
       } else {
         None

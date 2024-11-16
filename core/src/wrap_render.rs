@@ -1,5 +1,3 @@
-use std::any::TypeId;
-
 use ribir_geom::{Point, Size, Transform};
 use smallvec::SmallVec;
 use widget_id::RenderQueryable;
@@ -60,13 +58,15 @@ struct RenderPair {
 }
 
 impl Query for RenderPair {
-  fn query_all<'q>(&'q self, type_id: TypeId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
-    self.host.query_all(type_id, out)
+  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    self.host.query_all(query_id, out)
   }
 
-  fn query(&self, type_id: TypeId) -> Option<QueryHandle> { self.host.query(type_id) }
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> { self.host.query(query_id) }
 
-  fn query_write(&self, type_id: TypeId) -> Option<QueryHandle> { self.host.query_write(type_id) }
+  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    self.host.query_write(query_id)
+  }
 
   fn queryable(&self) -> bool { self.host.queryable() }
 }

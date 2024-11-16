@@ -286,7 +286,7 @@ impl WidgetId {
     let mut out = smallvec![];
     self
       .assert_get(tree)
-      .query_all(TypeId::of::<T>(), &mut out);
+      .query_all(&QueryId::of::<T>(), &mut out);
     out.into_iter().filter_map(QueryHandle::into_ref)
   }
 
@@ -295,7 +295,7 @@ impl WidgetId {
   pub(crate) fn query_write<T: Any>(self, tree: &WidgetTree) -> Option<WriteRef<T>> {
     self
       .assert_get(tree)
-      .query_write(TypeId::of::<T>())
+      .query_write(&QueryId::of::<T>())
       .and_then(QueryHandle::into_mut)
   }
 
@@ -303,7 +303,7 @@ impl WidgetId {
   pub(crate) fn query_ref<T: Any>(self, tree: &WidgetTree) -> Option<QueryRef<T>> {
     self
       .assert_get(tree)
-      .query(TypeId::of::<T>())
+      .query(&QueryId::of::<T>())
       .and_then(QueryHandle::into_ref)
   }
 
@@ -311,7 +311,7 @@ impl WidgetId {
   pub(crate) fn contain_type<T: Any>(self, tree: &WidgetTree) -> bool {
     self
       .assert_get(tree)
-      .query(TypeId::of::<T>())
+      .query(&QueryId::of::<T>())
       .is_some()
   }
 
