@@ -206,8 +206,7 @@ impl Painter {
     let s = self.current_state();
     s.transform
       .inverse()
-      .unwrap()
-      .outer_transformed_rect(&s.bounds)
+      .map_or_else(Rect::zero, |t| t.outer_transformed_rect(&s.bounds))
   }
 
   #[inline]
@@ -981,5 +980,15 @@ mod test {
       .rect(&rect(-500., -500., 10., 10.))
       .fill();
     assert_eq!(painter.commands.len(), 2);
+  }
+
+  #[test]
+  fn fix_scale_zero_crash() {
+    let mut painter = painter();
+
+    painter
+      .scale(0., 0.)
+      .rect(&rect(0., 0., 10., 10.))
+      .fill();
   }
 }
