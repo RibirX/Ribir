@@ -1,3 +1,5 @@
+// todo: replace the icon theme with named_svgs and icon fonts for improved
+// functionality.
 use std::collections::HashMap;
 
 use crate::{prelude::*, render_helper::RenderProxy};
@@ -68,7 +70,7 @@ impl Compose for NamedSvg {
 
 impl IconTheme {
   pub fn new(icon_size: IconSize) -> Self {
-    let svg = include_crate_svg!("src/builtin_widgets/theme/miss_icon.svg");
+    let svg = include_crate_svg!("src/builtin_widgets/default_named.svg");
     let miss_icon = Resource::new(svg);
     let mut icons = HashMap::<_, _, ahash::RandomState>::default();
     icons.insert(MISS_ICON, miss_icon);
