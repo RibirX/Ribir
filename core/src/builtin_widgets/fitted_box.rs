@@ -33,7 +33,7 @@ pub enum BoxFit {
 #[derive(SingleChild, Default)]
 pub struct FittedBox {
   pub box_fit: BoxFit,
-  scale_cache: Cell<Transform>,
+  scale_cache: Cell<Vector>,
 }
 
 impl Declare for FittedBox {
@@ -49,64 +49,61 @@ impl FittedBox {
 impl Render for FittedBox {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let container_size = clamp.max;
+    if container_size.is_empty() {
+      self.scale_cache.set(Vector::zero());
+      return container_size;
+    }
+
     clamp.max = INFINITY_SIZE;
     let child_size = ctx.assert_perform_single_child_layout(clamp);
 
     if child_size.is_empty() {
-      self.scale_cache.set(Transform::default());
+      self.scale_cache.set(Vector::zero());
+      return child_size;
     }
-    let scale_x = container_size.width / child_size.width;
-    let scale_y = container_size.height / child_size.height;
-    match self.box_fit {
-      BoxFit::None => self.scale_cache.set(Transform::scale(1., 1.)),
-      BoxFit::Fill => self
-        .scale_cache
-        .set(Transform::scale(scale_x, scale_y)),
+
+    let x = container_size.width / child_size.width;
+    let y = container_size.height / child_size.height;
+    let scale = match self.box_fit {
+      BoxFit::None => Vector::new(1., 1.),
+      BoxFit::Fill => Vector::new(x, y),
       BoxFit::Contain => {
-        let scale = scale_x.min(scale_y);
-        self
-          .scale_cache
-          .set(Transform::scale(scale, scale));
+        let scale = x.min(y);
+        Vector::new(scale, scale)
       }
       BoxFit::Cover => {
-        let scale = scale_x.max(scale_y);
-        self
-          .scale_cache
-          .set(Transform::scale(scale, scale));
+        let scale = x.max(y);
+        Vector::new(scale, scale)
       }
-      BoxFit::CoverY => {
-        self
-          .scale_cache
-          .set(Transform::scale(scale_y, scale_y));
-      }
-      BoxFit::CoverX => {
-        self
-          .scale_cache
-          .set(Transform::scale(scale_x, scale_x));
-      }
-    }
-    let Transform { m11: x, m22: y, .. } = self.scale_cache.get();
-    Size::new(child_size.width * x, child_size.height * y)
+      BoxFit::CoverY => Vector::new(y, y),
+      BoxFit::CoverX => Vector::new(x, x),
+    };
+    self.scale_cache.set(scale);
+
+    Size::new(child_size.width * scale.x, child_size.height * scale.y)
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let Transform { m11: x, m22: y, .. } = self.scale_cache.get();
+    let scale = self.scale_cache.get();
     if matches!(self.box_fit, BoxFit::Cover) {
       let size = ctx.box_size().unwrap();
       let child_size = ctx
         .single_child_box()
         .expect("Should always have a single child")
         .size;
-      if size.width < child_size.width * x || size.height < child_size.height * y {
+      if size.width < child_size.width * scale.x || size.height < child_size.height * scale.y {
         let path = Path::rect(&Rect::from(size));
         ctx.painter().clip(path.into());
       }
     }
 
-    ctx.painter().scale(x, y);
+    ctx.painter().scale(scale.x, scale.y);
   }
 
-  fn get_transform(&self) -> Option<Transform> { Some(self.scale_cache.get()) }
+  fn get_transform(&self) -> Option<Transform> {
+    let scale = self.scale_cache.get();
+    Some(Transform::scale(scale.x, scale.y))
+  }
 }
 
 #[cfg(test)]
@@ -122,7 +119,7 @@ mod tests {
     box_fit: BoxFit,
     size: Size,
     expect: Size,
-    expected_scale: Transform,
+    expected_scale: Vector,
   }
 
   impl FitTestCase {
@@ -152,7 +149,7 @@ mod tests {
       box_fit: BoxFit::None,
       size: small_size,
       expect: small_size,
-      expected_scale: Transform::scale(1., 1.),
+      expected_scale: Vector::new(1., 1.),
     }
     .test();
 
@@ -160,7 +157,7 @@ mod tests {
       box_fit: BoxFit::Fill,
       size: small_size,
       expect: WND_SIZE,
-      expected_scale: Transform::scale(3., 2.),
+      expected_scale: Vector::new(3., 2.),
     }
     .test();
 
@@ -168,7 +165,7 @@ mod tests {
       box_fit: BoxFit::Cover,
       size: small_size,
       expect: WND_SIZE,
-      expected_scale: Transform::scale(3., 3.),
+      expected_scale: Vector::new(3., 3.),
     }
     .test();
 
@@ -177,7 +174,7 @@ mod tests {
       box_fit: BoxFit::Cover,
       size: big_size_clip,
       expect: WND_SIZE,
-      expected_scale: Transform::scale(0.5, 0.5),
+      expected_scale: Vector::new(0.5, 0.5),
     }
     .test();
 
@@ -185,7 +182,7 @@ mod tests {
       box_fit: BoxFit::Contain,
       size: small_size,
       expect: Size::new(200., 300.),
-      expected_scale: Transform::scale(2., 2.),
+      expected_scale: Vector::new(2., 2.),
     }
     .test();
   }
