@@ -162,7 +162,7 @@ impl SvgDocument {
       let rg = reader
         .read_to_end_into(e.name().to_owned(), &mut buf)
         .unwrap();
-      &source[rg.start..rg.end]
+      &source[rg.start as usize..rg.end as usize]
     } else {
       ""
     };
