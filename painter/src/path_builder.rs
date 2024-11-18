@@ -5,6 +5,7 @@ use lyon_algorithms::path::{
   path::Builder as LyonBuilder,
 };
 use ribir_geom::{Angle, Point, Rect, Transform, Vector};
+use usvg::tiny_skia_path;
 
 use crate::{LineCap, LineJoin, Path, Radius, StrokeOptions};
 

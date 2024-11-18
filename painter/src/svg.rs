@@ -1,14 +1,18 @@
-use std::{error::Error, io::Read};
+use std::{error::Error, io::Read, vec};
 
 use ribir_algo::Resource;
 use ribir_geom::{Point, Rect, Size, Transform};
 use serde::{Deserialize, Serialize};
-use usvg::{Options, Stop, Tree, TreeParsing};
+use usvg::{Options, Stop, Tree};
 
 use crate::{
   Brush, Color, GradientStop, LineCap, LineJoin, PaintCommand, Path, StrokeOptions,
   color::{LinearGradient, RadialGradient},
 };
+
+/// This is a basic SVG support designed for rendering to Ribir painter. It is
+/// currently quite simple and primarily used for Ribir icons. More features
+/// will be added as needed.
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Svg {
@@ -16,120 +20,18 @@ pub struct Svg {
   pub commands: Resource<Box<[PaintCommand]>>,
 }
 
-/// Fits size into a viewbox. copy from resvg
-fn fit_view_box(size: usvg::Size, vb: &usvg::ViewBox) -> usvg::Size {
-  let s = vb.rect.size();
-
-  if vb.aspect.align == usvg::Align::None {
-    s
-  } else if vb.aspect.slice {
-    size.expand_to(s)
-  } else {
-    size.scale_to(s)
-  }
-}
-
 // todo: we need to support currentColor to change svg color.
+// todo: share fontdb
 impl Svg {
   pub fn parse_from_bytes(svg_data: &[u8]) -> Result<Self, Box<dyn Error>> {
     let opt = Options { ..<_>::default() };
     let tree = Tree::from_data(svg_data, &opt).unwrap();
-    let view_rect = tree.view_box.rect;
-    let size = tree.size;
-    let fit_size = fit_view_box(size, &tree.view_box);
+
+    let size = tree.size();
 
     let bound_rect = Rect::from_size(Size::new(f32::MAX, f32::MAX));
-
     let mut painter = crate::Painter::new(bound_rect);
-    painter.apply_transform(
-      &Transform::translation(-view_rect.x(), -view_rect.y())
-        .then_scale(size.width() / fit_size.width(), size.height() / fit_size.height()),
-    );
-    tree.root.traverse().for_each(|edge| match edge {
-      rctree::NodeEdge::Start(node) => {
-        use usvg::NodeKind;
-        painter.save();
-        match &*node.borrow() {
-          NodeKind::Path(p) => {
-            painter.apply_transform(&matrix_convert(p.transform));
-            let path = usvg_path_to_path(p);
-            if let Some(ref fill) = p.fill {
-              let (brush, transform) = brush_from_usvg_paint(&fill.paint, fill.opacity, &size);
-              let mut painter = painter.save_guard();
-
-              let inverse_ts = transform.inverse().unwrap();
-              let path = Resource::new(path.clone().transform(&inverse_ts));
-              painter
-                .set_fill_brush(brush.clone())
-                .apply_transform(&transform)
-                .fill_path(path.into());
-              //&o_ts.then(&n_ts.inverse().unwrap())));
-            }
-
-            if let Some(ref stroke) = p.stroke {
-              let cap = match stroke.linecap {
-                usvg::LineCap::Butt => LineCap::Butt,
-                usvg::LineCap::Square => LineCap::Square,
-                usvg::LineCap::Round => LineCap::Round,
-              };
-              let join = match stroke.linejoin {
-                usvg::LineJoin::Miter => LineJoin::Miter,
-                usvg::LineJoin::Bevel => LineJoin::Bevel,
-                usvg::LineJoin::Round => LineJoin::Round,
-                usvg::LineJoin::MiterClip => LineJoin::MiterClip,
-              };
-              let options = StrokeOptions {
-                width: stroke.width.get(),
-                line_cap: cap,
-                line_join: join,
-                miter_limit: stroke.miterlimit.get(),
-              };
-
-              let (brush, transform) = brush_from_usvg_paint(&stroke.paint, stroke.opacity, &size);
-              let mut painter = painter.save_guard();
-
-              painter
-                .set_stroke_brush(brush.clone())
-                .apply_transform(&transform);
-
-              let path = path
-                .transform(&transform.inverse().unwrap())
-                .stroke(&options, Some(painter.transform()));
-
-              if let Some(p) = path {
-                painter.fill_path(Resource::new(p).into());
-              }
-            };
-          }
-          NodeKind::Image(_) => {
-            // todo;
-            log::warn!("[painter]: not support draw embed image in svg, ignored!");
-          }
-          NodeKind::Group(ref g) => {
-            painter.apply_transform(&matrix_convert(g.transform));
-            // todo;
-            if g.opacity.get() != 1. {
-              log::warn!("[painter]: not support `opacity` in svg, ignored!");
-            }
-            if g.clip_path.is_some() {
-              log::warn!("[painter]: not support `clip path` in svg, ignored!");
-            }
-            if g.mask.is_some() {
-              log::warn!("[painter]: not support `mask` in svg, ignored!");
-            }
-            if !g.filters.is_empty() {
-              log::warn!("[painter]: not support `filters` in svg, ignored!");
-            }
-          }
-          NodeKind::Text(_) => {
-            todo!("Not support text in SVG temporarily, we'll add it after refactoring `painter`.")
-          }
-        }
-      }
-      rctree::NodeEdge::End(_) => {
-        painter.restore();
-      }
-    });
+    paint_group(tree.root(), &mut painter);
 
     let paint_commands = painter.finish().to_owned().into_boxed_slice();
 
@@ -154,9 +56,73 @@ impl Svg {
   pub fn deserialize(str: &str) -> Result<Self, Box<dyn Error>> { Ok(serde_json::from_str(str)?) }
 }
 
+fn paint_group(g: &usvg::Group, painter: &mut crate::Painter) {
+  let mut painter = painter.save_guard();
+  for child in g.children() {
+    match child {
+      usvg::Node::Group(g) => {
+        // todo;
+        painter.apply_alpha(g.opacity().get());
+
+        if g.clip_path().is_some() {
+          log::warn!("[painter]: not support `clip path` in svg, ignored!");
+        }
+        if g.mask().is_some() {
+          log::warn!("[painter]: not support `mask` in svg, ignored!");
+        }
+        if !g.filters().is_empty() {
+          log::warn!("[painter]: not support `filters` in svg, ignored!");
+        }
+        paint_group(g, &mut painter);
+      }
+      usvg::Node::Path(p) => {
+        painter.set_transform(matrix_convert(p.abs_transform()));
+        let path = usvg_path_to_path(p);
+        if let Some(fill) = p.fill() {
+          let (brush, transform) = brush_from_usvg_paint(fill.paint(), fill.opacity());
+
+          let inverse_ts = transform.inverse().unwrap();
+          let path = Resource::new(path.clone().transform(&inverse_ts));
+          painter
+            .set_fill_brush(brush.clone())
+            .apply_transform(&transform)
+            .fill_path(path.into());
+          //&o_ts.then(&n_ts.inverse().unwrap())));
+        }
+
+        if let Some(stroke) = p.stroke() {
+          let options = StrokeOptions {
+            width: stroke.width().get(),
+            line_cap: stroke.linecap().into(),
+            line_join: stroke.linejoin().into(),
+            miter_limit: stroke.miterlimit().get(),
+          };
+
+          let (brush, transform) = brush_from_usvg_paint(stroke.paint(), stroke.opacity());
+          painter
+            .set_stroke_brush(brush.clone())
+            .apply_transform(&transform);
+
+          let path = path
+            .transform(&transform.inverse().unwrap())
+            .stroke(&options, Some(painter.transform()));
+
+          if let Some(p) = path {
+            painter.fill_path(Resource::new(p).into());
+          }
+        };
+      }
+      usvg::Node::Image(_) => {
+        // todo;
+        log::warn!("[painter]: not support draw embed image in svg, ignored!");
+      }
+      usvg::Node::Text(t) => paint_group(t.flattened(), &mut painter),
+    }
+  }
+}
 fn usvg_path_to_path(path: &usvg::Path) -> Path {
   let mut builder = lyon_algorithms::path::Path::svg_builder();
-  path.data.segments().for_each(|seg| match seg {
+  path.data().segments().for_each(|seg| match seg {
     usvg::tiny_skia_path::PathSegment::MoveTo(pt) => {
       builder.move_to(point(pt.x, pt.y));
     }
@@ -182,9 +148,7 @@ fn matrix_convert(t: usvg::Transform) -> Transform {
   Transform::new(sx, ky, kx, sy, tx, ty)
 }
 
-fn brush_from_usvg_paint(
-  paint: &usvg::Paint, opacity: usvg::Opacity, size: &usvg::Size,
-) -> (Brush, Transform) {
+fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity) -> (Brush, Transform) {
   match paint {
     usvg::Paint::Color(usvg::Color { red, green, blue }) => (
       Color::from_rgb(*red, *green, *blue)
@@ -193,42 +157,28 @@ fn brush_from_usvg_paint(
       Transform::identity(),
     ),
     usvg::Paint::LinearGradient(linear) => {
-      let stops = convert_to_gradient_stops(&linear.stops);
-      let size_scale = match linear.units {
-        usvg::Units::UserSpaceOnUse => (1., 1.),
-        usvg::Units::ObjectBoundingBox => (size.width(), size.height()),
-      };
+      let stops = convert_to_gradient_stops(linear.stops());
       let gradient = LinearGradient {
-        start: Point::new(linear.x1 * size_scale.0, linear.y1 * size_scale.1),
-        end: Point::new(linear.x2 * size_scale.0, linear.y2 * size_scale.1),
+        start: Point::new(linear.x1(), linear.y1()),
+        end: Point::new(linear.x2(), linear.y2()),
         stops,
-        spread_method: linear.spread_method.into(),
+        spread_method: linear.spread_method().into(),
       };
 
-      (Brush::LinearGradient(gradient), matrix_convert(linear.transform))
+      (Brush::LinearGradient(gradient), matrix_convert(linear.transform()))
     }
     usvg::Paint::RadialGradient(radial_gradient) => {
-      let stops = convert_to_gradient_stops(&radial_gradient.stops);
-      let size_scale = match radial_gradient.units {
-        usvg::Units::UserSpaceOnUse => (1., 1.),
-        usvg::Units::ObjectBoundingBox => (size.width(), size.height()),
-      };
+      let stops = convert_to_gradient_stops(radial_gradient.stops());
       let gradient = RadialGradient {
-        start_center: Point::new(
-          radial_gradient.fx * size_scale.0,
-          radial_gradient.fy * size_scale.1,
-        ),
+        start_center: Point::new(radial_gradient.fx(), radial_gradient.fy()),
         start_radius: 0., // usvg not support fr
-        end_center: Point::new(
-          radial_gradient.cx * size_scale.0,
-          radial_gradient.cy * size_scale.1,
-        ),
-        end_radius: radial_gradient.r.get() * size_scale.0,
+        end_center: Point::new(radial_gradient.cx(), radial_gradient.cy()),
+        end_radius: radial_gradient.r().get(),
         stops,
-        spread_method: radial_gradient.spread_method.into(),
+        spread_method: radial_gradient.spread_method().into(),
       };
 
-      (Brush::RadialGradient(gradient), matrix_convert(radial_gradient.transform))
+      (Brush::RadialGradient(gradient), matrix_convert(radial_gradient.transform()))
     }
     paint => {
       log::warn!("[painter]: not support `{paint:?}` in svg, use black instead!");
@@ -243,10 +193,10 @@ fn convert_to_gradient_stops(stops: &[Stop]) -> Vec<GradientStop> {
   let mut stops: Vec<_> = stops
     .iter()
     .map(|stop| {
-      let usvg::Color { red, green, blue } = stop.color;
+      let usvg::Color { red, green, blue } = stop.color();
       GradientStop {
-        offset: stop.offset.get(),
-        color: Color::new(red, green, blue, stop.opacity.to_u8()),
+        offset: stop.offset().get(),
+        color: Color::new(red, green, blue, stop.opacity().to_u8()),
       }
     })
     .collect();
@@ -264,4 +214,25 @@ fn convert_to_gradient_stops(stops: &[Stop]) -> Vec<GradientStop> {
     }
   }
   stops
+}
+
+impl From<usvg::LineCap> for LineCap {
+  fn from(value: usvg::LineCap) -> Self {
+    match value {
+      usvg::LineCap::Butt => LineCap::Butt,
+      usvg::LineCap::Round => LineCap::Round,
+      usvg::LineCap::Square => LineCap::Square,
+    }
+  }
+}
+
+impl From<usvg::LineJoin> for LineJoin {
+  fn from(value: usvg::LineJoin) -> Self {
+    match value {
+      usvg::LineJoin::Miter => LineJoin::Miter,
+      usvg::LineJoin::MiterClip => LineJoin::MiterClip,
+      usvg::LineJoin::Round => LineJoin::Round,
+      usvg::LineJoin::Bevel => LineJoin::Bevel,
+    }
+  }
 }
