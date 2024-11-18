@@ -355,15 +355,21 @@ impl LayoutCase {
 pub struct WidgetTester {
   pub widget: GenWidget,
   pub wnd_size: Option<Size>,
+  pub env_init: Option<Box<dyn FnOnce()>>,
   pub on_initd: Option<InitdFn>,
   pub comparison: Option<f64>,
 }
 
-type InitdFn = Box<dyn Fn(&mut TestWindow)>;
+type InitdFn = Box<dyn FnOnce(&mut TestWindow)>;
 
 impl WidgetTester {
   pub fn new(widget: impl Into<GenWidget>) -> Self {
-    Self { wnd_size: None, widget: widget.into(), on_initd: None, comparison: None }
+    Self { wnd_size: None, widget: widget.into(), on_initd: None, env_init: None, comparison: None }
+  }
+
+  pub fn with_env_init(mut self, env_init: impl Fn() + 'static) -> Self {
+    self.env_init = Some(Box::new(env_init));
+    self
   }
 
   /// This callback runs after creating the window and drawing the first frame.
@@ -382,11 +388,15 @@ impl WidgetTester {
     self
   }
 
-  pub fn create_wnd(&self) -> TestWindow {
+  pub fn create_wnd(&mut self) -> TestWindow {
+    if let Some(env_init) = self.env_init.take() {
+      env_init();
+    }
+
     let wnd_size = self.wnd_size.unwrap_or(Size::new(1024., 1024.));
     let mut wnd = TestWindow::new_with_size(self.widget.clone(), wnd_size);
     wnd.draw_frame();
-    if let Some(initd) = self.on_initd.as_ref() {
+    if let Some(initd) = self.on_initd.take() {
       initd(&mut wnd);
       wnd.draw_frame();
     }
@@ -394,7 +404,7 @@ impl WidgetTester {
   }
 
   #[track_caller]
-  pub fn layout_check(&self, cases: &[LayoutCase]) {
+  pub fn layout_check(mut self, cases: &[LayoutCase]) {
     let wnd = self.create_wnd();
     cases.iter().for_each(|c| c.check(&wnd));
   }

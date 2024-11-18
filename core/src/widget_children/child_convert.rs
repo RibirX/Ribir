@@ -1,3 +1,4 @@
+use super::{DeclareInit, DeclareInto};
 use crate::{pipe::*, widget::*};
 
 /// Trait for conversions type as a child of widget.
@@ -93,4 +94,20 @@ where
 {
   #[inline]
   fn into_child(self) -> FnWidget<'w> { FnWidget::new(self) }
+}
+
+impl<U, T> IntoChild<DeclareInit<U>, RENDER> for T
+where
+  T: DeclareInto<U, 1>,
+{
+  #[inline]
+  fn into_child(self) -> DeclareInit<U> { self.declare_into() }
+}
+
+impl<U, T> IntoChild<DeclareInit<U>, COMPOSE> for T
+where
+  T: DeclareInto<U, 2>,
+{
+  #[inline]
+  fn into_child(self) -> DeclareInit<U> { self.declare_into() }
 }

@@ -17,14 +17,11 @@ fn new(palette: Palette) -> Theme {
     typography_theme: typography_theme(),
     classes,
     icon_theme: icon_theme(),
-    transitions_theme: TransitionTheme::default(),
-    compose_decorators: <_>::default(),
-    custom_styles: <_>::default(),
-    font_bytes: Some(vec![
+    font_bytes: vec![
       include_bytes!("./fonts/Roboto-Regular.ttf").to_vec(),
       include_bytes!("./fonts/Roboto-Medium.ttf").to_vec(),
-    ]),
-    font_files: None,
+    ],
+    ..Default::default()
   };
 
   fill_svgs! { theme.icon_theme,

@@ -17,6 +17,7 @@ ribir_algo = { path = "../algo", version = "0.4.0-alpha.15" }
 ribir_core = { path = "../core", version = "0.4.0-alpha.15" }
 ribir_gpu = { path = "../gpu", version = "0.4.0-alpha.15" }
 ribir_material = { path = "../themes/material", version = "0.4.0-alpha.15", optional = true }
+ribir_slim = { path = "../themes/ribir_slim", version = "0.4.0-alpha.15", optional = true }
 ribir_widgets = { path = "../widgets", version = "0.4.0-alpha.15", optional = true }
 rxrust.workspace = true
 wgpu = { workspace = true, optional = true }
@@ -54,6 +55,7 @@ wgpu = ["ribir_gpu/wgpu", "dep:wgpu"]
 widgets = ["ribir_widgets"]
 tokio-async = ["ribir_core/tokio-async"]
 nightly = ["ribir_core/nightly"]
+slim = ["ribir_slim"]
 
 [[test]]
 harness = false

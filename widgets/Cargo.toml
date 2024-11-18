@@ -26,3 +26,4 @@ paste.workspace = true
 winit.workspace = true
 ribir_dev_helper = {path = "../dev-helper"}
 ribir_material = {path = "../themes/material"}
+ribir_slim = {path = "../themes/ribir_slim"}

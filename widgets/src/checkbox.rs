@@ -2,6 +2,7 @@ use ribir_core::prelude::*;
 
 use crate::{
   common_widget::{Leading, Trailing},
+  icon::ICON,
   prelude::{Icon, Label, Row, Text},
 };
 
@@ -59,55 +60,62 @@ impl ComposeChild<'static> for Checkbox {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fn_widget! {
       let CheckBoxStyle {
-        icon_size,
         label_style,
         label_color,
+        ..
       } = CheckBoxStyle::of(BuildCtx::get());
-
-      let icon = @CheckBoxDecorator {
-        color: pipe!($this.color),
-        @Icon { size: icon_size,
-          @ { pipe!{
-            if $this.indeterminate {
-              svgs::INDETERMINATE_CHECK_BOX
-            } else if $this.checked {
-              svgs::CHECK_BOX
-            } else {
-              svgs::CHECK_BOX_OUTLINE_BLANK
+      @OverrideClass {
+        name: ICON,
+        class_impl: style_class! {
+          clamp: BoxClamp::fixed_size(CheckBoxStyle::of(BuildCtx::get()).icon_size)
+        },
+        @fn_widget! {
+          let icon = @CheckBoxDecorator {
+            color: pipe!($this.color),
+            @Icon {
+              @ { pipe!{
+                if $this.indeterminate {
+                  svgs::INDETERMINATE_CHECK_BOX
+                } else if $this.checked {
+                  svgs::CHECK_BOX
+                } else {
+                  svgs::CHECK_BOX_OUTLINE_BLANK
+                }
+              }}
             }
-          }}
-        }
-      }.into_widget();
+          }.into_widget();
 
-      let checkbox = if let Some(child) = child  {
-        let label = |label: Label| @Text {
-          text: label.0,
-          foreground: label_color,
-          text_style: label_style,
-        };
+          let checkbox = if let Some(child) = child  {
+            let label = |label: Label| @Text {
+              text: label.0,
+              foreground: label_color,
+              text_style: label_style,
+            };
 
-        @Row {
-          @ {
-            match child {
-              CheckboxTemplate::Before(w) => {
-                [(label(w.0)).into_widget(), icon]
-              },
-              CheckboxTemplate::After(w) => {
-                [icon, label(w.0).into_widget()]
-              },
+            @Row {
+              @ {
+                match child {
+                  CheckboxTemplate::Before(w) => {
+                    [(label(w.0)).into_widget(), icon]
+                  },
+                  CheckboxTemplate::After(w) => {
+                    [icon, label(w.0).into_widget()]
+                  },
+                }
+              }
+            }.into_widget()
+          } else {
+            icon
+          };
+
+          let checkbox = FatObj::new(checkbox);
+          @ $checkbox {
+            cursor: CursorIcon::Pointer,
+            on_tap: move |_| $this.write().switch_check(),
+            on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
+              $this.write().switch_check()
             }
           }
-        }.into_widget()
-      } else {
-        icon
-      };
-
-      let checkbox = FatObj::new(checkbox);
-      @ $checkbox {
-        cursor: CursorIcon::Pointer,
-        on_tap: move |_| $this.write().switch_check(),
-        on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
-          $this.write().switch_check()
         }
       }
     }

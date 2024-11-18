@@ -54,6 +54,9 @@ impl Render for Text {
 }
 
 impl Text {
+  pub fn new<const M: u8>(text: impl Into<CowArc<str>>) -> Self {
+    Self { text: text.into(), text_align: TextAlign::Start, glyphs: Default::default() }
+  }
   pub fn glyphs(&self) -> Option<Ref<VisualGlyphs>> {
     Ref::filter_map(self.glyphs.borrow(), |v| v.as_ref()).ok()
   }

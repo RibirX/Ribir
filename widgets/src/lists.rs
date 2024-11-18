@@ -196,10 +196,7 @@ impl<'w> EdgeWidget<'w> {
         EdgeWidget::Icon(w) => {
           let margin = icon.gap.map(|margin| Margin { margin });
           @ $margin {
-            @Icon {
-              size: icon.size,
-              @ { w }
-            }
+            @Icon { @ { w }            }
           }
         },
         EdgeWidget::Text(label) => {

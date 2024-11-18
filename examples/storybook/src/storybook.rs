@@ -26,7 +26,6 @@ fn content() -> Widget<'static> {
               clamp: BoxClamp::fixed_height(30.),
               @Text { text: "Common buttons" }
               @Icon {
-                size: Size::splat(16.),
                 @ { material_svgs::INFO }
               }
             }
@@ -96,7 +95,6 @@ fn content() -> Widget<'static> {
               @Row {
                 @Text { text: "Floating action buttons" }
                 @Icon {
-                  size: Size::splat(16.),
                   @ { material_svgs::INFO }
                 }
               }
@@ -129,7 +127,6 @@ fn content() -> Widget<'static> {
               @Row {
                 @Text { text: "Icon buttons" }
                 @Icon {
-                  size: Size::splat(16.),
                   @ { material_svgs::INFO }
                 }
               }
@@ -201,7 +198,6 @@ fn content() -> Widget<'static> {
             h_align: HAlign::Center,
             @Text { text: "Divider" }
             @Icon {
-              size: Size::splat(16.),
               @ { material_svgs::INFO }
             }
           }

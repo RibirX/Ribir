@@ -14,7 +14,7 @@ version.workspace = true
 [dependencies]
 paste.workspace = true
 # we disable `default-features`, because we want more control over testing.
-ribir = {path = "../../ribir", features = ["material", "widgets"]}
+ribir = {path = "../../ribir", features = ["material", "slim", "widgets"]}
 serde = {workspace = true, features = ["derive"]}
 serde_json = {workspace = true}
 

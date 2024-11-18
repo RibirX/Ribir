@@ -156,12 +156,12 @@ pub fn pipe(input: TokenStream) -> TokenStream {
 pub fn style_class(input: TokenStream) -> TokenStream {
   let input: proc_macro2::TokenStream = input.into();
   quote! {
-    move |widget: Widget| {
+    (move |widget: Widget| {
       fn_widget! {
         let widget = FatObj::new(widget);
         @ $widget { #input }
       }.into_widget()
-    }
+    }) as fn(Widget) -> Widget
   }
   .into()
 }

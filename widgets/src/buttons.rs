@@ -59,7 +59,6 @@ impl ComposeChild<'static> for ButtonImpl {
         @{
           let padding = $this.padding_style.map(Padding::new);
           let icon = icon.map(|icon| @Icon {
-            size: pipe!($this.icon_size),
             @{ icon }
           });
           let label = label.map(|label| @Text {

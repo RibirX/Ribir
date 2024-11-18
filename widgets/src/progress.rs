@@ -115,17 +115,20 @@ pub struct SpinnerArc {
 impl Render for SpinnerArc {
   fn only_sized_by_parent(&self) -> bool { true }
 
-  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.max }
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let wnd_size = ctx.window().size();
+    clamp.max.min(wnd_size)
+  }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
     let Self { start, end } = *self;
-    if self.offset_angle().to_degrees().abs() < 0.1 {
+    let size = ctx.box_size().unwrap();
+    if self.offset_angle().to_degrees().abs() < 0.1 || size.is_empty() {
       return;
     }
 
     let start = start - Angle::pi() / 2.;
     let end = end - Angle::pi() / 2.;
-    let size = ctx.box_size().unwrap();
     let center = Point::new(size.width / 2., size.height / 2.);
     let radius = min(center.x, center.y);
     let painter = ctx.painter();

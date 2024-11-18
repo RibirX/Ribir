@@ -120,17 +120,13 @@ impl FontDB {
     families
       .iter()
       .filter_map(|f| {
-        if let Some(id) = self.data_base.query(&Query {
+        let id = self.data_base.query(&Query {
           families: &[to_db_family(f)],
           weight: *weight,
           stretch: *stretch,
           style: *style,
-        }) {
-          if self.face_data_or_insert(id).is_some() {
-            return Some(id);
-          }
-        }
-        None
+        })?;
+        self.face_data_or_insert(id).map(|_| id)
       })
       .collect()
   }
