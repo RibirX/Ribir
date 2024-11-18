@@ -19,12 +19,10 @@ log.workspace = true
 lyon_algorithms = {version = "1.0.3", features = ["serialization"]}
 lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional = true}
 material-color-utilities-rs = {workspace = true}
-rctree.workspace = true
 ribir_algo = {path = "../algo", version = "0.4.0-alpha.15" }
 ribir_geom = {path = "../geom", version = "0.4.0-alpha.15" }
 serde = {version = "1.0", features = ["derive"]}
 serde_json.workspace = true
-tiny-skia-path = {workspace = true}
 usvg.workspace = true
 zerocopy = {workspace = true, optional = true, features = ["derive"]}
 derive_more= {workspace = true, features = ["add", "add_assign", "not", "mul"]} 
