@@ -160,8 +160,7 @@ impl Tabs {
     tabs: impl StateWriter<Value = Tabs> + 'static,
     indicator: impl StateWriter<Value = IndicatorDecorator> + 'static,
   ) -> impl Iterator<Item = impl IntoWidget<'static, FN>> {
-    let TabsStyle { icon_size: size, icon_pos, active_color, foreground, label_style, .. } =
-      tabs_style;
+    let TabsStyle { icon_pos, active_color, foreground, label_style, .. } = tabs_style;
     headers
       .into_iter()
       .enumerate()
@@ -172,7 +171,7 @@ impl Tabs {
         let label_style = label_style.clone();
         let indicator = indicator.clone_writer();
         fn_widget! {
-          let icon_widget = icon.map(|icon| @Icon { size, @ { icon }});
+          let icon_widget = icon.map(|icon| @Icon { @ { icon }});
           let label_widget = label.map(|label| {
             @Text {
               text: label.0,

@@ -1,6 +1,27 @@
 use ribir_core::{fill_svgs, prelude::*};
+mod classes;
+pub mod slim;
+
+pub fn purple() -> Theme {
+  let p = Palette {
+    primary: Color::from_u32(0x6750A4FF),
+    secondary: Color::from_u32(0x625B71FF),
+    tertiary: Color::from_u32(0x7D5260FF),
+    neutral: Color::from_u32(0xFFFBFEFF),
+    neutral_variant: Color::from_u32(0xE7E0ECFF),
+    error: Color::from_u32(0xB3261EFF),
+    warning: Color::from_u32(0xFFB74DFF),
+    success: Color::from_u32(0x81C784FF),
+    brightness: Brightness::Light,
+    light: LightnessCfg::light_theme_default(),
+    dark: LightnessCfg::dark_theme_default(),
+  };
+
+  with_palette(p)
+}
 
 pub fn with_palette(palette: Palette) -> Theme {
+  let classes = classes::initd_classes();
   let icon_size = IconSize {
     tiny: Size::new(18., 18.),
     small: Size::new(24., 24.),
@@ -39,17 +60,7 @@ pub fn with_palette(palette: Palette) -> Theme {
     svgs::TEXT_CARET: "./icons/text_caret.svg"
   };
 
-  Theme {
-    palette,
-    typography_theme: typography_theme(),
-    classes: <_>::default(),
-    icon_theme,
-    transitions_theme: Default::default(),
-    compose_decorators: Default::default(),
-    custom_styles: Default::default(),
-    font_bytes: None,
-    font_files: None,
-  }
+  Theme { palette, classes, typography_theme: typography_theme(), icon_theme, ..Default::default() }
 }
 
 fn typography_theme() -> TypographyTheme {

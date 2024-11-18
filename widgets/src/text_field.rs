@@ -288,7 +288,6 @@ impl<'c> ComposeChild<'c> for TextField {
           align_items: Align::Stretch,
           @{
             leading_icon.map(|t| @Icon {
-              size: IconSize::of(ctx).small,
               @{ t.0 }
             })
           }
@@ -297,10 +296,7 @@ impl<'c> ComposeChild<'c> for TextField {
             @{ build_content_area(this, theme, config) }
           }
           @{
-            trailing_icon.map(|t| @Icon {
-              size: IconSize::of(ctx).small,
-              @{ t.0 }
-            })
+            trailing_icon.map(|t| @Icon { @{ t.0 } })
           }
         }
         @Container {

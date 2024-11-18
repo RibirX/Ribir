@@ -85,8 +85,19 @@ pub struct Theme {
   pub transitions_theme: TransitionTheme,
   pub compose_decorators: ComposeDecorators,
   pub custom_styles: CustomStyles,
-  pub font_bytes: Option<Vec<Vec<u8>>>,
-  pub font_files: Option<Vec<String>>,
+  pub font_bytes: Vec<Vec<u8>>,
+  pub font_files: Vec<String>,
+  /// This font is used for icons to display text as icons through font
+  /// ligatures. It is crucial to ensure that this font is included in either
+  /// `font_bytes` or `font_files`.
+  ///
+  /// Theme makers may not know which icons the application will utilize, making
+  /// it challenging to provide a default icon font. Additionally, offering a
+  /// vast selection of icons in a single font file can result in a large file
+  /// size, which is not ideal for web platforms. Therefore, this configuration
+  /// allows the application developer to supply the font file. Certainly, the
+  /// icon also works with `SVG` and [`named_svgs`](super::named_svgs).
+  pub icon_font: FontFace,
 }
 
 impl Theme {
@@ -107,16 +118,13 @@ impl Theme {
   fn load_fonts(&mut self) {
     let mut font_db = AppCtx::font_db().borrow_mut();
     let Theme { font_bytes, font_files, .. } = self;
-    if let Some(font_bytes) = font_bytes {
-      font_bytes
-        .iter()
-        .for_each(|data| font_db.load_from_bytes(data.clone()));
-    }
-    if let Some(font_files) = font_files {
-      font_files.iter().for_each(|path| {
-        let _ = font_db.load_font_file(path);
-      });
-    }
+    font_bytes
+      .iter()
+      .for_each(|data| font_db.load_from_bytes(data.clone()));
+
+    font_files.iter().for_each(|path| {
+      let _ = font_db.load_font_file(path);
+    });
   }
 }
 
@@ -232,13 +240,14 @@ impl Default for Theme {
     Theme {
       palette: Palette::default(),
       typography_theme: typography_theme(),
-      classes: <_>::default(),
       icon_theme,
+      classes: <_>::default(),
       transitions_theme: Default::default(),
       compose_decorators: Default::default(),
       custom_styles: Default::default(),
-      font_bytes: None,
-      font_files: None,
+      font_bytes: vec![],
+      font_files: vec![],
+      icon_font: Default::default(),
     }
   }
 }

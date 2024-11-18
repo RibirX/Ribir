@@ -50,9 +50,14 @@ macro_rules! widget_layout_test {
 #[macro_export]
 macro_rules! widget_image_tests {
   ($name:ident, $widget_tester:expr) => {
-    widget_image_tests!(gen_test: $name, with_default_by_wgpu, Theme::default(), $widget_tester);
-    widget_image_tests!(gen_test:
-      $name,
+    widget_image_tests!(
+      gen_test: $name,
+      with_default_by_wgpu,
+      ribir_slim::purple(),
+      $widget_tester
+    );
+    widget_image_tests!(
+      gen_test: $name,
       with_material_by_wgpu,
       ribir_material::purple::light(),
       $widget_tester

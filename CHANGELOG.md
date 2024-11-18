@@ -33,6 +33,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Added `OverrideClass` to override a single class within a subtree. (#657 @M-Adoo)
 - **widgets**: Added `LinearProgress` and `SpinnerProgress` widgets along with their respective material themes. (#630 @wjian23 @M-Adoo)
 
+### Changed
+
+- **widgets**: The `Icon` widget utilizes classes to configure its style, and it does not have a size property. (#660 @M-Adoo)
+
 ### Fixed
 
 - **core**: The size of the `Root` container is too small, which could lead to potential missed hits. (#654 @M-Adoo)

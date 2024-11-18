@@ -53,7 +53,7 @@ impl Compose for MessageList {
           align_items: Align::Center,
           @Row {
             item_gap: 10.,
-            @TinyIcon { @{ svgs::MENU } }
+            @Icon { @{ svgs::MENU } }
             @Text {
               text: "Message",
               foreground: palette.on_surface(),
@@ -62,8 +62,8 @@ impl Compose for MessageList {
           }
           @Row {
             item_gap: 10.,
-            @TinyIcon { @{ svgs::SEARCH } }
-            @TinyIcon { @{ svgs::MORE_VERT } }
+            @Icon { @{ svgs::SEARCH } }
+            @Icon { @{ svgs::MORE_VERT } }
           }
         }
         @Tabs {
@@ -116,7 +116,7 @@ impl Compose for MessageList {
 
 #[cfg(test)]
 mod tests {
-  use ribir::{core::test_helper::*, material as ribir_material};
+  use ribir::{core::test_helper::*, material as ribir_material, slim as ribir_slim};
   use ribir_dev_helper::*;
 
   use super::*;

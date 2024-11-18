@@ -15,7 +15,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-  use ribir::{core::test_helper::*, material as ribir_material};
+  use ribir::{core::test_helper::*, material as ribir_material, slim as ribir_slim};
   use ribir_dev_helper::*;
 
   use super::*;
