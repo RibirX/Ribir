@@ -72,11 +72,21 @@ pub enum PaintPath {
 /// The action to apply to the path, such as fill color, image, gradient, etc.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PaintPathAction {
+  Paint {
+    brush: CommandBrush,
+    /// The style to paint the path.
+    painting_style: PaintingStyle,
+  },
+
+  Clip,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CommandBrush {
   Color(Color),
   Image { img: Resource<PixelImage>, opacity: f32 },
   Radial(RadialGradient),
   Linear(LinearGradient),
-  Clip,
 }
 
 #[repr(u32)]
@@ -109,6 +119,17 @@ pub struct PathCommand {
   pub transform: Transform,
   // The action to apply to the path.
   pub action: PaintPathAction,
+}
+
+/// Explain the method for rendering shapes and paths, including filling or
+/// stroking them.
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub enum PaintingStyle {
+  /// Fill the path.
+  #[default]
+  Fill,
+  /// Stroke path with line width.
+  Stroke(StrokeOptions),
 }
 
 /// Define the default method for the painter to render paths, including filling
@@ -366,8 +387,9 @@ impl Painter {
 
   pub fn clip(&mut self, path: PaintPath) -> &mut Self {
     invisible_return!(self);
-    if locatable_bounds(&path.bounds) {
-      if let Some(bounds) = self.intersection_paint_bounds(&path.bounds) {
+    let p_bounds = path.bounds(None);
+    if locatable_bounds(&p_bounds) {
+      if let Some(bounds) = self.intersection_paint_bounds(&p_bounds) {
         let s = self.current_state_mut();
         s.bounds = s.transform.outer_transformed_rect(&bounds);
         let cmd = PathCommand::new(path, PaintPathAction::Clip, s.transform);
@@ -381,63 +403,23 @@ impl Painter {
 
   /// Fill a path with fill brush.
   pub fn fill_path(&mut self, path: PaintPath) -> &mut Self {
-    invisible_return!(self);
-
-    let brush = self.fill_brush().clone();
-    if locatable_bounds(&path.bounds)
-      && self.intersect_paint_bounds(&path.bounds)
-      && brush.is_visible()
-    {
-      let mut action = match brush {
-        Brush::Color(color) => PaintPathAction::Color(color),
-        Brush::Image(img) => PaintPathAction::Image { img, opacity: 1. },
-        Brush::RadialGradient(radial_gradient) => PaintPathAction::Radial(radial_gradient),
-        Brush::LinearGradient(linear_gradient) => PaintPathAction::Linear(linear_gradient),
-      };
-      action.apply_alpha(self.alpha());
-      let ts = *self.transform();
-      let cmd = PathCommand::new(path, action, ts);
-      self.commands.push(PaintCommand::Path(cmd));
-    }
-
-    self
+    self.inner_draw_path(path, PathStyle::Fill)
   }
 
   /// Draw a path with the default style.
   pub fn draw_path(&mut self, path: PaintPath) -> &mut Self {
-    match &self.current_state().style {
-      PathStyle::Fill => self.fill_path(path),
-      PathStyle::Stroke => {
-        let path = path.deref().clone();
-        self.stroke_path(path)
-      }
-    }
+    self.inner_draw_path(path, self.current_state().style)
   }
 
   /// Outlines the current path with the current brush and `StrokeOptions`.
-  ///
-  /// ## Note
-  ///
-  /// Unlike `fill_path`, `stroke_path` accepts a `Path` instead of a
-  /// `PaintPath`. Therefore, the path will not be cached across `stroke_path`
-  /// calls, as the actual path depends on the current `StrokeOptions` of the
-  /// painter.
-  ///
-  /// If you want to stroke a path using `Resource<Path>`, you should retain the
-  /// result of `Path::stroke` with `Resource<Path>` and pass it to `fill_path`.
-  pub fn stroke_path(&mut self, path: Path) -> &mut Self {
-    if let Some(stroke_path) = path.stroke(self.stroke_options(), Some(self.transform())) {
-      self.swap_brush();
-      self.fill_path(stroke_path.into());
-      self.swap_brush();
-    }
-    self
+  pub fn stroke_path(&mut self, path: PaintPath) -> &mut Self {
+    self.inner_draw_path(path, PathStyle::Stroke)
   }
 
   /// Strokes (outlines) the current path with the current brush and line width.
   pub fn stroke(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
-    self.stroke_path(builder.build())
+    self.stroke_path(builder.build().into())
   }
 
   /// Fill the current path with current brush.
@@ -602,7 +584,9 @@ impl Painter {
         let cmd = match cmd.clone() {
           PaintCommand::Path(mut path) => {
             path.transform(&transform);
-            path.action.apply_alpha(alpha);
+            if let PaintPathAction::Paint { ref mut brush, .. } = path.action {
+              brush.apply_alpha(alpha);
+            }
             PaintCommand::Path(path)
           }
           PaintCommand::PopClip => PaintCommand::PopClip,
@@ -726,9 +710,42 @@ impl Painter {
     self
   }
 
-  fn swap_brush(&mut self) {
-    let state = self.current_state_mut();
-    std::mem::swap(&mut state.fill_brush, &mut state.stroke_brush);
+  fn inner_draw_path(&mut self, path: PaintPath, path_style: PathStyle) -> &mut Self {
+    invisible_return!(self);
+    let line_width = matches!(path_style, PathStyle::Stroke).then(|| self.line_width());
+    let p_bounds = path.bounds(line_width);
+    if !locatable_bounds(&p_bounds) || !self.intersect_paint_bounds(&p_bounds) {
+      return self;
+    }
+
+    let brush = match path_style {
+      PathStyle::Fill => self.fill_brush().clone(),
+      PathStyle::Stroke => self.stroke_brush().clone(),
+    };
+
+    if brush.is_visible() {
+      let mut brush = CommandBrush::from(brush);
+      let painting_style = match path_style {
+        PathStyle::Fill => PaintingStyle::Fill,
+        PathStyle::Stroke => PaintingStyle::Stroke(self.stroke_options().clone()),
+      };
+      brush.apply_alpha(self.alpha());
+      let ts = *self.transform();
+      let action = PaintPathAction::Paint { brush, painting_style };
+      let cmd = PathCommand::new(path, action, ts);
+      self.commands.push(PaintCommand::Path(cmd));
+    }
+
+    self
+  }
+}
+
+impl PaintingStyle {
+  pub fn line_width(&self) -> Option<f32> {
+    match self {
+      PaintingStyle::Fill => None,
+      PaintingStyle::Stroke(stroke) => Some(stroke.width),
+    }
   }
 }
 
@@ -781,6 +798,17 @@ impl Painter {
       && t.m22.is_finite()
       && t.m31.is_finite()
       && t.m32.is_finite()
+  }
+}
+
+impl From<Brush> for CommandBrush {
+  fn from(brush: Brush) -> Self {
+    match brush {
+      Brush::Color(color) => CommandBrush::Color(color),
+      Brush::Image(img) => CommandBrush::Image { img, opacity: 1. },
+      Brush::RadialGradient(radial_gradient) => CommandBrush::Radial(radial_gradient),
+      Brush::LinearGradient(linear_gradient) => CommandBrush::Linear(linear_gradient),
+    }
   }
 }
 
@@ -843,7 +871,12 @@ impl From<Resource<Path>> for PaintPath {
 
 impl PathCommand {
   pub fn new(path: PaintPath, action: PaintPathAction, transform: Transform) -> Self {
-    let paint_bounds = transform.outer_transformed_rect(path.bounds());
+    let line_width = if let PaintPathAction::Paint { painting_style, .. } = &action {
+      painting_style.line_width()
+    } else {
+      None
+    };
+    let paint_bounds = transform.outer_transformed_rect(&path.bounds(line_width));
     Self { path, transform, paint_bounds, action }
   }
 
@@ -856,20 +889,19 @@ impl PathCommand {
     self.transform = self.transform.then(transform);
     self.paint_bounds = self
       .transform
-      .outer_transformed_rect(self.path.bounds());
+      .outer_transformed_rect(&self.path.bounds(None));
   }
 }
 
-impl PaintPathAction {
+impl CommandBrush {
   pub fn apply_alpha(&mut self, alpha: f32) -> &mut Self {
     match self {
-      PaintPathAction::Color(color) => *color = color.apply_alpha(alpha),
-      PaintPathAction::Image { opacity, .. } => *opacity *= alpha,
-      PaintPathAction::Radial(RadialGradient { stops, .. })
-      | PaintPathAction::Linear(LinearGradient { stops, .. }) => stops
+      CommandBrush::Color(color) => *color = color.apply_alpha(alpha),
+      CommandBrush::Image { opacity, .. } => *opacity *= alpha,
+      CommandBrush::Radial(RadialGradient { stops, .. })
+      | CommandBrush::Linear(LinearGradient { stops, .. }) => stops
         .iter_mut()
         .for_each(|s| s.color = s.color.apply_alpha(alpha)),
-      PaintPathAction::Clip => {}
     }
     self
   }

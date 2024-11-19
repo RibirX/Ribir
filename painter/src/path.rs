@@ -1,24 +1,25 @@
 use std::ops::Range;
 
 use lyon_algorithms::{
+  geom::euclid::SideOffsets2D,
   measure::{PathMeasurements, SampleType},
   path::{Event, Path as LyonPath},
 };
 use ribir_geom::{Point, Rect, Transform};
 use serde::{Deserialize, Serialize};
 
-use crate::path_builder::{PathBuilder, stroke_path};
+use crate::path_builder::PathBuilder;
 
 /// Path widget describe a shape, build the shape from [`Builder`]!
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Path {
   pub(crate) lyon_path: LyonPath,
   // the bounds of the path.
-  pub(crate) bounds: Rect,
+  bounds: Rect,
 }
 
 /// Stroke properties.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct StrokeOptions {
   /// A stroke thickness.
   ///
@@ -107,11 +108,20 @@ pub struct PathSampler {
 }
 
 impl Path {
+  pub(crate) fn new(lyon_path: LyonPath, bounds: Rect) -> Self { Self { lyon_path, bounds } }
+
   #[inline]
   pub fn builder() -> PathBuilder { PathBuilder::default() }
 
-  #[inline]
-  pub fn bounds(&self) -> &Rect { &self.bounds }
+  pub fn bounds(&self, line_width: Option<f32>) -> Rect {
+    if let Some(line_width) = line_width {
+      self
+        .bounds
+        .outer_rect(SideOffsets2D::new_all_same(line_width / 2.))
+    } else {
+      self.bounds
+    }
+  }
 
   /// create a rect path.
   pub fn rect(rect: &Rect) -> Self {
@@ -133,14 +143,6 @@ impl Path {
     let mut builder = Path::builder();
     builder.circle(center, radius);
     builder.build()
-  }
-
-  /// Convert this path to a stroked path
-  ///
-  /// `ts` is the current transform of the path pre applied. Provide it have a
-  /// more precise convert.
-  pub fn stroke(&self, options: &StrokeOptions, ts: Option<&Transform>) -> Option<Path> {
-    stroke_path(&self.lyon_path, options, ts).map(Into::into)
   }
 
   /// Returns a transformed path in place.
@@ -175,7 +177,7 @@ impl Path {
   }
 
   #[cfg(feature = "tessellation")]
-  pub fn tessellate<Attr>(
+  pub fn fill_tessellate<Attr>(
     &self, tolerance: f32, buffer: &mut VertexBuffers<Attr>,
     vertex_ctor: impl Fn(Point) -> Vertex<Attr>,
   ) {
@@ -187,6 +189,46 @@ impl Path {
         &self.lyon_path,
         &FillOptions::non_zero().with_tolerance(tolerance),
         &mut BuffersBuilder::new(buffer, move |v: FillVertex| {
+          vertex_ctor(v.position().cast_unit())
+        }),
+      )
+      .unwrap();
+  }
+
+  #[cfg(feature = "tessellation")]
+  pub fn stroke_tessellate<Attr>(
+    &self, tolerance: f32, options: StrokeOptions, buffer: &mut VertexBuffers<Attr>,
+    vertex_ctor: impl Fn(Point) -> Vertex<Attr>,
+  ) {
+    use lyon_tessellation::{
+      BuffersBuilder, StrokeOptions as TessOptions, StrokeTessellator, StrokeVertex,
+    };
+
+    let mut stroke_tess = StrokeTessellator::default();
+    let StrokeOptions { width, miter_limit, line_cap, line_join } = options;
+    let cap = match line_cap {
+      LineCap::Butt => lyon_tessellation::LineCap::Butt,
+      LineCap::Round => lyon_tessellation::LineCap::Round,
+      LineCap::Square => lyon_tessellation::LineCap::Square,
+    };
+    let join = match line_join {
+      LineJoin::Miter => lyon_tessellation::LineJoin::Miter,
+      LineJoin::Round => lyon_tessellation::LineJoin::Round,
+      LineJoin::Bevel => lyon_tessellation::LineJoin::Bevel,
+      LineJoin::MiterClip => lyon_tessellation::LineJoin::MiterClip,
+    };
+    let options = TessOptions::tolerance(tolerance)
+      .with_start_cap(cap)
+      .with_end_cap(cap)
+      .with_line_join(join)
+      .with_miter_limit(miter_limit)
+      .with_line_width(width);
+
+    stroke_tess
+      .tessellate_path(
+        &self.lyon_path,
+        &options,
+        &mut BuffersBuilder::new(buffer, move |v: StrokeVertex| {
           vertex_ctor(v.position().cast_unit())
         }),
       )
