@@ -1,4 +1,5 @@
 use ribir_geom::{Point, Size};
+use ribir_painter::{PaintingStyle, TextStyle};
 
 use super::{WidgetCtx, WidgetCtxImpl};
 use crate::{
@@ -17,6 +18,8 @@ pub struct LayoutCtx<'a> {
   /// The widget tree of the window, not borrow it from `wnd` is because a
   /// `LayoutCtx` always in a mutable borrow.
   pub(crate) tree: &'a mut WidgetTree,
+  painting_style: PaintingStyle,
+  text_style: TextStyle,
 }
 
 impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
@@ -28,6 +31,20 @@ impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
 }
 
 impl<'a> LayoutCtx<'a> {
+  pub(crate) fn new(id: WidgetId, tree: &'a mut WidgetTree) -> Self {
+    let painting_style = if let Some(style) = id.query_ancestors_ref::<PaintingStyle>(tree) {
+      style.clone()
+    } else {
+      PaintingStyle::Fill
+    };
+    let text_style = if let Some(style) = id.query_ancestors_ref::<TextStyle>(tree) {
+      style.clone()
+    } else {
+      TextStyle::default()
+    };
+
+    Self { id, tree, painting_style, text_style }
+  }
   /// Perform layout of the child widget referenced, resetting the widget
   /// position to (0, 0) relative to the parent if its position is not set by
   /// its layout logic, and return the resulting size after layout.
@@ -40,7 +57,12 @@ impl<'a> LayoutCtx<'a> {
         // Safety: the `tree` just use to get the widget of `id`, and `tree2` not drop
         // or modify it during perform layout.
         let tree2 = unsafe { &mut *(self.tree as *mut WidgetTree) };
-        let mut ctx = LayoutCtx { id: child, tree: tree2 };
+        let mut ctx = LayoutCtx {
+          id: child,
+          tree: tree2,
+          painting_style: self.painting_style.clone(),
+          text_style: self.text_style.clone(),
+        };
         let size = child
           .assert_get(self.tree)
           .perform_layout(clamp, &mut ctx);
@@ -129,4 +151,16 @@ impl<'a> LayoutCtx<'a> {
     assert_eq!(child.parent(self.tree), Some(self.id));
     self.tree.store.force_layout(child).is_some()
   }
+
+  pub fn set_painting_style(&mut self, style: PaintingStyle) -> PaintingStyle {
+    std::mem::replace(&mut self.painting_style, style)
+  }
+
+  pub fn painting_style(&self) -> &PaintingStyle { &self.painting_style }
+
+  pub fn set_text_style(&mut self, style: TextStyle) -> TextStyle {
+    std::mem::replace(&mut self.text_style, style)
+  }
+
+  pub fn text_style(&self) -> &TextStyle { &self.text_style }
 }

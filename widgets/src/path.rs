@@ -81,6 +81,6 @@ mod tests {
     })
     .with_wnd_size(WND_SIZE)
     .with_comparison(0.000025),
-    LayoutCase::default().with_size(SIZE_40)
+    LayoutCase::default().with_size(Size::splat(40.5))
   );
 }

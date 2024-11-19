@@ -15,12 +15,12 @@ pub struct Text {
 
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let style = Provider::of::<TextStyle>(&ctx).unwrap();
+    let style = ctx.text_style();
     let info = AppCtx::typography_store()
       .borrow_mut()
       .typography(
         self.text.substr(..),
-        &style,
+        style,
         clamp.max,
         self.text_align,
         PlaceLineDirection::TopToBottom,

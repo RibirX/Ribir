@@ -33,7 +33,10 @@ impl<'c> ComposeChild<'c> for TextStyleWidget {
 
 impl WrapRender for TextStyleWidget {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    host.perform_layout(clamp, ctx)
+    let old = ctx.set_text_style(self.text_style.clone());
+    let size = host.perform_layout(clamp, ctx);
+    ctx.set_text_style(old);
+    size
   }
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {

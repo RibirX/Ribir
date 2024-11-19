@@ -13,11 +13,30 @@ impl Declare for PaintingStyleWidget {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl_compose_child_for_wrap_render!(PaintingStyleWidget);
+impl<'c> ComposeChild<'c> for PaintingStyleWidget {
+  type Child = Widget<'c>;
+
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    // We need to provide the text style for the children to access.
+    match this.try_into_value() {
+      Ok(this) => {
+        let style = this.painting_style.clone();
+        WrapRender::combine_child(State::value(this), child).attach_data(Box::new(Queryable(style)))
+      }
+      Err(this) => {
+        let style = this.map_reader(|w| PartData::from_ref(&w.painting_style));
+        WrapRender::combine_child(this, child).attach_data(Box::new(style))
+      }
+    }
+  }
+}
 
 impl WrapRender for PaintingStyleWidget {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    host.perform_layout(clamp, ctx)
+    let old = ctx.set_painting_style(self.painting_style.clone());
+    let size = host.perform_layout(clamp, ctx);
+    ctx.set_painting_style(old);
+    size
   }
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
