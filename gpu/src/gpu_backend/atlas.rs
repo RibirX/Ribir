@@ -1,7 +1,7 @@
-use std::{any::Any, hash::Hash};
+use std::hash::Hash;
 
 use guillotiere::{Allocation, AtlasAllocator};
-use ribir_algo::{FrameCache, Resource};
+use ribir_algo::FrameCache;
 use ribir_geom::{DeviceRect, DeviceSize};
 use ribir_painter::image::ColorFormat;
 use slab::Slab;
@@ -27,19 +27,20 @@ pub(crate) struct AtlasConfig {
   max_size: DeviceSize,
 }
 
-pub(crate) struct Atlas<T: Texture> {
+pub(crate) struct Atlas<K, T: Texture> {
   config: AtlasConfig,
   atlas_allocator: AtlasAllocator,
   texture: T,
-  cache: FrameCache<Resource<dyn Any>, AtlasHandle>,
+  cache: FrameCache<K, AtlasHandle>,
   /// Extra textures which store only single allocation.
   extras: Slab<T>,
   /// All allocations in the current frame and not cached.
   islands: ahash::HashSet<AtlasDist>,
 }
 
-impl<T: Texture> Atlas<T>
+impl<K, T: Texture> Atlas<K, T>
 where
+  K: Hash + Eq,
   T::Host: GPUBackendImpl<Texture = T>,
 {
   pub fn new(config: AtlasConfig, format: ColorFormat, gpu_impl: &mut T::Host) -> Self {
@@ -55,7 +56,7 @@ where
     }
   }
 
-  pub fn get(&mut self, key: &Resource<dyn Any>, scale: f32) -> Option<&AtlasHandle> {
+  pub fn get(&mut self, key: &K, scale: f32) -> Option<&AtlasHandle> {
     self
       .cache
       .get(key)
@@ -65,7 +66,7 @@ where
 
   /// Cache a handle to the atlas. If the key already exists, the old handle
   /// will be replaced
-  pub fn cache(&mut self, key: Resource<dyn Any>, scale: f32, dist: AtlasDist) -> AtlasHandle {
+  pub fn cache(&mut self, key: K, scale: f32, dist: AtlasDist) -> AtlasHandle {
     let handle = AtlasHandle { scale, dist };
 
     if self.islands.contains(&dist) {
@@ -83,7 +84,7 @@ where
   /// Return the handle of cached resource. If the resource is not cached,
   /// allocate it and call `init` to initialize the texture.
   pub fn get_or_cache(
-    &mut self, key: Resource<dyn Any>, scale: f32, size: DeviceSize, gpu: &mut T::Host,
+    &mut self, key: K, scale: f32, size: DeviceSize, gpu: &mut T::Host,
     init: impl FnOnce(&DeviceRect, &mut T, &mut T::Host),
   ) -> AtlasHandle {
     if let Some(h) = self.get(&key, scale) {
@@ -198,7 +199,7 @@ impl AtlasDist {
     }
   }
 
-  pub(super) fn tex_rect<T>(&self, atlas: &Atlas<T>) -> DeviceRect
+  pub(super) fn tex_rect<K, T>(&self, atlas: &Atlas<K, T>) -> DeviceRect
   where
     T: Texture,
   {
@@ -217,7 +218,7 @@ impl AtlasHandle {
     }
   }
 
-  pub(super) fn tex_rect<T>(&self, atlas: &Atlas<T>) -> DeviceRect
+  pub(super) fn tex_rect<K, T>(&self, atlas: &Atlas<K, T>) -> DeviceRect
   where
     T: Texture,
   {
@@ -243,7 +244,10 @@ impl Eq for AtlasDist {}
 #[cfg(feature = "wgpu")]
 #[cfg(test)]
 mod tests {
+  use std::any::Any;
+
   use futures::executor::block_on;
+  use ribir_algo::Resource;
 
   use super::*;
   use crate::{WgpuImpl, WgpuTexture};
@@ -252,8 +256,11 @@ mod tests {
   fn resource_hit() {
     let mut gpu = block_on(WgpuImpl::headless());
     let size = gpu.limits().texture_size;
-    let mut atlas =
-      Atlas::<WgpuTexture>::new(AtlasConfig::new("", size), ColorFormat::Rgba8, &mut gpu);
+    let mut atlas = Atlas::<Resource<dyn Any>, WgpuTexture>::new(
+      AtlasConfig::new("", size),
+      ColorFormat::Rgba8,
+      &mut gpu,
+    );
     let resource = Resource::new(1);
     let h1 = atlas.get_or_cache(resource.clone().into_any(), 1., size, &mut gpu, |_, _, _| {});
     let h2 = atlas.get_or_cache(resource.clone().into_any(), 0.8, size, &mut gpu, |_, _, _| {});
@@ -268,7 +275,7 @@ mod tests {
   #[test]
   fn atlas_grow_to_alloc() {
     let mut gpu_impl = block_on(WgpuImpl::headless());
-    let mut atlas = Atlas::<WgpuTexture>::new(
+    let mut atlas = Atlas::<Resource<dyn Any>, WgpuTexture>::new(
       AtlasConfig::new("", DeviceSize::new(4096, 4096)),
       ColorFormat::Alpha8,
       &mut gpu_impl,
@@ -286,8 +293,11 @@ mod tests {
   fn resource_clear() {
     let mut wgpu = block_on(WgpuImpl::headless());
     let size = wgpu.limits().texture_size;
-    let mut atlas =
-      Atlas::<WgpuTexture>::new(AtlasConfig::new("", size), ColorFormat::Rgba8, &mut wgpu);
+    let mut atlas = Atlas::<Resource<dyn Any>, WgpuTexture>::new(
+      AtlasConfig::new("", size),
+      ColorFormat::Rgba8,
+      &mut wgpu,
+    );
     let dist = atlas.allocate(DeviceSize::new(32, 32), &mut wgpu);
     atlas.cache(Resource::new(1).into_any(), 1., dist);
     atlas.allocate(size, &mut wgpu);
@@ -302,7 +312,7 @@ mod tests {
   #[test]
   fn fix_scale_path_cache_miss() {
     let mut wgpu = block_on(WgpuImpl::headless());
-    let mut atlas = Atlas::<WgpuTexture>::new(
+    let mut atlas = Atlas::<Resource<dyn Any>, WgpuTexture>::new(
       AtlasConfig::new("", DeviceSize::new(4096, 4096)),
       ColorFormat::Rgba8,
       &mut wgpu,
@@ -333,7 +343,7 @@ mod tests {
   #[test]
   fn fix_atlas_expand_overlap() {
     let mut wgpu = block_on(WgpuImpl::headless());
-    let mut atlas = Atlas::<WgpuTexture>::new(
+    let mut atlas = Atlas::<Resource<dyn Any>, WgpuTexture>::new(
       AtlasConfig::new("", DeviceSize::new(4096, 4096)),
       ColorFormat::Alpha8,
       &mut wgpu,

@@ -1,13 +1,12 @@
 use lyon_algorithms::path::{
-  Event, Path as LyonPath, Winding,
+  Winding,
   builder::BorderRadii,
   geom::{Arc, LineSegment},
   path::Builder as LyonBuilder,
 };
-use ribir_geom::{Angle, Point, Rect, Transform, Vector};
-use usvg::tiny_skia_path;
+use ribir_geom::{Angle, Point, Rect, Vector};
 
-use crate::{LineCap, LineJoin, Path, Radius, StrokeOptions};
+use crate::{Path, Radius};
 
 #[derive(Default)]
 pub struct PathBuilder {
@@ -154,14 +153,6 @@ impl PathBuilder {
     self
   }
 
-  /// Return a path that strokes (outlines) the current path with the stroke
-  /// options.
-  #[inline]
-  pub fn stroke(self, options: &StrokeOptions, ts: Option<&Transform>) -> Option<Path> {
-    let path = self.lyon_builder.build();
-    stroke_path(&path, options, ts).map(Into::into)
-  }
-
   /// Construct a path from the current state of the builder.
   #[inline]
   pub fn build(self) -> Path {
@@ -175,80 +166,6 @@ impl PathBuilder {
   /// Caller must ensure that the bounds are correct.
   pub fn build_with_bounds(self, bounds: Rect) -> Path {
     let path = self.lyon_builder.build();
-    Path { lyon_path: path, bounds }
-  }
-}
-
-pub(crate) fn stroke_path(
-  path: &LyonPath, options: &StrokeOptions, ts: Option<&Transform>,
-) -> Option<LyonPath> {
-  let mut builder = tiny_skia_path::PathBuilder::default();
-  let resolution = ts.map_or(1., |t| {
-    let t = into_tiny_transform(*t);
-    tiny_skia_path::PathStroker::compute_resolution_scale(&t)
-  });
-
-  path.iter().for_each(|e| match e {
-    Event::Begin { at } => builder.move_to(at.x, at.y),
-    Event::Line { to, .. } => builder.line_to(to.x, to.y),
-    Event::Quadratic { ctrl, to, .. } => builder.quad_to(ctrl.x, ctrl.y, to.x, to.y),
-    Event::Cubic { ctrl1, ctrl2, to, .. } => {
-      builder.cubic_to(ctrl1.x, ctrl1.y, ctrl2.x, ctrl2.y, to.x, to.y)
-    }
-    Event::End { close, .. } => {
-      if close {
-        builder.close()
-      }
-    }
-  });
-
-  let path = builder
-    .finish()
-    .unwrap()
-    .stroke(&options.clone().into(), resolution)?;
-
-  let mut builder = LyonPath::svg_builder();
-  path.segments().for_each(|seg| match seg {
-    tiny_skia_path::PathSegment::MoveTo(at) => {
-      builder.move_to((at.x, at.y).into());
-    }
-    tiny_skia_path::PathSegment::LineTo(to) => {
-      builder.line_to((to.x, to.y).into());
-    }
-    tiny_skia_path::PathSegment::QuadTo(c, t) => {
-      builder.quadratic_bezier_to((c.x, c.y).into(), (t.x, t.y).into());
-    }
-    tiny_skia_path::PathSegment::CubicTo(c1, c2, to) => {
-      builder.cubic_bezier_to((c1.x, c1.y).into(), (c2.x, c2.y).into(), (to.x, to.y).into());
-    }
-    tiny_skia_path::PathSegment::Close => builder.close(),
-  });
-  Some(builder.build())
-}
-
-fn into_tiny_transform(ts: Transform) -> tiny_skia_path::Transform {
-  let Transform { m11, m12, m21, m22, m31, m32, .. } = ts;
-  tiny_skia_path::Transform { sx: m11, kx: m21, ky: m12, sy: m22, tx: m31, ty: m32 }
-}
-
-impl From<StrokeOptions> for tiny_skia_path::Stroke {
-  fn from(value: StrokeOptions) -> Self {
-    let StrokeOptions { width, miter_limit, line_cap, line_join } = value;
-    tiny_skia_path::Stroke {
-      width,
-      miter_limit,
-      line_cap: match line_cap {
-        LineCap::Butt => tiny_skia_path::LineCap::Butt,
-        LineCap::Round => tiny_skia_path::LineCap::Round,
-        LineCap::Square => tiny_skia_path::LineCap::Square,
-      },
-      line_join: match line_join {
-        LineJoin::Miter => tiny_skia_path::LineJoin::Miter,
-        LineJoin::Round => tiny_skia_path::LineJoin::Round,
-        LineJoin::Bevel => tiny_skia_path::LineJoin::Bevel,
-        LineJoin::MiterClip => tiny_skia_path::LineJoin::MiterClip,
-      },
-      dash: None,
-    }
+    Path::new(path, bounds)
   }
 }

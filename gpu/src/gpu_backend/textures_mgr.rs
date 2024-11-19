@@ -4,7 +4,10 @@ use guillotiere::euclid::SideOffsets2D;
 use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use ribir_algo::Resource;
 use ribir_geom::{DeviceRect, DeviceSize, Size, Transform, transform_to_device_rect};
-use ribir_painter::{PaintPath, Path, PixelImage, Vertex, VertexBuffers, image::ColorFormat};
+use ribir_painter::{
+  PaintPath, PaintingStyle, Path, PixelImage, StrokeOptions, Vertex, VertexBuffers,
+  image::ColorFormat,
+};
 
 use super::{
   Texture,
@@ -21,24 +24,31 @@ pub(super) enum TextureID {
   Bundle(usize),
 }
 
+#[derive(PartialEq, Clone)]
+enum PathKey {
+  Fill(Resource<dyn Any>),
+  Stroke { resource: Resource<dyn Any>, options: StrokeOptions },
+}
+
 pub(super) struct TexturesMgr<T: Texture> {
-  alpha_atlas: Atlas<T>,
-  rgba_atlas: Atlas<T>,
+  alpha_atlas: Atlas<PathKey, T>,
+  rgba_atlas: Atlas<Resource<dyn Any>, T>,
   /// Similar to the `rgba_atlas`, this is used to allocate the target texture
   /// for drawing commands.
   ///
   /// We keep it separate from `rgba_atlas` because the backend may not permit a
   /// texture to be used both as a target and as a sampled resource in the same
   /// draw call.
-  target_atlas: Atlas<T>,
-  fill_task: Vec<FillTask>,
-  fill_task_buffers: VertexBuffers<()>,
+  target_atlas: Atlas<Resource<dyn Any>, T>,
+  tess_task: Vec<TessTask>,
+  tess_task_buffer: VertexBuffers<()>,
   need_clear_areas: Vec<DeviceRect>,
 }
 
-struct FillTask {
+struct TessTask {
   slice: TextureSlice,
   path: PaintPath,
+  style: PaintingStyle,
   // transform to construct vertex
   transform: Transform,
   clip_rect: Option<DeviceRect>,
@@ -94,8 +104,8 @@ where
         ColorFormat::Rgba8,
         gpu_impl,
       ),
-      fill_task: <_>::default(),
-      fill_task_buffers: <_>::default(),
+      tess_task: <_>::default(),
+      tess_task_buffer: <_>::default(),
       need_clear_areas: vec![],
     }
   }
@@ -103,29 +113,40 @@ where
   /// Store an alpha path in texture and return the texture and a transform that
   /// can transform the mask to viewport
   pub(super) fn store_alpha_path(
-    &mut self, path: &PaintPath, matrix: &Transform, viewport: &DeviceRect, gpu: &mut T::Host,
+    &mut self, path: &PaintPath, style: &PaintingStyle, matrix: &Transform, viewport: &DeviceRect,
+    gpu: &mut T::Host,
   ) -> (TextureSlice, Transform) {
+    let path_bounds = path.bounds(style.line_width());
     match path {
       PaintPath::Share(p) => {
-        let cache_scale: f32 = self.cache_scale(&path.bounds().size, matrix);
-        let key = p.clone().into_any();
+        let resource = p.clone().into_any();
+        let cache_scale: f32 = self.cache_scale(&path_bounds.size, matrix);
+        let key = match style {
+          PaintingStyle::Fill => PathKey::Fill(resource),
+          PaintingStyle::Stroke(options) => PathKey::Stroke { resource, options: options.clone() },
+        };
+
         let (slice, scale) = if let Some(h) = self.alpha_atlas.get(&key, cache_scale).copied() {
-          let mask_slice = self.alpha_atlas_dist_to_tex_silice(&h.dist);
+          let mask_slice = self.alpha_atlas_dist_to_tex_slice(&h.dist);
           (mask_slice, h.scale)
         } else {
-          let scale_bounds = p.bounds().scale(cache_scale, cache_scale);
+          let scale_bounds = path_bounds.scale(cache_scale, cache_scale);
           let (dist, slice) =
             self.alpha_allocate(scale_bounds.round_out().size.to_i32().cast_unit(), gpu);
           let _ = self.alpha_atlas.cache(key, cache_scale, dist);
           let offset = slice.rect.origin.to_f32().cast_unit() - scale_bounds.origin;
           let transform = Transform::scale(cache_scale, cache_scale).then_translate(offset);
-          self
-            .fill_task
-            .push(FillTask { slice, path: path.clone(), transform, clip_rect: None });
+          self.tess_task.push(TessTask {
+            slice,
+            path: path.clone(),
+            transform,
+            clip_rect: None,
+            style: style.clone(),
+          });
           (slice, cache_scale)
         };
 
-        let path_origin = p.bounds().origin * scale;
+        let path_origin = path_bounds.origin * scale;
         let slice_origin = slice.rect.origin.to_vector().to_f32();
         // back to slice origin
         let matrix = Transform::translation(-slice_origin.x, -slice_origin.y)
@@ -139,7 +160,7 @@ where
         (slice.expand_for_paste(), matrix)
       }
       PaintPath::Own(_) => {
-        let paint_bounds = transform_to_device_rect(path.bounds(), matrix);
+        let paint_bounds = transform_to_device_rect(&path_bounds, matrix);
         let alloc_size = size_expand_blank(paint_bounds.size);
 
         let (visual_rect, clip_rect) = if self.alpha_atlas.is_good_size_to_alloc(alloc_size) {
@@ -156,8 +177,9 @@ where
           .to_f32()
           .cast_unit();
         let ts = matrix.then_translate(offset);
-        let task = FillTask { slice, transform: ts, path: path.clone(), clip_rect };
-        self.fill_task.push(task);
+        let task =
+          TessTask { slice, transform: ts, path: path.clone(), style: style.clone(), clip_rect };
+        self.tess_task.push(task);
 
         let offset = (visual_rect.origin - slice.rect.origin).to_f32();
         (slice.expand_for_paste(), Transform::translation(offset.x, offset.y))
@@ -168,17 +190,24 @@ where
   pub(super) fn store_image(
     &mut self, img: &Resource<PixelImage>, gpu: &mut T::Host,
   ) -> TextureSlice {
-    let atlas = match img.color_format() {
-      ColorFormat::Rgba8 => &mut self.rgba_atlas,
-      ColorFormat::Alpha8 => &mut self.alpha_atlas,
-    };
-
-    let h =
-      atlas.get_or_cache(img.clone().into_any(), 1., img.size(), gpu, |rect, texture, gpu| {
-        texture.write_data(rect, img.pixel_bytes(), gpu)
-      });
-
-    TextureSlice { tex_id: TextureID::Rgba(h.tex_id()), rect: h.tex_rect(atlas) }
+    match img.color_format() {
+      ColorFormat::Rgba8 => {
+        let atlas = &mut self.rgba_atlas;
+        let h =
+          atlas.get_or_cache(img.clone().into_any(), 1., img.size(), gpu, |rect, texture, gpu| {
+            texture.write_data(rect, img.pixel_bytes(), gpu)
+          });
+        TextureSlice { tex_id: TextureID::Rgba(h.tex_id()), rect: h.tex_rect(atlas) }
+      }
+      ColorFormat::Alpha8 => {
+        let key = PathKey::Fill(img.clone().into_any());
+        let atlas = &mut self.alpha_atlas;
+        let h = atlas.get_or_cache(key, 1., img.size(), gpu, |rect, texture, gpu| {
+          texture.write_data(rect, img.pixel_bytes(), gpu)
+        });
+        TextureSlice { tex_id: TextureID::Rgba(h.tex_id()), rect: h.tex_rect(atlas) }
+      }
+    }
   }
 
   pub(super) fn store_commands(
@@ -204,10 +233,10 @@ where
     // affect the current slice.
     let dist = self.alpha_atlas.allocate(size, gpu);
 
-    (dist, self.alpha_atlas_dist_to_tex_silice(&dist))
+    (dist, self.alpha_atlas_dist_to_tex_slice(&dist))
   }
 
-  fn alpha_atlas_dist_to_tex_silice(&self, dist: &AtlasDist) -> TextureSlice {
+  fn alpha_atlas_dist_to_tex_slice(&self, dist: &AtlasDist) -> TextureSlice {
     let blank_side = SideOffsets2D::new_all_same(ALPHA_BLANK_EDGE);
     let rect = dist.tex_rect(&self.alpha_atlas);
 
@@ -229,17 +258,26 @@ where
     }
   }
 
-  fn fill_tess(
-    path: &Path, ts: &Transform, slice_size: &DeviceSize, buffer: &mut VertexBuffers<()>,
+  fn tessellate(
+    path: &Path, style: &PaintingStyle, ts: &Transform, slice_size: &DeviceSize,
+    buffer: &mut VertexBuffers<()>,
   ) -> Range<u32> {
     let start = buffer.indices.len() as u32;
-    let path_size = path.bounds().size;
+    let path_size = path.bounds(style.line_width()).size;
     let slice_size = slice_size.to_f32();
     let scale = (slice_size.width / path_size.width).max(slice_size.height / path_size.height);
-    path.tessellate(TOLERANCE / scale, buffer, |pos| {
+    let tolerance = TOLERANCE / scale;
+    let vertex_ctor = |pos| {
       let pos = ts.transform_point(pos);
       Vertex::new([pos.x, pos.y], ())
-    });
+    };
+    match style {
+      PaintingStyle::Fill => path.fill_tessellate(tolerance, buffer, vertex_ctor),
+      PaintingStyle::Stroke(options) => {
+        path.stroke_tessellate(tolerance, options.clone(), buffer, vertex_ctor)
+      }
+    }
+
     start..buffer.indices.len() as u32
   }
 
@@ -247,7 +285,7 @@ where
   where
     T: Texture<Host = G>,
   {
-    if self.fill_task.is_empty() {
+    if self.tess_task.is_empty() {
       return;
     }
 
@@ -257,7 +295,7 @@ where
       self.need_clear_areas.clear();
     }
 
-    self.fill_task.sort_by(|a, b| {
+    self.tess_task.sort_by(|a, b| {
       let a_clip = a.clip_rect.is_some();
       let b_clip = b.clip_rect.is_some();
       if a_clip == b_clip {
@@ -269,18 +307,19 @@ where
       }
     });
 
-    let mut draw_indices = Vec::with_capacity(self.fill_task.len());
-    if self.fill_task.len() < PAR_CHUNKS_SIZE {
-      for f in self.fill_task.iter() {
-        let FillTask { slice, path, clip_rect, transform: ts } = f;
-        let rg = Self::fill_tess(path, ts, &slice.rect.size, &mut self.fill_task_buffers);
+    let mut draw_indices = Vec::with_capacity(self.tess_task.len());
+    if self.tess_task.len() < PAR_CHUNKS_SIZE {
+      for f in self.tess_task.iter() {
+        let TessTask { slice, path, clip_rect, transform, style } = f;
+        let rg =
+          Self::tessellate(path, style, transform, &slice.rect.size, &mut self.tess_task_buffer);
         draw_indices.push((slice.tex_id, rg, clip_rect));
       }
     } else {
-      let mut tasks = Vec::with_capacity(self.fill_task.len());
-      for f in self.fill_task.iter() {
-        let FillTask { slice, path, clip_rect, transform: ts } = f;
-        tasks.push((slice, ts, path, clip_rect));
+      let mut tasks = Vec::with_capacity(self.tess_task.len());
+      for f in self.tess_task.iter() {
+        let TessTask { slice, path, clip_rect, transform, style } = f;
+        tasks.push((slice, style, transform, path, clip_rect));
       }
 
       let par_tess_res = tasks
@@ -288,8 +327,8 @@ where
         .map(|tasks| {
           let mut buffer = VertexBuffers::default();
           let mut indices = Vec::with_capacity(tasks.len());
-          for (slice, ts, path, clip_rect) in tasks.iter() {
-            let rg = Self::fill_tess(path, ts, &slice.rect.size, &mut buffer);
+          for (slice, style, ts, path, clip_rect) in tasks.iter() {
+            let rg = Self::tessellate(path, style, ts, &slice.rect.size, &mut buffer);
             indices.push((slice.tex_id, rg, *clip_rect));
           }
           (indices, buffer)
@@ -299,17 +338,17 @@ where
       par_tess_res
         .into_iter()
         .for_each(|(indices, buffer)| {
-          let offset = self.fill_task_buffers.indices.len() as u32;
+          let offset = self.tess_task_buffer.indices.len() as u32;
           draw_indices.extend(indices.into_iter().map(|(id, mut rg, clip)| {
             rg.start += offset;
             rg.end += offset;
             (id, rg, clip)
           }));
-          extend_buffer(&mut self.fill_task_buffers, buffer);
+          extend_buffer(&mut self.tess_task_buffer, buffer);
         })
     };
 
-    gpu_impl.load_alpha_vertices(&self.fill_task_buffers);
+    gpu_impl.load_alpha_vertices(&self.tess_task_buffer);
 
     let mut idx = 0;
     loop {
@@ -343,16 +382,16 @@ where
         rg.start..end.start
       } else {
         idx = draw_indices.len();
-        rg.start..self.fill_task_buffers.indices.len() as u32
+        rg.start..self.tess_task_buffer.indices.len() as u32
       };
 
       let texture = id_to_texture_mut!(self, *tex_id);
       gpu_impl.draw_alpha_triangles(&indices, texture);
     }
 
-    self.fill_task.clear();
-    self.fill_task_buffers.vertices.clear();
-    self.fill_task_buffers.indices.clear();
+    self.tess_task.clear();
+    self.tess_task_buffer.vertices.clear();
+    self.tess_task_buffer.indices.clear();
   }
 
   pub(crate) fn end_frame(&mut self) {
@@ -399,6 +438,24 @@ impl TextureSlice {
     self
   }
 }
+
+impl Hash for PathKey {
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    match self {
+      PathKey::Fill(path) => path.hash(state),
+      PathKey::Stroke { resource: path, options } => {
+        path.hash(state);
+        let StrokeOptions { width, miter_limit, line_cap, line_join } = options;
+        width.to_bits().hash(state);
+        miter_limit.to_bits().hash(state);
+        line_cap.hash(state);
+        line_join.hash(state);
+      }
+    }
+  }
+}
+
+impl Eq for PathKey {}
 
 #[cfg(feature = "wgpu")]
 #[cfg(test)]
@@ -477,10 +534,21 @@ pub mod tests {
     let p = PaintPath::Share(p.clone());
 
     let viewport = rect(0, 0, 1024, 1024);
-    let (slice1, ts1) = mgr.store_alpha_path(&p, &Transform::scale(2., 2.), &viewport, &mut wgpu);
+    let (slice1, ts1) = mgr.store_alpha_path(
+      &p,
+      &PaintingStyle::Fill,
+      &Transform::scale(2., 2.),
+      &viewport,
+      &mut wgpu,
+    );
 
-    let (slice2, ts2) =
-      mgr.store_alpha_path(&p, &Transform::translation(100., 100.), &viewport, &mut wgpu);
+    let (slice2, ts2) = mgr.store_alpha_path(
+      &p,
+      &PaintingStyle::Fill,
+      &Transform::translation(100., 100.),
+      &viewport,
+      &mut wgpu,
+    );
     assert_eq!(slice1, slice2);
 
     assert_eq!(ts1, Transform::new(1., 0., 0., 1., -2., -2.));

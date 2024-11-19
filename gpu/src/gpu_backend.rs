@@ -5,8 +5,8 @@ use ribir_geom::{
   DeviceRect, DeviceSize, Point, Transform, rect_corners, transform_to_device_rect,
 };
 use ribir_painter::{
-  Color, PaintCommand, PaintPath, PaintPathAction, PainterBackend, PathCommand, PixelImage, Vertex,
-  VertexBuffers, image::ColorFormat,
+  Color, CommandBrush, PaintCommand, PaintPath, PaintPathAction, PainterBackend, PaintingStyle,
+  PathCommand, PixelImage, Vertex, VertexBuffers, image::ColorFormat,
 };
 
 use crate::{
@@ -184,69 +184,77 @@ where
         }
 
         let matrix = transform.then(global_matrix);
-        let (rect, mask_head) = self.new_mask_layer(&viewport, &matrix, path);
-
-        match &action {
-          PaintPathAction::Color(color) => {
-            let color = color.into_components();
-            let color_attr = ColorAttr { color, mask_head };
-            let buffer = &mut self.color_vertices_buffer;
-            add_rect_vertices(rect, output_tex_size, color_attr, buffer);
-            self.current_phase = CurrentPhase::Color;
+        let (rect, mask_head) = match action {
+          PaintPathAction::Clip => {
+            self.new_mask_layer(&viewport, &matrix, path, &PaintingStyle::Fill)
           }
-          PaintPathAction::Image { img, opacity } => {
-            let slice = self.tex_mgr.store_image(img, &mut self.gpu_impl);
-            let ts = matrix.inverse().unwrap();
-            self.draw_img_slice(slice, &ts, mask_head, *opacity, output_tex_size, rect);
+          PaintPathAction::Paint { painting_style, .. } => {
+            self.new_mask_layer(&viewport, &matrix, path, painting_style)
           }
-          PaintPathAction::Radial(radial) => {
-            let prim: RadialGradientPrimitive = RadialGradientPrimitive {
-              transform: matrix.inverse().unwrap().to_array(),
-              stop_start: self.radial_gradient_stops.len() as u32,
-              stop_cnt: radial.stops.len() as u32,
-              start_center: radial.start_center.to_array(),
-              start_radius: radial.start_radius,
-              end_center: radial.end_center.to_array(),
-              end_radius: radial.end_radius,
-              mask_head,
-              spread: radial.spread_method as u32,
-            };
-            let stops = radial
-              .stops
-              .iter()
-              .map(GradientStopPrimitive::new);
-            self.radial_gradient_stops.extend(stops);
-            let prim_idx = self.radial_gradient_prims.len() as u32;
-            self.radial_gradient_prims.push(prim);
-            let buffer = &mut self.radial_gradient_vertices_buffer;
-
-            add_rect_vertices(rect, output_tex_size, RadialGradientPrimIndex(prim_idx), buffer);
-            self.current_phase = CurrentPhase::RadialGradient;
-          }
-          PaintPathAction::Linear(linear) => {
-            let stop = (self.linear_gradient_stops.len() << 16 | linear.stops.len()) as u32;
-            let mask_head_and_spread = mask_head << 16 | linear.spread_method as i32;
-            let prim: LinearGradientPrimitive = LinearGradientPrimitive {
-              transform: matrix.inverse().unwrap().to_array(),
-              stop,
-              start_position: linear.start.to_array(),
-              end_position: linear.end.to_array(),
-              mask_head_and_spread,
-            };
-            let stops = linear
-              .stops
-              .iter()
-              .map(GradientStopPrimitive::new);
-            self.linear_gradient_stops.extend(stops);
-            let prim_idx = self.linear_gradient_prims.len() as u32;
-            self.linear_gradient_prims.push(prim);
-            let buffer = &mut self.linear_gradient_vertices_buffer;
-            add_rect_vertices(rect, output_tex_size, LinearGradientPrimIndex(prim_idx), buffer);
-            self.current_phase = CurrentPhase::LinearGradient;
-          }
+        };
+        match action {
           PaintPathAction::Clip => self
             .clip_layer_stack
             .push(ClipLayer { viewport, mask_head }),
+          PaintPathAction::Paint { brush, .. } => match brush {
+            CommandBrush::Color(color) => {
+              let color = color.into_components();
+              let color_attr = ColorAttr { color, mask_head };
+              let buffer = &mut self.color_vertices_buffer;
+              add_rect_vertices(rect, output_tex_size, color_attr, buffer);
+              self.current_phase = CurrentPhase::Color;
+            }
+            CommandBrush::Image { img, opacity } => {
+              let slice = self.tex_mgr.store_image(img, &mut self.gpu_impl);
+              let ts = matrix.inverse().unwrap();
+              self.draw_img_slice(slice, &ts, mask_head, *opacity, output_tex_size, rect);
+            }
+            CommandBrush::Radial(radial) => {
+              let prim: RadialGradientPrimitive = RadialGradientPrimitive {
+                transform: matrix.inverse().unwrap().to_array(),
+                stop_start: self.radial_gradient_stops.len() as u32,
+                stop_cnt: radial.stops.len() as u32,
+                start_center: radial.start_center.to_array(),
+                start_radius: radial.start_radius,
+                end_center: radial.end_center.to_array(),
+                end_radius: radial.end_radius,
+                mask_head,
+                spread: radial.spread_method as u32,
+              };
+              let stops = radial
+                .stops
+                .iter()
+                .map(GradientStopPrimitive::new);
+              self.radial_gradient_stops.extend(stops);
+              let prim_idx = self.radial_gradient_prims.len() as u32;
+              self.radial_gradient_prims.push(prim);
+              let buffer = &mut self.radial_gradient_vertices_buffer;
+
+              add_rect_vertices(rect, output_tex_size, RadialGradientPrimIndex(prim_idx), buffer);
+              self.current_phase = CurrentPhase::RadialGradient;
+            }
+            CommandBrush::Linear(linear) => {
+              let stop = (self.linear_gradient_stops.len() << 16 | linear.stops.len()) as u32;
+              let mask_head_and_spread = mask_head << 16 | linear.spread_method as i32;
+              let prim: LinearGradientPrimitive = LinearGradientPrimitive {
+                transform: matrix.inverse().unwrap().to_array(),
+                stop,
+                start_position: linear.start.to_array(),
+                end_position: linear.end.to_array(),
+                mask_head_and_spread,
+              };
+              let stops = linear
+                .stops
+                .iter()
+                .map(GradientStopPrimitive::new);
+              self.linear_gradient_stops.extend(stops);
+              let prim_idx = self.linear_gradient_prims.len() as u32;
+              self.linear_gradient_prims.push(prim);
+              let buffer = &mut self.linear_gradient_vertices_buffer;
+              add_rect_vertices(rect, output_tex_size, LinearGradientPrimIndex(prim_idx), buffer);
+              self.current_phase = CurrentPhase::LinearGradient;
+            }
+          },
         }
       }
       PaintCommand::PopClip => {
@@ -423,20 +431,23 @@ where
   fn can_batch_path_command(&self, cmd: &PathCommand) -> bool {
     let limits = self.gpu_impl.limits();
     let tex_used = self.tex_ids_map.len();
-    match (self.current_phase, &cmd.action) {
+
+    let PaintPathAction::Paint { brush, .. } = &cmd.action else {
+      return tex_used < limits.max_tex_load;
+    };
+
+    match (self.current_phase, brush) {
       (CurrentPhase::None, _) => true,
-      (_, PaintPathAction::Clip) | (CurrentPhase::Color, PaintPathAction::Color(_)) => {
-        tex_used < limits.max_tex_load
-      }
-      (CurrentPhase::Img, PaintPathAction::Image { .. }) => {
+      (CurrentPhase::Color, CommandBrush::Color(_)) => tex_used < limits.max_tex_load,
+      (CurrentPhase::Img, CommandBrush::Image { .. }) => {
         tex_used < limits.max_tex_load - 1 && self.img_prims.len() < limits.max_image_primitives
       }
-      (CurrentPhase::RadialGradient, PaintPathAction::Radial(_)) => {
+      (CurrentPhase::RadialGradient, CommandBrush::Radial(_)) => {
         tex_used < limits.max_tex_load
           && self.radial_gradient_prims.len() < limits.max_radial_gradient_primitives
           && self.radial_gradient_stops.len() < limits.max_gradient_stop_primitives
       }
-      (CurrentPhase::LinearGradient, PaintPathAction::Linear(_)) => {
+      (CurrentPhase::LinearGradient, CommandBrush::Linear(_)) => {
         tex_used < limits.max_tex_load
           && self.linear_gradient_prims.len() < limits.max_linear_gradient_primitives
           && self.linear_gradient_stops.len() < limits.max_gradient_stop_primitives
@@ -460,12 +471,12 @@ where
   }
 
   fn new_mask_layer(
-    &mut self, view: &DeviceRect, matrix: &Transform, path: &PaintPath,
+    &mut self, view: &DeviceRect, matrix: &Transform, path: &PaintPath, style: &PaintingStyle,
   ) -> ([Point; 4], i32) {
     let (mask, mask_to_view) =
       self
         .tex_mgr
-        .store_alpha_path(path, matrix, view, &mut self.gpu_impl);
+        .store_alpha_path(path, style, matrix, view, &mut self.gpu_impl);
 
     let mut points = rect_corners(&mask.rect.to_f32().cast_unit());
     for p in points.iter_mut() {
@@ -783,10 +794,13 @@ mod tests {
       .map(|i| {
         let color = if i % 2 == 0 { Color::GREEN } else { Color::RED };
         PaintCommand::Path(PathCommand {
-          paint_bounds: *circle.bounds(),
+          paint_bounds: circle.bounds(None),
           path: circle.clone().into(),
           transform: Transform::translation(i as f32 * 8., i as f32 * 8.),
-          action: PaintPathAction::Color(color),
+          action: PaintPathAction::Paint {
+            brush: CommandBrush::Color(color),
+            painting_style: PaintingStyle::Fill,
+          },
         })
       })
       .collect();

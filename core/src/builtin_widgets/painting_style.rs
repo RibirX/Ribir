@@ -1,16 +1,5 @@
 use crate::{prelude::*, wrap_render::*};
 
-/// Explain the method for rendering shapes and paths, including filling or
-/// stroking them.
-#[derive(Clone, Debug, Default)]
-pub enum PaintingStyle {
-  /// Fill the path.
-  #[default]
-  Fill,
-  /// Stroke path with line width.
-  Stroke(StrokeOptions),
-}
-
 /// A widget that sets the strategies for painting shapes and paths . It's can
 /// be inherited by its descendants.
 #[derive(Default)]

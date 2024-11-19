@@ -67,7 +67,7 @@ impl<R: Render> RenderProxy for Sc<R> {
 
 impl Render for Resource<Path> {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
-    let size = self.bounds().max().to_vector().to_size();
+    let size = self.bounds(None).max().to_vector().to_size();
     clamp.clamp(size)
   }
 

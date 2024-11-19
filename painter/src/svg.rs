@@ -101,15 +101,9 @@ fn paint_group(g: &usvg::Group, painter: &mut crate::Painter) {
           let (brush, transform) = brush_from_usvg_paint(stroke.paint(), stroke.opacity());
           painter
             .set_stroke_brush(brush.clone())
-            .apply_transform(&transform);
-
-          let path = path
-            .transform(&transform.inverse().unwrap())
-            .stroke(&options, Some(painter.transform()));
-
-          if let Some(p) = path {
-            painter.fill_path(Resource::new(p).into());
-          }
+            .set_strokes(options)
+            .apply_transform(&transform)
+            .stroke_path(path.into());
         };
       }
       usvg::Node::Image(_) => {
