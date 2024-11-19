@@ -107,7 +107,7 @@ impl SvgDocument {
 
     std::str::from_utf8(&writer.into_inner())
       .ok()
-      .and_then(|str| Svg::parse_from_bytes(str.as_bytes()).ok())
+      .and_then(|str| Svg::parse_from_bytes(str.as_bytes(), true, false).ok())
   }
 
   fn parse(data: &[u8]) -> Option<HashMap<String, String>> {

@@ -759,8 +759,12 @@ mod tests {
   painter_backend_eq_image_test!(draw_svg_gradient, comparison = 0.0025);
   fn draw_svg_gradient() -> Painter {
     let mut painter = painter(Size::new(64., 64.));
-    let svg =
-      Svg::parse_from_bytes(include_bytes!("../../tests/assets/fill_with_gradient.svg")).unwrap();
+    let svg = Svg::parse_from_bytes(
+      include_bytes!("../../tests/assets/fill_with_gradient.svg"),
+      true,
+      false,
+    )
+    .unwrap();
 
     painter.draw_svg(&svg);
     painter
@@ -805,8 +809,7 @@ mod tests {
       })
       .collect();
 
-    let svg = Svg { size: Size::new(512., 512.), commands: Resource::new(commands) };
-    painter.draw_svg(&svg);
+    painter.draw_bundle_commands(Rect::from_size(Size::new(512., 512.)), Resource::new(commands));
     painter
   }
   painter_backend_eq_image_test!(draw_bundle_svg, comparison = 0.001);

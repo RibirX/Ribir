@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 impl Render for Svg {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.clamp(self.size) }
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.clamp(self.size()) }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
     let painter = ctx.painter();
@@ -17,7 +17,7 @@ pub mod named_svgs {
 
   const DEFAULT_SVG_KEY: &str = "__RIRBIR_DEFAULT_SVG__";
   static SVGS: LazyLock<Mutex<ahash::AHashMap<&'static str, Svg>>> = LazyLock::new(|| {
-    let svg = include_crate_svg!("src/builtin_widgets/default_named.svg");
+    let svg = include_crate_svg!("src/builtin_widgets/default_named.svg", true, false);
     let mut set = ahash::AHashMap::new();
     set.insert(DEFAULT_SVG_KEY, svg);
     Mutex::new(set)
@@ -51,8 +51,8 @@ mod tests {
   fn svgs_smoke() -> Painter {
     named_svgs::register(
       "test::add",
-      Svg::parse_from_bytes(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" height="48" width="48"><path d="M22.5 38V25.5H10v-3h12.5V10h3v12.5H38v3H25.5V38Z"/></svg>"#.as_bytes(),
+      Svg::parse_from_bytes(r#"<svg xmlns="http://www.w3.org/2000/svg" height="48" width="48"><path d="M22.5 38V25.5H10v-3h12.5V10h3v12.5H38v3H25.5V38Z"/></svg>"#.as_bytes(),
+      true, false
       ).unwrap(),
     );
     let mut painter = Painter::new(Rect::from_size(Size::new(128., 64.)));

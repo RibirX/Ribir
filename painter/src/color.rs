@@ -71,13 +71,13 @@ impl Color {
   }
 
   #[inline]
-  pub fn from_u32(rgba: u32) -> Self {
+  pub const fn from_u32(rgba: u32) -> Self {
     let bytes = rgba.to_be_bytes();
     Self { red: bytes[0], green: bytes[1], blue: bytes[2], alpha: bytes[3] }
   }
 
   #[inline]
-  pub fn into_u32(self) -> u32 {
+  pub const fn into_u32(self) -> u32 {
     let Self { red, green, blue, alpha } = self;
     u32::from_be_bytes([red, green, blue, alpha])
   }
