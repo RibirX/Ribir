@@ -113,11 +113,17 @@ mod tests {
   widget_image_tests!(
     icons,
     WidgetTester::new(row! {
-      @Icon { @ { svgs::DELETE }}
-      @Icon { @ { "search" } }
+      @Icon {
+        foreground: Color::BLUE,
+        @ { svgs::DELETE }
+      }
+      @Icon {
+        foreground: Color::RED,
+        @ { "search" }
+      }
       @Icon { @SpinnerProgress { value: Some(0.8) }}
     })
-    .with_wnd_size(Size::new(300., 200.))
+    .with_wnd_size(Size::new(128., 64.))
     .with_env_init(|| {
       let mut theme = AppCtx::app_theme().write();
       // Specify the icon font.

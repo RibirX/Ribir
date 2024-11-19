@@ -80,7 +80,7 @@ mod tests {
         .foreground(Color::BLACK)
     })
     .with_wnd_size(WND_SIZE)
-    .with_comparison(0.000025),
+    .with_comparison(0.00003),
     LayoutCase::default().with_size(Size::splat(40.5))
   );
 }

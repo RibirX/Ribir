@@ -1,4 +1,4 @@
-use std::{error::Error, io::Read, vec};
+use std::{cell::RefCell, error::Error, io::Read, vec};
 
 use ribir_algo::Resource;
 use ribir_geom::{Point, Rect, Size, Transform};
@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use usvg::{Options, Stop, Tree};
 
 use crate::{
-  Brush, Color, GradientStop, LineCap, LineJoin, PaintCommand, Path, StrokeOptions,
+  Brush, Color, CommandBrush, GradientStop, LineCap, LineJoin, PaintCommand, PaintPathAction, Path,
+  StrokeOptions,
   color::{LinearGradient, RadialGradient},
 };
 
@@ -14,17 +15,49 @@ use crate::{
 /// currently quite simple and primarily used for Ribir icons. More features
 /// will be added as needed.
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Svg {
-  pub size: Size,
-  pub commands: Resource<Box<[PaintCommand]>>,
+  size: Size,
+  commands: Resource<Box<[PaintCommand]>>,
+
+  inherited_fill: bool,
+  inherited_stroke: bool,
+  #[serde(skip)]
+  last: RefCell<Option<StaticSvg>>,
 }
 
-// todo: we need to support currentColor to change svg color.
+#[derive(Clone)]
+struct StaticSvg {
+  inherited_fill: Brush,
+  inherited_stroke: Brush,
+  commands: Resource<Box<[PaintCommand]>>,
+}
+
 // todo: share fontdb
 impl Svg {
-  pub fn parse_from_bytes(svg_data: &[u8]) -> Result<Self, Box<dyn Error>> {
-    let opt = Options { ..<_>::default() };
+  // FIXME: This is a temporary workaround. Utilize the magic color for the SVG,
+  // and replace it with the actual color when rendering.
+  const DYNAMIC_COLOR: Color = Color::from_u32(0x191B1901);
+  const DYNAMIC_COLOR_STR: &'static str = "#191B1901";
+
+  /// Parse SVG from bytes.
+  ///
+  /// - **inherit_fill**: Indicates whether this SVG will inherit the fill color
+  ///   from the environment.
+  /// - **inherit_stroke**: Indicates whether this SVG will inherit the stroke
+  ///   color from the environment.
+  pub fn parse_from_bytes(
+    svg_data: &[u8], inherit_fill: bool, inherit_stroke: bool,
+  ) -> Result<Self, Box<dyn Error>> {
+    let magic = Self::DYNAMIC_COLOR_STR;
+    let style_sheet = match (inherit_fill, inherit_stroke) {
+      (true, true) => Some(format!("svg {{ fill: {magic}; stroke: {magic} }}")),
+      (true, false) => Some(format!("svg {{ fill: {magic} }}")),
+      (false, true) => Some(format!("svg {{ stroke: {magic} }}")),
+      _ => None,
+    };
+
+    let opt = Options { style_sheet, ..<_>::default() };
     let tree = Tree::from_data(svg_data, &opt).unwrap();
 
     let size = tree.size();
@@ -34,19 +67,60 @@ impl Svg {
     paint_group(tree.root(), &mut painter);
 
     let paint_commands = painter.finish().to_owned().into_boxed_slice();
+    let (used_fill_fallback, used_stroke_fallback) = fallback_color_check(&paint_commands);
 
     Ok(Svg {
       size: Size::new(size.width(), size.height()),
       commands: Resource::new(paint_commands),
+      inherited_fill: used_fill_fallback,
+      inherited_stroke: used_stroke_fallback,
+      last: RefCell::new(None),
     })
   }
 
-  pub fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn Error>> {
+  /// Parse SVG from a file.
+  ///
+  /// - **inherit_fill**: Indicates whether this SVG will inherit the fill color
+  ///   from the environment.
+  /// - **inherit_stroke**: Indicates whether this SVG will inherit the stroke
+  ///   color from the environment.
+  pub fn open<P: AsRef<std::path::Path>>(
+    path: P, fill_inject: bool, stroke_inject: bool,
+  ) -> Result<Self, Box<dyn Error>> {
     let mut file = std::fs::File::open(path)?;
     let mut bytes = vec![];
     file.read_to_end(&mut bytes)?;
-    Self::parse_from_bytes(&bytes)
+    Self::parse_from_bytes(&bytes, fill_inject, stroke_inject)
   }
+
+  pub fn size(&self) -> Size { self.size }
+
+  pub fn commands(
+    &self, fill_brush: &Brush, stroke_brush: &Brush,
+  ) -> Resource<Box<[PaintCommand]>> {
+    if !self.inherited_fill && !self.inherited_stroke {
+      self.commands.clone()
+    } else {
+      let mut last = self.last.borrow_mut();
+      if let Some(last) = last
+        .as_ref()
+        .filter(|last| &last.inherited_fill == fill_brush && &last.inherited_stroke == stroke_brush)
+      {
+        last.commands.clone()
+      } else {
+        let commands = brush_replace(&self.commands, fill_brush, stroke_brush);
+        let commands = Resource::new(commands);
+        *last = Some(StaticSvg {
+          inherited_fill: fill_brush.clone(),
+          inherited_stroke: stroke_brush.clone(),
+          commands: commands.clone(),
+        });
+        commands
+      }
+    }
+  }
+
+  pub fn command_size(&self) -> usize { self.commands.len() }
 
   pub fn serialize(&self) -> Result<String, Box<dyn Error>> {
     // use json replace bincode, because https://github.com/Ogeon/palette/issues/130
@@ -181,6 +255,63 @@ fn brush_from_usvg_paint(paint: &usvg::Paint, opacity: usvg::Opacity) -> (Brush,
   }
 }
 
+fn fallback_color_check(cmds: &[PaintCommand]) -> (bool, bool) {
+  let mut fill_fallback = false;
+  let mut stroke_fallback = false;
+  for c in cmds {
+    if fill_fallback && stroke_fallback {
+      break;
+    }
+
+    match c {
+      PaintCommand::Path(p) => {
+        if let PaintPathAction::Paint { painting_style, brush, .. } = &p.action {
+          if matches!(brush, CommandBrush::Color(c) if c == &Svg::DYNAMIC_COLOR) {
+            match painting_style {
+              crate::PaintingStyle::Fill => fill_fallback = true,
+              crate::PaintingStyle::Stroke(_) => stroke_fallback = true,
+            }
+          }
+        }
+      }
+      PaintCommand::PopClip => {}
+      PaintCommand::Bundle { cmds, .. } => {
+        let (f, s) = fallback_color_check(cmds);
+        fill_fallback = f;
+        stroke_fallback |= s;
+      }
+    }
+  }
+  (fill_fallback, stroke_fallback)
+}
+
+fn brush_replace(cmds: &[PaintCommand], fill: &Brush, stroke: &Brush) -> Box<[PaintCommand]> {
+  cmds
+    .iter()
+    .map(|c| match c {
+      PaintCommand::Path(p) => {
+        let mut p = p.clone();
+        if let PaintPathAction::Paint { painting_style, brush, .. } = &mut p.action {
+          if matches!(brush, CommandBrush::Color(c) if c == &Svg::DYNAMIC_COLOR) {
+            match painting_style {
+              crate::PaintingStyle::Fill => *brush = fill.clone().into(),
+              crate::PaintingStyle::Stroke(_) => *brush = stroke.clone().into(),
+            }
+          }
+        }
+        PaintCommand::Path(p)
+      }
+      PaintCommand::PopClip => PaintCommand::PopClip,
+      PaintCommand::Bundle { transform, opacity, bounds, cmds } => {
+        let cmds = brush_replace(cmds, fill, stroke);
+        let cmds = Resource::new(cmds);
+
+        PaintCommand::Bundle { transform: *transform, opacity: *opacity, bounds: *bounds, cmds }
+      }
+    })
+    .collect()
+}
+
 fn convert_to_gradient_stops(stops: &[Stop]) -> Vec<GradientStop> {
   assert!(!stops.is_empty());
 
@@ -227,6 +358,18 @@ impl From<usvg::LineJoin> for LineJoin {
       usvg::LineJoin::MiterClip => LineJoin::MiterClip,
       usvg::LineJoin::Round => LineJoin::Round,
       usvg::LineJoin::Bevel => LineJoin::Bevel,
+    }
+  }
+}
+
+impl Clone for Svg {
+  fn clone(&self) -> Self {
+    Svg {
+      size: self.size,
+      commands: self.commands.clone(),
+      inherited_fill: self.inherited_fill,
+      inherited_stroke: self.inherited_stroke,
+      last: RefCell::new(self.last.borrow().clone()),
     }
   }
 }

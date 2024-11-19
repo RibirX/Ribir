@@ -32,6 +32,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Added `QueryId` as a replacement for `TypeId` to facilitate querying types by Provider across different binaries. (#656 @M-Adoo)
 - **core**: Added `OverrideClass` to override a single class within a subtree. (#657 @M-Adoo)
 - **widgets**: Added `LinearProgress` and `SpinnerProgress` widgets along with their respective material themes. (#630 @wjian23 @M-Adoo)
+- **painter**: SVG now supports switching the default color, allowing for icon color changes. (#661 @M-Adoo)
 
 ### Changed
 

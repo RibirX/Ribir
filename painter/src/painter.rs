@@ -569,6 +569,7 @@ impl Painter {
 
   pub fn draw_svg(&mut self, svg: &Svg) -> &mut Self {
     invisible_return!(self);
+    let commands = svg.commands(self.fill_brush(), self.stroke_brush());
 
     // For a large number of path commands (more than 16), bundle them
     // together as a single resource. This allows the backend to cache
@@ -576,11 +577,11 @@ impl Painter {
     // For a small number of path commands (less than 16), store them
     // individually as multiple resources. This means the backend doesn't
     // need to perform a single draw operation for an SVG.
-    if svg.commands.len() <= 16 {
+    if commands.len() <= 16 {
       let transform = *self.transform();
       let alpha = self.alpha();
 
-      for cmd in svg.commands.iter() {
+      for cmd in commands.iter() {
         let cmd = match cmd.clone() {
           PaintCommand::Path(mut path) => {
             path.transform(&transform);
@@ -600,8 +601,8 @@ impl Painter {
         self.commands.push(cmd);
       }
     } else {
-      let rect = Rect::from_size(svg.size);
-      self.draw_bundle_commands(rect, svg.commands.clone());
+      let rect = Rect::from_size(svg.size());
+      self.draw_bundle_commands(rect, commands.clone());
     }
 
     self
@@ -662,7 +663,7 @@ impl Painter {
         .map(|h| h as f32 / face.units_per_em() as f32)
         .unwrap_or(1.)
         .max(1.);
-      let size = svg.size;
+      let size = svg.size();
       let bound_size = bounds.size;
       let scale = (bound_size.width / size.width).min(bound_size.height / size.height) / grid_scale;
       self
@@ -984,7 +985,8 @@ mod test {
   fn filter_invalid_commands() {
     let mut painter = painter();
 
-    let svg = Svg::parse_from_bytes(include_bytes!("../../tests/assets/test1.svg")).unwrap();
+    let svg =
+      Svg::parse_from_bytes(include_bytes!("../../tests/assets/test1.svg"), true, false).unwrap();
     painter
       .save()
       .set_transform(Transform::translation(f32::NAN, f32::INFINITY))
@@ -995,8 +997,12 @@ mod test {
   #[test]
   fn draw_svg_gradient() {
     let mut painter = Painter::new(Rect::from_size(Size::new(64., 64.)));
-    let svg =
-      Svg::parse_from_bytes(include_bytes!("../../tests/assets/fill_with_gradient.svg")).unwrap();
+    let svg = Svg::parse_from_bytes(
+      include_bytes!("../../tests/assets/fill_with_gradient.svg"),
+      true,
+      false,
+    )
+    .unwrap();
 
     painter.draw_svg(&svg);
   }

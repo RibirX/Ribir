@@ -248,10 +248,11 @@ pub fn part_writer(input: TokenStream) -> TokenStream {
 /// This macro returns an expression of type `Svg`.
 #[proc_macro]
 pub fn include_crate_svg(input: TokenStream) -> TokenStream {
-  let file = parse_macro_input! { input as syn::LitStr };
+  let IncludeSvgArgs { path, inherit_fill, inherit_stroke } =
+    parse_macro_input! { input as IncludeSvgArgs };
   let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-  let path = std::path::Path::new(&dir).join(file.value());
-  include_svg_from_path(path)
+  let path = std::path::Path::new(&dir).join(path);
+  include_svg_from_path(path, inherit_fill, inherit_stroke)
 }
 
 /// Includes an SVG file as an `Svg`.
@@ -265,7 +266,8 @@ pub fn include_crate_svg(input: TokenStream) -> TokenStream {
 #[cfg(feature = "nightly")]
 #[proc_macro]
 pub fn include_svg(input: TokenStream) -> TokenStream {
-  let rf = parse_macro_input! { input as syn::LitStr };
+  let IncludeSvgArgs { path, inherit_fill, inherit_stroke } =
+    parse_macro_input! { input as IncludeSvgArgs };
 
   let mut span = proc_macro::Span::call_site();
   while let Some(p) = span.parent() {
@@ -273,14 +275,16 @@ pub fn include_svg(input: TokenStream) -> TokenStream {
   }
   let mut file = span.source_file().path();
   file.pop();
-  file.push(rf.value());
+  file.push(path);
 
-  include_svg_from_path(file)
+  include_svg_from_path(file, inherit_fill, inherit_stroke)
 }
 
-fn include_svg_from_path(path: std::path::PathBuf) -> TokenStream {
-  let encoded_bytes =
-    ribir_painter::Svg::open(path.as_path()).and_then(|reader| reader.serialize());
+fn include_svg_from_path(
+  path: std::path::PathBuf, inherit_fill: bool, inherit_stroke: bool,
+) -> TokenStream {
+  let encoded_bytes = ribir_painter::Svg::open(path.as_path(), inherit_fill, inherit_stroke)
+    .and_then(|reader| reader.serialize());
   match encoded_bytes {
     Ok(data) => quote! {
       Svg::deserialize(#data).unwrap()
@@ -290,5 +294,23 @@ fn include_svg_from_path(path: std::path::PathBuf) -> TokenStream {
       let err = format!("{err}({:?})", &path);
       quote! { compile_error!(#err) }.into()
     }
+  }
+}
+
+struct IncludeSvgArgs {
+  path: String,
+  inherit_fill: bool,
+  inherit_stroke: bool,
+}
+
+impl syn::parse::Parse for IncludeSvgArgs {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let path = input.parse::<syn::LitStr>()?.value();
+    input.parse::<syn::Token![,]>()?;
+    let inherit_fill = input.parse::<syn::LitBool>()?.value;
+    input.parse::<syn::Token![,]>()?;
+    let inherit_stroke = input.parse::<syn::LitBool>()?.value;
+
+    Ok(IncludeSvgArgs { path, inherit_fill, inherit_stroke })
   }
 }
