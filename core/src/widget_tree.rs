@@ -84,7 +84,7 @@ impl WidgetTree {
           .map(|info| info.clamp)
           .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
 
-        let mut ctx = LayoutCtx { id: wid, tree: self };
+        let mut ctx = LayoutCtx::new(wid, self);
         ctx.perform_child_layout(wid, clamp);
       }
     }

@@ -310,6 +310,12 @@ impl WidgetId {
       .and_then(QueryHandle::into_ref)
   }
 
+  pub(crate) fn query_ancestors_ref<T: Any>(self, tree: &WidgetTree) -> Option<QueryRef<T>> {
+    self
+      .ancestors(tree)
+      .find_map(|id| id.query_ref::<T>(tree))
+  }
+
   /// return if this object contain type `T`
   pub(crate) fn contain_type<T: Any>(self, tree: &WidgetTree) -> bool {
     self

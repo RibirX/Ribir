@@ -20,7 +20,7 @@ use crate::text::*;
 /// theme
 ///   .font_files
 ///   .push("the font file path".to_string());
-/// theme.default_icon_font = FontFace {
+/// theme.icon_font = FontFace {
 ///   families: Box::new([FontFamily::Name("Your icon font family name".into())]),
 ///   // The rest of the face configuration depends on your font file
 ///   ..<_>::default()
@@ -54,7 +54,7 @@ use crate::text::*;
 ///     class_impl: style_class! {
 ///       clamp: BoxClamp::fixed_size(Size::new(64., 64.)),
 ///       text_style: TextStyle {
-///         font_face: Theme::of(BuildCtx::get()).default_icon_font.clone(),
+///         font_face: Theme::of(BuildCtx::get()).icon_font.clone(),
 ///         line_height: 64.,
 ///         font_size: 64.,
 ///         ..<_>::default()
