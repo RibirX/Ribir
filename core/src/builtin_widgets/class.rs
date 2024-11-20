@@ -48,6 +48,17 @@ use crate::{
   window::WindowId,
 };
 
+/// Macro used to define a class to override for a `ClassName`, this is a
+/// shorthand if you only want to compose builtin widgets with your host widget.
+#[macro_export]
+macro_rules! style_class {
+($($field: ident: $value: expr),* $(,)?) => {
+    (move |widget: Widget| {
+      $crate::prelude::FatObj::new(widget) $(.$field($value))* .into_widget()
+    }) as $crate::prelude::ClassImpl
+  };
+}
+
 /// A collection comprises the implementations of the `ClassName`, offering the
 /// implementation of `Class` within its descendants.
 

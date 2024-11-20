@@ -6,7 +6,7 @@ use crate::{
   error::result_to_token_stream, symbol_process::DollarRefsCtx, watch_macro::process_watch_body,
 };
 
-pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
+pub fn gen_code(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>) -> TokenStream {
   let span = input.span();
   let res = process_watch_body(input, refs_ctx).map(|(upstream, map_handler)| {
     quote_spanned! {span =>

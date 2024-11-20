@@ -288,19 +288,19 @@ impl Fold for DollarRefsCtx {
       let dollar_ref = DollarRef { name, builtin: None, used: DollarUsedInfo::Reader };
       self.add_dollar_ref(dollar_ref)
     } else if mac.path.is_ident(KW_WATCH) {
-      mac.tokens = crate::watch_macro::gen_code(mac.tokens, self);
+      mac.tokens = crate::watch_macro::gen_code(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PART_WRITER) {
       mac.tokens = crate::part_writer::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PIPE) {
-      mac.tokens = crate::pipe_macro::gen_code(mac.tokens, self);
+      mac.tokens = crate::pipe_macro::gen_code(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_DISTINCT_PIPE) {
-      mac.tokens = crate::distinct_pipe_macro::gen_code(mac.tokens, self);
+      mac.tokens = crate::distinct_pipe_macro::gen_code(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_RDL) {
-      mac.tokens = RdlMacro::gen_code(mac.tokens, self);
+      mac.tokens = RdlMacro::gen_code(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_FN_WIDGET) {
       mac.tokens = fn_widget_macro::gen_code(mac.tokens, self);

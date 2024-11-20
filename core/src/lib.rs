@@ -65,6 +65,7 @@ pub mod prelude {
     animation::*,
     class_names, multi_class_impl, providers,
     query::*,
+    style_class,
     ticker::{Duration, Instant},
   };
 }

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote_spanned};
+use quote::{ToTokens, quote, quote_spanned};
 use smallvec::SmallVec;
 use syn::{
   Expr, Ident, Macro, Path, Result as SynResult, Stmt, braced,
@@ -61,23 +61,41 @@ pub struct DeclareField {
 }
 
 impl RdlMacro {
-  pub fn gen_code(input: TokenStream, refs: &mut DollarRefsCtx) -> TokenStream {
-    let res = symbol_to_macro(input).and_then(|input| match syn::parse2::<RdlMacro>(input)? {
+  pub fn gen_code(input: TokenStream, ctx: Option<&mut DollarRefsCtx>) -> TokenStream {
+    let res = symbol_to_macro(input).and_then(|input| {
+      let rdl = syn::parse2::<RdlMacro>(input)?;
+      if let Some(ctx) = ctx {
+        RdlMacro::gen_rdl(rdl, ctx)
+      } else {
+        let mut ctx = DollarRefsCtx::top_level();
+        let mut tokens = RdlMacro::gen_rdl(rdl, &mut ctx)?;
+        let refs = ctx.pop_dollar_scope(false);
+        if !refs.is_empty() {
+          tokens = quote! {{ #refs; #tokens }};
+        }
+        Ok(tokens)
+      }
+    });
+    result_to_token_stream(res)
+  }
+
+  fn gen_rdl(self, refs: &mut DollarRefsCtx) -> crate::error::Result<TokenStream> {
+    let tokens = match self {
       RdlMacro::Literal(stl) => {
         let obj = DeclareObj::from_literal(stl, refs);
         obj.error_check()?;
-        Ok(obj.to_token_stream())
+        obj.to_token_stream()
       }
       RdlMacro::ExprObj { span, stmts } => {
         let stmts = stmts.into_iter().map(|s| refs.fold_stmt(s));
         if stmts.len() > 1 {
-          Ok(quote_spanned! { span => { #(#stmts)* }})
+          quote_spanned! { span => { #(#stmts)* }}
         } else {
-          Ok(quote_spanned! { span => #(#stmts)* })
+          quote_spanned! { span => #(#stmts)* }
         }
       }
-    });
-    result_to_token_stream(res)
+    };
+    Ok(tokens)
   }
 }
 

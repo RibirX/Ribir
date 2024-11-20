@@ -854,3 +854,16 @@ fn fix_use_var_in_children() {
     }
   };
 }
+
+#[test]
+fn fix_top_level_rdl_builtin() {
+  reset_test_env!();
+
+  let mut w = FatObj::new(MockBox { size: Size::zero() });
+  rdl! {
+    let _o1 = $w.opacity;
+    let _ = move || {
+      let _o2 = $w.opacity;
+    };
+  };
+}
