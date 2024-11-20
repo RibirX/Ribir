@@ -121,7 +121,7 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
 ///   like: `let row = rdl!{ Widget::new(Void) };`
 #[proc_macro]
 pub fn rdl(input: TokenStream) -> TokenStream {
-  RdlMacro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
+  RdlMacro::gen_code(input.into(), None).into()
 }
 
 /// The `fn_widget` macro generates a widget from a function widget based on an
@@ -146,25 +146,7 @@ pub fn ribir_expanded_ಠ_ಠ(input: TokenStream) -> TokenStream { input }
 /// The `$` symbol denotes the state reference and automatically subscribes to
 /// any changes made to it. It triggers when the `$` state modifies.
 #[proc_macro]
-pub fn pipe(input: TokenStream) -> TokenStream {
-  pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
-}
-
-/// Macro used to define a class to override for a `ClassName`, this is a
-/// shorthand if you only want to compose builtin widgets with your host widget.
-#[proc_macro]
-pub fn style_class(input: TokenStream) -> TokenStream {
-  let input: proc_macro2::TokenStream = input.into();
-  quote! {
-    (move |widget: Widget| {
-      fn_widget! {
-        let widget = FatObj::new(widget);
-        @ $widget { #input }
-      }.into_widget()
-    }) as fn(Widget) -> Widget
-  }
-  .into()
-}
+pub fn pipe(input: TokenStream) -> TokenStream { pipe_macro::gen_code(input.into(), None).into() }
 
 /// A shorthand macro for `pipe!` can be utilized as follows:
 /// `pipe!(...).value_chain(|s| s.distinct_until_changed().box_it())`.
@@ -174,7 +156,7 @@ pub fn style_class(input: TokenStream) -> TokenStream {
 /// changes made to it.
 #[proc_macro]
 pub fn distinct_pipe(input: TokenStream) -> TokenStream {
-  distinct_pipe_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
+  distinct_pipe_macro::gen_code(input.into(), None).into()
 }
 
 /// The `watch!` macro converts an expression into an `Observable` stream. Use
@@ -218,9 +200,7 @@ pub fn distinct_pipe(input: TokenStream) -> TokenStream {
 /// u.unsubscribe();
 /// ```
 #[proc_macro]
-pub fn watch(input: TokenStream) -> TokenStream {
-  watch_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
-}
+pub fn watch(input: TokenStream) -> TokenStream { watch_macro::gen_code(input.into(), None).into() }
 
 /// The `part_writer` macro creates a partial writer from a mutable reference of
 /// a writer.

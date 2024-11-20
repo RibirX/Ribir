@@ -44,6 +44,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: The hit test for the `TransformWidget` is not applied at the correct position. (#654 @M-Adoo)
 - **core**: Switching to a style class may result in missing widgets. (#655 @M-Adoo)
 - **core**: The animation does not restore the state value correctly when multiple animations are applied to the same state. (#662 @M-Adoo)
+- **macros**: the top-level `rdl!`, `pipe!` and `watch!` do not capture built-in widgets as intended. (#pr @M-Adoo)
 
 - **core**: inner embed anchor not work (#665 @wjian23)
 - **core**: fix query render object with multi target hits (#665 @wjian23)
