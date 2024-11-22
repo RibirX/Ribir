@@ -16,24 +16,27 @@ pub struct FrameTicker {
 
 #[derive(Clone)]
 pub enum FrameMsg {
-  /// This msg emit when all event has processed and framework begin to do
-  /// layout & paint of the frame.
+  /// This message is emitted when all events have been processed and the
+  /// framework begins the layout and painting of the frame.
   ///
-  /// only the first frame of continuous frames that do not need to be drawn
-  /// will be sent this message.
+  /// Only the first frame of continuous frames that do not require drawing will
+  /// receive this message.
   NewFrame(Instant),
-  /// This Msg emit when performed layout finished, and widget tree ready to
-  /// draw.
-  /// #  Notice  
-  /// - this message may emit more than once, if someone listen this message and
-  ///   do some stuff to lead to some widget need relayout, be careful to modify
-  ///   widget in the listener of this message.
+  /// This message is emitted before the framework starts the layout of the
+  /// frame.
+  BeforeLayout(Instant),
+  /// This message is emitted when the layout process is completed, and the
+  /// widget tree is ready to be rendered. # Notice
+  /// - This message may be emitted more than once if there are listeners
+  ///   performing actions that trigger a widget relayout. Exercise caution when
+  ///   modifying widgets in the listener of this message.
   LayoutReady(Instant),
-  /// This msg emit after render data has submitted that mean all stuffs of
-  /// current frame need to processed by framework done.
+  /// This message is emitted after the render data has been submitted,
+  /// indicating that all tasks for the current frame have been completed by the
+  /// framework.
   ///
-  /// only the first frame of continuous frames that do not need to be drawn
-  /// will be sent this message.
+  /// Only the first frame of continuous frames that do not require drawing will
+  /// receive this message.
   Finish(Instant),
 }
 

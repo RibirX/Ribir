@@ -62,7 +62,13 @@ where
         .frame_tick_stream()
         .subscribe(move |msg| {
           match msg {
-            FrameMsg::NewFrame(time) => {
+            FrameMsg::NewFrame(_) => {
+              let animate = animate.write();
+              // the state may change during animate.
+              let value = animate.state.get();
+              animate.state.set(value);
+            }
+            FrameMsg::BeforeLayout(time) => {
               let p = animate
                 .read()
                 .running_info
@@ -166,8 +172,6 @@ where
     match progress {
       AnimateProgress::Between(rate) => {
         let value = self.state.calc_lerp_value(from, to, rate);
-        // the state may change during animate.
-        *to = self.state.get();
         self.state.set(value);
       }
       AnimateProgress::Dismissed => self.state.set(from.clone()),

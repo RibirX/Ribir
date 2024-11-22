@@ -43,6 +43,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: The size of the `Root` container is too small, which could lead to potential missed hits. (#654 @M-Adoo)
 - **core**: The hit test for the `TransformWidget` is not applied at the correct position. (#654 @M-Adoo)
 - **core**: Switching to a style class may result in missing widgets. (#655 @M-Adoo)
+- **core**: The animation does not restore the state value correctly when multiple animations are applied to the same state. (#662 @M-Adoo)
 
 
 ## [0.4.0-alpha.15] - 2024-11-13
