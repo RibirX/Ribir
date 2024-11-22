@@ -197,9 +197,8 @@ impl Window {
   #[track_caller]
   pub fn draw_frame(&self) -> bool {
     AppCtx::run_until_stalled();
-    self
-      .frame_ticker
-      .emit(FrameMsg::NewFrame(Instant::now()));
+    let ticker = &self.frame_ticker;
+    ticker.emit(FrameMsg::NewFrame(Instant::now()));
     self.run_frame_tasks();
 
     self.update_painter_viewport();
@@ -213,6 +212,7 @@ impl Window {
       };
       self.shell_wnd.borrow_mut().begin_frame(surface);
 
+      ticker.emit(FrameMsg::BeforeLayout(Instant::now()));
       self.layout();
 
       self.tree().draw();
@@ -227,9 +227,7 @@ impl Window {
     }
 
     AppCtx::end_frame();
-    self
-      .frame_ticker
-      .emit(FrameMsg::Finish(Instant::now()));
+    ticker.emit(FrameMsg::Finish(Instant::now()));
 
     draw
   }
