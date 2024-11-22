@@ -101,6 +101,7 @@ impl TestWindow {
   pub fn draw_frame(&mut self) {
     // Test window not have a eventloop, manually wake-up every frame.
     Timer::wake_timeout_futures();
+    AppCtx::run_until_stalled();
     self.run_frame_tasks();
 
     AppCtx::frame_ticks().clone().next(Instant::now());

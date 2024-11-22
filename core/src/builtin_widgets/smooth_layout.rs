@@ -35,7 +35,7 @@
 //!     }
 //! };
 //! ```
-use crate::{prelude::*, wrap_render::*};
+use crate::{prelude::*, ticker::FrameMsg, window::WindowFlags, wrap_render::*};
 
 smooth_pos_widget_impl!(SmoothPos, Point);
 smooth_pos_widget_impl!(SmoothY, f32, y);
@@ -44,7 +44,7 @@ smooth_size_widget_impl!(SmoothSize, Size);
 smooth_size_widget_impl!(SmoothHeight, f32, height);
 smooth_size_widget_impl!(SmoothWidth, f32, width);
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct SmoothImpl<T> {
   running: bool,
   value: T,
@@ -70,6 +70,15 @@ impl<T: Copy + PartialEq + 'static> Stateful<SmoothImpl<T>> {
   }
 }
 
+fn on_frame_end_once(ctx: &LayoutCtx, f: impl FnMut(FrameMsg) + 'static) {
+  ctx
+    .window()
+    .frame_tick_stream()
+    .filter(|msg| matches!(msg, FrameMsg::Finish(_)))
+    .take(1)
+    .subscribe(f);
+}
+
 macro_rules! smooth_size_widget_impl {
   ($name:ident, $size_ty:ty $(, $field:ident)?) => {
     #[doc = "This widget enables smooth size transitions for its child after layout.\
@@ -81,17 +90,25 @@ macro_rules! smooth_size_widget_impl {
       fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx)
         -> Size
       {
+        if !ctx.window().flags().contains(WindowFlags::ANIMATIONS) {
+          return host.perform_layout(clamp, ctx);
+        }
+
         let SmoothImpl { running, value } = *self.0.read();
-        if running {
-          clamp.min $(.$field)? = value;
-          clamp.max $(.$field)? = value;
+        if !running {
+          let size = host.perform_layout(clamp, ctx);
+          let new_v = size $(.$field)?;
+          if value != new_v {
+            let this = self.0.clone_writer();
+            // Trigger the transition in the next frame; otherwise,
+            // the animation will start with an incorrect initial frame.
+            on_frame_end_once(ctx, move |_| this.write().value = new_v);
+          }
         }
-        let size = host.perform_layout(clamp, ctx);
-        let new_v = size $(.$field)?;
-        if !running && value != new_v {
-          self.0.write().value = new_v;
-        }
-        size
+
+        clamp.min $(.$field)? = value;
+        clamp.max $(.$field)? = value;
+        host.perform_layout(clamp, ctx)
       }
     }
 
@@ -126,11 +143,17 @@ macro_rules! smooth_pos_widget_impl {
 
     impl WrapRender for $name {
       fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+        if !ctx.window().flags().contains(WindowFlags::ANIMATIONS) {
+          return host.perform_layout(clamp, ctx);
+        }
+
         let smooth = self.0.clone_writer();
         if !smooth.read().running  {
           let wid = ctx.widget_id();
           let wnd = ctx.window();
-          let _ = AppCtx::spawn_local(async move {
+          // Trigger the transition in the next frame; otherwise,
+          // the animation will start with an incorrect initial frame.
+          on_frame_end_once(ctx, move |_| {
             let pos = wnd.map_to_global(Point::zero(), wid);
             smooth.write().value = pos$(.$field)?;
           });
@@ -140,6 +163,10 @@ macro_rules! smooth_pos_widget_impl {
       }
 
       fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
+        if !ctx.window().flags().contains(WindowFlags::ANIMATIONS) {
+          return host.paint(ctx);
+        }
+
         let SmoothImpl { running, value } = *self.0.read();
         if running {
           let pos = ctx.map_to_global(Point::zero());

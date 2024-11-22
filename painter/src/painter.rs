@@ -715,7 +715,10 @@ impl Painter {
     invisible_return!(self);
     let line_width = matches!(path_style, PathStyle::Stroke).then(|| self.line_width());
     let p_bounds = path.bounds(line_width);
-    if !locatable_bounds(&p_bounds) || !self.intersect_paint_bounds(&p_bounds) {
+    if p_bounds.is_empty()
+      || !locatable_bounds(&p_bounds)
+      || !self.intersect_paint_bounds(&p_bounds)
+    {
       return self;
     }
 
