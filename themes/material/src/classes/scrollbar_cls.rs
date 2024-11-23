@@ -15,13 +15,13 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(SCROLL_CLIENT_AREA, |w| w);
 
   classes.insert(H_SCROLL_THUMB, style_class! {
-    background: Palette::of(BuildCtx::get()).primary(),
+    background: BuildCtx::get().variant_color(),
     border_radius: md::RADIUS_4,
     margin: EdgeInsets::vertical(1.),
     clamp: BoxClamp::min_width(THUMB_MIN_SIZE).with_fixed_height(md::THICKNESS_8)
   });
   classes.insert(V_SCROLL_THUMB, style_class! {
-    background: Palette::of(BuildCtx::get()).primary(),
+    background: BuildCtx::get().variant_color(),
     border_radius: md::RADIUS_4,
     margin: EdgeInsets::horizontal(1.),
     clamp: BoxClamp::min_height(THUMB_MIN_SIZE).with_fixed_width(md::THICKNESS_8)
@@ -67,7 +67,7 @@ fn base_track(w: Widget) -> Widget {
 
     let mut w = @ $w {
       background: {
-        let color = Palette::of(BuildCtx::get()).primary_container();
+        let color = BuildCtx::get().variant_color_container();
         pipe!(if $w.is_hover() { color } else { color.with_alpha(0.)})
       },
       on_disposed: move |_| u.unsubscribe(),
