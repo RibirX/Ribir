@@ -61,7 +61,7 @@ impl PartialEq for VAnchor {
   }
 }
 
-#[derive(Clone, Copy, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Anchor {
   /// Specifies the horizontal position you want to anchor the widget, See
   /// [`HAnchor`]!. if None, the widget is anchored by the parent

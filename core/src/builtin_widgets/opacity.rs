@@ -24,7 +24,9 @@ impl WrapRender for Opacity {
   }
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
-    ctx.painter().apply_alpha(self.opacity);
-    host.paint(ctx)
+    if self.opacity > 0. {
+      ctx.painter().apply_alpha(self.opacity);
+      host.paint(ctx)
+    }
   }
 }

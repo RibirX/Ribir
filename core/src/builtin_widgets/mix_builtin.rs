@@ -421,9 +421,17 @@ fn callbacks_for_focus_node(child: Widget) -> Widget {
 impl<'c> ComposeChild<'c> for MixBuiltin {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, mut child: Self::Child) -> Widget<'c> {
-    if this.read().contain_flag(MixFlags::Focus) {
+    let mix = this.read();
+    if mix.contain_flag(MixFlags::Focus) {
       child = callbacks_for_focus_node(child);
     }
+    if !mix.subject.is_empty() {
+      let subject = mix.subject.clone();
+      mix.on_disposed(move |_| {
+        let _ = AppCtx::spawn_local(async move { subject.unsubscribe() });
+      });
+    }
+    drop(mix);
     child.try_unwrap_state_and_attach(this)
   }
 }

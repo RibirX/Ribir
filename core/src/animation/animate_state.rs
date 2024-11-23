@@ -79,7 +79,9 @@ where
 
   #[inline]
   fn animate_state_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
-    StateWatcher::modifies(self)
+    StateWatcher::raw_modifies(self)
+      .filter(|s| s.contains(ModifyScope::all()))
+      .box_it()
   }
 }
 

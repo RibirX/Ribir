@@ -252,7 +252,6 @@ fn override_compose_decorator(theme: &mut Theme) {
       let host = FatObj::new(host);
       @Ripple {
         center: true,
-        color: pipe!($style.color),
         radius: 24.,
         bounded: RippleBound::Unbounded,
         @InteractiveLayer {
@@ -269,10 +268,6 @@ fn override_compose_decorator(theme: &mut Theme) {
       let host = FatObj::new(host);
       @Ripple {
         center: false,
-        color: {
-          let palette = Palette::of(BuildCtx::get()).clone();
-          pipe!(palette.on_of(&palette.base_of(&$style.color)))
-        },
         bounded: RippleBound::Radius(Radius::all(20.)),
         @InteractiveLayer {
           border_radii: Radius::all(20.),
@@ -293,10 +288,6 @@ fn override_compose_decorator(theme: &mut Theme) {
       let host = FatObj::new(host);
       @Ripple {
         center: false,
-        color: {
-          let palette = Palette::of(BuildCtx::get()).clone();
-          pipe!(palette.base_of(&$style.color))
-        },
         bounded: RippleBound::Radius(Radius::all(20.)),
         @InteractiveLayer {
           border_radii: Radius::all(20.),
@@ -317,10 +308,6 @@ fn override_compose_decorator(theme: &mut Theme) {
     fn_widget! {
       @Ripple {
         center: false,
-        color: {
-          let palette = Palette::of(BuildCtx::get()).clone();
-          pipe!(palette.on_of(&palette.base_of(&$style.color)))
-        },
         bounded: RippleBound::Radius(Radius::all(20.)),
         @InteractiveLayer {
           border_radii: Radius::all(20.),

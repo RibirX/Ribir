@@ -69,34 +69,27 @@ where
               animate.state.set(value);
             }
             FrameMsg::BeforeLayout(time) => {
-              let p = animate
-                .read()
-                .running_info
-                .as_ref()
-                .unwrap()
-                .last_progress;
-              // Stop the animate at the next frame of animate finished, to ensure draw the
-              // last frame of the animate.
-              if matches!(p, AnimateProgress::Finish) {
+              animate.shallow().advance_to(time);
+            }
+            FrameMsg::LayoutReady(_) => {}
+            FrameMsg::Finish(_) => {
+              let mut w_ref = animate.write();
+              let info = w_ref.running_info.as_mut().unwrap();
+              let last_progress = info.last_progress;
+              let to = info.to.clone();
+              info.already_lerp = false;
+              w_ref.state.set(to);
+              // Forgets modifies because we only modifies the inner info.
+              w_ref.forget_modifies();
+
+              if matches!(last_progress, AnimateProgress::Finish) {
+                drop(w_ref);
                 let wnd = AppCtx::get_window(wnd_id).unwrap();
                 let animate = animate.clone_writer();
                 wnd
                   .frame_spawn(async move { animate.stop() })
                   .unwrap();
-              } else {
-                animate.shallow().advance_to(time);
               }
-            }
-            FrameMsg::LayoutReady(_) => {}
-            FrameMsg::Finish(_) => {
-              let mut animate = animate.write();
-              let info = animate.running_info.as_mut().unwrap();
-              info.already_lerp = false;
-              let data_value = info.to.clone();
-              animate.state.set(data_value);
-
-              // Forgets modifies because we only modifies the inner info.
-              animate.forget_modifies();
             }
           }
         })

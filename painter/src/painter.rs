@@ -318,6 +318,11 @@ impl Painter {
 
   pub fn alpha(&self) -> f32 { self.current_state().opacity }
 
+  pub fn set_alpha(&mut self, alpha: f32) -> &mut Self {
+    self.current_state_mut().opacity = alpha;
+    self
+  }
+
   #[inline]
   pub fn set_strokes(&mut self, strokes: StrokeOptions) -> &mut Self {
     self.current_state_mut().stroke_options = strokes;
