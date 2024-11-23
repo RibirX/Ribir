@@ -23,10 +23,6 @@ pub mod easing {
   pub const STANDARD_ACCELERATE: CubicBezierEasing = CubicBezierEasing::new(0.3, 0., 1., 1.);
   pub const STANDARD_DECELERATE: CubicBezierEasing = CubicBezierEasing::new(0., 0., 0., 1.);
 
-  pub const LEGACY: CubicBezierEasing = CubicBezierEasing::new(0.4, 0., 0.2, 1.);
-  pub const LEGACY_ACCELERATE: CubicBezierEasing = CubicBezierEasing::new(0.4, 0., 1., 1.);
-  pub const LEGACY_DECELERATE: CubicBezierEasing = CubicBezierEasing::new(0., 0., 0.2, 1.);
-
   pub mod duration {
 
     use crate::Duration;

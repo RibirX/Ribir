@@ -37,6 +37,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Changed
 
 - **widgets**: The `Icon` widget utilizes classes to configure its style, and it does not have a size property. (#660 @M-Adoo)
+- **theme:** Refactor the `Ripple` and `StateLayer` of the material theme to enhance their visual effects. (#pr @M-Adoo)
 
 ### Fixed
 

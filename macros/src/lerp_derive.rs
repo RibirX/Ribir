@@ -13,7 +13,7 @@ pub(crate) fn lerp_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenStre
     syn::Fields::Named(n) => {
       let fields = n.named.iter().map(|f| &f.ident);
       quote! {
-        impl #g_impl Lerp for #name #g_ty #g_impl #g_where {
+        impl #g_impl Lerp for #name #g_ty #g_where {
           fn lerp(&self, to: &Self, factor: f32) -> Self {
             #name {
               #(#fields: Lerp::lerp(&self.#fields, &to.#fields, factor)),*
@@ -29,7 +29,7 @@ pub(crate) fn lerp_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenStre
         .enumerate()
         .map(|(i, f)| syn::Index { index: i as u32, span: f.span() });
       quote! {
-        impl #g_impl Lerp for #name #g_ty #g_impl #g_where {
+        impl #g_impl Lerp for #name #g_ty #g_where {
           fn lerp(&self, to: &Self, factor: f32) -> Self {
             #name(#(Lerp::lerp(&self.#indexes, &to.#indexes, factor)) ,*)
           }
