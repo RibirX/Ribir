@@ -28,7 +28,7 @@ fn lerp_angle(from: &Angle, to: &Angle, rate: f32) -> Angle {
 }
 pub(super) fn init(classes: &mut Classes) {
   classes.insert(MD_BASE_LINEAR_INDICATOR, style_class! {
-    background: Palette::of(BuildCtx::get()).primary(),
+    background: BuildCtx::get().variant_color(),
     border_radius: md::RADIUS_2,
   });
   classes.insert(MD_BASE_SPINNER, style_class! {
@@ -41,14 +41,14 @@ pub(super) fn init(classes: &mut Classes) {
   });
   classes.insert(MD_BASE_SPINNER_INDICATOR, style_class! {
     class: MD_BASE_SPINNER,
-    foreground: Palette::of(BuildCtx::get()).primary(),
+    foreground: BuildCtx::get().variant_color(),
   });
   classes.insert(MD_BASE_SPINNER_TRACK, style_class! {
     class: MD_BASE_SPINNER,
-    foreground: Palette::of(BuildCtx::get()).secondary_container(),
+    foreground: BuildCtx::get().variant_color_container(),
   });
   classes.insert(LINEAR_INDETERMINATE_TRACK, style_class! {
-    background: Palette::of(BuildCtx::get()).secondary_container(),
+    background: BuildCtx::get().variant_color_container(),
     border_radius: md::RADIUS_2,
     margin: md::EDGES_LEFT_4,
   });

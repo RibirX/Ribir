@@ -23,6 +23,26 @@ impl BuildCtx {
   /// Return the window of this context is created from.
   pub fn window(&self) -> Sc<Window> { self.tree().window() }
 
+  /// This method returns the color of the current build process, with the
+  /// primary color of the palette serving as the default.
+  ///
+  /// This color is used for interactions between the user and the widget theme.
+  /// For instance, the `Button` widget does not have a `color` property, but
+  /// its class utilizes the color returned by this method to style the button.
+  /// Therefore, users can modify this color to change the button's color
+  /// without having to override its class.
+  pub fn variant_color(&self) -> Color {
+    // todo: We have not yet enabled the ability to change the variant color. This
+    // method is provided for compatibility purposes now.
+    Palette::of(self).primary()
+  }
+
+  /// The container color of the variant color.
+  pub fn variant_color_container(&self) -> Color {
+    let color = self.variant_color();
+    Palette::of(self).container_of(&color)
+  }
+
   pub(crate) fn tree(&self) -> &WidgetTree {
     // Safety: Please refer to the comments in `WidgetTree::tree_mut` for more
     // information.
