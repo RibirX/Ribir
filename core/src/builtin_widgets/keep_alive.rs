@@ -15,6 +15,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct KeepAlive {
   pub keep_alive: bool,
+  pub(crate) wid: Option<TrackId>,
 }
 
 impl Declare for KeepAlive {
@@ -26,11 +27,21 @@ impl Declare for KeepAlive {
 impl<'c> ComposeChild<'c> for KeepAlive {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let modifies = this.raw_modifies();
-    child
+    fn_widget! {
+      let mut w = FatObj::new(child);
+      { this.silent().wid = Some($w.track_id()); }
+      let modifies = this.raw_modifies();
+      w
+      .into_widget()
       .try_unwrap_state_and_attach(this)
       .on_build(|id| id.dirty_on(modifies))
+    }
+    .into_widget()
   }
+}
+
+impl KeepAlive {
+  pub(crate) fn track_id(&self) -> Option<TrackId> { self.wid.clone() }
 }
 
 #[cfg(test)]

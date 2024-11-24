@@ -237,7 +237,7 @@ impl HitTestCtx {
   pub fn box_hit_test(&self, pos: Point) -> HitTest {
     let is_hit = self
       .box_rect()
-      .map_or(false, |rect| rect.contains(pos));
+      .is_some_and(|rect| rect.contains(pos));
     HitTest { hit: is_hit, can_hit_child: is_hit }
   }
 }

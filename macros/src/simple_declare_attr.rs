@@ -162,7 +162,7 @@ impl<'a> DeclareField<'a> {
     self
       .attr
       .as_ref()
-      .map_or(false, |attr| attr.strict.is_some())
+      .is_some_and(|attr| attr.strict.is_some())
   }
 
   pub fn default_value(&self) -> Option<TokenStream> {

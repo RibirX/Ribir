@@ -79,7 +79,7 @@ impl<'a> ImageTest<'a> {
     let overwrite = std::ffi::OsStr::new("overwrite");
     let dir = ref_path.parent().unwrap();
     let stem = ref_path.file_stem().unwrap().to_str().unwrap();
-    if std::env::var_os("RIBIR_IMG_TEST").map_or(false, |var| var == overwrite) {
+    if std::env::var_os("RIBIR_IMG_TEST").is_some_and(|var| var == overwrite) {
       std::fs::create_dir_all(dir).unwrap();
       let mut file = File::create(ref_path).unwrap();
       test_img.write_as_png(&mut file).unwrap();

@@ -160,7 +160,7 @@ impl Wordle {
   }
 
   fn is_win(&self) -> bool {
-    self.guesses.last().map_or(false, |g| {
+    self.guesses.last().is_some_and(|g| {
       g.0
         .iter()
         .all(|c| c.hint() == Some(CharHint::Correct))

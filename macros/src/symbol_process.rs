@@ -245,7 +245,7 @@ impl Fold for DollarRefsCtx {
 
     if let Member::Named(member) = member {
       let info = BUILTIN_INFOS.get(&member.to_string());
-      if info.map_or(false, |info| {
+      if info.is_some_and(|info| {
         info.mem_ty == BuiltinMemberType::Field && self.replace_builtin_host(&mut *base, info)
       }) {
         return i;
@@ -258,7 +258,7 @@ impl Fold for DollarRefsCtx {
   fn fold_expr_method_call(&mut self, mut i: ExprMethodCall) -> ExprMethodCall {
     // fold builtin method on state
     let info = BUILTIN_INFOS.get(&i.method.to_string());
-    if info.map_or(false, |info| {
+    if info.is_some_and(|info| {
       info.mem_ty == BuiltinMemberType::Method && self.replace_builtin_host(&mut i.receiver, info)
     }) {
       return i;

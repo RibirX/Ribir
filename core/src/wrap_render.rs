@@ -62,6 +62,10 @@ impl Query for RenderPair {
     self.host.query_all(query_id, out)
   }
 
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    self.host.query_all_write(query_id, out)
+  }
+
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle> { self.host.query(query_id) }
 
   fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {

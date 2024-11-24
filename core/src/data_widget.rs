@@ -43,6 +43,13 @@ impl Query for DataAttacher {
     }
   }
 
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    self.render.query_all_write(query_id, out);
+    if let Some(h) = self.data.query_write(query_id) {
+      out.push(h)
+    }
+  }
+
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
     self
       .data
@@ -73,6 +80,10 @@ impl Query for AnonymousAttacher {
   #[inline]
   fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
     self.render.query_all(query_id, out)
+  }
+
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    self.render.query_all_write(query_id, out)
   }
 
   #[inline]

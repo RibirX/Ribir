@@ -7,6 +7,7 @@ use std::{
 
 use futures::{Future, task::LocalSpawnExt};
 use ribir_algo::Sc;
+use widget_id::TrackId;
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 pub use winit::window::CursorIcon;
 
@@ -52,7 +53,7 @@ pub struct Window {
   /// is dropped.
   ///
   /// This widgets it's detached from its parent, but still need to paint.
-  delay_drop_widgets: RefCell<Vec<(Option<WidgetId>, WidgetId)>>,
+  pub(crate) delay_drop_widgets: RefCell<Vec<(Option<WidgetId>, TrackId)>>,
 
   flags: Cell<WindowFlags>,
 }
@@ -338,30 +339,42 @@ impl Window {
   }
 
   fn draw_delay_drop_widgets(&self) {
-    let mut delay_widgets = self.delay_drop_widgets.borrow_mut();
     let mut painter = self.painter.borrow_mut();
 
-    delay_widgets.retain(|(parent, wid)| {
-      let tree = self.tree_mut();
-      let drop_conditional = wid
-        .query_ref::<KeepAlive>(tree)
-        .map_or(true, |d| !d.keep_alive);
-      let parent_dropped = parent
-        .map_or(false, |p| p.is_dropped(tree) || p.ancestors(tree).last() != Some(tree.root()));
-      let need_drop = drop_conditional || parent_dropped;
-      if need_drop {
-        tree.remove_subtree(*wid);
-      } else {
-        let mut painter = painter.save_guard();
-        if let Some(p) = parent {
-          let offset = tree.map_to_global(Point::zero(), *p);
-          painter.translate(offset.x, offset.y);
+    self
+      .delay_drop_widgets
+      .borrow_mut()
+      .retain(|(parent, wid)| {
+        let wid = wid.get().unwrap();
+        let tree = self.tree_mut();
+        let drop_conditional = wid
+          .query_ref::<KeepAlive>(tree)
+          .map_or(true, |d| !d.keep_alive);
+        let parent_dropped = parent
+          .as_ref()
+          .is_some_and(|p| p.ancestors(tree).any(|w| w.is_dropped(tree)));
+        let need_drop = drop_conditional || parent_dropped;
+        if need_drop {
+          tree.remove_subtree(wid);
         }
-        let mut ctx = PaintingCtx::new(*wid, tree, &mut painter);
-        wid.paint_subtree(&mut ctx);
-      }
-      !need_drop
-    });
+        !need_drop
+      });
+    self
+      .delay_drop_widgets
+      .borrow()
+      .iter()
+      .for_each(|(parent, wid)| {
+        if let Some(wid) = wid.get() {
+          let tree = self.tree();
+          let mut painter = painter.save_guard();
+          if let Some(p) = parent {
+            let offset = tree.map_to_global(Point::zero(), *p);
+            painter.translate(offset.x, offset.y);
+          }
+          let mut ctx = PaintingCtx::new(wid, tree, &mut painter);
+          wid.paint_subtree(&mut ctx);
+        }
+      });
   }
 
   fn run_priority_tasks(&self) {
@@ -405,13 +418,16 @@ impl Window {
               self.emit(id, &mut e);
             });
 
-          let keep_alive = id.contain_type::<KeepAlive>(self.tree());
+          let keep_alive_id = id
+            .query_ref::<KeepAlive>(self.tree())
+            .filter(|d| d.keep_alive)
+            .and_then(|d| d.track_id());
 
-          if keep_alive {
+          if let Some(keep_alive_id) = keep_alive_id {
             self
               .delay_drop_widgets
               .borrow_mut()
-              .push((parent, id));
+              .push((parent, keep_alive_id));
           } else {
             self.add_delay_event(DelayEvent::RemoveSubtree(id));
           }

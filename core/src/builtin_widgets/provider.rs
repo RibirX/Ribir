@@ -141,15 +141,17 @@ pub trait ProviderCtx {
     })
   }
 
+  fn all_write_of<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
+    self.all_providers().flat_map(|p| {
+      let mut out = SmallVec::new();
+      p.query_all_write(&QueryId::of::<Q>(), &mut out);
+      out.into_iter().filter_map(QueryHandle::into_mut)
+    })
+  }
+
   fn of<Q: 'static>(&self) -> Option<QueryRef<Q>> { self.all_of().next() }
 
-  fn write_of<Q: 'static>(&self) -> Option<WriteRef<Q>> {
-    self
-      .all_providers()
-      .filter_map(|p| p.query_write(&QueryId::of::<Q>()))
-      .filter_map(QueryHandle::into_mut)
-      .next()
-  }
+  fn write_of<Q: 'static>(&self) -> Option<WriteRef<Q>> { self.all_write_of().next() }
 
   fn all_providers(&self) -> impl Iterator<Item = &dyn Query>;
 }
@@ -182,6 +184,12 @@ impl<const M: usize> Query for [Box<dyn Query>; M] {
     self
       .iter()
       .for_each(|q| q.query_all(query_id, out))
+  }
+
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    self
+      .iter()
+      .for_each(|q| q.query_all_write(query_id, out))
   }
 
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {

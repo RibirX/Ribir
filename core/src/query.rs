@@ -13,6 +13,10 @@ pub trait Query: Any {
   /// in an inside-to-outside order.
   fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>);
 
+  /// Queries all writers that match the provided type id, returning their
+  /// handles in an inside-to-outside order.
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>);
+
   /// Queries the type that matches the provided type id, returning its handle.
   /// This method always returns the outermost type.
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle>;
@@ -209,6 +213,8 @@ impl<T: Any> Query for Queryable<T> {
     }
   }
 
+  fn query_all_write<'q>(&'q self, _: &QueryId, _: &mut SmallVec<[QueryHandle<'q>; 1]>) {}
+
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
     (query_id == &QueryId::of::<T>()).then(|| QueryHandle::new(&self.0))
   }
@@ -237,6 +243,12 @@ where
     // The value of the writer and the writer itself cannot be queried
     // at the same time.
     if let Some(h) = self.query(query_id) {
+      out.push(h)
+    }
+  }
+
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    if let Some(h) = self.query_write(query_id) {
       out.push(h)
     }
   }
@@ -285,6 +297,8 @@ macro_rules! impl_query_for_reader {
         out.push(h)
       }
     }
+
+    fn query_all_write<'q>(&'q self, _: &QueryId, _: &mut SmallVec<[QueryHandle<'q>; 1]>) {}
 
     fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
       if query_id == &QueryId::of::<V>() {

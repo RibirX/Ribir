@@ -141,10 +141,7 @@ impl SvgDocument {
   ) {
     if let Some(id) = e
       .attributes()
-      .find(|a| {
-        a.as_ref()
-          .map_or(false, |a| a.key == QName(b"id"))
-      })
+      .find(|a| a.as_ref().is_ok_and(|a| a.key == QName(b"id")))
       .map(|a| a.unwrap().value)
     {
       unsafe {

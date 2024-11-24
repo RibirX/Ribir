@@ -15,7 +15,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   let syn::DeriveInput { vis, ident: host, generics, data, .. } = input;
   let stt = data_struct_unwrap(data, DECLARE)?;
 
-  let mut tokens = if stt.fields.is_empty() {
+  let mut tokens: TokenStream = if stt.fields.is_empty() {
     empty_impl(host, &stt.fields)
   } else {
     let declarer = Declarer::new(host, &mut stt.fields)?;
@@ -539,6 +539,13 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self.fat_obj = self.fat_obj.keep_alive(v);
           self
         }
+
+        #[doc="Initializes the `track_id` value of the `TrackWidgetId` widget."]
+        #vis fn track_id<const _M: u8>(mut self) -> Self
+        {
+          self.fat_obj = self.fat_obj.track_id();
+          self
+        }
       }
     }
   };
@@ -586,7 +593,7 @@ fn declarer_set_methods<'a>(
       if f
         .attr
         .as_ref()
-        .map_or(false, |attr| attr.strict.is_some())
+        .is_some_and(|attr| attr.strict.is_some())
       {
         quote! {
           #[inline]
