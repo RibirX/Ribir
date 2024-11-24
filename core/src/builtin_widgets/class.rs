@@ -144,15 +144,20 @@ impl ComposeChild<'static> for Classes {
 }
 
 impl<'c> ComposeChild<'c> for OverrideClass {
-  type Child = FnWidget<'c>;
+  type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     let cls_override = this.try_into_value().unwrap_or_else(|_| {
       panic!("Attempting to use `OverrideClass` as a reader or writer is not allowed.")
     });
-
-    Provider::new(Box::new(Queryable(cls_override)))
-      .with_child(child)
-      .into_widget()
+    let f = move || {
+      BuildCtx::get_mut()
+        .current_providers
+        .push(Box::new(Queryable(cls_override)));
+      let id = child.build();
+      BuildCtx::get_mut().current_providers.pop();
+      Widget::from_id(id)
+    };
+    f.into_widget()
   }
 }
 
@@ -659,7 +664,7 @@ mod tests {
           class_impl: style_class! {
             clamp: BoxClamp::fixed_size(Size::new(66., 66.))
           } as ClassImpl,
-          @container! {
+          @Container {
             size: Size::new(100., 100.),
             class: MARGIN,
           }
