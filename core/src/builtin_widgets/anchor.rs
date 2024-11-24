@@ -175,6 +175,7 @@ impl_compose_child_for_wrap_render!(RelativeAnchor);
 
 impl WrapRender for RelativeAnchor {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    ctx.update_position(ctx.widget_id(), Point::zero());
     let child_size = host.perform_layout(clamp, ctx);
 
     let Anchor { x, y } = self.anchor;
@@ -191,7 +192,8 @@ impl WrapRender for RelativeAnchor {
       })
       .unwrap_or_default();
 
-    ctx.update_position(ctx.widget_id(), Point::new(x, y));
+    let pos = ctx.box_pos().unwrap_or_default();
+    ctx.update_position(ctx.widget_id(), pos + Size::new(x, y));
     child_size
   }
 }
@@ -239,5 +241,22 @@ mod test {
     pixel_bottom_right,
     widget_tester(Anchor::right_bottom(1., 1.)),
     LayoutCase::default().with_pos((49., 49.).into())
+  );
+
+  widget_layout_test!(
+    multi_anchor,
+    WidgetTester::new(fn_widget! {
+      let w = @Container {
+        size: Size::new(100., 100.),
+        anchor: Anchor::left(40.),
+      }.into_widget();
+
+      let w = FatObj::new(w);
+      @$ w {
+        anchor: Anchor::top(30.)
+      }
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0]).with_rect(ribir_geom::rect(40., 30., 100., 100.))
   );
 }

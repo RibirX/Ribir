@@ -91,7 +91,7 @@ impl WrapRender for HAlignWidget {
 
     let child_size = host.perform_layout(clamp, ctx);
     let x = align.align_value(child_size.width, clamp.max.width);
-    let pos = ctx.position(ctx.widget_id()).unwrap_or_default();
+    let pos = ctx.box_pos().unwrap_or_default();
     ctx.update_position(ctx.widget_id(), Point::new(x, pos.y));
     clamp.clamp(child_size)
   }
@@ -107,7 +107,7 @@ impl WrapRender for VAlignWidget {
     }
     let child_size = host.perform_layout(clamp, ctx);
     let y = align.align_value(child_size.height, clamp.max.height);
-    let pos = ctx.position(ctx.widget_id()).unwrap_or_default();
+    let pos = ctx.box_pos().unwrap_or_default();
     ctx.update_position(ctx.widget_id(), Point::new(pos.x, y));
     clamp.clamp(child_size)
   }
