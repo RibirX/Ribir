@@ -18,6 +18,7 @@ pub struct WidgetId(pub(crate) NodeId);
 // replace the `WidgetId` you get this place holder.
 pub(crate) enum PlaceHolder {
   PrevSibling(WidgetId),
+  NextSibling(WidgetId),
   Parent(WidgetId),
 }
 
@@ -111,6 +112,8 @@ impl WidgetId {
   pub(crate) fn place_holder(self, tree: &WidgetTree) -> PlaceHolder {
     if let Some(prev) = self.prev_sibling(tree) {
       PlaceHolder::PrevSibling(prev)
+    } else if let Some(next) = self.next_sibling(tree) {
+      PlaceHolder::NextSibling(next)
     } else {
       PlaceHolder::Parent(self.parent(tree).unwrap())
     }
@@ -221,6 +224,10 @@ impl WidgetId {
 
   pub(crate) fn insert_after(self, next: WidgetId, tree: &mut WidgetTree) {
     self.0.insert_after(next.0, &mut tree.arena);
+  }
+
+  pub(crate) fn insert_before(self, prev: WidgetId, tree: &mut WidgetTree) {
+    self.0.insert_before(prev.0, &mut tree.arena);
   }
 
   pub(crate) fn append(self, child: WidgetId, tree: &mut WidgetTree) {
@@ -389,6 +396,7 @@ impl PlaceHolder {
   pub(crate) fn replace(self, widget: WidgetId, tree: &mut WidgetTree) {
     match self {
       PlaceHolder::PrevSibling(prev) => prev.insert_after(widget, tree),
+      PlaceHolder::NextSibling(next) => next.insert_before(widget, tree),
       PlaceHolder::Parent(parent) => parent.append(widget, tree),
     }
   }
