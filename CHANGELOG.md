@@ -46,6 +46,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: The animation does not restore the state value correctly when multiple animations are applied to the same state. (#662 @M-Adoo)
 
 - **core**: inner embed anchor not work (#pr @wjian23)
+- **core**: fix query render object with multi target hits (#pr @wjian23)
 
 ## [0.4.0-alpha.15] - 2024-11-13
 

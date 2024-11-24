@@ -45,16 +45,16 @@ impl Query for DataAttacher {
 
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
     self
-      .render
+      .data
       .query(query_id)
-      .or_else(|| self.data.query(query_id))
+      .or_else(|| self.render.query(query_id))
   }
 
   fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
     self
-      .render
+      .data
       .query_write(query_id)
-      .or_else(|| self.data.query_write(query_id))
+      .or_else(|| self.render.query_write(query_id))
   }
 
   fn queryable(&self) -> bool { true }
