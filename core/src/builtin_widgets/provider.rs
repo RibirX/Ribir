@@ -134,22 +134,22 @@ impl<'c> ComposeChild<'c> for Provider {
 /// event objects.
 pub trait ProviderCtx {
   fn all_of<Q: 'static>(&self) -> impl Iterator<Item = QueryRef<Q>> {
-    self
-      .all_providers()
-      .filter_map(|p| p.query(&QueryId::of::<Q>()))
-      .filter_map(QueryHandle::into_ref)
-  }
-
-  fn all_write_of<Q: 'static>(&self) -> impl Iterator<Item = WriteRef<Q>> {
-    self
-      .all_providers()
-      .filter_map(|p| p.query_write(&QueryId::of::<Q>()))
-      .filter_map(QueryHandle::into_mut)
+    self.all_providers().flat_map(|p| {
+      let mut out = SmallVec::new();
+      p.query_all(&QueryId::of::<Q>(), &mut out);
+      out.into_iter().filter_map(QueryHandle::into_ref)
+    })
   }
 
   fn of<Q: 'static>(&self) -> Option<QueryRef<Q>> { self.all_of().next() }
 
-  fn write_of<Q: 'static>(&self) -> Option<WriteRef<Q>> { self.all_write_of().next() }
+  fn write_of<Q: 'static>(&self) -> Option<WriteRef<Q>> {
+    self
+      .all_providers()
+      .filter_map(|p| p.query_write(&QueryId::of::<Q>()))
+      .filter_map(QueryHandle::into_mut)
+      .next()
+  }
 
   fn all_providers(&self) -> impl Iterator<Item = &dyn Query>;
 }
