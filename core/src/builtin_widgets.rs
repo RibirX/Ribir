@@ -900,17 +900,19 @@ impl<'a> FatObj<Widget<'a>> {
       host
         + [
           track_id,
-          class,
           padding,
           fitted_box,
-          constrained_box,
           box_decoration,
           foreground,
+          painting_style,
+          text_style,
           scrollable,
           layout_box,
           mix_builtin,
           request_focus,
+          class,
           cursor,
+          constrained_box,
           margin,
           transform,
           opacity,
@@ -919,8 +921,6 @@ impl<'a> FatObj<Widget<'a>> {
           v_align,
           relative_anchor,
           global_anchor,
-          painting_style,
-          text_style,
           keep_alive
         ]
     );
