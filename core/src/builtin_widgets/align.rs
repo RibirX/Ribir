@@ -85,8 +85,6 @@ impl WrapRender for HAlignWidget {
     let align: Align = self.h_align.into();
     if align == Align::Stretch {
       clamp.min.width = clamp.max.width;
-    } else {
-      clamp.min.width = 0.;
     }
 
     let child_size = host.perform_layout(clamp, ctx);
@@ -102,8 +100,6 @@ impl WrapRender for VAlignWidget {
     let align: Align = self.v_align.into();
     if align == Align::Stretch {
       clamp.min.height = clamp.max.height;
-    } else {
-      clamp.min.height = 0.;
     }
     let child_size = host.perform_layout(clamp, ctx);
     let y = align.align_value(child_size.height, clamp.max.height);
