@@ -15,10 +15,11 @@ impl<'c> ComposeChild<'c> for RequestFocus {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      let child = FatObj::new(child);
+      let mut child = FatObj::new(child);
       @ $child {
         on_mounted: move |e| {
-          let handle = e.window().focus_mgr.borrow().focus_handle(e.id);
+          let track_id = $child.track_id();
+          let handle = e.window().focus_mgr.borrow().focus_handle(track_id);
           $this.silent().handle = Some(handle);
         }
       }

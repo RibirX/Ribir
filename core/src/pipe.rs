@@ -731,13 +731,22 @@ impl PipeNode {
   }
 
   fn transplant_to_new(
-    &self, old_node: Box<dyn RenderQueryable>, new: WidgetId, tree: &mut WidgetTree,
+    &self, old_node: Box<dyn RenderQueryable>, new_id: WidgetId, tree: &mut WidgetTree,
   ) {
     let old = self.as_ref().dyn_info.borrow().host_id();
-    let [old, new] = tree.get_many_mut(&[old, new]);
-    std::mem::swap(&mut self.as_mut().data, new);
 
+    let [old, new] = tree.get_many_mut(&[old, new_id]);
     std::mem::swap(old, new);
+
+    let mut wids = SmallVec::new();
+    new.query_all(&QueryId::of::<TrackId>(), &mut wids);
+    wids.into_iter().for_each(|wid| {
+      if let Some(wid) = wid.into_ref::<TrackId>() {
+        wid.set(Some(new_id));
+      }
+    });
+
+    std::mem::swap(&mut self.as_mut().data, old);
     *old = old_node;
   }
 
@@ -809,11 +818,18 @@ impl Query for PipeNode {
     }
   }
 
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    let p = self.as_ref();
+    p.data.query_all_write(query_id, out);
+  }
+
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
     let p = self.as_ref();
-    p.data
-      .query(query_id)
-      .or_else(|| (query_id == &QueryId::of::<DynInfo>()).then(|| QueryHandle::new(&p.dyn_info)))
+    if query_id == &QueryId::of::<DynInfo>() {
+      Some(QueryHandle::new(&p.dyn_info))
+    } else {
+      p.data.query(query_id)
+    }
   }
 
   fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {

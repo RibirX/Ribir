@@ -167,7 +167,7 @@ struct ImeHandle<H> {
   pre_edit: Option<PreEditState>,
   guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
   window: Sc<Window>,
-  caret_id: LazyWidgetId,
+  caret_id: TrackId,
 }
 
 impl<E, H> ImeHandle<H>
@@ -175,7 +175,7 @@ where
   E: EditableText + 'static,
   H: StateWriter<Value = E>,
 {
-  fn new(window: Sc<Window>, host: H, caret_id: LazyWidgetId) -> Self {
+  fn new(window: Sc<Window>, host: H, caret_id: TrackId) -> Self {
     Self { window, host, pre_edit: None, guard: None, caret_id }
   }
   fn ime_allowed(&mut self) {
@@ -230,14 +230,7 @@ where
     }
 
     let window = self.window.clone();
-    let wid = self.caret_id.clone();
-
-    let pos = window.map_to_global(Point::zero(), wid.assert_id());
-    let size = window
-      .widget_size(wid.assert_id())
-      .unwrap_or_default();
-    window.set_ime_cursor_area(&Rect::new(pos, size));
-
+    let caret_id = self.caret_id.clone();
     let tick_of_layout_ready = window
       .frame_tick_stream()
       .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
@@ -248,11 +241,11 @@ where
         .sample(tick_of_layout_ready)
         .box_it()
         .subscribe(move |_| {
-          let pos = window.map_to_global(Point::zero(), wid.assert_id());
-          let size = window
-            .widget_size(wid.assert_id())
-            .unwrap_or_default();
-          window.set_ime_cursor_area(&Rect::new(pos, size));
+          if let Some(wid) = caret_id.get() {
+            let pos = window.map_to_global(Point::zero(), wid);
+            let size = window.widget_size(wid).unwrap_or_default();
+            window.set_ime_cursor_area(&Rect::new(pos, size));
+          }
         })
         .unsubscribe_when_dropped(),
     );
@@ -347,14 +340,14 @@ where
         scrollable: scroll_dir,
       };
 
-      let caret_box = @Caret {
+      let mut caret_box = @Caret {
         focused: pipe!($stack.has_focus()),
         clamp: pipe!(
             $this.current_line_height(&$text).unwrap_or(0.)
           ).map(BoxClamp::fixed_height),
       };
 
-      let caret_box_id = caret_box.lazy_host_id();
+      let caret_box_id = $caret_box.track_id();
       let mut caret_box = @$caret_box {
         anchor: pipe!(
           let pos = $this.caret_position(&$text).unwrap_or_default();

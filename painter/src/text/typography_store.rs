@@ -446,7 +446,7 @@ impl VisualGlyphs {
           if l
             .glyphs
             .last()
-            .map_or(false, |g| g.glyph_id == NEWLINE_GLYPH_ID)
+            .is_some_and(|g| g.glyph_id == NEWLINE_GLYPH_ID)
           {
             l.glyphs.len() - 1
           } else {

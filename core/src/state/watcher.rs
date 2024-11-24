@@ -17,6 +17,10 @@ impl<R> Watcher<R> {
   }
 }
 
+impl<R> From<Watcher<Reader<R>>> for Reader<R> {
+  fn from(w: Watcher<Reader<R>>) -> Self { w.reader }
+}
+
 impl<R: StateReader> StateReader for Watcher<R> {
   type Value = R::Value;
   type Reader = R::Reader;

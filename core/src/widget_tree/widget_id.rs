@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use std::{convert::Infallible, rc::Rc};
 
 use indextree::{Node, NodeId};
 use rxrust::ops::box_it::CloneableBoxOp;
@@ -30,6 +30,26 @@ impl<T: Render + Query> RenderQueryable for T {
   fn as_render(&self) -> &dyn Render { self }
 
   fn as_query(&self) -> &dyn Query { self }
+}
+
+/// You can get TrackId by builtin method of track_id().
+/// see [`TrackWidgetId::track_id`]
+pub struct TrackId(Stateful<Option<WidgetId>>);
+
+impl TrackId {
+  pub fn get(&self) -> Option<WidgetId> { *self.0.read() }
+
+  pub fn watcher(&self) -> impl StateWatcher<Value = Option<WidgetId>> { self.0.clone_watcher() }
+
+  pub(crate) fn set(&self, id: Option<WidgetId>) { *self.0.write() = id; }
+}
+
+impl Default for TrackId {
+  fn default() -> Self { Self(Stateful::new(None)) }
+}
+
+impl Clone for TrackId {
+  fn clone(&self) -> Self { Self(self.0.clone_writer()) }
 }
 
 impl WidgetId {
@@ -96,8 +116,23 @@ impl WidgetId {
     }
   }
 
+  fn delay_drop_parent(&self, tree: &WidgetTree) -> Option<WidgetId> {
+    if self == &tree.root() {
+      return None;
+    }
+    let wnd = tree.window();
+    let delay_drop_widgets = wnd.delay_drop_widgets.borrow();
+    delay_drop_widgets.iter().find_map(
+      |(parent, id)| {
+        if id.get() == Some(*self) { *parent } else { None }
+      },
+    )
+  }
+
   pub(crate) fn parent(self, tree: &WidgetTree) -> Option<WidgetId> {
-    self.node_feature(tree, |node| node.parent())
+    self
+      .node_feature(tree, |node| node.parent())
+      .or_else(|| self.delay_drop_parent(tree))
   }
 
   pub(crate) fn first_child(self, tree: &WidgetTree) -> Option<WidgetId> {
@@ -128,7 +163,22 @@ impl WidgetId {
     // `IndexTree` not check if is a freed id when create iterator, we may iterate
     // another node,so we need check it manually.
     assert!(!self.is_dropped(tree));
-    self.0.ancestors(&tree.arena).map(WidgetId)
+
+    let last_elem = Rc::new(RefCell::new(self));
+    let last_elem2 = last_elem.clone();
+    self
+      .0
+      .ancestors(&tree.arena)
+      .map(move |id| {
+        *last_elem2.borrow_mut() = WidgetId(id);
+        WidgetId(id)
+      })
+      .chain(
+        Some(last_elem)
+          .into_iter()
+          .filter_map(|v| v.borrow().delay_drop_parent(tree))
+          .flat_map(|wid| wid.0.ancestors(&tree.arena).map(WidgetId)),
+      )
   }
 
   #[inline]
@@ -258,13 +308,10 @@ impl WidgetId {
           while let Some(p) = node {
             // self node sub-tree paint finished, goto sibling
             ctx.painter.restore();
-            node = match p == self {
-              true => None,
-              false => p.next_sibling(tree),
-            };
+            node = p.next_sibling(tree);
             if node.is_some() {
               break;
-            } else {
+            } else if p != self {
               // if there is no more sibling, back to parent to find sibling.
               node = p.parent(tree);
             }
@@ -291,6 +338,17 @@ impl WidgetId {
       .assert_get(tree)
       .query_all(&QueryId::of::<T>(), &mut out);
     out.into_iter().filter_map(QueryHandle::into_ref)
+  }
+
+  #[allow(unused)]
+  pub(crate) fn query_all_write_iter<T: Any>(
+    self, tree: &WidgetTree,
+  ) -> impl DoubleEndedIterator<Item = WriteRef<T>> {
+    let mut out = smallvec![];
+    self
+      .assert_get(tree)
+      .query_all_write(&QueryId::of::<T>(), &mut out);
+    out.into_iter().filter_map(QueryHandle::into_mut)
   }
 
   #[allow(unused)]

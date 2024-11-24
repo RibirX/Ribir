@@ -21,23 +21,21 @@ pub(crate) struct FocusManager {
 }
 
 pub struct FocusHandle {
-  wid: WidgetId,
+  wid: TrackId,
   wnd_id: WindowId,
 }
 
 impl FocusHandle {
   pub(crate) fn request_focus(&self) {
     if let Some(wnd) = AppCtx::get_window(self.wnd_id) {
-      wnd
-        .focus_mgr
-        .borrow_mut()
-        .request_focus_to(Some(self.wid));
+      let wid = self.wid.get();
+      wnd.focus_mgr.borrow_mut().request_focus_to(wid);
     }
   }
 
   pub(crate) fn unfocus(&self) {
     if let Some(wnd) = AppCtx::get_window(self.wnd_id) {
-      if wnd.focus_mgr.borrow().focusing == Some(self.wid) {
+      if wnd.focus_mgr.borrow().focusing == self.wid.get() {
         wnd.focus_mgr.borrow_mut().request_focus_to(None);
       }
     }
@@ -125,7 +123,7 @@ impl FocusManager {
     }
   }
 
-  pub(crate) fn focus_handle(&self, wid: WidgetId) -> FocusHandle {
+  pub(crate) fn focus_handle(&self, wid: TrackId) -> FocusHandle {
     FocusHandle { wid, wnd_id: self.window().id() }
   }
 
@@ -336,7 +334,7 @@ impl FocusManager {
         .and_then(|n| n.wid)
         .filter(|wid| !wid.is_dropped(tree))
         .and_then(|wid| wid.query_ref::<FocusScope>(tree))
-        .map_or(false, |s| s.skip_descendants)
+        .is_some_and(|s| s.skip_descendants)
     })
   }
 

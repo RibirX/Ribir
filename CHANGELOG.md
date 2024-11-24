@@ -45,8 +45,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Switching to a style class may result in missing widgets. (#655 @M-Adoo)
 - **core**: The animation does not restore the state value correctly when multiple animations are applied to the same state. (#662 @M-Adoo)
 
-- **core**: inner embed anchor not work (#pr @wjian23)
-- **core**: fix query render object with multi target hits (#pr @wjian23)
+- **core**: inner embed anchor not work (#665 @wjian23)
+- **core**: fix query render object with multi target hits (#665 @wjian23)
+- **core**: Use track_id track WidgetId, which may changed when created by pipe or class. (#665 @wjian23)
 
 ## [0.4.0-alpha.15] - 2024-11-13
 

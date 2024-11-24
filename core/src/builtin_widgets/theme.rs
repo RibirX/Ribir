@@ -158,6 +158,12 @@ impl<T: StateWriter<Value = Theme>> Query for ThemeQuerier<T> {
     }
   }
 
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    if let Some(h) = self.query_write(query_id) {
+      out.push(h)
+    }
+  }
+
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
     ReadRef::filter_map(self.0.read(), |v: &Theme| {
       let w: Option<&dyn QueryAny> = if &QueryId::of::<Theme>() == query_id {

@@ -195,10 +195,10 @@ impl Class {
       p.query_match(&[override_cls_id, classes_id], &|id, h| {
         if id == &override_cls_id {
           h.downcast_ref::<OverrideClass>()
-            .map_or(false, |c| c.name == cls)
+            .is_some_and(|c| c.name == cls)
         } else {
           h.downcast_ref::<Classes>()
-            .map_or(false, |c| c.store.contains_key(&cls))
+            .is_some_and(|c| c.store.contains_key(&cls))
         }
       })
     })?;
@@ -249,6 +249,7 @@ impl ClassChild {
     inner.child_id = id;
     id.wrap_node(BuildCtx::get_mut().tree_mut(), |node| {
       inner.child = node;
+
       Box::new(self.clone())
     });
   }
@@ -283,6 +284,17 @@ impl ClassChild {
     } else {
       n_orig.insert_after(*orig_id, tree);
       n_orig.dispose_subtree(tree);
+    }
+
+    if *child_id != new_id {
+      // update the DynamicWidgetId out of the class node when id changed.
+      let mut v = SmallVec::new();
+      class_node.query_all_write(&QueryId::of::<TrackId>(), &mut v);
+      v.into_iter()
+        .filter_map(QueryHandle::into_ref)
+        .for_each(|handle: QueryRef<'_, TrackId>| {
+          handle.set(Some(new_id));
+        });
     }
 
     new_id.wrap_node(tree, |node| {
@@ -320,9 +332,16 @@ impl ClassChild {
       }
     }
 
-    *child_id = new_id;
+    new_id
+      .query_all_iter::<TrackId>(tree)
+      .for_each(|wid| {
+        wid.set(Some(new_id));
+      });
+
     tree.mark_dirty(new_id);
-    tree.mark_dirty(*orig_id);
+    if new_id != *orig_id && new_id.ancestor_of(*orig_id, tree) {
+      tree.mark_dirty(*orig_id);
+    }
   }
 
   #[allow(clippy::mut_from_ref)]
@@ -374,6 +393,10 @@ impl Query for OrigChild {
     self.node().query_all(type_id, out)
   }
 
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    self.node_mut().query_all_write(query_id, out)
+  }
+
   fn query(&self, type_id: &QueryId) -> Option<QueryHandle> { self.node().query(type_id) }
 
   fn query_match(
@@ -392,6 +415,10 @@ impl Query for ClassChild {
     &'q self, type_id: &QueryId, out: &mut smallvec::SmallVec<[QueryHandle<'q>; 1]>,
   ) {
     self.inner().child.query_all(type_id, out)
+  }
+
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    self.inner().child.query_all_write(query_id, out)
   }
 
   fn query(&self, type_id: &QueryId) -> Option<QueryHandle> { self.inner().child.query(type_id) }

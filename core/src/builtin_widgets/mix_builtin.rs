@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use std::{cell::RefCell, convert::Infallible};
 
 use rxrust::prelude::*;
 
@@ -358,22 +358,6 @@ impl MixBuiltin {
     }
   }
 
-  fn callbacks_for_focus_node(&self) {
-    self
-      .on_mounted(move |e| {
-        let mut all_mix = e.query_all_iter::<MixBuiltin>().peekable();
-        if all_mix.peek().is_some() {
-          let auto_focus = all_mix.any(|mix| mix.flags.read().is_auto_focus());
-          e.window()
-            .add_focus_node(e.id, auto_focus, FocusType::Node)
-        }
-      })
-      .on_disposed(|e| {
-        e.window()
-          .remove_focus_node(e.id, FocusType::Node)
-      });
-  }
-
   fn subject(&self) -> EventSubject { self.subject.clone() }
 
   pub(crate) fn contain_flag(&self, t: MixFlags) -> bool { self.flags.read().contains(t) }
@@ -396,11 +380,49 @@ fn life_fn_once_to_fn_mut(
   }
 }
 
+fn callbacks_for_focus_node(child: Widget) -> Widget {
+  fn_widget! {
+  let guard = Sc::new(RefCell::new(None));
+  let guard2 = guard.clone();
+  let mut child = FatObj::new(child);
+  @$child {
+    on_mounted: move |e| {
+      let mut all_mix = e.query_all_iter::<MixBuiltin>().peekable();
+      if all_mix.peek().is_some() {
+        let auto_focus = all_mix.any(|mix| mix.flags.read().is_auto_focus());
+        let track_id = $child.track_id().watcher();
+        let wnd = e.window();
+        let init_id = e.id();
+        wnd.add_focus_node(init_id, auto_focus, FocusType::Node);
+        *guard2.borrow_mut() = Some(
+          watch!(*$track_id)
+            .merge(observable::of(Some(init_id)))
+            .distinct_until_changed()
+            .pairwise()
+            .subscribe(move |(old, new)| {
+              if let Some(wid) = old {
+                wnd.remove_focus_node(wid, FocusType::Node);
+              }
+              if let Some(wid) = new {
+                wnd.add_focus_node(wid, auto_focus, FocusType::Node);
+              }
+            }).unsubscribe_when_dropped());
+        }
+      },
+      on_disposed: move |e| {
+        guard.borrow_mut().take();
+        e.window().remove_focus_node(e.id(), FocusType::Node);
+      }
+    }
+  }
+  .into_widget()
+}
+
 impl<'c> ComposeChild<'c> for MixBuiltin {
   type Child = Widget<'c>;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+  fn compose_child(this: impl StateWriter<Value = Self>, mut child: Self::Child) -> Widget<'c> {
     if this.read().contain_flag(MixFlags::Focus) {
-      this.read().callbacks_for_focus_node();
+      child = callbacks_for_focus_node(child);
     }
     child.try_unwrap_state_and_attach(this)
   }

@@ -5,7 +5,6 @@
 //! declare syntax, so other objects can use the builtin fields and methods like
 //! self fields and methods.
 
-use std::cell::Cell;
 pub mod key;
 mod painting_style;
 pub use key::{Key, KeyWidget};
@@ -14,7 +13,6 @@ pub mod image_widget;
 pub mod keep_alive;
 pub use keep_alive::*;
 mod theme;
-use ribir_algo::Sc;
 pub use theme::*;
 mod cursor;
 pub use cursor::*;
@@ -74,11 +72,10 @@ pub use text_style::*;
 mod smooth_layout;
 pub use smooth_layout::*;
 
-use crate::prelude::*;
+mod track_widget_id;
+pub use track_widget_id::*;
 
-#[derive(Clone, Default)]
-/// LazyWidgetId is a widget id that will be valid after widget build.
-pub struct LazyWidgetId(Sc<Cell<Option<WidgetId>>>);
+use crate::prelude::*;
 
 /// A fat object that extend the `T` object with all builtin widgets ability.
 ///
@@ -110,8 +107,7 @@ pub struct LazyWidgetId(Sc<Cell<Option<WidgetId>>>);
 #[derive(Default)]
 pub struct FatObj<T> {
   host: T,
-  host_id: LazyWidgetId,
-  id: LazyWidgetId,
+  track_id: Option<State<TrackWidgetId>>,
   class: Option<State<Class>>,
   padding: Option<State<Padding>>,
   fitted_box: Option<State<FittedBox>>,
@@ -137,35 +133,6 @@ pub struct FatObj<T> {
   keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
 }
 
-impl LazyWidgetId {
-  /// Creates a new `LazyWidgetId` associated with a widget. You can retrieve
-  /// the widget's ID after the build process using this `LazyWidgetId`.
-  pub fn new(widget: Widget) -> (Widget, Self) {
-    let lazy_id = Self(<_>::default());
-    let w = lazy_id.clone().bind(widget);
-    (w, lazy_id)
-  }
-
-  /// Bind a widget to the LazyWidgetId, and return a widget that will set the
-  /// id to the LazyWidgetId after build.
-  pub fn bind(self, widget: Widget) -> Widget {
-    widget.on_build(move |id| {
-      assert!(self.id().is_none(), "The LazyWidgetID only allows binding to one widget.");
-      self.0.set(Some(id));
-    })
-  }
-
-  pub fn id(&self) -> Option<WidgetId> { self.0.get() }
-
-  pub fn assert_id(&self) -> WidgetId {
-    self.0.get().expect(
-      "The binding is not associated with a widget, or the bound widget has not been built yet.",
-    )
-  }
-
-  fn ref_count(&self) -> usize { self.0.ref_count() }
-}
-
 impl<T> FatObj<T> {
   /// Create a new `FatObj` with the given host object.
   pub fn new(host: T) -> Self { FatObj::<()>::default().with_child(host) }
@@ -175,8 +142,7 @@ impl<T> FatObj<T> {
   pub fn map<V>(self, f: impl FnOnce(T) -> V) -> FatObj<V> {
     FatObj {
       host: f(self.host),
-      host_id: self.host_id,
-      id: self.id,
+      track_id: self.track_id,
       class: self.class,
       mix_builtin: self.mix_builtin,
       request_focus: self.request_focus,
@@ -205,8 +171,7 @@ impl<T> FatObj<T> {
 
   /// Return true if the FatObj not contains any builtin widgets.
   pub fn is_empty(&self) -> bool {
-    self.host_id.ref_count() == 1
-      && self.id.ref_count() == 1
+    self.track_id.is_none()
       && self.mix_builtin.is_none()
       && self.request_focus.is_none()
       && self.fitted_box.is_none()
@@ -240,18 +205,18 @@ impl<T> FatObj<T> {
     assert!(self.is_empty(), "Unwrap a FatObj with contains builtin widgets is not allowed.");
     self.host
   }
-
-  /// Return the LazyWidgetId of the host widget, through which you can access
-  /// the WidgetId after building.
-  pub fn lazy_host_id(&self) -> LazyWidgetId { self.host_id.clone() }
-
-  /// Return the LazyWidgetId point to WidgetId of the root of the sub widget
-  /// tree after the FatObj has built.
-  pub fn lazy_id(&self) -> LazyWidgetId { self.id.clone() }
 }
 
 // builtin widgets accessors
 impl<T> FatObj<T> {
+  /// Returns the `State<TrackWidgetId>` widget from the FatObj. If it doesn't
+  /// exist, a new one is created.
+  pub fn get_track_id_widget(&mut self) -> &State<TrackWidgetId> {
+    self
+      .track_id
+      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+
   /// Returns the `State<Class>` widget from the FatObj. If it doesn't exist, a
   /// new one is created.
   pub fn get_class_widget(&mut self) -> &State<Class> {
@@ -883,6 +848,12 @@ impl<T> FatObj<T> {
     self
   }
 
+  /// Initializes the track_id of the widget.
+  pub fn track_id(mut self) -> Self {
+    self.get_track_id_widget();
+    self
+  }
+
   fn declare_builtin_init<V: 'static, B: 'static, const M: u8>(
     mut self, init: impl DeclareInto<V, M>, get_builtin: impl FnOnce(&mut Self) -> &State<B>,
     set_value: fn(&mut B, V),
@@ -925,12 +896,10 @@ impl<'a> FatObj<Widget<'a>> {
       };
     }
     let mut host = self.host;
-    if self.host_id.0.ref_count() > 1 {
-      host = self.host_id.clone().bind(host);
-    }
     compose_builtin_widgets!(
       host
         + [
+          track_id,
           class,
           padding,
           fitted_box,
@@ -958,9 +927,6 @@ impl<'a> FatObj<Widget<'a>> {
 
     if let Some(h) = self.keep_alive_unsubscribe_handle {
       host = host.attach_anonymous_data(h);
-    }
-    if self.id.0.ref_count() > 1 {
-      host = self.id.clone().bind(host);
     }
     host
   }

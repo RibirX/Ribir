@@ -46,7 +46,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::events::*;
   #[doc(no_inline)]
-  pub use crate::overlay::Overlay;
+  pub use crate::overlay::{AutoClosePolicy, Overlay, OverlayStyle};
   #[doc(no_inline)]
   pub use crate::pipe::{BoxPipe, FinalChain, MapPipe, ModifiesPipe, Pipe};
   #[doc(no_inline)]
@@ -58,7 +58,7 @@ pub mod prelude {
   #[doc(no_inline)]
   pub use crate::widget_children::*;
   #[doc(no_inline)]
-  pub use crate::widget_tree::{BoxClamp, LayoutInfo, WidgetId};
+  pub use crate::widget_tree::{BoxClamp, LayoutInfo, TrackId, WidgetId};
   #[doc(no_inline)]
   pub use crate::window::Window;
   pub use crate::{

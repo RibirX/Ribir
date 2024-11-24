@@ -3,7 +3,7 @@ use std::{cell::RefCell, cmp::Reverse, collections::HashSet, mem::MaybeUninit};
 pub mod widget_id;
 use indextree::Arena;
 use widget_id::RenderQueryable;
-pub use widget_id::WidgetId;
+pub use widget_id::{TrackId, WidgetId};
 mod layout_info;
 pub use layout_info::*;
 
