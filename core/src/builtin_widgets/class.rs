@@ -83,6 +83,12 @@ pub struct Classes {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct ClassName(&'static str);
 
+/// A function that transforms a `Widget` into another `Widget` as a class
+/// implementation.
+///
+/// The function accepts a `Widget` as input and returns a
+/// `Widget` as output, ensuring that the input widget is retained in the
+/// returned widget. Otherwise, switching the class to another class will fail.
 pub type ClassImpl = fn(Widget) -> Widget;
 
 /// This widget is used to apply class to its child widget by the `ClassName`.
@@ -123,6 +129,11 @@ impl ClassName {
 
 impl Classes {
   #[inline]
+  /// Assigns the implementation of `cls` to the store and returns the previous
+  /// implementation, if any.
+  ///
+  /// Note: You must ensure that the widget provided in the `ClassImpl` is
+  /// maintained in the returned widget of the `ClassImpl`.
   pub fn insert(&mut self, cls: ClassName, f: ClassImpl) -> Option<ClassImpl> {
     self.store.insert(cls, f)
   }
@@ -299,7 +310,7 @@ impl ClassChild {
       new_id = *orig_id;
     } else {
       n_orig.insert_after(*orig_id, tree);
-      n_orig.dispose_subtree(tree);
+      tree.remove_subtree(n_orig);
     }
 
     if *child_id != new_id {
@@ -500,11 +511,15 @@ mod tests {
     });
 
     wnd.draw_frame();
-    wnd.assert_root_size(Size::new(120., 120.));
+    wnd.assert_root_size(Size::splat(120.));
 
     *w_cls.write() = BOX_200;
     wnd.draw_frame();
-    wnd.assert_root_size(Size::new(200., 200.));
+    wnd.assert_root_size(Size::splat(200.));
+
+    *w_cls.write() = MARGIN;
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::splat(120.));
   }
 
   #[test]
@@ -623,11 +638,11 @@ mod tests {
     });
 
     wnd.draw_frame();
-    wnd.assert_root_size(Size::new(100., 100.));
+    wnd.assert_root_size(Size::splat(100.));
 
     *w_cls.write() = BOX_200;
     wnd.draw_frame();
-    wnd.assert_root_size(Size::new(200., 200.));
+    wnd.assert_root_size(Size::splat(200.));
   }
 
   #[test]
