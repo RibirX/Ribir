@@ -120,9 +120,7 @@ pub fn child_template_trait_derive(input: TokenStream) -> TokenStream {
 /// - 3. use expression to declare a object and not allow declare children,
 ///   like: `let row = rdl!{ Widget::new(Void) };`
 #[proc_macro]
-pub fn rdl(input: TokenStream) -> TokenStream {
-  RdlMacro::gen_code(input.into(), None).into()
-}
+pub fn rdl(input: TokenStream) -> TokenStream { RdlMacro::gen_code(input.into(), None).into() }
 
 /// The `fn_widget` macro generates a widget from a function widget based on an
 /// expression.
