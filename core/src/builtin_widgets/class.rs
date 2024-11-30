@@ -32,7 +32,7 @@
 //! ```
 
 use std::{
-  cell::UnsafeCell,
+  cell::{RefCell, UnsafeCell},
   hash::{Hash, Hasher},
 };
 
@@ -42,7 +42,7 @@ use widget_id::RenderQueryable;
 
 use crate::{
   data_widget::AnonymousAttacher,
-  pipe::DynInfo,
+  pipe::{DynInfo, DynWidgetsInfo, GenRange},
   prelude::*,
   render_helper::{PureRender, RenderProxy},
   window::WindowId,
@@ -180,13 +180,12 @@ impl<'c> ComposeChild<'c> for Class {
       Ok(c) => c.apply_style(child),
       Err(this) => {
         let this2 = this.clone_watcher();
-        let cls_child = ClassChild::new(BuildCtx::get().tree().dummy_id());
+        let cls_child = ClassNode::dummy(BuildCtx::get().tree().dummy_id());
         // Reapply the class when it is updated.
         let cls_child2 = cls_child.clone();
         let child = child.on_build(move |orig_id| {
           let tree = BuildCtx::get_mut().tree_mut();
-          let mut orig_child = OrigChild::from_id(orig_id, tree);
-          cls_child2.inner().orig_id = orig_id;
+          let mut orig_child = ClassNode::from_id(orig_id, tree);
           let orig_child2 = orig_child.clone();
           let wnd_id = tree.window().id();
           let u = this2
@@ -201,7 +200,7 @@ impl<'c> ComposeChild<'c> for Class {
         this
           .read()
           .apply_style(child)
-          .on_build(move |child_id| cls_child.set_child_id(child_id))
+          .on_build(move |child_id| cls_child.init_from_id(child_id))
       }
     };
     f.into_widget()
@@ -254,38 +253,59 @@ macro_rules! multi_class_impl {
 }
 
 #[derive(Clone)]
-struct OrigChild(Sc<UnsafeCell<Box<dyn RenderQueryable>>>);
+struct ClassNode(Sc<UnsafeCell<InnerClassNode>>);
 
-#[derive(Clone)]
-struct ClassChild(Sc<UnsafeCell<InnerClassChild>>);
-
-struct InnerClassChild {
-  child: Box<dyn RenderQueryable>,
-  child_id: WidgetId,
-  orig_id: WidgetId,
+struct InnerClassNode {
+  render: Box<dyn RenderQueryable>,
+  id_info: DynInfo,
 }
 
-impl ClassChild {
-  fn new(id: WidgetId) -> Self {
-    let inner = InnerClassChild { child: Box::new(PureRender(Void)), child_id: id, orig_id: id };
+impl ClassNode {
+  fn dummy(id: WidgetId) -> Self {
+    let inner = InnerClassNode {
+      render: Box::new(PureRender(Void)),
+      id_info: Sc::new(RefCell::new(DynWidgetsInfo {
+        multi_pos: 0,
+        gen_range: GenRange::Single(id),
+      })),
+    };
     Self(Sc::new(UnsafeCell::new(inner)))
   }
 
-  fn set_child_id(&self, id: WidgetId) {
+  fn from_id(id: WidgetId, tree: &mut WidgetTree) -> Self {
+    let mut orig = None;
+    id.wrap_node(tree, |node| {
+      let c = ClassNode(Sc::new(UnsafeCell::new(InnerClassNode {
+        render: node,
+        id_info: Sc::new(RefCell::new(DynWidgetsInfo {
+          multi_pos: 0,
+          gen_range: GenRange::Single(id),
+        })),
+      })));
+      orig = Some(c.clone());
+      Box::new(c)
+    });
+
+    orig.unwrap()
+  }
+
+  fn init_from_id(&self, id: WidgetId) {
     let inner = self.inner();
-    inner.child_id = id;
+    inner.id_info.borrow_mut().gen_range = GenRange::Single(id);
     id.wrap_node(BuildCtx::get_mut().tree_mut(), |node| {
-      inner.child = node;
+      inner.render = node;
 
       Box::new(self.clone())
     });
   }
 
-  fn update(&self, orig: &OrigChild, class: &Class, wnd_id: WindowId) {
+  fn update(&self, orig: &ClassNode, class: &Class, wnd_id: WindowId) {
     let wnd =
       AppCtx::get_window(wnd_id).expect("This handle is not valid because the window is closed");
-    let InnerClassChild { child, child_id, orig_id } = self.inner();
-    let _guard = BuildCtx::init_for(*child_id, wnd.tree);
+    let child_id = self.id();
+    let orig_id = orig.id();
+    let InnerClassNode { render: child, id_info } = self.inner();
+    let _guard = BuildCtx::init_for(child_id, wnd.tree);
     let n_orig = BuildCtx::get_mut().alloc(Box::new(orig.clone()));
     let tree = BuildCtx::get_mut().tree_mut();
     let cls_holder = child_id.place_holder(tree);
@@ -302,18 +322,18 @@ impl ClassChild {
     let class_node = std::mem::replace(child_id.get_node_mut(tree).unwrap(), child_node);
 
     // Retain the original widget ID.
-    let [new, old] = tree.get_many_mut(&[n_orig, *orig_id]);
+    let [new, old] = tree.get_many_mut(&[n_orig, orig_id]);
     std::mem::swap(new, old);
     if new_id == n_orig {
       // If applying the class does not generate additional widgets, the original
       // widget ID will include all new elements after the swap.
-      new_id = *orig_id;
+      new_id = orig_id;
     } else {
-      n_orig.insert_after(*orig_id, tree);
+      n_orig.insert_after(orig_id, tree);
       tree.remove_subtree(n_orig);
     }
 
-    if *child_id != new_id {
+    if child_id != new_id {
       // update the DynamicWidgetId out of the class node when id changed.
       let mut v = SmallVec::new();
       class_node.query_all_write(&QueryId::of::<TrackId>(), &mut v);
@@ -329,12 +349,12 @@ impl ClassChild {
       class_node
     });
 
-    if new_id != *child_id {
+    if new_id != child_id {
       // If a pipe widget generates a widget with a class, we place the pipe node
       // outside of the class node. However, since its widget ID is altered, we must
       // notify the pipe node accordingly.
-      let old_rg = *child_id..=*orig_id;
-      let new_rg = new_id..=*orig_id;
+      let old_rg = child_id..=orig_id;
+      let new_rg = new_id..=orig_id;
       new_id
         .query_all_iter::<DynInfo>(tree)
         .rev()
@@ -353,7 +373,7 @@ impl ClassChild {
     let mut stack: SmallVec<[WidgetId; 1]> = smallvec![new_id];
     while let Some(w) = stack.pop() {
       // Skip the original child subtree as it does not consist of new widgets.
-      if w != *orig_id {
+      if w != child_id {
         w.on_mounted_subtree(tree);
         stack.extend(w.children(tree).rev());
       }
@@ -365,99 +385,76 @@ impl ClassChild {
         wid.set(Some(new_id));
       });
 
+    id_info.borrow_mut().gen_range = GenRange::Single(new_id);
     tree.mark_dirty(new_id);
-    if new_id != *orig_id && new_id.ancestor_of(*orig_id, tree) {
-      tree.mark_dirty(*orig_id);
+    if new_id != orig_id && new_id.ancestor_of(orig_id, tree) {
+      tree.mark_dirty(orig_id);
     }
   }
 
   #[allow(clippy::mut_from_ref)]
-  fn inner(&self) -> &mut InnerClassChild { unsafe { &mut *self.0.get() } }
+  fn inner(&self) -> &mut InnerClassNode { unsafe { &mut *self.0.get() } }
 
   fn take_inner(&self) -> Box<dyn RenderQueryable> {
-    std::mem::replace(&mut self.inner().child, Box::new(PureRender(Void)))
-  }
-}
-
-impl OrigChild {
-  fn from_id(id: WidgetId, tree: &mut WidgetTree) -> Self {
-    let mut orig = None;
-    id.wrap_node(tree, |node| {
-      let c = OrigChild(Sc::new(UnsafeCell::new(node)));
-      orig = Some(c.clone());
-      Box::new(c)
-    });
-
-    orig.unwrap()
+    std::mem::replace(&mut self.inner().render, Box::new(PureRender(Void)))
   }
 
   fn attach_subscription(&mut self, guard: impl Any) {
-    let inner = self.node_mut();
+    let inner = &mut self.inner().render;
     let child = unsafe { Box::from_raw(inner.as_mut()) };
     let child = Box::new(AnonymousAttacher::new(child, Box::new(guard)));
     let tmp = std::mem::replace(inner, child);
     std::mem::forget(tmp);
   }
 
-  fn node(&self) -> &dyn RenderQueryable { unsafe { &*(*self.0.get()) } }
-
-  #[allow(clippy::mut_from_ref)]
-  fn node_mut(&self) -> &mut Box<dyn RenderQueryable> { unsafe { &mut (*self.0.get()) } }
+  fn id(&self) -> WidgetId { self.inner().id_info.borrow().host_id() }
 }
 
-impl RenderProxy for OrigChild {
-  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.node() }
+impl RenderProxy for ClassNode {
+  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.inner().render.as_ref() }
 }
 
-impl RenderProxy for ClassChild {
-  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.inner().child.as_ref() }
-}
-
-impl Query for OrigChild {
+impl Query for ClassNode {
   fn query_all<'q>(
-    &'q self, type_id: &QueryId, out: &mut smallvec::SmallVec<[QueryHandle<'q>; 1]>,
+    &'q self, query_id: &QueryId, out: &mut smallvec::SmallVec<[QueryHandle<'q>; 1]>,
   ) {
-    self.node().query_all(type_id, out)
+    let inner = self.inner();
+    inner.render.query_all(query_id, out);
+    if query_id == &QueryId::of::<DynInfo>() {
+      out.push(QueryHandle::new(&inner.id_info));
+    }
   }
 
   fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
-    self.node_mut().query_all_write(query_id, out)
+    self.inner().render.query_all_write(query_id, out)
   }
 
-  fn query(&self, type_id: &QueryId) -> Option<QueryHandle> { self.node().query(type_id) }
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    let inner = self.inner();
+    if query_id == &QueryId::of::<DynInfo>() {
+      Some(QueryHandle::new(&inner.id_info))
+    } else {
+      inner.render.query(query_id)
+    }
+  }
 
   fn query_match(
     &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
   ) -> Option<(QueryId, QueryHandle)> {
-    self.node().query_match(ids, filter)
+    let inner = self.inner();
+    inner.render.query_match(ids, filter).or_else(|| {
+      let dyn_info_id = QueryId::of::<DynInfo>();
+      (ids.contains(&dyn_info_id))
+        .then(|| {
+          let h = QueryHandle::new(&inner.id_info);
+          filter(&dyn_info_id, &h).then_some((dyn_info_id, h))
+        })
+        .flatten()
+    })
   }
 
   fn query_write(&self, type_id: &QueryId) -> Option<QueryHandle> {
-    self.node_mut().query_write(type_id)
-  }
-}
-
-impl Query for ClassChild {
-  fn query_all<'q>(
-    &'q self, type_id: &QueryId, out: &mut smallvec::SmallVec<[QueryHandle<'q>; 1]>,
-  ) {
-    self.inner().child.query_all(type_id, out)
-  }
-
-  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
-    self.inner().child.query_all_write(query_id, out)
-  }
-
-  fn query(&self, type_id: &QueryId) -> Option<QueryHandle> { self.inner().child.query(type_id) }
-
-  fn query_match(
-    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
-  ) -> Option<(QueryId, QueryHandle)> {
-    self.inner().child.query_match(ids, filter)
-  }
-
-  fn query_write(&self, type_id: &QueryId) -> Option<QueryHandle> {
-    self.inner().child.query_write(type_id)
+    self.inner().render.query_write(type_id)
   }
 }
 
@@ -689,5 +686,32 @@ mod tests {
 
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(66., 66.));
+  }
+
+  #[test]
+  fn fix_pipe_class_on_pipe_widget() {
+    reset_test_env!();
+
+    let (w_trigger, w) = split_value(true);
+    let (cls, w_cls) = split_value(EMPTY);
+
+    let mut wnd = TestWindow::new(fn_widget! {
+      let w_trigger = w_trigger.clone_watcher();
+      let cls = cls.clone_watcher();
+      initd_classes().with_child(fn_widget! {
+        let w = pipe!(*$w_trigger).map(|_|{
+          @Container {size: Size::new(100., 100.) }
+        });
+        let w = FatObj::new(w);
+        @ $w { class: pipe!(*$cls) }
+      })
+    });
+
+    wnd.draw_frame();
+    *w.write() = false;
+    wnd.draw_frame();
+    *w_cls.write() = MARGIN;
+    wnd.draw_frame();
+    wnd.assert_root_size(Size::splat(120.));
   }
 }

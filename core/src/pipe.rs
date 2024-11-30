@@ -612,21 +612,21 @@ struct InnerPipeNode {
 
 #[derive(Debug)]
 pub(crate) struct DynWidgetsInfo {
-  multi_pos: usize,
-  gen_range: GenRange,
+  pub(crate) multi_pos: usize,
+  pub(crate) gen_range: GenRange,
 }
 
 pub(crate) type DynInfo = Sc<RefCell<DynWidgetsInfo>>;
 
 #[derive(Debug)]
-enum GenRange {
+pub enum GenRange {
   Single(WidgetId),
   Multi(Vec<WidgetId>),
   ParentOnly(RangeInclusive<WidgetId>),
 }
 
 impl DynWidgetsInfo {
-  fn new(range: GenRange) -> DynInfo {
+  pub(crate) fn new(range: GenRange) -> DynInfo {
     Sc::new(RefCell::new(DynWidgetsInfo { gen_range: range, multi_pos: 0 }))
   }
 
