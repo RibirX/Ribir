@@ -24,6 +24,6 @@ mod tests {
     todos,
     WidgetTester::new(todos)
       .with_wnd_size(Size::new(400., 640.))
-      .with_comparison(0.002)
+      .with_comparison(0.0002)
   );
 }
