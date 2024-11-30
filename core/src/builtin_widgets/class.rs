@@ -212,7 +212,7 @@ impl Class {
     if let Some(cls_impl) = self.class_impl() { cls_impl(w) } else { w }
   }
 
-  fn class_impl(&self) -> Option<QueryRef<ClassImpl>> {
+  fn class_impl(&self) -> Option<ClassImpl> {
     let cls = self.class?;
     let override_cls_id = QueryId::of::<OverrideClass>();
     let classes_id = QueryId::of::<Classes>();
@@ -232,10 +232,10 @@ impl Class {
     if id == override_cls_id {
       handle
         .into_ref::<OverrideClass>()
-        .map(|cls| QueryRef::map(cls, |c| &c.class_impl))
+        .map(|cls| cls.class_impl)
     } else {
       let classes = handle.into_ref::<Classes>()?;
-      QueryRef::filter_map(classes, |c| c.store.get(&cls)).ok()
+      classes.store.get(&cls).cloned()
     }
   }
 }

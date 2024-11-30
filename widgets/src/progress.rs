@@ -182,17 +182,15 @@ mod tests {
 
   widget_image_tests!(
     progress_widget,
-    WidgetTester::new(fn_widget! {
-      @Column {
+    WidgetTester::new(self::column! {
+      justify_content: JustifyContent::SpaceAround,
+      align_items: Align::Center,
+      @LinearProgress { value: None }
+      @LinearProgress { value: Some(0.2) }
+      @Row {
         justify_content: JustifyContent::SpaceAround,
-        align_items: Align::Center,
-        @LinearProgress { value: None }
-        @LinearProgress { value: Some(0.2) }
-        @Row {
-          justify_content: JustifyContent::SpaceAround,
-          @SpinnerProgress { value: None }
-          @SpinnerProgress { value: Some(0.4) }
-        }
+        @SpinnerProgress { value: None }
+        @SpinnerProgress { value: Some(0.4) }
       }
     })
     .with_wnd_size(Size::new(300., 200.))

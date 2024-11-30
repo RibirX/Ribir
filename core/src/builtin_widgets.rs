@@ -48,6 +48,7 @@ pub use align::*;
 pub mod fitted_box;
 pub use fitted_box::*;
 pub mod svg;
+pub use svg::*;
 
 pub mod clip;
 pub use clip::*;

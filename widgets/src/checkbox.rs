@@ -1,36 +1,84 @@
 use ribir_core::prelude::*;
+use svg::named_svgs;
 
 use crate::{
   common_widget::{Leading, Trailing},
-  icon::ICON,
-  prelude::{Icon, Label, Row, Text},
+  prelude::{Icon, Row, Text},
+  text::TextInit,
 };
 
-/// Represents a control that a user can select and clear.
-#[derive(Clone, Declare)]
+class_names! {
+  #[doc = "This base class specifies for the checkbox widget."]
+  CHECKBOX,
+  #[doc = "This class specifies the checked checkbox."]
+  CHECKBOX_CHECKED,
+  #[doc = "This class specifies the unchecked checkbox."]
+  CHECKBOX_UNCHECKED,
+  #[doc = "This class specifies the indeterminate checkbox."]
+  CHECKBOX_INDETERMINATE,
+}
+/// The `Checkbox` allows users to toggle an option on or off, or represent a
+/// list of options that are partially selected.
+///
+/// It also supports associating a label with the checkbox, with the label
+/// inheriting the text style from its surrounding context.
+///
+/// # Example
+///
+/// ```
+/// use ribir_core::prelude::*;
+/// use ribir_widgets::prelude::*;
+///
+/// let _check = checkbox! { checked: true };
+///
+/// let _partially = checkbox! { indeterminate: true };
+/// ```
+///
+/// It also supports a label before or after the checkbox.
+///
+/// ```
+/// use ribir_core::prelude::*;
+/// use ribir_widgets::prelude::*;
+///
+/// let _check = checkbox! {
+///   @ { "Default label placed after the checkbox!" }
+/// };
+///
+/// let _heading = checkbox! {
+///   @Leading("Label placed before the checkbox!")
+/// };
+///
+/// let _trailing = checkbox! {
+///   @Trailing("Label placed after the checkbox!")
+/// };
+/// ```
+///
+/// If you are a theme maker, you can register three named SVGs that the
+/// checkbox uses with the following constants:
+///
+/// * `UNCHECKED_ICON`
+/// * `CHECKED_ICON`
+/// * `INDETERMINATE_ICON`
+///
+/// This allows you to quickly customize the appearance of a checkbox to your
+/// preferences.
+#[derive(Clone, Copy, Declare, PartialEq, Eq)]
 pub struct Checkbox {
   #[declare(default)]
   pub checked: bool,
   #[declare(default)]
   pub indeterminate: bool,
-  #[declare(default=Palette::of(BuildCtx::get() ).primary())]
-  pub color: Color,
 }
 
-#[derive(Clone)]
-pub struct CheckBoxStyle {
-  /// The size of the checkbox icon.
-  pub icon_size: Size,
-  /// The text style of the checkbox label.
-  pub label_style: TextStyle,
-  /// The checkbox foreground
-  pub label_color: Brush,
-}
+pub const UNCHECKED_ICON: &str = "unchecked_box";
+pub const CHECKED_ICON: &str = "checked_box";
+pub const INDETERMINATE_ICON: &str = "indeterminate_box";
 
-#[derive(Clone, Declare)]
-pub struct CheckBoxDecorator {
-  #[declare(default=Palette::of(BuildCtx::get()).primary())]
-  pub color: Color,
+#[derive(Template)]
+pub enum CheckboxChild {
+  Label(TextInit),
+  Before(Leading<TextInit>),
+  After(Trailing<TextInit>),
 }
 
 impl Checkbox {
@@ -42,80 +90,62 @@ impl Checkbox {
       self.checked = !self.checked;
     }
   }
-}
 
-#[derive(Template)]
-pub enum CheckboxTemplate {
-  Before(Leading<Label>),
-  After(Trailing<Label>),
-}
+  fn state_class_name(&self) -> ClassName {
+    if self.indeterminate {
+      CHECKBOX_INDETERMINATE
+    } else if self.checked {
+      CHECKBOX_CHECKED
+    } else {
+      CHECKBOX_UNCHECKED
+    }
+  }
 
-impl ComposeDecorator for CheckBoxDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
+  fn icon_name(&self) -> &'static str {
+    if self.indeterminate {
+      INDETERMINATE_ICON
+    } else if self.checked {
+      CHECKED_ICON
+    } else {
+      UNCHECKED_ICON
+    }
+  }
 }
 
 impl ComposeChild<'static> for Checkbox {
-  type Child = Option<CheckboxTemplate>;
+  type Child = Option<CheckboxChild>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
-    fn_widget! {
-      let CheckBoxStyle {
-        label_style,
-        label_color,
-        ..
-      } = CheckBoxStyle::of(BuildCtx::get());
-      @OverrideClass {
-        name: ICON,
-        class_impl: style_class! {
-          clamp: BoxClamp::fixed_size(CheckBoxStyle::of(BuildCtx::get()).icon_size)
-        },
-        @fn_widget! {
-          let icon = @CheckBoxDecorator {
-            color: pipe!($this.color),
-            @Icon {
-              @ { pipe!{
-                if $this.indeterminate {
-                  svgs::INDETERMINATE_CHECK_BOX
-                } else if $this.checked {
-                  svgs::CHECK_BOX
-                } else {
-                  svgs::CHECK_BOX_OUTLINE_BLANK
-                }
-              }}
-            }
-          }.into_widget();
+    rdl! {
+      let checkbox = @Class {
+        class: CHECKBOX,
+        @Icon {
+          cursor: CursorIcon::Pointer,
+          class: distinct_pipe!($this.state_class_name()),
+          @pipe!(named_svgs::get($this.icon_name()))
+        }
+      };
+      let checkbox = if let Some(child) = child {
+        let row = @Row { align_items: Align::Center };
+        let row = match child {
+          CheckboxChild::Label(text) | CheckboxChild::Before(Leading(text)) => @ $row {
+            @ { checkbox }
+            @Text { text }
+          },
+          CheckboxChild::After(Trailing(text)) => @ $row {
+            @Text { text}
+            @ { checkbox }
+          },
+        };
+        FatObj::new(row.into_widget())
+      } else {
+        checkbox.map(|w| w.into_widget())
+      };
 
-          let checkbox = if let Some(child) = child  {
-            let label = |label: Label| @Text {
-              text: label.0,
-              foreground: label_color,
-              text_style: label_style,
-            };
-
-            @Row {
-              @ {
-                match child {
-                  CheckboxTemplate::Before(w) => {
-                    [(label(w.0)).into_widget(), icon]
-                  },
-                  CheckboxTemplate::After(w) => {
-                    [icon, label(w.0).into_widget()]
-                  },
-                }
-              }
-            }.into_widget()
-          } else {
-            icon
-          };
-
-          let checkbox = FatObj::new(checkbox);
-          @ $checkbox {
-            cursor: CursorIcon::Pointer,
-            on_tap: move |_| $this.write().switch_check(),
-            on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
-              $this.write().switch_check()
-            }
-          }
+      @ $checkbox {
+        on_tap: move |_| $this.write().switch_check(),
+        on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
+          $this.write().switch_check()
         }
       }
     }
@@ -123,48 +153,21 @@ impl ComposeChild<'static> for Checkbox {
   }
 }
 
-impl CustomStyle for CheckBoxStyle {
-  fn default_style(ctx: &impl ProviderCtx) -> Self {
-    CheckBoxStyle {
-      icon_size: Size::splat(24.),
-      label_style: TypographyTheme::of(ctx).body_large.text.clone(),
-      label_color: Palette::of(ctx).on_surface().into(),
-    }
-  }
-}
 #[cfg(test)]
-mod tests {
+pub mod tests {
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
 
   use super::*;
+  use crate::prelude::*;
 
-  widget_test_suit!(
-    checked,
-    WidgetTester::new(fn_widget! { @Checkbox { checked: true } })
-      .with_wnd_size(Size::new(48., 48.))
-      .with_comparison(0.001),
-    LayoutCase::default().with_size(Size::new(24., 24.))
-  );
-
-  widget_test_suit!(
-    unchecked,
-    WidgetTester::new(fn_widget! { @Checkbox {} })
-      .with_wnd_size(Size::new(48., 48.))
-      .with_comparison(0.001),
-    LayoutCase::default().with_size(Size::new(24., 24.))
-  );
-
-  widget_test_suit!(
-    indeterminate,
-    WidgetTester::new(fn_widget! {
-      @Checkbox {
-        checked: true,
-        indeterminate: true,
-      }
+  widget_image_tests!(
+    checkbox,
+    WidgetTester::new(self::column! {
+      @Checkbox { checked: true, @ { "checked" } }
+      @Checkbox { indeterminate: true, @Leading("indeterminate") }
+      @Checkbox { @Trailing("unchecked") }
     })
-    .with_wnd_size(Size::new(48., 48.))
-    .with_comparison(0.001),
-    LayoutCase::default().with_size(Size::new(24., 24.))
+    .with_wnd_size(Size::new(240., 160.)),
   );
 }

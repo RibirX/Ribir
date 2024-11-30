@@ -36,8 +36,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Changed
 
+- **widgets**: The `Checkbox` widget uses classes to style and simplify its label syntax. (#666 @M-Adoo)
 - **widgets**: The `Icon` widget utilizes classes to configure its style, and it does not have a size property. (#660 @M-Adoo)
-- **theme:** Refactor the `Ripple` and `StateLayer` of the material theme to enhance their visual effects. (#pr @M-Adoo)
+- **theme:** Refactor the `Ripple` and `StateLayer` of the material theme to enhance their visual effects. (#666 @M-Adoo)
 
 ### Fixed
 
@@ -45,7 +46,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: The hit test for the `TransformWidget` is not applied at the correct position. (#654 @M-Adoo)
 - **core**: Switching to a style class may result in missing widgets. (#655 @M-Adoo)
 - **core**: The animation does not restore the state value correctly when multiple animations are applied to the same state. (#662 @M-Adoo)
-- **macros**: the top-level `rdl!`, `pipe!` and `watch!` do not capture built-in widgets as intended. (#pr @M-Adoo)
+- **macros**: the top-level `rdl!`, `pipe!` and `watch!` do not capture built-in widgets as intended. (#666 @M-Adoo)
 
 - **core**: inner embed anchor not work (#665 @wjian23)
 - **core**: fix query render object with multi target hits (#665 @wjian23)
@@ -100,7 +101,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Added the built-in widget `TextStyleWidgetWidget`, allowing any widget to easily configure the text style within it using `text_style`. (#635, @M-Adoo)
+- **core**: Added the built-in widget `TextStyleWidget`, allowing any widget to easily configure the text style within it using `text_style`. (#635, @M-Adoo)
 
 ### Breaking
 

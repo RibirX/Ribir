@@ -64,6 +64,7 @@ pub const RADIUS_5: Radius = Radius::all(5.);
 pub const RADIUS_10: Radius = Radius::all(10.);
 pub const RADIUS_20: Radius = Radius::all(20.);
 
+pub const RADIUS_1: Radius = Radius::all(1.);
 pub const RADIUS_2: Radius = Radius::all(2.);
 pub const RADIUS_4: Radius = Radius::all(4.);
 pub const RADIUS_8: Radius = Radius::all(8.);
