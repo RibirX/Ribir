@@ -265,20 +265,12 @@ fn content() -> Widget<'static> {
   }
 
   fn checkbox_show() -> GenWidget {
-    fn_widget! {
-      @Column {
-        margin: EdgeInsets::all(20.),
-        @Lists {
-          @Checkbox {
-            @Leading(Label::new("Option1"))
-          }
-          @Checkbox {
-            @Leading(Label::new("Option2"))
-          }
-          @Checkbox {
-            @Leading(Label::new("Option3"))
-          }
-        }
+    self::column! {
+      margin: EdgeInsets::all(20.),
+      @Lists {
+        @Checkbox { @ { "Option1" } }
+        @Checkbox { @ { "Option2" } }
+        @Checkbox { @ { "Option3" } }
       }
     }
     .into()

@@ -39,10 +39,22 @@ use crate::text::*;
 /// };
 /// ```
 ///
-/// The size of the icon is determined by the `ICON` class. If you need a
-/// different size for the icon, you can override the `ICON` class to apply the
-/// changes to the icon within its subtree.
+/// The standard size of the icon and its font is determined by the `ICON`
+/// class. Therefore, if you desire a different size from the standard size, you
+/// should use `clamp` to limit the icon's size.
 ///
+/// ```
+/// use ribir_core::prelude::*;
+/// use ribir_widgets::prelude::*;
+///
+/// let _icon = icon! {
+///   clamp: BoxClamp::fixed_size(Size::new(64., 64.)),
+///   @ { named_svgs::get_or_default("search") }
+/// };
+/// ```
+///
+/// Alternatively, if you wish to modify the icon font or the standard size of
+/// the icon for the entire subtree, you can override the `ICON` class.
 ///
 /// ```
 /// use ribir_core::prelude::*;
@@ -77,7 +89,7 @@ pub enum IconChild<'c> {
   /// The text to display as a icon.
   ///
   /// Use a `DeclareInit<CowArc<str>>` so that we can accept a pipe text.
-  FontIcon(DeclareInit<CowArc<str>>),
+  FontIcon(TextInit),
   Widget(Widget<'c>),
 }
 

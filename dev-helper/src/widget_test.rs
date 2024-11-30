@@ -49,11 +49,12 @@ macro_rules! widget_layout_test {
 #[cfg(not(target_arch = "wasm32"))]
 #[macro_export]
 macro_rules! widget_image_tests {
-  ($name:ident, $widget_tester:expr) => {
+  ($name:ident, $widget_tester:expr $(,)?) => {
     paste::paste! {
       #[test]
       fn [<$name _with_default_by_wgpu>]() {
         let _scope = unsafe { AppCtx::new_lock_scope() };
+        svg::named_svgs::reset();
         unsafe { AppCtx::set_app_theme(ribir_slim::purple()) };
 
         let name = format!("{}_with_default_by_wgpu", std::stringify!($name));
@@ -63,6 +64,7 @@ macro_rules! widget_image_tests {
       #[test]
       fn [<$name _with_material_by_wgpu>]() {
         let _scope = unsafe { AppCtx::new_lock_scope() };
+        svg::named_svgs::reset();
         unsafe { AppCtx::set_app_theme(ribir_material::purple::light()) };
 
         let name = format!("{}_with_material_by_wgpu", std::stringify!($name));

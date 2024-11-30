@@ -30,8 +30,6 @@ fn new(palette: Palette) -> Theme {
     svgs::ARROW_DROP_DOWN: "./icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::ARROW_FORWARD: "./icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::CANCEL: "./icons/cancel_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHECK_BOX: "./icons/check_box_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHECK_BOX_OUTLINE_BLANK: "./icons/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::CHEVRON_RIGHT: "./icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::CLOSE: "./icons/close_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::DELETE: "./icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
@@ -39,7 +37,6 @@ fn new(palette: Palette) -> Theme {
     svgs::EXPAND_MORE: "./icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::FAVORITE: "./icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::HOME: "./icons/home_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::INDETERMINATE_CHECK_BOX: "./icons/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::LOGIN: "./icons/login_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::LOGOUT: "./icons/logout_FILL0_wght400_GRAD0_opsz48.svg",
     svgs::MENU: "./icons/menu_FILL0_wght400_GRAD0_opsz48.svg",
@@ -81,13 +78,6 @@ const AVATAR_RADIUS: f32 = 20.;
 const LIST_IMAGE_ITEM_SIZE: f32 = 56.;
 
 fn init_custom_style(theme: &mut Theme) {
-  theme
-    .custom_styles
-    .set_custom_style(CheckBoxStyle {
-      icon_size: md::SIZE_24,
-      label_style: theme.typography_theme.body_large.text.clone(),
-      label_color: theme.palette.on_surface().into(),
-    });
   theme
     .custom_styles
     .set_custom_style(InputStyle { size: Some(20.) });
@@ -247,22 +237,7 @@ fn override_compose_decorator(theme: &mut Theme) {
     }
     .into_widget()
   });
-  styles.override_compose_decorator::<CheckBoxDecorator>(move |style, host, _| {
-    fn_widget! {
-      let host = FatObj::new(host);
-      @Ripple {
-        center: true,
-        radius: 24.,
-        bounded: RippleBound::Unbounded,
-        @InteractiveLayer {
-          color: pipe!($style.color),
-          border_radii: Radius::all(24.),
-          @ $host { margin: EdgeInsets::all(12.) }
-        }
-      }
-    }
-    .into_widget()
-  });
+
   styles.override_compose_decorator::<FilledButtonDecorator>(move |style, host, _| {
     fn_widget! {
       let host = FatObj::new(host);

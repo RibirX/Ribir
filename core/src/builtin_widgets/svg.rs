@@ -16,6 +16,7 @@ pub mod named_svgs {
   pub use super::*;
 
   const DEFAULT_SVG_KEY: &str = "__RIRBIR_DEFAULT_SVG__";
+
   static SVGS: LazyLock<Mutex<ahash::AHashMap<&'static str, Svg>>> = LazyLock::new(|| {
     let svg = include_crate_svg!("src/builtin_widgets/default_named.svg", true, false);
     let mut set = ahash::AHashMap::new();
@@ -38,6 +39,13 @@ pub mod named_svgs {
   /// default SVG if not found.
   pub fn get_or_default(name: &str) -> Svg {
     get(name).unwrap_or_else(|| get(DEFAULT_SVG_KEY).unwrap())
+  }
+
+  pub fn reset() {
+    SVGS.lock().unwrap().clear();
+
+    let svg = include_crate_svg!("src/builtin_widgets/default_named.svg", true, false);
+    named_svgs::register(DEFAULT_SVG_KEY, svg);
   }
 }
 

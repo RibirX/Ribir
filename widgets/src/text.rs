@@ -3,6 +3,7 @@ use std::cell::{Ref, RefCell};
 use ribir_core::prelude::*;
 use typography::PlaceLineDirection;
 
+pub type TextInit = DeclareInit<CowArc<str>>;
 /// The text widget display text with a single style.
 #[derive(Declare)]
 pub struct Text {

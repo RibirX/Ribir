@@ -1,5 +1,6 @@
 use ribir_core::prelude::Classes;
 
+mod checkbox_cls;
 mod icon_cls;
 mod progress_cls;
 mod radio_cls;
@@ -12,5 +13,7 @@ pub fn initd_classes() -> Classes {
   scrollbar_cls::init(&mut classes);
   radio_cls::init(&mut classes);
   progress_cls::init(&mut classes);
+  checkbox_cls::init(&mut classes);
+
   classes
 }
