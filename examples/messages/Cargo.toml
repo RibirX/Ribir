@@ -14,7 +14,8 @@ version.workspace = true
 [dependencies]
 paste.workspace = true
 # we disable `default-features`, because we want more control over testing.
-ribir = {path = "../../ribir", features = ["material", "slim", "widgets"]}
+ribir = {path = "../../ribir", features = ["material", "widgets"]}
+ribir_slim = { path = "../../themes/ribir_slim" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
