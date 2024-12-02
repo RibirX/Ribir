@@ -9,8 +9,6 @@ pub mod clipboard;
 mod winit_shell_wnd;
 #[cfg(feature = "material")]
 pub use ribir_material as material;
-#[cfg(feature = "slim")]
-pub use ribir_slim as slim;
 
 mod platform;
 pub use platform::*;
@@ -19,8 +17,6 @@ pub mod prelude {
 
   #[cfg(feature = "material")]
   pub use super::material;
-  #[cfg(feature = "slim")]
-  pub use super::slim;
   #[cfg(feature = "widgets")]
   pub use super::widgets::prelude::*;
   pub use crate::app::*;
