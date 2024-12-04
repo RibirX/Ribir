@@ -6,7 +6,7 @@ use smallvec::{SmallVec, smallvec};
 use unicode_script::{Script, UnicodeScript};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::{Glyph, GlyphUnit, Overflow, TextAlign, shaper::ShapeResult};
+use crate::{Glyph, GlyphUnit, TextAlign, TextOverflow, shaper::ShapeResult};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PlaceLineDirection {
@@ -64,7 +64,7 @@ pub struct TypographyMan<Paras> {
   text_align: TextAlign,
   line_height: GlyphUnit,
   bounds: Size<GlyphUnit>,
-  overflow: Overflow,
+  overflow: TextOverflow,
   /// Not directly use text as inputs, but accept glyphs after text shape
   /// because both simple text and rich text can custom compose its glyph runs
   /// by text reorder result and its style .
@@ -80,7 +80,7 @@ where
 {
   pub fn new(
     inputs: Paras, line_dir: PlaceLineDirection, text_align: TextAlign, line_height: GlyphUnit,
-    bounds: Size<GlyphUnit>, overflow: Overflow,
+    bounds: Size<GlyphUnit>, overflow: TextOverflow,
   ) -> Self {
     Self {
       line_dir,

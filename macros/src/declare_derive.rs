@@ -448,13 +448,43 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
-
         #[doc="Initializes the text style for this widget."]
         #vis fn text_style<const _M: u8>(mut self, v: impl DeclareInto<TextStyle, _M>) -> Self {
           self.fat_obj = self.fat_obj.text_style(v);
           self
         }
 
+        #[doc="Initializes the font size of this widget."]
+        #vis fn font_size<const _M: u8>(mut self, v: impl DeclareInto<f32, _M>) -> Self {
+          self.fat_obj = self.fat_obj.font_size(v);
+          self
+        }
+
+        #[doc="Initializes the font face of this widget."]
+        #vis fn font_face<const _M: u8>(mut self, v: impl DeclareInto<FontFace, _M>) -> Self {
+          self.fat_obj = self.fat_obj.font_face(v);
+          self
+        }
+
+        #[doc="Initializes the letter space of this widget."]
+        #vis fn letter_spacing<const _M: u8>(mut self, v: impl DeclareInto<f32, _M>) -> Self {
+          self.fat_obj = self.fat_obj.letter_spacing(v);
+          self
+        }
+
+        #[doc="Initializes the text line height of this widget."]
+        #vis fn text_line_height<const _M: u8>(mut self, v: impl DeclareInto<f32, _M>) -> Self {
+          self.fat_obj = self.fat_obj.text_line_height(v);
+          self
+        }
+
+        #[doc="Initializes the text overflow of this widget."]
+        #vis fn text_overflow<const _M: u8>(mut self, v: impl DeclareInto<TextOverflow, _M>)
+           -> Self
+        {
+          self.fat_obj = self.fat_obj.text_overflow(v);
+          self
+        }
 
         #[doc="Initializes the extra space within the widget."]
         #vis fn padding<const _M: u8>(mut self, v: impl DeclareInto<EdgeInsets, _M>) -> Self {

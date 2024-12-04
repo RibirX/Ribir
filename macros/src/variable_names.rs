@@ -122,6 +122,11 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "painting_style" => builtin_member! { "PaintingStyleWidget", Field, "painting_style" },
   // TextStyleWidget
   "text_style" => builtin_member! { "TextStyleWidget", Field, "text_style" },
+  "font_size" => builtin_member! { "TextStyleWidget", Method, "text_style" },
+  "font_face" => builtin_member! { "TextStyleWidget", Method, "text_style" },
+  "letter_space" => builtin_member! { "TextStyleWidget", Method, "text_style" },
+  "text_line_height" => builtin_member! { "TextStyleWidget", Method, "text_style" },
+  "text_overflow" => builtin_member! { "TextStyleWidget", Method, "text_style" },
   // Padding
   "padding" => builtin_member!{"Padding", Field, "padding"},
   // LayoutBox
