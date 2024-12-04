@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.17] - 2024-12-04
+
 ### Features
 
 - **core**: Added the `named_svgs` module to enable sharing SVGs using string keys, replacing the need for `IconTheme`. (#658 @M-Adoo)
@@ -514,7 +516,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.15...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.17...HEAD
+[0.4.0-alpha.17]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.15...ribir-v0.4.0-alpha.17
 [0.4.0-alpha.15]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.14...ribir-v0.4.0-alpha.15
 [0.4.0-alpha.14]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.12...ribir-v0.4.0-alpha.14
 [0.4.0-alpha.12]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.11...ribir-v0.4.0-alpha.12
