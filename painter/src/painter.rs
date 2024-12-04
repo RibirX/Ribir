@@ -295,6 +295,10 @@ impl Painter {
   #[inline]
   pub fn text_style(&self) -> &TextStyle { &self.current_state().text_style }
 
+  /// Return the current text style used by the painter.
+  #[inline]
+  pub fn text_style_mut(&mut self) -> &mut TextStyle { &mut self.current_state_mut().text_style }
+
   /// Set the text style for the painter.
   #[inline]
   pub fn set_text_style(&mut self, text_style: TextStyle) -> &mut Self {

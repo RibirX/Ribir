@@ -362,7 +362,13 @@ pub fn typography_theme() -> TypographyTheme {
     line_height: f32, font_size: f32, letter_space: f32, font_face: FontFace,
   ) -> TextTheme {
     TextTheme {
-      text: TextStyle { line_height, font_size, letter_space, font_face, overflow: Overflow::Clip },
+      text: TextStyle {
+        line_height,
+        font_size,
+        letter_space,
+        font_face,
+        overflow: TextOverflow::Clip,
+      },
       decoration: TextDecorationStyle {
         decoration: TextDecoration::NONE,
         decoration_color: Color::BLACK.with_alpha(0.87).into(),

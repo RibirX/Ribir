@@ -293,8 +293,8 @@ impl ComposeChild<'static> for TextArea {
           let this = $this;
           let mut style = this.style.clone();
           let overflow = match this.auto_wrap {
-            true => Overflow::AutoWrap,
-            false => Overflow::Clip,
+            true => TextOverflow::AutoWrap,
+            false => TextOverflow::Clip,
           };
           if style.overflow != overflow {
             style.overflow = overflow;

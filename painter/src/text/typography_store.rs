@@ -28,7 +28,7 @@ pub struct TypographyKey {
   line_width: GlyphUnit,
   text_align: TextAlign,
   line_dir: PlaceLineDirection,
-  overflow: Overflow,
+  overflow: TextOverflow,
 }
 
 /// Do simple text typography and cache it.
@@ -464,14 +464,14 @@ impl VisualGlyphs {
 impl TypographyKey {
   fn new(
     runs: Box<[RunKey]>, bounds: Size<GlyphUnit>, text_align: TextAlign,
-    line_dir: PlaceLineDirection, overflow: Overflow,
+    line_dir: PlaceLineDirection, overflow: TextOverflow,
   ) -> Self {
     let line_width = match overflow {
       // line width is not so important in clip mode, the cache can be use even with difference line
       // width. The wider one can use for the narrower one. S
-      Overflow::Clip => GlyphUnit::MAX,
+      TextOverflow::Clip => GlyphUnit::MAX,
 
-      Overflow::AutoWrap => {
+      TextOverflow::AutoWrap => {
         if line_dir.is_horizontal() {
           bounds.height
         } else {
@@ -501,10 +501,10 @@ mod tests {
   fn test_face() -> FontFace {
     FontFace { families: Box::new([FontFamily::Name("DejaVu Sans".into())]), ..<_>::default() }
   }
-  fn text_style(font_size: f32, overflow: Overflow, letter_space: f32) -> TextStyle {
+  fn text_style(font_size: f32, overflow: TextOverflow, letter_space: f32) -> TextStyle {
     TextStyle { font_size, font_face: test_face(), letter_space, line_height: font_size, overflow }
   }
-  fn zero_letter_space_style(font_size: f32, overflow: Overflow) -> TextStyle {
+  fn zero_letter_space_style(font_size: f32, overflow: TextOverflow) -> TextStyle {
     text_style(font_size, overflow, 0.)
   }
 
@@ -525,7 +525,7 @@ mod tests {
     world!"
       .into();
 
-    let style = zero_letter_space_style(14., Overflow::Clip);
+    let style = zero_letter_space_style(14., TextOverflow::Clip);
     let visual = typography_text(
       text,
       &style,
@@ -541,7 +541,7 @@ mod tests {
   fn empty_text_bounds() {
     let text = "".into();
 
-    let style = zero_letter_space_style(14., Overflow::Clip);
+    let style = zero_letter_space_style(14., TextOverflow::Clip);
     let visual = typography_text(
       text,
       &style,
@@ -556,7 +556,7 @@ mod tests {
   #[test]
   fn new_line_bounds() {
     let text = "123\n".into();
-    let style = zero_letter_space_style(14., Overflow::Clip);
+    let style = zero_letter_space_style(14., TextOverflow::Clip);
     let visual = typography_text(
       text,
       &style,
@@ -571,7 +571,7 @@ mod tests {
   #[test]
   fn simple_typography_text() {
     fn glyphs(
-      overflow: Overflow, bounds: Size, text_align: TextAlign, line_dir: PlaceLineDirection,
+      overflow: TextOverflow, bounds: Size, text_align: TextAlign, line_dir: PlaceLineDirection,
     ) -> Vec<(f32, f32)> {
       let text = "Hello--------\nworld!".into();
       let style = text_style(10., overflow, 2.);
@@ -588,7 +588,7 @@ mod tests {
     }
 
     let not_bounds = glyphs(
-      Overflow::Clip,
+      TextOverflow::Clip,
       Size::new(f32::MAX, f32::MAX),
       TextAlign::Start,
       PlaceLineDirection::TopToBottom,
@@ -618,7 +618,7 @@ mod tests {
     ]);
 
     let r_align = glyphs(
-      Overflow::Clip,
+      TextOverflow::Clip,
       Size::new(100., f32::MAX),
       TextAlign::End,
       PlaceLineDirection::TopToBottom,
@@ -648,7 +648,7 @@ mod tests {
     ],);
 
     let bottom = glyphs(
-      Overflow::Clip,
+      TextOverflow::Clip,
       Size::new(100., 100.),
       TextAlign::Start,
       PlaceLineDirection::BottomToTop,
@@ -680,7 +680,7 @@ mod tests {
     ],);
 
     let center_clip = glyphs(
-      Overflow::Clip,
+      TextOverflow::Clip,
       Size::new(40., 15.),
       TextAlign::Center,
       PlaceLineDirection::TopToBottom,
@@ -710,7 +710,7 @@ mod tests {
 
     let text: Substr = "hi!".into();
 
-    let style = zero_letter_space_style(16., Overflow::Clip);
+    let style = zero_letter_space_style(16., TextOverflow::Clip);
 
     assert!(store.cache.is_empty());
 
@@ -744,7 +744,7 @@ mod tests {
 
   #[test]
   fn cluster_position() {
-    let style = zero_letter_space_style(15., Overflow::Clip);
+    let style = zero_letter_space_style(15., TextOverflow::Clip);
     let text =
       "abcd \u{202e} right_to_left_1 \u{202d} embed \u{202c} right_to_left_2 \u{202c} end".into();
     let glyphs = typography_text(
@@ -763,7 +763,7 @@ mod tests {
 
   #[test]
   fn auto_wrap_position() {
-    let style = zero_letter_space_style(16., Overflow::AutoWrap);
+    let style = zero_letter_space_style(16., TextOverflow::AutoWrap);
     let text = "WITHIN BOUND\rLINE WITH LONG WORD LIKE: ABCDEFGHIJKLMNOPQRSTUVWXYZ, WILL AUTO \
                 WRAP TO 3 LINES."
       .into();
@@ -802,7 +802,7 @@ mod tests {
     let mut store = test_store();
     let text: Substr = "1234".into();
 
-    let style = zero_letter_space_style(16., Overflow::Clip);
+    let style = zero_letter_space_style(16., TextOverflow::Clip);
     let glyphs1 = store.typography(
       text.clone(),
       &style,

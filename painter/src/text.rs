@@ -92,18 +92,18 @@ pub struct TextStyle {
   /// The line height of the text in logical pixels.
   pub line_height: f32,
   /// How to handle the visual overflow.
-  pub overflow: Overflow,
+  pub overflow: TextOverflow,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Debug)]
-pub enum Overflow {
+pub enum TextOverflow {
   #[default]
   Clip,
   AutoWrap,
 }
 
-impl Overflow {
-  fn is_auto_wrap(&self) -> bool { matches!(self, Overflow::AutoWrap) }
+impl TextOverflow {
+  fn is_auto_wrap(&self) -> bool { matches!(self, TextOverflow::AutoWrap) }
 }
 
 #[derive(Debug, Clone, PartialEq)]

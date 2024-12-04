@@ -23,6 +23,8 @@ impl BuildCtx {
   /// Return the window of this context is created from.
   pub fn window(&self) -> Sc<Window> { self.tree().window() }
 
+  pub fn text_style(&self) -> QueryRef<TextStyle> { Provider::of::<TextStyle>(self).unwrap() }
+
   /// This method returns the color of the current build process, with the
   /// primary color of the palette serving as the default.
   ///

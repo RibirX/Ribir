@@ -387,9 +387,9 @@ impl<T> FatObj<T> {
   /// Returns the `State<TextStyleWidget>` widget from the FatObj. If it
   /// doesn't exist, a new one will be created.
   pub fn get_text_style_widget(&mut self) -> &State<TextStyleWidget> {
-    self
-      .text_style
-      .get_or_insert_with(|| State::value(<_>::default()))
+    self.text_style.get_or_insert_with(|| {
+      State::value(TextStyleWidget { text_style: BuildCtx::get().text_style().clone() })
+    })
   }
 
   /// Returns the `State<Visibility>` widget from the FatObj. If it doesn't
@@ -745,6 +745,31 @@ impl<T> FatObj<T> {
   /// Initializes the text style of this widget.
   pub fn text_style<const M: u8>(self, v: impl DeclareInto<TextStyle, M>) -> Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style = v)
+  }
+
+  /// Initializes the font size of this widget.
+  pub fn font_size<const M: u8>(self, v: impl DeclareInto<f32, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_size = v)
+  }
+
+  /// Initializes the font face of this widget.
+  pub fn font_face<const M: u8>(self, v: impl DeclareInto<FontFace, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_face = v)
+  }
+
+  /// Initializes the letter space of this widget.
+  pub fn letter_spacing<const M: u8>(self, v: impl DeclareInto<f32, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.letter_space = v)
+  }
+
+  /// Initializes the text line height of this widget.
+  pub fn text_line_height<const M: u8>(self, v: impl DeclareInto<f32, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.line_height = v)
+  }
+
+  /// Initializes the text overflow of this widget.
+  pub fn text_overflow<const M: u8>(self, v: impl DeclareInto<TextOverflow, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.overflow = v)
   }
 
   /// Initializes the background of the widget.

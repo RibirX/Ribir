@@ -14,7 +14,7 @@ pub(super) fn init(classes: &mut Classes) {
         font_size: 24.,
         letter_space: 0.,
         font_face,
-        overflow: Overflow::Clip,
+        overflow: TextOverflow::Clip,
       })
       .into_widget()
   });

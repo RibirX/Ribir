@@ -232,7 +232,7 @@ mod tests {
       },
       letter_space: 0.,
       line_height: 16.,
-      overflow: Overflow::AutoWrap,
+      overflow: TextOverflow::AutoWrap,
     };
     let glyphs = store.typography(
       "1 23 456 7890\n12345".into(),
