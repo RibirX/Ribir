@@ -29,10 +29,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Enhanced support for built-in fields such as `font_size`, `font_face`, `letter_spacing`, `text_line_height`, and `text_overflow` through `TextStyleWidget`. (#668 @M-Adoo)
 - **widgets**: Icon size should be maintained even if its container is not sufficiently large. (#668 @M-Adoo)
+- **core**: Added the builtin widget of tooltips (#664 @wjian23)
 
 ### Changed
 
-- **core**: Refactor the builtin widget of global_anchor (#pr @wjian23)
+- **core**: Refactor the builtin widget of global_anchor (#664 @wjian23)
 
 ## [0.4.0-alpha.17] - 2024-12-04
 

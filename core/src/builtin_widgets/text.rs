@@ -1,7 +1,8 @@
 use std::cell::{Ref, RefCell};
 
-use ribir_core::prelude::*;
 use typography::PlaceLineDirection;
+
+use crate::prelude::*;
 
 pub type TextInit = DeclareInit<CowArc<str>>;
 /// The text widget display text with a single style.
@@ -91,19 +92,17 @@ define_text_with_theme_style!(H4, title_large);
 define_text_with_theme_style!(H5, title_medium);
 define_text_with_theme_style!(H6, title_small);
 
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
-  use ribir_core::test_helper::*;
+  use ribir::{core::test_helper::*, material as ribir_material, prelude::*};
   use ribir_dev_helper::*;
 
-  use super::*;
-  use crate::layout::SizedBox;
   const WND_SIZE: Size = Size::new(164., 64.);
 
   widget_test_suit!(
     text_clip,
     WidgetTester::new(fn_widget! {
-      @SizedBox {
+      @ MockBox {
         size: Size::new(50., 45.),
         @Text {
           text: "hello world,\rnice to meet you.",

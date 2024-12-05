@@ -4,6 +4,7 @@ mod checkbox_cls;
 mod progress_cls;
 mod radio_cls;
 mod scrollbar_cls;
+mod tooltips_cls;
 
 pub fn initd_classes() -> Classes {
   let mut classes = Classes::default();
@@ -12,6 +13,7 @@ pub fn initd_classes() -> Classes {
   radio_cls::init(&mut classes);
   progress_cls::init(&mut classes);
   checkbox_cls::init(&mut classes);
+  tooltips_cls::init(&mut classes);
 
   classes
 }

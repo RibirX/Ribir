@@ -19,7 +19,6 @@ use crate::{
     text_selectable::{SelectableText, bind_point_listener, select_key_handle},
   },
   layout::{OnlySizedByParent, Stack, StackFit},
-  prelude::Text,
 };
 
 pub struct Placeholder(DeclareInit<CowArc<str>>);

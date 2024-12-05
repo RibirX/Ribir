@@ -214,6 +214,7 @@ impl Overlay {
               }
             }
           },
+          @{ w }
         }.into_widget();
       };
       if close_policy.contains(AutoClosePolicy::ESC) {

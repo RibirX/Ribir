@@ -3,8 +3,7 @@ use svg::named_svgs;
 
 use crate::{
   common_widget::{Leading, Trailing},
-  prelude::{Icon, Row, Text},
-  text::TextInit,
+  prelude::{Icon, Row},
 };
 
 class_names! {
