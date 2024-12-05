@@ -837,9 +837,14 @@ impl<T> FatObj<T> {
     self.declare_builtin_init(v, Self::get_relative_anchor_widget, |m, v| m.anchor = v)
   }
 
-  /// Initializes the global anchor of the widget.
-  pub fn global_anchor<const M: u8>(self, v: impl DeclareInto<Anchor, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor = v)
+  /// Initializes the horizontal global anchor of the widget.
+  pub fn global_anchor_x<const M: u8>(self, v: impl DeclareInto<GlobalAnchorX, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_x = v)
+  }
+
+  /// Initializes the vertical global anchor of the widget.
+  pub fn global_anchor_y<const M: u8>(self, v: impl DeclareInto<GlobalAnchorY, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_y = v)
   }
 
   /// Initializes the visibility of the widget.

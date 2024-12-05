@@ -543,9 +543,19 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
-        #[doc="Initializes the global anchor of the widget."]
-        #vis fn global_anchor<const _M: u8>(mut self, v: impl DeclareInto<Anchor, _M>) -> Self {
-          self.fat_obj = self.fat_obj.global_anchor(v);
+        #[doc="Initializes the horizontal global anchor of the widget."]
+        #vis fn global_anchor_x<const _M: u8>(
+          mut self, v: impl DeclareInto<GlobalAnchorX, _M>
+        ) -> Self {
+          self.fat_obj = self.fat_obj.global_anchor_x(v);
+          self
+        }
+
+        #[doc="Initializes the vertical global anchor of the widget."]
+        #vis fn global_anchor_y<const _M: u8>(
+          mut self, v: impl DeclareInto<GlobalAnchorY, _M>
+        ) -> Self {
+          self.fat_obj = self.fat_obj.global_anchor_y(v);
           self
         }
 
@@ -576,6 +586,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self.fat_obj = self.fat_obj.track_id();
           self
         }
+
       }
     }
   };
