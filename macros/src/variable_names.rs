@@ -138,7 +138,8 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "layout_width" => builtin_member!{"LayoutBox", Method, "layout_box"},
   "layout_height" => builtin_member!{"LayoutBox", Method, "layout_box"},
   // GlobalAnchor
-  "global_anchor" => builtin_member!{"GlobalAnchor", Field, "global_anchor"},
+  "global_anchor_x" => builtin_member!{"GlobalAnchor", Field, "global_anchor_x"},
+  "global_anchor_y" => builtin_member!{"GlobalAnchor", Field, "global_anchor_y"},
   // Cursor
   "cursor" => builtin_member!{"Cursor", Field, "cursor"},
   // Margin

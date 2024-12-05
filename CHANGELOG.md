@@ -30,6 +30,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Enhanced support for built-in fields such as `font_size`, `font_face`, `letter_spacing`, `text_line_height`, and `text_overflow` through `TextStyleWidget`. (#668 @M-Adoo)
 - **widgets**: Icon size should be maintained even if its container is not sufficiently large. (#668 @M-Adoo)
 
+### Changed
+
+- **core**: Refactor the builtin widget of global_anchor (#pr @wjian23)
+
 ## [0.4.0-alpha.17] - 2024-12-04
 
 ### Features
@@ -46,6 +50,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **widgets**: The `Checkbox` widget uses classes to style and simplify its label syntax. (#666 @M-Adoo)
 - **widgets**: The `Icon` widget utilizes classes to configure its style, and it does not have a size property. (#660 @M-Adoo)
 - **theme:** Refactor the `Ripple` and `StateLayer` of the material theme to enhance their visual effects. (#666 @M-Adoo)
+
 
 ### Fixed
 
