@@ -79,7 +79,7 @@ unicode-segmentation = "1.9.0"
 usvg = { version= "0.44.0", default-features = false }
 webbrowser = "0.8.8"
 wgpu = {version = "0.20.0", features=["webgl"]}
-winit = { version="0.29.5", default-features = false, features = ["x11", "wayland", "wayland-dlopen", "rwh_06"]}
+winit = { version="0.30.0", default-features = false, features = ["x11", "wayland", "wayland-dlopen", "rwh_06"]}
 zerocopy = "0.7.3"
 quick-xml = "0.37.1"
 macos-accessibility-client = { version = "0.0.1" }
