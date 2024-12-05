@@ -47,6 +47,7 @@ pub trait Render: 'static {
   /// its child can be hit if the widget itself is not hit.
   fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { ctx.box_hit_test(pos) }
 
+  /// Return a transform to map the coordinate from its parent to this widget.
   fn get_transform(&self) -> Option<Transform> { None }
 }
 

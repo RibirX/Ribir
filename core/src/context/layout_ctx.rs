@@ -37,11 +37,10 @@ impl<'a> LayoutCtx<'a> {
     } else {
       PaintingStyle::Fill
     };
-    let text_style = if let Some(style) = id.query_ancestors_ref::<TextStyle>(tree) {
-      style.clone()
-    } else {
-      TextStyle::default()
-    };
+    let text_style = id
+      .query_ancestors_ref::<TextStyle>(tree)
+      .unwrap()
+      .clone();
 
     Self { id, tree, painting_style, text_style }
   }
@@ -163,4 +162,6 @@ impl<'a> LayoutCtx<'a> {
   }
 
   pub fn text_style(&self) -> &TextStyle { &self.text_style }
+
+  pub fn text_style_mut(&mut self) -> &mut TextStyle { &mut self.text_style }
 }

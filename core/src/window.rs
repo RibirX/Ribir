@@ -304,11 +304,10 @@ impl Window {
     let _guard = BuildCtx::init_for(root, self.tree);
     let ctx = BuildCtx::get();
     let brush = Palette::of(ctx).on_surface_variant();
-    let text_style = TypographyTheme::of(ctx).body_medium.text.clone();
     self
       .painter
       .borrow_mut()
-      .set_init_state(brush.into(), text_style);
+      .set_init_state(brush.into());
   }
 
   #[inline]

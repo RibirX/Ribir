@@ -17,6 +17,7 @@ fn content() -> Widget<'static> {
   fn actions_show() -> GenWidget {
     fn_widget! {
       @Scrollbar {
+        text_line_height: 24.,
         @Column {
           clamp: BoxClamp::EXPAND_X,
           align_items: Align::Center,

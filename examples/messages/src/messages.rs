@@ -46,6 +46,7 @@ impl Compose for MessageList {
     fn_widget! {
       let palette = Palette::of(BuildCtx::get());
       @Column {
+        text_line_height: 24.,
         background: palette.surface(),
         @Row {
           justify_content: JustifyContent::SpaceBetween,
