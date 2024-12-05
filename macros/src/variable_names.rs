@@ -166,6 +166,8 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "opacity" => builtin_member!{"Opacity", Field, "opacity"},
   // KeepAlive
   "keep_alive" => builtin_member!{"KeepAlive", Field, "keep_alive"},
+  // Tooltips
+  "tooltips" => builtin_member!{"Tooltips", Field, "tooltips"},
   // TrackWidgetId
   "track_id" => builtin_member!{"TrackWidgetId", Method, "track_id"},
 };

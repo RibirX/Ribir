@@ -41,7 +41,8 @@ web-time.workspace = true
 colored.workspace = true
 paste.workspace = true
 ribir_dev_helper = {path = "../dev-helper"}
-ribir = { path = "../ribir" }
+ribir = { path = "../ribir", features = ["material"] }
+ribir_slim = { path = "../themes/ribir_slim" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio = { workspace = true, features = ["full"]}

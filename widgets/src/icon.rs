@@ -2,8 +2,6 @@ use std::cell::Cell;
 
 use ribir_core::{impl_compose_child_for_wrap_render, prelude::*, wrap_render::WrapRender};
 
-use crate::text::*;
-
 /// An widget represents an icon.
 ///
 /// The icon size is determined by the text line height, so you can use

@@ -28,7 +28,6 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::prelude::*;
 
   widget_layout_test!(
     fix_size,

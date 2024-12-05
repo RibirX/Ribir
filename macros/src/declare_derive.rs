@@ -587,6 +587,12 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self
         }
 
+        #[doc="Initializes the `tooltips` value of the `Tooltips` widget."]
+        #vis fn tooltips<const _M: u8>(mut self, v: impl DeclareInto<CowArc<str>, _M>) -> Self
+        {
+          self.fat_obj = self.fat_obj.tooltips(v);
+          self
+        }
       }
     }
   };
