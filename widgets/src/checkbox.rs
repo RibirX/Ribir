@@ -118,10 +118,10 @@ impl ComposeChild<'static> for Checkbox {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     rdl! {
       let checkbox = @Class {
-        class: CHECKBOX,
+        class: distinct_pipe!($this.state_class_name()),
         @Icon {
+          class: CHECKBOX,
           cursor: CursorIcon::Pointer,
-          class: distinct_pipe!($this.state_class_name()),
           @pipe!(named_svgs::get($this.icon_name()))
         }
       };

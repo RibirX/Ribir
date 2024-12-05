@@ -5,7 +5,7 @@ use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-  Brush, Color, Glyph, PixelImage, Svg, TextStyle, VisualGlyphs,
+  Brush, Color, Glyph, PixelImage, Svg, VisualGlyphs,
   color::{LinearGradient, RadialGradient},
   font_db::FontDB,
   path::*,
@@ -164,7 +164,6 @@ struct PainterState {
   stroke_brush: Brush,
   fill_brush: Brush,
   style: PathStyle,
-  text_style: TextStyle,
   transform: Transform,
   opacity: f32,
   clip_cnt: usize,
@@ -180,7 +179,6 @@ impl PainterState {
       stroke_options: <_>::default(),
       stroke_brush: Color::BLACK.into(),
       fill_brush: Color::GRAY.into(),
-      text_style: TextStyle::default(),
       transform: Transform::identity(),
       clip_cnt: 0,
       opacity: 1.,
@@ -203,10 +201,9 @@ impl Painter {
 
   /// Change the default brush and text style of the painter, and then reset
   /// the painter state.
-  pub fn set_init_state(&mut self, brush: Brush, text_style: TextStyle) {
+  pub fn set_init_state(&mut self, brush: Brush) {
     self.init_state.fill_brush = brush.clone();
     self.init_state.stroke_brush = brush;
-    self.init_state.text_style = text_style;
     self.reset();
   }
 
@@ -288,21 +285,6 @@ impl Painter {
   #[inline]
   pub fn set_fill_brush(&mut self, brush: impl Into<Brush>) -> &mut Self {
     self.current_state_mut().fill_brush = brush.into();
-    self
-  }
-
-  /// Return the current text style used by the painter.
-  #[inline]
-  pub fn text_style(&self) -> &TextStyle { &self.current_state().text_style }
-
-  /// Return the current text style used by the painter.
-  #[inline]
-  pub fn text_style_mut(&mut self) -> &mut TextStyle { &mut self.current_state_mut().text_style }
-
-  /// Set the text style for the painter.
-  #[inline]
-  pub fn set_text_style(&mut self, text_style: TextStyle) -> &mut Self {
-    self.current_state_mut().text_style = text_style;
     self
   }
 
@@ -651,11 +633,11 @@ impl Painter {
     self
   }
 
-  pub fn draw_glyph(&mut self, g: &Glyph, font_db: &FontDB) -> &mut Self {
+  pub fn draw_glyph(&mut self, g: &Glyph, font_size: f32, font_db: &FontDB) -> &mut Self {
     let Some(face) = font_db.try_get_face_data(g.face_id) else { return self };
 
     let unit = face.units_per_em() as f32;
-    let scale = self.text_style().font_size / unit;
+    let scale = font_size / unit;
 
     let matrix = *self.transform();
 
@@ -679,9 +661,7 @@ impl Painter {
         .translate(bounds.min_x(), bounds.min_y())
         .scale(scale, scale)
         .draw_svg(&svg);
-    } else if let Some(img) =
-      face.glyph_raster_image(g.glyph_id, (unit / self.text_style().font_size) as u16)
-    {
+    } else if let Some(img) = face.glyph_raster_image(g.glyph_id, (unit / font_size) as u16) {
       let m_width = img.width() as f32;
       let m_height = img.height() as f32;
       let scale = (bounds.width() / m_width).min(bounds.height() / m_height);
@@ -714,7 +694,7 @@ impl Painter {
     self.translate(visual_rect.origin.x, visual_rect.origin.y);
 
     for g in visual_glyphs.glyphs_in_bounds(&paint_rect) {
-      self.draw_glyph(&g, font_db);
+      self.draw_glyph(&g, visual_glyphs.font_size(), font_db);
     }
 
     self

@@ -44,12 +44,4 @@ impl WrapRender for TextStyleWidget {
     ctx.set_text_style(old);
     size
   }
-
-  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
-    ctx
-      .painter()
-      .set_text_style(self.text_style.clone());
-
-    host.paint(ctx)
-  }
 }

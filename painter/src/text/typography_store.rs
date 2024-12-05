@@ -69,6 +69,8 @@ impl VisualGlyphs {
     }
     Self { font_size, x, y, visual_info, order_info }
   }
+
+  pub fn font_size(&self) -> f32 { self.font_size }
 }
 
 impl TypographyStore {

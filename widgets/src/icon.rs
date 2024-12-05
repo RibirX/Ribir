@@ -1,12 +1,20 @@
-use ribir_core::prelude::*;
+use std::cell::Cell;
+
+use ribir_core::{impl_compose_child_for_wrap_render, prelude::*, wrap_render::WrapRender};
 
 use crate::text::*;
 
-/// An icon widget represents an icon.
+/// An widget represents an icon.
 ///
-/// It can accept either text or another widget as its child. If the child is
-/// text, the widget uses the font ligature to display the text as an icon.
-/// Therefore, an icon font must be provided.
+/// The icon size is determined by the text line height, so you can use
+/// `text_line_height` to change the icon size. Use the text line height to
+/// determine the icon size make it easier to match with the label beside it.
+///
+/// This widget accept either text or another widget as its child. If the child
+/// is text, the widget uses the icon font ligature to display the text as an
+/// icon. The icon font is specified in the `Theme` by `icon_font` property,
+/// therefore if you want text as an icon, you need to set and load the icon
+/// font before running the app.
 ///
 ///
 /// # Example
@@ -39,50 +47,19 @@ use crate::text::*;
 /// };
 /// ```
 ///
-/// The standard size of the icon and its font is determined by the `ICON`
-/// class. Therefore, if you desire a different size from the standard size, you
-/// should use `clamp` to limit the icon's size.
+/// To specify the icon size, you can use the `text_line_height` property.
 ///
 /// ```
 /// use ribir_core::prelude::*;
 /// use ribir_widgets::prelude::*;
 ///
 /// let _icon = icon! {
-///   clamp: BoxClamp::fixed_size(Size::new(64., 64.)),
+///   text_line_height: 64.,
 ///   @ { named_svgs::get_or_default("search") }
-/// };
-/// ```
-///
-/// Alternatively, if you wish to modify the icon font or the standard size of
-/// the icon for the entire subtree, you can override the `ICON` class.
-///
-/// ```
-/// use ribir_core::prelude::*;
-/// use ribir_widgets::prelude::*;
-///
-/// let w = fn_widget! {
-///   @OverrideClass {
-///     name: ICON,
-///     class_impl: style_class! {
-///       clamp: BoxClamp::fixed_size(Size::new(64., 64.)),
-///       text_style: TextStyle {
-///         font_face: Theme::of(BuildCtx::get()).icon_font.clone(),
-///         line_height: 64.,
-///         font_size: 64.,
-///         ..<_>::default()
-///       }
-///     } as ClassImpl,
-///     @icon! { @ { svgs::DELETE } }
-///   }
 /// };
 /// ```
 #[derive(Declare, Default, Clone, Copy)]
 pub struct Icon;
-
-class_names! {
-  #[doc = "This class is used to specify the size of the icon and the text style for the icon."]
-  ICON,
-}
 
 #[derive(Template)]
 pub enum IconChild<'c> {
@@ -97,21 +74,68 @@ impl<'c> ComposeChild<'c> for Icon {
   type Child = IconChild<'c>;
   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     let child = match child {
-      IconChild::FontIcon(text) => text! { text }.into_widget(),
+      IconChild::FontIcon(text) => IconText.with_child(text! { text }).into_widget(),
       IconChild::Widget(child) => child,
     };
 
-    let icon = FatObj::new(child)
-      .box_fit(BoxFit::Contain)
-      .h_align(HAlign::Center)
-      .v_align(VAlign::Center)
-      .into_widget();
-
-    // We need apply class after align and box_fit.
-    Class { class: Some(ICON) }
-      .with_child(icon)
+    IconRender { scale: Cell::new(0.) }
+      .with_child(child)
       .into_widget()
   }
+}
+
+struct IconText;
+impl_compose_child_for_wrap_render!(IconText);
+
+impl WrapRender for IconText {
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    let font_face = Theme::of(&ctx).icon_font.clone();
+    let old = ctx.text_style().clone();
+    let style = ctx.text_style_mut();
+    style.font_face = font_face;
+    style.font_size = style.line_height;
+    let size = host.perform_layout(clamp, ctx);
+    *ctx.text_style_mut() = old;
+    size
+  }
+}
+
+#[derive(SingleChild)]
+struct IconRender {
+  scale: Cell<f32>,
+}
+
+impl Render for IconRender {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let icon_size = ctx.text_style().line_height;
+    let child_size = ctx
+      .perform_single_child_layout(clamp.expand())
+      .unwrap_or_default();
+    let scale = icon_size / child_size.width.max(child_size.height);
+    self.scale.set(scale);
+    clamp.clamp(Size::splat(icon_size))
+  }
+
+  fn paint(&self, ctx: &mut PaintingCtx) {
+    let child_size = ctx.single_child_box().unwrap().size;
+    if !child_size.is_empty() {
+      let size = ctx.box_size().unwrap();
+      let painter = ctx.painter();
+      let scale = self.scale.get();
+      let real_size = child_size * scale;
+      if real_size.greater_than(size).any() {
+        painter.clip(Path::rect(&Rect::from_size(size)).into());
+      }
+      painter.scale(scale, scale);
+    }
+  }
+
+  fn get_transform(&self) -> Option<Transform> {
+    let scale = self.scale.get();
+    Some(Transform::scale(scale, scale))
+  }
+
+  fn only_sized_by_parent(&self) -> bool { true }
 }
 
 #[cfg(test)]
@@ -125,6 +149,7 @@ mod tests {
   widget_image_tests!(
     icons,
     WidgetTester::new(row! {
+      text_line_height: 24.,
       @Icon {
         foreground: Color::BLUE,
         @ { svgs::DELETE }
@@ -149,5 +174,19 @@ mod tests {
       };
     })
     .with_comparison(0.002)
+  );
+
+  widget_image_tests!(
+    keep_icon_visual,
+    WidgetTester::new(container! {
+      size: Size::splat(24.),
+      @Icon {
+        foreground: Color::RED,
+        text_line_height: 48.,
+        @ { named_svgs::get_or_default("") }
+      }
+    })
+    .with_wnd_size(Size::splat(64.))
+    .with_comparison(0.0002)
   );
 }
