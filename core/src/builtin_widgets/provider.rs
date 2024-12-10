@@ -118,14 +118,17 @@ impl<'c> ComposeChild<'c> for Provider {
       })
       .provider;
 
+    fn_widget! {
     // We push the provider into the build context to ensure that the widget build
     // logic can access this provider.
-    let ctx = BuildCtx::get_mut();
-    ctx.current_providers.push(provider);
-    child.into_widget().on_build(|id| {
-      let provider = ctx.current_providers.pop().unwrap();
-      id.attach_data(provider, ctx.tree_mut());
-    })
+      let ctx = BuildCtx::get_mut();
+      ctx.current_providers.push(provider);
+      child.into_widget().on_build(move |id| {
+        let provider = ctx.current_providers.pop().unwrap();
+        id.attach_data(provider, ctx.tree_mut());
+      })
+    }
+    .into_widget()
   }
 }
 
@@ -258,6 +261,41 @@ mod tests {
     wnd.draw_frame();
 
     assert_eq!(*value.read(), 1);
+  }
+
+  #[test]
+  fn with_multi_providers() {
+    reset_test_env!();
+
+    let (value1, w_value1) = split_value(0);
+    let (value2, w_value2) = split_value(0);
+    let w = fn_widget! {
+      let w_value1 = w_value1.clone_writer();
+      let w_value2 = w_value2.clone_writer();
+      @MockMulti {
+        @ {
+          Provider::new(Box::new(Queryable(1i32))).with_child(fn_widget! {
+            let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
+            *$w_value1.write() = *v;
+            @ Void{}
+          })
+        }
+
+        @ {
+          Provider::new(Box::new(Queryable(2i32))).with_child(fn_widget! {
+            let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
+            *$w_value2.write() = *v;
+            @ Void{}
+          })
+        }
+      }
+    };
+
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+
+    assert_eq!(*value1.read(), 1);
+    assert_eq!(*value2.read(), 2);
   }
 
   #[test]

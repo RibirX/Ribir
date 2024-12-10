@@ -35,6 +35,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Refactor the builtin widget of global_anchor (#664 @wjian23)
 
+### Fixed
+- **core**: fix mismatch of providers (#pr @wjian23)
+
 ## [0.4.0-alpha.17] - 2024-12-04
 
 ### Features
