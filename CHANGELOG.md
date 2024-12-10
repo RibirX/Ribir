@@ -25,6 +25,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+- **core**: fix mismatch of providers (#pr @wjian23)
+
 ## [0.4.0-alpha.18] - 2024-12-11
 
 ### Features
