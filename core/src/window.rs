@@ -550,6 +550,19 @@ impl Window {
           let Event::ImePreEditCapture(e) = e else { unreachable!() };
           self.bottom_up_emit(&mut Event::ImePreEdit(e), wid, None);
         }
+
+        DelayEvent::GrabPointerDown(wid) => {
+          let mut e = Event::PointerDown(PointerEvent::from_mouse(wid, self));
+          self.emit(wid, &mut e);
+        }
+        DelayEvent::GrabPointerMove(wid) => {
+          let mut e = Event::PointerMove(PointerEvent::from_mouse(wid, self));
+          self.emit(wid, &mut e);
+        }
+        DelayEvent::GrabPointerUp(wid) => {
+          let mut e = Event::PointerUp(PointerEvent::from_mouse(wid, self));
+          self.emit(wid, &mut e);
+        }
       }
     }
   }
@@ -774,6 +787,9 @@ pub(crate) enum DelayEvent {
   PointerLeave { bottom: WidgetId, up: Option<WidgetId> },
   Tap(WidgetId),
   ImePreEdit { wid: WidgetId, pre_edit: ImePreEdit },
+  GrabPointerDown(WidgetId),
+  GrabPointerMove(WidgetId),
+  GrabPointerUp(WidgetId),
 }
 
 impl From<u64> for WindowId {
