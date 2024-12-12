@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Added `grab_pointer` to grabs all the pointer input.  (#pr @wjian23)
+
 ### Fixed
 - **core**: fix mismatch of providers (#pr @wjian23)
 

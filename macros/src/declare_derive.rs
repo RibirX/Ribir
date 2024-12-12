@@ -593,6 +593,8 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           self.fat_obj = self.fat_obj.tooltips(v);
           self
         }
+
+
       }
     }
   };

@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
 use crate::{
@@ -5,16 +7,57 @@ use crate::{
   window::{DelayEvent, WindowId},
 };
 
+/// Grabs the pointer input.
+///
+/// The widget corresponding to the wid will receives all pointer events
+/// (on_pointer_down, on_pointer_move, and on_pointer_up) until the handle's
+/// release() is called or the GrabPointer is dropped; other widgets get no
+/// pointer events at all.
+pub struct GrabPointer(Sc<RefCell<Option<WidgetId>>>);
+
+impl GrabPointer {
+  /// Grab the pointer input to the widget corresponding to the wid.
+  ///
+  /// it may return None if Some wid is already grabbed.
+  #[must_use]
+  pub fn grab(wid: WidgetId, wnd: &Window) -> Option<Self> {
+    wnd.dispatcher.borrow().grab_pointer(wid)
+  }
+
+  /// Release the pointer input.
+  pub fn release(self) {}
+}
+
+impl Drop for GrabPointer {
+  fn drop(&mut self) { self.0.borrow_mut().take(); }
+}
+
 pub(crate) struct Dispatcher {
   wnd_id: WindowId,
   pub(crate) info: DispatchInfo,
   pub(crate) entered_widgets: Vec<WidgetId>,
-  pub(crate) pointer_down_uid: Option<WidgetId>,
+  grab_mouse_wid: Sc<RefCell<Option<WidgetId>>>,
+  pointer_down_wid: Option<WidgetId>,
 }
 
 impl Dispatcher {
   pub fn new(wnd_id: WindowId) -> Self {
-    Self { wnd_id, info: <_>::default(), entered_widgets: vec![], pointer_down_uid: None }
+    Self {
+      wnd_id,
+      info: <_>::default(),
+      entered_widgets: vec![],
+      grab_mouse_wid: Sc::new(RefCell::new(None)),
+      pointer_down_wid: None,
+    }
+  }
+
+  pub(crate) fn grab_pointer(&self, wid: WidgetId) -> Option<GrabPointer> {
+    if self.grab_mouse_wid.borrow().is_none() {
+      *self.grab_mouse_wid.borrow_mut() = Some(wid);
+      Some(GrabPointer(self.grab_mouse_wid.clone()))
+    } else {
+      None
+    }
   }
 
   fn window(&self) -> Sc<Window> {
@@ -77,19 +120,63 @@ impl Dispatcher {
     }
   }
 
-  pub fn cursor_move_to(&mut self, position: Point) {
-    self.info.cursor_pos = position;
-    self.pointer_enter_leave_dispatch();
-    if let Some(hit) = self.hit_widget() {
+  fn cursor_press_down(&mut self, hit: Option<WidgetId>) {
+    let grab_pointer = *self.grab_mouse_wid.borrow();
+    if let Some(grab_pointer) = grab_pointer {
       self
         .window()
-        .add_delay_event(DelayEvent::PointerMove(hit));
+        .add_delay_event(DelayEvent::GrabPointerDown(grab_pointer));
+    } else {
+      self.pointer_down_wid = None;
+      if let Some(hit) = hit {
+        self.pointer_down_wid = Some(hit);
+        self
+          .window()
+          .add_delay_event(DelayEvent::PointerDown(hit));
+      }
+    }
+  }
+
+  fn cursor_press_up(&mut self, hit: Option<WidgetId>) {
+    let wnd = self.window();
+    let grab_pointer = *self.grab_mouse_wid.borrow();
+    if let Some(grab_pointer) = grab_pointer {
+      wnd.add_delay_event(DelayEvent::GrabPointerUp(grab_pointer));
+    } else {
+      if let Some(hit) = hit {
+        wnd.add_delay_event(DelayEvent::PointerUp(hit));
+        if let Some(wid) = self.pointer_down_wid {
+          if let Some(p) = wid.lowest_common_ancestor(hit, wnd.tree()) {
+            wnd.add_delay_event(DelayEvent::Tap(p));
+          }
+        }
+      }
+      self.pointer_down_wid = None;
+    }
+  }
+
+  pub fn cursor_move_to(&mut self, position: Point) {
+    self.info.cursor_pos = position;
+    let grab_pointer = *self.grab_mouse_wid.borrow();
+    if let Some(grab_pointer) = grab_pointer {
+      self
+        .window()
+        .add_delay_event(DelayEvent::GrabPointerMove(grab_pointer));
+    } else {
+      self.pointer_enter_leave_dispatch();
+      if let Some(hit) = self.hit_widget() {
+        self
+          .window()
+          .add_delay_event(DelayEvent::PointerMove(hit));
+      }
     }
   }
 
   pub fn on_cursor_left(&mut self) {
-    self.info.cursor_pos = Point::new(-1., -1.);
-    self.pointer_enter_leave_dispatch();
+    if self.grab_mouse_wid.borrow().is_none() {
+      self.info.cursor_pos = Point::new(-1., -1.);
+      self.pointer_enter_leave_dispatch();
+    }
   }
 
   pub fn dispatch_mouse_input(
@@ -110,20 +197,9 @@ impl Dispatcher {
           // only the last button release emit event.
           if self.info.mouse_button.1.is_empty() {
             self.info.mouse_button.0 = None;
-            let wnd = self.window();
-            let mut dispatch = |tree: &WidgetTree| {
-              let hit = self.hit_widget()?;
-              wnd.add_delay_event(DelayEvent::PointerUp(hit));
+            let hit = self.hit_widget();
 
-              let tap_on = self
-                .pointer_down_uid
-                .take()?
-                .lowest_common_ancestor(hit, tree)?;
-              wnd.add_delay_event(DelayEvent::Tap(tap_on));
-              Some(())
-            };
-
-            dispatch(wnd.tree());
+            self.cursor_press_up(hit);
           }
         }
       };
@@ -148,11 +224,10 @@ impl Dispatcher {
 
   fn bubble_pointer_down(&mut self) {
     let hit = self.hit_widget();
-    self.pointer_down_uid = hit;
     let wnd = self.window();
     let tree = wnd.tree();
 
-    let nearest_focus = self.pointer_down_uid.and_then(|wid| {
+    let nearest_focus = hit.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
         id.query_all_iter::<MixBuiltin>(tree)
           .any(|m| m.contain_flag(MixFlags::Focus))
@@ -163,9 +238,8 @@ impl Dispatcher {
     } else {
       wnd.focus_mgr.borrow_mut().blur(tree);
     }
-    if let Some(hit) = hit {
-      wnd.add_delay_event(DelayEvent::PointerDown(hit));
-    }
+
+    self.cursor_press_down(hit);
   }
 
   fn pointer_enter_leave_dispatch(&mut self) {
@@ -438,10 +512,10 @@ mod tests {
     let w = fn_widget! {
       @MockBox {
         size: INFINITY_SIZE,
+        padding: EdgeInsets::all(4.),
         on_pointer_enter: move |_| { $e_writer.write().push(2); },
         on_pointer_leave: move |_| { $l_writer.write().push(2); },
         @MockBox {
-          margin: EdgeInsets::all(4.),
           size: INFINITY_SIZE,
           on_pointer_enter: move |_| { $e_writer.write().push(1); },
           on_pointer_leave: move |_| { $l_writer.write().push(1); }

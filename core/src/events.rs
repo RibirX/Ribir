@@ -8,6 +8,7 @@ use crate::{
 };
 
 pub(crate) mod dispatcher;
+pub use dispatcher::GrabPointer;
 mod pointers;
 pub use pointers::*;
 use ribir_geom::Point;
