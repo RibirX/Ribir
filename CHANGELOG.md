@@ -27,10 +27,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Added `grab_pointer` to grabs all the pointer input.  (#pr @wjian23)
+- **core**: Added `grab_pointer` to grabs all the pointer input. (#pr @wjian23)
 
 ### Fixed
-- **core**: fix mismatch of providers (#pr @wjian23)
+- **core**: fix mismatch of providers. (#pr @wjian23)
+- **core**: Added DeclarerWithSubscription to let Widget `Expanded` accept pipe value. (#pr @wjian23)
 
 ## [0.4.0-alpha.18] - 2024-12-11
 

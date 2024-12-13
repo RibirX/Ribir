@@ -1,16 +1,53 @@
 use ribir_core::prelude::*;
+use smallvec::SmallVec;
 
 /// A widget that expanded a child of `Flex`, so that the child fills the
 /// available space. If multiple children are expanded, the available space is
 /// divided among them according to the flex factor.
 #[derive(Clone, PartialEq)]
-// `Expand` should not support `FatObj`, as this may cause the `Expanded` to be invisible to its
-// parent. `@Expanded { margin: EdgeInsets::all(10.) }` actually expands as `@Margin { @Expanded {
-// .. } }`.
-#[simple_declare]
+// `Expand` should not support `FatObj`, as this may cause the `Expanded` to be
+// invisible to its parent. `@Expanded { margin: EdgeInsets::all(10.) }`
+// actually expands as `@Margin { @Expanded { .. } }`.
 pub struct Expanded {
-  #[declare(default = 1.)]
   pub flex: f32,
+}
+
+impl Default for Expanded {
+  fn default() -> Self { Self { flex: 1. } }
+}
+
+#[derive(Default)]
+pub struct ExpandedDeclarer {
+  flex: Option<DeclareInit<f32>>,
+}
+
+impl ExpandedDeclarer {
+  pub fn flex<const M: u8>(mut self, flex: impl DeclareInto<f32, M>) -> Self {
+    self.flex = Some(flex.declare_into());
+    self
+  }
+}
+
+impl Declare for Expanded {
+  type Builder = ExpandedDeclarer;
+
+  fn declarer() -> Self::Builder { ExpandedDeclarer::default() }
+}
+
+impl ObjDeclarer for ExpandedDeclarer {
+  type Target = DeclarerWithSubscription<State<Expanded>>;
+
+  fn finish(self) -> Self::Target {
+    let (v, u) = self.flex.map(|v| v.unzip()).unwrap_or((1., None));
+    let host = State::value(Expanded { flex: v });
+    let mut subscribes = SmallVec::new();
+    if let Some(o) = u {
+      let host = host.clone_writer();
+      let u = o.subscribe(move |(_, v)| host.write().flex = v);
+      subscribes.push(u)
+    }
+    DeclarerWithSubscription::new(host, subscribes)
+  }
 }
 
 impl<'c> ComposeChild<'c> for Expanded {
