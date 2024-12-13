@@ -13,9 +13,8 @@ class_names! {
 /// use ribir::prelude::*;
 ///
 /// let w = text! {
-///     text: "hover to show tooltips!",
-///     tooltips: "this is tooltips",
-///   }
+///   text: "hover to show tooltips!",
+///   tooltips: "this is tooltips",
 /// };
 /// App::run(w);
 /// ```

@@ -73,7 +73,7 @@ pub enum GlobalAnchorY {
 ///       on_tap: move |e| overlay.show(e.window()),
 ///     }
 ///   }
-/// }
+/// };
 /// App::run(app);
 /// ```
 pub struct GlobalAnchor {

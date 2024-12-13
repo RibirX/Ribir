@@ -86,7 +86,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: $NIGHTLY_VERSION
-          components: rustfmt, clippy
+          components: llvm-tools-preview
 
       - name: Install cargo-nextest and cargo-llvm-cov
         uses: taiki-e/install-action@v2
@@ -202,7 +202,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          cargo llvm-cov --workspace --lcov --output-path lcov.info --all-features
+          cargo llvm-cov --workspace --lcov --output-path lcov.info --all-features --doctests
 
       - name: generate coverage report
         id: coverage
