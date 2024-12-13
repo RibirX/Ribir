@@ -127,7 +127,7 @@ impl Overlay {
   ///       let wnd = e.window();
   ///       overlay.show_map(move |w| {
   ///         let mut w = FatObj::new(w);
-  ///         @$w {
+  ///         @ $w {
   ///           global_anchor_x: GlobalAnchorX::left_align_to($button.track_id(), 0.),
   ///         }.into_widget()
   ///        },
