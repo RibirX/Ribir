@@ -155,7 +155,7 @@ impl<'a> DeclareField<'a> {
     self
       .attr
       .as_ref()
-      .map_or(true, |attr| attr.skip.is_none())
+      .is_none_or(|attr| attr.skip.is_none())
   }
 
   pub fn is_strict(&self) -> bool {
@@ -189,7 +189,7 @@ impl<'a> DeclareField<'a> {
     self
       .attr
       .as_ref()
-      .map_or(true, |attr| attr.custom.is_none() && attr.skip.is_none())
+      .is_none_or(|attr| attr.custom.is_none() && attr.skip.is_none())
   }
 
   pub fn doc_attr(&self) -> Option<&Attribute> {

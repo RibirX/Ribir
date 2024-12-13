@@ -74,7 +74,7 @@ pub enum GlobalAnchorY {
 ///     }
 ///   }
 /// }
-/// App::run(w);
+/// App::run(app);
 /// ```
 pub struct GlobalAnchor {
   /// the horizontal global anchor

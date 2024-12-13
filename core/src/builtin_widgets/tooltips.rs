@@ -13,7 +13,7 @@ class_names! {
 /// use ribir::prelude::*;
 ///
 /// let w = fn_widget! {
-///   @FilledButton{
+///   @Text {
 ///     text: "hover to show tooltips!",
 ///     tooltips: "this is tooltips",
 ///   }

@@ -234,12 +234,11 @@ fn option_type_extract(ty: &syn::Type) -> Option<&syn::Type> {
     .filter(|s| s.ident == "Option")
     .filter(|_| {
       // the second last can be None or "option"
-      iter.next().map_or(true, |s| {
+      iter.next().is_none_or(|s| {
         match_ident(s, "option")
           && iter
             .next()
-            // the second last can be None or "option" or "core"
-            .map_or(true, |s| match_ident(s, "std") || match_ident(s, "core"))
+            .is_none_or(|s| match_ident(s, "std") || match_ident(s, "core"))
       })
     })
     .and_then(|s| match &s.arguments {

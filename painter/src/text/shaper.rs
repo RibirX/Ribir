@@ -144,7 +144,7 @@ fn collect_miss_part<'a>(
           last_miss_cluster = Some(glyph.cluster);
         } else if last_miss_cluster
           .as_ref()
-          .map_or(true, |cluster| *cluster != glyph.cluster)
+          .is_none_or(|cluster| *cluster != glyph.cluster)
           && miss_start.is_some()
         {
           miss_parts.push((miss_start.take().unwrap(), idx, helper.clone()));
