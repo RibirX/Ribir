@@ -82,7 +82,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
 
       impl #g_impl #name #g_ty #g_where {
         #[doc="Specify the `Class` that should be applied to the widget."]
-        #vis fn class<const _M: u8>(mut self, v: impl DeclareInto<ClassName, _M>) -> Self {
+        #vis fn class<const _M: usize>(mut self, v: impl DeclareInto<ClassName, _M>) -> Self {
           self.fat_obj = self.fat_obj.class(v);
           self
         }
@@ -91,14 +91,14 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
           allow or prevent widgets from being sequentially focusable(usually with \
           the Tab key, hence the name) and determine their relative ordering for \
           sequential focus navigation"]
-        #vis fn tab_index<const _M: u8>(mut self, v: impl DeclareInto<i16, _M>) -> Self {
+        #vis fn tab_index<const _M: usize>(mut self, v: impl DeclareInto<i16, _M>) -> Self {
           self.fat_obj = self.fat_obj.tab_index(v);
           self
         }
 
         #[doc="Initializes whether the `widget` should automatically get focus \
           when the window loads."]
-        #vis fn auto_focus<const _M: u8>(mut self, v: impl DeclareInto<bool, _M>) -> Self {
+        #vis fn auto_focus<const _M: usize>(mut self, v: impl DeclareInto<bool, _M>) -> Self {
           self.fat_obj = self.fat_obj.auto_focus(v);
           self
         }
@@ -409,25 +409,27 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         }
 
         #[doc="Initializes how its child should be scale to fit its box."]
-        #vis fn box_fit<const _M: u8>(mut self, v: impl DeclareInto<BoxFit, _M>) -> Self {
+        #vis fn box_fit<const _M: usize>(mut self, v: impl DeclareInto<BoxFit, _M>) -> Self {
           self.fat_obj = self.fat_obj.box_fit(v);
           self
         }
 
         #[doc="Initializes the background of the widget."]
-        #vis fn background<const _M: u8>(mut self, v: impl DeclareInto<Option<Brush>, _M>) -> Self {
+        #vis fn background<const _M: usize>(mut self, v: impl DeclareInto<Option<Brush>, _M>)
+          -> Self
+        {
           self.fat_obj = self.fat_obj.background(v);
           self
         }
 
         #[doc="Initializes the border of the widget."]
-        #vis fn border<const _M: u8>(mut self, v: impl DeclareInto<Option<Border>, _M>) -> Self {
+        #vis fn border<const _M: usize>(mut self, v: impl DeclareInto<Option<Border>, _M>) -> Self {
           self.fat_obj = self.fat_obj.border(v);
           self
         }
 
         #[doc="Initializes the border radius of the widget."]
-        #vis fn border_radius<const _M: u8>(
+        #vis fn border_radius<const _M: usize>(
           mut self, v: impl DeclareInto<Option<Radius>, _M>
         ) -> Self {
           self.fat_obj = self.fat_obj.border_radius(v);
@@ -435,13 +437,13 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         }
 
         #[doc="Initializes the foreground for this widget."]
-        #vis fn foreground<const _M: u8>(mut self, v: impl DeclareInto<Brush, _M>) -> Self {
+        #vis fn foreground<const _M: usize>(mut self, v: impl DeclareInto<Brush, _M>) -> Self {
           self.fat_obj = self.fat_obj.foreground(v);
           self
         }
 
         #[doc="Initializes the painting style for shapes and paths."]
-        #vis fn painting_style<const _M: u8>(mut self, v: impl DeclareInto<PaintingStyle, _M>)
+        #vis fn painting_style<const _M: usize>(mut self, v: impl DeclareInto<PaintingStyle, _M>)
           -> Self
         {
           self.fat_obj = self.fat_obj.painting_style(v);
@@ -449,37 +451,37 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         }
 
         #[doc="Initializes the text style for this widget."]
-        #vis fn text_style<const _M: u8>(mut self, v: impl DeclareInto<TextStyle, _M>) -> Self {
+        #vis fn text_style<const _M: usize>(mut self, v: impl DeclareInto<TextStyle, _M>) -> Self {
           self.fat_obj = self.fat_obj.text_style(v);
           self
         }
 
         #[doc="Initializes the font size of this widget."]
-        #vis fn font_size<const _M: u8>(mut self, v: impl DeclareInto<f32, _M>) -> Self {
+        #vis fn font_size<const _M: usize>(mut self, v: impl DeclareInto<f32, _M>) -> Self {
           self.fat_obj = self.fat_obj.font_size(v);
           self
         }
 
         #[doc="Initializes the font face of this widget."]
-        #vis fn font_face<const _M: u8>(mut self, v: impl DeclareInto<FontFace, _M>) -> Self {
+        #vis fn font_face<const _M: usize>(mut self, v: impl DeclareInto<FontFace, _M>) -> Self {
           self.fat_obj = self.fat_obj.font_face(v);
           self
         }
 
         #[doc="Initializes the letter space of this widget."]
-        #vis fn letter_spacing<const _M: u8>(mut self, v: impl DeclareInto<f32, _M>) -> Self {
+        #vis fn letter_spacing<const _M: usize>(mut self, v: impl DeclareInto<f32, _M>) -> Self {
           self.fat_obj = self.fat_obj.letter_spacing(v);
           self
         }
 
         #[doc="Initializes the text line height of this widget."]
-        #vis fn text_line_height<const _M: u8>(mut self, v: impl DeclareInto<f32, _M>) -> Self {
+        #vis fn text_line_height<const _M: usize>(mut self, v: impl DeclareInto<f32, _M>) -> Self {
           self.fat_obj = self.fat_obj.text_line_height(v);
           self
         }
 
         #[doc="Initializes the text overflow of this widget."]
-        #vis fn text_overflow<const _M: u8>(mut self, v: impl DeclareInto<TextOverflow, _M>)
+        #vis fn text_overflow<const _M: usize>(mut self, v: impl DeclareInto<TextOverflow, _M>)
            -> Self
         {
           self.fat_obj = self.fat_obj.text_overflow(v);
@@ -487,49 +489,49 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         }
 
         #[doc="Initializes the extra space within the widget."]
-        #vis fn padding<const _M: u8>(mut self, v: impl DeclareInto<EdgeInsets, _M>) -> Self {
+        #vis fn padding<const _M: usize>(mut self, v: impl DeclareInto<EdgeInsets, _M>) -> Self {
           self.fat_obj = self.fat_obj.padding(v);
           self
         }
 
         #[doc="Initializes the cursor of the widget."]
-        #vis fn cursor<const _M: u8>(mut self, v: impl DeclareInto<CursorIcon, _M>) -> Self {
+        #vis fn cursor<const _M: usize>(mut self, v: impl DeclareInto<CursorIcon, _M>) -> Self {
           self.fat_obj = self.fat_obj.cursor(v);
           self
         }
 
         #[doc="Initializes the space around the widget."]
-        #vis fn margin<const _M: u8>(mut self, v: impl DeclareInto<EdgeInsets, _M>) -> Self {
+        #vis fn margin<const _M: usize>(mut self, v: impl DeclareInto<EdgeInsets, _M>) -> Self {
           self.fat_obj = self.fat_obj.margin(v);
           self
         }
 
         #[doc="Initializes how user can scroll the widget."]
-        #vis fn scrollable<const _M: u8>(mut self, v: impl DeclareInto<Scrollable, _M>) -> Self {
+        #vis fn scrollable<const _M: usize>(mut self, v: impl DeclareInto<Scrollable, _M>) -> Self {
           self.fat_obj = self.fat_obj.scrollable(v);
           self
         }
 
         #[doc="Initializes the constraints clamp of the widget."]
-        #vis fn clamp<const _M: u8>(mut self, v: impl DeclareInto<BoxClamp, _M>) -> Self {
+        #vis fn clamp<const _M: usize>(mut self, v: impl DeclareInto<BoxClamp, _M>) -> Self {
           self.fat_obj = self.fat_obj.clamp(v);
           self
         }
 
         #[doc="Initializes the transformation of the widget."]
-        #vis fn transform<const _M: u8>(mut self, v: impl DeclareInto<Transform, _M>) -> Self {
+        #vis fn transform<const _M: usize>(mut self, v: impl DeclareInto<Transform, _M>) -> Self {
           self.fat_obj = self.fat_obj.transform(v);
           self
         }
 
         #[doc="Initializes how the widget should be aligned horizontally."]
-        #vis fn h_align<const _M: u8>(mut self, v: impl DeclareInto<HAlign, _M>) -> Self {
+        #vis fn h_align<const _M: usize>(mut self, v: impl DeclareInto<HAlign, _M>) -> Self {
           self.fat_obj = self.fat_obj.h_align(v);
           self
         }
 
         #[doc="Initializes how the widget should be aligned vertically."]
-        #vis fn v_align<const _M: u8>(mut self, v: impl DeclareInto<VAlign, _M>) -> Self {
+        #vis fn v_align<const _M: usize>(mut self, v: impl DeclareInto<VAlign, _M>) -> Self {
           self.fat_obj = self.fat_obj.v_align(v);
           self
         }
@@ -538,13 +540,13 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         important to note that if you anchor the child widget outside of its \
         parent, it may become unable to click, so ensure there is ample space \
         within the parent."]
-        #vis fn anchor<const _M: u8>(mut self, v: impl DeclareInto<Anchor, _M>) -> Self {
+        #vis fn anchor<const _M: usize>(mut self, v: impl DeclareInto<Anchor, _M>) -> Self {
           self.fat_obj = self.fat_obj.anchor(v);
           self
         }
 
         #[doc="Initializes the horizontal global anchor of the widget."]
-        #vis fn global_anchor_x<const _M: u8>(
+        #vis fn global_anchor_x<const _M: usize>(
           mut self, v: impl DeclareInto<GlobalAnchorX, _M>
         ) -> Self {
           self.fat_obj = self.fat_obj.global_anchor_x(v);
@@ -552,7 +554,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         }
 
         #[doc="Initializes the vertical global anchor of the widget."]
-        #vis fn global_anchor_y<const _M: u8>(
+        #vis fn global_anchor_y<const _M: usize>(
           mut self, v: impl DeclareInto<GlobalAnchorY, _M>
         ) -> Self {
           self.fat_obj = self.fat_obj.global_anchor_y(v);
@@ -560,35 +562,35 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
         }
 
         #[doc="Initializes the visibility of the widget."]
-        #vis fn visible<const _M: u8>(mut self, v: impl DeclareInto<bool, _M>) -> Self
+        #vis fn visible<const _M: usize>(mut self, v: impl DeclareInto<bool, _M>) -> Self
         {
           self.fat_obj = self.fat_obj.visible(v);
           self
         }
 
         #[doc="Initializes the opacity of the widget."]
-        #vis fn opacity<const _M: u8>(mut self, v: impl DeclareInto<f32, _M>) -> Self
+        #vis fn opacity<const _M: usize>(mut self, v: impl DeclareInto<f32, _M>) -> Self
         {
           self.fat_obj = self.fat_obj.opacity(v);
           self
         }
 
         #[doc="Initializes the `keep_alive` value of the `KeepAlive` widget."]
-        #vis fn keep_alive<const _M: u8>(mut self, v: impl DeclareInto<bool, _M>) -> Self
+        #vis fn keep_alive<const _M: usize>(mut self, v: impl DeclareInto<bool, _M>) -> Self
         {
           self.fat_obj = self.fat_obj.keep_alive(v);
           self
         }
 
         #[doc="Initializes the `track_id` value of the `TrackWidgetId` widget."]
-        #vis fn track_id<const _M: u8>(mut self) -> Self
+        #vis fn track_id<const _M: usize>(mut self) -> Self
         {
           self.fat_obj = self.fat_obj.track_id();
           self
         }
 
         #[doc="Initializes the `tooltips` value of the `Tooltips` widget."]
-        #vis fn tooltips<const _M: u8>(mut self, v: impl DeclareInto<CowArc<str>, _M>) -> Self
+        #vis fn tooltips<const _M: usize>(mut self, v: impl DeclareInto<CowArc<str>, _M>) -> Self
         {
           self.fat_obj = self.fat_obj.tooltips(v);
           self
@@ -657,7 +659,7 @@ fn declarer_set_methods<'a>(
           #[inline]
           #[allow(clippy::type_complexity)]
           #doc
-          #vis fn #set_method<const _M: u8>(mut self, v: impl DeclareInto<#ty, _M>) -> Self {
+          #vis fn #set_method<const _M: usize>(mut self, v: impl DeclareInto<#ty, _M>) -> Self {
             self.#field_name = Some(v.declare_into());
             self
           }

@@ -65,6 +65,7 @@ pub trait Pipe: 'static {
 /// has a better conversion from `Pipe` to `BoxPipe`.
 ///
 /// Call `into_pipe` to convert it to a `Pipe` type.
+#[derive(ChildOfCompose)]
 pub struct BoxPipe<V>(Box<dyn Pipe<Value = V>>);
 
 pub struct MapPipe<V, S, F> {

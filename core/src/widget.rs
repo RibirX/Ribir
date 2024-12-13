@@ -88,7 +88,7 @@ impl<'w> LazyNode<'w> {
 
 /// A boxed function widget that can be called multiple times to regenerate
 /// widget.
-#[derive(Clone)]
+#[derive(Clone, ChildOfCompose)]
 pub struct GenWidget(InnerGenWidget);
 type InnerGenWidget = Sc<RefCell<Box<dyn FnMut() -> Widget<'static>>>>;
 
@@ -98,6 +98,7 @@ type InnerGenWidget = Sc<RefCell<Box<dyn FnMut() -> Widget<'static>>>>;
 /// It already implements `IntoChild`, allowing any function widget to be
 /// converted to `FnWidget`. Therefore, using `FnWidget` as the child type of
 /// `ComposeChild` enables the acceptance of all function widgets.
+#[derive(ChildOfCompose)]
 pub struct FnWidget<'w>(Box<dyn FnOnce() -> Widget<'w> + 'w>);
 
 // The widget type marker.

@@ -1,10 +1,7 @@
 use ribir_core::prelude::*;
 use svg::named_svgs;
 
-use crate::{
-  common_widget::{Leading, Trailing},
-  prelude::{Icon, Row},
-};
+use crate::prelude::{Icon, PositionChild, Row};
 
 class_names! {
   #[doc = "This base class specifies for the checkbox widget."]
@@ -44,11 +41,11 @@ class_names! {
 /// };
 ///
 /// let _heading = checkbox! {
-///   @Leading("Label placed before the checkbox!")
+///   @Leading::new("Label placed before the checkbox!")
 /// };
 ///
 /// let _trailing = checkbox! {
-///   @Trailing("Label placed after the checkbox!")
+///   @Trailing::new("Label placed after the checkbox!")
 /// };
 /// ```
 ///
@@ -72,13 +69,6 @@ pub struct Checkbox {
 pub const UNCHECKED_ICON: &str = "unchecked_box";
 pub const CHECKED_ICON: &str = "checked_box";
 pub const INDETERMINATE_ICON: &str = "indeterminate_box";
-
-#[derive(Template)]
-pub enum CheckboxChild {
-  Label(TextInit),
-  Before(Leading<TextInit>),
-  After(Trailing<TextInit>),
-}
 
 impl Checkbox {
   pub fn switch_check(&mut self) {
@@ -112,7 +102,7 @@ impl Checkbox {
 }
 
 impl ComposeChild<'static> for Checkbox {
-  type Child = Option<CheckboxChild>;
+  type Child = Option<PositionChild<TextInit>>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     rdl! {
@@ -127,11 +117,11 @@ impl ComposeChild<'static> for Checkbox {
       let checkbox = if let Some(child) = child {
         let row = @Row { align_items: Align::Center };
         let row = match child {
-          CheckboxChild::Label(text) | CheckboxChild::Before(Leading(text)) => @ $row {
+          PositionChild::Default(text) | PositionChild::Leading(text) => @ $row {
             @ { checkbox }
             @Text { text }
           },
-          CheckboxChild::After(Trailing(text)) => @ $row {
+          PositionChild::Trailing(text) => @ $row {
             @Text { text}
             @ { checkbox }
           },
@@ -164,8 +154,8 @@ pub mod tests {
     checkbox,
     WidgetTester::new(self::column! {
       @Checkbox { checked: true, @ { "checked" } }
-      @Checkbox { indeterminate: true, @Leading("indeterminate") }
-      @Checkbox { @Trailing("unchecked") }
+      @Checkbox { indeterminate: true, @Leading::new("indeterminate") }
+      @Checkbox { @Trailing::new("unchecked") }
     })
     .with_wnd_size(Size::new(240., 160.)),
   );

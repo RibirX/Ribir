@@ -111,6 +111,7 @@ pub struct TabItem {
   text: Option<Label>,
 }
 
+#[derive(ChildOfCompose)]
 pub struct TabPane(pub GenWidget);
 
 #[derive(Declare)]

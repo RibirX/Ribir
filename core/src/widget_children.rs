@@ -5,42 +5,246 @@ mod single_child_impl;
 pub use compose_child_impl::*;
 pub use multi_child_impl::*;
 pub use single_child_impl::*;
-pub mod child_convert;
-pub use child_convert::IntoChild;
+pub mod into_child_compose;
 
-/// Trait to mark a widget can have one widget as child.
-pub trait SingleChild {}
-/// Trait to tell Ribir a object that has multi children.
-pub trait MultiChild {}
-/// A boxed render widget that support accept one child.
-#[derive(SingleChild)]
-pub struct BoxedSingleChild(Widget<'static>);
-
-/// A boxed render widget that support accept multi children.
-#[derive(MultiChild)]
-pub struct BoxedMultiChild(Widget<'static>);
-
-/// This trait specifies the type of child a widget can have, and the target
-/// type represents the result of the widget composing its child.
+/// The trait is for a widget that can have only one child.
 ///
-/// The N and M markers are used to avoid implementation conflicts. If Rust
-/// supports generic specialization, we could avoid using them.
-///
-/// The M marker is used for child conversion.
-/// The N marker is used to distinguish the parent type:
-/// - 0 for SingleChild
-/// - 1 for MultiChild
-/// - 2..9 for ComposeChild
-pub trait WithChild<'w, C, const N: usize, const M: usize> {
-  type Target: 'w;
-  fn with_child(self, child: C) -> Self::Target;
+/// Use `#[derive(SingleChild)]` for implementing this trait. It's best to use
+/// the derive method first; manual implementation is not suggested unless you
+/// fully understand how widget composition works in the framework.
+pub trait SingleChild: IntoWidget<'static, RENDER> {
+  /// Compose the child to a new widget.
+  fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c>
+  where
+    Self: Sized;
+
+  fn into_parent(self: Box<Self>) -> Widget<'static>;
 }
 
-/// Trait for specifying the child type and implementing how to compose the
-/// child.
+/// The trait is for a widget that can have more than one children.
+///
+/// Use `#[derive(MultiChild)]` for implementing this trait. It's best to use
+/// the derive method first; manual implementation is not suggested unless you
+/// fully understand how widget composition works in the framework.
+pub trait MultiChild: IntoWidget<'static, RENDER> {
+  fn with_child<'c, const N: usize, const M: usize>(
+    self, child: impl IntoChildMulti<'c, N, M>,
+  ) -> MultiPair<'c>
+  where
+    Self: Sized;
+
+  fn into_parent(self: Box<Self>) -> Widget<'static>;
+}
+
+/// Trait for specifying the child type and defining how to compose the child.
+///
+/// ## Child Conversion
+///
+/// `ComposeChild` only accepts children that can be converted to
+/// `ComposeChild::Child` by implementing `IntoChildCompose`. If the child is a
+/// [`Template`], it allows for more flexibility.
+///
+/// ### Basic Conversion
+///
+/// The most basic child type is `Widget<'c>`, which automatically converts any
+/// widget to it. This allows you to compose any widget.
+///
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// #[derive(Declare)]
+/// struct X;
+///
+/// impl<'c> ComposeChild<'c> for X {
+///   type Child = Widget<'c>;
+///
+///   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+///     let w = FatObj::new(child);
+///     w.background(Color::RED).into_widget()
+///   }
+/// }
+///
+/// // You can compose `X` with any widget, and `X` will automatically apply a background color to it.
+///
+/// let _with_container = x! {
+///   @Container {  size: Size::splat(100.) }
+/// };
+///
+/// let _with_text = x! {
+///   @Text { text: "Hi!" }
+/// };
+/// ```
+///
+/// If you want to compose a custom type, you can derive [`ChildOfCompose`] for
+/// it to restrict composition to only that type. Additionally, you can
+/// implement [`ComposeChildFrom`] to enable the composition of more types.
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// #[derive(Declare)]
+/// struct X;
+///
+/// #[derive(ChildOfCompose)]
+/// struct A;
+///
+/// impl ComposeChild<'static> for X {
+///   type Child = A;
+///
+///   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
+///     unimplemented!()
+///   }
+/// }
+///
+/// // Only A is supported as a child of X.
+/// let _only_a = x! {
+///   @ { A }
+/// };
+///
+/// struct B;
+///
+/// impl ComposeChildFrom<B, 1> for A {
+///   fn compose_child_from(_: B) -> Self { A }
+/// }
+///
+/// // After implementing `ComposeChildFrom<B>` for `A`, now `B` can also be a child of `X`.
+/// let _with_a = x! { @ { A } };
+/// let _with_b = x! { @ { B } };
+/// ```
+///
+/// ### Template Child
+///
+/// Templates outline the shape of children for `ComposeChild` and offer more
+/// flexible child conversion.
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// #[derive(Declare)]
+/// struct X;
+///
+/// #[derive(ChildOfCompose)]
+/// struct B;
+///
+/// #[derive(Template)]
+/// struct XChild {
+///   a: Widget<'static>,
+///   b: Option<B>,
+/// }
+///
+/// impl<'c> ComposeChild<'c> for X {
+///   type Child = XChild;
+///
+///   fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
+///     unimplemented!()
+///   }
+/// }
+///
+/// // The template child allows `X` to have two children: a widget and a `B`, where `B` is optional.
+///
+/// let _with_only_widget = x! { @Container { size: Size::splat(100.) } };
+/// let _with_widget_and_b = x! {
+///   @Container { size: Size::splat(100.) }
+///   @ { B }
+/// };
+/// ```
+///
+/// Templates can also be enums, see [`Template`] for more details.
 pub trait ComposeChild<'c>: Sized {
   type Child: 'c;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c>;
+}
+
+/// The trait converts a type into a child of the `SingleChild`.
+pub trait IntoChildSingle<'c, const M: usize> {
+  fn into_child_single(self) -> Option<Widget<'c>>;
+}
+
+/// The trait converts a type into a child of the `MultiChild`.
+pub trait IntoChildMulti<'c, const N: usize, const M: usize> {
+  fn into_child_multi(self) -> impl Iterator<Item = Widget<'c>>;
+}
+
+/// Trait for conversions type as a child of widget. The opposite of
+/// `ComposeChildFrom`.
+///
+/// You should not directly implement this trait. Instead, implement
+/// `ComposeChildFrom`.
+///
+/// It is similar to `Into` but with a const marker to automatically implement
+/// all possible conversions without implementing conflicts.
+pub trait IntoChildCompose<C, const M: usize> {
+  fn into_child_compose(self) -> C;
+}
+
+/// Used to do value-to-value conversions while consuming the input value. It is
+/// the reciprocal of `IntoChildCompose`.
+///
+/// One should always prefer implementing `ComposeChildFrom` over
+/// `IntoChildCompose`, because implementing `ComposeChildFrom` will
+/// automatically implement `IntoChildCompose`.
+pub trait ComposeChildFrom<C, const M: usize> {
+  fn compose_child_from(from: C) -> Self;
+}
+
+/// This trait signifies that a type can serve as a child of `ComposeChild`.
+///
+/// Implementing this trait involves implementing `ComposeChildFrom` from this
+/// type to itself.
+///
+/// One can utilize `#[derive(ChildOfCompose)]` to implement this trait.
+pub trait ChildOfCompose {}
+
+/// The template specifies the types of children that `ComposeChild` can have,
+/// gathering these children and providing them to the parent for composition.
+///
+/// You can use `#[derive(Template)]` to implement this trait for a struct or
+/// enum.
+///
+/// In a struct, children are collected from its fields, so the field types must
+/// be distinct and not convertible between each other using `ComposeChildFrom`.
+///
+/// In an enum, children are collected from its variants, so the variant types
+/// must also be distinct and not convertible between each other using
+/// `ComposeChildFrom`.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// #[derive(Template)]
+/// struct MyTemplate<'w> {
+///   leading_icon: Leading<Widget<'w>>,
+///   trailing_icon: Option<Trailing<Widget<'w>>>,
+/// }
+/// ```
+///
+/// This template outlines two child components for its parent: a mandatory
+/// `Leading<Widget>` and an optional `Trailing<Widget>`.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// #[derive(Template)]
+/// enum MyTemplate<'w> {
+///   Leading(Leading<Widget<'w>>),
+///   Trailing(Trailing<Widget<'w>>),
+/// }
+/// ```
+///
+/// This template specifies one child for its parent, which must be either a
+/// leading icon or a trailing icon.
+///
+/// Refer to the [`ComposeChild`] documentation for further information.
+pub trait Template: Sized {
+  type Builder: TemplateBuilder;
+  fn builder() -> Self::Builder;
+}
+
+/// The builder of a template.
+pub trait TemplateBuilder: Sized {
+  type Target;
+  fn build_tml(self) -> Self::Target;
 }
 
 /// A pair of object and its child without compose, this keep the type
@@ -55,24 +259,14 @@ pub struct Pair<W, C> {
 /// type.
 pub type WidgetOf<'a, W> = Pair<W, Widget<'a>>;
 
-impl IntoWidgetStrict<'static, RENDER> for BoxedMultiChild {
+impl IntoWidgetStrict<'static, RENDER> for Box<dyn MultiChild> {
   #[inline]
-  fn into_widget_strict(self) -> Widget<'static> { self.0 }
+  fn into_widget_strict(self) -> Widget<'static> { self.into_parent() }
 }
 
-impl IntoWidgetStrict<'static, RENDER> for BoxedSingleChild {
+impl IntoWidgetStrict<'static, RENDER> for Box<dyn SingleChild> {
   #[inline]
-  fn into_widget_strict(self) -> Widget<'static> { self.0 }
-}
-
-impl BoxedSingleChild {
-  #[inline]
-  pub fn new(widget: impl SingleIntoParent) -> Self { Self(widget.into_parent()) }
-}
-
-impl BoxedMultiChild {
-  #[inline]
-  pub fn new(widget: impl MultiIntoParent) -> Self { Self(widget.into_parent()) }
+  fn into_widget_strict(self) -> Widget<'static> { self.into_parent() }
 }
 
 impl<W, C> Pair<W, C> {
@@ -101,22 +295,26 @@ mod tests {
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
+  #[allow(dead_code)]
   fn compose_template_child() {
     reset_test_env!();
     #[derive(Declare)]
     struct Page;
-    #[derive(Declare, SingleChild)]
-    struct Header;
-    #[derive(Declare, SingleChild)]
-    struct Content;
-    #[derive(Declare, SingleChild)]
-    struct Footer;
+
+    #[derive(Template)]
+    struct Header<'w>(Widget<'w>);
+
+    #[derive(Template)]
+    struct Content<'w>(Widget<'w>);
+
+    #[derive(Template)]
+    struct Footer<'w>(Widget<'w>);
 
     #[derive(Template)]
     struct PageTml<'w> {
-      _header: WidgetOf<'w, FatObj<Header>>,
-      _content: WidgetOf<'w, FatObj<Content>>,
-      _footer: WidgetOf<'w, FatObj<Footer>>,
+      _header: Header<'w>,
+      _content: Content<'w>,
+      _footer: Footer<'w>,
     }
 
     impl<'c> ComposeChild<'c> for Page {
@@ -143,11 +341,10 @@ mod tests {
 
     #[derive(Declare)]
     struct Parent;
-    #[derive(Declare, SingleChild)]
     struct Child;
 
     impl<'c> ComposeChild<'c> for Parent {
-      type Child = Option<Pair<FatObj<Child>, Widget<'c>>>;
+      type Child = Option<Pair<Child, Widget<'c>>>;
 
       fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
         Void.into_widget()
@@ -156,7 +353,7 @@ mod tests {
 
     let _ = fn_widget! {
       @Parent {
-        @Child { @Void {} }
+        @ { Pair::new(Child, Void) }
       }
     };
   }
@@ -176,9 +373,9 @@ mod tests {
   fn tuple_as_vec() {
     reset_test_env!();
 
-    #[derive(Declare)]
+    #[derive(Declare, ChildOfCompose)]
     struct A;
-    #[derive(Declare)]
+    #[derive(Declare, ChildOfCompose)]
     struct B;
 
     impl ComposeChild<'static> for A {
@@ -260,18 +457,17 @@ mod tests {
     #[derive(Declare)]
     struct P;
 
-    #[derive(Declare, SingleChild)]
     struct X;
 
     impl<'c> ComposeChild<'c> for P {
-      type Child = WidgetOf<'c, FatObj<X>>;
+      type Child = WidgetOf<'c, X>;
       fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
         Void.into_widget()
       }
     }
 
     let _ = fn_widget! {
-      @P { @X { @Void {} } }
+      @P { @{ Pair::new(X, Void)}}
     };
   }
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -294,6 +490,8 @@ mod tests {
   }
 
   const FIX_OPTION_TEMPLATE_EXPECT_SIZE: Size = Size::new(100., 200.);
+
+  #[derive(ChildOfCompose)]
   struct Field;
 
   #[derive(Template, Default)]
@@ -304,14 +502,14 @@ mod tests {
   struct Host {}
 
   impl ComposeChild<'static> for Host {
-    type Child = Option<ConfigTml>;
+    type Child = ConfigTml;
     fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
       fn_widget! { @MockBox { size: FIX_OPTION_TEMPLATE_EXPECT_SIZE } }.into_widget()
     }
   }
 
   widget_layout_test!(
-    fix_option_template,
+    template_option_field,
     WidgetTester::new(fn_widget! { @Host { @{ Field } }}),
     LayoutCase::default().with_size(FIX_OPTION_TEMPLATE_EXPECT_SIZE)
   );

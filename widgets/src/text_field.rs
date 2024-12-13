@@ -288,7 +288,7 @@ impl<'c> ComposeChild<'c> for TextField {
           align_items: Align::Stretch,
           @{
             leading_icon.map(|t| @Icon {
-              @{ t.0 }
+              @{ t.unwrap() }
             })
           }
           @Expanded {
@@ -296,7 +296,7 @@ impl<'c> ComposeChild<'c> for TextField {
             @{ build_content_area(this, theme, config) }
           }
           @{
-            trailing_icon.map(|t| @Icon { @{ t.0 } })
+            trailing_icon.map(|t| @Icon { @{ t.unwrap() } })
           }
         }
         @Container {
@@ -346,7 +346,7 @@ fn build_input_area(
     @Row {
       @{
         prefix.map(|p| @Text{
-          text: p.0.0,
+          text: p.unwrap().0,
           foreground: pipe!($theme.text_brush.clone()),
           text_style: pipe!($theme.text.clone()),
         })
@@ -357,7 +357,7 @@ fn build_input_area(
       }
       @{
         suffix.map(|s| @Text{
-          text: s.0.0,
+          text: s.unwrap().0,
           foreground: pipe!($theme.text_brush.clone()),
           text_style: pipe!($theme.text.clone()),
         })

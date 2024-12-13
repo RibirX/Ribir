@@ -1,160 +1,147 @@
 use super::*;
 use crate::pipe::InnerPipe;
 
-// We preserve the parent type, while the child must always be a widget. This is
-// important to maintain the integrity of the template, as it may rely on
-// accessing the parent type.
-impl<'w, 'c: 'w, P, C, const M: usize> WithChild<'w, C, 0, M> for P
-where
-  P: Parent + 'static,
-  C: IntoWidget<'c, M> + 'w,
-{
-  type Target = WidgetOf<'w, Self>;
-  fn with_child(self, child: C) -> Self::Target {
-    Pair { parent: self, child: child.into_widget() }
-  }
+/// This trait allows an `Option` of `SingleChild` to compose child.
+pub trait OptionSingleChild {
+  fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c>;
 }
 
-// with option child
-impl<'w, 'c: 'w, P, C, const M: usize> WithChild<'w, Option<C>, 0, M> for P
+impl<P> OptionSingleChild for Option<P>
 where
-  P: SingleIntoParent,
-  C: IntoWidget<'c, M> + 'w,
+  P: SingleChild,
 {
-  type Target = Widget<'w>;
-  fn with_child(self, child: Option<C>) -> Self::Target {
-    if let Some(child) = child {
-      Pair { parent: self, child: child.into_widget() }.into_widget()
-    } else {
-      self.into_parent()
-    }
-  }
-}
-
-// option parent with child
-impl<'w, 'c: 'w, P, C, const M: usize> WithChild<'w, C, 0, M> for Option<P>
-where
-  P: SingleIntoParent,
-  C: IntoWidget<'c, M> + 'w,
-{
-  type Target = Widget<'w>;
-
-  fn with_child(self, child: C) -> Self::Target {
+  fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c> {
+    let child = child.into_child_single();
     if let Some(parent) = self {
-      Pair { parent, child: child.into_widget() }.into_widget()
+      parent.with_child(child)
     } else {
-      child.into_widget()
+      child.expect("Either the parent or the child must exist.")
     }
   }
 }
 
-impl<'w, W: SingleIntoParent> IntoWidgetStrict<'w, RENDER> for WidgetOf<'w, W> {
-  fn into_widget_strict(self) -> Widget<'w> {
-    let f = move || {
-      let Pair { parent, child } = self;
+impl<'c, W, const M: usize> IntoChildSingle<'c, M> for W
+where
+  W: IntoWidget<'c, M>,
+{
+  fn into_child_single(self) -> Option<Widget<'c>> { Some(self.into_widget()) }
+}
 
-      parent
-        .into_parent()
-        .directly_compose_children(vec![child])
-    };
+impl<'c, W, const M: usize> IntoChildSingle<'c, M> for Option<W>
+where
+  W: IntoWidget<'c, M>,
+{
+  fn into_child_single(self) -> Option<Widget<'c>> { self.map(IntoWidget::into_widget) }
+}
 
-    f.into_widget()
+impl<T: SingleChild> SingleChild for FatObj<T> {
+  fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c> {
+    self
+      .map(|parent| parent.with_child(child))
+      .into_widget()
   }
+
+  fn into_parent(self: Box<Self>) -> Widget<'static> { self.into_widget() }
 }
 
-/// This trait indicates that a type can serve as a parent widget for another
-/// widget.
-///
-/// It is similar to the `SingleChild` trait but includes the concept of
-/// a pipe for `SingleChild`. The reason for this distinction is that the logic
-/// for being a parent widget with a pipe differs from that of a regular render
-/// widget. Therefore, the pipe does not implement the `SingleChild` trait but
-/// instead utilizes the `Parent` trait to distinguish between the two.
-trait Parent {}
+macro_rules! impl_single_child_methods_for_pipe {
+  () => {
+    fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c> {
+      compose_single_child(self.into_parent_widget(), child.into_child_single())
+    }
 
-impl<T: SingleChild> Parent for T {}
-impl<T: Parent> Parent for FatObj<T> {}
-
-impl<S, V: Parent, F> Parent for MapPipe<V, S, F> {}
-
-impl<S, V: Parent, F> Parent for FinalChain<V, S, F> {}
-
-impl<V: Parent> Parent for Box<dyn Pipe<Value = V>> {}
-
-impl<S, V: Parent, F> Parent for MapPipe<Option<V>, S, F> {}
-
-impl<S, V: Parent, F> Parent for FinalChain<Option<V>, S, F> {}
-
-impl<V: Parent> Parent for Box<dyn Pipe<Value = Option<V>>> {}
-
-/// This trait converts a parent into a widget. We require this trait because
-/// the logic for being a parent widget with a pipe differs from that of a
-/// regular render widget.
-pub trait SingleIntoParent: 'static {
-  fn into_parent(self) -> Widget<'static>;
+    fn into_parent(self: Box<Self>) -> Widget<'static> { self.into_parent_widget() }
+  };
 }
 
-// Implementation `IntoParent`
-impl<P: SingleChild + IntoWidget<'static, RENDER>> SingleIntoParent for P {
+impl<S, V, F> SingleChild for MapPipe<V, S, F>
+where
+  Self: InnerPipe<Value = V>,
+  V: SingleChild,
+{
+  impl_single_child_methods_for_pipe!();
+}
+
+impl<S, V, F> SingleChild for FinalChain<V, S, F>
+where
+  Self: InnerPipe<Value = V>,
+  V: SingleChild,
+{
+  impl_single_child_methods_for_pipe!();
+}
+
+impl<V> SingleChild for Box<dyn Pipe<Value = V>>
+where
+  V: SingleChild,
+{
+  impl_single_child_methods_for_pipe!();
+}
+
+macro_rules! impl_single_child_methods_for_pipe_option {
+  () => {
+    fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c> {
+      let parent = self
+        .map(|w| w.map_or_else(|| Void.into_widget(), V::into_widget))
+        .into_parent_widget();
+      compose_single_child(parent, child.into_child_single())
+    }
+
+    fn into_parent(self: Box<Self>) -> Widget<'static> {
+      self
+        .map(|w| w.map_or_else(|| Void.into_widget(), V::into_widget))
+        .into_parent_widget()
+    }
+  };
+}
+impl<S, V, F> SingleChild for MapPipe<Option<V>, S, F>
+where
+  Self: InnerPipe<Value = Option<V>>,
+  V: SingleChild,
+{
+  impl_single_child_methods_for_pipe_option!();
+}
+
+impl<S, V, F> SingleChild for FinalChain<Option<V>, S, F>
+where
+  Self: InnerPipe<Value = Option<V>>,
+  V: SingleChild,
+{
+  impl_single_child_methods_for_pipe_option!();
+}
+
+impl<V> SingleChild for Box<dyn Pipe<Value = Option<V>>>
+where
+  V: SingleChild,
+{
+  impl_single_child_methods_for_pipe_option!();
+}
+
+impl<T> SingleChild for T
+where
+  T: StateReader<Value: SingleChild> + IntoWidget<'static, RENDER>,
+{
+  fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c> {
+    compose_single_child(self.into_widget(), child.into_child_single())
+  }
+
   #[inline]
-  fn into_parent(self) -> Widget<'static> { self.into_widget() }
+  fn into_parent(self: Box<Self>) -> Widget<'static> { self.into_widget() }
 }
 
-impl<P: SingleIntoParent> SingleIntoParent for FatObj<P> {
-  fn into_parent(self) -> Widget<'static> { self.map(|p| p.into_parent()).into_widget() }
+impl SingleChild for Box<dyn SingleChild> {
+  fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c> {
+    compose_single_child(self.into_parent(), child.into_child_single())
+  }
+
+  fn into_parent(self: Box<Self>) -> Widget<'static> { (*self).into_parent() }
 }
 
-impl<S, V, F> SingleIntoParent for MapPipe<V, S, F>
-where
-  Self: InnerPipe<Value = V>,
-  V: SingleIntoParent + IntoWidget<'static, RENDER>,
-{
-  fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
-}
+pub fn compose_single_child<'c>(parent: Widget<'c>, child: Option<Widget<'c>>) -> Widget<'c> {
+  let f = move || {
+    if let Some(child) = child { parent.directly_compose_children(vec![child]) } else { parent }
+  };
 
-impl<S, V, F> SingleIntoParent for FinalChain<V, S, F>
-where
-  Self: InnerPipe<Value = V>,
-  V: SingleIntoParent + IntoWidget<'static, RENDER>,
-{
-  fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
-}
-
-impl<V> SingleIntoParent for Box<dyn Pipe<Value = V>>
-where
-  V: SingleIntoParent + IntoWidget<'static, RENDER>,
-{
-  fn into_parent(self) -> Widget<'static> { self.into_parent_widget() }
-}
-
-impl<S, V, F> SingleIntoParent for MapPipe<Option<V>, S, F>
-where
-  Self: InnerPipe<Value = Option<V>>,
-  V: SingleIntoParent + IntoWidget<'static, RENDER>,
-{
-  fn into_parent(self) -> Widget<'static> { option_pipe_into_parent(self) }
-}
-
-impl<S, V, F> SingleIntoParent for FinalChain<Option<V>, S, F>
-where
-  Self: InnerPipe<Value = Option<V>>,
-  V: SingleIntoParent + IntoWidget<'static, RENDER>,
-{
-  fn into_parent(self) -> Widget<'static> { option_pipe_into_parent(self) }
-}
-
-impl<V> SingleIntoParent for Box<dyn Pipe<Value = Option<V>>>
-where
-  V: SingleIntoParent + IntoWidget<'static, RENDER>,
-{
-  fn into_parent(self) -> Widget<'static> { option_pipe_into_parent(self) }
-}
-
-fn option_pipe_into_parent<const M: usize>(
-  p: impl InnerPipe<Value = Option<impl IntoWidget<'static, M>>>,
-) -> Widget<'static> {
-  p.map(|w| w.map_or_else(|| Void.into_widget(), IntoWidget::into_widget))
-    .into_parent_widget()
+  f.into_widget()
 }
 #[cfg(test)]
 mod tests {

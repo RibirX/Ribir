@@ -56,7 +56,7 @@ macro_rules! fill_svgs {
 pub const CUSTOM_ICON_START: NamedSvg = NamedSvg::new(65536);
 
 /// The identify of a svg define in theme.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, ChildOfCompose)]
 pub struct NamedSvg(pub usize);
 
 impl Compose for NamedSvg {

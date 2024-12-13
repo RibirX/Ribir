@@ -218,21 +218,21 @@ fn content() -> Widget<'static> {
           @UrlLink {
             url: "https://ribir.org",
             @ListItem {
-              @Leading(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
+              @Leading::new(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
               @ { HeadlineText(Label::new("One line list item")) }
               @ { SupportingText(Label::new("One line supporting text")) }
             }
           }
           @Divider { indent: 16. }
           @ListItem {
-            @Leading(EdgeWidget::Icon(svgs::MENU.into_widget()))
+            @Leading::new(EdgeWidget::Icon(svgs::MENU.into_widget()))
             @ { HeadlineText(Label::new("One line list item")) }
-            @Trailing(EdgeWidget::Text(Label::new("100+")))
+            @Trailing::new(EdgeWidget::Text(Label::new("100+")))
           }
           @Divider { indent: 16. }
           @ListItem {
             line_number: 2usize,
-            @Leading(
+            @Leading::new(
               EdgeWidget::Avatar(
                 @Avatar {
                   @ { Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png"))) }
@@ -241,23 +241,23 @@ fn content() -> Widget<'static> {
             )
             @ { HeadlineText(Label::new("Two lines list item")) }
             @ { SupportingText(Label::new("Two lines supporting text \rTwo lines supporting text")) }
-            @Trailing(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
+            @Trailing::new(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
           }
           @Divider { indent: 16. }
           @ListItem {
-            @Leading(EdgeWidget::Avatar(@Avatar { @Label::new("A") }))
+            @Leading::new(EdgeWidget::Avatar(@Avatar { @Label::new("A") }))
             @ { HeadlineText(Label::new("One lines list item")) }
             @ { SupportingText(Label::new("One lines supporting text")) }
-            @Trailing(EdgeWidget::Text(Label::new("100+")))
+            @Trailing::new(EdgeWidget::Text(Label::new("100+")))
           }
           @Divider { indent: 16. }
           @ListItem {
-            @Leading(EdgeWidget::Poster(
+            @Leading::new(EdgeWidget::Poster(
               Poster(Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png"))))
             ))
             @ { HeadlineText(Label::new("One lines list item")) }
             @ { SupportingText(Label::new("One lines supporting text")) }
-            @Trailing(@EdgeWidget::Text(Label::new("100+")))
+            @Trailing::new(@EdgeWidget::Text(Label::new("100+")))
           }
         }
       }

@@ -208,11 +208,12 @@ fn pipe_single_parent() {
   let w = fn_widget! {
     let edges = EdgeInsets::all(5.);
     let blank = pipe! {
-      if *$outside_blank {
-        BoxedSingleChild::new(Margin { margin: edges })
+      let w: Box<dyn SingleChild> = if *$outside_blank {
+        Box::new(Margin { margin: edges })
       } else {
-        BoxedSingleChild::new(FittedBox::new(BoxFit::None))
-      }
+        Box::new(FittedBox::new(BoxFit::None))
+      };
+      w
     };
     rdl!{
       $blank {
@@ -238,11 +239,12 @@ fn pipe_multi_parent() {
   let stack_or_flex2 = stack_or_flex.clone_writer();
   let w = fn_widget! {
     let container = pipe! {
-      if *$stack_or_flex {
-        BoxedMultiChild::new(rdl!{ Stack { } })
+      let p: Box<dyn MultiChild> = if *$stack_or_flex {
+        Box::new(rdl!{ Stack { } })
       } else {
-        BoxedMultiChild::new(rdl!{ Flex { } })
-      }
+        Box::new(rdl!{ Flex { } })
+      };
+      p
     };
 
     rdl!{
