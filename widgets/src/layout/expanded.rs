@@ -22,7 +22,7 @@ pub struct ExpandedDeclarer {
 }
 
 impl ExpandedDeclarer {
-  pub fn flex<const M: u8>(mut self, flex: impl DeclareInto<f32, M>) -> Self {
+  pub fn flex<const M: usize>(mut self, flex: impl DeclareInto<f32, M>) -> Self {
     self.flex = Some(flex.declare_into());
     self
   }

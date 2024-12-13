@@ -724,7 +724,7 @@ impl<T> FatObj<T> {
   ///   tab_index value, their order relative to each other follows their
   ///   position in the tree source. The maximum value for tab_index is 32767.
   ///   If not specified, it takes the default value 0.
-  pub fn tab_index<const M: u8>(self, tab_idx: impl DeclareInto<i16, M>) -> Self {
+  pub fn tab_index<const M: usize>(self, tab_idx: impl DeclareInto<i16, M>) -> Self {
     self.declare_builtin_init(
       tab_idx,
       |this| this.get_mix_builtin_widget().mix_flags(),
@@ -733,7 +733,7 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes the `Class` that should be applied to the widget.
-  pub fn class<const M: u8>(self, cls: impl DeclareInto<ClassName, M>) -> Self {
+  pub fn class<const M: usize>(self, cls: impl DeclareInto<ClassName, M>) -> Self {
     self.declare_builtin_init(cls, Self::get_class_widget, |c, cls| c.class = Some(cls))
   }
 
@@ -742,7 +742,7 @@ impl<T> FatObj<T> {
   ///
   /// Only one widget should have this attribute specified.  If there are
   /// several, the widget nearest the root, get the initial focus.
-  pub fn auto_focus<const M: u8>(self, v: impl DeclareInto<bool, M>) -> Self {
+  pub fn auto_focus<const M: usize>(self, v: impl DeclareInto<bool, M>) -> Self {
     self.declare_builtin_init(
       v,
       |this| this.get_mix_builtin_widget().mix_flags(),
@@ -751,137 +751,137 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes how its child should be scale to fit its box.
-  pub fn box_fit<const M: u8>(self, v: impl DeclareInto<BoxFit, M>) -> Self {
+  pub fn box_fit<const M: usize>(self, v: impl DeclareInto<BoxFit, M>) -> Self {
     self.declare_builtin_init(v, Self::get_fitted_box_widget, |m, v| m.box_fit = v)
   }
 
   /// Initializes the painting style of this widget.
-  pub fn painting_style<const M: u8>(self, v: impl DeclareInto<PaintingStyle, M>) -> Self {
+  pub fn painting_style<const M: usize>(self, v: impl DeclareInto<PaintingStyle, M>) -> Self {
     self.declare_builtin_init(v, Self::get_painting_style_widget, |m, v| m.painting_style = v)
   }
 
   /// Initializes the text style of this widget.
-  pub fn text_style<const M: u8>(self, v: impl DeclareInto<TextStyle, M>) -> Self {
+  pub fn text_style<const M: usize>(self, v: impl DeclareInto<TextStyle, M>) -> Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style = v)
   }
 
   /// Initializes the font size of this widget.
-  pub fn font_size<const M: u8>(self, v: impl DeclareInto<f32, M>) -> Self {
+  pub fn font_size<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_size = v)
   }
 
   /// Initializes the font face of this widget.
-  pub fn font_face<const M: u8>(self, v: impl DeclareInto<FontFace, M>) -> Self {
+  pub fn font_face<const M: usize>(self, v: impl DeclareInto<FontFace, M>) -> Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_face = v)
   }
 
   /// Initializes the letter space of this widget.
-  pub fn letter_spacing<const M: u8>(self, v: impl DeclareInto<f32, M>) -> Self {
+  pub fn letter_spacing<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.letter_space = v)
   }
 
   /// Initializes the text line height of this widget.
-  pub fn text_line_height<const M: u8>(self, v: impl DeclareInto<f32, M>) -> Self {
+  pub fn text_line_height<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.line_height = v)
   }
 
   /// Initializes the text overflow of this widget.
-  pub fn text_overflow<const M: u8>(self, v: impl DeclareInto<TextOverflow, M>) -> Self {
+  pub fn text_overflow<const M: usize>(self, v: impl DeclareInto<TextOverflow, M>) -> Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.overflow = v)
   }
 
   /// Initializes the background of the widget.
-  pub fn background<const M: u8>(self, v: impl DeclareInto<Option<Brush>, M>) -> Self {
+  pub fn background<const M: usize>(self, v: impl DeclareInto<Option<Brush>, M>) -> Self {
     self.declare_builtin_init(v, Self::get_box_decoration_widget, |m, v| m.background = v)
   }
 
   /// Initializes the foreground of the widget.
-  pub fn foreground<const M: u8>(self, v: impl DeclareInto<Brush, M>) -> Self {
+  pub fn foreground<const M: usize>(self, v: impl DeclareInto<Brush, M>) -> Self {
     self.declare_builtin_init(v, Self::get_foreground_widget, |m, v| m.foreground = v)
   }
 
   /// Initializes the border of the widget.
-  pub fn border<const M: u8>(self, v: impl DeclareInto<Option<Border>, M>) -> Self {
+  pub fn border<const M: usize>(self, v: impl DeclareInto<Option<Border>, M>) -> Self {
     self.declare_builtin_init(v, Self::get_box_decoration_widget, |m, v| m.border = v)
   }
 
   /// Initializes the border radius of the widget.
-  pub fn border_radius<const M: u8>(self, v: impl DeclareInto<Option<Radius>, M>) -> Self {
+  pub fn border_radius<const M: usize>(self, v: impl DeclareInto<Option<Radius>, M>) -> Self {
     self.declare_builtin_init(v, Self::get_box_decoration_widget, |m, v| m.border_radius = v)
   }
 
   /// Initializes the extra space within the widget.
-  pub fn padding<const M: u8>(self, v: impl DeclareInto<EdgeInsets, M>) -> Self {
+  pub fn padding<const M: usize>(self, v: impl DeclareInto<EdgeInsets, M>) -> Self {
     self.declare_builtin_init(v, Self::get_padding_widget, |m, v| m.padding = v)
   }
 
   /// Initializes the cursor of the widget.
-  pub fn cursor<const M: u8>(self, v: impl DeclareInto<CursorIcon, M>) -> Self {
+  pub fn cursor<const M: usize>(self, v: impl DeclareInto<CursorIcon, M>) -> Self {
     self.declare_builtin_init(v, Self::get_cursor_widget, |m, v| m.cursor = v)
   }
 
   /// Initializes the space around the widget.
-  pub fn margin<const M: u8>(self, v: impl DeclareInto<EdgeInsets, M>) -> Self {
+  pub fn margin<const M: usize>(self, v: impl DeclareInto<EdgeInsets, M>) -> Self {
     self.declare_builtin_init(v, Self::get_margin_widget, |m, v| m.margin = v)
   }
 
   /// Initializes the constraints clamp of the widget.
-  pub fn clamp<const M: u8>(self, v: impl DeclareInto<BoxClamp, M>) -> Self {
+  pub fn clamp<const M: usize>(self, v: impl DeclareInto<BoxClamp, M>) -> Self {
     self.declare_builtin_init(v, Self::get_constrained_box_widget, |m, v| m.clamp = v)
   }
 
   /// Initializes how user can scroll the widget.
-  pub fn scrollable<const M: u8>(self, v: impl DeclareInto<Scrollable, M>) -> Self {
+  pub fn scrollable<const M: usize>(self, v: impl DeclareInto<Scrollable, M>) -> Self {
     self.declare_builtin_init(v, Self::get_scrollable_widget, |m, v| m.scrollable = v)
   }
 
   /// Initializes the transformation of the widget.
-  pub fn transform<const M: u8>(self, v: impl DeclareInto<Transform, M>) -> Self {
+  pub fn transform<const M: usize>(self, v: impl DeclareInto<Transform, M>) -> Self {
     self.declare_builtin_init(v, Self::get_transform_widget, |m, v| m.transform = v)
   }
 
   /// Initializes how the widget should be aligned horizontally.
-  pub fn h_align<const M: u8>(self, v: impl DeclareInto<HAlign, M>) -> Self {
+  pub fn h_align<const M: usize>(self, v: impl DeclareInto<HAlign, M>) -> Self {
     self.declare_builtin_init(v, Self::get_h_align_widget, |m, v| m.h_align = v)
   }
 
   /// Initializes how the widget should be aligned vertically.
-  pub fn v_align<const M: u8>(self, v: impl DeclareInto<VAlign, M>) -> Self {
+  pub fn v_align<const M: usize>(self, v: impl DeclareInto<VAlign, M>) -> Self {
     self.declare_builtin_init(v, Self::get_v_align_widget, |m, v| m.v_align = v)
   }
 
   /// Initializes the relative anchor to the parent of the widget.
-  pub fn anchor<const M: u8>(self, v: impl DeclareInto<Anchor, M>) -> Self {
+  pub fn anchor<const M: usize>(self, v: impl DeclareInto<Anchor, M>) -> Self {
     self.declare_builtin_init(v, Self::get_relative_anchor_widget, |m, v| m.anchor = v)
   }
 
   /// Initializes the horizontal global anchor of the widget.
-  pub fn global_anchor_x<const M: u8>(self, v: impl DeclareInto<GlobalAnchorX, M>) -> Self {
+  pub fn global_anchor_x<const M: usize>(self, v: impl DeclareInto<GlobalAnchorX, M>) -> Self {
     self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_x = v)
   }
 
   /// Initializes the vertical global anchor of the widget.
-  pub fn global_anchor_y<const M: u8>(self, v: impl DeclareInto<GlobalAnchorY, M>) -> Self {
+  pub fn global_anchor_y<const M: usize>(self, v: impl DeclareInto<GlobalAnchorY, M>) -> Self {
     self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_y = v)
   }
 
   /// Initializes the visibility of the widget.
-  pub fn visible<const M: u8>(self, v: impl DeclareInto<bool, M>) -> Self {
+  pub fn visible<const M: usize>(self, v: impl DeclareInto<bool, M>) -> Self {
     self.declare_builtin_init(v, Self::get_visibility_widget, |m, v| m.visible = v)
   }
 
   /// Initializes the opacity of the widget.
-  pub fn opacity<const M: u8>(self, v: impl DeclareInto<f32, M>) -> Self {
+  pub fn opacity<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
     self.declare_builtin_init(v, Self::get_opacity_widget, |m, v| m.opacity = v)
   }
 
   /// Initializes the tooltips of the widget.
-  pub fn tooltips<const M: u8>(self, v: impl DeclareInto<CowArc<str>, M>) -> Self {
+  pub fn tooltips<const M: usize>(self, v: impl DeclareInto<CowArc<str>, M>) -> Self {
     self.declare_builtin_init(v, Self::get_tooltips_widget, |m, v| m.tooltips = v)
   }
 
   /// Initializes the `keep_alive` value of the `KeepAlive` widget.
-  pub fn keep_alive<const M: u8>(mut self, v: impl DeclareInto<bool, M>) -> Self {
+  pub fn keep_alive<const M: usize>(mut self, v: impl DeclareInto<bool, M>) -> Self {
     let (v, o) = v.declare_into().unzip();
     let d = self.get_keep_alive_widget();
     d.write().keep_alive = v;
@@ -908,7 +908,7 @@ impl<T> FatObj<T> {
     self
   }
 
-  fn declare_builtin_init<V: 'static, B: 'static, const M: u8>(
+  fn declare_builtin_init<V: 'static, B: 'static, const M: usize>(
     mut self, init: impl DeclareInto<V, M>, get_builtin: impl FnOnce(&mut Self) -> &State<B>,
     set_value: fn(&mut B, V),
   ) -> Self {
@@ -1059,12 +1059,30 @@ where
   }
 }
 
-impl<'w, T, C, const N: usize, const M: usize> WithChild<'w, C, N, M>
-  for DeclarerWithSubscription<T>
+impl<T: SingleChild> SingleChild for DeclarerWithSubscription<T> {
+  fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c> {
+    self.map(|w| w.with_child(child)).into_widget()
+  }
+
+  fn into_parent(self: Box<Self>) -> Widget<'static> { (*self).into_widget() }
+}
+
+impl<T: MultiChild> MultiChild for DeclarerWithSubscription<T> {
+  fn with_child<'c, const N: usize, const M: usize>(
+    self, child: impl IntoChildMulti<'c, N, M>,
+  ) -> MultiPair<'c> {
+    MultiPair::new(self, child)
+  }
+
+  fn into_parent(self: Box<Self>) -> Widget<'static> { (*self).into_widget() }
+}
+
+impl<'w, T, C, const TML: bool, const WRITER: bool, const N: usize, const M: usize>
+  ComposeWithChild<'w, C, WRITER, TML, N, M> for DeclarerWithSubscription<T>
 where
-  T: WithChild<'w, C, N, M> + 'w,
-  C: 'w,
+  T: ComposeWithChild<'w, C, WRITER, TML, N, M>,
 {
   type Target = DeclarerWithSubscription<T::Target>;
-  fn with_child(self, c: C) -> Self::Target { self.map(|w| w.with_child(c)) }
+
+  fn with_child(self, child: C) -> Self::Target { self.map(|host| host.with_child(child)) }
 }

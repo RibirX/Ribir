@@ -21,11 +21,12 @@ use crate::{
   layout::{OnlySizedByParent, Stack, StackFit},
 };
 
+#[derive(ChildOfCompose)]
 pub struct Placeholder(DeclareInit<CowArc<str>>);
 
 impl Placeholder {
   #[inline]
-  pub fn new<const M: u8>(str: impl DeclareInto<CowArc<str>, M>) -> Self {
+  pub fn new<const M: usize>(str: impl DeclareInto<CowArc<str>, M>) -> Self {
     Self(str.declare_into())
   }
 }

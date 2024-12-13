@@ -49,17 +49,17 @@ use crate::prelude::*;
 ///   @Lists {
 ///     // use leading icon
 ///     @ListItem {
-///       @Leading(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
+///       @Leading::new(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
 ///       @HeadlineText(Label::new("headline text"))
 ///     }
 ///     // use leading label
 ///     @ListItem {
-///       @Leading(EdgeWidget::Text(Label::new("A")))
+///       @Leading::new(EdgeWidget::Text(Label::new("A")))
 ///       @HeadlineText(Label::new("headline text"))
 ///     }
 ///     // use leading custom widget
 ///     @ListItem {
-///       @Leading(
+///       @Leading::new(
 ///         EdgeWidget::Custom(
 ///           @CustomEdgeWidget(
 ///              @Container {
@@ -84,17 +84,17 @@ use crate::prelude::*;
 ///     // use trailing icon
 ///     @ListItem {
 ///       @HeadlineText(Label::new("headline text"))
-///       @Trailing(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
+///       @Trailing::new(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
 ///     }
 ///     // use trailing label
 ///     @ListItem {
 ///       @HeadlineText(Label::new("headline text"))
-///       @Trailing(EdgeWidget::Text(Label::new("A")))
+///       @Trailing::new(EdgeWidget::Text(Label::new("A")))
 ///     }
 ///     // use trailing custom widget
 ///     @ListItem {
 ///       @HeadlineText(Label::new("headline text"))
-///       @Trailing(
+///       @Trailing::new(
 ///         EdgeWidget::Custom(
 ///           @CustomEdgeWidget(
 ///             @Container {
@@ -171,9 +171,11 @@ pub struct EdgeWidgetStyle {
   pub custom: EdgeItemStyle,
 }
 
+#[derive(ChildOfCompose)]
 pub struct Poster(pub Resource<PixelImage>);
-
+#[derive(ChildOfCompose)]
 pub struct HeadlineText(pub Label);
+#[derive(ChildOfCompose)]
 pub struct SupportingText(pub Label);
 
 #[derive(Template)]
@@ -278,7 +280,7 @@ impl<'c> ComposeChild<'c> for ListItem {
         @ $padding {
           @Row {
             align_items: pipe!(item_align($this.line_number)),
-            @{ leading.map(move |w| w.0.compose_with_style(leading_config)) }
+            @{ leading.map(move |w| w.unwrap().compose_with_style(leading_config)) }
             @Expanded {
               flex: 1.,
               @ $label_gap {
@@ -307,7 +309,7 @@ impl<'c> ComposeChild<'c> for ListItem {
                 }
               }
             }
-            @{ trailing.map(|w| w.0.compose_with_style(trailing_config))}
+            @{ trailing.map(|w| w.unwrap().compose_with_style(trailing_config))}
           }
         }
       }

@@ -3,8 +3,13 @@ use ribir::prelude::*;
 #[derive(Declare)]
 struct P;
 
+#[derive(ChildOfCompose)]
 struct ChildA;
+
+#[derive(ChildOfCompose)]
 struct ChildB;
+
+#[derive(ChildOfCompose)]
 struct ChildC;
 
 #[derive(Template)]

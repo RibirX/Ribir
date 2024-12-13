@@ -20,13 +20,13 @@ pub trait ObjDeclarer {
 }
 
 /// Used to do conversion from a value to the `DeclareInit` type.
-pub trait DeclareFrom<V, const M: u8> {
+pub trait DeclareFrom<V, const M: usize> {
   fn declare_from(value: V) -> Self;
 }
 
 /// A value-to-value conversion that consumes the input value. The
 /// opposite of [`DeclareFrom`].
-pub trait DeclareInto<V, const M: u8> {
+pub trait DeclareInto<V, const M: usize> {
   fn declare_into(self) -> DeclareInit<V>;
 }
 
@@ -77,7 +77,7 @@ where
   }
 }
 
-impl<T, V, const M: u8> DeclareInto<V, M> for T
+impl<T, V, const M: usize> DeclareInto<V, M> for T
 where
   DeclareInit<V>: DeclareFrom<T, M>,
 {

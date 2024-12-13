@@ -157,14 +157,14 @@ where
 
     @$item {
       @{ HeadlineText(Label::new($task.label.clone())) }
-      @Leading(EdgeWidget::Custom({
+      @Leading::new(EdgeWidget::Custom({
         let checkbox = @Checkbox { checked: pipe!($task.complete) };
         watch!($checkbox.checked)
           .distinct_until_changed()
           .subscribe(move |v| $task.write().complete = v);
         CustomEdgeWidget(checkbox.into_widget())
       }))
-      @Trailing(EdgeWidget::Icon({
+      @Trailing::new(EdgeWidget::Icon({
         let icon = svgs::CLOSE;
         let icon = FatObj::new(icon);
         @ $icon {

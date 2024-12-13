@@ -424,20 +424,6 @@ impl<W: Compose + 'static> IntoWidgetStrict<'static, COMPOSE> for State<W> {
   fn into_widget_strict(self) -> Widget<'static> { Compose::compose(self) }
 }
 
-impl<T> MultiChild for T
-where
-  T: StateReader,
-  T::Value: MultiChild,
-{
-}
-
-impl<T> SingleChild for T
-where
-  T: StateReader,
-  T::Value: SingleChild,
-{
-}
-
 #[cfg(test)]
 mod tests {
   use std::cell::Cell;
