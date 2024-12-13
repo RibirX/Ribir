@@ -7,12 +7,15 @@
 
 pub mod key;
 mod painting_style;
+use std::ops::DerefMut;
+
 pub use key::{Key, KeyWidget};
 pub use painting_style::*;
 pub mod image_widget;
 pub mod keep_alive;
 pub use keep_alive::*;
 mod theme;
+use smallvec::SmallVec;
 pub use theme::*;
 mod cursor;
 pub use cursor::*;
@@ -998,4 +1001,70 @@ impl<T> std::ops::Deref for FatObj<T> {
 impl<T> std::ops::DerefMut for FatObj<T> {
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.host }
+}
+
+/// DeclarerWithSubscription, a declarer with subscriptions
+///
+/// Used to wraps a declarer to make it the widget auto unsubscribe when
+/// disposed. Normally you should not use this directly, most Widget types
+/// derive with Declare attribute has support builtin widgets has the ability
+/// of unsubscribing when disposed.
+pub struct DeclarerWithSubscription<T> {
+  inner: T,
+  subscribes: SmallVec<[BoxSubscription<'static>; 1]>,
+}
+
+impl<T> DeclarerWithSubscription<T> {
+  pub fn new(host: T, subscribes: SmallVec<[BoxSubscription<'static>; 1]>) -> Self {
+    Self { inner: host, subscribes }
+  }
+}
+
+impl<T> Deref for DeclarerWithSubscription<T> {
+  type Target = T;
+
+  fn deref(&self) -> &Self::Target { &self.inner }
+}
+
+impl<T> DerefMut for DeclarerWithSubscription<T> {
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.inner }
+}
+
+impl<T> DeclarerWithSubscription<T> {
+  fn map<M>(self, f: impl FnOnce(T) -> M) -> DeclarerWithSubscription<M> {
+    DeclarerWithSubscription { inner: f(self.inner), subscribes: self.subscribes }
+  }
+}
+
+impl<'w, T, const M: usize> IntoWidgetStrict<'w, M> for DeclarerWithSubscription<T>
+where
+  T: IntoWidget<'w, M>,
+{
+  fn into_widget_strict(self) -> Widget<'w> {
+    let DeclarerWithSubscription { inner: host, subscribes } = self;
+    let w = host.into_widget();
+    if subscribes.is_empty() {
+      w
+    } else {
+      fn_widget! {
+        let w = FatObj::new(w);
+        @ $w {
+          on_disposed: move |_| {
+            subscribes.into_iter().for_each(|u| u.unsubscribe());
+          }
+        }
+      }
+      .into_widget()
+    }
+  }
+}
+
+impl<'w, T, C, const N: usize, const M: usize> WithChild<'w, C, N, M>
+  for DeclarerWithSubscription<T>
+where
+  T: WithChild<'w, C, N, M> + 'w,
+  C: 'w,
+{
+  type Target = DeclarerWithSubscription<T::Target>;
+  fn with_child(self, c: C) -> Self::Target { self.map(|w| w.with_child(c)) }
 }
