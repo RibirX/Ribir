@@ -149,7 +149,7 @@ impl FocusManager {
       .find(|request| {
         request
           .as_ref()
-          .map_or(true, |id| !id.is_dropped(arena))
+          .is_none_or(|id| !id.is_dropped(arena))
       });
 
     let focusing = next_focus

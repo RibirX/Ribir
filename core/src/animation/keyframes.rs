@@ -102,6 +102,7 @@ impl<S: AnimateStateSetter> KeyFrames<S> {
     Self { state, frames: keyframes.into_boxed_slice() }
   }
 
+  #[allow(clippy::type_complexity)]
   /// Converts the `KeyFrames` into a `LerpFnState` that can be used for
   /// animations.
   pub fn into_lerp_fn_state(

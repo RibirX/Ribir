@@ -348,7 +348,7 @@ impl Window {
         let tree = self.tree_mut();
         let drop_conditional = wid
           .query_ref::<KeepAlive>(tree)
-          .map_or(true, |d| !d.keep_alive);
+          .is_none_or(|d| !d.keep_alive);
         let parent_dropped = parent
           .as_ref()
           .is_some_and(|p| p.ancestors(tree).any(|w| w.is_dropped(tree)));

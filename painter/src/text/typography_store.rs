@@ -232,7 +232,7 @@ impl VisualGlyphs {
     let order_info = &self.order_info.paras[para];
     let locator = RangeLocator::from_unorder_ranges(order_info.runs.iter());
     let dst_run = locator.range_index(cluster);
-    let is_ltr = dst_run.map_or(true, |run| order_info.levels[order_info.runs[run].start].is_ltr());
+    let is_ltr = dst_run.is_none_or(|run| order_info.levels[order_info.runs[run].start].is_ltr());
     let is_layout_before = |glyph_cluster: usize| {
       if dst_run.is_none() {
         return true;
