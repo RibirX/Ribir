@@ -12,8 +12,7 @@ class_names! {
 /// ```no_run
 /// use ribir::prelude::*;
 ///
-/// let w = fn_widget! {
-///   @Text {
+/// let w = text! {
 ///     text: "hover to show tooltips!",
 ///     tooltips: "this is tooltips",
 ///   }
@@ -84,9 +83,10 @@ impl<'c> ComposeChild<'c> for Tooltips {
 
       let wnd = BuildCtx::get().window();
       let u = watch!($child.is_hover())
+        .delay(Duration::from_millis(150), AppCtx::scheduler())
         .distinct_until_changed()
-        .subscribe(move |v| {
-          if v {
+        .subscribe(move |_| {
+          if $child.is_hover() {
             $this.show(wnd.clone());
           } else {
             $this.hidden();
