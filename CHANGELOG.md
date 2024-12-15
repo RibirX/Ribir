@@ -34,9 +34,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Fixed
 
-- **core**: fix mismatch of providers. (#669 @wjian23)
+- **core**: Fix mismatch of providers. (#669 @wjian23)
 - **core**: Added DeclarerWithSubscription to let Widget `Expanded` accept pipe value. (#669 @wjian23)
-- **core**: running an animation that is already in progress does not trigger a smooth transition. (#pr @M-Adoo)
+- **core**: Running an animation that is already in progress does not trigger a smooth transition. (#pr @M-Adoo)
+- **core**: The framework incorrectly clamps the layout result of the render widget. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.18] - 2024-12-11
 

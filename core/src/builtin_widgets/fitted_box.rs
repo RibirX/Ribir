@@ -47,15 +47,15 @@ impl FittedBox {
 }
 
 impl Render for FittedBox {
-  fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let container_size = clamp.max;
     if container_size.is_empty() {
       self.scale_cache.set(Vector::zero());
       return container_size;
     }
 
-    clamp.max = INFINITY_SIZE;
-    let child_size = ctx.assert_perform_single_child_layout(clamp);
+    let child_size =
+      ctx.assert_perform_single_child_layout(BoxClamp { min: clamp.min, max: INFINITY_SIZE });
 
     if child_size.is_empty() {
       self.scale_cache.set(Vector::zero());
@@ -79,8 +79,8 @@ impl Render for FittedBox {
       BoxFit::CoverX => Vector::new(x, x),
     };
     self.scale_cache.set(scale);
-
-    Size::new(child_size.width * scale.x, child_size.height * scale.y)
+    let size = Size::new(child_size.width * scale.x, child_size.height * scale.y);
+    clamp.clamp(size)
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {

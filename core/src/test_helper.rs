@@ -241,10 +241,11 @@ impl Render for MockMulti {
 
 impl Render for MockBox {
   fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    clamp.max = clamp.max.min(self.size);
+    let size = clamp.clamp(self.size);
+    clamp.max = clamp.max.min(size);
     ctx.perform_single_child_layout(clamp);
 
-    self.size
+    size
   }
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
