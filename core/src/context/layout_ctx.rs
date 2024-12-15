@@ -71,7 +71,6 @@ impl<'a> LayoutCtx<'a> {
           .add_delay_event(DelayEvent::PerformedLayout(child));
 
         let info = tree2.store.layout_info_or_default(child);
-        let size = clamp.clamp(size);
         info.clamp = clamp;
         info.size = Some(size);
 
