@@ -46,11 +46,26 @@ smooth_size_widget_impl!(SmoothWidth, f32, width);
 
 #[derive(Default, Debug)]
 struct SmoothImpl<T> {
+  /// Indicates whether the transition is running.
   running: bool,
+  /// Indicates if a relayout is required for the widget.
+  force_layout: bool,
   value: T,
 }
 
 impl<T: Copy + PartialEq + 'static> Stateful<SmoothImpl<T>> {
+  fn set_running(&self, ready: bool) {
+    let mut w_ref = self.write();
+    w_ref.running = ready;
+    w_ref.forget_modifies();
+  }
+
+  fn set_force_layout(&self, force: bool) {
+    let mut w_ref = self.write();
+    w_ref.force_layout = force;
+    w_ref.forget_modifies();
+  }
+
   fn transition(
     &self, transition: impl Transition + 'static,
   ) -> Stateful<Animate<impl AnimateState + 'static>>
@@ -59,13 +74,7 @@ impl<T: Copy + PartialEq + 'static> Stateful<SmoothImpl<T>> {
   {
     let animate = part_writer!(&mut self.value).transition(transition);
     let this = self.clone_writer();
-    watch!($animate.is_running())
-      .distinct_until_changed()
-      .subscribe(move |running| {
-        let mut w = this.write();
-        w.running = running;
-        w.forget_modifies();
-      });
+    watch!($animate.is_running()).subscribe(move |running| this.set_running(running));
     animate
   }
 }
@@ -94,14 +103,18 @@ macro_rules! smooth_size_widget_impl {
           return host.perform_layout(clamp, ctx);
         }
 
-        let SmoothImpl { running, value } = *self.0.read();
-        if !running {
+        let SmoothImpl { force_layout, value, running } = *self.0.read();
+        if force_layout || !running {
+          if force_layout {
+            self.0.set_force_layout(false);
+          }
+
           let size = host.perform_layout(clamp, ctx);
           let new_v = size $(.$field)?;
           if value != new_v {
             let this = self.0.clone_writer();
-            // Trigger the transition in the next frame; otherwise,
-            // the animation will start with an incorrect initial frame.
+            // We must update the value in the next frame to ensure a
+            // seamless size transition from the previous value to the new one.
             on_frame_end_once(ctx, move |_| this.write().value = new_v);
           }
         }
@@ -115,20 +128,32 @@ macro_rules! smooth_size_widget_impl {
     impl<'c> ComposeChild<'c> for $name {
       type Child = Widget<'c>;
       fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-        fn_widget!{
-          let modifies = this.read().0.raw_modifies();
-          WrapRender::combine_child(this, child)
-            .on_build(move |id, | id.dirty_on(modifies) )
-        }.into_widget()
+        let inner = this.read().0.clone_writer();
+        WrapRender::combine_child(this, child).on_build(move |id| {
+          // When the value changes, we mark the widget as dirty to prompt a new layout.
+          // If the widget is already marked as dirty before the smooth widget marks it,
+          // we don't use the smooth value. This indicates that the data of the host
+          // widget has changed, requiring a smooth transition to the new layout result.
+          let marker = BuildCtx::get().tree().dirty_marker();
+          let h = inner.raw_modifies()
+            .filter(|b| b.contains(ModifyScope::FRAMEWORK))
+            .subscribe(move |_| {
+              if !marker.mark(id) {
+                inner.set_force_layout(true);
+              }
+            })
+            .unsubscribe_when_dropped();
+          id.attach_anonymous_data(h, BuildCtx::get_mut().tree_mut());
+        })
       }
     }
 
     impl $name {
       #[doc = "Enable the transition with the provided argument and return the animation of the transition."]
       pub fn transition(&self, transition: impl Transition + 'static)
-        -> Stateful< Animate<impl AnimateState + 'static>>
+        -> Stateful<Animate<impl AnimateState + 'static>>
       {
-        self.0.transition(transition, )
+        self.0.transition(transition)
       }
     }
   };
@@ -147,15 +172,34 @@ macro_rules! smooth_pos_widget_impl {
           return host.perform_layout(clamp, ctx);
         }
 
-        let smooth = self.0.clone_writer();
-        if !smooth.read().running  {
+        let SmoothImpl { force_layout, running,.. } = *self.0.read();
+
+        if force_layout || !running {
+          let smooth = self.0.clone_writer();
+
+          if !running {
+            // As the animation begins in the next frame, we manually mark it as
+            // running to ensure that this frame displays the smooth value instead
+            // of the actual value, maintaining a smooth animation.
+            smooth.set_running(true);
+          }
+          if force_layout {
+            smooth.set_force_layout(false);
+          }
+
           let wid = ctx.widget_id();
           let wnd = ctx.window();
-          // Trigger the transition in the next frame; otherwise,
-          // the animation will start with an incorrect initial frame.
+          // We need to wait until the end of this frame to determine
+          // the position of the widget.
           on_frame_end_once(ctx, move |_| {
             let pos = wnd.map_to_global(Point::zero(), wid);
-            smooth.write().value = pos$(.$field)?;
+            if smooth.read().value != pos $(.$field)? {
+              smooth.write().value = pos $(.$field)?;
+            } else if !running {
+              // If the position has not changed, indicating that the animation
+              // has not started, we revert the running state.
+              smooth.set_running(false);
+            }
           });
         }
 
@@ -167,7 +211,7 @@ macro_rules! smooth_pos_widget_impl {
           return host.paint(ctx);
         }
 
-        let SmoothImpl { running, value } = *self.0.read();
+        let SmoothImpl { running, value,.. } = *self.0.read();
         if running {
           let pos = ctx.map_to_global(Point::zero());
           #[allow(unused_assignments)]
@@ -181,12 +225,33 @@ macro_rules! smooth_pos_widget_impl {
       }
     }
 
-    impl_compose_child_for_wrap_render!($name);
+    impl<'c> ComposeChild<'c> for $name {
+      type Child = Widget<'c>;
+      fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+        let inner = this.read().0.clone_writer();
+        WrapRender::combine_child(this, child).on_build(move |id| {
+          // A smooth transition is activated when the value changes. However, if
+          // the widget is already marked as dirty, we will cancel the smooth
+          // transition because it indicates that a new layout has been triggered.
+          let marker = BuildCtx::get().tree().dirty_marker();
+          let h = inner.raw_modifies()
+            .filter(|b| b.contains(ModifyScope::FRAMEWORK))
+            .subscribe(move |_| {
+              if marker.is_dirty(id) {
+                inner.set_force_layout(true)
+              }
+            })
+            .unsubscribe_when_dropped();
+          id.attach_anonymous_data(h, BuildCtx::get_mut().tree_mut());
+        })
+      }
+    }
+
 
     impl $name {
       #[doc = "Enable the transition with the provided argument and return the animation of the transition."]
       pub fn transition(&self, transition: impl Transition + 'static)
-        -> Stateful< Animate<impl AnimateState + 'static>>
+         -> Stateful<Animate<impl AnimateState + 'static>>
       {
         self.0.transition(transition)
       }

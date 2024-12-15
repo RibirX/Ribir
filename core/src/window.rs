@@ -263,7 +263,7 @@ impl Window {
     if self.painter.borrow().viewport().size != size {
       let tree = self.tree_mut();
       let root = tree.root();
-      tree.mark_dirty(root);
+      tree.dirty_marker().mark(root);
       tree.store.remove(root);
       let mut painter = self.painter.borrow_mut();
       painter.set_viewport(Rect::from_size(size));

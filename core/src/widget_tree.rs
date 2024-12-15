@@ -21,6 +21,9 @@ pub(crate) struct WidgetTree {
   pub(crate) dummy_id: WidgetId,
 }
 
+/// A tool that help you to mark a widget as dirty
+pub(crate) struct DirtyMarker(DirtySet);
+
 type TreeArena = Arena<Box<dyn RenderQueryable>>;
 
 impl WidgetTree {
@@ -48,7 +51,7 @@ impl WidgetTree {
       .build();
 
     self.root = root;
-    self.mark_dirty(root);
+    self.dirty_marker().mark(root);
     root.on_mounted_subtree(self);
     root
   }
@@ -56,6 +59,8 @@ impl WidgetTree {
   pub(crate) fn root(&self) -> WidgetId { self.root }
 
   pub(crate) fn dummy_id(&self) -> WidgetId { self.dummy_id }
+
+  pub(crate) fn dirty_marker(&self) -> DirtyMarker { DirtyMarker(self.dirty_set.clone()) }
 
   /// Draw current tree by painter.
   pub(crate) fn draw(&self) {
@@ -89,9 +94,6 @@ impl WidgetTree {
       }
     }
   }
-
-  // todo: split layout and paint dirty.
-  pub(crate) fn mark_dirty(&self, id: WidgetId) { self.dirty_set.borrow_mut().insert(id); }
 
   pub(crate) fn is_dirty(&self) -> bool { !self.dirty_set.borrow().is_empty() }
 
@@ -227,6 +229,15 @@ impl WidgetTree {
 
     Self { root, dummy_id, wnd_id, arena, store: <_>::default(), dirty_set: <_>::default() }
   }
+}
+
+impl DirtyMarker {
+  // todo: split layout and paint dirty.
+
+  /// Mark the widget as dirty, return true if it is not already dirty.
+  pub(crate) fn mark(&self, id: WidgetId) -> bool { self.0.borrow_mut().insert(id) }
+
+  pub(crate) fn is_dirty(&self, id: WidgetId) -> bool { self.0.borrow().contains(&id) }
 }
 
 #[simple_declare]
@@ -378,10 +389,10 @@ mod tests {
     assert_eq!(tree.count(tree.content_root()), 11);
 
     let root = tree.root();
-    tree.mark_dirty(root);
+    tree.dirty_marker().mark(root);
     let new_root = empty_node(&mut tree.arena);
     root.insert_after(new_root, tree);
-    tree.mark_dirty(new_root);
+    tree.dirty_marker().mark(new_root);
     tree.detach(root);
     tree.remove_subtree(root);
 

@@ -67,11 +67,11 @@ impl WidgetId {
   /// result in a panic.
   pub fn dirty_on(self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>) {
     let tree = BuildCtx::get_mut().tree_mut();
-    let dirty_set = tree.dirty_set.clone();
+    let marker = tree.dirty_marker();
     let h = upstream
       .filter(|b| b.contains(ModifyScope::FRAMEWORK))
       .subscribe(move |_| {
-        dirty_set.borrow_mut().insert(self);
+        marker.mark(self);
       })
       .unsubscribe_when_dropped();
 
