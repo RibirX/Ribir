@@ -89,9 +89,8 @@ pub struct GlobalAnchor {
 impl Default for GlobalAnchor {
   fn default() -> Self {
     Self {
-      global_anchor_x: GlobalAnchorX::value(HAnchor::Left(0.0)),
-      global_anchor_y: GlobalAnchorY::value(VAnchor::Top(0.0)),
-
+      global_anchor_x: GlobalAnchorX::value(HAnchor::default()),
+      global_anchor_y: GlobalAnchorY::value(VAnchor::default()),
       guard: Default::default(),
     }
   }
@@ -100,18 +99,15 @@ impl Default for GlobalAnchor {
 impl GlobalAnchorX {
   /// Init the horizontal offset from the HAnchor relative to the Window View.
   pub fn value(x: HAnchor) -> Self {
-    match x {
-      HAnchor::Left(offset) => Self::Once(Box::new(move |_, _| Ok(offset))),
-      HAnchor::Right(offset) => Self::Once(Box::new(move |t, wnd: &Sc<Window>| {
-        let wid = t.get().unwrap();
-        if wid.is_dropped(wnd.tree()) {
-          return Err(());
-        }
-        let size = wnd.widget_size(wid).unwrap();
-        let wnd_size = wnd.size();
-        Ok(wnd_size.width - size.width - offset)
-      })),
-    }
+    Self::Once(Box::new(move |t, wnd: &Sc<Window>| {
+      let wid = t.get().unwrap();
+      if wid.is_dropped(wnd.tree()) {
+        return Err(());
+      }
+      let size = wnd.widget_size(wid).unwrap();
+      let wnd_size = wnd.size();
+      Ok(x.into_pixel(size.width, wnd_size.width))
+    }))
   }
 
   /// Init the global horizontal anchor from the custom function, which will
@@ -190,18 +186,15 @@ impl GlobalAnchorX {
 impl GlobalAnchorY {
   /// Init the global vertical anchor from VAnchor relative to the Window View.
   pub fn value(y: VAnchor) -> Self {
-    match y {
-      VAnchor::Top(offset) => Self::Once(Box::new(move |_, _| Ok(offset))),
-      VAnchor::Bottom(offset) => Self::Once(Box::new(move |t, wnd: &Sc<Window>| {
-        let wid = t.get().unwrap();
-        if wid.is_dropped(wnd.tree()) {
-          return Err(());
-        }
-        let size = wnd.widget_size(wid).unwrap();
-        let wnd_size = wnd.size();
-        Ok(wnd_size.height - size.height - offset)
-      })),
-    }
+    Self::Once(Box::new(move |t, wnd: &Sc<Window>| {
+      let wid = t.get().unwrap();
+      if wid.is_dropped(wnd.tree()) {
+        return Err(());
+      }
+      let size = wnd.widget_size(wid).unwrap();
+      let wnd_size = wnd.size();
+      Ok(y.into_pixel(size.height, wnd_size.height))
+    }))
   }
 
   /// Init the global vertical anchor from the custom function, which will
@@ -337,7 +330,7 @@ fn apply_global_anchor(
           let parent = id.parent(wnd.tree()).unwrap();
           let pt = wnd.map_from_global(Point::new(x, y), parent);
           let mut anchor = anchor.write();
-          let val = Anchor { x: Some(HAnchor::Left(pt.x)), y: Some(VAnchor::Top(pt.y)) };
+          let val = Anchor::from_point(pt);
           if anchor.anchor != val {
             anchor.anchor = val;
           }

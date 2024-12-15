@@ -1,7 +1,4 @@
-use crate::prelude::{
-  Angle, Box2D, Brush, Color, DevicePoint, DeviceRect, DeviceSize, DeviceVector, Point, Radius,
-  Rect, Size, Transform, Vector,
-};
+use crate::prelude::*;
 
 /// Linearly interpolate between two value.
 ///
@@ -148,10 +145,17 @@ impl Lerp for Brush {
   fn lerp(&self, to: &Self, factor: f32) -> Self {
     match (self, to) {
       (Brush::Color(from), Brush::Color(to)) => from.lerp(to, factor).into(),
-      _ => {
-        // todo: only support pure color brush now.
-        to.clone()
-      }
+      _ => to.clone(),
+    }
+  }
+}
+
+impl Lerp for Measure {
+  fn lerp(&self, to: &Self, factor: f32) -> Self {
+    match (self, to) {
+      (Measure::Pixel(from), Measure::Pixel(to)) => Measure::Pixel(from.lerp(to, factor)),
+      (Measure::Percent(from), Measure::Percent(to)) => Measure::Percent(from.lerp(to, factor)),
+      _ => to.clone(),
     }
   }
 }

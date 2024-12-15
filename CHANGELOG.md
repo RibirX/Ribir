@@ -30,6 +30,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: Added `grab_pointer` to grabs all the pointer input. (#669 @wjian23)
+- **core**: Added `Measure` to enable support for percentage values for position, and `Anchor` now supports percentage values. (#pr @M-Adoo)
 - **widgets**: Added the widget of Slider (#669 @wjian23)
 
 ### Fixed
