@@ -47,11 +47,13 @@ where
 
     let new_to = this.state.get();
 
-    if let Some(AnimateInfo { from, to, last_progress, .. }) = &mut this.running_info {
+    if let Some(AnimateInfo { from, to, last_progress, start_at, .. }) = &mut this.running_info {
       *from = this
         .state
         .calc_lerp_value(from, to, last_progress.value());
       *to = new_to;
+      *last_progress = AnimateProgress::Between(0.);
+      *start_at = Instant::now();
     } else {
       drop(animate_ref);
 
@@ -62,23 +64,16 @@ where
         .frame_tick_stream()
         .subscribe(move |msg| {
           match msg {
-            FrameMsg::NewFrame(_) => {
-              let animate = animate.write();
-              // the state may change during animate.
-              let value = animate.state.get();
-              animate.state.set(value);
-            }
             FrameMsg::BeforeLayout(time) => {
               animate.shallow().advance_to(time);
             }
-            FrameMsg::LayoutReady(_) => {}
             FrameMsg::Finish(_) => {
               let mut w_ref = animate.write();
               let info = w_ref.running_info.as_mut().unwrap();
               let last_progress = info.last_progress;
               let to = info.to.clone();
               info.already_lerp = false;
-              w_ref.state.set(to);
+              w_ref.state.revert_value(to);
               // Forgets modifies because we only modifies the inner info.
               w_ref.forget_modifies();
 
@@ -91,6 +86,7 @@ where
                   .unwrap();
               }
             }
+            _ => {}
           }
         })
         .unsubscribe_when_dropped();

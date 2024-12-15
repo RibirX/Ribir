@@ -12,6 +12,7 @@ pub trait AnimateStateSetter {
 
   fn get(&self) -> Self::Value;
   fn set(&self, v: Self::Value);
+  fn revert_value(&self, v: Self::Value);
   fn animate_state_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible>;
   fn clone_setter(&self) -> Self::C;
 }
@@ -75,6 +76,13 @@ where
   fn set(&self, v: Self::Value) { *self.shallow() = v; }
 
   #[inline]
+  fn revert_value(&self, v: Self::Value) {
+    let mut w = self.write();
+    *w = v;
+    w.forget_modifies();
+  }
+
+  #[inline]
   fn clone_setter(&self) -> Self::C { self.clone_writer() }
 
   #[inline]
@@ -107,6 +115,9 @@ where
 
   #[inline]
   fn set(&self, v: Self::Value) { self.state.set(v) }
+
+  #[inline]
+  fn revert_value(&self, v: Self::Value) { self.state.revert_value(v) }
 
   #[inline]
   fn clone_setter(&self) -> Self::C { self.state.clone_setter() }
@@ -157,6 +168,10 @@ macro_rules! impl_animate_state_for_tuple {
 
         fn set(&self, v: Self::Value) {
           $(self.$tuple.set(v.$tuple);) *
+        }
+
+        fn revert_value(&self, v: Self::Value) {
+          $(self.$tuple.revert_value(v.$tuple);) *
         }
 
         #[inline]
