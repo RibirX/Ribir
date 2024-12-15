@@ -24,6 +24,18 @@ pub use rxrust;
 pub mod overlay;
 pub mod query;
 pub mod wrap_render;
+
+/// Represents measurement units for positioning and sizing.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Measure {
+  /// Value in logical pixels.
+  Pixel(f32),
+
+  /// Value as a percentage of the maximum widget size.
+  /// 1.0 corresponds to 100%.
+  Percent(f32),
+}
+
 pub mod prelude {
   pub use log;
   #[doc(no_inline)]
@@ -37,6 +49,7 @@ pub mod prelude {
   pub use rxrust::prelude::*;
   pub use smallvec;
 
+  pub use super::Measure;
   #[doc(no_inline)]
   pub use crate::builtin_widgets::*;
   #[doc(no_inline)]
@@ -71,3 +84,20 @@ pub mod prelude {
 }
 
 pub mod test_helper;
+
+impl From<f32> for Measure {
+  fn from(value: f32) -> Self { Measure::Pixel(value) }
+}
+
+impl Default for Measure {
+  fn default() -> Self { Measure::Pixel(0.0) }
+}
+
+impl Measure {
+  pub fn into_pixel(self, max_clamp: f32) -> f32 {
+    match self {
+      Measure::Pixel(x) => x,
+      Measure::Percent(x) => x * max_clamp,
+    }
+  }
+}

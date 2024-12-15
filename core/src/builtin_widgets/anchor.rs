@@ -1,30 +1,30 @@
 use crate::{prelude::*, wrap_render::*};
 
 /// Specifies the horizontal position you want to anchor the widget.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum HAnchor {
   /// positions the widget's left edge x pixels to the right of the target's
   /// left edge.
-  Left(f32),
+  Left(Measure),
 
   /// positions the widget's right edge x pixels to the left of the target's
   /// right edge.
-  Right(f32),
+  Right(Measure),
 }
 
 /// Specifies the vertical position you want to anchor the widget.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VAnchor {
   /// positions the widget's top edge x pixels bellow the target's top edge.
-  Top(f32),
+  Top(Measure),
 
   /// positions the widget's bottom edge x pixels above the target's bottom
   /// edge.
-  Bottom(f32),
+  Bottom(Measure),
 }
 
 impl HAnchor {
-  pub fn map(self, f: impl FnOnce(f32) -> f32) -> Self {
+  fn map(self, f: impl FnOnce(Measure) -> Measure) -> Self {
     match self {
       HAnchor::Left(x) => HAnchor::Left(f(x)),
       HAnchor::Right(x) => HAnchor::Right(f(x)),
@@ -33,30 +33,10 @@ impl HAnchor {
 }
 
 impl VAnchor {
-  pub fn map(self, f: impl FnOnce(f32) -> f32) -> Self {
+  fn map(self, f: impl FnOnce(Measure) -> Measure) -> Self {
     match self {
       VAnchor::Top(x) => VAnchor::Top(f(x)),
       VAnchor::Bottom(x) => VAnchor::Bottom(f(x)),
-    }
-  }
-}
-
-impl PartialEq for HAnchor {
-  fn eq(&self, other: &Self) -> bool {
-    match (self, other) {
-      (HAnchor::Left(x1), HAnchor::Left(x2)) => (x1 - x2).abs() < f32::EPSILON,
-      (HAnchor::Right(x1), HAnchor::Right(x2)) => (x1 - x2).abs() < f32::EPSILON,
-      _ => false,
-    }
-  }
-}
-
-impl PartialEq for VAnchor {
-  fn eq(&self, other: &Self) -> bool {
-    match (self, other) {
-      (VAnchor::Top(y1), VAnchor::Top(y2)) => (y1 - y2).abs() < f32::EPSILON,
-      (VAnchor::Bottom(y1), VAnchor::Bottom(y2)) => (y1 - y2).abs() < f32::EPSILON,
-      _ => false,
     }
   }
 }
@@ -77,7 +57,7 @@ impl Lerp for HAnchor {
     match (self, other) {
       (HAnchor::Left(x1), HAnchor::Left(x2)) => HAnchor::Left(x1.lerp(x2, t)),
       (HAnchor::Right(x1), HAnchor::Right(x2)) => HAnchor::Right(x1.lerp(x2, t)),
-      _ => unreachable!(),
+      _ => *other,
     }
   }
 }
@@ -87,7 +67,7 @@ impl Lerp for VAnchor {
     match (self, other) {
       (VAnchor::Top(y1), VAnchor::Top(y2)) => VAnchor::Top(y1.lerp(y2, t)),
       (VAnchor::Bottom(y1), VAnchor::Bottom(y2)) => VAnchor::Bottom(y1.lerp(y2, t)),
-      _ => unreachable!(),
+      _ => *other,
     }
   }
 }
@@ -96,15 +76,15 @@ impl Lerp for Anchor {
   fn lerp(&self, other: &Self, t: f32) -> Self {
     let x = match (self.x, other.x) {
       (Some(x1), Some(x2)) => Some(x1.lerp(&x2, t)),
-      (Some(x1), None) => Some(x1.map(|x| x.lerp(&0., t))),
-      (None, Some(x1)) => Some(x1.map(|x| 0_f32.lerp(&x, t))),
+      (Some(x1), None) => Some(x1.map(|x| x.lerp(&Measure::default(), t))),
+      (None, Some(x1)) => Some(x1.map(|x| Measure::default().lerp(&x, t))),
       _ => None,
     };
 
     let y = match (self.y, other.y) {
       (Some(y1), Some(y2)) => Some(y1.lerp(&y2, t)),
-      (Some(y1), None) => Some(y1.map(|y| y.lerp(&0., t))),
-      (None, Some(y1)) => Some(y1.map(|y| 0_f32.lerp(&y, t))),
+      (Some(y1), None) => Some(y1.map(|y| y.lerp(&Measure::default(), t))),
+      (None, Some(y1)) => Some(y1.map(|y| Measure::default().lerp(&y, t))),
       _ => None,
     };
     Self { x, y }
@@ -115,43 +95,55 @@ impl Anchor {
   pub fn new(x: HAnchor, y: VAnchor) -> Self { Self { x: Some(x), y: Some(y) } }
 
   /// Return Anchor that positions the widget's left top corner to the position
-  pub fn from_point(pos: Point) -> Self { Self::new(HAnchor::Left(pos.x), VAnchor::Top(pos.y)) }
+  pub fn from_point(pos: Point) -> Self { pos.into() }
 
   /// Return Anchor that positions the widget's left edge x pixels to the right
   /// of the target's left edge.
-  pub fn left(x: f32) -> Self { Self { x: Some(HAnchor::Left(x)), y: None } }
+  pub fn left(x: impl Into<Measure>) -> Self { Self { x: Some(HAnchor::Left(x.into())), y: None } }
 
   /// Return Anchor that positions the widget's right edge x pixels to the left
   /// of the target's right edge.
-  pub fn right(x: f32) -> Self { Self { x: Some(HAnchor::Right(x)), y: None } }
+  pub fn right(x: impl Into<Measure>) -> Self {
+    Self { x: Some(HAnchor::Right(x.into())), y: None }
+  }
 
   /// Return Anchor that positions the widget's top edge x pixels bellow the
   /// target's top edge.
-  pub fn top(y: f32) -> Self { Self { x: None, y: Some(VAnchor::Top(y)) } }
+  pub fn top(y: impl Into<Measure>) -> Self { Self { x: None, y: Some(VAnchor::Top(y.into())) } }
 
   /// Return Anchor that positions the widget's bottom edge x pixels above the
   /// parent's bottom edge.
-  pub fn bottom(y: f32) -> Self { Self { x: None, y: Some(VAnchor::Bottom(y)) } }
+  pub fn bottom(y: impl Into<Measure>) -> Self {
+    Self { x: None, y: Some(VAnchor::Bottom(y.into())) }
+  }
 
   /// Return Anchor that positions the widget's left top corner to the position
   /// x pixel right, y pixel bellow relative to the left top corner of
   /// the target
-  pub fn left_top(x: f32, y: f32) -> Self { Self::new(HAnchor::Left(x), VAnchor::Top(y)) }
+  pub fn left_top(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
+    Self::new(HAnchor::Left(x.into()), VAnchor::Top(y.into()))
+  }
 
   /// Return Anchor that positions the widget's right top corner to the position
   /// x pixel left, y pixel bellow relative to the right top corner of
   /// the target
-  pub fn right_top(x: f32, y: f32) -> Self { Self::new(HAnchor::Right(x), VAnchor::Top(y)) }
+  pub fn right_top(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
+    Self::new(HAnchor::Right(x.into()), VAnchor::Top(y.into()))
+  }
 
   /// Return Anchor that positions the widget's left bottom corner to the
   /// position x pixel right, y pixel above relative to the left bottom corner
   /// of the target
-  pub fn left_bottom(x: f32, y: f32) -> Self { Self::new(HAnchor::Left(x), VAnchor::Bottom(y)) }
+  pub fn left_bottom(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
+    Self::new(HAnchor::Left(x.into()), VAnchor::Bottom(y.into()))
+  }
 
   /// Return Anchor that positions the widget's right bottom corner to the
   /// position x pixel left, y pixel above relative to the right bottom corner
   /// of the target
-  pub fn right_bottom(x: f32, y: f32) -> Self { Self::new(HAnchor::Right(x), VAnchor::Bottom(y)) }
+  pub fn right_bottom(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
+    Self::new(HAnchor::Right(x.into()), VAnchor::Bottom(y.into()))
+  }
 }
 
 /// This widget is used to anchor child constraints relative to the parent
@@ -178,30 +170,56 @@ impl WrapRender for RelativeAnchor {
     ctx.update_position(ctx.widget_id(), Point::zero());
     let child_size = host.perform_layout(clamp, ctx);
 
-    let Anchor { x, y } = self.anchor;
-    let x = x
-      .map(|x| match x {
-        HAnchor::Left(x) => x,
-        HAnchor::Right(x) => clamp.max.width - child_size.width - x,
-      })
-      .unwrap_or_default();
-    let y = y
-      .map(|y| match y {
-        VAnchor::Top(y) => y,
-        VAnchor::Bottom(y) => clamp.max.height - child_size.height - y,
-      })
-      .unwrap_or_default();
+    let offset = self.anchor.into_pixel(child_size, clamp.max);
 
     let pos = ctx.box_pos().unwrap_or_default();
-    ctx.update_position(ctx.widget_id(), pos + Size::new(x, y));
+    ctx.update_position(ctx.widget_id(), pos + Size::new(offset.x, offset.y));
     child_size
+  }
+}
+
+impl HAnchor {
+  pub fn into_pixel(self, width: f32, max_clamp: f32) -> f32 {
+    match self {
+      HAnchor::Left(x) => x.into_pixel(max_clamp),
+      HAnchor::Right(x) => max_clamp - width - x.into_pixel(max_clamp),
+    }
+  }
+}
+
+impl VAnchor {
+  pub fn into_pixel(self, height: f32, max_clamp: f32) -> f32 {
+    match self {
+      VAnchor::Top(y) => y.into_pixel(max_clamp),
+      VAnchor::Bottom(y) => max_clamp - height - y.into_pixel(max_clamp),
+    }
+  }
+}
+
+impl Anchor {
+  pub fn into_pixel(self, size: Size, max_clamp: Size) -> Point {
+    let Self { x, y } = self;
+    Point::new(
+      x.map(|x| x.into_pixel(size.width, max_clamp.width))
+        .unwrap_or_default(),
+      y.map(|y| y.into_pixel(size.height, max_clamp.height))
+        .unwrap_or_default(),
+    )
   }
 }
 
 impl From<Point> for Anchor {
   fn from(value: Point) -> Self {
-    Anchor { x: Some(HAnchor::Left(value.x)), y: Some(VAnchor::Top(value.y)) }
+    Self::new(HAnchor::Left(value.x.into()), VAnchor::Top(value.y.into()))
   }
+}
+
+impl Default for HAnchor {
+  fn default() -> Self { Self::Left(Measure::default()) }
+}
+
+impl Default for VAnchor {
+  fn default() -> Self { Self::Top(Measure::default()) }
 }
 
 #[cfg(test)]
