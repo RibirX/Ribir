@@ -128,7 +128,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           old.dispose_subtree(tree);
           new.on_mounted_subtree(tree);
 
-          tree.mark_dirty(new);
+          tree.dirty_marker().mark(new);
           // The context initialized by `PipeWidgetUpdater` must be cleared.
           BuildCtx::clear();
         });
@@ -197,7 +197,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         old.iter().for_each(|id| id.dispose_subtree(tree));
         new.iter().for_each(|w| {
           w.on_mounted_subtree(tree);
-          tree.mark_dirty(*w)
+          tree.dirty_marker().mark(*w);
         });
 
         // The context initialized by `PipeWidgetUpdater` must be cleared.
@@ -301,7 +301,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
             }
           }
 
-          tree.mark_dirty(p);
+          tree.dirty_marker().mark(p);
           // The context initialized by `PipeWidgetUpdater` must be cleared.
           BuildCtx::clear();
         });

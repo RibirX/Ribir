@@ -189,7 +189,7 @@ impl Overlay {
               let tree = wnd.tree_mut();
               let root = tree.root();
               wid.dispose_subtree(tree);
-              tree.mark_dirty(root);
+              tree.dirty_marker().mark(root);
             });
         }
       }
@@ -242,7 +242,7 @@ impl Overlay {
     let tree = wnd.tree_mut();
     tree.root().append(wid, tree);
     wid.on_mounted_subtree(tree);
-    tree.mark_dirty(wid);
+    tree.dirty_marker().mark(wid);
 
     self.0.borrow_mut().showing = Some(ShowingInfo { generator: gen.into(), wnd_id: wnd.id() });
 

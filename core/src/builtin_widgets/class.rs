@@ -386,9 +386,10 @@ impl ClassNode {
       });
 
     id_info.borrow_mut().gen_range = GenRange::Single(new_id);
-    tree.mark_dirty(new_id);
+    let marker = tree.dirty_marker();
+    marker.mark(new_id);
     if new_id != orig_id && new_id.ancestor_of(orig_id, tree) {
-      tree.mark_dirty(orig_id);
+      marker.mark(orig_id);
     }
   }
 
