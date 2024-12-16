@@ -160,15 +160,10 @@ impl<'c> ComposeChild<'c> for OverrideClass {
     let cls_override = this.try_into_value().unwrap_or_else(|_| {
       panic!("Attempting to use `OverrideClass` as a reader or writer is not allowed.")
     });
-    let f = move || {
-      BuildCtx::get_mut()
-        .current_providers
-        .push(Box::new(Queryable(cls_override)));
-      let id = child.build();
-      BuildCtx::get_mut().current_providers.pop();
-      Widget::from_id(id)
-    };
-    f.into_widget()
+
+    Provider::new(Box::new(Queryable(cls_override)))
+      .with_child(fn_widget! { child })
+      .into_widget()
   }
 }
 

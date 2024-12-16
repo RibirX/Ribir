@@ -28,12 +28,9 @@ impl<'c> ComposeChild<'c> for TextStyleWidget {
       }
     };
 
-    let ctx = BuildCtx::get_mut();
-    ctx.current_providers.push(provider);
-    child.into_widget().on_build(|id| {
-      let provider = ctx.current_providers.pop().unwrap();
-      id.attach_data(provider, ctx.tree_mut());
-    })
+    Provider::new(provider)
+      .with_child(fn_widget! { child })
+      .into_widget()
   }
 }
 
