@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **core**: fix set opacity zero no work to it's children. (#pr @wjian23)
+
 ## [0.4.0-alpha.19] - 2024-12-18
 
 ### Features
