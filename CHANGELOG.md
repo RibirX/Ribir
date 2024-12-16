@@ -27,7 +27,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Fixed
 
-- **core**: fix set opacity zero no work to it's children. (#pr @wjian23)
+- **core**: fix set opacity zero no work to it's children. (#671 @wjian23)
+- **core**: Fix TextStyle cause providers mismatched (#671 @wjian23)
 
 ## [0.4.0-alpha.19] - 2024-12-18
 
