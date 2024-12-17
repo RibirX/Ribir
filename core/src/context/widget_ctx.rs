@@ -146,23 +146,17 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   fn widget_box_size(&self, wid: WidgetId) -> Option<Size> {
     self
       .tree()
-      .store
       .layout_info(wid)
       .and_then(|info| info.size)
   }
 
   fn widget_box_pos(&self, wid: WidgetId) -> Option<Point> {
-    self
-      .tree()
-      .store
-      .layout_info(wid)
-      .map(|info| info.pos)
+    self.tree().layout_info(wid).map(|info| info.pos)
   }
 
   fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {
     self
       .tree()
-      .store
       .layout_info(wid)
       .and_then(|info| info.size.map(|size| Rect::new(info.pos, size)))
   }

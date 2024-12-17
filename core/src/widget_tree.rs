@@ -22,6 +22,7 @@ pub(crate) struct WidgetTree {
 }
 
 /// A tool that help you to mark a widget as dirty
+#[derive(Clone)]
 pub(crate) struct DirtyMarker(DirtySet);
 
 type TreeArena = Arena<Box<dyn RenderQueryable>>;
@@ -93,6 +94,10 @@ impl WidgetTree {
         ctx.perform_child_layout(wid, clamp);
       }
     }
+  }
+
+  pub(crate) fn layout_info(&self, id: WidgetId) -> Option<&LayoutInfo> {
+    self.store.layout_info(id)
   }
 
   pub(crate) fn is_dirty(&self) -> bool { !self.dirty_set.borrow().is_empty() }

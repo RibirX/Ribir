@@ -120,7 +120,6 @@ impl Align {
 }
 
 impl From<HAlign> for Align {
-  #[inline]
   fn from(h: HAlign) -> Self {
     match h {
       HAlign::Left => Align::Start,
@@ -132,13 +131,34 @@ impl From<HAlign> for Align {
 }
 
 impl From<VAlign> for Align {
-  #[inline]
   fn from(h: VAlign) -> Self {
     match h {
       VAlign::Top => Align::Start,
       VAlign::Center => Align::Center,
       VAlign::Bottom => Align::End,
       VAlign::Stretch => Align::Stretch,
+    }
+  }
+}
+
+impl From<Align> for HAlign {
+  fn from(h: Align) -> Self {
+    match h {
+      Align::Start => HAlign::Left,
+      Align::Center => HAlign::Center,
+      Align::End => HAlign::Right,
+      Align::Stretch => HAlign::Stretch,
+    }
+  }
+}
+
+impl From<Align> for VAlign {
+  fn from(h: Align) -> Self {
+    match h {
+      Align::Start => VAlign::Top,
+      Align::Center => VAlign::Center,
+      Align::End => VAlign::Bottom,
+      Align::Stretch => VAlign::Stretch,
     }
   }
 }

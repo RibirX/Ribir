@@ -61,7 +61,7 @@ where
       let this = &mut *self.write();
       let tick_handle = wnd
         .frame_ticker
-        .frame_tick_stream()
+        .clone()
         .subscribe(move |msg| {
           match msg {
             FrameMsg::BeforeLayout(time) => {

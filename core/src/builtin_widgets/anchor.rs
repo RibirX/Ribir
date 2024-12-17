@@ -222,6 +222,22 @@ impl Default for VAnchor {
   fn default() -> Self { Self::Top(Measure::default()) }
 }
 
+impl From<f32> for HAnchor {
+  fn from(value: f32) -> Self { Self::Left(value.into()) }
+}
+
+impl From<f32> for VAnchor {
+  fn from(value: f32) -> Self { Self::Top(value.into()) }
+}
+
+impl From<Measure> for HAnchor {
+  fn from(value: Measure) -> Self { Self::Left(value) }
+}
+
+impl From<Measure> for VAnchor {
+  fn from(value: Measure) -> Self { Self::Top(value) }
+}
+
 #[cfg(test)]
 mod test {
   use ribir_dev_helper::*;

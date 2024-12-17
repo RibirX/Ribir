@@ -38,49 +38,37 @@ pub enum Measure {
 
 pub mod prelude {
   pub use log;
-  #[doc(no_inline)]
   pub use ribir_algo::*;
   pub use ribir_geom::*;
-  #[doc(no_inline)]
   pub use ribir_macros::*;
-  #[doc(no_inline)]
   pub use ribir_painter::*;
   #[doc(hidden)]
   pub use rxrust::prelude::*;
   pub use smallvec;
 
-  pub use super::Measure;
-  #[doc(no_inline)]
-  pub use crate::builtin_widgets::*;
-  #[doc(no_inline)]
-  pub use crate::context::*;
-  #[doc(no_inline)]
-  pub use crate::declare::*;
-  #[doc(no_inline)]
-  pub use crate::events::*;
-  #[doc(no_inline)]
-  pub use crate::overlay::{AutoClosePolicy, Overlay, OverlayStyle};
-  #[doc(no_inline)]
-  pub use crate::pipe::{BoxPipe, FinalChain, MapPipe, ModifiesPipe, Pipe};
-  #[doc(no_inline)]
-  pub use crate::state::*;
-  #[doc(no_inline)]
-  pub use crate::widget;
-  #[doc(no_inline)]
-  pub use crate::widget::*;
-  #[doc(no_inline)]
-  pub use crate::widget_children::*;
-  #[doc(no_inline)]
-  pub use crate::widget_tree::{BoxClamp, LayoutInfo, TrackId, WidgetId};
-  #[doc(no_inline)]
-  pub use crate::window::Window;
-  pub use crate::{
+  pub use super::{
+    Measure,
     animation::*,
-    class_names, multi_class_impl, providers,
+    builtin_widgets::*,
+    class_names,
+    context::*,
+    declare::*,
+    events::*,
+    multi_class_impl,
+    overlay::{AutoClosePolicy, Overlay, OverlayStyle},
+    pipe::{BoxPipe, FinalChain, MapPipe, ModifiesPipe, Pipe},
+    providers,
     query::*,
+    state::*,
     style_class,
     ticker::{Duration, Instant},
+    widget,
+    widget::*,
+    widget_children::*,
+    widget_tree::{BoxClamp, LayoutInfo, TrackId, WidgetId},
+    window::Window,
   };
+  pub use crate::{smooth_height, smooth_pos, smooth_size, smooth_width, smooth_x, smooth_y};
 }
 
 pub mod test_helper;
