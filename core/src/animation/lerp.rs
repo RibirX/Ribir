@@ -155,7 +155,7 @@ impl Lerp for Measure {
     match (self, to) {
       (Measure::Pixel(from), Measure::Pixel(to)) => Measure::Pixel(from.lerp(to, factor)),
       (Measure::Percent(from), Measure::Percent(to)) => Measure::Percent(from.lerp(to, factor)),
-      _ => to.clone(),
+      _ => *to,
     }
   }
 }

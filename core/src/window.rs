@@ -165,6 +165,21 @@ impl Window {
       .focus_prev_widget(self.tree());
   }
 
+  /// Execute the callback when the next frame begins.
+  pub fn once_next_frame(&self, f: impl FnOnce() + 'static) {
+    self.once_on_lifecycle(f, |msg| matches!(msg, FrameMsg::NewFrame(_)))
+  }
+
+  /// Execute the callback when the current frame finished.
+  pub fn once_frame_finished(&self, f: impl FnOnce() + 'static) {
+    self.once_on_lifecycle(f, |msg| matches!(msg, FrameMsg::Finish(_)))
+  }
+
+  /// Execute the callback before the next layout begins.
+  pub fn once_before_layout(&self, f: impl FnOnce() + 'static) {
+    self.once_on_lifecycle(f, |msg| matches!(msg, FrameMsg::BeforeLayout(_)))
+  }
+
   /// Return an `rxRust` Scheduler, which will guarantee all task add to the
   /// scheduler will finished before current frame finished.
   #[inline]
@@ -179,7 +194,7 @@ impl Window {
   pub fn priority_task_queue(&self) -> &PriorityTaskQueue { &self.priority_task_queue }
 
   pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, Infallible> {
-    self.frame_ticker.frame_tick_stream()
+    self.frame_ticker.clone()
   }
 
   pub fn inc_running_animate(&self) {
@@ -198,8 +213,8 @@ impl Window {
   #[track_caller]
   pub fn draw_frame(&self) -> bool {
     AppCtx::run_until_stalled();
-    let ticker = &self.frame_ticker;
-    ticker.emit(FrameMsg::NewFrame(Instant::now()));
+    let mut ticker = self.frame_ticker.clone();
+    ticker.next(FrameMsg::NewFrame(Instant::now()));
     self.run_frame_tasks();
 
     self.update_painter_viewport();
@@ -213,7 +228,7 @@ impl Window {
       };
       self.shell_wnd.borrow_mut().begin_frame(surface);
 
-      ticker.emit(FrameMsg::BeforeLayout(Instant::now()));
+      ticker.next(FrameMsg::BeforeLayout(Instant::now()));
       self.layout();
 
       self.tree().draw();
@@ -228,7 +243,8 @@ impl Window {
     }
 
     AppCtx::end_frame();
-    ticker.emit(FrameMsg::Finish(Instant::now()));
+    ticker.next(FrameMsg::Finish(Instant::now()));
+    ticker.retain();
 
     draw
   }
@@ -248,7 +264,7 @@ impl Window {
 
       if !tree.is_dirty() {
         let ready = FrameMsg::LayoutReady(Instant::now());
-        self.frame_ticker.emit(ready);
+        self.frame_ticker.clone().next(ready);
         self.run_frame_tasks();
       }
 
@@ -753,6 +769,18 @@ impl Window {
 
     self.processes_ime_pre_edit(ImePreEdit::PreEdit { value: txt.to_owned(), cursor: *cursor });
     *self.pre_edit.borrow_mut() = Some(txt.to_owned());
+  }
+
+  fn once_on_lifecycle(
+    &self, callback: impl FnOnce() + 'static, filter: impl Fn(&FrameMsg) -> bool + 'static,
+  ) {
+    let mut f = Some(callback);
+    self
+      .frame_ticker
+      .clone()
+      .filter(filter)
+      .take(1)
+      .subscribe(move |_| f.take().unwrap()());
   }
 }
 

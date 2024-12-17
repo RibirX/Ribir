@@ -2,15 +2,12 @@ use std::convert::Infallible;
 #[cfg(not(target_family = "wasm"))]
 pub use std::time::{Duration, Instant};
 
-use rxrust::prelude::{Observer, Subject};
+use rxrust::prelude::Subject;
 #[cfg(target_family = "wasm")]
 pub use web_time::{Duration, Instant};
 
 /// Frame ticker emit message when new frame need to draw.
-#[derive(Default, Clone)]
-pub struct FrameTicker {
-  subject: Subject<'static, FrameMsg, Infallible>,
-}
+pub type FrameTicker = Subject<'static, FrameMsg, Infallible>;
 
 /// Message emitted at different status of a frame.
 
@@ -38,12 +35,4 @@ pub enum FrameMsg {
   /// Only the first frame of continuous frames that do not require drawing will
   /// receive this message.
   Finish(Instant),
-}
-
-impl FrameTicker {
-  #[inline]
-  pub(crate) fn emit(&self, msg: FrameMsg) { self.subject.clone().next(msg) }
-
-  #[inline]
-  pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, Infallible> { self.subject.clone() }
 }

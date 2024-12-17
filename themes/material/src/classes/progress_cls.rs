@@ -1,5 +1,5 @@
 use easing::CubicBezierEasing;
-use ribir_core::prelude::*;
+use ribir_core::{prelude::*, smooth_width};
 use ribir_widgets::prelude::*;
 
 use crate::md;
@@ -71,10 +71,13 @@ pub(super) fn init(classes: &mut Classes) {
     .into_widget()
   });
   classes.insert(LINEAR_DETERMINATE_INDICATOR, move |host| {
-    let host = FatObj::new(host).class(MD_BASE_LINEAR_INDICATOR);
-    let smooth = SmoothWidth::default();
-    smooth.transition(DETERMINATE_TRANS);
-    smooth.with_child(host).into_widget()
+    let host = FatObj::new(host);
+    smooth_width! {
+      transition: DETERMINATE_TRANS,
+      init_value: 0.,
+      @ $host { class: MD_BASE_LINEAR_INDICATOR }
+    }
+    .into_widget()
   });
   classes.insert(LINEAR_INDETERMINATE_INDICATOR, move |host| {
     // We expanded the indicator to a `Row[Indicator, Track, Indicator]` structure,

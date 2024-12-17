@@ -10,7 +10,11 @@ use futures::{Future, executor::LocalPool, task::LocalSpawnExt};
 use pin_project_lite::pin_project;
 use ribir_algo::Sc;
 use ribir_painter::{TypographyStore, font_db::FontDB};
-use rxrust::{scheduler::NEW_TIMER_FN, subject::Subject};
+use rxrust::{
+  prelude::{ObservableExt, ObservableItem},
+  scheduler::NEW_TIMER_FN,
+  subject::Subject,
+};
 
 use crate::{
   builtin_widgets::Theme,
@@ -147,6 +151,11 @@ impl AppCtx {
     &Self::shared().frame_ticks
   }
 
+  /// Execute the callback at the beginning of the next frame.
+  pub fn once_next_frame<F: FnMut(Instant) + 'static>(f: F) {
+    AppCtx::frame_ticks().clone().take(1).subscribe(f);
+  }
+
   /// Runs all tasks in the local(usually means on the main thread) pool and
   /// returns if no more progress can be made on any task.
   #[track_caller]
@@ -229,6 +238,7 @@ impl AppCtx {
       .typography_store
       .borrow_mut()
       .end_frame();
+    AppCtx::frame_ticks().clone().retain();
   }
 }
 

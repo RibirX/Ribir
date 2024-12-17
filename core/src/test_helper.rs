@@ -397,11 +397,10 @@ impl WidgetTester {
 
     let wnd_size = self.wnd_size.unwrap_or(Size::new(1024., 1024.));
     let mut wnd = TestWindow::new_with_size(self.widget.clone(), wnd_size);
-    wnd.draw_frame();
     if let Some(initd) = self.on_initd.take() {
       initd(&mut wnd);
-      wnd.draw_frame();
     }
+    wnd.draw_frame();
     wnd
   }
 
