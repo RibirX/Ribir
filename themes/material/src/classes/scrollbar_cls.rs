@@ -67,7 +67,7 @@ fn base_track(w: Widget) -> Widget {
 
     let mut w = @ $w {
       background: {
-        let color = BuildCtx::get().variant_color_container();
+        let color = BuildCtx::get().variant_container_color();
         pipe!(if $w.is_hover() { color } else { color.with_alpha(0.)})
       },
       on_disposed: move |_| u.unsubscribe(),

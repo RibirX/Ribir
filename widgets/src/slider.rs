@@ -398,6 +398,6 @@ mod tests {
       @RangeSlider { start: 10., end: 73., divisions: Some(10) }
     })
     .with_wnd_size(Size::new(300., 200.))
-    .with_comparison(0.002)
+    .with_comparison(0.0002)
   );
 }

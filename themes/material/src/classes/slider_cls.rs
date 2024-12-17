@@ -1,114 +1,77 @@
 use ribir_core::prelude::*;
 use ribir_widgets::prelude::*;
 
+use crate::md;
+
 const INDICATOR_HEIGHT: f32 = 44.;
 const TRACK_HEIGHT: f32 = 16.;
-const TRACK_WIDTH: f32 = 4.;
 
-const SMALL_RADIUS: f32 = 2.;
-const LARGE_RADIUS: f32 = 8.;
-const STOP_INDICATOR_MARGIN: EdgeInsets = EdgeInsets::horizontal(6.);
-const STOP_INDICATOR_SIZE: Size = Size::new(4., 4.);
+const RADIUS_L2_R8: Radius = Radius::new(2., 8., 2., 8.);
+const RADIUS_L8_R2: Radius = Radius::new(8., 2., 8., 2.);
 
 macro_rules! stop_indicator_class {
   ($($field: ident: $value: expr),* ) => {
     style_class! {
       v_align: VAlign::Center,
-      border_radius: Radius::all(SMALL_RADIUS),
-      margin: STOP_INDICATOR_MARGIN,
-      clamp: BoxClamp::fixed_size(STOP_INDICATOR_SIZE),
+      border_radius: md::RADIUS_2,
+      margin: md::EDGES_HOR_6,
+      clamp: BoxClamp::fixed_size(md::SIZE_4),
       $($field: $value),*
     }
   };
 }
 
 pub(super) fn init(classes: &mut Classes) {
-  classes.insert(
-    SLIDER_CONTAINER,
-    style_class!(
-      cursor: CursorIcon::Pointer,
-      clamp: BoxClamp::fixed_height(INDICATOR_HEIGHT)
-    ),
-  );
-  classes.insert(SLIDER_ACTIVE_TRACK, |w| {
-    fn_widget! {
-      let w = FatObj::new(w);
-      @ $w {
-        background: Palette::of(BuildCtx::get()).primary(),
-        border_radius: Radius::new(LARGE_RADIUS, SMALL_RADIUS, LARGE_RADIUS, SMALL_RADIUS),
-        clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
-      }
-    }
-    .into_widget()
+  classes.insert(SLIDER_CONTAINER, style_class! {
+    cursor: CursorIcon::Pointer,
+    clamp: BoxClamp::fixed_height(INDICATOR_HEIGHT)
+  });
+  classes.insert(SLIDER_ACTIVE_TRACK, style_class! {
+    background: BuildCtx::get().variant_color(),
+    border_radius: RADIUS_L8_R2,
+    clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
   });
 
-  classes.insert(SLIDER_INACTIVE_TRACK, |w| {
-    fn_widget! {
-      let w = FatObj::new(w);
-      @ $w {
-        border_radius: Radius::new(SMALL_RADIUS, LARGE_RADIUS, SMALL_RADIUS, LARGE_RADIUS),
-        background: Palette::of(BuildCtx::get()).secondary_container(),
-        clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
-      }
-    }
-    .into_widget()
+  classes.insert(SLIDER_INACTIVE_TRACK, style_class! {
+    border_radius: RADIUS_L2_R8,
+    background: BuildCtx::get().variant_container_color(),
+    clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
   });
 
-  classes.insert(SLIDER_INDICATOR, |w| {
-    fn_widget! {
-      let w = FatObj::new(w);
-      @ $w {
-        v_align: VAlign::Center,
-        background: Palette::of(BuildCtx::get()).primary(),
-        border_radius: Radius::all(SMALL_RADIUS),
-        margin: EdgeInsets::horizontal(6.),
-        clamp: BoxClamp::fixed_size(Size::new(TRACK_WIDTH, INDICATOR_HEIGHT)),
-      }
-    }
-    .into_widget()
+  classes.insert(SLIDER_INDICATOR, style_class! {
+    v_align: VAlign::Center,
+    background: BuildCtx::get().variant_color(),
+    border_radius: md::RADIUS_2,
+    margin: EdgeInsets::horizontal(6.),
+    clamp: BoxClamp::fixed_size(Size::new(md::THICKNESS_4, INDICATOR_HEIGHT)),
   });
 
-  classes.insert(RANGE_SLIDER_INACTIVE_TRACK_LEFT, |w| {
-    fn_widget! {
-      let w = FatObj::new(w);
-        @ $w {
-          border_radius: Radius::new(LARGE_RADIUS, SMALL_RADIUS, LARGE_RADIUS, SMALL_RADIUS),
-          background: Palette::of(BuildCtx::get()).secondary_container(),
-          clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
-        }
-    }
-    .into_widget()
+  classes.insert(RANGE_SLIDER_INACTIVE_TRACK_LEFT, style_class! {
+    border_radius: RADIUS_L8_R2,
+    background: BuildCtx::get().variant_container_color(),
+    clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
   });
 
-  classes.insert(RANGE_SLIDER_INACTIVE_TRACK_RIGHT, |w| {
-    fn_widget! {
-      let w = FatObj::new(w);
-        @ $w {
-          border_radius: Radius::new(SMALL_RADIUS, LARGE_RADIUS, SMALL_RADIUS, LARGE_RADIUS,),
-          background: Palette::of(BuildCtx::get()).secondary_container(),
-          clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
-        }
-    }
-    .into_widget()
+  classes.insert(RANGE_SLIDER_INACTIVE_TRACK_RIGHT, style_class! {
+    border_radius: RADIUS_L2_R8,
+    background: BuildCtx::get().variant_container_color(),
+    clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
   });
 
-  classes.insert(RANGE_SLIDER_ACTIVE_TRACK, |w| {
-    fn_widget! {
-      let w = FatObj::new(w);
-        @ $w {
-          border_radius: Radius::all(SMALL_RADIUS),
-          background: Palette::of(BuildCtx::get()).primary(),
-          clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
-        }
-    }
-    .into_widget()
+  classes.insert(RANGE_SLIDER_ACTIVE_TRACK, style_class! {
+    border_radius: md::RADIUS_2,
+    background: BuildCtx::get().variant_color(),
+    clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
   });
 
   classes.insert(STOP_INDICATOR_ACTIVE, stop_indicator_class! {
-    background: Palette::of(BuildCtx::get()).on_primary()
+    background: {
+      let ctx = BuildCtx::get();
+      Palette::of(ctx).on_of(&ctx.variant_color())
+    }
   });
 
   classes.insert(STOP_INDICATOR_INACTIVE, stop_indicator_class! {
-    background: Palette::of(BuildCtx::get()).on_secondary_container()
+    background: BuildCtx::get().variant_color()
   });
 }

@@ -45,10 +45,10 @@ pub(super) fn init(classes: &mut Classes) {
   });
   classes.insert(MD_BASE_SPINNER_TRACK, style_class! {
     class: MD_BASE_SPINNER,
-    foreground: BuildCtx::get().variant_color_container(),
+    foreground: BuildCtx::get().variant_container_color(),
   });
   classes.insert(LINEAR_INDETERMINATE_TRACK, style_class! {
-    background: BuildCtx::get().variant_color_container(),
+    background: BuildCtx::get().variant_container_color(),
     border_radius: md::RADIUS_2,
     margin: md::EDGES_LEFT_4,
   });
