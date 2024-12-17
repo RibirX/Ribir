@@ -76,6 +76,8 @@ pub const SIZE_10: Size = Size::new(10., 10.);
 pub const SIZE_20: Size = Size::new(20., 20.);
 pub const SIZE_40: Size = Size::new(40., 40.);
 
+pub const SIZE_4: Size = Size::new(4., 4.);
+pub const SIZE_8: Size = Size::new(8., 8.);
 pub const SIZE_18: Size = Size::new(18., 18.);
 pub const SIZE_24: Size = Size::new(24., 24.);
 pub const SIZE_36: Size = Size::new(36., 36.);
@@ -89,6 +91,8 @@ pub const EDGES_LEFT_4: EdgeInsets = EdgeInsets::only_left(4.);
 pub const EDGES_RIGHT_4: EdgeInsets = EdgeInsets::only_right(4.);
 pub const EDGES_TOP_4: EdgeInsets = EdgeInsets::only_top(4.);
 pub const EDGES_BOTTOM_4: EdgeInsets = EdgeInsets::only_bottom(4.);
+
+pub const EDGES_HOR_6: EdgeInsets = EdgeInsets::horizontal(6.);
 
 // Borders
 pub fn border_primary_2() -> Border {

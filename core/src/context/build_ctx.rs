@@ -40,10 +40,7 @@ impl BuildCtx {
   }
 
   /// The container color of the variant color.
-  pub fn variant_color_container(&self) -> Color {
-    let color = self.variant_color();
-    Palette::of(self).container_of(&color)
-  }
+  pub fn variant_container_color(&self) -> Color { Palette::of(self).secondary_container() }
 
   pub(crate) fn tree(&self) -> &WidgetTree {
     // Safety: Please refer to the comments in `WidgetTree::tree_mut` for more
