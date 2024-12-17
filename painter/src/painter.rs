@@ -642,11 +642,12 @@ impl Painter {
     let matrix = *self.transform();
 
     let bounds = g.bounds();
+    let middle_align_shift = face.x_height() as f32 / 2.;
     if let Some(path) = face.outline_glyph(g.glyph_id) {
       self
         .translate(bounds.min_x(), bounds.min_y())
         .scale(scale, -scale)
-        .translate(0., -unit)
+        .translate(0., -unit + middle_align_shift)
         .draw_path(path.into());
     } else if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
       let grid_scale = face
