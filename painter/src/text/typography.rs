@@ -197,26 +197,15 @@ where
 
   fn consume_run(&mut self, run: &InputRun, cursor: &mut impl InlineCursor) {
     let font_size = run.font_size_factor * GlyphUnit::PIXELS_PER_EM as f32;
+    let em = GlyphUnit::from_pixel(font_size);
     let text = run.text();
     let base = run.range.start as u32;
-    let em = GlyphUnit::from_pixel(font_size);
-    let line_offset = (em - GlyphUnit::STANDARD_EM) / 2.;
+    let line_offset = (self.line_height - em) / 2.;
     let is_auto_wrap = self.overflow.is_auto_wrap();
-
-    let verify_line_height = |this: &mut Self| {
-      let line = this.visual_lines.last_mut().unwrap();
-      if this.line_dir.is_horizontal() {
-        line.width = line.width.max(em)
-      } else {
-        line.height = line.height.max(em)
-      }
-    };
-    (verify_line_height)(self);
 
     let new_line = |this: &mut Self, cursor: &mut dyn InlineCursor| {
       this.end_line();
       this.begin_line();
-      (verify_line_height)(this);
       cursor.reset();
     };
 
@@ -259,19 +248,24 @@ where
     line.unwrap().glyphs.push(g)
   }
 
-  fn begin_line(&mut self) { self.visual_lines.push(<_>::default()); }
+  fn begin_line(&mut self) {
+    let mut line = VisualLine::default();
+    if self.line_dir.is_horizontal() {
+      line.width = self.line_height;
+    } else {
+      line.height = self.line_height;
+    }
+    self.visual_lines.push(line);
+  }
 
   fn end_line(&mut self) {
     let line = self.visual_lines.last_mut().unwrap();
     // we will reorder the line after consumed all inputs.
     if self.line_dir.is_horizontal() {
       line.height = self.inline_cursor;
-      line.width = self.line_height;
     } else {
       line.width = self.inline_cursor;
-      line.height = self.line_height;
     }
-
     self.over_bounds |= self.is_over_line_bound(self.inline_cursor);
     self.over_bounds |= self.is_last_line_over();
     self.inline_cursor = GlyphUnit::ZERO;

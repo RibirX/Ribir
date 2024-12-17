@@ -25,26 +25,31 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Added `Measure` to enable support for percentage values for position, and `Anchor` now supports percentage values. (#672 @M-Adoo)
+- **core**: Add APIs `AppCtx::once_next_frame`, `Window::once_next_frame`, `Window::once_frame_finished` and `Window::once_before_layout`. (#672 @M-Adoo)
+
 ### Fixed
 
-- **core**: fix set opacity zero no work to it's children. (#671 @wjian23)
+- **core**: Fix set opacity zero no work to it's children. (#671 @wjian23)
 - **core**: Fix TextStyle cause providers mismatched (#671 @wjian23)
+- **core**: Running an animation that is already in progress does not trigger a smooth transition. (#672 @M-Adoo)
+- **core**: The framework incorrectly clamps the layout result of the render widget. (#672 @M-Adoo)
+- **painter**: Fixed text line height does not work correctly. (#pr @M-Adoo)
+- **painter**: Fixed issue with text not being drawn at the middle baseline by default. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.19] - 2024-12-18
 
 ### Features
 
 - **core**: Added `grab_pointer` to grabs all the pointer input. (#669 @wjian23)
-- **core**: Added `Measure` to enable support for percentage values for position, and `Anchor` now supports percentage values. (#672 @M-Adoo)
-- **core**: Add APIs `AppCtx::once_next_frame`, `Window::once_next_frame`, `Window::once_frame_finished` and `Window::once_before_layout`. (#672 @M-Adoo)
 - **widgets**: Added the widget of Slider (#669 @wjian23)
 
 ### Fixed
 
 - **core**: Fix mismatch of providers. (#669 @wjian23)
 - **core**: Added DeclarerWithSubscription to let Widget `Expanded` accept pipe value. (#669 @wjian23)
-- **core**: Running an animation that is already in progress does not trigger a smooth transition. (#672 @M-Adoo)
-- **core**: The framework incorrectly clamps the layout result of the render widget. (#672 @M-Adoo)
 
 ## [0.4.0-alpha.18] - 2024-12-11
 
