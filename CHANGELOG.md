@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.19] - 2024-12-18
+
 ### Features
 
 - **core**: Added `grab_pointer` to grabs all the pointer input. (#669 @wjian23)
@@ -539,7 +541,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.18...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.19...HEAD
+[0.4.0-alpha.19]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.18...ribir-v0.4.0-alpha.19
 [0.4.0-alpha.18]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.17...ribir-v0.4.0-alpha.18
 [0.4.0-alpha.17]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.15...ribir-v0.4.0-alpha.17
 [0.4.0-alpha.15]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.14...ribir-v0.4.0-alpha.15
