@@ -19,6 +19,17 @@ pub struct FontDB {
   cache: HashMap<ID, Option<Face>>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum GlyphBaseline {
+  /// The glyph baseline is the normal alphabetic baseline, which is the default
+  /// value.
+  #[default]
+  Alphabetic,
+  /// This option adjusts the baseline to position the capital letter in the
+  /// middle of the em box.
+  Middle,
+}
+
 type FontGlyphCache<K, V> = Sc<RefCell<HashMap<K, Option<V>>>>;
 #[derive(Clone)]
 pub struct Face {
@@ -30,6 +41,7 @@ pub struct Face {
   outline_glyphs: FontGlyphCache<GlyphId, Resource<Path>>,
   svg_glyphs: Sc<RefCell<SvgGlyphCache>>,
   x_height: u16,
+  cap_height: i16,
   ascender: i16,
   descender: i16,
 }
@@ -287,6 +299,9 @@ impl Face {
       }
     }
     .get();
+    let cap_height = rb_face
+      .capital_height()
+      .unwrap_or((x_height as f32 * 1.4) as i16);
 
     Some(Face {
       source_data,
@@ -299,6 +314,7 @@ impl Face {
       x_height,
       ascender,
       descender,
+      cap_height,
     })
   }
 
@@ -307,6 +323,14 @@ impl Face {
   pub fn descender(&self) -> i16 { self.descender }
 
   pub fn x_height(&self) -> u16 { self.x_height }
+
+  pub fn baseline_offset(&self, baseline: GlyphBaseline) -> i16 {
+    match baseline {
+      GlyphBaseline::Alphabetic => 0,
+      GlyphBaseline::Middle => (self.units_per_em() as i16 - self.cap_height) / 2,
+    }
+  }
+
   #[inline]
   pub fn has_char(&self, c: char) -> bool { self.rb_face.as_ref().glyph_index(c).is_some() }
 

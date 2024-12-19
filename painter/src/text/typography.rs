@@ -119,20 +119,30 @@ where
 
   fn adjust_lines(&mut self, visual_width: GlyphUnit, visual_height: GlyphUnit) {
     let text_align = self.text_align;
-
+    let lines = self.visual_lines.iter_mut();
     match self.line_dir {
-      PlaceLineDirection::LeftToRight | PlaceLineDirection::RightToLeft => {
-        let mut x_offset = GlyphUnit::ZERO;
-        self.visual_lines.iter_mut().for_each(move |l| {
-          l.x = x_offset;
-          x_offset += l.width;
+      PlaceLineDirection::LeftToRight => {
+        lines.fold(GlyphUnit::ZERO, move |offset, l| {
+          l.x = offset;
+          offset + l.width
         });
       }
-      PlaceLineDirection::TopToBottom | PlaceLineDirection::BottomToTop => {
-        let mut y_offset = GlyphUnit::ZERO;
-        self.visual_lines.iter_mut().for_each(move |l| {
-          l.y = y_offset;
-          y_offset += l.height;
+      PlaceLineDirection::RightToLeft => {
+        lines.fold(visual_width, |offset, l| {
+          l.x = offset - l.width;
+          l.x
+        });
+      }
+      PlaceLineDirection::TopToBottom => {
+        lines.fold(GlyphUnit::ZERO, move |offset, l| {
+          l.y = offset;
+          offset + l.height
+        });
+      }
+      PlaceLineDirection::BottomToTop => {
+        lines.fold(visual_height, |offset, l| {
+          l.y = offset - l.height;
+          l.y
         });
       }
     };
@@ -408,6 +418,20 @@ impl PlaceLineDirection {
 impl VisualLine {
   pub fn line_height(&self, line_dir: PlaceLineDirection) -> GlyphUnit {
     if line_dir.is_horizontal() { self.width } else { self.height }
+  }
+
+  pub fn glyphs_iter(&self, hor_line: bool) -> impl DoubleEndedIterator<Item = Glyph> + '_ {
+    self.glyphs.iter().map(move |g| {
+      let mut g = g.clone();
+      g.x_offset += self.x;
+      g.y_offset += self.y;
+      if hor_line {
+        g.y_advance = self.height;
+      } else {
+        g.x_advance = self.width;
+      }
+      g
+    })
   }
 }
 
