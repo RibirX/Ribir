@@ -98,16 +98,6 @@ pub enum SpreadMethod {
   Repeat,
 }
 
-impl From<usvg::SpreadMethod> for SpreadMethod {
-  fn from(value: usvg::SpreadMethod) -> Self {
-    match value {
-      usvg::SpreadMethod::Pad => SpreadMethod::Pad,
-      usvg::SpreadMethod::Reflect => SpreadMethod::Reflect,
-      usvg::SpreadMethod::Repeat => SpreadMethod::Repeat,
-    }
-  }
-}
-
 /// A path and its geometry information are friendly to paint and cache.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PathCommand {
@@ -637,17 +627,15 @@ impl Painter {
     let Some(face) = font_db.try_get_face_data(g.face_id) else { return self };
 
     let unit = face.units_per_em() as f32;
-    let scale = font_size / unit;
-
     let matrix = *self.transform();
 
     let bounds = g.bounds();
-    let middle_align_shift = face.x_height() as f32 / 2.;
     if let Some(path) = face.outline_glyph(g.glyph_id) {
+      let scale = font_size / unit;
       self
         .translate(bounds.min_x(), bounds.min_y())
         .scale(scale, -scale)
-        .translate(0., -unit + middle_align_shift)
+        .translate(0., -unit)
         .draw_path(path.into());
     } else if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
       let grid_scale = face
@@ -689,12 +677,16 @@ impl Painter {
     let Some(paint_rect) = self.intersection_paint_bounds(&box_rect) else {
       return self;
     };
+    let Some(glyphs) = visual_glyphs.glyphs_in_bounds(&paint_rect) else {
+      return self;
+    };
+
     if !paint_rect.contains_rect(&visual_rect) {
       self.clip(Path::rect(&paint_rect).into());
     }
     self.translate(visual_rect.origin.x, visual_rect.origin.y);
 
-    for g in visual_glyphs.glyphs_in_bounds(&paint_rect) {
+    for g in glyphs {
       self.draw_glyph(&g, visual_glyphs.font_size(), font_db);
     }
 
@@ -900,6 +892,17 @@ impl CommandBrush {
     self
   }
 }
+
+impl From<usvg::SpreadMethod> for SpreadMethod {
+  fn from(value: usvg::SpreadMethod) -> Self {
+    match value {
+      usvg::SpreadMethod::Pad => SpreadMethod::Pad,
+      usvg::SpreadMethod::Reflect => SpreadMethod::Reflect,
+      usvg::SpreadMethod::Repeat => SpreadMethod::Repeat,
+    }
+  }
+}
+
 // bounds that has a limited location and size
 fn locatable_bounds(bounds: &Rect) -> bool {
   bounds.origin.is_finite() && !bounds.width().is_nan() && !bounds.height().is_nan()

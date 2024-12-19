@@ -239,6 +239,7 @@ mod tests {
       &style,
       Size::new(GlyphUnit::PIXELS_PER_EM as f32 * 5.0, GlyphUnit::PIXELS_PER_EM as f32 * 3.0),
       TextAlign::Start,
+      font_db::GlyphBaseline::Alphabetic,
       PlaceLineDirection::TopToBottom,
     );
 

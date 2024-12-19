@@ -1,5 +1,6 @@
 use std::{cell::RefCell, ops::Range};
 
+use font_db::GlyphBaseline;
 use ribir_algo::{FrameCache, Sc, Substr};
 use ribir_geom::{Point, Rect, Size};
 
@@ -27,6 +28,7 @@ pub struct TypographyKey {
   /// us to determine if a cache can be reused even if its bounds are different.
   line_width: GlyphUnit,
   text_align: TextAlign,
+  baseline: GlyphBaseline,
   line_dir: PlaceLineDirection,
   overflow: TextOverflow,
 }
@@ -89,7 +91,7 @@ impl TypographyStore {
   /// Do a simply typography that only support single style.
   pub fn typography(
     &mut self, text: Substr, style: &TextStyle, bounds: Size, text_align: TextAlign,
-    line_dir: PlaceLineDirection,
+    baseline: GlyphBaseline, line_dir: PlaceLineDirection,
   ) -> VisualGlyphs {
     let TextStyle { font_size, ref font_face, letter_space, line_height, overflow } = *style;
     // Since we cache the result of the standard font size, we must ensure that all
@@ -111,7 +113,7 @@ impl TypographyStore {
       .select_all_match(font_face)
       .into_boxed_slice();
     let runs = [RunKey { ids, line_height, letter_space, text }].into();
-    let key = TypographyKey::new(runs, bounds, text_align, line_dir, overflow);
+    let key = TypographyKey::new(runs, bounds, text_align, line_dir, overflow, baseline);
     let infos = if let Some(infos) = self.cache.get(&key).cloned() {
       infos
     } else {
@@ -129,7 +131,7 @@ impl TypographyStore {
 
             let shape_result = self
               .shaper
-              .shape_text(&text.substr(r.clone()), ids, dir);
+              .shape_text(&text.substr(r.clone()), ids, dir, baseline);
             InputRun::new(shape_result, 1., letter_space, r.clone())
           })
           .collect()
@@ -391,51 +393,43 @@ impl VisualGlyphs {
   fn to_pixel_value(&self, v: GlyphUnit) -> f32 { v.cast_to(self.font_size).into_pixel() }
 
   pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + '_ {
+    let hor_line = self.is_horizontal_line();
     self
       .visual_info
       .visual_lines
       .iter()
-      .flat_map(move |l| {
-        l.glyphs.iter().map(|g| {
-          let mut g = g.clone();
-          g.x_offset += l.x;
-          g.y_offset += l.y;
-          g
-        })
-      })
+      .flat_map(move |l| l.glyphs_iter(hor_line))
       .map(move |g| g.cast_to(self.font_size))
   }
 
-  pub fn glyphs_in_bounds(&self, rc: &Rect) -> impl Iterator<Item = Glyph> + '_ {
+  pub fn glyphs_in_bounds(&self, rc: &Rect) -> Option<impl Iterator<Item = Glyph> + '_> {
     let visual_rect = self.visual_rect();
-    let mut rc = visual_rect.intersection(rc).unwrap_or_default();
+    let mut rc = visual_rect.intersection(rc)?;
     rc.origin -= visual_rect.origin.to_vector();
+
     let scale = self.font_size / GlyphUnit::PIXELS_PER_EM as f32;
     let min_x = GlyphUnit::from_pixel(rc.min_x() / scale);
     let min_y = GlyphUnit::from_pixel(rc.min_y() / scale);
     let max_x = GlyphUnit::from_pixel(rc.max_x() / scale);
     let max_y = GlyphUnit::from_pixel(rc.max_y() / scale);
-    let is_hline = !self.visual_info.line_dir.is_horizontal();
-    self
+
+    let hor_line = self.is_horizontal_line();
+    let iter = self
       .visual_info
       .visual_lines
       .iter()
-      .filter(move |l| !(l.y + l.height < min_y || max_y < l.y))
-      .flat_map(move |l| {
-        l.glyphs.iter().map(move |g| {
-          let mut g = g.clone();
-          g.x_offset += l.x;
-          g.y_offset += l.y;
-          if is_hline {
-            g.y_advance = l.height;
-          } else {
-            g.x_advance = l.width;
-          }
-          g
-        })
+      .filter(move |l| {
+        min_x < l.x + l.width && l.x < max_x && min_y < l.y + l.height && l.y < max_y
       })
-      .filter(move |g| !(g.x_offset + g.x_advance < min_x || max_x < g.x_offset))
-      .map(move |g| g.cast_to(self.font_size))
+      .flat_map(move |l| l.glyphs_iter(hor_line))
+      .filter(move |g| {
+        min_x < g.x_offset + g.x_advance
+          && g.x_offset < max_x
+          && min_y < g.y_offset + g.y_advance
+          && g.y_offset < max_y
+      })
+      .map(move |g| g.cast_to(self.font_size));
+    Some(iter)
   }
 
   pub fn glyph_count(&self, row: usize, ignore_new_line: bool) -> usize {
@@ -461,12 +455,14 @@ impl VisualGlyphs {
   }
 
   pub fn glyph_row_count(&self) -> usize { self.visual_info.visual_lines.len() }
+
+  fn is_horizontal_line(&self) -> bool { !self.visual_info.line_dir.is_horizontal() }
 }
 
 impl TypographyKey {
   fn new(
     runs: Box<[RunKey]>, bounds: Size<GlyphUnit>, text_align: TextAlign,
-    line_dir: PlaceLineDirection, overflow: TextOverflow,
+    line_dir: PlaceLineDirection, overflow: TextOverflow, baseline: GlyphBaseline,
   ) -> Self {
     let line_width = match overflow {
       // line width is not so important in clip mode, the cache can be use even with difference line
@@ -482,7 +478,7 @@ impl TypographyKey {
       }
     };
 
-    Self { runs, line_width, text_align, line_dir, overflow }
+    Self { runs, line_width, text_align, line_dir, overflow, baseline }
   }
 }
 
@@ -515,7 +511,7 @@ mod tests {
     line_dir: PlaceLineDirection,
   ) -> VisualGlyphs {
     let mut store = test_store();
-    store.typography(text, style, bounds, text_align, line_dir)
+    store.typography(text, style, bounds, text_align, GlyphBaseline::Alphabetic, line_dir)
   }
 
   #[test]
@@ -582,6 +578,7 @@ mod tests {
       let visual_rc = info.visual_rect();
       info
         .glyphs_in_bounds(&Rect::from_size(bounds))
+        .unwrap()
         .map(|g| {
           let bounds = g.bounds();
           (visual_rc.origin.x + bounds.min_x(), visual_rc.origin.y + bounds.min_y())
@@ -658,27 +655,27 @@ mod tests {
 
     assert_eq!(&bottom, &[
       // first line
-      (0.0, 80.0),
-      (10.1796875, 80.0),
-      (18.297852, 80.0),
-      (24.40918, 80.0),
-      (29.1875, 80.0),
-      (37.535156, 80.0),
+      (0.0, 90.),
+      (10.1796875, 90.),
+      (18.297852, 90.),
+      (24.40918, 90.),
+      (29.1875, 90.),
+      (37.535156, 90.),
       // second line
-      (0.0, 90.0),
-      (9.520508, 90.0),
-      (17.672852, 90.0),
-      (22.451172, 90.0),
-      (27.229492, 90.0),
-      (35.533203, 90.0),
-      (41.1416, 90.0),
-      (46.75, 90.0),
-      (52.3584, 90.0),
-      (57.967773, 90.0),
-      (63.57617, 90.0),
-      (69.18457, 90.0),
-      (74.79297, 90.0),
-      (80.40137, 90.0)
+      (0.0, 80.),
+      (9.520508, 80.),
+      (17.672852, 80.),
+      (22.451172, 80.),
+      (27.229492, 80.),
+      (35.533203, 80.),
+      (41.1416, 80.),
+      (46.75, 80.),
+      (52.3584, 80.),
+      (57.967773, 80.),
+      (63.57617, 80.),
+      (69.18457, 80.),
+      (74.79297, 80.),
+      (80.40137, 80.)
     ],);
 
     let center_clip = glyphs(
@@ -721,6 +718,7 @@ mod tests {
       &style,
       Size::new(f32::MAX, f32::MAX),
       TextAlign::Start,
+      GlyphBaseline::Alphabetic,
       PlaceLineDirection::TopToBottom,
     );
 
@@ -733,6 +731,7 @@ mod tests {
       &style,
       Size::new(f32::MAX, f32::MAX),
       TextAlign::Start,
+      GlyphBaseline::Alphabetic,
       PlaceLineDirection::TopToBottom,
     );
 
@@ -810,6 +809,7 @@ mod tests {
       &style,
       Size::new(10. * GlyphUnit::PIXELS_PER_EM as f32, 2. * GlyphUnit::PIXELS_PER_EM as f32),
       TextAlign::Center,
+      GlyphBaseline::Alphabetic,
       PlaceLineDirection::TopToBottom,
     );
 
@@ -818,6 +818,7 @@ mod tests {
       &style,
       Size::new(20.0 * GlyphUnit::PIXELS_PER_EM as f32, 2.0 * GlyphUnit::PIXELS_PER_EM as f32),
       TextAlign::Center,
+      GlyphBaseline::Alphabetic,
       PlaceLineDirection::TopToBottom,
     );
 

@@ -1,4 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
+use font_db::GlyphBaseline;
 use ribir_painter::{shaper::*, *};
 
 fn shape_1k(c: &mut Criterion) {
@@ -20,7 +21,7 @@ fn shape_1k(c: &mut Criterion) {
       shaper.end_frame();
 
       let str = include_str!("../../LICENSE").into();
-      shaper.shape_text(&str, &ids, TextDirection::LeftToRight)
+      shaper.shape_text(&str, &ids, TextDirection::LeftToRight, GlyphBaseline::Alphabetic)
     })
   });
 }

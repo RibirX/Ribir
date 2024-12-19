@@ -19,6 +19,15 @@ pub struct FontDB {
   cache: HashMap<ID, Option<Face>>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum GlyphBaseline {
+  /// The glyph baseline is the normal alphabetic baseline. Default value.
+  #[default]
+  Alphabetic,
+  /// The text baseline is the middle of the em square.
+  Middle,
+}
+
 type FontGlyphCache<K, V> = Sc<RefCell<HashMap<K, Option<V>>>>;
 #[derive(Clone)]
 pub struct Face {
@@ -307,6 +316,18 @@ impl Face {
   pub fn descender(&self) -> i16 { self.descender }
 
   pub fn x_height(&self) -> u16 { self.x_height }
+
+  pub fn baseline_offset(&self, baseline: GlyphBaseline) -> i16 {
+    match baseline {
+      GlyphBaseline::Alphabetic => 0,
+      GlyphBaseline::Middle => {
+        let unit = self.units_per_em();
+        let x_height = self.x_height();
+        (unit / 2) as i16 - (x_height / 2) as i16
+      }
+    }
+  }
+
   #[inline]
   pub fn has_char(&self, c: char) -> bool { self.rb_face.as_ref().glyph_index(c).is_some() }
 
