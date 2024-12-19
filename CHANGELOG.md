@@ -29,6 +29,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Added `Measure` to enable support for percentage values for position, and `Anchor` now supports percentage values. (#672 @M-Adoo)
 - **core**: Add APIs `AppCtx::once_next_frame`, `Window::once_next_frame`, `Window::once_frame_finished` and `Window::once_before_layout`. (#672 @M-Adoo)
+- **painter**: Typography now supports baselines (middle and alphabetic). (#pr @M-Adoo)
 
 ### Fixed
 

@@ -7,6 +7,7 @@ use ribir_algo::{FrameCache, Sc, Substr};
 pub use rustybuzz::ttf_parser::GlyphId;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
 
+use super::{GlyphUnit, font_db::GlyphBaseline};
 use crate::{
   Glyph, TextDirection,
   font_db::{Face, FontDB, ID},
@@ -33,6 +34,7 @@ struct ShapeKey {
   face_ids: Box<[ID]>,
   text: Substr,
   direction: TextDirection,
+  baseline: GlyphBaseline,
 }
 
 struct GlyphsWithoutFallback {
@@ -49,13 +51,13 @@ impl TextShaper {
   /// Shape text and return the glyphs, caller should do text reorder before
   /// call this method.
   pub fn shape_text(
-    &mut self, text: &Substr, face_ids: &[ID], direction: TextDirection,
+    &mut self, text: &Substr, face_ids: &[ID], direction: TextDirection, baseline: GlyphBaseline,
   ) -> Sc<ShapeResult> {
-    if let Some(res) = self.get_cache(text, face_ids, direction) {
+    if let Some(res) = self.get_cache(text, face_ids, direction, baseline) {
       res.clone()
     } else {
       let mut glyphs = self
-        .shape_text_with_fallback(text, direction, face_ids)
+        .shape_text_with_fallback(text, direction, face_ids, baseline)
         .unwrap_or_default();
 
       if let Some(last_char) = text.bytes().last() {
@@ -67,16 +69,17 @@ impl TextShaper {
       }
 
       let glyphs = Sc::new(ShapeResult { text: text.clone(), glyphs });
-      self
-        .shape_cache
-        .put(ShapeKey { face_ids: face_ids.into(), text: text.clone(), direction }, glyphs.clone());
+      self.shape_cache.put(
+        ShapeKey { face_ids: face_ids.into(), text: text.clone(), direction, baseline },
+        glyphs.clone(),
+      );
       glyphs
     }
   }
 
   /// Directly shape text without bidi reordering.
   pub fn shape_text_with_fallback(
-    &self, text: &str, dir: TextDirection, face_ids: &[ID],
+    &self, text: &str, dir: TextDirection, face_ids: &[ID], baseline: GlyphBaseline,
   ) -> Option<Vec<Glyph>> {
     let mut font_fallback = FallBackFaceHelper::new(face_ids, &self.font_db);
     let face = font_fallback.next_fallback_face(text)?;
@@ -84,41 +87,54 @@ impl TextShaper {
     buffer.push_str(text);
     buffer.set_direction(dir.into());
 
-    let GlyphsWithoutFallback { mut glyphs, mut buffer } = Self::directly_shape(buffer, &face);
+    let GlyphsWithoutFallback { mut glyphs, mut buffer } =
+      Self::directly_shape(buffer, baseline, dir.is_horizontal(), &face);
     let mut new_part = vec![(0, glyphs.len(), font_fallback.clone())];
     loop {
       if new_part.is_empty() {
         break;
       }
       let miss_part = collect_miss_part(&glyphs, &new_part);
-      (buffer, new_part) = regen_miss_part(text, dir, &mut glyphs, miss_part, buffer);
+      (buffer, new_part) = regen_miss_part(text, dir, baseline, &mut glyphs, miss_part, buffer);
     }
 
     Some(glyphs)
   }
 
-  fn directly_shape(text: UnicodeBuffer, face: &Face) -> GlyphsWithoutFallback {
+  fn directly_shape(
+    text: UnicodeBuffer, baseline: GlyphBaseline, hor_text: bool, face: &Face,
+  ) -> GlyphsWithoutFallback {
     let output = rustybuzz::shape(face.as_rb_face(), &[], text);
     let mut glyphs = Vec::with_capacity(output.len());
 
     let infos = output.glyph_infos();
     let positions = output.glyph_positions();
 
+    let shift = face.baseline_offset(baseline);
+    let scale = GlyphUnit::UNITS_PER_EM as f32 / face.units_per_em() as f32;
+    let shift = GlyphUnit::new(f32::ceil(shift as f32 * scale) as i32);
+
     (0..output.len()).for_each(|idx| {
       let &GlyphInfo { glyph_id, cluster, .. } = &infos[idx];
       let p = &positions[idx];
-      glyphs.push(Glyph::new(GlyphId(glyph_id as u16), cluster, p, face))
+      let mut g = Glyph::new(GlyphId(glyph_id as u16), cluster, p, face);
+      if hor_text {
+        g.y_offset -= shift;
+      } else {
+        g.x_offset -= shift;
+      }
+      glyphs.push(g)
     });
 
     GlyphsWithoutFallback { glyphs, buffer: output.clear() }
   }
 
   pub fn get_cache(
-    &mut self, text: &str, face_ids: &[ID], direction: TextDirection,
+    &mut self, text: &str, face_ids: &[ID], direction: TextDirection, baseline: GlyphBaseline,
   ) -> Option<Sc<ShapeResult>> {
     self
       .shape_cache
-      .get(&(face_ids, text, direction) as &(dyn ShapeKeySlice))
+      .get(&(face_ids, text, direction, baseline) as &(dyn ShapeKeySlice))
       .cloned()
   }
 
@@ -165,7 +181,7 @@ fn collect_miss_part<'a>(
 }
 
 fn regen_miss_part<'a>(
-  text: &str, dir: TextDirection, glyphs: &mut Vec<Glyph>,
+  text: &str, dir: TextDirection, baseline: GlyphBaseline, glyphs: &mut Vec<Glyph>,
   miss_part: Vec<(usize, usize, FallBackFaceHelper<'a>)>, mut buffer: UnicodeBuffer,
 ) -> (UnicodeBuffer, Vec<(usize, usize, FallBackFaceHelper<'a>)>) {
   let is_rtl = matches!(dir, TextDirection::RightToLeft | TextDirection::BottomToTop);
@@ -195,7 +211,7 @@ fn regen_miss_part<'a>(
     if let Some(face) = helper.next_fallback_face(miss_text) {
       buffer.push_str(miss_text);
       buffer.set_direction(hb_direction);
-      let mut res = TextShaper::directly_shape(buffer, &face);
+      let mut res = TextShaper::directly_shape(buffer, baseline, dir.is_horizontal(), &face);
       buffer = res.buffer;
       for g in res.glyphs.iter_mut() {
         g.cluster += miss_range.start as u32;
@@ -213,6 +229,7 @@ trait ShapeKeySlice {
   fn face_ids(&self) -> &[ID];
   fn text(&self) -> &str;
   fn direction(&self) -> TextDirection;
+  fn baseline(&self) -> GlyphBaseline;
 }
 
 impl<'a> std::borrow::Borrow<dyn ShapeKeySlice + 'a> for ShapeKey {
@@ -224,6 +241,7 @@ impl Hash for dyn ShapeKeySlice + '_ {
     self.face_ids().hash(state);
     self.text().hash(state);
     self.direction().hash(state);
+    self.baseline().hash(state);
   }
 }
 
@@ -232,6 +250,7 @@ impl PartialEq for dyn ShapeKeySlice + '_ {
     self.face_ids() == other.face_ids()
       && self.text() == other.text()
       && self.direction() == other.direction()
+      && self.baseline() == other.baseline()
   }
 }
 
@@ -243,14 +262,18 @@ impl ShapeKeySlice for ShapeKey {
   fn text(&self) -> &str { &self.text }
 
   fn direction(&self) -> TextDirection { self.direction }
+
+  fn baseline(&self) -> GlyphBaseline { self.baseline }
 }
 
-impl ShapeKeySlice for (&[ID], &str, TextDirection) {
+impl ShapeKeySlice for (&[ID], &str, TextDirection, GlyphBaseline) {
   fn face_ids(&self) -> &[ID] { self.0 }
 
   fn text(&self) -> &str { self.1 }
 
   fn direction(&self) -> TextDirection { self.2 }
+
+  fn baseline(&self) -> GlyphBaseline { self.3 }
 }
 
 impl From<TextDirection> for rustybuzz::Direction {
@@ -338,18 +361,30 @@ mod tests {
         ..<_>::default()
       });
     let dir = TextDirection::LeftToRight;
-
+    let baseline = GlyphBaseline::Alphabetic;
     // No cache exists
-    assert!(shaper.get_cache(&text, &ids, dir).is_none());
+    assert!(
+      shaper
+        .get_cache(&text, &ids, dir, baseline)
+        .is_none()
+    );
 
-    let result = shaper.shape_text(&text, &ids, dir);
+    let result = shaper.shape_text(&text, &ids, dir, GlyphBaseline::Alphabetic);
     assert_eq!(result.glyphs.len(), 6);
 
-    assert!(shaper.get_cache(&text, &ids, dir).is_some());
+    assert!(
+      shaper
+        .get_cache(&text, &ids, dir, baseline)
+        .is_some()
+    );
 
     shaper.end_frame();
     shaper.end_frame();
-    assert!(shaper.get_cache(&text, &ids, dir).is_none());
+    assert!(
+      shaper
+        .get_cache(&text, &ids, dir, baseline)
+        .is_none()
+    );
   }
 
   #[test]
@@ -385,7 +420,12 @@ mod tests {
       });
 
     let dir = TextDirection::LeftToRight;
-    let latin1 = shaper.shape_text(&"hello world! 你好，世界".into(), &ids_latin, dir);
+    let latin1 = shaper.shape_text(
+      &"hello world! 你好，世界".into(),
+      &ids_latin,
+      dir,
+      GlyphBaseline::Alphabetic,
+    );
     assert_eq!(
       latin1
         .glyphs
@@ -401,7 +441,12 @@ mod tests {
       (13, 5)
     );
 
-    let fallback_chinese = shaper.shape_text(&"hello world! 你好，世界".into(), &ids_all, dir);
+    let fallback_chinese = shaper.shape_text(
+      &"hello world! 你好，世界".into(),
+      &ids_all,
+      dir,
+      GlyphBaseline::Alphabetic,
+    );
     let clusters = fallback_chinese
       .glyphs
       .iter()
@@ -421,7 +466,7 @@ mod tests {
     let mut shaper = TextShaper::new(<_>::default());
 
     let dir = TextDirection::LeftToRight;
-    let result = shaper.shape_text(&"你好世界".into(), &[], dir);
+    let result = shaper.shape_text(&"你好世界".into(), &[], dir, GlyphBaseline::Alphabetic);
     assert_eq!(result.glyphs.len(), 4);
   }
 
@@ -449,7 +494,12 @@ mod tests {
           ]),
           ..<_>::default()
         });
-      let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
+      let res = shaper.shape_text(
+        &text.substr(..),
+        &ids,
+        TextDirection::LeftToRight,
+        GlyphBaseline::Alphabetic,
+      );
       assert_eq!(res.glyphs.len(), 8);
       assert!(res.glyphs.iter().all(|glyph| glyph.is_miss()));
     }
@@ -470,7 +520,12 @@ mod tests {
           ..<_>::default()
         });
       shaper.shape_cache.clear();
-      let res = shaper.shape_text(&text.substr(..), &ids, TextDirection::LeftToRight);
+      let res = shaper.shape_text(
+        &text.substr(..),
+        &ids,
+        TextDirection::LeftToRight,
+        GlyphBaseline::Alphabetic,
+      );
       assert!(res.glyphs.len() == 8);
       assert!(res.glyphs.iter().all(|glyph| glyph.is_not_miss()));
     }
@@ -499,7 +554,12 @@ mod tests {
         ..<_>::default()
       });
 
-    let res = shaper.shape_text(&"👨‍👩‍👦‍👦".into(), &ids_all, TextDirection::LeftToRight);
+    let res = shaper.shape_text(
+      &"👨‍👩‍👦‍👦".into(),
+      &ids_all,
+      TextDirection::LeftToRight,
+      GlyphBaseline::Alphabetic,
+    );
     assert!(res.glyphs.len() == 7);
   }
 }

@@ -1,5 +1,6 @@
 use std::cell::{Ref, RefCell};
 
+use font_db::GlyphBaseline;
 use typography::PlaceLineDirection;
 
 use crate::prelude::*;
@@ -25,6 +26,7 @@ impl Render for Text {
         style,
         clamp.max,
         self.text_align,
+        GlyphBaseline::Middle,
         PlaceLineDirection::TopToBottom,
       );
 
