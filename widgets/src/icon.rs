@@ -107,7 +107,7 @@ impl Render for IconRender {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let icon_size = ctx.text_style().line_height;
     let child_size = ctx
-      .perform_single_child_layout(clamp.expand())
+      .perform_single_child_layout(BoxClamp::default())
       .unwrap_or_default();
     let scale = icon_size / child_size.width.max(child_size.height);
     self.scale.set(scale);
@@ -124,7 +124,10 @@ impl Render for IconRender {
       if real_size.greater_than(size).any() {
         painter.clip(Path::rect(&Rect::from_size(size)).into());
       }
-      painter.scale(scale, scale);
+      let offset = (size - real_size) / 2.0;
+      painter
+        .translate(offset.width, offset.height)
+        .scale(scale, scale);
     }
   }
 
@@ -157,6 +160,11 @@ mod tests {
         @ { "search" }
       }
       @Icon { @SpinnerProgress { value: Some(0.8) }}
+      @Icon {
+        background: Color::RED,
+        clamp: BoxClamp::fixed_size(Size::splat(48.)),
+        @ { "search" }
+      }
     })
     .with_wnd_size(Size::new(128., 64.))
     .with_env_init(|| {

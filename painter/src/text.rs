@@ -191,6 +191,8 @@ impl GlyphUnit {
   pub const MAX: Self = Self(i32::MAX);
   pub const STANDARD_EM: Self = Self(Self::UNITS_PER_EM as i32);
 
+  pub fn new(pos: i32) -> Self { Self(pos) }
+
   pub fn from_pixel(pos: f32) -> Self { Self(f32::ceil(pos * Self::UNITS_PER_PIXEL as f32) as i32) }
 
   pub fn max(&self, other: Self) -> Self { Self(self.0.max(other.0)) }

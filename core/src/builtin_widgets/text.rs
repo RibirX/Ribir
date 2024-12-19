@@ -1,5 +1,6 @@
 use std::cell::{Ref, RefCell};
 
+use font_db::GlyphBaseline;
 use typography::PlaceLineDirection;
 
 use crate::prelude::*;
@@ -25,6 +26,7 @@ impl Render for Text {
         style,
         clamp.max,
         self.text_align,
+        GlyphBaseline::Middle,
         PlaceLineDirection::TopToBottom,
       );
 
@@ -127,6 +129,27 @@ mod tests {
     h1,
     WidgetTester::new(fn_widget! {
       @H1 { text: "Hello ribir!" }
+    })
+    .with_wnd_size(WND_SIZE)
+    .with_comparison(0.000025)
+  );
+
+  widget_image_tests!(
+    middle_baseline,
+    WidgetTester::new(self::column! {
+      item_gap: 8.,
+      @Text {
+        text: "Baseline check!",
+        font_size: 20.,
+        text_line_height: 20.,
+        background: Color::RED,
+      }
+      @Text {
+        text: "Text line height check!",
+        font_size: 20.,
+        text_line_height: 40.,
+        background: Color::GREEN,
+      }
     })
     .with_wnd_size(WND_SIZE)
     .with_comparison(0.000025)

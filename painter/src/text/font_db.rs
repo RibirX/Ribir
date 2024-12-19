@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ops::Deref, sync::Arc};
+use std::{cell::RefCell, num::NonZeroU16, ops::Deref, sync::Arc};
 
 use ahash::HashMap;
 use fontdb::{Database, Query};
@@ -19,6 +19,15 @@ pub struct FontDB {
   cache: HashMap<ID, Option<Face>>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum GlyphBaseline {
+  /// The glyph baseline is the normal alphabetic baseline. Default value.
+  #[default]
+  Alphabetic,
+  /// The text baseline is the middle of the em square.
+  Middle,
+}
+
 type FontGlyphCache<K, V> = Sc<RefCell<HashMap<K, Option<V>>>>;
 #[derive(Clone)]
 pub struct Face {
@@ -29,6 +38,9 @@ pub struct Face {
   raster_image_glyphs: FontGlyphCache<GlyphId, Resource<PixelImage>>,
   outline_glyphs: FontGlyphCache<GlyphId, Resource<Path>>,
   svg_glyphs: Sc<RefCell<SvgGlyphCache>>,
+  x_height: u16,
+  ascender: i16,
+  descender: i16,
 }
 
 impl FontDB {
@@ -266,6 +278,25 @@ impl Face {
     // Safety: we know the ptr_data has some valid lifetime with source data, and
     // hold them in same struct.
     let rb_face = rustybuzz::Face::from_slice(unsafe { &*ptr_data }, face_index)?;
+    let ascender = rb_face.ascender();
+    let descender = rb_face.descender();
+    let x_height = rb_face
+      .x_height()
+      .and_then(|x| u16::try_from(x).ok())
+      .and_then(NonZeroU16::new);
+    let x_height = match x_height {
+      Some(height) => height,
+      None => {
+        // If not set - fallback to height * 45%.
+        // 45% is what Firefox uses.
+        u16::try_from((f32::from(ascender - descender) * 0.45) as i32)
+          .ok()
+          .and_then(NonZeroU16::new)
+          .unwrap()
+      }
+    }
+    .get();
+
     Some(Face {
       source_data,
       face_data_index: face_index,
@@ -274,7 +305,27 @@ impl Face {
       outline_glyphs: <_>::default(),
       raster_image_glyphs: <_>::default(),
       svg_glyphs: <_>::default(),
+      x_height,
+      ascender,
+      descender,
     })
+  }
+
+  pub fn ascender(&self) -> i16 { self.ascender }
+
+  pub fn descender(&self) -> i16 { self.descender }
+
+  pub fn x_height(&self) -> u16 { self.x_height }
+
+  pub fn baseline_offset(&self, baseline: GlyphBaseline) -> i16 {
+    match baseline {
+      GlyphBaseline::Alphabetic => 0,
+      GlyphBaseline::Middle => {
+        let unit = self.units_per_em();
+        let x_height = self.x_height();
+        (unit / 2) as i16 - (x_height / 2) as i16
+      }
+    }
   }
 
   #[inline]
