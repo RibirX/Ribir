@@ -29,7 +29,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Added `Measure` to enable support for percentage values for position, and `Anchor` now supports percentage values. (#672 @M-Adoo)
 - **core**: Add APIs `AppCtx::once_next_frame`, `Window::once_next_frame`, `Window::once_frame_finished` and `Window::once_before_layout`. (#672 @M-Adoo)
-- **painter**: Typography now supports baselines (middle and alphabetic). (#pr @M-Adoo)
+- **painter**: Typography now supports baselines (middle and alphabetic). (#674 @M-Adoo)
 
 ### Fixed
 
@@ -37,8 +37,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Fix TextStyle cause providers mismatched (#671 @wjian23)
 - **core**: Running an animation that is already in progress does not trigger a smooth transition. (#672 @M-Adoo)
 - **core**: The framework incorrectly clamps the layout result of the render widget. (#672 @M-Adoo)
-- **painter**: Fixed text line height does not work correctly. (#pr @M-Adoo)
-- **painter**: Fixed issue with text not being drawn at the middle baseline by default. (#pr @M-Adoo)
+- **core**: Padding will not change the child's size; otherwise, child elements like `Icon` may not work correctly. (#674 @M-Adoo)
+- **painter**: Fixed text line height does not work correctly. (#674 @M-Adoo)
+- **painter**: Fixed issue with text not being drawn at the middle baseline by default. (#674 @M-Adoo)
 
 ## [0.4.0-alpha.19] - 2024-12-18
 
