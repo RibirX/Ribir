@@ -4,47 +4,50 @@ sidebar_position: 2
 
 # Quick Start
 
-This chapter will introduce you to all the syntax and basic concepts of Ribir.
+This chapter will introduce you to all the syntax and common basic concepts of Ribir.
 
 > You will learn
 >
 > - How to create and compose widgets
-> - How to respond to events and operate data
-> - How to make the view automatically respond to data changes
+> - How to respond to events and manipulate data
+> - How to make views automatically respond to data changes
 > - How to build dynamic widgets
-> - How to map your own data structure to a view
+> - How to map your own data structures to views
 > - How to use built-in widgets as part of other widgets
-> - How to convert, separate and trace original state -- to facilitate the transfer of state and control the scope of view updates
+> - How to transform, separate, and trace the state — facilitating state transfer and controlling the scope of view updates
 
 ## What is a widget?
 
-In Ribir, the widget is the basic unit for describing the view. In form, it can be a button, a text, a list, a dialog, or even the entire application interface. In code, it can be a function, a closure, or a data object. The type that Ribir can build `Widget` through `&BuildCtx` is called widget. Note the difference between `Widget` and widget, in the context of the entire Ribir, widget is a generic term, and the capitalized `Widget` is a specific widget, which is also the pass for all widgets to enter the view.
+In Ribir, a widget is the basic unit that describes a view. It can be a button, a text box, a list, a dialog, or even the entire application interface. In code, it can be a function, a closure, or a data object.
 
-If you don't understand the above words very well, don't worry, because you don't need to care about the construction process of the widget at all, and Ribir also prohibits developer interference in this process. You only need to understand that Ribir divides all widgets into four categories:
+If you don't quite understand the above, don't worry, because you don't need to focus on the widget construction process, and Ribir prohibits interference in this process. You just need to understand that Ribir divides all widgets into four categories:
 
 - function widget
 - `Compose` widget
 - `Render` widget
 - `ComposeChild` widget
 
-This chapter will only introduce function widget and `Compose` widget. Because in most scenarios, these two widgets are enough to meet our needs. As advanced content, we will cover `Render` widgets and `ComposeChild` widgets in [Widget In-depth](../understanding_ribir/widget_in_depth.md).
+This chapter will only introduce function widgets and `Compose` widgets. Because in most scenarios, these two types of widgets are sufficient to meet our needs. As advanced content, we will cover `Render` widgets and `ComposeChild` widgets in [Widgets In-depth](../understanding_ribir/widget_in_depth.md).
+
+Please note the difference between `Widget` and widget in the entire context of Ribir. Widget is a generic term, while the capitalized `Widget` is a specific widget, also the pass for all widgets to enter the view.
 
 ## Function widget
 
-The function or closure that accepts `&BuildCtx` as the input parameter and returns the `Widget` is called a function widget.
+A function or closure that returns a `Widget` is called a function widget. A function widget that can be called multiple times can be transformed into a `GenWidget`, and the root widget of our application requires a `GenWidget`.
 
-A function widget is the simplest way to define a widget without external state dependencies. In [Try Ribir](./try_it.md), you have seen a function widget of `Hello world!`. In this section, we will continue to introduce it through the example of `Hello world!`.
+Defining widgets through functions is the simplest and fastest way. In [Try Ribir](./try_it.md), you have already seen an example of a `Hello World!` function widget. In this section, we will continue the introduction using the `Hello World!` example.
 
+### Defining widgets through function
 
-### Define widget through function
-
-A function widget can be defined directly through a function:
+Let's start by defining a `hello_world` function to complete our example.
 
 ```rust no_run
 use ribir::prelude::*;
 
 fn hello_world() -> Widget<'static> {
-  rdl!{ Text { text: "Hello World!" } }
+  Text::declarer()
+    .text("Hello World!")
+    .finish()
     .into_widget()
 }
 
@@ -53,20 +56,28 @@ fn main() {
 }
 ```
 
-At first, you should find the difference in the parameter declaration (`ctx!(): &BuildCtx`) in the function signature. We use `ctx!()` as the parameter name instead of directly giving a name. This is because `rdl!` will unify `ctx!()` as the variable name to refer to `&BuildCtx` inside.
-  
-Then, you can see the next line `rdl!{ Text { text: "Hello World!" } }`, which creates a `Text` with the content `Hello World!` through `rdl!`. The details of `rdl!` will be put aside for now, and will be introduced in detail in the section [Creating objects using `rdl!`](#creating-objects-using-rdl).
+Because the `Text` widget only provides a declarative API creation method, we need to create its declarer with `Text::declarer()` and finish the creation with `finish()`. Then, we convert it to a `Widget` type using `into_widget()`.
 
-Finally, build `Text` into `Widget` through the `build` method as the return value of the function.
+For declarative widgets, we can also simplify their writing with `rdl!`.
 
+```rust
+use ribir::prelude::*;
+
+fn hello_world() -> Widget<'static> {
+  rdl!{ Text { text: "Hello World!" } }
+    .into_widget()
+}
+```
+
+We will delve into the details of `rdl!` in the section [Using `rdl!` to Create Objects](#using-rdl-to-create-objects). For now, let's put it aside.
 
 > Tip
-> 
-> There are multiple procedural macros in Ribir, and `&BuildCtx` is often used as a variable that needs to be passed across macros. In order to simplify this passing process, Ribir uses `ctx!` as the variable name in this case to allow it to be used across macros. So, you will often see the macro `ctx!` in the future.
+>
+> The framework automatically implements the `into_widget` method for all types of widgets.
 
-### Closure and `fn_widget!`
+### Closures and `fn_widget!`
 
-Because `hello_world` is not called by anyone else, you can rewrite it as a closure:
+Since `hello_world` is not called by anyone else, you can rewrite it as a closure:
 
 ```rust no_run
 use ribir::prelude::*;
@@ -80,10 +91,10 @@ fn main() {
 }
 ```
 
-For function widgets created through closure, Ribir provides a `fn_widget!` macro to simplify this process. Except for the two syntactic sugars `@` and `$` that we will talk about later in this chapter, you can simply think it will expand the code like this:
+For creating function widgets through closures, Ribir provides a `fn_widget!` macro to simplify this process. Apart from supporting the two syntactic sugars `@` and `$` that we will talk about next in this chapter, you can think of `fn_widget!` as expanding the code like this:
 
-``` rust ignore
-move |ctx!(): &BuildCtx| -> Widget {
+```rust ignore
+move || -> Widget {
   {
     // Your code
   }
@@ -91,8 +102,7 @@ move |ctx!(): &BuildCtx| -> Widget {
 }
 ```
 
-The `hello_world` example is rewritten with `fn_widget`!`:
-
+Using `fn_widget!` to rewrite the `hello_world` example:
 
 ```rust no_run
 use ribir::prelude::*;
@@ -103,22 +113,42 @@ fn main() {
   });
 }
 ```
-Do you notice that except for not using `@`, this example is already the same as what you saw in [Try Ribir](./try_it.md).
 
-## Creating objects using `rdl!`
+Usually, declarative widgets provide a macro of the same name, which creates a function widget rooted in itself using `fn_widget!`.
 
-`rdl` is the abbreviation of Ribir Declarative Language, and the purpose of the `rdl!` macro is to help you create objects in a declarative way.
+So, our example can be further simplified to:
 
-> Notice
+```rust no_run
+use ribir::prelude::*;
+
+fn main() {
+  App::run(text! { text: "Hello World!"});
+}
+```
+
+This is the example we saw in [Try Ribir](./try_it.md).
+
+## Using `rdl!` to Create Objects
+
+`rdl` stands for Ribir Declarative Language, and the `rdl!` macro aims to help you create objects in a declarative way.
+
+> Tips
 >
-> `rdl!` does not care about types, it only does processing at the syntax level, so it is not only widgets that can use it.
+> `rdl!` does not care about types, it only processes syntax at the language level, so it is not limited to widgets only.
 
-### Declarative creation of objects
+### Declaratively Creating Objects
 
-Although `rdl!` supports any Rust expression, but what we mean by declarative creation of objects, specifically refers to the way of creating objects through structure literals.
+Although `rdl!` supports any Rust expression, when we talk about declarative object creation, we specifically refer to creating objects through struct literals:
 
-When your expression is a structure literal, `rdl!` will create an object through the `Declare` trait, which requires that the type of the object you create must inherit or implement the `Declare` trait.
+```rust ignore
+rdl! { 
+  ObjectType {
+    ... // Field declarations
+  } 
+}
+```
 
+When your expression is a struct literal, `rdl!` creates objects using the `Declare` trait, which requires the object type you create to inherit or implement the `Declare` trait.
 
 ```rust
 use ribir::prelude::*;
@@ -134,14 +164,30 @@ fn use_rdl() {
 }
 ```
 
-In the above example, `Counter` inherits `Declare` and marks the default value of `count` as `1`. So in `rdl!`, you don't need to assign a value to `count`, `rdl!` will assign it a default value of `1` when creating it. `Declare` has some other features, which we will not expand here.
+In the example above, `Counter` inherits `Declare` and marks `count` with a default value of `1`. Therefore, in `rdl!`, you don't need to assign a value to `count`, as `rdl!` will default it to `1`. `Declare` has some other features, but we won't delve into them here.
 
-## Composing widgets
+### Expression-Based Object Creation
 
-You already know how to create a widget, and now we will compose a simple counter application by nesting widgets in another widget.
+Besides creating objects through struct literals, you can also place any expression inside `rdl!`. This is useful when dealing with nested compositions, and it is only necessary when nesting as children. The following example shows how to use expressions to create objects in `rdl`:
 
-You can nest additional `rdl!` instances as children within the widget declared by the structure literal. Please note that child widgets must always be declared after the parent widget's properties. This is a formatting requirement of `rdl!`.
+```rust ignore
+use ribir::prelude::*;
 
+let _parent = rdl!{
+  // You can write any expression here, and the result of the expression will be the child
+  if  {
+    ...
+  } else {
+    ...
+  }
+};
+```
+
+### Composing Widgets
+
+Now that you know how to create widgets in `rdl!`, let's compose widgets to create a simple counter application.
+
+You can nest widgets within struct literal declarations to create children using `rdl!`. Note that children are always required to be declared after their parent widget fields, which is a format requirement enforced by `rdl!`.
 
 ```rust no_run
 use ribir::prelude::*;
@@ -149,11 +195,8 @@ use ribir::prelude::*;
 fn main() {
   let counter = fn_widget! { 
     rdl!{ 
-      Row {
-        rdl!{ FilledButton {
-          rdl!{ Label::new("Increment") }
-        }}
-        rdl!{ H1 { text: "0" } }
+      Button {
+        rdl!{ "0" }
       }
     }
   };
@@ -162,7 +205,7 @@ fn main() {
 }
 ```
 
-In the above example, we created a `Row` with two child nodes, `FilledButton` and `H1`. These three widgets are already defined in the `ribir_widgets` library.
+In the example above, we created a `Button` and composed it with a string as a child. `Button` is already defined in the `ribir_widgets` library.
 
 `rdl!` also allows you to declare children for widgets that have already been created:
 
@@ -171,14 +214,10 @@ use ribir::prelude::*;
 
 fn main() {
   let counter = fn_widget! {
-    let row = rdl!{ Row { align_items: Align::Center } };
-
+    let btn = rdl! { Button {} };
     rdl!{ 
-      $row {
-        rdl!{ FilledButton {
-          rdl!{ Label::new("Increment") }
-        }}
-        rdl!{ Text { text: "0" } }
+      $btn {
+        rdl!{ "0" }
       }
     }
   };
@@ -187,157 +226,102 @@ fn main() {
 }
 ```
 
-Do you notice the `rdl!{ $row { ... } }`? It is the same as the structure literal syntax, but with `$` in front of it, it means that it is a variable rather than a type, so it will not create a new widget, but directly use this variable to compose with the child.
+Notice the `rdl!{ $btn { ... } }` syntax? Similar to struct literal syntax, but with `$` in front, it indicates that the parent is a variable rather than a type, so it doesn't create a new widget but directly uses that variable to compose with the child.
 
-> Tip
+> Tips
 >
-> In Ribir, the composition of parent and child widgets is not arbitrary, but subject to type constraints. The parent can restrict the type of the child and implement the composition logic, ensuring the correctness of the composition.
->
-> In our example above, `Row` accepts any number and any type of widget, `Text` cannot accept any children, and `FilledButton` is a bit more complicated, it allows to accept a `Label` as its text and a `Svg` as the button icon.
->
-> For how to constrain the child type of the widget, we will introduce it in [Widget In-depth](../understanding_ribir/widget_in_depth.md).
+> In Ribir, the composition of parent and child is not arbitrary but is restricted by type, ensuring the correctness of the composition. 
+> In our example, `Button` specifies that it can accept two optional children: a string as a label and a `Widget` as an icon.
+> **Why is the label of the Button designed to be a child rather than its own field?** This is because, if it were a field of `Button`, it would occupy memory regardless of whether `Button` has a label or not. By making it a child, there is no memory overhead for this field when the Button doesn't have a label.
 
-### Creating objects through expressions
+> We will delve into how to constrain the type of children for widgets in [Understanding Ribir](../understanding_ribir/widget_in_depth.md).
 
-Except for creating objects through structure literals, you can also create objects by wrapping any expression with `rdl!{...}`. The advantage of this approach is that you can write any code in `{...}` to create objects. This is very useful in nested composition, and it is only necessary when nesting as a child. The following example shows how to use expressions to create objects in `rdl`:
 
-```rust ignore
-use ribir::prelude::*;
+## `@` Syntactic Sugar
 
-let _ = fn_widget! {
-  rdl!{ Row {
-    rdl!{
-      // you can write any expression here, the result of the expression will be the child
-      if xxx {
-        ...
-      } else {
-        ...
-      }
-    }
-  }}
-};
-```
+In the process of compose widgets, we used multiple `rdl!`. On one hand, it helps us have a clear declarative structure when interacting with Rust syntax (especially in complex examples) - when you see `rdl!`, you know that the composition or creation of a widget node has begun; on the other hand, when every node is wrapped with `rdl!`, it may appear too verbose, making it hard to see the key information.
 
-At this point, let's review the previous example:
+Fortunately, Ribir provides an `@` syntactic sugar for `rdl!`, and in actual use, you mostly use `@` instead of `rdl!`. There are three main cases:
 
-```rust no_run
-use ribir::prelude::*;
+- `@Button {...}` as a struct literal's syntactic sugar, expands to `rdl!{ Button {...} }`
+- `@ $btn {...}` as syntactic sugar for variable struct literals, expands to `rdl!{ $btn {...} }`
+- `@ { ... }` is syntactic sugar for expressions, expanding to `rdl!{ ... }`
 
-fn main() {
-  App::run(fn_widget! { 
-    rdl!{ Text { text: "Hello World!" } }
-  });
-}
-```
-
-I believe you should have fully understood it.
-
-## The `@` syntactic sugar
-
-In the process of composing widgets, we use a lot of `rdl!`. It allows you to have a clear declarative structure when interacting with Rust syntax (especially complex examples)-when you see `rdl!`, you know that the composition or creation of a widget node has begun; on the other hand, when each node is wrapped with `rdl!`, it looks too long to see the key information at a glance.
-
-Fortunately, Ribir offers a syntactic sugar, `@`, as an alternative to `rdl!`. In practice, we almost always use `@` instead of `rdl!`. There are three use cases:
-
-- `@ Row {...}` as a syntactic sugar for structure literals, expanded to `rdl!{ Row {...} }`
-- `@ $row {...}` as a syntactic sugar for variable structure literals, expanded to `rdl!{ $row {...} }`
-- `@ {...}` as a syntactic sugar for expressions, expanded to `rdl!{ ... }`
-
-Now let's rewrite the previous example of Counter using `@`:
+Now, let's rewrite the above counter example using `@`:
 
 ```rust no_run
 use ribir::prelude::*;
 
 fn main() {
   App::run(fn_widget! {
-    @Row {
-      @FilledButton {
-        @ { Label::new("Increment") }
-      }
-      @Text { text: "0" }
+    @Button {
+      @ { "0" }
     }
   });
 }
 ```
-For expression widgets that are simple function calls, the `{}` can be omitted for brevity:
 
-```rust ignore
-fn_widget! {
-  // Instead of using braces:
-  let label = @ { Label::new("Increment") };
-  // You can directly write:
-  let label = @Label::new("Increment");
-  ...
-};
-```
+## State - Making Data Watchable and Shareable
 
-## State -- make data watchable and shareable
+Although we have created a counter, it always displays `0`, and clicking the button does not do anything. In this section, you will learn how to make your counter work using state.
 
-Although we have created a counter, it always shows `0` and does not respond to the button. In this section, you will learn how to make your counter work through state.
+State is a wrapper that makes data watchable and shareable.
 
-The state is a wrapper that makes data watchable and shareable. 
+The complete lifecycle of an interactive Ribir widget is as follows:
 
-`State = Data + Watchable + Shareable`
-
-The complete life cycle of an interactive Ribir widget is as follows:
-
-1. Convert your data to a state.
-2. Declaratively map the state to build the view.
-3. During the interaction, modify the data through the state.
-4. Receive data changes through the state, and update the view point-to-point according to the mapping relationship.
+1. Convert your data into state.
+2. Declare a mapping from state to view to build the view.
+3. During interaction, modify the data through state.
+4. Receive data changes through state and update the view point-to-point based on the mapping.
 5. Repeat steps 3 and 4.
 
-![lifecycle](../assets/data-flows.svg)
-
-Now, let's improve our example by introducing the state.
+Now, let's introduce state to transform our example.
 
 ```rust no_run
 use ribir::prelude::*;
 
 fn main() {
   App::run(fn_widget! {
-    // Change 1: Create a state through `State::new`
+    // Change 1: Create a state using `State::value`
     let count = State::value(0);
-
-    @Row {
-      @FilledButton {
-        // Change 2: increase the count by 1 when the button is clicked
-        on_tap: move |_| *$count.write() += 1,
-        @ { Label::new("Increment") }
-      }
-      // Change 3: display the count through the state, and keep the view continuously updated.
-      @H1 { text: pipe!($count.to_string()) }
+    @Button {
+      // Change 2: Modify the state on tap
+      on_tap: move |_| *$count.write() += 1,
+      // Change 3: Display data using state and keep the view updated.
+      // For macros or function calls, you can omit the curly braces after `@`
+      @ pipe!($count.to_string())
     }
   });
 }
 ```
 
-Through the above three changes, the Counter example is complete. But in changes 2 and 3, new things have been introduced -- `$` and `pipe!`. They are very important usages in Ribir, let's introduce them in two sections.
+By making these 3 changes, the small counter example is complete. However, in changes 2 and 3, new elements are introduced — `$` and `pipe!`. They are crucial in Ribir, and understanding them will help you work effectively with state.
 
-## The `$` syntactic sugar
+## $ Syntactic Sugar
 
-There are two important syntactic sugars in Ribir, one is the [@ syntactic sugar](#the-@-syntactic-sugar) we introduced earlier, and the other is the `$` syntactic sugar.
+In Ribir, there are two important syntactic sugars, one is the [`@` Syntactic Sugar](#-syntactic-sugar) introduced earlier, and the other is the `$` syntactic sugar.
 
-### Read and write references to state
+### State Read and Write References
 
-`$` represents a read or write reference to the state that follows it. For example, `$count` represents a read reference to the `count` state, and when it is followed by a `write()` call, it represents a write reference to the `count` state, such as `$count.write()`.
+`$` indicates a read or write reference to the state that follows it. For example, `$count` represents a read reference to `count`, and when followed by a `write()` call, it represents a write reference to `count`, such as `$count.write()`.
 
-Except for `write`, Ribir also has a `silent` write reference, modifying data through `silent` write reference will not trigger view updates.
+Besides `write`, Ribir also provides a `silent` write reference, where modifying data through `silent` write does not trigger view updates.
 
-The `$` syntactic sugar for a state is expanded to:
+The expansion logic of state's `$` syntactic sugar is as follows:
 
-- `$counter.write()` expand to `counter.write()`
-- `$counter.silent()` expand to `counter.silent()`
-- `$counter` expand to `counter.read()`
+- `$counter.write()` expands to `counter.write()`
+- `$counter.silent()` expands to `counter.silent()`
+- `$counter` expands to `counter.read()`
 
-### Automatic sharing of state
+### Automatic Sharing of States
 
-When `$` is in a `move` closure, the state it points to will be cloned (read/write), and the closure captures the clone of the state, so `$` allows you to directly use a state and easily complete sharing without having to clone it separately.
+When `$` is inside a `move` closure, it points to a cloned version of the state (read/write). The closure captures a clone of the state, allowing you to use the state directly and easily share it without needing to clone it explicitly.
 
 ```rust ignore
 move |_| *$count.write() += 1
 ```
 
-Roughly expanded to:
+Expands roughly to
 
 ```rust ignore
 {
@@ -346,11 +330,11 @@ Roughly expanded to:
 }
 ```
 
-### The priority of syntactic sugar expansion
+### Priority of Syntactic Sugar Expansion
 
-Do you remember that we also used `$` in [Composing widgets](#composing-widgets)? For example, `rdl!{ $row { ... } }` or `@$row { ... }`, this is not a reference to state data. Because `rdl!` gives it a different semantics -- declare the parent widget through a variable.
+Remember we also used `$` in [Composing Widgets](#composing-widgets)? For example, `rdl!{ $btn { ... } }` or `@ $btn { ... }`. This is not a reference to state data, as `rdl!` assigns a different semantic meaning to it — creating a parent widget using a variable declaration.
 
-No matter `@` or `$`, they should first follow the semantics of the macro they are in, and then as a syntactic sugar of Ribir. When we use `@` or `$` in a macro that is not provided by Ribir, they no longer be a syntactic sugar of Ribir, because the external macro may use them with special semantics. For example:
+Whether it's `@` or `$`, they should first follow the semantics of the macro they are in, and then be considered as Ribir's syntactic sugar. When using `@` or `$` inside an external macro, they no longer act as Ribir's syntactic sugar, as the external macro likely gives them special meanings.
 
 ```rust ignore
 use ribir::prelude::*;
@@ -358,15 +342,16 @@ use ribir::prelude::*;
 fn_widget!{
   user_macro! {
     // `@` is not a syntactic sugar here, its semantics 
-    // depends on the implementation of `user_macro!`
-    @Row { ... }
+    // depend on the implementation of `user_macro!`
+    @Button { ... }
   }
 }
 ```
 
+
 ## `Pipe` stream -- keep responding to data
 
-A `Pipe` stream is a continuously updated data stream with an initial value. It can be decomposed into an initial value and an RxRust stream -- the RxRust stream can be subscribed. It is also the only channel for Ribir to update data changes to the view.
+A `Pipe` stream is a continuously updated data stream with an initial value. It can be decomposed into an initial value and an rxRust stream -- the rxRust stream can be subscribed. It is also the only channel for Ribir to update data changes to the view.
 
 Ribir provides a `pipe!` macro to help you quickly create a `Pipe` stream. It accepts an expression and monitors all states marked with `$` in the expression to trigger the recalculation of the expression.
 
@@ -381,55 +366,51 @@ let b = State::value(0);
 let sum = pipe!(*$a + *$b);
 ```
 
-When declaring an object, you can initialize its property with a `Pipe` stream, so that its property will continue to change with this `Pipe` stream. As we have seen in [State -- make data watchable and shareable](#state----make-data-watchable-and-shareable)
+When declaring an object, you can initialize its property with a `Pipe` stream, so that its property will continue to change with this `Pipe` stream. As we have seen in [State - Making Data Watchable and Shareable](#state---making-data-watchable-and-shareable)
 
 ```rust ignore
   @Text { text: pipe!($count.to_string()) }
 ```
 
-### Dynamically render different widgets
+### Rendering widgets dynamically
 
+Up until now, the structure of all the views you've created has been static, with only the properties changing with the data, but the structure of the widgets does not change with the data. In fact, you can also create a continuously changing widget structure through the `Pipe` stream.
 
-At this point, all the structures of the views you create are static, and only the properties will change with the data, but the structure of the widget will not change with the data. You can also create a continuously changing widget structure through the `Pipe` stream.
+Let's say you have a counter, and instead of displaying the number in text, the counter counts the number in little red squares:
 
-Suppose you have a counter that doesn't display the count with numbers, but instead uses red squares to represent the count:
 
 ![box counter](../assets/box_counter.gif)
 
-The code:
+Code:
 
 ```rust no_run
 use ribir::prelude::*;
 
 fn main() {
-  App::run( fn_widget! {
-    let counter = State::value(0);
-
-    @Row {
-      @FilledButton {
-        on_tap: move |_| *$counter.write() += 1,
-        @ { Label::new("Increment") }
-      }
-      @ {
-        pipe!(*$counter).map(move |counter| {
-          (0..counter).map(move |_| {
-            @Container {
-              margin: EdgeInsets::all(2.),
-              size: Size::new(10., 10.),
-              background: Color::RED
-            }
-          })
+  let counter = State::value(0);
+  App::run(row! {
+    @Button {
+      on_tap: move |_| *$counter.write() += 1,
+      @ { "Increment" }
+    }
+    @ {
+      pipe!(*$counter).map(move |counter| {
+        (0..counter).map(move |_| {
+          @Container {
+            margin: EdgeInsets::all(2.),
+            size: Size::new(10., 10.),
+            background: Color::RED
+          }
         })
-      }
+      })
     }
   });
 }
 ```
 
-### Try to keep `pipe!` containing the smallest expression
+### Try to keep `pipe!` to the smallest possible expression.
 
-While `pipe!` can hold any expression, it's best to keep it minimal and use `map` for transformations. This makes it easier to track changes in `pipe!` and avoids unnecessary dependencies in complex expressions. So, in the example above, we write:
-
+Although `pipe!` can contain as many expressions as you like, it is recommended that you try to include only the smallest expressions in `pipe!` and then use `map` to complete the transformation. This allows you to see the source of changes in `pipe!` more clearly and avoids unnecessary dependencies in complex expressions. So, the example above writes
 
 ```rust ignore
 pipe!(*$counter).map(move |counter| {
@@ -457,11 +438,12 @@ pipe!{
 }
 ```
 
-### Chain RxRust operators on `Pipe` stream
+### Operators for rxRust on `Pipe` chains
 
-The update push of the `Pipe` stream is built on top of the RxRust stream, so the `Pipe` also provides the `value_chain` method for you to operate on the RxRust stream. Therefore, you can use RxRust operators such as `filter`, `debounce` `distinct_until_change` and other operations to reduce the frequency of updates.
+The update push of the `Pipe` stream is built on top of the rxRust stream, so `Pipe` also provides the method `value_chain` that lets you manipulate the rxRust stream. So you can use rxRust operators such as `filter`, `debounce` `distinct_until_change` and so on to reduce the frequency of updates.
 
-Let's say you have a simple auto-sum example:
+Suppose you have a simple auto-summing example:
+
 
 ```rust no_run
 use ribir::prelude::*;
@@ -487,28 +469,29 @@ fn main() {
 }
 ```
 
-In the above example, the first two `Text` will be updated with the modification of `a` and `b`, even if the values of `a` and `b` do not change -- such as setting the same value to them. The last `Text` filters out duplicate updates through `distinct_until_changed`, and it will only be updated when the sum of `a` and `b` changes.
+In the above example, the first two `Text`s are updated as `a` and `b` are modified, even if the values of `a` and `b` do not change - e.g., by setting the same values for them. The last `Text`, on the other hand, filters out updates with duplicate values via `distinct_until_changed`, and will only update if the result of the sum of `a` , `b` changes.
 
-So, when we click on the last `Text`, only the first two `Text` will be marked as updated, and the last `Text` will not.
+So when we click on the last `Text`, only the first two `Texts` will be marked as updated, and the last `Text` will not.
+
 
 > Tip
->
-> In general, to identify the dynamic parts of the view, simply look for where `pipe!` is used.
+> In general, to find out which part of the view is dynamically changing, you just need to look for where the `pipe!` is.
 
 
-## `watch!` watches for modifications to expressions
+## Listening for expression changes with `watch!`
 
-`watch!` is a macro that watches for modifications in expressions. It accepts an expression and monitors all states marked with `$` in the expression to trigger the recalculation of the expression and push the latest result to the downstream subscriber.
+`watch!` is a macro that listens for changes to an expression, takes in an expression, and monitors all of the `$`-marked state in the expression to trigger a recalculation of the expression and push the latest results to downstream subscribers.
 
-Both `watch!` and `pipe!` watch changes in expressions and have similar syntax. However, `pipe!` comes with an initial value, acting more like a continuously changing value rather than a simple subscribable data stream. On the other hand, `watch!` is purely a subscribable data stream. As a result, the output of `pipe!` can be used to initialize widget properties, while the output of `watch!` cannot.
 
+`watch!` listens for changes to the expression and has the same syntax as `pipe!`, but `pipe!` is initialized and behaves more like a continuously changing value than a subscribable stream, whereas `watch!` is only a subscribable stream, so `pipe!` can be used as a value to initialize the properties of the widget, whereas `watch!` cannot.
 
 In short:
 
-- `pipe!` =  (Initial Value + RxRust Stream)
-- `watch!` = RxRust Stream
+- `pipe!` = (initial value + rxRust stream)
+- `watch!` = rxRust stream
 
-Of course, you can also use `watch!` to implement your counter:
+You can also use `watch!` to implement your counter manually:
+
   
 ```rust no_run
 use ribir::prelude::*;
@@ -523,9 +506,9 @@ fn main() {
     });
 
     @Row {
-      @FilledButton {
+      @Button {
         on_tap: move |_| *$count.write() += 1,
-        @ { Label::new("Increment") }
+        @ { "Increment" }
       }
       @{ display }
     }
@@ -533,13 +516,14 @@ fn main() {
 }
 ```
 
-When we call `subscribe`, we create a subscription to the `watch!` expression. This subscription stays active until you manually call `unsubscribe`, or until the State being watched by `watch!` no longer has a writer.
+Once we call `subscribe`, we create a subscription to the expression in `watch!`. This subscription will exist until you manually call `unsubscribe`, or until the State that `watch!` is listening to no longer has a write source.
 
-In the example above, we don't need to call `unsubscribe` because the subscription should last for the entire application lifecycle.
+In the above example, we don't need to call `unsubscribe` because the subscription needs to exist throughout the application's lifecycle.
 
-There are two main situations where you'd need to manually call `unsubscribe`:
+Typically, there are two cases where you need to call `unsubscribe` manually:
 
-The first situation is when the subscription's lifecycle should be shorter than the watched State. For instance, when using an external state to build a widget:
+In the first case, you want the subscription to have a shorter lifecycle than the state it is listening to. A typical example of this situation is building widgets using external state, for example:
+
 
 ```rust
 use ribir::prelude::*;
@@ -551,16 +535,18 @@ fn show_name(name: State<String>) -> Widget<'static> {
       $text.write().text = format!("Hi, {}!", name).into();
     });
 
-    // `name` is a shareable state, it might be held by others, 
-    // extending its lifecycle beyond the widget. So, we need to 
-    // unsubscribe when the widget is destroyed
+    // `name` is a shareable state that can be held by other people, 
+    // making its lifecycle longer than that of the widget 
+    // so we need to unsubscribe when the widget is destroyed.
+
     @$text { on_disposed: move |_| u.unsubscribe() }
   }
   .into_widget()
 }
 ```
 
-The second situation is  when the `watch!` downstream holds the writer of the watched State. `watch!` automatically unsubscribes when the watched State loses its writer. If the downstream holds the writer, it creates a circular reference. You must manually unsubscribe to prevent a memory leak:
+In the second case, the downstream of `watch!` performs a write operation on the listened state. Because `watch!` relies on the listened state no longer having a write source to automatically unsubscribe, this constitutes a circular reference when its downstream holds a write source for the listened state. At this point, the subscription must be manually unsubscribed or a memory leak will result. Example:
+
 
 ```rust
 use ribir::prelude::*;
@@ -575,15 +561,15 @@ let u = watch!(*$even_num).subscribe(move |v| {
   }
 });
 
-// Call the following code at the right time to prevent a memory leak
+// The following code needs to be called at the right time, otherwise it will result in circular references
 u.unsubscribe()
 ```
 
-## `Compose` widget -- describe your data structure
+## `Compose` widget - describing your data structure
 
-Typically, in complex real-world scenarios, you can't complete all development tasks just by creating some local data and using simple function widgets. You need your own data structures and use `Compose` widgets to map your data structures to the view.
+Often, in complex real-world scenarios, you can't do it all by just creating some localized data and using simple function widgets. You need your own data structures, and you can map your data structures to views with the `Compose` widget.
 
-Using the `Compose` widget, the Counter example can be rewritten as:
+Rewrite the counter example to use the `Compose` widget:
 
 ```rust no_run
 use  ribir::prelude::*;
@@ -598,14 +584,9 @@ impl Counter {
 
 impl Compose for Counter {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    fn_widget! {
-      @Row {
-        @FilledButton {
-          on_tap: move |_| $this.write().increment(),
-          @ { Label::new("Increment") }
-        }
-        @H1 { text: pipe!($this.0.to_string()) }
-      }
+    button! {
+      on_tap: move |_| $this.write().increment(),
+      @pipe!($this.0.to_string())
     }
     .into_widget()
   }
@@ -617,14 +598,14 @@ fn main() {
 
 ```
 
-In the above example, when you implement `Compose` for `Counter`, `Counter` and all writable states of `Counter` are valid widgets.
+In the above example, when you implement `Compose` for `Counter`, `Counter` and all writable states of `Counter` are now a legal widget.
+
 
 ## Built-in widgets
 
-Ribir provides a set of built-in widgets that allow you to configure basic styles, respond to events, manage lifecycles, and more. The key difference between built-in widgets and regular widgets is that when you create a widget declaratively, you can use the fields and methods of the built-in widget as if they were your own. Ribir will handle the creation and composition of the built-in widgets for you.
+Ribir provides a set of built-in widgets that allow you to configure the underlying styles, events, lifecycle, etc. The important difference between built-in widgets and regular widgets is that when you create a widget declaratively, you can use the fields and methods of the built-in widgets as if they were your own, and Ribir does the work of creating and compose the built-in widgets for you.
 
-
-Let's take `Margin` as an example. Suppose you want to set a 10-pixel blank margin for a `Text`, the code is as follows:
+Let's take `Margin` for example, suppose you want to set a margin of 10 pixels for a `Text`, the code would look like this:
 
 
 ```rust no_run
@@ -657,7 +638,8 @@ fn main() {
 }
 ```
 
-When you create a widget declaratively, you can directly access the fields of the built-in widget, even if you don't explicitly declare them (if you use them in your code, the corresponding built-in widget will be created). For example:
+
+When you create a widget declaratively, you can access the fields of the built-in widgets directly, even if you don't show them declared (if you use them in your code, the corresponding built-in widgets will be created). For example:
 
 ```rust no_run
 use ribir::prelude::*;
@@ -674,28 +656,28 @@ fn main() {
 }
 ```
 
-This is extended through the generic type `FatObj`. Refer to the API documentation of [`FatObj`](https://docs.rs/ribir_core/@RIBIR_VERSION/ribir_core/builtin_widgets/struct.FatObj.html) to see all the extended capabilities it provides.
+This is extended by the generic type `FatObj`, refer to the API documentation for [`FatObj`](https://docs.rs/ribir_core/@RIBIR_VERSION/ribir_core/builtin_widgets/struct.FatObj.html) to see all the extensibility it provides.
 
-## Map, Split and trace the original state
+## State Transitions, Separation, and Traceability
 
-From the previous sections, you have learned:
+As you have learned after the previous chapters:
 
-- Modifying the state's data will directly update the corresponding view.
-- You can use `Compose` to map the data to view
+- State modifications to data cause dependent views to be updated directly
+- The mapping of data to views is accomplished through `Compose`.
 
-Suppose `AppData` is the data of your entire application, you can use `Compose` to map it to the view. However, if `AppData` is complex, using only one `Compose` to map the view of the entire application will be a disaster in code organization; and the entire application view only depends on one state, which will cause any modification to `AppData` to update all dynamic parts of the view. In most cases, this will cause your application to not get the best interactive performance.
+Assuming that `AppData` is the data for your entire application, you can map it to a view with `Compose`. However, if `AppData` is a complex piece of data, mapping the entire application view with a single `Compose` would be a disaster in terms of code organization; and relying on a single state for the entire application view would result in any modification to `AppData` updating the entire dynamic portion of the view, which in most cases would result in less than optimal interactive performance.
 
-Fortunately, for state management, Ribir provides a mechanism for transformation, splitting, and tracing the origin state. It allows you to start with a complete application state, and then map or split that state into smaller sub-states. These sub-states can be further mapped or split. Within these sub-states, you can use the tracing mechanism to identify their origin state.
+Luckily, Ribir provides a set of mechanisms for transforming, separating, and tracing state. It lets you start with a complete application state, then transform or separate the application state into smaller sub-states, which in turn can continue to transform or separate...; and within the sub-states you can transform or separate... ; and within the sub-states, you can access the source of your own transitions or separations through the traceability mechanism.
 
-### Map and split, convert state to sub-state
+### Transitions and Separation, converting states into sub-states
 
-The **map** is to transform a parent state into a sub-state, and the sub-state has the same data as the parent state. Modifying the parent state is equivalent to modifying the sub-state, and vice versa. It only reduces the visible scope of the data, making it easier for you to use or pass only part of the state.
+**Transitions** are the transitions from a parent state to a child state. The parent and child states share the same data, and modifying the parent state is equivalent to modifying the child state, and vice versa. It simply reduces the visible scope of the data, making it easier if you want to use and pass only part of the state.
+**Separation is the separation of child states from a parent state, where the parent and child states share the same data. The difference is that changing data in the child state does not trigger dependent view updates for the parent state.
 
-The **split** is to separate a sub-state from a parent state. The parent and child state also share the same data. The difference is that modifying data through the sub-state will not trigger the views dependent on the parent state to update.
 
-What you need to note is that whether it's **map** or **split**, the parent and child state share the same data. Therefore, their modifications to the data will affect each other, but the scope of data modifications they push may be different.
+You should note that the parent and child states share the same data regardless of whether they are transformed or separated. Therefore, their modifications to the data affect each other, but the scope of the data changes they push may be different.
 
-Read the following example carefully to help you better understand how state **map** and **split** work:
+Carefully reading the following examples will help you better understand how state transitions and separations work:
 
 ```rust
 use ribir::prelude::*;
@@ -754,20 +736,20 @@ AppCtx::run_until_stalled();
 // Child(map) framework
 ```
 
-Because data modification notifications are sent out asynchronously in batches, in the example, for ease of understanding, we call `AppCtx::run_until_stalled()` after each data modification to force the notifications to be sent. However, this should not appear in your actual code.
+Because Ribir's data modification notifications are sent out in asynchronous batches, we call `AppCtx::run_until_stalled()` every time a data modification is made to force comprehensible sends in the example for ease of understanding, but this shouldn't be in your real code.
 
-If you only want to get a read-only sub-state, you can use `map_reader` to convert:
+
+If you just want a read-only sub-state, then you can convert it with `map_reader`:
 
 ```rust ignore
-let count_reader = state.map_reader(|d| PartData::from_ref(&d.count));
+let count_reader = state.map_reader(|d| &d.count);
 ```
 
-However, Ribir does not provide a `split_reader`, because splitting a read-only sub-state is equivalent to converting a read-only sub-state.
-
+But Ribir doesn't provide a ``split_reader``, because separating a read-only sub-state is equivalent to converting a read-only sub-state.
 
 ### The origin state of the sub-state
 
-Any state can get where it comes from through `origin_reader` and `origin_writer`. The origin state of the root state is itself, and the origin state of the sub-state is where it splits from.
+Each state can get where it came from through `origin_reader` and `origin_writer`. The root state's origin state is itself, and the sub-state's origin state is where it splits off from.
 
 ```rust
 use ribir::prelude::*;
@@ -790,5 +772,4 @@ let _: &Stateful<AppData> = split_count.origin_writer();
 
 ## The next step
 
-You have mastered all the syntax and basic concepts needed to develop a Ribir application. It's time to put them into practice by [Practice: Todos application](../practice_todos_app/develop_a_todos_app.md).
-
+You have mastered all the syntax and basic concepts needed to develop a Ribir application. Now it's time to put them into practice with [Exercise: Todos application](../practice_todos_app/develop_a_todos_app.md).

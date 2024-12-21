@@ -31,6 +31,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Add APIs `AppCtx::once_next_frame`, `Window::once_next_frame`, `Window::once_frame_finished` and `Window::once_before_layout`. (#672 @M-Adoo)
 - **painter**: Typography now supports baselines (middle and alphabetic). (#674 @M-Adoo)
 
+### Changed
+
+- **widgets**: Refactor the buttons use class to implement. (#675 @M-Adoo)
+
 ### Fixed
 
 - **core**: Fix set opacity zero no work to it's children. (#671 @wjian23)

@@ -1,5 +1,5 @@
 mod ui;
-mod wordle;
+pub mod wordle;
 use ribir::prelude::*;
 pub use ui::wordle_game;
 

@@ -47,7 +47,7 @@ pub enum GlobalAnchorY {
 /// use ribir::prelude::*;
 /// let app = fn_widget! {
 ///   let mut button = @FilledButton {
-///     @{ Label::new("click show overlay") }
+///     @{ "click show overlay" }
 ///   };
 ///   let overlay = Overlay::new(
 ///     move || {

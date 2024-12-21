@@ -5,8 +5,6 @@ use svg::named_svgs;
 
 use crate::*;
 
-const RIPPLE_RADIUS: f32 = 20.;
-
 pub(super) fn init(classes: &mut Classes) {
   named_svgs::register(
     UNCHECKED_ICON,
@@ -28,7 +26,7 @@ pub(super) fn init(classes: &mut Classes) {
     let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(md::RADIUS_20));
     let w = FatObj::new(w);
     ripple! {
-      radius: RIPPLE_RADIUS,
+      radius: 20.,
       center: true,
       margin: EDGES_4,
       @ $hover_layer { @ $w {

@@ -2,12 +2,11 @@ use ribir::prelude::*;
 
 pub fn counter() -> Widget<'static> {
   let cnt = Stateful::new(0);
-  row! {
-    @FilledButton {
-      on_tap: move |_| *$cnt.write() += 1,
-      @{ Label::new("Inc") }
-    }
-    @H1 { text: pipe!($cnt.to_string()) }
+  button! {
+    h_align: HAlign::Center,
+    v_align: VAlign::Center,
+    on_tap: move |_| *$cnt.write() += 1,
+    @pipe!($cnt.to_string())
   }
   .into_widget()
 }
@@ -19,7 +18,7 @@ pub fn run() {
 
   App::run(counter)
     .with_app_theme(material::purple::light())
-    .with_size(Size::new(300., 150.))
+    .with_size(Size::new(320., 240.))
     .with_title("Counter");
 }
 
@@ -33,7 +32,7 @@ mod tests {
   widget_image_tests!(
     counter,
     WidgetTester::new(counter)
-      .with_wnd_size(Size::new(400., 600.))
+      .with_wnd_size(Size::new(320., 240.))
       .with_comparison(0.001)
   );
 }
