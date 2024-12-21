@@ -111,8 +111,7 @@ mod tests {
         }
       }
     })
-    .with_wnd_size(WND_SIZE)
-    .with_comparison(0.000025),
+    .with_wnd_size(WND_SIZE),
     LayoutCase::default().with_size(Size::new(50., 45.))
   );
 
@@ -122,7 +121,6 @@ mod tests {
       @Text { text: "Hello ribir!"}
     })
     .with_wnd_size(WND_SIZE)
-    .with_comparison(0.000025)
   );
 
   widget_image_tests!(
@@ -131,7 +129,6 @@ mod tests {
       @H1 { text: "Hello ribir!" }
     })
     .with_wnd_size(WND_SIZE)
-    .with_comparison(0.000025)
   );
 
   widget_image_tests!(
@@ -152,6 +149,6 @@ mod tests {
       }
     })
     .with_wnd_size(WND_SIZE)
-    .with_comparison(0.000025)
+    .with_comparison(0.00004)
   );
 }

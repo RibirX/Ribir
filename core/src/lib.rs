@@ -54,7 +54,7 @@ pub mod prelude {
     context::*,
     declare::*,
     events::*,
-    multi_class_impl,
+    multi_class,
     overlay::{AutoClosePolicy, Overlay, OverlayStyle},
     pipe::{BoxPipe, FinalChain, MapPipe, ModifiesPipe, Pipe},
     providers,
@@ -62,13 +62,12 @@ pub mod prelude {
     state::*,
     style_class,
     ticker::{Duration, Instant},
-    widget,
     widget::*,
     widget_children::*,
     widget_tree::{BoxClamp, LayoutInfo, TrackId, WidgetId},
     window::Window,
   };
-  pub use crate::{smooth_height, smooth_pos, smooth_size, smooth_width, smooth_x, smooth_y};
+  pub use crate::{timer, *};
 }
 
 pub mod test_helper;

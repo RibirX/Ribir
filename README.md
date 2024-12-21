@@ -43,23 +43,19 @@ A simple example of a counter:
 ``` rust no_run
 use ribir::prelude::*;
 fn main() {
-  let counter = fn_widget! {
-    let cnt = Stateful::new(0);
-    @Row {
-      @FilledButton {
-        on_tap: move |_| *$cnt.write() += 1,
-        @{ Label::new("Inc") }
-      }
-      @H1 { text: pipe!($cnt.to_string()) }
-    }
-  };
-  App::run(counter);
+  let cnt = Stateful::new(0);
+  App::run(button! {
+    h_align: HAlign::Center,
+    v_align: VAlign::Center,
+    on_tap: move |_| *$cnt.write() += 1,
+    @pipe!($cnt.to_string())
+  });
 }
 ```
 </div>
     </td>
       <td style="padding:10px">
-        <img src="./static/counter_demo.gif" width="430"/>
+        <img src="./static/counter_demo.gif" width="320px"/>
       </td>
     </tr>
 </table>
@@ -70,27 +66,18 @@ fn main() {
 use ribir::prelude::*;
 
 fn main() {
-  let counter = || {
-    let cnt = Stateful::new(0);
+  let cnt = Stateful::new(0);
 
+  App::run(move || {
     let c_cnt = cnt.clone_writer();
-    let inc_btn = FilledButton::declarer()
+    Button::declarer()
       .on_tap(move |_| *c_cnt.write() += 1)
+      .h_align(HAlign::Center)
+      .v_align(VAlign::Center)
       .finish()
-      .with_child(Label::new("Inc"));
-
-    let counter = H1::declarer()
-      .text(pipe!($cnt.to_string()))
-      .finish();
-
-    Row::declarer()
-      .finish()
-      .with_child(inc_btn)
-      .with_child(counter)
+      .with_child(pipe!($cnt.to_string()))
       .into_widget()
-  };
-
-  App::run(counter);
+  });
 }
 ```
 

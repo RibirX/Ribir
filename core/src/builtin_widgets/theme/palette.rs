@@ -366,7 +366,7 @@ impl LightnessGroup {
       base: LightnessTone::new(0.4),
       on: LightnessTone::new(1.),
       container: LightnessTone::new(0.9),
-      on_container: LightnessTone::new(0.1),
+      on_container: LightnessTone::new(0.4),
     }
   }
 

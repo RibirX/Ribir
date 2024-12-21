@@ -60,6 +60,8 @@ impl WrapRender for BoxDecoration {
       let rect = Rect::from_size(size);
       let painter = ctx.painter();
       if let Some(ref background) = self.background {
+        let old_brush = painter.fill_brush().clone();
+
         painter.set_fill_brush(background.clone());
         if let Some(radius) = &self.border_radius {
           painter.rect_round(&rect, radius);
@@ -67,16 +69,11 @@ impl WrapRender for BoxDecoration {
           painter.rect(&rect);
         }
         painter.fill();
+
+        painter.set_fill_brush(old_brush);
       }
       self.paint_border(painter, size);
 
-      if let Some(Brush::Color(ref background)) = self.background {
-        let foreground = Palette::of(&ctx).on_container_of(background);
-        ctx
-          .painter()
-          .set_fill_brush(foreground)
-          .set_stroke_brush(foreground);
-      }
       host.paint(ctx)
     }
   }

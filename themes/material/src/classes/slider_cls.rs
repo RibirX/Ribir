@@ -72,6 +72,9 @@ pub(super) fn init(classes: &mut Classes) {
   });
 
   classes.insert(STOP_INDICATOR_INACTIVE, stop_indicator_class! {
-    background: BuildCtx::get().variant_color()
+    background: {
+      let ctx = BuildCtx::get();
+      Palette::of(ctx).on_container_of(&ctx.variant_color())
+    }
   });
 }

@@ -1,7 +1,5 @@
 use ribir::{material::material_svgs, prelude::*};
 
-static NORMAL_BUTTON_SIZE: Size = Size::new(120., 40.);
-
 fn header() -> Widget<'static> {
   static TITLE: &str = "Material Design";
   fn_widget! {
@@ -17,7 +15,6 @@ fn content() -> Widget<'static> {
   fn actions_show() -> GenWidget {
     fn_widget! {
       @Scrollbar {
-        text_line_height: 24.,
         @Column {
           clamp: BoxClamp::EXPAND_X,
           align_items: Align::Center,
@@ -26,9 +23,7 @@ fn content() -> Widget<'static> {
             @Row {
               clamp: BoxClamp::fixed_height(30.),
               @Text { text: "Common buttons" }
-              @Icon {
-                @ { material_svgs::INFO }
-              }
+              @Icon { @ { material_svgs::INFO } }
             }
             @Column {
               item_gap: 20.,
@@ -41,50 +36,26 @@ fn content() -> Widget<'static> {
               }),
               @Row {
                 item_gap: 20.,
-                @SizedBox {
-                  size: NORMAL_BUTTON_SIZE,
-                  @FilledButton {
-                    @ { Label::new("Filled") }
-                  }
-                }
-                @SizedBox {
-                  size: NORMAL_BUTTON_SIZE,
-                  @FilledButton {
-                    @ { svgs::ADD }
-                    @ { Label::new("Icon") }
-                  }
+                @FilledButton { @ {"Filled" } }
+                @FilledButton {
+                  @Icon { @{ svgs::SETTINGS } }
+                  @ { "Icon" }
                 }
               }
               @Row {
                 item_gap: 20.,
-                @SizedBox {
-                  size: NORMAL_BUTTON_SIZE,
-                  @OutlinedButton {
-                    @ { Label::new("Outlined") }
-                  }
-                }
-                @SizedBox {
-                  size: NORMAL_BUTTON_SIZE,
-                  @OutlinedButton {
-                    @ { svgs::ADD }
-                    @ { Label::new("Icon") }
-                  }
+                @Button { @ { "Outlined" } }
+                @Button {
+                  @Icon { @Icon { @ { svgs::SEARCH } } }
+                  @ { "Icon" }
                 }
               }
               @Row {
                 item_gap: 20.,
-                @SizedBox {
-                  size: NORMAL_BUTTON_SIZE,
-                  @Button {
-                    @ { Label::new("Text") }
-                  }
-                }
-                @SizedBox {
-                  size: NORMAL_BUTTON_SIZE,
-                  @Button {
-                    @ { svgs::ADD }
-                    @ { Label::new("Icon") }
-                  }
+                @TextButton { @ { "Text" } }
+                @TextButton {
+                  @Icon { @ { svgs::ADD } }
+                  @ { "Icon" }
                 }
               }
             }
@@ -95,9 +66,7 @@ fn content() -> Widget<'static> {
               clamp: BoxClamp::fixed_height(30.),
               @Row {
                 @Text { text: "Floating action buttons" }
-                @Icon {
-                  @ { material_svgs::INFO }
-                }
+                @Icon { @ { material_svgs::INFO } }
               }
             }
             @Column {
@@ -111,12 +80,10 @@ fn content() -> Widget<'static> {
               }),
               @Row {
                 item_gap: 20.,
-                @FabButton {
-                  @ { svgs::ADD }
-                }
-                @FabButton {
-                  @ { svgs::ADD }
-                  @ { Label::new("Create") }
+                @Fab { @Icon { @ { svgs::ADD } } }
+                @Fab {
+                  @Icon { @ { svgs::ADD } }
+                  @ { "Create" }
                 }
               }
             }
@@ -127,9 +94,7 @@ fn content() -> Widget<'static> {
               clamp: BoxClamp::fixed_height(30.),
               @Row {
                 @Text { text: "Icon buttons" }
-                @Icon {
-                  @ { material_svgs::INFO }
-                }
+                @Icon { @ { material_svgs::INFO } }
               }
             }
             @Column {
@@ -143,15 +108,9 @@ fn content() -> Widget<'static> {
               }),
               @Row {
                 item_gap: 20.,
-                @Button {
-                  @ { svgs::SETTINGS }
-                }
-                @FilledButton {
-                  @ { svgs::SETTINGS }
-                }
-                @OutlinedButton {
-                  @ { svgs::SETTINGS }
-                }
+                @TextButton { @Icon { @ { svgs::SETTINGS } } }
+                @FilledButton { @Icon { @ { svgs::SETTINGS } } }
+                @Button { @Icon{ @ { svgs::SETTINGS } } }
               }
             }
           }

@@ -48,16 +48,42 @@ use crate::{
   window::WindowId,
 };
 
-/// Macro used to define a class to override for a `ClassName`, this is a
-/// shorthand if you only want to compose builtin widgets with your host widget.
+/// The macro is used to create a class implementation by accepting declarations
+/// of the built-in widget fields.
 #[macro_export]
 macro_rules! style_class {
 ($($field: ident: $value: expr),* $(,)?) => {
-    (move |widget: Widget| {
+    (move |widget: $crate::prelude::Widget| {
       $crate::prelude::FatObj::new(widget) $(.$field($value))* .into_widget()
     }) as $crate::prelude::ClassImpl
   };
 }
+
+/// The macro is used to create a class implementation with a specified name
+/// while accepting declarations of the built-in widget fields.
+#[macro_export]
+macro_rules! named_style_class {
+  ($name: ident => { $($field: ident: $value: expr),* $(,)? }) => {
+    fn $name(widget: $crate::prelude::Widget) -> $crate::prelude::Widget {
+      $crate::prelude::FatObj::new(widget) $(.$field($value))* .into_widget()
+    }
+  };
+}
+
+/// This macro is used to define a class implementation by combining multiple
+/// other class implementations.
+#[macro_export]
+macro_rules! multi_class {
+  ($($class: expr),*) => {
+    move |mut w: Widget| {
+      $(w = $class(w);)*
+      w
+    }
+  };
+}
+
+/// A empty class implementation that returns the input widget as is.
+pub fn empty_cls(w: Widget) -> Widget { w }
 
 /// A collection comprises the implementations of the `ClassName`, offering the
 /// implementation of `Class` within its descendants.
@@ -233,18 +259,6 @@ impl Class {
       classes.store.get(&cls).cloned()
     }
   }
-}
-
-/// This macro is used to define a class implementation by combining multiple
-/// other class implementations.
-#[macro_export]
-macro_rules! multi_class_impl {
-  ($($class: expr),*) => {
-    move |mut w: Widget| {
-      $(w = $class(w);)*
-      w
-    }
-  };
 }
 
 #[derive(Clone)]

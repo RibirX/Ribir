@@ -33,6 +33,7 @@ pub struct LinearProgress {
   /// 2.Indeterminate, when the value is None.
   ///   Indeterminate means that progress is being made without indicating how
   ///   much progress has passed and remains.
+  #[declare(default)]
   pub value: Option<f32>,
 }
 
@@ -48,6 +49,7 @@ pub struct SpinnerProgress {
   /// 2.Indeterminate, when the value is None.
   ///   Indeterminate means that progress is being made without indicating how
   ///   much progress has passed and remains.
+  #[declare(default)]
   pub value: Option<f32>,
 }
 

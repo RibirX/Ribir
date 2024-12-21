@@ -25,7 +25,7 @@ use crate::{prelude::*, window::WindowId};
 ///     OverlayStyle { auto_close_policy: AutoClosePolicy::TAP_OUTSIDE, mask: None });
 ///   @FilledButton{
 ///     on_tap: move |e| overlay.show(e.window()),
-///     @{ Label::new("Click me to show overlay") }
+///     @{ "Click me to show overlay" }
 ///   }
 /// };
 /// App::run(w);
@@ -119,7 +119,7 @@ impl Overlay {
   ///     fn_widget! { @Text { text: "overlay" } },
   ///     OverlayStyle { auto_close_policy: AutoClosePolicy::TAP_OUTSIDE, mask: None }
   ///   );
-  ///   let mut button = @FilledButton{};
+  ///   let mut button = @FilledButton {};
   ///   @$button {
   ///     h_align: HAlign::Center,
   ///     v_align: VAlign::Center,
@@ -134,7 +134,7 @@ impl Overlay {
   ///        e.window()
   ///       );
   ///     },
-  ///     @{ Label::new("Click to show overlay") }
+  ///     @{ "Click to show overlay" }
   ///   }
   /// };
   /// App::run(w);
