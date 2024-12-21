@@ -6,11 +6,33 @@ pub struct Leading<T>(T);
 #[derive(ChildOfCompose)]
 pub struct Trailing<T>(T);
 
+/// `PositionChild` is an enum that can contain a leading child, a trailing
+/// child, or a default child.
+///
+/// It is useful for assisting your widget in
+/// gathering a child that is wrapped by `Leading`, `Trailing`, or neither.
 #[derive(ChildOfCompose)]
 pub enum PositionChild<T> {
   Default(T),
   Leading(T),
   Trailing(T),
+}
+
+impl<T> PositionChild<T> {
+  /// Unwraps the `PositionChild` into its contained value.
+  pub fn unwrap(self) -> T {
+    match self {
+      PositionChild::Default(t) => t,
+      PositionChild::Leading(t) => t,
+      PositionChild::Trailing(t) => t,
+    }
+  }
+
+  /// Returns `true` if the `PositionChild` is a `Leading` child.
+  pub fn is_leading(&self) -> bool { matches!(self, PositionChild::Leading(_)) }
+
+  /// Returns `true` if the `PositionChild` is a `Trailing` child.
+  pub fn is_trailing(&self) -> bool { matches!(self, PositionChild::Trailing(_)) }
 }
 
 impl<T> Leading<T> {

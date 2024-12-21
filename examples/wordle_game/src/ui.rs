@@ -18,8 +18,8 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
     fn_widget! {
       @FilledButton {
         on_tap: move |_| $this.write().guessing.enter_char(key),
-        color: pipe!{ hint_color($this.key_hint(key)) },
-        @ { Label::new(key.to_string()) }
+        // todo: color: pipe!{ hint_color($this.key_hint(key)) },
+        @ { key.to_string() }
       }
     }
     .into_widget()
@@ -28,7 +28,6 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
   fn keyboard(self, state_bar: impl StateWriter<Value = Text> + 'static) -> Widget<'static> {
     let this: <Self as StateWriter>::Writer = self.clone_writer();
     fn_widget! {
-    let palette = Palette::of(BuildCtx::get());
     @Column {
         item_gap: 5.,
         align_items: Align::Center,
@@ -51,8 +50,8 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
           justify_content: JustifyContent::Center,
           @FilledButton {
             on_tap: move |_| $this.write().guessing.delete_back_char(),
-            color: palette.surface_variant(),
-            @ { Label::new("Del") }
+            // todo: color: palette.surface_variant(),
+            @ { "Del" }
           }
           @ { self.chars_key(['Z', 'X', 'C', 'V', 'B', 'N', 'M' ]) }
 
@@ -61,8 +60,8 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
               Ok(status) => state_bar.write().text = status.state_message().into(),
               Err(e) => state_bar.write().text = e.message().into(),
             },
-            color: palette.surface_variant(),
-            @ { Label::new("Enter") }
+            // todo: color: palette.surface_variant(),
+            @ { "Enter" }
           }
         }
       }
@@ -157,19 +156,19 @@ impl Compose for Wordle {
       let state_bar = @Text { text: "" };
       let keyboard = this.clone_writer().keyboard(state_bar.clone_writer());
 
-      let give_up = @OutlinedButton {
+      let give_up = @Button {
         on_tap: move |_| {
           let status = $this.write().give_up();
           $state_bar.write().text = status.state_message().into();
         },
-        @ { Label::new("Give up") }
+        @ { "Give up" }
       };
       let new_game = @FilledButton {
         on_tap: move |_| {
           $this.write().reset();
           $state_bar.write().text = "".into();
         },
-        @ { Label::new("New game") }
+        @ { "New game" }
       };
 
       @Container {

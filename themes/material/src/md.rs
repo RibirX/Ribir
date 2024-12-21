@@ -62,6 +62,8 @@ pub mod easing {
 
 pub const RADIUS_5: Radius = Radius::all(5.);
 pub const RADIUS_10: Radius = Radius::all(10.);
+pub const RADIUS_12: Radius = Radius::all(12.);
+pub const RADIUS_16: Radius = Radius::all(16.);
 pub const RADIUS_20: Radius = Radius::all(20.);
 
 pub const RADIUS_1: Radius = Radius::all(1.);
@@ -93,6 +95,15 @@ pub const EDGES_TOP_4: EdgeInsets = EdgeInsets::only_top(4.);
 pub const EDGES_BOTTOM_4: EdgeInsets = EdgeInsets::only_bottom(4.);
 
 pub const EDGES_HOR_6: EdgeInsets = EdgeInsets::horizontal(6.);
+pub const EDGES_HOR_8: EdgeInsets = EdgeInsets::horizontal(8.);
+pub const EDGES_HOR_12: EdgeInsets = EdgeInsets::horizontal(12.);
+
+pub const EDGES_16: EdgeInsets = EdgeInsets::all(16.);
+pub const EDGES_HOR_16: EdgeInsets = EdgeInsets::horizontal(16.);
+pub const EDGES_HOR_24: EdgeInsets = EdgeInsets::horizontal(24.);
+pub const EDGES_HOR_32: EdgeInsets = EdgeInsets::horizontal(32.);
+pub const EDGES_HOR_36: EdgeInsets = EdgeInsets::horizontal(36.);
+pub const EDGES_HOR_48: EdgeInsets = EdgeInsets::horizontal(48.);
 
 // Borders
 pub fn border_primary_2() -> Border {

@@ -22,8 +22,8 @@ class_names! {
 /// # Example
 ///
 /// ```
-/// use ribir_core::prelude::*;
-/// use ribir_widgets::prelude::*;
+/// # use ribir_core::prelude::*;
+/// # use ribir_widgets::prelude::*;
 ///
 /// let _check = checkbox! { checked: true };
 ///
@@ -143,7 +143,7 @@ impl ComposeChild<'static> for Checkbox {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
   use ribir_core::test_helper::*;
   use ribir_dev_helper::*;
 

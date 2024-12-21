@@ -18,7 +18,7 @@ sidebar_position: 2
 
 ## 什么是 widget？
 
-在 Ribir 中，widget 作为核心概念，它是对视图进行描述的基本单元。在形式上它可以是一个按钮，一个文本框，一个列表，一个对话框，甚至是整个应用界面。在代码上，它可以是一个函数，一个闭包或者一个数据对象。Ribir 将能通过 `&BuildCtx` 构建出 `Widget` 的类型叫做 widget。注意 `Widget` 和 widget 的差别，在整个 Ribir 的语境中，widget 是一个泛称，而大写开头的 `Widget` 是一个具体的 widget，也是所有 widget 构建进入视图的通行证。
+在 Ribir 中，widget 作为核心概念，它是对视图进行描述的基本单元。在形式上它可以是一个按钮，一个文本框，一个列表，一个对话框，甚至是整个应用界面。在代码上，它可以是一个函数，一个闭包或者一个数据对象。
 
 如果你不是特别理解上面的话，不用在意，因为你完全不需要关注 widget 的构建过程，Ribir 也禁止干涉这个过程。你只需明白，Ribir 将所有的 widget 分成四类：
 
@@ -29,22 +29,25 @@ sidebar_position: 2
 
 本章将只会介绍函数 widget 和 `Compose` widget。因为在大部分场景中这两种 widget 已经足够满足我们的需求了。作为进阶的内容，我们将在[深入 widget](../understanding_ribir/widget_in_depth.md)中覆盖 `Render` widget 和 `ComposeChild` widget。
 
+注意 `Widget` 和 widget 的差别，在整个 Ribir 的语境中，widget 是一个泛称，而大写开头的 `Widget` 是一个具体的 widget，也是所有 widget 构建进入视图的通行证。
 
 ## 函数 widget
 
-接收 `&BuildCtx` 作为入参并返回 `Widget` 的函数或闭包被称为函数 widget。
+返回 `Widget` 的函数或闭包被称为函数 widget ，一个可以被多次调用的函数 widget ，可以转换为一个 `GenWidget`, 而我们应用的根 widget 就要求是一个 `GenWidget`.
 
-在没有外部状态依赖的情况下，通过函数来定义 widget 是最简单的一种方式。在[体验 Ribir](./try_it.md)中，你已经见过一个 `Hello world!` 的函数 widget 了。本节中，我们仍通过 `Hello world!` 的例子来展开介绍。
+通过函数来定义 widget 是最简单快速的一种方式。在[体验 Ribir](./try_it.md)中，你已经见过一个 `Hello world!` 的函数 widget 了。本节中，我们仍通过 `Hello world!` 的例子来展开介绍。
 
-### 通过函数来定义 widget
+### 通过函数来定义 widget 
 
-直接通过函数来定义 widget：
+我们先通过定义一个 `hello_world` 函数来完成我们的例子。
 
 ```rust no_run
 use ribir::prelude::*;
 
 fn hello_world() -> Widget<'static> {
-  rdl!{ Text { text: "Hello World!" } }
+  Text::declarer()
+    .text("Hello World!")
+    .finish()
     .into_widget()
 }
 
@@ -53,13 +56,25 @@ fn main() {
 }
 ```
 
-`rdl!{ Text { text: "Hello World!" } }`，通过 `rdl！` 创建了一个内容为 `Hello World!` 的 `Text`。关于 `rdl!` 的细节，你可以先放到一边，将在小节 [使用 `rdl!` 创建对象](#使用-rdl-创建对象) 中详细介绍。
+因为 `Text` 这个 widget ，只提供了声明式 API 创建一种方法，所以我们需要以 `Text::declarer()` 来创建它的声明器，并以 `finish` 来完成创建。紧接着，我们通过 `into_widget` 来将它转化为 `Widget` 类型。
 
-最后，将 `Text` 通过 `build` 方法构建成 `Widget`，作为函数的返回值。
+对于声明式 widget 我们还可以通过 `rdl!` 来简化它的写法。
+
+```rust
+use ribir::prelude::*;
+
+fn hello_world() -> Widget<'static> {
+  rdl!{ Text { text: "Hello World!" } }
+    .into_widget()
+}
+```
+
+关于 `rdl!` 的细节，我们将在小节 [使用 `rdl!` 创建对象](#使用-rdl-创建对象) 中详细介绍，现在先将它暂且放一放。
+
 
 > 小提示
 >
-> Ribir 中有多个过程宏，而 &BuildCtx 常常作为一个需要跨宏使用的变量。为了简化这个传递过程 ，Ribir 在这样的情况下，统一使用 `ctx!` 来命名 `&BuildCtx`，以允许它跨宏使用。所以，你以后会经常看到 `ctx!` 这个宏。
+> 框架会给所有类型的 widget 自动实现 `into_widget` 的方法。
 
 ### 闭包和 `fn_widget!`
 
@@ -77,7 +92,7 @@ fn main() {
 }
 ```
 
-对于通过闭包创建函数控件，Ribir 提供了一个 `fn_widget!` 宏来简化这个过程，`fn_widget!` 除了支持我们本章接下来要讲到的两个语法糖 `@` 和 `$` 之外，你可以简单认为它会这样展开代码：
+而对于通过闭包创建函数 widget ，Ribir 提供了一个 `fn_widget!` 宏来简化这个过程，`fn_widget!` 除了支持我们本章接下来要讲到的两个语法糖 `@` 和 `$` 之外，你可以简单认为它会这样展开代码：
 
 ``` rust ignore
 move || -> Widget {
@@ -101,7 +116,19 @@ fn main() {
 }
 ```
 
-你有没有发现，除了没有使用 `@` 以外，这个例子和你在[体验 Ribir](./try_it.md)中看到的已经一样了。
+通常声明式 widget 都会提供一个同名宏，这个宏会通过 `fn_widget!` 来创建以自己为根节点的函数 widget 。
+
+所以，我们的例子可以进一步简化为:
+
+```rust no_run
+use ribir::prelude::*;
+
+fn main() {
+  App::run(text! { text: "Hello World!"});
+}
+```
+
+这便是我们在[体验 Ribir](./try_it.md)中看到的例子了。
 
 ## 使用 `rdl!` 创建对象
 
@@ -113,7 +140,16 @@ fn main() {
 
 ### 声明式创建对象
 
-尽管 `rdl!` 支持任意 Rust 表达式，但我们所说的声明式创建对象，特指通过结构体字面量的方式。
+尽管 `rdl!` 支持任意 Rust 表达式，但我们所说的声明式创建对象，特指通过结构体字面量的方式：
+
+```rust ignore
+rdl! { 
+  ObjectType {
+    ... // 字段声明
+  } 
+}
+```
+
 
 当你的表达式是一个结构体字面量时， `rdl!` 会通过 `Declare` trait 来创建对象，这就要求你所创建的对象的类型必须继承或实现了 `Declare` trait。
 
@@ -133,9 +169,27 @@ fn use_rdl() {
 
 上面的例子中，`Counter` 继承了 `Declare`， 并标记 `count` 默认值为 `1`。 所以在 `rdl!` 中，你可以不用给 `count` 赋值，`rdl!` 创建它时会默认赋值为 `1`。`Declare` 还有一些其它的特性，我们暂不在这里展开。
 
-## 组合 widget
+### 表达式创建对象
 
-你已经知道如何创建一个 widget 了，我们现在通过 widget 嵌套在另一个 widget 中来组合出一个简单的计数应用。
+除了通过结构体字面量的方式创建对象以外，你还可以在 `rdl!` 中放置任意表达式，`rdl!`。这种方式的好处是，你可以在 `{...}` 中写任意代码在创建对象。这在嵌套组合中非常有用，也只在嵌套作为孩子时有必要。下面的例子展示如何在 `rdl` 中使用表达式创建对象：
+
+```rust ignore
+use ribir::prelude::*;
+
+let _parent = rdl!{
+  // 在这里你可以写任意的表达式，表达式的结果将作为孩子
+  if  {
+    ...
+  } else {
+    ...
+  }
+};
+```
+
+
+### 组合 widget
+
+你已经知道如何在 `rdl!` 中创建 widget 了，我们现在通过将 widget 嵌套在另一个 widget 中来组合出一个简单的计数应用。
 
 你可以在结构体字面量声明的 widget 中嵌入其它 `rdl!` 作为孩子，注意孩子总是被要求声明在父 widget 属性的后面，这是 `rdl!` 对格式的强制要求。
 
@@ -145,11 +199,8 @@ use ribir::prelude::*;
 fn main() {
   let counter = fn_widget! { 
     rdl!{ 
-      Row {
-        rdl!{ FilledButton {
-          rdl!{ Label::new("Increment") }
-        }}
-        rdl!{ H1 { text: "0" } }
+      Button {
+        rdl!{ "0" }
       }
     }
   };
@@ -158,7 +209,7 @@ fn main() {
 }
 ```
 
-上面的例子中，我们创建了一个 `Row`，它有两个子节点，`FilledButton` 和 `H1`。这三种 widget 都是 ribir_widgets 库中已定义好的。
+上面的例子中，我们创建了一个 `Button`, 并给它组合了一个字符串作为孩子。`Button` 是在 ribir_widgets 库中已定义好的。
 
 `rdl!` 也允许你为已创建好的 widget 声明孩子: 
 
@@ -167,14 +218,10 @@ use ribir::prelude::*;
 
 fn main() {
   let counter = fn_widget! {
-    let row = rdl!{ Row { align_items: Align::Center } };
-
+    let btn = rdl! { Button {} };
     rdl!{ 
-      $row {
-        rdl!{ FilledButton {
-          rdl!{ Label::new("Increment") }
-        }}
-        rdl!{ Text { text: "0" } }
+      $btn {
+        rdl!{ "0" }
       }
     }
   };
@@ -183,59 +230,27 @@ fn main() {
 }
 ```
 
-注意到 `rdl!{ $row { ... } }` 了吗？ 它和结构体字面量语法一样，但是加上 `$` 后，它表示作为父亲使一个变量而不是类型，所以它不会新建一个 widget，而是直接使用这个变量来和孩子组合。
+注意到 `rdl!{ $btn { ... } }` 了吗？ 它和结构体字面量语法一样，但是加上 `$` 后，它表示作为父亲的是一个变量而不是类型，所以它不会新建一个 widget ，而是直接使用这个变量来和孩子组合。
 
 > 小提示
 >
 > 在 Ribir 中，父子的组合并不是任意的，而是有类型限制的，父亲可以约束孩子的类型并给出组合逻辑。这确保了组合的正确性。
 >
-> 在我们上面的例子中，`Row` 接收任意数目，任意类型的 widget,`Text` 不能接收任何孩子, 而 `FilledButton` 则更复杂一点，它允许接收一个 `Label` 作为它的文字和一个 `Svg` 作为按钮图标。
+> 在我们上面的例子中，`Button` 规定好了可以接受两个可选的孩子，一个字符串作为标签，一个 `Widget` 作为 icon。
 >
-> 对于如何约束 widget 的孩子类型，我们将在[深入 widget](../understanding_ribir/widget_in_depth.md)中展开介绍。
-
-### 表达式创建对象
-
-除了通过结构体字面量创建对象以外，你还可以通过 `rdl!{...}` 包裹任意表达式来创建对象。这种方式的好处是，你可以在 `{...}` 中写任意代码在创建对象。这在嵌套组合中非常有用，也只在嵌套作为孩子时有必要。下面的例子展示如何在 `rdl` 中使用表达式创建对象：
-
-```rust ignore
-use ribir::prelude::*;
-
-let _ = fn_widget! {
-  rdl!{ Row {
-    rdl!{
-      // 在这里你可以写任意的表达式，表达式的结果将作为孩子
-      if xxx {
-        ...
-      } else {
-        ...
-      }
-    }
-  }}
-};
-```
-
-到这里，回顾前文的例子：
-
-```rust no_run
-use ribir::prelude::*;
-
-fn main() {
-  App::run(fn_widget! { 
-    rdl!{ Text { text: "Hello World!" } }
-  });
-}
-```
-
-相信你应该已经完全理解它了。
+> **为什么 Button 的标签要设计为是一个孩子而不是一个自己的字段呢？**
+> 这是因为，如果设计为 `Button` 自己的字段，那么无论 `Button` 在使用时是否有一个标签，这个字段都要占用内存。而如果是作为一个孩子，则不存在这个字段内存的开销了。
+>
+> 关于如何约束 widget 的孩子类型，我们将在[深入 widget ](../understanding_ribir/widget_in_depth.md)中展开介绍。
 
 ## `@` 语法糖
 
-在组合 widget 的过程中，我们用到了大量的 `rdl!`。一方面，它让你在与 Rust 语法交互时（特别是复杂的例子）能有一个清晰的声明式结构——当你看到 `rdl!` 时，你就知道一个 widget 节点的组合或创建开始了；另一方面，当每一个节点都用 `rdl!` 包裹时，它又看上去太冗长了，无法让你一眼看到重点信息。
+在组合 widget 的过程中，我们用到了多个 `rdl!`。一方面，它让你在与 Rust 语法交互时（特别是复杂的例子）能有一个清晰的声明式结构——当你看到 `rdl!` 时，你就知道一个 widget 节点的组合或创建开始了；另一方面，当每一个节点都用 `rdl!` 包裹时，它又看上去太冗长了，无法让你一眼看到重点信息。
 
 好在，Ribir 为 `rdl!` 提供了一个 `@` 语法糖，在实际使用的过程中，基本上用的都是 `@` 而非 `rdl!`。总共有三种情况：
 
-- `@ Row {...}` 作为结构体字面量的语法糖，展开为 `rdl!{ Row {...} }`
-- `@ $row {...}` 作为变量结构体字面量的语法糖，展开为 `rdl!{ $row {...} }`
+- `@Button {...}` 作为结构体字面量的语法糖，展开为 `rdl!{ Button {...} }`
+- `@ $btn {...}` 作为变量结构体字面量的语法糖，展开为 `rdl!{ $btn {...} }`
 - `@ { ... } ` 是表达式的语法糖，展开为 `rdl!{ ... }` 
 
 现在用 `@` 改写上面的计数器的例子:
@@ -245,26 +260,11 @@ use ribir::prelude::*;
 
 fn main() {
   App::run(fn_widget! {
-    @Row {
-      @FilledButton {
-        @ { Label::new("Increment") }
-      }
-      @Text { text: "0" }
+    @Button {
+      @ { "0" }
     }
   });
 }
-```
-
-对于简单的函数调用形式的表达式 widget ，可以省略 `{}` 以简化书写：
-
-```rust ignore
-fn_widget! {
-  // 使用大括号的写法：
-  let label = @ { Label::new("Increment") };
-  // 可以直接写为：
-  let label = @Label::new("Increment");
-  ...
-};
 ```
 
 ## 状态——让数据变得可被侦和共享
@@ -294,15 +294,12 @@ fn main() {
   App::run(fn_widget! {
     // 变更 1: 通过 `State::value` 创建一个状态
     let count = State::value(0);
-
-    @Row {
-      @FilledButton {
-        // 变更 2： 通过点击事件来修改状态
-        on_tap: move |_| *$count.write() += 1,
-        @ { Label::new("Increment") }
-      }
+    @Button {
+      // 变更 2： 通过点击事件来修改状态
+      on_tap: move |_| *$count.write() += 1,
       // 变更 3： 通过状态来显示数据，并保持视图的持续更新。
-      @H1 { text: pipe!($count.to_string()) }
+      // 对于宏或者函数调用，我们可以省略 @ 后面的一对大括号
+      @ pipe!($count.to_string())
     }
   });
 }
@@ -347,7 +344,7 @@ move |_| *$count.write() += 1
 ### 语法糖展开的优先级
 
 还记得我们在[组合-widget](#组合-widget)中也同样用到了 `$` 吗？
-比如 `rdl!{ $row { ... } }` 或者 `@$row { ... }`，这可不是对状态数据的引用哦。因为 `rdl!` 赋予了它其它的语义——通过变量声明父 widget。
+比如 `rdl!{ $btn { ... } }` 或者 `@ $btn { ... }`，这可不是对状态数据的引用哦。因为 `rdl!` 赋予了它其它的语义——通过变量声明父 widget。
 
 无论是 `@` 还是 `$`，它们首先应遵循它们所在宏的语义，其次才是一个 Ribir 语法糖。当我们在一个非 Ribir 提供的宏中使用 `@` 或 `$` 时，它们就不再是 Ribir 的语法糖，因为外部宏很可能为它们赋予了特殊的语义。比如：
 
@@ -357,14 +354,14 @@ use ribir::prelude::*;
 fn_widget!{
   user_macro! {
     // `@` 此时不是语法糖，它的语义取决于 `user_macro!` 的实现
-    @Row { ... }
+    @Button { ... }
   }
 }
 ```
 
 ## `Pipe` 流 —— 保持对数据的持续响应
 
-`Pipe` 流是一个带初始值的持续更新的数据流，它可以被分解为一个初始值和 RxRust 流 —— RxRust 流可以被订阅。它也是 Ribir 将数据变更更新到视图的唯一通道。
+`Pipe` 流是一个带初始值的持续更新的数据流，它可以被分解为一个初始值和 rxRust 流 —— rxRust 流可以被订阅。它也是 Ribir 将数据变更更新到视图的唯一通道。
 
 Ribir 提供了一个 `pipe!` 宏来辅助你快速创建 `Pipe` 流。它接收一个表达式，并监测表达式中的所有用 `$` 标记出的状态，以此来触发表达式的重算。
 
@@ -385,7 +382,7 @@ let sum = pipe!(*$a + *$b);
   @Text { text: pipe!($count.to_string()) }
 ```
 
-### 动态渲染不同的 widget
+### 动态渲染 widget
 
 到目前为止，所有你创建的视图的结构都是静态的，它们仅仅只有属性会随着数据变更，但 widget 的结构不会随着数据变更。实际上，你同样可以通过 `Pipe` 流来创建持续变化的 widget 结构。
 
@@ -400,25 +397,22 @@ let sum = pipe!(*$a + *$b);
 use ribir::prelude::*;
 
 fn main() {
-  App::run( fn_widget! {
-    let counter = State::value(0);
-
-    @Row {
-      @FilledButton {
-        on_tap: move |_| *$counter.write() += 1,
-        @ { Label::new("Increment") }
-      }
-      @ {
-        pipe!(*$counter).map(move |counter| {
-          (0..counter).map(move |_| {
-            @Container {
-              margin: EdgeInsets::all(2.),
-              size: Size::new(10., 10.),
-              background: Color::RED
-            }
-          })
+  let counter = State::value(0);
+  App::run(row! {
+    @Button {
+      on_tap: move |_| *$counter.write() += 1,
+      @ { "Increment" }
+    }
+    @ {
+      pipe!(*$counter).map(move |counter| {
+        (0..counter).map(move |_| {
+          @Container {
+            margin: EdgeInsets::all(2.),
+            size: Size::new(10., 10.),
+            background: Color::RED
+          }
         })
-      }
+      })
     }
   });
 }
@@ -454,9 +448,9 @@ pipe!{
 }
 ```
 
-### 为 `Pipe` 链上 RxRust 的操作符
+### 为 `Pipe` 链上 rxRust 的操作符
 
-`Pipe` 流的更新推送是建立在 RxRust 流之上的，所以 `Pipe` 也提供了方法 `value_chain` 让你可以操作 RxRust 流。因此，你可以使用 RxRust 的操作符来如 `filter`, `debounce` `distinct_until_change` 等等操作来减少更新的频率。
+`Pipe` 流的更新推送是建立在 rxRust 流之上的，所以 `Pipe` 也提供了方法 `value_chain` 让你可以操作 rxRust 流。因此，你可以使用 rxRust 的操作符来如 `filter`, `debounce` `distinct_until_change` 等等操作来减少更新的频率。
 
 假设你有一个简单的自动求和例子：
 
@@ -494,17 +488,17 @@ fn main() {
 > 一般来讲，想知道视图哪部分是动态变化的，你只需要查找哪里有 `pipe!`。
 
 
-## `watch!` 侦听表达式的变更
+## 用 `watch!` 侦听表达式的变更
 
 `watch!` 是一个用来侦听表达式变更的宏，它接收一个表达式，并监测表达式中的所有用 `$` 标记出的状态，以此来触发表达式的重算，并向下游的订阅者推送最新的结果。
 
 
-`watch!` 与 `pipe!` 一样侦听着表达式的变更，并有相同的语法，但 `pipe!` 是带初始值的，它表现的更像一个持续变更的值，而不仅仅是一个可订阅的数据流，而 `watch!` 则仅是一个可订阅的数据流，因此 `pipe!` 的结果可以被当做一个值来初始化 widget 的属性，而 `watch!` 的结果则不能。
+`watch!` 与 `pipe!` 一样侦听着表达式的变更，并有相同的语法，但 `pipe!` 是带初始值的，它表现的更像一个持续变更的值，而不仅仅是一个可订阅的数据流，而 `watch!` 则仅是一个可订阅的数据流，因此 `pipe!` 可以被当做一个值来初始化 widget 的属性，而 `watch!` 则不能。
 
 简而言之：
 
-- `pipe!` = (初始值 + RxRust 流)
-- `watch!` = RxRust 流
+- `pipe!` = (初始值 + rxRust 流)
+- `watch!` = rxRust 流
 
 你也可以用 `watch!` 来手动实现你的计数器：
   
@@ -521,9 +515,9 @@ fn main() {
     });
 
     @Row {
-      @FilledButton {
+      @Button {
         on_tap: move |_| *$count.write() += 1,
-        @ { Label::new("Increment") }
+        @ { "Increment" }
       }
       @{ display }
     }
@@ -549,8 +543,8 @@ fn show_name(name: State<String>) -> Widget<'static> {
       $text.write().text = format!("Hi, {}!", name).into();
     });
 
-    // `name` 是一个可共享的状态，它可能被其他人持有，使它的生命周期长于控件
-    // 所以我们需要在控件销毁时取消订阅
+    // `name` 是一个可共享的状态，它可能被其他人持有，使它的生命周期长于 widget 
+    // 所以我们需要在 widget 销毁时取消订阅
     @$text { on_disposed: move |_| u.unsubscribe() }
   }
   .into_widget()
@@ -594,14 +588,9 @@ impl Counter {
 
 impl Compose for Counter {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    fn_widget! {
-      @Row {
-        @FilledButton {
-          on_tap: move |_| $this.write().increment(),
-          @ { Label::new("Increment") }
-        }
-        @H1 { text: pipe!($this.0.to_string()) }
-      }
+    button! {
+      on_tap: move |_| $this.write().increment(),
+      @pipe!($this.0.to_string())
     }
     .into_widget()
   }

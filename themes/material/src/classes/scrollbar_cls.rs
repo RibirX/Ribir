@@ -12,7 +12,7 @@ pub(super) fn init(classes: &mut Classes) {
   //
   // However, we also provide an empty class implementation to prevent it from
   // inheriting the ancestor class implementation of `SCROLL_CLIENT_AREA`.
-  classes.insert(SCROLL_CLIENT_AREA, |w| w);
+  classes.insert(SCROLL_CLIENT_AREA, empty_cls);
 
   classes.insert(H_SCROLL_THUMB, style_class! {
     background: BuildCtx::get().variant_color(),
@@ -27,15 +27,9 @@ pub(super) fn init(classes: &mut Classes) {
     clamp: BoxClamp::min_height(THUMB_MIN_SIZE).with_fixed_width(md::THICKNESS_8)
   });
 
-  const H_TRACK: ClassImpl = style_class! {
-    v_align: VAlign::Bottom
-  };
-  const V_TRACK: ClassImpl = style_class! {
-    h_align: HAlign::Right
-  };
-
-  classes.insert(H_SCROLL_TRACK, multi_class_impl![base_track, H_TRACK]);
-  classes.insert(V_SCROLL_TRACK, multi_class_impl![base_track, V_TRACK]);
+  classes
+    .insert(H_SCROLL_TRACK, multi_class![base_track, style_class! { v_align: VAlign::Bottom }]);
+  classes.insert(V_SCROLL_TRACK, multi_class![base_track, style_class! { h_align: HAlign::Right }]);
 }
 
 fn base_track(w: Widget) -> Widget {

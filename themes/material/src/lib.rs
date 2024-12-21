@@ -66,10 +66,6 @@ fn new(palette: Palette) -> Theme {
   theme
 }
 
-const FAB_RADIUS: f32 = 16.;
-const LABEL_GAP: f32 = 8.;
-const BUTTON_RADIUS: f32 = 20.;
-const BUTTON_PADDING: f32 = 16.;
 const INDICATOR_SIZE: f32 = 60.;
 const LIST_ITEM_GAP: f32 = 16.;
 const LIST_ITEM_SIZE: f32 = 40.;
@@ -87,48 +83,7 @@ fn init_custom_style(theme: &mut Theme) {
   theme
     .custom_styles
     .set_custom_style(SelectedHighLightStyle { brush: Color::from_rgb(181, 215, 254).into() });
-  theme
-    .custom_styles
-    .set_custom_style(FilledButtonStyle {
-      height: 40.,
-      icon_size: md::SIZE_18,
-      label_gap: LABEL_GAP,
-      icon_pos: IconPosition::Before,
-      label_style: theme.typography_theme.label_large.text.clone(),
-      radius: BUTTON_RADIUS,
-      padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
-    });
-  theme
-    .custom_styles
-    .set_custom_style(OutlinedButtonStyle {
-      height: 40.,
-      icon_size: md::SIZE_18,
-      label_gap: LABEL_GAP,
-      icon_pos: IconPosition::Before,
-      label_style: theme.typography_theme.label_large.text.clone(),
-      radius: BUTTON_RADIUS,
-      padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
-      border_width: 1.,
-    });
-  theme.custom_styles.set_custom_style(ButtonStyle {
-    height: 40.,
-    icon_size: md::SIZE_18,
-    label_gap: LABEL_GAP,
-    icon_pos: IconPosition::Before,
-    label_style: theme.typography_theme.label_large.text.clone(),
-    padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
-  });
-  theme
-    .custom_styles
-    .set_custom_style(FabButtonStyle {
-      height: 56.,
-      icon_size: md::SIZE_24,
-      label_gap: LABEL_GAP,
-      icon_pos: IconPosition::Before,
-      label_style: theme.typography_theme.label_large.text.clone(),
-      radius: FAB_RADIUS,
-      padding_style: EdgeInsets::horizontal(BUTTON_PADDING),
-    });
+
   theme.custom_styles.set_custom_style(TabsStyle {
     extent_with_both: 64.,
     extent_only_label: 48.,
@@ -238,66 +193,6 @@ fn override_compose_decorator(theme: &mut Theme) {
     .into_widget()
   });
 
-  styles.override_compose_decorator::<FilledButtonDecorator>(move |style, host, _| {
-    fn_widget! {
-      let host = FatObj::new(host);
-      @Ripple {
-        center: false,
-        bounded: RippleBound::Radius(Radius::all(20.)),
-        @InteractiveLayer {
-          border_radii: Radius::all(20.),
-          color: {
-            let palette = Palette::of(BuildCtx::get()).clone();
-            pipe!(palette.on_of(&palette.base_of(&$style.color)))
-          },
-          @$host {
-            margin: EdgeInsets::all(0.)
-          }
-        }
-      }
-    }
-    .into_widget()
-  });
-  styles.override_compose_decorator::<OutlinedButtonDecorator>(move |style, host, _| {
-    fn_widget! {
-      let host = FatObj::new(host);
-      @Ripple {
-        center: false,
-        bounded: RippleBound::Radius(Radius::all(20.)),
-        @InteractiveLayer {
-          border_radii: Radius::all(20.),
-          color: {
-            let palette = Palette::of(BuildCtx::get()).clone();
-            pipe!(palette.base_of(&$style.color))
-          },
-          @ $host {
-            margin: EdgeInsets::all(0.)
-          }
-        }
-      }
-    }
-    .into_widget()
-  });
-  styles.override_compose_decorator::<ButtonDecorator>(move |style, host, _| {
-    let host = FatObj::new(host);
-    fn_widget! {
-      @Ripple {
-        center: false,
-        bounded: RippleBound::Radius(Radius::all(20.)),
-        @InteractiveLayer {
-          border_radii: Radius::all(20.),
-          color: {
-            let palette = Palette::of(BuildCtx::get()).clone();
-            pipe!(palette.on_of(&palette.base_of(&$style.color)))
-          },
-          @ $host {
-            margin: EdgeInsets::all(0.)
-          }
-        }
-      }
-    }
-    .into_widget()
-  });
   let textfield = TextFieldThemeSuit::from_theme(&theme.palette, &theme.typography_theme);
   theme.custom_styles.set_custom_style(textfield);
 }

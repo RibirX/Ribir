@@ -125,7 +125,7 @@ impl HoverLayer {
     let hover = layer.get_mix_flags_widget().clone_reader();
     let u = watch!($layer.is_hover())
       // Delay hover effects to prevent displaying this layer while scrolling.
-      .delay(Duration::from_millis(100), AppCtx::scheduler())
+      .delay(Duration::from_millis(50), AppCtx::scheduler())
       .subscribe(move |_| {
         layer2
           .write()
@@ -165,12 +165,28 @@ impl<const M: u8> WrapRender for StateLayer<M> {
   }
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
-    host.paint(ctx);
     if self.draw_opacity > 0. {
-      let opacity = ctx.painter().alpha();
-      ctx.painter().apply_alpha(self.draw_opacity);
+      // record transform and fill brush for draw layer used, because the host widget
+      // may change them.
+      let (matrix, fill_brush) = {
+        let painter = ctx.painter();
+        let m = painter.transform();
+        let fill_brush = painter.fill_brush();
+        (*m, fill_brush.clone())
+      };
+
+      host.paint(ctx);
+
+      ctx
+        .painter()
+        .save()
+        .set_transform(matrix)
+        .set_fill_brush(fill_brush)
+        .apply_alpha(self.draw_opacity);
       self.area.draw(ctx);
-      ctx.painter().set_alpha(opacity);
+      ctx.painter().restore();
+    } else {
+      host.paint(ctx);
     }
   }
 }
