@@ -9,6 +9,7 @@ class_names! {
 
 #[derive(Declare)]
 pub struct Radio {
+  #[declare(default)]
   pub checked: bool,
 }
 

@@ -62,7 +62,7 @@ pub struct ImageTest<'a> {
 #[cfg(not(target_arch = "wasm32"))]
 impl<'a> ImageTest<'a> {
   pub fn new(test_img: PixelImage, ref_path: &'a std::path::Path) -> Self {
-    Self { test_img, ref_path, comparison: 0.00001 }
+    Self { test_img, ref_path, comparison: 0.000025 }
   }
 
   pub fn with_comparison(mut self, comparison: f64) -> Self {

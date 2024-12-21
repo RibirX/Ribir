@@ -142,6 +142,17 @@ pub struct FatObj<T> {
   keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
 }
 
+/// Create a function widget that uses an empty `FatObj` as the host object.
+#[macro_export]
+macro_rules! fat_obj {
+  ($($t: tt)*) => {
+    fn_widget! {
+      let obj = FatObj::<()>::default();
+      @ $obj { $($t)* }
+    }
+  };
+}
+
 impl<T> FatObj<T> {
   /// Create a new `FatObj` with the given host object.
   pub fn new(host: T) -> Self { FatObj::<()>::default().with_child(host) }
@@ -956,8 +967,8 @@ impl<'a> FatObj<Widget<'a>> {
           track_id,
           padding,
           fitted_box,
-          box_decoration,
           foreground,
+          box_decoration,
           painting_style,
           text_style,
           scrollable,

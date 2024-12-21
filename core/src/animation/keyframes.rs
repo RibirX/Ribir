@@ -122,13 +122,21 @@ impl<S: AnimateStateSetter> KeyFrames<S> {
         from.lerp(&frames[0].state_value, rate)
       } else if idx == frames.len() {
         let pre_rate = frames[idx - 1].rate;
-        let rate = (rate - pre_rate) / (1. - pre_rate);
-        frames[idx - 1].state_value.lerp(to, rate)
+        if pre_rate == 1. {
+          to.clone()
+        } else {
+          let rate = (rate - pre_rate) / (1. - pre_rate);
+          frames[idx - 1].state_value.lerp(to, rate)
+        }
       } else {
-        let f1 = &frames[idx - 1];
         let f2 = &frames[idx];
-        let rate = (rate - f1.rate) / (f2.rate - f1.rate);
-        f1.state_value.lerp(&f2.state_value, rate)
+        let f1 = &frames[idx - 1];
+        if f2.rate == f1.rate {
+          f2.state_value.clone()
+        } else {
+          let rate = (rate - f1.rate) / (f2.rate - f1.rate);
+          f1.state_value.lerp(&f2.state_value, rate)
+        }
       }
     })
   }

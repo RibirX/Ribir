@@ -2,198 +2,175 @@
 sidebar_position: 2
 ---
 
-# Using Ribir without "DSL"
+# Using Ribir without relying on "DSL"
 
-Whether you want clearer debugging or more Rust-like code, you might choose not to use Ribir's "DSL".
 
-Don't worry. Ribir was designed to use "DSL" as a simple syntax layer. You can use Ribir's API to build UI directly. Even in a single piece of code, you can choose to use the API and macros together. Everything will be simple and natural.
+Perhaps for the sake of more intuitive debugging, or perhaps to give code a more Rust-like feel, some people will prefer to avoid using too many macros and introducing new syntax, and therefore will be reluctant to use [Ribir](https://github.com/RibirX/Ribir)'s "DSL".
+
+This is fine, because Ribir was designed from the beginning to position the "DSL" as a lightweight syntax transformation layer, and you can use Ribir's APIs directly to build the UI. You can even choose to use the APIs partly, the macros partly, and the two intertwined in a single code snippet. Everything will be simple and natural.
 
 ## Core Concepts
 
 In Ribir:
 
-- Views are built as basic units of widgets.
-- Widgets are [composed **purely**](./widget_in_depth.md#pure-composition) from other widgets.
+- Views are built with widgets as their base unit.
+- Widgets are linked to each other by [**pure composition**](. /widget_in_depth.md#composition) to form new widgets.
 
-So, building a UI with the API mainly involves two key points:
+Therefore, there are two key points involved in building the UI through the API:
 
-- How to create a widget
+- How to create widgets
 - How to compose child widgets
 
-## Creating a widget with the API
+## Creating widgets via API
 
-Let's take the `FilledButton` widget as an example. Its definition is as follows:
+As an example, the `Radio` control is defined as follows:
 
 ```rust
 use ribir::prelude::*;
 
-struct FilledButton {
-  color: Color
+pub struct Radio {
+  pub checked: bool,
 }
 ```
 
-This is just like a regular Rust structure. You can directly create an object:
+This is no different than a regular Rust struct, you can just create an object:
 
 ```rust
 use ribir::prelude::*;
 
-let button = FilledButton { color: Color::RED };
+let radio = Radio { checked: true };
 ```
 
-And there you have it, a red button.
+This gives us a checked `Radio`.
 
-### Extending Widget Functionality with `FatObj`
+### Extending the capabilities of a widget with `FatObj`
 
-We've created a button, but it doesn't have any API for handling events.
+We've created a `Radio`, but it doesn't provide any API for responding to events.
 
-In Ribir, event handling is implemented by separate widgets, not directly in the button itself. Any widget can gain event handling capabilities by compose with it.
+This is because in Ribir, event response is implemented by a separate widget. Any widget can be composed with it to gain the ability to respond to events.
 
-For built-in widgets like event handlers, you don't need to compose them to use their features. Ribir offers a generic called `FatObj<T>`, which has initialization APIs for all built-in widgets. Simply wrap your widget with it, and your widget will have all the features of the built-in widgets.
+And, for built-in widgets such as event responses, we can get them without composing them; Ribir provides a `FatObj<T>` generic, which provides the initialization API for all built-in widgets, and wrapping our widgets in it gives the widgets all of the capabilities of the built-in widgets.
 
 ```rust
 use ribir::prelude::*;
 
-let button = FilledButton { color: Color::RED };
-let button = FatObj::new(button)
-  .on_tap(|_| println!("Button tapped"));
+let radio = Radio { checked: true };
+let radio = FatObj::new(radio)
+  .on_tap(|_| println!("Radio tapped"));
 ```
 
-But in practice, we usually don't write it directly like this. Instead, we create widgets using the `Declare` trait.
+But in practice, instead of writing it this way, we usually create the widget via the `Declare` trait.
 
 ```rust
 use ribir::prelude::*;
 
-fn button_demo(ctx: &BuildCtx) {
-  let btn: FatObj<State<FilledButton>> = FilledButton::declarer()
-    .color(Color::RED)
-    .on_tap(|_| println!("Button clicked"))
-    .finish();
-}
+let btn: FatObj<State<Radio>> = Radio::declarer()
+  .checked(true)
+  .on_tap(|_| println!("Radio clicked"))
+  .finish();
 ```
 
 ### Why should we use `Declare` to create widgets?
 
-In the previous example, we used a method similar to the Builder pattern to create a widget. This might seem more complicated, but it actually has several benefits.
-
-#### Interacting with `BuildCtx`
-
-First, let's look at the complete definition of `FillButton`:
-
-```rust
-use ribir::core::prelude::*;
-
-#[derive(Declare, Default)]
-pub struct FilledButton {
-  #[declare(default=Palette::of(BuildCtx::get()).primary())]
-  pub color: Color,
-}
-```
-
-Note the attribute `#[declare(default=Palette::of(BuildCtx::get()).primary())]`. This means that if you don't set a `color` value when creating `FilledButton` with `Declare`, it will use the primary color from the palette as the default.
-
-This is the main reason we use `Declare` to create widgets: it allows widgets to access `BuildCtx` when they're created. This lets widgets automatically configure themselves based on the context, like changing dynamically with the theme.
+In the above example, we created the widgets in a similar way to the Builder pattern, which makes the process seem more complicated. However, this approach actually brings more advantages.
 
 
-#### Full Setup API
+#### Complete Initialization API
 
-Another thing to note is that we're creating `FatObj<State<FilledButton>>`, not `FilledButton`. This is because `Declare` allows us to configure properties with methods of the same name and also use `FatObj` to extend the capabilities of built-in widgets. We use `State` because it lets your widget's state be observed and modified, which is a very common capability. For example, we might want the button's color to change to blue when clicked.
+Note that we end up creating a `FatObj<State<Radio>>` instead of a `Radio`. This is because with `Declare`, we can not only configure properties using the method of the same name, but also extend the capabilities of the built-in widget with `FatObj`. As for why we use `State`, it's because `State` allows you to have the state of your control listened to and modified.
 
 ```rust
 use ribir::prelude::*;
 
-fn button_demo(_: &BuildCtx){
-  let mut btn: FatObj<State<FilledButton>> = FilledButton::declarer()
-    .color(Color::RED)
-    .finish();
+let mut radio: FatObj<State<Radio>> = Radio::declarer()
+  // We can use the built-in ability
+  .on_tap(|_| println!("taped!"))
+  .finish();
 
-  let w = btn.clone_writer();
-  btn = btn.on_tap(move |_| w.write().color = Color::BLUE);
-}
+watch!($radio.checked)
+  .subscribe(|checked| println!("The radio state change to {checked}"));
 ```
 
-Naturally, whether you're using `FatObj` or `State`, any associated overhead is only added to the final view you build when you utilize their provided capabilities.
+Of course, both `FatObj` and `State` only affect the overhead of the final constructed view if you use the capabilities they provide.
 
-#### Supports Initialization with `pipe!` Stream
+#### Support for initialization using `pipe!` streams
 
-Another benefit of using `Declare` to create widgets is that it allows for property initialization through the `pipe!` stream. Properties set up with the `pipe!` stream will adapt as the stream changes. For instance, let's say we want to create two `FilledButton`s, and we want `btn2`'s color to change in sync with `btn1`'s color.
+Another advantage of using `Declare` to create widgets is that it supports initializing properties with a `pipe!` stream. Properties initialized by a `pipe!` stream will change as the stream changes. For example, we want to create two `Radio`s, where the state of one follows the state of the other.
+
 
 ```rust
 use ribir::prelude::*;
 
-fn button_demo(ctx: &BuildCtx){
-  let btn1 = FilledButton::declarer().color(Color::RED).finish();
+let mut radio1: FatObj<State<Radio>> = Radio::declarer()
+  .checked(true)
+  .finish();
+let radio2 = Radio::declarer()
+  .checked(pipe!($radio1.checked))
+  .finish();
 
-  let btn2 = FilledButton::declarer()
-    .color(pipe!($btn1.color))
-    .finish();
-
-  btn1.write().color = Color::BLUE;
-}
+let _row = Row::declarer()
+  .finish()
+  .with_child(radio1)
+  .with_child(radio2)
+  .into_widget();
 ```
 
-When we change the color of `btn1`, the color of `btn2` will also change accordingly.
+#### Support for accessing built-in widget properties
 
-#### How to Access Built-in Widget Properties
+Note that while widgets created with `Declare` can be configured with all built-in capabilities directly, if you need to modify the properties of a built-in widget after initialization, you need to get the corresponding built-in widget before doing so. This is because these built-in widgets are composed on demand. In the following example, we create a button and change its margins when clicked:
 
-It's important to note that although widgets created with `Declare` can directly configure all built-in capabilities, if you need to modify the properties of a built-in widget after initialization, you need to first get the corresponding built-in widget and then operate on it. This is because these built-in widgets are composed as needed. In the example below, we create a button and change its margin when clicked.
 
 ```rust
 use ribir::prelude::*;
 
-fn button_demo(ctx: &BuildCtx){
-  let mut btn = FilledButton::declarer()
-    .color(Color::RED)
-    .finish();
+let mut btn = Radio::declarer().finish();
 
-  let m = btn.get_margin_widget().clone_writer();
-  btn = btn.on_tap(move |_| m.write().margin = EdgeInsets::all(10.0));
-}
-
+let m = btn.get_margin_widget().clone_writer();
+let btn = btn
+  .on_tap(move |_| m.write().margin = EdgeInsets::all(10.0))
+  .into_widget();
 ```
 
-## Composing Child Widgets
+## Composing child widgets
 
-In Ribir, we use the `with_child` method to compose a child widget with a parent widget to form a new widget. And the `@` syntax primarily uses `with_child` for its implementation. You might find yourself using this more often than you'd expect.
+In Ribir, we use the `with_child` method to compose child widgets with their parent widgets to form new widgets. `@` syntax is also primarily implemented using `with_child`. In fact, you'll probably use it more often than you think.
 
-For example, for a `FilledButton`, the displayed text is also a child widget, not a property of it. This is because it can either be a text button or an icon button. If these were properties, memory would be allocated for the properties you don't need, whether you're using a text button or an icon button. But if it's a child widget, you can compose as needed.
+For example, for a `Button`, the text it displays is even a child widget, not its property. This is because it can be either a text button or an icon button. If these were properties, then whether you use a text button or an icon button, memory would be allocated for properties you don't need. But if it's a child widget, it can be composed depending on the usage.
 
 Here's an example of a text button and an icon button:
 
 ```rust
 use ribir::prelude::*;
 
-fn button_demo(ctx: &BuildCtx) {
-  let text_btn = FilledButton::declarer()
-    .color(Color::RED)
-    .finish()
-    .with_child(Label::new("Text Button"));
+let text_btn = Button::declarer()
+  .finish()
+  .with_child("Text Button");
 
-  let icon_btn = FilledButton::declarer()
-    .color(Color::RED)
-    .finish()
-    .with_child(svgs::ADD);
-}
+let icon_btn = Button::declarer()
+  .finish()
+  .with_child(Icon.with_child(named_svgs::get_or_default("search")));
 ```
 
-## Mixing API and Macros
+## A mix of APIs and macros
 
-Ribir's "DSL" is not a new language, but a set of macros. Each macro can be used as an independent expression, so you can freely mix them. Below, we'll implement an example of a counter. We'll create the buttons and the counter text directly through the API, and use `$` when initializing their properties to avoid cloning `cnt`. Finally, we'll use the `@` syntax to combine them into a `Row`:
+Ribir's "DSL" is not an entirely new language, but rather a set of macros. Each macro can be used as a standalone expression, so you can mix and match them freely. Below we will implement a counter example. We'll create the text for the button and the counter directly through the API, and use `$` when initializing their properties to avoid cloning `cnt`. Finally, we'll combine them into a `Row` using the `@` syntax:
 
 ```rust
 use ribir::prelude::*;
 
 let counter = fn_widget! {
   let cnt = Stateful::new(0);
-  let btn = FilledButton::declarer()
+  let btn = Button::declarer()
     .on_tap(move |_| *$cnt.write() += 1)
     .finish()
-    .with_child(Label::new("Inc"));
+    .with_child("Inc");
 
   let label = H1::declarer()
     .text(pipe!($cnt.to_string()))
     .finish();
 
   @Row {
+    align_items: Align::Center,
     @ { btn }
     @ { label }
   }
@@ -202,9 +179,8 @@ let counter = fn_widget! {
 
 ## Conclusion
 
-We hope that everyone using Ribir can choose their preferred way of using it, whether through the "DSL" or directly using the API, to get the best experience.
+We want everyone who uses Ribir to be able to choose how they want to use it, whether it's through the "DSL" or using the API directly, to get the best experience possible.
 
-But what you need to understand is that Ribir's "DSL" is not a new language, we don't even call it "DSL". It's entirely built on the API we introduced above, just a set of macros, aimed at making the UI structure clearer, more readable, and avoiding some obvious repetitive code, such as frequent cloning of State due to move semantics.
+But what you need to understand is that Ribir's "DSL" is not a new language - we don't even call it a "DSL". It's built entirely on the API we described above, and is just a set of macros designed to make the UI structure clearer and more readable, and to avoid some obvious duplication of code, such as the need to clone State frequently because of move semantics.
 
-In short, you can choose to use it partially, or choose not to use it at all, everything is free, you don't have to be afraid of seeing new syntax. Keep exploring and enjoy your [Ribir journey](../get_started/quick_start.md)!
-
+In short, you can choose to use it partially or not at all, everything is free and there is no need to be intimidated by seeing new syntax. Continue your [Ribir journey](../get_started/quick_start.md)!
