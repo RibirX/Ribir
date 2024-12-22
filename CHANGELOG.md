@@ -41,6 +41,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **painter**: Fixed text line height does not work correctly. (#674 @M-Adoo)
 - **painter**: Fixed issue with text not being drawn at the middle baseline by default. (#674 @M-Adoo)
 
+### Changed
+
+- **core**: Optimize QueryId::is_same by not creating a String using format for every comparison (#678 @tashcan)
+
 ## [0.4.0-alpha.19] - 2024-12-18
 
 ### Features
@@ -317,7 +321,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Lazy build the widget tree. (#612, @M-Adoo)
 - **core**: Simplify the implementation of parent composition with child widgets. (#612, @M-Adoo)
-  
+
   Merge `SingleWithChild`, `MultiWithChild`, and `ComposeWithChild` into a single trait called WithChild.
 
 ### Breaking
@@ -391,18 +395,18 @@ Check out our Wordle game demo, now running smoothly in your browser\!
 
 - **ribir**: Introduced `AppRunGuard` to allow app and window configuration prior to app startup. (\#565, @M-Adoo)
   Previously, to configure the app and window before startup, `App::run` couldn't be used:
-  
+
   ``` rust
   unsafe {
     AppCtx::set_app_theme(material::purple::light());
   }
-  
+
   App::new_window(root, None).set_title("Counter");
   App::exec();
   ```
-  
+
   Now, with AppRunGuard, you can use `App::run` and chain the configuration methods:
-  
+
   ``` rust
   App::run(root)
     .with_app_theme(material::purple::light())
@@ -486,14 +490,14 @@ While these are public APIs, they are typically not required for direct use in u
 ### Features
 
 - Support the overlay (@wjian23).
-  
+
   This enhancement simplifies the creation of overlay widgets. It streamlines the addition of any widget to an overlay and offers a more user-friendly API for overlay management
 
 - **macros**: Generates documentation for the builder methods of members in `#[derive(Declare)]`, thus improving IDE support.(\#538 @M-Adoo)
 
 - **core**: All built-in widget abilities are now exported on `FatObj`. (\#535 @M-Adoo)
   You can directly use `FatObj` to configure built-in widget abilities such as `on_click`, `on_key_down`, etc.
-  
+
   ``` rust
   let _ = FatObj::new(Void)
     .margin(EdgeInsets::all(1.0))
@@ -502,7 +506,7 @@ While these are public APIs, they are typically not required for direct use in u
 
 - **macros**: `#[derive(Decalre)]` now generates a `FatObj<State<T>>` instead of `State<T>`, and supports initialization of all built-in widgets on its ObjBuilder. (\#535 @M-Adoo)
   All pipes used to initialize the field will be unsubscribed when the FatObj is disposed.
-  
+
   ``` rust
   let row = Row::builder()
     .margin(...)
