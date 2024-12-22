@@ -362,21 +362,30 @@ pub struct QueryId {
 
 #[derive(Debug, PartialEq, Eq)]
 struct TypeInfo {
-  name: String,
-  layout: std::alloc::Layout,
+  name: &'static str,
+  pkg_version: &'static str,
+  layout: &'static std::alloc::Layout,
+}
+
+struct TypeInfoOf<T> {
+  _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> TypeInfoOf<T> {
+  const LAYOUT: std::alloc::Layout = std::alloc::Layout::new::<T>();
+
+  fn type_info() -> TypeInfo {
+    TypeInfo {
+      name: std::any::type_name::<T>(),
+      pkg_version: env!("CARGO_PKG_VERSION"),
+      layout: &Self::LAYOUT,
+    }
+  }
 }
 
 impl QueryId {
   pub fn of<T: 'static>() -> Self {
-    QueryId {
-      type_id: TypeId::of::<T>(),
-      info: || {
-        let layout = std::alloc::Layout::new::<T>();
-        let name =
-          format!("{}+{}", std::any::type_name::<T>(), env!("CARGO_PKG_VERSION")).to_string();
-        TypeInfo { name, layout }
-      },
-    }
+    QueryId { type_id: TypeId::of::<T>(), info: || TypeInfoOf::<T>::type_info() }
   }
 
   pub fn is_same(&self, other: &QueryId) -> bool {
