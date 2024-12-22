@@ -1,5 +1,6 @@
 use std::{convert::Infallible, rc::Rc};
 
+use ahash::HashSetExt;
 use indextree::{Node, NodeId};
 use rxrust::ops::box_it::CloneableBoxOp;
 use smallvec::smallvec;
@@ -289,21 +290,38 @@ impl WidgetId {
 
   pub(crate) fn paint_subtree(self, ctx: &mut PaintingCtx) {
     let mut w = Some(self);
+
+    let wnd = ctx.window();
+    let tree = wnd.tree();
+
+    let mut did_paint = HashSet::<WidgetId, ahash::RandomState>::new();
     while let Some(id) = w {
       ctx.id = id;
-      ctx.painter.save();
-      let wnd = ctx.window();
-      let tree = wnd.tree();
 
       let mut need_paint = false;
       if ctx.painter.alpha() != 0. {
         if let Some(layout_box) = ctx.box_rect() {
-          let render = id.assert_get(tree);
+          let transform = *ctx.painter.transform();
           ctx
             .painter
             .translate(layout_box.min_x(), layout_box.min_y());
-          render.paint(ctx);
-          need_paint = true;
+          if ctx
+            .painter()
+            .intersection_paint_bounds(&Rect::from_size(layout_box.size))
+            .is_some()
+          {
+            let render = id.assert_get(tree);
+            ctx.painter.set_transform(transform);
+            ctx.painter.save();
+            ctx
+              .painter
+              .translate(layout_box.min_x(), layout_box.min_y());
+            render.paint(ctx);
+            did_paint.insert(id);
+            need_paint = true;
+          } else {
+            ctx.painter.set_transform(transform);
+          }
         }
       }
 
@@ -314,7 +332,10 @@ impl WidgetId {
           let mut node = w;
           while let Some(p) = node {
             // self node sub-tree paint finished, goto sibling
-            ctx.painter.restore();
+            if did_paint.contains(&p) {
+              did_paint.remove(&p);
+              ctx.painter.restore();
+            }
             node = p.next_sibling(tree);
             if node.is_some() {
               break;

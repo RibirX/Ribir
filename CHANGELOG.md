@@ -44,6 +44,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Changed
 
 - **core**: Optimize QueryId::is_same by not creating a String using format for every comparison (#678 @tashcan)
+- **core**: Skip paint for out of bounds widgets (#677 @tashcan)
 
 ## [0.4.0-alpha.19] - 2024-12-18
 
