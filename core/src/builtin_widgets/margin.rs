@@ -127,7 +127,10 @@ pub(crate) fn space_around_layout(
 
   // Reset children position before layout
   ctx.update_position(child, Point::zero());
-  ctx.force_child_relayout(child);
+
+  // No need to force child relayout since the child position determined by this
+  // widget is already set during layout.
+  // ctx.force_child_relayout(child);
 
   let thickness = edges.thickness();
   let zero = Size::zero();

@@ -53,7 +53,7 @@
 //! ```
 use ribir_core::prelude::*;
 
-use crate::{layout::Row, prelude::PositionChild};
+use crate::{layout::HorizontalLine, prelude::PositionChild};
 
 /// Represents the default button, usually with a border.
 #[derive(Default, Declare)]
@@ -306,11 +306,11 @@ impl<'c> ButtonChild<'c> {
 
         let label = @Text { class: btn_label, text }.into_widget();
 
-        let row = @Row { class: btn, align_items: Align::Center };
+        let h_line = @HorizontalLine { class: btn };
         if trailing_icon {
-          @ $row { @[label, icon] }
+          @ $h_line { @[label, icon] }
         } else {
-          @ $row { @[icon, label] }
+          @ $h_line { @[icon, label] }
         }
       }
       .into_widget(),
