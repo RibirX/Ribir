@@ -1,7 +1,7 @@
 use lyon_path::geom::euclid::approxord::min;
 use ribir_core::prelude::*;
 
-use crate::layout::{FractionallyWidthBox, Row};
+use crate::layout::{FractionallyWidthBox, HorizontalLine};
 
 class_names! {
   #[doc = "Class name for the whole linear progress"]
@@ -56,7 +56,7 @@ pub struct SpinnerProgress {
 impl Compose for LinearProgress {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      @Row {
+      @HorizontalLine {
         class: LINEAR_PROGRESS,
         @FractionallyWidthBox {
           class: distinct_pipe! {

@@ -1,7 +1,10 @@
 use ribir_core::prelude::*;
 use svg::named_svgs;
 
-use crate::prelude::{Icon, PositionChild, Row};
+use crate::{
+  layout::HorizontalLine,
+  prelude::{Icon, PositionChild},
+};
 
 class_names! {
   #[doc = "This base class specifies for the checkbox widget."]
@@ -115,18 +118,17 @@ impl ComposeChild<'static> for Checkbox {
         }
       };
       let checkbox = if let Some(child) = child {
-        let row = @Row { align_items: Align::Center };
-        let row = match child {
-          PositionChild::Default(text) | PositionChild::Leading(text) => @ $row {
+        let h_line = match child {
+          PositionChild::Default(text) | PositionChild::Leading(text) => @HorizontalLine {
             @ { checkbox }
             @Text { text }
           },
-          PositionChild::Trailing(text) => @ $row {
+          PositionChild::Trailing(text) => @HorizontalLine {
             @Text { text}
             @ { checkbox }
           },
         };
-        FatObj::new(row.into_widget())
+        FatObj::new(h_line.into_widget())
       } else {
         checkbox.map(|w| w.into_widget())
       };
