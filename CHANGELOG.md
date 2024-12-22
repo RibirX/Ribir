@@ -38,6 +38,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Running an animation that is already in progress does not trigger a smooth transition. (#672 @M-Adoo)
 - **core**: The framework incorrectly clamps the layout result of the render widget. (#672 @M-Adoo)
 - **core**: Padding will not change the child's size; otherwise, child elements like `Icon` may not work correctly. (#674 @M-Adoo)
+- **core**: Allow children to be hit outside their parent's boundaries for non-fixed-size containers. (#676 @M-Adoo)
 - **painter**: Fixed text line height does not work correctly. (#674 @M-Adoo)
 - **painter**: Fixed issue with text not being drawn at the middle baseline by default. (#674 @M-Adoo)
 
