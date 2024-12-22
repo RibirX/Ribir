@@ -45,7 +45,13 @@ pub trait Render: 'static {
 
   /// Verify if the provided position is within this widget and return whether
   /// its child can be hit if the widget itself is not hit.
-  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { ctx.box_hit_test(pos) }
+  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
+    let hit = ctx.box_hit_test(pos);
+    // If the widget is not solely sized by the parent, indicating it is not a
+    // fixed-size container, we permit the child to receive hits even if it
+    // extends beyond its parent boundaries.
+    HitTest { hit, can_hit_child: hit || !self.only_sized_by_parent() }
+  }
 
   /// Return a transform to map the coordinate from its parent to this widget.
   fn get_transform(&self) -> Option<Transform> { None }

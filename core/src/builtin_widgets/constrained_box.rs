@@ -20,6 +20,10 @@ impl WrapRender for ConstrainedBox {
     let min = clamp.clamp(self.clamp.min);
     host.perform_layout(BoxClamp { min, max }, ctx)
   }
+
+  fn only_sized_by_parent(&self, host: &dyn Render) -> bool {
+    self.clamp.min == self.clamp.max || host.only_sized_by_parent()
+  }
 }
 
 #[cfg(test)]

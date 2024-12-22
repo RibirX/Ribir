@@ -793,4 +793,25 @@ mod tests {
     assert!(expect_hit.read().is_some());
     assert_eq!(dispatcher.hit_widget(), *expect_hit.read());
   }
+
+  #[test]
+  fn fix_over_container_hit() {
+    reset_test_env!();
+
+    let mut wnd = TestWindow::new_with_size(
+      mock_stack! {
+        @MockBox {
+          anchor: Anchor::left_top(100., 100.),
+          size: Size::new(100., 100.),
+         }
+      },
+      Size::new(500., 500.),
+    );
+    wnd.draw_frame();
+    let mut dispatcher = wnd.dispatcher.borrow_mut();
+    dispatcher.info.cursor_pos = Point::new(105., 105.);
+    let w = dispatcher.hit_widget();
+
+    assert_ne!(w.unwrap(), wnd.tree().root());
+  }
 }
