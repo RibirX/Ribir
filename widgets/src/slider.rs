@@ -2,10 +2,7 @@ use std::{mem::swap, ops::Range};
 
 use ribir_core::prelude::*;
 
-use crate::{
-  layout::{Expanded, JustifyContent, Row},
-  prelude::Stack,
-};
+use crate::prelude::*;
 
 class_names! {
   #[doc = "Class name for the slider container"]
@@ -385,7 +382,6 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::prelude::*;
 
   widget_image_tests!(
     slider_widgets,

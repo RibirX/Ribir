@@ -12,7 +12,7 @@ pub struct Text {
   pub text: CowArc<str>,
   #[declare(default = TextAlign::Start)]
   pub text_align: TextAlign,
-  #[declare(default)]
+  #[declare(skip)]
   glyphs: RefCell<Option<VisualGlyphs>>,
 }
 

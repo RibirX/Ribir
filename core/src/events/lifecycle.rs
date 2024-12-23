@@ -7,11 +7,7 @@ pub type LifecycleEvent = CommonEvent;
 mod tests {
   use std::collections::HashSet;
 
-  use crate::{
-    prelude::*,
-    reset_test_env,
-    test_helper::{MockBox, MockMulti, TestWindow, split_value},
-  };
+  use crate::{prelude::*, reset_test_env, test_helper::*};
 
   #[test]
   fn full_lifecycle() {

@@ -85,7 +85,7 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::layout::SizedBox;
+  use crate::layout::*;
 
   widget_test_suit!(
     horizontal_line,

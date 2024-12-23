@@ -1,7 +1,6 @@
-use lyon_path::geom::euclid::approxord::min;
 use ribir_core::prelude::*;
 
-use crate::layout::{FractionallyWidthBox, HorizontalLine};
+use crate::layout::*;
 
 class_names! {
   #[doc = "Class name for the whole linear progress"]
@@ -132,7 +131,7 @@ impl Render for SpinnerArc {
     let start = start - Angle::pi() / 2.;
     let end = end - Angle::pi() / 2.;
     let center = Point::new(size.width / 2., size.height / 2.);
-    let radius = min(center.x, center.y);
+    let radius = center.x.min(center.y);
     let painter = ctx.painter();
     match painter.style() {
       PathStyle::Fill => {
@@ -180,7 +179,6 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::prelude::*;
 
   widget_image_tests!(
     progress_widget,

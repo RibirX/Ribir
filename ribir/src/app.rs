@@ -541,10 +541,7 @@ impl Default for WindowAttributes {
 #[cfg(test)]
 mod tests {
 
-  use ribir_core::{
-    prelude::*,
-    test_helper::{MockBox, TestWindow},
-  };
+  use ribir_core::{prelude::*, test_helper::*};
   use winit::event::Ime;
 
   use super::App;

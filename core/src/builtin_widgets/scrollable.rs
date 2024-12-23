@@ -140,10 +140,7 @@ mod tests {
   use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
   use super::*;
-  use crate::{
-    reset_test_env,
-    test_helper::{MockBox, TestWindow},
-  };
+  use crate::{reset_test_env, test_helper::*};
 
   fn test_assert(scrollable: Scrollable, delta_x: f32, delta_y: f32, expect_x: f32, expect_y: f32) {
     let w = fn_widget! {

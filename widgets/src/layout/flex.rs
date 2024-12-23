@@ -76,12 +76,12 @@ pub use column;
 pub use row;
 
 impl Declare for Row {
-  type Builder = FlexDeclarer;
+  type Builder = FatObj<FlexDeclarer>;
   fn declarer() -> Self::Builder { Flex::declarer().direction(Direction::Horizontal) }
 }
 
 impl Declare for Column {
-  type Builder = FlexDeclarer;
+  type Builder = FatObj<FlexDeclarer>;
   fn declarer() -> Self::Builder { Flex::declarer().direction(Direction::Vertical) }
 }
 

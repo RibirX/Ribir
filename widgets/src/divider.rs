@@ -7,7 +7,7 @@ use crate::prelude::*;
 /// # example
 /// ```
 /// # use ribir_core::prelude::*;
-/// # use ribir_widgets::prelude::{Divider, SizedBox, Direction, Column};
+/// # use ribir_widgets::prelude::*;
 ///
 /// // use default Divider default settings
 /// let widget = fn_widget! {
