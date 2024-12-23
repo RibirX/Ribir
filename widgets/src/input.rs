@@ -13,12 +13,12 @@ pub use text_selectable::TextSelectable;
 
 use crate::{
   input::{
-    caret::Caret,
+    caret::*,
     handle::{TextCaretWriter, edit_handle, edit_key_handle},
-    selected_text::SelectedHighLight,
+    selected_text::*,
     text_selectable::{SelectableText, bind_point_listener, select_key_handle},
   },
-  layout::{OnlySizedByParent, Stack, StackFit},
+  layout::*,
 };
 
 #[derive(ChildOfCompose)]
@@ -478,15 +478,10 @@ fn auto_scroll_pos(container: &ScrollableWidget, before: Point, after: Point, si
 
 #[cfg(test)]
 mod tests {
-  use ribir_core::{
-    prelude::*,
-    reset_test_env,
-    test_helper::{TestWindow, split_value},
-  };
+  use ribir_core::{prelude::*, reset_test_env, test_helper::*};
   use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 
-  use super::{EditableText, Input};
-  use crate::layout::SizedBox;
+  use super::*;
 
   #[test]
   fn input_edit() {
@@ -494,7 +489,7 @@ mod tests {
     let (value, w_value) = split_value(String::default());
     let w = fn_widget! {
       let input = @Input { auto_focus: true };
-      watch!($input.text().clone())
+      watch!($input.text.clone())
         .subscribe(move |text| *$w_value.write() = text.to_string());
       input
     };
@@ -514,7 +509,7 @@ mod tests {
     let (value, w_value) = split_value(String::default());
     let w = fn_widget! {
       let input = @Input { size: None };
-      watch!($input.text().clone())
+      watch!($input.text.clone())
         .subscribe(move |text| *$w_value.write() = text.to_string());
 
       @SizedBox {

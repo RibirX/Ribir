@@ -92,9 +92,10 @@ where
 }
 
 #[derive(Declare)]
-struct ThemeSuitProxy<S: 'static, T: 'static>
+struct ThemeSuitProxy<S, T>
 where
-  S: Hash + Eq,
+  T: 'static,
+  S: Hash + Eq + 'static,
 {
   suit: ThemeSuit<S, T>,
   state: S,

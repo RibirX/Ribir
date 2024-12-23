@@ -267,10 +267,7 @@ mod tests {
   use super::*;
   #[cfg(target_arch = "wasm32")]
   use crate::test_helper::wasm_bindgen_test;
-  use crate::{
-    reset_test_env,
-    test_helper::{MockBox, MockMulti, TestWindow},
-  };
+  use crate::{reset_test_env, test_helper::*};
 
   impl WidgetTree {
     pub(crate) fn content_root(&self) -> WidgetId { self.root.first_child(self).unwrap() }

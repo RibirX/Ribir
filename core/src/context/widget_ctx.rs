@@ -238,11 +238,7 @@ impl HitTestCtx {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{
-    prelude::*,
-    reset_test_env,
-    test_helper::{MockBox, TestWindow},
-  };
+  use crate::{prelude::*, reset_test_env, test_helper::*};
 
   define_widget_context!(TestCtx);
 

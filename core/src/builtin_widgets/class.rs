@@ -478,10 +478,7 @@ impl Hash for OverrideClass {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{
-    reset_test_env,
-    test_helper::{MockBox, MockMulti, TestWindow, split_value},
-  };
+  use crate::{reset_test_env, test_helper::*};
   class_names!(MARGIN, BOX_200, CLAMP_50, EMPTY);
 
   fn initd_classes() -> Classes {

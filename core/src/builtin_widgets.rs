@@ -936,10 +936,20 @@ impl<T> FatObj<T> {
   }
 }
 
-impl<T> ObjDeclarer for FatObj<T> {
-  type Target = Self;
+pub trait FatDeclarerExtend: Sized {
+  type Target;
+  fn finish(this: FatObj<Self>) -> FatObj<Self::Target>;
+}
 
-  fn finish(self) -> Self::Target { self }
+impl<T: FatDeclarerExtend> ObjDeclarer for FatObj<T> {
+  type Target = FatObj<T::Target>;
+
+  fn finish(self) -> Self::Target { T::finish(self) }
+}
+
+impl FatDeclarerExtend for () {
+  type Target = ();
+  fn finish(this: FatObj<()>) -> FatObj<()> { this }
 }
 
 impl<'w, T, const M: usize> IntoWidgetStrict<'w, M> for FatObj<T>

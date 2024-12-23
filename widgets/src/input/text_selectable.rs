@@ -4,7 +4,7 @@ use ribir_core::prelude::*;
 
 use super::glyphs_helper::TextGlyphsHelper;
 use crate::{
-  input::{glyphs_helper::GlyphsHelper, selected_text::SelectedHighLight},
+  input::{glyphs_helper::GlyphsHelper, selected_text::*},
   prelude::*,
 };
 

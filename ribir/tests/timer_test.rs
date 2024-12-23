@@ -4,14 +4,8 @@ use rxrust::scheduler::NEW_TIMER_FN;
 mod test_single_thread {
   use std::{cell::RefCell, rc::Rc, thread::sleep};
 
-  use ribir_core::{
-    prelude::*,
-    reset_test_env,
-    test_helper::{MockBox, TestWindow, split_value},
-  };
+  use ribir_core::{prelude::*, reset_test_env, test_helper::*};
   use winit::event::{DeviceId, ElementState, MouseButton};
-
-  use super::*;
 
   pub fn test_widget_with_timer() {
     let w = fn_widget! {

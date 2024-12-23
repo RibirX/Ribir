@@ -23,10 +23,7 @@ mod tests {
   use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
   use super::*;
-  use crate::{
-    reset_test_env,
-    test_helper::{MockBox, TestWindow},
-  };
+  use crate::{reset_test_env, test_helper::*};
 
   #[test]
   fn smoke() {

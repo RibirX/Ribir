@@ -1,5 +1,5 @@
 use ribir_core::{prelude::*, wrap_render::WrapRender};
-use ribir_widgets::{layout::Stack, path::PathPaintKit, prelude::StackFit};
+use ribir_widgets::prelude::*;
 
 use crate::md;
 
