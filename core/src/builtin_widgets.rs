@@ -984,10 +984,10 @@ impl<'a> FatObj<Widget<'a>> {
           scrollable,
           layout_box,
           class,
-          cursor,
           constrained_box,
           tooltips,
           margin,
+          cursor,
           mix_builtin,
           request_focus,
           transform,
@@ -1106,4 +1106,9 @@ where
   type Target = DeclarerWithSubscription<T::Target>;
 
   fn with_child(self, child: C) -> Self::Target { self.map(|host| host.with_child(child)) }
+}
+
+impl Declare for FatObj<()> {
+  type Builder = Self;
+  fn declarer() -> Self::Builder { FatObj::default() }
 }
