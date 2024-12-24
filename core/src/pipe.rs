@@ -739,13 +739,7 @@ impl PipeNode {
     let [old, new] = tree.get_many_mut(&[old, new_id]);
     std::mem::swap(old, new);
 
-    let mut wids = SmallVec::new();
-    new.query_all(&QueryId::of::<TrackId>(), &mut wids);
-    wids.into_iter().for_each(|wid| {
-      if let Some(wid) = wid.into_ref::<TrackId>() {
-        wid.set(Some(new_id));
-      }
-    });
+    new.update_track_id(new_id);
 
     std::mem::swap(&mut self.as_mut().data, old);
     *old = old_node;

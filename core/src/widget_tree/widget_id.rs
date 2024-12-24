@@ -2,7 +2,7 @@ use std::{convert::Infallible, rc::Rc};
 
 use indextree::{Node, NodeId};
 use rxrust::ops::box_it::CloneableBoxOp;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 
 use super::*;
 use crate::{
@@ -43,6 +43,17 @@ impl TrackId {
   pub fn watcher(&self) -> impl StateWatcher<Value = Option<WidgetId>> { self.0.clone_watcher() }
 
   pub(crate) fn set(&self, id: Option<WidgetId>) { *self.0.write() = id; }
+}
+
+impl dyn RenderQueryable {
+  pub(crate) fn update_track_id(&self, new_id: WidgetId) {
+    let mut handles = SmallVec::new();
+    self.query_all(&QueryId::of::<TrackId>(), &mut handles);
+    handles
+      .into_iter()
+      .filter_map(QueryHandle::into_ref::<TrackId>)
+      .for_each(move |q| q.set(Some(new_id)));
+  }
 }
 
 impl Default for TrackId {
