@@ -87,11 +87,14 @@ impl WrapRender for HAlignWidget {
       clamp.min.width = clamp.max.width;
     }
 
-    let child_size = host.perform_layout(clamp, ctx);
-    let x = align.align_value(child_size.width, clamp.max.width);
+    let host_size = host.perform_layout(clamp, ctx);
+    let x = align.align_value(host_size.width, clamp.max.width);
     let pos = ctx.box_pos().unwrap_or_default();
     ctx.update_position(ctx.widget_id(), Point::new(x, pos.y));
-    clamp.clamp(child_size)
+
+    // The size should not be clamped; it should simply follow its host. If the host
+    // ignores the constraint, the align widget should do the same.
+    host_size
   }
 }
 
@@ -101,11 +104,14 @@ impl WrapRender for VAlignWidget {
     if align == Align::Stretch {
       clamp.min.height = clamp.max.height;
     }
-    let child_size = host.perform_layout(clamp, ctx);
-    let y = align.align_value(child_size.height, clamp.max.height);
+    let host_size = host.perform_layout(clamp, ctx);
+    let y = align.align_value(host_size.height, clamp.max.height);
     let pos = ctx.box_pos().unwrap_or_default();
     ctx.update_position(ctx.widget_id(), Point::new(pos.x, y));
-    clamp.clamp(child_size)
+
+    // The size should not be clamped; it should simply follow its host. If the host
+    // ignores the constraint, the align widget should do the same.
+    host_size
   }
 }
 
