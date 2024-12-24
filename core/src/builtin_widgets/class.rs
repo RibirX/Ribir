@@ -88,7 +88,7 @@ pub fn empty_cls(w: Widget) -> Widget { w }
 /// A collection comprises the implementations of the `ClassName`, offering the
 /// implementation of `Class` within its descendants.
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Classes {
   pub(crate) store: ahash::HashMap<ClassName, ClassImpl>,
 }
@@ -332,6 +332,9 @@ impl ClassNode {
 
     // Retain the original widget ID.
     let [new, old] = tree.get_many_mut(&[n_orig, orig_id]);
+    // The "new" node is transferred to the "old" node, and the tracking ID within
+    // it needs to be updated.
+    new.update_track_id(orig_id);
     std::mem::swap(new, old);
     if new_id == n_orig {
       // If applying the class does not generate additional widgets, the original
@@ -339,18 +342,12 @@ impl ClassNode {
       new_id = orig_id;
     } else {
       n_orig.insert_after(orig_id, tree);
-      tree.remove_subtree(n_orig);
     }
+    tree.remove_subtree(n_orig);
 
     if child_id != new_id {
       // update the DynamicWidgetId out of the class node when id changed.
-      let mut v = SmallVec::new();
-      class_node.query_all_write(&QueryId::of::<TrackId>(), &mut v);
-      v.into_iter()
-        .filter_map(QueryHandle::into_ref)
-        .for_each(|handle: QueryRef<'_, TrackId>| {
-          handle.set(Some(new_id));
-        });
+      class_node.update_track_id(new_id);
     }
 
     new_id.wrap_node(tree, |node| {
@@ -387,12 +384,6 @@ impl ClassNode {
         stack.extend(w.children(tree).rev());
       }
     }
-
-    new_id
-      .query_all_iter::<TrackId>(tree)
-      .for_each(|wid| {
-        wid.set(Some(new_id));
-      });
 
     id_info.borrow_mut().gen_range = GenRange::Single(new_id);
     let marker = tree.dirty_marker();
@@ -720,5 +711,44 @@ mod tests {
     *w_cls.write() = MARGIN;
     wnd.draw_frame();
     wnd.assert_root_size(Size::splat(120.));
+  }
+
+  #[test]
+  fn fix_track_id_in_new_class() {
+    reset_test_env!();
+
+    class_names!(TRACK_ID);
+    let mut classes = initd_classes();
+    classes.insert(TRACK_ID, |w| {
+      let mut w = FatObj::new(w);
+      rdl! {
+        @Container {
+          size: Size::new(100., 100.),
+          @ $w {
+            on_performed_layout: move |e| {
+              let id = $w.track_id().get().unwrap();
+              assert!(!id.is_dropped(e.tree()));
+            }
+          }
+        }
+      }
+      .into_widget()
+    });
+
+    let (cls, w_cls) = split_value(EMPTY);
+
+    let mut wnd = TestWindow::new(fn_widget! {
+      let cls = cls.clone_watcher();
+      classes.clone().with_child(fn_widget! {
+        @Container {
+          size: Size::new(100., 100.),
+          class: pipe!(*$cls),
+        }
+      })
+    });
+
+    wnd.draw_frame();
+    *w_cls.write() = TRACK_ID;
+    wnd.draw_frame();
   }
 }
