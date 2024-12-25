@@ -83,15 +83,16 @@ impl WidgetTree {
         if wid.is_dropped(self) {
           continue;
         }
+        if self.store.layout_box_size(wid).is_none() {
+          let clamp = self
+            .store
+            .layout_info(wid)
+            .map(|info| info.clamp)
+            .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
 
-        let clamp = self
-          .store
-          .layout_info(wid)
-          .map(|info| info.clamp)
-          .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
-
-        let mut ctx = LayoutCtx::new(wid, self);
-        ctx.perform_child_layout(wid, clamp);
+          let mut ctx = LayoutCtx::new(wid, self);
+          ctx.perform_layout(clamp);
+        }
       }
     }
   }

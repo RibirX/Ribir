@@ -44,44 +44,44 @@ impl<'a> LayoutCtx<'a> {
 
     Self { id, tree, painting_style, text_style }
   }
-  /// Perform layout of the child widget referenced, resetting the widget
-  /// position to (0, 0) relative to the parent if its position is not set by
-  /// its layout logic, and return the resulting size after layout.
+
+  /// Perform layout of the widget of the context and return its size.
+  pub(crate) fn perform_layout(&mut self, clamp: BoxClamp) -> Size {
+    // Safety: the `tree` just use to get the widget of `id`, and `tree2` not drop
+    // or modify it during perform layout.
+    let tree2 = unsafe { &*(self.tree as *mut WidgetTree) };
+
+    let id = self.id();
+    let w = id.assert_get(tree2);
+    let size = w.perform_layout(clamp, self);
+
+    self
+      .window()
+      .add_delay_event(DelayEvent::PerformedLayout(id));
+
+    let info = self.tree.store.layout_info_or_default(id);
+    info.clamp = clamp;
+    info.size = Some(size);
+    size
+  }
+
+  /// Perform layout of the `child` and return its size.
   pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
     let info = self.tree.store.layout_info(child);
-    let size = info
+    info
       .filter(|info| info.clamp == clamp)
       .and_then(|info| info.size)
       .unwrap_or_else(|| {
-        // Safety: the `tree` just use to get the widget of `id`, and `tree2` not drop
-        // or modify it during perform layout.
-        let tree2 = unsafe { &mut *(self.tree as *mut WidgetTree) };
-        let mut ctx = LayoutCtx {
-          id: child,
-          tree: tree2,
-          painting_style: self.painting_style.clone(),
-          text_style: self.text_style.clone(),
-        };
-        let size = child
-          .assert_get(self.tree)
-          .perform_layout(clamp, &mut ctx);
+        // The position needs to be reset, as some parent render widgets may not have
+        // set the position.
+        self.update_position(child, Point::zero());
 
-        self
-          .window()
-          .add_delay_event(DelayEvent::PerformedLayout(child));
-
-        let info = tree2.store.layout_info_or_default(child);
-        info.clamp = clamp;
-        info.size = Some(size);
+        let id = std::mem::replace(&mut self.id, child);
+        let size = self.perform_layout(clamp);
+        self.id = id;
 
         size
-      });
-
-    if child != self.tree.root() && self.widget_box_pos(child).is_none() {
-      self.update_position(child, Point::zero())
-    }
-
-    size
+      })
   }
 
   /// Adjust the position of the widget where it should be placed relative to
