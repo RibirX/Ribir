@@ -398,8 +398,9 @@ where
         Ok(r) => ReaderRender(r).into_widget(),
         Err(s) => {
           let modifies = s.raw_modifies();
-          let w = ReaderRender(s.clone_reader()).into_widget();
-          w.on_build(move |id| id.dirty_on(modifies))
+          ReaderRender(s.clone_reader())
+            .into_widget()
+            .dirty_on(modifies)
         }
       },
     }

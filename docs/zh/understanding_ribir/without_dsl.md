@@ -121,12 +121,14 @@ let _row = Row::declarer()
 ```rust
 use ribir::prelude::*;
 
-let mut btn = Radio::declarer().finish();
-
-let m = btn.get_margin_widget().clone_writer();
-let btn = btn
-  .on_tap(move |_| m.write().margin = EdgeInsets::all(10.0))
-  .into_widget();
+fn radio_btn() -> Widget<'static> {
+  let mut btn = Radio::declarer().finish();
+  
+  let m = btn.get_margin_widget().clone_writer();
+  btn
+    .on_tap(move |_| m.write().margin = EdgeInsets::all(10.0))
+    .into_widget()
+}
 ```
 
 ## 子 widget 的组合

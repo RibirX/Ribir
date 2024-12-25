@@ -30,11 +30,11 @@ impl<'c> ComposeChild<'c> for KeepAlive {
     fn_widget! {
       let mut w = FatObj::new(child);
       { this.silent().wid = Some($w.track_id()); }
-      let modifies = this.raw_modifies();
       w
       .into_widget()
+      .dirty_on(this.raw_modifies())
       .try_unwrap_state_and_attach(this)
-      .on_build(|id| id.dirty_on(modifies))
+
     }
     .into_widget()
   }

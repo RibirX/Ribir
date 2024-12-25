@@ -29,24 +29,27 @@ pub trait WrapRender {
 
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> { host.get_transform() }
 
-  fn combine_child(this: impl StateWriter<Value = Self>, child: Widget) -> Widget
+  fn combine_child(this: impl StateWriter<Value = Self>, mut child: Widget) -> Widget
   where
     Self: Sized + 'static,
   {
-    child.on_build(move |id| {
-      let tree = BuildCtx::get_mut().tree_mut();
-      id.wrap_node(tree, |r| match this.try_into_value() {
-        Ok(this) => Box::new(RenderPair { wrapper: Box::new(this), host: r }),
-        Err(this) => {
-          let reader = match this.into_reader() {
-            Ok(r) => r,
-            Err(s) => {
-              id.dirty_on(s.raw_modifies());
-              s.clone_reader()
-            }
-          };
-          Box::new(RenderPair { wrapper: Box::new(reader), host: r })
-        }
+    let wrapper: Box<dyn WrapRender> = match this.try_into_value() {
+      Ok(this) => Box::new(this),
+      Err(this) => {
+        let reader = match this.into_reader() {
+          Ok(r) => r,
+          Err(s) => {
+            child = child.dirty_on(s.raw_modifies());
+            s.clone_reader()
+          }
+        };
+        Box::new(reader)
+      }
+    };
+
+    child.on_build(|id| {
+      id.wrap_node(BuildCtx::get_mut().tree_mut(), move |r| {
+        Box::new(RenderPair { wrapper, host: r })
       });
     })
   }
