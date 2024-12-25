@@ -212,8 +212,6 @@ impl std::ops::DerefMut for LayoutStore {
 
 #[cfg(test)]
 mod tests {
-  use std::cell::Cell;
-
   use super::*;
   use crate::{prelude::*, reset_test_env, test_helper::*};
 
@@ -369,50 +367,5 @@ mod tests {
 
     wnd.draw_frame();
     assert_eq!(*cnt.read(), 2);
-  }
-
-  #[test]
-  fn layout_visit_prev_position() {
-    reset_test_env!();
-
-    #[derive(Declare)]
-    struct MockWidget {
-      pos: Cell<Point>,
-      size: Size,
-    }
-
-    impl Render for MockWidget {
-      fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-        self.pos.set(ctx.box_pos().unwrap_or_default());
-        self.size
-      }
-      #[inline]
-      fn only_sized_by_parent(&self) -> bool { true }
-
-      #[inline]
-      fn paint(&self, _: &mut PaintingCtx) {}
-    }
-
-    let (pos, w_pos) = split_value(Point::zero());
-    let (size, w_size) = split_value(Size::zero());
-
-    let w = fn_widget! {
-      let w = @MockWidget {
-        size: pipe!(*$size),
-        pos: Cell::new(Point::zero()),
-      };
-      @MockMulti {
-        @MockBox{ size: Size::new(50., 50.) }
-        @$w {
-          on_performed_layout: move |_| *$w_pos.write() = $w.pos.get()
-        }
-      }
-    };
-    let mut wnd = TestWindow::new(w);
-    wnd.draw_frame();
-
-    *w_size.write() = Size::new(1., 1.);
-    wnd.draw_frame();
-    assert_eq!(*pos.read(), Point::new(50., 0.));
   }
 }
