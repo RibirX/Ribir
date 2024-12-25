@@ -1,11 +1,12 @@
-use std::cell::RefCell;
 #[doc(hidden)]
 pub use std::{
   any::{Any, TypeId},
   marker::PhantomData,
   ops::Deref,
 };
+use std::{cell::RefCell, convert::Infallible};
 
+use ops::box_it::CloneableBoxOp;
 use ribir_algo::Sc;
 use smallvec::SmallVec;
 use widget_id::RenderQueryable;
@@ -198,6 +199,33 @@ impl<'w> Widget<'w> {
     };
 
     Widget(InnerWidget::Lazy(LazyNode::new(lazy)))
+  }
+
+  /// Subscribe to the modified `upstream` to mark the widget as dirty when the
+  /// `upstream` emits a modify event containing `ModifyScope::FRAMEWORK`.
+  ///
+  /// # Panic
+  /// This method only works within a build process; otherwise, it will
+  /// result in a panic.
+  pub fn dirty_on(self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>) -> Self {
+    let track = TrackWidgetId::default();
+    let id = track.track_id();
+
+    let tree = BuildCtx::get_mut().tree_mut();
+    let marker = tree.dirty_marker();
+    let h = upstream
+      .filter(|b| b.contains(ModifyScope::FRAMEWORK))
+      .subscribe(move |_| {
+        if let Some(id) = id.get() {
+          marker.mark(id);
+        }
+      })
+      .unsubscribe_when_dropped();
+
+    track
+      .with_child(self)
+      .into_widget()
+      .attach_anonymous_data(h)
   }
 
   pub(crate) fn from_render(r: Box<dyn RenderQueryable>) -> Widget<'static> {

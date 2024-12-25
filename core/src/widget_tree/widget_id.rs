@@ -1,7 +1,6 @@
-use std::{convert::Infallible, rc::Rc};
+use std::rc::Rc;
 
 use indextree::{Node, NodeId};
-use rxrust::ops::box_it::CloneableBoxOp;
 use smallvec::{SmallVec, smallvec};
 
 use super::*;
@@ -68,25 +67,6 @@ impl WidgetId {
   /// Returns a reference to the node data.
   pub(crate) fn get<'a, 'b>(self, tree: &'a WidgetTree) -> Option<&'a (dyn RenderQueryable + 'b)> {
     tree.arena.get(self.0).map(|n| &**n.get())
-  }
-
-  /// Subscribe to the modified `upstream` to mark the widget as dirty when the
-  /// `upstream` emits a modify event containing `ModifyScope::FRAMEWORK`.
-  ///
-  /// # Panic
-  /// This method only works within a build process; otherwise, it will
-  /// result in a panic.
-  pub fn dirty_on(self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>) {
-    let tree = BuildCtx::get_mut().tree_mut();
-    let marker = tree.dirty_marker();
-    let h = upstream
-      .filter(|b| b.contains(ModifyScope::FRAMEWORK))
-      .subscribe(move |_| {
-        marker.mark(self);
-      })
-      .unsubscribe_when_dropped();
-
-    self.attach_anonymous_data(h, tree);
   }
 
   pub(crate) fn get_node_mut(self, tree: &mut WidgetTree) -> Option<&mut Box<dyn RenderQueryable>> {

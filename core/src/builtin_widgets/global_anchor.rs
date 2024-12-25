@@ -298,7 +298,7 @@ impl<'c> ComposeChild<'c> for GlobalAnchor {
       }
     }
     .into_widget()
-    .on_build(move |id| id.dirty_on(modifies))
+    .dirty_on(modifies)
   }
 }
 

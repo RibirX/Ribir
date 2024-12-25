@@ -274,35 +274,41 @@ macro_rules! impl_compose_child {
       type Child = Widget<'c>;
 
       fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-        let inner = this.read().0.clone_writer();
-        WrapRender::combine_child(this, child).on_build(move |id| {
-          let ctx = BuildCtx::get();
-          let marker = ctx.tree().dirty_marker();
-          let window = ctx.window();
+        let track = TrackWidgetId::default();
+        let id = track.track_id();
+        let ctx = BuildCtx::get();
+        let marker = ctx.tree().dirty_marker();
+        let window = ctx.window();
 
-          // The animation utilizes the smooth value for a seamless visual transition.
-          // Throughout the animation, we must monitor if the widget has been altered by
-          // external factors. If any modifications occur, we must initiate a forced
-          // layout to ensure the animation transitions to a new and accurate layout
-          // result.
-          let h = inner
-            .raw_modifies()
-            .filter(|b| b.contains(ModifyScope::FRAMEWORK))
-            .subscribe(move |_| {
-              let inner = inner.clone_writer();
-              let marker = marker.clone();
-              window.once_before_layout(move || {
-                if marker.is_dirty(id) {
-                  inner.set_force_layout(true)
-                }
-                if $dirty_self {
-                  marker.mark(id);
-                }
-              })
+        // The animation utilizes the smooth value for a seamless visual transition.
+        // Throughout the animation, we must monitor if the widget has been altered by
+        // external factors. If any modifications occur, we must initiate a forced
+        // layout to ensure the animation transitions to a new and accurate layout
+        // result.
+        let inner = this.read().0.clone_writer();
+        let h = inner
+          .raw_modifies()
+          .filter(|b| b.contains(ModifyScope::FRAMEWORK))
+          .subscribe(move |_| {
+            let inner = inner.clone_writer();
+            let marker = marker.clone();
+            let id = id.get().unwrap();
+            window.once_before_layout(move || {
+              if marker.is_dirty(id) {
+                inner.set_force_layout(true)
+              }
+              if $dirty_self {
+                marker.mark(id);
+              }
             })
-            .unsubscribe_when_dropped();
-          id.attach_anonymous_data(h, BuildCtx::get_mut().tree_mut());
-        })
+          })
+          .unsubscribe_when_dropped();
+        let child = track
+          .with_child(child)
+          .into_widget()
+          .attach_anonymous_data(h);
+
+        WrapRender::combine_child(this, child)
       }
     }
   };
