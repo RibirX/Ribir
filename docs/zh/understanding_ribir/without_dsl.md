@@ -29,7 +29,8 @@ sidebar_position: 2
 use ribir::prelude::*;
 
 pub struct Radio {
-  pub checked: bool,
+  pub selected: bool,
+  pub value: Box<dyn Any>
 }
 ```
 
@@ -38,7 +39,7 @@ pub struct Radio {
 ```rust
 use ribir::prelude::*;
 
-let radio = Radio { checked: true };
+let radio = Radio { selected: true, value: Box::new(1.) };
 ```
 
 这样，我们就得到了一个选中的 `Radio`.
@@ -54,7 +55,7 @@ let radio = Radio { checked: true };
 ```rust
 use ribir::prelude::*;
 
-let radio = Radio { checked: true };
+let radio = Radio { selected: true, value: Box::new(1.) };
 let radio = FatObj::new(radio)
   .on_tap(|_| println!("Radio tapped"));
 ```
@@ -65,7 +66,7 @@ let radio = FatObj::new(radio)
 use ribir::prelude::*;
 
 let btn: FatObj<State<Radio>> = Radio::declarer()
-  .checked(true)
+  .selected(true)
   .on_tap(|_| println!("Radio clicked"))
   .finish();
 ```
@@ -87,8 +88,8 @@ let mut radio: FatObj<State<Radio>> = Radio::declarer()
   .on_tap(|_| println!("taped!"))
   .finish();
 
-watch!($radio.checked)
-  .subscribe(|checked| println!("The radio state change to {checked}"));
+watch!($radio.selected)
+  .subscribe(|selected| println!("The radio state change to {selected}"));
 ```
 
 当然，无论是 `FatObj` 还是 `State`，只有在你用到它们提供的能力时，才会影响到最终构建的视图的开销。
@@ -101,10 +102,10 @@ watch!($radio.checked)
 use ribir::prelude::*;
 
 let mut radio1: FatObj<State<Radio>> = Radio::declarer()
-  .checked(true)
+  .selected(true)
   .finish();
 let radio2 = Radio::declarer()
-  .checked(pipe!($radio1.checked))
+  .selected(pipe!($radio1.selected))
   .finish();
 
 let _row = Row::declarer()

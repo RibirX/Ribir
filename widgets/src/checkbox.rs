@@ -1,26 +1,14 @@
 use ribir_core::prelude::*;
-use svg::named_svgs;
 
-use crate::{
-  layout::HorizontalLine,
-  prelude::{Icon, PositionChild},
-};
+use crate::prelude::{PositionChild, icon_with_label};
 
-class_names! {
-  #[doc = "This base class specifies for the checkbox widget."]
-  CHECKBOX,
-  #[doc = "This class specifies the checked checkbox."]
-  CHECKBOX_CHECKED,
-  #[doc = "This class specifies the unchecked checkbox."]
-  CHECKBOX_UNCHECKED,
-  #[doc = "This class specifies the indeterminate checkbox."]
-  CHECKBOX_INDETERMINATE,
-}
 /// The `Checkbox` allows users to toggle an option on or off, or represent a
 /// list of options that are partially selected.
 ///
-/// It also supports associating a label with the checkbox, with the label
-/// inheriting the text style from its surrounding context.
+/// It also supports associating a label with the checkbox, the label inheriting
+/// the text style from its nearest ancestor. The label can be positioned before
+/// or after the radio button using the `Leading` and `Trailing` types, with the
+/// default position being after the radio button.
 ///
 /// # Example
 ///
@@ -51,16 +39,6 @@ class_names! {
 ///   @Trailing::new("Label placed after the checkbox!")
 /// };
 /// ```
-///
-/// If you are a theme maker, you can register three named SVGs that the
-/// checkbox uses with the following constants:
-///
-/// * `UNCHECKED_ICON`
-/// * `CHECKED_ICON`
-/// * `INDETERMINATE_ICON`
-///
-/// This allows you to quickly customize the appearance of a checkbox to your
-/// preferences.
 #[derive(Clone, Copy, Declare, PartialEq, Eq)]
 pub struct Checkbox {
   #[declare(default)]
@@ -69,9 +47,16 @@ pub struct Checkbox {
   pub indeterminate: bool,
 }
 
-pub const UNCHECKED_ICON: &str = "unchecked_box";
-pub const CHECKED_ICON: &str = "checked_box";
-pub const INDETERMINATE_ICON: &str = "indeterminate_box";
+class_names! {
+  #[doc = "This base class specifies for the checkbox icon."]
+  CHECKBOX,
+  #[doc = "This class specifies the checked checkbox icon"]
+  CHECKBOX_CHECKED,
+  #[doc = "This class specifies the unchecked checkbox icon."]
+  CHECKBOX_UNCHECKED,
+  #[doc = "This class specifies the indeterminate checkbox icon."]
+  CHECKBOX_INDETERMINATE,
+}
 
 impl Checkbox {
   pub fn switch_check(&mut self) {
@@ -92,16 +77,6 @@ impl Checkbox {
       CHECKBOX_UNCHECKED
     }
   }
-
-  fn icon_name(&self) -> &'static str {
-    if self.indeterminate {
-      INDETERMINATE_ICON
-    } else if self.checked {
-      CHECKED_ICON
-    } else {
-      UNCHECKED_ICON
-    }
-  }
 }
 
 impl ComposeChild<'static> for Checkbox {
@@ -109,35 +84,16 @@ impl ComposeChild<'static> for Checkbox {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     rdl! {
-      let checkbox = @Class {
+      let icon = @Class {
         class: distinct_pipe!($this.state_class_name()),
-        @Icon {
-          class: CHECKBOX,
-          cursor: CursorIcon::Pointer,
-          @pipe!(named_svgs::get($this.icon_name()))
-        }
+        @Void { class: CHECKBOX }
       };
-      let checkbox = if let Some(child) = child {
-        let h_line = match child {
-          PositionChild::Default(text) | PositionChild::Leading(text) => @HorizontalLine {
-            @ { checkbox }
-            @Text { text }
-          },
-          PositionChild::Trailing(text) => @HorizontalLine {
-            @Text { text}
-            @ { checkbox }
-          },
-        };
-        FatObj::new(h_line.into_widget())
-      } else {
-        checkbox.map(|w| w.into_widget())
-      };
-
-      @ $checkbox {
+      @FatObj {
         on_tap: move |_| $this.write().switch_check(),
         on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
           $this.write().switch_check()
-        }
+        },
+        @ icon_with_label(icon.into_widget(), child)
       }
     }
     .into_widget()

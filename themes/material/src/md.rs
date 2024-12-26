@@ -87,6 +87,7 @@ pub const SIZE_48: Size = Size::new(48., 48.);
 pub const SIZE_64: Size = Size::new(64., 64.);
 
 pub const EDGES_4: EdgeInsets = EdgeInsets::all(4.);
+pub const EDGES_10: EdgeInsets = EdgeInsets::all(10.);
 pub const EDGES_HOR_4: EdgeInsets = EdgeInsets::horizontal(4.);
 pub const EDGES_VER_4: EdgeInsets = EdgeInsets::vertical(4.);
 pub const EDGES_LEFT_4: EdgeInsets = EdgeInsets::only_left(4.);
@@ -106,9 +107,9 @@ pub const EDGES_HOR_36: EdgeInsets = EdgeInsets::horizontal(36.);
 pub const EDGES_HOR_48: EdgeInsets = EdgeInsets::horizontal(48.);
 
 // Borders
-pub fn border_primary_2() -> Border {
-  let primary = Palette::of(BuildCtx::get()).primary();
-  Border::all(BorderSide::new(2., primary.into()))
+pub fn border_variant_color_2() -> Border {
+  let color = BuildCtx::get().variant_color();
+  Border::all(BorderSide::new(2., color.into()))
 }
 pub fn border_on_surface_variant_2() -> Border {
   let surface_variant = Palette::of(BuildCtx::get()).on_surface_variant();

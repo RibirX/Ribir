@@ -1,4 +1,6 @@
-use ribir_core::prelude::{ChildOfCompose, ComposeChildFrom, IntoChildCompose};
+use ribir_core::prelude::*;
+
+use crate::layout::HorizontalLine;
 
 #[derive(ChildOfCompose)]
 pub struct Leading<T>(T);
@@ -49,6 +51,25 @@ impl<T> Trailing<T> {
   }
 
   pub fn unwrap(self) -> T { self.0 }
+}
+
+/// Composes a widget with a label in horizontal line.
+pub fn icon_with_label(icon: Widget, label: Option<PositionChild<TextInit>>) -> Widget {
+  let Some(label) = label else { return icon };
+
+  rdl! {
+    match label {
+     PositionChild::Leading(text) => @HorizontalLine {
+       @Text { text }
+       @ { icon }
+     },
+     PositionChild::Trailing(text) | PositionChild::Default(text) => @HorizontalLine {
+       @ { icon }
+       @Text { text }
+     }
+   }
+  }
+  .into_widget()
 }
 
 impl<T> ComposeChildFrom<Leading<T>, 0> for PositionChild<T> {
