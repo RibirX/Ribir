@@ -158,14 +158,12 @@ where
     let elapsed = at - *start_at;
     let progress = self.transition.rate_of_change(elapsed);
 
-    match progress {
-      AnimateProgress::Between(rate) => {
-        let value = self.state.calc_lerp_value(from, to, rate);
-        self.state.set(value);
-      }
-      AnimateProgress::Dismissed => self.state.set(from.clone()),
-      AnimateProgress::Finish => {}
-    }
+    let v = match progress {
+      AnimateProgress::Between(rate) => self.state.calc_lerp_value(from, to, rate),
+      AnimateProgress::Dismissed => from.clone(),
+      AnimateProgress::Finish => to.clone(),
+    };
+    self.state.set(v);
 
     *last_progress = progress;
     *already_lerp = true;
