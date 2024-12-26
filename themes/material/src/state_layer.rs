@@ -1,5 +1,4 @@
 use ribir_core::{prelude::*, wrap_render::WrapRender};
-use ribir_widgets::prelude::*;
 
 use crate::md;
 
@@ -8,92 +7,6 @@ const PRESSED_OPACITY: u8 = 10;
 
 pub type HoverLayer = StateLayer<HOVER_OPACITY>;
 pub type PressedLayer = StateLayer<PRESSED_OPACITY>;
-
-/// Widget that as an visual indicator of material design used to present the
-/// interactive status of its child.
-#[derive(Declare)]
-pub(crate) struct StateLayerOld {
-  pub color: Color,
-  pub path: Path,
-  pub role: StateRole,
-}
-/// Widget that as visual indicator of material design used to communicate the
-/// status of interactive widget, its visual state will reactive to its child
-/// interactive state.
-#[derive(Declare)]
-pub(crate) struct InteractiveLayer {
-  /// the color of the state layer, will apply a fixed opacity in different
-  /// state.
-  pub color: Color,
-  /// The border radii
-  pub border_radii: Radius,
-}
-
-impl Compose for StateLayerOld {
-  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    fn_widget! {
-      @PathPaintKit {
-        path: pipe!($this.path.clone()),
-        foreground: pipe!($this.role.calc_color($this.color)),
-      }
-    }
-    .into_widget()
-  }
-}
-
-impl<'c> ComposeChild<'c> for InteractiveLayer {
-  type Child = Widget<'c>;
-
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    fn_widget! {
-      let mut host = FatObj::new(child);
-      let layer = @IgnorePointer {
-        @Container {
-          size: pipe!($host.layout_size()),
-          @StateLayerOld {
-            color: pipe!($this.color),
-            path: pipe!(Path::rect_round(&$host.layout_rect(), &$this.border_radii)),
-            role: pipe!(if $host.is_pointer_pressed() {
-              StateRole::pressed()
-            } else if $host.has_focus() {
-              StateRole::focus()
-            } else if $host.is_hover() {
-              StateRole::hover()
-            } else {
-              // todo: not support drag & drop now
-              StateRole::custom(0.)
-            })
-          }
-        }
-      };
-
-      @Stack {
-        fit: StackFit::Passthrough,
-        @{ host }
-        @{ layer }
-      }
-    }
-    .into_widget()
-  }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct StateRole(f32);
-
-impl StateRole {
-  pub const fn hover() -> Self { Self(0.08) }
-
-  pub const fn focus() -> Self { Self(0.12) }
-
-  pub const fn pressed() -> Self { Self(0.12) }
-
-  pub const fn dragged() -> Self { Self(0.16) }
-
-  pub const fn custom(opacity: f32) -> Self { Self(opacity) }
-
-  #[inline]
-  pub fn calc_color(self, color: Color) -> Color { color.with_alpha(self.0) }
-}
 
 #[derive(Debug, Clone)]
 pub struct StateLayer<const M: u8> {
