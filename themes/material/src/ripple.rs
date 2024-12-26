@@ -14,7 +14,7 @@ pub struct Ripple {
   /// Whether the ripple always originates from the center of the host bound.
   #[declare(default)]
   pub center: bool,
-  #[declare(default=RippleBound::Bounded)]
+  #[declare(default=RippleBound::Unbounded)]
   /// How ripples show outside of the host widget box.
   pub bounded: RippleBound,
   #[declare(default)]

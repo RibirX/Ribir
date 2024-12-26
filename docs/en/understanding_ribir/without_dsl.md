@@ -29,7 +29,8 @@ As an example, the `Radio` control is defined as follows:
 use ribir::prelude::*;
 
 pub struct Radio {
-  pub checked: bool,
+  pub selected: bool,
+  pub value: Box<dyn Any>
 }
 ```
 
@@ -38,10 +39,10 @@ This is no different than a regular Rust struct, you can just create an object:
 ```rust
 use ribir::prelude::*;
 
-let radio = Radio { checked: true };
+let radio = Radio { selected: true, value: Box::new(1.) };
 ```
 
-This gives us a checked `Radio`.
+This gives us a selected `Radio`.
 
 ### Extending the capabilities of a widget with `FatObj`
 
@@ -54,7 +55,7 @@ And, for built-in widgets such as event responses, we can get them without compo
 ```rust
 use ribir::prelude::*;
 
-let radio = Radio { checked: true };
+let radio = Radio { selected: true, value: Box::new(1.) };
 let radio = FatObj::new(radio)
   .on_tap(|_| println!("Radio tapped"));
 ```
@@ -65,7 +66,7 @@ But in practice, instead of writing it this way, we usually create the widget vi
 use ribir::prelude::*;
 
 let btn: FatObj<State<Radio>> = Radio::declarer()
-  .checked(true)
+  .selected(true)
   .on_tap(|_| println!("Radio clicked"))
   .finish();
 ```
@@ -87,8 +88,8 @@ let mut radio: FatObj<State<Radio>> = Radio::declarer()
   .on_tap(|_| println!("taped!"))
   .finish();
 
-watch!($radio.checked)
-  .subscribe(|checked| println!("The radio state change to {checked}"));
+watch!($radio.selected)
+  .subscribe(|selected| println!("The radio state change to {selected}"));
 ```
 
 Of course, both `FatObj` and `State` only affect the overhead of the final constructed view if you use the capabilities they provide.
@@ -102,10 +103,10 @@ Another advantage of using `Declare` to create widgets is that it supports initi
 use ribir::prelude::*;
 
 let mut radio1: FatObj<State<Radio>> = Radio::declarer()
-  .checked(true)
+  .selected(true)
   .finish();
 let radio2 = Radio::declarer()
-  .checked(pipe!($radio1.checked))
+  .selected(pipe!($radio1.selected))
   .finish();
 
 let _row = Row::declarer()

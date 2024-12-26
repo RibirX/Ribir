@@ -5,7 +5,12 @@ impl Render for Svg {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.clamp(self.size()) }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
+    let size = ctx.box_size().unwrap();
     let painter = ctx.painter();
+    if self.size().greater_than(size).any() {
+      painter.clip(Path::rect(&Rect::from_size(size)).into());
+    }
+
     painter.draw_svg(self);
   }
 }
