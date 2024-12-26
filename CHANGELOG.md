@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **core**: The animation finish may miss drawing the last frame. (#682 @M-Adoo)
+
 ## [0.4.0-alpha.20] - 2024-12-25
 
 ### Features
