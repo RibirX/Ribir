@@ -161,7 +161,7 @@ impl FocusManager {
     let focus_to = if let Some(node) = info {
       if node.has_focus_scope() {
         let scope = self.scope_property(node.wid);
-        if node.has_focus_node() && scope.can_focus {
+        if node.has_focus_node() && !scope.skip_host {
           node.wid
         } else if !scope.skip_descendants {
           self
@@ -214,7 +214,7 @@ impl FocusManager {
       let mut v = vec![];
       let node = self.scope_property(id);
 
-      if has_focus_node && node.can_focus {
+      if has_focus_node && !node.skip_host {
         v.push(FocusType::Node);
       }
       if !node.skip_descendants {
