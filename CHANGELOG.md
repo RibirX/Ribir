@@ -29,6 +29,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: ensure object safety of `StateReader`， `StateWatcher` and `StateWriter` (#692 @M-Adoo)
 
+### Breading
+
+- **core**: Rename `can_focus` field of FocusScope to `skip_host`. (#pr @wjian23)
+
 ## [0.4.0-alpha.23] - 2025-01-15
 
 ### Features

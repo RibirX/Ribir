@@ -7,11 +7,11 @@ pub struct FocusScope {
   #[declare(default)]
   pub skip_descendants: bool,
 
-  /// If true, the child widget can be focused.
-  /// Default value is false, then the child widget can't be focused, but not
-  /// skip the whole subtree.
-  #[declare(default)]
-  pub can_focus: bool,
+  /// If true (default), then the host widget can not be focused, but not skip
+  /// the whole subtree if skip_descendants is false.
+  /// If false, then the host widget can be focused.
+  #[declare(default = true)]
+  pub skip_host: bool,
 }
 
 impl<'c> ComposeChild<'c> for FocusScope {
@@ -108,7 +108,7 @@ mod tests {
       @MockMulti {
         @MockBox { size, tab_index: 0i16, auto_focus: true }
         @FocusScope {
-          can_focus: true,
+          skip_host: false,
           skip_descendants: true,
           tab_index: 3i16,
           @MockMulti {
@@ -156,7 +156,7 @@ mod tests {
     let result = tap_cnt.clone_reader();
     let widget = fn_widget! {
       let mut host = @FocusScope {
-        can_focus: false,
+        skip_host: true,
         on_key_down: move |_| *$tap_cnt.write() += 1,
       };
       let request_focus_box = @MockBox {

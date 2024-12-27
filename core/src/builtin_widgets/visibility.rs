@@ -17,7 +17,7 @@ impl<'c> ComposeChild<'c> for Visibility {
     fn_widget! {
       @FocusScope {
         skip_descendants: pipe!(!$this.get_visible()),
-        can_focus: pipe!($this.get_visible()),
+        skip_host: pipe!(!$this.get_visible()),
         @VisibilityRender {
           display: pipe!($this.get_visible()),
           @ { child }
