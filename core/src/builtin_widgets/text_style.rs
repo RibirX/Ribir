@@ -3,7 +3,7 @@ use crate::{prelude::*, wrap_render::WrapRender};
 /// This widget establishes the text style for painting the text within its
 /// descendants.
 pub struct TextStyleWidget {
-  pub text_style: TextStyle,
+  pub text_style: TextStyleOptional,
 }
 
 impl Declare for TextStyleWidget {
@@ -16,27 +16,13 @@ impl<'c> ComposeChild<'c> for TextStyleWidget {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    // We need to provide the text style for the children to access.
-    let (child, provider): (_, Box<dyn Query>) = match this.try_into_value() {
-      Ok(this) => {
-        let style = this.text_style.clone();
-        (WrapRender::combine_child(State::value(this), child), Box::new(Queryable(style)))
-      }
-      Err(this) => {
-        let style = this.map_reader(|w| PartData::from_ref(&w.text_style));
-        (WrapRender::combine_child(this, child), Box::new(style))
-      }
-    };
-
-    Provider::new(provider)
-      .with_child(fn_widget! { child })
-      .into_widget()
+    WrapRender::combine_child(this, child)
   }
 }
 
 impl WrapRender for TextStyleWidget {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    let old = ctx.set_text_style(self.text_style.clone());
+    let old = ctx.set_text_style(self.text_style.merge(ctx.text_style()));
     let size = host.perform_layout(clamp, ctx);
     ctx.set_text_style(old);
     size

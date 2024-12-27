@@ -25,6 +25,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Changed
+
+- **core**: Refactor TextStyleWidget to support the setting of some font style fields. (#pr @wjian23)
+
+
 ## [0.4.0-alpha.20] - 2024-12-25
 
 ### Features

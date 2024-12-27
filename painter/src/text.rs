@@ -95,6 +95,48 @@ pub struct TextStyle {
   pub overflow: TextOverflow,
 }
 
+/// use to update config of text style.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct TextStyleOptional {
+  /// The size of fonts (in logical pixels) to use when painting the text.
+  pub font_size: Option<f32>,
+  /// The font face to use when painting the text.
+  pub font_face: Option<FontFace>,
+  /// The space between characters in logical pixel units.
+  pub letter_space: Option<f32>,
+  /// The line height of the text in logical pixels.
+  pub line_height: Option<f32>,
+  /// How to handle the visual overflow.
+  pub overflow: Option<TextOverflow>,
+}
+
+impl From<TextStyle> for TextStyleOptional {
+  fn from(value: TextStyle) -> Self {
+    Self {
+      font_size: Some(value.font_size),
+      font_face: Some(value.font_face),
+      letter_space: Some(value.letter_space),
+      line_height: Some(value.line_height),
+      overflow: Some(value.overflow),
+    }
+  }
+}
+
+impl TextStyleOptional {
+  pub fn merge(&self, origin: &TextStyle) -> TextStyle {
+    TextStyle {
+      font_size: self.font_size.unwrap_or(origin.font_size),
+      font_face: self
+        .font_face
+        .clone()
+        .unwrap_or(origin.font_face.clone()),
+      letter_space: self.letter_space.unwrap_or(origin.letter_space),
+      line_height: self.line_height.unwrap_or(origin.line_height),
+      overflow: self.overflow.unwrap_or(origin.overflow),
+    }
+  }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Debug)]
 pub enum TextOverflow {
   #[default]

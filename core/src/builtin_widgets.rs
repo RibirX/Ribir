@@ -409,7 +409,7 @@ impl<T> FatObj<T> {
   /// doesn't exist, a new one will be created.
   pub fn get_text_style_widget(&mut self) -> &State<TextStyleWidget> {
     self.text_style.get_or_insert_with(|| {
-      State::value(TextStyleWidget { text_style: BuildCtx::get().text_style().clone() })
+      State::value(TextStyleWidget { text_style: TextStyleOptional::default() })
     })
   }
 
@@ -773,32 +773,39 @@ impl<T> FatObj<T> {
 
   /// Initializes the text style of this widget.
   pub fn text_style<const M: usize>(self, v: impl DeclareInto<TextStyle, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style = v)
+    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style = v.into())
   }
 
   /// Initializes the font size of this widget.
   pub fn font_size<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_size = v)
+    self
+      .declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_size = Some(v))
   }
 
   /// Initializes the font face of this widget.
   pub fn font_face<const M: usize>(self, v: impl DeclareInto<FontFace, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_face = v)
+    self
+      .declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_face = Some(v))
   }
 
   /// Initializes the letter space of this widget.
   pub fn letter_spacing<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.letter_space = v)
+    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| {
+      m.text_style.letter_space = Some(v)
+    })
   }
 
   /// Initializes the text line height of this widget.
   pub fn text_line_height<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.line_height = v)
+    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| {
+      m.text_style.line_height = Some(v)
+    })
   }
 
   /// Initializes the text overflow of this widget.
   pub fn text_overflow<const M: usize>(self, v: impl DeclareInto<TextOverflow, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.overflow = v)
+    self
+      .declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.overflow = Some(v))
   }
 
   /// Initializes the background of the widget.
