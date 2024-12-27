@@ -28,6 +28,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Changed
 
 - **core**: Refactor TextStyleWidget to support the setting of some font style fields. (#pr @wjian23)
+- **core**: Rename `can_focus` field of FocusScope to `skip_host`. (#pr @wjian23)
 
 
 ## [0.4.0-alpha.20] - 2024-12-25
