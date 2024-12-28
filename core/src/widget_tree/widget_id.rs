@@ -235,6 +235,7 @@ impl WidgetId {
     leaf
   }
   /// Return the single child of `widget`, panic if have more than once child.
+  #[track_caller]
   pub(crate) fn single_child(&self, tree: &WidgetTree) -> Option<WidgetId> {
     assert_eq!(self.first_child(tree), self.last_child(tree), "Have more than one child.");
     self.first_child(tree)

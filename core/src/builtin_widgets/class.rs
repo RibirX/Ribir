@@ -181,6 +181,8 @@ impl ComposeChild<'static> for Classes {
 }
 
 impl<'c> ComposeChild<'c> for OverrideClass {
+  /// Since the class is lazily applied, there is no need for the child of
+  /// `OverrideClass` to be a `FnWidget`.
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     let cls_override = this.try_into_value().unwrap_or_else(|_| {
@@ -224,7 +226,7 @@ impl<'c> ComposeChild<'c> for Class {
           .on_build(move |child_id| cls_child.init_from_id(child_id))
       }
     };
-    f.into_widget()
+    FnWidget::new(f).into_widget()
   }
 }
 
@@ -315,15 +317,16 @@ impl ClassNode {
     let orig_id = orig.id();
     let InnerClassNode { render: child, id_info } = self.inner();
     let _guard = BuildCtx::init_for(child_id, wnd.tree);
-    let n_orig = BuildCtx::get_mut().alloc(Box::new(orig.clone()));
-    let tree = BuildCtx::get_mut().tree_mut();
-    let cls_holder = child_id.place_holder(tree);
+    let ctx = BuildCtx::get_mut();
+    let n_orig = ctx.alloc(Box::new(orig.clone()));
+    let cls_holder = child_id.place_holder(ctx.tree_mut());
 
     // Extract the child from this node, retaining only the external information
     // linked from the parent to create a clean context for applying the class.
     let child_node = self.take_inner();
-    let mut new_id = class.apply_style(Widget::from_id(n_orig)).build();
+    let mut new_id = ctx.build(class.apply_style(Widget::from_id(n_orig)));
 
+    let tree = ctx.tree_mut();
     // Place the inner child node within the old ID for disposal, then utilize the
     // class node to wrap the new child in the new ID.
     // This action should be taken before modifying the `orig_id`, as the `orig_id`

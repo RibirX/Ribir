@@ -11,12 +11,16 @@ pub struct BuildCtx {
   /// Widgets from the root widget to the current widget provide data that the
   /// descendants can access.
   pub(crate) providers: SmallVec<[WidgetId; 1]>,
-  /// Providers are available for the preallocated widget but have not been
-  /// attached yet.
+  /// Providers are available for current building
   pub(crate) current_providers: SmallVec<[Box<dyn Query>; 1]>,
   pub(crate) tree: NonNull<WidgetTree>,
   // Todo: Since `Theme`, `Palette`, `TypographyTheme` and `TextStyle` are frequently queried
   // during the building process, layout and paint. we should cache the closest one.
+  /// The stack is utilized to temporarily store the children's relationships
+  /// during the build process. The widget's lifetime remains valid throughout
+  /// this process; hence, we use 'static to avoid introducing a lifetime for
+  /// the BuildCtx.
+  pub(crate) children: Vec<(WidgetId, Widget<'static>)>,
 }
 
 impl BuildCtx {
@@ -59,6 +63,47 @@ impl BuildCtx {
 
   pub(crate) fn alloc(&mut self, node: Box<dyn RenderQueryable>) -> WidgetId {
     new_node(&mut self.tree_mut().arena, node)
+  }
+
+  pub(crate) fn build(&mut self, widget: Widget<'_>) -> WidgetId {
+    let size = self.children.len();
+    let root = widget.call(self);
+    loop {
+      if self.children.len() == size {
+        break;
+      }
+      if let Some((p, child)) = self.children.pop() {
+        let c = child.call(self);
+        p.append(c, self.tree_mut());
+      }
+    }
+
+    root
+  }
+
+  pub(crate) fn build_with_provider(
+    &mut self, widget: Widget<'_>, provider: Box<dyn Query>,
+  ) -> WidgetId {
+    // We push the provider into the build context to ensure that the widget build
+    // logic can access this provider.
+    self.current_providers.push(provider);
+    let id = self.build(widget.into_widget());
+    let provider = self.current_providers.pop().unwrap();
+    // Attach the provider to the widget so its descendants can access it.
+    id.attach_data(provider, self.tree_mut());
+    id
+  }
+  pub(crate) fn build_parent(&mut self, parent: Widget<'_>, children: Vec<Widget<'_>>) -> WidgetId {
+    let root = self.build(parent);
+    let p = root.single_leaf(self.tree_mut());
+    for c in children.into_iter().rev() {
+      // Safety: The child will not truly extend its lifetime to 'static; it only
+      // exists during the build process, and the parent's lifetime live longer than
+      // the build process.
+      let c: Widget<'static> = unsafe { std::mem::transmute(c) };
+      self.children.push((p, c));
+    }
+    root
   }
 }
 
@@ -110,13 +155,19 @@ impl BuildCtx {
       .filter(|id| id.queryable(t))
       .collect();
     providers.reverse();
-    let ctx = BuildCtx { tree, providers, current_providers: <_>::default() };
+    let ctx =
+      BuildCtx { tree, providers, current_providers: <_>::default(), children: <_>::default() };
     BuildCtx::set(ctx);
   }
 
   pub(crate) fn set(ctx: BuildCtx) { unsafe { CTX = Some(LocalSender::new(ctx)) } }
 
-  pub(crate) fn clear() { unsafe { CTX = None } }
+  pub(crate) fn clear() {
+    if let Some(ctx) = BuildCtx::try_get() {
+      assert!(ctx.children.is_empty());
+    }
+    unsafe { CTX = None }
+  }
 }
 
 pub(crate) struct BuildCtxInitdGuard;

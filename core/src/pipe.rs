@@ -116,7 +116,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
 
           let ctx = BuildCtx::get_mut();
           let old_node = pipe_node.remove_old_data();
-          let new = w.into_widget().build();
+          let new = ctx.build(w.into_widget());
           let tree = ctx.tree_mut();
           pipe_node.transplant_to_new(old_node, new, tree);
 
@@ -171,18 +171,20 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           _ => unreachable!(),
         };
 
-        let tree = BuildCtx::get_mut().tree_mut();
+        let ctx = BuildCtx::get_mut();
+
         let old_node = pipe_node.remove_old_data();
         let mut new = vec![];
         for (idx, w) in m.into_iter().enumerate() {
-          let id = w.into_widget().build();
+          let id = ctx.build(w.into_widget());
           new.push(id);
-          set_pos_of_multi(id, idx, tree);
+          set_pos_of_multi(id, idx, ctx.tree_mut());
         }
         if new.is_empty() {
-          new.push(Void.into_widget().build());
+          new.push(ctx.build(Void.into_widget()));
         }
 
+        let tree = ctx.tree_mut();
         pipe_node.transplant_to_new(old_node, new[0], tree);
 
         query_outside_infos(new[0], &info, tree)
@@ -268,7 +270,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           };
 
           let old_node = pipe_node.remove_old_data();
-          let p = w.into_widget().build();
+          let p = BuildCtx::get_mut().build(w.into_widget());
           let tree = BuildCtx::get_mut().tree_mut();
           pipe_node.transplant_to_new(old_node, p, tree);
 
