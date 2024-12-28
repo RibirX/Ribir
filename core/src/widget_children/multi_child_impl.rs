@@ -137,11 +137,7 @@ impl MultiChild for Box<dyn MultiChild> {
 
 impl<'w> IntoWidgetStrict<'w, RENDER> for MultiPair<'w> {
   fn into_widget_strict(self) -> Widget<'w> {
-    let f = move || {
-      let MultiPair { parent, children } = self;
-      parent.directly_compose_children(children)
-    };
-
-    f.into_widget()
+    let MultiPair { parent, children } = self;
+    Widget::new(parent, children)
   }
 }

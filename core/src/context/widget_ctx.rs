@@ -115,6 +115,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   fn widget_parent(&self, w: WidgetId) -> Option<WidgetId> { w.parent(self.tree()) }
 
   #[inline]
+  #[track_caller]
   fn single_child(&self) -> Option<WidgetId> { self.id().single_child(self.tree()) }
 
   #[inline]

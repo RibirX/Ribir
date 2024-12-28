@@ -118,17 +118,7 @@ impl<'c> ComposeChild<'c> for Provider {
       })
       .provider;
 
-    fn_widget! {
-    // We push the provider into the build context to ensure that the widget build
-    // logic can access this provider.
-      let ctx = BuildCtx::get_mut();
-      ctx.current_providers.push(provider);
-      child.into_widget().on_build(move |id| {
-        let provider = ctx.current_providers.pop().unwrap();
-        id.attach_data(provider, ctx.tree_mut());
-      })
-    }
-    .into_widget()
+    Widget::from_fn(move |ctx| ctx.build_with_provider(child.into_widget(), provider))
   }
 }
 

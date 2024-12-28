@@ -34,6 +34,7 @@ impl WidgetTree {
       tree: wnd.tree,
       providers: <_>::default(),
       current_providers: <_>::default(),
+      children: <_>::default(),
     });
 
     let theme = AppCtx::app_theme().clone_writer();
@@ -48,8 +49,8 @@ impl WidgetTree {
           }
         })
       })
-      .into_widget()
-      .build();
+      .into_widget();
+    let root = BuildCtx::get_mut().build(root);
 
     self.root = root;
     self.dirty_marker().mark(root);

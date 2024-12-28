@@ -238,7 +238,7 @@ impl Overlay {
 
     let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
 
-    let wid = gen().build();
+    let wid = BuildCtx::get_mut().build(gen());
     let tree = wnd.tree_mut();
     tree.root().append(wid, tree);
     wid.on_mounted_subtree(tree);
@@ -276,7 +276,7 @@ impl ShowingOverlays {
       }
 
       let ShowingInfo { generator, .. } = showing.as_ref().unwrap();
-      let wid = generator.gen_widget().build();
+      let wid = BuildCtx::get_mut().build(generator.gen_widget());
       tree.root().append(wid, tree);
 
       wid.on_mounted_subtree(tree);
