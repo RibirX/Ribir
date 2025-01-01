@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.21] - 2025-01-01
+
 ### Fixed
 
 - **core**: The animation finish may miss drawing the last frame. (#682 @M-Adoo)
@@ -573,7 +575,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.20...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.21...HEAD
+[0.4.0-alpha.21]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.20...ribir-v0.4.0-alpha.21
 [0.4.0-alpha.20]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.19...ribir-v0.4.0-alpha.20
 [0.4.0-alpha.19]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.18...ribir-v0.4.0-alpha.19
 [0.4.0-alpha.18]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.17...ribir-v0.4.0-alpha.18
