@@ -76,6 +76,15 @@ pub trait StateWatcher: StateReader {
   fn clone_watcher(&self) -> Watcher<Self::Reader> {
     Watcher::new(self.clone_reader(), self.raw_modifies())
   }
+
+  /// Return a new watcher by applying a function to the contained value.
+  fn map_watcher<V: ?Sized, M>(&self, part_map: M) -> Watcher<MapReader<Self::Reader, M>>
+  where
+    M: Fn(&Self::Value) -> PartData<V> + Clone,
+  {
+    let reader = self.map_reader(part_map);
+    Watcher::new(reader, self.raw_modifies())
+  }
 }
 
 pub trait StateWriter: StateWatcher {

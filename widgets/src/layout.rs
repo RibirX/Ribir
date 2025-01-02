@@ -21,6 +21,8 @@ impl Direction {
   pub fn is_vertical(&self) -> bool { matches!(self, Direction::Vertical) }
 }
 
+pub mod text_clamp;
+pub use text_clamp::*;
 pub mod flex;
 mod sized_box;
 pub use flex::*;

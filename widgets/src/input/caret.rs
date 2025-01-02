@@ -1,36 +1,52 @@
 use ribir_core::prelude::*;
-#[derive(Declare)]
-pub struct Caret {
-  pub focused: bool,
-  #[declare(default = svgs::TEXT_CARET)]
-  pub icon: NamedSvg,
+use ticker::FrameMsg;
+
+use crate::{input::glyphs_helper::GlyphsHelper, prelude::*};
+
+class_names! {
+  #[doc = "Class name for the text caret"]
+  TEXT_CARET,
 }
 
+#[derive(Declare)]
+pub struct Caret {}
+
 impl Compose for Caret {
-  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    let blink_interval = Duration::from_millis(500);
+  fn compose(_this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      let icon = FatObj::new($this.icon);
-      let mut caret = @ $icon {
-        opacity: 0.,
-        box_fit: BoxFit::CoverY,
-      };
-      let mut _guard = None;
-      let u = watch!($this.focused)
-        .subscribe(move |focused| {
-          if focused {
-            $caret.write().opacity = 1.;
-            let unsub = interval(blink_interval, AppCtx::scheduler())
-              .subscribe(move |idx| $caret.write().opacity = (idx % 2) as f32)
-              .unsubscribe_when_dropped();
-            _guard = Some(unsub);
-          } else {
-            $caret.write().opacity = 0.;
-            _guard = None;
+      @IgnorePointer {
+        @TextClamp {
+          rows: Some(1.),
+          @ Void {
+            class: TEXT_CARET
           }
-        });
-      @ $caret { on_disposed: move |_| u.unsubscribe() }
+        }
+      }
     }
     .into_widget()
   }
+}
+
+pub fn caret_widget(
+  caret: impl StateWatcher<Value = CaretState>, text: impl StateWatcher<Value = Text>,
+) -> Widget<'static> {
+  fn_widget! {
+    let tick_of_layout_ready = BuildCtx::get().window()
+      .frame_tick_stream()
+      .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
+
+      @Caret {
+        anchor: pipe!(($text.text.clone(), *$caret)).value_chain(|v|{
+          v.sample(tick_of_layout_ready).box_it()
+        }).map(move |_| {
+          if let Some(glyphs) = $text.glyphs() {
+            let pos = glyphs.cursor($caret.caret_position());
+            Anchor::from_point(pos)
+          } else {
+            Anchor::default()
+          }
+        }),
+      }
+  }
+  .into_widget()
 }

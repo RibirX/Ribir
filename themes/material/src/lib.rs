@@ -74,16 +74,6 @@ const AVATAR_RADIUS: f32 = 20.;
 const LIST_IMAGE_ITEM_SIZE: f32 = 56.;
 
 fn init_custom_style(theme: &mut Theme) {
-  theme
-    .custom_styles
-    .set_custom_style(InputStyle { size: Some(20.) });
-  theme
-    .custom_styles
-    .set_custom_style(TextAreaStyle { rows: Some(2.), cols: Some(20.) });
-  theme
-    .custom_styles
-    .set_custom_style(SelectedHighLightStyle { brush: Color::from_rgb(181, 215, 254).into() });
-
   theme.custom_styles.set_custom_style(TabsStyle {
     extent_with_both: 64.,
     extent_only_label: 48.,
@@ -152,12 +142,6 @@ fn init_custom_style(theme: &mut Theme) {
           gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
         },
       },
-    });
-  theme
-    .custom_styles
-    .set_custom_style(PlaceholderStyle {
-      foreground: theme.palette.on_surface_variant().into(),
-      text_style: theme.typography_theme.body_medium.text.clone(),
     });
 }
 

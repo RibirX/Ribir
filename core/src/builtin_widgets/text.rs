@@ -16,6 +16,9 @@ pub struct Text {
   glyphs: RefCell<Option<VisualGlyphs>>,
 }
 
+impl ChildOfCompose for FatObj<State<Text>> {}
+impl ChildOfCompose for Stateful<Text> {}
+
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let style = ctx.text_style();

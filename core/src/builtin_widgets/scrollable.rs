@@ -14,6 +14,22 @@ pub enum Scrollable {
   Both,
 }
 
+pub struct ScrollViewInfo {
+  pub current: Point,
+  pub global_view: Rect,
+}
+
+pub struct ScrollRequest(Box<dyn Fn(ScrollViewInfo) -> Point>);
+
+impl ScrollRequest {
+  pub fn new(f: impl Fn(ScrollViewInfo) -> Point + 'static) -> Self { Self(Box::new(f)) }
+}
+
+/// A event request scroll to the given position.
+/// The event will include a ScrollRequest which is a callback that receive the
+/// current scroll position and return the new scroll position.
+pub type ScrollRequestEvent = CustomEvent<ScrollRequest>;
+
 /// Helper struct for builtin scrollable field.
 #[derive(Default)]
 pub struct ScrollableWidget {
@@ -62,6 +78,17 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
         .subscribe(move |v| $this.write().set_page(v));
 
       @Clip {
+        on_custom_event: move |e: &mut ScrollRequestEvent| {
+          let mut view = $view.layout_rect();
+          let mut write_ref = $this.write();
+          view.origin = e.window().map_to_global(view.origin, e.current_target());
+          let current = write_ref.get_scroll_pos();
+          write_ref.jump_to((e.data().0)(ScrollViewInfo {
+            current,
+            global_view: view,
+          }));
+          e.stop_propagation();
+        },
         @ $view {
           on_wheel: move |e| $this.write().scroll(-e.delta_x, -e.delta_y),
           @ { child }

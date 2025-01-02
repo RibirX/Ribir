@@ -4,78 +4,8 @@ use ribir_core::prelude::*;
 
 use super::caret_state::CaretPosition;
 
-impl<K, V> SingleKeyMap<K, V>
-where
-  K: Eq,
-{
-  fn get(&self, key: &K) -> Option<&V> {
-    self
-      .0
-      .as_ref()
-      .filter(|(k, _)| k == key)
-      .map(|(_, v)| v)
-  }
-}
-
-struct SingleKeyMap<K, V>(Option<(K, V)>);
-
-impl<K, V> Default for SingleKeyMap<K, V> {
-  fn default() -> Self { Self(None) }
-}
-
-#[derive(Default)]
-pub(crate) struct TextGlyphsHelper {
-  helper: SingleKeyMap<CowArc<str>, VisualGlyphs>,
-}
-
-impl TextGlyphsHelper {
-  pub(crate) fn new(text: CowArc<str>, glyphs: VisualGlyphs) -> Self {
-    Self { helper: SingleKeyMap(Some((text, glyphs))) }
-  }
-
-  pub(crate) fn line_end(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
-    self.helper.get(text)?.line_end(caret).into()
-  }
-
-  pub(crate) fn line_begin(
-    &self, text: &CowArc<str>, caret: CaretPosition,
-  ) -> Option<CaretPosition> {
-    self.helper.get(text)?.line_begin(caret).into()
-  }
-
-  pub(crate) fn prev(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
-    self.helper.get(text)?.prev(caret).into()
-  }
-
-  pub(crate) fn next(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
-    self.helper.get(text)?.next(caret).into()
-  }
-
-  pub(crate) fn up(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
-    self.helper.get(text)?.up(caret).into()
-  }
-
-  pub(crate) fn down(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<CaretPosition> {
-    self.helper.get(text)?.down(caret).into()
-  }
-
-  pub(crate) fn cursor(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<Point> {
-    let this = self.helper.get(text)?;
-    this.cursor(caret).into()
-  }
-
-  pub(crate) fn line_height(&self, text: &CowArc<str>, caret: CaretPosition) -> Option<f32> {
-    let this = self.helper.get(text)?;
-    this.line_height_by_caret(caret).into()
-  }
-
-  pub(crate) fn selection(&self, text: &CowArc<str>, rg: &Range<usize>) -> Option<Vec<Rect>> {
-    self.helper.get(text)?.selection(rg).into()
-  }
-}
-
 pub(crate) trait GlyphsHelper {
-  fn caret_position_from_pos(&self, x: f32, y: f32) -> CaretPosition;
+  fn caret_position_from_pos(&self, pos: Point) -> CaretPosition;
 
   fn line_end(&self, caret: CaretPosition) -> CaretPosition;
 
@@ -93,18 +23,16 @@ pub(crate) trait GlyphsHelper {
 
   fn cursor(&self, caret: CaretPosition) -> Point;
 
-  fn line_height_by_caret(&self, caret: CaretPosition) -> f32;
-
   fn selection(&self, rg: &Range<usize>) -> Vec<Rect>;
 
   fn caret_position(&self, caret: CaretPosition) -> (usize, usize);
 }
 
 impl GlyphsHelper for VisualGlyphs {
-  fn caret_position_from_pos(&self, x: f32, y: f32) -> CaretPosition {
-    let (para, mut offset) = self.nearest_glyph(x, y);
+  fn caret_position_from_pos(&self, pos: Point) -> CaretPosition {
+    let (para, mut offset) = self.nearest_glyph(pos.x, pos.y);
     let rc = self.glyph_rect(para, offset);
-    if (rc.min_x() - x).abs() > (rc.max_x() - x).abs() {
+    if (rc.min_x() - pos.x).abs() > (rc.max_x() - pos.x).abs() {
       offset += 1;
     }
     let cluster = self.position_to_cluster(para, offset);
@@ -177,17 +105,12 @@ impl GlyphsHelper for VisualGlyphs {
   fn cursor(&self, caret: CaretPosition) -> Point {
     let (row, col) = self.caret_position(caret);
     if col == 0 {
-      let glphy = self.glyph_rect(row, col);
-      Point::new(glphy.min_x(), glphy.min_y())
+      let glyph = self.glyph_rect(row, col);
+      Point::new(glyph.min_x(), glyph.min_y())
     } else {
-      let glphy = self.glyph_rect(row, col - 1);
-      Point::new(glphy.max_x(), glphy.min_y())
+      let glyph = self.glyph_rect(row, col - 1);
+      Point::new(glyph.max_x(), glyph.min_y())
     }
-  }
-
-  fn line_height_by_caret(&self, caret: CaretPosition) -> f32 {
-    let (row, _col) = self.caret_position(caret);
-    self.line_height(row)
   }
 
   fn selection(&self, rg: &Range<usize>) -> Vec<Rect> {

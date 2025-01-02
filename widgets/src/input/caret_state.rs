@@ -4,7 +4,6 @@ use std::ops::Range;
 pub enum CaretState {
   Caret(CaretPosition),
   Select(CaretPosition, CaretPosition),
-  Selecting(CaretPosition, CaretPosition),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -28,48 +27,18 @@ impl CaretState {
       CaretState::Select(begin, end) => {
         Range { start: begin.cluster.min(end.cluster), end: begin.cluster.max(end.cluster) }
       }
-      CaretState::Selecting(begin, end) => {
-        Range { start: begin.cluster.min(end.cluster), end: begin.cluster.max(end.cluster) }
-      }
     }
   }
 
   pub fn cluster(&self) -> usize {
     match *self {
-      CaretState::Caret(cursor)
-      | CaretState::Select(_, cursor)
-      | CaretState::Selecting(_, cursor) => cursor.cluster,
+      CaretState::Caret(cursor) | CaretState::Select(_, cursor) => cursor.cluster,
     }
   }
 
   pub fn caret_position(&self) -> CaretPosition {
     match *self {
-      CaretState::Caret(cursor)
-      | CaretState::Select(_, cursor)
-      | CaretState::Selecting(_, cursor) => cursor,
-    }
-  }
-
-  pub fn valid(self, len: usize) -> Self {
-    match self {
-      CaretState::Caret(caret) => {
-        CaretPosition { cluster: caret.cluster.min(len), position: None }.into()
-      }
-      CaretState::Select(begin, end) => {
-        let begin = CaretState::from(begin).valid(len);
-        let end = CaretState::from(end).valid(len);
-        if begin == end {
-          begin
-        } else {
-          CaretState::Select(begin.caret_position(), end.caret_position())
-        }
-      }
-      CaretState::Selecting(begin, end) => CaretState::Selecting(
-        CaretState::from(begin)
-          .valid(len)
-          .caret_position(),
-        CaretState::from(end).valid(len).caret_position(),
-      ),
+      CaretState::Caret(cursor) | CaretState::Select(_, cursor) => cursor,
     }
   }
 }

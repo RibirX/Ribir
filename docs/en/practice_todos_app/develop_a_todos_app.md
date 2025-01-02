@@ -589,7 +589,7 @@ impl Compose for Todos {
                 $input.write().set_text("");
               }
             },
-            @{ Placeholder::new("What do you want to do ?") }
+            @Text { text:"What do you want to do ?" }
           }
         }
         @Tabs {
