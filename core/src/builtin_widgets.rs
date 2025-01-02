@@ -735,6 +735,20 @@ impl<T> FatObj<T> {
     on_mixin!(self, on_focus_out, f)
   }
 
+  /// Attaches a handler to the specific custom event that is bubbled from the
+  /// descendants.
+  pub fn on_custom_concrete_event<E: 'static>(
+    mut self, f: impl FnMut(&mut CustomEvent<E>) + 'static,
+  ) -> Self {
+    on_mixin!(self, on_custom_concrete_event, f)
+  }
+
+  /// Attaches a handler to raw custom event that is bubbled from the
+  /// descendants.
+  pub fn on_custom_event(mut self, f: impl FnMut(&mut RawCustomEvent) + 'static) -> Self {
+    on_mixin!(self, on_custom_event, f)
+  }
+
   /// Attaches a handler to the widget that is triggered during the capture
   /// phase of a focus out event. This is similar to `on_focus_out`, but it's
   /// triggered earlier in the event flow. For more information on event

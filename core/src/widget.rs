@@ -86,6 +86,7 @@ pub struct FnWidget<'w>(Box<dyn FnOnce() -> Widget<'w> + 'w>);
 pub const COMPOSE: usize = 1;
 pub const RENDER: usize = 2;
 pub const FN: usize = 3;
+pub const STATELESS_COMPOSE: usize = 4;
 
 /// Defines a trait for converting any widget into a `Widget` type. Direct
 /// implementation of this trait is not recommended as it is automatically
@@ -128,7 +129,7 @@ impl<'w, const M: usize, T: IntoWidgetStrict<'w, M>> IntoWidget<'w, M> for T {
   fn into_widget(self) -> Widget<'w> { self.into_widget_strict() }
 }
 
-impl<C: Compose + 'static> IntoWidgetStrict<'static, COMPOSE> for C {
+impl<C: Compose + 'static> IntoWidgetStrict<'static, STATELESS_COMPOSE> for C {
   #[inline]
   fn into_widget_strict(self) -> Widget<'static> {
     Compose::compose(State::value(self)).into_widget()

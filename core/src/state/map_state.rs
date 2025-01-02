@@ -141,14 +141,6 @@ where
   fn into_widget_strict(self) -> Widget<'w> { WriterRender(self).into_widget() }
 }
 
-impl<S, F> IntoWidgetStrict<'static, COMPOSE> for MapWriter<S, F>
-where
-  Self: StateWriter + 'static,
-  <Self as StateReader>::Value: Compose,
-{
-  fn into_widget_strict(self) -> Widget<'static> { Compose::compose(self) }
-}
-
 trait MapReaderFn<Input: ?Sized>: Clone {
   type Output: ?Sized;
   fn call<'a>(&self, input: ReadRef<'a, Input>) -> ReadRef<'a, Self::Output>;
