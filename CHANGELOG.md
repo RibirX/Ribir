@@ -28,6 +28,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: ensure object safety of `StateReader`， `StateWatcher` and `StateWriter` (#692 @M-Adoo)
+- **core**: Support extend custom event. (#pr @wjian23)
+
+### Changed
+
+- **core**: Unified implementation of IntoWidget for impl StateWriter<V:Compose>. (#pr @wjian23)
 
 ### Breading
 
@@ -69,6 +74,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Fixed
 
 - **core**: The animation finish may miss drawing the last frame. (#682 @M-Adoo)
+
 
 ## [0.4.0-alpha.20] - 2024-12-25
 

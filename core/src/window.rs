@@ -336,6 +336,10 @@ impl Window {
 
   pub fn set_flags(&self, flags: WindowFlags) { self.flags.set(flags) }
 
+  pub fn bubble_custom_event<E: 'static>(&self, from: WidgetId, e: E) {
+    self.add_delay_event(DelayEvent::BubbleCustomEvent { from, data: Box::new(e) as Box<dyn Any> });
+  }
+
   pub(crate) fn add_focus_node(&self, wid: WidgetId, auto_focus: bool, focus_type: FocusType) {
     self
       .focus_mgr
@@ -576,6 +580,10 @@ impl Window {
         DelayEvent::GrabPointerUp(wid) => {
           let mut e = Event::PointerUp(PointerEvent::from_mouse(wid, self));
           self.emit(wid, &mut e);
+        }
+        DelayEvent::BubbleCustomEvent { from: id, data } => {
+          let mut e = Event::CustomEvent(new_custom_event(CommonEvent::new(id, self.tree), data));
+          self.bottom_up_emit(&mut e, None);
         }
       }
     }
@@ -848,6 +856,10 @@ pub(crate) enum DelayEvent {
   GrabPointerDown(WidgetId),
   GrabPointerMove(WidgetId),
   GrabPointerUp(WidgetId),
+  BubbleCustomEvent {
+    from: WidgetId,
+    data: Box<dyn Any>,
+  },
 }
 
 impl From<u64> for WindowId {

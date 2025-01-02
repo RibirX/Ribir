@@ -202,7 +202,10 @@ impl<W: Render + 'static> IntoWidgetStrict<'static, RENDER> for Stateful<W> {
   fn into_widget_strict(self) -> Widget<'static> { WriterRender(self).into_widget() }
 }
 
-impl<W: Compose + 'static> IntoWidgetStrict<'static, COMPOSE> for Stateful<W> {
+impl<W: Compose + 'static, T> IntoWidgetStrict<'static, COMPOSE> for T
+where
+  T: StateWriter<Value = W>,
+{
   fn into_widget_strict(self) -> Widget<'static> { Compose::compose(self) }
 }
 

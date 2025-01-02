@@ -105,6 +105,8 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "on_focus_in_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
   "on_focus_out" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
   "on_focus_out_capture" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_custom_concrete_event" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
+  "on_custom_event" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
   "events_stream" => builtin_member!{"MixBuiltin", Method, "mix_builtin"},
 
   // RequestFocus

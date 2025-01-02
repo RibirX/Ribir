@@ -26,12 +26,17 @@ bitflags! {
      FocusIn/FocusOut and their capture events"]
     const FocusInOut = 1 << 5;
 
+    #[doc="Bubble custom event listener flag, hint the widget is listening to \
+     custom events"]
+    const Customs = 1 << 6;
+
     const AllListeners = Self::Lifecycle.bits()
       | Self::Pointer.bits()
       | Self::Wheel.bits()
       | Self::KeyBoard.bits()
       | Self::Focus.bits()
-      | Self::FocusInOut.bits();
+      | Self::FocusInOut.bits()
+      | Self::Customs.bits();
     // listener end
 
     #[doc="Indicates whether this widget is tracing its focus status."]
@@ -67,7 +72,7 @@ impl Declare for MixBuiltin {
 }
 
 macro_rules! event_map_filter {
-  ($event_name:ident, $event_ty:ident) => {
+  ($event_name:ident, $event_ty:ty) => {
     (|e| match e {
       Event::$event_name(e) => Some(e),
       _ => None,
@@ -76,7 +81,7 @@ macro_rules! event_map_filter {
 }
 
 macro_rules! impl_event_callback {
-  ($this:ident, $listen_type:ident, $event_name:ident, $event_ty:ident, $handler:ident) => {{
+  ($this:ident, $listen_type:ident, $event_name:ident, $event_ty:ty, $handler:ident) => {{
     $this.silent_mark(MixFlags::$listen_type);
     let _ = $this
       .subject()
@@ -323,6 +328,21 @@ impl MixBuiltin {
 
   pub fn on_focus_out_capture(&self, f: impl FnMut(&mut FocusEvent) + 'static) -> &Self {
     impl_event_callback!(self, FocusInOut, FocusOutCapture, FocusEvent, f)
+  }
+
+  pub fn on_custom_concrete_event<E: 'static, F: FnMut(&mut CustomEvent<E>) + 'static>(
+    &self, mut f: F,
+  ) -> &Self {
+    let wrap_f = move |arg: &mut RawCustomEvent| {
+      if let Some(e) = arg.downcast_mut::<E>() {
+        f(e);
+      }
+    };
+    impl_event_callback!(self, Customs, CustomEvent, RawCustomEvent, wrap_f)
+  }
+
+  pub fn on_custom_event(&self, f: impl FnMut(&mut RawCustomEvent) + 'static) -> &Self {
+    impl_event_callback!(self, Customs, CustomEvent, RawCustomEvent, f)
   }
 
   /// Begin tracing the focus status of this widget.

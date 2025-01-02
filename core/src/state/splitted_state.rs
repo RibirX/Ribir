@@ -129,11 +129,3 @@ where
 {
   fn into_widget_strict(self) -> Widget<'w> { WriterRender(self).into_widget() }
 }
-
-impl<S, F> IntoWidgetStrict<'static, COMPOSE> for SplittedWriter<S, F>
-where
-  Self: StateWriter + 'static,
-  <Self as StateReader>::Value: Compose,
-{
-  fn into_widget_strict(self) -> Widget<'static> { Compose::compose(self) }
-}
