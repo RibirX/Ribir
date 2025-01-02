@@ -1,4 +1,4 @@
-use std::ptr::NonNull;
+use std::{any::Any, ptr::NonNull};
 
 use self::dispatcher::DispatchInfo;
 use crate::{
@@ -9,6 +9,8 @@ use crate::{
 
 pub(crate) mod dispatcher;
 pub use dispatcher::GrabPointer;
+pub mod custom_event;
+pub use custom_event::*;
 mod pointers;
 pub use pointers::*;
 use ribir_geom::Point;
@@ -167,6 +169,8 @@ pub enum Event {
   /// The main difference between this event and focusout is that focusout emit
   /// in bubbles phase but this event emit in capture phase.
   FocusOutCapture(FocusEvent),
+  /// Custom event.
+  CustomEvent(CustomEvent<dyn Any>),
 }
 
 impl std::ops::Deref for Event {
@@ -198,6 +202,7 @@ impl std::ops::Deref for Event {
       Event::Wheel(e) | Event::WheelCapture(e) => e,
       Event::Chars(e) | Event::CharsCapture(e) => e,
       Event::KeyDown(e) | Event::KeyDownCapture(e) | Event::KeyUp(e) | Event::KeyUpCapture(e) => e,
+      Event::CustomEvent(e) => e,
     }
   }
 }
@@ -229,6 +234,7 @@ impl std::ops::DerefMut for Event {
       Event::Wheel(e) | Event::WheelCapture(e) => e,
       Event::Chars(e) | Event::CharsCapture(e) => e,
       Event::KeyDown(e) | Event::KeyDownCapture(e) | Event::KeyUp(e) | Event::KeyUpCapture(e) => e,
+      Event::CustomEvent(e) => e,
     }
   }
 }
@@ -262,6 +268,7 @@ impl Event {
       | Event::FocusInCapture(_)
       | Event::FocusOut(_)
       | Event::FocusOutCapture(_) => MixFlags::FocusInOut,
+      Event::CustomEvent(_) => MixFlags::Customs,
     }
   }
 }
