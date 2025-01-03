@@ -12,7 +12,9 @@ pub struct Declarer<'a> {
   pub fields: Vec<DeclareField<'a>>,
 }
 
-pub(crate) fn simple_declarer_attr(stt: &mut syn::ItemStruct) -> Result<TokenStream> {
+pub(crate) fn simple_declarer_attr(
+  stt: &mut syn::ItemStruct, stateless: bool,
+) -> Result<TokenStream> {
   if stt.fields.is_empty() {
     return empty_impl(stt);
   }
@@ -38,19 +40,32 @@ pub(crate) fn simple_declarer_attr(stt: &mut syn::ItemStruct) -> Result<TokenStr
       }
     }
 
-    impl #g_impl ObjDeclarer for #name #g_ty #g_where {
-      type Target = State<#ident #g_ty>;
-
-      #[inline]
-      fn finish(mut self) -> Self::Target {
-        State::value(#ident {#(#init_pairs),*})
-      }
-    }
-
     impl #g_impl #name #g_ty #g_where {
       #(#set_methods)*
     }
   };
+
+  if stateless {
+    tokens.extend(quote! {
+      impl #g_impl ObjDeclarer for #name #g_ty #g_where {
+        type Target = #ident #g_ty;
+
+        fn finish(self) -> Self::Target {
+          #ident {#(#init_pairs),*}
+        }
+      }
+    });
+  } else {
+    tokens.extend(quote! {
+      impl #g_impl ObjDeclarer for #name #g_ty #g_where {
+        type Target = State<#ident #g_ty>;
+
+        fn finish(mut self) -> Self::Target {
+          State::value(#ident {#(#init_pairs),*})
+        }
+      }
+    });
+  }
 
   stt.to_tokens(&mut tokens);
   Ok(tokens)
