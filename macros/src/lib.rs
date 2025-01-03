@@ -109,9 +109,10 @@ pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
 /// `State<T>` that not extend any built-in ability, and not support `pipe!` to
 /// init the field.
 #[proc_macro_attribute]
-pub fn simple_declare(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn simple_declare(attr: TokenStream, item: TokenStream) -> TokenStream {
   let mut input = parse_macro_input!(item as syn::ItemStruct);
-  simple_declare_attr::simple_declarer_attr(&mut input)
+  let stateless = syn::parse::<syn::Ident>(attr).is_ok_and(|i| i == "stateless");
+  simple_declare_attr::simple_declarer_attr(&mut input, stateless)
     .unwrap_or_else(|e| e.into_compile_error())
     .into()
 }
