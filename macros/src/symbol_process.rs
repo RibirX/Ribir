@@ -24,6 +24,7 @@ pub const KW_PIPE: &str = "pipe";
 pub const KW_DISTINCT_PIPE: &str = "distinct_pipe";
 pub const KW_WATCH: &str = "watch";
 pub const KW_PART_WRITER: &str = "part_writer";
+pub const KW_PART_READER: &str = "part_reader";
 pub const KW_FN_WIDGET: &str = "fn_widget";
 
 pub use tokens_pre_process::*;
@@ -291,7 +292,10 @@ impl Fold for DollarRefsCtx {
       mac.tokens = crate::watch_macro::gen_code(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PART_WRITER) {
-      mac.tokens = crate::part_writer::gen_code(mac.tokens, self);
+      mac.tokens = crate::part_state::gen_part_wrier(mac.tokens, self);
+      mark_macro_expanded(&mut mac);
+    } else if mac.path.is_ident(KW_PART_READER) {
+      mac.tokens = crate::part_state::gen_part_reader(mac.tokens, self);
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PIPE) {
       mac.tokens = crate::pipe_macro::gen_code(mac.tokens, Some(self));
