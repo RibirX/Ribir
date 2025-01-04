@@ -3,7 +3,7 @@ use std::any::{Any, TypeId};
 use smallvec::SmallVec;
 
 use crate::state::{
-  MapReader, MapWriterAsReader, PartData, ReadRef, Reader, StateReader, StateWriter, WriteRef,
+  MapReader, MapWriterAsReader, ReadRef, Reader, StateReader, StateWriter, WriteRef,
 };
 
 /// A type can composed by many types, this trait help us to query the type and
@@ -62,13 +62,7 @@ impl<'a> QueryHandle<'a> {
   pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
     match self.0 {
       InnerHandle::Ref(r) => r.q_downcast_ref::<T>(),
-      InnerHandle::Owned(ref o) => o
-        .q_downcast_ref::<ReadRef<'static, dyn QueryAny>>()
-        .and_then(|r| r.q_downcast_ref::<T>())
-        .or_else(|| {
-          o.q_downcast_ref::<WriteRef<'static, dyn QueryAny>>()
-            .and_then(|w| w.q_downcast_ref::<T>())
-        }),
+      InnerHandle::Owned(ref o) => downcast_from_state_ref(o),
     }
   }
 
@@ -84,23 +78,23 @@ impl<'a> QueryHandle<'a> {
       return None;
     };
 
-    o.q_downcast_mut::<WriteRef<'static, dyn QueryAny>>()?
-      .q_downcast_mut::<T>()
+    o.q_downcast_mut::<WriteRef<'static, T>>()
+      .map(|v| &mut **v)
   }
 
   pub(crate) fn new(r: &'a dyn QueryAny) -> Self { QueryHandle(InnerHandle::Ref(r)) }
 
-  pub(crate) fn from_read_ref(r: ReadRef<'a, dyn QueryAny>) -> Self {
+  pub(crate) fn from_read_ref<T: ?Sized + 'static>(r: ReadRef<'a, T>) -> Self {
     // Safety: The lifetime is maintained in the return handle and will be shortened
     // once the handle is downcast.
-    let r: ReadRef<'static, dyn QueryAny> = unsafe { std::mem::transmute(r) };
+    let r: ReadRef<'static, T> = unsafe { std::mem::transmute(r) };
     QueryHandle(InnerHandle::Owned(Box::new(r)))
   }
 
-  pub(crate) fn from_write_ref(w: WriteRef<'a, dyn QueryAny>) -> Self {
+  pub(crate) fn from_write_ref<T: ?Sized + 'static>(w: WriteRef<'a, T>) -> Self {
     // Safety: The lifetime is maintained in the return handle and will be shortened
     // once the handle is downcast.
-    let w: WriteRef<'static, dyn QueryAny> = unsafe { std::mem::transmute(w) };
+    let w: WriteRef<'static, T> = unsafe { std::mem::transmute(w) };
     QueryHandle(InnerHandle::Owned(Box::new(w)))
   }
 
@@ -110,13 +104,7 @@ impl<'a> QueryHandle<'a> {
         .q_downcast_ref::<T>()
         .map(|type_ref| QueryRef { type_ref, data: None }),
       InnerHandle::Owned(o) => {
-        let inner = o
-          .q_downcast_ref::<ReadRef<'static, dyn QueryAny>>()
-          .and_then(|r| r.q_downcast_ref::<T>())
-          .or_else(|| {
-            o.q_downcast_ref::<WriteRef<'static, dyn QueryAny>>()
-              .and_then(|w| w.q_downcast_ref::<T>())
-          })?;
+        let inner = downcast_from_state_ref::<T>(&o)?;
         let type_ref = unsafe { &*(inner as *const T) };
         Some(QueryRef { type_ref, data: Some(o) })
       }
@@ -128,13 +116,22 @@ impl<'a> QueryHandle<'a> {
       return None;
     };
 
-    let w = *q_downcast::<WriteRef<'static, dyn QueryAny>>(o).ok()?;
-    WriteRef::filter_map(w, |v| {
-      v.q_downcast_mut::<T>()
-        .map(PartData::from_ref_mut)
+    o.is::<WriteRef<'static, T>>().then(|| unsafe {
+      let raw = Box::into_raw(o);
+      *Box::from_raw(raw as *mut WriteRef<'static, T>)
     })
-    .ok()
   }
+}
+
+fn downcast_from_state_ref<T: 'static>(owned: &Box<dyn QueryAny>) -> Option<&T> {
+  owned
+    .q_downcast_ref::<ReadRef<'static, T>>()
+    .map(|v| &**v)
+    .or_else(|| {
+      owned
+        .q_downcast_ref::<WriteRef<'static, T>>()
+        .map(|v| &**v)
+    })
 }
 
 impl<'q, T: ?Sized> QueryRef<'q, T> {
@@ -255,8 +252,7 @@ where
 
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
     if query_id == &QueryId::of::<T::Value>() {
-      let w = ReadRef::map(self.read(), |v| PartData::from_ref(v as &dyn QueryAny));
-      Some(QueryHandle::from_read_ref(w))
+      Some(QueryHandle::from_read_ref(self.read()))
     } else if query_id == &QueryId::of::<T>() {
       Some(QueryHandle::new(self))
     } else {
@@ -266,8 +262,7 @@ where
 
   fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
     if query_id == &QueryId::of::<T::Value>() {
-      let w = WriteRef::map(self.write(), |v| PartData::from_ref(v as &dyn QueryAny));
-      Some(QueryHandle::from_write_ref(w))
+      Some(QueryHandle::from_write_ref(self.write()))
     } else if query_id == &QueryId::of::<T>() {
       Some(QueryHandle::new(self))
     } else {
@@ -302,8 +297,7 @@ macro_rules! impl_query_for_reader {
 
     fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
       if query_id == &QueryId::of::<V>() {
-        let r = ReadRef::map(self.read(), |v| PartData::from_ref(v as &dyn QueryAny));
-        Some(QueryHandle::from_read_ref(r))
+        Some(QueryHandle::from_read_ref(self.read()))
       } else if query_id == &QueryId::of::<Self>() {
         Some(QueryHandle::new(self))
       } else {
@@ -433,21 +427,11 @@ impl dyn QueryAny {
   }
 }
 
-fn q_downcast<T: QueryAny>(any: Box<dyn QueryAny>) -> Result<Box<T>, Box<dyn QueryAny>> {
-  if any.is::<T>() {
-    unsafe {
-      let raw = Box::into_raw(any);
-      Ok(Box::from_raw(raw as *mut T))
-    }
-  } else {
-    Err(any)
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::{reset_test_env, state::State};
+  use crate::prelude::PartData;
 
   #[test]
   fn query_ref() {

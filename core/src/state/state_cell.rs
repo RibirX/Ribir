@@ -110,11 +110,59 @@ impl<T: ?Sized> PartData<T> {
 }
 
 impl<T> PartData<T> {
-  /// Create a `PartData` from a type that should be point to the part data not
-  /// a copy. E.g. Option<&T>, `Box`, `Arc`, `Rc`, etc.
+  /// Create a `PartData` from a pointer that points to the part data of the
+  /// original data. For example, `Option<&T>`, `Box`, `Arc`, `Rc`, etc.
   ///
-  /// Caller should ensure that the data is not a copy.
-  pub fn from_data(ptr_data: T) -> Self { PartData::PartData(Box::new(ptr_data)) }
+  /// The data used to create this `PartData` must point to the data in your
+  /// original data.
+  ///
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let vec = Stateful::new(vec![1, 2, 3]);
+  /// // We get the state of the second element.
+  /// // `v.get(1)` returns an `Option<&i32>`, which is valid in the vector.
+  /// let elem2 = vec.map_reader(|v| unsafe {
+  ///   PartData::from_ptr(std::mem::transmute::<_, Option<&'static i32>>(v.get(1)))
+  /// });
+  /// ```
+  ///
+  /// # Safety
+  ///
+  /// Exercise caution when using this method, as it can lead to dangling
+  /// pointers in the state reference internals.
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let ab = Stateful::new((1, 2));
+  ///
+  /// let ab2 = ab.map_reader(|v| unsafe { PartData::from_ptr(*v) });
+  ///
+  /// // The `_a` may result in a dangling pointer issue since it utilizes the value of `ab2.read()`. However, `ab2` copies the
+  /// // value of `ab` rather than referencing it.
+  /// // When `ab2.read()` is dropped, `_a` still points to it, making access to `_a` dangerous.
+  /// let _a = ReadRef::map(ab2.read(), |v| unsafe { PartData::from_ptr(v.0) });
+  /// ```
+  ///
+  ///
+  /// Otherwise, your modifications will not be applied to the state.
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let vec = Stateful::new(vec![1, 2, 3]);
+  ///
+  /// // We create a state of the second element. However, this state is a copy of
+  /// // the vector because `v[1]` returns a copy of the value in the vector, not a
+  /// // reference.
+  /// let mut elem2 = vec.map_writer(|v| unsafe { PartData::from_ptr(v[1]) });
+  ///
+  /// // This modification will not alter the `vec`.
+  /// *elem2.write() = 20;
+  /// ```
+  pub unsafe fn from_ptr(ptr_data: T) -> Self { PartData::PartData(Box::new(ptr_data)) }
 }
 
 pub struct ReadRef<'a, T: ?Sized> {
