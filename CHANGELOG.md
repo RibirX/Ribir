@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **macros**: Added the `part_reader!` macro to generate a partial reader from a reference of a reader. (#pr @M-Adoo)
+
 ## [0.4.0-alpha.22] - 2025-01-08
 
 ### Fixed

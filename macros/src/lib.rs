@@ -5,7 +5,7 @@ extern crate proc_macro;
 
 mod declare_derive;
 mod lerp_derive;
-mod part_writer;
+mod part_state;
 mod util;
 use proc_macro::TokenStream;
 use quote::quote;
@@ -244,7 +244,23 @@ pub fn watch(input: TokenStream) -> TokenStream { watch_macro::gen_code(input.in
 /// use of `$` is unnecessary.
 #[proc_macro]
 pub fn part_writer(input: TokenStream) -> TokenStream {
-  part_writer::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
+  part_state::gen_part_wrier(input.into(), &mut DollarRefsCtx::top_level()).into()
+}
+
+/// The `part_reader` macro creates a partial reader from a reference of a
+/// reader.
+///
+/// This macro specifically accepts simple expressions to indicate the partial
+/// of the reader, as shown in the following patterns:
+///
+/// - For a field: `part_reader!(&reader.xxx)`
+/// - For a method returning a reference: `part_reader!(reader.xxx())`.
+///
+/// Since it operates on a reader and not a state reference of the reader, the
+/// use of `$` is unnecessary.
+#[proc_macro]
+pub fn part_reader(input: TokenStream) -> TokenStream {
+  part_state::gen_part_reader(input.into(), &mut DollarRefsCtx::top_level()).into()
 }
 
 /// Includes an SVG file as an `Svg`.

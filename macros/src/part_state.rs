@@ -1,5 +1,5 @@
 use proc_macro2::{Ident, TokenStream};
-use quote::{ToTokens, quote, quote_spanned};
+use quote::{ToTokens, quote_spanned};
 use syn::{
   AngleBracketedGenericArguments, Expr, Member, Result, Token, parenthesized,
   parse::{Parse, ParseStream},
@@ -12,11 +12,17 @@ use crate::{
   variable_names::{BUILTIN_INFOS, BuiltinMemberType},
 };
 
-pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
-  match syn::parse2::<PartWriter>(input) {
+pub fn gen_part_wrier(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
+  match syn::parse2::<PartState>(input) {
     Ok(part) => {
-      let info = part.writer_info(refs_ctx);
-      let tokens = part.gen_tokens(&info, refs_ctx);
+      let info = part.state_info(refs_ctx);
+      let host = part.host_tokens(&info, refs_ctx);
+      let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
+      let tokens = quote_spanned! { state.span() =>
+        #host #dot map_writer(
+          |w| PartData::from_ref_mut(#and_token #mutability w #dot #part_expr #tail_dot #tail_expr)
+        )
+      };
       refs_ctx.add_dollar_ref(info);
       tokens
     }
@@ -24,10 +30,28 @@ pub fn gen_code(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream
   }
 }
 
-struct PartWriter {
+pub fn gen_part_reader(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
+  match syn::parse2::<PartState>(input) {
+    Ok(part) => {
+      let info = part.state_info(refs_ctx);
+      let host = part.host_tokens(&info, refs_ctx);
+      let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
+      let tokens = quote_spanned! { state.span() =>
+        #host #dot map_reader(
+          |r| PartData::from_ref(#and_token #mutability r #dot #part_expr #tail_dot #tail_expr)
+        )
+      };
+      refs_ctx.add_dollar_ref(info);
+      tokens
+    }
+    Err(err) => err.to_compile_error(),
+  }
+}
+
+struct PartState {
   and_token: Option<Token![&]>,
   mutability: Option<Token![mut]>,
-  writer: Ident,
+  state: Ident,
   dot: Token![.],
   part_expr: PartExpr,
   tail_dot: Option<Token![.]>,
@@ -44,11 +68,11 @@ enum PartExpr {
   },
 }
 
-impl Parse for PartWriter {
+impl Parse for PartState {
   fn parse(input: ParseStream) -> Result<Self> {
     let and_token = input.parse()?;
     let mutability = input.parse()?;
-    let writer = if input.peek(Token![self]) {
+    let state = if input.peek(Token![self]) {
       let this = input.parse::<Token![self]>()?;
       Ident::from(this)
     } else {
@@ -76,12 +100,12 @@ impl Parse for PartWriter {
 
     let tail_dot = input.parse()?;
     let tail_expr = if input.is_empty() { None } else { Some(input.parse()?) };
-    Ok(Self { and_token, mutability, writer, dot, part_expr, tail_dot, tail_expr })
+    Ok(Self { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr })
   }
 }
 
-impl PartWriter {
-  fn writer_info(&self, refs_ctx: &DollarRefsCtx) -> DollarRef {
+impl PartState {
+  fn state_info(&self, refs_ctx: &DollarRefsCtx) -> DollarRef {
     let builtin_info = match &self.part_expr {
       PartExpr::Member(Member::Named(member)) => BUILTIN_INFOS
         .get(&member.to_string())
@@ -92,34 +116,30 @@ impl PartWriter {
       _ => None,
     };
     if let Some(info) = builtin_info {
-      refs_ctx.builtin_dollar_ref(self.writer.clone(), info, DollarUsedInfo::Writer)
+      refs_ctx.builtin_dollar_ref(self.state.clone(), info, DollarUsedInfo::Writer)
     } else {
-      DollarRef { name: self.writer.clone(), builtin: None, used: DollarUsedInfo::Writer }
+      DollarRef { name: self.state.clone(), builtin: None, used: DollarUsedInfo::Writer }
     }
   }
 
-  fn gen_tokens(&self, writer_info: &DollarRef, refs_ctx: &DollarRefsCtx) -> TokenStream {
-    let Self { and_token, mutability, writer, dot, part_expr, tail_dot, tail_expr } = self;
-    let part_expr = match part_expr {
-      PartExpr::Member(member) => member.to_token_stream(),
-      PartExpr::Method { method, turbofish, paren_token, args } => {
-        let mut tokens = quote! {};
-        method.to_tokens(&mut tokens);
-        turbofish.to_tokens(&mut tokens);
-        paren_token.surround(&mut tokens, |tokens| args.to_tokens(tokens));
-        tokens
-      }
-    };
-    let host = if writer_info.builtin.is_some() {
+  fn host_tokens(&self, writer_info: &DollarRef, refs_ctx: &DollarRefsCtx) -> TokenStream {
+    if writer_info.builtin.is_some() {
       refs_ctx.builtin_host_tokens(writer_info)
     } else {
-      writer.to_token_stream()
-    };
+      self.state.to_token_stream()
+    }
+  }
+}
 
-    quote_spanned! { writer.span() =>
-      #host #dot map_writer(
-        |w| PartData::from_ref_mut(#and_token #mutability w #dot #part_expr #tail_dot #tail_expr)
-      )
+impl ToTokens for PartExpr {
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    match self {
+      PartExpr::Member(member) => member.to_tokens(tokens),
+      PartExpr::Method { method, turbofish, paren_token, args } => {
+        method.to_tokens(tokens);
+        turbofish.to_tokens(tokens);
+        paren_token.surround(tokens, |tokens| args.to_tokens(tokens));
+      }
     }
   }
 }
