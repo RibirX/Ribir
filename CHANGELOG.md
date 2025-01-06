@@ -18,12 +18,16 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 **crate or effect scope**: description of change (#pr @contributor)
 ```
 
-1.  When creating a pull request, `#pr` will automatically update with the pull request number.
-2.  Replace `@contributor` with your GitHub username.
+1. When creating a pull request, `#pr` will automatically update with the pull request number.
+2. Replace `@contributor` with your GitHub username.
 
 <!-- next-header -->
 
 ## [@Unreleased] - @ReleaseDate
+
+### Fixed
+
+- cargo: Fixed Documentation link (#686 @EpixMan)
 
 ## [0.4.0-alpha.21] - 2025-01-01
 
@@ -99,7 +103,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **widgets**: The `Checkbox` widget uses classes to style and simplify its label syntax. (#666 @M-Adoo)
 - **widgets**: The `Icon` widget utilizes classes to configure its style, and it does not have a size property. (#660 @M-Adoo)
 - **theme:** Refactor the `Ripple` and `StateLayer` of the material theme to enhance their visual effects. (#666 @M-Adoo)
-
 
 ### Fixed
 
@@ -196,7 +199,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Merged boolean status widgets into a single widget `MixFlags`, including `HasFocus`, `MouseHover` and `PointerPressed`. (#627 @M-Adoo)
 - **core**: Reimplemented `HAlignWidget`, `VAlignWidget`, `RelativeAnchor`, `BoxDecoration`, `ConstrainedBox`, `IgnorePoint`, `Opacity`, `Padding`, `TransformWidget`, and `VisibilityRender` as `WrapRender`. (#626 @M-Adoo)
 
-
 ### Fixed
 
 - **core**: The `SplitWriter` and `MapWriter` of the render widget may not be flagged as dirty. (#626, @M-Adoo)
@@ -204,7 +206,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Breaking
 
 - **painter**: Removed `Painter::brush` and `Painter::set_brush`, now using `fill_brush`, `stroke_brush`, `set_fill_brush`, and `set_stroke_brush` methods instead. (#628 @M-Adoo)
-
 
 ## [0.4.0-alpha.9] - 2024-09-18
 
@@ -245,7 +246,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **widgets**: Flex may not decrease the gap for the second child during layout. (#622 @M-Adoo)
 
-
 ## [0.4.0-alpha.6] - 2024-08-21
 
 ### Features
@@ -277,6 +277,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
   ```
 
 - **core**: Added `Provider` widget to share data between sub-tree. (#618 @M-Adoo)
+
   ```rust
   Provider::new(Box::new(State::value(0i32))).with_child(fn_widget! {
     @SizedBox {
@@ -317,7 +318,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Removed unnecessary `Writer` since it has the same capabilities as `Stateful`. (#615 @M-Adoo)
 
-
 ## [0.4.0-alpha.4] - 2024-08-07
 
 ### Features
@@ -347,7 +347,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - Removed the all builder traits such as WidgetBuilder and ComposeBuilder and so on. (#612 @M-Adoo)
 - All implicit child conversions have been removed, except for conversions to Widget. (#612 @M-Adoo)
 
-
 ## [0.4.0-alpha.3] - 2024-06-26
 
 ## [0.4.0-alpha.2] - 2024-06-19
@@ -357,6 +356,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Added support to query a `WriteRef` from a state, enabling users to modify the state after attaching it to a widget. (#601 @M-Adoo)
 - **core**: Introduced the `DeclareInto` trait for any type that implements `DeclareFrom`. (#604 @M-Adoo)
 - **macros**: Improved widget declaration to allow specifying widget types via path. (#606 @M-Adoo)
+
   ```rust
     // Previously, a widget type could only be specified using an identifier, requiring prior import of `Row`.
     use ribir::prelude::*;
@@ -381,7 +381,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### BREAKING
 
 - **core**: Removed the infrequently used `StateFrom` trait, as there's a more efficient alternative. (#604 @M-Adoo)
-
 
 ## [0.4.0-alpha.1](https://github.com/RibirX/Ribir/compare/ribir-v0.3.0-beta.2...ribir-v0.4.0-alpha.1) - 2024-06-12
 
