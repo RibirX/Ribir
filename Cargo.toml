@@ -22,14 +22,14 @@ debug = true
 
 [profile.release]
 lto = true
-strip = true  
+strip = true
 codegen-units = 1
 
 [workspace.package]
 authors = ["RibirX<Adoo@outlook.com>"]
 categories = ["gui"]
 description = "A non-intrusive declarative GUI framework, to build modern native/wasm cross-platform applications."
-documentation = "https://ribir.org/docs"
+documentation = "https://ribir.org/docs/introduction"
 edition = "2021"
 homepage = "https://ribir.org"
 keywords = ["gui", "ui", "declarative", "compose-ui"]
@@ -45,7 +45,7 @@ bitflags = "2.6.0"
 blake3 = "1.3.3"
 colored = "2.1.0"
 derive_more = "1.0.0"
-dssim-core="3.2.9"
+dssim-core = "3.2.9"
 env_logger = "0.7.1"
 euclid = "0.22.11"
 fontdb = "0.23.0"
@@ -66,7 +66,9 @@ proc-macro2 = "1.0.89"
 quote = "1.0.37"
 rayon = "1.10.0"
 rustybuzz = "0.20.1"
-rxrust = { version="1.0.0-beta.9", default-features = false, features = ["futures-scheduler"]}
+rxrust = { version = "1.0.0-beta.9", default-features = false, features = [
+  "futures-scheduler",
+] }
 scoped_threadpool = "0.1.9"
 triomphe = "0.1.12"
 serde = "1.0"
@@ -76,10 +78,15 @@ syn = "2.0.87"
 unicode-bidi = "0.3.7"
 unicode-script = "0.5.4"
 unicode-segmentation = "1.9.0"
-usvg = { version= "0.44.0", default-features = false }
+usvg = { version = "0.44.0", default-features = false }
 webbrowser = "0.8.8"
-wgpu = {version = "0.20.0", features=["webgl"]}
-winit = { version="0.29.5", default-features = false, features = ["x11", "wayland", "wayland-dlopen", "rwh_06"]}
+wgpu = { version = "0.20.0", features = ["webgl"] }
+winit = { version = "0.29.5", default-features = false, features = [
+  "x11",
+  "wayland",
+  "wayland-dlopen",
+  "rwh_06",
+] }
 zerocopy = "0.7.3"
 quick-xml = "0.37.1"
 macos-accessibility-client = { version = "0.0.1" }
