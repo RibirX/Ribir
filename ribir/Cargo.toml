@@ -9,7 +9,7 @@ keywords.workspace = true
 license.workspace = true
 name = "ribir"
 readme.workspace = true
-repository = "https://github.com/RibirX/Ribir/ribir"
+repository = "https://github.com/RibirX/Ribir"
 version.workspace = true
 
 [dependencies]
