@@ -57,7 +57,7 @@ impl<'c> ComposeChild<'c> for Expanded {
     let data: Box<dyn Query> = match this.try_into_value() {
       Ok(this) => Box::new(Queryable(this)),
       Err(this) => {
-        child = child.dirty_on(this.raw_modifies());
+        child = child.dirty_on(this.raw_modifies(), DirtyPhase::Layout);
         Box::new(this)
       }
     };

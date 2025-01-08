@@ -27,6 +27,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
+- **core**: The `Render::dirty_phase` method has been added to allow widgets to mark only the paint phase as dirty when it is modified. (#689 @M-Adoo)
 - **macros**: Added the `part_reader!` macro to generate a partial reader from a reference of a reader. (#688 @M-Adoo)
 - **macros**: The `simple_declare` now supports the `stateless` meta attribute, `#[simple_declare(stateless)]`. (#688 @M-Adoo)
 

@@ -163,7 +163,7 @@ impl Declare for RelativeAnchor {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl_compose_child_for_wrap_render!(RelativeAnchor);
+impl_compose_child_for_wrap_render!(RelativeAnchor, DirtyPhase::Layout);
 
 impl WrapRender for RelativeAnchor {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {

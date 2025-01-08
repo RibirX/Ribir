@@ -389,9 +389,9 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
 
   node.dyn_info_mut().gen_range = GenRange::Single(new_id);
   let marker = tree.dirty_marker();
-  marker.mark(new_id);
+  marker.mark(new_id, DirtyPhase::Layout);
   if new_id != orig_id && new_id.ancestor_of(orig_id, tree) {
-    marker.mark(orig_id);
+    marker.mark(orig_id, DirtyPhase::Layout);
   }
 }
 

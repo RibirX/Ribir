@@ -12,7 +12,7 @@ impl Declare for ConstrainedBox {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl_compose_child_for_wrap_render!(ConstrainedBox);
+impl_compose_child_for_wrap_render!(ConstrainedBox, DirtyPhase::Layout);
 
 impl WrapRender for ConstrainedBox {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {

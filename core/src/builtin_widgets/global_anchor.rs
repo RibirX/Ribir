@@ -298,7 +298,7 @@ impl<'c> ComposeChild<'c> for GlobalAnchor {
       }
     }
     .into_widget()
-    .dirty_on(modifies)
+    .dirty_on(modifies, DirtyPhase::Layout)
   }
 }
 

@@ -42,7 +42,7 @@ impl BorderSide {
   pub fn new(width: f32, color: Brush) -> Self { Self { width, color } }
 }
 
-impl_compose_child_for_wrap_render!(BoxDecoration);
+impl_compose_child_for_wrap_render!(BoxDecoration, DirtyPhase::Layout);
 
 impl WrapRender for BoxDecoration {
   fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {

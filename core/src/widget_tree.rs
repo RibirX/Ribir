@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp::Reverse, collections::HashSet, mem::MaybeUninit};
+use std::{cell::RefCell, cmp::Reverse, mem::MaybeUninit};
 
 pub mod widget_id;
 use indextree::Arena;
@@ -10,7 +10,16 @@ pub use layout_info::*;
 use self::widget::widget_id::new_node;
 use crate::{overlay::ShowingOverlays, prelude::*, render_helper::PureRender, window::WindowId};
 
-pub(crate) type DirtySet = Sc<RefCell<HashSet<WidgetId, ahash::RandomState>>>;
+/// This enum defines the dirty phases of the widget.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum DirtyPhase {
+  /// Indicates that the widget needs to be relayouted.
+  Layout,
+  /// Indicates that the widget needs to be repainted.
+  Paint,
+}
+
+pub(crate) type DirtySet = Sc<RefCell<ahash::HashMap<WidgetId, DirtyPhase>>>;
 
 pub(crate) struct WidgetTree {
   pub(crate) root: WidgetId,
@@ -48,7 +57,7 @@ impl WidgetTree {
     let root = BuildCtx::get_mut().build(root);
 
     self.root = root;
-    self.dirty_marker().mark(root);
+    self.dirty_marker().mark(root, DirtyPhase::Layout);
     root.on_mounted_subtree(self);
     root
   }
@@ -139,23 +148,16 @@ impl WidgetTree {
 
     let mut needs_layout = vec![];
 
-    let dirty_widgets = {
-      let mut state_changed = self.dirty_set.borrow_mut();
-      let dirty_widgets = state_changed.clone();
-      state_changed.clear();
-      dirty_widgets
-    };
-
-    for id in dirty_widgets.iter() {
-      if id.is_dropped(self) {
+    for (id, dirty) in self.dirty_set.borrow_mut().drain() {
+      if id.is_dropped(self) || dirty != DirtyPhase::Layout {
         continue;
       }
 
-      if let Some(info) = self.store.get_mut(id) {
+      if let Some(info) = self.store.get_mut(&id) {
         info.size.take();
       }
 
-      let mut relayout_root = *id;
+      let mut relayout_root = id;
       // All ancestors of this render widget should relayout until the one which only
       // sized by parent.
       for p in id.0.ancestors(&self.arena).skip(1).map(WidgetId) {
@@ -237,12 +239,22 @@ impl WidgetTree {
 }
 
 impl DirtyMarker {
-  // todo: split layout and paint dirty.
+  /// Mark the widget as dirty and return true if the widget was not already
+  /// marked as dirty in this phase previously.
+  pub(crate) fn mark(&self, id: WidgetId, scope: DirtyPhase) -> bool {
+    let mut map = self.0.borrow_mut();
+    if let Some(s) = map.get_mut(&id) {
+      if *s == DirtyPhase::Paint && scope == DirtyPhase::Layout {
+        *s = scope;
+        return true;
+      }
+      false
+    } else {
+      map.insert(id, scope).is_none()
+    }
+  }
 
-  /// Mark the widget as dirty, return true if it is not already dirty.
-  pub(crate) fn mark(&self, id: WidgetId) -> bool { self.0.borrow_mut().insert(id) }
-
-  pub(crate) fn is_dirty(&self, id: WidgetId) -> bool { self.0.borrow().contains(&id) }
+  pub(crate) fn is_dirty(&self, id: WidgetId) -> bool { self.0.borrow().contains_key(&id) }
 }
 
 #[simple_declare]
@@ -389,10 +401,12 @@ mod tests {
     assert_eq!(tree.count(tree.content_root()), 11);
 
     let root = tree.root();
-    tree.dirty_marker().mark(root);
+    tree.dirty_marker().mark(root, DirtyPhase::Layout);
     let new_root = empty_node(&mut tree.arena);
     root.insert_after(new_root, tree);
-    tree.dirty_marker().mark(new_root);
+    tree
+      .dirty_marker()
+      .mark(new_root, DirtyPhase::Layout);
     tree.detach(root);
     tree.remove_subtree(root);
 
@@ -466,5 +480,47 @@ mod tests {
     wnd.draw_frame();
     let len_1_widget = wnd.painter.borrow_mut().finish().len();
     assert_eq!(len_1_widget, len_100_widget);
+  }
+
+  #[test]
+  fn paint_phase_dirty() {
+    reset_test_env!();
+
+    #[derive(Default)]
+    struct DirtyPaintOnly {
+      paint_cnt: std::cell::Cell<usize>,
+    }
+
+    impl Render for DirtyPaintOnly {
+      fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.max }
+
+      fn paint(&self, _: &mut PaintingCtx) { self.paint_cnt.set(self.paint_cnt.get() + 1); }
+
+      fn dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
+    }
+
+    let paint_cnt = Stateful::new(DirtyPaintOnly::default());
+    let c_paint_cnt = paint_cnt.clone_writer();
+
+    let (layout_cnt, w_layout_cnt) = split_value(0);
+
+    let mut wnd = TestWindow::new(fat_obj! {
+      on_performed_layout: move |_| *$w_layout_cnt.write() += 1,
+      @ { paint_cnt.clone_writer() }
+    });
+
+    wnd.draw_frame();
+
+    assert_eq!(*layout_cnt.read(), 1);
+    assert_eq!(c_paint_cnt.read().paint_cnt.get(), 1);
+
+    {
+      let _ = &mut *c_paint_cnt.write();
+    }
+
+    wnd.draw_frame();
+
+    assert_eq!(*layout_cnt.read(), 1);
+    assert_eq!(c_paint_cnt.read().paint_cnt.get(), 2);
   }
 }

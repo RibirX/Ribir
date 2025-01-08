@@ -14,7 +14,9 @@ use crate::prelude::*;
 /// child size, it can be implemented as a `WrapRender` instead of `Render`,
 /// eliminating the need to allocate a node in the widget tree.
 pub trait WrapRender {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size;
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    host.perform_layout(clamp, ctx)
+  }
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) { host.paint(ctx) }
 
@@ -29,7 +31,9 @@ pub trait WrapRender {
 
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> { host.get_transform() }
 
-  fn combine_child(this: impl StateWriter<Value = Self>, mut child: Widget) -> Widget
+  fn combine_child(
+    this: impl StateWriter<Value = Self>, mut child: Widget, dirty: DirtyPhase,
+  ) -> Widget
   where
     Self: Sized + 'static,
   {
@@ -39,7 +43,7 @@ pub trait WrapRender {
         let reader = match this.into_reader() {
           Ok(r) => r,
           Err(s) => {
-            child = child.dirty_on(s.raw_modifies());
+            child = child.dirty_on(s.raw_modifies(), dirty);
             s.clone_reader()
           }
         };
@@ -99,6 +103,8 @@ impl Render for RenderPair {
       .hit_test(self.host.as_render(), ctx, pos)
   }
 
+  fn dirty_phase(&self) -> DirtyPhase { self.host.dirty_phase() }
+
   fn get_transform(&self) -> Option<Transform> { self.wrapper.get_transform(self.host.as_render()) }
 }
 
@@ -128,11 +134,11 @@ where
 
 #[macro_export]
 macro_rules! impl_compose_child_for_wrap_render {
-  ($name:ty) => {
+  ($name:ty, $dirty:expr) => {
     impl<'c> ComposeChild<'c> for $name {
       type Child = Widget<'c>;
       fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-        WrapRender::combine_child(this, child)
+        WrapRender::combine_child(this, child, $dirty)
       }
     }
   };

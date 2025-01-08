@@ -64,7 +64,7 @@ pub mod prelude {
     ticker::{Duration, Instant},
     widget::*,
     widget_children::*,
-    widget_tree::{BoxClamp, LayoutInfo, TrackId, WidgetId},
+    widget_tree::{BoxClamp, DirtyPhase, LayoutInfo, TrackId, WidgetId},
     window::Window,
   };
   pub use crate::{timer, *};
