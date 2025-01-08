@@ -1,6 +1,6 @@
 use crate::{impl_common_event_deref, prelude::*};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ImePreEdit {
   /// Notifies when the IME PreEdit begin a new round.
   ///

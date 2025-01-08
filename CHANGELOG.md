@@ -27,7 +27,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **macros**: Added the `part_reader!` macro to generate a partial reader from a reference of a reader. (#pr @M-Adoo)
+- **macros**: Added the `part_reader!` macro to generate a partial reader from a reference of a reader. (#688 @M-Adoo)
+- **macros**: The `simple_declare` now supports the `stateless` meta attribute, `#[simple_declare(stateless)]`. (#688 @M-Adoo)
 
 ## [0.4.0-alpha.22] - 2025-01-08
 
@@ -100,7 +101,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Added the `named_svgs` module to enable sharing SVGs using string keys, replacing the need for `IconTheme`. (#658 @M-Adoo)
 - **core**: The `keyframes!` macro has been introduced to manage the intermediate steps of animation states. (#653 @M-Adoo)
 - **core**: Added `QueryId` as a replacement for `TypeId` to facilitate querying types by Provider across different binaries. (#656 @M-Adoo)
-- **core**: Added `OverrideClass` to override a single class within a subtree. (#657 @M-Adoo)
 - **widgets**: Added `LinearProgress` and `SpinnerProgress` widgets along with their respective material themes. (#630 @wjian23 @M-Adoo)
 - **painter**: SVG now supports switching the default color, allowing for icon color changes. (#661 @M-Adoo)
 
@@ -285,7 +285,12 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Added `Provider` widget to share data between sub-tree. (#618 @M-Adoo)
 
   ```rust
-  Provider::new(Box::new(State::value(0i32))).with_child(fn_widget! {
+  let state = Stateful::value(0132);
+  providers!{
+    providers: smallvec![
+      Provider::new(state.clone_writer()), 
+      Provider::value_of_state(state)
+    ],
     @SizedBox {
       size: Size::new(1.,1.),
       on_tap: |e| {
@@ -302,9 +307,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
         }
       }
     }
-  });
+  }
   ```
-
 - **core**: Added `Overlay::of` to allow querying the overlay in event callbacks. (#618 @M-Adoo)
 - **core**: Added `WidgetCtx::query`, `WidgetCtx::query_write`, `WidgetCtx::query_of_widget` and  `WidgetCtx::query_write_of_widget`. (#618 @M-Adoo)
 

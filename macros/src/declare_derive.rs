@@ -52,6 +52,7 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
      impl #g_impl FatDeclarerExtend for #name #g_ty #g_where {
        type Target = State<#host #g_ty>;
 
+       #[track_caller]
        fn finish(mut fat_ಠ_ಠ: FatObj<Self>) -> FatObj<Self::Target> {
          #(#field_values)*
          let this_ಠ_ಠ = State::value(#host {

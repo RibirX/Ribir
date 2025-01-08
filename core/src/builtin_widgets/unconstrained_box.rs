@@ -14,7 +14,7 @@ pub struct UnconstrainedBox {
 
 /// Enum to describe which axis will imposes no constraints on its child, use by
 /// `UnConstrainedBox`.
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
 pub enum UnconstrainedDir {
   X,
   Y,

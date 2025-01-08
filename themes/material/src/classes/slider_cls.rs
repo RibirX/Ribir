@@ -27,20 +27,20 @@ pub(super) fn init(classes: &mut Classes) {
     clamp: BoxClamp::fixed_height(INDICATOR_HEIGHT)
   });
   classes.insert(SLIDER_ACTIVE_TRACK, style_class! {
-    background: BuildCtx::get().variant_color(),
+    background: BuildCtx::color(),
     border_radius: RADIUS_L8_R2,
     clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
   });
 
   classes.insert(SLIDER_INACTIVE_TRACK, style_class! {
     border_radius: RADIUS_L2_R8,
-    background: BuildCtx::get().variant_container_color(),
+    background: BuildCtx::container_color(),
     clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
   });
 
   classes.insert(SLIDER_INDICATOR, style_class! {
     v_align: VAlign::Center,
-    background: BuildCtx::get().variant_color(),
+    background: BuildCtx::color(),
     border_radius: md::RADIUS_2,
     margin: EdgeInsets::horizontal(6.),
     clamp: BoxClamp::fixed_size(Size::new(md::THICKNESS_4, INDICATOR_HEIGHT)),
@@ -48,33 +48,27 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(RANGE_SLIDER_INACTIVE_TRACK_LEFT, style_class! {
     border_radius: RADIUS_L8_R2,
-    background: BuildCtx::get().variant_container_color(),
+    background: BuildCtx::container_color(),
     clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
   });
 
   classes.insert(RANGE_SLIDER_INACTIVE_TRACK_RIGHT, style_class! {
     border_radius: RADIUS_L2_R8,
-    background: BuildCtx::get().variant_container_color(),
+    background: BuildCtx::container_color(),
     clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
   });
 
   classes.insert(RANGE_SLIDER_ACTIVE_TRACK, style_class! {
     border_radius: md::RADIUS_2,
-    background: BuildCtx::get().variant_color(),
+    background: BuildCtx::color(),
     clamp: BoxClamp::fixed_height(TRACK_HEIGHT),
   });
 
   classes.insert(STOP_INDICATOR_ACTIVE, stop_indicator_class! {
-    background: {
-      let ctx = BuildCtx::get();
-      Palette::of(ctx).on_of(&ctx.variant_color())
-    }
+    background: Palette::of(BuildCtx::get()).on_of(&BuildCtx::color())
   });
 
   classes.insert(STOP_INDICATOR_INACTIVE, stop_indicator_class! {
-    background: {
-      let ctx = BuildCtx::get();
-      Palette::of(ctx).on_container_of(&ctx.variant_color())
-    }
+    background: Palette::of(BuildCtx::get()).on_container_of(&BuildCtx::color())
   });
 }

@@ -176,7 +176,7 @@ pub enum TextFieldState {
 }
 
 impl CustomStyle for TextFieldThemeSuit {
-  fn default_style(ctx: &impl ProviderCtx) -> Self {
+  fn default_style(ctx: &impl AsRef<ProviderCtx>) -> Self {
     Self::from_theme(&Palette::of(ctx), &TypographyTheme::of(ctx))
   }
 }

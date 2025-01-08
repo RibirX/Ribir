@@ -7,6 +7,7 @@ use std::{
 
 use futures::{Future, task::LocalSpawnExt};
 use ribir_algo::Sc;
+use smallvec::SmallVec;
 use widget_id::TrackId;
 use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
 pub use winit::window::CursorIcon;
@@ -386,8 +387,8 @@ impl Window {
             let offset = tree.map_to_global(Point::zero(), *p);
             painter.translate(offset.x, offset.y);
           }
-          let mut ctx = PaintingCtx::new(wid, tree, &mut painter);
-          wid.paint_subtree(&mut ctx);
+
+          wid.paint_subtree(tree, &mut painter);
         }
       });
   }
@@ -455,32 +456,39 @@ impl Window {
           self.emit(id, &mut e);
         }
         DelayEvent::FocusIn { bottom, up } => {
-          let mut e = Event::FocusInCapture(FocusEvent::new(bottom, self.tree));
-          self.top_down_emit(&mut e, bottom, up);
-          let mut e = Event::FocusIn(FocusEvent::new(bottom, self.tree));
-          self.bottom_up_emit(&mut e, bottom, up);
+          let top = up.unwrap_or_else(|| self.tree().root());
+          self.top_down_emit(&mut Event::FocusInCapture(FocusEvent::new(top, self.tree)), bottom);
+          self.bottom_up_emit(&mut Event::FocusIn(FocusEvent::new(bottom, self.tree)), up);
         }
         DelayEvent::Blur(id) => {
           let mut e = Event::Blur(FocusEvent::new(id, self.tree));
           self.emit(id, &mut e);
         }
         DelayEvent::FocusOut { bottom, up } => {
-          let mut e = Event::FocusOutCapture(FocusEvent::new(bottom, self.tree));
-          self.top_down_emit(&mut e, bottom, up);
-          let mut e = Event::FocusOut(FocusEvent::new(bottom, self.tree));
-          self.bottom_up_emit(&mut e, bottom, up);
+          let top = up.unwrap_or_else(|| self.tree().root());
+          self.top_down_emit(&mut Event::FocusOutCapture(FocusEvent::new(top, self.tree)), bottom);
+          self.bottom_up_emit(&mut Event::FocusOut(FocusEvent::new(bottom, self.tree)), up);
         }
-        DelayEvent::KeyDown(event) => {
-          let id = event.id();
-
-          let mut e = Event::KeyDownCapture(event);
-          self.top_down_emit(&mut e, id, None);
-          let Event::KeyDownCapture(e) = e else { unreachable!() };
-          let mut e = Event::KeyDown(e);
-          self.bottom_up_emit(&mut e, id, None);
-          let Event::KeyDown(e) = e else { unreachable!() };
-          if !e.is_prevent_default() && *e.key() == VirtualKey::Named(NamedKey::Tab) {
-            self.add_delay_event(DelayEvent::TabFocusMove);
+        DelayEvent::KeyBoard { id, physical_key, key, is_repeat, location, state } => {
+          let root = self.tree().root();
+          let event =
+            KeyboardEvent::new(self, root, physical_key, key.clone(), is_repeat, location);
+          let mut event = match state {
+            ElementState::Pressed => Event::KeyDownCapture(event),
+            ElementState::Released => Event::KeyUpCapture(event),
+          };
+          self.top_down_emit(&mut event, id);
+          drop(event);
+          let event = KeyboardEvent::new(self, id, physical_key, key, is_repeat, location);
+          let mut event = match state {
+            ElementState::Pressed => Event::KeyDown(event),
+            ElementState::Released => Event::KeyUp(event),
+          };
+          self.bottom_up_emit(&mut event, None);
+          if let Event::KeyDown(e) = event {
+            if !e.is_prevent_default() && *e.key() == VirtualKey::Named(NamedKey::Tab) {
+              self.add_delay_event(DelayEvent::TabFocusMove);
+            }
           }
         }
         DelayEvent::TabFocusMove => {
@@ -499,74 +507,64 @@ impl Window {
             focus_mgr.focus_next_widget(self.tree());
           }
         }
-        DelayEvent::KeyUp(event) => {
-          let id = event.id();
-          let mut e = Event::KeyUpCapture(event);
-          self.top_down_emit(&mut e, id, None);
-          let Event::KeyUpCapture(e) = e else { unreachable!() };
-          let mut e = Event::KeyUp(e);
-          self.bottom_up_emit(&mut e, id, None);
-        }
+
         DelayEvent::Chars { id, chars } => {
-          let mut e = Event::CharsCapture(CharsEvent::new(chars, id, self));
-          self.top_down_emit(&mut e, id, None);
-          let Event::CharsCapture(e) = e else { unreachable!() };
-          let mut e = Event::Chars(e);
-          self.bottom_up_emit(&mut e, id, None);
+          let event = CharsEvent::new(chars.clone(), self.tree().root(), self);
+          self.top_down_emit(&mut Event::CharsCapture(event), id);
+          self.bottom_up_emit(&mut Event::Chars(CharsEvent::new(chars, id, self)), None);
         }
         DelayEvent::Wheel { id, delta_x, delta_y } => {
-          let mut e = Event::WheelCapture(WheelEvent::new(delta_x, delta_y, id, self));
-          self.top_down_emit(&mut e, id, None);
-          let mut e = Event::Wheel(WheelEvent::new(delta_x, delta_y, id, self));
-          self.bottom_up_emit(&mut e, id, None);
+          let event = WheelEvent::new(delta_x, delta_y, self.tree().root(), self);
+          self.top_down_emit(&mut Event::WheelCapture(event), id);
+          self.bottom_up_emit(&mut Event::Wheel(WheelEvent::new(delta_x, delta_y, id, self)), None);
         }
         DelayEvent::PointerDown(id) => {
-          let mut e = Event::PointerDownCapture(PointerEvent::from_mouse(id, self));
-          self.top_down_emit(&mut e, id, None);
-          let mut e = Event::PointerDown(PointerEvent::from_mouse(id, self));
-          self.bottom_up_emit(&mut e, id, None);
+          let root = self.tree().root();
+          let event = PointerEvent::from_mouse(root, self);
+          self.top_down_emit(&mut Event::PointerDownCapture(event), id);
+          self.bottom_up_emit(&mut Event::PointerDown(PointerEvent::from_mouse(id, self)), None);
           self
             .focus_mgr
             .borrow_mut()
             .refresh_focus(self.tree());
         }
         DelayEvent::PointerMove(id) => {
-          let mut e = Event::PointerMoveCapture(PointerEvent::from_mouse(id, self));
-          self.top_down_emit(&mut e, id, None);
-          let mut e = Event::PointerMove(PointerEvent::from_mouse(id, self));
-          self.bottom_up_emit(&mut e, id, None);
+          let event = PointerEvent::from_mouse(self.tree().root(), self);
+          self.top_down_emit(&mut Event::PointerMoveCapture(event), id);
+          self.bottom_up_emit(&mut Event::PointerMove(PointerEvent::from_mouse(id, self)), None);
         }
         DelayEvent::PointerUp(id) => {
-          let mut e = Event::PointerUpCapture(PointerEvent::from_mouse(id, self));
-          self.top_down_emit(&mut e, id, None);
-          let mut e = Event::PointerUp(PointerEvent::from_mouse(id, self));
-          self.bottom_up_emit(&mut e, id, None);
+          let event = PointerEvent::from_mouse(self.tree().root(), self);
+          self.top_down_emit(&mut Event::PointerUpCapture(event), id);
+          let event = PointerEvent::from_mouse(id, self);
+          self.bottom_up_emit(&mut Event::PointerUp(event), None);
         }
         DelayEvent::_PointerCancel(id) => {
-          let mut e = Event::PointerCancel(PointerEvent::from_mouse(id, self));
-          self.bottom_up_emit(&mut e, id, None);
+          let event = PointerEvent::from_mouse(self.tree().root(), self);
+          self.top_down_emit(&mut Event::PointerCancelCapture(event), id);
+          let event = PointerEvent::from_mouse(id, self);
+          self.bottom_up_emit(&mut Event::PointerCancel(event), None);
         }
         DelayEvent::PointerEnter { bottom, up } => {
-          let mut e = Event::PointerEnter(PointerEvent::from_mouse(bottom, self));
-          self.top_down_emit(&mut e, bottom, up);
+          let top = up.unwrap_or_else(|| self.tree().root());
+          self.top_down_emit(&mut Event::PointerEnter(PointerEvent::from_mouse(top, self)), bottom);
         }
         DelayEvent::PointerLeave { bottom, up } => {
-          let mut e = Event::PointerLeave(PointerEvent::from_mouse(bottom, self));
-          self.bottom_up_emit(&mut e, bottom, up);
+          self.bottom_up_emit(&mut Event::PointerLeave(PointerEvent::from_mouse(bottom, self)), up);
         }
         DelayEvent::Tap(wid) => {
-          let mut e = Event::TapCapture(PointerEvent::from_mouse(wid, self));
-          self.top_down_emit(&mut e, wid, None);
-          let mut e = Event::Tap(PointerEvent::from_mouse(wid, self));
-          self.bottom_up_emit(&mut e, wid, None);
+          let event = PointerEvent::from_mouse(self.tree().root(), self);
+          self.top_down_emit(&mut Event::TapCapture(event), wid);
+          let event = PointerEvent::from_mouse(wid, self);
+          self.bottom_up_emit(&mut Event::Tap(event), None);
         }
         DelayEvent::ImePreEdit { wid, pre_edit } => {
-          let mut e = Event::ImePreEditCapture(ImePreEditEvent::new(pre_edit, wid, self));
-          self.top_down_emit(&mut e, wid, None);
-          let Event::ImePreEditCapture(e) = e else { unreachable!() };
-          self.bottom_up_emit(&mut Event::ImePreEdit(e), wid, None);
+          let root = self.tree().root();
+          let ime_event = ImePreEditEvent::new(pre_edit.clone(), root, self);
+          self.top_down_emit(&mut Event::ImePreEditCapture(ime_event), wid);
+          let ime_event = ImePreEditEvent::new(pre_edit, wid, self);
+          self.bottom_up_emit(&mut Event::ImePreEdit(ime_event), None);
         }
-
         DelayEvent::GrabPointerDown(wid) => {
           let mut e = Event::PointerDown(PointerEvent::from_mouse(wid, self));
           self.emit(wid, &mut e);
@@ -592,19 +590,20 @@ impl Window {
       })
   }
 
-  fn top_down_emit(&self, e: &mut Event, bottom: WidgetId, up: Option<WidgetId>) {
+  fn top_down_emit(&self, e: &mut Event, bottom: WidgetId) {
     let tree = self.tree();
     let path = bottom
       .ancestors(tree)
-      .take_while(|id| Some(*id) != up)
+      .take_while(|id| id != &e.target())
       .collect::<Vec<_>>();
 
+    let mut buffer = SmallVec::new();
     path.iter().rev().all(|id| {
+      e.capture_to_child(*id, &mut buffer);
       id.query_all_iter::<MixBuiltin>(tree)
         .rev()
         .all(|m| {
           if m.contain_flag(e.flags()) {
-            e.set_current_target(*id);
             m.dispatch(e);
           }
           e.is_propagation()
@@ -612,19 +611,19 @@ impl Window {
     });
   }
 
-  fn bottom_up_emit(&self, e: &mut Event, bottom: WidgetId, up: Option<WidgetId>) {
+  fn bottom_up_emit(&self, e: &mut Event, up: Option<WidgetId>) {
     if !e.is_propagation() {
       return;
     }
 
     let tree = self.tree();
-    bottom
+    e.target()
       .ancestors(tree)
       .take_while(|id| Some(*id) != up)
       .all(|id| {
+        e.bubble_to_parent(id);
         id.query_all_iter::<MixBuiltin>(tree).all(|m| {
           if m.contain_flag(e.flags()) {
-            e.set_current_target(id);
             m.dispatch(e);
           }
           e.is_propagation()
@@ -796,25 +795,56 @@ impl Drop for Window {
 pub(crate) enum DelayEvent {
   Mounted(WidgetId),
   PerformedLayout(WidgetId),
-  Disposed { parent: Option<WidgetId>, id: WidgetId },
+  Disposed {
+    parent: Option<WidgetId>,
+    id: WidgetId,
+  },
   RemoveSubtree(WidgetId),
   Focus(WidgetId),
   Blur(WidgetId),
-  FocusIn { bottom: WidgetId, up: Option<WidgetId> },
-  FocusOut { bottom: WidgetId, up: Option<WidgetId> },
-  KeyDown(KeyboardEvent),
-  KeyUp(KeyboardEvent),
+  FocusIn {
+    bottom: WidgetId,
+    up: Option<WidgetId>,
+  },
+  FocusOut {
+    bottom: WidgetId,
+    up: Option<WidgetId>,
+  },
+  KeyBoard {
+    id: WidgetId,
+    physical_key: PhysicalKey,
+    key: VirtualKey,
+    is_repeat: bool,
+    location: KeyLocation,
+    state: ElementState,
+  },
   TabFocusMove,
-  Chars { id: WidgetId, chars: String },
-  Wheel { id: WidgetId, delta_x: f32, delta_y: f32 },
+  Chars {
+    id: WidgetId,
+    chars: String,
+  },
+  Wheel {
+    id: WidgetId,
+    delta_x: f32,
+    delta_y: f32,
+  },
   PointerDown(WidgetId),
   PointerMove(WidgetId),
   PointerUp(WidgetId),
   _PointerCancel(WidgetId),
-  PointerEnter { bottom: WidgetId, up: Option<WidgetId> },
-  PointerLeave { bottom: WidgetId, up: Option<WidgetId> },
+  PointerEnter {
+    bottom: WidgetId,
+    up: Option<WidgetId>,
+  },
+  PointerLeave {
+    bottom: WidgetId,
+    up: Option<WidgetId>,
+  },
   Tap(WidgetId),
-  ImePreEdit { wid: WidgetId, pre_edit: ImePreEdit },
+  ImePreEdit {
+    wid: WidgetId,
+    pre_edit: ImePreEdit,
+  },
   GrabPointerDown(WidgetId),
   GrabPointerMove(WidgetId),
   GrabPointerUp(WidgetId),

@@ -51,7 +51,7 @@ impl TransitionTheme {
   /// Retrieve the nearest `TransitionTheme` from the context among its
   /// ancestors
   #[inline]
-  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Self> {
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<Self> {
     // At least one application theme exists
     Provider::of::<Self>(ctx).unwrap()
   }
@@ -59,7 +59,7 @@ impl TransitionTheme {
   /// Retrieve the nearest `TransitionTheme` from the context among its
   /// ancestors and return a write reference to the theme.
   #[inline]
-  pub fn write_of(ctx: &impl ProviderCtx) -> WriteRef<Self> {
+  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<Self> {
     // At least one application theme exists
     Provider::write_of::<Self>(ctx).unwrap()
   }
@@ -70,7 +70,7 @@ impl TransitionIdent {
 
   /// get transition of the transition identify from the context if it have or
   /// return linear transition.
-  pub fn of(self, ctx: &impl ProviderCtx) -> Box<dyn Transition> {
+  pub fn of(self, ctx: &impl AsRef<ProviderCtx>) -> Box<dyn Transition> {
     let panic_msg = format!(
       "Neither `Transition({:?})` nor `transitions::LINEAR` are initialized in all \
        `TransitionTheme` instances.",
@@ -82,10 +82,9 @@ impl TransitionIdent {
       .expect(&panic_msg)
   }
 
-  pub fn find(self, ctx: &impl ProviderCtx) -> Option<Box<dyn Transition>> {
-    ctx
-      .all_of::<TransitionTheme>()
-      .find_map(|t| t.transitions.get(&self).map(|t| t.box_clone()))
+  pub fn find(self, ctx: &impl AsRef<ProviderCtx>) -> Option<Box<dyn Transition>> {
+    Provider::of::<TransitionTheme>(ctx)
+      .and_then(|t| t.transitions.get(&self).map(|t| t.box_clone()))
   }
 }
 

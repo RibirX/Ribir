@@ -12,7 +12,7 @@ pub struct SelectedHighLightStyle {
   pub brush: Brush,
 }
 impl CustomStyle for SelectedHighLightStyle {
-  fn default_style(_: &impl ProviderCtx) -> Self {
+  fn default_style(_: &impl AsRef<ProviderCtx>) -> Self {
     SelectedHighLightStyle { brush: Color::from_rgb(181, 215, 254).into() }
   }
 }

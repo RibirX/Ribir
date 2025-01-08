@@ -47,7 +47,7 @@ impl WrapRender for VisibilityRender {
     }
   }
 
-  fn hit_test(&self, host: &dyn Render, ctx: &HitTestCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
     if self.display {
       host.hit_test(ctx, pos)
     } else {

@@ -77,7 +77,7 @@ pub struct TabsStyle {
 }
 
 impl CustomStyle for TabsStyle {
-  fn default_style(ctx: &impl ProviderCtx) -> Self {
+  fn default_style(ctx: &impl AsRef<ProviderCtx>) -> Self {
     let palette = Palette::of(ctx);
     TabsStyle {
       extent_with_both: 64.,

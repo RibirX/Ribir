@@ -20,12 +20,6 @@ impl<R: Render> Query for PureRender<R> {
 
   fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
 
-  fn query_match(
-    &self, _: &[QueryId], _: &dyn Fn(&QueryId, &QueryHandle) -> bool,
-  ) -> Option<(QueryId, QueryHandle)> {
-    None
-  }
-
   fn queryable(&self) -> bool { false }
 }
 
@@ -49,7 +43,9 @@ where
   fn only_sized_by_parent(&self) -> bool { self.proxy().only_sized_by_parent() }
 
   #[inline]
-  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest { self.proxy().hit_test(ctx, pos) }
+  fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
+    self.proxy().hit_test(ctx, pos)
+  }
 
   #[inline]
   fn get_transform(&self) -> Option<Transform> { self.proxy().get_transform() }
@@ -69,7 +65,7 @@ impl<R: Render> RenderProxy for Sc<R> {
 
 impl Render for Resource<Path> {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let line_width = ctx.painting_style().line_width();
+    let line_width = Provider::of::<PaintingStyle>(ctx).and_then(|p| p.line_width());
     let size = self
       .bounds(line_width)
       .max()
@@ -82,7 +78,13 @@ impl Render for Resource<Path> {
   fn only_sized_by_parent(&self) -> bool { true }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
+    let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
+    let painter = ctx.painter();
     let path = PaintPath::Share(self.clone());
-    ctx.painter().draw_path(path);
+    if let Some(PaintingStyle::Stroke(options)) = style {
+      painter.set_strokes(options).stroke_path(path);
+    } else {
+      painter.fill_path(path);
+    }
   }
 }

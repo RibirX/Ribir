@@ -28,7 +28,7 @@ named_style_class!(common_label_only => {
 fn text_button_init(classes: &mut Classes) {
   fn interactive(w: Widget) -> Widget {
     FatObj::new(base_interactive(w, md::RADIUS_20))
-      .foreground(BuildCtx::get().variant_color())
+      .foreground(BuildCtx::color())
       .clamp(BTN_40_CLAMP)
       .into_widget()
   }
@@ -50,7 +50,7 @@ fn text_button_init(classes: &mut Classes) {
 
 fn filled_button_init(classes: &mut Classes) {
   fn filled_interactive(w: Widget) -> Widget {
-    let color = BuildCtx::get().variant_color();
+    let color = BuildCtx::color();
     let w = FatObj::new(w)
       .background(color)
       .border_radius(md::RADIUS_20)
@@ -82,7 +82,7 @@ fn button_init(classes: &mut Classes) {
       .into_widget();
 
     FatObj::new(base_interactive(w, md::RADIUS_20))
-      .foreground(BuildCtx::get().variant_color())
+      .foreground(BuildCtx::color())
       .into_widget()
   }
 
@@ -96,7 +96,7 @@ fn button_init(classes: &mut Classes) {
 }
 
 fn fab_common_interactive(w: Widget, radius: Radius, btn_clamp: BoxClamp) -> Widget {
-  let color = BuildCtx::get().variant_color();
+  let color = BuildCtx::color();
   let p = Palette::of(BuildCtx::get());
 
   let w = FatObj::new(w)

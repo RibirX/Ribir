@@ -34,7 +34,7 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       let mut view = @UnconstrainedBox {
-        dir: pipe!{
+        dir: distinct_pipe!{
           let this = $this;
           match this.scrollable {
             Scrollable::X => UnconstrainedDir::X,
@@ -43,11 +43,12 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
           }
         },
         clamp_dim: ClampDim::MAX_SIZE,
+        on_wheel: move |e| $this.write().scroll(-e.delta_x, -e.delta_y),
       };
 
       let child = FatObj::new(child);
       let mut child = @ $child {
-        anchor: pipe!{
+        anchor: distinct_pipe!{
           let this = $this;
           let pos = this.get_scroll_pos();
           Anchor::left_top(-pos.x, -pos.y)
@@ -61,12 +62,7 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
         .distinct_until_changed()
         .subscribe(move |v| $this.write().set_page(v));
 
-      @Clip {
-        @ $view {
-          on_wheel: move |e| $this.write().scroll(-e.delta_x, -e.delta_y),
-          @ { child }
-        }
-      }
+      @Clip { @ $view { @ { child } } }
     }
     .into_widget()
   }

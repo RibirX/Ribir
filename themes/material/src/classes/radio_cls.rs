@@ -33,7 +33,7 @@ pub(super) fn init(classes: &mut Classes) {
   }
 
   classes.insert(RADIO_SELECTED, |ripple| {
-    let color = BuildCtx::get().variant_color();
+    let color = BuildCtx::color();
     let icon = rdl! {
       let  w = @Container {
         size: md::SIZE_10,
@@ -52,7 +52,7 @@ pub(super) fn init(classes: &mut Classes) {
       };
       @Container {
         size: md::SIZE_20,
-        border: md::border_variant_color_2(),
+        border: md::border_2(),
         border_radius: md::RADIUS_10,
         on_mounted: move |_| scale_in.run(),
         @ { w }
@@ -65,7 +65,7 @@ pub(super) fn init(classes: &mut Classes) {
     let foreground = Palette::of(BuildCtx::get()).on_surface_variant();
     let icon = container! {
       size: md::SIZE_20,
-      border: md::border_on_surface_variant_2(),
+      border: md::border_2_surface_color(),
       border_radius: md::RADIUS_10,
     };
     icon_with_ripple(icon.into_widget(), ripple, foreground)

@@ -18,12 +18,12 @@ pub struct Text {
 
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let style = ctx.text_style();
+    let style = Provider::of::<TextStyle>(ctx).unwrap();
     let info = AppCtx::typography_store()
       .borrow_mut()
       .typography(
         self.text.substr(..),
-        style,
+        &style,
         clamp.max,
         self.text_align,
         GlyphBaseline::Middle,
@@ -49,11 +49,19 @@ impl Render for Text {
       return;
     };
 
+    let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
+    let painter = ctx.painter();
+    if let Some(PaintingStyle::Stroke(options)) = style {
+      painter
+        .set_style(PathStyle::Stroke)
+        .set_strokes(options);
+    } else {
+      painter.set_style(PathStyle::Fill);
+    }
+
     let visual_glyphs = self.glyphs().unwrap();
     let font_db = AppCtx::font_db().clone();
-    ctx
-      .painter()
-      .draw_glyphs_in_rect(&visual_glyphs, box_rect, &font_db.borrow());
+    painter.draw_glyphs_in_rect(&visual_glyphs, box_rect, &font_db.borrow());
   }
 }
 
@@ -104,7 +112,7 @@ mod tests {
   widget_test_suit!(
     text_clip,
     WidgetTester::new(fn_widget! {
-      @ MockBox {
+      @MockBox {
         size: Size::new(50., 45.),
         @Text {
           text: "hello world,\rnice to meet you.",

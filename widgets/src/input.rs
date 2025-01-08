@@ -38,7 +38,7 @@ pub struct PlaceholderStyle {
 }
 
 impl CustomStyle for PlaceholderStyle {
-  fn default_style(ctx: &impl ProviderCtx) -> Self {
+  fn default_style(ctx: &impl AsRef<ProviderCtx>) -> Self {
     Self {
       foreground: Palette::of(ctx).on_surface_variant().into(),
       text_style: TypographyTheme::of(ctx).body_medium.text.clone(),
@@ -52,7 +52,7 @@ pub struct InputStyle {
 }
 
 impl CustomStyle for InputStyle {
-  fn default_style(_: &impl ProviderCtx) -> Self { InputStyle { size: Some(20.) } }
+  fn default_style(_: &impl AsRef<ProviderCtx>) -> Self { InputStyle { size: Some(20.) } }
 }
 
 #[derive(Clone, PartialEq)]
@@ -62,7 +62,7 @@ pub struct TextAreaStyle {
 }
 
 impl CustomStyle for TextAreaStyle {
-  fn default_style(_: &impl ProviderCtx) -> Self {
+  fn default_style(_: &impl AsRef<ProviderCtx>) -> Self {
     TextAreaStyle { rows: Some(2.), cols: Some(20.) }
   }
 }

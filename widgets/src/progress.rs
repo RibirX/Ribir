@@ -92,7 +92,8 @@ impl Compose for SpinnerProgress {
       };
       // It is essential to ensure that the spinner is accessible by the class,
       // as the class may need to perform animations on the spinner.
-      Provider::new(Box::new(spinner.clone_writer())).with_child(fn_widget!{
+      @Providers {
+        providers: [Provider::new(spinner.clone_writer())],
         @ $spinner {
           class: distinct_pipe! {
             if $this.value.is_some() {
@@ -102,7 +103,7 @@ impl Compose for SpinnerProgress {
             }
           }
         }
-      })
+      }
     }
     .into_widget()
   }
@@ -132,9 +133,20 @@ impl Render for SpinnerArc {
     let end = end - Angle::pi() / 2.;
     let center = Point::new(size.width / 2., size.height / 2.);
     let radius = center.x.min(center.y);
+
+    let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
     let painter = ctx.painter();
-    match painter.style() {
-      PathStyle::Fill => {
+    match style {
+      Some(PaintingStyle::Stroke(strokes)) => {
+        let radius = radius - strokes.width / 2.0;
+        painter
+          .set_strokes(strokes)
+          .begin_path(arc_start_at(start, center, radius))
+          .arc_to(center, radius, start, end)
+          .end_path(false)
+          .stroke();
+      }
+      _ => {
         painter
           .begin_path(center)
           .line_to(arc_start_at(start, center, radius))
@@ -142,15 +154,6 @@ impl Render for SpinnerArc {
           .line_to(center)
           .end_path(true)
           .fill();
-      }
-      PathStyle::Stroke => {
-        let line_width = painter.line_width();
-        let radius = radius - line_width / 2.0;
-        painter
-          .begin_path(arc_start_at(start, center, radius))
-          .arc_to(center, radius, start, end)
-          .end_path(false)
-          .stroke();
       }
     }
   }

@@ -262,12 +262,7 @@ mod tests {
     let c_stagger = stagger.clone_writer();
     let w = fn_widget! {
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };
-      $stagger.write().push_state(
-        mock_box
-          .get_opacity_widget()
-          .map_writer(|w| PartData::from_ref_mut(&mut w.opacity)),
-        0.,
-      );
+      $stagger.write().push_state(part_writer!(&mut mock_box.opacity),0.);
       stagger.run();
 
       mock_box

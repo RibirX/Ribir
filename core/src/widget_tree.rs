@@ -30,26 +30,21 @@ type TreeArena = Arena<Box<dyn RenderQueryable>>;
 impl WidgetTree {
   pub fn init(&mut self, wnd: &Window, content: GenWidget) -> WidgetId {
     self.root.0.remove_subtree(&mut self.arena);
-    let _guard = BuildCtx::init(BuildCtx {
-      tree: wnd.tree,
-      providers: <_>::default(),
-      current_providers: <_>::default(),
-      children: <_>::default(),
-    });
+    let _guard = BuildCtx::init(BuildCtx::empty(wnd.tree));
 
     let theme = AppCtx::app_theme().clone_writer();
-    let overlays = Queryable(ShowingOverlays::default());
-    let root = Provider::new(Box::new(overlays))
-      .with_child(fn_widget! {
-        theme.with_child(fn_widget!{
-          let overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
-          overlays.rebuild();
-          @Root {
-            @{ content.gen_widget() }
-          }
-        })
-      })
-      .into_widget();
+    let child = move || {
+      let overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
+      overlays.rebuild();
+      Root
+        .with_child(content.gen_widget())
+        .into_widget()
+    };
+
+    let (mut providers, child) = Theme::preprocess_before_compose(theme, child.into());
+    providers.push(Provider::new(ShowingOverlays::default()));
+
+    let root = Providers::new(providers).with_child(child);
     let root = BuildCtx::get_mut().build(root);
 
     self.root = root;
@@ -69,8 +64,7 @@ impl WidgetTree {
     let wnd = self.window();
     let mut painter = wnd.painter.borrow_mut();
     let tree = wnd.tree();
-    let mut ctx = PaintingCtx::new(self.root(), tree, &mut painter);
-    self.root().paint_subtree(&mut ctx);
+    self.root().paint_subtree(tree, &mut painter);
   }
 
   /// Do the work of computing the layout for all node which need, Return if any
@@ -96,6 +90,10 @@ impl WidgetTree {
         }
       }
     }
+  }
+
+  pub(crate) fn alloc_node(&mut self, node: Box<dyn RenderQueryable>) -> WidgetId {
+    new_node(&mut self.arena, node)
   }
 
   pub(crate) fn layout_info(&self, id: WidgetId) -> Option<&LayoutInfo> {
@@ -260,8 +258,6 @@ impl Render for Root {
 
     clamp.max
   }
-
-  fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 #[cfg(test)]
