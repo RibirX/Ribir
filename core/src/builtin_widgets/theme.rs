@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 pub use ribir_algo::{CowArc, Resource};
-use smallvec::SmallVec;
+use smallvec::{SmallVec, smallvec};
 
 use crate::prelude::*;
 
@@ -28,13 +28,17 @@ pub enum Brightness {
   Light,
 }
 
-/// A `Theme` widget is used to share design configurations among its
-/// descendants.
+/// The `Theme` widget serves to distribute design settings to its
+/// subsequent elements.
 ///
-/// This includes palettes, font styles, animation transitions, and icons. An
-/// app theme is always present, but you can also use a different
-/// theme for parts of your sub-tree. You can customize parts of the theme using
-/// `Palette`, `TypographyTheme`, and `IconTheme`.
+/// Access it through `Theme::of`, and utilize `Theme::write_of` to obtain
+/// a writable reference to the theme for modifications.
+///
+/// Certain components of the theme that are frequently used, such as `Palette`,
+/// `TextStyle`, `IconFont`, `Color`, and `ContainerColor`, are also provide
+/// as read-only providers when the `Theme` widget compose. If you want to
+/// customize specific aspects of the theme, utilize `Providers` to overwrite
+/// elements like `Palette`, `TextStyle`, and more.
 ///
 /// # Examples
 ///
@@ -61,13 +65,13 @@ pub enum Brightness {
 /// App::run(w);
 /// ```
 ///
-/// You can provide a theme for a widget:
+/// You can use an other theme for a widget.
 ///
 /// ```
 /// use ribir::prelude::*;
 ///
+/// // Feel free to use a different theme here.
 /// let w = Theme::default().with_child(fn_widget! {
-///   // Feel free to use a different theme here.
 ///   Void
 /// });
 /// ```
@@ -85,7 +89,9 @@ pub struct Theme {
   pub transitions_theme: TransitionTheme,
   pub compose_decorators: ComposeDecorators,
   pub custom_styles: CustomStyles,
+  // The theme requires font bytes.
   pub font_bytes: Vec<Vec<u8>>,
+  // The theme requires font files.
   pub font_files: Vec<String>,
   /// This font is used for icons to display text as icons through font
   /// ligatures. It is crucial to ensure that this font is included in either
@@ -97,32 +103,75 @@ pub struct Theme {
   /// size, which is not ideal for web platforms. Therefore, this configuration
   /// allows the application developer to supply the font file. Certainly, the
   /// icon also works with `SVG` and [`named_svgs`](super::named_svgs).
-  pub icon_font: FontFace,
+  pub icon_font: IconFont,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct IconFont(pub FontFace);
+
 impl Theme {
-  /// Retrieve the nearest `Theme` from the context among its ancestors
-  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Theme> {
-    // At least one application theme exists
-    Provider::of(ctx).unwrap()
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<Self> { Provider::of(ctx).unwrap() }
+
+  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<Self> {
+    Provider::write_of(ctx).unwrap()
   }
 
-  /// Retrieve the nearest `Theme` from the context among its ancestors and
-  /// return a write reference to the theme.
-  pub fn write_of(ctx: &impl ProviderCtx) -> WriteRef<Theme> {
-    // At least one application theme exists
-    Provider::write_of(ctx).unwrap()
+  pub(crate) fn preprocess_before_compose(
+    this: impl StateWriter<Value = Self>, child: GenWidget,
+  ) -> (SmallVec<[Provider; 1]>, Widget<'static>) {
+    fn load_fonts(theme: &impl StateWriter<Value = Theme>) {
+      // Loading fonts does not require regenerating the `Theme` subtree, as this
+      // method has already been called within a regenerated subtree.
+      let mut t = theme.write();
+      t.load_fonts();
+      t.forget_modifies();
+    }
+
+    load_fonts(&this);
+    let container_color = this.map_reader(|t| {
+      // Safety Note: In this instance, a copied value of the palette is utilized,
+      // which is not the correct method of using `PartData`. However, in this case,
+      // it is only a read-only value, and once added to the providers, neither the
+      // state reader nor its read reference can be accessed by anyone. Therefore, it
+      // is considered safe.
+      unsafe { PartData::from_ptr(ContainerColor(t.palette.secondary_container())) }
+    });
+
+    let providers = smallvec![
+      // The theme provider is designated as writable state,
+      // while other components of the theme provider are treated as read-only state.
+      Provider::value_of_state(this.clone_writer()),
+      Provider::value_of_state(part_reader!(&this.palette.primary)),
+      Provider::value_of_state(container_color),
+      Provider::value_of_state(part_reader!(&this.typography_theme.body_medium.text)),
+      Provider::value_of_state(part_reader!(&this.palette)),
+      Provider::value_of_state(part_reader!(&this.typography_theme)),
+      Provider::value_of_state(part_reader!(&this.icon_theme)),
+      Classes::reader_into_provider(part_reader!(&this.classes)),
+      Provider::value_of_state(part_reader!(&this.transitions_theme)),
+      Provider::value_of_state(part_reader!(&this.compose_decorators)),
+      Provider::value_of_state(part_reader!(&this.custom_styles)),
+      Provider::value_of_state(part_reader!(&this.icon_font))
+    ];
+    let child = pipe!($this;)
+      .map(move |_| {
+        load_fonts(&this);
+        child.gen_widget()
+      })
+      .into_widget();
+    (providers, child)
   }
 
   /// Loads the fonts specified in the theme configuration.
   fn load_fonts(&mut self) {
     let mut font_db = AppCtx::font_db().borrow_mut();
     let Theme { font_bytes, font_files, .. } = self;
+
     font_bytes
-      .iter()
+      .drain(..)
       .for_each(|data| font_db.load_from_bytes(data.clone()));
 
-    font_files.iter().for_each(|path| {
+    font_files.drain(..).for_each(|path| {
       let _ = font_db.load_font_file(path);
     });
   }
@@ -135,100 +184,9 @@ impl ComposeChild<'static> for Theme {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     use crate::prelude::*;
 
-    this.silent().load_fonts();
-    let w = this.clone_watcher();
-    let theme = ThemeQuerier(this.clone_writer());
-
-    Provider::new(Box::new(theme))
-      .with_child(fn_widget! {
-        pipe!($w;).map(move |_| child.gen_widget())
-      })
-      .into_widget()
+    let (providers, child) = Theme::preprocess_before_compose(this, child);
+    Providers::new(providers).with_child(child)
   }
-}
-
-struct ThemeQuerier<T: StateWriter<Value = Theme>>(T);
-
-impl<T: StateWriter<Value = Theme>> Query for ThemeQuerier<T> {
-  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
-    // The value of the writer and the writer itself cannot be queried
-    // at the same time.
-    if let Some(h) = self.query(query_id) {
-      out.push(h)
-    }
-  }
-
-  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
-    if let Some(h) = self.query_write(query_id) {
-      out.push(h)
-    }
-  }
-
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
-    ReadRef::filter_map(self.0.read(), |v: &Theme| {
-      let w: Option<&dyn QueryAny> = if &QueryId::of::<Theme>() == query_id {
-        Some(v)
-      } else if &QueryId::of::<Palette>() == query_id {
-        Some(&v.palette)
-      } else if &QueryId::of::<TypographyTheme>() == query_id {
-        Some(&v.typography_theme)
-      } else if &QueryId::of::<TextStyle>() == query_id {
-        Some(&v.typography_theme.body_medium.text)
-      } else if &QueryId::of::<Classes>() == query_id {
-        Some(&v.classes)
-      } else if &QueryId::of::<IconTheme>() == query_id {
-        Some(&v.icon_theme)
-      } else if &QueryId::of::<TransitionTheme>() == query_id {
-        Some(&v.transitions_theme)
-      } else if &QueryId::of::<ComposeDecorators>() == query_id {
-        Some(&v.compose_decorators)
-      } else if &QueryId::of::<CustomStyles>() == query_id {
-        Some(&v.custom_styles)
-      } else {
-        None
-      };
-      w.map(PartData::from_ref)
-    })
-    .ok()
-    .map(QueryHandle::from_read_ref)
-  }
-
-  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
-    WriteRef::filter_map(self.0.write(), |v: &mut Theme| {
-      let w: Option<&mut dyn QueryAny> = if &QueryId::of::<Theme>() == query_id {
-        Some(v)
-      } else if &QueryId::of::<Palette>() == query_id {
-        Some(&mut v.palette)
-      } else if &QueryId::of::<TypographyTheme>() == query_id {
-        Some(&mut v.typography_theme)
-      } else if &QueryId::of::<IconTheme>() == query_id {
-        Some(&mut v.icon_theme)
-      } else if &QueryId::of::<TransitionTheme>() == query_id {
-        Some(&mut v.transitions_theme)
-      } else if &QueryId::of::<ComposeDecorators>() == query_id {
-        Some(&mut v.compose_decorators)
-      } else if &QueryId::of::<CustomStyles>() == query_id {
-        Some(&mut v.custom_styles)
-      } else {
-        None
-      };
-      w.map(PartData::from_ref_mut)
-    })
-    .ok()
-    .map(QueryHandle::from_write_ref)
-  }
-
-  fn query_match(
-    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
-  ) -> Option<(QueryId, QueryHandle)> {
-    ids.iter().find_map(|id| {
-      self
-        .query(id)
-        .filter(|h| filter(id, h))
-        .map(|h| (*id, h))
-    })
-  }
-  fn queryable(&self) -> bool { true }
 }
 
 impl Default for Theme {
@@ -312,16 +270,22 @@ mod tests {
       theme.with_child(fn_widget! {
         $writer.write().push(Palette::of(BuildCtx::get()).brightness);
         let writer = writer.clone_writer();
-        Palette { brightness: Brightness::Dark, ..Default::default() }
-          .with_child(fn_widget!{
+        let palette = Palette { brightness: Brightness::Dark, ..Default::default() };
+        @Providers {
+          providers: [Provider::new(palette)],
+          @  {
             $writer.write().push(Palette::of(BuildCtx::get()).brightness);
             let writer = writer.clone_writer();
-            Palette { brightness: Brightness::Light, ..Default::default() }
-              .with_child(fn_widget!{
+            let palette = Palette { brightness: Brightness::Light, ..Default::default() };
+            @Providers {
+              providers: [Provider::new(palette)],
+              @ {
                 $writer.write().push(Palette::of(BuildCtx::get()).brightness);
                 Void
-            })
-        })
+              }
+            }
+          }
+        }
       })
     };
 

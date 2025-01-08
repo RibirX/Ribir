@@ -338,7 +338,7 @@ pub struct ListItemStyle {
 }
 
 impl CustomStyle for ListItemStyle {
-  fn default_style(ctx: &impl ProviderCtx) -> Self {
+  fn default_style(ctx: &impl AsRef<ProviderCtx>) -> Self {
     let typography = TypographyTheme::of(ctx);
     let palette = Palette::of(ctx);
     ListItemStyle {

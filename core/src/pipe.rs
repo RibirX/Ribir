@@ -1,5 +1,5 @@
 use std::{
-  cell::{Cell, RefCell, UnsafeCell},
+  cell::{Cell, UnsafeCell},
   convert::Infallible,
   ops::RangeInclusive,
   ptr::NonNull,
@@ -48,13 +48,14 @@ pub trait Pipe: 'static {
   ///
   /// - *scope*: specifies the scope of the modifications to be emitted by the
   ///   stream.
-  /// - *updater*: If this is a pipe widget, an updater needs to be provided.
+  /// - *init*: If this is a pipe widget, an `PipeWidgetBuildInit` needs to be
+  ///   provided to init the build context.
   fn unzip(
-    self, scope: ModifyScope, updater: Option<PipeWidgetUpdater>,
+    self, scope: ModifyScope, init: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>);
 
   fn box_unzip(
-    self: Box<Self>, scope: ModifyScope, priority: Option<PipeWidgetUpdater>,
+    self: Box<Self>, scope: ModifyScope, priority: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>);
 }
 
@@ -97,31 +98,29 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     Self::Value: IntoWidget<'static, M>,
   {
     let f = move || {
-      let ctx = BuildCtx::get();
-      let info = DynWidgetsInfo::new(GenRange::Single(ctx.tree().root()));
+      let pipe_node = PipeNode::empty_node();
 
-      let updater = PipeWidgetUpdater::new_with_tree(info.clone(), BuildCtx::get().tree.as_ptr());
-      let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(updater));
+      let tree_ptr = BuildCtx::get().tree_ptr();
+      let init = PipeWidgetBuildInit::new_with_tree(pipe_node.clone(), tree_ptr);
+      let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(init));
+      w.into_widget().on_build(move |w| {
+        pipe_node.init_for_single(w);
 
-      w.into_widget().on_build(|w| {
-        info
-          .borrow_mut()
-          .set_gen_range(GenRange::Single(w));
-
-        let pipe_node = PipeNode::share_capture(w, info);
         let c_pipe_node = pipe_node.clone();
         let u = modifies.subscribe(move |(_, w)| {
-          let info = pipe_node.dyn_info();
-          let old = info.borrow().host_id();
-
+          let old = pipe_node.dyn_info().host_id();
+          let old_node = pipe_node.take_data();
+          let without_ctx = BuildCtx::try_get().is_none();
+          if without_ctx {
+            BuildCtx::set_for(old, unsafe { NonNull::new_unchecked(tree_ptr) });
+          }
           let ctx = BuildCtx::get_mut();
-          let old_node = pipe_node.remove_old_data();
           let new = ctx.build(w.into_widget());
           let tree = ctx.tree_mut();
           pipe_node.transplant_to_new(old_node, new, tree);
 
-          query_outside_infos(new, &info, tree)
-            .for_each(|info| info.borrow_mut().single_replace(old, new));
+          query_outside_infos(new, &pipe_node, tree)
+            .for_each(|node| node.dyn_info_mut().single_replace(old, new));
 
           update_key_status_single(old, new, tree);
           old.insert_after(new, tree);
@@ -129,10 +128,12 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           new.on_mounted_subtree(tree);
 
           tree.dirty_marker().mark(new);
-          // The context initialized by `PipeWidgetUpdater` must be cleared.
-          BuildCtx::clear();
+
+          if without_ctx {
+            BuildCtx::clear();
+          }
         });
-        c_pipe_node.own_subscription(u);
+        c_pipe_node.attach_subscription(u);
       })
     };
     f.into_widget()
@@ -143,37 +144,38 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     Self::Value: IntoIterator,
     <Self::Value as IntoIterator>::Item: IntoWidget<'static, M>,
   {
-    let info = DynWidgetsInfo::new(GenRange::Multi(vec![]));
-
-    let mut updater = PipeWidgetUpdater::new(info.clone());
-    let (m, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(updater.clone()));
+    let node = PipeNode::empty_node();
+    let mut init = PipeWidgetBuildInit::new(node.clone());
+    let (m, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(init.clone()));
     let mut iter = m.into_iter();
 
     let first = iter
       .next()
       .map_or_else(|| Void.into_widget(), IntoWidget::into_widget);
 
-    let info2 = info.clone();
+    let pipe_node = node.clone();
     let first = first.into_widget().on_build(move |id| {
-      match &mut info2.borrow_mut().gen_range {
-        GenRange::Multi(m) => m.push(id),
-        _ => unreachable!(),
-      };
+      pipe_node.init(id, GenRange::Multi(vec![id]));
+      let tree_ptr = BuildCtx::get().tree_ptr();
+      init.set_tree(tree_ptr);
 
-      updater.set_tree(BuildCtx::get().tree.as_ptr());
-      let pipe_node = PipeNode::share_capture(id, info2);
       let c_pipe_node = pipe_node.clone();
 
       let u = modifies.subscribe(move |(_, m)| {
-        let info = pipe_node.dyn_info();
-        let old = match &info.borrow().gen_range {
+        let old = match &pipe_node.dyn_info().gen_range {
           GenRange::Multi(m) => m.clone(),
           _ => unreachable!(),
         };
 
-        let ctx = BuildCtx::get_mut();
+        let old_node = pipe_node.take_data();
+        let without_ctx = BuildCtx::try_get().is_none();
+        if without_ctx {
+          BuildCtx::set_for(pipe_node.dyn_info().host_id(), unsafe {
+            NonNull::new_unchecked(tree_ptr)
+          });
+        }
 
-        let old_node = pipe_node.remove_old_data();
+        let ctx = BuildCtx::get_mut();
         let mut new = vec![];
         for (idx, w) in m.into_iter().enumerate() {
           let id = ctx.build(w.into_widget());
@@ -187,8 +189,8 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         let tree = ctx.tree_mut();
         pipe_node.transplant_to_new(old_node, new[0], tree);
 
-        query_outside_infos(new[0], &info, tree)
-          .for_each(|info| info.borrow_mut().multi_replace(&old, &new));
+        query_outside_infos(new[0], &pipe_node, tree)
+          .for_each(|node| node.dyn_info_mut().multi_replace(&old, &new));
 
         update_key_state_multi(old.iter().copied(), new.iter().copied(), tree);
 
@@ -202,18 +204,19 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           tree.dirty_marker().mark(*w);
         });
 
-        // The context initialized by `PipeWidgetUpdater` must be cleared.
-        BuildCtx::clear();
+        if without_ctx {
+          BuildCtx::clear();
+        }
       });
 
-      c_pipe_node.own_subscription(u);
+      c_pipe_node.attach_subscription(u);
     });
 
     let mut widgets = vec![first];
     for (idx, w) in iter.enumerate() {
-      let info = info.clone();
+      let pipe_node = node.clone();
       let w = w.into_widget().on_build(move |id| {
-        match &mut info.borrow_mut().gen_range {
+        match &mut pipe_node.dyn_info_mut().gen_range {
           GenRange::Multi(m) => m.push(id),
           _ => unreachable!(),
         };
@@ -223,7 +226,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           // We need to associate the parent information with the children pipe so that
           // when the child pipe is regenerated, it can update the parent pipe information
           // accordingly.
-          id.attach_data(Box::new(Queryable(info.clone())), tree);
+          id.attach_data(Box::new(pipe_node), tree);
         }
       });
 
@@ -239,37 +242,38 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     Self::Value: IntoWidget<'static, M>,
   {
     let f = move || {
-      let ctx = BuildCtx::get();
-      let root = ctx.tree().root();
-      let info = DynWidgetsInfo::new(GenRange::ParentOnly(root..=root));
+      let node = PipeNode::empty_node();
+      let init = PipeWidgetBuildInit::new_with_tree(node.clone(), BuildCtx::get().tree_ptr());
+      let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(init));
 
-      let updater = PipeWidgetUpdater::new_with_tree(info.clone(), ctx.tree.as_ptr());
-      let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(updater));
-
-      w.into_widget().on_build(|p| {
-        let pipe_node = PipeNode::share_capture(p, info.clone());
-        let tree = BuildCtx::get_mut().tree_mut();
+      w.into_widget().on_build(move |p| {
+        let tree: &mut WidgetTree = BuildCtx::get_mut().tree_mut();
         let leaf = p.single_leaf(tree);
-        info
-          .borrow_mut()
-          .set_gen_range(GenRange::ParentOnly(p..=leaf));
+        node.init(p, GenRange::ParentOnly(p..=leaf));
 
         // We need to associate the parent information with the pipe of leaf widget,
         // when the leaf pipe is regenerated, it can update the parent pipe information
         // accordingly.
-        if leaf.contain_type::<DynInfo>(tree) {
-          leaf.attach_data(Box::new(Queryable(info)), tree);
+        if leaf.contain_type::<PipeNode>(tree) {
+          leaf.attach_data(Box::new(node.clone()), tree);
         };
 
-        let c_pipe_node = pipe_node.clone();
+        let pipe_node = node.clone();
         let u = modifies.subscribe(move |(_, w)| {
-          let info = pipe_node.dyn_info();
-          let (top, bottom) = match &info.borrow().gen_range {
+          let (top, bottom) = match &pipe_node.dyn_info().gen_range {
             GenRange::ParentOnly(p) => p.clone().into_inner(),
             _ => unreachable!(),
           };
 
-          let old_node = pipe_node.remove_old_data();
+          let old_node = pipe_node.take_data();
+
+          let without_ctx = BuildCtx::try_get().is_none();
+          if without_ctx {
+            BuildCtx::set_for(pipe_node.dyn_info().host_id(), unsafe {
+              NonNull::new_unchecked(tree)
+            });
+          }
+
           let p = BuildCtx::get_mut().build(w.into_widget());
           let tree = BuildCtx::get_mut().tree_mut();
           pipe_node.transplant_to_new(old_node, p, tree);
@@ -280,9 +284,9 @@ pub(crate) trait InnerPipe: Pipe + Sized {
             new_rg.end().append(c, tree);
           }
 
-          query_outside_infos(p, &info, tree).for_each(|info| {
-            info
-              .borrow_mut()
+          query_outside_infos(p, &pipe_node, tree).for_each(|node| {
+            node
+              .dyn_info_mut()
               .single_range_replace(&(top..=bottom), &new_rg);
           });
 
@@ -304,11 +308,13 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           }
 
           tree.dirty_marker().mark(p);
-          // The context initialized by `PipeWidgetUpdater` must be cleared.
-          BuildCtx::clear();
+
+          if without_ctx {
+            BuildCtx::clear();
+          }
         });
 
-        c_pipe_node.own_subscription(u);
+        node.attach_subscription(u);
       })
     };
     f.into_widget()
@@ -332,20 +338,19 @@ impl Pipe for ModifiesPipe {
 
   #[inline]
   fn unzip(
-    self, scope: ModifyScope, updater: Option<PipeWidgetUpdater>,
+    self, scope: ModifyScope, init: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     let stream = self
       .0
       .filter(move |s| s.contains(scope))
       .map(|s| (s, s));
 
-    let stream = if let Some(updater) = updater {
-      let build_init = updater.build_init_fn();
-      stream
+    let stream = if let Some(init) = init {
+      let source = stream
         .sample(AppCtx::frame_ticks().clone())
-        .priority(updater)
-        .tap(move |_| build_init())
-        .box_it()
+        .priority(init.clone());
+
+      PipeWidgetContextOp { source, init }.box_it()
     } else {
       stream.box_it()
     };
@@ -355,7 +360,7 @@ impl Pipe for ModifiesPipe {
 
   #[inline]
   fn box_unzip(
-    self: Box<Self>, scope: ModifyScope, updater: Option<PipeWidgetUpdater>,
+    self: Box<Self>, scope: ModifyScope, updater: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     (*self).unzip(scope, updater)
   }
@@ -366,16 +371,16 @@ impl<V: 'static> Pipe for Box<dyn Pipe<Value = V>> {
 
   #[inline]
   fn unzip(
-    self, scope: ModifyScope, updater: Option<PipeWidgetUpdater>,
+    self, scope: ModifyScope, init: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
-    self.box_unzip(scope, updater)
+    self.box_unzip(scope, init)
   }
 
   #[inline]
   fn box_unzip(
-    self: Box<Self>, scope: ModifyScope, updater: Option<PipeWidgetUpdater>,
+    self: Box<Self>, scope: ModifyScope, init: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
-    (*self).box_unzip(scope, updater)
+    (*self).box_unzip(scope, init)
   }
 }
 
@@ -388,18 +393,18 @@ where
   type Value = V;
 
   fn unzip(
-    self, scope: ModifyScope, updater: Option<PipeWidgetUpdater>,
+    self, scope: ModifyScope, init: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     let Self { source, mut f, .. } = self;
-    let (v, stream) = source.unzip(scope, updater);
+    let (v, stream) = source.unzip(scope, init);
     (f(v), stream.map(move |(s, v)| (s, f(v))).box_it())
   }
 
   #[inline]
   fn box_unzip(
-    self: Box<Self>, scope: ModifyScope, updater: Option<PipeWidgetUpdater>,
+    self: Box<Self>, scope: ModifyScope, init: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
-    (*self).unzip(scope, updater)
+    (*self).unzip(scope, init)
   }
 }
 
@@ -412,18 +417,18 @@ where
   type Value = V;
 
   fn unzip(
-    self, scope: ModifyScope, updater: Option<PipeWidgetUpdater>,
+    self, scope: ModifyScope, init: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     let Self { source, f, .. } = self;
-    let (v, stream) = source.unzip(scope, updater);
+    let (v, stream) = source.unzip(scope, init);
     (v, f(stream))
   }
 
   #[inline]
   fn box_unzip(
-    self: Box<Self>, scope: ModifyScope, updater: Option<PipeWidgetUpdater>,
+    self: Box<Self>, scope: ModifyScope, init: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
-    (*self).unzip(scope, updater)
+    (*self).unzip(scope, init)
   }
 }
 
@@ -435,14 +440,14 @@ impl<V: 'static> Pipe for ValuePipe<V> {
 
   #[inline]
   fn unzip(
-    self, _: ModifyScope, _: Option<PipeWidgetUpdater>,
+    self, _: ModifyScope, _: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     (self.0, observable::empty().box_it())
   }
 
   #[inline]
   fn box_unzip(
-    self: Box<Self>, scope: ModifyScope, priority: Option<PipeWidgetUpdater>,
+    self: Box<Self>, scope: ModifyScope, priority: Option<PipeWidgetBuildInit>,
   ) -> (Self::Value, ValueStream<Self::Value>) {
     self.unzip(scope, priority)
   }
@@ -606,11 +611,11 @@ fn update_key_states(
 /// the pipe to the first node, and user can attach `key` or `listener` to the
 /// widget after `Pipe::build_widget` call.
 #[derive(Clone)]
-struct PipeNode(Sc<UnsafeCell<InnerPipeNode>>);
+pub(crate) struct PipeNode(Sc<UnsafeCell<InnerPipeNode>>);
 
 struct InnerPipeNode {
   data: Box<dyn RenderQueryable>,
-  dyn_info: DynInfo,
+  dyn_info: DynWidgetsInfo,
 }
 
 #[derive(Debug)]
@@ -618,8 +623,6 @@ pub(crate) struct DynWidgetsInfo {
   pub(crate) multi_pos: usize,
   pub(crate) gen_range: GenRange,
 }
-
-pub(crate) type DynInfo = Sc<RefCell<DynWidgetsInfo>>;
 
 #[derive(Debug)]
 pub enum GenRange {
@@ -629,11 +632,9 @@ pub enum GenRange {
 }
 
 impl DynWidgetsInfo {
-  pub(crate) fn new(range: GenRange) -> DynInfo {
-    Sc::new(RefCell::new(DynWidgetsInfo { gen_range: range, multi_pos: 0 }))
+  pub(crate) fn new(range: GenRange) -> DynWidgetsInfo {
+    DynWidgetsInfo { gen_range: range, multi_pos: 0 }
   }
-
-  fn set_gen_range(&mut self, range: GenRange) { self.gen_range = range; }
 
   pub(crate) fn single_replace(&mut self, old: WidgetId, new: WidgetId) {
     match &mut self.gen_range {
@@ -711,32 +712,42 @@ impl DynWidgetsInfo {
 }
 
 impl PipeNode {
-  fn share_capture(id: WidgetId, dyn_info: DynInfo) -> Self {
-    let mut pipe_node = None;
-
-    id.wrap_node(BuildCtx::get_mut().tree_mut(), |r| {
-      let inner_node = InnerPipeNode { data: r, dyn_info };
-      let p = Self(Sc::new(UnsafeCell::new(inner_node)));
-      pipe_node = Some(p.clone());
-      Box::new(p)
-    });
-
-    // Safety: init before.
-    unsafe { pipe_node.unwrap_unchecked() }
+  pub(crate) fn empty_node() -> Self {
+    let gen_range = GenRange::Single(BuildCtx::get().tree().dummy_id());
+    let dyn_info = DynWidgetsInfo::new(gen_range);
+    let inner = InnerPipeNode { data: Box::new(PureRender(Void)), dyn_info };
+    Self(Sc::new(UnsafeCell::new(inner)))
   }
 
-  fn dyn_info(&self) -> DynInfo { self.as_ref().dyn_info.clone() }
+  pub(crate) fn init_for_single(&self, w: WidgetId) { self.init(w, GenRange::Single(w)); }
+
+  pub(crate) fn init(&self, id: WidgetId, range: GenRange) {
+    self.dyn_info_mut().gen_range = range;
+    let node = self.clone();
+    id.wrap_node(BuildCtx::get_mut().tree_mut(), |r| {
+      node.as_mut().data = r;
+      Box::new(node)
+    });
+  }
+
+  pub(crate) fn dyn_info(&self) -> &DynWidgetsInfo { &self.as_ref().dyn_info }
+
+  pub(crate) fn dyn_info_mut(&self) -> &mut DynWidgetsInfo { &mut self.as_mut().dyn_info }
 
   // Remove the old widget so that the new widget build logic cannot access it
   // anymore.
-  fn remove_old_data(&self) -> Box<dyn RenderQueryable> {
-    std::mem::replace(&mut self.as_mut().data, Box::new(PureRender(Void)))
+  pub(crate) fn take_data(&self) -> Box<dyn RenderQueryable> {
+    self.replace_data(Box::new(PureRender(Void)))
+  }
+
+  pub(crate) fn replace_data(&self, new: Box<dyn RenderQueryable>) -> Box<dyn RenderQueryable> {
+    std::mem::replace(&mut self.as_mut().data, new)
   }
 
   fn transplant_to_new(
     &self, old_node: Box<dyn RenderQueryable>, new_id: WidgetId, tree: &mut WidgetTree,
   ) {
-    let old = self.as_ref().dyn_info.borrow().host_id();
+    let old = self.dyn_info().host_id();
 
     let [old, new] = tree.get_many_mut(&[old, new_id]);
     std::mem::swap(old, new);
@@ -758,12 +769,14 @@ impl PipeNode {
     unsafe { &mut *self.0.get() }
   }
 
+  pub(crate) fn host_render(&self) -> &mut Box<dyn RenderQueryable> { &mut self.as_mut().data }
+
   /// Attach a subscription to host widget of the `PipeNode`, and the
   /// subscription will be unsubscribed when the `PipeNode` dropped.
-  fn own_subscription(self, u: impl Subscription + 'static) {
+  fn attach_subscription(self, u: impl Subscription + 'static) {
     let tree = BuildCtx::get_mut().tree_mut();
     let node = self.as_mut();
-    let id = node.dyn_info.borrow().host_id();
+    let id = node.dyn_info.host_id();
     // if the subscription is closed, we can cancel and unwrap the `PipeNode`
     // immediately.
     if u.is_closed() {
@@ -776,33 +789,33 @@ impl PipeNode {
 }
 
 fn set_pos_of_multi(w: WidgetId, pos: usize, tree: &WidgetTree) -> bool {
-  w.query_all_iter::<DynInfo>(tree)
-    .inspect(|info| info.borrow_mut().set_pos_of_multi(pos))
+  w.query_all_iter::<PipeNode>(tree)
+    .inspect(|node| node.dyn_info_mut().set_pos_of_multi(pos))
     .count()
     > 0
 }
 fn query_outside_infos<'l>(
-  id: WidgetId, to: &'l DynInfo, tree: &'l WidgetTree,
-) -> impl Iterator<Item = QueryRef<'l, DynInfo>> {
+  id: WidgetId, to: &'l PipeNode, tree: &'l WidgetTree,
+) -> impl Iterator<Item = QueryRef<'l, PipeNode>> {
   let mut hit = false;
-  id.query_all_iter::<DynInfo>(tree)
+  id.query_all_iter::<PipeNode>(tree)
     .rev()
     .take_while(move |info| {
       if hit {
         false
       } else {
-        hit = Sc::ptr_eq(info, to);
+        hit = Sc::ptr_eq(&info.0, &to.0);
         true
       }
     })
 }
 
-fn pipe_priority_value(info: &DynInfo, tree: &WidgetTree) -> i64 {
-  let id = info.borrow().host_id();
+fn pipe_priority_value(node: &PipeNode, tree: &WidgetTree) -> i64 {
+  let id = node.dyn_info().host_id();
   let depth = id.ancestors(tree).count() as i64;
-  let embed = query_outside_infos(id, info, tree).count() as i64;
+  let embed = query_outside_infos(id, node, tree).count() as i64;
 
-  let pos = info.borrow_mut().pos_of_multi() as i64;
+  let pos = node.dyn_info().pos_of_multi() as i64;
   depth << 60 | pos << 40 | embed
 }
 
@@ -810,8 +823,8 @@ impl Query for PipeNode {
   fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
     let p = self.as_ref();
     p.data.query_all(query_id, out);
-    if query_id == &QueryId::of::<DynInfo>() {
-      out.push(QueryHandle::new(&p.dyn_info))
+    if query_id == &QueryId::of::<Self>() {
+      out.push(QueryHandle::new(self))
     }
   }
 
@@ -822,8 +835,8 @@ impl Query for PipeNode {
 
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
     let p = self.as_ref();
-    if query_id == &QueryId::of::<DynInfo>() {
-      Some(QueryHandle::new(&p.dyn_info))
+    if query_id == &QueryId::of::<Self>() {
+      Some(QueryHandle::new(self))
     } else {
       p.data.query(query_id)
     }
@@ -831,21 +844,6 @@ impl Query for PipeNode {
 
   fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
     self.as_ref().data.query_write(query_id)
-  }
-
-  fn query_match(
-    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
-  ) -> Option<(QueryId, QueryHandle)> {
-    let p = self.as_ref();
-    p.data.query_match(ids, filter).or_else(|| {
-      let dyn_info_id = QueryId::of::<DynInfo>();
-      (ids.contains(&dyn_info_id))
-        .then(|| {
-          let h = QueryHandle::new(&p.dyn_info);
-          filter(&dyn_info_id, &h).then_some((dyn_info_id, h))
-        })
-        .flatten()
-    })
   }
 
   fn queryable(&self) -> bool { true }
@@ -863,7 +861,7 @@ impl Render for PipeNode {
     false
   }
 
-  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
     self.as_ref().data.hit_test(ctx, pos)
   }
 
@@ -871,21 +869,19 @@ impl Render for PipeNode {
 }
 
 #[derive(Clone)]
-pub struct PipeWidgetUpdater {
-  dyn_info: DynInfo,
+pub struct PipeWidgetBuildInit {
+  node: PipeNode,
   tree: Sc<Cell<*mut WidgetTree>>,
 }
 
-impl PipeWidgetUpdater {
-  fn new_with_tree(dyn_info: DynInfo, tree: *mut WidgetTree) -> Self {
-    let mut p = Self::new(dyn_info);
+impl PipeWidgetBuildInit {
+  fn new_with_tree(node: PipeNode, tree: *mut WidgetTree) -> Self {
+    let mut p = Self::new(node);
     p.set_tree(tree);
     p
   }
 
-  fn new(dyn_info: DynInfo) -> Self {
-    Self { dyn_info, tree: Sc::new(Cell::new(std::ptr::null_mut())) }
-  }
+  fn new(node: PipeNode) -> Self { Self { node, tree: Sc::new(Cell::new(std::ptr::null_mut())) } }
 
   fn set_tree(&mut self, tree: *mut WidgetTree) {
     assert!(self.tree.get().is_null());
@@ -896,23 +892,13 @@ impl PipeWidgetUpdater {
     let tree = self.tree.get();
     (!tree.is_null()).then(|| unsafe { &*tree })
   }
-
-  fn build_init_fn(&self) -> impl Fn() {
-    let this = self.clone();
-
-    move || {
-      let wid = this.dyn_info.borrow().host_id();
-      let tree = NonNull::new(this.tree.get()).expect("Tree must not be null.");
-      BuildCtx::set_for(wid, tree)
-    }
-  }
 }
 
-impl Priority for PipeWidgetUpdater {
+impl Priority for PipeWidgetBuildInit {
   fn priority(&mut self) -> i64 {
     self
       .tree()
-      .map_or(-1, |tree| pipe_priority_value(&self.dyn_info, tree))
+      .map_or(-1, |tree| pipe_priority_value(&self.node, tree))
   }
 
   fn queue(&mut self) -> Option<&PriorityTaskQueue> {
@@ -924,6 +910,61 @@ impl Priority for PipeWidgetUpdater {
       unsafe { std::mem::transmute(queue) }
     })
   }
+}
+
+struct PipeWidgetContextOp<S> {
+  source: S,
+  init: PipeWidgetBuildInit,
+}
+
+struct PipeWidgetContextObserver<O> {
+  observer: O,
+  init: PipeWidgetBuildInit,
+}
+
+impl<Item: 'static, Err: 'static, O, S> Observable<Item, Err, O> for PipeWidgetContextOp<S>
+where
+  O: Observer<Item, Err> + 'static,
+  S: Observable<Item, Err, PipeWidgetContextObserver<O>> + 'static,
+{
+  type Unsub = S::Unsub;
+
+  fn actual_subscribe(self, observer: O) -> Self::Unsub {
+    let Self { source, init } = self;
+    source.actual_subscribe(PipeWidgetContextObserver { observer, init })
+  }
+}
+
+impl<Item, Err, S> ObservableExt<Item, Err> for PipeWidgetContextOp<S> where
+  S: ObservableExt<Item, Err>
+{
+}
+
+impl<Item, Err, O> Observer<Item, Err> for PipeWidgetContextObserver<O>
+where
+  O: Observer<Item, Err>,
+{
+  fn next(&mut self, value: Item) {
+    let Self { observer, init } = self;
+    let wid = init.node.dyn_info().host_id();
+    let tree = NonNull::new(init.tree.get()).expect("Tree must not be null.");
+
+    // Initialize the build context
+    let old = init.node.take_data();
+    BuildCtx::set_for(wid, tree);
+    init.node.replace_data(old);
+
+    observer.next(value);
+
+    // Clear the build context immediately after the downstream process.
+    BuildCtx::clear();
+  }
+
+  fn error(self, err: Err) { self.observer.error(err); }
+
+  fn complete(self) { self.observer.complete(); }
+
+  fn is_finished(&self) -> bool { self.observer.is_finished() }
 }
 
 #[cfg(test)]

@@ -23,7 +23,7 @@ pub trait WrapRender {
     host.only_sized_by_parent()
   }
 
-  fn hit_test(&self, host: &dyn Render, ctx: &HitTestCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
     host.hit_test(ctx, pos)
   }
 
@@ -75,12 +75,6 @@ impl Query for RenderPair {
     self.host.query_write(query_id)
   }
 
-  fn query_match(
-    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
-  ) -> Option<(QueryId, QueryHandle)> {
-    self.host.query_match(ids, filter)
-  }
-
   fn queryable(&self) -> bool { self.host.queryable() }
 }
 
@@ -99,7 +93,7 @@ impl Render for RenderPair {
       .only_sized_by_parent(self.host.as_render())
   }
 
-  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
     self
       .wrapper
       .hit_test(self.host.as_render(), ctx, pos)
@@ -123,7 +117,7 @@ where
     self.read().only_sized_by_parent(host)
   }
 
-  fn hit_test(&self, host: &dyn Render, ctx: &HitTestCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
     self.read().hit_test(host, ctx, pos)
   }
 

@@ -23,13 +23,10 @@ pub(crate) enum PlaceHolder {
 
 pub trait RenderQueryable: Render + Query {
   fn as_render(&self) -> &dyn Render;
-  fn as_query(&self) -> &dyn Query;
 }
 
 impl<T: Render + Query> RenderQueryable for T {
   fn as_render(&self) -> &dyn Render { self }
-
-  fn as_query(&self) -> &dyn Query { self }
 }
 
 /// You can get TrackId by builtin method of track_id().
@@ -279,44 +276,42 @@ impl WidgetId {
     self.wrap_node(tree, |render| Box::new(AnonymousAttacher::new(render, Box::new(data))));
   }
 
-  pub(crate) fn paint_subtree(self, ctx: &mut PaintingCtx) {
-    let mut w = Some(self);
-    while let Some(id) = w {
-      ctx.id = id;
-      ctx.painter.save();
-      let wnd = ctx.window();
-      let tree = wnd.tree();
-
-      let mut need_paint = false;
-      if ctx.painter.alpha() != 0. {
+  pub(crate) fn paint_subtree(self, tree: &WidgetTree, painter: &mut Painter) {
+    let mut ctx = PaintingCtx::new(self, tree, painter);
+    let mut painting = vec![];
+    loop {
+      let id = ctx.id();
+      if ctx.painter().alpha() != 0. {
         if let Some(layout_box) = ctx.box_rect() {
+          painting.push(id);
           let render = id.assert_get(tree);
           ctx
-            .painter
+            .painter()
+            .save()
             .translate(layout_box.min_x(), layout_box.min_y());
-          render.paint(ctx);
-          need_paint = true;
+          render.paint(&mut ctx);
+
+          if let Some(c) = id.first_child(tree) {
+            ctx.switch_to(c);
+            continue;
+          }
+        };
+      }
+
+      while let Some(painting) = painting.pop() {
+        ctx.painter().restore();
+        ctx.switch_to(painting);
+        ctx.finish();
+
+        if let Some(sibling) = painting.next_sibling(tree) {
+          ctx.switch_to(sibling);
+          break;
         }
       }
 
-      w = id
-        .first_child(tree)
-        .filter(|_| need_paint)
-        .or_else(|| {
-          let mut node = w;
-          while let Some(p) = node {
-            // self node sub-tree paint finished, goto sibling
-            ctx.painter.restore();
-            node = p.next_sibling(tree);
-            if node.is_some() {
-              break;
-            } else if p != self {
-              // if there is no more sibling, back to parent to find sibling.
-              node = p.parent(tree);
-            }
-          }
-          node
-        });
+      if painting.is_empty() {
+        break;
+      }
     }
   }
 }
@@ -365,12 +360,6 @@ impl WidgetId {
       .assert_get(tree)
       .query(&QueryId::of::<T>())
       .and_then(QueryHandle::into_ref)
-  }
-
-  pub(crate) fn query_ancestors_ref<T: Any>(self, tree: &WidgetTree) -> Option<QueryRef<T>> {
-    self
-      .ancestors(tree)
-      .find_map(|id| id.query_ref::<T>(tree))
   }
 
   /// return if this object contain type `T`

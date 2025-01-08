@@ -22,5 +22,13 @@ macro_rules! impl_common_event_deref {
       #[inline]
       fn borrow_mut(&mut self) -> &mut CommonEvent { &mut self.common }
     }
+
+    impl AsRef<$crate::prelude::ProviderCtx> for $event_name {
+      fn as_ref(&self) -> &$crate::prelude::ProviderCtx { self.common.as_ref() }
+    }
+
+    impl AsMut<$crate::prelude::ProviderCtx> for $event_name {
+      fn as_mut(&mut self) -> &mut $crate::prelude::ProviderCtx { self.common.as_mut() }
+    }
   };
 }

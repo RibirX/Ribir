@@ -16,14 +16,13 @@ macro_rules! fill_custom_style {
 }
 
 pub trait CustomStyle: Sized + Clone + 'static {
-  fn default_style(ctx: &impl ProviderCtx) -> Self;
+  fn default_style(ctx: &impl AsRef<ProviderCtx>) -> Self;
 
   #[inline]
-  fn of(ctx: &impl ProviderCtx) -> Self {
+  fn of(ctx: &impl AsRef<ProviderCtx>) -> Self {
     let tid = TypeId::of::<Self>();
-    ctx
-      .all_of::<CustomStyles>()
-      .find_map(|t| {
+    Provider::of::<CustomStyles>(ctx)
+      .and_then(|t| {
         t.themes
           .get(&tid)
           .and_then(|c| c.downcast_ref::<Self>())

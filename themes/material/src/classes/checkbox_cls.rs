@@ -39,7 +39,7 @@ pub(super) fn init(classes: &mut Classes) {
   };
 
   fn check_icon_with_ripple<'w>(icon: Widget<'w>, ripple: Widget<'w>) -> Widget<'w> {
-    let ripple_color = BuildCtx::get().variant_color();
+    let ripple_color = BuildCtx::color();
     let icon = container! {
       size: md::SIZE_18,
       background: ripple_color,
@@ -50,7 +50,6 @@ pub(super) fn init(classes: &mut Classes) {
   }
 
   classes.insert(CHECKBOX_CHECKED, |w| {
-    let ctx = BuildCtx::get();
     let icon = rdl! {
       let mut builder = Path::builder();
       builder
@@ -72,7 +71,7 @@ pub(super) fn init(classes: &mut Classes) {
       };
       @FatObj {
         on_mounted: move |_| enter.run(),
-        foreground: Palette::of(ctx).on_of(&ctx.variant_color()),
+        foreground: Palette::of(BuildCtx::get()).on_of(&BuildCtx::color()),
         painting_style: PaintingStyle::Stroke(StrokeOptions {
           width: 2.,
           ..Default::default()
@@ -85,13 +84,12 @@ pub(super) fn init(classes: &mut Classes) {
     check_icon_with_ripple(icon, w)
   });
   classes.insert(CHECKBOX_INDETERMINATE, |w| {
-    let ctx = BuildCtx::get();
     let icon = rdl! {
       let icon = @Container{
         size: Size::new(12., 2.),
         h_align: HAlign::Center,
         v_align: VAlign::Center,
-        background: Palette::of(ctx).on_of(&ctx.variant_color()),
+        background: Palette::of(BuildCtx::get()).on_of(&BuildCtx::color()),
       };
       let enter = @Animate {
         state: part_writer!(&mut icon.size),
@@ -107,7 +105,7 @@ pub(super) fn init(classes: &mut Classes) {
     let foreground = Palette::of(BuildCtx::get()).on_surface_variant();
     let icon = container! {
       size: md::SIZE_18,
-      border: md::border_on_surface_variant_2(),
+      border: md::border_2_surface_color(),
       border_radius: md::RADIUS_2,
       clamp: BoxClamp::fixed_size(md::SIZE_18),
     }

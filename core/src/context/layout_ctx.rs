@@ -1,8 +1,8 @@
 use ribir_geom::{Point, Size};
-use ribir_painter::{PaintingStyle, TextStyle};
 
 use super::{WidgetCtx, WidgetCtxImpl};
 use crate::{
+  prelude::ProviderCtx,
   widget::{BoxClamp, WidgetTree},
   widget_tree::WidgetId,
   window::DelayEvent,
@@ -14,12 +14,11 @@ use crate::{
 /// `LayoutCtx`. `LayoutCtx` provide method to perform child layout and also
 /// provides methods to update descendants position.
 pub struct LayoutCtx<'a> {
-  pub(crate) id: WidgetId,
+  id: WidgetId,
   /// The widget tree of the window, not borrow it from `wnd` is because a
   /// `LayoutCtx` always in a mutable borrow.
-  pub(crate) tree: &'a mut WidgetTree,
-  painting_style: PaintingStyle,
-  text_style: TextStyle,
+  tree: &'a mut WidgetTree,
+  provider_ctx: ProviderCtx,
 }
 
 impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
@@ -32,17 +31,13 @@ impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
 
 impl<'a> LayoutCtx<'a> {
   pub(crate) fn new(id: WidgetId, tree: &'a mut WidgetTree) -> Self {
-    let painting_style = if let Some(style) = id.query_ancestors_ref::<PaintingStyle>(tree) {
-      style.clone()
+    let provider_ctx = if let Some(p) = id.parent(tree) {
+      ProviderCtx::collect_from(p, tree)
     } else {
-      PaintingStyle::Fill
+      ProviderCtx::default()
     };
-    let text_style = id
-      .query_ancestors_ref::<TextStyle>(tree)
-      .unwrap()
-      .clone();
 
-    Self { id, tree, painting_style, text_style }
+    Self { id, tree, provider_ctx }
   }
 
   /// Perform layout of the widget of the context and return its size.
@@ -68,7 +63,7 @@ impl<'a> LayoutCtx<'a> {
   /// Perform layout of the `child` and return its size.
   pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
     let info = self.tree.store.layout_info(child);
-    info
+    let size = info
       .filter(|info| info.clamp == clamp)
       .and_then(|info| info.size)
       .unwrap_or_else(|| {
@@ -81,7 +76,9 @@ impl<'a> LayoutCtx<'a> {
         self.id = id;
 
         size
-      })
+      });
+    self.provider_ctx.pop_providers_for(child);
+    size
   }
 
   /// Adjust the position of the widget where it should be placed relative to
@@ -149,18 +146,12 @@ impl<'a> LayoutCtx<'a> {
     assert_eq!(child.parent(self.tree), Some(self.id));
     self.tree.store.force_layout(child).is_some()
   }
+}
 
-  pub fn set_painting_style(&mut self, style: PaintingStyle) -> PaintingStyle {
-    std::mem::replace(&mut self.painting_style, style)
-  }
+impl<'w> AsRef<ProviderCtx> for LayoutCtx<'w> {
+  fn as_ref(&self) -> &ProviderCtx { &self.provider_ctx }
+}
 
-  pub fn painting_style(&self) -> &PaintingStyle { &self.painting_style }
-
-  pub fn set_text_style(&mut self, style: TextStyle) -> TextStyle {
-    std::mem::replace(&mut self.text_style, style)
-  }
-
-  pub fn text_style(&self) -> &TextStyle { &self.text_style }
-
-  pub fn text_style_mut(&mut self) -> &mut TextStyle { &mut self.text_style }
+impl<'w> AsMut<ProviderCtx> for LayoutCtx<'w> {
+  fn as_mut(&mut self) -> &mut ProviderCtx { &mut self.provider_ctx }
 }

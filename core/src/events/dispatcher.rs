@@ -93,13 +93,10 @@ impl Dispatcher {
     state: ElementState,
   ) {
     let wnd = self.window();
-    if let Some(focus_id) = wnd.focusing() {
-      let event = KeyboardEvent::new(&wnd, focus_id, physical_key, key, is_repeat, location);
-      match state {
-        ElementState::Pressed => wnd.add_delay_event(DelayEvent::KeyDown(event)),
-        ElementState::Released => wnd.add_delay_event(DelayEvent::KeyUp(event)),
-      };
-    } else if key == VirtualKey::Named(NamedKey::Tab) {
+    if let Some(id) = wnd.focusing() {
+      let e = DelayEvent::KeyBoard { key, state, physical_key, is_repeat, location, id };
+      wnd.add_delay_event(e);
+    } else if key == VirtualKey::Named(NamedKey::Tab) && state == ElementState::Pressed {
       wnd.add_delay_event(DelayEvent::TabFocusMove);
     }
   }
@@ -163,8 +160,9 @@ impl Dispatcher {
         .window()
         .add_delay_event(DelayEvent::GrabPointerMove(grab_pointer));
     } else {
-      self.pointer_enter_leave_dispatch();
-      if let Some(hit) = self.hit_widget() {
+      let new_hit = self.hit_widget();
+      self.pointer_enter_leave_dispatch(new_hit);
+      if let Some(hit) = new_hit {
         self
           .window()
           .add_delay_event(DelayEvent::PointerMove(hit));
@@ -175,7 +173,7 @@ impl Dispatcher {
   pub fn on_cursor_left(&mut self) {
     if self.grab_mouse_wid.borrow().is_none() {
       self.info.cursor_pos = Point::new(-1., -1.);
-      self.pointer_enter_leave_dispatch();
+      self.pointer_enter_leave_dispatch(self.hit_widget());
     }
   }
 
@@ -189,7 +187,23 @@ impl Dispatcher {
           self.info.mouse_button.1 |= button.into();
           // only the first button press emit event.
           if self.info.mouse_button.1 == button.into() {
-            self.bubble_pointer_down();
+            let hit = self.hit_widget();
+            let wnd = self.window();
+            let tree = wnd.tree();
+
+            let nearest_focus = hit.and_then(|wid| {
+              wid.ancestors(tree).find(|id| {
+                id.query_all_iter::<MixBuiltin>(tree)
+                  .any(|m| m.contain_flag(MixFlags::Focus))
+              })
+            });
+            if let Some(focus_id) = nearest_focus {
+              wnd.focus_mgr.borrow_mut().focus(focus_id, tree);
+            } else {
+              wnd.focus_mgr.borrow_mut().blur(tree);
+            }
+
+            self.cursor_press_down(hit);
           }
         }
         ElementState::Released => {
@@ -222,28 +236,7 @@ impl Dispatcher {
     }
   }
 
-  fn bubble_pointer_down(&mut self) {
-    let hit = self.hit_widget();
-    let wnd = self.window();
-    let tree = wnd.tree();
-
-    let nearest_focus = hit.and_then(|wid| {
-      wid.ancestors(tree).find(|id| {
-        id.query_all_iter::<MixBuiltin>(tree)
-          .any(|m| m.contain_flag(MixFlags::Focus))
-      })
-    });
-    if let Some(focus_id) = nearest_focus {
-      wnd.focus_mgr.borrow_mut().focus(focus_id, tree);
-    } else {
-      wnd.focus_mgr.borrow_mut().blur(tree);
-    }
-
-    self.cursor_press_down(hit);
-  }
-
-  fn pointer_enter_leave_dispatch(&mut self) {
-    let new_hit = self.hit_widget();
+  fn pointer_enter_leave_dispatch(&mut self, new_hit: Option<WidgetId>) {
     let wnd = self.window();
     let tree = wnd.tree();
 
@@ -267,52 +260,56 @@ impl Dispatcher {
   }
 
   fn hit_widget(&self) -> Option<WidgetId> {
-    let mut hit_target = None;
-    let wnd = self.window();
-    let tree = wnd.tree();
+    fn deepest_test(ctx: &mut HitTestCtx, pos: &mut Point) -> Option<WidgetId> {
+      // Safety: The widget tree remains read-only throughout the entire hit testing
+      // process.
+      let tree = unsafe { &*(ctx.tree() as *const WidgetTree) };
+      let mut hit_target = None;
+      loop {
+        let id = ctx.id();
+        let r = id.assert_get(tree);
+        let HitTest { hit, can_hit_child } = r.hit_test(ctx, *pos);
 
-    let mut w = Some(tree.root());
-    let mut pos = self.info.cursor_pos;
-    while let Some(id) = w {
-      let r = id.assert_get(tree);
-      let ctx = HitTestCtx { id, tree: wnd.tree };
-      let HitTest { hit, can_hit_child } = r.hit_test(&ctx, pos);
+        if hit {
+          hit_target = Some(id);
+        }
 
-      pos = tree.map_from_parent(id, pos);
+        if hit || can_hit_child {
+          if let Some(c) = id.last_child(tree) {
+            *pos = ctx.map_from_parent(*pos);
+            ctx.set_id(c);
+            continue;
+          }
+        }
 
-      if hit {
-        hit_target = w;
+        break;
       }
 
-      w = id
-        .last_child(tree)
-        .filter(|_| can_hit_child)
-        .or_else(|| {
-          if hit {
-            return None;
-          }
-
-          pos = tree.map_to_parent(id, pos);
-
-          let mut node = w;
-          while let Some(p) = node {
-            node = p.previous_sibling(tree);
-            if node.is_some() {
-              break;
-            } else {
-              node = p.parent(tree);
-
-              if let Some(id) = node {
-                pos = tree.map_to_parent(id, pos);
-                if node == hit_target {
-                  node = None;
-                }
-              }
-            }
-          }
-          node
-        });
+      hit_target
     }
+
+    let mut ctx = HitTestCtx::new(self.window().tree);
+    let mut pos = self.info.cursor_pos;
+    let mut hit_target = deepest_test(&mut ctx, &mut pos);
+
+    let (ctx, tree) = ctx.split_tree();
+    while hit_target.is_some() && Some(ctx.id()) != hit_target {
+      ctx.finish();
+      let id = ctx.id();
+      if let Some(sibling) = id.previous_sibling(tree) {
+        ctx.set_id(sibling);
+        if let Some(hit) = deepest_test(ctx, &mut pos) {
+          hit_target = Some(hit);
+        }
+      } else if let Some(p) = id.parent(tree) {
+        ctx.finish();
+        ctx.set_id(p);
+        pos = ctx.map_to_parent(pos);
+      } else {
+        break;
+      }
+    }
+
     hit_target
   }
 }

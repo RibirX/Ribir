@@ -56,26 +56,15 @@ bitflags! {
 impl TypographyTheme {
   /// Retrieve the nearest `TypographyTheme` from the context among its
   /// ancestors
-  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Self> {
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<Self> {
     // At least one application theme exists
     Provider::of(ctx).unwrap()
   }
 
   /// Retrieve the nearest `TypographyTheme` from the context among its
   /// ancestors and return a write reference to the theme.
-  pub fn write_of(ctx: &impl ProviderCtx) -> WriteRef<Self> {
+  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<Self> {
     // At least one application theme exists
     Provider::write_of(ctx).unwrap()
-  }
-}
-
-impl ComposeChild<'static> for TypographyTheme {
-  type Child = GenWidget;
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
-    Provider::new(Box::new(this.clone_writer()))
-      .with_child(fn_widget! {
-        pipe!($this;).map(move |_| child.gen_widget())
-      })
-      .into_widget()
   }
 }

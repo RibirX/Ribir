@@ -14,7 +14,7 @@ impl WrapRender for IgnorePointer {
     host.perform_layout(clamp, ctx)
   }
 
-  fn hit_test(&self, host: &dyn Render, ctx: &HitTestCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
     if self.ignore { HitTest { hit: false, can_hit_child: false } } else { host.hit_test(ctx, pos) }
   }
 }

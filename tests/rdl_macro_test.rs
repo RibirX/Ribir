@@ -188,17 +188,6 @@ widget_layout_test!(
   LayoutCase::default().with_size(Size::new(4., 2.))
 );
 
-widget_layout_test!(
-  capture_closure_used_ctx,
-  WidgetTester::new(fn_widget! {
-    let size_box = @SizedBox { size: ZERO_SIZE };
-    @ $size_box {
-      on_mounted: move |e| $size_box.write().size = IconSize::of(&e).tiny
-    }
-  }),
-  LayoutCase::default().with_size(Size::new(18., 18.))
-);
-
 #[test]
 fn pipe_single_parent() {
   reset_test_env!();

@@ -182,15 +182,12 @@ impl Overlay {
         showing_overlays.remove(self);
 
         if let Some(wid) = track_id.and_then(|track_id| track_id.get()) {
-          AppCtx::frame_ticks()
-            .clone()
-            .take(1)
-            .subscribe(move |_| {
-              let tree = wnd.tree_mut();
-              let root = tree.root();
-              wid.dispose_subtree(tree);
-              tree.dirty_marker().mark(root);
-            });
+          AppCtx::once_next_frame(move |_| {
+            let tree = wnd.tree_mut();
+            let root = tree.root();
+            wid.dispose_subtree(tree);
+            tree.dirty_marker().mark(root);
+          });
         }
       }
     }

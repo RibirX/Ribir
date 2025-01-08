@@ -24,16 +24,7 @@ pub trait Query: Any {
   /// Queries the reference of the writer that matches the provided type id.
   fn query_write(&self, id: &QueryId) -> Option<QueryHandle>;
 
-  /// Query multiple types sequentially from inside to outside and return the
-  /// first one that matches the `filter` function.
-  ///
-  /// It's not equivalent to query the id one by one, it query all types level
-  /// by level.
-  fn query_match(
-    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
-  ) -> Option<(QueryId, QueryHandle)>;
-
-  /// Hint this is a non-queryable type.
+  /// Hint if this is a queryable type.
   fn queryable(&self) -> bool { true }
 }
 
@@ -123,6 +114,7 @@ impl<'a> QueryHandle<'a> {
   }
 }
 
+#[allow(clippy::borrowed_box)] // The state reference must be a trait boxed.
 fn downcast_from_state_ref<T: 'static>(owned: &Box<dyn QueryAny>) -> Option<&T> {
   owned
     .q_downcast_ref::<ReadRef<'static, T>>()
@@ -218,17 +210,6 @@ impl<T: Any> Query for Queryable<T> {
 
   fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
 
-  fn query_match(
-    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
-  ) -> Option<(QueryId, QueryHandle)> {
-    ids.iter().find_map(|id| {
-      self
-        .query(id)
-        .filter(|h| filter(id, h))
-        .map(|h| (*id, h))
-    })
-  }
-
   fn queryable(&self) -> bool { true }
 }
 
@@ -270,16 +251,6 @@ where
     }
   }
 
-  fn query_match(
-    &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
-  ) -> Option<(QueryId, QueryHandle)> {
-    ids.iter().find_map(|id| {
-      self
-        .query(id)
-        .filter(|h| filter(id, h))
-        .map(|h| (*id, h))
-    })
-  }
   fn queryable(&self) -> bool { true }
 }
 
@@ -306,17 +277,6 @@ macro_rules! impl_query_for_reader {
     }
 
     fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
-
-    fn query_match(
-      &self, ids: &[QueryId], filter: &dyn Fn(&QueryId, &QueryHandle) -> bool,
-    ) -> Option<(QueryId, QueryHandle)> {
-      ids.iter().find_map(|id| {
-        self
-          .query(id)
-          .filter(|h| filter(id, h))
-          .map(move |q| (*id, q))
-      })
-    }
 
     fn queryable(&self) -> bool { true }
   };
@@ -354,21 +314,21 @@ pub struct QueryId {
   info: fn() -> TypeInfo,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct TypeInfo {
-  name: &'static str,
-  pkg_version: &'static str,
-  layout: &'static std::alloc::Layout,
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub(crate) struct TypeInfo {
+  pub(crate) name: &'static str,
+  pub(crate) pkg_version: &'static str,
+  pub(crate) layout: &'static std::alloc::Layout,
 }
 
-struct TypeInfoOf<T> {
+pub(crate) struct TypeInfoOf<T> {
   _phantom: std::marker::PhantomData<T>,
 }
 
 impl<T> TypeInfoOf<T> {
   const LAYOUT: std::alloc::Layout = std::alloc::Layout::new::<T>();
 
-  fn type_info() -> TypeInfo {
+  pub(crate) fn type_info() -> TypeInfo {
     TypeInfo {
       name: std::any::type_name::<T>(),
       pkg_version: env!("CARGO_PKG_VERSION"),
@@ -430,8 +390,7 @@ impl dyn QueryAny {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{reset_test_env, state::State};
-  use crate::prelude::PartData;
+  use crate::{prelude::PartData, reset_test_env, state::State};
 
   #[test]
   fn query_ref() {

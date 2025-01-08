@@ -3,7 +3,9 @@ use std::ptr::NonNull;
 use self::dispatcher::DispatchInfo;
 use crate::{
   builtin_widgets::MixFlags,
-  context::{WidgetCtx, WidgetCtxImpl, define_widget_context},
+  context::{WidgetCtx, WidgetCtxImpl},
+  prelude::ProviderCtx,
+  query::QueryHandle,
   widget_tree::{WidgetId, WidgetTree},
 };
 
@@ -17,6 +19,7 @@ pub use keyboard::*;
 mod character;
 pub use character::*;
 mod wheel;
+use smallvec::SmallVec;
 pub use wheel::*;
 mod ime_pre_edit;
 pub use ime_pre_edit::*;
@@ -26,12 +29,16 @@ pub use lifecycle::*;
 pub(crate) mod focus_mgr;
 mod listener_impl_helper;
 
-define_widget_context!(
-  CommonEvent,
+pub struct CommonEvent {
+  pub(crate) id: WidgetId,
+  // The framework guarantees the validity of this pointer at all times; therefore, refrain from
+  // using a reference to prevent introducing lifetimes in `CommonEvent` and maintain cleaner code.
+  tree: NonNull<WidgetTree>,
+  provider_ctx: ProviderCtx,
   target: WidgetId,
   propagation: bool,
-  prevent_default: bool
-);
+  prevent_default: bool,
+}
 
 pub type FocusEvent = CommonEvent;
 pub type FocusBubbleEvent = CommonEvent;
@@ -121,6 +128,7 @@ pub enum Event {
   PointerUpCapture(PointerEvent),
   PointerMove(PointerEvent),
   PointerMoveCapture(PointerEvent),
+  PointerCancelCapture(PointerEvent),
   PointerCancel(PointerEvent),
   PointerEnter(PointerEvent),
   PointerLeave(PointerEvent),
@@ -189,6 +197,7 @@ impl std::ops::Deref for Event {
       | Event::PointerUpCapture(e)
       | Event::PointerMove(e)
       | Event::PointerMoveCapture(e)
+      | Event::PointerCancelCapture(e)
       | Event::PointerCancel(e)
       | Event::PointerEnter(e)
       | Event::PointerLeave(e)
@@ -221,6 +230,7 @@ impl std::ops::DerefMut for Event {
       | Event::PointerMove(e)
       | Event::PointerMoveCapture(e)
       | Event::PointerCancel(e)
+      | Event::PointerCancelCapture(e)
       | Event::PointerEnter(e)
       | Event::PointerLeave(e)
       | Event::Tap(e)
@@ -244,6 +254,7 @@ impl Event {
       | Event::PointerMove(_)
       | Event::PointerMoveCapture(_)
       | Event::PointerCancel(_)
+      | Event::PointerCancelCapture(_)
       | Event::PointerEnter(_)
       | Event::PointerLeave(_)
       | Event::Tap(_)
@@ -283,12 +294,45 @@ impl CommonEvent {
   /// it because in most case the event create in a environment that the
   /// `Dispatcher` already borrowed.
   pub(crate) fn new(target: WidgetId, tree: NonNull<WidgetTree>) -> Self {
-    Self { target, tree, id: target, propagation: true, prevent_default: false }
+    Self {
+      target,
+      id: target,
+      propagation: true,
+      prevent_default: false,
+      provider_ctx: ProviderCtx::collect_from(target, unsafe { tree.as_ref() }),
+      tree,
+    }
   }
 
-  pub(crate) fn set_current_target(&mut self, id: WidgetId) { self.id = id; }
+  pub(crate) fn bubble_to_parent(&mut self, id: WidgetId) {
+    self.id = id;
+    self.provider_ctx.pop_providers_for(id);
+  }
+
+  pub(crate) fn capture_to_child(&mut self, id: WidgetId, buffer: &mut SmallVec<[QueryHandle; 1]>) {
+    let tree = unsafe { self.tree.as_ref() };
+    self
+      .provider_ctx
+      .push_providers_for(id, tree, buffer);
+    self.id = id;
+  }
 
   fn pick_info<R>(&self, f: impl FnOnce(&DispatchInfo) -> R) -> R {
     f(&self.window().dispatcher.borrow().info)
   }
+}
+
+impl WidgetCtxImpl for CommonEvent {
+  #[inline]
+  fn id(&self) -> WidgetId { self.id }
+
+  fn tree(&self) -> &WidgetTree { unsafe { self.tree.as_ref() } }
+}
+
+impl AsRef<ProviderCtx> for CommonEvent {
+  fn as_ref(&self) -> &ProviderCtx { &self.provider_ctx }
+}
+
+impl AsMut<ProviderCtx> for CommonEvent {
+  fn as_mut(&mut self) -> &mut ProviderCtx { &mut self.provider_ctx }
 }

@@ -16,10 +16,16 @@ impl Render for PathPaintKit {
 
   fn paint(&self, ctx: &mut PaintingCtx) {
     let path = PaintPath::Share(self.path.clone());
-    ctx.painter().draw_path(path);
+    let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
+    let painter = ctx.painter();
+    if let Some(PaintingStyle::Stroke(options)) = style {
+      painter.set_strokes(options).stroke_path(path);
+    } else {
+      painter.fill_path(path);
+    }
   }
 
-  fn hit_test(&self, _ctx: &HitTestCtx, _: Point) -> HitTest {
+  fn hit_test(&self, _ctx: &mut HitTestCtx, _: Point) -> HitTest {
     HitTest { hit: false, can_hit_child: false }
   }
 }

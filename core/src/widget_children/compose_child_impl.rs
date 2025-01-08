@@ -239,9 +239,8 @@ where
     let f = move || {
       let tid = TypeId::of::<W>();
       let ctx = BuildCtx::get();
-      let decor = ctx
-        .all_of::<ComposeDecorators>()
-        .find_map(|t| QueryRef::filter_map(t, |t| t.styles.get(&tid)).ok());
+      let decor = Provider::of::<ComposeDecorators>(BuildCtx::get())
+        .and_then(|t| QueryRef::filter_map(t, |t| t.styles.get(&tid)).ok());
 
       if let Some(style) = decor {
         style(Box::new(self), host, ctx)

@@ -24,7 +24,7 @@ impl WrapRender for TransformWidget {
     host.paint(ctx)
   }
 
-  fn hit_test(&self, host: &dyn Render, ctx: &HitTestCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
     if let Some(t) = self.transform.inverse() {
       let lt = ctx.box_pos().unwrap();
       let pos = (pos - lt).to_point();

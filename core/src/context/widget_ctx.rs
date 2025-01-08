@@ -4,6 +4,7 @@ use ribir_algo::Sc;
 use ribir_geom::{Point, Rect, Size};
 
 use crate::{
+  prelude::ProviderCtx,
   query::QueryRef,
   state::WriteRef,
   widget::{BoxClamp, WidgetTree},
@@ -96,6 +97,13 @@ pub(crate) trait WidgetCtxImpl {
   fn id(&self) -> WidgetId;
 
   fn tree(&self) -> &WidgetTree;
+
+  fn split_tree(&mut self) -> (&mut Self, &WidgetTree) {
+    // Safety: The widget tree remains read-only throughout the entire hit testing
+    // process.
+    let tree = unsafe { &*(self.tree() as *const WidgetTree) };
+    (self, tree)
+  }
 }
 
 impl<T: WidgetCtxImpl> WidgetCtx for T {
@@ -202,46 +210,50 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   fn window(&self) -> Sc<Window> { self.tree().window() }
 }
 
-macro_rules! define_widget_context {
-  (
-    $(#[$outer:meta])*
-    $name: ident $(, $extra_name: ident: $extra_ty: ty)*
-  ) => {
-    $(#[$outer])*
-    pub struct $name {
-      pub(crate) id: WidgetId,
-      pub(crate) tree: NonNull<WidgetTree>,
-      $(pub(crate) $extra_name: $extra_ty,)*
-    }
-
-    impl WidgetCtxImpl for $name {
-      #[inline]
-      fn id(&self) -> WidgetId { self.id }
-
-      fn tree(&self) -> &WidgetTree {
-        unsafe {self.tree.as_ref()}
-      }
-    }
-  };
+pub struct HitTestCtx {
+  id: WidgetId,
+  tree: NonNull<WidgetTree>,
+  provider_ctx: ProviderCtx,
 }
-pub(crate) use define_widget_context;
 
-define_widget_context!(HitTestCtx);
+impl WidgetCtxImpl for HitTestCtx {
+  #[inline]
+  fn id(&self) -> WidgetId { self.id }
+
+  fn tree(&self) -> &WidgetTree { unsafe { self.tree.as_ref() } }
+}
 
 impl HitTestCtx {
+  pub(crate) fn new(tree: NonNull<WidgetTree>) -> Self {
+    let id = unsafe { tree.as_ref() }.root();
+    let provider_ctx = ProviderCtx::default();
+    Self { id, tree, provider_ctx }
+  }
+
   pub fn box_hit_test(&self, pos: Point) -> bool {
     self
       .box_rect()
       .is_some_and(|rect| rect.contains(pos))
   }
+
+  pub(crate) fn set_id(&mut self, id: WidgetId) { self.id = id; }
+
+  /// Method to be called when the hit test of the subtree is finished.
+  pub(crate) fn finish(&mut self) { self.provider_ctx.pop_providers_for(self.id); }
+}
+
+impl AsRef<ProviderCtx> for HitTestCtx {
+  fn as_ref(&self) -> &ProviderCtx { &self.provider_ctx }
+}
+
+impl AsMut<ProviderCtx> for HitTestCtx {
+  fn as_mut(&mut self) -> &mut ProviderCtx { &mut self.provider_ctx }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::{prelude::*, reset_test_env, test_helper::*};
-
-  define_widget_context!(TestCtx);
 
   #[test]
   fn map_self_eq_self() {
@@ -261,7 +273,9 @@ mod tests {
     let pos = Point::zero();
     let child = root.single_child(tree).unwrap();
 
-    let w_ctx = TestCtx { id: child, tree: wnd.tree };
+    let mut w_ctx = HitTestCtx::new(wnd.tree);
+    w_ctx.set_id(child);
+
     assert_eq!(w_ctx.map_from(pos, child), pos);
     assert_eq!(w_ctx.map_to(pos, child), pos);
   }
@@ -286,7 +300,7 @@ mod tests {
 
     let root = wnd.tree().root();
     let child = get_single_child_by_depth(root, wnd.tree(), 2);
-    let w_ctx = TestCtx { id: root, tree: wnd.tree };
+    let w_ctx = HitTestCtx::new(wnd.tree);
     let from_pos = Point::new(30., 30.);
     assert_eq!(w_ctx.map_from(from_pos, child), Point::new(45., 45.));
     let to_pos = Point::new(50., 50.);

@@ -45,7 +45,7 @@ pub trait Render: 'static {
 
   /// Verify if the provided position is within this widget and return whether
   /// its child can be hit if the widget itself is not hit.
-  fn hit_test(&self, ctx: &HitTestCtx, pos: Point) -> HitTest {
+  fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
     let hit = ctx.box_hit_test(pos);
     // If the widget is not solely sized by the parent, indicating it is not a
     // fixed-size container, we permit the child to receive hits even if it
@@ -196,7 +196,7 @@ impl<'w> Widget<'w> {
   }
 
   pub(crate) fn from_render(r: Box<dyn RenderQueryable>) -> Widget<'static> {
-    Widget::from_fn(|_| BuildCtx::get_mut().alloc(r))
+    Widget::from_fn(|_| BuildCtx::get_mut().tree_mut().alloc_node(r))
   }
 
   /// Attach anonymous data to a widget and user can't query it.

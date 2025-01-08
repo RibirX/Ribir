@@ -37,7 +37,7 @@ pub struct AvatarStyle {
 }
 
 impl CustomStyle for AvatarStyle {
-  fn default_style(ctx: &impl ProviderCtx) -> Self {
+  fn default_style(ctx: &impl AsRef<ProviderCtx>) -> Self {
     AvatarStyle {
       size: Size::splat(40.),
       radius: Some(20.),

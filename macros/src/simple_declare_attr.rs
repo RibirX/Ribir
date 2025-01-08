@@ -50,6 +50,7 @@ pub(crate) fn simple_declarer_attr(
       impl #g_impl ObjDeclarer for #name #g_ty #g_where {
         type Target = #ident #g_ty;
 
+        #[track_caller]
         fn finish(self) -> Self::Target {
           #ident {#(#init_pairs),*}
         }
@@ -60,6 +61,7 @@ pub(crate) fn simple_declarer_attr(
       impl #g_impl ObjDeclarer for #name #g_ty #g_where {
         type Target = State<#ident #g_ty>;
 
+        #[track_caller]
         fn finish(mut self) -> Self::Target {
           State::value(#ident {#(#init_pairs),*})
         }

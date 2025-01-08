@@ -120,7 +120,7 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "foreground" => builtin_member! { "Foreground", Field, "foreground"},
   // PaintingStyleWidget
   "painting_style" => builtin_member! { "PaintingStyleWidget", Field, "painting_style" },
-  // TextStyleWidget
+  // TextStyle
   "text_style" => builtin_member! { "TextStyleWidget", Field, "text_style" },
   "font_size" => builtin_member! { "TextStyleWidget", Method, "text_style" },
   "font_face" => builtin_member! { "TextStyleWidget", Method, "text_style" },

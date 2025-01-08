@@ -107,11 +107,11 @@ pub const EDGES_HOR_36: EdgeInsets = EdgeInsets::horizontal(36.);
 pub const EDGES_HOR_48: EdgeInsets = EdgeInsets::horizontal(48.);
 
 // Borders
-pub fn border_variant_color_2() -> Border {
-  let color = BuildCtx::get().variant_color();
+pub fn border_2() -> Border {
+  let color = BuildCtx::color();
   Border::all(BorderSide::new(2., color.into()))
 }
-pub fn border_on_surface_variant_2() -> Border {
+pub fn border_2_surface_color() -> Border {
   let surface_variant = Palette::of(BuildCtx::get()).on_surface_variant();
   Border::all(BorderSide::new(2., surface_variant.into()))
 }

@@ -80,7 +80,7 @@ impl IconTheme {
 
   /// Retrieve the nearest `IconTheme` from the context among its ancestors
   #[inline]
-  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Self> {
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<Self> {
     // At least one application theme exists
     Provider::of::<Self>(ctx).unwrap()
   }
@@ -88,7 +88,7 @@ impl IconTheme {
   /// Retrieve the nearest `IconTheme` from the context among its ancestors and
   /// return a write reference to the theme.
   #[inline]
-  pub fn write_of(ctx: &impl ProviderCtx) -> WriteRef<Self> {
+  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<Self> {
     // At least one application theme exists
     Provider::write_of::<Self>(ctx).unwrap()
   }
@@ -103,7 +103,7 @@ impl IconTheme {
 }
 
 impl IconSize {
-  pub fn of(ctx: &impl ProviderCtx) -> QueryRef<Self> {
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<Self> {
     QueryRef::map(IconTheme::of(ctx), |i| &i.icon_size)
   }
 }
@@ -113,17 +113,15 @@ impl NamedSvg {
 
   /// get the svg icon of the ident from the context if it have otherwise return
   /// a default icon.
-  pub fn of_or_miss(self, ctx: &impl ProviderCtx) -> Resource<Svg> {
+  pub fn of_or_miss(self, ctx: &impl AsRef<ProviderCtx>) -> Resource<Svg> {
     NamedSvg::of(self, ctx)
       .or_else(|| MISS_ICON.of(ctx))
       .expect("Neither Icon({:?}) nor 'MISS_ICON' are initialized in all `IconTheme` instances.")
   }
 
   /// get the svg icon of the ident from the context if it have.
-  pub fn of(self, ctx: &impl ProviderCtx) -> Option<Resource<Svg>> {
-    ctx
-      .all_of::<IconTheme>()
-      .find_map(|t| t.svgs.get(&self).cloned())
+  pub fn of(self, ctx: &impl AsRef<ProviderCtx>) -> Option<Resource<Svg>> {
+    IconTheme::of(ctx).svgs.get(&self).cloned()
   }
 }
 

@@ -65,8 +65,6 @@ mod mix_builtin;
 pub use mix_builtin::*;
 pub mod container;
 pub use container::*;
-mod provider;
-pub use provider::*;
 mod class;
 pub use class::*;
 mod constrained_box;
@@ -82,6 +80,8 @@ mod text;
 pub use text::*;
 mod tooltips;
 pub use tooltips::*;
+mod providers;
+pub use providers::*;
 
 use crate::prelude::*;
 
@@ -409,7 +409,11 @@ impl<T> FatObj<T> {
   /// doesn't exist, a new one will be created.
   pub fn get_text_style_widget(&mut self) -> &State<TextStyleWidget> {
     self.text_style.get_or_insert_with(|| {
-      State::value(TextStyleWidget { text_style: BuildCtx::get().text_style().clone() })
+      State::value(TextStyleWidget {
+        text_style: Provider::of::<TextStyle>(BuildCtx::get())
+          .unwrap()
+          .clone(),
+      })
     })
   }
 
