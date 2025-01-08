@@ -53,6 +53,11 @@ pub trait Render: 'static {
     HitTest { hit, can_hit_child: hit || !self.only_sized_by_parent() }
   }
 
+  /// By default, this function returns a `Layout` phase to indicate that the
+  /// widget should be marked as dirty when modified. When the layout phase is
+  /// marked as dirty, the paint phase will also be affected.
+  fn dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
+
   /// Return a transform to map the coordinate from its parent to this widget.
   fn get_transform(&self) -> Option<Transform> { None }
 }
@@ -174,7 +179,9 @@ impl<'w> Widget<'w> {
   /// # Panic
   /// This method only works within a build process; otherwise, it will
   /// result in a panic.
-  pub fn dirty_on(self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>) -> Self {
+  pub fn dirty_on(
+    self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>, dirty: DirtyPhase,
+  ) -> Self {
     let track = TrackWidgetId::default();
     let id = track.track_id();
 
@@ -184,7 +191,7 @@ impl<'w> Widget<'w> {
       .filter(|b| b.contains(ModifyScope::FRAMEWORK))
       .subscribe(move |_| {
         if let Some(id) = id.get() {
-          marker.mark(id);
+          marker.mark(id, dirty);
         }
       })
       .unsubscribe_when_dropped();

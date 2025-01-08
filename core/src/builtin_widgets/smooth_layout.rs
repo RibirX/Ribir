@@ -194,7 +194,7 @@ macro_rules! smooth_size_widget_impl {
       }
     }
 
-    impl_compose_child!($name, true);
+    impl_compose_child!($name, DirtyPhase::Layout);
   };
 }
 
@@ -264,12 +264,12 @@ macro_rules! smooth_pos_widget_impl {
       }
     }
 
-    impl_compose_child!($name, false);
+    impl_compose_child!($name, DirtyPhase::Paint);
   };
 }
 
 macro_rules! impl_compose_child {
-  ($name:ty, $dirty_self:literal) => {
+  ($name:ty, $dirty:expr) => {
     impl<'c> ComposeChild<'c> for $name {
       type Child = Widget<'c>;
 
@@ -297,9 +297,7 @@ macro_rules! impl_compose_child {
               if marker.is_dirty(id) {
                 inner.set_force_layout(true)
               }
-              if $dirty_self {
-                marker.mark(id);
-              }
+              marker.mark(id, $dirty);
             })
           })
           .unsubscribe_when_dropped();
@@ -308,7 +306,7 @@ macro_rules! impl_compose_child {
           .into_widget()
           .attach_anonymous_data(h);
 
-        WrapRender::combine_child(this, child)
+        WrapRender::combine_child(this, child, $dirty)
       }
     }
   };

@@ -6,7 +6,7 @@ pub struct IgnorePointer {
   pub ignore: bool,
 }
 
-impl_compose_child_for_wrap_render!(IgnorePointer);
+impl_compose_child_for_wrap_render!(IgnorePointer, DirtyPhase::Paint);
 
 impl WrapRender for IgnorePointer {
   #[inline]

@@ -11,7 +11,7 @@ impl Declare for TransformWidget {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl_compose_child_for_wrap_render!(TransformWidget);
+impl_compose_child_for_wrap_render!(TransformWidget, DirtyPhase::Paint);
 
 impl WrapRender for TransformWidget {
   #[inline]

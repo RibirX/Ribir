@@ -127,7 +127,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           old.dispose_subtree(tree);
           new.on_mounted_subtree(tree);
 
-          tree.dirty_marker().mark(new);
+          tree.dirty_marker().mark(new, DirtyPhase::Layout);
 
           if without_ctx {
             BuildCtx::clear();
@@ -201,7 +201,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         old.iter().for_each(|id| id.dispose_subtree(tree));
         new.iter().for_each(|w| {
           w.on_mounted_subtree(tree);
-          tree.dirty_marker().mark(*w);
+          tree.dirty_marker().mark(*w, DirtyPhase::Layout);
         });
 
         if without_ctx {
@@ -307,7 +307,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
             }
           }
 
-          tree.dirty_marker().mark(p);
+          tree.dirty_marker().mark(p, DirtyPhase::Layout);
 
           if without_ctx {
             BuildCtx::clear();

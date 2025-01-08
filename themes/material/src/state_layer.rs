@@ -68,15 +68,11 @@ impl<'c, const M: u8> ComposeChild<'c> for StateLayer<M> {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child)
+    WrapRender::combine_child(this, child, DirtyPhase::Paint)
   }
 }
 
 impl<const M: u8> WrapRender for StateLayer<M> {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    host.perform_layout(clamp, ctx)
-  }
-
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     if self.draw_opacity > 0. {
       // record transform and fill brush for draw layer used, because the host widget

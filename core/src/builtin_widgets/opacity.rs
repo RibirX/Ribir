@@ -16,7 +16,7 @@ impl Default for Opacity {
   fn default() -> Self { Self { opacity: 1.0 } }
 }
 
-impl_compose_child_for_wrap_render!(Opacity);
+impl_compose_child_for_wrap_render!(Opacity, DirtyPhase::Paint);
 
 impl WrapRender for Opacity {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {

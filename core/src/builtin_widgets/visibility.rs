@@ -33,7 +33,7 @@ struct VisibilityRender {
   display: bool,
 }
 
-impl_compose_child_for_wrap_render!(VisibilityRender);
+impl_compose_child_for_wrap_render!(VisibilityRender, DirtyPhase::Layout);
 
 impl WrapRender for VisibilityRender {
   #[inline]

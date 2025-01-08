@@ -15,7 +15,7 @@ impl Declare for Foreground {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl_compose_child_for_wrap_render!(Foreground);
+impl_compose_child_for_wrap_render!(Foreground, DirtyPhase::Paint);
 
 impl WrapRender for Foreground {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {

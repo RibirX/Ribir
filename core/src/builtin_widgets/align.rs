@@ -77,8 +77,8 @@ impl Declare for VAlignWidget {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl_compose_child_for_wrap_render!(HAlignWidget);
-impl_compose_child_for_wrap_render!(VAlignWidget);
+impl_compose_child_for_wrap_render!(HAlignWidget, DirtyPhase::Layout);
+impl_compose_child_for_wrap_render!(VAlignWidget, DirtyPhase::Layout);
 
 impl WrapRender for HAlignWidget {
   fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {

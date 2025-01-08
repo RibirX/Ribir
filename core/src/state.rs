@@ -400,7 +400,7 @@ where
           let modifies = s.raw_modifies();
           ReaderRender(s.clone_reader())
             .into_widget()
-            .dirty_on(modifies)
+            .dirty_on(modifies, s.read().dirty_phase())
         }
       },
     }

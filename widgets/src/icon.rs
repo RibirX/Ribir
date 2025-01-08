@@ -83,7 +83,7 @@ impl<'c> ComposeChild<'c> for Icon {
 }
 
 struct IconText;
-impl_compose_child_for_wrap_render!(IconText);
+impl_compose_child_for_wrap_render!(IconText, DirtyPhase::Layout);
 
 impl WrapRender for IconText {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {

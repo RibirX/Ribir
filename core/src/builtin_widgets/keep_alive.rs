@@ -32,7 +32,7 @@ impl<'c> ComposeChild<'c> for KeepAlive {
       { this.silent().wid = Some($w.track_id()); }
       w
       .into_widget()
-      .dirty_on(this.raw_modifies())
+      .dirty_on(this.raw_modifies(), DirtyPhase::Layout)
       .try_unwrap_state_and_attach(this)
 
     }
