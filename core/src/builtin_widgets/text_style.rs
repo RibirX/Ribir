@@ -19,10 +19,10 @@ impl<'c> ComposeChild<'c> for TextStyleWidget {
     // We need to provide the text style for the children to access.
     let provider = match this.try_into_value() {
       Ok(this) => Provider::new(this.text_style),
-      Err(this) => {
-        let style = this.map_reader(|w| PartData::from_ref(&w.text_style));
-        Provider::value_of_state(style)
-      }
+      Err(this) => Provider::value_of_writer(
+        this.map_writer(|w| PartData::from_ref_mut(&mut w.text_style)),
+        Some(DirtyPhase::LayoutSubtree),
+      ),
     };
 
     Providers::new([provider])

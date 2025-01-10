@@ -65,7 +65,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
     providers! {
       providers: smallvec::smallvec![
         Provider::new(scroll.clone_writer()),
-        Provider::value_of_state(scroll.clone_writer())
+        Provider::value_of_writer(scroll.clone_writer(), None),
       ],
       @ {
         let h_scrollbar = distinct_pipe!($scroll.is_x_scrollable())

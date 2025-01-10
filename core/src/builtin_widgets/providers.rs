@@ -67,7 +67,7 @@
 //!     // Providing a `Stateful<i32>`
 //!     Provider::new(state.clone_writer()),
 //!     // Providing an `i32`
-//!     Provider::value_of_state(state)
+//!     Provider::value_of_writer(state, None),
 //!   ],
 //!   @ {
 //!     let ctx = BuildCtx::get();
@@ -126,8 +126,9 @@
 //!   }
 //! };
 //! ```
-use std::cell::RefCell;
+use std::{cell::RefCell, convert::Infallible};
 
+use ops::box_it::CloneableBoxOp;
 use ribir_painter::Color;
 use smallvec::SmallVec;
 use widget_id::RenderQueryable;
@@ -160,6 +161,20 @@ pub enum Provider {
 /// process.
 pub trait ProviderSetup {
   fn setup(self: Box<Self>, ctx: &mut ProviderCtx) -> Box<dyn ProviderRestore>;
+  /// This method indicates whether this provider may affect the dirty state of
+  /// the widget tree.
+  fn is_dirty_affecting(&self) -> bool { false }
+  /// If the provider is mutable and a change in value affects the widget tree,
+  /// it should implement this method to provide two pieces of information.
+  /// First, it should indicate its dirty phase to show that this provider
+  /// impacts layout or paint. Second, it should offer the observable for the
+  /// framework to monitor to trigger relayout or paint operations.
+  ///
+  /// This method is only invoked if the [`ProviderSetup::is_dirty_affecting`]
+  /// returns true and is called when `Providers` compose their child.
+  fn unzip(
+    self: Box<Self>,
+  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyScope, Infallible>);
 }
 
 /// This trait is used to retrieve the providers from the context. In most
@@ -187,11 +202,49 @@ impl Provider {
   /// Establish a provider for `T`.
   pub fn new<T: 'static>(value: T) -> Provider { Provider::Setup(Box::new(Setup::new(value))) }
 
-  /// Establish a provider for the `Value` of a state. If you use a writer to
-  /// create this provider, a write reference of the value can be accessed
+  /// Establish a provider for the `Value` of a reader.
+  pub fn value_of_reader<R>(value: R) -> Provider
+  where
+    R: StateReader<Reader: Query>,
+    R::Value: Sized + 'static,
+  {
+    match value.try_into_value() {
+      Ok(v) => Provider::Setup(Box::new(Setup::new(v))),
+      Err(v) => Provider::Setup(Box::new(Setup::from_state(v.clone_reader()))),
+    }
+  }
+
+  /// Establish a provider for the `Value` of a writer. If you create this
+  /// provider using a writer, you can access a write reference of the value
   /// through [`Provider::write_of`].
-  pub fn value_of_state<V: 'static>(value: impl StateReader<Value = V> + Query) -> Provider {
-    Provider::Setup(Box::new(Setup::from_state(value)))
+  ///
+  /// The `dirty` parameter is utilized to specify the dirty phase affected when
+  /// the value of writer is modified. It depends on how your descendants
+  /// utilize it; if they rely on the writer's value for painting or layout, a
+  /// dirty phase should be passed, otherwise, you can pass `None`.
+  ///
+  /// In general, if your provider affects the layout, it impacts the entire
+  /// subtree. This is because the entire subtree can access the provider and
+  /// utilize it, so you should pass `Some(DirtyPhase::LayoutSubtree)`.
+  pub fn value_of_writer<V: 'static>(
+    value: impl StateWriter<Value = V> + Query, dirty: Option<DirtyPhase>,
+  ) -> Provider {
+    match value.try_into_value() {
+      Ok(v) => Provider::Setup(Box::new(Setup::new(v))),
+      Err(this) => {
+        if let Some(dirty) = dirty {
+          let writer = WriterSetup {
+            modifies: this.raw_modifies(),
+            info: Provider::info::<V>(),
+            value: Box::new(this),
+            dirty,
+          };
+          Provider::Setup(Box::new(writer))
+        } else {
+          Provider::Setup(Box::new(Setup::from_state(this)))
+        }
+      }
+    }
   }
 
   /// Access the provider of `P` within the context.
@@ -202,10 +255,6 @@ impl Provider {
   /// Access the write reference of `P` within the context.
   pub fn write_of<P: 'static>(ctx: &impl AsRef<ProviderCtx>) -> Option<WriteRef<P>> {
     ctx.as_ref().get_provider_write::<P>()
-  }
-
-  pub(crate) fn custom(info: TypeInfo, value: Box<dyn Query>) -> Self {
-    Provider::Setup(Box::new(Setup { info, value }))
   }
 
   /// Setup the provider to the context.
@@ -286,7 +335,7 @@ impl Providers {
   }
 
   pub(crate) fn restore_providers(&self, map: &mut ProviderCtx) {
-    for p in self.providers.borrow_mut().iter_mut() {
+    for p in self.providers.borrow_mut().iter_mut().rev() {
       p.restore(map);
     }
   }
@@ -404,15 +453,25 @@ impl ProviderCtx {
 
 impl Providers {
   pub fn with_child<'w, const M: usize>(self, child: impl IntoWidget<'w, M>) -> Widget<'w> {
-    let child = child.into_widget();
+    let mut child = child.into_widget();
     self.restore_providers(BuildCtx::get_mut().as_mut());
+
+    for provider in self.providers.borrow_mut().iter_mut() {
+      let Provider::Setup(p) = provider else { unreachable!() };
+      if p.is_dirty_affecting() {
+        let setup = unsafe { Box::from_raw(&mut **p) };
+        let (s, dirty, upstream) = setup.unzip();
+        child = child.dirty_on(upstream, dirty);
+        let f = std::mem::replace(p, s);
+        std::mem::forget(f);
+      }
+    }
+
     Widget::from_fn(move |ctx| {
       self.setup_providers(ctx.as_mut());
       let id = ctx.build(child);
       self.restore_providers(ctx.as_mut());
-      id.wrap_node(ctx.tree_mut(), |render| {
-        Box::new(ProvidersRender { providers: Queryable(self), render })
-      });
+      id.wrap_node(ctx.tree_mut(), |render| Box::new(ProvidersRender { providers: self, render }));
       id
     })
   }
@@ -447,37 +506,32 @@ impl Drop for ProviderCtx {
 }
 
 struct ProvidersRender {
-  providers: Queryable<Providers>,
+  providers: Providers,
   render: Box<dyn RenderQueryable>,
 }
 
 impl Query for ProvidersRender {
   fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
     self.render.query_all(query_id, out);
-    if let Some(h) = self.providers.query(query_id) {
-      out.push(h)
+    if query_id == &QueryId::of::<Providers>() {
+      out.push(QueryHandle::new(&self.providers));
     }
   }
 
   fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
     self.render.query_all_write(query_id, out);
-    if let Some(h) = self.providers.query_write(query_id) {
-      out.push(h)
-    }
   }
 
   fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
-    self
-      .providers
-      .query(query_id)
-      .or_else(|| self.render.query(query_id))
+    if query_id == &QueryId::of::<Providers>() {
+      Some(QueryHandle::new(&self.providers))
+    } else {
+      self.render.query(query_id)
+    }
   }
 
   fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
-    self
-      .providers
-      .query_write(query_id)
-      .or_else(|| self.render.query_write(query_id))
+    self.render.query_write(query_id)
   }
 
   fn queryable(&self) -> bool { true }
@@ -485,29 +539,29 @@ impl Query for ProvidersRender {
 
 impl Render for ProvidersRender {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let Self { render, providers: Queryable(p) } = self;
-    p.setup_providers(ctx.as_mut());
+    let Self { render, providers } = self;
+    providers.setup_providers(ctx.as_mut());
     let size = render.perform_layout(clamp, ctx);
-    p.restore_providers(ctx.as_mut());
+    providers.restore_providers(ctx.as_mut());
     size
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let Self { render, providers: Queryable(p) } = self;
+    let Self { render, providers } = self;
     let id = ctx.id();
     // The providers will be popped in the `PaintingCtx::finish` method, once the
     // painting of the entire subtree is completed.
-    ctx.as_mut().push_providers(id, p);
+    ctx.as_mut().push_providers(id, providers);
 
     render.paint(ctx);
   }
 
   fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
-    let Self { render, providers: Queryable(p) } = self;
+    let Self { render, providers } = self;
     let id = ctx.id();
     // The providers will be popped in the `HitTestCtx::finish` method, once the
     // hit test of the entire subtree is completed.
-    ctx.as_mut().push_providers(id, p);
+    ctx.as_mut().push_providers(id, providers);
     render.hit_test(ctx, pos)
   }
 
@@ -516,7 +570,7 @@ impl Render for ProvidersRender {
   fn get_transform(&self) -> Option<Transform> { self.render.get_transform() }
 }
 
-pub struct Setup {
+pub(crate) struct Setup {
   info: TypeInfo,
   value: Box<dyn Query>,
 }
@@ -526,6 +580,20 @@ struct Restore {
   value: Option<Box<dyn Query>>,
 }
 
+struct WriterSetup {
+  info: TypeInfo,
+  value: Box<dyn Query>,
+  modifies: CloneableBoxOp<'static, ModifyScope, Infallible>,
+  dirty: DirtyPhase,
+}
+
+struct WriterRestore {
+  info: TypeInfo,
+  restore_value: Option<Box<dyn Query>>,
+  modifies: CloneableBoxOp<'static, ModifyScope, Infallible>,
+  dirty: DirtyPhase,
+}
+
 impl ProviderSetup for Setup {
   fn setup(self: Box<Self>, map: &mut ProviderCtx) -> Box<dyn ProviderRestore> {
     let Setup { info, value } = *self;
@@ -533,20 +601,59 @@ impl ProviderSetup for Setup {
 
     Box::new(Restore { info, value: old })
   }
+
+  fn unzip(
+    self: Box<Self>,
+  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyScope, Infallible>) {
+    unreachable!();
+  }
 }
 
 impl ProviderRestore for Restore {
   fn restore(self: Box<Self>, map: &mut ProviderCtx) -> Box<dyn ProviderSetup> {
     let Restore { info, value } = *self;
-    let v = if let Some(v) = value {
-      map.set_raw_provider(info, v)
-    } else {
-      map.remove_raw_provider(&info)
-    };
-    let Some(v) = v else {
-      panic!("Provider restore not matched");
-    };
+    let v = restore(info, value, map);
     Box::new(Setup { info, value: v })
+  }
+}
+
+impl ProviderSetup for WriterSetup {
+  fn setup(self: Box<Self>, map: &mut ProviderCtx) -> Box<dyn ProviderRestore> {
+    let WriterSetup { info, value, modifies, dirty } = *self;
+    let old = map.set_raw_provider(info, value);
+    Box::new(WriterRestore { info, restore_value: old, modifies, dirty })
+  }
+
+  fn is_dirty_affecting(&self) -> bool { true }
+
+  fn unzip(
+    self: Box<Self>,
+  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyScope, Infallible>) {
+    let Self { info, value, modifies, dirty } = *self;
+    (Box::new(Setup { info, value }), dirty, modifies)
+  }
+}
+
+impl ProviderRestore for WriterRestore {
+  fn restore(self: Box<Self>, map: &mut ProviderCtx) -> Box<dyn ProviderSetup> {
+    let WriterRestore { info, restore_value, modifies, dirty } = *self;
+    let v = restore(info, restore_value, map);
+    Box::new(WriterSetup { info, value: v, modifies, dirty })
+  }
+}
+
+fn restore(
+  info: TypeInfo, restore_value: Option<Box<dyn Query>>, map: &mut ProviderCtx,
+) -> Box<dyn Query> {
+  let v = if let Some(v) = restore_value {
+    map.set_raw_provider(info, v)
+  } else {
+    map.remove_raw_provider(&info)
+  };
+  if let Some(v) = v {
+    v
+  } else {
+    panic!("Provider restore not matched");
   }
 }
 
@@ -555,6 +662,8 @@ impl Setup {
     Setup { info: Provider::info::<T>(), value: Box::new(Queryable(value)) }
   }
 
+  pub(crate) fn custom(info: TypeInfo, value: Box<dyn Query>) -> Self { Setup { info, value } }
+
   pub(crate) fn from_state<V: 'static>(value: impl StateReader<Value = V> + Query) -> Self {
     Setup { info: Provider::info::<V>(), value: Box::new(value) }
   }
@@ -562,6 +671,8 @@ impl Setup {
 
 #[cfg(test)]
 mod tests {
+
+  use std::cell::Cell;
 
   use smallvec::smallvec;
 
@@ -713,5 +824,59 @@ mod tests {
     *w_trigger.write() = false;
     wnd.draw_frame();
     assert_eq!(*value.read(), 2);
+  }
+
+  #[test]
+  fn dirty_paint() {
+    reset_test_env!();
+
+    struct PaintCnt {
+      layout_cnt: Cell<usize>,
+      paint_cnt: Cell<usize>,
+    }
+
+    impl Render for PaintCnt {
+      fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
+        self.layout_cnt.set(self.layout_cnt.get() + 1);
+        clamp.max
+      }
+      fn paint(&self, _: &mut PaintingCtx) { self.paint_cnt.set(self.paint_cnt.get() + 1); }
+    }
+
+    let paint = Stateful::new(true);
+    let c_paint = paint.clone_writer();
+    let layout = Stateful::new(());
+    let c_layout = layout.clone_writer();
+
+    let (cnt, w_cnt) = split_value(PaintCnt { layout_cnt: Cell::new(0), paint_cnt: Cell::new(0) });
+
+    let w = providers! {
+      providers: smallvec![
+        Provider::value_of_writer(paint.clone_writer(), Some(DirtyPhase::Paint)),
+        Provider::value_of_writer(layout.clone_writer(), Some(DirtyPhase::LayoutSubtree)),
+      ],
+      @ {w_cnt.clone_writer()}
+    };
+
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+    assert_eq!(cnt.read().layout_cnt.get(), 1);
+    assert_eq!(cnt.read().paint_cnt.get(), 1);
+
+    {
+      let _ = &mut *c_paint.write();
+    }
+
+    wnd.draw_frame();
+    assert_eq!(cnt.read().layout_cnt.get(), 1);
+    assert_eq!(cnt.read().paint_cnt.get(), 2);
+
+    {
+      let _ = &mut *c_layout.write();
+    }
+
+    wnd.draw_frame();
+    assert_eq!(cnt.read().layout_cnt.get(), 2);
+    assert_eq!(cnt.read().paint_cnt.get(), 3);
   }
 }

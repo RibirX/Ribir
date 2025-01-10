@@ -31,9 +31,10 @@
 //! App::run(w).with_app_theme(theme);
 //! ```
 
-use std::hash::Hash;
+use std::{convert::Infallible, hash::Hash};
 
 use data_widget::AnonymousAttacher;
+use ops::box_it::CloneableBoxOp;
 use pipe::PipeNode;
 use smallvec::{SmallVec, smallvec};
 
@@ -186,6 +187,12 @@ impl ProviderSetup for Classes {
     let classes = Box::new(Setup::new(*self)).setup(map);
     Box::new(ClassesRestore { overrides, classes })
   }
+
+  fn unzip(
+    self: Box<Self>,
+  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyScope, Infallible>) {
+    unreachable!();
+  }
 }
 
 impl<R: StateReader<Value = Classes> + Query> ProviderSetup for ClassesReaderSetup<R> {
@@ -194,6 +201,12 @@ impl<R: StateReader<Value = Classes> + Query> ProviderSetup for ClassesReaderSet
     let overrides = classes.read().remove_intersects_class(map);
     let classes = Box::new(Setup::from_state(classes)).setup(map);
     Box::new(ClassesRestore { overrides, classes })
+  }
+
+  fn unzip(
+    self: Box<Self>,
+  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyScope, Infallible>) {
+    unreachable!();
   }
 }
 
@@ -271,7 +284,8 @@ impl Class {
   /// };
   /// ```
   pub fn provider(name: ClassName, cls_impl: ClassImpl) -> Provider {
-    Provider::custom(name.type_info(), Box::new(Queryable(cls_impl)))
+    let setup = Setup::custom(name.type_info(), Box::new(Queryable(cls_impl)));
+    Provider::Setup(Box::new(setup))
   }
 
   fn apply_style<'a>(&self, w: Widget<'a>) -> Widget<'a> {
@@ -421,7 +435,7 @@ mod tests {
   }
 
   impl Classes {
-    fn into_provider(self) -> Provider { Provider::Setup(Box::new(Setup::new(self))) }
+    fn into_provider(self) -> Provider { Provider::new(self) }
   }
 
   #[test]

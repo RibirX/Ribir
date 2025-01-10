@@ -13,8 +13,12 @@ use crate::{overlay::ShowingOverlays, prelude::*, render_helper::PureRender, win
 /// This enum defines the dirty phases of the widget.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum DirtyPhase {
-  /// Indicates that the widget needs to be relayouted.
+  /// Indicates that the widget requires a layout update.
   Layout,
+  /// This indicates that the subtree needs to undergo a forced relayout,
+  /// primarily used for providers that may introduce layout constraints beyond
+  /// the parent level.
+  LayoutSubtree,
   /// Indicates that the widget needs to be repainted.
   Paint,
 }
@@ -149,11 +153,17 @@ impl WidgetTree {
     let mut needs_layout = vec![];
 
     for (id, dirty) in self.dirty_set.borrow_mut().drain() {
-      if id.is_dropped(self) || dirty != DirtyPhase::Layout {
+      if id.is_dropped(self) || dirty == DirtyPhase::Paint {
         continue;
       }
 
-      if let Some(info) = self.store.get_mut(&id) {
+      if dirty == DirtyPhase::LayoutSubtree {
+        for w in id.0.descendants(&self.arena).map(WidgetId) {
+          if let Some(info) = self.store.get_mut(&w) {
+            info.size.take();
+          }
+        }
+      } else if let Some(info) = self.store.get_mut(&id) {
         info.size.take();
       }
 
