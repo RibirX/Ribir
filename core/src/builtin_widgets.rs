@@ -138,8 +138,9 @@ pub struct FatObj<T> {
   painting_style: Option<State<PaintingStyleWidget>>,
   text_style: Option<State<TextStyleWidget>>,
   keep_alive: Option<State<KeepAlive>>,
-  tooltips: Option<State<Tooltips>>,
   keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
+  tooltips: Option<State<Tooltips>>,
+  providers: Option<SmallVec<[Provider; 1]>>,
 }
 
 /// Create a function widget that uses an empty `FatObj` as the host object.
@@ -187,6 +188,7 @@ impl<T> FatObj<T> {
       tooltips: self.tooltips,
       keep_alive: self.keep_alive,
       keep_alive_unsubscribe_handle: self.keep_alive_unsubscribe_handle,
+      providers: self.providers,
     }
   }
 
@@ -770,7 +772,7 @@ impl<T> FatObj<T> {
     self.declare_builtin_init(v, Self::get_fitted_box_widget, |m, v| m.box_fit = v)
   }
 
-  /// Initializes the painting style of this widget.
+  /// Provide a painting style to this widget.
   pub fn painting_style<const M: usize>(self, v: impl DeclareInto<PaintingStyle, M>) -> Self {
     self.declare_builtin_init(v, Self::get_painting_style_widget, |m, v| m.painting_style = v)
   }
@@ -923,6 +925,16 @@ impl<T> FatObj<T> {
     self
   }
 
+  /// Initializes the providers of the widget.
+  pub fn providers(mut self, providers: impl Into<SmallVec<[Provider; 1]>>) -> Self {
+    if let Some(vec) = self.providers.as_mut() {
+      vec.extend(providers.into());
+    } else {
+      self.providers = Some(providers.into());
+    }
+    self
+  }
+
   fn declare_builtin_init<V: 'static, B: 'static, const M: usize>(
     mut self, init: impl DeclareInto<V, M>, get_builtin: impl FnOnce(&mut Self) -> &State<B>,
     set_value: fn(&mut B, V),
@@ -964,7 +976,7 @@ where
 }
 
 impl<'a> FatObj<Widget<'a>> {
-  fn compose(self) -> Widget<'a> {
+  fn compose(mut self) -> Widget<'a> {
     macro_rules! compose_builtin_widgets {
       ($host: ident + [$($field: ident),*]) => {
         $(
@@ -975,18 +987,29 @@ impl<'a> FatObj<Widget<'a>> {
       };
     }
     let mut host = self.host;
+    if let Some(painting_style) = self.painting_style {
+      self
+        .providers
+        .get_or_insert_default()
+        .push(PaintingStyleWidget::into_provider(painting_style));
+    }
+    if let Some(text_style) = self.text_style {
+      self
+        .providers
+        .get_or_insert_default()
+        .push(TextStyleWidget::into_provider(text_style));
+    }
+
+    compose_builtin_widgets!(
+      host + [track_id, padding, fitted_box, foreground, box_decoration, scrollable, layout_box]
+    );
+    if let Some(providers) = self.providers {
+      host = Providers::new(providers).with_child(host);
+    }
+
     compose_builtin_widgets!(
       host
         + [
-          track_id,
-          padding,
-          fitted_box,
-          foreground,
-          box_decoration,
-          painting_style,
-          text_style,
-          scrollable,
-          layout_box,
           class,
           constrained_box,
           tooltips,
