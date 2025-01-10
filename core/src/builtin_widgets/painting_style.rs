@@ -20,10 +20,10 @@ impl<'c> ComposeChild<'c> for PaintingStyleWidget {
     // We need to provide the text style for the children to access.
     let provider = match this.try_into_value() {
       Ok(this) => Provider::new(this.painting_style),
-      Err(this) => {
-        let style = this.map_reader(|w| PartData::from_ref(&w.painting_style));
-        Provider::value_of_state(style)
-      }
+      Err(this) => Provider::value_of_writer(
+        this.map_writer(|w| PartData::from_ref_mut(&mut w.painting_style)),
+        Some(DirtyPhase::LayoutSubtree),
+      ),
     };
 
     Providers::new([provider])

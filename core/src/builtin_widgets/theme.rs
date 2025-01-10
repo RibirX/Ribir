@@ -140,18 +140,18 @@ impl Theme {
     let providers = smallvec![
       // The theme provider is designated as writable state,
       // while other components of the theme provider are treated as read-only state.
-      Provider::value_of_state(this.clone_writer()),
-      Provider::value_of_state(part_reader!(&this.palette.primary)),
-      Provider::value_of_state(container_color),
-      Provider::value_of_state(part_reader!(&this.typography_theme.body_medium.text)),
-      Provider::value_of_state(part_reader!(&this.palette)),
-      Provider::value_of_state(part_reader!(&this.typography_theme)),
-      Provider::value_of_state(part_reader!(&this.icon_theme)),
+      Provider::value_of_writer(this.clone_writer(), None),
+      Provider::value_of_reader(part_reader!(&this.palette.primary)),
+      Provider::value_of_reader(container_color),
+      Provider::value_of_reader(part_reader!(&this.typography_theme.body_medium.text)),
+      Provider::value_of_reader(part_reader!(&this.palette)),
+      Provider::value_of_reader(part_reader!(&this.typography_theme)),
+      Provider::value_of_reader(part_reader!(&this.icon_theme)),
       Classes::reader_into_provider(part_reader!(&this.classes)),
-      Provider::value_of_state(part_reader!(&this.transitions_theme)),
-      Provider::value_of_state(part_reader!(&this.compose_decorators)),
-      Provider::value_of_state(part_reader!(&this.custom_styles)),
-      Provider::value_of_state(part_reader!(&this.icon_font))
+      Provider::value_of_reader(part_reader!(&this.transitions_theme)),
+      Provider::value_of_reader(part_reader!(&this.compose_decorators)),
+      Provider::value_of_reader(part_reader!(&this.custom_styles)),
+      Provider::value_of_reader(part_reader!(&this.icon_font))
     ];
     let child = pipe!($this;)
       .map(move |_| {

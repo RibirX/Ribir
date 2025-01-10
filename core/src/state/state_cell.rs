@@ -95,6 +95,7 @@ impl<W> StateCell<W> {
 
 /// A partial data of a state, which should be point to the part data of the
 /// state.
+// todo: `PartData` should be a private type; otherwise, we can use a &T to create mutable data.
 #[derive(Clone)]
 pub enum PartData<T: ?Sized> {
   PartRef(NonNull<T>),
