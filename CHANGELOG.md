@@ -29,6 +29,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: The `Render::dirty_phase` method has been added to allow widgets to mark only the paint phase as dirty when it is modified. (#689 @M-Adoo)
 - **core**: Supports `Provider` to dirty the tree if it's a state writer. (#689 @M-Adoo)
+- **core**: Added the built-in field `providers` to provide data to its descendants. (#pr @M-Adoo)
 - **macros**: Added the `part_reader!` macro to generate a partial reader from a reference of a reader. (#688 @M-Adoo)
 - **macros**: The `simple_declare` now supports the `stateless` meta attribute, `#[simple_declare(stateless)]`. (#688 @M-Adoo)
 

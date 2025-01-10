@@ -141,7 +141,7 @@ pub struct Providers {
   providers: RefCell<SmallVec<[Provider; 1]>>,
 }
 
-/// Macro used to generate a function widget using `BuildVariants` as the root
+/// Macro used to generate a function widget using `Providers` as the root
 /// widget.
 #[macro_export]
 macro_rules! providers {
@@ -297,9 +297,12 @@ impl Declare for Providers {
 }
 
 impl ProvidersDeclarer {
-  pub fn providers(mut self, variants: impl Into<SmallVec<[Provider; 1]>>) -> Self {
-    assert!(self.providers.is_none(), "Providers already initialized");
-    self.providers = Some(variants.into());
+  pub fn providers(mut self, providers: impl Into<SmallVec<[Provider; 1]>>) -> Self {
+    if let Some(vec) = self.providers.as_mut() {
+      vec.extend(providers.into());
+    } else {
+      self.providers = Some(providers.into());
+    }
     self
   }
 }
