@@ -827,10 +827,10 @@ fn fix_direct_use_map_writer_with_builtin() {
   fn _x(mut host: FatObj<Void>) {
     let _anchor = host
       .get_relative_anchor_widget()
-      .map_writer(|w| PartData::from_ref_mut(&mut w.anchor));
+      .map_writer(|w| PartMut::new(&mut w.anchor));
     let _anchor = host
       .get_relative_anchor_widget()
-      .map_writer(|w| PartData::from_ref_mut(&mut w.anchor));
+      .map_writer(|w| PartMut::new(&mut w.anchor));
   }
 }
 

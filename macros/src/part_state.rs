@@ -20,7 +20,7 @@ pub fn gen_part_wrier(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> Token
       let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
       let tokens = quote_spanned! { state.span() =>
         #host #dot map_writer(
-          |w| PartData::from_ref_mut(#and_token #mutability w #dot #part_expr #tail_dot #tail_expr)
+          |w| PartMut::new(#and_token #mutability w #dot #part_expr #tail_dot #tail_expr)
         )
       };
       refs_ctx.add_dollar_ref(info);
@@ -38,7 +38,7 @@ pub fn gen_part_reader(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> Toke
       let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
       let tokens = quote_spanned! { state.span() =>
         #host #dot map_reader(
-          |r| PartData::from_ref(#and_token #mutability r #dot #part_expr #tail_dot #tail_expr)
+          |r| PartRef::new(#and_token #mutability r #dot #part_expr #tail_dot #tail_expr)
         )
       };
       refs_ctx.add_dollar_ref(info);

@@ -390,7 +390,7 @@ impl dyn QueryAny {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{prelude::PartData, reset_test_env, state::State};
+  use crate::{prelude::PartMut, reset_test_env, state::State};
 
   #[test]
   fn query_ref() {
@@ -430,7 +430,7 @@ mod tests {
     }
 
     let x = State::value(X { a: 0, _b: 1 });
-    let y = x.split_writer(|x| PartData::from_ref_mut(&mut x.a));
+    let y = x.split_writer(|x| PartMut::new(&mut x.a));
     {
       let h = y.query(&QueryId::of::<i32>()).unwrap();
       assert!(h.downcast_ref::<i32>().is_some());
