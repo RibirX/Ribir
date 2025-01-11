@@ -22,7 +22,7 @@ impl<S, V: ?Sized, M> StateReader for MapReader<S, M>
 where
   Self: 'static,
   S: StateReader,
-  M: Fn(&S::Value) -> PartData<V> + Clone,
+  M: Fn(&S::Value) -> PartRef<V> + Clone,
 {
   type Value = V;
   type OriginReader = S;
@@ -52,7 +52,7 @@ impl<S, V: ?Sized, M> StateReader for MapWriterAsReader<S, M>
 where
   Self: 'static,
   S: StateReader,
-  M: Fn(&mut S::Value) -> PartData<V> + Clone,
+  M: Fn(&mut S::Value) -> PartMut<V> + Clone,
 {
   type Value = V;
   type OriginReader = S;
@@ -84,7 +84,7 @@ impl<V: ?Sized, S, M> StateReader for MapWriter<S, M>
 where
   Self: 'static,
   S: StateWriter,
-  M: Fn(&mut S::Value) -> PartData<V> + Clone,
+  M: Fn(&mut S::Value) -> PartMut<V> + Clone,
 {
   type Value = V;
   type OriginReader = S;
@@ -116,7 +116,7 @@ impl<V: ?Sized, W, M> StateWatcher for MapWriter<W, M>
 where
   Self: 'static,
   W: StateWriter,
-  M: Fn(&mut W::Value) -> PartData<V> + Clone,
+  M: Fn(&mut W::Value) -> PartMut<V> + Clone,
 {
   #[inline]
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
@@ -128,7 +128,7 @@ impl<V: ?Sized, W, M> StateWriter for MapWriter<W, M>
 where
   Self: 'static,
   W: StateWriter,
-  M: Fn(&mut W::Value) -> PartData<V> + Clone,
+  M: Fn(&mut W::Value) -> PartMut<V> + Clone,
 {
   type Writer = MapWriter<W::Writer, M>;
   type OriginWriter = W;
@@ -165,7 +165,7 @@ impl<V: ?Sized, S, F> RenderProxy for MapReader<S, F>
 where
   Self: 'static,
   S: StateReader,
-  F: Fn(&S::Value) -> PartData<V> + Clone,
+  F: Fn(&S::Value) -> PartRef<V> + Clone,
   V: Render,
 {
   #[inline]
@@ -176,7 +176,7 @@ impl<V: ?Sized, S, F> RenderProxy for MapWriterAsReader<S, F>
 where
   Self: 'static,
   S: StateReader,
-  F: Fn(&mut S::Value) -> PartData<V> + Clone,
+  F: Fn(&mut S::Value) -> PartMut<V> + Clone,
   V: Render,
 {
   fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.read() }

@@ -689,8 +689,8 @@ struct AppData {
 }
 
 let state = State::value(AppData { count: 0 });
-let map_count = state.map_writer(|d| PartData::from_ref(&mut d.count));
-let split_count = state.split_writer(|d| PartData::from_ref(&mut d.count));
+let map_count = state.map_writer(|d| PartMut::new(&mut d.count));
+let split_count = state.split_writer(|d| PartMut::new(&mut d.count));
 
 watch!($state.count).subscribe(|_| println!("父状态数据"));
 watch!(*$map_count).subscribe(|_| println!("子状态（转换）数据"));
@@ -762,7 +762,7 @@ struct AppData {
 }
 
 let state: State<AppData> = State::value(AppData { count: 0 });
-let split_count = state.split_writer(|d| PartData::from_ref(&mut d.count));
+let split_count = state.split_writer(|d| PartMut::new(&mut d.count));
 
 // 根状态的源状态是它自己
 let _: &State<AppData> = state.origin_reader();

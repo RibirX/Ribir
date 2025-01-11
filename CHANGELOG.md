@@ -33,6 +33,15 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **macros**: Added the `part_reader!` macro to generate a partial reader from a reference of a reader. (#688 @M-Adoo)
 - **macros**: The `simple_declare` now supports the `stateless` meta attribute, `#[simple_declare(stateless)]`. (#688 @M-Adoo)
 
+### Fixed
+
+- **Core**: `PartData` allows the use of a reference to create a write reference, which is unsafe. Introduce `PartRef` and `PartMut` to replace it. (#pr @M-Adoo)
+
+
+### Breading
+
+- **core**: Removed `PartData`. (#pr @M-Adoo)
+
 ## [0.4.0-alpha.22] - 2025-01-08
 
 ### Fixed

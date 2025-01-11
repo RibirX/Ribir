@@ -26,7 +26,7 @@ impl PaintingStyleWidget {
     match this.try_into_value() {
       Ok(this) => Provider::new(this.painting_style),
       Err(this) => Provider::value_of_writer(
-        this.map_writer(|w| PartData::from_ref_mut(&mut w.painting_style)),
+        this.map_writer(|w| PartMut::new(&mut w.painting_style)),
         Some(DirtyPhase::LayoutSubtree),
       ),
     }

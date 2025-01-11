@@ -265,7 +265,7 @@ mod tests {
     {
       drop_writer_subscribe(
         #[allow(clippy::redundant_closure)]
-        Stateful::new(()).map_writer(|v| PartData::from_ref_mut(v)),
+        Stateful::new(()).map_writer(|v| PartMut::new(v)),
         drop_cnt.clone(),
       );
     };
@@ -275,7 +275,7 @@ mod tests {
     {
       drop_writer_subscribe(
         #[allow(clippy::redundant_closure)]
-        Stateful::new(()).split_writer(|v| PartData::from_ref_mut(v)),
+        Stateful::new(()).split_writer(|v| PartMut::new(v)),
         drop_cnt.clone(),
       );
     };

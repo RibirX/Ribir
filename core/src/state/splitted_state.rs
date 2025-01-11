@@ -16,7 +16,7 @@ impl<V: ?Sized, O, W> StateReader for SplittedWriter<O, W>
 where
   Self: 'static,
   O: StateWriter,
-  W: Fn(&mut O::Value) -> PartData<V> + Clone,
+  W: Fn(&mut O::Value) -> PartMut<V> + Clone,
 {
   type Value = V;
   type OriginReader = O;
@@ -48,7 +48,7 @@ impl<V: ?Sized, O, W> StateWatcher for SplittedWriter<O, W>
 where
   Self: 'static,
   O: StateWriter,
-  W: Fn(&mut O::Value) -> PartData<V> + Clone,
+  W: Fn(&mut O::Value) -> PartMut<V> + Clone,
 {
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, std::convert::Infallible> {
     self.info.notifier.raw_modifies().box_it()
@@ -59,7 +59,7 @@ impl<V: ?Sized, O, W> StateWriter for SplittedWriter<O, W>
 where
   Self: 'static,
   O: StateWriter,
-  W: Fn(&mut O::Value) -> PartData<V> + Clone,
+  W: Fn(&mut O::Value) -> PartMut<V> + Clone,
 {
   type Writer = SplittedWriter<O::Writer, W>;
   type OriginWriter = O;
@@ -93,7 +93,7 @@ where
 impl<V: ?Sized, O, W> SplittedWriter<O, W>
 where
   O: StateWriter,
-  W: Fn(&mut O::Value) -> PartData<V> + Clone,
+  W: Fn(&mut O::Value) -> PartMut<V> + Clone,
 {
   pub(super) fn new(origin: O, mut_map: W) -> Self {
     Self { origin, splitter: mut_map, info: Sc::new(WriterInfo::new()) }
@@ -108,8 +108,10 @@ where
     assert!(!orig.modified);
     orig.modify_scope.remove(ModifyScope::FRAMEWORK);
     orig.modified = true;
-    let value =
-      ValueMutRef { inner: (self.splitter)(&mut orig.value), borrow: orig.value.borrow.clone() };
+    let value = ValueMutRef {
+      inner: (self.splitter)(&mut orig.value).inner,
+      borrow: orig.value.borrow.clone(),
+    };
 
     WriteRef { value, modified: false, modify_scope, info: &self.info }
   }

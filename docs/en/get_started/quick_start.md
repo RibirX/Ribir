@@ -687,8 +687,8 @@ struct AppData {
 }
 
 let state = State::value(AppData { count: 0 });
-let map_count = state.map_writer(|d| PartData::from_ref_mut(&mut d.count));
-let split_count = state.split_writer(|d| PartData::from_ref_mut(&mut d.count));
+let map_count = state.map_writer(|d| PartMut::new(&mut d.count));
+let split_count = state.split_writer(|d| PartMut::new(&mut d.count));
 
 watch!($state.count).subscribe(|_| println!("Parent data"));
 watch!(*$map_count).subscribe(|_| println!("Child(map) data"));
@@ -759,7 +759,7 @@ struct AppData {
 }
 
 let state: State<AppData> = State::value(AppData { count: 0 });
-let split_count = state.split_writer(|d| PartData::from_ref_mut(&mut d.count));
+let split_count = state.split_writer(|d| PartMut::new(&mut d.count));
 
 // the root state's origin state is itself
 let _: &State<AppData> = state.origin_reader();

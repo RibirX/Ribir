@@ -2,6 +2,7 @@
 //! manage the borrow flag.
 use std::{
   cell::{Cell, UnsafeCell},
+  marker::PhantomData,
   ops::{Deref, DerefMut},
   ptr::NonNull,
 };
@@ -57,7 +58,7 @@ impl<W> StateCell<W> {
 
     // SAFETY: `BorrowRef` ensures that there is only immutable access
     // to the value while borrowed.
-    let inner = PartData::PartRef(unsafe { NonNull::new_unchecked(self.data.get()) });
+    let inner = InnerPart::Ref(unsafe { NonNull::new_unchecked(self.data.get()) });
     ReadRef { inner, borrow: BorrowRef { borrow } }
   }
 
@@ -84,7 +85,7 @@ impl<W> StateCell<W> {
 
     borrow.set(UNUSED - 1);
     let v_ref = BorrowRefMut { borrow };
-    let inner = PartData::PartRef(unsafe { NonNull::new_unchecked(self.data.get()) });
+    let inner = InnerPart::Ref(unsafe { NonNull::new_unchecked(self.data.get()) });
     ValueMutRef { inner, borrow: v_ref }
   }
 
@@ -93,28 +94,41 @@ impl<W> StateCell<W> {
   pub(super) fn into_inner(self) -> W { self.data.into_inner() }
 }
 
-/// A partial data of a state, which should be point to the part data of the
-/// state.
-// todo: `PartData` should be a private type; otherwise, we can use a &T to create mutable data.
+/// A partial reference value of a state, which should be point to the part data
+/// of the state.
 #[derive(Clone)]
-pub enum PartData<T: ?Sized> {
-  PartRef(NonNull<T>),
-  PartData(Box<T>),
+pub struct PartRef<'a, T: ?Sized> {
+  pub(crate) inner: InnerPart<T>,
+  _phantom: PhantomData<&'a T>,
 }
 
-impl<T: ?Sized> PartData<T> {
-  /// Create a `PartData` from a reference.
-  pub fn from_ref(v: &T) -> Self { PartData::PartRef(NonNull::from(v)) }
-
-  /// Create a `PartData` from a mutable reference.
-  pub fn from_ref_mut(v: &mut T) -> Self { PartData::PartRef(NonNull::from(v)) }
+/// A partial mutable reference value of a state, which should be point to the
+/// part data of the state.
+#[derive(Clone)]
+pub struct PartMut<'a, T: ?Sized> {
+  pub(crate) inner: InnerPart<T>,
+  _phantom: PhantomData<&'a mut T>,
 }
 
-impl<T> PartData<T> {
-  /// Create a `PartData` from a pointer that points to the part data of the
+#[derive(Clone)]
+pub(crate) enum InnerPart<T: ?Sized> {
+  Ref(NonNull<T>),
+  // Box the `T` to allow it to be `?Sized`.
+  Ptr(Box<T>),
+}
+
+impl<'a, T: ?Sized> PartRef<'a, T> {
+  /// Create a `PartRef` from a reference.
+  pub fn new(v: &T) -> Self {
+    Self { inner: InnerPart::Ref(NonNull::from(v)), _phantom: PhantomData }
+  }
+}
+
+impl<'a, T> PartRef<'a, T> {
+  /// Create a `PartRef` from a pointer that points to the part data of the
   /// original data. For example, `Option<&T>`, `Box`, `Arc`, `Rc`, etc.
   ///
-  /// The data used to create this `PartData` must point to the data in your
+  /// The data used to create this `PartRef` must point to the data in your
   /// original data.
   ///
   ///
@@ -127,7 +141,7 @@ impl<T> PartData<T> {
   /// // We get the state of the second element.
   /// // `v.get(1)` returns an `Option<&i32>`, which is valid in the vector.
   /// let elem2 = vec.map_reader(|v| unsafe {
-  ///   PartData::from_ptr(std::mem::transmute::<_, Option<&'static i32>>(v.get(1)))
+  ///   PartRef::from_ptr(std::mem::transmute::<_, Option<&'static i32>>(v.get(1)))
   /// });
   /// ```
   ///
@@ -140,14 +154,64 @@ impl<T> PartData<T> {
   ///
   /// let ab = Stateful::new((1, 2));
   ///
-  /// let ab2 = ab.map_reader(|v| unsafe { PartData::from_ptr(*v) });
+  /// let ab2 = ab.map_reader(|v| unsafe { PartRef::from_ptr(*v) });
   ///
-  /// // The `_a` may result in a dangling pointer issue since it utilizes the value of `ab2.read()`. However, `ab2` copies the
-  /// // value of `ab` rather than referencing it.
-  /// // When `ab2.read()` is dropped, `_a` still points to it, making access to `_a` dangerous.
-  /// let _a = ReadRef::map(ab2.read(), |v| unsafe { PartData::from_ptr(v.0) });
+  /// // The `_a` may result in a dangling pointer issue since it utilizes the
+  /// // value of `ab2.read()`. However, `ab2` copies the value of `ab` rather
+  /// // than referencing it. When `ab2.read()` is dropped, `_a` still points to
+  /// // it, making access to `_a` dangerous.
+  /// let _a = ReadRef::map(ab2.read(), |v| unsafe { PartRef::from_ptr(v.0) });
+  /// ```
+  pub unsafe fn from_ptr(ptr_data: T) -> Self {
+    Self { inner: InnerPart::Ptr(Box::new(ptr_data)), _phantom: PhantomData }
+  }
+}
+
+impl<'a, T: ?Sized> PartMut<'a, T> {
+  /// Create a `PartMut` from a mutable reference.
+  pub fn new(v: &mut T) -> Self {
+    Self { inner: InnerPart::Ref(NonNull::from(v)), _phantom: PhantomData }
+  }
+}
+
+impl<'a, T> PartMut<'a, T> {
+  /// Create a `PartMut` from a pointer that points to the part data of the
+  /// original data. For example, `Option<&T>`, `Box`, `Arc`, `Rc`, etc.
+  ///
+  /// The data used to create this `PartMut` must point to the data in your
+  /// original data.
+  ///
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let vec = Stateful::new(vec![1, 2, 3]);
+  /// // We get the state of the second element.
+  /// // `v.get_mut(1)` returns an `Option<&mut i32>`, which is valid in the vector.
+  /// let elem2 = vec.map_writer(|v| unsafe {
+  ///   PartMut::from_ptr(std::mem::transmute::<_, Option<&'static i32>>(v.get_mut(1)))
+  /// });
   /// ```
   ///
+  /// # Safety
+  ///
+  /// Exercise caution when using this method, as it can lead to dangling
+  /// pointers in the state reference internals.
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let ab = Stateful::new((1, 2));
+  ///
+  /// let ab2 = ab.map_writer(|v| unsafe { PartMut::from_ptr(*v) });
+  ///
+  /// // The `_a` may result in a dangling pointer issue since it utilizes the
+  /// // value of `ab2.write()`. However, `ab2` copies the value of `ab` rather
+  /// // than referencing it. When `ab2.write()` is dropped, `_a` still points
+  /// // to it, making access to `_a` dangerous.
+  /// let _a = WriteRef::map(ab2.write(), |v| unsafe { PartMut::from_ptr(v.0) });
+  /// ```
   ///
   /// Otherwise, your modifications will not be applied to the state.
   /// ```
@@ -158,21 +222,23 @@ impl<T> PartData<T> {
   /// // We create a state of the second element. However, this state is a copy of
   /// // the vector because `v[1]` returns a copy of the value in the vector, not a
   /// // reference.
-  /// let mut elem2 = vec.map_writer(|v| unsafe { PartData::from_ptr(v[1]) });
+  /// let mut elem2 = vec.map_writer(|v| unsafe { PartMut::from_ptr(v[1]) });
   ///
   /// // This modification will not alter the `vec`.
   /// *elem2.write() = 20;
   /// ```
-  pub unsafe fn from_ptr(ptr_data: T) -> Self { PartData::PartData(Box::new(ptr_data)) }
+  pub unsafe fn from_ptr(ptr_data: T) -> Self {
+    Self { inner: InnerPart::Ptr(Box::new(ptr_data)), _phantom: PhantomData }
+  }
 }
 
 pub struct ReadRef<'a, T: ?Sized> {
-  pub(crate) inner: PartData<T>,
+  pub(crate) inner: InnerPart<T>,
   pub(crate) borrow: BorrowRef<'a>,
 }
 
 pub(crate) struct ValueMutRef<'a, T: ?Sized> {
-  pub(crate) inner: PartData<T>,
+  pub(crate) inner: InnerPart<T>,
   pub(crate) borrow: BorrowRefMut<'a>,
 }
 
@@ -184,21 +250,21 @@ pub(crate) struct BorrowRef<'b> {
   borrow: &'b Cell<BorrowFlag>,
 }
 
-impl<T: ?Sized> Deref for PartData<T> {
+impl<T: ?Sized> Deref for InnerPart<T> {
   type Target = T;
   fn deref(&self) -> &Self::Target {
     match self {
-      PartData::PartRef(ptr) => unsafe { ptr.as_ref() },
-      PartData::PartData(data) => data,
+      InnerPart::Ref(ptr) => unsafe { ptr.as_ref() },
+      InnerPart::Ptr(data) => data,
     }
   }
 }
 
-impl<T: ?Sized> DerefMut for PartData<T> {
+impl<T: ?Sized> DerefMut for InnerPart<T> {
   fn deref_mut(&mut self) -> &mut Self::Target {
     match self {
-      PartData::PartRef(ptr) => unsafe { ptr.as_mut() },
-      PartData::PartData(data) => data,
+      InnerPart::Ref(ptr) => unsafe { ptr.as_mut() },
+      InnerPart::Ptr(data) => data,
     }
   }
 }
@@ -255,8 +321,8 @@ impl BorrowRef<'_> {
 
 impl<'a, V: ?Sized> ReadRef<'a, V> {
   /// Make a new `ReadRef` by mapping the value of the current `ReadRef`.
-  pub fn map<U: ?Sized>(r: ReadRef<'a, V>, f: impl FnOnce(&V) -> PartData<U>) -> ReadRef<'a, U> {
-    ReadRef { inner: f(&r.inner), borrow: r.borrow }
+  pub fn map<U: ?Sized>(r: ReadRef<'a, V>, f: impl FnOnce(&V) -> PartRef<U>) -> ReadRef<'a, U> {
+    ReadRef { inner: f(&r.inner).inner, borrow: r.borrow }
   }
 
   /// Makes a new `ReadRef` for an optional component of the borrowed data. The
@@ -274,18 +340,17 @@ impl<'a, V: ?Sized> ReadRef<'a, V> {
   ///
   /// let c = Stateful::new(vec![1, 2, 3]);
   /// let b1: ReadRef<'_, Vec<u32>> = c.read();
-  /// let b2: Result<ReadRef<'_, u32>, _> =
-  ///   ReadRef::filter_map(b1, |v| v.get(1).map(PartData::from_ref));
+  /// let b2: Result<ReadRef<'_, u32>, _> = ReadRef::filter_map(b1, |v| v.get(1).map(PartRef::new));
   /// assert_eq!(*b2.unwrap(), 2);
   /// ```
   pub fn filter_map<U: ?Sized, M>(
     orig: ReadRef<'a, V>, part_map: M,
   ) -> std::result::Result<ReadRef<'a, U>, Self>
   where
-    M: Fn(&V) -> Option<PartData<U>>,
+    M: Fn(&V) -> Option<PartRef<U>>,
   {
     match part_map(&orig.inner) {
-      Some(inner) => Ok(ReadRef { inner, borrow: orig.borrow }),
+      Some(inner) => Ok(ReadRef { inner: inner.inner, borrow: orig.borrow }),
       None => Err(orig),
     }
   }
@@ -293,29 +358,20 @@ impl<'a, V: ?Sized> ReadRef<'a, V> {
   /// Split the current `ReadRef` into two `ReadRef`s by mapping the value to
   /// two parts.
   pub fn map_split<U: ?Sized, W: ?Sized>(
-    orig: ReadRef<'a, V>, f: impl FnOnce(&V) -> (PartData<U>, PartData<W>),
+    orig: ReadRef<'a, V>, f: impl FnOnce(&V) -> (PartRef<U>, PartRef<W>),
   ) -> (ReadRef<'a, U>, ReadRef<'a, W>) {
     let (a, b) = f(&*orig);
     let borrow = orig.borrow.clone();
 
-    (ReadRef { inner: a, borrow: borrow.clone() }, ReadRef { inner: b, borrow })
+    (ReadRef { inner: a.inner, borrow: borrow.clone() }, ReadRef { inner: b.inner, borrow })
   }
 
   pub(crate) fn mut_as_ref_map<U: ?Sized>(
-    orig: ReadRef<'a, V>, f: impl FnOnce(&mut V) -> PartData<U>,
+    orig: ReadRef<'a, V>, f: impl FnOnce(&mut V) -> PartMut<U>,
   ) -> ReadRef<'a, U> {
-    let ReadRef { inner: value, borrow } = orig;
-    let value = match value {
-      PartData::PartRef(mut ptr) => unsafe {
-        // Safety: This method is used to map a state to a part of it. Although a `&mut
-        // T` is passed to the closure, it is the user's responsibility to
-        // ensure that the closure does not modify the state.
-        f(ptr.as_mut())
-      },
-      PartData::PartData(mut data) => f(&mut data),
-    };
-
-    ReadRef { inner: value, borrow }
+    let ReadRef { mut inner, borrow } = orig;
+    let value = f(&mut inner);
+    ReadRef { inner: value.inner, borrow }
   }
 }
 
@@ -350,4 +406,16 @@ impl<T: ?Sized + Debug> Debug for WriteRef<'_, T> {
 
 impl<T: ?Sized + Debug> Debug for QueryRef<'_, T> {
   fn fmt(&self, f: &mut Formatter<'_>) -> Result { Debug::fmt(&**self, f) }
+}
+
+impl<'a, T: ?Sized> From<PartMut<'a, T>> for PartRef<'a, T> {
+  fn from(part: PartMut<T>) -> Self { Self { inner: part.inner, _phantom: PhantomData } }
+}
+
+impl<'a, T> From<&'a T> for PartRef<'a, T> {
+  fn from(part: &'a T) -> Self { PartRef::new(part) }
+}
+
+impl<'a, T> From<&'a mut T> for PartMut<'a, T> {
+  fn from(part: &'a mut T) -> Self { PartMut::new(part) }
 }

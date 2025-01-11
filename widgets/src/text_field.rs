@@ -321,7 +321,7 @@ fn build_input_area(
       visible: pipe!(!$this.text.is_empty() || $theme.state == TextFieldState::Focused),
     };
     input_area.get_visibility_widget()
-      .map_writer(|w| PartData::from_ref(&w.visible))
+      .map_writer(|w| PartMut::new(&mut w.visible))
       .transition(transitions::LINEAR.of(BuildCtx::get()));
 
     let mut input = @Input{ style: pipe!($theme.text.clone()) };
@@ -383,7 +383,7 @@ impl Compose for TextFieldLabel {
         text_style: pipe!($this.style.clone()),
       };
 
-      this.map_writer(|w| PartData::from_ref(&w.style.font_size))
+      this.map_writer(|w| PartMut::new(&mut w.style.font_size))
         .transition(transitions::LINEAR.of(BuildCtx::get()));
 
       label
@@ -402,9 +402,7 @@ fn build_content_area(
       padding: pipe!($theme.input_padding($this.text.is_empty())),
     };
 
-    content_area
-      .get_padding_widget()
-      .map_writer(|w| PartData::from_ref(&w.padding))
+    part_writer!(&mut content_area.padding)
       .transition(transitions::LINEAR.of(BuildCtx::get()));
 
     @ $content_area {

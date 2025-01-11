@@ -55,7 +55,7 @@ fn task_lists(
               let task = this.split_writer(
                 // task will always exist, if the task is removed,
                 // sthe widgets list will be rebuild.
-                move |todos| PartData::from_ref_mut(todos.get_task_mut(id).unwrap()),
+                move |todos| PartMut::new(todos.get_task_mut(id).unwrap()),
               );
               let item = pipe!(*$editing == Some(id))
                 .value_chain(|s| s.distinct_until_changed().box_it())
@@ -141,10 +141,10 @@ where
       $item.write().opacity = 0.;
       let transform = item
         .get_transform_widget()
-        .map_writer(|w| PartData::from_ref_mut(&mut w.transform));
+        .map_writer(|w| PartMut::new(&mut w.transform));
       let opacity = item
         .get_opacity_widget()
-        .map_writer(|w| PartData::from_ref_mut(&mut w.opacity));
+        .map_writer(|w| PartMut::new(&mut w.opacity));
       let fly_in = stagger.push_state(
         (transform, opacity),
         (Transform::translation(0., 64.), 0.),

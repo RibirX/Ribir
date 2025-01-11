@@ -11,7 +11,7 @@ pub use prior_op::*;
 use ribir_algo::Sc;
 use rxrust::ops::box_it::{BoxOp, CloneableBoxOp};
 pub use splitted_state::*;
-pub use state_cell::{PartData, ReadRef};
+pub use state_cell::*;
 use state_cell::{StateCell, ValueMutRef};
 pub use stateful::*;
 pub use watcher::*;
@@ -42,7 +42,7 @@ pub trait StateReader: 'static {
   #[inline]
   fn map_reader<U: ?Sized, F>(&self, map: F) -> MapReader<Self::Reader, F>
   where
-    F: Fn(&Self::Value) -> PartData<U> + Clone,
+    F: Fn(&Self::Value) -> PartRef<U> + Clone,
   {
     MapReader { origin: self.clone_reader(), part_map: map }
   }
@@ -123,7 +123,7 @@ pub trait StateWriter: StateWatcher {
   #[inline]
   fn split_writer<V: ?Sized, W>(&self, mut_map: W) -> SplittedWriter<Self::Writer, W>
   where
-    W: Fn(&mut Self::Value) -> PartData<V> + Clone,
+    W: Fn(&mut Self::Value) -> PartMut<V> + Clone,
   {
     SplittedWriter::new(self.clone_writer(), mut_map)
   }
@@ -142,7 +142,7 @@ pub trait StateWriter: StateWatcher {
   #[inline]
   fn map_writer<V: ?Sized, M>(&self, part_map: M) -> MapWriter<Self::Writer, M>
   where
-    M: Fn(&mut Self::Value) -> PartData<V> + Clone,
+    M: Fn(&mut Self::Value) -> PartMut<V> + Clone,
   {
     let origin = self.clone_writer();
     MapWriter { origin, part_map }
@@ -270,9 +270,9 @@ impl<W> State<W> {
 impl<'a, V: ?Sized> WriteRef<'a, V> {
   pub fn map<U: ?Sized, M>(mut orig: WriteRef<'a, V>, part_map: M) -> WriteRef<'a, U>
   where
-    M: Fn(&mut V) -> PartData<U>,
+    M: Fn(&mut V) -> PartMut<U>,
   {
-    let inner = part_map(&mut orig.value);
+    let inner = part_map(&mut orig.value).inner;
     let borrow = orig.value.borrow.clone();
     let value = ValueMutRef { inner, borrow };
 
@@ -295,17 +295,18 @@ impl<'a, V: ?Sized> WriteRef<'a, V> {
   /// let c = Stateful::new(vec![1, 2, 3]);
   /// let b1: WriteRef<'_, Vec<u32>> = c.write();
   /// let b2: Result<WriteRef<'_, u32>, _> =
-  ///   WriteRef::filter_map(b1, |v| v.get(1).map(PartData::from_ref));
+  ///   WriteRef::filter_map(b1, |v| v.get_mut(1).map(PartMut::<u32>::new));
   /// assert_eq!(*b2.unwrap(), 2);
   /// ```
   pub fn filter_map<U: ?Sized, M>(
     mut orig: WriteRef<'a, V>, part_map: M,
   ) -> Result<WriteRef<'a, U>, Self>
   where
-    M: Fn(&mut V) -> Option<PartData<U>>,
+    M: Fn(&mut V) -> Option<PartMut<U>>,
   {
     match part_map(&mut orig.value) {
       Some(inner) => {
+        let inner = inner.inner;
         let borrow = orig.value.borrow.clone();
         let value = ValueMutRef { inner, borrow };
         let WriteRef { modify_scope, info, .. } = orig;
@@ -320,10 +321,11 @@ impl<'a, V: ?Sized> WriteRef<'a, V> {
     mut orig: WriteRef<'a, V>, f: F,
   ) -> (WriteRef<'a, U1>, WriteRef<'a, U2>)
   where
-    F: FnOnce(&mut V) -> (PartData<U1>, PartData<U2>),
+    F: FnOnce(&mut V) -> (PartMut<U1>, PartMut<U2>),
   {
     let WriteRef { info, modify_scope, modified, .. } = orig;
     let (a, b) = f(&mut *orig.value);
+    let (a, b) = (a.inner, b.inner);
     let borrow = orig.value.borrow.clone();
     let a = ValueMutRef { inner: a, borrow: borrow.clone() };
     let b = ValueMutRef { inner: b, borrow };
@@ -445,7 +447,7 @@ mod tests {
     reset_test_env!();
 
     let origin = State::value(Origin { a: 0, b: 0 });
-    let map_state = origin.map_writer(|v| PartData::from_ref_mut(&mut v.b));
+    let map_state = origin.map_writer(|v| PartMut::new(&mut v.b));
 
     let track_origin = Sc::new(Cell::new(0));
     let track_map = Sc::new(Cell::new(0));
@@ -481,7 +483,7 @@ mod tests {
     reset_test_env!();
 
     let origin = State::value(Origin { a: 0, b: 0 });
-    let split = origin.split_writer(|v| PartData::from_ref_mut(&mut v.b));
+    let split = origin.split_writer(|v| PartMut::new(&mut v.b));
 
     let track_origin = Sc::new(Cell::new(0));
     let track_split = Sc::new(Cell::new(0));
@@ -536,11 +538,11 @@ mod tests {
 
     let _map_writer_compose_widget = fn_widget! {
       Stateful::new((C, 0))
-        .map_writer(|v| PartData::from_ref_mut(&mut v.0))
+        .map_writer(|v| PartMut::new(&mut v.0))
     };
     let _split_writer_compose_widget = fn_widget! {
       Stateful::new((C, 0))
-        .split_writer(|v| PartData::from_ref_mut(&mut v.0))
+        .split_writer(|v| PartMut::new(&mut v.0))
     };
   }
 
@@ -586,24 +588,24 @@ mod tests {
 
     let _map_writer_with_child = fn_widget! {
       let w = Stateful::new((CC, 0))
-        .map_writer(|v| PartData::from_ref_mut(&mut v.0));
+        .map_writer(|v| PartMut::new(&mut v.0));
       @$w { @{ Void } }
     };
 
     let _map_writer_without_child = fn_widget! {
       Stateful::new((CC, 0))
-        .map_writer(|v| PartData::from_ref_mut(&mut v.0))
+        .map_writer(|v| PartMut::new(&mut v.0))
     };
 
     let _split_writer_with_child = fn_widget! {
       let w = Stateful::new((CC, 0))
-        .split_writer(|v| PartData::from_ref_mut(&mut v.0));
+        .split_writer(|v| PartMut::new(&mut v.0));
       @$w { @{ Void } }
     };
 
     let _split_writer_without_child = fn_widget! {
       Stateful::new((CC, 0))
-        .split_writer(|v| PartData::from_ref_mut(&mut v.0))
+        .split_writer(|v| PartMut::new(&mut v.0))
     };
   }
 
@@ -625,17 +627,17 @@ mod tests {
     };
 
     let _map_reader_render_widget = fn_widget! {
-      Stateful::new((Void, 0)).map_reader(|v| PartData::from_ref(&v.0))
+      Stateful::new((Void, 0)).map_reader(|v| PartRef::new(&v.0))
     };
 
     let _map_writer_render_widget = fn_widget! {
       Stateful::new((Void, 0))
-        .map_writer(|v| PartData::from_ref_mut(&mut v.0))
+        .map_writer(|v| PartMut::new(&mut v.0))
     };
 
     let _split_writer_render_widget = fn_widget! {
       Stateful::new((Void, 0))
-        .split_writer(|v| PartData::from_ref_mut(&mut v.0))
+        .split_writer(|v| PartMut::new(&mut v.0))
     };
   }
 
@@ -644,11 +646,11 @@ mod tests {
   fn trait_object_part_data() {
     reset_test_env!();
     let s = State::value(0);
-    let m = s.split_writer(|v| PartData::from_ref(v as &mut dyn Any));
+    let m = s.split_writer(|v| PartMut::new(v as &mut dyn Any));
     let v: ReadRef<dyn Any> = m.read();
     assert_eq!(*v.downcast_ref::<i32>().unwrap(), 0);
 
-    let s = s.map_writer(|v| PartData::from_ref(v as &mut dyn Any));
+    let s = s.map_writer(|v| PartMut::new(v as &mut dyn Any));
     let v: ReadRef<dyn Any> = s.read();
     assert_eq!(*v.downcast_ref::<i32>().unwrap(), 0);
   }
