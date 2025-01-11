@@ -290,10 +290,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
   ```rust
   let state = Stateful::value(0132);
   providers!{
-    providers: smallvec![
-      Provider::new(state.clone_writer()), 
-      Provider::value_of_state(state)
-    ],
+    providers: [Provider::value_of_reader(state)],
     @SizedBox {
       size: Size::new(1.,1.),
       on_tap: |e| {
@@ -304,7 +301,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
       @Text {
         text: {
           // Access the provider in any descendants
-          let v = Provider::of::<Stateful<i32>>(ctx!());
+          let v = Provider::state_of::<Stateful<i32>>(BuildCtx::get());
           let v = v.unwrap().clone_writer();
           pipe!($v.to_string())
         }

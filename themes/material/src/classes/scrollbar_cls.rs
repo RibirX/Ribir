@@ -33,7 +33,6 @@ pub(super) fn init(classes: &mut Classes) {
 
 fn style_track(w: Widget, is_hor: bool) -> Widget {
   rdl! {
-    let scroll = Provider::of::<Stateful<ScrollableWidget>>(BuildCtx::get()).unwrap();
     let mut w = FatObj::new(w);
     if is_hor {
       w = w.v_align(VAlign::Bottom);
@@ -75,6 +74,9 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
       fade = Some(u);
     };
 
+    let scroll = Provider::state_of::<Stateful<ScrollableWidget>>(BuildCtx::get())
+      .unwrap()
+      .clone_writer();
     let u = if is_hor {
       watch!(($scroll).get_scroll_pos().x)
         .distinct_until_changed()

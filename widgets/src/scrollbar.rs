@@ -63,10 +63,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
     // scroll states or enables descendants to trigger scrolling to a different
     // position.
     providers! {
-      providers: smallvec::smallvec![
-        Provider::new(scroll.clone_writer()),
-        Provider::value_of_writer(scroll.clone_writer(), None),
-      ],
+      providers: [Provider::value_of_writer(scroll.clone_writer(), None)],
       @ {
         let h_scrollbar = distinct_pipe!($scroll.is_x_scrollable())
           .map(move |need_bar| need_bar.then(||{
