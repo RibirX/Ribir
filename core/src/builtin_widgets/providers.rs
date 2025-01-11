@@ -199,10 +199,49 @@ pub struct ProviderCtx {
 }
 
 impl Provider {
-  /// Establish a provider for `T`.
+  /// Establish a provider for `T` using [`Provider::of`].
+  ///
+  /// ## Example
+  ///
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let w = providers! {
+  ///   providers: [Provider::new(1i32)],
+  ///   @ {
+  ///     assert_eq!(*Provider::of::<i32>(BuildCtx::get()).unwrap(), 1);
+  ///     Void
+  ///   }
+  /// };
+  /// ```
   pub fn new<T: 'static>(value: T) -> Provider { Provider::Setup(Box::new(Setup::new(value))) }
 
-  /// Establish a provider for the `Value` of a reader.
+  /// Establish a provider for the value of a reader. It will clone the reader
+  /// to create the provider to prevent any writer leaks.
+  ///  
+  /// Obtain the value using [`Provider::of`], and if you want to access the
+  /// reader, using [`Provider::state_of`].  
+  ///  
+  /// ## Example
+  ///  
+  ///  ```
+  ///  use ribir_core::prelude::*;
+  ///  
+  ///  let w = providers! {
+  ///    providers: [Provider::value_of_reader(Stateful::new(1i32))],
+  ///    @ {
+  ///      let ctx = BuildCtx::get();
+  ///      // Obtain the value
+  ///      assert_eq!(*Provider::of::<i32>(ctx).unwrap(), 1);
+  ///      
+  ///      // Obtain the reader  
+  ///      let reader = Provider::state_of::
+  ///         <<Stateful<i32> as StateReader>::Reader>(ctx);
+  ///       assert_eq!(*reader.unwrap().read(), 1);
+  ///      Void
+  ///    }
+  ///  };
+  ///  ```
   pub fn value_of_reader<R>(value: R) -> Provider
   where
     R: StateReader<Reader: Query>,
@@ -214,18 +253,45 @@ impl Provider {
     }
   }
 
-  /// Establish a provider for the `Value` of a writer. If you create this
-  /// provider using a writer, you can access a write reference of the value
-  /// through [`Provider::write_of`].
+  /// Establish a provider for the value of a writer.
   ///
-  /// The `dirty` parameter is utilized to specify the dirty phase affected when
-  /// the value of writer is modified. It depends on how your descendants
-  /// utilize it; if they rely on the writer's value for painting or layout, a
-  /// dirty phase should be passed, otherwise, you can pass `None`.
+  /// Obtain the value using [`Provider::of`], get the write reference of the
+  /// writer using [`Provider::write_of`], and if you need to access the writer,
+  /// use [`Provider::state_of`].
   ///
-  /// In general, if your provider affects the layout, it impacts the entire
-  /// subtree. This is because the entire subtree can access the provider and
-  /// utilize it, so you should pass `Some(DirtyPhase::LayoutSubtree)`.
+  /// The `dirty` parameter is used to specify the affected dirty phase when
+  /// modifying the writer's value. Depending on how your descendants use it, if
+  /// they rely on the writer's value for painting or layout, a dirty phase
+  /// should be passed; otherwise, `None` can be passed.
+  ///
+  /// Generally, if your provider affects the layout, it impacts the entire
+  /// subtree because the entire subtree can access and use the provider. In
+  /// such cases, pass `Some(DirtyPhase::LayoutSubtree)`.
+  ///
+  /// ## Example
+  ///
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let w = providers! {
+  ///   providers: [Provider::value_of_writer(Stateful::new(1i32), None)],
+  ///   @ {
+  ///     let ctx = BuildCtx::get();
+  ///     // Obtain the value
+  ///     assert_eq!(*Provider::of::<i32>(ctx).unwrap(), 1);
+  ///
+  ///     // Obtain the writer reference
+  ///     let w_value = Provider::write_of::<i32>(ctx);
+  ///     *w_value.unwrap() = 2;
+  ///
+  ///     // Obtain the writer
+  ///     let writer = Provider::state_of::<Stateful<i32>>(ctx);
+  ///     assert_eq!(*writer.unwrap().write(), 2);
+  ///
+  ///     Void
+  ///   }
+  /// };
+  /// ```
   pub fn value_of_writer<V: 'static>(
     value: impl StateWriter<Value = V> + Query, dirty: Option<DirtyPhase>,
   ) -> Provider {
@@ -247,14 +313,26 @@ impl Provider {
     }
   }
 
-  /// Access the provider of `P` within the context.
-  pub fn of<P: 'static>(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<P>> {
-    ctx.as_ref().get_provider::<P>()
+  /// Obtain the provider of `V` from the context where `V` is created using
+  /// [`Provider::new`], or where it is the value of a state created with
+  /// [`Provider::value_of_reader`] or [`Provider::value_of_writer`].
+  pub fn of<V: 'static>(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<V>> {
+    ctx.as_ref().get_provider::<V>()
   }
 
-  /// Access the write reference of `P` within the context.
-  pub fn write_of<P: 'static>(ctx: &impl AsRef<ProviderCtx>) -> Option<WriteRef<P>> {
-    ctx.as_ref().get_provider_write::<P>()
+  /// Obtain the write reference of the writer's value from the context in
+  /// which the provider is created using [`Provider::value_of_writer`].
+  pub fn write_of<V: 'static>(ctx: &impl AsRef<ProviderCtx>) -> Option<WriteRef<V>> {
+    ctx.as_ref().get_provider_write::<V>()
+  }
+
+  /// Obtain the state of `S` from the context where `S` is created using
+  /// [`Provider::value_of_reader`] or [`Provider::value_of_writer`].
+  pub fn state_of<S>(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<S>>
+  where
+    S: StateReader<Value: Sized + 'static>,
+  {
+    ctx.as_ref().get_provider_state::<S>()
   }
 
   /// Setup the provider to the context.
@@ -436,6 +514,18 @@ impl ProviderCtx {
       .get(&info)
       .and_then(|q| q.query_write(&QueryId::of::<T>()))
       .and_then(QueryHandle::into_mut)
+  }
+
+  pub fn get_provider_state<S>(&self) -> Option<QueryRef<S>>
+  where
+    S: StateReader<Value: Sized + 'static>,
+  {
+    let info = Provider::info::<S::Value>();
+    self
+      .data
+      .get(&info)
+      .and_then(|q| q.query_write(&QueryId::of::<S>()))
+      .and_then(QueryHandle::into_ref)
   }
 
   pub(crate) fn remove_key_value_if(
