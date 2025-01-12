@@ -129,7 +129,6 @@
 use std::{cell::RefCell, convert::Infallible};
 
 use ops::box_it::CloneableBoxOp;
-use ribir_painter::Color;
 use smallvec::SmallVec;
 use widget_id::RenderQueryable;
 
@@ -183,11 +182,6 @@ pub trait ProviderSetup {
 pub trait ProviderRestore {
   fn restore(self: Box<Self>, ctx: &mut ProviderCtx) -> Box<dyn ProviderSetup>;
 }
-
-/// A type for providing the container color of the widget.
-#[derive(Copy, Clone)]
-#[repr(transparent)]
-pub struct ContainerColor(pub Color);
 
 /// The context used to store the providers.
 #[derive(Default)]
@@ -420,10 +414,6 @@ impl Providers {
       p.restore(map);
     }
   }
-}
-
-impl ContainerColor {
-  pub fn provider(color: Color) -> Provider { Provider::new(ContainerColor(color)) }
 }
 
 impl ProviderCtx {
@@ -779,10 +769,10 @@ mod tests {
       @Providers {
         providers: smallvec![Provider::new(Color::RED)],
         @ {
-          assert_eq!(BuildCtx::color(), Color::RED);
+          assert_eq!(BuildCtx::color().clone_value(), Color::RED);
           @MockMulti {
             @fn_widget!{
-              assert_eq!(BuildCtx::color(), Color::RED);
+              assert_eq!(BuildCtx::color().clone_value(), Color::RED);
               Void
             }
           }
@@ -790,7 +780,7 @@ mod tests {
       }
       @ {
         let color = BuildCtx::color();
-        assert_eq!(color, Palette::of(BuildCtx::get()).primary());
+        assert_eq!(color.clone_value(), Palette::of(BuildCtx::get()).primary());
         Void
       }
     });
@@ -807,9 +797,9 @@ mod tests {
         providers: smallvec![ContainerColor::provider(Color::GREEN)],
         @ {
           let container_color = BuildCtx::container_color();
-          assert_eq!(container_color, Color::GREEN);
+          assert_eq!(container_color.clone_value(), Color::GREEN);
           let color = BuildCtx::color();
-          assert_eq!(color, Color::RED);
+          assert_eq!(color.clone_value(), Color::RED);
           Void
         }
       }

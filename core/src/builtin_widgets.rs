@@ -986,19 +986,23 @@ impl<'a> FatObj<Widget<'a>> {
         )*
       };
     }
+    macro_rules! consume_providers_widget {
+      ($host: ident, + [$($field: ident: $w_ty: ty),*]) => {
+        $(
+          if let Some($field) = self.$field {
+            self
+            .providers
+            .get_or_insert_default()
+            .push(<$w_ty>::into_provider($field));
+          }
+        )*
+      };
+    }
     let mut host = self.host;
-    if let Some(painting_style) = self.painting_style {
-      self
-        .providers
-        .get_or_insert_default()
-        .push(PaintingStyleWidget::into_provider(painting_style));
-    }
-    if let Some(text_style) = self.text_style {
-      self
-        .providers
-        .get_or_insert_default()
-        .push(TextStyleWidget::into_provider(text_style));
-    }
+    consume_providers_widget!(host, + [
+      painting_style: PaintingStyleWidget,
+      text_style: TextStyleWidget
+    ]);
 
     compose_builtin_widgets!(
       host + [track_id, padding, fitted_box, foreground, box_decoration, scrollable, layout_box]

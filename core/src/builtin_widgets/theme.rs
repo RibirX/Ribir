@@ -106,8 +106,20 @@ pub struct Theme {
   pub icon_font: IconFont,
 }
 
+/// A type for providing the icon font of the widget.
 #[derive(Clone, Debug, Default)]
 pub struct IconFont(pub FontFace);
+
+/// A container color of the theme providing for the widgets that should
+/// consider as their default container brush. The user can provide another
+/// `ContainerColor` to customize use the widget.
+#[derive(Clone)]
+#[repr(transparent)]
+pub struct ContainerColor(pub Color);
+
+impl ContainerColor {
+  pub fn provider(color: Color) -> Provider { Provider::new(ContainerColor(color)) }
+}
 
 impl Theme {
   pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<Self> { Provider::of(ctx).unwrap() }

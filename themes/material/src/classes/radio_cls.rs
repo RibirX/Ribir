@@ -18,7 +18,9 @@ pub(super) fn init(classes: &mut Classes) {
     .into_widget()
   });
 
-  fn icon_with_ripple<'w>(icon: Widget<'w>, ripple: Widget<'w>, foreground: Color) -> Widget<'w> {
+  fn icon_with_ripple<'w>(
+    icon: Widget<'w>, ripple: Widget<'w>, foreground: DeclareInit<Brush>,
+  ) -> Widget<'w> {
     stack! {
       margin: md::EDGES_4,
       foreground,
@@ -33,11 +35,10 @@ pub(super) fn init(classes: &mut Classes) {
   }
 
   classes.insert(RADIO_SELECTED, |ripple| {
-    let color = BuildCtx::color();
     let icon = rdl! {
       let  w = @Container {
         size: md::SIZE_10,
-        background: color,
+        background: BuildCtx::color(),
         border_radius: md::RADIUS_5,
         h_align: HAlign::Center,
         v_align: VAlign::Center,
@@ -59,7 +60,7 @@ pub(super) fn init(classes: &mut Classes) {
       }
     };
 
-    icon_with_ripple(icon.into_widget(), ripple, color)
+    icon_with_ripple(icon.into_widget(), ripple, BuildCtx::color().declare_into())
   });
   classes.insert(RADIO_UNSELECTED, |ripple| {
     let foreground = Palette::of(BuildCtx::get()).on_surface_variant();
@@ -68,6 +69,6 @@ pub(super) fn init(classes: &mut Classes) {
       border: md::border_2_surface_color(),
       border_radius: md::RADIUS_10,
     };
-    icon_with_ripple(icon.into_widget(), ripple, foreground)
+    icon_with_ripple(icon.into_widget(), ripple, foreground.declare_into())
   });
 }

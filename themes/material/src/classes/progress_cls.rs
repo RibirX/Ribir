@@ -15,38 +15,30 @@ fn indeterminate_trans() -> Box<dyn Transition> {
     .box_it()
 }
 
-class_names! {
-  MD_BASE_LINEAR_INDICATOR,
-  MD_BASE_SPINNER,
-  MD_BASE_SPINNER_INDICATOR,
-  MD_BASE_SPINNER_TRACK
-}
-
-fn lerp_angle(from: &Angle, to: &Angle, rate: f32) -> Angle {
-  let radians = from.radians.lerp(&to.radians, rate);
-  Angle::radians(radians)
-}
-pub(super) fn init(classes: &mut Classes) {
-  classes.insert(MD_BASE_LINEAR_INDICATOR, style_class! {
-    background: BuildCtx::color(),
-    border_radius: md::RADIUS_2,
-  });
-  classes.insert(MD_BASE_SPINNER, style_class! {
+fn md_base_spinner(w: Widget, foreground: DeclareInit<Brush>) -> Widget {
+  fat_obj! {
+    foreground,
     clamp: BoxClamp::fixed_size(md::SIZE_48),
     painting_style: PaintingStyle::Stroke(StrokeOptions {
       width: md::THICKNESS_4,
       line_cap: LineCap::Round,
       ..Default::default()
     }),
-  });
-  classes.insert(MD_BASE_SPINNER_INDICATOR, style_class! {
-    class: MD_BASE_SPINNER,
-    foreground: BuildCtx::color(),
-  });
-  classes.insert(MD_BASE_SPINNER_TRACK, style_class! {
-    class: MD_BASE_SPINNER,
-    foreground: BuildCtx::container_color(),
-  });
+    @ { w }
+  }
+  .into_widget()
+}
+
+named_style_class! { md_base_linear_indicator => {
+  background: BuildCtx::color(),
+  border_radius: md::RADIUS_2,
+}}
+
+fn lerp_angle(from: &Angle, to: &Angle, rate: f32) -> Angle {
+  let radians = from.radians.lerp(&to.radians, rate);
+  Angle::radians(radians)
+}
+pub(super) fn init(classes: &mut Classes) {
   classes.insert(LINEAR_INDETERMINATE_TRACK, style_class! {
     background: BuildCtx::container_color(),
     border_radius: md::RADIUS_2,
@@ -64,18 +56,18 @@ pub(super) fn init(classes: &mut Classes) {
       // introduced for the progress.
       @Container {
         h_align: HAlign::Right,
-        class: MD_BASE_LINEAR_INDICATOR,
+        background: BuildCtx::color(),
+        border_radius: md::RADIUS_2,
         size: Size::new(md::THICKNESS_4, md::THICKNESS_4),
       }
     }
     .into_widget()
   });
   classes.insert(LINEAR_DETERMINATE_INDICATOR, move |host| {
-    let host = FatObj::new(host);
     smooth_width! {
       transition: DETERMINATE_TRANS,
       init_value: 0.,
-      @ $host { class: MD_BASE_LINEAR_INDICATOR }
+      @md_base_linear_indicator(host)
     }
     .into_widget()
   });
@@ -84,7 +76,6 @@ pub(super) fn init(classes: &mut Classes) {
     // thus transforming the entire progress into `Row[Indicator, Track,
     // Indicator, Track]`, adjusting the size of the four children to simulate
     // the repeated motion.
-    let host = FatObj::new(host);
     fn_widget! {
       let indicator1 = @Expanded { flex: 0.};
       let track1 = @Expanded { flex: 0.,  };
@@ -114,15 +105,16 @@ pub(super) fn init(classes: &mut Classes) {
 
       @ $total_fraction {
         @Row {
-          @ $indicator1 { @ $host { class: MD_BASE_LINEAR_INDICATOR } }
+          @ $indicator1 { @md_base_linear_indicator(host) }
           @ $track1 {
             @FractionallyWidthBox { class: LINEAR_INDETERMINATE_TRACK }
           }
           @ $indicator2 {
-            @FractionallyWidthBox {
-              margin: EdgeInsets::only_left(4.),
-              class: MD_BASE_LINEAR_INDICATOR
-            }
+            @md_base_linear_indicator(
+              @FractionallyWidthBox {
+                margin: EdgeInsets::only_left(4.),
+              }.into_widget()
+            )
           }
         }
       }
@@ -131,7 +123,6 @@ pub(super) fn init(classes: &mut Classes) {
   });
 
   classes.insert(SPINNER_DETERMINATE, move |w| {
-    let w = FatObj::new(w);
     let margin_angle: Angle = Angle::degrees(16.);
     fn_widget! {
       let indicator = Provider::of::<Stateful<SpinnerArc>>(BuildCtx::get()).unwrap();
@@ -158,8 +149,8 @@ pub(super) fn init(classes: &mut Classes) {
         transform: Transform::translation(-center.width, -center.height)
           .then_rotate(margin_angle / 2.)
           .then_translate(center.to_vector()),
-        @ $track { class: MD_BASE_SPINNER_TRACK }
-        @ $w { class: MD_BASE_SPINNER_INDICATOR }
+        @md_base_spinner(track.into_widget(), BuildCtx::container_color().declare_into())
+        @md_base_spinner(w, BuildCtx::color().declare_into())
       }
 
     }
@@ -167,7 +158,6 @@ pub(super) fn init(classes: &mut Classes) {
   });
 
   classes.insert(SPINNER_INDETERMINATE, move |w| {
-    let w = FatObj::new(w);
     fn_widget! {
       let indicator = Provider::of::<Stateful<SpinnerArc>>(BuildCtx::get()).unwrap();
       let pi = Angle::pi();
@@ -186,8 +176,7 @@ pub(super) fn init(classes: &mut Classes) {
         transition: indeterminate_trans(),
         from: (Angle::zero(), pi * 0.1),
       }.run();
-
-      @ $w { class: MD_BASE_SPINNER_INDICATOR }
+      @md_base_spinner(w, BuildCtx::color().declare_into())
     }
     .into_widget()
   });

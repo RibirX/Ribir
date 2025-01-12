@@ -18,14 +18,15 @@ impl BuildCtx {
   /// Return the window of this context is created from.
   pub fn window(&self) -> Sc<Window> { self.tree().window() }
 
-  /// Return the `Color` provide in the current build context.
-  pub fn color() -> Color { *Provider::of::<Color>(BuildCtx::get()).unwrap() }
+  /// Return the variant of `Color` provided in the current build context.
+  pub fn color() -> Variant<Color> { Variant::new(BuildCtx::get()).unwrap() }
 
-  /// Return the `ContainerColor` provide in the current build context.
-  pub fn container_color() -> Color {
-    Provider::of::<ContainerColor>(BuildCtx::get())
-      .map(|v| v.0)
+  /// Return the variant of the `ContainerColor` provide in the current build
+  /// context and unwrap it as a `Color`.
+  pub fn container_color() -> VariantMap<ContainerColor, impl Fn(ContainerColor) -> Color> {
+    Variant::new(BuildCtx::get())
       .unwrap()
+      .map(|c: ContainerColor| c.0)
   }
 
   pub(crate) fn tree(&self) -> &WidgetTree {

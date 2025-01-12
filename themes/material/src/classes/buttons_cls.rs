@@ -57,9 +57,8 @@ fn filled_button_init(classes: &mut Classes) {
       .clamp(BTN_40_CLAMP)
       .into_widget();
 
-    let on_color = Palette::of(BuildCtx::get()).on_of(&color);
     FatObj::new(base_interactive(w, md::RADIUS_20))
-      .foreground(on_color)
+      .foreground(BuildCtx::color().on_this_color(BuildCtx::get()))
       .into_widget()
   }
 
@@ -97,14 +96,17 @@ fn button_init(classes: &mut Classes) {
 
 fn fab_common_interactive(w: Widget, radius: Radius, btn_clamp: BoxClamp) -> Widget {
   let color = BuildCtx::color();
-  let p = Palette::of(BuildCtx::get());
 
   let w = FatObj::new(w)
-    .background(p.container_of(&color))
+    .background(
+      color
+        .clone()
+        .into_container_color(BuildCtx::get()),
+    )
     .clamp(btn_clamp)
     .border_radius(radius);
   FatObj::new(base_interactive(w.into_widget(), radius))
-    .foreground(p.on_container_of(&color))
+    .foreground(color.on_this_container_color(BuildCtx::get()))
     .into_widget()
 }
 

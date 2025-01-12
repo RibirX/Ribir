@@ -31,6 +31,8 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(V_SCROLL_TRACK, |w| style_track(w, false));
 }
 
+fn track_color(w: Color, hovering: bool) -> Color { if hovering { w } else { w.with_alpha(0.) } }
+
 fn style_track(w: Widget, is_hor: bool) -> Widget {
   rdl! {
     let mut w = FatObj::new(w);
@@ -42,10 +44,10 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
     let mut w = @ $w {
       opacity: 0.,
       visible: false,
-      background: {
-        let color = BuildCtx::container_color();
-        pipe!(if $w.is_hover() { color } else { color.with_alpha(0.)})
-      },
+      background: match Variant::<ContainerColor>::new(BuildCtx::get()).unwrap() {
+        Variant::Value(c) => pipe!(track_color(c.0, $w.is_hover())).declare_into(),
+        Variant::Stateful(c) => pipe!(track_color($c.0, $w.is_hover())).declare_into()
+      }
     };
 
     let trans = EasingTransition {

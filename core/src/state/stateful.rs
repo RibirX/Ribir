@@ -149,6 +149,17 @@ impl<W> Stateful<W> {
     Self { data: Sc::new(StateCell::new(data)), info: Sc::new(WriterInfo::new()) }
   }
 
+  pub fn from_pipe(p: impl Pipe<Value = W>) -> (Self, BoxSubscription<'static>)
+  where
+    Self: 'static,
+  {
+    let (v, p) = p.unzip(ModifyScope::DATA, None);
+    let s = Stateful::new(v);
+    let s2 = s.clone_writer();
+    let u = p.subscribe(move |(_, v)| *s2.write() = v);
+    (s, u)
+  }
+
   fn write_ref(&self, scope: ModifyScope) -> WriteRef<'_, W> {
     let value = self.data.write();
     WriteRef { value, modified: false, modify_scope: scope, info: &self.info }

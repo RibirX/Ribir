@@ -14,16 +14,7 @@ impl Render for PathPaintKit {
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
 
-  fn paint(&self, ctx: &mut PaintingCtx) {
-    let path = PaintPath::Share(self.path.clone());
-    let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
-    let painter = ctx.painter();
-    if let Some(PaintingStyle::Stroke(options)) = style {
-      painter.set_strokes(options).stroke_path(path);
-    } else {
-      painter.fill_path(path);
-    }
-  }
+  fn paint(&self, ctx: &mut PaintingCtx) { self.path.paint(ctx); }
 
   fn hit_test(&self, _ctx: &mut HitTestCtx, _: Point) -> HitTest {
     HitTest { hit: false, can_hit_child: false }

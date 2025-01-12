@@ -17,10 +17,11 @@ pub enum Brush {
 }
 
 impl Brush {
-  pub fn only_convert_color(&self, f: impl FnOnce(&Color) -> Color) -> Brush {
+  /// Returns the color of the brush, or `None` if the brush is not a color.
+  pub fn get_color(&self) -> Option<Color> {
     match self {
-      Brush::Color(color) => f(color).into(),
-      _ => panic!("Need Color!"),
+      Brush::Color(c) => Some(*c),
+      _ => None,
     }
   }
 
