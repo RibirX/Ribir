@@ -65,10 +65,10 @@ pub(super) fn init(classes: &mut Classes) {
   });
 
   classes.insert(STOP_INDICATOR_ACTIVE, stop_indicator_class! {
-    background: Palette::of(BuildCtx::get()).on_of(&BuildCtx::color())
+    background: BuildCtx::color().on_this_color(BuildCtx::get())
   });
 
   classes.insert(STOP_INDICATOR_INACTIVE, stop_indicator_class! {
-    background: Palette::of(BuildCtx::get()).on_container_of(&BuildCtx::color())
+    background: BuildCtx::color().on_this_container_color(BuildCtx::get())
   });
 }

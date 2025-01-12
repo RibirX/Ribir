@@ -29,18 +29,19 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: The `Render::dirty_phase` method has been added to allow widgets to mark only the paint phase as dirty when it is modified. (#689 @M-Adoo)
 - **core**: Supports `Provider` to dirty the tree if it's a state writer. (#689 @M-Adoo)
-- **core**: Added the built-in field `providers` to provide data to its descendants. (#pr @M-Adoo)
+- **core**: Added the built-in field `providers` to provide data to its descendants. (#690 @M-Adoo)
+- **core**: Added `Variant` to support building widgets with variables across `Providers`. (#690 @M-Adoo)
 - **macros**: Added the `part_reader!` macro to generate a partial reader from a reference of a reader. (#688 @M-Adoo)
 - **macros**: The `simple_declare` now supports the `stateless` meta attribute, `#[simple_declare(stateless)]`. (#688 @M-Adoo)
 
 ### Fixed
 
-- **Core**: `PartData` allows the use of a reference to create a write reference, which is unsafe. Introduce `PartRef` and `PartMut` to replace it. (#pr @M-Adoo)
+- **Core**: `PartData` allows the use of a reference to create a write reference, which is unsafe. Introduce `PartRef` and `PartMut` to replace it. (#690 @M-Adoo)
 
 
 ### Breading
 
-- **core**: Removed `PartData`. (#pr @M-Adoo)
+- **core**: Removed `PartData`. (#690 @M-Adoo)
 
 ## [0.4.0-alpha.22] - 2025-01-08
 

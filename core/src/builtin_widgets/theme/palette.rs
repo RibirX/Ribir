@@ -254,6 +254,13 @@ impl Palette {
   }
 
   #[inline]
+  pub fn on_surface_container(&self) -> Color {
+    self
+      .neutral
+      .with_lightness(self.lightness_cfg().color_group.on_container)
+  }
+
+  #[inline]
   pub fn surface_container_high(&self) -> Color {
     self
       .neutral
@@ -343,6 +350,13 @@ impl Palette {
   #[inline]
   pub fn on_container_of(&self, color: &Color) -> Color {
     color.with_lightness(self.lightness_cfg().color_group.on_container)
+  }
+
+  pub fn lightness_group(&self) -> &LightnessGroup {
+    match self.brightness {
+      Brightness::Dark => &self.dark.color_group,
+      Brightness::Light => &self.light.color_group,
+    }
   }
 
   #[inline]

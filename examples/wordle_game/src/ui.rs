@@ -15,54 +15,69 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
 
   fn char_key(self, key: char) -> Widget<'static> {
     let this = self.clone_writer();
-    fn_widget! {
-      @FilledButton {
-        on_tap: move |_| $this.write().guessing.enter_char(key),
-        // todo: color: pipe!{ hint_color($this.key_hint(key)) },
-        @ { key.to_string() }
-      }
+
+    let palette = Palette::of(BuildCtx::get());
+    let base = palette.base_of(&palette.surface_variant());
+    let success = palette.success();
+    let warning = palette.warning();
+    let error = palette.error();
+    let (color, u) = Stateful::from_pipe(pipe! {
+      $this.key_hint(key).map_or(
+        base,
+        |s| match s {
+          CharHint::Correct => success,
+          CharHint::WrongPosition => warning,
+          CharHint::Wrong => error,
+        })
+    });
+
+    filled_button! {
+      providers: [Provider::value_of_writer(color, None)],
+      on_tap: move |_| $this.write().guessing.enter_char(key),
+      on_disposed:  move |_| u.unsubscribe(),
+      @ { key.to_string() }
     }
     .into_widget()
   }
 
   fn keyboard(self, state_bar: impl StateWriter<Value = Text> + 'static) -> Widget<'static> {
     let this: <Self as StateWriter>::Writer = self.clone_writer();
-    fn_widget! {
-    @Column {
+    let palette = Palette::of(BuildCtx::get());
+    let gray = palette.base_of(&palette.surface_variant());
+    self::column! {
+      item_gap: 5.,
+      align_items: Align::Center,
+      justify_content: JustifyContent::Center,
+      @Row {
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Center,
-        @Row {
-          item_gap: 5.,
-          align_items: Align::Center,
-          justify_content: JustifyContent::Center,
-          @ { this.clone_writer().chars_key(['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P']) }
+        @ { this.clone_writer().chars_key(['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P']) }
+      }
+      @Row {
+        item_gap: 5.,
+        align_items: Align::Center,
+        justify_content: JustifyContent::Center,
+        @ { this.clone_writer().chars_key(['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ]) }
+      }
+      @Row {
+        item_gap: 5.,
+        align_items: Align::Center,
+        justify_content: JustifyContent::Center,
+        @FilledButton {
+          providers: [Provider::new(gray)],
+          on_tap: move |_| $this.write().guessing.delete_back_char(),
+          @ { "Del" }
         }
-        @Row {
-          item_gap: 5.,
-          align_items: Align::Center,
-          justify_content: JustifyContent::Center,
-          @ { this.clone_writer().chars_key(['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ]) }
-        }
-        @Row {
-          item_gap: 5.,
-          align_items: Align::Center,
-          justify_content: JustifyContent::Center,
-          @FilledButton {
-            on_tap: move |_| $this.write().guessing.delete_back_char(),
-            // todo: color: palette.surface_variant(),
-            @ { "Del" }
-          }
-          @ { self.chars_key(['Z', 'X', 'C', 'V', 'B', 'N', 'M' ]) }
+        @ { self.chars_key(['Z', 'X', 'C', 'V', 'B', 'N', 'M' ]) }
 
-          @FilledButton {
-            on_tap: move |_| match $this.write().guess() {
-              Ok(status) => state_bar.write().text = status.state_message().into(),
-              Err(e) => state_bar.write().text = e.message().into(),
-            },
-            // todo: color: palette.surface_variant(),
-            @ { "Enter" }
-          }
+        @FilledButton {
+          providers: [Provider::new(gray)],
+          on_tap: move |_| match $this.write().guess() {
+            Ok(status) => state_bar.write().text = status.state_message().into(),
+            Err(e) => state_bar.write().text = e.message().into(),
+          },
+          @ { "Enter" }
         }
       }
     }
@@ -101,7 +116,7 @@ impl<T: StateWriter<Value = Wordle> + 'static> WordleExtraWidgets for T {}
 fn hint_color(hint: Option<CharHint>) -> Color {
   let palette = Palette::of(BuildCtx::get());
   hint.map_or_else(
-    || palette.surface_variant(),
+    || palette.base_of(&palette.surface_variant()),
     |s| match s {
       CharHint::Correct => palette.success(),
       CharHint::WrongPosition => palette.warning(),

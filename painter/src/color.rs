@@ -49,6 +49,9 @@ pub struct LightnessTone(f32);
 impl LightnessTone {
   #[inline]
   pub fn new(tone: f32) -> Self { Self(tone.clamp(0., 1.0)) }
+
+  #[inline]
+  pub fn value(self) -> f32 { self.0 }
 }
 
 impl Color {
@@ -96,12 +99,16 @@ impl Color {
     self
   }
 
-  #[inline]
   pub fn with_lightness(self, l: LightnessTone) -> Self {
     let mut hct = htc::Hct::from_int([self.alpha, self.red, self.green, self.blue]);
     hct.set_tone((l.0 * 100.).clamp(0., 100.) as f64);
     let argb = hct.to_int();
     Self { red: argb[1], green: argb[2], blue: argb[3], alpha: argb[0] }
+  }
+
+  pub fn lightness(self) -> LightnessTone {
+    let hct = htc::Hct::from_int([self.alpha, self.red, self.green, self.blue]);
+    LightnessTone::new(hct.tone() as f32 / 100.)
   }
 
   #[inline]

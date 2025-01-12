@@ -19,7 +19,9 @@ pub(super) fn init(classes: &mut Classes) {
     .into_widget()
   });
 
-  fn icon_with_ripple<'w>(icon: Widget<'w>, ripple: Widget<'w>, foreground: Color) -> Widget<'w> {
+  fn icon_with_ripple<'w>(
+    icon: Widget<'w>, ripple: Widget<'w>, foreground: Variant<Color>,
+  ) -> Widget<'w> {
     stack! {
       margin: md::EDGES_4,
       foreground,
@@ -39,14 +41,13 @@ pub(super) fn init(classes: &mut Classes) {
   };
 
   fn check_icon_with_ripple<'w>(icon: Widget<'w>, ripple: Widget<'w>) -> Widget<'w> {
-    let ripple_color = BuildCtx::color();
     let icon = container! {
       size: md::SIZE_18,
-      background: ripple_color,
+      background: BuildCtx::color(),
       border_radius: md::RADIUS_2,
       @ { icon }
     };
-    icon_with_ripple(icon.into_widget(), ripple, ripple_color)
+    icon_with_ripple(icon.into_widget(), ripple, BuildCtx::color())
   }
 
   classes.insert(CHECKBOX_CHECKED, |w| {
@@ -71,7 +72,7 @@ pub(super) fn init(classes: &mut Classes) {
       };
       @FatObj {
         on_mounted: move |_| enter.run(),
-        foreground: Palette::of(BuildCtx::get()).on_of(&BuildCtx::color()),
+        foreground: BuildCtx::color().on_this_color(BuildCtx::get()),
         painting_style: PaintingStyle::Stroke(StrokeOptions {
           width: 2.,
           ..Default::default()
@@ -89,7 +90,7 @@ pub(super) fn init(classes: &mut Classes) {
         size: Size::new(12., 2.),
         h_align: HAlign::Center,
         v_align: VAlign::Center,
-        background: Palette::of(BuildCtx::get()).on_of(&BuildCtx::color()),
+        background: BuildCtx::color().on_this_color(BuildCtx::get()),
       };
       let enter = @Animate {
         state: part_writer!(&mut icon.size),
@@ -102,7 +103,6 @@ pub(super) fn init(classes: &mut Classes) {
   });
 
   classes.insert(CHECKBOX_UNCHECKED, |w| {
-    let foreground = Palette::of(BuildCtx::get()).on_surface_variant();
     let icon = container! {
       size: md::SIZE_18,
       border: md::border_2_surface_color(),
@@ -111,6 +111,7 @@ pub(super) fn init(classes: &mut Classes) {
     }
     .into_widget();
 
-    icon_with_ripple(icon, w, foreground)
+    let foreground = Palette::of(BuildCtx::get()).on_surface_variant();
+    icon_with_ripple(icon, w, Variant::Value(foreground))
   });
 }
