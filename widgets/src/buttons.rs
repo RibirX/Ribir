@@ -10,7 +10,7 @@
 //! - A string as a label.
 //! - And a widget as an icon.
 //!
-//! # Usage
+//! ## Usage
 //!
 //! ```
 //! # use ribir_core::prelude::*;
@@ -51,37 +51,89 @@
 //!   @ { "Trailing" }
 //! };
 //! ```
+//!
+//! ## Changing the Color
+//!
+//! The theme should adapt to the `Color` provider to change the button's color.
+//! If you opt for a custom color, I suggest adjusting the color's lightness
+//! tone using the palette to ensure suitability for both light and dark themes.
+//!
+//! ```
+//! # use ribir_core::prelude::*;
+//! # use ribir_widgets::prelude::*;
+//!
+//! let _ = fn_widget! {
+//!   let p = Palette::of(BuildCtx::get());
+//!   let dyn_color = Stateful::new(p.base_of(&Color::YELLOW));
+//!   @Row {
+//!     @Button {
+//!       providers: [Provider::new(p.tertiary())],
+//!       @ { "Tertiary" }
+//!     }
+//!     @Button {
+//!       providers: [Provider::new(p.base_of(&Color::RED))],
+//!       @ { "Custom Color" }
+//!     }
+//!     @Button {
+//!       providers: [Provider::value_of_writer(dyn_color, None)],
+//!       @ { "Dynamic Color" }
+//!     }
+//!   }
+//! };
+//! ```
 use ribir_core::prelude::*;
 
 use crate::{layout::HorizontalLine, prelude::PositionChild};
 
 /// Represents the default button, usually with a border.
+///
+/// See the [module-level documentation](self) for more.
 #[derive(Default, Declare)]
 pub struct Button;
 
 /// Represents a button with a filled background.
+///
+/// See the [module-level documentation](self) for more.
 #[derive(Declare, Default)]
 pub struct FilledButton;
 
 /// Represents a text button without a border or background, suitable for
 /// low-emphasis actions.
+///
+/// See the [module-level documentation](self) for more.
 #[derive(Default, Declare)]
 pub struct TextButton;
 
 /// Represents a floating action button that typically floats at the bottom of
 /// the screen.
+///
+/// See the [module-level documentation](self) for base usage.
+///
+/// The `Fab` theme incorporates the `FabSize` provider to define its size and
+/// shape, allowing you to customize the button's dimensions. However, it is
+/// important to note that the `FabSize` is assumed to be read-only, meaning
+/// that the theme will not adjust to changes even if you provide a
+/// `Stateful<FabSize>`.
+///
+/// ```
+/// # use ribir_core::prelude::*;
+/// # use ribir_widgets::prelude::*;
+///
+/// let _ = fab! {
+///  providers: [Provider::new(FabSize::Large)],
+///  @Icon { @SpinnerProgress {} }
+///  @ { "Label" }
+/// };
+/// ```
 #[derive(Default, Declare)]
 pub struct Fab;
 
-/// Represents a small-sized floating action button that often floats at the
-/// bottom of the screen.
-#[derive(Default, Declare)]
-pub struct MiniFab;
-
-/// Represents a large-sized floating action button that often floats at the
-/// bottom of the screen.
-#[derive(Default, Declare)]
-pub struct LargeFab;
+#[derive(Debug, Clone, Copy)]
+pub enum FabSize {
+  Mini,
+  Normal,
+  Large,
+}
 
 /// The template child for buttons indicating the possible label and
 /// icon types the button can have.
@@ -207,66 +259,6 @@ impl<'c> ComposeChild<'c> for Fab {
       FAB_LABEL,
       FAB_ICON_ONLY,
       FAB_LABEL_ONLY,
-    ])
-  }
-}
-
-class_names! {
-  #[doc = "This class specifies a fully mini fab button, including both an icon and a label."]
-  MINI_FAB,
-  #[doc = "This class specifies for the label of the mini fab button."]
-  MINI_FAB_LABEL,
-  #[doc = "This class specifies for the leading icon of the mini fab button."]
-  MINI_FAB_LEADING_ICON,
-  #[doc = "This class specifies for the trailing icon of the mini fab button."]
-  MINI_FAB_TRAILING_ICON,
-  #[doc = "This class specifies for the icon-only mini fab button."]
-  MINI_FAB_ICON_ONLY,
-  #[doc = "This class specifies for the label-only mini fab button."]
-  MINI_FAB_LABEL_ONLY
-}
-
-impl<'c> ComposeChild<'c> for MiniFab {
-  type Child = ButtonChild<'c>;
-
-  fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    child.compose_to_widget([
-      MINI_FAB,
-      MINI_FAB_LEADING_ICON,
-      MINI_FAB_TRAILING_ICON,
-      MINI_FAB_LABEL,
-      MINI_FAB_ICON_ONLY,
-      MINI_FAB_LABEL_ONLY,
-    ])
-  }
-}
-
-class_names! {
-  #[doc = "This class specifies a fully large fab button, including both an icon and a label."]
-  LARGE_FAB,
-  #[doc = "This class specifies for the label of the large fab button."]
-  LARGE_FAB_LABEL,
-  #[doc = "This class specifies for the leading icon of the large fab button."]
-  LARGE_FAB_LEADING_ICON,
-  #[doc = "This class specifies for the trailing icon of the large fab button."]
-  LARGE_FAB_TRAILING_ICON,
-  #[doc = "This class specifies for the icon-only large fab button."]
-  LARGE_FAB_ICON_ONLY,
-  #[doc = "This class specifies for the label-only large fab button."]
-  LARGE_FAB_LABEL_ONLY
-}
-
-impl<'c> ComposeChild<'c> for LargeFab {
-  type Child = ButtonChild<'c>;
-
-  fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    child.compose_to_widget([
-      LARGE_FAB,
-      LARGE_FAB_LEADING_ICON,
-      LARGE_FAB_TRAILING_ICON,
-      LARGE_FAB_LABEL,
-      LARGE_FAB_ICON_ONLY,
-      LARGE_FAB_LABEL_ONLY,
     ])
   }
 }
@@ -417,18 +409,28 @@ mod tests {
       line_gap: 20.,
       wrap: true,
       // icon only
-      @MiniFab { @Icon { @miss_icon() } }
-      // label only
-      @MiniFab { @{ "Label only"} }
-      @MiniFab {
+      @Fab {
+        providers: [Provider::new(FabSize::Mini)],
         @Icon { @miss_icon() }
-        @ { "Default icon position" }
       }
-      @MiniFab {
+      // label only
+      @Fab {
+        providers: [Provider::new(FabSize::Mini)],
+        @{ "Label only"}
+      }
+      @Fab {
+        providers: [Provider::new(FabSize::Mini)],
+        @Icon { @miss_icon() }
+        @ { "Default icon position"
+      }
+      }
+      @Fab {
+        providers: [Provider::new(FabSize::Mini)],
         @Leading::new(@Icon { @miss_icon() })
         @ { "Leading icon" }
       }
-      @MiniFab {
+      @Fab {
+        providers: [Provider::new(FabSize::Mini)],
         @ { "Trailing icon" }
         @Trailing::new(@Icon { @miss_icon() })
       }
@@ -470,19 +472,28 @@ mod tests {
       v_align: Align::Center,
       line_gap: 20.,
       wrap: true,
-      // icon only
       // label only
-      @LargeFab { @{ "Label only"} }
-      @LargeFab {
+      @Fab {
+        providers: [Provider::new(FabSize::Large)],
+        @{ "Label only"}
+      }
+      @Fab {
+        providers: [Provider::new(FabSize::Large)],
         @Icon { @miss_icon() }
         @ { "Default icon position" }
       }
-      @LargeFab {
+      @Fab {
+        providers: [Provider::new(FabSize::Large)],
         @Leading::new(@Icon { @miss_icon() })
         @ { "Leading icon" }
       }
-      @LargeFab { @Icon { @miss_icon() } }
-      @LargeFab {
+      // icon only
+      @Fab {
+        providers: [Provider::new(FabSize::Large)],
+        @Icon { @miss_icon() }
+      }
+      @Fab {
+        providers: [Provider::new(FabSize::Large)],
         @ { "Trailing icon" }
         @Trailing::new(@Icon { @miss_icon() })
       }
