@@ -31,7 +31,7 @@ fn md_base_spinner(w: Widget, foreground: DeclareInit<Brush>) -> Widget {
 
 named_style_class! { md_base_linear_indicator => {
   background: BuildCtx::color(),
-  border_radius: md::RADIUS_2,
+  radius: md::RADIUS_2,
 }}
 
 fn lerp_angle(from: &Angle, to: &Angle, rate: f32) -> Angle {
@@ -41,7 +41,7 @@ fn lerp_angle(from: &Angle, to: &Angle, rate: f32) -> Angle {
 pub(super) fn init(classes: &mut Classes) {
   classes.insert(LINEAR_INDETERMINATE_TRACK, style_class! {
     background: BuildCtx::container_color(),
-    border_radius: md::RADIUS_2,
+    radius: md::RADIUS_2,
     margin: md::EDGES_LEFT_4,
   });
   classes.insert(LINEAR_PROGRESS, style_class! {
@@ -57,7 +57,7 @@ pub(super) fn init(classes: &mut Classes) {
       @Container {
         h_align: HAlign::Right,
         background: BuildCtx::color(),
-        border_radius: md::RADIUS_2,
+        radius: md::RADIUS_2,
         size: Size::new(md::THICKNESS_4, md::THICKNESS_4),
       }
     }

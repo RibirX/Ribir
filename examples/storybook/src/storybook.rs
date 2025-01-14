@@ -29,7 +29,7 @@ fn content() -> Widget<'static> {
               item_gap: 20.,
               padding: EdgeInsets::new(20., 40., 20., 40.),
               background: Palette::of(BuildCtx::get()).surface_container_low(),
-              border_radius: Radius::all(4.),
+              radius: Radius::all(4.),
               border: Border::all(BorderSide {
                 color: Palette::of(BuildCtx::get()).primary().into(),
                 width: 1.,
@@ -73,7 +73,7 @@ fn content() -> Widget<'static> {
               item_gap: 20.,
               padding: EdgeInsets::new(20., 40., 20., 40.),
               background: Palette::of(BuildCtx::get()).surface_container_lowest(),
-              border_radius: Radius::all(4.),
+              radius: Radius::all(4.),
               border: Border::all(BorderSide {
                 color: Palette::of(BuildCtx::get()).primary().into(),
                 width: 1.,
@@ -101,7 +101,7 @@ fn content() -> Widget<'static> {
               item_gap: 20.,
               padding: EdgeInsets::new(20., 40., 20., 40.),
               background: Palette::of(BuildCtx::get()).surface_container_lowest(),
-              border_radius: Radius::all(4.),
+              radius: Radius::all(4.),
               border: Border::all(BorderSide {
                 color: Palette::of(BuildCtx::get()).primary().into(),
                 width: 1.,

@@ -1,26 +1,14 @@
 use std::ops::Range;
 
-use crate::{prelude::*, wrap_render::*};
-/// The BoxDecoration provides configuration options to draw the background and
-/// border of a box.
-///
-/// If a background color is specified, a derived foreground calculation from
-/// the background will be applied to its children.
-#[derive(Default, Clone)]
-pub struct BoxDecoration {
-  /// The background of the box.
-  pub background: Option<Brush>,
-  /// A border to draw above the background
-  pub border: Option<Border>,
-  /// The corners of this box are rounded by this `BorderRadius`. The round
-  /// corner only work if the two borders beside it are same style.
-  pub border_radius: Option<Radius>,
-}
+use wrap_render::WrapRender;
 
-impl Declare for BoxDecoration {
-  type Builder = FatObj<()>;
-  #[inline]
-  fn declarer() -> Self::Builder { FatObj::new(()) }
+use super::*;
+
+/// This widget adds a border to the host widget based on the layout size and
+/// utilizes the provided `Radius` to round the corners.
+#[derive(Default, Clone)]
+pub struct BorderWidget {
+  pub border: Border,
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -37,93 +25,10 @@ pub struct BorderSide {
   pub width: f32,
 }
 
-impl BorderSide {
+impl Declare for BorderWidget {
+  type Builder = FatObj<()>;
   #[inline]
-  pub fn new(width: f32, color: Brush) -> Self { Self { width, color } }
-}
-
-impl_compose_child_for_wrap_render!(BoxDecoration, DirtyPhase::Layout);
-
-impl WrapRender for BoxDecoration {
-  fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    if let Some(border) = self.border.as_ref() {
-      let min =
-        Size::new(border.left.width + border.right.width, border.top.width + border.bottom.width);
-      clamp.min = clamp.clamp(min);
-    }
-    host.perform_layout(clamp, ctx)
-  }
-
-  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
-    let size = ctx.box_size().unwrap();
-    if !size.is_empty() {
-      let rect = Rect::from_size(size);
-      let painter = ctx.painter();
-      if let Some(ref background) = self.background {
-        let old_brush = painter.fill_brush().clone();
-
-        painter.set_fill_brush(background.clone());
-        if let Some(radius) = &self.border_radius {
-          painter.rect_round(&rect, radius);
-        } else {
-          painter.rect(&rect);
-        }
-        painter.fill();
-
-        painter.set_fill_brush(old_brush);
-      }
-      self.paint_border(painter, size);
-
-      host.paint(ctx)
-    }
-  }
-}
-
-impl BoxDecoration {
-  fn paint_border(&self, painter: &mut Painter, size: Size) {
-    // Connecting adjacent borders implies that the styles of the neighboring
-    // borders should match. If one of the adjacent borders is absent, the corner
-    // radius will align with the existing border.
-
-    let Some(border) = self.border.as_ref() else {
-      return;
-    };
-    let first = border
-      .find_visible(SidePos::Top..SidePos::Top)
-      .map(|side| border.expand_continuous(side));
-
-    if let Some(rg) = first {
-      let old_brush = painter.fill_brush().clone();
-      let radius = self.limited_radius(size);
-      border.paint_continuous_borders(size, &rg, &radius, painter);
-
-      // if the first continuous border only has one side, there maybe existing
-      // another border on its opposite side
-      if rg.start.next() == rg.end {
-        let opposite = rg.end.next();
-        if let Some(side) = border.find_visible(opposite..opposite.next()) {
-          border.paint_continuous_borders(size, &(side..side.next()), &radius, painter);
-        }
-      }
-
-      painter.set_fill_brush(old_brush);
-    }
-  }
-
-  fn limited_radius(&self, size: Size) -> Radius {
-    if let Some(radius) = self.border_radius {
-      let max = size.height.min(size.width) / 2.;
-      let Radius { top_left, top_right, bottom_left, bottom_right } = radius;
-      Radius {
-        top_left: top_left.min(max),
-        top_right: top_right.min(max),
-        bottom_left: bottom_left.min(max),
-        bottom_right: bottom_right.min(max),
-      }
-    } else {
-      Radius::all(0.)
-    }
-  }
+  fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
 impl Border {
@@ -146,6 +51,99 @@ impl Border {
 
   #[inline]
   pub fn none() -> Self { Self { ..Default::default() } }
+}
+
+impl BorderSide {
+  #[inline]
+  pub fn new(width: f32, color: Brush) -> Self { Self { width, color } }
+}
+
+impl_compose_child_for_wrap_render!(BorderWidget, DirtyPhase::Layout);
+
+impl WrapRender for BorderWidget {
+  fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    let border = &self.border;
+    let min =
+      Size::new(border.left.width + border.right.width, border.top.width + border.bottom.width);
+    clamp.min = clamp.clamp(min);
+    host.perform_layout(clamp, ctx)
+  }
+
+  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
+    let size = ctx.box_size().unwrap();
+    let (provider_ctx, painter) = ctx.provider_ctx_and_painter();
+
+    if !size.is_empty() {
+      // Connecting adjacent borders implies that the styles of the neighboring
+      // borders should match. If one of the adjacent borders is absent, the corner
+      // radius will align with the existing border.
+      let border = &self.border;
+      let first = border
+        .find_visible(SidePos::Top..SidePos::Top)
+        .map(|side| border.expand_continuous(side));
+
+      if let Some(rg) = first {
+        let old_brush = painter.fill_brush().clone();
+        let radius = if let Some(r) = Provider::of::<Radius>(provider_ctx) {
+          limited_radius(&r, size)
+        } else {
+          Radius::all(0.)
+        };
+        border.paint_continuous_borders(size, &rg, &radius, painter);
+
+        // if the first continuous border only has one side, there maybe existing
+        // another border on its opposite side
+        if rg.start.next() == rg.end {
+          let opposite = rg.end.next();
+          if let Some(side) = border.find_visible(opposite..opposite.next()) {
+            border.paint_continuous_borders(size, &(side..side.next()), &radius, painter);
+          }
+        }
+
+        painter.set_fill_brush(old_brush);
+      }
+    }
+
+    host.paint(ctx);
+  }
+}
+fn limited_radius(radius: &Radius, size: Size) -> Radius {
+  let max = size.height.min(size.width) / 2.;
+  let Radius { top_left, top_right, bottom_left, bottom_right } = radius;
+  Radius {
+    top_left: top_left.min(max),
+    top_right: top_right.min(max),
+    bottom_left: bottom_left.min(max),
+    bottom_right: bottom_right.min(max),
+  }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+enum SidePos {
+  Top,
+  Right,
+  Bottom,
+  Left,
+}
+
+impl SidePos {
+  fn next(&self) -> Self {
+    match self {
+      SidePos::Top => SidePos::Right,
+      SidePos::Right => SidePos::Bottom,
+      SidePos::Bottom => SidePos::Left,
+      SidePos::Left => SidePos::Top,
+    }
+  }
+
+  fn prev(&self) -> Self {
+    match self {
+      SidePos::Top => SidePos::Left,
+      SidePos::Right => SidePos::Top,
+      SidePos::Bottom => SidePos::Right,
+      SidePos::Left => SidePos::Bottom,
+    }
+  }
 }
 
 impl Border {
@@ -488,55 +486,12 @@ impl Border {
   }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-enum SidePos {
-  Top,
-  Right,
-  Bottom,
-  Left,
-}
-
-impl SidePos {
-  fn next(&self) -> Self {
-    match self {
-      SidePos::Top => SidePos::Right,
-      SidePos::Right => SidePos::Bottom,
-      SidePos::Bottom => SidePos::Left,
-      SidePos::Left => SidePos::Top,
-    }
-  }
-
-  fn prev(&self) -> Self {
-    match self {
-      SidePos::Top => SidePos::Left,
-      SidePos::Right => SidePos::Top,
-      SidePos::Bottom => SidePos::Right,
-      SidePos::Left => SidePos::Bottom,
-    }
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
   use crate::{reset_test_env, test_helper::*};
-
-  #[test]
-  fn default_value_is_none() {
-    let dummy = std::mem::MaybeUninit::uninit();
-    // just for test, we know BoxDecoration not use `ctx` to build.
-    let ctx: BuildCtx = unsafe { dummy.assume_init() };
-    let mut w = BoxDecoration::declarer().finish();
-    let w = w.get_box_decoration_widget();
-
-    assert_eq!(w.read().border, None);
-    assert_eq!(w.read().border_radius, None);
-    assert_eq!(w.read().background, None);
-
-    std::mem::forget(ctx);
-  }
 
   const SIZE: Size = Size::new(100., 100.);
 
@@ -561,17 +516,21 @@ mod tests {
     top: f32, right: f32, bottom: f32, left: f32, radius: Option<Radius>,
   ) -> Widget<'static> {
     let brush: Brush = Color::RED.with_alpha(0.5).into();
-    mock_box! {
-      size: Size::new(100., 50.),
-      margin: EdgeInsets::all(10.),
-      background: Color::GRAY.with_alpha(0.5),
-      border: Border {
-        left: BorderSide::new(left, brush.clone()),
-        right: BorderSide::new(right, brush.clone()),
-        top: BorderSide::new(top, brush.clone()),
-        bottom: BorderSide::new(bottom, brush),
-      },
-      border_radius: radius
+    fn_widget! {
+      let mut mock_box = @MockBox { size: Size::new(100., 50.) };
+      if let Some(radius) = radius {
+        mock_box = mock_box.radius(radius);
+      }
+      @ $mock_box {
+        margin: EdgeInsets::all(10.),
+        background: Color::GRAY.with_alpha(0.5),
+        border: Border {
+          left: BorderSide::new(left, brush.clone()),
+          right: BorderSide::new(right, brush.clone()),
+          top: BorderSide::new(top, brush.clone()),
+          bottom: BorderSide::new(bottom, brush),
+        },
+      }
     }
     .into_widget()
   }

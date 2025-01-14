@@ -51,7 +51,7 @@ fn filled_button_init(classes: &mut Classes) {
     let color = BuildCtx::color();
     let w = FatObj::new(w)
       .background(color)
-      .border_radius(md::RADIUS_20)
+      .radius(md::RADIUS_20)
       .clamp(BTN_40_CLAMP)
       .into_widget();
 
@@ -74,7 +74,7 @@ fn button_init(classes: &mut Classes) {
     let outline = Palette::of(BuildCtx::get()).outline();
     let w = FatObj::new(w)
       .border(Border::all(BorderSide { color: outline.into(), width: 1. }))
-      .border_radius(md::RADIUS_20)
+      .radius(md::RADIUS_20)
       .clamp(BTN_40_CLAMP)
       .into_widget();
 
@@ -130,7 +130,7 @@ fn fab_init(classes: &mut Classes) {
     let w = FatObj::new(w)
       .background(background)
       .clamp(BoxClamp::min_width(btn_height).with_fixed_height(btn_height))
-      .border_radius(radius);
+      .radius(radius);
 
     FatObj::new(base_interactive(w.into_widget(), radius))
       .foreground(foreground)

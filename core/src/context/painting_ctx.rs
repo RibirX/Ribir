@@ -31,13 +31,20 @@ impl<'a> PaintingCtx<'a> {
   }
 
   /// Called by the framework when the painting widget is finished.
+  #[inline]
   pub(crate) fn finish(&mut self) { self.provider_ctx.pop_providers_for(self.id); }
 
+  #[inline]
   pub(crate) fn switch_to(&mut self, id: WidgetId) { self.id = id; }
 
   /// Return the 2d painter to draw 2d things.
   #[inline]
   pub fn painter(&mut self) -> &mut Painter { self.painter }
+
+  #[inline]
+  pub fn provider_ctx_and_painter(&mut self) -> (&mut ProviderCtx, &mut Painter) {
+    (&mut self.provider_ctx, self.painter)
+  }
 }
 
 impl<'w> AsRef<ProviderCtx> for PaintingCtx<'w> {
