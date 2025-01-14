@@ -151,7 +151,7 @@ impl Wordle {
       @Container {
         size: Size::new(56., 56.),
         background: color,
-        border_radius: Radius::all(4.),
+        radius: Radius::all(4.),
         @Text {
           text_style: TypographyTheme::of(BuildCtx::get()).display_small.text.clone(),
           foreground: font_color,

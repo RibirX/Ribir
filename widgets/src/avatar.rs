@@ -69,9 +69,11 @@ impl ComposeChild<'static> for Avatar {
       let palette2 = Palette::of(ctx).clone();
       let w: Widget = match child {
         AvatarTemplate::Text(text) => {
-          @Container {
-            size,
-            border_radius: radius.map(Radius::all),
+          let mut container = @Container { size };
+          if let Some(radius) = radius {
+            container = container.radius(Radius::all(radius));
+          }
+          @ $container {
             background: pipe!(Brush::from(palette1.base_of(&$this.color))),
             @Text {
               h_align: HAlign::Center,

@@ -36,6 +36,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **macros**: Added the `part_reader!` macro to generate a partial reader from a reference of a reader. (#688 @M-Adoo)
 - **macros**: The `simple_declare` now supports the `stateless` meta attribute, `#[simple_declare(stateless)]`. (#688 @M-Adoo)
 
+### Changed
+
+- **widgets**: Replace `BoxDecoration` with three separate widgets: `BorderWidget`, `RadiusWidget`, and `Background`. (#691 @M-Adoo)
+
 ### Fixed
 
 - **Core**: `PartData` allows the use of a reference to create a write reference, which is unsafe. Introduce `PartRef` and `PartMut` to replace it. (#690 @M-Adoo)
@@ -44,6 +48,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Breading
 
 - **core**: Removed `PartData`. (#690 @M-Adoo)
+- **core**: Removed `BoxDecoration`. (#691 @M-Adoo)
 
 ## [0.4.0-alpha.22] - 2025-01-08
 

@@ -9,7 +9,7 @@ pub(super) fn init(classes: &mut Classes) {
     let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(md::RADIUS_20));
     ripple! {
       cursor: CursorIcon::Pointer,
-      radius: 20.,
+      ripple_radius: 20.,
       center: true,
       @ $hover_layer {
         clamp: BoxClamp::fixed_size(md::SIZE_40),
@@ -44,7 +44,7 @@ pub(super) fn init(classes: &mut Classes) {
     let icon = container! {
       size: md::SIZE_18,
       background: BuildCtx::color(),
-      border_radius: md::RADIUS_2,
+      radius: md::RADIUS_2,
       @ { icon }
     };
     icon_with_ripple(icon.into_widget(), ripple, BuildCtx::color())
@@ -106,7 +106,7 @@ pub(super) fn init(classes: &mut Classes) {
     let icon = container! {
       size: md::SIZE_18,
       border: md::border_2_surface_color(),
-      border_radius: md::RADIUS_2,
+      radius: md::RADIUS_2,
       clamp: BoxClamp::fixed_size(md::SIZE_18),
     }
     .into_widget();

@@ -26,8 +26,6 @@ mod foreground;
 mod padding;
 pub use foreground::*;
 pub use padding::*;
-mod box_decoration;
-pub use box_decoration::*;
 mod scrollable;
 pub use scrollable::*;
 mod transform_widget;
@@ -82,6 +80,12 @@ mod tooltips;
 pub use tooltips::*;
 mod providers;
 pub use providers::*;
+mod border;
+pub use border::*;
+mod radius;
+pub use radius::*;
+mod background;
+pub use background::*;
 
 use crate::prelude::*;
 
@@ -120,7 +124,9 @@ pub struct FatObj<T> {
   padding: Option<State<Padding>>,
   fitted_box: Option<State<FittedBox>>,
   constrained_box: Option<State<ConstrainedBox>>,
-  box_decoration: Option<State<BoxDecoration>>,
+  radius: Option<State<RadiusWidget>>,
+  border: Option<State<BorderWidget>>,
+  background: Option<State<Background>>,
   foreground: Option<State<Foreground>>,
   scrollable: Option<State<ScrollableWidget>>,
   layout_box: Option<State<LayoutBox>>,
@@ -168,7 +174,9 @@ impl<T> FatObj<T> {
       mix_builtin: self.mix_builtin,
       request_focus: self.request_focus,
       fitted_box: self.fitted_box,
-      box_decoration: self.box_decoration,
+      border: self.border,
+      radius: self.radius,
+      background: self.background,
       foreground: self.foreground,
       padding: self.padding,
       layout_box: self.layout_box,
@@ -198,7 +206,9 @@ impl<T> FatObj<T> {
       && self.mix_builtin.is_none()
       && self.request_focus.is_none()
       && self.fitted_box.is_none()
-      && self.box_decoration.is_none()
+      && self.border.is_none()
+      && self.radius.is_none()
+      && self.background.is_none()
       && self.foreground.is_none()
       && self.padding.is_none()
       && self.layout_box.is_none()
@@ -297,11 +307,21 @@ impl<T> FatObj<T> {
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 
-  /// Returns the `State<BoxDecoration>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_box_decoration_widget(&mut self) -> &State<BoxDecoration> {
+  pub fn get_border_widget(&mut self) -> &State<BorderWidget> {
     self
-      .box_decoration
+      .border
+      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+
+  pub fn get_radius_widget(&mut self) -> &State<RadiusWidget> {
+    self
+      .radius
+      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+
+  pub fn get_background_widget(&mut self) -> &State<Background> {
+    self
+      .background
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 
@@ -808,8 +828,8 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes the background of the widget.
-  pub fn background<const M: usize>(self, v: impl DeclareInto<Option<Brush>, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_box_decoration_widget, |m, v| m.background = v)
+  pub fn background<const M: usize>(self, v: impl DeclareInto<Brush, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_background_widget, |m, v| m.background = v)
   }
 
   /// Initializes the foreground of the widget.
@@ -818,13 +838,13 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes the border of the widget.
-  pub fn border<const M: usize>(self, v: impl DeclareInto<Option<Border>, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_box_decoration_widget, |m, v| m.border = v)
+  pub fn border<const M: usize>(self, v: impl DeclareInto<Border, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_border_widget, |m, v| m.border = v)
   }
 
   /// Initializes the border radius of the widget.
-  pub fn border_radius<const M: usize>(self, v: impl DeclareInto<Option<Radius>, M>) -> Self {
-    self.declare_builtin_init(v, Self::get_box_decoration_widget, |m, v| m.border_radius = v)
+  pub fn radius<const M: usize>(self, v: impl DeclareInto<Radius, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_radius_widget, |m, v| m.radius = v)
   }
 
   /// Initializes the extra space within the widget.
@@ -1005,7 +1025,11 @@ impl<'a> FatObj<Widget<'a>> {
     ]);
 
     compose_builtin_widgets!(
-      host + [track_id, padding, fitted_box, foreground, box_decoration, scrollable, layout_box]
+      host
+        + [
+          track_id, padding, fitted_box, foreground, border, background, radius, scrollable,
+          layout_box
+        ]
     );
     if let Some(providers) = self.providers {
       host = Providers::new(providers).with_child(host);

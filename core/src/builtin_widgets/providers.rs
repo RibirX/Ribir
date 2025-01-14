@@ -752,6 +752,14 @@ impl Setup {
   }
 }
 
+impl AsRef<ProviderCtx> for ProviderCtx {
+  fn as_ref(&self) -> &ProviderCtx { self }
+}
+
+impl AsMut<ProviderCtx> for ProviderCtx {
+  fn as_mut(&mut self) -> &mut ProviderCtx { self }
+}
+
 #[cfg(test)]
 mod tests {
 

@@ -112,10 +112,12 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "unfocus" => builtin_member!{"RequestFocus", Method, "request_focus"},
   // FittedBox
   "box_fit" => builtin_member!{"FittedBox", Field, "fitted_box"},
-  // BoxDecoration
-  "background" => builtin_member!{"BoxDecoration", Field, "box_decoration"},
-  "border" => builtin_member!{"BoxDecoration", Field, "box_decoration"},
-  "border_radius" => builtin_member!{"BoxDecoration", Field, "box_decoration"},
+  // Background
+  "background" => builtin_member!{"Background", Field, "background"},
+  // BorderWidget
+  "border" => builtin_member!{"BorderWidget", Field, "border"},
+  // RadiusWidget
+  "radius" => builtin_member!{"RadiusWidget", Field, "radius"},
   // Foreground
   "foreground" => builtin_member! { "Foreground", Field, "foreground"},
   // PaintingStyleWidget

@@ -10,7 +10,7 @@ pub struct Ripple {
   /// default radius will be the distance from the center of the ripple to the
   /// furthest corner of the host bounding rectangle.
   #[declare(default)]
-  pub radius: Option<f32>,
+  pub ripple_radius: Option<f32>,
   /// Whether the ripple always originates from the center of the host bound.
   #[declare(default)]
   pub center: bool,
@@ -100,7 +100,7 @@ fn init_ripple_launcher(
       let center = pos.unwrap_or_else(|| {
         (size / 2.).to_vector().to_point()
       });
-      let radius = $this.radius.unwrap_or_else(|| {
+      let radius = $this.ripple_radius.unwrap_or_else(|| {
         let distance_x = f32::max(center.x , size.width - center.x);
         let distance_y = f32::max(center.y, size.height - center.y);
         (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()

@@ -7,7 +7,7 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(RADIO, |w| {
     let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(md::RADIUS_20));
     ripple! {
-      radius: 20.,
+      ripple_radius: 20.,
       center: true,
       cursor: CursorIcon::Pointer,
       @ $hover_layer {
@@ -39,7 +39,7 @@ pub(super) fn init(classes: &mut Classes) {
       let  w = @Container {
         size: md::SIZE_10,
         background: BuildCtx::color(),
-        border_radius: md::RADIUS_5,
+        radius: md::RADIUS_5,
         h_align: HAlign::Center,
         v_align: VAlign::Center,
       };
@@ -54,7 +54,7 @@ pub(super) fn init(classes: &mut Classes) {
       @Container {
         size: md::SIZE_20,
         border: md::border_2(),
-        border_radius: md::RADIUS_10,
+        radius: md::RADIUS_10,
         on_mounted: move |_| scale_in.run(),
         @ { w }
       }
@@ -67,7 +67,7 @@ pub(super) fn init(classes: &mut Classes) {
     let icon = container! {
       size: md::SIZE_20,
       border: md::border_2_surface_color(),
-      border_radius: md::RADIUS_10,
+      radius: md::RADIUS_10,
     };
     icon_with_ripple(icon.into_widget(), ripple, foreground.declare_into())
   });

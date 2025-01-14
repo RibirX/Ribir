@@ -198,39 +198,37 @@ impl Overlay {
     let close_policy = self.auto_close_policy();
     let inner = self.0.clone();
     let gen = fn_widget! {
-      let mut w = content.gen_widget().into_widget();
-      if background.is_some() || close_policy.contains(AutoClosePolicy::TAP_OUTSIDE) {
-        w = @Container {
-          size: Size::new(f32::INFINITY, f32::INFINITY),
-          background: background.clone(),
-          on_tap: move |e| {
+      let w = content.gen_widget().into_widget();
+      let mut w = if background.is_some() || close_policy.contains(AutoClosePolicy::TAP_OUTSIDE) {
+        let mut container = @Container { size: Size::splat(f32::INFINITY) };
+        if let Some(background) = background.clone() {
+          container = container.background(background);
+        }
+        if close_policy.contains(AutoClosePolicy::TAP_OUTSIDE) {
+          container = container.on_tap(move |e| {
             if e.target() == e.current_target() {
-              if let Some(overlay) = Overlay::of(&**e)
-              {
+              if let Some(overlay) = Overlay::of(&**e) {
                 overlay.close();
               }
             }
-          },
-          @{ w }
-        }.into_widget();
+          })
+        }
+        container.map(|c| c.with_child(w))
+      } else {
+        FatObj::new(w)
       };
       if close_policy.contains(AutoClosePolicy::ESC) {
-        let fat_obj = FatObj::new(w);
-        w = @ $fat_obj{
-          on_key_down: move |e| {
-            if *e.key() == VirtualKey::Named(NamedKey::Escape) {
-              if let Some(overlay) = Overlay::of(&**e)
-              {
-                overlay.close();
-              }
+        w = w.on_key_down(move |e| {
+          if *e.key() == VirtualKey::Named(NamedKey::Escape) {
+            if let Some(overlay) = Overlay::of(&**e) {
+              overlay.close();
             }
           }
-        }.into_widget();
+        });
       }
 
-      let mut w = FatObj::new(w);
       *inner.borrow().track_id.borrow_mut() = Some($w.track_id());
-      @ { w }
+      w
     };
 
     let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
