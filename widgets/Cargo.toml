@@ -17,8 +17,8 @@ version.workspace = true
 [dependencies]
 lyon_algorithms.workspace = true
 lyon_path.workspace = true
-ribir_core = {path = "../core", version = "0.4.0-alpha.22" }
-ribir_geom = {path = "../geom", version = "0.4.0-alpha.22" }
+ribir_core = {path = "../core", version = "0.4.0-alpha.23" }
+ribir_geom = {path = "../geom", version = "0.4.0-alpha.23" }
 webbrowser.workspace = true
 
 [dev-dependencies]
