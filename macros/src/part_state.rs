@@ -30,6 +30,24 @@ pub fn gen_part_wrier(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> Token
   }
 }
 
+pub fn gen_split_wrier(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
+  match syn::parse2::<PartState>(input) {
+    Ok(part) => {
+      let info = part.state_info(refs_ctx);
+      let host = part.host_tokens(&info, refs_ctx);
+      let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
+      let tokens = quote_spanned! { state.span() =>
+        #host #dot split_writer(
+          |w| PartMut::new(#and_token #mutability w #dot #part_expr #tail_dot #tail_expr)
+        )
+      };
+      refs_ctx.add_dollar_ref(info);
+      tokens
+    }
+    Err(err) => err.to_compile_error(),
+  }
+}
+
 pub fn gen_part_reader(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
   match syn::parse2::<PartState>(input) {
     Ok(part) => {
@@ -38,6 +56,24 @@ pub fn gen_part_reader(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> Toke
       let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
       let tokens = quote_spanned! { state.span() =>
         #host #dot map_reader(
+          |r| PartRef::new(#and_token #mutability r #dot #part_expr #tail_dot #tail_expr)
+        )
+      };
+      refs_ctx.add_dollar_ref(info);
+      tokens
+    }
+    Err(err) => err.to_compile_error(),
+  }
+}
+
+pub fn gen_part_watcher(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
+  match syn::parse2::<PartState>(input) {
+    Ok(part) => {
+      let info = part.state_info(refs_ctx);
+      let host = part.host_tokens(&info, refs_ctx);
+      let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
+      let tokens = quote_spanned! { state.span() =>
+        #host #dot map_watcher(
           |r| PartRef::new(#and_token #mutability r #dot #part_expr #tail_dot #tail_expr)
         )
       };

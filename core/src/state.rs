@@ -90,6 +90,16 @@ pub trait StateWatcher: StateReader {
   fn clone_watcher(&self) -> Self::Watcher
   where
     Self: Sized;
+
+  /// Return a new watcher by applying a function to the contained value.
+  fn map_watcher<U: ?Sized, F>(&self, map: F) -> Watcher<MapReader<Self::Reader, F>>
+  where
+    F: Fn(&Self::Value) -> PartRef<U> + Clone,
+    Self: Sized,
+  {
+    let reader = self.map_reader(map);
+    Watcher::new(reader, self.raw_modifies())
+  }
 }
 
 pub trait StateWriter: StateWatcher {
@@ -441,6 +451,104 @@ where
       },
     }
   }
+}
+
+impl<V: ?Sized + 'static> StateReader for Box<dyn StateReader<Value = V>> {
+  type Value = V;
+  type Reader = Self;
+
+  #[inline]
+  fn read(&self) -> ReadRef<'_, V> { (**self).read() }
+
+  #[inline]
+  fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
+    (**self).clone_boxed_reader()
+  }
+
+  fn clone_reader(&self) -> Self::Reader { self.clone_boxed_reader() }
+}
+
+impl<V: ?Sized + 'static> StateReader for Box<dyn StateWatcher<Value = V>> {
+  type Value = V;
+  type Reader = Box<dyn StateReader<Value = V>>;
+
+  #[inline]
+  fn read(&self) -> ReadRef<'_, V> { (**self).read() }
+
+  #[inline]
+  fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
+    (**self).clone_boxed_reader()
+  }
+
+  #[inline]
+  fn clone_reader(&self) -> Self::Reader { self.clone_boxed_reader() }
+}
+
+impl<V: ?Sized + 'static> StateWatcher for Box<dyn StateWatcher<Value = V>> {
+  type Watcher = Box<dyn StateWatcher<Value = V>>;
+
+  #[inline]
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+    (**self).raw_modifies()
+  }
+
+  #[inline]
+  fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
+    (**self).clone_boxed_watcher()
+  }
+
+  #[inline]
+  fn clone_watcher(&self) -> Self::Watcher { self.clone_boxed_watcher() }
+}
+
+impl<V: ?Sized + 'static> StateReader for Box<dyn StateWriter<Value = V>> {
+  type Value = V;
+  type Reader = Box<dyn StateReader<Value = V>>;
+
+  #[inline]
+  fn read(&self) -> ReadRef<'_, V> { (**self).read() }
+
+  #[inline]
+  fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
+    (**self).clone_boxed_reader()
+  }
+
+  #[inline]
+  fn clone_reader(&self) -> Self::Reader { self.clone_boxed_reader() }
+}
+
+impl<V: ?Sized + 'static> StateWatcher for Box<dyn StateWriter<Value = V>> {
+  type Watcher = Box<dyn StateWatcher<Value = Self::Value>>;
+  #[inline]
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+    (**self).raw_modifies()
+  }
+
+  #[inline]
+  fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
+    (**self).clone_boxed_watcher()
+  }
+
+  #[inline]
+  fn clone_watcher(&self) -> Self::Watcher { self.clone_boxed_watcher() }
+}
+
+impl<V: ?Sized + 'static> StateWriter for Box<dyn StateWriter<Value = V>> {
+  #[inline]
+  fn into_reader(self) -> Result<Self::Reader, Self> { Err(self) }
+  #[inline]
+  fn write(&self) -> WriteRef<Self::Value> { (**self).write() }
+  #[inline]
+  fn silent(&self) -> WriteRef<Self::Value> { (**self).silent() }
+  #[inline]
+  fn shallow(&self) -> WriteRef<Self::Value> { (**self).shallow() }
+  #[inline]
+  fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {
+    (**self).clone_boxed_writer()
+  }
+
+  #[inline]
+  fn clone_writer(&self) -> Self { self.clone_boxed_writer() }
 }
 
 impl<R> RenderProxy for ReaderRender<R>
