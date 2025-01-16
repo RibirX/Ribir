@@ -16,6 +16,36 @@ pub struct Text {
   glyphs: RefCell<Option<VisualGlyphs>>,
 }
 
+pub fn text_glyph(
+  text: Substr, text_style: &TextStyle, text_align: TextAlign, bounds: Size,
+) -> VisualGlyphs {
+  AppCtx::typography_store()
+    .borrow_mut()
+    .typography(
+      text,
+      text_style,
+      bounds,
+      text_align,
+      GlyphBaseline::Middle,
+      PlaceLineDirection::TopToBottom,
+    )
+}
+
+pub fn paint_text(
+  painter: &mut Painter, glyphs: &VisualGlyphs, style: PaintingStyle, box_rect: Rect,
+) {
+  if let PaintingStyle::Stroke(options) = style {
+    painter
+      .set_style(PathStyle::Stroke)
+      .set_strokes(options);
+  } else {
+    painter.set_style(PathStyle::Fill);
+  }
+
+  let font_db = AppCtx::font_db().clone();
+  painter.draw_glyphs_in_rect(glyphs, box_rect, &font_db.borrow());
+}
+
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let style = Provider::of::<TextStyle>(ctx).unwrap();
@@ -50,18 +80,8 @@ impl Render for Text {
     };
 
     let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
-    let painter = ctx.painter();
-    if let Some(PaintingStyle::Stroke(options)) = style {
-      painter
-        .set_style(PathStyle::Stroke)
-        .set_strokes(options);
-    } else {
-      painter.set_style(PathStyle::Fill);
-    }
-
     let visual_glyphs = self.glyphs().unwrap();
-    let font_db = AppCtx::font_db().clone();
-    painter.draw_glyphs_in_rect(&visual_glyphs, box_rect, &font_db.borrow());
+    paint_text(ctx.painter(), &visual_glyphs, style.unwrap_or(PaintingStyle::Fill), box_rect);
   }
 }
 

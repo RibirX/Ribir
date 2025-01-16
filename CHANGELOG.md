@@ -28,17 +28,18 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: ensure object safety of `StateReader`， `StateWatcher` and `StateWriter` (#692 @M-Adoo)
-- **core**: Support extend custom event. (#pr @wjian23)
-- **core**: add `map_watcher` to `StateWatcher` (#pr @wjian23)
-- **core**: Added `ensure_visible` and ScrollableProvider to ScrollableWidget, to support descendant to be showed.(#pr @wjian23)
+- **core**: Support extend custom event. (#684 @wjian23)
+- **core**: Added `map_watcher` to `StateWatcher` (#684 @wjian23)
+- **core**: Added `ensure_visible` and ScrollableProvider to ScrollableWidget, to support descendant to be showed.(#684 @wjian23)
 
 ### Changed
 
-- **core**: Unified implementation of IntoWidget for impl StateWriter<V:Compose>. (#pr @wjian23)
+- **core**: Unified implementation of IntoWidget for impl StateWriter<V:Compose>. (#684 @wjian23)
+- **widgets**: Refactor `Input` Widget. (#684 @wjian23)
 
 ### Breading
 
-- **core**: Rename `can_focus` field of FocusScope to `skip_host`. (#pr @wjian23)
+- **core**: Rename `can_focus` field of FocusScope to `skip_host`. (#684 @wjian23)
 
 ## [0.4.0-alpha.23] - 2025-01-15
 

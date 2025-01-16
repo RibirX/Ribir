@@ -57,6 +57,11 @@ impl BoxClamp {
     self
   }
 
+  pub fn with_max_size(mut self, size: Size) -> Self {
+    self.max = size.max(self.min);
+    self
+  }
+
   pub const fn with_fixed_height(mut self, height: f32) -> Self {
     self.min.height = height;
     self.max.height = height;

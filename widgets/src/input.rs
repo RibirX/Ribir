@@ -1,279 +1,169 @@
-use ribir_core::{prelude::*, ticker::FrameMsg};
-mod caret;
-mod caret_state;
-mod glyphs_helper;
-mod handle;
-mod selected_text;
-mod text_selectable;
 use std::ops::Range;
 
-pub use caret_state::{CaretPosition, CaretState};
-pub use selected_text::SelectedHighLightStyle;
-pub use text_selectable::TextSelectable;
+use ribir_core::prelude::*;
+use text_selection::TextSelection;
 
-use crate::{
-  input::{
-    caret::*,
-    handle::{TextCaretWriter, edit_handle, edit_key_handle},
-    selected_text::*,
-    text_selectable::{SelectableText, bind_point_listener, select_key_handle},
-  },
-  layout::*,
-};
+use crate::prelude::*;
 
-#[derive(ChildOfCompose)]
-pub struct Placeholder(DeclareInit<CowArc<str>>);
+mod edit_text;
+mod text_glyphs;
 
-impl Placeholder {
-  #[inline]
-  pub fn new<const M: usize>(str: impl DeclareInto<CowArc<str>, M>) -> Self {
-    Self(str.declare_into())
-  }
-}
+mod text_editable;
+mod text_selectable;
+mod text_selection;
 
-#[derive(Clone)]
-pub struct PlaceholderStyle {
-  pub text_style: TextStyle,
-  pub foreground: Brush,
-}
+pub use edit_text::{BaseText, EditText};
+pub use text_editable::{TEXT_CARET, edit_text};
+pub use text_glyphs::{TextGlyphs, TextGlyphsPainter, TextGlyphsProvider, VisualText};
+pub use text_selectable::{TextSelectable, TextSelectableDeclareExtend};
+pub use text_selection::TEXT_HIGH_LIGHT;
 
-impl CustomStyle for PlaceholderStyle {
-  fn default_style(ctx: &impl AsRef<ProviderCtx>) -> Self {
-    Self {
-      foreground: Palette::of(ctx).on_surface_variant().into(),
-      text_style: TypographyTheme::of(ctx).body_medium.text.clone(),
-    }
-  }
-}
-
-#[derive(Clone, PartialEq)]
-pub struct InputStyle {
-  pub size: Option<f32>,
-}
-
-impl CustomStyle for InputStyle {
-  fn default_style(_: &impl AsRef<ProviderCtx>) -> Self { InputStyle { size: Some(20.) } }
-}
-
-#[derive(Clone, PartialEq)]
-pub struct TextAreaStyle {
-  pub rows: Option<f32>,
-  pub cols: Option<f32>,
-}
-
-impl CustomStyle for TextAreaStyle {
-  fn default_style(_: &impl AsRef<ProviderCtx>) -> Self {
-    TextAreaStyle { rows: Some(2.), cols: Some(20.) }
-  }
-}
-
-pub trait EditableText: Sized {
-  fn text(&self) -> &CowArc<str>;
-
-  fn caret(&self) -> CaretState;
-
-  fn set_text_with_caret(&mut self, text: &str, caret: CaretState);
-
-  fn writer(&mut self) -> TextCaretWriter<Self> { TextCaretWriter::new(self) }
-}
-
+/// The `Input` struct is a widget that represents a text input field
+/// that displays a single line of text. if you need multi line text, use
+/// `[TextArea]`
+///
+/// The Input will emit the [TextChangedEvent] event when the text is changed,
+/// emit the [TextSelectChanged] event when the text selection is changed.
+/// The Input also implement the [EditableText] trait, which you can set
+/// the text and the caret selection.
+///
+/// ## Example
+///
+/// ```rust no_run
+/// use ribir::prelude::*;
+/// let w = fn_widget! {
+///   let input = @Input {};
+///   @Column {
+///     @ Text { text: pipe!("the input value is:".to_string() + $input.text()) }
+///     @ Row {
+///       @ Text { text: "input value:" }
+///       @ { input }
+///     }
+///   }
+/// };
+/// App::run(w);
+/// ```
 #[derive(Declare)]
 pub struct Input {
-  #[declare(default = TypographyTheme::of(BuildCtx::get()).body_large.text.clone())]
-  pub style: TextStyle,
   #[declare(skip)]
-  text: CowArc<str>,
+  host: TextGlyphs<InputText>,
   #[declare(skip)]
-  caret: CaretState,
-  #[declare(default = InputStyle::of(BuildCtx::get()).size)]
-  size: Option<f32>,
-}
-
-#[derive(Declare)]
-pub struct TextArea {
-  #[declare(default = TypographyTheme::of(BuildCtx::get()).body_large.text.clone())]
-  pub style: TextStyle,
-  #[declare(default = true)]
-  pub auto_wrap: bool,
-  #[declare(skip)]
-  text: CowArc<str>,
-  #[declare(skip)]
-  caret: CaretState,
-  #[declare(default = TextAreaStyle::of(BuildCtx::get()).rows)]
-  rows: Option<f32>,
-  #[declare(default = TextAreaStyle::of(BuildCtx::get()).cols)]
-  cols: Option<f32>,
+  selection: TextSelection<InputText>,
 }
 
 impl Input {
   /// set the text and the caret selection will be reset to the start.
-  pub fn set_text(&mut self, text: &str) { self.set_text_with_caret(text, CaretState::default()); }
+  pub fn set_text(&mut self, text: &str) {
+    let v = text
+      .chars()
+      .filter(|c| *c != '\n' && *c != '\r')
+      .collect::<String>();
+    *self.host.text_mut() = InputText::new(v);
+    self.selection.from = CaretPosition::default();
+    self.selection.to = CaretPosition::default();
+  }
+
+  pub fn text(&self) -> &CowArc<str> { &self.host.text().0 }
+
+  /// set the caret selection, and the caret position will be set to the `to`
+  /// cluster
+  pub fn select(&mut self, from: usize, to: usize) {
+    self.selection.from = CaretPosition { cluster: from, position: None };
+    self.selection.to = CaretPosition { cluster: to, position: None };
+  }
+
+  /// return the selection range of the text
+  pub fn selection(&self) -> Range<usize> { self.selection.selection() }
+}
+
+/// The `TextArea` struct is a widget that represents a text input field
+/// that displays multiple lines of text. for single line text, use `[Input]`
+#[derive(Declare)]
+pub struct TextArea {
+  /// if true, the text will be auto wrap when the text is too long
+  auto_wrap: bool,
+  #[declare(skip)]
+  host: TextGlyphs<CowArc<str>>,
+  #[declare(skip)]
+  selection: TextSelection<CowArc<str>>,
 }
 
 impl TextArea {
   /// set the text and the caret selection will be reset to the start.
-  pub fn set_text(&mut self, text: &str) { self.set_text_with_caret(text, CaretState::default()); }
+  pub fn set_text(&mut self, text: &str) {
+    *self.host.text_mut() = text.to_string().into();
+    self.selection.from = CaretPosition::default();
+    self.selection.to = CaretPosition::default();
+  }
+
+  pub fn text(&self) -> &CowArc<str> { self.host.text() }
+
+  /// set the caret selection, and the caret position will be set to the `to`
+  /// cluster
+  pub fn select(&mut self, from: usize, to: usize) {
+    self.selection.from = CaretPosition { cluster: from, position: None };
+    self.selection.to = CaretPosition { cluster: to, position: None };
+  }
+
+  /// return the selection range of the text
+  pub fn selection(&self) -> Range<usize> { self.selection.selection() }
 }
 
-impl SelectableText for Input {
-  fn select_range(&self) -> Range<usize> { self.caret.select_range() }
-
-  fn text(&self) -> &CowArc<str> { &self.text }
-
-  fn caret(&self) -> CaretState { self.caret }
-
-  fn set_caret(&mut self, caret: CaretState) { self.caret = caret; }
+#[derive(Clone, Eq, PartialEq, Default)]
+pub struct InputText(CowArc<str>);
+impl InputText {
+  pub fn new(v: impl Into<CowArc<str>>) -> Self { InputText(v.into()) }
+  pub fn text(&self) -> &CowArc<str> { &self.0 }
 }
 
-impl EditableText for Input {
-  fn text(&self) -> &CowArc<str> { &self.text }
-  fn caret(&self) -> CaretState { self.caret }
-  fn set_text_with_caret(&mut self, text: &str, caret: CaretState) {
-    let new_text = text.replace(['\r', '\n'], " ");
-    self.text = new_text.into();
-    self.caret = caret;
+impl BaseText for InputText {
+  fn len(&self) -> usize { self.0.len() }
+  fn substr(&self, rg: Range<usize>) -> Substr { self.0.substr(rg) }
+  fn measure_bytes(&self, byte_from: usize, char_len: isize) -> usize {
+    self.0.measure_bytes(byte_from, char_len)
+  }
+  fn select_token(&self, byte_from: usize) -> Range<usize> { self.0.select_token(byte_from) }
+}
+
+impl VisualText for InputText {
+  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &LayoutCtx) -> VisualGlyphs {
+    self.0.layout_glyphs(clamp, ctx)
+  }
+
+  fn paint(&self, painter: &mut Painter, style: PaintingStyle, glyphs: &VisualGlyphs, rect: Rect) {
+    self.0.paint(painter, style, glyphs, rect);
   }
 }
 
-impl SelectableText for TextArea {
-  fn select_range(&self) -> Range<usize> { self.caret.select_range() }
+impl EditText for InputText {
+  fn insert_str(&mut self, at: usize, v: &str) -> usize {
+    let new_v = v
+      .chars()
+      .filter(|c| *c != '\n' && *c != '\r')
+      .collect::<String>();
+    self.0.insert_str(at, new_v.as_str())
+  }
 
-  fn text(&self) -> &CowArc<str> { &self.text }
-
-  fn caret(&self) -> CaretState { self.caret }
-
-  fn set_caret(&mut self, caret: CaretState) { self.caret = caret; }
+  fn delete(&mut self, rg: Range<usize>) -> Range<usize> { self.0.delete(rg) }
 }
 
-impl EditableText for TextArea {
-  fn text(&self) -> &CowArc<str> { &self.text }
-
-  fn caret(&self) -> CaretState { self.caret }
-
-  fn set_text_with_caret(&mut self, text: &str, caret: CaretState) {
-    self.text = text.to_string().into();
-    self.caret = caret;
-  }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct CaretPosition {
+  /// the cluster of the caret
+  pub cluster: usize,
+  /// the position of the caret, it may be set by the ui interaction
+  pub position: Option<(usize, usize)>,
 }
 
-#[derive(Debug)]
-struct PreEditState {
-  position: usize,
-  value: Option<String>,
-}
-
-struct ImeHandle<H> {
-  host: H,
-  pre_edit: Option<PreEditState>,
-  guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
-  window: Sc<Window>,
-  caret_id: TrackId,
-}
-
-impl<E, H> ImeHandle<H>
-where
-  E: EditableText + 'static,
-  H: StateWriter<Value = E>,
-{
-  fn new(window: Sc<Window>, host: H, caret_id: TrackId) -> Self {
-    Self { window, host, pre_edit: None, guard: None, caret_id }
-  }
-  fn ime_allowed(&mut self) {
-    self.window.set_ime_allowed(true);
-    self.track_cursor();
-  }
-
-  fn ime_disallowed(&mut self) {
-    self.window.set_ime_allowed(false);
-    self.guard = None;
-  }
-
-  fn update_pre_edit(&mut self, e: &ImePreEditEvent) {
-    match &e.pre_edit {
-      ImePreEdit::Begin => {
-        let mut host = self.host.write();
-        let rg = host.caret().select_range();
-        host.writer().delete_byte_range(&rg);
-        self.pre_edit = Some(PreEditState { position: rg.start, value: None });
-      }
-      ImePreEdit::PreEdit { value, cursor } => {
-        let Some(PreEditState { position, value: edit_value }) = self.pre_edit.as_mut() else {
-          return;
-        };
-        let mut host = self.host.write();
-        let mut writer = host.writer();
-        if let Some(txt) = edit_value {
-          writer.delete_byte_range(&(*position..*position + txt.len()));
-        }
-        writer.insert_str(value);
-        writer.set_to(*position + cursor.map_or(0, |(start, _)| start));
-        *edit_value = Some(value.clone());
-      }
-      ImePreEdit::End => {
-        if let Some(PreEditState { value: Some(txt), position, .. }) = self.pre_edit.take() {
-          let mut host = self.host.write();
-          let mut writer = host.writer();
-          writer.delete_byte_range(&(position..position + txt.len()));
-        }
-      }
-    }
-    if self.pre_edit.is_none() {
-      self.track_cursor();
-    } else {
-      self.guard = None;
-    }
-  }
-
-  fn track_cursor(&mut self) {
-    if self.guard.is_some() {
-      return;
-    }
-
-    let window = self.window.clone();
-    let caret_id = self.caret_id.clone();
-    let tick_of_layout_ready = window
-      .frame_tick_stream()
-      .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
-    self.guard = Some(
-      self
-        .host
-        .modifies()
-        .sample(tick_of_layout_ready)
-        .box_it()
-        .subscribe(move |_| {
-          if let Some(wid) = caret_id.get() {
-            let pos = window.map_to_global(Point::zero(), wid);
-            let size = window.widget_size(wid).unwrap_or_default();
-            window.set_ime_cursor_area(&Rect::new(pos, size));
-          }
-        })
-        .unsubscribe_when_dropped(),
-    );
-  }
-}
-
-impl ComposeChild<'static> for Input {
-  type Child = Option<Placeholder>;
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, placeholder: Self::Child,
-  ) -> Widget<'static> {
+impl Compose for Input {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      let text = @Text {
-        text: pipe!($this.text.clone()),
-        text_style: pipe!($this.style.clone()),
-      };
       @FocusScope {
-        can_focus: true,
-        @ConstrainedBox {
-          clamp: pipe!(size_clamp(&$this.style, Some(1.), $this.size)),
-          @ {
-            EditableTextExtraWidget::edit_area(
-              this.clone_writer(),
-              text,
-              BoxPipe::value(Scrollable::X).into_pipe(),
-              placeholder
-            )
-          }
+        skip_host: true,
+        @TextClamp {
+          rows: Some(1.),
+          scrollable: Scrollable::X,
+          @ { edit_text(part_writer!(&mut this.host), split_writer!(&mut this.selection)) }
         }
       }
     }
@@ -281,199 +171,24 @@ impl ComposeChild<'static> for Input {
   }
 }
 
-impl ComposeChild<'static> for TextArea {
-  type Child = Option<Placeholder>;
-  fn compose_child(
-    this: impl StateWriter<Value = Self>, placeholder: Self::Child,
-  ) -> Widget<'static> {
+impl Compose for TextArea {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      let text = @Text {
-        text: pipe!($this.text.clone()),
-        text_style: pipe!{
-          let this = $this;
-          let mut style = this.style.clone();
-          let overflow = match this.auto_wrap {
-            true => TextOverflow::AutoWrap,
-            false => TextOverflow::Clip,
-          };
-          if style.overflow != overflow {
-            style.overflow = overflow;
-          }
-          style
-        },
-      };
-
-      let scroll_dir = pipe!($this.auto_wrap).map(|auto_wrap| match auto_wrap {
-        true => Scrollable::Y,
-        false => Scrollable::Both,
-      });
       @FocusScope {
-        can_focus: true,
-        @ConstrainedBox {
-          clamp: pipe!(size_clamp(&$this.style, $this.rows, $this.cols)),
-          @EditableTextExtraWidget::edit_area(
-            this.clone_writer(),
-            text,
-            scroll_dir,
-            placeholder
-          )
+        skip_host: true,
+        @Scrollbar {
+          scrollable: pipe!($this.auto_wrap).map(|v| if v {
+            Scrollable::Y
+          } else {
+            Scrollable::Both
+          }),
+          text_overflow: TextOverflow::AutoWrap,
+          @ { edit_text(part_writer!(&mut this.host), split_writer!(&mut this.selection)) }
         }
       }
     }
     .into_widget()
   }
-}
-
-trait EditableTextExtraWidget: EditableText + SelectableText
-where
-  Self: 'static,
-{
-  fn edit_area(
-    this: impl StateWriter<Value = Self>, text: FatObj<State<Text>>,
-    scroll_dir: impl Pipe<Value = Scrollable>, placeholder: Option<Placeholder>,
-  ) -> Widget<'static> {
-    fn_widget! {
-      let only_text = text.clone_reader();
-
-      let mut stack = @Stack {
-        fit: StackFit::Passthrough,
-        scrollable: scroll_dir,
-      };
-
-      let mut caret_box = @Caret {
-        focused: pipe!($stack.has_focus()),
-        clamp: pipe!(
-            $this.current_line_height(&$text).unwrap_or(0.)
-          ).map(BoxClamp::fixed_height),
-      };
-
-      let caret_box_id = $caret_box.track_id();
-      let mut caret_box = @$caret_box {
-        anchor: pipe!(
-          let pos = $this.caret_position(&$text).unwrap_or_default();
-          Anchor::left_top(pos.x, pos.y)
-        ),
-      };
-      let scrollable = stack.get_scrollable_widget();
-      let wnd = BuildCtx::get().window();
-      let tick_of_layout_ready = wnd
-        .frame_tick_stream()
-        .filter(|msg| matches!(msg, FrameMsg::LayoutReady(_)));
-      watch!(SelectableText::caret(&*$this))
-        .distinct_until_changed()
-        .sample(tick_of_layout_ready)
-        .map(move |_| $this.caret_position(&$text).unwrap_or_default())
-        .scan_initial((Point::zero(), Point::zero()), |pair, v| (pair.1, v))
-        .subscribe(move |(before, after)| {
-          let mut scrollable = $scrollable.silent();
-          let pos = auto_scroll_pos(&scrollable, before, after, $caret_box.layout_size());
-          scrollable.jump_to(pos);
-      });
-
-      let placeholder = @ {
-        placeholder.map(move |holder| @Text {
-          visible: pipe!(SelectableText::text(&*$this).is_empty()),
-          text: holder.0,
-        })
-      };
-
-      let ime_handle = Stateful::new(
-        ImeHandle::new(wnd, this.clone_writer(), caret_box_id)
-      );
-      let mut stack = @ $stack {
-        on_focus: move |_| $ime_handle.write().ime_allowed(),
-        on_blur: move |_| $ime_handle.write().ime_disallowed(),
-        on_chars: move |c| {
-          let _hint_capture_writer = || $this.write();
-          edit_handle(&this, c);
-        },
-        on_key_down: move |k| {
-          let _hint_capture_writer = || $this.write();
-          select_key_handle(&this, &$only_text, k);
-          edit_key_handle(&this, k);
-        },
-        on_ime_pre_edit: move |e| {
-          $ime_handle.write().update_pre_edit(e);
-        },
-      };
-
-      let high_light_rect = @UnconstrainedBox {
-        clamp_dim: ClampDim::MIN_SIZE,
-        @OnlySizedByParent {
-          @SelectedHighLight {
-            visible: pipe!($stack.has_focus()),
-            rects: pipe! { $this.select_text_rect(&$text) }
-          }
-        }
-      };
-
-      let caret = @UnconstrainedBox {
-        clamp_dim: ClampDim::MIN_SIZE,
-        @OnlySizedByParent { @ {caret_box } }
-      };
-
-      let text_widget = text.into_widget();
-      let text_widget = bind_point_listener(
-        this.clone_writer(),
-        text_widget,
-        only_text
-      );
-
-      @ $stack {
-        padding: EdgeInsets::horizontal(2.),
-        @ { placeholder }
-        @ { high_light_rect }
-        @ { caret }
-        @ { text_widget }
-      }
-    }
-    .into_widget()
-  }
-}
-
-impl EditableTextExtraWidget for TextArea {}
-
-impl EditableTextExtraWidget for Input {}
-
-fn size_clamp(style: &TextStyle, rows: Option<f32>, cols: Option<f32>) -> BoxClamp {
-  let mut clamp: BoxClamp =
-    BoxClamp { min: Size::new(0., 0.), max: Size::new(f32::INFINITY, f32::INFINITY) };
-  if let Some(cols) = cols {
-    let width = cols * style.font_size;
-    clamp = clamp.with_fixed_width(width);
-  }
-  if let Some(rows) = rows {
-    clamp = clamp.with_fixed_height(rows * style.line_height);
-  }
-  clamp
-}
-
-fn auto_scroll_pos(container: &ScrollableWidget, before: Point, after: Point, size: Size) -> Point {
-  let view_size = container.scroll_view_size();
-  let content_size = container.scroll_content_size();
-  let current = container.get_scroll_pos();
-  if view_size.contains(content_size) {
-    return current;
-  }
-
-  let calc_offset = |current, before, after, max_size, size| {
-    let view_after = current + after;
-    let view_before = current + before;
-    let best_position = if !(0. <= view_before + size && view_before < max_size) {
-      (max_size - size) / 2.
-    } else if view_after < 0. {
-      0.
-    } else if view_after > max_size - size {
-      max_size - size
-    } else {
-      view_after
-    };
-    current + best_position - view_after
-  };
-  Point::new(
-    calc_offset(current.x, before.x, after.x, view_size.width, size.width),
-    calc_offset(current.y, before.y, after.y, view_size.height, size.height),
-  )
 }
 
 #[cfg(test)]
@@ -489,7 +204,7 @@ mod tests {
     let (value, w_value) = split_value(String::default());
     let w = fn_widget! {
       let input = @Input { auto_focus: true };
-      watch!($input.text.clone())
+      watch!($input.text().clone())
         .subscribe(move |text| *$w_value.write() = text.to_string());
       input
     };
@@ -500,7 +215,7 @@ mod tests {
 
     wnd.processes_receive_chars("hello\nworld".into());
     wnd.draw_frame();
-    assert_eq!(*value.read(), "hello world");
+    assert_eq!(*value.read(), "helloworld");
   }
 
   #[test]
@@ -508,8 +223,8 @@ mod tests {
     reset_test_env!();
     let (value, w_value) = split_value(String::default());
     let w = fn_widget! {
-      let input = @Input { size: None };
-      watch!($input.text.clone())
+      let input = @Input {  };
+      watch!($input.text().clone())
         .subscribe(move |text| *$w_value.write() = text.to_string());
 
       @SizedBox {
