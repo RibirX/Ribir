@@ -317,7 +317,7 @@ impl VisualGlyphs {
         ),
       },
       |glyph| {
-        let orign = Point::new(
+        let origin = Point::new(
           self.to_pixel_value(glyph.x_offset + line.x),
           self.to_pixel_value(glyph.y_offset + line.y),
         );
@@ -327,7 +327,7 @@ impl VisualGlyphs {
             Size::new(self.to_pixel_value(glyph.x_advance), self.to_pixel_value(line.height))
           }
         };
-        Rect::new(orign, size)
+        Rect::new(origin, size)
       },
     );
     rc.origin += Point::new(self.to_pixel_value(self.x), self.to_pixel_value(self.y)).to_vector();
@@ -343,51 +343,53 @@ impl VisualGlyphs {
   }
 
   pub fn select_range(&self, rg: &Range<usize>) -> Vec<Rect> {
-    struct TypoRectJointer {
-      acc: Vec<Rect>,
-      cur: Option<Rect>,
-    }
-
-    impl TypoRectJointer {
-      fn new() -> Self { Self { acc: vec![], cur: None } }
-      fn join_x(&mut self, next: Rect) {
-        if let Some(rc) = &mut self.cur {
-          rc.size.width = next.max_x() - rc.min_x();
-        } else {
-          self.cur = Some(next);
-        }
-      }
-      fn new_rect(&mut self) {
-        let cur = self.cur.take();
-        if let Some(rc) = cur {
-          self.acc.push(rc);
-        }
-      }
-      fn rects(self) -> Vec<Rect> { self.acc }
-    }
-    let mut jointer = TypoRectJointer::new();
+    let mut rects = vec![];
     for line in &self.visual_info.visual_lines {
-      let height = self.to_pixel_value(line.height);
-      let offset_x = self.x + line.x;
-      let offset_y = self.y + line.y;
-      for glyph in &line.glyphs {
+      let mut inline: Vec<(usize, usize)> = vec![];
+      for (i, glyph) in line.glyphs.iter().enumerate() {
         if rg.contains(&(glyph.cluster as usize)) {
-          let glyph = glyph.clone().cast_to(self.font_size);
-          let rc = Rect::new(
-            Point::new(
-              self.to_pixel_value(glyph.x_offset + offset_x),
-              self.to_pixel_value(glyph.y_offset + offset_y),
-            ),
-            Size::new(self.to_pixel_value(glyph.x_advance), height),
-          );
-          jointer.join_x(rc);
-        } else {
-          jointer.new_rect();
+          if let Some((_, end)) = inline
+            .last_mut()
+            .filter(|(_, end)| (*end + 1) == i)
+          {
+            *end += 1;
+          } else {
+            inline.push((i, i));
+          }
         }
       }
-      jointer.new_rect();
+
+      if !inline.is_empty() {
+        let is_horizontal = !self.visual_info.line_dir.is_horizontal();
+        let offset_x = self.x + line.x;
+        let offset_y = self.y + line.y;
+        inline.into_iter().for_each(|(start, end)| {
+          let (x_min, x_max, y_min, y_max) = if is_horizontal {
+            (
+              line.glyphs[start].x_offset,
+              line.glyphs[end].x_offset + line.glyphs[end].x_advance,
+              GlyphUnit::ZERO,
+              line.height,
+            )
+          } else {
+            (
+              GlyphUnit::ZERO,
+              line.width,
+              line.glyphs[start].y_offset,
+              line.glyphs[end].y_offset + line.glyphs[end].y_advance,
+            )
+          };
+          let rect = Rect::from_points([
+            Point::new(self.to_pixel_value(x_min), self.to_pixel_value(y_min)),
+            Point::new(self.to_pixel_value(x_max), self.to_pixel_value(y_max)),
+          ]);
+          rects.push(
+            rect.translate((self.to_pixel_value(offset_x), self.to_pixel_value(offset_y)).into()),
+          );
+        });
+      }
     }
-    jointer.rects()
+    rects
   }
 
   fn to_pixel_value(&self, v: GlyphUnit) -> f32 { v.cast_to(self.font_size).into_pixel() }

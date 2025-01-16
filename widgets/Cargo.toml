@@ -20,6 +20,7 @@ lyon_path.workspace = true
 ribir_core = {path = "../core", version = "0.4.0-alpha.23" }
 ribir_geom = {path = "../geom", version = "0.4.0-alpha.23" }
 webbrowser.workspace = true
+unicode-segmentation.workspace = true
 
 [dev-dependencies]
 paste.workspace = true
@@ -27,3 +28,4 @@ winit.workspace = true
 ribir_dev_helper = {path = "../dev-helper"}
 ribir_material = {path = "../themes/material"}
 ribir_slim = {path = "../themes/ribir_slim"}
+ribir = { path = "../ribir", features = ["material"] }

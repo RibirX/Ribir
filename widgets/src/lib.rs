@@ -14,6 +14,7 @@ pub mod path;
 pub mod progress;
 pub mod radio;
 pub mod scrollbar;
+pub mod select_region;
 pub mod slider;
 pub mod tabs;
 pub mod text_field;
@@ -23,6 +24,6 @@ pub mod prelude {
   pub use super::{
     avatar::*, buttons::*, checkbox::*, common_widget::*, divider::*, grid_view::*, icon::*,
     input::*, label::*, layout::*, link::*, lists::*, path::*, progress::*, radio::*, scrollbar::*,
-    slider::*, tabs::*, text_field::*, transform_box::*,
+    select_region::*, slider::*, tabs::*, text_field::*, transform_box::*,
   };
 }

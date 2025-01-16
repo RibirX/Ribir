@@ -19,16 +19,6 @@ mod typography_store;
 pub use typography_store::{TypographyStore, VisualGlyphs};
 mod svg_glyph_cache;
 
-mod text_writer;
-pub use text_writer::{
-  CharacterCursor, TextWriter, select_next_word, select_prev_word, select_word,
-};
-
-mod grapheme_cursor;
-pub use grapheme_cursor::GraphemeCursor;
-
-pub mod unicode_help;
-
 // Enum value descriptions are from the CSS spec.
 /// A [font family](https://www.w3.org/TR/2018/REC-css-fonts-3-20180920/#propdef-font-family).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

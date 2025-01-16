@@ -109,20 +109,26 @@ fn input(
     if let Some(text) = text {
       $input.write().set_text(&text);
     }
-    @ $input {
-      margin: EdgeInsets::horizontal(24.),
-      h_align: HAlign::Stretch,
-      border: {
-        let color = Palette::of(BuildCtx::get()).surface_variant().into();
-        Border::only_bottom(BorderSide { width: 2., color })
-      },
-      on_key_down: move |e| {
-        if e.key_code() == &PhysicalKey::Code(KeyCode::Enter) {
-          on_submit($input.text().clone());
-          $input.write().set_text("");
-        }
-      },
-      @{ Placeholder::new("What do you want to do ?") }
+    @ Stack {
+      padding: EdgeInsets::horizontal(24.),
+      @Text {
+        h_align: HAlign::Stretch,
+        visible: pipe!($input.text().is_empty()),
+        text: "What do you want to do ?"
+      }
+      @ $input {
+        h_align: HAlign::Stretch,
+        border: {
+          let color = Palette::of(BuildCtx::get()).surface_variant().into();
+          Border::only_bottom(BorderSide { width: 2., color })
+        },
+        on_key_down: move |e| {
+          if e.key_code() == &PhysicalKey::Code(KeyCode::Enter) {
+            on_submit($input.text().clone());
+            $input.write().set_text("");
+          }
+        },
+      }
     }
   }
   .into_widget()

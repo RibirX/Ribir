@@ -22,10 +22,9 @@ pub struct TextFieldTml<'w> {
   /// a text field.
   label: Option<Label>,
 
-  /// The placeholder text is displayed in the input field before the user
-  /// enters a value.
-  placeholder: Option<Placeholder>,
-
+  // /// The placeholder text is displayed in the input field before the user
+  // /// enters a value.
+  // placeholder: Option<Placeholder>,
   /// Use prefix text before the editable text to show symbols or abbreviations
   /// that help users enter the right type of information in a form’s text
   /// input
@@ -312,9 +311,11 @@ impl<'c> ComposeChild<'c> for TextField {
 }
 
 fn build_input_area(
-  this: impl StateWriter<Value = TextField> + 'static, theme: State<TextFieldThemeProxy>,
-  prefix: Option<Leading<Label>>, suffix: Option<Trailing<Label>>,
-  placeholder: Option<Placeholder>,
+  this: impl StateWriter<Value = TextField> + 'static,
+  theme: State<TextFieldThemeProxy>,
+  prefix: Option<Leading<Label>>,
+  suffix: Option<Trailing<Label>>,
+  // placeholder: Option<Placeholder>,
 ) -> Widget<'static> {
   fn_widget! {
     let mut input_area = @Row {
@@ -324,7 +325,7 @@ fn build_input_area(
       .map_writer(|w| PartMut::new(&mut w.visible))
       .transition(transitions::LINEAR.of(BuildCtx::get()));
 
-    let mut input = @Input{ style: pipe!($theme.text.clone()) };
+    let mut input = @Input{ };
     $input.write().set_text(&$this.text);
 
     watch!($input.text().clone())
@@ -354,7 +355,7 @@ fn build_input_area(
       }
       @Expanded {
         flex: 1.,
-        @ $input { @{placeholder} }
+        @ $input { }
       }
       @{
         suffix.map(|s| @Text{
@@ -397,7 +398,7 @@ fn build_content_area(
   mut config: TextFieldTml,
 ) -> Widget<'static> {
   fn_widget! {
-    take_option_field!({label, prefix, suffix, placeholder}, config);
+    take_option_field!({label, prefix, suffix}, config);
     let mut content_area = @Column {
       padding: pipe!($theme.input_padding($this.text.is_empty())),
     };
@@ -415,7 +416,7 @@ fn build_content_area(
           }
         })
       }
-      @ { build_input_area(this, theme, prefix, suffix, placeholder)}
+      @ { build_input_area(this, theme, prefix, suffix)}
     }
   }
   .into_widget()
