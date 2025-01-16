@@ -21,7 +21,13 @@ pub struct ScrollableWidget {
   scroll_pos: Point,
   page: Size,
   content_size: Size,
+
+  view_id: Option<TrackId>,
 }
+
+/// the descendant widgets of `Scrollable` can use
+/// `Provider::state_of::<ScrollableProvider>` to scroll the view.
+pub type ScrollableProvider = Box<dyn StateWriter<Value = ScrollableWidget>>;
 
 impl Declare for ScrollableWidget {
   type Builder = FatObj<()>;
@@ -62,13 +68,73 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
         .distinct_until_changed()
         .subscribe(move |v| $this.write().set_page(v));
 
-      @Clip { @ $view { @ { child } } }
+      $this.write().view_id = Some($view.track_id());
+      @Clip {
+        providers: [Provider::value_of_writer(this.clone_boxed_writer(), None)],
+        @ $view { @ { child } }
+      }
     }
     .into_widget()
   }
 }
 
 impl ScrollableWidget {
+  pub fn map_to_view(&self, p: Point, child: WidgetId, wnd: &Window) -> Option<Point> {
+    let view_id = self.view_id.as_ref()?.get()?;
+    let pos = wnd.map_to_global(p, child);
+    let base = wnd.map_to_global(Point::zero(), view_id);
+    Some(pos - base.to_vector())
+  }
+
+  /// Ensure the given child is visible in the scroll view with the given anchor
+  /// relative to the view.
+  /// If Anchor.x is None,  it will anchor the widget to the closest edge of the
+  /// view in horizontal direction, when the widget is out of the view.
+  /// If Anchor.y is None, it will anchor the widget to the closest edge of the
+  /// view in vertical direction, when the widget is out of the view.
+  pub fn ensure_visible(&mut self, child: WidgetId, anchor: Anchor, wnd: &Window) {
+    let Some(pos) = self.map_to_view(Point::zero(), child, wnd) else { return };
+    let Some(size) = wnd.widget_size(child) else { return };
+    let child_rect = Rect::new(pos, size);
+    let view_size = self.scroll_view_size();
+
+    let best_auto_position_fn = |min: f32, max: f32, max_limit: f32| {
+      if (min < 0. && max_limit < max) || (0. < min && max < max_limit) {
+        min
+      } else if min.abs() < (max - max_limit).abs() {
+        0.
+      } else {
+        max_limit - (max - min)
+      }
+    };
+    let Anchor { x, y } = anchor;
+    let top_left = match (x, y) {
+      (Some(x), Some(y)) => Point::new(
+        x.into_pixel(child_rect.width(), view_size.width),
+        y.into_pixel(child_rect.height(), view_size.height),
+      ),
+      (Some(x), None) => {
+        let best_y =
+          best_auto_position_fn(child_rect.min_y(), child_rect.max_y(), view_size.height);
+        Point::new(x.into_pixel(child_rect.width(), view_size.width), best_y)
+      }
+      (None, Some(y)) => {
+        let best_x = best_auto_position_fn(child_rect.min_x(), child_rect.max_x(), view_size.width);
+        Point::new(best_x, y.into_pixel(child_rect.height(), view_size.height))
+      }
+      (None, None) => {
+        let best_x = best_auto_position_fn(child_rect.min_x(), child_rect.max_x(), view_size.width);
+        let best_y =
+          best_auto_position_fn(child_rect.min_y(), child_rect.max_y(), view_size.height);
+        Point::new(best_x, best_y)
+      }
+    };
+
+    let old = self.get_scroll_pos();
+    let offset = child_rect.origin - top_left;
+    self.jump_to(old + offset);
+  }
+
   pub fn scroll(&mut self, x: f32, y: f32) {
     let mut new = self.scroll_pos;
     if self.scrollable != Scrollable::X {
