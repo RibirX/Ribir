@@ -749,29 +749,6 @@ let count_reader = state.map_reader(|d| &d.count);
 
 但 Ribir 并没有提供一个 `split_reader`，因为分离一个只读的子状态，其意义等同于转换一个只读子状态。
 
-### 溯源状态
-
-任何状态都可以通过 `origin_reader` 和 `origin_writer` 来获得当前状态的来源。根状态的源状态是自己，而子状态的源状态是转换或分离出它的父状态。
-
-
-```rust
-use ribir::prelude::*;
-
-struct AppData {
-  count: usize,
-}
-
-let state: State<AppData> = State::value(AppData { count: 0 });
-let split_count = state.split_writer(|d| PartMut::new(&mut d.count));
-
-// 根状态的源状态是它自己
-let _: &State<AppData> = state.origin_reader();
-let _: &State<AppData> = state.origin_writer();
-
-// 子状态的源状态是它的父亲
-let _: &Stateful<AppData> = split_count.origin_reader();
-let _: &Stateful<AppData> = split_count.origin_writer();
-```
 
 ## 下一步
 

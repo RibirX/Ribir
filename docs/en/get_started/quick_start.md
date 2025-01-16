@@ -747,28 +747,6 @@ let count_reader = state.map_reader(|d| &d.count);
 
 But Ribir doesn't provide a ``split_reader``, because separating a read-only sub-state is equivalent to converting a read-only sub-state.
 
-### The origin state of the sub-state
-
-Each state can get where it came from through `origin_reader` and `origin_writer`. The root state's origin state is itself, and the sub-state's origin state is where it splits off from.
-
-```rust
-use ribir::prelude::*;
-
-struct AppData {
-  count: usize,
-}
-
-let state: State<AppData> = State::value(AppData { count: 0 });
-let split_count = state.split_writer(|d| PartMut::new(&mut d.count));
-
-// the root state's origin state is itself
-let _: &State<AppData> = state.origin_reader();
-let _: &State<AppData> = state.origin_writer();
-
-// the sub-state's origin state is where it splits from
-let _: &Stateful<AppData> = split_count.origin_reader();
-let _: &Stateful<AppData> = split_count.origin_writer();
-```
 
 ## The next step
 
