@@ -487,7 +487,7 @@ impl Default for MixBuiltin {
 
 impl Clone for MixBuiltin {
   fn clone(&self) -> Self {
-    let flags = State::stateful(self.flags.clone_writer());
+    let flags = self.flags.clone_writer();
     Self { flags, subject: self.subject.clone() }
   }
 }

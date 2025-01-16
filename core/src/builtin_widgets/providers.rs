@@ -52,9 +52,19 @@
 //! };
 //! ```
 //!
-//! State can be provided as either its value or itself. When providing a writer
-//! as its value, you can access its write reference using
-//! [`Provider::write_of`] to modify the state.
+//! ## Providing State
+//!
+//! State can be provided in unique manner, allowing both its value and the
+//! self reference to be accessed through a single provider. You can choose to
+//! provide a writer, watcher, or reader using [`Provider::value_of_writer`],
+//! [`Provider::value_of_watcher`], and [`Provider::value_of_reader`]
+//! respectively.
+//!
+//! The value can be accessed using [`Provider::of`], and the state itself can
+//! be accessed using [`Provider::state_of`].
+//!
+//! If a writer is provided, the write reference can be accessed using
+//! [`Provider::write_of`] to make writer reference to the state.
 //!
 //! ```
 //! use ribir::prelude::*;
@@ -64,9 +74,7 @@
 //!
 //! providers! {
 //!   providers: smallvec![
-//!     // Providing a `Stateful<i32>`
-//!     Provider::new(state.clone_writer()),
-//!     // Providing an `i32`
+//!     // Providing an writer of `i32`
 //!     Provider::value_of_writer(state, None),
 //!   ],
 //!   @ {
@@ -74,9 +82,9 @@
 //!     // Accessing the state value
 //!     let value = *Provider::of::<i32>(ctx).unwrap();
 //!     assert_eq!(value, 1);
-//!     // Accessing the state itself
 //!     {
-//!       let _state = Provider::of::<Stateful<i32>>(ctx).unwrap();
+//!       // Accessing the state itself
+//!       let _state = Provider::state_of::<Stateful<i32>>(ctx).unwrap();
 //!     }
 //!     // Accessing the write reference of the state to modify the value
 //!     let mut value = Provider::write_of::<i32>(ctx).unwrap();
@@ -84,6 +92,32 @@
 //!     @Text { text: "Both state and its value provided!" }
 //!   }
 //! };
+//! ```
+//!
+//! If the type of the state is unknown, we can provide it using a boxed state
+//! trait.
+//!
+//! ```
+//! use ribir::prelude::*;
+//! use smallvec::smallvec;
+//!
+//! fn provide_box_state(writer: impl StateWriter<Value = i32>) {
+//!   let writer: Box<dyn StateWriter<Value = i32>> = Box::new(writer);
+//!   let _ = providers! {
+//!     providers: [Provider::value_of_writer(writer, None)],
+//!     @ {
+//!       let ctx = BuildCtx::get();
+//!       // Accessing the state value
+//!       let value = *Provider::of::<i32>(ctx).unwrap();
+//!       assert_eq!(value, 1);
+//!       // Accessing the state itself
+//!       {
+//!         let _state = Provider::state_of::<Box<dyn StateWriter<Value = i32>>>(ctx).unwrap();
+//!       }
+//!       @Text { text: "Both state and its value provided!" }
+//!     }
+//!   };
+//! }
 //! ```
 //!
 //! ## Scope of Providers in the Build Process
@@ -112,7 +146,6 @@
 //! ```
 //!
 //! The correct approach is as follows:
-//!
 //! ```
 //! use ribir::prelude::*;
 //!
@@ -229,22 +262,42 @@ impl Provider {
   ///      assert_eq!(*Provider::of::<i32>(ctx).unwrap(), 1);
   ///      
   ///      // Obtain the reader  
-  ///      let reader = Provider::state_of::
-  ///         <<Stateful<i32> as StateReader>::Reader>(ctx);
+  ///      let reader = Provider::state_of::<Reader<i32>>(ctx);
   ///       assert_eq!(*reader.unwrap().read(), 1);
   ///      Void
   ///    }
   ///  };
   ///  ```
-  pub fn value_of_reader<R>(value: R) -> Provider
-  where
-    R: StateReader<Reader: Query>,
-    R::Value: Sized + 'static,
-  {
-    match value.try_into_value() {
-      Ok(v) => Provider::Setup(Box::new(Setup::new(v))),
-      Err(v) => Provider::Setup(Box::new(Setup::from_state(v.clone_reader()))),
-    }
+  pub fn value_of_reader(value: impl StateReader<Value: Sized, Reader: Query>) -> Provider {
+    Provider::Setup(Box::new(Setup::from_state(value.clone_reader())))
+  }
+
+  /// Establish a provider for the value of a watcher. It will clone the watcher
+  /// to create the provider to prevent any writer leaks.
+  ///
+  /// Obtain the value using [`Provider::of`], and if you want to access the
+  /// watcher, using [`Provider::state_of`].
+  ///
+  /// ## Example
+  ///
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let w = providers! {
+  ///   providers: [Provider::value_of_watcher(Stateful::new(1i32))],
+  ///   @ {
+  ///     let ctx = BuildCtx::get();
+  ///     // Obtain the value
+  ///     assert_eq!(*Provider::of::<i32>(ctx).unwrap(), 1);
+  ///     // Obtain the watcher
+  ///     let watcher = Provider::state_of::<Watcher<Reader<i32>>>(ctx);
+  ///     assert_eq!(*watcher.unwrap().read(), 1);
+  ///     Void
+  ///   }
+  /// };
+  /// ```
+  pub fn value_of_watcher(value: impl StateWatcher<Value: Sized, Watcher: Query>) -> Provider {
+    Provider::Setup(Box::new(Setup::from_state(value.clone_watcher())))
   }
 
   /// Establish a provider for the value of a writer.
@@ -289,21 +342,16 @@ impl Provider {
   pub fn value_of_writer<V: 'static>(
     value: impl StateWriter<Value = V> + Query, dirty: Option<DirtyPhase>,
   ) -> Provider {
-    match value.try_into_value() {
-      Ok(v) => Provider::Setup(Box::new(Setup::new(v))),
-      Err(this) => {
-        if let Some(dirty) = dirty {
-          let writer = WriterSetup {
-            modifies: this.raw_modifies(),
-            info: Provider::info::<V>(),
-            value: Box::new(this),
-            dirty,
-          };
-          Provider::Setup(Box::new(writer))
-        } else {
-          Provider::Setup(Box::new(Setup::from_state(this)))
-        }
-      }
+    if let Some(dirty) = dirty {
+      let writer = WriterSetup {
+        modifies: value.raw_modifies(),
+        info: Provider::info::<V>(),
+        value: Box::new(value),
+        dirty,
+      };
+      Provider::Setup(Box::new(writer))
+    } else {
+      Provider::Setup(Box::new(Setup::from_state(value)))
     }
   }
 
@@ -514,7 +562,7 @@ impl ProviderCtx {
     self
       .data
       .get(&info)
-      .and_then(|q| q.query_write(&QueryId::of::<S>()))
+      .and_then(|q| q.query(&QueryId::of::<S>()))
       .and_then(QueryHandle::into_ref)
   }
 
@@ -839,7 +887,7 @@ mod tests {
 
     let (value, w_value) = split_value(0);
     let w = providers! {
-      providers: smallvec![Provider::new(1i32)],
+      providers: [Provider::new(1i32)],
       @MockBox {
         size: Size::new(1.,1.),
         @ {
@@ -864,7 +912,7 @@ mod tests {
     let (value2, w_value2) = split_value(0);
     let w = mock_multi! {
       @Providers {
-        providers: smallvec![Provider::new(1i32)],
+        providers: [Provider::new(1i32)],
         @ {
           let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
           *$w_value1.write() = *v;
@@ -896,7 +944,7 @@ mod tests {
     let (trigger, w_trigger) = split_value(true);
 
     let w = providers! {
-      providers: smallvec![Provider::new(w_value.clone_writer())],
+      providers: [Provider::new(w_value.clone_writer())],
       @ {
         // We do not allow the use of the build context in the pipe at the moment.
         let value = Provider::of::<Stateful<i32>>(BuildCtx::get())
@@ -969,5 +1017,83 @@ mod tests {
     wnd.draw_frame();
     assert_eq!(cnt.read().layout_cnt.get(), 2);
     assert_eq!(cnt.read().paint_cnt.get(), 3);
+  }
+
+  #[test]
+  fn boxed_reader() {
+    reset_test_env!();
+
+    let w = fn_widget! {
+      let boxed_reader: Box<dyn StateReader<Value = i32>> = Box::new(Stateful::new(1i32));
+
+      @Providers {
+        providers: [Provider::value_of_reader(boxed_reader)],
+        @ {
+          let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
+          assert_eq!(*v, 1);
+
+          let v = Provider::state_of::<Box<dyn StateReader<Value = i32>>>(BuildCtx::get()).unwrap();
+          assert_eq!(*v.read(), 1);
+          Void
+        }
+      }
+    };
+
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+  }
+
+  #[test]
+  fn boxed_watcher() {
+    reset_test_env!();
+
+    let w = fn_widget! {
+      let boxed_watcher: Box<dyn StateWatcher<Value = i32>> = Box::new(Stateful::new(1i32));
+
+      @Providers {
+        providers: [Provider::value_of_watcher(boxed_watcher)],
+        @ {
+          let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
+          assert_eq!(*v, 1);
+
+          let v = Provider::state_of::<Box<dyn StateWatcher<Value = i32>>>(
+              BuildCtx::get()
+            )
+            .unwrap();
+          assert_eq!(*v.read(), 1);
+          Void
+        }
+      }
+    };
+
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+  }
+
+  #[test]
+  fn boxed_writer() {
+    reset_test_env!();
+
+    let w = fn_widget! {
+      let boxed_writer: Box<dyn StateWriter<Value = i32>> = Box::new(Stateful::new(1i32));
+
+      @Providers {
+        providers: [Provider::value_of_writer(boxed_writer, None)],
+        @ {
+          let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
+          assert_eq!(*v, 1);
+
+          let v = Provider::state_of::<Box<dyn StateWriter<Value = i32>>>(
+              BuildCtx::get()
+            )
+            .unwrap();
+          assert_eq!(*v.read(), 1);
+          Void
+        }
+      }
+    };
+
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
   }
 }

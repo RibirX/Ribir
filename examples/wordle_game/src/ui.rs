@@ -41,7 +41,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
   }
 
   fn keyboard(self, state_bar: impl StateWriter<Value = Text> + 'static) -> Widget<'static> {
-    let this: <Self as StateWriter>::Writer = self.clone_writer();
+    let this = self.clone_writer();
     let palette = Palette::of(BuildCtx::get());
     let gray = palette.base_of(&palette.surface_variant());
     self::column! {

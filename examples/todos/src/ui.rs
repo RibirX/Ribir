@@ -4,7 +4,8 @@ use crate::todos::{Task, Todos};
 
 impl Compose for Todos {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    fn_widget! {
+    providers! {
+      providers: [Provider::value_of_writer(this.clone_writer(), None)],
       @Column {
         align_items: Align::Center,
         item_gap: 12.,
@@ -130,9 +131,7 @@ fn input(
 fn task_item_widget<S>(task: S, stagger: Stateful<Stagger<Box<dyn Transition>>>) -> Widget<'static>
 where
   S: StateWriter<Value = Task> + 'static,
-  S::OriginWriter: StateWriter<Value = Todos>,
 {
-  let todos = task.origin_writer().clone_writer();
   fn_widget! {
     let id = $task.id();
     let mut item = @ListItem { };
@@ -169,7 +168,7 @@ where
         let icon = FatObj::new(icon);
         @ $icon {
           cursor: CursorIcon::Pointer,
-          on_tap: move |_| $todos.write().remove(id),
+          on_tap: move |e| Provider::write_of::<Todos>(e).unwrap().remove(id)
         }.into_widget()
       }))
     }

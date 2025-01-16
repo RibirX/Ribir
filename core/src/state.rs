@@ -22,15 +22,20 @@ use crate::{prelude::*, render_helper::RenderProxy};
 pub trait StateReader: 'static {
   /// The value type of this state.
   type Value: ?Sized;
-  /// The origin state type that this state map or split from . Otherwise
-  /// return itself.
-  type OriginReader: StateReader;
-  type Reader: StateReader<Value = Self::Value>;
+  type Reader: StateReader<Value = Self::Value>
+  where
+    Self: Sized;
 
   /// Return a reference of this state.
   fn read(&self) -> ReadRef<Self::Value>;
-  /// get a clone of this state that only can read.
-  fn clone_reader(&self) -> Self::Reader;
+
+  /// Return a boxed reader of this state.
+  fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>>;
+
+  /// Return a cloned reader of this state.
+  fn clone_reader(&self) -> Self::Reader
+  where
+    Self: Sized;
   /// Maps an reader to another by applying a function to a contained
   /// value. The return reader is just a shortcut to access part of the origin
   /// reader.
@@ -43,22 +48,27 @@ pub trait StateReader: 'static {
   fn map_reader<U: ?Sized, F>(&self, map: F) -> MapReader<Self::Reader, F>
   where
     F: Fn(&Self::Value) -> PartRef<U> + Clone,
+    Self: Sized,
   {
     MapReader { origin: self.clone_reader(), part_map: map }
   }
-  /// Return the origin reader that this state map or split from . Otherwise
-  /// return itself.
-  fn origin_reader(&self) -> &Self::OriginReader;
 
   /// try convert this state into the value, if there is no other share this
   /// state, otherwise return an error with self.
   fn try_into_value(self) -> Result<Self::Value, Self>
   where
     Self: Sized,
-    Self::Value: Sized;
+    Self::Value: Sized,
+  {
+    Err(self)
+  }
 }
 
 pub trait StateWatcher: StateReader {
+  type Watcher: StateWatcher<Value = Self::Value>
+  where
+    Self: Sized;
+
   /// Return a modifies `Rx` stream of the state, user can subscribe it to
   /// response the state changes.
   fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
@@ -72,16 +82,17 @@ pub trait StateWatcher: StateReader {
   /// `modifies` instead if you only want to response the data changes.
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible>;
 
-  /// Clone a reader that can be used to observe the modifies of the state.
-  fn clone_watcher(&self) -> Watcher<Self::Reader> {
-    Watcher::new(self.clone_reader(), self.raw_modifies())
-  }
+  /// Clone a boxed watcher that can be used to observe the modifies of the
+  /// state.
+  fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>>;
+
+  /// Clone a watcher that can be used to observe the modifies of the state.
+  fn clone_watcher(&self) -> Self::Watcher
+  where
+    Self: Sized;
 }
 
 pub trait StateWriter: StateWatcher {
-  type Writer: StateWriter<Value = Self::Value>;
-  type OriginWriter: StateWriter;
-
   /// Convert the writer to a reader if no other writers exist.
   fn into_reader(self) -> Result<Self::Reader, Self>
   where
@@ -98,10 +109,14 @@ pub trait StateWriter: StateWatcher {
   /// state and then modifies it back to trigger the view update. Use it only
   /// if you know how a shallow reference works.
   fn shallow(&self) -> WriteRef<Self::Value>;
-  /// Clone this state writer.
-  fn clone_writer(&self) -> Self::Writer;
-  /// Return the origin writer that this state map or split from.
-  fn origin_writer(&self) -> &Self::OriginWriter;
+
+  /// Clone a boxed writer of this state.
+  fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>>;
+
+  /// Clone a writer of this state.
+  fn clone_writer(&self) -> Self
+  where
+    Self: Sized;
   /// Return a new writer that be part of the origin writer by applying a
   /// function to the contained value.
   ///
@@ -121,9 +136,10 @@ pub trait StateWriter: StateWatcher {
   /// modified within this function. Therefore, if the original data is
   /// modified, no downstream will be notified.
   #[inline]
-  fn split_writer<V: ?Sized, W>(&self, mut_map: W) -> SplittedWriter<Self::Writer, W>
+  fn split_writer<V: ?Sized, W>(&self, mut_map: W) -> SplittedWriter<Self, W>
   where
     W: Fn(&mut Self::Value) -> PartMut<V> + Clone,
+    Self: Sized,
   {
     SplittedWriter::new(self.clone_writer(), mut_map)
   }
@@ -140,9 +156,10 @@ pub trait StateWriter: StateWatcher {
   /// modified within this function. Therefore, if the original data is
   /// modified, no downstream will be notified.
   #[inline]
-  fn map_writer<V: ?Sized, M>(&self, part_map: M) -> MapWriter<Self::Writer, M>
+  fn map_writer<V: ?Sized, M>(&self, part_map: M) -> MapWriter<Self, M>
   where
     M: Fn(&mut Self::Value) -> PartMut<V> + Clone,
+    Self: Sized,
   {
     let origin = self.clone_writer();
     MapWriter { origin, part_map }
@@ -166,7 +183,6 @@ pub(crate) enum InnerState<W> {
 
 impl<T: 'static> StateReader for State<T> {
   type Value = T;
-  type OriginReader = Self;
   type Reader = Reader<T>;
 
   fn read(&self) -> ReadRef<T> {
@@ -177,10 +193,12 @@ impl<T: 'static> StateReader for State<T> {
   }
 
   #[inline]
-  fn clone_reader(&self) -> Self::Reader { self.as_stateful().clone_reader() }
+  fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
+    Box::new(self.clone_reader())
+  }
 
   #[inline]
-  fn origin_reader(&self) -> &Self::OriginReader { self }
+  fn clone_reader(&self) -> Self::Reader { self.as_stateful().clone_reader() }
 
   fn try_into_value(self) -> Result<Self::Value, Self> {
     match self.0.into_inner() {
@@ -191,16 +209,24 @@ impl<T: 'static> StateReader for State<T> {
 }
 
 impl<T: 'static> StateWatcher for State<T> {
+  type Watcher = Watcher<Self::Reader>;
+  #[inline]
+  fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
+    Box::new(self.clone_watcher())
+  }
+
   #[inline]
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
     self.as_stateful().raw_modifies()
   }
+
+  #[inline]
+  fn clone_watcher(&self) -> Watcher<Self::Reader> {
+    Watcher::new(self.clone_reader(), self.raw_modifies())
+  }
 }
 
 impl<T: 'static> StateWriter for State<T> {
-  type Writer = Stateful<T>;
-  type OriginWriter = Self;
-
   fn into_reader(self) -> Result<Self::Reader, Self>
   where
     Self: Sized,
@@ -221,10 +247,12 @@ impl<T: 'static> StateWriter for State<T> {
   fn shallow(&self) -> WriteRef<T> { self.as_stateful().shallow() }
 
   #[inline]
-  fn clone_writer(&self) -> Self::Writer { self.as_stateful().clone_writer() }
+  fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {
+    Box::new(self.clone_writer())
+  }
 
   #[inline]
-  fn origin_writer(&self) -> &Self::OriginWriter { self }
+  fn clone_writer(&self) -> Self { State::stateful(self.as_stateful().clone_writer()) }
 }
 
 impl<W> State<W> {
@@ -234,6 +262,12 @@ impl<W> State<W> {
 
   pub fn value(value: W) -> Self { State(UnsafeCell::new(InnerState::Data(StateCell::new(value)))) }
 
+  pub fn into_stateful(self) -> Stateful<W>
+  where
+    W: 'static,
+  {
+    self.as_stateful().clone_writer()
+  }
   pub fn as_stateful(&self) -> &Stateful<W> {
     match self.inner_ref() {
       InnerState::Data(w) => {
@@ -425,6 +459,104 @@ impl<R: Render> IntoWidgetStrict<'static, RENDER> for State<R> {
 impl<W: Compose + 'static> IntoWidgetStrict<'static, COMPOSE> for State<W> {
   #[inline]
   fn into_widget_strict(self) -> Widget<'static> { Compose::compose(self) }
+}
+
+impl<V: ?Sized + 'static> StateReader for Box<dyn StateReader<Value = V>> {
+  type Value = V;
+  type Reader = Self;
+
+  #[inline]
+  fn read(&self) -> ReadRef<'_, V> { (**self).read() }
+
+  #[inline]
+  fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
+    (**self).clone_boxed_reader()
+  }
+
+  fn clone_reader(&self) -> Self::Reader { self.clone_boxed_reader() }
+}
+
+impl<V: ?Sized + 'static> StateReader for Box<dyn StateWatcher<Value = V>> {
+  type Value = V;
+  type Reader = Box<dyn StateReader<Value = V>>;
+
+  #[inline]
+  fn read(&self) -> ReadRef<'_, V> { (**self).read() }
+
+  #[inline]
+  fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
+    (**self).clone_boxed_reader()
+  }
+
+  #[inline]
+  fn clone_reader(&self) -> Self::Reader { self.clone_boxed_reader() }
+}
+
+impl<V: ?Sized + 'static> StateWatcher for Box<dyn StateWatcher<Value = V>> {
+  type Watcher = Box<dyn StateWatcher<Value = V>>;
+
+  #[inline]
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+    (**self).raw_modifies()
+  }
+
+  #[inline]
+  fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
+    (**self).clone_boxed_watcher()
+  }
+
+  #[inline]
+  fn clone_watcher(&self) -> Self::Watcher { self.clone_boxed_watcher() }
+}
+
+impl<V: ?Sized + 'static> StateReader for Box<dyn StateWriter<Value = V>> {
+  type Value = V;
+  type Reader = Box<dyn StateReader<Value = V>>;
+
+  #[inline]
+  fn read(&self) -> ReadRef<'_, V> { (**self).read() }
+
+  #[inline]
+  fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
+    (**self).clone_boxed_reader()
+  }
+
+  #[inline]
+  fn clone_reader(&self) -> Self::Reader { self.clone_boxed_reader() }
+}
+
+impl<V: ?Sized + 'static> StateWatcher for Box<dyn StateWriter<Value = V>> {
+  type Watcher = Box<dyn StateWatcher<Value = Self::Value>>;
+  #[inline]
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+    (**self).raw_modifies()
+  }
+
+  #[inline]
+  fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
+    (**self).clone_boxed_watcher()
+  }
+
+  #[inline]
+  fn clone_watcher(&self) -> Self::Watcher { self.clone_boxed_watcher() }
+}
+
+impl<V: ?Sized + 'static> StateWriter for Box<dyn StateWriter<Value = V>> {
+  #[inline]
+  fn into_reader(self) -> Result<Self::Reader, Self> { Err(self) }
+  #[inline]
+  fn write(&self) -> WriteRef<Self::Value> { (**self).write() }
+  #[inline]
+  fn silent(&self) -> WriteRef<Self::Value> { (**self).silent() }
+  #[inline]
+  fn shallow(&self) -> WriteRef<Self::Value> { (**self).shallow() }
+  #[inline]
+  fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {
+    (**self).clone_boxed_writer()
+  }
+
+  #[inline]
+  fn clone_writer(&self) -> Self { self.clone_boxed_writer() }
 }
 
 #[cfg(test)]

@@ -34,7 +34,7 @@ pub trait AnimateState: AnimateStateSetter {
       .state(self)
       .finish();
 
-    let c_animate = animate.clone_writer();
+    let c_animate = animate.as_stateful().clone_writer();
     let init_value = observable::of(state.get());
     state
       .animate_state_modifies()
@@ -66,7 +66,7 @@ where
   S: StateWriter,
   S::Value: Clone,
 {
-  type C = S::Writer;
+  type C = S;
   type Value = S::Value;
 
   #[inline]

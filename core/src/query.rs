@@ -2,9 +2,7 @@ use std::any::{Any, TypeId};
 
 use smallvec::SmallVec;
 
-use crate::state::{
-  MapReader, MapWriterAsReader, ReadRef, Reader, StateReader, StateWriter, WriteRef,
-};
+use crate::state::*;
 
 /// A type can composed by many types, this trait help us to query the type and
 /// the inner type by type id.
@@ -282,23 +280,26 @@ macro_rules! impl_query_for_reader {
   };
 }
 
-impl<S, F, V> Query for MapReader<S, F>
+impl<S, F, V: 'static> Query for MapReader<S, F>
 where
   Self: StateReader<Value = V>,
-  V: Any,
 {
   impl_query_for_reader!();
 }
 
-impl<S, F, V> Query for MapWriterAsReader<S, F>
-where
-  Self: StateReader<Value = V>,
-  V: Any,
-{
+impl<V: 'static> Query for Reader<V> {
   impl_query_for_reader!();
 }
 
-impl<V: Any> Query for Reader<V> {
+impl<V: 'static> Query for Box<dyn StateReader<Value = V>> {
+  impl_query_for_reader!();
+}
+
+impl<V: 'static, R: StateReader<Value = V>> Query for Watcher<R> {
+  impl_query_for_reader!();
+}
+
+impl<V: 'static> Query for Box<dyn StateWatcher<Value = V>> {
   impl_query_for_reader!();
 }
 
