@@ -36,7 +36,6 @@ impl<'a> LayoutCtx<'a> {
     } else {
       ProviderCtx::default()
     };
-
     Self { id, tree, provider_ctx }
   }
 
@@ -47,25 +46,25 @@ impl<'a> LayoutCtx<'a> {
     let tree2 = unsafe { &*(self.tree as *mut WidgetTree) };
 
     let id = self.id();
-    let w = id.assert_get(tree2);
-    let size = w.perform_layout(clamp, self);
+
+    debug_assert!(clamp.min.is_finite());
+    let size = id.assert_get(tree2).perform_layout(clamp, self);
+    debug_assert!(size.is_finite());
+    let info = self.tree.store.layout_info_or_default(id);
+    info.clamp = clamp;
+    info.size = Some(size);
 
     self
       .window()
       .add_delay_event(DelayEvent::PerformedLayout(id));
 
-    let info = self.tree.store.layout_info_or_default(id);
-    info.clamp = clamp;
-    info.size = Some(size);
     size
   }
 
   /// Perform layout of the `child` and return its size.
   pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
-    let info = self.tree.store.layout_info(child);
-    let size = info
-      .filter(|info| info.clamp == clamp)
-      .and_then(|info| info.size)
+    let size = self
+      .get_calculated_size(child, clamp)
       .unwrap_or_else(|| {
         // The position needs to be reset, as some parent render widgets may not have
         // set the position.
@@ -77,7 +76,8 @@ impl<'a> LayoutCtx<'a> {
 
         size
       });
-    self.provider_ctx.pop_providers_for(child);
+    self.provider_ctx.pop_providers_for(self.id);
+
     size
   }
 
@@ -145,6 +145,11 @@ impl<'a> LayoutCtx<'a> {
   pub fn force_child_relayout(&mut self, child: WidgetId) -> bool {
     assert_eq!(child.parent(self.tree), Some(self.id));
     self.tree.store.force_layout(child).is_some()
+  }
+
+  fn get_calculated_size(&self, child: WidgetId, clamp: BoxClamp) -> Option<Size> {
+    let info = self.tree.store.layout_info(child)?;
+    if info.clamp == clamp { info.size } else { None }
   }
 }
 

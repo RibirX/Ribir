@@ -31,8 +31,9 @@ pub enum Measure {
   /// Value in logical pixels.
   Pixel(f32),
 
-  /// Value as a percentage of the maximum widget size.
-  /// 1.0 corresponds to 100%.
+  /// The value represents a percentage of the maximum size provided by the
+  /// finite parent clamp, corresponding to the parent's size if the parent is a
+  /// fixed-size container. A value of 1.0 corresponds to 100%.
   Percent(f32),
 }
 
@@ -84,7 +85,13 @@ impl Measure {
   pub fn into_pixel(self, max_clamp: f32) -> f32 {
     match self {
       Measure::Pixel(x) => x,
-      Measure::Percent(x) => x * max_clamp,
+      Measure::Percent(x) => {
+        if x.is_finite() {
+          x * max_clamp
+        } else {
+          0.
+        }
+      }
     }
   }
 }

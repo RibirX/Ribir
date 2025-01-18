@@ -717,7 +717,6 @@ mod tests {
 
     let w = fn_widget! {
       @MockStack {
-        clamp: BoxClamp::EXPAND_BOTH,
         @MockBox {
           anchor: Point::new(50., 50.),
           on_mounted: move |ctx| {

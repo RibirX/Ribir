@@ -31,8 +31,7 @@ impl Render for HorizontalLine {
     let child_clamp = clamp.with_min_size(ZERO_SIZE);
     let (ctx, children) = ctx.split_children();
     for c in children {
-      let clamp = child_clamp.with_max_width(child_clamp.max.width - size.width);
-      let child_size = ctx.perform_child_layout(c, clamp);
+      let child_size = ctx.perform_child_layout(c, child_clamp);
       size.width += child_size.width;
       size.height = size.height.max(child_size.height);
     }
@@ -58,8 +57,7 @@ impl Render for VerticalLine {
     let child_clamp = clamp.with_min_size(ZERO_SIZE);
     let (ctx, children) = ctx.split_children();
     for c in children {
-      let clamp = child_clamp.with_max_height(child_clamp.max.height - size.height);
-      let child_size = ctx.perform_child_layout(c, clamp);
+      let child_size = ctx.perform_child_layout(c, child_clamp);
       size.width = size.width.max(child_size.width);
       size.height += child_size.height;
     }

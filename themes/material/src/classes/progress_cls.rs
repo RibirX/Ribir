@@ -46,7 +46,7 @@ pub(super) fn init(classes: &mut Classes) {
   });
   classes.insert(LINEAR_PROGRESS, style_class! {
     margin: md::EDGES_HOR_4,
-    clamp: BoxClamp::EXPAND_X.with_fixed_height(md::THICKNESS_4)
+    clamp: BoxClamp::UNLIMITED.with_fixed_height(md::THICKNESS_4)
   });
   classes.insert(LINEAR_DETERMINATE_TRACK, |w| {
     let w = FatObj::new(w);

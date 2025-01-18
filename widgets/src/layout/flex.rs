@@ -322,14 +322,6 @@ impl FlexLayouter {
         ctx.update_position(child, info.pos.to_size(*dir).to_vector().to_point());
       })
     });
-
-    for child in children {
-      self.lines.iter_mut().for_each(|line| {
-        line.items_info.iter_mut().for_each(|info| {
-          ctx.update_position(child, info.pos.to_size(*dir).to_vector().to_point());
-        })
-      });
-    }
   }
 
   fn place_line(&mut self) {

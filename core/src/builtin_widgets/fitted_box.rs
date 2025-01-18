@@ -48,10 +48,10 @@ impl FittedBox {
 
 impl Render for FittedBox {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let container_size = clamp.max;
-    if container_size.is_empty() {
+    let container = clamp.max;
+    if container.is_empty() {
       self.scale_cache.set(Vector::zero());
-      return container_size;
+      return Size::zero();
     }
 
     let child_size =
@@ -62,8 +62,8 @@ impl Render for FittedBox {
       return child_size;
     }
 
-    let x = container_size.width / child_size.width;
-    let y = container_size.height / child_size.height;
+    let x = if container.width.is_finite() { container.width / child_size.width } else { 1. };
+    let y = if container.height.is_finite() { container.height / child_size.height } else { 1. };
     let scale = match self.box_fit {
       BoxFit::None => Vector::new(1., 1.),
       BoxFit::Fill => Vector::new(x, y),

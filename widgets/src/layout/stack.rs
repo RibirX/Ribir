@@ -39,8 +39,8 @@ impl Render for Stack {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let stack_clamp = match self.fit {
       StackFit::Loose => clamp.loose(),
-      StackFit::Expand => BoxClamp { min: clamp.max, max: clamp.max },
-      StackFit::Passthrough => clamp,
+      StackFit::Expand if clamp.max.is_finite() => BoxClamp { min: clamp.max, max: clamp.max },
+      _ => clamp,
     };
 
     let mut size = ZERO_SIZE;

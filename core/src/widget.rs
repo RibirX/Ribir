@@ -31,6 +31,17 @@ pub trait Render: 'static {
   ///
   /// In implementing this function, You are responsible for calling every
   /// children's perform_layout across the `LayoutCtx`
+  ///
+  /// ## Guidelines for implementing this method
+  ///
+  /// - The clamp should restrict the size to always fall within the specified
+  ///   range.
+  /// - Avoid returning infinity or NaN size, as this could result in a crash.
+  ///   If your size calculation is dependent on the `clamp.max`, you might want
+  ///   to consider using [`LayoutCtx::fixed_max`].
+  /// - Parent has responsibility to call the children's perform_layout, and
+  ///   update the children's position. If the children position is not updated
+  ///   that will set to zero.
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size;
 
   /// Draw the widget on the paint device using `PaintingCtx::painter` within

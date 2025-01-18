@@ -62,9 +62,11 @@ pub struct Divider {
 impl Render for Divider {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
     if self.direction.is_horizontal() {
-      Size::new(clamp.max.width, self.extent)
+      let width = clamp.max.width;
+      if width.is_finite() { Size::new(width, self.extent) } else { clamp.min }
     } else {
-      Size::new(self.extent, clamp.max.height)
+      let height = clamp.max.height;
+      if height.is_finite() { Size::new(self.extent, height) } else { clamp.min }
     }
   }
 
