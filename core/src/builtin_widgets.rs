@@ -986,6 +986,12 @@ impl<T> FatObj<T> {
   }
 }
 
+impl<T> FatObj<T> {
+  /// Take the scrollable widget from this widget, and return it if it exists.
+  pub fn take_scrollable_widget(&mut self) -> Option<State<ScrollableWidget>> {
+    self.scrollable.take()
+  }
+}
 pub trait FatDeclarerExtend: Sized {
   type Target;
   fn finish(this: FatObj<Self>) -> FatObj<Self::Target>;

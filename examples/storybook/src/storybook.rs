@@ -16,7 +16,7 @@ fn content() -> Widget<'static> {
     fn_widget! {
       @Scrollbar {
         @Column {
-          clamp: BoxClamp::EXPAND_X,
+          h_align: HAlign::Stretch,
           align_items: Align::Center,
           @Column {
             align_items: Align::Center,
@@ -277,7 +277,7 @@ fn content() -> Widget<'static> {
 pub fn storybook() -> Widget<'static> {
   let f = fn_widget! {
     @Column {
-      clamp: BoxClamp::EXPAND_X,
+      h_align: HAlign::Stretch,
       align_items: Align::Center,
       background: Palette::of(BuildCtx::get()).surface_container_low(),
       @ { header() }

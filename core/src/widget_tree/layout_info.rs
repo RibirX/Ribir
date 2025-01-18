@@ -13,19 +13,7 @@ pub struct BoxClamp {
 }
 
 impl BoxClamp {
-  /// clamp use to expand the width to max
-  pub const EXPAND_X: BoxClamp =
-    BoxClamp { min: Size::new(f32::INFINITY, 0.), max: Size::new(f32::INFINITY, f32::INFINITY) };
-
-  /// clamp use to expand the height to max
-  pub const EXPAND_Y: BoxClamp =
-    BoxClamp { min: Size::new(0., f32::INFINITY), max: Size::new(f32::INFINITY, f32::INFINITY) };
-
-  /// clamp use to expand the size to max
-  pub const EXPAND_BOTH: BoxClamp = BoxClamp {
-    min: Size::new(f32::INFINITY, f32::INFINITY),
-    max: Size::new(f32::INFINITY, f32::INFINITY),
-  };
+  pub const UNLIMITED: BoxClamp = BoxClamp { min: ZERO_SIZE, max: INFINITY_SIZE };
 
   /// clamp use fixed width and unfixed height
   pub const fn fixed_width(width: f32) -> Self {
@@ -41,15 +29,19 @@ impl BoxClamp {
   pub const fn fixed_size(size: Size) -> Self { BoxClamp { min: size, max: size } }
 
   pub const fn min_width(width: f32) -> Self {
-    let mut clamp = BoxClamp::EXPAND_BOTH;
+    let mut clamp = Self::UNLIMITED;
     clamp.min.width = width;
     clamp
   }
 
   pub const fn min_height(height: f32) -> Self {
-    let mut clamp = BoxClamp::EXPAND_BOTH;
+    let mut clamp = Self::UNLIMITED;
     clamp.min.height = height;
     clamp
+  }
+
+  pub const fn min_size(min: Size) -> Self {
+    Self { min, max: Size::new(f32::INFINITY, f32::INFINITY) }
   }
 
   pub fn with_min_size(mut self, size: Size) -> Self {
@@ -102,8 +94,8 @@ pub struct LayoutInfo {
   /// Box bound is the bound of the layout can be place. it will be set after
   /// render object computing its layout. It's passed by render object's parent.
   pub clamp: BoxClamp,
-  /// object's layout size, Some value after the render
-  /// object has been layout, otherwise is none value.
+  /// The size of the object's layout result, indicating that the object has
+  /// been laid out; otherwise, it is `None`.
   pub size: Option<Size>,
   /// The position render object to place, default is zero
   pub pos: Point,

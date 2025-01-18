@@ -162,7 +162,7 @@ mod tests {
   widget_image_tests!(
     middle_baseline,
     WidgetTester::new(self::column! {
-      item_gap: 8.,
+      justify_content: JustifyContent::SpaceBetween,
       @Text {
         text: "Baseline check!",
         font_size: 20.,

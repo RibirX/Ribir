@@ -24,9 +24,7 @@ use crate::layout::Stack;
 /// `Provider::of::<ScrollableWidget>` to retrieve the scroll status and
 /// determine the scrollbar's appearance.
 
-#[derive(Declare)]
 pub struct Scrollbar {
-  #[declare(default=Stateful::new(ScrollableWidget::default()))]
   scroll: Stateful<ScrollableWidget>,
 }
 
@@ -43,6 +41,14 @@ class_names! {
   SCROLL_CLIENT_AREA
 }
 
+/// Macro used to generate a function widget using `Scrollbar` as the root
+/// widget.
+#[macro_export]
+macro_rules! scrollbar {
+  ($($t: tt)*) => { fn_widget! { @Scrollbar { $($t)* } } };
+}
+pub use scrollbar;
+
 impl Scrollbar {
   pub fn new(scrollable: Scrollable) -> Self {
     let mut inner = ScrollableWidget::default();
@@ -53,6 +59,27 @@ impl Scrollbar {
   /// Return the `ScrollableWidget` of the scrollbar. You can utilize it to
   /// scroll the child or access scroll information.
   pub fn inner_scrollable_widget(&self) -> &Stateful<ScrollableWidget> { &self.scroll }
+}
+
+pub struct ScrollbarDeclarer;
+
+impl Declare for Scrollbar {
+  type Builder = FatObj<ScrollbarDeclarer>;
+
+  fn declarer() -> Self::Builder { FatObj::new(ScrollbarDeclarer) }
+}
+
+impl FatDeclarerExtend for ScrollbarDeclarer {
+  type Target = Scrollbar;
+  fn finish(mut this: FatObj<Self>) -> FatObj<Self::Target> {
+    let scroll = this.take_scrollable_widget();
+    let scroll = if let Some(scroll) = scroll {
+      scroll.into_stateful()
+    } else {
+      Stateful::new(ScrollableWidget::default())
+    };
+    this.map(|_| Scrollbar { scroll })
+  }
 }
 
 impl<'c> ComposeChild<'c> for Scrollbar {
@@ -69,7 +96,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
           .map(move |need_bar| need_bar.then(||{
             let mut h_track = @Stack {
               class: H_SCROLL_TRACK,
-              clamp: BoxClamp::EXPAND_X,
+              h_align: HAlign::Stretch,
               on_wheel: move |e| $scroll.write().scroll(-e.delta_x, -e.delta_y),
             };
 
@@ -99,7 +126,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
           .map(move |need_bar| need_bar.then(|| {
             let mut v_track = @Stack {
               class: V_SCROLL_TRACK,
-              clamp: BoxClamp::EXPAND_Y,
+              v_align: VAlign::Stretch,
               on_wheel: move |e| $scroll.write().scroll(-e.delta_x, -e.delta_y),
             };
 

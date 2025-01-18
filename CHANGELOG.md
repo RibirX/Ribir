@@ -37,6 +37,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Unified implementation of IntoWidget for impl StateWriter<V:Compose>. (#684 @wjian23)
 - **widgets**: Refactor `Input` Widget. (#684 @wjian23)
 
+### Fixed
+
+- **core & widgets**: Layouts are not permitted to return an infinite size, so if a layout requires scaling or expanding the size infinitely, that action should be disregarded. (#pr @M-Adoo)
+
 ### Breading
 
 - **core**: Rename `can_focus` field of FocusScope to `skip_host`. (#684 @wjian23)

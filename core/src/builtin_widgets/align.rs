@@ -83,8 +83,8 @@ impl_compose_child_for_wrap_render!(VAlignWidget, DirtyPhase::Layout);
 impl WrapRender for HAlignWidget {
   fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
     let align: Align = self.h_align.into();
-    if align == Align::Stretch {
-      clamp.min.width = clamp.max.width;
+    if align == Align::Stretch && clamp.max.width.is_finite() {
+      clamp = clamp.with_fixed_width(clamp.max.width);
     }
 
     let host_size = host.perform_layout(clamp, ctx);
@@ -101,8 +101,8 @@ impl WrapRender for HAlignWidget {
 impl WrapRender for VAlignWidget {
   fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
     let align: Align = self.v_align.into();
-    if align == Align::Stretch {
-      clamp.min.height = clamp.max.height;
+    if align == Align::Stretch && clamp.max.height.is_finite() {
+      clamp = clamp.with_fixed_height(clamp.max.height);
     }
     let host_size = host.perform_layout(clamp, ctx);
     let y = align.align_value(host_size.height, clamp.max.height);
@@ -117,10 +117,14 @@ impl WrapRender for VAlignWidget {
 
 impl Align {
   pub fn align_value(self, child_size: f32, box_size: f32) -> f32 {
-    match self {
-      Align::Center => (box_size - child_size) / 2.,
-      Align::End => box_size - child_size,
-      _ => 0.,
+    if box_size.is_finite() {
+      match self {
+        Align::Center => (box_size - child_size) / 2.,
+        Align::End => box_size - child_size,
+        _ => 0.,
+      }
+    } else {
+      0.
     }
   }
 }

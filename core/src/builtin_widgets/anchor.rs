@@ -171,7 +171,6 @@ impl WrapRender for RelativeAnchor {
     let child_size = host.perform_layout(clamp, ctx);
 
     let offset = self.anchor.into_pixel(child_size, clamp.max);
-
     let pos = ctx.box_pos().unwrap_or_default();
     ctx.update_position(ctx.widget_id(), pos + Size::new(offset.x, offset.y));
     child_size
@@ -179,30 +178,30 @@ impl WrapRender for RelativeAnchor {
 }
 
 impl HAnchor {
-  pub fn into_pixel(self, width: f32, max_clamp: f32) -> f32 {
+  pub fn into_pixel(self, width: f32, parent: f32) -> f32 {
     match self {
-      HAnchor::Left(x) => x.into_pixel(max_clamp),
-      HAnchor::Right(x) => max_clamp - width - x.into_pixel(max_clamp),
+      HAnchor::Left(x) => x.into_pixel(parent),
+      HAnchor::Right(x) => parent - width - x.into_pixel(parent),
     }
   }
 }
 
 impl VAnchor {
-  pub fn into_pixel(self, height: f32, max_clamp: f32) -> f32 {
+  pub fn into_pixel(self, height: f32, parent: f32) -> f32 {
     match self {
-      VAnchor::Top(y) => y.into_pixel(max_clamp),
-      VAnchor::Bottom(y) => max_clamp - height - y.into_pixel(max_clamp),
+      VAnchor::Top(y) => y.into_pixel(parent),
+      VAnchor::Bottom(y) => parent - height - y.into_pixel(parent),
     }
   }
 }
 
 impl Anchor {
-  pub fn into_pixel(self, size: Size, max_clamp: Size) -> Point {
+  pub fn into_pixel(self, size: Size, parent: Size) -> Point {
     let Self { x, y } = self;
     Point::new(
-      x.map(|x| x.into_pixel(size.width, max_clamp.width))
+      x.map(|x| x.into_pixel(size.width, parent.width))
         .unwrap_or_default(),
-      y.map(|y| y.into_pixel(size.height, max_clamp.height))
+      y.map(|y| y.into_pixel(size.height, parent.height))
         .unwrap_or_default(),
     )
   }

@@ -65,7 +65,7 @@ impl Compose for LinearProgress {
               LINEAR_INDETERMINATE_INDICATOR
             }
           },
-          factor: distinct_pipe! { $this.value.unwrap_or(1.) },
+          factor: distinct_pipe! { $this.value.unwrap_or(0.) },
         }
         @FractionallyWidthBox {
           class: distinct_pipe! {
@@ -75,7 +75,7 @@ impl Compose for LinearProgress {
               LINEAR_INDETERMINATE_TRACK
             }
           },
-          factor: 1.
+          factor: distinct_pipe! { $this.value.map_or(1., |v| 1. - v) },
         }
       }
     }
