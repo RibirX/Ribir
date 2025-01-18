@@ -21,6 +21,10 @@ pub(crate) fn simple_declarer_attr(
   let syn::ItemStruct { vis, generics, ident, fields, .. } = stt;
   let declarer = Declarer::new(ident, fields)?;
 
+  if declarer.all_fields_skipped() {
+    return Ok(self_impl(ident, generics, declarer.all_members()));
+  }
+
   let name = &declarer.name;
   let init_pairs = init_pairs(&declarer.fields, ident);
   let set_methods = declarer_set_methods(&declarer.fields, vis);
@@ -97,6 +101,31 @@ fn empty_impl(stt: &syn::ItemStruct) -> Result<TokenStream> {
   Ok(tokens)
 }
 
+fn self_impl<'a>(
+  name: &Ident, generics: &syn::Generics, members: impl Iterator<Item = &'a Ident>,
+) -> TokenStream {
+  let (g_impl, g_ty, g_where) = generics.split_for_impl();
+
+  quote! {
+    impl #g_impl Declare for #name #g_ty #g_where {
+      type Builder = #name #g_ty;
+
+      fn declarer() -> Self::Builder {
+        #name {
+          #(#members: <_>::default()),*
+        }
+      }
+    }
+
+    impl #g_impl ObjDeclarer for #name #g_ty #g_where {
+      type Target = #name #g_ty;
+
+      #[track_caller]
+      fn finish(self) -> Self::Target { self }
+    }
+  }
+}
+
 impl<'a> Declarer<'a> {
   pub fn new(host: &'a Ident, stt_fields: &'a mut Fields) -> Result<Self> {
     let name = Ident::new(&format!("{host}Declarer"), host.span());
@@ -133,6 +162,18 @@ impl<'a> Declarer<'a> {
       .filter(|f| f.is_not_skip())
       .map(|f| (f.member(), &f.field.ty))
       .unzip()
+  }
+
+  pub fn all_members(&self) -> impl Iterator<Item = &Ident> {
+    self.fields.iter().map(|f| f.member())
+  }
+
+  pub fn all_fields_skipped(&self) -> bool {
+    self.fields.iter().all(|f| {
+      f.attr
+        .as_ref()
+        .is_some_and(|attr| attr.skip.is_some())
+    })
   }
 }
 mod kw {

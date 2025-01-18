@@ -36,6 +36,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Unified implementation of IntoWidget for impl StateWriter<V:Compose>. (#684 @wjian23)
 - **widgets**: Refactor `Input` Widget. (#684 @wjian23)
+- **macros**: Generate cleaner code for #[derive(Declare)] when all fields are omitted. (#pr @M-Adoo)
 
 ### Fixed
 
