@@ -26,7 +26,12 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ## [@Unreleased] - @ReleaseDate
 
 ### Features
+
 - **core**: Add builtin filed `clip_boundary`. (#694 @wjian23)
+
+### Fixed
+
+- **core & widgets**: Layouts are not permitted to return an infinite size, so if a layout requires scaling or expanding the size infinitely, that action should be disregarded. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.24] - 2025-01-22
 

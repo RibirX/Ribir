@@ -37,74 +37,100 @@ pub struct FractionallyHeightBox {
 
 // implementation for FractionallySizedBox
 impl Render for FractionallySizedBox {
-  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { self.size(clamp) }
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
+    let max = clamp.max;
+    let mut size = clamp.min;
+
+    if max.width.is_finite() {
+      let factor = self.width_factor.clamp(0., 1.);
+      let width = max.width * factor;
+      size.width = width.clamp(clamp.min.width, clamp.max.width);
+    }
+
+    if max.height.is_finite() {
+      let factor = self.height_factor.clamp(0., 1.);
+      let height = max.height * factor;
+      size.height = height.clamp(clamp.min.height, clamp.max.height);
+    }
+
+    size
+  }
 }
 
 ribir_core::impl_compose_child_for_wrap_render!(FractionallySizedBox, DirtyPhase::Layout);
 
 impl WrapRender for FractionallySizedBox {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    let size = self.size(clamp);
-    host.perform_layout(BoxClamp::fixed_size(size), ctx)
-  }
-}
+  fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    let max = clamp.max;
+    if max.width.is_finite() {
+      let factor = self.width_factor.clamp(0., 1.);
+      let width = max.width * factor;
+      clamp = clamp.with_fixed_width(width);
+    }
 
-impl FractionallySizedBox {
-  fn size(&self, clamp: BoxClamp) -> Size {
-    let w_factor = self.width_factor.clamp(0., 1.);
-    let h_factor = self.height_factor.clamp(0., 1.);
-    let size = Size::new(clamp.max.width * w_factor, clamp.max.height * h_factor);
-    clamp.clamp(size)
+    if max.height.is_finite() {
+      let factor = self.height_factor.clamp(0., 1.);
+      let height = max.height * factor;
+      clamp = clamp.with_fixed_height(height);
+    }
+
+    host.perform_layout(clamp, ctx)
   }
 }
 
 // implementation for FractionallyWidthBox
 impl Render for FractionallyWidthBox {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
-    let width = self.width(clamp);
-    Size::new(width, clamp.max.height)
+    if clamp.max.width.is_finite() {
+      let factor = self.factor.clamp(0., 1.);
+      let height = if clamp.max.height.is_finite() { clamp.max.height } else { clamp.min.height };
+      Size::new(clamp.max.width * factor, height)
+    } else {
+      clamp.min
+    }
   }
 }
 
 ribir_core::impl_compose_child_for_wrap_render!(FractionallyWidthBox, DirtyPhase::Layout);
 
 impl WrapRender for FractionallyWidthBox {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    let width = self.width(clamp);
-    host.perform_layout(clamp.with_fixed_width(width), ctx)
+  fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    let max = clamp.max.width;
+    if max.is_finite() {
+      let factor = self.factor.clamp(0., 1.);
+      let width = (max * factor).clamp(clamp.min.width, clamp.max.width);
+      clamp = clamp.with_fixed_width(width);
+    }
+    host.perform_layout(clamp, ctx)
   }
 }
 
-impl FractionallyWidthBox {
-  fn width(&self, clamp: BoxClamp) -> f32 {
-    let factor = self.factor.clamp(0., 1.);
-    let width = clamp.max.width * factor;
-    width.clamp(clamp.min.width, clamp.max.width)
-  }
-}
 // implementation for FractionallyHeightBox
 
 impl Render for FractionallyHeightBox {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
-    let height = self.height(clamp);
-    Size::new(clamp.max.width, height)
+    if clamp.max.height.is_finite() {
+      let factor = self.factor.clamp(0., 1.);
+      let width = if clamp.max.width.is_finite() { clamp.max.width } else { clamp.min.width };
+      Size::new(width, clamp.max.height * factor)
+    } else {
+      clamp.min
+    }
   }
 }
 
 ribir_core::impl_compose_child_for_wrap_render!(FractionallyHeightBox, DirtyPhase::Layout);
 
 impl WrapRender for FractionallyHeightBox {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    let height = self.height(clamp);
-    host.perform_layout(clamp.with_fixed_height(height), ctx)
-  }
-}
+  fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    let max = clamp.max.height;
+    if max.is_finite() {
+      let factor = self.factor.clamp(0., 1.);
+      let height = (max * factor).clamp(clamp.min.height, clamp.max.height);
+      clamp = clamp.with_fixed_height(height)
+    }
 
-impl FractionallyHeightBox {
-  fn height(&self, clamp: BoxClamp) -> f32 {
-    let factor = self.factor.clamp(0., 1.);
-    let height = clamp.max.height * factor;
-    height.clamp(clamp.min.height, clamp.max.height)
+    host.perform_layout(clamp, ctx)
   }
 }
 
