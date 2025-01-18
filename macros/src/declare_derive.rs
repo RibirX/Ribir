@@ -20,66 +20,70 @@ pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenS
   } else {
     let extend_declare = Ident::new(&format!("{host}DeclareExtend"), host.span());
     let declarer = Declarer::new(host, &mut stt.fields)?;
-    let Declarer { name, fields, .. } = &declarer;
-    // reverse name check.
-    fields
-      .iter()
-      .try_for_each(DeclareField::check_reserve)?;
-    let set_methods = declarer_set_methods(fields);
+    if declarer.all_fields_skipped() {
+      self_impl(host, generics, declarer.all_members())
+    } else {
+      let Declarer { name, fields, .. } = &declarer;
+      // reverse name check.
+      fields
+        .iter()
+        .try_for_each(DeclareField::check_reserve)?;
+      let set_methods = declarer_set_methods(fields);
 
-    let field_names = declarer.fields.iter().map(DeclareField::member);
-    let field_names2 = field_names.clone();
+      let field_names = declarer.fields.iter().map(DeclareField::member);
+      let field_names2 = field_names.clone();
 
-    let (builder_f_names, builder_f_tys) = declarer.declare_names_tys();
-    let field_values = field_values(&declarer.fields, host);
-    let (g_impl, g_ty, g_where) = generics.split_for_impl();
-    quote! {
-     #vis struct #name #generics #g_where {
-       #(
-         #[allow(clippy::type_complexity)]
-         #builder_f_names : Option<DeclareInit<#builder_f_tys>>,
-       )*
-     }
-
-     impl #g_impl Declare for #host #g_ty #g_where {
-       type Builder = FatObj<#name #g_ty>;
-
-       fn declarer() -> Self::Builder {
-         FatObj::new(#name { #(#builder_f_names : None ,)* })
-       }
-     }
-
-     impl #g_impl FatDeclarerExtend for #name #g_ty #g_where {
-       type Target = State<#host #g_ty>;
-
-       #[track_caller]
-       fn finish(mut fat_ಠ_ಠ: FatObj<Self>) -> FatObj<Self::Target> {
-         #(#field_values)*
-         let this_ಠ_ಠ = State::value(#host {
-           #(#field_names : #field_names.0),*
-         });
+      let (builder_f_names, builder_f_tys) = declarer.declare_names_tys();
+      let field_values = field_values(&declarer.fields, host);
+      let (g_impl, g_ty, g_where) = generics.split_for_impl();
+      quote! {
+       #vis struct #name #generics #g_where {
          #(
-           if let Some(o) = #field_names2.1 {
-             let this_ಠ_ಠ = this_ಠ_ಠ.clone_writer();
-             let u = o.subscribe(move |(_, v)| this_ಠ_ಠ.write().#field_names2 = v);
-             fat_ಠ_ಠ = fat_ಠ_ಠ.on_disposed(move |_| u.unsubscribe());
-           }
-         );*
-
-         fat_ಠ_ಠ.map(move |_| this_ಠ_ಠ)
+           #[allow(clippy::type_complexity)]
+           #builder_f_names : Option<DeclareInit<#builder_f_tys>>,
+         )*
        }
-     }
 
-     #vis trait #extend_declare #g_ty: Sized #g_where {
-      fn inner(&mut self) -> &mut #name #g_ty;
+       impl #g_impl Declare for #host #g_ty #g_where {
+         type Builder = FatObj<#name #g_ty>;
 
-      #(#set_methods)*
-     }
+         fn declarer() -> Self::Builder {
+           FatObj::new(#name { #(#builder_f_names : None ,)* })
+         }
+       }
 
-     impl #g_impl #extend_declare #g_ty for FatObj<#name #g_ty> #g_where {
-        #[inline(always)]
-       fn inner(&mut self) -> &mut #name #g_ty { &mut **self }
-     }
+       impl #g_impl FatDeclarerExtend for #name #g_ty #g_where {
+         type Target = State<#host #g_ty>;
+
+         #[track_caller]
+         fn finish(mut fat_ಠ_ಠ: FatObj<Self>) -> FatObj<Self::Target> {
+           #(#field_values)*
+           let this_ಠ_ಠ = State::value(#host {
+             #(#field_names : #field_names.0),*
+           });
+           #(
+             if let Some(o) = #field_names2.1 {
+               let this_ಠ_ಠ = this_ಠ_ಠ.clone_writer();
+               let u = o.subscribe(move |(_, v)| this_ಠ_ಠ.write().#field_names2 = v);
+               fat_ಠ_ಠ = fat_ಠ_ಠ.on_disposed(move |_| u.unsubscribe());
+             }
+           );*
+
+           fat_ಠ_ಠ.map(move |_| this_ಠ_ಠ)
+         }
+       }
+
+       #vis trait #extend_declare #g_impl: Sized #g_where {
+        fn inner(&mut self) -> &mut #name #g_ty;
+
+        #(#set_methods)*
+       }
+
+       impl #g_impl #extend_declare #g_ty for FatObj<#name #g_ty> #g_where {
+          #[inline(always)]
+         fn inner(&mut self) -> &mut #name #g_ty { &mut **self }
+       }
+      }
     }
   };
 
@@ -224,6 +228,30 @@ fn empty_impl(name: &Ident, fields: &Fields) -> TokenStream {
     impl FatDeclarerExtend for #name {
       type Target = #name;
       fn finish(this: FatObj<#name>) -> FatObj<#name> { this }
+    }
+  }
+}
+
+fn self_impl<'a>(
+  name: &Ident, generics: &syn::Generics, members: impl Iterator<Item = &'a Ident>,
+) -> TokenStream {
+  let (g_impl, g_ty, g_where) = generics.split_for_impl();
+  quote! {
+    impl #g_impl Declare for #name #g_ty #g_where {
+      type Builder = FatObj<#name #g_ty>;
+
+      fn declarer() -> Self::Builder {
+        FatObj::new(#name {
+          #(#members: <_>::default()),*
+        })
+      }
+    }
+
+    impl #g_impl FatDeclarerExtend for #name #g_ty #g_where {
+      type Target = State<#name #g_ty>;
+      fn finish(this: FatObj<Self>) -> FatObj<Self::Target> {
+        this.map(State::value)
+      }
     }
   }
 }
