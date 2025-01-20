@@ -307,7 +307,7 @@ impl Fold for DollarRefsCtx {
       mac.tokens = RdlMacro::gen_code(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_FN_WIDGET) {
-      mac.tokens = fn_widget_macro::gen_code(mac.tokens, self);
+      mac.tokens = fn_widget_macro::gen_code(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else {
       mac = syn::fold::fold_macro(self, mac);
