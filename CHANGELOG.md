@@ -30,21 +30,21 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: ensure object safety of `StateReader`， `StateWatcher` and `StateWriter` (#692 @M-Adoo)
 - **core**: Support extend custom event. (#684 @wjian23)
 - **core**: Added `map_watcher` to `StateWatcher` (#684 @wjian23)
-- **core**: Added `ensure_visible` and ScrollableProvider to ScrollableWidget, to support descendant to be showed.(#684 @wjian23)
-- **core**: `IgnorePointer` now has the ability to only ignore events for the widget itself. (#pr @M-Adoo)
+- **core**: Added `visible_widget` and ScrollableProvider to ScrollableWidget, to support descendant to be showed.(#684 @wjian23)
+- **core**: `IgnorePointer` now has the ability to only ignore events for the widget itself. (#693 @M-Adoo)
 
 ### Changed
 
 - **core**: Unified implementation of IntoWidget for impl StateWriter<V:Compose>. (#684 @wjian23)
 - **widgets**: Refactor `Input` Widget. (#684 @wjian23)
-- **macros**: Generate cleaner code for #[derive(Declare)] when all fields are omitted. (#pr @M-Adoo)
+- **macros**: Generate cleaner code for #[derive(Declare)] when all fields are omitted. (#693 @M-Adoo)
 
 ### Fixed
 
-- **core**: The child should not be painted when visible is false. (#pr @M-Adoo)
-- **core**: Ensure that the content widget size in the scrollable widget is not smaller than its viewport. (#pr @M-Adoo)
-- **core & widgets**: Layouts are not permitted to return an infinite size, so if a layout requires scaling or expanding the size infinitely, that action should be disregarded. (#pr @M-Adoo)
-- **macros**: Embedding `fn_widget!` may lead to missed captured variables. (#pr @M-Adoo)
+- **core**: The child should not be painted when visible is false. (#693 @M-Adoo)
+- **core**: Ensure that the content widget size in the scrollable widget is not smaller than its viewport. (#693 @M-Adoo)
+- **core & widgets**: Layouts are not permitted to return an infinite size, so if a layout requires scaling or expanding the size infinitely, that action should be disregarded. (#693 @M-Adoo)
+- **macros**: Embedding `fn_widget!` may lead to missed captured variables. (#693 @M-Adoo)
 
 ### Breading
 

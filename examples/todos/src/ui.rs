@@ -118,10 +118,6 @@ fn input(
       }
       @ $input {
         h_align: HAlign::Stretch,
-        border: {
-          let color = Palette::of(BuildCtx::get()).surface_variant().into();
-          Border::only_bottom(BorderSide { width: 2., color })
-        },
         on_key_down: move |e| {
           if e.key_code() == &PhysicalKey::Code(KeyCode::Enter) {
             on_submit($input.text().clone());

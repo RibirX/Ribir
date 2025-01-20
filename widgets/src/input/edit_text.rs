@@ -14,7 +14,7 @@ pub trait BaseText: Eq {
 pub trait EditText: BaseText {
   fn insert_str(&mut self, at: usize, s: &str) -> usize;
 
-  fn delete(&mut self, rg: Range<usize>) -> Range<usize>;
+  fn del_rg_str(&mut self, rg: Range<usize>) -> Range<usize>;
 }
 
 impl BaseText for CowArc<str> {
@@ -80,7 +80,7 @@ impl EditText for CowArc<str> {
     v.len()
   }
 
-  fn delete(&mut self, mut rg: Range<usize>) -> Range<usize> {
+  fn del_rg_str(&mut self, mut rg: Range<usize>) -> Range<usize> {
     rg.start = rg.start.min(self.len());
     rg.end = rg.end.min(self.len());
 

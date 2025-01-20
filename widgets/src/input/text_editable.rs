@@ -1,126 +1,101 @@
 use std::ops::Range;
 
-use ribir_core::{
-  events::{ImePreEdit, ImePreEditEvent},
-  prelude::{
-    AppCtx, CharsEvent, KeyCode, KeyboardEvent, NamedKey, PhysicalKey, StateWriter, Substr,
-    VirtualKey, *,
-  },
-};
+use ribir_core::prelude::*;
 
 use super::{
   CaretPosition,
   edit_text::EditText,
-  text_glyphs::{TextGlyphs, TextGlyphsPainter, TextGlyphsProvider},
-  text_selection::TextSelection,
+  text_selectable::{Selection, TextSelectable},
 };
 use crate::{input::text_glyphs::VisualGlyphsHelper, prelude::*};
 
 class_names! {
-  #[doc = "Class name for the text caret"]
+  /// Class name for the text caret
   TEXT_CARET,
 }
 
-pub fn edit_text<T: VisualText + EditText + 'static + Clone>(
-  text: impl StateWriter<Value = TextGlyphs<T>>,
-  selection: impl StateWriter<Value = TextSelection<T>>,
-) -> Widget<'static> {
-  fn_widget! {
-    let mut writer = TextWriter {
-      host: part_writer!(text.text_mut()),
-      selection: selection.clone_writer()
-    };
-    let ime = Stateful::new(ImeHandle::new(writer.clone()));
-    let mut text = FatObj::new(@$text {});
-    let mut caret = FatObj::new(@ {
-      let selection = selection.clone_writer();
-      pipe!($text.has_focus()).map(move |v|
-        if v {
-          caret_widget(selection.clone_watcher())
-        } else {
-          @Void{}.into_widget()
-        }
-      )
-    });
+#[derive(Declare, Default)]
+pub struct BasicEditor<T: 'static> {
+  host: TextSelectable<T>,
+  pre_edit: Option<PreEditState>,
+}
 
-    let ctx = BuildCtx::get();
-    let wnd = ctx.window();
-    let scrollable = Provider::state_of::<ScrollableProvider>(ctx).map(|p| p.clone_writer());
-    let u = watch!($caret.layout_rect())
-      .subscribe(move |mut rect| {
-        if $text.has_focus() && !$ime.is_in_pre_edit() {
-          if let Some(wid) = $caret.track_id().get() {
-            if let Some(scrollable) = &scrollable {
-              scrollable.write().ensure_visible(wid, Anchor::default(), &wnd);
+impl<T: Default + VisualText + EditText + Clone + 'static> Compose for BasicEditor<T> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
+    fn_widget! {
+      let mut text = FatObj::new(part_writer!(&mut this.host));
+
+      let this2 = this.clone_writer();
+      let caret = pipe! { $text.has_focus().then(|| Self::caret_widget(this2.clone_writer()))};
+
+      @Stack {
+        fit: StackFit::Passthrough,
+        @ $text {
+          on_focus_in: move |e| { e.window().set_ime_allowed(true); },
+          on_focus_out: move|e| { e.window().set_ime_allowed(false); },
+          on_chars: move |e| {
+            let mut this = $this.write();
+            if !this.chars_handle(e) {
+              this.forget_modifies();
             }
-            rect.origin = wnd.map_to_global(Point::zero(), wid);
-            wnd.set_ime_cursor_area(&rect);
+          },
+          on_key_down: move |k| {
+            let mut this = $this.write();
+            if !this.keys_handle(k) {
+              this.forget_modifies();
+            }
+          },
+          on_ime_pre_edit: move|e| { $this.write().process_pre_edit(e);},
+        }
+        @IgnorePointer {
+          @UnconstrainedBox {
+            dir: UnconstrainedDir::Both,
+            @OnlySizedByParent { @ { caret } }
           }
         }
-      });
-
-    @FocusScope {
-      skip_host: true,
-      @ $text {
-        margin: pipe!($caret.layout_size()).map(|v|EdgeInsets::only_right(v.width)),
-        on_disposed: move |_| u.unsubscribe(),
-        on_focus_in: move |e| { e.window().set_ime_allowed(true); },
-        on_focus_out: move|e| { e.window().set_ime_allowed(false); },
-        on_chars: {
-          let mut writer = writer.clone();
-          move |c| { writer.chars_handle(c); }
-        },
-        on_key_down: move |k| { writer.keys_handle(k); },
-        on_ime_pre_edit: move|e| {
-          $ime.write().process_pre_edit(e);
-        },
-        @ OnlySizedByParent {
-          clamp: BoxClamp::EXPAND_BOTH,
-          @ { selection }
-        }
-        @ IgnorePointer { @ { TextGlyphsPainter::<T>::default() } }
-        @ OnlySizedByParent { @ { caret } }
       }
     }
+    .into_widget()
   }
-  .into_widget()
 }
 
-fn caret_widget<T: 'static>(
-  selectable: impl StateWatcher<Value = TextSelection<T>>,
-) -> Widget<'static> {
-  fn_widget! {
-    let cache = Provider::state_of::<TextGlyphsProvider<T>>(&BuildCtx::get())
-      .expect("Text Caret: TextGlyphs not found")
-      .clone_watcher();
-    let mut anchor = Anchor::default();
-    @IgnorePointer {
-      anchor: pipe!({
-        if let Some(pos) = $cache.glyphs().as_ref().map(|cache| cache.cursor($selectable.to)) {
-          anchor = Anchor::from_point(pos)
-        }
-        anchor
-      }),
-      @TextClamp {
+impl<T: EditText + 'static> BasicEditor<T> {
+  fn caret_widget(this: impl StateWriter<Value = Self>) -> Widget<'static> {
+    fn_widget! {
+      let mut caret = @TextClamp {
         rows: Some(1.),
         class: TEXT_CARET,
-        @ Void {  }
-      }
+        on_performed_layout: move |e| {
+          let caret_size = e.box_size().unwrap();
+          if !$this.is_in_pre_edit() {
+            if let Some(mut scrollable) = Provider::write_of::<ScrollableWidget>(e) {
+              let wnd = e.window();
+              let lt = scrollable.map_to_content(Point::zero(), e.current_target(), &wnd).unwrap();
+              scrollable.visible_content_box(Rect::new(lt, caret_size), Anchor::default());
+            }
+          }
+          let pos = e.map_to_global(Point::zero());
+          e.window().set_ime_cursor_area(&Rect::new(pos, caret_size));
+        },
+        @ { Void }
+      };
+      let wnd = BuildCtx::get().window();
+      let u = watch!($this;).subscribe(move |_| {
+        wnd.once_layout_ready(move || {
+          $caret.write().anchor = Anchor::from_point($this.caret_pos())
+        })
+      });
+      caret.on_disposed(move |_| u.unsubscribe())
     }
+    .into_widget()
   }
-  .into_widget()
-}
+  fn caret_pos(&self) -> Point {
+    self
+      .glyphs()
+      .map(|g| g.cursor(self.selection.to))
+      .unwrap_or_default()
+  }
 
-struct TextWriter<H, T> {
-  host: H,
-  selection: T,
-}
-
-impl<T: EditText + 'static, H, S> TextWriter<H, S>
-where
-  H: StateWriter<Value = T>,
-  S: StateWriter<Value = TextSelection<T>>,
-{
   fn chars_handle(&mut self, event: &CharsEvent) -> bool {
     if event.common.with_command_key() {
       return false;
@@ -149,10 +124,6 @@ where
     deal
   }
 
-  fn clone(&self) -> TextWriter<H, S> {
-    TextWriter { host: self.host.clone_writer(), selection: self.selection.clone_writer() }
-  }
-
   fn edit_with_command(&mut self, event: &KeyboardEvent) -> bool {
     if !event.with_command_key() {
       return false;
@@ -165,84 +136,105 @@ where
         let txt = clipboard.borrow_mut().read_text();
         if let Ok(txt) = txt {
           self.insert(&txt);
+          return true;
         }
-        true
       }
       PhysicalKey::Code(KeyCode::KeyX) => {
-        let rg = self.selection();
+        let rg = self.cluster_rg();
         if !rg.is_empty() {
-          let txt = self.substr(rg.clone()).to_string();
-          self.delete_selection();
+          let txt = self.substr(rg).to_string();
+          self.del_sel();
           let clipboard = AppCtx::clipboard();
           let _ = clipboard.borrow_mut().clear();
           let _ = clipboard.borrow_mut().write_text(&txt);
+          return true;
         }
-        true
       }
-      _ => false,
-    }
+      _ => {}
+    };
+    false
   }
 
   fn edit_with_key(&mut self, key: &KeyboardEvent) -> bool {
     match key.key() {
       VirtualKey::Named(NamedKey::Backspace) => {
-        let mut rg = self.selection();
+        let mut rg = self.cluster_rg();
         if rg.is_empty() {
           let len = self.measure_bytes(rg.start, -1);
           rg = Range { start: rg.start - len, end: rg.start };
         }
-        self.delete(rg);
+        !self.delete(rg).is_empty()
       }
       VirtualKey::Named(NamedKey::Delete) => {
-        let mut rg = self.selection();
+        let mut rg = self.cluster_rg();
         if rg.is_empty() {
           let len = self.measure_bytes(rg.start, 1);
           rg = Range { start: rg.start, end: rg.start + len };
         }
-        self.delete(rg);
+        !self.delete(rg).is_empty()
       }
-      _ => (),
-    };
-    true
+      _ => false,
+    }
   }
-
-  fn measure_bytes(&self, start: usize, len: isize) -> usize {
-    self.host.read().measure_bytes(start, len)
-  }
-
-  fn set_selection(&mut self, from: CaretPosition, to: CaretPosition) {
-    self.selection.write().from = from;
-    self.selection.write().to = to;
-  }
-
-  fn selection(&self) -> Range<usize> { self.selection.read().selection() }
-
-  fn substr(&self, rg: Range<usize>) -> Substr { self.host.read().substr(rg) }
 
   fn insert(&mut self, chars: &str) -> usize {
-    let rg = self.selection();
-    let delete_rg = self.host.write().delete(rg);
-    let len = self
-      .host
-      .write()
-      .insert_str(delete_rg.start, chars);
-    let pos = CaretPosition { cluster: len + delete_rg.start, position: None };
-    self.selection.write().from = pos;
-    self.selection.write().to = pos;
+    let del_rg = self.del_sel();
+    let len = self.insert_str(del_rg.start, chars);
+    let pos = CaretPosition { cluster: len + del_rg.start, position: None };
+    self.host.selection = Selection::splat(pos);
     len
   }
 
-  fn delete_selection(&mut self) {
-    let rg = self.selection();
-    let delete_rg = self.host.write().delete(rg);
-    self.selection.write().from = CaretPosition { cluster: delete_rg.start, position: None };
-    self.selection.write().to = CaretPosition { cluster: delete_rg.start, position: None };
+  fn del_sel(&mut self) -> Range<usize> { self.delete(self.cluster_rg()) }
+
+  fn delete(&mut self, rg: Range<usize>) -> Range<usize> {
+    let del_rg = self.del_rg_str(rg);
+    self.host.selection = Selection::splat(CaretPosition { cluster: del_rg.start, position: None });
+    del_rg
   }
 
-  fn delete(&mut self, rg: Range<usize>) {
-    let delete_rg = self.host.write().delete(rg);
-    self.selection.write().from = CaretPosition { cluster: delete_rg.start, position: None };
-    self.selection.write().to = CaretPosition { cluster: delete_rg.start, position: None };
+  fn is_in_pre_edit(&self) -> bool { self.pre_edit.is_some() }
+
+  fn process_pre_edit(&mut self, e: &ImePreEditEvent) {
+    match &e.pre_edit {
+      ImePreEdit::Begin => {
+        self.del_sel();
+        self.pre_edit = Some(PreEditState { position: self.cluster_rg().start, value: None });
+      }
+      ImePreEdit::PreEdit { value, cursor } => {
+        let Some(pre_edit) = self.pre_edit.as_mut() else {
+          return;
+        };
+        // Safety: it is safe to modify all the fields to avoid conflicts with the
+        // borrow checker.
+        let PreEditState { position: pos, value: editing } =
+          unsafe { &mut *(pre_edit as *mut PreEditState) };
+        if let Some(txt) = editing {
+          self.delete(Range { start: *pos, end: *pos + txt.len() });
+        }
+        let len = self.insert(value);
+        let pos = if len == value.len() {
+          *editing = Some(value.clone());
+          CaretPosition {
+            cluster: *pos + cursor.map(|(start, _)| start).unwrap_or(0),
+            position: None,
+          }
+        } else {
+          *editing = Some(
+            self
+              .substr(Range { start: *pos, end: *pos + len })
+              .to_string(),
+          );
+          CaretPosition { cluster: *pos + len, position: None }
+        };
+        self.host.selection = Selection::splat(pos);
+      }
+      ImePreEdit::End => {
+        if let Some(PreEditState { value: Some(txt), position, .. }) = self.pre_edit.take() {
+          self.delete(Range { start: position, end: position + txt.len() });
+        }
+      }
+    }
   }
 }
 
@@ -252,61 +244,12 @@ struct PreEditState {
   value: Option<String>,
 }
 
-pub struct ImeHandle<H, S> {
-  writer: TextWriter<H, S>,
-  pre_edit: Option<PreEditState>,
+impl<T> std::ops::Deref for BasicEditor<T> {
+  type Target = TextSelectable<T>;
+
+  fn deref(&self) -> &Self::Target { &self.host }
 }
 
-impl<T, H, S> ImeHandle<H, S>
-where
-  T: EditText + 'static,
-  H: StateWriter<Value = T>,
-  S: StateWriter<Value = TextSelection<T>>,
-{
-  fn new(writer: TextWriter<H, S>) -> Self { Self { writer, pre_edit: None } }
-
-  fn is_in_pre_edit(&self) -> bool { self.pre_edit.is_some() }
-
-  fn process_pre_edit(&mut self, e: &ImePreEditEvent) {
-    match &e.pre_edit {
-      ImePreEdit::Begin => {
-        self.writer.delete_selection();
-        self.pre_edit = Some(PreEditState { position: self.writer.selection().start, value: None });
-      }
-      ImePreEdit::PreEdit { value, cursor } => {
-        let Some(PreEditState { position, value: edit_value }) = self.pre_edit.as_mut() else {
-          return;
-        };
-        if let Some(txt) = edit_value {
-          self
-            .writer
-            .delete(Range { start: *position, end: *position + txt.len() });
-        }
-        let len = self.writer.insert(value);
-        let pos = if len == value.len() {
-          *edit_value = Some(value.clone());
-          CaretPosition {
-            cluster: *position + cursor.map(|(start, _)| start).unwrap_or(0),
-            position: None,
-          }
-        } else {
-          *edit_value = Some(
-            self
-              .writer
-              .substr(Range { start: *position, end: *position + len })
-              .to_string(),
-          );
-          CaretPosition { cluster: *position + len, position: None }
-        };
-        self.writer.set_selection(pos, pos);
-      }
-      ImePreEdit::End => {
-        if let Some(PreEditState { value: Some(txt), position, .. }) = self.pre_edit.take() {
-          self
-            .writer
-            .delete(Range { start: position, end: position + txt.len() });
-        }
-      }
-    }
-  }
+impl<T> std::ops::DerefMut for BasicEditor<T> {
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.host }
 }

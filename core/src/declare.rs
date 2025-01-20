@@ -48,6 +48,16 @@ impl<V: 'static> DeclareInit<V> {
       }
     }
   }
+
+  pub fn map<F, U: 'static>(self, f: F) -> DeclareInit<U>
+  where
+    F: Fn(V) -> U + 'static,
+  {
+    match self {
+      Self::Value(v) => DeclareInit::Value(f(v)),
+      Self::Pipe(v) => v.into_pipe().map(f).declare_into(),
+    }
+  }
 }
 
 impl<T: Default> Default for DeclareInit<T> {
