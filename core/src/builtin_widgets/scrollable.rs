@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use crate::prelude::*;
 /// Enumerate to describe which direction allow widget to scroll.
 #[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Hash)]
@@ -25,8 +27,15 @@ pub struct ScrollableWidget {
   view_id: Option<TrackId>,
 }
 
-/// the descendant widgets of `Scrollable` can use
-/// `Provider::state_of::<ScrollableProvider>` to scroll the view.
+/// The provider of `ScrollableWidget` providers the descendant widgets to use
+/// it.
+///
+/// - Use `Provider::state_of::<ScrollableProvider>` to get the writer of the
+///   `ScrollableWidget`.
+/// - Use `Provider::of::<ScrollableWidget>` to get reference of the
+///   `ScrollableWidget`.
+/// - Use `Provider::write_of` to get the writer's reference of the
+///   `ScrollableWidget`.
 pub type ScrollableProvider = Box<dyn StateWriter<Value = ScrollableWidget>>;
 
 impl Declare for ScrollableWidget {
@@ -39,39 +48,38 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      let mut view = @UnconstrainedBox {
-        dir: distinct_pipe!{
+      let mut view = @Viewport {
+        scroll_dir: distinct_pipe!{
           let this = $this;
-          match this.scrollable {
-            Scrollable::X => UnconstrainedDir::X,
-            Scrollable::Y => UnconstrainedDir::Y,
-            Scrollable::Both => UnconstrainedDir::Both,
-          }
+          this.scrollable
         },
-        clamp_dim: ClampDim::MAX_SIZE,
         on_wheel: move |e| $this.write().scroll(-e.delta_x, -e.delta_y),
       };
 
       let child = FatObj::new(child);
-      let mut child = @ $child {
+      let child = @ $child {
         anchor: distinct_pipe!{
           let this = $this;
           let pos = this.get_scroll_pos();
           Anchor::left_top(-pos.x, -pos.y)
+        },
+        on_performed_layout: move |e| {
+          let content_size = e.box_size().unwrap_or_default();
+          if $this.content_size != content_size {
+            $this.write().set_content_size(content_size);
+          }
         }
       };
-
-      watch!($child.layout_size())
-        .distinct_until_changed()
-        .subscribe(move |v| $this.write().set_content_size(v));
-      watch!($view.layout_size())
-        .distinct_until_changed()
-        .subscribe(move |v| $this.write().set_page(v));
 
       $this.write().view_id = Some($view.track_id());
 
       @ $view {
-        clip_boundary: true,
+        on_performed_layout: move |_| {
+          let view_size = $view.size.get();
+          if $this.page != view_size {
+            $this.write().set_page(view_size);
+          }
+        },
         providers: [Provider::value_of_writer(this.clone_boxed_writer(), None)],
         @ { child }
       }
@@ -196,6 +204,45 @@ impl ScrollableWidget {
   fn set_page(&mut self, page: Size) {
     self.page = page;
     self.sync_pos()
+  }
+}
+
+#[derive(SingleChild, Declare)]
+struct Viewport {
+  scroll_dir: Scrollable,
+  #[declare(skip)]
+  size: Cell<Size>,
+}
+
+impl Render for Viewport {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let mut child_clamp = clamp;
+    if self.scroll_dir != Scrollable::X {
+      child_clamp.max.height = f32::INFINITY;
+    }
+    if self.scroll_dir != Scrollable::Y {
+      child_clamp.max.width = f32::INFINITY;
+    }
+
+    let child_size = ctx.assert_perform_single_child_layout(child_clamp);
+    let size = clamp.clamp(child_size);
+    // The viewport needs to accurately record its real size, as widgets like
+    // `padding` may increase the size without the viewport accounting for the
+    // additional space.
+    self.size.set(size);
+
+    size
+  }
+
+  fn paint(&self, ctx: &mut PaintingCtx) {
+    let rect = Rect::from_size(self.size.get());
+    let path = if let Some(radius) = Provider::of::<Radius>(ctx) {
+      Path::rect_round(&rect, &radius)
+    } else {
+      Path::rect(&rect)
+    };
+
+    ctx.painter().clip(path.into());
   }
 }
 

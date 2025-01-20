@@ -1,6 +1,6 @@
 use ribir_core::prelude::*;
 
-use crate::layout::Stack;
+use crate::layout::{Stack, StackDeclareExtend, StackFit};
 
 /// This widget wraps its child in a `ScrollableWidget` and adds two scrollbar
 /// for interactivity and visual scroll position indication.
@@ -102,7 +102,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
               class: H_SCROLL_THUMB,
               size: distinct_pipe!{
                 let width = h_thumb_rate(&$scroll) * $h_track.layout_width();
-                Size::new(width, 0.)
+                Size::new(width, 4.)
               }
             };
 
@@ -136,7 +136,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
               class: V_SCROLL_THUMB,
               size: distinct_pipe!{
                 let height = v_thumb_rate(&$scroll) * $v_track.layout_height();
-                Size::new(0., height)
+                Size::new(4., height)
               }
             };
 
@@ -160,12 +160,27 @@ impl<'c> ComposeChild<'c> for Scrollbar {
 
         let scroll = FatObj::new(scroll);
         @Stack {
+          fit: StackFit::Passthrough,
           @ $scroll {
             class: SCROLL_CLIENT_AREA,
             @{ child }
           }
-          @ { h_scrollbar }
-          @ { v_scrollbar }
+          @IgnorePointer{
+            ignore: IgnoreScope::OnlySelf,
+            @UnconstrainedBox {
+              dir: UnconstrainedDir::Both,
+              clamp_dim: ClampDim::MIN_SIZE,
+              @ { h_scrollbar }
+            }
+          }
+          @IgnorePointer{
+            ignore: IgnoreScope::OnlySelf,
+            @UnconstrainedBox {
+              dir: UnconstrainedDir::Both,
+              clamp_dim: ClampDim::MIN_SIZE,
+              @ { v_scrollbar }
+            }
+          }
         }
       }
     }

@@ -27,7 +27,7 @@ impl WrapRender for ClipBoundary {
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     if self.clip_boundary {
-      let rect: lyon_geom::euclid::Rect<f32, LogicUnit> = Rect::from_size(
+      let rect = Rect::from_size(
         ctx
           .box_size()
           .expect("impossible without size in painting stage"),
