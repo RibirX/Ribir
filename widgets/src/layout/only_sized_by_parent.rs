@@ -1,10 +1,13 @@
 use ribir_core::prelude::*;
+use wrap_render::WrapRender;
 
 /// OnlySizedByParent implies that the parent is the only input into determining
 /// the widget's size, so layout changes to the subtree do not trigger a parent
 /// relayout.
-#[derive(SingleChild, Declare)]
+#[derive(Declare)]
 pub struct OnlySizedByParent {}
+
+impl_compose_child_for_wrap_render!(OnlySizedByParent, DirtyPhase::Paint);
 
 // `OnlySizedByParent` must be an independent node in the widget tree.
 // Therefore, any modifications to its child should terminate at
@@ -12,14 +15,12 @@ pub struct OnlySizedByParent {}
 // `OnlySizedByParent` node is also dirty, and its parent must be marked as
 // dirty. For instance, if `w2` in a Row[w1, OnlySizedByParent<w2>] is dirty,
 // the Row requires a relayout.
-impl Render for OnlySizedByParent {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx
-      .perform_single_child_layout(clamp)
-      .unwrap_or(ZERO_SIZE)
+impl WrapRender for OnlySizedByParent {
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    host.perform_layout(clamp, ctx)
   }
 
-  fn only_sized_by_parent(&self) -> bool { true }
+  fn only_sized_by_parent(&self, _: &dyn Render) -> bool { true }
 }
 
 #[cfg(test)]
