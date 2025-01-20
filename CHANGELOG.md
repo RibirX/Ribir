@@ -28,6 +28,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: Add builtin filed `clip_boundary`. (#694 @wjian23)
+- **core**: `IgnorePointer` now has the ability to only ignore events for the widget itself. (#pr @M-Adoo)
 
 ### Changed 
 
