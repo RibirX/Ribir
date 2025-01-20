@@ -353,7 +353,6 @@ impl Compose for RangeSlider {
 fn stop_indicator_track(cnt: usize, actives: Range<usize>, filter: Vec<usize>) -> Widget<'static> {
   fn_widget!(
     @IgnorePointer {
-      ignore: true,
       @Row {
         v_align: VAlign::Center,
         align_items: Align::Center,
