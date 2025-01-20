@@ -40,6 +40,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Fixed
 
+- **core**: The child should not be painted when visible is false. (#pr @M-Adoo)
 - **core & widgets**: Layouts are not permitted to return an infinite size, so if a layout requires scaling or expanding the size infinitely, that action should be disregarded. (#pr @M-Adoo)
 - **macros**: Embedding `fn_widget!` may lead to missed captured variables. (#pr @M-Adoo)
 
