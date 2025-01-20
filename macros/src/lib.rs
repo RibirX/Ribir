@@ -161,7 +161,7 @@ pub fn rdl(input: TokenStream) -> TokenStream { RdlMacro::gen_code(input.into(),
 /// `$name` is used to express a state reference to `name`.
 #[proc_macro]
 pub fn fn_widget(input: TokenStream) -> TokenStream {
-  fn_widget_macro::gen_code(input.into(), &mut DollarRefsCtx::top_level()).into()
+  fn_widget_macro::gen_code(input.into(), None).into()
 }
 
 /// This macro just return the input token stream. It's do nothing but help
