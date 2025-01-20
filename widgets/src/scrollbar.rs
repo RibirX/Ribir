@@ -99,6 +99,13 @@ impl<'c> ComposeChild<'c> for Scrollbar {
               h_align: HAlign::Stretch,
               on_wheel: move |e| $scroll.write().scroll(-e.delta_x, -e.delta_y),
             };
+            let mut h_thumb =  @Container {
+              class: H_SCROLL_THUMB,
+              size: distinct_pipe!{
+                let width = h_thumb_rate(&$scroll) * $h_track.layout_width();
+                Size::new(width, 0.)
+              }
+            };
 
             @ $h_track {
               on_tap: move |e| if e.is_primary {
@@ -108,16 +115,12 @@ impl<'c> ComposeChild<'c> for Scrollbar {
                 let scroll_pos = Point::new(x, scroll.get_scroll_pos().y);
                 scroll.jump_to(scroll_pos);
               },
-              @Container {
-                class: H_SCROLL_THUMB,
-                size: distinct_pipe!{
-                  let width = h_thumb_rate(&$scroll) * $h_track.layout_width();
-                  Size::new(width, 0.)
-                },
+              @ $h_thumb {
                 anchor: distinct_pipe!{
-                  let pos = $scroll.get_x_scroll_rate() * $h_track.layout_width();
-                  Anchor::left(pos)
-                },
+                  let rate = $scroll.get_x_scroll_rate();
+                  let distance = $h_track.layout_width() - $h_thumb.layout_width();
+                  Anchor::left(rate * distance)
+                }
               }
             }
           }));
@@ -130,6 +133,14 @@ impl<'c> ComposeChild<'c> for Scrollbar {
               on_wheel: move |e| $scroll.write().scroll(-e.delta_x, -e.delta_y),
             };
 
+            let mut v_thumb = @Container {
+              class: V_SCROLL_THUMB,
+              size: distinct_pipe!{
+                let height = v_thumb_rate(&$scroll) * $v_track.layout_height();
+                Size::new(0., height)
+              }
+            };
+
             @ $v_track {
               on_tap: move |e| if e.is_primary {
                 let rate = e.position().y / $v_track.layout_height();
@@ -138,16 +149,12 @@ impl<'c> ComposeChild<'c> for Scrollbar {
                 let scroll_pos = Point::new(scroll.get_scroll_pos().x, y);
                 scroll.jump_to(scroll_pos);
               },
-              @Container {
-                class: V_SCROLL_THUMB,
-                size: distinct_pipe!{
-                  let height = v_thumb_rate(&$scroll) * $v_track.layout_height();
-                  Size::new(0., height)
-                },
+              @ $v_thumb {
                 anchor: distinct_pipe!{
-                  let pos = $scroll.get_y_scroll_rate() * $v_track.layout_height();
-                  Anchor::top(pos)
-                },
+                  let rate = $scroll.get_y_scroll_rate();
+                  let distance = $v_track.layout_height() - $v_thumb.layout_height();
+                  Anchor::top(rate * distance)
+                }
               }
             }
           }));
