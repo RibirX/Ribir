@@ -44,6 +44,8 @@ impl WrapRender for VisibilityRender {
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     if self.display {
       host.paint(ctx)
+    } else {
+      ctx.painter().apply_alpha(0.);
     }
   }
 
@@ -62,4 +64,40 @@ impl Visibility {
 
   #[inline]
   fn get_visible(&self) -> bool { self.visible }
+}
+
+#[cfg(test)]
+mod tests {
+  use test_helper::split_value;
+
+  use super::*;
+  use crate::test_helper::*;
+
+  #[test]
+  fn visible_children_not_paint() {
+    reset_test_env!();
+
+    struct PainterHit(Stateful<i32>);
+
+    impl Render for PainterHit {
+      fn perform_layout(&self, clamp: BoxClamp, _ctx: &mut LayoutCtx) -> Size { clamp.max }
+
+      fn paint(&self, _ctx: &mut PaintingCtx) { *self.0.write() += 1; }
+    }
+
+    let hit = Stateful::new(0);
+    let (visible, w_visible) = split_value(true);
+    let hit2 = hit.clone_writer();
+    let mut wnd = TestWindow::new(container! {
+      size: Size::splat(100.),
+      visible: pipe!(*$visible),
+      @PainterHit(hit2.clone_writer())
+    });
+
+    wnd.draw_frame();
+    assert_eq!(*hit.read(), 1);
+    *w_visible.write() = false;
+    wnd.draw_frame();
+    assert_eq!(*hit.read(), 1);
+  }
 }
