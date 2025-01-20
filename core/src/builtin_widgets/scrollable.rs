@@ -177,13 +177,13 @@ impl ScrollableWidget {
   pub fn get_scroll_pos(&self) -> Point { self.scroll_pos }
 
   pub fn get_x_scroll_rate(&self) -> f32 {
-    let content = self.content_size.width;
-    if content.is_infinite() || content.is_nan() { 0. } else { self.scroll_pos.x / content }
+    let pos = self.scroll_pos.x;
+    if pos.is_normal() { pos / self.max_scrollable().x } else { 0. }
   }
 
   pub fn get_y_scroll_rate(&self) -> f32 {
-    let content = self.content_size.height;
-    if content.is_infinite() || content.is_nan() { 0. } else { self.scroll_pos.y / content }
+    let pos = self.scroll_pos.y;
+    if pos.is_normal() { pos / self.max_scrollable().y } else { 0. }
   }
 
   fn sync_pos(&mut self) { self.jump_to(self.scroll_pos) }
