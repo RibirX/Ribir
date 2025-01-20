@@ -31,6 +31,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Support extend custom event. (#684 @wjian23)
 - **core**: Added `map_watcher` to `StateWatcher` (#684 @wjian23)
 - **core**: Added `ensure_visible` and ScrollableProvider to ScrollableWidget, to support descendant to be showed.(#684 @wjian23)
+- **core**: `IgnorePointer` now has the ability to only ignore events for the widget itself. (#pr @M-Adoo)
 
 ### Changed
 
