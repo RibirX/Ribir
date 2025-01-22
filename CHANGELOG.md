@@ -25,6 +25,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+- **core**: Add builtin filed `clip_boundary`. (#694 @wjian23)
+
 ## [0.4.0-alpha.24] - 2025-01-22
 
 ### Features

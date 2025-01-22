@@ -88,7 +88,7 @@ pub struct TextStyle {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Debug)]
 pub enum TextOverflow {
   #[default]
-  Clip,
+  Overflow,
   AutoWrap,
 }
 

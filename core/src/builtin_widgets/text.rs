@@ -34,16 +34,18 @@ pub fn text_glyph(
 pub fn paint_text(
   painter: &mut Painter, glyphs: &VisualGlyphs, style: PaintingStyle, box_rect: Rect,
 ) {
-  if let PaintingStyle::Stroke(options) = style {
-    painter
-      .set_style(PathStyle::Stroke)
-      .set_strokes(options);
-  } else {
-    painter.set_style(PathStyle::Fill);
-  }
+  if let Some(rect) = painter.intersection_paint_bounds(&box_rect) {
+    if let PaintingStyle::Stroke(options) = style {
+      painter
+        .set_style(PathStyle::Stroke)
+        .set_strokes(options);
+    } else {
+      painter.set_style(PathStyle::Fill);
+    }
 
-  let font_db = AppCtx::font_db().clone();
-  painter.draw_glyphs_in_rect(glyphs, box_rect, &font_db.borrow());
+    let font_db = AppCtx::font_db().clone();
+    painter.draw_glyphs_in_rect(glyphs, rect, &font_db.borrow());
+  }
 }
 
 impl Render for Text {
@@ -81,7 +83,8 @@ impl Render for Text {
 
     let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
     let visual_glyphs = self.glyphs().unwrap();
-    paint_text(ctx.painter(), &visual_glyphs, style.unwrap_or(PaintingStyle::Fill), box_rect);
+    let rect = visual_glyphs.visual_rect();
+    paint_text(ctx.painter(), &visual_glyphs, style.unwrap_or(PaintingStyle::Fill), rect);
   }
 }
 
@@ -134,6 +137,7 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @MockBox {
         size: Size::new(50., 45.),
+        clip_boundary: true,
         @Text {
           text: "hello world,\rnice to meet you.",
         }
@@ -171,12 +175,13 @@ mod tests {
       }
       @Text {
         text: "Text line height check!",
+        clip_boundary: true,
         font_size: 20.,
         text_line_height: 40.,
         background: Color::GREEN,
       }
     })
     .with_wnd_size(WND_SIZE)
-    .with_comparison(0.00004)
+    .with_comparison(0.00009)
   );
 }

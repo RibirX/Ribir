@@ -174,4 +174,8 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "tooltips" => builtin_member!{"Tooltips", Field, "tooltips"},
   // TrackWidgetId
   "track_id" => builtin_member!{"TrackWidgetId", Method, "track_id"},
+  // ClipBoundary
+  "clip_boundary" => builtin_member!{"ClipBoundary", Field, "clip_boundary"},
+  // Providers
+  "providers" => builtin_member!{"Providers", Field, "providers"},
 };
