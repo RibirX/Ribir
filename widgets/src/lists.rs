@@ -285,6 +285,7 @@ impl<'c> ComposeChild<'c> for ListItem {
               flex: 1.,
               @ $label_gap {
                 @Column {
+                  clip_boundary: true,
                   @Text {
                     text: headline.0.0,
                     foreground: Palette::of(ctx).on_surface(),

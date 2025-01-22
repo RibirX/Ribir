@@ -75,6 +75,7 @@ impl ComposeChild<'static> for Avatar {
           }
           @ $container {
             background: pipe!(Brush::from(palette1.base_of(&$this.color))),
+            clip_boundary: true,
             @Text {
               h_align: HAlign::Center,
               v_align: VAlign::Center,
@@ -91,7 +92,7 @@ impl ComposeChild<'static> for Avatar {
               &Rect::from_size(size),
               &Radius::all(radius),
             );
-            Clip { clip: ClipType::Path(path) }
+            Clip { clip_path: path }
           });
           @$clip {
             @Container {

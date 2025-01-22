@@ -53,6 +53,8 @@ pub use svg::*;
 
 pub mod clip;
 pub use clip::*;
+pub mod clip_boundary;
+pub use clip_boundary::*;
 pub mod focus_node;
 pub use focus_node::*;
 pub mod focus_scope;
@@ -146,6 +148,7 @@ pub struct FatObj<T> {
   keep_alive: Option<State<KeepAlive>>,
   keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
   tooltips: Option<State<Tooltips>>,
+  clip_boundary: Option<State<ClipBoundary>>,
   providers: Option<SmallVec<[Provider; 1]>>,
 }
 
@@ -194,6 +197,7 @@ impl<T> FatObj<T> {
       visibility: self.visibility,
       opacity: self.opacity,
       tooltips: self.tooltips,
+      clip_boundary: self.clip_boundary,
       keep_alive: self.keep_alive,
       keep_alive_unsubscribe_handle: self.keep_alive_unsubscribe_handle,
       providers: self.providers,
@@ -228,6 +232,7 @@ impl<T> FatObj<T> {
       && self.opacity.is_none()
       && self.keep_alive.is_none()
       && self.tooltips.is_none()
+      && self.clip_boundary.is_none()
   }
 
   /// Return the host object of the FatObj.
@@ -468,6 +473,14 @@ impl<T> FatObj<T> {
   pub fn get_tooltips_widget(&mut self) -> &State<Tooltips> {
     self
       .tooltips
+      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+
+  /// Returns the `State<ClipBoundary>` widget from the FatObj. If it doesn't
+  /// exist, a new one is created.
+  pub fn get_clip_boundary_widget(&mut self) -> &State<ClipBoundary> {
+    self
+      .clip_boundary
       .get_or_insert_with(|| State::value(<_>::default()))
   }
 }
@@ -931,6 +944,11 @@ impl<T> FatObj<T> {
     self.declare_builtin_init(v, Self::get_tooltips_widget, |m, v| m.tooltips = v)
   }
 
+  /// Initializes the clip_boundary of the widget.
+  pub fn clip_boundary<const M: usize>(self, v: impl DeclareInto<bool, M>) -> Self {
+    self.declare_builtin_init(v, Self::get_clip_boundary_widget, |m, v| m.clip_boundary = v)
+  }
+
   /// Initializes the `keep_alive` value of the `KeepAlive` widget.
   pub fn keep_alive<const M: usize>(mut self, v: impl DeclareInto<bool, M>) -> Self {
     let (v, o) = v.declare_into().unzip();
@@ -1041,7 +1059,15 @@ impl<'a> FatObj<Widget<'a>> {
     compose_builtin_widgets!(
       host
         + [
-          track_id, padding, fitted_box, foreground, border, background, radius, scrollable,
+          track_id,
+          padding,
+          fitted_box,
+          foreground,
+          border,
+          background,
+          clip_boundary,
+          radius,
+          scrollable,
           layout_box
         ]
     );

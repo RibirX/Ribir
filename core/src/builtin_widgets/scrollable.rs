@@ -69,9 +69,11 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
         .subscribe(move |v| $this.write().set_page(v));
 
       $this.write().view_id = Some($view.track_id());
-      @Clip {
+
+      @ $view {
+        clip_boundary: true,
         providers: [Provider::value_of_writer(this.clone_boxed_writer(), None)],
-        @ $view { @ { child } }
+        @ { child }
       }
     }
     .into_widget()
@@ -224,7 +226,7 @@ mod tests {
     });
 
     wnd.draw_frame();
-    let pos = wnd.layout_info_by_path(&[0, 0, 0]).unwrap().pos;
+    let pos = wnd.layout_info_by_path(&[0, 0]).unwrap().pos;
     assert_eq!(pos, Point::new(expect_x, expect_y));
   }
 

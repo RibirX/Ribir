@@ -235,7 +235,7 @@ fn typography_theme() -> TypographyTheme {
       weight: FontWeight::NORMAL,
       ..<_>::default()
     };
-    let overflow = TextOverflow::Clip;
+    let overflow = TextOverflow::Overflow;
     TextTheme {
       text: TextStyle { line_height, font_size, letter_space, font_face, overflow },
       decoration: TextDecorationStyle {

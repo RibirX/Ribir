@@ -246,7 +246,7 @@ pub fn typography_theme() -> TypographyTheme {
         font_size,
         letter_space,
         font_face,
-        overflow: TextOverflow::Clip,
+        overflow: TextOverflow::Overflow,
       },
       decoration: TextDecorationStyle {
         decoration: TextDecoration::NONE,

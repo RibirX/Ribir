@@ -681,9 +681,6 @@ impl Painter {
       return self;
     };
 
-    if !paint_rect.contains_rect(&visual_rect) {
-      self.clip(Path::rect(&paint_rect).into());
-    }
     self.translate(visual_rect.origin.x, visual_rect.origin.y);
 
     for g in glyphs {
