@@ -1009,6 +1009,9 @@ impl<T> FatObj<T> {
   pub fn take_scrollable_widget(&mut self) -> Option<State<ScrollableWidget>> {
     self.scrollable.take()
   }
+
+  /// Returns `true` if the widget has a class.
+  pub fn has_class(&self) -> bool { self.class.is_some() }
 }
 pub trait FatDeclarerExtend: Sized {
   type Target;
@@ -1190,6 +1193,7 @@ impl<T: SingleChild> SingleChild for DeclarerWithSubscription<T> {
 }
 
 impl<T: MultiChild> MultiChild for DeclarerWithSubscription<T> {
+  type Target<'c> = MultiPair<'c>;
   fn with_child<'c, const N: usize, const M: usize>(
     self, child: impl IntoChildMulti<'c, N, M>,
   ) -> MultiPair<'c> {

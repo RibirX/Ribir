@@ -40,6 +40,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **macros**: Embedding `fn_widget!` may lead to missed captured variables. (#pr @M-Adoo)
 - **core**: The child should not be painted when visible is false. (#pr @M-Adoo)
 - **core**: Ensure that the content widget size in the scrollable widget is not smaller than its viewport. (#pr @M-Adoo)
+- **core**: The crash occurs when a parent widget with a class tries to convert the widget with more than one leaf. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.24] - 2025-01-22
 

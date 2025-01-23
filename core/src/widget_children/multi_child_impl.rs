@@ -2,8 +2,8 @@ use super::*;
 use crate::pipe::InnerPipe;
 
 pub struct MultiPair<'a> {
-  parent: Widget<'static>,
-  children: Vec<Widget<'a>>,
+  pub(crate) parent: Widget<'static>,
+  pub(crate) children: Vec<Widget<'a>>,
 }
 
 impl<'a> MultiPair<'a> {
@@ -71,6 +71,7 @@ impl<T> MultiChild for T
 where
   T: StateReader<Value: MultiChild> + IntoWidget<'static, RENDER>,
 {
+  type Target<'c> = MultiPair<'c>;
   fn with_child<'c, const N: usize, const M: usize>(
     self, child: impl IntoChildMulti<'c, N, M>,
   ) -> MultiPair<'c> {
@@ -82,6 +83,8 @@ where
 
 macro_rules! impl_pipe_methods {
   () => {
+    type Target<'c> = MultiPair<'c>;
+
     fn with_child<'c, const N: usize, const M: usize>(
       self, child: impl IntoChildMulti<'c, N, M>,
     ) -> MultiPair<'c> {
@@ -116,23 +119,45 @@ where
 }
 
 impl<P: MultiChild> MultiChild for FatObj<P> {
+  type Target<'c> = FatObj<MultiPair<'c>>;
   fn with_child<'c, const N: usize, const M: usize>(
     self, child: impl IntoChildMulti<'c, N, M>,
-  ) -> MultiPair<'c> {
-    MultiPair::new(self, child)
+  ) -> FatObj<MultiPair<'c>> {
+    self.map(move |p| MultiPair::new(p, child))
   }
 
-  fn into_parent(self: Box<Self>) -> Widget<'static> { self.into_widget() }
+  fn into_parent(self: Box<Self>) -> Widget<'static> {
+    let this = *self;
+    if !this.has_class() {
+      this.into_widget()
+    } else {
+      panic!("A FatObj should not have a class attribute when acting as a single parent")
+    }
+  }
+}
+
+impl<'a> FatObj<MultiPair<'a>> {
+  pub fn with_child<'b, 'c, const N: usize, const M: usize>(
+    self, child: impl IntoChildMulti<'b, N, M>,
+  ) -> FatObj<MultiPair<'c>>
+  where
+    'a: 'c,
+    'b: 'c,
+  {
+    self.map(move |p| p.with_child(child))
+  }
 }
 
 impl MultiChild for Box<dyn MultiChild> {
+  type Target<'c> = MultiPair<'c>;
+
   fn with_child<'c, const N: usize, const M: usize>(
     self, child: impl IntoChildMulti<'c, N, M>,
   ) -> MultiPair<'c> {
     MultiPair::new(self, child)
   }
 
-  fn into_parent(self: Box<Self>) -> Widget<'static> { (*self).into_parent() }
+  fn into_parent(self: Box<Self>) -> Widget<'static> { todo!() }
 }
 
 impl<'w> IntoWidgetStrict<'w, RENDER> for MultiPair<'w> {

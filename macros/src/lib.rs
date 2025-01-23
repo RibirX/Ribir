@@ -51,8 +51,9 @@ pub fn multi_child_derive(input: TokenStream) -> TokenStream {
   let name = input.ident;
   quote! {
     impl #impl_generics MultiChild for #name #ty_generics #where_clause {
+      type Target<'c> = MultiPair<'c>;
       fn with_child<'c, const N: usize, const M: usize>(self, child: impl IntoChildMulti<'c, N, M>)
-        -> MultiPair<'c>
+        -> Self::Target<'c>
       {
         MultiPair::new(self, child)
       }
