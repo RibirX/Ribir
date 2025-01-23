@@ -27,9 +27,13 @@ pub trait SingleChild: IntoWidget<'static, RENDER> {
 /// the derive method first; manual implementation is not suggested unless you
 /// fully understand how widget composition works in the framework.
 pub trait MultiChild: IntoWidget<'static, RENDER> {
+  type Target<'c>
+  where
+    Self: Sized;
+
   fn with_child<'c, const N: usize, const M: usize>(
     self, child: impl IntoChildMulti<'c, N, M>,
-  ) -> MultiPair<'c>
+  ) -> Self::Target<'c>
   where
     Self: Sized;
 
