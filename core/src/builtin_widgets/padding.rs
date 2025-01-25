@@ -1,11 +1,9 @@
+use wrap_render::WrapRender;
+
 use crate::prelude::*;
 
-/// The widget utilizes empty space to surround the child widget.
-///
-/// Both `Padding` and `Margin` utilize empty space to surround the child
-/// widget. The difference lies in the fact that when used as a built-in widget,
-/// padding makes the empty space appear as a part of the child widget, whereas
-/// margin does not. For example:
+/// A widget shrinks its content size, and the padding area is the space between
+/// its content and its border.
 ///
 /// ```
 /// use ribir::prelude::*;
@@ -22,7 +20,7 @@ use crate::prelude::*;
 ///   background: Color::GREEN,
 /// };
 /// ```
-#[derive(Default, SingleChild)]
+#[derive(Default)]
 pub struct Padding {
   pub padding: EdgeInsets,
 }
@@ -33,9 +31,33 @@ impl Declare for Padding {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl Render for Padding {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    space_around_layout(&self.padding, &clamp, ctx)
+impl_compose_child_for_wrap_render!(Padding, DirtyPhase::Layout);
+
+impl WrapRender for Padding {
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    let thickness = self.padding.thickness();
+
+    let min = (clamp.min - thickness).max(ZERO_SIZE);
+    let max = (clamp.max - thickness).max(ZERO_SIZE);
+    // Shrink the clamp of child.
+    let child_clamp = BoxClamp { min, max };
+    let size = host.perform_layout(child_clamp, ctx);
+    clamp.clamp(size + thickness)
+  }
+
+  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
+    ctx.content_only_transform_apply(&Transform::translation(self.padding.left, self.padding.top));
+    host.paint(ctx);
+  }
+
+  fn get_transform(&self, host: &dyn Render) -> Option<Transform> {
+    let padding_matrix = Transform::translation(self.padding.left, self.padding.top);
+
+    let ts = host
+      .get_transform()
+      .map_or(padding_matrix, |h| padding_matrix.then(&h));
+
+    Some(ts)
   }
 }
 
@@ -61,16 +83,14 @@ mod tests {
         }
       }
     }),
-    // Padding widget
-    LayoutCase::default().with_size(Size::new(101., 100.)),
     // MockMulti widget
-    LayoutCase::new(&[0, 0])
-      .with_size(Size::new(100., 100.))
-      .with_x(1.),
-    // MockBox
-    LayoutCase::new(&[0, 0, 0])
-      .with_size(Size::new(100., 100.))
-      .with_x(0.)
+    LayoutCase::default()
+      .with_size(Size::new(101., 100.))
+      .with_x(0.),
+    // The MockBox
+    // padding does not update the children's position, but it transforms during painting and hit
+    // testing.
+    LayoutCase::new(&[0, 0]).with_size(Size::new(100., 100.))
   );
 
   #[test]

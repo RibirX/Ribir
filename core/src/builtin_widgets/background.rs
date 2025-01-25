@@ -23,7 +23,7 @@ impl WrapRender for Background {
 
     if !size.is_empty() {
       let rect = Rect::from_size(size);
-      let (provider_ctx, painter) = ctx.provider_ctx_and_painter();
+      let (provider_ctx, mut painter) = ctx.provider_ctx_and_box_painter();
       let old_brush = painter.fill_brush().clone();
 
       painter.set_fill_brush(self.background.clone());

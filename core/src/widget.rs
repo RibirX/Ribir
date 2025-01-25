@@ -69,7 +69,7 @@ pub trait Render: 'static {
   /// marked as dirty, the paint phase will also be affected.
   fn dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 
-  /// Return a transform to map the coordinate from its parent to this widget.
+  /// Return a transform to map the coordinate to parent coordinate.
   fn get_transform(&self) -> Option<Transform> { None }
 }
 

@@ -10,11 +10,6 @@ pub struct EdgeInsets {
 
 /// The widget utilizes empty space to surround the child widget.
 ///
-/// Both `Padding` and `Margin` utilize empty space to surround the child
-/// widget. The difference lies in the fact that when used as a built-in widget,
-/// padding makes the empty space appear as a part of the child widget, whereas
-/// margin does not. For example:
-///
 /// ```
 /// use ribir::prelude::*;
 ///
@@ -43,7 +38,23 @@ impl Declare for Margin {
 
 impl Render for Margin {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    space_around_layout(&self.margin, &clamp, ctx)
+    let Some(child) = ctx.single_child() else { return clamp.min };
+
+    // Reset child position before layout
+    ctx.update_position(child, Point::zero());
+
+    let thickness = self.margin.thickness().min(clamp.max);
+    let min = (clamp.min - thickness).max(ZERO_SIZE);
+    let max = (clamp.max - thickness).max(ZERO_SIZE);
+
+    // Shrink the clamp of child.
+    let child_clamp = BoxClamp { min, max };
+    let size = ctx.perform_child_layout(child, child_clamp);
+    let pos = ctx.position(child).unwrap();
+    let pos = pos + Vector::new(self.margin.left, self.margin.top);
+    ctx.update_position(child, pos);
+
+    size + thickness
   }
 }
 
@@ -115,35 +126,6 @@ impl std::ops::AddAssign for EdgeInsets {
     self.bottom += rhs.bottom;
     self.top += rhs.top;
   }
-}
-
-pub(crate) fn space_around_layout(
-  edges: &EdgeInsets, clamp: &BoxClamp, ctx: &mut LayoutCtx,
-) -> Size {
-  let child = match ctx.single_child() {
-    Some(c) => c,
-    None => return Size::zero(),
-  };
-
-  // Reset children position before layout
-  ctx.update_position(child, Point::zero());
-
-  // No need to force child relayout since the child position determined by this
-  // widget is already set during layout.
-  // ctx.force_child_relayout(child);
-
-  let thickness = edges.thickness().min(clamp.max);
-  let min = (clamp.min - thickness).max(ZERO_SIZE);
-  let max = clamp.max - thickness;
-
-  // Shrink the clamp of child.
-  let child_clamp = BoxClamp { min, max };
-  let size = ctx.assert_perform_single_child_layout(child_clamp);
-  let pos = ctx.position(child).unwrap();
-  let pos = pos + Vector::new(edges.left, edges.top);
-  ctx.update_position(child, pos);
-
-  size + thickness
 }
 
 #[cfg(test)]

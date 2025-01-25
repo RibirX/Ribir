@@ -27,8 +27,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Add builtin filed `clip_boundary`. (#694 @wjian23)
+- **core**: Add builtin field `clip_boundary`. (#694 @wjian23)
 - **core**: `IgnorePointer` now has the ability to only ignore events for the widget itself. (#pr @M-Adoo)
+- **core**: Included `BoxPainter` to draw decorations starting from the widget box's origin while ignoring padding. (#pr @M-Adoo)
 
 ### Changed 
 
@@ -41,6 +42,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: The child should not be painted when visible is false. (#pr @M-Adoo)
 - **core**: Ensure that the content widget size in the scrollable widget is not smaller than its viewport. (#pr @M-Adoo)
 - **core**: The crash occurs when a parent widget with a class tries to convert the widget with more than one leaf. (#pr @M-Adoo)
+- **core**: The padding only reduces the content size and does not affect the border and background size. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.24] - 2025-01-22
 
@@ -117,7 +119,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Fix TextStyle cause providers mismatched (#671 @wjian23)
 - **core**: Running an animation that is already in progress does not trigger a smooth transition. (#672 @M-Adoo)
 - **core**: The framework incorrectly clamps the layout result of the render widget. (#672 @M-Adoo)
-- **core**: Padding will not change the child's size; otherwise, child elements like `Icon` may not work correctly. (#674 @M-Adoo)
 - **core**: Allow children to be hit outside their parent's boundaries for non-fixed-size containers. (#676 @M-Adoo)
 - **painter**: Fixed text line height does not work correctly. (#674 @M-Adoo)
 - **painter**: Fixed issue with text not being drawn at the middle baseline by default. (#674 @M-Adoo)
