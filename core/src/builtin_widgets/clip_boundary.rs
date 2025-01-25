@@ -32,13 +32,14 @@ impl WrapRender for ClipBoundary {
           .box_size()
           .expect("impossible without size in painting stage"),
       );
+
       let path = if let Some(radius) = Provider::of::<Radius>(ctx) {
         Path::rect_round(&rect, &radius)
       } else {
         Path::rect(&rect)
       };
 
-      ctx.painter().clip(path.into());
+      ctx.box_painter().clip(path.into());
     }
     host.paint(ctx)
   }

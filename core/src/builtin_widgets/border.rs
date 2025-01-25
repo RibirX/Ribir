@@ -71,9 +71,9 @@ impl WrapRender for BorderWidget {
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     let size = ctx.box_size().unwrap();
-    let (provider_ctx, painter) = ctx.provider_ctx_and_painter();
 
     if !size.is_empty() {
+      let (provider_ctx, mut painter) = ctx.provider_ctx_and_box_painter();
       // Connecting adjacent borders implies that the styles of the neighboring
       // borders should match. If one of the adjacent borders is absent, the corner
       // radius will align with the existing border.
@@ -89,14 +89,14 @@ impl WrapRender for BorderWidget {
         } else {
           Radius::all(0.)
         };
-        border.paint_continuous_borders(size, &rg, &radius, painter);
+        border.paint_continuous_borders(size, &rg, &radius, &mut painter);
 
         // if the first continuous border only has one side, there maybe existing
         // another border on its opposite side
         if rg.start.next() == rg.end {
           let opposite = rg.end.next();
           if let Some(side) = border.find_visible(opposite..opposite.next()) {
-            border.paint_continuous_borders(size, &(side..side.next()), &radius, painter);
+            border.paint_continuous_borders(size, &(side..side.next()), &radius, &mut painter);
           }
         }
 
