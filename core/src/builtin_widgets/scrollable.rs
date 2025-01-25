@@ -96,53 +96,67 @@ impl ScrollableWidget {
     Some(pos - base.to_vector())
   }
 
+  pub fn map_to_content(&self, p: Point, child: WidgetId, wnd: &Window) -> Option<Point> {
+    let content_id = self
+      .view_id
+      .as_ref()?
+      .get()?
+      .single_child(wnd.tree())?;
+    let pos = wnd.map_to_global(p, child);
+    let base = wnd.map_to_global(Point::zero(), content_id);
+    Some(pos - base.to_vector())
+  }
+
+  /// Keep the content box visible in the scroll view with the given anchor
+  /// relative to the view.
+  ///
+  /// If Anchor.x is None,  it will anchor the widget to the closest edge of the
+  /// view in horizontal direction, when the widget is out of the view.
+  /// If Anchor.y is None, it will anchor the widget to the closest edge of the
+  /// view in vertical direction, when the widget is out of the view.
+  pub fn visible_content_box(&mut self, rect: Rect, anchor: Anchor) {
+    let view_size = self.scroll_view_size();
+
+    let offset_x = anchor
+      .x
+      .or_else(|| {
+        if rect.min_x() > self.scroll_pos.x + view_size.width {
+          Some(HAnchor::Right(0.0.into()))
+        } else if rect.max_x() < self.scroll_pos.x {
+          Some(HAnchor::Left(0.0.into()))
+        } else {
+          None
+        }
+      })
+      .map_or(self.scroll_pos.x, |x| rect.min_x() - x.into_pixel(rect.width(), view_size.width));
+
+    let offset_y = anchor
+      .y
+      .or_else(|| {
+        if rect.min_y() > view_size.height + self.scroll_pos.y {
+          Some(VAnchor::Bottom(0.0.into()))
+        } else if rect.max_y() < self.scroll_pos.y {
+          Some(VAnchor::Top(0.0.into()))
+        } else {
+          None
+        }
+      })
+      .map_or(self.scroll_pos.y, |y| rect.min_y() - y.into_pixel(rect.height(), view_size.height));
+
+    self.jump_to(Point::new(offset_x, offset_y));
+  }
+
   /// Ensure the given child is visible in the scroll view with the given anchor
   /// relative to the view.
   /// If Anchor.x is None,  it will anchor the widget to the closest edge of the
   /// view in horizontal direction, when the widget is out of the view.
   /// If Anchor.y is None, it will anchor the widget to the closest edge of the
   /// view in vertical direction, when the widget is out of the view.
-  pub fn ensure_visible(&mut self, child: WidgetId, anchor: Anchor, wnd: &Window) {
-    let Some(pos) = self.map_to_view(Point::zero(), child, wnd) else { return };
+  pub fn visible_widget(&mut self, child: WidgetId, anchor: Anchor, wnd: &Window) {
+    let Some(pos) = self.map_to_content(Point::zero(), child, wnd) else { return };
     let Some(size) = wnd.widget_size(child) else { return };
-    let child_rect = Rect::new(pos, size);
-    let view_size = self.scroll_view_size();
-
-    let best_auto_position_fn = |min: f32, max: f32, max_limit: f32| {
-      if (min < 0. && max_limit < max) || (0. < min && max < max_limit) {
-        min
-      } else if min.abs() < (max - max_limit).abs() {
-        0.
-      } else {
-        max_limit - (max - min)
-      }
-    };
-    let Anchor { x, y } = anchor;
-    let top_left = match (x, y) {
-      (Some(x), Some(y)) => Point::new(
-        x.into_pixel(child_rect.width(), view_size.width),
-        y.into_pixel(child_rect.height(), view_size.height),
-      ),
-      (Some(x), None) => {
-        let best_y =
-          best_auto_position_fn(child_rect.min_y(), child_rect.max_y(), view_size.height);
-        Point::new(x.into_pixel(child_rect.width(), view_size.width), best_y)
-      }
-      (None, Some(y)) => {
-        let best_x = best_auto_position_fn(child_rect.min_x(), child_rect.max_x(), view_size.width);
-        Point::new(best_x, y.into_pixel(child_rect.height(), view_size.height))
-      }
-      (None, None) => {
-        let best_x = best_auto_position_fn(child_rect.min_x(), child_rect.max_x(), view_size.width);
-        let best_y =
-          best_auto_position_fn(child_rect.min_y(), child_rect.max_y(), view_size.height);
-        Point::new(best_x, best_y)
-      }
-    };
-
-    let old = self.get_scroll_pos();
-    let offset = child_rect.origin - top_left;
-    self.jump_to(old + offset);
+    let show_box = Rect::new(pos, size);
+    self.visible_content_box(show_box, anchor);
   }
 
   pub fn scroll(&mut self, x: f32, y: f32) {

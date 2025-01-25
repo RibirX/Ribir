@@ -181,6 +181,11 @@ impl Window {
     self.once_on_lifecycle(f, |msg| matches!(msg, FrameMsg::BeforeLayout(_)))
   }
 
+  /// Execute the callback when the layout is ready.
+  pub fn once_layout_ready(&self, f: impl FnOnce() + 'static) {
+    self.once_on_lifecycle(f, |msg| matches!(msg, FrameMsg::LayoutReady(_)))
+  }
+
   /// Return an `rxRust` Scheduler, which will guarantee all task add to the
   /// scheduler will finished before current frame finished.
   #[inline]

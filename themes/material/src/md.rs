@@ -86,8 +86,9 @@ pub const SIZE_36: Size = Size::new(36., 36.);
 pub const SIZE_48: Size = Size::new(48., 48.);
 pub const SIZE_64: Size = Size::new(64., 64.);
 
+pub const EDGES_2: EdgeInsets = EdgeInsets::all(2.);
+
 pub const EDGES_4: EdgeInsets = EdgeInsets::all(4.);
-pub const EDGES_10: EdgeInsets = EdgeInsets::all(10.);
 pub const EDGES_HOR_4: EdgeInsets = EdgeInsets::horizontal(4.);
 pub const EDGES_VER_4: EdgeInsets = EdgeInsets::vertical(4.);
 pub const EDGES_LEFT_4: EdgeInsets = EdgeInsets::only_left(4.);
@@ -97,6 +98,9 @@ pub const EDGES_BOTTOM_4: EdgeInsets = EdgeInsets::only_bottom(4.);
 
 pub const EDGES_HOR_6: EdgeInsets = EdgeInsets::horizontal(6.);
 pub const EDGES_HOR_8: EdgeInsets = EdgeInsets::horizontal(8.);
+
+pub const EDGES_10: EdgeInsets = EdgeInsets::all(10.);
+
 pub const EDGES_HOR_12: EdgeInsets = EdgeInsets::horizontal(12.);
 
 pub const EDGES_16: EdgeInsets = EdgeInsets::all(16.);

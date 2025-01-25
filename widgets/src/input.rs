@@ -1,7 +1,6 @@
 use std::ops::Range;
 
 use ribir_core::prelude::*;
-use text_selection::TextSelection;
 
 use crate::prelude::*;
 
@@ -10,13 +9,18 @@ mod text_glyphs;
 
 mod text_editable;
 mod text_selectable;
-mod text_selection;
 
-pub use edit_text::{BaseText, EditText};
-pub use text_editable::{TEXT_CARET, edit_text};
-pub use text_glyphs::{TextGlyphs, TextGlyphsPainter, TextGlyphsProvider, VisualText};
-pub use text_selectable::{TextSelectable, TextSelectableDeclareExtend};
-pub use text_selection::TEXT_HIGH_LIGHT;
+pub use edit_text::*;
+pub use text_editable::*;
+pub use text_glyphs::*;
+pub use text_selectable::*;
+
+class_names!(
+  ///Class name for the input widget
+  INPUT,
+  ///Class name for the text area widget
+  TEXTAREA,
+);
 
 /// The `Input` struct is a widget that represents a text input field
 /// that displays a single line of text. if you need multi line text, use
@@ -46,9 +50,7 @@ pub use text_selection::TEXT_HIGH_LIGHT;
 #[derive(Declare)]
 pub struct Input {
   #[declare(skip)]
-  host: TextGlyphs<InputText>,
-  #[declare(skip)]
-  selection: TextSelection<InputText>,
+  basic: BasicEditor<InputText>,
 }
 
 impl Input {
@@ -58,22 +60,24 @@ impl Input {
       .chars()
       .filter(|c| *c != '\n' && *c != '\r')
       .collect::<String>();
-    *self.host.text_mut() = InputText::new(v);
-    self.selection.from = CaretPosition::default();
-    self.selection.to = CaretPosition::default();
+    *self.basic.text_mut() = InputText::new(v);
+    let selection = &mut self.basic.selection;
+    selection.from = CaretPosition::default();
+    selection.to = CaretPosition::default();
   }
 
-  pub fn text(&self) -> &CowArc<str> { &self.host.text().0 }
+  pub fn text(&self) -> &CowArc<str> { &self.basic.text().0 }
 
   /// set the caret selection, and the caret position will be set to the `to`
   /// cluster
   pub fn select(&mut self, from: usize, to: usize) {
-    self.selection.from = CaretPosition { cluster: from, position: None };
-    self.selection.to = CaretPosition { cluster: to, position: None };
+    let selection = &mut self.basic.selection;
+    selection.from = CaretPosition { cluster: from, position: None };
+    selection.to = CaretPosition { cluster: to, position: None };
   }
 
   /// return the selection range of the text
-  pub fn selection(&self) -> Range<usize> { self.selection.selection() }
+  pub fn selection(&self) -> Range<usize> { self.basic.cluster_rg() }
 }
 
 /// The `TextArea` struct is a widget that represents a text input field
@@ -81,32 +85,33 @@ impl Input {
 #[derive(Declare)]
 pub struct TextArea {
   /// if true, the text will be auto wrap when the text is too long
+  #[declare(default = true)]
   auto_wrap: bool,
   #[declare(skip)]
-  host: TextGlyphs<CowArc<str>>,
-  #[declare(skip)]
-  selection: TextSelection<CowArc<str>>,
+  basic: BasicEditor<CowArc<str>>,
 }
 
 impl TextArea {
   /// set the text and the caret selection will be reset to the start.
   pub fn set_text(&mut self, text: &str) {
-    *self.host.text_mut() = text.to_string().into();
-    self.selection.from = CaretPosition::default();
-    self.selection.to = CaretPosition::default();
+    *self.basic.text_mut() = text.to_string().into();
+    let selection = &mut self.basic.selection;
+    selection.from = CaretPosition::default();
+    selection.to = CaretPosition::default();
   }
 
-  pub fn text(&self) -> &CowArc<str> { self.host.text() }
+  pub fn text(&self) -> &CowArc<str> { self.basic.text() }
 
   /// set the caret selection, and the caret position will be set to the `to`
   /// cluster
   pub fn select(&mut self, from: usize, to: usize) {
-    self.selection.from = CaretPosition { cluster: from, position: None };
-    self.selection.to = CaretPosition { cluster: to, position: None };
+    let selection = &mut self.basic.selection;
+    selection.from = CaretPosition { cluster: from, position: None };
+    selection.to = CaretPosition { cluster: to, position: None };
   }
 
   /// return the selection range of the text
-  pub fn selection(&self) -> Range<usize> { self.selection.selection() }
+  pub fn selection(&self) -> Range<usize> { self.basic.cluster_rg() }
 }
 
 #[derive(Clone, Eq, PartialEq, Default)]
@@ -144,7 +149,7 @@ impl EditText for InputText {
     self.0.insert_str(at, new_v.as_str())
   }
 
-  fn delete(&mut self, rg: Range<usize>) -> Range<usize> { self.0.delete(rg) }
+  fn del_rg_str(&mut self, rg: Range<usize>) -> Range<usize> { self.0.del_rg_str(rg) }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -157,13 +162,15 @@ pub struct CaretPosition {
 
 impl Compose for Input {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    fn_widget! {
-      @FocusScope {
-        skip_host: true,
-        @TextClamp {
-          rows: Some(1.),
+    focus_scope! {
+      skip_host: true,
+      @TextClamp {
+        rows: Some(1.),
+        cols: Some(20.),
+        class: INPUT,
+        @FatObj {
           scrollable: Scrollable::X,
-          @ { edit_text(part_writer!(&mut this.host), split_writer!(&mut this.selection)) }
+          @part_writer!(&mut this.basic)
         }
       }
     }
@@ -173,17 +180,14 @@ impl Compose for Input {
 
 impl Compose for TextArea {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    fn_widget! {
-      @FocusScope {
-        skip_host: true,
+    focus_scope! {
+      @TextClamp {
+        rows: Some(2.),
+        cols: Some(20.),
+        class: TEXTAREA,
         @Scrollbar {
-          scrollable: pipe!($this.auto_wrap).map(|v| if v {
-            Scrollable::Y
-          } else {
-            Scrollable::Both
-          }),
           text_overflow: TextOverflow::AutoWrap,
-          @ { edit_text(part_writer!(&mut this.host), split_writer!(&mut this.selection)) }
+          @part_writer!(&mut this.basic)
         }
       }
     }

@@ -1,10 +1,8 @@
+use std::cell::{Ref, RefCell};
+
 use ribir_core::prelude::*;
 
-use super::{CaretPosition, Stack, edit_text::BaseText};
-
-/// The descendants of TextGlyphs can get the impl StateWriter<Value TextGlyphs>
-/// like Provider::state_of::<TextGlyphsProvider<T>>::(ctx)
-pub type TextGlyphsProvider<T> = Box<dyn StateWriter<Value = TextGlyphs<T>>>;
+use super::{CaretPosition, edit_text::BaseText};
 
 /// [`TextGlyphs`]
 ///
@@ -18,10 +16,12 @@ where
 {
   text: T,
   #[declare(skip)]
-  glyphs: Option<VisualGlyphs>,
+  glyphs: RefCell<Option<VisualGlyphs>>,
 }
 
 impl<T: 'static> TextGlyphs<T> {
+  pub fn new(text: T) -> Self { Self { text, glyphs: Default::default() } }
+
   pub fn text(&self) -> &T { &self.text }
 
   pub fn text_mut(&mut self) -> &mut T {
@@ -29,7 +29,9 @@ impl<T: 'static> TextGlyphs<T> {
     &mut self.text
   }
 
-  pub fn glyphs(&self) -> Option<&VisualGlyphs> { self.glyphs.as_ref() }
+  pub fn glyphs(&self) -> Option<Ref<VisualGlyphs>> {
+    Ref::filter_map(self.glyphs.borrow(), |v| v.as_ref()).ok()
+  }
 }
 
 pub trait VisualText: BaseText {
@@ -51,53 +53,39 @@ impl VisualText for CowArc<str> {
   }
 }
 
-impl<T: VisualText + Clone + 'static> From<T> for TextGlyphs<T> {
-  fn from(text: T) -> Self { Self { text, glyphs: Default::default() } }
-}
-
-impl<'a> From<&'a str> for TextGlyphs<CowArc<str>> {
-  fn from(text: &'a str) -> Self {
-    let text = CowArc::from(text.to_string());
-    Self { text, glyphs: Default::default() }
-  }
-}
-
 impl<T: VisualText> TextGlyphs<T> {
   pub fn paint(&self, painter: &mut Painter, style: PaintingStyle, rect: Rect) {
-    if let Some(glyphs) = self.glyphs.as_ref() {
-      self.text.paint(painter, style, glyphs, rect);
+    if let Some(glyphs) = self.glyphs() {
+      self.text.paint(painter, style, &glyphs, rect);
     }
   }
 
   pub fn layout_glyphs(&mut self, clamp: BoxClamp, ctx: &LayoutCtx) {
-    self.glyphs = Some(self.text.layout_glyphs(clamp, ctx));
+    *self.glyphs.borrow_mut() = Some(self.text.layout_glyphs(clamp, ctx));
   }
 }
 
-impl<'w, T: VisualText + 'static + Clone> ComposeChild<'w> for TextGlyphs<T> {
-  type Child = Vec<Widget<'w>>;
-  fn compose_child(this: impl StateWriter<Value = Self>, children: Self::Child) -> Widget<'w> {
-    fn_widget! {
-      Providers::new([
-        Provider::value_of_writer(this.clone_boxed_writer(), Some(DirtyPhase::LayoutSubtree))
-      ]).with_child(
-        fn_widget! {
-          let layout = FatObj::new(Stateful::new(LayoutGlyphs::<T>::new()));
-          let u = watch!($this.text().clone())
-            .distinct_until_changed()
-            .subscribe(
-            move |_| {
-              $layout.write().relayout();
-            }
-          );
-          @$layout {
-            on_disposed: move |_| u.unsubscribe(),
-            @ Stack { @ { children } }
-          }
-        }.into_widget()
-      )
-    }
-    .into_widget()
+impl<T: VisualText + 'static> Render for TextGlyphs<T> {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    let glyphs = self.text.layout_glyphs(clamp, ctx);
+    let size = glyphs.visual_rect().size;
+    *self.glyphs.borrow_mut() = Some(glyphs);
+    clamp.clamp(size)
+  }
+
+  fn paint(&self, ctx: &mut PaintingCtx) {
+    let box_rect = Rect::from_size(ctx.box_size().unwrap());
+    if ctx
+      .painter()
+      .intersection_paint_bounds(&box_rect)
+      .is_none()
+    {
+      return;
+    };
+
+    let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
+    let visual_glyphs = self.glyphs().unwrap();
+    paint_text(ctx.painter(), &visual_glyphs, style.unwrap_or(PaintingStyle::Fill), box_rect);
   }
 }
 
@@ -218,72 +206,14 @@ impl VisualGlyphsHelper for VisualGlyphs {
   }
 }
 
-#[derive(SingleChild)]
-struct LayoutGlyphs<T>
-where
-  T: VisualText + 'static,
-{
-  _marker: std::marker::PhantomData<T>,
+impl<T> std::ops::Deref for TextGlyphs<T> {
+  type Target = T;
+
+  fn deref(&self) -> &Self::Target { &self.text }
 }
 
-impl<T: 'static + VisualText> LayoutGlyphs<T> {
-  fn new() -> Self { LayoutGlyphs { _marker: std::marker::PhantomData } }
-
-  fn relayout(&mut self) {}
-}
-
-impl<T: 'static + VisualText> Render for LayoutGlyphs<T> {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let cache = Provider::state_of::<TextGlyphsProvider<T>>(ctx).unwrap();
-
-    cache.silent().layout_glyphs(clamp, ctx);
-
-    let size = cache
-      .read()
-      .glyphs()
-      .as_ref()
-      .map(|t| t.visual_rect().size)
-      .unwrap_or_default();
-
-    let child = ctx.assert_single_child();
-    let child_size = ctx.perform_child_layout(child, clamp);
-
-    clamp.clamp(size.max(child_size))
-  }
-}
-
-/// The TextGlyphsPainter Widget will paint the glyphs get from the provider
-/// TextGlyphsProvider, and should be use as child of `TextGlyphs`
-pub struct TextGlyphsPainter<T> {
-  marker: std::marker::PhantomData<T>,
-}
-
-impl<T> Default for TextGlyphsPainter<T> {
-  fn default() -> Self { TextGlyphsPainter { marker: std::marker::PhantomData } }
-}
-
-impl<T: 'static + VisualText + Clone> Render for TextGlyphsPainter<T> {
-  fn paint(&self, ctx: &mut PaintingCtx) {
-    let box_rect = Rect::from_size(ctx.box_size().unwrap());
-    if let Some(rect) = ctx.painter().intersection_paint_bounds(&box_rect) {
-      let glyphs = Provider::state_of::<TextGlyphsProvider<T>>(ctx).map(|p| p.clone_reader());
-      if let Some(glyphs) = glyphs {
-        let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
-        glyphs
-          .read()
-          .paint(ctx.painter(), style.unwrap_or(PaintingStyle::Fill), rect);
-      }
-    };
-  }
-
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let text_glyphs = Provider::state_of::<TextGlyphsProvider<T>>(ctx).unwrap();
-    let size = text_glyphs
-      .read()
-      .glyphs()
-      .map_or(clamp.min, |g| g.visual_rect().size);
-    size
-  }
+impl<T> std::ops::DerefMut for TextGlyphs<T> {
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.text }
 }
 
 #[cfg(test)]
