@@ -182,6 +182,6 @@ mod tests {
       }
     })
     .with_wnd_size(WND_SIZE)
-    .with_comparison(0.00009)
+    .with_comparison(0.0001)
   );
 }

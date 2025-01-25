@@ -28,21 +28,21 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: Add builtin field `clip_boundary`. (#694 @wjian23)
-- **core**: `IgnorePointer` now has the ability to only ignore events for the widget itself. (#pr @M-Adoo)
-- **core**: Included `BoxPainter` to draw decorations starting from the widget box's origin while ignoring padding. (#pr @M-Adoo)
+- **core**: `IgnorePointer` now has the ability to only ignore events for the widget itself. (#695 @M-Adoo)
+- **core**: Included `BoxPainter` to draw decorations starting from the widget box's origin while ignoring padding. (#695 @M-Adoo)
 
 ### Changed 
 
-- **macros**: Generate cleaner code for #[derive(Declare)] when all fields are omitted. (#pr @M-Adoo)
+- **macros**: Generate cleaner code for #[derive(Declare)] when all fields are omitted. (#695 @M-Adoo)
 
 ### Fixed
 
-- **core & widgets**: Layouts are not permitted to return an infinite size, so if a layout requires scaling or expanding the size infinitely, that action should be disregarded. (#pr @M-Adoo)
-- **macros**: Embedding `fn_widget!` may lead to missed captured variables. (#pr @M-Adoo)
-- **core**: The child should not be painted when visible is false. (#pr @M-Adoo)
-- **core**: Ensure that the content widget size in the scrollable widget is not smaller than its viewport. (#pr @M-Adoo)
-- **core**: The crash occurs when a parent widget with a class tries to convert the widget with more than one leaf. (#pr @M-Adoo)
-- **core**: The padding only reduces the content size and does not affect the border and background size. (#pr @M-Adoo)
+- **core & widgets**: Layouts are not permitted to return an infinite size, so if a layout requires scaling or expanding the size infinitely, that action should be disregarded. (#695 @M-Adoo)
+- **macros**: Embedding `fn_widget!` may lead to missed captured variables. (#695 @M-Adoo)
+- **core**: The child should not be painted when visible is false. (#695 @M-Adoo)
+- **core**: Ensure that the content widget size in the scrollable widget is not smaller than its viewport. (#695 @M-Adoo)
+- **core**: The crash occurs when a parent widget with a class tries to convert the widget with more than one leaf. (#695 @M-Adoo)
+- **core**: The padding only reduces the content size and does not affect the border and background size. (#695 @M-Adoo)
 
 ## [0.4.0-alpha.24] - 2025-01-22
 
@@ -51,7 +51,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: ensure object safety of `StateReader`， `StateWatcher` and `StateWriter` (#692 @M-Adoo)
 - **core**: Support extend custom event. (#684 @wjian23)
 - **core**: Added `map_watcher` to `StateWatcher` (#684 @wjian23)
-- **core**: Added `ensure_visible` and ScrollableProvider to ScrollableWidget, to support descendant to be showed.(#684 @wjian23)
+- **core**: Added `visible_widget` and ScrollableProvider to ScrollableWidget, to support descendant to be showed.(#684 @wjian23)
 
 ### Changed
 
