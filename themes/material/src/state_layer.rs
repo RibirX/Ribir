@@ -1,4 +1,5 @@
-use ribir_core::{prelude::*, wrap_render::WrapRender};
+use ribir_core::prelude::*;
+use ribir_widgets::prelude::*;
 
 use crate::md;
 
@@ -68,36 +69,43 @@ impl<'c, const M: u8> ComposeChild<'c> for StateLayer<M> {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child, DirtyPhase::Paint)
+    stack! {
+      fit: StackFit::Passthrough,
+      @ { child }
+      @ {
+        match this.try_into_value() {
+          Ok(value) => value.into_widget(),
+          Err(this) => WriterRender::new(this).into_widget()
+        }
+      }
+    }
+    .into_widget()
   }
 }
 
-impl<const M: u8> WrapRender for StateLayer<M> {
-  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
-    if self.draw_opacity > 0. {
-      // record transform and fill brush for draw layer used, because the host widget
-      // may change them.
-      let (matrix, fill_brush) = {
-        let painter = ctx.painter();
-        let m = painter.transform();
-        let fill_brush = painter.fill_brush();
-        (*m, fill_brush.clone())
+impl<const M: u8> Render for StateLayer<M> {
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.min }
+
+  fn paint(&self, ctx: &mut PaintingCtx) {
+    let StateLayer { area, draw_opacity } = self;
+    if *draw_opacity > 0. {
+      let p = ctx.parent().unwrap();
+      let size = ctx.widget_box_size(p).unwrap();
+      let rect = Rect::from_size(size);
+      let painter = ctx.painter().apply_alpha(*draw_opacity);
+      match area {
+        LayerArea::Circle { center, radius, clip } => {
+          if let Some(clip) = clip {
+            painter.clip(Path::rect_round(&rect, clip).into());
+          }
+          painter.circle(*center, *radius).fill()
+        }
+        LayerArea::WidgetCover(radius) => painter.rect_round(&rect, radius).fill(),
       };
-
-      host.paint(ctx);
-
-      ctx
-        .painter()
-        .save()
-        .set_transform(matrix)
-        .set_fill_brush(fill_brush)
-        .apply_alpha(self.draw_opacity);
-      self.area.draw(ctx);
-      ctx.painter().restore();
-    } else {
-      host.paint(ctx);
     }
   }
+
+  fn dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 }
 
 /// The path of a state layer to fill can either be a radius that fills the
@@ -108,21 +116,4 @@ impl<const M: u8> WrapRender for StateLayer<M> {
 pub enum LayerArea {
   Circle { center: Point, radius: f32, clip: Option<Radius> },
   WidgetCover(Radius),
-}
-
-impl LayerArea {
-  fn draw(&self, ctx: &mut PaintingCtx) {
-    let size = ctx.box_size().unwrap();
-    let rect = Rect::from_size(size);
-    let painter = ctx.painter();
-    match self {
-      LayerArea::Circle { center, radius, clip } => {
-        if let Some(clip) = clip {
-          painter.clip(Path::rect_round(&rect, clip).into());
-        }
-        painter.circle(*center, *radius).fill()
-      }
-      LayerArea::WidgetCover(radius) => painter.rect_round(&rect, radius).fill(),
-    };
-  }
 }

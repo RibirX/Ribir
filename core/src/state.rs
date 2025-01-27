@@ -428,7 +428,11 @@ impl<'a, W: ?Sized> Drop for WriteRef<'a, W> {
   }
 }
 
-pub(crate) struct WriterRender<T>(pub(crate) T);
+pub struct WriterRender<T>(pub(crate) T);
+
+impl<T> WriterRender<T> {
+  pub fn new(value: T) -> Self { WriterRender(value) }
+}
 
 struct ReaderRender<T>(pub(crate) T);
 
