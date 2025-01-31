@@ -114,7 +114,7 @@ mod tests {
         @Trailing::new("Trailing label position.")
       }
     })
-    .with_wnd_size(Size::new(200., 80.))
+    .with_wnd_size(Size::new(200., 256.))
     .with_comparison(0.002)
   );
 }

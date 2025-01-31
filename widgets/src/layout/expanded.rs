@@ -52,7 +52,7 @@ impl ObjDeclarer for ExpandedDeclarer {
 
 impl<'c> ComposeChild<'c> for Expanded {
   type Child = Widget<'c>;
-  #[inline]
+
   fn compose_child(this: impl StateWriter<Value = Self>, mut child: Self::Child) -> Widget<'c> {
     let data: Box<dyn Query> = match this.try_into_value() {
       Ok(this) => Box::new(Queryable(this)),
@@ -124,14 +124,14 @@ mod tests {
       }
     })
     .with_wnd_size(Size::new(350., 500.)),
-    LayoutCase::default().with_rect(ribir_geom::rect(0., 0., 350., 100.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 50., 50.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(50., 0., 100., 50.)),
-    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(150., 0., 100., 50.)),
-    LayoutCase::new(&[0, 3]).with_rect(ribir_geom::rect(250., 0., 100., 50.)),
-    LayoutCase::new(&[0, 4]).with_rect(ribir_geom::rect(0., 50., 100., 50.)),
-    LayoutCase::new(&[0, 5]).with_rect(ribir_geom::rect(100., 50., 50., 50.)),
-    LayoutCase::new(&[0, 6]).with_rect(ribir_geom::rect(150., 50., 200., 50.))
+    LayoutCase::default().with_rect(ribir_geom::rect(0., 0., 350., 150.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 150., 50.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(150., 0., 100., 50.)),
+    LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(250., 0., 100., 50.)),
+    LayoutCase::new(&[0, 3]).with_rect(ribir_geom::rect(0., 50., 100., 50.)),
+    LayoutCase::new(&[0, 4]).with_rect(ribir_geom::rect(100., 50., 100., 50.)),
+    LayoutCase::new(&[0, 5]).with_rect(ribir_geom::rect(200., 50., 150., 50.)),
+    LayoutCase::new(&[0, 6]).with_rect(ribir_geom::rect(0., 100., 350., 50.))
   );
 
   #[test]
@@ -144,6 +144,7 @@ mod tests {
       watch!(*$flex).subscribe(move |val| $expanded.write().flex = val);
 
       @Row {
+        h_align: HAlign::Stretch,
         @ $expanded { @ { Void } }
         @Expanded {
           flex: 1.,

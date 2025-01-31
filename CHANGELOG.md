@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **widgets**: Ensure that the `Flex` expands items only after allocating space to all items, prioritizing the display of items in full initially. (#696 @M-Adoo)
+
 ## [0.4.0-alpha.25] - 2025-01-29
 
 ### Features
