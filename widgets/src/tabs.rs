@@ -247,6 +247,7 @@ impl ComposeChild<'static> for Tabs {
           (false, false) => 0.
         };
         let mut flex = @Flex {
+          align_items: Align::Stretch,
           direction: pipe!(match $this.pos {
             Position::Top | Position::Bottom => Direction::Horizontal,
             Position::Left | Position::Right => Direction::Vertical,

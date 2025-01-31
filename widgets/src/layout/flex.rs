@@ -29,6 +29,37 @@ pub enum JustifyContent {
   SpaceEvenly,
 }
 
+/// The `Flex` is a layout container that arranges its children in a
+/// one-dimensional manner. It distributes space among the children and provides
+/// alignment options in two axes.
+///
+/// The flex container consists of a main axis and a cross axis. The main axis
+/// is determined by the `direction` property, while the cross axis is
+/// perpendicular to it. The `direction` property can be set to
+/// `Direction::Horizontal` or `Direction::Vertical`, and setting `reverse` to
+/// true will reverse the main axis.
+///
+/// If the direction of the flex container is known, consider using [`Row`] or
+/// [`Column`] instead. The `wrap` property controls whether flex items should
+/// wrap onto multiple lines or remain on a single line in the main axis.
+///
+/// The `align_items` property specifies how flex items are positioned in the
+/// flex container along the cross axis, while `justify_content` determines
+/// their placement along the main axis.
+///
+/// Adjust the `item_gap` property to set the gap between items in the main
+/// axis, and the `line_gap` property for the gap between lines in the cross
+/// axis.
+///
+/// Regarding expansion and shrinking, use an [`Expanded`] widget to make a
+/// child expand to fill the available space along the main axis. The space is
+/// distributed to expanded children based on their `flex` value, with the
+/// available space being the remaining area in the main axis after allocating
+/// space for all children.
+///
+/// Therefore, the `Expanded` widget will expand only within a fixed-size
+/// container.
+
 #[derive(Default, MultiChild, Declare, Clone, PartialEq)]
 pub struct Flex {
   /// Reverse the main axis.
@@ -90,17 +121,10 @@ impl Render for Flex {
     if Align::Stretch == self.align_items && self.wrap {
       warn!("stretch align and wrap property is conflict");
     }
-    let direction = self.direction;
-    let max_size = FlexSize::from_size(clamp.max, direction);
-    let mut min_size = FlexSize::from_size(clamp.min, direction);
-    if Align::Stretch == self.align_items {
-      min_size.cross = max_size.cross;
-    }
+
     let mut layouter = FlexLayouter {
-      max: max_size,
-      min: min_size,
       reverse: self.reverse,
-      dir: direction,
+      dir: self.direction,
       align_items: self.align_items,
       justify_content: self.justify_content,
       wrap: self.wrap,
@@ -108,8 +132,9 @@ impl Render for Flex {
       cross_axis_gap: self.line_gap,
       current_line: <_>::default(),
       lines: vec![],
+      has_flex: false,
     };
-    layouter.layout(ctx)
+    layouter.layout(clamp, ctx)
   }
 
   #[inline]
@@ -136,8 +161,6 @@ impl FlexSize {
       Direction::Vertical => Self { cross: size.width, main: size.height },
     }
   }
-
-  fn zero() -> Self { Self { main: 0., cross: 0. } }
 }
 
 impl std::ops::Sub for FlexSize {
@@ -148,8 +171,6 @@ impl std::ops::Sub for FlexSize {
 }
 
 struct FlexLayouter {
-  max: FlexSize,
-  min: FlexSize,
   reverse: bool,
   dir: Direction,
   align_items: Align,
@@ -159,12 +180,35 @@ struct FlexLayouter {
   lines: Vec<MainLineInfo>,
   main_axis_gap: f32,
   cross_axis_gap: f32,
+  has_flex: bool,
 }
 
 impl FlexLayouter {
-  fn layout(&mut self, ctx: &mut LayoutCtx) -> Size {
-    self.perform_children_layout(ctx);
-    self.flex_children_layout(ctx);
+  fn layout(&mut self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    // Perform children layout without limit its main axis, and if its cross
+    // axis is stretch the children need to align in cross axis so we also not limit
+    // the cross axis.
+    let dir = self.dir;
+    let flex_max = FlexSize::from_size(clamp.max, dir);
+    let cross_min = if Align::Stretch == self.align_items && flex_max.cross.is_finite() {
+      flex_max.cross
+    } else {
+      0.
+    };
+    let child_clamp = BoxClamp {
+      min: FlexSize { main: 0., cross: cross_min }.to_size(dir),
+      max: FlexSize { main: f32::INFINITY, cross: flex_max.cross }.to_size(dir),
+    };
+    self.perform_children_layout(flex_max.main, child_clamp, ctx);
+
+    if self.has_flex {
+      let flex_main = if flex_max.main.is_finite() {
+        flex_max.main
+      } else {
+        FlexSize::from_size(clamp.min, dir).main
+      };
+      self.flex_children_layout(flex_main, child_clamp, ctx);
+    }
 
     // cross direction need calculate cross_axis_gap but last line don't need.
     let cross = self
@@ -172,107 +216,77 @@ impl FlexLayouter {
       .iter()
       .fold(-self.cross_axis_gap, |sum, l| sum + l.cross_line_height + self.cross_axis_gap);
     let main = match self.justify_content {
-      JustifyContent::Start | JustifyContent::Center | JustifyContent::End => self
+      JustifyContent::SpaceBetween | JustifyContent::SpaceAround | JustifyContent::SpaceEvenly
+        if flex_max.main.is_finite() =>
+      {
+        flex_max.main
+      }
+      _ => self
         .lines
         .iter()
         .fold(0f32, |max, l| max.max(l.main_width)),
-      JustifyContent::SpaceBetween | JustifyContent::SpaceAround | JustifyContent::SpaceEvenly => {
-        self.max.main
-      }
     };
-    let size = FlexSize { cross, main };
-    let &mut Self { max, min, dir, .. } = self;
-    let size = size
-      .to_size(dir)
-      .clamp(min.to_size(dir), max.to_size(dir));
+    let size = clamp.clamp(FlexSize { cross, main }.to_size(dir));
     self.update_children_position(FlexSize::from_size(size, dir), ctx);
     size
   }
 
-  fn perform_children_layout(&mut self, ctx: &mut LayoutCtx) {
+  fn perform_children_layout(&mut self, max_main: f32, clamp: BoxClamp, ctx: &mut LayoutCtx) {
     let (ctx, children) = ctx.split_children();
-    let &mut Self { max, min, wrap, dir, .. } = self;
-    let min = if self.align_items == Align::Stretch {
-      FlexSize { main: 0., cross: min.cross }
-    } else {
-      FlexSize::zero()
-    };
+    let &mut Self { wrap, dir, .. } = self;
     let mut children = children.peekable();
     while let Some(c) = children.next() {
-      let mut max = max;
-      if !wrap {
-        max.main -= self.current_line.main_width;
-      }
-
-      let clamp = BoxClamp { max: max.to_size(dir), min: min.to_size(dir) };
-
-      let mut info = FlexLayoutInfo {
-        flex: ctx
-          .query_of_widget::<Expanded>(c)
-          .map(|expanded| expanded.flex),
-        pos: <_>::default(),
-        size: <_>::default(),
-      };
-
-      let gap = if children.peek().is_some() && !FlexLayouter::is_space_layout(self.justify_content)
-      {
+      let gap = if children.peek().is_some() && !self.justify_content.is_space_layout() {
         self.main_axis_gap
       } else {
         0.
       };
 
-      // flex-item need use empty space to resize after all fixed widget performed
-      // layout.
       let line = &mut self.current_line;
-      if let Some(flex) = info.flex {
-        line.flex_sum += flex;
-        line.main_width += gap;
+
+      let size = ctx.perform_child_layout(c, clamp);
+      let size = FlexSize::from_size(size, dir);
+
+      if wrap && !line.is_empty() && line.main_width + size.main > max_main {
+        self.place_line();
       } else {
-        let size = ctx.perform_child_layout(c, clamp);
-        let size = FlexSize::from_size(size, dir);
-        info.size = size;
-
-        if wrap && !line.is_empty() && line.main_width + size.main > max.main {
-          self.place_line();
-        } else {
-          line.main_width += gap;
-        }
-
-        let line = &mut self.current_line;
-        line.main_width += size.main;
-        line.cross_line_height = line.cross_line_height.max(size.cross);
+        line.main_width += gap;
       }
 
+      let line = &mut self.current_line;
+      line.main_width += size.main;
+      line.cross_line_height = line.cross_line_height.max(size.cross);
+
+      let flex = ctx
+        .query_of_widget::<Expanded>(c)
+        .map(|expanded| expanded.flex)
+        .filter(|f| f.is_normal() && *f > 0.)
+        .inspect(|_| {
+          self.current_line.has_flex = true;
+          self.has_flex = true;
+        });
+      let info = FlexLayoutInfo { flex, pos: <_>::default(), size };
       self.current_line.items_info.push(info);
     }
 
     self.place_line();
   }
 
-  fn is_space_layout(justify_content: JustifyContent) -> bool {
-    matches!(
-      justify_content,
-      JustifyContent::SpaceAround | JustifyContent::SpaceBetween | JustifyContent::SpaceEvenly
-    )
-  }
-
-  fn flex_children_layout(&mut self, ctx: &mut LayoutCtx) {
+  fn flex_children_layout(&mut self, main_width: f32, clamp: BoxClamp, ctx: &mut LayoutCtx) {
     let (ctx, mut children) = ctx.split_children();
+
     self.lines.iter_mut().for_each(|line| {
-      let flex_sum = if line.flex_sum.is_normal() { line.flex_sum } else { 1. };
-      let flex_unit = (self.max.main - line.main_width) / flex_sum;
+      let flex_unit = line.calc_flex_unit_and_remove_useless_flex(main_width);
+
       line.items_info.iter_mut().for_each(|info| {
         let child = children.next().unwrap();
-        if let Some(flex) = info.flex {
-          let &mut Self { mut max, mut min, dir, .. } = self;
-          // If the maximum size is not specified, we are unable to calculate the flex
-          // size.
-          if flex_unit.is_normal() {
-            let main = flex_unit * flex;
-            max.main = main;
-            min.main = main;
+        if let (Some(flex), Some(unit)) = (info.flex, flex_unit) {
+          let dir = self.dir;
+          let main = unit * flex;
+          let clamp = match dir {
+            Direction::Horizontal => clamp.with_fixed_width(main),
+            Direction::Vertical => clamp.with_fixed_height(main),
           };
-          let clamp = BoxClamp { max: max.to_size(dir), min: min.to_size(dir) };
           let size = ctx.perform_child_layout(child, clamp);
           info.size = FlexSize::from_size(size, dir);
           line.main_width += info.size.main;
@@ -337,8 +351,8 @@ impl FlexLayouter {
 struct MainLineInfo {
   main_width: f32,
   items_info: Vec<FlexLayoutInfo>,
-  flex_sum: f32,
   cross_line_height: f32,
+  has_flex: bool,
 }
 
 struct FlexLayoutInfo {
@@ -349,6 +363,40 @@ struct FlexLayoutInfo {
 
 impl MainLineInfo {
   fn is_empty(&self) -> bool { self.items_info.is_empty() }
+
+  fn calc_flex_unit_and_remove_useless_flex(&mut self, max: f32) -> Option<f32> {
+    if !self.has_flex || self.main_width >= max {
+      return None;
+    }
+
+    let unit = self.flex_unit(max)?;
+    let mut unused_flex = false;
+    self
+      .items_info
+      .iter_mut()
+      .for_each(|item: &mut FlexLayoutInfo| {
+        if item
+          .flex
+          .is_some_and(|flex| flex * unit < item.size.main)
+        {
+          item.flex = None;
+          unused_flex = true;
+        }
+      });
+
+    if unused_flex { self.flex_unit(max) } else { Some(unit) }
+  }
+
+  fn flex_unit(&self, max: f32) -> Option<f32> {
+    let (flex_sum, flex_width) = self
+      .items_info
+      .iter()
+      .filter_map(|info| info.flex.map(|flex| (flex, info.size.main)))
+      .fold((0., 0.), |sum, (flex, size)| (sum.0 + flex, sum.1 + size));
+
+    let available_space = max - self.main_width + flex_width;
+    Some(available_space / flex_sum)
+  }
 
   fn place_args(&self, main_max: f32, justify_content: JustifyContent, gap: f32) -> (f32, f32) {
     if self.items_info.is_empty() {
@@ -373,6 +421,15 @@ impl MainLineInfo {
         (step, step)
       }
     }
+  }
+}
+
+impl JustifyContent {
+  fn is_space_layout(&self) -> bool {
+    matches!(
+      self,
+      JustifyContent::SpaceAround | JustifyContent::SpaceBetween | JustifyContent::SpaceEvenly
+    )
   }
 }
 
@@ -477,6 +534,7 @@ mod tests {
     main_axis_expand,
     WidgetTester::new(fn_widget! {
       @Row {
+        h_align: HAlign::Stretch,
         item_gap: 15.,
         @SizedBox { size: Size::new(120., 20.) }
         @Expanded {
@@ -645,21 +703,28 @@ mod tests {
         @Flex {
           direction: Direction::Horizontal,
           @Expanded {
+            flex: 2.,
+            @SizedBox { size: Size::splat(100.),}
+          }
+          @Expanded {
             flex: 1.,
-            @SizedBox { size: INFINITY_SIZE,}
+            @SizedBox { size: Size::splat(50.),}
           }
           @SizedBox { size: Size::new(100., 20.) }
           @Expanded {
-            flex: 3.,
-            @SizedBox { size: INFINITY_SIZE, }
+            // The flex will be ignored, because the flex is not enough
+            flex: 0.5,
+            @SizedBox { size: Size::splat(100.), }
           }
         }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
     LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 500., 25.)),
-    LayoutCase::new(&[0, 0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 25.)),
-    LayoutCase::new(&[0, 0, 2]).with_rect(ribir_geom::rect(200., 0., 300., 25.))
+    LayoutCase::new(&[0, 0, 0]).with_rect(ribir_geom::rect(0., 0., 200., 25.)),
+    LayoutCase::new(&[0, 0, 1]).with_rect(ribir_geom::rect(200., 0., 100., 25.)),
+    LayoutCase::new(&[0, 0, 2]).with_rect(ribir_geom::rect(300., 0., 100., 20.)),
+    LayoutCase::new(&[0, 0, 3]).with_rect(ribir_geom::rect(400., 0., 100., 25.))
   );
 
   widget_layout_test!(
@@ -678,6 +743,6 @@ mod tests {
       .with_height(100.),
     LayoutCase::new(&[0, 1])
       .with_y(150.)
-      .with_height(350.)
+      .with_height(500.)
   );
 }
