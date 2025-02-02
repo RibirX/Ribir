@@ -52,7 +52,7 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
       visible: false,
       background: match Variant::<ContainerColor>::new(BuildCtx::get()).unwrap() {
         Variant::Value(c) => pipe!(track_color(c.0, $w.is_hover())).declare_into(),
-        Variant::Stateful(c) => pipe!(track_color($c.0, $w.is_hover())).declare_into()
+        Variant::Watcher(c) => pipe!(track_color($c.0, $w.is_hover())).declare_into()
       }
     };
 

@@ -2,12 +2,12 @@ use crate::prelude::*;
 /// `Variant` is an enum designed to help you store a clone of a provider. It
 /// serves as a shortcut for `Provider::state_of` and `Provider::of`.
 ///
-/// Initially, it checks for the existence of a stateful provider; if not
+/// Initially, it checks for the existence of a watcher provider; if not
 /// found, it proceeds to check the value provider.
 ///
 /// It supports conversion to `DeclareInit` for initialization of a declare
 /// object, enabling the object to track changes in the provider value if it's a
-/// stateful provider.
+/// watcher provider.
 ///
 /// ## Example
 ///
@@ -24,10 +24,10 @@ use crate::prelude::*;
 /// ```
 ///
 /// Here, we create a 100x100 rectangle with a background using the `Color`
-/// Provider. If an ancestor provides a `Stateful<Color>`, this rectangle will
+/// Provider. If an ancestor provides a writer of `Color`, this rectangle will
 /// reflect changes in color.
 pub enum Variant<V> {
-  Stateful(Stateful<V>),
+  Watcher(Box<dyn StateWatcher<Value = V>>),
   Value(V),
 }
 
@@ -42,8 +42,8 @@ pub struct VariantMap<V: 'static, F> {
 impl<V: Clone + 'static> Variant<V> {
   /// Creates a new `Variant` from a provider context.
   pub fn new(ctx: &impl AsRef<ProviderCtx>) -> Option<Self> {
-    if let Some(value) = Provider::state_of::<Stateful<V>>(ctx) {
-      Some(Variant::Stateful(value.clone_writer()))
+    if let Some(value) = Provider::state_of::<Box<dyn StateWriter<Value = V>>>(ctx) {
+      Some(Variant::Watcher(value.clone_boxed_watcher()))
     } else {
       Provider::of::<V>(ctx).map(|v| Variant::Value(v.clone()))
     }
@@ -61,7 +61,7 @@ impl<V: Clone + 'static> Variant<V> {
   pub fn clone_value(&self) -> V {
     match self {
       Variant::Value(v) => v.clone(),
-      Variant::Stateful(v) => v.read().clone(),
+      Variant::Watcher(v) => v.read().clone(),
     }
   }
 }
@@ -134,7 +134,7 @@ where
 {
   fn declare_from(value: Variant<V>) -> Self {
     match value {
-      Variant::Stateful(value) => pipe!($value.clone()).declare_into(),
+      Variant::Watcher(value) => pipe!($value.clone()).declare_into(),
       Variant::Value(value) => DeclareInit::Value(value.into()),
     }
   }
@@ -147,7 +147,7 @@ where
 {
   fn declare_from(value: VariantMap<V, F>) -> Self {
     match value.variant {
-      Variant::Stateful(s) => pipe!(P::from((value.map)($s.clone()))).declare_into(),
+      Variant::Watcher(s) => pipe!(P::from((value.map)($s.clone()))).declare_into(),
       Variant::Value(v) => DeclareInit::Value((value.map)(v).into()),
     }
   }
@@ -156,7 +156,7 @@ where
 impl<V: Clone + 'static> Clone for Variant<V> {
   fn clone(&self) -> Self {
     match self {
-      Variant::Stateful(value) => Variant::Stateful(value.clone_writer()),
+      Variant::Watcher(value) => Variant::Watcher(value.clone_boxed_watcher()),
       Variant::Value(value) => Variant::Value(value.clone()),
     }
   }
