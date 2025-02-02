@@ -25,21 +25,26 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
-### Fixed
-- **core**: Fixed the provider of the current widget was lost during event bubbling.(#702 @wjian23)
-- **core**: Fixed the panic when overlay recreate provider_ctx during event callback.(#702 @wjian23)
-
 ### Features
+
 - **core**: record the visual rect after layout.(#698 @wjian23)
 - **widget**: Add the Widget of Menu.(#702 @wjian23)
 
 ### Fixed
+
+- **core**: Fixed the provider of the current widget was lost during event bubbling.(#702 @wjian23)
+- **core**: Fixed the panic when overlay recreate provider_ctx during event callback.(#702 @wjian23)
 - **core**: fix miss pop providers when call `push_providers_for` separately during layout.(#698 @wjian23)
 - **core**: enables embedding declare template as child in widget with Vec of template(#704 @wjian23)
 
 ### Changed
+
 - **widgets**: Refactor `Divider` Widget. (#702 @wjian23)
 - **ci**: update rust version of ci to 2025-03-06 (#702 @wjian23)
+
+### Breaking
+
+- **core**: Remove the `text_align` from the `Text` widget and replace it with the `TextAlign` provider instead. (#pr @M-Adoo)
 
 ## [0.4.0-alpha.27] - 2025-02-12
 
@@ -57,6 +62,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Fixed
 
 - **widgets**: Ensure that the `Flex` expands items only after allocating space to all items, prioritizing the display of items in full initially. (#696 @M-Adoo)
+
 
 ## [0.4.0-alpha.25] - 2025-01-29
 
