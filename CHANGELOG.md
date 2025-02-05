@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.26] - 2025-02-05
+
 ### Fixed
 
 - **widgets**: Ensure that the `Flex` expands items only after allocating space to all items, prioritizing the display of items in full initially. (#696 @M-Adoo)
@@ -644,7 +646,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.25...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.26...HEAD
+[0.4.0-alpha.26]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.25...ribir-v0.4.0-alpha.26
 [0.4.0-alpha.25]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.24...ribir-v0.4.0-alpha.25
 [0.4.0-alpha.24]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.23...ribir-v0.4.0-alpha.24
 [0.4.0-alpha.23]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.22...ribir-v0.4.0-alpha.23
