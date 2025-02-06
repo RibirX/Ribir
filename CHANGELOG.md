@@ -26,7 +26,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ## [@Unreleased] - @ReleaseDate
 
 ### Features
-- **core**: Add the ability to force redraw a frame. (#pr @zihadmahiuddin)
+- **core**: Add the ability to force redraw a frame. (#697 @zihadmahiuddin)
+
+### Fixed
+- **core**: Fix window staying empty after switching workspace (e.g. in i3wm) by doing a force redraw. (#697 @zihadmahiuddin)
 
 ## [0.4.0-alpha.26] - 2025-02-05
 

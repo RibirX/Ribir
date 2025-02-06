@@ -100,6 +100,13 @@ impl App {
               loop_handle.exit();
             }
           }
+          WindowEvent::Occluded(false) => {
+            // this is triggered before the app re-enters view
+            // for example, in something like i3 window manager,
+            // when you switch back to the workspace that the app is in
+            // in such cases, we need to re-enter the view otherwise the window stays empty
+            wnd.draw_frame(true);
+          }
           WindowEvent::RedrawRequested => {
             AppCtx::frame_ticks().clone().next(Instant::now());
 
