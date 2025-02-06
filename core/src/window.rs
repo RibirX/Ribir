@@ -217,7 +217,7 @@ impl Window {
 
   /// Draw an image what current render tree represent.
   #[track_caller]
-  pub fn draw_frame(&self) -> bool {
+  pub fn draw_frame(&self, force: bool) -> bool {
     AppCtx::run_until_stalled();
     let mut ticker = self.frame_ticker.clone();
     ticker.next(FrameMsg::NewFrame(Instant::now()));
@@ -225,7 +225,7 @@ impl Window {
 
     self.update_painter_viewport();
     let draw = self.need_draw() && !self.size().is_empty();
-    if draw {
+    if force || draw {
       let root = self.tree().root();
 
       let surface = {

@@ -25,6 +25,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+- **core**: Add the ability to force redraw a frame. (#pr @zihadmahiuddin)
+
 ## [0.4.0-alpha.26] - 2025-02-05
 
 ### Fixed

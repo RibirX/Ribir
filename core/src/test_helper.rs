@@ -105,7 +105,7 @@ impl TestWindow {
     self.run_frame_tasks();
 
     AppCtx::frame_ticks().clone().next(Instant::now());
-    self.0.draw_frame();
+    self.0.draw_frame(false);
   }
 }
 

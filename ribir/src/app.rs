@@ -108,7 +108,7 @@ impl App {
               if wnd.is_visible() != Some(false) {
                 // if this frame is really draw, request another redraw. To make sure the draw
                 // always end with a empty draw and emit an extra tick cycle message.
-                if wnd.draw_frame() {
+                if wnd.draw_frame(false) {
                   request_redraw(&wnd);
                 }
               }
