@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.27] - 2025-02-12
+
 ### Features
 - **core**: Add the ability to force redraw a frame. (#697 @zihadmahiuddin)
 
@@ -652,7 +654,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.26...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.27...HEAD
+[0.4.0-alpha.27]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.26...ribir-v0.4.0-alpha.27
 [0.4.0-alpha.26]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.25...ribir-v0.4.0-alpha.26
 [0.4.0-alpha.25]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.24...ribir-v0.4.0-alpha.25
 [0.4.0-alpha.24]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.23...ribir-v0.4.0-alpha.24
