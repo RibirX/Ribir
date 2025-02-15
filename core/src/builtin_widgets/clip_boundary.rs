@@ -43,6 +43,12 @@ impl WrapRender for ClipBoundary {
     }
     host.paint(ctx)
   }
+
+  fn visual_box(&self, _: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
+    let clip_rect = Rect::from_size(ctx.box_size().unwrap());
+    ctx.clip(clip_rect);
+    Some(clip_rect)
+  }
 }
 
 #[cfg(test)]

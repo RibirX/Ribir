@@ -258,6 +258,12 @@ impl Render for Viewport {
 
     ctx.painter().clip(path.into());
   }
+
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
+    let clip_rect = Rect::from_size(self.size.get());
+    ctx.clip(clip_rect);
+    Some(clip_rect)
+  }
 }
 
 #[cfg(test)]

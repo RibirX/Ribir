@@ -268,6 +268,7 @@ pub struct LayoutCase {
   y: Option<f32>,
   width: Option<f32>,
   height: Option<f32>,
+  visual_rect: Option<Rect>,
 }
 
 impl LayoutCase {
@@ -332,11 +333,16 @@ impl LayoutCase {
     self
   }
 
+  pub fn with_visual_rect(mut self, rect: Rect) -> Self {
+    self.visual_rect = Some(rect);
+    self
+  }
+
   pub fn with_rect(self, rect: Rect) -> Self { self.with_pos(rect.origin).with_size(rect.size) }
 
   #[track_caller]
   pub fn check(&self, wnd: &TestWindow) {
-    let Self { path, x, y, width, height } = self;
+    let Self { path, x, y, width, height, visual_rect } = self;
 
     let info = wnd.layout_info_by_path(path).unwrap();
     if let Some(x) = x {
@@ -350,6 +356,9 @@ impl LayoutCase {
     }
     if let Some(h) = height {
       assert_eq!(info.size.unwrap().height, *h, "unexpected height");
+    }
+    if let Some(rect) = visual_rect {
+      assert_eq!(info.visual_box.bounds_rect(), Some(*rect), "unexpected visual rect");
     }
   }
 }
@@ -412,5 +421,7 @@ impl WidgetTester {
 }
 
 impl Default for LayoutCase {
-  fn default() -> Self { Self { path: &[0], x: None, y: None, width: None, height: None } }
+  fn default() -> Self {
+    Self { path: &[0], x: None, y: None, width: None, height: None, visual_rect: None }
+  }
 }

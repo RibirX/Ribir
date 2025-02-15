@@ -11,6 +11,8 @@ impl Render for PathPaintKit {
   #[inline]
   fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size { Size::zero() }
 
+  fn visual_box(&self, _: &mut VisualCtx) -> Option<Rect> { Some(self.path.bounds(None)) }
+
   #[inline]
   fn only_sized_by_parent(&self) -> bool { true }
 

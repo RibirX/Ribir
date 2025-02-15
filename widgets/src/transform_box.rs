@@ -28,7 +28,12 @@ impl Render for TransformBox {
   }
 
   #[inline]
-  fn paint(&self, _: &mut PaintingCtx) {}
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
+    Some(Rect::from_size(ctx.box_size().unwrap()))
+  }
+
+  #[inline]
+  fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().apply_transform(&self.matrix); }
 }
 
 impl TransformBox {

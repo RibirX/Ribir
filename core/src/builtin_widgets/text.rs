@@ -51,21 +51,24 @@ pub fn paint_text(
 impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let style = Provider::of::<TextStyle>(ctx).unwrap();
-    let info = AppCtx::typography_store()
-      .borrow_mut()
-      .typography(
-        self.text.substr(..),
-        &style,
-        clamp.max,
-        self.text_align,
-        GlyphBaseline::Middle,
-        PlaceLineDirection::TopToBottom,
-      );
 
-    let size = info.visual_rect().size;
-    *self.glyphs.borrow_mut() = Some(info);
+    let glyphs = text_glyph(self.text.substr(..), &style, self.text_align, clamp.max);
+
+    let size = glyphs.visual_rect().size;
+    *self.glyphs.borrow_mut() = Some(glyphs);
 
     clamp.clamp(size)
+  }
+
+  fn visual_box(&self, _: &mut VisualCtx) -> Option<Rect> {
+    Some(
+      self
+        .glyphs
+        .borrow()
+        .as_ref()
+        .map(|info| info.visual_rect())
+        .unwrap_or_default(),
+    )
   }
 
   #[inline]

@@ -19,6 +19,14 @@ impl WrapRender for TransformWidget {
     host.perform_layout(clamp, ctx)
   }
 
+  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
+    host
+      .visual_box(ctx)
+      .map_or(Some(Rect::from_size(ctx.box_size().unwrap())), |rect| {
+        Some(self.transform.outer_transformed_rect(&rect))
+      })
+  }
+
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     ctx.painter().apply_transform(&self.transform);
     host.paint(ctx)

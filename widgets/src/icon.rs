@@ -117,6 +117,10 @@ impl Render for IconRender {
     clamp.clamp(Size::splat(icon_size))
   }
 
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
+    Some(Rect::from_size(ctx.box_size().unwrap()))
+  }
+
   fn paint(&self, ctx: &mut PaintingCtx) {
     let child_size = ctx.single_child_box().unwrap().size;
     if !child_size.is_empty() {

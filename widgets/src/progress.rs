@@ -122,6 +122,11 @@ impl Render for SpinnerArc {
     clamp.max.min(wnd_size)
   }
 
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
+    let size = ctx.box_size().unwrap();
+    Some(Rect::from_size(size))
+  }
+
   fn paint(&self, ctx: &mut PaintingCtx) {
     let Self { start, end } = *self;
     let size = ctx.box_size().unwrap();

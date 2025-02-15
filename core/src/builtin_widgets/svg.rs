@@ -4,6 +4,10 @@ impl Render for Svg {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.clamp(self.size()) }
 
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
+    Some(Rect::from_size(ctx.box_size().unwrap()))
+  }
+
   fn paint(&self, ctx: &mut PaintingCtx) {
     let size = ctx.box_size().unwrap();
     let painter = ctx.painter();

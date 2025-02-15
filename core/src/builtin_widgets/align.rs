@@ -113,6 +113,10 @@ impl WrapRender for VAlignWidget {
     // ignores the constraint, the align widget should do the same.
     host_size
   }
+
+  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
+    host.visual_box(ctx)
+  }
 }
 
 impl Align {

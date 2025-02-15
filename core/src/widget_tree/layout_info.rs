@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ribir_geom::ZERO_SIZE;
+use ribir_geom::{Rect, ZERO_SIZE};
 
 use super::{Lerp, WidgetId, WidgetTree};
 use crate::prelude::{INFINITY_SIZE, Point, Size};
@@ -87,6 +87,25 @@ impl BoxClamp {
   }
 }
 
+#[derive(Default, Debug, Clone, PartialEq, Copy)]
+pub struct VisualBox {
+  /// the bounds rect of the render object
+  pub rect: Option<Rect>,
+  /// the bounds rect of the subtree
+  pub subtree: Option<Rect>,
+}
+
+impl VisualBox {
+  pub fn bounds_rect(&self) -> Option<Rect> {
+    match (self.rect, self.subtree) {
+      (Some(rect), Some(subtree)) => Some(rect.union(&subtree)),
+      (Some(rect), None) => Some(rect),
+      (None, Some(subtree)) => Some(subtree),
+      (None, None) => None,
+    }
+  }
+}
+
 /// render object's layout box, the information about layout, including box
 /// size, box position, and the clamp of render object layout.
 #[derive(Debug, Default, Clone)]
@@ -99,6 +118,9 @@ pub struct LayoutInfo {
   pub size: Option<Size>,
   /// The position render object to place, default is zero
   pub pos: Point,
+
+  /// the visual box of the render object
+  pub visual_box: VisualBox,
 }
 
 /// Store the render object's place relative to parent coordinate and the

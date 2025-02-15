@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp::Reverse, mem::MaybeUninit};
+use std::{cell::RefCell, cmp::Reverse, collections::BTreeSet, mem::MaybeUninit};
 
 pub mod widget_id;
 use indextree::Arena;
@@ -84,9 +84,10 @@ impl WidgetTree {
   /// node has really computing the layout.
   pub(crate) fn layout(&mut self, win_size: Size) {
     loop {
-      let Some(mut needs_layout) = self.layout_list() else {
+      let Some((mut needs_layout, mut needs_paint)) = self.layout_list() else {
         break;
       };
+      let mut visual_roots = BTreeSet::new();
       while let Some(wid) = needs_layout.pop() {
         if wid.is_dropped(self) {
           continue;
@@ -99,7 +100,34 @@ impl WidgetTree {
             .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
 
           let mut ctx = LayoutCtx::new(wid, self);
+          let visual_rect = ctx.visual_box(wid);
           ctx.perform_layout(clamp);
+          let new_rect = ctx.visual_box(wid);
+          if visual_rect != new_rect {
+            if let Some(parent) = wid.parent(self) {
+              let depth = parent.ancestors(self).count();
+              visual_roots.insert((depth, parent));
+            }
+          }
+        }
+      }
+
+      while let Some(wid) = needs_paint.pop() {
+        if wid.is_dropped(self) {
+          continue;
+        }
+        let depth = wid.ancestors(self).count();
+        visual_roots.insert((depth, wid));
+      }
+
+      while let Some((depth, wid)) = visual_roots.pop_first() {
+        let mut ctx = LayoutCtx::new(wid, self);
+        let visual_rect = ctx.visual_box(wid);
+        let new_rect = ctx.update_visual_box();
+        if visual_rect != new_rect {
+          if let Some(parent) = wid.parent(self) {
+            visual_roots.insert((depth - 1, parent));
+          }
         }
       }
     }
@@ -145,15 +173,20 @@ impl WidgetTree {
       self.display_node(prefix, c, display)
     });
   }
-  pub(crate) fn layout_list(&mut self) -> Option<Vec<WidgetId>> {
+  pub(crate) fn layout_list(&mut self) -> Option<(Vec<WidgetId>, Vec<WidgetId>)> {
     if self.dirty_set.borrow().is_empty() {
       return None;
     }
 
     let mut needs_layout = vec![];
+    let mut needs_paint = vec![];
 
     for (id, dirty) in self.dirty_set.borrow_mut().drain() {
-      if id.is_dropped(self) || dirty == DirtyPhase::Paint {
+      if id.is_dropped(self) {
+        continue;
+      }
+      if dirty == DirtyPhase::Paint {
+        needs_paint.push(id);
         continue;
       }
 
@@ -190,10 +223,9 @@ impl WidgetTree {
       needs_layout.push(relayout_root);
     }
 
-    (!needs_layout.is_empty()).then(|| {
-      needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(self).count()));
-      needs_layout
-    })
+    needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(self).count()));
+
+    Some((needs_layout, needs_paint))
   }
 
   pub fn detach(&mut self, id: WidgetId) {
@@ -284,6 +316,8 @@ impl Render for Root {
 
 #[cfg(test)]
 mod tests {
+  use ribir_dev_helper::widget_layout_test;
+
   use super::*;
   #[cfg(target_arch = "wasm32")]
   use crate::test_helper::wasm_bindgen_test;
@@ -420,7 +454,7 @@ mod tests {
     tree.detach(root);
     tree.remove_subtree(root);
 
-    assert_eq!(tree.layout_list(), Some(vec![new_root]));
+    assert_eq!(tree.layout_list(), Some((vec![new_root], vec![])));
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -533,4 +567,62 @@ mod tests {
     assert_eq!(*layout_cnt.read(), 1);
     assert_eq!(c_paint_cnt.read().paint_cnt.get(), 2);
   }
+
+  #[derive(Declare, SingleChild)]
+  pub struct FixedSizeBox {
+    /// The specified size of the box.
+    pub size: Size,
+  }
+
+  impl Render for FixedSizeBox {
+    #[inline]
+    fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+      ctx.perform_single_child_layout(BoxClamp { min: self.size, max: self.size });
+      self.size
+    }
+
+    #[inline]
+    fn only_sized_by_parent(&self) -> bool { true }
+  }
+
+  fn visual_overflow() -> GenWidget {
+    fn_widget! {
+      @MockMulti {
+        @FixedSizeBox {
+          size: Size::new(150., 50.),
+          background: Color::GRAY,
+          @MockStack {
+            @ FixedSizeBox {
+              size: Size::new(100., 100.),
+              background: Color::GRAY,
+              anchor: Anchor::left_top(-30., 0.),
+            }
+            @ FixedSizeBox {
+              size: Size::new(100., 100.),
+              background: Color::GRAY,
+              anchor: Anchor::top(-20.),
+            }
+          }
+        }
+        @FixedSizeBox {
+          size: Size::new(150., 50.),
+          background: Color::GRAY,
+          clip_boundary: true,
+          @ FixedSizeBox {
+            size: Size::new(100., 100.),
+            background: Color::GRAY,
+            anchor: Anchor::left_top(-30., 20.),
+          }
+        }
+      }
+    }
+    .into()
+  }
+  widget_layout_test!(
+    visual_overflow,
+    WidgetTester::new(visual_overflow()).with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0])
+      .with_visual_rect(Rect::new(Point::new(-30., -20.), Size::new(180., 120.))),
+    LayoutCase::new(&[0, 1]).with_visual_rect(Rect::new(Point::new(0., 0.), Size::new(150., 50.)))
+  );
 }
