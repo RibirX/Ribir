@@ -31,6 +31,10 @@ pub trait WrapRender {
 
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> { host.get_transform() }
 
+  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
+    host.visual_box(ctx)
+  }
+
   fn combine_child(
     this: impl StateWriter<Value = Self>, mut child: Widget, dirty: DirtyPhase,
   ) -> Widget
@@ -89,6 +93,12 @@ impl Render for RenderPair {
       .perform_layout(clamp, self.host.as_render(), ctx)
   }
 
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
+    self
+      .wrapper
+      .visual_box(self.host.as_render(), ctx)
+  }
+
   fn paint(&self, ctx: &mut PaintingCtx) { self.wrapper.paint(self.host.as_render(), ctx); }
 
   fn only_sized_by_parent(&self) -> bool {
@@ -129,6 +139,10 @@ where
 
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> {
     self.read().get_transform(host)
+  }
+
+  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
+    self.read().visual_box(host, ctx)
   }
 }
 

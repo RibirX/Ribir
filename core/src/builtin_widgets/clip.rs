@@ -19,4 +19,10 @@ impl Render for Clip {
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().clip(self.clip_path.clone().into()); }
+
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
+    let clip_rect = self.clip_path.bounds(None);
+    ctx.clip(clip_rect);
+    Some(clip_rect)
+  }
 }

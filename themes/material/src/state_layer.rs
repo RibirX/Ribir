@@ -86,6 +86,10 @@ impl<'c, const M: u8> ComposeChild<'c> for StateLayer<M> {
 impl<const M: u8> Render for StateLayer<M> {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.min }
 
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
+    Some(Rect::from_size(ctx.box_size().unwrap()))
+  }
+
   fn paint(&self, ctx: &mut PaintingCtx) {
     let StateLayer { area, draw_opacity } = self;
     if *draw_opacity > 0. {

@@ -37,6 +37,9 @@ where
   }
 
   #[inline]
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { self.proxy().visual_box(ctx) }
+
+  #[inline]
   fn paint(&self, ctx: &mut PaintingCtx) { self.proxy().paint(ctx) }
 
   #[inline]

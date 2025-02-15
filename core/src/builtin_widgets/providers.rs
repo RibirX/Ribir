@@ -677,6 +677,8 @@ impl Render for ProvidersRender {
     size
   }
 
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { self.render.visual_box(ctx) }
+
   fn paint(&self, ctx: &mut PaintingCtx) {
     let Self { render, providers } = self;
     let id = ctx.id();

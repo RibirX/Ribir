@@ -28,9 +28,12 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ## [0.4.0-alpha.27] - 2025-02-12
 
 ### Features
+
 - **core**: Add the ability to force redraw a frame. (#697 @zihadmahiuddin)
+- **core**: record the visual rect after layout.(#pr @wjian23)
 
 ### Fixed
+
 - **core**: Fix window staying empty after switching workspace (e.g. in i3wm) by doing a force redraw. (#697 @zihadmahiuddin)
 
 ## [0.4.0-alpha.26] - 2025-02-05

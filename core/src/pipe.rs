@@ -854,6 +854,8 @@ impl Render for PipeNode {
     self.as_ref().data.perform_layout(clamp, ctx)
   }
 
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { self.as_ref().data.visual_box(ctx) }
+
   fn paint(&self, ctx: &mut PaintingCtx) { self.as_ref().data.paint(ctx) }
 
   fn only_sized_by_parent(&self) -> bool {

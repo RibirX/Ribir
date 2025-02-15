@@ -2,8 +2,9 @@ use ribir_geom::{Point, Size};
 
 use super::{WidgetCtx, WidgetCtxImpl};
 use crate::{
+  context::VisualCtx,
   prelude::ProviderCtx,
-  widget::{BoxClamp, WidgetTree},
+  widget::{BoxClamp, VisualBox, WidgetTree},
   widget_tree::WidgetId,
   window::DelayEvent,
 };
@@ -14,11 +15,11 @@ use crate::{
 /// `LayoutCtx`. `LayoutCtx` provide method to perform child layout and also
 /// provides methods to update descendants position.
 pub struct LayoutCtx<'a> {
-  id: WidgetId,
+  pub(crate) id: WidgetId,
   /// The widget tree of the window, not borrow it from `wnd` is because a
   /// `LayoutCtx` always in a mutable borrow.
-  tree: &'a mut WidgetTree,
-  provider_ctx: ProviderCtx,
+  pub(crate) tree: &'a mut WidgetTree,
+  pub(crate) provider_ctx: ProviderCtx,
 }
 
 impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
@@ -53,6 +54,10 @@ impl<'a> LayoutCtx<'a> {
     let info = self.tree.store.layout_info_or_default(id);
     info.clamp = clamp;
     info.size = Some(size);
+
+    {
+      VisualCtx::from_layout_ctx(self).update_visual_box();
+    }
 
     self
       .window()
@@ -150,6 +155,15 @@ impl<'a> LayoutCtx<'a> {
   fn get_calculated_size(&self, child: WidgetId, clamp: BoxClamp) -> Option<Size> {
     let info = self.tree.store.layout_info(child)?;
     if info.clamp == clamp { info.size } else { None }
+  }
+
+  pub(crate) fn visual_box(&mut self, id: WidgetId) -> VisualBox {
+    let info = self.tree.store.layout_info_or_default(id);
+    info.visual_box
+  }
+
+  pub(crate) fn update_visual_box(&mut self) -> VisualBox {
+    VisualCtx::from_layout_ctx(self).update_visual_box()
   }
 }
 

@@ -19,14 +19,19 @@ impl Default for Opacity {
 impl_compose_child_for_wrap_render!(Opacity, DirtyPhase::Paint);
 
 impl WrapRender for Opacity {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    host.perform_layout(clamp, ctx)
-  }
-
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     ctx.painter().apply_alpha(self.opacity);
     if self.opacity > 0. {
       host.paint(ctx)
+    }
+  }
+
+  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
+    if self.opacity > 0. {
+      host.visual_box(ctx)
+    } else {
+      ctx.clip(Rect::from_size(Size::zero()));
+      None
     }
   }
 }

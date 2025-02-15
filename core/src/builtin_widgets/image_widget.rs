@@ -15,4 +15,10 @@ impl Render for Resource<PixelImage> {
       painter.draw_img(self.clone(), &rc, &Some(rc));
     }
   }
+
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
+    let box_rect = Rect::from_size(ctx.box_size().unwrap());
+    let img_rect = Rect::from_size(Size::new(self.width() as f32, self.height() as f32));
+    img_rect.intersection(&box_rect)
+  }
 }

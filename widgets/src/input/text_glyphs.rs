@@ -70,7 +70,12 @@ impl<T: VisualText + 'static> Render for TextGlyphs<T> {
     let glyphs = self.text.layout_glyphs(clamp, ctx);
     let size = glyphs.visual_rect().size;
     *self.glyphs.borrow_mut() = Some(glyphs);
-    clamp.clamp(size)
+    size
+  }
+
+  fn visual_box(&self, _: &mut VisualCtx) -> Option<Rect> {
+    let visual_glyphs = self.glyphs().unwrap();
+    Some(visual_glyphs.visual_rect())
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {

@@ -50,6 +50,15 @@ impl WrapRender for Padding {
     host.paint(ctx);
   }
 
+  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
+    host
+      .visual_box(ctx)
+      .map_or(Some(Rect::from_size(ctx.box_size().unwrap())), |mut rect| {
+        rect.size += self.padding.thickness();
+        Some(rect)
+      })
+  }
+
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> {
     let padding_matrix = Transform::translation(self.padding.left, self.padding.top);
 

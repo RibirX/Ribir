@@ -22,11 +22,6 @@ pub enum IgnoreScope {
 impl_compose_child_for_wrap_render!(IgnorePointer, DirtyPhase::Paint);
 
 impl WrapRender for IgnorePointer {
-  #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    host.perform_layout(clamp, ctx)
-  }
-
   fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
     match self.ignore {
       IgnoreScope::Subtree => HitTest { hit: false, can_hit_child: false },

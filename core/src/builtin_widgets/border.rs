@@ -69,6 +69,16 @@ impl WrapRender for BorderWidget {
     host.perform_layout(clamp, ctx)
   }
 
+  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
+    let visual_box = host.visual_box(ctx);
+    let size = ctx.box_size().unwrap();
+    if visual_box.is_none() {
+      Some(Rect::from_size(size))
+    } else {
+      visual_box.map(|rect| rect.union(&Rect::from_size(size)))
+    }
+  }
+
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     let size = ctx.box_size().unwrap();
 

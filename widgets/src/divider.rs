@@ -71,21 +71,31 @@ impl Render for Divider {
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let mut size = ctx.box_size().unwrap();
-    let (origin, size) = if self.direction.is_horizontal() {
-      size.width -= self.indent + self.end_indent;
-      size.height = self.thickness;
-      let y = (self.extent - self.thickness) / 2.;
-      (Point::new(self.indent, y), size)
-    } else {
-      size.width = self.thickness;
-      size.height -= self.indent + self.end_indent;
-      let x = (self.extent - self.thickness) / 2.;
-      (Point::new(x, self.indent), size)
-    };
+    let rect = self.paint_rect(ctx.box_size().unwrap());
     let painter = ctx.painter();
     painter.set_fill_brush(self.color.clone());
-    painter.rect(&Rect::new(origin, size));
+    painter.rect(&rect);
     painter.fill();
+  }
+
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
+    let rect = self.paint_rect(ctx.box_size().unwrap());
+    Some(rect)
+  }
+}
+
+impl Divider {
+  fn paint_rect(&self, mut box_size: Size) -> Rect {
+    if self.direction.is_horizontal() {
+      box_size.width -= self.indent + self.end_indent;
+      box_size.height = self.thickness;
+      let y = (self.extent - self.thickness) / 2.;
+      Rect::new(Point::new(self.indent, y), box_size)
+    } else {
+      box_size.width = self.thickness;
+      box_size.height -= self.indent + self.end_indent;
+      let x = (self.extent - self.thickness) / 2.;
+      Rect::new(Point::new(x, self.indent), box_size)
+    }
   }
 }

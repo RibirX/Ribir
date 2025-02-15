@@ -1,8 +1,10 @@
 mod painting_ctx;
 pub use painting_ctx::PaintingCtx;
 mod layout_ctx;
+mod visual_ctx;
 mod widget_ctx;
 pub use layout_ctx::*;
+pub use visual_ctx::*;
 pub use widget_ctx::*;
 pub(crate) mod build_ctx;
 pub use build_ctx::BuildCtx;

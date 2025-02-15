@@ -71,6 +71,23 @@ pub trait Render: 'static {
 
   /// Return a transform to map the coordinate to parent coordinate.
   fn get_transform(&self) -> Option<Transform> { None }
+
+  /// Computes the visual bounding box of the widget relative to self.
+  /// The method is called by framework after the layout is done.
+  /// Usually if you paint something, you should return the bounding box of the
+  /// paint. Default implementation will return None which means the
+  /// current widget will not be rendered.
+  ///
+  ///
+  /// Parameters:
+  ///
+  /// * `ctx`: The VisualCtx.
+  ///
+  /// Returns:
+  ///
+  /// The visual bounding box of the widget.
+  #[allow(unused_variables)]
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { None }
 }
 
 /// The common type of all widget can convert to.
