@@ -59,6 +59,7 @@ impl<'a> LayoutCtx<'a> {
       VisualCtx::from_layout_ctx(self).update_visual_box();
     }
 
+    self.provider_ctx.pop_providers_for(self.id());
     self
       .window()
       .add_delay_event(DelayEvent::PerformedLayout(id));
@@ -68,7 +69,7 @@ impl<'a> LayoutCtx<'a> {
 
   /// Perform layout of the `child` and return its size.
   pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
-    let size = self
+    self
       .get_calculated_size(child, clamp)
       .unwrap_or_else(|| {
         // The position needs to be reset, as some parent render widgets may not have
@@ -80,10 +81,7 @@ impl<'a> LayoutCtx<'a> {
         self.id = id;
 
         size
-      });
-    self.provider_ctx.pop_providers_for(self.id);
-
-    size
+      })
   }
 
   /// Adjust the position of the widget where it should be placed relative to
