@@ -1,6 +1,6 @@
 use ribir_core::prelude::*;
 
-use crate::layout::{Stack, StackDeclareExtend, StackFit};
+use crate::layout::*;
 
 /// This widget wraps its child in a `ScrollableWidget` and adds two scrollbar
 /// for interactivity and visual scroll position indication.
@@ -165,22 +165,8 @@ impl<'c> ComposeChild<'c> for Scrollbar {
             class: SCROLL_CLIENT_AREA,
             @{ child }
           }
-          @IgnorePointer{
-            ignore: IgnoreScope::OnlySelf,
-            @UnconstrainedBox {
-              dir: UnconstrainedDir::Both,
-              clamp_dim: ClampDim::MIN_SIZE,
-              @ { h_scrollbar }
-            }
-          }
-          @IgnorePointer{
-            ignore: IgnoreScope::OnlySelf,
-            @UnconstrainedBox {
-              dir: UnconstrainedDir::Both,
-              clamp_dim: ClampDim::MIN_SIZE,
-              @ { v_scrollbar }
-            }
-          }
+          @InParentLayout { @{ h_scrollbar } }
+          @InParentLayout { @{ v_scrollbar } }
         }
       }
     }

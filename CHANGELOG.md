@@ -29,6 +29,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: record the visual rect after layout.(#698 @wjian23)
 - **widget**: Add the Widget of Menu.(#702 @wjian23)
+- **widgets**: Allow children of the `Stack` to adjust their size based on the `Stack`'s size. (#pr @M-Adoo)
 
 ### Fixed
 
