@@ -51,6 +51,8 @@ impl<R: StateReader> StateReader for Watcher<R> {
 impl<R: StateReader> StateWatcher for Watcher<R> {
   type Watcher = Watcher<R::Reader>;
 
+  fn into_reader(self) -> Result<Self::Reader, Self> { Err(self) }
+
   #[inline]
   fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
     Box::new(self.clone_watcher())
