@@ -71,6 +71,15 @@ where
   M: Fn(&mut W::Value) -> PartMut<V> + Clone,
 {
   type Watcher = Watcher<Self::Reader>;
+
+  fn into_reader(self) -> Result<Self::Reader, Self> {
+    let Self { origin, part_map } = self;
+    match origin.into_reader() {
+      Ok(origin) => Ok(MapReader { origin, part_map: WriterMapReaderFn(part_map) }),
+      Err(origin) => Err(Self { origin, part_map }),
+    }
+  }
+
   #[inline]
   fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
     Box::new(self.clone_watcher())
@@ -93,14 +102,6 @@ where
   W: StateWriter,
   M: Fn(&mut W::Value) -> PartMut<V> + Clone,
 {
-  fn into_reader(self) -> Result<Self::Reader, Self> {
-    let Self { origin, part_map } = self;
-    match origin.into_reader() {
-      Ok(origin) => Ok(MapReader { origin, part_map: WriterMapReaderFn(part_map) }),
-      Err(origin) => Err(Self { origin, part_map }),
-    }
-  }
-
   #[inline]
   fn write(&self) -> WriteRef<Self::Value> { WriteRef::map(self.origin.write(), &self.part_map) }
 
