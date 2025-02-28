@@ -588,6 +588,8 @@ impl DollarRefsScope {
       }
     }
   }
+
+  pub fn keep_only_builtin_refs(&mut self) { self.refs.drain_filter(|r| r.builtin.is_none()); }
 }
 
 impl DollarRef {
