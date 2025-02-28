@@ -245,7 +245,7 @@ pub fn watch(input: TokenStream) -> TokenStream { watch_macro::gen_code(input.in
 /// use of `$` is unnecessary.
 #[proc_macro]
 pub fn part_writer(input: TokenStream) -> TokenStream {
-  part_state::gen_part_wrier(input.into(), &mut DollarRefsCtx::top_level()).into()
+  part_state::gen_part_writer(input.into(), &mut DollarRefsCtx::top_level()).into()
 }
 
 /// The `split_writer` macro creates a split writer from a reference of a
@@ -261,7 +261,7 @@ pub fn part_writer(input: TokenStream) -> TokenStream {
 /// use of `$` is unnecessary.
 #[proc_macro]
 pub fn split_writer(input: TokenStream) -> TokenStream {
-  part_state::gen_split_wrier(input.into(), &mut DollarRefsCtx::top_level()).into()
+  part_state::gen_split_writer(input.into(), &mut DollarRefsCtx::top_level()).into()
 }
 
 /// The `map_watcher` macro creates a partial watcher from a reference of a
@@ -270,13 +270,13 @@ pub fn split_writer(input: TokenStream) -> TokenStream {
 /// This macro specifically accepts simple expressions to indicate the partial
 /// of the watcher, as shown in the following patterns:
 ///
-/// - For a field: `map_watcher!(&watcher.xxx)`
-/// - For a method returning a reference: `map_watcher!(watcher.xxx())`.
+/// - For a field: `part_watcher!(&watcher.xxx)`
+/// - For a method returning a reference: `part_watcher!(watcher.xxx())`.
 ///
 /// Since it operates on a watcher and not a state reference of the watcher, the
 /// use of `$` is unnecessary.
 #[proc_macro]
-pub fn map_watcher(input: TokenStream) -> TokenStream {
+pub fn part_watcher(input: TokenStream) -> TokenStream {
   part_state::gen_part_watcher(input.into(), &mut DollarRefsCtx::top_level()).into()
 }
 
