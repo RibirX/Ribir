@@ -336,43 +336,24 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
     return;
   }
 
-  let n_orig = wnd.tree_mut().alloc_node(Box::new(orig.clone()));
-  let cls_holder = child_id.place_holder(wnd.tree_mut());
+  let child_holder = child_id.place_holder(wnd.tree_mut());
 
   // Extract the child from this node, retaining only the external information
   // linked from the parent to create a clean context for applying the class.
-  let child_node = node.take_data();
-
+  let old_child_node = node.take_data();
   let _guard = BuildCtx::init_for(child_id, wnd.tree);
   let ctx = BuildCtx::get_mut();
-  let mut new_id = ctx.build(class.apply_style(Widget::from_id(n_orig)));
 
-  let tree = ctx.tree_mut();
   // Place the inner child node within the old ID for disposal, then utilize the
   // class node to wrap the new child in the new ID.
-  // This action should be taken before modifying the `orig_id`, as the `orig_id`
-  // may be the same as the `child_id`.
-  let class_node = std::mem::replace(child_id.get_node_mut(tree).unwrap(), child_node);
+  let class_node =
+    std::mem::replace(child_id.get_node_mut(ctx.tree_mut()).unwrap(), old_child_node);
 
-  // Retain the original widget ID.
-  let [new, old] = tree.get_many_mut(&[n_orig, orig_id]);
-  // The "new" node is transferred to the "old" node, and the tracking ID within
-  // it needs to be updated.
-  new.update_track_id(orig_id);
-  std::mem::swap(new, old);
-  if new_id == n_orig {
-    // If applying the class does not generate additional widgets, the original
-    // widget ID will include all new elements after the swap.
-    new_id = orig_id;
-  } else {
-    n_orig.insert_after(orig_id, tree);
-  }
-  tree.remove_subtree(n_orig);
+  // Revert the original node to its original state to apply the class.
+  *orig_id.get_node_mut(ctx.tree_mut()).unwrap() = Box::new(orig.clone());
+  let new_id = ctx.build(class.apply_style(Widget::from_id(orig_id)));
 
-  if child_id != new_id {
-    // update the DynamicWidgetId out of the class node when id changed.
-    class_node.update_track_id(new_id);
-  }
+  let tree = ctx.tree_mut();
 
   new_id.wrap_node(tree, |render| {
     node.replace_data(render);
@@ -392,7 +373,7 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
           .dyn_info_mut()
           .single_range_replace(&old_rg, &new_rg)
       });
-    cls_holder.replace(new_id, tree);
+    child_holder.replace(new_id, tree);
   }
 
   if orig_id != child_id {
@@ -717,6 +698,41 @@ mod tests {
 
     wnd.draw_frame();
     *w_cls.write() = TRACK_ID;
+    wnd.draw_frame();
+  }
+
+  #[test]
+  fn fix_pipe_class_in_pipe_class() {
+    reset_test_env!();
+
+    class_names! { PIPE_CLS, INNER_PIPE_A, INNER_PIPE_B };
+
+    let (cls, w_cls) = split_value(INNER_PIPE_A);
+    let (out, w_out) = split_value(EMPTY);
+    let mut wnd = TestWindow::new(fn_widget! {
+      let mut classes = Classes::default();
+      classes.insert(PIPE_CLS, |w| {
+        FatObj::new(w)
+          .class(Variant::<ClassName>::new(BuildCtx::get()).unwrap())
+          .into_widget()
+      });
+
+      let out = out.clone_watcher();
+      let cls = cls.clone_watcher();
+      providers!{
+        providers: smallvec![
+          classes.clone().into_provider(),
+          Provider::value_of_watcher(cls.clone_watcher())
+        ],
+        @MockBox {
+          class: pipe!(*$out),
+          size: Size::new(100., 100.),
+        }
+      }
+    });
+    *w_out.write() = PIPE_CLS;
+    wnd.draw_frame();
+    *w_cls.write() = INNER_PIPE_B;
     wnd.draw_frame();
   }
 }
