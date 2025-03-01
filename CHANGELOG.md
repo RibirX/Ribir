@@ -29,7 +29,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: record the visual rect after layout.(#698 @wjian23)
 - **widget**: Add the Widget of Menu.(#702 @wjian23)
-- **widgets**: Allow children of the `Stack` to adjust their size based on the `Stack`'s size. (#pr @M-Adoo)
+- **widgets**: Allow children of the `Stack` to adjust their size based on the `Stack`'s size. (#706 @M-Adoo)
 
 ### Fixed
 
@@ -37,7 +37,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Fixed the panic when overlay recreate provider_ctx during event callback.(#702 @wjian23)
 - **core**: fix miss pop providers when call `push_providers_for` separately during layout.(#698 @wjian23)
 - **core**: enables embedding declare template as child in widget with Vec of template(#704 @wjian23)
-- **macro**: Fixed issue where top-level `fn_widget!` macro did not capture a built-in widget. (#pr @M-Adoo)
+- **macro**: Fixed issue where top-level `fn_widget!` macro did not capture a built-in widget. (#706 @M-Adoo)
 
 ### Changed
 
@@ -46,7 +46,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
-- **core**: Remove the `text_align` from the `Text` widget and replace it with the `TextAlign` provider instead. (#pr @M-Adoo)
+- **core**: Remove the `text_align` from the `Text` widget and replace it with the `TextAlign` provider instead. (#706 @M-Adoo)
 
 ## [0.4.0-alpha.27] - 2025-02-12
 
