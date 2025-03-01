@@ -36,7 +36,6 @@
 
 use std::{convert::Infallible, hash::Hash};
 
-use data_widget::AnonymousAttacher;
 use ops::box_it::CloneableBoxOp;
 use pipe::PipeNode;
 use smallvec::{SmallVec, smallvec};
@@ -239,26 +238,25 @@ impl<'c> ComposeChild<'c> for Class {
       Err(this) => {
         let this2 = this.clone_watcher();
         let cls_child = ClassNode::empty_node();
-        // Reapply the class when it is updated.
+        let orig_child = ClassNode::empty_node();
+        let orig_child2 = orig_child.clone();
+        let child = child.on_build(move |orig_id| orig_child2.init_for_single(orig_id));
+
         let cls_child2 = cls_child.clone();
-        let child = child.on_build(move |orig_id| {
-          let orig_child = ClassNode::empty_node();
-          orig_child.init_for_single(orig_id);
-          let orig_child2 = orig_child.clone();
-          let wnd_id = BuildCtx::get().window().id();
-          let u = this2
-            .raw_modifies()
-            .filter(|s| s.contains(ModifyScope::FRAMEWORK))
-            .sample(AppCtx::frame_ticks().clone())
-            .subscribe(move |_| class_update(&cls_child2, &orig_child2, &this2.read(), wnd_id))
-            .unsubscribe_when_dropped();
-          orig_child.combine_subscription_guard(u);
-        });
+        let orig_child2 = orig_child.clone();
+        let wnd_id = BuildCtx::get().window().id();
+        let u = this2
+          .raw_modifies()
+          .filter(|s| s.contains(ModifyScope::FRAMEWORK))
+          .sample(AppCtx::frame_ticks().clone())
+          .subscribe(move |_| class_update(&cls_child2, &orig_child2, &this2.read(), wnd_id))
+          .unsubscribe_when_dropped();
 
         this
           .read()
           .apply_style(child)
           .on_build(move |child_id| cls_child.init_for_single(child_id))
+          .attach_anonymous_data(u)
       }
     };
     FnWidget::new(f).into_widget()
@@ -315,16 +313,6 @@ impl Class {
 }
 
 type ClassNode = PipeNode;
-
-impl ClassNode {
-  fn combine_subscription_guard(&self, guard: impl Any) {
-    let inner = self.host_render();
-    let child = unsafe { Box::from_raw(inner.as_mut()) };
-    let child = Box::new(AnonymousAttacher::new(child, Box::new(guard)));
-    let tmp = std::mem::replace(inner, child);
-    std::mem::forget(tmp);
-  }
-}
 
 fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: WindowId) {
   let wnd =
@@ -734,5 +722,54 @@ mod tests {
     wnd.draw_frame();
     *w_cls.write() = INNER_PIPE_B;
     wnd.draw_frame();
+  }
+
+  #[test]
+  fn fix_pipe_class_unsubscribed() {
+    reset_test_env!();
+
+    class_names! { OUT_PIPE_CLS, INNER_PIPE };
+
+    let inner_apply = Stateful::new(0usize);
+    let w_inner_apply = inner_apply.clone_writer();
+    let (inner, w_inner) = split_value(false);
+    let (out, w_out) = split_value(false);
+    let mut wnd = TestWindow::new(fn_widget! {
+      let out_cls = Class::provider(OUT_PIPE_CLS, |w| {
+        let inner_cls = Variant::<bool>::new(BuildCtx::get()).unwrap().map(|_| INNER_PIPE);
+        FatObj::new(w)
+          .class(inner_cls)
+          .into_widget()
+      });
+      let inner_cls = Class::provider(INNER_PIPE, |w| {
+        *Provider::write_of::<usize>(BuildCtx::get()).unwrap() += 1;
+        w
+      });
+
+      let out = out.clone_watcher();
+      let inner = inner.clone_watcher();
+      let w_inner_apply = w_inner_apply.clone_writer();
+      providers!{
+        providers: smallvec![
+          out_cls, inner_cls,
+          Provider::value_of_watcher(inner.clone_watcher()),
+          Provider::value_of_writer(w_inner_apply.clone_writer(), None),
+        ],
+        @MockBox {
+          class: pipe!(let _ = *$out; OUT_PIPE_CLS),
+          size: Size::new(100., 100.),
+        }
+      }
+    });
+    wnd.draw_frame();
+    assert_eq!(*inner_apply.read(), 1);
+
+    *w_out.write() = true;
+    wnd.draw_frame();
+    assert_eq!(*inner_apply.read(), 2);
+
+    *w_inner.write() = true;
+    wnd.draw_frame();
+    assert_eq!(*inner_apply.read(), 3);
   }
 }

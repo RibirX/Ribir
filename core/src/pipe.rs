@@ -769,8 +769,6 @@ impl PipeNode {
     unsafe { &mut *self.0.get() }
   }
 
-  pub(crate) fn host_render(&self) -> &mut Box<dyn RenderQueryable> { &mut self.as_mut().data }
-
   /// Attach a subscription to host widget of the `PipeNode`, and the
   /// subscription will be unsubscribed when the `PipeNode` dropped.
   fn attach_subscription(self, u: impl Subscription + 'static) {
