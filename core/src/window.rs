@@ -634,13 +634,14 @@ impl Window {
       .ancestors(tree)
       .take_while(|id| Some(*id) != up)
       .all(|id| {
-        e.bubble_to_parent(id);
-        id.query_all_iter::<MixBuiltin>(tree).all(|m| {
+        let is_propagation = id.query_all_iter::<MixBuiltin>(tree).all(|m| {
           if m.contain_flag(e.flags()) {
             m.dispatch(e);
           }
           e.is_propagation()
-        })
+        });
+        e.bubble_to_parent(id);
+        is_propagation
       });
   }
 

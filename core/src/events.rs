@@ -311,9 +311,14 @@ impl CommonEvent {
     }
   }
 
-  pub(crate) fn bubble_to_parent(&mut self, id: WidgetId) {
-    self.id = id;
-    self.provider_ctx.pop_providers_for(id);
+  pub(crate) fn bubble_to_parent(&mut self, id: WidgetId) -> bool {
+    if let Some(parent) = id.parent(self.tree()) {
+      self.provider_ctx.pop_providers_for(id);
+      self.id = parent;
+      true
+    } else {
+      false
+    }
   }
 
   pub(crate) fn capture_to_child(&mut self, id: WidgetId, buffer: &mut SmallVec<[QueryHandle; 1]>) {
