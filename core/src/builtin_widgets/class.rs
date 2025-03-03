@@ -329,6 +329,10 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
 
   let child_id = node.dyn_info().host_id();
   let orig_id = orig.dyn_info().host_id();
+  if child_id.is_dropped(wnd.tree()) {
+    return;
+  }
+
   let n_orig = wnd.tree_mut().alloc_node(Box::new(orig.clone()));
   let cls_holder = child_id.place_holder(wnd.tree_mut());
 

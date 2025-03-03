@@ -31,6 +31,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 - **core**: record the visual rect after layout.(#698 @wjian23)
+- **widget**: Add the Widget of Menu.(#pr @wjian23)
 
 ### Fixed
 - **core**: fix miss pop providers when call `push_providers_for` separately during layout.(#698 @wjian23)

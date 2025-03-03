@@ -158,6 +158,13 @@ impl Window {
       .focus_next_widget(self.tree());
   }
 
+  pub fn request_focus(&self, wid: WidgetId) {
+    self
+      .focus_mgr
+      .borrow_mut()
+      .request_focus_to(Some(wid));
+  }
+
   /// Request switch the focus to prev widget.
   pub fn request_prev_focus(&self) {
     self

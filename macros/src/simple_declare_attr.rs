@@ -55,7 +55,7 @@ pub(crate) fn simple_declarer_attr(
         type Target = #ident #g_ty;
 
         #[track_caller]
-        fn finish(self) -> Self::Target {
+        fn finish(mut self) -> Self::Target {
           #ident {#(#init_pairs),*}
         }
       }

@@ -508,7 +508,7 @@ impl FocusManager {
   // to None and the focused widget requests blur, it will refresh focus
   // immediately because the widget may be in a disposed state and the widget
   // will be removed soon.
-  fn request_focus_to(&mut self, focus_to: Option<WidgetId>) {
+  pub(crate) fn request_focus_to(&mut self, focus_to: Option<WidgetId>) {
     self.request_focusing = Some(focus_to);
   }
 
