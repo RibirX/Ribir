@@ -27,6 +27,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Fixed
 - **core**: Fixed the provider of the current widget was lost during event bubbling.(#pr @wjian23)
+- **core**: Fixed the panic when overlay recreate provider_ctx during event callback.(#pr @wjian23)
 
 ### Features
 - **core**: record the visual rect after layout.(#698 @wjian23)
