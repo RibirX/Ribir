@@ -46,3 +46,8 @@ where
 {
   fn into_child_compose(self) -> C { C::compose_child_from(self) }
 }
+
+impl<U: Into<CowArc<str>>> ComposeChildFrom<U, 1> for CowArc<str> {
+  #[inline]
+  fn compose_child_from(from: U) -> Self { from.into() }
+}
