@@ -29,7 +29,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: record the visual rect after layout.(#698 @wjian23)
 
 ### Fixed
+
 - **core**: fix miss pop providers when call `push_providers_for` separately during layout.(#698 @wjian23)
+- **core**: enables embedding template instances as child elements in template `Vec`. (#703 @M-Adoo)
 
 ## [0.4.0-alpha.27] - 2025-02-12
 

@@ -217,6 +217,26 @@ where
   }
 }
 
+// Implementation note: Although `VecBuilder` is not a writer (hence `WRITER`
+// should logically be false), we explicitly mark it as a writer to resolve
+// trait implementation conflicts. This approach is viable because:
+// - `VecBuilder` will never act as a writer during child composition
+// - It maintains full compatibility with the `ComposeChild` trait.
+impl<'w, C, T, const N: usize, const M: usize> ComposeWithChild<'w, C, true, true, N, M>
+  for VecBuilder<T>
+where
+  T: Template<Builder: TemplateBuilder<Target = T>>,
+  T::Builder: ComposeWithChild<'w, C, false, true, N, M, Target = T::Builder>,
+{
+  type Target = Self;
+
+  fn with_child(mut self, child: C) -> Self::Target {
+    let child = T::builder().with_child(child).build_tml();
+    self.0.push(child);
+    self
+  }
+}
+
 // todo: remove it, keep it for backward compatibility.
 
 impl ChildOfCompose for Resource<PixelImage> {}
@@ -336,5 +356,25 @@ mod tests {
       let state = State::value(0);
       @PipeParent {  @ { pipe!(*$state) } }
     };
+  }
+
+  #[test]
+  #[allow(dead_code)]
+  fn template_in_vec_template() {
+    #[derive(Template)]
+    struct A {
+      a: Option<TextInit>,
+    }
+
+    #[derive(Template)]
+    enum Item {
+      Item(A),
+      Widget(Widget<'static>),
+    }
+
+    let vec_tml: VecBuilder<Item> = Vec::builder();
+
+    let a = A::builder().with_child("Hi!");
+    let _ = vec_tml.with_child(a);
   }
 }
