@@ -70,7 +70,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         let gen = with_child_generics(generics, ty);
         let (g_impl, _, g_where) = gen.split_for_impl();
         tokens.extend(quote! {
-          impl #g_impl ComposeWithChild<'_c, _C, false, true, {#f_idx + 1}, _M>
+          impl #g_impl ComposeWithChild<'_c, _C, false, 1, {#f_idx + 1}, _M>
             for #builder #g_ty #g_where
           {
             type Target = Self;
@@ -177,7 +177,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             let gen = with_child_generics(generics, ty);
             let (g_impl, _, g_where) = gen.split_for_impl();
             tokens.extend(quote! {
-              impl #g_impl ComposeWithChild<'_c, _C, false, true, {#i + 1}, _M>
+              impl #g_impl ComposeWithChild<'_c, _C, false, 1, {#i + 1}, _M>
                 for #builder #g_ty #g_where
               {
                 type Target = Self;
