@@ -9,14 +9,15 @@ use super::*;
 /// The `M` and `WRITER` use to avoid implementation conflicts.
 ///
 /// - The `WRITER` marker if it is a writer.
-/// - The `TML` marker if it is a template.
+/// - The `TML` marker is used for `Template` to indicate it will convert by
+///   TML's level of 'Template', 0 for no 'Template'
 /// - The `N` marker is used to distinguish the type fill in `Template`
 /// - The `M` marker is used for child conversion.
 pub trait ComposeWithChild<
   'w,
   C,
   const WRITER: bool,
-  const TML: bool,
+  const TML: usize,
   const N: usize,
   const M: usize,
 >
@@ -26,7 +27,7 @@ pub trait ComposeWithChild<
 }
 
 // ComposeWithChild implementations
-impl<'w, P, C, const M: usize> ComposeWithChild<'w, C, true, false, 0, M> for P
+impl<'w, P, C, const M: usize> ComposeWithChild<'w, C, true, 0, 0, M> for P
 where
   P: StateWriter,
   P::Value: ComposeChild<'w>,
@@ -39,12 +40,11 @@ where
   }
 }
 
-impl<'w, P, Builder, C, const N: usize, const M: usize> ComposeWithChild<'w, C, true, true, N, M>
-  for P
+impl<'w, P, Builder, C, const N: usize, const M: usize> ComposeWithChild<'w, C, true, 1, N, M> for P
 where
   P: StateWriter,
   P::Value: ComposeChild<'w, Child: Template<Builder = Builder>>,
-  Builder: ComposeWithChild<'w, C, false, true, N, M>,
+  Builder: ComposeWithChild<'w, C, false, 1, N, M>,
 {
   type Target = Pair<Self, Builder::Target>;
 
@@ -54,7 +54,21 @@ where
   }
 }
 
-impl<'w, P, C, Target, const TML: bool, const N: usize, const M: usize>
+impl<'w, P, Builder, C, const N: usize, const M: usize> ComposeWithChild<'w, C, true, 2, N, M> for P
+where
+  P: StateWriter,
+  P::Value: ComposeChild<'w, Child: Template<Builder = Builder>>,
+  Builder: ComposeWithChild<'w, C, false, 2, N, M>,
+{
+  type Target = Pair<Self, Builder::Target>;
+
+  fn with_child(self, child: C) -> Self::Target {
+    let child = <P::Value as ComposeChild<'w>>::Child::builder().with_child(child);
+    Pair { parent: self, child }
+  }
+}
+
+impl<'w, P, C, Target, const TML: usize, const N: usize, const M: usize>
   ComposeWithChild<'w, C, false, TML, N, M> for P
 where
   P: ComposeChild<'w>,
@@ -65,7 +79,7 @@ where
   fn with_child(self, child: C) -> Self::Target { State::value(self).with_child(child) }
 }
 
-impl<'w, W, C, const TML: bool, const WRITER: bool, const N: usize, const M: usize>
+impl<'w, W, C, const TML: usize, const WRITER: bool, const N: usize, const M: usize>
   ComposeWithChild<'w, C, WRITER, TML, N, M> for FatObj<W>
 where
   W: ComposeWithChild<'w, C, WRITER, TML, N, M>,
@@ -77,9 +91,9 @@ where
 
 // Option needn't implement for `Template`
 impl<'w, T, C, const WRITER: bool, const N: usize, const M: usize>
-  ComposeWithChild<'w, C, WRITER, false, N, M> for Option<T>
+  ComposeWithChild<'w, C, WRITER, 0, N, M> for Option<T>
 where
-  T: ComposeWithChild<'w, C, WRITER, false, 0, M>,
+  T: ComposeWithChild<'w, C, WRITER, 0, 0, M>,
   C: IntoChildCompose<Widget<'w>, M>,
   T::Target: IntoWidget<'w, N>,
 {
@@ -92,10 +106,10 @@ where
 
 // The continuation with a child is only possible if the child of `Pair` is a
 // `Template`.
-impl<'w, W, C1, C2: 'w, const WRITER: bool, const M: usize, const N: usize>
-  ComposeWithChild<'w, C2, WRITER, true, N, M> for Pair<W, C1>
+impl<'w, W, C1, C2: 'w, const WRITER: bool, const TML: usize, const M: usize, const N: usize>
+  ComposeWithChild<'w, C2, WRITER, TML, N, M> for Pair<W, C1>
 where
-  C1: ComposeWithChild<'w, C2, WRITER, true, N, M>,
+  C1: ComposeWithChild<'w, C2, WRITER, TML, N, M>,
 {
   type Target = Pair<W, C1::Target>;
 
@@ -142,7 +156,7 @@ impl<T> ComposeChildFrom<OptionBuilder<T>, 1> for Option<T> {
   fn compose_child_from(from: OptionBuilder<T>) -> Self { from.build_tml() }
 }
 
-impl<'w, C, T, const M: usize> ComposeWithChild<'w, C, false, true, 0, M> for OptionBuilder<T>
+impl<'w, C, T, const M: usize> ComposeWithChild<'w, C, false, 1, 0, M> for OptionBuilder<T>
 where
   C: IntoChildCompose<T, M>,
 {
@@ -152,8 +166,7 @@ where
   fn with_child(self, child: C) -> Self::Target { self.with_child(Some(child)) }
 }
 
-impl<'w, C, T, const M: usize> ComposeWithChild<'w, Option<C>, false, true, 1, M>
-  for OptionBuilder<T>
+impl<'w, C, T, const M: usize> ComposeWithChild<'w, Option<C>, false, 1, 1, M> for OptionBuilder<T>
 where
   C: IntoChildCompose<T, M>,
 {
@@ -188,7 +201,7 @@ impl<T> ComposeChildFrom<VecBuilder<T>, 1> for Vec<T> {
   fn compose_child_from(from: VecBuilder<T>) -> Self { from.build_tml() }
 }
 
-impl<'w, C, T, const M: usize> ComposeWithChild<'w, C, false, true, 0, M> for VecBuilder<T>
+impl<'w, C, T, const M: usize> ComposeWithChild<'w, C, false, 1, 0, M> for VecBuilder<T>
 where
   C: IntoChildCompose<T, M>,
 {
@@ -201,7 +214,25 @@ where
   }
 }
 
-impl<'w, C, T, const M: usize> ComposeWithChild<'w, C, false, true, 1, M> for VecBuilder<T>
+impl<'w, C, T, const N: usize, const M: usize> ComposeWithChild<'w, C, false, 2, N, M>
+  for VecBuilder<T>
+where
+  T: Template,
+  T::Builder: ComposeWithChild<'w, C, false, 1, N, M>,
+  <T::Builder as ComposeWithChild<'w, C, false, 1, N, M>>::Target: TemplateBuilder<Target = T>,
+{
+  type Target = Self;
+
+  #[inline]
+  fn with_child(mut self, child: C) -> Self::Target {
+    self
+      .0
+      .push(T::builder().with_child(child).build_tml());
+    self
+  }
+}
+
+impl<'w, C, T, const M: usize> ComposeWithChild<'w, C, false, 1, 1, M> for VecBuilder<T>
 where
   C: IntoIterator,
   C::Item: IntoChildCompose<T, M>,
@@ -274,7 +305,7 @@ where
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_helper::MockBox;
+  use crate::test_helper::{MockBox, MockStack};
 
   #[derive(Template)]
   enum PTml {
@@ -335,6 +366,39 @@ mod tests {
     let _pipe_child = fn_widget! {
       let state = State::value(0);
       @PipeParent {  @ { pipe!(*$state) } }
+    };
+  }
+
+  #[test]
+  fn compose_template_enum() {
+    #[allow(dead_code)]
+    #[derive(Template)]
+    enum EnumTml {
+      Widget(Widget<'static>),
+      Text(TextInit),
+    }
+
+    #[derive(Declare)]
+    struct EnumTest {}
+
+    impl ComposeChild<'static> for EnumTest {
+      type Child = Vec<EnumTml>;
+
+      fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
+        todo!()
+      }
+    }
+
+    let _ = fn_widget! {
+      let v = Stateful::new(true);
+      let w = EnumTml::Widget(fn_widget! { @Void {} }.into_widget());
+      @EnumTest {
+        @ Void {}
+        @ { "test" }
+        @ { pipe!(*$v).map(|_| @Void {}) }
+        @ MockStack { @Void {} }
+        @ {w}
+      }
     };
   }
 }

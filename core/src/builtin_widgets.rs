@@ -1203,7 +1203,7 @@ impl<T: MultiChild> MultiChild for DeclarerWithSubscription<T> {
   fn into_parent(self: Box<Self>) -> Widget<'static> { (*self).into_widget() }
 }
 
-impl<'w, T, C, const TML: bool, const WRITER: bool, const N: usize, const M: usize>
+impl<'w, T, C, const TML: usize, const WRITER: bool, const N: usize, const M: usize>
   ComposeWithChild<'w, C, WRITER, TML, N, M> for DeclarerWithSubscription<T>
 where
   T: ComposeWithChild<'w, C, WRITER, TML, N, M>,

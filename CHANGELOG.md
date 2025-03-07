@@ -30,6 +30,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Fixed
 - **core**: fix miss pop providers when call `push_providers_for` separately during layout.(#698 @wjian23)
+- **core**: enables embedding declare template as child in widget with Vec of template(#704 @wjian23)
 
 ## [0.4.0-alpha.27] - 2025-02-12
 
