@@ -74,7 +74,7 @@ impl<T: VisualText + 'static> Render for TextGlyphs<T> {
   }
 
   fn visual_box(&self, _: &mut VisualCtx) -> Option<Rect> {
-    let visual_glyphs = self.glyphs().unwrap();
+    let visual_glyphs = self.glyphs()?;
     Some(visual_glyphs.visual_rect())
   }
 

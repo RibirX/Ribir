@@ -22,7 +22,7 @@ impl WrapRender for TransformWidget {
   fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
     host
       .visual_box(ctx)
-      .map_or(Some(Rect::from_size(ctx.box_size().unwrap())), |rect| {
+      .map_or(Some(Rect::from_size(ctx.box_size()?)), |rect| {
         Some(self.transform.outer_transformed_rect(&rect))
       })
   }

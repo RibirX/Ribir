@@ -53,7 +53,7 @@ impl WrapRender for Padding {
   fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
     host
       .visual_box(ctx)
-      .map_or(Some(Rect::from_size(ctx.box_size().unwrap())), |mut rect| {
+      .map_or(Some(Rect::from_size(ctx.box_size()?)), |mut rect| {
         rect.size += self.padding.thickness();
         Some(rect)
       })

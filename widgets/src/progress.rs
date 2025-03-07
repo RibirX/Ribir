@@ -123,7 +123,7 @@ impl Render for SpinnerArc {
   }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    let size = ctx.box_size().unwrap();
+    let size = ctx.box_size()?;
     Some(Rect::from_size(size))
   }
 

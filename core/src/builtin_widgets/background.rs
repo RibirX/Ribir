@@ -41,7 +41,7 @@ impl WrapRender for Background {
 
   fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
     let visual_box = host.visual_box(ctx);
-    let size = ctx.box_size().unwrap();
+    let size = ctx.box_size()?;
     if visual_box.is_none() {
       Some(Rect::from_size(size))
     } else {

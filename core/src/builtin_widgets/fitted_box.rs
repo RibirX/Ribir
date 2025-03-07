@@ -84,7 +84,7 @@ impl Render for FittedBox {
   }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    let clip_rect = Rect::from_size(ctx.box_size().unwrap());
+    let clip_rect = Rect::from_size(ctx.box_size()?);
     ctx.clip(clip_rect);
     Some(clip_rect)
   }
