@@ -5,7 +5,7 @@ impl Render for Svg {
   fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.clamp(self.size()) }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    Some(Rect::from_size(ctx.box_size().unwrap()))
+    Some(Rect::from_size(ctx.box_size()?))
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {

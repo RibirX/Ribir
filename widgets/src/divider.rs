@@ -79,7 +79,7 @@ impl Render for Divider {
   }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    let rect = self.paint_rect(ctx.box_size().unwrap());
+    let rect = self.paint_rect(ctx.box_size()?);
     Some(rect)
   }
 }
