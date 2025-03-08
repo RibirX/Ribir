@@ -211,7 +211,7 @@ impl Compose for Wordle {
           justify_content: JustifyContent::Center,
           item_gap: 5.,
           @H1 { text: "Wordle" }
-          @Divider { extent: 20. }
+          @Divider { }
           @ { this.chars_grid() }
           @ { state_bar }
           @ { keyboard }

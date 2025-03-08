@@ -2,6 +2,7 @@ use ribir_core::prelude::Classes;
 
 mod buttons_cls;
 mod checkbox_cls;
+mod divider_cls;
 mod input_cls;
 mod progress_cls;
 mod radio_cls;
@@ -19,6 +20,7 @@ pub fn initd_classes() -> Classes {
   tooltips_cls::init(&mut classes);
   slider_cls::init(&mut classes);
   input_cls::init(&mut classes);
+  divider_cls::init(&mut classes);
 
   classes
 }

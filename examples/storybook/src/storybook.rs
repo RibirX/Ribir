@@ -182,13 +182,13 @@ fn content() -> Widget<'static> {
               @ { SupportingText(Label::new("One line supporting text")) }
             }
           }
-          @Divider { indent: 16. }
+          @Divider { indent: DividerIndent::Start }
           @ListItem {
             @Leading::new(EdgeWidget::Icon(svgs::MENU.into_widget()))
             @ { HeadlineText(Label::new("One line list item")) }
             @Trailing::new(EdgeWidget::Text(Label::new("100+")))
           }
-          @Divider { indent: 16. }
+          @Divider { indent: DividerIndent::Start }
           @ListItem {
             line_number: 2usize,
             @Leading::new(
@@ -202,14 +202,14 @@ fn content() -> Widget<'static> {
             @ { SupportingText(Label::new("Two lines supporting text \rTwo lines supporting text")) }
             @Trailing::new(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
           }
-          @Divider { indent: 16. }
+          @Divider { indent: DividerIndent::Start }
           @ListItem {
             @Leading::new(EdgeWidget::Avatar(@Avatar { @Label::new("A") }))
             @ { HeadlineText(Label::new("One lines list item")) }
             @ { SupportingText(Label::new("One lines supporting text")) }
             @Trailing::new(EdgeWidget::Text(Label::new("100+")))
           }
-          @Divider { indent: 16. }
+          @Divider { indent: DividerIndent::Start }
           @ListItem {
             @Leading::new(EdgeWidget::Poster(
               Poster(Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png"))))
