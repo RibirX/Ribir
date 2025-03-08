@@ -190,46 +190,45 @@ impl FlexLayouter {
     // the cross axis.
     let dir = self.dir;
     let flex_max = FlexSize::from_size(clamp.max, dir);
-    let cross_min = if Align::Stretch == self.align_items && flex_max.cross.is_finite() {
-      flex_max.cross
-    } else {
-      0.
-    };
-    let child_clamp = BoxClamp {
-      min: FlexSize { main: 0., cross: cross_min }.to_size(dir),
-      max: FlexSize { main: f32::INFINITY, cross: flex_max.cross }.to_size(dir),
-    };
+    let flex_min = FlexSize::from_size(clamp.min, dir);
+
+    let child_clamp = self.create_child_clamp(clamp);
+
     self.perform_children_layout(flex_max.main, child_clamp, ctx);
 
-    if self.has_flex {
-      let flex_main = if flex_max.main.is_finite() {
-        flex_max.main
-      } else {
-        FlexSize::from_size(clamp.min, dir).main
-      };
-      self.flex_children_layout(flex_main, child_clamp, ctx);
+    if self.need_secondary_layout() {
+      // Uses minimum main axis size as distribution basis when max constraint
+      // is unbounded
+      let flex_main = if flex_max.main.is_finite() { flex_max.main } else { flex_min.main };
+      self.stretch_and_flex_layout(flex_main, child_clamp, ctx);
     }
 
-    // cross direction need calculate cross_axis_gap but last line don't need.
-    let cross = self
-      .lines
-      .iter()
-      .fold(-self.cross_axis_gap, |sum, l| sum + l.cross_line_height + self.cross_axis_gap);
-    let main = match self.justify_content {
-      JustifyContent::SpaceBetween | JustifyContent::SpaceAround | JustifyContent::SpaceEvenly
-        if flex_max.main.is_finite() =>
-      {
-        flex_max.main
-      }
-      _ => self
-        .lines
-        .iter()
-        .fold(0f32, |max, l| max.max(l.main_width)),
-    };
-    let size = clamp.clamp(FlexSize { cross, main }.to_size(dir));
+    let size = self.finally_size(flex_max);
+    let size = clamp.clamp(size.to_size(dir));
     self.update_children_position(FlexSize::from_size(size, dir), ctx);
     size
   }
+
+  /// Creates child constraints based on wrapping behavior:
+  /// - Wrapped: No limits on either axis
+  /// - Not wrapped: Allows unlimited main axis growth while preserving cross
+  ///   axis constraints
+  fn create_child_clamp(&self, clamp: BoxClamp) -> BoxClamp {
+    if self.wrap {
+      BoxClamp::default()
+    } else {
+      match self.dir {
+        Direction::Horizontal => clamp
+          .with_min_width(0.)
+          .with_max_width(f32::INFINITY),
+        Direction::Vertical => clamp
+          .with_min_height(0.)
+          .with_max_height(f32::INFINITY),
+      }
+    }
+  }
+
+  fn need_secondary_layout(&self) -> bool { self.has_flex || self.align_items == Align::Stretch }
 
   fn perform_children_layout(&mut self, max_main: f32, clamp: BoxClamp, ctx: &mut LayoutCtx) {
     let (ctx, children) = ctx.split_children();
@@ -255,7 +254,6 @@ impl FlexLayouter {
 
       let line = &mut self.current_line;
       line.main_width += size.main;
-      line.cross_line_height = line.cross_line_height.max(size.cross);
 
       let flex = ctx
         .query_of_widget::<Expanded>(c)
@@ -272,53 +270,86 @@ impl FlexLayouter {
     self.place_line();
   }
 
-  fn flex_children_layout(&mut self, main_width: f32, clamp: BoxClamp, ctx: &mut LayoutCtx) {
+  fn stretch_and_flex_layout(&mut self, main_width: f32, clamp: BoxClamp, ctx: &mut LayoutCtx) {
     let (ctx, mut children) = ctx.split_children();
+    let dir = self.dir;
 
     self.lines.iter_mut().for_each(|line| {
+      let mut line_clamp = clamp;
+      if self.align_items == Align::Stretch {
+        let cross = line.max_cross();
+        line_clamp = match dir {
+          Direction::Horizontal => line_clamp.with_fixed_height(cross),
+          Direction::Vertical => line_clamp.with_fixed_width(cross),
+        };
+      }
       let flex_unit = line.calc_flex_unit_and_remove_useless_flex(main_width);
 
       line.items_info.iter_mut().for_each(|info| {
         let child = children.next().unwrap();
+        let mut item_clamp = line_clamp;
         if let (Some(flex), Some(unit)) = (info.flex, flex_unit) {
-          let dir = self.dir;
           let main = unit * flex;
-          let clamp = match dir {
-            Direction::Horizontal => clamp.with_fixed_width(main),
-            Direction::Vertical => clamp.with_fixed_height(main),
+          item_clamp = match dir {
+            Direction::Horizontal => item_clamp.with_fixed_width(main),
+            Direction::Vertical => item_clamp.with_fixed_height(main),
           };
-          let size = ctx.perform_child_layout(child, clamp);
-          info.size = FlexSize::from_size(size, dir);
-          line.main_width += info.size.main;
-          line.cross_line_height = line.cross_line_height.max(info.size.cross);
+        }
+
+        if self.align_items == Align::Stretch || (info.flex.is_some() && flex_unit.is_some()) {
+          let size = ctx.perform_child_layout(child, item_clamp);
+          let new_size = FlexSize::from_size(size, dir);
+          line.main_width += new_size.main - info.size.main;
+          info.size = new_size;
         }
       });
     });
   }
 
+  fn finally_size(&self, flex_max: FlexSize) -> FlexSize {
+    let main = match self.justify_content {
+      JustifyContent::SpaceBetween | JustifyContent::SpaceAround | JustifyContent::SpaceEvenly
+        if flex_max.main.is_finite() =>
+      {
+        flex_max.main
+      }
+      _ => self
+        .lines
+        .iter()
+        .fold(0f32, |max, l| max.max(l.main_width)),
+    };
+
+    let cross = if self.lines.is_empty() {
+      0.0
+    } else {
+      self
+        .lines
+        .iter()
+        .map(|l| l.max_cross())
+        .sum::<f32>()
+        + self.cross_axis_gap * (self.lines.len() - 1) as f32
+    };
+    FlexSize { main, cross }
+  }
+
   fn update_children_position(&mut self, bound: FlexSize, ctx: &mut LayoutCtx) {
     let Self { reverse, dir, align_items, justify_content, lines, .. } = self;
 
-    let cross_size = lines.iter().map(|l| l.cross_line_height).sum();
-    // cross gap don't use calc offset
-    let cross_gap_count =
-      if !lines.is_empty() { (lines.len() - 1) as f32 * self.cross_axis_gap } else { 0. };
-    let cross_offset = align_items.align_value(cross_size, bound.cross - cross_gap_count);
-
     macro_rules! update_position {
       ($($rev: ident)?) => {
-        let mut cross = cross_offset - self.cross_axis_gap;
+        let mut cross = -self.cross_axis_gap;
         lines.iter_mut()$(.$rev())?.for_each(|line| {
           let (mut main, step) = line.place_args(bound.main, *justify_content, self.main_axis_gap);
+          let line_cross = line.max_cross();
           line.items_info.iter_mut()$(.$rev())?.for_each(|item| {
             let item_cross_offset =
-              align_items.align_value(item.size.cross, line.cross_line_height);
+              align_items.align_value(item.size.cross, line_cross);
 
             item.pos.cross = cross + item_cross_offset + self.cross_axis_gap;
             item.pos.main = main;
             main = main + item.size.main + step;
           });
-          cross += line.cross_line_height + self.cross_axis_gap;
+          cross += line_cross + self.cross_axis_gap;
         });
       };
     }
@@ -351,7 +382,6 @@ impl FlexLayouter {
 struct MainLineInfo {
   main_width: f32,
   items_info: Vec<FlexLayoutInfo>,
-  cross_line_height: f32,
   has_flex: bool,
 }
 
@@ -421,6 +451,15 @@ impl MainLineInfo {
         (step, step)
       }
     }
+  }
+
+  fn max_cross(&self) -> f32 {
+    self
+      .items_info
+      .iter()
+      .map(|info| info.size.cross)
+      .max_by(|a, b| a.total_cmp(b))
+      .unwrap_or(0.)
   }
 }
 
@@ -723,7 +762,7 @@ mod tests {
     LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 500., 25.)),
     LayoutCase::new(&[0, 0, 0]).with_rect(ribir_geom::rect(0., 0., 200., 25.)),
     LayoutCase::new(&[0, 0, 1]).with_rect(ribir_geom::rect(200., 0., 100., 25.)),
-    LayoutCase::new(&[0, 0, 2]).with_rect(ribir_geom::rect(300., 0., 100., 20.)),
+    LayoutCase::new(&[0, 0, 2]).with_rect(ribir_geom::rect(300., 0., 100., 25.)),
     LayoutCase::new(&[0, 0, 3]).with_rect(ribir_geom::rect(400., 0., 100., 25.))
   );
 

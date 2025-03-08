@@ -38,6 +38,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: fix miss pop providers when call `push_providers_for` separately during layout.(#698 @wjian23)
 - **core**: enables embedding declare template as child in widget with Vec of template(#704 @wjian23)
 - **macro**: Fixed issue where top-level `fn_widget!` macro did not capture a built-in widget. (#706 @M-Adoo)
+- **widgets**: `Flex` now stretches cross-axis items using final line dimensions instead of constraint clamping. (#pr by @M-Adoo)
+
 
 ### Changed
 
