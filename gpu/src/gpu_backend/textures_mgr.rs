@@ -217,10 +217,13 @@ where
     let dist = self
       .target_atlas
       .get_or_cache(target, scale, size, gpu, init);
-    (dist.scale, TextureSlice {
-      tex_id: TextureID::Bundle(dist.tex_id()),
-      rect: dist.tex_rect(&self.target_atlas),
-    })
+    (
+      dist.scale,
+      TextureSlice {
+        tex_id: TextureID::Bundle(dist.tex_id()),
+        rect: dist.tex_rect(&self.target_atlas),
+      },
+    )
   }
 
   pub(super) fn texture(&self, tex_id: TextureID) -> &T { id_to_texture!(self, tex_id) }
@@ -470,8 +473,7 @@ pub mod tests {
   use crate::{WgpuImpl, WgpuTexture};
 
   pub fn color_image(color: Color, width: u32, height: u32) -> Resource<PixelImage> {
-    let data = std::iter::repeat(color.into_components())
-      .take(width as usize * height as usize)
+    let data = std::iter::repeat_n(color.into_components(), width as usize * height as usize)
       .flatten()
       .collect::<Vec<_>>();
 

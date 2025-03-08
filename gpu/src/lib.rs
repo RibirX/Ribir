@@ -183,7 +183,7 @@ pub struct DrawPhaseLimits {
   pub max_mask_layers: usize,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy)]
 pub struct ColorAttr {
   /// brush's Rgba color
@@ -192,19 +192,19 @@ pub struct ColorAttr {
   pub mask_head: i32,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
 pub struct ImagePrimIndex(u32);
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
 pub struct RadialGradientPrimIndex(u32);
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
 pub struct LinearGradientPrimIndex(u32);
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
 pub struct GradientStopPrimitive {
   pub color: u32,
@@ -217,7 +217,7 @@ impl GradientStopPrimitive {
   }
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
 pub struct RadialGradientPrimitive {
   /// A 2x3 column-major matrix, transform a vertex position to the texture
@@ -242,7 +242,7 @@ pub struct RadialGradientPrimitive {
   pub spread: u32,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
 pub struct LinearGradientPrimitive {
   /// A 2x3 column-major matrix, transform a vertex position to the texture
@@ -263,7 +263,7 @@ pub struct LinearGradientPrimitive {
   pub mask_head_and_spread: i32,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(AsBytes, PartialEq, Clone, Copy)]
 pub struct ImgPrimitive {
   /// A 2x3 column-major matrix, transform a vertex position to the image
@@ -284,7 +284,7 @@ pub struct ImgPrimitive {
 /// The mask layer describes an alpha channel layer that is used in the fragment
 /// shader to sample the alpha channel and apply it to the color.
 #[derive(AsBytes, Clone)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct MaskLayer {
   /// A 2x3 column-major matrix, transform a vertex position to its mask texture
   /// position.

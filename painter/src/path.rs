@@ -95,7 +95,7 @@ pub type VertexBuffers<V> = lyon_tessellation::VertexBuffers<Vertex<V>, u32>;
 
 #[cfg(feature = "tessellation")]
 #[derive(Copy, Clone, Debug, zerocopy::AsBytes, Default)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct Vertex<Attr> {
   pub pos: [f32; 2],
   pub attr: Attr,
