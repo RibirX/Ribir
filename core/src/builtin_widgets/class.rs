@@ -17,9 +17,12 @@
 //!
 //! let mut theme = Theme::default();
 //! // Define how `RED_BORDER` transforms a widget.
-//! theme.classes.insert(RED_BORDER, style_class! {
-//!   border: Border::all(BorderSide::new(2., Color::RED.into()))
-//! });
+//! theme.classes.insert(
+//!   RED_BORDER,
+//!   style_class! {
+//!     border: Border::all(BorderSide::new(2., Color::RED.into()))
+//!   },
+//! );
 //!
 //! let w = fn_widget! {
 //!   @Container {
@@ -432,9 +435,12 @@ mod tests {
       }
       .into_widget()
     });
-    classes.insert(CLAMP_50, style_class! {
-      clamp: BoxClamp::fixed_size(Size::new(50., 50.))
-    });
+    classes.insert(
+      CLAMP_50,
+      style_class! {
+        clamp: BoxClamp::fixed_size(Size::new(50., 50.))
+      },
+    );
     classes
   }
 

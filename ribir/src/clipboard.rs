@@ -1,7 +1,4 @@
-use std::{
-  borrow::Cow,
-  io::{Error, ErrorKind},
-};
+use std::{borrow::Cow, io::Error};
 
 use arboard::ImageData;
 use ribir_core::prelude::{PixelImage, image::ColorFormat, log::warn};
@@ -67,11 +64,11 @@ impl ribir_core::clipboard::Clipboard for Clipboard {
 
 fn error_convert(err: arboard::Error) -> Error {
   match err {
-    arboard::Error::ContentNotAvailable => Error::new(ErrorKind::Other, "ContentNotAvailable"),
-    arboard::Error::ClipboardNotSupported => Error::new(ErrorKind::Other, "ClipboardNotSupported"),
-    arboard::Error::ClipboardOccupied => Error::new(ErrorKind::Other, "ClipboardOccupied"),
-    arboard::Error::ConversionFailure => Error::new(ErrorKind::Other, "ConversionFailure"),
-    arboard::Error::Unknown { description } => Error::new(ErrorKind::Other, description),
-    e => Error::new(ErrorKind::Other, e),
+    arboard::Error::ContentNotAvailable => Error::other("ContentNotAvailable"),
+    arboard::Error::ClipboardNotSupported => Error::other("ClipboardNotSupported"),
+    arboard::Error::ClipboardOccupied => Error::other("ClipboardOccupied"),
+    arboard::Error::ConversionFailure => Error::other("ConversionFailure"),
+    arboard::Error::Unknown { description } => Error::other(description),
+    e => Error::other(e),
   }
 }

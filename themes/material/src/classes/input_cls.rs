@@ -21,12 +21,15 @@ pub(super) fn init(classes: &mut Classes) {
     .into_widget()
   });
 
-  classes.insert(TEXT_SELECTION, style_class! {
-    background: {
-      let color = BuildCtx::color();
-      color.into_container_color(BuildCtx::get()).map(|c| c.with_alpha(0.8))
-    }
-  });
+  classes.insert(
+    TEXT_SELECTION,
+    style_class! {
+      background: {
+        let color = BuildCtx::color();
+        color.into_container_color(BuildCtx::get()).map(|c| c.with_alpha(0.8))
+      }
+    },
+  );
 
   fn input_border(w: Widget) -> Widget {
     let mut w = FatObj::new(w);

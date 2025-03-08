@@ -21,40 +21,61 @@ named_style_class!(vertical_base => {
 pub(super) fn init(classes: &mut Classes) {
   classes.insert(HORIZONTAL_DIVIDER, horizontal_base);
 
-  classes.insert(HORIZONTAL_DIVIDER_INDENT_START, multi_class! {
-    horizontal_base,
-    style_class!{ margin: EdgeInsets::only_left(MARGIN_HORIZONTAL) }
-  });
+  classes.insert(
+    HORIZONTAL_DIVIDER_INDENT_START,
+    multi_class! {
+      horizontal_base,
+      style_class!{ margin: EdgeInsets::only_left(MARGIN_HORIZONTAL) }
+    },
+  );
 
-  classes.insert(HORIZONTAL_DIVIDER_INDENT_END, multi_class! {
-    horizontal_base,
-    style_class!{ margin: EdgeInsets::only_right(MARGIN_HORIZONTAL) }
-  });
+  classes.insert(
+    HORIZONTAL_DIVIDER_INDENT_END,
+    multi_class! {
+      horizontal_base,
+      style_class!{ margin: EdgeInsets::only_right(MARGIN_HORIZONTAL) }
+    },
+  );
 
-  classes.insert(HORIZONTAL_DIVIDER_INDENT_BOTH, multi_class! {
-    horizontal_base,
-    style_class!{ margin: EdgeInsets::horizontal(MARGIN_HORIZONTAL) }
-  });
+  classes.insert(
+    HORIZONTAL_DIVIDER_INDENT_BOTH,
+    multi_class! {
+      horizontal_base,
+      style_class!{ margin: EdgeInsets::horizontal(MARGIN_HORIZONTAL) }
+    },
+  );
 
-  classes.insert(HORIZONTAL_DIVIDER_INDENT_BOTH, multi_class! {
-    horizontal_base,
-    style_class!{ margin: EdgeInsets::horizontal(MARGIN_HORIZONTAL) }
-  });
+  classes.insert(
+    HORIZONTAL_DIVIDER_INDENT_BOTH,
+    multi_class! {
+      horizontal_base,
+      style_class!{ margin: EdgeInsets::horizontal(MARGIN_HORIZONTAL) }
+    },
+  );
 
   classes.insert(VERTICAL_DIVIDER, vertical_base);
 
-  classes.insert(VERTICAL_DIVIDER_INDENT_START, multi_class! {
-    vertical_base,
-    style_class! { margin: EdgeInsets::only_top(MARGIN_VERTICAL)}
-  });
+  classes.insert(
+    VERTICAL_DIVIDER_INDENT_START,
+    multi_class! {
+      vertical_base,
+      style_class! { margin: EdgeInsets::only_top(MARGIN_VERTICAL)}
+    },
+  );
 
-  classes.insert(VERTICAL_DIVIDER_INDENT_END, multi_class! {
-    vertical_base,
-    style_class! { margin: EdgeInsets::only_bottom(MARGIN_VERTICAL)}
-  });
+  classes.insert(
+    VERTICAL_DIVIDER_INDENT_END,
+    multi_class! {
+      vertical_base,
+      style_class! { margin: EdgeInsets::only_bottom(MARGIN_VERTICAL)}
+    },
+  );
 
-  classes.insert(VERTICAL_DIVIDER_INDENT_BOTH, multi_class! {
-    vertical_base,
-    style_class! { margin: EdgeInsets::vertical(MARGIN_VERTICAL)}
-  });
+  classes.insert(
+    VERTICAL_DIVIDER_INDENT_BOTH,
+    multi_class! {
+      vertical_base,
+      style_class! { margin: EdgeInsets::vertical(MARGIN_VERTICAL)}
+    },
+  );
 }
