@@ -78,13 +78,8 @@ impl Overlay {
   }
 
   /// Return the overlay that the `ctx` belongs to if it is within an overlay.
-  pub fn of(ctx: &impl WidgetCtx) -> Option<Self> {
-    let wnd = ctx.window();
-    let tree = wnd.tree();
-    let overlays = tree
-      .root()
-      .query_ref::<ShowingOverlays>(tree)
-      .unwrap();
+  pub fn of<C: AsRef<ProviderCtx> + WidgetCtx>(ctx: &C) -> Option<Self> {
+    let overlays = Provider::of::<ShowingOverlays>(&ctx).unwrap();
 
     overlays.showing_of(ctx)
   }
@@ -177,12 +172,14 @@ impl Overlay {
     if let Some(showing) = showing {
       let ShowingInfo { wnd_id, .. } = showing;
       if let Some(wnd) = AppCtx::get_window(wnd_id) {
-        let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
-        let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
-        showing_overlays.remove(self);
-
         if let Some(wid) = track_id.and_then(|track_id| track_id.get()) {
-          AppCtx::once_next_frame(move |_| {
+          let this = self.clone();
+          let _ = AppCtx::spawn_local(async move {
+            {
+              let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
+              let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
+              showing_overlays.remove(&this);
+            }
             let tree = wnd.tree_mut();
             let root = tree.root();
             wid.dispose_subtree(tree);
@@ -231,18 +228,21 @@ impl Overlay {
       w
     };
 
-    let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
+    let this = self.clone();
+    let _ = AppCtx::spawn_local(async move {
+      let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
 
-    let wid = BuildCtx::get_mut().build(gen());
-    let tree = wnd.tree_mut();
-    tree.root().append(wid, tree);
-    wid.on_mounted_subtree(tree);
-    tree.dirty_marker().mark(wid, DirtyPhase::Layout);
+      let wid = BuildCtx::get_mut().build(gen());
+      let tree = wnd.tree_mut();
+      tree.root().append(wid, tree);
+      wid.on_mounted_subtree(tree);
+      tree.dirty_marker().mark(wid, DirtyPhase::Layout);
 
-    self.0.borrow_mut().showing = Some(ShowingInfo { generator: gen.into(), wnd_id: wnd.id() });
+      this.0.borrow_mut().showing = Some(ShowingInfo { generator: gen.into(), wnd_id: wnd.id() });
 
-    let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
-    showing_overlays.add(self.clone());
+      let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
+      showing_overlays.add(this);
+    });
   }
 
   fn showing_root(&self) -> Option<WidgetId> {

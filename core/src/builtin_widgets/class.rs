@@ -17,9 +17,12 @@
 //!
 //! let mut theme = Theme::default();
 //! // Define how `RED_BORDER` transforms a widget.
-//! theme.classes.insert(RED_BORDER, style_class! {
-//!   border: Border::all(BorderSide::new(2., Color::RED.into()))
-//! });
+//! theme.classes.insert(
+//!   RED_BORDER,
+//!   style_class! {
+//!     border: Border::all(BorderSide::new(2., Color::RED.into()))
+//!   },
+//! );
 //!
 //! let w = fn_widget! {
 //!   @Container {
@@ -329,6 +332,10 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
 
   let child_id = node.dyn_info().host_id();
   let orig_id = orig.dyn_info().host_id();
+  if child_id.is_dropped(wnd.tree()) {
+    return;
+  }
+
   let n_orig = wnd.tree_mut().alloc_node(Box::new(orig.clone()));
   let cls_holder = child_id.place_holder(wnd.tree_mut());
 
@@ -428,9 +435,12 @@ mod tests {
       }
       .into_widget()
     });
-    classes.insert(CLAMP_50, style_class! {
-      clamp: BoxClamp::fixed_size(Size::new(50., 50.))
-    });
+    classes.insert(
+      CLAMP_50,
+      style_class! {
+        clamp: BoxClamp::fixed_size(Size::new(50., 50.))
+      },
+    );
     classes
   }
 

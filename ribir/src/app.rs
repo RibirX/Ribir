@@ -583,22 +583,24 @@ mod tests {
     App::process_winit_ime_event(&wnd, Ime::Preedit("hello".to_string(), None));
     App::process_winit_ime_event(&wnd, Ime::Disabled);
     wnd.draw_frame();
-    assert_eq!(&*log.read(), &[
-      "on_ime_pre_edit_begin",
-      "on_ime_pre_edit_update hello",
-      "on_ime_pre_edit_end"
-    ]);
+    assert_eq!(
+      &*log.read(),
+      &["on_ime_pre_edit_begin", "on_ime_pre_edit_update hello", "on_ime_pre_edit_end"]
+    );
 
     log.write().clear();
     App::process_winit_ime_event(&wnd, Ime::Preedit("hello".to_string(), None));
     App::process_winit_ime_event(&wnd, Ime::Commit("hello".to_string()));
     wnd.draw_frame();
-    assert_eq!(&*log.read(), &[
-      "on_ime_pre_edit_begin",
-      "on_ime_pre_edit_update hello",
-      "on_ime_pre_edit_end",
-      "on_chars hello",
-    ]);
+    assert_eq!(
+      &*log.read(),
+      &[
+        "on_ime_pre_edit_begin",
+        "on_ime_pre_edit_update hello",
+        "on_ime_pre_edit_end",
+        "on_chars hello",
+      ]
+    );
 
     log.write().clear();
     App::process_winit_ime_event(&wnd, Ime::Preedit("hello".to_string(), None));
@@ -616,12 +618,15 @@ mod tests {
     );
 
     wnd.draw_frame();
-    assert_eq!(&*log.read(), &[
-      "on_ime_pre_edit_begin",
-      "on_ime_pre_edit_update hello",
-      "on_ime_pre_edit_end",
-      "on_chars hello",
-      "on_tap",
-    ]);
+    assert_eq!(
+      &*log.read(),
+      &[
+        "on_ime_pre_edit_begin",
+        "on_ime_pre_edit_update hello",
+        "on_ime_pre_edit_end",
+        "on_chars hello",
+        "on_tap",
+      ]
+    );
   }
 }

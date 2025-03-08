@@ -158,6 +158,13 @@ impl Window {
       .focus_next_widget(self.tree());
   }
 
+  pub fn request_focus(&self, wid: WidgetId) {
+    self
+      .focus_mgr
+      .borrow_mut()
+      .request_focus_to(Some(wid));
+  }
+
   /// Request switch the focus to prev widget.
   pub fn request_prev_focus(&self) {
     self
@@ -634,13 +641,14 @@ impl Window {
       .ancestors(tree)
       .take_while(|id| Some(*id) != up)
       .all(|id| {
-        e.bubble_to_parent(id);
-        id.query_all_iter::<MixBuiltin>(tree).all(|m| {
+        let is_propagation = id.query_all_iter::<MixBuiltin>(tree).all(|m| {
           if m.contain_flag(e.flags()) {
             m.dispatch(e);
           }
           e.is_propagation()
-        })
+        });
+        e.bubble_to_parent(id);
+        is_propagation
       });
   }
 

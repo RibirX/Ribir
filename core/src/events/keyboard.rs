@@ -123,15 +123,18 @@ mod tests {
     );
 
     wnd.run_frame_tasks();
-    assert_eq!(&*k2.read(), &[
-      "key down capture Character(\"0\")",
-      "key down Character(\"0\")",
-      "key up capture Character(\"0\")",
-      "key up Character(\"0\")",
-      "key down capture Character(\"1\")",
-      "key down Character(\"1\")",
-      "key up capture Character(\"1\")",
-      "key up Character(\"1\")"
-    ]);
+    assert_eq!(
+      &*k2.read(),
+      &[
+        "key down capture Character(\"0\")",
+        "key down Character(\"0\")",
+        "key up capture Character(\"0\")",
+        "key up Character(\"0\")",
+        "key down capture Character(\"1\")",
+        "key down Character(\"1\")",
+        "key up capture Character(\"1\")",
+        "key up Character(\"1\")"
+      ]
+    );
   }
 }

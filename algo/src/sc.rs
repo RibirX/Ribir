@@ -183,7 +183,7 @@ impl<T: ?Sized> Drop for Sc<T> {
   }
 }
 
-impl<T> Clone for Sc<T> {
+impl<T: ?Sized> Clone for Sc<T> {
   #[inline]
   fn clone(&self) -> Self {
     self.inner().inc();
