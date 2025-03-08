@@ -97,7 +97,14 @@ pub const EDGES_TOP_4: EdgeInsets = EdgeInsets::only_top(4.);
 pub const EDGES_BOTTOM_4: EdgeInsets = EdgeInsets::only_bottom(4.);
 
 pub const EDGES_HOR_6: EdgeInsets = EdgeInsets::horizontal(6.);
+
+pub const EDGES_8: EdgeInsets = EdgeInsets::all(8.);
 pub const EDGES_HOR_8: EdgeInsets = EdgeInsets::horizontal(8.);
+pub const EDGES_VER_8: EdgeInsets = EdgeInsets::vertical(8.);
+pub const EDGES_LEFT_8: EdgeInsets = EdgeInsets::only_left(8.);
+pub const EDGES_RIGHT_8: EdgeInsets = EdgeInsets::only_right(8.);
+pub const EDGES_TOP_8: EdgeInsets = EdgeInsets::only_top(8.);
+pub const EDGES_BOTTOM_8: EdgeInsets = EdgeInsets::only_bottom(8.);
 
 pub const EDGES_10: EdgeInsets = EdgeInsets::all(10.);
 
@@ -105,6 +112,12 @@ pub const EDGES_HOR_12: EdgeInsets = EdgeInsets::horizontal(12.);
 
 pub const EDGES_16: EdgeInsets = EdgeInsets::all(16.);
 pub const EDGES_HOR_16: EdgeInsets = EdgeInsets::horizontal(16.);
+pub const EDGES_VER_16: EdgeInsets = EdgeInsets::vertical(16.);
+pub const EDGES_LEFT_16: EdgeInsets = EdgeInsets::only_left(16.);
+pub const EDGES_RIGHT_16: EdgeInsets = EdgeInsets::only_right(16.);
+pub const EDGES_TOP_16: EdgeInsets = EdgeInsets::only_top(16.);
+pub const EDGES_BOTTOM_16: EdgeInsets = EdgeInsets::only_bottom(16.);
+
 pub const EDGES_HOR_24: EdgeInsets = EdgeInsets::horizontal(24.);
 pub const EDGES_HOR_32: EdgeInsets = EdgeInsets::horizontal(32.);
 pub const EDGES_HOR_36: EdgeInsets = EdgeInsets::horizontal(36.);
