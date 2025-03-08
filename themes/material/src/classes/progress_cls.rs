@@ -39,15 +39,21 @@ fn lerp_angle(from: &Angle, to: &Angle, rate: f32) -> Angle {
   Angle::radians(radians)
 }
 pub(super) fn init(classes: &mut Classes) {
-  classes.insert(LINEAR_INDETERMINATE_TRACK, style_class! {
-    background: BuildCtx::container_color(),
-    radius: md::RADIUS_2,
-    margin: md::EDGES_LEFT_4,
-  });
-  classes.insert(LINEAR_PROGRESS, style_class! {
-    margin: md::EDGES_HOR_4,
-    clamp: BoxClamp::UNLIMITED.with_fixed_height(md::THICKNESS_4)
-  });
+  classes.insert(
+    LINEAR_INDETERMINATE_TRACK,
+    style_class! {
+      background: BuildCtx::container_color(),
+      radius: md::RADIUS_2,
+      margin: md::EDGES_LEFT_4,
+    },
+  );
+  classes.insert(
+    LINEAR_PROGRESS,
+    style_class! {
+      margin: md::EDGES_HOR_4,
+      clamp: BoxClamp::UNLIMITED.with_fixed_height(md::THICKNESS_4)
+    },
+  );
   classes.insert(LINEAR_DETERMINATE_TRACK, |w| {
     let w = FatObj::new(w);
     stack! {

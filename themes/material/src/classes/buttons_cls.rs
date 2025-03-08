@@ -31,18 +31,24 @@ fn text_button_init(classes: &mut Classes) {
       .into_widget()
   }
 
-  classes.insert(TEXT_BTN, multi_class![
-    style_class! { padding: md::EDGES_HOR_12, text_style: btn_label_style(18.) },
-    interactive
-  ]);
+  classes.insert(
+    TEXT_BTN,
+    multi_class![
+      style_class! { padding: md::EDGES_HOR_12, text_style: btn_label_style(18.) },
+      interactive
+    ],
+  );
   classes.insert(TEXT_BTN_LABEL, style_class! { margin: md::EDGES_HOR_4 });
   classes.insert(TEXT_BTN_LEADING_ICON, style_class! { margin: md::EDGES_RIGHT_4 });
   classes.insert(TEXT_BTN_TRAILING_ICON, style_class! { margin: md::EDGES_LEFT_4 });
 
-  classes.insert(TEXT_BTN_LABEL_ONLY, multi_class![
-    style_class! { padding: md::EDGES_HOR_12, text_style: btn_label_style(40.) },
-    interactive
-  ]);
+  classes.insert(
+    TEXT_BTN_LABEL_ONLY,
+    multi_class![
+      style_class! { padding: md::EDGES_HOR_12, text_style: btn_label_style(40.) },
+      interactive
+    ],
+  );
   classes.insert(TEXT_BTN_ICON_ONLY, multi_class![common_icon_only, interactive]);
 }
 
@@ -137,41 +143,50 @@ fn fab_init(classes: &mut Classes) {
       .into_widget()
   }
 
-  classes.insert(FAB_ICON_ONLY, multi_class![
-    match fab_size() {
-      FabSize::Large => style_class! { text_line_height: LARGE_ICON_SIZE },
-      _ => common_icon_only,
-    },
-    fab_interactive
-  ]);
+  classes.insert(
+    FAB_ICON_ONLY,
+    multi_class![
+      match fab_size() {
+        FabSize::Large => style_class! { text_line_height: LARGE_ICON_SIZE },
+        _ => common_icon_only,
+      },
+      fab_interactive
+    ],
+  );
 
-  classes.insert(FAB_LABEL_ONLY, multi_class![
-    match fab_size() {
-      FabSize::Mini => common_label_only,
-      FabSize::Normal =>
-        style_class! { padding: md::EDGES_HOR_24, text_style: btn_label_style(BTN_HEIGHT) },
-      FabSize::Large => style_class! {
-        text_style: large_label_style(LARGE_BTN_HEIGHT),
-        padding: md::EDGES_HOR_48,
+  classes.insert(
+    FAB_LABEL_ONLY,
+    multi_class![
+      match fab_size() {
+        FabSize::Mini => common_label_only,
+        FabSize::Normal =>
+          style_class! { padding: md::EDGES_HOR_24, text_style: btn_label_style(BTN_HEIGHT) },
+        FabSize::Large => style_class! {
+          text_style: large_label_style(LARGE_BTN_HEIGHT),
+          padding: md::EDGES_HOR_48,
+        },
       },
-    },
-    fab_interactive
-  ]);
+      fab_interactive
+    ],
+  );
 
-  classes.insert(FAB, multi_class![
-    match fab_size() {
-      FabSize::Mini => common_btn,
-      FabSize::Normal => style_class! {
-        padding: md::EDGES_HOR_16,
-        text_style: btn_label_style(24.)
+  classes.insert(
+    FAB,
+    multi_class![
+      match fab_size() {
+        FabSize::Mini => common_btn,
+        FabSize::Normal => style_class! {
+          padding: md::EDGES_HOR_16,
+          text_style: btn_label_style(24.)
+        },
+        FabSize::Large => style_class! {
+          padding: md::EDGES_HOR_32,
+          text_style: large_label_style(LARGE_ICON_SIZE)
+        },
       },
-      FabSize::Large => style_class! {
-        padding: md::EDGES_HOR_32,
-        text_style: large_label_style(LARGE_ICON_SIZE)
-      },
-    },
-    fab_interactive
-  ]);
+      fab_interactive
+    ],
+  );
   classes.insert(FAB_LEADING_ICON, empty_cls);
   classes.insert(FAB_TRAILING_ICON, empty_cls);
   classes.insert(FAB_LABEL, |w| match fab_size() {

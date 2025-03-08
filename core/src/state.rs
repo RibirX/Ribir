@@ -373,12 +373,10 @@ impl<'a, V: ?Sized> WriteRef<'a, V> {
     let borrow = orig.value.borrow.clone();
     let a = ValueMutRef { inner: a, borrow: borrow.clone() };
     let b = ValueMutRef { inner: b, borrow };
-    (WriteRef { value: a, modified, modify_scope, info }, WriteRef {
-      value: b,
-      modified,
-      modify_scope,
-      info,
-    })
+    (
+      WriteRef { value: a, modified, modify_scope, info },
+      WriteRef { value: b, modified, modify_scope, info },
+    )
   }
 
   /// Forget all modifies of this reference. So all the modifies occurred on

@@ -179,6 +179,7 @@ pub struct HeadlineText(pub Label);
 pub struct SupportingText(pub Label);
 
 #[derive(Template)]
+#[allow(clippy::large_enum_variant)]
 pub enum EdgeWidget<'w> {
   Text(Label),
   Icon(Widget<'w>),
