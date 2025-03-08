@@ -21,7 +21,7 @@ macro_rules! widget_test_suit {
 /// import `ribir_core::test_helper::*;` before using it.
 #[macro_export]
 macro_rules! widget_layout_test {
-  ($name:ident, $widget_tester:expr, $($case:expr),+) => {
+  ($name:ident, $widget_tester:expr, $($case:expr),+ $(,)?) => {
     paste::paste! {
       #[test]
       fn [<$name _layout>]() {
