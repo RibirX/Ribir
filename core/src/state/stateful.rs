@@ -74,6 +74,10 @@ impl<W: 'static> StateReader for Stateful<W> {
 impl<W: 'static> StateWatcher for Stateful<W> {
   type Watcher = Watcher<Self::Reader>;
 
+  fn into_reader(self) -> Result<Self::Reader, Self> {
+    if self.info.writer_count.get() == 1 { Ok(self.clone_reader()) } else { Err(self) }
+  }
+
   #[inline]
   fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
     Box::new(self.clone_watcher())
@@ -91,13 +95,6 @@ impl<W: 'static> StateWatcher for Stateful<W> {
 }
 
 impl<W: 'static> StateWriter for Stateful<W> {
-  fn into_reader(self) -> Result<Self::Reader, Self>
-  where
-    Self: Sized,
-  {
-    if self.info.writer_count.get() == 1 { Ok(self.clone_reader()) } else { Err(self) }
-  }
-
   #[inline]
   fn write(&self) -> WriteRef<W> { self.write_ref(ModifyScope::BOTH) }
 

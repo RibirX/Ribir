@@ -12,10 +12,10 @@ use crate::{
   variable_names::{BUILTIN_INFOS, BuiltinMemberType},
 };
 
-pub fn gen_part_wrier(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
+pub fn gen_part_writer(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
   match syn::parse2::<PartState>(input) {
     Ok(part) => {
-      let info = part.state_info(refs_ctx);
+      let info = part.state_info(refs_ctx, DollarUsedInfo::Writer);
       let host = part.host_tokens(&info, refs_ctx);
       let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
       let tokens = quote_spanned! { state.span() =>
@@ -30,10 +30,10 @@ pub fn gen_part_wrier(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> Token
   }
 }
 
-pub fn gen_split_wrier(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
+pub fn gen_split_writer(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
   match syn::parse2::<PartState>(input) {
     Ok(part) => {
-      let info = part.state_info(refs_ctx);
+      let info = part.state_info(refs_ctx, DollarUsedInfo::Writer);
       let host = part.host_tokens(&info, refs_ctx);
       let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
       let tokens = quote_spanned! { state.span() =>
@@ -51,7 +51,7 @@ pub fn gen_split_wrier(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> Toke
 pub fn gen_part_reader(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
   match syn::parse2::<PartState>(input) {
     Ok(part) => {
-      let info = part.state_info(refs_ctx);
+      let info = part.state_info(refs_ctx, DollarUsedInfo::Reader);
       let host = part.host_tokens(&info, refs_ctx);
       let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
       let tokens = quote_spanned! { state.span() =>
@@ -69,7 +69,7 @@ pub fn gen_part_reader(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> Toke
 pub fn gen_part_watcher(input: TokenStream, refs_ctx: &mut DollarRefsCtx) -> TokenStream {
   match syn::parse2::<PartState>(input) {
     Ok(part) => {
-      let info = part.state_info(refs_ctx);
+      let info = part.state_info(refs_ctx, DollarUsedInfo::Watcher);
       let host = part.host_tokens(&info, refs_ctx);
       let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
       let tokens = quote_spanned! { state.span() =>
@@ -141,7 +141,7 @@ impl Parse for PartState {
 }
 
 impl PartState {
-  fn state_info(&self, refs_ctx: &DollarRefsCtx) -> DollarRef {
+  fn state_info(&self, refs_ctx: &DollarRefsCtx, used: DollarUsedInfo) -> DollarRef {
     let builtin_info = match &self.part_expr {
       PartExpr::Member(Member::Named(member)) => BUILTIN_INFOS
         .get(&member.to_string())
@@ -152,9 +152,9 @@ impl PartState {
       _ => None,
     };
     if let Some(info) = builtin_info {
-      refs_ctx.builtin_dollar_ref(self.state.clone(), info, DollarUsedInfo::Writer)
+      refs_ctx.builtin_dollar_ref(self.state.clone(), info, used)
     } else {
-      DollarRef { name: self.state.clone(), builtin: None, used: DollarUsedInfo::Writer }
+      DollarRef { name: self.state.clone(), builtin: None, used }
     }
   }
 

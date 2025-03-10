@@ -14,14 +14,16 @@ pub(crate) fn gen_code(input: TokenStream, ctx: Option<&mut DollarRefsCtx>) -> T
       ctx.new_dollar_scope(None);
       let stmts = body.fold(ctx).0;
       let refs = ctx.pop_dollar_scope(false);
-      (stmts, Some(refs))
+      (stmts, refs)
     } else {
       let mut ctx = DollarRefsCtx::top_level();
       let stmts = body.fold(&mut ctx).0;
-      let _ = ctx.pop_dollar_scope(false);
-      (stmts, None)
+      let mut refs = ctx.pop_dollar_scope(false);
+      refs.keep_only_builtin_refs();
+
+      (stmts, refs)
     };
-    if let Some(refs) = refs.filter(|refs| !refs.is_empty()) {
+    if !refs.is_empty() {
       Ok(quote! {{
         #refs
         move || -> Widget { #(#stmts)*.into_widget() }

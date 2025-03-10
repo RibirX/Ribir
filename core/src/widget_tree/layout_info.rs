@@ -44,6 +44,8 @@ impl BoxClamp {
     Self { min, max: Size::new(f32::INFINITY, f32::INFINITY) }
   }
 
+  pub const fn max_size(max: Size) -> Self { Self { min: ZERO_SIZE, max } }
+
   pub fn with_min_size(mut self, size: Size) -> Self {
     self.min = size.min(self.max);
     self

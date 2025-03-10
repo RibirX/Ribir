@@ -48,6 +48,10 @@ where
 {
   type Watcher = Watcher<Self::Reader>;
 
+  fn into_reader(self) -> Result<Self::Reader, Self> {
+    if self.info.writer_count.get() == 1 { Ok(self.clone_reader()) } else { Err(self) }
+  }
+
   #[inline]
   fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
     Box::new(self.clone_watcher())
@@ -68,10 +72,6 @@ where
   O: StateWriter,
   W: Fn(&mut O::Value) -> PartMut<V> + Clone,
 {
-  fn into_reader(self) -> Result<Self::Reader, Self> {
-    if self.info.writer_count.get() == 1 { Ok(self.clone_reader()) } else { Err(self) }
-  }
-
   #[inline]
   fn write(&self) -> WriteRef<Self::Value> { self.split_ref(self.origin.write()) }
 

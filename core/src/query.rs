@@ -67,8 +67,12 @@ impl<'a> QueryHandle<'a> {
       return None;
     };
 
-    o.q_downcast_mut::<WriteRef<'static, T>>()
-      .map(|v| &mut **v)
+    if o.q_downcast_mut::<T>().is_some() {
+      o.q_downcast_mut::<T>()
+    } else {
+      o.q_downcast_mut::<WriteRef<'static, T>>()
+        .map(|v| &mut **v)
+    }
   }
 
   pub(crate) fn new(r: &'a dyn QueryAny) -> Self { QueryHandle(InnerHandle::Ref(r)) }
@@ -115,8 +119,12 @@ impl<'a> QueryHandle<'a> {
 #[allow(clippy::borrowed_box)] // The state reference must be a trait boxed.
 fn downcast_from_state_ref<T: 'static>(owned: &Box<dyn QueryAny>) -> Option<&T> {
   owned
-    .q_downcast_ref::<ReadRef<'static, T>>()
-    .map(|v| &**v)
+    .q_downcast_ref::<T>()
+    .or_else(|| {
+      owned
+        .q_downcast_ref::<ReadRef<'static, T>>()
+        .map(|v| &**v)
+    })
     .or_else(|| {
       owned
         .q_downcast_ref::<WriteRef<'static, T>>()
@@ -234,6 +242,12 @@ where
       Some(QueryHandle::from_read_ref(self.read()))
     } else if query_id == &QueryId::of::<T>() {
       Some(QueryHandle::new(self))
+    } else if query_id == &QueryId::of::<Box<dyn StateWriter<Value = T::Value>>>() {
+      Some(QueryHandle(InnerHandle::Owned(Box::new(self.clone_boxed_writer()))))
+    } else if query_id == &QueryId::of::<Box<dyn StateWatcher<Value = T::Value>>>() {
+      Some(QueryHandle(InnerHandle::Owned(Box::new(self.clone_boxed_watcher()))))
+    } else if query_id == &QueryId::of::<Box<dyn StateReader<Value = T::Value>>>() {
+      Some(QueryHandle(InnerHandle::Owned(Box::new(self.clone_boxed_reader()))))
     } else {
       None
     }
@@ -269,6 +283,8 @@ macro_rules! impl_query_for_reader {
         Some(QueryHandle::from_read_ref(self.read()))
       } else if query_id == &QueryId::of::<Self>() {
         Some(QueryHandle::new(self))
+      } else if query_id == &QueryId::of::<Box<dyn StateReader<Value = V>>>() {
+        Some(QueryHandle(InnerHandle::Owned(Box::new(self.clone_boxed_reader()))))
       } else {
         None
       }
@@ -296,7 +312,31 @@ impl<V: 'static> Query for Box<dyn StateReader<Value = V>> {
 }
 
 impl<V: 'static, R: StateReader<Value = V>> Query for Watcher<R> {
-  impl_query_for_reader!();
+  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    if let Some(h) = self.query(query_id) {
+      out.push(h)
+    }
+  }
+
+  fn query_all_write<'q>(&'q self, _: &QueryId, _: &mut SmallVec<[QueryHandle<'q>; 1]>) {}
+
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    if query_id == &QueryId::of::<V>() {
+      Some(QueryHandle::from_read_ref(self.read()))
+    } else if query_id == &QueryId::of::<Self>() {
+      Some(QueryHandle::new(self))
+    } else if query_id == &QueryId::of::<Box<dyn StateWatcher<Value = V>>>() {
+      Some(QueryHandle(InnerHandle::Owned(Box::new(self.clone_boxed_watcher()))))
+    } else if query_id == &QueryId::of::<Box<dyn StateReader<Value = V>>>() {
+      Some(QueryHandle(InnerHandle::Owned(Box::new(self.clone_boxed_reader()))))
+    } else {
+      None
+    }
+  }
+
+  fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
+
+  fn queryable(&self) -> bool { true }
 }
 
 impl<V: 'static> Query for Box<dyn StateWatcher<Value = V>> {
@@ -449,5 +489,44 @@ mod tests {
     assert!(h.downcast_ref::<i32>().is_some());
     assert!(h.downcast_mut::<i32>().is_none());
     assert!(h.into_mut::<i32>().is_none());
+  }
+
+  #[test]
+  fn query_box() {
+    reset_test_env!();
+
+    let state = Stateful::new(0i32);
+    let writer: Box<dyn StateWriter<Value = i32>> = Box::new(state.clone_writer());
+    {
+      let h = writer.query(&QueryId::of::<Box<dyn StateWriter<Value = i32>>>());
+      assert!(h.is_some());
+    }
+    {
+      let h = writer.query(&QueryId::of::<Box<dyn StateReader<Value = i32>>>());
+      assert!(h.is_some());
+    }
+    {
+      let h = writer.query(&QueryId::of::<Box<dyn StateWatcher<Value = i32>>>());
+      assert!(h.is_some());
+    }
+    let watcher = writer.clone_watcher();
+    {
+      let h = watcher.query(&QueryId::of::<Box<dyn StateWatcher<Value = i32>>>());
+      assert!(h.is_some());
+    }
+    {
+      let h = watcher.query(&QueryId::of::<Box<dyn StateReader<Value = i32>>>());
+      assert!(h.is_some());
+    }
+
+    let reader = writer.clone_reader();
+    {
+      let h = reader.query(&QueryId::of::<Box<dyn StateReader<Value = i32>>>());
+      assert!(h.is_some());
+    }
+
+    let mut h = writer.query_write(&QueryId::of::<i32>()).unwrap();
+    assert!(h.downcast_mut::<i32>().is_some());
+    assert!(h.into_mut::<i32>().is_some());
   }
 }

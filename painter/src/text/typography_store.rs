@@ -51,25 +51,30 @@ pub struct VisualGlyphs {
 }
 
 impl VisualGlyphs {
-  pub fn new(
-    font_size: f32, line_dir: PlaceLineDirection, order_info: Sc<ReorderResult>,
-    bound_width: GlyphUnit, bound_height: GlyphUnit, visual_info: Sc<VisualInfos>,
-  ) -> Self {
-    let (mut x, mut y) = <_>::default();
+  pub fn new(font_size: f32, order_info: Sc<ReorderResult>, visual_info: Sc<VisualInfos>) -> Self {
+    Self { font_size, visual_info, order_info, x: GlyphUnit::ZERO, y: GlyphUnit::ZERO }
+  }
+
+  pub fn align(&mut self, display_bounds: Rect) {
+    let display_bounds = display_bounds / self.font_size * GlyphUnit::PIXELS_PER_EM as f32;
+    self.x = GlyphUnit::from_pixel(display_bounds.min_x());
+    self.y = GlyphUnit::from_pixel(display_bounds.min_y());
+    let bound_width = GlyphUnit::from_pixel(display_bounds.width());
+    let bound_height = GlyphUnit::from_pixel(display_bounds.height());
+    let VisualInfos { text_align, line_dir, visual_size, .. } = *self.visual_info;
 
     if line_dir.is_horizontal() {
-      y += text_align_offset(visual_info.visual_height, bound_height, visual_info.text_align);
+      self.y += text_align_offset(visual_size.height, bound_height, text_align);
     } else {
-      x += text_align_offset(visual_info.visual_width, bound_width, visual_info.text_align);
+      self.x += text_align_offset(visual_size.width, bound_width, text_align);
     }
 
     if line_dir == PlaceLineDirection::RightToLeft {
-      x += bound_width - visual_info.visual_width
+      self.x += bound_width - visual_size.width;
     }
     if line_dir == PlaceLineDirection::BottomToTop {
-      y += bound_height - visual_info.visual_height
+      self.y += bound_height - visual_size.height;
     }
-    Self { font_size, x, y, visual_info, order_info }
   }
 
   pub fn font_size(&self) -> f32 { self.font_size }
@@ -144,7 +149,7 @@ impl TypographyStore {
       infos
     };
 
-    VisualGlyphs::new(font_size, line_dir, info, bounds.width, bounds.height, infos.clone())
+    VisualGlyphs::new(font_size, info, infos.clone())
   }
 
   pub fn font_db(&self) -> &Sc<RefCell<FontDB>> { &self.font_db }
@@ -157,7 +162,10 @@ impl VisualGlyphs {
 
     Rect::new(
       Point::new(self.to_pixel_value(self.x), self.to_pixel_value(self.y)),
-      Size::new(self.to_pixel_value(info.visual_width), self.to_pixel_value(info.visual_height)),
+      Size::new(
+        self.to_pixel_value(info.visual_size.width),
+        self.to_pixel_value(info.visual_size.height),
+      ),
     )
   }
 
@@ -165,7 +173,7 @@ impl VisualGlyphs {
     let scale = self.font_size / GlyphUnit::PIXELS_PER_EM as f32;
     let x = GlyphUnit::from_pixel(offset_x / scale) - self.x;
     let y = GlyphUnit::from_pixel(offset_y / scale) - self.y;
-    let mut bottom = self.visual_info.visual_height;
+    let mut bottom = self.visual_info.visual_size.height;
 
     let mut iter = self
       .visual_info
@@ -488,6 +496,8 @@ impl TypographyKey {
 mod tests {
   use core::f32;
 
+  use lyon_algorithms::geom::euclid::Rect;
+
   use super::*;
   use crate::FontFamily;
 
@@ -576,7 +586,9 @@ mod tests {
       let text = "Hello--------\nworld!".into();
       let style = text_style(10., overflow, 2.);
 
-      let info = typography_text(text, &style, bounds, text_align, line_dir);
+      let mut info = typography_text(text, &style, bounds, text_align, line_dir);
+      info.align(Rect::from_size(bounds));
+
       let visual_rc = info.visual_rect();
       info
         .glyphs_in_bounds(&Rect::from_size(bounds))
@@ -818,23 +830,29 @@ mod tests {
     let text: Substr = "1234".into();
 
     let style = zero_letter_space_style(16., TextOverflow::Overflow);
-    let glyphs1 = store.typography(
+    let bounds1 =
+      Size::new(10. * GlyphUnit::PIXELS_PER_EM as f32, 2. * GlyphUnit::PIXELS_PER_EM as f32);
+    let mut glyphs1 = store.typography(
       text.clone(),
       &style,
-      Size::new(10. * GlyphUnit::PIXELS_PER_EM as f32, 2. * GlyphUnit::PIXELS_PER_EM as f32),
+      bounds1,
       TextAlign::Center,
       GlyphBaseline::Alphabetic,
       PlaceLineDirection::TopToBottom,
     );
+    glyphs1.align(Rect::from_size(bounds1));
 
-    let glyphs2 = store.typography(
+    let bounds2 =
+      Size::new(20. * GlyphUnit::PIXELS_PER_EM as f32, 2. * GlyphUnit::PIXELS_PER_EM as f32);
+    let mut glyphs2 = store.typography(
       text,
       &style,
-      Size::new(20.0 * GlyphUnit::PIXELS_PER_EM as f32, 2.0 * GlyphUnit::PIXELS_PER_EM as f32),
+      bounds2,
       TextAlign::Center,
       GlyphBaseline::Alphabetic,
       PlaceLineDirection::TopToBottom,
     );
+    glyphs2.align(Rect::from_size(bounds2));
 
     let offset_x = 5. * GlyphUnit::PIXELS_PER_EM as f32;
     assert_eq!(

@@ -36,7 +36,6 @@
 
 use std::{convert::Infallible, hash::Hash};
 
-use data_widget::AnonymousAttacher;
 use ops::box_it::CloneableBoxOp;
 use pipe::PipeNode;
 use smallvec::{SmallVec, smallvec};
@@ -239,26 +238,25 @@ impl<'c> ComposeChild<'c> for Class {
       Err(this) => {
         let this2 = this.clone_watcher();
         let cls_child = ClassNode::empty_node();
-        // Reapply the class when it is updated.
+        let orig_child = ClassNode::empty_node();
+        let orig_child2 = orig_child.clone();
+        let child = child.on_build(move |orig_id| orig_child2.init_for_single(orig_id));
+
         let cls_child2 = cls_child.clone();
-        let child = child.on_build(move |orig_id| {
-          let orig_child = ClassNode::empty_node();
-          orig_child.init_for_single(orig_id);
-          let orig_child2 = orig_child.clone();
-          let wnd_id = BuildCtx::get().window().id();
-          let u = this2
-            .raw_modifies()
-            .filter(|s| s.contains(ModifyScope::FRAMEWORK))
-            .sample(AppCtx::frame_ticks().clone())
-            .subscribe(move |_| class_update(&cls_child2, &orig_child2, &this2.read(), wnd_id))
-            .unsubscribe_when_dropped();
-          orig_child.combine_subscription_guard(u);
-        });
+        let orig_child2 = orig_child.clone();
+        let wnd_id = BuildCtx::get().window().id();
+        let u = this2
+          .raw_modifies()
+          .filter(|s| s.contains(ModifyScope::FRAMEWORK))
+          .sample(AppCtx::frame_ticks().clone())
+          .subscribe(move |_| class_update(&cls_child2, &orig_child2, &this2.read(), wnd_id))
+          .unsubscribe_when_dropped();
 
         this
           .read()
           .apply_style(child)
           .on_build(move |child_id| cls_child.init_for_single(child_id))
+          .attach_anonymous_data(u)
       }
     };
     FnWidget::new(f).into_widget()
@@ -316,16 +314,6 @@ impl Class {
 
 type ClassNode = PipeNode;
 
-impl ClassNode {
-  fn combine_subscription_guard(&self, guard: impl Any) {
-    let inner = self.host_render();
-    let child = unsafe { Box::from_raw(inner.as_mut()) };
-    let child = Box::new(AnonymousAttacher::new(child, Box::new(guard)));
-    let tmp = std::mem::replace(inner, child);
-    std::mem::forget(tmp);
-  }
-}
-
 fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: WindowId) {
   let wnd =
     AppCtx::get_window(wnd_id).expect("This handle is not valid because the window is closed");
@@ -336,43 +324,24 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
     return;
   }
 
-  let n_orig = wnd.tree_mut().alloc_node(Box::new(orig.clone()));
-  let cls_holder = child_id.place_holder(wnd.tree_mut());
+  let child_holder = child_id.place_holder(wnd.tree_mut());
 
   // Extract the child from this node, retaining only the external information
   // linked from the parent to create a clean context for applying the class.
-  let child_node = node.take_data();
-
+  let old_child_node = node.take_data();
   let _guard = BuildCtx::init_for(child_id, wnd.tree);
   let ctx = BuildCtx::get_mut();
-  let mut new_id = ctx.build(class.apply_style(Widget::from_id(n_orig)));
 
-  let tree = ctx.tree_mut();
   // Place the inner child node within the old ID for disposal, then utilize the
   // class node to wrap the new child in the new ID.
-  // This action should be taken before modifying the `orig_id`, as the `orig_id`
-  // may be the same as the `child_id`.
-  let class_node = std::mem::replace(child_id.get_node_mut(tree).unwrap(), child_node);
+  let class_node =
+    std::mem::replace(child_id.get_node_mut(ctx.tree_mut()).unwrap(), old_child_node);
 
-  // Retain the original widget ID.
-  let [new, old] = tree.get_many_mut(&[n_orig, orig_id]);
-  // The "new" node is transferred to the "old" node, and the tracking ID within
-  // it needs to be updated.
-  new.update_track_id(orig_id);
-  std::mem::swap(new, old);
-  if new_id == n_orig {
-    // If applying the class does not generate additional widgets, the original
-    // widget ID will include all new elements after the swap.
-    new_id = orig_id;
-  } else {
-    n_orig.insert_after(orig_id, tree);
-  }
-  tree.remove_subtree(n_orig);
+  // Revert the original node to its original state to apply the class.
+  *orig_id.get_node_mut(ctx.tree_mut()).unwrap() = Box::new(orig.clone());
+  let new_id = ctx.build(class.apply_style(Widget::from_id(orig_id)));
 
-  if child_id != new_id {
-    // update the DynamicWidgetId out of the class node when id changed.
-    class_node.update_track_id(new_id);
-  }
+  let tree = ctx.tree_mut();
 
   new_id.wrap_node(tree, |render| {
     node.replace_data(render);
@@ -392,7 +361,7 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
           .dyn_info_mut()
           .single_range_replace(&old_rg, &new_rg)
       });
-    cls_holder.replace(new_id, tree);
+    child_holder.replace(new_id, tree);
   }
 
   if orig_id != child_id {
@@ -718,5 +687,89 @@ mod tests {
     wnd.draw_frame();
     *w_cls.write() = TRACK_ID;
     wnd.draw_frame();
+  }
+
+  #[test]
+  fn fix_pipe_class_in_pipe_class() {
+    reset_test_env!();
+
+    class_names! { PIPE_CLS, INNER_PIPE_A, INNER_PIPE_B };
+
+    let (cls, w_cls) = split_value(INNER_PIPE_A);
+    let (out, w_out) = split_value(EMPTY);
+    let mut wnd = TestWindow::new(fn_widget! {
+      let mut classes = Classes::default();
+      classes.insert(PIPE_CLS, |w| {
+        FatObj::new(w)
+          .class(Variant::<ClassName>::new(BuildCtx::get()).unwrap())
+          .into_widget()
+      });
+
+      let out = out.clone_watcher();
+      let cls = cls.clone_watcher();
+      providers!{
+        providers: smallvec![
+          classes.clone().into_provider(),
+          Provider::value_of_watcher(cls.clone_watcher())
+        ],
+        @MockBox {
+          class: pipe!(*$out),
+          size: Size::new(100., 100.),
+        }
+      }
+    });
+    *w_out.write() = PIPE_CLS;
+    wnd.draw_frame();
+    *w_cls.write() = INNER_PIPE_B;
+    wnd.draw_frame();
+  }
+
+  #[test]
+  fn fix_pipe_class_unsubscribed() {
+    reset_test_env!();
+
+    class_names! { OUT_PIPE_CLS, INNER_PIPE };
+
+    let inner_apply = Stateful::new(0usize);
+    let w_inner_apply = inner_apply.clone_writer();
+    let (inner, w_inner) = split_value(false);
+    let (out, w_out) = split_value(false);
+    let mut wnd = TestWindow::new(fn_widget! {
+      let out_cls = Class::provider(OUT_PIPE_CLS, |w| {
+        let inner_cls = Variant::<bool>::new(BuildCtx::get()).unwrap().map(|_| INNER_PIPE);
+        FatObj::new(w)
+          .class(inner_cls)
+          .into_widget()
+      });
+      let inner_cls = Class::provider(INNER_PIPE, |w| {
+        *Provider::write_of::<usize>(BuildCtx::get()).unwrap() += 1;
+        w
+      });
+
+      let out = out.clone_watcher();
+      let inner = inner.clone_watcher();
+      let w_inner_apply = w_inner_apply.clone_writer();
+      providers!{
+        providers: smallvec![
+          out_cls, inner_cls,
+          Provider::value_of_watcher(inner.clone_watcher()),
+          Provider::value_of_writer(w_inner_apply.clone_writer(), None),
+        ],
+        @MockBox {
+          class: pipe!(let _ = *$out; OUT_PIPE_CLS),
+          size: Size::new(100., 100.),
+        }
+      }
+    });
+    wnd.draw_frame();
+    assert_eq!(*inner_apply.read(), 1);
+
+    *w_out.write() = true;
+    wnd.draw_frame();
+    assert_eq!(*inner_apply.read(), 2);
+
+    *w_inner.write() = true;
+    wnd.draw_frame();
+    assert_eq!(*inner_apply.read(), 3);
   }
 }

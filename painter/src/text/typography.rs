@@ -54,8 +54,7 @@ pub struct VisualInfos {
   /// if the typography result over the bounds provide by caller.
   pub over_bounds: bool,
   pub line_dir: PlaceLineDirection,
-  pub visual_width: GlyphUnit,
-  pub visual_height: GlyphUnit,
+  pub visual_size: Size<GlyphUnit>,
 }
 
 /// Typography the glyphs in a bounds.
@@ -104,12 +103,11 @@ where
       self.visual_lines.reverse();
     }
 
-    let (visual_width, visual_height) = self.visual_size();
-    self.adjust_lines(visual_width, visual_height);
+    let visual_size = self.visual_size();
+    self.adjust_lines(visual_size);
 
     VisualInfos {
-      visual_width,
-      visual_height,
+      visual_size,
       text_align: self.text_align,
       visual_lines: self.visual_lines,
       over_bounds: self.over_bounds,
@@ -117,7 +115,7 @@ where
     }
   }
 
-  fn adjust_lines(&mut self, visual_width: GlyphUnit, visual_height: GlyphUnit) {
+  fn adjust_lines(&mut self, visual_size: Size<GlyphUnit>) {
     let text_align = self.text_align;
     let lines = self.visual_lines.iter_mut();
     match self.line_dir {
@@ -128,7 +126,7 @@ where
         });
       }
       PlaceLineDirection::RightToLeft => {
-        lines.fold(visual_width, |offset, l| {
+        lines.fold(visual_size.width, |offset, l| {
           l.x = offset - l.width;
           l.x
         });
@@ -140,23 +138,24 @@ where
         });
       }
       PlaceLineDirection::BottomToTop => {
-        lines.fold(visual_height, |offset, l| {
+        lines.fold(visual_size.height, |offset, l| {
           l.y = offset - l.height;
           l.y
         });
       }
     };
-
-    self.visual_lines.iter_mut().for_each(|l| {
-      if self.line_dir.is_horizontal() {
-        l.y += text_align_offset(l.height, visual_height, text_align);
-      } else {
-        l.x += text_align_offset(l.width, visual_width, text_align);
-      }
-    });
+    if text_align != TextAlign::Start {
+      self.visual_lines.iter_mut().for_each(|l| {
+        if self.line_dir.is_horizontal() {
+          l.y += text_align_offset(l.height, visual_size.height, text_align);
+        } else {
+          l.x += text_align_offset(l.width, visual_size.width, text_align);
+        }
+      });
+    }
   }
 
-  fn visual_size(&self) -> (GlyphUnit, GlyphUnit) {
+  fn visual_size(&self) -> Size<GlyphUnit> {
     let mut width = GlyphUnit::ZERO;
     let mut height = GlyphUnit::ZERO;
     if self.line_dir.is_horizontal() {
@@ -170,8 +169,7 @@ where
         height += l.height;
       })
     };
-
-    (width, height)
+    Size::new(width, height)
   }
 
   /// consume paragraph and return if early break because over boundary.
