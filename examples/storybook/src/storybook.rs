@@ -13,10 +13,10 @@ fn header() -> Widget<'static> {
 
 fn content() -> Widget<'static> {
   fn actions_show() -> GenWidget {
-    fn_widget! {
-      @Scrollbar {
+    scrollbar! {
+      @Stack {
         @Column {
-          h_align: HAlign::Stretch,
+          h_align: HAlign::Center,
           align_items: Align::Center,
           @Column {
             align_items: Align::Center,
@@ -115,7 +115,7 @@ fn content() -> Widget<'static> {
             }
           }
         }
-      }.into_widget()
+      }
     }
     .into()
   }
@@ -124,25 +124,19 @@ fn content() -> Widget<'static> {
     fn_widget! {
       @Tabs {
         @Tab {
-          @TabItem {
-            @ { svgs::HOME }
-            @ { Label::new("Video") }
-          }
-          @TabPane(fn_widget!(Void).into())
+          label: "Videos",
+          icon: @Icon { @ { svgs::HOME } },
+          @void! {}
         }
         @Tab {
-          @TabItem {
-            @ { svgs::HOME }
-            @ { Label::new("Photos") }
-          }
-          @TabPane(fn_widget!(Void).into())
+          label: "Photos",
+          icon: @Icon { @ { svgs::HOME } },
+          @void! {}
         }
         @Tab {
-          @TabItem {
-            @ { svgs::HOME }
-            @ { Label::new("Audio") }
-          }
-          @TabPane(fn_widget!(Void).into())
+          label: "Audio",
+          icon: @Icon { @ { svgs::HOME } },
+          @void! {}
         }
       }
     }
@@ -238,36 +232,27 @@ fn content() -> Widget<'static> {
 
   fn_widget! {
     @Tabs {
-      pos: Position::Bottom,
+      h_align: HAlign::Stretch,
+      providers: [Provider::new(TabPos::Bottom)],
       @Tab {
-        @TabItem {
-          @ { Label::new("Actions") }
-        }
-        @TabPane(actions_show())
+        label: "Actions",
+        @actions_show()
       }
       @Tab {
-        @TabItem {
-          @ { Label::new("Tabs") }
-        }
-        @TabPane(tabs_show())
+        label: "Tabs",
+        @tabs_show()
       }
       @Tab {
-        @TabItem {
-          @ { Label::new("Containment") }
-        }
-        @TabPane(containment_show())
+        label: "Containment",
+        @containment_show()
       }
       @Tab {
-        @TabItem {
-          @ { Label::new("Lists") }
-        }
-        @TabPane(lists_show())
+        label: "Lists",
+        @lists_show()
       }
       @Tab {
-        @TabItem {
-          @ { Label::new("Selections") }
-        }
-        @TabPane(checkbox_show())
+        label: "Selections",
+        @checkbox_show()
       }
     }
   }
@@ -277,7 +262,6 @@ fn content() -> Widget<'static> {
 pub fn storybook() -> Widget<'static> {
   let f = fn_widget! {
     @Column {
-      h_align: HAlign::Stretch,
       align_items: Align::Center,
       background: Palette::of(BuildCtx::get()).surface_container_low(),
       @ { header() }

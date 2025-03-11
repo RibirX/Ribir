@@ -682,6 +682,8 @@ impl Window {
 
   pub fn widget_pos(&self, id: WidgetId) -> Option<Point> { self.tree().store.layout_box_pos(id) }
 
+  pub fn is_valid_widget(&self, id: WidgetId) -> bool { !id.is_dropped(self.tree()) }
+
   pub(crate) fn tree(&self) -> &WidgetTree {
     // Safety: Please refer to the comments in `WidgetTree::tree_mut` for more
     // information.

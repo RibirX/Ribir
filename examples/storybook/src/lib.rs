@@ -24,6 +24,6 @@ mod tests {
     storybook,
     WidgetTester::new(storybook)
       .with_wnd_size(Size::new(1024., 768.))
-      .with_comparison(0.0025)
+      .with_comparison(0.001)
   );
 }

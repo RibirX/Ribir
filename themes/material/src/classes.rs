@@ -9,6 +9,7 @@ mod progress_cls;
 mod radio_cls;
 mod scrollbar_cls;
 mod slider_cls;
+mod tabs_cls;
 mod tooltips_cls;
 
 pub fn initd_classes() -> Classes {
@@ -24,6 +25,7 @@ pub fn initd_classes() -> Classes {
   input_cls::init(&mut classes);
   divider_cls::init(&mut classes);
   menu_cls::init(&mut classes);
+  tabs_cls::init(&mut classes);
 
   classes
 }

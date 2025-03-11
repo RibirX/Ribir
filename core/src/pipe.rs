@@ -866,6 +866,8 @@ impl Render for PipeNode {
   }
 
   fn get_transform(&self) -> Option<Transform> { self.as_ref().data.get_transform() }
+
+  fn dirty_phase(&self) -> DirtyPhase { self.as_ref().data.dirty_phase() }
 }
 
 #[derive(Clone)]

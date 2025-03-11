@@ -29,6 +29,22 @@ impl BuildCtx {
       .map(|c: ContainerColor| c.0)
   }
 
+  /// Return if the widget is still valid.
+  pub fn is_valid_widget(&self, id: WidgetId) -> bool { !id.is_dropped(self.tree()) }
+
+  /// Marks the widget as requiring a re-layout, ensuring it will be processed
+  /// in the next layout pass.
+  ///
+  /// Widgets are automatically flagged as dirty upon state changes. This method
+  /// allows for explicit marking of the widget as dirty when additional
+  /// layout updates are needed outside of standard state changes.
+  pub fn dirty(&self, id: WidgetId) {
+    let tree = self.tree();
+    let scope = id.assert_get(tree).dirty_phase();
+    let scope = if scope == DirtyPhase::LayoutSubtree { scope } else { DirtyPhase::Layout };
+    tree.dirty_marker().mark(id, scope);
+  }
+
   pub(crate) fn tree(&self) -> &WidgetTree {
     // Safety: Please refer to the comments in `WidgetTree::tree_mut` for more
     // information.

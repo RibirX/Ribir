@@ -69,45 +69,40 @@ impl Compose for MessageList {
         }
         @Expanded {
           @Tabs {
-            pos: Position::Bottom,
+            h_align: HAlign::Stretch,
+            providers: [Provider::new(TabPos::Bottom)],
             @Tab {
-              @TabItem {
-                @{ material_svgs::SMS }
-                @{ Label::new("Messages") }
-              }
-              @TabPane(
-                fn_widget! {
-                  @Scrollbar {
-                    @Lists {
-                      @{
-                        let message_gen = move |message: Message| {
-                          @Column {
-                            @ListItem {
-                              line_number: 1usize,
-                              @HeadlineText(Label::new(message.nick_name.clone()))
-                              @SupportingText(Label::new(message.content.clone()))
-                              @Leading::new(
-                                EdgeWidget::Avatar(@Avatar { @{ message.img.clone() } })
-                              )
-                              @Trailing::new(EdgeWidget::Icon(svgs::MORE_HORIZ.into_widget()))
-                            }
-                            @Divider {}
+              label: "Messages",
+              icon: @Icon { @{ material_svgs::SMS } },
+              @fn_widget! {
+                @Scrollbar {
+                  @Lists {
+                    @{
+                      let message_gen = move |message: Message| {
+                        @Column {
+                          @ListItem {
+                            line_number: 1usize,
+                            @HeadlineText(Label::new(message.nick_name.clone()))
+                            @SupportingText(Label::new(message.content.clone()))
+                            @Leading::new(
+                              EdgeWidget::Avatar(@Avatar { @{ message.img.clone() } })
+                            )
+                            @Trailing::new(EdgeWidget::Icon(svgs::MORE_HORIZ.into_widget()))
                           }
-                        };
+                          @Divider {}
+                        }
+                      };
 
-                        $this.messages.clone().into_iter().map(message_gen)
-                      }
+                      $this.messages.clone().into_iter().map(message_gen)
                     }
                   }
-                }.into()
-              )
+                }
+              }
             }
             @Tab {
-              @TabItem {
-                @{ material_svgs::ACCOUNT_CIRCLE }
-                @{ Label::new("Person") }
-              }
-              @TabPane(fn_widget!(@Text { text: "Person" }).into())
+              label: "Person",
+              icon: @Icon { @{ material_svgs::ACCOUNT_CIRCLE } },
+              @fn_widget!(@Text { text: "Person" })
             }
           }
         }

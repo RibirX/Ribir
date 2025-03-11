@@ -76,24 +76,15 @@ pub enum GlobalAnchorY {
 /// };
 /// App::run(app);
 /// ```
+#[derive(Default)]
 pub struct GlobalAnchor {
   /// the horizontal global anchor
-  pub global_anchor_x: GlobalAnchorX,
+  pub global_anchor_x: Option<GlobalAnchorX>,
 
   /// the vertical global anchor
-  pub global_anchor_y: GlobalAnchorY,
+  pub global_anchor_y: Option<GlobalAnchorY>,
 
   guard: RefCell<Option<SubscriptionGuard<BoxSubscription<'static>>>>,
-}
-
-impl Default for GlobalAnchor {
-  fn default() -> Self {
-    Self {
-      global_anchor_x: GlobalAnchorX::value(HAnchor::default()),
-      global_anchor_y: GlobalAnchorY::value(VAnchor::default()),
-      guard: Default::default(),
-    }
-  }
 }
 
 impl GlobalAnchorX {
@@ -312,8 +303,11 @@ fn apply_global_anchor(
 
   let anchor = anchor.clone_writer();
   let this_ref = this.read();
+  let anchor_x = this_ref.global_anchor_x.as_ref();
+  let anchor_y = this_ref.global_anchor_y.as_ref();
+
   let watch: BoxOp<'static, _, _> =
-    match (this_ref.global_anchor_x.is_once(), this_ref.global_anchor_y.is_once()) {
+    match (anchor_x.is_some_and(|x| x.is_once()), anchor_y.is_some_and(|y| y.is_once())) {
       (true, true) => tick_of_layout_ready.take(1).box_it(),
       _ => tick_of_layout_ready.box_it(),
     };
@@ -322,20 +316,40 @@ fn apply_global_anchor(
     watch
       .subscribe(move |_| {
         let read_ref = this.read();
-        let x = read_ref.global_anchor_x.offset(&host, &wnd);
-        let y = read_ref.global_anchor_y.offset(&host, &wnd);
+        let x = read_ref
+          .global_anchor_x
+          .as_ref()
+          .map(|x| x.offset(&host, &wnd))
+          .transpose();
+        let y = read_ref
+          .global_anchor_y
+          .as_ref()
+          .as_ref()
+          .map(|y| y.offset(&host, &wnd))
+          .transpose();
 
         if let (Ok(x), Ok(y)) = (x, y) {
+          let pos = Point::new(x.unwrap_or_default(), y.unwrap_or_default());
           let id = host.get().unwrap();
           let parent = id.parent(wnd.tree()).unwrap();
-          let pt = wnd.map_from_global(Point::new(x, y), parent);
+          let pt = wnd.map_from_global(pos, parent);
           let mut anchor = anchor.write();
-          let val = Anchor::from_point(pt);
+
+          let val = match (x.is_some(), y.is_some()) {
+            (true, true) => Anchor::from_point(pt),
+            (true, false) => Anchor::left(pt.x),
+            (false, true) => Anchor::top(pt.y),
+            (false, false) => Anchor::default(),
+          };
+
           if anchor.anchor != val {
             anchor.anchor = val;
           }
         } else {
-          read_ref.guard.borrow_mut().take();
+          let this = this.clone_reader();
+          let _ = AppCtx::spawn_local(async move {
+            this.read().guard.borrow_mut().take();
+          });
         }
       })
       .unsubscribe_when_dropped(),

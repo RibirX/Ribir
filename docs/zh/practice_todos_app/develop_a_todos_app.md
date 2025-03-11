@@ -205,27 +205,21 @@ impl Compose for Todos {
 ```rust ignore
 @Tabs {
   @Tab {
-    @TabItem { @{ Label::new("ALL") } }
-    @TabPane {
-      @{ fn_widget!{ @Text { text: "Coming Soon!" } }}
-    }
+    label: "ALL"
+    @text!{ text: "Coming Soon!" }
   }
   @Tab {
-    @TabItem { @{ Label::new("ACTIVE") } }
-    @TabPane {
-      @{ fn_widget!{ @Text { text: "Coming Soon!" } } }
-    }
+    label: "ACTIVE",
+    @text!{ text: "Coming Soon!" }
   }
   @Tab {
-    @TabItem { @{ Label::new("DONE") } }
-    @TabPane {
-      @{ fn_widget!{ @Text { text: "Coming Soon!" } }}
-    }
+    label: "DONE"
+    @text! { text: "Coming Soon!" }
   }
 }
 ```
 
-同样 `Tabs` 也是 Ribir widgets 库为我们提供的，它是一个 `ComposeChild` widget，并且规定了它的孩子必须是 `Tab` 类型。因为，我们现在还没有准备好 `Tab` 中要展示的内容，所以用了一个 “Coming soon!” 的 `Text` 来占位。不过，在 `TabPane` 中，我们没有直接使用 `Text` 控件，而是用了一个函数 widget 来作为孩子，这是因为 `Tabs` 规定了 `TabPane` 的内容必须是一个 `GenWidget`, 因为它只想构建活动 `Tab` 对应的内容，而不是所有 `Tab`。而一个支持多次调用的函数 widget 可以转换成 `GenWidget`。
+同样 `Tabs` 也是 Ribir widgets 库为我们提供的，它是一个 `ComposeChild` widget，并且规定了它的孩子必须是 `Tab` 类型。因为，我们现在还没有准备好 `Tab` 中要展示的内容，所以用了一个 “Coming soon!” 的 `Text` 来占位。不过，我们没有直接使用 `@Text` 来声明控件，而是用`text!`来声明了一个函数 widget 来作为孩子，这是因为 `Tab` 规定了它的内容必须是一个 `GenWidget`, 因为 `Tabs` 只想构建活动 `Tab` 对应的内容，而不是所有 `Tab`。而一个支持多次调用的函数 widget 可以转换成 `GenWidget`。
 
 ### 增加任务录入能力
 
@@ -370,7 +364,7 @@ where
 
 最后，用 `ListItem` 来展示一个完整任务，将 `Checkbox`, 删除按钮和任务内容组合在一起。`ListItem` 也是 Ribir widgets 库提供的一个 widget，并规定了自己的孩子类型，这里用到了 `HeadlineText` 来展示标题， `Leading` 表示头部内容，`Trailing` 表示尾部内容。
 
-现在，在 `Todos` 的 `compose` 中找到 `TabPane` 并用 `task_lists` 来替换掉原来的 "coming soon!" 吧：
+现在，在 `Todos` 的 `compose` 中用 `task_lists` 来替换掉原来的 "coming soon!" 吧：
 
 ```rust ignore
 // ui.rs
@@ -379,22 +373,21 @@ where
 
 @Tabs {
   @Tab {
-    @TabItem { @{ Label::new("ALL") } }
+    label: "ALL",
     // new
-    @TabPane { @{ task_lists(&this, |_| true) } }
+    @task_lists(&this, |_| true)
   }
   @Tab {
-    @TabItem { @{ Label::new("ACTIVE") } }
+    label: "ACTIVE",
     // new
-    @TabPane { @{ task_lists(&this, |t| !t.complete )} }
+    @task_lists(&this, |t| !t.complete )
   }
   @Tab {
-    @TabItem { @{ Label::new("DONE") } }
+    label: "DONE",
     // new
-    @TabPane { @{ task_lists(&this, |t| t.complete )} }
+    @task_lists(&this, |t| t.complete )
   }
 }
-
 ...
 ```
 
@@ -597,16 +590,16 @@ impl Compose for Todos {
         }
         @Tabs {
           @Tab {
-            @TabItem { @{ Label::new("ALL") } }
-            @TabPane { @{ task_lists(&this, |_| true) } }
+            label: "ALL",
+            @task_lists(&this, |_| true)
           }
           @Tab {
-            @TabItem { @{ Label::new("ACTIVE") } }
-            @TabPane { @{ task_lists(&this, |t| !t.complete )} }
+            label: "ACTIVE",
+            @task_lists(&this, |t| !t.complete )
           }
           @Tab {
-            @TabItem { @{ Label::new("DONE") } }
-            @TabPane { @{ task_lists(&this, |t| t.complete )} }
+            label: "DONE",
+            @task_lists(&this, |t| t.complete )
           }
         }
       }

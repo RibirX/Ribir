@@ -203,27 +203,24 @@ Next, we'll add an empty task tabs to the `Column` to set up our entire structur
 ```rust ignore
 @Tabs {
   @Tab {
-    @TabItem { @{ Label::new("ALL") } }
-    @TabPane {
-      @{ fn_widget!{ @Text { text: "Coming Soon!" } }}
-    }
+    label: "ALL",
+    @text! { text: text: "Coming Soon!" }
   }
   @Tab {
-    @TabItem { @{ Label::new("ACTIVE") } }
-    @TabPane {
-      @{ fn_widget!{ @Text { text: "Coming Soon!" } } }
-    }
+    label: "ACTIVE",
+    @text! { text: text: "Coming Soon!" }
   }
   @Tab {
-    @TabItem { @{ Label::new("DONE") } }
-    @TabPane {
-      @{ fn_widget!{ @Text { text: "Coming Soon!" } }}
-    }
+    label: "DONE",
+    @text! { text: "Coming Soon!" }
   }
 }
 ```
 
-`Tabs` is also provided by the Ribir widgets library. It's a `ComposeChild` widget, and its children must be of the `Tab` type. Since we're not ready to show content in the `Tab` yet, we're using a `Text` widget with "Coming soon!" as a placeholder. However, in `TabPane`, we didn't use the `Text` widget directly. Instead, we used a function widget as a child. This is because `Tabs` requires the content of `TabPane` to be a `GenWidget`, as it only wants to build the content for the active `Tab`, not all `Tabs`. A function widget that supports multiple calls can be converted into a `GenWidget`.
+The `Tabs` widget, available in Ribir's widget library, is implemented as a `ComposeChild` widget that specifically requires `Tab`-typed children. In our current implementation, we utilize a `Text` widget displaying "Coming soon!" as temporary content. However, instead of directly instantiating a `Text` widget, we employ the `text!` macro to declare the child element. 
+
+This architectural decision stems from `Tab`'s requirement for children is a `GenWidget`. The `Tabs` container optimizes rendering performance by dynamically building only the active tab's content. The `text!` macro generates a function widget that satisfies this requirement through its capacity for multiple invocations, enabling automatic conversion to a `GenWidget` instance.
+
 
 ### Add the ability to enter tasks
 
@@ -367,7 +364,7 @@ Next, use `Checkbox` to show whether the task is complete, monitor its changes, 
 
 Finally, use `ListItem` to show a complete task, composing `Checkbox`, delete button and task content together. `ListItem` is also a widget provided by the Ribir widgets library, and specifies its own child type. Here, `HeadlineText` is used to show the title, `Leading` represents the header content, and `Trailing` represents the tail content.
 
-Now, in the `compose` of `Todos`, find `TabPane` and replace the original "coming soon!" with `task_lists`.
+Now, in the `compose` of `Todos`, replace the original "coming soon!" with `task_lists`.
 
 ```rust ignore
 // ui.rs
@@ -376,19 +373,19 @@ Now, in the `compose` of `Todos`, find `TabPane` and replace the original "comin
 
 @Tabs {
   @Tab {
-    @TabItem { @{ Label::new("ALL") } }
+    label: "ALL",
     // new
-    @TabPane { @{ task_lists(&this, |_| true) } }
+    @task_lists(&this, |_| true)
   }
   @Tab {
-    @TabItem { @{ Label::new("ACTIVE") } }
+    label: "ACTIVE",
     // new
-    @TabPane { @{ task_lists(&this, |t| !t.complete )} }
+    @task_lists(&this, |t| !t.complete )
   }
   @Tab {
-    @TabItem { @{ Label::new("DONE") } }
+    label: "DONE",
     // new
-    @TabPane { @{ task_lists(&this, |t| t.complete )} }
+    @task_lists(&this, |t| t.complete )
   }
 }
 
@@ -594,16 +591,16 @@ impl Compose for Todos {
         }
         @Tabs {
           @Tab {
-            @TabItem { @{ Label::new("ALL") } }
-            @TabPane { @{ task_lists(&this, |_| true) } }
+            label: "ALL",
+            @task_lists(&this, |_| true)
           }
           @Tab {
-            @TabItem { @{ Label::new("ACTIVE") } }
-            @TabPane { @{ task_lists(&this, |t| !t.complete )} }
+            label: "ACTIVE",
+            @task_lists(&this, |t| !t.complete )
           }
           @Tab {
-            @TabItem { @{ Label::new("DONE") } }
-            @TabPane { @{ task_lists(&this, |t| t.complete )} }
+            label: "DONE",
+            @task_lists(&this, |t| t.complete )
           }
         }
       }

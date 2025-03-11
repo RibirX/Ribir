@@ -146,12 +146,22 @@ impl Anchor {
   }
 }
 
-/// This widget is used to anchor child constraints relative to the parent
-/// widget.
+/// A widget used to anchor child constraints relative to the parent widget.
 ///
-/// It's important to note that if you anchor the child widget outside of its
-/// parent, it may become unable to click, so ensure there is ample space within
-/// the parent.
+/// **Note:** If the anchor is a percentage value or it relative to the right or
+/// bottom, the position is calculated based on the maximum size (`clamp.max`)
+/// received during `perform_layout`. This may not match the parent widget's
+/// size if the parent is not a fixed-size widget.
+///
+/// ## Why Not Use Parent Size for Calculation?
+///
+/// 1. In `Ribir`, the layout phase is top-down, so the parent's size is unknown
+///    when the child is laid out.
+/// 2. Layout widgets use `clamp` to constrain the child's size, assuming the
+///    child depends solely on the `clamp` for layout. If `VAlignWidget` used
+///    the parent's size for alignment, it could violate the `clamp`. For
+///    example, `Padding` reduces the `clamp` for its child, but its own size
+///    might not increase.
 #[derive(Default)]
 pub struct RelativeAnchor {
   pub anchor: Anchor,

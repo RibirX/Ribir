@@ -33,6 +33,6 @@ mod tests {
     counter,
     WidgetTester::new(counter)
       .with_wnd_size(Size::new(320., 240.))
-      .with_comparison(0.001)
+      .with_comparison(0.0001)
   );
 }

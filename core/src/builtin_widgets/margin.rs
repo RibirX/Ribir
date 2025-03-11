@@ -100,6 +100,30 @@ impl EdgeInsets {
     Self { left: horizontal, right: horizontal, ..Self::ZERO }
   }
 
+  #[inline]
+  pub const fn with_top(mut self, top: f32) -> Self {
+    self.top = top;
+    self
+  }
+
+  #[inline]
+  pub const fn with_right(mut self, right: f32) -> Self {
+    self.right = right;
+    self
+  }
+
+  #[inline]
+  pub const fn with_bottom(mut self, bottom: f32) -> Self {
+    self.bottom = bottom;
+    self
+  }
+
+  #[inline]
+  pub const fn with_left(mut self, left: f32) -> Self {
+    self.left = left;
+    self
+  }
+
   pub const fn thickness(&self) -> Size {
     Size::new(self.right + self.left, self.bottom + self.top)
   }

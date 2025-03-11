@@ -66,7 +66,6 @@ fn new(palette: Palette) -> Theme {
   theme
 }
 
-const INDICATOR_SIZE: f32 = 60.;
 const LIST_ITEM_GAP: f32 = 16.;
 const LIST_ITEM_SIZE: f32 = 40.;
 const AVATAR_SIZE: f32 = 40.;
@@ -74,17 +73,6 @@ const AVATAR_RADIUS: f32 = 20.;
 const LIST_IMAGE_ITEM_SIZE: f32 = 56.;
 
 fn init_custom_style(theme: &mut Theme) {
-  theme.custom_styles.set_custom_style(TabsStyle {
-    extent_with_both: 64.,
-    extent_only_label: 48.,
-    extent_only_icon: 48.,
-    icon_size: theme.icon_theme.icon_size.small,
-    icon_pos: Position::Top,
-    active_color: theme.palette.primary().into(),
-    foreground: theme.palette.on_surface_variant().into(),
-    label_style: theme.typography_theme.title_small.text.clone(),
-    indicator: IndicatorStyle { extent: 3., measure: Some(INDICATOR_SIZE) },
-  });
   theme.custom_styles.set_custom_style(AvatarStyle {
     size: Size::splat(AVATAR_SIZE),
     radius: Some(AVATAR_RADIUS),
@@ -146,37 +134,6 @@ fn init_custom_style(theme: &mut Theme) {
 }
 
 fn override_compose_decorator(theme: &mut Theme) {
-  let styles = &mut theme.compose_decorators;
-
-  styles.override_compose_decorator::<IndicatorDecorator>(|style, host, _| {
-    fn_widget! {
-      let host = FatObj::new(host);
-      let mut indicator = @ $host {
-        anchor: pipe!{
-          let style = $style;
-          let x = match style.pos {
-            Position::Top | Position::Bottom => style.rect.origin.x
-              + (style.rect.size.width - INDICATOR_SIZE) / 2.,
-            Position::Left => style.rect.size.width - style.extent,
-            Position::Right => 0.,
-          };
-          let y = match style.pos {
-            Position::Left | Position::Right => style.rect.origin.y
-              + (style.rect.size.height - INDICATOR_SIZE) / 2.,
-            Position::Top => style.rect.size.height - style.extent,
-            Position::Bottom => 0.,
-          };
-          Anchor::left_top(x, y)
-        },
-      };
-
-      part_writer!(&mut indicator.anchor)
-        .transition(transitions::EASE_IN.of(BuildCtx::get()));
-      indicator
-    }
-    .into_widget()
-  });
-
   let textfield = TextFieldThemeSuit::from_theme(&theme.palette, &theme.typography_theme);
   theme.custom_styles.set_custom_style(textfield);
 }
@@ -232,7 +189,7 @@ pub fn typography_theme() -> TypographyTheme {
     ..<_>::default()
   };
   let medium_face = FontFace {
-    families: Box::new([FontFamily::Name("Roboto Medium".into()), FontFamily::Serif]),
+    families: Box::new([FontFamily::Name("Roboto".into()), FontFamily::Serif]),
     weight: FontWeight::MEDIUM,
     ..<_>::default()
   };

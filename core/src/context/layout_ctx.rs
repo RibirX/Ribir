@@ -60,6 +60,10 @@ impl<'a> LayoutCtx<'a> {
     }
 
     self.provider_ctx.pop_providers_for(self.id());
+    // TODO: Add event after layout phase completion to avoid excessive event
+    // notifications.
+    // Example: A Flex container may lay out children twice during its layout
+    // process, but only needs to emit a single event for its children.
     self
       .window()
       .add_delay_event(DelayEvent::PerformedLayout(id));

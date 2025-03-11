@@ -35,6 +35,8 @@ pub trait WrapRender {
     host.visual_box(ctx)
   }
 
+  fn dirty_phase(&self, host: &dyn Render) -> DirtyPhase { host.dirty_phase() }
+
   fn combine_child(
     this: impl StateWriter<Value = Self>, mut child: Widget, dirty: DirtyPhase,
   ) -> Widget
@@ -113,7 +115,7 @@ impl Render for RenderPair {
       .hit_test(self.host.as_render(), ctx, pos)
   }
 
-  fn dirty_phase(&self) -> DirtyPhase { self.host.dirty_phase() }
+  fn dirty_phase(&self) -> DirtyPhase { self.wrapper.dirty_phase(self.host.as_render()) }
 
   fn get_transform(&self) -> Option<Transform> { self.wrapper.get_transform(self.host.as_render()) }
 }

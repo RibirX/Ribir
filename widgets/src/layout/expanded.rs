@@ -12,6 +12,14 @@ pub struct Expanded {
   pub flex: f32,
 }
 
+/// Macro used to generate a function widget using `Expanded` as the root
+/// widget.
+#[macro_export]
+macro_rules! expanded {
+  ($($t: tt)*) => { fn_widget! { @Expanded { $($t)* } } };
+}
+pub use expanded;
+
 impl Default for Expanded {
   fn default() -> Self { Self { flex: 1. } }
 }
