@@ -1,7 +1,6 @@
 on:
   merge_group:
   pull_request:
-    types: [synchronize, labeled, reopened, ready_for_review]
   push:
     branches:
       - master
@@ -34,7 +33,6 @@ env:
 name: CI
 jobs:
   lint:
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'B-test')
     name: rust code lint
     runs-on: ubuntu-latest
     steps:
