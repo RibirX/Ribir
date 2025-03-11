@@ -95,10 +95,18 @@ impl TypographyStore {
 
   /// Do a simply typography that only support single style.
   pub fn typography(
-    &mut self, text: Substr, style: &TextStyle, bounds: Size, text_align: TextAlign,
+    &mut self, text: Substr, style: &TextStyle, bounds: Size, mut text_align: TextAlign,
     baseline: GlyphBaseline, line_dir: PlaceLineDirection,
   ) -> VisualGlyphs {
     let TextStyle { font_size, ref font_face, letter_space, line_height, overflow } = *style;
+    if text_align != TextAlign::Start {
+      // If the text align is not start, we must ensure that the bounds are finite.
+      if (!bounds.width.is_finite() && !line_dir.is_horizontal())
+        || (!bounds.height.is_finite() && line_dir.is_horizontal())
+      {
+        text_align = TextAlign::Start;
+      }
+    }
     // Since we cache the result of the standard font size, we must ensure that all
     // variables are cast relative to this standard font size.
     let scale = font_size / GlyphUnit::PIXELS_PER_EM as f32;

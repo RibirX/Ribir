@@ -2,329 +2,406 @@ use ribir_core::prelude::*;
 
 use crate::prelude::*;
 
-/// Tabs usage
+/// Hierarchical content organization widget for navigation and view
+/// switching
 ///
-/// # Example
-/// ```
-/// # use ribir_core::prelude::*;
-/// # use ribir_widgets::prelude::*;
+/// The Tabs widget manages grouped content at equivalent hierarchy levels
+/// through tabbed navigation.
 ///
-/// let tabs = fn_widget! {
-///   @Tabs {
-///     @Tab {
-///       @TabItem {
-///         @ { svgs::HOME }
-///         @ { Label::new("Home") }
-///       }
-///       @TabPane(fn_widget!{ @Text { text: "content" } }.into())
-///     }
-///     @Tab {
-///       @TabItem {
-///         @ { svgs::HOME }
-///         @ { Label::new("Home") }
-///       }
-///       @TabPane(fn_widget!{ @Text { text: "content" } }.into())
-///     }
+/// Each tab consists of:
+/// - Optional header elements (icon/label)
+/// - Lazy-loaded content pane (`GenWidget`)
+///
+/// ## Basic Usage
+///
+/// While tabs support flexible content configurations, maintain visual
+/// consistency across headers for better UX:
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// tabs! {
+///   @Tab {
+///     label: "News",
+///     @text! { text: "Breaking news content..." }
 ///   }
-/// };
-///
-/// // bottom tabs
-/// let bottom_tabs = fn_widget! {
-///   @Tabs {
-///     pos: Position::Bottom,
-///     @Tab {
-///       @TabItem {
-///         @ { svgs::HOME }
-///         @ { Label::new("Home") }
-///       }
-///       @TabPane(fn_widget!{ @Text { text: "content" } }.into())
-///     }
-///     @Tab {
-///       @TabItem {
-///         @ { svgs::HOME }
-///         @ { Label::new("Home") }
-///       }
-///       @TabPane(fn_widget!{ @Text { text: "content" } }.into())
-///     }
+///   @Tab {
+///     label: "Sports",
+///     icon: @Icon { @named_svgs::get_or_default("sports") },
+///     @text! { text: "Live sports updates..." }
+///   }
+///   @Tab {
+///     label: "Settings",
+///     icon: @Icon { @named_svgs::get_or_default("settings") },
+///     @text! { text: "System configuration..." }
 ///   }
 /// };
 /// ```
+///
+/// ## Configuration Architecture
+///
+/// Style parameters use provider-based configuration to:
+///
+/// 1. Enable theme customization and override capabilities
+/// 2. Maintain lean API surface for core component
+///
+/// Key configuration providers:
+///
+/// | Provider           | Purpose                          | Default     |
+/// |--------------------|----------------------------------|-------------|
+/// | `TabPos`           | Tab header position              | `Top`       |
+/// | `TabType`          | Visual hierarchy level           | `Primary`   |
+/// | `TabsInlineIcon`   | Icon/label layout mode           | `true`      |
+/// | `Color`            | Color active header              |  theme.primary    |
+///
+/// ```rust
+/// use ribir::prelude::*;
+/// use smallvec::smallvec;
+///
+/// tabs! {
+///   providers: smallvec![
+///     Provider::new(TabPos::Left),
+///     Provider::new(TabType::Secondary),
+///     Provider::new(TabsInlineIcon(true)),
+///     Provider::new(Palette::of(BuildCtx::get()).secondary()),
+///   ],
+///   @Tab {
+///     label: "Mail",
+///     icon: @Icon { @named_svgs::get_or_default("mail") },
+///     @text!{ text: "Mail widget here" }
+///   }
+///   @Tab {
+///     label: "Calendar",
+///     icon: @Icon { @named_svgs::get_or_default("calendar") },
+///     @text!{ text: "Calendar widget here" }
+///   }
+///   @Tab {
+///     label: "Files",
+///     icon: @Icon { @named_svgs::get_or_default("files") },
+///     @text!{ text: "Files widget here" }
+///   }
+/// };
+/// ```
+///
+/// ## Implementation Notes
+///
+/// 1. Content panes initialize lazily through `GenWidget`
+/// 2. Header consistency checks recommend using `TabInfo` metadata
+/// 3. Theme overrides may ignore certain configurations
 #[derive(Declare, Clone)]
 pub struct Tabs {
-  #[declare(default = Position::Top)]
-  pub pos: Position,
+  /// The index of the currently active tab.
   #[declare(default)]
-  pub cur_idx: usize,
+  active: usize,
+  /// The number of tabs.
+  #[declare(skip)]
+  tabs_cnt: usize,
 }
 
-#[derive(Clone)]
-pub struct IndicatorStyle {
-  pub measure: Option<f32>,
-  pub extent: f32,
+class_names! {
+  /// Class name for the icon of the tab header
+  TAB_ICON,
+  /// Class name for the label of the tab header
+  TAB_LABEL,
+  /// Class name for the tab header no matter is active or not
+  TAB_HEADER,
+  /// Class name for the scrollable view of the tab headers.
+  TAB_HEADERS_VIEW,
+  /// Class name for the tab headers container
+  TAB_HEADERS_CONTAINER,
+  /// Class name for the tab pane
+  TAB_PANE,
+  /// Class name for the whole tabs
+  TABS
 }
 
-#[derive(Clone)]
-pub struct TabsStyle {
-  pub extent_only_label: f32,
-  pub extent_only_icon: f32,
-  pub extent_with_both: f32,
-  pub icon_size: Size,
-  pub icon_pos: Position,
-  pub active_color: Brush,
-  pub foreground: Brush,
-  pub label_style: TextStyle,
-  pub indicator: IndicatorStyle,
+/// The `Tab` is utilized to define a tab within a set of tabs. Each tab
+/// consists of a label and an icon as properties, with a pane as its child
+/// widget.
+#[derive(ChildOfCompose)]
+pub struct Tab<'t> {
+  icon: Option<Widget<'t>>,
+  label: Option<TextInit>,
+  pane: Option<GenWidget>,
 }
 
-impl CustomStyle for TabsStyle {
-  fn default_style(ctx: &impl AsRef<ProviderCtx>) -> Self {
-    let palette = Palette::of(ctx);
-    TabsStyle {
-      extent_with_both: 64.,
-      extent_only_label: 48.,
-      extent_only_icon: 48.,
-      icon_size: Size::splat(24.),
-      icon_pos: Position::Top,
-      active_color: palette.primary().into(),
-      foreground: palette.on_surface_variant().into(),
-      label_style: TypographyTheme::of(ctx).title_small.text.clone(),
-      indicator: IndicatorStyle { extent: 3., measure: Some(60.) },
-    }
+/// A provider let the user specify the position of the tabs. The default value
+/// is top.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum TabPos {
+  #[default]
+  Top,
+  Bottom,
+  Left,
+  Right,
+}
+
+/// The provider allows users to select a tab style. The actual appearance is
+/// determined by the theme and a theme may only support a subset of the
+/// options.
+///
+/// The `Tabs` widget does not require the theme maker to support dynamic
+/// changes of this provider. Therefore, the user should not provide a writer
+/// state of the `TabType`, as this may not work as expected.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum TabType {
+  #[default]
+  Primary,
+  Secondary,
+  Tertiary,
+  Quaternary,
+}
+
+/// The provider controls inline display of tab labels and icons in header. This
+/// is not a forceful requirement for the theme, so the themes may override this
+/// configuration if their design system prohibits.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TabsInlineIcon(pub bool);
+
+/// Represents metadata about a tab, including its index and whether it contains
+/// an icon or a label.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TabInfo {
+  pub idx: usize,
+  pub has_icon: bool,
+  pub has_label: bool,
+}
+
+impl TabInfo {
+  /// Checks if the tab displays only an icon (no label).
+  pub fn is_icon_only(&self) -> bool { self.has_icon && !self.has_label }
+
+  /// Checks if the tab displays only a label (no icon).
+  pub fn is_label_only(&self) -> bool { self.has_label && !self.has_icon }
+
+  /// Checks if the tab displays both an icon and a label.
+  pub fn has_icon_and_label(&self) -> bool { self.has_icon && self.has_label }
+}
+
+impl<'t> Declare for Tab<'t> {
+  type Builder = Self;
+  fn declarer() -> Self::Builder { Self { icon: None, label: None, pane: None } }
+}
+
+impl<'t> ObjDeclarer for Tab<'t> {
+  type Target = Self;
+
+  fn finish(self) -> Self::Target { self }
+}
+
+impl<'t> Tab<'t> {
+  pub fn label<const M: usize>(mut self, label: impl DeclareInto<CowArc<str>, M>) -> Self {
+    self.label = Some(label.declare_into());
+    self
+  }
+
+  pub fn icon<const M: usize>(mut self, icon: impl IntoWidget<'t, M>) -> Self {
+    self.icon = Some(icon.into_widget());
+    self
   }
 }
-#[derive(Declare)]
-pub struct TabsDecorator {}
 
-impl ComposeDecorator for TabsDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
-}
-
-#[derive(Template)]
-pub struct Tab {
-  label: TabItem,
-  child: TabPane,
-}
-
-#[derive(Template)]
-pub struct TabItem {
-  icon: Option<NamedSvg>,
-  text: Option<Label>,
-}
-
-#[derive(ChildOfCompose)]
-pub struct TabPane(pub GenWidget);
-
-#[derive(Declare)]
-pub struct TabDecorator {}
-
-impl ComposeDecorator for TabDecorator {
-  fn compose_decorator(_: State<Self>, host: Widget) -> Widget { host }
-}
-
-#[derive(Declare)]
-pub struct IndicatorDecorator {
-  pub pos: Position,
-  pub rect: Rect,
-  pub extent: f32,
-}
-
-impl ComposeDecorator for IndicatorDecorator {
-  fn compose_decorator(this: State<Self>, host: Widget) -> Widget {
-    fn_widget! {
-      let host = FatObj::new(host);
-      @ $host{
-        anchor: pipe!{
-          let this = $this;
-          let x = match this.pos {
-            Position::Top | Position::Bottom =>
-              this.rect.origin.x + (this.rect.size.width - 60.) / 2.,
-            Position::Left => this.rect.size.width - this.extent,
-            Position::Right => 0.,
-          };
-          let y = match this.pos {
-            Position::Left | Position::Right => this.rect.origin.y
-              + (this.rect.size.height - 60.) / 2.,
-            Position::Top => this.rect.size.height - this.extent,
-            Position::Bottom => 0.,
-          };
-          Anchor::left_top(x, y)
-        },
-      }
-    }
-    .into_widget()
+impl<'t> Tab<'t> {
+  pub fn with_child(mut self, pane: impl Into<GenWidget>) -> Self {
+    assert!(self.pane.is_none());
+    self.pane = Some(pane.into());
+    self
   }
 }
 
 impl Tabs {
-  fn tab_header(
-    headers: Vec<(Option<NamedSvg>, Option<Label>)>, tabs_style: TabsStyle,
-    tabs: impl StateWriter<Value = Tabs> + 'static,
-    indicator: impl StateWriter<Value = IndicatorDecorator> + 'static,
-  ) -> impl Iterator<Item = impl IntoWidget<'static, FN>> {
-    let TabsStyle { icon_pos, active_color, foreground, label_style, .. } = tabs_style;
-    headers
-      .into_iter()
-      .enumerate()
-      .map(move |(idx, (icon, label))| {
-        let tabs = tabs.clone_writer();
-        let active_color = active_color.clone();
-        let foreground = foreground.clone();
-        let label_style = label_style.clone();
-        let indicator = indicator.clone_writer();
-        fn_widget! {
-          let icon_widget = icon.map(|icon| @Icon { @ { icon }});
-          let label_widget = label.map(|label| {
-            @Text {
-              text: label.0,
-              foreground: pipe!(match $tabs.cur_idx == idx {
-                true => active_color.clone(),
-                false => foreground.clone(),
-              }),
-              text_style: label_style,
-            }
-          });
-          @ {
-            let mut tab_header = @Flex {
-              align_items: Align::Center,
-              justify_content: JustifyContent::Center,
-              direction: match icon_pos {
-                Position::Left | Position::Right => Direction::Horizontal,
-                Position::Top | Position::Bottom => Direction::Vertical,
-              },
-              reverse: matches!(icon_pos, Position::Right | Position::Bottom),
-              on_tap: move |_| if $tabs.cur_idx != idx {
-                $tabs.write().cur_idx = idx;
-              },
-            };
-            let u = watch!(($tabs.cur_idx == idx, $tab_header.layout_rect()))
-              .filter_map(|(active, rect)| active.then_some(rect))
-              .subscribe(move |v| $indicator.write().rect = v);
+  pub fn active_idx(&self) -> usize { self.active }
 
-            @TabDecorator {
-              on_disposed: move |_| { u.unsubscribe(); },
-              @Expanded {
-                @$tab_header {
-                  @ { icon_widget }
-                  @ { label_widget }
-                }
-              }
-            }
-          }
-        }
-      })
+  pub fn set_active(&mut self, idx: usize) {
+    if idx < self.tabs_cnt {
+      self.active = idx;
+    }
   }
 }
 
-impl ComposeChild<'static> for Tabs {
-  type Child = Vec<Tab>;
+impl<'c> ComposeChild<'c> for Tabs {
+  type Child = Vec<Tab<'c>>;
 
-  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
-    let mut headers = vec![];
-    let mut panes = vec![];
-
-    for tab in child.into_iter() {
-      let Tab { label: header, child: pane } = tab;
-      headers.push((header.icon, header.text));
-      panes.push(pane.0)
-    }
-
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      let tabs_style = TabsStyle::of(BuildCtx::get());
-        let TabsStyle {
-          extent_only_icon,
-          extent_only_label,
-          extent_with_both,
-          active_color,
-          indicator,
-          ..
-        } = tabs_style.clone();
-        let has_icon = headers.iter().any(|item| item.0.is_some());
-        let has_label = headers.iter().any(|item| item.1.is_some());
-        let extent = match (has_icon, has_label) {
-          (true, true) => extent_with_both,
-          (false, true) => extent_only_label,
-          (true, false) => extent_only_icon,
-          (false, false) => 0.
-        };
-        let mut flex = @Flex {
-          align_items: Align::Stretch,
-          direction: pipe!(match $this.pos {
-            Position::Top | Position::Bottom => Direction::Horizontal,
-            Position::Left | Position::Right => Direction::Vertical,
-          })
-        };
-        let divider = @Divider {
-          direction: pipe!(match $this.pos {
-            Position::Top | Position::Bottom => Direction::Horizontal,
-            Position::Left | Position::Right => Direction::Vertical,
-          }),
-          anchor: pipe!(
-            let x = match $this.pos {
-              Position::Left => $flex.layout_size().width - 1.,
-              Position::Top | Position::Right | Position::Bottom => 0.,
-            };
-            let y = match $this.pos {
-              Position::Top => $flex.layout_size().height - 1.,
-              Position::Bottom | Position::Right | Position::Left => 0.,
-            };
-            Anchor::left_top(x, y)
-          )
-        };
+      this.silent().tabs_cnt = child.len();
+      let position = Variant::<TabPos>::new_or_default(BuildCtx::get());
 
-        let indicator_decorator = @IndicatorDecorator {
-          pos: pipe!($this.pos),
-          extent: indicator.extent,
-          rect: Rect::zero()
-        };
-        let header = @Stack {
-          @ConstrainedBox {
-            clamp: pipe!(match $this.pos {
-              Position::Top | Position::Bottom => BoxClamp::fixed_height(extent),
-              Position::Left | Position::Right => BoxClamp::fixed_width(extent),
-            }),
-            @ $flex {
-              @Tabs::tab_header(
-                headers, tabs_style,
-                this.clone_writer(),
-                indicator_decorator.clone_writer()
-              )
-            }
-          }
-          @ { divider }
-          @ $indicator_decorator {
-            @ Container {
-              background: active_color,
-              size: pipe!(match $this.pos {
-                Position::Top | Position::Bottom => indicator.measure.map_or(
-                  Size::new($indicator_decorator.rect.width(), indicator.extent),
-                  |measure| Size::new(measure, indicator.extent)
-                ),
-                Position::Left | Position::Right => indicator.measure.map_or(
-                  Size::new(indicator.extent, $indicator_decorator.rect.height()),
-                  |measure| Size::new(indicator.extent, measure)
-                ),
-              })
-            }
-          }
-        };
+      let (headers, panes): (Vec<_>, Vec<_>) = child
+        .into_iter()
+        .enumerate()
+        .map(|(idx, tab)| tab.into_header_and_pane(idx))
+        .unzip();
 
-      @TabsDecorator {
-        @Flex {
-          direction: pipe!(match  $this.pos {
-            Position::Left | Position::Right => Direction::Horizontal,
-            Position::Top | Position::Bottom => Direction::Vertical,
-          }),
-          reverse: pipe!{
-            let pos = $this.pos;
-            matches!(pos, Position::Right | Position::Bottom)
-          },
-          @ { header }
-          @Expanded {
-            @ { pipe!($this.cur_idx).map(move |idx| panes[idx].gen_widget()) }
+      @Flex {
+        providers: [Provider::value_of_writer(this.clone_writer(), None)],
+        class: TABS,
+        direction: position.clone().map(TabPos::main_dir),
+        reverse: position.clone().map(TabPos::main_reverse),
+        @ScrollableWidget {
+          scrollable: position.clone().map(TabPos::headers_scroll_dir),
+          @Flex {
+            align_items: Align::Stretch,
+            direction: position.map(TabPos::headers_dir),
+            class: TAB_HEADERS_CONTAINER,
+            @ { headers }
           }
+        }
+        @Expanded {
+          @ { pipe!($this.active).map(move |idx| panes[idx].gen_widget()) }
         }
       }
     }
     .into_widget()
   }
+}
+
+impl<'w> Tab<'w> {
+  fn into_header_and_pane(mut self, idx: usize) -> (Widget<'w>, GenWidget) {
+    let pane = self.take_pane();
+    let header = self.tab_header(idx);
+    (header, pane)
+  }
+
+  fn tab_header(self, idx: usize) -> Widget<'w> {
+    let tab_info = self.info(idx);
+    fn_widget! {
+      let ctx = BuildCtx::get();
+      let inline = Variant::<TabsInlineIcon>::new_or_default(ctx);
+      let line = match inline {
+        Variant::Value(inline) => inline.into_line_widget(),
+        Variant::Watcher(w) => Box::new(pipe!($w.into_line_widget())),
+      };
+
+      let header = @Class {
+        class: TAB_HEADER,
+        on_tap: move |e| {
+          let prev = Provider::of::<Tabs>(e).unwrap().active;
+          if prev != idx {
+            Provider::write_of::<Tabs>(e).unwrap().set_active(idx);
+          }
+        },
+        @ $line {
+          @ { self.icon.map(|icon| class! { class: TAB_ICON, @{ icon } }) }
+          @ { self.label.map(|label| text! { text: label, class: TAB_LABEL }) }
+        }
+      };
+
+      @Expanded {
+        @Providers {
+          providers: [Provider::new(tab_info)],
+          @ { header }
+        }
+      }
+    }
+    .into_widget()
+  }
+
+  pub fn take_pane(&mut self) -> GenWidget {
+    let pane = self
+      .pane
+      .take()
+      .unwrap_or_else(|| void! {}.into());
+
+    fat_obj! {
+      class: TAB_PANE,
+      @pane.gen_widget()
+    }
+    .into()
+  }
+
+  pub fn info(&self, idx: usize) -> TabInfo {
+    TabInfo { has_icon: self.icon.is_some(), has_label: self.label.is_some(), idx }
+  }
+}
+
+impl TabPos {
+  pub fn is_horizontal(self) -> bool { matches!(self, TabPos::Top | TabPos::Bottom) }
+
+  fn main_dir(self) -> Direction {
+    match self {
+      TabPos::Top | TabPos::Bottom => Direction::Vertical,
+      TabPos::Left | TabPos::Right => Direction::Horizontal,
+    }
+  }
+
+  fn main_reverse(self) -> bool {
+    match self {
+      TabPos::Top | TabPos::Left => false,
+      TabPos::Bottom | TabPos::Right => true,
+    }
+  }
+
+  fn headers_dir(self) -> Direction {
+    match self {
+      TabPos::Top | TabPos::Bottom => Direction::Horizontal,
+      TabPos::Left | TabPos::Right => Direction::Vertical,
+    }
+  }
+
+  fn headers_scroll_dir(self) -> Scrollable {
+    match self {
+      TabPos::Top | TabPos::Bottom => Scrollable::X,
+      TabPos::Left | TabPos::Right => Scrollable::Y,
+    }
+  }
+}
+
+impl TabsInlineIcon {
+  fn into_line_widget(self) -> Box<dyn MultiChild> {
+    if self.0 { Box::new(HorizontalLine) } else { Box::new(VerticalLine) }
+  }
+}
+
+impl Default for TabsInlineIcon {
+  fn default() -> Self { TabsInlineIcon(true) }
+}
+
+#[cfg(test)]
+mod tests {
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
+  use smallvec::smallvec;
+
+  use super::*;
+
+  fn tabs_tester(tab_type: TabType, pos: TabPos) -> WidgetTester {
+    WidgetTester::new(tabs! {
+      providers: smallvec![Provider::new(tab_type), Provider::new(pos)],
+      h_align: HAlign::Stretch,
+      v_align: VAlign::Stretch,
+      // Tab only label
+      @Tab {
+        label: "Tab 1",
+        @text! { text: "Only label" }
+      }
+      // Tab only icon
+      @Tab {
+         icon: @Icon { @named_svgs::default() },
+      }
+      // Tab with label and icon
+      @Tab {
+        label: "Tab 3",
+        icon: @Icon { @named_svgs::default() },
+        @text! { text: "Label and icon" }
+      }
+    })
+    .with_wnd_size(Size::new(256., 128.))
+  }
+
+  widget_image_tests!(primary_left, tabs_tester(TabType::Primary, TabPos::Left),);
+
+  widget_image_tests!(primary_right, tabs_tester(TabType::Primary, TabPos::Right),);
+
+  widget_image_tests!(primary_top, tabs_tester(TabType::Primary, TabPos::Top),);
+
+  widget_image_tests!(primary_bottom, tabs_tester(TabType::Primary, TabPos::Bottom),);
+
+  widget_image_tests!(secondary_left, tabs_tester(TabType::Secondary, TabPos::Left),);
+
+  widget_image_tests!(secondary_right, tabs_tester(TabType::Secondary, TabPos::Right),);
+
+  widget_image_tests!(secondary_top, tabs_tester(TabType::Secondary, TabPos::Top),);
+
+  widget_image_tests!(secondary_bottom, tabs_tester(TabType::Secondary, TabPos::Bottom),);
 }

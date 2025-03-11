@@ -797,8 +797,8 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes the `Class` that should be applied to the widget.
-  pub fn class<const M: usize>(self, cls: impl DeclareInto<ClassName, M>) -> Self {
-    self.declare_builtin_init(cls, Self::get_class_widget, |c, cls| c.class = Some(cls))
+  pub fn class<const M: usize>(self, cls: impl DeclareInto<Option<ClassName>, M>) -> Self {
+    self.declare_builtin_init(cls, Self::get_class_widget, |c, cls| c.class = cls)
   }
 
   /// Initializes whether the `widget` should automatically get focus when the
@@ -920,12 +920,16 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes the horizontal global anchor of the widget.
-  pub fn global_anchor_x<const M: usize>(self, v: impl DeclareInto<GlobalAnchorX, M>) -> Self {
+  pub fn global_anchor_x<const M: usize>(
+    self, v: impl DeclareInto<Option<GlobalAnchorX>, M>,
+  ) -> Self {
     self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_x = v)
   }
 
   /// Initializes the vertical global anchor of the widget.
-  pub fn global_anchor_y<const M: usize>(self, v: impl DeclareInto<GlobalAnchorY, M>) -> Self {
+  pub fn global_anchor_y<const M: usize>(
+    self, v: impl DeclareInto<Option<GlobalAnchorY>, M>,
+  ) -> Self {
     self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_y = v)
   }
 
@@ -968,12 +972,6 @@ impl<T> FatObj<T> {
         .unsubscribe_when_dropped();
       self.keep_alive_unsubscribe_handle = Some(Box::new(u));
     }
-    self
-  }
-
-  /// Initializes the track_id of the widget.
-  pub fn track_id(mut self) -> Self {
-    self.get_track_id_widget();
     self
   }
 

@@ -79,15 +79,6 @@ impl Render for Text {
   fn only_sized_by_parent(&self) -> bool { false }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let box_rect = Rect::from_size(ctx.box_size().unwrap());
-    if ctx
-      .painter()
-      .intersection_paint_bounds(&box_rect)
-      .is_none()
-    {
-      return;
-    };
-
     let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());
     let visual_glyphs = self.glyphs().unwrap();
     let rect = visual_glyphs.visual_rect();

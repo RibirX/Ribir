@@ -1,7 +1,7 @@
 use crate::{prelude::*, wrap_render::*};
 
 /// A enum that describe how widget align to its box.
-#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Align {
   /// The children are aligned to the start edge of the box provided by parent.
   /// The same as [`HAlign::Left`]! if direction is horizontal and
@@ -53,16 +53,76 @@ pub enum VAlign {
   Stretch,
 }
 
-/// A widget that align its child in x-axis, base on child's width.
+/// A widget that horizontally aligns its child based on the maximum width
+/// constraint (`clamp.max`) received during `perform_layout`.
+///
+/// If the clamp is not a finite value, the child is aligned to the left.
+///
+/// ## Alignment Behavior
+///
+/// Since `Ribir`'s layout phase is a single-pass top-down process,
+/// `HAlignWidget` aligns the child based on the `clamp.max` value it receives
+/// during layout. This means the alignment may not match the parent's size if
+/// the parent does not enforce a fixed width.
+///
+/// If the alignment is not as expected, ensure the parent provides a fixed
+/// width to the widget.
+///
+/// ## Why Not Use Parent Size For Alignment?
+///
+/// 1. In `Ribir`, the layout phase is top-down, so the parent's size is unknown
+///    when the child is laid out.
+/// 2. Layout widgets use `clamp` to constrain the child's size, assuming the
+///    child depends solely on the `clamp` for layout. If `HAlignWidget` used
+///    the parent's size for alignment, it could violate the `clamp`. For
+///    example, `Padding` reduces the `clamp` for its child, but its own size
+///    might not increase.
 #[derive(Default)]
 pub struct HAlignWidget {
   pub h_align: HAlign,
 }
 
-/// A widget that align its child in y-axis, base on child's height.
+/// A widget that vertically aligns its child based on the maximum height
+/// (`clamp.max`) received during `perform_layout`.
+///
+/// If the clamp is not a finite value, the child is aligned to the top.
+///
+/// ## Alignment Behavior
+///
+/// Since `Ribir`'s layout phase is a single-pass top-down process,
+/// `VAlignWidget` aligns its child based on the `clamp.max` value it receives
+/// during `perform_layout`. This means the alignment may not match the parent's
+/// size if the parent does not enforce a fixed height.
+///
+/// If the alignment is not as expected, ensure the parent provides a fixed
+/// width to the widget.
+///
+/// ## Why Not Use Parent Size For Alignment?
+///
+/// 1. In `Ribir`, the layout phase is top-down, so the parent's size is unknown
+///    when the child is laid out.
+/// 2. Layout widgets use `clamp` to constrain the child's size, assuming the
+///    child depends solely on the `clamp` for layout. If `VAlignWidget` used
+///    the parent's size for alignment, it could violate the `clamp`. For
+///    example, `Padding` reduces the `clamp` for its child, but its own size
+///    might not increase.
 #[derive(Default)]
 pub struct VAlignWidget {
   pub v_align: VAlign,
+}
+
+/// Macro used to generate a function widget using the `HAlignWidget` as the
+/// root widget.
+#[macro_export]
+macro_rules! h_align_widget {
+  ($($t: tt)*) => { fn_widget! { @HAlignWidget { $($t)* } } };
+}
+
+/// Macro used to generate a function widget using the `VAlignWidget` as the
+/// root widget.
+#[macro_export]
+macro_rules! v_align_widget {
+  ($($t: tt)*) => { fn_widget! { @VAlignWidget { $($t)* } } };
 }
 
 impl Declare for HAlignWidget {
@@ -194,6 +254,34 @@ mod tests {
       }
     }
     .into()
+  }
+
+  // Edge case: box_size is infinity
+  #[test]
+  fn align_value_infinity() {
+    let align = Align::Center;
+    assert_eq!(align.align_value(10., f32::INFINITY), 0.);
+  }
+
+  // Edge case: box_size is NaN
+  #[test]
+  fn align_value_nan() {
+    let align = Align::Center;
+    assert_eq!(align.align_value(10., f32::NAN), 0.);
+  }
+
+  // Edge case: child_size > box_size
+  #[test]
+  fn align_value_child_larger_than_box() {
+    let align = Align::Center;
+    assert_eq!(align.align_value(20., 10.), -5.);
+  }
+
+  // Edge case: child_size == box_size
+  #[test]
+  fn align_value_child_equal_to_box() {
+    let align = Align::Center;
+    assert_eq!(align.align_value(10., 10.), 0.);
   }
 
   widget_layout_test!(

@@ -46,8 +46,11 @@ pub mod named_svgs {
 
   /// Functions similarly to [`named_svgs::get`](get), but returns the
   /// default SVG if not found.
-  pub fn get_or_default(name: &str) -> Svg {
-    get(name).unwrap_or_else(|| get(DEFAULT_SVG_KEY).unwrap())
+  pub fn get_or_default(name: &str) -> Svg { get(name).unwrap_or_else(default) }
+
+  /// Provides fallback SVG content when a requested named asset is unavailable
+  pub fn default() -> Svg {
+    get(DEFAULT_SVG_KEY).expect("Default SVG asset should be preloaded in all execution contexts")
   }
 
   pub fn reset() {

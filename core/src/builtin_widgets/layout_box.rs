@@ -1,6 +1,41 @@
 use crate::prelude::*;
 
-/// Widget let user to access the layout result of its child.
+/// A widget that allows access to the layout result of its child.
+///
+/// ## Caution: Avoid Dependency on Layout Results for View Updates
+///
+/// Layout operations occur frequently, so relying on layout results to update
+/// other widgets should be done with extreme caution. Doing so can easily lead
+/// to performance issues, such as double layouts or infinite layout loops
+/// within a single frame.
+///
+/// ### Example Scenario:
+///
+/// Suppose Widget A depends on the layout size of Widget B.
+///
+/// 1. Widget A completes its layout and notifies Widget B.
+/// 2. Since Widget B depends on Widget A's layout result, it becomes "dirty"
+///    and requests a layout.
+/// 3. When Widget B becomes dirty, it may also mark all its ancestors as dirty.
+/// 4. Since Widget A is a descendant of one of Widget B's ancestors, Widget A
+///    may be laid out again when that ancestor performs its layout.
+/// 5. If the layout result of Widget A in step 4 differs from step 1, the
+///    process repeats from step 1.
+///
+/// In step 4, this can lead to a double layout within the same frame. In step
+/// 5, it may result in an infinite layout loop.
+///
+/// **Solution**:
+/// - Use `OnlySizedByParent` to wrap `B` if `B` does not affect the size of its
+///   parent. This prevents unnecessary dirty propagation to the parent.
+/// - Ensure that there is no circular dependency in your logic.
+///
+/// ## Avoid Using Layout Results to Create Pipe Widgets
+///
+/// Layout result changes are only notified within a `Data` scope. This means
+/// that if you use a layout result as the upstream of a pipe widget, the pipe
+/// widget will not update when the layout result of the widget changes.
+
 #[derive(Default)]
 pub struct LayoutBox {
   /// the rect box of its child and the coordinate is relative to its parent.

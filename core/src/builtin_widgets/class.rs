@@ -113,9 +113,16 @@ pub struct ClassName(&'static str);
 pub type ClassImpl = fn(Widget) -> Widget;
 
 /// This widget is used to apply class to its child widget by the `ClassName`.
-#[derive(Default)]
+#[derive(Default, Clone, PartialEq)]
 pub struct Class {
   pub class: Option<ClassName>,
+}
+
+/// This macro is used to generate a function widget using `Class` as the root
+/// widget.
+#[macro_export]
+macro_rules! class {
+  ($($t: tt)*) => { fn_widget! { @Class { $($t)* } } };
 }
 
 /// This macro is utilized to define class names; ensure that your name is
@@ -249,7 +256,9 @@ impl<'c> ComposeChild<'c> for Class {
           .raw_modifies()
           .filter(|s| s.contains(ModifyScope::FRAMEWORK))
           .sample(AppCtx::frame_ticks().clone())
-          .subscribe(move |_| class_update(&cls_child2, &orig_child2, &this2.read(), wnd_id))
+          .map(move |_| this2.read().clone())
+          .distinct_until_changed()
+          .subscribe(move |class| class_update(&cls_child2, &orig_child2, &class, wnd_id))
           .unsubscribe_when_dropped();
 
         this

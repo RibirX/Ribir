@@ -89,6 +89,25 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
 }
 
 impl ScrollableWidget {
+  /// Returns the reference of the closest scrollable widget from the context.
+  #[inline]
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<Self>> { Provider::of::<Self>(ctx) }
+
+  /// Returns the write reference of the closest scrollable widget from the
+  /// context.
+  #[inline]
+  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> Option<WriteRef<Self>> {
+    Provider::write_of::<Self>(ctx)
+  }
+
+  /// Returns the writer of the closest scrollable widget from the context.
+  #[inline]
+  pub fn boxed_writer_of(
+    ctx: &impl AsRef<ProviderCtx>,
+  ) -> Option<Box<dyn StateWriter<Value = Self>>> {
+    Provider::state_of::<Box<dyn StateWriter<Value = Self>>>(ctx).map(|s| s.clone_boxed_writer())
+  }
+
   pub fn map_to_view(&self, p: Point, child: WidgetId, wnd: &Window) -> Option<Point> {
     let view_id = self.view_id.as_ref()?.get()?;
     let pos = wnd.map_to_global(p, child);
@@ -120,9 +139,9 @@ impl ScrollableWidget {
     let offset_x = anchor
       .x
       .or_else(|| {
-        if rect.min_x() > self.scroll_pos.x + view_size.width {
+        if rect.max_x() > self.scroll_pos.x + view_size.width {
           Some(HAnchor::Right(0.0.into()))
-        } else if rect.max_x() < self.scroll_pos.x {
+        } else if rect.min_x() < self.scroll_pos.x {
           Some(HAnchor::Left(0.0.into()))
         } else {
           None
@@ -133,9 +152,9 @@ impl ScrollableWidget {
     let offset_y = anchor
       .y
       .or_else(|| {
-        if rect.min_y() > view_size.height + self.scroll_pos.y {
+        if rect.max_y() > view_size.height + self.scroll_pos.y {
           Some(VAnchor::Bottom(0.0.into()))
-        } else if rect.max_y() < self.scroll_pos.y {
+        } else if rect.min_y() < self.scroll_pos.y {
           Some(VAnchor::Top(0.0.into()))
         } else {
           None

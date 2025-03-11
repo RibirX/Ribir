@@ -192,6 +192,11 @@ macro_rules! smooth_size_widget_impl {
         self.clamp_layout_clamp(&mut clamp);
         host.perform_layout(clamp, ctx)
       }
+
+      fn dirty_phase(&self, host: &dyn Render) -> DirtyPhase {
+        let dirty = host.dirty_phase();
+        if dirty != DirtyPhase::LayoutSubtree { DirtyPhase::Layout } else { dirty }
+      }
     }
 
     impl_compose_child!($name, DirtyPhase::Layout);
@@ -261,6 +266,11 @@ macro_rules! smooth_pos_widget_impl {
           ctx.painter().translate(offset.x, offset.y);
         }
         host.paint(ctx);
+      }
+
+      fn dirty_phase(&self, host: &dyn Render) -> DirtyPhase {
+        let dirty = host.dirty_phase();
+        if dirty != DirtyPhase::LayoutSubtree { DirtyPhase::Layout } else { dirty }
       }
     }
 

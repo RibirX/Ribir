@@ -110,6 +110,12 @@ impl<const M: u8> Render for StateLayer<M> {
   }
 
   fn dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
+
+  fn hit_test(&self, _: &mut HitTestCtx, _: Point) -> HitTest {
+    // This widget only serves as a visual effect and should not affect the hit
+    // test.
+    HitTest { hit: false, can_hit_child: false }
+  }
 }
 
 /// The path of a state layer to fill can either be a radius that fills the
