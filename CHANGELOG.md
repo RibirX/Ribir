@@ -38,13 +38,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: fix miss pop providers when call `push_providers_for` separately during layout.(#698 @wjian23)
 - **core**: enables embedding declare template as child in widget with Vec of template(#704 @wjian23)
 - **macro**: Fixed issue where top-level `fn_widget!` macro did not capture a built-in widget. (#706 @M-Adoo)
-- **widgets**: `Flex` now stretches cross-axis items using final line dimensions instead of constraint clamping. (#pr by @M-Adoo)
+- **widgets**: `Flex` now stretches cross-axis items using final line dimensions instead of constraint clamping. (#707 by @M-Adoo)
 
 
 ### Changed
 
 - **widgets**: Refactor `Divider` Widget. (#702 @wjian23)
-- **widgets**: Refactor `Tabs` Widget. (#pr @M-Adoo)
+- **widgets**: Refactor `Tabs` Widget. (#707 @M-Adoo)
 - **ci**: update rust version of ci to 2025-03-06 (#702 @wjian23)
 
 ### Breaking
