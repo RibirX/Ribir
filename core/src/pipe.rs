@@ -993,7 +993,8 @@ mod tests {
     };
     let wnd = TestWindow::new(w);
     let tree = wnd.tree_mut();
-    tree.layout(Size::zero());
+    let mut queue = vec![];
+    tree.layout(Size::zero(), &mut queue);
     let ids = tree
       .content_root()
       .descendants(tree)
@@ -1002,7 +1003,8 @@ mod tests {
     {
       *c_size.write() = Size::new(1., 1.);
     }
-    tree.layout(Size::zero());
+    let mut queue = vec![];
+    tree.layout(Size::zero(), &mut queue);
     let new_ids = tree
       .content_root()
       .descendants(tree)
@@ -1030,7 +1032,8 @@ mod tests {
     };
     let wnd = TestWindow::new(w);
     let tree = wnd.tree_mut();
-    tree.layout(Size::zero());
+    let mut queue = vec![];
+    tree.layout(Size::zero(), &mut queue);
     let ids = tree
       .content_root()
       .descendants(tree)
@@ -1039,7 +1042,8 @@ mod tests {
     {
       *c_size.write() = Size::new(1., 1.);
     }
-    tree.layout(Size::zero());
+    let mut queue = vec![];
+    tree.layout(Size::zero(), &mut queue);
     let new_ids = tree
       .content_root()
       .descendants(tree)

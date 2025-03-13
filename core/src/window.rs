@@ -263,11 +263,23 @@ impl Window {
   }
 
   pub fn layout(&self) {
+    let mut layout_queue = Vec::with_capacity(64);
+    let mut notified_widgets = ahash::HashSet::default();
+
     loop {
       self.run_frame_tasks();
 
       let tree = self.tree_mut();
-      tree.layout(self.shell_wnd.borrow().inner_size());
+      tree.layout(self.shell_wnd.borrow().inner_size(), &mut layout_queue);
+
+      // Process layout completion events
+      layout_queue
+        .drain(..)
+        .filter(|id| notified_widgets.insert(*id))
+        .for_each(|id| {
+          self.add_delay_event(DelayEvent::PerformedLayout(id));
+        });
+      notified_widgets.clear();
       self.run_frame_tasks();
 
       if !tree.is_dirty() {

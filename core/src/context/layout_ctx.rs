@@ -6,7 +6,6 @@ use crate::{
   prelude::ProviderCtx,
   widget::{BoxClamp, VisualBox, WidgetTree},
   widget_tree::WidgetId,
-  window::DelayEvent,
 };
 
 /// A place to compute the render object's layout.
@@ -20,6 +19,7 @@ pub struct LayoutCtx<'a> {
   /// `LayoutCtx` always in a mutable borrow.
   pub(crate) tree: &'a mut WidgetTree,
   pub(crate) provider_ctx: ProviderCtx,
+  pub(crate) laid_out_queue: &'a mut Vec<WidgetId>,
 }
 
 impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
@@ -31,13 +31,15 @@ impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
 }
 
 impl<'a> LayoutCtx<'a> {
-  pub(crate) fn new(id: WidgetId, tree: &'a mut WidgetTree) -> Self {
+  pub(crate) fn new(
+    id: WidgetId, tree: &'a mut WidgetTree, laid_out_queue: &'a mut Vec<WidgetId>,
+  ) -> Self {
     let provider_ctx = if let Some(p) = id.parent(tree) {
       ProviderCtx::collect_from(p, tree)
     } else {
       ProviderCtx::default()
     };
-    Self { id, tree, provider_ctx }
+    Self { id, tree, provider_ctx, laid_out_queue }
   }
 
   /// Perform layout of the widget of the context and return its size.
@@ -59,14 +61,8 @@ impl<'a> LayoutCtx<'a> {
       VisualCtx::from_layout_ctx(self).update_visual_box();
     }
 
-    self.provider_ctx.pop_providers_for(self.id());
-    // TODO: Add event after layout phase completion to avoid excessive event
-    // notifications.
-    // Example: A Flex container may lay out children twice during its layout
-    // process, but only needs to emit a single event for its children.
-    self
-      .window()
-      .add_delay_event(DelayEvent::PerformedLayout(id));
+    self.provider_ctx.pop_providers_for(id);
+    self.laid_out_queue.push(id);
 
     size
   }
