@@ -44,27 +44,31 @@ impl<'a> LayoutCtx<'a> {
 
   /// Perform layout of the widget of the context and return its size.
   pub(crate) fn perform_layout(&mut self, clamp: BoxClamp) -> Size {
-    // Safety: the `tree` just use to get the widget of `id`, and `tree2` not drop
-    // or modify it during perform layout.
-    let tree2 = unsafe { &*(self.tree as *mut WidgetTree) };
+    self
+      .get_calculated_size(self.id, clamp)
+      .unwrap_or_else(|| {
+        // Safety: the `tree` just use to get the widget of `id`, and `tree2` not drop
+        // or modify it during perform layout.
+        let tree2 = unsafe { &*(self.tree as *mut WidgetTree) };
 
-    let id = self.id();
+        let id = self.id();
 
-    debug_assert!(clamp.min.is_finite());
-    let size = id.assert_get(tree2).perform_layout(clamp, self);
-    debug_assert!(size.is_finite());
-    let info = self.tree.store.layout_info_or_default(id);
-    info.clamp = clamp;
-    info.size = Some(size);
+        debug_assert!(clamp.min.is_finite());
+        let size = id.assert_get(tree2).perform_layout(clamp, self);
+        debug_assert!(size.is_finite());
+        let info = self.tree.store.layout_info_or_default(id);
+        info.clamp = clamp;
+        info.size = Some(size);
 
-    {
-      VisualCtx::from_layout_ctx(self).update_visual_box();
-    }
+        {
+          VisualCtx::from_layout_ctx(self).update_visual_box();
+        }
 
-    self.provider_ctx.pop_providers_for(id);
-    self.laid_out_queue.push(id);
+        self.provider_ctx.pop_providers_for(id);
+        self.laid_out_queue.push(id);
 
-    size
+        size
+      })
   }
 
   /// Perform layout of the `child` and return its size.
