@@ -82,7 +82,7 @@ impl WidgetTree {
 
   /// Do the work of computing the layout for all node which need, Return if any
   /// node has really computing the layout.
-  pub(crate) fn layout(&mut self, win_size: Size) {
+  pub(crate) fn layout(&mut self, win_size: Size, laid_out_queue: &mut Vec<WidgetId>) {
     loop {
       let Some((mut needs_layout, mut needs_paint)) = self.layout_list() else {
         break;
@@ -99,7 +99,7 @@ impl WidgetTree {
             .map(|info| info.clamp)
             .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
 
-          let mut ctx = LayoutCtx::new(wid, self);
+          let mut ctx = LayoutCtx::new(wid, self, laid_out_queue);
           let visual_rect = ctx.visual_box(wid);
           ctx.perform_layout(clamp);
           let new_rect = ctx.visual_box(wid);
@@ -121,7 +121,7 @@ impl WidgetTree {
       }
 
       while let Some((depth, wid)) = visual_roots.pop_first() {
-        let mut ctx = LayoutCtx::new(wid, self);
+        let mut ctx = LayoutCtx::new(wid, self, laid_out_queue);
         let visual_rect = ctx.visual_box(wid);
         let new_rect = ctx.update_visual_box();
         if visual_rect != new_rect {
@@ -174,7 +174,7 @@ impl WidgetTree {
     });
   }
   pub(crate) fn layout_list(&mut self) -> Option<(Vec<WidgetId>, Vec<WidgetId>)> {
-    if self.dirty_set.borrow().is_empty() {
+    if !self.is_dirty() {
       return None;
     }
 
@@ -441,7 +441,8 @@ mod tests {
       }
     });
     let tree = wnd.tree_mut();
-    tree.layout(Size::new(512., 512.));
+    let mut queue = vec![];
+    tree.layout(Size::new(512., 512.), &mut queue);
     assert_eq!(tree.count(tree.content_root()), 11);
 
     let root = tree.root();
@@ -481,7 +482,8 @@ mod tests {
 
     let wnd = TestWindow::new(widget);
     let tree = wnd.tree_mut();
-    tree.layout(Size::new(100., 100.));
+    let mut queue = vec![];
+    tree.layout(Size::new(100., 100.), &mut queue);
 
     *c_trigger.write() = 2;
     assert!(!tree.is_dirty())
