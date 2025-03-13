@@ -49,6 +49,7 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       let mut view = @Viewport {
+        clip_boundary: true,
         scroll_dir: distinct_pipe!{
           let this = $this;
           this.scrollable
@@ -272,23 +273,6 @@ impl Render for Viewport {
     self.size.set(size);
 
     size
-  }
-
-  fn paint(&self, ctx: &mut PaintingCtx) {
-    let rect = Rect::from_size(self.size.get());
-    let path = if let Some(radius) = Provider::of::<Radius>(ctx) {
-      Path::rect_round(&rect, &radius)
-    } else {
-      Path::rect(&rect)
-    };
-
-    ctx.painter().clip(path.into());
-  }
-
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    let clip_rect = Rect::from_size(self.size.get());
-    ctx.clip(clip_rect);
-    Some(clip_rect)
   }
 }
 
