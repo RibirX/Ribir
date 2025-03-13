@@ -49,6 +49,15 @@ impl WrapRender for ClipBoundary {
     ctx.clip(clip_rect);
     Some(clip_rect)
   }
+
+  fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
+    let mut hit = host.hit_test(ctx, pos);
+
+    // Clip child hit testing to box boundaries
+    hit.can_hit_child &= ctx.box_hit_test(pos);
+
+    hit
+  }
 }
 
 #[cfg(test)]

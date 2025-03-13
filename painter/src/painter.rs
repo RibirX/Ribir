@@ -370,12 +370,15 @@ impl Painter {
     invisible_return!(self);
     let p_bounds = path.bounds(None);
     if locatable_bounds(&p_bounds) {
-      if let Some(bounds) = self.intersection_paint_bounds(&p_bounds) {
-        let s = self.current_state_mut();
+      let intersect = self.intersection_paint_bounds(&p_bounds);
+      let s = self.current_state_mut();
+      if let Some(bounds) = intersect {
         s.bounds = s.transform.outer_transformed_rect(&bounds);
         let cmd = PathCommand::new(path, PaintPathAction::Clip, s.transform);
         self.commands.push(PaintCommand::Path(cmd));
         self.current_state_mut().clip_cnt += 1;
+      } else {
+        s.bounds = Rect::zero();
       }
     }
 
@@ -541,6 +544,10 @@ impl Painter {
     &mut self, bounds: Rect, cmds: Resource<Box<[PaintCommand]>>,
   ) -> &mut Self {
     invisible_return!(self);
+    if self.intersection_paint_bounds(&bounds).is_none() {
+      return self;
+    }
+
     let transform = *self.transform();
     let opacity = self.alpha();
     let cmd = PaintCommand::Bundle { transform, opacity, bounds, cmds };
@@ -550,6 +557,11 @@ impl Painter {
 
   pub fn draw_svg(&mut self, svg: &Svg) -> &mut Self {
     invisible_return!(self);
+    let rect = Rect::from_size(svg.size());
+    if self.intersection_paint_bounds(&rect).is_none() {
+      return self;
+    }
+
     let commands = svg.commands(self.fill_brush(), self.stroke_brush());
 
     // For a large number of path commands (more than 16), bundle them
@@ -582,7 +594,6 @@ impl Painter {
         self.commands.push(cmd);
       }
     } else {
-      let rect = Rect::from_size(svg.size());
       self.draw_bundle_commands(rect, commands.clone());
     }
 
@@ -1021,5 +1032,30 @@ mod test {
       .scale(0., 0.)
       .rect(&rect(0., 0., 10., 10.))
       .fill();
+  }
+
+  #[test]
+  fn clip_zero() {
+    let mut painter = painter();
+
+    painter
+      .clip(Path::rect(&rect(0., 0., 0., 0.)).into())
+      .rect(&rect(0., 0., 10., 10.))
+      .fill();
+
+    assert_eq!(painter.commands.len(), 0);
+
+    painter.draw_bundle_commands(
+      Rect::from_size(Size::new(10., 10.)),
+      Resource::new(Box::new([PaintCommand::Path(PathCommand::new(
+        Path::rect(&rect(0., 0., 10., 10.)).into(),
+        PaintPathAction::Paint {
+          painting_style: PaintingStyle::Fill,
+          brush: Brush::Color(Color::BLACK).into(),
+        },
+        Transform::identity(),
+      ))])),
+    );
+    assert_eq!(painter.commands.len(), 0);
   }
 }

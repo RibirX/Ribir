@@ -39,6 +39,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: enables embedding declare template as child in widget with Vec of template(#704 @wjian23)
 - **core**: Ensure layout event is emitted once per layout phase (not per frame) (PR #pr by @M-Adoo)
 - **core**: Use minimum constraint size for viewport in unbounded layouts (PR #pr by @M-Adoo)
+- **painter**: Properly discard render operations when clipping to zero-sized rectangles (#pr @M-Adoo)
 - **macro**: Fixed issue where top-level `fn_widget!` macro did not capture a built-in widget. (#706 @M-Adoo)
 - **widgets**: `Flex` now stretches cross-axis items using final line dimensions instead of constraint clamping. (#707 by @M-Adoo)
 
