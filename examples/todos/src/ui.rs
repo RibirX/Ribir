@@ -13,19 +13,21 @@ impl Compose for Todos {
         @input(None, move |text| {
           $this.write().new_task(text.to_string());
         })
-        @Tabs {
-          h_align: HAlign::Stretch,
-          @Tab {
-            label: "All",
-            @ task_lists(this.clone_writer(), |_| true)
-          }
-          @Tab {
-            label: "ACTIVE",
-            @ task_lists(this.clone_writer(), |t| !t.complete )
-          }
-          @Tab {
-            label: "DONE",
-            @task_lists(this, |t| t.complete )
+        @Expanded {
+          @Tabs {
+            h_align: HAlign::Stretch,
+            @Tab {
+              label: "All",
+              @ task_lists(this.clone_writer(), |_| true)
+            }
+            @Tab {
+              label: "ACTIVE",
+              @ task_lists(this.clone_writer(), |t| !t.complete )
+            }
+            @Tab {
+              label: "DONE",
+              @task_lists(this, |t| t.complete )
+            }
           }
         }
       }
