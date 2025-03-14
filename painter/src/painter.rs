@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
   Brush, Color, Glyph, PixelImage, Svg, VisualGlyphs,
-  color::{LinearGradient, RadialGradient},
+  color::{ColorFilterMatrix, LinearGradient, RadialGradient},
   font_db::FontDB,
   path::*,
   path_builder::PathBuilder,
@@ -84,7 +84,7 @@ pub enum PaintPathAction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CommandBrush {
   Color(Color),
-  Image { img: Resource<PixelImage>, opacity: f32 },
+  Image { img: Resource<PixelImage>, color_filter: ColorMatrix },
   Radial(RadialGradient),
   Linear(LinearGradient),
 }
@@ -139,12 +139,84 @@ pub enum PaintCommand {
   /// means the backend can cache it.
   Bundle {
     transform: Transform,
-    opacity: f32,
+    color_filter: ColorMatrix,
     /// the bounds of the bundle commands. This is the union of all paint
     /// command
     bounds: Rect,
     cmds: Resource<Box<[PaintCommand]>>,
   },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ColorMatrix {
+  Opacity(f32),
+  Matrix(ColorFilterMatrix),
+}
+
+impl From<ColorFilterMatrix> for ColorMatrix {
+  fn from(m: ColorFilterMatrix) -> Self { ColorMatrix::Matrix(m) }
+}
+
+impl Default for ColorMatrix {
+  fn default() -> Self { ColorMatrix::Opacity(1.) }
+}
+
+impl ColorMatrix {
+  pub fn identity() -> Self { ColorMatrix::Opacity(1.) }
+
+  pub fn from_opacity(a: f32) -> Self { ColorMatrix::Opacity(a) }
+
+  pub fn from_matrix(m: ColorFilterMatrix) -> Self { ColorMatrix::Matrix(m) }
+
+  fn apply_alpha(&mut self, alpha: f32) {
+    match self {
+      ColorMatrix::Opacity(a) => {
+        *a *= alpha;
+      }
+      ColorMatrix::Matrix(matrix) => {
+        matrix.apply_alpha(alpha);
+      }
+    };
+  }
+
+  fn apply_color_filter(&mut self, mut matrix: ColorFilterMatrix) {
+    let v = match self {
+      ColorMatrix::Opacity(a) => {
+        matrix.apply_alpha(*a);
+        ColorMatrix::Matrix(matrix)
+      }
+      ColorMatrix::Matrix(m) => ColorMatrix::Matrix(m.chains(&matrix)),
+    };
+    *self = v;
+  }
+
+  fn chains(&mut self, next: &ColorMatrix) {
+    match next {
+      ColorMatrix::Opacity(a) => self.apply_alpha(*a),
+      ColorMatrix::Matrix(m) => self.apply_color_filter(*m),
+    }
+  }
+
+  fn apply_to(&self, color: &Color) -> Color {
+    match self {
+      ColorMatrix::Opacity(a) => color.apply_alpha(*a),
+      ColorMatrix::Matrix(m) => m.apply_to(color),
+    }
+  }
+
+  fn is_transparent(&self) -> bool {
+    match self {
+      ColorMatrix::Opacity(a) => *a == 0.,
+      ColorMatrix::Matrix(m) => m.is_transparent(),
+    }
+  }
+
+  pub fn to_matrix(&self) -> ColorFilterMatrix {
+    match self {
+      ColorMatrix::Opacity(a) => ColorFilterMatrix::only_alpha(*a),
+      ColorMatrix::Matrix(m) => *m,
+    }
+  }
 }
 
 #[derive(Clone)]
@@ -155,7 +227,7 @@ struct PainterState {
   fill_brush: Brush,
   style: PathStyle,
   transform: Transform,
-  opacity: f32,
+  color_filter: ColorMatrix,
   clip_cnt: usize,
   /// The visible boundary of the painter in visual axis, not care about the
   /// transform.
@@ -171,7 +243,7 @@ impl PainterState {
       fill_brush: Color::GRAY.into(),
       transform: Transform::identity(),
       clip_cnt: 0,
-      opacity: 1.,
+      color_filter: ColorMatrix::Opacity(1.),
       style: PathStyle::Fill,
     }
   }
@@ -288,16 +360,22 @@ impl Painter {
   }
 
   pub fn apply_alpha(&mut self, alpha: f32) -> &mut Self {
-    self.current_state_mut().opacity *= alpha;
+    self
+      .current_state_mut()
+      .color_filter
+      .apply_alpha(alpha);
     self
   }
 
-  pub fn alpha(&self) -> f32 { self.current_state().opacity }
-
-  pub fn set_alpha(&mut self, alpha: f32) -> &mut Self {
-    self.current_state_mut().opacity = alpha;
+  pub fn apply_color_filter(&mut self, filter: impl Into<ColorMatrix>) -> &mut Self {
+    self
+      .current_state_mut()
+      .color_filter
+      .chains(&filter.into());
     self
   }
+
+  pub fn is_transparent(&self) -> bool { self.current_state().color_filter.is_transparent() }
 
   #[inline]
   pub fn set_strokes(&mut self, strokes: StrokeOptions) -> &mut Self {
@@ -349,6 +427,9 @@ impl Painter {
   /// Return the current transformation matrix being applied to the layer.
   #[inline]
   pub fn transform(&self) -> &Transform { &self.current_state().transform }
+
+  #[inline]
+  fn color_filter(&self) -> &ColorMatrix { &self.current_state().color_filter }
 
   /// Resets (overrides) the current transformation to the identity matrix, and
   /// then invokes a transformation described by the arguments of this method.
@@ -410,6 +491,14 @@ impl Painter {
   pub fn fill(&mut self) -> &mut Self {
     let builder = std::mem::take(&mut self.path_builder);
     self.fill_path(builder.build().into())
+  }
+
+  pub fn apply_color_matrix(&mut self, matrix: ColorFilterMatrix) -> &mut Self {
+    self
+      .current_state_mut()
+      .color_filter
+      .apply_color_filter(matrix);
+    self
   }
 
   /// Draw the current path with the current paint style and brush.
@@ -549,8 +638,8 @@ impl Painter {
     }
 
     let transform = *self.transform();
-    let opacity = self.alpha();
-    let cmd = PaintCommand::Bundle { transform, opacity, bounds, cmds };
+    let color_filter = *self.color_filter();
+    let cmd = PaintCommand::Bundle { transform, color_filter, bounds, cmds };
     self.commands.push(cmd);
     self
   }
@@ -572,24 +661,21 @@ impl Painter {
     // need to perform a single draw operation for an SVG.
     if commands.len() <= 16 {
       let transform = *self.transform();
-      let alpha = self.alpha();
 
       for cmd in commands.iter() {
         let cmd = match cmd.clone() {
           PaintCommand::Path(mut path) => {
             path.transform(&transform);
             if let PaintPathAction::Paint { ref mut brush, .. } = path.action {
-              brush.apply_alpha(alpha);
+              brush.apply_color_filter(self.color_filter());
             }
             PaintCommand::Path(path)
           }
           PaintCommand::PopClip => PaintCommand::PopClip,
-          PaintCommand::Bundle { transform: b_ts, opacity, bounds, cmds } => PaintCommand::Bundle {
-            transform: transform.then(&b_ts),
-            opacity: alpha * opacity,
-            bounds,
-            cmds,
-          },
+          PaintCommand::Bundle { transform: b_ts, mut color_filter, bounds, cmds } => {
+            color_filter.chains(self.color_filter());
+            PaintCommand::Bundle { transform: transform.then(&b_ts), color_filter, bounds, cmds }
+          }
         };
         self.commands.push(cmd);
       }
@@ -723,7 +809,7 @@ impl Painter {
         PathStyle::Fill => PaintingStyle::Fill,
         PathStyle::Stroke => PaintingStyle::Stroke(self.stroke_options().clone()),
       };
-      brush.apply_alpha(self.alpha());
+      brush.apply_color_filter(self.color_filter());
       let ts = *self.transform();
       let action = PaintPathAction::Paint { brush, painting_style };
       let cmd = PathCommand::new(path, action, ts);
@@ -784,7 +870,7 @@ impl Painter {
 
   fn is_visible_canvas(&self) -> bool {
     let t = self.current_state().transform;
-    self.alpha() > 0.
+    !self.is_transparent()
       && locatable_bounds(self.viewport())
       && t.m11.is_finite()
       && t.m12.is_finite()
@@ -799,7 +885,7 @@ impl From<Brush> for CommandBrush {
   fn from(brush: Brush) -> Self {
     match brush {
       Brush::Color(color) => CommandBrush::Color(color),
-      Brush::Image(img) => CommandBrush::Image { img, opacity: 1. },
+      Brush::Image(img) => CommandBrush::Image { img, color_filter: ColorMatrix::default() },
       Brush::RadialGradient(radial_gradient) => CommandBrush::Radial(radial_gradient),
       Brush::LinearGradient(linear_gradient) => CommandBrush::Linear(linear_gradient),
     }
@@ -888,14 +974,14 @@ impl PathCommand {
 }
 
 impl CommandBrush {
-  pub fn apply_alpha(&mut self, alpha: f32) -> &mut Self {
+  pub fn apply_color_filter(&mut self, filter: &ColorMatrix) -> &mut Self {
     match self {
-      CommandBrush::Color(color) => *color = color.apply_alpha(alpha),
-      CommandBrush::Image { opacity, .. } => *opacity *= alpha,
+      CommandBrush::Color(color) => *color = filter.apply_to(color),
+      CommandBrush::Image { color_filter, .. } => color_filter.chains(filter),
       CommandBrush::Radial(RadialGradient { stops, .. })
       | CommandBrush::Linear(LinearGradient { stops, .. }) => stops
         .iter_mut()
-        .for_each(|s| s.color = s.color.apply_alpha(alpha)),
+        .for_each(|s| s.color = filter.apply_to(&s.color)),
     }
     self
   }

@@ -396,12 +396,20 @@ pub fn img_triangles_shader(limits: &DrawPhaseLimits) -> String {
     img_start: vec2<f32>,
     /// The size of the image image.
     img_size: vec2<f32>,
+    
     /// This is a mix field,
     /// - the high 16 bits is the index of head mask layer, as a i16 type.
     /// - the low 16 bits is the index of texture, as a u16 type.
     mask_head_and_tex_idx: i32,
-    /// extra alpha apply to current vertex
-    opacity: f32,
+
+    /// align
+    dummy: i32,
+
+    /// base color
+    base_color: vec4<f32>,
+
+    /// color matrix of [f32; 4 * 4]
+    color_matrix: mat4x4<f32>,
   }
   
   struct VertexOutput {
@@ -438,8 +446,8 @@ pub fn img_triangles_shader(limits: &DrawPhaseLimits) -> String {
           mask_idx = mask.prev_mask_idx;
       }
   
-      color.a = color.a * alpha * prim.opacity;
-      return color;
+      color.a = color.a * alpha;
+      return  color * prim.color_matrix + prim.base_color;
   }
   
   fn img_sample(prim: ImgPrimitive, pos: vec2<f32>) -> vec4<f32> {

@@ -5,8 +5,9 @@ use ribir_geom::{
   DeviceRect, DeviceSize, Point, Transform, rect_corners, transform_to_device_rect,
 };
 use ribir_painter::{
-  Color, CommandBrush, PaintCommand, PaintPath, PaintPathAction, PainterBackend, PaintingStyle,
-  PathCommand, PixelImage, Vertex, VertexBuffers, image::ColorFormat,
+  Color, ColorMatrix, CommandBrush, PaintCommand, PaintPath, PaintPathAction, PainterBackend,
+  PaintingStyle, PathCommand, PixelImage, Vertex, VertexBuffers, color::ColorFilterMatrix,
+  image::ColorFormat,
 };
 
 use crate::{
@@ -204,10 +205,10 @@ where
               add_rect_vertices(rect, output_tex_size, color_attr, buffer);
               self.current_phase = CurrentPhase::Color;
             }
-            CommandBrush::Image { img, opacity } => {
+            CommandBrush::Image { img, color_filter } => {
               let slice = self.tex_mgr.store_image(img, &mut self.gpu_impl);
               let ts = matrix.inverse().unwrap();
-              self.draw_img_slice(slice, &ts, mask_head, *opacity, output_tex_size, rect);
+              self.draw_img_slice(slice, &ts, mask_head, color_filter, output_tex_size, rect);
             }
             CommandBrush::Radial(radial) => {
               let prim: RadialGradientPrimitive = RadialGradientPrimitive {
@@ -264,7 +265,7 @@ where
           self.clip_layer_stack.pop();
         }
       }
-      PaintCommand::Bundle { transform, opacity, bounds, cmds } => {
+      PaintCommand::Bundle { transform, color_filter, bounds, cmds } => {
         let matrix = transform.then(global_matrix);
         let scale = self.tex_mgr.cache_scale(&bounds.size, &matrix);
         let cache_size = bounds.size * scale;
@@ -326,7 +327,14 @@ where
           .clip_layer_stack
           .last()
           .map_or(-1, |l| l.mask_head);
-        self.draw_img_slice(slice, &view_to_slice, mask_head, *opacity, output_tex_size, points);
+        self.draw_img_slice(
+          slice,
+          &view_to_slice,
+          mask_head,
+          color_filter,
+          output_tex_size,
+          points,
+        );
       }
     }
   }
@@ -408,19 +416,24 @@ where
   }
 
   fn draw_img_slice(
-    &mut self, img_slice: TextureSlice, transform: &Transform, mask_head: i32, opacity: f32,
-    output_tex_size: DeviceSize, rect: [Point; 4],
+    &mut self, img_slice: TextureSlice, transform: &Transform, mask_head: i32,
+    color_filter: &ColorMatrix, output_tex_size: DeviceSize, rect: [Point; 4],
   ) {
     let img_start = img_slice.rect.origin.to_f32().to_array();
     let img_size = img_slice.rect.size.to_f32().to_array();
     let mask_head_and_tex_idx = mask_head << 16 | self.tex_ids_map.tex_idx(img_slice.tex_id) as i32;
     let prim_idx = self.img_prims.len() as u32;
+    let ColorFilterMatrix { matrix, base_color } = color_filter.to_matrix();
+    let base = base_color.map_or([0.; 4], |c| c.into_f32_components());
+
     let prim = ImgPrimitive {
       transform: transform.to_array(),
       img_start,
       img_size,
       mask_head_and_tex_idx,
-      opacity,
+      color_matrix: matrix,
+      base_color: base,
+      dummy: 0,
     };
     self.img_prims.push(prim);
     let buffer = &mut self.img_vertices_buffer;

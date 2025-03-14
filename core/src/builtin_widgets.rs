@@ -50,6 +50,8 @@ pub mod fitted_box;
 pub use fitted_box::*;
 pub mod svg;
 pub use svg::*;
+pub mod color_filter;
+pub use color_filter::*;
 
 pub mod clip;
 pub use clip::*;

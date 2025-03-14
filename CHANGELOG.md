@@ -30,6 +30,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: record the visual rect after layout.(#698 @wjian23)
 - **widget**: Add the Widget of Menu.(#702 @wjian23)
 - **widgets**: Allow children of the `Stack` to adjust their size based on the `Stack`'s size. (#706 @M-Adoo)
+- **core**: Add support for ColorFilter.(#709 @wjian23)
 
 ### Fixed
 
@@ -37,9 +38,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Fixed the panic when overlay recreate provider_ctx during event callback.(#702 @wjian23)
 - **core**: fix miss pop providers when call `push_providers_for` separately during layout.(#698 @wjian23)
 - **core**: enables embedding declare template as child in widget with Vec of template(#704 @wjian23)
-- **core**: Ensure layout event is emitted once per layout phase (not per frame) (PR #pr by @M-Adoo)
-- **core**: Use minimum constraint size for viewport in unbounded layouts (PR #pr by @M-Adoo)
-- **painter**: Properly discard render operations when clipping to zero-sized rectangles (#pr @M-Adoo)
+- **core**: Ensure layout event is emitted once per layout phase (not per frame) (PR #709 by @M-Adoo)
+- **core**: Use minimum constraint size for viewport in unbounded layouts (PR #709 by @M-Adoo)
+- **painter**: Properly discard render operations when clipping to zero-sized rectangles (#709 @M-Adoo)
 - **macro**: Fixed issue where top-level `fn_widget!` macro did not capture a built-in widget. (#706 @M-Adoo)
 - **widgets**: `Flex` now stretches cross-axis items using final line dimensions instead of constraint clamping. (#707 by @M-Adoo)
 
