@@ -19,8 +19,8 @@ log.workspace = true
 lyon_algorithms = {version = "1.0.3", features = ["serialization"]}
 lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional = true}
 material-color-utilities-rs = {workspace = true}
-ribir_algo = {path = "../algo", version = "0.4.0-alpha.27" }
-ribir_geom = {path = "../geom", version = "0.4.0-alpha.27" }
+ribir_algo = {path = "../algo", version = "0.4.0-alpha.28" }
+ribir_geom = {path = "../geom", version = "0.4.0-alpha.28" }
 serde = {version = "1.0", features = ["derive"]}
 serde_json.workspace = true
 usvg.workspace = true

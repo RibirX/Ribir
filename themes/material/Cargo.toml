@@ -13,5 +13,5 @@ repository = "https://github.com/RibirX/Ribir/themes/material"
 version.workspace = true
 
 [dependencies]
-ribir_core = {path = "../../core", version = "0.4.0-alpha.27" }
-ribir_widgets = {path = "../../widgets", version = "0.4.0-alpha.27" }
+ribir_core = {path = "../../core", version = "0.4.0-alpha.28" }
+ribir_widgets = {path = "../../widgets", version = "0.4.0-alpha.28" }
