@@ -1,6 +1,7 @@
 on:
   merge_group:
   pull_request:
+    types: [synchronize, labeled, reopened, ready_for_review]
   push:
     branches:
       - master
