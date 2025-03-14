@@ -1,13 +1,15 @@
 name: Update CHANGELOG on PR Approval
-permissions:
-  contents: write
-  pull-requests: write
 on:
-  pull_request_review:
-    types: [submitted]
+  pull_request_target:
+    branches:
+      - master
+      - release-*
+    paths:
+      - "CHANGELOG.md"
+
 jobs:
   update-changelog:
-    if: github.event.review.state == 'approved'
+    if: github.event.pull_request.labels.*.name == 'B-merge-ready'
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Required for checkout and push
@@ -19,7 +21,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           fetch-depth: 0
-
+          token: ${{ secrets.RIBIR_RELEASE }}
       - name: Update PR number in CHANGELOG
         shell: bash
         run: |
@@ -37,10 +39,9 @@ jobs:
           git add CHANGELOG.md
           git commit --amend --no-edit
           git push -f
-      # Wait 3 seconds before adding label to trigger push event
-      - run: sleep 3s
+      # Wait 3 seconds before adding label to trigger event
+      - run: sleep 3s          
       - uses: hmarr/auto-approve-action@v4
-        if: github.event.review.state != 'approved'
         with:
+          github-token: ${{ secrets.RIBIR_RELEASE }}
           review-message: "An auto approved after bot, because ${{ github.actor }} already approved before."
-    

@@ -35,7 +35,7 @@ homepage = "https://ribir.org"
 keywords = ["gui", "ui", "declarative", "compose-ui"]
 license = "MIT"
 readme = "README.md"
-version = "0.4.0-alpha.27"
+version = "0.4.0-alpha.28"
 rust-version = "1.81.0"
 
 [workspace.dependencies]
