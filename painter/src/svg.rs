@@ -302,11 +302,16 @@ fn brush_replace(cmds: &[PaintCommand], fill: &Brush, stroke: &Brush) -> Box<[Pa
         PaintCommand::Path(p)
       }
       PaintCommand::PopClip => PaintCommand::PopClip,
-      PaintCommand::Bundle { transform, opacity, bounds, cmds } => {
+      PaintCommand::Bundle { transform, color_filter, bounds, cmds } => {
         let cmds = brush_replace(cmds, fill, stroke);
         let cmds = Resource::new(cmds);
 
-        PaintCommand::Bundle { transform: *transform, opacity: *opacity, bounds: *bounds, cmds }
+        PaintCommand::Bundle {
+          transform: *transform,
+          color_filter: *color_filter,
+          bounds: *bounds,
+          cmds,
+        }
       }
     })
     .collect()

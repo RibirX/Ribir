@@ -273,12 +273,20 @@ pub struct ImgPrimitive {
   pub img_start: [f32; 2],
   /// The size of the image image.
   pub img_size: [f32; 2],
+
   /// This represents a mix of two 16-bit indices:
   /// - The high 16-bit index represents the head mask layer. It is an i16.
   /// - The low 16-bit index represents the texture. It is a u16.
   pub mask_head_and_tex_idx: i32,
-  /// extra alpha apply to current vertex
-  pub opacity: f32,
+
+  /// dummy for align
+  pub dummy: i32,
+
+  /// the final pix color will be color * color_matrix + base_color
+  pub base_color: [f32; 4],
+
+  /// the final pix color will be color * color_matrix + base_color
+  pub color_matrix: [f32; 4 * 4],
 }
 
 /// The mask layer describes an alpha channel layer that is used in the fragment
