@@ -25,6 +25,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+
 ### Features
 
 - **core**: record the visual rect after layout.(#698 @wjian23)
@@ -38,9 +39,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Fixed the panic when overlay recreate provider_ctx during event callback.(#702 @wjian23)
 - **core**: fix miss pop providers when call `push_providers_for` separately during layout.(#698 @wjian23)
 - **core**: enables embedding declare template as child in widget with Vec of template(#704 @wjian23)
-- **core**: Ensure layout event is emitted once per layout phase (not per frame) (PR #709 by @M-Adoo)
-- **core**: Use minimum constraint size for viewport in unbounded layouts (PR #709 by @M-Adoo)
-- **painter**: Properly discard render operations when clipping to zero-sized rectangles (#709 @M-Adoo)
+- **core**: Ensure layout event is emitted once per layout phase (not per frame) (#708 by @M-Adoo)
+- **core**: Use minimum constraint size for viewport in unbounded layouts (#708 by @M-Adoo)
+- **painter**: Properly discard render operations when clipping to zero-sized rectangles (#708 @M-Adoo)
 - **macro**: Fixed issue where top-level `fn_widget!` macro did not capture a built-in widget. (#706 @M-Adoo)
 - **widgets**: `Flex` now stretches cross-axis items using final line dimensions instead of constraint clamping. (#707 by @M-Adoo)
 

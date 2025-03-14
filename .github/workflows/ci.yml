@@ -1,6 +1,7 @@
 on:
   merge_group:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches:
       - master
@@ -33,6 +34,7 @@ env:
 name: CI
 jobs:
   lint:
+    if: ${{ github.event_name != 'labeled' || github.event.label.name == 'B-pr-num' }}
     name: rust code lint
     runs-on: ubuntu-latest
     steps:
@@ -268,4 +270,3 @@ jobs:
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       - name: Run wasm test of core
         run: wasm-pack test --headless --chrome ./core
-      
