@@ -13,11 +13,11 @@ repository = "https://github.com/RibirX/Ribir"
 version.workspace = true
 
 [dependencies]
-ribir_algo = { path = "../algo", version = "0.4.0-alpha.27" }
-ribir_core = { path = "../core", version = "0.4.0-alpha.27" }
-ribir_gpu = { path = "../gpu", version = "0.4.0-alpha.27" }
-ribir_material = { path = "../themes/material", version = "0.4.0-alpha.27", optional = true }
-ribir_widgets = { path = "../widgets", version = "0.4.0-alpha.27", optional = true }
+ribir_algo = { path = "../algo", version = "0.4.0-alpha.28" }
+ribir_core = { path = "../core", version = "0.4.0-alpha.28" }
+ribir_gpu = { path = "../gpu", version = "0.4.0-alpha.28" }
+ribir_material = { path = "../themes/material", version = "0.4.0-alpha.28", optional = true }
+ribir_widgets = { path = "../widgets", version = "0.4.0-alpha.28", optional = true }
 rxrust.workspace = true
 wgpu = { workspace = true, optional = true }
 winit.workspace = true
