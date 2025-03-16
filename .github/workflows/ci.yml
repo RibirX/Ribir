@@ -1,7 +1,7 @@
 on:
   merge_group:
   pull_request:
-    types: [synchronize, labeled, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches:
       - master
@@ -269,52 +269,3 @@ jobs:
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       - name: Run wasm test of core
         run: wasm-pack test --headless --chrome ./core
-  merge-ready:
-    if: github.event_name == 'pull_request'
-    permissions:
-      pull-requests: write
-    needs: [lint, test-with-gpu, doc-examples, wasm-compile, wasm-test]
-    runs-on: ubuntu-latest
-    steps:
-    - name: Check Approval and Label PR
-      uses: actions/github-script@v7
-      continue-on-error: true
-      with:
-        github-token: ${{ secrets.RIBIR_RELEASE }}
-        script: |
-          try {
-            // Get latest reviews with pagination support
-            const { data: reviews } = await github.rest.pulls.listReviews({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-              per_page: 100
-            });
-    
-            // Check for existing approvals
-            const hasApproval = reviews.some(review => review.state === 'APPROVED');
-    
-            if (hasApproval) {
-              // Add merge-ready label
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                labels: ['B-merge-ready']
-              });
-              console.log('Added B-merge-ready label');
-            } else {
-             // Remove merge-ready label
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                name: 'B-merge-ready'
-             });
-              console.log('Removed B-merge-ready label');
-            }
-          } catch (error) {
-            core.error('Label update failed: ' + error.message);
-            core.setFailed(error);
-          }
-    

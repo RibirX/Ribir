@@ -1,19 +1,117 @@
+# name: pre-merge
+# on:
+#   pull_request_target:
+#     branches:
+#       - master
+#       - release-*
+#     paths:
+#       - "CHANGELOG.md"
+# jobs:
+#   update-changelog:
+#     runs-on: ubuntu-latest
+#     permissions:
+#       contents: write  # Required for checkout and push
+#       pull-requests: write
+#     env: 
+#       MERGE_READY: true
+#     steps:
+#       # Verify all jobs succeeded and check for approvals in one step
+#       - name: Verify PR readiness
+#         uses: actions/github-script@v7
+#         with:
+#           github-token: ${{ secrets.RIBIR_RELEASE }}
+#           script: |
+#             const { owner, repo } = context.repo;
+#             const ref = context.payload.pull_request.head.sha;
+
+#             // Check if all CI jobs succeeded
+#             const { data: checks } = await github.rest.checks.listForRef({ owner, repo, ref });
+#             console.log(checks);
+#             if (checks.total_count === 0 || checks.check_runs.some(run => run.conclusion !== 'success')) {
+#               process.env.MERGE_READY = false;
+#             }
+
+#             // Check if there is at least one approval
+#             const { data: reviews } = await github.rest.pulls.listReviews({
+#               owner,
+#               repo,
+#               pull_number: context.payload.pull_request.number,
+#               per_page: 100
+#             });
+#             if (!reviews.some(review => review.state === 'APPROVED')) {
+#               process.env.MERGE_READY = false;
+#             }
+
+#       # Only proceed if PR is ready to merge
+#       - name: Checkout PR branch
+#         if: ${{ env.MERGE_READY == 'true' }}
+#         uses: actions/checkout@v4
+#         with:
+#           ref: ${{ github.event.pull_request.head.ref }}
+#           repository: ${{ github.event.pull_request.head.repo.full_name }}
+#           fetch-depth: 0
+#           token: ${{ secrets.RIBIR_RELEASE }}
+
+#       # Configure Git user details once
+#       - name: Configure Git user
+#         if: ${{ env.MERGE_READY == 'true' }}
+#         run: |
+#           git config user.name "RChangelog[bot]"
+#           git config user.email "155627257+RChangelog[bot]@users.noreply.github.com"
+
+#       # Update PR number in CHANGELOG.md and commit changes if necessary
+#       - name: Update PR number in CHANGELOG
+#         if: ${{ env.MERGE_READY == 'true' }}
+#         shell: bash
+#         run: |
+#           sed -i '/^##/,$ {s/#pr/#${{ github.event.pull_request.number }}/g}' ./CHANGELOG.md
+
+#           # Exit early if no changes are detected
+#           if [ $(git status --porcelain | wc -l) -eq 0 ]; then exit 0; fi
+
+#           git add CHANGELOG.md && git commit --amend --no-edit && git push -f
+
+#       # Auto-approve the PR after successful updates (if applicable)
+#       - uses: hmarr/auto-approve-action@v4
+#         with:
+#          github-token : "${{ secrets.RIBIR_RELEASE }}" 
+#          review-message : "An auto approved after bot , because ${GITHUB_ACTOR} already approved before."
+#        # Add or remove merge-ready label based on readiness status  
+#       - name: Add merge-ready label
+#         if: ${{ env.MERGE_READY == 'true' }}
+#         uses: actions/github-script@v7
+#         with:
+#           github-token: ${{ secrets.RIBIR_RELEASE }}
+#           script: |
+#             await github.rest.issues.addLabels({
+#               owner: context.repo.owner,
+#               repo: context.repo.repo,
+#               issue_number: context.payload.pull_request.number,
+#               labels: ['B-merge-ready']
+#             });
+#             console.log('Added B-merge-ready label');
+#       - name: Remove merge-ready label
+#         if: ${{ env.MERGE_READY == 'false' }}
+#         uses: actions/github-script@v7
+#         with:
+#           github-token: ${{ secrets.RIBIR_RELEASE }}
+#           script: |
+#             await github.rest.issues.removeLabel({
+#               owner: context.repo.owner,
+#               repo: context.repo.repo,
+#               issue_number: context.payload.pull_request.number,
+#               name: 'B-merge-ready'
+#             });
+#             console.log('Removed B-merge-ready label');
+
+# todo: 定时触发一遍
 name: Update CHANGELOG on PR Approval
 on:
-  pull_request_target:
-    branches:
-      - master
-      - release-*
-    paths:
-      - "CHANGELOG.md"
-
+  pull_request_review:
+    # types: [submitted]
 jobs:
-  update-changelog:
-    if: github.event.pull_request.labels.*.name == 'B-merge-ready'
+  check-and-reapprove:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # Required for checkout and push
-      pull-requests: write
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -22,26 +120,51 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           fetch-depth: 0
           token: ${{ secrets.RIBIR_RELEASE }}
-      - name: Update PR number in CHANGELOG
-        shell: bash
+      - name: Reapprove if only specific paths are changed
         run: |
-          sed -i '/^##/,$ {s/#pr/#${{ github.event.pull_request.number }}/g}' ./CHANGELOG.md
-          if [ $(git status --porcelain | wc -l) -eq 0 ]; then
-            echo "No changes to commit."
-            exit 0
-          fi
-
-          # Configure Git
-          git config user.name "RChangelog[bot]"
-          git config user.email "155627257+RChangelog[bot]@users.noreply.github.com"
-
-          # Commit and push changes
-          git add CHANGELOG.md
-          git commit --amend --no-edit
-          git push -f
-      # Wait 3 seconds before adding label to trigger event
-      - run: sleep 3s          
-      - uses: hmarr/auto-approve-action@v4
+          gh pr review ${{ github.event.pull_request.number }} --approve --body "An auto approved after bot, because ${{ github.actor }} already approved before."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  update-changelog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for checkout and push
+      pull-requests: write
+    steps:
+      - name: check approve on pull request_review
+        uses: hmarr/auto-approve-action@v4
+        continue-on-error: true
         with:
           github-token: ${{ secrets.RIBIR_RELEASE }}
           review-message: "An auto approved after bot, because ${{ github.actor }} already approved before."
+      - name: check add label on pull request_review
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['B-merge-ready']
+            });
+            console.log('Added B-merge-ready label');
+      - name: check remove label on pull request_review
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          github-token: ${{ secrets.RIBIR_RELEASE }}
+          script: |
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              name: 'B-merge-ready'
+            });
+            console.log('Removed B-merge-ready label');
+      - name: add labels
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          github_token: ${{ secrets.RIBIR_RELEASE }}
+          labels: B-merge-ready
+
