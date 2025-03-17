@@ -32,7 +32,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **widget**: Add the Widget of Menu.(#702 @wjian23)
 - **widgets**: Allow children of the `Stack` to adjust their size based on the `Stack`'s size. (#706 @M-Adoo)
 - **core**: Add support for ColorFilter.(#709 @wjian23)
-- **core**: Add builtin field `disable`.(#pr @wjian23)
+- **core**: Added builtin field `disable`.(#712 @wjian23)
+- **core**: Added ColorFilter of `hue_rotate_filter` and `saturate_filter`(#712 @wjian23)
 
 ### Fixed
 
@@ -45,8 +46,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **painter**: Properly discard render operations when clipping to zero-sized rectangles (#708 @M-Adoo)
 - **macro**: Fixed issue where top-level `fn_widget!` macro did not capture a built-in widget. (#706 @M-Adoo)
 - **widgets**: `Flex` now stretches cross-axis items using final line dimensions instead of constraint clamping. (#707 by @M-Adoo)
-- **core**: Fixed track_id in class node not update.(#pr @wjian23)
-- **core**: Fixed FocusScope not work when host changed by class or pipe.(#pr@wjian23)
+- **core**: Fixed track_id in class node not update.(#712 @wjian23)
+- **core**: Fixed FocusScope not work when host changed by class or pipe.(#712@wjian23)
 
 ### Changed
 
