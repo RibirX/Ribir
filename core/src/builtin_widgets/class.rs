@@ -352,6 +352,11 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
 
   let tree = ctx.tree_mut();
 
+  if child_id != new_id {
+    // update the DynamicWidgetId out of the class node when id changed.
+    class_node.update_track_id(new_id);
+  }
+
   new_id.wrap_node(tree, |render| {
     node.replace_data(render);
     class_node
@@ -780,5 +785,47 @@ mod tests {
     *w_inner.write() = true;
     wnd.draw_frame();
     assert_eq!(*inner_apply.read(), 3);
+  }
+
+  // the track_id is bind after the class, when the class is changed and wrap with
+  // new reader(here is the margin), the track_id should changed.
+  #[test]
+  fn fix_track_id_in_class_node() {
+    reset_test_env!();
+
+    class_names! { WRAP_CLS, IDENTITY_CLS };
+
+    let (r_cls, w_cls) = split_value(IDENTITY_CLS);
+    let (r_id, w_id) = split_value(None);
+    let w = fn_widget! {
+      let cls = Class::provider(WRAP_CLS, style_class!(
+        margin: EdgeInsets::all(2.),
+      ));
+
+      let mut w = FatObj::new(
+        @Void {
+          class: pipe!(*$r_cls),
+        }.into_widget()
+      );
+      *$w_id.write() = Some($w.track_id());
+
+      @Providers{
+        providers: smallvec![
+          cls,
+        ],
+        @ { w }
+      }
+    };
+
+    let mut wnd = TestWindow::new(w);
+    wnd.draw_frame();
+    let id1 = r_id.read().as_ref().and_then(|w| w.get());
+
+    *w_cls.write() = WRAP_CLS;
+    wnd.draw_frame();
+
+    let id2 = r_id.read().as_ref().and_then(|w| w.get());
+    assert!(id1 != id2);
+    assert!(!id2.unwrap().is_dropped(wnd.tree()));
   }
 }
