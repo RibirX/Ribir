@@ -2,6 +2,7 @@ use ribir_core::prelude::Classes;
 
 mod buttons_cls;
 mod checkbox_cls;
+mod disabled_cls;
 mod divider_cls;
 mod input_cls;
 mod menu_cls;
@@ -26,6 +27,7 @@ pub fn initd_classes() -> Classes {
   divider_cls::init(&mut classes);
   menu_cls::init(&mut classes);
   tabs_cls::init(&mut classes);
+  disabled_cls::init(&mut classes);
 
   classes
 }

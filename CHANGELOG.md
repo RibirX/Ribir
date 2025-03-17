@@ -32,6 +32,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **widget**: Add the Widget of Menu.(#702 @wjian23)
 - **widgets**: Allow children of the `Stack` to adjust their size based on the `Stack`'s size. (#706 @M-Adoo)
 - **core**: Add support for ColorFilter.(#709 @wjian23)
+- **core**: Add builtin field `disable`.(#pr @wjian23)
 
 ### Fixed
 

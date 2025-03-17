@@ -178,4 +178,6 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   "clip_boundary" => builtin_member!{"ClipBoundary", Field, "clip_boundary"},
   // Providers
   "providers" => builtin_member!{"Providers", Field, "providers"},
+  // Disabled
+  "disabled" => builtin_member!{"Disabled", Field, "disabled"},
 };
