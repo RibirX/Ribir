@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::{events::focus_mgr::FocusType, prelude::*};
 
 #[derive(Declare, Clone, Default)]
@@ -18,10 +20,18 @@ impl<'c> ComposeChild<'c> for FocusScope {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      let child = FatObj::new(child);
+      let mut child = FatObj::new(child);
+      let guard = Sc::new(RefCell::new(None));
+      let guard2 = guard.clone();
       @ $child {
-        on_mounted: move |e| e.window().add_focus_node(e.id, false, FocusType::Scope),
-        on_disposed: move|e| e.window().remove_focus_node(e.id, FocusType::Scope),
+        on_mounted: move |e| {
+          *guard.borrow_mut() = Some(
+            Window::add_focus_node(e.window(), $child.track_id(), false, FocusType::Scope)
+          );
+        },
+        on_disposed: move|_| {
+          guard2.borrow_mut().take();
+        },
       }
       .into_widget()
       .try_unwrap_state_and_attach(this)

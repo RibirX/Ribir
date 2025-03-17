@@ -364,18 +364,38 @@ impl Window {
     self.add_delay_event(DelayEvent::BubbleCustomEvent { from, data: Box::new(e) as Box<dyn Any> });
   }
 
-  pub(crate) fn add_focus_node(&self, wid: WidgetId, auto_focus: bool, focus_type: FocusType) {
-    self
-      .focus_mgr
-      .borrow_mut()
-      .add_focus_node(wid, auto_focus, focus_type);
-  }
+  pub(crate) fn add_focus_node(
+    this: Sc<Self>, track_id: TrackId, auto_focus: bool, focus_type: FocusType,
+  ) -> FocusNodeGuard<impl Subscription> {
+    let init_id = track_id.get().unwrap();
+    let watcher = track_id.watcher();
 
-  pub(crate) fn remove_focus_node(&self, wid: WidgetId, focus_tyep: FocusType) {
-    self
+    this
       .focus_mgr
       .borrow_mut()
-      .remove_focus_node(wid, focus_tyep);
+      .add_focus_node(init_id, auto_focus, focus_type);
+
+    let wnd = this.clone();
+    let guard = watch!(*$watcher)
+      .merge(observable::of(Some(init_id)))
+      .distinct_until_changed()
+      .pairwise()
+      .subscribe(move |(old, new)| {
+        if let Some(wid) = old {
+          wnd
+            .focus_mgr
+            .borrow_mut()
+            .remove_focus_node(wid, focus_type);
+        }
+        if let Some(wid) = new {
+          wnd
+            .focus_mgr
+            .borrow_mut()
+            .add_focus_node(wid, auto_focus, focus_type);
+        }
+      })
+      .unsubscribe_when_dropped();
+    FocusNodeGuard { wnd: this, track_id, _guard: guard, focus_type }
   }
 
   pub(crate) fn add_delay_event(&self, e: DelayEvent) {
@@ -815,6 +835,25 @@ impl Window {
       .filter(filter)
       .take(1)
       .subscribe(move |_| f.take().unwrap()());
+  }
+}
+
+pub(crate) struct FocusNodeGuard<U: Subscription> {
+  wnd: Sc<Window>,
+  track_id: TrackId,
+  focus_type: FocusType,
+  _guard: SubscriptionGuard<U>,
+}
+
+impl<U: Subscription> Drop for FocusNodeGuard<U> {
+  fn drop(&mut self) {
+    if let Some(id) = self.track_id.get() {
+      self
+        .wnd
+        .focus_mgr
+        .borrow_mut()
+        .remove_focus_node(id, self.focus_type);
+    }
   }
 }
 

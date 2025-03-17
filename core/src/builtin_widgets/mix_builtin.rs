@@ -408,30 +408,15 @@ fn callbacks_for_focus_node(child: Widget) -> Widget {
   @$child {
     on_mounted: move |e| {
       let mut all_mix = e.query_all_iter::<MixBuiltin>().peekable();
-      if all_mix.peek().is_some() {
-        let auto_focus = all_mix.any(|mix| mix.flags.read().is_auto_focus());
-        let track_id = $child.track_id().watcher();
-        let wnd = e.window();
-        let init_id = e.id();
-        wnd.add_focus_node(init_id, auto_focus, FocusType::Node);
-        *guard2.borrow_mut() = Some(
-          watch!(*$track_id)
-            .merge(observable::of(Some(init_id)))
-            .distinct_until_changed()
-            .pairwise()
-            .subscribe(move |(old, new)| {
-              if let Some(wid) = old {
-                wnd.remove_focus_node(wid, FocusType::Node);
-              }
-              if let Some(wid) = new {
-                wnd.add_focus_node(wid, auto_focus, FocusType::Node);
-              }
-            }).unsubscribe_when_dropped());
+        if all_mix.peek().is_some() {
+          let auto_focus = all_mix.any(|mix| mix.flags.read().is_auto_focus());
+          *guard.borrow_mut() = Some(
+            Window::add_focus_node(e.window(), $child.track_id(), auto_focus, FocusType::Node)
+          );
         }
       },
-      on_disposed: move |e| {
-        guard.borrow_mut().take();
-        e.window().remove_focus_node(e.id(), FocusType::Node);
+      on_disposed: move |_| {
+        guard2.borrow_mut().take();
       }
     }
   }
