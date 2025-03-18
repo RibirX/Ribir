@@ -1,5 +1,6 @@
 name: CHANGELOG
 on:
+  merge_group:
   pull_request_target:
     types: [labeled, auto_merge_enabled]
     branches:
@@ -11,10 +12,13 @@ jobs:
     if: ${{ github.event_name != 'labeled' || github.event.label.name == 'B-merge-ready' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Required for checkout and push
+      contents: write # Required for checkout and push
       pull-requests: write
 
     steps:
+      - name: Early Success in Merge Group
+        if: ${{ github.event_name == 'merge_group' }}
+        run: exit 0
       # Verify PR readiness (approvals)
       - name: Verify PR Readiness
         id: verify-pr-readiness
@@ -56,7 +60,8 @@ jobs:
 
           # Exit early if no changes are detected 
           git diff --quiet || (git add CHANGELOG.md && git commit --amend --no-edit && git push -f)
-
+      
+      - run: sleep 3s
       # Auto-approve the PR after successful updates (if applicable)
       - name : Auto-Approve PR 
         if : ${{ steps.verify-pr-readiness.outputs.is_ready == 'true' }}
