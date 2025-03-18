@@ -68,16 +68,9 @@ fn new(palette: Palette) -> Theme {
 
 const LIST_ITEM_GAP: f32 = 16.;
 const LIST_ITEM_SIZE: f32 = 40.;
-const AVATAR_SIZE: f32 = 40.;
-const AVATAR_RADIUS: f32 = 20.;
 const LIST_IMAGE_ITEM_SIZE: f32 = 56.;
 
 fn init_custom_style(theme: &mut Theme) {
-  theme.custom_styles.set_custom_style(AvatarStyle {
-    size: Size::splat(AVATAR_SIZE),
-    radius: Some(AVATAR_RADIUS),
-    text_style: theme.typography_theme.body_large.text.clone(),
-  });
   theme
     .custom_styles
     .set_custom_style(ListItemStyle {

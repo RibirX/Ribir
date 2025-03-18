@@ -59,14 +59,62 @@ macro_rules! style_class {
   };
 }
 
-/// The macro is used to create a class implementation with a specified name
-/// while accepting declarations of the built-in widget fields.
+/// This macro generates a function for creating a styled widget with predefined
+/// fields. It simplifies the process of applying consistent styles to widgets.
+///
+/// # Usage
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// named_style_impl!(primary_button => {
+///   padding: EdgeInsets::all(8.),
+///   background: Color::BLUE,
+/// });
+/// ```
 #[macro_export]
-macro_rules! named_style_class {
-  ($name: ident => { $($field: ident: $value: expr),* $(,)? }) => {
-    fn $name(widget: $crate::prelude::Widget) -> $crate::prelude::Widget {
-      $crate::prelude::FatObj::new(widget) $(.$field($value))* .into_widget()
+macro_rules! named_style_impl {
+  ($(#[$meta:meta])* $style_name:ident => {
+      $($field:ident: $value:expr),* $(,)?
+  }) => {
+    $(#[$meta])*
+    fn $style_name(widget: $crate::prelude::Widget) -> $crate::prelude::Widget {
+      $crate::prelude::FatObj::new(widget)
+        $(.$field($value))*
+        .into_widget()
     }
+  };
+}
+
+/// This macro generates multiple styled widget builder functions in one go.
+/// It helps in defining several styles simultaneously, reducing repetition.
+///
+/// # Example
+/// ```
+/// use ribir::prelude::*;
+///
+/// named_styles_impl! {
+///   /// Secondary button style for auxiliary actions
+///   secondary_button => {
+///       padding: EdgeInsets::all(6.),
+///       background: Color::GRAY,
+///   },
+///
+///   /// Danger button style for destructive operations
+///   danger_button => {
+///       padding: EdgeInsets::all(8.),
+///       background: Color::RED,
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! named_styles_impl {
+  ($( $(#[$meta:meta])* $name:ident => { $($field:ident: $value:expr),* $(,)? } ),* $(,)? ) => {
+    $(
+      named_style_impl! {
+        $(#[$meta])*
+        $name => { $($field: $value),* }
+      }
+    )*
   };
 }
 

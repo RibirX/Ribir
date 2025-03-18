@@ -198,7 +198,7 @@ fn content() -> Widget<'static> {
           }
           @Divider { indent: DividerIndent::Start }
           @ListItem {
-            @Leading::new(EdgeWidget::Avatar(@Avatar { @Label::new("A") }))
+            @Leading::new(EdgeWidget::Avatar(@Avatar { @ { "A" } }))
             @ { HeadlineText(Label::new("One lines list item")) }
             @ { SupportingText(Label::new("One lines supporting text")) }
             @Trailing::new(EdgeWidget::Text(Label::new("100+")))
