@@ -29,7 +29,7 @@ fn md_base_spinner(w: Widget, foreground: DeclareInit<Brush>) -> Widget {
   .into_widget()
 }
 
-named_style_class! { md_base_linear_indicator => {
+named_style_impl! { md_base_linear_indicator => {
   background: BuildCtx::color(),
   radius: md::RADIUS_2,
 }}

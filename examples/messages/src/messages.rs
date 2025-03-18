@@ -84,9 +84,7 @@ impl Compose for MessageList {
                             line_number: 1usize,
                             @HeadlineText(Label::new(message.nick_name.clone()))
                             @SupportingText(Label::new(message.content.clone()))
-                            @Leading::new(
-                              EdgeWidget::Avatar(@Avatar { @{ message.img.clone() } })
-                            )
+                            @Leading::new(EdgeWidget::Avatar(@Avatar { @{ message.img.clone() }}))
                             @Trailing::new(EdgeWidget::Icon(svgs::MORE_HORIZ.into_widget()))
                           }
                           @Divider {}

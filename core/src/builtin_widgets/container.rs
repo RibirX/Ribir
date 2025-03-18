@@ -7,10 +7,9 @@ pub struct Container {
 }
 
 impl Render for Container {
-  fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let size = clamp.clamp(self.size);
-    clamp.max = clamp.max.min(self.size);
-    ctx.perform_single_child_layout(clamp);
+    ctx.perform_single_child_layout(BoxClamp::max_size(size));
     size
   }
 

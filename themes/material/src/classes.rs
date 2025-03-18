@@ -1,5 +1,6 @@
 use ribir_core::prelude::Classes;
 
+mod avatar_cls;
 mod buttons_cls;
 mod checkbox_cls;
 mod disabled_cls;
@@ -28,6 +29,7 @@ pub fn initd_classes() -> Classes {
   menu_cls::init(&mut classes);
   tabs_cls::init(&mut classes);
   disabled_cls::init(&mut classes);
+  avatar_cls::init(&mut classes);
 
   classes
 }

@@ -5,12 +5,12 @@ use crate::md;
 
 const THICKNESS: f32 = 1.;
 
-named_style_class!(horizontal_base => {
+named_style_impl!(horizontal_base => {
   clamp: BoxClamp::fixed_size(Size::new(f32::INFINITY, THICKNESS)),
   background: Palette::of(BuildCtx::get()).outline_variant(),
 });
 
-named_style_class!(vertical_base => {
+named_style_impl!(vertical_base => {
   clamp: BoxClamp::fixed_size(Size::new(THICKNESS, f32::INFINITY)),
   background: Palette::of(BuildCtx::get()).outline_variant(),
 });

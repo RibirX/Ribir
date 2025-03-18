@@ -183,7 +183,7 @@ pub struct SupportingText(pub Label);
 pub enum EdgeWidget<'w> {
   Text(Label),
   Icon(Widget<'w>),
-  Avatar(FatObj<Pair<State<Avatar>, AvatarTemplateBuilder>>),
+  Avatar(FatObj<Pair<State<Avatar>, AvatarChildBuilder<'w>>>),
   Image(Resource<PixelImage>),
   Poster(Poster),
   Custom(CustomEdgeWidget<'w>),
