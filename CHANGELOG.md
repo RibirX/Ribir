@@ -48,6 +48,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Changed
 
+- ci test (#pr @M-Adoo)
 - **widgets**: Refactor `Divider` Widget. (#702 @wjian23)
 - **widgets**: Refactor `Tabs` Widget. (#707 @M-Adoo)
 - **ci**: update rust version of ci to 2025-03-06 (#702 @wjian23)
