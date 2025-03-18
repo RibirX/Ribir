@@ -9,16 +9,14 @@ on:
 
 jobs:
   update-pr-number:
-    if: ${{ github.event_name != 'labeled' || github.event.label.name == 'B-merge-ready' }}
+    if: ${{ github.event_name == 'merge_group' }}
+    # if: ${{ github.event_name != 'labeled' || github.event.label.name == 'B-merge-ready' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # Required for checkout and push
       pull-requests: write
 
     steps:
-      - name: Early Success in Merge Group
-        if: ${{ github.event_name == 'merge_group' }}
-        run: exit 0
       # Verify PR readiness (approvals)
       - name: Verify PR Readiness
         id: verify-pr-readiness
