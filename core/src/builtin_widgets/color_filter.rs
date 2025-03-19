@@ -1,6 +1,6 @@
 use ribir_painter::color::ColorFilterMatrix;
 
-use crate::prelude::*;
+use crate::{prelude::*, wrap_render::WrapRender};
 
 /// GRAYSCALE_FILTER
 ///
@@ -87,17 +87,22 @@ pub const INVERT_FILTER: ColorFilterMatrix = ColorFilterMatrix {
 };
 
 /// This widget applies a [`ColorFilterMatrix`] to the child widget.
-#[derive(Declare, SingleChild)]
+#[derive(Declare)]
 pub struct ColorFilter {
   pub filter: ColorFilterMatrix,
 }
 
-impl Render for ColorFilter {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.assert_perform_single_child_layout(clamp)
+impl_compose_child_for_wrap_render!(ColorFilter, DirtyPhase::Paint);
+
+impl WrapRender for ColorFilter {
+  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+    host.perform_layout(clamp, ctx)
   }
 
-  fn paint(&self, ctx: &mut PaintingCtx) { ctx.painter().apply_color_matrix(self.filter); }
+  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
+    ctx.painter().apply_color_matrix(self.filter);
+    host.paint(ctx);
+  }
 }
 
 #[cfg(not(target_arch = "wasm32"))]

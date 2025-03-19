@@ -70,6 +70,7 @@ jobs:
         if: ${{ github.event_name != 'merge_group' }}
         uses : actions/github-script@v7
         with :
+          github-token: ${{ secrets.RIBIR_RELEASE }}
           script: |
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
