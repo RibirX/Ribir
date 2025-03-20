@@ -72,8 +72,8 @@ impl Compose for MessageList {
             h_align: HAlign::Stretch,
             providers: [Provider::new(TabPos::Bottom)],
             @Tab {
-              label: "Messages",
-              icon: @Icon { @{ material_svgs::SMS } },
+              @ { "Messages" }
+              @Icon { @{ material_svgs::SMS } }
               @fn_widget! {
                 @Scrollbar {
                   @Lists {
@@ -98,8 +98,8 @@ impl Compose for MessageList {
               }
             }
             @Tab {
-              label: "Person",
-              icon: @Icon { @{ material_svgs::ACCOUNT_CIRCLE } },
+              @ { "Person" }
+              @Icon { @{ material_svgs::ACCOUNT_CIRCLE } }
               @fn_widget!(@Text { text: "Person" })
             }
           }

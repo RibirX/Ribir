@@ -76,7 +76,8 @@ jobs:
             const issue_number = context.payload.pull_request.number;
           
             const isReady = ${{ steps.verify-pr-readiness.outputs.is_ready == 'true' }};
-          
+
+            try { await removeLabel('B-merge-ready');} catch (error) {}
             if (isReady) {
               try { await removeLabel('B-pr-num');} catch (error) {}
               
@@ -88,12 +89,6 @@ jobs:
               });
               console.log("Added 'B-pr-num' label");
             } else {
-              try {
-                await removeLabel('B-merge-ready');
-                console.log("Removed 'B-pr-num' and 'B-merge-ready' labels");
-              } catch (error) {
-                console.error("Error removing labels:", error);
-              }
               throw new Error("PR is not ready");
             }
           

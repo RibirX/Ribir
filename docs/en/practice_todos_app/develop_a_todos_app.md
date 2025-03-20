@@ -203,15 +203,15 @@ Next, we'll add an empty task tabs to the `Column` to set up our entire structur
 ```rust ignore
 @Tabs {
   @Tab {
-    label: "ALL",
+    @{ "ALL" }
     @text! { text: text: "Coming Soon!" }
   }
   @Tab {
-    label: "ACTIVE",
+    @{ "ACTIVE" }
     @text! { text: text: "Coming Soon!" }
   }
   @Tab {
-    label: "DONE",
+    @{ "DONE" }
     @text! { text: "Coming Soon!" }
   }
 }
@@ -373,17 +373,17 @@ Now, in the `compose` of `Todos`, replace the original "coming soon!" with `task
 
 @Tabs {
   @Tab {
-    label: "ALL",
+    @{ "ALL" }
     // new
     @task_lists(&this, |_| true)
   }
   @Tab {
-    label: "ACTIVE",
+    @{ "ACTIVE" }
     // new
     @task_lists(&this, |t| !t.complete )
   }
   @Tab {
-    label: "DONE",
+    @{ "DONE" }
     // new
     @task_lists(&this, |t| t.complete )
   }
@@ -591,15 +591,15 @@ impl Compose for Todos {
         }
         @Tabs {
           @Tab {
-            label: "ALL",
+            @{ "ALL" }
             @task_lists(&this, |_| true)
           }
           @Tab {
-            label: "ACTIVE",
+            @{ "ACTIVE" }
             @task_lists(&this, |t| !t.complete )
           }
           @Tab {
-            label: "DONE",
+            @{ "DONE" }
             @task_lists(&this, |t| t.complete )
           }
         }

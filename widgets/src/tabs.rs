@@ -9,7 +9,7 @@ use crate::prelude::*;
 /// through tabbed navigation.
 ///
 /// Each tab consists of:
-/// - Optional header elements (icon/label)
+/// - Optional header widgets (icon/label)
 /// - Lazy-loaded content pane (`GenWidget`)
 ///
 /// ## Basic Usage
@@ -22,17 +22,17 @@ use crate::prelude::*;
 ///
 /// tabs! {
 ///   @Tab {
-///     label: "News",
+///     @ { "News" }
 ///     @text! { text: "Breaking news content..." }
 ///   }
 ///   @Tab {
-///     label: "Sports",
-///     icon: @Icon { @named_svgs::get_or_default("sports") },
+///     @ { "Sports" }
+///     @Icon { @named_svgs::get_or_default("sports") }
 ///     @text! { text: "Live sports updates..." }
 ///   }
 ///   @Tab {
-///     label: "Settings",
-///     icon: @Icon { @named_svgs::get_or_default("settings") },
+///     @ { "Settings" }
+///     @Icon { @named_svgs::get_or_default("settings") }
 ///     @text! { text: "System configuration..." }
 ///   }
 /// };
@@ -66,18 +66,18 @@ use crate::prelude::*;
 ///     Provider::new(Palette::of(BuildCtx::get()).secondary()),
 ///   ],
 ///   @Tab {
-///     label: "Mail",
-///     icon: @Icon { @named_svgs::get_or_default("mail") },
+///     @ { "Mail" }
+///     @Icon { @named_svgs::get_or_default("mail") }
 ///     @text!{ text: "Mail widget here" }
 ///   }
 ///   @Tab {
-///     label: "Calendar",
-///     icon: @Icon { @named_svgs::get_or_default("calendar") },
+///     @ { "Calendar" }
+///     @Icon { @named_svgs::get_or_default("calendar") }
 ///     @text!{ text: "Calendar widget here" }
 ///   }
 ///   @Tab {
-///     label: "Files",
-///     icon: @Icon { @named_svgs::get_or_default("files") },
+///     @ { "Files" }
+///     @Icon { @named_svgs::get_or_default("files") }
 ///     @text!{ text: "Files widget here" }
 ///   }
 /// };
@@ -118,9 +118,9 @@ class_names! {
 /// The `Tab` is utilized to define a tab within a set of tabs. Each tab
 /// consists of a label and an icon as properties, with a pane as its child
 /// widget.
-#[derive(ChildOfCompose)]
+#[derive(Template)]
 pub struct Tab<'t> {
-  icon: Option<Widget<'t>>,
+  icon: Option<IconTml<'t>>,
   label: Option<TextInit>,
   pane: Option<GenWidget>,
 }
@@ -176,37 +176,6 @@ impl TabInfo {
 
   /// Checks if the tab displays both an icon and a label.
   pub fn has_icon_and_label(&self) -> bool { self.has_icon && self.has_label }
-}
-
-impl<'t> Declare for Tab<'t> {
-  type Builder = Self;
-  fn declarer() -> Self::Builder { Self { icon: None, label: None, pane: None } }
-}
-
-impl<'t> ObjDeclarer for Tab<'t> {
-  type Target = Self;
-
-  fn finish(self) -> Self::Target { self }
-}
-
-impl<'t> Tab<'t> {
-  pub fn label<const M: usize>(mut self, label: impl DeclareInto<CowArc<str>, M>) -> Self {
-    self.label = Some(label.declare_into());
-    self
-  }
-
-  pub fn icon<const M: usize>(mut self, icon: impl IntoWidget<'t, M>) -> Self {
-    self.icon = Some(icon.into_widget());
-    self
-  }
-}
-
-impl<'t> Tab<'t> {
-  pub fn with_child(mut self, pane: impl Into<GenWidget>) -> Self {
-    assert!(self.pane.is_none());
-    self.pane = Some(pane.into());
-    self
-  }
 }
 
 impl Tabs {
@@ -282,7 +251,7 @@ impl<'w> Tab<'w> {
           }
         },
         @ $line {
-          @ { self.icon.map(|icon| class! { class: TAB_ICON, @{ icon } }) }
+          @ { self.icon.map(|icon| icon! { class: TAB_ICON, @{ icon } }) }
           @ { self.label.map(|label| text! { text: label, class: TAB_LABEL }) }
         }
       };
@@ -372,17 +341,17 @@ mod tests {
       v_align: VAlign::Stretch,
       // Tab only label
       @Tab {
-        label: "Tab 1",
+        @{ "Tab 1" }
         @text! { text: "Only label" }
       }
       // Tab only icon
       @Tab {
-         icon: @Icon { @named_svgs::default() },
+         @Icon { @named_svgs::default() }
       }
       // Tab with label and icon
       @Tab {
-        label: "Tab 3",
-        icon: @Icon { @named_svgs::default() },
+        @ { "Tab 3" }
+        @Icon { @named_svgs::default() }
         @text! { text: "Label and icon" }
       }
     })
