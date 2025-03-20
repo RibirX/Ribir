@@ -124,18 +124,18 @@ fn content() -> Widget<'static> {
     fn_widget! {
       @Tabs {
         @Tab {
-          label: "Videos",
-          icon: @Icon { @ { svgs::HOME } },
+          @ { "Videos" }
+          @Icon { @ { svgs::HOME } }
           @void! {}
         }
         @Tab {
-          label: "Photos",
-          icon: @Icon { @ { svgs::HOME } },
+          @ { "Photos" }
+          @Icon { @ { svgs::HOME } }
           @void! {}
         }
         @Tab {
-          label: "Audio",
-          icon: @Icon { @ { svgs::HOME } },
+          @ { "Audio" }
+          @Icon { @ { svgs::HOME } }
           @void! {}
         }
       }
@@ -235,23 +235,23 @@ fn content() -> Widget<'static> {
       h_align: HAlign::Stretch,
       providers: [Provider::new(TabPos::Bottom)],
       @Tab {
-        label: "Actions",
+        @ { "Actions" }
         @actions_show()
       }
       @Tab {
-        label: "Tabs",
+        @ { "Tabs" }
         @tabs_show()
       }
       @Tab {
-        label: "Containment",
+        @ { "Containment" }
         @containment_show()
       }
       @Tab {
-        label: "Lists",
+        @ { "Lists" }
         @lists_show()
       }
       @Tab {
-        label: "Selections",
+        @ { "Selections" }
         @checkbox_show()
       }
     }

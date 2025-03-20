@@ -17,15 +17,15 @@ impl Compose for Todos {
           @Tabs {
             h_align: HAlign::Stretch,
             @Tab {
-              label: "All",
-              @ task_lists(this.clone_writer(), |_| true)
+              @ { "All" }
+              @task_lists(this.clone_writer(), |_| true)
             }
             @Tab {
-              label: "ACTIVE",
-              @ task_lists(this.clone_writer(), |t| !t.complete )
+              @ { "ACTIVE" }
+              @task_lists(this.clone_writer(), |t| !t.complete )
             }
             @Tab {
-              label: "DONE",
+              @ { "DONE" }
               @task_lists(this, |t| t.complete )
             }
           }
