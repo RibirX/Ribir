@@ -2,10 +2,10 @@ use ribir_core::prelude::*;
 
 use crate::layout::HorizontalLine;
 
-#[derive(ChildOfCompose)]
+#[derive(Template)]
 pub struct Leading<T>(T);
 
-#[derive(ChildOfCompose)]
+#[derive(Template)]
 pub struct Trailing<T>(T);
 
 /// `PositionChild` is an enum that can contain a leading child, a trailing
@@ -76,8 +76,20 @@ impl<T> ComposeChildFrom<Leading<T>, 0> for PositionChild<T> {
   fn compose_child_from(from: Leading<T>) -> Self { PositionChild::Leading(from.0) }
 }
 
+impl<T> ComposeChildFrom<LeadingBuilder<T>, 0> for PositionChild<T> {
+  fn compose_child_from(from: LeadingBuilder<T>) -> Self {
+    PositionChild::Leading(from.build_tml().0)
+  }
+}
+
 impl<T> ComposeChildFrom<Trailing<T>, 0> for PositionChild<T> {
   fn compose_child_from(from: Trailing<T>) -> Self { PositionChild::Trailing(from.0) }
+}
+
+impl<T> ComposeChildFrom<TrailingBuilder<T>, 0> for PositionChild<T> {
+  fn compose_child_from(from: TrailingBuilder<T>) -> Self {
+    PositionChild::Trailing(from.build_tml().0)
+  }
 }
 
 impl<T> ComposeChildFrom<T, 0> for PositionChild<T> {
@@ -97,3 +109,23 @@ macro_rules! impl_compose_child_from_for_position {
 }
 
 impl_compose_child_from_for_position!(1, 2, 3);
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn leading_trailing_declare() {
+    reset_test_env!();
+
+    let _leading: Leading<TextInit> = rdl! {
+      @Leading { @{ "Leading" } }
+    }
+    .into_child_compose();
+
+    let _trailing: Trailing<TextInit> = rdl! {
+      @Trailing { @{ "Trailing" } }
+    }
+    .into_child_compose();
+  }
+}
