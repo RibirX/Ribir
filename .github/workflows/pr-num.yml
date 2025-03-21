@@ -31,11 +31,11 @@ jobs:
               per_page: 100
             });
             const hasApproval = reviews.some(review => review.state === 'APPROVED');
-            core.setOutput('is_ready', hasApproval);
+            core.setOutput('has_approval', hasApproval);
 
       # Checkout PR branch if ready
       - name: Checkout PR Branch
-        if: ${{ steps.verify-pr-readiness.outputs.is_ready == 'true' }}
+        if: ${{ steps.verify-pr-readiness.outputs.has_approval == 'true' }}
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
@@ -44,29 +44,33 @@ jobs:
 
       # Configure Git user details once
       - name: Configure Git User
-        if: ${{ steps.verify-pr-readiness.outputs.is_ready == 'true' }}
+        if: ${{ steps.verify-pr-readiness.outputs.has_approval == 'true' }}
         run: |
           git config user.name "RChangelog[bot]"
           git config user.email "155627257+RChangelog[bot]@users.noreply.github.com"
 
       # Update PR number in CHANGELOG.md and commit changes if necessary
       - name: Update PR Number in CHANGELOG.md
-        if: ${{ steps.verify-pr-readiness.outputs.is_ready == 'true' }}
+        if: ${{ steps.verify-pr-readiness.outputs.has_approval == 'true' }}
         shell: bash
-        run : |
+        run: |
           sed -i '/^##/,$ {s/#pr/#${{ github.event.pull_request.number }}/g}' ./CHANGELOG.md
-
-          # Exit early if no changes are detected 
-          git diff --quiet || (git add CHANGELOG.md && git commit --amend --no-edit && git push -f)
-      
+          if git diff --exit-code HEAD^ HEAD -- CHANGELOG.md; then
+            echo "changelog_updated=false" >> $GITHUB_OUTPUT
+          else
+            echo "changelog_updated=true" >> $GITHUB_OUTPUT
+            git add CHANGELOG.md && git commit --amend --no-edit && git push -f
+          fi
       - run: sleep 3s
       # Auto-approve the PR after successful updates (if applicable)
       - name : Auto-Approve PR 
-        if : ${{ steps.verify-pr-readiness.outputs.is_ready == 'true' }}
+        if : ${{ steps.verify-pr-readiness.outputs.has_approval == 'true' && steps.update-pr-number.outputs.changelog_updated == 'true' }}
         uses : hmarr/auto-approve-action@v4 
         with :
-           review-message : "Auto-approved again because only update the PR number."  
-      - name : Manage Label 
+          review-message : "Auto-approved again because only update the PR number."  
+
+      # Manage labels based on PR readiness and changelog updates  
+      - name : Manage Labels
         if: ${{ github.event_name != 'merge_group' }}
         uses : actions/github-script@v7
         with :
@@ -75,29 +79,18 @@ jobs:
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
           
-            const isReady = ${{ steps.verify-pr-readiness.outputs.is_ready == 'true' }};
+            const isReady = ${{ steps.verify-pr-readiness.outputs.has_approval == 'true' }};
+            const changelogUpdated = ${{ steps . update-pr-number . outputs . changelog_updated == 'true'}};
 
-            try { await removeLabel('B-merge-ready');} catch (error) {}
-            if (isReady) {
-              try { await removeLabel('B-pr-num');} catch (error) {}
-              
-              await github.rest.issues.addLabels({
-                owner,
-                repo,
-                issue_number,
-                labels: ['B-pr-num']
-              });
-              console.log("Added 'B-pr-num' label");
-            } else {
-              throw new Error("PR is not ready");
-            }
-          
             async function removeLabel(labelName) {
-              await github.rest.issues.removeLabel({
-                owner,
-                repo,
-                issue_number,
-                name: labelName
-              });
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: labelName }); } catch (error) {} // Ignore errors if label doesn't exist
             }
-    
+
+            if (isReady && changelogUpdated) {   
+              await removeLabel('B-pr-num');
+              await github.rest.issues.addLabels({ owner , repo , issue_number , labels:['B-pr-num'] });
+              console.log("Added 'B-pr-num' label");   
+            } else {   
+              await removeLabel('B-merge-ready');   
+              throw new Error("PR is not ready"); // Exit workflow early when conditions aren't met    
+            }
