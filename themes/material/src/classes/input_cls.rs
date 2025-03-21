@@ -34,18 +34,13 @@ pub(super) fn init(classes: &mut Classes) {
   fn input_border(w: Widget) -> Widget {
     let mut w = FatObj::new(w);
     let blur = Palette::of(BuildCtx::get()).on_surface_variant();
-    let border = match BuildCtx::color() {
-      Variant::Watcher(v) => pipe! {
-        let color = if $w.has_focus() { *$v } else { blur };
-        Border::all(BorderSide::new(1., color.into()))
-      }
-      .declare_into(),
-      Variant::Value(c) => pipe! {
-        let color = if $w.has_focus() { c } else { blur };
-        Border::all(BorderSide::new(1., color.into()))
-      }
-      .declare_into(),
-    };
+
+    let focus_watcher = part_watcher!(&w.has_focus());
+    let border = BuildCtx::color().map_with_watcher(focus_watcher, move |c, focus| {
+      let color = if *focus { *c } else { blur };
+      Border::all(BorderSide::new(1., color.into()))
+    });
+
     w.border(border)
       .radius(md::RADIUS_2)
       .into_widget()
