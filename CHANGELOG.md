@@ -25,6 +25,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **macros**: Fixed `part_xxx!` macro handling of built-in widget state when used as a top-level macro. (#pr @M-Adoo)
+
+
 ## [0.4.0-alpha.29] - 2025-03-19
 
 

@@ -9,7 +9,6 @@ mod part_state;
 mod util;
 use proc_macro::TokenStream;
 use quote::quote;
-use symbol_process::DollarRefsCtx;
 use syn::{DeriveInput, parse_macro_input};
 mod child_template;
 mod fn_widget_macro;
@@ -245,7 +244,7 @@ pub fn watch(input: TokenStream) -> TokenStream { watch_macro::gen_code(input.in
 /// use of `$` is unnecessary.
 #[proc_macro]
 pub fn part_writer(input: TokenStream) -> TokenStream {
-  part_state::gen_part_writer(input.into(), &mut DollarRefsCtx::top_level()).into()
+  part_state::gen_part_writer(input.into(), None).into()
 }
 
 /// The `split_writer` macro creates a split writer from a reference of a
@@ -261,7 +260,7 @@ pub fn part_writer(input: TokenStream) -> TokenStream {
 /// use of `$` is unnecessary.
 #[proc_macro]
 pub fn split_writer(input: TokenStream) -> TokenStream {
-  part_state::gen_split_writer(input.into(), &mut DollarRefsCtx::top_level()).into()
+  part_state::gen_split_writer(input.into(), None).into()
 }
 
 /// The `map_watcher` macro creates a partial watcher from a reference of a
@@ -277,7 +276,7 @@ pub fn split_writer(input: TokenStream) -> TokenStream {
 /// use of `$` is unnecessary.
 #[proc_macro]
 pub fn part_watcher(input: TokenStream) -> TokenStream {
-  part_state::gen_part_watcher(input.into(), &mut DollarRefsCtx::top_level()).into()
+  part_state::gen_part_watcher(input.into(), None).into()
 }
 
 /// The `part_reader` macro creates a partial reader from a reference of a
@@ -293,7 +292,7 @@ pub fn part_watcher(input: TokenStream) -> TokenStream {
 /// use of `$` is unnecessary.
 #[proc_macro]
 pub fn part_reader(input: TokenStream) -> TokenStream {
-  part_state::gen_part_reader(input.into(), &mut DollarRefsCtx::top_level()).into()
+  part_state::gen_part_reader(input.into(), None).into()
 }
 
 /// Includes an SVG file as an `Svg`.

@@ -24,6 +24,7 @@ pub const KW_PIPE: &str = "pipe";
 pub const KW_DISTINCT_PIPE: &str = "distinct_pipe";
 pub const KW_WATCH: &str = "watch";
 pub const KW_PART_WRITER: &str = "part_writer";
+pub const KW_SPLIT_WRITER: &str = "split_writer";
 pub const KW_PART_READER: &str = "part_reader";
 pub const KW_PART_WATCHER: &str = "part_watcher";
 pub const KW_FN_WIDGET: &str = "fn_widget";
@@ -293,13 +294,16 @@ impl Fold for DollarRefsCtx {
       mac.tokens = crate::watch_macro::gen_code(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PART_WRITER) {
-      mac.tokens = crate::part_state::gen_part_writer(mac.tokens, self);
+      mac.tokens = crate::part_state::gen_part_writer(mac.tokens, Some(self));
+      mark_macro_expanded(&mut mac);
+    } else if mac.path.is_ident(KW_SPLIT_WRITER) {
+      mac.tokens = crate::part_state::gen_split_writer(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PART_READER) {
-      mac.tokens = crate::part_state::gen_part_reader(mac.tokens, self);
+      mac.tokens = crate::part_state::gen_part_reader(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PART_WATCHER) {
-      mac.tokens = crate::part_state::gen_part_watcher(mac.tokens, self);
+      mac.tokens = crate::part_state::gen_part_watcher(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PIPE) {
       mac.tokens = crate::pipe_macro::gen_code(mac.tokens, Some(self));
@@ -357,24 +361,27 @@ impl ToTokens for DollarRef {
 
 impl DollarRef {
   pub fn capture_state(&self, var_name: &Ident, tokens: &mut TokenStream) {
-    let Self { name, builtin, used } = self;
+    let state = self.real_state_tokens();
+    let clone_method = match self.used {
+      DollarUsedInfo::Reader => quote!(clone_reader),
+      DollarUsedInfo::Watcher => quote!(clone_watcher),
+      DollarUsedInfo::Writer => quote!(clone_writer),
+    };
 
-    if let Some(BuiltinInfo { host, get_builtin: member, run_before_clone }) = builtin {
-      quote_spanned! { name.span() =>
-        let #var_name = #host #(.#run_before_clone())* .#member()
-      }
+    // Use a single `quote!` macro to generate the tokens for better readability
+    let output = quote_spanned! { self.name.span() =>
+      let #var_name = #state.#clone_method();
+    };
+
+    output.to_tokens(tokens);
+  }
+
+  pub fn real_state_tokens(&self) -> TokenStream {
+    if let Some(BuiltinInfo { host, get_builtin: member, run_before_clone }) = &self.builtin {
+      quote! { #host #(.#run_before_clone())* .#member() }
     } else {
-      quote_spanned! { name.span() => let #var_name = #name }
+      self.name.to_token_stream()
     }
-    .to_tokens(tokens);
-    let span = name.span();
-    match used {
-      DollarUsedInfo::Reader => quote_spanned! { span => .clone_reader() },
-      DollarUsedInfo::Watcher => quote_spanned! { span => .clone_watcher() },
-      DollarUsedInfo::Writer => quote_spanned! { span => .clone_writer() },
-    }
-    .to_tokens(tokens);
-    syn::token::Semi(name.span()).to_tokens(tokens);
   }
 }
 
