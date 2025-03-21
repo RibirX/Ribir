@@ -94,10 +94,15 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             .clone()
             .into_pairs()
             .map(convert_to_builder_pair);
+          let names = fields.iter().map(|f| f.ident.as_ref().unwrap());
           tokens.extend(quote! {
-            #[derive(Default)]
             #vis struct #builder #g_impl #g_where {
               #(#builder_fields)*
+            }
+
+            impl #g_impl Default for #builder #g_ty #g_where {
+              #[inline]
+              fn default() -> Self { Self { #(#names: None),* } }
             }
           });
 
@@ -122,13 +127,18 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             .iter_mut()
             .enumerate()
             .for_each(|(f_idx, f)| with_child_impl(f_idx, f, &mut tokens));
+          let nones = fields.iter().map(|_| quote! { None });
           let builder_fields = fields
             .clone()
             .into_pairs()
             .map(convert_to_builder_pair);
           tokens.extend(quote! {
-            #[derive(Default)]
             #vis struct #builder #g_impl #g_where(#(#builder_fields)*);
+
+            impl #g_impl Default for #builder #g_ty #g_where {
+              #[inline]
+              fn default() -> Self { Self(#(#nones),*) }
+            }
           });
 
           let init_values = fields.iter().enumerate().map(|(idx, field)| {
@@ -155,8 +165,13 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
     syn::Data::Enum(DataEnum { variants, .. }) => {
       let err_str = format!("Child `{}` not specify.", quote! { #name });
       tokens.extend(quote! {
-        #[derive(Default)]
         #vis struct #builder #g_impl #g_where(Option<#name #g_ty>);
+
+        impl #g_impl Default for #builder #g_ty #g_where {
+          fn default() -> Self {
+            Self(None)
+          }
+        }
 
         impl #g_impl TemplateBuilder for #builder #g_ty #g_where {
           type Target = #name #g_ty;
