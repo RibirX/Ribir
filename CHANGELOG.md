@@ -28,6 +28,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **theme**: Added support for the Material Theme using the `DisabledRipple` provider to disable the ripple effect. (#pr by @M-Adoo)
+- **widgets**: Added `defer_alloc` to `Expanded` widget, allowing space allocation to be deferred until after other widgets are allocated. (#pr @M-Adoo)
 
 ### Fixed
 

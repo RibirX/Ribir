@@ -219,6 +219,7 @@ impl<'c> ComposeChild<'c> for Tabs {
           }
         }
         @Expanded {
+          defer_alloc: true,
           @ { pipe!($this.active).map(move |idx| panes[idx].gen_widget()) }
         }
       }
