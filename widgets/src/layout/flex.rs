@@ -203,10 +203,14 @@ impl FlexLayouter {
       self.stretch_and_flex_layout(flex_main, child_clamp, ctx);
     }
 
-    let size = self.finally_size(flex_max);
-    let size = clamp.clamp(size.to_size(dir));
-    self.update_children_position(FlexSize::from_size(size, dir), ctx);
-    size
+    let expect = self.finally_size(flex_max);
+    let real_size = clamp.clamp(expect.to_size(dir));
+    let real = FlexSize::from_size(real_size, dir);
+    let cross_box_offset = self
+      .align_items
+      .align_value(expect.cross, real.cross);
+    self.update_children_position(real.main, cross_box_offset, ctx);
+    real_size
   }
 
   /// Creates child constraints based on wrapping behavior:
@@ -218,12 +222,8 @@ impl FlexLayouter {
       BoxClamp::default()
     } else {
       match self.dir {
-        Direction::Horizontal => clamp
-          .with_min_width(0.)
-          .with_max_width(f32::INFINITY),
-        Direction::Vertical => clamp
-          .with_min_height(0.)
-          .with_max_height(f32::INFINITY),
+        Direction::Horizontal => BoxClamp::max_height(clamp.max.height),
+        Direction::Vertical => BoxClamp::max_width(clamp.max.width),
       }
     }
   }
@@ -332,14 +332,16 @@ impl FlexLayouter {
     FlexSize { main, cross }
   }
 
-  fn update_children_position(&mut self, bound: FlexSize, ctx: &mut LayoutCtx) {
+  fn update_children_position(
+    &mut self, main_bound: f32, cross_box_offset: f32, ctx: &mut LayoutCtx,
+  ) {
     let Self { reverse, dir, align_items, justify_content, lines, .. } = self;
 
     macro_rules! update_position {
       ($($rev: ident)?) => {
-        let mut cross = -self.cross_axis_gap;
+        let mut cross = cross_box_offset - self.cross_axis_gap;
         lines.iter_mut()$(.$rev())?.for_each(|line| {
-          let (mut main, step) = line.place_args(bound.main, *justify_content, self.main_axis_gap);
+          let (mut main, step) = line.place_args(main_bound, *justify_content, self.main_axis_gap);
           let line_cross = line.max_cross();
           line.items_info.iter_mut()$(.$rev())?.for_each(|item| {
             let item_cross_offset =
@@ -762,7 +764,7 @@ mod tests {
     LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 500., 25.)),
     LayoutCase::new(&[0, 0, 0]).with_rect(ribir_geom::rect(0., 0., 200., 25.)),
     LayoutCase::new(&[0, 0, 1]).with_rect(ribir_geom::rect(200., 0., 100., 25.)),
-    LayoutCase::new(&[0, 0, 2]).with_rect(ribir_geom::rect(300., 0., 100., 25.)),
+    LayoutCase::new(&[0, 0, 2]).with_rect(ribir_geom::rect(300., 0., 100., 20.)),
     LayoutCase::new(&[0, 0, 3]).with_rect(ribir_geom::rect(400., 0., 100., 25.))
   );
 
@@ -783,5 +785,17 @@ mod tests {
     LayoutCase::new(&[0, 1])
       .with_y(150.)
       .with_height(500.)
+  );
+
+  widget_layout_test!(
+    cross_greater_than_children,
+    WidgetTester::new(row! {
+      clamp: BoxClamp::min_height(500.),
+      align_items: Align::Center,
+      @Container { size: Size::new(100., 100.) }
+    })
+    .with_wnd_size(Size::new(500., 500.)),
+    LayoutCase::default().with_height(500.),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 200., 100., 100.))
   );
 }

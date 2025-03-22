@@ -207,7 +207,9 @@ impl<'c> ComposeChild<'c> for Tabs {
         class: TABS,
         direction: position.clone().map(TabPos::main_dir),
         reverse: position.clone().map(TabPos::main_reverse),
+        align_items: Align::Stretch,
         @ScrollableWidget {
+          class: TAB_HEADERS_VIEW,
           scrollable: position.clone().map(TabPos::headers_scroll_dir),
           @Flex {
             align_items: Align::Stretch,
