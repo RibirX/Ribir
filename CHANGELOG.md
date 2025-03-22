@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **theme**: Added support for the Material Theme using the `DisabledRipple` provider to disable the ripple effect. (#pr by @M-Adoo)
+
 ### Fixed
 
 - **macros**: Fixed `part_xxx!` macro handling of built-in widget state when used as a top-level macro. (#pr @M-Adoo)

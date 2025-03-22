@@ -205,11 +205,17 @@ fn btn_label_style(line_height: f32) -> TextStyle {
 }
 
 fn base_interactive(w: Widget, radius: Radius) -> Widget {
-  let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(radius));
-  ripple! {
-    bounded: RippleBound::Radius(radius),
-    cursor: CursorIcon::Pointer,
-    @ $hover_layer { @ { w } }
+  if DisabledRipple::get(BuildCtx::get()) {
+    FatObj::new(w)
+      .cursor(CursorIcon::Pointer)
+      .into_widget()
+  } else {
+    let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(radius));
+    ripple! {
+      bounded: RippleBound::Radius(radius),
+      cursor: CursorIcon::Pointer,
+      @ $hover_layer { @ { w } }
+    }
+    .into_widget()
   }
-  .into_widget()
 }
