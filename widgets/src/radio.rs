@@ -1,14 +1,18 @@
 use ribir_core::prelude::*;
 
-use crate::prelude::{PositionChild, icon_with_label};
+use crate::prelude::*;
 
 class_names! {
-  #[doc = "Basic class name for the radio button"]
-  RADIO,
-  #[doc = "Class name for the radio button when selected"]
+  /// The class name for the radio button when selected
   RADIO_SELECTED,
-  #[doc = "Class name for the radio button when unselected"]
+  /// The class name for the radio button when unselected
   RADIO_UNSELECTED,
+  /// Basic class name for the radio button
+  RADIO,
+  /// The icon class name for the selected radio button
+  RADIO_SELECTED_ICON,
+  /// The icon class name for the unselected radio button
+  RADIO_UNSELECTED_ICON
 }
 
 /// A radio button allows you to select one option from a group of options.
@@ -67,23 +71,30 @@ impl Radio {
   fn radio_class_name(&self) -> ClassName {
     if self.selected { RADIO_SELECTED } else { RADIO_UNSELECTED }
   }
+
+  fn radio_icon_class_name(&self) -> ClassName {
+    if self.selected { RADIO_SELECTED_ICON } else { RADIO_UNSELECTED_ICON }
+  }
 }
 
 impl ComposeChild<'static> for Radio {
   type Child = Option<PositionChild<TextInit>>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
-    rdl! {
-      let icon = @Class {
-        class: distinct_pipe!($this.radio_class_name()),
-        @Void { class: RADIO }
-      };
-      @FatObj {
-        on_tap: move |_| $this.write().selected = true,
-        on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
-          $this.write().selected = true
-        },
-        @icon_with_label(icon.into_widget(), child)
+    fat_obj! {
+      on_tap: move |_| $this.write().selected = true,
+      on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
+        $this.write().selected = true
+      },
+      @ {
+        let icon = @Class {
+          class: distinct_pipe!($this.radio_class_name()),
+          @Icon {
+            class: RADIO,
+            @Void { class: distinct_pipe!($this.radio_icon_class_name()) }
+          }
+        };
+        icon_with_label(icon.into_widget(), child)
       }
     }
     .into_widget()

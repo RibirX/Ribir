@@ -1,6 +1,6 @@
 use ribir_core::prelude::*;
 
-use crate::prelude::{PositionChild, icon_with_label};
+use crate::prelude::*;
 
 /// The `Checkbox` allows users to toggle an option on or off, or represent a
 /// list of options that are partially selected.
@@ -48,14 +48,20 @@ pub struct Checkbox {
 }
 
 class_names! {
-  #[doc = "This base class specifies for the checkbox icon."]
-  CHECKBOX,
-  #[doc = "This class specifies the checked checkbox icon"]
+  /// The class name for the container of a checked checkbox.
   CHECKBOX_CHECKED,
-  #[doc = "This class specifies the unchecked checkbox icon."]
+  /// The class name for the container of an unchecked checkbox.
   CHECKBOX_UNCHECKED,
-  #[doc = "This class specifies the indeterminate checkbox icon."]
+  /// The class name for the container of an indeterminate checkbox.
   CHECKBOX_INDETERMINATE,
+  /// The base class name for the checkbox container.
+  CHECKBOX,
+  /// The class name for the icon of an unchecked checkbox.
+  CHECKBOX_UNCHECKED_ICON,
+  /// The class name for the icon of a checked checkbox.
+  CHECKBOX_CHECKED_ICON,
+  /// The class name for the icon of an indeterminate checkbox.
+  CHECKBOX_INDETERMINATE_ICON
 }
 
 impl Checkbox {
@@ -77,23 +83,36 @@ impl Checkbox {
       CHECKBOX_UNCHECKED
     }
   }
+
+  fn icon_class_name(&self) -> ClassName {
+    if self.indeterminate {
+      CHECKBOX_INDETERMINATE_ICON
+    } else if self.checked {
+      CHECKBOX_CHECKED_ICON
+    } else {
+      CHECKBOX_UNCHECKED_ICON
+    }
+  }
 }
 
 impl ComposeChild<'static> for Checkbox {
   type Child = Option<PositionChild<TextInit>>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
-    rdl! {
-      let icon = @Class {
-        class: distinct_pipe!($this.state_class_name()),
-        @Void { class: CHECKBOX }
-      };
-      @FatObj {
-        on_tap: move |_| $this.write().switch_check(),
-        on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
-          $this.write().switch_check()
-        },
-        @ icon_with_label(icon.into_widget(), child)
+    fat_obj! {
+      on_tap: move |_| $this.write().switch_check(),
+      on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
+        $this.write().switch_check()
+      },
+      @ {
+        let icon = @Class {
+          class: distinct_pipe!($this.state_class_name()),
+          @Icon {
+            class: CHECKBOX,
+            @Void { class: distinct_pipe!($this.icon_class_name())}
+          }
+        };
+        icon_with_label(icon.into_widget(), child)
       }
     }
     .into_widget()
@@ -106,7 +125,6 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::prelude::*;
 
   widget_image_tests!(
     checkbox,

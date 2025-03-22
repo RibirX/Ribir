@@ -68,20 +68,24 @@ pub fn init(classes: &mut Classes) {
   );
 
   classes.insert(TAB_HEADER, |w| {
+    let w = class! {
+      clamp: header_clamp(),
+      class: is_active_header().map(move |active| {
+        if active { MD_ACTIVE_HEADER } else { MD_INACTIVE_HEADER }
+      }),
+      cursor: CursorIcon::Pointer,
+      foreground: foreground_color(),
+      @{ w }
+    };
+
+    if DisabledRipple::get(BuildCtx::get()) {
+      return w.into_widget();
+    }
+
     let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(Radius::default()));
     ripple! {
       bounded: RippleBound::Radius(Radius::default()),
-      cursor: CursorIcon::Pointer,
-      foreground: foreground_color(),
-      @ $hover_layer {
-        clamp: header_clamp(),
-        @Class {
-          class: is_active_header().map(move |active| {
-            if active { MD_ACTIVE_HEADER } else { MD_INACTIVE_HEADER }
-          }),
-          @{ w }
-        }
-      }
+      @ $hover_layer { @{ w } }
     }
     .into_widget()
   });
