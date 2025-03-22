@@ -16,7 +16,15 @@ pub fn init(classes: &mut Classes) {
     MD_ACTIVE_HEADER,
   }
 
-  classes.insert(TAB_HEADERS_VIEW, empty_cls);
+  classes.insert(
+    TAB_HEADERS_VIEW,
+    style_class! {
+      h_align: tab_pos_var()
+        .map(|pos| if pos.is_horizontal() { HAlign::Stretch } else { HAlign::Left }),
+      v_align: tab_pos_var()
+        .map(|pos| if !pos.is_horizontal() { VAlign::Stretch } else { VAlign::Top }),
+    },
+  );
   classes.insert(TAB_HEADERS_CONTAINER, |w| {
     stack! {
       providers: providers(),
