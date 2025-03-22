@@ -1,15 +1,25 @@
 use ribir_core::prelude::*;
 use smallvec::SmallVec;
 
-/// A widget that expanded a child of `Flex`, so that the child fills the
-/// available space. If multiple children are expanded, the available space is
-/// divided among them according to the flex factor.
-#[derive(Clone, PartialEq)]
-// `Expand` should not support `FatObj`, as this may cause the `Expanded` to be
-// invisible to its parent. `@Expanded { margin: EdgeInsets::all(10.) }`
-// actually expands as `@Margin { @Expanded { .. } }`.
+/// A widget that expands a child within a `Flex` container, allowing the child
+/// to fill the available space. If multiple children are expanded, the
+/// available space is divided among them based on their flex factor.
+#[derive(Clone, Copy, PartialEq)]
+// `Expand` should not support `FatObj`, as this may cause the `Expanded` widget
+// to become invisible to its parent. For example, `@Expanded { margin:
+// EdgeInsets::all(10.) }` actually expands as `@Margin { @Expanded { .. } }`.
 pub struct Expanded {
+  /// The flex factor determining how much space this child should occupy
+  /// relative to other expanded children.
   pub flex: f32,
+
+  /// Determines if the child widget should defer its space allocation until
+  /// after other widgets have been allocated their space. When set to `true`,
+  /// this expanded widget will not allocate any space initially and will
+  /// ignore its own size constraints. Instead, it will wait for all other
+  /// widgets to be allocated space first, and then divide the remaining
+  /// available space based on its flex factor.
+  pub defer_alloc: bool,
 }
 
 /// Macro used to generate a function widget using `Expanded` as the root
@@ -21,17 +31,27 @@ macro_rules! expanded {
 pub use expanded;
 
 impl Default for Expanded {
-  fn default() -> Self { Self { flex: 1. } }
+  fn default() -> Self { Self { flex: 1., defer_alloc: false } }
 }
 
 #[derive(Default)]
 pub struct ExpandedDeclarer {
   flex: Option<DeclareInit<f32>>,
+  defer_alloc: Option<DeclareInit<bool>>,
 }
 
 impl ExpandedDeclarer {
+  #[track_caller]
   pub fn flex<const M: usize>(mut self, flex: impl DeclareInto<f32, M>) -> Self {
+    assert!(self.flex.is_none(), "`flex` is already set");
     self.flex = Some(flex.declare_into());
+    self
+  }
+
+  #[track_caller]
+  pub fn defer_alloc<const M: usize>(mut self, defer_alloc: impl DeclareInto<bool, M>) -> Self {
+    assert!(self.defer_alloc.is_none(), "`defer_alloc` is already set");
+    self.defer_alloc = Some(defer_alloc.declare_into());
     self
   }
 }
@@ -46,14 +66,25 @@ impl ObjDeclarer for ExpandedDeclarer {
   type Target = DeclarerWithSubscription<State<Expanded>>;
 
   fn finish(self) -> Self::Target {
-    let (v, u) = self.flex.map(|v| v.unzip()).unwrap_or((1., None));
-    let host = State::value(Expanded { flex: v });
+    let (flex, u_flex) = self.flex.map_or((1., None), |v| v.unzip());
+    let (defer_alloc, u_defer_alloc) = self
+      .defer_alloc
+      .map_or((false, None), |v| v.unzip());
+
+    let host = State::value(Expanded { flex, defer_alloc });
     let mut subscribes = SmallVec::new();
-    if let Some(o) = u {
+    if let Some(o) = u_flex {
       let host = host.clone_writer();
       let u = o.subscribe(move |(_, v)| host.write().flex = v);
       subscribes.push(u)
     }
+
+    if let Some(o) = u_defer_alloc {
+      let host = host.clone_writer();
+      let u = o.subscribe(move |(_, v)| host.write().defer_alloc = v);
+      subscribes.push(u)
+    }
+
     DeclarerWithSubscription::new(host, subscribes)
   }
 }

@@ -243,8 +243,17 @@ impl FlexLayouter {
 
       let line = &mut self.current_line;
 
-      let size = ctx.perform_child_layout(c, clamp);
-      let size = FlexSize::from_size(size, dir);
+      let expanded = ctx
+        .query_of_widget::<Expanded>(c)
+        .map(|e| *e)
+        .filter(|e| e.flex.is_normal() && e.flex > 0.);
+
+      let size = if expanded.is_some_and(|e| e.defer_alloc) {
+        FlexSize::default()
+      } else {
+        let size = ctx.perform_child_layout(c, clamp);
+        FlexSize::from_size(size, dir)
+      };
 
       if wrap && !line.is_empty() && line.main_width + size.main > max_main {
         self.place_line();
