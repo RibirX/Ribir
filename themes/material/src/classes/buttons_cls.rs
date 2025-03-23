@@ -33,7 +33,7 @@ fn text_button_init(classes: &mut Classes) {
 
   classes.insert(
     TEXT_BTN,
-    multi_class![
+    class_multi_impl![
       style_class! { padding: md::EDGES_HOR_12, text_style: btn_label_style(18.) },
       interactive
     ],
@@ -44,12 +44,12 @@ fn text_button_init(classes: &mut Classes) {
 
   classes.insert(
     TEXT_BTN_LABEL_ONLY,
-    multi_class![
+    class_multi_impl![
       style_class! { padding: md::EDGES_HOR_12, text_style: btn_label_style(40.) },
       interactive
     ],
   );
-  classes.insert(TEXT_BTN_ICON_ONLY, multi_class![common_icon_only, interactive]);
+  classes.insert(TEXT_BTN_ICON_ONLY, class_multi_impl![common_icon_only, interactive]);
 }
 
 fn filled_button_init(classes: &mut Classes) {
@@ -66,13 +66,13 @@ fn filled_button_init(classes: &mut Classes) {
       .into_widget()
   }
 
-  classes.insert(FILLED_BTN, multi_class![common_btn, filled_interactive]);
+  classes.insert(FILLED_BTN, class_multi_impl![common_btn, filled_interactive]);
   classes.insert(FILLED_BTN_LABEL, common_btn_label);
   classes.insert(FILLED_BTN_LEADING_ICON, empty_cls);
   classes.insert(FILLED_BTN_TRAILING_ICON, empty_cls);
 
-  classes.insert(FILLED_BTN_LABEL_ONLY, multi_class![common_label_only, filled_interactive]);
-  classes.insert(FILLED_BTN_ICON_ONLY, multi_class![common_icon_only, filled_interactive]);
+  classes.insert(FILLED_BTN_LABEL_ONLY, class_multi_impl![common_label_only, filled_interactive]);
+  classes.insert(FILLED_BTN_ICON_ONLY, class_multi_impl![common_icon_only, filled_interactive]);
 }
 
 fn button_init(classes: &mut Classes) {
@@ -89,13 +89,13 @@ fn button_init(classes: &mut Classes) {
       .into_widget()
   }
 
-  classes.insert(BUTTON, multi_class![common_btn, btn_interactive]);
+  classes.insert(BUTTON, class_multi_impl![common_btn, btn_interactive]);
   classes.insert(BTN_LABEL, common_btn_label);
   classes.insert(BTN_LEADING_ICON, empty_cls);
   classes.insert(BTN_TRAILING_ICON, empty_cls);
 
-  classes.insert(BTN_LABEL_ONLY, multi_class![common_label_only, btn_interactive]);
-  classes.insert(BTN_ICON_ONLY, multi_class![common_icon_only, btn_interactive]);
+  classes.insert(BTN_LABEL_ONLY, class_multi_impl![common_label_only, btn_interactive]);
+  classes.insert(BTN_ICON_ONLY, class_multi_impl![common_icon_only, btn_interactive]);
 }
 
 fn fab_init(classes: &mut Classes) {
@@ -145,7 +145,7 @@ fn fab_init(classes: &mut Classes) {
 
   classes.insert(
     FAB_ICON_ONLY,
-    multi_class![
+    class_multi_impl![
       match fab_size() {
         FabSize::Large => style_class! { text_line_height: LARGE_ICON_SIZE },
         _ => common_icon_only,
@@ -156,7 +156,7 @@ fn fab_init(classes: &mut Classes) {
 
   classes.insert(
     FAB_LABEL_ONLY,
-    multi_class![
+    class_multi_impl![
       match fab_size() {
         FabSize::Mini => common_label_only,
         FabSize::Normal =>
@@ -172,7 +172,7 @@ fn fab_init(classes: &mut Classes) {
 
   classes.insert(
     FAB,
-    multi_class![
+    class_multi_impl![
       match fab_size() {
         FabSize::Mini => common_btn,
         FabSize::Normal => style_class! {
