@@ -19,14 +19,14 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(AVATAR_WIDGET, base_avatar);
   classes.insert(
     AVATAR_LABEL_CONTAINER,
-    multi_class![
+    class_multi_impl![
       style_class! { background: BuildCtx::color().into_container_color(BuildCtx::get()) },
       base_container
     ],
   );
   classes.insert(
     AVATAR_LABEL,
-    multi_class![
+    class_multi_impl![
       style_class! {
         foreground: BuildCtx::color().on_this_container_color(BuildCtx::get()),
         text_style: TypographyTheme::of(BuildCtx::get()).title_medium.text.clone()

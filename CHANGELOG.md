@@ -28,6 +28,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: Introduced the `PairOf` utility to preserve parent and child type information of `ComposeChild`. (#pr @M-Adoo)
+- **core**: Added `class_array!` macro to apply multiple classes at once. (#pr by @M-Adoo)·
 
 ### Breaking
 
