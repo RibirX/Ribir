@@ -120,7 +120,7 @@ class_names! {
 /// widget.
 #[derive(Template)]
 pub struct Tab<'t> {
-  icon: Option<IconTml<'t>>,
+  icon: Option<PairOf<'t, Icon>>,
   label: Option<TextInit>,
   pane: Option<GenWidget>,
 }

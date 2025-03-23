@@ -156,6 +156,14 @@ pub trait MultiChild: IntoWidget<'static, RENDER> {
 pub trait ComposeChild<'c>: Sized {
   type Child: 'c;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c>;
+
+  /// Returns a builder for the child template.
+  fn child_template() -> <Self::Child as Template>::Builder
+  where
+    Self::Child: Template,
+  {
+    <Self::Child as Template>::builder()
+  }
 }
 
 /// The trait converts a type into a child of the `SingleChild`.
@@ -259,9 +267,9 @@ pub struct Pair<W, C> {
   child: C,
 }
 
-/// A alias of `Pair<W, Widget>`, means `Widget` is the child of the generic
-/// type.
-pub type WidgetOf<'a, W> = Pair<W, Widget<'a>>;
+/// A pair used to store a `ComposeChild` widget and its child. This preserves
+/// the type information of both the parent and child without composition.
+pub struct PairOf<'c, W: ComposeChild<'c>>(FatObj<Pair<State<W>, <W as ComposeChild<'c>>::Child>>);
 
 impl IntoWidget<'static, RENDER> for Box<dyn MultiChild> {
   #[inline]
@@ -289,6 +297,56 @@ impl<W, C> Pair<W, C> {
   #[inline]
   pub fn parent(self) -> W { self.parent }
 }
+
+impl<'c, W: ComposeChild<'c>> PairOf<'c, W> {
+  pub fn parent(&self) -> &State<W> { &self.0.parent }
+}
+
+impl<'c, W> IntoWidget<'c, COMPOSE> for PairOf<'c, W>
+where
+  W: ComposeChild<'c> + 'static,
+{
+  #[inline]
+  fn into_widget(self) -> Widget<'c> { self.0.into_widget() }
+}
+
+impl<'c, W, C, const M: usize> ComposeChildFrom<Pair<W, C>, M> for PairOf<'c, W>
+where
+  W: ComposeChild<'c> + 'static,
+  C: IntoChildCompose<<W as ComposeChild<'c>>::Child, M>,
+{
+  fn compose_child_from(from: Pair<W, C>) -> Self {
+    let Pair { parent, child } = from;
+    Self(FatObj::new(Pair { parent: State::value(parent), child: child.into_child_compose() }))
+  }
+}
+
+impl<'c, W, C, const M: usize> ComposeChildFrom<Pair<State<W>, C>, M> for PairOf<'c, W>
+where
+  W: ComposeChild<'c> + 'static,
+  C: IntoChildCompose<<W as ComposeChild<'c>>::Child, M>,
+{
+  fn compose_child_from(from: Pair<State<W>, C>) -> Self {
+    let Pair { parent, child } = from;
+    Self(FatObj::new(Pair { parent, child: child.into_child_compose() }))
+  }
+}
+
+impl<'c, W, C, const M: usize> ComposeChildFrom<FatObj<Pair<State<W>, C>>, M> for PairOf<'c, W>
+where
+  W: ComposeChild<'c> + 'static,
+  C: IntoChildCompose<<W as ComposeChild<'c>>::Child, M>,
+{
+  fn compose_child_from(from: FatObj<Pair<State<W>, C>>) -> Self {
+    let pair = from.map(|p| {
+      let Pair { parent, child } = p;
+      Pair { parent, child: child.into_child_compose() }
+    });
+    Self(pair)
+  }
+}
+
+impl<T> ChildOfCompose for FatObj<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -455,27 +513,6 @@ mod tests {
     };
   }
 
-  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-  #[test]
-  fn pair_to_pair() {
-    reset_test_env!();
-
-    #[derive(Declare)]
-    struct P;
-
-    struct X;
-
-    impl<'c> ComposeChild<'c> for P {
-      type Child = WidgetOf<'c, X>;
-      fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'c> {
-        Void.into_widget()
-      }
-    }
-
-    let _ = fn_widget! {
-      @P { @{ Pair::new(X, Void)}}
-    };
-  }
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
   fn fix_multi_fill_for_pair() {
