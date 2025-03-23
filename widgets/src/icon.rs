@@ -68,10 +68,6 @@ pub enum IconChild<'c> {
   Widget(Widget<'c>),
 }
 
-/// The template for the icon widget. It can only be converted from an icon
-/// widget, which helps to enforce the child type constraint.
-pub struct IconTml<'c>(Widget<'c>);
-
 impl<'c> ComposeChild<'c> for Icon {
   type Child = IconChild<'c>;
   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
@@ -143,22 +139,6 @@ impl Render for IconRender {
   fn only_sized_by_parent(&self) -> bool { true }
 }
 
-impl<'c> ComposeChildFrom<Pair<Icon, IconChildBuilder<'c>>, 1> for IconTml<'c> {
-  #[inline]
-  fn compose_child_from(from: Pair<Icon, IconChildBuilder<'c>>) -> Self {
-    IconTml(from.child().build_tml().into_icon_widget())
-  }
-}
-
-impl<'c> ComposeChildFrom<FatObj<Pair<State<Icon>, IconChildBuilder<'c>>>, 1> for IconTml<'c> {
-  fn compose_child_from(from: FatObj<Pair<State<Icon>, IconChildBuilder<'c>>>) -> Self {
-    let w = from
-      .map(|p| p.child().build_tml().into_icon_widget())
-      .into_widget();
-    IconTml(w)
-  }
-}
-
 impl<'c> IconChild<'c> {
   fn into_icon_widget(self) -> Widget<'c> {
     let child = match self {
@@ -170,11 +150,6 @@ impl<'c> IconChild<'c> {
       .with_child(child)
       .into_widget()
   }
-}
-
-impl<'w> IntoWidget<'w, COMPOSE> for IconTml<'w> {
-  #[inline]
-  fn into_widget(self) -> Widget<'w> { self.0 }
 }
 
 #[cfg(test)]

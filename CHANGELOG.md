@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Introduced the `PairOf` utility to preserve parent and child type information of `ComposeChild`. (#pr @M-Adoo)
+
 ### Breaking
 
 - **core**: PipeWidget will be lazy created by pipe value of FnWidget.(#723 @wjian23)
