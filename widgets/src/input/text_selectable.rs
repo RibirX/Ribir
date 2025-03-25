@@ -114,15 +114,19 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
           @OnlySizedByParent {
             @Stack {
               @pipe!{
-                let this = $this;
-                let rcs = this.glyphs()
-                  .map(|glyphs| glyphs.select_range(&$selection.cluster_rg()))
-                  .unwrap_or_default();
-                rcs.into_iter().map(move |rc| @Container {
-                  class: TEXT_SELECTION,
-                  anchor: Anchor::from_point(rc.origin),
-                  size: rc.size,
-                })
+                move || {
+                  let this = $this;
+                  let rcs = this.glyphs()
+                    .map(|glyphs| glyphs.select_range(&$selection.cluster_rg()))
+                    .unwrap_or_default();
+                  rcs.into_iter().map(move |rc| {
+                    @Container {
+                      class: TEXT_SELECTION,
+                      anchor: Anchor::from_point(rc.origin),
+                      size: rc.size,
+                    }
+                  })
+                }
               }
             }
           }

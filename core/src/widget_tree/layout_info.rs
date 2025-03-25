@@ -284,10 +284,15 @@ mod tests {
         on_performed_layout: move |_| *$w_layout_cnt.write() += 1,
         @ {
           pipe!($child_box.size.is_empty())
-            .map(move|b| if b {
-                MockBox { size: Size::new(1., 1.) }.into_widget()
-              } else {
-                child_box.clone_writer().into_widget()
+            .map(move|b| {
+              let child_box = child_box.clone_writer();
+              fn_widget! {
+                if b {
+                  MockBox { size: Size::new(1., 1.) }.into_widget()
+                } else {
+                  child_box.into_widget()
+                }
+              }
             })
         }
       }

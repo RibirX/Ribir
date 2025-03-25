@@ -88,13 +88,15 @@ impl Slider {
     }
   }
 
-  fn stop_indicator_track(&self) -> Option<Widget<'static>> {
+  fn stop_indicator_track(&self) -> Option<impl FnOnce() -> Widget<'static>> {
     let divisions = self.divisions?;
     if divisions == 0 {
       return None;
     }
     let active = (self.ratio() * divisions as f32) as usize;
-    Some(stop_indicator_track(divisions + 1, 0..active, vec![active]))
+    Some(fn_widget! {
+        stop_indicator_track(divisions + 1, 0..active, vec![active])
+    })
   }
 }
 
@@ -256,14 +258,16 @@ impl RangeSlider {
     }
   }
 
-  fn stop_indicator_track(&self) -> Option<Widget<'static>> {
+  fn stop_indicator_track(&self) -> Option<impl FnOnce() -> Widget<'static> + 'static> {
     let divisions = self.divisions?;
     if divisions == 0 {
       return None;
     }
     let start = (self.start_ratio() * divisions as f32) as usize;
     let end = (self.end_ratio() * divisions as f32) as usize;
-    Some(stop_indicator_track(divisions + 1, start..end + 1, vec![start, end]))
+    Some(fn_widget! {
+      stop_indicator_track(divisions + 1, start..end + 1, vec![start, end])
+    })
   }
 }
 

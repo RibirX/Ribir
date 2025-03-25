@@ -49,7 +49,7 @@ pub fn init(classes: &mut Classes) {
         }
       },
       @{ w }
-      @in_parent_layout! { @ { tab_pos_var().map(indicator) } }
+      @in_parent_layout! { @ { tab_pos_var().map(|pos| fn_widget!{ @ { indicator(pos) }}) } }
     }
     .into_widget()
   });

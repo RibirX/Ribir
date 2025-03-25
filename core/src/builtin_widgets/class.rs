@@ -692,7 +692,7 @@ mod tests {
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
         @ {
-          let w = pipe!(*$w_trigger).map(|_|{
+          let w = pipe!(*$w_trigger).map(|_| fn_widget!{
             @Container {size: Size::new(100., 100.) }
           });
           @Class {

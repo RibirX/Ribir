@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{pipe::OptionPipeWidget, prelude::*};
 /// `Variant` is an enum designed to help you store a clone of a provider. It
 /// serves as a shortcut for `Provider::state_of` and `Provider::of`.
 ///
@@ -192,7 +192,7 @@ where
 {
   fn into_widget(self) -> Widget<'static> {
     match self {
-      Variant::Watcher(w) => pipe!($w.clone()).into_widget(),
+      Variant::Watcher(w) => pipe!(move || $w.clone()).into_widget(),
       Variant::Value(v) => v.into_widget(),
     }
   }
@@ -201,14 +201,14 @@ where
 impl<V: 'static, U: 'static, F: 'static, const M: usize> IntoWidget<'static, M> for VariantMap<V, F>
 where
   V: Clone,
-  U: IntoWidget<'static, M>,
+  U: OptionPipeWidget<M>,
   F: Fn(V) -> U,
 {
   fn into_widget(self) -> Widget<'static> {
     let Self { variant, map } = self;
     match variant {
       Variant::Watcher(w) => pipe!(map($w.clone())).into_widget(),
-      Variant::Value(v) => map(v).into_widget(),
+      Variant::Value(v) => map(v).option_to_widget(),
     }
   }
 }

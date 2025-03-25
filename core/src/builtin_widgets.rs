@@ -1048,11 +1048,11 @@ impl FatDeclarerExtend for () {
   fn finish(this: FatObj<()>) -> FatObj<()> { this }
 }
 
-impl<'w, T, const M: usize> IntoWidgetStrict<'w, M> for FatObj<T>
+impl<'w, T, const M: usize> IntoWidget<'w, M> for FatObj<T>
 where
   T: IntoWidget<'w, M>,
 {
-  fn into_widget_strict(self) -> Widget<'w> { self.map(|w| w.into_widget()).compose() }
+  fn into_widget(self) -> Widget<'w> { self.map(|w| w.into_widget()).compose() }
 }
 
 impl<'a> FatObj<Widget<'a>> {
@@ -1181,11 +1181,11 @@ impl<T> DeclarerWithSubscription<T> {
   }
 }
 
-impl<'w, T, const M: usize> IntoWidgetStrict<'w, M> for DeclarerWithSubscription<T>
+impl<'w, T, const M: usize> IntoWidget<'w, M> for DeclarerWithSubscription<T>
 where
   T: IntoWidget<'w, M>,
 {
-  fn into_widget_strict(self) -> Widget<'w> {
+  fn into_widget(self) -> Widget<'w> {
     let DeclarerWithSubscription { inner: host, subscribes } = self;
     let w = host.into_widget();
     if subscribes.is_empty() {

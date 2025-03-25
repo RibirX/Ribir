@@ -186,7 +186,7 @@ fn main() {
 use ribir::prelude::*;
 
 impl Compose for Todos {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidget<FN> {
     fn_widget! {
       @Column {
         align_items: Align::Center,
@@ -278,21 +278,24 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, filter: fn(&Task) -> bool)
     @VScrollBar {
       @Lists {
         @ { pipe!($this;).map(move |_| {
-          // 这里故意写一行不会执行的代码, 告诉 Ribir 
+          move || {
+
+            // 这里故意写一行不会执行的代码, 告诉 Ribir 
           // 当前闭包需要捕获 `this` 的 Writer 而不是 Reader
-          let _hint_capture_writer = || $this.write();
-          
-          let mut widgets = vec![];
-          for id in $this.all_tasks() {
-            if $this.get_task(id).map_or(false, filter) {
-              let task = this.split_writer(
-                move |todos| todos.get_task(id).unwrap(),
-                move |todos| todos.get_task_mut(id).unwrap(),
-              );
-              widgets.push(task_item(task));
+            let _hint_capture_writer = || $this.write();
+            
+            let mut widgets = vec![];
+            for id in $this.all_tasks() {
+              if $this.get_task(id).map_or(false, filter) {
+                let task = this.split_writer(
+                  move |todos| todos.get_task(id).unwrap(),
+                  move |todos| todos.get_task_mut(id).unwrap(),
+                );
+                widgets.push(task_item(task));
+              }
             }
+            widgets
           }
-          widgets
         }) }
       }
     }
@@ -329,7 +332,7 @@ let _hint_capture_writer = || $this.write();
 
 ...
 
-fn task_item<S>(task: S) -> impl IntoWidgetStrict<FN>
+fn task_item<S>(task: S) -> impl IntoWidget<FN>
 where
   S: StateWriter<Value = Task> + 'static,
   S::OriginWriter: StateWriter<Value = Todos>,
@@ -569,7 +572,7 @@ use ribir::prelude::{svgs, *};
 use std::time::Duration;
 
 impl Compose for Todos {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidget<FN> {
     fn_widget! {
       @Column {
         align_items: Align::Center,
@@ -662,7 +665,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
   .into()
 }
 
-fn task_item<S>(task: S) -> impl IntoWidgetStrict<FN>
+fn task_item<S>(task: S) -> impl IntoWidget<FN>
 where
   S::OriginWriter: StateWriter<Value = Todos>,
 {

@@ -405,13 +405,15 @@ fn main() {
     }
     @ {
       pipe!(*$counter).map(move |counter| {
-        (0..counter).map(move |_| {
-          @Container {
-            margin: EdgeInsets::all(2.),
-            size: Size::new(10., 10.),
-            background: Color::RED
-          }
-        })
+        move || {
+          (0..counter).map(move |_| {
+            @Container {
+              margin: EdgeInsets::all(2.),
+              size: Size::new(10., 10.),
+              background: Color::RED
+            }
+          })
+        }
       })
     }
   });
@@ -424,13 +426,15 @@ fn main() {
 
 ```rust ignore
 pipe!(*$counter).map(move |counter| {
-  (0..counter).map(move |_| {
-    @Container {
-      margin: EdgeInsets::all(2.),
-      size: Size::new(10., 10.),
-      background: Color::RED
-    }
-  })
+  move || {
+    (0..counter).map(move |_| {
+      @Container {
+        margin: EdgeInsets::all(2.),
+        size: Size::new(10., 10.),
+        background: Color::RED
+      }
+    })
+  }
 })
 ```
 
@@ -438,13 +442,15 @@ pipe!(*$counter).map(move |counter| {
 
 ```rust ignore
 pipe!{
-  (0..*$counter).map(move |_| {
-    @Container {
-      margin: EdgeInsets::all(2.),
-      size: Size::new(10., 10.),
-      background: Color::RED
-    }
-  })
+  move || {
+    (0..*$counter).map(move |_| {
+      @Container {
+        margin: EdgeInsets::all(2.),
+        size: Size::new(10., 10.),
+        background: Color::RED
+      }
+    })
+  }
 }
 ```
 

@@ -92,7 +92,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
       providers: [Provider::value_of_writer(scroll.clone_writer(), None)],
       @ {
         let h_scrollbar = distinct_pipe!($scroll.is_x_scrollable())
-          .map(move |need_bar| need_bar.then(||{
+          .map(move |need_bar| need_bar.then(|| fn_widget!{
             let mut h_track = @Stack {
               class: H_SCROLL_TRACK,
               h_align: HAlign::Stretch,
@@ -125,7 +125,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
           }));
 
         let v_scrollbar = distinct_pipe!($scroll.is_y_scrollable())
-          .map(move |need_bar| need_bar.then(|| {
+          .map(move |need_bar| need_bar.then(|| fn_widget!{
             let mut v_track = @Stack {
               class: V_SCROLL_TRACK,
               v_align: VAlign::Stretch,

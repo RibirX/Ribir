@@ -123,9 +123,9 @@ where
   }
 }
 
-impl<'w, S, F> IntoWidgetStrict<'w, RENDER> for SplittedWriter<S, F>
+impl<'w, S, F> IntoWidget<'w, RENDER> for SplittedWriter<S, F>
 where
   Self: StateWriter<Value: Render + Sized> + 'w,
 {
-  fn into_widget_strict(self) -> Widget<'w> { WriterRender(self).into_widget() }
+  fn into_widget(self) -> Widget<'w> { WriterRender(self).into_widget() }
 }

@@ -56,10 +56,12 @@ impl<V: Default> Default for KeyChange<V> {
 /// // This widget will be tracked by `Key`, `Pipe` know itself generate `KeyWidget`
 /// fn_widget!{
 ///   @ {
-///     pipe!($trigger;).map(move |_| @KeyWidget {
-///       key: "key",
-///       value: (),
-///       @Void {}
+///     pipe!($trigger;).map(move |_| fn_widget!{
+///       @KeyWidget {
+///         key: "key",
+///         value: (),
+///         @Void {}
+///       }
 ///     })
 ///   }
 /// };
@@ -69,14 +71,16 @@ impl<V: Default> Default for KeyChange<V> {
 /// // generate `KeyWidget`, because the root of generated widget is `Margin`.
 /// fn_widget!{
 ///   @ {
-///     pipe!($trigger;).map(move |_|
-///     @Margin {
+///     pipe!($trigger;).map(move |_| fn_widget!{
+///       @Margin {
 ///       margin: EdgeInsets::all(10.),
-///       @KeyWidget {
-///         key: "key",
-///         value: (),
-///         @Void {}
-///     }})
+///         @KeyWidget {
+///           key: "key",
+///           value: (),
+///           @Void {}
+///         }
+///       }
+///   })
 ///   }
 /// };
 // `KeyWidget` should not support `FatObj`, as this may cause the `KeyWidget` to be invisible to its

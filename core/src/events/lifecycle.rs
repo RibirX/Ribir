@@ -24,14 +24,14 @@ mod tests {
         size: Size::zero(),
         @ {
           pipe!(*$is_empty).map(move |v| {
-            (!v).then(move || {
+            (!v).then(move || fn_widget!{
               @MockBox {
                 size: Size::zero(),
                 on_mounted: move |_| $lifecycle.write().push("static mounted"),
                 on_performed_layout: move |_| $lifecycle.write().push("static performed layout"),
                 on_disposed: move |_| $lifecycle.write().push("static disposed"),
                 @ {
-                  pipe!(*$trigger).map(move |_| {
+                  pipe!(*$trigger).map(move |_| fn_widget!{
                     @MockBox {
                       size: Size::zero(),
                       on_mounted: move |_| $lifecycle.write().push("dyn mounted"),
@@ -110,11 +110,15 @@ mod tests {
       @MockMulti {
         @ {
           pipe!(*$cnt).map(move |cnt| {
-            (0..cnt).map(move |_| @MockBox {
-              size: Size::zero(),
-              on_mounted: move |e| { $mounted.write().insert(e.id); },
-              on_disposed: move |e| { $disposed.write().insert(e.id); },
-            })
+            move || {
+              (0..cnt).map(move |_| {
+                @MockBox {
+                  size: Size::zero(),
+                  on_mounted: move |e| { $mounted.write().insert(e.id); },
+                  on_disposed: move |e| { $disposed.write().insert(e.id); },
+                }
+              })
+            }
           })
         }
       }
