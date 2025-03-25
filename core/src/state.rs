@@ -568,8 +568,8 @@ where
   fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.0.read() }
 }
 
-impl<R: Render> IntoWidgetStrict<'static, RENDER> for State<R> {
-  fn into_widget_strict(self) -> Widget<'static> { WriterRender(self).into_widget() }
+impl<R: Render> IntoWidget<'static, RENDER> for State<R> {
+  fn into_widget(self) -> Widget<'static> { WriterRender(self).into_widget() }
 }
 
 #[cfg(test)]

@@ -26,7 +26,10 @@ impl<T: Default + VisualText + EditText + Clone + 'static> Compose for BasicEdit
       let mut text = FatObj::new(part_writer!(&mut this.host));
 
       let this2 = this.clone_writer();
-      let caret = pipe! { $text.has_focus().then(|| Self::caret_widget(this2.clone_writer()))};
+      let caret = pipe! {
+        let this = this2.clone_writer();
+        $text.has_focus().then(|| fn_widget! {Self::caret_widget(this)})
+      };
       let mut caret = FatObj::new(caret);
 
       @Stack {

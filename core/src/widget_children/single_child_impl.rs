@@ -1,5 +1,5 @@
 use super::*;
-use crate::pipe::InnerPipe;
+use crate::pipe::{InnerPipe, OptionPipeWidget};
 
 /// This trait allows an `Option` of `SingleChild` to compose child.
 pub trait OptionSingleChild {
@@ -61,25 +61,10 @@ macro_rules! impl_single_child_methods_for_pipe {
   };
 }
 
-impl<S, V, F> SingleChild for MapPipe<V, S, F>
-where
-  Self: InnerPipe<Value = V>,
-  V: SingleChild,
-{
-  impl_single_child_methods_for_pipe!();
-}
-
-impl<S, V, F> SingleChild for FinalChain<V, S, F>
-where
-  Self: InnerPipe<Value = V>,
-  V: SingleChild,
-{
-  impl_single_child_methods_for_pipe!();
-}
-
 impl<V> SingleChild for Box<dyn Pipe<Value = V>>
 where
-  V: SingleChild,
+  V: OptionPipeWidget<RENDER> + 'static,
+  <V as OptionPipeWidget<RENDER>>::Widget: SingleChild,
 {
   impl_single_child_methods_for_pipe!();
 }
@@ -87,38 +72,27 @@ where
 macro_rules! impl_single_child_methods_for_pipe_option {
   () => {
     fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c> {
-      let parent = self
-        .map(|w| w.map_or_else(|| Void.into_widget(), V::into_widget))
-        .into_parent_widget();
+      let parent = self.into_parent_widget();
       compose_single_child(parent, child.into_child_single())
     }
 
-    fn into_parent(self: Box<Self>) -> Widget<'static> {
-      self
-        .map(|w| w.map_or_else(|| Void.into_widget(), V::into_widget))
-        .into_parent_widget()
-    }
+    fn into_parent(self: Box<Self>) -> Widget<'static> { self.into_parent_widget() }
   };
 }
-impl<S, V, F> SingleChild for MapPipe<Option<V>, S, F>
+impl<S, V, F> SingleChild for MapPipe<V, S, F>
 where
-  Self: InnerPipe<Value = Option<V>>,
-  V: SingleChild,
+  Self: InnerPipe<Value = V>,
+  V: OptionPipeWidget<RENDER>,
+  <V as OptionPipeWidget<RENDER>>::Widget: SingleChild,
 {
   impl_single_child_methods_for_pipe_option!();
 }
 
-impl<S, V, F> SingleChild for FinalChain<Option<V>, S, F>
+impl<S, V, F> SingleChild for FinalChain<V, S, F>
 where
-  Self: InnerPipe<Value = Option<V>>,
-  V: SingleChild,
-{
-  impl_single_child_methods_for_pipe_option!();
-}
-
-impl<V> SingleChild for Box<dyn Pipe<Value = Option<V>>>
-where
-  V: SingleChild,
+  Self: InnerPipe<Value = V>,
+  V: OptionPipeWidget<RENDER>,
+  <V as OptionPipeWidget<RENDER>>::Widget: SingleChild,
 {
   impl_single_child_methods_for_pipe_option!();
 }
@@ -164,7 +138,7 @@ mod tests {
 
   #[test]
   fn fix_mock_box_compose_pipe_option_widget() {
-    fn _x(w: BoxPipe<Option<Widget<'static>>>) {
+    fn _x(w: BoxPipe<Option<impl Fn() -> Widget<'static> + 'static>>) {
       MockBox { size: ZERO_SIZE }.with_child(w.into_pipe());
     }
   }

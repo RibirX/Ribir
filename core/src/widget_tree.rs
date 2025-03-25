@@ -376,11 +376,11 @@ mod tests {
     let c_c = child.clone_writer();
     let w = fn_widget! {
       @ {
-        pipe!(*$parent).map(move |p|{
+        pipe!(*$parent).map(move |p| fn_widget!{
           if p {
             @MockBox {
               size: Size::zero(),
-              @ { pipe!($child.then(|| Void)) }
+              @ { pipe!($child.then(|| fn_widget!{ @Void {}})) }
             }.into_widget()
           } else {
             Void.into_widget()
@@ -407,7 +407,7 @@ mod tests {
 
     let trigger = Stateful::new(true);
     let c_trigger = trigger.clone_writer();
-    let w = fn_widget! { @ { pipe!($trigger; Void) }};
+    let w = fn_widget! { @ { pipe!($trigger; fn_widget!{ @Void {}}) }};
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
@@ -468,14 +468,16 @@ mod tests {
     let widget = fn_widget! {
       @ MockMulti {
         @{
-          pipe!(*$trigger).map(move |b| {
-            let size = if b > 0 {
-              Size::new(1., 1.)
-            } else {
-              Size::zero()
-            };
-            (0..3).map(move |_| MockBox { size })
-          })
+          pipe!(*$trigger).map(move |b|
+            move || {
+              let size = if b > 0 {
+                Size::new(1., 1.)
+              } else {
+                Size::zero()
+              };
+              (0..3).map(move |_| @MockBox { size } )
+            }
+          )
         }
       }
     };

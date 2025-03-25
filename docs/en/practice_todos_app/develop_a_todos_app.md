@@ -184,7 +184,7 @@ Then, add the following code to `ui.rs` to describe `Todos` as a widget:
 use ribir::prelude::*;
 
 impl Compose for Todos {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidget<FN> {
     fn_widget! {
       @Column {
         align_items: Align::Center,
@@ -329,7 +329,7 @@ Next, let's look at the implementation of `task_item`:
 
 ...
 
-fn task_item<S>(task: S) -> impl IntoWidgetStrict<FN>
+fn task_item<S>(task: S) -> impl IntoWidget<FN>
 where
   S: StateWriter<Value = Task> + 'static,
   S::OriginWriter: StateWriter<Value = Todos>,
@@ -570,7 +570,7 @@ use ribir::prelude::{svgs, *};
 use std::time::Duration;
 
 impl Compose for Todos {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidgetStrict<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidget<FN> {
     fn_widget! {
       @Column {
         align_items: Align::Center,
@@ -663,7 +663,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
   .into()
 }
 
-fn task_item<S>(task: S) -> impl IntoWidgetStrict<FN>
+fn task_item<S>(task: S) -> impl IntoWidget<FN>
 where
   S: StateWriter<Value = Task> + 'static,
   S::OriginWriter: StateWriter<Value = Todos>,

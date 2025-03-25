@@ -14,6 +14,51 @@ use crate::{builtin_widgets::key::AnyKey, prelude::*, render_helper::PureRender}
 
 pub type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
 
+/// Trait used to create a widget from a pipe value.
+pub(crate) trait PipeWidget<const M: usize> {
+  type Widget;
+  fn to_widget(self) -> Widget<'static>;
+}
+
+/// Trait used to create a widget from a option pipe value.
+pub(crate) trait OptionPipeWidget<const M: usize> {
+  type Widget;
+  fn option_to_widget(self) -> Widget<'static>;
+}
+
+impl PipeWidget<FN> for FnWidget<'static> {
+  type Widget = FnWidget<'static>;
+  fn to_widget(self) -> Widget<'static> { self.into_widget() }
+}
+
+impl PipeWidget<FN> for GenWidget {
+  type Widget = GenWidget;
+  fn to_widget(self) -> Widget<'static> { self.into_widget() }
+}
+
+impl<const M: usize, W: IntoWidget<'static, M>, T: FnOnce() -> W> PipeWidget<M> for T {
+  type Widget = W;
+  fn to_widget(self) -> Widget<'static> { self().into_widget() }
+}
+
+impl<const M: usize, W> OptionPipeWidget<M> for W
+where
+  W: PipeWidget<M>,
+{
+  type Widget = W::Widget;
+  fn option_to_widget(self) -> Widget<'static> { self.to_widget() }
+}
+
+impl<const M: usize, W> OptionPipeWidget<M> for Option<W>
+where
+  W: PipeWidget<M>,
+{
+  type Widget = W::Widget;
+  fn option_to_widget(self) -> Widget<'static> {
+    self.map_or_else(|| Void.into_widget(), |f| f.to_widget())
+  }
+}
+
 /// A trait for a value that can be subscribed its continuous modifies.
 pub trait Pipe: 'static {
   type Value;
@@ -95,7 +140,7 @@ impl<V: 'static> BoxPipe<V> {
 pub(crate) trait InnerPipe: Pipe + Sized {
   fn build_single<const M: usize>(self) -> Widget<'static>
   where
-    Self::Value: IntoWidget<'static, M>,
+    Self::Value: OptionPipeWidget<M> + 'static,
   {
     let f = move || {
       let pipe_node = PipeNode::empty_node();
@@ -103,7 +148,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
       let tree_ptr = BuildCtx::get().tree_ptr();
       let init = PipeWidgetBuildInit::new_with_tree(pipe_node.clone(), tree_ptr);
       let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(init));
-      w.into_widget().on_build(move |w| {
+      w.option_to_widget().on_build(move |w| {
         pipe_node.init_for_single(w);
 
         let c_pipe_node = pipe_node.clone();
@@ -115,7 +160,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
             BuildCtx::set_for(old, unsafe { NonNull::new_unchecked(tree_ptr) });
           }
           let ctx = BuildCtx::get_mut();
-          let new = ctx.build(w.into_widget());
+          let new = ctx.build(w.option_to_widget());
           let tree = ctx.tree_mut();
           pipe_node.transplant_to_new(old_node, new, tree);
 
@@ -139,19 +184,20 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     f.into_widget()
   }
 
-  fn build_multi<const M: usize>(self) -> Vec<Widget<'static>>
+  fn build_multi<'w, const M: usize, I>(self) -> Vec<Widget<'w>>
   where
-    Self::Value: IntoIterator,
-    <Self::Value as IntoIterator>::Item: IntoWidget<'static, M>,
+    Self::Value: FnOnce() -> I,
+    I: IntoIterator,
+    <I as IntoIterator>::Item: IntoWidget<'w, M>,
   {
     let node = PipeNode::empty_node();
     let mut init = PipeWidgetBuildInit::new(node.clone());
     let (m, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(init.clone()));
-    let mut iter = m.into_iter();
+    let mut iter = m().into_iter();
 
     let first = iter
       .next()
-      .map_or_else(|| Void.into_widget(), IntoWidget::into_widget);
+      .map_or_else(|| Void.into_widget(), move |v| v.into_widget());
 
     let pipe_node = node.clone();
     let first = first.into_widget().on_build(move |id| {
@@ -177,7 +223,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
 
         let ctx = BuildCtx::get_mut();
         let mut new = vec![];
-        for (idx, w) in m.into_iter().enumerate() {
+        for (idx, w) in m().into_iter().enumerate() {
           let id = ctx.build(w.into_widget());
           new.push(id);
           set_pos_of_multi(id, idx, ctx.tree_mut());
@@ -239,14 +285,14 @@ pub(crate) trait InnerPipe: Pipe + Sized {
   fn into_parent_widget<const M: usize>(self) -> Widget<'static>
   where
     Self: Sized,
-    Self::Value: IntoWidget<'static, M>,
+    Self::Value: OptionPipeWidget<M> + 'static,
   {
     let f = move || {
       let node = PipeNode::empty_node();
       let init = PipeWidgetBuildInit::new_with_tree(node.clone(), BuildCtx::get().tree_ptr());
       let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(init));
 
-      w.into_widget().on_build(move |p| {
+      w.option_to_widget().on_build(move |p| {
         let tree: &mut WidgetTree = BuildCtx::get_mut().tree_mut();
         let leaf = p.single_leaf(tree);
         node.init(p, GenRange::ParentOnly(p..=leaf));
@@ -274,7 +320,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
             });
           }
 
-          let p = BuildCtx::get_mut().build(w.into_widget());
+          let p = BuildCtx::get_mut().build(w.option_to_widget());
           let tree = BuildCtx::get_mut().tree_mut();
           pipe_node.transplant_to_new(old_node, p, tree);
 
@@ -455,57 +501,27 @@ impl<V: 'static> Pipe for ValuePipe<V> {
 
 impl<T: Pipe> InnerPipe for T {}
 
-impl<V, S, F, const M: usize> IntoWidgetStrict<'static, M> for MapPipe<V, S, F>
+impl<V, S, F, const M: usize> IntoWidget<'static, M> for MapPipe<V, S, F>
 where
   Self: InnerPipe<Value = V>,
-  V: IntoWidget<'static, M>,
+  V: OptionPipeWidget<M>,
 {
-  fn into_widget_strict(self) -> Widget<'static> { self.build_single() }
+  fn into_widget(self) -> Widget<'static> { self.build_single() }
 }
 
-impl<V, S, F, const M: usize> IntoWidgetStrict<'static, M> for FinalChain<V, S, F>
+impl<V, S, F, const M: usize> IntoWidget<'static, M> for FinalChain<V, S, F>
 where
   Self: InnerPipe<Value = V>,
-  V: IntoWidget<'static, M>,
+  V: OptionPipeWidget<M>,
 {
-  fn into_widget_strict(self) -> Widget<'static> { self.build_single() }
+  fn into_widget(self) -> Widget<'static> { self.build_single() }
 }
 
-impl<const M: usize, V> IntoWidgetStrict<'static, M> for Box<dyn Pipe<Value = V>>
+impl<const M: usize, V> IntoWidget<'static, M> for Box<dyn Pipe<Value = V>>
 where
-  V: IntoWidget<'static, M>,
+  V: OptionPipeWidget<M> + 'static,
 {
-  fn into_widget_strict(self) -> Widget<'static> { self.build_single() }
-}
-
-impl<V, S, F, const M: usize> IntoWidget<'static, M> for MapPipe<Option<V>, S, F>
-where
-  Self: InnerPipe<Value = Option<V>>,
-  V: IntoWidget<'static, M>,
-{
-  fn into_widget(self) -> Widget<'static> { option_into_widget(self) }
-}
-
-impl<V, S, F, const M: usize> IntoWidget<'static, M> for FinalChain<Option<V>, S, F>
-where
-  Self: InnerPipe<Value = Option<V>>,
-  V: IntoWidget<'static, M>,
-{
-  fn into_widget(self) -> Widget<'static> { option_into_widget(self) }
-}
-
-impl<const M: usize, V> IntoWidget<'static, M> for Box<dyn Pipe<Value = Option<V>>>
-where
-  V: IntoWidget<'static, M>,
-{
-  fn into_widget(self) -> Widget<'static> { option_into_widget(self) }
-}
-
-fn option_into_widget<const M: usize>(
-  p: impl InnerPipe<Value = Option<impl IntoWidget<'static, M>>>,
-) -> Widget<'static> {
-  p.map(|w| w.map_or_else(|| Void.into_widget(), IntoWidget::into_widget))
-    .build_single()
+  fn into_widget(self) -> Widget<'static> { self.build_single() }
 }
 
 fn update_children_key_status(old: WidgetId, new: WidgetId, tree: &WidgetTree) {
@@ -988,7 +1004,7 @@ mod tests {
     let size = Stateful::new(Size::zero());
     let c_size = size.clone_writer();
     let w = fn_widget! {
-      let p = pipe! { MockBox { size: *$size }};
+      let p = pipe! { move|| @MockBox { size: *$size }};
       @$p { @Void {} }
     };
     let wnd = TestWindow::new(w);
@@ -1025,7 +1041,7 @@ mod tests {
       @MockBox {
         size: Size::zero(),
         @ {
-          let p = pipe! { MockBox { size: *$size }};
+          let p = pipe! { move || {MockBox { size: *$size }}};
           @$p { @Void {} }
         }
       }
@@ -1063,8 +1079,10 @@ mod tests {
     let w = fn_widget! {
       let p = pipe! {
         // just use to force update the widget, when trigger modified.
-        $c_trigger;
-        MockBox { size: Size::zero() }
+        fn_widget! {
+          $c_trigger;
+          MockBox { size: Size::zero() }
+        }
       };
       @KeyWidget {
         key: 0,
@@ -1105,13 +1123,15 @@ mod tests {
       @MockMulti {
         @ {
           pipe!($v.clone()).map(move |v| {
-            v.into_iter().map(move |_| {
-              @MockBox{
-                size: Size::zero(),
-                on_mounted: move |_| *$new_cnt.write() += 1,
-                on_disposed: move |_| *$drop_cnt.write() += 1
-              }
-            })
+            move || {
+                v.into_iter().map(move |_| fn_widget!{
+                @MockBox{
+                  size: Size::zero(),
+                  on_mounted: move |_| *$new_cnt.write() += 1,
+                  on_disposed: move |_| *$drop_cnt.write() += 1
+                }
+              })
+            }
           })
         }
       }
@@ -1142,12 +1162,12 @@ mod tests {
     let (mnt_cnt, w_mnt_cnt) = split_value(0);
 
     let w = fn_widget! {
-      pipe!(*$p).map(move |_| {
+      pipe!(*$p).map(move |_| fn_widget!{
         @MockBox {
           size: Size::zero(),
           on_mounted: move |_| *$w_mnt_cnt.write() +=1,
           @{
-            pipe!(*$c).map(move |_| {
+            pipe!(*$c).map(move |_| fn_widget!{
               @MockBox {
                 size: Size::zero(),
                 on_mounted: move |_| *$w_mnt_cnt.write() +=1,
@@ -1197,27 +1217,29 @@ mod tests {
       @MockMulti {
         @ {
           pipe!($v.clone()).map(move |v| {
-            v.into_iter().map(move |(i, c)| {
-              let key = @KeyWidget { key: i, value: c };
-              @$key {
-                @MockBox {
-                  size: Size::zero(),
-                  on_mounted: move |_| {
-                    if $key.is_enter() {
-                      $c_enter_list.write().push($key.value);
-                    }
+            move || {
+              v.into_iter().map(move |(i, c)| fn_widget!{
+                let key = @KeyWidget { key: i, value: c };
+                @$key {
+                  @MockBox {
+                    size: Size::zero(),
+                    on_mounted: move |_| {
+                      if $key.is_enter() {
+                        $c_enter_list.write().push($key.value);
+                      }
 
-                    if $key.is_changed() {
-                      $c_update_list.write().push($key.value);
-                      *$c_key_change.write() = $key.get_change();
+                      if $key.is_changed() {
+                        $c_update_list.write().push($key.value);
+                        *$c_key_change.write() = $key.get_change();
+                      }
+                    },
+                    on_disposed: move |_| if $key.is_leave() {
+                      $c_leave_list.write().push($key.value);
                     }
-                  },
-                  on_disposed: move |_| if $key.is_leave() {
-                    $c_leave_list.write().push($key.value);
                   }
                 }
-              }
-            })
+              })
+            }
           })
         }
       }
@@ -1319,7 +1341,7 @@ mod tests {
       wid: Option<WidgetId>,
     }
 
-    fn build(task: Stateful<Task>) -> impl IntoWidget<'static, FN> {
+    fn build(task: Stateful<Task>) -> impl FnOnce() -> Widget<'static> {
       fn_widget! {
        @TaskWidget {
           keep_alive: pipe!($task.pin),
@@ -1368,7 +1390,7 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ { pipe!{
-          $c_tasks.iter().map(|t| build(t.clone_writer())).collect::<Vec<_>>()
+          move || $c_tasks.iter().map(|t| build(t.clone_writer())).collect::<Vec<_>>()
         }}
       }
     };
@@ -1446,10 +1468,10 @@ mod tests {
 
     let w = fn_widget! {
       @MockMulti {
-        @ { pipe!(*$child).map(move |_| {
+        @ { pipe!(*$child).map(move |_| fn_widget!{
           @MockMulti {
             keep_alive: pipe!(!*$child_destroy_until),
-            @ { pipe!(*$grandson).map(move |_| {
+            @ { pipe!(*$grandson).map(move |_| fn_widget!{
               @MockBox {
                 keep_alive: pipe!(!*$grandson_destroy_until),
                 size: Size::zero(),
@@ -1506,7 +1528,7 @@ mod tests {
     reset_test_env!();
     let _ = fn_widget! {
       let v = Stateful::new(true);
-      let w = pipe!(*$v).map(move |_| Void.into_widget());
+      let w = pipe!(*$v).map(move |_| fn_widget!{ @ Void {} });
       w.into_widget()
     };
   }
@@ -1522,9 +1544,11 @@ mod tests {
       @MockMulti {
         @ {
           pipe!(*$box_count).map(move |v| {
-            (0..v).map(move |_| {
-              pipe!(*$child_size).map(move |size| @MockBox { size })
-            })
+            move || {
+              (0..v).map(move |_| fn_widget!{
+                pipe!(*$child_size).map(move |size| fn_widget! { @MockBox { size } })
+              })
+            }
           })
         }
       }
@@ -1555,10 +1579,12 @@ mod tests {
       @MockMulti {
         @ {
           pipe!(*$box_count).map(move |v| {
-            (0..v).map(move |_| {
-              let pipe_parent = pipe!(*$child_size).map(move |size| @MockBox { size });
-              @$pipe_parent { @Void {} }
-            })
+            move || {
+              (0..v).map(move |_| fn_widget!{
+                let pipe_parent = pipe!(*$child_size).map(move |size| move||{ @MockBox { size } });
+                @$pipe_parent { @Void {} }
+              })
+            }
           })
         }
       }
@@ -1587,9 +1613,9 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          pipe!(*$pipe_trigger).map(move |w| {
+          pipe!(*$pipe_trigger).map(move |w| fn_widget!{
             pipe!(*$inner_pipe_trigger)
-              .map(move |h| @MockBox { size: Size::new(w as f32, h as f32) })
+              .map(move |h| fn_widget! { @MockBox { size: Size::new(w as f32, h as f32) } })
           })
         }
       }
@@ -1618,9 +1644,9 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          pipe!(*$outer).map(move |w| {
+          pipe!(*$outer).map(move |w| fn_widget!{
             let pipe_parent = pipe!(*$inner)
-              .map(move |h| @MockBox { size: Size::new(w as f32, h as f32) });
+              .map(move |h| move|| {@MockBox { size: Size::new(w as f32, h as f32) } });
             @$pipe_parent { @Void {} }
           })
         }
@@ -1653,9 +1679,9 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          let p = pipe!(*$pipe_trigger).map(move |w| {
+          let p = pipe!(*$pipe_trigger).map(move |w| move||{
             pipe!(*$inner_pipe_trigger)
-              .map(move |h| @MockBox { size: Size::new(w as f32, h as f32) })
+              .map(move |h| move|| { @MockBox { size: Size::new(w as f32, h as f32) }})
           });
 
           @$p { @Void {} }
@@ -1688,8 +1714,8 @@ mod tests {
     let c_hit_count = hit_count.clone_writer();
 
     let w = fn_widget! {
-      pipe!($parent;).map(move |_| {
-        pipe!($child;).map(move |_| {
+      pipe!($parent;).map(move |_| fn_widget!{
+        pipe!($child;).map(move |_| fn_widget!{
           *$hit_count.write() += 1;
           Void
         })
@@ -1721,9 +1747,9 @@ mod tests {
     let widget = fn_widget! {
       @MockMulti {
         @{
-          pipe!(*$r1).map(move |_|{
+          pipe!(*$r1).map(move |_| fn_widget!{
             pipe!(*$r2)
-              .map(move |r| {
+              .map(move |r| fn_widget!{
                 @MockBox {
                   background: Color::YELLOW,
                   size: Size::new(100.0, 10.0 * r + 100.),
@@ -1754,15 +1780,17 @@ mod tests {
       @MockMulti {
         @ {
           pipe!($w;).map(move |_| {
-            $w.silent().push(0);
-            (0..10).map(move |idx| {
-              pipe!($w;).map(move |_| {
-                $w.silent().push(idx + 1);
-                @MockBox {
-                  size: Size::new(1., 1.),
-                }
+            move || {
+              $w.silent().push(0);
+              (0..10).map(move |idx| {
+                pipe!($w;).map(move |_| fn_widget!{
+                  $w.silent().push(idx + 1);
+                  @MockBox {
+                    size: Size::new(1., 1.),
+                  }
+                })
               })
-            })
+            }
           })
         }
       }
@@ -1785,10 +1813,12 @@ mod tests {
     let widget = fn_widget! {
       @MockMulti {
         @ {
-          pipe!($m_watcher;).map(move |_| [
-            @ { Void.into_widget() },
-            @ { pipe!($son_watcher;).map(|_| Void).into_widget() }
-          ])
+          pipe!($m_watcher;).map(move |_| {
+            move || {[
+              Void.into_widget() ,
+              pipe!($son_watcher;).map(|_| fn_widget! {@Void{}}).into_widget(),
+            ]}
+          })
         }
       }
     };
@@ -1811,9 +1841,9 @@ mod tests {
 
     let widget = fn_widget! {
       let p = @ {
-        pipe!($m_watcher;).map(move |_| {
+        pipe!($m_watcher;).map(move |_| move||{
           // margin is static, but its child MockBox is a pipe.
-          let p = pipe!($son_watcher;).map(|_| MockBox { size: Size::zero() });
+          let p = pipe!($son_watcher;).map(|_| move|| { MockBox { size: Size::zero() }});
           FatObj::new(p).margin(EdgeInsets::all(1.))
         })
       };

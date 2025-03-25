@@ -25,17 +25,20 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Breaking
+
+- **core**: PipeWidget will be lazy created by pipe value of FnWidget.(#723 @wjian23)
+
 ## [0.4.0-alpha.30] - 2025-03-26
 
 ### Features
 
-- **theme**: Added support for the Material Theme using the `DisabledRipple` provider to disable the ripple effect. (#pr by @M-Adoo)
-- **widgets**: Added `defer_alloc` to `Expanded` widget, allowing space allocation to be deferred until after other widgets are allocated. (#pr @M-Adoo)
+- **theme**: Added support for the Material Theme using the `DisabledRipple` provider to disable the ripple effect. (#722 by @M-Adoo)
+- **widgets**: Added `defer_alloc` to `Expanded` widget, allowing space allocation to be deferred until after other widgets are allocated. (#722 @M-Adoo)
 
 ### Fixed
 
-- **macros**: Fixed `part_xxx!` macro handling of built-in widget state when used as a top-level macro. (#pr @M-Adoo)
-
+- **macros**: Fixed `part_xxx!` macro handling of built-in widget state when used as a top-level macro. (#722 @M-Adoo)
 
 ## [0.4.0-alpha.29] - 2025-03-19
 

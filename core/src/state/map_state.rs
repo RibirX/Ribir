@@ -135,11 +135,11 @@ where
   fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.read() }
 }
 
-impl<'w, S, F> IntoWidgetStrict<'w, RENDER> for MapWriter<S, F>
+impl<'w, S, F> IntoWidget<'w, RENDER> for MapWriter<S, F>
 where
   Self: StateWriter<Value: Render + Sized>,
 {
-  fn into_widget_strict(self) -> Widget<'w> { WriterRender(self).into_widget() }
+  fn into_widget(self) -> Widget<'w> { WriterRender(self).into_widget() }
 }
 
 trait MapReaderFn<Input: ?Sized>: Clone {

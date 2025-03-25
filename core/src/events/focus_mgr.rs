@@ -754,9 +754,11 @@ mod tests {
     let w = fn_widget! {
       @MockMulti{
         @ { pipe! {
-          $visible.map(|_| @MockBox {
-            size: Size::default(),
-            on_tap: move |_| {},
+          $visible.map(|_| fn_widget! {
+            @MockBox {
+              size: Size::default(),
+              on_tap: move |_| {},
+            }
           })}
         }
       }
@@ -824,17 +826,15 @@ mod tests {
     let w = fn_widget! {
       @MockBox{
         size: Size::new(20., 20.),
-        @ { pipe! {
-          if *$focused {
+        @ {
+          pipe!(*$focused).map(move |v| v.then(move || fn_widget!{
             @MockBox {
-              auto_focus: true,
-              on_chars: move |e| $input_writer.write().push_str(&e.chars),
-              size: Size::new(10., 10.),
-            }.into_widget()
-          } else {
-            Void.into_widget()
-          }
-        }}
+            auto_focus: true,
+            on_chars: move |e| $input_writer.write().push_str(&e.chars),
+            size: Size::new(10., 10.),
+            }
+          }))
+        }
       }
     };
     let mut wnd = TestWindow::new(w);
@@ -865,7 +865,7 @@ mod tests {
       @MockMulti{
         @ {
           (0..4).map(move |i| {
-            pipe! (*$active_idx).map(move |idx| {
+            pipe! (*$active_idx).map(move |idx| fn_widget!{
               @MockBox {
                 auto_focus: i == idx,
                 on_chars: move |e| if idx == 2 { $input_writer.write().push_str(&e.chars) },

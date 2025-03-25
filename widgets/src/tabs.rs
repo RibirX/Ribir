@@ -220,7 +220,7 @@ impl<'c> ComposeChild<'c> for Tabs {
         }
         @Expanded {
           defer_alloc: true,
-          @ { pipe!($this.active).map(move |idx| panes[idx].gen_widget()) }
+          @ { pipe!($this.active).map(move |idx| { panes[idx].clone()}) }
         }
       }
     }
@@ -242,7 +242,9 @@ impl<'w> Tab<'w> {
       let inline = Variant::<TabsInlineIcon>::new_or_default(ctx);
       let line = match inline {
         Variant::Value(inline) => inline.into_line_widget(),
-        Variant::Watcher(w) => Box::new(pipe!($w.into_line_widget())),
+        Variant::Watcher(w) => Box::new(
+          pipe!(*$w).map(move |inline| { move|| { inline.into_line_widget()} })
+        ),
       };
 
       let header = @Class {

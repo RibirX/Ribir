@@ -168,7 +168,7 @@ impl Theme {
     let child = pipe!($this;)
       .map(move |_| {
         load_fonts(&this);
-        child.gen_widget()
+        child.clone()
       })
       .into_widget();
     (providers, child)

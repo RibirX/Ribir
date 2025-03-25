@@ -263,14 +263,14 @@ pub struct Pair<W, C> {
 /// type.
 pub type WidgetOf<'a, W> = Pair<W, Widget<'a>>;
 
-impl IntoWidgetStrict<'static, RENDER> for Box<dyn MultiChild> {
+impl IntoWidget<'static, RENDER> for Box<dyn MultiChild> {
   #[inline]
-  fn into_widget_strict(self) -> Widget<'static> { self.into_parent() }
+  fn into_widget(self) -> Widget<'static> { self.into_parent() }
 }
 
-impl IntoWidgetStrict<'static, RENDER> for Box<dyn SingleChild> {
+impl IntoWidget<'static, RENDER> for Box<dyn SingleChild> {
   #[inline]
-  fn into_widget_strict(self) -> Widget<'static> { self.into_parent() }
+  fn into_widget(self) -> Widget<'static> { self.into_parent() }
 }
 
 impl<W, C> Pair<W, C> {
@@ -408,10 +408,8 @@ mod tests {
     // with single child
     let _e = fn_widget! {
       let p = pipe!{
-        if $c_size.area() > 0. {
-          MockBox { size: *$c_size }
-        } else {
-          MockBox { size: Size::new(1., 1.) }
+        move || {
+          @MockBox { size: if $c_size.area() > 0. { *$c_size } else { Size::new(1., 1.)} }
         }
       };
       @$p { @MockBox { size: pipe!(*$c_size) } }
@@ -429,13 +427,17 @@ mod tests {
     let c_size = size.clone_watcher();
     // option with single child
     let _e = fn_widget! {
-      let p = pipe!(($c_size.area() > 0.).then(|| @MockBox { size: Size::zero() }));
+      let p = pipe!(($c_size.area() > 0.).then(|| {
+        move || { @MockBox { size: Size::zero() }}
+      }));
       @$p { @MockBox { size: Size::zero() } }
     };
 
     // option with `Widget`
     let _e = fn_widget! {
-      let p = pipe!(($size.area() > 0.).then(|| @MockBox { size: Size::zero() }));
+      let p = pipe!(($size.area() > 0.).then(|| {
+        move || { @MockBox { size: Size::zero() }}
+      }));
       @$p { @ { Void }}
     };
   }

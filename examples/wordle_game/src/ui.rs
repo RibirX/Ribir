@@ -99,7 +99,10 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
               justify_content: JustifyContent::Center,
               @ {
                 pipe! {
-                  (0..$this.len_hint()).map(move |col| @ { $this.char_grid(row, col) })
+                  move || {
+                    (0..$this.len_hint())
+                    .map(move |col| fn_widget! { @ { $this.char_grid(row, col) }})
+                  }
                 }
               }
             }

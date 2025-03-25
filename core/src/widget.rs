@@ -125,14 +125,6 @@ pub trait IntoWidget<'w, const M: usize>: 'w {
   fn into_widget(self) -> Widget<'w>;
 }
 
-/// A trait used by the framework to implement `IntoWidget`. Unlike
-/// `IntoWidget`, this trait is not implemented for `Widget` itself. This design
-/// choice allows the framework to use either `IntoWidget` or `IntoWidgetStrict`
-/// as a generic bound, preventing implementation conflicts.
-pub(crate) trait IntoWidgetStrict<'w, const M: usize>: 'w {
-  fn into_widget_strict(self) -> Widget<'w>;
-}
-
 impl GenWidget {
   pub fn new(f: impl FnMut() -> Widget<'static> + 'static) -> Self {
     Self(Sc::new(RefCell::new(Box::new(f))))
@@ -152,20 +144,13 @@ impl<'w> IntoWidget<'w, FN> for Widget<'w> {
   fn into_widget(self) -> Widget<'w> { self }
 }
 
-impl<'w, const M: usize, T: IntoWidgetStrict<'w, M>> IntoWidget<'w, M> for T {
-  #[inline(always)]
-  fn into_widget(self) -> Widget<'w> { self.into_widget_strict() }
-}
-
-impl<C: Compose + 'static> IntoWidgetStrict<'static, STATELESS_COMPOSE> for C {
+impl<C: Compose + 'static> IntoWidget<'static, STATELESS_COMPOSE> for C {
   #[inline]
-  fn into_widget_strict(self) -> Widget<'static> {
-    Compose::compose(State::value(self)).into_widget()
-  }
+  fn into_widget(self) -> Widget<'static> { Compose::compose(State::value(self)).into_widget() }
 }
 
-impl<R: Render + 'static> IntoWidgetStrict<'static, RENDER> for R {
-  fn into_widget_strict(self) -> Widget<'static> { Widget::from_render(Box::new(PureRender(self))) }
+impl<R: Render + 'static> IntoWidget<'static, RENDER> for R {
+  fn into_widget(self) -> Widget<'static> { Widget::from_render(Box::new(PureRender(self))) }
 }
 
 impl<W: ComposeChild<'static, Child = Option<C>>, C> Compose for W {
@@ -174,21 +159,21 @@ impl<W: ComposeChild<'static, Child = Option<C>>, C> Compose for W {
   }
 }
 
-impl<'w, F> IntoWidgetStrict<'w, FN> for F
+impl<'w, F> IntoWidget<'w, FN> for F
 where
   F: FnOnce() -> Widget<'w> + 'w,
 {
-  fn into_widget_strict(self) -> Widget<'w> { Widget::from_fn(move |ctx| self().call(ctx)) }
+  fn into_widget(self) -> Widget<'w> { Widget::from_fn(move |ctx| self().call(ctx)) }
 }
 
-impl<'w> IntoWidgetStrict<'w, FN> for FnWidget<'w> {
+impl<'w> IntoWidget<'w, FN> for FnWidget<'w> {
   #[inline]
-  fn into_widget_strict(self) -> Widget<'w> { self.0.into_widget_strict() }
+  fn into_widget(self) -> Widget<'w> { self.0.into_widget() }
 }
 
-impl IntoWidgetStrict<'static, FN> for GenWidget {
+impl IntoWidget<'static, FN> for GenWidget {
   #[inline]
-  fn into_widget_strict(self) -> Widget<'static> { self.gen_widget() }
+  fn into_widget(self) -> Widget<'static> { self.gen_widget() }
 }
 
 impl<'w> Widget<'w> {

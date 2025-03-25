@@ -50,7 +50,7 @@ fn task_lists(
     @Scrollbar {
       on_mounted: move |_| c_stagger.run(),
       @ {
-        pipe!($this;).map(move |_| {
+        pipe!($this;).map(move |_| fn_widget!{
           let _hint_capture_this = || $this.write();
           let mut widgets = vec![];
 
@@ -63,7 +63,7 @@ fn task_lists(
               );
               let item = pipe!(*$editing == Some(id))
                 .value_chain(|s| s.distinct_until_changed().box_it())
-                .map(move |b|{
+                .map(move |b| fn_widget!{
                   if b {
                     @Container {
                       size: Size::new(f32::INFINITY, 64.),

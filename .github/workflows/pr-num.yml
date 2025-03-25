@@ -50,12 +50,15 @@ jobs:
           git config user.email "155627257+RChangelog[bot]@users.noreply.github.com"
 
       # Update PR number in CHANGELOG.md and commit changes if necessary
-      - name: Update PR Number in CHANGELOG.md
+      - name: Update Changelog
         if: ${{ steps.verify-pr-readiness.outputs.has_approval == 'true' }}
         shell: bash
         run: |
+          # Replace placeholder with PR number in CHANGELOG.md
           sed -i '/^##/,$ {s/#pr/#${{ github.event.pull_request.number }}/g}' ./CHANGELOG.md
-          if git diff --exit-code HEAD^ HEAD -- CHANGELOG.md; then
+          
+          # Check if changelog was modified and set output accordingly
+          if git diff --exit-code --quiet CHANGELOG.md; then
             echo "changelog_updated=false" >> $GITHUB_OUTPUT
           else
             echo "changelog_updated=true" >> $GITHUB_OUTPUT
@@ -64,7 +67,7 @@ jobs:
       - run: sleep 3s
       # Auto-approve the PR after successful updates (if applicable)
       - name : Auto-Approve PR 
-        if : ${{ steps.verify-pr-readiness.outputs.has_approval == 'true' && steps.update-pr-number.outputs.changelog_updated == 'true' }}
+        if : ${{ steps.verify-pr-readiness.outputs.has_approval == 'true' && steps.update-changelog.outputs.changelog_updated == 'true' }}
         uses : hmarr/auto-approve-action@v4 
         with :
           review-message : "Auto-approved again because only update the PR number."  
@@ -80,7 +83,7 @@ jobs:
             const issue_number = context.payload.pull_request.number;
           
             const isReady = ${{ steps.verify-pr-readiness.outputs.has_approval == 'true' }};
-            const changelogUpdated = ${{ steps . update-pr-number . outputs . changelog_updated == 'true'}};
+            const changelogUpdated = ${{ steps.update-changelog.outputs.changelog_updated == 'true'}};
 
             async function removeLabel(labelName) {
               try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: labelName }); } catch (error) {} // Ignore errors if label doesn't exist

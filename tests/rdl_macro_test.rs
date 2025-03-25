@@ -197,12 +197,13 @@ fn pipe_single_parent() {
   let w = fn_widget! {
     let edges = EdgeInsets::all(5.);
     let blank = pipe! {
-      let w: Box<dyn SingleChild> = if *$outside_blank {
-        Box::new(Margin { margin: edges })
-      } else {
-        Box::new(FittedBox::new(BoxFit::None))
-      };
-      w
+      move || -> Box<dyn SingleChild> {
+        if *$outside_blank {
+          Box::new(Margin { margin: edges })
+        } else {
+          Box::new(FittedBox::new(BoxFit::None))
+        }
+      }
     };
     rdl!{
       $blank {
@@ -228,12 +229,13 @@ fn pipe_multi_parent() {
   let stack_or_flex2 = stack_or_flex.clone_writer();
   let w = fn_widget! {
     let container = pipe! {
-      let p: Box<dyn MultiChild> = if *$stack_or_flex {
-        Box::new(rdl!{ Stack { } })
-      } else {
-        Box::new(rdl!{ Flex { } })
-      };
-      p
+      move || -> Box<dyn MultiChild> {
+        if *$stack_or_flex {
+          Box::new(rdl!{ Stack { } })
+        } else {
+          Box::new(rdl!{ Flex { } })
+        }
+      }
     };
 
     rdl!{
@@ -261,7 +263,11 @@ fn pipe_as_child() {
   let box_or_not2 = box_or_not.clone_watcher();
   let w = fn_widget! {
     let blank = pipe!{
-      $box_or_not2.then(|| rdl!{ SizedBox { size: Size::new(100., 100.) } })
+      $box_or_not2.then(|| {
+        move || {
+          rdl!{ SizedBox { size: Size::new(100., 100.) } }
+        }
+      })
     };
     rdl!{ Stack { rdl!{ blank } } }
   };
@@ -284,7 +290,12 @@ fn pipe_as_multi_child() {
   let w = fn_widget! {
     let fix_box = SizedBox { size: Size::new(100., 100.) };
     let boxes = pipe! {
-      (0..*$cnt).map(|_| fix_box.clone()).collect::<Vec<_>>()
+      let fix_box = fix_box.clone();
+      move || {
+        (0..*$cnt).map(move |_| {
+          fix_box.clone()
+        })
+      }
     };
     rdl!{ Flex { rdl!{ boxes } } }
   };
@@ -480,9 +491,9 @@ fn expression_for_children() {
   let size_five = Size::new(5., 5.);
   let embed_expr = fn_widget! {
     let sized_box = @SizedBox { size: size_one };
-    let multi_box = (0..3).map(move |_| @SizedBox { size: pipe!($sized_box.size) });
+    let multi_box = (0..3).map(move |_| fn_widget! { @SizedBox { size: pipe!($sized_box.size) }});
     let pipe_box = pipe!($sized_box.size.area() > 2.)
-      .map(move |v| v.then(|| @SizedBox { size: pipe!($sized_box.size) }));
+      .map(move |v| v.then(|| fn_widget! { @SizedBox { size: pipe!($sized_box.size) } }));
 
     @Flex {
       on_tap: move |_| $sized_box.write().size = size_five,
@@ -735,7 +746,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
 
     @$container {
       @ {
-        pipe!{$trigger.then(|| {
+        pipe!{$trigger.then(|| fn_widget!{
           @SizedBox { size: Size::zero() }
         })}
       }
@@ -782,10 +793,10 @@ fn fix_silent_not_relayout_dyn_widget() {
   let c_trigger_size = trigger_size.clone_writer();
   let w = fn_widget! {
     pipe! {
-      if $trigger_size.area() > 0. {
-        SizedBox { size: *$trigger_size }
-      } else {
-        SizedBox { size: ZERO_SIZE }
+      fn_widget! {
+        @SizedBox {
+          size: if $trigger_size.area() > 0. { *$trigger_size } else { ZERO_SIZE}
+        }
       }
     }
   };

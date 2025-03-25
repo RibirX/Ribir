@@ -441,7 +441,7 @@ impl Drop for AppRunGuard {
 impl EventSender {
   pub fn send(&self, e: AppEvent) {
     if let Err(err) = self.0.send_event(e) {
-      log::error!("{}", err.to_string())
+      log::error!("{}", err)
     }
   }
 }

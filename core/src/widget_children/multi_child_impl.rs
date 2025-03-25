@@ -1,5 +1,5 @@
 use super::*;
-use crate::pipe::InnerPipe;
+use crate::pipe::{InnerPipe, PipeWidget};
 
 pub struct MultiPair<'a> {
   pub(crate) parent: Widget<'static>,
@@ -31,20 +31,9 @@ impl<'a> MultiPair<'a> {
   }
 }
 
-impl<'c> IntoChildMulti<'c, 0, 0> for Widget<'c> {
-  fn into_child_multi(self) -> impl Iterator<Item = Widget<'c>> { std::iter::once(self) }
-}
-
-// Choose `IntoWidgetStrict` for child widgets instead of `IntoWidget`. This is
-// because `IntoWidget` may lead
-// `Pipe<Value = Option<impl IntoWidget>>` has two implementations:
-//
-// - As a single widget child, satisfy the `IntoWidget` requirement, albeit not
-//   `IntoWidget`.
-// - As a `Pipe` that facilitates iteration over multiple widgets.
-impl<'w, const M: usize, W: IntoWidgetStrict<'w, M>> IntoChildMulti<'w, 0, M> for W {
+impl<'w, const M: usize, W: IntoWidget<'w, M>> IntoChildMulti<'w, 0, M> for W {
   fn into_child_multi(self) -> impl Iterator<Item = Widget<'w>> {
-    std::iter::once(self.into_widget_strict())
+    std::iter::once(self.into_widget())
   }
 }
 
@@ -58,11 +47,12 @@ where
   }
 }
 
-impl<'w, const M: usize, C> IntoChildMulti<'w, 2, M> for C
+impl<'w, C, const M: usize, I, W> IntoChildMulti<'w, 2, M> for C
 where
   C: InnerPipe,
-  C::Value: IntoIterator,
-  <C::Value as IntoIterator>::Item: IntoWidget<'static, M>,
+  C::Value: FnOnce() -> I,
+  I: IntoIterator<Item = W>,
+  W: IntoWidget<'w, M>,
 {
   fn into_child_multi(self) -> impl Iterator<Item = Widget<'w>> { self.build_multi().into_iter() }
 }
@@ -95,25 +85,28 @@ macro_rules! impl_pipe_methods {
   };
 }
 
-impl<S, V, F> MultiChild for MapPipe<V, S, F>
+impl<S, F, W> MultiChild for MapPipe<W, S, F>
 where
-  Self: InnerPipe<Value = V>,
-  V: MultiChild,
+  Self: InnerPipe<Value = W>,
+  W: PipeWidget<RENDER>,
+  W::Widget: MultiChild + 'static,
 {
   impl_pipe_methods!();
 }
 
-impl<S, V, F> MultiChild for FinalChain<V, S, F>
+impl<S, F, W> MultiChild for FinalChain<W, S, F>
 where
-  Self: InnerPipe<Value = V>,
-  V: MultiChild,
+  Self: InnerPipe<Value = W>,
+  W: PipeWidget<RENDER>,
+  W::Widget: MultiChild + 'static,
 {
   impl_pipe_methods!();
 }
 
-impl<V> MultiChild for Box<dyn Pipe<Value = V>>
+impl<W> MultiChild for Box<dyn Pipe<Value = W>>
 where
-  V: MultiChild,
+  W: PipeWidget<RENDER> + 'static,
+  W::Widget: MultiChild + 'static,
 {
   impl_pipe_methods!();
 }
@@ -160,8 +153,8 @@ impl MultiChild for Box<dyn MultiChild> {
   fn into_parent(self: Box<Self>) -> Widget<'static> { todo!() }
 }
 
-impl<'w> IntoWidgetStrict<'w, RENDER> for MultiPair<'w> {
-  fn into_widget_strict(self) -> Widget<'w> {
+impl<'w> IntoWidget<'w, RENDER> for MultiPair<'w> {
+  fn into_widget(self) -> Widget<'w> {
     let MultiPair { parent, children } = self;
     Widget::new(parent, children)
   }

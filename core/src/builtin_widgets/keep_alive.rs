@@ -59,15 +59,13 @@ mod tests {
     let remove_widget = Stateful::new(false);
     let c_remove_widget = remove_widget.clone_writer();
     let mut wnd = TestWindow::new(fn_widget! {
-      pipe! {
-        if *$remove_widget {
-          Void.into_widget()
-        } else {
-          FatObj::new(Void)
-            .keep_alive(pipe!(*$keep_alive))
-            .into_widget()
-        }
-      }
+      pipe!(*$remove_widget).map(move |v|
+        (!v).then(move || fn_widget!{
+          @Void {
+            keep_alive: pipe!(*$keep_alive)
+          }
+        })
+      )
     });
 
     let root = wnd.tree().content_root();

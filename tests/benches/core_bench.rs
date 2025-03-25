@@ -18,7 +18,9 @@ impl Compose for Embed {
         MockBox { size: Size::new(10., 10.) }.into_widget()
       };
       let multi = pipe!{
-        (0..$this.width - 1).map(|_| MockBox { size: Size::new(10., 10.)})
+        move || {
+          (0..$this.width - 1).map(|_|  MockBox { size: Size::new(10., 10.)})
+        }
       };
       MockMulti
         .with_child(multi)
@@ -41,13 +43,15 @@ impl Compose for Recursive {
         @{
           pipe!(($this.width, $this.depth))
             .map(move |(width, depth)| {
-              (0..width).map(move |_| -> Widget {
-                if depth > 1 {
-                  Recursive { width, depth: depth - 1 }.into_widget()
-                } else {
-                  MockBox { size: Size::new(10., 10.)}.into_widget()
-                }
-              })
+              move || {
+                (0..width).map(move |_| fn_widget! {
+                  if depth > 1 {
+                    Recursive { width, depth: depth - 1 }.into_widget()
+                  } else {
+                    MockBox { size: Size::new(10., 10.)}.into_widget()
+                  }
+                })
+              }
             })
         }
       }

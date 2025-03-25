@@ -512,7 +512,7 @@ mod tests {
     let mix_keep = fn_widget! {
       let pipe_w = FatObj::new( pipe! {
         $trigger;
-        @Void { on_performed_layout: move |_| {} }
+        fn_widget! { @Void { on_performed_layout: move |_| {} }}
       });
 
       @ $pipe_w {

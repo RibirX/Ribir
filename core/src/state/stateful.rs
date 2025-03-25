@@ -195,19 +195,19 @@ impl WriterInfo {
   pub(crate) fn dec_writer(&self) { self.writer_count.set(self.writer_count.get() - 1); }
 }
 
-impl<W: Render + 'static> IntoWidgetStrict<'static, RENDER> for Stateful<W> {
-  fn into_widget_strict(self) -> Widget<'static> { WriterRender(self).into_widget() }
+impl<W: Render + 'static> IntoWidget<'static, RENDER> for Stateful<W> {
+  fn into_widget(self) -> Widget<'static> { WriterRender(self).into_widget() }
 }
 
-impl<W: Compose + 'static, T> IntoWidgetStrict<'static, COMPOSE> for T
+impl<W: Compose + 'static, T> IntoWidget<'static, COMPOSE> for T
 where
   T: StateWriter<Value = W>,
 {
-  fn into_widget_strict(self) -> Widget<'static> { Compose::compose(self) }
+  fn into_widget(self) -> Widget<'static> { Compose::compose(self) }
 }
 
-impl<W: Render> IntoWidgetStrict<'static, RENDER> for Reader<W> {
-  fn into_widget_strict(self) -> Widget<'static> {
+impl<W: Render> IntoWidget<'static, RENDER> for Reader<W> {
+  fn into_widget(self) -> Widget<'static> {
     match Sc::try_unwrap(self.0) {
       Ok(r) => r.into_inner().into_widget(),
       Err(s) => s.into_widget(),

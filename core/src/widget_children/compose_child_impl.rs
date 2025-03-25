@@ -119,14 +119,14 @@ where
   }
 }
 
-impl<'w, W, C, const M: usize> IntoWidgetStrict<'w, M> for Pair<W, C>
+impl<'w, W, C, const M: usize> IntoWidget<'w, M> for Pair<W, C>
 where
   W: StateWriter,
   W::Value: ComposeChild<'w>,
   C: IntoChildCompose<<W::Value as ComposeChild<'w>>::Child, M> + 'w,
 {
   #[inline]
-  fn into_widget_strict(self) -> Widget<'w> {
+  fn into_widget(self) -> Widget<'w> {
     let Self { parent, child } = self;
     ComposeChild::compose_child(parent, child.into_child_compose()).into_widget()
   }
@@ -395,7 +395,7 @@ mod tests {
       @EnumTest {
         @ Void {}
         @ { "test" }
-        @ { pipe!(*$v).map(|_| @Void {}) }
+        @ { pipe!(*$v).map(|_| fn_widget! { @Void {} }) }
         @ MockStack { @Void {} }
         @ {w}
       }
