@@ -76,7 +76,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             type Target = Self;
             #[track_caller]
             fn with_child(mut self, c: _C) -> Self::Target {
-              assert!(self.#field_name.is_none(), "Try to fill same type twice.");
+              assert!(self.#field_name.is_none(), concat!("Already has a `", stringify!(#ty), "` child"));
               self.#field_name = Some(c.into_child_compose());
               self
             }
@@ -198,7 +198,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
                 type Target = Self;
                 #[track_caller]
                 fn with_child(mut self, c: _C) -> Self::Target {
-                  assert!(self.0.is_none(), "Try to fill same type twice.");
+                  assert!(self.0.is_none(), concat!("Already has a `", stringify!(#ty), "` child."));
                   self.0 = Some(#name::#v_name(c.into_child_compose()));
                   self
                 }
