@@ -93,8 +93,6 @@ mod tokens_pre_process {
           // maybe rust identify bind syntax, `identify @`
           if at.as_char() == '@' && !matches!(tokens.last(), Some(TokenTree::Ident(_))) =>
         {
-          tokens.push(TokenTree::Ident(Ident::new(KW_RDL, at.span())));
-          tokens.push(not_token(at.span()));
           let mut rdl_group = smallvec::SmallVec::<[TokenTree; 3]>::default();
            match iter.next() {
             // declare a variable widget as parent,  `@ $var { ... }`
@@ -123,12 +121,16 @@ mod tokens_pre_process {
               };
             },
           };
+
+          let span = tokens_span(&rdl_group);
+          tokens.push(TokenTree::Ident(Ident::new(KW_RDL, span)));
+          tokens.push(not_token(span));
           if let Some(TokenTree::Group(_)) = rdl_group.last()  {
             let rdl_group = TokenStream::from_iter(rdl_group);
             tokens.push(TokenTree::Group(Group::new(Delimiter::Brace, rdl_group)));
           } else {
             let follow = rdl_group.last().map(|n| n.span());
-            return Err(Error::RdlAtSyntax{at: at.span(), follow});
+            return Err(Error::RdlAtSyntax{at: span, follow});
           }
         }
         Some(TokenTree::Punct(p)) if p.as_char() == '$' => {
@@ -163,6 +165,12 @@ mod tokens_pre_process {
       };
     }
     Ok(tokens.into_iter().collect())
+  }
+
+  fn tokens_span(tokens: &[TokenTree]) -> Span {
+    let start = tokens.first().unwrap().span();
+    let end = tokens.last().unwrap().span();
+    start.join(end).unwrap_or(start)
   }
 
   fn in_macro(tokens: &[TokenTree]) -> bool {
