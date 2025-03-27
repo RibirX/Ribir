@@ -72,7 +72,7 @@ fn task_lists(
                           $task.write().label = text.to_string();
                           *$editing.write() = None;
                         });
-                        let input = FatObj::new(input);
+                        let mut input = FatObj::new(input);
                         @ $input {
                           v_align: VAlign::Center,
                           on_key_down: move |e| {
@@ -86,7 +86,7 @@ fn task_lists(
                   } else {
                     let _hint = || $stagger.write();
                     let item = task_item_widget(task.clone_writer(), stagger.clone_writer());
-                    let item = FatObj::new(item);
+                    let mut item = FatObj::new(item);
                     @ $item {
                       on_double_tap: move |_| *$editing.write() = Some(id)
                     }.into_widget()
@@ -170,7 +170,7 @@ where
       }))
       @Trailing::new(EdgeWidget::Icon({
         let icon = svgs::CLOSE;
-        let icon = FatObj::new(icon);
+        let mut icon = FatObj::new(icon);
         @ $icon {
           cursor: CursorIcon::Pointer,
           on_tap: move |e| Provider::write_of::<Todos>(e).unwrap().remove(id)

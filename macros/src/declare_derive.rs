@@ -1,98 +1,102 @@
 use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
-use syn::{Fields, Ident, Visibility, spanned::Spanned};
+use syn::{Ident, Visibility, spanned::Spanned};
 
 use crate::{
   simple_declare_attr::*,
-  util::data_struct_unwrap,
   variable_names::{BUILTIN_INFOS, BuiltinMemberType},
 };
 
-const DECLARE: &str = "Declare";
+pub(crate) fn declare_derive(stt: &mut syn::ItemStruct) -> syn::Result<TokenStream> {
+  let declarer = Declarer::new(stt)?;
 
-pub(crate) fn declare_derive(input: &mut syn::DeriveInput) -> syn::Result<TokenStream> {
-  let syn::DeriveInput { vis, ident: host, generics, data, .. } = input;
-  let stt = data_struct_unwrap(data, DECLARE)?;
+  let Declarer { name, fields, original, .. } = &declarer;
+  // reverse name check.
+  fields
+    .iter()
+    .try_for_each(DeclareField::check_reserve)?;
+  let syn::ItemStruct { vis, ident: host, generics, .. } = &original;
 
-  let mut tokens: TokenStream = if stt.fields.is_empty() {
-    empty_impl(host, &stt.fields)
-  } else {
-    let extend_declare = Ident::new(&format!("{host}DeclareExtend"), host.span());
-    let declarer = Declarer::new(host, &mut stt.fields)?;
-    if declarer.all_fields_skipped() {
-      self_impl(host, generics, declarer.all_members())
-    } else {
-      let Declarer { name, fields, .. } = &declarer;
-      // reverse name check.
-      fields
-        .iter()
-        .try_for_each(DeclareField::check_reserve)?;
-      let set_methods = declarer_set_methods(fields);
+  let set_methods = declarer_set_methods(vis, fields);
+  let (g_impl, g_ty, g_where) = generics.split_for_impl();
+  let builder_members = declarer.builder_members();
+  let builder_members_2 = declarer.builder_members();
+  let builder_tys = declarer.builder_tys();
 
-      let field_names = declarer.fields.iter().map(DeclareField::member);
-      let field_names2 = field_names.clone();
+  let mut tokens = quote! {
+   #vis struct #name #generics #g_where {
+     fat_ಠ_ಠ: FatObj<()>,
+     _marker: std::marker::PhantomData<#host #g_ty>,
+     #(
+       #[allow(clippy::type_complexity)]
+       #builder_members : Option<DeclareInit<#builder_tys>>,
+     )*
+   }
 
-      let (builder_f_names, builder_f_tys) = declarer.declare_names_tys();
-      let field_values = field_values(&declarer.fields, host);
-      let (g_impl, g_ty, g_where) = generics.split_for_impl();
-      quote! {
-       #vis struct #name #generics #g_where {
-         #(
-           #[allow(clippy::type_complexity)]
-           #builder_f_names : Option<DeclareInit<#builder_f_tys>>,
-         )*
-       }
+   impl #g_impl Declare for #host #g_ty #g_where {
+     type Builder = #name #g_ty;
 
-       impl #g_impl Declare for #host #g_ty #g_where {
-         type Builder = FatObj<#name #g_ty>;
-
-         fn declarer() -> Self::Builder {
-           FatObj::new(#name { #(#builder_f_names : None ,)* })
-         }
-       }
-
-       impl #g_impl FatDeclarerExtend for #name #g_ty #g_where {
-         type Target = State<#host #g_ty>;
-
-         #[track_caller]
-         fn finish(mut fat_ಠ_ಠ: FatObj<Self>) -> FatObj<Self::Target> {
-           #(#field_values)*
-           let this_ಠ_ಠ = State::value(#host {
-             #(#field_names : #field_names.0),*
-           });
-           #(
-             if let Some(o) = #field_names2.1 {
-               let this_ಠ_ಠ = this_ಠ_ಠ.clone_writer();
-               let u = o.subscribe(move |(_, v)| this_ಠ_ಠ.write().#field_names2 = v);
-               fat_ಠ_ಠ = fat_ಠ_ಠ.on_disposed(move |_| u.unsubscribe());
-             }
-           );*
-
-           fat_ಠ_ಠ.map(move |_| this_ಠ_ಠ)
-         }
-       }
-
-       #vis trait #extend_declare #g_impl: Sized #g_where {
-        fn inner(&mut self) -> &mut #name #g_ty;
-
-        #(#set_methods)*
-       }
-
-       impl #g_impl #extend_declare #g_ty for FatObj<#name #g_ty> #g_where {
-          #[inline(always)]
-         fn inner(&mut self) -> &mut #name #g_ty { &mut **self }
-       }
+     fn declarer() -> Self::Builder {
+      #name {
+        fat_ಠ_ಠ: FatObj::new(()),
+        _marker: std::marker::PhantomData,
+        #(#builder_members_2: None ,)*
       }
-    }
+     }
+   }
+
+   impl #g_impl #name #g_ty #g_where {
+      #(#set_methods)*
+   }
   };
 
-  widget_macro_to_tokens(host, vis, &mut tokens);
+  if fields.is_empty() {
+    let finish_obj = declarer.finish_obj(std::iter::empty());
+    tokens.extend(quote! {
+      impl #g_impl ObjDeclarer for #name #g_ty #g_where {
+        type Target = FatObj<#host #g_ty>;
+
+        #[track_caller]
+        fn finish(mut self) -> Self::Target {
+          self.fat_ಠ_ಠ.map(|_| #finish_obj)
+        }
+      }
+    });
+  } else {
+    let field_names = declarer.all_members();
+    let field_values = field_values(&declarer);
+    let finish_obj = declarer.finish_obj(declarer.all_members().map(|m| quote! {#m.0}));
+    tokens.extend(quote! {
+      impl #g_impl ObjDeclarer for #name #g_ty #g_where {
+        type Target = FatObj<State<#host #g_ty>>;
+
+        #[track_caller]
+        fn finish(mut self) -> Self::Target {
+          #(#field_values)*
+          let this_ಠ_ಠ = State::value(#finish_obj);
+          let mut fat_ಠ_ಠ = self.fat_ಠ_ಠ;
+          #(
+            if let Some(o) = #field_names.1 {
+              let this_ಠ_ಠ = this_ಠ_ಠ.clone_writer();
+              let u = o.subscribe(move |(_, v)| this_ಠ_ಠ.write().#field_names = v);
+              fat_ಠ_ಠ.on_disposed(move |_| u.unsubscribe());
+            }
+          );*
+
+          fat_ಠ_ಠ.map(move |_| this_ಠ_ಠ)
+        }
+      }
+    })
+  }
+
+  deref_fat_obj(&declarer).to_tokens(&mut tokens);
+  widget_macro_to_tokens(host, vis).to_tokens(&mut tokens);
 
   Ok(tokens)
 }
 
-fn widget_macro_to_tokens(name: &Ident, vis: &Visibility, tokens: &mut TokenStream) {
+fn widget_macro_to_tokens(name: &Ident, vis: &Visibility) -> TokenStream {
   let macro_name = name.to_string().to_snake_case();
   let doc =
     format!("Macro used to generate a function widget using `{}` as the root widget.", macro_name);
@@ -102,7 +106,7 @@ fn widget_macro_to_tokens(name: &Ident, vis: &Visibility, tokens: &mut TokenStre
   } else {
     quote! { #[allow(unused_macros)] }
   };
-  tokens.extend(quote! {
+  quote! {
     #[allow(unused_macros)]
     #export_attr
     #[doc = #doc]
@@ -113,10 +117,12 @@ fn widget_macro_to_tokens(name: &Ident, vis: &Visibility, tokens: &mut TokenStre
     }
     #[allow(unused_imports)]
     #vis use #macro_name;
-  })
+  }
 }
 
-fn declarer_set_methods<'a>(fields: &'a [DeclareField]) -> impl Iterator<Item = TokenStream> + 'a {
+fn declarer_set_methods<'a>(
+  vis: &'a Visibility, fields: &'a [DeclareField],
+) -> impl Iterator<Item = TokenStream> + 'a {
   fields
     .iter()
     .filter(|f| f.need_set_method())
@@ -133,8 +139,8 @@ fn declarer_set_methods<'a>(fields: &'a [DeclareField]) -> impl Iterator<Item = 
         quote! {
           #[inline]
           #doc
-          fn #set_method(mut self, v: #ty) -> Self {
-            self.inner().#field_name = Some(DeclareInit::Value(v));
+          #vis fn #set_method(&mut self, v: #ty) -> &mut Self {
+            self.#field_name = Some(DeclareInit::Value(v));
             self
           }
         }
@@ -143,8 +149,10 @@ fn declarer_set_methods<'a>(fields: &'a [DeclareField]) -> impl Iterator<Item = 
           #[inline]
           #[allow(clippy::type_complexity)]
           #doc
-          fn #set_method<const _M: usize>(mut self, v: impl DeclareInto<#ty, _M>) -> Self {
-            self.inner().#field_name = Some(v.declare_into());
+          #vis fn #set_method<const _M: usize>(&mut self, v: impl DeclareInto<#ty, _M>)
+            -> &mut Self
+          {
+            self.#field_name = Some(v.declare_into());
             self
           }
         }
@@ -152,24 +160,23 @@ fn declarer_set_methods<'a>(fields: &'a [DeclareField]) -> impl Iterator<Item = 
     })
 }
 
-fn field_values<'a>(
-  fields: &'a [DeclareField], stt_name: &'a Ident,
-) -> impl Iterator<Item = TokenStream> + 'a {
-  fields.iter().map(move |f| {
+fn field_values<'a>(declarer: &'a Declarer) -> impl Iterator<Item = TokenStream> + 'a {
+  let host = declarer.host();
+  declarer.fields.iter().map(move |f| {
     let f_name = f.member();
     let ty = &f.field.ty;
 
     let v = if f.is_not_skip() {
       if let Some(df) = f.default_value() {
         quote! {
-          Option::take(&mut fat_ಠ_ಠ.#f_name).map_or_else(
+          Option::take(&mut self.#f_name).map_or_else(
             || (#df, None),
             |v| v.unzip()
           )
         }
       } else {
-        let err = format!("Required field `{stt_name}::{f_name}` not set");
-        quote! { Option::take(&mut fat_ಠ_ಠ.#f_name).expect(#err).unzip() }
+        let err = format!("Required field `{host}::{f_name}` not set");
+        quote! { Option::take(&mut self.#f_name).expect(#err).unzip() }
       }
     } else {
       // skip field must have default value.
@@ -186,71 +193,43 @@ fn field_values<'a>(
 impl<'a> DeclareField<'a> {
   fn check_reserve(&self) -> syn::Result<()> {
     let member = self.member();
-    if let Some(r) = BUILTIN_INFOS
+    BUILTIN_INFOS
       .get(member.to_string().as_str())
       .filter(|info| info.mem_ty == BuiltinMemberType::Field)
-    {
-      let mut field = self.field.clone();
-      // not display the attrs in the help code.
-      field.attrs.clear();
+      .map(|builtin_mem| {
+        let mut field = self.field.clone();
+        // not display the attrs in the help code.
+        field.attrs.clear();
 
-      let msg = format!(
-        "the identifier `{}` is reserved for `{}`
-To avoid name conflicts during declaration, use the `rename` meta, like so:
-``` 
-#[declare(rename = new_name)],
-{}
-```
-",
-        member,
-        &r.host_ty,
-        field.to_token_stream()
-      );
-      Err(syn::Error::new_spanned(field, msg))
-    } else {
-      Ok(())
-    }
+        let msg = format!(
+          "Error: Identifier `{member}` is reserved for {type_name} usage.
+      This name conflicts with a built-in declaration. ",
+          type_name = &builtin_mem.host_ty,
+        );
+
+        Err(syn::Error::new_spanned(field, msg))
+      })
+      .unwrap_or(Ok(()))
   }
 }
 
-fn empty_impl(name: &Ident, fields: &Fields) -> TokenStream {
-  let construct = match fields {
-    Fields::Named(_) => quote!(#name {}),
-    Fields::Unnamed(_) => quote!(#name()),
-    Fields::Unit => quote!(#name),
-  };
+fn deref_fat_obj(declarer: &Declarer) -> TokenStream {
+  let (g_impl, g_ty, g_where) = declarer.original.generics.split_for_impl();
+  let name = &declarer.name;
+
   quote! {
-    impl Declare for #name  {
-      type Builder = FatObj<#name>;
-      fn declarer() -> Self::Builder { FatObj::new(#construct) }
-    }
-
-    impl FatDeclarerExtend for #name {
-      type Target = #name;
-      fn finish(this: FatObj<#name>) -> FatObj<#name> { this }
-    }
-  }
-}
-
-fn self_impl<'a>(
-  name: &Ident, generics: &syn::Generics, members: impl Iterator<Item = &'a Ident>,
-) -> TokenStream {
-  let (g_impl, g_ty, g_where) = generics.split_for_impl();
-  quote! {
-    impl #g_impl Declare for #name #g_ty #g_where {
-      type Builder = FatObj<#name #g_ty>;
-
-      fn declarer() -> Self::Builder {
-        FatObj::new(#name {
-          #(#members: <_>::default()),*
-        })
+    impl #g_impl std::ops::Deref for #name #g_ty #g_where {
+      type Target = FatObj<()>;
+      #[inline]
+      fn deref(&self) -> &Self::Target {
+        &self.fat_ಠ_ಠ
       }
     }
 
-    impl #g_impl FatDeclarerExtend for #name #g_ty #g_where {
-      type Target = State<#name #g_ty>;
-      fn finish(this: FatObj<Self>) -> FatObj<Self::Target> {
-        this.map(State::value)
+    impl #g_impl std::ops::DerefMut for #name #g_ty #g_where {
+      #[inline]
+      fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.fat_ಠ_ಠ
       }
     }
   }

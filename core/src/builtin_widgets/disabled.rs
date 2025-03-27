@@ -38,7 +38,7 @@ impl<'c> ComposeChild<'c> for Disabled {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      let child = FatObj::new(child);
+      let mut child = FatObj::new(child);
       @FocusScope {
         skip_descendants: pipe!($this.disabled()),
         skip_host: pipe!($this.disabled()),
@@ -46,7 +46,7 @@ impl<'c> ComposeChild<'c> for Disabled {
           ignore: pipe!($this.disabled()).map(
             |v| if v { IgnoreScope::Subtree } else { IgnoreScope::None }
           ),
-          @ $child{ class: pipe!($this.disabled()).map(|v| v.then_some(DISABLED)) }
+          @ $child { class: pipe!($this.disabled()).map(|v| v.then_some(DISABLED)) }
         }
       }
     }

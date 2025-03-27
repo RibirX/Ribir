@@ -100,20 +100,18 @@ pub fn init(classes: &mut Classes) {
       .unwrap()
       .0 = w.get_track_id_widget().read().track_id();
 
-    let w = if tab_type() == TabType::Primary {
+    let mut w = if tab_type() == TabType::Primary {
       // The primary tabs indicator's length depends on the active tab's content size.
       // Wrapping the tab header in a stack ensures the content retains its original
       // size.
       let stack = Stack::declarer().finish();
-      let child = w
-        .margin(md::EDGES_HOR_16)
+      w.margin(md::EDGES_HOR_16)
         .h_align(HAlign::Center)
         .v_align(VAlign::Center);
-      stack
-        .with_child(child)
-        .map(IntoWidget::into_widget)
+      stack.with_child(w).map(IntoWidget::into_widget)
     } else {
-      w.padding(md::EDGES_HOR_16)
+      w.padding(md::EDGES_HOR_16);
+      w.map(IntoWidget::into_widget)
     };
 
     // This code is responsible for making sure the active tab header is visible
@@ -157,8 +155,8 @@ pub fn init(classes: &mut Classes) {
 
         scrollable.visible_widget(wid, Anchor::default(), &wnd);
       });
-    })
-    .into_widget()
+    });
+    w.into_widget()
   });
 }
 
@@ -193,7 +191,7 @@ fn indicator(pos: TabPos) -> Widget<'static> {
      };
 
      if tt == TabType::Primary {
-      indicator = indicator.radius(match pos {
+      indicator.radius(match pos {
         TabPos::Top => Radius::top(3.),
         TabPos::Bottom => Radius::bottom(3.),
         TabPos::Left => Radius::left(3.),
@@ -209,7 +207,7 @@ fn indicator(pos: TabPos) -> Widget<'static> {
       anchor
     };
 
-    smooth = match pos {
+    match pos {
       TabPos::Top =>  smooth.v_align(VAlign::Bottom),
       TabPos::Bottom =>  smooth.v_align(VAlign::Top),
       TabPos::Left =>  smooth.h_align(HAlign::Right),

@@ -55,13 +55,9 @@ pub struct Radio {
   pub value: Box<dyn Any>,
 }
 
-pub trait RadioDeclarerCustomExtend {
+impl RadioDeclarer {
   /// Initialize the radio value without supporting the pipe value format.
-  fn value<V: 'static>(self, value: V) -> Self;
-}
-
-impl RadioDeclarerCustomExtend for FatObj<RadioDeclarer> {
-  fn value<V: 'static>(mut self, value: V) -> Self {
+  pub fn value<V: 'static>(&mut self, value: V) -> &mut Self {
     self.value = Some(DeclareInit::Value(Box::new(value)));
     self
   }

@@ -41,9 +41,8 @@ pub(super) fn init(classes: &mut Classes) {
       Border::all(BorderSide::new(1., color.into()))
     });
 
-    w.border(border)
-      .radius(md::RADIUS_2)
-      .into_widget()
+    w.border(border).radius(md::RADIUS_2);
+    w.into_widget()
   }
   classes.insert(INPUT, input_border);
   classes.insert(TEXTAREA, input_border);

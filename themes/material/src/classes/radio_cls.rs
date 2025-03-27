@@ -12,13 +12,14 @@ pub(super) fn init(classes: &mut Classes) {
   );
 
   classes.insert(RADIO, |w| {
-    let w = FatObj::new(w)
-      .text_line_height(20.)
+    let mut w = FatObj::new(w);
+    w.text_line_height(20.)
       .cursor(CursorIcon::Pointer);
 
     if DisabledRipple::get(BuildCtx::get()) {
+      w.margin(md::EDGES_2);
       // 24x24 if no ripple
-      return w.margin(md::EDGES_2).into_widget();
+      return w.into_widget();
     }
 
     let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(md::RADIUS_20));
@@ -33,7 +34,7 @@ pub(super) fn init(classes: &mut Classes) {
   });
 
   classes.insert(RADIO_SELECTED_ICON, |w| {
-    let w = FatObj::new(w);
+    let mut w = FatObj::new(w);
     rdl! {
       let mut bullet = @ $w  {
         clamp: BoxClamp::fixed_size(md::SIZE_10),

@@ -55,7 +55,7 @@ pub(super) fn init(classes: &mut Classes) {
     },
   );
   classes.insert(LINEAR_DETERMINATE_TRACK, |w| {
-    let w = FatObj::new(w);
+    let mut w = FatObj::new(w);
     stack! {
       @ $w { class: LINEAR_INDETERMINATE_TRACK }
       // As part of the Material Design 3 theme, a stop indicator has been

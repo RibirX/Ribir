@@ -53,11 +53,11 @@ mod tests {
     reset_test_env!();
 
     let widget = fn_widget! {
-      let m = @MockBox {
+      let mut m = @MockBox {
         tab_index: 0i16,
         size: Size::default(),
       };
-      let m = @ $m { tab_index: 0i16, };
+      let mut m = @ $m { tab_index: 0i16, };
       @ $m { tab_index: 0i16 }
     };
 

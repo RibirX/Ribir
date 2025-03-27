@@ -57,7 +57,7 @@ impl<'c> ComposeChild<'c> for Tooltips {
       let mut child = FatObj::new(child);
       *$this.overlay.borrow_mut() = Some(Overlay::new(
         move || {
-          let w = @Text {
+          let mut w = @Text {
             text: pipe!($this.tooltips().clone()),
             class: TOOLTIPS,
           };

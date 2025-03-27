@@ -107,13 +107,21 @@ pub use column;
 pub use row;
 
 impl Declare for Row {
-  type Builder = FatObj<FlexDeclarer>;
-  fn declarer() -> Self::Builder { Flex::declarer().direction(Direction::Horizontal) }
+  type Builder = FlexDeclarer;
+  fn declarer() -> Self::Builder {
+    let mut f = Flex::declarer();
+    f.direction(Direction::Horizontal);
+    f
+  }
 }
 
 impl Declare for Column {
-  type Builder = FatObj<FlexDeclarer>;
-  fn declarer() -> Self::Builder { Flex::declarer().direction(Direction::Vertical) }
+  type Builder = FlexDeclarer;
+  fn declarer() -> Self::Builder {
+    let mut f = Flex::declarer();
+    f.direction(Direction::Vertical);
+    f
+  }
 }
 
 impl Render for Flex {

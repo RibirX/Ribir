@@ -90,7 +90,8 @@ impl<T: EditText + 'static> BasicEditor<T> {
           $caret.write().anchor = Anchor::from_point($this.caret_pos())
         })
       });
-      caret.on_disposed(move |_| u.unsubscribe())
+      caret.on_disposed(move |_| u.unsubscribe());
+      caret
     }
     .into_widget()
   }

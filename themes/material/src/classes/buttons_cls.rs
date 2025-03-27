@@ -25,10 +25,10 @@ named_style_impl!(common_label_only => {
 
 fn text_button_init(classes: &mut Classes) {
   fn interactive(w: Widget) -> Widget {
-    FatObj::new(base_interactive(w, md::RADIUS_20))
-      .foreground(BuildCtx::color())
-      .clamp(BTN_40_CLAMP)
-      .into_widget()
+    let mut w = FatObj::new(base_interactive(w, md::RADIUS_20));
+    w.foreground(BuildCtx::color())
+      .clamp(BTN_40_CLAMP);
+    w.into_widget()
   }
 
   classes.insert(
@@ -55,15 +55,14 @@ fn text_button_init(classes: &mut Classes) {
 fn filled_button_init(classes: &mut Classes) {
   fn filled_interactive(w: Widget) -> Widget {
     let color = BuildCtx::color();
-    let w = FatObj::new(w)
-      .background(color)
+    let mut w = FatObj::new(w);
+    w.background(color)
       .radius(md::RADIUS_20)
-      .clamp(BTN_40_CLAMP)
-      .into_widget();
+      .clamp(BTN_40_CLAMP);
 
-    FatObj::new(base_interactive(w, md::RADIUS_20))
-      .foreground(BuildCtx::color().on_this_color(BuildCtx::get()))
-      .into_widget()
+    let mut w = FatObj::new(base_interactive(w.into_widget(), md::RADIUS_20));
+    w.foreground(BuildCtx::color().on_this_color(BuildCtx::get()));
+    w.into_widget()
   }
 
   classes.insert(FILLED_BTN, class_multi_impl![common_btn, filled_interactive]);
@@ -78,15 +77,14 @@ fn filled_button_init(classes: &mut Classes) {
 fn button_init(classes: &mut Classes) {
   fn btn_interactive(w: Widget) -> Widget {
     let outline = Palette::of(BuildCtx::get()).outline();
-    let w = FatObj::new(w)
-      .border(Border::all(BorderSide { color: outline.into(), width: 1. }))
+    let mut w = FatObj::new(w);
+    w.border(Border::all(BorderSide { color: outline.into(), width: 1. }))
       .radius(md::RADIUS_20)
-      .clamp(BTN_40_CLAMP)
-      .into_widget();
+      .clamp(BTN_40_CLAMP);
 
-    FatObj::new(base_interactive(w, md::RADIUS_20))
-      .foreground(BuildCtx::color())
-      .into_widget()
+    let mut w = FatObj::new(base_interactive(w.into_widget(), md::RADIUS_20));
+    w.foreground(BuildCtx::color());
+    w.into_widget()
   }
 
   classes.insert(BUTTON, class_multi_impl![common_btn, btn_interactive]);
@@ -133,14 +131,14 @@ fn fab_init(classes: &mut Classes) {
       FabSize::Large => Radius::all(28.),
     };
 
-    let w = FatObj::new(w)
-      .background(background)
+    let mut w = FatObj::new(w);
+    w.background(background)
       .clamp(BoxClamp::min_width(btn_height).with_fixed_height(btn_height))
       .radius(radius);
 
-    FatObj::new(base_interactive(w.into_widget(), radius))
-      .foreground(foreground)
-      .into_widget()
+    let mut w = FatObj::new(base_interactive(w.into_widget(), radius));
+    w.foreground(foreground);
+    w.into_widget()
   }
 
   classes.insert(
@@ -190,9 +188,11 @@ fn fab_init(classes: &mut Classes) {
   classes.insert(FAB_LEADING_ICON, empty_cls);
   classes.insert(FAB_TRAILING_ICON, empty_cls);
   classes.insert(FAB_LABEL, |w| match fab_size() {
-    FabSize::Large => FatObj::new(w)
-      .padding(md::EDGES_HOR_16)
-      .into_widget(),
+    FabSize::Large => {
+      let mut w = FatObj::new(w);
+      w.padding(md::EDGES_HOR_16);
+      w.into_widget()
+    }
     _ => common_btn_label(w),
   });
 }
@@ -206,9 +206,9 @@ fn btn_label_style(line_height: f32) -> TextStyle {
 
 fn base_interactive(w: Widget, radius: Radius) -> Widget {
   if DisabledRipple::get(BuildCtx::get()) {
-    FatObj::new(w)
-      .cursor(CursorIcon::Pointer)
-      .into_widget()
+    let mut w = FatObj::new(w);
+    w.cursor(CursorIcon::Pointer);
+    w.into_widget()
   } else {
     let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(radius));
     ripple! {

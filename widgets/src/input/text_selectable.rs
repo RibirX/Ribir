@@ -45,12 +45,8 @@ pub struct Selection {
   pub to: CaretPosition,
 }
 
-pub trait TextSelectableDeclarerExtend<T> {
-  fn text<const M: usize>(self, text: impl DeclareInto<T, M>) -> Self;
-}
-
-impl<T> TextSelectableDeclarerExtend<T> for FatObj<TextSelectableDeclarer<T>> {
-  fn text<const M: usize>(mut self, text: impl DeclareInto<T, M>) -> Self {
+impl<T> TextSelectableDeclarer<T> {
+  pub fn text<const M: usize>(&mut self, text: impl DeclareInto<T, M>) -> &mut Self {
     let text = text.declare_into().map(TextGlyphs::new);
     self.text = Some(text);
     self

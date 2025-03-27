@@ -10,37 +10,37 @@ const DECLARE_ATTR: &str = "declare";
 pub struct Declarer<'a> {
   pub name: Ident,
   pub fields: Vec<DeclareField<'a>>,
+  pub original: &'a syn::ItemStruct,
 }
 
 pub(crate) fn simple_declarer_attr(
   stt: &mut syn::ItemStruct, stateless: bool,
 ) -> Result<TokenStream> {
-  if stt.fields.is_empty() {
-    return empty_impl(stt);
-  }
-  let syn::ItemStruct { vis, generics, ident, fields, .. } = stt;
-  let declarer = Declarer::new(ident, fields)?;
+  let declarer = Declarer::new(stt)?;
+  let Declarer { name, original, .. } = &declarer;
+  let syn::ItemStruct { vis, generics, ident: host, .. } = original;
 
-  if declarer.all_fields_skipped() {
-    return Ok(self_impl(ident, generics, declarer.all_members()));
-  }
-
-  let name = &declarer.name;
-  let init_pairs = init_pairs(&declarer.fields, ident);
+  let finish_obj = declarer.finish_obj(finish_values(&declarer));
   let set_methods = declarer_set_methods(&declarer.fields, vis);
   let (g_impl, g_ty, g_where) = generics.split_for_impl();
-  let (builder_f_names, builder_f_tys) = declarer.declare_names_tys();
+  let builder_members = declarer.builder_members();
+  let builder_members_2 = declarer.builder_members();
+  let builder_tys = declarer.builder_tys();
 
   let mut tokens = quote! {
     #vis struct #name #generics #g_where {
-      #(#builder_f_names : Option<#builder_f_tys>),*
+      _marker: std::marker::PhantomData<#host #g_ty>,
+      #(#builder_members : Option<#builder_tys>),*
     }
 
-    impl #g_impl Declare for #ident #g_ty #g_where {
+    impl #g_impl Declare for #host #g_ty #g_where {
       type Builder = #name #g_ty;
 
       fn declarer() -> Self::Builder {
-        #name { #(#builder_f_names : None ),*}
+        #name {
+          _marker: std::marker::PhantomData,
+          #(#builder_members_2 : None ),*
+        }
       }
     }
 
@@ -49,133 +49,126 @@ pub(crate) fn simple_declarer_attr(
     }
   };
 
-  if stateless {
+  if stateless || original.fields.is_empty() {
     tokens.extend(quote! {
       impl #g_impl ObjDeclarer for #name #g_ty #g_where {
-        type Target = #ident #g_ty;
+        type Target = #host #g_ty;
 
         #[track_caller]
         fn finish(mut self) -> Self::Target {
-          #ident {#(#init_pairs),*}
+          #finish_obj
         }
       }
     });
   } else {
     tokens.extend(quote! {
       impl #g_impl ObjDeclarer for #name #g_ty #g_where {
-        type Target = State<#ident #g_ty>;
+        type Target = State<#host #g_ty>;
 
         #[track_caller]
         fn finish(mut self) -> Self::Target {
-          State::value(#ident {#(#init_pairs),*})
+          State::value(#finish_obj)
         }
       }
     });
   }
 
-  stt.to_tokens(&mut tokens);
+  original.to_tokens(&mut tokens);
   Ok(tokens)
 }
 
-fn empty_impl(stt: &syn::ItemStruct) -> Result<TokenStream> {
-  let syn::ItemStruct { ident: name, fields, .. } = stt;
-  let construct = match fields {
-    Fields::Named(_) => quote!(#name {}),
-    Fields::Unnamed(_) => quote!(#name()),
-    Fields::Unit => quote!(#name),
-  };
-  let tokens = quote! {
-    #stt
+fn finish_values<'a>(declarer: &'a Declarer) -> impl Iterator<Item = TokenStream> + 'a {
+  let host = declarer.host();
+  declarer.fields.iter().map(move |f| {
+    let f_name = f.member();
 
-    impl Declare for #name  {
-      type Builder = #name;
-      fn declarer() -> Self::Builder { #construct }
-    }
-
-    impl ObjDeclarer for #name {
-      type Target = #name;
-      #[inline]
-      fn finish(self) -> Self::Target { self }
-    }
-  };
-  Ok(tokens)
-}
-
-fn self_impl<'a>(
-  name: &Ident, generics: &syn::Generics, members: impl Iterator<Item = &'a Ident>,
-) -> TokenStream {
-  let (g_impl, g_ty, g_where) = generics.split_for_impl();
-
-  quote! {
-    impl #g_impl Declare for #name #g_ty #g_where {
-      type Builder = #name #g_ty;
-
-      fn declarer() -> Self::Builder {
-        #name {
-          #(#members: <_>::default()),*
-        }
+    if f.is_not_skip() {
+      if let Some(df) = f.default_value() {
+        quote! { self.#f_name.take().unwrap_or_else(|| #df) }
+      } else {
+        let err = format!("Required field `{host}::{f_name}` not set");
+        quote_spanned! { f_name.span() => self.#f_name.take().expect(#err) }
       }
+    } else {
+      // skip field must have default value.
+      f.default_value().unwrap()
     }
-
-    impl #g_impl ObjDeclarer for #name #g_ty #g_where {
-      type Target = #name #g_ty;
-
-      #[track_caller]
-      fn finish(self) -> Self::Target { self }
-    }
-  }
+  })
 }
 
 impl<'a> Declarer<'a> {
-  pub fn new(host: &'a Ident, stt_fields: &'a mut Fields) -> Result<Self> {
+  pub fn new(item_stt: &'a mut syn::ItemStruct) -> Result<Self> {
+    let host = &item_stt.ident;
     let name = Ident::new(&format!("{host}Declarer"), host.span());
-    let mut fields = vec![];
-    match stt_fields {
-      Fields::Named(named) => {
-        for f in named.named.iter_mut() {
-          let idx = f.attrs.iter().position(
-            |attr| matches!(&attr.meta, syn::Meta::List(l) if l.path.is_ident(DECLARE_ATTR)),
-          );
-          let builder_attr = if let Some(idx) = idx {
-            let attr = f.attrs.remove(idx);
-            let args: DeclareAttr = attr.parse_args()?;
-            Some(args)
-          } else {
-            None
-          };
-          fields.push(DeclareField { attr: builder_attr, field: f });
-        }
-      }
-      Fields::Unit => {}
-      Fields::Unnamed(unnamed) => {
-        let err = syn::Error::new(unnamed.span(), "not support to derive for tuple struct");
-        return Err(err);
-      }
-    }
-    Ok(Declarer { name, fields })
+    // Safety: During field collection, we only maintain a reference to `stt_fields`
+    // and extract the `build` attribute from each field. No additional ownership
+    // or mutation is performed, ensuring safe access.
+    let (original, item_stt) = unsafe {
+      let ptr = item_stt as *mut syn::ItemStruct;
+      (&*ptr, &mut *ptr)
+    };
+    let fields = match &mut item_stt.fields {
+      Fields::Named(named) => collect_fields(named.named.iter_mut()),
+      Fields::Unnamed(unnamed) => collect_fields(unnamed.unnamed.iter_mut()),
+      Fields::Unit => vec![],
+    };
+
+    Ok(Declarer { name, fields, original })
   }
 
-  pub fn declare_names_tys(&self) -> (Vec<&Ident>, Vec<&syn::Type>) {
-    self
-      .fields
-      .iter()
-      .filter(|f| f.is_not_skip())
-      .map(|f| (f.member(), &f.field.ty))
-      .unzip()
+  pub fn builder_members(&self) -> impl Iterator<Item = &Ident> {
+    self.no_skip_fields().map(|f| f.member())
+  }
+
+  pub fn builder_tys(&self) -> impl Iterator<Item = &syn::Type> {
+    self.no_skip_fields().map(|f| &f.field.ty)
   }
 
   pub fn all_members(&self) -> impl Iterator<Item = &Ident> {
     self.fields.iter().map(|f| f.member())
   }
 
-  pub fn all_fields_skipped(&self) -> bool {
-    self.fields.iter().all(|f| {
-      f.attr
-        .as_ref()
-        .is_some_and(|attr| attr.skip.is_some())
-    })
+  pub fn finish_obj(&self, values: impl Iterator<Item = TokenStream>) -> TokenStream {
+    let host = self.host();
+
+    match &self.original.fields {
+      Fields::Named(_) => {
+        let members = self.all_members();
+        quote!(#host { #(#members: #values),* })
+      }
+      Fields::Unnamed(_) => quote!(#host(#(#values),*)),
+      Fields::Unit => quote!(#host),
+    }
   }
+
+  fn no_skip_fields(&self) -> impl Iterator<Item = &DeclareField> {
+    self.fields.iter().filter(|f| f.is_not_skip())
+  }
+
+  pub fn host(&self) -> &Ident { &self.original.ident }
 }
+
+fn collect_fields<'a>(fields: impl Iterator<Item = &'a mut syn::Field>) -> Vec<DeclareField<'a>> {
+  fields
+    .enumerate()
+    .map(|(idx, f)| {
+      if f.ident.is_none() {
+        f.ident = Some(Ident::new(&format!("v_{idx}"), f.span()))
+      }
+      DeclareField { attr: take_build_attr(f), field: f }
+    })
+    .collect()
+}
+
+fn take_build_attr(field: &mut syn::Field) -> Option<DeclareAttr> {
+  let idx = field
+    .attrs
+    .iter()
+    .position(|attr| matches!(&attr.meta, syn::Meta::List(l) if l.path.is_ident(DECLARE_ATTR)));
+
+  field.attrs.remove(idx?).parse_args().ok()
+}
+
 mod kw {
   use syn::custom_keyword;
   custom_keyword!(rename);
@@ -334,7 +327,7 @@ pub fn declarer_set_methods<'a>(
         quote! {
           #[inline]
           #doc_attr
-          #vis fn #set_method(mut self, v: #ty) -> Self {
+          #vis fn #set_method(&mut self, v: #ty) -> &mut Self {
             self.#field_name = Some(v);
             self
           }
@@ -343,7 +336,7 @@ pub fn declarer_set_methods<'a>(
         quote! {
           #[inline]
           #doc_attr
-          #vis fn #set_method(mut self, v: impl Into<#ty>) -> Self
+          #vis fn #set_method(&mut self, v: impl Into<#ty>) -> &mut Self
           {
             self.#field_name = Some(v.into());
             self
@@ -351,25 +344,4 @@ pub fn declarer_set_methods<'a>(
         }
       }
     })
-}
-
-fn init_pairs<'a>(
-  fields: &'a [DeclareField], stt_name: &'a Ident,
-) -> impl Iterator<Item = TokenStream> + 'a {
-  fields.iter().map(move |f| {
-    let f_name = f.member();
-
-    if f.is_not_skip() {
-      if let Some(df) = f.default_value() {
-        quote! { #f_name: self.#f_name.take().unwrap_or_else(|| #df) }
-      } else {
-        let err = format!("Required field `{stt_name}::{f_name}` not set");
-        quote_spanned! { f_name.span() => #f_name: self.#f_name.expect(#err) }
-      }
-    } else {
-      // skip field must have default value.
-      let df = f.default_value().unwrap();
-      quote! { #f_name: #df }
-    }
-  })
 }

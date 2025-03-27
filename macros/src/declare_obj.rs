@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote, quote_spanned};
+use quote::{ToTokens, quote_spanned};
 use smallvec::SmallVec;
 use syn::{
   Ident, Macro, Path,
@@ -129,16 +129,30 @@ impl DeclareObj {
   fn is_one_line_node(&self) -> bool {
     let this = &self.this;
     match &this.node_type {
-      ObjType::Type { .. } => this.fields.len() <= 1,
-      ObjType::Var { used_me, .. } => used_me.is_empty() && this.fields.len() <= 1,
+      ObjType::Type { .. } => this.fields.is_empty(),
+      ObjType::Var { used_me, .. } => used_me.is_empty() && this.fields.is_empty(),
     }
   }
 
   fn gen_node_tokens(&self, tokens: &mut TokenStream) {
     match &self.this.node_type {
       ObjType::Type { ty, span } => {
-        let name = Ident::new("_ಠ_ಠ", *span);
-        self.gen_fields_tokens(&name, quote! { #ty::declarer() }, quote! { .finish() }, tokens);
+        if self.children.is_empty() && self.this.fields.is_empty() {
+          quote_spanned! { *span => #ty::declarer().finish() }.to_tokens(tokens)
+        } else {
+          let name = Ident::new("_ಠ_ಠ", *span);
+          if self.this.fields.is_empty() {
+            quote_spanned! { *span => let #name = #ty::declarer().finish(); }.to_tokens(tokens);
+          } else {
+            quote_spanned! { *span => let mut #name = #ty::declarer(); }.to_tokens(tokens);
+            self.gen_fields_tokens(&name, tokens);
+            if self.children.is_empty() {
+              quote_spanned! { *span => #name.finish() }.to_tokens(tokens);
+            } else {
+              quote_spanned! { *span => let #name = #name.finish(); }.to_tokens(tokens);
+            }
+          }
+        }
       }
       ObjType::Var { var, used_me } => {
         // if has capture self, rename to `_ಠ_ಠ` avoid conflict name.
@@ -150,11 +164,11 @@ impl DeclareObj {
             .for_each(|r| r.to_tokens(tokens));
 
           let name = Ident::new("_ಠ_ಠ", var.span());
-          quote_spanned! { var.span() =>  let #name = #var;}.to_tokens(tokens);
+          quote_spanned! { var.span() =>  let mut #name = #var;}.to_tokens(tokens);
           let orig = std::mem::replace(&mut self_ref.name, name.clone());
           self_ref.capture_state(&orig, tokens);
 
-          self.gen_fields_tokens(&name, name.to_token_stream(), quote! {}, tokens);
+          self.gen_fields_tokens(&name, tokens);
           // If a child exist, revert the variable name to compose children.
           if !self.children.is_empty() {
             quote_spanned! { var.span() =>
@@ -162,20 +176,21 @@ impl DeclareObj {
               let mut #var = #name;
             }
             .to_tokens(tokens);
+          } else {
+            name.to_tokens(tokens);
           }
         } else {
           used_me.to_tokens(tokens);
-          self.gen_fields_tokens(var, var.to_token_stream(), quote! {}, tokens);
+          self.gen_fields_tokens(var, tokens);
+          if self.children.is_empty() {
+            var.to_tokens(tokens);
+          }
         }
       }
-    }
+    };
   }
 
-  fn gen_fields_tokens(
-    &self, var: &Ident, head: TokenStream, tail: TokenStream, tokens: &mut TokenStream,
-  ) {
-    let fields = &self.this.fields;
-
+  fn gen_fields_tokens(&self, var: &Ident, tokens: &mut TokenStream) {
     // If there are multiple fields, we avoid generating a chained call to prevent
     // borrowing twice. For example:
     //
@@ -188,42 +203,10 @@ impl DeclareObj {
     // as Rust does not handle this.
     //
     // If there are existing children, we define a variable to interact with them.
-    if fields.len() <= 1 {
-      let fields = fields.iter();
-      if self.children.is_empty() {
-        quote_spanned! { var.span() => #head #(#fields)* #tail }
-      } else {
-        quote_spanned! { var.span() =>
-          #[allow(unused_mut)]
-          let mut #var = #head #(#fields)* #tail;
-        }
-      }
-      .to_tokens(tokens);
-    } else {
-      let mut fields = fields.iter().peekable();
-
-      let first = fields.next().unwrap();
-      quote_spanned! { var.span() =>
-        #[allow(unused_mut)]
-        let mut #var = #head #first;
-      }
-      .to_tokens(tokens);
-
-      while let Some(f) = fields.next() {
-        if fields.peek().is_none() {
-          if self.children.is_empty() {
-            quote_spanned! { var.span() => #var #f #tail }
-          } else {
-            quote_spanned! { var.span() =>
-              #[allow(unused_mut)]
-              let mut #var = #var #f #tail;
-            }
-          }
-          .to_tokens(tokens);
-        } else {
-          quote_spanned! { var.span() => #var = #var #f; }.to_tokens(tokens);
-        }
-      }
-    }
+    self
+      .this
+      .fields
+      .iter()
+      .for_each(|f| quote_spanned! { var.span() => #var #f; }.to_tokens(tokens));
   }
 }

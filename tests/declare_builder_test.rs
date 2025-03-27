@@ -14,7 +14,9 @@ fn declarer_smoke() {
     b: i32,
   }
 
-  let b = <B as Declare>::declarer().a(1.).b(1).finish();
+  let mut b = <B as Declare>::declarer();
+  b.a(1.).b(1);
+  let b = b.finish();
   assert_eq!(b.read().a, 1.);
   assert_eq!(b.read().b, 1);
 }
@@ -64,7 +66,9 @@ fn declarer_simple_attr() {
     b: i32,
   }
 
-  let s = Simple::declarer().a(1.).b(1).finish();
+  let mut s = Simple::declarer();
+  s.a(1.).b(1);
+  let s = s.finish();
   assert_eq!(s.read().a, 1.);
   assert_eq!(s.read().b, 1);
 }

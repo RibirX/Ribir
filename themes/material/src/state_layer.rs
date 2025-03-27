@@ -45,7 +45,8 @@ impl HoverLayer {
           .write()
           .set_visible_state(hover.read().is_hover());
       });
-    layer.on_disposed(move |_| u.unsubscribe())
+    layer.on_disposed(move |_| u.unsubscribe());
+    layer
   }
 }
 

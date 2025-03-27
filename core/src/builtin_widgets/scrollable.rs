@@ -57,7 +57,7 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
         on_wheel: move |e| $this.write().scroll(-e.delta_x, -e.delta_y),
       };
 
-      let child = FatObj::new(child);
+      let mut child = FatObj::new(child);
       let child = @ $child {
         anchor: distinct_pipe!{
           let this = $this;

@@ -5,7 +5,7 @@ use crate::md;
 pub(super) fn init(classes: &mut Classes) {
   classes.insert(TOOLTIPS, |w| {
     fn_widget! {
-      let w = FatObj::new(w);
+      let mut w = FatObj::new(w);
       let mut w = @FatObj {
         background: Palette::of(BuildCtx::get()).inverse_surface(),
         margin: EdgeInsets::only_bottom(4.),

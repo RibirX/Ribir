@@ -510,7 +510,7 @@ mod tests {
     let (trigger, w_trigger) = split_value(0);
     let (outer_layout, w_outer_layout) = split_value(0);
     let mix_keep = fn_widget! {
-      let pipe_w = FatObj::new( pipe! {
+      let mut pipe_w = FatObj::new( pipe! {
         $trigger;
         fn_widget! { @Void { on_performed_layout: move |_| {} }}
       });
