@@ -45,10 +45,9 @@ Let's start by defining a `hello_world` function to complete our example.
 use ribir::prelude::*;
 
 fn hello_world() -> Widget<'static> {
-  Text::declarer()
-    .text("Hello World!")
-    .finish()
-    .into_widget()
+  let mut text = Text::declarer();
+  text.text("Hello World!");
+  text.finish().into_widget()
 }
 
 fn main() { 
@@ -536,7 +535,7 @@ use ribir::prelude::*;
 
 fn show_name(name: State<String>) -> Widget<'static> {
   fn_widget!{
-    let text = @Text { text: "Hi, Guest!" };
+    let mut text = @Text { text: "Hi, Guest!" };
     let u = watch!($name.to_string()).subscribe(move |name| {
       $text.write().text = format!("Hi, {}!", name).into();
     });

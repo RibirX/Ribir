@@ -54,7 +54,9 @@ pub struct Classes {
 macro_rules! style_class {
 ($($field: ident: $value: expr),* $(,)?) => {
     (move |widget: $crate::prelude::Widget| {
-      $crate::prelude::FatObj::new(widget) $(.$field($value))* .into_widget()
+      let mut fat_ಠ_ಠ = $crate::prelude::FatObj::new(widget);
+      $(fat_ಠ_ಠ.$field($value);)*
+      fat_ಠ_ಠ.into_widget()
     }) as $crate::prelude::ClassImpl
   };
 }
@@ -78,9 +80,9 @@ macro_rules! named_style_impl {
   }) => {
     $(#[$meta])*
     fn $style_name(widget: $crate::prelude::Widget) -> $crate::prelude::Widget {
-      $crate::prelude::FatObj::new(widget)
-        $(.$field($value))*
-        .into_widget()
+      let mut fat_ಠ_ಠ = $crate::prelude::FatObj::new(widget);
+      fat_ಠ_ಠ$(.$field($value))*;
+      fat_ಠ_ಠ.into_widget()
     }
   };
 }
@@ -364,9 +366,11 @@ impl<'w, const M: usize> ComposeChild<'w> for [DeclareInit<Option<ClassName>>; M
     for cls in this.into_iter().rev() {
       widget = match cls {
         DeclareInit::Value(class) => Class { class }.with_child(widget).into_widget(),
-        DeclareInit::Pipe(cls) => FatObj::new(widget)
-          .class(DeclareInit::Pipe(cls))
-          .into_widget(),
+        DeclareInit::Pipe(cls) => {
+          let mut widget = FatObj::new(widget);
+          widget.class(DeclareInit::Pipe(cls));
+          widget.into_widget()
+        }
       };
     }
     widget
@@ -834,10 +838,8 @@ mod tests {
     let (out, w_out) = split_value(EMPTY);
     let mut wnd = TestWindow::new(fn_widget! {
       let mut classes = Classes::default();
-      classes.insert(PIPE_CLS, |w| {
-        FatObj::new(w)
-          .class(Variant::<ClassName>::new(BuildCtx::get()).unwrap())
-          .into_widget()
+      classes.insert(PIPE_CLS, style_class!{
+        class: Variant::<ClassName>::new(BuildCtx::get()).unwrap()
       });
 
       let out = out.clone_watcher();
@@ -870,11 +872,8 @@ mod tests {
     let (inner, w_inner) = split_value(false);
     let (out, w_out) = split_value(false);
     let mut wnd = TestWindow::new(fn_widget! {
-      let out_cls = Class::provider(OUT_PIPE_CLS, |w| {
-        let inner_cls = Variant::<bool>::new(BuildCtx::get()).unwrap().map(|_| INNER_PIPE);
-        FatObj::new(w)
-          .class(inner_cls)
-          .into_widget()
+      let out_cls = Class::provider(OUT_PIPE_CLS, style_class!{
+        class: Variant::<bool>::new(BuildCtx::get()).unwrap().map(|_| INNER_PIPE)
       });
       let inner_cls = Class::provider(INNER_PIPE, |w| {
         *Provider::write_of::<usize>(BuildCtx::get()).unwrap() += 1;

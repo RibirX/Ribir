@@ -60,24 +60,24 @@ impl Scrollbar {
   pub fn inner_scrollable_widget(&self) -> &Stateful<ScrollableWidget> { &self.scroll }
 }
 
-pub struct ScrollbarDeclarer;
+pub struct ScrollbarDeclarer(FatObj<()>);
 
 impl Declare for Scrollbar {
-  type Builder = FatObj<ScrollbarDeclarer>;
+  type Builder = ScrollbarDeclarer;
 
-  fn declarer() -> Self::Builder { FatObj::new(ScrollbarDeclarer) }
+  fn declarer() -> Self::Builder { ScrollbarDeclarer(FatObj::new(())) }
 }
 
-impl FatDeclarerExtend for ScrollbarDeclarer {
-  type Target = Scrollbar;
-  fn finish(mut this: FatObj<Self>) -> FatObj<Self::Target> {
-    let scroll = this.take_scrollable_widget();
+impl ObjDeclarer for ScrollbarDeclarer {
+  type Target = FatObj<Scrollbar>;
+  fn finish(mut self) -> Self::Target {
+    let scroll = self.0.take_scrollable_widget();
     let scroll = if let Some(scroll) = scroll {
       scroll.into_stateful()
     } else {
       Stateful::new(ScrollableWidget::default())
     };
-    this.map(|_| Scrollbar { scroll })
+    self.0.map(|_| Scrollbar { scroll })
   }
 }
 
@@ -158,7 +158,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
             }
           }));
 
-        let scroll = FatObj::new(scroll);
+        let mut scroll = FatObj::new(scroll);
         @Stack {
           fit: StackFit::Passthrough,
           @ $scroll {
@@ -179,6 +179,15 @@ fn h_thumb_rate(s: &ScrollableWidget) -> f32 {
 }
 fn v_thumb_rate(s: &ScrollableWidget) -> f32 {
   s.scroll_view_size().height / s.scroll_content_size().height
+}
+
+impl std::ops::Deref for ScrollbarDeclarer {
+  type Target = FatObj<()>;
+  fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl std::ops::DerefMut for ScrollbarDeclarer {
+  fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
 }
 
 #[cfg(test)]

@@ -13,13 +13,14 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(CHECKBOX_INDETERMINATE, style_class! { foreground: BuildCtx::color() });
 
   classes.insert(CHECKBOX, |w| {
-    let w = FatObj::new(w)
-      .text_line_height(18.)
+    let mut w = FatObj::new(w);
+    w.text_line_height(18.)
       .cursor(CursorIcon::Pointer);
 
     if DisabledRipple::get(BuildCtx::get()) {
       // 24x24 if no ripple
-      return w.margin(EdgeInsets::all(3.)).into_widget();
+      w.margin(EdgeInsets::all(3.));
+      return w.into_widget();
     }
 
     let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(md::RADIUS_20));
@@ -83,7 +84,7 @@ pub(super) fn init(classes: &mut Classes) {
   });
   classes.insert(CHECKBOX_INDETERMINATE_ICON, |w| {
     let icon = rdl! {
-      let icon = @Container{
+      let mut icon = @Container{
         size: Size::new(12., 2.),
         h_align: HAlign::Center,
         v_align: VAlign::Center,

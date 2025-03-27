@@ -1844,7 +1844,9 @@ mod tests {
         pipe!($m_watcher;).map(move |_| move||{
           // margin is static, but its child MockBox is a pipe.
           let p = pipe!($son_watcher;).map(|_| move|| { MockBox { size: Size::zero() }});
-          FatObj::new(p).margin(EdgeInsets::all(1.))
+          let mut obj = FatObj::new(p);
+          obj.margin(EdgeInsets::all(1.));
+          obj
         })
       };
       @ $p {

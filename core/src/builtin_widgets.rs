@@ -114,13 +114,13 @@ use crate::prelude::*;
 /// ```rust
 /// use ribir_core::{prelude::*, test_helper::*};
 ///
-/// let w = |ctx: &BuildCtx| {
-///   let mut multi = FatObj::new(MockMulti::default()).margin(EdgeInsets::all(10.));
+/// let w = || {
+///   let mut multi = FatObj::new(MockMulti::default());
+///   multi.margin(EdgeInsets::all(10.));
 ///
 ///   let w = multi.get_margin_widget().clone_writer();
-///   multi
-///     .on_tap(move |_| w.write().margin = EdgeInsets::all(20.))
-///     .into_widget()
+///   multi.on_tap(move |_| w.write().margin = EdgeInsets::all(20.));
+///   multi.into_widget()
 /// };
 /// ```
 #[derive(Default)]
@@ -163,7 +163,7 @@ pub struct FatObj<T> {
 macro_rules! fat_obj {
   ($($t: tt)*) => {
     fn_widget! {
-      let obj = FatObj::<()>::default();
+      let mut obj = FatObj::<()>::default();
       @ $obj { $($t)* }
     }
   };
@@ -512,29 +512,29 @@ macro_rules! on_mixin {
 impl<T> FatObj<T> {
   /// Attaches an event handler to the widget. It's triggered when any event or
   /// lifecycle change happens.
-  pub fn on_event(mut self, f: impl FnMut(&mut Event) + 'static) -> Self {
+  pub fn on_event(&mut self, f: impl FnMut(&mut Event) + 'static) -> &mut Self {
     on_mixin!(self, on_event, f)
   }
 
   /// Attaches an event handler that runs when the widget is first mounted to
   /// the tree.
-  pub fn on_mounted(mut self, f: impl FnOnce(&mut LifecycleEvent) + 'static) -> Self {
+  pub fn on_mounted(&mut self, f: impl FnOnce(&mut LifecycleEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_mounted, f)
   }
 
   /// Attaches an event handler that runs after the widget is performed layout.
-  pub fn on_performed_layout(mut self, f: impl FnMut(&mut LifecycleEvent) + 'static) -> Self {
+  pub fn on_performed_layout(&mut self, f: impl FnMut(&mut LifecycleEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_performed_layout, f)
   }
 
   /// Attaches an event handler that runs when the widget is disposed.
-  pub fn on_disposed(mut self, f: impl FnOnce(&mut LifecycleEvent) + 'static) -> Self {
+  pub fn on_disposed(&mut self, f: impl FnOnce(&mut LifecycleEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_disposed, f)
   }
 
   /// Attaches a handler to the widget that is triggered when a pointer down
   /// occurs.
-  pub fn on_pointer_down(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_pointer_down(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_pointer_down, f)
   }
 
@@ -542,13 +542,15 @@ impl<T> FatObj<T> {
   /// phase of a pointer down event. This is similar to `on_pointer_down`, but
   /// it's triggered earlier in the event flow. For more information on event
   /// capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_pointer_down_capture(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_pointer_down_capture(
+    &mut self, f: impl FnMut(&mut PointerEvent) + 'static,
+  ) -> &mut Self {
     on_mixin!(self, on_pointer_down_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when a pointer up
   /// occurs.
-  pub fn on_pointer_up(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_pointer_up(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_pointer_up, f)
   }
 
@@ -556,13 +558,13 @@ impl<T> FatObj<T> {
   /// phase of a pointer up event. This is similar to `on_pointer_up`, but it's
   /// triggered earlier in the event flow. For more information on event
   /// capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_pointer_up_capture(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_pointer_up_capture(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_pointer_up_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when a pointer move
   /// occurs.
-  pub fn on_pointer_move(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_pointer_move(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_pointer_move, f)
   }
 
@@ -570,33 +572,35 @@ impl<T> FatObj<T> {
   /// phase of a pointer move event. This is similar to `on_pointer_move`, but
   /// it's triggered earlier in the event flow. For more information on event
   /// capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_pointer_move_capture(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_pointer_move_capture(
+    &mut self, f: impl FnMut(&mut PointerEvent) + 'static,
+  ) -> &mut Self {
     on_mixin!(self, on_pointer_move_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when a pointer event
   /// cancels.
-  pub fn on_pointer_cancel(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_pointer_cancel(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_pointer_cancel, f)
   }
 
   /// Attaches a handler to the widget that is triggered when a pointer device
   /// is moved into the hit test boundaries of an widget or one of its
   /// descendants.
-  pub fn on_pointer_enter(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_pointer_enter(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_pointer_enter, f)
   }
 
   /// Attaches a handler to the widget that is triggered when a pointer device
   /// is moved out of the hit test boundaries of an widget or one of its
   /// descendants.
-  pub fn on_pointer_leave(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_pointer_leave(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_pointer_leave, f)
   }
 
   /// Attaches a handler to the widget that is triggered when a tap(click)
   /// occurs.
-  pub fn on_tap(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_tap(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_tap, f)
   }
 
@@ -604,13 +608,13 @@ impl<T> FatObj<T> {
   /// phase of a tap event. This is similar to `on_tap`, but it's triggered
   /// earlier in the event flow. For more information on event capturing, see
   /// [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_tap_capture(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_tap_capture(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_tap_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when a double tap
   /// occurs.
-  pub fn on_double_tap(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_double_tap(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_double_tap, f)
   }
 
@@ -618,13 +622,13 @@ impl<T> FatObj<T> {
   /// phase of a double tap event. This is similar to `on_double_tap`, but it's
   /// triggered earlier in the event flow. For more information on event
   /// capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_double_tap_capture(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_double_tap_capture(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_double_tap_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when a triple tap
   /// occurs.
-  pub fn on_triple_tap(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_triple_tap(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_triple_tap, f)
   }
 
@@ -632,15 +636,15 @@ impl<T> FatObj<T> {
   /// occurs. This is similar to `on_double_tap`, but it's triggered earlier
   /// in the event flow. For more information on event capturing, see
   /// [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_triple_tap_capture(mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> Self {
+  pub fn on_triple_tap_capture(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_triple_tap_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when a x-times tap
   /// occurs.
   pub fn on_x_times_tap(
-    mut self, (times, f): (usize, impl FnMut(&mut PointerEvent) + 'static),
-  ) -> Self {
+    &mut self, (times, f): (usize, impl FnMut(&mut PointerEvent) + 'static),
+  ) -> &mut Self {
     self
       .get_mix_builtin_widget()
       .on_x_times_tap((times, f));
@@ -652,8 +656,8 @@ impl<T> FatObj<T> {
   /// it's triggered earlier in the event flow. For more information on event
   /// capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
   pub fn on_x_times_tap_capture(
-    mut self, (times, f): (usize, impl FnMut(&mut PointerEvent) + 'static),
-  ) -> Self {
+    &mut self, (times, f): (usize, impl FnMut(&mut PointerEvent) + 'static),
+  ) -> &mut Self {
     self
       .get_mix_builtin_widget()
       .on_x_times_tap_capture((times, f));
@@ -662,7 +666,7 @@ impl<T> FatObj<T> {
 
   /// Attaches a handler to the widget that is triggered when the user rotates a
   /// wheel button on a pointing device (typically a mouse).
-  pub fn on_wheel(mut self, f: impl FnMut(&mut WheelEvent) + 'static) -> Self {
+  pub fn on_wheel(&mut self, f: impl FnMut(&mut WheelEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_wheel, f)
   }
 
@@ -670,13 +674,13 @@ impl<T> FatObj<T> {
   /// phase of a wheel event. This is similar to `on_wheel`, but it's triggered
   /// earlier in the event flow. For more information on event capturing, see
   /// [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_wheel_capture(mut self, f: impl FnMut(&mut WheelEvent) + 'static) -> Self {
+  pub fn on_wheel_capture(&mut self, f: impl FnMut(&mut WheelEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_wheel_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when the input method
   /// pre-edit area is changed.
-  pub fn on_ime_pre_edit(mut self, f: impl FnMut(&mut ImePreEditEvent) + 'static) -> Self {
+  pub fn on_ime_pre_edit(&mut self, f: impl FnMut(&mut ImePreEditEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_ime_pre_edit, f)
   }
 
@@ -684,13 +688,15 @@ impl<T> FatObj<T> {
   /// phase of a ime pre-edit event. This is similar to `on_ime_pre_edit`,
   /// but it's triggered earlier in the event flow. For more information on
   /// event capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_ime_pre_edit_capture(mut self, f: impl FnMut(&mut ImePreEditEvent) + 'static) -> Self {
+  pub fn on_ime_pre_edit_capture(
+    &mut self, f: impl FnMut(&mut ImePreEditEvent) + 'static,
+  ) -> &mut Self {
     on_mixin!(self, on_ime_pre_edit_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when the input method
   /// commits text or keyboard pressed the text key.
-  pub fn on_chars(mut self, f: impl FnMut(&mut CharsEvent) + 'static) -> Self {
+  pub fn on_chars(&mut self, f: impl FnMut(&mut CharsEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_chars, f)
   }
 
@@ -698,13 +704,13 @@ impl<T> FatObj<T> {
   /// phase of a chars event. This is similar to `on_chars`, but it's triggered
   /// earlier in the event flow. For more information on event capturing,
   /// see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_chars_capture(mut self, f: impl FnMut(&mut CharsEvent) + 'static) -> Self {
+  pub fn on_chars_capture(&mut self, f: impl FnMut(&mut CharsEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_chars_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when the keyboard key
   /// is pressed.
-  pub fn on_key_down(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
+  pub fn on_key_down(&mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_key_down, f)
   }
 
@@ -712,13 +718,13 @@ impl<T> FatObj<T> {
   /// phase of a key down event. This is similar to `on_key_down`, but it's
   /// triggered earlier in the event flow. For more information on event
   /// capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_key_down_capture(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
+  pub fn on_key_down_capture(&mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_key_down_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when the keyboard key
   /// is released.
-  pub fn on_key_up(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
+  pub fn on_key_up(&mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_key_up, f)
   }
 
@@ -726,26 +732,26 @@ impl<T> FatObj<T> {
   /// phase of a key up event. This is similar to `on_key_up`, but it's
   /// triggered earlier in the event flow. For more information on event
   /// capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_key_up_capture(mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> Self {
+  pub fn on_key_up_capture(&mut self, f: impl FnMut(&mut KeyboardEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_key_up_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when the widget is
   /// focused.
-  pub fn on_focus(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+  pub fn on_focus(&mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_focus, f)
   }
 
   /// Attaches a handler to the widget that is triggered when the widget is lost
   /// focus.
-  pub fn on_blur(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+  pub fn on_blur(&mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_blur, f)
   }
 
   /// Attaches a handler to the widget that is triggered when the widget or its
   /// descendants are focused. The main difference between this event and focus
   /// is that focusin bubbles while focus does not.
-  pub fn on_focus_in(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+  pub fn on_focus_in(&mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_focus_in, f)
   }
 
@@ -753,28 +759,28 @@ impl<T> FatObj<T> {
   /// phase of a focus in event. This is similar to `on_focus_in`, but it's
   /// triggered earlier in the event flow. For more information on event
   /// capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_focus_in_capture(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+  pub fn on_focus_in_capture(&mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_focus_in_capture, f)
   }
 
   /// Attaches a handler to the widget that is triggered when the widget or its
   /// descendants are lost focus. The main difference between this event and
   /// focusout is that focusout bubbles while blur does not.
-  pub fn on_focus_out(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+  pub fn on_focus_out(&mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_focus_out, f)
   }
 
   /// Attaches a handler to the specific custom event that is bubbled from the
   /// descendants.
   pub fn on_custom_concrete_event<E: 'static>(
-    mut self, f: impl FnMut(&mut CustomEvent<E>) + 'static,
-  ) -> Self {
+    &mut self, f: impl FnMut(&mut CustomEvent<E>) + 'static,
+  ) -> &mut Self {
     on_mixin!(self, on_custom_concrete_event, f)
   }
 
   /// Attaches a handler to raw custom event that is bubbled from the
   /// descendants.
-  pub fn on_custom_event(mut self, f: impl FnMut(&mut RawCustomEvent) + 'static) -> Self {
+  pub fn on_custom_event(&mut self, f: impl FnMut(&mut RawCustomEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_custom_event, f)
   }
 
@@ -782,7 +788,7 @@ impl<T> FatObj<T> {
   /// phase of a focus out event. This is similar to `on_focus_out`, but it's
   /// triggered earlier in the event flow. For more information on event
   /// capturing, see [Event capture](https://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-flow-capture).
-  pub fn on_focus_out_capture(mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> Self {
+  pub fn on_focus_out_capture(&mut self, f: impl FnMut(&mut FocusEvent) + 'static) -> &mut Self {
     on_mixin!(self, on_focus_out_capture, f)
   }
 
@@ -804,7 +810,7 @@ impl<T> FatObj<T> {
   ///   tab_index value, their order relative to each other follows their
   ///   position in the tree source. The maximum value for tab_index is 32767.
   ///   If not specified, it takes the default value 0.
-  pub fn tab_index<const M: usize>(self, tab_idx: impl DeclareInto<i16, M>) -> Self {
+  pub fn tab_index<const M: usize>(&mut self, tab_idx: impl DeclareInto<i16, M>) -> &mut Self {
     self.declare_builtin_init(
       tab_idx,
       |this| this.get_mix_builtin_widget().mix_flags(),
@@ -813,7 +819,9 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes the `Class` that should be applied to the widget.
-  pub fn class<const M: usize>(self, cls: impl DeclareInto<Option<ClassName>, M>) -> Self {
+  pub fn class<const M: usize>(
+    &mut self, cls: impl DeclareInto<Option<ClassName>, M>,
+  ) -> &mut Self {
     self.declare_builtin_init(cls, Self::get_class_widget, |c, cls| c.class = cls)
   }
 
@@ -822,7 +830,7 @@ impl<T> FatObj<T> {
   ///
   /// Only one widget should have this attribute specified.  If there are
   /// several, the widget nearest the root, get the initial focus.
-  pub fn auto_focus<const M: usize>(self, v: impl DeclareInto<bool, M>) -> Self {
+  pub fn auto_focus<const M: usize>(&mut self, v: impl DeclareInto<bool, M>) -> &mut Self {
     self.declare_builtin_init(
       v,
       |this| this.get_mix_builtin_widget().mix_flags(),
@@ -831,151 +839,155 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes how its child should be scale to fit its box.
-  pub fn box_fit<const M: usize>(self, v: impl DeclareInto<BoxFit, M>) -> Self {
+  pub fn box_fit<const M: usize>(&mut self, v: impl DeclareInto<BoxFit, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_fitted_box_widget, |m, v| m.box_fit = v)
   }
 
   /// Provide a painting style to this widget.
-  pub fn painting_style<const M: usize>(self, v: impl DeclareInto<PaintingStyle, M>) -> Self {
+  pub fn painting_style<const M: usize>(
+    &mut self, v: impl DeclareInto<PaintingStyle, M>,
+  ) -> &mut Self {
     self.declare_builtin_init(v, Self::get_painting_style_widget, |m, v| m.painting_style = v)
   }
 
   /// Initializes the text style of this widget.
-  pub fn text_style<const M: usize>(self, v: impl DeclareInto<TextStyle, M>) -> Self {
+  pub fn text_style<const M: usize>(&mut self, v: impl DeclareInto<TextStyle, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style = v)
   }
 
   /// Initializes the font size of this widget.
-  pub fn font_size<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
+  pub fn font_size<const M: usize>(&mut self, v: impl DeclareInto<f32, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_size = v)
   }
 
   /// Initializes the font face of this widget.
-  pub fn font_face<const M: usize>(self, v: impl DeclareInto<FontFace, M>) -> Self {
+  pub fn font_face<const M: usize>(&mut self, v: impl DeclareInto<FontFace, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_face = v)
   }
 
   /// Initializes the letter space of this widget.
-  pub fn letter_spacing<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
+  pub fn letter_spacing<const M: usize>(&mut self, v: impl DeclareInto<f32, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.letter_space = v)
   }
 
   /// Initializes the text line height of this widget.
-  pub fn text_line_height<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
+  pub fn text_line_height<const M: usize>(&mut self, v: impl DeclareInto<f32, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.line_height = v)
   }
 
   /// Initializes the text overflow of this widget.
-  pub fn text_overflow<const M: usize>(self, v: impl DeclareInto<TextOverflow, M>) -> Self {
+  pub fn text_overflow<const M: usize>(
+    &mut self, v: impl DeclareInto<TextOverflow, M>,
+  ) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.overflow = v)
   }
 
   /// Initializes the background of the widget.
-  pub fn background<const M: usize>(self, v: impl DeclareInto<Brush, M>) -> Self {
+  pub fn background<const M: usize>(&mut self, v: impl DeclareInto<Brush, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_background_widget, |m, v| m.background = v)
   }
 
   /// Initializes the foreground of the widget.
-  pub fn foreground<const M: usize>(self, v: impl DeclareInto<Brush, M>) -> Self {
+  pub fn foreground<const M: usize>(&mut self, v: impl DeclareInto<Brush, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_foreground_widget, |m, v| m.foreground = v)
   }
 
   /// Initializes the border of the widget.
-  pub fn border<const M: usize>(self, v: impl DeclareInto<Border, M>) -> Self {
+  pub fn border<const M: usize>(&mut self, v: impl DeclareInto<Border, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_border_widget, |m, v| m.border = v)
   }
 
   /// Initializes the border radius of the widget.
-  pub fn radius<const M: usize>(self, v: impl DeclareInto<Radius, M>) -> Self {
+  pub fn radius<const M: usize>(&mut self, v: impl DeclareInto<Radius, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_radius_widget, |m, v| m.radius = v)
   }
 
   /// Initializes the extra space within the widget.
-  pub fn padding<const M: usize>(self, v: impl DeclareInto<EdgeInsets, M>) -> Self {
+  pub fn padding<const M: usize>(&mut self, v: impl DeclareInto<EdgeInsets, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_padding_widget, |m, v| m.padding = v)
   }
 
   /// Initializes the cursor of the widget.
-  pub fn cursor<const M: usize>(self, v: impl DeclareInto<CursorIcon, M>) -> Self {
+  pub fn cursor<const M: usize>(&mut self, v: impl DeclareInto<CursorIcon, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_cursor_widget, |m, v| m.cursor = v)
   }
 
   /// Initializes the space around the widget.
-  pub fn margin<const M: usize>(self, v: impl DeclareInto<EdgeInsets, M>) -> Self {
+  pub fn margin<const M: usize>(&mut self, v: impl DeclareInto<EdgeInsets, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_margin_widget, |m, v| m.margin = v)
   }
 
   /// Initializes the constraints clamp of the widget.
-  pub fn clamp<const M: usize>(self, v: impl DeclareInto<BoxClamp, M>) -> Self {
+  pub fn clamp<const M: usize>(&mut self, v: impl DeclareInto<BoxClamp, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_constrained_box_widget, |m, v| m.clamp = v)
   }
 
   /// Initializes how user can scroll the widget.
-  pub fn scrollable<const M: usize>(self, v: impl DeclareInto<Scrollable, M>) -> Self {
+  pub fn scrollable<const M: usize>(&mut self, v: impl DeclareInto<Scrollable, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_scrollable_widget, |m, v| m.scrollable = v)
   }
 
   /// Initializes the transformation of the widget.
-  pub fn transform<const M: usize>(self, v: impl DeclareInto<Transform, M>) -> Self {
+  pub fn transform<const M: usize>(&mut self, v: impl DeclareInto<Transform, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_transform_widget, |m, v| m.transform = v)
   }
 
   /// Initializes how the widget should be aligned horizontally.
-  pub fn h_align<const M: usize>(self, v: impl DeclareInto<HAlign, M>) -> Self {
+  pub fn h_align<const M: usize>(&mut self, v: impl DeclareInto<HAlign, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_h_align_widget, |m, v| m.h_align = v)
   }
 
   /// Initializes how the widget should be aligned vertically.
-  pub fn v_align<const M: usize>(self, v: impl DeclareInto<VAlign, M>) -> Self {
+  pub fn v_align<const M: usize>(&mut self, v: impl DeclareInto<VAlign, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_v_align_widget, |m, v| m.v_align = v)
   }
 
   /// Initializes the relative anchor to the parent of the widget.
-  pub fn anchor<const M: usize>(self, v: impl DeclareInto<Anchor, M>) -> Self {
+  pub fn anchor<const M: usize>(&mut self, v: impl DeclareInto<Anchor, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_relative_anchor_widget, |m, v| m.anchor = v)
   }
 
   /// Initializes the horizontal global anchor of the widget.
   pub fn global_anchor_x<const M: usize>(
-    self, v: impl DeclareInto<Option<GlobalAnchorX>, M>,
-  ) -> Self {
+    &mut self, v: impl DeclareInto<Option<GlobalAnchorX>, M>,
+  ) -> &mut Self {
     self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_x = v)
   }
 
   /// Initializes the vertical global anchor of the widget.
   pub fn global_anchor_y<const M: usize>(
-    self, v: impl DeclareInto<Option<GlobalAnchorY>, M>,
-  ) -> Self {
+    &mut self, v: impl DeclareInto<Option<GlobalAnchorY>, M>,
+  ) -> &mut Self {
     self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_y = v)
   }
 
   /// Initializes the visibility of the widget.
-  pub fn visible<const M: usize>(self, v: impl DeclareInto<bool, M>) -> Self {
+  pub fn visible<const M: usize>(&mut self, v: impl DeclareInto<bool, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_visibility_widget, |m, v| m.visible = v)
   }
 
   /// Initializes the opacity of the widget.
-  pub fn opacity<const M: usize>(self, v: impl DeclareInto<f32, M>) -> Self {
+  pub fn opacity<const M: usize>(&mut self, v: impl DeclareInto<f32, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_opacity_widget, |m, v| m.opacity = v)
   }
 
   /// Initializes the tooltips of the widget.
-  pub fn tooltips<const M: usize>(self, v: impl DeclareInto<CowArc<str>, M>) -> Self {
+  pub fn tooltips<const M: usize>(&mut self, v: impl DeclareInto<CowArc<str>, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_tooltips_widget, |m, v| m.tooltips = v)
   }
 
   /// Initializes the disabled state of the widget.
-  pub fn disabled<const M: usize>(self, v: impl DeclareInto<bool, M>) -> Self {
+  pub fn disabled<const M: usize>(&mut self, v: impl DeclareInto<bool, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_disabled_widget, |m, v| m.disabled = v)
   }
 
   /// Initializes the clip_boundary of the widget.
-  pub fn clip_boundary<const M: usize>(self, v: impl DeclareInto<bool, M>) -> Self {
+  pub fn clip_boundary<const M: usize>(&mut self, v: impl DeclareInto<bool, M>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_clip_boundary_widget, |m, v| m.clip_boundary = v)
   }
 
   /// Initializes the `keep_alive` value of the `KeepAlive` widget.
-  pub fn keep_alive<const M: usize>(mut self, v: impl DeclareInto<bool, M>) -> Self {
+  pub fn keep_alive<const M: usize>(&mut self, v: impl DeclareInto<bool, M>) -> &mut Self {
     let (v, o) = v.declare_into().unzip();
     let d = self.get_keep_alive_widget();
     d.write().keep_alive = v;
@@ -997,7 +1009,7 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes the providers of the widget.
-  pub fn providers(mut self, providers: impl Into<SmallVec<[Provider; 1]>>) -> Self {
+  pub fn providers(&mut self, providers: impl Into<SmallVec<[Provider; 1]>>) -> &mut Self {
     if let Some(vec) = self.providers.as_mut() {
       vec.extend(providers.into());
     } else {
@@ -1007,10 +1019,10 @@ impl<T> FatObj<T> {
   }
 
   fn declare_builtin_init<V: 'static, B: 'static, const M: usize>(
-    mut self, init: impl DeclareInto<V, M>, get_builtin: impl FnOnce(&mut Self) -> &State<B>,
+    &mut self, init: impl DeclareInto<V, M>, get_builtin: impl FnOnce(&mut Self) -> &State<B>,
     set_value: fn(&mut B, V),
-  ) -> Self {
-    let builtin = get_builtin(&mut self);
+  ) -> &mut Self {
+    let builtin = get_builtin(self);
     let (v, o) = init.declare_into().unzip();
     set_value(&mut *builtin.silent(), v);
     if let Some(o) = o {
@@ -1031,21 +1043,6 @@ impl<T> FatObj<T> {
 
   /// Returns `true` if the widget has a class.
   pub fn has_class(&self) -> bool { self.class.is_some() }
-}
-pub trait FatDeclarerExtend: Sized {
-  type Target;
-  fn finish(this: FatObj<Self>) -> FatObj<Self::Target>;
-}
-
-impl<T: FatDeclarerExtend> ObjDeclarer for FatObj<T> {
-  type Target = FatObj<T::Target>;
-
-  fn finish(self) -> Self::Target { T::finish(self) }
-}
-
-impl FatDeclarerExtend for () {
-  type Target = ();
-  fn finish(this: FatObj<()>) -> FatObj<()> { this }
 }
 
 impl<'w, T, const M: usize> IntoWidget<'w, M> for FatObj<T>
@@ -1192,7 +1189,7 @@ where
       w
     } else {
       fn_widget! {
-        let w = FatObj::new(w);
+        let mut w = FatObj::new(w);
         @ $w {
           on_disposed: move |_| {
             subscribes.into_iter().for_each(|u| u.unsubscribe());
@@ -1236,4 +1233,10 @@ where
 impl Declare for FatObj<()> {
   type Builder = Self;
   fn declarer() -> Self::Builder { FatObj::default() }
+}
+
+impl ObjDeclarer for FatObj<()> {
+  type Target = Self;
+
+  fn finish(self) -> Self::Target { self }
 }

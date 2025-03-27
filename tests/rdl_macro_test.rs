@@ -365,7 +365,7 @@ fn closure_in_fn_widget_capture() {
   let hi_res = Stateful::new(CowArc::borrowed(""));
   let hi_res2 = hi_res.clone_reader();
   let w = fn_widget! {
-    let text = @ Text { text: "hi" };
+    let mut text = @ Text { text: "hi" };
     let on_mounted = move |_: &mut _| *$hi_res.write() =$text.text.clone();
     @ $text { on_mounted }
   };
@@ -742,7 +742,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
   let w = fn_widget! {
     let mut container = @SizedBox { size: Size::zero() };
     let h = watch!(*$trigger).subscribe(move |_| *$w_cnt.write() +=1 );
-    container = container.on_disposed(move |_| h.unsubscribe());
+    container.on_disposed(move |_| h.unsubscribe());
 
     @$container {
       @ {
@@ -848,7 +848,7 @@ fn fix_direct_use_map_writer_with_builtin() {
 #[test]
 fn fix_use_var_in_children() {
   let _w = fn_widget! {
-    let p = @MockBox { size: Size::zero() };
+    let mut p = @MockBox { size: Size::zero() };
     @ $p {
       opacity: 1.,
       // Use layout size query write of `p`

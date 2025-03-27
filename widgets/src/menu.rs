@@ -345,7 +345,7 @@ impl MenuControl {
 fn anchor_around(target: Rect) -> impl FnMut(Widget<'static>) -> Widget<'static> {
   move |w: Widget<'static>| -> Widget<'static> {
     fn_widget! {
-      let w = FatObj::new(w);
+      let mut w = FatObj::new(w);
       @ $w {
         global_anchor_x: GlobalAnchorX::custom(move |host, wnd| {
           let host_id = host.get().unwrap();
@@ -408,7 +408,7 @@ impl<'w> MenuItem<'w> {
       self;
     fn_widget! {
       let leading = leading.map(|w| {
-        let w = FatObj::new(w.unwrap());
+        let mut w = FatObj::new(w.unwrap());
         @ $w { class: MENU_ITEM_LEADING }
       });
       let trailing_text = trailing_hint_text.map(
@@ -418,7 +418,7 @@ impl<'w> MenuItem<'w> {
         }
       );
       let trailing = trailing.map(|w| {
-        let w = FatObj::new(w.unwrap());
+        let mut w = FatObj::new(w.unwrap());
         @$w { class: MENU_ITEM_TRAILING }
       });
 

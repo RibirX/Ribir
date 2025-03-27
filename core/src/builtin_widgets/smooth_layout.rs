@@ -327,54 +327,59 @@ macro_rules! impl_smooth_layout_declare {
     paste::paste! {
       #[derive(Default)]
       pub struct [<$name Declarer>] {
-        transition: Option<Box<dyn Transition>>,
-        init_value: Option<$init_ty>,
-      }
-
-      pub trait [<$name DeclareExtend>] {
         /// How to transition the layout value.
-        fn transition(self, transition: impl Transition + 'static) -> Self;
+        transition: Option<Box<dyn Transition>>,
         /// The initial value that the first layout will transition from.
-        fn init_value(self, init_value: impl Into<$init_ty>) -> Self;
+        init_value: Option<$init_ty>,
+        fat_obj: FatObj<()>,
       }
 
-      impl [<$name DeclareExtend>] for FatObj<[<$name Declarer>]> {
-        fn transition(mut self, transition: impl Transition + 'static) -> Self {
+      impl [<$name Declarer>] {
+        pub fn transition(&mut self, transition: impl Transition + 'static) -> &mut Self {
           self.transition = Some(Box::new(transition));
           self
         }
 
-        fn init_value(mut self, init_value: impl Into<$init_ty>) -> Self {
+        pub fn init_value(&mut self, init_value: impl Into<$init_ty>) -> &mut Self {
           self.init_value = Some(init_value.into());
           self
         }
       }
 
       impl Declare for $name {
-        type Builder = FatObj<[<$name Declarer>]>;
+        type Builder = [<$name Declarer>];
 
         #[inline]
         fn declarer() -> Self::Builder {
-          FatObj::new([<$name Declarer>]::default())
+          [<$name Declarer>]::default()
         }
       }
 
-      impl FatDeclarerExtend for [<$name Declarer>] {
-        type Target = $name;
+      impl ObjDeclarer for [<$name Declarer>] {
+        type Target = FatObj<$name>;
 
-        fn finish(mut this: FatObj<Self>) -> FatObj<Self::Target> {
-            let transition = this.transition.take().unwrap_or_else(|| {
+        fn finish(self) -> Self::Target {
+          let transition = self.transition.unwrap_or_else(|| {
             Box::new(EasingTransition {
               easing: easing::LinearEasing,
               duration: Duration::from_millis(200),
             })
           });
-          let value = SmoothValue::Init(this.init_value.take());
+          let value = SmoothValue::Init(self.init_value);
           let w = $name(Stateful::new(SmoothImpl { running: false, force_layout: false, value }));
           w.0.transition(transition);
-
-          this.map(|_| w)
+          self.fat_obj.map(|_| w)
         }
+      }
+
+      impl std::ops::Deref for [<$name Declarer>] {
+        type Target = FatObj<()>;
+        #[inline]
+        fn deref(&self) -> &Self::Target { &self.fat_obj }
+      }
+
+      impl std::ops::DerefMut for [<$name Declarer>] {
+        fn deref_mut(&mut self) -> &mut Self::Target { &mut self.fat_obj }
       }
     }
   };

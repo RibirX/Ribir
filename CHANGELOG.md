@@ -27,12 +27,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Introduced the `PairOf` utility to preserve parent and child type information of `ComposeChild`. (#pr @M-Adoo)
-- **core**: Added `class_array!` macro to apply multiple classes at once. (#pr by @M-Adoo)·
+- **core**: Introduced the `PairOf` utility to preserve parent and child type information of `ComposeChild`. (#724 @M-Adoo)
+- **core**: Added `class_array!` macro to apply multiple classes at once. (#724 by @M-Adoo)·
 
 ### Breaking
 
 - **core**: PipeWidget will be lazy created by pipe value of FnWidget.(#723 @wjian23)
+- **core**: Changed `Declare` to initialize fields in-place rather than returning a new object (#724 by @M-Adoo)
+
 
 ## [0.4.0-alpha.30] - 2025-03-26
 

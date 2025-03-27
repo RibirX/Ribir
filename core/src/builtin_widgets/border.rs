@@ -529,7 +529,7 @@ mod tests {
     fn_widget! {
       let mut mock_box = @MockBox { size: Size::new(100., 50.) };
       if let Some(radius) = radius {
-        mock_box = mock_box.radius(radius);
+        mock_box.radius(radius);
       }
       @ $mock_box {
         margin: EdgeInsets::all(10.),

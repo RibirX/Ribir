@@ -28,11 +28,12 @@ pub trait AnimateState: AnimateStateSetter {
     Self::Value: PartialEq,
   {
     let state = self.clone_setter();
-    let animate = Animate::declarer()
+    let mut animate = Animate::declarer();
+    animate
       .transition(Box::new(transition))
       .from(self.get())
-      .state(self)
-      .finish();
+      .state(self);
+    let animate = animate.finish();
 
     let c_animate = animate.as_stateful().clone_writer();
     let init_value = observable::of(state.get());

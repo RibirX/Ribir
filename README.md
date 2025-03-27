@@ -70,11 +70,11 @@ fn main() {
 
   App::run(move || {
     let c_cnt = cnt.clone_writer();
-    Button::declarer()
-      .on_tap(move |_| *c_cnt.write() += 1)
+    let mut btn = Button::declarer();
+    btn.on_tap(move |_| *c_cnt.write() += 1)
       .h_align(HAlign::Center)
-      .v_align(VAlign::Center)
-      .finish()
+      .v_align(VAlign::Center);
+    btn.finish()
       .with_child(pipe!($cnt.to_string()))
       .into_widget()
   });

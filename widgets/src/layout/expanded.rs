@@ -42,14 +42,16 @@ pub struct ExpandedDeclarer {
 
 impl ExpandedDeclarer {
   #[track_caller]
-  pub fn flex<const M: usize>(mut self, flex: impl DeclareInto<f32, M>) -> Self {
+  pub fn flex<const M: usize>(&mut self, flex: impl DeclareInto<f32, M>) -> &mut Self {
     assert!(self.flex.is_none(), "`flex` is already set");
     self.flex = Some(flex.declare_into());
     self
   }
 
   #[track_caller]
-  pub fn defer_alloc<const M: usize>(mut self, defer_alloc: impl DeclareInto<bool, M>) -> Self {
+  pub fn defer_alloc<const M: usize>(
+    &mut self, defer_alloc: impl DeclareInto<bool, M>,
+  ) -> &mut Self {
     assert!(self.defer_alloc.is_none(), "`defer_alloc` is already set");
     self.defer_alloc = Some(defer_alloc.declare_into());
     self

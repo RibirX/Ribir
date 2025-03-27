@@ -86,7 +86,7 @@ impl Compose for LinearProgress {
 impl Compose for SpinnerProgress {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      let spinner = @SpinnerArc {
+      let mut spinner = @SpinnerArc {
         start: Angle::zero(),
         end: distinct_pipe! { Angle::two_pi() * $this.value.unwrap_or(0.) },
       };

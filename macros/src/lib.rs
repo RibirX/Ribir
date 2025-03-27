@@ -99,8 +99,8 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
 /// [declare]: ../ribir/declare/index.html
 #[proc_macro_derive(Declare, attributes(declare))]
 pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
-  let mut input = parse_macro_input!(input as DeriveInput);
-  declare_derive::declare_derive(&mut input)
+  let mut stt = parse_macro_input!(input as syn::ItemStruct);
+  declare_derive::declare_derive(&mut stt)
     .unwrap_or_else(|e| e.into_compile_error())
     .into()
 }

@@ -294,7 +294,7 @@ mod test {
         anchor: Anchor::left(40.),
       }.into_widget();
 
-      let w = FatObj::new(w);
+      let mut w = FatObj::new(w);
       @$ w {
         anchor: Anchor::top(30.)
       }

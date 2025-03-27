@@ -106,7 +106,7 @@ impl<'c> ComposeChild<'c> for TextFieldThemeProxy {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      let child = FatObj::new(child);
+      let mut child = FatObj::new(child);
       @ $child {
         on_tap: move |_| {
           let mut this = $this.write();
@@ -349,7 +349,7 @@ fn build_input_area(
       .distinct_until_changed()
       .filter(|state| state == &TextFieldState::Focused)
       .subscribe(move |_| $input.request_focus());
-    input = input.on_disposed(move|_| {
+    input.on_disposed(move|_| {
       h.unsubscribe();
       u.unsubscribe();
     });

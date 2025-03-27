@@ -65,10 +65,9 @@ But in practice, instead of writing it this way, we usually create the widget vi
 ```rust
 use ribir::prelude::*;
 
-let btn: FatObj<State<Radio>> = Radio::declarer()
-  .selected(true)
-  .on_tap(|_| println!("Radio clicked"))
-  .finish();
+let mut btn = Radio::declarer();
+btn.selected(true).on_tap(|_| println!("Radio clicked"));
+let btn: FatObj<State<Radio>> = btn.finish();
 ```
 
 ### Why should we use `Declare` to create widgets?
@@ -83,10 +82,10 @@ Note that we end up creating a `FatObj<State<Radio>>` instead of a `Radio`. This
 ```rust
 use ribir::prelude::*;
 
-let mut radio: FatObj<State<Radio>> = Radio::declarer()
+let mut radio = Radio::declarer();
   // We can use the built-in ability
-  .on_tap(|_| println!("taped!"))
-  .finish();
+radio.on_tap(|_| println!("taped!"));
+let radio: FatObj<State<Radio>> = radio.finish();
 
 watch!($radio.selected)
   .subscribe(|selected| println!("The radio state change to {selected}"));
@@ -102,12 +101,12 @@ Another advantage of using `Declare` to create widgets is that it supports initi
 ```rust
 use ribir::prelude::*;
 
-let mut radio1: FatObj<State<Radio>> = Radio::declarer()
-  .selected(true)
-  .finish();
-let radio2 = Radio::declarer()
-  .selected(pipe!($radio1.selected))
-  .finish();
+let mut radio1 = Radio::declarer();
+radio1.selected(true);
+let radio1: FatObj<State<Radio>> = radio1.finish();
+let mut radio2 = Radio::declarer();
+radio2.selected(pipe!($radio1.selected));
+let radio2 = radio2.finish();
 
 let _row = Row::declarer()
   .finish()
@@ -127,10 +126,9 @@ use ribir::prelude::*;
 fn radio_btn() -> Widget<'static> {
   let mut btn = Radio::declarer().finish();
   
-  let m = btn.get_margin_widget().clone_writer();
-  btn
-    .on_tap(move |_| m.write().margin = EdgeInsets::all(10.0))
-    .into_widget()
+  let mut m = btn.get_margin_widget().clone_writer();
+  btn.on_tap(move |_| m.write().margin = EdgeInsets::all(10.0));
+  btn.into_widget()
 }
 ```
 
@@ -163,14 +161,13 @@ use ribir::prelude::*;
 
 let counter = fn_widget! {
   let cnt = Stateful::new(0);
-  let btn = Button::declarer()
-    .on_tap(move |_| *$cnt.write() += 1)
-    .finish()
-    .with_child("Inc");
+  let mut btn = Button::declarer();
+  btn.on_tap(move |_| *$cnt.write() += 1);
+  let btn = btn.finish().with_child("Inc");
 
-  let label = H1::declarer()
-    .text(pipe!($cnt.to_string()))
-    .finish();
+  let mut label = H1::declarer();
+  label.text(pipe!($cnt.to_string()));
+  let label = label.finish();
 
   @Row {
     align_items: Align::Center,

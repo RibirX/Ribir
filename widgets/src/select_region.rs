@@ -24,7 +24,7 @@ impl<'c> ComposeChild<'c> for PointerSelectRegion {
 
   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      let child = FatObj::new(child);
+      let mut child = FatObj::new(child);
       let grab_handle = Stateful::new(None);
       let from = Stateful::new(None);
       @ $child {

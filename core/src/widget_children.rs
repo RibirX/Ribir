@@ -64,8 +64,9 @@ pub trait MultiChild: IntoWidget<'static, RENDER> {
 ///   type Child = Widget<'c>;
 ///
 ///   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-///     let w = FatObj::new(child);
-///     w.background(Color::RED).into_widget()
+///     let mut w = FatObj::new(child);
+///     w.background(Color::RED);
+///     w.into_widget()
 ///   }
 /// }
 ///

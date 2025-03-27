@@ -417,7 +417,7 @@ impl Declare for Providers {
 }
 
 impl ProvidersDeclarer {
-  pub fn providers(mut self, providers: impl Into<SmallVec<[Provider; 1]>>) -> Self {
+  pub fn providers(&mut self, providers: impl Into<SmallVec<[Provider; 1]>>) -> &mut Self {
     if let Some(vec) = self.providers.as_mut() {
       vec.extend(providers.into());
     } else {
@@ -446,9 +446,9 @@ impl ObjDeclarer for ProvidersDeclarer {
 
 impl Providers {
   pub fn new(providers: impl Into<SmallVec<[Provider; 1]>>) -> Self {
-    Providers::declarer()
-      .providers(providers)
-      .finish()
+    let mut builder = Providers::declarer();
+    builder.providers(providers);
+    builder.finish()
   }
 
   pub(crate) fn setup_providers(&self, map: &mut ProviderCtx) {
