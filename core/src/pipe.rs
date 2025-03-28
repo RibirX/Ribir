@@ -26,19 +26,21 @@ pub(crate) trait OptionPipeWidget<const M: usize> {
   fn option_to_widget(self) -> Widget<'static>;
 }
 
-impl PipeWidget<FN> for FnWidget<'static> {
-  type Widget = FnWidget<'static>;
+impl<F: FnOnce() -> W + 'static, W: IntoWidget<'static, M>, const M: usize> PipeWidget<M>
+  for FnWidget<'static, F, W, M>
+{
+  type Widget = W;
+  fn to_widget(self) -> Widget<'static> { self.into_widget() }
+}
+
+impl PipeWidget<FN> for BoxFnWidget<'static> {
+  type Widget = Widget<'static>;
   fn to_widget(self) -> Widget<'static> { self.into_widget() }
 }
 
 impl PipeWidget<FN> for GenWidget {
   type Widget = GenWidget;
   fn to_widget(self) -> Widget<'static> { self.into_widget() }
-}
-
-impl<const M: usize, W: IntoWidget<'static, M>, T: FnOnce() -> W> PipeWidget<M> for T {
-  type Widget = W;
-  fn to_widget(self) -> Widget<'static> { self().into_widget() }
 }
 
 impl<const M: usize, W> OptionPipeWidget<M> for W
@@ -1004,7 +1006,7 @@ mod tests {
     let size = Stateful::new(Size::zero());
     let c_size = size.clone_writer();
     let w = fn_widget! {
-      let p = pipe! { move|| @MockBox { size: *$size }};
+      let p = pipe! { fn_widget!{ @MockBox { size: *$size }}};
       @$p { @Void {} }
     };
     let wnd = TestWindow::new(w);
@@ -1041,7 +1043,7 @@ mod tests {
       @MockBox {
         size: Size::zero(),
         @ {
-          let p = pipe! { move || {MockBox { size: *$size }}};
+          let p = pipe! { fn_widget! {MockBox { size: *$size }}};
           @$p { @Void {} }
         }
       }
@@ -1341,7 +1343,7 @@ mod tests {
       wid: Option<WidgetId>,
     }
 
-    fn build(task: Stateful<Task>) -> impl FnOnce() -> Widget<'static> {
+    fn build(task: Stateful<Task>) -> Widget<'static> {
       fn_widget! {
        @TaskWidget {
           keep_alive: pipe!($task.pin),
@@ -1357,7 +1359,7 @@ mod tests {
             assert_eq!(wid, Some(ctx.id));
           }
         }
-      }
+      }.into_widget()
     }
 
     #[derive(Declare)]
@@ -1581,7 +1583,7 @@ mod tests {
           pipe!(*$box_count).map(move |v| {
             move || {
               (0..v).map(move |_| fn_widget!{
-                let pipe_parent = pipe!(*$child_size).map(move |size| move||{ @MockBox { size } });
+                let pipe_parent = pipe!(*$child_size).map(move |size| fn_widget!{ @MockBox { size } });
                 @$pipe_parent { @Void {} }
               })
             }
@@ -1646,7 +1648,7 @@ mod tests {
         @ {
           pipe!(*$outer).map(move |w| fn_widget!{
             let pipe_parent = pipe!(*$inner)
-              .map(move |h| move|| {@MockBox { size: Size::new(w as f32, h as f32) } });
+              .map(move |h| fn_widget! {@MockBox { size: Size::new(w as f32, h as f32) } });
             @$pipe_parent { @Void {} }
           })
         }
@@ -1679,9 +1681,9 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          let p = pipe!(*$pipe_trigger).map(move |w| move||{
+          let p = pipe!(*$pipe_trigger).map(move |w| fn_widget!{
             pipe!(*$inner_pipe_trigger)
-              .map(move |h| move|| { @MockBox { size: Size::new(w as f32, h as f32) }})
+              .map(move |h| fn_widget! { @MockBox { size: Size::new(w as f32, h as f32) }})
           });
 
           @$p { @Void {} }
@@ -1841,9 +1843,9 @@ mod tests {
 
     let widget = fn_widget! {
       let p = @ {
-        pipe!($m_watcher;).map(move |_| move||{
+        pipe!($m_watcher;).map(move |_| fn_widget!{
           // margin is static, but its child MockBox is a pipe.
-          let p = pipe!($son_watcher;).map(|_| move|| { MockBox { size: Size::zero() }});
+          let p = pipe!($son_watcher;).map(|_| fn_widget! { MockBox { size: Size::zero() }});
           let mut obj = FatObj::new(p);
           obj.margin(EdgeInsets::all(1.));
           obj

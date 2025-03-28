@@ -101,7 +101,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
                 pipe! {
                   move || {
                     (0..$this.len_hint())
-                    .map(move |col| fn_widget! { @ { $this.char_grid(row, col) }})
+                    .map(move |col| fn_widget! { $this.char_grid(row, col) })
                   }
                 }
               }

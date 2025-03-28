@@ -231,14 +231,14 @@ impl Overlay {
     let this = self.clone();
     let _ = AppCtx::spawn_local(async move {
       let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
-
-      let wid = BuildCtx::get_mut().build(gen());
+      let generator: GenWidget = gen.into();
+      let wid = BuildCtx::get_mut().build(generator.gen_widget());
       let tree = wnd.tree_mut();
       tree.root().append(wid, tree);
       wid.on_mounted_subtree(tree);
       tree.dirty_marker().mark(wid, DirtyPhase::Layout);
 
-      this.0.borrow_mut().showing = Some(ShowingInfo { generator: gen.into(), wnd_id: wnd.id() });
+      this.0.borrow_mut().showing = Some(ShowingInfo { generator, wnd_id: wnd.id() });
 
       let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
       showing_overlays.add(this);

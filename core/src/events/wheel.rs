@@ -18,7 +18,6 @@ impl WheelEvent {
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
 
   use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
 
@@ -29,34 +28,29 @@ mod tests {
   fn smoke() {
     reset_test_env!();
 
-    let source_receive_for_bubble = Rc::new(RefCell::new((0., 0.)));
-    let bubble_receive = source_receive_for_bubble.clone();
-    let source_receive_for_capture = Rc::new(RefCell::new((0., 0.)));
-    let capture_receive = source_receive_for_capture.clone();
-    let event_order = Rc::new(RefCell::new(Vec::new()));
-    let bubble_event_order = event_order.clone();
-    let capture_event_order = event_order.clone();
+    let (bubble_receive_reader, bubble_receive) = split_value((0., 0.));
+    let (capture_receive_reader, capture_receive) = split_value((0., 0.));
+    let (event_order_reader, event_order) = split_value(vec![]);
 
     let widget = fn_widget! {
       @MockBox {
         size: Size::new(200., 200.),
         on_wheel_capture: move |wheel| {
-          *capture_receive.borrow_mut() = (wheel.delta_x,  wheel.delta_y);
-          (*capture_event_order.borrow_mut()).push("capture");
+          *$capture_receive.write() = (wheel.delta_x,  wheel.delta_y);
+          $event_order.write().push("capture");
         },
         @MockBox {
           size: Size::new(100., 100.),
           auto_focus: true,
           on_wheel: move |wheel| {
-            *bubble_receive.borrow_mut() = (wheel.delta_x, wheel.delta_y);
-            (*bubble_event_order.borrow_mut()).push("bubble");
+            *$bubble_receive.write() = (wheel.delta_x, wheel.delta_y);
+            $event_order.write().push("bubble");
           }
         }
       }
     };
 
-    let mut wnd =
-      TestWindow::new_with_size(move || widget.clone().into_widget(), Size::new(100., 100.));
+    let mut wnd = TestWindow::new_with_size(widget, Size::new(100., 100.));
 
     wnd.draw_frame();
     let device_id = unsafe { DeviceId::dummy() };
@@ -68,8 +62,8 @@ mod tests {
     });
     wnd.run_frame_tasks();
 
-    assert_eq!(*source_receive_for_bubble.borrow(), (1., 1.));
-    assert_eq!(*source_receive_for_capture.borrow(), (1., 1.));
-    assert_eq!(*event_order.borrow(), ["capture", "bubble"]);
+    assert_eq!(*bubble_receive_reader.read(), (1., 1.));
+    assert_eq!(*capture_receive_reader.read(), (1., 1.));
+    assert_eq!(*event_order_reader.read(), ["capture", "bubble"]);
   }
 }

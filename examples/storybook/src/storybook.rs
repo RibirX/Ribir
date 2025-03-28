@@ -260,7 +260,7 @@ fn content() -> Widget<'static> {
 }
 
 pub fn storybook() -> Widget<'static> {
-  let f = fn_widget! {
+  fn_widget! {
     @Column {
       align_items: Align::Center,
       background: Palette::of(BuildCtx::get()).surface_container_low(),
@@ -269,6 +269,6 @@ pub fn storybook() -> Widget<'static> {
         @ { content() }
       }
     }
-  };
-  f()
+  }
+  .into_widget()
 }

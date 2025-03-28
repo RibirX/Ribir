@@ -407,7 +407,7 @@ mod tests {
 
     let trigger = Stateful::new(true);
     let c_trigger = trigger.clone_writer();
-    let w = fn_widget! { @ { pipe!($trigger; fn_widget!{ @Void {}}) }};
+    let w = fn_widget! { pipe!($trigger; fn_widget!{ @Void {}}) };
 
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
