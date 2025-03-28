@@ -552,7 +552,7 @@ mod tests {
     // with single child
     let _e = fn_widget! {
       let p = pipe!{
-        move || {
+        fn_widget! {
           @MockBox { size: if $c_size.area() > 0. { *$c_size } else { Size::new(1., 1.)} }
         }
       };
@@ -572,7 +572,7 @@ mod tests {
     // option with single child
     let _e = fn_widget! {
       let p = pipe!(($c_size.area() > 0.).then(|| {
-        move || { @MockBox { size: Size::zero() }}
+        fn_widget! { @MockBox { size: Size::zero() }}
       }));
       @$p { @MockBox { size: Size::zero() } }
     };
@@ -580,7 +580,7 @@ mod tests {
     // option with `Widget`
     let _e = fn_widget! {
       let p = pipe!(($size.area() > 0.).then(|| {
-        move || { @MockBox { size: Size::zero() }}
+        fn_widget! { @MockBox { size: Size::zero() }}
       }));
       @$p { @ { Void }}
     };

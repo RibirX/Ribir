@@ -138,7 +138,7 @@ mod tests {
 
   #[test]
   fn fix_mock_box_compose_pipe_option_widget() {
-    fn _x(w: BoxPipe<Option<impl Fn() -> Widget<'static> + 'static>>) {
+    fn _x(w: BoxPipe<Option<BoxFnWidget<'static>>>) {
       MockBox { size: ZERO_SIZE }.with_child(w.into_pipe());
     }
   }

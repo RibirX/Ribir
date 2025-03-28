@@ -38,6 +38,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: PipeWidget will be lazy created by pipe value of FnWidget.(#723 @wjian23)
 - **core**: Changed `Declare` to initialize fields in-place rather than returning a new object (#724 by @M-Adoo)
+- **core**: The fn_widget! macro preserves the type information of the returned widget. (#pr @wjian23)
 
 
 ## [0.4.0-alpha.30] - 2025-03-26

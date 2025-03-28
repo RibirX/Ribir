@@ -88,15 +88,13 @@ impl Slider {
     }
   }
 
-  fn stop_indicator_track(&self) -> Option<impl FnOnce() -> Widget<'static>> {
+  fn stop_indicator_track(&self) -> Option<BoxFnWidget<'static>> {
     let divisions = self.divisions?;
     if divisions == 0 {
       return None;
     }
     let active = (self.ratio() * divisions as f32) as usize;
-    Some(fn_widget! {
-        stop_indicator_track(divisions + 1, 0..active, vec![active])
-    })
+    Some(stop_indicator_track(divisions + 1, 0..active, vec![active]))
   }
 }
 
@@ -155,7 +153,7 @@ impl Compose for Slider {
           }
         }
 
-        @{ pipe!($this.stop_indicator_track()) }
+        @{ pipe!($this.stop_indicator_track() ) }
       }
     }
     .into_widget()
@@ -258,16 +256,14 @@ impl RangeSlider {
     }
   }
 
-  fn stop_indicator_track(&self) -> Option<impl FnOnce() -> Widget<'static> + 'static> {
+  fn stop_indicator_track(&self) -> Option<BoxFnWidget<'static>> {
     let divisions = self.divisions?;
     if divisions == 0 {
       return None;
     }
     let start = (self.start_ratio() * divisions as f32) as usize;
     let end = (self.end_ratio() * divisions as f32) as usize;
-    Some(fn_widget! {
-      stop_indicator_track(divisions + 1, start..end + 1, vec![start, end])
-    })
+    Some(stop_indicator_track(divisions + 1, start..end + 1, vec![start, end]))
   }
 }
 
@@ -354,7 +350,9 @@ impl Compose for RangeSlider {
   }
 }
 
-fn stop_indicator_track(cnt: usize, actives: Range<usize>, filter: Vec<usize>) -> Widget<'static> {
+fn stop_indicator_track(
+  cnt: usize, actives: Range<usize>, filter: Vec<usize>,
+) -> BoxFnWidget<'static> {
   fn_widget!(
     @IgnorePointer {
       @Row {
@@ -376,7 +374,7 @@ fn stop_indicator_track(cnt: usize, actives: Range<usize>, filter: Vec<usize>) -
       }
     }
   )
-  .into_widget()
+  .boxed()
 }
 
 #[cfg(test)]

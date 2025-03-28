@@ -74,7 +74,7 @@ impl Compose for MessageList {
             @Tab {
               @ { "Messages" }
               @Icon { @{ material_svgs::SMS } }
-              @fn_widget! {
+              @ fn_widget! {
                 @Scrollbar {
                   @Lists {
                     @{
@@ -100,7 +100,7 @@ impl Compose for MessageList {
             @Tab {
               @ { "Person" }
               @Icon { @{ material_svgs::ACCOUNT_CIRCLE } }
-              @fn_widget!(@Text { text: "Person" })
+              @ { fn_widget! { @Text { text: "Person" } } }
             }
           }
         }

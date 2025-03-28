@@ -192,7 +192,7 @@ where
 {
   fn into_widget(self) -> Widget<'static> {
     match self {
-      Variant::Watcher(w) => pipe!(move || $w.clone()).into_widget(),
+      Variant::Watcher(w) => pipe!(fn_widget! { $w.clone() }).into_widget(),
       Variant::Value(v) => v.into_widget(),
     }
   }

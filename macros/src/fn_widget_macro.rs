@@ -26,10 +26,14 @@ pub(crate) fn gen_code(input: TokenStream, ctx: Option<&mut DollarRefsCtx>) -> T
     if !refs.is_empty() {
       Ok(quote! {{
         #refs
-        move || -> Widget { #(#stmts)*.into_widget() }
+        let f = move || { #(#stmts)* };
+        FnWidget::new(f)
       }})
     } else {
-      Ok(quote! { move || -> Widget { #(#stmts)*.into_widget() }})
+      Ok(quote! {{
+          let f = move || { #(#stmts)* };
+          FnWidget::new(f)
+      }})
     }
   });
 

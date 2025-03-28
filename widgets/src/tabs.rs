@@ -243,7 +243,7 @@ impl<'w> Tab<'w> {
       let line = match inline {
         Variant::Value(inline) => inline.into_line_widget(),
         Variant::Watcher(w) => Box::new(
-          pipe!(*$w).map(move |inline| { move|| { inline.into_line_widget()} })
+          pipe!(*$w).map(move |inline| { fn_widget! { inline.into_line_widget() }})
         ),
       };
 
@@ -275,7 +275,7 @@ impl<'w> Tab<'w> {
     let pane = self
       .pane
       .take()
-      .unwrap_or_else(|| void! {}.into());
+      .unwrap_or_else(|| fn_widget! { @Void {} }.into());
 
     fat_obj! {
       class: TAB_PANE,

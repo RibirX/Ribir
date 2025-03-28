@@ -101,14 +101,27 @@ pub struct InnerWidget<'w>(Box<dyn FnOnce(&mut BuildCtx) -> WidgetId + 'w>);
 pub struct GenWidget(InnerGenWidget);
 type InnerGenWidget = Sc<RefCell<Box<dyn FnMut() -> Widget<'static>>>>;
 
-/// The `FnWidget<'w>` is a type alias that denotes a boxed trait object of a
-/// function widget.
-///
-/// It already implements `IntoChild`, allowing any function widget to be
-/// converted to `FnWidget`. Therefore, using `FnWidget` as the child type of
-/// `ComposeChild` enables the acceptance of all function widgets.
 #[derive(ChildOfCompose)]
-pub struct FnWidget<'w>(Box<dyn FnOnce() -> Widget<'w> + 'w>);
+pub struct FnWidget<'w, F, W, const M: usize> {
+  f: F,
+  _marker: PhantomData<&'w W>,
+}
+
+#[derive(ChildOfCompose)]
+pub struct BoxFnWidget<'w>(Box<dyn FnOnce() -> Widget<'w> + 'w>);
+
+impl<'w, W, F, const M: usize> FnWidget<'w, F, W, M>
+where
+  Self: 'w,
+  F: FnOnce() -> W,
+  W: IntoWidget<'w, M>,
+{
+  pub fn new(f: F) -> Self { Self { f, _marker: PhantomData } }
+
+  pub fn call(self) -> W { (self.f)() }
+
+  pub fn boxed(self) -> BoxFnWidget<'w> { BoxFnWidget(Box::new(move || self.call().into_widget())) }
+}
 
 // The widget type marker.
 pub const COMPOSE: usize = 1;
@@ -131,12 +144,6 @@ impl GenWidget {
   }
 
   pub fn gen_widget(&self) -> Widget<'static> { self.0.borrow_mut()() }
-}
-
-impl<'w> FnWidget<'w> {
-  pub fn new(f: impl FnOnce() -> Widget<'w> + 'w) -> Self { Self(Box::new(f)) }
-
-  pub fn call(self) -> Widget<'w> { (self.0)() }
 }
 
 impl<'w> IntoWidget<'w, FN> for Widget<'w> {
@@ -166,11 +173,21 @@ where
   fn into_widget(self) -> Widget<'w> { Widget::from_fn(move |ctx| self().call(ctx)) }
 }
 
-impl<'w> IntoWidget<'w, FN> for FnWidget<'w> {
+impl<'w, F: FnOnce() -> W, W: IntoWidget<'w, M>, const M: usize> IntoWidget<'w, M>
+  for FnWidget<'w, F, W, M>
+where
+  Self: 'w,
+{
+  #[inline]
+  fn into_widget(self) -> Widget<'w> {
+    Widget::from_fn(move |ctx| (self.f)().into_widget().call(ctx))
+  }
+}
+
+impl<'w> IntoWidget<'w, FN> for BoxFnWidget<'w> {
   #[inline]
   fn into_widget(self) -> Widget<'w> { self.0.into_widget() }
 }
-
 impl IntoWidget<'static, FN> for GenWidget {
   #[inline]
   fn into_widget(self) -> Widget<'static> { self.gen_widget() }
@@ -266,4 +283,11 @@ impl<'w> Widget<'w> {
 impl<F: FnMut() -> Widget<'static> + 'static> From<F> for GenWidget {
   #[inline]
   fn from(f: F) -> Self { Self::new(f) }
+}
+
+impl<F: FnMut() -> W + 'static, W: IntoWidget<'static, M>, const M: usize>
+  From<FnWidget<'static, F, W, M>> for GenWidget
+{
+  #[inline]
+  fn from(mut f: FnWidget<'static, F, W, M>) -> Self { Self::new(move || (f.f)().into_widget()) }
 }

@@ -17,7 +17,6 @@ impl CharsEvent {
 
 #[cfg(test)]
 mod tests {
-  use std::{cell::RefCell, rc::Rc};
 
   use super::*;
   use crate::{reset_test_env, test_helper::*, window::DelayEvent};
@@ -54,9 +53,8 @@ mod tests {
   #[test]
   fn chars_capture() {
     reset_test_env!();
-    let receive = Rc::new(RefCell::new("".to_string()));
-    let chars_receive = receive.clone();
-    let capture_receive = receive.clone();
+
+    let (reader, writer) = split_value("".to_string());
 
     let widget = fn_widget! {
       @MockBox {
@@ -65,16 +63,16 @@ mod tests {
           let chars = event.chars.to_string();
           // The value received first is multiplied by 2
           let char = (chars.parse::<i32>().unwrap() * 2).to_string();
-          capture_receive.borrow_mut().push_str(&char);
+          $writer.write().push_str(&char);
         },
         @MockBox {
           size: ZERO_SIZE,
           auto_focus: true,
-          on_chars: move |event| chars_receive.borrow_mut().push_str(&event.chars),
+          on_chars: move |event| $writer.write().push_str(&event.chars),
         }
       }
     };
-    let mut wnd = TestWindow::new(move || widget.clone().into_widget());
+    let mut wnd = TestWindow::new(widget);
 
     let test_text_case = "123";
     wnd.draw_frame();
@@ -85,6 +83,6 @@ mod tests {
       }
     });
     wnd.run_frame_tasks();
-    assert_eq!(&*receive.borrow(), "214263");
+    assert_eq!(&*reader.read(), "214263");
   }
 }
