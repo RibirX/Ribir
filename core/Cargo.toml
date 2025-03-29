@@ -15,7 +15,6 @@ version.workspace = true
 [dependencies]
 ahash.workspace = true
 bitflags.workspace = true
-blake3 = {workspace = true, features = ["rayon"]}
 futures.workspace = true
 indextree.workspace = true
 log.workspace = true

@@ -9,7 +9,7 @@ pub mod key;
 mod painting_style;
 use std::ops::DerefMut;
 
-pub use key::{Key, KeyWidget};
+pub use key::{Key, KeyWidget, KeyWidgetDeclarer};
 pub use painting_style::*;
 pub mod image_widget;
 pub mod keep_alive;
