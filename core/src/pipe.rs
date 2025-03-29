@@ -5,19 +5,31 @@ use std::{
   ptr::NonNull,
 };
 
+use ahash::HashMap;
 use ribir_algo::Sc;
 use rxrust::ops::box_it::BoxOp;
 use smallvec::SmallVec;
 use widget_id::RenderQueryable;
 
-use crate::{builtin_widgets::key::AnyKey, prelude::*, render_helper::PureRender};
+use crate::{prelude::*, render_helper::PureRender};
 
 pub type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
 
+pub(crate) trait PipeKeyWidget<'c, const M: usize> {
+  fn into_key_widget(self) -> (Option<Key>, Widget<'c>);
+}
+
+impl<'c, const M: usize, W: IntoWidget<'c, M>> PipeKeyWidget<'c, M> for W {
+  fn into_key_widget(self) -> (Option<Key>, Widget<'c>) { (None, self.into_widget()) }
+}
+
+impl<'c> PipeKeyWidget<'c, 0> for (Key, Widget<'c>) {
+  fn into_key_widget(self) -> (Option<Key>, Widget<'c>) { (Some(self.0), self.1) }
+}
+
 /// Trait used to create a widget from a pipe value.
-pub(crate) trait PipeWidget<const M: usize> {
+pub(crate) trait PipeWidget<const M: usize>: IntoWidget<'static, M> {
   type Widget;
-  fn to_widget(self) -> Widget<'static>;
 }
 
 /// Trait used to create a widget from a option pipe value.
@@ -30,17 +42,14 @@ impl<F: FnOnce() -> W + 'static, W: IntoWidget<'static, M>, const M: usize> Pipe
   for FnWidget<'static, F, W, M>
 {
   type Widget = W;
-  fn to_widget(self) -> Widget<'static> { self.into_widget() }
 }
 
 impl PipeWidget<FN> for BoxFnWidget<'static> {
   type Widget = Widget<'static>;
-  fn to_widget(self) -> Widget<'static> { self.into_widget() }
 }
 
 impl PipeWidget<FN> for GenWidget {
-  type Widget = GenWidget;
-  fn to_widget(self) -> Widget<'static> { self.into_widget() }
+  type Widget = Widget<'static>;
 }
 
 impl<const M: usize, W> OptionPipeWidget<M> for W
@@ -48,7 +57,7 @@ where
   W: PipeWidget<M>,
 {
   type Widget = W::Widget;
-  fn option_to_widget(self) -> Widget<'static> { self.to_widget() }
+  fn option_to_widget(self) -> Widget<'static> { self.into_widget() }
 }
 
 impl<const M: usize, W> OptionPipeWidget<M> for Option<W>
@@ -57,7 +66,7 @@ where
 {
   type Widget = W::Widget;
   fn option_to_widget(self) -> Widget<'static> {
-    self.map_or_else(|| Void.into_widget(), |f| f.to_widget())
+    self.map_or_else(|| Void.into_widget(), |f| f.into_widget())
   }
 }
 
@@ -169,7 +178,6 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           query_outside_infos(new, &pipe_node, tree)
             .for_each(|node| node.dyn_info_mut().single_replace(old, new));
 
-          update_key_status_single(old, new, tree);
           old.insert_after(new, tree);
           old.dispose_subtree(tree);
           new.on_mounted_subtree(tree);
@@ -190,20 +198,19 @@ pub(crate) trait InnerPipe: Pipe + Sized {
   where
     Self::Value: FnOnce() -> I,
     I: IntoIterator,
-    <I as IntoIterator>::Item: IntoWidget<'w, M>,
+    <I as IntoIterator>::Item: PipeKeyWidget<'w, M>,
   {
     let node = PipeNode::empty_node();
     let mut init = PipeWidgetBuildInit::new(node.clone());
     let (m, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(init.clone()));
-    let mut iter = m().into_iter();
-
-    let first = iter
-      .next()
-      .map_or_else(|| Void.into_widget(), move |v| v.into_widget());
+    let mut iter = m().into_iter().map(|w| w.into_key_widget());
 
     let pipe_node = node.clone();
-    let first = first.into_widget().on_build(move |id| {
-      pipe_node.init(id, GenRange::Multi(vec![id]));
+    let (key, first) = iter
+      .next()
+      .unwrap_or_else(|| (None, Void {}.into_widget()));
+    let first = first.on_build(move |id| {
+      pipe_node.init(id, GenRange::Multi(vec![(key, id)]));
       let tree_ptr = BuildCtx::get().tree_ptr();
       init.set_tree(tree_ptr);
 
@@ -223,34 +230,75 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           });
         }
 
+        let mut old_key_widgets = old
+          .iter()
+          .filter_map(|(key, wid)| key.as_ref().map(|k| (k.clone(), *wid)))
+          .collect::<HashMap<Key, WidgetId>>();
+
         let ctx = BuildCtx::get_mut();
         let mut new = vec![];
-        for (idx, w) in m().into_iter().enumerate() {
-          let id = ctx.build(w.into_widget());
-          new.push(id);
+        let mut new_mounted = vec![];
+        for (idx, (key, w)) in m()
+          .into_iter()
+          .map(|w| w.into_key_widget())
+          .enumerate()
+        {
+          let id = if let Some(wid) = key
+            .as_ref()
+            .and_then(|k| old_key_widgets.remove(k))
+          {
+            wid
+          } else {
+            let id = ctx.build(w);
+            new_mounted.push(id);
+            id
+          };
+
+          new.push((key, id));
           set_pos_of_multi(id, idx, ctx.tree_mut());
         }
         if new.is_empty() {
-          new.push(ctx.build(Void.into_widget()));
+          new.push((None, ctx.build(Void.into_widget())));
         }
 
+        let dummy = ctx.build(Void {}.into_widget());
         let tree = ctx.tree_mut();
-        pipe_node.transplant_to_new(old_node, new[0], tree);
 
-        query_outside_infos(new[0], &pipe_node, tree)
-          .for_each(|node| node.dyn_info_mut().multi_replace(&old, &new));
+        if new[0].1 != old[0].1 {
+          pipe_node.transplant_to_new(old_node, new[0].1, tree);
+        } else {
+          pipe_node.replace_data(old_node);
+        }
 
-        update_key_state_multi(old.iter().copied(), new.iter().copied(), tree);
+        // Replacing the old widget ID with new widgets for the external pipe node of
+        // the current pipe. The self dynamic information will be updated at
+        // the end,including the widget id and the key. So the key is only
+        // used to the same level.
+        query_outside_infos(new[0].1, &pipe_node, tree).for_each(|node| {
+          node
+            .dyn_info_mut()
+            .multi_replace(&old, new.iter().map(|(_, w)| *w))
+        });
 
+        old[0].1.insert_after(dummy, tree);
         new
           .iter()
           .rev()
-          .for_each(|w| old[0].insert_after(*w, tree));
-        old.iter().for_each(|id| id.dispose_subtree(tree));
-        new.iter().for_each(|w| {
-          w.on_mounted_subtree(tree);
-          tree.dirty_marker().mark(*w, DirtyPhase::Layout);
+          .for_each(|(_, w)| dummy.insert_after(*w, tree));
+
+        old
+          .iter()
+          .filter(|(key, _)| if let Some(k) = key { old_key_widgets.contains_key(k) } else { true })
+          .for_each(|(_, id)| id.dispose_subtree(tree));
+
+        new_mounted.into_iter().for_each(|id| {
+          id.on_mounted_subtree(tree);
+          tree.dirty_marker().mark(id, DirtyPhase::Layout);
         });
+
+        dummy.dispose_subtree(tree);
+
+        pipe_node.dyn_info_mut().gen_range = GenRange::Multi(new);
 
         if without_ctx {
           BuildCtx::clear();
@@ -261,11 +309,11 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     });
 
     let mut widgets = vec![first];
-    for (idx, w) in iter.enumerate() {
+    for (idx, (key, w)) in iter.enumerate() {
       let pipe_node = node.clone();
-      let w = w.into_widget().on_build(move |id| {
+      let w = w.on_build(move |id| {
         match &mut pipe_node.dyn_info_mut().gen_range {
-          GenRange::Multi(m) => m.push(id),
+          GenRange::Multi(m) => m.push((key, id)),
           _ => unreachable!(),
         };
 
@@ -338,7 +386,6 @@ pub(crate) trait InnerPipe: Pipe + Sized {
               .single_range_replace(&(top..=bottom), &new_rg);
           });
 
-          update_key_status_single(top, p, tree);
           top.insert_after(p, tree);
           top.dispose_subtree(tree);
 
@@ -526,95 +573,6 @@ where
   fn into_widget(self) -> Widget<'static> { self.build_single() }
 }
 
-fn update_children_key_status(old: WidgetId, new: WidgetId, tree: &WidgetTree) {
-  match (old.first_child(tree), old.last_child(tree), new.first_child(tree), new.last_child(tree)) {
-    // old or new children is empty.
-    (None, _, _, _) | (_, _, None, _) => {}
-    (Some(_), None, _, _) | (_, _, Some(_), None) => {
-      unreachable!("first child is some, but last child is none")
-    }
-    (Some(o_first), Some(o_last), Some(n_first), Some(n_last)) => {
-      match (o_first == o_last, n_first == n_last) {
-        (true, true) => update_key_status_single(o_first, n_first, tree),
-        (true, false) => {
-          if let Some(old_key) = o_first.query_ref::<Box<dyn AnyKey>>(tree) {
-            let o_key = old_key.key();
-            new.children(tree).any(|n| {
-              if let Some(new_key) = n.query_ref::<Box<dyn AnyKey>>(tree) {
-                let same_key = o_key == new_key.key();
-                if same_key {
-                  update_key_states(&**old_key, o_first, &**new_key, n, tree);
-                }
-                same_key
-              } else {
-                false
-              }
-            });
-          }
-        }
-        (false, true) => {
-          if let Some(new_key) = n_first.query_ref::<Box<dyn AnyKey>>(tree) {
-            let n_key = new_key.key();
-            old.children(tree).any(|o| {
-              if let Some(old_key) = o.query_ref::<Box<dyn AnyKey>>(tree) {
-                let same_key = old_key.key() == n_key;
-                if same_key {
-                  update_key_states(&**old_key, o, &**new_key, n_first, tree);
-                }
-                same_key
-              } else {
-                false
-              }
-            });
-          }
-        }
-        (false, false) => update_key_state_multi(old.children(tree), new.children(tree), tree),
-      }
-    }
-  }
-}
-
-fn update_key_status_single(old: WidgetId, new: WidgetId, tree: &WidgetTree) {
-  if let Some(old_key) = old.query_ref::<Box<dyn AnyKey>>(tree) {
-    if let Some(new_key) = new.query_ref::<Box<dyn AnyKey>>(tree) {
-      if old_key.key() == new_key.key() {
-        update_key_states(&**old_key, old, &**new_key, new, tree);
-      }
-    }
-  }
-}
-
-fn update_key_state_multi(
-  old: impl Iterator<Item = WidgetId>, new: impl Iterator<Item = WidgetId>, tree: &WidgetTree,
-) {
-  let mut old_key_list = ahash::HashMap::default();
-  for o in old {
-    if let Some(old_key) = o.query_ref::<Box<dyn AnyKey>>(tree) {
-      old_key_list.insert(old_key.key(), o);
-    }
-  }
-
-  if !old_key_list.is_empty() {
-    for n in new {
-      if let Some(new_key) = n.query_ref::<Box<dyn AnyKey>>(tree) {
-        if let Some(o) = old_key_list.get(&new_key.key()).copied() {
-          if let Some(old_key) = o.query_ref::<Box<dyn AnyKey>>(tree) {
-            update_key_states(&**old_key, o, &**new_key, n, tree);
-          }
-        }
-      }
-    }
-  }
-}
-
-fn update_key_states(
-  old_key: &dyn AnyKey, old: WidgetId, new_key: &dyn AnyKey, new: WidgetId, tree: &WidgetTree,
-) {
-  new_key.record_prev_key_widget(old_key);
-  old_key.record_next_key_widget(new_key);
-  update_children_key_status(old, new, tree)
-}
-
 /// `PipeNode` just use to wrap a `Box<dyn Render>`, and provide a choice to
 /// change the inner `Box<dyn Render>` by `UnsafeCell` at a safe time --
 /// although it is stored using a reference counting pointer, its logic
@@ -645,7 +603,7 @@ pub(crate) struct DynWidgetsInfo {
 #[derive(Debug)]
 pub enum GenRange {
   Single(WidgetId),
-  Multi(Vec<WidgetId>),
+  Multi(Vec<(Option<Key>, WidgetId)>),
   ParentOnly(RangeInclusive<WidgetId>),
 }
 
@@ -661,8 +619,8 @@ impl DynWidgetsInfo {
         *id = new;
       }
       GenRange::Multi(m) => {
-        if let Some(idx) = m.iter().position(|w| *w == old) {
-          m[idx] = new;
+        if let Some(idx) = m.iter().position(|w| w.1 == old) {
+          m[idx].1 = new;
         }
       }
       GenRange::ParentOnly(p) => {
@@ -683,8 +641,8 @@ impl DynWidgetsInfo {
       GenRange::Single(id) => *id = *new.start(),
       GenRange::Multi(m) => {
         let p = *old.start();
-        if let Some(idx) = m.iter().position(|w| *w == p) {
-          m[idx] = *new.start();
+        if let Some(idx) = m.iter().position(|w| w.1 == p) {
+          m[idx].1 = *new.start();
         }
       }
       GenRange::ParentOnly(p) => {
@@ -698,16 +656,18 @@ impl DynWidgetsInfo {
     }
   }
 
-  fn multi_replace(&mut self, old: &[WidgetId], new: &[WidgetId]) {
+  fn multi_replace(
+    &mut self, old: &[(Option<Key>, WidgetId)], new: impl Iterator<Item = WidgetId>,
+  ) {
     match &mut self.gen_range {
       GenRange::Single(_) => unreachable!("Single pipe node never have multi pipe child."),
       GenRange::Multi(m) => {
-        if let Some(from) = m.iter().position(|w| &old[0] == w) {
+        if let Some(from) = m.iter().position(|w| old[0].1 == w.1) {
           let to = m
             .iter()
-            .position(|w| &old[old.len() - 1] == w)
+            .position(|w| old[old.len() - 1].1 == w.1)
             .expect("must include");
-          m.splice(from..=to, new.iter().copied());
+          m.splice(from..=to, new.map(|w| (None, w)));
         }
       }
       GenRange::ParentOnly(_) => {
@@ -719,7 +679,7 @@ impl DynWidgetsInfo {
   pub(crate) fn host_id(&self) -> WidgetId {
     match &self.gen_range {
       GenRange::Single(id) => *id,
-      GenRange::Multi(m) => *m.first().unwrap(),
+      GenRange::Multi(m) => m.first().unwrap().1,
       GenRange::ParentOnly(p) => *p.start(),
     }
   }
@@ -991,12 +951,7 @@ where
 mod tests {
   use std::{cell::Cell, rc::Rc};
 
-  use crate::{
-    builtin_widgets::key::{AnyKey, KeyChange},
-    prelude::*,
-    reset_test_env,
-    test_helper::*,
-  };
+  use crate::{prelude::*, reset_test_env, test_helper::*};
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
@@ -1070,43 +1025,6 @@ mod tests {
 
     assert_eq!(ids[0], new_ids[0]);
     assert_eq!(ids[2], new_ids[2]);
-  }
-
-  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-  #[test]
-  fn attach_data_to_pipe_widget() {
-    reset_test_env!();
-    let trigger = Stateful::new(false);
-    let c_trigger = trigger.clone_watcher();
-    let w = fn_widget! {
-      let p = pipe! {
-        // just use to force update the widget, when trigger modified.
-        fn_widget! {
-          $c_trigger;
-          MockBox { size: Size::zero() }
-        }
-      };
-      @KeyWidget {
-        key: 0,
-        value: (),
-        @ { p }
-      }
-    };
-
-    let mut wnd = TestWindow::new(w);
-    wnd.draw_frame();
-    {
-      *trigger.write() = true;
-    }
-    wnd.draw_frame();
-    let tree = wnd.tree();
-
-    // the key should still in the root widget after pipe widget updated.
-    assert!(
-      tree
-        .content_root()
-        .contain_type::<Box<dyn AnyKey>>(tree)
-    );
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -1201,135 +1119,6 @@ mod tests {
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
-  fn pipe_widgets_with_key() {
-    reset_test_env!();
-
-    let v = Stateful::new(vec![(1, '1'), (2, '2'), (3, '3')]);
-    let enter_list: Stateful<Vec<char>> = Stateful::new(vec![]);
-    let update_list: Stateful<Vec<char>> = Stateful::new(vec![]);
-    let leave_list: Stateful<Vec<char>> = Stateful::new(vec![]);
-    let key_change: Stateful<KeyChange<char>> = Stateful::new(KeyChange::default());
-
-    let c_v = v.clone_writer();
-    let c_enter_list = enter_list.clone_writer();
-    let c_update_list = update_list.clone_writer();
-    let c_leave_list = leave_list.clone_writer();
-    let c_key_change = key_change.clone_writer();
-    let w = fn_widget! {
-      @MockMulti {
-        @ {
-          pipe!($v.clone()).map(move |v| {
-            move || {
-              v.into_iter().map(move |(i, c)| fn_widget!{
-                let key = @KeyWidget { key: i, value: c };
-                @$key {
-                  @MockBox {
-                    size: Size::zero(),
-                    on_mounted: move |_| {
-                      if $key.is_enter() {
-                        $c_enter_list.write().push($key.value);
-                      }
-
-                      if $key.is_changed() {
-                        $c_update_list.write().push($key.value);
-                        *$c_key_change.write() = $key.get_change();
-                      }
-                    },
-                    on_disposed: move |_| if $key.is_leave() {
-                      $c_leave_list.write().push($key.value);
-                    }
-                  }
-                }
-              })
-            }
-          })
-        }
-      }
-    };
-
-    // 1. 3 item enter
-    let mut wnd = TestWindow::new(w);
-    wnd.draw_frame();
-    let expect_vec = ['1', '2', '3'];
-    assert_eq!((*enter_list.read()).len(), 3);
-    assert!(
-      (*enter_list.read())
-        .iter()
-        .all(|item| expect_vec.contains(item))
-    );
-    // clear enter list vec
-    enter_list.write().clear();
-
-    // 2. add 1 item
-    c_v.write().push((4, '4'));
-    wnd.draw_frame();
-
-    let expect_vec = ['4'];
-    assert_eq!((*enter_list.read()).len(), 1);
-    assert!(
-      enter_list
-        .read()
-        .iter()
-        .all(|item| expect_vec.contains(item))
-    );
-    // clear enter list vec
-    enter_list.write().clear();
-
-    // 3. update the second item
-    c_v.write()[1].1 = 'b';
-    wnd.draw_frame();
-
-    let expect_vec = [];
-    assert_eq!((*enter_list.read()).len(), 0);
-    assert!(
-      (*enter_list.read())
-        .iter()
-        .all(|item| expect_vec.contains(item))
-    );
-
-    let expect_vec = ['b'];
-    assert_eq!((*update_list.read()).len(), 1);
-    assert!(
-      (*update_list.read())
-        .iter()
-        .all(|item| expect_vec.contains(item))
-    );
-    assert_eq!(*key_change.read(), KeyChange(Some('2'), 'b'));
-    update_list.write().clear();
-
-    // 4. remove the second item
-    c_v.write().remove(1);
-    wnd.draw_frame();
-    let expect_vec = vec!['b'];
-    assert_eq!((*leave_list.read()), expect_vec);
-    assert_eq!((*leave_list.read()).len(), 1);
-    assert!(
-      leave_list
-        .read()
-        .iter()
-        .all(|item| expect_vec.contains(item))
-    );
-    leave_list.write().clear();
-
-    // 5. update the first item
-    c_v.write()[0].1 = 'a';
-    wnd.draw_frame();
-
-    assert_eq!((*enter_list.read()).len(), 0);
-
-    let expect_vec = ['a'];
-    assert_eq!((*update_list.read()).len(), 1);
-    assert!(
-      (*update_list.read())
-        .iter()
-        .all(|item| expect_vec.contains(item))
-    );
-    assert_eq!(*key_change.read(), KeyChange(Some('1'), 'a'));
-    update_list.write().clear();
-  }
-
-  #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-  #[test]
   fn delay_drop_widgets() {
     reset_test_env!();
 
@@ -1359,7 +1148,8 @@ mod tests {
             assert_eq!(wid, Some(ctx.id));
           }
         }
-      }.into_widget()
+      }
+      .into_widget()
     }
 
     #[derive(Declare)]
@@ -1582,8 +1372,9 @@ mod tests {
         @ {
           pipe!(*$box_count).map(move |v| {
             move || {
-              (0..v).map(move |_| fn_widget!{
-                let pipe_parent = pipe!(*$child_size).map(move |size| fn_widget!{ @MockBox { size } });
+              (0..v).map(move |_| {
+                let pipe_parent = pipe!(*$child_size)
+                  .map(move |size| fn_widget!{ @MockBox { size } });
                 @$pipe_parent { @Void {} }
               })
             }
