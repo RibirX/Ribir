@@ -5,6 +5,8 @@ use syn::{
   parse::{Parse, discouraged::Speculative},
   spanned::Spanned,
 };
+
+use crate::util;
 const DECLARE_ATTR: &str = "declare";
 
 pub struct Declarer<'a> {
@@ -243,13 +245,7 @@ impl<'a> DeclareField<'a> {
       .is_none_or(|attr| attr.custom.is_none() && attr.skip.is_none())
   }
 
-  pub fn doc_attr(&self) -> Option<&Attribute> {
-    self
-      .field
-      .attrs
-      .iter()
-      .find(|attr| matches!(&attr.meta, syn::Meta::NameValue(nv) if nv.path.is_ident("doc")))
-  }
+  pub fn doc_attr(&self) -> Option<&Attribute> { util::doc_attr(self.field) }
 }
 
 impl Parse for DeclareAttr {

@@ -1,9 +1,9 @@
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::quote;
+use quote::{ToTokens, quote};
 use syn::{
   AngleBracketedGenericArguments, DataEnum, Field, Fields, FieldsNamed, FieldsUnnamed,
-  GenericArgument, Index, PathArguments, PathSegment, Type, parse_quote, punctuated::Pair,
-  spanned::Spanned, token::Comma,
+  GenericArgument, Index, Meta, PathArguments, PathSegment, Type, Visibility, parse_quote,
+  spanned::Spanned,
 };
 
 const BUILDER: &str = "Builder";
@@ -58,7 +58,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         }
       });
 
-      let with_child_impl = |f_idx: usize, f: &mut Field, tokens: &mut TokenStream| {
+      let with_child_impl = |f_idx: usize, f: &Field, tokens: &mut TokenStream| {
         let field_name = if let Some(name) = f.ident.as_ref() {
           quote! {#name}
         } else {
@@ -85,19 +85,20 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       };
 
       match &mut stt.fields {
-        Fields::Named(FieldsNamed { named: fields, .. }) => {
-          fields
-            .iter_mut()
-            .enumerate()
-            .for_each(|(f_idx, f)| with_child_impl(f_idx, f, &mut tokens));
-          let builder_fields = fields
-            .clone()
-            .into_pairs()
-            .map(convert_to_builder_pair);
-          let names = fields.iter().map(|f| f.ident.as_ref().unwrap());
+        Fields::Named(FieldsNamed { named, .. }) => {
+          let builder_fields_def = named.iter().map(move |f| {
+            let ty = &f.ty;
+            let name = f.ident.as_ref().unwrap();
+            if option_type_extract(ty).is_none() {
+              quote! { #name: Option<#ty> }
+            } else {
+              quote! { #name: #ty }
+            }
+          });
+          let names = named.iter().map(|f| f.ident.as_ref().unwrap());
           tokens.extend(quote! {
             #vis struct #builder #g_impl #g_where {
-              #(#builder_fields)*
+              #(#builder_fields_def),*
             }
 
             impl #g_impl Default for #builder #g_ty #g_where {
@@ -106,12 +107,40 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             }
           });
 
-          let init_values = fields.iter().map(|field| {
-            let field_name = field.ident.as_ref().unwrap();
-            let ty = &field.ty;
-            let value = gen_init_value_tokens(quote!(#field_name), ty);
-            quote! {#field_name: #value}
+          let (mut declare_fields, mut field_value, mut child) = (vec![], vec![], vec![]);
+          named.iter_mut().for_each(|f| {
+            if let Some(field) = take_template_field(f) {
+              declare_fields.push(&*f);
+              field_value.push(field.value);
+            } else {
+              child.push(&*f);
+            }
           });
+
+          if !declare_fields.is_empty() {
+            let declare_methods = declare_field_methods(vis, &declare_fields);
+            tokens.extend(quote! {
+              impl #g_impl #builder #g_ty #g_where {
+                #(#declare_methods)*
+              }
+            });
+          }
+
+          child
+            .iter()
+            .enumerate()
+            .for_each(|(f_idx, f)| with_child_impl(f_idx, f, &mut tokens));
+
+          let init_values = declare_fields
+            .iter()
+            .zip(field_value.iter())
+            .map(|(field, value)| gen_init_field_tokens(field, value))
+            .chain(child.iter().map(|field| {
+              let field_name = field.ident.as_ref().unwrap();
+              let ty = &field.ty;
+              let value = gen_init_child_tokens(quote!(#field_name), ty);
+              quote! {#field_name: #value}
+            }));
 
           tokens.extend(quote! {
             impl #g_impl TemplateBuilder for #builder #g_ty #g_where {
@@ -128,12 +157,16 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             .enumerate()
             .for_each(|(f_idx, f)| with_child_impl(f_idx, f, &mut tokens));
           let nones = fields.iter().map(|_| quote! { None });
-          let builder_fields = fields
-            .clone()
-            .into_pairs()
-            .map(convert_to_builder_pair);
+          let builder_fields_def = fields.iter().map(|f| {
+            let ty = &f.ty;
+            if option_type_extract(ty).is_none() {
+              quote! { Option<#ty> }
+            } else {
+              quote! { #ty }
+            }
+          });
           tokens.extend(quote! {
-            #vis struct #builder #g_impl #g_where(#(#builder_fields)*);
+            #vis struct #builder #g_impl #g_where(#(#builder_fields_def),*);
 
             impl #g_impl Default for #builder #g_ty #g_where {
               #[inline]
@@ -143,7 +176,7 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
           let init_values = fields.iter().enumerate().map(|(idx, field)| {
             let idx = Index::from(idx);
-            gen_init_value_tokens(quote!(#idx), &field.ty)
+            gen_init_child_tokens(quote!(#idx), &field.ty)
           });
 
           tokens.extend(quote! {
@@ -249,19 +282,71 @@ fn option_type_extract(ty: &syn::Type) -> Option<&syn::Type> {
     })
 }
 
-fn convert_to_builder_pair(mut p: Pair<Field, Comma>) -> Pair<Field, Comma> {
-  let ty = &p.value().ty;
-  if option_type_extract(ty).is_none() {
-    p.value_mut().ty = parse_quote!(Option<#ty>);
-  };
-  p
-}
-
-fn gen_init_value_tokens(field_name: TokenStream, ty: &syn::Type) -> TokenStream {
+fn gen_init_child_tokens(field_name: TokenStream, ty: &syn::Type) -> TokenStream {
   let mut value = quote! { self.#field_name };
   if option_type_extract(ty).is_none() {
     let err = format!("Required child `{}` not specify", quote! { #ty });
     value.extend(quote! { .expect(#err)});
   };
   value
+}
+
+fn gen_init_field_tokens(field: &Field, default: &Option<syn::Expr>) -> TokenStream {
+  let field_name = field.ident.as_ref().unwrap();
+  let ty = &field.ty;
+  if let Some(df) = default {
+    quote! { #field_name: self.#field_name.unwrap_or_else(|| #df.template_field_into()) }
+  } else if option_type_extract(ty).is_none() {
+    let err = format!("Required field `{}: {}` not set", field_name, ty.to_token_stream());
+    quote! { #field_name: self.#field_name.expect(#err) }
+  } else {
+    quote! { #field_name: self.#field_name }
+  }
+}
+
+struct TemplateField {
+  value: Option<syn::Expr>,
+}
+
+fn take_template_field(field: &mut syn::Field) -> Option<TemplateField> {
+  let pos = field
+    .attrs
+    .iter()
+    .position(|attr| attr.path().is_ident("template"))?;
+
+  let attr = field.attrs.remove(pos);
+  let meta = attr
+    .parse_args::<Meta>()
+    .expect("Unsupported meta!");
+  if !meta.path().is_ident("field") {
+    panic!("template only support `field` now");
+  }
+
+  match meta {
+    Meta::Path(_) => Some(TemplateField { value: None }),
+    Meta::List(_) => panic!("`field` not support list value"),
+    Meta::NameValue(nv) => Some(TemplateField { value: Some(nv.value) }),
+  }
+}
+
+fn declare_field_methods<'a>(
+  vis: &'a Visibility, fields: &'a [&'a Field],
+) -> impl Iterator<Item = TokenStream> + 'a {
+  fields.iter().map(move |field| {
+    let field_name = field.ident.as_ref().unwrap();
+    let doc = crate::util::doc_attr(field);
+    let ty = &field.ty;
+
+    quote! {
+      #[inline]
+      #[allow(clippy::type_complexity)]
+      #doc
+      #vis fn #field_name<const _M: usize>(&mut self, v: impl TemplateFieldInto<#ty, _M>)
+        -> &mut Self
+      {
+        self.#field_name = Some(v.template_field_into());
+        self
+      }
+    }
+  })
 }

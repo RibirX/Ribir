@@ -15,3 +15,10 @@ pub fn data_struct_unwrap<'a>(
     }
   }
 }
+
+pub fn doc_attr(field: &syn::Field) -> Option<&syn::Attribute> {
+  field
+    .attrs
+    .iter()
+    .find(|attr| matches!(&attr.meta, syn::Meta::NameValue(nv) if nv.path.is_ident("doc")))
+}
