@@ -199,58 +199,105 @@ pub trait ComposeChildFrom<C, const M: usize> {
   fn compose_child_from(from: C) -> Self;
 }
 
-/// This trait signifies that a type can serve as a child of `ComposeChild`.
+/// Marker trait for types that can be used as children in composition
+/// hierarchies.
 ///
-/// Implementing this trait involves implementing `ComposeChildFrom` from this
-/// type to itself.
-///
-/// One can utilize `#[derive(ChildOfCompose)]` to implement this trait.
+/// This trait is typically implemented using `#[derive(ChildOfCompose)]`, which
+/// automatically generates the [`ComposeChildFrom`] implementation for `Self`.
 pub trait ChildOfCompose {}
 
-/// The template specifies the types of children that `ComposeChild` can have,
-/// gathering these children and providing them to the parent for composition.
+/// A type-safe template system for constructing valid widget composition
+/// hierarchies.
 ///
-/// You can use `#[derive(Template)]` to implement this trait for a struct or
-/// enum.
+/// Provides compile-time validation of widget structure through composition
+/// rules and type-driven child relationships. Templates serve as blueprint
+/// definitions that:
+/// - Define valid child configurations through type constraints
+/// - Enable automatic widget conversions via [`ComposeChildFrom`]
+/// - Support default value initialization for non-widget fields
 ///
-/// In a struct, children are collected from its fields, so the field types must
-/// be distinct and not convertible between each other using `ComposeChildFrom`.
+/// # Key Features
 ///
-/// In an enum, children are collected from its variants, so the variant types
-/// must also be distinct and not convertible between each other using
-/// `ComposeChildFrom`.
+/// - **Type-Checked Composition**: Enforces valid widget hierarchies at compile
+///   time
+/// - **Flexible Child Specification**: Supports both required and optional
+///   children
+/// - **Dual-Mode Definition**: Works with both structs (fixed layout) and enums
+///   (variant selection)
+/// - **Automatic Conversions**: Leverages Rust's type system for seamless child
+///   conversion
 ///
-/// # Example
+/// # Implementation Mechanics
 ///
+/// When derived via `#[derive(Template)]`, the system:
+/// 1. Generates a builder interface with type-checked composition methods
+/// 2. Enforces parent/child compatibility through trait bounds
+/// 3. Automatically applies default values to non-widget fields
+/// 4. Implements necessary conversion traits for child widgets
+///
+/// # Template Patterns
+///
+/// ## Basic Widget Composition
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// #[derive(Declare)]
+/// struct MyButton;
+///
+/// // Defines valid child configurations for MyButton
+/// #[derive(Template)]
+/// struct ButtonChild<'w> {
+///   icon: Option<PairOf<'w, Icon>>, // Optional icon child
+///   label: Option<CowArc<str>>,     // Optional text label
+/// }
+///
+/// impl<'c> ComposeChild<'c> for MyButton {
+///   type Child = ButtonChild<'c>;
+///
+///   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+///     unimplemented!() // Actual composition logic
+///   }
+/// }
+///
+/// // Usage with text child (automatically converted to ButtonChild)
+/// let _btn = fn_widget! {
+///   @MyButton { @{ "Hi!" } }  // String converts to label via ComposeChildFrom
+/// };
+/// ```
+///
+/// ## Struct-Based Layout Definition
 /// ```rust
 /// use ribir::prelude::*;
 ///
 /// #[derive(Template)]
-/// struct MyTemplate<'w> {
-///   leading_icon: Leading<Widget<'w>>,
-///   trailing_icon: Option<Trailing<Widget<'w>>>,
+/// struct Toolbar<'w> {
+///   title: CowArc<str>,       // Mandatory text element
+///   menu: Option<Widget<'w>>, // Optional widget slot
+///   #[template(field = Color::BLUE)]
+///   theme: Color, // Non-widget field with default
 /// }
 /// ```
 ///
-/// This template outlines two child components for its parent: a mandatory
-/// `Leading<Widget>` and an optional `Trailing<Widget>`.
-///
+/// ## Enum-Based Variant Selection
 /// ```rust
 /// use ribir::prelude::*;
 ///
 /// #[derive(Template)]
-/// enum MyTemplate<'w> {
-///   Leading(Leading<Widget<'w>>),
-///   Trailing(Trailing<Widget<'w>>),
+/// enum ButtonContent<'w> {
+///   Icon(PairOf<'w, Icon>), // Icon-only variant
+///   Label(CowArc<str>),     // Text-only variant
+///   Both {
+///     // Combined variant
+///     icon: PairOf<'w, Icon>,
+///     label: CowArc<str>,
+///   },
 /// }
 /// ```
-///
-/// This template specifies one child for its parent, which must be either a
-/// leading icon or a trailing icon.
-///
-/// Refer to the [`ComposeChild`] documentation for further information.
 pub trait Template: Sized {
+  /// Type responsible for validating and constructing template instances
   type Builder: TemplateBuilder;
+
+  /// Creates a configured builder instance ready for composition
   fn builder() -> Self::Builder;
 }
 
@@ -271,6 +318,44 @@ pub struct Pair<W, C> {
 /// A pair used to store a `ComposeChild` widget and its child. This preserves
 /// the type information of both the parent and child without composition.
 pub struct PairOf<'c, W: ComposeChild<'c>>(FatObj<Pair<State<W>, <W as ComposeChild<'c>>::Child>>);
+
+pub trait TemplateFieldFrom<T, const M: usize> {
+  fn template_field_from(from: T) -> Self;
+}
+
+pub trait TemplateFieldInto<T, const M: usize> {
+  fn template_field_into(self) -> T;
+}
+
+impl<T, U> TemplateFieldFrom<U, 0> for T
+where
+  T: From<U>,
+{
+  fn template_field_from(from: U) -> Self { from.into() }
+}
+
+impl<T, U> TemplateFieldFrom<U, 1> for DeclareInit<T>
+where
+  DeclareInit<T>: DeclareFrom<U, 1>,
+  T: From<U>,
+{
+  fn template_field_from(from: U) -> Self { DeclareInit::declare_from(from) }
+}
+
+impl<T, U> TemplateFieldFrom<U, 2> for DeclareInit<T>
+where
+  DeclareInit<T>: DeclareFrom<U, 2>,
+  T: From<U>,
+{
+  fn template_field_from(from: U) -> Self { DeclareInit::declare_from(from) }
+}
+
+impl<T, U, const M: usize> TemplateFieldInto<U, M> for T
+where
+  U: TemplateFieldFrom<T, M>,
+{
+  fn template_field_into(self) -> U { U::template_field_from(self) }
+}
 
 impl IntoWidget<'static, RENDER> for Box<dyn MultiChild> {
   #[inline]
@@ -557,4 +642,38 @@ mod tests {
     WidgetTester::new(fn_widget! { @Host { @{ Field } }}),
     LayoutCase::default().with_size(FIX_OPTION_TEMPLATE_EXPECT_SIZE)
   );
+
+  #[test]
+  fn template_field() {
+    #[derive(Template)]
+    struct TemplateField {
+      #[template(field = 0)]
+      _x: i32,
+      #[template(field)]
+      _y: TextInit,
+      _child: Widget<'static>,
+    }
+
+    #[derive(Declare)]
+    struct X;
+
+    impl ComposeChild<'static> for X {
+      type Child = TemplateField;
+
+      fn compose_child(_: impl StateWriter<Value = Self>, _child: Self::Child) -> Widget<'static> {
+        unreachable!()
+      }
+    }
+
+    let _ = fn_widget! {
+      @X {
+        @TemplateField {
+          _y: "hi",
+          // x is optional, is has a default value of 0
+          // y: "hi",
+          @Void {}
+        }
+      }
+    };
+  }
 }

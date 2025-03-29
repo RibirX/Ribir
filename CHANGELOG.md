@@ -28,7 +28,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: Introduced the `PairOf` utility to preserve parent and child type information of `ComposeChild`. (#724 @M-Adoo)
-- **core**: Added `class_array!` macro to apply multiple classes at once. (#724 by @M-Adoo)·
+- **core**: Added `class_array!` macro to apply multiple classes at once. (#724 by @M-Adoo)
+- **core**: Add non-child field support to `Template`. (#725 @M-Adoo)
+  - Support default values for non-child fields via `#[template(field)]` attribute.
+  - Maintain backward compatibility with existing child-focused patterns
+
 
 ### Breaking
 
