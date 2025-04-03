@@ -42,7 +42,7 @@ impl<'c> ComposeChild<'c> for Disabled {
       @FocusScope {
         skip_descendants: pipe!($this.disabled()),
         skip_host: pipe!($this.disabled()),
-        @ IgnorePointer {
+        @IgnorePointer {
           ignore: pipe!($this.disabled()).map(
             |v| if v { IgnoreScope::Subtree } else { IgnoreScope::None }
           ),

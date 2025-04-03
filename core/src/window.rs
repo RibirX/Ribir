@@ -173,6 +173,13 @@ impl Window {
       .focus_prev_widget(self.tree());
   }
 
+  /// Attempts to set focus to the specified widget, returning the actual
+  /// focused widget ID. If the widget is not focusable, it returns `None`.
+  pub fn try_focus(&self, widget_id: WidgetId) -> Option<WidgetId> {
+    let mut focus_manager = self.focus_mgr.try_borrow_mut().ok()?;
+    focus_manager.try_focus(widget_id, self.tree())
+  }
+
   /// Execute the callback when the next frame begins.
   pub fn once_next_frame(&self, f: impl FnOnce() + 'static) {
     self.once_on_lifecycle(f, |msg| matches!(msg, FrameMsg::NewFrame(_)))

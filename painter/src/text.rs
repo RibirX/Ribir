@@ -199,6 +199,28 @@ impl GlyphUnit {
 }
 fn cast(pos: i32, scale: f32) -> GlyphUnit { GlyphUnit(f32::ceil(pos as f32 * scale) as i32) }
 
+impl TextStyle {
+  /// Sets the font size of the text style.
+  #[inline]
+  pub fn with_font_size(self, font_size: f32) -> Self { Self { font_size, ..self } }
+
+  /// Sets the font face of the text style.
+  #[inline]
+  pub fn with_font_face(self, font_face: FontFace) -> Self { Self { font_face, ..self } }
+
+  /// Sets the letter space of the text style.
+  #[inline]
+  pub fn with_letter_space(self, letter_space: f32) -> Self { Self { letter_space, ..self } }
+
+  /// Sets the line height of the text style.
+  #[inline]
+  pub fn with_line_height(self, line_height: f32) -> Self { Self { line_height, ..self } }
+
+  /// Sets the text overflow of the text style.
+  #[inline]
+  pub fn with_overflow(self, overflow: TextOverflow) -> Self { Self { overflow, ..self } }
+}
+
 impl Glyph {
   fn new(glyph_id: GlyphId, cluster: u32, pos: &GlyphPosition, face: &Face) -> Self {
     let scale = GlyphUnit::UNITS_PER_EM as f32 / face.units_per_em() as f32;

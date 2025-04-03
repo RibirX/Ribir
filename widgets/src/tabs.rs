@@ -292,28 +292,28 @@ impl<'w> Tab<'w> {
 impl TabPos {
   pub fn is_horizontal(self) -> bool { matches!(self, TabPos::Top | TabPos::Bottom) }
 
-  fn main_dir(self) -> Direction {
+  fn main_dir(&self) -> Direction {
     match self {
       TabPos::Top | TabPos::Bottom => Direction::Vertical,
       TabPos::Left | TabPos::Right => Direction::Horizontal,
     }
   }
 
-  fn main_reverse(self) -> bool {
+  fn main_reverse(&self) -> bool {
     match self {
       TabPos::Top | TabPos::Left => false,
       TabPos::Bottom | TabPos::Right => true,
     }
   }
 
-  fn headers_dir(self) -> Direction {
+  fn headers_dir(&self) -> Direction {
     match self {
       TabPos::Top | TabPos::Bottom => Direction::Horizontal,
       TabPos::Left | TabPos::Right => Direction::Vertical,
     }
   }
 
-  fn headers_scroll_dir(self) -> Scrollable {
+  fn headers_scroll_dir(&self) -> Scrollable {
     match self {
       TabPos::Top | TabPos::Bottom => Scrollable::X,
       TabPos::Left | TabPos::Right => Scrollable::Y,

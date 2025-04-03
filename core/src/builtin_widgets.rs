@@ -211,6 +211,14 @@ impl<T> FatObj<T> {
     }
   }
 
+  /// Splits the `FatObj` into its host object and the remaining shell.
+  /// Returns a tuple containing both the extracted host and the shell object.
+  pub fn into_parts(self) -> (T, FatObj<()>) {
+    let mut host = None;
+    let fat = self.map(|old| host = Some(old));
+    (host.expect("Host value should be set"), fat)
+  }
+
   /// Return true if the FatObj not contains any builtin widgets.
   pub fn is_empty(&self) -> bool {
     self.track_id.is_none()

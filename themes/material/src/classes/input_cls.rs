@@ -11,7 +11,7 @@ pub(super) fn init(classes: &mut Classes) {
       let u = interval(blink_interval, AppCtx::scheduler())
         .subscribe(move |idx| $w.write().opacity = (idx % 2) as f32);
       let border = BuildCtx::color()
-        .map(|color| Border::only_left(BorderSide::new(2., color.into())));
+        .map(|color| Border::only_left(BorderSide::new(2., (*color).into())));
       @ $w {
         clamp: BoxClamp::fixed_width(2.),
         border,

@@ -159,6 +159,16 @@ impl<W> Stateful<W> {
     Self { data: Sc::new(StateCell::new(data)), info: Sc::new(WriterInfo::new()) }
   }
 
+  /// Determines if two `Stateful` instances point to the same underlying data.
+  ///
+  /// Performs pointer equality checks on both:
+  /// - The state data container
+  /// - The associated metadata
+  #[inline]
+  pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+    Sc::ptr_eq(&this.data, &other.data) && Sc::ptr_eq(&this.info, &other.info)
+  }
+
   pub fn from_pipe(p: impl Pipe<Value = W>) -> (Self, BoxSubscription<'static>)
   where
     Self: 'static,

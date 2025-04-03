@@ -146,8 +146,8 @@ pub fn border_1_left(color: Color) -> Border {
   Border::only_left(BorderSide::new(1., color.into()))
 }
 
-pub fn border_2() -> VariantMap<Color, impl Fn(Color) -> Border> {
-  BuildCtx::color().map(|color| Border::all(BorderSide::new(2., color.into())))
+pub fn border_2() -> VariantMap<Color, impl Fn(&Color) -> Border> {
+  BuildCtx::color().map(|color| Border::all(BorderSide::new(2., (*color).into())))
 }
 pub fn border_2_surface_color() -> Border {
   let surface_variant = Palette::of(BuildCtx::get()).on_surface_variant();

@@ -49,7 +49,12 @@ pub fn init(classes: &mut Classes) {
         }
       },
       @{ w }
-      @in_parent_layout! { @ { tab_pos_var().map(|pos| fn_widget!{ indicator(pos) }) } }
+      @in_parent_layout! {
+        @ { tab_pos_var().map(|pos| {
+          let pos = *pos;
+          fn_widget! { indicator(&pos) }
+        })}
+      }
     }
     .into_widget()
   });
@@ -160,7 +165,7 @@ pub fn init(classes: &mut Classes) {
   });
 }
 
-fn indicator(pos: TabPos) -> Widget<'static> {
+fn indicator(pos: &TabPos) -> Widget<'static> {
   fn p_length(length: f32) -> f32 { (length - 4.).max(24.) }
   fn p_offset(length: f32) -> f32 { (length - p_length(length)) / 2. }
 
