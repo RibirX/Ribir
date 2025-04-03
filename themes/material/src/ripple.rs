@@ -44,6 +44,7 @@ impl<'c> ComposeChild<'c> for Ripple {
         on_pointer_down: move |e| {
           let pos = (!$this.center).then(||e.position());
           $this.launch(pos);
+          e.stop_propagation();
         },
         on_disposed: move |_| $this.write().launcher = None,
         @ { child }

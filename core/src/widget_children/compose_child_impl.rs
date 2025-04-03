@@ -86,7 +86,16 @@ where
 {
   type Target = FatObj<W::Target>;
 
-  fn with_child(self, child: C) -> Self::Target { self.map(|host| host.with_child(child)) }
+  #[track_caller]
+  fn with_child(self, child: C) -> Self::Target {
+    // Employing a verbose method to ensure accurate panic location reporting,
+    // since the `closure_track_caller` macro is currently in an unstable state.
+    // Once `closure_track_caller` becomes stable, a more concise alternative would
+    // be: `self.map(|p| p.with_child(child))`
+    let (host, fat) = self.into_parts();
+    let child = host.with_child(child);
+    fat.map(|_| child)
+  }
 }
 
 // Option needn't implement for `Template`
@@ -113,6 +122,7 @@ where
 {
   type Target = Pair<W, C1::Target>;
 
+  #[track_caller]
   fn with_child(self, c: C2) -> Self::Target {
     let Pair { parent: widget, child } = self;
     Pair { parent: widget, child: child.with_child(c) }

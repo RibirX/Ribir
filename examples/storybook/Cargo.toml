@@ -15,6 +15,7 @@ version.workspace = true
 paste.workspace = true
 # we disable `default-features`, because we want more control over testing.
 ribir = {path = "../../ribir", features = ["material", "widgets"]}
+webbrowser.workspace = true
 
 [dev-dependencies]
 ribir_dev_helper = {path = "../../dev-helper"}
@@ -23,6 +24,7 @@ ribir_slim = { path = "../../themes/ribir_slim" }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
 wasm-bindgen = "0.2.92"
+
 
 [features]
 wgpu = ["ribir/wgpu"]

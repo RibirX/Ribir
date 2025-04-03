@@ -52,8 +52,7 @@ fn task_lists(
       @ {
         pipe!($this;).map(move |_| fn_widget!{
           let _hint_capture_this = || $this.write();
-          let mut widgets = vec![];
-
+          let mut items = List::child_template();
           for id in $this.all_tasks() {
             if $this.get_task(id).map_or(false, cond) {
               let task = this.split_writer(
@@ -92,11 +91,16 @@ fn task_lists(
                     }.into_widget()
                   }
                 });
-
-              widgets.push(item);
+              items = items.with_child(@ListCustomItem {
+                interactive: false,
+                @{ item }
+              });
             }
           }
-          @Lists { @ { widgets } }
+          @List {
+            selectable: ListSelectable::None,
+            @ { items }
+          }
         })
       }
     }
@@ -139,7 +143,27 @@ where
 {
   fn_widget! {
     let id = $task.id();
-    let mut item = @ListItem { };
+    let item = @ListItemChildren {
+      @ {
+        let mut checkbox = @Checkbox { checked: pipe!($task.complete) };
+        let u = watch!($checkbox.checked)
+          .distinct_until_changed()
+          .subscribe(move |v| $task.write().complete = v);
+        checkbox.on_disposed(move |_| u.unsubscribe());
+        checkbox
+      }
+      @ListItemHeadline { @ { $task.label.clone() } }
+      @Trailing {
+        @Icon {
+          cursor: CursorIcon::Pointer,
+          on_tap: move |e| Provider::write_of::<Todos>(e).unwrap().remove(id),
+          @ { svgs::CLOSE }
+        }
+      }
+    }.build_tml().compose_sections();
+
+    let mut item = FatObj::new(item);
+
     let mut stagger = $stagger.write();
     if !stagger.has_ever_run() {
       $item.write().opacity = 0.;
@@ -159,24 +183,7 @@ where
       });
     }
 
-    @$item {
-      @{ HeadlineText(Label::new($task.label.clone())) }
-      @Leading::new(EdgeWidget::Custom({
-        let checkbox = @Checkbox { checked: pipe!($task.complete) };
-        watch!($checkbox.checked)
-          .distinct_until_changed()
-          .subscribe(move |v| $task.write().complete = v);
-        CustomEdgeWidget(checkbox.into_widget())
-      }))
-      @Trailing::new(EdgeWidget::Icon({
-        let icon = svgs::CLOSE;
-        let mut icon = FatObj::new(icon);
-        @ $icon {
-          cursor: CursorIcon::Pointer,
-          on_tap: move |e| Provider::write_of::<Todos>(e).unwrap().remove(id)
-        }.into_widget()
-      }))
-    }
+    item
   }
   .into_widget()
 }

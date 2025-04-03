@@ -6,6 +6,7 @@ mod checkbox_cls;
 mod disabled_cls;
 mod divider_cls;
 mod input_cls;
+mod list_cls;
 mod menu_cls;
 mod progress_cls;
 mod radio_cls;
@@ -30,6 +31,7 @@ pub fn initd_classes() -> Classes {
   tabs_cls::init(&mut classes);
   disabled_cls::init(&mut classes);
   avatar_cls::init(&mut classes);
+  list_cls::init(&mut classes);
 
   classes
 }

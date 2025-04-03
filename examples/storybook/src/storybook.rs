@@ -1,4 +1,5 @@
 use ribir::{material::material_svgs, prelude::*};
+use webbrowser::{Browser, open_browser};
 
 fn header() -> Widget<'static> {
   static TITLE: &str = "Material Design";
@@ -166,51 +167,52 @@ fn content() -> Widget<'static> {
     fn_widget! {
       @Column {
         margin: EdgeInsets::all(20.),
-        @Lists {
+        @List {
           margin: EdgeInsets::only_top(20.),
-          @UrlLink {
-            url: "https://ribir.org",
-            @ListItem {
-              @Leading::new(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
-              @ { HeadlineText(Label::new("One line list item")) }
-              @ { SupportingText(Label::new("One line supporting text")) }
+          @ListItem {
+            interactive: true,
+            on_tap: move |_| {
+              if let Err(err) = open_browser(Browser::Default, "https://ribir.org") {
+                println!("Failed to open browser: {}", err);
+              }
+            },
+            @Icon { @{ svgs::CHECK_BOX_OUTLINE_BLANK } }
+            @ListItemHeadline { @ { "One line list item" } }
+            @ListItemSupporting { @ { "One line supporting text"}}
+          }
+          @Divider { indent: DividerIndent::Start }
+          @ListItem {
+            @Icon { @ { svgs::MENU } }
+            @ListItemHeadline { @{ "One line list item"} }
+            @ListItemTrailingSupporting { @{ "100+" } }
+          }
+          @Divider { indent: DividerIndent::Start }
+          @ListItem {
+            @Avatar {
+              @Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png")))
             }
+            @ListItemHeadline { @ { "Two lines list item" }}
+            @ListItemSupporting {
+              lines: 2usize,
+              @ { "Two lines supporting text \rTwo lines supporting text" }
+            }
+            @Trailing { @Icon {  @ { svgs::CHECK_BOX_OUTLINE_BLANK } } }
           }
           @Divider { indent: DividerIndent::Start }
           @ListItem {
-            @Leading::new(EdgeWidget::Icon(svgs::MENU.into_widget()))
-            @ { HeadlineText(Label::new("One line list item")) }
-            @Trailing::new(EdgeWidget::Text(Label::new("100+")))
+            @Avatar { @ { "A" } }
+            @ListItemHeadline{ @ { "One lines list item" } }
+            @ListItemSupporting{ @ { "One lines supporting text" }}
+            @ListItemTrailingSupporting { @ { "100+" } }
           }
           @Divider { indent: DividerIndent::Start }
           @ListItem {
-            line_number: 2usize,
-            @Leading::new(
-              EdgeWidget::Avatar(
-                @Avatar {
-                  @ { Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-1.png"))) }
-                }
-              )
-            )
-            @ { HeadlineText(Label::new("Two lines list item")) }
-            @ { SupportingText(Label::new("Two lines supporting text \rTwo lines supporting text")) }
-            @Trailing::new(EdgeWidget::Icon(svgs::CHECK_BOX_OUTLINE_BLANK.into_widget()))
-          }
-          @Divider { indent: DividerIndent::Start }
-          @ListItem {
-            @Leading::new(EdgeWidget::Avatar(@Avatar { @ { "A" } }))
-            @ { HeadlineText(Label::new("One lines list item")) }
-            @ { SupportingText(Label::new("One lines supporting text")) }
-            @Trailing::new(EdgeWidget::Text(Label::new("100+")))
-          }
-          @Divider { indent: DividerIndent::Start }
-          @ListItem {
-            @Leading::new(EdgeWidget::Poster(
-              Poster(Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png"))))
-            ))
-            @ { HeadlineText(Label::new("One lines list item")) }
-            @ { SupportingText(Label::new("One lines supporting text")) }
-            @Trailing::new(@EdgeWidget::Text(Label::new("100+")))
+            @ListItemThumbNail {
+              @Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png")))
+            }
+            @ListItemHeadline { @ { "One lines list item" } }
+            @ListItemSupporting { @ { "One lines supporting text" } }
+            @ListItemTrailingSupporting { @ { "100+" } }
           }
         }
       }
@@ -221,10 +223,19 @@ fn content() -> Widget<'static> {
   fn checkbox_show() -> GenWidget {
     self::column! {
       margin: EdgeInsets::all(20.),
-      @Lists {
-        @Checkbox { @ { "Option1" } }
-        @Checkbox { @ { "Option2" } }
-        @Checkbox { @ { "Option3" } }
+      @List {
+        @ListItem {
+          @Checkbox { }
+          @ListItemHeadline { @{ "Option1"  } }
+        }
+        @ListItem {
+          @Checkbox { }
+          @ListItemHeadline { @{ "Option2"  } }
+        }
+        @ListItem {
+          @Checkbox { }
+          @ListItemHeadline { @{ "Option3"  } }
+        }
       }
     }
     .into()

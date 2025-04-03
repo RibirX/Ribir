@@ -39,9 +39,12 @@ pub struct VariantMap<V: 'static, F> {
   map: F,
 }
 
-impl<V: Clone + 'static> Variant<V> {
+impl<V: 'static> Variant<V> {
   /// Creates a new `Variant` from a provider context.
-  pub fn new(ctx: &impl AsRef<ProviderCtx>) -> Option<Self> {
+  pub fn new(ctx: &impl AsRef<ProviderCtx>) -> Option<Self>
+  where
+    V: Clone,
+  {
     if let Some(value) = Provider::state_of::<Box<dyn StateWatcher<Value = V>>>(ctx) {
       Some(Variant::Watcher(value.clone_boxed_watcher()))
     } else {
@@ -51,7 +54,10 @@ impl<V: Clone + 'static> Variant<V> {
 
   /// Creates a new `Variant` from a provider context or uses the default value
   /// if it's not found.
-  pub fn new_or(ctx: &impl AsRef<ProviderCtx>, default: V) -> Self {
+  pub fn new_or(ctx: &impl AsRef<ProviderCtx>, default: V) -> Self
+  where
+    V: Clone,
+  {
     Self::new(ctx).unwrap_or(Variant::Value(default))
   }
 
@@ -59,21 +65,32 @@ impl<V: Clone + 'static> Variant<V> {
   /// if it's not found.
   pub fn new_or_default(ctx: &impl AsRef<ProviderCtx>) -> Self
   where
-    V: Default,
+    V: Default + Clone,
   {
     Self::new_or(ctx, V::default())
+  }
+
+  /// Creates a new `Variant` from a watcher.
+  pub fn from_watcher(watcher: impl StateWatcher<Value = V>) -> Self {
+    match watcher.try_into_value() {
+      Ok(v) => Variant::Value(v),
+      Err(w) => Variant::Watcher(w.clone_boxed_watcher()),
+    }
   }
 
   /// Maps a value to another value using a function.
   pub fn map<F, U>(self, map: F) -> VariantMap<V, F>
   where
-    F: Fn(V) -> U,
+    F: Fn(&V) -> U,
   {
     VariantMap { variant: self, map }
   }
 
   /// Clones the value of the variant.
-  pub fn clone_value(&self) -> V {
+  pub fn clone_value(&self) -> V
+  where
+    V: Clone,
+  {
     match self {
       Variant::Value(v) => v.clone(),
       Variant::Watcher(v) => v.read().clone(),
@@ -95,7 +112,7 @@ impl Variant<Color> {
   /// tone.
   pub fn into_base_color(
     self, ctx: &impl AsRef<ProviderCtx>,
-  ) -> VariantMap<Color, impl Fn(Color) -> Color> {
+  ) -> VariantMap<Color, impl Fn(&Color) -> Color> {
     let p = Palette::of(ctx);
     let lightness = p.lightness_group().base;
     self.map(move |c| c.with_lightness(lightness))
@@ -105,7 +122,7 @@ impl Variant<Color> {
   /// lightness tone.
   pub fn into_container_color(
     self, ctx: &impl AsRef<ProviderCtx>,
-  ) -> VariantMap<Color, impl Fn(Color) -> Color> {
+  ) -> VariantMap<Color, impl Fn(&Color) -> Color> {
     let p = Palette::of(ctx);
     let lightness = p.lightness_group().container;
     self.map(move |c| c.with_lightness(lightness))
@@ -115,7 +132,7 @@ impl Variant<Color> {
   /// is suitable display on its base color.
   pub fn on_this_color(
     self, ctx: &impl AsRef<ProviderCtx>,
-  ) -> VariantMap<Color, impl Fn(Color) -> Color> {
+  ) -> VariantMap<Color, impl Fn(&Color) -> Color> {
     let p = Palette::of(ctx);
     let lightness = p.lightness_group().on;
     self.map(move |c| c.with_lightness(lightness))
@@ -125,7 +142,7 @@ impl Variant<Color> {
   /// is suitable display on its container color.
   pub fn on_this_container_color(
     self, ctx: &impl AsRef<ProviderCtx>,
-  ) -> VariantMap<Color, impl Fn(Color) -> Color> {
+  ) -> VariantMap<Color, impl Fn(&Color) -> Color> {
     let p = Palette::of(ctx);
     let lightness = p.lightness_group().on_container;
     self.map(move |c| c.with_lightness(lightness))
@@ -134,21 +151,21 @@ impl Variant<Color> {
 
 impl<V, F> VariantMap<V, F> {
   /// Maps a value to another value using a function.
-  pub fn map<F2, U1, U2>(self, map: F2) -> VariantMap<V, impl Fn(V) -> U2>
+  pub fn map<F2, U1, U2>(self, map: F2) -> VariantMap<V, impl Fn(&V) -> U2>
   where
-    F: Fn(V) -> U1,
+    F: Fn(&V) -> U1,
     F2: Fn(U1) -> U2,
   {
-    VariantMap { variant: self.variant, map: move |v| map((self.map)(v)) }
+    VariantMap { variant: self.variant, map: move |v: &V| map((self.map)(v)) }
   }
 
   /// Clones the value of the variant.
   pub fn clone_value<U>(&self) -> U
   where
-    F: Fn(V) -> U,
+    F: Fn(&V) -> U,
     V: Clone,
   {
-    (self.map)(self.variant.clone_value())
+    (self.map)(&self.variant.clone_value())
   }
 }
 
@@ -164,15 +181,15 @@ where
   }
 }
 
-impl<V: Clone + 'static, F, U, P> DeclareFrom<VariantMap<V, F>, 0> for DeclareInit<P>
+impl<V, F, U, P> DeclareFrom<VariantMap<V, F>, 0> for DeclareInit<P>
 where
-  F: Fn(V) -> U + 'static,
+  F: Fn(&V) -> U + 'static,
   P: From<U> + 'static,
 {
   fn declare_from(value: VariantMap<V, F>) -> Self {
     match value.variant {
-      Variant::Watcher(s) => pipe!(P::from((value.map)($s.clone()))).declare_into(),
-      Variant::Value(v) => DeclareInit::Value((value.map)(v).into()),
+      Variant::Watcher(s) => pipe!(P::from((value.map)(&$s))).declare_into(),
+      Variant::Value(v) => DeclareInit::Value((value.map)(&v).into()),
     }
   }
 }
@@ -202,13 +219,13 @@ impl<V: 'static, U: 'static, F: 'static, const M: usize> IntoWidget<'static, M> 
 where
   V: Clone,
   U: OptionPipeWidget<M>,
-  F: Fn(V) -> U,
+  F: Fn(&V) -> U,
 {
   fn into_widget(self) -> Widget<'static> {
     let Self { variant, map } = self;
     match variant {
-      Variant::Watcher(w) => pipe!(map($w.clone())).into_widget(),
-      Variant::Value(v) => map(v).option_to_widget(),
+      Variant::Watcher(w) => pipe!(map(&$w)).into_widget(),
+      Variant::Value(v) => map(&v).option_to_widget(),
     }
   }
 }

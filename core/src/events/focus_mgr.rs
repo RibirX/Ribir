@@ -480,6 +480,41 @@ impl FocusManager {
     self.refresh_focus(tree);
   }
 
+  /// Attempts to focus the specified widget, returning the actual focused
+  /// widget ID on success.
+  ///
+  /// Returns `None` if:
+  /// - The widget is in an ignored focus scope
+  /// - The widget doesn't exist in the tree
+  /// - The widget isn't focusable through normal navigation
+  pub fn try_focus(&mut self, wid: WidgetId, tree: &WidgetTree) -> Option<WidgetId> {
+    if self.ignore_scope_id(wid).is_some() {
+      return None;
+    }
+
+    let node = self.node_ids.get(&wid)?;
+    let info = self.get(*node)?;
+
+    let id = if info.has_focus_scope() {
+      let scope = self.scope_property(info.wid);
+      if info.has_focus_node() && !scope.skip_host {
+        info.wid
+      } else if !scope.skip_descendants {
+        self
+          .focus_step_in_scope(*node, None, false)
+          .and_then(|id| self.assert_get(id).wid)
+      } else {
+        None
+      }
+    } else {
+      info.wid
+    };
+    self.request_focus_to(id);
+    self.refresh_focus(tree);
+
+    self.focusing()
+  }
+
   pub fn focus(&mut self, wid: WidgetId, tree: &WidgetTree) {
     self.request_focus_to(Some(wid));
     self.refresh_focus(tree);

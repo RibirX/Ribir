@@ -386,6 +386,13 @@ impl<W, C> Pair<W, C> {
 
 impl<'c, W: ComposeChild<'c>> PairOf<'c, W> {
   pub fn parent(&self) -> &State<W> { &self.0.parent }
+
+  pub fn into_fat_widget(self) -> FatObj<Widget<'c>>
+  where
+    W: 'static,
+  {
+    self.0.map(IntoWidget::into_widget)
+  }
 }
 
 impl<'c, W> IntoWidget<'c, COMPOSE> for PairOf<'c, W>

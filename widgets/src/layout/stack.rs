@@ -57,9 +57,9 @@ pub enum StackFit {
   /// Passes the constraints through without modification.
   Passthrough,
 }
-
 impl Render for Stack {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    // Determine appropriate clamp based on stack fit
     let stack_clamp = match self.fit {
       StackFit::Loose => clamp.loose(),
       StackFit::Expand => {
@@ -76,29 +76,42 @@ impl Render for Stack {
       _ => clamp,
     };
 
-    let mut size = ZERO_SIZE;
+    // Split children into those that need parent-sized layout and others
     let (ctx, children) = ctx.split_children();
-    let mut in_parents = vec![];
-    for child in children {
-      if ctx
-        .query_of_widget::<InParentLayout>(child)
+    let (in_parents, regulars): (Vec<_>, _) = children.into_iter().partition(|child| {
+      ctx
+        .query_of_widget::<InParentLayout>(*child)
         .is_some()
-      {
-        in_parents.push(child);
-      } else {
+    });
+
+    // Layout regular children first
+    let mut stack_size = regulars
+      .into_iter()
+      .fold(ZERO_SIZE, |max_size, child| {
         let child_size = ctx.perform_child_layout(child, stack_clamp);
-        size = size.max(child_size);
+        max_size.max(child_size)
+      });
+
+    // Handle special in-parent children based on current layout size
+    if stack_size.is_empty() && clamp.min.is_empty() {
+      // When no regular children, layout in-parent children with original constraints
+      in_parents.into_iter().for_each(|child| {
+        let child_size = ctx.perform_child_layout(child, stack_clamp);
+        stack_size = stack_size.max(child_size);
+      });
+      clamp.clamp(stack_size)
+    } else {
+      // When we have valid size, layout in-parent children with parent-relative
+      // constraints
+      let stack_size = clamp.clamp(stack_size);
+      if !in_parents.is_empty() {
+        let parent_relative_clamp = BoxClamp::max_size(stack_size);
+        in_parents.into_iter().for_each(|child| {
+          ctx.perform_child_layout(child, parent_relative_clamp);
+        });
       }
+      stack_size
     }
-    let size = clamp.clamp(size);
-    if !in_parents.is_empty() {
-      // Child layout within parent should only be constrained by parent's size
-      let in_parent_clamp = BoxClamp::max_size(size);
-      for child in in_parents {
-        ctx.perform_child_layout(child, in_parent_clamp);
-      }
-    }
-    size
   }
 }
 

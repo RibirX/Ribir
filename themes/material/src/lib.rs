@@ -71,68 +71,7 @@ fn new(palette: Palette) -> Theme {
   }
 
   override_compose_decorator(&mut theme);
-  init_custom_style(&mut theme);
   theme
-}
-
-const LIST_ITEM_GAP: f32 = 16.;
-const LIST_ITEM_SIZE: f32 = 40.;
-const LIST_IMAGE_ITEM_SIZE: f32 = 56.;
-
-fn init_custom_style(theme: &mut Theme) {
-  theme
-    .custom_styles
-    .set_custom_style(ListItemStyle {
-      padding_style: Some(EdgeInsets { left: 0., right: 24., bottom: 8., top: 8. }),
-      item_align: |num| {
-        if num >= 2 { Align::Start } else { Align::Center }
-      },
-      label_gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-      headline_style: theme.typography_theme.body_large.text.clone(),
-      supporting_style: theme.typography_theme.body_medium.text.clone(),
-      leading_config: EdgeWidgetStyle {
-        icon: EdgeItemStyle { size: md::SIZE_24, gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)) },
-        text: EdgeTextItemStyle {
-          style: theme.typography_theme.label_small.text.clone(),
-          foreground: theme.palette.on_surface_variant().into(),
-          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-        },
-        avatar: EdgeItemStyle {
-          size: Size::splat(LIST_ITEM_SIZE),
-          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-        },
-        image: EdgeItemStyle {
-          size: Size::splat(LIST_IMAGE_ITEM_SIZE),
-          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-        },
-        poster: EdgeItemStyle { size: Size::new(120., 64.), gap: None },
-        custom: EdgeItemStyle {
-          size: Size::splat(LIST_ITEM_SIZE),
-          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-        },
-      },
-      trailing_config: EdgeWidgetStyle {
-        icon: EdgeItemStyle { size: md::SIZE_24, gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)) },
-        text: EdgeTextItemStyle {
-          style: theme.typography_theme.label_small.text.clone(),
-          foreground: theme.palette.on_surface_variant().into(),
-          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-        },
-        avatar: EdgeItemStyle {
-          size: Size::splat(LIST_ITEM_SIZE),
-          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-        },
-        image: EdgeItemStyle {
-          size: Size::splat(LIST_IMAGE_ITEM_SIZE),
-          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-        },
-        poster: EdgeItemStyle { size: Size::new(120., 64.), gap: None },
-        custom: EdgeItemStyle {
-          size: Size::splat(LIST_ITEM_SIZE),
-          gap: Some(EdgeInsets::only_left(LIST_ITEM_GAP)),
-        },
-      },
-    });
 }
 
 fn override_compose_decorator(theme: &mut Theme) {
