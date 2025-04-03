@@ -25,6 +25,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **core**: Fix `FittedBox` to always center its child (#pr by @M-Adoo)
+
+
 ## [0.4.0-alpha.31] - 2025-04-02
 
 ### Features

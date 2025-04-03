@@ -1086,11 +1086,11 @@ impl<'a> FatObj<Widget<'a>> {
         + [
           track_id,
           padding,
-          fitted_box,
           foreground,
           border,
           background,
           clip_boundary,
+          fitted_box,
           radius,
           scrollable,
           layout_box
