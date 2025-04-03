@@ -208,18 +208,39 @@ impl WidgetTree {
 }
 
 impl BoxClamp {
+  /// Restricts a size to stay within the clamp's minimum and maximum bounds
   #[inline]
   pub fn clamp(self, size: Size) -> Size { size.clamp(self.min, self.max) }
 
+  /// Creates a constraint that allows maximum expansion
+  /// (sets maximum dimensions to infinity while preserving minimums)
   #[inline]
   pub fn expand(mut self) -> Self {
     self.max = INFINITY_SIZE;
     self
   }
 
+  /// Creates a constraint with relaxed minimum requirements
+  /// (sets minimum dimensions to zero while preserving maximums)
   #[inline]
   pub fn loose(mut self) -> Self {
     self.min = ZERO_SIZE;
+    self
+  }
+
+  /// Removes horizontal constraints while preserving vertical bounds
+  /// (width can be any value between 0 and infinity)
+  pub fn free_width(mut self) -> Self {
+    self.min.width = 0.0;
+    self.max.width = f32::INFINITY;
+    self
+  }
+
+  /// Removes vertical constraints while preserving horizontal bounds
+  /// (height can be any value between 0 and infinity)
+  pub fn free_height(mut self) -> Self {
+    self.min.height = 0.0;
+    self.max.height = f32::INFINITY;
     self
   }
 }
