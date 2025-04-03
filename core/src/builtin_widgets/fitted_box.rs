@@ -2,38 +2,41 @@ use std::cell::Cell;
 
 use crate::prelude::*;
 
+/// Defines how a widget should be scaled and positioned within its container
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
 pub enum BoxFit {
-  /// Widget will not be scale.
+  /// Widget maintains original size without scaling
   #[default]
   None,
-  /// The entire widget will completely fill its container. If the widget's
-  /// aspect ratio does not match the aspect ratio of its box, then the widget
-  /// will be stretched to fit.
+  /// Stretches widget to fill container, ignoring aspect ratio
   Fill,
-  /// Widget is scaled to maintain its aspect ratio while fitting within the
-  /// container box. The entire widget is made to fill the box, while preserving
-  /// its aspect ratio,
+  /// Scales widget uniformly (maintaining aspect ratio) to fit within
+  /// container, potentially leaving empty spaces
   Contain,
-  /// Widget is scale to maintain its aspect ratio while filling to full cover
-  /// its container box. If the widget's aspect ratio does not the aspect ratio
-  /// of its box, then the widget will be clipped to fit.
+  /// Scales widget uniformly to completely cover container,
+  /// potentially clipping content
   Cover,
-
-  /// The widget scales to maintain its aspect ratio while filling the full
-  /// coverage Y direction of its container box.
-  CoverY,
-
-  /// The widget scales to maintain its aspect ratio while filling the full
-  /// coverage X direction of its container box.
-  CoverX,
+  /// Scales widget to fully cover container's height while maintaining aspect
+  /// ratio, potentially clipping content
+  CoverHeight,
+  /// Scales widget to fully cover container's width while maintaining aspect
+  /// ratio, potentially clipping content
+  CoverWidth,
 }
 
-/// Widget set how its child should be scale to fit its box.
+/// A widget that scales and positions its child according to specified [BoxFit]
+/// strategy
+///
+/// The FittedBox applies scaling transformation and optional clipping to ensure
+/// its child fits within the available space according to the selected fitting
+/// strategy. It maintains the calculated scale factor for proper rendering
+/// transformation.
 #[derive(SingleChild, Default)]
 pub struct FittedBox {
+  /// The fitting strategy to apply
   pub box_fit: BoxFit,
-  scale_cache: Cell<Vector>,
+  /// Stores calculated scale factors for rendering transformation
+  scale_factor: Cell<Vector>,
 }
 
 impl Declare for FittedBox {
@@ -43,44 +46,106 @@ impl Declare for FittedBox {
 }
 
 impl FittedBox {
-  pub fn new(box_fit: BoxFit) -> Self { Self { box_fit, scale_cache: <_>::default() } }
+  /// Creates a FittedBox with specified scaling strategy
+  pub fn new(box_fit: BoxFit) -> Self { Self { box_fit, scale_factor: Cell::default() } }
+
+  fn layout_child(
+    &self, clamp: BoxClamp, ctx: &mut LayoutCtx, max_valid: impl FnOnce(Size) -> bool,
+    min_valid: impl Fn(Size) -> bool, fit_scale: impl FnOnce(Size, Size) -> Vector,
+  ) -> Size {
+    let mut container = if max_valid(clamp.max) {
+      clamp.max
+    } else if min_valid(clamp.min) {
+      clamp.min
+    } else {
+      self.scale_factor.set(Vector::one());
+      return ctx.assert_perform_single_child_layout(clamp);
+    };
+
+    let child_size = ctx.assert_perform_single_child_layout(BoxClamp::default());
+
+    if !min_valid(child_size) {
+      self.scale_factor.set(Vector::one());
+      return clamp.clamp(child_size);
+    }
+
+    let scale = fit_scale(child_size, container);
+    self.scale_factor.set(scale);
+    let child = ctx.assert_single_child();
+    let mut pos = ctx.widget_box_pos(child).unwrap_or_default();
+    if container.width.is_finite() {
+      pos.x = container.width / 2.0 - child_size.width * scale.x / 2.0;
+    } else {
+      container.width = child_size.width * scale.x;
+    }
+    if container.height.is_finite() {
+      pos.y = container.height / 2.0 - child_size.height * scale.y / 2.0;
+    } else {
+      container.height = child_size.height * scale.y;
+    }
+    ctx.update_position(child, pos);
+
+    clamp.clamp(container)
+  }
 }
 
 impl Render for FittedBox {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let container = clamp.max;
-    if container.is_empty() {
-      self.scale_cache.set(Vector::zero());
-      return Size::zero();
-    }
-
-    let child_size =
-      ctx.assert_perform_single_child_layout(BoxClamp { min: clamp.min, max: INFINITY_SIZE });
-
-    if child_size.is_empty() {
-      self.scale_cache.set(Vector::zero());
-      return child_size;
-    }
-
-    let x = if container.width.is_finite() { container.width / child_size.width } else { 1. };
-    let y = if container.height.is_finite() { container.height / child_size.height } else { 1. };
-    let scale = match self.box_fit {
-      BoxFit::None => Vector::new(1., 1.),
-      BoxFit::Fill => Vector::new(x, y),
-      BoxFit::Contain => {
-        let scale = x.min(y);
-        Vector::new(scale, scale)
+    match self.box_fit {
+      BoxFit::None => {
+        self.scale_factor.set(Vector::one());
+        ctx.assert_perform_single_child_layout(clamp)
       }
-      BoxFit::Cover => {
-        let scale = x.max(y);
-        Vector::new(scale, scale)
-      }
-      BoxFit::CoverY => Vector::new(y, y),
-      BoxFit::CoverX => Vector::new(x, x),
-    };
-    self.scale_cache.set(scale);
-    let size = Size::new(child_size.width * scale.x, child_size.height * scale.y);
-    clamp.clamp(size)
+      BoxFit::Fill => self.layout_child(
+        clamp,
+        ctx,
+        Size::is_finite,
+        |size| !size.is_empty(),
+        |child, container| {
+          Vector::new(container.width / child.width, container.height / child.height)
+        },
+      ),
+      BoxFit::Contain => self.layout_child(
+        clamp,
+        ctx,
+        |size| size.width.is_finite() || size.height.is_finite(),
+        |size| !size.is_empty(),
+        |child, container| {
+          let scale = f32::min(container.width / child.width, container.height / child.height);
+          Vector::splat(scale)
+        },
+      ),
+      BoxFit::Cover => self.layout_child(
+        clamp,
+        ctx,
+        Size::is_finite,
+        |size| !size.is_empty(),
+        |child, container| {
+          let scale = f32::max(container.width / child.width, container.height / child.height);
+          Vector::splat(scale)
+        },
+      ),
+      BoxFit::CoverWidth => self.layout_child(
+        clamp,
+        ctx,
+        |size| size.width.is_finite(),
+        |size| size.width > 0.,
+        |child, container| {
+          let scale = container.width / child.width;
+          Vector::splat(scale)
+        },
+      ),
+      BoxFit::CoverHeight => self.layout_child(
+        clamp,
+        ctx,
+        |size| size.height.is_finite(),
+        |size| size.height > 0.,
+        |child, container| {
+          let scale = container.height / child.height;
+          Vector::splat(scale)
+        },
+      ),
+    }
   }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
@@ -90,8 +155,8 @@ impl Render for FittedBox {
   }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
-    let scale = self.scale_cache.get();
-    if matches!(self.box_fit, BoxFit::Cover) {
+    let scale = self.scale_factor.get();
+    if matches!(self.box_fit, BoxFit::Cover | BoxFit::CoverHeight | BoxFit::CoverWidth) {
       let size = ctx.box_size().unwrap();
       let child_size = ctx
         .single_child_box()
@@ -102,12 +167,11 @@ impl Render for FittedBox {
         ctx.painter().clip(path.into());
       }
     }
-
     ctx.painter().scale(scale.x, scale.y);
   }
 
   fn get_transform(&self) -> Option<Transform> {
-    let scale = self.scale_cache.get();
+    let scale = self.scale_factor.get();
     Some(Transform::scale(scale.x, scale.y))
   }
 }
@@ -132,7 +196,7 @@ mod tests {
     fn test(self) {
       let Self { box_fit, size, expect, expected_scale } = self;
 
-      let (fit, w_fit) = split_value(FittedBox { box_fit, scale_cache: <_>::default() });
+      let (fit, w_fit) = split_value(FittedBox { box_fit, scale_factor: <_>::default() });
 
       let w = fn_widget! {
         let w_fit = w_fit.clone_writer();
@@ -141,7 +205,7 @@ mod tests {
       let mut wnd = TestWindow::new_with_size(w, WND_SIZE);
       wnd.draw_frame();
       wnd.assert_root_size(expect);
-      assert_eq!(fit.read().scale_cache.get(), expected_scale);
+      assert_eq!(fit.read().scale_factor.get(), expected_scale);
     }
   }
 
@@ -187,7 +251,7 @@ mod tests {
     FitTestCase {
       box_fit: BoxFit::Contain,
       size: small_size,
-      expect: Size::new(200., 300.),
+      expect: WND_SIZE,
       expected_scale: Vector::new(2., 2.),
     }
     .test();
@@ -203,5 +267,19 @@ mod tests {
     })
     .with_wnd_size(WND_SIZE),
     LayoutCase::default().with_size(WND_SIZE)
+  );
+
+  widget_layout_test!(
+    contain_in_the_center,
+    WidgetTester::new(mock_box! {
+      size: Size::splat(100.),
+      @MockBox {
+        size: Size::new(100., 200.),
+        box_fit: BoxFit::Contain,
+      }
+    }),
+    LayoutCase::new(&[0, 0, 0])
+      .with_size(Size::new(100., 200.))
+      .with_pos(Point::new(25., 0.)),
   );
 }
