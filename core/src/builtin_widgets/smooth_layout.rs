@@ -697,7 +697,7 @@ mod tests {
       WidgetTester::new(crate::smooth_size! {
         transition: TEST_TRANS,
         init_value: Size::splat(Measure::Percent(0.5)),
-        @center_red_block_10_x_10()
+        @red_block_10_x_10()
       })
       .with_wnd_size(Size::new(100., 100.))
       .on_initd(|wnd| wnd.set_flags(WindowFlags::ANIMATIONS)),
@@ -708,7 +708,7 @@ mod tests {
       WidgetTester::new(crate::smooth_size! {
         transition: TEST_TRANS,
         init_value: Size::splat(5f32.into()),
-        @center_red_block_10_x_10()
+        @red_block_10_x_10()
       })
       .with_wnd_size(Size::new(100., 100.))
       .on_initd(|wnd| wnd.set_flags(WindowFlags::ANIMATIONS)),
