@@ -87,7 +87,7 @@ mod tests {
   use crate::{prelude::*, reset_test_env, test_helper::*};
 
   fn tap_on(wnd: &Window, x: f32, y: f32) {
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     let logical = LogicalPosition::new(x, y);
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {

@@ -80,7 +80,7 @@ mod tests {
     let mut wnd = TestWindow::new(row_tree);
 
     wnd.draw_frame();
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     wnd
       .dispatcher
       .borrow_mut()
@@ -88,7 +88,7 @@ mod tests {
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Help);
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     wnd
       .dispatcher
       .borrow_mut()
@@ -96,7 +96,7 @@ mod tests {
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Pointer);
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     wnd
       .dispatcher
       .borrow_mut()
@@ -104,7 +104,7 @@ mod tests {
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::AllScroll);
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     wnd
       .dispatcher
       .borrow_mut()
@@ -112,7 +112,7 @@ mod tests {
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Pointer);
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     wnd
       .dispatcher
       .borrow_mut()

@@ -4,10 +4,15 @@
 <head>
     <meta charset="UTF-8" />
     <title>Ribir</title>
+    <style>
+        .ribir_canvas:focus {
+            outline: none;
+        }
+    </style>
 </head>
 
 <body>
-    <canvas class="ribir_canvas" style="width: 400px;height: 600px;" width="800" height="1200"></canvas>
+    <div class="ribir_container"></div>
     <script type="module">
         import init, { run } from "./web_wasm.js";
         async function startup() {

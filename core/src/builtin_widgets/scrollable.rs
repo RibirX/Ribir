@@ -294,7 +294,7 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::MouseWheel {
       device_id,

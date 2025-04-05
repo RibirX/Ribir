@@ -32,14 +32,26 @@ pub trait RuntimeWaker {
   fn wake(&self);
 }
 
-/// The context is shared throughout the application, "AppCtx" is not
-/// thread-safe, and only allowed to be used in the first thread that uses
-/// "AppCtx".
+/// Global context shared throughout the application.
 ///
-/// All mutable methods of "AppCtx" are unsafe, and should call the mutable
-/// methods before application startup, all the mutable calls during the
-/// application running is dangerous. Because the reference of "AppCtx" maybe
-/// already hold by others.
+/// # Thread Safety
+///
+/// `AppCtx` is not thread-safe and must only be used in the initial thread
+/// where it was created. Any attempt to use it across threads may result
+/// in panic.
+///
+/// # Initialization Requirements
+///
+/// - The context must be initialized by an application instance before use
+/// - Contains runtime-dependent components including:
+///   - Future wakers
+///   - Clipboard handlers
+///   - Other platform-specific subsystems
+///
+/// # Caveats
+///
+/// - ⚠️ Do not use before application startup completes
+/// - ⚠️ Using uninitialized context may lead to undefined behavior
 pub struct AppCtx {
   app_theme: Stateful<Theme>,
   windows: RefCell<ahash::HashMap<WindowId, Sc<Window>>>,
@@ -189,6 +201,7 @@ impl AppCtx {
 
   /// Set the runtime waker of the application, this should be called before
   /// application startup.
+  ///
   /// # Safety
   /// This should be only called before application startup. The behavior is
   /// undefined if you call it in a running application.

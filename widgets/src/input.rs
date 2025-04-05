@@ -241,7 +241,7 @@ mod tests {
     wnd.draw_frame();
     assert_eq!(*value.read(), "");
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (50., 10.).into() });
 

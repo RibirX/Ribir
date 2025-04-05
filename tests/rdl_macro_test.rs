@@ -663,7 +663,7 @@ fn builtin_bind_to_self() {
 }
 
 fn tap_at(wnd: &TestWindow, pos: (i32, i32)) {
-  let device_id = unsafe { DeviceId::dummy() };
+  let device_id = DeviceId::dummy();
 
   #[allow(deprecated)]
   wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: pos.into() });
