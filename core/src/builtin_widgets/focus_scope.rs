@@ -187,7 +187,7 @@ mod tests {
     wnd.draw_frame();
 
     // request_focus
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,

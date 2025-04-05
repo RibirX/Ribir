@@ -53,7 +53,7 @@ impl PixelImage {
       ColorFormat::Rgba8 => ::image::ColorType::Rgba8,
       ColorFormat::Alpha8 => ::image::ColorType::L8,
     };
-    png_encoder.write_image(&self.data, self.width, self.height, fmt)?;
+    png_encoder.write_image(&self.data, self.width, self.height, fmt.into())?;
     Ok(())
   }
 

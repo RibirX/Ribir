@@ -69,7 +69,7 @@ mod test_single_thread {
     let (wnd, count) = env(2);
     let c_wnd = wnd.clone();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     let is_complete = Rc::new(RefCell::new(false));
     let is_complete2 = is_complete.clone();
     observable::interval(Duration::from_millis(10), AppCtx::scheduler())
@@ -112,7 +112,7 @@ mod test_single_thread {
     let (wnd, count) = env(3);
     let c_wnd = wnd.clone();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     let is_complete = Rc::new(RefCell::new(false));
     let is_complete2 = is_complete.clone();
     observable::interval(Duration::from_millis(10), AppCtx::scheduler())

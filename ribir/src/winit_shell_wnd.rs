@@ -6,13 +6,15 @@ use ribir_core::{
 };
 use winit::{
   dpi::{LogicalPosition, LogicalSize},
-  event_loop::EventLoopWindowTarget,
+  window::WindowAttributes,
 };
 
-use crate::{
-  backends::*,
-  prelude::{WindowAttributes, request_redraw},
-};
+#[cfg(target_family = "wasm")]
+pub const RIBIR_CANVAS: &str = "ribir_canvas";
+#[cfg(target_family = "wasm")]
+pub const RIBIR_CONTAINER: &str = "ribir_container";
+
+use crate::{app::App, backends::*, prelude::request_redraw};
 pub trait WinitBackend<'a>: Sized {
   fn new(window: &'a winit::window::Window) -> impl Future<Output = Self>;
 
@@ -83,7 +85,7 @@ impl ShellWindow for WinitShellWnd {
 
   fn set_cursor(&mut self, cursor: CursorIcon) {
     self.cursor = cursor;
-    self.winit_wnd.set_cursor_icon(cursor)
+    self.winit_wnd.set_cursor(cursor)
   }
 
   #[inline]
@@ -174,100 +176,48 @@ pub(crate) fn new_id(id: winit::window::WindowId) -> WindowId {
 
 impl WinitShellWnd {
   #[cfg(target_family = "wasm")]
-  pub(crate) async fn new_with_canvas<T>(
-    canvas: web_sys::HtmlCanvasElement, window_target: &EventLoopWindowTarget<T>,
-    attrs: WindowAttributes,
-  ) -> Self {
-    use winit::platform::web::WindowBuilderExtWebSys;
-    let builder = winit::window::WindowBuilder::new().with_canvas(Some(canvas));
+  pub(crate) async fn new(mut attrs: WindowAttributes) -> Self {
+    use web_sys::wasm_bindgen::JsCast;
+    use winit::platform::web::WindowAttributesExtWebSys;
 
-    Self::inner_wnd(builder, window_target, attrs).await
-  }
-
-  #[cfg(target_family = "wasm")]
-  pub(crate) async fn new<T>(
-    window_target: &EventLoopWindowTarget<T>, attrs: WindowAttributes,
-  ) -> Self {
-    const RIBIR_CANVAS: &str = "ribir_canvas";
-    const RIBIR_CANVAS_USED: &str = "ribir_canvas_used";
-
-    use web_sys::{HtmlCanvasElement, wasm_bindgen::JsCast};
     let document = web_sys::window().unwrap().document().unwrap();
-    let elems = document.get_elements_by_class_name(RIBIR_CANVAS);
+    let canvas = document
+      .create_element("canvas")
+      .unwrap()
+      .dyn_into::<web_sys::HtmlCanvasElement>()
+      .unwrap();
+    canvas.set_class_name(RIBIR_CANVAS);
+    let style = canvas.style();
+    let _ = style.set_property("width", "100%");
+    let _ = style.set_property("height", "100%");
+    let elems = document.get_elements_by_class_name(RIBIR_CONTAINER);
 
-    let mut canvas = None;
-    let len = elems.length();
-    for idx in 0..len {
-      if let Some(elem) = elems.get_with_index(idx) {
-        let mut classes_name = elem.class_name();
-        if !classes_name
-          .split(" ")
-          .any(|v| v == RIBIR_CANVAS_USED)
-        {
-          if let Ok(c) = elem.clone().dyn_into::<HtmlCanvasElement>() {
-            classes_name.push_str(&format!(" {}", RIBIR_CANVAS_USED));
-            elem.set_class_name(&classes_name);
-            canvas = Some(c);
-          } else {
-            let child = document.create_element("canvas").unwrap();
-            elem.append_child(&child).unwrap();
-            canvas = Some(child.dyn_into::<HtmlCanvasElement>().unwrap())
-          }
-          break;
-        }
-      }
+    if let Some(elem) = elems.item(0) {
+      elem.set_class_name(&elem.class_name().replace(RIBIR_CONTAINER, ""));
+      elem.append_child(&canvas).unwrap();
+    } else if let Some(body) = document.body() {
+      body.append_child(&canvas).unwrap();
+    } else {
+      document.append_child(&canvas).unwrap();
     }
 
-    let canvas = canvas.expect("No unused 'ribir_canvas' class element found.");
+    attrs = attrs.with_canvas(Some(canvas));
+    let wnd = Self::inner_new(attrs).await;
 
-    return Self::new_with_canvas(canvas, window_target, attrs).await;
+    wnd
   }
 
   #[cfg(not(target_family = "wasm"))]
-  pub(crate) async fn new<T>(
-    window_target: &EventLoopWindowTarget<T>, attrs: WindowAttributes,
-  ) -> Self {
-    Self::inner_wnd(winit::window::WindowBuilder::new(), window_target, attrs).await
-  }
+  pub(crate) async fn new(attrs: WindowAttributes) -> Self { Self::inner_new(attrs).await }
 
-  async fn inner_wnd<T>(
-    mut builder: winit::window::WindowBuilder, window_target: &EventLoopWindowTarget<T>,
-    attrs: WindowAttributes,
-  ) -> Self {
-    builder = builder
-      .with_title(attrs.title)
-      .with_maximized(attrs.maximized)
-      .with_resizable(attrs.resizable)
-      // hide the window until the render backend is ready
-      .with_visible(false)
-      .with_decorations(attrs.decorations);
-
-    if let Some(size) = attrs.size {
-      builder = builder.with_inner_size(LogicalSize::new(size.width, size.height));
-    }
-    if let Some(min_size) = attrs.min_size {
-      builder = builder.with_min_inner_size(LogicalSize::new(min_size.width, min_size.height));
-    }
-    if let Some(max_size) = attrs.max_size {
-      builder = builder.with_max_inner_size(LogicalSize::new(max_size.width, max_size.height));
-    }
-    if let Some(pos) = attrs.position {
-      builder = builder.with_position(LogicalPosition::new(pos.x, pos.y));
-    }
-    if let Some(icon) = attrs.icon {
-      builder = builder.with_window_icon(Some(img_to_winit_icon(&icon)));
-    }
-
-    let winit_wnd: winit::window::Window = builder.build(window_target).unwrap();
+  async fn inner_new(attrs: WindowAttributes) -> Self {
+    let winit_wnd = App::active_event_loop()
+      .create_window(attrs)
+      .unwrap();
     let ptr = &winit_wnd as *const winit::window::Window;
     // Safety: a reference to winit_wnd is valid as long as the WinitShellWnd is
     // alive.
     let backend = Backend::new(unsafe { &*ptr }).await;
-
-    // show the window after the render backend is ready
-    if attrs.visible {
-      winit_wnd.set_visible(attrs.visible);
-    }
     WinitShellWnd { backend, winit_wnd, cursor: CursorIcon::Default }
   }
 }

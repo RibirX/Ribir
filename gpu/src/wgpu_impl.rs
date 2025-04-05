@@ -337,9 +337,9 @@ impl GPUBackendImpl for WgpuImpl {
 impl<'a> Surface<'a> {
   /// Resize the surface to the given size.
   pub fn resize(&mut self, size: DeviceSize, backend: &WgpuImpl) {
-    self.config.width = size.width as u32;
-    self.config.height = size.height as u32;
-    if !size.is_empty() {
+    if !size.is_empty() && size != self.size() {
+      self.config.width = size.width as u32;
+      self.config.height = size.height as u32;
       self
         .surface
         .configure(backend.device(), &self.config);

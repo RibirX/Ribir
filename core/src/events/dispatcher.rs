@@ -375,7 +375,7 @@ mod tests {
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (1., 1.).into() });
     wnd.run_frame_tasks();
@@ -402,7 +402,7 @@ mod tests {
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
 
     wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
     wnd.run_frame_tasks();
@@ -437,7 +437,7 @@ mod tests {
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
 
     wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
     wnd.run_frame_tasks();
@@ -494,7 +494,7 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    wnd.process_mouse_input(unsafe { DeviceId::dummy() }, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_input(DeviceId::dummy(), ElementState::Pressed, MouseButton::Left);
     wnd.run_frame_tasks();
     assert_eq!(record.read().len(), 1);
   }
@@ -523,7 +523,7 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (10, 10).into() });
@@ -582,7 +582,7 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
     wnd.draw_frame();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
@@ -616,7 +616,7 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
     wnd.draw_frame();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
@@ -669,7 +669,7 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    let device_id = unsafe { DeviceId::dummy() };
+    let device_id = DeviceId::dummy();
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
       device_id,

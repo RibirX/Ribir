@@ -32,6 +32,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Changed
 
 - **widgets**: The `List` widgets has been redesigned with class-based styling and cleaner syntax. (#727 @M-Adoo)
+- **ribir**: Updated winit dependency to v0.30.* (#pr @M-Adoo)
+
+### BREAKING CHANGES
+
+- **ribir/web**: Changed canvas management strategy: (#pr @M-Adoo)
+  - Now searches for `ribir_container` element to append new canvas
+  - No longer reuses existing canvas elements
+
 
 
 ## [0.4.0-alpha.31] - 2025-04-02

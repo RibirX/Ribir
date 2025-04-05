@@ -1,9 +1,15 @@
 use std::{cell::RefCell, convert::Infallible, sync::LazyLock};
 
-use ribir_core::{local_sender::LocalSender, prelude::*, timer::Timer, window::WindowId};
+use app_event_handler::AppHandler;
+use ribir_core::{
+  local_sender::LocalSender,
+  prelude::{image::ColorFormat, *},
+  timer::Timer,
+  window::WindowId,
+};
 use winit::{
-  event::{ElementState, Event, Ime, KeyEvent, StartCause, WindowEvent},
-  event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy, EventLoopWindowTarget},
+  event::{ElementState, Ime, KeyEvent},
+  event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
 };
 
 use crate::{
@@ -11,29 +17,17 @@ use crate::{
   winit_shell_wnd::{WinitShellWnd, new_id},
 };
 
+mod app_event_handler;
+
 pub struct App {
+  event_loop: RefCell<Option<EventLoopState>>,
   event_loop_proxy: EventLoopProxy<AppEvent>,
-  /// The event loop of the application, it's only available on native platform
-  /// after `App::exec` called
-  event_loop: RefCell<Option<EventLoop<AppEvent>>>,
-  #[cfg(not(target_family = "wasm"))]
   active_wnd: std::cell::Cell<Option<WindowId>>,
   events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
 }
 
-/// Attributes for creating a new window.
-pub struct WindowAttributes {
-  pub resizable: bool,
-  pub maximized: bool,
-  pub visible: bool,
-  pub decorations: bool,
-  pub title: String,
-  pub size: Option<Size>,
-  pub min_size: Option<Size>,
-  pub max_size: Option<Size>,
-  pub position: Option<Point>,
-  pub icon: Option<Resource<PixelImage>>,
-}
+/// The attributes use to create a window.
+pub struct WindowAttributes(winit::window::WindowAttributes);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HotkeyEvent {
@@ -63,6 +57,17 @@ pub struct EventSender(EventLoopProxy<AppEvent>);
 #[derive(Clone)]
 pub struct EventWaker(EventLoopProxy<AppEvent>);
 
+/// Represents the lifecycle states of an application's event loop
+enum EventLoopState {
+  /// Initialized but not yet running event loop.
+  /// Contains the unstarted event loop configuration.
+  NotStarted(Box<EventLoop<AppEvent>>),
+
+  /// Active running event loop with guaranteed valid access.
+  /// The reference is maintained and validated by the `AppEventHandler`.
+  Running(&'static ActiveEventLoop),
+}
+
 impl App {
   pub fn events_stream() -> MutRefItemSubject<'static, AppEvent, Infallible> {
     App::shared().events_stream.clone()
@@ -85,111 +90,6 @@ impl App {
       Ime::Disabled => wnd.exit_pre_edit(),
     }
   }
-
-  fn event_loop_handle(event: Event<AppEvent>, loop_handle: &EventLoopWindowTarget<AppEvent>) {
-    match event {
-      Event::WindowEvent { event, window_id } => {
-        let wnd_id = new_id(window_id);
-        let Some(wnd) = AppCtx::get_window(wnd_id) else {
-          return;
-        };
-        match event {
-          WindowEvent::CloseRequested => {
-            AppCtx::remove_wnd(wnd_id);
-            if !AppCtx::has_wnd() {
-              loop_handle.exit();
-            }
-          }
-          WindowEvent::Occluded(false) => {
-            // this is triggered before the app re-enters view
-            // for example, in something like i3 window manager,
-            // when you switch back to the workspace that the app is in
-            // in such cases, we need to re-enter the view otherwise the window stays empty
-            wnd.draw_frame(true);
-          }
-          WindowEvent::RedrawRequested => {
-            AppCtx::frame_ticks().clone().next(Instant::now());
-
-            if let Some(wnd) = AppCtx::get_window(wnd_id) {
-              // if the window is not visible, don't draw it./
-              if wnd.is_visible() != Some(false) {
-                // if this frame is really draw, request another redraw. To make sure the draw
-                // always end with a empty draw and emit an extra tick cycle message.
-                if wnd.draw_frame(false) {
-                  request_redraw(&wnd);
-                }
-              }
-            }
-          }
-          WindowEvent::Resized(_) => {
-            let size = wnd.shell_wnd().borrow().inner_size();
-            wnd.shell_wnd().borrow_mut().on_resize(size);
-            request_redraw(&wnd)
-          }
-          WindowEvent::Focused(focused) => {
-            let mut event = AppEvent::WndFocusChanged(wnd_id, focused);
-
-            App::shared()
-              .events_stream
-              .clone()
-              .next(&mut event);
-          }
-          WindowEvent::KeyboardInput { event, .. } if !wnd.is_pre_editing() => {
-            let KeyEvent { physical_key, logical_key, text, location, repeat, state, .. } = event;
-            wnd.processes_keyboard_event(physical_key, logical_key, repeat, location, state);
-            if state == ElementState::Pressed {
-              if let Some(txt) = text {
-                wnd.processes_receive_chars(txt.to_string());
-              }
-            }
-          }
-          WindowEvent::Ime(ime) => App::process_winit_ime_event(&wnd, ime),
-          WindowEvent::MouseInput { state, button, device_id, .. } => {
-            if state == ElementState::Pressed {
-              wnd.force_exit_pre_edit()
-            }
-            wnd.process_mouse_input(device_id, state, button);
-          }
-          #[allow(deprecated)]
-          event => wnd.processes_native_event(event),
-        }
-        wnd.emit_events();
-
-        if wnd.need_draw() {
-          request_redraw(&wnd)
-        }
-      }
-      Event::AboutToWait => {
-        let run_count = AppCtx::run_until_stalled();
-        if run_count > 0 {
-          for wnd in AppCtx::windows().borrow().values() {
-            request_redraw(wnd);
-          }
-        }
-        if run_count > 0 {
-          loop_handle.set_control_flow(ControlFlow::Poll);
-        } else if let Some(t) = Timer::recently_timeout() {
-          let control = ControlFlow::wait_duration(t.duration_since(Instant::now()));
-          loop_handle.set_control_flow(control);
-        } else {
-          loop_handle.set_control_flow(ControlFlow::Wait);
-        };
-      }
-      Event::NewEvents(StartCause::Poll | StartCause::ResumeTimeReached { .. }) => {
-        Timer::wake_timeout_futures()
-      }
-      Event::UserEvent(mut event) => {
-        AppCtx::spawn_local(async move {
-          App::shared()
-            .events_stream
-            .clone()
-            .next(&mut event);
-        })
-        .unwrap();
-      }
-      _ => (),
-    }
-  }
 }
 
 /// A guard returned by `App::run` that enables application configuration
@@ -210,46 +110,36 @@ impl App {
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run(root: impl Into<GenWidget>) -> AppRunGuard { AppRunGuard::new(root.into()) }
+  pub fn run(root: impl Into<GenWidget>) -> AppRunGuard {
+    // Keep the application instance is created, when user call
+    let _app = App::shared();
+    AppRunGuard::new(root.into())
+  }
 
   /// Get a event sender of the application event loop, you can use this to send
   /// event.
   pub fn event_sender() -> EventSender { EventSender(App::shared().event_loop_proxy.clone()) }
 
-  /// Creating a new window using the `root` widget and the specified canvas.
-  /// Note: This is exclusive to the web platform.
-  #[cfg(target_family = "wasm")]
-  pub async fn new_with_canvas(
-    root: GenWidget, canvas: web_sys::HtmlCanvasElement, attrs: WindowAttributes,
-  ) -> Sc<Window> {
-    let event_loop = App::shared().event_loop.borrow();
-    let event_loop = event_loop.as_ref().expect(
-      " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
-    );
-    let shell_wnd = WinitShellWnd::new_with_canvas(canvas, &event_loop, attrs).await;
-    let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
-    wnd
-  }
-
-  /// create a new window with the `root` widget
-  #[allow(clippy::await_holding_refcell_ref)]
+  /// Creates a new window containing the specified root widget.
+  ///
+  /// # Platform-specific Behavior: Web
+  ///
+  /// - Looks for the first DOM element with CSS class `ribir_container`:
+  ///   - If found: Creates a canvas and appends it to this container
+  ///   - After use, removes the `ribir_container` class from the element
+  ///   - Subsequent windows will look for the next container with this class
+  /// - If no container found, creates and appends the canvas to the body.
   pub async fn new_window(root: GenWidget, attrs: WindowAttributes) -> Sc<Window> {
-    let app = App::shared();
-    let event_loop = app.event_loop.borrow();
-    let event_loop = event_loop.as_ref().expect(
-      " Event loop consumed. You can't create window after `App::exec` called in Web platform.",
-    );
-    let shell_wnd = WinitShellWnd::new(event_loop, attrs).await;
+    let shell_wnd = WinitShellWnd::new(attrs.0).await;
     let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
 
-    #[cfg(not(target_family = "wasm"))]
+    let app = App::shared();
     if app.active_wnd.get().is_none() {
       app.active_wnd.set(Some(wnd.id()));
     }
     wnd
   }
 
-  #[cfg(not(target_family = "wasm"))]
   pub fn active_window() -> Sc<Window> {
     App::shared()
       .active_wnd
@@ -260,7 +150,6 @@ impl App {
 
   /// set the window with `id` to be the active window, and the active window.
   #[track_caller]
-  #[cfg(not(target_family = "wasm"))]
   pub fn set_active_window(id: WindowId) {
     App::shared().active_wnd.set(Some(id));
 
@@ -279,34 +168,19 @@ impl App {
   /// thread until the application exit.
   #[track_caller]
   pub fn exec() {
+    let event_loop = App::take_event_loop();
+
     #[cfg(not(target_family = "wasm"))]
-    {
-      use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
-      let mut event_loop = App::shared().event_loop.borrow_mut();
-      let _ = event_loop
-        .as_mut()
-        .unwrap()
-        .run_on_demand(App::event_loop_handle);
-    }
+    let _ = event_loop.run_app(&mut AppHandler::default());
 
     #[cfg(target_family = "wasm")]
-    {
-      use winit::platform::web::EventLoopExtWebSys;
-      let mut event_loop = App::shared().event_loop.borrow_mut();
-      let event_loop = event_loop.take().expect(
-        "Event loop consumed. You can't exec the application after `App::exec` called in Web \
-         platform.",
-      );
-      event_loop.spawn(App::event_loop_handle);
-    }
+    winit::platform::web::EventLoopExtWebSys::spawn_app(event_loop, AppHandler::default());
   }
 
   #[track_caller]
   fn shared() -> &'static App {
     static APP: LazyLock<LocalSender<App>> = LazyLock::new(|| {
-      let event_loop = EventLoopBuilder::with_user_event()
-        .build()
-        .unwrap();
+      let event_loop = EventLoop::with_user_event().build().unwrap();
       let waker = EventWaker(event_loop.create_proxy());
 
       #[cfg(not(target_family = "wasm"))]
@@ -314,16 +188,61 @@ impl App {
       AppCtx::set_runtime_waker(Box::new(waker));
 
       register_platform_app_events_handlers();
+      let event_loop = Box::new(event_loop);
       let app = App {
         event_loop_proxy: event_loop.create_proxy(),
-        event_loop: RefCell::new(Some(event_loop)),
+        event_loop: RefCell::new(Some(EventLoopState::NotStarted(event_loop))),
         events_stream: <_>::default(),
-        #[cfg(not(target_family = "wasm"))]
         active_wnd: std::cell::Cell::new(None),
       };
       LocalSender::new(app)
     });
     &APP
+  }
+
+  fn take_event_loop() -> EventLoop<AppEvent> {
+    let app = App::shared();
+    let mut event_loop = app.event_loop.borrow_mut();
+    let event_loop = event_loop
+      .take()
+      .expect("Event loop already consumed.");
+    match event_loop {
+      EventLoopState::NotStarted(event_loop) => *event_loop,
+      EventLoopState::Running(_) => panic!("Event loop already running."),
+    }
+  }
+
+  /// Retrieves the active event loop instance for the current execution
+  /// context.
+  ///
+  /// This provides access to platform-specific system resources including:
+  /// - Window creation and management
+  /// - System theme information
+  /// - Monitor enumeration
+  /// - Event processing control
+  ///
+  /// # Important Safety Notes
+  ///
+  /// 1. **Lifetime Management**: The returned event loop reference is transient
+  ///    and should never be stored in long-lived structures. The underlying
+  ///    instance may be invalidated or refreshed during event loop iterations.
+  ///
+  /// 2. **Thread Affinity**: This interface is main-thread constrained. Access
+  ///    must occur exclusively through this accessor function to ensure thread
+  ///    safety and prevent invalid state references.
+  ///
+  /// 3. **Reentrancy**: Avoid nested calls during event processing as this may
+  ///    lead to undefined behavior in platform-specific implementations.
+  pub(crate) fn active_event_loop() -> &'static ActiveEventLoop {
+    let event_loop = App::shared().event_loop.borrow();
+    let state = event_loop
+      .as_ref()
+      .expect("Event loop must be initialized before access");
+
+    match state {
+      EventLoopState::Running(event_loop) => event_loop,
+      EventLoopState::NotStarted(_) => panic!("Event loop accessed in invalid state."),
+    }
   }
 }
 
@@ -333,7 +252,7 @@ impl AppRunGuard {
     assert!(!ONCE.is_completed(), "App::run can only be called once.");
     ONCE.call_once(|| {});
 
-    Self { root: Some(root), wnd_attrs: Some(Default::default()), theme_initd: false }
+    Self { root: Some(root), wnd_attrs: Some(WindowAttributes::default()), theme_initd: false }
   }
 
   /// Set the application theme, this will apply to whole application.
@@ -341,75 +260,6 @@ impl AppRunGuard {
     AppCtx::set_app_theme(theme);
     self.theme_initd = true;
     self
-  }
-
-  /// Sets the initial title of the window in the title bar.
-  ///
-  /// The default is `"Ribir App"`.
-  pub fn with_title(&mut self, title: impl Into<String>) -> &mut Self {
-    self.wnd_attr().title = title.into();
-    self
-  }
-
-  /// Sets whether the window should be resizable or not. The default is `true`.
-  pub fn with_resizable(&mut self, resizable: bool) -> &mut Self {
-    self.wnd_attr().resizable = resizable;
-    self
-  }
-
-  /// Sets the initial size of the window client area, window excluding the
-  /// title bar and borders.
-  pub fn with_size(&mut self, size: Size) -> &mut Self {
-    self.wnd_attr().size = Some(size);
-    self
-  }
-
-  /// Sets the minimum size of the window client area
-  pub fn with_min_size(&mut self, size: Size) -> &mut Self {
-    self.wnd_attr().min_size = Some(size);
-    self
-  }
-
-  /// Sets the maximum size of the window client area
-  pub fn with_max_size(&mut self, size: Size) -> &mut Self {
-    self.wnd_attr().max_size = Some(size);
-    self
-  }
-
-  /// Sets the initial position of the window in screen coordinates.
-  pub fn with_position(&mut self, position: Point) -> &mut Self {
-    self.wnd_attr().position = Some(position);
-    self
-  }
-
-  /// Sets whether the window should be maximized when it is first shown.
-  pub fn with_maximized(&mut self, maximized: bool) -> &mut Self {
-    self.wnd_attr().maximized = maximized;
-    self
-  }
-
-  /// Sets whether the window should be visible when it is first shown.
-  pub fn with_visible(&mut self, visible: bool) -> &mut Self {
-    self.wnd_attr().visible = visible;
-    self
-  }
-
-  /// Sets whether the window should have a border, a title bar, etc.
-  pub fn with_decorations(&mut self, decorations: bool) -> &mut Self {
-    self.wnd_attr().decorations = decorations;
-    self
-  }
-
-  /// Sets the icon of the window.
-  pub fn with_icon(&mut self, icon: Resource<PixelImage>) -> &mut Self {
-    self.wnd_attr().icon = Some(icon);
-    self
-  }
-
-  fn wnd_attr(&mut self) -> &mut WindowAttributes {
-    // Should be safe to unwrap because `wnd_attrs` is always `Some` before
-    // drop.
-    unsafe { self.wnd_attrs.as_mut().unwrap_unchecked() }
   }
 }
 
@@ -423,18 +273,11 @@ impl Drop for AppRunGuard {
 
     let root = self.root.take().unwrap();
     let attr = self.wnd_attrs.take().unwrap();
-    let wnd = App::new_window(root, attr);
-
-    #[cfg(target_family = "wasm")]
-    wasm_bindgen_futures::spawn_local(async move {
-      let _ = wnd.await;
-      App::exec();
-    });
-    #[cfg(not(target_family = "wasm"))]
-    {
-      AppCtx::wait_future(wnd);
-      App::exec();
-    }
+    AppCtx::spawn_local(async move {
+      let _ = App::new_window(root, attr).await;
+    })
+    .unwrap();
+    App::exec();
   }
 }
 
@@ -463,85 +306,99 @@ pub(crate) fn request_redraw(wnd: &Window) {
   shell.winit_wnd.request_redraw();
 }
 
+fn into_winit_size(size: Size) -> winit::dpi::Size {
+  winit::dpi::LogicalSize::new(size.width, size.height).into()
+}
+
 impl WindowAttributes {
-  /// Sets the initial title of the window in the title bar.
+  /// Initial title of the window in the title bar.
   ///
-  /// The default is `"Ribir App"`.
+  /// Default: `"Ribir App"`
   pub fn with_title(&mut self, title: impl Into<String>) -> &mut Self {
-    self.title = title.into();
+    self.0.title = title.into();
     self
   }
 
-  /// Sets whether the window should be resizable or not. The default is `true`.
+  /// Whether the window should be resizable.
+  ///
+  /// Default: `true`
   pub fn with_resizable(&mut self, resizable: bool) -> &mut Self {
-    self.resizable = resizable;
+    self.0.resizable = resizable;
     self
   }
 
-  /// Sets the initial size of the window client area, window excluding the
-  /// title bar and borders.
+  /// Initial size of the window client area (excluding decorations).
   pub fn with_size(&mut self, size: Size) -> &mut Self {
-    self.size = Some(size);
+    self.0.inner_size = Some(into_winit_size(size));
     self
   }
 
-  /// Sets the minimum size of the window client area
+  /// Minimum size of the window client area
   pub fn with_min_size(&mut self, size: Size) -> &mut Self {
-    self.min_size = Some(size);
+    self.0.min_inner_size = Some(into_winit_size(size));
     self
   }
 
-  /// Sets the maximum size of the window client area
+  /// Maximum size of the window client area
   pub fn with_max_size(&mut self, size: Size) -> &mut Self {
-    self.max_size = Some(size);
+    self.0.max_inner_size = Some(into_winit_size(size));
     self
   }
 
-  /// Sets the initial position of the window in screen coordinates.
-  pub fn with_position(&mut self, position: Point) -> &mut Self {
-    self.position = Some(position);
+  /// Initial position of the window in screen coordinates.
+  pub fn position(mut self, position: Point) -> Self {
+    self.0.position = Some(winit::dpi::LogicalPosition::new(position.x, position.y).into());
     self
   }
 
-  /// Sets whether the window should be maximized when it is first shown.
+  /// Whether the window should start maximized.
+  ///
+  /// Default: `false`
   pub fn with_maximized(&mut self, maximized: bool) -> &mut Self {
-    self.maximized = maximized;
+    self.0.maximized = maximized;
     self
   }
 
-  /// Sets whether the window should be visible when it is first shown.
+  /// Initial window visibility.
+  ///
+  /// Default: `true`
   pub fn with_visible(&mut self, visible: bool) -> &mut Self {
-    self.visible = visible;
+    self.0.visible = visible;
     self
   }
 
-  /// Sets whether the window should have a border, a title bar, etc.
+  /// Whether the window should show decorations.
+  ///
+  /// Default: `true`
   pub fn with_decorations(&mut self, decorations: bool) -> &mut Self {
-    self.decorations = decorations;
+    self.0.decorations = decorations;
     self
   }
 
-  /// Sets the icon of the window.
-  pub fn with_icon(&mut self, icon: Resource<PixelImage>) -> &mut Self {
-    self.icon = Some(icon);
+  /// Window icon in RGBA8 format.
+  pub fn with_icon(&mut self, icon: &PixelImage) -> &mut Self {
+    debug_assert!(icon.color_format() == ColorFormat::Rgba8, "Icon must be in RGBA8 format");
+
+    self.0.window_icon =
+      winit::window::Icon::from_rgba(icon.pixel_bytes().to_vec(), icon.width(), icon.height()).ok();
+
     self
   }
 }
 
 impl Default for WindowAttributes {
-  fn default() -> Self {
-    Self {
-      resizable: true,
-      size: None,
-      min_size: None,
-      max_size: None,
-      position: None,
-      title: "Ribir App".to_string(),
-      maximized: false,
-      visible: true,
-      decorations: true,
-      icon: None,
-    }
+  fn default() -> Self { Self(winit::window::WindowAttributes::default().with_title("Ribir App")) }
+}
+
+impl std::ops::Deref for AppRunGuard {
+  type Target = WindowAttributes;
+
+  fn deref(&self) -> &Self::Target { unsafe { self.wnd_attrs.as_ref().unwrap_unchecked() } }
+}
+
+impl std::ops::DerefMut for AppRunGuard {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    unsafe { self.wnd_attrs.as_mut().unwrap_unchecked() }
   }
 }
 
@@ -605,7 +462,7 @@ mod tests {
     log.write().clear();
     App::process_winit_ime_event(&wnd, Ime::Preedit("hello".to_string(), None));
     wnd.force_exit_pre_edit();
-    let device_id = unsafe { winit::event::DeviceId::dummy() };
+    let device_id = winit::event::DeviceId::dummy();
     wnd.process_mouse_input(
       device_id,
       winit::event::ElementState::Pressed,
