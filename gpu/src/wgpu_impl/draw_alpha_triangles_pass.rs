@@ -34,7 +34,7 @@ impl DrawAlphaTrianglesPass {
       layout: Some(&layout),
       vertex: wgpu::VertexState {
         module: &shader,
-        entry_point: "vs_main",
+        entry_point: Some("vs_main"),
         buffers: &[wgpu::VertexBufferLayout {
           array_stride: size_of::<Vertex<()>>() as wgpu::BufferAddress,
           step_mode: wgpu::VertexStepMode::Vertex,
@@ -48,7 +48,7 @@ impl DrawAlphaTrianglesPass {
       },
       fragment: Some(wgpu::FragmentState {
         module: &shader,
-        entry_point: "fs_main",
+        entry_point: Some("fs_main"),
         targets: &[Some(wgpu::ColorTargetState {
           format: wgpu::TextureFormat::R8Unorm,
           blend: Some(wgpu::BlendState {
@@ -75,6 +75,7 @@ impl DrawAlphaTrianglesPass {
       depth_stencil: None,
       multisample: wgpu::MultisampleState { count: 1, mask: !0, alpha_to_coverage_enabled: false },
       multiview: None,
+      cache: None,
     });
 
     Self { vertices_buffer, pipeline, size_uniform }

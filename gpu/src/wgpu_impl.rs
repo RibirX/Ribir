@@ -434,7 +434,7 @@ impl Texture for WgpuTexture {
     let bytes_per_pixel = self.color_format().pixel_per_bytes();
 
     backend.queue.write_texture(
-      wgpu::ImageCopyTexture {
+      wgpu::TexelCopyTextureInfo {
         texture: self.inner_tex.texture(),
         mip_level: 0,
         origin,
@@ -442,7 +442,7 @@ impl Texture for WgpuTexture {
       },
       data,
       // The layout of the texture
-      wgpu::ImageDataLayout {
+      wgpu::TexelCopyBufferLayout {
         offset: 0,
         bytes_per_row: Some(bytes_per_pixel as u32 * size.width),
         rows_per_image: Some(size.height),
@@ -476,15 +476,15 @@ impl Texture for WgpuTexture {
     let encoder = command_encoder!(backend);
 
     encoder.copy_texture_to_buffer(
-      wgpu::ImageCopyTexture {
+      wgpu::TexelCopyTextureInfo {
         texture: self.inner_tex.texture(),
         mip_level: 0,
         origin,
         aspect: wgpu::TextureAspect::All,
       },
-      wgpu::ImageCopyBuffer {
+      wgpu::TexelCopyBufferInfo {
         buffer: &buffer,
-        layout: wgpu::ImageDataLayout {
+        layout: wgpu::TexelCopyBufferLayout {
           offset: 0,
           bytes_per_row: Some(padded_row_bytes),
           rows_per_image: Some(height as u32),
@@ -545,7 +545,7 @@ impl WgpuImpl {
 
   #[allow(clippy::needless_lifetimes)]
   async fn create<'a>(target: Option<wgpu::SurfaceTarget<'a>>) -> (WgpuImpl, Option<Surface<'a>>) {
-    let mut instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+    let mut instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
       backends: wgpu::Backends::PRIMARY,
       ..<_>::default()
     });
@@ -559,7 +559,7 @@ impl WgpuImpl {
       .await
       .is_none()
     {
-      instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+      instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends: wgpu::Backends::SECONDARY,
         ..<_>::default()
       });
@@ -699,13 +699,13 @@ impl WgpuImpl {
       depth_or_array_layers: 1,
     };
     encoder.copy_texture_to_texture(
-      wgpu::ImageCopyTexture {
+      wgpu::TexelCopyTextureInfo {
         texture: from_tex,
         mip_level: 0,
         origin: src_origin,
         aspect: wgpu::TextureAspect::All,
       },
-      wgpu::ImageCopyTexture {
+      wgpu::TexelCopyTextureInfo {
         texture: dist_tex,
         mip_level: 0,
         origin: dst_origin,
