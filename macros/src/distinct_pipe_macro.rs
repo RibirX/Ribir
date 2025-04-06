@@ -15,7 +15,7 @@ pub fn gen_code(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>) -> Tok
         #map_handler
       )
       // Since the pipe has an initial value, we skip the initial notification.
-      .value_chain(|s| s.skip(1).distinct_until_key_changed(|v: &(_, _)| v.1).box_it())
+      .value_chain(|s| s.distinct_until_key_changed(|v: &(_, _)| v.1).skip(1).box_it())
     }
   });
   result_to_token_stream(res)

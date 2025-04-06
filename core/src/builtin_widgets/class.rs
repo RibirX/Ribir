@@ -339,9 +339,11 @@ impl<'c> ComposeChild<'c> for Class {
         let u = this2
           .raw_modifies()
           .filter(|s| s.contains(ModifyScope::FRAMEWORK))
-          .sample(AppCtx::frame_ticks().clone())
+          .merge(observable::of(ModifyScope::FRAMEWORK))
           .map(move |_| this2.read().clone())
           .distinct_until_changed()
+          .skip(1)
+          .sample(AppCtx::frame_ticks().clone())
           .subscribe(move |class| class_update(&cls_child2, &orig_child2, &class, wnd_id))
           .unsubscribe_when_dropped();
 
@@ -865,17 +867,26 @@ mod tests {
   fn fix_pipe_class_unsubscribed() {
     reset_test_env!();
 
-    class_names! { OUT_PIPE_CLS, INNER_PIPE };
+    class_names! { OUT_PIPE_CLS, OUT_PIPE_CLS_2, INNER_PIPE, INNER_PIPE_2};
 
     let inner_apply = Stateful::new(0usize);
     let w_inner_apply = inner_apply.clone_writer();
     let (inner, w_inner) = split_value(false);
-    let (out, w_out) = split_value(false);
+    let (out, w_out) = split_value(OUT_PIPE_CLS);
     let mut wnd = TestWindow::new(fn_widget! {
       let out_cls = Class::provider(OUT_PIPE_CLS, style_class!{
-        class: Variant::<bool>::new(BuildCtx::get()).unwrap().map(|_| INNER_PIPE)
+        class: Variant::<bool>::new(BuildCtx::get()).unwrap()
+          .map(|b| if *b { INNER_PIPE } else { INNER_PIPE_2 } )
+      });
+      let out_cls_2 = Class::provider(OUT_PIPE_CLS_2, style_class!{
+        class: Variant::<bool>::new(BuildCtx::get()).unwrap()
+          .map(|b| if *b { INNER_PIPE } else { INNER_PIPE_2 } )
       });
       let inner_cls = Class::provider(INNER_PIPE, |w| {
+        *Provider::write_of::<usize>(BuildCtx::get()).unwrap() += 1;
+        w
+      });
+      let inner_cls_2 = Class::provider(INNER_PIPE_2, |w| {
         *Provider::write_of::<usize>(BuildCtx::get()).unwrap() += 1;
         w
       });
@@ -885,12 +896,12 @@ mod tests {
       let w_inner_apply = w_inner_apply.clone_writer();
       providers!{
         providers: smallvec![
-          out_cls, inner_cls,
+          out_cls, out_cls_2, inner_cls, inner_cls_2,
           Provider::value_of_watcher(inner.clone_watcher()),
           Provider::value_of_writer(w_inner_apply.clone_writer(), None),
         ],
         @MockBox {
-          class: pipe!(let _ = *$out; OUT_PIPE_CLS),
+          class: pipe!(*$out),
           size: Size::new(100., 100.),
         }
       }
@@ -898,7 +909,7 @@ mod tests {
     wnd.draw_frame();
     assert_eq!(*inner_apply.read(), 1);
 
-    *w_out.write() = true;
+    *w_out.write() = OUT_PIPE_CLS_2;
     wnd.draw_frame();
     assert_eq!(*inner_apply.read(), 2);
 

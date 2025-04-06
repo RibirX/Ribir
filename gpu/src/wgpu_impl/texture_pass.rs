@@ -262,7 +262,7 @@ fn tex_render_pipeline<T>(
     layout: Some(layout),
     vertex: wgpu::VertexState {
       module: shader,
-      entry_point: "vs_main",
+      entry_point: Some("vs_main"),
       buffers: &[wgpu::VertexBufferLayout {
         array_stride: size_of::<Vertex<T>>() as wgpu::BufferAddress,
         step_mode: wgpu::VertexStepMode::Vertex,
@@ -272,7 +272,7 @@ fn tex_render_pipeline<T>(
     },
     fragment: Some(wgpu::FragmentState {
       module: shader,
-      entry_point: "fs_main",
+      entry_point: Some("fs_main"),
       targets: &[Some(wgpu::ColorTargetState {
         format,
         blend: Some(wgpu::BlendState::REPLACE),
@@ -292,6 +292,7 @@ fn tex_render_pipeline<T>(
     depth_stencil: None,
     multisample: wgpu::MultisampleState { count: 1, mask: !0, alpha_to_coverage_enabled: false },
     multiview: None,
+    cache: None,
   })
 }
 

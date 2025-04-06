@@ -114,7 +114,7 @@ impl DrawLinearGradientTrianglesPass {
         layout: Some(&self.layout),
         vertex: wgpu::VertexState {
           module: &self.shader,
-          entry_point: "vs_main",
+          entry_point: Some("vs_main"),
           buffers: &[wgpu::VertexBufferLayout {
             array_stride: size_of::<Vertex<LinearGradientPrimIndex>>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
@@ -137,7 +137,7 @@ impl DrawLinearGradientTrianglesPass {
         },
         fragment: Some(wgpu::FragmentState {
           module: &self.shader,
-          entry_point: "fs_main",
+          entry_point: Some("fs_main"),
           targets: &[Some(wgpu::ColorTargetState {
             format,
             blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -163,6 +163,7 @@ impl DrawLinearGradientTrianglesPass {
           alpha_to_coverage_enabled: false,
         },
         multiview: None,
+        cache: None,
       });
       self.pipeline = Some(pipeline);
     }

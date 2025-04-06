@@ -192,8 +192,8 @@ impl<'c> ComposeChild<'c> for Tabs {
   type Child = Vec<Tab<'c>>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    this.silent().tabs_cnt = child.len();
     fn_widget! {
-      this.silent().tabs_cnt = child.len();
       let position = Variant::<TabPos>::new_or_default(BuildCtx::get());
 
       let (headers, panes): (Vec<_>, Vec<_>) = child
