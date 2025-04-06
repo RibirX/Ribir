@@ -99,17 +99,12 @@ impl<T: ToOwned + ?Sized + 'static> Clone for CowArc<T> {
   }
 }
 
-impl<B: ?Sized> Debug for CowArc<B>
-where
-  B: Debug + ToOwned,
-  B::Owned: Debug,
-{
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match *self {
-      CowArc::Borrowed(ref b) => Debug::fmt(b, f),
-      CowArc::Owned(ref o) => Debug::fmt(o, f),
-    }
-  }
+impl<B: ?Sized + Debug + ToOwned> Debug for CowArc<B> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { (**self).fmt(f) }
+}
+
+impl<B: ?Sized + std::fmt::Display + ToOwned> std::fmt::Display for CowArc<B> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { (**self).fmt(f) }
 }
 
 impl<T: ToOwned + ?Sized> CowArc<T> {
@@ -169,6 +164,11 @@ impl<T: ToOwned<Owned = T>> From<T> for CowArc<T> {
 impl From<String> for CowArc<str> {
   #[inline]
   fn from(str: String) -> Self { CowArc::owned(str) }
+}
+
+impl From<char> for CowArc<str> {
+  #[inline]
+  fn from(c: char) -> Self { CowArc::owned(c.to_string()) }
 }
 
 impl Default for CowArc<str> {

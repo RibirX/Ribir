@@ -3,7 +3,7 @@ use ribir::{
   prelude::*,
 };
 use ribir_dev_helper::*;
-use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
+use winit::event::WindowEvent;
 
 widget_layout_test!(
   simplest_leaf_rdl,
@@ -663,14 +663,13 @@ fn builtin_bind_to_self() {
 }
 
 fn tap_at(wnd: &TestWindow, pos: (i32, i32)) {
-  let device_id = DeviceId::dummy();
-
   #[allow(deprecated)]
-  wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: pos.into() });
-
-  wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
-
-  wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
+  wnd.processes_native_event(WindowEvent::CursorMoved {
+    device_id: winit::event::DeviceId::dummy(),
+    position: pos.into(),
+  });
+  wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+  wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 }
 
 #[test]

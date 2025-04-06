@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
+use winit::event::{ElementState, MouseScrollDelta, WindowEvent};
 
 use crate::{
   prelude::*,
@@ -67,11 +67,17 @@ impl Dispatcher {
 #[derive(Default)]
 pub(crate) struct DispatchInfo {
   /// The current state of mouse button press state.
-  mouse_button: (Option<DeviceId>, MouseButtons),
+  pressed_button: PressedButtonInfo,
   /// The current global position (relative to window) of mouse
   cursor_pos: Point,
   /// The current state of the keyboard modifiers
   modifiers: ModifiersState,
+}
+
+#[derive(Default)]
+struct PressedButtonInfo {
+  buttons: MouseButtons,
+  device_id: Option<Box<dyn DeviceId>>,
 }
 
 impl Dispatcher {
@@ -108,47 +114,12 @@ impl Dispatcher {
     }
   }
 
-  pub fn dispatch_receive_chars(&mut self, chars: String) {
+  pub fn dispatch_receive_chars(&mut self, chars: CowArc<str>) {
     let wnd = self.window();
     if let Some(focus) = wnd.focusing() {
       self
         .window()
         .add_delay_event(DelayEvent::Chars { id: focus, chars });
-    }
-  }
-
-  fn cursor_press_down(&mut self, hit: Option<WidgetId>) {
-    let grab_pointer = *self.grab_mouse_wid.borrow();
-    if let Some(grab_pointer) = grab_pointer {
-      self
-        .window()
-        .add_delay_event(DelayEvent::GrabPointerDown(grab_pointer));
-    } else {
-      self.pointer_down_wid = None;
-      if let Some(hit) = hit {
-        self.pointer_down_wid = Some(hit);
-        self
-          .window()
-          .add_delay_event(DelayEvent::PointerDown(hit));
-      }
-    }
-  }
-
-  fn cursor_press_up(&mut self, hit: Option<WidgetId>) {
-    let wnd = self.window();
-    let grab_pointer = *self.grab_mouse_wid.borrow();
-    if let Some(grab_pointer) = grab_pointer {
-      wnd.add_delay_event(DelayEvent::GrabPointerUp(grab_pointer));
-    } else {
-      if let Some(hit) = hit {
-        wnd.add_delay_event(DelayEvent::PointerUp(hit));
-        if let Some(wid) = self.pointer_down_wid {
-          if let Some(p) = wid.lowest_common_ancestor(hit, wnd.tree()) {
-            wnd.add_delay_event(DelayEvent::Tap(p));
-          }
-        }
-      }
-      self.pointer_down_wid = None;
     }
   }
 
@@ -177,47 +148,60 @@ impl Dispatcher {
     }
   }
 
-  pub fn dispatch_mouse_input(
-    &mut self, device_id: DeviceId, state: ElementState, button: MouseButton,
-  ) {
-    // A mouse press/release emit during another mouse's press will ignored.
-    if self.info.mouse_button.0.get_or_insert(device_id) == &device_id {
-      match state {
-        ElementState::Pressed => {
-          self.info.mouse_button.1 |= button.into();
-          // only the first button press emit event.
-          if self.info.mouse_button.1 == button.into() {
-            let hit = self.hit_widget();
-            let wnd = self.window();
-            let tree = wnd.tree();
+  pub fn dispatch_press_mouse(&mut self, device_id: Box<dyn DeviceId>, button: MouseButtons) {
+    self.info.set_device_id(device_id);
+    *self.info.mouse_buttons_mut() |= button;
 
-            let nearest_focus = hit.and_then(|wid| {
-              wid.ancestors(tree).find(|id| {
-                id.query_all_iter::<MixBuiltin>(tree)
-                  .any(|m| m.contain_flag(MixFlags::Focus))
-              })
-            });
-            if let Some(focus_id) = nearest_focus {
-              wnd.focus_mgr.borrow_mut().focus(focus_id, tree);
-            } else {
-              wnd.focus_mgr.borrow_mut().blur(tree);
-            }
+    let hit = self.hit_widget();
+    let wnd = self.window();
+    let tree = wnd.tree();
 
-            self.cursor_press_down(hit);
-          }
-        }
-        ElementState::Released => {
-          self.info.mouse_button.1.remove(button.into());
-          // only the last button release emit event.
-          if self.info.mouse_button.1.is_empty() {
-            self.info.mouse_button.0 = None;
-            let hit = self.hit_widget();
-
-            self.cursor_press_up(hit);
-          }
-        }
-      };
+    let nearest_focus = hit.and_then(|wid| {
+      wid.ancestors(tree).find(|id| {
+        id.query_all_iter::<MixBuiltin>(tree)
+          .any(|m| m.contain_flag(MixFlags::Focus))
+      })
+    });
+    if let Some(focus_id) = nearest_focus {
+      wnd.focus_mgr.borrow_mut().focus(focus_id, tree);
+    } else {
+      wnd.focus_mgr.borrow_mut().blur(tree);
     }
+
+    let grab_pointer = *self.grab_mouse_wid.borrow();
+    if let Some(grab_pointer) = grab_pointer {
+      self
+        .window()
+        .add_delay_event(DelayEvent::GrabPointerDown(grab_pointer));
+    } else if let Some(hit) = hit {
+      self.pointer_down_wid = Some(hit);
+      self
+        .window()
+        .add_delay_event(DelayEvent::PointerDown(hit));
+    }
+  }
+
+  pub fn dispatch_release_mouse(&mut self, device_id: Box<dyn DeviceId>, button: MouseButtons) {
+    self.info.set_device_id(device_id);
+
+    let hit = self.hit_widget();
+
+    let wnd = self.window();
+    let grab_pointer = *self.grab_mouse_wid.borrow();
+    if let Some(grab_pointer) = grab_pointer {
+      wnd.add_delay_event(DelayEvent::GrabPointerUp(grab_pointer));
+    } else {
+      if let Some(hit) = hit {
+        wnd.add_delay_event(DelayEvent::PointerUp(hit));
+        if let Some(wid) = self.pointer_down_wid {
+          if let Some(p) = wid.lowest_common_ancestor(hit, wnd.tree()) {
+            wnd.add_delay_event(DelayEvent::Tap(p));
+          }
+        }
+      }
+      self.pointer_down_wid = None;
+    }
+    self.info.mouse_buttons_mut().remove(button);
   }
 
   pub fn dispatch_wheel(&mut self, delta: MouseScrollDelta, wnd_factor: f64) {
@@ -322,7 +306,24 @@ impl DispatchInfo {
   pub fn global_pos(&self) -> Point { self.cursor_pos }
 
   #[inline]
-  pub fn mouse_buttons(&self) -> MouseButtons { self.mouse_button.1 }
+  pub fn mouse_buttons(&self) -> MouseButtons { self.pressed_button.buttons }
+
+  fn mouse_buttons_mut(&mut self) -> &mut MouseButtons { &mut self.pressed_button.buttons }
+
+  fn is_different_device(&self, device_id: &dyn DeviceId) -> bool {
+    self
+      .pressed_button
+      .device_id
+      .as_ref()
+      .is_some_and(|d| !d.is_same_device(device_id))
+  }
+
+  fn set_device_id(&mut self, device_id: Box<dyn DeviceId>) {
+    if self.is_different_device(device_id.as_ref()) {
+      self.pressed_button.buttons = MouseButtons::empty();
+    }
+    self.pressed_button.device_id = Some(device_id);
+  }
 }
 
 #[cfg(test)]
@@ -349,6 +350,7 @@ mod tests {
         size: Size::new(100., 30.),
         on_pointer_down : move |e| $events.write().push(Info::new(e)),
         on_pointer_move: move |e| $events.write().push(Info::new(e)),
+        on_tap: move |e| $events.write().push(Info::new(e)),
         on_pointer_up: move |e| $events.write().push(Info::new(e)),
         on_pointer_cancel: move |e| $events.write().push(Info::new(e)),
       }
@@ -375,9 +377,11 @@ mod tests {
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
-    let device_id = DeviceId::dummy();
     #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (1., 1.).into() });
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: winit::event::DeviceId::dummy(),
+      position: (1., 1.).into(),
+    });
     wnd.run_frame_tasks();
 
     assert_eq!(records.read().len(), 2);
@@ -386,7 +390,7 @@ mod tests {
 
     wnd.run_frame_tasks();
 
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.run_frame_tasks();
     let mut records = records.write();
     assert_eq!(records[0].btns.bits().count_ones(), 1);
@@ -399,76 +403,93 @@ mod tests {
     reset_test_env!();
 
     let (root, records) = record_pointer();
+    let device_id = Box::new(DummyDeviceId);
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
-    let device_id = DeviceId::dummy();
-
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_press(device_id.clone(), MouseButtons::PRIMARY);
     wnd.run_frame_tasks();
 
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Right);
+    wnd.process_mouse_press(device_id.clone(), MouseButtons::SECONDARY);
     wnd.run_frame_tasks();
 
     #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (1, 1).into() });
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: winit::event::DeviceId::dummy(),
+      position: (1, 1).into(),
+    });
     wnd.run_frame_tasks();
 
-    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
+    wnd.process_mouse_release(device_id.clone(), MouseButtons::PRIMARY);
     wnd.run_frame_tasks();
 
-    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Right);
+    wnd.process_mouse_release(device_id, MouseButtons::SECONDARY);
     wnd.run_frame_tasks();
     let records = records.read();
-    assert_eq!(records.len(), 3);
+    assert_eq!(records.len(), 6);
 
     assert_eq!(records[0].btns, MouseButtons::PRIMARY);
     assert_eq!(records[1].btns, MouseButtons::PRIMARY | MouseButtons::SECONDARY);
-    assert_eq!(records[2].btns, MouseButtons::default());
+    assert_eq!(records[2].btns, MouseButtons::PRIMARY | MouseButtons::SECONDARY);
+    assert_eq!(records[3].btns, MouseButtons::SECONDARY);
+    assert_eq!(records[4].btns, MouseButtons::SECONDARY);
+    assert_eq!(records[5].btns, MouseButtons::default());
   }
 
-  // Can not mock two different device id for macos.
-  #[cfg(not(target_os = "macos"))]
   #[test]
   fn different_device_mouse() {
     reset_test_env!();
+
+    #[derive(Clone, Copy)]
+    struct WinitDeviceId(winit::event::DeviceId);
+
+    impl DeviceId for WinitDeviceId {
+      fn as_any(&self) -> &dyn std::any::Any { self }
+      fn is_same_device(&self, other: &dyn DeviceId) -> bool {
+        other
+          .as_any()
+          .downcast_ref::<WinitDeviceId>()
+          .is_some_and(|other| self.0 == other.0)
+      }
+      fn clone_boxed(&self) -> Box<dyn DeviceId> { Box::new(WinitDeviceId(self.0)) }
+    }
 
     let (root, record) = record_pointer();
     let mut wnd = TestWindow::new(root);
     wnd.draw_frame();
 
-    let device_id = DeviceId::dummy();
+    let device_id = Box::new(DummyDeviceId);
+    let device_id_2 = WinitDeviceId(winit::event::DeviceId::dummy());
 
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_press(device_id.clone(), MouseButtons::PRIMARY);
     wnd.run_frame_tasks();
     assert_eq!(record.read().len(), 1);
 
-    // A mouse press/release emit during another mouse's press will be ignored.
-    let device_id_2 = unsafe {
-      let mut id = DeviceId::dummy();
-      (&mut id as *mut DeviceId).write_bytes(1, 1);
-      id
-    };
-
-    wnd.process_mouse_input(device_id_2, ElementState::Pressed, MouseButton::Left);
-    wnd.process_mouse_input(device_id_2, ElementState::Released, MouseButton::Left);
+    wnd.process_mouse_press(Box::new(device_id_2), MouseButtons::SECONDARY);
     wnd.run_frame_tasks();
-    assert_eq!(record.read().len(), 1);
+    assert_eq!(record.read().len(), 2);
+    // different device clear before buttons
+    assert_eq!(record.read()[1].btns, MouseButtons::SECONDARY);
+
+    wnd.process_mouse_release(Box::new(device_id_2), MouseButtons::SECONDARY);
+    wnd.run_frame_tasks();
+    // a tap event is processed
+    assert_eq!(record.read().len(), 4);
+    assert_eq!(record.read()[3].btns, MouseButtons::empty());
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: device_id_2,
+      device_id: device_id_2.0,
       position: (1, 1).into(),
     });
     wnd.run_frame_tasks();
     // but cursor move processed.
-    assert_eq!(record.read().len(), 2);
-    assert_eq!(record.read().len(), 2);
-    assert_eq!(record.read()[1].btns, MouseButtons::PRIMARY);
+    assert_eq!(record.read().len(), 5);
+    assert_eq!(record.read()[4].btns, MouseButtons::empty());
 
-    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
+    wnd.process_mouse_release(device_id, MouseButtons::PRIMARY);
     wnd.run_frame_tasks();
-    assert_eq!(record.read().len(), 3);
+    assert_eq!(record.read().len(), 6);
   }
 
   #[test]
@@ -494,7 +515,7 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    wnd.process_mouse_input(DeviceId::dummy(), ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.run_frame_tasks();
     assert_eq!(record.read().len(), 1);
   }
@@ -523,7 +544,7 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    let device_id = DeviceId::dummy();
+    let device_id = winit::event::DeviceId::dummy();
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (10, 10).into() });
@@ -582,15 +603,13 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
     wnd.draw_frame();
 
-    let device_id = DeviceId::dummy();
-
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
+      device_id: winit::event::DeviceId::dummy(),
       position: (50f64, 50f64).into(),
     });
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
-    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.run_frame_tasks();
     assert_eq!(*click_path.read(), [1, 2, 3, 4]);
   }
@@ -616,16 +635,13 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
     wnd.draw_frame();
 
-    let device_id = DeviceId::dummy();
-
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
+      device_id: winit::event::DeviceId::dummy(),
       position: (50f64, 50f64).into(),
     });
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
-
-    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 
     wnd.run_frame_tasks();
     {
@@ -636,17 +652,17 @@ mod tests {
 
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
+      device_id: winit::event::DeviceId::dummy(),
       position: (50f64, 50f64).into(),
     });
 
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
+      device_id: winit::event::DeviceId::dummy(),
       position: (50f64, 150f64).into(),
     });
-    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
+    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.run_frame_tasks();
     assert_eq!(*click_path.read(), 1);
   }
@@ -669,26 +685,25 @@ mod tests {
     let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    let device_id = DeviceId::dummy();
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
+      device_id: winit::event::DeviceId::dummy(),
       position: (45f64, 45f64).into(),
     });
 
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 
     // point down on a focus widget
     assert!(wnd.focus_mgr.borrow().focusing().is_some());
 
-    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
+    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
+      device_id: winit::event::DeviceId::dummy(),
       position: (80f64, 80f64).into(),
     });
 
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 
     assert!(wnd.focus_mgr.borrow().focusing().is_none());
   }

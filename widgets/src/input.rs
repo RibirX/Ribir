@@ -198,7 +198,7 @@ impl Compose for TextArea {
 #[cfg(test)]
 mod tests {
   use ribir_core::{prelude::*, reset_test_env, test_helper::*};
-  use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
+  use winit::event::WindowEvent;
 
   use super::*;
 
@@ -241,12 +241,14 @@ mod tests {
     wnd.draw_frame();
     assert_eq!(*value.read(), "");
 
-    let device_id = DeviceId::dummy();
     #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (50., 10.).into() });
+    wnd.processes_native_event(WindowEvent::CursorMoved {
+      device_id: winit::event::DeviceId::dummy(),
+      position: (50., 10.).into(),
+    });
 
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
-    wnd.process_mouse_input(device_id, ElementState::Released, MouseButton::Left);
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.draw_frame();
 
     wnd.processes_receive_chars("hello".into());

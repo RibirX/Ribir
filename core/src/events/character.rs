@@ -2,7 +2,7 @@ use crate::{impl_common_event_deref, prelude::*};
 
 #[derive(Debug)]
 pub struct CharsEvent {
-  pub chars: String,
+  pub chars: CowArc<str>,
   pub common: CommonEvent,
 }
 
@@ -10,7 +10,7 @@ impl_common_event_deref!(CharsEvent);
 
 impl CharsEvent {
   #[inline]
-  pub fn new(chars: String, id: WidgetId, wnd: &Window) -> Self {
+  pub fn new(chars: CowArc<str>, id: WidgetId, wnd: &Window) -> Self {
     Self { chars, common: CommonEvent::new(id, wnd.tree) }
   }
 }

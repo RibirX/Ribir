@@ -874,19 +874,19 @@ mod tests {
     };
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    wnd.processes_receive_chars("hello".to_string());
+    wnd.processes_receive_chars("hello".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "hello");
 
     *focused_writer.write() = false;
     wnd.draw_frame();
-    wnd.processes_receive_chars("has no receiver".to_string());
+    wnd.processes_receive_chars("has no receiver".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "hello");
 
     *focused_writer.write() = true;
     wnd.draw_frame();
-    wnd.processes_receive_chars(" ribir".to_string());
+    wnd.processes_receive_chars(" ribir".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "hello ribir");
   }
@@ -913,25 +913,25 @@ mod tests {
     };
     let mut wnd = TestWindow::new(w);
     wnd.draw_frame();
-    wnd.processes_receive_chars("hello".to_string());
+    wnd.processes_receive_chars("hello".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "");
 
     *active_idx_writer.write() += 1;
     wnd.draw_frame();
-    wnd.processes_receive_chars("ribir".to_string());
+    wnd.processes_receive_chars("ribir".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "");
 
     *active_idx_writer.write() += 1;
     wnd.draw_frame();
-    wnd.processes_receive_chars("nice to see you".to_string());
+    wnd.processes_receive_chars("nice to see you".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "nice to see you");
 
     *active_idx_writer.write() += 1;
     wnd.draw_frame();
-    wnd.processes_receive_chars("Bye-Bye".to_string());
+    wnd.processes_receive_chars("Bye-Bye".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "nice to see you");
     wnd.draw_frame();

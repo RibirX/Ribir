@@ -5,7 +5,6 @@ mod test_single_thread {
   use std::{cell::RefCell, rc::Rc, thread::sleep};
 
   use ribir_core::{prelude::*, reset_test_env, test_helper::*};
-  use winit::event::{DeviceId, ElementState, MouseButton};
 
   pub fn test_widget_with_timer() {
     let w = fn_widget! {
@@ -69,7 +68,6 @@ mod test_single_thread {
     let (wnd, count) = env(2);
     let c_wnd = wnd.clone();
 
-    let device_id = DeviceId::dummy();
     let is_complete = Rc::new(RefCell::new(false));
     let is_complete2 = is_complete.clone();
     observable::interval(Duration::from_millis(10), AppCtx::scheduler())
@@ -78,8 +76,11 @@ mod test_single_thread {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
-        let state = if i % 2 == 0 { ElementState::Pressed } else { ElementState::Released };
-        c_wnd.process_mouse_input(device_id, state, MouseButton::Left);
+        if i % 2 == 0 {
+          c_wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY)
+        } else {
+          c_wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY)
+        };
       });
 
     run_until(&wnd, || *is_complete2.borrow());
@@ -96,11 +97,11 @@ mod test_single_thread {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
-        c_wnd.process_mouse_input(
-          device_id,
-          if i % 2 == 0 { ElementState::Pressed } else { ElementState::Released },
-          MouseButton::Left,
-        );
+        if i % 2 == 0 {
+          c_wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY)
+        } else {
+          c_wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY)
+        };
       });
 
     run_until(&wnd, || *is_complete2.borrow());
@@ -112,7 +113,6 @@ mod test_single_thread {
     let (wnd, count) = env(3);
     let c_wnd = wnd.clone();
 
-    let device_id = DeviceId::dummy();
     let is_complete = Rc::new(RefCell::new(false));
     let is_complete2 = is_complete.clone();
     observable::interval(Duration::from_millis(10), AppCtx::scheduler())
@@ -121,11 +121,11 @@ mod test_single_thread {
         *is_complete.borrow_mut() = true;
       })
       .subscribe(move |i| {
-        c_wnd.process_mouse_input(
-          device_id,
-          if i % 2 == 0 { ElementState::Pressed } else { ElementState::Released },
-          MouseButton::Left,
-        );
+        if i % 2 == 0 {
+          c_wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY)
+        } else {
+          c_wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY)
+        }
       });
 
     run_until(&wnd, || *is_complete2.borrow());

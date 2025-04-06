@@ -28,6 +28,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Fixed
 
 - **core**: Fix `FittedBox` to always center its child (#727 by @M-Adoo)
+- **core**: Fix incorrect drop pointer press or release event when multiple devices are used simultaneously, ensuring that only the tap event is dropped while other events are fired correctly. (#730 @M-Adoo)
+
 
 ### Changed
 
