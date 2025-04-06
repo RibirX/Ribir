@@ -85,7 +85,7 @@ impl App {
       }
       Ime::Commit(value) => {
         wnd.exit_pre_edit();
-        wnd.processes_receive_chars(value);
+        wnd.processes_receive_chars(value.into());
       }
       Ime::Disabled => wnd.exit_pre_edit(),
     }
@@ -462,17 +462,9 @@ mod tests {
     log.write().clear();
     App::process_winit_ime_event(&wnd, Ime::Preedit("hello".to_string(), None));
     wnd.force_exit_pre_edit();
-    let device_id = winit::event::DeviceId::dummy();
-    wnd.process_mouse_input(
-      device_id,
-      winit::event::ElementState::Pressed,
-      winit::event::MouseButton::Left,
-    );
-    wnd.process_mouse_input(
-      device_id,
-      winit::event::ElementState::Released,
-      winit::event::MouseButton::Left,
-    );
+
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 
     wnd.draw_frame();
     assert_eq!(

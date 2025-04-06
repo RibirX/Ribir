@@ -44,7 +44,7 @@ impl<'c> ComposeChild<'c> for FocusScope {
 mod tests {
   use winit::{
     dpi::LogicalPosition,
-    event::{DeviceId, ElementState, MouseButton, WindowEvent},
+    event::{DeviceId, ElementState, WindowEvent},
   };
 
   use super::*;
@@ -187,13 +187,13 @@ mod tests {
     wnd.draw_frame();
 
     // request_focus
-    let device_id = DeviceId::dummy();
+
     #[allow(deprecated)]
     wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id,
+      device_id: DeviceId::dummy(),
       position: LogicalPosition::new(75., 25.).to_physical(1.),
     });
-    wnd.process_mouse_input(device_id, ElementState::Pressed, MouseButton::Left);
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 
     // will deal key event twice (inner and host).
     wnd.draw_frame();

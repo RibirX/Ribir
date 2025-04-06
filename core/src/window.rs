@@ -9,7 +9,7 @@ use futures::{Future, task::LocalSpawnExt};
 use ribir_algo::Sc;
 use smallvec::SmallVec;
 use widget_id::TrackId;
-use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
+use winit::event::{ElementState, WindowEvent};
 pub use winit::window::CursorIcon;
 
 use crate::{
@@ -129,7 +129,7 @@ impl Window {
       .dispatch_keyboard_input(physical_key, key, is_repeat, location, state);
   }
 
-  pub fn processes_receive_chars(&self, chars: String) {
+  pub fn processes_receive_chars(&self, chars: CowArc<str>) {
     self
       .dispatcher
       .borrow_mut()
@@ -143,11 +143,18 @@ impl Window {
       .dispatch_ime_pre_edit(ime)
   }
 
-  pub fn process_mouse_input(&self, device_id: DeviceId, state: ElementState, button: MouseButton) {
+  pub fn process_mouse_press(&self, device_id: Box<dyn DeviceId>, button: MouseButtons) {
     self
       .dispatcher
       .borrow_mut()
-      .dispatch_mouse_input(device_id, state, button);
+      .dispatch_press_mouse(device_id, button);
+  }
+
+  pub fn process_mouse_release(&self, device_id: Box<dyn DeviceId>, button: MouseButtons) {
+    self
+      .dispatcher
+      .borrow_mut()
+      .dispatch_release_mouse(device_id, button);
   }
 
   /// Request switch the focus to next widget.
@@ -810,7 +817,7 @@ impl Window {
       self.set_ime_allowed(false);
       self.processes_ime_pre_edit(ImePreEdit::End);
       if let Some(s) = self.pre_edit.borrow_mut().take() {
-        self.processes_receive_chars(s);
+        self.processes_receive_chars(s.into());
       }
       self.set_ime_allowed(true);
     }
@@ -902,7 +909,7 @@ pub(crate) enum DelayEvent {
   TabFocusMove,
   Chars {
     id: WidgetId,
-    chars: String,
+    chars: CowArc<str>,
   },
   Wheel {
     id: WidgetId,

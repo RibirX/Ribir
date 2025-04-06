@@ -71,7 +71,7 @@ impl ApplicationHandler<AppEvent> for AppHandler {
         wnd.processes_keyboard_event(physical_key, logical_key, repeat, location, state);
         if state == ElementState::Pressed {
           if let Some(txt) = text {
-            wnd.processes_receive_chars(txt.to_string());
+            wnd.processes_receive_chars(txt.to_string().into());
           }
         }
       }
@@ -80,7 +80,11 @@ impl ApplicationHandler<AppEvent> for AppHandler {
         if state == ElementState::Pressed {
           wnd.force_exit_pre_edit()
         }
-        wnd.process_mouse_input(device_id, state, button);
+        let device_id = Box::new(WinitDeviceId(device_id));
+        match state {
+          ElementState::Pressed => wnd.process_mouse_press(device_id, button.into()),
+          ElementState::Released => wnd.process_mouse_release(device_id, button.into()),
+        }
       }
       #[allow(deprecated)]
       event => wnd.processes_native_event(event),
@@ -148,4 +152,20 @@ fn active_event_guard(active: &ActiveEventLoop) -> impl Drop {
   }
 
   Guard
+}
+
+#[derive(Debug, Clone, Copy)]
+struct WinitDeviceId(winit::event::DeviceId);
+
+impl DeviceId for WinitDeviceId {
+  fn as_any(&self) -> &dyn std::any::Any { self }
+
+  fn is_same_device(&self, other: &dyn DeviceId) -> bool {
+    other
+      .as_any()
+      .downcast_ref::<WinitDeviceId>()
+      .is_some_and(|other| self.0 == other.0)
+  }
+
+  fn clone_boxed(&self) -> Box<dyn DeviceId> { Box::new(WinitDeviceId(self.0)) }
 }

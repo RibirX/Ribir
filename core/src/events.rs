@@ -28,6 +28,8 @@ pub use ime_pre_edit::*;
 mod lifecycle;
 pub use lifecycle::*;
 
+mod device_id;
+pub use device_id::*;
 pub(crate) mod focus_mgr;
 mod listener_impl_helper;
 
