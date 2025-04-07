@@ -104,7 +104,7 @@ mod tests {
 
     let w = fn_widget! {
       let mut host = @MockMulti {};
-      watch!($host.has_focus())
+      watch!($host.is_focused())
         .subscribe(move |v| *$w_focused.write() = v);
 
       @$host {

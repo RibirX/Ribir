@@ -28,7 +28,7 @@ impl<T: Default + VisualText + EditText + Clone + 'static> Compose for BasicEdit
       let this2 = this.clone_writer();
       let caret = pipe! {
         let this = this2.clone_writer();
-        $text.has_focus().then(|| fn_widget! {Self::caret_widget(this)})
+        $text.is_focused().then(|| fn_widget! {Self::caret_widget(this)})
       };
       let mut caret = FatObj::new(caret);
 

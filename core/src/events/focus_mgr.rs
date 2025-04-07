@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, ptr::NonNull};
 
 use indextree::{Arena, NodeId};
 
@@ -7,11 +7,33 @@ use crate::{
   window::{DelayEvent, WindowId},
 };
 
+/// The FocusEvent interface represents focus-related events, including focus,
+/// blur, focusin, and focusout.
+pub struct FocusEvent {
+  pub common: CommonEvent,
+  pub reason: FocusReason,
+}
+
+impl_common_event_deref!(FocusEvent);
+
+/// Represents the source interaction that caused a UI element to gain focus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum FocusReason {
+  /// Keyboard navigation (Tab/Arrow keys)
+  Keyboard,
+  /// Pointer interaction (mouse click/touch tap)
+  Pointer,
+  /// Automatic focus assignment during window loaded
+  AutoFocus,
+  /// Programmatic focus or unspecified source,
+  Other,
+}
+
 #[derive(Debug)]
 pub(crate) struct FocusManager {
   /// store current focusing node, and its position in tab_orders.
   focusing: Option<WidgetId>,
-  request_focusing: Option<Option<WidgetId>>,
   frame_auto_focus: Vec<WidgetId>,
   focus_widgets: Vec<WidgetId>,
   node_ids: ahash::HashMap<WidgetId, NodeId>,
@@ -26,17 +48,19 @@ pub struct FocusHandle {
 }
 
 impl FocusHandle {
-  pub(crate) fn request_focus(&self) {
+  pub(crate) fn request_focus(&self, reason: FocusReason) {
     if let Some(wnd) = AppCtx::get_window(self.wnd_id) {
-      let wid = self.wid.get();
-      wnd.focus_mgr.borrow_mut().request_focus_to(wid);
+      if let Some(wid) = self.wid.get() {
+        wnd.focus_mgr.borrow_mut().focus(wid, reason);
+      }
     }
   }
 
-  pub(crate) fn unfocus(&self) {
+  pub(crate) fn unfocus(&self, reason: FocusReason) {
     if let Some(wnd) = AppCtx::get_window(self.wnd_id) {
-      if wnd.focus_mgr.borrow().focusing == self.wid.get() {
-        wnd.focus_mgr.borrow_mut().request_focus_to(None);
+      let mut focus_mgr = wnd.focus_mgr.borrow_mut();
+      if focus_mgr.focusing == self.wid.get() {
+        focus_mgr.blur(reason);
       }
     }
   }
@@ -53,6 +77,18 @@ pub(crate) struct FocusNodeInfo {
   pub scope_cnt: u32,
   pub node_cnt: u32,
   pub wid: Option<WidgetId>,
+}
+
+impl FocusReason {
+  pub fn from_u8(reason: u8) -> FocusReason {
+    match reason {
+      0 => FocusReason::Keyboard,
+      1 => FocusReason::Pointer,
+      2 => FocusReason::AutoFocus,
+      3 => FocusReason::Other,
+      _ => unreachable!(),
+    }
+  }
 }
 
 impl FocusNodeInfo {
@@ -87,7 +123,6 @@ impl FocusManager {
       wnd_id,
       focus_widgets: Vec::new(),
       frame_auto_focus: vec![],
-      request_focusing: None,
       focusing: None,
       node_ids: ahash::HashMap::default(),
       arena,
@@ -140,52 +175,37 @@ impl FocusManager {
     }
   }
 
-  pub fn next_focus(&mut self, arena: &WidgetTree) -> Option<WidgetId> {
-    let request_focus = self.request_focusing.take();
-    let autos = self.frame_auto_focus.drain(..);
-    let next_focus = request_focus
-      .into_iter()
-      .chain(autos.map(Some))
-      .find(|request| {
-        request
-          .as_ref()
-          .is_none_or(|id| !id.is_dropped(arena))
-      });
+  fn find_real_focus_widget(&mut self, focus: WidgetId) -> Option<WidgetId> {
+    if self.ignore_scope_id(focus).is_some() {
+      return None;
+    }
 
-    let focusing = next_focus
-      .unwrap_or(self.focusing)
-      .filter(|node_id| self.ignore_scope_id(*node_id).is_none());
-    let focus_node = focusing.and_then(|wid| self.node_ids.get(&wid));
-    let info = focus_node.and_then(|id: &NodeId| self.get(*id));
-
-    let focus_to = if let Some(node) = info {
-      if node.has_focus_scope() {
-        let scope = self.scope_property(node.wid);
-        if node.has_focus_node() && !scope.skip_host {
-          node.wid
-        } else if !scope.skip_descendants {
-          self
-            .focus_step_in_scope(*focus_node.unwrap(), None, false)
-            .and_then(|id| self.assert_get(id).wid)
-        } else {
-          None
-        }
+    let focus_node = self.node_ids.get(&focus)?;
+    let info = self.get(*focus_node)?;
+    if info.has_focus_scope() {
+      let scope = self.scope_property(info.wid);
+      if info.has_focus_node() && !scope.skip_host {
+        info.wid
+      } else if !scope.skip_descendants {
+        self
+          .focus_step_in_scope(*focus_node, None, false)
+          .and_then(|id| self.assert_get(id).wid)
       } else {
-        node.wid
+        None
       }
     } else {
-      None
-    };
-    focus_to
+      info.wid
+    }
   }
 
-  fn focus_move_circle(&mut self, backward: bool) {
+  fn focus_move_circle(&mut self, backward: bool) -> Option<WidgetId> {
     let has_focus = self.focusing.is_some();
     let mut wid = self.focus_step(self.focusing, backward);
     if wid.is_none() && has_focus {
       wid = self.focus_step(wid, backward);
     }
-    self.request_focus_to(wid);
+
+    wid
   }
 
   fn focus_step(&mut self, focusing: Option<WidgetId>, backward: bool) -> Option<WidgetId> {
@@ -470,14 +490,20 @@ impl FocusManager {
 }
 
 impl FocusManager {
-  pub fn focus_next_widget(&mut self, tree: &WidgetTree) {
-    self.focus_move_circle(false);
-    self.refresh_focus(tree);
+  /// Attempts to move focus to the next widget, returning the actual focused
+  /// widget ID on success.
+  pub fn focus_next_widget(&mut self, reason: FocusReason) -> Option<WidgetId> {
+    self
+      .focus_move_circle(false)
+      .and_then(|wid| self.focus(wid, reason))
   }
 
-  pub fn focus_prev_widget(&mut self, tree: &WidgetTree) {
-    self.focus_move_circle(true);
-    self.refresh_focus(tree);
+  /// Attempts to move focus to the previous widget, returning the actual
+  /// focused widget ID on success.
+  pub fn focus_prev_widget(&mut self, reason: FocusReason) -> Option<WidgetId> {
+    self
+      .focus_move_circle(true)
+      .and_then(|wid| self.focus(wid, reason))
   }
 
   /// Attempts to focus the specified widget, returning the actual focused
@@ -487,73 +513,45 @@ impl FocusManager {
   /// - The widget is in an ignored focus scope
   /// - The widget doesn't exist in the tree
   /// - The widget isn't focusable through normal navigation
-  pub fn try_focus(&mut self, wid: WidgetId, tree: &WidgetTree) -> Option<WidgetId> {
-    if self.ignore_scope_id(wid).is_some() {
-      return None;
-    }
-
-    let node = self.node_ids.get(&wid)?;
-    let info = self.get(*node)?;
-
-    let id = if info.has_focus_scope() {
-      let scope = self.scope_property(info.wid);
-      if info.has_focus_node() && !scope.skip_host {
-        info.wid
-      } else if !scope.skip_descendants {
-        self
-          .focus_step_in_scope(*node, None, false)
-          .and_then(|id| self.assert_get(id).wid)
-      } else {
-        None
-      }
+  pub fn focus(&mut self, wid: WidgetId, reason: FocusReason) -> Option<WidgetId> {
+    let focus = self.find_real_focus_widget(wid)?;
+    if self.focus_widgets.first() != Some(&focus) {
+      self.change_focusing_to(Some(focus), reason);
+      Some(focus)
     } else {
-      info.wid
-    };
-    self.request_focus_to(id);
-    self.refresh_focus(tree);
-
-    self.focusing()
+      None
+    }
   }
 
-  pub fn focus(&mut self, wid: WidgetId, tree: &WidgetTree) {
-    self.request_focus_to(Some(wid));
-    self.refresh_focus(tree);
+  /// Blurs the current focused widget, and returns the previous focused.
+  pub fn blur(&mut self, reason: FocusReason) -> Option<WidgetId> {
+    self.change_focusing_to(None, reason)
   }
-
-  pub fn blur(&mut self, tree: &WidgetTree) {
-    self.request_focus_to(None);
-    self.refresh_focus(tree);
-  }
-
-  pub(crate) fn blur_on_dispose(&mut self) { self.change_focusing_to(None); }
 
   /// return the focusing widget.
   pub fn focusing(&self) -> Option<WidgetId> { self.focusing }
 
-  pub fn refresh_focus(&mut self, tree: &WidgetTree) {
-    let new_focus = self.next_focus(tree);
-    if self.focus_widgets.first() != new_focus.as_ref() {
-      self.change_focusing_to(new_focus);
+  pub fn on_widget_tree_update(&mut self, tree: &WidgetTree) {
+    let autos = self
+      .frame_auto_focus
+      .drain(..)
+      .find(|wid| !wid.is_dropped(tree))
+      .or(self.focusing);
+
+    if let Some(focus) = autos {
+      self.focus(focus, FocusReason::AutoFocus);
     }
   }
 
-  // When focus_to is Some(wid), wid requests focus, which delays refreshing the
-  // focus, because wid may be a newly added widget in init. But you can call
-  // refresh_focus manually to force a refresh. Conversely, if focus_to is set
-  // to None and the focused widget requests blur, it will refresh focus
-  // immediately because the widget may be in a disposed state and the widget
-  // will be removed soon.
-  pub(crate) fn request_focus_to(&mut self, focus_to: Option<WidgetId>) {
-    self.request_focusing = Some(focus_to);
-  }
-
-  fn change_focusing_to(&mut self, node: Option<WidgetId>) -> Option<WidgetId> {
+  fn change_focusing_to(
+    &mut self, node: Option<WidgetId>, reason: FocusReason,
+  ) -> Option<WidgetId> {
     let wnd = self.window();
     let tree = wnd.tree();
 
     // dispatch blur event
     if let Some(wid) = self.focusing() {
-      wnd.add_delay_event(DelayEvent::Blur(wid));
+      wnd.add_delay_event(DelayEvent::Blur { id: wid, reason });
     };
 
     let old = self
@@ -565,18 +563,25 @@ impl FocusManager {
     // bubble focus out
     if let Some(old) = old {
       let ancestor = node.and_then(|w| w.lowest_common_ancestor(old, tree));
-      wnd.add_delay_event(DelayEvent::FocusOut { bottom: old, up: ancestor });
+      wnd.add_delay_event(DelayEvent::FocusOut { bottom: old, up: ancestor, reason });
     };
 
     if let Some(new) = node {
-      wnd.add_delay_event(DelayEvent::Focus(new));
+      wnd.add_delay_event(DelayEvent::Focus { id: new, reason });
       let ancestor = old.and_then(|o| o.lowest_common_ancestor(new, tree));
-      wnd.add_delay_event(DelayEvent::FocusIn { bottom: new, up: ancestor });
+      wnd.add_delay_event(DelayEvent::FocusIn { bottom: new, up: ancestor, reason });
     }
 
     self.focus_widgets = node.map_or(vec![], |wid| wid.ancestors(tree).collect::<Vec<_>>());
     self.focusing = node;
     old
+  }
+}
+
+impl FocusEvent {
+  pub(crate) fn new(wid: WidgetId, reason: FocusReason, tree: NonNull<WidgetTree>) -> Self {
+    let common = CommonEvent::new(wid, tree);
+    Self { common, reason }
   }
 }
 
@@ -603,8 +608,7 @@ mod tests {
     let wnd = TestWindow::new(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let tree = wnd.tree();
-
-    focus_mgr.refresh_focus(tree);
+    focus_mgr.on_widget_tree_update(tree);
 
     let id = tree.content_root().first_child(tree);
     assert!(id.is_some());
@@ -632,7 +636,7 @@ mod tests {
       .first_child(tree)
       .and_then(|p| p.next_sibling(tree));
     assert!(id.is_some());
-    focus_mgr.refresh_focus(tree);
+    focus_mgr.focus(id.unwrap(), FocusReason::Other);
     assert_eq!(focus_mgr.focusing(), id);
   }
 
@@ -656,8 +660,7 @@ mod tests {
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
 
     let tree = wnd.tree();
-
-    focus_mgr.refresh_focus(tree);
+    focus_mgr.on_widget_tree_update(tree);
 
     let negative = tree.content_root().first_child(tree).unwrap();
     let id0 = negative.next_sibling(tree).unwrap();
@@ -669,32 +672,32 @@ mod tests {
 
     {
       // next focus sequential
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id2));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id3));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id4));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id0));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id0_0));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id1));
 
       // previous focus sequential
 
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id0_0));
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id0));
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id4));
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id3));
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id2));
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id1));
     }
   }
@@ -758,11 +761,11 @@ mod tests {
     wnd
       .focus_mgr
       .borrow_mut()
-      .refresh_focus(wnd.tree());
+      .on_widget_tree_update(wnd.tree());
     wnd
       .focus_mgr
       .borrow_mut()
-      .focus(child, wnd.tree());
+      .focus(child, FocusReason::Other);
     wnd.draw_frame();
     assert_eq!(&*log.borrow(), &["focus child", "focusin child", "focusin parent"]);
     log.borrow_mut().clear();
@@ -770,12 +773,15 @@ mod tests {
     wnd
       .focus_mgr
       .borrow_mut()
-      .focus_next_widget(wnd.tree());
+      .focus_next_widget(FocusReason::Other);
     wnd.run_frame_tasks();
     assert_eq!(&*log.borrow(), &["blur child", "focusout child", "focus parent",]);
     log.borrow_mut().clear();
 
-    wnd.focus_mgr.borrow_mut().blur(wnd.tree());
+    wnd
+      .focus_mgr
+      .borrow_mut()
+      .blur(FocusReason::Other);
     wnd.run_frame_tasks();
     assert_eq!(&*log.borrow(), &["blur parent", "focusout parent",]);
   }
@@ -846,10 +852,8 @@ mod tests {
 
     let first_box = tree.content_root().first_child(tree);
     let focus_scope = first_box.unwrap().next_sibling(tree);
-    focus_mgr.request_focus_to(focus_scope);
-
     let inner_box = focus_scope.unwrap().first_child(tree);
-    focus_mgr.refresh_focus(tree);
+    focus_mgr.focus(inner_box.unwrap(), FocusReason::Other);
     assert_eq!(focus_mgr.focusing(), inner_box);
   }
 
@@ -935,5 +939,58 @@ mod tests {
     wnd.draw_frame();
     assert_eq!(*input.read(), "nice to see you");
     wnd.draw_frame();
+  }
+
+  #[test]
+  fn focus_reason_from_u8() {
+    assert_eq!(FocusReason::from_u8(0), FocusReason::Keyboard);
+    assert_eq!(FocusReason::from_u8(1), FocusReason::Pointer);
+    assert_eq!(FocusReason::from_u8(2), FocusReason::AutoFocus);
+    assert_eq!(FocusReason::from_u8(3), FocusReason::Other);
+  }
+
+  #[test]
+  fn focus_reason_to_u8() {
+    assert_eq!(FocusReason::Keyboard as u8, 0);
+    assert_eq!(FocusReason::Pointer as u8, 1);
+    assert_eq!(FocusReason::AutoFocus as u8, 2);
+    assert_eq!(FocusReason::Other as u8, 3);
+  }
+
+  #[test]
+  #[should_panic]
+  fn focus_reason_unreachable() { FocusReason::from_u8(4); }
+
+  #[test]
+  fn track_focus_reason() {
+    reset_test_env!();
+    let (reason, w_reason) = split_value(FocusReason::Other);
+    let f = fn_widget! {
+      let mut w = @Container {
+        auto_focus: true,
+        size: Size::splat(100.)
+      };
+      let u = watch!($w.focus_changed_reason())
+        .subscribe(move |v| *$w_reason.write() = v);
+      @ $w {
+        on_disposed: move |_| u.unsubscribe()
+      }
+    };
+
+    let mut wnd = TestWindow::new(f);
+
+    wnd.draw_frame();
+    assert_eq!(*reason.read(), FocusReason::AutoFocus);
+
+    wnd
+      .focus_mgr
+      .borrow_mut()
+      .blur(FocusReason::Other);
+    wnd.draw_frame();
+    assert_eq!(*reason.read(), FocusReason::Other);
+
+    wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
+    wnd.draw_frame();
+    assert_eq!(*reason.read(), FocusReason::Pointer);
   }
 }

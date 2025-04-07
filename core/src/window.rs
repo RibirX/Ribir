@@ -157,34 +157,28 @@ impl Window {
       .dispatch_release_mouse(device_id, button);
   }
 
-  /// Request switch the focus to next widget.
-  pub fn request_next_focus(&self) {
+  /// Request switch the focus to next widget and return the actual focused
+  /// widget ID on success.
+  pub fn request_next_focus(&self, reason: FocusReason) -> Option<WidgetId> {
     self
       .focus_mgr
       .borrow_mut()
-      .focus_next_widget(self.tree());
-  }
-
-  pub fn request_focus(&self, wid: WidgetId) {
-    self
-      .focus_mgr
-      .borrow_mut()
-      .request_focus_to(Some(wid));
-  }
-
-  /// Request switch the focus to prev widget.
-  pub fn request_prev_focus(&self) {
-    self
-      .focus_mgr
-      .borrow_mut()
-      .focus_prev_widget(self.tree());
+      .focus_next_widget(reason)
   }
 
   /// Attempts to set focus to the specified widget, returning the actual
-  /// focused widget ID. If the widget is not focusable, it returns `None`.
-  pub fn try_focus(&self, widget_id: WidgetId) -> Option<WidgetId> {
-    let mut focus_manager = self.focus_mgr.try_borrow_mut().ok()?;
-    focus_manager.try_focus(widget_id, self.tree())
+  /// focused widget ID on success.
+  pub fn request_focus(&self, wid: WidgetId, reason: FocusReason) -> Option<WidgetId> {
+    self.focus_mgr.borrow_mut().focus(wid, reason)
+  }
+
+  /// Request switch the focus to previous widget and return the actual focused
+  /// widget ID on success.
+  pub fn request_prev_focus(&self, reason: FocusReason) -> Option<WidgetId> {
+    self
+      .focus_mgr
+      .borrow_mut()
+      .focus_prev_widget(reason)
   }
 
   /// Execute the callback when the next frame begins.
@@ -297,7 +291,10 @@ impl Window {
       self.run_frame_tasks();
 
       if !tree.is_dirty() {
-        self.focus_mgr.borrow_mut().refresh_focus(tree);
+        self
+          .focus_mgr
+          .borrow_mut()
+          .on_widget_tree_update(tree);
         self.run_frame_tasks();
       }
 
@@ -490,7 +487,10 @@ impl Window {
             .rev()
             .for_each(|id| {
               if Some(id) == self.focusing() {
-                self.focus_mgr.borrow_mut().blur_on_dispose();
+                self
+                  .focus_mgr
+                  .borrow_mut()
+                  .blur(FocusReason::Other);
               }
               let mut e = Event::Disposed(LifecycleEvent::new(id, self.tree));
               self.emit(id, &mut e);
@@ -513,23 +513,29 @@ impl Window {
         DelayEvent::RemoveSubtree(id) => {
           self.tree_mut().remove_subtree(id);
         }
-        DelayEvent::Focus(id) => {
-          let mut e = Event::Focus(FocusEvent::new(id, self.tree));
+        DelayEvent::Focus { id, reason } => {
+          let mut e = Event::Focus(FocusEvent::new(id, reason, self.tree));
           self.emit(id, &mut e);
         }
-        DelayEvent::FocusIn { bottom, up } => {
+        DelayEvent::FocusIn { bottom, up, reason } => {
           let top = up.unwrap_or_else(|| self.tree().root());
-          self.top_down_emit(&mut Event::FocusInCapture(FocusEvent::new(top, self.tree)), bottom);
-          self.bottom_up_emit(&mut Event::FocusIn(FocusEvent::new(bottom, self.tree)), up);
+          self.top_down_emit(
+            &mut Event::FocusInCapture(FocusEvent::new(top, reason, self.tree)),
+            bottom,
+          );
+          self.bottom_up_emit(&mut Event::FocusIn(FocusEvent::new(bottom, reason, self.tree)), up);
         }
-        DelayEvent::Blur(id) => {
-          let mut e = Event::Blur(FocusEvent::new(id, self.tree));
+        DelayEvent::Blur { id, reason } => {
+          let mut e = Event::Blur(FocusEvent::new(id, reason, self.tree));
           self.emit(id, &mut e);
         }
-        DelayEvent::FocusOut { bottom, up } => {
+        DelayEvent::FocusOut { bottom, up, reason } => {
           let top = up.unwrap_or_else(|| self.tree().root());
-          self.top_down_emit(&mut Event::FocusOutCapture(FocusEvent::new(top, self.tree)), bottom);
-          self.bottom_up_emit(&mut Event::FocusOut(FocusEvent::new(bottom, self.tree)), up);
+          self.top_down_emit(
+            &mut Event::FocusOutCapture(FocusEvent::new(top, reason, self.tree)),
+            bottom,
+          );
+          self.bottom_up_emit(&mut Event::FocusOut(FocusEvent::new(bottom, reason, self.tree)), up);
         }
         DelayEvent::KeyBoard { id, physical_key, key, is_repeat, location, state } => {
           let root = self.tree().root();
@@ -564,9 +570,9 @@ impl Window {
 
           let mut focus_mgr = self.focus_mgr.borrow_mut();
           if pressed_shift {
-            focus_mgr.focus_prev_widget(self.tree());
+            focus_mgr.focus_prev_widget(FocusReason::Keyboard);
           } else {
-            focus_mgr.focus_next_widget(self.tree());
+            focus_mgr.focus_next_widget(FocusReason::Keyboard);
           }
         }
 
@@ -585,10 +591,6 @@ impl Window {
           let event = PointerEvent::from_mouse(root, self);
           self.top_down_emit(&mut Event::PointerDownCapture(event), id);
           self.bottom_up_emit(&mut Event::PointerDown(PointerEvent::from_mouse(id, self)), None);
-          self
-            .focus_mgr
-            .borrow_mut()
-            .refresh_focus(self.tree());
         }
         DelayEvent::PointerMove(id) => {
           let event = PointerEvent::from_mouse(self.tree().root(), self);
@@ -888,15 +890,23 @@ pub(crate) enum DelayEvent {
     id: WidgetId,
   },
   RemoveSubtree(WidgetId),
-  Focus(WidgetId),
-  Blur(WidgetId),
+  Focus {
+    id: WidgetId,
+    reason: FocusReason,
+  },
+  Blur {
+    id: WidgetId,
+    reason: FocusReason,
+  },
   FocusIn {
     bottom: WidgetId,
     up: Option<WidgetId>,
+    reason: FocusReason,
   },
   FocusOut {
     bottom: WidgetId,
     up: Option<WidgetId>,
+    reason: FocusReason,
   },
   KeyBoard {
     id: WidgetId,

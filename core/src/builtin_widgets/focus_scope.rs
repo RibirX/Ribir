@@ -75,7 +75,7 @@ mod tests {
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let tree = wnd.tree();
 
-    focus_mgr.refresh_focus(tree);
+    focus_mgr.on_widget_tree_update(tree);
 
     let id0 = tree.content_root().first_child(tree).unwrap();
     let scope = id0.next_sibling(tree).unwrap();
@@ -86,25 +86,25 @@ mod tests {
 
     {
       // next focus sequential
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id1));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(scope_id1));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(scope_id2));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(scope_id3));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id0));
 
       // previous focus sequential
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(scope_id3));
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(scope_id2));
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(scope_id1));
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::Other);
       assert_eq!(focus_mgr.focusing(), Some(id1));
     }
   }
@@ -134,7 +134,7 @@ mod tests {
     let wnd = TestWindow::new(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let tree = wnd.tree_mut();
-    focus_mgr.refresh_focus(tree);
+    focus_mgr.on_widget_tree_update(tree);
 
     let id0 = tree.content_root().first_child(tree).unwrap();
     let scope = id0.next_sibling(tree).unwrap();
@@ -142,17 +142,17 @@ mod tests {
 
     {
       // next focus sequential
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::AutoFocus);
       assert_eq!(focus_mgr.focusing(), Some(id1));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::AutoFocus);
       assert_eq!(focus_mgr.focusing(), Some(scope));
-      focus_mgr.focus_next_widget(tree);
+      focus_mgr.focus_next_widget(FocusReason::AutoFocus);
       assert_eq!(focus_mgr.focusing(), Some(id0));
 
       // previous focus sequential
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::AutoFocus);
       assert_eq!(focus_mgr.focusing(), Some(scope));
-      focus_mgr.focus_prev_widget(tree);
+      focus_mgr.focus_prev_widget(FocusReason::AutoFocus);
       assert_eq!(focus_mgr.focusing(), Some(id1));
     }
   }
@@ -171,7 +171,7 @@ mod tests {
       };
       let request_focus_box = @MockBox {
         size,
-        on_pointer_down: move |_| $host.request_focus()
+        on_pointer_down: move |_| $host.request_focus(FocusReason::Pointer)
       };
       @MockMulti {
         @$host {
