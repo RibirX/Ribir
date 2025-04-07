@@ -155,17 +155,17 @@ impl Dispatcher {
     let hit = self.hit_widget();
     let wnd = self.window();
     let tree = wnd.tree();
-
     let nearest_focus = hit.and_then(|wid| {
       wid.ancestors(tree).find(|id| {
         id.query_all_iter::<MixBuiltin>(tree)
           .any(|m| m.contain_flag(MixFlags::Focus))
       })
     });
+    let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     if let Some(focus_id) = nearest_focus {
-      wnd.focus_mgr.borrow_mut().focus(focus_id, tree);
+      focus_mgr.focus(focus_id, FocusReason::Pointer);
     } else {
-      wnd.focus_mgr.borrow_mut().blur(tree);
+      focus_mgr.blur(FocusReason::Pointer);
     }
 
     let grab_pointer = *self.grab_mouse_wid.borrow();

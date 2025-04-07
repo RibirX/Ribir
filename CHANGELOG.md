@@ -25,6 +25,12 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Add built-in method `focus_change_reason` to retrieve last focus/blur event cause. (#734 by @M-Adoo)
+- **core**: Add reason in `FocusEvent` to indicate the cause of focus change. (#734 @M-Adoo)
+
+
 ### Fixed
 
 - **core**: Fix `FittedBox` to always center its child (#727 by @M-Adoo)
@@ -38,12 +44,18 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **ribir**: Updated winit dependency to v0.30.* (#728 @M-Adoo)
 - **ribir**: Updated wgpu dependency to v0.24.* (#728 @M-Adoo)
 
+
 ### BREAKING CHANGES
 
+- **core**: Standardize built-in method naming conventions: (#734 @M-Adoo)
+  - Boolean state checks (past participle):
+    - `has_focus` → `is_focused`
+    - `is_hover` → `is_hovered`
+  - Property accessors:
+    - `is_auto_focus` → `auto_focus` (getter)
 - **ribir/web**: Changed canvas management strategy: (#728 @M-Adoo)
   - Now searches for `ribir_container` element to append new canvas
   - No longer reuses existing canvas elements
-
 
 
 ## [0.4.0-alpha.31] - 2025-04-02

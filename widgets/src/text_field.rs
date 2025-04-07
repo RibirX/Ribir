@@ -348,7 +348,7 @@ fn build_input_area(
     let h = watch!($theme.state)
       .distinct_until_changed()
       .filter(|state| state == &TextFieldState::Focused)
-      .subscribe(move |_| $input.request_focus());
+      .subscribe(move |_| $input.request_focus(FocusReason::Other));
     input.on_disposed(move|_| {
       h.unsubscribe();
       u.unsubscribe();

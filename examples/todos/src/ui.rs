@@ -98,7 +98,7 @@ fn task_lists(
             }
           }
           @List {
-            selectable: ListSelectable::None,
+            select_mode: ListSelectMode::None,
             @ { items }
           }
         })

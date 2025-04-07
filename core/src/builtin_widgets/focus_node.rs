@@ -29,16 +29,17 @@ impl<'c> ComposeChild<'c> for RequestFocus {
     .into_widget()
   }
 }
+
 impl RequestFocus {
-  pub fn request_focus(&self) {
+  pub fn request_focus(&self, reason: FocusReason) {
     if let Some(h) = self.handle.as_ref() {
-      h.request_focus();
+      h.request_focus(reason);
     }
   }
 
-  pub fn unfocus(&self) {
+  pub fn unfocus(&self, reason: FocusReason) {
     if let Some(h) = self.handle.as_ref() {
-      h.unfocus();
+      h.unfocus(reason);
     }
   }
 }

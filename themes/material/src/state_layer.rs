@@ -37,13 +37,13 @@ impl HoverLayer {
     let layer2 = layer.clone_writer();
 
     let hover = layer.get_mix_flags_widget().clone_reader();
-    let u = watch!($layer.is_hover())
+    let u = watch!($layer.is_hovered())
       // Delay hover effects to prevent displaying this layer while scrolling.
       .delay(Duration::from_millis(50), AppCtx::scheduler())
       .subscribe(move |_| {
         layer2
           .write()
-          .set_visible_state(hover.read().is_hover());
+          .set_visible_state(hover.read().is_hovered());
       });
     layer.on_disposed(move |_| u.unsubscribe());
     layer

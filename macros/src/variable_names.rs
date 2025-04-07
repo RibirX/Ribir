@@ -60,10 +60,11 @@ pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   // Class
   "class" => builtin_member!{"Class", Field, "class"},
   // MixFlags
-  "has_focus" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_focus" },
-  "is_hover" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_hover" },
+  "is_focused" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_focus" },
+  "focus_changed_reason" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_focus" },
+  "is_hovered" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_hover" },
   "is_pointer_pressed" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_pointer_pressed" },
-  "is_auto_focus" => builtin_member!{"MixFlags", Method, "mix_flags"},
+  "auto_focus" => builtin_member!{"MixFlags", Method, "mix_flags"},
   "set_auto_focus" => builtin_member!{"MixFlags", Method, "mix_flags"},
   "tab_index" => builtin_member!{"MixFlags", Method, "mix_flags"},
   "set_tab_index" => builtin_member!{"MixFlags", Method, "mix_flags"},

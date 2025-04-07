@@ -51,8 +51,8 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
       opacity: 0.,
       visible: false,
       background: match Variant::<ContainerColor>::new(BuildCtx::get()).unwrap() {
-        Variant::Value(c) => pipe!(track_color(c.0, $w.is_hover())).declare_into(),
-        Variant::Watcher(c) => pipe!(track_color($c.0, $w.is_hover())).declare_into()
+        Variant::Value(c) => pipe!(track_color(c.0, $w.is_hovered())).declare_into(),
+        Variant::Watcher(c) => pipe!(track_color($c.0, $w.is_hovered())).declare_into()
       }
     };
 
@@ -74,7 +74,7 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
         f.unsubscribe();
       }
       let u = observable::timer((), Duration::from_secs(3), AppCtx::scheduler())
-        .filter(move |_| !$w.is_hover())
+        .filter(move |_| !$w.is_hovered())
         .subscribe(move |_| {
           $w.write().opacity = 0.;
           $w.write().visible = false;

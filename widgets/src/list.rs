@@ -5,7 +5,7 @@ use crate::prelude::*;
 /// A vertical list widget supporting multiple selection modes and item types.
 ///
 /// Key features:
-/// - Configurable selection behavior ([`ListSelectable`])
+/// - Configurable selection behavior ([`ListSelectMode`])
 /// - Mix of standard ([`ListItem`]) and custom ([`ListCustomItem`]) items, as
 ///   well as dividers between items
 /// - Interactive and non-interactive modes
@@ -13,7 +13,7 @@ use crate::prelude::*;
 ///
 /// ## Selection Modes
 ///
-/// Control selection behavior with [`ListSelectable`]:
+/// Control selection behavior with [`ListSelectMode`]:
 /// - **`None`**: Display-only with no selection logic
 /// - **`Single`**: Exclusive selection (radio button-like)
 /// - **`Multi`**: Multiple selection (checkbox-style)
@@ -28,7 +28,7 @@ use crate::prelude::*;
 /// use ribir::prelude::*;
 ///
 /// list! {
-///   selectable: ListSelectable::Single,
+///   select_mode: ListSelectMode::Single,
 ///   @ListItem {
 ///     @Icon { @named_svgs::default() }
 ///     @ListItemHeadline { @ { "Primary Text" } }
@@ -51,7 +51,7 @@ use crate::prelude::*;
 /// use ribir::prelude::*;
 ///
 /// list! {
-///   selectable: ListSelectable::Multi,
+///   select_mode: ListSelectMode::Multi,
 ///   @ListCustomItem { @H1 { text: "Custom Header" } }
 ///   @ListCustomItem { @Text { text: "Custom Content" } }
 /// };
@@ -65,7 +65,7 @@ use crate::prelude::*;
 /// use ribir::prelude::*;
 ///
 /// list! {
-///   selectable: ListSelectable::None,
+///   select_mode: ListSelectMode::None,
 ///   @ListCustomItem { @H2 { text: "Section Header" } }
 ///   @ListItem {
 ///     @ListItemHeadline { @ { "First Item" } }
@@ -86,7 +86,7 @@ use crate::prelude::*;
 /// use ribir::prelude::*;
 ///
 /// list! {
-///   selectable: ListSelectable::None,
+///   select_mode: ListSelectMode::None,
 ///   @ListItem {
 ///     on_tap: move |_| log::info!("Item tapped"),
 ///     @ListItemHeadline { @ { "Press Me" } }
@@ -106,7 +106,7 @@ use crate::prelude::*;
 /// use ribir::prelude::*;
 ///
 /// list! {
-///   selectable: ListSelectable::None,
+///   select_mode: ListSelectMode::None,
 ///   @ListItem {
 ///     interactive: false,
 ///     @ListItemHeadline { @ { "Static Content" } }
@@ -150,9 +150,9 @@ pub struct List {
   /// - `Single`: Only one item can be selected at a time
   /// - `Multi`: Multiple items can be selected
   ///
-  /// Default: [`ListSelectable::None`]
+  /// Default: [`ListSelectMode::None`]
   #[declare(default)]
-  selectable: ListSelectable,
+  select_mode: ListSelectMode,
   /// Tracks keyboard navigation focus
   #[declare(skip)]
   active_item: Option<usize>,
@@ -218,7 +218,7 @@ pub struct ListItem {
   /// Controls visual feedback for user interactions without affecting selection
   /// logic. The visual effect is determined by the user's theme settings.
   /// Feedback can be enabled or disabled per item, independent of the
-  /// selectable mode configuration in the parent [`List`] widget.
+  /// select_mode mode configuration in the parent [`List`] widget.
   #[declare(default = true)]
   interactive: bool,
   /// Indicates if this item is currently chosen/activated
@@ -250,7 +250,7 @@ pub enum ListChild<'c> {
 
 /// Defines the selection behavior for the List widget
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub enum ListSelectable {
+pub enum ListSelectMode {
   /// No items can be selected (default)
   #[default]
   None,
@@ -356,14 +356,14 @@ impl<'c> ComposeChild<'c> for List {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     List::collect_items(&this, &child);
-    let select_mode = this.read().selectable;
+    let select_mode = this.read().select_mode;
 
     self::column! {
       class: LIST,
       align_items: Align::Stretch,
       on_disposed: move |_| $this.write().clear(),
       on_key_down: move |e| {
-        if select_mode != ListSelectable::None {
+        if select_mode != ListSelectMode::None {
           match e.key() {
             VirtualKey::Named(NamedKey::ArrowUp)  => $this.write().focus_prev_item(&e.window()),
             VirtualKey::Named(NamedKey::ArrowDown) => $this.write().focus_next_item(&e.window()),
@@ -507,7 +507,10 @@ impl List {
     for i in 0..len {
       let idx = (start + i) % len;
       let Some(id) = self.items[idx].read().wid.get() else { break };
-      if wnd.try_focus(id).is_some() {
+      if wnd
+        .request_focus(id, FocusReason::Keyboard)
+        .is_some()
+      {
         self.active_item = Some(idx);
         break;
       }
@@ -520,7 +523,10 @@ impl List {
     for i in 0..len {
       let idx = (start + len - i) % len;
       let Some(id) = self.items[idx].read().wid.get() else { break };
-      if wnd.try_focus(id).is_some() {
+      if wnd
+        .request_focus(id, FocusReason::Keyboard)
+        .is_some()
+      {
         self.active_item = Some(idx);
         break;
       }
@@ -567,7 +573,7 @@ impl List {
 
   fn on_item_select(&mut self, idx: usize) {
     self.active_item = Some(idx);
-    if self.selectable == ListSelectable::Single {
+    if self.select_mode == ListSelectMode::Single {
       for (i, item) in self.items.iter().enumerate() {
         if i != idx && item.read().is_selected() {
           item.write().deselect();
@@ -581,10 +587,10 @@ impl List {
   ) -> Widget<'c> {
     item.silent().wid = list_item.get_track_id_widget().read().track_id();
 
-    if self.selectable == ListSelectable::None {
+    if self.select_mode == ListSelectMode::None {
       list_item.into_widget()
     } else {
-      let toggle = self.selectable == ListSelectable::Multi;
+      let toggle = self.select_mode == ListSelectMode::Multi;
       rdl! {
         @ $list_item {
           on_tap: move |_| $item.write().inner_select(toggle),

@@ -131,7 +131,7 @@ impl MenuControl {
       .as_ref()
       .and_then(|id| id.get())
     {
-      wnd.request_focus(id);
+      wnd.request_focus(id, FocusReason::Other);
     }
   }
 
@@ -552,7 +552,7 @@ impl<'w> ComposeChild<'w> for Menu {
           menu.close(&e.window());
         },
         on_mounted: move |e| {
-          e.window().request_focus(e.current_target());
+          e.window().request_focus(e.current_target(), FocusReason::AutoFocus);
         },
         on_key_down: move |e| {
           let menu = Provider::of::<MenuControl>(e).unwrap();

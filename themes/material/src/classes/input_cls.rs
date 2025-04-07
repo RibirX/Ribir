@@ -35,7 +35,7 @@ pub(super) fn init(classes: &mut Classes) {
     let mut w = FatObj::new(w);
     let blur = Palette::of(BuildCtx::get()).on_surface_variant();
 
-    let focus_watcher = part_watcher!(&w.has_focus());
+    let focus_watcher = part_watcher!(&w.is_focused());
     let border = BuildCtx::color().map_with_watcher(focus_watcher, move |c, focus| {
       let color = if *focus { *c } else { blur };
       Border::all(BorderSide::new(1., color.into()))

@@ -31,6 +31,7 @@ pub use lifecycle::*;
 mod device_id;
 pub use device_id::*;
 pub(crate) mod focus_mgr;
+pub use focus_mgr::*;
 mod listener_impl_helper;
 
 pub struct CommonEvent {
@@ -44,8 +45,6 @@ pub struct CommonEvent {
   prevent_default: bool,
 }
 
-pub type FocusEvent = CommonEvent;
-pub type FocusBubbleEvent = CommonEvent;
 impl CommonEvent {
   /// The target property of the Event interface is a reference to the object
   /// onto which the event was dispatched. It is different from
@@ -188,10 +187,8 @@ impl std::ops::Deref for Event {
 
   fn deref(&self) -> &Self::Target {
     match self {
-      Event::Mounted(e)
-      | Event::PerformedLayout(e)
-      | Event::Disposed(e)
-      | Event::Focus(e)
+      Event::Mounted(e) | Event::PerformedLayout(e) | Event::Disposed(e) => e,
+      Event::Focus(e)
       | Event::Blur(e)
       | Event::FocusIn(e)
       | Event::FocusInCapture(e)
@@ -221,10 +218,8 @@ impl std::ops::Deref for Event {
 impl std::ops::DerefMut for Event {
   fn deref_mut(&mut self) -> &mut Self::Target {
     match self {
-      Event::Mounted(e)
-      | Event::PerformedLayout(e)
-      | Event::Disposed(e)
-      | Event::Focus(e)
+      Event::Mounted(e) | Event::PerformedLayout(e) | Event::Disposed(e) => e,
+      Event::Focus(e)
       | Event::Blur(e)
       | Event::FocusIn(e)
       | Event::FocusInCapture(e)

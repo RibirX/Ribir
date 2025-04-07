@@ -51,12 +51,22 @@ bitflags! {
     const TracePointerPressed = 1 << 20;
     #[doc="Indicates whether the pointer is pressed on this widget."]
     const PointerPressed = 1 << 21;
-
     #[doc="Indicates whether this widget has auto-focus functionality."]
-    const AutoFocus = 1 << 47;
-    // The last 16 bits keep for tab index
+    const AutoFocus = 1 << 22;
+
+    // The last 32 bits keep to store data:
+    // - 2 bits for focus reason(32..34)
+    // - 16 bits for tab index(34..50)
+    // - reserved
   }
 }
+
+/// Bits storing focus reason (2 bits)
+const FOCUS_REASON_SHIFT: u64 = 32;
+const FOCUS_REASON_MASK: u64 = 0b11 << FOCUS_REASON_SHIFT;
+/// Bit range storing tab index (16 bits)
+const TAB_IDX_SHIFT: u64 = 34;
+const TAB_IDX_MASK: u64 = 0xFFFF << TAB_IDX_SHIFT;
 
 pub type EventSubject = MutRefItemSubject<'static, Event, Infallible>;
 
@@ -93,53 +103,81 @@ macro_rules! impl_event_callback {
 }
 
 impl MixFlags {
-  /// Indicates whether the focus is on this widget (including its children).
+  /// Checks if the widget or any descendant currently has focus visibility.
   ///
-  /// By default, the focus status is not traced. You need to call
-  /// `MixBuiltin::trace_focus` to start recording the focus status of
-  /// this widget. If you do not call `MixBuiltin::trace_focus` when
-  /// this widget is created, this method will always return `false`, even if it
-  /// has focus.
-  pub fn has_focus(&self) -> bool { self.contains(MixFlags::Focused) }
+  /// Focus tracking must be explicitly enabled during widget creation by
+  /// calling `MixBuiltin::trace_focus`. Without initialization, this method
+  /// will consistently return `false` regardless of actual focus state.
+  #[inline]
+  pub fn is_focused(&self) -> bool { self.contains(MixFlags::Focused) }
 
-  /// Indicates whether the mouse is hovering over this widget (including its
-  /// children).
+  /// Retrieves the reason for the most recent focus change event.
   ///
-  /// By default, the hover status is not traced. You need to call
-  /// `MixBuiltin::trace_hover` to start tracking the focus status of
-  /// this widget. If you do not call `MixBuiltin::trace_hover` when this
-  /// widget is created, this method will always return false, even if the mouse
-  /// is hovering over it.
-  pub fn is_hover(&self) -> bool { self.contains(MixFlags::Hovered) }
+  /// When focused: indicates why focus was gained  
+  /// When unfocused: indicates why focus was lost
+  ///
+  /// # Note
+  /// Meaningful only when focus tracking is enabled via
+  /// `MixBuiltin::trace_focus`. The return value becomes undefined if focus
+  /// tracing wasn't initialized.
+  pub fn focus_changed_reason(&self) -> FocusReason {
+    let reason = (self.bits() & FOCUS_REASON_MASK) >> FOCUS_REASON_SHIFT;
+    FocusReason::from_u8(reason as u8)
+  }
 
-  /// Indicates whether the the pointer is pressed on this widget.
+  /// Determines if the widget or any descendant is currently hovered.
   ///
-  /// By default, the pressed status is not traced. You need to call
-  /// `MixBuiltin::trace_pointer_pressed` to start tracking the focus status of
-  /// this widget. If you do not call `MixBuiltin::trace_pointer_pressed` when
-  /// this widget is created, this method will always return false, even if
-  /// the mouse is hovering over it.
+  /// Hover tracking requires explicit initialization via
+  /// `MixBuiltin::trace_hover` during widget creation. Uninitialized hover
+  /// state will always return `false`.
+  #[inline]
+  pub fn is_hovered(&self) -> bool { self.contains(MixFlags::Hovered) }
+
+  /// Checks for active pointer press within widget boundaries.
+  ///
+  /// Requires prior initialization with `MixBuiltin::trace_pointer_pressed`.
+  #[inline]
   pub fn is_pointer_pressed(&self) -> bool { self.contains(MixFlags::PointerPressed) }
 
-  pub fn is_auto_focus(&self) -> bool { self.contains(MixFlags::AutoFocus) }
+  /// Indicates whether auto-focus is enabled for initial view activation.
+  #[inline]
+  pub fn auto_focus(&self) -> bool { self.contains(MixFlags::AutoFocus) }
 
-  pub fn set_auto_focus(&mut self, v: bool) {
-    if v {
+  /// Configures auto-focus behavior with proper flag management.
+  ///
+  /// Enables/disables automatic focus acquisition during view activation,
+  /// maintaining valid flag combinations.
+  pub fn set_auto_focus(&mut self, enable: bool) {
+    if enable {
       self.insert(MixFlags::AutoFocus | MixFlags::Focus);
     } else {
       self.remove(MixFlags::AutoFocus);
     }
   }
 
+  /// Retrieves validated tab index for keyboard navigation.
+  ///
+  /// Returns `None` if tab navigation is disabled (Focus flag unset).
+  /// The returned value is guaranteed to be within valid bounds.
   pub fn tab_index(&self) -> Option<i16> {
-    self
-      .contains(MixFlags::Focus)
-      .then(|| (self.bits() >> 48) as i16)
+    self.contains(MixFlags::Focus).then(|| {
+      let tab_idx = (self.bits() & TAB_IDX_MASK) >> TAB_IDX_SHIFT;
+      tab_idx as i16
+    })
   }
 
+  /// Updates tab index with value sanitization and layout invalidation.
+  ///
+  /// Automatically enables focus tracking and clamps values to valid ranges.
   pub fn set_tab_index(&mut self, tab_idx: i16) {
     self.insert(MixFlags::Focus);
-    let flags = self.bits() | ((tab_idx as u64) << 48);
+    let flags = (self.bits() & !TAB_IDX_MASK) | ((tab_idx as u64) << TAB_IDX_SHIFT);
+    *self = MixFlags::from_bits_retain(flags);
+  }
+
+  /// (Internal) Updates focus reason flags while maintaining state integrity.
+  fn set_focus_reason(&mut self, reason: FocusReason) {
+    let flags = (self.bits() & !FOCUS_REASON_MASK) | ((reason as u64) << FOCUS_REASON_SHIFT);
     *self = MixFlags::from_bits_retain(flags);
   }
 }
@@ -350,9 +388,17 @@ impl MixBuiltin {
     if !self.contain_flag(MixFlags::TraceFocus) {
       self.silent_mark(MixFlags::TraceFocus);
       let flags = self.flags.clone_writer();
-      self.on_focus_in(move |_| flags.write().insert(MixFlags::Focused));
+      self.on_focus_in(move |e| {
+        let mut flags = flags.write();
+        flags.insert(MixFlags::Focused);
+        flags.set_focus_reason(e.reason);
+      });
       let flags = self.flags.clone_writer();
-      self.on_focus_out(move |_| flags.write().remove(MixFlags::Focused));
+      self.on_focus_out(move |e| {
+        let mut flags = flags.write();
+        flags.set_focus_reason(e.reason);
+        flags.remove(MixFlags::Focused)
+      });
     }
   }
 
@@ -409,7 +455,7 @@ fn callbacks_for_focus_node(child: Widget) -> Widget {
     on_mounted: move |e| {
       let mut all_mix = e.query_all_iter::<MixBuiltin>().peekable();
         if all_mix.peek().is_some() {
-          let auto_focus = all_mix.any(|mix| mix.flags.read().is_auto_focus());
+          let auto_focus = all_mix.any(|mix| mix.flags.read().auto_focus());
           *guard.borrow_mut() = Some(
             Window::add_focus_node(e.window(), $child.track_id(), auto_focus, FocusType::Node)
           );
@@ -528,5 +574,18 @@ mod tests {
 
     wnd.draw_frame();
     assert_eq!(*outer_layout.read(), 2);
+  }
+
+  #[test]
+  fn flags_data_check() {
+    let mut mix = MixFlags::default();
+
+    mix.set_focus_reason(FocusReason::Keyboard);
+    mix.set_focus_reason(FocusReason::Pointer);
+    mix.set_tab_index(16);
+    mix.set_tab_index(-10);
+
+    assert_eq!(mix.focus_changed_reason(), FocusReason::Pointer);
+    assert_eq!(mix.tab_index(), Some(-10));
   }
 }
