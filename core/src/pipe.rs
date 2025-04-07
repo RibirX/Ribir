@@ -318,12 +318,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         };
 
         let tree = BuildCtx::get_mut().tree_mut();
-        if set_pos_of_multi(id, idx + 1, tree) {
-          // We need to associate the parent information with the children pipe so that
-          // when the child pipe is regenerated, it can update the parent pipe information
-          // accordingly.
-          id.attach_data(Box::new(pipe_node), tree);
-        }
+        set_pos_of_multi(id, idx + 1, tree);
       });
 
       widgets.push(w);
@@ -764,12 +759,11 @@ impl PipeNode {
   }
 }
 
-fn set_pos_of_multi(w: WidgetId, pos: usize, tree: &WidgetTree) -> bool {
-  w.query_all_iter::<PipeNode>(tree)
-    .inspect(|node| node.dyn_info_mut().set_pos_of_multi(pos))
-    .count()
-    > 0
+fn set_pos_of_multi(w: WidgetId, pos: usize, tree: &WidgetTree) {
+  w.query_ref::<PipeNode>(tree)
+    .inspect(|node| node.dyn_info_mut().set_pos_of_multi(pos));
 }
+
 fn query_outside_infos<'l>(
   id: WidgetId, to: &'l PipeNode, tree: &'l WidgetTree,
 ) -> impl Iterator<Item = QueryRef<'l, PipeNode>> {
