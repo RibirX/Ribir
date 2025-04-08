@@ -322,7 +322,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
           // We need to associate the parent information with the children pipe so that
           // when the child pipe is regenerated, it can update the parent pipe information
           // accordingly.
-          id.attach_data(Box::new(pipe_node), tree);
+          id.attach_data(Box::new(QueryFilter::only_self(pipe_node)), tree);
         }
       });
 
