@@ -1,13 +1,14 @@
-use ribir_core::prelude::*;
-use ribir_widgets::prelude::*;
+use ribir_core::{prelude::*, wrap_render::WrapRender};
 
 use crate::md;
 
 const HOVER_OPACITY: u8 = 8;
 const PRESSED_OPACITY: u8 = 10;
+const FOCUS_OPACITY: u8 = 10;
 
 pub type HoverLayer = StateLayer<HOVER_OPACITY>;
 pub type PressedLayer = StateLayer<PRESSED_OPACITY>;
+pub type FocusLayer = StateLayer<FOCUS_OPACITY>;
 
 #[derive(Debug, Clone)]
 pub struct StateLayer<const M: u8> {
@@ -70,52 +71,48 @@ impl<'c, const M: u8> ComposeChild<'c> for StateLayer<M> {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    stack! {
-      fit: StackFit::Passthrough,
-      @ { child }
-      @ {
-        match this.try_into_value() {
-          Ok(value) => value.into_widget(),
-          Err(this) => WriterRender::new(this).into_widget()
-        }
-      }
-    }
-    .into_widget()
+    WrapRender::combine_child(this, child, DirtyPhase::Paint)
   }
 }
 
-impl<const M: u8> Render for StateLayer<M> {
-  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.min }
-
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
-    Some(Rect::from_size(ctx.box_size()?))
-  }
-
-  fn paint(&self, ctx: &mut PaintingCtx) {
+impl<const M: u8> WrapRender for StateLayer<M> {
+  fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     let StateLayer { area, draw_opacity } = self;
-    if *draw_opacity > 0. {
-      let p = ctx.parent().unwrap();
-      let size = ctx.widget_box_size(p).unwrap();
-      let rect = Rect::from_size(size);
-      let painter = ctx.painter().apply_alpha(*draw_opacity);
-      match area {
-        LayerArea::Circle { center, radius, clip } => {
-          if let Some(clip) = clip {
-            painter.clip(Path::rect_round(&rect, clip).into());
-          }
-          painter.circle(*center, *radius).fill()
-        }
-        LayerArea::WidgetCover(radius) => painter.rect_round(&rect, radius).fill(),
-      };
+    if *draw_opacity <= 0. {
+      return host.paint(ctx);
     }
+
+    // Fork a painter to create an overlay without affecting the main painter's
+    // state
+    let mut layer = ctx.painter().fork();
+    host.paint(ctx);
+
+    let rect = Rect::from_size(ctx.box_size().unwrap());
+    layer.apply_alpha(*draw_opacity);
+    match area {
+      LayerArea::Circle { center, radius, clip } => {
+        if let Some(clip) = clip {
+          layer.clip(Path::rect_round(&rect, clip).into());
+        }
+        layer.circle(*center, *radius).fill()
+      }
+      LayerArea::WidgetCover(radius) => layer.rect_round(&rect, radius).fill(),
+    };
+    ctx.painter().merge(&mut layer);
   }
 
-  fn dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
+  fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
+    if let LayerArea::Circle { radius, .. } = self.area {
+      if self.draw_opacity > 0. {
+        let rect = Rect::from_size(Size::splat(radius * 2.));
+        let union = host
+          .visual_box(ctx)
+          .map_or(rect, |v| v.union(&rect));
+        return Some(union);
+      }
+    }
 
-  fn hit_test(&self, _: &mut HitTestCtx, _: Point) -> HitTest {
-    // This widget only serves as a visual effect and should not affect the hit
-    // test.
-    HitTest { hit: false, can_hit_child: false }
+    host.visual_box(ctx)
   }
 }
 
