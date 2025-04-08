@@ -1,4 +1,7 @@
-use std::any::{Any, TypeId};
+use std::{
+  any::{Any, TypeId},
+  marker::PhantomData,
+};
 
 use smallvec::SmallVec;
 
@@ -426,6 +429,60 @@ impl dyn QueryAny {
       None
     }
   }
+}
+
+/// QueryFilter<D, T>
+/// A helper type that restricts query operations to only a specific type `T`
+/// from the underlying data `D`.
+pub struct QueryFilter<D, T> {
+  data: D,
+  _mark: PhantomData<T>,
+}
+
+impl<D> QueryFilter<D, D> {
+  pub fn only_self(data: D) -> QueryFilter<D, D> { QueryFilter { data, _mark: PhantomData } }
+}
+impl<D, T> QueryFilter<D, T> {
+  pub fn new(data: D) -> QueryFilter<D, T> { QueryFilter { data, _mark: PhantomData } }
+}
+
+impl<D, T: 'static> Query for QueryFilter<D, T>
+where
+  D: Query,
+{
+  fn query_all<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    let target = QueryId::of::<T>();
+    if query_id != &target {
+      return;
+    }
+    self.data.query_all(&target, out);
+  }
+
+  fn query_all_write<'q>(&'q self, query_id: &QueryId, out: &mut SmallVec<[QueryHandle<'q>; 1]>) {
+    let target = QueryId::of::<T>();
+    if query_id != &target {
+      return;
+    }
+    self.data.query_all_write(&target, out);
+  }
+
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    let target = QueryId::of::<T>();
+    if query_id != &target {
+      return None;
+    }
+    self.data.query(&target)
+  }
+
+  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    let target = QueryId::of::<T>();
+    if query_id != &target {
+      return None;
+    }
+    self.data.query_write(&target)
+  }
+
+  fn queryable(&self) -> bool { true }
 }
 
 #[cfg(test)]
