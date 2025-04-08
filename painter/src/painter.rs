@@ -261,6 +261,59 @@ impl Painter {
     }
   }
 
+  /// Creates an isolated state snapshot for atomic drawing operations.
+  ///
+  /// The forked painter maintains complete isolation from the original:
+  /// - Captures cloned copy of the current rendering state
+  /// - Maintains independent command buffer and path builder
+  ///
+  /// When merged back:
+  /// - Inherits original state at fork time (immune to original's state
+  ///   changes)
+  /// - Transfers recorded commands without state contamination
+  ///
+  /// # Example
+  /// ```
+  /// use ribir_geom::*;
+  /// use ribir_painter::*;
+  ///
+  /// let mut painter = Painter::new(Rect::from_size(Size::splat(512.)));
+  /// let mut overlay = painter.fork(); // Capture initial clear state
+  ///
+  /// // Overlay draws in original state context
+  /// overlay
+  ///   .rect(&Rect::from_size(Size::splat(200.)))
+  ///   .fill();
+  ///
+  /// // Original painter changes state
+  /// painter
+  ///   .set_fill_brush(Color::RED)
+  ///   .circle(Point::splat(100.), 50.)
+  ///   .fill();
+  ///
+  /// // Merge preserves overlay's commands with original fork-time state
+  /// painter.merge(&mut overlay);
+  /// ```
+  pub fn fork(&self) -> Self {
+    let init_state = self.current_state().clone();
+    Painter {
+      state_stack: vec![init_state.clone()],
+      init_state,
+      commands: vec![],
+      path_builder: Path::builder(),
+    }
+  }
+
+  /// Merges commands from a forked painter while preserving state isolation
+  ///
+  /// # Behavior
+  /// - Transfers all drawing commands via buffer swapping (O(1) for Vec
+  ///   storage)
+  /// - Maintains original painter's current rendering state
+  /// - Leaves forked painter with empty command buffer post-merge
+  /// - Preserves both painters' path builders and state stacks
+  pub fn merge(&mut self, forked: &mut Painter) { self.commands.append(forked.finish().0); }
+
   /// Change the default brush and text style of the painter, and then reset
   /// the painter state.
   pub fn set_init_state(&mut self, brush: Brush) {
