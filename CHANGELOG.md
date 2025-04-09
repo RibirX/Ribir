@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.32] - 2025-04-09
+
 ### Features
 
 - **core**: Add built-in method `focus_change_reason` to retrieve last focus/blur event cause. (#734 by @M-Adoo)
@@ -758,7 +760,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.31...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.32...HEAD
+[0.4.0-alpha.32]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.31...ribir-v0.4.0-alpha.32
 [0.4.0-alpha.31]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.30...ribir-v0.4.0-alpha.31
 [0.4.0-alpha.30]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.29...ribir-v0.4.0-alpha.30
 [0.4.0-alpha.29]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.27...ribir-v0.4.0-alpha.29
