@@ -14,22 +14,11 @@ pub struct Ripple {
   /// Whether the ripple always originates from the center of the host bound.
   #[declare(default)]
   pub center: bool,
-  #[declare(default=RippleBound::Unbounded)]
-  /// How ripples show outside of the host widget box.
-  pub bounded: RippleBound,
+  #[declare(default)]
+  /// If the ripple need boundary in the widget or not.
+  pub bounded: bool,
   #[declare(default)]
   launcher: Option<Box<dyn Fn(Option<Point>)>>,
-}
-
-/// Config how ripples show outside of the host widget box.
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum RippleBound {
-  /// Ripples visible outside of the host widget.
-  Unbounded,
-  /// Ripples only visible in the host widget box.
-  Bounded,
-  /// Ripples only visible in the host widget box with a border radius.
-  Radius(Radius),
 }
 
 impl<'c> ComposeChild<'c> for Ripple {
@@ -37,7 +26,7 @@ impl<'c> ComposeChild<'c> for Ripple {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
-      let mut ripple_layer = PressedLayer::new(LayerArea::WidgetCover(Radius::all(0.)));
+      let mut ripple_layer = PressedLayer::new(LayerArea::FullContent);
       init_ripple_launcher(&this, &mut ripple_layer);
 
       @ $ripple_layer {
@@ -63,19 +52,20 @@ fn init_ripple_launcher(
   this: &impl StateWriter<Value = Ripple>, layer: &mut FatObj<Stateful<PressedLayer>>,
 ) {
   rdl! {
+    let circle_state = LerpFnState::new(
+      part_writer!(&mut layer.area),
+      move |_, to, factor| {
+        let LayerArea::Circle { center, radius, constrain_to_bounds } = *to else { unreachable!() };
+        LayerArea::Circle { center, radius: f32::lerp(&0., &radius, factor), constrain_to_bounds }
+      }
+    );
     let ripple_grow = @Animate {
-      state: LerpFnState::new(
-        part_writer!(&mut layer.area),
-        move |_, to, factor| {
-          let LayerArea::Circle { center, radius, clip } = *to else { unreachable!() };
-          LayerArea::Circle { center, radius: f32::lerp(&0., &radius, factor), clip }
-        }
-      ),
+      state: (circle_state, part_writer!(&mut layer.draw_opacity)),
       transition: EasingTransition {
         easing: md::easing::EMPHASIZED_DECELERATE,
         duration: md::easing::duration::SHORT3,
       }.box_it(),
-      from: LayerArea::WidgetCover(Radius::all(0.)),
+      from: (LayerArea::FullContent, 0.),
     };
 
     let fade_out = @Animate {
@@ -106,14 +96,10 @@ fn init_ripple_launcher(
         let distance_y = f32::max(center.y, size.height - center.y);
         (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()
       });
-      let clip = match $this.bounded {
-        RippleBound::Unbounded => None,
-        RippleBound::Bounded => Some(Radius::all(0.)),
-        RippleBound::Radius(radius) => Some(radius),
-      };
+      let constrain_to_bounds = $this.bounded;
       {
         let mut layer = $layer.write();
-        layer.area = LayerArea::Circle { center, radius, clip };
+        layer.area = LayerArea::Circle { center, radius, constrain_to_bounds };
         layer.show();
       }
       ripple_grow.run()

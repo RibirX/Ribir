@@ -79,14 +79,13 @@ impl ComposeChild<'static> for Radio {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fat_obj! {
       on_tap: move |_| $this.write().selected = true,
-      on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
-        $this.write().selected = true
-      },
       @ {
-        let icon = @Class {
-          class: distinct_pipe!($this.radio_class_name()),
+        let classes = class_array![distinct_pipe!($this.radio_class_name()), RADIO];
+        let icon = @ $classes {
           @Icon {
-            class: RADIO,
+            on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
+              $this.write().selected = true
+            },
             @Void { class: distinct_pipe!($this.radio_icon_class_name()) }
           }
         };

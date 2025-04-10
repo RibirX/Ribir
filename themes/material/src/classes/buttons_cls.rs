@@ -25,9 +25,10 @@ named_style_impl!(common_label_only => {
 
 fn text_button_init(classes: &mut Classes) {
   fn interactive(w: Widget) -> Widget {
-    let mut w = FatObj::new(base_interactive(w, md::RADIUS_20));
+    let mut w = base_interactive(w);
     w.foreground(BuildCtx::color())
-      .clamp(BTN_40_CLAMP);
+      .clamp(BTN_40_CLAMP)
+      .radius(md::RADIUS_20);
     w.into_widget()
   }
 
@@ -56,12 +57,13 @@ fn filled_button_init(classes: &mut Classes) {
   fn filled_interactive(w: Widget) -> Widget {
     let color = BuildCtx::color();
     let mut w = FatObj::new(w);
-    w.background(color)
+    w.background(color).radius(md::RADIUS_20);
+
+    let mut w = base_interactive(w.into_widget());
+    w.foreground(BuildCtx::color().on_this_color(BuildCtx::get()))
       .radius(md::RADIUS_20)
       .clamp(BTN_40_CLAMP);
 
-    let mut w = FatObj::new(base_interactive(w.into_widget(), md::RADIUS_20));
-    w.foreground(BuildCtx::color().on_this_color(BuildCtx::get()));
     w.into_widget()
   }
 
@@ -78,12 +80,12 @@ fn button_init(classes: &mut Classes) {
   fn btn_interactive(w: Widget) -> Widget {
     let outline = Palette::of(BuildCtx::get()).outline();
     let mut w = FatObj::new(w);
-    w.border(Border::all(BorderSide { color: outline.into(), width: 1. }))
+    w.border(Border::all(BorderSide { color: outline.into(), width: 1. }));
+
+    let mut w = base_interactive(w.into_widget());
+    w.foreground(BuildCtx::color())
       .radius(md::RADIUS_20)
       .clamp(BTN_40_CLAMP);
-
-    let mut w = FatObj::new(base_interactive(w.into_widget(), md::RADIUS_20));
-    w.foreground(BuildCtx::color());
     w.into_widget()
   }
 
@@ -132,12 +134,12 @@ fn fab_init(classes: &mut Classes) {
     };
 
     let mut w = FatObj::new(w);
-    w.background(background)
+    w.background(background);
+
+    let mut w = base_interactive(w.into_widget());
+    w.foreground(foreground)
       .clamp(BoxClamp::min_width(btn_height).with_fixed_height(btn_height))
       .radius(radius);
-
-    let mut w = FatObj::new(base_interactive(w.into_widget(), radius));
-    w.foreground(foreground);
     w.into_widget()
   }
 
@@ -204,18 +206,15 @@ fn btn_label_style(line_height: f32) -> TextStyle {
   text_style
 }
 
-fn base_interactive(w: Widget, radius: Radius) -> Widget {
-  if DisabledRipple::get(BuildCtx::get()) {
-    let mut w = FatObj::new(w);
-    w.cursor(CursorIcon::Pointer);
-    w.into_widget()
+fn base_interactive(w: Widget) -> FatObj<Widget> {
+  let mut w = if DisabledRipple::get(BuildCtx::get()) {
+    FatObj::new(w)
   } else {
-    let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(radius));
-    ripple! {
-      bounded: RippleBound::Radius(radius),
-      cursor: CursorIcon::Pointer,
-      @ $hover_layer { @ { w } }
-    }
-    .into_widget()
-  }
+    let mut layers = InteractiveLayers::declarer();
+    layers.bounded(true);
+    let layers = layers.finish();
+    layers.map(move |l| l.with_child(w).into_widget())
+  };
+  w.cursor(CursorIcon::Pointer);
+  w
 }

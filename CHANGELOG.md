@@ -29,7 +29,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Add built-in method `focus_change_reason` to retrieve last focus/blur event cause. (#734 by @M-Adoo)
 - **core**: Add reason in `FocusEvent` to indicate the cause of focus change. (#734 @M-Adoo)
-- **painter**: Add `fork()`/`merge()` methods for `Painter` for low-cost layer composition (#pr @M-Adoo)
+- **painter**: Add `fork()`/`merge()` methods for `Painter` for low-cost layer composition (#736 @M-Adoo)
+- **material**: Add `InteractiveLayers` to provide material design interactive layers for its child. (#736 @M-Adoo)
 
 
 

@@ -23,13 +23,14 @@ pub(super) fn init(classes: &mut Classes) {
       return w.into_widget();
     }
 
-    let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(md::RADIUS_20));
-    ripple! {
+    interactive_layers! {
+      clamp: BoxClamp::fixed_size(md::SIZE_40),
       margin: md::EDGES_4,
+      radius: md::RADIUS_20,
       ripple_radius: 20.,
       center: true,
-      clamp: BoxClamp::fixed_size(md::SIZE_40),
-      @ $hover_layer { @ { w } }
+      ring_outer_offset: 2.,
+      @ { w}
     }
     .into_widget()
   });
