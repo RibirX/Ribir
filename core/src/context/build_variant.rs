@@ -61,13 +61,22 @@ impl<V: 'static> Variant<V> {
     Self::new(ctx).unwrap_or(Variant::Value(default))
   }
 
+  /// Creates a new `Variant` from a provider context or uses the `f` closure
+  /// to create a default value if the context lookup fails.
+  pub fn new_or_else(ctx: &impl AsRef<ProviderCtx>, f: impl FnOnce() -> V) -> Self
+  where
+    V: Clone,
+  {
+    Self::new(ctx).unwrap_or_else(|| Variant::Value(f()))
+  }
+
   /// Creates a new `Variant` from a provider context or uses the default value
   /// if it's not found.
   pub fn new_or_default(ctx: &impl AsRef<ProviderCtx>) -> Self
   where
     V: Default + Clone,
   {
-    Self::new_or(ctx, V::default())
+    Self::new_or_else(ctx, V::default)
   }
 
   /// Creates a new `Variant` from a watcher.

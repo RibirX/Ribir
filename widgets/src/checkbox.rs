@@ -101,14 +101,13 @@ impl ComposeChild<'static> for Checkbox {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fat_obj! {
       on_tap: move |_| $this.write().switch_check(),
-      on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
-        $this.write().switch_check()
-      },
       @ {
-        let icon = @Class {
-          class: distinct_pipe!($this.state_class_name()),
+        let classes = class_array![distinct_pipe!($this.state_class_name()), CHECKBOX];
+        let icon = @ $classes {
           @Icon {
-            class: CHECKBOX,
+            on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
+              $this.write().switch_check()
+            },
             @Void { class: distinct_pipe!($this.icon_class_name())}
           }
         };

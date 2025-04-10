@@ -87,10 +87,9 @@ pub fn init(classes: &mut Classes) {
       return w.into_widget();
     }
 
-    let hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(Radius::default()));
-    ripple! {
-      bounded: RippleBound::Radius(Radius::default()),
-      @ $hover_layer { @{ w } }
+    interactive_layers! {
+      bounded: true,
+      @ { w }
     }
     .into_widget()
   });

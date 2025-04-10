@@ -34,13 +34,10 @@ pub(super) fn init(classes: &mut Classes) {
       return w;
     }
 
-    let mut hover_layer = HoverLayer::tracked(LayerArea::WidgetCover(Radius::default()));
-    ripple! {
-      bounded: RippleBound::Bounded,
-      @ $hover_layer {
-        cursor: CursorIcon::Pointer,
-        @{ w }
-      }
+    interactive_layers! {
+      cursor: CursorIcon::Pointer,
+      bounded: true,
+      @{ w }
     }
     .into_widget()
   });

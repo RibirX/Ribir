@@ -15,6 +15,7 @@ pub type Transform<T = f32> = euclid::Transform2D<T, LogicUnit, LogicUnit>;
 pub type Vector<T = f32> = euclid::Vector2D<T, LogicUnit>;
 pub type Angle<T = f32> = euclid::Angle<T>;
 pub type Box2D<T = f32> = euclid::Box2D<T, LogicUnit>;
+pub type SideOffsets2D<T = f32> = euclid::SideOffsets2D<T, LogicUnit>;
 
 pub type DeviceRect<T = i32> = euclid::Rect<T, PhysicUnit>;
 pub type DevicePoint<T = i32> = euclid::Point2D<T, PhysicUnit>;

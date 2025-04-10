@@ -325,6 +325,18 @@ impl Radius {
   pub const fn bottom_right(bottom_right: f32) -> Self {
     Radius { bottom_right, top_left: 0., top_right: 0., bottom_left: 0. }
   }
+
+  /// Adds the specified value to all four corners' radii
+  pub const fn add_to_all(self, increment: f32) -> Self {
+    let Self { top_left, top_right, bottom_left, bottom_right } = self;
+
+    Self {
+      top_left: top_left + increment,
+      top_right: top_right + increment,
+      bottom_left: bottom_left + increment,
+      bottom_right: bottom_right + increment,
+    }
+  }
 }
 
 impl From<LyonPath> for Path {
