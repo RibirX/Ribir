@@ -23,6 +23,8 @@ pub mod window;
 pub use rxrust;
 pub mod overlay;
 pub mod query;
+pub mod reusable;
+
 pub mod wrap_render;
 
 /// Represents measurement units for positioning and sizing.
@@ -59,6 +61,7 @@ pub mod prelude {
     pipe::{BoxPipe, FinalChain, MapPipe, ModifiesPipe, Pipe},
     providers,
     query::*,
+    reusable::*,
     state::*,
     style_class,
     ticker::{Duration, Instant},

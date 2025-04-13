@@ -474,27 +474,25 @@ impl Window {
       match e {
         DelayEvent::Mounted(id) => {
           let mut e = Event::Mounted(LifecycleEvent::new(id, self.tree));
-          self.emit(id, &mut e);
+          self.emit_from_outside(id, &mut e);
         }
         DelayEvent::PerformedLayout(id) => {
           let mut e = Event::PerformedLayout(LifecycleEvent::new(id, self.tree));
-          self.emit(id, &mut e);
+          self.emit_from_inside(id, &mut e);
         }
         DelayEvent::Disposed { id, parent } => {
-          id.descendants(self.tree())
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .for_each(|id| {
-              if Some(id) == self.focusing() {
-                self
-                  .focus_mgr
-                  .borrow_mut()
-                  .blur(FocusReason::Other);
-              }
-              let mut e = Event::Disposed(LifecycleEvent::new(id, self.tree));
-              self.emit(id, &mut e);
-            });
+          let mut stack = vec![id];
+          while let Some(id) = stack.pop() {
+            stack.extend(id.children(self.tree()));
+            if Some(id) == self.focusing() {
+              self
+                .focus_mgr
+                .borrow_mut()
+                .blur(FocusReason::Other);
+            }
+            let mut e = Event::Disposed(LifecycleEvent::new(id, self.tree));
+            self.emit_from_outside(id, &mut e);
+          }
 
           let keep_alive_id = id
             .query_ref::<KeepAlive>(self.tree())
@@ -515,7 +513,7 @@ impl Window {
         }
         DelayEvent::Focus { id, reason } => {
           let mut e = Event::Focus(FocusEvent::new(id, reason, self.tree));
-          self.emit(id, &mut e);
+          self.emit_from_inside(id, &mut e);
         }
         DelayEvent::FocusIn { bottom, up, reason } => {
           let top = up.unwrap_or_else(|| self.tree().root());
@@ -527,7 +525,7 @@ impl Window {
         }
         DelayEvent::Blur { id, reason } => {
           let mut e = Event::Blur(FocusEvent::new(id, reason, self.tree));
-          self.emit(id, &mut e);
+          self.emit_from_inside(id, &mut e);
         }
         DelayEvent::FocusOut { bottom, up, reason } => {
           let top = up.unwrap_or_else(|| self.tree().root());
@@ -631,15 +629,15 @@ impl Window {
         }
         DelayEvent::GrabPointerDown(wid) => {
           let mut e = Event::PointerDown(PointerEvent::from_mouse(wid, self));
-          self.emit(wid, &mut e);
+          self.emit_from_inside(wid, &mut e);
         }
         DelayEvent::GrabPointerMove(wid) => {
           let mut e = Event::PointerMove(PointerEvent::from_mouse(wid, self));
-          self.emit(wid, &mut e);
+          self.emit_from_inside(wid, &mut e);
         }
         DelayEvent::GrabPointerUp(wid) => {
           let mut e = Event::PointerUp(PointerEvent::from_mouse(wid, self));
-          self.emit(wid, &mut e);
+          self.emit_from_inside(wid, &mut e);
         }
         DelayEvent::BubbleCustomEvent { from: id, data } => {
           let mut e = Event::CustomEvent(new_custom_event(CommonEvent::new(id, self.tree), data));
@@ -649,13 +647,25 @@ impl Window {
     }
   }
 
-  fn emit(&self, id: WidgetId, e: &mut Event) {
+  fn emit_from_inside(&self, id: WidgetId, e: &mut Event) {
     id.query_all_iter::<MixBuiltin>(self.tree())
-      .for_each(|m| {
+      .any(|m| {
         if m.contain_flag(e.flags()) {
           m.dispatch(e);
         }
-      })
+        e.is_prevent_default()
+      });
+  }
+
+  fn emit_from_outside(&self, id: WidgetId, e: &mut Event) {
+    id.query_all_iter::<MixBuiltin>(self.tree())
+      .rev()
+      .any(|m| {
+        if m.contain_flag(e.flags()) {
+          m.dispatch(e);
+        }
+        e.is_prevent_default()
+      });
   }
 
   fn top_down_emit(&self, e: &mut Event, bottom: WidgetId) {
@@ -668,14 +678,8 @@ impl Window {
     let mut buffer = SmallVec::new();
     path.iter().rev().all(|id| {
       e.capture_to_child(*id, &mut buffer);
-      id.query_all_iter::<MixBuiltin>(tree)
-        .rev()
-        .all(|m| {
-          if m.contain_flag(e.flags()) {
-            m.dispatch(e);
-          }
-          e.is_propagation()
-        })
+      self.emit_from_outside(*id, e);
+      e.is_propagation()
     });
   }
 
@@ -689,14 +693,9 @@ impl Window {
       .ancestors(tree)
       .take_while(|id| Some(*id) != up)
       .all(|id| {
-        let is_propagation = id.query_all_iter::<MixBuiltin>(tree).all(|m| {
-          if m.contain_flag(e.flags()) {
-            m.dispatch(e);
-          }
-          e.is_propagation()
-        });
+        self.emit_from_inside(id, e);
         e.bubble_to_parent(id);
-        is_propagation
+        e.is_propagation()
       });
   }
 

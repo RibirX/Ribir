@@ -25,6 +25,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Add `Reusable` helper to enable widget recycling and reuse. (#737 @M-Adoo)
+
+
 ## [0.4.0-alpha.32] - 2025-04-09
 
 ### Features
