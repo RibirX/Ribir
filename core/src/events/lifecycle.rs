@@ -89,8 +89,8 @@ mod tests {
         "dyn mounted",
         "dyn performed layout",
         "static performed layout",
-        "dyn disposed",
         "static disposed",
+        "dyn disposed"
       ]
     );
   }

@@ -118,12 +118,16 @@ impl CommonEvent {
 }
 
 pub enum Event {
-  /// Event fired when the widget is mounted. This event is fired only once.
+  /// Fired when a widget is mounted to the tree.
+  ///
+  /// Occurs exactly once per widget lifetime.
   Mounted(LifecycleEvent),
   /// Event fired when the widget is performed layout. This event may fire
   /// multiple times in same frame if a widget modified after performed layout.
   PerformedLayout(LifecycleEvent),
-  /// Event fired when the widget is disposed. This event is fired only once.
+  /// Fired when a widget is permanently removed from the tree.
+  ///
+  /// Occurs exactly once per widget lifetime.
   Disposed(LifecycleEvent),
   PointerDown(PointerEvent),
   PointerDownCapture(PointerEvent),
