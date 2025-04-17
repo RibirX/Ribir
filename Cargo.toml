@@ -97,6 +97,7 @@ web-sys = { version = "0.3.69", features = ["HtmlCollection"] }
 web-time = "1.1.0"
 getrandom = { version = "0.2.12", features = ["js"] }
 heck = "0.5.0"
+url = "2.5.4"
 
 [workspace.metadata.release]
 shared-version = true

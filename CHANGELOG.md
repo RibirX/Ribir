@@ -25,21 +25,26 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Added `Location` provider to manage and track user navigation positions within application windows. (#740 @M-Adoo)
+
+
 ## [0.4.0-alpha.33] - 2025-04-16
 
 ### Features
 
-- **core**: Add `Reusable` helper to enable widget recycling and reuse. (#737 @M-Adoo)
+- **core**: Added `Reusable` helper to enable widget recycling and reuse. (#737 @M-Adoo)
 
 
 ## [0.4.0-alpha.32] - 2025-04-09
 
 ### Features
 
-- **core**: Add built-in method `focus_change_reason` to retrieve last focus/blur event cause. (#734 by @M-Adoo)
-- **core**: Add reason in `FocusEvent` to indicate the cause of focus change. (#734 @M-Adoo)
-- **painter**: Add `fork()`/`merge()` methods for `Painter` for low-cost layer composition (#736 @M-Adoo)
-- **material**: Add `InteractiveLayers` to provide material design interactive layers for its child. (#736 @M-Adoo)
+- **core**: Added built-in method `focus_change_reason` to retrieve last focus/blur event cause. (#734 by @M-Adoo)
+- **core**: Added reason in `FocusEvent` to indicate the cause of focus change. (#734 @M-Adoo)
+- **painter**: Added `fork()`/`merge()` methods for `Painter` for low-cost layer composition (#736 @M-Adoo)
+- **material**: Added `InteractiveLayers` to provide material design interactive layers for its child. (#736 @M-Adoo)
 
 
 
@@ -76,7 +81,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Introduced the `PairOf` utility to preserve parent and child type information of `ComposeChild`. (#724 @M-Adoo)
 - **core**: Added `class_array!` macro to apply multiple classes at once. (#724 by @M-Adoo)
-- **core**: Add non-child field support to `Template`. (#725 @M-Adoo)
+- **core**: Added non-child field support to `Template`. (#725 @M-Adoo)
   - Support default values for non-child fields via `#[template(field)]` attribute.
   - Maintain backward compatibility with existing child-focused patterns
 
@@ -106,9 +111,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: record the visual rect after layout.(#698 @wjian23)
-- **widget**: Add the Widget of Menu.(#702 @wjian23)
+- **widget**: Added the Widget of Menu.(#702 @wjian23)
 - **widgets**: Allow children of the `Stack` to adjust their size based on the `Stack`'s size. (#706 @M-Adoo)
-- **core**: Add support for ColorFilter.(#709 @wjian23)
+- **core**: Added support for ColorFilter.(#709 @wjian23)
 - **core**: Added builtin field `disable`.(#712 @wjian23)
 - **core**: Added ColorFilter of `hue_rotate_filter` and `saturate_filter`(#712 @wjian23)
 
@@ -141,7 +146,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Add the ability to force redraw a frame. (#697 @zihadmahiuddin)
+- **core**: Added the ability to force redraw a frame. (#697 @zihadmahiuddin)
 
 
 ### Fixed
@@ -159,7 +164,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Add builtin field `clip_boundary`. (#694 @wjian23)
+- **core**: Added builtin field `clip_boundary`. (#694 @wjian23)
 - **core**: `IgnorePointer` now has the ability to only ignore events for the widget itself. (#695 @M-Adoo)
 - **core**: Included `BoxPainter` to draw decorations starting from the widget box's origin while ignoring padding. (#695 @M-Adoo)
 
@@ -318,7 +323,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **macros**: Every widget that derives `Declare` will automatically implement a macro with the same name to declare a function widget using it as the root widget. (#651 @M-Adoo)
 - **core**: Added the smooth widgets for transitioning the layout position and size. (#645 @M-Adoo)
 - **widgets**: Added three widgets `FractionallyWidthBox`, `FractionallyHeightBox`, and `FractionallySizedBox` to enable fractional sizing of widgets. (#647 @M-Adoo)
-- **widgets**: Add widget of radio button (#649 @wjian23)
+- **widgets**: Added widget of radio button (#649 @wjian23)
 - **core**: `BuildCtx::get()` and `BuildCtx::get_mut()` have been added to facilitate access from anywhere within a build context. (#650 @M-Adoo)
 
 ### Fixed
@@ -626,7 +631,7 @@ Check out our Wordle game demo, now running smoothly in your browser\!
 - **core**: Introduced `StateWatcher` for watching state modifies, which was previously the responsibility of `StateReader`. This results in a cleaner and more compact `StateReader` implementation. (\#556, @M-Adoo)
 - **gpu**: Introduced `GPUBackendImpl::max_textures_per_draw` to set a limit on textures per draw phase (\#562 @M-Adoo)
 - **gpu**: Updated the `wgpu` implementation of the GPU backend to support WebGL. (\#578, @M-Adoo)
-- **ci**: add wasm test (\#583 @wjian23)
+- **ci**: Added wasm test (\#583 @wjian23)
 - **ci**: wasm server watch file change (\#586 @wjian23)
 - **painter**: Introduced support for `Resource<Path>` for drawing. This indicates that the `Path` may be shared with others, allowing the backend to cache it. (\#589 @M-Adoo)
 - **painter**: Introduced support for bundled commands, enabling the backend to process these commands as a single entity and cache the resulting output. (\#589 @M-Adoo)
@@ -766,8 +771,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 
 ### Documented
 
-- **introduction**: add `introduction.md` to introduce Ribir and why choose it.
-- **get started**: add the `get_started` series of tutorials to help users get started with Ribir.
+- **introduction**: added `introduction.md` to introduce Ribir and why choose it.
+- **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
 [@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.33...HEAD

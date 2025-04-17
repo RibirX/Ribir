@@ -55,10 +55,15 @@ impl WidgetTree {
     };
 
     let (mut providers, child) = Theme::preprocess_before_compose(theme, child.into());
+    let location = Location::stateful();
     providers.push(Provider::new(ShowingOverlays::default()));
+    providers.push(Provider::value_of_writer(location.clone_writer(), None));
 
-    let root = Providers::new(providers).with_child(child);
-    let root = BuildCtx::get_mut().build(root);
+    let mut root = FatObj::new(child);
+    root
+      .providers(providers)
+      .on_disposed(move |_| location.write().release());
+    let root = BuildCtx::get_mut().build(root.into_widget());
 
     self.root = root;
     self.dirty_marker().mark(root, DirtyPhase::Layout);
