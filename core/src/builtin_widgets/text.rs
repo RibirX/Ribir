@@ -87,7 +87,7 @@ impl Render for Text {
 }
 
 impl Text {
-  pub fn new<const M: u8>(text: impl Into<CowArc<str>>) -> Self {
+  pub fn new(text: impl Into<CowArc<str>>) -> Self {
     Self { text: text.into(), glyphs: Default::default() }
   }
   pub fn glyphs(&self) -> Option<Ref<VisualGlyphs>> {

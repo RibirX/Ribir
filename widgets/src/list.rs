@@ -493,11 +493,59 @@ impl<'w> ListItemChildren<'w> {
 }
 
 impl List {
-  pub fn selected_items(&self) -> impl DoubleEndedIterator<Item = &Stateful<ListItem>> {
+  /// Returns an iterator over all selected items in the list
+  ///
+  /// # Returns
+  ///
+  /// An iterator yielding pairs of index and reference to the selected
+  /// `ListItem`.
+  pub fn selected_items(&self) -> impl DoubleEndedIterator<Item = (usize, &Stateful<ListItem>)> {
     self
       .items
       .iter()
-      .filter(|item| item.read().is_selected())
+      .enumerate()
+      .filter(|(_, item)| item.read().is_selected())
+  }
+
+  /// Deselects all items in the list.
+  ///
+  /// This method iterates over all items in the list and marks each one as
+  /// unselected.
+  pub fn deselect_all(&mut self) {
+    self
+      .items
+      .iter()
+      .for_each(|item| item.write().deselect());
+    self.active_item = None;
+  }
+
+  /// Selects items according to the current [`ListSelectMode`]:
+  /// - **`Single`**: Selects the first item
+  /// - **`Multi`**: Selects all items
+  /// - **`None`**: No action
+  ///
+  /// # Returns
+  ///
+  /// The number of items selected:
+  /// - `0` in `None` mode
+  /// - `1` in `Single` mode (if items exist)
+  /// - Total item count in `Multi` mode
+  pub fn select_all(&mut self) -> usize {
+    let take_count = match self.select_mode {
+      ListSelectMode::Single => 1,
+      ListSelectMode::Multi => self.items.len(),
+      ListSelectMode::None => return 0,
+    };
+
+    self
+      .items
+      .iter()
+      .take(take_count)
+      .for_each(|item| item.write().select());
+
+    self.active_item = Some(0);
+
+    take_count
   }
 
   fn focus_next_item(&mut self, wnd: &Window) {

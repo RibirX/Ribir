@@ -11,7 +11,7 @@ pub enum ColorFormat {
 
 impl ColorFormat {
   /// return have many bytes per pixel need
-  pub const fn pixel_per_bytes(&self) -> u8 {
+  pub const fn bytes_per_pixel(&self) -> u8 {
     match self {
       ColorFormat::Rgba8 => 4,
       ColorFormat::Alpha8 => 1,

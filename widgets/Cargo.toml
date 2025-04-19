@@ -20,6 +20,7 @@ lyon_path.workspace = true
 ribir_core = {path = "../core", version = "0.4.0-alpha.34" }
 ribir_geom = {path = "../geom", version = "0.4.0-alpha.34" }
 unicode-segmentation.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 paste.workspace = true

@@ -107,6 +107,8 @@ impl TestWindow {
     AppCtx::frame_ticks().clone().next(Instant::now());
     self.0.draw_frame(false);
   }
+
+  pub fn fmt_tree(&self) -> String { self.tree().display_tree(self.tree().root()) }
 }
 
 impl std::ops::Deref for TestWindow {
