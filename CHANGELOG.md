@@ -29,6 +29,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Added `Location` provider to manage and track user navigation positions within application windows. (#740 @M-Adoo)
 
+### Fixed
+- **core**: Fixed `Reuseable` panic when when holding the same Reuseable while pipe changes continuously.(#pr @wjian23)
 
 ## [0.4.0-alpha.33] - 2025-04-16
 
