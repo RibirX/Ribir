@@ -5,12 +5,13 @@
 //! declare syntax, so other objects can use the builtin fields and methods like
 //! self fields and methods.
 
-pub mod key;
 mod painting_style;
 use std::ops::DerefMut;
-
-pub use key::{Key, KeyWidget, KeyWidgetDeclarer};
+pub mod reuse_id;
+pub use reuse_id::*;
+pub mod widget_scope;
 pub use painting_style::*;
+pub use widget_scope::*;
 pub mod image_widget;
 pub mod keep_alive;
 pub use keep_alive::*;
@@ -158,6 +159,7 @@ pub struct FatObj<T> {
   disabled: Option<State<Disabled>>,
   clip_boundary: Option<State<ClipBoundary>>,
   providers: Option<SmallVec<[Provider; 1]>>,
+  reuse: Option<Reuse>,
 }
 
 /// Create a function widget that uses an empty `FatObj` as the host object.
@@ -210,6 +212,7 @@ impl<T> FatObj<T> {
       keep_alive: self.keep_alive,
       keep_alive_unsubscribe_handle: self.keep_alive_unsubscribe_handle,
       providers: self.providers,
+      reuse: self.reuse,
     }
   }
 
@@ -251,6 +254,7 @@ impl<T> FatObj<T> {
       && self.tooltips.is_none()
       && self.disabled.is_none()
       && self.clip_boundary.is_none()
+      && self.reuse.is_none()
   }
 
   /// Return the host object of the FatObj.
@@ -1028,6 +1032,12 @@ impl<T> FatObj<T> {
     self
   }
 
+  pub fn reuse_id(&mut self, reuse_id: impl Into<ReuseId>) -> &mut Self {
+    assert!(self.reuse.is_none());
+    self.reuse = Some(Reuse { reuse_id: reuse_id.into() });
+    self
+  }
+
   fn declare_builtin_init<V: 'static, B: 'static, const M: usize>(
     &mut self, init: impl DeclareInto<V, M>, get_builtin: impl FnOnce(&mut Self) -> &State<B>,
     set_value: fn(&mut B, V),
@@ -1128,7 +1138,8 @@ impl<'a> FatObj<Widget<'a>> {
           v_align,
           relative_anchor,
           global_anchor,
-          keep_alive
+          keep_alive,
+          reuse
         ]
     );
 

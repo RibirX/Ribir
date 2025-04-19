@@ -1,5 +1,5 @@
 use super::*;
-use crate::pipe::{InnerPipe, PipeKeyWidget, PipeWidget};
+use crate::pipe::{InnerPipe, PipeWidget};
 
 pub struct MultiPair<'a> {
   pub(crate) parent: Widget<'static>,
@@ -52,7 +52,7 @@ where
   C: InnerPipe,
   C::Value: FnOnce() -> I,
   I: IntoIterator<Item = W>,
-  W: PipeKeyWidget<'w, M>,
+  W: IntoWidget<'w, M>,
 {
   fn into_child_multi(self) -> impl Iterator<Item = Widget<'w>> { self.build_multi().into_iter() }
 }

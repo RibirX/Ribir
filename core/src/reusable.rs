@@ -40,12 +40,10 @@ impl Reusable {
   ///
   /// returns`(Widget, Reusable)`, the Widget must be placed before the Reusable
   /// being used again, otherwise it will panic.
-  pub fn new<'a, const M: usize>(
-    w: impl IntoWidget<'a, M>, wnd: &Sc<Window>,
-  ) -> (Widget<'a>, Self) {
+  pub fn new<'a, const M: usize>(w: impl IntoWidget<'a, M>) -> (Widget<'a>, Self) {
     let mut obj = FatObj::new(w);
     let track_id = obj.get_track_id_widget().read().track_id();
-    let this = Self(Sc::new(RefCell::new(ReusableState::Recycled { track_id, wnd_id: wnd.id() })));
+    let this = Self(Sc::new(RefCell::new(ReusableState::WaitToUse { track_id })));
 
     (this.handle_reusable_wrapper(obj.into_widget()), this)
   }
@@ -78,6 +76,9 @@ impl Reusable {
   fn gen_widget(&mut self) -> Widget<'static> {
     let mut inner_state = self.0.borrow_mut();
     let w = match &mut *inner_state {
+      ReusableState::WaitToUse { .. } => {
+        panic!("Reusable must be used before it can be retrieved")
+      }
       ReusableState::Using { render, track_id } => {
         let render = render.clone();
         let track_id = track_id.clone();
@@ -161,9 +162,9 @@ impl Reusable {
 
   fn on_build(&self, id: WidgetId) {
     let track_id = match &*self.0.borrow() {
-      ReusableState::Using { track_id, .. } | ReusableState::Recycled { track_id, .. } => {
-        track_id.clone()
-      }
+      ReusableState::Using { track_id, .. }
+      | ReusableState::Recycled { track_id, .. }
+      | ReusableState::WaitToUse { track_id } => track_id.clone(),
       _ => panic!("Widget in invalid state for reuse. Expected Init/Recycled"),
     };
 
@@ -202,6 +203,7 @@ fn move_inner_render_to_new(
 struct ReusableRenderWrapper(Sc<UnsafeCell<Box<dyn RenderQueryable>>>);
 
 enum ReusableState {
+  WaitToUse { track_id: TrackId },
   Using { track_id: TrackId, render: ReusableRenderWrapper },
   Recycled { track_id: TrackId, wnd_id: WindowId },
   Dropped,
@@ -275,7 +277,7 @@ mod tests {
         text: "Hello",
         on_mounted: move |_| $w_info.write().push("Mounted"),
         on_disposed: move |_| $w_info.write().push("Disposed"),
-      }, &BuildCtx::get().window());
+      });
       *ctrl2.borrow_mut() = Some(reusable.clone());
       let mut w = Some(w.into_widget());
       let f = GenWidget::new(move || {

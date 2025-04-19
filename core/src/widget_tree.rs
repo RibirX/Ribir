@@ -58,6 +58,7 @@ impl WidgetTree {
     let location = Location::stateful();
     providers.push(Provider::new(ShowingOverlays::default()));
     providers.push(Provider::value_of_writer(location.clone_writer(), None));
+    providers.push(Provider::value_of_writer(Stateful::new(GlobalWidgets::default()), None));
 
     let mut root = FatObj::new(child);
     root
