@@ -1,12 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, hash::Hash, ops::DerefMut};
+use std::{hash::Hash, ops::DerefMut};
 
 use smallvec::smallvec;
 
 use crate::prelude::*;
-enum CacheWidget {
-  Widget(Widget<'static>),
-  Reusable(Reusable),
-}
 
 /// WidgetScope
 ///
@@ -16,7 +12,7 @@ pub struct WidgetScope<K>
 where
   K: Eq + Hash + Clone,
 {
-  widgets: Sc<RefCell<HashMap<K, CacheWidget>>>,
+  widgets: ahash::HashMap<K, Reusable>,
 }
 
 impl<K> WidgetScope<K>
@@ -25,79 +21,32 @@ where
 {
   /// Returns a widget associated with the given key.
   pub fn get(&self, key: &K) -> Option<Widget<'static>> {
-    let widgets = self.widgets.clone();
-    let key = key.clone();
-    self
-      .widgets
-      .borrow()
-      .get(&key)
-      .map(move |w| match w {
-        CacheWidget::Widget(_) => fn_widget! {
-          widgets.borrow_mut().get_mut(&key).map(move |cache| {
-            match cache {
-              CacheWidget::Widget(w) => {
-                let w = std::mem::replace(w, Void {}.into_widget());
-                let (w, reusable)  = Reusable::new(w);
-                *cache = CacheWidget::Reusable(reusable);
-                w
-              }
-              CacheWidget::Reusable(r) => {
-                r.get_widget()
-              }
-            }
-          }).expect("the widget has been removed ")
-        }
-        .into_widget(),
-        CacheWidget::Reusable(r) => r.get_widget(),
-      })
+    self.widgets.get(key).map(move |r| r.get_widget())
   }
 
   /// Checks if a widget associated with the given key is currently in use.
   pub fn is_in_used(&self, key: &K) -> bool {
     self
       .widgets
-      .borrow()
       .get(key)
-      .is_some_and(|w| match w {
-        CacheWidget::Widget(_) => false,
-        CacheWidget::Reusable(w) => w.is_in_used(),
-      })
+      .is_some_and(|r| r.is_in_used())
   }
 
   /// Inserts a reusable widget into the cache.
   pub fn insert_reusable(&mut self, key: K, reusable: Reusable) {
-    self
-      .widgets
-      .borrow_mut()
-      .insert(key, CacheWidget::Reusable(reusable));
-  }
-
-  /// Inserts a widget associated with the given key into the cache.
-  pub fn insert(&mut self, key: K, widget: Widget<'static>) {
-    self
-      .widgets
-      .borrow_mut()
-      .insert(key, CacheWidget::Widget(widget));
+    self.widgets.insert(key, reusable);
   }
 
   /// Removes a widget associated with the given key from the cache.
-  pub fn remove(&mut self, key: &K) { self.widgets.borrow_mut().remove(key); }
+  pub fn remove(&mut self, key: &K) { self.widgets.remove(key); }
 
   /// Removes all widgets from the cache.
-  pub fn clear(&mut self) { self.widgets.borrow_mut().clear(); }
+  pub fn clear(&mut self) { self.widgets.clear(); }
 
   /// Returns an iterator over the ids of the cached widgets.
-  pub fn get_ids(&self) -> impl Iterator<Item = K> {
-    self
-      .widgets
-      .borrow()
-      .keys()
-      .cloned()
-      .collect::<Vec<_>>()
-      .into_iter()
-  }
+  pub fn get_ids(&self) -> impl Iterator<Item = K> + '_ { self.widgets.keys().cloned() }
 
-  fn new() -> Self { Self { widgets: Sc::new(RefCell::new(HashMap::new())) } }
+  fn new() -> Self { Self { widgets: ahash::HashMap::default() } }
 }
 
 pub(crate) fn get_or_insert<'a, K>(
@@ -132,36 +81,6 @@ where
 ///
 /// The global cache widget can be accessed either via the built in reuse_id
 /// field with a GlobalId or directly through the get method of GlobalWidgets.
-/// # Example:
-/// ``` no_run
-/// use ribir::prelude::*;
-/// let w = fn_widget! {
-///    const TIPS_KEY: &str = "tips";
-///    let mut scope = Provider::write_of::<GlobalWidgets>(BuildCtx::get()).unwrap();
-///    scope.insert(GlobalId::new(TIPS_KEY), @Text { text: "Global Text" }.into_widget());
-///    let show_tips = Stateful::new(false);
-///    @Column {
-///      @ FilledButton {
-///        on_tap: move |_| {
-///          let is_show = *$show_tips;
-///          *$show_tips.write() = !is_show;
-///        },
-///        @ { pipe!(*$show_tips).map(move |show_tips| if show_tips { "Hide" } else { "Show" } ) }
-///      }
-///      @ {
-///        pipe!(*$show_tips).map(move |show_tips| fn_widget!{
-///          let scope = Provider::of::<GlobalWidgets>(BuildCtx::get()).unwrap();
-///          if show_tips {
-///            scope.get(&GlobalId::new(TIPS_KEY)).unwrap()
-///          } else {
-///            @Void {}.into_widget()
-///          }
-///        })
-///      }
-///    }
-/// };
-/// App::run(w);
-/// ```
 pub struct GlobalWidgets(WidgetScope<GlobalId>);
 impl Default for GlobalWidgets {
   fn default() -> Self { Self(WidgetScope::new()) }
@@ -262,7 +181,7 @@ mod tests {
   use crate::test_helper::*;
 
   impl LocalWidgets {
-    fn count(&self) -> usize { self.widgets.borrow().len() }
+    fn count(&self) -> usize { self.widgets.len() }
   }
 
   #[test]
@@ -292,7 +211,7 @@ mod tests {
               @ {
                 (0..cnt).map(move |i| {
                   @Reuse {
-                    reuse_id: LocalId::from_num(i),
+                    reuse_id: LocalId::number(i),
                     @ {
                       fn_widget! {
                         *$build_w.write() += 1;

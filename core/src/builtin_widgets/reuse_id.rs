@@ -1,64 +1,82 @@
 use crate::prelude::*;
 
-/// DisposePolicy
+/// Defines caching behavior for LocalWidget instances
 ///
-/// Defines the disposal policy for LocalWidget instances.
+/// Controls how long widgets should be retained in memory after they become
+/// unused.
 #[derive(Default, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum CachePolicy {
-  /// The widget will be disposed (released) as soon as it is no longer in use.
+  /// Widgets are immediately released when no longer used
   #[default]
   ImmediateRelease,
-
-  /// The widget will remain cached until explicitly removed by the user.
+  /// Widgets persist in cache until manually removed
   ManualControl,
 }
 
-/// ReuseId
+/// ReuseId is an identifier used to recognize identical widgets in either
+/// global or local scope.
 ///
-/// An identifier used to reference reusable widgets in either global or local
-/// scope.
+/// If two widgets share the same `ReuseId` within their scope, they will be
+/// treated as identical. During widget updates, the framework will reuse
+/// existing widgets with matching `ReuseId` instead of creating new ones.
 ///
-/// - `Global`: The widget will be stored in `GlobalWidgets` and can be accessed
-///   across the entire window. It must be explicitly removed when no longer
-///   needed.
-/// - `Local`: The widget will be stored in `LocalWidgets` with automatic
-///   disposal based on the specified `DisposePolicy` (defaults to
-///   `DisposePolicy::NotUsed`).
+/// This enables:
+/// - Tracking persistent widgets across frames
+/// - Performance optimization through widget reuse
 ///
-/// Usage:
-/// - Create with `GlobalId::new()` or `LocalId::from_num()/from_str()`
-/// - Convert to `ReuseId` using `.into()` or `LocalId::reuse_with_policy()`
-/// - Use as `reuse_id` field in `Reuse` Widget
+/// Important considerations:
+/// - The framework relies entirely on `ReuseId`, not widget types
+/// - Developers must ensure:
+///   1. `ReuseId` uniqueness within its scope
+///   2. Consistency between `ReuseId` and actual widget type
 ///
-/// # Example
-/// ``` no_run
+/// ReuseId variants:
+/// - `GlobalId`: Window-wide reuse, requires explicit removal
+/// - `LocalId`: Scoped reuse within nearest `LocalWidgets`, with caching
+///   controlled by `CachePolicy` (default: [`CachePolicy::ImmediateRelease`])
+///
+/// # Examples
+///
+/// ## Local Scoped Reuse
+/// ```rust
 /// use ribir::prelude::*;
-/// let w = fn_widget! {
-///  let cnt = Stateful::new(0);
-///  @ LocalWidgets {
-///    @Column {
-///      @ FilledButton {
-///        on_tap: move |_| *$cnt.write() += 1,
-///        @ { "add" }
-///      }
-///      @ {
-///        pipe!(*$cnt).map(move |cnt|
-///          move || {
-///            @ {
-///              (0..cnt).map(move |i| {
-///                 @Text {
-///                  reuse_id: LocalId::from_num(i),
-///                  text: format!("Item {},  create_at {:?}", i, Instant::now())
-///                 }
-///              })
-///            }
+///
+/// let widget = fn_widget! {
+///   let cnt = Stateful::new(0);
+///   @LocalWidgets {
+///     @Column {
+///       @FilledButton {
+///         on_tap: move |_| *$cnt.write() += 1,
+///         @ { "Increment" }
+///       }
+///       @ {
+///         pipe!(*$cnt).map(move |cnt| move || {
+///           @ {
+///             (0..cnt).map(move |i| @FatObj {
+///               reuse_id: LocalId::number(i),
+///               @text! {
+///                 text: format!("Item {i}, created at {:?}", Instant::now())
+///               }
+///             })
 ///           }
-///          )
-///      }
-///    }
-///  }
+///         })
+///       }
+///     }
+///   }
 /// };
-/// App::run(w);
+/// ```
+///
+/// ## Global reusable widget
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn global_widget() -> Widget<'static> {
+///   fat_obj! {
+///     reuse_id: GlobalId::new("global_widget"),
+///     @text! { text: "Globally reusable widget" }
+///   }
+///   .into_widget()
+/// }
 /// ```
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum ReuseId {
@@ -66,57 +84,69 @@ pub enum ReuseId {
   Local(LocalId, CachePolicy),
 }
 
+/// Local-scoped widget identifier with multiple key formats
 #[derive(PartialEq, Hash, Eq, Clone, Debug)]
 pub enum LocalId {
   Number(usize),
   String(CowArc<str>),
 }
 
+/// Global-scoped widget identifier with string-based key
 #[derive(PartialEq, Hash, Eq, Clone, Debug)]
 pub struct GlobalId(CowArc<str>);
 
-impl From<LocalId> for ReuseId {
-  fn from(value: LocalId) -> Self { ReuseId::Local(value, CachePolicy::default()) }
-}
-
-impl From<GlobalId> for ReuseId {
-  fn from(value: GlobalId) -> Self { ReuseId::Global(value) }
-}
-
-impl<T: Into<CowArc<str>>> From<T> for GlobalId {
-  fn from(value: T) -> Self { GlobalId(value.into()) }
+/// Widget reuse manager with automatic instance tracking
+///
+/// Implements a reuse strategy that:
+/// 1. Checks for existing instances matching the `ReuseId`
+/// 2. Reuses found instances or registers new ones
+/// 3. Applies cache policies for automatic cleanup
+///
+/// Registration scope depends on `ReuseId` type:
+/// - `GlobalId`: Registered in global widget registry
+/// - `LocalId`: Registered in nearest local widget scope
+#[derive(Clone)]
+pub struct Reuse {
+  pub reuse_id: ReuseId,
 }
 
 impl GlobalId {
+  /// Creates a new global ID from a convertible key type
   pub fn new(key: impl Into<CowArc<str>>) -> Self { GlobalId(key.into()) }
 }
 
 impl LocalId {
-  pub fn from_string(key: impl Into<CowArc<str>>) -> Self { LocalId::String(key.into()) }
+  /// Creates a text-based local ID
+  pub fn string(key: impl Into<CowArc<str>>) -> Self { LocalId::String(key.into()) }
 
-  pub fn from_num(key: usize) -> Self { LocalId::Number(key) }
+  /// Creates a numeric local ID
+  pub fn number(key: usize) -> Self { LocalId::Number(key) }
 
-  pub fn reuse_with_policy(self, policy: CachePolicy) -> ReuseId { ReuseId::Local(self, policy) }
+  /// Converts to ReuseId with specified cache policy
+  pub fn with_policy(self, policy: CachePolicy) -> ReuseId { ReuseId::Local(self, policy) }
+}
+
+impl From<LocalId> for ReuseId {
+  /// Creates a ReuseId with default cache policy
+  fn from(value: LocalId) -> Self { ReuseId::Local(value, CachePolicy::default()) }
+}
+
+impl From<GlobalId> for ReuseId {
+  /// Creates a global-scoped ReuseId
+  fn from(value: GlobalId) -> Self { ReuseId::Global(value) }
+}
+
+impl<T: Into<CowArc<str>>> From<T> for GlobalId {
+  /// Converts string-like types to GlobalId
+  fn from(value: T) -> Self { GlobalId(value.into()) }
 }
 
 impl ReuseId {
+  /// Returns true for local-scoped identifiers
   pub fn is_local(&self) -> bool { matches!(self, ReuseId::Local(..)) }
 
+  /// Returns true for global-scoped identifiers
   pub fn is_global(&self) -> bool { matches!(self, ReuseId::Global(..)) }
-}
-
-/// Reuse Widget, implement for builtin `reuse_id`
-///
-/// This Widget will directly display the corresponding widget based on the
-/// ReuseId:
-/// - If a widget with the corresponding ReuseId can be found, it will directly
-///   display that widget.
-/// - If a widget with the corresponding ReuseId cannot be found, it will
-///   display its child widget and register it in GlobalWidgets or LocalWidgets
-///   according to the type of ReuseId (Global or Local) for future reference.
-#[derive(Clone)]
-pub struct Reuse {
-  pub reuse_id: ReuseId,
 }
 
 impl Declare for Reuse {

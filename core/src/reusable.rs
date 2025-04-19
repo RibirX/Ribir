@@ -12,6 +12,9 @@ use crate::{
 /// A container that enables efficient reuse of widget instances across multiple
 /// placements.
 ///
+/// Prefer using [`ReuseId`] for widget reuse between scopes instead of manually
+/// managing reuse.
+///
 /// This type maintains a widget that can be recycled when removed from the
 /// widget tree, allowing subsequent reuse through `get_widget()`. The widget is
 /// fully disposed when:

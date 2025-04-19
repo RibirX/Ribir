@@ -431,7 +431,7 @@ impl Texture for WgpuTexture {
       depth_or_array_layers: 1,
     };
     let origin = wgpu::Origin3d { x: dist.min_x() as u32, y: dist.min_y() as u32, z: 0 };
-    let bytes_per_pixel = self.color_format().pixel_per_bytes();
+    let bytes_per_pixel = self.color_format().bytes_per_pixel();
 
     backend.queue.write_texture(
       wgpu::TexelCopyTextureInfo {
@@ -457,7 +457,7 @@ impl Texture for WgpuTexture {
     let width = rect.width();
     let height = rect.height();
     let format = self.color_format();
-    let pixel_bytes = format.pixel_per_bytes();
+    let pixel_bytes = format.bytes_per_pixel();
     let align_width = align(width as u32, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT / pixel_bytes as u32);
     let padded_row_bytes = pixel_bytes as u32 * align_width;
 
