@@ -59,6 +59,7 @@ macro_rules! builtin_member {
 pub static BUILTIN_INFOS: phf::Map<&'static str, BuiltinMember> = phf_map! {
   // Class
   "class" => builtin_member!{"Class", Field, "class"},
+  "reuse_id" => builtin_member!{"Reuse", Field, "reuse_id"},
   // MixFlags
   "is_focused" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_focus" },
   "focus_changed_reason" => builtin_member!{"MixFlags", Method, "mix_flags", "trace_focus" },

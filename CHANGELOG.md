@@ -30,7 +30,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Added `Location` provider to manage and track user navigation positions within application windows. (#740 @M-Adoo)
 
 ### Fixed
-- **core**: Fixed `Reuseable` panic when when holding the same Reuseable while pipe changes continuously.(#pr @wjian23)
+- **core**: Fixed `Reuseable` panic when when holding the same Reuseable while pipe changes continuously.(#741 @wjian23)
+
+### BREAKING CHANGES
+- **core**: Added built in filed `reuse_id`, `GlobalWidgets` and `LocalWidgets`; removed `KeyWidget`. Use `reuse_id` as replacements for similar scenarios.(#741 @wjian23)
 
 ## [0.4.0-alpha.33] - 2025-04-16
 
