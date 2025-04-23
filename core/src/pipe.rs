@@ -219,15 +219,10 @@ pub(crate) trait InnerPipe: Pipe + Sized {
 
         let ctx = BuildCtx::get_mut();
         let mut new = vec![];
-        for (idx, w) in m()
-          .into_iter()
-          .map(|w| w.into_widget())
-          .enumerate()
-        {
+        for w in m().into_iter().map(|w| w.into_widget()) {
           let id = ctx.build(w);
 
           new.push(id);
-          set_pos_of_multi(id, idx, ctx.tree_mut());
         }
         if new.is_empty() {
           new.push(ctx.build(Void.into_widget()));
@@ -278,7 +273,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     });
 
     let mut widgets = vec![first];
-    for (idx, w) in iter.enumerate() {
+    for w in iter {
       let pipe_node = node.clone();
       let w = w.on_build(move |id| {
         match &mut pipe_node.dyn_info_mut().gen_range {
@@ -287,7 +282,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         };
 
         let tree = BuildCtx::get_mut().tree_mut();
-        if set_pos_of_multi(id, idx + 1, tree) {
+        if has_pipe_node(id, tree) {
           // We need to associate the parent information with the children pipe so that
           // when the child pipe is regenerated, it can update the parent pipe information
           // accordingly.
@@ -565,7 +560,6 @@ struct InnerPipeNode {
 
 #[derive(Debug)]
 pub(crate) struct DynWidgetsInfo {
-  pub(crate) multi_pos: usize,
   pub(crate) gen_range: GenRange,
 }
 
@@ -577,9 +571,7 @@ pub enum GenRange {
 }
 
 impl DynWidgetsInfo {
-  pub(crate) fn new(range: GenRange) -> DynWidgetsInfo {
-    DynWidgetsInfo { gen_range: range, multi_pos: 0 }
-  }
+  pub(crate) fn new(range: GenRange) -> DynWidgetsInfo { DynWidgetsInfo { gen_range: range } }
 
   pub(crate) fn single_replace(&mut self, old: WidgetId, new: WidgetId) {
     match &mut self.gen_range {
@@ -650,10 +642,6 @@ impl DynWidgetsInfo {
       GenRange::ParentOnly(p) => *p.start(),
     }
   }
-
-  fn set_pos_of_multi(&mut self, pos: usize) { self.multi_pos = pos; }
-
-  fn pos_of_multi(&self) -> usize { self.multi_pos }
 }
 
 impl PipeNode {
@@ -731,12 +719,8 @@ impl PipeNode {
   }
 }
 
-fn set_pos_of_multi(w: WidgetId, pos: usize, tree: &WidgetTree) -> bool {
-  w.query_all_iter::<PipeNode>(tree)
-    .inspect(|node| node.dyn_info_mut().set_pos_of_multi(pos))
-    .count()
-    > 0
-}
+fn has_pipe_node(w: WidgetId, tree: &WidgetTree) -> bool { w.query_ref::<PipeNode>(tree).is_some() }
+
 fn query_outside_infos<'l>(
   id: WidgetId, to: &'l PipeNode, tree: &'l WidgetTree,
 ) -> impl Iterator<Item = QueryRef<'l, PipeNode>> {
@@ -758,8 +742,7 @@ fn pipe_priority_value(node: &PipeNode, tree: &WidgetTree) -> i64 {
   let depth = id.ancestors(tree).count() as i64;
   let embed = query_outside_infos(id, node, tree).count() as i64;
 
-  let pos = node.dyn_info().pos_of_multi() as i64;
-  depth << 60 | pos << 40 | embed
+  depth << 32 | embed
 }
 
 impl Query for PipeNode {
