@@ -27,6 +27,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Fixed
 - **core**: Fixed the priority of the pipe does not depend on its position (the previous position was not accurately tracked). (#742 @wjian23)
+- **widgets**: Fixed infinite layout loop caused by `Scrollbar` during window resizing (#pr by @M-Adoo)
+
 
 ## [0.4.0-alpha.34] - 2025-04-23
 
