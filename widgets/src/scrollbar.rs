@@ -114,11 +114,13 @@ impl<'c> ComposeChild<'c> for Scrollbar {
                 let scroll_pos = Point::new(x, scroll.get_scroll_pos().y);
                 scroll.jump_to(scroll_pos);
               },
-              @ $h_thumb {
-                anchor: distinct_pipe!{
-                  let rate = $scroll.get_x_scroll_rate();
-                  let distance = $h_track.layout_width() - $h_thumb.layout_width();
-                  Anchor::left(rate * distance)
+              @OnlySizedByParent {
+                @ $h_thumb {
+                  anchor: distinct_pipe!{
+                    let rate = $scroll.get_x_scroll_rate();
+                    let distance = $h_track.layout_width() - $h_thumb.layout_width();
+                    Anchor::left(rate * distance)
+                  }
                 }
               }
             }
@@ -148,11 +150,13 @@ impl<'c> ComposeChild<'c> for Scrollbar {
                 let scroll_pos = Point::new(scroll.get_scroll_pos().x, y);
                 scroll.jump_to(scroll_pos);
               },
-              @ $v_thumb {
-                anchor: distinct_pipe!{
-                  let rate = $scroll.get_y_scroll_rate();
-                  let distance = $v_track.layout_height() - $v_thumb.layout_height();
-                  Anchor::top(rate * distance)
+              @OnlySizedByParent {
+                @ $v_thumb {
+                  anchor: distinct_pipe!{
+                    let rate = $scroll.get_y_scroll_rate();
+                    let distance = $v_track.layout_height() - $v_thumb.layout_height();
+                    Anchor::top(rate * distance)
+                  }
                 }
               }
             }
