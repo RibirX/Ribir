@@ -74,12 +74,12 @@ impl FittedBox {
     let child = ctx.assert_single_child();
     let mut pos = ctx.widget_box_pos(child).unwrap_or_default();
     if container.width.is_finite() {
-      pos.x = container.width / 2.0 - child_size.width * scale.x / 2.0;
+      pos.x = center_align(container.width, child_size.width, scale.x);
     } else {
       container.width = child_size.width * scale.x;
     }
     if container.height.is_finite() {
-      pos.y = container.height / 2.0 - child_size.height * scale.y / 2.0;
+      pos.y = center_align(container.height, child_size.height, scale.y);
     } else {
       container.height = child_size.height * scale.y;
     }
@@ -175,6 +175,8 @@ impl Render for FittedBox {
     Some(Transform::scale(scale.x, scale.y))
   }
 }
+
+fn center_align(container: f32, child: f32, scale: f32) -> f32 { (container / scale - child) / 2.0 }
 
 #[cfg(test)]
 mod tests {
@@ -280,6 +282,6 @@ mod tests {
     }),
     LayoutCase::new(&[0, 0, 0])
       .with_size(Size::new(100., 200.))
-      .with_pos(Point::new(25., 0.)),
+      .with_pos(Point::new(50., 0.)),
   );
 }
