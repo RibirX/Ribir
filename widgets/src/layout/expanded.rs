@@ -19,6 +19,8 @@ pub struct Expanded {
   /// ignore its own size constraints. Instead, it will wait for all other
   /// widgets to be allocated space first, and then divide the remaining
   /// available space based on its flex factor.
+  ///
+  /// The default value is `true`.
   pub defer_alloc: bool,
 }
 
@@ -71,7 +73,7 @@ impl ObjDeclarer for ExpandedDeclarer {
     let (flex, u_flex) = self.flex.map_or((1., None), |v| v.unzip());
     let (defer_alloc, u_defer_alloc) = self
       .defer_alloc
-      .map_or((false, None), |v| v.unzip());
+      .map_or((true, None), |v| v.unzip());
 
     let host = State::value(Expanded { flex, defer_alloc });
     let mut subscribes = SmallVec::new();
@@ -147,6 +149,7 @@ mod tests {
       @Row {
         wrap: true,
         @Expanded {
+          defer_alloc: false,
           flex: 1. ,
           @SizedBox { size }
         }
@@ -155,10 +158,12 @@ mod tests {
         @SizedBox { size }
         @SizedBox { size }
         @Expanded {
+          defer_alloc: false,
           flex: 1. ,
           @SizedBox { size, }
         }
         @Expanded {
+          defer_alloc: false,
           flex: 4.,
           @SizedBox { size, }
         }
