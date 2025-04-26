@@ -262,6 +262,7 @@ impl<'w> Tab<'w> {
       };
 
       @Expanded {
+        defer_alloc: false,
         @Providers {
           providers: [Provider::new(tab_info)],
           @ { header }

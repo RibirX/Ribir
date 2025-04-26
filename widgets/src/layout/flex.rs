@@ -201,9 +201,7 @@ impl FlexLayouter {
     let flex_min = FlexSize::from_size(clamp.min, dir);
 
     let child_clamp = self.create_child_clamp(clamp);
-
     self.perform_children_layout(flex_max.main, child_clamp, ctx);
-
     if self.need_secondary_layout() {
       // Uses minimum main axis size as distribution basis when max constraint
       // is unbounded
@@ -272,14 +270,11 @@ impl FlexLayouter {
       let line = &mut self.current_line;
       line.main_width += size.main;
 
-      let flex = ctx
-        .query_of_widget::<Expanded>(c)
-        .map(|expanded| expanded.flex)
-        .filter(|f| f.is_normal() && *f > 0.)
-        .inspect(|_| {
-          self.current_line.has_flex = true;
-          self.has_flex = true;
-        });
+      let flex = expanded.map(|e| {
+        self.current_line.has_flex = true;
+        self.has_flex = true;
+        e.flex
+      });
       let info = FlexLayoutInfo { flex, pos: <_>::default(), size };
       self.current_line.items_info.push(info);
     }
@@ -313,7 +308,10 @@ impl FlexLayouter {
           };
         }
 
-        if self.align_items == Align::Stretch || (info.flex.is_some() && flex_unit.is_some()) {
+        if self.align_items == Align::Stretch
+          || (info.flex.is_some() && flex_unit.is_some())
+          || ctx.box_size().is_none()
+        {
           let size = ctx.perform_child_layout(child, item_clamp);
           let new_size = FlexSize::from_size(size, dir);
           line.main_width += new_size.main - info.size.main;
@@ -761,15 +759,18 @@ mod tests {
         @Flex {
           direction: Direction::Horizontal,
           @Expanded {
+            defer_alloc: false,
             flex: 2.,
             @SizedBox { size: Size::splat(100.),}
           }
           @Expanded {
+            defer_alloc: false,
             flex: 1.,
             @SizedBox { size: Size::splat(50.),}
           }
           @SizedBox { size: Size::new(100., 20.) }
           @Expanded {
+            defer_alloc: false,
             // The flex will be ignored, because the flex is not enough
             flex: 0.5,
             @SizedBox { size: Size::splat(100.), }
