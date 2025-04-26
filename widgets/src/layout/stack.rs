@@ -85,33 +85,23 @@ impl Render for Stack {
     });
 
     // Layout regular children first
-    let mut stack_size = regulars
+    let stack_size = regulars
       .into_iter()
       .fold(ZERO_SIZE, |max_size, child| {
         let child_size = ctx.perform_child_layout(child, stack_clamp);
         max_size.max(child_size)
       });
 
-    // Handle special in-parent children based on current layout size
-    if stack_size.is_empty() && clamp.min.is_empty() {
-      // When no regular children, layout in-parent children with original constraints
+    // When we have valid size, layout in-parent children with parent-relative
+    // constraints
+    let stack_size = clamp.clamp(stack_size);
+    if !in_parents.is_empty() {
+      let parent_relative_clamp = BoxClamp::max_size(stack_size);
       in_parents.into_iter().for_each(|child| {
-        let child_size = ctx.perform_child_layout(child, stack_clamp);
-        stack_size = stack_size.max(child_size);
+        ctx.perform_child_layout(child, parent_relative_clamp);
       });
-      clamp.clamp(stack_size)
-    } else {
-      // When we have valid size, layout in-parent children with parent-relative
-      // constraints
-      let stack_size = clamp.clamp(stack_size);
-      if !in_parents.is_empty() {
-        let parent_relative_clamp = BoxClamp::max_size(stack_size);
-        in_parents.into_iter().for_each(|child| {
-          ctx.perform_child_layout(child, parent_relative_clamp);
-        });
-      }
-      stack_size
     }
+    stack_size
   }
 }
 

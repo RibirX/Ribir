@@ -412,10 +412,9 @@ impl<'c> ComposeChild<'c> for ListCustomItem {
     let item_classes = ListItem::item_classes(&this.read().0);
     item_classes
       .with_child(stack! {
-        @InParentLayout {
-          @ $child {
-            v_align: ListItemAlignItems::get_align(BuildCtx::get()).map(|v| v.into()),
-          }
+        fit: StackFit::Passthrough,
+        @ $child {
+          v_align: ListItemAlignItems::get_align(BuildCtx::get()).map(|v| v.into()),
         }
       })
       .into_widget()
