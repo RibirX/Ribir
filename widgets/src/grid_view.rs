@@ -73,7 +73,7 @@ impl Render for GridView {
   }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { false }
+  fn size_affected_by_child(&self) -> bool { true }
 
   #[inline]
   fn paint(&self, _: &mut PaintingCtx) {}

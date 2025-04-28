@@ -136,7 +136,7 @@ impl Render for IconRender {
     Some(Transform::scale(scale, scale))
   }
 
-  fn only_sized_by_parent(&self) -> bool { true }
+  fn size_affected_by_child(&self) -> bool { false }
 }
 
 impl<'c> IconChild<'c> {

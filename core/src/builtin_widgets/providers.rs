@@ -698,7 +698,7 @@ impl Render for ProvidersRender {
     render.hit_test(ctx, pos)
   }
 
-  fn only_sized_by_parent(&self) -> bool { self.render.only_sized_by_parent() }
+  fn size_affected_by_child(&self) -> bool { self.render.size_affected_by_child() }
 
   fn get_transform(&self) -> Option<Transform> { self.render.get_transform() }
 }

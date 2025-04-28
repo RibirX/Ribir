@@ -338,6 +338,7 @@ mod tests {
   pub struct FixedBox {
     pub size: Size,
   }
+
   impl Render for FixedBox {
     #[inline]
     fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
@@ -345,7 +346,7 @@ mod tests {
       self.size
     }
     #[inline]
-    fn only_sized_by_parent(&self) -> bool { true }
+    fn size_affected_by_child(&self) -> bool { false }
     #[inline]
     fn paint(&self, _: &mut PaintingCtx) {}
   }

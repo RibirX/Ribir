@@ -76,7 +76,7 @@ impl Render for Text {
   }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { false }
+  fn size_affected_by_child(&self) -> bool { false }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
     let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());

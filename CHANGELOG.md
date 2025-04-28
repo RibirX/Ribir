@@ -30,6 +30,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Fixed incorrect child positioning during `box_fit` scaling (#743 by @M-Adoo)
 - **widgets**: Fixed infinite layout loop caused by `Scrollbar` during window resizing (#743  @M-Adoo)
 
+### BREAKING CHANGES
+- **core**: method of Render `only_sized_by_parent` rename to `size_affected_by_child`, Widget `OnlySizedByParent` rename to `NoAffectedParentSize`.(#pr @wjian23)
 
 ## [0.4.0-alpha.34] - 2025-04-23
 

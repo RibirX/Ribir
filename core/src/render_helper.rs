@@ -43,7 +43,7 @@ where
   fn paint(&self, ctx: &mut PaintingCtx) { self.proxy().paint(ctx) }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { self.proxy().only_sized_by_parent() }
+  fn size_affected_by_child(&self) -> bool { self.proxy().size_affected_by_child() }
 
   #[inline]
   fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
@@ -78,7 +78,7 @@ impl Render for Resource<Path> {
   }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { true }
+  fn size_affected_by_child(&self) -> bool { true }
 
   fn paint(&self, ctx: &mut PaintingCtx) {
     let style = Provider::of::<PaintingStyle>(ctx).map(|p| p.clone());

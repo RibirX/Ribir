@@ -115,8 +115,7 @@ pub struct SpinnerArc {
 }
 
 impl Render for SpinnerArc {
-  fn only_sized_by_parent(&self) -> bool { true }
-
+  fn size_affected_by_child(&self) -> bool { false }
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let wnd_size = ctx.window().size();
     clamp.max.min(wnd_size)

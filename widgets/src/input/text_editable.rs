@@ -55,7 +55,7 @@ impl<T: Default + VisualText + EditText + Clone + 'static> Compose for BasicEdit
         @IgnorePointer {
           @UnconstrainedBox {
             dir: UnconstrainedDir::Both,
-            @OnlySizedByParent { @ { caret } }
+            @NoAffectedParentSize { @ { caret } }
           }
         }
       }

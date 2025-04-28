@@ -50,18 +50,17 @@ pub trait Render: 'static {
   /// framework ensures that the parent is always painted before its children.
   fn paint(&self, _: &mut PaintingCtx) {}
 
-  /// Whether the constraints from parent are the only input to detect the
-  /// widget size, and child nodes' size not affect its size.
-  fn only_sized_by_parent(&self) -> bool { false }
+  /// Whether the child nodes' size affect its size.
+  fn size_affected_by_child(&self) -> bool { true }
 
   /// Verify if the provided position is within this widget and return whether
   /// its child can be hit if the widget itself is not hit.
   fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
     let hit = ctx.box_hit_test(pos);
-    // If the widget is not solely sized by the parent, indicating it is not a
+    // If the widget is affected by child, indicating it is not a
     // fixed-size container, we permit the child to receive hits even if it
     // extends beyond its parent boundaries.
-    HitTest { hit, can_hit_child: hit || !self.only_sized_by_parent() }
+    HitTest { hit, can_hit_child: hit || self.size_affected_by_child() }
   }
 
   /// By default, this function returns a `Layout` phase to indicate that the

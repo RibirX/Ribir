@@ -57,6 +57,7 @@ pub enum StackFit {
   /// Passes the constraints through without modification.
   Passthrough,
 }
+
 impl Render for Stack {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     // Determine appropriate clamp based on stack fit
