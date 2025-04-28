@@ -29,9 +29,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Fixed the priority of the pipe does not depend on its position (the previous position was not accurately tracked). (#742 @wjian23)
 - **core**: Fixed incorrect child positioning during `box_fit` scaling (#743 by @M-Adoo)
 - **widgets**: Fixed infinite layout loop caused by `Scrollbar` during window resizing (#743  @M-Adoo)
+- **widgets**: Prevent stack re-layout when subtree of InParentLayout changed.(#745 @wjian23)
 
 ### BREAKING CHANGES
-- **core**: method of Render `only_sized_by_parent` rename to `size_affected_by_child`, Widget `OnlySizedByParent` rename to `NoAffectedParentSize`.(#pr @wjian23)
+- **core**: method of Render `only_sized_by_parent` rename to `size_affected_by_child`, Widget `OnlySizedByParent` rename to `NoAffectedParentSize`.(#745 @wjian23)
 
 ## [0.4.0-alpha.34] - 2025-04-23
 

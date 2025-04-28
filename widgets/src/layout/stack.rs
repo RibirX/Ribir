@@ -1,5 +1,6 @@
 use ribir_core::prelude::*;
 
+use crate::prelude::{NoAffectedParentSize, no_affected_parent_size};
 /// A widget that overlaps its children, allowing for flexible layout
 /// management.
 ///
@@ -17,7 +18,8 @@ pub struct Stack {
 }
 
 /// A widget that indicates to its parent that it should perform layout within
-/// the parent's bounds.
+/// the parent's bounds, and the layout changes to the subtree do not
+/// trigger stack to re-layout.
 ///
 /// This widget is used to control the layout behavior of its child within a
 /// `Stack`.
@@ -110,7 +112,11 @@ impl<'c> ComposeChild<'c> for InParentLayout {
   type Child = Widget<'c>;
 
   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    child.attach_data(Box::new(Queryable(InParentLayout)))
+    no_affected_parent_size! {
+      @ {child}
+    }
+    .into_widget()
+    .attach_data(Box::new(Queryable(InParentLayout)))
   }
 }
 #[cfg(test)]
@@ -180,7 +186,9 @@ mod tests {
       }
     }),
     LayoutCase::default().with_size(TEN),
-    LayoutCase::new(&[0, 1]).with_size(ONE).with_x(9.)
+    LayoutCase::new(&[0, 1, 0])
+      .with_size(ONE)
+      .with_x(9.)
   );
 
   widget_layout_test!(
