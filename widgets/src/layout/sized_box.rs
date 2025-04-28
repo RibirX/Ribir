@@ -19,7 +19,7 @@ impl Render for SizedBox {
   }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { true }
+  fn size_affected_by_child(&self) -> bool { false }
 }
 
 #[cfg(test)]

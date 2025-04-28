@@ -218,7 +218,7 @@ fn indicator(pos: &TabPos) -> Widget<'static> {
       TabPos::Right =>  smooth.h_align(HAlign::Left),
     };
     @ $smooth {
-      @OnlySizedByParent { @IgnorePointer {
+      @NoAffectedParentSize { @IgnorePointer {
         @ @UnconstrainedBox {
           dir: UnconstrainedDir::Both,
           @ { indicator }

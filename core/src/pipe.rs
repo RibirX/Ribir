@@ -784,9 +784,10 @@ impl Render for PipeNode {
 
   fn paint(&self, ctx: &mut PaintingCtx) { self.as_ref().data.paint(ctx) }
 
-  fn only_sized_by_parent(&self) -> bool {
-    // A pipe node is always sized by its parent because it can generate any widget.
-    false
+  fn size_affected_by_child(&self) -> bool {
+    // A pipe node's size is always affected by its child because it can generate
+    // any widget.
+    true
   }
 
   fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {

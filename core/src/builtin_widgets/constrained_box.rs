@@ -21,8 +21,9 @@ impl WrapRender for ConstrainedBox {
     host.perform_layout(BoxClamp { min, max }, ctx)
   }
 
-  fn only_sized_by_parent(&self, host: &dyn Render) -> bool {
-    self.clamp.min == self.clamp.max || host.only_sized_by_parent()
+  fn size_affected_by_child(&self, host: &dyn Render) -> bool {
+    let is_fixed = self.clamp.min == self.clamp.max;
+    if is_fixed { false } else { host.size_affected_by_child() }
   }
 }
 

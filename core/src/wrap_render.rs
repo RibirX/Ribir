@@ -20,9 +20,9 @@ pub trait WrapRender {
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) { host.paint(ctx) }
 
-  fn only_sized_by_parent(&self, host: &dyn Render) -> bool {
+  fn size_affected_by_child(&self, host: &dyn Render) -> bool {
     // Detected by its host by default, so we return true here.
-    host.only_sized_by_parent()
+    host.size_affected_by_child()
   }
 
   fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
@@ -103,10 +103,10 @@ impl Render for RenderPair {
 
   fn paint(&self, ctx: &mut PaintingCtx) { self.wrapper.paint(self.host.as_render(), ctx); }
 
-  fn only_sized_by_parent(&self) -> bool {
+  fn size_affected_by_child(&self) -> bool {
     self
       .wrapper
-      .only_sized_by_parent(self.host.as_render())
+      .size_affected_by_child(self.host.as_render())
   }
 
   fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
@@ -131,8 +131,8 @@ where
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) { self.read().paint(host, ctx) }
 
-  fn only_sized_by_parent(&self, host: &dyn Render) -> bool {
-    self.read().only_sized_by_parent(host)
+  fn size_affected_by_child(&self, host: &dyn Render) -> bool {
+    self.read().size_affected_by_child(host)
   }
 
   fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {

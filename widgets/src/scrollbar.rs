@@ -114,7 +114,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
                 let scroll_pos = Point::new(x, scroll.get_scroll_pos().y);
                 scroll.jump_to(scroll_pos);
               },
-              @OnlySizedByParent {
+              @NoAffectedParentSize {
                 @ $h_thumb {
                   anchor: distinct_pipe!{
                     let rate = $scroll.get_x_scroll_rate();
@@ -150,7 +150,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
                 let scroll_pos = Point::new(scroll.get_scroll_pos().x, y);
                 scroll.jump_to(scroll_pos);
               },
-              @OnlySizedByParent {
+              @NoAffectedParentSize {
                 @ $v_thumb {
                   anchor: distinct_pipe!{
                     let rate = $scroll.get_y_scroll_rate();

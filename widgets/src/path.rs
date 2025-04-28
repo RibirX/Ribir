@@ -14,7 +14,7 @@ impl Render for PathPaintKit {
   fn visual_box(&self, _: &mut VisualCtx) -> Option<Rect> { Some(self.path.bounds(None)) }
 
   #[inline]
-  fn only_sized_by_parent(&self) -> bool { true }
+  fn size_affected_by_child(&self) -> bool { false }
 
   fn paint(&self, ctx: &mut PaintingCtx) { self.path.paint(ctx); }
 

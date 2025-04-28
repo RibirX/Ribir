@@ -23,7 +23,7 @@ impl WrapRender for ClipBoundary {
     host.perform_layout(clamp, ctx)
   }
 
-  fn only_sized_by_parent(&self, host: &dyn Render) -> bool { host.only_sized_by_parent() }
+  fn size_affected_by_child(&self, host: &dyn Render) -> bool { host.size_affected_by_child() }
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
     if self.clip_boundary {

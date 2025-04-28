@@ -281,9 +281,6 @@ mod tests {
     }
 
     #[inline]
-    fn only_sized_by_parent(&self) -> bool { true }
-
-    #[inline]
     fn paint(&self, _: &mut PaintingCtx) {}
   }
 

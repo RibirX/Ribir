@@ -222,7 +222,7 @@ impl WidgetTree {
           info.size.take();
         }
 
-        if p.assert_get(self).only_sized_by_parent() {
+        if !p.assert_get(self).size_affected_by_child() {
           break;
         }
       }
@@ -592,7 +592,7 @@ mod tests {
     }
 
     #[inline]
-    fn only_sized_by_parent(&self) -> bool { true }
+    fn size_affected_by_child(&self) -> bool { true }
   }
 
   fn visual_overflow() -> GenWidget {

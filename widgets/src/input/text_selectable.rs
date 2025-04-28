@@ -107,7 +107,7 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
           }
         },
         @Stack {
-          @OnlySizedByParent {
+          @NoAffectedParentSize {
             @Stack {
               @pipe!{
                 move || {
