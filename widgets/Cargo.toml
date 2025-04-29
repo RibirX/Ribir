@@ -21,6 +21,7 @@ ribir_core = {path = "../core", version = "0.4.0-alpha.35" }
 ribir_geom = {path = "../geom", version = "0.4.0-alpha.35" }
 unicode-segmentation.workspace = true
 thiserror.workspace = true
+ahash.workspace = true
 
 [dev-dependencies]
 paste.workspace = true
