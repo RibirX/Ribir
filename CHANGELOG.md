@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.35] - 2025-04-30
+
 ### Fixed
 - **core**: Fixed the priority of the pipe does not depend on its position (the previous position was not accurately tracked). (#742 @wjian23)
 - **core**: Fixed incorrect child positioning during `box_fit` scaling (#743 by @M-Adoo)
@@ -792,7 +794,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.34...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.35...HEAD
+[0.4.0-alpha.35]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.34...ribir-v0.4.0-alpha.35
 [0.4.0-alpha.34]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.33...ribir-v0.4.0-alpha.34
 [0.4.0-alpha.33]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.32...ribir-v0.4.0-alpha.33
 [0.4.0-alpha.32]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.31...ribir-v0.4.0-alpha.32
