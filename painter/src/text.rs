@@ -4,7 +4,7 @@
 //! Some detail processing learn from [usvg](https://github.com/RazrFalcon/resvg/blob/master/usvg/src/text)
 pub mod font_db;
 pub mod shaper;
-use std::hash::Hash;
+use std::{borrow::Cow, hash::Hash};
 
 use derive_more::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
 use font_db::Face;
@@ -277,4 +277,9 @@ impl Default for TextStyle {
       overflow: <_>::default(),
     }
   }
+}
+
+impl<T: Into<Cow<'static, str>>> From<T> for FontFamily {
+  #[inline]
+  fn from(value: T) -> Self { FontFamily::Name(value.into()) }
 }

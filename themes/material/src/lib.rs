@@ -128,16 +128,18 @@ fn icon_theme() -> IconTheme {
 /// headline4, headline3, headline2, headline1, and caption. The
 /// `body_style` is applied to the remaining text styles.
 pub fn typography_theme() -> TypographyTheme {
-  let regular_face = FontFace {
-    families: Box::new([FontFamily::Name("Roboto".into()), FontFamily::Serif]),
-    weight: FontWeight::NORMAL,
-    ..<_>::default()
-  };
-  let medium_face = FontFace {
-    families: Box::new([FontFamily::Name("Roboto".into()), FontFamily::Serif]),
-    weight: FontWeight::MEDIUM,
-    ..<_>::default()
-  };
+  let mut families = vec!["Roboto".into()];
+  families.extend(
+    fallback_font_families()
+      .iter()
+      .map(|f| (*f).into()),
+  );
+  families.push(FontFamily::SansSerif);
+  let families = families.into_boxed_slice();
+
+  let regular_face =
+    FontFace { families: families.clone(), weight: FontWeight::NORMAL, ..<_>::default() };
+  let medium_face = FontFace { families, weight: FontWeight::MEDIUM, ..<_>::default() };
 
   fn text_theme(
     line_height: f32, font_size: f32, letter_space: f32, font_face: FontFace,

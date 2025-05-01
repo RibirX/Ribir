@@ -774,20 +774,20 @@ impl Painter {
   }
 
   pub fn draw_glyph(&mut self, g: &Glyph, font_size: f32, font_db: &FontDB) -> &mut Self {
+    #[inline]
+    fn prefer_glyph_img_size(font_size: f32, matrix: &Transform) -> u16 {
+      let scale = matrix.m11.max(matrix.m22);
+      // We always prefer a larger image to has better quality for font.
+      (font_size * scale * 2.) as u16
+    }
+
     let Some(face) = font_db.try_get_face_data(g.face_id) else { return self };
 
     let unit = face.units_per_em() as f32;
     let matrix = *self.transform();
 
     let bounds = g.bounds();
-    if let Some(path) = face.outline_glyph(g.glyph_id) {
-      let scale = font_size / unit;
-      self
-        .translate(bounds.min_x(), bounds.min_y())
-        .scale(scale, -scale)
-        .translate(0., -unit)
-        .draw_path(path.into());
-    } else if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
+    if let Some(svg) = face.glyph_svg_image(g.glyph_id) {
       let grid_scale = face
         .vertical_height()
         .map(|h| h as f32 / face.units_per_em() as f32)
@@ -800,18 +800,24 @@ impl Painter {
         .translate(bounds.min_x(), bounds.min_y())
         .scale(scale, scale)
         .draw_svg(&svg);
-    } else if let Some(img) = face.glyph_raster_image(g.glyph_id, (unit / font_size) as u16) {
+    } else if let Some(img) =
+      face.glyph_raster_image(g.glyph_id, prefer_glyph_img_size(font_size, &matrix))
+    {
       let m_width = img.width() as f32;
       let m_height = img.height() as f32;
       let scale = (bounds.width() / m_width).min(bounds.height() / m_height);
 
-      let x_offset = bounds.min_x() + (bounds.width() - (m_width * scale)) / 2.;
-      let y_offset = bounds.min_y() + (bounds.height() - (m_height * scale)) / 2.;
-
       self
-        .translate(x_offset, y_offset)
+        .translate(bounds.min_x(), bounds.min_y())
         .scale(scale, scale)
         .draw_img(img, &Rect::from_size(Size::new(m_width, m_height)), &None);
+    } else if let Some(path) = face.outline_glyph(g.glyph_id) {
+      let scale = font_size / unit;
+      self
+        .translate(bounds.min_x(), bounds.min_y())
+        .scale(scale, -scale)
+        .translate(0., -unit)
+        .draw_path(path.into());
     }
 
     self.set_transform(matrix);
