@@ -187,7 +187,7 @@ class_names! {
   /// Image container within a list item
   LIST_ITEM_IMG,
   /// Thumbnail image container
-  LIST_ITEM_THUMB_NAIL,
+  LIST_ITEM_THUMBNAIL,
   /// Leading widget container (left side)
   LIST_ITEM_LEADING,
   /// Trailing widget container (right side)
@@ -335,7 +335,15 @@ impl ListItem {
   }
 
   /// Internal method to handle selection with toggle support
-  fn inner_select(&mut self, toggle: bool) { if toggle { self.toggle() } else { self.select() } }
+  fn select_action(mut this: WriteRef<Self>, mode: ListSelectMode) {
+    if this.interactive {
+      match mode {
+        ListSelectMode::None => {}
+        ListSelectMode::Single => this.toggle(),
+        ListSelectMode::Multi => this.select(),
+      }
+    }
+  }
 
   /// Generates classes based on the item's state
   fn item_classes(item: &impl StateWatcher<Value = Self>) -> [DeclareInit<Option<ClassName>>; 3] {
@@ -445,7 +453,7 @@ impl<'c> ComposeChild<'c> for ListItemThumbNail {
   type Child = Widget<'c>;
 
   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    class! { class: LIST_ITEM_THUMB_NAIL, @ { child } }.into_widget()
+    class! { class: LIST_ITEM_THUMBNAIL, @ { child } }.into_widget()
   }
 }
 
@@ -505,6 +513,20 @@ impl List {
       .iter()
       .enumerate()
       .filter(|(_, item)| item.read().is_selected())
+  }
+
+  /// Returns the active item's index and reference if available
+  ///
+  /// The active item is either:
+  /// - Last focused item
+  /// - Last selected item
+  pub fn active_item(&self) -> Option<(usize, &Stateful<ListItem>)> {
+    self.active_item.and_then(|active_idx| {
+      self
+        .items
+        .get(active_idx)
+        .map(|item| (active_idx, item))
+    })
   }
 
   /// Deselects all items in the list.
@@ -634,17 +656,17 @@ impl List {
   ) -> Widget<'c> {
     item.silent().wid = list_item.get_track_id_widget().read().track_id();
 
-    if self.select_mode == ListSelectMode::None {
+    let mode = self.select_mode;
+    if mode == ListSelectMode::None {
       list_item.into_widget()
     } else {
-      let toggle = self.select_mode == ListSelectMode::Multi;
       rdl! {
         @ $list_item {
-          on_tap: move |_| $item.write().inner_select(toggle),
+          on_tap: move |_| ListItem::select_action($item.write(), mode),
           on_key_down: move |e| {
             if matches!(e.key(), VirtualKey::Named(NamedKey::Enter)
               | VirtualKey::Named(NamedKey::Space)) {
-              $item.write().inner_select(toggle);
+              ListItem::select_action($item.write(), mode)
             }
           }
         }.into_widget()
@@ -752,6 +774,15 @@ mod tests {
        @ListItemTrailingSupporting { @ { "100+" } }
        @Trailing { @Icon { @named_svgs::default() } }
      }
+
+     @ListItem {
+      @ListItemHeadline { @ { "Counter"} }
+      @Trailing {
+        @ListItemThumbNail {
+          @Container { size: Size::new(160., 90.), background: Color::GREEN }
+        }
+      }
+    }
    }).with_wnd_size(Size::new(320., 640.))
    .with_comparison(0.00005)
   }
