@@ -356,7 +356,7 @@ impl Face {
   }
 
   pub fn glyph_raster_image(
-    &self, glyph_id: GlyphId, pixels_per_em: u16,
+    &self, glyph_id: GlyphId, img_size: u16,
   ) -> Option<Resource<PixelImage>> {
     self
       .raster_image_glyphs
@@ -365,7 +365,7 @@ impl Face {
       .or_insert_with(|| {
         self
           .rb_face
-          .glyph_raster_image(glyph_id, pixels_per_em)
+          .glyph_raster_image(glyph_id, img_size)
           .and_then(|img| match img.format {
             #[cfg(feature = "png")]
             rustybuzz::ttf_parser::RasterImageFormat::PNG => {

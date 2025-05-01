@@ -68,3 +68,89 @@ impl TypographyTheme {
     Provider::write_of(ctx).unwrap()
   }
 }
+
+/// Returns platform-specific font fallback families with comprehensive language
+/// support including emoji, CJK, and international characters.
+///
+/// The list prioritizes system fonts first, followed by common fallbacks.
+/// Fonts are ordered by likelihood of containing required glyphs.
+pub fn fallback_font_families() -> &'static [&'static str] {
+  #[cfg(target_os = "android")]
+  const FAMILIES: &[&str] = &[
+    "Roboto",              // System default
+    "Noto Sans CJK SC",    // CJK optimized
+    "Noto Color Emoji",    // Google emoji
+    "Droid Sans Fallback", // Legacy fallback
+    "Source Han Sans",     // Adobe CJK
+    "Noto Serif",          // Serif variant
+    "Google Sans",         // Modern UI
+    "Motoya L Maru",       // Japanese rounded font
+    "Padauk",              // Southeast Asian
+  ];
+
+  #[cfg(target_os = "ios")]
+  const FAMILIES: &[&str] = &[
+    ".AppleSystemUIFont", // System default
+    "Apple Color Emoji",  // iOS emoji
+    "PingFang SC",        // Chinese UI
+    "Hiragino Sans",      // Japanese
+    "Noto Sans CJK SC",   // CJK fallback
+    "Chalkboard SE",      // iOS serif
+    "Geeza Pro",          // Arabic
+    "Kefa",               // African scripts
+    "Roboto",             // Cross-platform
+  ];
+
+  #[cfg(target_os = "linux")]
+  const FAMILIES: &[&str] = &[
+    "Noto Sans",           // Google's international font
+    "Noto Sans CJK SC",    // CJK support
+    "DejaVu Sans",         // General Unicode
+    "FreeSans",            // Linux system font
+    "WenQuanYi Zen Hei",   // Chinese handwriting
+    "Symbola",             // Ancient scripts/emoji
+    "Noto Color Emoji",    // Google emoji
+    "Roboto",              // Material design
+    "Droid Sans Fallback", // Android-derived fallback
+  ];
+
+  #[cfg(target_os = "macos")]
+  const FAMILIES: &[&str] = &[
+    ".SF NS",            // San Francisco (system default)
+    "Menlo",             // macOS monospace
+    "Apple Color Emoji", // Apple emoji
+    "Noto Sans CJK SC",  // Pan-CJK fallback
+    "PingFang SC",       // Simplified Chinese
+    "Hiragino Sans",     // Japanese
+    "Geneva",            // Legacy system UI
+    "Arial Unicode MS",  // Broad Unicode support
+    "Roboto",            // Cross-platform fallback
+    "Source Han Sans",   // Adobe's CJK font
+  ];
+
+  #[cfg(target_os = "windows")]
+  const FAMILIES: &[&str] = &[
+    "Segoe UI",         // System UI font
+    "Segoe UI Emoji",   // Windows emoji
+    "Segoe UI Symbol",  // Symbols
+    "Microsoft YaHei",  // Simplified Chinese UI
+    "SimSun",           // Legacy CJK
+    "Nirmala UI",       // South Asian scripts
+    "Noto Sans CJK SC", // CJK fallback
+    "Arial",            // Western fallback
+    "Roboto",           // Cross-platform UI
+    "Times New Roman",  // Serif fallback
+  ];
+
+  // Default empty fallback for unsupported platforms
+  #[cfg(not(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "windows"
+  )))]
+  const FAMILIES: &[&str] = &[];
+
+  FAMILIES
+}
