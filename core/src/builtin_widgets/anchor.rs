@@ -146,22 +146,22 @@ impl Anchor {
   }
 }
 
-/// A widget used to anchor child constraints relative to the parent widget.
+/// A virtual widget that anchors its child relative to parent constraints.
 ///
-/// **Note:** If the anchor is a percentage value or it relative to the right or
-/// bottom, the position is calculated based on the maximum size (`clamp.max`)
-/// received during `perform_layout`. This may not match the parent widget's
-/// size if the parent is not a fixed-size widget.
+/// ## Note
 ///
-/// ## Why Not Use Parent Size for Calculation?
+/// If the anchor is percentage or relative to the bottom or right edge, we
+/// calculate the offset based on a container base on the child size and the
+/// constraints but not the parent constraints. The container is determined by
+/// the following priority rules:
 ///
-/// 1. In `Ribir`, the layout phase is top-down, so the parent's size is unknown
-///    when the child is laid out.
-/// 2. Layout widgets use `clamp` to constrain the child's size, assuming the
-///    child depends solely on the `clamp` for layout. If `VAlignWidget` used
-///    the parent's size for alignment, it could violate the `clamp`. For
-///    example, `Padding` reduces the `clamp` for its child, but its own size
-///    might not increase.
+/// 1. Use the maximum constraint if it's finite.
+/// 2. Fall back to the clamped child size (constrained by min/max limits) .
+///
+/// ## Usage Guidelines
+///
+/// For reliable alignment, use within parents has fixed size
+
 #[derive(Default)]
 pub struct RelativeAnchor {
   pub anchor: Anchor,
@@ -180,7 +180,10 @@ impl WrapRender for RelativeAnchor {
     ctx.update_position(ctx.widget_id(), Point::zero());
     let child_size = host.perform_layout(clamp, ctx);
 
-    let offset = self.anchor.into_pixel(child_size, clamp.max);
+    let container =
+      Size::new(clamp.container_width(child_size.width), clamp.container_height(child_size.height));
+
+    let offset = self.anchor.into_pixel(child_size, container);
     let pos = ctx.box_pos().unwrap_or_default();
     ctx.update_position(ctx.widget_id(), pos + Size::new(offset.x, offset.y));
     child_size

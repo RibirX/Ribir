@@ -95,6 +95,77 @@ impl BoxClamp {
     self.min.height = height.min(self.max.height);
     self
   }
+
+  /// Calculates an estimated container width during child layout phases when
+  /// parent width is unknown.
+  ///
+  /// Provides a deterministic strategy to determine container width based on
+  /// constraints and child metrics:
+  ///
+  /// 1. **Constraint-based width**: Uses the maximum width constraint when
+  ///    finite and bounded
+  /// 2. **Content-based width**: Falls back to child width clamped by minimum
+  ///    width constraint
+  ///
+  /// # Arguments
+  ///
+  /// - `child_width`: The child's intrinsic width requirement before clamping
+  ///
+  /// # Returns
+  ///
+  /// Estimated layout width that respects constraints while considering child
+  /// requirements.
+  ///
+  /// # Implementation Notes
+  ///
+  /// The returned width represents a layout hypothesis rather than final parent
+  /// dimensions. This intermediate value enables consistent layout calculations
+  /// before parent constraints are fully resolved, but may differ from the
+  /// final container width determined during parent layout phases.
+  pub fn container_width(&self, child_width: f32) -> f32 {
+    let min = self.min.width;
+    let max = self.max.width;
+
+    // Prefer finite maximum constraint when available, otherwise use clamped child
+    // width
+    if max.is_finite() { max } else { min.max(child_width) }
+  }
+
+  /// Calculates an estimated container height during child layout phases when
+  /// parent height is unknown.
+  ///
+  /// Provides a deterministic strategy to determine container height based on
+  /// constraints and child metrics:
+  ///
+  /// 1. **Constraint-based height**: Uses the maximum height constraint when
+  ///    finite and bounded
+  /// 2. **Content-based height**: Falls back to child height clamped by minimum
+  ///    height constraint
+  ///
+  /// # Arguments
+  ///
+  /// - `child_height`: The child's intrinsic height requirement before clamping
+  ///
+  /// # Returns
+  ///
+  /// Estimated layout height that respects constraints while considering child
+  /// requirements.
+  ///
+  /// # Implementation Notes
+  ///
+  /// The returned height represents a layout hypothesis rather than final
+  /// parent dimensions. This intermediate value enables consistent layout
+  /// calculations before parent constraints are fully resolved, but may
+  /// differ from the final container height determined during parent layout
+  /// phases.
+  pub fn container_height(&self, child_height: f32) -> f32 {
+    let min = self.min.height;
+    let max = self.max.height;
+
+    // Prefer finite maximum constraint when available, otherwise use clamped child
+    // height
+    if max.is_finite() { max } else { min.max(child_height) }
+  }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Copy)]

@@ -52,73 +52,51 @@ pub enum VAlign {
   /// constraints passed to the children to be tight.
   Stretch,
 }
-/// A widget that horizontally aligns its child within available layout
+
+/// A virtual widget that horizontally positions its child based on parent
 /// constraints.
 ///
-/// The alignment is determined by the width constraints (`BoxClamp`) received
-/// during `perform_layout`, following these priority rules:
-/// 1. If maximum width is finite, uses maximum width for alignment
-/// 2. If minimum width is greater than zero, uses minimum width for alignment
-/// 3. Otherwise, alignment has no effect
+/// ## Layout Behavior
 ///
-/// # Important Notes
-/// - This widget may override width constraints to achieve proper alignment
-/// - Final alignment depends on parent-provided constraints, not final parent
-///   size
+/// As we don't know the parent size during layout, the alignment container
+/// width is determined by the following priority rules:
 ///
-/// # Layout Behavior
+/// 1. Use the maximum constraint width if it's finite.
+/// 2. Fall back to the clamped child width (constrained by min/max limits) .
 ///
-/// In Ribir's top-down layout system:
-/// - Alignment uses constraints available during this widget's layout phase
-/// - May not match parent size if parent doesn't enforce fixed width
-/// - For predictable results, ensure parents provide clear width constraints
+/// ## Implementation Notes
 ///
-/// # Why Constraints Instead of Parent Size?
+/// - Parent precedence: Final x-position may be overridden by parent layout
+///   logic
+/// - Constraint relaxation: This widget removes width constraints during child
+///   layout to ensure proper alignment calculation
 ///
-/// 1. **Layout Order**: Parent size is unknown during child layout (top-down
-///    process)
-/// 2. **Constraint Safety**: Using parent size could violate layout clamps:
-///    - Example: `Padding` reduces child's constraints but might not expand
-///      itself
-///    - Alignment must respect the received constraints to maintain layout
-///      integrity
+/// ## Usage Guidelines
+///
+/// For reliable alignment:
+///
+/// - Use within parents with fixed width
+/// - Avoid combining with parents that perform custom x-axis positioning
 #[derive(Default)]
 pub struct HAlignWidget {
+  /// Configuration for horizontal alignment strategy
+  ///
+  /// See [`HAlign`] documentation for available alignment options and their
+  /// behavior in different layout scenarios.
   pub h_align: HAlign,
 }
 
-/// A widget that vertically aligns its child within available layout
+/// A virtual widget that vertically positions its child based on parent
 /// constraints.
 ///
-/// The alignment is determined by the height constraints (`BoxClamp`) received
-/// during `perform_layout`, following these priority rules:
-/// 1. If maximum height is finite, uses maximum height for alignment
-/// 2. If minimum height is greater than zero, uses minimum height for alignment
-/// 3. Otherwise, alignment has no effect
-///
-/// # Important Notes
-/// - This widget may override height constraints to achieve proper alignment
-/// - Final alignment depends on parent-provided constraints, not final parent
-///   size
-///
-/// # Layout Behavior
-///
-/// In Ribir's top-down layout system:
-/// - Alignment uses constraints available during this widget's layout phase
-/// - May not match parent size if parent doesn't enforce fixed height
-/// - For predictable results, ensure parents provide clear height constraints
-///
-/// # Why Constraints Instead of Parent Size?
-///
-/// 1. **Layout Order**: Parent size is unknown during child layout (top-down
-///    process)
-/// 2. **Constraint Safety**: Using parent size could violate layout clamps:
-///    - Example: `Padding` reduces child's constraints but might not expand
-///      itself
-///    - Alignment must respect the received constraints to maintain layout
-///      integrity
+/// This widget is similar to [`HAlignWidget`], but aligns children in y-axis.
+/// See [`HAlignWidget`] for more details.
 #[derive(Default)]
 pub struct VAlignWidget {
+  /// Configuration for vertical alignment strategy
+  ///
+  /// See [`VAlign`] documentation for available alignment options and their
+  /// behavior in different layout scenarios.
   pub v_align: VAlign,
 }
 
@@ -153,62 +131,56 @@ impl_compose_child_for_wrap_render!(VAlignWidget, DirtyPhase::Layout);
 
 impl WrapRender for HAlignWidget {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    let align_to = if clamp.max.width.is_finite() {
-      clamp.max.width
-    } else if clamp.min.width > 0. {
-      clamp.min.width
-    } else {
-      return host.perform_layout(clamp, ctx);
-    };
-    let clamp = if self.h_align == HAlign::Stretch {
-      clamp.with_fixed_width(align_to)
+    let max = clamp.max.width;
+    let host_clamp = if self.h_align == HAlign::Stretch && max.is_finite() {
+      clamp.with_fixed_width(max)
     } else {
       clamp.free_width()
     };
+    let size = host.perform_layout(host_clamp, ctx);
 
-    let host_size = host.perform_layout(clamp, ctx);
-    let x = Align::align_value(self.h_align.into(), host_size.width, align_to);
+    // Get the alignment container, see the [`HAlignWidget`] documentation.
+    let container = clamp.container_width(size.width);
+    let x = Align::align_value(self.h_align.into(), size.width, container);
     let pos = ctx.box_pos().unwrap_or_default();
     ctx.update_position(ctx.widget_id(), Point::new(x, pos.y));
 
-    host_size
+    // Don't clamp, because we free the width to get proper alignment
+    size
   }
 }
 
 impl WrapRender for VAlignWidget {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    let align_to = if clamp.max.height.is_finite() {
-      clamp.max.height
-    } else if clamp.min.height > 0. {
-      clamp.min.height
-    } else {
-      return host.perform_layout(clamp, ctx);
-    };
-    let clamp = if self.v_align == VAlign::Stretch {
-      clamp.with_fixed_height(align_to)
+    let max = clamp.max.height;
+    let host_clamp = if self.v_align == VAlign::Stretch && max.is_finite() {
+      clamp.with_fixed_height(max)
     } else {
       clamp.free_height()
     };
+    let size = host.perform_layout(host_clamp, ctx);
 
-    let host_size = host.perform_layout(clamp, ctx);
-    let y = Align::align_value(self.v_align.into(), host_size.height, align_to);
+    // Get the alignment container, see the [`VAlignWidget`] documentation.
+    let container = clamp.container_height(size.height);
+    let y = Align::align_value(self.v_align.into(), size.height, container);
     let pos = ctx.box_pos().unwrap_or_default();
     ctx.update_position(ctx.widget_id(), Point::new(pos.x, y));
 
-    host_size
+    // Don't clamp, because we free the height to get proper alignment
+    size
   }
 }
 
 impl Align {
   pub fn align_value(self, child_size: f32, box_size: f32) -> f32 {
-    if box_size.is_finite() {
-      match self {
-        Align::Center => (box_size - child_size) / 2.,
-        Align::End => box_size - child_size,
-        _ => 0.,
-      }
-    } else {
-      0.
+    if !box_size.is_finite() {
+      return 0.;
+    }
+
+    match self {
+      Align::Center => (box_size - child_size) / 2.,
+      Align::End => box_size - child_size,
+      _ => 0.,
     }
   }
 }
