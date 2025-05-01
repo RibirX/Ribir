@@ -103,6 +103,9 @@ pub struct Route {
 }
 
 impl RouterParams {
+  /// Returns a read-only reference to the RouterParams provider of the context.
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<Self>> { Provider::of(ctx) }
+
   /// Returns captured parameter value if exists.
   ///
   /// Returns `None` if no parameter with the given name was matched.

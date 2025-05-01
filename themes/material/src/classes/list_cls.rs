@@ -92,8 +92,42 @@ pub(super) fn init(classes: &mut Classes) {
     },
   );
 
-  classes.insert(LIST_ITEM_LEADING, style_class! { margin: md::EDGES_LEFT_16 });
+  named_style_impl! { standard_thumbnail =>{
+    clamp: BoxClamp::fixed_height(64.),
+    box_fit: BoxFit::CoverHeight
+  }};
 
+  classes.insert(LIST_ITEM_THUMBNAIL, standard_thumbnail);
+
+  classes.insert(
+    LIST_ITEM_LEADING,
+    style_class! {
+      margin: md::EDGES_LEFT_16,
+      // Overrides the thumbnail class, to shrink the left margin space in the leading.
+      providers: [Class::provider(
+        LIST_ITEM_THUMBNAIL,
+        class_multi_impl![standard_thumbnail, style_class! { margin: EdgeInsets::only_left(-16.)}],
+      )],
+    },
+  );
+
+  classes.insert(
+    LIST_ITEM_TRAILING,
+    class_multi_impl![
+      ensure_trailing_spacing,
+      style_class! {
+        margin: md::EDGES_RIGHT_16,
+        // Overrides the thumbnail class, to shrink the right margin space in the trailing.
+        providers: [Class::provider(
+          LIST_ITEM_THUMBNAIL,
+          class_multi_impl![
+            standard_thumbnail,
+            style_class! { margin: EdgeInsets::only_right(-16.)}
+          ],
+        )],
+      }
+    ],
+  );
   /// Ensures proper spacing for the trailing widget in a list item.
   /// If the item does not support content, there may be excessive space between
   /// the headline and trailing widget. This function ensures the trailing
@@ -103,43 +137,25 @@ pub(super) fn init(classes: &mut Classes) {
     let struct_info = Provider::of::<ListItemStructInfo>(BuildCtx::get());
     let needs_spacing =
       struct_info.is_some_and(|info| !info.supporting && !info.trailing_supporting);
-    let mut widget = FatObj::new(widget);
 
     if needs_spacing {
-      container! {
-        size: md::SIZE_48,
-        @ $widget {
-            h_align: HAlign::Center,
-            v_align: VAlign::Center,
-        }
+      let mut widget = FatObj::new(widget);
+      stack! {
+        fit: StackFit::Passthrough,
+        clamp: BoxClamp::min_width(48.),
+        @ $widget { h_align: HAlign::Center }
       }
       .into_widget()
     } else {
-      widget.clamp(BoxClamp::max_size(md::SIZE_48));
-      widget.into_widget()
+      widget
     }
   }
-
-  classes.insert(
-    LIST_ITEM_TRAILING,
-    class_multi_impl![ensure_trailing_spacing, style_class! { margin: md::EDGES_RIGHT_16 }],
-  );
 
   classes.insert(
     LIST_ITEM_IMG,
     style_class! {
       clamp: BoxClamp::fixed_size(Size::splat(56.)),
       box_fit: BoxFit::Contain
-    },
-  );
-
-  classes.insert(
-    LIST_ITEM_THUMB_NAIL,
-    style_class! {
-      // Align thumbnail to the left edge by applying negative margin
-      margin: EdgeInsets::only_left(-16.),
-      clamp: BoxClamp::fixed_height(64.),
-      box_fit: BoxFit::Contain,
     },
   );
 }
