@@ -273,56 +273,6 @@ where
 
 impl ChildOfCompose for Resource<PixelImage> {}
 
-pub trait CompatibilityWithChild<'w, C, const N: usize, const M: usize> {
-  type Target;
-  fn with_child(self, child: C) -> Self::Target;
-}
-
-impl<'w, W, C, const M: usize> CompatibilityWithChild<'w, C, 8, M> for State<W>
-where
-  W: ComposeDecorator + 'static,
-  C: IntoWidget<'w, M>,
-{
-  type Target = Widget<'w>;
-
-  fn with_child(self, child: C) -> Self::Target {
-    let host = child.into_widget();
-
-    let f = move || {
-      let tid = TypeId::of::<W>();
-      let ctx = BuildCtx::get();
-      let decor = Provider::of::<ComposeDecorators>(BuildCtx::get())
-        .and_then(|t| QueryRef::filter_map(t, |t| t.styles.get(&tid)).ok());
-
-      if let Some(style) = decor {
-        style(Box::new(self), host, ctx)
-      } else {
-        ComposeDecorator::compose_decorator(self, host).into_widget()
-      }
-    };
-    f.into_widget()
-  }
-}
-
-impl<'w, T, C, const M: usize> CompatibilityWithChild<'w, C, 9, M> for T
-where
-  T: ComposeDecorator + 'static,
-  C: IntoWidget<'w, M>,
-{
-  type Target = Widget<'w>;
-
-  fn with_child(self, child: C) -> Self::Target { State::value(self).with_child(child) }
-}
-
-impl<'w, W, C, const N: usize, const M: usize> CompatibilityWithChild<'w, C, N, M> for FatObj<W>
-where
-  W: CompatibilityWithChild<'w, C, N, M>,
-{
-  type Target = FatObj<W::Target>;
-
-  fn with_child(self, child: C) -> Self::Target { self.map(|host| host.with_child(child)) }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
