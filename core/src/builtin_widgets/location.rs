@@ -141,13 +141,13 @@ impl Location {
   /// - `url`: Relative path for navigation (e.g., "about" or "/contact")
   /// - `ctx`: Location state provider context
   pub fn goto(url: &str, ctx: &impl AsRef<ProviderCtx>) -> Result<(), Box<dyn Error>> {
-    Self::write_of(ctx).apply_relative_url(url)
+    Self::write_of(ctx).resolve_relative(url)
   }
 
   /// A low-level method to apply a relative URL to the current location.
   ///
   /// Use [`goto`](Location::goto) instead of this method when possible.
-  pub fn apply_relative_url(&mut self, url: &str) -> Result<(), Box<dyn Error>> {
+  pub fn resolve_relative(&mut self, url: &str) -> Result<(), Box<dyn Error>> {
     let new_url = self
       .join(url)
       .map_err(|e| format!("Invalid path '{}': {}", url, e))?;
@@ -272,16 +272,16 @@ mod tests {
 
     let location = Location::stateful();
     let mut w = location.write();
-    w.apply_relative_url("a/b/c").unwrap();
+    w.resolve_relative("a/b/c").unwrap();
     assert_eq!(w.url.as_str(), "https://ribir.org/a/b/c");
 
-    w.apply_relative_url("/a/b/d").unwrap();
+    w.resolve_relative("/a/b/d").unwrap();
     assert_eq!(w.url.as_str(), "https://ribir.org/a/b/d");
 
-    w.apply_relative_url("../e").unwrap();
+    w.resolve_relative("../e").unwrap();
     assert_eq!(w.url.as_str(), "https://ribir.org/a/e");
 
-    w.apply_relative_url("./f").unwrap();
+    w.resolve_relative("./f").unwrap();
     assert_eq!(w.url.as_str(), "https://ribir.org/a/f");
   }
 }

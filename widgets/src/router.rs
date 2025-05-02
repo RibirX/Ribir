@@ -318,7 +318,7 @@ mod tests {
     let mut wnd = TestWindow::new(fn_widget! {
       let location = Location::state_of(BuildCtx::get());
       watch!($nav.to_string()).subscribe(move |v| {
-        let _ = $location.write().apply_relative_url(&v);
+        let _ = $location.write().resolve_relative(&v);
       });
 
       @Router {

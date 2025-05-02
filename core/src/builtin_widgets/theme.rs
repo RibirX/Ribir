@@ -16,8 +16,7 @@ mod typography_theme;
 pub use typography_theme::*;
 mod transition_theme;
 pub use transition_theme::*;
-mod compose_decorators;
-pub use compose_decorators::*;
+
 mod custom_styles;
 pub use custom_styles::*;
 pub use ribir_painter::*;
@@ -87,7 +86,6 @@ pub struct Theme {
   pub classes: Classes,
   pub icon_theme: IconTheme,
   pub transitions_theme: TransitionTheme,
-  pub compose_decorators: ComposeDecorators,
   pub custom_styles: CustomStyles,
   // The theme requires font bytes.
   pub font_bytes: Vec<Vec<u8>>,
@@ -161,7 +159,6 @@ impl Theme {
       Provider::value_of_reader(part_reader!(&this.icon_theme)),
       Classes::reader_into_provider(part_reader!(&this.classes)),
       Provider::value_of_reader(part_reader!(&this.transitions_theme)),
-      Provider::value_of_reader(part_reader!(&this.compose_decorators)),
       Provider::value_of_reader(part_reader!(&this.custom_styles)),
       Provider::value_of_reader(part_reader!(&this.icon_font))
     ];
@@ -219,7 +216,6 @@ impl Default for Theme {
       icon_theme,
       classes: <_>::default(),
       transitions_theme: Default::default(),
-      compose_decorators: Default::default(),
       custom_styles: Default::default(),
       font_bytes: vec![],
       font_files: vec![],

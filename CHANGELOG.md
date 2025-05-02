@@ -35,6 +35,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Added common fallback system fonts list function `fallback_font_families`, so that themes can use. (#748 @M-Adoo)
 
+### BREAKING
+
+- **core**: The `ComposeDecorator` trait has been removed. (#pr @M-Adoo)
+
 ## [0.4.0-alpha.35] - 2025-04-30
 
 ### Fixed

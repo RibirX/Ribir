@@ -289,7 +289,7 @@ pub struct ListItemImg;
 
 /// Widget for thumbnail images in list items
 #[simple_declare]
-pub struct ListItemThumbNail;
+pub struct ListItemThumbnail;
 
 /// The template for the [`ListItem`] widget, which includes the leading,
 /// content, and trailing sections
@@ -449,7 +449,7 @@ impl<'c> ComposeChild<'c> for ListItemImg {
   }
 }
 
-impl<'c> ComposeChild<'c> for ListItemThumbNail {
+impl<'c> ComposeChild<'c> for ListItemThumbnail {
   type Child = Widget<'c>;
 
   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
@@ -763,7 +763,7 @@ mod tests {
        @ListItemSupporting { @ { "description"} }
      }
      @ListItem {
-       @ListItemThumbNail {
+       @ListItemThumbnail {
          @Container { size: Size::new(160., 90.), background: Color::GREEN }
        }
        @ListItemHeadline { @ { "Counter"} }
@@ -778,7 +778,7 @@ mod tests {
      @ListItem {
       @ListItemHeadline { @ { "Counter"} }
       @Trailing {
-        @ListItemThumbNail {
+        @ListItemThumbnail {
           @Container { size: Size::new(160., 90.), background: Color::GREEN }
         }
       }

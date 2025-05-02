@@ -207,7 +207,7 @@ fn content() -> Widget<'static> {
           }
           @Divider { indent: DividerIndent::Start }
           @ListItem {
-            @ListItemThumbNail {
+            @ListItemThumbnail {
               @Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-3.png")))
             }
             @ListItemHeadline { @ { "One lines list item" } }
