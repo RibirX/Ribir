@@ -33,27 +33,44 @@ impl PixelImage {
     PixelImage { data, width, height, format }
   }
 
-  #[cfg(feature = "png")]
-  pub fn from_png(bytes: &[u8]) -> Self {
-    let img = ::image::load(std::io::Cursor::new(bytes), image::ImageFormat::Png)
-      .unwrap()
-      .to_rgba8();
-    let width = img.width();
-    let height = img.height();
-    PixelImage::new(img.into_raw().into(), width, height, ColorFormat::Rgba8)
+  #[cfg(feature = "jpeg")]
+  pub fn from_jpeg(bytes: &[u8]) -> Self { Self::parse_img(bytes, image::ImageFormat::Jpeg) }
+
+  #[cfg(feature = "jpeg")]
+  pub fn write_as_jpeg(
+    &self, w: &mut impl std::io::Write,
+  ) -> Result<(), Box<dyn std::error::Error>> {
+    use image::{DynamicImage, GrayImage, RgbaImage};
+
+    let encoder = ::image::codecs::jpeg::JpegEncoder::new(w);
+    match self.format {
+      ColorFormat::Rgba8 => DynamicImage::from(
+        RgbaImage::from_raw(self.width, self.height, self.data.to_vec()).ok_or("Invalid image")?,
+      )
+      .to_rgb8()
+      .write_with_encoder(encoder)?,
+      ColorFormat::Alpha8 => GrayImage::from_raw(self.width, self.height, self.data.to_vec())
+        .ok_or("Invalid image")?
+        .write_with_encoder(encoder)?,
+    };
+    Ok(())
   }
+
+  #[cfg(feature = "png")]
+  pub fn from_png(bytes: &[u8]) -> Self { Self::parse_img(bytes, image::ImageFormat::Png) }
 
   #[cfg(feature = "png")]
   pub fn write_as_png(
     &self, w: &mut impl std::io::Write,
   ) -> Result<(), Box<dyn std::error::Error>> {
     use image::ImageEncoder;
-    let png_encoder = ::image::codecs::png::PngEncoder::new(w);
+
+    let encoder = ::image::codecs::png::PngEncoder::new(w);
     let fmt = match self.format {
       ColorFormat::Rgba8 => ::image::ColorType::Rgba8,
       ColorFormat::Alpha8 => ::image::ColorType::L8,
     };
-    png_encoder.write_image(&self.data, self.width, self.height, fmt.into())?;
+    encoder.write_image(&self.data, self.width, self.height, fmt.into())?;
     Ok(())
   }
 
@@ -67,6 +84,16 @@ impl PixelImage {
   pub fn size(&self) -> DeviceSize { DeviceSize::new(self.width as i32, self.height as i32) }
   #[inline]
   pub fn pixel_bytes(&self) -> &[u8] { &self.data }
+
+  #[cfg(any(feature = "jpeg", feature = "png"))]
+  fn parse_img(bytes: &[u8], format: image::ImageFormat) -> PixelImage {
+    let img = ::image::load(std::io::Cursor::new(bytes), format)
+      .unwrap()
+      .to_rgba8();
+    let width = img.width();
+    let height = img.height();
+    PixelImage::new(img.into_raw().into(), width, height, ColorFormat::Rgba8)
+  }
 }
 
 impl std::fmt::Debug for PixelImage {

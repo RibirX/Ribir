@@ -47,9 +47,10 @@ ribir_dev_helper = { path = "../dev-helper" }
 ribir_material = { path = "../themes/material" }
 
 [features]
-default = ["wgpu", "widgets", "material", "png"]
+default = ["wgpu", "widgets", "material", "png", "jpeg"]
 material = ["ribir_material"]
 png = ["ribir_core/png"]
+jpeg = ["ribir_core/jpeg"]
 wgpu = ["ribir_gpu/wgpu", "dep:wgpu"]
 widgets = ["ribir_widgets"]
 tokio-async = ["ribir_core/tokio-async"]
