@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **painter**: Support jpeg image. (#753 @wjian23)
+
 ## [0.4.0-alpha.36] - 2025-05-07
 
 ### Features

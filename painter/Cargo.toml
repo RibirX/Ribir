@@ -41,4 +41,5 @@ getrandom.workspace = true
 
 [features]
 png = ["image/png"]
+jpeg = ["image/jpeg"]
 tessellation = ["lyon_tessellation", "zerocopy"]
