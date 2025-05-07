@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.36] - 2025-05-07
+
 ### Features
 
 - **core**: Added common fallback system fonts list function `fallback_font_families`, so that themes can use. (#748 @M-Adoo)
@@ -799,7 +801,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.35...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.36...HEAD
+[0.4.0-alpha.36]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.35...ribir-v0.4.0-alpha.36
 [0.4.0-alpha.35]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.34...ribir-v0.4.0-alpha.35
 [0.4.0-alpha.34]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.33...ribir-v0.4.0-alpha.34
 [0.4.0-alpha.33]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.32...ribir-v0.4.0-alpha.33
