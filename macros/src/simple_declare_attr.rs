@@ -221,7 +221,7 @@ impl<'a> DeclareField<'a> {
   pub fn default_value(&self) -> Option<TokenStream> {
     let attr = self.attr.as_ref()?;
     if let Some(DefaultMeta { value: Some(ref value), .. }) = attr.default.as_ref() {
-      Some(quote! { From::from(#value) })
+      Some(quote! { RFrom::r_from(#value) })
     } else if attr.default.is_some() || attr.skip.is_some() {
       Some(quote! { <_>::default() })
     } else {

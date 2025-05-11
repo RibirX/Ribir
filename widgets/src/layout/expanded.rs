@@ -38,24 +38,24 @@ impl Default for Expanded {
 
 #[derive(Default)]
 pub struct ExpandedDeclarer {
-  flex: Option<DeclareInit<f32>>,
-  defer_alloc: Option<DeclareInit<bool>>,
+  flex: Option<PipeValue<f32>>,
+  defer_alloc: Option<PipeValue<bool>>,
 }
 
 impl ExpandedDeclarer {
   #[track_caller]
-  pub fn flex<const M: usize>(&mut self, flex: impl DeclareInto<f32, M>) -> &mut Self {
+  pub fn flex<K: ?Sized>(&mut self, flex: impl RInto<PipeValue<f32>, K>) -> &mut Self {
     assert!(self.flex.is_none(), "`flex` is already set");
-    self.flex = Some(flex.declare_into());
+    self.flex = Some(flex.r_into());
     self
   }
 
   #[track_caller]
-  pub fn defer_alloc<const M: usize>(
-    &mut self, defer_alloc: impl DeclareInto<bool, M>,
+  pub fn defer_alloc<K: ?Sized>(
+    &mut self, defer_alloc: impl RInto<PipeValue<bool>, K>,
   ) -> &mut Self {
     assert!(self.defer_alloc.is_none(), "`defer_alloc` is already set");
-    self.defer_alloc = Some(defer_alloc.declare_into());
+    self.defer_alloc = Some(defer_alloc.r_into());
     self
   }
 }

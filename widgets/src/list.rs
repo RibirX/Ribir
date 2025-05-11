@@ -268,20 +268,20 @@ pub struct ListItemAlignItems(pub Align);
 
 /// Template for the primary headline text of a list item
 #[derive(Template)]
-pub struct ListItemHeadline(TextInit);
+pub struct ListItemHeadline(TextValue);
 
 /// Template for supporting text with line clamping
 #[derive(Template)]
 pub struct ListItemSupporting {
   /// The number of visible text lines
   #[template(field = 1usize)]
-  lines: DeclareInit<usize>,
-  text: TextInit,
+  lines: PipeValue<usize>,
+  text: TextValue,
 }
 
 /// Template for trailing supporting text
 #[derive(Template)]
-pub struct ListItemTrailingSupporting(TextInit);
+pub struct ListItemTrailingSupporting(TextValue);
 
 /// Widget for images in list items
 #[simple_declare]
@@ -346,7 +346,7 @@ impl ListItem {
   }
 
   /// Generates classes based on the item's state
-  fn item_classes(item: &impl StateWatcher<Value = Self>) -> [DeclareInit<Option<ClassName>>; 3] {
+  fn item_classes(item: &impl StateWatcher<Value = Self>) -> [PipeValue<Option<ClassName>>; 3] {
     class_array![
       distinct_pipe! {
         if $item.is_selected() { LIST_ITEM_SELECTED } else { LIST_ITEM_UNSELECTED }
@@ -458,10 +458,10 @@ impl<'c> ComposeChild<'c> for ListItemThumbnail {
 }
 
 impl ListItemAlignItems {
-  pub fn get_align(ctx: &BuildCtx) -> DeclareInit<Align> {
+  pub fn get_align(ctx: &BuildCtx) -> PipeValue<Align> {
     Variant::<Self>::new_or_default(ctx)
       .map(|v| v.0)
-      .declare_into()
+      .r_into()
   }
 }
 

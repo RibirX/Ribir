@@ -88,16 +88,16 @@ impl ToTokens for DeclareObj {
         if !children.is_empty() {
           let mut children = Vec::with_capacity(self.children.len());
           for (i, c) in self.children.iter().enumerate() {
-            let child = Ident::new(&format!("_child_{i}_ಠ_ಠ"), c.span());
+            let child = Ident::new(&format!("_child_{i}_ಠ_ಠ"), c.tokens.span());
             quote_spanned! { c.span() => let #child = #c; }.to_tokens(tokens);
-            children.push((c.span(), child))
+            children.push(child)
           }
           match &this.node_type {
             ObjType::Type { span, .. } => quote_spanned! { *span => _ಠ_ಠ }.to_tokens(tokens),
             ObjType::Var { var, .. } => var.to_tokens(tokens),
           };
-          children.into_iter().for_each(|(span, name)| {
-            quote_spanned! { span => .with_child(#name) }.to_tokens(tokens)
+          children.into_iter().for_each(|name| {
+            quote_spanned! { name.span() => .with_child(#name) }.to_tokens(tokens)
           });
         }
       })

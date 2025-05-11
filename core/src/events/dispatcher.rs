@@ -355,7 +355,7 @@ mod tests {
         on_pointer_cancel: move |e| $events.write().push(Info::new(e)),
       }
     };
-    (w.into(), e2)
+    (w.r_into(), e2)
   }
 
   #[test]

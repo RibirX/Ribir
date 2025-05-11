@@ -50,15 +50,13 @@ pub enum CachePolicy {
 ///         @ { "Increment" }
 ///       }
 ///       @ {
-///         pipe!(*$cnt).map(move |cnt| move || {
-///           @ {
-///             (0..cnt).map(move |i| @FatObj {
-///               reuse_id: LocalId::number(i),
-///               @text! {
-///                 text: format!("Item {i}, created at {:?}", Instant::now())
-///               }
-///             })
-///           }
+///         pipe!(*$cnt).map(move |cnt| {
+///           (0..cnt).map(move |i| @FatObj {
+///             reuse_id: LocalId::number(i),
+///             @text! {
+///               text: format!("Item {i}, created at {:?}", Instant::now())
+///             }
+///           })
 ///         })
 ///       }
 ///     }

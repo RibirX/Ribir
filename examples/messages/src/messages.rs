@@ -77,20 +77,18 @@ impl Compose for MessageList {
               @ fn_widget! {
                 @Scrollbar {
                   @List {
-                    @{
-                      let mut children = List::child_template();
+                    @ {
+                      let mut children = List::child_builder();
                       for message in $this.messages.iter() {
-                        children = @ $children {
-                          @ListItem {
-                            @Avatar { @{ message.img.clone() }}
-                            @ListItemHeadline { @ { message.nick_name.clone()} }
-                            @ListItemSupporting {
-                              @ { message.content.clone() }
-                            }
-                            @Trailing { @Icon { @{ svgs::MORE_HORIZ } } }
+                        children = children.with_child(@ListItem {
+                          @Avatar { @{ message.img.clone() }}
+                          @ListItemHeadline { @ { message.nick_name.clone()} }
+                          @ListItemSupporting {
+                            @ { message.content.clone() }
                           }
-                          @Divider {}
-                        };
+                          @Trailing { @Icon { @{ svgs::MORE_HORIZ } } }
+                        })
+                        .with_child(@Divider {});
                       }
                       children
                     }

@@ -65,8 +65,8 @@ struct ShowingInfo {
 
 impl Overlay {
   /// Create overlay from a function widget that may call many times.
-  pub fn new(gen: impl Into<GenWidget>, style: OverlayStyle) -> Self {
-    let gen = gen.into();
+  pub fn new<K: ?Sized>(gen: impl RInto<GenWidget, K>, style: OverlayStyle) -> Self {
+    let gen = gen.r_into();
     let OverlayStyle { auto_close_policy, mask } = style;
     Self(Sc::new(RefCell::new(InnerOverlay {
       gen,
@@ -143,7 +143,7 @@ impl Overlay {
     }
     let gen = self.0.borrow().gen.clone();
     let gen = move || f(gen.gen_widget());
-    self.inner_show(gen.into(), wnd);
+    self.inner_show(gen.r_into(), wnd);
   }
 
   /// Show the widget at the give position.
@@ -195,7 +195,7 @@ impl Overlay {
     let close_policy = self.auto_close_policy();
     let inner = self.0.clone();
     let gen = fn_widget! {
-      let w = content.gen_widget().into_widget();
+      let w = content.gen_widget();
       let mut w = if background.is_some() || close_policy.contains(AutoClosePolicy::TAP_OUTSIDE) {
         let mut container = @Container { size: Size::splat(f32::INFINITY) };
         if let Some(background) = background.clone() {
@@ -210,7 +210,7 @@ impl Overlay {
             }
           });
         }
-        container.map(|c| c.with_child(w))
+        container.map(|c| c.with_child(w).into_widget())
       } else {
         FatObj::new(w)
       };
@@ -231,7 +231,7 @@ impl Overlay {
     let this = self.clone();
     let _ = AppCtx::spawn_local(async move {
       let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
-      let generator: GenWidget = gen.into();
+      let generator: GenWidget = gen.r_into();
       let wid = BuildCtx::get_mut().build(generator.gen_widget());
       let tree = wnd.tree_mut();
       tree.root().append(wid, tree);

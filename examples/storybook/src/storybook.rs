@@ -118,7 +118,7 @@ fn content() -> Widget<'static> {
         }
       }
     }
-    .into()
+    .r_into()
   }
 
   fn tabs_show() -> GenWidget {
@@ -141,7 +141,7 @@ fn content() -> Widget<'static> {
         }
       }
     }
-    .into()
+    .r_into()
   }
 
   fn containment_show() -> GenWidget {
@@ -160,7 +160,7 @@ fn content() -> Widget<'static> {
         @Divider {}
       }
     }
-    .into()
+    .r_into()
   }
 
   fn lists_show() -> GenWidget {
@@ -217,7 +217,7 @@ fn content() -> Widget<'static> {
         }
       }
     }
-    .into()
+    .r_into()
   }
 
   fn checkbox_show() -> GenWidget {
@@ -238,7 +238,7 @@ fn content() -> Widget<'static> {
         }
       }
     }
-    .into()
+    .r_into()
   }
 
   fn_widget! {

@@ -96,7 +96,7 @@ impl Checkbox {
 }
 
 impl ComposeChild<'static> for Checkbox {
-  type Child = Option<PositionChild<TextInit>>;
+  type Child = Option<PositionChild<TextValue>>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fat_obj! {

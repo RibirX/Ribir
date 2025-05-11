@@ -15,7 +15,7 @@ fn indeterminate_trans() -> Box<dyn Transition> {
     .box_it()
 }
 
-fn md_base_spinner(w: Widget, foreground: DeclareInit<Brush>) -> Widget {
+fn md_base_spinner(w: Widget, foreground: PipeValue<Brush>) -> Widget {
   fat_obj! {
     foreground,
     clamp: BoxClamp::fixed_size(md::SIZE_48),
@@ -155,8 +155,8 @@ pub(super) fn init(classes: &mut Classes) {
         transform: Transform::translation(-center.width, -center.height)
           .then_rotate(margin_angle / 2.)
           .then_translate(center.to_vector()),
-        @md_base_spinner(track.into_widget(), BuildCtx::container_color().declare_into())
-        @md_base_spinner(w, BuildCtx::color().declare_into())
+        @md_base_spinner(track.into_widget(), BuildCtx::container_color().r_into())
+        @md_base_spinner(w, BuildCtx::color().r_into())
       }
 
     }
@@ -182,7 +182,7 @@ pub(super) fn init(classes: &mut Classes) {
         transition: indeterminate_trans(),
         from: (Angle::zero(), pi * 0.1),
       }.run();
-      @md_base_spinner(w, BuildCtx::color().declare_into())
+      @md_base_spinner(w, BuildCtx::color().r_into())
     }
     .into_widget()
   });

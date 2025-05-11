@@ -11,152 +11,173 @@ use ribir_algo::Sc;
 use widget_id::RenderQueryable;
 
 pub(crate) use crate::widget_tree::*;
-use crate::{context::*, prelude::*, render_helper::PureRender};
-pub trait Compose: Sized {
-  /// Describes the part of the user interface represented by this widget.
-  /// Called by framework, should never directly call it.
-  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static>;
+use crate::{context::*, prelude::*};
+
+/// Defines how a type composes its user interface representation from its state
+///
+/// Implement this trait for types that need to create widget hierarchies based
+/// on their internal state.
+pub trait Compose {
+  fn compose(state: impl StateWriter<Value = Self>) -> Widget<'static>
+  where
+    Self: Sized;
 }
 
+/// Core rendering interface for visual widgets
+///
+/// Implement this trait for widgets that need custom layout calculation,
+/// painting logic, or hit testing behavior. The framework calls these methods
+/// during different phases of the rendering pipeline.
+pub trait Render: 'static {
+  /// Calculate widget layout within constraints
+  ///
+  /// # Parameters
+  /// - `clamp`: Size constraints from parent
+  /// - `ctx`: Layout context and child management
+  ///
+  /// # Implementation Guide
+  /// 1. **Constraint Handling**:
+  ///    - Respect clamp.min/max boundaries
+  /// 2. **Child Management**:
+  ///    - Call `ctx.perform_layout()` for each child
+  ///    - Set child positions via `LayoutCtx`
+  /// 3. **Size Safety**:
+  ///    - Never return infinite/NaN sizes
+  ///    - Fall back to clamp limits for invalid calculations
+  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size;
+
+  /// Custom painting implementation
+  ///
+  /// Use `PaintingCtx::painter` for drawing operations. Child widgets are
+  /// painted automatically by the framework after parent painting completes.
+  fn paint(&self, _: &mut PaintingCtx) {}
+
+  /// Calculates the visual bounding box of the widget's painting effects
+  ///
+  /// # Parameters
+  /// - `ctx`: Provides access to layout and visual context information
+  ///
+  /// # Returns
+  /// - `Some(Rect)`: Bounding box in local coordinates if the widget paints
+  ///   content
+  /// - `None`: Default value indicating no visual representation
+  #[allow(unused_variables)]
+  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { None }
+
+  /// Child size dependency flag
+  ///
+  /// Return `false` for fixed-size containers to optimize layout passes.
+  /// Default implementation assumes child-dependent sizing.
+  fn size_affected_by_child(&self) -> bool { true }
+
+  /// Hit testing implementation
+  ///
+  /// # Parameters
+  /// - `ctx`: Hit test context and helpers
+  /// - `pos`: Test position in local coordinates
+  ///
+  /// Return `HitTest` with:
+  /// - `hit`: Whether position intersects widget
+  /// - `can_hit_child`: Whether to test child widgets
+  fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
+    let hit = ctx.box_hit_test(pos);
+    HitTest { hit, can_hit_child: hit || self.size_affected_by_child() }
+  }
+
+  /// Dirty state propagation control
+  ///
+  /// Return `DirtyPhase::Layout` (default) to mark as dirty on modifications.
+  /// Use `DirtyPhase::Visual` for paint-only updates.
+  fn dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
+
+  /// Custom coordinate transformation
+  ///
+  /// Return `Some(Transform)` to apply local-to-parent transformation.
+  /// Used for widgets with custom positioning or transformation effects.
+  fn get_transform(&self) -> Option<Transform> { None }
+}
+
+/// Result of a hit testing operation
+///
+/// Contains both the hit status and child hit testing policy:
+/// - `hit`: True if the widget itself was hit
+/// - `can_hit_child`: Whether to continue testing child widgets
 pub struct HitTest {
   pub hit: bool,
   pub can_hit_child: bool,
 }
 
-/// RenderWidget is a widget which want to paint something or do a layout to
-/// calc itself size and update children positions.
-pub trait Render: 'static {
-  /// Do the work of computing the layout for this widget, and return the
-  /// size it need.
-  ///
-  /// In implementing this function, You are responsible for calling every
-  /// children's perform_layout across the `LayoutCtx`
-  ///
-  /// ## Guidelines for implementing this method
-  ///
-  /// - The clamp should restrict the size to always fall within the specified
-  ///   range.
-  /// - Avoid returning infinity or NaN size, as this could result in a crash.
-  ///   If your size calculation is dependent on the `clamp.max`, you might want
-  ///   to consider using [`LayoutCtx::fixed_max`].
-  /// - Parent has responsibility to call the children's perform_layout, and
-  ///   update the children's position. If the children position is not updated
-  ///   that will set to zero.
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size;
-
-  /// Draw the widget on the paint device using `PaintingCtx::painter` within
-  /// its own coordinate system. This method should not handle painting of
-  /// children; the framework will handle painting of children individually. The
-  /// framework ensures that the parent is always painted before its children.
-  fn paint(&self, _: &mut PaintingCtx) {}
-
-  /// Whether the child nodes' size affect its size.
-  fn size_affected_by_child(&self) -> bool { true }
-
-  /// Verify if the provided position is within this widget and return whether
-  /// its child can be hit if the widget itself is not hit.
-  fn hit_test(&self, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
-    let hit = ctx.box_hit_test(pos);
-    // If the widget is affected by child, indicating it is not a
-    // fixed-size container, we permit the child to receive hits even if it
-    // extends beyond its parent boundaries.
-    HitTest { hit, can_hit_child: hit || self.size_affected_by_child() }
-  }
-
-  /// By default, this function returns a `Layout` phase to indicate that the
-  /// widget should be marked as dirty when modified. When the layout phase is
-  /// marked as dirty, the paint phase will also be affected.
-  fn dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
-
-  /// Return a transform to map the coordinate to parent coordinate.
-  fn get_transform(&self) -> Option<Transform> { None }
-
-  /// Computes the visual bounding box of the widget relative to self.
-  /// The method is called by framework after the layout is done.
-  /// Usually if you paint something, you should return the bounding box of the
-  /// paint. Default implementation will return None which means the
-  /// current widget will not be rendered.
-  ///
-  ///
-  /// Parameters:
-  ///
-  /// * `ctx`: The VisualCtx.
-  ///
-  /// Returns:
-  ///
-  /// The visual bounding box of the widget.
-  #[allow(unused_variables)]
-  fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { None }
-}
-
-/// The common type of all widget can convert to.
+/// Primary widget handle type
+///
+/// Contains either static content or dynamic generator function.
+/// All widget composition operations eventually produce this type.
 pub struct Widget<'w>(InnerWidget<'w>);
 
-pub struct InnerWidget<'w>(Box<dyn FnOnce(&mut BuildCtx) -> WidgetId + 'w>);
+/// Internal widget representation
+pub(crate) struct InnerWidget<'w>(Box<dyn FnOnce(&mut BuildCtx) -> WidgetId + 'w>);
 
-/// A boxed function widget that can be called multiple times to regenerate
-/// widget.
-#[derive(Clone, ChildOfCompose)]
+/// Conversion interface for widget-like types
+///
+/// Automatically implemented for all types that can be converted to [`Widget`]
+/// through the [`RInto`] trait system.
+pub trait IntoWidget<'a, K> {
+  fn into_widget(self) -> Widget<'a>;
+}
+
+/// Reusable widget generator
+///
+/// Contains a boxed closure that can produce new widget instances on demand.
+#[derive(Clone)]
 pub struct GenWidget(InnerGenWidget);
 type InnerGenWidget = Sc<RefCell<Box<dyn FnMut() -> Widget<'static>>>>;
 
-#[derive(ChildOfCompose)]
-pub struct FnWidget<'w, F, W, const M: usize> {
-  f: F,
-  _marker: PhantomData<&'w W>,
-}
-
-#[derive(ChildOfCompose)]
-pub struct BoxFnWidget<'w>(Box<dyn FnOnce() -> Widget<'w> + 'w>);
-
-impl<'w, W, F, const M: usize> FnWidget<'w, F, W, M>
-where
-  Self: 'w,
-  F: FnOnce() -> W,
-  W: IntoWidget<'w, M>,
-{
-  pub fn new(f: F) -> Self { Self { f, _marker: PhantomData } }
-
-  pub fn call(self) -> W { (self.f)() }
-
-  pub fn boxed(self) -> BoxFnWidget<'w> { BoxFnWidget(Box::new(move || self.call().into_widget())) }
-}
-
-// The widget type marker.
-pub const COMPOSE: usize = 1;
-pub const RENDER: usize = 2;
-pub const FN: usize = 3;
-pub const STATELESS_COMPOSE: usize = 4;
-
-/// Defines a trait for converting any widget into a `Widget` type. Direct
-/// implementation of this trait is not recommended as it is automatically
-/// implemented by the framework.
+/// Single-use widget generator
 ///
-/// Instead, focus on implementing `Compose`, `Render`, or `ComposeChild`.
-pub trait IntoWidget<'w, const M: usize>: 'w {
-  fn into_widget(self) -> Widget<'w>;
+/// Wraps a closure that produces a widget when called.
+pub struct FnWidget<W, F: FnOnce() -> W>(pub(crate) F);
+pub type BoxFnWidget<'w> = Box<dyn FnOnce() -> Widget<'w> + 'w>;
+
+impl<W, F> FnWidget<W, F>
+where
+  F: FnOnce() -> W,
+{
+  pub fn new<'w, K>(f: F) -> Self
+  where
+    W: IntoWidget<'w, K>,
+  {
+    Self(f)
+  }
+
+  pub fn into_inner(self) -> F { self.0 }
+
+  pub fn call(self) -> W { (self.0)() }
+
+  pub fn boxed<'w, K>(self) -> BoxFnWidget<'w>
+  where
+    W: IntoWidget<'w, K> + 'w,
+    F: 'w,
+  {
+    Box::new(move || self.call().into_widget())
+  }
 }
 
 impl GenWidget {
-  pub fn new(f: impl FnMut() -> Widget<'static> + 'static) -> Self {
-    Self(Sc::new(RefCell::new(Box::new(f))))
+  pub fn new<W, K>(mut f: impl FnMut() -> W + 'static) -> Self
+  where
+    W: IntoWidget<'static, K>,
+  {
+    Self(Sc::new(RefCell::new(Box::new(move || f().into_widget()))))
+  }
+
+  pub fn from_fn_widget<F, W, K>(f: FnWidget<W, F>) -> Self
+  where
+    F: FnMut() -> W + 'static,
+    W: IntoWidget<'static, K>,
+  {
+    Self::new(f.into_inner())
   }
 
   pub fn gen_widget(&self) -> Widget<'static> { self.0.borrow_mut()() }
-}
-
-impl<'w> IntoWidget<'w, FN> for Widget<'w> {
-  #[inline(always)]
-  fn into_widget(self) -> Widget<'w> { self }
-}
-
-impl<C: Compose + 'static> IntoWidget<'static, STATELESS_COMPOSE> for C {
-  #[inline]
-  fn into_widget(self) -> Widget<'static> { Compose::compose(State::value(self)).into_widget() }
-}
-
-impl<R: Render + 'static> IntoWidget<'static, RENDER> for R {
-  fn into_widget(self) -> Widget<'static> { Widget::from_render(Box::new(PureRender(self))) }
 }
 
 impl<W: ComposeChild<'static, Child = Option<C>>, C> Compose for W {
@@ -165,36 +186,11 @@ impl<W: ComposeChild<'static, Child = Option<C>>, C> Compose for W {
   }
 }
 
-impl<'w, F> IntoWidget<'w, FN> for F
-where
-  F: FnOnce() -> Widget<'w> + 'w,
-{
-  fn into_widget(self) -> Widget<'w> { Widget::from_fn(move |ctx| self().call(ctx)) }
-}
-
-impl<'w, F: FnOnce() -> W, W: IntoWidget<'w, M>, const M: usize> IntoWidget<'w, M>
-  for FnWidget<'w, F, W, M>
-where
-  Self: 'w,
-{
-  #[inline]
-  fn into_widget(self) -> Widget<'w> {
-    Widget::from_fn(move |ctx| (self.f)().into_widget().call(ctx))
-  }
-}
-
-impl<'w> IntoWidget<'w, FN> for BoxFnWidget<'w> {
-  #[inline]
-  fn into_widget(self) -> Widget<'w> { self.0.into_widget() }
-}
-impl IntoWidget<'static, FN> for GenWidget {
-  #[inline]
-  fn into_widget(self) -> Widget<'static> { self.gen_widget() }
-}
-
 impl<'w> Widget<'w> {
-  /// Invoke a function when the root node of the widget is built, passing its
-  /// ID and build context as parameters.
+  /// Register build completion callback
+  ///
+  /// The provided closure receives the final [`WidgetId`] after this widget
+  /// has been built.
   pub fn on_build(self, f: impl FnOnce(WidgetId) + 'w) -> Self {
     Widget::from_fn(move |ctx| {
       let id = self.call(ctx);
@@ -203,12 +199,7 @@ impl<'w> Widget<'w> {
     })
   }
 
-  /// Subscribe to the modified `upstream` to mark the widget as dirty when the
-  /// `upstream` emits a modify event containing `ModifyScope::FRAMEWORK`.
-  ///
-  /// # Panic
-  /// This method only works within a build process; otherwise, it will
-  /// result in a panic.
+  /// Establish reactive dirtiness tracking
   pub fn dirty_on(
     self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>, dirty: DirtyPhase,
   ) -> Self {
@@ -230,10 +221,6 @@ impl<'w> Widget<'w> {
       .with_child(self)
       .into_widget()
       .attach_anonymous_data(h)
-  }
-
-  pub(crate) fn from_render(r: Box<dyn RenderQueryable>) -> Widget<'static> {
-    Widget::from_fn(|_| BuildCtx::get_mut().tree_mut().alloc_node(r))
   }
 
   /// Attach anonymous data to a widget and user can't query it.
@@ -258,6 +245,10 @@ impl<'w> Widget<'w> {
     self.attach_data(data)
   }
 
+  pub(crate) fn from_render(r: Box<dyn RenderQueryable>) -> Widget<'static> {
+    Widget::from_fn(|_| BuildCtx::get_mut().tree_mut().alloc_node(r))
+  }
+
   /// Convert an ID back to a widget.
   ///
   /// # Note
@@ -279,14 +270,15 @@ impl<'w> Widget<'w> {
   pub(crate) fn call(self, ctx: &mut BuildCtx) -> WidgetId { (self.0.0)(ctx) }
 }
 
-impl<F: FnMut() -> Widget<'static> + 'static> From<F> for GenWidget {
-  #[inline]
-  fn from(f: F) -> Self { Self::new(f) }
+impl From<GenWidget> for Widget<'static> {
+  fn from(widget: GenWidget) -> Self { FnWidget::new(move || widget.gen_widget()).into_widget() }
 }
 
-impl<F: FnMut() -> W + 'static, W: IntoWidget<'static, M>, const M: usize>
-  From<FnWidget<'static, F, W, M>> for GenWidget
+// ----- Into Widget --------------
+
+impl<'w, W, K> IntoWidget<'w, K> for W
+where
+  W: RInto<Widget<'w>, K>,
 {
-  #[inline]
-  fn from(mut f: FnWidget<'static, F, W, M>) -> Self { Self::new(move || (f.f)().into_widget()) }
+  fn into_widget(self) -> Widget<'w> { self.r_into() }
 }

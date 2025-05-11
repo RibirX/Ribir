@@ -205,26 +205,6 @@ impl WriterInfo {
   pub(crate) fn dec_writer(&self) { self.writer_count.set(self.writer_count.get() - 1); }
 }
 
-impl<W: Render + 'static> IntoWidget<'static, RENDER> for Stateful<W> {
-  fn into_widget(self) -> Widget<'static> { WriterRender(self).into_widget() }
-}
-
-impl<W: Compose + 'static, T> IntoWidget<'static, COMPOSE> for T
-where
-  T: StateWriter<Value = W>,
-{
-  fn into_widget(self) -> Widget<'static> { Compose::compose(self) }
-}
-
-impl<W: Render> IntoWidget<'static, RENDER> for Reader<W> {
-  fn into_widget(self) -> Widget<'static> {
-    match Sc::try_unwrap(self.0) {
-      Ok(r) => r.into_inner().into_widget(),
-      Err(s) => s.into_widget(),
-    }
-  }
-}
-
 impl Notifier {
   pub(crate) fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
     self.0.clone().box_it()

@@ -110,10 +110,10 @@ impl App {
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run(root: impl Into<GenWidget>) -> AppRunGuard {
+  pub fn run<K: ?Sized>(root: impl RInto<GenWidget, K>) -> AppRunGuard {
     // Keep the application instance is created, when user call
     let _app = App::shared();
-    AppRunGuard::new(root.into())
+    AppRunGuard::new(root.r_into())
   }
 
   /// Get a event sender of the application event loop, you can use this to send

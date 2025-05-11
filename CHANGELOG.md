@@ -29,6 +29,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **painter**: Support jpeg image. (#753 @wjian23)
 
+### Changed
+
+- **core**: Simplify type conversion system by unifying implementations under `RFrom` and `RInto` traits (by @M-Adoo)
+
+
 ## [0.4.0-alpha.36] - 2025-05-07
 
 ### Features
@@ -557,10 +562,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Introduced `IntoWidget` and `IntoChild`. (@M-Adoo #612)
+- **core**: Introduced `IntoWidget`. (@M-Adoo #612)
 
   The `IntoWidget` trait allows for the conversion of any widget to the type `Widget`.
-  The `IntoChild` trait provides a way to convert a more general type into a child of `ComposeChild`.
 
 ### Fixed
 
@@ -569,9 +573,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Changed
 
 - **core**: Lazy build the widget tree. (#612, @M-Adoo)
-- **core**: Simplify the implementation of parent composition with child widgets. (#612, @M-Adoo)
-
-  Merge `SingleWithChild`, `MultiWithChild`, and `ComposeWithChild` into a single trait called WithChild.
 
 ### Breaking
 
@@ -589,7 +590,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: Added support to query a `WriteRef` from a state, enabling users to modify the state after attaching it to a widget. (#601 @M-Adoo)
-- **core**: Introduced the `DeclareInto` trait for any type that implements `DeclareFrom`. (#604 @M-Adoo)
 - **macros**: Improved widget declaration to allow specifying widget types via path. (#606 @M-Adoo)
 
   ```rust

@@ -18,9 +18,7 @@ impl Compose for Embed {
         MockBox { size: Size::new(10., 10.) }.into_widget()
       };
       let multi = pipe!{
-        move || {
-          (0..$this.width - 1).map(|_|  MockBox { size: Size::new(10., 10.)})
-        }
+        (0..$this.width - 1).map(|_|  MockBox { size: Size::new(10., 10.)})
       };
       MockMulti
         .with_child(multi)
@@ -43,15 +41,13 @@ impl Compose for Recursive {
         @{
           pipe!(($this.width, $this.depth))
             .map(move |(width, depth)| {
-              move || {
-                (0..width).map(move |_| fn_widget! {
-                  if depth > 1 {
-                    Recursive { width, depth: depth - 1 }.into_widget()
-                  } else {
-                    MockBox { size: Size::new(10., 10.)}.into_widget()
-                  }
-                })
-              }
+              (0..width).map(move |_| fn_widget! {
+                if depth > 1 {
+                  Recursive { width, depth: depth - 1 }.into_widget()
+                } else {
+                  MockBox { size: Size::new(10., 10.)}.into_widget()
+                }
+              })
             })
         }
       }
@@ -64,7 +60,7 @@ fn bench_widget_inflate(b: &mut Bencher, w: impl Compose + Clone + 'static) {
   let mut wnd = TestWindow::new(fn_widget!(Void));
   b.iter(|| {
     let w = w.clone();
-    wnd.0.init(fn_widget! { w.clone() }.into());
+    wnd.0.init(fn_widget! { w.clone() }.r_into());
     wnd.draw_frame();
   });
   AppCtx::remove_wnd(wnd.id());

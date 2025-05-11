@@ -4,9 +4,9 @@ use ribir::{
   prelude::*,
 };
 
-fn bench_example(b: &mut Bencher, f: impl Into<GenWidget>) {
+fn bench_example<K: ?Sized>(b: &mut Bencher, f: impl RInto<GenWidget, K>) {
   let _ = AppCtx::shared();
-  let f: GenWidget = f.into();
+  let f: GenWidget = f.r_into();
   b.iter(|| {
     let mut wnd = TestWindow::new(f.clone());
     wnd.draw_frame();

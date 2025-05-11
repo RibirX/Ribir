@@ -33,7 +33,7 @@ class_names! {
 #[derive(Template)]
 pub enum AvatarChild<'c> {
   /// Text display variant (e.g. user initials)
-  Label(TextInit),
+  Label(TextValue),
   /// Custom widget variant (e.g. profile image)
   Widget(Widget<'c>),
 }

@@ -59,7 +59,7 @@ pub(super) fn init(classes: &mut Classes) {
         radius: md::RADIUS_10,
         on_mounted: move |_| scale_in.run(),
         @ { bullet }
-      }
+      }.into_widget()
     }
   });
   classes.insert(

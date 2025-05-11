@@ -583,7 +583,7 @@ impl ProviderCtx {
 }
 
 impl Providers {
-  pub fn with_child<'w, const M: usize>(self, child: impl IntoWidget<'w, M>) -> Widget<'w> {
+  pub fn with_child<'w, K>(self, child: impl IntoWidget<'w, K>) -> Widget<'w> {
     let mut child = child.into_widget();
     self.restore_providers(BuildCtx::get_mut().as_mut());
 

@@ -56,7 +56,7 @@ impl<'c> ComposeChild<'c> for Tooltips {
     fn_widget! {
       let mut child = FatObj::new(child);
       *$this.overlay.borrow_mut() = Some(Overlay::new(
-        move || {
+        GenWidget::new(move || {
           let mut w = @Text {
             text: pipe!($this.tooltips().clone()),
             class: TOOLTIPS,
@@ -73,8 +73,9 @@ impl<'c> ComposeChild<'c> for Tooltips {
                 $child.track_id(), $child.layout_size().height
               ).always_follow()
             ),
-          }.into_widget()
-        },  OverlayStyle {
+          }
+        }),
+        OverlayStyle {
           auto_close_policy: AutoClosePolicy::NOT_AUTO_CLOSE,
           mask: None,
         }

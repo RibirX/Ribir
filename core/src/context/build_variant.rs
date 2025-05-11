@@ -1,11 +1,11 @@
-use crate::{pipe::OptionPipeWidget, prelude::*};
+use crate::{pipe::InnerPipe, prelude::*};
 /// `Variant` is an enum designed to help you store a clone of a provider. It
 /// serves as a shortcut for `Provider::state_of` and `Provider::of`.
 ///
 /// Initially, it checks for the existence of a watcher provider; if not
 /// found, it proceeds to check the value provider.
 ///
-/// It supports conversion to `DeclareInit` for initialization of a declare
+/// It supports conversion to `PipeValue` for initialization of a declare
 /// object, enabling the object to track changes in the provider value if it's a
 /// watcher provider.
 ///
@@ -178,27 +178,28 @@ impl<V, F> VariantMap<V, F> {
   }
 }
 
-impl<V: Clone + 'static, U> DeclareFrom<Variant<V>, 0> for DeclareInit<U>
+pub struct VariantKind<K: ?Sized>(PhantomData<fn() -> K>);
+impl<V: Clone + 'static, U, K: ?Sized + 'static> RFrom<Variant<V>, VariantKind<K>> for PipeValue<U>
 where
-  U: From<V> + 'static,
+  U: RFrom<V, K> + 'static,
 {
-  fn declare_from(value: Variant<V>) -> Self {
+  fn r_from(value: Variant<V>) -> Self {
     match value {
-      Variant::Watcher(value) => pipe!($value.clone()).declare_into(),
-      Variant::Value(value) => DeclareInit::Value(value.into()),
+      Variant::Watcher(value) => pipe!($value.clone()).r_into(),
+      Variant::Value(value) => value.r_into(),
     }
   }
 }
 
-impl<V, F, U, P> DeclareFrom<VariantMap<V, F>, 0> for DeclareInit<P>
+impl<V, F, U, P, K: ?Sized> RFrom<VariantMap<V, F>, VariantKind<K>> for PipeValue<P>
 where
   F: Fn(&V) -> U + 'static,
-  P: From<U> + 'static,
+  P: RFrom<U, K> + 'static,
 {
-  fn declare_from(value: VariantMap<V, F>) -> Self {
+  fn r_from(value: VariantMap<V, F>) -> Self {
     match value.variant {
-      Variant::Watcher(s) => pipe!(P::from((value.map)(&$s))).declare_into(),
-      Variant::Value(v) => DeclareInit::Value((value.map)(&v).into()),
+      Variant::Watcher(s) => pipe!(P::r_from((value.map)(&$s))).r_into(),
+      Variant::Value(v) => (value.map)(&v).r_into(),
     }
   }
 }
@@ -212,29 +213,28 @@ impl<V: Clone + 'static> Clone for Variant<V> {
   }
 }
 
-impl<V, const M: usize> IntoWidget<'static, M> for Variant<V>
+impl<V, K: ?Sized> RFrom<Variant<V>, OtherWidget<K>> for Widget<'static>
 where
-  V: IntoWidget<'static, M> + Clone,
+  V: RInto<Widget<'static>, K> + Clone + 'static,
 {
-  fn into_widget(self) -> Widget<'static> {
-    match self {
-      Variant::Watcher(w) => pipe!(fn_widget! { $w.clone() }).into_widget(),
-      Variant::Value(v) => v.into_widget(),
+  fn r_from(value: Variant<V>) -> Self {
+    match value {
+      Variant::Watcher(w) => pipe!($w.clone().r_into()).into_widget(),
+      Variant::Value(v) => v.r_into(),
     }
   }
 }
 
-impl<V: 'static, U: 'static, F: 'static, const M: usize> IntoWidget<'static, M> for VariantMap<V, F>
+impl<V, F, U, K: ?Sized> RFrom<VariantMap<V, F>, OtherWidget<K>> for Widget<'static>
 where
-  V: Clone,
-  U: OptionPipeWidget<M>,
-  F: Fn(&V) -> U,
+  F: Fn(&V) -> U + 'static,
+  U: RInto<Widget<'static>, K> + 'static,
 {
-  fn into_widget(self) -> Widget<'static> {
-    let Self { variant, map } = self;
+  fn r_from(value: VariantMap<V, F>) -> Self {
+    let VariantMap { variant, map } = value;
     match variant {
-      Variant::Watcher(w) => pipe!(map(&$w)).into_widget(),
-      Variant::Value(v) => map(&v).option_to_widget(),
+      Variant::Watcher(w) => pipe!(map(&$w)).build_single(),
+      Variant::Value(v) => map(&v).r_into(),
     }
   }
 }

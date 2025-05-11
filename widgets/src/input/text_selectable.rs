@@ -46,8 +46,8 @@ pub struct Selection {
 }
 
 impl<T> TextSelectableDeclarer<T> {
-  pub fn text<const M: usize>(&mut self, text: impl DeclareInto<T, M>) -> &mut Self {
-    let text = text.declare_into().map(TextGlyphs::new);
+  pub fn text<K: ?Sized>(&mut self, text: impl RInto<PipeValue<T>, K>) -> &mut Self {
+    let text = text.r_into().map(TextGlyphs::new);
     self.text = Some(text);
     self
   }
@@ -109,20 +109,18 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
         @Stack {
           @NoAffectedParentSize {
             @Stack {
-              @pipe!{
-                move || {
-                  let this = $this;
-                  let rcs = this.glyphs()
-                    .map(|glyphs| glyphs.select_range(&$selection.cluster_rg()))
-                    .unwrap_or_default();
-                  rcs.into_iter().map(move |rc| {
-                    @Container {
-                      class: TEXT_SELECTION,
-                      anchor: Anchor::from_point(rc.origin),
-                      size: rc.size,
-                    }
-                  })
-                }
+              @pipe! {
+                let this = $this;
+                let rcs = this.glyphs()
+                  .map(|glyphs| glyphs.select_range(&$selection.cluster_rg()))
+                  .unwrap_or_default();
+                rcs.into_iter().map(move |rc| {
+                  @Container {
+                    class: TEXT_SELECTION,
+                    anchor: Anchor::from_point(rc.origin),
+                    size: rc.size,
+                  }
+                })
               }
             }
           }

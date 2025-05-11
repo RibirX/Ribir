@@ -50,10 +50,7 @@ pub fn init(classes: &mut Classes) {
       },
       @{ w }
       @in_parent_layout! {
-        @ { tab_pos_var().map(|pos| {
-          let pos = *pos;
-          fn_widget! { indicator(&pos) }
-        })}
+        @ { tab_pos_var().map(indicator) }
       }
     }
     .into_widget()
@@ -112,7 +109,7 @@ pub fn init(classes: &mut Classes) {
       w.margin(md::EDGES_HOR_16)
         .h_align(HAlign::Center)
         .v_align(VAlign::Center);
-      stack.with_child(w).map(IntoWidget::into_widget)
+      stack.map(|p| p.with_child(w).into_widget())
     } else {
       w.padding(md::EDGES_HOR_16);
       w.map(IntoWidget::into_widget)
@@ -170,22 +167,22 @@ fn indicator(pos: &TabPos) -> Widget<'static> {
 
   let header = active_header_rect_state();
   let tt = tab_type();
-  let (size, anchor) = match (tt, pos.is_horizontal()) {
+  let (size, anchor): (PipeValue<_>, PipeValue<_>) = match (tt, pos.is_horizontal()) {
     (TabType::Primary, true) => (
-      distinct_pipe!(Size::new(p_length($header.width()), 3.)).declare_into(),
-      distinct_pipe!(Anchor::left($header.min_x() + p_offset($header.width()))).declare_into(),
+      distinct_pipe!(Size::new(p_length($header.width()), 3.)).r_into(),
+      distinct_pipe!(Anchor::left($header.min_x() + p_offset($header.width()))).r_into(),
     ),
     (TabType::Primary, false) => (
-      distinct_pipe!(Size::new(3., p_length($header.height()))).declare_into(),
-      distinct_pipe!(Anchor::top($header.min_y() + p_offset($header.height()))).declare_into(),
+      distinct_pipe!(Size::new(3., p_length($header.height()))).r_into(),
+      distinct_pipe!(Anchor::top($header.min_y() + p_offset($header.height()))).r_into(),
     ),
     (_, true) => (
-      distinct_pipe!(Size::new($header.width(), 2.)).declare_into(),
-      distinct_pipe!(Anchor::left($header.min_x())).declare_into(),
+      distinct_pipe!(Size::new($header.width(), 2.)).r_into(),
+      distinct_pipe!(Anchor::left($header.min_x())).r_into(),
     ),
     (_, false) => (
-      distinct_pipe!(Size::new(2., $header.height())).declare_into(),
-      distinct_pipe!(Anchor::top($header.min_y())).declare_into(),
+      distinct_pipe!(Size::new(2., $header.height())).r_into(),
+      distinct_pipe!(Anchor::top($header.min_y())).r_into(),
     ),
   };
 
@@ -273,7 +270,7 @@ fn providers() -> SmallVec<[Provider; 1]> {
   providers
 }
 
-fn foreground_color() -> DeclareInit<Brush> {
+fn foreground_color() -> PipeValue<Brush> {
   let ctx = BuildCtx::get();
   let tabs = tabs_watcher();
   let cur_tab = tab_info();
@@ -284,7 +281,7 @@ fn foreground_color() -> DeclareInit<Brush> {
     .map_with_watcher(tabs, move |active_color, tabs| {
       if tabs.active_idx() == cur_tab.idx { *active_color } else { inactive_color }
     })
-    .declare_into()
+    .r_into()
 }
 
 fn is_active_header() -> impl Pipe<Value = bool> {

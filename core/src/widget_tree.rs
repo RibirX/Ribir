@@ -46,15 +46,13 @@ impl WidgetTree {
     let _guard = BuildCtx::init(BuildCtx::empty(wnd.tree));
 
     let theme = AppCtx::app_theme().clone_writer();
-    let child = move || {
+    let child = GenWidget::new(move || {
       let overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
       overlays.rebuild();
-      Root
-        .with_child(content.gen_widget())
-        .into_widget()
-    };
+      Root.with_child(content.gen_widget())
+    });
 
-    let (mut providers, child) = Theme::preprocess_before_compose(theme, child.into());
+    let (mut providers, child) = Theme::preprocess_before_compose(theme, child);
     let location = Location::stateful();
     providers.push(Provider::new(ShowingOverlays::default()));
     providers.push(Provider::value_of_writer(location.clone_writer(), None));
@@ -472,18 +470,14 @@ mod tests {
     let trigger = Stateful::new(1);
     let c_trigger = trigger.clone_writer();
     let widget = fn_widget! {
-      @ MockMulti {
-        @{
-          pipe!(*$trigger).map(move |b|
-            move || {
-              let size = if b > 0 {
-                Size::new(1., 1.)
-              } else {
-                Size::zero()
-              };
-              (0..3).map(move |_| @MockBox { size } )
-            }
-          )
+      @MockMulti {
+        @pipe!{
+          let size = if *$trigger > 0 {
+            Size::new(1., 1.)
+          } else {
+            Size::zero()
+          };
+          (0..3).map(move |_| @MockBox { size } )
         }
       }
     };
@@ -626,7 +620,7 @@ mod tests {
         }
       }
     }
-    .into()
+    .r_into()
   }
   widget_layout_test!(
     visual_overflow,

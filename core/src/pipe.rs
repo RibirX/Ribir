@@ -1,61 +1,17 @@
 use std::{
   cell::{Cell, UnsafeCell},
   convert::Infallible,
-  ops::RangeInclusive,
   ptr::NonNull,
 };
 
 use ribir_algo::Sc;
 use rxrust::ops::box_it::BoxOp;
-use smallvec::SmallVec;
+use smallvec::{SmallVec, smallvec};
 use widget_id::RenderQueryable;
 
 use crate::{prelude::*, render_helper::PureRender};
 
 pub type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
-
-/// Trait used to create a widget from a pipe value.
-pub(crate) trait PipeWidget<const M: usize>: IntoWidget<'static, M> {
-  type Widget;
-}
-
-/// Trait used to create a widget from a option pipe value.
-pub(crate) trait OptionPipeWidget<const M: usize> {
-  type Widget;
-  fn option_to_widget(self) -> Widget<'static>;
-}
-
-impl<F: FnOnce() -> W + 'static, W: IntoWidget<'static, M>, const M: usize> PipeWidget<M>
-  for FnWidget<'static, F, W, M>
-{
-  type Widget = W;
-}
-
-impl PipeWidget<FN> for BoxFnWidget<'static> {
-  type Widget = Widget<'static>;
-}
-
-impl PipeWidget<FN> for GenWidget {
-  type Widget = Widget<'static>;
-}
-
-impl<const M: usize, W> OptionPipeWidget<M> for W
-where
-  W: PipeWidget<M>,
-{
-  type Widget = W::Widget;
-  fn option_to_widget(self) -> Widget<'static> { self.into_widget() }
-}
-
-impl<const M: usize, W> OptionPipeWidget<M> for Option<W>
-where
-  W: PipeWidget<M>,
-{
-  type Widget = W::Widget;
-  fn option_to_widget(self) -> Widget<'static> {
-    self.map_or_else(|| Void.into_widget(), |f| f.into_widget())
-  }
-}
 
 /// A trait for a value that can be subscribed its continuous modifies.
 pub trait Pipe: 'static {
@@ -109,7 +65,6 @@ pub trait Pipe: 'static {
 /// has a better conversion from `Pipe` to `BoxPipe`.
 ///
 /// Call `into_pipe` to convert it to a `Pipe` type.
-#[derive(ChildOfCompose)]
 pub struct BoxPipe<V>(Box<dyn Pipe<Value = V>>);
 
 pub struct MapPipe<V, S, F> {
@@ -136,17 +91,17 @@ impl<V: 'static> BoxPipe<V> {
 }
 
 pub(crate) trait InnerPipe: Pipe + Sized {
-  fn build_single<const M: usize>(self) -> Widget<'static>
+  fn build_single<K>(self) -> Widget<'static>
   where
-    Self::Value: OptionPipeWidget<M> + 'static,
+    Self::Value: RInto<OptionWidget<'static>, K>,
   {
-    let f = move || {
-      let pipe_node = PipeNode::empty_node();
+    FnWidget::new(move || {
+      let pipe_node = PipeNode::empty_node(GenRange::Single(BuildCtx::get().tree().dummy_id()));
 
       let tree_ptr = BuildCtx::get().tree_ptr();
       let init = PipeWidgetBuildInit::new_with_tree(pipe_node.clone(), tree_ptr);
       let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(init));
-      w.option_to_widget().on_build(move |w| {
+      w.r_into().unwrap_or_void().on_build(move |w| {
         pipe_node.init_for_single(w);
 
         let c_pipe_node = pipe_node.clone();
@@ -158,7 +113,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
             BuildCtx::set_for(old, unsafe { NonNull::new_unchecked(tree_ptr) });
           }
           let ctx = BuildCtx::get_mut();
-          let new = ctx.build(w.option_to_widget());
+          let new = ctx.build(w.r_into().unwrap_or_void());
           let tree = ctx.tree_mut();
           pipe_node.transplant_to_new(old_node, new, tree);
 
@@ -177,20 +132,18 @@ pub(crate) trait InnerPipe: Pipe + Sized {
         });
         c_pipe_node.attach_subscription(u);
       })
-    };
-    f.into_widget()
+    })
+    .into_widget()
   }
 
-  fn build_multi<'w, const M: usize, I>(self) -> Vec<Widget<'w>>
+  fn build_multi<K>(self) -> Vec<Widget<'static>>
   where
-    Self::Value: FnOnce() -> I,
-    I: IntoIterator,
-    <I as IntoIterator>::Item: IntoWidget<'w, M>,
+    Self::Value: IntoIterator<Item: IntoWidget<'static, K>>,
   {
-    let node = PipeNode::empty_node();
+    let node = PipeNode::empty_node(GenRange::Multi(vec![]));
     let mut init = PipeWidgetBuildInit::new(node.clone());
     let (m, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(init.clone()));
-    let mut iter = m().into_iter().map(|w| w.into_widget());
+    let mut iter = m.into_iter().map(|w| w.into_widget());
 
     let pipe_node = node.clone();
     let first = iter
@@ -219,7 +172,7 @@ pub(crate) trait InnerPipe: Pipe + Sized {
 
         let ctx = BuildCtx::get_mut();
         let mut new = vec![];
-        for w in m().into_iter().map(|w| w.into_widget()) {
+        for w in m.into_iter().map(IntoWidget::into_widget) {
           let id = ctx.build(w);
 
           new.push(id);
@@ -296,87 +249,101 @@ pub(crate) trait InnerPipe: Pipe + Sized {
     widgets
   }
 
-  fn into_parent_widget<const M: usize>(self) -> Widget<'static>
+  fn with_children<'w>(self, mut children: Vec<Widget<'w>>) -> Widget<'w>
   where
     Self: Sized,
-    Self::Value: OptionPipeWidget<M> + 'static,
+    Self::Value: XParent,
   {
-    let f = move || {
-      let node = PipeNode::empty_node();
+    fn bind_update<Value: XParent>(node: PipeNode, modifies: ValueStream<Value>) {
+      let pipe_node = node.clone();
+      let tree = BuildCtx::get().tree_ptr();
+      let u = modifies.subscribe(move |(_, w)| {
+        let GenRange::ParentOnly { parent: old_p, first_leaf } = pipe_node.dyn_info().gen_range
+        else {
+          unreachable!();
+        };
+
+        let old_node = pipe_node.take_data();
+
+        let without_ctx = BuildCtx::try_get().is_none();
+        if without_ctx {
+          BuildCtx::set_for(pipe_node.dyn_info().host_id(), unsafe {
+            NonNull::new_unchecked(tree)
+          });
+        }
+        let ctx = BuildCtx::get_mut();
+
+        let mut children = vec![];
+        let mut child = Some(first_leaf);
+        while let Some(c) = child {
+          child = c.next_sibling(ctx.tree_mut());
+          children.push(Widget::from_id(c));
+        }
+
+        let p = ctx.build(w.x_with_children(children));
+
+        let tree = ctx.tree_mut();
+        pipe_node.transplant_to_new(old_node, p, tree);
+        query_outside_infos(p, &pipe_node, tree).for_each(|node| {
+          node.dyn_info_mut().parent_replace(old_p, p);
+        });
+
+        old_p.insert_after(p, tree);
+        old_p.dispose_subtree(tree);
+
+        let mut stack: SmallVec<[WidgetId; 1]> = smallvec![p];
+        while let Some(c) = stack.pop() {
+          if Some(first_leaf) != c.first_child(tree) {
+            stack.extend(c.children(tree));
+          }
+          c.on_widget_mounted(tree);
+        }
+
+        tree.dirty_marker().mark(p, DirtyPhase::Layout);
+
+        if without_ctx {
+          BuildCtx::clear();
+        }
+      });
+
+      node.attach_subscription(u);
+    }
+
+    FnWidget::new(move || {
+      let dummy = BuildCtx::get().tree().dummy_id();
+      let node = PipeNode::empty_node(GenRange::ParentOnly { parent: dummy, first_leaf: dummy });
+
       let init = PipeWidgetBuildInit::new_with_tree(node.clone(), BuildCtx::get().tree_ptr());
       let (w, modifies) = self.unzip(ModifyScope::FRAMEWORK, Some(init));
 
-      w.option_to_widget().on_build(move |p| {
-        let tree: &mut WidgetTree = BuildCtx::get_mut().tree_mut();
-        let leaf = p.single_leaf(tree);
-        node.init(p, GenRange::ParentOnly(p..=leaf));
-
-        // We need to associate the parent information with the pipe of leaf widget,
-        // when the leaf pipe is regenerated, it can update the parent pipe information
-        // accordingly.
-        if leaf.contain_type::<PipeNode>(tree) {
-          leaf.attach_data(Box::new(node.clone()), tree);
-        };
-
-        let pipe_node = node.clone();
-        let u = modifies.subscribe(move |(_, w)| {
-          let (top, bottom) = match &pipe_node.dyn_info().gen_range {
-            GenRange::ParentOnly(p) => p.clone().into_inner(),
-            _ => unreachable!(),
+      assert!(!children.is_empty());
+      let first_child = std::mem::replace(&mut children[0], Void.into_widget());
+      let first_child = first_child.on_build({
+        let node = node.clone();
+        move |leaf| {
+          // We need to associate the parent information with the pipe of leaf widget,
+          // when the leaf pipe is regenerated, it can update the parent pipe information
+          // accordingly.
+          leaf.attach_data(Box::new(node.clone()), BuildCtx::get_mut().tree_mut());
+          let GenRange::ParentOnly { first_leaf, .. } = &mut node.dyn_info_mut().gen_range else {
+            unreachable!()
           };
+          assert_eq!(*first_leaf, dummy);
+          *first_leaf = leaf;
+          bind_update(node, modifies);
+        }
+      });
+      let _ = std::mem::replace(&mut children[0], first_child);
 
-          let old_node = pipe_node.take_data();
-
-          let without_ctx = BuildCtx::try_get().is_none();
-          if without_ctx {
-            BuildCtx::set_for(pipe_node.dyn_info().host_id(), unsafe {
-              NonNull::new_unchecked(tree)
-            });
-          }
-
-          let p = BuildCtx::get_mut().build(w.option_to_widget());
-          let tree = BuildCtx::get_mut().tree_mut();
-          pipe_node.transplant_to_new(old_node, p, tree);
-
-          let new_rg = p..=p.single_leaf(tree);
-          let children: SmallVec<[WidgetId; 1]> = bottom.children(tree).collect();
-          for c in children {
-            new_rg.end().append(c, tree);
-          }
-
-          query_outside_infos(p, &pipe_node, tree).for_each(|node| {
-            node
-              .dyn_info_mut()
-              .single_range_replace(&(top..=bottom), &new_rg);
-          });
-
-          top.insert_after(p, tree);
-          top.dispose_subtree(tree);
-
-          let mut w = p;
-          loop {
-            w.on_widget_mounted(tree);
-            if w == *new_rg.end() {
-              break;
-            }
-            if let Some(c) = w.first_child(tree) {
-              w = c;
-            } else {
-              break;
-            }
-          }
-
-          tree.dirty_marker().mark(p, DirtyPhase::Layout);
-
-          if without_ctx {
-            BuildCtx::clear();
-          }
-        });
-
-        node.attach_subscription(u);
+      w.x_with_children(children).on_build(move |p| {
+        let GenRange::ParentOnly { parent, first_leaf } = node.dyn_info_mut().gen_range else {
+          unreachable!()
+        };
+        assert_eq!(parent, dummy);
+        node.init(p, GenRange::ParentOnly { parent: p, first_leaf });
       })
-    };
-    f.into_widget()
+    })
+    .into_widget()
   }
 }
 
@@ -514,29 +481,6 @@ impl<V: 'static> Pipe for ValuePipe<V> {
 
 impl<T: Pipe> InnerPipe for T {}
 
-impl<V, S, F, const M: usize> IntoWidget<'static, M> for MapPipe<V, S, F>
-where
-  Self: InnerPipe<Value = V>,
-  V: OptionPipeWidget<M>,
-{
-  fn into_widget(self) -> Widget<'static> { self.build_single() }
-}
-
-impl<V, S, F, const M: usize> IntoWidget<'static, M> for FinalChain<V, S, F>
-where
-  Self: InnerPipe<Value = V>,
-  V: OptionPipeWidget<M>,
-{
-  fn into_widget(self) -> Widget<'static> { self.build_single() }
-}
-
-impl<const M: usize, V> IntoWidget<'static, M> for Box<dyn Pipe<Value = V>>
-where
-  V: OptionPipeWidget<M> + 'static,
-{
-  fn into_widget(self) -> Widget<'static> { self.build_single() }
-}
-
 /// `PipeNode` just use to wrap a `Box<dyn Render>`, and provide a choice to
 /// change the inner `Box<dyn Render>` by `UnsafeCell` at a safe time --
 /// although it is stored using a reference counting pointer, its logic
@@ -563,11 +507,11 @@ pub(crate) struct DynWidgetsInfo {
   pub(crate) gen_range: GenRange,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GenRange {
   Single(WidgetId),
   Multi(Vec<WidgetId>),
-  ParentOnly(RangeInclusive<WidgetId>),
+  ParentOnly { parent: WidgetId, first_leaf: WidgetId },
 }
 
 impl DynWidgetsInfo {
@@ -584,34 +528,31 @@ impl DynWidgetsInfo {
           m[idx] = new;
         }
       }
-      GenRange::ParentOnly(p) => {
-        if p.start() == &old {
-          *p = new..=*p.end();
+      GenRange::ParentOnly { parent, first_leaf } => {
+        if parent == &old {
+          *parent = new;
         }
-        if p.end() == &old {
-          *p = *p.start()..=new;
+        if first_leaf == &old {
+          *first_leaf = new;
         }
       }
     }
   }
 
-  pub(crate) fn single_range_replace(
-    &mut self, old: &RangeInclusive<WidgetId>, new: &RangeInclusive<WidgetId>,
-  ) {
+  pub(crate) fn parent_replace(&mut self, old: WidgetId, new: WidgetId) {
     match &mut self.gen_range {
-      GenRange::Single(id) => *id = *new.start(),
+      GenRange::Single(id) => *id = new,
       GenRange::Multi(m) => {
-        let p = *old.start();
-        if let Some(idx) = m.iter().position(|w| w == &p) {
-          m[idx] = *new.start();
+        if let Some(idx) = m.iter().position(|w| w == &old) {
+          m[idx] = new;
         }
       }
-      GenRange::ParentOnly(p) => {
-        if p.start() == old.start() {
-          *p = *new.start()..=*p.end();
+      GenRange::ParentOnly { parent, first_leaf } => {
+        if parent == &old {
+          *parent = new;
         }
-        if p.end() == old.end() {
-          *p = *p.start()..=*new.end();
+        if first_leaf == &old {
+          *first_leaf = new;
         }
       }
     }
@@ -629,7 +570,7 @@ impl DynWidgetsInfo {
           m.splice(from..=to, new);
         }
       }
-      GenRange::ParentOnly(_) => {
+      GenRange::ParentOnly { .. } => {
         unreachable!("Single parent node never have multi pipe child.")
       }
     }
@@ -639,14 +580,13 @@ impl DynWidgetsInfo {
     match &self.gen_range {
       GenRange::Single(id) => *id,
       GenRange::Multi(m) => *m.first().unwrap(),
-      GenRange::ParentOnly(p) => *p.start(),
+      GenRange::ParentOnly { parent, .. } => *parent,
     }
   }
 }
 
 impl PipeNode {
-  pub(crate) fn empty_node() -> Self {
-    let gen_range = GenRange::Single(BuildCtx::get().tree().dummy_id());
+  pub(crate) fn empty_node(gen_range: GenRange) -> Self {
     let dyn_info = DynWidgetsInfo::new(gen_range);
     let inner = InnerPipeNode { data: Box::new(PureRender(Void)), dyn_info };
     Self(Sc::new(UnsafeCell::new(inner)))
@@ -898,6 +838,47 @@ where
   fn is_finished(&self) -> bool { self.observer.is_finished() }
 }
 
+impl<V, S, F> From<MapPipe<V, S, F>> for BoxPipe<V>
+where
+  MapPipe<V, S, F>: Pipe<Value = V>,
+{
+  fn from(p: MapPipe<V, S, F>) -> Self { BoxPipe::pipe(Box::new(p)) }
+}
+
+impl<V, S, F> From<FinalChain<V, S, F>> for BoxPipe<V>
+where
+  FinalChain<V, S, F>: Pipe<Value = V>,
+{
+  fn from(p: FinalChain<V, S, F>) -> Self { BoxPipe::pipe(Box::new(p)) }
+}
+
+/// Expands a given implementation macro to all supported pipe types.
+///
+/// Each invocation passes two arguments to the target macro:
+/// 1. Generic type parameters in angle brackets
+/// 2. Concrete pipe type with generic parameters
+///
+/// # Example
+///
+/// ``` ignore
+/// iter_all_pipe_type_to_impl!(my_macro);
+/// ```
+/// Expands to:
+/// ```ignore
+/// my_macro!(<V>, Box<dyn Pipe<Value = V>>);
+/// my_macro!(<V, S, F>, MapPipe<V, S, F>);
+/// my_macro!(<V, S, F>, FinalChain<V, S, F>);
+/// ```
+macro_rules! iter_all_pipe_type_to_impl {
+    ($impl_macro:ident) => {
+        $impl_macro!(<V>, Box<dyn Pipe<Value = V>>);
+        $impl_macro!(<V, S, F>, MapPipe<V, S, F>);
+        $impl_macro!(<V, S, F>, FinalChain<V, S, F>);
+    };
+}
+
+pub(crate) use iter_all_pipe_type_to_impl;
+
 #[cfg(test)]
 mod tests {
   use std::{cell::Cell, rc::Rc};
@@ -994,15 +975,13 @@ mod tests {
       @MockMulti {
         @ {
           pipe!($v.clone()).map(move |v| {
-            move || {
-                v.into_iter().map(move |_| fn_widget!{
-                @MockBox{
-                  size: Size::zero(),
-                  on_mounted: move |_| *$new_cnt.write() += 1,
-                  on_disposed: move |_| *$drop_cnt.write() += 1
-                }
-              })
-            }
+            v.into_iter().map(move |_| {
+              @MockBox{
+                size: Size::zero(),
+                on_mounted: move |_| *$new_cnt.write() += 1,
+                on_disposed: move |_| *$drop_cnt.write() += 1
+              }
+            })
           })
         }
       }
@@ -1132,9 +1111,9 @@ mod tests {
     let c_tasks = tasks.clone_watcher();
     let w = fn_widget! {
       @MockMulti {
-        @ { pipe!{
-          move || $c_tasks.iter().map(|t| build(t.clone_writer())).collect::<Vec<_>>()
-        }}
+        @pipe!{
+          $c_tasks.iter().map(|t| build(t.clone_writer())).collect::<Vec<_>>()
+        }
       }
     };
 
@@ -1287,11 +1266,9 @@ mod tests {
       @MockMulti {
         @ {
           pipe!(*$box_count).map(move |v| {
-            move || {
-              (0..v).map(move |_| fn_widget!{
-                pipe!(*$child_size).map(move |size| fn_widget! { @MockBox { size } })
-              })
-            }
+            (0..v).map(move |_| fn_widget!{
+              pipe!(*$child_size).map(move |size| fn_widget! { @MockBox { size } })
+            })
           })
         }
       }
@@ -1322,13 +1299,11 @@ mod tests {
       @MockMulti {
         @ {
           pipe!(*$box_count).map(move |v| {
-            move || {
-              (0..v).map(move |_| {
-                let pipe_parent = pipe!(*$child_size)
-                  .map(move |size| fn_widget!{ @MockBox { size } });
-                @$pipe_parent { @Void {} }
-              })
-            }
+            (0..v).map(move |_| {
+              let pipe_parent = pipe!(*$child_size)
+                .map(move |size| fn_widget!{ @MockBox { size } });
+              @$pipe_parent { @Void {} }
+            })
           })
         }
       }
@@ -1524,8 +1499,7 @@ mod tests {
       @MockMulti {
         @ {
           pipe!($w;).map(move |_| {
-            move || {
-              $w.silent().push(0);
+            $w.silent().push(0);
               (0..10).map(move |idx| {
                 pipe!($w;).map(move |_| fn_widget!{
                   $w.silent().push(idx + 1);
@@ -1534,7 +1508,6 @@ mod tests {
                   }
                 })
               })
-            }
           })
         }
       }
@@ -1557,11 +1530,12 @@ mod tests {
     let widget = fn_widget! {
       @MockMulti {
         @ {
+
           pipe!($m_watcher;).map(move |_| {
-            move || {[
+            [
               Void.into_widget() ,
               pipe!($son_watcher;).map(|_| fn_widget! {@Void{}}).into_widget(),
-            ]}
+            ]
           })
         }
       }

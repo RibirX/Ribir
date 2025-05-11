@@ -83,7 +83,7 @@ pub type MenuEvent = CustomEvent<MenuEventData>;
 pub struct Menu {}
 
 /// the controller of the popup menu
-#[derive(Clone, ChildOfCompose)]
+#[derive(Clone)]
 pub struct MenuControl(Sc<RefCell<MenuData>>);
 
 struct MenuItemData {
@@ -102,9 +102,9 @@ struct MenuData {
 
 impl MenuControl {
   /// Receive a function generator of widget return a MenuControl
-  pub fn new(gen: impl Into<GenWidget>) -> Self {
+  pub fn new<K: ?Sized>(gen: impl RInto<GenWidget, K>) -> Self {
     Self(Sc::new(RefCell::new(MenuData {
-      gen: gen.into(),
+      gen: gen.r_into(),
       handle: None,
       item_trigger: None,
       selected: None,
@@ -151,8 +151,8 @@ impl MenuControl {
     F: FnMut(Widget<'static>) -> Widget<'static> + 'static,
   {
     let gen = self.0.borrow().gen.clone();
-    let gen = move || f(gen.gen_widget());
-    self.inner_show(gen.into(), None, wnd);
+    let gen = GenWidget::new(move || f(gen.gen_widget()));
+    self.inner_show(gen, None, wnd);
   }
 
   /// Close the menu
@@ -260,7 +260,7 @@ impl MenuControl {
 
   fn inner_show(&self, gen: GenWidget, parent: Option<ParentMenuInfo>, wnd: &Sc<Window>) {
     let handle = self.clone();
-    let fn_gen = fn_widget! {
+    let fn_gen = GenWidget::from_fn_widget(fn_widget! {
       let mut w = FatObj::new(gen.clone());
       handle.0.borrow_mut().id = Some($w.track_id());
       @Providers {
@@ -284,7 +284,7 @@ impl MenuControl {
           },
         }
       }
-    };
+    });
 
     let style = if parent.is_some() {
       OverlayStyle { auto_close_policy: AutoClosePolicy::NOT_AUTO_CLOSE, mask: None }
@@ -318,7 +318,7 @@ impl MenuControl {
     let gen = sub_menu.0.borrow().gen.clone();
 
     sub_menu.inner_show(
-      { move || anchor_around(rc)(gen.gen_widget()) }.into(),
+      GenWidget::new(move || anchor_around(rc)(gen.gen_widget())),
       Some(ParentMenuInfo { menu: self.clone(), idx: from_item }),
       wnd,
     );
@@ -377,12 +377,9 @@ fn anchor_around(target: Rect) -> impl FnMut(Widget<'static>) -> Widget<'static>
   }
 }
 
-#[derive(ChildOfCompose)]
-pub struct MenuHintText(TextInit);
+pub struct MenuHintText(TextValue);
 impl MenuHintText {
-  pub fn new<const M: usize>(child: impl IntoChildCompose<TextInit, M>) -> Self {
-    MenuHintText(child.into_child_compose())
-  }
+  pub fn new<K: ?Sized>(child: impl RInto<TextValue, K>) -> Self { MenuHintText(child.r_into()) }
 }
 
 #[derive(Template)]
@@ -433,7 +430,7 @@ impl<'w> MenuItem<'w> {
       });
 
       let class = Stateful::new(MENU_ITEM);
-      @ Row{
+      @Row{
         class: pipe!(*$class),
         align_items: Align::Center,
         on_disposed: {
@@ -502,7 +499,6 @@ pub enum MenuChild<'w> {
 /// it will use a default divider, otherwise, it will use the specified
 /// widget as the divider.
 
-#[derive(ChildOfCompose)]
 #[simple_declare(stateless)]
 pub struct MenuDivider {
   #[declare(default)]

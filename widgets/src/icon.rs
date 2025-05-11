@@ -64,7 +64,7 @@ pub enum IconChild<'c> {
   /// The text to display as a icon.
   ///
   /// Use a `DeclareInit<CowArc<str>>` so that we can accept a pipe text.
-  FontIcon(TextInit),
+  FontIcon(TextValue),
   Widget(Widget<'c>),
 }
 

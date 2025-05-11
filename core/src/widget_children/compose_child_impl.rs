@@ -1,90 +1,58 @@
 use super::*;
 
 /// The trait is used to enable child composition for `ComposeChild`.
-///
-/// We choose to return a pair of parent and child instead of directly composing
-/// and returning a `Widget`. This approach allows for continued composition
-/// with certain child types like `Vec`.
-///
-/// The `M` and `WRITER` use to avoid implementation conflicts.
-///
-/// - The `WRITER` marker if it is a writer.
-/// - The `TML` marker is used for `Template` to indicate it will convert by
-///   TML's level of 'Template', 0 for no 'Template'
-/// - The `N` marker is used to distinguish the type fill in `Template`
-/// - The `M` marker is used for child conversion.
-pub trait ComposeWithChild<
-  'w,
-  C,
-  const WRITER: bool,
-  const TML: usize,
-  const N: usize,
-  const M: usize,
->
-{
+pub trait ComposeWithChild<C, K: ?Sized> {
   type Target;
   fn with_child(self, child: C) -> Self::Target;
 }
 
-// ComposeWithChild implementations
-impl<'w, P, C, const M: usize> ComposeWithChild<'w, C, true, 0, 0, M> for P
+// ------ With child implementations ------
+/// ComposeChild compose a type that can convert to its specific child type.
+///
+/// We choose to return a pair of parent and child instead of directly composing
+/// and returning a `Widget`. This approach allows for continued composition
+/// with certain child types like `Vec`.
+pub struct ChildKind<K: ?Sized>(PhantomData<fn() -> K>);
+
+pub struct TmlKind<K: ?Sized>(PhantomData<fn() -> K>);
+
+impl<'c, P, C, K: ?Sized> ComposeWithChild<C, ChildKind<K>> for P
 where
-  P: StateWriter,
-  P::Value: ComposeChild<'w>,
-  C: IntoChildCompose<<P::Value as ComposeChild<'w>>::Child, M>,
+  P: StateWriter<Value: ComposeChild<'c, Child: RFrom<C, K>>>,
 {
-  type Target = Pair<P, <P::Value as ComposeChild<'w>>::Child>;
+  type Target = Pair<P, C>;
+
+  #[inline]
+  fn with_child(self, child: C) -> Self::Target { Pair { parent: self, child } }
+}
+
+impl<'c, P, C, Builder, K: ?Sized> ComposeWithChild<C, TmlKind<&'c K>> for P
+where
+  P: StateWriter<Value: ComposeChild<'c, Child: Template<Builder = Builder>>>,
+  Builder: Default + ComposeWithChild<C, K>,
+{
+  type Target = Pair<P, Builder::Target>;
 
   fn with_child(self, child: C) -> Self::Target {
-    Pair { parent: self, child: child.into_child_compose() }
+    Pair { parent: self, child: Builder::default().with_child(child) }
   }
 }
 
-impl<'w, P, Builder, C, const N: usize, const M: usize> ComposeWithChild<'w, C, true, 1, N, M> for P
+pub struct StatelessKind<K: ?Sized>(PhantomData<fn() -> K>);
+impl<'c, P, C, K: ?Sized> ComposeWithChild<C, StatelessKind<K>> for P
 where
-  P: StateWriter,
-  P::Value: ComposeChild<'w, Child: Template<Builder = Builder>>,
-  Builder: ComposeWithChild<'w, C, false, 1, N, M>,
+  P: ComposeChild<'c>,
+  State<P>: ComposeWithChild<C, K>,
 {
-  type Target = Pair<Self, Builder::Target>;
-
-  fn with_child(self, child: C) -> Self::Target {
-    let child = <P::Value as ComposeChild<'w>>::Child::builder().with_child(child);
-    Pair { parent: self, child }
-  }
-}
-
-impl<'w, P, Builder, C, const N: usize, const M: usize> ComposeWithChild<'w, C, true, 2, N, M> for P
-where
-  P: StateWriter,
-  P::Value: ComposeChild<'w, Child: Template<Builder = Builder>>,
-  Builder: ComposeWithChild<'w, C, false, 2, N, M>,
-{
-  type Target = Pair<Self, Builder::Target>;
-
-  fn with_child(self, child: C) -> Self::Target {
-    let child = <P::Value as ComposeChild<'w>>::Child::builder().with_child(child);
-    Pair { parent: self, child }
-  }
-}
-
-impl<'w, P, C, Target, const TML: usize, const N: usize, const M: usize>
-  ComposeWithChild<'w, C, false, TML, N, M> for P
-where
-  P: ComposeChild<'w>,
-  State<P>: ComposeWithChild<'w, C, true, TML, N, M, Target = Target>,
-{
-  type Target = Target;
-
+  type Target = <State<P> as ComposeWithChild<C, K>>::Target;
   fn with_child(self, child: C) -> Self::Target { State::value(self).with_child(child) }
 }
 
-impl<'w, W, C, const TML: usize, const WRITER: bool, const N: usize, const M: usize>
-  ComposeWithChild<'w, C, WRITER, TML, N, M> for FatObj<W>
+impl<P, C, K: ?Sized> ComposeWithChild<C, K> for FatObj<P>
 where
-  W: ComposeWithChild<'w, C, WRITER, TML, N, M>,
+  P: ComposeWithChild<C, K>,
 {
-  type Target = FatObj<W::Target>;
+  type Target = FatObj<P::Target>;
 
   #[track_caller]
   fn with_child(self, child: C) -> Self::Target {
@@ -98,58 +66,48 @@ where
   }
 }
 
-// Option needn't implement for `Template`
-impl<'w, T, C, const WRITER: bool, const N: usize, const M: usize>
-  ComposeWithChild<'w, C, WRITER, 0, N, M> for Option<T>
+impl<P, C, Child, K: ?Sized> ComposeWithChild<Child, K> for Pair<P, C>
 where
-  T: ComposeWithChild<'w, C, WRITER, 0, 0, M>,
-  C: IntoChildCompose<Widget<'w>, M>,
-  T::Target: IntoWidget<'w, N>,
+  C: ComposeWithChild<Child, K>,
 {
-  type Target = Widget<'w>;
-
-  fn with_child(self, c: C) -> Self::Target {
-    if let Some(p) = self { p.with_child(c).into_widget() } else { c.into_child_compose() }
+  type Target = Pair<P, C::Target>;
+  #[inline]
+  fn with_child(self, child: Child) -> Self::Target {
+    let Pair { parent, child: c } = self;
+    Pair { parent, child: c.with_child(child) }
   }
 }
 
-// The continuation with a child is only possible if the child of `Pair` is a
-// `Template`.
-impl<'w, W, C1, C2: 'w, const WRITER: bool, const TML: usize, const M: usize, const N: usize>
-  ComposeWithChild<'w, C2, WRITER, TML, N, M> for Pair<W, C1>
+pub trait OptionComposeWithChild<'c, C, K: ?Sized> {
+  fn with_child(self, child: C) -> Widget<'c>;
+}
+impl<'c, P, C, K> OptionComposeWithChild<'c, C, K> for Option<P>
 where
-  C1: ComposeWithChild<'w, C2, WRITER, TML, N, M>,
+  P: ComposeWithChild<C, K>,
+  C: IntoWidget<'c, K>,
+  P::Target: IntoWidget<'c, K>,
 {
-  type Target = Pair<W, C1::Target>;
-
-  #[track_caller]
-  fn with_child(self, c: C2) -> Self::Target {
-    let Pair { parent: widget, child } = self;
-    Pair { parent: widget, child: child.with_child(c) }
+  #[inline]
+  fn with_child(self, child: C) -> Widget<'c> {
+    if let Some(p) = self { p.with_child(child).into_widget() } else { child.into_widget() }
   }
 }
 
-impl<'w, W, C: 'w> IntoWidget<'w, COMPOSE> for Pair<W, C>
-where
-  W: StateWriter,
-  W::Value: ComposeChild<'w, Child = C>,
-{
-  fn into_widget(self) -> Widget<'w> {
-    let Self { parent, child } = self;
-    ComposeChild::compose_child(parent, child).into_widget()
-  }
+pub struct BuildTml;
+impl<B: TemplateBuilder> RFrom<B, BuildTml> for B::Target {
+  #[inline]
+  fn r_from(from: B) -> Self { from.build_tml() }
 }
 
-impl<'w, W, C, TML> IntoWidget<'w, FN> for Pair<W, C>
+// ---- convert to widget -------
+impl<'w, P, C, K: ?Sized> RFrom<Pair<P, C>, OtherWidget<K>> for Widget<'w>
 where
-  W: StateWriter,
-  W::Value: ComposeChild<'w, Child = TML>,
-  TML: Template<Builder = C>,
-  C: TemplateBuilder<Target = TML> + 'w,
+  P: StateWriter<Value: ComposeChild<'w, Child: RFrom<C, K>>>,
 {
-  fn into_widget(self) -> Widget<'w> {
-    let Self { parent, child } = self;
-    ComposeChild::compose_child(parent, child.build_tml()).into_widget()
+  #[inline]
+  fn r_from(from: Pair<P, C>) -> Self {
+    let Pair { parent, child } = from;
+    ComposeChild::compose_child(parent, child.r_into())
   }
 }
 
@@ -164,7 +122,11 @@ impl<T> Template for Option<T> {
 /// The template builder for `Option` introduces a new type to disambiguate the
 /// `with_child` method call for `Option`, especially when `Option` acts as a
 /// parent for a widget with `with_child` method.
-pub struct OptionBuilder<T>(Option<T>);
+pub struct OptionBuilder<T>(pub Option<T>);
+
+impl<T> Default for OptionBuilder<T> {
+  fn default() -> Self { Self(None) }
+}
 
 impl<T> TemplateBuilder for OptionBuilder<T> {
   type Target = Option<T>;
@@ -172,31 +134,24 @@ impl<T> TemplateBuilder for OptionBuilder<T> {
   fn build_tml(self) -> Self::Target { self.0 }
 }
 
-impl<T> ComposeChildFrom<OptionBuilder<T>, 1> for Option<T> {
-  #[inline]
-  fn compose_child_from(from: OptionBuilder<T>) -> Self { from.build_tml() }
-}
-
-impl<'w, C, T, const M: usize> ComposeWithChild<'w, C, false, 1, 0, M> for OptionBuilder<T>
+impl<C, T, K: ?Sized> ComposeWithChild<C, ValueKind<K>> for OptionBuilder<T>
 where
-  C: IntoChildCompose<T, M>,
+  C: RInto<T, K>,
 {
   type Target = Self;
 
-  #[inline]
   fn with_child(self, child: C) -> Self::Target { self.with_child(Some(child)) }
 }
 
-impl<'w, C, T, const M: usize> ComposeWithChild<'w, Option<C>, false, 1, 1, M> for OptionBuilder<T>
+impl<C, T, K: ?Sized> ComposeWithChild<Option<C>, Option<fn() -> K>> for OptionBuilder<T>
 where
-  C: IntoChildCompose<T, M>,
+  C: RInto<T, K>,
 {
   type Target = Self;
 
-  #[inline]
   fn with_child(mut self, child: Option<C>) -> Self::Target {
     debug_assert!(self.0.is_none(), "Option already has a child");
-    self.0 = child.map(IntoChildCompose::into_child_compose);
+    self.0 = child.map(RInto::r_into);
     self
   }
 }
@@ -204,6 +159,10 @@ where
 // impl Vec<T> as Template
 
 pub struct VecBuilder<T>(Vec<T>);
+
+impl<T> Default for VecBuilder<T> {
+  fn default() -> Self { Self(vec![]) }
+}
 
 impl<T> Template for Vec<T> {
   type Builder = VecBuilder<T>;
@@ -217,30 +176,22 @@ impl<T> TemplateBuilder for VecBuilder<T> {
   fn build_tml(self) -> Self::Target { self.0 }
 }
 
-impl<T> ComposeChildFrom<VecBuilder<T>, 1> for Vec<T> {
-  #[inline]
-  fn compose_child_from(from: VecBuilder<T>) -> Self { from.build_tml() }
-}
-
-impl<'w, C, T, const M: usize> ComposeWithChild<'w, C, false, 1, 0, M> for VecBuilder<T>
+impl<C, T, K: ?Sized> ComposeWithChild<C, std::iter::Once<&'static K>> for VecBuilder<T>
 where
-  C: IntoChildCompose<T, M>,
+  C: RInto<T, K>,
 {
   type Target = Self;
 
   #[inline]
   fn with_child(mut self, child: C) -> Self::Target {
-    self.0.push(child.into_child_compose());
+    self.0.push(child.r_into());
     self
   }
 }
 
-impl<'w, C, T, const N: usize, const M: usize> ComposeWithChild<'w, C, false, 2, N, M>
-  for VecBuilder<T>
+impl<C, T, K: ?Sized> ComposeWithChild<C, dyn Iterator<Item = K>> for VecBuilder<T>
 where
-  T: Template,
-  T::Builder: ComposeWithChild<'w, C, false, 1, N, M>,
-  <T::Builder as ComposeWithChild<'w, C, false, 1, N, M>>::Target: TemplateBuilder<Target = T>,
+  C: IntoIterator<Item: RInto<T, K>>,
 {
   type Target = Self;
 
@@ -248,30 +199,10 @@ where
   fn with_child(mut self, child: C) -> Self::Target {
     self
       .0
-      .push(T::builder().with_child(child).build_tml());
+      .extend(child.into_iter().map(|v| v.r_into()));
     self
   }
 }
-
-impl<'w, C, T, const M: usize> ComposeWithChild<'w, C, false, 1, 1, M> for VecBuilder<T>
-where
-  C: IntoIterator,
-  C::Item: IntoChildCompose<T, M>,
-{
-  type Target = Self;
-
-  #[inline]
-  fn with_child(mut self, child: C) -> Self::Target {
-    self
-      .0
-      .extend(child.into_iter().map(|v| v.into_child_compose()));
-    self
-  }
-}
-
-// todo: remove it, keep it for backward compatibility.
-
-impl ChildOfCompose for Resource<PixelImage> {}
 
 #[cfg(test)]
 mod tests {
@@ -282,8 +213,6 @@ mod tests {
   enum PTml {
     Void(Void),
   }
-
-  impl ChildOfCompose for Void {}
 
   struct P;
 
@@ -346,7 +275,7 @@ mod tests {
     #[derive(Template)]
     enum EnumTml {
       Widget(Widget<'static>),
-      Text(TextInit),
+      Text(TextValue),
     }
 
     #[derive(Declare)]
@@ -356,7 +285,7 @@ mod tests {
       type Child = Vec<EnumTml>;
 
       fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
-        todo!()
+        unreachable!()
       }
     }
 
@@ -370,6 +299,51 @@ mod tests {
         @ MockStack { @Void {} }
         @ {w}
       }
+    };
+  }
+
+  #[test]
+  fn enum_conversion() {
+    pub struct BuilderX;
+
+    struct BuilderAKind<K: ?Sized>(PhantomData<fn() -> K>);
+    struct BuilderBKind<K: ?Sized>(PhantomData<fn() -> K>);
+
+    impl<C, K: ?Sized> RFrom<C, BuilderAKind<K>> for BuilderX
+    where
+      C: RInto<Widget<'static>, K>,
+    {
+      fn r_from(_: C) -> Self { unreachable!() }
+    }
+
+    impl<C, K: ?Sized> RFrom<C, BuilderBKind<K>> for BuilderX
+    where
+      C: RInto<CowArc<str>, K>,
+    {
+      fn r_from(_: C) -> Self { unreachable!() }
+    }
+
+    impl<'w, K: ?Sized, C> ComposeWithChild<C, BuilderAKind<K>> for BuilderX
+    where
+      C: RInto<Widget<'w>, K>,
+    {
+      type Target = Self;
+      fn with_child(self, _: C) -> Self { unreachable!() }
+    }
+
+    impl<K: ?Sized, C> ComposeWithChild<C, BuilderBKind<K>> for BuilderX
+    where
+      C: RInto<CowArc<str>, K>,
+    {
+      type Target = Self;
+      fn with_child(self, _: C) -> Self { unreachable!() }
+    }
+    let _ = move || {
+      let builder = BuilderX;
+      let builder = builder.with_child("Hello");
+      let _builder = builder.with_child(Void);
+      let _builder: BuilderX = "hello".r_into();
+      let _builder: BuilderX = Void.r_into();
     };
   }
 }
