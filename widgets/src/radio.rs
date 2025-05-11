@@ -58,7 +58,7 @@ pub struct Radio {
 impl RadioDeclarer {
   /// Initialize the radio value without supporting the pipe value format.
   pub fn value<V: 'static>(&mut self, value: V) -> &mut Self {
-    self.value = Some(DeclareInit::Value(Box::new(value)));
+    self.value = Some(PipeValue::Value(Box::new(value)));
     self
   }
 }
@@ -74,7 +74,7 @@ impl Radio {
 }
 
 impl ComposeChild<'static> for Radio {
-  type Child = Option<PositionChild<TextInit>>;
+  type Child = Option<PositionChild<TextValue>>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fat_obj! {

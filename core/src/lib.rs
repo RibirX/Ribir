@@ -21,6 +21,7 @@ pub mod widget_children;
 pub(crate) mod widget_tree;
 pub mod window;
 pub use rxrust;
+pub mod convert;
 pub mod overlay;
 pub mod query;
 pub mod reusable;
@@ -54,6 +55,7 @@ pub mod prelude {
     builtin_widgets::*,
     class_multi_impl, class_names,
     context::*,
+    convert::*,
     declare::*,
     events::*,
     overlay::{AutoClosePolicy, Overlay, OverlayStyle},

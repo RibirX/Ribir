@@ -205,21 +205,16 @@ mod tests {
           }
         },
         @MockMulti {
-        @ {
-            pipe!(*$item_cnt).map(move |cnt|
-              move || {
-              @ {
-                (0..cnt).map(move |i| {
-                  @Reuse {
-                    reuse_id: LocalId::number(i),
-                    @ {
-                      fn_widget! {
-                        *$build_w.write() += 1;
-                        Void {}.into_widget()
-                      }
-                    }
+          @pipe! {
+            (0..*$item_cnt).map(move |i| {
+              @Reuse {
+                reuse_id: LocalId::number(i),
+                @ {
+                  fn_widget! {
+                    *$build_w.write() += 1;
+                    Void {}.into_widget()
                   }
-                })
+                }
               }
             })
           }

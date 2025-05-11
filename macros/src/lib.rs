@@ -30,15 +30,7 @@ pub fn single_child_derive(input: TokenStream) -> TokenStream {
   let name = input.ident;
 
   quote! {
-    impl #impl_generics SingleChild for #name #ty_generics #where_clause {
-      fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c> {
-        compose_single_child(self.into_widget(), child.into_child_single())
-      }
-
-      fn into_parent(self: Box<Self>) -> Widget<'static> {
-        self.into_widget()
-      }
-    }
+    impl #impl_generics SingleChild for #name #ty_generics #where_clause {}
   }
   .into()
 }
@@ -49,29 +41,7 @@ pub fn multi_child_derive(input: TokenStream) -> TokenStream {
   let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
   let name = input.ident;
   quote! {
-    impl #impl_generics MultiChild for #name #ty_generics #where_clause {
-      type Target<'c> = MultiPair<'c>;
-      fn with_child<'c, const N: usize, const M: usize>(self, child: impl IntoChildMulti<'c, N, M>)
-        -> Self::Target<'c>
-      {
-        MultiPair::new(self, child)
-      }
-
-      fn into_parent(self: Box<Self>) -> Widget<'static> {
-        self.into_widget()
-      }
-    }
-  }
-  .into()
-}
-
-#[proc_macro_derive(ChildOfCompose)]
-pub fn child_of_compose(input: TokenStream) -> TokenStream {
-  let input = parse_macro_input!(input as DeriveInput);
-  let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-  let name = input.ident;
-  quote! {
-    impl #impl_generics ChildOfCompose for #name #ty_generics #where_clause {}
+    impl #impl_generics MultiChild for #name #ty_generics #where_clause {}
   }
   .into()
 }

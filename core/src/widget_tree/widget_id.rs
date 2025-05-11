@@ -362,14 +362,6 @@ impl WidgetId {
       .and_then(QueryHandle::into_ref)
   }
 
-  /// return if this object contain type `T`
-  pub(crate) fn contain_type<T: Any>(self, tree: &WidgetTree) -> bool {
-    self
-      .assert_get(tree)
-      .query(&QueryId::of::<T>())
-      .is_some()
-  }
-
   pub(crate) fn queryable(&self, tree: &WidgetTree) -> bool { self.assert_get(tree).queryable() }
 }
 

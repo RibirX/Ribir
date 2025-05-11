@@ -1,11 +1,8 @@
 use ribir_core::prelude::*;
 
-#[derive(ChildOfCompose)]
-pub struct Label(pub DeclareInit<CowArc<str>>);
+pub struct Label(pub PipeValue<CowArc<str>>);
 
 impl Label {
   #[inline]
-  pub fn new<const M: usize>(str: impl DeclareInto<CowArc<str>, M>) -> Self {
-    Self(str.declare_into())
-  }
+  pub fn new<K: ?Sized>(str: impl RInto<PipeValue<CowArc<str>>, K>) -> Self { Self(str.r_into()) }
 }

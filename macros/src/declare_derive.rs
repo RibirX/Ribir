@@ -30,7 +30,7 @@ pub(crate) fn declare_derive(stt: &mut syn::ItemStruct) -> syn::Result<TokenStre
      _marker: std::marker::PhantomData<#host #g_ty>,
      #(
        #[allow(clippy::type_complexity)]
-       #builder_members : Option<DeclareInit<#builder_tys>>,
+       #builder_members : Option<PipeValue<#builder_tys>>,
      )*
    }
 
@@ -140,7 +140,7 @@ fn declarer_set_methods<'a>(
           #[inline]
           #doc
           #vis fn #set_method(&mut self, v: #ty) -> &mut Self {
-            self.#field_name = Some(DeclareInit::Value(v));
+            self.#field_name = Some(PipeValue::Value(v));
             self
           }
         }
@@ -149,10 +149,10 @@ fn declarer_set_methods<'a>(
           #[inline]
           #[allow(clippy::type_complexity)]
           #doc
-          #vis fn #set_method<const _M: usize>(&mut self, v: impl DeclareInto<#ty, _M>)
+          #vis fn #set_method<_K: ?Sized>(&mut self, v: impl RInto<PipeValue<#ty>, _K>)
             -> &mut Self
           {
-            self.#field_name = Some(v.declare_into());
+            self.#field_name = Some(v.r_into());
             self
           }
         }

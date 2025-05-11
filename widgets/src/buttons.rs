@@ -139,7 +139,7 @@ pub enum FabSize {
 /// icon types the button can have.
 #[derive(Template)]
 pub struct ButtonChild<'c> {
-  label: Option<TextInit>,
+  label: Option<TextValue>,
   icon: Option<PositionChild<Widget<'c>>>,
 }
 

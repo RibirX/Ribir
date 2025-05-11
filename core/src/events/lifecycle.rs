@@ -110,15 +110,13 @@ mod tests {
       @MockMulti {
         @ {
           pipe!(*$cnt).map(move |cnt| {
-            move || {
-              (0..cnt).map(move |_| {
-                @MockBox {
-                  size: Size::zero(),
-                  on_mounted: move |e| { $mounted.write().insert(e.id); },
-                  on_disposed: move |e| { $disposed.write().insert(e.id); },
-                }
-              })
-            }
+            (0..cnt).map(move |_| {
+              @MockBox {
+                size: Size::zero(),
+                on_mounted: move |e| { $mounted.write().insert(e.id); },
+                on_disposed: move |e| { $disposed.write().insert(e.id); },
+              }
+            })
           })
         }
       }

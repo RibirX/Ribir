@@ -824,7 +824,7 @@ impl<T> FatObj<T> {
   ///   tab_index value, their order relative to each other follows their
   ///   position in the tree source. The maximum value for tab_index is 32767.
   ///   If not specified, it takes the default value 0.
-  pub fn tab_index<const M: usize>(&mut self, tab_idx: impl DeclareInto<i16, M>) -> &mut Self {
+  pub fn tab_index<K: ?Sized>(&mut self, tab_idx: impl RInto<PipeValue<i16>, K>) -> &mut Self {
     self.declare_builtin_init(
       tab_idx,
       |this| this.get_mix_builtin_widget().mix_flags(),
@@ -833,8 +833,8 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes the `Class` that should be applied to the widget.
-  pub fn class<const M: usize>(
-    &mut self, cls: impl DeclareInto<Option<ClassName>, M>,
+  pub fn class<K: ?Sized>(
+    &mut self, cls: impl RInto<PipeValue<Option<ClassName>>, K>,
   ) -> &mut Self {
     self.declare_builtin_init(cls, Self::get_class_widget, |c, cls| c.class = cls)
   }
@@ -844,7 +844,7 @@ impl<T> FatObj<T> {
   ///
   /// Only one widget should have this attribute specified.  If there are
   /// several, the widget nearest the root, get the initial focus.
-  pub fn auto_focus<const M: usize>(&mut self, v: impl DeclareInto<bool, M>) -> &mut Self {
+  pub fn auto_focus<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
     self.declare_builtin_init(
       v,
       |this| this.get_mix_builtin_widget().mix_flags(),
@@ -853,156 +853,156 @@ impl<T> FatObj<T> {
   }
 
   /// Initializes how its child should be scale to fit its box.
-  pub fn box_fit<const M: usize>(&mut self, v: impl DeclareInto<BoxFit, M>) -> &mut Self {
+  pub fn box_fit<K: ?Sized>(&mut self, v: impl RInto<PipeValue<BoxFit>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_fitted_box_widget, |m, v| m.box_fit = v)
   }
 
   /// Provide a painting style to this widget.
-  pub fn painting_style<const M: usize>(
-    &mut self, v: impl DeclareInto<PaintingStyle, M>,
+  pub fn painting_style<K: ?Sized>(
+    &mut self, v: impl RInto<PipeValue<PaintingStyle>, K>,
   ) -> &mut Self {
     self.declare_builtin_init(v, Self::get_painting_style_widget, |m, v| m.painting_style = v)
   }
 
   /// Initializes the text style of this widget.
-  pub fn text_style<const M: usize>(&mut self, v: impl DeclareInto<TextStyle, M>) -> &mut Self {
+  pub fn text_style<K: ?Sized>(&mut self, v: impl RInto<PipeValue<TextStyle>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style = v)
   }
 
   /// Initializes the font size of this widget.
-  pub fn font_size<const M: usize>(&mut self, v: impl DeclareInto<f32, M>) -> &mut Self {
+  pub fn font_size<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_size = v)
   }
 
   /// Initializes the font face of this widget.
-  pub fn font_face<const M: usize>(&mut self, v: impl DeclareInto<FontFace, M>) -> &mut Self {
+  pub fn font_face<K: ?Sized>(&mut self, v: impl RInto<PipeValue<FontFace>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_face = v)
   }
 
   /// Initializes the letter space of this widget.
-  pub fn letter_spacing<const M: usize>(&mut self, v: impl DeclareInto<f32, M>) -> &mut Self {
+  pub fn letter_spacing<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.letter_space = v)
   }
 
   /// Initializes the text line height of this widget.
-  pub fn text_line_height<const M: usize>(&mut self, v: impl DeclareInto<f32, M>) -> &mut Self {
+  pub fn text_line_height<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.line_height = v)
   }
 
   /// Initializes the text overflow of this widget.
-  pub fn text_overflow<const M: usize>(
-    &mut self, v: impl DeclareInto<TextOverflow, M>,
+  pub fn text_overflow<K: ?Sized>(
+    &mut self, v: impl RInto<PipeValue<TextOverflow>, K>,
   ) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.overflow = v)
   }
 
   /// Initializes the background of the widget.
-  pub fn background<const M: usize>(&mut self, v: impl DeclareInto<Brush, M>) -> &mut Self {
+  pub fn background<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Brush>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_background_widget, |m, v| m.background = v)
   }
 
   /// Initializes the foreground of the widget.
-  pub fn foreground<const M: usize>(&mut self, v: impl DeclareInto<Brush, M>) -> &mut Self {
+  pub fn foreground<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Brush>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_foreground_widget, |m, v| m.foreground = v)
   }
 
   /// Initializes the border of the widget.
-  pub fn border<const M: usize>(&mut self, v: impl DeclareInto<Border, M>) -> &mut Self {
+  pub fn border<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Border>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_border_widget, |m, v| m.border = v)
   }
 
   /// Initializes the border radius of the widget.
-  pub fn radius<const M: usize>(&mut self, v: impl DeclareInto<Radius, M>) -> &mut Self {
+  pub fn radius<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Radius>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_radius_widget, |m, v| m.radius = v)
   }
 
   /// Initializes the extra space within the widget.
-  pub fn padding<const M: usize>(&mut self, v: impl DeclareInto<EdgeInsets, M>) -> &mut Self {
+  pub fn padding<K: ?Sized>(&mut self, v: impl RInto<PipeValue<EdgeInsets>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_padding_widget, |m, v| m.padding = v)
   }
 
   /// Initializes the cursor of the widget.
-  pub fn cursor<const M: usize>(&mut self, v: impl DeclareInto<CursorIcon, M>) -> &mut Self {
+  pub fn cursor<K: ?Sized>(&mut self, v: impl RInto<PipeValue<CursorIcon>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_cursor_widget, |m, v| m.cursor = v)
   }
 
   /// Initializes the space around the widget.
-  pub fn margin<const M: usize>(&mut self, v: impl DeclareInto<EdgeInsets, M>) -> &mut Self {
+  pub fn margin<K: ?Sized>(&mut self, v: impl RInto<PipeValue<EdgeInsets>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_margin_widget, |m, v| m.margin = v)
   }
 
   /// Initializes the constraints clamp of the widget.
-  pub fn clamp<const M: usize>(&mut self, v: impl DeclareInto<BoxClamp, M>) -> &mut Self {
+  pub fn clamp<K: ?Sized>(&mut self, v: impl RInto<PipeValue<BoxClamp>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_constrained_box_widget, |m, v| m.clamp = v)
   }
 
   /// Initializes how user can scroll the widget.
-  pub fn scrollable<const M: usize>(&mut self, v: impl DeclareInto<Scrollable, M>) -> &mut Self {
+  pub fn scrollable<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Scrollable>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_scrollable_widget, |m, v| m.scrollable = v)
   }
 
   /// Initializes the transformation of the widget.
-  pub fn transform<const M: usize>(&mut self, v: impl DeclareInto<Transform, M>) -> &mut Self {
+  pub fn transform<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Transform>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_transform_widget, |m, v| m.transform = v)
   }
 
   /// Initializes how the widget should be aligned horizontally.
-  pub fn h_align<const M: usize>(&mut self, v: impl DeclareInto<HAlign, M>) -> &mut Self {
+  pub fn h_align<K: ?Sized>(&mut self, v: impl RInto<PipeValue<HAlign>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_h_align_widget, |m, v| m.h_align = v)
   }
 
   /// Initializes how the widget should be aligned vertically.
-  pub fn v_align<const M: usize>(&mut self, v: impl DeclareInto<VAlign, M>) -> &mut Self {
+  pub fn v_align<K: ?Sized>(&mut self, v: impl RInto<PipeValue<VAlign>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_v_align_widget, |m, v| m.v_align = v)
   }
 
   /// Initializes the relative anchor to the parent of the widget.
-  pub fn anchor<const M: usize>(&mut self, v: impl DeclareInto<Anchor, M>) -> &mut Self {
+  pub fn anchor<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Anchor>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_relative_anchor_widget, |m, v| m.anchor = v)
   }
 
   /// Initializes the horizontal global anchor of the widget.
-  pub fn global_anchor_x<const M: usize>(
-    &mut self, v: impl DeclareInto<Option<GlobalAnchorX>, M>,
+  pub fn global_anchor_x<K: ?Sized>(
+    &mut self, v: impl RInto<PipeValue<Option<GlobalAnchorX>>, K>,
   ) -> &mut Self {
     self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_x = v)
   }
 
   /// Initializes the vertical global anchor of the widget.
-  pub fn global_anchor_y<const M: usize>(
-    &mut self, v: impl DeclareInto<Option<GlobalAnchorY>, M>,
+  pub fn global_anchor_y<K: ?Sized>(
+    &mut self, v: impl RInto<PipeValue<Option<GlobalAnchorY>>, K>,
   ) -> &mut Self {
     self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_y = v)
   }
 
   /// Initializes the visibility of the widget.
-  pub fn visible<const M: usize>(&mut self, v: impl DeclareInto<bool, M>) -> &mut Self {
+  pub fn visible<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_visibility_widget, |m, v| m.visible = v)
   }
 
   /// Initializes the opacity of the widget.
-  pub fn opacity<const M: usize>(&mut self, v: impl DeclareInto<f32, M>) -> &mut Self {
+  pub fn opacity<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_opacity_widget, |m, v| m.opacity = v)
   }
 
   /// Initializes the tooltips of the widget.
-  pub fn tooltips<const M: usize>(&mut self, v: impl DeclareInto<CowArc<str>, M>) -> &mut Self {
+  pub fn tooltips<K: ?Sized>(&mut self, v: impl RInto<PipeValue<CowArc<str>>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_tooltips_widget, |m, v| m.tooltips = v)
   }
 
   /// Initializes the disabled state of the widget.
-  pub fn disabled<const M: usize>(&mut self, v: impl DeclareInto<bool, M>) -> &mut Self {
+  pub fn disabled<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_disabled_widget, |m, v| m.disabled = v)
   }
 
   /// Initializes the clip_boundary of the widget.
-  pub fn clip_boundary<const M: usize>(&mut self, v: impl DeclareInto<bool, M>) -> &mut Self {
+  pub fn clip_boundary<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_clip_boundary_widget, |m, v| m.clip_boundary = v)
   }
 
   /// Initializes the `keep_alive` value of the `KeepAlive` widget.
-  pub fn keep_alive<const M: usize>(&mut self, v: impl DeclareInto<bool, M>) -> &mut Self {
-    let (v, o) = v.declare_into().unzip();
+  pub fn keep_alive<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
+    let (v, o) = v.r_into().unzip();
     let d = self.get_keep_alive_widget();
     d.write().keep_alive = v;
     if let Some(o) = o {
@@ -1038,12 +1038,12 @@ impl<T> FatObj<T> {
     self
   }
 
-  fn declare_builtin_init<V: 'static, B: 'static, const M: usize>(
-    &mut self, init: impl DeclareInto<V, M>, get_builtin: impl FnOnce(&mut Self) -> &State<B>,
+  fn declare_builtin_init<V: 'static, B: 'static, K: ?Sized>(
+    &mut self, init: impl RInto<PipeValue<V>, K>, get_builtin: impl FnOnce(&mut Self) -> &State<B>,
     set_value: fn(&mut B, V),
   ) -> &mut Self {
     let builtin = get_builtin(self);
-    let (v, o) = init.declare_into().unzip();
+    let (v, o) = init.r_into().unzip();
     set_value(&mut *builtin.silent(), v);
     if let Some(o) = o {
       let c_builtin = builtin.clone_writer();
@@ -1065,15 +1065,8 @@ impl<T> FatObj<T> {
   pub fn has_class(&self) -> bool { self.class.is_some() }
 }
 
-impl<'w, T, const M: usize> IntoWidget<'w, M> for FatObj<T>
-where
-  T: IntoWidget<'w, M>,
-{
-  fn into_widget(self) -> Widget<'w> { self.map(|w| w.into_widget()).compose() }
-}
-
 impl<'a> FatObj<Widget<'a>> {
-  fn compose(mut self) -> Widget<'a> {
+  pub(crate) fn compose(mut self) -> Widget<'a> {
     macro_rules! compose_builtin_widgets {
       ($host: ident + [$($field: ident),*]) => {
         $(
@@ -1181,6 +1174,10 @@ impl<T> DeclarerWithSubscription<T> {
   pub fn new(host: T, subscribes: SmallVec<[BoxSubscription<'static>; 1]>) -> Self {
     Self { inner: host, subscribes }
   }
+
+  fn map<M>(self, f: impl FnOnce(T) -> M) -> DeclarerWithSubscription<M> {
+    DeclarerWithSubscription { inner: f(self.inner), subscribes: self.subscribes }
+  }
 }
 
 impl<T> Deref for DeclarerWithSubscription<T> {
@@ -1193,61 +1190,48 @@ impl<T> DerefMut for DeclarerWithSubscription<T> {
   fn deref_mut(&mut self) -> &mut Self::Target { &mut self.inner }
 }
 
-impl<T> DeclarerWithSubscription<T> {
-  fn map<M>(self, f: impl FnOnce(T) -> M) -> DeclarerWithSubscription<M> {
-    DeclarerWithSubscription { inner: f(self.inner), subscribes: self.subscribes }
-  }
-}
-
-impl<'w, T, const M: usize> IntoWidget<'w, M> for DeclarerWithSubscription<T>
+impl<'w, T, K> RFrom<DeclarerWithSubscription<T>, OtherWidget<DeclarerWithSubscription<K>>>
+  for Widget<'w>
 where
-  T: IntoWidget<'w, M>,
+  T: IntoWidget<'w, K> + 'w,
 {
-  fn into_widget(self) -> Widget<'w> {
-    let DeclarerWithSubscription { inner: host, subscribes } = self;
-    let w = host.into_widget();
+  fn r_from(value: DeclarerWithSubscription<T>) -> Self {
+    let DeclarerWithSubscription { inner, subscribes } = value;
+
     if subscribes.is_empty() {
-      w
+      inner.into_widget()
     } else {
-      fn_widget! {
-        let mut w = FatObj::new(w);
-        @ $w {
-          on_disposed: move |_| {
-            subscribes.into_iter().for_each(|u| u.unsubscribe());
-          }
-        }
-      }
-      .into_widget()
+      let mut w = FatObj::new(inner.into_widget());
+      w.on_disposed(move |_| {
+        subscribes
+          .into_iter()
+          .for_each(|u| u.unsubscribe());
+      });
+      w.into_widget()
     }
   }
 }
 
-impl<T: SingleChild> SingleChild for DeclarerWithSubscription<T> {
-  fn with_child<'c, const M: usize>(self, child: impl IntoChildSingle<'c, M>) -> Widget<'c> {
-    self.map(|w| w.with_child(child)).into_widget()
-  }
+impl<T: SingleChild> SingleChild for DeclarerWithSubscription<T> {}
 
-  fn into_parent(self: Box<Self>) -> Widget<'static> { (*self).into_widget() }
+impl<P> MultiChild for DeclarerWithSubscription<P> where P: MultiChild {}
+
+impl<P: Parent> Parent for DeclarerWithSubscription<P> {
+  fn with_children<'w>(self, children: Vec<Widget<'w>>) -> Widget<'w>
+  where
+    Self: 'w,
+  {
+    self
+      .map(|host| host.with_children(children))
+      .into_widget()
+  }
 }
 
-impl<T: MultiChild> MultiChild for DeclarerWithSubscription<T> {
-  type Target<'c> = MultiPair<'c>;
-  fn with_child<'c, const N: usize, const M: usize>(
-    self, child: impl IntoChildMulti<'c, N, M>,
-  ) -> MultiPair<'c> {
-    MultiPair::new(self, child)
-  }
-
-  fn into_parent(self: Box<Self>) -> Widget<'static> { (*self).into_widget() }
-}
-
-impl<'w, T, C, const TML: usize, const WRITER: bool, const N: usize, const M: usize>
-  ComposeWithChild<'w, C, WRITER, TML, N, M> for DeclarerWithSubscription<T>
+impl<C, K: ?Sized, P> ComposeWithChild<C, K> for DeclarerWithSubscription<P>
 where
-  T: ComposeWithChild<'w, C, WRITER, TML, N, M>,
+  P: ComposeWithChild<C, K>,
 {
-  type Target = DeclarerWithSubscription<T::Target>;
-
+  type Target = DeclarerWithSubscription<P::Target>;
   fn with_child(self, child: C) -> Self::Target { self.map(|host| host.with_child(child)) }
 }
 

@@ -121,7 +121,7 @@ class_names! {
 #[derive(Template)]
 pub struct Tab<'t> {
   icon: Option<PairOf<'t, Icon>>,
-  label: Option<TextInit>,
+  label: Option<TextValue>,
   pane: Option<GenWidget>,
 }
 
@@ -242,9 +242,8 @@ impl<'w> Tab<'w> {
       let inline = Variant::<TabsInlineIcon>::new_or_default(ctx);
       let line = match inline {
         Variant::Value(inline) => inline.into_line_widget(),
-        Variant::Watcher(w) => Box::new(
-          pipe!(*$w).map(move |inline| { fn_widget! { inline.into_line_widget() }})
-        ),
+        Variant::Watcher(w) => pipe!(*$w)
+          .map(move |inline| { inline.into_line_widget() }).into()
       };
 
       let header = @Class {
@@ -273,16 +272,15 @@ impl<'w> Tab<'w> {
   }
 
   pub fn take_pane(&mut self) -> GenWidget {
-    let pane = self
-      .pane
-      .take()
-      .unwrap_or_else(|| fn_widget! { @Void {} }.into());
+    let pane = self.pane.take();
 
-    fat_obj! {
+    GenWidget::from_fn_widget(fat_obj! {
       class: TAB_PANE,
-      @pane.gen_widget()
-    }
-    .into()
+      @ {
+        pane.as_ref()
+          .map_or_else(|| Void.into_widget(), GenWidget::gen_widget)
+      }
+    })
   }
 
   pub fn info(&self, idx: usize) -> TabInfo {
@@ -323,8 +321,8 @@ impl TabPos {
 }
 
 impl TabsInlineIcon {
-  fn into_line_widget(self) -> Box<dyn MultiChild> {
-    if self.0 { Box::new(HorizontalLine) } else { Box::new(VerticalLine) }
+  fn into_line_widget(self) -> XMultiChild<'static> {
+    if self.0 { HorizontalLine.into() } else { VerticalLine.into() }
   }
 }
 

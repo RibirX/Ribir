@@ -245,7 +245,7 @@ mod tests {
         @MockBox { size: CHILD_SIZE }
       }
     }
-    .into()
+    .r_into()
   }
 
   // Edge case: box_size is infinity
@@ -315,7 +315,7 @@ mod tests {
         @MockBox { size: CHILD_SIZE }
       }
     }
-    .into()
+    .r_into()
   }
 
   widget_layout_test!(
@@ -356,7 +356,7 @@ mod tests {
           size: CHILD_SIZE
         }
     }
-    .into()
+    .r_into()
   }
 
   widget_layout_test!(

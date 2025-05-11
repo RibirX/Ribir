@@ -52,7 +52,7 @@ fn task_lists(
       @ {
         pipe!($this;).map(move |_| fn_widget!{
           let _hint_capture_this = || $this.write();
-          let mut items = List::child_template();
+          let mut items = vec![];
           for id in $this.all_tasks() {
             if $this.get_task(id).map_or(false, cond) {
               let task = this.split_writer(
@@ -91,7 +91,7 @@ fn task_lists(
                     }.into_widget()
                   }
                 });
-              items = items.with_child(@ListCustomItem {
+              items.push(@ListCustomItem {
                 interactive: false,
                 @{ item }
               });
@@ -105,7 +105,7 @@ fn task_lists(
       }
     }
   }
-  .into()
+  .r_into()
 }
 
 fn input(

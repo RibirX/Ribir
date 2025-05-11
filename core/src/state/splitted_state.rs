@@ -1,5 +1,4 @@
 use super::*;
-use crate::widget::*;
 
 /// A writer splitted writer from another writer, and has its own notifier.
 pub struct SplittedWriter<O, W> {
@@ -121,11 +120,4 @@ where
 
     WriteRef { value, modified: false, modify_scope, info: &self.info }
   }
-}
-
-impl<'w, S, F> IntoWidget<'w, RENDER> for SplittedWriter<S, F>
-where
-  Self: StateWriter<Value: Render + Sized> + 'w,
-{
-  fn into_widget(self) -> Widget<'w> { WriterRender(self).into_widget() }
 }

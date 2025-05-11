@@ -404,15 +404,13 @@ fn main() {
     }
     @ {
       pipe!(*$counter).map(move |counter| {
-        move || {
-          (0..counter).map(move |_| {
-            @Container {
-              margin: EdgeInsets::all(2.),
-              size: Size::new(10., 10.),
-              background: Color::RED
-            }
-          })
-        }
+        (0..counter).map(move |_| {
+          @Container {
+            margin: EdgeInsets::all(2.),
+            size: Size::new(10., 10.),
+            background: Color::RED
+          }
+        })
       })
     }
   });

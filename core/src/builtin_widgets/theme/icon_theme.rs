@@ -56,15 +56,14 @@ macro_rules! fill_svgs {
 pub const CUSTOM_ICON_START: NamedSvg = NamedSvg::new(65536);
 
 /// The identify of a svg define in theme.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, ChildOfCompose)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct NamedSvg(pub usize);
 
 impl Compose for NamedSvg {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    fn_widget! {
-      pipe!(*$this).map(|v| fn_widget!{ v.of_or_miss(BuildCtx::get())})
-    }
-    .into_widget()
+    pipe!(*$this)
+      .map(|v| v.of_or_miss(BuildCtx::get()))
+      .into_widget()
   }
 }
 

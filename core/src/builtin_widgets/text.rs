@@ -5,7 +5,7 @@ use typography::PlaceLineDirection;
 
 use crate::prelude::*;
 
-pub type TextInit = DeclareInit<CowArc<str>>;
+pub type TextValue = PipeValue<CowArc<str>>;
 /// The text widget displays text with a single style.
 ///
 /// The `TextStyle` provider is utilized to format the text.

@@ -19,26 +19,15 @@ pub trait ObjDeclarer {
   fn finish(self) -> Self::Target;
 }
 
-/// Used to do conversion from a value to the `DeclareInit` type.
-pub trait DeclareFrom<V, const M: usize> {
-  fn declare_from(value: V) -> Self;
-}
-
-/// A value-to-value conversion that consumes the input value. The
-/// opposite of [`DeclareFrom`].
-pub trait DeclareInto<V, const M: usize> {
-  fn declare_into(self) -> DeclareInit<V>;
-}
-
-/// The type use to store the init value of the field when declare a object.
-pub enum DeclareInit<V> {
+/// A enum that represents a value that can be either a value or a pipe.
+pub enum PipeValue<V> {
   Value(V),
   Pipe(BoxPipe<V>),
 }
 
 pub type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
 
-impl<V: 'static> DeclareInit<V> {
+impl<V: 'static> PipeValue<V> {
   pub fn unzip(self) -> (V, Option<ValueStream<V>>) {
     match self {
       Self::Value(v) => (v, None),
@@ -49,48 +38,32 @@ impl<V: 'static> DeclareInit<V> {
     }
   }
 
-  pub fn map<F, U: 'static>(self, f: F) -> DeclareInit<U>
+  pub fn map<F, U: 'static>(self, f: F) -> PipeValue<U>
   where
     F: Fn(V) -> U + 'static,
   {
     match self {
-      Self::Value(v) => DeclareInit::Value(f(v)),
-      Self::Pipe(v) => v.into_pipe().map(f).declare_into(),
+      Self::Value(v) => PipeValue::Value(f(v)),
+      Self::Pipe(v) => v.into_pipe().map(f).r_into(),
     }
   }
 }
 
-impl<T: Default> Default for DeclareInit<T> {
-  #[inline]
+impl<T: Default> Default for PipeValue<T> {
   fn default() -> Self { Self::Value(T::default()) }
 }
 
-impl<V> DeclareFrom<DeclareInit<V>, 0> for DeclareInit<V> {
-  #[inline]
-  fn declare_from(value: DeclareInit<V>) -> Self { value }
+pub struct ValueKind<K: ?Sized>(PhantomData<fn() -> K>);
+impl<T: RInto<V, K>, V, K: ?Sized> RFrom<T, ValueKind<K>> for PipeValue<V> {
+  fn r_from(value: T) -> Self { Self::Value(value.r_into()) }
 }
 
-impl<V, U: From<V>> DeclareFrom<V, 1> for DeclareInit<U> {
-  #[inline]
-  fn declare_from(value: V) -> Self { Self::Value(value.into()) }
-}
-
-impl<P, V> DeclareFrom<P, 2> for DeclareInit<V>
+impl<P, V: 'static, K: ?Sized + 'static> RFrom<P, dyn Pipe<Value = K>> for PipeValue<V>
 where
-  P: Pipe,
-  V: From<P::Value> + 'static,
+  P: Pipe<Value: RInto<V, K>>,
 {
-  #[inline]
-  fn declare_from(value: P) -> Self {
-    let pipe = Box::new(value.map(Into::into));
+  fn r_from(value: P) -> Self {
+    let pipe = Box::new(value.map(RInto::r_into));
     Self::Pipe(BoxPipe::pipe(pipe))
   }
-}
-
-impl<T, V, const M: usize> DeclareInto<V, M> for T
-where
-  DeclareInit<V>: DeclareFrom<T, M>,
-{
-  #[inline]
-  fn declare_into(self) -> DeclareInit<V> { DeclareInit::declare_from(self) }
 }

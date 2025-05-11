@@ -16,7 +16,7 @@ use state_cell::{StateCell, ValueMutRef};
 pub use stateful::*;
 pub use watcher::*;
 
-use crate::{prelude::*, render_helper::RenderProxy};
+use crate::prelude::*;
 
 /// The `StateReader` trait allows for reading, clone and map the state.
 pub trait StateReader: 'static {
@@ -427,35 +427,6 @@ impl<'a, W: ?Sized> Drop for WriteRef<'a, W> {
   }
 }
 
-pub struct WriterRender<T>(pub(crate) T);
-
-impl<T> WriterRender<T> {
-  pub fn new(value: T) -> Self { WriterRender(value) }
-}
-
-struct ReaderRender<T>(pub(crate) T);
-
-impl<T> WriterRender<T>
-where
-  T: StateWatcher,
-  T::Value: Render + Sized,
-{
-  pub fn into_widget(self) -> Widget<'static> {
-    match self.0.try_into_value() {
-      Ok(r) => r.into_widget(),
-      Err(this) => match this.into_reader() {
-        Ok(r) => ReaderRender(r).into_widget(),
-        Err(s) => {
-          let modifies = s.raw_modifies();
-          ReaderRender(s.clone_reader())
-            .into_widget()
-            .dirty_on(modifies, s.read().dirty_phase())
-        }
-      },
-    }
-  }
-}
-
 impl<V: ?Sized + 'static> StateReader for Box<dyn StateReader<Value = V>> {
   type Value = V;
   type Reader = Self;
@@ -557,19 +528,6 @@ impl<V: ?Sized + 'static> StateWriter for Box<dyn StateWriter<Value = V>> {
 
   #[inline]
   fn clone_writer(&self) -> Self { self.clone_boxed_writer() }
-}
-
-impl<R> RenderProxy for ReaderRender<R>
-where
-  R: StateReader,
-  R::Value: Render,
-{
-  #[inline(always)]
-  fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.0.read() }
-}
-
-impl<R: Render> IntoWidget<'static, RENDER> for State<R> {
-  fn into_widget(self) -> Widget<'static> { WriterRender(self).into_widget() }
 }
 
 #[cfg(test)]

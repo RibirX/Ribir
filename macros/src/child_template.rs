@@ -1,3 +1,4 @@
+use heck::ToUpperCamelCase;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::{
@@ -10,15 +11,14 @@ const BUILDER: &str = "Builder";
 const TEMPLATE: &str = "Template";
 fn with_child_generics(generics: &syn::Generics, child_ty: &Type) -> syn::Generics {
   let mut gen = generics.clone();
-  gen.params.push(parse_quote!('_c));
+  gen.params.push(parse_quote!(_K: ?Sized));
   gen.params.push(parse_quote!(_C));
-  gen.params.push(parse_quote!(const _M: usize));
 
   let predicates = &mut gen
     .where_clause
     .get_or_insert_with(|| parse_quote! { where })
     .predicates;
-  predicates.push(parse_quote!(_C: IntoChildCompose<#child_ty, _M>));
+  predicates.push(parse_quote!(_C: RInto<#child_ty, _K>));
 
   gen
 }
@@ -27,24 +27,17 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
   let syn::DeriveInput { vis, ident: name, generics, data, .. } = input;
   let (g_impl, g_ty, g_where) = generics.split_for_impl();
   let builder = Ident::new(&format!("{name}{BUILDER}"), name.span());
-  let mut tokens = quote! {
-    impl #g_impl Template for #name #g_ty #g_where {
-      type Builder = #builder #g_ty;
-
-      #[inline]
-      fn builder() -> Self::Builder {  <_>::default() }
-    }
-
-    impl #g_impl ChildOfCompose for #name #g_ty {}
-
-    impl #g_impl ComposeChildFrom<#builder #g_ty, 1> for #name #g_ty {
-      #[inline]
-      fn compose_child_from(from: #builder #g_ty) -> Self { from.build_tml() }
-    }
-  };
+  let mut tokens = quote! {};
   match data {
     syn::Data::Struct(stt) => {
       tokens.extend(quote! {
+        impl #g_impl Template for #name #g_ty #g_where {
+          type Builder = #builder #g_ty;
+
+          #[inline]
+          fn builder() -> Self::Builder {  <_>::default() }
+        }
+
         impl #g_impl Declare for #name #g_ty #g_where {
           type Builder = #builder #g_ty;
           #[inline]
@@ -69,15 +62,18 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
 
         let gen = with_child_generics(generics, ty);
         let (g_impl, _, g_where) = gen.split_for_impl();
+        let kind_name = Ident::new(
+          &format!("{builder}{}Kind", field_name.to_string().to_upper_camel_case()),
+          Span::call_site(),
+        );
         tokens.extend(quote! {
-          impl #g_impl ComposeWithChild<'_c, _C, false, 1, {#f_idx + 1}, _M>
-            for #builder #g_ty #g_where
-          {
+          #vis struct #kind_name<K: ?Sized>(std::marker::PhantomData<fn() -> K>);
+          impl #g_impl ComposeWithChild<_C, #kind_name<_K>> for #builder #g_ty #g_where {
             type Target = Self;
             #[track_caller]
             fn with_child(mut self, c: _C) -> Self::Target {
               assert!(self.#field_name.is_none(), concat!("Already has a `", stringify!(#ty), "` child"));
-              self.#field_name = Some(c.into_child_compose());
+              self.#field_name = Some(c.r_into());
               self
             }
           }
@@ -196,44 +192,23 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
       Ok(tokens)
     }
     syn::Data::Enum(DataEnum { variants, .. }) => {
-      let err_str = format!("Child `{}` not specify.", quote! { #name });
-      tokens.extend(quote! {
-        #vis struct #builder #g_impl #g_where(Option<#name #g_ty>);
-
-        impl #g_impl Default for #builder #g_ty #g_where {
-          fn default() -> Self {
-            Self(None)
-          }
-        }
-
-        impl #g_impl TemplateBuilder for #builder #g_ty #g_where {
-          type Target = #name #g_ty;
-          #[track_caller]
-          fn build_tml(self) -> Self::Target {
-            self.0.expect(&#err_str)
-          }
-        }
-      });
-
-      variants.iter().enumerate().for_each(|(i, v)| {
+      variants.iter().for_each(|v| {
         if let Fields::Unnamed(FieldsUnnamed { unnamed, .. }) = &v.fields {
-          // only the enum variant has a single type need to implement fill convert.
+          // only the enum variant has a single type need to implement child convert
           if unnamed.len() == 1 {
             let f = unnamed.first().unwrap();
             let ty = &f.ty;
             let v_name = &v.ident;
             let gen = with_child_generics(generics, ty);
             let (g_impl, _, g_where) = gen.split_for_impl();
+            let kind_name = Ident::new(&format!("{name}{}Kind", v.ident), Span::call_site());
+
             tokens.extend(quote! {
-              impl #g_impl ComposeWithChild<'_c, _C, false, 1, {#i + 1}, _M>
-                for #builder #g_ty #g_where
-              {
-                type Target = Self;
+              #vis struct #kind_name<K: ?Sized>(std::marker::PhantomData<fn() -> K>);
+              impl #g_impl RFrom<_C, #kind_name<_K>> for #name #g_ty #g_where {
                 #[track_caller]
-                fn with_child(mut self, c: _C) -> Self::Target {
-                  assert!(self.0.is_none(), concat!("Already has a `", stringify!(#ty), "` child."));
-                  self.0 = Some(#name::#v_name(c.into_child_compose()));
-                  self
+                fn r_from(c: _C) -> Self {
+                  #name::#v_name(c.r_into())
                 }
               }
             });
@@ -295,7 +270,7 @@ fn gen_init_field_tokens(field: &Field, default: &Option<syn::Expr>) -> TokenStr
   let field_name = field.ident.as_ref().unwrap();
   let ty = &field.ty;
   if let Some(df) = default {
-    quote! { #field_name: self.#field_name.unwrap_or_else(|| #df.template_field_into()) }
+    quote! { #field_name: self.#field_name.unwrap_or_else(|| #df.r_into()) }
   } else if option_type_extract(ty).is_none() {
     let err = format!("Required field `{}: {}` not set", field_name, ty.to_token_stream());
     quote! { #field_name: self.#field_name.expect(#err) }
@@ -341,10 +316,9 @@ fn declare_field_methods<'a>(
       #[inline]
       #[allow(clippy::type_complexity)]
       #doc
-      #vis fn #field_name<const _M: usize>(&mut self, v: impl TemplateFieldInto<#ty, _M>)
-        -> &mut Self
+      #vis fn #field_name<K: ?Sized>(&mut self, v: impl RInto<#ty, K>) -> &mut Self
       {
-        self.#field_name = Some(v.template_field_into());
+        self.#field_name = Some(v.r_into());
         self
       }
     }
