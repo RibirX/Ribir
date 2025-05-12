@@ -256,7 +256,7 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: compile to wasm
-        run: cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper
+        run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper
   wasm-test:
     needs: lint
     name: wasm test
@@ -269,4 +269,4 @@ jobs:
       - name: Install
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       - name: Run wasm test of core
-        run: wasm-pack test --headless --chrome ./core
+        run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' wasm-pack test --headless --chrome ./core

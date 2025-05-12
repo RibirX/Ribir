@@ -78,7 +78,6 @@ unicode-bidi = "0.3.7"
 unicode-script = "0.5.4"
 unicode-segmentation = "1.9.0"
 usvg = { version = "0.45.0", default-features = false }
-webbrowser = "0.8.8"
 wgpu = { version = "24.0.3", features = ["webgl"] }
 winit = { version = "0.30.9", default-features = false, features = [
   "x11",
@@ -92,13 +91,15 @@ macos-accessibility-client = { version = "0.0.1" }
 tokio = { version = "1.0" }
 tokio-stream = { version = "0.1" }
 priority-queue = "2.1.1"
-phf = "0.11.2"
 web-sys = { version = "0.3.69", features = ["HtmlCollection"] }
 web-time = "1.1.0"
-getrandom = { version = "0.2.12", features = ["js"] }
 heck = "0.5.0"
 url = "2.5.4"
 thiserror = "2.0.12"
+
+getrandom-v2 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom-v3 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
 
 [workspace.metadata.release]
 shared-version = true

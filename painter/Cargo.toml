@@ -36,8 +36,10 @@ quick-xml.workspace = true
 ahash.workspace = true
 triomphe.workspace = true
 
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom.workspace = true
+getrandom-v2.workspace = true
+getrandom-v3.workspace = true
 
 [features]
 png = ["image/png"]
