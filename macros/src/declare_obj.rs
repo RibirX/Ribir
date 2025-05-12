@@ -112,7 +112,7 @@ impl DeclareObj {
         .this
         .fields
         .iter()
-        .filter(|f| !BUILTIN_INFOS.contains_key(&f.member.to_string()))
+        .filter(|f| !BUILTIN_INFOS.contains_key(f.member.to_string().as_str()))
         .collect::<Vec<_>>();
       if !invalid_fields.is_empty() {
         let spans = invalid_fields

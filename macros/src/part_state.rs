@@ -153,10 +153,10 @@ impl PartState {
   fn state_info(&self, refs_ctx: &DollarRefsCtx, used: DollarUsedInfo) -> DollarRef {
     let builtin_info = match &self.part_expr {
       PartExpr::Member(Member::Named(member)) => BUILTIN_INFOS
-        .get(&member.to_string())
+        .get(member.to_string().as_str())
         .filter(|info| info.mem_ty == BuiltinMemberType::Field),
       PartExpr::Method { method, .. } => BUILTIN_INFOS
-        .get(&method.to_string())
+        .get(method.to_string().as_str())
         .filter(|info| info.mem_ty == BuiltinMemberType::Method),
       _ => None,
     };

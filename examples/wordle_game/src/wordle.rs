@@ -4,8 +4,6 @@ use std::{
   sync::OnceLock,
 };
 
-use rand::prelude::*;
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CharHint {
   Correct,
@@ -104,7 +102,7 @@ pub struct Wordle {
 impl Wordle {
   pub fn new(max_rounds: usize, word_len: usize) -> Self {
     loop {
-      let idx = random::<usize>() % Self::word_dict().len();
+      let idx = rand::random::<u32>() as usize % Self::word_dict().len();
       let word = Self::word_dict()
         .iter()
         .nth(idx)

@@ -42,7 +42,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### BREAKING
 
-- **core**: The `ComposeDecorator` trait has been removed. (#pr @M-Adoo)
+- **core**: The `ComposeDecorator` trait has been removed. (#754 @M-Adoo)
 
 ## [0.4.0-alpha.35] - 2025-04-30
 

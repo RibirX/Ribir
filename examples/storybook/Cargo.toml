@@ -15,7 +15,7 @@ version.workspace = true
 paste.workspace = true
 # we disable `default-features`, because we want more control over testing.
 ribir = {path = "../../ribir", features = ["material", "widgets"]}
-webbrowser.workspace = true
+webbrowser = "0.8.8"
 
 [dev-dependencies]
 ribir_dev_helper = {path = "../../dev-helper"}

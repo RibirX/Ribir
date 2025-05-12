@@ -113,6 +113,7 @@ impl Wasm {
     let release_flg = if self.release { Some("--release") } else { None };
     let package = self.package.clone();
 
+    shell.set_var("RUSTFLAGS", "--cfg getrandom_backend=\"wasm_js\"");
     xshell::cmd!(
       shell,
       "cargo build -p {package} --lib  {release_flg...} --target wasm32-unknown-unknown"

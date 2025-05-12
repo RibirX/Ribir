@@ -16,8 +16,8 @@ version.workspace = true
 paste.workspace = true
 ribir = {path = "../../ribir", features = ["material", "widgets"]}
 csv = "1.3.0"
-rand = "0.8.5"
-getrandom = { workspace = true }
+rand = "0.9.1"
+getrandom-v3 = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
