@@ -212,7 +212,7 @@ impl<'c> ComposeChild<'c> for Tabs {
           class: TAB_HEADERS_VIEW,
           scrollable: position.clone().map(TabPos::headers_scroll_dir),
           @Flex {
-            align_items: Align::Stretch,
+            align_items: Align::Center,
             direction: position.map(TabPos::headers_dir),
             class: TAB_HEADERS_CONTAINER,
             @ { headers }

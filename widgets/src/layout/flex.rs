@@ -192,17 +192,29 @@ struct FlexLayouter {
 }
 
 impl FlexLayouter {
-  fn layout(&mut self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn layout(&mut self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     // Perform children layout without limit its main axis, and if its cross
     // axis is stretch the children need to align in cross axis so we also not limit
     // the cross axis.
     let dir = self.dir;
+    if !self.wrap && self.align_items == Align::Stretch {
+      match dir {
+        Direction::Horizontal if clamp.max.height.is_finite() => {
+          clamp = clamp.with_max_height(clamp.max.height);
+        }
+        Direction::Vertical if clamp.max.width.is_finite() => {
+          clamp = clamp.with_max_width(clamp.max.width);
+        }
+        _ => {}
+      }
+    }
+
     let flex_max = FlexSize::from_size(clamp.max, dir);
     let flex_min = FlexSize::from_size(clamp.min, dir);
 
     let child_clamp = self.create_child_clamp(clamp);
     self.perform_children_layout(flex_max.main, child_clamp, ctx);
-    if self.need_secondary_layout() {
+    if self.has_flex {
       // Uses minimum main axis size as distribution basis when max constraint
       // is unbounded
       let flex_main = if flex_max.main.is_finite() {
@@ -213,7 +225,7 @@ impl FlexLayouter {
           .iter()
           .fold(flex_min.main, |m, l| m.max(l.main_width))
       };
-      self.stretch_and_flex_layout(flex_main, flex_max.main, child_clamp, ctx);
+      self.flex_layout(flex_main, flex_max.main, child_clamp, ctx);
     }
 
     let expect = self.finally_size(flex_max);
@@ -240,8 +252,6 @@ impl FlexLayouter {
       }
     }
   }
-
-  fn need_secondary_layout(&self) -> bool { self.has_flex || self.align_items == Align::Stretch }
 
   fn perform_children_layout(&mut self, max_main: f32, clamp: BoxClamp, ctx: &mut LayoutCtx) {
     let (ctx, children) = ctx.split_children();
@@ -294,26 +304,19 @@ impl FlexLayouter {
     self.place_line();
   }
 
-  fn stretch_and_flex_layout(
+  fn flex_layout(
     &mut self, main_container: f32, main_max: f32, clamp: BoxClamp, ctx: &mut LayoutCtx,
   ) {
     let (ctx, mut children) = ctx.split_children();
     let dir = self.dir;
 
     self.lines.iter_mut().for_each(|line| {
-      let mut line_clamp = clamp;
-      if self.align_items == Align::Stretch {
-        let cross = line.max_cross();
-        line_clamp = match dir {
-          Direction::Horizontal => line_clamp.with_fixed_height(cross),
-          Direction::Vertical => line_clamp.with_fixed_width(cross),
-        };
-      }
+      let line_clamp = clamp;
       let (flex_unit, mut space_left) = line.calc_flex_unit_and_space_left(main_container);
       for info in line.items_info.iter_mut() {
         let child = children.next().unwrap();
         let mut item_clamp = line_clamp;
-        let reflex = if info.defer_layout {
+        if info.defer_layout {
           if flex_unit == 0. && main_max > main_container {
             let max = main_max - main_container + space_left;
             item_clamp = match dir {
@@ -327,7 +330,6 @@ impl FlexLayouter {
               Direction::Vertical => item_clamp.with_fixed_height(main),
             }
           }
-          true
         } else if info.flex.is_some() && space_left > 0. {
           let main = (info.flex.unwrap() * flex_unit).min(info.size.main + space_left);
           space_left -= main - info.size.main;
@@ -335,17 +337,14 @@ impl FlexLayouter {
             Direction::Horizontal => item_clamp.with_fixed_width(main),
             Direction::Vertical => item_clamp.with_fixed_height(main),
           };
-          true
         } else {
-          false
+          continue;
         };
 
-        if self.align_items == Align::Stretch || reflex {
-          let size = ctx.perform_child_layout(child, item_clamp);
-          let new_size = FlexSize::from_size(size, dir);
-          line.main_width += new_size.main - info.size.main;
-          info.size = new_size;
-        }
+        let size = ctx.perform_child_layout(child, item_clamp);
+        let new_size = FlexSize::from_size(size, dir);
+        line.main_width += new_size.main - info.size.main;
+        info.size = new_size;
       }
     });
   }
@@ -709,8 +708,8 @@ mod tests {
     stretch_cross_align,
     cross_align(Align::Stretch),
     LayoutCase::default().with_size(Size::new(300., 40.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 40.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 0., 100., 40.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 20.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 0., 100., 30.)),
     LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 40.))
   );
 
