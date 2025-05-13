@@ -205,8 +205,15 @@ impl FlexLayouter {
     if self.need_secondary_layout() {
       // Uses minimum main axis size as distribution basis when max constraint
       // is unbounded
-      let flex_main = if flex_max.main.is_finite() { flex_max.main } else { flex_min.main };
-      self.stretch_and_flex_layout(flex_main, child_clamp, ctx);
+      let flex_main = if flex_max.main.is_finite() {
+        flex_max.main
+      } else {
+        self
+          .lines
+          .iter()
+          .fold(flex_min.main, |m, l| m.max(l.main_width))
+      };
+      self.stretch_and_flex_layout(flex_main, flex_max.main, child_clamp, ctx);
     }
 
     let expect = self.finally_size(flex_max);
@@ -287,7 +294,9 @@ impl FlexLayouter {
     self.place_line();
   }
 
-  fn stretch_and_flex_layout(&mut self, main_width: f32, clamp: BoxClamp, ctx: &mut LayoutCtx) {
+  fn stretch_and_flex_layout(
+    &mut self, main_container: f32, main_max: f32, clamp: BoxClamp, ctx: &mut LayoutCtx,
+  ) {
     let (ctx, mut children) = ctx.split_children();
     let dir = self.dir;
 
@@ -300,33 +309,44 @@ impl FlexLayouter {
           Direction::Vertical => line_clamp.with_fixed_width(cross),
         };
       }
-      let (flex_unit, mut space_left) = line.calc_flex_unit_and_space_left(main_width);
-      line.items_info.iter_mut().for_each(|info| {
+      let (flex_unit, mut space_left) = line.calc_flex_unit_and_space_left(main_container);
+      for info in line.items_info.iter_mut() {
         let child = children.next().unwrap();
         let mut item_clamp = line_clamp;
-        let resize_main = if info.defer_layout {
-          Some(info.flex.unwrap() * flex_unit)
+        let reflex = if info.defer_layout {
+          if flex_unit == 0. && main_max > main_container {
+            let max = main_max - main_container + space_left;
+            item_clamp = match dir {
+              Direction::Horizontal => item_clamp.with_max_width(max),
+              Direction::Vertical => item_clamp.with_max_height(max),
+            };
+          } else {
+            let main = info.flex.unwrap() * flex_unit;
+            item_clamp = match dir {
+              Direction::Horizontal => item_clamp.with_fixed_width(main),
+              Direction::Vertical => item_clamp.with_fixed_height(main),
+            }
+          }
+          true
         } else if info.flex.is_some() && space_left > 0. {
           let main = (info.flex.unwrap() * flex_unit).min(info.size.main + space_left);
           space_left -= main - info.size.main;
-          Some(main)
-        } else {
-          None
-        };
-        if let Some(main) = resize_main {
           item_clamp = match dir {
             Direction::Horizontal => item_clamp.with_fixed_width(main),
             Direction::Vertical => item_clamp.with_fixed_height(main),
           };
-        }
+          true
+        } else {
+          false
+        };
 
-        if self.align_items == Align::Stretch || resize_main.is_some() {
+        if self.align_items == Align::Stretch || reflex {
           let size = ctx.perform_child_layout(child, item_clamp);
           let new_size = FlexSize::from_size(size, dir);
           line.main_width += new_size.main - info.size.main;
           info.size = new_size;
         }
-      });
+      }
     });
   }
 
@@ -834,27 +854,47 @@ mod tests {
   widget_layout_test!(
     flex_when_zero_space,
     WidgetTester::new(column! {
+      @Container {
+        size: Size::new(60., 500.),
+      }
+      @Expanded {
+        flex: 1.,
         @Container {
-          size: Size::new(60., 500.),
+          size: Size::new(50., 140.),
         }
-        @Expanded {
-          flex: 1.,
-          @Container {
-            size: Size::new(50., 140.),
-          }
+      }
+      @Expanded {
+        flex: 1.,
+        defer_alloc: false,
+        @Container {
+          size: Size::new(50., 140.),
         }
-        @Expanded {
-          flex: 1.,
-          defer_alloc: false,
-          @Container {
-            size: Size::new(50., 140.),
-          }
-        }
+      }
     })
     .with_wnd_size(Size::new(500., 500.)),
     LayoutCase::default().with_height(500.),
     LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 60., 500.)),
     LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(0., 500., 50., 0.)),
     LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(0., 500., 50., 140.))
+  );
+
+  widget_layout_test!(
+    fix_defer_alloc_has_size_in_unlimited_clamp,
+    WidgetTester::new(unconstrained_box! {
+      @Flex {
+        @Container {
+          size: Size::splat(300.),
+        }
+        @Expanded {
+          flex: 1.,
+          defer_alloc: true,
+          @Container {
+            size: Size::new(50., 140.),
+          }
+        }
+      }
+    })
+    .with_wnd_size(Size::splat(300.)),
+    LayoutCase::new(&[0, 0, 1]).with_size(Size::new(50., 140.)),
   );
 }
