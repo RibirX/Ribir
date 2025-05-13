@@ -166,7 +166,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Use minimum constraint size for viewport in unbounded layouts (#708 by @M-Adoo)
 - **painter**: Properly discard render operations when clipping to zero-sized rectangles (#708 @M-Adoo)
 - **macro**: Fixed issue where top-level `fn_widget!` macro did not capture a built-in widget. (#706 @M-Adoo)
-- **widgets**: `Flex` now stretches cross-axis items using final line dimensions instead of constraint clamping. (#707 by @M-Adoo)
 - **core**: Fixed track_id in class node not update.(#712 @wjian23)
 - **core**: Fixed FocusScope not work when host changed by class or pipe.(#712@wjian23)
 
