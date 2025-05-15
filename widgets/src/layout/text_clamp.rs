@@ -17,7 +17,7 @@ pub struct TextClamp {
   pub cols: Option<f32>,
 }
 
-impl_compose_child_for_wrap_render!(TextClamp, DirtyPhase::Layout);
+impl_compose_child_for_wrap_render!(TextClamp);
 
 impl WrapRender for TextClamp {
   fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
@@ -33,6 +33,9 @@ impl WrapRender for TextClamp {
 
     host.perform_layout(clamp, ctx)
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 }
 
 #[cfg(test)]

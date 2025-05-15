@@ -12,7 +12,7 @@ impl Declare for ConstrainedBox {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl_compose_child_for_wrap_render!(ConstrainedBox, DirtyPhase::Layout);
+impl_compose_child_for_wrap_render!(ConstrainedBox);
 
 impl WrapRender for ConstrainedBox {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
@@ -25,6 +25,9 @@ impl WrapRender for ConstrainedBox {
     let is_fixed = self.clamp.min == self.clamp.max;
     if is_fixed { false } else { host.size_affected_by_child() }
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 }
 
 #[cfg(test)]

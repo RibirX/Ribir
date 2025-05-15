@@ -102,7 +102,7 @@ impl<'c, const M: u8> ComposeChild<'c> for StateLayer<M> {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    WrapRender::combine_child(this, child, DirtyPhase::Paint)
+    WrapRender::combine_child(this, child)
   }
 }
 
@@ -144,6 +144,9 @@ impl<const M: u8> WrapRender for StateLayer<M> {
 
     host.visual_box(ctx)
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 }
 
 /// Defines a visual layer region that doesn't participate in layout

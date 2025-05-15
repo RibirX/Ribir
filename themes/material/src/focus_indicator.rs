@@ -61,7 +61,7 @@ pub struct FocusRing {
   stroke_width: f32,
 }
 
-impl_compose_child_for_wrap_render!(FocusRing, DirtyPhase::Paint);
+impl_compose_child_for_wrap_render!(FocusRing);
 
 impl FocusRing {
   pub fn create_for(outer_offset: f32, host: &mut FatObj<Widget>) -> Stateful<Self> {
@@ -128,4 +128,7 @@ impl WrapRender for FocusRing {
     painter.stroke();
     host.paint(ctx);
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 }

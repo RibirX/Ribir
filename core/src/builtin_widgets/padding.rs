@@ -31,7 +31,7 @@ impl Declare for Padding {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl_compose_child_for_wrap_render!(Padding, DirtyPhase::Layout);
+impl_compose_child_for_wrap_render!(Padding);
 
 impl WrapRender for Padding {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
@@ -68,6 +68,9 @@ impl WrapRender for Padding {
 
     Some(ts)
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 }
 
 impl Padding {
