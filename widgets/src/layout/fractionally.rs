@@ -57,7 +57,7 @@ impl Render for FractionallySizedBox {
   }
 }
 
-ribir_core::impl_compose_child_for_wrap_render!(FractionallySizedBox, DirtyPhase::Layout);
+ribir_core::impl_compose_child_for_wrap_render!(FractionallySizedBox);
 
 impl WrapRender for FractionallySizedBox {
   fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
@@ -76,6 +76,9 @@ impl WrapRender for FractionallySizedBox {
 
     host.perform_layout(clamp, ctx)
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 }
 
 // implementation for FractionallyWidthBox
@@ -91,7 +94,7 @@ impl Render for FractionallyWidthBox {
   }
 }
 
-ribir_core::impl_compose_child_for_wrap_render!(FractionallyWidthBox, DirtyPhase::Layout);
+ribir_core::impl_compose_child_for_wrap_render!(FractionallyWidthBox);
 
 impl WrapRender for FractionallyWidthBox {
   fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
@@ -103,6 +106,9 @@ impl WrapRender for FractionallyWidthBox {
     }
     host.perform_layout(clamp, ctx)
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 }
 
 // implementation for FractionallyHeightBox
@@ -119,7 +125,7 @@ impl Render for FractionallyHeightBox {
   }
 }
 
-ribir_core::impl_compose_child_for_wrap_render!(FractionallyHeightBox, DirtyPhase::Layout);
+ribir_core::impl_compose_child_for_wrap_render!(FractionallyHeightBox);
 
 impl WrapRender for FractionallyHeightBox {
   fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
@@ -132,6 +138,9 @@ impl WrapRender for FractionallyHeightBox {
 
     host.perform_layout(clamp, ctx)
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 }
 
 #[cfg(test)]

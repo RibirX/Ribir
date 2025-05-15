@@ -48,6 +48,9 @@ impl WrapRender for Background {
       visual_box.map(|rect| rect.union(&Rect::from_size(size)))
     }
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 }
 
-impl_compose_child_for_wrap_render!(Background, DirtyPhase::Paint);
+impl_compose_child_for_wrap_render!(Background);

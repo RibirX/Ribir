@@ -58,7 +58,7 @@ impl BorderSide {
   pub fn new(width: f32, color: Brush) -> Self { Self { width, color } }
 }
 
-impl_compose_child_for_wrap_render!(BorderWidget, DirtyPhase::Layout);
+impl_compose_child_for_wrap_render!(BorderWidget);
 
 impl WrapRender for BorderWidget {
   fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
@@ -116,6 +116,9 @@ impl WrapRender for BorderWidget {
 
     host.paint(ctx);
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 }
 fn limited_radius(radius: &Radius, size: Size) -> Radius {
   let max = size.height.min(size.width) / 2.;

@@ -197,9 +197,11 @@ macro_rules! smooth_size_widget_impl {
         let dirty = host.dirty_phase();
         if dirty != DirtyPhase::LayoutSubtree { DirtyPhase::Layout } else { dirty }
       }
+
+      fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
     }
 
-    impl_compose_child!($name, DirtyPhase::Layout);
+    impl_compose_child!($name);
   };
 }
 
@@ -272,14 +274,16 @@ macro_rules! smooth_pos_widget_impl {
         let dirty = host.dirty_phase();
         if dirty != DirtyPhase::LayoutSubtree { DirtyPhase::Layout } else { dirty }
       }
+
+      fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
     }
 
-    impl_compose_child!($name, DirtyPhase::Paint);
+    impl_compose_child!($name);
   };
 }
 
 macro_rules! impl_compose_child {
-  ($name:ty, $dirty:expr) => {
+  ($name:ty) => {
     impl<'c> ComposeChild<'c> for $name {
       type Child = Widget<'c>;
 
@@ -296,6 +300,7 @@ macro_rules! impl_compose_child {
         // layout to ensure the animation transitions to a new and accurate layout
         // result.
         let inner = this.read().0.clone_writer();
+        let dirty = this.wrapper_dirty_phase();
         let h = inner
           .raw_modifies()
           .filter(|b| b.contains(ModifyScope::FRAMEWORK))
@@ -307,7 +312,7 @@ macro_rules! impl_compose_child {
               if marker.is_dirty(id) {
                 inner.set_force_layout(true)
               }
-              marker.mark(id, $dirty);
+              marker.mark(id, dirty);
             })
           })
           .unsubscribe_when_dropped();
@@ -316,7 +321,7 @@ macro_rules! impl_compose_child {
           .into_widget()
           .attach_anonymous_data(h);
 
-        WrapRender::combine_child(this, child, $dirty)
+        WrapRender::combine_child(this, child)
       }
     }
   };

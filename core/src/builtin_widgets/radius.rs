@@ -52,6 +52,9 @@ impl WrapRender for RadiusWidget {
     host.paint(ctx);
     provider.restore(ctx.as_mut());
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 }
 
-impl_compose_child_for_wrap_render!(RadiusWidget, DirtyPhase::Paint);
+impl_compose_child_for_wrap_render!(RadiusWidget);

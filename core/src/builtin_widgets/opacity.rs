@@ -16,7 +16,7 @@ impl Default for Opacity {
   fn default() -> Self { Self { opacity: 1.0 } }
 }
 
-impl_compose_child_for_wrap_render!(Opacity, DirtyPhase::Paint);
+impl_compose_child_for_wrap_render!(Opacity);
 
 impl WrapRender for Opacity {
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {
@@ -34,4 +34,7 @@ impl WrapRender for Opacity {
       None
     }
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 }

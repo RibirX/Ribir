@@ -16,7 +16,7 @@ impl Declare for ClipBoundary {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl_compose_child_for_wrap_render!(ClipBoundary, DirtyPhase::Layout);
+impl_compose_child_for_wrap_render!(ClipBoundary);
 
 impl WrapRender for ClipBoundary {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
@@ -58,6 +58,9 @@ impl WrapRender for ClipBoundary {
 
     hit
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 }
 
 #[cfg(test)]
