@@ -45,14 +45,15 @@ impl Compose for MessageList {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       let palette = Palette::of(BuildCtx::get());
-      @Column {
+      @Flex {
+        direction: Direction::Vertical,
         text_line_height: 24.,
         background: palette.surface(),
-        @Row {
+        @Flex {
           justify_content: JustifyContent::SpaceBetween,
           padding: EdgeInsets::new(8., 16., 8., 16.),
           align_items: Align::Center,
-          @Row {
+          @Flex {
             item_gap: 10.,
             @Icon { @{ svgs::MENU } }
             @Text {
@@ -61,7 +62,7 @@ impl Compose for MessageList {
               text_style: TypographyTheme::of(BuildCtx::get()).title_large.text.clone(),
             }
           }
-          @Row {
+          @Flex {
             item_gap: 10.,
             @Icon { @{ svgs::SEARCH } }
             @Icon { @{ svgs::MORE_VERT } }

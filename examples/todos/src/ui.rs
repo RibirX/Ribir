@@ -6,7 +6,8 @@ impl Compose for Todos {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     providers! {
       providers: [Provider::value_of_writer(this.clone_writer(), None)],
-      @Column {
+      @Flex {
+        direction: Direction::Vertical,
         align_items: Align::Center,
         item_gap: 12.,
         @H1 { text: "Todo" }

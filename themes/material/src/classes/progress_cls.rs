@@ -39,14 +39,12 @@ fn lerp_angle(from: &Angle, to: &Angle, rate: f32) -> Angle {
   Angle::radians(radians)
 }
 pub(super) fn init(classes: &mut Classes) {
-  classes.insert(
-    LINEAR_INDETERMINATE_TRACK,
-    style_class! {
-      background: BuildCtx::container_color(),
-      radius: md::RADIUS_2,
-      margin: md::EDGES_LEFT_4,
-    },
-  );
+  named_style_impl! { linear_base_track => {
+    background: BuildCtx::container_color(),
+    radius: md::RADIUS_2,
+    margin: md::EDGES_LEFT_4,
+  }};
+
   classes.insert(
     LINEAR_PROGRESS,
     style_class! {
@@ -55,16 +53,18 @@ pub(super) fn init(classes: &mut Classes) {
     },
   );
   classes.insert(LINEAR_DETERMINATE_TRACK, |w| {
-    let mut w = FatObj::new(w);
     stack! {
-      @ $w { class: LINEAR_INDETERMINATE_TRACK }
+      fit: StackFit::Passthrough,
+      @linear_base_track(w)
       // As part of the Material Design 3 theme, a stop indicator has been
       // introduced for the progress.
-      @Container {
-        h_align: HAlign::Right,
-        background: BuildCtx::color(),
-        radius: md::RADIUS_2,
-        size: Size::new(md::THICKNESS_4, md::THICKNESS_4),
+      @InParentLayout {
+        @Container {
+          h_align: HAlign::Right,
+          background: BuildCtx::color(),
+          radius: md::RADIUS_2,
+          size: Size::new(md::THICKNESS_4, md::THICKNESS_4),
+        }
       }
     }
     .into_widget()
@@ -77,7 +77,7 @@ pub(super) fn init(classes: &mut Classes) {
     }
     .into_widget()
   });
-  classes.insert(LINEAR_INDETERMINATE_INDICATOR, move |host| {
+  classes.insert(LINEAR_PROGRESS_INDETERMINATE, move |host| {
     // We expanded the indicator to a `Row[Indicator, Track, Indicator]` structure,
     // thus transforming the entire progress into `Row[Indicator, Track,
     // Indicator, Track]`, adjusting the size of the four children to simulate
@@ -86,7 +86,7 @@ pub(super) fn init(classes: &mut Classes) {
       let indicator1 = @Expanded { flex: 0.};
       let track1 = @Expanded { flex: 0.,  };
       let indicator2 = @Expanded { flex: 0.};
-      let total_fraction = @FractionallyWidthBox { factor: 0. };
+      let track2 = @Expanded { flex: 0. };
 
       @Animate {
         transition: indeterminate_trans(),
@@ -95,34 +95,32 @@ pub(super) fn init(classes: &mut Classes) {
             part_writer!(&mut indicator1.flex),
             part_writer!(&mut track1.flex),
             part_writer!(&mut indicator2.flex),
-            part_writer!(&mut total_fraction.factor),
+            part_writer!(&mut track2.flex),
           ),
-          15% => (0., 0., 0.15, 0.15),
-          45% => (0., 0.5, 0.5, 1.),
-          55% => (0.15, 0.6, 0.25, 1.),
-          60% => (0.35, 0.65, 0., 1.),
-          60% => (0., 0., 0.35, 0.35),
-          80% => (0., 0.4, 0.6, 1.),
-          95% => (0., 1., 0., 1.),
-          95% => (0., 0., 0., 0.),
+          15% => (0., 0., 0.15, 0.85),
+          45% => (0., 0.5, 0.5, 0.),
+          55% => (0.15, 0.6, 0.25, 0.),
+          60% => (0.35, 0.65, 0., 0.),
+          60% => (0., 0., 0.35, 0.65),
+          80% => (0., 0.4, 0.6, 0.),
+          95% => (0., 1., 0., 0.),
+          95% => (0., 0., 0., 1.),
         },
-        from: (0., 0., 0., 0.)
+        from: (0., 0., 0., 1.)
       }.run();
 
-      @ $total_fraction {
-        @Row {
-          @ $indicator1 { @md_base_linear_indicator(host) }
-          @ $track1 {
-            @FractionallyWidthBox { class: LINEAR_INDETERMINATE_TRACK }
-          }
-          @ $indicator2 {
-            @md_base_linear_indicator(
-              @FractionallyWidthBox {
-                margin: EdgeInsets::only_left(4.),
-              }.into_widget()
-            )
+      @Flex {
+        class: LINEAR_PROGRESS,
+        align_items: Align::Stretch,
+        @ $indicator1 { @md_base_linear_indicator(host) }
+        @ $track1 { @linear_base_track(Void.into_widget()) }
+        @ $indicator2 {
+          @Margin {
+            margin: EdgeInsets::only_left(4.),
+            @md_base_linear_indicator(Void.into_widget())
           }
         }
+        @ $track2 { @linear_base_track(Void.into_widget()) }
       }
     }
     .into_widget()

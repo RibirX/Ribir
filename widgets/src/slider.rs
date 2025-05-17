@@ -111,9 +111,9 @@ impl Compose for Slider {
         this.forget_modifies();
       });
 
-      let mut row = @Row { align_items: Align::Center };
+      let mut row = @Flex { align_items: Align::Center };
       let drag_info = Stateful::new(None);
-      @ Stack {
+      @Stack {
         class: SLIDER_CONTAINER,
         @ $row {
           v_align: VAlign::Center,
@@ -276,7 +276,7 @@ impl Compose for RangeSlider {
         this.forget_modifies();
       });
 
-      let mut row = @Row { align_items: Align::Center };
+      let mut row = @Flex { align_items: Align::Center };
       let drag_info1 = Stateful::new(None);
       let drag_info2 = Stateful::new(None);
       @Stack {
@@ -355,7 +355,7 @@ fn stop_indicator_track(
 ) -> BoxFnWidget<'static> {
   fn_widget!(
     @IgnorePointer {
-      @Row {
+      @Flex {
         v_align: VAlign::Center,
         align_items: Align::Center,
         justify_content: JustifyContent::SpaceBetween,
@@ -386,7 +386,8 @@ mod tests {
 
   widget_image_tests!(
     slider_widgets,
-    WidgetTester::new(self::column! {
+    WidgetTester::new(flex! {
+      direction: Direction::Vertical,
       justify_content: JustifyContent::SpaceAround,
       align_items: Align::Center,
       @Slider { value: 32. }

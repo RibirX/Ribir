@@ -83,7 +83,7 @@
 //! ```
 use ribir_core::prelude::*;
 
-use crate::{layout::HorizontalLine, prelude::PositionChild};
+use crate::prelude::*;
 
 /// Represents the default button, usually with a border.
 ///
@@ -297,12 +297,13 @@ impl<'c> ButtonChild<'c> {
         }.into_widget();
 
         let label = @Text { class: btn_label, text }.into_widget();
+        let items = if trailing_icon { [label, icon] } else { [icon, label] };
 
-        let h_line = @HorizontalLine { class: btn };
-        if trailing_icon {
-          @ $h_line { @[label, icon] }
-        } else {
-          @ $h_line { @[icon, label] }
+        @Row {
+          class: btn,
+          align_items: Align::Center,
+          justify_content: JustifyContent::Center,
+          @ { items }
         }
       }
       .into_widget(),
@@ -316,13 +317,12 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::prelude::*;
 
   fn miss_icon() -> Svg { named_svgs::get_or_default("default") }
 
   widget_image_tests!(
     button,
-    WidgetTester::new(row! {
+    WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
       line_gap: 20.,
       wrap: true,
@@ -348,7 +348,7 @@ mod tests {
 
   widget_image_tests!(
     filled_button,
-    WidgetTester::new(row! {
+    WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
       v_align: Align::Center,
       line_gap: 20.,
@@ -376,7 +376,7 @@ mod tests {
 
   widget_image_tests!(
     outlined_button,
-    WidgetTester::new(row! {
+    WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
       v_align: Align::Center,
       line_gap: 20.,
@@ -403,7 +403,7 @@ mod tests {
 
   widget_image_tests!(
     mini_fab,
-    WidgetTester::new(row! {
+    WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
       v_align: Align::Center,
       line_gap: 20.,
@@ -440,7 +440,7 @@ mod tests {
 
   widget_image_tests!(
     fab,
-    WidgetTester::new(row! {
+    WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
       v_align: Align::Center,
       line_gap: 20.,
@@ -467,7 +467,7 @@ mod tests {
 
   widget_image_tests!(
     large_fab,
-    WidgetTester::new(row! {
+    WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
       v_align: Align::Center,
       line_gap: 20.,

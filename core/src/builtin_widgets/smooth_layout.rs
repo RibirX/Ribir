@@ -737,7 +737,8 @@ mod tests {
     reset_test_env!();
 
     assert_widget_eq_image!(
-      WidgetTester::new(self::column! {
+      WidgetTester::new(flex! {
+        direction: Direction::Vertical,
         item_gap: 2.,
         // If no initial value is provided, begin at its real place.
         @SmoothWidth {
@@ -769,7 +770,7 @@ mod tests {
     reset_test_env!();
 
     assert_widget_eq_image!(
-      WidgetTester::new(self::row! {
+      WidgetTester::new(flex! {
         item_gap: 2.,
         // If no initial value is provided, begin at its real place.
         @SmoothHeight {

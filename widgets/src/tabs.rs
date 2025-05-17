@@ -241,9 +241,9 @@ impl<'w> Tab<'w> {
       let ctx = BuildCtx::get();
       let inline = Variant::<TabsInlineIcon>::new_or_default(ctx);
       let line = match inline {
-        Variant::Value(inline) => inline.into_line_widget(),
+        Variant::Value(inline) => inline.align_header_widget(),
         Variant::Watcher(w) => pipe!(*$w)
-          .map(move |inline| { inline.into_line_widget() }).into()
+          .map(TabsInlineIcon::align_header_widget).into()
       };
 
       let header = @Class {
@@ -321,8 +321,12 @@ impl TabPos {
 }
 
 impl TabsInlineIcon {
-  fn into_line_widget(self) -> XMultiChild<'static> {
-    if self.0 { HorizontalLine.into() } else { VerticalLine.into() }
+  fn align_header_widget(self) -> XMultiChild<'static> {
+    if self.0 {
+      Row { align_items: Align::Center, justify_content: JustifyContent::Center }.into()
+    } else {
+      Column { align_items: Align::Center, justify_content: JustifyContent::Center }.into()
+    }
   }
 }
 

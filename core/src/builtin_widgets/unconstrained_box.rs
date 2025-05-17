@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-#[derive(Declare, SingleChild)]
+#[derive(Declare, SingleChild, Default)]
 /// A widget that imposes no constraints on its child, allowing it to layout and
 /// display as its "natural" size. Its size is equal to its child then clamp by
 /// parent.
@@ -22,34 +22,28 @@ pub enum UnconstrainedDir {
   Both,
 }
 
-bitflags! {
-  /// Enum to describe which box clamp dim will imposes no constraints on its
-  /// child, use by `UnConstrainedBox`.
-  ///
-  #[derive(Clone, Copy, Eq, PartialEq)]
-  pub struct ClampDim: u8 {
-    const MIN_SIZE = 0x01;
-    const MAX_SIZE = 0x02;
-    const Both = Self::MIN_SIZE.bits() | Self::MAX_SIZE.bits();
-  }
-}
-
-impl Default for ClampDim {
-  fn default() -> Self { ClampDim::Both }
+/// Enum to describe which box clamp dim will imposes no constraints on its
+/// child, use by `UnConstrainedBox`.
+#[derive(Clone, Copy, Eq, PartialEq, Default)]
+pub enum ClampDim {
+  Min,
+  Max,
+  #[default]
+  Both,
 }
 
 impl Render for UnconstrainedBox {
   #[inline]
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let mut child_clamp = clamp;
-    if self.clamp_dim.contains(ClampDim::MIN_SIZE) {
+    if self.clamp_dim != ClampDim::Max {
       match self.dir {
         UnconstrainedDir::X => child_clamp.min.width = 0.,
         UnconstrainedDir::Y => child_clamp.min.height = 0.,
         UnconstrainedDir::Both => child_clamp = child_clamp.loose(),
       };
     }
-    if self.clamp_dim.contains(ClampDim::MAX_SIZE) {
+    if self.clamp_dim != ClampDim::Min {
       match self.dir {
         UnconstrainedDir::X => child_clamp.max.width = f32::INFINITY,
         UnconstrainedDir::Y => child_clamp.max.height = f32::INFINITY,

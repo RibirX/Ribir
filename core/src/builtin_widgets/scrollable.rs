@@ -258,15 +258,14 @@ impl Render for Viewport {
       child_clamp.max.width = f32::INFINITY;
     }
 
-    let mut child_size = ctx.assert_perform_single_child_layout(child_clamp);
-    // Use minimal size when parent constraints are unbounded
+    let mut size = ctx.assert_perform_single_child_layout(child_clamp);
     if self.scroll_dir != Scrollable::X && clamp.max.height.is_infinite() {
-      child_size.height = clamp.min.height;
+      size.height = clamp.container_height(size.height);
     }
     if self.scroll_dir != Scrollable::Y && clamp.max.width.is_infinite() {
-      child_size.width = clamp.min.width;
+      size.width = clamp.container_width(size.width);
     }
-    let size = clamp.clamp(child_size);
+    size = clamp.clamp(size);
     // The viewport needs to accurately record its real size, as widgets like
     // `padding` may increase the size without the viewport accounting for the
     // additional space.
