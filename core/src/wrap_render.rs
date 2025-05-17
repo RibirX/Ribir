@@ -37,31 +37,32 @@ pub trait WrapRender {
 
   fn dirty_phase(&self, host: &dyn Render) -> DirtyPhase { host.dirty_phase() }
 
-  fn combine_child(
-    this: impl StateWriter<Value = Self>, mut child: Widget, dirty: DirtyPhase,
-  ) -> Widget
+  fn wrapper_dirty_phase(&self) -> DirtyPhase;
+
+  fn combine_x_multi_child(this: impl StateWriter<Value = Self>, x: XMultiChild) -> XMultiChild
   where
     Self: Sized + 'static,
   {
-    let wrapper: Box<dyn WrapRender> = match this.try_into_value() {
-      Ok(this) => Box::new(this),
-      Err(this) => {
-        let reader = match this.into_reader() {
-          Ok(r) => r,
-          Err(s) => {
-            child = child.dirty_on(s.raw_modifies(), dirty);
-            s.clone_reader()
-          }
-        };
-        Box::new(reader)
-      }
-    };
+    let combine = combine_method::<Self>(this);
+    let parent = CombinedParent { combine: Box::new(combine), parent: x.0 };
+    XMultiChild(Box::new(parent))
+  }
 
-    child.on_build(|id| {
-      id.wrap_node(BuildCtx::get_mut().tree_mut(), move |r| {
-        Box::new(RenderPair { wrapper, host: r })
-      });
-    })
+  fn combine_x_single_child(this: impl StateWriter<Value = Self>, x: XSingleChild) -> XSingleChild
+  where
+    Self: Sized + 'static,
+  {
+    let combine = combine_method::<Self>(this);
+    let parent = CombinedParent { combine: Box::new(combine), parent: x.0 };
+    XSingleChild(Box::new(parent))
+  }
+
+  fn combine_child(this: impl StateWriter<Value = Self>, child: Widget) -> Widget
+  where
+    Self: Sized + 'static,
+  {
+    let combine = combine_method::<Self>(this);
+    combine(child)
   }
 }
 
@@ -146,18 +147,65 @@ where
   fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
     self.read().visual_box(host, ctx)
   }
+
+  /// Returns the dirty phase of the wrapped render, this value should
+  /// always be the same.
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { self.read().wrapper_dirty_phase() }
 }
 
 #[macro_export]
 macro_rules! impl_compose_child_for_wrap_render {
-  ($name:ty, $dirty:expr) => {
+  ($name:ty) => {
     impl<'c> ComposeChild<'c> for $name {
       type Child = Widget<'c>;
       fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-        WrapRender::combine_child(this, child, $dirty)
+        WrapRender::combine_child(this, child)
       }
     }
   };
 }
 
 pub(crate) use impl_compose_child_for_wrap_render;
+
+pub struct CombinedParent<'p> {
+  combine: Box<dyn FnOnce(Widget) -> Widget>,
+  parent: Box<dyn BoxedParent + 'p>,
+}
+
+impl<'p> BoxedParent for CombinedParent<'p> {
+  fn boxed_with_children<'w>(self: Box<Self>, children: Vec<Widget<'w>>) -> Widget<'w>
+  where
+    Self: 'w,
+  {
+    let Self { combine, parent } = *self;
+    let widget = parent.boxed_with_children(children);
+    combine(widget)
+  }
+}
+
+fn combine_method<Wrapper: WrapRender + 'static>(
+  this: impl StateWriter<Value = Wrapper>,
+) -> impl FnOnce(Widget) -> Widget {
+  let dirty_phase = this.wrapper_dirty_phase();
+  move |mut host| {
+    let wrapper: Box<dyn WrapRender> = match this.try_into_value() {
+      Ok(this) => Box::new(this),
+      Err(this) => {
+        let reader = match this.into_reader() {
+          Ok(r) => r,
+          Err(s) => {
+            host = host.dirty_on(s.raw_modifies(), dirty_phase);
+            s.clone_reader()
+          }
+        };
+        Box::new(reader)
+      }
+    };
+
+    host.on_build(|id| {
+      id.wrap_node(BuildCtx::get_mut().tree_mut(), move |host| {
+        Box::new(RenderPair { wrapper, host })
+      });
+    })
+  }
+}

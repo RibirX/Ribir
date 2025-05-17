@@ -33,7 +33,7 @@ struct VisibilityRender {
   display: bool,
 }
 
-impl_compose_child_for_wrap_render!(VisibilityRender, DirtyPhase::Layout);
+impl_compose_child_for_wrap_render!(VisibilityRender);
 
 impl WrapRender for VisibilityRender {
   #[inline]
@@ -65,6 +65,8 @@ impl WrapRender for VisibilityRender {
       HitTest { hit: false, can_hit_child: false }
     }
   }
+
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 }
 
 impl Visibility {

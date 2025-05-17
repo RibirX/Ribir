@@ -416,13 +416,14 @@ impl<'c> ComposeChild<'c> for ListCustomItem {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let mut child = FatObj::new(child);
     let item_classes = ListItem::item_classes(&this.read().0);
     item_classes
-      .with_child(stack! {
-        fit: StackFit::Passthrough,
-        @ $child {
+      .with_child(unconstrained_box! {
+        clamp_dim: ClampDim::Max,
+        dir: UnconstrainedDir::Y,
+        @VAlignWidget {
           v_align: ListItemAlignItems::get_align(BuildCtx::get()).map(|v| v.into()),
+          @ { child }
         }
       })
       .into_widget()
@@ -480,10 +481,10 @@ impl<'w> ListItemChildren<'w> {
       class! { class: LIST_ITEM_TRAILING, @ { t.unwrap() } }
     });
 
-    row! {
+    flex! {
       align_items: ListItemAlignItems::get_align(BuildCtx::get()),
       @ { leading_widget }
-      @Expanded { defer_alloc: true, @ { content } }
+      @Expanded { @ { content } }
       @ { trailing_supporting }
       @ { trailing_widget }
     }

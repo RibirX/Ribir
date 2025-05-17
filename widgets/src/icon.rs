@@ -76,7 +76,7 @@ impl<'c> ComposeChild<'c> for Icon {
 }
 
 struct IconText;
-impl_compose_child_for_wrap_render!(IconText, DirtyPhase::Layout);
+impl_compose_child_for_wrap_render!(IconText);
 
 impl WrapRender for IconText {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
@@ -90,6 +90,9 @@ impl WrapRender for IconText {
     style.restore(ctx.as_mut());
     size
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
 }
 
 #[derive(SingleChild)]

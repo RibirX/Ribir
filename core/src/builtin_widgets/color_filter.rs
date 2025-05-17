@@ -92,7 +92,7 @@ pub struct ColorFilter {
   pub filter: ColorFilterMatrix,
 }
 
-impl_compose_child_for_wrap_render!(ColorFilter, DirtyPhase::Paint);
+impl_compose_child_for_wrap_render!(ColorFilter);
 
 impl WrapRender for ColorFilter {
   fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
@@ -103,6 +103,9 @@ impl WrapRender for ColorFilter {
     ctx.painter().apply_color_matrix(self.filter);
     host.paint(ctx);
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 }
 
 #[cfg(not(target_arch = "wasm32"))]

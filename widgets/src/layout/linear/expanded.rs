@@ -121,7 +121,7 @@ mod tests {
     one_line_expanded,
     WidgetTester::new(fn_widget! {
       let size = Size::new(100., 50.);
-      @Row {
+      @Flex  {
         @Expanded {
           flex: 1.,
           @SizedBox { size }
@@ -146,7 +146,7 @@ mod tests {
     wrap_expanded,
     WidgetTester::new(fn_widget! {
       let size = Size::new(100., 50.);
-      @Row {
+      @Flex {
         wrap: true,
         @Expanded {
           defer_alloc: false,
@@ -189,7 +189,7 @@ mod tests {
       let expanded = @Expanded { flex: 1. };
       watch!(*$flex).subscribe(move |val| $expanded.write().flex = val);
 
-      @Row {
+      @Flex {
         h_align: HAlign::Stretch,
         @ $expanded { @ { Void } }
         @Expanded {

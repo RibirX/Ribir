@@ -19,7 +19,7 @@ pub enum IgnoreScope {
   Subtree,
 }
 
-impl_compose_child_for_wrap_render!(IgnorePointer, DirtyPhase::Paint);
+impl_compose_child_for_wrap_render!(IgnorePointer);
 
 impl WrapRender for IgnorePointer {
   fn hit_test(&self, host: &dyn Render, ctx: &mut HitTestCtx, pos: Point) -> HitTest {
@@ -32,4 +32,7 @@ impl WrapRender for IgnorePointer {
       IgnoreScope::None => host.hit_test(ctx, pos),
     }
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Paint }
 }
