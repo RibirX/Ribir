@@ -54,13 +54,13 @@ impl BoxClamp {
     Self { min: ZERO_SIZE, max: Size::new(width, f32::INFINITY) }
   }
 
-  pub fn with_min_size(mut self, size: Size) -> Self {
-    self.min = size.min(self.max);
+  pub const fn with_min_size(mut self, size: Size) -> Self {
+    self.min = Size::new(size.width.min(self.max.width), size.height.min(self.max.height));
     self
   }
 
-  pub fn with_max_size(mut self, size: Size) -> Self {
-    self.max = size.max(self.min);
+  pub const fn with_max_size(mut self, size: Size) -> Self {
+    self.max = Size::new(size.width.max(self.min.width), size.height.max(self.min.height));
     self
   }
 
@@ -76,22 +76,22 @@ impl BoxClamp {
     self
   }
 
-  pub fn with_max_width(mut self, width: f32) -> Self {
+  pub const fn with_max_width(mut self, width: f32) -> Self {
     self.max.width = width.max(self.min.width);
     self
   }
 
-  pub fn with_max_height(mut self, height: f32) -> Self {
+  pub const fn with_max_height(mut self, height: f32) -> Self {
     self.max.height = height.max(self.min.height);
     self
   }
 
-  pub fn with_min_width(mut self, width: f32) -> Self {
+  pub const fn with_min_width(mut self, width: f32) -> Self {
     self.min.width = width.min(self.max.width);
     self
   }
 
-  pub fn with_min_height(mut self, height: f32) -> Self {
+  pub const fn with_min_height(mut self, height: f32) -> Self {
     self.min.height = height.min(self.max.height);
     self
   }
@@ -122,7 +122,7 @@ impl BoxClamp {
   /// dimensions. This intermediate value enables consistent layout calculations
   /// before parent constraints are fully resolved, but may differ from the
   /// final container width determined during parent layout phases.
-  pub fn container_width(&self, child_width: f32) -> f32 {
+  pub const fn container_width(&self, child_width: f32) -> f32 {
     let min = self.min.width;
     let max = self.max.width;
 
@@ -158,7 +158,7 @@ impl BoxClamp {
   /// calculations before parent constraints are fully resolved, but may
   /// differ from the final container height determined during parent layout
   /// phases.
-  pub fn container_height(&self, child_height: f32) -> f32 {
+  pub const fn container_height(&self, child_height: f32) -> f32 {
     let min = self.min.height;
     let max = self.max.height;
 

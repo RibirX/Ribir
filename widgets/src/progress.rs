@@ -3,17 +3,14 @@ use ribir_core::prelude::*;
 use crate::layout::*;
 
 class_names! {
+  /// Class name for the indeterminate linear progress
+  LINEAR_PROGRESS_INDETERMINATE,
   #[doc = "Class name for the whole linear progress"]
   LINEAR_PROGRESS,
   #[doc = "Class name for the track of the determinate linear progress"]
   LINEAR_DETERMINATE_TRACK,
   #[doc = "Class name for the linear progress determinate indicator"]
   LINEAR_DETERMINATE_INDICATOR,
-  #[doc = "Class name for the track of the indeterminate linear progress"]
-  LINEAR_INDETERMINATE_TRACK,
-  #[doc = "Class name for the linear progress indeterminate indicator"]
-  LINEAR_INDETERMINATE_INDICATOR,
-
   #[doc = "Class name for the determine spinner progress"]
   SPINNER_DETERMINATE,
   #[doc = "Class name for the indeterminate spinner progress"]
@@ -21,7 +18,7 @@ class_names! {
 }
 
 /// The widget that shows progress along a line.
-#[derive(Declare)]
+#[derive(Declare, Clone)]
 pub struct LinearProgress {
   /// there are two kind of linear progress.
   /// 1.Determinate, when the value is Some(xx).
@@ -37,7 +34,7 @@ pub struct LinearProgress {
 }
 
 /// The widget displays progress along a spinner.
-#[derive(Declare)]
+#[derive(Declare, Clone)]
 pub struct SpinnerProgress {
   /// there are two kind of linear progress.
   /// 1.Determinate, when the value is Some(xx).
@@ -54,30 +51,41 @@ pub struct SpinnerProgress {
 
 impl Compose for LinearProgress {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    fn_widget! {
-      @HorizontalLine {
-        class: LINEAR_PROGRESS,
-        @FractionallyWidthBox {
-          class: distinct_pipe! {
-            if $this.value.is_some() {
-              LINEAR_DETERMINATE_INDICATOR
-            } else {
-              LINEAR_INDETERMINATE_INDICATOR
-            }
-          },
-          factor: distinct_pipe! { $this.value.unwrap_or(0.) },
-        }
-        @FractionallyWidthBox {
-          class: distinct_pipe! {
-            if $this.value.is_some() {
-              LINEAR_DETERMINATE_TRACK
-            } else {
-              LINEAR_INDETERMINATE_TRACK
-            }
-          },
-          factor: distinct_pipe! { $this.value.map_or(1., |v| 1. - v) },
+    distinct_pipe!($this.value.is_some())
+      .map(move |determinate| {
+        if determinate { Self::determinate(this.clone_watcher()) } else { Self::indeterminate() }
+      })
+      .into_widget()
+  }
+}
+
+impl LinearProgress {
+  fn determinate(this: impl StateWatcher<Value = Self>) -> Widget<'static> {
+    flex! {
+      align_items: Align::Center,
+      class: LINEAR_PROGRESS,
+      @Expanded {
+        flex: distinct_pipe! { $this.value.unwrap_or(1.) },
+        @Container {
+          size: Size::new(0., 6.),
+          class: LINEAR_DETERMINATE_INDICATOR,
         }
       }
+      @Expanded {
+        flex: distinct_pipe! {$this.value.map_or(0., |v| 1. - v) },
+        @Container {
+          size: Size::new(0., 6.),
+          class: LINEAR_DETERMINATE_TRACK,
+        }
+      }
+    }
+    .into_widget()
+  }
+
+  fn indeterminate() -> Widget<'static> {
+    container! {
+      class: LINEAR_PROGRESS_INDETERMINATE,
+      size: Size::new(0., 6.),
     }
     .into_widget()
   }
@@ -116,9 +124,8 @@ pub struct SpinnerArc {
 
 impl Render for SpinnerArc {
   fn size_affected_by_child(&self) -> bool { false }
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let wnd_size = ctx.window().size();
-    clamp.max.min(wnd_size)
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
+    clamp.clamp(Size::splat(40.))
   }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {

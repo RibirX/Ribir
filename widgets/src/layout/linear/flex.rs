@@ -1,33 +1,6 @@
 use ribir_core::prelude::{log::warn, *};
 
-use super::{Direction, Expanded};
-
-/// How the children should be placed along the main axis in a flex layout.
-#[derive(Debug, Copy, Clone, PartialEq, Default)]
-pub enum JustifyContent {
-  /// Place the children as close to the start of the main axis as possible.
-  #[default]
-  Start,
-  ///Place the children as close to the middle of the main axis as possible.
-  Center,
-  /// Place the children as close to the end of the main axis as possible.
-  End,
-  /// The children are evenly distributed within the alignment container along
-  /// the main axis. The spacing between each pair of adjacent items is the
-  /// same. The first item is flush with the main-start edge, and the last
-  /// item is flush with the main-end edge.
-  SpaceBetween,
-  /// The children are evenly distributed within the alignment container
-  /// along the main axis. The spacing between each pair of adjacent items is
-  /// the same. The empty space before the first and after the last item
-  /// equals half of the space between each pair of adjacent items.
-  SpaceAround,
-  /// The children are evenly distributed within the alignment container along
-  /// the main axis. The spacing between each pair of adjacent items, the
-  /// main-start edge and the first item, and the main-end edge and the last
-  /// item, are all exactly the same.
-  SpaceEvenly,
-}
+use super::{Direction, Expanded, JustifyContent};
 
 /// The `Flex` is a layout container that arranges its children in a
 /// one-dimensional manner. It distributes space among the children and provides
@@ -39,9 +12,12 @@ pub enum JustifyContent {
 /// `Direction::Horizontal` or `Direction::Vertical`, and setting `reverse` to
 /// true will reverse the main axis.
 ///
-/// If the direction of the flex container is known, consider using [`Row`] or
-/// [`Column`] instead. The `wrap` property controls whether flex items should
-/// wrap onto multiple lines or remain on a single line in the main axis.
+/// If the flex container's direction is known and it's used in a single-line
+/// layout (without wrapping or expanding), consider using [`Row`] or [`Column`]
+/// instead.
+///
+/// The `wrap` property controls whether flex items should wrap onto multiple
+/// lines or remain on a single line in the main axis.
 ///
 /// The `align_items` property specifies how flex items are positioned in the
 /// flex container along the cross axis, while `justify_content` determines
@@ -87,43 +63,6 @@ pub struct Flex {
   pub line_gap: f32,
 }
 
-/// A type help to declare flex widget as horizontal.
-pub struct Row;
-
-/// A type help to declare flex widget as Vertical.
-pub struct Column;
-
-#[macro_export]
-macro_rules! row {
-  ($($t: tt)*) => { fn_widget! { @Row { $($t)* } } };
-}
-
-#[macro_export]
-macro_rules! column {
-  ($($t: tt)*) => { fn_widget! { @Column { $($t)* } } };
-}
-
-pub use column;
-pub use row;
-
-impl Declare for Row {
-  type Builder = FlexDeclarer;
-  fn declarer() -> Self::Builder {
-    let mut f = Flex::declarer();
-    f.direction(Direction::Horizontal);
-    f
-  }
-}
-
-impl Declare for Column {
-  type Builder = FlexDeclarer;
-  fn declarer() -> Self::Builder {
-    let mut f = Flex::declarer();
-    f.direction(Direction::Vertical);
-    f
-  }
-}
-
 impl Render for Flex {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     if Align::Stretch == self.align_items && self.wrap {
@@ -149,35 +88,6 @@ impl Render for Flex {
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-struct FlexSize {
-  main: f32,
-  cross: f32,
-}
-
-impl FlexSize {
-  fn to_size(self, dir: Direction) -> Size {
-    match dir {
-      Direction::Horizontal => Size::new(self.main, self.cross),
-      Direction::Vertical => Size::new(self.cross, self.main),
-    }
-  }
-
-  fn from_size(size: Size, dir: Direction) -> Self {
-    match dir {
-      Direction::Horizontal => Self { main: size.width, cross: size.height },
-      Direction::Vertical => Self { cross: size.width, main: size.height },
-    }
-  }
-}
-
-impl std::ops::Sub for FlexSize {
-  type Output = Self;
-  fn sub(self, rhs: Self) -> Self::Output {
-    FlexSize { main: self.main - rhs.main, cross: self.cross - rhs.cross }
-  }
-}
-
 struct FlexLayouter {
   reverse: bool,
   dir: Direction,
@@ -192,50 +102,25 @@ struct FlexLayouter {
 }
 
 impl FlexLayouter {
-  fn layout(&mut self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    // Perform children layout without limit its main axis, and if its cross
-    // axis is stretch the children need to align in cross axis so we also not limit
-    // the cross axis.
+  fn layout(&mut self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let dir = self.dir;
-    if !self.wrap && self.align_items == Align::Stretch {
-      match dir {
-        Direction::Horizontal if clamp.max.height.is_finite() => {
-          clamp = clamp.with_max_height(clamp.max.height);
-        }
-        Direction::Vertical if clamp.max.width.is_finite() => {
-          clamp = clamp.with_max_width(clamp.max.width);
-        }
-        _ => {}
-      }
-    }
 
-    let flex_max = FlexSize::from_size(clamp.max, dir);
-    let flex_min = FlexSize::from_size(clamp.min, dir);
+    let main_max = dir.max_of(&clamp);
 
     let child_clamp = self.create_child_clamp(clamp);
-    self.perform_children_layout(flex_max.main, child_clamp, ctx);
+    self.perform_children_layout(main_max, child_clamp, ctx);
     if self.has_flex {
-      // Uses minimum main axis size as distribution basis when max constraint
-      // is unbounded
-      let flex_main = if flex_max.main.is_finite() {
-        flex_max.main
-      } else {
-        self
-          .lines
-          .iter()
-          .fold(flex_min.main, |m, l| m.max(l.main_width))
-      };
-      self.flex_layout(flex_main, flex_max.main, child_clamp, ctx);
+      let container = dir.container_main(&clamp, self.main_size());
+      self.flex_layout(container, main_max, child_clamp, ctx);
     }
 
-    let expect = self.finally_size(flex_max);
-    let real_size = clamp.clamp(expect.to_size(dir));
-    let real = FlexSize::from_size(real_size, dir);
+    let expect = self.finally_size(main_max);
+    let real = clamp.clamp(expect);
     let cross_box_offset = self
       .align_items
-      .align_value(expect.cross, real.cross);
-    self.update_children_position(real.main, cross_box_offset, ctx);
-    real_size
+      .align_value(dir.cross_of(expect), dir.cross_of(real));
+    self.update_children_position(dir.main_of(real), cross_box_offset, ctx);
+    real
   }
 
   /// Creates child constraints based on wrapping behavior:
@@ -246,9 +131,15 @@ impl FlexLayouter {
     if self.wrap {
       BoxClamp::default()
     } else {
-      match self.dir {
-        Direction::Horizontal => BoxClamp::max_height(clamp.max.height),
-        Direction::Vertical => BoxClamp::max_width(clamp.max.width),
+      let max_cross = self.dir.cross_max_of(&clamp);
+      if self.align_items == Align::Stretch && max_cross.is_finite() {
+        self
+          .dir
+          .with_fixed_cross(BoxClamp::default(), max_cross)
+      } else {
+        self
+          .dir
+          .with_cross_max(BoxClamp::default(), max_cross)
       }
     }
   }
@@ -269,23 +160,22 @@ impl FlexLayouter {
       let expanded = ctx
         .query_of_widget::<Expanded>(c)
         .map(|e| *e)
-        .filter(|e| e.flex.is_normal() && e.flex > 0.);
+        .filter(|e| (e.flex.is_normal() && e.flex > 0.) || e.flex == 0.);
 
       let size = if expanded.is_some_and(|e| e.defer_alloc) {
-        FlexSize::default()
+        Size::zero()
       } else {
-        let size = ctx.perform_child_layout(c, clamp);
-        FlexSize::from_size(size, dir)
+        ctx.perform_child_layout(c, clamp)
       };
-
-      if wrap && !line.is_empty() && line.main_width + size.main > max_main {
+      let main = dir.main_of(size);
+      if wrap && !line.is_empty() && line.main + main > max_main {
         self.place_line();
       } else {
-        line.main_width += gap;
+        line.main += gap;
       }
 
       let line = &mut self.current_line;
-      line.main_width += size.main;
+      line.main += main;
 
       let flex = expanded.map(|e| {
         self.current_line.has_flex = true;
@@ -294,7 +184,8 @@ impl FlexLayouter {
       });
       let info = FlexLayoutInfo {
         flex,
-        pos: <_>::default(),
+        main_pos: 0.,
+        cross_pos: 0.,
         size,
         defer_layout: expanded.is_some_and(|e| e.defer_alloc),
       };
@@ -304,62 +195,47 @@ impl FlexLayouter {
     self.place_line();
   }
 
-  fn flex_layout(
-    &mut self, main_container: f32, main_max: f32, clamp: BoxClamp, ctx: &mut LayoutCtx,
-  ) {
+  fn flex_layout(&mut self, container: f32, max: f32, clamp: BoxClamp, ctx: &mut LayoutCtx) {
     let (ctx, mut children) = ctx.split_children();
     let dir = self.dir;
 
     self.lines.iter_mut().for_each(|line| {
       let line_clamp = clamp;
-      let (flex_unit, mut space_left) = line.calc_flex_unit_and_space_left(main_container);
+      let (flex_unit, mut space_left) = line.calc_flex_unit_and_space_left(self.dir, container);
       for info in line.items_info.iter_mut() {
         let child = children.next().unwrap();
+        let item_main = dir.main_of(info.size);
         let mut item_clamp = line_clamp;
         if info.defer_layout {
-          if flex_unit == 0. && main_max > main_container {
-            let max = main_max - main_container + space_left;
-            item_clamp = match dir {
-              Direction::Horizontal => item_clamp.with_max_width(max),
-              Direction::Vertical => item_clamp.with_max_height(max),
-            };
+          if flex_unit == 0. && max > container {
+            let max = max - container + space_left;
+            item_clamp = dir.with_max(item_clamp, max);
           } else {
             let main = info.flex.unwrap() * flex_unit;
-            item_clamp = match dir {
-              Direction::Horizontal => item_clamp.with_fixed_width(main),
-              Direction::Vertical => item_clamp.with_fixed_height(main),
-            }
+            item_clamp = dir.with_fixed_main(item_clamp, main);
           }
         } else if info.flex.is_some() && space_left > 0. {
-          let main = (info.flex.unwrap() * flex_unit).min(info.size.main + space_left);
-          space_left -= main - info.size.main;
-          item_clamp = match dir {
-            Direction::Horizontal => item_clamp.with_fixed_width(main),
-            Direction::Vertical => item_clamp.with_fixed_height(main),
-          };
+          let main = (info.flex.unwrap() * flex_unit).min(item_main + space_left);
+          space_left -= main - item_main;
+          item_clamp = dir.with_fixed_main(item_clamp, main);
         } else {
           continue;
         };
 
-        let size = ctx.perform_child_layout(child, item_clamp);
-        let new_size = FlexSize::from_size(size, dir);
-        line.main_width += new_size.main - info.size.main;
-        info.size = new_size;
+        info.size = ctx.perform_child_layout(child, item_clamp);
+        line.main += dir.main_of(info.size) - item_main;
       }
     });
   }
 
-  fn finally_size(&self, flex_max: FlexSize) -> FlexSize {
-    let main = match self.justify_content {
-      JustifyContent::SpaceBetween | JustifyContent::SpaceAround | JustifyContent::SpaceEvenly
-        if flex_max.main.is_finite() =>
-      {
-        flex_max.main
-      }
-      _ => self
+  fn finally_size(&self, main_max: f32) -> Size {
+    let main = if main_max.is_finite() && self.justify_content.is_space_layout() {
+      main_max
+    } else {
+      self
         .lines
         .iter()
-        .fold(0f32, |max, l| max.max(l.main_width)),
+        .fold(0f32, |max, l| max.max(l.main))
     };
 
     let cross = if self.lines.is_empty() {
@@ -368,48 +244,44 @@ impl FlexLayouter {
       self
         .lines
         .iter()
-        .map(|l| l.max_cross())
+        .map(|l| l.max_cross(self.dir))
         .sum::<f32>()
         + self.cross_axis_gap * (self.lines.len() - 1) as f32
     };
-    FlexSize { main, cross }
+
+    self.dir.to_size(main, cross)
   }
 
-  fn update_children_position(
-    &mut self, main_bound: f32, cross_box_offset: f32, ctx: &mut LayoutCtx,
-  ) {
-    let Self { reverse, dir, align_items, justify_content, lines, .. } = self;
+  fn update_children_position(&mut self, container: f32, cross_offset: f32, ctx: &mut LayoutCtx) {
+    let Self { reverse, dir, align_items, justify_content, cross_axis_gap, main_axis_gap, .. } =
+      *self;
+    let mut cross = cross_offset - cross_axis_gap;
+    self.for_each_line(|line| {
+      let (mut main, mut step) =
+        justify_content.item_offset_and_step(container - line.main, line.items_info.len());
+      if !justify_content.is_space_layout() {
+        step += main_axis_gap;
+      }
 
-    macro_rules! update_position {
-      ($($rev: ident)?) => {
-        let mut cross = cross_box_offset - self.cross_axis_gap;
-        lines.iter_mut()$(.$rev())?.for_each(|line| {
-          let (mut main, step) = line.place_args(main_bound, *justify_content, self.main_axis_gap);
-          let line_cross = line.max_cross();
-          line.items_info.iter_mut()$(.$rev())?.for_each(|item| {
-            let item_cross_offset =
-              align_items.align_value(item.size.cross, line_cross);
+      let line_cross = line.max_cross(dir);
+      line.for_each_item(reverse, |item| {
+        let (item_main, item_cross) = dir.main_cross_of(item.size);
+        let item_cross_offset = align_items.align_value(item_cross, line_cross);
 
-            item.pos.cross = cross + item_cross_offset + self.cross_axis_gap;
-            item.pos.main = main;
-            main = main + item.size.main + step;
-          });
-          cross += line_cross + self.cross_axis_gap;
-        });
-      };
-    }
-    if *reverse {
-      update_position!(rev);
-    } else {
-      update_position!();
-    }
+        item.cross_pos = cross + item_cross_offset + cross_axis_gap;
+        item.main_pos = main;
+        main = main + item_main + step;
+      });
+      cross += line_cross + cross_axis_gap;
+    });
 
     let (ctx, mut children) = ctx.split_children();
 
     self.lines.iter_mut().for_each(|line| {
       line.items_info.iter_mut().for_each(|info| {
         let child = children.next().unwrap();
-        ctx.update_position(child, info.pos.to_size(*dir).to_vector().to_point());
+        let pos = dir.to_point(info.main_pos, info.cross_pos);
+        ctx.update_position(child, pos);
       })
     });
   }
@@ -421,18 +293,29 @@ impl FlexLayouter {
         .push(std::mem::take(&mut self.current_line));
     }
   }
+
+  fn main_size(&self) -> f32 { self.lines.iter().fold(0., |m, l| m.max(l.main)) }
+
+  fn for_each_line(&mut self, mut f: impl FnMut(&mut MainLineInfo)) {
+    if self.reverse {
+      self.lines.iter_mut().rev().for_each(&mut f);
+    } else {
+      self.lines.iter_mut().for_each(&mut f);
+    }
+  }
 }
 
 #[derive(Default)]
 struct MainLineInfo {
-  main_width: f32,
+  main: f32,
   items_info: Vec<FlexLayoutInfo>,
   has_flex: bool,
 }
 
 struct FlexLayoutInfo {
-  pos: FlexSize,
-  size: FlexSize,
+  main_pos: f32,
+  cross_pos: f32,
+  size: Size,
   flex: Option<f32>,
   defer_layout: bool,
 }
@@ -446,14 +329,14 @@ impl MainLineInfo {
   //   size according to flex.
   // - return (flex_unit, 0.), only the expanded items with defer_alloc is true
   //   will try to expanded to size according to flex.
-  fn calc_flex_unit_and_space_left(&mut self, max: f32) -> (f32, f32) {
+  fn calc_flex_unit_and_space_left(&mut self, dir: Direction, max: f32) -> (f32, f32) {
     if !self.has_flex {
       return (0., 0.);
     }
 
     // no space left, it's compact. no need to re-layout for flex with defer_alloc
     // is false.
-    if self.main_width >= max {
+    if self.main >= max {
       return (0., 0.);
     }
 
@@ -468,58 +351,36 @@ impl MainLineInfo {
       } else {
         flex_alloc += item.flex.unwrap();
       }
-      flex_width += item.size.main;
+      flex_width += dir.main_of(item.size);
     }
 
-    let unit = (max - self.main_width + flex_width) / (flex_alloc + flex_defer);
-    if unit * flex_alloc >= flex_width {
-      (unit, unit * flex_alloc - flex_width)
-    } else {
-      ((max - self.main_width) / flex_defer, 0.)
-    }
-  }
-
-  fn place_args(&self, main_max: f32, justify_content: JustifyContent, gap: f32) -> (f32, f32) {
-    if self.items_info.is_empty() {
+    if flex_alloc + flex_defer <= 0. {
       return (0., 0.);
     }
 
-    let item_cnt = self.items_info.len() as f32;
-    match justify_content {
-      JustifyContent::Start => (0., gap),
-      JustifyContent::Center => ((main_max - self.main_width) / 2., gap),
-      JustifyContent::End => (main_max - self.main_width, gap),
-      JustifyContent::SpaceAround => {
-        let step = (main_max - self.main_width) / item_cnt;
-        (step / 2., step)
-      }
-      JustifyContent::SpaceBetween => {
-        let step = (main_max - self.main_width) / (item_cnt - 1.);
-        (0., step)
-      }
-      JustifyContent::SpaceEvenly => {
-        let step = (main_max - self.main_width) / (item_cnt + 1.);
-        (step, step)
-      }
+    let unit = (max - self.main + flex_width) / (flex_alloc + flex_defer);
+    if unit * flex_alloc >= flex_width {
+      (unit, unit * flex_alloc - flex_width)
+    } else if flex_defer > 0. {
+      ((max - self.main) / flex_defer, 0.)
+    } else {
+      (0., 0.)
     }
   }
 
-  fn max_cross(&self) -> f32 {
+  fn max_cross(&self, dir: Direction) -> f32 {
     self
       .items_info
       .iter()
-      .map(|info| info.size.cross)
-      .max_by(|a, b| a.total_cmp(b))
-      .unwrap_or(0.)
+      .fold(0., |acc, info| acc.max(dir.cross_of(info.size)))
   }
-}
 
-impl JustifyContent {
-  fn is_space_layout(&self) -> bool {
-    matches!(
-      self,
-      JustifyContent::SpaceAround | JustifyContent::SpaceBetween | JustifyContent::SpaceEvenly
-    )
+  fn for_each_item(&mut self, reverse: bool, mut f: impl FnMut(&mut FlexLayoutInfo)) {
+    if reverse {
+      self.items_info.iter_mut().rev().for_each(&mut f);
+    } else {
+      self.items_info.iter_mut().for_each(&mut f);
+    }
   }
 }
 
@@ -590,7 +451,7 @@ mod tests {
   widget_layout_test!(
     main_axis_gap,
     WidgetTester::new(fn_widget! {
-      @Row {
+      @Flex {
         item_gap: 15.,
         @SizedBox { size: Size::new(120., 20.) }
         @SizedBox { size: Size::new(80., 20.) }
@@ -606,7 +467,7 @@ mod tests {
   widget_layout_test!(
     main_axis_reverse_gap,
     WidgetTester::new(fn_widget! {
-      @Row {
+      @Flex {
         item_gap: 15.,
         reverse: true,
         @SizedBox { size: Size::new(120., 20.) }
@@ -623,7 +484,7 @@ mod tests {
   widget_layout_test!(
     main_axis_expand,
     WidgetTester::new(fn_widget! {
-      @Row {
+      @Flex {
         h_align: HAlign::Stretch,
         item_gap: 15.,
         @SizedBox { size: Size::new(120., 20.) }
@@ -666,7 +527,7 @@ mod tests {
 
   fn cross_align(align: Align) -> WidgetTester {
     WidgetTester::new(fn_widget! {
-      @Row {
+      @Flex {
         align_items: align,
         @SizedBox { size: Size::new(100., 20.) }
         @SizedBox { size: Size::new(100., 30.) }
@@ -708,8 +569,8 @@ mod tests {
     stretch_cross_align,
     cross_align(Align::Stretch),
     LayoutCase::default().with_size(Size::new(300., 40.)),
-    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 20.)),
-    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 0., 100., 30.)),
+    LayoutCase::new(&[0, 0]).with_rect(ribir_geom::rect(0., 0., 100., 40.)),
+    LayoutCase::new(&[0, 1]).with_rect(ribir_geom::rect(100., 0., 100., 40.)),
     LayoutCase::new(&[0, 2]).with_rect(ribir_geom::rect(200., 0., 100., 40.))
   );
 
@@ -718,7 +579,7 @@ mod tests {
       let item_size = Size::new(100., 20.);
       @SizedBox {
         size: Size::new(500., 500.),
-        @Row {
+        @Flex {
           justify_content,
           align_items: Align::Start,
           @SizedBox { size: item_size }
@@ -822,7 +683,8 @@ mod tests {
   widget_layout_test!(
     fix_flex_gap,
     WidgetTester::new(fn_widget! {
-      @Column {
+      @Flex {
+        direction: Direction::Vertical,
         item_gap: 50.,
         @SizedBox { size: Size::new(100., 100.) }
         @SizedBox { size: Size::new(100., 500.) }
@@ -840,7 +702,7 @@ mod tests {
 
   widget_layout_test!(
     cross_greater_than_children,
-    WidgetTester::new(row! {
+    WidgetTester::new(flex! {
       clamp: BoxClamp::min_height(500.),
       align_items: Align::Center,
       @Container { size: Size::new(100., 100.) }
@@ -852,7 +714,8 @@ mod tests {
 
   widget_layout_test!(
     flex_when_zero_space,
-    WidgetTester::new(column! {
+    WidgetTester::new(flex! {
+      direction: Direction::Vertical,
       @Container {
         size: Size::new(60., 500.),
       }

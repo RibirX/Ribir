@@ -11,7 +11,7 @@ use crate::prelude::{NoAffectedParentSize, no_affected_parent_size};
 /// 2. **In-Parent Layout**: Other children are laid out afterward, using the
 ///    `Stack`'s size as constraints, enabling them to be positioned or aligned
 ///    relative to the `Stack`.
-#[derive(MultiChild, Declare)]
+#[derive(MultiChild, Declare, Default)]
 pub struct Stack {
   #[declare(default)]
   fit: StackFit,

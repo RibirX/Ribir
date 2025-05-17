@@ -292,7 +292,7 @@ impl<'c> ComposeChild<'c> for TextField {
           size: pipe!(Size::new(0., $theme.container_height)),
           background: pipe!($theme.container_color),
         }
-        @Row {
+        @Flex {
           justify_content: JustifyContent::Center,
           align_items: Align::Stretch,
           @{

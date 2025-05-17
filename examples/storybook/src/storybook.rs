@@ -24,7 +24,8 @@ fn content() -> Widget<'static> {
               @Text { text: "Common buttons" }
               @Icon { @ { material_svgs::INFO } }
             }
-            @Column {
+            @Flex {
+              direction: Direction::Vertical,
               item_gap: 20.,
               padding: EdgeInsets::new(20., 40., 20., 40.),
               background: Palette::of(BuildCtx::get()).surface_container_low(),
@@ -33,7 +34,7 @@ fn content() -> Widget<'static> {
                 color: Palette::of(BuildCtx::get()).primary().into(),
                 width: 1.,
               }),
-              @Row {
+              @Flex {
                 item_gap: 20.,
                 @FilledButton { @ {"Filled" } }
                 @FilledButton {
@@ -41,7 +42,7 @@ fn content() -> Widget<'static> {
                   @ { "Icon" }
                 }
               }
-              @Row {
+              @Flex {
                 item_gap: 20.,
                 @Button { @ { "Outlined" } }
                 @Button {
@@ -49,7 +50,7 @@ fn content() -> Widget<'static> {
                   @ { "Icon" }
                 }
               }
-              @Row {
+              @Flex {
                 item_gap: 20.,
                 @TextButton { @ { "Text" } }
                 @TextButton {
@@ -68,7 +69,8 @@ fn content() -> Widget<'static> {
                 @Icon { @ { material_svgs::INFO } }
               }
             }
-            @Column {
+            @Flex {
+              direction: Direction::Vertical,
               item_gap: 20.,
               padding: EdgeInsets::new(20., 40., 20., 40.),
               background: Palette::of(BuildCtx::get()).surface_container_lowest(),
@@ -77,7 +79,7 @@ fn content() -> Widget<'static> {
                 color: Palette::of(BuildCtx::get()).primary().into(),
                 width: 1.,
               }),
-              @Row {
+              @Flex {
                 item_gap: 20.,
                 @Fab { @Icon { @ { svgs::ADD } } }
                 @Fab {
@@ -96,7 +98,8 @@ fn content() -> Widget<'static> {
                 @Icon { @ { material_svgs::INFO } }
               }
             }
-            @Column {
+            @Flex {
+              direction: Direction::Vertical,
               item_gap: 20.,
               padding: EdgeInsets::new(20., 40., 20., 40.),
               background: Palette::of(BuildCtx::get()).surface_container_lowest(),
@@ -105,7 +108,7 @@ fn content() -> Widget<'static> {
                 color: Palette::of(BuildCtx::get()).primary().into(),
                 width: 1.,
               }),
-              @Row {
+              @Flex {
                 item_gap: 20.,
                 @TextButton { @Icon { @ { svgs::SETTINGS } } }
                 @FilledButton { @Icon { @ { svgs::SETTINGS } } }
@@ -268,15 +271,12 @@ fn content() -> Widget<'static> {
 }
 
 pub fn storybook() -> Widget<'static> {
-  fn_widget! {
-    @Column {
-      align_items: Align::Center,
-      background: Palette::of(BuildCtx::get()).surface_container_low(),
-      @ { header() }
-      @Expanded {
-        @ { content() }
-      }
-    }
+  flex! {
+    direction: Direction::Vertical,
+    align_items: Align::Center,
+    background: Palette::of(BuildCtx::get()).surface_container_low(),
+    @ { header() }
+    @Expanded { @ { content() } }
   }
   .into_widget()
 }
