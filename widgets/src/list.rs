@@ -416,13 +416,14 @@ impl<'c> ComposeChild<'c> for ListCustomItem {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    let mut child = FatObj::new(child);
     let item_classes = ListItem::item_classes(&this.read().0);
     item_classes
-      .with_child(stack! {
-        fit: StackFit::Passthrough,
-        @ $child {
+      .with_child(unconstrained_box! {
+        clamp_dim: ClampDim::Max,
+        dir: UnconstrainedDir::Y,
+        @VAlignWidget {
           v_align: ListItemAlignItems::get_align(BuildCtx::get()).map(|v| v.into()),
+          @ { child }
         }
       })
       .into_widget()
@@ -480,10 +481,10 @@ impl<'w> ListItemChildren<'w> {
       class! { class: LIST_ITEM_TRAILING, @ { t.unwrap() } }
     });
 
-    row! {
+    flex! {
       align_items: ListItemAlignItems::get_align(BuildCtx::get()),
       @ { leading_widget }
-      @Expanded { defer_alloc: true, @ { content } }
+      @Expanded { @ { content } }
       @ { trailing_supporting }
       @ { trailing_widget }
     }
@@ -515,18 +516,53 @@ impl List {
       .filter(|(_, item)| item.read().is_selected())
   }
 
-  /// Returns the active item's index and reference if available
+  /// Returns the index of the currently active item if it is both active and
+  /// selected.
   ///
-  /// The active item is either:
-  /// - Last focused item
-  /// - Last selected item
-  pub fn active_item(&self) -> Option<(usize, &Stateful<ListItem>)> {
-    self.active_item.and_then(|active_idx| {
-      self
-        .items
-        .get(active_idx)
-        .map(|item| (active_idx, item))
-    })
+  /// This combines the checks from [`active_selected`] and returns the stored
+  /// index from [`active_item_idx`]. Returns `None` if either:
+  /// - There is no active item
+  /// - The active item is not selected
+  pub fn active_selected_idx(&self) -> Option<usize> {
+    self.active_selected().and(self.active_item)
+  }
+
+  /// Returns the active list item if it is currently selected.
+  ///
+  /// This performs a secondary check on the active item to verify its selected
+  /// state. Returns `None` if either:
+  /// - There is no active item
+  /// - The active item exists but is not selected
+  pub fn active_selected(&self) -> Option<Stateful<ListItem>> {
+    self
+      .active_item()
+      .filter(|item| item.read().is_selected())
+  }
+
+  /// Returns the stored index of the currently active item.
+  ///
+  /// The active item index is determined by the following precedence:
+  /// 1. Last focused item index
+  /// 2. Last selected item index
+  ///
+  /// Returns `None` if no item has been focused or selected yet,
+  /// or if the stored index is no longer valid.
+  pub fn active_item_idx(&self) -> Option<usize> { self.active_item }
+
+  /// Retrieves a clone of the currently active list item, if available.
+  ///
+  /// The active item is determined by the same rules as [`active_item_idx`].
+  /// This method will return `None` if:
+  /// - There is no stored active index
+  /// - The stored index is out of bounds for the current items list
+  ///
+  /// The returned item is cloned using the [`Stateful::clone_writer`] method,
+  /// preserving any internal writer state.
+  pub fn active_item(&self) -> Option<Stateful<ListItem>> {
+    self
+      .active_item
+      .and_then(|i| self.items.get(i))
+      .map(Stateful::clone_writer)
   }
 
   /// Deselects all items in the list.

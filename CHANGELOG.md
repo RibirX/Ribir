@@ -25,6 +25,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### BREAKING
+
+- **Widgets**: `Row` and `Column` now provide basic linear layouts, arranging children in a straight line without `Flex`'s advanced capabilities. (#759 @M-Adoo)
+
+
 ## [0.4.0-alpha.37] - 2025-05-14
 
 ### Features
@@ -284,7 +289,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Added `Measure` to enable support for percentage values for position, and `Anchor` now supports percentage values. (#672 @M-Adoo)
 - **core**: Added APIs `AppCtx::once_next_frame`, `Window::once_next_frame`, `Window::once_frame_finished` and `Window::once_before_layout`. (#672 @M-Adoo)
 - **painter**: Typography now supports baselines (middle and alphabetic). (#674 @M-Adoo)
-- **Widgets**: Added new layout widgets, `HorizontalLine` and `VerticalLine`. (#679 @M-Adoo)
 
 ### Changed
 

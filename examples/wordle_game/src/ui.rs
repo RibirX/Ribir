@@ -44,23 +44,24 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
     let this = self.clone_writer();
     let palette = Palette::of(BuildCtx::get());
     let gray = palette.base_of(&palette.surface_variant());
-    self::column! {
+    flex! {
+      direction: Direction::Vertical,
       item_gap: 5.,
       align_items: Align::Center,
       justify_content: JustifyContent::Center,
-      @Row {
+      @Flex {
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Center,
         @ { this.clone_writer().chars_key(['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P']) }
       }
-      @Row {
+      @Flex {
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Center,
         @ { this.clone_writer().chars_key(['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ]) }
       }
-      @Row {
+      @Flex {
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Center,
@@ -87,13 +88,14 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
   fn chars_grid(self) -> Widget<'static> {
     let this = self.clone_writer();
     fn_widget! {
-      @Column {
+      @Flex {
+        direction: Direction::Vertical,
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Center,
         @ {
           (0..$this.max_rounds()).map(move |row| {
-            @Row {
+            @Flex {
               item_gap: 5.,
               align_items: Align::Center,
               justify_content: JustifyContent::Center,
@@ -203,7 +205,8 @@ impl Compose for Wordle {
             _ => {}
           }
         },
-        @Column {
+        @Flex {
+          direction: Direction::Vertical,
           margin: EdgeInsets::only_top(10.),
           h_align: HAlign::Center,
           align_items: Align::Center,
@@ -214,7 +217,7 @@ impl Compose for Wordle {
           @ { this.chars_grid() }
           @ { state_bar }
           @ { keyboard }
-          @Row {
+          @Flex {
             margin: EdgeInsets::only_top(10.),
             item_gap: 15.,
             @ { give_up }

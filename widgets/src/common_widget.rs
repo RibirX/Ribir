@@ -1,6 +1,6 @@
 use ribir_core::prelude::*;
 
-use crate::layout::HorizontalLine;
+use crate::layout::*;
 
 #[derive(Template)]
 pub struct Leading<T>(T);
@@ -53,19 +53,15 @@ impl<T> Trailing<T> {
 pub fn icon_with_label(icon: Widget, label: Option<PositionChild<TextValue>>) -> Widget {
   let Some(label) = label else { return icon };
 
-  rdl! {
-    match label {
-     PositionChild::Leading(Leading(text)) => @HorizontalLine {
-       @Text { text }
-       @ { icon }
-     },
-     PositionChild::Trailing(Trailing(text)) | PositionChild::Default(text) => @HorizontalLine {
-       @ { icon }
-       @Text { text }
-     }
-   }
-  }
-  .into_widget()
+  let row = Row { align_items: Align::Center, justify_content: JustifyContent::Start };
+  let row = match label {
+    PositionChild::Leading(Leading(text)) => row.with_child(text! { text}).with_child(icon),
+    PositionChild::Trailing(Trailing(text)) | PositionChild::Default(text) => {
+      row.with_child(icon).with_child(text! { text})
+    }
+  };
+
+  row.into_widget()
 }
 
 #[cfg(test)]

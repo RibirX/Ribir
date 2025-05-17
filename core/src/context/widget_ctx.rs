@@ -33,6 +33,10 @@ pub trait WidgetCtx {
   fn assert_single_child(&self) -> WidgetId { self.single_child().expect("Must have one child.") }
   /// Return if `widget` have child.
   fn has_child(&self) -> bool { self.first_child().is_some() }
+
+  /// Return the iterator of children of widget.
+  fn children(&self) -> impl Iterator<Item = WidgetId> + '_;
+
   /// Return the first child of widget.
   fn first_child(&self) -> Option<WidgetId>;
   /// Return the box rect of the single child of widget.
@@ -128,6 +132,9 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
 
   #[inline]
   fn first_child(&self) -> Option<WidgetId> { self.id().first_child(self.tree()) }
+
+  #[inline]
+  fn children(&self) -> impl Iterator<Item = WidgetId> + '_ { self.id().children(self.tree()) }
 
   #[inline]
   fn box_rect(&self) -> Option<Rect> { self.widget_box_rect(self.id()) }
