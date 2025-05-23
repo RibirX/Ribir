@@ -198,12 +198,8 @@ impl_into_x_widget_for_state_reader!(
 impl_into_x_widget_for_state_watcher!(<R: Render> Stateful<R>);
 impl_into_x_widget_for_state_watcher!(<R: Render> State<R>);
 impl_into_x_widget_for_state_watcher!(
-  <W, WM> MapWriter<W, WM>
-  where MapWriter<W, WM>: StateWatcher<Value: Render + Sized>
-);
-impl_into_x_widget_for_state_watcher!(
-  <O, M> SplittedWriter<O, M>
-  where SplittedWriter<O, M>: StateWatcher<Value: Render + Sized>
+  <D> StateValueWriter<D>
+  where StateValueWriter<D>: StateWatcher<Value: Render + Sized>
 );
 
 // --- Function Kind ---

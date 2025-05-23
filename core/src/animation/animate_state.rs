@@ -13,7 +13,7 @@ pub trait AnimateStateSetter {
   fn get(&self) -> Self::Value;
   fn set(&self, v: Self::Value);
   fn revert_value(&self, v: Self::Value);
-  fn animate_state_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible>;
+  fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible>;
   fn clone_setter(&self) -> Self::C;
 }
 
@@ -87,7 +87,7 @@ where
   fn clone_setter(&self) -> Self::C { self.clone_writer() }
 
   #[inline]
-  fn animate_state_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
+  fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
     StateWatcher::raw_modifies(self)
       .filter(|s| s.contains(ModifyScope::all()))
       .box_it()
@@ -124,7 +124,7 @@ where
   fn clone_setter(&self) -> Self::C { self.state.clone_setter() }
 
   #[inline]
-  fn animate_state_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
+  fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
     self.state.animate_state_modifies()
   }
 }
@@ -180,7 +180,7 @@ macro_rules! impl_animate_state_for_tuple {
           ( $(self.$tuple.clone_setter()),*)
         }
 
-        fn animate_state_modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
+        fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
           rxrust::observable::from_iter([$(self.$tuple.animate_state_modifies()), *])
             .merge_all(usize::MAX)
             .box_it()

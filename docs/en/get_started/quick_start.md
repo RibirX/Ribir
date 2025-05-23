@@ -690,8 +690,8 @@ struct AppData {
 }
 
 let state = State::value(AppData { count: 0 });
-let map_count = state.map_writer(|d| PartMut::new(&mut d.count));
-let split_count = state.split_writer(|d| PartMut::new(&mut d.count));
+let map_count = state.part_writer(None, |d| PartMut::new(&mut d.count));
+let split_count = state.part_writer(None, |d| PartMut::new(&mut d.count));
 
 watch!($state.count).subscribe(|_| println!("Parent data"));
 watch!(*$map_count).subscribe(|_| println!("Child(map) data"));
@@ -742,10 +742,10 @@ AppCtx::run_until_stalled();
 Because Ribir's data modification notifications are sent out in asynchronous batches, we call `AppCtx::run_until_stalled()` every time a data modification is made to force comprehensible sends in the example for ease of understanding, but this shouldn't be in your real code.
 
 
-If you just want a read-only sub-state, then you can convert it with `map_reader`:
+If you just want a read-only sub-state, then you can convert it with `part_reader`:
 
 ```rust ignore
-let count_reader = state.map_reader(|d| &d.count);
+let count_reader = state.part_reader(|d| &d.count);
 ```
 
 But Ribir doesn't provide a ``split_reader``, because separating a read-only sub-state is equivalent to converting a read-only sub-state.

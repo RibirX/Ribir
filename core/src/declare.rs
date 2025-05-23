@@ -25,7 +25,7 @@ pub enum PipeValue<V> {
   Pipe(BoxPipe<V>),
 }
 
-pub type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
+pub type ValueStream<V> = BoxOp<'static, (ModifyInfo, V), Infallible>;
 
 impl<V: 'static> PipeValue<V> {
   pub fn unzip(self) -> (V, Option<ValueStream<V>>) {
