@@ -692,8 +692,8 @@ struct AppData {
 }
 
 let state = State::value(AppData { count: 0 });
-let map_count = state.map_writer(|d| PartMut::new(&mut d.count));
-let split_count = state.split_writer(|d| PartMut::new(&mut d.count));
+let map_count = state.part_writer(None, |d| PartMut::new(&mut d.count));
+let split_count = state.part_writer(None, |d| PartMut::new(&mut d.count));
 
 watch!($state.count).subscribe(|_| println!("父状态数据"));
 watch!(*$map_count).subscribe(|_| println!("子状态（转换）数据"));
@@ -744,10 +744,10 @@ AppCtx::run_until_stalled();
 因为 Ribir 的数据修改通知是异步批量发出的，所以在例子中为了方便理解，我们每次数据修改都调用了 `AppCtx::run_until_stalled()` 来强制理解发送，但这不应该出现在你真实的代码中。
 
 
-如果你仅是想获得一个只读的子状态，那么可以通过 `map_reader` 来转换：
+如果你仅是想获得一个只读的子状态，那么可以通过 `part_reader` 来转换：
 
 ```rust ignore
-let count_reader = state.map_reader(|d| &d.count);
+let count_reader = state.part_reader(|d| &d.count);
 ```
 
 但 Ribir 并没有提供一个 `split_reader`，因为分离一个只读的子状态，其意义等同于转换一个只读子状态。

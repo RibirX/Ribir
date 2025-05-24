@@ -23,6 +23,53 @@ pub(crate) struct StateCell<W: ?Sized> {
   data: UnsafeCell<W>,
 }
 
+pub trait StateValue {
+  type Value: ?Sized;
+  fn write(&self) -> ValueMutRef<'_, Self::Value>;
+
+  fn read(&self) -> ReadRef<Self::Value>;
+
+  fn clone_box(&self) -> Box<dyn StateValue<Value = Self::Value>>;
+
+  fn try_into_value(self) -> std::result::Result<Self::Value, Self>
+  where
+    Self::Value: Sized,
+    Self: Sized,
+  {
+    Err(self)
+  }
+
+  fn map<U: ?Sized, M: Fn(&mut Self::Value) -> PartMut<U> + Clone>(
+    self, map: M,
+  ) -> MapState<Self, M>
+  where
+    Self: Sized,
+  {
+    MapState { orig: self, map }
+  }
+}
+
+impl<V: ?Sized> StateValue for Box<dyn StateValue<Value = V>> {
+  type Value = V;
+  fn read(&self) -> ReadRef<V> { self.deref().read() }
+
+  fn try_into_value(self) -> std::result::Result<V, Self>
+  where
+    Self: Sized,
+    V: Sized,
+  {
+    Err(self)
+  }
+
+  fn write(&self) -> ValueMutRef<'_, V> { self.deref().write() }
+
+  fn clone_box(&self) -> Box<dyn StateValue<Value = Self::Value>> { (**self).clone_box() }
+}
+
+impl<V: ?Sized> Clone for Box<dyn StateValue<Value = V>> {
+  fn clone(&self) -> Self { (**self).clone_box() }
+}
+
 impl<W> StateCell<W> {
   pub(crate) fn new(data: W) -> Self {
     StateCell {
@@ -33,7 +80,10 @@ impl<W> StateCell<W> {
     }
   }
 
-  #[track_caller]
+  pub(crate) fn is_unused(&self) -> bool { self.borrow_flag.get() == UNUSED }
+
+  pub(crate) fn into_inner(self) -> W { self.data.into_inner() }
+
   pub(crate) fn read(&self) -> ReadRef<W> {
     let borrow = &self.borrow_flag;
     let b = borrow.get().wrapping_add(1);
@@ -62,7 +112,7 @@ impl<W> StateCell<W> {
     ReadRef { inner, borrow: BorrowRef { borrow } }
   }
 
-  pub(crate) fn write(&self) -> ValueMutRef<'_, W> {
+  fn write(&self) -> ValueMutRef<'_, W> {
     // NOTE: Unlike BorrowRefMut::clone, new is called to create the initial
     // mutable reference, and so there must currently be no existing
     // references. Thus, while clone increments the mutable refcount, here
@@ -88,10 +138,39 @@ impl<W> StateCell<W> {
     let inner = InnerPart::Ref(unsafe { NonNull::new_unchecked(self.data.get()) });
     ValueMutRef { inner, borrow: v_ref }
   }
+}
 
-  pub(crate) fn is_unused(&self) -> bool { self.borrow_flag.get() == UNUSED }
+pub struct StateAtom<W>(Sc<StateCell<W>>);
 
-  pub(super) fn into_inner(self) -> W { self.data.into_inner() }
+impl<W> StateAtom<W> {
+  pub(crate) fn new(data: W) -> Self { StateAtom(Sc::new(StateCell::new(data))) }
+
+  pub(crate) fn from_state_cell(state_cell: StateCell<W>) -> Self { StateAtom(Sc::new(state_cell)) }
+
+  pub(crate) fn is_same_obj(&self, other: &Self) -> bool { Sc::ptr_eq(&self.0, &other.0) }
+}
+
+impl<W> Clone for StateAtom<W> {
+  fn clone(&self) -> Self { StateAtom(self.0.clone()) }
+}
+
+impl<W: 'static> StateValue for StateAtom<W> {
+  type Value = W;
+
+  fn read(&self) -> ReadRef<W> { self.0.read() }
+
+  fn try_into_value(self) -> std::result::Result<W, Self>
+  where
+    W: Sized,
+  {
+    Sc::try_unwrap(self.0)
+      .map(|t| t.into_inner())
+      .map_err(StateAtom)
+  }
+
+  fn write(&self) -> ValueMutRef<W> { self.0.write() }
+
+  fn clone_box(&self) -> Box<dyn StateValue<Value = W>> { Box::new(self.clone()) }
 }
 
 /// A partial reference value of a state, which should be point to the part data
@@ -140,7 +219,7 @@ impl<'a, T> PartRef<'a, T> {
   /// let vec = Stateful::new(vec![1, 2, 3]);
   /// // We get the state of the second element.
   /// // `v.get(1)` returns an `Option<&i32>`, which is valid in the vector.
-  /// let elem2 = vec.map_reader(|v| unsafe {
+  /// let elem2 = vec.part_reader(|v| unsafe {
   ///   PartRef::from_ptr(std::mem::transmute::<_, Option<&'static i32>>(v.get(1)))
   /// });
   /// ```
@@ -154,7 +233,7 @@ impl<'a, T> PartRef<'a, T> {
   ///
   /// let ab = Stateful::new((1, 2));
   ///
-  /// let ab2 = ab.map_reader(|v| unsafe { PartRef::from_ptr(*v) });
+  /// let ab2 = ab.part_reader(|v| unsafe { PartRef::from_ptr(*v) });
   ///
   /// // The `_a` may result in a dangling pointer issue since it utilizes the
   /// // value of `ab2.read()`. However, `ab2` copies the value of `ab` rather
@@ -190,7 +269,7 @@ impl<'a, T> PartMut<'a, T> {
   /// let vec = Stateful::new(vec![1, 2, 3]);
   /// // We get the state of the second element.
   /// // `v.get_mut(1)` returns an `Option<&mut i32>`, which is valid in the vector.
-  /// let elem2 = vec.map_writer(|v| unsafe {
+  /// let elem2 = vec.part_writer(None, |v| unsafe {
   ///   PartMut::from_ptr(std::mem::transmute::<_, Option<&'static i32>>(v.get_mut(1)))
   /// });
   /// ```
@@ -204,7 +283,7 @@ impl<'a, T> PartMut<'a, T> {
   ///
   /// let ab = Stateful::new((1, 2));
   ///
-  /// let ab2 = ab.map_writer(|v| unsafe { PartMut::from_ptr(*v) });
+  /// let ab2 = ab.part_writer(None, |v| unsafe { PartMut::from_ptr(*v) });
   ///
   /// // The `_a` may result in a dangling pointer issue since it utilizes the
   /// // value of `ab2.write()`. However, `ab2` copies the value of `ab` rather
@@ -222,7 +301,7 @@ impl<'a, T> PartMut<'a, T> {
   /// // We create a state of the second element. However, this state is a copy of
   /// // the vector because `v[1]` returns a copy of the value in the vector, not a
   /// // reference.
-  /// let mut elem2 = vec.map_writer(|v| unsafe { PartMut::from_ptr(v[1]) });
+  /// let mut elem2 = vec.part_writer(None, |v| unsafe { PartMut::from_ptr(v[1]) });
   ///
   /// // This modification will not alter the `vec`.
   /// *elem2.write() = 20;
@@ -237,7 +316,7 @@ pub struct ReadRef<'a, T: ?Sized> {
   pub(crate) borrow: BorrowRef<'a>,
 }
 
-pub(crate) struct ValueMutRef<'a, T: ?Sized> {
+pub struct ValueMutRef<'a, T: ?Sized> {
   pub(crate) inner: InnerPart<T>,
   pub(crate) borrow: BorrowRefMut<'a>,
 }
@@ -257,6 +336,14 @@ impl<T: ?Sized> Deref for InnerPart<T> {
       InnerPart::Ref(ptr) => unsafe { ptr.as_ref() },
       InnerPart::Ptr(data) => data,
     }
+  }
+}
+
+impl<'a, W: ?Sized> ValueMutRef<'a, W> {
+  pub(crate) fn map<U: ?Sized>(
+    mut self, map: impl FnOnce(&mut W) -> PartMut<U>,
+  ) -> ValueMutRef<'a, U> {
+    ValueMutRef { inner: map(&mut self.inner).inner, borrow: self.borrow }
   }
 }
 
@@ -394,7 +481,9 @@ impl<'a, T: ?Sized> DerefMut for ValueMutRef<'a, T> {
 
 use std::fmt::*;
 
-use super::{QueryRef, WriteRef};
+use ribir_algo::Sc;
+
+use super::{MapState, QueryRef, WriteRef};
 
 impl<T: ?Sized + Debug> Debug for ReadRef<'_, T> {
   fn fmt(&self, f: &mut Formatter<'_>) -> Result { Debug::fmt(&**self, f) }
@@ -418,4 +507,12 @@ impl<'a, T> From<&'a T> for PartRef<'a, T> {
 
 impl<'a, T> From<&'a mut T> for PartMut<'a, T> {
   fn from(part: &'a mut T) -> Self { PartMut::new(part) }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  impl<W> StateAtom<W> {
+    pub(crate) fn ref_count(&self) -> usize { self.0.ref_count() }
+  }
 }

@@ -11,7 +11,7 @@ use widget_id::RenderQueryable;
 
 use crate::{prelude::*, render_helper::PureRender};
 
-pub type ValueStream<V> = BoxOp<'static, (ModifyScope, V), Infallible>;
+pub type ValueStream<V> = BoxOp<'static, (ModifyInfo, V), Infallible>;
 
 /// A trait for a value that can be subscribed its continuous modifies.
 pub trait Pipe: 'static {
@@ -352,15 +352,15 @@ impl<S: Pipe, V, F: FnMut(S::Value) -> V> MapPipe<V, S, F> {
   pub fn new(source: S, f: F) -> Self { Self { source, f, _marker: PhantomData } }
 }
 
-pub struct ModifiesPipe(BoxOp<'static, ModifyScope, Infallible>);
+pub struct ModifiesPipe(BoxOp<'static, ModifyInfo, Infallible>);
 
 impl ModifiesPipe {
   #[inline]
-  pub fn new(modifies: BoxOp<'static, ModifyScope, Infallible>) -> Self { Self(modifies) }
+  pub fn new(modifies: BoxOp<'static, ModifyInfo, Infallible>) -> Self { Self(modifies) }
 }
 
 impl Pipe for ModifiesPipe {
-  type Value = ModifyScope;
+  type Value = ModifyInfo;
 
   #[inline]
   fn unzip(
@@ -369,7 +369,7 @@ impl Pipe for ModifiesPipe {
     let stream = self
       .0
       .filter(move |s| s.contains(scope))
-      .map(|s| (s, s));
+      .map(|s| (s.clone(), s));
 
     let stream = if let Some(init) = init {
       let source = stream
@@ -381,7 +381,7 @@ impl Pipe for ModifiesPipe {
       stream.box_it()
     };
 
-    (ModifyScope::empty(), stream)
+    (ModifyInfo::new(ModifyScope::empty(), None), stream)
   }
 
   #[inline]

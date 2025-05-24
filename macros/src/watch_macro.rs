@@ -37,7 +37,7 @@ pub fn process_watch_body(
   };
 
   let expr = body.0;
-  let map_handler = quote! { move |_: ModifyScope| { #(#expr)* } };
+  let map_handler = quote! { move |_: ModifyInfo| { #(#expr)* } };
   if refs.is_empty() {
     Err(Error::WatchNothing(span))
   } else {

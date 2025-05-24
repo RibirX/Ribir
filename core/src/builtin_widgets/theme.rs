@@ -138,7 +138,7 @@ impl Theme {
     }
 
     load_fonts(&this);
-    let container_color = this.map_reader(|t| {
+    let container_color = this.part_reader(|t| {
       // Safety Note: In this instance, a copied value of the palette is utilized,
       // which is not the correct method of using `PartRef`. However, in this case,
       // it is only a read-only value, and once added to the providers, neither the

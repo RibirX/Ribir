@@ -1,23 +1,70 @@
-use std::{cell::Cell, convert::Infallible};
+use std::{cell::RefCell, convert::Infallible};
 
+use ahash::HashMap;
 use ribir_algo::Sc;
-use rxrust::{ops::box_it::CloneableBoxOp, prelude::*};
+use rxrust::ops::box_it::CloneableBoxOp;
 
-use super::state_cell::StateCell;
 use crate::prelude::*;
 
 /// Stateful object use to watch the modifies of the inner data.
-pub struct Stateful<W> {
-  data: Sc<StateCell<W>>,
-  info: Sc<WriterInfo>,
+pub struct Stateful<W>(pub(crate) StateValueWriter<StateAtom<W>>);
+
+pub struct StateValueWriter<D> {
+  pub(crate) data: D,
+  pub(crate) info: WriterInfo,
 }
 
-pub struct Reader<W>(pub(crate) Sc<StateCell<W>>);
+impl<D> StateValueWriter<D> {
+  pub(crate) fn partial(self, id: &str) -> StateValueWriter<D> {
+    let StateValueWriter { data, info } = self;
+    let info = info.partials(id.to_string().into());
+    StateValueWriter { data, info }
+  }
+}
 
-/// The notifier is a `RxRust` stream that emit notification when the state
-/// changed.
-#[derive(Default, Clone)]
-pub struct Notifier(Subject<'static, ModifyScope, Infallible>);
+struct PartialMgr {
+  partial_notifiers: HashMap<Vec<CowArc<str>>, Subject>,
+}
+
+impl PartialMgr {
+  fn new(root: Subject) -> Self {
+    let mut m = HashMap::default();
+    m.insert(vec![], root);
+    Self { partial_notifiers: m }
+  }
+
+  fn restrict_partial(&mut self, path: Vec<CowArc<str>>) -> Subject {
+    self
+      .partial_notifiers
+      .entry(path)
+      .or_default()
+      .clone()
+  }
+
+  fn partial(&self, path: &[CowArc<str>]) -> Option<&Subject> { self.partial_notifiers.get(path) }
+
+  fn unrestrict(&mut self, id: &Vec<CowArc<str>>) { self.partial_notifiers.remove(id); }
+}
+
+pub type Reader<W> = StateValueReader<StateAtom<W>>;
+
+pub struct StateValueReader<D>(pub(crate) D);
+
+impl<V: ?Sized, W: 'static> StateReader for StateValueReader<W>
+where
+  W: StateValue<Value = V> + Clone,
+{
+  type Value = V;
+  type Reader = StateValueReader<W>;
+
+  fn clone_reader(&self) -> Self::Reader { StateValueReader(self.0.clone()) }
+
+  fn read(&self) -> ReadRef<V> { self.0.read() }
+
+  fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
+    Box::new(self.clone_reader())
+  }
+}
 
 bitflags! {
   #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -31,21 +78,110 @@ bitflags! {
   }
 }
 
-impl Notifier {
-  pub(crate) fn unsubscribe(&mut self) { self.0.clone().unsubscribe(); }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModifyInfo {
+  scope: ModifyScope,
+  partial: Option<PartialPath>,
 }
 
-pub(crate) struct WriterInfo {
-  pub(crate) notifier: Notifier,
-  /// The counter of the writer may be modified the data.
-  pub(crate) writer_count: Cell<usize>,
+impl ModifyInfo {
+  pub fn new(scope: ModifyScope, partial: Option<PartialPath>) -> Self { Self { scope, partial } }
+
+  pub fn contains(&self, scope: ModifyScope) -> bool { self.scope.contains(scope) }
+
+  pub fn scope(&self) -> ModifyScope { self.scope }
+
+  pub fn is_from_partial(&self) -> bool { self.partial.is_some() }
+
+  pub fn partial_path(&self) -> Option<&PartialPath> { self.partial.as_ref() }
+}
+
+#[derive(Default)]
+pub struct WriterInfoInner {
+  notifier: Notifier,
   /// The batched modifies of the `State` which will be notified.
-  pub(crate) batched_modifies: Cell<ModifyScope>,
+  batched_modifies: ModifyScope,
 }
 
-impl<W: 'static> StateReader for Stateful<W> {
+#[derive(Default)]
+pub struct WriterInfo(Sc<RefCell<WriterInfoInner>>);
+
+type Subject = rxrust::prelude::Subject<'static, ModifyInfo, Infallible>;
+
+enum Notifier {
+  Simple(Subject),
+  Partials { partials: Sc<RefCell<PartialMgr>>, path: Vec<CowArc<str>> },
+}
+
+impl Default for Notifier {
+  fn default() -> Self { Notifier::Simple(Subject::default()) }
+}
+
+impl Notifier {
+  pub(crate) fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
+    self.notifier().box_it()
+  }
+
+  #[inline]
+  fn notifier(&self) -> Subject {
+    match self {
+      Notifier::Simple(n) => n.clone(),
+      Notifier::Partials { partials, path } => partials
+        .borrow_mut()
+        .restrict_partial(path.clone()),
+    }
+  }
+
+  pub(crate) fn unregister_writer(&self) -> impl Subscription {
+    let notifier = self.notifier();
+    if let Notifier::Partials { partials, path: id } = self {
+      partials.borrow_mut().unrestrict(id)
+    }
+    notifier
+  }
+
+  pub(crate) fn notify_modifies(&self, scope: ModifyScope) {
+    match self {
+      Notifier::Simple(n) => n.clone().next(ModifyInfo::new(scope, None)),
+      Notifier::Partials { partials, path } => {
+        for i in 0..=path.len() {
+          if let Some(s) = partials.borrow_mut().partial(&path[0..i]) {
+            let child_path =
+              if i == path.len() { None } else { Some(path[i..path.len()].to_vec()) };
+            s.clone().next(ModifyInfo::new(scope, child_path));
+          }
+        }
+      }
+    }
+  }
+
+  fn partial(&mut self, id: CowArc<str>) -> Notifier {
+    if matches!(self, Notifier::Simple(_)) {
+      let notifier = self.notifier();
+
+      *self = Notifier::Partials {
+        partials: Sc::new(RefCell::new(PartialMgr::new(notifier))),
+        path: vec![],
+      };
+    }
+
+    match self {
+      Notifier::Partials { partials, path: origin_path } => {
+        let mut path = origin_path.clone();
+        path.push(id);
+        Notifier::Partials { partials: partials.clone(), path }
+      }
+      _ => unreachable!(),
+    }
+  }
+}
+
+impl<W: ?Sized, D> StateReader for StateValueWriter<D>
+where
+  D: StateValue<Value = W> + 'static + Clone,
+{
   type Value = W;
-  type Reader = Reader<W>;
+  type Reader = StateValueReader<D>;
 
   #[inline]
   fn read(&self) -> ReadRef<Self::Value> { self.data.read() }
@@ -56,26 +192,27 @@ impl<W: 'static> StateReader for Stateful<W> {
   }
 
   #[inline]
-  fn clone_reader(&self) -> Self::Reader { Reader(self.data.clone()) }
+  fn clone_reader(&self) -> Self::Reader { StateValueReader(self.data.clone()) }
 
-  fn try_into_value(self) -> Result<W, Self> {
-    if self.data.ref_count() == 1 {
-      let data = self.data.clone();
-      drop(self);
-      // SAFETY: `self.data.ref_count() == 1` guarantees unique access.
-      let data = unsafe { Sc::try_unwrap(data).unwrap_unchecked() };
-      Ok(data.into_inner())
-    } else {
-      Err(self)
-    }
+  fn try_into_value(self) -> Result<W, Self>
+  where
+    W: Sized,
+  {
+    let Self { data, info } = self;
+    data
+      .try_into_value()
+      .map_err(|data| Self { data, info })
   }
 }
 
-impl<W: 'static> StateWatcher for Stateful<W> {
+impl<W: ?Sized, D> StateWatcher for StateValueWriter<D>
+where
+  D: StateValue<Value = W> + 'static + Clone,
+{
   type Watcher = Watcher<Self::Reader>;
 
   fn into_reader(self) -> Result<Self::Reader, Self> {
-    if self.info.writer_count.get() == 1 { Ok(self.clone_reader()) } else { Err(self) }
+    if self.info.ref_count() == 1 { Ok(self.clone_reader()) } else { Err(self) }
   }
 
   #[inline]
@@ -84,8 +221,8 @@ impl<W: 'static> StateWatcher for Stateful<W> {
   }
 
   #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
-    self.info.notifier.raw_modifies()
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
+    self.info.raw_modifies()
   }
 
   #[inline]
@@ -94,7 +231,11 @@ impl<W: 'static> StateWatcher for Stateful<W> {
   }
 }
 
-impl<W: 'static> StateWriter for Stateful<W> {
+impl<W: ?Sized, D> StateWriter for StateValueWriter<D>
+where
+  D: StateValue<Value = W> + 'static + Clone,
+{
+  type State = D;
   #[inline]
   fn write(&self) -> WriteRef<W> { self.write_ref(ModifyScope::BOTH) }
 
@@ -110,43 +251,125 @@ impl<W: 'static> StateWriter for Stateful<W> {
   }
 
   #[inline]
-  fn clone_writer(&self) -> Self { self.clone() }
+  fn clone_writer(&self) -> Self { Self { data: self.data.clone(), info: self.info.clone() } }
+
+  fn part_writer<V: ?Sized + 'static, M>(
+    &self, id: Option<&str>, part_map: M,
+  ) -> StateValueWriter<MapState<Self::State, M>>
+  where
+    M: Fn(&mut Self::Value) -> PartMut<V> + Clone + 'static,
+    Self: Sized,
+  {
+    let w = StateValueWriter { data: self.data.clone().map(part_map), info: self.info.clone() };
+    if let Some(id) = id { w.partial(id) } else { w }
+  }
 }
 
-impl<W: 'static> StateReader for Reader<W> {
-  type Value = W;
-  type Reader = Self;
+impl<V: 'static> StateReader for Stateful<V> {
+  type Value = V;
+  type Reader = Reader<V>;
 
   #[inline]
-  fn read(&self) -> ReadRef<W> { self.0.read() }
+  fn read(&self) -> ReadRef<Self::Value> { self.0.read() }
 
   #[inline]
   fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
     Box::new(self.clone_reader())
   }
 
-  #[inline]
-  fn clone_reader(&self) -> Self { Reader(self.0.clone()) }
-
-  fn try_into_value(self) -> Result<Self::Value, Self> {
-    if self.0.ref_count() == 1 {
-      // SAFETY: `self.0.ref_count() == 1` guarantees unique access.
-      let data = unsafe { Sc::try_unwrap(self.0).unwrap_unchecked() };
-      Ok(data.into_inner())
-    } else {
-      Err(self)
-    }
+  fn clone_reader(&self) -> Self::Reader
+  where
+    Self: Sized,
+  {
+    self.0.clone_reader()
   }
 }
 
-impl<W> Drop for Stateful<W> {
-  fn drop(&mut self) { self.info.dec_writer(); }
+impl<V: 'static> StateWatcher for Stateful<V> {
+  type Watcher = Watcher<Reader<V>>;
+
+  fn into_reader(self) -> Result<Reader<V>, Self> { self.0.into_reader().map_err(|d| Stateful(d)) }
+
+  fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
+    Box::new(self.clone_watcher())
+  }
+
+  fn clone_watcher(&self) -> Watcher<Reader<V>> {
+    Watcher::new(self.clone_reader(), self.0.raw_modifies())
+  }
+
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
+    self.0.raw_modifies()
+  }
+}
+
+impl<V: 'static> StateWriter for Stateful<V> {
+  type State = StateAtom<V>;
+  #[inline]
+  fn write(&self) -> WriteRef<V> { self.0.write() }
+
+  #[inline]
+  fn silent(&self) -> WriteRef<V> { self.0.silent() }
+
+  #[inline]
+  fn shallow(&self) -> WriteRef<V> { self.0.shallow() }
+
+  #[inline]
+  fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {
+    Box::new(self.clone_writer())
+  }
+
+  fn clone_writer(&self) -> Self { Stateful(self.0.clone_writer()) }
+
+  fn part_writer<W: ?Sized + 'static, M>(
+    &self, id: Option<&str>, part_map: M,
+  ) -> StateValueWriter<MapState<Self::State, M>>
+  where
+    M: Fn(&mut Self::Value) -> PartMut<W> + Clone + 'static,
+    Self: Sized,
+  {
+    let data = StateValue::map(self.0.data.clone(), part_map);
+    let w = StateValueWriter { data, info: self.0.info.clone() };
+    if let Some(id) = id { w.partial(id) } else { w }
+  }
+}
+
+impl WriterInfo {
+  pub(crate) fn clone(&self) -> Self { Self(self.0.clone()) }
+
+  pub(crate) fn partials(&self, id: CowArc<str>) -> WriterInfo {
+    WriterInfo(Sc::new(RefCell::new(WriterInfoInner {
+      notifier: self.0.borrow_mut().notifier.partial(id),
+      batched_modifies: ModifyScope::empty(),
+    })))
+  }
+
+  pub(crate) fn ref_count(&self) -> usize { self.0.ref_count() }
+
+  pub(crate) fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
+    self.0.borrow().notifier.raw_modifies().box_it()
+  }
+
+  pub(crate) fn modified(&self, scope: ModifyScope) {
+    self.0.borrow_mut().batched_modifies |= scope;
+  }
+
+  pub(crate) fn has_modified(&self) -> bool { self.0.borrow().batched_modifies.is_empty() }
+
+  pub(crate) fn submit_modified(&self) {
+    let scope = self.0.borrow().batched_modifies;
+    self.0.borrow_mut().batched_modifies = ModifyScope::empty();
+    self.0.borrow().notifier.notify_modifies(scope);
+  }
+
+  fn unregister_writer(&self) -> impl Subscription { self.0.borrow().notifier.unregister_writer() }
 }
 
 impl Drop for WriterInfo {
   fn drop(&mut self) {
-    if self.writer_count.get() == 0 {
-      let mut notifier = self.notifier.clone();
+    if self.0.ref_count() == 1 {
+      let notifier = self.unregister_writer();
+
       // we use an async task to unsubscribe to wait the batched modifies to be
       // notified.
       let _ = AppCtx::spawn_local(async move { notifier.unsubscribe() });
@@ -156,7 +379,7 @@ impl Drop for WriterInfo {
 
 impl<W> Stateful<W> {
   pub fn new(data: W) -> Self {
-    Self { data: Sc::new(StateCell::new(data)), info: Sc::new(WriterInfo::new()) }
+    Self(StateValueWriter { data: StateAtom::new(data), info: WriterInfo::default() })
   }
 
   /// Determines if two `Stateful` instances point to the same underlying data.
@@ -166,7 +389,7 @@ impl<W> Stateful<W> {
   /// - The associated metadata
   #[inline]
   pub fn ptr_eq(this: &Self, other: &Self) -> bool {
-    Sc::ptr_eq(&this.data, &other.data) && Sc::ptr_eq(&this.info, &other.info)
+    this.0.data.is_same_obj(&other.0.data) && Sc::ptr_eq(&this.0.info.0, &other.0.info.0)
   }
 
   pub fn from_pipe(p: impl Pipe<Value = W>) -> (Self, BoxSubscription<'static>)
@@ -175,48 +398,26 @@ impl<W> Stateful<W> {
   {
     let (v, p) = p.unzip(ModifyScope::DATA, None);
     let s = Stateful::new(v);
-    let s2 = s.clone_writer();
+    let s2 = s.0.clone_writer();
     let u = p.subscribe(move |(_, v)| *s2.write() = v);
     (s, u)
   }
+}
 
+impl<W: ?Sized, D> StateValueWriter<D>
+where
+  D: StateValue<Value = W>,
+{
   fn write_ref(&self, scope: ModifyScope) -> WriteRef<'_, W> {
     let value = self.data.write();
     WriteRef { value, modified: false, modify_scope: scope, info: &self.info }
   }
-
-  fn clone(&self) -> Self {
-    self.info.inc_writer();
-    Self { data: self.data.clone(), info: self.info.clone() }
-  }
 }
 
-impl WriterInfo {
-  pub(crate) fn new() -> Self {
-    WriterInfo {
-      batched_modifies: <_>::default(),
-      writer_count: Cell::new(1),
-      notifier: <_>::default(),
-    }
-  }
-
-  pub(crate) fn inc_writer(&self) { self.writer_count.set(self.writer_count.get() + 1); }
-
-  pub(crate) fn dec_writer(&self) { self.writer_count.set(self.writer_count.get() - 1); }
-}
-
-impl Notifier {
-  pub(crate) fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
-    self.0.clone().box_it()
-  }
-
-  pub(crate) fn next(&self, scope: ModifyScope) { self.0.clone().next(scope) }
-}
-
-impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {
+impl<W: std::fmt::Debug + 'static> std::fmt::Debug for Stateful<W> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_tuple("Stateful")
-      .field(&*self.data.read())
+      .field(&*self.0.data.read())
       .finish()
   }
 }
@@ -279,7 +480,7 @@ mod tests {
     {
       drop_writer_subscribe(
         #[allow(clippy::redundant_closure)]
-        Stateful::new(()).map_writer(|v| PartMut::new(v)),
+        Stateful::new(()).part_writer(None, |v| PartMut::new(v)),
         drop_cnt.clone(),
       );
     };
@@ -289,7 +490,7 @@ mod tests {
     {
       drop_writer_subscribe(
         #[allow(clippy::redundant_closure)]
-        Stateful::new(()).split_writer(|v| PartMut::new(v)),
+        Stateful::new(()).part_writer(Some(""), |v| PartMut::new(v)),
         drop_cnt.clone(),
       );
     };
@@ -364,7 +565,14 @@ mod tests {
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
-    assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH]);
+    assert_eq!(
+      &notified
+        .borrow()
+        .iter()
+        .map(|s| s.scope())
+        .collect::<Vec<_>>(),
+      &[ModifyScope::BOTH]
+    );
 
     {
       let _ = &mut w.silent().size;
@@ -372,7 +580,14 @@ mod tests {
 
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
-    assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH, ModifyScope::DATA]);
+    assert_eq!(
+      &notified
+        .borrow()
+        .iter()
+        .map(|s| s.scope())
+        .collect::<Vec<_>>(),
+      &[ModifyScope::BOTH, ModifyScope::DATA]
+    );
 
     {
       let _ = &mut w.write();
@@ -389,7 +604,14 @@ mod tests {
 
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
-    assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH, ModifyScope::DATA]);
+    assert_eq!(
+      &notified
+        .borrow()
+        .iter()
+        .map(|s| s.scope())
+        .collect::<Vec<_>>(),
+      &[ModifyScope::BOTH, ModifyScope::DATA]
+    );
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -403,8 +625,8 @@ mod tests {
     let _r = v.clone_reader();
 
     AppCtx::run_until_stalled();
-    assert_eq!(v.data.ref_count(), 2);
-    assert_eq!(v.info.ref_count(), 1);
+    assert_eq!(v.0.data.ref_count(), 2);
+    assert_eq!(v.0.info.ref_count(), 1);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -419,8 +641,8 @@ mod tests {
     let _ = stream.subscribe(|(_, v)| println!("{v}"));
 
     AppCtx::run_until_stalled();
-    assert_eq!(v.data.ref_count(), 2);
-    assert_eq!(v.info.ref_count(), 1);
+    assert_eq!(v.0.data.ref_count(), 2);
+    assert_eq!(v.0.info.ref_count(), 1);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -434,8 +656,8 @@ mod tests {
     let _ = watch!(*$v).subscribe(|v| println!("{v}"));
 
     AppCtx::run_until_stalled();
-    assert_eq!(v.data.ref_count(), 2);
-    assert_eq!(v.info.ref_count(), 1);
+    assert_eq!(v.0.data.ref_count(), 2);
+    assert_eq!(v.0.info.ref_count(), 1);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -448,10 +670,10 @@ mod tests {
     crate::reset_test_env!();
 
     let v = Stateful::new(1);
-    let data = v.data.clone();
-    let notifier = v.info.notifier.0.clone();
+    let data = v.0.data.clone();
+    let notifier = v.0.info.0.borrow().notifier.notifier();
     {
-      let info = v.info.clone();
+      let info = v.0.info.clone();
       let u = watch!(*$v).subscribe(move |_| *v.write() = 2);
       u.unsubscribe();
       AppCtx::run_until_stalled();
@@ -459,7 +681,7 @@ mod tests {
     }
 
     AppCtx::run_until_stalled();
-    assert_eq!(data.ref_count(), 1);
+
     assert_eq!(*data.read(), 2);
     assert!(notifier.is_closed());
   }

@@ -217,23 +217,7 @@ pub fn part_writer(input: TokenStream) -> TokenStream {
   part_state::gen_part_writer(input.into(), None).into()
 }
 
-/// The `split_writer` macro creates a split writer from a reference of a
-/// writer.
-///
-/// This macro specifically accepts simple expressions to indicate the partial
-/// of the writer, as shown in the following patterns:
-///
-/// - For a field: `split_writer!(&mut writer.xxx)`
-/// - For a method returning a reference: `split_writer!(writer.xxx())`.
-///
-/// Since it operates on a writer and not a state reference of the writer, the
-/// use of `$` is unnecessary.
-#[proc_macro]
-pub fn split_writer(input: TokenStream) -> TokenStream {
-  part_state::gen_split_writer(input.into(), None).into()
-}
-
-/// The `map_watcher` macro creates a partial watcher from a reference of a
+/// The `part_watcher` macro creates a partial watcher from a reference of a
 /// watcher.
 ///
 /// This macro specifically accepts simple expressions to indicate the partial

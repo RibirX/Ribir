@@ -833,14 +833,14 @@ fn no_watch() {
 }
 
 #[test]
-fn fix_direct_use_map_writer_with_builtin() {
+fn fix_direct_use_part_writer_with_builtin() {
   fn _x(mut host: FatObj<Void>) {
     let _anchor = host
       .get_relative_anchor_widget()
-      .map_writer(|w| PartMut::new(&mut w.anchor));
+      .part_writer(None, |w| PartMut::new(&mut w.anchor));
     let _anchor = host
       .get_relative_anchor_widget()
-      .map_writer(|w| PartMut::new(&mut w.anchor));
+      .part_writer(None, |w| PartMut::new(&mut w.anchor));
   }
 }
 

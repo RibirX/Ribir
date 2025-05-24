@@ -287,9 +287,9 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, filter: fn(&Task) -> bool)
             let mut widgets = vec![];
             for id in $this.all_tasks() {
               if $this.get_task(id).map_or(false, filter) {
-                let task = this.split_writer(
-                  move |todos| todos.get_task(id).unwrap(),
-                  move |todos| todos.get_task_mut(id).unwrap(),
+                let task = this.part_writer(
+                  Some(&format!("task{id}")),
+                  |todos| PartMut::new(&mut todos.get_task_mut(id).unwrap())
                 );
                 widgets.push(task_item(task));
               }
@@ -309,7 +309,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, filter: fn(&Task) -> bool)
 注意到状态分裂这一行了吗？
   
 ```rust ignore
-let task = this.split_writer(
+let task = this.part_writer(
   move |todos| todos.get_task(id).unwrap(),
   move |todos| todos.get_task_mut(id).unwrap(),
 );
@@ -416,9 +416,9 @@ fn_widget! {
 
           for id in $this.all_tasks() {
             if $this.get_task(id).map_or(false, cond) {
-              let task = this.split_writer(
-                move |todos| todos.get_task(id).unwrap(),
-                move |todos| todos.get_task_mut(id).unwrap(),
+              let task = this.part_writer(
+                Some(&format!("task{id}")),
+                |todos| PartMut::new(&mut todos.get_task_mut(id).unwrap())
               );
               // new: 如果任务处于编辑状态，则显示输入框，否则显示任务项
               let item = pipe!(*$editing == Some($task.id()))
@@ -623,9 +623,9 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
 
           for id in $this.all_tasks() {
             if $this.get_task(id).map_or(false, cond) {
-              let task = this.split_writer(
-                move |todos| todos.get_task(id).unwrap(),
-                move |todos| todos.get_task_mut(id).unwrap(),
+              let task = this.part_writer(
+                Some(&format!("task{id}")),
+                |todos| PartMut::new(&mut todos.get_task_mut(id).unwrap())
               );
               let item = pipe!(*$editing == Some($task.id()))
                 .value_chain(|s| s.distinct_until_changed().box_it())

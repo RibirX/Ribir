@@ -56,7 +56,7 @@ impl<T> TextSelectableDeclarer<T> {
 impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      let selection = split_writer!(&mut this.selection);
+      let selection = part_writer!(&mut this.selection);
 
       @PointerSelectRegion {
         on_custom_concrete_event: {
