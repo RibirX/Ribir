@@ -1013,9 +1013,7 @@ impl<T> FatObj<T> {
       // unsubscribing in `on_disposed`, we unsubscribe when the widget node is
       // dropped.
       let u = o
-        .subscribe(move |(_, v)| {
-          c_delay.write().keep_alive = v;
-        })
+        .subscribe(move |v| c_delay.write().keep_alive = v)
         .unsubscribe_when_dropped();
       self.keep_alive_unsubscribe_handle = Some(Box::new(u));
     }
@@ -1047,7 +1045,7 @@ impl<T> FatObj<T> {
     set_value(&mut *builtin.silent(), v);
     if let Some(o) = o {
       let c_builtin = builtin.clone_writer();
-      let u = o.subscribe(move |(_, v)| set_value(&mut *c_builtin.write(), v));
+      let u = o.subscribe(move |v| set_value(&mut *c_builtin.write(), v));
       self.on_disposed(move |_| u.unsubscribe())
     } else {
       self

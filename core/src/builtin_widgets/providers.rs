@@ -951,7 +951,7 @@ mod tests {
         // We do not allow the use of the build context in the pipe at the moment.
         let value = Provider::of::<Stateful<i32>>(BuildCtx::get())
           .unwrap().clone_writer();
-        pipe!(*$trigger).map(move |_| fn_widget!{
+        pipe!(*$trigger).map(move |_| {
           *$value.write() += 1;
           @Void {}
         })

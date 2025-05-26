@@ -60,7 +60,7 @@ impl BuildCtx {
     unsafe { tree.as_mut() }
   }
 
-  pub(crate) fn tree_ptr(&self) -> *mut WidgetTree { self.tree.as_ptr() }
+  pub(crate) fn tree_ptr(&self) -> NonNull<WidgetTree> { self.tree }
 
   pub(crate) fn build(&mut self, widget: Widget<'_>) -> WidgetId {
     let size = self.children.len();

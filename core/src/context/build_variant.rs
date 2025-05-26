@@ -1,4 +1,4 @@
-use crate::{pipe::InnerPipe, prelude::*};
+use crate::prelude::*;
 /// `Variant` is an enum designed to help you store a clone of a provider. It
 /// serves as a shortcut for `Provider::state_of` and `Provider::of`.
 ///
@@ -108,10 +108,10 @@ impl<V: 'static> Variant<V> {
 
   pub fn map_with_watcher<W, U: 'static>(
     self, w: impl StateWatcher<Value = W>, f: impl Fn(&V, &W) -> U + 'static,
-  ) -> Box<dyn Pipe<Value = U>> {
+  ) -> Pipe<U> {
     match self {
-      Variant::Watcher(v) => Box::new(pipe!(f(&$v, &$w))),
-      Variant::Value(v) => Box::new(pipe!(f(&v, &$w))),
+      Variant::Watcher(v) => pipe!(f(&$v, &$w)),
+      Variant::Value(v) => pipe!(f(&v, &$w)),
     }
   }
 }
@@ -185,7 +185,10 @@ where
 {
   fn r_from(value: Variant<V>) -> Self {
     match value {
-      Variant::Watcher(value) => pipe!($value.clone()).r_into(),
+      Variant::Watcher(value) => {
+        let init = value.read().clone().r_into();
+        pipe!(U::r_from($value.clone())).with_init_value(init)
+      }
       Variant::Value(value) => value.r_into(),
     }
   }
@@ -198,7 +201,12 @@ where
 {
   fn r_from(value: VariantMap<V, F>) -> Self {
     match value.variant {
-      Variant::Watcher(s) => pipe!(P::r_from((value.map)(&$s))).r_into(),
+      Variant::Watcher(s) => {
+        let init = (value.map)(&s.read()).r_into();
+        pipe!(P::r_from((value.map)(&$s)))
+          .with_init_value(init)
+          .r_into()
+      }
       Variant::Value(v) => (value.map)(&v).r_into(),
     }
   }

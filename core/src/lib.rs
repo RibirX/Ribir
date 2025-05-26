@@ -59,7 +59,7 @@ pub mod prelude {
     declare::*,
     events::*,
     overlay::{AutoClosePolicy, Overlay, OverlayStyle},
-    pipe::{BoxPipe, FinalChain, MapPipe, ModifiesPipe, Pipe},
+    pipe::Pipe,
     providers,
     query::*,
     reusable::*,

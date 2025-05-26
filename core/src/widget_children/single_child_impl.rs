@@ -55,22 +55,7 @@ impl<'p> SingleChild for XSingleChild<'p> {}
 impl<T> SingleChild for T where T: StateReader<Value: SingleChild> {}
 impl<T: SingleChild> SingleChild for FatObj<T> {}
 impl<F: FnOnce() -> W, W: SingleChild> SingleChild for FnWidget<W, F> {}
-
-/// Extends [`SingleChild`] capability to reactive pipe types
-///
-/// Applies to all pipe variants carrying single-child widgets that implement:
-/// - [`Pipe`] for reactive behavior
-/// - Value conversion to [`XSingleChild`] for composition
-macro_rules! impl_single_child_for_pipe {
-  (<$($generics:ident),*>, $pipe:ty) => {
-    impl<$($generics),*> SingleChild for $pipe
-    where
-      Self: Pipe<Value: Into<XSingleChild<'static>>>,
-    {}
-  }
-}
-
-iter_all_pipe_type_to_impl!(impl_single_child_for_pipe);
+impl<P: Into<XSingleChild<'static>>> SingleChild for Pipe<P> {}
 
 // ------------------ Composition Conversions ------------------
 
@@ -138,8 +123,6 @@ mod tests {
   /// Ensures pipe-based optional widgets maintain single-child invariants
   #[test]
   fn fix_mock_box_compose_pipe_option_widget() {
-    fn _x(w: BoxPipe<Option<BoxFnWidget<'static>>>) {
-      MockBox { size: ZERO_SIZE }.with_child(w.into_pipe());
-    }
+    fn _x(w: Pipe<Option<BoxFnWidget<'static>>>) { MockBox { size: ZERO_SIZE }.with_child(w); }
   }
 }

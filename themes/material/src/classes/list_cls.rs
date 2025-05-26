@@ -42,22 +42,28 @@ pub(super) fn init(classes: &mut Classes) {
     .into_widget()
   });
   classes.insert(LIST_ITEM, |w| {
-    let mut w = FatObj::new(w);
-    let margin =
-      pipe!($w.layout_height()).map(|h| if h >= 64. { md::EDGES_VER_12 } else { md::EDGES_VER_8 });
-
-    // The `List` widget uses the `ListItemAlignItems` provider to control the
-    // alignment of its child items.
-    let (align_provider, u) = Stateful::from_pipe(pipe! {
-      let align = if $w.layout_height() >= 64. { Align::Start } else { Align::Center };
-      ListItemAlignItems(align)
-    });
-
-    w.providers(smallvec::smallvec![Provider::value_of_watcher(align_provider),])
-      .clamp(BoxClamp::min_height(40.))
-      .margin(margin)
-      .on_disposed(|_| u.unsubscribe());
-    w.into_widget()
+    rdl! {
+      let mut item = @LayoutBox {};
+      let margin = distinct_pipe! {
+        if $item.layout_height() >= 80. { md::EDGES_VER_12 } else { md::EDGES_VER_8 }
+      };
+      // The `List` widget uses the `ListItemAlignItems` provider to control the
+      // alignment of its child items.
+      let (align_provider, u) = Stateful::from_pipe(distinct_pipe! {
+        let align = if $item.layout_height() >= 80. { Align::Start } else { Align::Center };
+        ListItemAlignItems(align)
+      });
+      @ $item {
+        providers: [Provider::value_of_watcher(align_provider)],
+        @FatObj {
+          clamp: BoxClamp::min_height(40.),
+          margin,
+          on_disposed: |_| u.unsubscribe(),
+          @ { w }
+        }
+      }
+    }
+    .into_widget()
   });
   classes.insert(
     LIST_ITEM_CONTENT,

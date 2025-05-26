@@ -39,6 +39,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [0.4.0-alpha.39] - 2025-05-28
 
+### **Changed**
+
+- **core**: Refactored `Pipe` trait into a `Pipe` struct, simplifying pipe-type management. (by @M-Adoo)
+
+
 ## [0.4.0-alpha.38] - 2025-05-21
 
 ### BREAKING
@@ -303,7 +308,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: Added `Measure` to enable support for percentage values for position, and `Anchor` now supports percentage values. (#672 @M-Adoo)
-- **core**: Added APIs `AppCtx::once_next_frame`, `Window::once_next_frame`, `Window::once_frame_finished` and `Window::once_before_layout`. (#672 @M-Adoo)
+- **core**: Added APIs `Window::once_next_frame`, `Window::once_frame_finished` and `Window::once_before_layout`. (#672 @M-Adoo)
 - **painter**: Typography now supports baselines (middle and alphabetic). (#674 @M-Adoo)
 
 ### Changed

@@ -9,12 +9,7 @@ use crate::{
 pub fn gen_code(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>) -> TokenStream {
   let span = input.span();
   let res = process_watch_body(input, refs_ctx).map(|(upstream, map_handler)| {
-    quote_spanned! {span =>
-    MapPipe::new(
-      // Since the pipe has an initial value, we skip the initial notification.
-      ModifiesPipe::new(#upstream.skip(1).box_it()),
-      #map_handler
-    )}
+    quote_spanned! {span => Pipe::new(#upstream.box_it(), #map_handler) }
   });
   result_to_token_stream(res)
 }

@@ -340,7 +340,7 @@ pub(crate) trait BoxedParent {
     Self: 'w;
 }
 
-pub trait XParent {
+pub(crate) trait XParent {
   fn x_with_children<'w>(self, children: Vec<Widget<'w>>) -> Widget<'w>
   where
     Self: 'w;
@@ -370,23 +370,14 @@ impl<P: XParent> Parent for FatObj<P> {
   }
 }
 
-macro_rules! impl_parent_for_pipe {
-  (<$($generics:ident),*> , $pipe:ty) => {
-    impl<$($generics),*> Parent for $pipe
-    where
-      $pipe: Pipe<Value: XParent>,
-    {
-      fn with_children<'w>(self, children: Vec<Widget<'w>>) -> Widget<'w>
-      where
-        Self: 'w,
-      {
-        InnerPipe::with_children(self, children)
-      }
-    }
-  };
+impl<P: XParent + 'static> Parent for Pipe<P> {
+  fn with_children<'w>(self, children: Vec<Widget<'w>>) -> Widget<'w>
+  where
+    Self: 'w,
+  {
+    self.with_children(children)
+  }
 }
-
-iter_all_pipe_type_to_impl!(impl_parent_for_pipe);
 
 impl<F: FnOnce() -> P, P: XParent> Parent for FnWidget<P, F> {
   fn with_children<'w>(self, children: Vec<Widget<'w>>) -> Widget<'w>

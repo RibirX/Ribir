@@ -180,12 +180,11 @@ impl ComposeChild<'static> for Router {
     }
 
     let location = Location::state_of(BuildCtx::get());
-    pipe!($location;)
-      .map(move |_| {
-        let this = this.clone_reader();
-        fn_widget! { this.read().switch(BuildCtx::get()) }
-      })
-      .into_widget()
+    pipe! {
+      let _ = $location;
+      this.read().switch(BuildCtx::get())
+    }
+    .into_widget()
   }
 }
 

@@ -461,7 +461,7 @@ fn main() {
       @Text { text: pipe!($b.to_string()) }
       @Text {
         text: pipe!((*$a + *$b).to_string())
-          .value_chain(|s| s.distinct_until_changed().box_it()),
+          .transform(|s| s.distinct_until_changed().box_it()),
         on_tap: move |_| {
           *$a.write() += 1;
           *$b.write() -= 1;

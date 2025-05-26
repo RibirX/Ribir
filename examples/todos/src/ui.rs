@@ -49,10 +49,11 @@ fn task_lists(
     let c_stagger = stagger.clone_writer();
 
     @Scrollbar {
-      on_mounted: move |_| c_stagger.run(),
+      on_mounted: move |e| {
+        e.window().once_next_frame(move || c_stagger.run());
+      },
       @ {
         pipe!($this;)
-          .value_chain(|f| f.filter(|(info, _)| info.partial_path().is_none()).box_it())
           .map(move |_| fn_widget!{
           let _hint_capture_this = || $this.write();
           let mut items = vec![];
@@ -64,8 +65,7 @@ fn task_lists(
                 // sthe widgets list will be rebuild.
                 move |todos| PartMut::new(todos.get_task_mut(id).unwrap()),
               );
-              let item = pipe!(*$editing == Some(id))
-                .value_chain(|s| s.distinct_until_changed().box_it())
+              let item = distinct_pipe!(*$editing == Some(id))
                 .map(move |b| fn_widget!{
                   if b {
                     @Container {

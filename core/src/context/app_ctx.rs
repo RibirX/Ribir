@@ -1,6 +1,5 @@
 use std::{
   cell::RefCell,
-  convert::Infallible,
   sync::{LazyLock, Mutex, MutexGuard},
   task::{Context, RawWaker, RawWakerVTable, Waker},
 };
@@ -10,17 +9,13 @@ use futures::{Future, executor::LocalPool, task::LocalSpawnExt};
 use pin_project_lite::pin_project;
 use ribir_algo::Sc;
 use ribir_painter::{TypographyStore, font_db::FontDB};
-use rxrust::{
-  prelude::{ObservableExt, ObservableItem},
-  scheduler::NEW_TIMER_FN,
-  subject::Subject,
-};
+use rxrust::scheduler::NEW_TIMER_FN;
 
 use crate::{
   builtin_widgets::Theme,
   clipboard::{Clipboard, MockClipboard},
   local_sender::LocalSender,
-  prelude::{FuturesLocalScheduler, Instant},
+  prelude::FuturesLocalScheduler,
   state::{StateWriter, Stateful},
   timer::Timer,
   widget::GenWidget,
@@ -61,7 +56,6 @@ pub struct AppCtx {
   runtime_waker: RefCell<Box<dyn RuntimeWaker + Send>>,
   scheduler: FuturesLocalScheduler,
   executor: RefCell<LocalPool>,
-  frame_ticks: Subject<'static, Instant, Infallible>,
 
   #[cfg(feature = "tokio-async")]
   tokio_runtime: tokio::runtime::Runtime,
@@ -157,17 +151,6 @@ impl AppCtx {
   #[track_caller]
   pub fn font_db() -> &'static Sc<RefCell<FontDB>> { &Self::shared().font_db }
 
-  /// This function returns a stream of app ticks, where each frame of the app
-  /// will emit a tick notification.
-  pub fn frame_ticks() -> &'static Subject<'static, Instant, Infallible> {
-    &Self::shared().frame_ticks
-  }
-
-  /// Execute the callback at the beginning of the next frame.
-  pub fn once_next_frame<F: FnMut(Instant) + 'static>(f: F) {
-    AppCtx::frame_ticks().clone().take(1).subscribe(f);
-  }
-
   /// Runs all tasks in the local(usually means on the main thread) pool and
   /// returns if no more progress can be made on any task.
   #[track_caller]
@@ -251,7 +234,6 @@ impl AppCtx {
       .typography_store
       .borrow_mut()
       .end_frame();
-    AppCtx::frame_ticks().clone().retain();
   }
 }
 
@@ -488,7 +470,6 @@ impl Default for AppCtx {
       scheduler,
       runtime_waker: RefCell::new(Box::new(MockWaker)),
       windows: RefCell::new(ahash::HashMap::default()),
-      frame_ticks: <_>::default(),
 
       #[cfg(feature = "tokio-async")]
       tokio_runtime: tokio::runtime::Builder::new_multi_thread()

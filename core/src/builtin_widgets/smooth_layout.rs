@@ -186,7 +186,9 @@ macro_rules! smooth_size_widget_impl {
           // delay this action until the next frame begins to avoid disturbing the
           // layout and animation logic.
           let this = $name(self.0.clone_writer());
-          AppCtx::once_next_frame(move |_| this.set_size(size))
+          ctx
+            .window()
+            .once_next_frame(move || this.set_size(size))
         }
 
         self.clamp_layout_clamp(&mut clamp);
@@ -237,7 +239,7 @@ macro_rules! smooth_pos_widget_impl {
           let wid = ctx.widget_id();
           let wnd = ctx.window();
           let smooth = $name(smooth);
-          AppCtx::once_next_frame(move |_| {
+          ctx.window().once_next_frame(move || {
             let pos = wnd.map_to_global(Point::zero(), wid);
             if !smooth.set_pos(pos) && !running {
               // If the position has not changed, indicating that the animation

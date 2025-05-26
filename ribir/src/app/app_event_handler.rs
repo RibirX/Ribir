@@ -36,8 +36,6 @@ impl ApplicationHandler<AppEvent> for AppHandler {
         wnd.draw_frame(true);
       }
       WindowEvent::RedrawRequested => {
-        AppCtx::frame_ticks().clone().next(Instant::now());
-
         if let Some(wnd) = AppCtx::get_window(wnd_id) {
           // if the window is not visible, don't draw it./
           if wnd.is_visible() != Some(false) {

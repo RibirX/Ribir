@@ -86,7 +86,7 @@ pub(super) fn init(classes: &mut Classes) {
       let indicator1 = @Expanded { flex: 0.};
       let track1 = @Expanded { flex: 0.,  };
       let indicator2 = @Expanded { flex: 0.};
-      let track2 = @Expanded { flex: 0. };
+      let track2 = @Expanded { flex: 1. };
 
       @Animate {
         transition: indeterminate_trans(),
