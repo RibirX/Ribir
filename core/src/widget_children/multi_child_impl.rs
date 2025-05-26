@@ -80,9 +80,9 @@ where
   }
 }
 
-impl<P, K> IntoWidgetIter<'static, dyn Pipe<Value = [K]>> for P
+impl<P, K> IntoWidgetIter<'static, Pipe<fn() -> [K]>> for Pipe<P>
 where
-  P: Pipe<Value: IntoIterator<Item: IntoWidget<'static, K>>>,
+  P: IntoIterator<Item: IntoWidget<'static, K>> + 'static,
 {
   fn into_widget_iter(self) -> impl Iterator<Item = Widget<'static>> {
     self.build_multi().into_iter()
@@ -114,19 +114,7 @@ impl<P: MultiChild> MultiChild for FatObj<P> {}
 
 impl<P: MultiChild, F: FnOnce() -> P> MultiChild for FnWidget<P, F> {}
 
-/// Macro-generated implementations for reactive pipe types
-///
-/// Applies MultiChild trait to all pipe variants that carry
-/// container-compatible values
-macro_rules! impl_multi_child_for_pipe {
-  (<$($generics:ident),*> , $pipe:ty) => {
-    impl<$($generics),*> MultiChild for $pipe
-    where
-      $pipe: Pipe<Value: Into<XMultiChild<'static>>>,
-    {}
-  };
-}
-crate::pipe::iter_all_pipe_type_to_impl!(impl_multi_child_for_pipe);
+impl<P: Into<XMultiChild<'static>>> MultiChild for Pipe<P> {}
 
 // ------ Final Composition Conversions ------
 

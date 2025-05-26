@@ -250,7 +250,7 @@ mod tests {
   struct PipeParent;
 
   impl ComposeChild<'static> for PipeParent {
-    type Child = BoxPipe<usize>;
+    type Child = PipeValue<usize>;
 
     fn compose_child(_: impl StateWriter<Value = Self>, _: Self::Child) -> Widget<'static> {
       Void.into_widget()
@@ -260,11 +260,11 @@ mod tests {
   #[test]
   fn compose_pipe_child() {
     let _value_child = fn_widget! {
-      @PipeParent {  @ { BoxPipe::value(0) } }
+      @PipeParent {  @ { 0usize } }
     };
 
     let _pipe_child = fn_widget! {
-      let state = State::value(0);
+      let state = State::value(0usize);
       @PipeParent {  @ { pipe!(*$state) } }
     };
   }

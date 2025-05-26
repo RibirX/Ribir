@@ -79,13 +79,13 @@ impl ObjDeclarer for ExpandedDeclarer {
     let mut subscribes = SmallVec::new();
     if let Some(o) = u_flex {
       let host = host.clone_writer();
-      let u = o.subscribe(move |(_, v)| host.write().flex = v);
+      let u = o.subscribe(move |v| host.write().flex = v);
       subscribes.push(u)
     }
 
     if let Some(o) = u_defer_alloc {
       let host = host.clone_writer();
-      let u = o.subscribe(move |(_, v)| host.write().defer_alloc = v);
+      let u = o.subscribe(move |v| host.write().defer_alloc = v);
       subscribes.push(u)
     }
 

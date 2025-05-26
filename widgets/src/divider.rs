@@ -75,8 +75,8 @@ impl Compose for Divider {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       @Void {
-        class: pipe!(($this.indent, $this.direction)).map(|(s,d)| {
-          match (s, d) {
+        class: pipe! {
+          match ($this.indent, $this.direction) {
             (DividerIndent::None, Direction::Horizontal) => HORIZONTAL_DIVIDER,
             (DividerIndent::Start, Direction::Horizontal) => HORIZONTAL_DIVIDER_INDENT_START,
             (DividerIndent::End, Direction::Horizontal) => HORIZONTAL_DIVIDER_INDENT_END,
@@ -86,7 +86,7 @@ impl Compose for Divider {
             (DividerIndent::End, Direction::Vertical) => VERTICAL_DIVIDER_INDENT_END,
             (DividerIndent::Both, Direction::Vertical) => VERTICAL_DIVIDER_INDENT_BOTH,
           }
-        }),
+        },
 
       }
     }

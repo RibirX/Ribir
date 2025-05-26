@@ -79,7 +79,7 @@ pub(crate) fn declare_derive(stt: &mut syn::ItemStruct) -> syn::Result<TokenStre
           #(
             if let Some(o) = #field_names.1 {
               let this_ಠ_ಠ = this_ಠ_ಠ.clone_writer();
-              let u = o.subscribe(move |(_, v)| this_ಠ_ಠ.write().#field_names = v);
+              let u = o.subscribe(move |v| this_ಠ_ಠ.write().#field_names = v);
               fat_ಠ_ಠ.on_disposed(move |_| u.unsubscribe());
             }
           );*

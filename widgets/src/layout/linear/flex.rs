@@ -312,6 +312,7 @@ struct MainLineInfo {
   has_flex: bool,
 }
 
+#[derive(Debug)]
 struct FlexLayoutInfo {
   main_pos: f32,
   cross_pos: f32,

@@ -1,4 +1,4 @@
-use crate::{pipe::InnerPipe, prelude::*, render_helper::PureRender};
+use crate::{prelude::*, render_helper::PureRender};
 
 /// Reciprocal conversion trait with explicit kind marker
 ///
@@ -250,19 +250,18 @@ where
 }
 
 // Pipe-to-widget conversion for reactive streams
-impl<P, K> RFrom<P, OtherWidget<dyn Pipe<Value = K>>> for Widget<'static>
+impl<P, K> RFrom<Pipe<P>, OtherWidget<Pipe<fn() -> K>>> for Widget<'static>
 where
-  P: Pipe<Value: RInto<Widget<'static>, K>>,
+  P: RInto<Widget<'static>, K> + 'static,
 {
-  fn r_from(pipe: P) -> Self { pipe.build_single() }
+  fn r_from(pipe: Pipe<P>) -> Self { pipe.build_single() }
 }
 
-impl<P, K, V> RFrom<P, PipeOptionWidget<K>> for Widget<'static>
+impl<P, K> RFrom<Pipe<Option<P>>, PipeOptionWidget<K>> for Widget<'static>
 where
-  P: Pipe<Value = Option<V>>,
-  V: RInto<Widget<'static>, K>,
+  P: RInto<Widget<'static>, K> + 'static,
 {
-  fn r_from(pipe: P) -> Self { pipe.build_single() }
+  fn r_from(pipe: Pipe<Option<P>>) -> Self { pipe.build_single() }
 }
 
 // --------------- Blanket Implementation --------------------

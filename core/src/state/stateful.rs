@@ -184,14 +184,16 @@ impl<W> Stateful<W> {
     Sc::ptr_eq(&this.data, &other.data) && Sc::ptr_eq(&this.info, &other.info)
   }
 
-  pub fn from_pipe(p: impl Pipe<Value = W>) -> (Self, BoxSubscription<'static>)
+  pub fn from_pipe(p: Pipe<W>) -> (Self, BoxSubscription<'static>)
   where
+    W: Default,
     Self: 'static,
   {
-    let (v, p) = p.unzip(ModifyScope::DATA, None);
-    let s = Stateful::new(v);
+    let s = Stateful::new(W::default());
     let s2 = s.clone_writer();
-    let u = p.subscribe(move |(_, v)| *s2.write() = v);
+    let u = p
+      .into_observable()
+      .subscribe(move |v| *s2.write() = v);
     (s, u)
   }
 
@@ -451,8 +453,9 @@ mod tests {
     // data + 1, info + 1
     let v = Stateful::new(1);
     // data +1
-    let (_, stream) = pipe!(*$v).unzip(ModifyScope::all(), None);
-    let _ = stream.subscribe(|(_, v)| println!("{v}"));
+    let _ = pipe!(*$v)
+      .into_observable()
+      .subscribe(|v| println!("{v}"));
 
     AppCtx::run_until_stalled();
     assert_eq!(v.data.ref_count(), 2);

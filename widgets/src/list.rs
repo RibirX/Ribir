@@ -261,7 +261,7 @@ pub enum ListSelectMode {
 }
 
 /// Theme provider for vertical alignment of list item widgets
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct ListItemAlignItems(pub Align);
 
 // The following templates define structural widgets of list items:

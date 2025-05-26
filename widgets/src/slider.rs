@@ -142,13 +142,14 @@ impl Compose for Slider {
             on_pointer_up: move |_| {
               $drag_info.write().take();
             },
-            tooltips: pipe!($this.value).map(move |v| {
-              let precision = precision($this.min, $this.max);
-              format!("{:.1$}", v, precision)
-            }),
+            tooltips: pipe! {
+              let this = $this;
+              let precision = precision(this.min, this.max);
+              format!("{:.1$}", this.value, precision)
+            },
           }
           @Expanded {
-            flex: pipe!($this.ratio()).map(|v| 1. - v),
+            flex: pipe!(1. - $this.ratio()),
             @Void { class: SLIDER_INACTIVE_TRACK }
           }
         }
@@ -294,10 +295,11 @@ impl Compose for RangeSlider {
           }
           @Void {
             class: SLIDER_INDICATOR,
-            tooltips: pipe!($this.start).map(move |v| {
-              let precision = precision($this.min, $this.max);
-              format!("{:.1$}", v, precision)
-            }),
+            tooltips: pipe!{
+              let this = $this;
+              let precision = precision(this.min, this.max);
+              format!("{:.1$}", this.start, precision)
+            },
             on_tap: move |e| e.stop_propagation(),
             on_pointer_down: move |e| {
               if let Some(handle) = GrabPointer::grab(e.current_target(), &e.window()) {
@@ -319,10 +321,11 @@ impl Compose for RangeSlider {
           }
           @Void {
             class: SLIDER_INDICATOR,
-            tooltips: pipe!($this.end).map(move |v| {
-              let precision = precision($this.min, $this.max);
-              format!("{:.1$}", v, precision)
-            }),
+            tooltips: pipe!{
+              let this = $this;
+              let precision = precision(this.min, this.max);
+              format!("{:.1$}", this.end, precision)
+            },
             on_tap: move |e| e.stop_propagation(),
             on_pointer_down: move |e| {
               if let Some(handle) = GrabPointer::grab(e.current_target(), &e.window()) {
@@ -339,7 +342,7 @@ impl Compose for RangeSlider {
             on_pointer_up: move |_| { $drag_info2.write().take(); }
           }
           @Expanded {
-            flex: pipe!($this.end_ratio()).map(|v| 1. - v),
+            flex: pipe!(1. - $this.end_ratio()),
             @Void { class: RANGE_SLIDER_INACTIVE_TRACK_RIGHT }
           }
         }

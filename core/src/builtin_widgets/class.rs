@@ -40,7 +40,7 @@ use ops::box_it::CloneableBoxOp;
 use pipe::PipeNode;
 use smallvec::{SmallVec, smallvec};
 
-use crate::{pipe::GenRange, prelude::*, window::WindowId};
+use crate::{pipe::GenRange, prelude::*, ticker::FrameMsg, window::WindowId};
 
 /// A collection of class implementations that are part of the `Theme`.
 #[derive(Default, Clone)]
@@ -327,8 +327,9 @@ impl<'c> ComposeChild<'c> for Class {
     let f = move || match this.try_into_value() {
       Ok(c) => c.apply_style(child),
       Err(this) => {
+        let ctx = BuildCtx::get();
         let this2 = this.clone_watcher();
-        let dummy = GenRange::Single(BuildCtx::get().tree().dummy_id());
+        let dummy = GenRange::Single(ctx.tree().dummy_id());
         let cls_child = ClassNode::empty_node(dummy.clone());
         let orig_child = ClassNode::empty_node(dummy);
         let orig_child2 = orig_child.clone();
@@ -336,7 +337,11 @@ impl<'c> ComposeChild<'c> for Class {
 
         let cls_child2 = cls_child.clone();
         let orig_child2 = orig_child.clone();
-        let wnd_id = BuildCtx::get().window().id();
+        let wnd_id = ctx.window().id();
+        let sampler = ctx
+          .window()
+          .frame_tick_stream()
+          .filter(|msg| matches!(msg, FrameMsg::NewFrame(_)));
         let u = this2
           .raw_modifies()
           .filter(|s| s.contains(ModifyScope::FRAMEWORK))
@@ -344,7 +349,7 @@ impl<'c> ComposeChild<'c> for Class {
           .map(move |_| this2.read().clone())
           .distinct_until_changed()
           .skip(1)
-          .sample(AppCtx::frame_ticks().clone())
+          .sample(sampler)
           .subscribe(move |class| class_update(&cls_child2, &orig_child2, &class, wnd_id))
           .unsubscribe_when_dropped();
 
@@ -369,9 +374,9 @@ impl<'w, const M: usize> ComposeChild<'w> for [PipeValue<Option<ClassName>>; M] 
     for cls in this.into_iter().rev() {
       widget = match cls {
         PipeValue::Value(class) => Class { class }.with_child(widget).into_widget(),
-        PipeValue::Pipe(cls) => {
+        cls @ PipeValue::Pipe { .. } => {
           let mut widget = FatObj::new(widget);
-          widget.class(PipeValue::Pipe(cls));
+          widget.class(cls);
           widget.into_widget()
         }
       };
@@ -476,11 +481,7 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
     // notify the pipe node accordingly.
     new_id
       .query_all_iter::<PipeNode>(tree)
-      .for_each(|node| {
-        node
-          .dyn_info_mut()
-          .parent_replace(child_id, new_id)
-      });
+      .for_each(|node| node.dyn_info_mut().replace(child_id, new_id));
     child_holder.replace(new_id, tree);
   }
 

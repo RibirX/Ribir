@@ -43,10 +43,10 @@ impl<'c> ComposeChild<'c> for Disabled {
         skip_descendants: pipe!($this.disabled()),
         skip_host: pipe!($this.disabled()),
         @IgnorePointer {
-          ignore: pipe!($this.disabled()).map(
-            |v| if v { IgnoreScope::Subtree } else { IgnoreScope::None }
-          ),
-          @ $child { class: pipe!($this.disabled()).map(|v| v.then_some(DISABLED)) }
+          ignore: pipe! {
+            if $this.disabled() { IgnoreScope::Subtree } else { IgnoreScope::None }
+          },
+          @ $child { class: pipe!($this.disabled().then_some(DISABLED)) }
         }
       }
     }

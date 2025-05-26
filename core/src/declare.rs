@@ -22,18 +22,18 @@ pub trait ObjDeclarer {
 /// A enum that represents a value that can be either a value or a pipe.
 pub enum PipeValue<V> {
   Value(V),
-  Pipe(BoxPipe<V>),
+  Pipe { init_value: V, pipe: Pipe<V> },
 }
 
-pub type ValueStream<V> = BoxOp<'static, (ModifyInfo, V), Infallible>;
+pub type ValueStream<V> = BoxOp<'static, V, Infallible>;
 
 impl<V: 'static> PipeValue<V> {
   pub fn unzip(self) -> (V, Option<ValueStream<V>>) {
     match self {
       Self::Value(v) => (v, None),
-      Self::Pipe(v) => {
-        let (v, pipe) = v.into_pipe().unzip(ModifyScope::DATA, None);
-        (v, Some(pipe))
+      Self::Pipe { init_value, pipe } => {
+        let pipe = pipe.with_scope(ModifyScope::DATA);
+        (init_value, Some(pipe.into_observable()))
       }
     }
   }
@@ -44,7 +44,9 @@ impl<V: 'static> PipeValue<V> {
   {
     match self {
       Self::Value(v) => PipeValue::Value(f(v)),
-      Self::Pipe(v) => v.into_pipe().map(f).r_into(),
+      Self::Pipe { init_value, pipe } => {
+        PipeValue::Pipe { init_value: f(init_value), pipe: pipe.map(f) }
+      }
     }
   }
 }
@@ -58,12 +60,13 @@ impl<T: RInto<V, K>, V, K: ?Sized> RFrom<T, ValueKind<K>> for PipeValue<V> {
   fn r_from(value: T) -> Self { Self::Value(value.r_into()) }
 }
 
-impl<P, V: 'static, K: ?Sized + 'static> RFrom<P, dyn Pipe<Value = K>> for PipeValue<V>
+impl<P, V, K: ?Sized + 'static> RFrom<Pipe<P>, Pipe<fn() -> K>> for PipeValue<V>
 where
-  P: Pipe<Value: RInto<V, K>>,
+  V: Default + 'static,
+  P: RInto<V, K> + 'static,
 {
-  fn r_from(value: P) -> Self {
-    let pipe = Box::new(value.map(RInto::r_into));
-    Self::Pipe(BoxPipe::pipe(pipe))
+  fn r_from(value: Pipe<P>) -> Self {
+    let pipe = value.transform(|stream| stream.map(RInto::r_into).box_it());
+    Self::Pipe { init_value: V::default(), pipe }
   }
 }

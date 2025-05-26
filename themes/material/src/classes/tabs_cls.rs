@@ -284,7 +284,7 @@ fn foreground_color() -> PipeValue<Brush> {
     .r_into()
 }
 
-fn is_active_header() -> impl Pipe<Value = bool> {
+fn is_active_header() -> Pipe<bool> {
   let tabs = tabs_watcher();
   let cur_tab = tab_info();
   pipe!($tabs.active_idx() == cur_tab.idx)
