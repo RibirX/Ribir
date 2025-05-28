@@ -138,8 +138,9 @@ impl Default for FontFace {
 /// Text-align relative to the horizontal or vertical, not caring about whether
 /// the text is left-to-right or right-to-left, In the horizontal the left is
 /// the start, and in vertical the top is the start.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub enum TextAlign {
+  #[default]
   Start,
   Center,
   End,

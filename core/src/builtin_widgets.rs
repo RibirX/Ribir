@@ -11,6 +11,8 @@ pub mod reuse_id;
 pub use reuse_id::*;
 pub mod widget_scope;
 pub use painting_style::*;
+mod text_align;
+pub use text_align::*;
 pub use widget_scope::*;
 pub mod image_widget;
 pub mod keep_alive;
@@ -152,6 +154,7 @@ pub struct FatObj<T> {
   relative_anchor: Option<State<RelativeAnchor>>,
   global_anchor: Option<State<GlobalAnchor>>,
   painting_style: Option<State<PaintingStyleWidget>>,
+  text_align: Option<State<TextAlignWidget>>,
   text_style: Option<State<TextStyleWidget>>,
   keep_alive: Option<State<KeepAlive>>,
   keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
@@ -204,6 +207,7 @@ impl<T> FatObj<T> {
       global_anchor: self.global_anchor,
       painting_style: self.painting_style,
       text_style: self.text_style,
+      text_align: self.text_align,
       visibility: self.visibility,
       opacity: self.opacity,
       tooltips: self.tooltips,
@@ -464,6 +468,14 @@ impl<T> FatObj<T> {
           .clone(),
       })
     })
+  }
+
+  /// Returns the `State<TextAlignWidget>` widget from the FatObj. If it
+  /// doesn't exist, a new one will be created.
+  pub fn get_text_align_widget(&mut self) -> &State<TextAlignWidget> {
+    self
+      .text_align
+      .get_or_insert_with(|| State::value(<TextAlignWidget>::default()))
   }
 
   /// Returns the `State<Visibility>` widget from the FatObj. If it doesn't
@@ -864,6 +876,10 @@ impl<T> FatObj<T> {
     self.declare_builtin_init(v, Self::get_painting_style_widget, |m, v| m.painting_style = v)
   }
 
+  pub fn text_align<K: ?Sized>(&mut self, v: impl RInto<PipeValue<TextAlign>, K>) -> &mut Self {
+    self.declare_builtin_init(v, Self::get_text_align_widget, |m, v| m.text_align = v)
+  }
+
   /// Initializes the text style of this widget.
   pub fn text_style<K: ?Sized>(&mut self, v: impl RInto<PipeValue<TextStyle>, K>) -> &mut Self {
     self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style = v)
@@ -1089,7 +1105,8 @@ impl<'a> FatObj<Widget<'a>> {
     let mut host = self.host;
     consume_providers_widget!(host, + [
       painting_style: PaintingStyleWidget,
-      text_style: TextStyleWidget
+      text_style: TextStyleWidget,
+      text_align: TextAlignWidget
     ]);
 
     compose_builtin_widgets!(

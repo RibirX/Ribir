@@ -135,6 +135,8 @@ pub static BUILTIN_INFOS: LazyLock<ahash::HashMap<&'static str, BuiltinMember>> 
     m.insert("foreground", builtin_member! { "Foreground", Field, "foreground"});
     // PaintingStyleWidget
     m.insert("painting_style", builtin_member! { "PaintingStyleWidget", Field, "painting_style" });
+    // TextAlign
+    m.insert("text_align", builtin_member! { "TextAlignWidget", Field, "text_align" });
     // TextStyle
     m.insert("text_style", builtin_member! { "TextStyleWidget", Field, "text_style" });
     m.insert("font_size", builtin_member! { "TextStyleWidget", Method, "text_style" });
