@@ -25,6 +25,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### **Changed**
+
+- **core**: Refactored `Pipe` trait into a `Pipe` struct, simplifying pipe-type management. (#765 @M-Adoo)
+- **core**: Added built-in `TextAlign` provider for text alignment via `text_align` property. (#764 @M-Adoo)
+
 ### BREAKING
 
 - **core**: Refactor partial writer to use `PartialId` (#762 by @wjian23)  
@@ -38,10 +43,6 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
     * Parents control child modification propagation
 
 ## [0.4.0-alpha.39] - 2025-05-28
-
-### **Changed**
-
-- **core**: Refactored `Pipe` trait into a `Pipe` struct, simplifying pipe-type management. (by @M-Adoo)
 
 
 ## [0.4.0-alpha.38] - 2025-05-21

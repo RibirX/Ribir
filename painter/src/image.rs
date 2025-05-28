@@ -3,6 +3,9 @@ use std::borrow::Cow;
 use ribir_geom::DeviceSize;
 use serde::{Deserialize, Serialize};
 
+#[cfg(any(feature = "jpeg", feature = "png"))]
+pub type ImageFormat = image::ImageFormat;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum ColorFormat {
   Rgba8,
@@ -34,7 +37,9 @@ impl PixelImage {
   }
 
   #[cfg(feature = "jpeg")]
-  pub fn from_jpeg(bytes: &[u8]) -> Self { Self::parse_img(bytes, image::ImageFormat::Jpeg) }
+  pub fn from_jpeg(bytes: &[u8]) -> Self {
+    Self::parse_img(bytes, image::ImageFormat::Jpeg).unwrap()
+  }
 
   #[cfg(feature = "jpeg")]
   pub fn write_as_jpeg(
@@ -57,7 +62,7 @@ impl PixelImage {
   }
 
   #[cfg(feature = "png")]
-  pub fn from_png(bytes: &[u8]) -> Self { Self::parse_img(bytes, image::ImageFormat::Png) }
+  pub fn from_png(bytes: &[u8]) -> Self { Self::parse_img(bytes, image::ImageFormat::Png).unwrap() }
 
   #[cfg(feature = "png")]
   pub fn write_as_png(
@@ -86,13 +91,11 @@ impl PixelImage {
   pub fn pixel_bytes(&self) -> &[u8] { &self.data }
 
   #[cfg(any(feature = "jpeg", feature = "png"))]
-  fn parse_img(bytes: &[u8], format: image::ImageFormat) -> PixelImage {
-    let img = ::image::load(std::io::Cursor::new(bytes), format)
-      .unwrap()
-      .to_rgba8();
+  pub fn parse_img(bytes: &[u8], format: image::ImageFormat) -> image::ImageResult<PixelImage> {
+    let img = ::image::load(std::io::Cursor::new(bytes), format)?.to_rgba8();
     let width = img.width();
     let height = img.height();
-    PixelImage::new(img.into_raw().into(), width, height, ColorFormat::Rgba8)
+    Ok(PixelImage::new(img.into_raw().into(), width, height, ColorFormat::Rgba8))
   }
 }
 

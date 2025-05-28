@@ -6,16 +6,24 @@ use typography::PlaceLineDirection;
 use crate::prelude::*;
 
 pub type TextValue = PipeValue<CowArc<str>>;
-/// The text widget displays text with a single style.
+
+/// A single-style text widget that uses context providers for formatting and
+/// alignment.
 ///
-/// The `TextStyle` provider is utilized to format the text.
+/// This widget combines three key aspects:
+/// 1. Text content (`text` field)
+/// 2. Formatting style ([`TextStyle`] context provider)
+/// 3. Alignment ([`TextAlign`] context provider)
 ///
-/// The `TextAlign` provider is used to align multiline text within the text
-/// bounds, with the default alignment being
-/// `TextAlign::Start`.
+/// The default alignment is [`TextAlign::Start`]. Glyph calculations are cached
+/// internally to optimize rendering performance.
 #[derive(Declare)]
 pub struct Text {
+  /// The text content to display, using copy-on-write semantics for efficient
+  /// string handling
   pub text: CowArc<str>,
+
+  /// Cached glyph layout results for the current text and style configuration
   #[declare(skip)]
   glyphs: RefCell<Option<VisualGlyphs>>,
 }
@@ -56,11 +64,14 @@ impl Render for Text {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
     let style = Provider::of::<TextStyle>(ctx).unwrap();
     let text_align = Provider::of::<TextAlign>(ctx).map_or(TextAlign::Start, |t| *t);
-    let glyphs = text_glyph(self.text.substr(..), &style, text_align, clamp.max);
+    let mut glyphs = text_glyph(self.text.substr(..), &style, text_align, clamp.max);
+    let mut size = glyphs.visual_rect().size;
+    if text_align != TextAlign::Start {
+      size.width = clamp.container_width(size.width);
+      glyphs.align(Rect::from_size(size));
+    }
 
-    let size = glyphs.visual_rect().size;
     *self.glyphs.borrow_mut() = Some(glyphs);
-
     clamp.clamp(size)
   }
 
