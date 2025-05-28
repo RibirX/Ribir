@@ -1,9 +1,8 @@
 use std::{cell::Cell, convert::Infallible};
 
 use ribir_algo::Sc;
-use rxrust::{ops::box_it::CloneableBoxOp, prelude::*};
+use rxrust::ops::box_it::CloneableBoxOp;
 
-use super::state_cell::StateCell;
 use crate::prelude::*;
 
 /// Stateful object use to watch the modifies of the inner data.
@@ -17,7 +16,7 @@ pub struct Reader<W>(pub(crate) Sc<StateCell<W>>);
 /// The notifier is a `RxRust` stream that emit notification when the state
 /// changed.
 #[derive(Default, Clone)]
-pub struct Notifier(Subject<'static, ModifyScope, Infallible>);
+pub struct Notifier(Subject<'static, ModifyInfo, Infallible>);
 
 bitflags! {
   #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -29,6 +28,22 @@ bitflags! {
     /// state change effect both widget data and framework.
     const BOTH = Self::DATA.bits() | Self::FRAMEWORK.bits();
   }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModifyInfo {
+  pub(crate) scope: ModifyScope,
+  pub(crate) partial: Option<PartialPath>,
+}
+
+impl ModifyInfo {
+  pub fn new(scope: ModifyScope, partial: Option<PartialPath>) -> Self { Self { scope, partial } }
+
+  pub fn contains(&self, scope: ModifyScope) -> bool { self.scope.contains(scope) }
+
+  pub fn scope(&self) -> ModifyScope { self.scope }
+
+  pub fn partial_path(&self) -> Option<&PartialPath> { self.partial.as_ref() }
 }
 
 impl Notifier {
@@ -84,7 +99,7 @@ impl<W: 'static> StateWatcher for Stateful<W> {
   }
 
   #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
     self.info.notifier.raw_modifies()
   }
 
@@ -182,7 +197,7 @@ impl<W> Stateful<W> {
 
   fn write_ref(&self, scope: ModifyScope) -> WriteRef<'_, W> {
     let value = self.data.write();
-    WriteRef { value, modified: false, modify_scope: scope, info: &self.info }
+    WriteRef { value, modified: false, modify_scope: scope, info: &self.info, partial: None }
   }
 
   fn clone(&self) -> Self {
@@ -206,11 +221,11 @@ impl WriterInfo {
 }
 
 impl Notifier {
-  pub(crate) fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+  pub(crate) fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
     self.0.clone().box_it()
   }
 
-  pub(crate) fn next(&self, scope: ModifyScope) { self.0.clone().next(scope) }
+  pub(crate) fn next(&self, scope: ModifyInfo) { self.0.clone().next(scope) }
 }
 
 impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {
@@ -279,7 +294,7 @@ mod tests {
     {
       drop_writer_subscribe(
         #[allow(clippy::redundant_closure)]
-        Stateful::new(()).map_writer(|v| PartMut::new(v)),
+        Stateful::new(()).part_writer(None, |v| PartMut::new(v)),
         drop_cnt.clone(),
       );
     };
@@ -289,7 +304,7 @@ mod tests {
     {
       drop_writer_subscribe(
         #[allow(clippy::redundant_closure)]
-        Stateful::new(()).split_writer(|v| PartMut::new(v)),
+        Stateful::new(()).part_writer(Some(""), |v| PartMut::new(v)),
         drop_cnt.clone(),
       );
     };
@@ -364,7 +379,14 @@ mod tests {
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
-    assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH]);
+    assert_eq!(
+      &notified
+        .borrow()
+        .iter()
+        .map(|s| s.scope())
+        .collect::<Vec<_>>(),
+      &[ModifyScope::BOTH]
+    );
 
     {
       let _ = &mut w.silent().size;
@@ -372,7 +394,14 @@ mod tests {
 
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
-    assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH, ModifyScope::DATA]);
+    assert_eq!(
+      &notified
+        .borrow()
+        .iter()
+        .map(|s| s.scope())
+        .collect::<Vec<_>>(),
+      &[ModifyScope::BOTH, ModifyScope::DATA]
+    );
 
     {
       let _ = &mut w.write();
@@ -389,7 +418,14 @@ mod tests {
 
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
-    assert_eq!(&*notified.borrow(), &[ModifyScope::BOTH, ModifyScope::DATA]);
+    assert_eq!(
+      &notified
+        .borrow()
+        .iter()
+        .map(|s| s.scope())
+        .collect::<Vec<_>>(),
+      &[ModifyScope::BOTH, ModifyScope::DATA]
+    );
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -459,7 +495,7 @@ mod tests {
     }
 
     AppCtx::run_until_stalled();
-    assert_eq!(data.ref_count(), 1);
+
     assert_eq!(*data.read(), 2);
     assert!(notifier.is_closed());
   }

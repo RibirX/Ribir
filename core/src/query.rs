@@ -299,7 +299,7 @@ macro_rules! impl_query_for_reader {
   };
 }
 
-impl<S, F, V: 'static> Query for MapReader<S, F>
+impl<S, F, V: 'static> Query for PartReader<S, F>
 where
   Self: StateReader<Value = V>,
 {
@@ -528,7 +528,7 @@ mod tests {
     }
 
     let x = State::value(X { a: 0, _b: 1 });
-    let y = x.split_writer(|x| PartMut::new(&mut x.a));
+    let y = x.part_writer(Some("a"), |x| PartMut::new(&mut x.a));
     {
       let h = y.query(&QueryId::of::<i32>()).unwrap();
       assert!(h.downcast_ref::<i32>().is_some());

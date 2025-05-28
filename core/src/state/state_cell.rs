@@ -140,7 +140,7 @@ impl<'a, T> PartRef<'a, T> {
   /// let vec = Stateful::new(vec![1, 2, 3]);
   /// // We get the state of the second element.
   /// // `v.get(1)` returns an `Option<&i32>`, which is valid in the vector.
-  /// let elem2 = vec.map_reader(|v| unsafe {
+  /// let elem2 = vec.part_reader(|v| unsafe {
   ///   PartRef::from_ptr(std::mem::transmute::<_, Option<&'static i32>>(v.get(1)))
   /// });
   /// ```
@@ -154,7 +154,7 @@ impl<'a, T> PartRef<'a, T> {
   ///
   /// let ab = Stateful::new((1, 2));
   ///
-  /// let ab2 = ab.map_reader(|v| unsafe { PartRef::from_ptr(*v) });
+  /// let ab2 = ab.part_reader(|v| unsafe { PartRef::from_ptr(*v) });
   ///
   /// // The `_a` may result in a dangling pointer issue since it utilizes the
   /// // value of `ab2.read()`. However, `ab2` copies the value of `ab` rather
@@ -190,7 +190,7 @@ impl<'a, T> PartMut<'a, T> {
   /// let vec = Stateful::new(vec![1, 2, 3]);
   /// // We get the state of the second element.
   /// // `v.get_mut(1)` returns an `Option<&mut i32>`, which is valid in the vector.
-  /// let elem2 = vec.map_writer(|v| unsafe {
+  /// let elem2 = vec.part_writer(None, |v| unsafe {
   ///   PartMut::from_ptr(std::mem::transmute::<_, Option<&'static i32>>(v.get_mut(1)))
   /// });
   /// ```
@@ -204,13 +204,13 @@ impl<'a, T> PartMut<'a, T> {
   ///
   /// let ab = Stateful::new((1, 2));
   ///
-  /// let ab2 = ab.map_writer(|v| unsafe { PartMut::from_ptr(*v) });
+  /// let ab2 = ab.part_writer(None, |v| unsafe { PartMut::from_ptr(*v) });
   ///
   /// // The `_a` may result in a dangling pointer issue since it utilizes the
   /// // value of `ab2.write()`. However, `ab2` copies the value of `ab` rather
   /// // than referencing it. When `ab2.write()` is dropped, `_a` still points
   /// // to it, making access to `_a` dangerous.
-  /// let _a = WriteRef::map(ab2.write(), |v| unsafe { PartMut::from_ptr(v.0) });
+  /// let _a = WriteRef::map(ab2.write(), |v| unsafe { PartMut::from_ptr(v.0) }, None);
   /// ```
   ///
   /// Otherwise, your modifications will not be applied to the state.
@@ -222,7 +222,7 @@ impl<'a, T> PartMut<'a, T> {
   /// // We create a state of the second element. However, this state is a copy of
   /// // the vector because `v[1]` returns a copy of the value in the vector, not a
   /// // reference.
-  /// let mut elem2 = vec.map_writer(|v| unsafe { PartMut::from_ptr(v[1]) });
+  /// let mut elem2 = vec.part_writer(None, |v| unsafe { PartMut::from_ptr(v[1]) });
   ///
   /// // This modification will not alter the `vec`.
   /// *elem2.write() = 20;
@@ -237,7 +237,7 @@ pub struct ReadRef<'a, T: ?Sized> {
   pub(crate) borrow: BorrowRef<'a>,
 }
 
-pub(crate) struct ValueMutRef<'a, T: ?Sized> {
+pub struct ValueMutRef<'a, T: ?Sized> {
   pub(crate) inner: InnerPart<T>,
   pub(crate) borrow: BorrowRefMut<'a>,
 }
