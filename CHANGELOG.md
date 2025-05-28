@@ -24,6 +24,18 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 <!-- next-header -->
 
 ## [@Unreleased] - @ReleaseDate
+### BREAKING
+- **core**: refactor part_writer with id.(#762 @wjian23)
+  Some change is as follows:
+    1. map_reader rename to part_reader
+    2. map_watcher rename to part_watcher
+    3. The part_writer component merges the functionalities of map_writer and split_writer, using the parameter id: Option<&str> to determine behavior.
+    - id = None:
+      part_writer retains the original logic of map_writer, share notification with origin writer.
+    - id = Some(..): notification mechanisms are adjusted as follows:
+      - Writers generated via the same split_writer path will share the same notification source.
+      - Modifications to a split_writer will trigger notifications to the origin writer, but changes from the origin writer will not proactively notify the split_writer.
+      - Writers derived from the same source split_writer with different Id will not interfere with each other's notifications.
 
 ## [0.4.0-alpha.39] - 2025-05-28
 
@@ -236,7 +248,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: ensure object safety of `StateReader`， `StateWatcher` and `StateWriter` (#692 @M-Adoo)
 - **core**: Support extend custom event. (#684 @wjian23)
-- **core**: Added `map_watcher` to `StateWatcher` (#684 @wjian23)
+- **core**: Added `part_watcher` to `StateWatcher` (#684 @wjian23)
 - **core**: Added `visible_widget` and ScrollableProvider to ScrollableWidget, to support descendant to be showed.(#684 @wjian23)
 
 ### Changed
@@ -670,7 +682,7 @@ Check out our Wordle game demo, now running smoothly in your browser\!
     .with_title("Counter");
   ```
 
-- **core**: The split functions in `StateReader::map_reader`, `StateWriter::map_writer`, and `StateWriter::split_writer` no longer need to return a reference. (\#568 @M-Adoo)
+- **core**: The split functions in `StateReader::part_reader`, `StateWriter::map_writer`, and `StateWriter::split_writer` no longer need to return a reference. (\#568 @M-Adoo)
 - **core**: Introduced `StateWatcher` for watching state modifies, which was previously the responsibility of `StateReader`. This results in a cleaner and more compact `StateReader` implementation. (\#556, @M-Adoo)
 - **gpu**: Introduced `GPUBackendImpl::max_textures_per_draw` to set a limit on textures per draw phase (\#562 @M-Adoo)
 - **gpu**: Updated the `wgpu` implementation of the GPU backend to support WebGL. (\#578, @M-Adoo)

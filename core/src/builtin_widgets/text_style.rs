@@ -25,7 +25,7 @@ impl TextStyleWidget {
     match this.try_into_value() {
       Ok(this) => Provider::new(this.text_style),
       Err(this) => Provider::value_of_writer(
-        this.map_writer(|w| PartMut::new(&mut w.text_style)),
+        this.part_writer(None, |w| PartMut::new(&mut w.text_style)),
         Some(DirtyPhase::LayoutSubtree),
       ),
     }

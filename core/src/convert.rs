@@ -192,18 +192,14 @@ macro_rules! impl_into_x_widget_for_state_watcher {
 }
 impl_into_x_widget_for_state_reader!(<R: Render> Box<dyn StateReader<Value = R>>);
 impl_into_x_widget_for_state_reader!(
-  <O, M> MapReader<O, M>
-  where MapReader<O, M>: StateReader<Value: Render + Sized>
+  <O, M> PartReader<O, M>
+  where PartReader<O, M>: StateReader<Value: Render + Sized>
 );
 impl_into_x_widget_for_state_watcher!(<R: Render> Stateful<R>);
 impl_into_x_widget_for_state_watcher!(<R: Render> State<R>);
 impl_into_x_widget_for_state_watcher!(
-  <W, WM> MapWriter<W, WM>
-  where MapWriter<W, WM>: StateWatcher<Value: Render + Sized>
-);
-impl_into_x_widget_for_state_watcher!(
-  <O, M> SplittedWriter<O, M>
-  where SplittedWriter<O, M>: StateWatcher<Value: Render + Sized>
+  <W, WM> PartWriter<W, WM>
+  where PartWriter<W, WM>: StateWatcher<Value: Render + Sized>
 );
 
 // --- Function Kind ---

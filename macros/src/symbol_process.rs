@@ -24,7 +24,6 @@ pub const KW_PIPE: &str = "pipe";
 pub const KW_DISTINCT_PIPE: &str = "distinct_pipe";
 pub const KW_WATCH: &str = "watch";
 pub const KW_PART_WRITER: &str = "part_writer";
-pub const KW_SPLIT_WRITER: &str = "split_writer";
 pub const KW_PART_READER: &str = "part_reader";
 pub const KW_PART_WATCHER: &str = "part_watcher";
 pub const KW_FN_WIDGET: &str = "fn_widget";
@@ -303,9 +302,6 @@ impl Fold for DollarRefsCtx {
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PART_WRITER) {
       mac.tokens = crate::part_state::gen_part_writer(mac.tokens, Some(self));
-      mark_macro_expanded(&mut mac);
-    } else if mac.path.is_ident(KW_SPLIT_WRITER) {
-      mac.tokens = crate::part_state::gen_split_writer(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
     } else if mac.path.is_ident(KW_PART_READER) {
       mac.tokens = crate::part_state::gen_part_reader(mac.tokens, Some(self));
@@ -596,12 +592,12 @@ impl DollarRefsScope {
       0 => quote! {},
       1 => {
         let upstream = self.refs[0].upstream_tokens();
-        quote! { observable::of(ModifyScope::DATA).merge(#upstream) }
+        quote! { observable::of(ModifyInfo::new(ModifyScope::DATA, None)).merge(#upstream) }
       }
       _ => {
         let upstream = self.iter().map(DollarRef::upstream_tokens);
         quote_spanned! { self.refs[0].name.span() =>
-          observable::of(ModifyScope::DATA)
+          observable::of(ModifyInfo::new(ModifyScope::DATA, None))
             .merge(observable::from_iter([#(#upstream),*]).merge_all(usize::MAX))
         }
       }

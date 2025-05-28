@@ -283,7 +283,7 @@ impl ProviderSetup for Classes {
 
   fn unzip(
     self: Box<Self>,
-  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyScope, Infallible>) {
+  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyInfo, Infallible>) {
     unreachable!();
   }
 }
@@ -298,7 +298,7 @@ impl<R: StateReader<Value = Classes> + Query> ProviderSetup for ClassesReaderSet
 
   fn unzip(
     self: Box<Self>,
-  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyScope, Infallible>) {
+  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyInfo, Infallible>) {
     unreachable!();
   }
 }
@@ -340,7 +340,7 @@ impl<'c> ComposeChild<'c> for Class {
         let u = this2
           .raw_modifies()
           .filter(|s| s.contains(ModifyScope::FRAMEWORK))
-          .merge(observable::of(ModifyScope::FRAMEWORK))
+          .merge(observable::of(ModifyInfo::new(ModifyScope::FRAMEWORK, None)))
           .map(move |_| this2.read().clone())
           .distinct_until_changed()
           .skip(1)

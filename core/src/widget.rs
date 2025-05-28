@@ -201,7 +201,7 @@ impl<'w> Widget<'w> {
 
   /// Establish reactive dirtiness tracking
   pub fn dirty_on(
-    self, upstream: CloneableBoxOp<'static, ModifyScope, Infallible>, dirty: DirtyPhase,
+    self, upstream: CloneableBoxOp<'static, ModifyInfo, Infallible>, dirty: DirtyPhase,
   ) -> Self {
     let track = TrackWidgetId::default();
     let id = track.track_id();

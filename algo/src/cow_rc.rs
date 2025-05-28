@@ -192,6 +192,25 @@ impl<B: ?Sized + ToOwned + PartialEq> PartialEq for CowArc<B> {
   }
 }
 
+impl<B: ?Sized + ToOwned + PartialOrd> PartialOrd for CowArc<B> {
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    let a: &B = self.borrow();
+    let b = other.borrow();
+    a.partial_cmp(b)
+  }
+}
+
+impl<B: ?Sized + ToOwned + Ord> Ord for CowArc<B>
+where
+  Self: Eq,
+{
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    let a: &B = self.borrow();
+    let b = other.borrow();
+    a.cmp(b)
+  }
+}
+
 impl<B: ?Sized + ToOwned + Hash> Hash for CowArc<B> {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
     let borrow: &B = self.borrow();

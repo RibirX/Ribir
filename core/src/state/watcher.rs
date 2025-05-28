@@ -6,12 +6,12 @@ use crate::prelude::*;
 
 pub struct Watcher<R> {
   reader: R,
-  modifies_observable: CloneableBoxOp<'static, ModifyScope, Infallible>,
+  modifies_observable: CloneableBoxOp<'static, ModifyInfo, Infallible>,
 }
 
 impl<R> Watcher<R> {
   pub fn new(
-    reader: R, modifies_observable: CloneableBoxOp<'static, ModifyScope, Infallible>,
+    reader: R, modifies_observable: CloneableBoxOp<'static, ModifyInfo, Infallible>,
   ) -> Self {
     Self { reader, modifies_observable }
   }
@@ -59,7 +59,7 @@ impl<R: StateReader> StateWatcher for Watcher<R> {
   }
 
   #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
     self.modifies_observable.clone()
   }
 

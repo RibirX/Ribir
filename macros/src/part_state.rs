@@ -1,5 +1,5 @@
 use proc_macro2::{Ident, TokenStream};
-use quote::{ToTokens, quote_spanned};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
   AngleBracketedGenericArguments, Expr, Member, Result, Token, parenthesized,
   parse::{Parse, ParseStream},
@@ -13,28 +13,17 @@ use crate::{
 };
 
 pub fn gen_part_writer(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>) -> TokenStream {
-  match syn::parse2::<PartState>(input) {
-    Ok(part) => {
-      let host = part.host_tokens(DollarUsedInfo::Writer, refs_ctx);
-      let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
+  match syn::parse2::<PartialPartState>(input) {
+    Ok(PartialPartState { id, part_state, .. }) => {
+      let host = part_state.host_tokens(DollarUsedInfo::Writer, refs_ctx);
+      let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } =
+        part_state;
+      let id = id
+        .map(|id| quote! { Some(#id) })
+        .unwrap_or(quote! { None });
       let tokens = quote_spanned! { state.span() =>
-        #host #dot map_writer(
-          |w| PartMut::new(#and_token #mutability w #dot #part_expr #tail_dot #tail_expr)
-        )
-      };
-      tokens
-    }
-    Err(err) => err.to_compile_error(),
-  }
-}
-
-pub fn gen_split_writer(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>) -> TokenStream {
-  match syn::parse2::<PartState>(input) {
-    Ok(part) => {
-      let host = part.host_tokens(DollarUsedInfo::Writer, refs_ctx);
-      let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
-      let tokens = quote_spanned! { state.span() =>
-        #host #dot split_writer(
+        #host #dot part_writer(
+          #id,
           |w| PartMut::new(#and_token #mutability w #dot #part_expr #tail_dot #tail_expr)
         )
       };
@@ -50,7 +39,7 @@ pub fn gen_part_reader(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>)
       let host = part.host_tokens(DollarUsedInfo::Reader, refs_ctx);
       let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
       let tokens = quote_spanned! { state.span() =>
-        #host #dot map_reader(
+        #host #dot part_reader(
           |r| PartRef::new(#and_token #mutability r #dot #part_expr #tail_dot #tail_expr)
         )
       };
@@ -66,7 +55,7 @@ pub fn gen_part_watcher(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>
       let host = part.host_tokens(DollarUsedInfo::Watcher, refs_ctx);
       let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } = part;
       let tokens = quote_spanned! { state.span() =>
-        #host #dot map_watcher(
+        #host #dot part_watcher(
           |r| PartRef::new(#and_token #mutability r #dot #part_expr #tail_dot #tail_expr)
         )
       };
@@ -86,6 +75,11 @@ struct PartState {
   tail_expr: Option<Expr>,
 }
 
+struct PartialPartState {
+  id: Option<Expr>,
+  part_state: PartState,
+}
+
 enum PartExpr {
   Member(Member),
   Method {
@@ -94,6 +88,20 @@ enum PartExpr {
     paren_token: Paren,
     args: Punctuated<Expr, Token![,]>,
   },
+}
+
+impl Parse for PartialPartState {
+  fn parse(input: ParseStream) -> Result<Self> {
+    let part_state = input.parse();
+    if let Ok(part_state) = part_state {
+      return Ok(Self { id: None, part_state });
+    }
+
+    let id = input.parse()?;
+    input.parse::<Token![,]>()?;
+    let part_state = input.parse()?;
+    Ok(PartialPartState { id: Some(id), part_state })
+  }
 }
 
 impl Parse for PartState {

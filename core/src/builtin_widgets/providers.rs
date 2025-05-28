@@ -206,7 +206,7 @@ pub trait ProviderSetup {
   /// returns true and is called when `Providers` compose their child.
   fn unzip(
     self: Box<Self>,
-  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyScope, Infallible>);
+  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyInfo, Infallible>);
 }
 
 /// This trait is used to retrieve the providers from the context. In most
@@ -716,14 +716,14 @@ struct Restore {
 struct WriterSetup {
   info: TypeInfo,
   value: Box<dyn Query>,
-  modifies: CloneableBoxOp<'static, ModifyScope, Infallible>,
+  modifies: CloneableBoxOp<'static, ModifyInfo, Infallible>,
   dirty: DirtyPhase,
 }
 
 struct WriterRestore {
   info: TypeInfo,
   restore_value: Option<Box<dyn Query>>,
-  modifies: CloneableBoxOp<'static, ModifyScope, Infallible>,
+  modifies: CloneableBoxOp<'static, ModifyInfo, Infallible>,
   dirty: DirtyPhase,
 }
 
@@ -737,7 +737,7 @@ impl ProviderSetup for Setup {
 
   fn unzip(
     self: Box<Self>,
-  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyScope, Infallible>) {
+  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyInfo, Infallible>) {
     unreachable!();
   }
 }
@@ -761,7 +761,7 @@ impl ProviderSetup for WriterSetup {
 
   fn unzip(
     self: Box<Self>,
-  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyScope, Infallible>) {
+  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyInfo, Infallible>) {
     let Self { info, value, modifies, dirty } = *self;
     (Box::new(Setup { info, value }), dirty, modifies)
   }

@@ -1,6 +1,5 @@
 mod map_state;
 mod prior_op;
-mod splitted_state;
 mod stateful;
 mod watcher;
 use std::{cell::UnsafeCell, convert::Infallible, mem::MaybeUninit, ops::DerefMut};
@@ -8,15 +7,15 @@ pub mod state_cell;
 
 pub use map_state::*;
 pub use prior_op::*;
-use ribir_algo::Sc;
 use rxrust::ops::box_it::{BoxOp, CloneableBoxOp};
-pub use splitted_state::*;
 pub use state_cell::*;
-use state_cell::{StateCell, ValueMutRef};
 pub use stateful::*;
 pub use watcher::*;
 
 use crate::prelude::*;
+
+pub type PartialId = CowArc<str>;
+pub type PartialPath = Vec<PartialId>;
 
 /// The `StateReader` trait allows for reading, clone and map the state.
 pub trait StateReader: 'static {
@@ -45,12 +44,12 @@ pub trait StateReader: 'static {
   /// original data, not a cloned portion. Otherwise, the returned reader will
   /// not respond to state changes.
   #[inline]
-  fn map_reader<U: ?Sized, F>(&self, map: F) -> MapReader<Self::Reader, F>
+  fn part_reader<U: ?Sized, F>(&self, map: F) -> PartReader<Self::Reader, F>
   where
     F: Fn(&Self::Value) -> PartRef<U> + Clone,
     Self: Sized,
   {
-    MapReader { origin: self.clone_reader(), part_map: map }
+    PartReader { origin: self.clone_reader(), part_map: map }
   }
 
   /// try convert this state into the value, if there is no other share this
@@ -76,7 +75,7 @@ pub trait StateWatcher: StateReader {
 
   /// Return a modifies `Rx` stream of the state, user can subscribe it to
   /// response the state changes.
-  fn modifies(&self) -> BoxOp<'static, ModifyScope, Infallible> {
+  fn modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
     self
       .raw_modifies()
       .filter(|s| s.contains(ModifyScope::DATA))
@@ -85,7 +84,7 @@ pub trait StateWatcher: StateReader {
 
   /// Return a modifies `Rx` stream of the state, including all modifies. Use
   /// `modifies` instead if you only want to response the data changes.
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible>;
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible>;
 
   /// Clone a boxed watcher that can be used to observe the modifies of the
   /// state.
@@ -97,12 +96,12 @@ pub trait StateWatcher: StateReader {
     Self: Sized;
 
   /// Return a new watcher by applying a function to the contained value.
-  fn map_watcher<U: ?Sized, F>(&self, map: F) -> Watcher<MapReader<Self::Reader, F>>
+  fn part_watcher<U: ?Sized, F>(&self, map: F) -> Watcher<PartReader<Self::Reader, F>>
   where
     F: Fn(&Self::Value) -> PartRef<U> + Clone,
     Self: Sized,
   {
-    let reader = self.map_reader(map);
+    let reader = self.part_reader(map);
     Watcher::new(reader, self.raw_modifies())
   }
 }
@@ -127,35 +126,32 @@ pub trait StateWriter: StateWatcher {
   fn clone_writer(&self) -> Self
   where
     Self: Sized;
-  /// Return a new writer that be part of the origin writer by applying a
-  /// function to the contained value.
-  ///
-  /// The return writer share the same data with the origin writer. But modify
-  /// the data through the return writer will not trigger the views depend on
-  /// the origin writer to update.
-  ///
-  /// If you want a new writer that has same notifier with the origin writer,
-  /// you can use `map_writer(...)`.
-  ///
-  /// ##Notice
-  ///
-  /// The `mut_map` function accepts a mutable reference, but it should not be
-  /// modified. Instead, return a mutable reference to a part of it. Ribir
-  /// uses this to access a portion of the original data, so a read operation
-  /// may also call it. Ribir assumes that the original data will not be
-  /// modified within this function. Therefore, if the original data is
-  /// modified, no downstream will be notified.
-  #[inline]
-  fn split_writer<V: ?Sized, W>(&self, mut_map: W) -> SplittedWriter<Self, W>
-  where
-    W: Fn(&mut Self::Value) -> PartMut<V> + Clone,
-    Self: Sized,
-  {
-    SplittedWriter::new(self.clone_writer(), mut_map)
-  }
 
-  /// Return a new writer by applying a function to the contained value. The
-  /// return writer is just a shortcut to access part of the origin writer.
+  /// part_writer
+  ///
+  /// Creates a new writer that derives a subset or transformation of the
+  /// original writer's value. The returned writer shares the same underlying
+  /// data with the original writer.
+  /// - If ID is None, the created writer is just a partial writer of the
+  ///   original and sharing the same notification.
+  /// - If ID is specified, the created writer's notification mechanisms are
+  ///   adjusted as follows:
+  /// 1. **Unidirectional Propagation**: Modifications made through the split
+  ///    writer will trigger updates on the original writer, but changes from
+  ///    the original writer will not propagate to the split writer.
+  ///
+  /// 2. **ID-Based Update Sharing**: Multiple split writers created with the
+  ///    same ID will share update notifications. This means modifications in
+  ///    any split writer with the same ID will be treated as a single source of
+  ///    truth for the original writer's dependencies.
+  ///
+  /// 3. **Isolated Update Domains**: Split writers created with different IDs
+  ///    operate in isolated notification domains. Updates from one ID will not
+  ///    trigger notifications in split writers with different IDs, even if they
+  ///    share the same original writer.
+  ///
+  /// If you need a writer that mirrors the original writer's notification
+  /// behavior exactly, use `part_writer(...)` instead.
   ///
   /// ##Notice
   ///
@@ -165,14 +161,74 @@ pub trait StateWriter: StateWatcher {
   /// may also call it. Ribir assumes that the original data will not be
   /// modified within this function. Therefore, if the original data is
   /// modified, no downstream will be notified.
-  #[inline]
-  fn map_writer<V: ?Sized, M>(&self, part_map: M) -> MapWriter<Self, M>
+  ///
+  /// ## Example, Use part_writer to map to part of the state
+  ///
+  /// ```rust no_run
+  /// use ribir::prelude::*;
+  ///
+  /// struct MyApp {
+  ///   name: String,
+  ///   // ...
+  /// }
+  ///
+  /// fn title_widget(app: impl StateWriter<Value = String>) -> Widget<'static> {
+  ///   fn_widget! { @Text { text: pipe!($app.write().clone()) } }.into_widget()
+  /// }
+  ///
+  /// let w = fn_widget! {
+  ///   let app = Stateful::new(MyApp { name: String::new() /* ... */ });
+  ///   title_widget(app.part_writer(None, |app| PartMut::new(&mut app.name)))
+  /// };
+  /// App::run(w);
+  /// ```
+  ///
+  /// ## Example, Use part_writer with a unique identifier to create isolated Writer.
+  /// part_writer with a unique identifier to bind to each item in the list,
+  /// enabling isolated modification of individual items
+  /// ```rust no_run
+  /// use ribir::prelude::*;
+  ///
+  /// let w = fn_widget! {
+  ///    let  items = Stateful::new(vec![String::new(), String::new()]);
+  ///    @Column {
+  ///      @FilledButton {
+  ///        on_tap: move |_| $items.write().push(String::new()),
+  ///        @ { "Add Item" }
+  ///      }
+  ///      @ {
+  ///        pipe!($items.len())
+  ///          .value_chain(|f| f.filter(|(info, _)| info.partial_path().is_none()).box_it())
+  ///          .map(move|cnt| {
+  ///            (0..cnt).map(move |i| fn_widget!{
+  ///              let _hint = || $items.write();
+  ///              let item = items.part_writer(
+  ///                 Some(&format!("item {i}")),
+  ///                 move |items| PartMut::new(items.get_mut(i).unwrap())
+  ///              );
+  ///              let input = @Input {};
+  ///              $input.write().set_text(&$item);
+  ///              watch!($input.text().clone())
+  ///                .subscribe(move |text| {
+  ///                  *$item.write() = text.to_string()
+  ///                });
+  ///              input
+  ///            })
+  ///        })
+  ///      }
+  ///    }
+  /// };
+  ///
+  /// App::run(w);
+  /// ```
+  fn part_writer<V: ?Sized + 'static, M>(
+    &self, id: Option<&str>, part_map: M,
+  ) -> PartWriter<Self, M>
   where
-    M: Fn(&mut Self::Value) -> PartMut<V> + Clone,
+    M: Fn(&mut Self::Value) -> PartMut<V> + Clone + 'static,
     Self: Sized,
   {
-    let origin = self.clone_writer();
-    MapWriter { origin, part_map }
+    PartWriter { origin: self.clone_writer(), part_map, id: id.map(|id| id.to_string().into()) }
   }
 }
 
@@ -181,6 +237,7 @@ pub struct WriteRef<'a, V: ?Sized> {
   info: &'a Sc<WriterInfo>,
   modify_scope: ModifyScope,
   modified: bool,
+  partial: Option<Vec<&'a PartialId>>,
 }
 
 /// Enum to store both stateless and stateful object.
@@ -237,7 +294,7 @@ impl<T: 'static> StateWatcher for State<T> {
   }
 
   #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
     self.as_stateful().raw_modifies()
   }
 
@@ -313,7 +370,9 @@ impl<W> State<W> {
 }
 
 impl<'a, V: ?Sized> WriteRef<'a, V> {
-  pub fn map<U: ?Sized, M>(mut orig: WriteRef<'a, V>, part_map: M) -> WriteRef<'a, U>
+  pub fn map<U: ?Sized, M>(
+    mut orig: WriteRef<'a, V>, part_map: M, partial: Option<&'a PartialId>,
+  ) -> WriteRef<'a, U>
   where
     M: Fn(&mut V) -> PartMut<U>,
   {
@@ -321,7 +380,14 @@ impl<'a, V: ?Sized> WriteRef<'a, V> {
     let borrow = orig.value.borrow.clone();
     let value = ValueMutRef { inner, borrow };
 
-    WriteRef { value, modified: false, modify_scope: orig.modify_scope, info: orig.info }
+    let partial = if let Some(partial) = partial {
+      let mut p = orig.partial.clone().unwrap_or_default();
+      p.push(partial);
+      Some(p)
+    } else {
+      orig.partial.clone()
+    };
+    WriteRef { value, modified: false, modify_scope: orig.modify_scope, info: orig.info, partial }
   }
 
   /// Makes a new `WriteRef` for an optional component of the borrowed data. The
@@ -340,11 +406,11 @@ impl<'a, V: ?Sized> WriteRef<'a, V> {
   /// let c = Stateful::new(vec![1, 2, 3]);
   /// let b1: WriteRef<'_, Vec<u32>> = c.write();
   /// let b2: Result<WriteRef<'_, u32>, _> =
-  ///   WriteRef::filter_map(b1, |v| v.get_mut(1).map(PartMut::<u32>::new));
+  ///   WriteRef::filter_map(b1, |v| v.get_mut(1).map(PartMut::<u32>::new), None);
   /// assert_eq!(*b2.unwrap(), 2);
   /// ```
   pub fn filter_map<U: ?Sized, M>(
-    mut orig: WriteRef<'a, V>, part_map: M,
+    mut orig: WriteRef<'a, V>, part_map: M, partial: Option<&'a PartialId>,
   ) -> Result<WriteRef<'a, U>, Self>
   where
     M: Fn(&mut V) -> Option<PartMut<U>>,
@@ -354,30 +420,24 @@ impl<'a, V: ?Sized> WriteRef<'a, V> {
         let inner = inner.inner;
         let borrow = orig.value.borrow.clone();
         let value = ValueMutRef { inner, borrow };
-        let WriteRef { modify_scope, info, .. } = orig;
 
-        Ok(WriteRef { value, modified: false, modify_scope, info })
+        let partial = if let Some(partial) = partial {
+          let mut p = orig.partial.clone().unwrap_or_default();
+          p.push(partial);
+          Some(p)
+        } else {
+          orig.partial.clone()
+        };
+        Ok(WriteRef {
+          value,
+          modified: false,
+          modify_scope: orig.modify_scope,
+          info: orig.info,
+          partial,
+        })
       }
       None => Err(orig),
     }
-  }
-
-  pub fn map_split<U1: ?Sized, U2: ?Sized, F>(
-    mut orig: WriteRef<'a, V>, f: F,
-  ) -> (WriteRef<'a, U1>, WriteRef<'a, U2>)
-  where
-    F: FnOnce(&mut V) -> (PartMut<U1>, PartMut<U2>),
-  {
-    let WriteRef { info, modify_scope, modified, .. } = orig;
-    let (a, b) = f(&mut *orig.value);
-    let (a, b) = (a.inner, b.inner);
-    let borrow = orig.value.borrow.clone();
-    let a = ValueMutRef { inner: a, borrow: borrow.clone() };
-    let b = ValueMutRef { inner: b, borrow };
-    (
-      WriteRef { value: a, modified, modify_scope, info },
-      WriteRef { value: b, modified, modify_scope, info },
-    )
   }
 
   /// Forget all modifies of this reference. So all the modifies occurred on
@@ -415,11 +475,16 @@ impl<'a, W: ?Sized> Drop for WriteRef<'a, W> {
       batched_modifies.set(*modify_scope);
 
       let info = info.clone();
+      let partial = self.partial.as_ref().map(|v| {
+        v.iter()
+          .map(|i| (**i).clone())
+          .collect::<Vec<_>>()
+      });
       let _ = AppCtx::spawn_local(async move {
         let scope = info
           .batched_modifies
           .replace(ModifyScope::empty());
-        info.notifier.next(scope);
+        info.notifier.next(ModifyInfo { scope, partial });
       });
     } else {
       batched_modifies.set(*modify_scope | batched_modifies.get());
@@ -465,7 +530,7 @@ impl<V: ?Sized + 'static> StateWatcher for Box<dyn StateWatcher<Value = V>> {
   fn into_reader(self) -> Result<Self::Reader, Self> { Err(self) }
 
   #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
     (**self).raw_modifies()
   }
 
@@ -501,7 +566,7 @@ impl<V: ?Sized + 'static> StateWatcher for Box<dyn StateWriter<Value = V>> {
   fn into_reader(self) -> Result<Self::Reader, Self> { Err(self) }
 
   #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyScope, Infallible> {
+  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
     (**self).raw_modifies()
   }
 
@@ -525,7 +590,6 @@ impl<V: ?Sized + 'static> StateWriter for Box<dyn StateWriter<Value = V>> {
   fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {
     (**self).clone_boxed_writer()
   }
-
   #[inline]
   fn clone_writer(&self) -> Self { self.clone_boxed_writer() }
 }
@@ -550,7 +614,7 @@ mod tests {
     reset_test_env!();
 
     let origin = State::value(Origin { a: 0, b: 0 });
-    let map_state = origin.map_writer(|v| PartMut::new(&mut v.b));
+    let map_state = origin.part_writer(None, |v| PartMut::new(&mut v.b));
 
     let track_origin = Sc::new(Cell::new(0));
     let track_map = Sc::new(Cell::new(0));
@@ -582,38 +646,59 @@ mod tests {
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
   #[test]
-  fn split_not_notify_origin() {
+  fn split_notify() {
     reset_test_env!();
 
     let origin = State::value(Origin { a: 0, b: 0 });
-    let split = origin.split_writer(|v| PartMut::new(&mut v.b));
+    let split_a = origin.part_writer(Some("a"), |v| PartMut::new(&mut v.a));
+    let split_b = origin.part_writer(Some("b"), |v| PartMut::new(&mut v.b));
 
     let track_origin = Sc::new(Cell::new(0));
-    let track_split = Sc::new(Cell::new(0));
+    let track_split_a = Sc::new(Cell::new(0));
+    let track_split_b = Sc::new(Cell::new(0));
 
     let c_origin = track_origin.clone();
     origin.modifies().subscribe(move |s| {
-      c_origin.set(c_origin.get() + s.bits());
+      c_origin.set(c_origin.get() + s.scope().bits());
     });
 
-    let c_split = track_split.clone();
-    split.modifies().subscribe(move |s| {
-      c_split.set(c_split.get() + s.bits());
+    let c_split_a = track_split_a.clone();
+    split_a.modifies().subscribe(move |s| {
+      c_split_a.set(c_split_a.get() + s.scope().bits());
     });
 
-    *split.write() = 0;
+    let c_split_b = track_split_b.clone();
+    split_b.modifies().subscribe(move |s| {
+      c_split_b.set(c_split_b.get() + s.scope().bits());
+    });
+
+    *split_a.write() = 0;
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
-    assert_eq!(track_origin.get(), ModifyScope::DATA.bits());
-    assert_eq!(track_split.get(), ModifyScope::BOTH.bits());
+    assert_eq!(track_origin.get(), ModifyScope::BOTH.bits());
+    assert_eq!(track_split_a.get(), ModifyScope::BOTH.bits());
+    assert_eq!(track_split_b.get(), 0);
 
-    origin.write().b = 0;
+    track_origin.set(0);
+    track_split_a.set(0);
+
+    *split_b.write() = 0;
     Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
-    assert_eq!(track_origin.get(), ModifyScope::DATA.bits() + ModifyScope::BOTH.bits());
-    // splitted downstream will not be notified.
-    assert_eq!(track_split.get(), ModifyScope::BOTH.bits());
+    assert_eq!(track_origin.get(), ModifyScope::BOTH.bits());
+    assert_eq!(track_split_b.get(), ModifyScope::BOTH.bits());
+    assert_eq!(track_split_a.get(), 0);
+
+    track_origin.set(0);
+    track_split_b.set(0);
+
+    origin.write().a = 0;
+    Timer::wake_timeout_futures();
+    AppCtx::run_until_stalled();
+    assert_eq!(track_origin.get(), ModifyScope::BOTH.bits());
+    assert_eq!(track_split_b.get(), 0);
+    assert_eq!(track_split_a.get(), 0);
   }
 
   struct C;
@@ -639,13 +724,13 @@ mod tests {
       Stateful::new(C).clone_writer()
     };
 
-    let _map_writer_compose_widget = fn_widget! {
+    let _part_writer_compose_widget = fn_widget! {
       Stateful::new((C, 0))
-        .map_writer(|v| PartMut::new(&mut v.0))
+        .part_writer(None, |v| PartMut::new(&mut v.0))
     };
-    let _split_writer_compose_widget = fn_widget! {
+    let _part_writer_compose_widget = fn_widget! {
       Stateful::new((C, 0))
-        .split_writer(|v| PartMut::new(&mut v.0))
+        .part_writer(Some("C"), |v| PartMut::new(&mut v.0))
     };
   }
 
@@ -689,26 +774,26 @@ mod tests {
       Stateful::new(CC).clone_writer()
     };
 
-    let _map_writer_with_child = fn_widget! {
+    let _part_writer_with_child = fn_widget! {
       let w = Stateful::new((CC, 0))
-        .map_writer(|v| PartMut::new(&mut v.0));
+        .part_writer(None, |v| PartMut::new(&mut v.0));
       @$w { @{ Void } }
     };
 
-    let _map_writer_without_child = fn_widget! {
+    let _part_writer_without_child = fn_widget! {
       Stateful::new((CC, 0))
-        .map_writer(|v| PartMut::new(&mut v.0))
+        .part_writer(None, |v| PartMut::new(&mut v.0))
     };
 
-    let _split_writer_with_child = fn_widget! {
+    let _part_writer_with_child = fn_widget! {
       let w = Stateful::new((CC, 0))
-        .split_writer(|v| PartMut::new(&mut v.0));
+        .part_writer(Some(""), |v| PartMut::new(&mut v.0));
       @$w { @{ Void } }
     };
 
-    let _split_writer_without_child = fn_widget! {
+    let _part_writer_without_child = fn_widget! {
       Stateful::new((CC, 0))
-        .split_writer(|v| PartMut::new(&mut v.0))
+        .part_writer(Some(""), |v| PartMut::new(&mut v.0))
     };
   }
 
@@ -729,18 +814,18 @@ mod tests {
       Stateful::new(Void).clone_writer()
     };
 
-    let _map_reader_render_widget = fn_widget! {
-      Stateful::new((Void, 0)).map_reader(|v| PartRef::new(&v.0))
+    let _part_reader_render_widget = fn_widget! {
+      Stateful::new((Void, 0)).part_reader(|v| PartRef::new(&v.0))
     };
 
-    let _map_writer_render_widget = fn_widget! {
+    let _part_writer_render_widget = fn_widget! {
       Stateful::new((Void, 0))
-        .map_writer(|v| PartMut::new(&mut v.0))
+        .part_writer(None, |v| PartMut::new(&mut v.0))
     };
 
-    let _split_writer_render_widget = fn_widget! {
+    let _part_writer_render_widget = fn_widget! {
       Stateful::new((Void, 0))
-        .split_writer(|v| PartMut::new(&mut v.0))
+        .part_writer(Some(""), |v| PartMut::new(&mut v.0))
     };
   }
 
@@ -749,11 +834,11 @@ mod tests {
   fn trait_object_part_data() {
     reset_test_env!();
     let s = State::value(0);
-    let m = s.split_writer(|v| PartMut::new(v as &mut dyn Any));
+    let m = s.part_writer(Some("0"), |v| PartMut::new(v as &mut dyn Any));
     let v: ReadRef<dyn Any> = m.read();
     assert_eq!(*v.downcast_ref::<i32>().unwrap(), 0);
 
-    let s = s.map_writer(|v| PartMut::new(v as &mut dyn Any));
+    let s = s.part_writer(None, |v| PartMut::new(v as &mut dyn Any));
     let v: ReadRef<dyn Any> = s.read();
     assert_eq!(*v.downcast_ref::<i32>().unwrap(), 0);
   }
