@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.39] - 2025-05-28
+
 ## [0.4.0-alpha.38] - 2025-05-21
 
 ### BREAKING
@@ -816,7 +818,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.38...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.39...HEAD
+[0.4.0-alpha.39]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.38...ribir-v0.4.0-alpha.39
 [0.4.0-alpha.38]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.37...ribir-v0.4.0-alpha.38
 [0.4.0-alpha.37]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.36...ribir-v0.4.0-alpha.37
 [0.4.0-alpha.36]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.35...ribir-v0.4.0-alpha.36
