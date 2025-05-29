@@ -19,8 +19,8 @@ pub fn gen_part_writer(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>)
       let PartState { and_token, mutability, state, dot, part_expr, tail_dot, tail_expr } =
         part_state;
       let id = id
-        .map(|id| quote! { Some(#id) })
-        .unwrap_or(quote! { None });
+        .map(|id| quote! { #id.into() })
+        .unwrap_or(quote! { PartialId::any() });
       let tokens = quote_spanned! { state.span() =>
         #host #dot part_writer(
           #id,

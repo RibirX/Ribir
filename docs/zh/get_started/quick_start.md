@@ -692,23 +692,23 @@ struct AppData {
 }
 
 let state = State::value(AppData { count: 0 });
-let map_count = state.part_writer(None, |d| PartMut::new(&mut d.count));
-let split_count = state.part_writer(None, |d| PartMut::new(&mut d.count));
+let map_count = state.part_writer(PartialId::any(), |d| PartMut::new(&mut d.count));
+let split_count = state.part_writer(PartialId::any(), |d| PartMut::new(&mut d.count));
 
 watch!($state.count).subscribe(|_| println!("父状态数据"));
 watch!(*$map_count).subscribe(|_| println!("子状态（转换）数据"));
 watch!(*$split_count).subscribe(|_| println!("子状态（分离）数据"));
 state
   .raw_modifies()
-  .filter(|s| s.contains(ModifyScope::FRAMEWORK))
+  .filter(|s| s.contains(ModifyEffect::FRAMEWORK))
   .subscribe(|_| println!("父状态 框架"));
 map_count
   .raw_modifies()
-  .filter(|s| s.contains(ModifyScope::FRAMEWORK))
+  .filter(|s| s.contains(ModifyEffect::FRAMEWORK))
   .subscribe(|_| println!("子状态（转换）框架"));
 split_count
   .raw_modifies()
-  .filter(|s| s.contains(ModifyScope::FRAMEWORK))
+  .filter(|s| s.contains(ModifyEffect::FRAMEWORK))
   .subscribe(|_| println!("子状态（分离）框架"));
 
 // 通过分离子状态修改数据，父子状态的订阅者都会被推送数据通知，

@@ -10,7 +10,8 @@ pub struct PartReader<S, F> {
 pub struct PartWriter<W, WM> {
   pub(super) origin: W,
   pub(super) part_map: WM,
-  pub(super) id: Option<PartialId>,
+  pub(super) path: PartialPath,
+  pub(super) include_partial: bool,
 }
 
 impl<S, M, V: ?Sized> StateReader for PartReader<S, M>
@@ -73,10 +74,10 @@ where
   type Watcher = Watcher<Self::Reader>;
 
   fn into_reader(self) -> Result<Self::Reader, Self> {
-    let Self { origin, part_map, id } = self;
+    let Self { origin, part_map, path, include_partial } = self;
     match origin.into_reader() {
       Ok(origin) => Ok(PartReader { origin, part_map: WriterMapReaderFn(part_map) }),
-      Err(origin) => Err(Self { origin, part_map, id }),
+      Err(origin) => Err(Self { origin, part_map, path, include_partial }),
     }
   }
 
@@ -87,27 +88,16 @@ where
 
   #[inline]
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
-    if let Some(id) = &self.id {
-      let id = id.clone();
-      self
-        .origin
-        .raw_modifies()
-        .filter_map(move |s| {
-          let ModifyInfo { partial, scope } = s;
-          if partial
-            .as_ref()
-            .is_some_and(|p| p.first() == Some(&id))
-          {
-            let mut partial = partial.unwrap();
-            partial.remove(0);
-            Some(ModifyInfo { partial: Some(partial), scope })
-          } else {
-            None
-          }
-        })
+    let modifies = self.origin.raw_modifies();
+    let path = self.path.clone();
+    let include_partial = self.include_partial;
+
+    if !self.path.is_empty() {
+      modifies
+        .filter(move |info| info.path_matches(&path, include_partial))
         .box_it()
     } else {
-      self.origin.raw_modifies()
+      modifies
     }
   }
 
@@ -123,19 +113,22 @@ where
   W: StateWriter,
   M: Fn(&mut W::Value) -> PartMut<V> + Clone,
 {
-  #[inline]
   fn write(&self) -> WriteRef<Self::Value> {
-    WriteRef::map(self.origin.write(), &self.part_map, self.id.as_ref())
+    let mut w = WriteRef::map(self.origin.write(), &self.part_map);
+    w.path = &self.path;
+    w
   }
 
-  #[inline]
   fn silent(&self) -> WriteRef<Self::Value> {
-    WriteRef::map(self.origin.silent(), &self.part_map, self.id.as_ref())
+    let mut w = WriteRef::map(self.origin.silent(), &self.part_map);
+    w.path = &self.path;
+    w
   }
 
-  #[inline]
   fn shallow(&self) -> WriteRef<Self::Value> {
-    WriteRef::map(self.origin.shallow(), &self.part_map, self.id.as_ref())
+    let mut w = WriteRef::map(self.origin.shallow(), &self.part_map);
+    w.path = &self.path;
+    w
   }
 
   #[inline]
@@ -148,9 +141,17 @@ where
     PartWriter {
       origin: self.origin.clone_writer(),
       part_map: self.part_map.clone(),
-      id: self.id.clone(),
+      path: self.path.clone(),
+      include_partial: self.include_partial,
     }
   }
+
+  fn include_partial_writers(mut self, include: bool) -> Self {
+    self.include_partial = include;
+    self
+  }
+
+  fn scope_path(&self) -> &PartialPath { &self.path }
 }
 
 trait MapReaderFn<Input: ?Sized>: Clone {

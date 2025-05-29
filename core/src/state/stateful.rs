@@ -9,6 +9,7 @@ use crate::prelude::*;
 pub struct Stateful<W> {
   data: Sc<StateCell<W>>,
   info: Sc<WriterInfo>,
+  include_partial: bool,
 }
 
 pub struct Reader<W>(pub(crate) Sc<StateCell<W>>);
@@ -20,7 +21,7 @@ pub struct Notifier(Subject<'static, ModifyInfo, Infallible>);
 
 bitflags! {
   #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-  pub struct ModifyScope: u8 {
+  pub struct ModifyEffect: u8 {
     /// state change only effect the data, transparent to ribir framework.
     const DATA  = 1 << 0;
     /// state change only effect to framework, transparent to widget data.
@@ -30,20 +31,29 @@ bitflags! {
   }
 }
 
+pub fn wildcard_scope_path() -> &'static PartialPath {
+  use std::sync::OnceLock;
+  static EMPTY_PATH: OnceLock<PartialPath> = OnceLock::new();
+
+  EMPTY_PATH.get_or_init(PartialPath::new)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModifyInfo {
-  pub(crate) scope: ModifyScope,
-  pub(crate) partial: Option<PartialPath>,
+  pub(crate) effect: ModifyEffect,
+  pub(crate) path: PartialPath,
 }
 
 impl ModifyInfo {
-  pub fn new(scope: ModifyScope, partial: Option<PartialPath>) -> Self { Self { scope, partial } }
+  pub fn new(effect: ModifyEffect, scopes: PartialPath) -> Self { Self { effect, path: scopes } }
 
-  pub fn contains(&self, scope: ModifyScope) -> bool { self.scope.contains(scope) }
+  /// Check if the effect is contained in this modify info.
+  pub fn contains(&self, effect: ModifyEffect) -> bool { self.effect.contains(effect) }
 
-  pub fn scope(&self) -> ModifyScope { self.scope }
-
-  pub fn partial_path(&self) -> Option<&PartialPath> { self.partial.as_ref() }
+  /// Check if the modify info validate the scope path.
+  pub(crate) fn path_matches(&self, path: &PartialPath, include_partial: bool) -> bool {
+    if include_partial { self.path.starts_with(path) } else { path == &self.path }
+  }
 }
 
 impl Notifier {
@@ -55,7 +65,7 @@ pub(crate) struct WriterInfo {
   /// The counter of the writer may be modified the data.
   pub(crate) writer_count: Cell<usize>,
   /// The batched modifies of the `State` which will be notified.
-  pub(crate) batched_modifies: Cell<ModifyScope>,
+  pub(crate) batched_modifies: Cell<ModifyEffect>,
 }
 
 impl<W: 'static> StateReader for Stateful<W> {
@@ -98,9 +108,15 @@ impl<W: 'static> StateWatcher for Stateful<W> {
     Box::new(self.clone_watcher())
   }
 
-  #[inline]
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
-    self.info.notifier.raw_modifies()
+    let modifies = self.info.notifier.raw_modifies();
+    if self.include_partial {
+      modifies
+    } else {
+      modifies
+        .filter(|info| info.path.is_empty())
+        .box_it()
+    }
   }
 
   #[inline]
@@ -111,13 +127,13 @@ impl<W: 'static> StateWatcher for Stateful<W> {
 
 impl<W: 'static> StateWriter for Stateful<W> {
   #[inline]
-  fn write(&self) -> WriteRef<W> { self.write_ref(ModifyScope::BOTH) }
+  fn write(&self) -> WriteRef<W> { self.write_ref(ModifyEffect::BOTH) }
 
   #[inline]
-  fn silent(&self) -> WriteRef<W> { self.write_ref(ModifyScope::DATA) }
+  fn silent(&self) -> WriteRef<W> { self.write_ref(ModifyEffect::DATA) }
 
   #[inline]
-  fn shallow(&self) -> WriteRef<W> { self.write_ref(ModifyScope::FRAMEWORK) }
+  fn shallow(&self) -> WriteRef<W> { self.write_ref(ModifyEffect::FRAMEWORK) }
 
   #[inline]
   fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {
@@ -126,6 +142,14 @@ impl<W: 'static> StateWriter for Stateful<W> {
 
   #[inline]
   fn clone_writer(&self) -> Self { self.clone() }
+
+  fn include_partial_writers(mut self, include: bool) -> Self {
+    self.include_partial = include;
+    self
+  }
+
+  #[inline]
+  fn scope_path(&self) -> &PartialPath { wildcard_scope_path() }
 }
 
 impl<W: 'static> StateReader for Reader<W> {
@@ -171,7 +195,11 @@ impl Drop for WriterInfo {
 
 impl<W> Stateful<W> {
   pub fn new(data: W) -> Self {
-    Self { data: Sc::new(StateCell::new(data)), info: Sc::new(WriterInfo::new()) }
+    Self {
+      data: Sc::new(StateCell::new(data)),
+      info: Sc::new(WriterInfo::new()),
+      include_partial: false,
+    }
   }
 
   /// Determines if two `Stateful` instances point to the same underlying data.
@@ -197,14 +225,15 @@ impl<W> Stateful<W> {
     (s, u)
   }
 
-  fn write_ref(&self, scope: ModifyScope) -> WriteRef<'_, W> {
+  fn write_ref(&self, effect: ModifyEffect) -> WriteRef<'_, W> {
+    let path = wildcard_scope_path();
     let value = self.data.write();
-    WriteRef { value, modified: false, modify_scope: scope, info: &self.info, partial: None }
+    WriteRef { value, modified: false, modify_effect: effect, info: &self.info, path }
   }
 
   fn clone(&self) -> Self {
     self.info.inc_writer();
-    Self { data: self.data.clone(), info: self.info.clone() }
+    Self { data: self.data.clone(), info: self.info.clone(), include_partial: self.include_partial }
   }
 }
 
@@ -240,6 +269,10 @@ impl<W: std::fmt::Debug> std::fmt::Debug for Stateful<W> {
 
 impl<W: Default> Default for Stateful<W> {
   fn default() -> Self { Self::new(W::default()) }
+}
+
+impl Default for ModifyInfo {
+  fn default() -> Self { ModifyInfo { path: PartialPath::new(), effect: ModifyEffect::BOTH } }
 }
 
 #[cfg(test)]
@@ -296,7 +329,7 @@ mod tests {
     {
       drop_writer_subscribe(
         #[allow(clippy::redundant_closure)]
-        Stateful::new(()).part_writer(None, |v| PartMut::new(v)),
+        Stateful::new(()).part_writer(PartialId::any(), |v| PartMut::new(v)),
         drop_cnt.clone(),
       );
     };
@@ -306,7 +339,7 @@ mod tests {
     {
       drop_writer_subscribe(
         #[allow(clippy::redundant_closure)]
-        Stateful::new(()).part_writer(Some(""), |v| PartMut::new(v)),
+        Stateful::new(()).part_writer("".into(), |v| PartMut::new(v)),
         drop_cnt.clone(),
       );
     };
@@ -385,9 +418,9 @@ mod tests {
       &notified
         .borrow()
         .iter()
-        .map(|s| s.scope())
+        .map(|s| s.effect)
         .collect::<Vec<_>>(),
-      &[ModifyScope::BOTH]
+      &[ModifyEffect::BOTH]
     );
 
     {
@@ -400,9 +433,9 @@ mod tests {
       &notified
         .borrow()
         .iter()
-        .map(|s| s.scope())
+        .map(|s| s.effect)
         .collect::<Vec<_>>(),
-      &[ModifyScope::BOTH, ModifyScope::DATA]
+      &[ModifyEffect::BOTH, ModifyEffect::DATA]
     );
 
     {
@@ -424,9 +457,9 @@ mod tests {
       &notified
         .borrow()
         .iter()
-        .map(|s| s.scope())
+        .map(|s| s.effect)
         .collect::<Vec<_>>(),
-      &[ModifyScope::BOTH, ModifyScope::DATA]
+      &[ModifyEffect::BOTH, ModifyEffect::DATA]
     );
   }
 
