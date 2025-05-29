@@ -165,7 +165,7 @@ pub(super) fn init(classes: &mut Classes) {
     fn_widget! {
       let indicator = Provider::of::<Stateful<SpinnerArc>>(BuildCtx::get()).unwrap();
       let pi = Angle::pi();
-      @Animate {
+      let infinite_animate = @Animate {
         state: keyframes!{
           state: (part_writer!(&mut indicator.start), part_writer!(&mut indicator.end)),
           20% => (pi * 0.5, pi * 1.),
@@ -179,8 +179,12 @@ pub(super) fn init(classes: &mut Classes) {
         },
         transition: indeterminate_trans(),
         from: (Angle::zero(), pi * 0.1),
-      }.run();
-      @md_base_spinner(w, BuildCtx::color().r_into())
+      };
+      infinite_animate.run();
+      @FatObj {
+        on_disposed: move |_| infinite_animate.stop(),
+        @md_base_spinner(w, BuildCtx::color().r_into())
+      }
     }
     .into_widget()
   });
