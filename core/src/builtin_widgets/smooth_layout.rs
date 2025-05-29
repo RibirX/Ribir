@@ -305,7 +305,7 @@ macro_rules! impl_compose_child {
         let dirty = this.wrapper_dirty_phase();
         let h = inner
           .raw_modifies()
-          .filter(|b| b.contains(ModifyScope::FRAMEWORK))
+          .filter(|b| b.contains(ModifyEffect::FRAMEWORK))
           .subscribe(move |_| {
             let inner = inner.clone_writer();
             let marker = marker.clone();

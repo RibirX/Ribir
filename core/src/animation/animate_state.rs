@@ -89,7 +89,7 @@ where
   #[inline]
   fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
     StateWatcher::raw_modifies(self)
-      .filter(|s| s.contains(ModifyScope::all()))
+      .filter(|s| s.contains(ModifyEffect::all()))
       .box_it()
   }
 }

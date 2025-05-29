@@ -24,18 +24,18 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 <!-- next-header -->
 
 ## [@Unreleased] - @ReleaseDate
+
 ### BREAKING
-- **core**: refactor part_writer with id.(#762 @wjian23)
-  Some change is as follows:
-    1. map_reader rename to part_reader
-    2. map_watcher rename to part_watcher
-    3. The part_writer component merges the functionalities of map_writer and split_writer, using the parameter id: Option<&str> to determine behavior.
-    - id = None:
-      part_writer retains the original logic of map_writer, share notification with origin writer.
-    - id = Some(..): notification mechanisms are adjusted as follows:
-      - Writers generated via the same split_writer path will share the same notification source.
-      - Modifications to a split_writer will trigger notifications to the origin writer, but changes from the origin writer will not proactively notify the split_writer.
-      - Writers derived from the same source split_writer with different Id will not interfere with each other's notifications.
+
+- **core**: Refactor partial writer to use `PartialId` (#762 by @wjian23)  
+  Changes include:
+  - Renamed `map_reader` → `part_reader`
+  - Renamed `map_watcher` → `part_watcher`
+  - Merged `map_writer` and `split_writer` into a single `part_writer` method:
+    * Now accepts `id: PartialId` parameter
+    * Creates isolated child writers for specific data segments
+    * Child writers ignore parent modifications
+    * Parents control child modification propagation
 
 ## [0.4.0-alpha.39] - 2025-05-28
 

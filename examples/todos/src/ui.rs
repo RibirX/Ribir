@@ -60,7 +60,7 @@ fn task_lists(
           for id in $this.all_tasks() {
             if $this.get_task(id).map_or(false, cond) {
               let task = this.part_writer(
-                Some(&format!("task {id:?}")),
+                format!("task {id:?}").into(),
                 // task will always exist, if the task is removed,
                 // sthe widgets list will be rebuild.
                 move |todos| PartMut::new(todos.get_task_mut(id).unwrap()),
@@ -173,10 +173,10 @@ where
       $item.write().opacity = 0.;
       let transform = item
         .get_transform_widget()
-        .part_writer(None, |w| PartMut::new(&mut w.transform));
+        .part_writer(PartialId::any(), |w| PartMut::new(&mut w.transform));
       let opacity = item
         .get_opacity_widget()
-        .part_writer(None, |w| PartMut::new(&mut w.opacity));
+        .part_writer(PartialId::any(), |w| PartMut::new(&mut w.opacity));
       let fly_in = stagger.push_state(
         (transform, opacity),
         (Transform::translation(0., 64.), 0.),

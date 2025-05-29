@@ -32,7 +32,7 @@ impl<V: 'static> PipeValue<V> {
     match self {
       Self::Value(v) => (v, None),
       Self::Pipe { init_value, pipe } => {
-        let pipe = pipe.with_scope(ModifyScope::DATA);
+        let pipe = pipe.with_effect(ModifyEffect::DATA);
         (init_value, Some(pipe.into_observable()))
       }
     }

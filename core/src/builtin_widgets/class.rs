@@ -344,8 +344,8 @@ impl<'c> ComposeChild<'c> for Class {
           .filter(|msg| matches!(msg, FrameMsg::NewFrame(_)));
         let u = this2
           .raw_modifies()
-          .filter(|s| s.contains(ModifyScope::FRAMEWORK))
-          .merge(observable::of(ModifyInfo::new(ModifyScope::FRAMEWORK, None)))
+          .filter(|s| s.contains(ModifyEffect::FRAMEWORK))
+          .merge(observable::of(ModifyInfo::default()))
           .map(move |_| this2.read().clone())
           .distinct_until_changed()
           .skip(1)

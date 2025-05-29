@@ -837,10 +837,10 @@ fn fix_direct_use_part_writer_with_builtin() {
   fn _x(mut host: FatObj<Void>) {
     let _anchor = host
       .get_relative_anchor_widget()
-      .part_writer(None, |w| PartMut::new(&mut w.anchor));
+      .part_writer(PartialId::any(), |w| PartMut::new(&mut w.anchor));
     let _anchor = host
       .get_relative_anchor_widget()
-      .part_writer(None, |w| PartMut::new(&mut w.anchor));
+      .part_writer(PartialId::any(), |w| PartMut::new(&mut w.anchor));
   }
 }
 

@@ -592,12 +592,12 @@ impl DollarRefsScope {
       0 => quote! {},
       1 => {
         let upstream = self.refs[0].upstream_tokens();
-        quote! { observable::of(ModifyInfo::new(ModifyScope::BOTH, None)).merge(#upstream) }
+        quote! { observable::of(ModifyInfo::default()).merge(#upstream) }
       }
       _ => {
         let upstream = self.iter().map(DollarRef::upstream_tokens);
         quote_spanned! { self.refs[0].name.span() =>
-          observable::of(ModifyInfo::new(ModifyScope::BOTH, None))
+          observable::of(ModifyInfo::default())
             .merge(observable::from_iter([#(#upstream),*]).merge_all(usize::MAX))
         }
       }

@@ -34,7 +34,7 @@ impl<V: 'static> Pipe<V> {
     trigger: BoxOp<'static, ModifyInfo, Infallible>,
     map_handler: impl FnMut(ModifyInfo) -> V + 'static,
   ) -> Self {
-    let info = SubscribeInfo { scope: ModifyScope::DATA, priority: None };
+    let info = SubscribeInfo { effect: ModifyEffect::DATA, priority: None };
     let info: Sc<RefCell<SubscribeInfo>> = Sc::new(RefCell::new(info));
     let observable = PipeOp { source: trigger, info: info.clone() }
       .map(map_handler)
@@ -43,12 +43,12 @@ impl<V: 'static> Pipe<V> {
     Pipe { subscribe_info: info, observable }
   }
 
-  /// Sets the modification scope filter for this pipe.
+  /// Sets the modification effect filter for this pipe.
   ///
-  /// Only modifications matching this scope will trigger updates.
+  /// Only modifications matching this effect will trigger updates.
   /// Returns the modified Pipe for chaining.
-  pub fn with_scope(self, scope: ModifyScope) -> Self {
-    self.subscribe_info.borrow_mut().scope = scope;
+  pub fn with_effect(self, effect: ModifyEffect) -> Self {
+    self.subscribe_info.borrow_mut().effect = effect;
     self
   }
 
@@ -74,7 +74,7 @@ impl<V: 'static> Pipe<V> {
   /// new Pipe.
   ///
   /// This provides low-level access to chain Rx operators while maintaining
-  /// existing pipe configuration (scope and priority).
+  /// existing pipe configuration (effect and priority).
   ///
   /// # Example
   ///
@@ -106,7 +106,7 @@ impl<V: 'static> Pipe<V> {
 
     let priority = PipeWidgetPriority::new(pipe_node.clone(), BuildCtx::get().window());
     let pipe = self
-      .with_scope(ModifyScope::FRAMEWORK)
+      .with_effect(ModifyEffect::FRAMEWORK)
       .with_priority(priority);
 
     let tree_ptr = BuildCtx::get().tree_ptr();
@@ -150,7 +150,7 @@ impl<V: 'static> Pipe<V> {
     let node = PipeNode::empty_node(GenRange::Multi { first: dummy_id, last: dummy_id });
     let priority = PipeWidgetPriority::new(node.clone(), BuildCtx::get().window());
     let pipe = self
-      .with_scope(ModifyScope::FRAMEWORK)
+      .with_effect(ModifyEffect::FRAMEWORK)
       .with_priority(priority);
 
     let tree_ptr = BuildCtx::get().tree_ptr();
@@ -289,7 +289,7 @@ impl<V: 'static> Pipe<V> {
 
     let priority = PipeWidgetPriority::new(node.clone(), BuildCtx::get().window());
     let pipe = self
-      .with_scope(ModifyScope::FRAMEWORK)
+      .with_effect(ModifyEffect::FRAMEWORK)
       .with_priority(priority);
 
     assert!(!children.is_empty());
@@ -336,7 +336,7 @@ impl<V: 'static> Pipe<V> {
 }
 
 struct SubscribeInfo {
-  scope: ModifyScope,
+  effect: ModifyEffect,
   priority: Option<PipeWidgetPriority>,
 }
 
@@ -624,7 +624,7 @@ where
 
   fn actual_subscribe(self, observer: O) -> Self::Unsub {
     let mut info = self.info.borrow_mut();
-    let scope = info.scope;
+    let scope = info.effect;
 
     let priority = info.priority.take();
     let source = self.source.filter(move |s| s.contains(scope));

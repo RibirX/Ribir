@@ -528,7 +528,7 @@ mod tests {
     }
 
     let x = State::value(X { a: 0, _b: 1 });
-    let y = x.part_writer(Some("a"), |x| PartMut::new(&mut x.a));
+    let y = x.part_writer("a".into(), |x| PartMut::new(&mut x.a));
     {
       let h = y.query(&QueryId::of::<i32>()).unwrap();
       assert!(h.downcast_ref::<i32>().is_some());

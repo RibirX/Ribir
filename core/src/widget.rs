@@ -209,7 +209,7 @@ impl<'w> Widget<'w> {
     let tree = BuildCtx::get_mut().tree_mut();
     let marker = tree.dirty_marker();
     let h = upstream
-      .filter(|b| b.contains(ModifyScope::FRAMEWORK))
+      .filter(|b| b.contains(ModifyEffect::FRAMEWORK))
       .subscribe(move |_| {
         if let Some(id) = id.get() {
           marker.mark(id, dirty);
