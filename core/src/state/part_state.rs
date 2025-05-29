@@ -86,9 +86,8 @@ where
     Box::new(self.clone_watcher())
   }
 
-  #[inline]
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
-    let modifies = self.origin.raw_modifies();
+    let modifies = self.write().info.notifier.raw_modifies();
     let path = self.path.clone();
     let include_partial = self.include_partial;
 
@@ -181,3 +180,43 @@ where
 
 #[derive(Clone)]
 pub struct WriterMapReaderFn<F>(pub(crate) F);
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::{prelude::*, test_helper::*};
+
+  #[test]
+  fn isolated_writer() {
+    reset_test_env!();
+
+    let pair = Stateful::new((1., true));
+    let first = pair.part_writer("1.".into(), |v| PartMut::new(&mut v.0));
+    let second = pair.part_writer("2.".into(), |v| PartMut::new(&mut v.1));
+    let (notifies, w_notifies) = split_value(vec![]);
+
+    watch!(*$pair).subscribe({
+      let w_notifies = w_notifies.clone_writer();
+      move |_| w_notifies.write().push("pair")
+    });
+    watch!(*$first).subscribe({
+      let w_notifies = w_notifies.clone_writer();
+      move |_| w_notifies.write().push("first")
+    });
+    watch!(*$second).subscribe({
+      let w_notifies = w_notifies.clone_writer();
+      move |_| w_notifies.write().push("second")
+    });
+
+    assert_eq!(&*notifies.read(), &["pair", "first", "second"]);
+    *first.write() = 2.;
+    AppCtx::run_until_stalled();
+    assert_eq!(&*notifies.read(), &["pair", "first", "second", "first"]);
+    *second.write() = false;
+    AppCtx::run_until_stalled();
+    assert_eq!(&*notifies.read(), &["pair", "first", "second", "first", "second"]);
+    *pair.write() = (3., false);
+    AppCtx::run_until_stalled();
+    assert_eq!(&*notifies.read(), &["pair", "first", "second", "first", "second", "pair"]);
+  }
+}
