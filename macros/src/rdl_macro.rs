@@ -17,6 +17,7 @@ use crate::{
   declare_obj::DeclareObj,
   error::result_to_token_stream,
   symbol_process::{DollarRefsCtx, kw, symbol_to_macro},
+  util::declare_init_method,
 };
 
 pub enum RdlMacro {
@@ -173,7 +174,8 @@ impl Parse for DeclareField {
 impl ToTokens for DeclareField {
   fn to_tokens(&self, tokens: &mut TokenStream) {
     let DeclareField { member, value, .. } = self;
-    quote_spanned! {value.span()=> .#member(#value)}.to_tokens(tokens);
+    let init_method = declare_init_method(member);
+    quote_spanned! {value.span()=> .#init_method(#value)}.to_tokens(tokens);
   }
 }
 

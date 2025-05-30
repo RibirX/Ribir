@@ -41,6 +41,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
     * Creates isolated child writers for specific data segments
     * Child writers ignore parent modifications
     * Parents control child modification propagation
+- **core**: Field declaration methods must now start with `with_` prefix (#767 by @M-Adoo)
+  - This change does not break the declaration syntax but introduces a breaking change for declarer APIs.
+
 
 ## [0.4.0-alpha.39] - 2025-05-28
 

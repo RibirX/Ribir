@@ -1349,7 +1349,7 @@ mod tests {
           // margin is static, but its child MockBox is a pipe.
           let p = pipe!($son_watcher;).map(|_| fn_widget! { MockBox { size: Size::zero() }});
           let mut obj = FatObj::new(p);
-          obj.margin(EdgeInsets::all(1.));
+          obj.with_margin(EdgeInsets::all(1.));
           obj
         })
       };

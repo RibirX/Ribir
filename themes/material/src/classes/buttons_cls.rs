@@ -26,9 +26,9 @@ named_style_impl!(common_label_only => {
 fn text_button_init(classes: &mut Classes) {
   fn interactive(w: Widget) -> Widget {
     let mut w = base_interactive(w);
-    w.foreground(BuildCtx::color())
-      .clamp(BTN_40_CLAMP)
-      .radius(md::RADIUS_20);
+    w.with_foreground(BuildCtx::color())
+      .with_clamp(BTN_40_CLAMP)
+      .with_radius(md::RADIUS_20);
     w.into_widget()
   }
 
@@ -57,12 +57,13 @@ fn filled_button_init(classes: &mut Classes) {
   fn filled_interactive(w: Widget) -> Widget {
     let color = BuildCtx::color();
     let mut w = FatObj::new(w);
-    w.background(color).radius(md::RADIUS_20);
+    w.with_background(color)
+      .with_radius(md::RADIUS_20);
 
     let mut w = base_interactive(w.into_widget());
-    w.foreground(BuildCtx::color().on_this_color(BuildCtx::get()))
-      .radius(md::RADIUS_20)
-      .clamp(BTN_40_CLAMP);
+    w.with_foreground(BuildCtx::color().on_this_color(BuildCtx::get()))
+      .with_radius(md::RADIUS_20)
+      .with_clamp(BTN_40_CLAMP);
 
     w.into_widget()
   }
@@ -80,12 +81,12 @@ fn button_init(classes: &mut Classes) {
   fn btn_interactive(w: Widget) -> Widget {
     let outline = Palette::of(BuildCtx::get()).outline();
     let mut w = FatObj::new(w);
-    w.border(Border::all(BorderSide { color: outline.into(), width: 1. }));
+    w.with_border(Border::all(BorderSide { color: outline.into(), width: 1. }));
 
     let mut w = base_interactive(w.into_widget());
-    w.foreground(BuildCtx::color())
-      .radius(md::RADIUS_20)
-      .clamp(BTN_40_CLAMP);
+    w.with_foreground(BuildCtx::color())
+      .with_radius(md::RADIUS_20)
+      .with_clamp(BTN_40_CLAMP);
     w.into_widget()
   }
 
@@ -134,12 +135,12 @@ fn fab_init(classes: &mut Classes) {
     };
 
     let mut w = FatObj::new(w);
-    w.background(background);
+    w.with_background(background);
 
     let mut w = base_interactive(w.into_widget());
-    w.foreground(foreground)
-      .clamp(BoxClamp::min_width(btn_height).with_fixed_height(btn_height))
-      .radius(radius);
+    w.with_foreground(foreground)
+      .with_clamp(BoxClamp::min_width(btn_height).with_fixed_height(btn_height))
+      .with_radius(radius);
     w.into_widget()
   }
 
@@ -192,7 +193,7 @@ fn fab_init(classes: &mut Classes) {
   classes.insert(FAB_LABEL, |w| match fab_size() {
     FabSize::Large => {
       let mut w = FatObj::new(w);
-      w.padding(md::EDGES_HOR_16);
+      w.with_padding(md::EDGES_HOR_16);
       w.into_widget()
     }
     _ => common_btn_label(w),
@@ -211,10 +212,10 @@ fn base_interactive(w: Widget) -> FatObj<Widget> {
     FatObj::new(w)
   } else {
     let mut layers = InteractiveLayers::declarer();
-    layers.bounded(true);
+    layers.with_bounded(true);
     let layers = layers.finish();
     layers.map(move |l| l.with_child(w).into_widget())
   };
-  w.cursor(CursorIcon::Pointer);
+  w.with_cursor(CursorIcon::Pointer);
   w
 }

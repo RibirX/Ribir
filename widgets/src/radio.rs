@@ -57,7 +57,7 @@ pub struct Radio {
 
 impl RadioDeclarer {
   /// Initialize the radio value without supporting the pipe value format.
-  pub fn value<V: 'static>(&mut self, value: V) -> &mut Self {
+  pub fn with_value<V: 'static>(&mut self, value: V) -> &mut Self {
     self.value = Some(PipeValue::Value(Box::new(value)));
     self
   }
