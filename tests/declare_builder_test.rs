@@ -15,18 +15,18 @@ fn declarer_smoke() {
   }
 
   let mut b = <B as Declare>::declarer();
-  b.a(1.).b(1);
+  b.with_a(1.).with_b(1);
   let b = b.finish();
   assert_eq!(b.read().a, 1.);
   assert_eq!(b.read().b, 1);
 }
 
 #[test]
-#[should_panic = "Required field `T::_a` not set"]
+#[should_panic = "Required field `T::a` not set"]
 fn panic_if_miss_require_field() {
   #[derive(Declare)]
   struct T {
-    _a: f32,
+    a: f32,
   }
 
   let _ = <T as Declare>::declarer().finish();
@@ -67,7 +67,7 @@ fn declarer_simple_attr() {
   }
 
   let mut s = Simple::declarer();
-  s.a(1.).b(1);
+  s.with_a(1.).with_b(1);
   let s = s.finish();
   assert_eq!(s.read().a, 1.);
   assert_eq!(s.read().b, 1);

@@ -60,7 +60,7 @@ impl WidgetTree {
 
     let mut root = FatObj::new(child);
     root
-      .providers(providers)
+      .with_providers(providers)
       .on_disposed(move |_| location.write().release());
     let root = BuildCtx::get_mut().build(root.into_widget());
 

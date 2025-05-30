@@ -6,7 +6,7 @@ use syn::{
   spanned::Spanned,
 };
 
-use crate::util;
+use crate::util::{declare_init_method, doc_attr};
 const DECLARE_ATTR: &str = "declare";
 
 pub struct Declarer<'a> {
@@ -173,7 +173,6 @@ fn take_build_attr(field: &mut syn::Field) -> Option<DeclareAttr> {
 
 mod kw {
   use syn::custom_keyword;
-  custom_keyword!(rename);
   custom_keyword!(default);
   custom_keyword!(custom);
   custom_keyword!(skip);
@@ -188,7 +187,6 @@ pub(crate) struct DefaultMeta {
 
 #[derive(Default)]
 pub(crate) struct DeclareAttr {
-  pub(crate) rename: Option<syn::Ident>,
   pub(crate) default: Option<DefaultMeta>,
   pub(crate) custom: Option<kw::custom>,
   // field with `skip` attr, will not generate setter method and use default to init value.
@@ -229,13 +227,9 @@ impl<'a> DeclareField<'a> {
     }
   }
 
-  pub fn set_method_name(&self) -> &Ident {
-    self
-      .attr
-      .as_ref()
-      .and_then(|attr| attr.rename.as_ref())
-      .or(self.field.ident.as_ref())
-      .unwrap()
+  pub fn set_method_name(&self) -> Ident {
+    let name = self.field.ident.as_ref().unwrap();
+    declare_init_method(name)
   }
 
   pub fn need_set_method(&self) -> bool {
@@ -245,7 +239,7 @@ impl<'a> DeclareField<'a> {
       .is_none_or(|attr| attr.custom.is_none() && attr.skip.is_none())
   }
 
-  pub fn doc_attr(&self) -> Option<&Attribute> { util::doc_attr(self.field) }
+  pub fn doc_attr(&self) -> Option<&Attribute> { doc_attr(self.field) }
 }
 
 impl Parse for DeclareAttr {
@@ -256,11 +250,7 @@ impl Parse for DeclareAttr {
 
       // use input instead of lookahead to peek builtin, because need't complicate in
       // compile error.
-      if lookahead.peek(kw::rename) {
-        input.parse::<kw::rename>()?;
-        input.parse::<syn::Token![=]>()?;
-        attr.rename = Some(input.parse()?);
-      } else if lookahead.peek(kw::custom) {
+      if lookahead.peek(kw::custom) {
         attr.custom = Some(input.parse()?);
       } else if lookahead.peek(kw::default) {
         attr.default = Some(input.parse()?);

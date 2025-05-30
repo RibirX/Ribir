@@ -39,7 +39,7 @@ pub struct InteractiveLayersDeclarer {
 }
 
 impl InteractiveLayersDeclarer {
-  pub fn ring_outer_offset(&mut self, offset: f32) -> &mut Self {
+  pub fn with_ring_outer_offset(&mut self, offset: f32) -> &mut Self {
     self.ring_outer_offset = offset;
     self
   }

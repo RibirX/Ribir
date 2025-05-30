@@ -342,12 +342,12 @@ macro_rules! impl_smooth_layout_declare {
       }
 
       impl [<$name Declarer>] {
-        pub fn transition(&mut self, transition: impl Transition + 'static) -> &mut Self {
+        pub fn with_transition(&mut self, transition: impl Transition + 'static) -> &mut Self {
           self.transition = Some(Box::new(transition));
           self
         }
 
-        pub fn init_value(&mut self, init_value: impl Into<$init_ty>) -> &mut Self {
+        pub fn with_init_value(&mut self, init_value: impl Into<$init_ty>) -> &mut Self {
           self.init_value = Some(init_value.into());
           self
         }

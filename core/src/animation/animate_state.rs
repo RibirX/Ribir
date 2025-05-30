@@ -30,9 +30,9 @@ pub trait AnimateState: AnimateStateSetter {
     let state = self.clone_setter();
     let mut animate = Animate::declarer();
     animate
-      .transition(Box::new(transition))
-      .from(self.get())
-      .state(self);
+      .with_transition(Box::new(transition))
+      .with_from(self.get())
+      .with_state(self);
     let animate = animate.finish();
 
     let c_animate = animate.as_stateful().clone_writer();

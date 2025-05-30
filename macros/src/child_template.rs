@@ -7,6 +7,8 @@ use syn::{
   spanned::Spanned,
 };
 
+use crate::util::{declare_init_method, doc_attr};
+
 const BUILDER: &str = "Builder";
 const TEMPLATE: &str = "Template";
 fn with_child_generics(generics: &syn::Generics, child_ty: &Type) -> syn::Generics {
@@ -309,14 +311,15 @@ fn declare_field_methods<'a>(
 ) -> impl Iterator<Item = TokenStream> + 'a {
   fields.iter().map(move |field| {
     let field_name = field.ident.as_ref().unwrap();
-    let doc = crate::util::doc_attr(field);
+    let with_field = declare_init_method(field_name);
+    let doc = doc_attr(field);
     let ty = &field.ty;
 
     quote! {
       #[inline]
       #[allow(clippy::type_complexity)]
       #doc
-      #vis fn #field_name<K: ?Sized>(&mut self, v: impl RInto<#ty, K>) -> &mut Self
+      #vis fn #with_field<K: ?Sized>(&mut self, v: impl RInto<#ty, K>) -> &mut Self
       {
         self.#field_name = Some(v.r_into());
         self

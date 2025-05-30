@@ -106,12 +106,12 @@ pub fn init(classes: &mut Classes) {
       // Wrapping the tab header in a stack ensures the content retains its original
       // size.
       let stack = Stack::declarer().finish();
-      w.margin(md::EDGES_HOR_16)
-        .h_align(HAlign::Center)
-        .v_align(VAlign::Center);
+      w.with_margin(md::EDGES_HOR_16)
+        .with_h_align(HAlign::Center)
+        .with_v_align(VAlign::Center);
       stack.map(|p| p.with_child(w).into_widget())
     } else {
-      w.padding(md::EDGES_HOR_16);
+      w.with_padding(md::EDGES_HOR_16);
       w.map(IntoWidget::into_widget)
     };
 
@@ -192,7 +192,7 @@ fn indicator(pos: &TabPos) -> Widget<'static> {
      };
 
      if tt == TabType::Primary {
-      indicator.radius(match pos {
+      indicator.with_radius(match pos {
         TabPos::Top => Radius::top(3.),
         TabPos::Bottom => Radius::bottom(3.),
         TabPos::Left => Radius::left(3.),
@@ -209,10 +209,10 @@ fn indicator(pos: &TabPos) -> Widget<'static> {
     };
 
     match pos {
-      TabPos::Top =>  smooth.v_align(VAlign::Bottom),
-      TabPos::Bottom =>  smooth.v_align(VAlign::Top),
-      TabPos::Left =>  smooth.h_align(HAlign::Right),
-      TabPos::Right =>  smooth.h_align(HAlign::Left),
+      TabPos::Top =>  smooth.with_v_align(VAlign::Bottom),
+      TabPos::Bottom =>  smooth.with_v_align(VAlign::Top),
+      TabPos::Left =>  smooth.with_h_align(HAlign::Right),
+      TabPos::Right =>  smooth.with_h_align(HAlign::Left),
     };
     @ $smooth {
       @NoAffectedParentSize { @IgnorePointer {
