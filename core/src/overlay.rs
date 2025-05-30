@@ -155,7 +155,7 @@ impl Overlay {
     self.show_map(
       move |w| {
         let mut obj = FatObj::new(w);
-        obj.anchor(Anchor::from_point(pos));
+        obj.with_anchor(Anchor::from_point(pos));
         obj.into_widget()
       },
       wnd,
@@ -199,7 +199,7 @@ impl Overlay {
       let mut w = if background.is_some() || close_policy.contains(AutoClosePolicy::TAP_OUTSIDE) {
         let mut container = @Container { size: Size::splat(f32::INFINITY) };
         if let Some(background) = background.clone() {
-          container.background(background);
+          container.with_background(background);
         }
         if close_policy.contains(AutoClosePolicy::TAP_OUTSIDE) {
           container.on_tap(move |e| {

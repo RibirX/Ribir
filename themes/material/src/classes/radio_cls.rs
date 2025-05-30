@@ -13,11 +13,11 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(RADIO, |w| {
     let mut w = FatObj::new(w);
-    w.text_line_height(20.)
-      .cursor(CursorIcon::Pointer);
+    w.with_text_line_height(20.)
+      .with_cursor(CursorIcon::Pointer);
 
     if DisabledRipple::get(BuildCtx::get()) {
-      w.margin(md::EDGES_2);
+      w.with_margin(md::EDGES_2);
       // 24x24 if no ripple
       return w.into_widget();
     }

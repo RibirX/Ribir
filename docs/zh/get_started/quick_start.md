@@ -46,7 +46,7 @@ use ribir::prelude::*;
 
 fn hello_world() -> Widget<'static> {
   let mut text = Text::declarer();
-  text.text("Hello World!");
+  text.with_text("Hello World!");
   text.finish().into_widget()
 }
 

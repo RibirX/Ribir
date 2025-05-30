@@ -22,3 +22,11 @@ pub fn doc_attr(field: &syn::Field) -> Option<&syn::Attribute> {
     .iter()
     .find(|attr| matches!(&attr.meta, syn::Meta::NameValue(nv) if nv.path.is_ident("doc")))
 }
+
+pub fn declare_init_method(member: &syn::Ident) -> syn::Ident {
+  if member.to_string().starts_with("on_") {
+    member.clone()
+  } else {
+    syn::Ident::new(&format!("with_{}", member), member.span())
+  }
+}

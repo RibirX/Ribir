@@ -46,7 +46,7 @@ pub struct Selection {
 }
 
 impl<T> TextSelectableDeclarer<T> {
-  pub fn text<K: ?Sized>(&mut self, text: impl RInto<PipeValue<T>, K>) -> &mut Self {
+  pub fn with_text<K: ?Sized>(&mut self, text: impl RInto<PipeValue<T>, K>) -> &mut Self {
     let text = text.r_into().map(TextGlyphs::new);
     self.text = Some(text);
     self

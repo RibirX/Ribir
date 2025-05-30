@@ -14,12 +14,12 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(CHECKBOX, |w| {
     let mut w = FatObj::new(w);
-    w.text_line_height(18.)
-      .cursor(CursorIcon::Pointer);
+    w.with_text_line_height(18.)
+      .with_cursor(CursorIcon::Pointer);
 
     if DisabledRipple::get(BuildCtx::get()) {
       // 24x24 if no ripple
-      w.margin(EdgeInsets::all(3.));
+      w.with_margin(EdgeInsets::all(3.));
       return w.into_widget();
     }
 

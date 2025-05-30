@@ -53,7 +53,7 @@ pub trait MultiChild: Sized {
 ///
 ///   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
 ///     let mut w = FatObj::new(child);
-///     w.background(Color::RED); // Apply styling to composed child
+///     w.with_background(Color::RED); // Apply styling to composed child
 ///     w.into_widget()
 ///   }
 /// }
@@ -650,14 +650,15 @@ mod tests {
   );
 
   #[test]
+  #[allow(dead_code)]
   fn template_field() {
     #[derive(Template)]
     struct TemplateField {
       #[template(field = 0)]
-      _x: i32,
+      x: i32,
       #[template(field)]
-      _y: TextValue,
-      _child: Widget<'static>,
+      y: TextValue,
+      child: Widget<'static>,
     }
 
     #[derive(Declare)]
@@ -674,7 +675,7 @@ mod tests {
     let _ = fn_widget! {
       @X {
         @TemplateField {
-          _y: "hi",
+          y: "hi",
           // x is optional, is has a default value of 0
           // y: "hi",
           @Void {}
