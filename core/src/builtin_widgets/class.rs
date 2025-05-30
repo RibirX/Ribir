@@ -54,9 +54,12 @@ pub struct Classes {
 macro_rules! style_class {
 ($($field: ident: $value: expr),* $(,)?) => {
     (move |widget: $crate::prelude::Widget| {
-      let mut fat_ಠ_ಠ = $crate::prelude::FatObj::new(widget);
-      $(fat_ಠ_ಠ.$field($value);)*
-      fat_ಠ_ಠ.into_widget()
+      rdl! {
+        @FatObj {
+          $( $field: $value, )*
+          @ { widget }
+        }
+      }.into_widget()
     }) as $crate::prelude::ClassImpl
   };
 }
@@ -80,9 +83,12 @@ macro_rules! named_style_impl {
   }) => {
     $(#[$meta])*
     fn $style_name(widget: $crate::prelude::Widget) -> $crate::prelude::Widget {
-      let mut fat_ಠ_ಠ = $crate::prelude::FatObj::new(widget);
-      fat_ಠ_ಠ$(.$field($value))*;
-      fat_ಠ_ಠ.into_widget()
+      rdl! {
+        @FatObj {
+          $( $field: $value, )*
+          @ { widget }
+        }.into_widget()
+      }
     }
   };
 }
@@ -376,7 +382,7 @@ impl<'w, const M: usize> ComposeChild<'w> for [PipeValue<Option<ClassName>>; M] 
         PipeValue::Value(class) => Class { class }.with_child(widget).into_widget(),
         cls @ PipeValue::Pipe { .. } => {
           let mut widget = FatObj::new(widget);
-          widget.class(cls);
+          widget.with_class(cls);
           widget.into_widget()
         }
       };

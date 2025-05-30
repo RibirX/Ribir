@@ -44,14 +44,14 @@ pub struct ExpandedDeclarer {
 
 impl ExpandedDeclarer {
   #[track_caller]
-  pub fn flex<K: ?Sized>(&mut self, flex: impl RInto<PipeValue<f32>, K>) -> &mut Self {
+  pub fn with_flex<K: ?Sized>(&mut self, flex: impl RInto<PipeValue<f32>, K>) -> &mut Self {
     assert!(self.flex.is_none(), "`flex` is already set");
     self.flex = Some(flex.r_into());
     self
   }
 
   #[track_caller]
-  pub fn defer_alloc<K: ?Sized>(
+  pub fn with_defer_alloc<K: ?Sized>(
     &mut self, defer_alloc: impl RInto<PipeValue<bool>, K>,
   ) -> &mut Self {
     assert!(self.defer_alloc.is_none(), "`defer_alloc` is already set");

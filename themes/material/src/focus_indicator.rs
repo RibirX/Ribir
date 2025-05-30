@@ -69,9 +69,9 @@ impl FocusRing {
 
     let mut animate = Animate::declarer();
     animate
-      .from(0.)
-      .state(part_writer!(&mut ring.stroke_width))
-      .transition(Box::new(EasingTransition {
+      .with_from(0.)
+      .with_state(part_writer!(&mut ring.stroke_width))
+      .with_transition(Box::new(EasingTransition {
         duration: md::easing::duration::MEDIUM2,
         easing: easing::CubicBezierEasing::new(0.05, 1., 0.4, 3.),
       }));

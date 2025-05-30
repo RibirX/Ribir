@@ -66,7 +66,7 @@ But in practice, instead of writing it this way, we usually create the widget vi
 use ribir::prelude::*;
 
 let mut btn = Radio::declarer();
-btn.selected(true).on_tap(|_| println!("Radio clicked"));
+btn.with_selected(true).on_tap(|_| println!("Radio clicked"));
 let btn: FatObj<State<Radio>> = btn.finish();
 ```
 
@@ -102,10 +102,10 @@ Another advantage of using `Declare` to create widgets is that it supports initi
 use ribir::prelude::*;
 
 let mut radio1 = Radio::declarer();
-radio1.selected(true);
+radio1.with_selected(true);
 let radio1: FatObj<State<Radio>> = radio1.finish();
 let mut radio2 = Radio::declarer();
-radio2.selected(pipe!($radio1.selected));
+radio2.with_selected(pipe!($radio1.selected));
 let radio2 = radio2.finish();
 
 let _row = Row::declarer()
@@ -166,7 +166,7 @@ let counter = fn_widget! {
   let btn = btn.finish().with_child("Inc");
 
   let mut label = H1::declarer();
-  label.text(pipe!($cnt.to_string()));
+  label.with_text(pipe!($cnt.to_string()));
   let label = label.finish();
 
   @Row {
