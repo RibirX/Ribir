@@ -215,7 +215,7 @@ fn main() {
   let counter = fn_widget! {
     let btn = rdl! { Button {} };
     rdl!{ 
-      $btn {
+      (btn) {
         rdl!{ "0" }
       }
     }
@@ -542,7 +542,7 @@ fn show_name(name: State<String>) -> Widget<'static> {
     // making its lifecycle longer than that of the widget 
     // so we need to unsubscribe when the widget is destroyed.
 
-    @$text { on_disposed: move |_| u.unsubscribe() }
+    @(text) { on_disposed: move |_| u.unsubscribe() }
   }
   .into_widget()
 }

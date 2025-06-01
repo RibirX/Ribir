@@ -43,6 +43,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
     * Parents control child modification propagation
 - **core**: Field declaration methods must now start with `with_` prefix (#767 by @M-Adoo)
   - This change does not break the declaration syntax but introduces a breaking change for declarer APIs.
+- **macros**: Replaced `@ $var { ... }` syntax with `@(expr) { ... }` to support expression parent and provide more uniform syntax. (#768 @M-Adoo)
 
 
 ## [0.4.0-alpha.39] - 2025-05-28
@@ -428,7 +429,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Breaking
 
-- **macros**: Using `@ $w { ... }` will no longer automatically wrap a `FatObj` for `w`. (#639 @M-Adoo)
+- **macros**: Using expression parent (`@(w) { ... }` before `@ $w { ...}`) will no longer automatically wrap a `FatObj` for `w`. (#639 @M-Adoo)
 
 ## [0.4.0-alpha.12] - 2024-10-09
 
@@ -715,7 +716,7 @@ Check out our Wordle game demo, now running smoothly in your browser\!
 
 - **core**: rename builtin field of delay\_drop\_until to keep\_alive (\#561 @wjian23)
 
-- **macros**: polish the compile error message of invalid filed in `@$var {}` (\#556 @M-Adoo)
+- **macros**: polish the compile error message of invalid filed in `@(var) {}` (\#556 @M-Adoo)
 - **gpu**: Removed dependency on the texture array feature of wgpu. (\#562, @M-Adoo)
 - **algo**: removed `Resource` and rename `ShareResource` to `Resource`. (\#564, @M-Adoo)
 - **dev-helper**: Support specific the comparison of image tests. (\#573 @M-Adoo)

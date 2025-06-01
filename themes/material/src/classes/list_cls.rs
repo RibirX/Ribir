@@ -53,7 +53,7 @@ pub(super) fn init(classes: &mut Classes) {
         let align = if $item.layout_height() >= 80. { Align::Start } else { Align::Center };
         ListItemAlignItems(align)
       });
-      @ $item {
+      @(item) {
         providers: [Provider::value_of_watcher(align_provider)],
         @FatObj {
           clamp: BoxClamp::min_height(40.),
@@ -149,7 +149,7 @@ pub(super) fn init(classes: &mut Classes) {
       stack! {
         fit: StackFit::Passthrough,
         clamp: BoxClamp::min_width(48.),
-        @ $widget { h_align: HAlign::Center }
+        @(widget) { h_align: HAlign::Center }
       }
       .into_widget()
     } else {

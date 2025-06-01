@@ -107,7 +107,7 @@ mod tests {
       watch!($host.is_focused())
         .subscribe(move |v| *$w_focused.write() = v);
 
-      @$host {
+      @(host) {
         @MockBox {
           size: Size::new(50., 50.,),
           on_tap: move |_| *$w_tap.write() += 1,

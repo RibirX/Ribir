@@ -27,7 +27,7 @@ impl<'c> ComposeChild<'c> for PointerSelectRegion {
       let mut child = FatObj::new(child);
       let grab_handle = Stateful::new(None);
       let from = Stateful::new(None);
-      @ $child {
+      @(child) {
         on_pointer_down: move |e| {
           *$from.write() = Some(e.position());
         },

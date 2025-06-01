@@ -46,7 +46,7 @@ impl<'c> ComposeChild<'c> for Disabled {
           ignore: pipe! {
             if $this.disabled() { IgnoreScope::Subtree } else { IgnoreScope::None }
           },
-          @ $child { class: pipe!($this.disabled().then_some(DISABLED)) }
+          @(child) { class: pipe!($this.disabled().then_some(DISABLED)) }
         }
       }
     }

@@ -265,7 +265,7 @@ impl MenuControl {
       handle.0.borrow_mut().id = Some($w.track_id());
       @Providers {
         providers: smallvec![Provider::new(handle.clone())],
-        @ $w{
+        @(w) {
           on_custom_concrete_event: move |e: &mut MenuEvent| {
             if let MenuEventData::Complete{menu,  data, ..} = e.data() {
               if let Some(ParentMenuInfo {menu, idx}) = menu.0.borrow().item_trigger.as_ref() {
@@ -346,7 +346,7 @@ fn anchor_around(target: Rect) -> impl FnMut(Widget<'static>) -> Widget<'static>
   move |w: Widget<'static>| -> Widget<'static> {
     fn_widget! {
       let mut w = FatObj::new(w);
-      @ $w {
+      @(w) {
         global_anchor_x: GlobalAnchorX::custom(move |host, wnd| {
           let host_id = host.get().unwrap();
           let wnd_size = wnd.size();
@@ -406,7 +406,7 @@ impl<'w> MenuItem<'w> {
     fn_widget! {
       let leading = leading.map(|w| {
         let mut w = FatObj::new(w.unwrap());
-        @ $w { class: MENU_ITEM_LEADING }
+        @(w) { class: MENU_ITEM_LEADING }
       });
       let trailing_text = trailing_hint_text.map(
         |w| @Text{
@@ -416,7 +416,7 @@ impl<'w> MenuItem<'w> {
       );
       let trailing = trailing.map(|w| {
         let mut w = FatObj::new(w.unwrap());
-        @$w { class: MENU_ITEM_TRAILING }
+        @(w) { class: MENU_ITEM_TRAILING }
       });
 
       let content = custom.unwrap_or_else(|| {
@@ -518,7 +518,7 @@ fn wrap_menu_item<'w>(w: Widget<'w>, key: CowArc<str>, menu: &MenuControl) -> Wi
   fn_widget! {
     let mut w = FatObj::new(w);
     let idx = menu.new_item($w.track_id(), key);
-    @ $w{
+    @(w) {
       on_pointer_move: {
         let menu = menu.clone();
         move |e| {

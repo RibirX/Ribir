@@ -534,7 +534,7 @@ mod tests {
       if let Some(radius) = radius {
         mock_box.with_radius(radius);
       }
-      @ $mock_box {
+      @(mock_box) {
         margin: EdgeInsets::all(10.),
         background: Color::GRAY.with_alpha(0.5),
         border: Border {

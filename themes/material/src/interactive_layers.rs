@@ -56,8 +56,8 @@ impl<'c> ComposeChild<'c> for InteractiveLayers {
       .unwrap_or_else(|_| panic!("InteractiveLayers shouldn't be a stateless widget"));
 
     rdl! {
-      @ $ripple {
-        @ $hover_layer {
+      @(ripple) {
+        @(hover_layer) {
           @FocusIndicator {
             ring_outer_offset: ring_outer_offset,
             @ { child }

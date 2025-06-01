@@ -96,7 +96,7 @@ pub(super) fn init(classes: &mut Classes) {
         transition: ICON_TRANS.box_it(),
         from: Size::new(0., 2.),
       };
-      @ $icon {
+      @(icon) {
         on_mounted: move |_| enter.run(),
         @ { w }
       }

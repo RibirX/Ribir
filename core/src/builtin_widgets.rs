@@ -171,7 +171,7 @@ macro_rules! fat_obj {
   ($($t: tt)*) => {
     fn_widget! {
       let mut obj = FatObj::<()>::default();
-      @ $obj { $($t)* }
+      @(obj) { $($t)* }
     }
   };
 }

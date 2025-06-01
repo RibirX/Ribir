@@ -29,7 +29,7 @@ impl<'c> ComposeChild<'c> for Ripple {
       let mut ripple_layer = PressedLayer::new(LayerArea::FullContent);
       init_ripple_launcher(&this, &mut ripple_layer);
 
-      @ $ripple_layer {
+      @(ripple_layer) {
         on_pointer_down: move |e| {
           let pos = (!$this.center).then(||e.position());
           $this.launch(pos);

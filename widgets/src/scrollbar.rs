@@ -106,7 +106,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
               }
             };
 
-            @ $h_track {
+            @(h_track) {
               on_tap: move |e| if e.is_primary {
                 let rate = e.position().x / $h_track.layout_width();
                 let mut scroll = $scroll.write();
@@ -114,7 +114,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
                 let scroll_pos = Point::new(x, scroll.get_scroll_pos().y);
                 scroll.jump_to(scroll_pos);
               },
-              @ $h_thumb {
+              @(h_thumb) {
                 anchor: distinct_pipe!{
                   let rate = $scroll.get_x_scroll_rate();
                   let distance = $h_track.layout_width() - $h_thumb.layout_width();
@@ -140,7 +140,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
               }
             };
 
-            @ $v_track {
+            @(v_track) {
               on_tap: move |e| if e.is_primary {
                 let rate = e.position().y / $v_track.layout_height();
                 let mut scroll = $scroll.write();
@@ -148,7 +148,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
                 let scroll_pos = Point::new(scroll.get_scroll_pos().x, y);
                 scroll.jump_to(scroll_pos);
               },
-              @ $v_thumb {
+              @(v_thumb) {
                 anchor: distinct_pipe!{
                   let rate = $scroll.get_y_scroll_rate();
                   let distance = $v_track.layout_height() - $v_thumb.layout_height();
@@ -161,7 +161,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
         let mut scroll = FatObj::new(scroll);
         @Stack {
           fit: StackFit::Passthrough,
-          @ $scroll {
+          @(scroll) {
             class: SCROLL_CLIENT_AREA,
             @{ child }
           }
@@ -201,7 +201,7 @@ mod test {
     init,
     WidgetTester::new(fn_widget! {
       let scrollbar = Scrollbar::new(Scrollable::Both);
-      @ $scrollbar {
+      @(scrollbar) {
         @Container { size: Size::new(500., 500.) }
       }
     })
@@ -219,7 +219,7 @@ mod test {
 
       WidgetTester::new(fn_widget! {
         let scrollbar = Scrollbar { scroll : inner.clone_writer() };
-        @ $scrollbar {
+        @(scrollbar) {
           @Container { size: Size::new(500., 500.) }
         }
       })

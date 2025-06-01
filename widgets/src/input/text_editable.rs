@@ -34,7 +34,7 @@ impl<T: Default + VisualText + EditText + Clone + 'static> Compose for BasicEdit
 
       @Stack {
         fit: StackFit::Passthrough,
-        @ $text {
+        @(text) {
           margin: pipe!(EdgeInsets::only_right($caret.layout_width())),
           on_focus_in: move |e| { e.window().set_ime_allowed(true); },
           on_focus_out: move|e| { e.window().set_ime_allowed(false); },

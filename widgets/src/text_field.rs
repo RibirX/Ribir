@@ -107,7 +107,7 @@ impl<'c> ComposeChild<'c> for TextFieldThemeProxy {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       let mut child = FatObj::new(child);
-      @ $child {
+      @(child) {
         on_tap: move |_| {
           let mut this = $this.write();
           match this.state {
@@ -364,7 +364,7 @@ fn build_input_area(
       }
       @Expanded {
         flex: 1.,
-        @ $input { }
+        @ { input }
       }
       @{
         suffix.map(|s| @Text{
@@ -415,7 +415,7 @@ fn build_content_area(
     part_writer!(&mut content_area.padding)
       .transition(transitions::LINEAR.of(BuildCtx::get()));
 
-    @ $content_area {
+    @(content_area) {
       @ {
         label.map(|label| @Expanded {
           flex: 1.,

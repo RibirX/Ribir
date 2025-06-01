@@ -69,7 +69,7 @@ pub enum GlobalAnchorY {
 ///   @Container {
 ///     size: Size::new(200., 100.),
 ///     padding: EdgeInsets::all(20.0),
-///     @ $button {
+///     @(button) {
 ///       on_tap: move |e| overlay.show(e.window()),
 ///     }
 ///   }
@@ -281,7 +281,7 @@ impl<'c> ComposeChild<'c> for GlobalAnchor {
             apply_global_anchor(&this2, &anchor_widget, $child.track_id(), wnd.clone());
           });
 
-      @ $child {
+      @(child) {
         on_disposed: move |_| {
           u.unsubscribe();
           $this.guard.borrow_mut().take();
@@ -385,7 +385,7 @@ mod tests {
         global_anchor_y: GlobalAnchorY::bottom_align_to($parent.track_id(), 20.),
       };
 
-      @ $parent {
+      @(parent) {
         @MockStack {
           @ { top_left }
           @ { bottom_right }

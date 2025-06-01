@@ -23,7 +23,7 @@ impl<'c> ComposeChild<'c> for FocusScope {
       let mut child = FatObj::new(child);
       let guard = Sc::new(RefCell::new(None));
       let guard2 = guard.clone();
-      @ $child {
+      @(child) {
         on_mounted: move |e| {
           *guard.borrow_mut() = Some(
             Window::add_focus_node(e.window(), $child.track_id(), false, FocusType::Scope)
@@ -174,7 +174,7 @@ mod tests {
         on_pointer_down: move |_| $host.request_focus(FocusReason::Pointer)
       };
       @MockMulti {
-        @$host {
+        @(host) {
           @MockMulti {
             @MockBox { size, on_key_down: move |_| *$tap_cnt.write() += 1, }
           }

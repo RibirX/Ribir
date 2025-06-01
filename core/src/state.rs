@@ -712,7 +712,7 @@ mod tests {
 
     let _state_with_child = fn_widget! {
       let cc = State::value(CC);
-      @$cc { @{ Void } }
+      @(cc) { @{ Void } }
     };
 
     let _state_without_child = fn_widget! {
@@ -721,7 +721,7 @@ mod tests {
 
     let _stateful_with_child = fn_widget! {
       let cc = Stateful::new(CC);
-      @$cc { @{ Void } }
+      @(cc) { @{ Void } }
     };
 
     let _stateful_without_child = fn_widget! {
@@ -730,7 +730,7 @@ mod tests {
 
     let _writer_with_child = fn_widget! {
       let cc = Stateful::new(CC).clone_writer();
-      @$cc { @{ Void } }
+      @(cc) { @{ Void } }
     };
 
     let _writer_without_child = fn_widget! {
@@ -740,7 +740,7 @@ mod tests {
     let _part_writer_with_child = fn_widget! {
       let w = Stateful::new((CC, 0))
         .part_writer(PartialId::any(), |v| PartMut::new(&mut v.0));
-      @$w { @{ Void } }
+      @(w) { @{ Void } }
     };
 
     let _part_writer_without_child = fn_widget! {
@@ -751,7 +751,7 @@ mod tests {
     let _part_writer_with_child = fn_widget! {
       let w = Stateful::new((CC, 0))
         .part_writer("".into(), |v| PartMut::new(&mut v.0));
-      @$w { @{ Void } }
+      @(w) { @{ Void } }
     };
 
     let _part_writer_without_child = fn_widget! {

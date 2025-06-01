@@ -81,7 +81,7 @@ impl ComposeChild<'static> for Radio {
       on_tap: move |_| $this.write().selected = true,
       @ {
         let classes = class_array![distinct_pipe!($this.radio_class_name()), RADIO];
-        let icon = @ $classes {
+        let icon = @(classes) {
           @Icon {
             on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
               $this.write().selected = true

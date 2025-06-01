@@ -47,7 +47,7 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
     } else {
       w.with_h_align(HAlign::Right);
     }
-    let mut w = @ $w {
+    let mut w = @(w) {
       opacity: 0.,
       visible: false,
       background: {
@@ -99,7 +99,7 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
         .subscribe(auto_hide)
     };
 
-    @ $w { on_disposed: move |_| u.unsubscribe() }
+    @(w) { on_disposed: move |_| u.unsubscribe() }
   }
   .into_widget()
 }

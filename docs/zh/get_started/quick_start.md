@@ -219,7 +219,7 @@ fn main() {
   let counter = fn_widget! {
     let btn = rdl! { Button {} };
     rdl!{ 
-      $btn {
+      (btn) {
         rdl!{ "0" }
       }
     }
@@ -548,7 +548,7 @@ fn show_name(name: State<String>) -> Widget<'static> {
 
     // `name` 是一个可共享的状态，它可能被其他人持有，使它的生命周期长于 widget 
     // 所以我们需要在 widget 销毁时取消订阅
-    @$text { on_disposed: move |_| u.unsubscribe() }
+    @(text) { on_disposed: move |_| u.unsubscribe() }
   }
   .into_widget()
 }

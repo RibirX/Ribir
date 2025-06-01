@@ -301,7 +301,7 @@ mod test {
       }.into_widget();
 
       let mut w = FatObj::new(w);
-      @$ w {
+      @(w) {
         anchor: Anchor::top(30.)
       }
     })

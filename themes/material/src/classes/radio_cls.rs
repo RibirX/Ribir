@@ -37,7 +37,7 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(RADIO_SELECTED_ICON, |w| {
     let mut w = FatObj::new(w);
     rdl! {
-      let mut bullet = @ $w  {
+      let mut bullet = @(w)  {
         clamp: BoxClamp::fixed_size(md::SIZE_10),
         background: BuildCtx::color(),
         radius: md::RADIUS_5,

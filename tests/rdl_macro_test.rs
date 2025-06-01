@@ -40,7 +40,7 @@ widget_layout_test!(
   rdl_with_child,
   WidgetTester::new(fn_widget! {
     let single_p = rdl!{ SizedBox { size: Size::new(500.,500.)  }};
-    rdl!{ $single_p { rdl!{ Void } } }
+    rdl!{ (single_p) { rdl!{ Void } } }
   }),
   LayoutCase::default().with_size(Size::new(500., 500.))
 );
@@ -52,7 +52,7 @@ widget_layout_test!(
       size: Size::new(500.,500.),
       margin: EdgeInsets::all(10.)
     }};
-    rdl!{ $single_p { rdl!{ Void } } }
+    rdl!{ (single_p) { rdl!{ Void } } }
   }),
   LayoutCase::default().with_size(Size::new(520., 520.))
 );
@@ -63,7 +63,7 @@ widget_layout_test!(
     let multi_p = rdl!{ Flex {
       margin: EdgeInsets::all(10.)
     } };
-    rdl!{ $multi_p { rdl!{ Void } } }
+    rdl!{ (multi_p) { rdl!{ Void } } }
   }),
   LayoutCase::default().with_size(Size::new(20., 20.))
 );
@@ -72,7 +72,7 @@ widget_layout_test!(
   compose_child_rdl_has_builtin_with_child,
   WidgetTester::new(fn_widget! {
     let multi_p = rdl!{ Row { margin: EdgeInsets::all(10.) }};
-    rdl!{ $multi_p { rdl!{ Void {} }} }
+    rdl!{ (multi_p) { rdl!{ Void {} }} }
   }),
   LayoutCase::default().with_size(Size::new(20., 20.))
 );
@@ -116,7 +116,7 @@ widget_layout_test!(
   dollar_as_rdl_parent,
   WidgetTester::new(fn_widget! {
     let b = rdl!{SizedBox { size: Size::new(500.,500.) }};
-    rdl!{ $b { rdl!{ Void {}} } }
+    rdl!{ (b) { rdl!{ Void {}} } }
   }),
   LayoutCase::default().with_size(Size::new(500., 500.))
 );
@@ -125,7 +125,7 @@ widget_layout_test!(
   dollar_as_middle_parent,
   WidgetTester::new(fn_widget! {
     let b = rdl!{ SizedBox { size: Size::new(500.,500.) }};
-    rdl!{ Row { rdl!{ $b { rdl!{ Void {} } } } } }
+    rdl!{ Row { rdl!{ (b) { rdl!{ Void {} } } } } }
   }),
   LayoutCase::default().with_size(Size::new(500., 500.))
 );
@@ -207,7 +207,7 @@ fn pipe_single_parent() {
       }
     };
     rdl!{
-      $blank {
+      (blank) {
         rdl!{ SizedBox { size: Size::new(100., 100.) } }
       }
     }
@@ -241,7 +241,7 @@ fn pipe_multi_parent() {
     };
 
     rdl!{
-      $container {
+      (container) {
         rdl!{ SizedBox { size: Size::new(100., 100.) } }
         rdl!{ SizedBox { size: Size::new(100., 100.) } }
       }
@@ -322,7 +322,7 @@ widget_layout_test!(
   WidgetTester::new(fn_widget! {
     let size = Size::new(100., 100.);
     let row = @Row {};
-    @ $row {
+    @(row) {
       // @ in @
       @SizedBox { size }
       // `rdl!` in @
@@ -338,7 +338,7 @@ widget_layout_test!(
     let size = Size::new(100., 100.);
     let row = @Row {};
     rdl!{
-      $row {
+      (row) {
         @SizedBox { size }
         @SizedBox { size }
       }
@@ -367,7 +367,7 @@ fn closure_in_fn_widget_capture() {
   let w = fn_widget! {
     let mut text = @ Text { text: "hi" };
     let on_mounted = move |_: &mut _| *$hi_res.write() =$text.text.clone();
-    @ $text { on_mounted }
+    @(text) { on_mounted }
   };
 
   let mut wnd = TestWindow::new(w);
@@ -434,7 +434,7 @@ fn event_attr_sugar_work() {
   const AFTER_TAP_SIZE: Size = Size::new(100., 100.);
   let w = fn_widget! {
     let sized_box = @SizedBox { size: BEFORE_SIZE };
-    @$sized_box {
+    @(sized_box) {
       @SizedBox {
         size: pipe!($sized_box.size),
         on_tap: move |_| $sized_box.write().size = AFTER_TAP_SIZE,
@@ -530,7 +530,7 @@ fn embed_widget_ref_outside() {
     let first = @SizedBox { size: Size::new(1., 1.) };
     let three_box = @{ (0..3).map(move |_| @ SizedBox { size: pipe!($first.size) } )};
     @Flex {
-      @$first { on_tap: move |_| $first.write().size = Size::new(2., 2.)}
+      @(first) { on_tap: move |_| $first.write().size = Size::new(2., 2.)}
       @{ three_box }
     }
   };
@@ -614,7 +614,7 @@ fn builtin_ref() {
     };
     @Flex {
       cursor: pipe!($tap_box.cursor),
-      @$tap_box {
+      @(tap_box) {
         on_tap: move |_| {
           $tap_box.write().cursor = CursorIcon::AllScroll;
           *$w_icon.write() = $tap_box.cursor;
@@ -639,7 +639,7 @@ fn builtin_bind_to_self() {
   let w = fn_widget! {
     let w_icon = w_icon.clone_writer();
     let sized_box = @SizedBox { size: Size::new(5., 5.) };
-    @$sized_box {
+    @(sized_box) {
       cursor: pipe!{
         let icon = if $sized_box.size.area() < 100. {
           CursorIcon::Pointer
@@ -712,7 +712,7 @@ fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
   let w = fn_widget! {
     let mut margin = @Margin { margin: EdgeInsets::all(1.) };
     watch!($margin.margin).subscribe(|_| {});
-    @$margin  { @Void {} }
+    @(margin)  { @Void {} }
   };
 
   let wnd = TestWindow::new(w);
@@ -723,7 +723,7 @@ fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
 fn fix_access_builtin_with_gap() {
   let _ = fn_widget! {
     let mut this = @Void { cursor: CursorIcon::Pointer };
-    @$this {
+    @(this) {
       on_tap: move |_| {
         // this access cursor across `silent` should compile pass.
         let _ = $this.silent().cursor;
@@ -743,7 +743,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
     let h = watch!(*$trigger).subscribe(move |_| *$w_cnt.write() +=1 );
     container.on_disposed(move |_| h.unsubscribe());
 
-    @$container {
+    @(container) {
       @ {
         pipe!{$trigger.then(|| fn_widget!{
           @SizedBox { size: Size::zero() }
@@ -848,7 +848,7 @@ fn fix_direct_use_part_writer_with_builtin() {
 fn fix_use_var_in_children() {
   let _w = fn_widget! {
     let mut p = @MockBox { size: Size::zero() };
-    @ $p {
+    @(p) {
       opacity: 1.,
       // Use layout size query write of `p`
       @MockBox { opacity: $p.opacity }

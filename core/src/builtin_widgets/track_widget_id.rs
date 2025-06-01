@@ -44,7 +44,7 @@ mod tests {
     let w = fn_widget! {
       let w = @ pipe!(*$trigger).map(move |_| fn_widget!{ @ Void {} });
       let mut w = FatObj::new(w);
-      @ $w {
+      @(w) {
         on_mounted: move |_| {
           *$w_id.write() = Some($w.track_id());
         }

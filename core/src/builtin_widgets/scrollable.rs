@@ -58,7 +58,7 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
       };
 
       let mut child = FatObj::new(child);
-      let child = @ $child {
+      let child = @(child) {
         anchor: distinct_pipe!{
           let this = $this;
           let pos = this.get_scroll_pos();
@@ -74,7 +74,7 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
 
       $this.write().view_id = Some($view.track_id());
 
-      @ $view {
+      @(view) {
         on_performed_layout: move |_| {
           let view_size = $view.size.get();
           if $this.page != view_size {

@@ -255,7 +255,7 @@ impl<'w> Tab<'w> {
             Provider::write_of::<Tabs>(e).unwrap().set_active(idx);
           }
         },
-        @ $line {
+        @(line) {
           @ { self.icon.map(|icon| icon! { class: TAB_ICON, @{ icon } }) }
           @ { self.label.map(|label| text! { text: label, class: TAB_LABEL }) }
         }
