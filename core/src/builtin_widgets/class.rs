@@ -631,15 +631,15 @@ mod tests {
   fn class_array() {
     reset_test_env!();
 
-    let wnd = TestWindow::from_widget(fn_widget! {
-        let margin_and_clamp = class_array![MARGIN, CLAMP_50];
-        @Providers {
-          providers: smallvec![initd_classes().into_provider()],
-          @(margin_and_clamp) {
-            @Container {
-              size: Size::new(100., 100.),
-            }
+    let mut wnd = TestWindow::from_widget(fn_widget! {
+      let margin_and_clamp = class_array![MARGIN, CLAMP_50];
+      @Providers {
+        providers: smallvec![initd_classes().into_provider()],
+        @(margin_and_clamp) {
+          @Container {
+            size: Size::new(100., 100.),
           }
+        }
       }
     });
 
