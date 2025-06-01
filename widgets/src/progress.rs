@@ -102,7 +102,7 @@ impl Compose for SpinnerProgress {
       // as the class may need to perform animations on the spinner.
       @Providers {
         providers: [Provider::new(spinner.clone_writer().into_stateful())],
-        @ $spinner {
+        @(spinner) {
           class: distinct_pipe! {
             if $this.value.is_some() {
               SPINNER_DETERMINATE

@@ -406,7 +406,7 @@ impl<'c> ComposeChild<'c> for ListItem {
 
     providers! {
       providers: [Provider::new(item_struct_info)],
-      @ $item_classes { @ { child.compose_sections() } }
+      @(item_classes) { @ { child.compose_sections() } }
     }
     .into_widget()
   }
@@ -697,7 +697,7 @@ impl List {
       list_item.into_widget()
     } else {
       rdl! {
-        @ $list_item {
+        @(list_item) {
           on_tap: move |_| ListItem::select_action($item.write(), mode),
           on_key_down: move |e| {
             if matches!(e.key(), VirtualKey::Named(NamedKey::Enter)

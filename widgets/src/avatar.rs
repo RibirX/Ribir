@@ -46,7 +46,7 @@ impl<'c> ComposeChild<'c> for Avatar {
       class: child.container_class(),
       clip_boundary: true,
       size: Size::splat(40.),
-      @ child.wrap_with_class()
+      @ { child.wrap_with_class() }
     }
     .into_widget()
   }

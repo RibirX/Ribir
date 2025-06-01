@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{ToTokens, quote_spanned};
 use smallvec::SmallVec;
 use syn::{
@@ -17,19 +17,41 @@ use crate::{
 };
 
 pub struct DeclareObj {
-  span: Span,
   this: ObjNode,
   children: SmallVec<[Macro; 1]>,
 }
 enum ObjType {
-  Type {
-    span: Span,
-    ty: Path,
-  },
-  Var {
-    var: Ident,
-    /// All references that used this var in the whole `DeclareObj`
-    used_me: DollarRefsScope,
+  Type(Path),
+  Expr {
+    expr: Ident,
+    /// A virtual scope that collects references used in the object's fields.
+    ///
+    /// This prevents double mutable borrow issues that can occur when
+    /// expression object is captured by its built-in fields.
+    ///
+    /// # Example
+    ///
+    /// Without collecting references, consider the following example:
+    ///
+    /// ```ignore
+    /// @(parent) {
+    ///   on_mounted: move |e| { *$write(parent.visible()) = true }
+    /// }
+    /// ```
+    ///
+    /// This expands to:
+    ///
+    /// ```ignore
+    /// parent.on_mounted({
+    ///   let visible = parent.visible().clone_writer();
+    ///   move |e| { *visible.write() = true }
+    /// });
+    /// ```
+    ///
+    /// This would result in two mutable borrows of `parent`:
+    /// 1. The first mutable borrow occurs on `parent.on_mounted()`.
+    /// 2. The second mutable borrow occurs on `parent.visible()`.
+    fields_used: DollarRefsScope,
   },
 }
 struct ObjNode {
@@ -51,20 +73,20 @@ impl DeclareObj {
         .collect()
     }
 
-    let StructLiteral { span, parent, mut fields, mut children } = stl;
+    let StructLiteral { parent, mut fields, mut children } = stl;
 
     let node_type = match parent {
       RdlParent::Type(ty) => {
         fields = fold_fields(fields, refs);
-        ObjType::Type { ty, span }
+        ObjType::Type(ty)
       }
-      RdlParent::Var(var) => {
+      RdlParent::Expr(expr) => {
         // Collect all dollar references to this var in its fields.
-        refs.new_dollar_scope(Some(var.clone()));
+        refs.new_dollar_scope(Some(expr.clone()));
         fields = fold_fields(fields, refs);
-        let used_me = refs.pop_dollar_scope(false);
+        let fields_used = refs.pop_dollar_scope(false);
 
-        ObjType::Var { var, used_me }
+        ObjType::Expr { expr, fields_used }
       }
     };
     children = children
@@ -72,17 +94,17 @@ impl DeclareObj {
       .map(|m| refs.fold_macro(m))
       .collect();
     let this = ObjNode { node_type, fields };
-    DeclareObj { this, span, children }
+    DeclareObj { this, children }
   }
 }
 
 impl ToTokens for DeclareObj {
   fn to_tokens(&self, tokens: &mut TokenStream) {
-    let Self { this, span, children } = self;
+    let Self { this, children } = self;
     if self.is_one_line_node() && children.is_empty() {
       self.gen_node_tokens(tokens);
     } else {
-      Brace(*span).surround(tokens, |tokens| {
+      Brace::default().surround(tokens, |tokens| {
         self.gen_node_tokens(tokens);
 
         if !children.is_empty() {
@@ -93,8 +115,8 @@ impl ToTokens for DeclareObj {
             children.push(child)
           }
           match &this.node_type {
-            ObjType::Type { span, .. } => quote_spanned! { *span => _ಠ_ಠ }.to_tokens(tokens),
-            ObjType::Var { var, .. } => var.to_tokens(tokens),
+            ObjType::Type(ty) => quote_spanned! { ty.span() => _ಠ_ಠ }.to_tokens(tokens),
+            ObjType::Expr { expr, .. } => expr.to_tokens(tokens),
           };
           children.into_iter().for_each(|name| {
             quote_spanned! { name.span() => .with_child(#name) }.to_tokens(tokens)
@@ -107,7 +129,7 @@ impl ToTokens for DeclareObj {
 
 impl DeclareObj {
   pub fn error_check(&self) -> Result<(), Error> {
-    if matches!(self.this.node_type, ObjType::Var { .. }) {
+    if matches!(self.this.node_type, ObjType::Expr { .. }) {
       let invalid_fields = self
         .this
         .fields
@@ -130,60 +152,64 @@ impl DeclareObj {
     let this = &self.this;
     match &this.node_type {
       ObjType::Type { .. } => this.fields.is_empty(),
-      ObjType::Var { used_me, .. } => used_me.is_empty() && this.fields.is_empty(),
+      ObjType::Expr { fields_used, .. } => fields_used.is_empty() && this.fields.is_empty(),
     }
   }
 
   fn gen_node_tokens(&self, tokens: &mut TokenStream) {
     match &self.this.node_type {
-      ObjType::Type { ty, span } => {
+      ObjType::Type(ty) => {
         if self.children.is_empty() && self.this.fields.is_empty() {
-          quote_spanned! { *span => #ty::declarer().finish() }.to_tokens(tokens)
+          quote_spanned! { ty.span() => #ty::declarer().finish() }.to_tokens(tokens)
         } else {
-          let name = Ident::new("_ಠ_ಠ", *span);
+          let span = ty.span();
+          let name = Ident::new("_ಠ_ಠ", span);
           if self.this.fields.is_empty() {
-            quote_spanned! { *span => let #name = #ty::declarer().finish(); }.to_tokens(tokens);
+            quote_spanned! { span => let #name = #ty::declarer().finish(); }.to_tokens(tokens);
           } else {
-            quote_spanned! { *span => let mut #name = #ty::declarer(); }.to_tokens(tokens);
+            quote_spanned! { span => let mut #name = #ty::declarer(); }.to_tokens(tokens);
             self.gen_fields_tokens(&name, tokens);
             if self.children.is_empty() {
-              quote_spanned! { *span => #name.finish() }.to_tokens(tokens);
+              quote_spanned! { span => #name.finish() }.to_tokens(tokens);
             } else {
-              quote_spanned! { *span => let #name = #name.finish(); }.to_tokens(tokens);
+              quote_spanned! { span => let #name = #name.finish(); }.to_tokens(tokens);
             }
           }
         }
       }
-      ObjType::Var { var, used_me } => {
+      ObjType::Expr { expr, fields_used } => {
+        // todo: we can not care if it self reference used in the fields, if
+        // we capture builtin state as normal.
+
         // if has capture self, rename to `_ಠ_ಠ` avoid conflict name.
-        let self_ref = used_me.iter().find(|r| r.builtin.is_none());
+        let self_ref = fields_used.iter().find(|r| r.builtin.is_none());
         if let Some(mut self_ref) = self_ref.cloned() {
-          used_me
+          fields_used
             .iter()
             .filter(|r| r.builtin.is_some())
             .for_each(|r| r.to_tokens(tokens));
 
-          let name = Ident::new("_ಠ_ಠ", var.span());
-          quote_spanned! { var.span() =>  let mut #name = #var;}.to_tokens(tokens);
+          let name = Ident::new("_ಠ_ಠ", expr.span());
+          quote_spanned! { expr.span() =>  let mut #name = #expr;}.to_tokens(tokens);
           let orig = std::mem::replace(&mut self_ref.name, name.clone());
           self_ref.capture_state(&orig, tokens);
 
           self.gen_fields_tokens(&name, tokens);
           // If a child exist, revert the variable name to compose children.
           if !self.children.is_empty() {
-            quote_spanned! { var.span() =>
+            quote_spanned! { expr.span() =>
               #[allow(unused_mut)]
-              let mut #var = #name;
+              let mut #expr = #name;
             }
             .to_tokens(tokens);
           } else {
             name.to_tokens(tokens);
           }
         } else {
-          used_me.to_tokens(tokens);
-          self.gen_fields_tokens(var, tokens);
+          fields_used.to_tokens(tokens);
+          self.gen_fields_tokens(expr, tokens);
           if self.children.is_empty() {
-            var.to_tokens(tokens);
+            expr.to_tokens(tokens);
           }
         }
       }
@@ -196,17 +222,15 @@ impl DeclareObj {
     //
     // ```
     // let mut x = ...;
-    // X::declarer().a(&mut x.a).b(&mut x.b).finish();
+    // X::declarer().with_a(&mut x.a).with_b(&mut x.b).finish();
     // ```
     //
     // In this scenario, `x` would be borrowed twice, causing a compilation failure
     // as Rust does not handle this.
-    //
-    // If there are existing children, we define a variable to interact with them.
-    self
-      .this
-      .fields
-      .iter()
-      .for_each(|f| quote_spanned! { var.span() => #var #f; }.to_tokens(tokens));
+    for f in self.this.fields.iter() {
+      var.to_tokens(tokens);
+      f.to_tokens(tokens);
+      syn::Token![;](f.value.span()).to_tokens(tokens);
+    }
   }
 }

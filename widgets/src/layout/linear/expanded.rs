@@ -191,7 +191,7 @@ mod tests {
 
       @Flex {
         h_align: HAlign::Stretch,
-        @ $expanded { @ { Void } }
+        @(expanded) { @ { Void } }
         @Expanded {
           flex: 1.,
           @ { Void }

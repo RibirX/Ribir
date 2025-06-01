@@ -6,11 +6,12 @@ use smallvec::SmallVec;
 use syn::{
   Expr, Ident, Macro, Path, Result as SynResult, Stmt, braced,
   fold::Fold,
-  parse::{Parse, ParseBuffer, ParseStream},
+  parenthesized,
+  parse::{Parse, ParseStream},
   parse_quote,
   punctuated::Punctuated,
   spanned::Spanned,
-  token::{Brace, Colon, Comma, Dollar, Not},
+  token::{Brace, Colon, Comma, Not, Paren},
 };
 
 use crate::{
@@ -32,7 +33,6 @@ pub enum RdlMacro {
 /// Declare a object use struct literal, like `rdl!{ Row { ... } }` or
 /// `@parent { ... }`
 pub struct StructLiteral {
-  pub span: Span,
   pub parent: RdlParent,
   pub fields: Punctuated<DeclareField, Comma>,
   /// Declare a child in `rdl!` can use `rdl!` macro or `@` symbol.
@@ -50,8 +50,8 @@ pub struct StructLiteral {
 pub enum RdlParent {
   /// Declare parent use a type `Row { ... }`
   Type(Path),
-  /// Declare parent use a variable prefixed with ` @parent { ... }`
-  Var(Ident),
+  /// Declare parent use a expression  @ { parent } { ... }`
+  Expr(Ident),
 }
 
 /// Declare a field of a widget.
@@ -102,59 +102,66 @@ impl RdlMacro {
 
 impl Parse for RdlMacro {
   fn parse(input: ParseStream) -> SynResult<Self> {
-    let fork = input.fork();
-    if fork.parse::<RdlParent>().is_ok() && fork.peek(Brace) {
+    // syntax: @(expr) { ... }
+    if input.peek(Paren) && input.peek2(Brace) {
       Ok(RdlMacro::Literal(input.parse()?))
+    }
+    // syntax: @(expr)
+    else if input.peek(Paren) {
+      let content;
+      let paren_token = parenthesized!(content in input);
+      Ok(RdlMacro::ExprObj { span: paren_token.span.join(), stmts: vec![content.parse()?] })
     } else {
-      Ok(RdlMacro::ExprObj { span: input.span(), stmts: syn::Block::parse_within(input)? })
+      let fork = input.fork();
+      // syntax: @Path { ... }
+      if fork.parse::<Path>().is_ok() && fork.peek(Brace) {
+        Ok(RdlMacro::Literal(input.parse()?))
+      }
+      // syntax: @{ ... }
+      else {
+        Ok(RdlMacro::ExprObj { span: input.span(), stmts: syn::Block::parse_within(input)? })
+      }
     }
   }
 }
 
 impl Parse for StructLiteral {
   fn parse(input: ParseStream) -> SynResult<Self> {
-    let span = input.span();
     let parent = input.parse()?;
     let content;
-    let _ = braced!(content in input);
+    braced!(content in input);
+
     let mut children = SmallVec::default();
     let mut fields = Punctuated::default();
-    loop {
-      if content.is_empty() {
-        break;
-      }
 
+    while !content.is_empty() {
       if content.peek(kw::rdl) && content.peek2(Not) {
         children.push(content.parse()?);
       } else if content.peek(Ident) {
-        let f: DeclareField = content.parse()?;
         if !children.is_empty() {
-          let err_msg = "Field should always declare before children.";
-          return Err(syn::Error::new(f.span(), err_msg));
+          return Err(syn::Error::new(content.span(), "Fields must be declared before children"));
         }
-        fields.push(f);
-        if !content.is_empty() {
+
+        fields.push_value(content.parse()?);
+        if content.peek(Comma) {
           fields.push_punct(content.parse()?);
         }
       } else {
-        return Err(syn::Error::new(content.span(), "expected a field or a child."));
+        return Err(syn::Error::new(content.span(), "Expected field or child (rdl!)"));
       }
     }
 
     check_duplicate_field(&fields)?;
-    Ok(StructLiteral { span, parent, fields, children })
+    Ok(StructLiteral { parent, fields, children })
   }
 }
 
 impl Parse for RdlParent {
   fn parse(input: ParseStream) -> SynResult<Self> {
-    if input.peek(kw::_dollar_ಠ_ಠ) && input.peek2(Not) {
-      let mac: Macro = input.parse()?;
-
-      Ok(RdlParent::Var(mac.parse_body_with(|input: &ParseBuffer| {
-        input.parse::<Dollar>()?;
-        input.parse()
-      })?))
+    if input.peek(Paren) {
+      let content;
+      parenthesized!(content in input);
+      Ok(RdlParent::Expr(content.parse()?))
     } else {
       Ok(RdlParent::Type(input.parse()?))
     }

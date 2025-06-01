@@ -202,7 +202,7 @@ mod tests {
 
       let w = fn_widget! {
         let w_fit = w_fit.clone_writer();
-        @$w_fit { @MockBox { size } }
+        @(w_fit) { @MockBox { size } }
       };
       let mut wnd = TestWindow::new_with_size(w, WND_SIZE);
       wnd.draw_frame();

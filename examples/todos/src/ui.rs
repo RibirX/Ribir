@@ -76,7 +76,7 @@ fn task_lists(
                           *$editing.write() = None;
                         });
                         let mut input = FatObj::new(input);
-                        @ $input {
+                        @(input) {
                           v_align: VAlign::Center,
                           on_key_down: move |e| {
                             if e.key_code() == &PhysicalKey::Code(KeyCode::Escape) {
@@ -90,7 +90,7 @@ fn task_lists(
                     let _hint = || $stagger.write();
                     let item = task_item_widget(task.clone_writer(), stagger.clone_writer());
                     let mut item = FatObj::new(item);
-                    @ $item {
+                    @(item) {
                       on_double_tap: move |_| *$editing.write() = Some(id)
                     }.into_widget()
                   }
@@ -127,7 +127,7 @@ fn input(
         visible: pipe!($input.text().is_empty()),
         text: "What do you want to do ?"
       }
-      @ $input {
+      @(input) {
         h_align: HAlign::Stretch,
         on_key_down: move |e| {
           if e.key_code() == &PhysicalKey::Code(KeyCode::Enter) {

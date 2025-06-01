@@ -16,7 +16,7 @@ impl<'c> ComposeChild<'c> for RequestFocus {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       let mut child = FatObj::new(child);
-      @ $child {
+      @(child) {
         on_mounted: move |e| {
           let track_id = $child.track_id();
           let handle = e.window().focus_mgr.borrow().focus_handle(track_id);
@@ -58,8 +58,8 @@ mod tests {
         tab_index: 0i16,
         size: Size::default(),
       };
-      let mut m = @ $m { tab_index: 0i16, };
-      @ $m { tab_index: 0i16 }
+      let mut m = @(m) { tab_index: 0i16, };
+      @(m) { tab_index: 0i16 }
     };
 
     let wnd = TestWindow::new(widget);

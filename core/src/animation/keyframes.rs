@@ -59,7 +59,7 @@
 //!     }.box_it()
 //!   };
 //!
-//!   @ $opacity_rect {
+//!   @(opacity_rect) {
 //!     on_tap: move |_| animate.run()
 //!   }
 //! };

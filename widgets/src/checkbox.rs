@@ -103,7 +103,7 @@ impl ComposeChild<'static> for Checkbox {
       on_tap: move |_| $this.write().switch_check(),
       @ {
         let classes = class_array![distinct_pipe!($this.state_class_name()), CHECKBOX];
-        let icon = @ $classes {
+        let icon = @(classes) {
           @Icon {
             on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
               $this.write().switch_check()

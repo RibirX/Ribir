@@ -152,7 +152,7 @@ macro_rules! class_multi_impl {
 /// let two_classes = class_array!(RED_BORDER, BLUE_BACKGROUND);
 ///
 /// let widget = fn_widget! {
-///   @ $two_classes {
+///   @(two_classes) {
 ///     @Container {
 ///       size: Size::new(100., 100.),
 ///     }
@@ -616,7 +616,7 @@ mod tests {
       let margin_and_clamp = class_array![MARGIN, CLAMP_50];
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
-        @ $margin_and_clamp {
+        @(margin_and_clamp) {
           @Container {
             size: Size::new(100., 100.),
           }
@@ -807,7 +807,7 @@ mod tests {
       rdl! {
         @Container {
           size: Size::new(100., 100.),
-          @ $w {
+          @(w) {
             on_performed_layout: move |e| {
               let id = $w.track_id().get().unwrap();
               assert!(!id.is_dropped(e.tree()));

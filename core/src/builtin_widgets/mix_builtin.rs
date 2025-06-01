@@ -451,7 +451,7 @@ fn callbacks_for_focus_node(child: Widget) -> Widget {
   let guard = Sc::new(RefCell::new(None));
   let guard2 = guard.clone();
   let mut child = FatObj::new(child);
-  @$child {
+  @(child) {
     on_mounted: move |e| {
       let mut all_mix = e.query_all_iter::<MixBuiltin>().peekable();
         if all_mix.peek().is_some() {
@@ -561,7 +561,7 @@ mod tests {
         fn_widget! { @Void { on_performed_layout: move |_| {} }}
       });
 
-      @ $pipe_w {
+      @(pipe_w) {
         on_performed_layout: move |_| *$w_outer_layout.write() +=1 ,
       }
     };

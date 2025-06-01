@@ -12,7 +12,7 @@ pub(super) fn init(classes: &mut Classes) {
         .subscribe(move |idx| $w.write().opacity = (idx % 2) as f32);
       let border = BuildCtx::color()
         .map(|color| Border::only_left(BorderSide::new(2., (*color).into())));
-      @ $w {
+      @(w) {
         clamp: BoxClamp::fixed_width(2.),
         border,
         on_disposed: move |_| u.unsubscribe()

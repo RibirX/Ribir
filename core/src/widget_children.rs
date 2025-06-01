@@ -519,7 +519,7 @@ mod tests {
 
     let _ = fn_widget! {
       let p = Some(MockBox { size: Size::zero() });
-      @$p { @{ Void } }
+      @(p) { @ { Void } }
     };
   }
 
@@ -542,7 +542,7 @@ mod tests {
     }
     let a = A;
     let _ = fn_widget! {
-      @$a {
+      @(a) {
         @ { B }
         @ { B }
       }
@@ -563,7 +563,7 @@ mod tests {
           @MockBox { size: if $c_size.area() > 0. { *$c_size } else { Size::new(1., 1.)} }
         }
       };
-      @$p { @MockBox { size: pipe!(*$c_size) } }
+      @(p) { @MockBox { size: pipe!(*$c_size) } }
     };
 
     // with multi child
@@ -581,7 +581,7 @@ mod tests {
       let p = pipe!(($c_size.area() > 0.).then(|| {
         fn_widget! { @MockBox { size: Size::zero() }}
       }));
-      @$p { @MockBox { size: Size::zero() } }
+      @(p) { @MockBox { size: Size::zero() } }
     };
 
     // option with `Widget`
@@ -589,7 +589,7 @@ mod tests {
       let p = pipe!(($size.area() > 0.).then(|| {
         fn_widget! { @MockBox { size: Size::zero() }}
       }));
-      @$p { @ { Void }}
+      @(p) { @ { Void }}
     };
   }
 

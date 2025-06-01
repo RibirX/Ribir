@@ -62,7 +62,7 @@ mod tests {
     fill_circle40,
     WidgetTester::new(fn_widget! {
       let mut path = FatObj::new(circle40());
-      @ $path {
+      @(path) {
         painting_style: PaintingStyle::Fill,
         foreground: Color::BLACK,
       }

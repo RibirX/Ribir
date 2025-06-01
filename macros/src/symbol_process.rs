@@ -75,95 +75,117 @@ pub struct DollarRefsScope {
 pub struct StackGuard<'a>(&'a mut DollarRefsCtx);
 
 mod tokens_pre_process {
+  use std::iter::Peekable;
+
   use proc_macro2::*;
+  use smallvec::SmallVec;
 
   use super::KW_DOLLAR_STR;
   use crate::{error::*, symbol_process::KW_RDL};
 
-  /// Convert `@` and `$` symbol to a `rdl!` or `_dollar_ಠ_ಠ!` macro, make it
-  /// conform to Rust syntax
+  /// Convert `@` and `$` symbols into valid Rust macros (`rdl!` or
+  /// `_dollar_ಠ_ಠ!`)
   pub fn symbol_to_macro(input: TokenStream) -> Result<TokenStream> {
-    let mut iter = input.into_iter();
-    let mut tokens = vec![];
+    let mut iter = input.into_iter().peekable();
+    let mut tokens = Vec::new();
 
-    loop {
-      match iter.next() {
-        Some(TokenTree::Punct(at))
-          // maybe rust identify bind syntax, `identify @`
+    while let Some(token) = iter.next() {
+      match token {
+        // Handle @ symbol for widget declarations
+        TokenTree::Punct(at)
           if at.as_char() == '@' && !matches!(tokens.last(), Some(TokenTree::Ident(_))) =>
         {
-          let mut rdl_group = smallvec::SmallVec::<[TokenTree; 3]>::default();
-           match iter.next() {
-            // declare a variable widget as parent,  `@ $var { ... }`
-            Some(TokenTree::Punct(dollar)) if dollar.as_char() == '$' => {
-              if let Some(TokenTree::Ident(var)) = iter.next() {
-                rdl_group.push(TokenTree::Punct(dollar));
-                rdl_group.push(TokenTree::Ident(var));
-                if let Some(g)  = iter.next()  {
-                 rdl_group.push(g);
-                };
-              } else {
-                return Err(Error::IdentNotFollowDollar(dollar.span()));
-              }
-            }
-            // declare a expression widget  `@ { ... }`
-            Some(TokenTree::Group(g)) => rdl_group.push(TokenTree::Group(g)) ,
-            // declare a new widget: `@ SizedBox { ... }`
-            mut n => {
-              while let Some(t) = n.take() {
-                let is_group = matches!(t, TokenTree::Group(_));
-                rdl_group.push(t);
-                if is_group {
-                  break
-                }
-                n = iter.next();
-              };
-            },
-          };
+          let at_group = parse_at_group(&mut iter, at.span())?;
+          let span = tokens_span(&at_group);
 
-          let span = tokens_span(&rdl_group);
           tokens.push(TokenTree::Ident(Ident::new(KW_RDL, span)));
           tokens.push(not_token(span));
-          if let Some(TokenTree::Group(_)) = rdl_group.last()  {
-            let rdl_group = TokenStream::from_iter(rdl_group);
+
+          if let Some(TokenTree::Group(_)) = at_group.last() {
+            let rdl_group = TokenStream::from_iter(at_group);
             tokens.push(TokenTree::Group(Group::new(Delimiter::Brace, rdl_group)));
           } else {
-            let follow = rdl_group.last().map(|n| n.span());
-            return Err(Error::RdlAtSyntax{at: span, follow});
+            let follow = at_group.last().map(|t| t.span());
+            return Err(Error::RdlAtSyntax { at: span, follow });
           }
         }
-        Some(TokenTree::Punct(p)) if p.as_char() == '$' => {
-          match iter.next() {
-            Some(TokenTree::Ident(name)) => {
-              tokens.push(TokenTree::Ident(Ident::new(KW_DOLLAR_STR, p.span())));
-              tokens.push(not_token(p.span()));
-              let span = name.span();
-              let mut g = Group::new(
-                Delimiter::Parenthesis,
-                [TokenTree::Punct(p), TokenTree::Ident(name)].into_iter().collect()
-              );
-              g.set_span(span);
-              tokens.push(TokenTree::Group(g));
-            }
-            Some(t) =>     return Err(Error::IdentNotFollowDollar(t.span())),
-            None =>   return Err(Error::IdentNotFollowDollar(p.span())),
-          };
-        }
-        Some(TokenTree::Group(mut g)) => {
-          // not process symbol in macro, because it's maybe as part of the macro syntax.
-          if !in_macro(&tokens) {
-            let mut n = Group::new(g.delimiter(), symbol_to_macro(g.stream())?);
-            n.set_span(g.span());
-            g = n;
-          }
 
+        // Handle $ symbol for dollar expressions
+        TokenTree::Punct(dollar) if dollar.as_char() == '$' => {
+          let Some(TokenTree::Ident(name)) = iter.next() else {
+            return Err(Error::IdentNotFollowDollar(dollar.span()));
+          };
+          tokens.push(TokenTree::Ident(Ident::new(KW_DOLLAR_STR, dollar.span())));
+          tokens.push(not_token(dollar.span()));
+          let name_span = name.span();
+
+          let mut g = Group::new(
+            Delimiter::Parenthesis,
+            TokenStream::from_iter([TokenTree::Punct(dollar.clone()), TokenTree::Ident(name)]),
+          );
+          g.set_span(name_span);
           tokens.push(TokenTree::Group(g));
         }
-        Some(t) => tokens.push(t),
-        None => break,
-      };
+
+        // Recursively process groups
+        TokenTree::Group(mut g) => {
+          if !in_macro(&tokens) {
+            let processed = symbol_to_macro(g.stream())?;
+            let mut new_group = Group::new(g.delimiter(), processed);
+            new_group.set_span(g.span());
+            g = new_group;
+          }
+          tokens.push(TokenTree::Group(g));
+        }
+
+        // Default case: preserve other tokens
+        other => tokens.push(other),
+      }
     }
+
     Ok(tokens.into_iter().collect())
+  }
+
+  /// Parse tokens following an `@` symbol into a widget declaration group
+  fn parse_at_group(
+    iter: &mut Peekable<impl Iterator<Item = TokenTree>>, at_span: Span,
+  ) -> Result<SmallVec<[TokenTree; 3]>> {
+    let mut rdl_group = SmallVec::new();
+
+    match iter.next() {
+      Some(TokenTree::Group(g)) => match g.delimiter() {
+        // Parenthesized expression widget: `@(expr) { ... }`
+        Delimiter::Parenthesis => {
+          rdl_group.push(TokenTree::Group(g));
+          // Lookahead for brace group
+          if iter
+            .peek()
+            .is_some_and(|t| matches!(t, TokenTree::Group(_)))
+          {
+            rdl_group.push(iter.next().unwrap());
+          }
+        }
+        // Braced expression widget: `@ { ... }`
+        Delimiter::Brace => rdl_group.push(TokenTree::Group(g)),
+        // Invalid delimiter
+        _ => return Err(Error::RdlAtSyntax { at: at_span, follow: Some(g.span()) }),
+      },
+
+      // Named widget declaration: `@WidgetName { ... }`
+      mut token => {
+        while let Some(t) = token.take() {
+          let is_group = matches!(&t, TokenTree::Group(_));
+          rdl_group.push(t);
+
+          if is_group {
+            break;
+          }
+          token = iter.next();
+        }
+      }
+    }
+
+    Ok(rdl_group)
   }
 
   fn tokens_span(tokens: &[TokenTree]) -> Span {

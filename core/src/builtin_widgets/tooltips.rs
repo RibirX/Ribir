@@ -62,7 +62,7 @@ impl<'c> ComposeChild<'c> for Tooltips {
             class: TOOLTIPS,
           };
 
-          @ $w {
+          @(w) {
             global_anchor_x: pipe!(
               GlobalAnchorX::center_align_to(
                 $child.track_id(), 0.
@@ -93,7 +93,7 @@ impl<'c> ComposeChild<'c> for Tooltips {
           }
         });
 
-      @ $child {
+      @(child) {
         on_disposed: move|_| {
           u.unsubscribe();
           $this.hidden();

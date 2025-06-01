@@ -115,7 +115,7 @@ impl Compose for Slider {
       let drag_info = Stateful::new(None);
       @Stack {
         class: SLIDER_CONTAINER,
-        @ $row {
+        @(row) {
           v_align: VAlign::Center,
           on_tap: move |e| {
             let width = $row.layout_size().width;
@@ -282,7 +282,7 @@ impl Compose for RangeSlider {
       let drag_info2 = Stateful::new(None);
       @Stack {
         class: SLIDER_CONTAINER,
-        @ $row {
+        @(row) {
           v_align: VAlign::Center,
           on_tap: move |e| {
             let width = $row.layout_size().width;

@@ -972,7 +972,7 @@ mod tests {
       };
       let u = watch!($w.focus_changed_reason())
         .subscribe(move |v| *$w_reason.write() = v);
-      @ $w {
+      @(w) {
         on_disposed: move |_| u.unsubscribe()
       }
     };

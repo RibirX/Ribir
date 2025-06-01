@@ -138,7 +138,7 @@
 //!
 //!   @Row {
 //!     @Text { text: "I can access providers in the build process" }
-//!     @ $providers {
+//!     @(providers) {
 //!       @Text { text: "We only want providers accessible in this subtree" }
 //!     }
 //!   }

@@ -19,7 +19,7 @@ impl<'c> ComposeChild<'c> for Cursor {
     fn_widget! {
       let save_cursor: Stateful<Option<CursorIcon>> = Stateful::new(None);
       let mut child = FatObj::new(child);
-      @ $child {
+      @(child) {
         on_pointer_enter: move |e: &mut PointerEvent| {
           if e.point_type == PointerType::Mouse
             && e.mouse_buttons() == MouseButtons::empty()

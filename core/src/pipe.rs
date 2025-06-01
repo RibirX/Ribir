@@ -694,7 +694,7 @@ mod tests {
     let c_size = size.clone_writer();
     let w = fn_widget! {
       let p = pipe! { fn_widget!{ @MockBox { size: *$size }}};
-      @$p { @Void {} }
+      @(p) { @Void {} }
     };
     let wnd = TestWindow::new(w);
     let tree = wnd.tree_mut();
@@ -731,7 +731,7 @@ mod tests {
         size: Size::zero(),
         @ {
           let p = pipe! { fn_widget! {MockBox { size: *$size }}};
-          @$p { @Void {} }
+          @(p) { @Void {} }
         }
       }
     };
@@ -1084,7 +1084,7 @@ mod tests {
             (0..v).map(move |_| {
               let pipe_parent = pipe!(*$child_size)
                 .map(move |size| fn_widget!{ @MockBox { size } });
-              @$pipe_parent { @Void {} }
+              @(pipe_parent) { @Void {} }
             })
           })
         }
@@ -1148,7 +1148,7 @@ mod tests {
           pipe!(*$outer).map(move |w| fn_widget!{
             let pipe_parent = pipe!(*$inner)
               .map(move |h| fn_widget! {@MockBox { size: Size::new(w as f32, h as f32) } });
-            @$pipe_parent { @Void {} }
+            @(pipe_parent) { @Void {} }
           })
         }
       }
@@ -1185,7 +1185,7 @@ mod tests {
               .map(move |h| fn_widget! { @MockBox { size: Size::new(w as f32, h as f32) }})
           });
 
-          @$p { @Void {} }
+          @(p) { @Void {} }
         }
       }
     };
@@ -1353,7 +1353,7 @@ mod tests {
           obj
         })
       };
-      @ $p {
+      @(p) {
         @{ Void }
       }
     };
