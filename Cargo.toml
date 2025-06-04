@@ -85,7 +85,7 @@ winit = { version = "0.30.9", default-features = false, features = [
   "wayland-dlopen",
   "rwh_06",
 ] }
-zerocopy = "0.7.3"
+zerocopy = "0.8.25"
 quick-xml = "0.37.1"
 macos-accessibility-client = { version = "0.0.1" }
 tokio = { version = "1.0" }
