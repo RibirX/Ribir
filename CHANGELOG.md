@@ -27,6 +27,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### **Changed**
 - **core**: Separate UI Rendering and Application Logic into Independent Threads. (@wjian23).
+- **core**: remove CustomStyles and TextField Widget.(@wjian23)
 
 ## [0.4.0-alpha.40] - 2025-06-04
 

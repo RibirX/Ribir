@@ -1,8 +1,6 @@
 //! Theme use to share visual config or style compose logic. It can be defined
 //! to app-wide or particular part of the application.
 
-use std::collections::HashMap;
-
 pub use ribir_algo::{CowArc, Resource};
 use smallvec::{SmallVec, smallvec};
 
@@ -15,11 +13,8 @@ pub use icon_theme::*;
 mod typography_theme;
 pub use typography_theme::*;
 mod transition_theme;
-pub use transition_theme::*;
-
-mod custom_styles;
-pub use custom_styles::*;
 pub use ribir_painter::*;
+pub use transition_theme::*;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Brightness {
@@ -74,12 +69,6 @@ pub enum Brightness {
 ///   Void
 /// });
 /// ```
-///
-/// # Todo
-///
-/// Simplify the theme by eliminating the need for `TransitionTheme`,
-// `CustomStyles`, and `ComposeDecorators` if we can find a more elegant way to
-// handle widget theme styles.
 pub struct Theme {
   pub palette: Palette,
   pub typography_theme: TypographyTheme,
