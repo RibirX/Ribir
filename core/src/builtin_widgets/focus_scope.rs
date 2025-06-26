@@ -42,10 +42,7 @@ impl<'c> ComposeChild<'c> for FocusScope {
 
 #[cfg(test)]
 mod tests {
-  use winit::{
-    dpi::LogicalPosition,
-    event::{DeviceId, ElementState, WindowEvent},
-  };
+  use winit::event::ElementState;
 
   use super::*;
   use crate::{reset_test_env, test_helper::*};
@@ -71,7 +68,7 @@ mod tests {
       }
     };
 
-    let wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let tree = wnd.tree();
 
@@ -131,7 +128,7 @@ mod tests {
       }
     };
 
-    let wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let tree = wnd.tree_mut();
     focus_mgr.on_widget_tree_update(tree);
@@ -183,22 +180,17 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     wnd.draw_frame();
 
     // request_focus
-
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: DeviceId::dummy(),
-      position: LogicalPosition::new(75., 25.).to_physical(1.),
-    });
+    wnd.process_cursor_move(Point::new(75., 25.));
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 
     // will deal key event twice (inner and host).
     wnd.draw_frame();
 
-    wnd.processes_keyboard_event(
+    wnd.process_keyboard_event(
       PhysicalKey::Code(KeyCode::Digit0),
       VirtualKey::Character("0".into()),
       false,
@@ -206,7 +198,6 @@ mod tests {
       ElementState::Pressed,
     );
 
-    wnd.run_frame_tasks();
     wnd.draw_frame();
     assert_eq!(*result.read(), 2);
   }

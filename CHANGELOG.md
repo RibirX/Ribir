@@ -25,6 +25,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### **Changed**
+- **core**: Separate UI Rendering and Application Logic into Independent Threads. (@wjian23).
+
 ## [0.4.0-alpha.40] - 2025-06-04
 
 ### **Changed**

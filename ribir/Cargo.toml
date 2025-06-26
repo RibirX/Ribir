@@ -14,19 +14,24 @@ version.workspace = true
 
 [dependencies]
 ribir_algo = { path = "../algo", version = "0.4.0-alpha.40" }
-ribir_core = { path = "../core", version = "0.4.0-alpha.40" }
+ribir_core = { path = "../core", version = "0.4.0-alpha.40", default-features = false }
 ribir_gpu = { path = "../gpu", version = "0.4.0-alpha.40" }
 ribir_material = { path = "../themes/material", version = "0.4.0-alpha.40", optional = true }
 ribir_widgets = { path = "../widgets", version = "0.4.0-alpha.40", optional = true }
 rxrust.workspace = true
 wgpu = { workspace = true, optional = true }
 winit.workspace = true
+futures.workspace = true
+pin-project-lite.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 arboard.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "rt", "sync"]}
+
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true
+tokio = { workspace = true, features = ["rt", "sync"]}
 
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -45,6 +50,7 @@ env_logger.workspace = true
 futures.workspace = true
 ribir_dev_helper = { path = "../dev-helper" }
 ribir_material = { path = "../themes/material" }
+ribir_core = { path = "../core", default-features = false, features=["test-utils"]  }
 
 [features]
 default = ["wgpu", "widgets", "material", "png", "jpeg"]
@@ -53,13 +59,7 @@ png = ["ribir_core/png"]
 jpeg = ["ribir_core/jpeg"]
 wgpu = ["ribir_gpu/wgpu", "dep:wgpu"]
 widgets = ["ribir_widgets"]
-tokio-async = ["ribir_core/tokio-async"]
 nightly = ["ribir_core/nightly"]
-
-[[test]]
-harness = false
-name = "single_thread"
-path = "tests/timer_test.rs"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.3.9"

@@ -29,7 +29,7 @@ impl<T: 'static> TextGlyphs<T> {
     &mut self.text
   }
 
-  pub fn glyphs(&self) -> Option<Ref<VisualGlyphs>> {
+  pub fn glyphs(&self) -> Option<Ref<'_, VisualGlyphs>> {
     Ref::filter_map(self.glyphs.borrow(), |v| v.as_ref()).ok()
   }
 }

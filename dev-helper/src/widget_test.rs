@@ -80,6 +80,7 @@ macro_rules! assert_widget_eq_image {
     let img_path = $crate::test_case_name!($name, "png");
 
     let mut wnd = $widget_tester.create_wnd();
+    wnd.0.draw_frame(None);
 
     let Frame { commands, viewport, surface } = wnd.take_last_frame().unwrap();
     let viewport = viewport.to_i32().cast_unit();

@@ -3,7 +3,6 @@ use ribir::{
   prelude::*,
 };
 use ribir_dev_helper::*;
-use winit::event::WindowEvent;
 
 widget_layout_test!(
   simplest_leaf_rdl,
@@ -165,8 +164,9 @@ widget_layout_test!(
   WidgetTester::new({
     let (scale, w_scale) = split_value(1.);
     let w = fn_widget! {
+      let base = IconSize::of(BuildCtx::get()).tiny;
       rdl!{ SizedBox {
-        size: pipe!(IconSize::of(BuildCtx::get()).tiny * *$scale)
+        size: pipe!(base * *$scale)
       }}
     };
     *w_scale.write() = 2.;
@@ -213,7 +213,7 @@ fn pipe_single_parent() {
     }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
   wnd.assert_root_size(Size::new(110., 110.));
 
@@ -248,7 +248,7 @@ fn pipe_multi_parent() {
     }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
   wnd.assert_root_size((100., 100.).into());
 
@@ -274,7 +274,7 @@ fn pipe_as_child() {
     rdl!{ Stack { rdl!{ blank } } }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
   wnd.assert_root_size((100., 100.).into());
 
@@ -300,7 +300,7 @@ fn pipe_as_multi_child() {
     rdl!{ Flex { rdl!{ boxes } } }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
   wnd.assert_root_size(Size::zero());
 
@@ -370,7 +370,7 @@ fn closure_in_fn_widget_capture() {
     @(text) { on_mounted }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
 
   assert_eq!(&**hi_res2.read(), "hi");
@@ -417,11 +417,11 @@ fn simple_ref_bind_work() {
   };
 
   let flex_size = Size::new(200., 100.);
-  let mut wnd = TestWindow::new(w);
-  wnd.layout();
+  let wnd = TestWindow::from_widget(w);
+  wnd.layout(wnd.size());
   wnd.assert_root_size(flex_size);
 
-  tap_at(&wnd, (1, 1));
+  tap_at(&wnd, (1., 1.));
 
   wnd.draw_frame();
   wnd.assert_root_size(flex_size * 2.);
@@ -442,13 +442,13 @@ fn event_attr_sugar_work() {
     }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
 
   wnd.assert_root_size(BEFORE_SIZE);
   LayoutCase::expect_size(&wnd, &[0, 0], BEFORE_SIZE);
 
-  tap_at(&wnd, (25, 25));
+  tap_at(&wnd, (25., 25.));
 
   wnd.draw_frame();
   wnd.assert_root_size(AFTER_TAP_SIZE);
@@ -474,10 +474,10 @@ fn widget_wrap_bind_work() {
     }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
   wnd.assert_root_size(Size::new(104., 52.));
-  tap_at(&wnd, (60, 1));
+  tap_at(&wnd, (60., 1.));
 
   wnd.draw_frame();
   wnd.assert_root_size(Size::new(70., 60.));
@@ -503,7 +503,7 @@ fn expression_for_children() {
     }
   };
 
-  let mut wnd = TestWindow::new(embed_expr);
+  let wnd = TestWindow::from_widget(embed_expr);
   wnd.draw_frame();
   wnd.assert_root_size(Size::new(4., 1.));
   LayoutCase::expect_size(&wnd, &[0, 0], size_one);
@@ -512,7 +512,7 @@ fn expression_for_children() {
   LayoutCase::expect_size(&wnd, &[0, 3], size_one);
   LayoutCase::expect_size(&wnd, &[0, 4], ZERO_SIZE);
 
-  tap_at(&wnd, (0, 0));
+  tap_at(&wnd, (0.5, 0.5));
   wnd.draw_frame();
   wnd.assert_root_size(Size::new(25., 5.));
   LayoutCase::expect_size(&wnd, &[0, 0], size_five);
@@ -535,11 +535,11 @@ fn embed_widget_ref_outside() {
     }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
   wnd.assert_root_size(Size::new(4., 1.));
 
-  tap_at(&wnd, (0, 0));
+  tap_at(&wnd, (0., 0.));
   wnd.draw_frame();
   wnd.assert_root_size(Size::new(8., 2.));
 }
@@ -560,7 +560,7 @@ fn bind_fields() {
       @ { [a, b, c] }
     }
   };
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
   let size = wnd
     .layout_info_by_path(&[0])
@@ -569,7 +569,7 @@ fn bind_fields() {
     .unwrap();
   assert_eq!(size, Size::new(4., 2.));
 
-  tap_at(&wnd, (0, 0));
+  tap_at(&wnd, (0., 0.));
   wnd.draw_frame();
 
   let size = wnd
@@ -623,10 +623,10 @@ fn builtin_ref() {
     }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
 
-  tap_at(&wnd, (1, 1));
+  tap_at(&wnd, (1., 1.));
   wnd.draw_frame();
   assert_eq!(*icon.read(), CursorIcon::AllScroll);
 }
@@ -653,19 +653,15 @@ fn builtin_bind_to_self() {
     }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
-  tap_at(&wnd, (1, 1));
+  tap_at(&wnd, (1., 1.));
   wnd.draw_frame();
   assert_eq!(*icon.read(), CursorIcon::Help);
 }
 
-fn tap_at(wnd: &TestWindow, pos: (i32, i32)) {
-  #[allow(deprecated)]
-  wnd.processes_native_event(WindowEvent::CursorMoved {
-    device_id: winit::event::DeviceId::dummy(),
-    position: pos.into(),
-  });
+fn tap_at(wnd: &TestWindow, pos: (f32, f32)) {
+  wnd.process_cursor_move(Point::new(pos.0, pos.1));
   wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
   wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 }
@@ -683,7 +679,7 @@ fn builtin_method_support() {
     sized_box
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
 
   assert_eq!(*c_layout_size.read(), Size::new(100., 100.));
@@ -700,7 +696,7 @@ fn fix_builtin_field_can_declare_as_widget() {
     }
   };
 
-  let wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
 
   assert_eq!(wnd.content_count(), 2);
 }
@@ -715,7 +711,7 @@ fn fix_use_builtin_field_of_builtin_widget_gen_duplicate() {
     @(margin)  { @Void {} }
   };
 
-  let wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   assert_eq!(wnd.content_count(), 2);
 }
 
@@ -752,7 +748,7 @@ fn fix_subscribe_cancel_after_widget_drop() {
     }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
   assert_eq!(*cnt.read(), 1);
   *w_trigger.write() = true;
@@ -800,7 +796,7 @@ fn fix_silent_not_relayout_dyn_widget() {
     }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
   wnd.assert_root_size(ZERO_SIZE);
   {
@@ -821,7 +817,7 @@ fn no_watch() {
     @SizedBox { size: *$c_size }
   };
 
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   wnd.draw_frame();
   wnd.assert_root_size(ZERO_SIZE);
 

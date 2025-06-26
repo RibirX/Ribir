@@ -25,8 +25,11 @@ impl<'c> ComposeChild<'c> for Cursor {
             && e.mouse_buttons() == MouseButtons::empty()
           {
             let wnd = e.window();
-            *$save_cursor.write() = Some(wnd.get_cursor());
-            wnd.set_cursor($this.get_cursor());
+            let old_cursor = *$save_cursor;
+            if old_cursor != Some(wnd.get_cursor()) {
+              *$save_cursor.write() = Some(wnd.get_cursor());
+              wnd.set_cursor($this.get_cursor());
+            }
           }
         },
         on_pointer_leave: move |e: &mut PointerEvent| {
@@ -51,8 +54,6 @@ impl Cursor {
 
 #[cfg(test)]
 mod tests {
-  use winit::event::{DeviceId, WindowEvent};
-
   use super::*;
   use crate::{reset_test_env, test_helper::*};
 
@@ -77,46 +78,27 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(row_tree);
+    let wnd = TestWindow::from_widget(row_tree);
 
     wnd.draw_frame();
-    let device_id = DeviceId::dummy();
-    wnd
-      .dispatcher
-      .borrow_mut()
-      .dispatch(WindowEvent::CursorMoved { device_id, position: (1f64, 1.).into() }, 1.);
+
+    wnd.process_cursor_move(Point::new(1., 1.));
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Help);
 
-    let device_id = DeviceId::dummy();
-    wnd
-      .dispatcher
-      .borrow_mut()
-      .dispatch(WindowEvent::CursorMoved { device_id, position: (101f64, 1.).into() }, 1.);
+    wnd.process_cursor_move(Point::new(101., 1.));
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Pointer);
 
-    let device_id = DeviceId::dummy();
-    wnd
-      .dispatcher
-      .borrow_mut()
-      .dispatch(WindowEvent::CursorMoved { device_id, position: (201f64, 1.).into() }, 1.);
+    wnd.process_cursor_move(Point::new(201., 1.));
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::AllScroll);
 
-    let device_id = DeviceId::dummy();
-    wnd
-      .dispatcher
-      .borrow_mut()
-      .dispatch(WindowEvent::CursorMoved { device_id, position: (101f64, 1.).into() }, 1.);
+    wnd.process_cursor_move(Point::new(101., 1.));
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Pointer);
 
-    let device_id = DeviceId::dummy();
-    wnd
-      .dispatcher
-      .borrow_mut()
-      .dispatch(WindowEvent::CursorMoved { device_id, position: (1f64, 1.).into() }, 1.);
+    wnd.process_cursor_move(Point::new(1., 1.));
     wnd.run_frame_tasks();
     assert_eq!(wnd.get_cursor(), CursorIcon::Help);
   }

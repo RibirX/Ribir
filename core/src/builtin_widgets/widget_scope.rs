@@ -222,7 +222,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
 
     let local_scope = local_scope.borrow_mut().take().unwrap();
@@ -236,6 +236,7 @@ mod tests {
     assert_eq!(local_scope.read().count(), 4);
 
     *item_w.write() = 2;
+    wnd.draw_frame();
     wnd.draw_frame();
 
     assert_eq!(*build_cnt.read(), 4);

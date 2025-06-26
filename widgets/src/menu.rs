@@ -606,7 +606,7 @@ mod tests {
       }
     };
 
-    let mut wnd: TestWindow = TestWindow::new(widget);
+    let wnd: TestWindow = TestWindow::from_widget(widget);
     wnd.draw_frame();
 
     let raw_wnd = wnd.0.clone();
@@ -645,7 +645,7 @@ mod tests {
         @MenuItem { @ { "Item 2" } }
     });
 
-    let mut wnd: TestWindow = TestWindow::new(fn_widget! { @Void {} });
+    let wnd: TestWindow = TestWindow::from_widget(fn_widget! { @Void {} });
     wnd.draw_frame();
 
     let raw_wnd = wnd.0.clone();
@@ -694,7 +694,7 @@ mod tests {
         @MenuItem { @ { "Item 2" } }
     });
 
-    let mut wnd: TestWindow = TestWindow::new(fn_widget! { @Void {} });
+    let wnd: TestWindow = TestWindow::from_widget(fn_widget! { @Void {} });
     wnd.draw_frame();
 
     let raw_wnd = wnd.0.clone();
@@ -702,11 +702,13 @@ mod tests {
     wnd.draw_frame();
 
     // Enter the first item to show the sub-menu
+    assert!(!sub_menu2.is_show());
 
     menu.enter(0, &raw_wnd);
-    wnd.draw_frame();
 
+    wnd.draw_frame();
     assert!(sub_menu2.is_show());
+
     // Select the first sub-item
     sub_menu2.enter(0, &raw_wnd);
     wnd.draw_frame();

@@ -387,7 +387,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     assert_eq!(*layout_cnt.read(), 1);
     {
@@ -420,7 +420,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     assert_eq!([3, 2, 1], &**layout_order.read());
     {
@@ -454,7 +454,7 @@ mod tests {
       assert_eq!(info.size.unwrap(), rect.size);
     }
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     assert_rect_by_path(&wnd, &[0, 0], ribir_geom::rect(50., 50., 50., 50.));
     assert_rect_by_path(&wnd, &[0, 0, 0], ribir_geom::rect(0., 0., 0., 0.));
@@ -482,7 +482,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     assert_eq!(*cnt.read(), 1);
 

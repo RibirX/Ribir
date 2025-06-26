@@ -51,7 +51,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     let first_id = id.read().as_ref().map(|w| w.get());
     assert!(first_id.is_some());

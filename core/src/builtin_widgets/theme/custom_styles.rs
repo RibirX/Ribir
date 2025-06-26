@@ -4,7 +4,7 @@ use super::*;
 /// information of theme mod not enough and need have itself theme.
 #[derive(Default)]
 pub struct CustomStyles {
-  themes: HashMap<TypeId, Box<dyn Any>, ahash::RandomState>,
+  themes: HashMap<TypeId, Box<dyn Any + Send>, ahash::RandomState>,
 }
 
 /// macro use to batch set custom theme.
@@ -32,9 +32,9 @@ pub trait CustomStyle: Sized + Clone + 'static {
   }
 }
 
-impl CustomStyles {
-  #[inline]
-  pub fn set_custom_style<T: CustomStyle + 'static>(&mut self, v: T) {
-    self.themes.insert(v.type_id(), Box::new(v));
-  }
-}
+// impl CustomStyles {
+//   #[inline]
+//   pub fn set_custom_style<T: CustomStyle + 'static>(&mut self, v: T) {
+//     self.themes.insert(v.type_id(), Box::new(v));
+//   }
+// }

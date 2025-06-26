@@ -239,6 +239,14 @@ where
   fn r_from(value: F) -> Self { GenWidget::new(value) }
 }
 
+impl<W, K> RFrom<Box<dyn FnMut() -> W>, K> for GenWidget
+where
+  W: IntoWidget<'static, K> + 'static,
+{
+  #[inline]
+  fn r_from(value: Box<dyn FnMut() -> W>) -> Self { GenWidget::new(value) }
+}
+
 // -------------- Advanced Type Conversions ------------------
 
 // Fat object conversion with nested widget transformation

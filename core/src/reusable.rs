@@ -275,7 +275,7 @@ mod tests {
     let (w_trigger, trigger) = split_value(0);
     let ctrl = Sc::new(RefCell::new(None));
     let ctrl2 = ctrl.clone();
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let (w, reusable) = Reusable::new(@Text {
         text: "Hello",
         on_mounted: move |_| $w_info.write().push("Mounted"),

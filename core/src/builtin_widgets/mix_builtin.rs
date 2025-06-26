@@ -479,7 +479,7 @@ impl<'c> ComposeChild<'c> for MixBuiltin {
     if !mix.subject.is_empty() {
       let subject = mix.subject.clone();
       mix.on_disposed(move |_| {
-        let _ = AppCtx::spawn_local(async move { subject.unsubscribe() });
+        AppCtx::spawn_local(async move { subject.unsubscribe() });
       });
     }
     drop(mix);
@@ -566,7 +566,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(mix_keep);
+    let wnd = TestWindow::from_widget(mix_keep);
     wnd.draw_frame();
     assert_eq!(*outer_layout.read(), 1);
 

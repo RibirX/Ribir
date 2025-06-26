@@ -26,6 +26,7 @@ wasm-bindgen = "0.2.92"
 [dev-dependencies]
 ribir_slim = { path = "../../themes/ribir_slim" }
 ribir_dev_helper = {path = "../../dev-helper"}
+ribir_core = { path = "../../core", features = ["test-utils"]}
 
 [features]
 wgpu = ["ribir/wgpu"]

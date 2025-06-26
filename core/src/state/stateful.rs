@@ -73,7 +73,7 @@ impl<W: 'static> StateReader for Stateful<W> {
   type Reader = Reader<W>;
 
   #[inline]
-  fn read(&self) -> ReadRef<Self::Value> { self.data.read() }
+  fn read(&self) -> ReadRef<'_, Self::Value> { self.data.read() }
 
   #[inline]
   fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
@@ -157,7 +157,7 @@ impl<W: 'static> StateReader for Reader<W> {
   type Reader = Self;
 
   #[inline]
-  fn read(&self) -> ReadRef<W> { self.0.read() }
+  fn read(&self) -> ReadRef<'_, W> { self.0.read() }
 
   #[inline]
   fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
@@ -188,7 +188,7 @@ impl Drop for WriterInfo {
       let mut notifier = self.notifier.clone();
       // we use an async task to unsubscribe to wait the batched modifies to be
       // notified.
-      let _ = AppCtx::spawn_local(async move { notifier.unsubscribe() });
+      AppCtx::spawn_local(async move { notifier.unsubscribe() });
     }
   }
 }
@@ -369,7 +369,7 @@ mod tests {
     });
 
     let state = sized_box.clone_writer();
-    let mut wnd = TestWindow::new(fn_widget! { sized_box.clone_writer() });
+    let wnd = TestWindow::from_widget(fn_widget! { sized_box.clone_writer() });
     wnd.draw_frame();
     assert_eq!(*notified_count.borrow(), 0);
     assert!(!wnd.tree().is_dirty());
@@ -378,7 +378,6 @@ mod tests {
     {
       state.write().size = Size::new(1., 1.);
     }
-    Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
     assert!(wnd.tree().is_dirty());
     wnd.draw_frame();
@@ -391,7 +390,7 @@ mod tests {
   fn fix_pin_widget_node() {
     crate::reset_test_env!();
 
-    let mut wnd = TestWindow::new(fn_widget!(MockBox { size: Size::new(100., 100.) }));
+    let wnd = TestWindow::from_widget(fn_widget!(MockBox { size: Size::new(100., 100.) }));
     wnd.draw_frame();
     let tree = wnd.tree();
     assert_eq!(tree.content_root().descendants(tree).count(), 1);
@@ -411,7 +410,6 @@ mod tests {
     {
       let _ = &mut w.write().size;
     }
-    Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
     assert_eq!(
@@ -427,7 +425,6 @@ mod tests {
       let _ = &mut w.silent().size;
     }
 
-    Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
     assert_eq!(
       &notified
@@ -451,7 +448,6 @@ mod tests {
       let _ = &mut w.silent();
     }
 
-    Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
     assert_eq!(
       &notified

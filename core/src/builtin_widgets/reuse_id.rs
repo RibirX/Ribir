@@ -225,8 +225,8 @@ fn wrap_dispose_recycled<'a>(
   let mut w = FatObj::new(w);
   let p = scope.clone_writer();
   let key = id.clone();
-  w.on_disposed(move |e| {
-    let _ = e.window().frame_spawn(async move {
+  w.on_disposed(move |_| {
+    AppCtx::spawn_local(async move {
       if !p.read().is_in_used(&key) {
         p.write().remove(&key);
       }

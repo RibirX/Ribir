@@ -26,6 +26,7 @@ ahash.workspace = true
 [dev-dependencies]
 paste.workspace = true
 winit.workspace = true
+ribir_core = { path = "../core", features=["test-utils"] }
 ribir_dev_helper = {path = "../dev-helper"}
 ribir_material = {path = "../themes/material"}
 ribir_slim = {path = "../themes/ribir_slim"}

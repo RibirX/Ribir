@@ -49,7 +49,7 @@ impl ribir_core::clipboard::Clipboard for Clipboard {
       .map_err(error_convert)
   }
 
-  fn read(&mut self, format: &str) -> Result<Cow<[u8]>, Error> {
+  fn read(&mut self, format: &str) -> Result<Cow<'_, [u8]>, Error> {
     warn!("read {format} data from clipboard");
     Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard read format {format}"))
   }

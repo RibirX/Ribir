@@ -2,7 +2,7 @@ use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 use ribir::{core::test_helper::*, prelude::*};
 
 fn widget_bench(b: &mut Bencher, w: GenWidget) {
-  let mut wnd = TestWindow::new(w);
+  let wnd = TestWindow::from_widget(w);
   b.iter(|| wnd.draw_frame());
   AppCtx::remove_wnd(wnd.id())
 }

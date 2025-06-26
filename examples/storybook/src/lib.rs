@@ -8,7 +8,7 @@ pub fn run() {
   std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
   App::run(storybook)
-    .with_app_theme(material::purple::light())
+    .with_app_theme(material::purple::light)
     .with_title("Storybook")
     .with_size(Size::new(1024., 768.));
 }

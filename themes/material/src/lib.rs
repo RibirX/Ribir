@@ -74,13 +74,7 @@ fn new(palette: Palette) -> Theme {
     material_svgs::INFO: "./icons/info_FILL0_wght400_GRAD0_opsz48.svg"
   }
 
-  override_compose_decorator(&mut theme);
   theme
-}
-
-fn override_compose_decorator(theme: &mut Theme) {
-  let textfield = TextFieldThemeSuit::from_theme(&theme.palette, &theme.typography_theme);
-  theme.custom_styles.set_custom_style(textfield);
 }
 
 pub mod purple {

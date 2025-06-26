@@ -15,16 +15,17 @@ pub mod pipe;
 pub(crate) mod render_helper;
 mod state;
 pub mod ticker;
-pub mod timer;
 pub mod widget;
 pub mod widget_children;
 pub(crate) mod widget_tree;
 pub mod window;
 pub use rxrust;
 pub mod convert;
+pub mod event_loop;
 pub mod overlay;
 pub mod query;
 pub mod reusable;
+pub mod scheduler;
 pub mod wrap_render;
 
 /// Represents measurement units for positioning and sizing.
@@ -57,6 +58,7 @@ pub mod prelude {
     context::*,
     convert::*,
     declare::*,
+    event_loop::EventLoop,
     events::*,
     overlay::{AutoClosePolicy, Overlay, OverlayStyle},
     pipe::Pipe,
@@ -71,9 +73,10 @@ pub mod prelude {
     widget_tree::{BoxClamp, DirtyPhase, LayoutInfo, TrackId, WidgetId},
     window::Window,
   };
-  pub use crate::{timer, *};
+  pub use crate::*;
 }
 
+#[cfg(feature = "test-utils")]
 pub mod test_helper;
 
 impl From<f32> for Measure {

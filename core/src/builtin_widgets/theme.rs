@@ -86,7 +86,6 @@ pub struct Theme {
   pub classes: Classes,
   pub icon_theme: IconTheme,
   pub transitions_theme: TransitionTheme,
-  pub custom_styles: CustomStyles,
   // The theme requires font bytes.
   pub font_bytes: Vec<Vec<u8>>,
   // The theme requires font files.
@@ -159,7 +158,6 @@ impl Theme {
       Provider::value_of_reader(part_reader!(&this.icon_theme)),
       Classes::reader_into_provider(part_reader!(&this.classes)),
       Provider::value_of_reader(part_reader!(&this.transitions_theme)),
-      Provider::value_of_reader(part_reader!(&this.custom_styles)),
       Provider::value_of_reader(part_reader!(&this.icon_font))
     ];
     let child = pipe!($this;)
@@ -216,7 +214,7 @@ impl Default for Theme {
       icon_theme,
       classes: <_>::default(),
       transitions_theme: Default::default(),
-      custom_styles: Default::default(),
+
       font_bytes: vec![],
       font_files: vec![],
       icon_font: Default::default(),
@@ -297,7 +295,7 @@ mod tests {
       })
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
 
     assert_eq!(*watcher.read(), [Brightness::Light, Brightness::Dark, Brightness::Light]);

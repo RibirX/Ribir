@@ -653,7 +653,7 @@ impl Query for ProvidersRender {
     self.render.query_all_write(query_id, out);
   }
 
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle<'_>> {
     if query_id == &QueryId::of::<Providers>() {
       Some(QueryHandle::new(&self.providers))
     } else {
@@ -661,7 +661,7 @@ impl Query for ProvidersRender {
     }
   }
 
-  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle<'_>> {
     self.render.query_write(query_id)
   }
 
@@ -823,7 +823,7 @@ mod tests {
   fn smoke() {
     reset_test_env!();
 
-    let mut wnd = TestWindow::new(mock_multi! {
+    let wnd = TestWindow::from_widget(mock_multi! {
       @Providers {
         providers: smallvec![Provider::new(Color::RED)],
         @ {
@@ -849,7 +849,7 @@ mod tests {
   fn embedded() {
     reset_test_env!();
 
-    let mut wnd = TestWindow::new(providers! {
+    let wnd = TestWindow::from_widget(providers! {
       providers: smallvec![Provider::new(Color::RED)],
       @Providers {
         providers: smallvec![ContainerColor::provider(Color::GREEN)],
@@ -871,7 +871,7 @@ mod tests {
 
     let (value, w_value) = split_value(0);
 
-    let mut wnd = TestWindow::new(providers! {
+    let wnd = TestWindow::from_widget(providers! {
       providers: smallvec![Provider::new(1i32)],
       @{
         let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
@@ -900,7 +900,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
 
     assert_eq!(*value.read(), 1);
@@ -932,7 +932,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
 
     assert_eq!(*value1.read(), 1);
@@ -958,7 +958,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     assert_eq!(*value.read(), 1);
 
@@ -999,7 +999,7 @@ mod tests {
       @ {w_cnt.clone_writer()}
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     assert_eq!(cnt.read().layout_cnt.get(), 1);
     assert_eq!(cnt.read().paint_cnt.get(), 1);
@@ -1041,7 +1041,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
   }
 
@@ -1068,7 +1068,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
   }
 
@@ -1095,7 +1095,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
   }
 }

@@ -73,14 +73,14 @@ pub trait WidgetCtx {
   fn map_from(&self, pos: Point, w: WidgetId) -> Point;
   /// Query all references to the `T` if it is shared within the widget
   /// represented by this context.
-  fn query_all_iter<T: 'static>(&self) -> impl DoubleEndedIterator<Item = QueryRef<T>>;
+  fn query_all_iter<T: 'static>(&self) -> impl DoubleEndedIterator<Item = QueryRef<'_, T>>;
   /// Query a reference to the `T` if it is shared within the widget
   /// represented by this context.
   ///
   /// This method differs from `Provider::of`, as `Provider::of` searches in all
   /// ancestors of the widget, whereas this method only searches within the
   /// current widget.
-  fn query<T: 'static>(&self) -> Option<QueryRef<T>>;
+  fn query<T: 'static>(&self) -> Option<QueryRef<'_, T>>;
   /// Query a write reference to the `T` if a writer of `T` is shared within the
   /// widget represented by this context.
   ///
@@ -89,7 +89,7 @@ pub trait WidgetCtx {
   /// searches within the current widget.
   fn query_write<T: 'static>(&self) -> Option<WriteRef<T>>;
   /// Query a reference to the `T` if it is shared within the widget `w`.
-  fn query_of_widget<T: 'static>(&self, w: WidgetId) -> Option<QueryRef<T>>;
+  fn query_of_widget<T: 'static>(&self, w: WidgetId) -> Option<QueryRef<'_, T>>;
   // Query a write reference to the `T` if a writer of `T` is shared within the
   // widget `w`.
   fn query_write_of_widget<T: 'static>(&self, w: WidgetId) -> Option<WriteRef<T>>;
@@ -195,18 +195,18 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     self.map_from_global(global)
   }
 
-  fn query_all_iter<Q: 'static>(&self) -> impl DoubleEndedIterator<Item = QueryRef<Q>> {
+  fn query_all_iter<Q: 'static>(&self) -> impl DoubleEndedIterator<Item = QueryRef<'_, Q>> {
     self.id().query_all_iter(self.tree())
   }
 
-  fn query<Q: 'static>(&self) -> Option<QueryRef<Q>> { self.query_of_widget::<Q>(self.id()) }
+  fn query<Q: 'static>(&self) -> Option<QueryRef<'_, Q>> { self.query_of_widget::<Q>(self.id()) }
 
   #[inline]
   fn query_write<Q: 'static>(&self) -> Option<WriteRef<Q>> {
     self.query_write_of_widget::<Q>(self.id())
   }
 
-  fn query_of_widget<Q: 'static>(&self, w: WidgetId) -> Option<QueryRef<Q>> {
+  fn query_of_widget<Q: 'static>(&self, w: WidgetId) -> Option<QueryRef<'_, Q>> {
     w.query_ref::<Q>(self.tree())
   }
 
@@ -272,7 +272,7 @@ mod tests {
         margin: EdgeInsets::all(2.),
       }
     };
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
 
     let tree = wnd.tree();
@@ -302,7 +302,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     let root = wnd.tree().root();

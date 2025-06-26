@@ -58,7 +58,7 @@ mod tests {
     let c_keep_alive = keep_alive.clone_writer();
     let remove_widget = Stateful::new(false);
     let c_remove_widget = remove_widget.clone_writer();
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       pipe!(*$remove_widget).map(move |v|
         (!v).then(move || fn_widget!{
           @Void {

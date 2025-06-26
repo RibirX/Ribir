@@ -35,7 +35,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
 
     let test_text_case = "Hello 世界！";
     wnd.draw_frame();
@@ -72,7 +72,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
 
     let test_text_case = "123";
     wnd.draw_frame();

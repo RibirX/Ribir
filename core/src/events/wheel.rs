@@ -18,9 +18,6 @@ impl WheelEvent {
 
 #[cfg(test)]
 mod tests {
-
-  use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
-
   use super::*;
   use crate::{reset_test_env, test_helper::*};
 
@@ -50,16 +47,11 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(widget, Size::new(100., 100.));
+    let wnd = TestWindow::new_with_size(widget, Size::new(100., 100.));
 
     wnd.draw_frame();
-    let device_id = DeviceId::dummy();
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseWheel {
-      device_id,
-      delta: MouseScrollDelta::PixelDelta((1.0, 1.0).into()),
-      phase: TouchPhase::Started,
-    });
+
+    wnd.process_wheel(1.0, 1.0);
     wnd.run_frame_tasks();
 
     assert_eq!(*bubble_receive_reader.read(), (1., 1.));

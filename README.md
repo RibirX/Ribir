@@ -42,14 +42,19 @@ A simple example of a counter:
 
 ``` rust no_run
 use ribir::prelude::*;
+
 fn main() {
-  let cnt = Stateful::new(0);
-  App::run(button! {
-    h_align: HAlign::Center,
-    v_align: VAlign::Center,
-    on_tap: move |_| *$cnt.write() += 1,
-    @pipe!($cnt.to_string())
-  });
+  App::run_with_data(
+    || Stateful::new(0),
+    move |cnt: &'static Stateful<i32>| {
+      button! {
+        h_align: HAlign::Center,
+        v_align: VAlign::Center,
+        on_tap: move |_| *$cnt.write() += 1,
+        @pipe!($cnt.to_string())
+      }
+    }
+  );
 }
 ```
 </div>
@@ -64,20 +69,18 @@ fn main() {
 
 ```rust no_run
 use ribir::prelude::*;
-
 fn main() {
-  let cnt = Stateful::new(0);
-
-  App::run(move || {
-    let c_cnt = cnt.clone_writer();
-    let mut btn = Button::declarer();
-    btn.on_tap(move |_| *c_cnt.write() += 1)
-      .with_h_align(HAlign::Center)
-      .with_v_align(VAlign::Center);
-    btn.finish()
-      .with_child(pipe!($cnt.to_string()))
-      .into_widget()
-  });
+  App::run_with_data(
+    || Stateful::new(0),
+    move |cnt: &'static Stateful<i32>| {
+      let c_cnt = cnt.clone_writer();
+      let mut btn = Button::declarer();
+      btn
+        .on_tap(move |_| *c_cnt.write() += 1)
+        .with_h_align(HAlign::Center)
+        .with_v_align(VAlign::Center);
+      btn.finish().with_child(pipe!($cnt.to_string()))
+    });
 }
 ```
 

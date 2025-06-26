@@ -1,17 +1,16 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg(test)]
-#[cfg(target_family = "wasm")]
+#[cfg(target_arch = "wasm32")]
 pub use wasm_bindgen_test::wasm_bindgen_test;
 
 #[cfg(test)]
-#[cfg(target_family = "wasm")]
+#[cfg(target_arch = "wasm32")]
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-pub use crate::timer::Timer;
 use crate::{
   prelude::*,
-  window::{ShellWindow, WindowFlags, WindowId},
+  window::{BoxShellWindow, Shell, ShellWindow, WindowFlags, WindowId},
 };
 
 pub struct Frame {
@@ -33,17 +32,40 @@ pub struct TestWindow(pub Sc<Window>);
 #[macro_export]
 macro_rules! reset_test_env {
   () => {
-    let _ = $crate::prelude::NEW_TIMER_FN.set($crate::timer::Timer::new_timer_future);
     let _guard = $crate::prelude::AppCtx::new_lock_scope();
   };
 }
 
+pub struct TestShell {}
+
+impl Shell for TestShell {
+  fn exit(&self) {}
+
+  fn new_shell_window(
+    &self, attr: window::WindowAttributes,
+  ) -> scheduler::BoxFuture<'static, BoxShellWindow> {
+    Box::pin(async move {
+      Box::new(TestShellWindow::new(attr.0.inner_size.map_or_else(
+        || Size::new(1024., 1024.),
+        |s| {
+          let s = s.to_logical(1.);
+          Size::new(s.width, s.height)
+        },
+      ))) as BoxShellWindow
+    })
+  }
+
+  fn run_in_shell(&self, f: scheduler::BoxFuture<'static, ()>) { AppCtx::spawn_local(f); }
+}
+
 impl TestWindow {
   /// Create a 1024x1024 window for test
-  pub fn new<K: ?Sized>(root: impl RInto<GenWidget, K>) -> Self { Self::new_wnd(root, None) }
+  pub fn from_widget<K: ?Sized>(root: impl RInto<GenWidget, K>) -> Self {
+    Self::new(root, Size::new(1024., 1024.), WindowFlags::empty())
+  }
 
   pub fn new_with_size<K: ?Sized>(root: impl RInto<GenWidget, K>, size: Size) -> Self {
-    Self::new_wnd(root, Some(size))
+    Self::new(root, size, WindowFlags::empty())
   }
 
   #[track_caller]
@@ -52,14 +74,12 @@ impl TestWindow {
     assert_eq!(info.size.unwrap(), size);
   }
 
-  fn new_wnd<K: ?Sized>(root: impl RInto<GenWidget, K>, size: Option<Size>) -> Self {
-    let _ = NEW_TIMER_FN.set(Timer::new_timer_future);
-    AppCtx::run_until_stalled();
+  pub fn new<K: ?Sized>(root: impl RInto<GenWidget, K>, size: Size, flags: WindowFlags) -> Self {
+    let wnd = Window::new(Box::new(TestShellWindow::new(size)), flags);
 
-    let wnd = AppCtx::new_window(Box::new(TestShellWindow::new(size)), root.r_into());
-    let mut flags = wnd.flags();
-    flags.remove(WindowFlags::ANIMATIONS);
-    wnd.set_flags(flags);
+    AppCtx::insert_window(wnd.clone());
+    wnd.init(root.r_into());
+
     wnd.run_frame_tasks();
     Self(wnd)
   }
@@ -98,16 +118,23 @@ impl TestWindow {
   }
 
   #[track_caller]
-  pub fn draw_frame(&mut self) {
+  pub fn draw_frame(&self) {
     // Test window not have a eventloop, manually wake-up every frame.
-    Timer::wake_timeout_futures();
-    AppCtx::run_until_stalled();
-    self.run_frame_tasks();
-
-    self.0.draw_frame(false);
+    #[cfg(not(target_arch = "wasm32"))]
+    AppCtx::new_test_frame(self);
   }
 
   pub fn fmt_tree(&self) -> String { self.tree().display_tree(self.tree().root()) }
+
+  pub fn request_resize(&self, size: Size) {
+    let root = self.0.tree().root();
+    self
+      .0
+      .tree()
+      .dirty_marker()
+      .mark(root, DirtyPhase::Layout);
+    self.0.request_resize(size);
+  }
 }
 
 impl std::ops::Deref for TestWindow {
@@ -117,24 +144,17 @@ impl std::ops::Deref for TestWindow {
 }
 
 pub struct TestShellWindow {
-  pub size: Size,
   pub cursor: CursorIcon,
   pub id: WindowId,
   pub surface_color: Color,
   pub last_frame: Option<Frame>,
+  pub size: Size,
 }
 
 impl ShellWindow for TestShellWindow {
   fn inner_size(&self) -> Size { self.size }
 
-  fn outer_size(&self) -> Size { self.size }
-
   fn request_resize(&mut self, size: Size) { self.on_resize(size); }
-
-  fn on_resize(&mut self, size: Size) {
-    self.size = size;
-    self.last_frame = None;
-  }
 
   fn set_min_size(&mut self, _: Size) {}
 
@@ -158,7 +178,7 @@ impl ShellWindow for TestShellWindow {
 
   fn focus_window(&mut self) {}
 
-  fn set_decorations(&mut self, _: bool) {}
+  // fn set_decorations(&mut self, _: bool) {}
 
   fn is_minimized(&self) -> bool { false }
 
@@ -170,31 +190,35 @@ impl ShellWindow for TestShellWindow {
 
   fn as_any_mut(&mut self) -> &mut dyn Any { self }
 
-  fn begin_frame(&mut self, surface: Color) { self.surface_color = surface; }
-
-  fn draw_commands(&mut self, viewport: Rect, commands: &[PaintCommand]) {
+  fn draw_commands(
+    &mut self, _wnd_size: Size, viewport: Rect, surface_color: Color, commands: &[PaintCommand],
+  ) {
     self.last_frame =
-      Some(Frame { commands: commands.to_owned(), viewport, surface: self.surface_color });
+      Some(Frame { commands: commands.to_owned(), viewport, surface: surface_color });
   }
 
-  fn end_frame(&mut self) {}
+  fn request_draw(&self) {}
 
   fn id(&self) -> WindowId { self.id }
 
-  fn device_pixel_ratio(&self) -> f32 { 1. }
+  fn close(&self) {}
 }
 
 impl TestShellWindow {
-  fn new(size: Option<Size>) -> Self {
+  fn new(size: Size) -> Self {
     static ID: AtomicU64 = AtomicU64::new(0);
-    let size = size.unwrap_or_else(|| Size::new(1024., 1024.));
     TestShellWindow {
-      size,
       cursor: CursorIcon::Default,
       id: ID.fetch_add(1, Ordering::Relaxed).into(),
       last_frame: None,
       surface_color: Color::WHITE,
+      size,
     }
+  }
+
+  fn on_resize(&mut self, size: Size) {
+    self.size = size;
+    self.last_frame = None;
   }
 }
 
@@ -367,6 +391,7 @@ impl LayoutCase {
 pub struct WidgetTester {
   pub widget: GenWidget,
   pub wnd_size: Option<Size>,
+  pub flags: Option<WindowFlags>,
   pub env_init: Option<Box<dyn FnOnce()>>,
   pub on_initd: Option<InitdFn>,
   pub comparison: Option<f64>,
@@ -382,7 +407,15 @@ impl WidgetTester {
       on_initd: None,
       env_init: None,
       comparison: None,
+      flags: None,
     }
+  }
+
+  pub fn new_with_data<K, D: 'static, W: IntoWidget<'static, K>>(
+    data: D, widget_builder: impl Fn(&'static D) -> W + 'static,
+  ) -> Self {
+    let w = move || widget_builder(unsafe { &*(&data as *const _) }).into_widget();
+    Self::new(w)
   }
 
   pub fn with_env_init(mut self, env_init: impl Fn() + 'static) -> Self {
@@ -390,7 +423,8 @@ impl WidgetTester {
     self
   }
 
-  /// This callback runs after creating the window and drawing the first frame.
+  /// This callback runs after creating the window and drawing the first
+  /// frame.
   pub fn on_initd(mut self, on_initd: impl Fn(&mut TestWindow) + 'static) -> Self {
     self.on_initd = Some(Box::new(on_initd));
     self
@@ -398,6 +432,11 @@ impl WidgetTester {
 
   pub fn with_wnd_size(mut self, size: Size) -> Self {
     self.wnd_size = Some(size);
+    self
+  }
+
+  pub fn with_flags(mut self, flags: WindowFlags) -> Self {
+    self.flags = Some(self.flags.unwrap_or(WindowFlags::empty()) | flags);
     self
   }
 
@@ -412,10 +451,13 @@ impl WidgetTester {
     }
 
     let wnd_size = self.wnd_size.unwrap_or(Size::new(1024., 1024.));
-    let mut wnd = TestWindow::new_with_size(self.widget.clone(), wnd_size);
+    let mut wnd =
+      TestWindow::new(self.widget.clone(), wnd_size, self.flags.unwrap_or(WindowFlags::empty()));
+
     if let Some(initd) = self.on_initd.take() {
       initd(&mut wnd);
     }
+
     wnd.draw_frame();
     wnd
   }
@@ -423,6 +465,7 @@ impl WidgetTester {
   #[track_caller]
   pub fn layout_check(mut self, cases: &[LayoutCase]) {
     let wnd = self.create_wnd();
+
     cases.iter().for_each(|c| c.check(&wnd));
   }
 }

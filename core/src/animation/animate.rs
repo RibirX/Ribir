@@ -38,7 +38,7 @@ where
   fn run(&self) {
     let mut animate_ref = self.write();
     let this = &mut *animate_ref;
-    let wnd_id = this.window_id;
+
     let Some(wnd) = AppCtx::get_window(this.window_id) else { return };
 
     if !wnd.flags().contains(WindowFlags::ANIMATIONS) {
@@ -79,11 +79,8 @@ where
 
               if matches!(last_progress, AnimateProgress::Finish) {
                 drop(w_ref);
-                let wnd = AppCtx::get_window(wnd_id).unwrap();
                 let animate = animate.clone_writer();
-                wnd
-                  .frame_spawn(async move { animate.stop() })
-                  .unwrap();
+                AppCtx::spawn_local(async move { animate.stop() });
               }
             }
             _ => {}
@@ -114,6 +111,7 @@ where
         _tick_msg_guard: Some(Box::new((tick_handle, state_handle))),
         already_lerp: false,
       });
+
       wnd.inc_running_animate();
     }
   }
@@ -187,6 +185,7 @@ where
 
 #[cfg(test)]
 mod tests {
+
   use super::*;
   use crate::{reset_test_env, test_helper::TestWindow};
 
@@ -207,7 +206,7 @@ mod tests {
       @Void {}
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
   }
 
@@ -231,8 +230,9 @@ mod tests {
       @Void { on_performed_layout: move |_| *$state.write() = 1 }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
+
     assert_eq!(*c_state.read(), 1);
   }
 }

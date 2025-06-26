@@ -4,9 +4,9 @@ use std::{
   ops::Range,
 };
 
-use futures::channel::oneshot;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::{Color, PixelImage, VertexBuffers, image::ColorFormat};
+use tokio::sync::oneshot;
 
 use self::{
   draw_alpha_triangles_pass::DrawAlphaTrianglesPass,
@@ -388,7 +388,9 @@ impl InnerTexture {
 impl WgpuTexture {
   fn from_tex(tex: wgpu::Texture) -> Self { Self::new(InnerTexture::Texture(tex)) }
 
-  pub(crate) fn color_attachments(&self, clear: Option<Color>) -> wgpu::RenderPassColorAttachment {
+  pub(crate) fn color_attachments(
+    &self, clear: Option<Color>,
+  ) -> wgpu::RenderPassColorAttachment<'_> {
     let load = match clear {
       Some(c) => {
         let [r, g, b, a] = c.into_f32_components();

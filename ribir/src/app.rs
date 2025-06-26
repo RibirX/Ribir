@@ -1,33 +1,39 @@
-use std::{cell::RefCell, convert::Infallible, sync::LazyLock};
+use std::{
+  cell::RefCell,
+  collections::HashMap,
+  convert::Infallible,
+  future::Future,
+  sync::LazyLock,
+  task::{Context, RawWaker, RawWakerVTable, Waker},
+};
 
 use app_event_handler::AppHandler;
+use pin_project_lite::pin_project;
 use ribir_core::{
   local_sender::LocalSender,
-  prelude::{image::ColorFormat, *},
-  timer::Timer,
-  window::WindowId,
+  prelude::*,
+  scheduler::{LocalPool, RuntimeWaker},
+  window::{BoxShell, BoxShellWindow, UiEvent, WindowAttributes, WindowFlags, WindowId},
 };
-use winit::{
-  event::{ElementState, Ime, KeyEvent},
-  event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
-};
+use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 
 use crate::{
   register_platform_app_events_handlers,
-  winit_shell_wnd::{WinitShellWnd, new_id},
+  winit_shell_wnd::{RibirShell, ShellCmd, ShellWndHandle, WinitShellWnd, new_id},
 };
 
 mod app_event_handler;
 
 pub struct App {
   event_loop: RefCell<Option<EventLoopState>>,
-  event_loop_proxy: EventLoopProxy<AppEvent>,
+  event_loop_proxy: EventLoopProxy<RibirAppEvent>,
+  windows: RefCell<HashMap<WindowId, Sc<RefCell<WinitShellWnd>>>>,
   active_wnd: std::cell::Cell<Option<WindowId>>,
   events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
+  local_pool: LocalPool,
+  _app_handler: RefCell<Option<UnboundedSender<UiEvent>>>,
 }
-
-/// The attributes use to create a window.
-pub struct WindowAttributes(winit::window::WindowAttributes);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HotkeyEvent {
@@ -49,19 +55,27 @@ pub enum AppEvent {
   Custom(Box<dyn Any + Send>),
 }
 
+pub enum RibirAppEvent {
+  App(AppEvent),
+  Cmd(ShellCmd),
+}
+
 /// A sender to send event to the application event loop from which the
 /// `EventSender` was created.
 #[derive(Clone)]
-pub struct EventSender(EventLoopProxy<AppEvent>);
+pub struct EventSender(EventLoopProxy<RibirAppEvent>);
 
 #[derive(Clone)]
-pub struct EventWaker(EventLoopProxy<AppEvent>);
+pub(crate) struct CmdSender(EventLoopProxy<RibirAppEvent>);
+
+#[derive(Clone)]
+pub struct EventWaker(EventLoopProxy<RibirAppEvent>);
 
 /// Represents the lifecycle states of an application's event loop
 enum EventLoopState {
   /// Initialized but not yet running event loop.
   /// Contains the unstarted event loop configuration.
-  NotStarted(Box<EventLoop<AppEvent>>),
+  NotStarted(Box<EventLoop<RibirAppEvent>>),
 
   /// Active running event loop with guaranteed valid access.
   /// The reference is maintained and validated by the `AppEventHandler`.
@@ -73,22 +87,21 @@ impl App {
     App::shared().events_stream.clone()
   }
 
-  fn process_winit_ime_event(wnd: &Window, ime: Ime) {
-    match ime {
-      Ime::Enabled => {}
-      Ime::Preedit(txt, cursor) => {
-        if txt.is_empty() {
-          wnd.exit_pre_edit();
-        } else {
-          wnd.update_pre_edit(&txt, &cursor);
-        }
-      }
-      Ime::Commit(value) => {
-        wnd.exit_pre_edit();
-        wnd.processes_receive_chars(value.into());
-      }
-      Ime::Disabled => wnd.exit_pre_edit(),
-    }
+  pub(crate) fn shell_window(id: WindowId) -> Option<Sc<RefCell<WinitShellWnd>>> {
+    App::shared().windows.borrow().get(&id).cloned()
+  }
+
+  pub(crate) fn remove_shell_window(id: WindowId) {
+    Self::shared().windows.borrow_mut().remove(&id);
+  }
+
+  fn send_event(event: UiEvent) {
+    let _ = Self::shared()
+      ._app_handler
+      .borrow()
+      .as_ref()
+      .unwrap()
+      .send(event);
   }
 }
 
@@ -100,9 +113,9 @@ impl App {
 /// Upon being dropped, it creates a new window with the `root` widget and
 /// then calls `App::exec`.
 pub struct AppRunGuard {
-  root: Option<GenWidget>,
+  root: Option<Box<dyn FnOnce() -> GenWidget + 'static + Send>>,
+  theme: Option<Box<dyn FnOnce() -> Theme + Send + 'static>>,
   wnd_attrs: Option<WindowAttributes>,
-  theme_initd: bool,
 }
 
 impl App {
@@ -110,15 +123,48 @@ impl App {
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run<K: ?Sized>(root: impl RInto<GenWidget, K>) -> AppRunGuard {
+  pub fn run<K: ?Sized, W: RInto<GenWidget, K> + Send + 'static>(root: W) -> AppRunGuard {
     // Keep the application instance is created, when user call
     let _app = App::shared();
-    AppRunGuard::new(root.r_into())
+    AppRunGuard::new(move || root.r_into())
+  }
+
+  /// Start an application with the `root` widget, this will use the default
+  /// theme to create an application and use the `root` widget to create a
+  /// window, then run the application.
+  /// Note:
+  ///  1. different from `run`, when the app need to recreate the hold widget
+  ///     again, it will use the same data build from `data_builder`.
+  ///  2. as the application's logic will be run in a separated thread, so the
+  ///     data need to be `Send` and lazy init.
+  #[track_caller]
+  pub fn run_with_data<
+    K,
+    Data: 'static,
+    W: IntoWidget<'static, K>,
+    Builder: Fn(&'static Data) -> W + Send + 'static,
+    DataBuilder: FnOnce() -> Data + Send + 'static,
+  >(
+    data_builder: DataBuilder, widget_builder: Builder,
+  ) -> AppRunGuard {
+    // Keep the application instance is created, when user call
+    let _app = App::shared();
+
+    AppRunGuard::new(move || {
+      let data = data_builder();
+      (move || {
+        let ptr = &data as *const Data;
+        widget_builder(unsafe { &*ptr }).into_widget()
+      })
+      .r_into()
+    })
   }
 
   /// Get a event sender of the application event loop, you can use this to send
   /// event.
   pub fn event_sender() -> EventSender { EventSender(App::shared().event_loop_proxy.clone()) }
+
+  pub(crate) fn cmd_sender() -> CmdSender { CmdSender(App::shared().event_loop_proxy.clone()) }
 
   /// Creates a new window containing the specified root widget.
   ///
@@ -129,15 +175,26 @@ impl App {
   ///   - After use, removes the `ribir_container` class from the element
   ///   - Subsequent windows will look for the next container with this class
   /// - If no container found, creates and appends the canvas to the body.
-  pub async fn new_window(root: GenWidget, attrs: WindowAttributes) -> Sc<Window> {
+  pub async fn new_window(attrs: WindowAttributes) -> BoxShellWindow {
     let shell_wnd = WinitShellWnd::new(attrs.0).await;
-    let wnd = AppCtx::new_window(Box::new(shell_wnd), root);
+
+    let proxy = ShellWndHandle {
+      winit_wnd: shell_wnd.winit_wnd.clone(),
+      sender: App::cmd_sender(),
+      cursor: CursorIcon::Default,
+    };
+
+    let wid: WindowId = shell_wnd.id();
 
     let app = App::shared();
+    app
+      .windows
+      .borrow_mut()
+      .insert(wid, Sc::new(RefCell::new(shell_wnd)));
     if app.active_wnd.get().is_none() {
-      app.active_wnd.set(Some(wnd.id()));
+      app.active_wnd.set(Some(wid));
     }
-    wnd
+    Box::new(proxy)
   }
 
   pub fn active_window() -> Sc<Window> {
@@ -155,6 +212,7 @@ impl App {
 
     // todo: set the window to be the top window, but we not really support
     // multi window fully, implement this later.
+
     if let Some(wnd) = AppCtx::get_window(id) {
       let mut shell = wnd.shell_wnd().borrow_mut();
       if shell.is_minimized() {
@@ -164,43 +222,71 @@ impl App {
     };
   }
 
+  pub(crate) fn spawn_local<Fut>(future: Fut)
+  where
+    Fut: Future<Output = ()> + 'static,
+  {
+    App::shared().local_pool.spawn_local(future);
+  }
+
   /// run the application, this will start the event loop and block the current
   /// thread until the application exit.
   #[track_caller]
-  pub fn exec() {
+  pub fn exec(app: impl FnOnce() + Send + 'static) {
+    let (sender, recv) = unbounded_channel();
+    *Self::shared()._app_handler.borrow_mut() = Some(sender);
+    let shell: BoxShell = Box::new(RibirShell { cmd_sender: App::cmd_sender() });
+    #[cfg(not(target_arch = "wasm32"))]
+    AppCtx::run(recv, shell, async {
+      AppCtx::set_clipboard(Box::new(crate::clipboard::Clipboard::new().unwrap()));
+      app();
+    });
+
+    #[cfg(target_arch = "wasm32")]
+    AppCtx::run(recv, shell, async move {
+      app();
+    });
+
     let event_loop = App::take_event_loop();
 
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(not(target_arch = "wasm32"))]
     let _ = event_loop.run_app(&mut AppHandler::default());
 
-    #[cfg(target_family = "wasm")]
+    #[cfg(target_arch = "wasm32")]
     winit::platform::web::EventLoopExtWebSys::spawn_app(event_loop, AppHandler::default());
   }
 
   #[track_caller]
-  fn shared() -> &'static App {
+  pub(crate) fn shared() -> &'static App {
     static APP: LazyLock<LocalSender<App>> = LazyLock::new(|| {
       let event_loop = EventLoop::with_user_event().build().unwrap();
-      let waker = EventWaker(event_loop.create_proxy());
-
-      #[cfg(not(target_family = "wasm"))]
-      AppCtx::set_clipboard(Box::new(crate::clipboard::Clipboard::new().unwrap()));
-      AppCtx::set_runtime_waker(Box::new(waker));
 
       register_platform_app_events_handlers();
       let event_loop = Box::new(event_loop);
-      let app = App {
+
+      let app: App = App {
         event_loop_proxy: event_loop.create_proxy(),
         event_loop: RefCell::new(Some(EventLoopState::NotStarted(event_loop))),
         events_stream: <_>::default(),
         active_wnd: std::cell::Cell::new(None),
+        local_pool: LocalPool::default(),
+        windows: <_>::default(),
+        _app_handler: <_>::default(),
       };
       LocalSender::new(app)
     });
     &APP
   }
 
-  fn take_event_loop() -> EventLoop<AppEvent> {
+  #[track_caller]
+  fn run_until_stalled() {
+    let waker = Box::new(EventWaker(App::shared().event_loop_proxy.clone()));
+    App::shared()
+      .local_pool
+      .run_until_stalled(Some(waker));
+  }
+
+  fn take_event_loop() -> EventLoop<RibirAppEvent> {
     let app = App::shared();
     let mut event_loop = app.event_loop.borrow_mut();
     let event_loop = event_loop
@@ -247,43 +333,50 @@ impl App {
 }
 
 impl AppRunGuard {
-  fn new(root: GenWidget) -> Self {
+  fn new<W: FnOnce() -> GenWidget + Send + 'static>(root: W) -> Self {
     static ONCE: std::sync::Once = std::sync::Once::new();
     assert!(!ONCE.is_completed(), "App::run can only be called once.");
     ONCE.call_once(|| {});
 
-    Self { root: Some(root), wnd_attrs: Some(WindowAttributes::default()), theme_initd: false }
+    Self { root: Some(Box::new(root)), wnd_attrs: Some(WindowAttributes::default()), theme: None }
   }
 
   /// Set the application theme, this will apply to whole application.
-  pub fn with_app_theme(&mut self, theme: Theme) -> &mut Self {
-    AppCtx::set_app_theme(theme);
-    self.theme_initd = true;
+  pub fn with_app_theme(&mut self, theme: impl FnOnce() -> Theme + Send + 'static) -> &mut Self {
+    self.theme = Some(Box::new(theme));
     self
   }
 }
 
 impl Drop for AppRunGuard {
   fn drop(&mut self) {
-    AppCtx::run_until_stalled();
-    #[cfg(feature = "ribir_material")]
-    if !self.theme_initd {
-      AppCtx::set_app_theme(ribir_material::purple::light());
-    }
-
     let root = self.root.take().unwrap();
     let attr = self.wnd_attrs.take().unwrap();
-    AppCtx::spawn_local(async move {
-      let _ = App::new_window(root, attr).await;
-    })
-    .unwrap();
-    App::exec();
+    let theme = self.theme.take();
+
+    App::exec(move || {
+      if let Some(theme) = theme {
+        AppCtx::set_app_theme(theme());
+      }
+
+      AppCtx::spawn_local(async move {
+        AppCtx::new_window(root(), WindowFlags::DEFAULT, attr).await;
+      });
+    });
   }
 }
 
 impl EventSender {
   pub fn send(&self, e: AppEvent) {
-    if let Err(err) = self.0.send_event(e) {
+    if let Err(err) = self.0.send_event(RibirAppEvent::App(e)) {
+      log::error!("{}", err)
+    }
+  }
+}
+
+impl CmdSender {
+  pub fn send(&self, cmd: ShellCmd) {
+    if let Err(err) = self.0.send_event(RibirAppEvent::Cmd(cmd)) {
       log::error!("{}", err)
     }
   }
@@ -291,104 +384,15 @@ impl EventSender {
 
 impl RuntimeWaker for EventWaker {
   fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> { Box::new(self.clone()) }
-  fn wake(&self) { let _ = self.0.send_event(AppEvent::FuturesWake); }
+  fn wake(&self) {
+    let _ = self
+      .0
+      .send_event(RibirAppEvent::App(AppEvent::FuturesWake));
+  }
 }
 
 /// EventWaker only send `RibirEvent::FuturesWake`.
 unsafe impl Send for EventWaker {}
-
-pub(crate) fn request_redraw(wnd: &Window) {
-  let wnd = wnd.shell_wnd().borrow();
-  let shell = wnd
-    .as_any()
-    .downcast_ref::<WinitShellWnd>()
-    .unwrap();
-  shell.winit_wnd.request_redraw();
-}
-
-fn into_winit_size(size: Size) -> winit::dpi::Size {
-  winit::dpi::LogicalSize::new(size.width, size.height).into()
-}
-
-impl WindowAttributes {
-  /// Initial title of the window in the title bar.
-  ///
-  /// Default: `"Ribir App"`
-  pub fn with_title(&mut self, title: impl Into<String>) -> &mut Self {
-    self.0.title = title.into();
-    self
-  }
-
-  /// Whether the window should be resizable.
-  ///
-  /// Default: `true`
-  pub fn with_resizable(&mut self, resizable: bool) -> &mut Self {
-    self.0.resizable = resizable;
-    self
-  }
-
-  /// Initial size of the window client area (excluding decorations).
-  pub fn with_size(&mut self, size: Size) -> &mut Self {
-    self.0.inner_size = Some(into_winit_size(size));
-    self
-  }
-
-  /// Minimum size of the window client area
-  pub fn with_min_size(&mut self, size: Size) -> &mut Self {
-    self.0.min_inner_size = Some(into_winit_size(size));
-    self
-  }
-
-  /// Maximum size of the window client area
-  pub fn with_max_size(&mut self, size: Size) -> &mut Self {
-    self.0.max_inner_size = Some(into_winit_size(size));
-    self
-  }
-
-  /// Initial position of the window in screen coordinates.
-  pub fn position(mut self, position: Point) -> Self {
-    self.0.position = Some(winit::dpi::LogicalPosition::new(position.x, position.y).into());
-    self
-  }
-
-  /// Whether the window should start maximized.
-  ///
-  /// Default: `false`
-  pub fn with_maximized(&mut self, maximized: bool) -> &mut Self {
-    self.0.maximized = maximized;
-    self
-  }
-
-  /// Initial window visibility.
-  ///
-  /// Default: `true`
-  pub fn with_visible(&mut self, visible: bool) -> &mut Self {
-    self.0.visible = visible;
-    self
-  }
-
-  /// Whether the window should show decorations.
-  ///
-  /// Default: `true`
-  pub fn with_decorations(&mut self, decorations: bool) -> &mut Self {
-    self.0.decorations = decorations;
-    self
-  }
-
-  /// Window icon in RGBA8 format.
-  pub fn with_icon(&mut self, icon: &PixelImage) -> &mut Self {
-    debug_assert!(icon.color_format() == ColorFormat::Rgba8, "Icon must be in RGBA8 format");
-
-    self.0.window_icon =
-      winit::window::Icon::from_rgba(icon.pixel_bytes().to_vec(), icon.width(), icon.height()).ok();
-
-    self
-  }
-}
-
-impl Default for WindowAttributes {
-  fn default() -> Self { Self(winit::window::WindowAttributes::default().with_title("Ribir App")) }
-}
 
 impl std::ops::Deref for AppRunGuard {
   type Target = WindowAttributes;
@@ -402,20 +406,84 @@ impl std::ops::DerefMut for AppRunGuard {
   }
 }
 
+pin_project! {
+  struct WakerFuture<F> {
+    #[pin]
+    fut: F,
+    waker: Box<dyn RuntimeWaker + Send>,
+  }
+}
+
+impl<F> WakerFuture<F>
+where
+  F: Future,
+{
+  fn local_waker(&self, cx: &std::task::Context<'_>) -> Waker {
+    type RawLocalWaker = (std::task::Waker, Box<dyn RuntimeWaker + Send>);
+    fn clone(this: *const ()) -> RawWaker {
+      let waker = this as *const RawLocalWaker;
+      let (w, cb) = unsafe { &*waker };
+      let data = Box::new((w.clone(), cb.clone()));
+      let raw = Box::leak(data) as *const RawLocalWaker;
+      RawWaker::new(raw as *const (), &VTABLE)
+    }
+
+    unsafe fn wake(this: *const ()) {
+      let waker = this as *mut RawLocalWaker;
+      let (w, ribir_waker) = unsafe { &*waker };
+      w.wake_by_ref();
+      ribir_waker.wake();
+      drop(this);
+    }
+
+    unsafe fn wake_by_ref(this: *const ()) {
+      let waker = this as *mut RawLocalWaker;
+      let (w, ribir_waker) = unsafe { &*waker };
+      w.wake_by_ref();
+      ribir_waker.wake();
+    }
+
+    unsafe fn drop(this: *const ()) {
+      let waker = this as *mut RawLocalWaker;
+      let _ = Box::from_raw(waker);
+    }
+    static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
+
+    let old_waker = cx.waker().clone();
+    let data = Box::new((old_waker, self.waker.clone()));
+    let raw = RawWaker::new(Box::leak(data) as *const RawLocalWaker as *const (), &VTABLE);
+    unsafe { Waker::from_raw(raw) }
+  }
+}
+
+impl<F> Future for WakerFuture<F>
+where
+  F: Future,
+{
+  type Output = F::Output;
+  fn poll(
+    self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>,
+  ) -> std::task::Poll<Self::Output> {
+    let waker = self.local_waker(cx);
+    let mut cx = Context::from_waker(&waker);
+    let this = self.project();
+    this.fut.poll(&mut cx)
+  }
+}
+
 #[cfg(test)]
 mod tests {
 
   use ribir_core::{prelude::*, test_helper::*};
   use winit::event::Ime;
 
-  use super::App;
-
   #[test]
   fn ime_pre_edit() {
+    reset_test_env!();
     let log = Stateful::new(vec![]);
     let log2 = log.clone_writer();
 
-    let mut wnd = TestWindow::new_with_size(
+    let wnd = TestWindow::new_with_size(
       fn_widget! {
         @MockBox {
           size: INFINITY_SIZE,
@@ -436,9 +504,9 @@ mod tests {
 
     wnd.draw_frame();
 
-    App::process_winit_ime_event(&wnd, Ime::Enabled);
-    App::process_winit_ime_event(&wnd, Ime::Preedit("hello".to_string(), None));
-    App::process_winit_ime_event(&wnd, Ime::Disabled);
+    wnd.process_ime(Ime::Enabled);
+    wnd.process_ime(Ime::Preedit("hello".to_string(), None));
+    wnd.process_ime(Ime::Disabled);
     wnd.draw_frame();
     assert_eq!(
       &*log.read(),
@@ -446,8 +514,9 @@ mod tests {
     );
 
     log.write().clear();
-    App::process_winit_ime_event(&wnd, Ime::Preedit("hello".to_string(), None));
-    App::process_winit_ime_event(&wnd, Ime::Commit("hello".to_string()));
+
+    wnd.process_ime(Ime::Preedit("hello".to_string(), None));
+    wnd.process_ime(Ime::Commit("hello".to_string()));
     wnd.draw_frame();
     assert_eq!(
       &*log.read(),
@@ -460,7 +529,7 @@ mod tests {
     );
 
     log.write().clear();
-    App::process_winit_ime_event(&wnd, Ime::Preedit("hello".to_string(), None));
+    wnd.process_ime(Ime::Preedit("hello".to_string(), None));
     wnd.force_exit_pre_edit();
 
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
