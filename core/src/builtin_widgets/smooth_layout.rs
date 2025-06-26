@@ -622,7 +622,7 @@ mod tests {
         }
       })
       .with_wnd_size(Size::new(100., 100.))
-      .on_initd(|wnd| wnd.set_flags(WindowFlags::ANIMATIONS)),
+      .with_flags(WindowFlags::ANIMATIONS),
       "smooth_pos"
     );
   }
@@ -656,7 +656,7 @@ mod tests {
         @SizedBox { size: Size::new(100., 10.) }
       })
       .with_wnd_size(Size::new(100., 30.))
-      .on_initd(|wnd| wnd.set_flags(WindowFlags::ANIMATIONS)),
+      .with_flags(WindowFlags::ANIMATIONS),
       "smooth_x"
     );
   }
@@ -690,7 +690,7 @@ mod tests {
         @SizedBox { size: Size::new(10., 100.) }
       })
       .with_wnd_size(Size::new(30., 100.))
-      .on_initd(|wnd| wnd.set_flags(WindowFlags::ANIMATIONS)),
+      .with_flags(WindowFlags::ANIMATIONS),
       "smooth_y"
     );
   }
@@ -707,7 +707,7 @@ mod tests {
         @red_block_10_x_10()
       })
       .with_wnd_size(Size::new(100., 100.))
-      .on_initd(|wnd| wnd.set_flags(WindowFlags::ANIMATIONS)),
+      .with_flags(WindowFlags::ANIMATIONS),
       "smooth_size_from_50p"
     );
 
@@ -718,7 +718,7 @@ mod tests {
         @red_block_10_x_10()
       })
       .with_wnd_size(Size::new(100., 100.))
-      .on_initd(|wnd| wnd.set_flags(WindowFlags::ANIMATIONS)),
+      .with_flags(WindowFlags::ANIMATIONS),
       "smooth_size_from_5"
     );
 
@@ -728,7 +728,7 @@ mod tests {
         @center_red_block_10_x_10()
       })
       .with_wnd_size(Size::new(100., 100.))
-      .on_initd(|wnd| wnd.set_flags(WindowFlags::ANIMATIONS)),
+      .with_flags(WindowFlags::ANIMATIONS),
       "smooth_size_from_real"
     );
   }
@@ -761,7 +761,7 @@ mod tests {
         }
       })
       .with_wnd_size(Size::new(100., 40.))
-      .on_initd(|wnd| wnd.set_flags(WindowFlags::ANIMATIONS)),
+      .with_flags(WindowFlags::ANIMATIONS),
       "smooth_width"
     );
   }
@@ -793,7 +793,7 @@ mod tests {
         }
       })
       .with_wnd_size(Size::new(40., 100.))
-      .on_initd(|wnd| wnd.set_flags(WindowFlags::ANIMATIONS)),
+      .with_flags(WindowFlags::ANIMATIONS),
       "smooth_height"
     );
   }

@@ -347,7 +347,7 @@ fn apply_global_anchor(
           }
         } else {
           let this = this.clone_reader();
-          let _ = AppCtx::spawn_local(async move {
+          AppCtx::spawn_local(async move {
             this.read().guard.borrow_mut().take();
           });
         }

@@ -104,7 +104,7 @@ pub struct Route {
 
 impl RouterParams {
   /// Returns a read-only reference to the RouterParams provider of the context.
-  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<Self>> { Provider::of(ctx) }
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<'_, Self>> { Provider::of(ctx) }
 
   /// Returns captured parameter value if exists.
   ///
@@ -237,7 +237,7 @@ fn route_match(path: &str, route_path: &str, params: &mut SmallVec<[(String, Str
 /// # Examples
 /// - Valid: `"users"`, `":id"`, `"*"`
 /// - Invalid: `":"`, `"user*", `"::id"`
-fn parse_segment(seg: &str) -> Result<PathSeg, PathError> {
+fn parse_segment(seg: &str) -> Result<PathSeg<'_>, PathError> {
   if seg == "*" {
     Ok(PathSeg::Wildcard)
   } else if let Some(name) = seg.strip_prefix(':') {
@@ -314,7 +314,7 @@ mod tests {
     const C_A_SIZE: Size = Size::new(320., 320.);
 
     let (nav, w_nav) = split_value("/");
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let location = Location::state_of(BuildCtx::get());
       watch!($nav.to_string()).subscribe(move |v| {
         let _ = $location.write().resolve_relative(&v);

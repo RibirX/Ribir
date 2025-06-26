@@ -85,12 +85,12 @@ mod tests {
     let keys = Stateful::new(vec![]);
     let k2 = keys.clone_reader();
 
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       Keys(keys.clone_writer())
     });
     wnd.draw_frame();
 
-    wnd.processes_keyboard_event(
+    wnd.process_keyboard_event(
       PhysicalKey::Code(KeyCode::Digit0),
       VirtualKey::Character("0".into()),
       false,
@@ -98,7 +98,7 @@ mod tests {
       ElementState::Pressed,
     );
 
-    wnd.processes_keyboard_event(
+    wnd.process_keyboard_event(
       PhysicalKey::Code(KeyCode::Digit0),
       VirtualKey::Character("0".into()),
       false,
@@ -106,7 +106,7 @@ mod tests {
       ElementState::Released,
     );
 
-    wnd.processes_keyboard_event(
+    wnd.process_keyboard_event(
       PhysicalKey::Code(KeyCode::Digit1),
       VirtualKey::Character("1".into()),
       false,
@@ -114,7 +114,7 @@ mod tests {
       ElementState::Pressed,
     );
 
-    wnd.processes_keyboard_event(
+    wnd.process_keyboard_event(
       PhysicalKey::Code(KeyCode::Digit1),
       VirtualKey::Character("1".into()),
       false,

@@ -174,7 +174,7 @@ impl Overlay {
       if let Some(wnd) = AppCtx::get_window(wnd_id) {
         if let Some(wid) = track_id.and_then(|track_id| track_id.get()) {
           let this = self.clone();
-          let _ = AppCtx::spawn_local(async move {
+          AppCtx::spawn_local(async move {
             {
               let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
               let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
@@ -229,7 +229,7 @@ impl Overlay {
     };
 
     let this = self.clone();
-    let _ = AppCtx::spawn_local(async move {
+    AppCtx::spawn_local(async move {
       let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
       let generator: GenWidget = gen.r_into();
       let wid = BuildCtx::get_mut().build(generator.gen_widget());
@@ -327,7 +327,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     let w_log = Rc::new(RefCell::new(vec![]));
     let r_log = w_log.clone();
     let overlay = Overlay::new(

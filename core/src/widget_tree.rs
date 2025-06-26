@@ -147,6 +147,7 @@ impl WidgetTree {
 
   pub(crate) fn is_dirty(&self) -> bool { !self.dirty_set.borrow().is_empty() }
 
+  #[allow(unused)]
   pub(crate) fn count(&self, wid: WidgetId) -> usize { wid.descendants(self).count() }
 
   pub(crate) fn window(&self) -> Sc<Window> {
@@ -282,6 +283,15 @@ impl WidgetTree {
 
     Self { root, dummy_id, wnd_id, arena, store: <_>::default(), dirty_set: <_>::default() }
   }
+
+  pub fn disposed(&mut self) {
+    let root = self.root();
+    let dummy = new_node(&mut self.arena, Box::new(PureRender(Void)));
+    root.insert_after(dummy, self);
+
+    self.root = dummy;
+    root.dispose_subtree(self);
+  }
 }
 
 impl DirtyMarker {
@@ -347,7 +357,7 @@ mod tests {
         @MockBox { size: pipe!(*$no_boundary_size) }
       }
     };
-    let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
+    let wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
     wnd.draw_frame();
     let size = wnd
       .layout_info_by_path(&[0, 0])
@@ -393,7 +403,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
 
     {
@@ -413,7 +423,7 @@ mod tests {
     let c_trigger = trigger.clone_writer();
     let w = fn_widget! { pipe!($trigger; fn_widget!{ @Void {}}) };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
 
     {
@@ -434,7 +444,7 @@ mod tests {
   fn drop_info_clear() {
     reset_test_env!();
 
-    let wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       @MockMulti {
         @ {
           (1..=10).map(|_| {
@@ -482,7 +492,7 @@ mod tests {
       }
     };
 
-    let wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     let tree = wnd.tree_mut();
     let mut queue = vec![];
     tree.layout(Size::new(100., 100.), &mut queue);
@@ -508,7 +518,7 @@ mod tests {
           })
         }
     }};
-    let mut wnd = TestWindow::new_with_size(w1, win_size);
+    let wnd = TestWindow::new_with_size(w1, win_size);
     wnd.draw_frame();
 
     let len_100_widget = wnd.painter.borrow_mut().finish().len();
@@ -524,7 +534,7 @@ mod tests {
         }
     }};
 
-    let mut wnd = TestWindow::new(w2);
+    let wnd = TestWindow::from_widget(w2);
     wnd.draw_frame();
     let len_1_widget = wnd.painter.borrow_mut().finish().len();
     assert_eq!(len_1_widget, len_100_widget);
@@ -552,7 +562,7 @@ mod tests {
 
     let (layout_cnt, w_layout_cnt) = split_value(0);
 
-    let mut wnd = TestWindow::new(fat_obj! {
+    let wnd = TestWindow::from_widget(fat_obj! {
       on_performed_layout: move |_| *$w_layout_cnt.write() += 1,
       @ { paint_cnt.clone_writer() }
     });

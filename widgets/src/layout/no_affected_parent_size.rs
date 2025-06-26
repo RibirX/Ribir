@@ -59,7 +59,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
+    let wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
 
     // layout init from top down.
     wnd.draw_frame();

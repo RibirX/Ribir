@@ -15,14 +15,17 @@
 //!
 //! class_names!(RED_BORDER);
 //!
-//! let mut theme = Theme::default();
-//! // Define how `RED_BORDER` transforms a widget.
-//! theme.classes.insert(
-//!   RED_BORDER,
-//!   style_class! {
-//!     border: Border::all(BorderSide::new(2., Color::RED.into()))
-//!   },
-//! );
+//! let theme_fn = move || {
+//!   let mut theme = Theme::default();
+//!   // Define how `RED_BORDER` transforms a widget.
+//!   theme.classes.insert(
+//!     RED_BORDER,
+//!     style_class! {
+//!       border: Border::all(BorderSide::new(2., Color::RED.into()))
+//!     },
+//!   );
+//!   theme
+//! };
 //!
 //! let w = fn_widget! {
 //!   @Container {
@@ -31,7 +34,7 @@
 //!   }
 //! };
 //!
-//! App::run(w).with_app_theme(theme);
+//! App::run(w).with_app_theme(theme_fn);
 //! ```
 
 use std::{convert::Infallible, hash::Hash};
@@ -348,6 +351,7 @@ impl<'c> ComposeChild<'c> for Class {
           .window()
           .frame_tick_stream()
           .filter(|msg| matches!(msg, FrameMsg::NewFrame(_)));
+
         let u = this2
           .raw_modifies()
           .filter(|s| s.contains(ModifyEffect::FRAMEWORK))
@@ -514,6 +518,7 @@ fn class_update(node: &ClassNode, orig: &ClassNode, class: &Class, wnd_id: Windo
 
 #[cfg(test)]
 mod tests {
+
   use super::*;
   use crate::{reset_test_env, test_helper::*};
   class_names!(MARGIN, BOX_200, CLAMP_50, EMPTY);
@@ -526,6 +531,7 @@ mod tests {
       fn_widget! {
         @MockBox {
           size: Size::new(200., 200.),
+          on_mounted: |_| {println!("mounted");},
           @ { w }
         }
       }
@@ -549,7 +555,7 @@ mod tests {
     reset_test_env!();
 
     let (cls, w_cls) = split_value(MARGIN);
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let cls = cls.clone_watcher();
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
@@ -573,7 +579,15 @@ mod tests {
   }
 
   #[test]
-  #[should_panic(expected = "on_disposed called")]
+  fn switch_class_many() {
+    for i in 0..10 {
+      println!("{i}");
+      switch_class();
+    }
+  }
+
+  #[test]
+
   fn on_disposed_of_class_nodes() {
     reset_test_env!();
 
@@ -581,14 +595,16 @@ mod tests {
 
     let (cls, w_cls) = split_value(ON_DISPOSED);
 
-    let mut wnd = TestWindow::new(fn_widget! {
+    static mut DISPOSED: bool = false;
+
+    let wnd = TestWindow::from_widget(fn_widget! {
       let cls = cls.clone_watcher();
       let mut classes = initd_classes();
-      classes.insert(ON_DISPOSED, |w| {
+      classes.insert(ON_DISPOSED, move |w| {
         fn_widget! {
           @MockBox {
             size: Size::zero(),
-            on_disposed: move |_| panic!("on_disposed called"),
+              on_disposed: move |_| unsafe { DISPOSED = true },
             @ { w }
           }
         }
@@ -604,23 +620,26 @@ mod tests {
     });
 
     wnd.draw_frame();
+    assert!(unsafe { !DISPOSED });
+
     *w_cls.write() = MARGIN;
     wnd.draw_frame();
+    assert!(unsafe { DISPOSED });
   }
 
   #[test]
   fn class_array() {
     reset_test_env!();
 
-    let mut wnd = TestWindow::new(fn_widget! {
-      let margin_and_clamp = class_array![MARGIN, CLAMP_50];
-      @Providers {
-        providers: smallvec![initd_classes().into_provider()],
-        @(margin_and_clamp) {
-          @Container {
-            size: Size::new(100., 100.),
+    let wnd = TestWindow::from_widget(fn_widget! {
+        let margin_and_clamp = class_array![MARGIN, CLAMP_50];
+        @Providers {
+          providers: smallvec![initd_classes().into_provider()],
+          @(margin_and_clamp) {
+            @Container {
+              size: Size::new(100., 100.),
+            }
           }
-        }
       }
     });
 
@@ -634,7 +653,7 @@ mod tests {
 
     class_names!(MULTI);
     let (cls, w_cls) = split_value(MARGIN);
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let cls = cls.clone_watcher();
       let mut classes = initd_classes();
       classes.insert(MULTI, |w| {
@@ -665,13 +684,13 @@ mod tests {
   }
 
   #[test]
-  #[should_panic(expected = "0")]
   fn fix_provider_in_pipe_class() {
     reset_test_env!();
 
     class_names!(PROVIDER_CLS);
 
-    let mut wnd = TestWindow::new(fn_widget! {
+    let (r_val, w_val) = split_value(-1);
+    let wnd = TestWindow::from_widget(fn_widget! {
       let trigger = Stateful::new(true);
       let mut classes = Classes::default();
       classes.insert(PROVIDER_CLS, |w| {
@@ -684,13 +703,15 @@ mod tests {
         @Container {
           size: Size::new(100., 100.),
           class: pipe!($trigger; PROVIDER_CLS),
-          on_performed_layout: |e| {
-            panic!("{}", *Provider::of::<i32>(e).unwrap());
+          on_performed_layout: move |e| {
+            *$w_val.write() =  *Provider::of::<i32>(e).unwrap();
           }
         }
       }
     });
     wnd.draw_frame();
+
+    assert_eq!(*r_val.read(), 0);
   }
 
   #[test]
@@ -698,7 +719,7 @@ mod tests {
     reset_test_env!();
 
     let (cls, w_cls) = split_value(EMPTY);
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let cls = cls.clone_watcher();
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
@@ -714,6 +735,7 @@ mod tests {
 
     *w_cls.write() = BOX_200;
     wnd.draw_frame();
+
     wnd.assert_root_size(Size::splat(200.));
   }
 
@@ -722,7 +744,7 @@ mod tests {
     reset_test_env!();
 
     let (cls, w_cls) = split_value(EMPTY);
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let cls = cls.clone_watcher();
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
@@ -745,7 +767,7 @@ mod tests {
   fn override_class() {
     reset_test_env!();
 
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       @Providers {
         providers: smallvec![
           initd_classes().into_provider(),
@@ -771,7 +793,7 @@ mod tests {
     let (w_trigger, w) = split_value(true);
     let (cls, w_cls) = split_value(EMPTY);
 
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let w_trigger = w_trigger.clone_watcher();
       let cls = cls.clone_watcher();
       @Providers {
@@ -820,7 +842,7 @@ mod tests {
 
     let (cls, w_cls) = split_value(EMPTY);
 
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let cls = cls.clone_watcher();
       @Providers {
         providers: smallvec![classes.clone().into_provider()],
@@ -844,7 +866,7 @@ mod tests {
 
     let (cls, w_cls) = split_value(INNER_PIPE_A);
     let (out, w_out) = split_value(EMPTY);
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let mut classes = Classes::default();
       classes.insert(PIPE_CLS, style_class!{
         class: Variant::<ClassName>::new(BuildCtx::get()).unwrap()
@@ -879,7 +901,7 @@ mod tests {
     let w_inner_apply = inner_apply.clone_writer();
     let (inner, w_inner) = split_value(false);
     let (out, w_out) = split_value(OUT_PIPE_CLS);
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let out_cls = Class::provider(OUT_PIPE_CLS, style_class!{
         class: Variant::<bool>::new(BuildCtx::get()).unwrap()
           .map(|b| if *b { INNER_PIPE } else { INNER_PIPE_2 } )
@@ -954,7 +976,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     let id1 = r_id.read().as_ref().and_then(|w| w.get());
 

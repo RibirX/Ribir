@@ -35,7 +35,7 @@ pub trait StateReader: 'static {
     Self: Sized;
 
   /// Return a reference of this state.
-  fn read(&self) -> ReadRef<Self::Value>;
+  fn read(&self) -> ReadRef<'_, Self::Value>;
 
   /// Return a boxed reader of this state.
   fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>>;
@@ -205,7 +205,7 @@ impl<T: 'static> StateReader for State<T> {
   type Value = T;
   type Reader = Reader<T>;
 
-  fn read(&self) -> ReadRef<T> {
+  fn read(&self) -> ReadRef<'_, T> {
     match self.inner_ref() {
       InnerState::Data(w) => w.read(),
       InnerState::Stateful(w) => w.read(),
@@ -368,8 +368,8 @@ impl<'a, V: ?Sized> WriteRef<'a, V> {
   /// use ribir_core::prelude::*;
   ///
   /// let c = Stateful::new(vec![1, 2, 3]);
-  /// let b1: WriteRef<'_, Vec<u32>> = c.write();
-  /// let b2: Result<WriteRef<'_, u32>, _> =
+  /// let b1: WriteRef<Vec<u32>> = c.write();
+  /// let b2: Result<WriteRef<u32>, _> =
   ///   WriteRef::filter_map(b1, |v| v.get_mut(1).map(PartMut::<u32>::new));
   /// assert_eq!(*b2.unwrap(), 2);
   /// ```
@@ -430,13 +430,8 @@ impl<'a, W: ?Sized> Drop for WriteRef<'a, W> {
       batched_modifies.set(*modify_scope);
 
       let info = info.clone();
-      let path = self.path.clone();
-      let _ = AppCtx::spawn_local(async move {
-        let effect = info
-          .batched_modifies
-          .replace(ModifyEffect::empty());
-        info.notifier.next(ModifyInfo { effect, path });
-      });
+
+      AppCtx::data_changed(self.path.clone(), info);
     } else {
       batched_modifies.set(*modify_scope | batched_modifies.get());
     }
@@ -562,9 +557,9 @@ mod tests {
   use std::cell::Cell;
 
   use super::*;
+  use crate::reset_test_env;
   #[cfg(target_arch = "wasm32")]
   use crate::test_helper::wasm_bindgen_test;
-  use crate::{reset_test_env, timer::Timer};
 
   struct Origin {
     a: i32,
@@ -593,14 +588,13 @@ mod tests {
     });
 
     origin.write().a = 1;
-    Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
     assert_eq!(track_origin.get(), 1);
     assert_eq!(track_map.get(), 1);
 
     *map_state.write() = 1;
-    Timer::wake_timeout_futures();
+
     AppCtx::run_until_stalled();
 
     assert_eq!(track_origin.get(), 2);
@@ -636,7 +630,6 @@ mod tests {
     });
 
     *split_a.write() = 0;
-    Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
 
     assert_eq!(track_origin.get(), ModifyEffect::BOTH.bits());
@@ -647,7 +640,6 @@ mod tests {
     track_split_a.set(0);
 
     *split_b.write() = 0;
-    Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
     assert_eq!(track_origin.get(), ModifyEffect::BOTH.bits());
     assert_eq!(track_split_b.get(), ModifyEffect::BOTH.bits());
@@ -657,7 +649,6 @@ mod tests {
     track_split_b.set(0);
 
     origin.write().a = 0;
-    Timer::wake_timeout_futures();
     AppCtx::run_until_stalled();
     assert_eq!(track_origin.get(), ModifyEffect::BOTH.bits());
     assert_eq!(track_split_b.get(), 0);

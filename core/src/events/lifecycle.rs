@@ -47,7 +47,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     assert_eq!(&**c_lc.read(), ["static mounted", "dyn mounted",]);
 
     wnd.draw_frame();
@@ -122,7 +122,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
     let mounted_ids = c_mounted.read().clone();
 

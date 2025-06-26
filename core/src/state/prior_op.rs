@@ -215,7 +215,7 @@ mod tests {
   fn prior_smoke() {
     reset_test_env!();
 
-    let mut wnd = TestWindow::new(fn_widget!(Void));
+    let wnd = TestWindow::from_widget(fn_widget!(Void));
     let wnd_id = wnd.id();
 
     let r = Stateful::new(Vec::new());
@@ -246,7 +246,7 @@ mod tests {
     reset_test_env!();
 
     let r = Stateful::new(Vec::new());
-    let mut wnd = TestWindow::new(fn_widget!(Void));
+    let wnd = TestWindow::from_widget(fn_widget!(Void));
     let wnd_id = wnd.id();
 
     let result = r.clone_writer();

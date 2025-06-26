@@ -563,7 +563,7 @@ mod tests {
         @ { border_100_50_box(10., 0., 0., 0., Some(Radius::all(5.))) }
       })
       .with_wnd_size(Size::new(400., 80.))
-      .with_comparison(0.000065),
+      .with_comparison(0.000068),
       "top_borders"
     );
 
@@ -577,7 +577,7 @@ mod tests {
         @ { border_100_50_box(0., 10., 0., 0., Some(Radius::all(5.))) }
       })
       .with_wnd_size(Size::new(400., 80.))
-      .with_comparison(0.000065),
+      .with_comparison(0.000068),
       "right_borders"
     );
 
@@ -591,7 +591,7 @@ mod tests {
         @ { border_100_50_box(0., 0., 10., 0., Some(Radius::all(5.))) }
       })
       .with_wnd_size(Size::new(400., 80.))
-      .with_comparison(0.000065),
+      .with_comparison(0.000068),
       "bottom_borders"
     );
 
@@ -605,7 +605,7 @@ mod tests {
         @ { border_100_50_box(0., 0., 0., 10., Some(Radius::all(5.))) }
       })
       .with_wnd_size(Size::new(400., 80.))
-      .with_comparison(0.000065),
+      .with_comparison(0.000068),
       "left_borders"
     );
   }

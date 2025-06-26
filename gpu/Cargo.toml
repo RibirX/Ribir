@@ -14,7 +14,7 @@ version.workspace = true
 
 [dependencies]
 ahash.workspace = true
-futures = {workspace = true, optional = true}
+tokio = {workspace = true, optional = true, features=["sync"]}
 guillotiere.workspace = true
 log.workspace = true
 rayon.workspace = true
@@ -28,7 +28,8 @@ zerocopy = {workspace=true, features = ["derive"]}
 [dev-dependencies]
 paste.workspace = true
 ribir_dev_helper = {path = "../dev-helper"}
+futures.workspace = true
 
 [features]
 default = ["wgpu"]
-wgpu = ["dep:wgpu", "futures"]
+wgpu = ["dep:wgpu", "tokio"]

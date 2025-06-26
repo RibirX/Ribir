@@ -102,7 +102,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     assert_eq!(*self_data.read(), Some(MyCustomData(1)));

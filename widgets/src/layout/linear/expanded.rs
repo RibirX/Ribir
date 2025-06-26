@@ -200,7 +200,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(widget, Size::new(400., 100.));
+    let wnd = TestWindow::new_with_size(widget, Size::new(400., 100.));
     wnd.draw_frame();
     LayoutCase::expect_size(&wnd, &[0, 0], Size::new(150., 0.));
     *w_flex.write() = 2.;

@@ -70,19 +70,17 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
     part_writer!(&mut w.background).transition(trans);
 
     // Show the scrollbar when scrolling.
-    let mut fade: Option<TaskHandle<_>> = None;
+    let mut fade: Option<SubscriptionGuard<_>> = None;
     let auto_hide = move |_| {
       $w.write().opacity = 1.;
       $w.write().visible = true;
-      if let Some(f) = fade.take() {
-        f.unsubscribe();
-      }
+      fade.take();
       let u = observable::timer((), Duration::from_secs(3), AppCtx::scheduler())
         .filter(move |_| !$w.is_hovered())
         .subscribe(move |_| {
           $w.write().opacity = 0.;
           $w.write().visible = false;
-        });
+        }).unsubscribe_when_dropped();
       fade = Some(u);
     };
 

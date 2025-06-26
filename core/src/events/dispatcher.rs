@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use winit::event::{ElementState, MouseScrollDelta, WindowEvent};
+use winit::event::ElementState;
 
 use crate::{
   prelude::*,
@@ -51,6 +51,10 @@ impl Dispatcher {
     }
   }
 
+  pub fn modifiers_changed(&mut self, modifiers: ModifiersState) {
+    self.info.modifiers = modifiers;
+  }
+
   pub(crate) fn grab_pointer(&self, wid: WidgetId) -> Option<GrabPointer> {
     if self.grab_mouse_wid.borrow().is_none() {
       *self.grab_mouse_wid.borrow_mut() = Some(wid);
@@ -81,19 +85,6 @@ struct PressedButtonInfo {
 }
 
 impl Dispatcher {
-  pub fn dispatch(&mut self, event: WindowEvent, wnd_factor: f64) {
-    match event {
-      WindowEvent::ModifiersChanged(s) => self.info.modifiers = s.state(),
-      WindowEvent::CursorMoved { position, .. } => {
-        let pos = position.to_logical::<f32>(wnd_factor);
-        self.cursor_move_to(Point::new(pos.x, pos.y))
-      }
-      WindowEvent::CursorLeft { .. } => self.on_cursor_left(),
-      WindowEvent::MouseWheel { delta, .. } => self.dispatch_wheel(delta, wnd_factor),
-      _ => log::info!("not processed event {:?}", event),
-    }
-  }
-
   pub fn dispatch_keyboard_input(
     &mut self, physical_key: PhysicalKey, key: VirtualKey, is_repeat: bool, location: KeyLocation,
     state: ElementState,
@@ -141,7 +132,7 @@ impl Dispatcher {
     }
   }
 
-  pub fn on_cursor_left(&mut self) {
+  pub fn on_cursor_leave(&mut self) {
     if self.grab_mouse_wid.borrow().is_none() {
       self.info.cursor_pos = Point::new(-1., -1.);
       self.pointer_enter_leave_dispatch(self.hit_widget());
@@ -153,6 +144,7 @@ impl Dispatcher {
     *self.info.mouse_buttons_mut() |= button;
 
     let hit = self.hit_widget();
+
     let wnd = self.window();
     let tree = wnd.tree();
     let nearest_focus = hit.and_then(|wid| {
@@ -204,19 +196,11 @@ impl Dispatcher {
     self.info.mouse_buttons_mut().remove(button);
   }
 
-  pub fn dispatch_wheel(&mut self, delta: MouseScrollDelta, wnd_factor: f64) {
-    if let Some(wid) = self.hit_widget() {
-      let (delta_x, delta_y) = match delta {
-        MouseScrollDelta::LineDelta(x, y) => (x * 16., y * 16.),
-        MouseScrollDelta::PixelDelta(delta) => {
-          let winit::dpi::LogicalPosition { x, y } = delta.to_logical(wnd_factor);
-          (x, y)
-        }
-      };
-
+  pub fn dispatch_wheel(&mut self, delta_x: f32, delta_y: f32) {
+    if let Some(id) = self.hit_widget() {
       self
         .window()
-        .add_delay_event(DelayEvent::Wheel { id: wid, delta_x, delta_y });
+        .add_delay_event(DelayEvent::Wheel { id, delta_x, delta_y });
     }
   }
 
@@ -243,7 +227,7 @@ impl Dispatcher {
     self.entered_widgets = new_hit.map_or(vec![], |wid| wid.ancestors(tree).collect::<Vec<_>>());
   }
 
-  fn hit_widget(&self) -> Option<WidgetId> {
+  pub(crate) fn hit_widget(&self) -> Option<WidgetId> {
     fn deepest_test(ctx: &mut HitTestCtx, pos: &mut Point) -> Option<WidgetId> {
       // Safety: The widget tree remains read-only throughout the entire hit testing
       // process.
@@ -374,14 +358,10 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(root);
+    let wnd = TestWindow::from_widget(root);
     wnd.draw_frame();
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: winit::event::DeviceId::dummy(),
-      position: (1., 1.).into(),
-    });
+    wnd.process_cursor_move(Point::new(1., 1.));
     wnd.run_frame_tasks();
 
     assert_eq!(records.read().len(), 2);
@@ -404,7 +384,7 @@ mod tests {
 
     let (root, records) = record_pointer();
     let device_id = Box::new(DummyDeviceId);
-    let mut wnd = TestWindow::new(root);
+    let wnd = TestWindow::from_widget(root);
     wnd.draw_frame();
 
     wnd.process_mouse_press(device_id.clone(), MouseButtons::PRIMARY);
@@ -413,11 +393,7 @@ mod tests {
     wnd.process_mouse_press(device_id.clone(), MouseButtons::SECONDARY);
     wnd.run_frame_tasks();
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: winit::event::DeviceId::dummy(),
-      position: (1, 1).into(),
-    });
+    wnd.process_cursor_move(Point::new(1., 1.));
     wnd.run_frame_tasks();
 
     wnd.process_mouse_release(device_id.clone(), MouseButtons::PRIMARY);
@@ -455,7 +431,7 @@ mod tests {
     }
 
     let (root, record) = record_pointer();
-    let mut wnd = TestWindow::new(root);
+    let wnd = TestWindow::from_widget(root);
     wnd.draw_frame();
 
     let device_id = Box::new(DummyDeviceId);
@@ -477,11 +453,12 @@ mod tests {
     assert_eq!(record.read().len(), 4);
     assert_eq!(record.read()[3].btns, MouseButtons::empty());
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: device_id_2.0,
-      position: (1, 1).into(),
-    });
+    // #[allow(deprecated)]
+    // wnd.processes_native_event(WindowEvent::CursorMoved {
+    //   device_id: device_id_2.0,
+    //   position: (1, 1).into(),
+    // });
+    wnd.process_cursor_move(Point::new(1., 1.));
     wnd.run_frame_tasks();
     // but cursor move processed.
     assert_eq!(record.read().len(), 5);
@@ -512,7 +489,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
@@ -541,41 +518,35 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    let device_id = winit::event::DeviceId::dummy();
-
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (10, 10).into() });
+    wnd.process_cursor_move(Point::new(10., 10.));
     wnd.run_frame_tasks();
     assert_eq!(&*enter.read(), &[2, 1]);
 
     // leave to parent
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (99, 99).into() });
+    wnd.process_cursor_move(Point::new(99., 99.));
     wnd.run_frame_tasks();
     assert_eq!(&*leave.read(), &[1]);
 
     // move in same widget,
     // check if duplicate event fired.
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (99, 99).into() });
+
+    wnd.process_cursor_move(Point::new(99., 99.));
     wnd.run_frame_tasks();
     assert_eq!(&*enter.read(), &[2, 1]);
     assert_eq!(&*leave.read(), &[1]);
 
     // leave all
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (999, 999).into() });
+    wnd.process_cursor_move(Point::new(999., 999.));
     wnd.run_frame_tasks();
     assert_eq!(&*leave.read(), &[1, 2]);
 
     // leave event trigger by window left.
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved { device_id, position: (10, 10).into() });
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorLeft { device_id });
+    wnd.process_cursor_move(Point::new(10.0, 10.));
+
+    wnd.process_cursor_leave();
     wnd.run_frame_tasks();
     assert_eq!(&*leave.read(), &[1, 2, 1, 2]);
   }
@@ -600,14 +571,10 @@ mod tests {
     };
 
     // Stretch row
-    let mut wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
+    let wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
     wnd.draw_frame();
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: winit::event::DeviceId::dummy(),
-      position: (50f64, 50f64).into(),
-    });
+    wnd.process_cursor_move(Point::new(50.0, 50.0));
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.run_frame_tasks();
@@ -632,14 +599,10 @@ mod tests {
     };
 
     // Stretch row
-    let mut wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
+    let wnd = TestWindow::new_with_size(w, Size::new(400., 400.));
     wnd.draw_frame();
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: winit::event::DeviceId::dummy(),
-      position: (50f64, 50f64).into(),
-    });
+    wnd.process_cursor_move(Point::new(50.0, 50.0));
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 
@@ -650,18 +613,11 @@ mod tests {
       *clicked = 0;
     }
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: winit::event::DeviceId::dummy(),
-      position: (50f64, 50f64).into(),
-    });
+    wnd.process_cursor_move(Point::new(50.0, 50.0));
 
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: winit::event::DeviceId::dummy(),
-      position: (50f64, 150f64).into(),
-    });
+
+    wnd.process_cursor_move(Point::new(50.0, 150.0));
     wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.run_frame_tasks();
     assert_eq!(*click_path.read(), 1);
@@ -682,14 +638,10 @@ mod tests {
         }
       }
     };
-    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: winit::event::DeviceId::dummy(),
-      position: (45f64, 45f64).into(),
-    });
+    wnd.process_cursor_move(Point::new(45.0, 45.0));
 
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 
@@ -697,11 +649,7 @@ mod tests {
     assert!(wnd.focus_mgr.borrow().focusing().is_some());
 
     wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: winit::event::DeviceId::dummy(),
-      position: (80f64, 80f64).into(),
-    });
+    wnd.process_cursor_move(Point::new(80.0, 80.0));
 
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
 
@@ -712,7 +660,7 @@ mod tests {
   fn fix_hit_out_window() {
     reset_test_env!();
 
-    let mut wnd = TestWindow::new(fn_widget!(MockBox { size: INFINITY_SIZE }));
+    let wnd = TestWindow::from_widget(fn_widget!(MockBox { size: INFINITY_SIZE }));
     wnd.draw_frame();
     let mut dispatcher = wnd.dispatcher.borrow_mut();
     dispatcher.info.cursor_pos = Point::new(-1., -1.);
@@ -749,7 +697,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(w, Size::new(500., 500.));
+    let wnd = TestWindow::new_with_size(w, Size::new(500., 500.));
     wnd.draw_frame();
     let mut dispatcher = wnd.dispatcher.borrow_mut();
     dispatcher.info.cursor_pos = Point::new(125., 125.);
@@ -765,7 +713,7 @@ mod tests {
   fn fix_align_hit_test() {
     reset_test_env!();
     let (expect_hit, w_hit) = split_value(None);
-    let mut wnd = TestWindow::new_with_size(
+    let wnd = TestWindow::new_with_size(
       fn_widget! {
         @MockBox {
           h_align: HAlign::Center,
@@ -787,7 +735,7 @@ mod tests {
   fn fix_transform_hit() {
     reset_test_env!();
     let (expect_hit, w_hit) = split_value(None);
-    let mut wnd = TestWindow::new_with_size(
+    let wnd = TestWindow::new_with_size(
       fn_widget! {
         @MockBox {
           anchor: Point::new(50., 50.),
@@ -809,7 +757,7 @@ mod tests {
   fn fix_over_container_hit() {
     reset_test_env!();
 
-    let mut wnd = TestWindow::new_with_size(
+    let wnd = TestWindow::new_with_size(
       mock_stack! {
         @MockBox {
           anchor: Anchor::left_top(100., 100.),

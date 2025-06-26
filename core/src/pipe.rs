@@ -516,7 +516,7 @@ impl Query for PipeNode {
     p.data.query_all_write(query_id, out);
   }
 
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query(&self, query_id: &QueryId) -> Option<QueryHandle<'_>> {
     let p = self.as_ref();
     if query_id == &QueryId::of::<Self>() {
       Some(QueryHandle::new(self))
@@ -525,7 +525,7 @@ impl Query for PipeNode {
     }
   }
 
-  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle<'_>> {
     self.as_ref().data.query_write(query_id)
   }
 
@@ -696,7 +696,7 @@ mod tests {
       let p = pipe! { fn_widget!{ @MockBox { size: *$size }}};
       @(p) { @Void {} }
     };
-    let wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     let tree = wnd.tree_mut();
     let mut queue = vec![];
     tree.layout(Size::zero(), &mut queue);
@@ -735,7 +735,7 @@ mod tests {
         }
       }
     };
-    let wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     let tree = wnd.tree_mut();
     let mut queue = vec![];
     tree.layout(Size::zero(), &mut queue);
@@ -787,7 +787,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     assert_eq!(*c_new_cnt.read(), 3);
     assert_eq!(*c_drop_cnt.read(), 0);
@@ -807,6 +807,7 @@ mod tests {
   #[test]
   fn pipe_widget_in_pipe() {
     reset_test_env!();
+
     let (p, w_p) = split_value(false);
     let (c, w_c) = split_value(false);
     let (mnt_cnt, w_mnt_cnt) = split_value(0);
@@ -827,24 +828,25 @@ mod tests {
         }
       })
     };
+    {
+      let wnd = TestWindow::from_widget(w);
+      wnd.draw_frame();
+      assert_eq!(*mnt_cnt.read(), 2);
 
-    let mut wnd = TestWindow::new(w);
-    wnd.draw_frame();
-    assert_eq!(*mnt_cnt.read(), 2);
+      // trigger the parent update
+      *w_p.write() = true;
+      // then trigger the child update.
+      *w_c.write() = true;
 
-    // trigger the parent update
-    *w_p.write() = true;
-    // then trigger the child update.
-    *w_c.write() = true;
+      wnd.draw_frame();
+      assert_eq!(*mnt_cnt.read(), 4);
 
-    wnd.draw_frame();
-    assert_eq!(*mnt_cnt.read(), 4);
-
-    // old pipe should be unsubscribed.
-    *w_p.write() = true;
-    *w_c.write() = true;
-    wnd.draw_frame();
-    assert_eq!(*mnt_cnt.read(), 6);
+      // old pipe should be unsubscribed.
+      *w_p.write() = true;
+      *w_c.write() = true;
+      wnd.draw_frame();
+      assert_eq!(*mnt_cnt.read(), 6);
+    }
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -917,7 +919,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     let mut removed = vec![];
 
     wnd.draw_frame();
@@ -1003,7 +1005,7 @@ mod tests {
         })}
       }
     };
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     let grandson_id = {
       let tree = wnd.tree();
@@ -1056,7 +1058,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(1., 1.));
 
@@ -1091,7 +1093,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(1., 1.));
 
@@ -1122,7 +1124,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(0., 0.));
 
@@ -1154,7 +1156,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(0., 0.));
 
@@ -1190,7 +1192,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     wnd.assert_root_size(Size::new(0., 0.));
 
@@ -1223,7 +1225,7 @@ mod tests {
       })
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
     assert_eq!(*c_hit_count.read(), 1);
 
@@ -1261,7 +1263,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     wnd.draw_frame();
     *w1.write() += 1.;
     *w2.write() += 1.;
@@ -1295,7 +1297,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     wnd.draw_frame();
     assert_eq!(w2.read()[0], 0);
     // The children order is not fixed
@@ -1303,7 +1305,6 @@ mod tests {
     w2.write().clear();
     wnd.draw_frame();
     assert_eq!(w2.read()[0], 0);
-    // The children order is not fixed
     assert_eq!(w2.read().iter().collect::<HashSet<_>>().len(), 11);
   }
 
@@ -1327,7 +1328,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     wnd.draw_frame();
     *son_writer.write() += 1;
     wnd.draw_frame();
@@ -1358,7 +1359,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     wnd.draw_frame();
     *son_writer.write() += 1;
     wnd.draw_frame();

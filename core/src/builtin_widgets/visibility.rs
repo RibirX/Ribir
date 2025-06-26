@@ -99,7 +99,7 @@ mod tests {
     let hit = Stateful::new(0);
     let (visible, w_visible) = split_value(true);
     let hit2 = hit.clone_writer();
-    let mut wnd = TestWindow::new(container! {
+    let wnd = TestWindow::from_widget(container! {
       size: Size::splat(100.),
       visible: pipe!(*$visible),
       @PainterHit(hit2.clone_writer())

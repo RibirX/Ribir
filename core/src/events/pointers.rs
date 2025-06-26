@@ -79,17 +79,10 @@ impl_common_event_deref!(PointerEvent);
 #[cfg(test)]
 mod tests {
 
-  use winit::{dpi::LogicalPosition, event::WindowEvent};
-
   use crate::{prelude::*, reset_test_env, test_helper::*};
 
   fn tap_on(wnd: &Window, x: f32, y: f32) {
-    let logical = LogicalPosition::new(x, y);
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::CursorMoved {
-      device_id: winit::event::DeviceId::dummy(),
-      position: logical.to_physical(1.),
-    });
+    wnd.process_cursor_move(Point::new(x, y));
 
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.process_mouse_release(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
@@ -119,7 +112,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
     tap_on(&wnd, 25., 25.);

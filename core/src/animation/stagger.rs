@@ -214,10 +214,11 @@ impl<T> Stagger<T> {
 
 #[cfg(test)]
 mod tests {
+
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::{reset_test_env, test_helper::*};
+  use crate::{reset_test_env, test_helper::*, window::WindowFlags};
 
   widget_layout_test!(
     stagger_run_and_stop,
@@ -268,10 +269,13 @@ mod tests {
       mock_box
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::new(w, Size::new(100., 100.), WindowFlags::ANIMATIONS);
+    assert!(c_stagger.is_running());
     wnd.draw_frame();
-    // draw twice to ensure the 'zero' animation is finished.
+
+    std::thread::sleep(Duration::from_millis(100));
     wnd.draw_frame();
+    // animation is finished.
     assert!(!c_stagger.is_running());
   }
 }

@@ -1,9 +1,9 @@
 use std::convert::Infallible;
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(target_arch = "wasm32"))]
 pub use std::time::{Duration, Instant};
 
 use rxrust::prelude::Subject;
-#[cfg(target_family = "wasm")]
+#[cfg(target_arch = "wasm32")]
 pub use web_time::{Duration, Instant};
 
 /// Frame ticker emit message when new frame need to draw.
@@ -11,7 +11,7 @@ pub type FrameTicker = Subject<'static, FrameMsg, Infallible>;
 
 /// Message emitted at different status of a frame.
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum FrameMsg {
   /// This message is emitted when all events have been processed and the
   /// framework begins the layout and painting of the frame.

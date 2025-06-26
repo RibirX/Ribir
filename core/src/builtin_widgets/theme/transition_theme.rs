@@ -2,7 +2,7 @@ use super::*;
 use crate::fill_transition;
 
 pub struct TransitionTheme {
-  pub transitions: ahash::HashMap<TransitionIdent, Box<dyn RocBoxClone>>,
+  pub transitions: ahash::HashMap<TransitionIdent, Box<dyn RocBoxClone + Send>>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -41,8 +41,8 @@ pub mod transitions {
 impl TransitionTheme {
   #[inline]
   pub fn set_transition(
-    &mut self, ident: TransitionIdent, transition: Box<dyn RocBoxClone>,
-  ) -> Option<Box<dyn RocBoxClone>> {
+    &mut self, ident: TransitionIdent, transition: Box<dyn RocBoxClone + Send>,
+  ) -> Option<Box<dyn RocBoxClone + Send>> {
     self.transitions.insert(ident, transition)
   }
 }

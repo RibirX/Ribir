@@ -71,7 +71,7 @@ impl<'a> PaintingCtx<'a> {
   /// Provide a box painter that can draw decorations from the widget box's
   /// origin point without being affected by padding transformations. Any
   /// transform made to this painter will be restore when it is dropped.
-  pub fn box_painter(&mut self) -> BoxPainter {
+  pub fn box_painter(&mut self) -> BoxPainter<'_> {
     let content = *self.painter.transform();
     let box_matrix = self.box_offset.then(&content);
     let painter = self.painter.set_transform(box_matrix);
@@ -80,11 +80,11 @@ impl<'a> PaintingCtx<'a> {
   }
 
   #[inline]
-  pub fn provider_ctx_and_painter(&mut self) -> (&mut ProviderCtx, &mut Painter) {
+  pub fn provider_ctx_and_painter(&mut self) -> (&'_ mut ProviderCtx, &mut Painter) {
     (&mut self.provider_ctx, self.painter)
   }
 
-  pub fn provider_ctx_and_box_painter(&mut self) -> (&mut ProviderCtx, BoxPainter) {
+  pub fn provider_ctx_and_box_painter(&mut self) -> (&'_ mut ProviderCtx, BoxPainter<'_>) {
     // Safety: The Provider context and box painter operate independently.
     let provider_ctx = &mut (unsafe { &mut *(self as *mut Self) }).provider_ctx;
     let painter = self.box_painter();

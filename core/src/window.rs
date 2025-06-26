@@ -5,11 +5,10 @@ use std::{
   ptr::NonNull,
 };
 
-use futures::{Future, task::LocalSpawnExt};
 use ribir_algo::Sc;
 use smallvec::SmallVec;
 use widget_id::TrackId;
-use winit::event::{ElementState, WindowEvent};
+use winit::event::{ElementState, Ime};
 pub use winit::window::CursorIcon;
 
 use crate::{
@@ -17,9 +16,163 @@ use crate::{
     dispatcher::Dispatcher,
     focus_mgr::{FocusManager, FocusType},
   },
-  prelude::*,
+  prelude::{image::ColorFormat, *},
+  scheduler::BoxFuture,
   ticker::{FrameMsg, FrameTicker},
 };
+
+/// The attributes use to create a window.
+#[derive(Default)]
+pub struct WindowAttributes(pub winit::window::WindowAttributes);
+
+fn into_winit_size(size: Size) -> winit::dpi::Size {
+  winit::dpi::LogicalSize::new(size.width, size.height).into()
+}
+impl WindowAttributes {
+  /// Initial title of the window in the title bar.
+  ///
+  /// Default: `"Ribir App"`
+  pub fn with_title(&mut self, title: impl Into<String>) -> &mut Self {
+    self.0.title = title.into();
+    self
+  }
+
+  /// Whether the window should be resizable.
+  ///
+  /// Default: `true`
+  pub fn with_resizable(&mut self, resizable: bool) -> &mut Self {
+    self.0.resizable = resizable;
+    self
+  }
+
+  /// Initial size of the window client area (excluding decorations).
+  pub fn with_size(&mut self, size: Size) -> &mut Self {
+    self.0.inner_size = Some(into_winit_size(size));
+    self
+  }
+
+  /// Minimum size of the window client area
+  pub fn with_min_size(&mut self, size: Size) -> &mut Self {
+    self.0.min_inner_size = Some(into_winit_size(size));
+    self
+  }
+
+  /// Maximum size of the window client area
+  pub fn with_max_size(&mut self, size: Size) -> &mut Self {
+    self.0.max_inner_size = Some(into_winit_size(size));
+    self
+  }
+
+  /// Initial position of the window in screen coordinates.
+  pub fn position(mut self, position: Point) -> Self {
+    self.0.position = Some(winit::dpi::LogicalPosition::new(position.x, position.y).into());
+    self
+  }
+
+  /// Whether the window should start maximized.
+  ///
+  /// Default: `false`
+  pub fn with_maximized(&mut self, maximized: bool) -> &mut Self {
+    self.0.maximized = maximized;
+    self
+  }
+
+  /// Initial window visibility.
+  ///
+  /// Default: `true`
+  pub fn with_visible(&mut self, visible: bool) -> &mut Self {
+    self.0.visible = visible;
+    self
+  }
+
+  /// Whether the window should show decorations.
+  ///
+  /// Default: `true`
+  pub fn with_decorations(&mut self, decorations: bool) -> &mut Self {
+    self.0.decorations = decorations;
+    self
+  }
+
+  /// Window icon in RGBA8 format.
+  pub fn with_icon(&mut self, icon: &PixelImage) -> &mut Self {
+    debug_assert!(icon.color_format() == ColorFormat::Rgba8, "Icon must be in RGBA8 format");
+
+    self.0.window_icon =
+      winit::window::Icon::from_rgba(icon.pixel_bytes().to_vec(), icon.width(), icon.height()).ok();
+
+    self
+  }
+}
+
+pub enum UiEvent {
+  RedrawRequest {
+    wnd_id: WindowId,
+    force: bool,
+  },
+  Resize {
+    wnd_id: WindowId,
+    size: Size,
+  },
+  ModifiersChanged {
+    wnd_id: WindowId,
+    state: ModifiersState,
+  },
+  CursorMoved {
+    wnd_id: WindowId,
+    pos: Point,
+  },
+  CursorLeft {
+    wnd_id: WindowId,
+  },
+  MouseWheel {
+    wnd_id: WindowId,
+    delta_x: f32,
+    delta_y: f32,
+  },
+  KeyBoard {
+    wnd_id: WindowId,
+    key: VirtualKey,
+    state: ElementState,
+    physical_key: PhysicalKey,
+    is_repeat: bool,
+    location: KeyLocation,
+  },
+  ImePreEdit {
+    wnd_id: WindowId,
+    ime: Ime,
+  },
+  ReceiveChars {
+    wnd_id: WindowId,
+    chars: CowArc<str>,
+  },
+  MouseInput {
+    wnd_id: WindowId,
+    device_id: Box<dyn DeviceId>,
+    button: MouseButtons,
+    state: ElementState,
+  },
+  CloseRequest {
+    wnd_id: WindowId,
+  },
+}
+
+impl UiEvent {
+  pub fn wnd_id(&self) -> Option<WindowId> {
+    match self {
+      UiEvent::RedrawRequest { wnd_id, .. }
+      | UiEvent::Resize { wnd_id, .. }
+      | UiEvent::ModifiersChanged { wnd_id, .. }
+      | UiEvent::CursorMoved { wnd_id, .. }
+      | UiEvent::CursorLeft { wnd_id, .. }
+      | UiEvent::MouseWheel { wnd_id, .. }
+      | UiEvent::KeyBoard { wnd_id, .. }
+      | UiEvent::ImePreEdit { wnd_id, .. }
+      | UiEvent::ReceiveChars { wnd_id, .. }
+      | UiEvent::MouseInput { wnd_id, .. }
+      | UiEvent::CloseRequest { wnd_id } => Some(*wnd_id),
+    }
+  }
+}
 
 /// Window is the root to represent.
 ///
@@ -42,13 +195,11 @@ pub struct Window {
   /// event immediately. So we store the event emitter in this vector,
   /// and emit them after all borrow finished.
   pub(crate) delay_emitter: RefCell<VecDeque<DelayEvent>>,
-  /// A task pool use to process `Future` or `rxRust` task, and will block until
-  /// all task finished before current frame end.
-  frame_pool: RefCell<FuturesLocalSchedulerPool>,
+
   /// A priority queue of tasks. So that tasks with lower priority value will be
   /// executed first.
-  priority_task_queue: PriorityTaskQueue,
-  shell_wnd: RefCell<Box<dyn ShellWindow>>,
+  pub(crate) priority_task_queue: PriorityTaskQueue,
+  shell_wnd: RefCell<BoxShellWindow>,
   /// A vector store the widget id pair of (parent, child). The child need to
   /// drop after its `KeepAlive::keep_alive` be false or its parent
   /// is dropped.
@@ -74,15 +225,23 @@ bitflags! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
 pub struct WindowId(u64);
 
+pub trait Shell {
+  fn new_shell_window(&self, attr: WindowAttributes) -> BoxFuture<'static, BoxShellWindow>;
+  fn run_in_shell(&self, f: BoxFuture<'static, ()>);
+  fn exit(&self);
+}
+
+#[cfg(target_arch = "wasm32")]
+pub type BoxShell = Box<dyn Shell>;
+#[cfg(not(target_arch = "wasm32"))]
+pub type BoxShell = Box<dyn Shell + Send>;
+
 pub trait ShellWindow {
   fn id(&self) -> WindowId;
   fn inner_size(&self) -> Size;
-  fn outer_size(&self) -> Size;
   fn set_ime_cursor_area(&mut self, rect: &Rect);
   fn set_ime_allowed(&mut self, allowed: bool);
 
-  fn request_resize(&mut self, size: Size);
-  fn on_resize(&mut self, size: Size);
   fn set_min_size(&mut self, size: Size);
   fn cursor(&self) -> CursorIcon;
   fn set_cursor(&mut self, cursor: CursorIcon);
@@ -95,31 +254,29 @@ pub trait ShellWindow {
   fn is_minimized(&self) -> bool;
   fn set_minimized(&mut self, minimized: bool);
   fn focus_window(&mut self);
-  fn set_decorations(&mut self, decorations: bool);
+  fn request_resize(&mut self, size: Size);
+  // fn set_decorations(&mut self, decorations: bool);
   fn as_any(&self) -> &dyn Any;
   fn as_any_mut(&mut self) -> &mut dyn Any;
-  /// The device pixel ratio of Window interface returns the ratio of the
-  /// resolution in physical pixels to the logic pixels for the current display
-  /// device.
-  fn device_pixel_ratio(&self) -> f32;
-  fn begin_frame(&mut self, surface_color: Color);
-  fn draw_commands(&mut self, viewport: Rect, commands: &[PaintCommand]);
-  fn end_frame(&mut self);
+
+  fn close(&self);
+
+  fn request_draw(&self);
+
+  fn draw_commands(
+    &mut self, wnd_size: Size, viewport: Rect, surface_color: Color, commands: &[PaintCommand],
+  );
 }
 
-impl Window {
-  #[deprecated(note = "The core window should not depends on shell window event.")]
-  #[inline]
-  /// processes native events from this native window
-  pub fn processes_native_event(&self, event: WindowEvent) {
-    let ratio = self.device_pixel_ratio() as f64;
-    self
-      .dispatcher
-      .borrow_mut()
-      .dispatch(event, ratio);
-  }
+#[cfg(target_arch = "wasm32")]
+pub type BoxShellWindow = Box<dyn ShellWindow>;
+#[cfg(not(target_arch = "wasm32"))]
+pub type BoxShellWindow = Box<dyn ShellWindow + Send>;
 
-  pub fn processes_keyboard_event(
+impl Window {
+  pub fn size(&self) -> Size { self.shell_wnd.borrow().inner_size() }
+
+  pub fn process_keyboard_event(
     &self, physical_key: PhysicalKey, key: VirtualKey, is_repeat: bool, location: KeyLocation,
     state: ElementState,
   ) {
@@ -129,14 +286,30 @@ impl Window {
       .dispatch_keyboard_input(physical_key, key, is_repeat, location, state);
   }
 
-  pub fn processes_receive_chars(&self, chars: CowArc<str>) {
+  pub fn process_receive_chars(&self, chars: CowArc<str>) {
     self
       .dispatcher
       .borrow_mut()
       .dispatch_receive_chars(chars)
   }
 
-  pub fn processes_ime_pre_edit(&self, ime: ImePreEdit) {
+  pub fn process_wheel(&self, delta_x: f32, delta_y: f32) {
+    self
+      .dispatcher
+      .borrow_mut()
+      .dispatch_wheel(delta_x, delta_y);
+  }
+
+  pub fn process_cursor_move(&self, position: Point) {
+    self
+      .dispatcher
+      .borrow_mut()
+      .cursor_move_to(position);
+  }
+
+  pub fn process_cursor_leave(&self) { self.dispatcher.borrow_mut().on_cursor_leave(); }
+
+  pub fn dispatch_ime_pre_edit(&self, ime: ImePreEdit) {
     self
       .dispatcher
       .borrow_mut()
@@ -201,17 +374,6 @@ impl Window {
     self.once_on_lifecycle(f, |msg| matches!(msg, FrameMsg::LayoutReady(_)))
   }
 
-  /// Return an `rxRust` Scheduler, which will guarantee all task add to the
-  /// scheduler will finished before current frame finished.
-  #[inline]
-  pub fn frame_scheduler(&self) -> FuturesLocalScheduler { self.frame_pool.borrow().spawner() }
-
-  /// Spawns a task that polls the given future with output `()` to completion.
-  /// And guarantee wait this task will finished in current frame.
-  pub fn frame_spawn(&self, f: impl Future<Output = ()> + 'static) -> Result<(), SpawnError> {
-    self.frame_scheduler().spawn_local(f)
-  }
-
   pub fn priority_task_queue(&self) -> &PriorityTaskQueue { &self.priority_task_queue }
 
   pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, Infallible> {
@@ -230,55 +392,43 @@ impl Window {
       .set(self.running_animates.get() - 1);
   }
 
-  /// Draw an image what current render tree represent.
+  /// Draw an image what current render tree represent. **Note**: this function
+  /// must be called after layout.
   #[track_caller]
-  pub fn draw_frame(&self, force: bool) -> bool {
-    AppCtx::run_until_stalled();
-    let mut ticker = self.frame_ticker.clone();
-    ticker.next(FrameMsg::NewFrame(Instant::now()));
-    self.run_frame_tasks();
-
-    self.update_painter_viewport();
-    let draw = self.need_draw() && !self.size().is_empty();
-    if force || draw {
+  pub fn draw_frame(&self, wnd_size: Option<Size>) -> bool {
+    let wnd_size = wnd_size.unwrap_or_else(|| self.size());
+    let draw = !wnd_size.is_empty() && !self.tree().is_dirty();
+    if draw {
       let root = self.tree().root();
-
       let surface = {
         let _guard = BuildCtx::init_for(root, self.tree);
         Palette::of(BuildCtx::get()).surface()
       };
-      self.shell_wnd.borrow_mut().begin_frame(surface);
-
-      ticker.next(FrameMsg::BeforeLayout(Instant::now()));
-      self.layout();
 
       self.tree().draw();
       self.draw_delay_drop_widgets();
 
       let mut shell = self.shell_wnd.borrow_mut();
-      let inner_size = shell.inner_size();
+
       let mut painter = self.painter.borrow_mut();
-      shell.draw_commands(Rect::from_size(inner_size), &painter.finish());
+      let cmds = painter.finish();
 
-      shell.end_frame();
+      shell.draw_commands(wnd_size, Rect::from_size(wnd_size), surface, &cmds);
     }
-
-    AppCtx::end_frame();
-    ticker.next(FrameMsg::Finish(Instant::now()));
-    ticker.retain();
 
     draw
   }
 
-  pub fn layout(&self) {
+  pub fn layout(&self, size: Size) -> bool {
     let mut layout_queue = Vec::with_capacity(64);
     let mut notified_widgets = ahash::HashSet::default();
-
+    let mut is_need_redraw = false;
     loop {
       self.run_frame_tasks();
 
       let tree = self.tree_mut();
-      tree.layout(self.shell_wnd.borrow().inner_size(), &mut layout_queue);
+      is_need_redraw |= tree.is_dirty();
+      tree.layout(size, &mut layout_queue);
 
       // Process layout completion events
       layout_queue
@@ -301,11 +451,7 @@ impl Window {
       if !tree.is_dirty() {
         let ready = FrameMsg::LayoutReady(Instant::now());
         self.frame_ticker.clone().next(ready);
-        self.run_frame_tasks();
-      }
-
-      if !tree.is_dirty() {
-        break;
+        return is_need_redraw;
       }
     }
   }
@@ -325,13 +471,13 @@ impl Window {
 
   pub fn need_draw(&self) -> bool { self.tree().is_dirty() || self.running_animates.get() > 0 }
 
-  pub fn new(shell_wnd: Box<dyn ShellWindow>) -> Sc<Self> {
+  pub fn new(shell_wnd: BoxShellWindow, flags: WindowFlags) -> Sc<Self> {
     let wnd_id = shell_wnd.id();
     let focus_mgr = RefCell::new(FocusManager::new(wnd_id));
     let tree = Box::new(WidgetTree::new(wnd_id));
     let dispatcher = RefCell::new(Dispatcher::new(wnd_id));
-    let size = shell_wnd.inner_size();
-    let painter = Painter::new(Rect::from_size(size));
+
+    let painter = Painter::new(Rect::from_size(shell_wnd.inner_size()));
     let window = Self {
       tree: NonNull::new(Box::into_raw(tree)).unwrap(),
       dispatcher,
@@ -340,11 +486,10 @@ impl Window {
       delay_emitter: <_>::default(),
       frame_ticker: FrameTicker::default(),
       running_animates: <_>::default(),
-      frame_pool: <_>::default(),
       priority_task_queue: PriorityTaskQueue::default(),
       shell_wnd: RefCell::new(shell_wnd),
       delay_drop_widgets: <_>::default(),
-      flags: Cell::new(WindowFlags::DEFAULT),
+      flags: Cell::new(flags),
       pre_edit: <_>::default(),
     };
 
@@ -365,7 +510,7 @@ impl Window {
   #[inline]
   pub fn id(&self) -> WindowId { self.shell_wnd.borrow().id() }
 
-  pub fn shell_wnd(&self) -> &RefCell<Box<dyn ShellWindow>> { &self.shell_wnd }
+  pub fn shell_wnd(&self) -> &RefCell<BoxShellWindow> { &self.shell_wnd }
 
   pub fn flags(&self) -> WindowFlags { self.flags.get() }
 
@@ -462,6 +607,7 @@ impl Window {
       task.run();
     }
   }
+
   /// Immediately emit all delay events. You should not call this method only if
   /// you want to interfere with the framework event dispatch process and know
   /// what you are doing.
@@ -703,12 +849,7 @@ impl Window {
   /// events.
   pub fn run_frame_tasks(&self) {
     loop {
-      self.frame_pool.borrow_mut().run();
-
-      if self.delay_emitter.borrow().is_empty()
-        && self.priority_task_queue.is_empty()
-        && AppCtx::run_until_stalled() == 0
-      {
+      if self.delay_emitter.borrow().is_empty() && self.priority_task_queue.is_empty() {
         break;
       }
 
@@ -752,11 +893,6 @@ impl Window {
 impl Window {
   /// Return the current focused widget id.
   pub fn focusing(&self) -> Option<WidgetId> { self.focus_mgr.borrow().focusing() }
-
-  /// The device pixel ratio of Window interface returns the ratio of the
-  /// resolution in physical pixels to the logic pixels for the current display
-  /// device.
-  pub fn device_pixel_ratio(&self) -> f32 { self.shell_wnd.borrow().device_pixel_ratio() }
 
   pub fn set_title(&self, title: &str) -> &Self {
     self.shell_wnd.borrow_mut().set_title(title);
@@ -804,8 +940,6 @@ impl Window {
 
   pub fn request_resize(&self, size: Size) { self.shell_wnd.borrow_mut().request_resize(size) }
 
-  pub fn size(&self) -> Size { self.shell_wnd.borrow().inner_size() }
-
   pub fn set_min_size(&self, size: Size) -> &Self {
     self.shell_wnd.borrow_mut().set_min_size(size);
     self
@@ -816,28 +950,58 @@ impl Window {
   pub fn force_exit_pre_edit(&self) {
     if self.is_pre_editing() {
       self.set_ime_allowed(false);
-      self.processes_ime_pre_edit(ImePreEdit::End);
+      self.dispatch_ime_pre_edit(ImePreEdit::End);
       if let Some(s) = self.pre_edit.borrow_mut().take() {
-        self.processes_receive_chars(s.into());
+        self.process_receive_chars(s.into());
       }
       self.set_ime_allowed(true);
     }
   }
 
+  pub fn close(&self) {
+    AppCtx::send_event(event_loop::FrameworkEvent::CloseWindow { wnd_id: self.id() });
+  }
+
+  pub(crate) fn dispose(&self) {
+    self.tree_mut().disposed();
+    self.run_frame_tasks();
+
+    AppCtx::windows().borrow_mut().remove(&self.id());
+    self.shell_wnd.borrow().close();
+  }
+
   pub fn exit_pre_edit(&self) {
     if self.is_pre_editing() {
-      self.processes_ime_pre_edit(ImePreEdit::End);
+      self.dispatch_ime_pre_edit(ImePreEdit::End);
       self.pre_edit.borrow_mut().take();
     }
   }
 
-  pub fn update_pre_edit(&self, txt: &str, cursor: &Option<(usize, usize)>) {
+  fn update_pre_edit(&self, txt: &str, cursor: &Option<(usize, usize)>) {
     if !self.is_pre_editing() {
-      self.processes_ime_pre_edit(ImePreEdit::Begin);
+      self.dispatch_ime_pre_edit(ImePreEdit::Begin);
     }
 
-    self.processes_ime_pre_edit(ImePreEdit::PreEdit { value: txt.to_owned(), cursor: *cursor });
+    self.dispatch_ime_pre_edit(ImePreEdit::PreEdit { value: txt.to_owned(), cursor: *cursor });
     *self.pre_edit.borrow_mut() = Some(txt.to_owned());
+  }
+
+  pub fn process_ime(&self, ime: Ime) {
+    match ime {
+      Ime::Enabled => {}
+      Ime::Preedit(txt, cursor) => {
+        if txt.is_empty() {
+          self.exit_pre_edit();
+        } else {
+          self.update_pre_edit(&txt, &cursor);
+        }
+      }
+      Ime::Commit(value) => {
+        self.exit_pre_edit();
+        self.process_receive_chars(value.into());
+      }
+      Ime::Disabled => self.exit_pre_edit(),
+    }
   }
 
   fn once_on_lifecycle(
@@ -972,7 +1136,7 @@ mod tests {
     reset_test_env!();
 
     let size = Size::new(100., 100.);
-    let mut wnd = TestWindow::new_with_size(fn_widget! { MockBox { size: INFINITY_SIZE } }, size);
+    let wnd = TestWindow::new_with_size(fn_widget! { MockBox { size: INFINITY_SIZE } }, size);
     wnd.draw_frame();
     wnd.assert_root_size(size);
 
@@ -988,18 +1152,21 @@ mod tests {
   fn fire_tasks_before_new_window() {
     reset_test_env!();
 
-    let theme = Theme::default();
-    AppCtx::set_app_theme(theme);
+    AppCtx::set_app_theme(Theme::default());
 
-    let mut wnd = TestWindow::new(fn_widget! {
+    let (disposed, w_disposed) = split_value(false);
+    TestWindow::from_widget(fn_widget! {
       @MockBox {
-        on_disposed: move |_| panic!("MockBox should not be disposed.\
-          Since a theme is set before the window creation, \
-          it should not trigger a regeneration."),
+        on_disposed: move |_| *$w_disposed.write() = true,
         size: Size::zero(),
       }
     });
 
-    wnd.draw_frame();
+    AppCtx::run_until_stalled();
+    assert!(
+      !*disposed.read(),
+      "MockBox should not be disposed.Since a theme is set before the window creation, it should \
+       not trigger a regeneration."
+    );
   }
 }

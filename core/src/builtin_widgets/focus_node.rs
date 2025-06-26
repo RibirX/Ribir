@@ -62,7 +62,7 @@ mod tests {
       @(m) { tab_index: 0i16 }
     };
 
-    let wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     let tree = wnd.tree();
     let id = tree.content_root();
 

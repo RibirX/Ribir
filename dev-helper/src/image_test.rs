@@ -197,7 +197,7 @@ pub fn wgpu_render_commands(
     block_on(img).unwrap()
   };
 
-  #[cfg(not(target_family = "wasm"))]
+  #[cfg(not(target_arch = "wasm32"))]
   {
     use std::sync::Mutex;
 
@@ -217,7 +217,7 @@ pub fn wgpu_render_commands(
     img
   }
 
-  #[cfg(target_family = "wasm")]
+  #[cfg(target_arch = "wasm32")]
   {
     let wgpu_impl = block_on(ribir_gpu::WgpuImpl::headless());
     let mut backend = GPUBackend::new(wgpu_impl);

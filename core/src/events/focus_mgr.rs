@@ -605,7 +605,7 @@ mod tests {
       }
     };
 
-    let wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let tree = wnd.tree();
     focus_mgr.on_widget_tree_update(tree);
@@ -627,7 +627,7 @@ mod tests {
       }
     };
 
-    let wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
     let tree = wnd.tree();
 
@@ -656,7 +656,7 @@ mod tests {
       }
     };
 
-    let wnd = TestWindow::new(widget);
+    let wnd = TestWindow::from_widget(widget);
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
 
     let tree = wnd.tree();
@@ -751,7 +751,7 @@ mod tests {
 
     let widget = EmbedFocus::default();
     let log: Sc<RefCell<Vec<&str>>> = widget.log.clone();
-    let mut wnd = TestWindow::new(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       widget.clone()
     });
 
@@ -805,7 +805,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     let focus_id = wnd.focus_mgr.borrow_mut().focusing();
 
     wnd.draw_frame();
@@ -844,7 +844,7 @@ mod tests {
         }
       }
     };
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
 
     let mut focus_mgr = wnd.focus_mgr.borrow_mut();
@@ -876,21 +876,21 @@ mod tests {
         }
       }
     };
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
-    wnd.processes_receive_chars("hello".into());
+    wnd.process_receive_chars("hello".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "hello");
 
     *focused_writer.write() = false;
     wnd.draw_frame();
-    wnd.processes_receive_chars("has no receiver".into());
+    wnd.process_receive_chars("has no receiver".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "hello");
 
     *focused_writer.write() = true;
     wnd.draw_frame();
-    wnd.processes_receive_chars(" ribir".into());
+    wnd.process_receive_chars(" ribir".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "hello ribir");
   }
@@ -915,27 +915,27 @@ mod tests {
         }
       }
     };
-    let mut wnd = TestWindow::new(w);
+    let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
-    wnd.processes_receive_chars("hello".into());
-    wnd.draw_frame();
-    assert_eq!(*input.read(), "");
-
-    *active_idx_writer.write() += 1;
-    wnd.draw_frame();
-    wnd.processes_receive_chars("ribir".into());
+    wnd.process_receive_chars("hello".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "");
 
     *active_idx_writer.write() += 1;
     wnd.draw_frame();
-    wnd.processes_receive_chars("nice to see you".into());
+    wnd.process_receive_chars("ribir".into());
+    wnd.draw_frame();
+    assert_eq!(*input.read(), "");
+
+    *active_idx_writer.write() += 1;
+    wnd.draw_frame();
+    wnd.process_receive_chars("nice to see you".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "nice to see you");
 
     *active_idx_writer.write() += 1;
     wnd.draw_frame();
-    wnd.processes_receive_chars("Bye-Bye".into());
+    wnd.process_receive_chars("Bye-Bye".into());
     wnd.draw_frame();
     assert_eq!(*input.read(), "nice to see you");
     wnd.draw_frame();
@@ -977,7 +977,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new(f);
+    let wnd = TestWindow::from_widget(f);
 
     wnd.draw_frame();
     assert_eq!(*reason.read(), FocusReason::AutoFocus);

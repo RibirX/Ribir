@@ -1,4 +1,4 @@
-pub trait DeviceId {
+pub trait DeviceId: Send {
   fn as_any(&self) -> &dyn std::any::Any;
   fn is_same_device(&self, other: &dyn DeviceId) -> bool;
   fn clone_boxed(&self) -> Box<dyn DeviceId>;

@@ -219,4 +219,11 @@ mod tests {
     AppCtx::run_until_stalled();
     assert_eq!(&*notifies.read(), &["pair", "first", "second", "first", "second", "pair"]);
   }
+
+  #[test]
+  fn test_many() {
+    for _ in 0..10 {
+      isolated_writer();
+    }
+  }
 }

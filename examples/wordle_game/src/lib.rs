@@ -9,7 +9,7 @@ pub fn run() {
   std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
   App::run(wordle_game)
-    .with_app_theme(material::purple::light())
+    .with_app_theme(material::purple::light)
     .with_size(Size::new(700., 620.));
 }
 

@@ -277,8 +277,6 @@ impl Render for Viewport {
 
 #[cfg(test)]
 mod tests {
-  use winit::event::{DeviceId, MouseScrollDelta, TouchPhase, WindowEvent};
-
   use super::*;
   use crate::{reset_test_env, test_helper::*};
 
@@ -290,16 +288,10 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
+    let wnd = TestWindow::new_with_size(w, Size::new(100., 100.));
     wnd.draw_frame();
 
-    let device_id = DeviceId::dummy();
-    #[allow(deprecated)]
-    wnd.processes_native_event(WindowEvent::MouseWheel {
-      device_id,
-      delta: MouseScrollDelta::PixelDelta((delta_x, delta_y).into()),
-      phase: TouchPhase::Started,
-    });
+    wnd.process_wheel(delta_x, delta_y);
 
     wnd.draw_frame();
     let pos = wnd.layout_info_by_path(&[0, 0]).unwrap().pos;
@@ -372,7 +364,7 @@ mod tests {
       }
     };
 
-    let mut wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
+    let wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
     wnd.draw_frame();
   }
 }
