@@ -97,7 +97,7 @@ thiserror = "2.0.12"
 wasm-bindgen-futures = "0.4.50"
 getrandom-v2 = { package = "getrandom", version = "0.2", features = ["js"] }
 getrandom-v3 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
-cfg-if = "1.0.1"
+cfg-if = "1.0"
 
 
 [workspace.metadata.release]

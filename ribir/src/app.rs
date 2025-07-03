@@ -338,7 +338,17 @@ impl AppRunGuard {
     assert!(!ONCE.is_completed(), "App::run can only be called once.");
     ONCE.call_once(|| {});
 
-    Self { root: Some(Box::new(root)), wnd_attrs: Some(WindowAttributes::default()), theme: None }
+    let theme: Option<Box<dyn FnOnce() -> Theme + Send + 'static>> = {
+      cfg_if::cfg_if! {
+        if #[cfg(feature = "ribir_material")] {
+          Some(Box::new(ribir_material::purple::light))
+        } else {
+          None
+        }
+      }
+    };
+
+    Self { root: Some(Box::new(root)), wnd_attrs: Some(WindowAttributes::default()), theme }
   }
 
   /// Set the application theme, this will apply to whole application.
