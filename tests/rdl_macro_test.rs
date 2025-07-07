@@ -490,6 +490,18 @@ fn widget_wrap_bind_work() {
 }
 
 #[test]
+fn expression_parent() {
+  fn parent() -> FatObj<Void> { FatObj::new(Void) }
+
+  let _x = fn_widget! {
+    @(parent()) {
+      background: Color::RED,
+      @ { Void }
+    }
+  };
+}
+
+#[test]
 fn expression_for_children() {
   reset_test_env!();
 

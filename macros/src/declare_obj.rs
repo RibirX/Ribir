@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote_spanned};
 use smallvec::SmallVec;
 use syn::{
-  Ident, Macro, Path,
+  Expr, Ident, Macro, Path,
   fold::Fold,
   punctuated::Punctuated,
   spanned::Spanned,
@@ -20,9 +20,9 @@ pub struct DeclareObj {
 }
 enum ObjType {
   Type(Path),
-  Expr {
-    // todo: support expr
-    expr: Ident,
+  Expr(Expr),
+  Var {
+    name: Ident,
     /// A virtual scope that collects references used in the object's fields.
     ///
     /// This prevents double mutable borrow issues that can occur when
@@ -80,12 +80,16 @@ impl DeclareObj {
         ObjType::Type(ty)
       }
       RdlParent::Expr(expr) => {
+        fields = fold_fields(fields, refs);
+        ObjType::Expr(expr)
+      }
+      RdlParent::Name(name) => {
         // Collect all dollar references to this var in its fields.
-        refs.new_dollar_scope(Some(expr.clone()));
+        refs.new_dollar_scope(Some(name.clone()));
         fields = fold_fields(fields, refs);
         let fields_used = refs.pop_dollar_scope(false);
 
-        ObjType::Expr { expr, fields_used }
+        ObjType::Var { name, fields_used }
       }
     };
     children = children
@@ -115,7 +119,8 @@ impl ToTokens for DeclareObj {
           }
           match &this.node_type {
             ObjType::Type(ty) => quote_spanned! { ty.span() => _ಠ_ಠ }.to_tokens(tokens),
-            ObjType::Expr { expr, .. } => expr.to_tokens(tokens),
+            ObjType::Expr(expr) => quote_spanned! { expr.span() => _ಠ_ಠ }.to_tokens(tokens),
+            ObjType::Var { name: expr, .. } => expr.to_tokens(tokens),
           };
           children.into_iter().for_each(|name| {
             quote_spanned! { name.span() => .with_child(#name) }.to_tokens(tokens)
@@ -130,8 +135,8 @@ impl DeclareObj {
   fn is_one_line_node(&self) -> bool {
     let this = &self.this;
     match &this.node_type {
-      ObjType::Type { .. } => this.fields.is_empty(),
-      ObjType::Expr { fields_used, .. } => fields_used.is_empty() && this.fields.is_empty(),
+      ObjType::Type { .. } | ObjType::Expr { .. } => this.fields.is_empty(),
+      ObjType::Var { fields_used, .. } => fields_used.is_empty() && this.fields.is_empty(),
     }
   }
 
@@ -156,11 +161,22 @@ impl DeclareObj {
           }
         }
       }
-      ObjType::Expr { expr, fields_used } => {
-        fields_used.to_tokens(tokens);
-        self.gen_fields_tokens(expr, tokens);
-        if self.children.is_empty() {
+      ObjType::Expr(expr) => {
+        let name = Ident::new("_ಠ_ಠ", expr.span());
+        if self.this.fields.is_empty() && self.children.is_empty() {
           expr.to_tokens(tokens);
+        } else if self.this.fields.is_empty() {
+          quote_spanned! { expr.span() => let #name = #expr; }.to_tokens(tokens);
+        } else {
+          quote_spanned! { expr.span() => let mut #name = #expr; }.to_tokens(tokens);
+          self.gen_fields_tokens(&name, tokens);
+        }
+      }
+      ObjType::Var { name, fields_used } => {
+        fields_used.to_tokens(tokens);
+        self.gen_fields_tokens(name, tokens);
+        if self.children.is_empty() {
+          name.to_tokens(tokens);
         }
       }
     };
