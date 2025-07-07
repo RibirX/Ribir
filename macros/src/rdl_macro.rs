@@ -22,7 +22,7 @@ use crate::{
 };
 
 pub enum RdlMacro {
-  Literal(StructLiteral),
+  Literal(Box<StructLiteral>),
   /// Declare an expression as a object, like `rdl!{ Widget::new(...) }`
   ExprObj {
     span: Span,
@@ -51,7 +51,8 @@ pub enum RdlParent {
   /// Declare parent use a type `Row { ... }`
   Type(Path),
   /// Declare parent use a expression  @ { parent } { ... }`
-  Expr(Ident),
+  Name(Ident),
+  Expr(Expr),
 }
 
 /// Declare a field of a widget.
@@ -82,7 +83,7 @@ impl RdlMacro {
 
   fn gen_rdl(self, refs: &mut DollarRefsCtx) -> crate::error::Result<TokenStream> {
     let tokens = match self {
-      RdlMacro::Literal(stl) => DeclareObj::from_literal(stl, refs).to_token_stream(),
+      RdlMacro::Literal(stl) => DeclareObj::from_literal(*stl, refs).to_token_stream(),
       RdlMacro::ExprObj { span, stmts } => {
         let stmts = stmts.into_iter().map(|s| refs.fold_stmt(s));
         if stmts.len() > 1 {
@@ -157,7 +158,12 @@ impl Parse for RdlParent {
     if input.peek(Paren) {
       let content;
       parenthesized!(content in input);
-      Ok(RdlParent::Expr(content.parse()?))
+      let fork = content.fork();
+      if fork.parse::<Ident>().is_ok() && fork.is_empty() {
+        Ok(RdlParent::Name(content.parse()?))
+      } else {
+        Ok(RdlParent::Expr(content.parse()?))
+      }
     } else {
       Ok(RdlParent::Type(input.parse()?))
     }

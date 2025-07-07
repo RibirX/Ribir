@@ -25,13 +25,26 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
-### **Changed**
+### Features
+
+- **macros**: Supported parent expression syntax using `$(...) { }`. (#773 @M-Adoo)
+- **macros**: builtin field names are not reversed. (#773 @M-Adoo)
+
+### Changed
+
 - **core**: Separate UI Rendering and Application Logic into Independent Threads. (@wjian23).
 - **core**: remove CustomStyles and TextField Widget.(@wjian23)
 
+### BREAKING
+
+- **macros**: supported explicit '$' syntax for variable capture and state modifies (#773 @M-Adoo)
+  - Requires using `$read()`, `$write()`, `$reader()`, `$writer()`, `$watcher()`, and `$clone()` for state operations
+- **core**: Removed all `get_xxx_widget` methods from `FatObj`, built-in state now directly accessible via `FatObj` exports (#773 @M-Adoo)
+
+
 ## [0.4.0-alpha.40] - 2025-06-04
 
-### **Changed**
+### Changed
 
 - **core**: Refactored `Pipe` trait into a `Pipe` struct, simplifying pipe-type management. (#765 @M-Adoo)
 - **core**: Added built-in `TextAlign` provider for text alignment via `text_align` property. (#764 @M-Adoo)
