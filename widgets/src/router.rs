@@ -181,7 +181,7 @@ impl ComposeChild<'static> for Router {
 
     let location = Location::state_of(BuildCtx::get());
     pipe! {
-      let _ = $location;
+      let _ = $watcher(location);
       this.read().switch(BuildCtx::get())
     }
     .into_widget()
@@ -316,8 +316,8 @@ mod tests {
     let (nav, w_nav) = split_value("/");
     let wnd = TestWindow::from_widget(fn_widget! {
       let location = Location::state_of(BuildCtx::get());
-      watch!($nav.to_string()).subscribe(move |v| {
-        let _ = $location.write().resolve_relative(&v);
+      watch!($read(nav).to_string()).subscribe(move |v| {
+        let _ = $write(location).resolve_relative(&v);
       });
 
       @Router {

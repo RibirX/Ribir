@@ -332,11 +332,11 @@ mod tests {
     let w = fn_widget! {
       @MockBox {
         size: Size::new(100., 30.),
-        on_pointer_down : move |e| $events.write().push(Info::new(e)),
-        on_pointer_move: move |e| $events.write().push(Info::new(e)),
-        on_tap: move |e| $events.write().push(Info::new(e)),
-        on_pointer_up: move |e| $events.write().push(Info::new(e)),
-        on_pointer_cancel: move |e| $events.write().push(Info::new(e)),
+        on_pointer_down : move |e| $write(events).push(Info::new(e)),
+        on_pointer_move: move |e| $write(events).push(Info::new(e)),
+        on_tap: move |e| $write(events).push(Info::new(e)),
+        on_pointer_up: move |e| $write(events).push(Info::new(e)),
+        on_pointer_cancel: move |e| $write(events).push(Info::new(e)),
       }
     };
     (w.r_into(), e2)
@@ -350,10 +350,10 @@ mod tests {
     let events = records.clone_writer();
     let root = fn_widget! {
       @MockMulti {
-        on_pointer_down : move |e| $events.write().push(Info::new(e)),
-        on_pointer_move: move |e| $events.write().push(Info::new(e)),
-        on_pointer_up: move |e| $events.write().push(Info::new(e)),
-        on_pointer_cancel: move |e| $events.write().push(Info::new(e)),
+        on_pointer_down : move |e| $write(events).push(Info::new(e)),
+        on_pointer_move: move |e| $write(events).push(Info::new(e)),
+        on_pointer_up: move |e| $write(events).push(Info::new(e)),
+        on_pointer_cancel: move |e| $write(events).push(Info::new(e)),
         @ { gen.gen_widget() }
       }
     };
@@ -477,12 +477,12 @@ mod tests {
     let w = fn_widget! {
       @MockBox {
         size: INFINITY_SIZE,
-        on_pointer_down: move |e| { $writer.write().push(e.current_target()); },
+        on_pointer_down: move |e| { $write(writer).push(e.current_target()); },
 
         @MockBox {
           size: Size::new(100., 30.),
           on_pointer_down: move |e| {
-            $writer.write().push(e.current_target());
+            $write(writer).push(e.current_target());
             e.stop_propagation();
           }
         }
@@ -508,12 +508,12 @@ mod tests {
       @MockBox {
         size: INFINITY_SIZE,
         padding: EdgeInsets::all(4.),
-        on_pointer_enter: move |_| { $e_writer.write().push(2); },
-        on_pointer_leave: move |_| { $l_writer.write().push(2); },
+        on_pointer_enter: move |_| { $write(e_writer).push(2); },
+        on_pointer_leave: move |_| { $write(l_writer).push(2); },
         @MockBox {
           size: INFINITY_SIZE,
-          on_pointer_enter: move |_| { $e_writer.write().push(1); },
-          on_pointer_leave: move |_| { $l_writer.write().push(1); }
+          on_pointer_enter: move |_| { $write(e_writer).push(1); },
+          on_pointer_leave: move |_| { $write(l_writer).push(1); }
         }
       }
     };
@@ -560,12 +560,12 @@ mod tests {
     let w = fn_widget! {
       @MockBox {
         size: Size::new(100., 100.),
-        on_tap: move |_| $c_click_path.write().push(4),
-        on_tap_capture: move |_| $c_click_path.write().push(1),
+        on_tap: move |_| $write(c_click_path).push(4),
+        on_tap_capture: move |_| $write(c_click_path).push(1),
         @MockBox {
           size: Size::new(100., 100.),
-          on_tap: move |_| $c_click_path.write().push(3),
-          on_tap_capture: move |_| $c_click_path.write().push(2),
+          on_tap: move |_| $write(c_click_path).push(3),
+          on_tap_capture: move |_| $write(c_click_path).push(2),
         }
       }
     };
@@ -589,10 +589,10 @@ mod tests {
     let c_click_path = click_path.clone_writer();
     let w = fn_widget! {
       @MockMulti {
-        on_tap: move |_| *$c_click_path.write() += 1,
+        on_tap: move |_| *$write(c_click_path) += 1,
         @MockBox {
           size: Size::new(100., 100.),
-          on_tap: move |_| *$c_click_path.write() += 1,
+          on_tap: move |_| *$write(c_click_path) += 1,
         }
         @MockBox { size: Size::new(100., 400.) }
       }
@@ -683,13 +683,13 @@ mod tests {
         @MockBox {
           anchor: Point::new(50., 50.),
           on_mounted: move |ctx| {
-            $writer.write().wid1 = Some(ctx.id);
+            $write(writer).wid1 = Some(ctx.id);
           },
           size: Size::new(100., 100.),
         }
         @MockBox {
           on_mounted: move |ctx| {
-            $writer.write().wid2 = Some(ctx.id);
+            $write(writer).wid2 = Some(ctx.id);
           },
           size: Size::new(50., 150.),
           anchor: Point::new(100., 100.),
@@ -719,7 +719,7 @@ mod tests {
           h_align: HAlign::Center,
           v_align: VAlign::Center,
           size: Size::new(100., 100.),
-          on_mounted: move |ctx| *$w_hit.write() = Some(ctx.id),
+          on_mounted: move |ctx| *$write(w_hit) = Some(ctx.id),
         }
       },
       Size::new(500., 500.),
@@ -741,7 +741,7 @@ mod tests {
           anchor: Point::new(50., 50.),
           transform: Transform::rotation(Angle::degrees(45.)),
           size: Size::new(100., 100.),
-          on_mounted: move |ctx| *$w_hit.write() = Some(ctx.id),
+          on_mounted: move |ctx| *$write(w_hit) = Some(ctx.id),
         }
       },
       Size::new(500., 500.),

@@ -195,15 +195,15 @@ mod tests {
     let second = pair.part_writer("2.".into(), |v| PartMut::new(&mut v.1));
     let (notifies, w_notifies) = split_value(vec![]);
 
-    watch!(*$pair).subscribe({
+    watch!(*$read(pair)).subscribe({
       let w_notifies = w_notifies.clone_writer();
       move |_| w_notifies.write().push("pair")
     });
-    watch!(*$first).subscribe({
+    watch!(*$read(first)).subscribe({
       let w_notifies = w_notifies.clone_writer();
       move |_| w_notifies.write().push("first")
     });
-    watch!(*$second).subscribe({
+    watch!(*$read(second)).subscribe({
       let w_notifies = w_notifies.clone_writer();
       move |_| w_notifies.write().push("second")
     });

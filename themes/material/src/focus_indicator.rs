@@ -78,8 +78,8 @@ impl FocusRing {
     let animate = animate.finish();
 
     let u = watch! {
-      $host.is_focused() &&
-      $host.focus_changed_reason() == FocusReason::Keyboard
+      *$read(host.is_focused()) &&
+      *$read(host.focus_changed_reason()) == FocusReason::Keyboard
     }
     .subscribe({
       let ring = ring.clone_writer();

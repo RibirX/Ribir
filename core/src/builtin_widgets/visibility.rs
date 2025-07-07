@@ -16,10 +16,10 @@ impl<'c> ComposeChild<'c> for Visibility {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       @FocusScope {
-        skip_descendants: pipe!(!$this.get_visible()),
-        skip_host: pipe!(!$this.get_visible()),
+        skip_descendants: pipe!(!$read(this).get_visible()),
+        skip_host: pipe!(!$read(this).get_visible()),
         @VisibilityRender {
-          display: pipe!($this.get_visible()),
+          display: pipe!($read(this).get_visible()),
           @ { child }
         }
       }
@@ -101,7 +101,7 @@ mod tests {
     let hit2 = hit.clone_writer();
     let wnd = TestWindow::from_widget(container! {
       size: Size::splat(100.),
-      visible: pipe!(*$visible),
+      visible: pipe!(*$read(visible)),
       @PainterHit(hit2.clone_writer())
     });
 

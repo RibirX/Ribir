@@ -63,8 +63,6 @@ pub mod clip;
 pub use clip::*;
 pub mod clip_boundary;
 pub use clip_boundary::*;
-pub mod focus_node;
-pub use focus_node::*;
 pub mod focus_scope;
 pub use focus_scope::*;
 pub mod global_anchor;
@@ -123,8 +121,8 @@ use crate::prelude::*;
 ///   let mut multi = FatObj::new(MockMulti::default());
 ///   multi.with_margin(EdgeInsets::all(10.));
 ///
-///   let w = multi.get_margin_widget().clone_writer();
-///   multi.on_tap(move |_| w.write().margin = EdgeInsets::all(20.));
+///   let margin = multi.margin();
+///   multi.on_tap(move |_| *margin.write() = EdgeInsets::all(20.));
 ///   multi.into_widget()
 /// };
 /// ```
@@ -143,7 +141,6 @@ pub struct FatObj<T> {
   scrollable: Option<State<ScrollableWidget>>,
   layout_box: Option<State<LayoutBox>>,
   mix_builtin: Option<MixBuiltin>,
-  request_focus: Option<State<RequestFocus>>,
   cursor: Option<State<Cursor>>,
   margin: Option<State<Margin>>,
   transform: Option<State<TransformWidget>>,
@@ -188,7 +185,6 @@ impl<T> FatObj<T> {
       track_id: self.track_id,
       class: self.class,
       mix_builtin: self.mix_builtin,
-      request_focus: self.request_focus,
       fitted_box: self.fitted_box,
       border: self.border,
       radius: self.radius,
@@ -232,7 +228,6 @@ impl<T> FatObj<T> {
   pub fn is_empty(&self) -> bool {
     self.track_id.is_none()
       && self.mix_builtin.is_none()
-      && self.request_focus.is_none()
       && self.fitted_box.is_none()
       && self.border.is_none()
       && self.radius.is_none()
@@ -272,264 +267,9 @@ impl<T> FatObj<T> {
   }
 }
 
-// builtin widgets accessors
-impl<T> FatObj<T> {
-  /// Returns the `State<TrackWidgetId>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
-  pub fn get_track_id_widget(&mut self) -> &State<TrackWidgetId> {
-    self
-      .track_id
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<Class>` widget from the FatObj. If it doesn't exist, a
-  /// new one is created.
-  pub fn get_class_widget(&mut self) -> &State<Class> {
-    self
-      .class
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  pub fn get_mix_builtin_widget(&mut self) -> &MixBuiltin {
-    self
-      .mix_builtin
-      .get_or_insert_with(MixBuiltin::default)
-  }
-
-  /// Returns the `State<RequestFocus>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_request_focus_widget(&mut self) -> &State<RequestFocus> {
-    self
-      .request_focus
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Return the `State<MixFlags>` from the `MixBuiltin`. If the `MixBuiltin`
-  /// does not exist in the `FatObj`, a new one will be created..
-  pub fn get_mix_flags_widget(&mut self) -> &State<MixFlags> {
-    self.get_mix_builtin_widget().mix_flags()
-  }
-
-  /// Begin tracing the focus status of this widget.
-  pub fn trace_focus(&mut self) -> &mut Self {
-    self.get_mix_builtin_widget().trace_focus();
-    self
-  }
-
-  /// Begin tracing the hover status of this widget.
-  pub fn trace_hover(&mut self) -> &mut Self {
-    self.get_mix_builtin_widget().trace_hover();
-    self
-  }
-
-  /// Begin tracing if the pointer pressed on this widget
-  pub fn trace_pointer_pressed(&mut self) -> &mut Self {
-    self
-      .get_mix_builtin_widget()
-      .trace_pointer_pressed();
-    self
-  }
-
-  /// Returns the `State<FittedBox>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_fitted_box_widget(&mut self) -> &State<FittedBox> {
-    self
-      .fitted_box
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  pub fn get_border_widget(&mut self) -> &State<BorderWidget> {
-    self
-      .border
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  pub fn get_radius_widget(&mut self) -> &State<RadiusWidget> {
-    self
-      .radius
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  pub fn get_background_widget(&mut self) -> &State<Background> {
-    self
-      .background
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<Foreground>` widget from the FatObj. If it does not
-  /// exist, a new one will be created.
-  pub fn get_foreground_widget(&mut self) -> &State<Foreground> {
-    self
-      .foreground
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<Padding>` widget from the FatObj. If it doesn't exist,
-  /// a new one will be created.
-  pub fn get_padding_widget(&mut self) -> &State<Padding> {
-    self
-      .padding
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<LayoutBox>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_layout_box_widget(&mut self) -> &State<LayoutBox> {
-    self
-      .layout_box
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<Cursor>` widget from the FatObj. If it doesn't exist, a
-  /// new one is created.
-  pub fn get_cursor_widget(&mut self) -> &State<Cursor> {
-    self
-      .cursor
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<Margin>` widget from the FatObj. If it doesn't exist, a
-  /// new one is created.
-  pub fn get_margin_widget(&mut self) -> &State<Margin> {
-    self
-      .margin
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  pub fn get_constrained_box_widget(&mut self) -> &State<ConstrainedBox> {
-    self
-      .constrained_box
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<ScrollableWidget>` widget from the FatObj. If it
-  /// doesn't exist, a new one will be created.
-  pub fn get_scrollable_widget(&mut self) -> &State<ScrollableWidget> {
-    self
-      .scrollable
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<TransformWidget>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_transform_widget(&mut self) -> &State<TransformWidget> {
-    self
-      .transform
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<HAlignWidget>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_h_align_widget(&mut self) -> &State<HAlignWidget> {
-    self
-      .h_align
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<VAlignWidget>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_v_align_widget(&mut self) -> &State<VAlignWidget> {
-    self
-      .v_align
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<RelativeAnchor>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_relative_anchor_widget(&mut self) -> &State<RelativeAnchor> {
-    self
-      .relative_anchor
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<GlobalAnchor>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_global_anchor_widget(&mut self) -> &State<GlobalAnchor> {
-    self
-      .global_anchor
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<PaintingStyleWidget>` widget from the FatObj. If it
-  /// doesn't exist, a new one will be created.
-  pub fn get_painting_style_widget(&mut self) -> &State<PaintingStyleWidget> {
-    self
-      .painting_style
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<TextStyleWidget>` widget from the FatObj. If it
-  /// doesn't exist, a new one will be created.
-  pub fn get_text_style_widget(&mut self) -> &State<TextStyleWidget> {
-    self.text_style.get_or_insert_with(|| {
-      State::value(TextStyleWidget {
-        text_style: Provider::of::<TextStyle>(BuildCtx::get())
-          .unwrap()
-          .clone(),
-      })
-    })
-  }
-
-  /// Returns the `State<TextAlignWidget>` widget from the FatObj. If it
-  /// doesn't exist, a new one will be created.
-  pub fn get_text_align_widget(&mut self) -> &State<TextAlignWidget> {
-    self
-      .text_align
-      .get_or_insert_with(|| State::value(<TextAlignWidget>::default()))
-  }
-
-  /// Returns the `State<Visibility>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_visibility_widget(&mut self) -> &State<Visibility> {
-    self
-      .visibility
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<Opacity>` widget from the FatObj. If it doesn't exist,
-  /// a new one will be created.
-  pub fn get_opacity_widget(&mut self) -> &State<Opacity> {
-    self
-      .opacity
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<KeepAlive>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn get_keep_alive_widget(&mut self) -> &State<KeepAlive> {
-    self
-      .keep_alive
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<Tooltips>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
-  pub fn get_tooltips_widget(&mut self) -> &State<Tooltips> {
-    self
-      .tooltips
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<Disabled>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
-  pub fn get_disabled_widget(&mut self) -> &State<Disabled> {
-    self
-      .disabled
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-
-  /// Returns the `State<ClipBoundary>` widget from the FatObj. If it doesn't
-  /// exist, a new one is created.
-  pub fn get_clip_boundary_widget(&mut self) -> &State<ClipBoundary> {
-    self
-      .clip_boundary
-      .get_or_insert_with(|| State::value(<_>::default()))
-  }
-}
-
 macro_rules! on_mixin {
   ($this:ident, $on_method:ident, $f:ident) => {{
-    $this.get_mix_builtin_widget().$on_method($f);
+    $this.mix_builtin_widget().$on_method($f);
     $this
   }};
 }
@@ -672,7 +412,7 @@ impl<T> FatObj<T> {
     &mut self, (times, f): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> &mut Self {
     self
-      .get_mix_builtin_widget()
+      .mix_builtin_widget()
       .on_x_times_tap((times, f));
     self
   }
@@ -685,7 +425,7 @@ impl<T> FatObj<T> {
     &mut self, (times, f): (usize, impl FnMut(&mut PointerEvent) + 'static),
   ) -> &mut Self {
     self
-      .get_mix_builtin_widget()
+      .mix_builtin_widget()
       .on_x_times_tap_capture((times, f));
     self
   }
@@ -837,18 +577,18 @@ impl<T> FatObj<T> {
   ///   position in the tree source. The maximum value for tab_index is 32767.
   ///   If not specified, it takes the default value 0.
   pub fn with_tab_index<K: ?Sized>(&mut self, tab_idx: impl RInto<PipeValue<i16>, K>) -> &mut Self {
-    self.declare_builtin_init(
-      tab_idx,
-      |this| this.get_mix_builtin_widget().mix_flags(),
-      |m, v| m.set_tab_index(v),
-    )
+    let focus = &self.focus_handle().flags;
+    self
+      .mix_builtin_widget()
+      .init_sub_widget(tab_idx, focus, |m, v| m.set_tab_index(v));
+    self
   }
 
   /// Initializes the `Class` that should be applied to the widget.
   pub fn with_class<K: ?Sized>(
     &mut self, cls: impl RInto<PipeValue<Option<ClassName>>, K>,
   ) -> &mut Self {
-    self.declare_builtin_init(cls, Self::get_class_widget, |c, cls| c.class = cls)
+    init_sub_widget!(self, class, class, cls)
   }
 
   /// Initializes whether the `widget` should automatically get focus when the
@@ -857,179 +597,187 @@ impl<T> FatObj<T> {
   /// Only one widget should have this attribute specified.  If there are
   /// several, the widget nearest the root, get the initial focus.
   pub fn with_auto_focus<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
-    self.declare_builtin_init(
-      v,
-      |this| this.get_mix_builtin_widget().mix_flags(),
-      |m, v| m.set_auto_focus(v),
-    )
+    let focus = &self.focus_handle().flags;
+    self
+      .mix_builtin_widget()
+      .init_sub_widget(v, focus, |m, v| m.set_auto_focus(v));
+    self
   }
 
   /// Initializes how its child should be scale to fit its box.
   pub fn with_box_fit<K: ?Sized>(&mut self, v: impl RInto<PipeValue<BoxFit>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_fitted_box_widget, |m, v| m.box_fit = v)
+    init_sub_widget!(self, fitted_box, box_fit, v)
   }
 
   /// Provide a painting style to this widget.
   pub fn with_painting_style<K: ?Sized>(
     &mut self, v: impl RInto<PipeValue<PaintingStyle>, K>,
   ) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_painting_style_widget, |m, v| m.painting_style = v)
+    init_sub_widget!(self, painting_style, painting_style, v)
   }
 
   pub fn with_text_align<K: ?Sized>(
     &mut self, v: impl RInto<PipeValue<TextAlign>, K>,
   ) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_text_align_widget, |m, v| m.text_align = v)
+    init_sub_widget!(self, text_align, text_align, v)
   }
 
   /// Initializes the text style of this widget.
   pub fn with_text_style<K: ?Sized>(
     &mut self, v: impl RInto<PipeValue<TextStyle>, K>,
   ) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style = v)
+    let mix = self
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let text_style = self
+      .text_style
+      .get_or_insert_with(|| State::value(TextStyleWidget::inherit_widget()));
+
+    mix.init_sub_widget(v, text_style, move |widget, v| widget.text_style = v);
+    self
   }
 
   /// Initializes the font size of this widget.
   pub fn with_font_size<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_size = v)
+    init_text_style!(self, font_size, v)
   }
 
   /// Initializes the font face of this widget.
   pub fn with_font_face<K: ?Sized>(&mut self, v: impl RInto<PipeValue<FontFace>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.font_face = v)
+    init_text_style!(self, font_face, v)
   }
 
   /// Initializes the letter space of this widget.
   pub fn with_letter_spacing<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.letter_space = v)
+    init_text_style!(self, letter_space, v)
   }
 
   /// Initializes the text line height of this widget.
   pub fn with_text_line_height<K: ?Sized>(
     &mut self, v: impl RInto<PipeValue<f32>, K>,
   ) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.line_height = v)
+    init_text_style!(self, line_height, v)
   }
 
   /// Initializes the text overflow of this widget.
   pub fn with_text_overflow<K: ?Sized>(
     &mut self, v: impl RInto<PipeValue<TextOverflow>, K>,
   ) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_text_style_widget, |m, v| m.text_style.overflow = v)
+    init_text_style!(self, overflow, v)
   }
 
   /// Initializes the background of the widget.
   pub fn with_background<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Brush>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_background_widget, |m, v| m.background = v)
+    init_sub_widget!(self, background, background, v)
   }
 
   /// Initializes the foreground of the widget.
   pub fn with_foreground<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Brush>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_foreground_widget, |m, v| m.foreground = v)
+    init_sub_widget!(self, foreground, foreground, v)
   }
 
   /// Initializes the border of the widget.
   pub fn with_border<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Border>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_border_widget, |m, v| m.border = v)
+    init_sub_widget!(self, border, border, v)
   }
 
   /// Initializes the border radius of the widget.
   pub fn with_radius<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Radius>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_radius_widget, |m, v| m.radius = v)
+    init_sub_widget!(self, radius, radius, v)
   }
 
   /// Initializes the extra space within the widget.
   pub fn with_padding<K: ?Sized>(&mut self, v: impl RInto<PipeValue<EdgeInsets>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_padding_widget, |m, v| m.padding = v)
+    init_sub_widget!(self, padding, padding, v)
   }
 
   /// Initializes the cursor of the widget.
   pub fn with_cursor<K: ?Sized>(&mut self, v: impl RInto<PipeValue<CursorIcon>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_cursor_widget, |m, v| m.cursor = v)
+    init_sub_widget!(self, cursor, cursor, v)
   }
 
   /// Initializes the space around the widget.
   pub fn with_margin<K: ?Sized>(&mut self, v: impl RInto<PipeValue<EdgeInsets>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_margin_widget, |m, v| m.margin = v)
+    init_sub_widget!(self, margin, margin, v)
   }
 
   /// Initializes the constraints clamp of the widget.
   pub fn with_clamp<K: ?Sized>(&mut self, v: impl RInto<PipeValue<BoxClamp>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_constrained_box_widget, |m, v| m.clamp = v)
+    init_sub_widget!(self, constrained_box, clamp, v)
   }
 
   /// Initializes how user can scroll the widget.
   pub fn with_scrollable<K: ?Sized>(
     &mut self, v: impl RInto<PipeValue<Scrollable>, K>,
   ) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_scrollable_widget, |m, v| m.scrollable = v)
+    init_sub_widget!(self, scrollable, scrollable, v)
   }
 
   /// Initializes the transformation of the widget.
   pub fn with_transform<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Transform>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_transform_widget, |m, v| m.transform = v)
+    init_sub_widget!(self, transform, transform, v)
   }
 
   /// Initializes how the widget should be aligned horizontally.
   pub fn with_h_align<K: ?Sized>(&mut self, v: impl RInto<PipeValue<HAlign>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_h_align_widget, |m, v| m.h_align = v)
+    init_sub_widget!(self, h_align, h_align, v)
   }
 
   /// Initializes how the widget should be aligned vertically.
   pub fn with_v_align<K: ?Sized>(&mut self, v: impl RInto<PipeValue<VAlign>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_v_align_widget, |m, v| m.v_align = v)
+    init_sub_widget!(self, v_align, v_align, v)
   }
 
   /// Initializes the relative anchor to the parent of the widget.
   pub fn with_anchor<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Anchor>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_relative_anchor_widget, |m, v| m.anchor = v)
+    init_sub_widget!(self, relative_anchor, anchor, v)
   }
 
   /// Initializes the horizontal global anchor of the widget.
   pub fn with_global_anchor_x<K: ?Sized>(
     &mut self, v: impl RInto<PipeValue<Option<GlobalAnchorX>>, K>,
   ) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_x = v)
+    init_sub_widget!(self, global_anchor, global_anchor_x, v)
   }
 
   /// Initializes the vertical global anchor of the widget.
   pub fn with_global_anchor_y<K: ?Sized>(
     &mut self, v: impl RInto<PipeValue<Option<GlobalAnchorY>>, K>,
   ) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_global_anchor_widget, |m, v| m.global_anchor_y = v)
+    init_sub_widget!(self, global_anchor, global_anchor_y, v)
   }
 
   /// Initializes the visibility of the widget.
   pub fn with_visible<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_visibility_widget, |m, v| m.visible = v)
+    init_sub_widget!(self, visibility, visible, v)
   }
 
   /// Initializes the opacity of the widget.
   pub fn with_opacity<K: ?Sized>(&mut self, v: impl RInto<PipeValue<f32>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_opacity_widget, |m, v| m.opacity = v)
+    init_sub_widget!(self, opacity, opacity, v)
   }
 
   /// Initializes the tooltips of the widget.
   pub fn with_tooltips<K: ?Sized>(
     &mut self, v: impl RInto<PipeValue<CowArc<str>>, K>,
   ) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_tooltips_widget, |m, v| m.tooltips = v)
+    init_sub_widget!(self, tooltips, tooltips, v)
   }
 
   /// Initializes the disabled state of the widget.
   pub fn with_disabled<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_disabled_widget, |m, v| m.disabled = v)
+    init_sub_widget!(self, disabled, disabled, v)
   }
 
   /// Initializes the clip_boundary of the widget.
   pub fn with_clip_boundary<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
-    self.declare_builtin_init(v, Self::get_clip_boundary_widget, |m, v| m.clip_boundary = v)
+    init_sub_widget!(self, clip_boundary, clip_boundary, v)
   }
 
   /// Initializes the `keep_alive` value of the `KeepAlive` widget.
   pub fn with_keep_alive<K: ?Sized>(&mut self, v: impl RInto<PipeValue<bool>, K>) -> &mut Self {
     let (v, o) = v.r_into().unzip();
-    let d = self.get_keep_alive_widget();
+    let d = sub_widget!(self, keep_alive);
     d.write().keep_alive = v;
     if let Some(o) = o {
       let c_delay = d.clone_writer();
@@ -1061,21 +809,361 @@ impl<T> FatObj<T> {
     self.reuse = Some(Reuse { reuse_id: reuse_id.into() });
     self
   }
+}
 
-  fn declare_builtin_init<V: 'static, B: 'static, K: ?Sized>(
-    &mut self, init: impl RInto<PipeValue<V>, K>, get_builtin: impl FnOnce(&mut Self) -> &State<B>,
-    set_value: fn(&mut B, V),
-  ) -> &mut Self {
-    let builtin = get_builtin(self);
-    let (v, o) = init.r_into().unzip();
-    set_value(&mut *builtin.silent(), v);
-    if let Some(o) = o {
-      let c_builtin = builtin.clone_writer();
-      let u = o.subscribe(move |v| set_value(&mut *c_builtin.write(), v));
-      self.on_disposed(move |_| u.unsubscribe())
-    } else {
-      self
-    }
+impl<T> FatObj<T> {
+  /// Creates and returns a state writer for managing the widget's CSS class
+  /// name.
+  ///
+  /// The returned writer allows:
+  /// - Modifying the class name dynamically
+  /// - Observing changes to the class name
+  /// - Composing with other reactive operations
+  pub fn class(&mut self) -> impl StateWriter<Value = Option<ClassName>> {
+    let class = sub_widget!(self, class);
+    part_writer!(&mut class.class)
+  }
+
+  /// Returns a watcher that tracks whether the widget is currently being
+  /// hovered over by a pointer.
+  ///
+  /// The watcher provides reactive boolean values indicating hover state
+  /// changes.
+  pub fn is_hovered(&mut self) -> impl StateWatcher<Value = bool> {
+    self.mix_builtin_widget().trace_hover();
+    self.mix_flags_watcher(|mix| unsafe { PartRef::from_ptr(mix.is_hovered()) })
+  }
+
+  /// Returns a watcher that tracks whether a pointer device is currently
+  /// pressed on this widget.
+  ///
+  /// Useful for implementing press/release interactions and visual feedback.
+  pub fn is_pointer_pressed(&mut self) -> impl StateWatcher<Value = bool> {
+    self.mix_builtin_widget().trace_pointer_pressed();
+    self.mix_flags_watcher(|mix| unsafe { PartRef::from_ptr(mix.is_pointer_pressed()) })
+  }
+
+  /// Returns a watcher that tracks the auto-focus state of the widget.
+  ///
+  /// The watcher will update whenever the auto-focus state changes.
+  ///
+  /// To change the auto-focus state, use [`FocusHandle::set_auto_focus`].
+  pub fn is_auto_focus(&mut self) -> impl StateWatcher<Value = bool> {
+    self
+      .focus_handle()
+      .flags
+      .part_watcher(|focus| unsafe { PartRef::from_ptr(focus.auto_focus()) })
+  }
+
+  /// Returns a watcher that tracks whether the widget currently has input
+  /// focus.
+  ///
+  /// This is essential for implementing focus-based behaviors and accessibility
+  /// features.
+  pub fn is_focused(&mut self) -> impl StateWatcher<Value = bool> {
+    self
+      .focus_handle()
+      .flags
+      .part_watcher(|focus| unsafe { PartRef::from_ptr(focus.is_focused()) })
+  }
+
+  /// Returns a watcher that tracks the reason why the widget currently has
+  /// input focus.
+  pub fn focus_changed_reason(&mut self) -> impl StateWatcher<Value = FocusReason> {
+    self
+      .focus_handle()
+      .flags
+      .part_watcher(|focus| unsafe { PartRef::from_ptr(focus.focus_changed_reason()) })
+  }
+
+  // Layout-related property watchers
+
+  /// Returns a watcher for tracking changes to the widget's layout rectangle
+  /// (position and size).
+  pub fn layout_rect(&mut self) -> impl StateWatcher<Value = Rect> {
+    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_rect()) })
+  }
+
+  /// Returns a watcher for tracking changes to the widget's layout position
+  /// (x,y coordinates).
+  pub fn layout_pos(&mut self) -> impl StateWatcher<Value = Point> {
+    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_pos()) })
+  }
+
+  /// Returns a watcher for tracking changes to the widget's dimensions (width
+  /// and height).
+  pub fn layout_size(&mut self) -> impl StateWatcher<Value = Size> {
+    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_size()) })
+  }
+
+  // Individual layout dimension watchers
+
+  /// Returns a watcher specifically for tracking the left position of the
+  /// widget's layout.
+  pub fn layout_left(&mut self) -> impl StateWatcher<Value = f32> {
+    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_left()) })
+  }
+
+  /// Returns a watcher specifically for tracking the top position of the
+  /// widget's layout.
+  pub fn layout_top(&mut self) -> impl StateWatcher<Value = f32> {
+    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_top()) })
+  }
+
+  /// Returns a watcher specifically for tracking the width of the widget's
+  /// layout.
+  pub fn layout_width(&mut self) -> impl StateWatcher<Value = f32> {
+    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_width()) })
+  }
+
+  /// Returns a watcher specifically for tracking the height of the widget's
+  /// layout.
+  pub fn layout_height(&mut self) -> impl StateWatcher<Value = f32> {
+    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_height()) })
+  }
+
+  // Style property writers
+
+  /// Creates and returns a state writer for controlling how child content fits
+  /// within this widget's bounds.
+  pub fn box_fit(&mut self) -> impl StateWriter<Value = BoxFit> {
+    let fitted_box = sub_widget!(self, fitted_box);
+    part_writer!(&mut fitted_box.box_fit)
+  }
+
+  /// Creates and returns a state writer for managing the widget's background
+  /// color/brush.
+  pub fn background(&mut self) -> impl StateWriter<Value = Brush> {
+    let background = sub_widget!(self, background);
+    part_writer!(&mut background.background)
+  }
+
+  /// Returns a state writer for modifying the widget's foreground brush.
+  /// This controls the color/texture of text, icons, and other foreground
+  /// elements.
+  pub fn foreground(&mut self) -> impl StateWriter<Value = Brush> {
+    let foreground = sub_widget!(self, foreground);
+    part_writer!(&mut foreground.foreground)
+  }
+
+  /// Returns a state writer for modifying corner radius values.
+  /// Controls the rounding of all four corners of the widget's bounding box.
+  pub fn radius(&mut self) -> impl StateWriter<Value = Radius> {
+    let radius = sub_widget!(self, radius);
+    part_writer!(&mut radius.radius)
+  }
+
+  /// Returns a state writer for modifying border properties.
+  /// Controls the width, color, and style of the widget's border.
+  pub fn border(&mut self) -> impl StateWriter<Value = Border> {
+    let border = sub_widget!(self, border);
+    part_writer!(&mut border.border)
+  }
+
+  /// Returns a state writer for modifying the painting style.
+  /// Determines whether to fill shapes (PaintingStyle::Fill) or stroke outlines
+  /// (PaintingStyle::Stroke).
+  pub fn painting_style(&mut self) -> impl StateWriter<Value = PaintingStyle> {
+    let painting_style = sub_widget!(self, painting_style);
+    part_writer!(&mut painting_style.painting_style)
+  }
+
+  /// Returns a state writer for modifying text alignment.
+  /// Controls horizontal and vertical positioning of text within its container.
+  pub fn text_align(&mut self) -> impl StateWriter<Value = TextAlign> {
+    let text_align = sub_widget!(self, text_align);
+    part_writer!(&mut text_align.text_align)
+  }
+
+  /// Returns a state writer for modifying the complete text style.
+  /// Provides comprehensive control over font properties, colors, and text
+  /// rendering.
+  pub fn text_style(&mut self) -> impl StateWriter<Value = TextStyle> {
+    let text_style = self.text_style_widget();
+    part_writer!(&mut text_style.text_style)
+  }
+
+  /// Returns a state writer specifically for modifying font size.
+  pub fn font_size(&mut self) -> impl StateWriter<Value = f32> {
+    let style = self.text_style_widget();
+    part_writer!(&mut style.text_style.font_size)
+  }
+
+  /// Returns a state writer specifically for modifying font face/family.
+  pub fn font_face(&mut self) -> impl StateWriter<Value = FontFace> {
+    let style = self.text_style_widget();
+    part_writer!(&mut style.text_style.font_face)
+  }
+
+  /// Returns a state writer for modifying letter spacing (tracking).
+  /// Adjusts horizontal space between characters (positive values increase
+  /// spacing).
+  pub fn letter_space(&mut self) -> impl StateWriter<Value = f32> {
+    let style = self.text_style_widget();
+    part_writer!(&mut style.text_style.letter_space)
+  }
+
+  /// Returns a state writer for modifying line height (leading).
+  /// Controls vertical spacing between lines of text (multiplier relative to
+  /// font size).
+  pub fn text_line_height(&mut self) -> impl StateWriter<Value = f32> {
+    let style = self.text_style_widget();
+    part_writer!(&mut style.text_style.line_height)
+  }
+
+  /// Returns a state writer for configuring text overflow behavior.
+  /// Determines how text is handled when it exceeds available space (clip,
+  /// ellipsis, etc.).
+  pub fn text_overflow(&mut self) -> impl StateWriter<Value = TextOverflow> {
+    let style = self.text_style_widget();
+    part_writer!(&mut style.text_style.overflow)
+  }
+
+  /// Returns a state writer for modifying interior padding.
+  /// Controls space between the widget's border and its content.
+  pub fn padding(&mut self) -> impl StateWriter<Value = EdgeInsets> {
+    let padding = sub_widget!(self, padding);
+    part_writer!(&mut padding.padding)
+  }
+
+  /// Returns a state writer for modifying exterior margins.
+  /// Controls space between this widget and adjacent elements.
+  pub fn margin(&mut self) -> impl StateWriter<Value = EdgeInsets> {
+    let margin = sub_widget!(self, margin);
+    part_writer!(&mut margin.margin)
+  }
+
+  /// Returns a state writer for modifying horizontal anchoring in global space.
+  /// Positions widget relative to the screen's horizontal edges
+  /// (left/center/right).
+  pub fn global_anchor_x(&mut self) -> impl StateWriter<Value = Option<GlobalAnchorX>> {
+    let anchor = sub_widget!(self, global_anchor);
+    part_writer!(&mut anchor.global_anchor_x)
+  }
+
+  /// Returns a state writer for modifying vertical anchoring in global space.
+  /// Positions widget relative to the screen's vertical edges
+  /// (top/center/bottom).
+  pub fn global_anchor_y(&mut self) -> impl StateWriter<Value = Option<GlobalAnchorY>> {
+    let anchor = sub_widget!(self, global_anchor);
+    part_writer!(&mut anchor.global_anchor_y)
+  }
+
+  /// Returns a state writer for modifying the cursor icon.
+  /// Changes the mouse cursor when hovering over the widget (pointer, text,
+  /// etc.).
+  pub fn cursor(&mut self) -> impl StateWriter<Value = CursorIcon> {
+    let cursor = sub_widget!(self, cursor);
+    part_writer!(&mut cursor.cursor)
+  }
+
+  /// Returns a state writer for enabling/disabling scroll behavior.
+  /// Controls whether the widget responds to scroll gestures and shows scroll
+  /// indicators.
+  pub fn scrollable(&mut self) -> impl StateWriter<Value = Scrollable> {
+    let scrollable = sub_widget!(self, scrollable);
+    part_writer!(&mut scrollable.scrollable)
+  }
+
+  /// Returns a state writer for modifying size constraints.
+  /// Sets minimum/maximum size boundaries for the widget's layout.
+  pub fn clamp(&mut self) -> impl StateWriter<Value = BoxClamp> {
+    let constrained_box = sub_widget!(self, constrained_box);
+    part_writer!(&mut constrained_box.clamp)
+  }
+
+  /// Returns a state writer for applying visual transformations.
+  /// Applies matrix transformations (translation, rotation, scaling) to the
+  /// widget.
+  pub fn transform(&mut self) -> impl StateWriter<Value = Transform> {
+    let transform = sub_widget!(self, transform);
+    part_writer!(&mut transform.transform)
+  }
+
+  /// Returns a state writer for modifying horizontal alignment.
+  /// Controls positioning within available horizontal space (left, center,
+  /// right).
+  pub fn h_align(&mut self) -> impl StateWriter<Value = HAlign> {
+    let h_align = sub_widget!(self, h_align);
+    part_writer!(&mut h_align.h_align)
+  }
+
+  /// Returns a state writer for modifying vertical alignment.
+  /// Controls positioning within available vertical space (top, center,
+  /// bottom).
+  pub fn v_align(&mut self) -> impl StateWriter<Value = VAlign> {
+    let v_align = sub_widget!(self, v_align);
+    part_writer!(&mut v_align.v_align)
+  }
+
+  /// Returns a state writer for modifying relative anchoring.
+  /// Positions widget relative to its parent using normalized coordinates
+  /// (0-1).
+  pub fn anchor(&mut self) -> impl StateWriter<Value = Anchor> {
+    let anchor = sub_widget!(self, relative_anchor);
+    part_writer!(&mut anchor.anchor)
+  }
+
+  /// Returns a state writer for modifying visibility state.
+  /// Controls whether the widget is rendered (true = visible, false = hidden).
+  pub fn visible(&mut self) -> impl StateWriter<Value = bool> {
+    let visibility = sub_widget!(self, visibility);
+    part_writer!(&mut visibility.visible)
+  }
+
+  /// Returns a state writer for modifying opacity.
+  /// Controls transparency level (0.0 = fully transparent, 1.0 = fully opaque).
+  pub fn opacity(&mut self) -> impl StateWriter<Value = f32> {
+    let opacity = sub_widget!(self, opacity);
+    part_writer!(&mut opacity.opacity)
+  }
+
+  /// Returns a state writer for modifying keep-alive behavior.
+  /// When true, preserves widget state even when not visible in the UI.
+  pub fn keep_alive(&mut self) -> impl StateWriter<Value = bool> {
+    let keep_alive = sub_widget!(self, keep_alive);
+    part_writer!(&mut keep_alive.keep_alive)
+  }
+
+  /// Returns a state writer for modifying tooltip content.
+  /// Controls the text displayed when hovering over the widget.
+  pub fn tooltips(&mut self) -> impl StateWriter<Value = CowArc<str>> {
+    let tooltips = sub_widget!(self, tooltips);
+    part_writer!(&mut tooltips.tooltips)
+  }
+
+  /// Returns the widget's unique tracking identifier.
+  /// Used for performance monitoring and debugging purposes.
+  pub fn track_id(&mut self) -> TrackId { sub_widget!(self, track_id).read().track_id() }
+
+  /// Returns a state writer for modifying clipping behavior.
+  /// When true, children are clipped to this widget's bounds.
+  pub fn clip_boundary(&mut self) -> impl StateWriter<Value = bool> {
+    let widget = sub_widget!(self, clip_boundary);
+    part_writer!(&mut widget.clip_boundary)
+  }
+
+  /// Returns a state writer for modifying disabled state.
+  /// When true, widget ignores all user interaction events.
+  pub fn disabled(&mut self) -> impl StateWriter<Value = bool> {
+    let widget = sub_widget!(self, disabled);
+    part_writer!(&mut widget.disabled)
+  }
+
+  /// Helper method to reduce code duplication for focus-related state watchers
+  fn mix_flags_watcher<R: 'static>(
+    &mut self, mapper: fn(&MixFlags) -> PartRef<R>,
+  ) -> impl StateWatcher<Value = R> {
+    self
+      .mix_builtin_widget()
+      .mix_flags()
+      .part_watcher(mapper)
+  }
+
+  fn layout_box_watcher<R: 'static>(
+    &mut self, mapper: fn(&LayoutBox) -> PartRef<R>,
+  ) -> impl StateWatcher<Value = R> {
+    sub_widget!(self, layout_box).part_watcher(mapper)
   }
 }
 
@@ -1087,6 +1175,106 @@ impl<T> FatObj<T> {
 
   /// Returns `true` if the widget has a class.
   pub fn has_class(&self) -> bool { self.class.is_some() }
+}
+
+// builtin widgets accessors
+impl<T> FatObj<T> {
+  /// Return the focus widget that can track and manage the focus states
+  pub fn focus_handle(&mut self) -> FocusHandle {
+    let wnd = BuildCtx::get().window().id();
+    let host = self.track_id();
+    self.mix_builtin_widget().focus_handle(wnd, host)
+  }
+
+  /// Returns the `State<ScrollableWidget>` widget from the FatObj. If it
+  /// doesn't exist, a new one will be created.
+  pub fn scrollable_widget(&mut self) -> &State<ScrollableWidget> { sub_widget!(self, scrollable) }
+
+  /// Returns the `State<RelativeAnchor>` widget from the FatObj. If it doesn't
+  /// exist, a new one will be created.
+  pub fn relative_anchor_widget(&mut self) -> &State<RelativeAnchor> {
+    sub_widget!(self, relative_anchor)
+  }
+
+  /// Returns the `State<GlobalAnchor>` widget from the FatObj. If it doesn't
+  /// exist, a new one will be created.
+  pub fn global_anchor_widget(&mut self) -> &State<GlobalAnchor> {
+    sub_widget!(self, global_anchor)
+  }
+
+  fn mix_builtin_widget(&mut self) -> &MixBuiltin {
+    self
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default)
+  }
+
+  /// Returns the `State<TextStyleWidget>` widget from the FatObj. If it
+  /// doesn't exist, a new one will be created.
+  fn text_style_widget(&mut self) -> &State<TextStyleWidget> {
+    self
+      .text_style
+      .get_or_insert_with(|| State::value(TextStyleWidget::inherit_widget()))
+  }
+
+  /// Returns the `State<Tooltips>` widget from the FatObj. If it doesn't
+  /// exist, a new one is created.
+  pub fn tooltips_widget(&mut self) -> &State<Tooltips> {
+    self
+      .tooltips
+      .get_or_insert_with(|| State::value(<_>::default()))
+  }
+}
+
+macro_rules! sub_widget {
+  ($this:expr, $path:ident) => {
+    $this
+      .$path
+      .get_or_insert_with(|| State::value(<_>::default()))
+  };
+}
+use sub_widget;
+
+macro_rules! init_sub_widget {
+  ($this:expr, $sub_widget_path:ident, $field:ident, $init_value:ident) => {{
+    let mix = $this
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let sub_widget = $this
+      .$sub_widget_path
+      .get_or_insert_with(|| State::value(<_>::default()));
+    mix.init_sub_widget($init_value, sub_widget, move |widget, v| widget.$field = v);
+    $this
+  }};
+}
+
+macro_rules! init_text_style {
+  ($this:expr, $field:ident, $init_value:ident) => {{
+    let mix = $this
+      .mix_builtin
+      .get_or_insert_with(MixBuiltin::default);
+    let text_style = $this
+      .text_style
+      .get_or_insert_with(|| State::value(TextStyleWidget::inherit_widget()));
+    mix.init_sub_widget($init_value, text_style, move |w, v| w.text_style.$field = v);
+    $this
+  }};
+}
+use init_sub_widget;
+use init_text_style;
+
+impl MixBuiltin {
+  fn init_sub_widget<V: 'static, B: 'static, K: ?Sized>(
+    &self, init: impl RInto<PipeValue<V>, K>, sub_widget: &impl StateWriter<Value = B>,
+    set_value: fn(&mut B, V),
+  ) {
+    let (v, o) = init.r_into().unzip();
+    set_value(&mut *sub_widget.silent(), v);
+    if let Some(o) = o {
+      let sub_widget = sub_widget.clone_writer();
+      let u = o.subscribe(move |v| set_value(&mut *sub_widget.write(), v));
+      self.on_disposed(move |_| u.unsubscribe());
+    }
+  }
 }
 
 impl<'a> FatObj<Widget<'a>> {
@@ -1147,7 +1335,6 @@ impl<'a> FatObj<Widget<'a>> {
           margin,
           cursor,
           mix_builtin,
-          request_focus,
           transform,
           opacity,
           visibility,

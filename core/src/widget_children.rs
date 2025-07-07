@@ -559,11 +559,9 @@ mod tests {
     // with single child
     let _e = fn_widget! {
       let p = pipe!{
-        fn_widget! {
-          @MockBox { size: if $c_size.area() > 0. { *$c_size } else { Size::new(1., 1.)} }
-        }
+        @MockBox { size: if $read(c_size).area() > 0. { *$read(c_size) } else { Size::new(1., 1.)} }
       };
-      @(p) { @MockBox { size: pipe!(*$c_size) } }
+      @(p) { @MockBox { size: pipe!(*$read(c_size)) } }
     };
 
     // with multi child
@@ -578,7 +576,7 @@ mod tests {
     let c_size = size.clone_watcher();
     // option with single child
     let _e = fn_widget! {
-      let p = pipe!(($c_size.area() > 0.).then(|| {
+      let p = pipe!(($read(c_size).area() > 0.).then(|| {
         fn_widget! { @MockBox { size: Size::zero() }}
       }));
       @(p) { @MockBox { size: Size::zero() } }
@@ -586,7 +584,7 @@ mod tests {
 
     // option with `Widget`
     let _e = fn_widget! {
-      let p = pipe!(($size.area() > 0.).then(|| {
+      let p = pipe!(($read(size).area() > 0.).then(|| {
         fn_widget! { @MockBox { size: Size::zero() }}
       }));
       @(p) { @ { Void }}

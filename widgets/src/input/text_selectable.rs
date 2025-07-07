@@ -64,14 +64,14 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
             match e.data() {
               PointerSelectData::Move{ from, to } |
               PointerSelectData::End { from, to } => {
-                let new_sel = $this.glyphs().map(|g| {
+                let new_sel = $read(this).glyphs().map(|g| {
                   Selection {
                     from: g.caret_position_from_pos(*from),
                     to: g.caret_position_from_pos(*to),
                   }
                 });
                 if let Some(new_sel) = new_sel {
-                  *$selection.write() = new_sel;
+                  *$write(selection) = new_sel;
                 }
               },
               _ => {}
@@ -79,15 +79,15 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
           }
         },
         on_key_down: move |e| {
-          let new_sel = $this.select_with_key(e);
+          let new_sel = $read(this).select_with_key(e);
           if let Some(new_sel) = new_sel {
-            *$selection.write() = new_sel;
+            *$write(selection) = new_sel;
           }
         },
         on_pointer_down: move |e| {
-          let caret = $this.glyphs().map(|g| g.caret_position_from_pos(e.position()));
+          let caret = $read(this).glyphs().map(|g| g.caret_position_from_pos(e.position()));
           if let Some(caret) = caret {
-            let mut selection = $selection.write();
+            let mut selection = $write(selection);
             if e.with_shift_key() {
               selection.to = CaretPosition{ cluster: caret.cluster, position: None };
             } else {
@@ -97,22 +97,23 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
           }
         },
         on_double_tap: move |e| {
-          let caret = $this
+          let this = $read(this);
+          let caret = this
             .glyphs()
             .map(|glyphs| glyphs.caret_position_from_pos(e.position()));
           if let Some(caret) = caret {
-            let rg = $this.text().select_token(caret.cluster);
-            $selection.write().from = CaretPosition{ cluster: rg.start, position: None };
-            $selection.write().to = CaretPosition{ cluster: rg.end, position: None };
+            let rg = this.text().select_token(caret.cluster);
+            let mut selection = $write(selection);
+            selection.from = CaretPosition{ cluster: rg.start, position: None };
+            selection.to = CaretPosition{ cluster: rg.end, position: None };
           }
         },
         @Stack {
           @NoAffectedParentSize {
             @Stack {
               @pipe! {
-                let this = $this;
-                let rcs = this.glyphs()
-                  .map(|glyphs| glyphs.select_range(&$selection.cluster_rg()))
+                let rcs = $read(this).glyphs()
+                  .map(|glyphs| glyphs.select_range(&$read(selection).cluster_rg()))
                   .unwrap_or_default();
                 rcs.into_iter().map(move |rc| {
                   @Container {

@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 #[derive(Default)]
 pub struct TrackWidgetId {
-  wid: TrackId,
+  pub(crate) wid: TrackId,
 }
 
 impl<'c> ComposeChild<'c> for TrackWidgetId {
@@ -42,11 +42,11 @@ mod tests {
     let (trigger, w_trigger) = split_value(false);
     let (id, w_id) = split_value(<Option<TrackId>>::None);
     let w = fn_widget! {
-      let w = @ pipe!(*$trigger).map(move |_| fn_widget!{ @ Void {} });
+      let w = @ pipe!(*$read(trigger)).map(move |_| fn_widget!{ @ Void {} });
       let mut w = FatObj::new(w);
       @(w) {
         on_mounted: move |_| {
-          *$w_id.write() = Some($w.track_id());
+          *$write(w_id) = Some($clone(w.track_id()));
         }
       }
     };

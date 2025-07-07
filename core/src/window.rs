@@ -524,7 +524,7 @@ impl Window {
     this: Sc<Self>, track_id: TrackId, auto_focus: bool, focus_type: FocusType,
   ) -> FocusNodeGuard<impl Subscription> {
     let init_id = track_id.get().unwrap();
-    let watcher = track_id.watcher();
+    let watcher = track_id.clone_watcher();
 
     this
       .focus_mgr
@@ -532,7 +532,7 @@ impl Window {
       .add_focus_node(init_id, auto_focus, focus_type);
 
     let wnd = this.clone();
-    let guard = watch!(*$watcher)
+    let guard = watch!(*$read(watcher))
       .merge(observable::of(Some(init_id)))
       .distinct_until_changed()
       .pairwise()
@@ -643,7 +643,7 @@ impl Window {
           let keep_alive_id = id
             .query_ref::<KeepAlive>(self.tree())
             .filter(|d| d.keep_alive)
-            .and_then(|d| d.track_id());
+            .map(|d| d.track_id());
 
           if let Some(keep_alive_id) = keep_alive_id {
             self
@@ -1157,7 +1157,7 @@ mod tests {
     let (disposed, w_disposed) = split_value(false);
     TestWindow::from_widget(fn_widget! {
       @MockBox {
-        on_disposed: move |_| *$w_disposed.write() = true,
+        on_disposed: move |_| *$write(w_disposed) = true,
         size: Size::zero(),
       }
     });

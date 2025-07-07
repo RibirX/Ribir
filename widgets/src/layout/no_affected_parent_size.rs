@@ -37,22 +37,22 @@ mod tests {
     let (child2_size, child2_size_writer) = split_value(Size::new(100., 100.));
     let w = fn_widget! {
       let child1 = @MockBox {
-        size: pipe!(*$child1_size),
+        size: pipe!(*$read(child1_size)),
         on_performed_layout: move |_| {
-          *$child1_layout_writer.write() += 1;
+          *$write(child1_layout_writer) += 1;
         },
       };
       let child2 = @NoAffectedParentSize {
         @MockBox {
-          size: pipe!(*$child2_size),
+          size: pipe!(*$read(child2_size)),
           on_performed_layout: move |_| {
-            *$child2_layout_writer.write() += 1;
+            *$write(child2_layout_writer) += 1;
           },
         }
       };
       @MockMulti {
         on_performed_layout: move |_| {
-          *$parent_layout_writer.write() += 1;
+          *$write(parent_layout_writer) += 1;
         },
         @ { child1 }
         @ { child2 }

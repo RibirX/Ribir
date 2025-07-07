@@ -18,8 +18,7 @@ pub(crate) fn gen_code(input: TokenStream, ctx: Option<&mut DollarRefsCtx>) -> T
     } else {
       let mut ctx = DollarRefsCtx::top_level();
       let stmts = body.fold(&mut ctx).0;
-      let mut refs = ctx.pop_dollar_scope(false);
-      refs.keep_only_builtin_refs();
+      let refs = ctx.pop_dollar_scope(false);
 
       (stmts, refs)
     };

@@ -285,10 +285,10 @@ fn main() {
     let count = State::value(0);
     @Button {
       // Change 2: Modify the state on tap
-      on_tap: move |_| *$count.write() += 1,
+      on_tap: move |_| *$write(count) += 1,
       // Change 3: Display data using state and keep the view updated.
       // For macros or function calls, you can omit the curly braces after `@`
-      @ pipe!($count.to_string())
+      @ pipe!($read(count).to_string())
     }
   });
 }
@@ -362,7 +362,7 @@ use ribir::prelude::*;
 let a = State::value(0);
 let b = State::value(0);
 
-let sum = pipe!(*$a + *$b);
+let sum = pipe!(*$read(a) + *$read(b));
 ```
 
 When declaring an object, you can initialize its property with a `Pipe` stream, so that its property will continue to change with this `Pipe` stream. As we have seen in [State - Making Data Watchable and Shareable](#state---making-data-watchable-and-shareable)
@@ -390,11 +390,11 @@ fn main() {
     move |cnt: &'static Stateful<i32>| {
       row! {
         @Button {
-          on_tap: move |_| *$cnt.write() += 1,
-        @ { "Increment" }
+          on_tap: move |_| *$write(cnt) += 1,
+          @ { "Increment" }
         }
         @ {
-          pipe!(*$cnt).map(move |cnt| {
+          pipe!(*$read(cnt)).map(move |cnt| {
             (0..cnt).map(move |_| {
               @Container {
                 margin: EdgeInsets::all(2.),
@@ -460,14 +460,14 @@ fn main() {
     let b = State::value(0);
 
     @Column {
-      @Text { text: pipe!($a.to_string()) }
-      @Text { text: pipe!($b.to_string()) }
+      @Text { text: pipe!($read(a).to_string()) }
+      @Text { text: pipe!($read(b).to_string()) }
       @Text {
-        text: pipe!((*$a + *$b).to_string())
+        text: pipe!((*$read(a) + *$read(b)).to_string())
           .transform(|s| s.distinct_until_changed().box_it()),
         on_tap: move |_| {
-          *$a.write() += 1;
-          *$b.write() -= 1;
+          *$write(a) += 1;
+          *$write(b) -= 1;
         }
       }
     }
@@ -507,13 +507,13 @@ fn main() {
     let count = State::value(0);
     let display = @H1 { text: "0" };
 
-    watch!(*$count).subscribe(move |v| {
-      $display.write().text = v.to_string().into();
+    watch!(*$read(count)).subscribe(move |v| {
+      $write(display).text = v.to_string().into();
     });
 
     @Row {
       @Button {
-        on_tap: move |_| *$count.write() += 1,
+        on_tap: move |_| *$write(count) += 1,
         @ { "Increment" }
       }
       @{ display }
@@ -537,8 +537,8 @@ use ribir::prelude::*;
 fn show_name(name: State<String>) -> Widget<'static> {
   fn_widget!{
     let mut text = @Text { text: "Hi, Guest!" };
-    let u = watch!($name.to_string()).subscribe(move |name| {
-      $text.write().text = format!("Hi, {}!", name).into();
+    let u = watch!($read(name).to_string()).subscribe(move |name| {
+      $write(text).text = format!("Hi, {}!", name).into();
     });
 
     // `name` is a shareable state that can be held by other people, 
@@ -561,7 +561,7 @@ let even_num = State::value(0);
 
 // Respond to changes in even_num, ensure it is even. 
 // If even_num is odd, add 1 to make it even
-let u = watch!(*$even_num).subscribe(move |v| {
+let u = watch!(*$read(even_num)).subscribe(move |v| {
   if v % 2 == 1 {
     *even_num.write() = v + 1;
   }
@@ -591,8 +591,8 @@ impl Counter {
 impl Compose for Counter {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     button! {
-      on_tap: move |_| $this.write().increment(),
-      @pipe!($this.0.to_string())
+      on_tap: move |_| $write(this).increment(),
+      @pipe!($read(this).0.to_string())
     }
     .into_widget()
   }
@@ -656,7 +656,7 @@ fn main() {
     let mut hello_world = @Text { text: "Hello World!" };
     // But you can still access the `margin` field,
     // It's created with default value when you use it. 
-    $hello_world.write().margin = EdgeInsets::all(10.);
+    *$write(hello_world.margin()) = EdgeInsets::all(10.);
     hello_world
   });
 }
@@ -696,9 +696,9 @@ let state = State::value(AppData { count: 0 });
 let map_count = state.part_writer(PartialId::any(), |d| PartMut::new(&mut d.count));
 let split_count = state.part_writer(PartialId::any(), |d| PartMut::new(&mut d.count));
 
-watch!($state.count).subscribe(|_| println!("Parent data"));
-watch!(*$map_count).subscribe(|_| println!("Child(map) data"));
-watch!(*$split_count).subscribe(|_| println!("Child(split) data"));
+watch!($read(state).count).subscribe(|_| println!("Parent data"));
+watch!(*$read(map_count)).subscribe(|_| println!("Child(map) data"));
+watch!(*$read(split_count)).subscribe(|_| println!("Child(split) data"));
 state
   .raw_modifies()
   .filter(|s| s.contains(ModifyEffect::FRAMEWORK))

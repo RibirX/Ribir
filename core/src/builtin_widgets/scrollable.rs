@@ -50,35 +50,33 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
     fn_widget! {
       let mut view = @Viewport {
         clip_boundary: true,
-        scroll_dir: distinct_pipe!{
-          let this = $this;
-          this.scrollable
-        },
-        on_wheel: move |e| $this.write().scroll(-e.delta_x, -e.delta_y),
+        scroll_dir: distinct_pipe!($read(this).scrollable),
+        on_wheel: move |e| $write(this).scroll(-e.delta_x, -e.delta_y),
       };
 
       let mut child = FatObj::new(child);
       let child = @(child) {
         anchor: distinct_pipe!{
-          let this = $this;
-          let pos = this.get_scroll_pos();
+          let pos = $read(this).get_scroll_pos();
           Anchor::left_top(-pos.x, -pos.y)
         },
         on_performed_layout: move |e| {
           let content_size = e.box_size().unwrap_or_default();
-          if $this.content_size != content_size {
-            $this.write().set_content_size(content_size);
+          let mut this = $write(this);
+          if this.content_size != content_size {
+            this.set_content_size(content_size);
           }
         }
       };
 
-      $this.write().view_id = Some($view.track_id());
+      this.write().view_id = Some(view.track_id());
 
       @(view) {
         on_performed_layout: move |_| {
-          let view_size = $view.size.get();
-          if $this.page != view_size {
-            $this.write().set_page(view_size);
+          let view_size = $read(view).size.get();
+          let mut this = $write(this);
+          if this.page != view_size {
+            this.set_page(view_size);
           }
         },
         providers: [Provider::value_of_writer(this.clone_boxed_writer(), None)],

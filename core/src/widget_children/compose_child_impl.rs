@@ -265,7 +265,7 @@ mod tests {
 
     let _pipe_child = fn_widget! {
       let state = State::value(0usize);
-      @PipeParent {  @ { pipe!(*$state) } }
+      @PipeParent {  @ { pipe!(*$read(state)) } }
     };
   }
 
@@ -295,7 +295,7 @@ mod tests {
       @EnumTest {
         @ Void {}
         @ { "test" }
-        @ { pipe!(*$v).map(|_| fn_widget! { @Void {} }) }
+        @ { pipe!(*$read(v)).map(|_| fn_widget! { @Void {} }) }
         @ MockStack { @Void {} }
         @ {w}
       }

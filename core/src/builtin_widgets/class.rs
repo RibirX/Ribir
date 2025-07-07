@@ -561,7 +561,7 @@ mod tests {
         providers: smallvec![initd_classes().into_provider()],
         @Container {
           size: Size::new(100., 100.),
-          class: pipe!(*$cls),
+          class: pipe!(*$read(cls)),
         }
       }
     });
@@ -614,7 +614,7 @@ mod tests {
         providers: smallvec![classes.into_provider()],
         @Container {
           size: Size::new(100., 100.),
-          class: pipe!(*$cls),
+          class: pipe!(*$read(cls)),
         }
       }
     });
@@ -631,7 +631,7 @@ mod tests {
   fn class_array() {
     reset_test_env!();
 
-    let mut wnd = TestWindow::from_widget(fn_widget! {
+    let wnd = TestWindow::from_widget(fn_widget! {
       let margin_and_clamp = class_array![MARGIN, CLAMP_50];
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
@@ -670,7 +670,7 @@ mod tests {
         providers: smallvec![classes.into_provider()],
         @Container {
           size: Size::new(100., 100.),
-          class: pipe!(*$cls),
+          class: pipe!(*$read(cls)),
         }
       }
     });
@@ -702,9 +702,9 @@ mod tests {
         providers: smallvec![classes.into_provider()],
         @Container {
           size: Size::new(100., 100.),
-          class: pipe!($trigger; PROVIDER_CLS),
+          class: pipe!($read(trigger); PROVIDER_CLS),
           on_performed_layout: move |e| {
-            *$w_val.write() =  *Provider::of::<i32>(e).unwrap();
+            *$write(w_val) =  *Provider::of::<i32>(e).unwrap();
           }
         }
       }
@@ -725,7 +725,7 @@ mod tests {
         providers: smallvec![initd_classes().into_provider()],
         @Container {
           size: Size::new(100., 100.),
-          class: pipe!(*$cls),
+          class: pipe!(*$read(cls)),
         }
       }
     });
@@ -750,7 +750,7 @@ mod tests {
         providers: smallvec![initd_classes().into_provider()],
         @Container {
           size: Size::new(100., 100.),
-          class: pipe!(*$cls),
+          class: pipe!(*$read(cls)),
         }
       }
     });
@@ -799,11 +799,11 @@ mod tests {
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
         @ {
-          let w = pipe!(*$w_trigger).map(|_| fn_widget!{
+          let w = pipe!(*$read(w_trigger)).map(|_| fn_widget!{
             @Container {size: Size::new(100., 100.) }
           });
           @Class {
-            class: pipe!(*$cls),
+            class: pipe!(*$read(cls)),
             @ { w }
           }
         }
@@ -831,7 +831,7 @@ mod tests {
           size: Size::new(100., 100.),
           @(w) {
             on_performed_layout: move |e| {
-              let id = $w.track_id().get().unwrap();
+              let id = $clone(w.track_id()).get().unwrap();
               assert!(!id.is_dropped(e.tree()));
             }
           }
@@ -848,7 +848,7 @@ mod tests {
         providers: smallvec![classes.clone().into_provider()],
         @Container {
           size: Size::new(100., 100.),
-          class: pipe!(*$cls),
+          class: pipe!(*$read(cls)),
         }
       }
     });
@@ -880,7 +880,7 @@ mod tests {
           Provider::value_of_watcher(cls.clone_watcher())
         ],
         @MockBox {
-          class: pipe!(*$out),
+          class: pipe!(*$read(out)),
           size: Size::new(100., 100.),
         }
       }
@@ -929,7 +929,7 @@ mod tests {
           Provider::value_of_writer(w_inner_apply.clone_writer(), None),
         ],
         @MockBox {
-          class: pipe!(*$out),
+          class: pipe!(*$read(out)),
           size: Size::new(100., 100.),
         }
       }
@@ -963,10 +963,10 @@ mod tests {
 
       let mut w = FatObj::new(
         @Void {
-          class: pipe!(*$r_cls),
+          class: pipe!(*$read(r_cls)),
         }.into_widget()
       );
-      *$w_id.write() = Some($w.track_id());
+      *$write(w_id) = Some($clone(w.track_id()));
 
       @Providers{
         providers: smallvec![

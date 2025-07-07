@@ -63,12 +63,12 @@ mod tests {
           let chars = event.chars.to_string();
           // The value received first is multiplied by 2
           let char = (chars.parse::<i32>().unwrap() * 2).to_string();
-          $writer.write().push_str(&char);
+          $write(writer).push_str(&char);
         },
         @MockBox {
           size: ZERO_SIZE,
           auto_focus: true,
-          on_chars: move |event| $writer.write().push_str(&event.chars),
+          on_chars: move |event| $write(writer).push_str(&event.chars),
         }
       }
     };

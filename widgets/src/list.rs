@@ -349,9 +349,9 @@ impl ListItem {
   fn item_classes(item: &impl StateWatcher<Value = Self>) -> [PipeValue<Option<ClassName>>; 3] {
     class_array![
       distinct_pipe! {
-        if $item.is_selected() { LIST_ITEM_SELECTED } else { LIST_ITEM_UNSELECTED }
+        if $read(item).is_selected() { LIST_ITEM_SELECTED } else { LIST_ITEM_UNSELECTED }
       },
-      distinct_pipe! { $item.is_interactive().then_some(LIST_ITEM_INTERACTIVE) },
+      distinct_pipe! { $read(item).is_interactive().then_some(LIST_ITEM_INTERACTIVE) },
       LIST_ITEM
     ]
   }
@@ -369,12 +369,12 @@ impl<'c> ComposeChild<'c> for List {
     self::column! {
       class: LIST,
       align_items: Align::Stretch,
-      on_disposed: move |_| $this.write().clear(),
+      on_disposed: move |_| $write(this).clear(),
       on_key_down: move |e| {
         if select_mode != ListSelectMode::None {
           match e.key() {
-            VirtualKey::Named(NamedKey::ArrowUp)  => $this.write().focus_prev_item(&e.window()),
-            VirtualKey::Named(NamedKey::ArrowDown) => $this.write().focus_next_item(&e.window()),
+            VirtualKey::Named(NamedKey::ArrowUp)  => $write(this).focus_prev_item(&e.window()),
+            VirtualKey::Named(NamedKey::ArrowDown) => $write(this).focus_next_item(&e.window()),
             _ => {}
           }
         }
@@ -383,11 +383,11 @@ impl<'c> ComposeChild<'c> for List {
         child.into_iter().map(move |item| match item {
           ListChild::StandardItem(pair) => {
             let item = pair.parent().as_stateful().clone_writer();
-            $this.item_select_actions(item, pair.into_fat_widget())
+            $read(this).item_select_actions(item, pair.into_fat_widget())
           },
           ListChild::CustomItem(pair) => {
             let item = pair.parent().read().0.clone_writer();
-            $this.item_select_actions(item, pair.into_fat_widget())
+            $read(this).item_select_actions(item, pair.into_fat_widget())
           },
           ListChild::Divider(divider) => divider.into_widget(),
         })
@@ -668,7 +668,7 @@ impl List {
     items.iter().enumerate().for_each(|(idx, item)| {
       let item = item.clone_writer();
       let this = this.clone_writer();
-      let u = watch!($item.is_selected())
+      let u = watch!($read(item).is_selected())
         .distinct_until_changed()
         .filter(|selected| *selected)
         .subscribe(move |_| this.write().on_item_select(idx));
@@ -690,7 +690,7 @@ impl List {
   fn item_select_actions<'c>(
     &self, item: Stateful<ListItem>, mut list_item: FatObj<Widget<'c>>,
   ) -> Widget<'c> {
-    item.silent().wid = list_item.get_track_id_widget().read().track_id();
+    item.silent().wid = list_item.track_id();
 
     let mode = self.select_mode;
     if mode == ListSelectMode::None {
@@ -698,11 +698,11 @@ impl List {
     } else {
       rdl! {
         @(list_item) {
-          on_tap: move |_| ListItem::select_action($item.write(), mode),
+          on_tap: move |_| ListItem::select_action($write(item), mode),
           on_key_down: move |e| {
             if matches!(e.key(), VirtualKey::Named(NamedKey::Enter)
               | VirtualKey::Named(NamedKey::Space)) {
-              ListItem::select_action($item.write(), mode)
+              ListItem::select_action($write(item), mode)
             }
           }
         }.into_widget()

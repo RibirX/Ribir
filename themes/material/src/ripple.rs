@@ -31,11 +31,12 @@ impl<'c> ComposeChild<'c> for Ripple {
 
       @(ripple_layer) {
         on_pointer_down: move |e| {
-          let pos = (!$this.center).then(||e.position());
-          $this.launch(pos);
+          let this = $read(this);
+          let pos = (!this.center).then(||e.position());
+          this.launch(pos);
           e.stop_propagation();
         },
-        on_disposed: move |_| $this.write().launcher = None,
+        on_disposed: move |_| $write(this).launcher = None,
         @ { child }
       }
     }
@@ -77,34 +78,34 @@ fn init_ripple_launcher(
       from: PressedLayer::show_opacity(),
     };
 
-    watch!(!$ripple_grow.is_running() && !$layer.is_pointer_pressed())
+    watch!(!$read(ripple_grow).is_running() && !*$read(layer.is_pointer_pressed()))
       .skip(1)
       .distinct_until_changed()
       .filter(|fade| *fade)
       .subscribe(move |_| {
-        $layer.write().hide();
+        $write(layer).hide();
         fade_out.run();
       });
 
     let launcher = move |pos: Option<Point>| {
-      let size = $layer.layout_size();
+      let size = *$read(layer.layout_size());
       let center = pos.unwrap_or_else(|| {
         (size / 2.).to_vector().to_point()
       });
-      let radius = $this.ripple_radius.unwrap_or_else(|| {
+      let radius = $read(this).ripple_radius.unwrap_or_else(|| {
         let distance_x = f32::max(center.x , size.width - center.x);
         let distance_y = f32::max(center.y, size.height - center.y);
         (distance_x.powf(2.) + distance_y.powf(2.)).sqrt()
       });
-      let constrain_to_bounds = $this.bounded;
+      let constrain_to_bounds = $read(this).bounded;
       {
-        let mut layer = $layer.write();
+        let mut layer = $write(layer);
         layer.area = LayerArea::Circle { center, radius, constrain_to_bounds };
         layer.show();
       }
       ripple_grow.run()
     };
 
-    $this.write().launcher = Some(Box::new(launcher));
+    $write(this).launcher = Some(Box::new(launcher));
   }
 }

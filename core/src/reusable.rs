@@ -45,7 +45,7 @@ impl Reusable {
   /// being used again, otherwise it will panic.
   pub fn new<'a, K>(w: impl IntoWidget<'a, K>) -> (Widget<'a>, Self) {
     let mut obj = FatObj::new(w);
-    let track_id = obj.get_track_id_widget().read().track_id();
+    let track_id = obj.track_id();
     let this = Self(Sc::new(RefCell::new(ReusableState::WaitToUse { track_id })));
 
     (this.handle_reusable_wrapper(obj.into_widget()), this)
@@ -278,8 +278,8 @@ mod tests {
     let wnd = TestWindow::from_widget(fn_widget! {
       let (w, reusable) = Reusable::new(@Text {
         text: "Hello",
-        on_mounted: move |_| $w_info.write().push("Mounted"),
-        on_disposed: move |_| $w_info.write().push("Disposed"),
+        on_mounted: move |_| $write(w_info).push("Mounted"),
+        on_disposed: move |_| $write(w_info).push("Disposed"),
       });
       *ctrl2.borrow_mut() = Some(reusable.clone());
       let mut w = Some(w.into_widget());
@@ -293,7 +293,7 @@ mod tests {
       @ pipe!{
         let f = f.clone();
         fn_widget! {
-          if *$w_trigger < 3 {
+          if *$read(w_trigger) < 3 {
             f.gen_widget()
           } else {
             Void {}.into_widget()

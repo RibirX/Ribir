@@ -22,16 +22,15 @@ impl<'c> ComposeChild<'c> for FocusScope {
     fn_widget! {
       let mut child = FatObj::new(child);
       let guard = Sc::new(RefCell::new(None));
-      let guard2 = guard.clone();
       @(child) {
         on_mounted: move |e| {
-          *guard.borrow_mut() = Some(
-            Window::add_focus_node(e.window(), $child.track_id(), false, FocusType::Scope)
+          let track_id = $clone(child.track_id());
+          let focus_guard = Window::add_focus_node(
+            e.window(), track_id, false, FocusType::Scope
           );
+          *$clone(guard).borrow_mut() = Some(focus_guard);
         },
-        on_disposed: move|_| {
-          guard2.borrow_mut().take();
-        },
+        on_disposed: move|_| { $clone(guard).borrow_mut().take(); },
       }
       .into_widget()
       .try_unwrap_state_and_attach(this)
@@ -164,16 +163,16 @@ mod tests {
     let widget = fn_widget! {
       let mut host = @FocusScope {
         skip_host: true,
-        on_key_down: move |_| *$tap_cnt.write() += 1,
+        on_key_down: move |_| *$write(tap_cnt) += 1,
       };
       let request_focus_box = @MockBox {
         size,
-        on_pointer_down: move |_| $host.request_focus(FocusReason::Pointer)
+        on_pointer_down: move |_| $clone(host.focus_handle()).request_focus(FocusReason::Pointer)
       };
       @MockMulti {
         @(host) {
           @MockMulti {
-            @MockBox { size, on_key_down: move |_| *$tap_cnt.write() += 1, }
+            @MockBox { size, on_key_down: move |_| *$write(tap_cnt) += 1, }
           }
         }
         @ { request_focus_box }

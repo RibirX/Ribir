@@ -1,24 +1,17 @@
 use std::cmp::Ordering;
 
-use proc_macro2::{Ident, TokenStream};
-use quote::{ToTokens, quote, quote_spanned};
+use proc_macro2::*;
+use quote::{ToTokens, quote_spanned};
 use smallvec::{SmallVec, smallvec};
-use syn::{
-  Expr, ExprField, ExprMethodCall, Macro, Member,
-  fold::Fold,
-  parse::{Parse, ParseStream},
-  parse_quote_spanned,
-  spanned::Spanned,
-  token::Dollar,
-};
+use syn::{Expr, Macro, Token, fold::Fold, parse_quote_spanned, spanned::Spanned};
 
 use crate::{
+  dollar_macro::{self, OriginExpr, StateExpr},
   fn_widget_macro,
   rdl_macro::RdlMacro,
-  variable_names::{BUILTIN_INFOS, BuiltinMember, BuiltinMemberType, ribir_suffix_variable},
 };
 
-pub const KW_DOLLAR_STR: &str = "_dollar_ಠ_ಠ";
+pub const KW_DOLLAR: &str = "_dollar_ಠ_ಠ";
 pub const KW_RDL: &str = "rdl";
 pub const KW_PIPE: &str = "pipe";
 pub const KW_DISTINCT_PIPE: &str = "distinct_pipe";
@@ -47,14 +40,15 @@ pub enum DollarUsedInfo {
   Reader,
   Watcher,
   Writer,
+  Clone,
 }
 
-#[derive(Hash, PartialEq, Eq, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct DollarRef {
-  pub name: Ident,
-  pub builtin: Option<BuiltinInfo>,
+  pub state_expr: StateExpr,
   pub used: DollarUsedInfo,
 }
+
 #[derive(Debug)]
 pub struct DollarRefsCtx {
   scopes: SmallVec<[DollarRefsScope; 1]>,
@@ -69,6 +63,7 @@ pub struct DollarRefsScope {
   /// This scope will exclusively capture the specified variable and will not be
   /// treated as a real scope. If set to `None`, it will capture all dollar
   /// references used.
+  // todo: remove it
   only_capture: Option<Ident>,
 }
 
@@ -77,10 +72,7 @@ pub struct StackGuard<'a>(&'a mut DollarRefsCtx);
 mod tokens_pre_process {
   use std::iter::Peekable;
 
-  use proc_macro2::*;
-  use smallvec::SmallVec;
-
-  use super::KW_DOLLAR_STR;
+  use super::*;
   use crate::{error::*, symbol_process::KW_RDL};
 
   /// Convert `@` and `$` symbols into valid Rust macros (`rdl!` or
@@ -112,18 +104,13 @@ mod tokens_pre_process {
 
         // Handle $ symbol for dollar expressions
         TokenTree::Punct(dollar) if dollar.as_char() == '$' => {
-          let Some(TokenTree::Ident(name)) = iter.next() else {
-            return Err(Error::IdentNotFollowDollar(dollar.span()));
-          };
-          tokens.push(TokenTree::Ident(Ident::new(KW_DOLLAR_STR, dollar.span())));
-          tokens.push(not_token(dollar.span()));
-          let name_span = name.span();
+          let dollar_group = parse_dollar_group(&mut iter, dollar.span())?;
 
-          let mut g = Group::new(
-            Delimiter::Parenthesis,
-            TokenStream::from_iter([TokenTree::Punct(dollar.clone()), TokenTree::Ident(name)]),
-          );
-          g.set_span(name_span);
+          tokens.push(TokenTree::Ident(Ident::new(KW_DOLLAR, dollar.span())));
+          tokens.push(not_token(dollar.span()));
+          let span = dollar_group.span();
+          let mut g = Group::new(Delimiter::Parenthesis, dollar_group);
+          g.set_span(span);
           tokens.push(TokenTree::Group(g));
         }
 
@@ -186,6 +173,24 @@ mod tokens_pre_process {
     }
 
     Ok(rdl_group)
+  }
+
+  fn parse_dollar_group(
+    iter: &mut impl Iterator<Item = TokenTree>, dollar_span: Span,
+  ) -> Result<TokenStream> {
+    let state_name = match iter.next() {
+      Some(TokenTree::Ident(ident)) => ident,
+      Some(token) => return Err(Error::DollarSyntax(dollar_span.join(token.span()).unwrap())),
+      None => return Err(Error::DollarSyntax(dollar_span)),
+    };
+
+    let group = match iter.next() {
+      Some(TokenTree::Group(g)) => g,
+      Some(token) => return Err(Error::DollarSyntax(dollar_span.join(token.span()).unwrap())),
+      None => return Err(Error::DollarSyntax(dollar_span)),
+    };
+
+    Ok(TokenStream::from_iter([TokenTree::Ident(state_name), TokenTree::Group(group)]))
   }
 
   fn tokens_span(tokens: &[TokenTree]) -> Span {
@@ -272,53 +277,10 @@ impl Fold for DollarRefsCtx {
     syn::fold::fold_pat_ident(self, i)
   }
 
-  fn fold_expr_field(&mut self, mut i: ExprField) -> ExprField {
-    let ExprField { base, member, .. } = &mut i;
-
-    if let Member::Named(member) = member {
-      let info = BUILTIN_INFOS.get(member.to_string().as_str());
-      if info.is_some_and(|info| {
-        info.mem_ty == BuiltinMemberType::Field && self.replace_builtin_host(&mut *base, info)
-      }) {
-        return i;
-      }
-    }
-
-    syn::fold::fold_expr_field(self, i)
-  }
-
-  fn fold_expr_method_call(&mut self, mut i: ExprMethodCall) -> ExprMethodCall {
-    // fold builtin method on state
-    let info = BUILTIN_INFOS.get(i.method.to_string().as_str());
-    if info.is_some_and(|info| {
-      info.mem_ty == BuiltinMemberType::Method && self.replace_builtin_host(&mut i.receiver, info)
-    }) {
-      return i;
-    }
-
-    // fold if write on state.
-    if let Expr::Macro(m) = &mut *i.receiver {
-      if is_state_write_method(&i.method) {
-        if let Some(d) = parse_dollar_macro(&m.mac) {
-          let name = d.name;
-          m.mac.tokens = expand_write_method(name.to_token_stream());
-          mark_macro_expanded(&mut m.mac);
-          let dollar_ref = DollarRef { name, builtin: None, used: DollarUsedInfo::Writer };
-          self.add_dollar_ref(dollar_ref);
-          return i;
-        }
-      }
-    }
-
-    syn::fold::fold_expr_method_call(self, i)
-  }
-
   fn fold_macro(&mut self, mut mac: Macro) -> Macro {
-    if let Some(DollarMacro { name, .. }) = parse_dollar_macro(&mac) {
-      mac.tokens = expand_read(name.to_token_stream());
+    if mac.path.is_ident(KW_DOLLAR) {
+      mac.tokens = dollar_macro::gen_code(mac.tokens, self);
       mark_macro_expanded(&mut mac);
-      let dollar_ref = DollarRef { name, builtin: None, used: DollarUsedInfo::Reader };
-      self.add_dollar_ref(dollar_ref)
     } else if mac.path.is_ident(KW_WATCH) {
       mac.tokens = crate::watch_macro::gen_code(mac.tokens, Some(self));
       mark_macro_expanded(&mut mac);
@@ -382,33 +344,29 @@ impl ToTokens for DollarRefsScope {
 }
 
 impl ToTokens for DollarRef {
-  fn to_tokens(&self, tokens: &mut TokenStream) { self.capture_state(&self.name, tokens); }
+  fn to_tokens(&self, tokens: &mut TokenStream) {
+    let Self { state_expr, used } = self;
+    let span = state_expr.origin_expr.span();
+
+    Token![let](span).to_tokens(tokens);
+    state_expr.name.to_tokens(tokens);
+    Token![=](span).to_tokens(tokens);
+    state_expr.origin_expr.to_tokens(tokens);
+    Token![.](span).to_tokens(tokens);
+    let method = match used {
+      DollarUsedInfo::Reader => Ident::new("clone_reader", span),
+      DollarUsedInfo::Watcher => Ident::new("clone_watcher", span),
+      DollarUsedInfo::Writer => Ident::new("clone_writer", span),
+      DollarUsedInfo::Clone => Ident::new("clone", span),
+    };
+    method.to_tokens(tokens);
+    syn::token::Paren(span).surround(tokens, |_| {});
+    Token![;](span).to_tokens(tokens);
+  }
 }
 
 impl DollarRef {
-  pub fn capture_state(&self, var_name: &Ident, tokens: &mut TokenStream) {
-    let state = self.real_state_tokens();
-    let clone_method = match self.used {
-      DollarUsedInfo::Reader => quote!(clone_reader),
-      DollarUsedInfo::Watcher => quote!(clone_watcher),
-      DollarUsedInfo::Writer => quote!(clone_writer),
-    };
-
-    // Use a single `quote!` macro to generate the tokens for better readability
-    let output = quote_spanned! { self.name.span() =>
-      let #var_name = #state.#clone_method();
-    };
-
-    output.to_tokens(tokens);
-  }
-
-  pub fn real_state_tokens(&self) -> TokenStream {
-    if let Some(BuiltinInfo { host, get_builtin: member, run_before_clone }) = &self.builtin {
-      quote! { #host #(.#run_before_clone())* .#member() }
-    } else {
-      self.name.to_token_stream()
-    }
-  }
+  fn is_var_state(&self) -> bool { matches!(self.state_expr.origin_expr, OriginExpr::Var(_)) }
 }
 
 impl DollarRefsCtx {
@@ -453,7 +411,7 @@ impl DollarRefsCtx {
   /// - **watch_scope**: A watch scope that should designate all readers as
   ///   watchers.
   pub fn pop_dollar_scope(&mut self, watch_scope: bool) -> DollarRefsScope {
-    let mut scope = self.scopes.pop().unwrap();
+    let mut scope = self.scopes.pop().expect("Unmatched scope");
     if scope.only_capture.is_none() {
       self.variable_stacks.pop();
     }
@@ -461,28 +419,29 @@ impl DollarRefsCtx {
     // To maintain the order, ensure that the builtin widget precedes its host.
     // Otherwise, the host might only clone a reader that cannot create a
     // builtin widget.
-    scope
-      .refs
-      .sort_by(|a, b| a.builtin.is_none().cmp(&b.builtin.is_none()));
+    scope.refs.sort_by_key(|r| r.is_var_state());
 
     if !self.scopes.is_empty() {
       for r in scope.refs.iter_mut() {
-        if self.is_capture_var(r.host()) {
+        if self.is_capture_var(&r.state_expr.origin_state) {
           let mut c_r = r.clone();
           if watch_scope && c_r.used == DollarUsedInfo::Reader {
             c_r.used = DollarUsedInfo::Watcher;
           }
           self.add_dollar_ref(c_r);
 
-          // If a built-in widget is captured by the parent scope and treated as a regular
-          // variable, the child scope does not need to capture it from the host variable.
-          r.builtin.take();
+          // If a expression state is captured by the parent scope and treated as a
+          // regular variable, the child scope does not need to capture it from
+          // the host variable.
+          r.state_expr.origin_expr = OriginExpr::Var(r.state_expr.name.clone());
         }
       }
     }
 
     if let Some(c) = scope.only_capture.as_ref() {
-      scope.refs.drain_filter(|r| r.host() != c);
+      scope
+        .refs
+        .drain_filter(|r| &r.state_expr.origin_state != c);
     }
     scope
   }
@@ -490,62 +449,6 @@ impl DollarRefsCtx {
   pub fn push_code_stack(&mut self) -> StackGuard<'_> {
     self.variable_stacks.push(vec![]);
     StackGuard(self)
-  }
-
-  pub fn builtin_host_tokens(&self, dollar_ref: &DollarRef) -> TokenStream {
-    let DollarRef { name, builtin, .. } = dollar_ref;
-    let BuiltinInfo { host, get_builtin: member, run_before_clone } = builtin.as_ref().unwrap();
-
-    // if used in embedded closure, we directly use the builtin variable, the
-    // variable that capture by the closure is already a separate builtin variable.
-    if !self.is_local_var(host) {
-      name.to_token_stream()
-    } else {
-      quote_spanned! { host.span() => #host #(.#run_before_clone())*.#member() }
-    }
-  }
-
-  pub fn builtin_dollar_ref(
-    &self, host: Ident, info: &BuiltinMember, used: DollarUsedInfo,
-  ) -> DollarRef {
-    // When a builtin widget captured by a `move |_| {...}` closure, we need split
-    // the builtin widget from the `FatObj` so we only capture the builtin part that
-    // we used.
-    let name = ribir_suffix_variable(&host, info.var_name);
-    let get_builtin = info.get_builtin_widget_method(host.span());
-    let run_before_clone = info
-      .run_before_clone_method(host.span())
-      .into_iter()
-      .collect();
-
-    let builtin = Some(BuiltinInfo { host, get_builtin, run_before_clone });
-    DollarRef { name, builtin, used }
-  }
-
-  fn replace_builtin_host(&mut self, caller: &mut Expr, info: &BuiltinMember) -> bool {
-    let mut used = DollarUsedInfo::Reader;
-    let e = match caller {
-      Expr::MethodCall(m) if is_state_write_method(&m.method) => {
-        used = DollarUsedInfo::Writer;
-        &mut *m.receiver
-      }
-      e => e,
-    };
-    let Expr::Macro(m) = e else { return false };
-
-    let Some(DollarMacro { name: host, .. }) = parse_dollar_macro(&m.mac) else { return false };
-    let dollar_ref = self.builtin_dollar_ref(host, info, used);
-
-    let state = self.builtin_host_tokens(&dollar_ref);
-    m.mac.tokens = if dollar_ref.used == DollarUsedInfo::Writer {
-      expand_write_method(state)
-    } else {
-      expand_read(state)
-    };
-    mark_macro_expanded(&mut m.mac);
-    self.add_dollar_ref(dollar_ref);
-
-    true
   }
 
   fn new_local_var(&mut self, name: &Ident) {
@@ -558,22 +461,16 @@ impl DollarRefsCtx {
 
   pub fn add_dollar_ref(&mut self, dollar_ref: DollarRef) {
     // local variable is not a outside reference.
-    if self.is_capture_var(dollar_ref.host()) {
+    if self.is_capture_var(&dollar_ref.state_expr.origin_state) {
       let scope = self.current_dollar_scope_mut();
       let r = scope
         .refs
         .iter_mut()
-        .find(|v| v.name == dollar_ref.name);
+        .find(|v| v.state_expr.origin_expr == dollar_ref.state_expr.origin_expr);
+
       if let Some(r) = r {
         if r.used.cmp(&dollar_ref.used) == Ordering::Less {
           r.used = dollar_ref.used
-        }
-        if let (Some(this), Some(other)) = (r.builtin.as_mut(), dollar_ref.builtin) {
-          for e in other.run_before_clone {
-            if this.run_before_clone.iter().any(|e2| &e != e2) {
-              this.run_before_clone.push(e);
-            }
-          }
         }
       } else {
         scope.refs.push(dollar_ref);
@@ -596,7 +493,7 @@ impl DollarRefsCtx {
     self.current_dollar_scope().only_capture.as_ref() == Some(name)
   }
 
-  fn is_capture_var(&self, name: &Ident) -> bool {
+  pub(crate) fn is_capture_var(&self, name: &Ident) -> bool {
     self.is_only_capture(name) || !self.is_local_var(name)
   }
 
@@ -609,74 +506,19 @@ impl DollarRefsCtx {
 }
 
 impl DollarRefsScope {
-  pub fn upstream_tokens(&self) -> TokenStream {
-    match self.len() {
-      0 => quote! {},
-      1 => {
-        let upstream = self.refs[0].upstream_tokens();
-        quote! { observable::of(ModifyInfo::default()).merge(#upstream) }
-      }
-      _ => {
-        let upstream = self.iter().map(DollarRef::upstream_tokens);
-        quote_spanned! { self.refs[0].name.span() =>
-          observable::of(ModifyInfo::default())
-            .merge(observable::from_iter([#(#upstream),*]).merge_all(usize::MAX))
-        }
-      }
-    }
-  }
+  pub(crate) fn is_state_empty(&self) -> bool { self.state_refs().next().is_none() }
 
-  pub fn keep_only_builtin_refs(&mut self) { self.refs.drain_filter(|r| r.builtin.is_none()); }
-}
-
-impl DollarRef {
-  pub fn host(&self) -> &Ident {
+  fn state_refs(&self) -> impl Iterator<Item = &DollarRef> {
     self
-      .builtin
-      .as_ref()
-      .map_or_else(|| &self.name, |b| &b.host)
-  }
-
-  pub fn upstream_tokens(&self) -> TokenStream {
-    let DollarRef { name, builtin, .. } = self;
-    if let Some(BuiltinInfo { host, get_builtin: member, .. }) = builtin {
-      quote_spanned! { name.span() => #host.#member().modifies() }
-    } else {
-      quote_spanned! { name.span() => #name.modifies() }
-    }
-  }
-}
-
-fn parse_dollar_macro(mac: &Macro) -> Option<DollarMacro> {
-  if mac.path.is_ident(KW_DOLLAR_STR) {
-    Some(mac.parse_body::<DollarMacro>().unwrap())
-  } else {
-    None
+      .refs
+      .iter()
+      .filter(|r| r.used != DollarUsedInfo::Clone)
   }
 }
 
 impl std::ops::Deref for DollarRefsScope {
   type Target = [DollarRef];
   fn deref(&self) -> &Self::Target { &self.refs }
-}
-
-struct DollarMacro {
-  _dollar: Dollar,
-  name: Ident,
-}
-
-impl Parse for DollarMacro {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
-    let _dollar = input.parse()?;
-    let name = if input.peek(syn::token::SelfValue) {
-      let name = input.parse::<syn::token::SelfValue>()?;
-      Ident::new("self", name.span())
-    } else {
-      input.parse::<Ident>()?
-    };
-
-    Ok(Self { _dollar, name })
-  }
 }
 
 impl<'a> std::ops::Deref for StackGuard<'a> {
@@ -695,9 +537,3 @@ impl<'a> Drop for StackGuard<'a> {
 impl Default for DollarRefsCtx {
   fn default() -> Self { Self { scopes: smallvec![<_>::default()], variable_stacks: vec![vec![]] } }
 }
-
-fn is_state_write_method(m: &Ident) -> bool { m == "write" || m == "silent" || m == "shallow" }
-
-fn expand_write_method(host: TokenStream) -> TokenStream { host }
-
-fn expand_read(name: TokenStream) -> TokenStream { quote_spanned!(name.span() => #name.read()) }

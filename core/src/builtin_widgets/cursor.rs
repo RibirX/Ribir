@@ -25,20 +25,20 @@ impl<'c> ComposeChild<'c> for Cursor {
             && e.mouse_buttons() == MouseButtons::empty()
           {
             let wnd = e.window();
-            let old_cursor = *$save_cursor;
+            let old_cursor = *$read(save_cursor);
             if old_cursor != Some(wnd.get_cursor()) {
-              *$save_cursor.write() = Some(wnd.get_cursor());
-              wnd.set_cursor($this.get_cursor());
+              *$write(save_cursor) = Some(wnd.get_cursor());
+              wnd.set_cursor($read(this).cursor);
             }
           }
         },
         on_pointer_leave: move |e: &mut PointerEvent| {
-          if let Some(cursor) = $save_cursor.write().take() {
+          if let Some(cursor) = $write(save_cursor).take() {
             e.window().set_cursor(cursor);
           }
         },
         on_disposed: move |e| {
-          if let Some(cursor) = $save_cursor.write().take() {
+          if let Some(cursor) = $write(save_cursor).take() {
             e.window().set_cursor(cursor);
           }
         },
@@ -46,10 +46,6 @@ impl<'c> ComposeChild<'c> for Cursor {
     }
     .into_widget()
   }
-}
-
-impl Cursor {
-  fn get_cursor(&self) -> CursorIcon { self.cursor }
 }
 
 #[cfg(test)]

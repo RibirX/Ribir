@@ -482,7 +482,7 @@ mod tests {
     // data + 1, info + 1
     let v = Stateful::new(1);
     // data +1
-    let _ = pipe!(*$v)
+    let _ = pipe!(*$read(v))
       .into_observable()
       .subscribe(|v| println!("{v}"));
 
@@ -499,7 +499,7 @@ mod tests {
     // data + 1, info + 1
     let v = Stateful::new(1);
     // data + 1
-    let _ = watch!(*$v).subscribe(|v| println!("{v}"));
+    let _ = watch!(*$read(v)).subscribe(|v| println!("{v}"));
 
     AppCtx::run_until_stalled();
     assert_eq!(v.data.ref_count(), 2);
@@ -520,7 +520,7 @@ mod tests {
     let notifier = v.info.notifier.0.clone();
     {
       let info = v.info.clone();
-      let u = watch!(*$v).subscribe(move |_| *v.write() = 2);
+      let u = watch!(*$read(v)).subscribe(move |_| *v.write() = 2);
       u.unsubscribe();
       AppCtx::run_until_stalled();
       assert_eq!(info.ref_count(), 1);

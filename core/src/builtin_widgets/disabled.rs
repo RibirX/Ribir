@@ -40,13 +40,13 @@ impl<'c> ComposeChild<'c> for Disabled {
     fn_widget! {
       let mut child = FatObj::new(child);
       @FocusScope {
-        skip_descendants: pipe!($this.disabled()),
-        skip_host: pipe!($this.disabled()),
+        skip_descendants: pipe!($read(this).disabled()),
+        skip_host: pipe!($read(this).disabled()),
         @IgnorePointer {
           ignore: pipe! {
-            if $this.disabled() { IgnoreScope::Subtree } else { IgnoreScope::None }
+            if $read(this).disabled() { IgnoreScope::Subtree } else { IgnoreScope::None }
           },
-          @(child) { class: pipe!($this.disabled().then_some(DISABLED)) }
+          @(child) { class: pipe!($read(this).disabled().then_some(DISABLED)) }
         }
       }
     }

@@ -354,7 +354,7 @@ mod tests {
     let w = fn_widget! {
       @MockBox {
         size: expect_size,
-        @MockBox { size: pipe!(*$no_boundary_size) }
+        @MockBox { size: pipe!(*$read(no_boundary_size)) }
       }
     };
     let wnd = TestWindow::new_with_size(w, Size::new(200., 200.));
@@ -390,11 +390,11 @@ mod tests {
     let c_c = child.clone_writer();
     let w = fn_widget! {
       @ {
-        pipe!(*$parent).map(move |p| fn_widget!{
+        pipe!(*$read(parent)).map(move |p| fn_widget!{
           if p {
             @MockBox {
               size: Size::zero(),
-              @ { pipe!($child.then(|| fn_widget!{ @Void {}})) }
+              @ { pipe!($read(child).then(|| fn_widget!{ @Void {}})) }
             }.into_widget()
           } else {
             Void.into_widget()
@@ -421,7 +421,7 @@ mod tests {
 
     let trigger = Stateful::new(true);
     let c_trigger = trigger.clone_writer();
-    let w = fn_widget! { pipe!($trigger; fn_widget!{ @Void {}}) };
+    let w = fn_widget! { pipe!($read(trigger); fn_widget!{ @Void {}}) };
 
     let wnd = TestWindow::from_widget(w);
     wnd.draw_frame();
@@ -482,7 +482,7 @@ mod tests {
     let widget = fn_widget! {
       @MockMulti {
         @pipe!{
-          let size = if *$trigger > 0 {
+          let size = if *$read(trigger) > 0 {
             Size::new(1., 1.)
           } else {
             Size::zero()
@@ -563,7 +563,7 @@ mod tests {
     let (layout_cnt, w_layout_cnt) = split_value(0);
 
     let wnd = TestWindow::from_widget(fat_obj! {
-      on_performed_layout: move |_| *$w_layout_cnt.write() += 1,
+      on_performed_layout: move |_| *$write(w_layout_cnt) += 1,
       @ { paint_cnt.clone_writer() }
     });
 

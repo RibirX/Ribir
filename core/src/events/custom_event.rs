@@ -88,7 +88,7 @@ mod tests {
         size: Size::new(100., 100.),
         on_custom_event: move |e: &mut RawCustomEvent| {
           if let Some(e) = e.downcast_mut() {
-            *$w_parent_data.write() = Some(*e.data());
+            *$write(w_parent_data) = Some(*e.data());
           }
         },
         @MockBox {
@@ -97,7 +97,7 @@ mod tests {
             e.window().bubble_custom_event(e.widget_id(), MyCustomData(1));
           },
           on_custom_concrete_event: move |e: &mut MyCustomEvent| {
-            *$w_self_data.write() = Some(*e.data());
+            *$write(w_self_data) = Some(*e.data());
           }
         }
       }

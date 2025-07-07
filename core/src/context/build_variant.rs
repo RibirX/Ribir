@@ -110,8 +110,8 @@ impl<V: 'static> Variant<V> {
     self, w: impl StateWatcher<Value = W>, f: impl Fn(&V, &W) -> U + 'static,
   ) -> Pipe<U> {
     match self {
-      Variant::Watcher(v) => pipe!(f(&$v, &$w)),
-      Variant::Value(v) => pipe!(f(&v, &$w)),
+      Variant::Watcher(v) => pipe!(f(&$read(v), &$read(w))),
+      Variant::Value(v) => pipe!(f(&v, &$read(w))),
     }
   }
 }
@@ -187,7 +187,7 @@ where
     match value {
       Variant::Watcher(value) => {
         let init = value.read().clone().r_into();
-        pipe!(U::r_from($value.clone())).with_init_value(init)
+        pipe!(U::r_from($read(value).clone())).with_init_value(init)
       }
       Variant::Value(value) => value.r_into(),
     }
@@ -203,7 +203,7 @@ where
     match value.variant {
       Variant::Watcher(s) => {
         let init = (value.map)(&s.read()).r_into();
-        pipe!(P::r_from((value.map)(&$s)))
+        pipe!(P::r_from((value.map)(&$read(s))))
           .with_init_value(init)
           .r_into()
       }
@@ -227,7 +227,7 @@ where
 {
   fn r_from(value: Variant<V>) -> Self {
     match value {
-      Variant::Watcher(w) => pipe!($w.clone().r_into()).into_widget(),
+      Variant::Watcher(w) => pipe!($read(w).clone().r_into()).into_widget(),
       Variant::Value(v) => v.r_into(),
     }
   }
@@ -241,7 +241,7 @@ where
   fn r_from(value: VariantMap<V, F>) -> Self {
     let VariantMap { variant, map } = value;
     match variant {
-      Variant::Watcher(w) => pipe!(map(&$w)).build_single(),
+      Variant::Watcher(w) => pipe!(map(&$read(w))).build_single(),
       Variant::Value(v) => map(&v).r_into(),
     }
   }

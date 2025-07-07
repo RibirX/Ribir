@@ -23,20 +23,20 @@ mod tests {
       @MockBox {
         size: Size::zero(),
         @ {
-          pipe!(*$is_empty).map(move |v| {
+          pipe!(*$read(is_empty)).map(move |v| {
             (!v).then(move || fn_widget!{
               @MockBox {
                 size: Size::zero(),
-                on_mounted: move |_| $lifecycle.write().push("static mounted"),
-                on_performed_layout: move |_| $lifecycle.write().push("static performed layout"),
-                on_disposed: move |_| $lifecycle.write().push("static disposed"),
+                on_mounted: move |_| $write(lifecycle).push("static mounted"),
+                on_performed_layout: move |_| $write(lifecycle).push("static performed layout"),
+                on_disposed: move |_| $write(lifecycle).push("static disposed"),
                 @ {
-                  pipe!(*$trigger).map(move |_| fn_widget!{
+                  pipe!(*$read(trigger)).map(move |_| fn_widget!{
                     @MockBox {
                       size: Size::zero(),
-                      on_mounted: move |_| $lifecycle.write().push("dyn mounted"),
-                      on_performed_layout: move |_| $lifecycle.write().push("dyn performed layout"),
-                      on_disposed: move |_| $lifecycle.write().push("dyn disposed")
+                      on_mounted: move |_| $write(lifecycle).push("dyn mounted"),
+                      on_performed_layout: move |_| $write(lifecycle).push("dyn performed layout"),
+                      on_disposed: move |_| $write(lifecycle).push("dyn disposed")
                     }
                   })
                 }
@@ -109,12 +109,12 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          pipe!(*$cnt).map(move |cnt| {
+          pipe!(*$read(cnt)).map(move |cnt| {
             (0..cnt).map(move |_| {
               @MockBox {
                 size: Size::zero(),
-                on_mounted: move |e| { $mounted.write().insert(e.id); },
-                on_disposed: move |e| { $disposed.write().insert(e.id); },
+                on_mounted: move |e| { $write(mounted).insert(e.id); },
+                on_disposed: move |e| { $write(disposed).insert(e.id); },
               }
             })
           })

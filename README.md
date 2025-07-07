@@ -50,8 +50,8 @@ fn main() {
       button! {
         h_align: HAlign::Center,
         v_align: VAlign::Center,
-        on_tap: move |_| *$cnt.write() += 1,
-        @pipe!($cnt.to_string())
+        on_tap: move |_| *$write(cnt) += 1,
+        @pipe!($read(cnt).to_string())
       }
     }
   );
@@ -79,7 +79,7 @@ fn main() {
         .on_tap(move |_| *c_cnt.write() += 1)
         .with_h_align(HAlign::Center)
         .with_v_align(VAlign::Center);
-      btn.finish().with_child(pipe!($cnt.to_string()))
+      btn.finish().with_child(pipe!($read(cnt).to_string()))
     });
 }
 ```

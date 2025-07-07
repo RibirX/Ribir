@@ -5,11 +5,11 @@ fn main() {
     move |cnt: &'static Stateful<i32>| {
       row! {
         @Button {
-          on_tap: move |_| *$cnt.write() += 1,
-        @ { "Increment" }
+          on_tap: move |_| *$write(cnt) += 1,
+          @ { "Increment" }
         }
         @ {
-          pipe!(*$cnt).map(move |cnt| {
+          pipe!(*$read(cnt)).map(move |cnt| {
             (0..cnt).map(move |_| {
               @Container {
                 margin: EdgeInsets::all(2.),

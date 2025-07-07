@@ -262,7 +262,7 @@ impl MenuControl {
     let handle = self.clone();
     let fn_gen = GenWidget::from_fn_widget(fn_widget! {
       let mut w = FatObj::new(gen.clone());
-      handle.0.borrow_mut().id = Some($w.track_id());
+      handle.0.borrow_mut().id = Some(w.track_id());
       @Providers {
         providers: smallvec![Provider::new(handle.clone())],
         @(w) {
@@ -431,7 +431,7 @@ impl<'w> MenuItem<'w> {
 
       let class = Stateful::new(MENU_ITEM);
       @Row{
-        class: pipe!(*$class),
+        class: pipe!(*$read(class)),
         align_items: Align::Center,
         on_disposed: {
           let sub_menu = sub_menu.clone();
@@ -448,9 +448,9 @@ impl<'w> MenuItem<'w> {
           match e.data() {
             MenuEventData::Select{ selected, .. } => {
               if *selected {
-                *$class.write() = MENU_ITEM_SELECTED;
+                *$write(class) = MENU_ITEM_SELECTED;
               } else {
-                *$class.write() = MENU_ITEM;
+                *$write(class) = MENU_ITEM;
                 if let Some(menu) = sub_menu.as_ref() {
                   if menu.is_show() {
                     menu.close(&wnd);
@@ -517,7 +517,7 @@ fn wrap_menu_item<'w>(w: Widget<'w>, key: CowArc<str>, menu: &MenuControl) -> Wi
   let menu = menu.clone();
   fn_widget! {
     let mut w = FatObj::new(w);
-    let idx = menu.new_item($w.track_id(), key);
+    let idx = menu.new_item(w.track_id(), key);
     @(w) {
       on_pointer_move: {
         let menu = menu.clone();
@@ -638,11 +638,11 @@ mod tests {
     let menu = MenuControl::new(menu! {
       on_custom_concrete_event: move|e: &mut MenuEvent| {
         if let MenuEventData::Enter{idx, ..} = e.data() {
-          if *idx == 1 { *$w.write() = true; }
+          if *idx == 1 { *$write(w) = true; }
         }
       },
       @MenuItem { @ { "Item 1" } }
-        @MenuItem { @ { "Item 2" } }
+      @MenuItem { @ { "Item 2" } }
     });
 
     let wnd: TestWindow = TestWindow::from_widget(fn_widget! { @Void {} });
@@ -682,7 +682,7 @@ mod tests {
         on_custom_concrete_event: move |e: &mut MenuEvent| {
           if let MenuEventData::Complete{data: Some(data), ..} = e.data() {
             if let Ok(s) = data.clone().downcast::<String>() {
-              *$w.write() = s.to_string();
+              *$write(w) = s.to_string();
             }
           }
         },

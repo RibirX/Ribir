@@ -53,8 +53,8 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
       background: {
         let container_color = Variant::<ContainerColor>::new(BuildCtx::get()).unwrap();
         let brush: PipeValue<Brush> = match container_color {
-          Variant::Value(c) => pipe!(track_color(c.0, $w.is_hovered())).r_into(),
-          Variant::Watcher(c) => pipe!(track_color($c.0, $w.is_hovered())).r_into()
+          Variant::Value(c) => pipe!(track_color(c.0, *$read(w.is_hovered()))).r_into(),
+          Variant::Watcher(c) => pipe!(track_color($read(c).0, *$read(w.is_hovered()))).r_into()
         };
         brush
       }
@@ -65,21 +65,21 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
       duration: md::easing::duration::MEDIUM2
     };
     // Smoothly fade in and out the scrollbar.
-    part_writer!(&mut w.opacity).transition(trans.clone());
+    w.opacity().transition(trans.clone());
     // Smoothly display the background.
-    part_writer!(&mut w.background).transition(trans);
+    w.background().transition(trans);
 
     // Show the scrollbar when scrolling.
     let mut fade: Option<SubscriptionGuard<_>> = None;
     let auto_hide = move |_| {
-      $w.write().opacity = 1.;
-      $w.write().visible = true;
+      *$write(w.opacity()) = 1.;
+      *$write(w.visible()) = true;
       fade.take();
       let u = observable::timer((), Duration::from_secs(3), AppCtx::scheduler())
-        .filter(move |_| !$w.is_hovered())
+        .filter(move |_| !*$read(w.is_hovered()))
         .subscribe(move |_| {
-          $w.write().opacity = 0.;
-          $w.write().visible = false;
+          *$write(w.opacity()) = 0.;
+          *$write(w.visible()) = false;
         }).unsubscribe_when_dropped();
       fade = Some(u);
     };
@@ -88,11 +88,11 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
       .unwrap()
       .clone_writer();
     let u = if is_hor {
-      watch!(($scroll).get_scroll_pos().x)
+      watch!($read(scroll).get_scroll_pos().x)
         .distinct_until_changed()
         .subscribe(auto_hide)
     } else {
-      watch!(($scroll).get_scroll_pos().y)
+      watch!($read(scroll).get_scroll_pos().y)
         .distinct_until_changed()
         .subscribe(auto_hide)
     };

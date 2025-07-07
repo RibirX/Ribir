@@ -117,7 +117,7 @@ macro_rules! define_text_with_theme_style {
       fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
         fn_widget! {
           @Text {
-            text: pipe!($this.text.clone()),
+            text: pipe!($read(this).text.clone()),
             text_style: TypographyTheme::of(BuildCtx::get()).$style.text.clone(),
           }
         }

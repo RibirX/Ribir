@@ -42,30 +42,6 @@ pub(crate) struct FocusManager {
   wnd_id: WindowId,
 }
 
-pub struct FocusHandle {
-  wid: TrackId,
-  wnd_id: WindowId,
-}
-
-impl FocusHandle {
-  pub(crate) fn request_focus(&self, reason: FocusReason) {
-    if let Some(wnd) = AppCtx::get_window(self.wnd_id) {
-      if let Some(wid) = self.wid.get() {
-        wnd.focus_mgr.borrow_mut().focus(wid, reason);
-      }
-    }
-  }
-
-  pub(crate) fn unfocus(&self, reason: FocusReason) {
-    if let Some(wnd) = AppCtx::get_window(self.wnd_id) {
-      let mut focus_mgr = wnd.focus_mgr.borrow_mut();
-      if focus_mgr.focusing == self.wid.get() {
-        focus_mgr.blur(reason);
-      }
-    }
-  }
-}
-
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub(crate) enum FocusType {
   Scope,
@@ -157,11 +133,6 @@ impl FocusManager {
       self.frame_auto_focus.push(wid);
     }
   }
-
-  pub(crate) fn focus_handle(&self, wid: TrackId) -> FocusHandle {
-    FocusHandle { wid, wnd_id: self.window().id() }
-  }
-
   pub(crate) fn remove_focus_node(&mut self, wid: WidgetId, focus_type: FocusType) {
     let Some(id) = self.node_ids.get(&wid).cloned() else {
       return;
@@ -717,30 +688,30 @@ mod tests {
           @MockBox {
             size: INFINITY_SIZE,
             on_focus: move |_| {
-              $this.log.borrow_mut().push("focus parent");
+              $read(this).log.borrow_mut().push("focus parent");
             },
             on_blur: move |_| {
-              $this.log.borrow_mut().push("blur parent");
+              $read(this).log.borrow_mut().push("blur parent");
             },
             on_focus_in: move |_| {
-              $this.log.borrow_mut().push("focusin parent");
+              $read(this).log.borrow_mut().push("focusin parent");
             },
             on_focus_out: move |_| {
-              $this.log.borrow_mut().push("focusout parent");
+              $read(this).log.borrow_mut().push("focusout parent");
             },
             @MockBox {
               size: Size::zero(),
               on_focus: move |_| {
-                $this.log.borrow_mut().push("focus child");
+                $read(this).log.borrow_mut().push("focus child");
               },
               on_blur: move |_| {
-                $this.log.borrow_mut().push("blur child");
+                $read(this).log.borrow_mut().push("blur child");
               },
               on_focus_in: move |_| {
-                $this.log.borrow_mut().push("focusin child");
+                $read(this).log.borrow_mut().push("focusin child");
               },
               on_focus_out: move |_| {
-                $this.log.borrow_mut().push("focusout child");
+                $read(this).log.borrow_mut().push("focusout child");
               },
             }
           }
@@ -795,7 +766,7 @@ mod tests {
     let w = fn_widget! {
       @MockMulti{
         @ { pipe! {
-          $visible.map(|_| fn_widget! {
+          $read(visible).map(|_| fn_widget! {
             @MockBox {
               size: Size::default(),
               on_tap: move |_| {},
@@ -866,10 +837,10 @@ mod tests {
       @MockBox{
         size: Size::new(20., 20.),
         @ {
-          pipe!(*$focused).map(move |v| v.then(move || fn_widget!{
+          pipe!(*$read(focused)).map(move |v| v.then(move || fn_widget!{
             @MockBox {
             auto_focus: true,
-            on_chars: move |e| $input_writer.write().push_str(&e.chars),
+            on_chars: move |e| $write(input_writer).push_str(&e.chars),
             size: Size::new(10., 10.),
             }
           }))
@@ -904,10 +875,10 @@ mod tests {
       @MockMulti{
         @ {
           (0..4).map(move |i| {
-            pipe! (*$active_idx).map(move |idx| fn_widget!{
+            pipe! (*$read(active_idx)).map(move |idx| fn_widget!{
               @MockBox {
                 auto_focus: i == idx,
-                on_chars: move |e| if idx == 2 { $input_writer.write().push_str(&e.chars) },
+                on_chars: move |e| if idx == 2 { $write(input_writer).push_str(&e.chars) },
                 size: Size::new(10., 10.),
               }
             })
@@ -970,8 +941,8 @@ mod tests {
         auto_focus: true,
         size: Size::splat(100.)
       };
-      let u = watch!($w.focus_changed_reason())
-        .subscribe(move |v| *$w_reason.write() = v);
+      let u = watch!(*$read(w.focus_changed_reason()))
+        .subscribe(move |v| *$write(w_reason) = v);
       @(w) {
         on_disposed: move |_| u.unsubscribe()
       }
@@ -992,5 +963,32 @@ mod tests {
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.draw_frame();
     assert_eq!(*reason.read(), FocusReason::Pointer);
+  }
+
+  #[test]
+  fn dynamic_focus_node() {
+    reset_test_env!();
+
+    let widget = fn_widget! {
+      let mut m = @MockBox {
+        tab_index: 0i16,
+        size: Size::default(),
+      };
+      let mut m = @(m) { tab_index: 0i16, };
+      @(m) { tab_index: 0i16 }
+    };
+
+    let wnd = TestWindow::from_widget(widget);
+    let tree = wnd.tree();
+    let id = tree.content_root();
+
+    let mut cnt = 0;
+    id.query_all_iter::<MixBuiltin>(tree)
+      .for_each(|b| {
+        if b.contain_flag(MixFlags::Focus) {
+          cnt += 1;
+        }
+      });
+    assert_eq!(cnt, 1);
   }
 }

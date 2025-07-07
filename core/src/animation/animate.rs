@@ -227,7 +227,7 @@ mod tests {
 
       animate.run();
 
-      @Void { on_performed_layout: move |_| *$state.write() = 1 }
+      @Void { on_performed_layout: move |_| *$write(state) = 1 }
     };
 
     let wnd = TestWindow::from_widget(w);

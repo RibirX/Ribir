@@ -10,7 +10,7 @@ impl Compose for AB {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       @SizedBox {
-        size: match *$this {
+        size: match *$read(this) {
           AB::A => ZERO_SIZE,
           AB::B => SIZE_ONE
         }
@@ -39,7 +39,7 @@ impl Compose for TupleBox {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       @SizedBox {
-        size: pipe!($this.0),
+        size: pipe!($read(this).0),
       }
     }
     .into_widget()

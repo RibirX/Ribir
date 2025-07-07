@@ -78,7 +78,7 @@ use ribir::prelude::*;
 fn_widget!{
   let show_hi = Stateful::new(true);
   @Text {
-    visible: pipe!(*$show_hi),
+    visible: pipe!(*$read(show_hi)),
     text: "Hello world!"
   }
 };

@@ -36,7 +36,7 @@ pub struct TrackId(Stateful<Option<WidgetId>>);
 impl TrackId {
   pub fn get(&self) -> Option<WidgetId> { *self.0.read() }
 
-  pub fn watcher(&self) -> impl StateWatcher<Value = Option<WidgetId>> { self.0.clone_watcher() }
+  pub fn clone_watcher(&self) -> Watcher<Reader<Option<WidgetId>>> { self.0.clone_watcher() }
 
   pub(crate) fn set(&self, id: Option<WidgetId>) { *self.0.write() = id; }
 }

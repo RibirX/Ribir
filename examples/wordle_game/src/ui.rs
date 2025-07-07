@@ -22,7 +22,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
     let warning = palette.warning();
     let error = palette.error();
     let (color, u) = Stateful::from_pipe(pipe! {
-      $this.key_hint(key).map_or(
+      $read(this).key_hint(key).map_or(
         base,
         |s| match s {
           CharHint::Correct => success,
@@ -33,7 +33,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
 
     filled_button! {
       providers: [Provider::value_of_writer(color, None)],
-      on_tap: move |_| $this.write().guessing.enter_char(key),
+      on_tap: move |_| $write(this).guessing.enter_char(key),
       on_disposed:  move |_| u.unsubscribe(),
       @ { key.to_string() }
     }
@@ -67,14 +67,14 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
         justify_content: JustifyContent::Center,
         @FilledButton {
           providers: [Provider::new(gray)],
-          on_tap: move |_| $this.write().guessing.delete_back_char(),
+          on_tap: move |_| $write(this).guessing.delete_back_char(),
           @ { "Del" }
         }
         @ { self.chars_key(['Z', 'X', 'C', 'V', 'B', 'N', 'M' ]) }
 
         @FilledButton {
           providers: [Provider::new(gray)],
-          on_tap: move |_| match $this.write().guess() {
+          on_tap: move |_| match $write(this).guess() {
             Ok(status) => state_bar.write().text = status.state_message().into(),
             Err(e) => state_bar.write().text = e.message().into(),
           },
@@ -94,14 +94,14 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
         align_items: Align::Center,
         justify_content: JustifyContent::Center,
         @ {
-          (0..$this.max_rounds()).map(move |row| {
+          (0..$read(this).max_rounds()).map(move |row| {
             @Flex {
               item_gap: 5.,
               align_items: Align::Center,
               justify_content: JustifyContent::Center,
               @pipe! {
-                (0..$this.len_hint())
-                  .map(move |col| fn_widget! { $this.char_grid(row, col) })
+                (0..$read(this).len_hint())
+                  .map(move |col| fn_widget! { $read(this).char_grid(row, col) })
               }
             }
           })
@@ -174,15 +174,15 @@ impl Compose for Wordle {
 
       let give_up = @Button {
         on_tap: move |_| {
-          let status = $this.write().give_up();
-          $state_bar.write().text = status.state_message().into();
+          let status = $write(this).give_up();
+          $write(state_bar).text = status.state_message().into();
         },
         @ { "Give up" }
       };
       let new_game = @FilledButton {
         on_tap: move |_| {
-          $this.write().reset();
-          $state_bar.write().text = "".into();
+          $write(this).reset();
+          $write(state_bar).text = "".into();
         },
         @ { "New game" }
       };
@@ -191,15 +191,15 @@ impl Compose for Wordle {
         size: Size::new(f32::INFINITY, f32::INFINITY),
         auto_focus: true,
         on_chars: move |e| {
-          e.chars.chars().for_each(|c| $this.write().guessing.enter_char(c))
+          e.chars.chars().for_each(|c| $write(this).guessing.enter_char(c))
         },
         on_key_down: move |e| {
           match e.key() {
-            VirtualKey::Named(NamedKey::Backspace) => $this.write().guessing.delete_back_char(),
+            VirtualKey::Named(NamedKey::Backspace) => $write(this).guessing.delete_back_char(),
             VirtualKey::Named(NamedKey::Enter) => {
-              match $this.write().guess() {
-                Ok(status) => $state_bar.write().text = status.state_message().into(),
-                Err(e) => $state_bar.write().text = e.message().into(),
+              match $write(this).guess() {
+                Ok(status) => $write(state_bar).text = status.state_message().into(),
+                Err(e) => $write(state_bar).text = e.message().into(),
               }
             },
             _ => {}

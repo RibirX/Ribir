@@ -4,6 +4,7 @@
 extern crate proc_macro;
 
 mod declare_derive;
+mod dollar_macro;
 mod lerp_derive;
 mod part_state;
 mod util;

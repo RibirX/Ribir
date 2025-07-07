@@ -46,7 +46,7 @@ pub(super) fn init(classes: &mut Classes) {
       };
 
       let scale_in = @Animate {
-        state: part_writer!(&mut bullet.clamp),
+        state: bullet.clamp(),
         transition: EasingTransition {
           duration: md::easing::duration::SHORT3,
           easing: md::easing::EMPHASIZED_DECELERATE,
