@@ -10,10 +10,8 @@ use syn::{
 };
 
 use crate::{
-  error::Error,
   rdl_macro::{DeclareField, RdlParent, StructLiteral},
   symbol_process::{DollarRefsCtx, DollarRefsScope},
-  variable_names::BUILTIN_INFOS,
 };
 
 pub struct DeclareObj {
@@ -129,26 +127,6 @@ impl ToTokens for DeclareObj {
 }
 
 impl DeclareObj {
-  pub fn error_check(&self) -> Result<(), Error> {
-    if matches!(self.this.node_type, ObjType::Expr { .. }) {
-      let invalid_fields = self
-        .this
-        .fields
-        .iter()
-        .filter(|f| !BUILTIN_INFOS.contains_key(f.member.to_string().as_str()))
-        .collect::<Vec<_>>();
-      if !invalid_fields.is_empty() {
-        let spans = invalid_fields
-          .iter()
-          .map(|f| f.member.span())
-          .collect();
-        return Err(Error::InvalidFieldInVar(spans));
-      }
-    }
-
-    Ok(())
-  }
-
   fn is_one_line_node(&self) -> bool {
     let this = &self.this;
     match &this.node_type {

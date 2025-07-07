@@ -2,7 +2,6 @@ use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote_spanned};
 
 pub enum Error {
-  InvalidFieldInVar(Box<[Span]>),
   WatchNothing(Span),
   RdlAtSyntax { at: Span, follow: Option<Span> },
   DollarSyntax(Span),
@@ -12,22 +11,11 @@ pub enum Error {
 impl Error {
   pub fn to_compile_error(&self) -> TokenStream {
     match self {
-      Error::InvalidFieldInVar(fields) => Self::invalid_field_in_var_error(fields),
       Error::WatchNothing(span) => Self::watch_nothing_error(*span),
       &Error::RdlAtSyntax { at, follow } => Self::rdl_at_syntax_error(at, follow),
       &Error::DollarSyntax(span) => Self::dollar_syntax_error(span),
       Error::Syn(err) => err.to_compile_error(),
     }
-  }
-
-  fn invalid_field_in_var_error(fields: &[Span]) -> TokenStream {
-    let mut tokens = TokenStream::new();
-    let error_msg = "Only built-in fields are allowed in variable parent declarations.";
-
-    for span in fields {
-      quote_spanned! { *span => compile_error!(#error_msg); }.to_tokens(&mut tokens);
-    }
-    tokens
   }
 
   fn watch_nothing_error(span: Span) -> TokenStream {
