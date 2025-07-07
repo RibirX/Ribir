@@ -51,7 +51,7 @@ pub struct SpinnerProgress {
 
 impl Compose for LinearProgress {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
-    distinct_pipe!($this.value.is_some())
+    distinct_pipe!($read(this).value.is_some())
       .map(move |determinate| {
         if determinate { Self::determinate(this.clone_watcher()) } else { Self::indeterminate() }
       })
@@ -65,14 +65,14 @@ impl LinearProgress {
       align_items: Align::Center,
       class: LINEAR_PROGRESS,
       @Expanded {
-        flex: distinct_pipe! { $this.value.unwrap_or(1.) },
+        flex: distinct_pipe! { $read(this).value.unwrap_or(1.) },
         @Container {
           size: Size::new(0., 6.),
           class: LINEAR_DETERMINATE_INDICATOR,
         }
       }
       @Expanded {
-        flex: distinct_pipe! {$this.value.map_or(0., |v| 1. - v) },
+        flex: distinct_pipe! {$read(this).value.map_or(0., |v| 1. - v) },
         @Container {
           size: Size::new(0., 6.),
           class: LINEAR_DETERMINATE_TRACK,
@@ -96,7 +96,7 @@ impl Compose for SpinnerProgress {
     fn_widget! {
       let mut spinner = @SpinnerArc {
         start: Angle::zero(),
-        end: distinct_pipe! { Angle::two_pi() * $this.value.unwrap_or(0.) },
+        end: distinct_pipe! { Angle::two_pi() * $read(this).value.unwrap_or(0.) },
       };
       // It is essential to ensure that the spinner is accessible by the class,
       // as the class may need to perform animations on the spinner.
@@ -104,7 +104,7 @@ impl Compose for SpinnerProgress {
         providers: [Provider::new(spinner.clone_writer().into_stateful())],
         @(spinner) {
           class: distinct_pipe! {
-            if $this.value.is_some() {
+            if $read(this).value.is_some() {
               SPINNER_DETERMINATE
             } else {
               SPINNER_INDETERMINATE

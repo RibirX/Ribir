@@ -45,12 +45,12 @@ pub(super) fn init(classes: &mut Classes) {
     rdl! {
       let mut item = @LayoutBox {};
       let margin = distinct_pipe! {
-        if $item.layout_height() >= 80. { md::EDGES_VER_12 } else { md::EDGES_VER_8 }
+        if *$read(item.layout_height()) >= 80. { md::EDGES_VER_12 } else { md::EDGES_VER_8 }
       };
       // The `List` widget uses the `ListItemAlignItems` provider to control the
       // alignment of its child items.
       let (align_provider, u) = Stateful::from_pipe(distinct_pipe! {
-        let align = if $item.layout_height() >= 80. { Align::Start } else { Align::Center };
+        let align = if *$read(item.layout_height()) >= 80. { Align::Start } else { Align::Center };
         ListItemAlignItems(align)
       });
       @(item) {

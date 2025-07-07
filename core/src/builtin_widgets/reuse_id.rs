@@ -46,11 +46,11 @@ pub enum CachePolicy {
 ///   @LocalWidgets {
 ///     @Column {
 ///       @FilledButton {
-///         on_tap: move |_| *$cnt.write() += 1,
+///         on_tap: move |_| *$write(cnt) += 1,
 ///         @ { "Increment" }
 ///       }
 ///       @ {
-///         pipe!(*$cnt).map(move |cnt| {
+///         pipe!(*$read(cnt)).map(move |cnt| {
 ///           (0..cnt).map(move |i| @FatObj {
 ///             reuse_id: LocalId::number(i),
 ///             @text! {
@@ -206,7 +206,7 @@ impl Compose for Reuse {
           let p = Provider::state_of
             ::<Box<dyn StateWriter<Value = LocalWidgets>>>(BuildCtx::get())
             .unwrap();
-          let w = $p.get(&key).expect("{this.reuse_id:?} is not find");
+          let w = $read(p).get(&key).expect("{this.reuse_id:?} is not find");
           if policy == CachePolicy::ImmediateRelease {
             wrap_dispose_recycled(&key, &*p, w)
           } else {

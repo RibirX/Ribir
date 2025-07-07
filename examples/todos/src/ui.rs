@@ -12,7 +12,7 @@ impl Compose for Todos {
         item_gap: 12.,
         @H1 { text: "Todo" }
         @input(None, move |text| {
-          $this.write().new_task(text.to_string());
+          $write(this).new_task(text.to_string());
         })
         @Expanded {
           @Tabs {
@@ -53,45 +53,43 @@ fn task_lists(
         e.window().once_next_frame(move || c_stagger.run());
       },
       @ {
-        pipe!($this;)
+        pipe!($read(this);)
           .map(move |_| fn_widget!{
-          let _hint_capture_this = || $this.write();
           let mut items = vec![];
-          for id in $this.all_tasks() {
-            if $this.get_task(id).map_or(false, cond) {
-              let task = this.part_writer(
+          for id in $read(this).all_tasks() {
+            if $read(this).get_task(id).map_or(false, cond) {
+              let task = $writer(this).part_writer(
                 format!("task {id:?}").into(),
                 // task will always exist, if the task is removed,
                 // sthe widgets list will be rebuild.
                 move |todos| PartMut::new(todos.get_task_mut(id).unwrap()),
               );
-              let item = distinct_pipe!(*$editing == Some(id))
+              let item = distinct_pipe!(*$read(editing) == Some(id))
                 .map(move |b| fn_widget!{
                   if b {
                     @Container {
                       size: Size::new(f32::INFINITY, 64.),
                       @{
-                        let input = input(Some($task.label.clone()), move |text|{
-                          $task.write().label = text.to_string();
-                          *$editing.write() = None;
+                        let input = input(Some($read(task).label.clone()), move |text|{
+                          $write(task).label = text.to_string();
+                          *$write(editing) = None;
                         });
                         let mut input = FatObj::new(input);
                         @(input) {
                           v_align: VAlign::Center,
                           on_key_down: move |e| {
                             if e.key_code() == &PhysicalKey::Code(KeyCode::Escape) {
-                              *$editing.write() = None;
+                              *$write(editing) = None;
                             }
                           }
                         }
                       }
                     }.into_widget()
                   } else {
-                    let _hint = || $stagger.write();
-                    let item = task_item_widget(task.clone_writer(), stagger.clone_writer());
+                    let item = task_item_widget($writer(task), $writer(stagger));
                     let mut item = FatObj::new(item);
                     @(item) {
-                      on_double_tap: move |_| *$editing.write() = Some(id)
+                      on_double_tap: move |_| *$write(editing) = Some(id)
                     }.into_widget()
                   }
                 });
@@ -116,23 +114,23 @@ fn input(
   text: Option<String>, mut on_submit: impl FnMut(CowArc<str>) + 'static,
 ) -> Widget<'static> {
   fn_widget! {
-    let input = @Input { auto_focus: true };
+    let mut input = @Input { auto_focus: true };
     if let Some(text) = text {
-      $input.write().set_text(&text);
+      $write(input).set_text(&text);
     }
     @ Stack {
       padding: EdgeInsets::horizontal(24.),
       @Text {
         h_align: HAlign::Stretch,
-        visible: pipe!($input.text().is_empty()),
+        visible: pipe!($read(input).text().is_empty()),
         text: "What do you want to do ?"
       }
       @(input) {
         h_align: HAlign::Stretch,
         on_key_down: move |e| {
           if e.key_code() == &PhysicalKey::Code(KeyCode::Enter) {
-            on_submit($input.text().clone());
-            $input.write().set_text("");
+            on_submit($read(input).text().clone());
+            $write(input).set_text("");
           }
         },
       }
@@ -146,17 +144,17 @@ where
   S: StateWriter<Value = Task> + 'static,
 {
   fn_widget! {
-    let id = $task.id();
+    let id = $read(task).id();
     let item = @ListItemChildren {
       @ {
-        let mut checkbox = @Checkbox { checked: pipe!($task.complete) };
-        let u = watch!($checkbox.checked)
+        let mut checkbox = @Checkbox { checked: pipe!($read(task).complete) };
+        let u = watch!($read(checkbox).checked)
           .distinct_until_changed()
-          .subscribe(move |v| $task.write().complete = v);
+          .subscribe(move |v| $write(task).complete = v);
         checkbox.on_disposed(move |_| u.unsubscribe());
         checkbox
       }
-      @ListItemHeadline { @ { $task.label.clone() } }
+      @ListItemHeadline { @ { $read(task).label.clone() } }
       @Trailing {
         @Icon {
           cursor: CursorIcon::Pointer,
@@ -168,22 +166,16 @@ where
 
     let mut item = FatObj::new(item);
 
-    let mut stagger = $stagger.write();
+    let mut stagger = $write(stagger);
     if !stagger.has_ever_run() {
-      $item.write().opacity = 0.;
-      let transform = item
-        .get_transform_widget()
-        .part_writer(PartialId::any(), |w| PartMut::new(&mut w.transform));
-      let opacity = item
-        .get_opacity_widget()
-        .part_writer(PartialId::any(), |w| PartMut::new(&mut w.opacity));
+      *$write(item.opacity()) = 0.;
       let fly_in = stagger.push_state(
-        (transform, opacity),
+        (item.transform(), item.opacity()),
         (Transform::translation(0., 64.), 0.),
       );
       // items not displayed until the stagger animation is started.
-      watch!($fly_in.is_running()).filter(|v| *v).first().subscribe(move |_| {
-        $item.write().opacity = 1.;
+      watch!($read(fly_in).is_running()).filter(|v| *v).first().subscribe(move |_| {
+        *$write(item.opacity()) = 1.;
       });
     }
 

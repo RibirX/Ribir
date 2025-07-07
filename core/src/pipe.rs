@@ -693,7 +693,7 @@ mod tests {
     let size = Stateful::new(Size::zero());
     let c_size = size.clone_writer();
     let w = fn_widget! {
-      let p = pipe! { fn_widget!{ @MockBox { size: *$size }}};
+      let p = pipe! { fn_widget!{ @MockBox { size: *$read(size) }}};
       @(p) { @Void {} }
     };
     let wnd = TestWindow::from_widget(w);
@@ -730,7 +730,7 @@ mod tests {
       @MockBox {
         size: Size::zero(),
         @ {
-          let p = pipe! { fn_widget! {MockBox { size: *$size }}};
+          let p = pipe! { fn_widget! {MockBox { size: *$read(size) }}};
           @(p) { @Void {} }
         }
       }
@@ -774,12 +774,12 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          pipe!($v.clone()).map(move |v| {
+          pipe!($read(v).clone()).map(move |v| {
             v.into_iter().map(move |_| {
               @MockBox{
                 size: Size::zero(),
-                on_mounted: move |_| *$new_cnt.write() += 1,
-                on_disposed: move |_| *$drop_cnt.write() += 1
+                on_mounted: move |_| *$write(new_cnt) += 1,
+                on_disposed: move |_| *$write(drop_cnt) += 1
               }
             })
           })
@@ -813,15 +813,15 @@ mod tests {
     let (mnt_cnt, w_mnt_cnt) = split_value(0);
 
     let w = fn_widget! {
-      pipe!(*$p).map(move |_| fn_widget!{
+      pipe!(*$read(p)).map(move |_| fn_widget!{
         @MockBox {
           size: Size::zero(),
-          on_mounted: move |_| *$w_mnt_cnt.write() +=1,
+          on_mounted: move |_| *$write(w_mnt_cnt) +=1,
           @{
-            pipe!(*$c).map(move |_| fn_widget!{
+            pipe!(*$read(c)).map(move |_| fn_widget!{
               @MockBox {
                 size: Size::zero(),
-                on_mounted: move |_| *$w_mnt_cnt.write() +=1,
+                on_mounted: move |_| *$write(w_mnt_cnt) +=1,
               }
             })
           }
@@ -867,16 +867,16 @@ mod tests {
     fn build(task: Stateful<Task>) -> Widget<'static> {
       fn_widget! {
        @TaskWidget {
-          keep_alive: pipe!($task.pin),
-          layout_cnt: pipe!($task.layout_cnt.clone()),
-          paint_cnt: pipe!($task.paint_cnt.clone()),
-          trigger: pipe!($task.trigger),
+          keep_alive: pipe!($read(task).pin),
+          layout_cnt: pipe!($read(task).layout_cnt.clone()),
+          paint_cnt: pipe!($read(task).paint_cnt.clone()),
+          trigger: pipe!($read(task).trigger),
           on_mounted: move |ctx| {
-            $task.write().mounted += 1;
-            $task.write().wid = Some(ctx.id);
+            $write(task).mounted += 1;
+            $write(task).wid = Some(ctx.id);
           },
           on_disposed: move |ctx| {
-            let wid = $task.write().wid.take();
+            let wid = $write(task).wid.take();
             assert_eq!(wid, Some(ctx.id));
           }
         }
@@ -914,7 +914,7 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @pipe!{
-          $c_tasks.iter().map(|t| build(t.clone_writer())).collect::<Vec<_>>()
+          $read(c_tasks).iter().map(|t| build(t.clone_writer())).collect::<Vec<_>>()
         }
       }
     };
@@ -992,12 +992,12 @@ mod tests {
 
     let w = fn_widget! {
       @MockMulti {
-        @ { pipe!(*$child).map(move |_| fn_widget!{
+        @ { pipe!(*$read(child)).map(move |_| fn_widget!{
           @MockMulti {
-            keep_alive: pipe!(!*$child_destroy_until),
-            @ { pipe!(*$grandson).map(move |_| fn_widget!{
+            keep_alive: pipe!(!*$read(child_destroy_until)),
+            @ { pipe!(*$read(grandson)).map(move |_| fn_widget!{
               @MockBox {
-                keep_alive: pipe!(!*$grandson_destroy_until),
+                keep_alive: pipe!(!*$read(grandson_destroy_until)),
                 size: Size::zero(),
               }
             })}
@@ -1034,7 +1034,7 @@ mod tests {
     reset_test_env!();
     let _ = fn_widget! {
       let v = Stateful::new(true);
-      let w = pipe!(*$v).map(move |_| fn_widget!{ @ Void {} });
+      let w = pipe!(*$read(v)).map(move |_| fn_widget!{ @ Void {} });
       w.into_widget()
     };
   }
@@ -1049,9 +1049,9 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          pipe!(*$box_count).map(move |v| {
+          pipe!(*$read(box_count)).map(move |v| {
             (0..v).map(move |_| fn_widget!{
-              pipe!(*$child_size).map(move |size| fn_widget! { @MockBox { size } })
+              pipe!(*$read(child_size)).map(move |size| fn_widget! { @MockBox { size } })
             })
           })
         }
@@ -1082,9 +1082,9 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          pipe!(*$box_count).map(move |v| {
+          pipe!(*$read(box_count)).map(move |v| {
             (0..v).map(move |_| {
-              let pipe_parent = pipe!(*$child_size)
+              let pipe_parent = pipe!(*$read(child_size))
                 .map(move |size| fn_widget!{ @MockBox { size } });
               @(pipe_parent) { @Void {} }
             })
@@ -1116,8 +1116,8 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          pipe!(*$pipe_trigger).map(move |w| fn_widget!{
-            pipe!(*$inner_pipe_trigger)
+          pipe!(*$read(pipe_trigger)).map(move |w| fn_widget!{
+            pipe!(*$read(inner_pipe_trigger))
               .map(move |h| fn_widget! { @MockBox { size: Size::new(w as f32, h as f32) } })
           })
         }
@@ -1147,8 +1147,8 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          pipe!(*$outer).map(move |w| fn_widget!{
-            let pipe_parent = pipe!(*$inner)
+          pipe!(*$read(outer)).map(move |w| fn_widget!{
+            let pipe_parent = pipe!(*$read(inner))
               .map(move |h| fn_widget! {@MockBox { size: Size::new(w as f32, h as f32) } });
             @(pipe_parent) { @Void {} }
           })
@@ -1182,8 +1182,8 @@ mod tests {
     let w = fn_widget! {
       @MockMulti {
         @ {
-          let p = pipe!(*$pipe_trigger).map(move |w| fn_widget!{
-            pipe!(*$inner_pipe_trigger)
+          let p = pipe!(*$read(pipe_trigger)).map(move |w| fn_widget!{
+            pipe!(*$read(inner_pipe_trigger))
               .map(move |h| fn_widget! { @MockBox { size: Size::new(w as f32, h as f32) }})
           });
 
@@ -1217,9 +1217,9 @@ mod tests {
     let c_hit_count = hit_count.clone_writer();
 
     let w = fn_widget! {
-      pipe!($parent;).map(move |_| fn_widget!{
-        pipe!($child;).map(move |_| fn_widget!{
-          *$hit_count.write() += 1;
+      pipe!($read(parent);).map(move |_| fn_widget!{
+        pipe!($read(child);).map(move |_| fn_widget!{
+          *$write(hit_count) += 1;
           Void
         })
       })
@@ -1250,8 +1250,8 @@ mod tests {
     let widget = fn_widget! {
       @MockMulti {
         @{
-          pipe!(*$r1).map(move |_| fn_widget!{
-            pipe!(*$r2)
+          pipe!(*$read(r1)).map(move |_| fn_widget!{
+            pipe!(*$read(r2))
               .map(move |r| fn_widget!{
                 @MockBox {
                   background: Color::YELLOW,
@@ -1282,11 +1282,11 @@ mod tests {
     let widget = fn_widget! {
       @MockMulti {
         @ {
-          pipe!($w;).map(move |_| {
-            $w.silent().push(0);
+          pipe!($read(w);).map(move |_| {
+            $write(w).silent().push(0);
             (0..10).map(move |idx| {
               pipe!{
-                $w.silent().push(idx + 1);
+                $write(w).silent().push(idx + 1);
                 @MockBox {
                   size: Size::new(1., 1.),
                 }
@@ -1318,10 +1318,10 @@ mod tests {
       @MockMulti {
         @ {
 
-          pipe!($m_watcher;).map(move |_| {
+          pipe!($read(m_watcher);).map(move |_| {
             [
               Void.into_widget() ,
-              pipe!($son_watcher;).map(|_| fn_widget! {@Void{}}).into_widget(),
+              pipe!($read(son_watcher);).map(|_| fn_widget! {@Void{}}).into_widget(),
             ]
           })
         }
@@ -1346,9 +1346,9 @@ mod tests {
 
     let widget = fn_widget! {
       let p = @ {
-        pipe!($m_watcher;).map(move |_| fn_widget!{
+        pipe!($read(m_watcher);).map(move |_| fn_widget!{
           // margin is static, but its child MockBox is a pipe.
-          let p = pipe!($son_watcher;).map(|_| fn_widget! { MockBox { size: Size::zero() }});
+          let p = pipe!($read(son_watcher);).map(|_| fn_widget! { MockBox { size: Size::zero() }});
           let mut obj = FatObj::new(p);
           obj.with_margin(EdgeInsets::all(1.));
           obj

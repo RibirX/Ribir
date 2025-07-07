@@ -35,7 +35,7 @@ impl HoverLayer {
       duration: md::easing::duration::SHORT2,
     });
 
-    let u = watch!($host.is_hovered())
+    let u = watch!(*$read(host.is_hovered()))
       // Delay hover effects to prevent displaying this layer while scrolling.
       .throttle_time(Duration::from_millis(100), ThrottleEdge::tailing(), AppCtx::scheduler())
       .distinct_until_changed()
@@ -59,8 +59,8 @@ impl FocusLayer {
     });
 
     let u = watch! {
-      $host.is_focused()
-      && $host.focus_changed_reason() == FocusReason::Keyboard
+      *$read(host.is_focused())
+      && *$read(host.focus_changed_reason()) == FocusReason::Keyboard
     }
     .distinct_until_changed()
     .subscribe({

@@ -10,15 +10,15 @@ pub struct Embed {
 impl Compose for Embed {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      let recursive_child: Widget = if $this.depth > 1 {
-        let width = $this.width;
-        let depth = $this.depth - 1;
+      let recursive_child: Widget = if $read(this).depth > 1 {
+        let width = $read(this).width;
+        let depth = $read(this).depth - 1;
         Embed { width, depth }.into_widget()
       } else {
         MockBox { size: Size::new(10., 10.) }.into_widget()
       };
       let multi = pipe!{
-        (0..$this.width - 1).map(|_|  MockBox { size: Size::new(10., 10.)})
+        (0..$read(this).width - 1).map(|_|  MockBox { size: Size::new(10., 10.)})
       };
       MockMulti
         .with_child(multi)
@@ -39,7 +39,7 @@ impl Compose for Recursive {
     fn_widget! {
       @MockMulti {
         @{
-          pipe!(($this.width, $this.depth))
+          pipe!(($read(this).width, $read(this).depth))
             .map(move |(width, depth)| {
               (0..width).map(move |_| fn_widget! {
                 if depth > 1 {

@@ -500,13 +500,13 @@ mod tests {
           auto_focus: true,
           on_ime_pre_edit: move |e| {
             match &e.pre_edit {
-              ImePreEdit::Begin => $log2.write().push("on_ime_pre_edit_begin".to_string()),
-              ImePreEdit::PreEdit { value, .. } => $log2.write().push(format!("on_ime_pre_edit_update {value}")),
-              ImePreEdit::End => $log2.write().push("on_ime_pre_edit_end".to_string()),
+              ImePreEdit::Begin => $write(log2).push("on_ime_pre_edit_begin".to_string()),
+              ImePreEdit::PreEdit { value, .. } => $write(log2).push(format!("on_ime_pre_edit_update {value}")),
+              ImePreEdit::End => $write(log2).push("on_ime_pre_edit_end".to_string()),
             }
           },
-          on_chars: move|e| $log2.write().push(format!("on_chars {}", e.chars)),
-          on_tap: move |_| $log2.write().push("on_tap".to_string()),
+          on_chars: move|e| $write(log2).push(format!("on_chars {}", e.chars)),
+          on_tap: move |_| $write(log2).push("on_tap".to_string()),
         }
       },
       Size::new(200., 200.),

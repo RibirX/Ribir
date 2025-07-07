@@ -76,7 +76,8 @@ impl Compose for Divider {
     fn_widget! {
       @Void {
         class: pipe! {
-          match ($this.indent, $this.direction) {
+          let this = $read(this);
+          match (this.indent, this.direction) {
             (DividerIndent::None, Direction::Horizontal) => HORIZONTAL_DIVIDER,
             (DividerIndent::Start, Direction::Horizontal) => HORIZONTAL_DIVIDER_INDENT_START,
             (DividerIndent::End, Direction::Horizontal) => HORIZONTAL_DIVIDER_INDENT_END,

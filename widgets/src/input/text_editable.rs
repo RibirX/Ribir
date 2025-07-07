@@ -25,32 +25,32 @@ impl<T: Default + VisualText + EditText + Clone + 'static> Compose for BasicEdit
     fn_widget! {
       let mut text = FatObj::new(part_writer!(&mut this.host));
 
-      let this2 = this.clone_writer();
       let caret = pipe! {
-        let this = this2.clone_writer();
-        $text.is_focused().then(|| fn_widget! {Self::caret_widget(this)})
+        $read(text.is_focused()).then(|| fn_widget! {
+          Self::caret_widget($writer(this))
+        })
       };
       let mut caret = FatObj::new(caret);
 
       @Stack {
         fit: StackFit::Passthrough,
         @(text) {
-          margin: pipe!(EdgeInsets::only_right($caret.layout_width())),
+          margin: pipe!(EdgeInsets::only_right(*$read(caret.layout_width()))),
           on_focus_in: move |e| { e.window().set_ime_allowed(true); },
           on_focus_out: move|e| { e.window().set_ime_allowed(false); },
           on_chars: move |e| {
-            let mut this = $this.write();
+            let mut this = $write(this);
             if !this.chars_handle(e) {
               this.forget_modifies();
             }
           },
           on_key_down: move |k| {
-            let mut this = $this.write();
+            let mut this = $write(this);
             if !this.keys_handle(k) {
               this.forget_modifies();
             }
           },
-          on_ime_pre_edit: move|e| { $this.write().process_pre_edit(e);},
+          on_ime_pre_edit: move|e| { $write(this).process_pre_edit(e);},
         }
         @IgnorePointer {
           @UnconstrainedBox {
@@ -72,7 +72,7 @@ impl<T: EditText + 'static> BasicEditor<T> {
         class: TEXT_CARET,
         on_performed_layout: move |e| {
           let caret_size = e.box_size().unwrap();
-          if !$this.is_in_pre_edit() {
+          if !$read(this).is_in_pre_edit() {
             if let Some(mut scrollable) = Provider::write_of::<ScrollableWidget>(e) {
               let wnd = e.window();
               let lt = scrollable.map_to_content(Point::zero(), e.current_target(), &wnd).unwrap();
@@ -85,9 +85,9 @@ impl<T: EditText + 'static> BasicEditor<T> {
         @ { Void }
       };
       let wnd = BuildCtx::get().window();
-      let u = watch!($this;).subscribe(move |_| {
+      let u = watch!($read(this);).subscribe(move |_| {
         wnd.once_layout_ready(move || {
-          $caret.write().anchor = Anchor::from_point($this.caret_pos())
+          *$write(caret.anchor()) = Anchor::from_point($read(this).caret_pos())
         })
       });
       caret.on_disposed(move |_| u.unsubscribe());

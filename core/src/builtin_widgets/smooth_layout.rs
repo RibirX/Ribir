@@ -154,7 +154,7 @@ where
   {
     let animate = part_writer!(&mut self.value).transition(transition);
     let this = self.clone_writer();
-    watch!($animate.is_running()).subscribe(move |running| this.set_running(running));
+    watch!($read(animate).is_running()).subscribe(move |running| this.set_running(running));
   }
 }
 

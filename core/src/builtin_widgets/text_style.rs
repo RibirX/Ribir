@@ -31,3 +31,13 @@ impl TextStyleWidget {
     }
   }
 }
+
+impl TextStyleWidget {
+  pub fn inherit_widget() -> Self {
+    TextStyleWidget {
+      text_style: Provider::of::<TextStyle>(BuildCtx::get())
+        .unwrap()
+        .clone(),
+    }
+  }
+}

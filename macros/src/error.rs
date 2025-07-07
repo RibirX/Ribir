@@ -5,7 +5,7 @@ pub enum Error {
   InvalidFieldInVar(Box<[Span]>),
   WatchNothing(Span),
   RdlAtSyntax { at: Span, follow: Option<Span> },
-  IdentNotFollowDollar(Span),
+  DollarSyntax(Span),
   Syn(syn::Error),
 }
 
@@ -15,7 +15,7 @@ impl Error {
       Error::InvalidFieldInVar(fields) => Self::invalid_field_in_var_error(fields),
       Error::WatchNothing(span) => Self::watch_nothing_error(*span),
       &Error::RdlAtSyntax { at, follow } => Self::rdl_at_syntax_error(at, follow),
-      Error::IdentNotFollowDollar(span) => Self::ident_not_follow_dollar_error(*span),
+      &Error::DollarSyntax(span) => Self::dollar_syntax_error(span),
       Error::Syn(err) => err.to_compile_error(),
     }
   }
@@ -31,8 +31,8 @@ impl Error {
   }
 
   fn watch_nothing_error(span: Span) -> TokenStream {
-    let error_msg =
-      "Expression does not subscribe to anything. It must contain at least one '$' symbol.";
+    let error_msg = "Expression does not subscribe to anything. It must contain at least one '$' \
+                     symbol for state.";
     quote_spanned! { span => compile_error!(#error_msg) }
   }
 
@@ -46,9 +46,19 @@ impl Error {
     quote_spanned! { span => compile_error!(#error_msg) }
   }
 
-  fn ident_not_follow_dollar_error(span: Span) -> TokenStream {
-    let error_msg = "Syntax error: Expected identifier after '$'";
-    quote_spanned! { span => compile_error!(#error_msg) }
+  fn dollar_syntax_error(span: Span) -> TokenStream {
+    const ERROR_MSG: &str = r#"Invalid $ syntax. Expected one of the following forms:
+      
+      • $read(...)    - Reads and captures the state
+      • $write(...)   - Writes and captures the state
+      • $reader(...)  - Captures a state reader
+      • $writer(...)  - Captures a state writer
+      • $watcher(...) - Captures a state watcher
+      • $clone(...)   - Clones and captures the value
+
+    
+  Note: The '$' symbol must be followed by one of these keywords."#;
+    quote_spanned! { span => compile_error!(#ERROR_MSG) }
   }
 }
 

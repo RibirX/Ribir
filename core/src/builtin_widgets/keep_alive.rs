@@ -15,7 +15,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct KeepAlive {
   pub keep_alive: bool,
-  pub(crate) wid: Option<TrackId>,
+  wid: TrackId,
 }
 
 impl Declare for KeepAlive {
@@ -27,21 +27,18 @@ impl Declare for KeepAlive {
 impl<'c> ComposeChild<'c> for KeepAlive {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    fn_widget! {
-      let mut w = FatObj::new(child);
-      { this.silent().wid = Some($w.track_id()); }
-      w
+    let track = TrackWidgetId { wid: this.read().track_id() };
+
+    track
+      .with_child(child)
       .into_widget()
       .dirty_on(this.raw_modifies(), DirtyPhase::Layout)
       .try_unwrap_state_and_attach(this)
-
-    }
-    .into_widget()
   }
 }
 
 impl KeepAlive {
-  pub(crate) fn track_id(&self) -> Option<TrackId> { self.wid.clone() }
+  pub(crate) fn track_id(&self) -> TrackId { self.wid.clone() }
 }
 
 #[cfg(test)]
@@ -59,10 +56,10 @@ mod tests {
     let remove_widget = Stateful::new(false);
     let c_remove_widget = remove_widget.clone_writer();
     let wnd = TestWindow::from_widget(fn_widget! {
-      pipe!(*$remove_widget).map(move |v|
+      pipe!(*$read(remove_widget)).map(move |v|
         (!v).then(move || fn_widget!{
           @Void {
-            keep_alive: pipe!(*$keep_alive)
+            keep_alive: pipe!(*$read(keep_alive))
           }
         })
       )

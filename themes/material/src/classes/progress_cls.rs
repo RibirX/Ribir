@@ -132,7 +132,7 @@ pub(super) fn init(classes: &mut Classes) {
       let indicator = Provider::of::<Stateful<SpinnerArc>>(BuildCtx::get()).unwrap();
       let track = @SpinnerArc {
         start: distinct_pipe! {
-          let indicator = $indicator;
+          let indicator = $read(indicator);
           if indicator.offset_angle().to_degrees().abs() < 0.1 {
             Angle::zero()
           } else {

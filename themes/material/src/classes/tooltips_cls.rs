@@ -17,15 +17,15 @@ pub(super) fn init(classes: &mut Classes) {
           h_align: HAlign::Center,
         }
       };
-      let animate = part_writer!(&mut w.opacity)
+      let animate = w.opacity()
         .transition(EasingTransition{
           easing: md::easing::STANDARD_ACCELERATE,
           duration: md::easing::duration::SHORT2
         }.box_it());
       @(w) {
-        keep_alive: pipe!($animate.is_running() || $w.opacity != 0.),
+        keep_alive: pipe!($read(animate).is_running() || *$read(w.opacity()) != 0.),
         on_disposed: move |_| {
-          $w.write().opacity = 0.;
+          *$write(w.opacity()) = 0.;
         }
       }
     }

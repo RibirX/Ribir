@@ -51,17 +51,16 @@ impl Declare for LayoutBox {
 impl<'c> ComposeChild<'c> for LayoutBox {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    fn_widget! {
-      let mut w = FatObj::new(child);
-      w.on_performed_layout(move |e| {
-        let new_rect = e.box_rect().unwrap();
-        if $this.rect != new_rect {
-          $this.silent().rect = new_rect;
-        }
-      });
-      w
-    }
-    .into_widget()
+    let mut w = FatObj::new(child);
+    w.on_performed_layout(move |e| {
+      let new_rect = e.box_rect().unwrap();
+      let mut this = this.silent();
+      if this.rect != new_rect {
+        this.rect = new_rect;
+      }
+    });
+
+    w.into_widget()
   }
 }
 
@@ -106,7 +105,7 @@ mod tests {
     smoke,
     WidgetTester::new(fn_widget! {
       let mut first_box = @MockBox { size: Size::new(100., 200.) };
-      let second_box = @MockBox { size: pipe!($first_box.layout_size()) };
+      let second_box = @MockBox { size: pipe!(*$read(first_box.layout_size())) };
       @MockMulti {
         @ { [first_box, second_box ] }
       }

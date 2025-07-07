@@ -295,10 +295,10 @@ fn main() {
     let count = State::value(0);
     @Button {
       // 变更 2： 通过点击事件来修改状态
-      on_tap: move |_| *$count.write() += 1,
+      on_tap: move |_| *$write(count) += 1,
       // 变更 3： 通过状态来显示数据，并保持视图的持续更新。
       // 对于宏或者函数调用，我们可以省略 @ 后面的一对大括号
-      @ pipe!($count.to_string())
+      @ pipe!($read(count).to_string())
     }
   });
 }
@@ -372,7 +372,7 @@ use ribir::prelude::*;
 let a = State::value(0);
 let b = State::value(0);
 
-let sum = pipe!(*$a + *$b);
+let sum = pipe!(*$read(a) + *$read(b));
 ```
 
 在声明一个对象时，你可以通过一个 `Pipe` 流去初始化它的属性，这样它的属性就会持续随着这个 `Pipe` 流变更。如我们在[状态——让数据变得可被侦和共享](#状态——让数据变得可被侦和共享)中见过的：
@@ -400,11 +400,11 @@ fn main() {
     move |cnt: &'static Stateful<i32>| {
       row! {
         @Button {
-          on_tap: move |_| *$cnt.write() += 1,
-        @ { "Increment" }
+          on_tap: move |_| *$write(cnt) += 1,
+          @ { "Increment" }
         }
         @ {
-          pipe!(*$cnt).map(move |cnt| {
+          pipe!(*$read(cnt)).map(move |cnt| {
             (0..cnt).map(move |_| {
               @Container {
                 margin: EdgeInsets::all(2.),
@@ -469,14 +469,14 @@ fn main() {
     let b = State::value(0);
 
     @Column {
-      @Text { text: pipe!($a.to_string()) }
-      @Text { text: pipe!($b.to_string()) }
+      @Text { text: pipe!($read(a).to_string()) }
+      @Text { text: pipe!($read(b).to_string()) }
       @Text {
-        text: pipe!((*$a + *$b).to_string())
+        text: pipe!((*$read(a) + *$read(b)).to_string())
           .transform(|s| s.distinct_until_changed().box_it()),
         on_tap: move |_| {
-          *$a.write() += 1;
-          *$b.write() -= 1;
+          *$write(a) += 1;
+          *$write(b) -= 1;
         }
       }
     }
@@ -516,13 +516,13 @@ fn main() {
     let count = State::value(0);
     let display = @H1 { text: "0" };
 
-    watch!(*$count).subscribe(move |v| {
-      $display.write().text = v.to_string().into();
+    watch!(*$read(count)).subscribe(move |v| {
+      $write(display).text = v.to_string().into();
     });
 
     @Row {
       @Button {
-        on_tap: move |_| *$count.write() += 1,
+        on_tap: move |_| *$write(count) += 1,
         @ { "Increment" }
       }
       @{ display }
@@ -545,8 +545,8 @@ use ribir::prelude::*;
 fn show_name(name: State<String>) -> Widget<'static> {
   fn_widget!{
     let mut text = @Text { text: "Hi, Guest!" };
-    let u = watch!($name.to_string()).subscribe(move |name| {
-      $text.write().text = format!("Hi, {}!", name).into();
+    let u = watch!($read(name).to_string()).subscribe(move |name| {
+      $write(text).text = format!("Hi, {}!", name).into();
     });
 
     // `name` 是一个可共享的状态，它可能被其他人持有，使它的生命周期长于 widget 
@@ -565,7 +565,7 @@ use ribir::prelude::*;
 let even_num = State::value(0);
 
 // 响应 even_num 的变更，确保其为偶数，当 even_num 为奇数时，将其加 1 使其变为偶数
-let u = watch!(*$even_num).subscribe(move |v| {
+let u = watch!(*$read(even_num)).subscribe(move |v| {
   if v % 2 == 1 {
     *even_num.write() = v + 1;
   }
@@ -595,8 +595,8 @@ impl Counter {
 impl Compose for Counter {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     button! {
-      on_tap: move |_| $this.write().increment(),
-      @pipe!($this.0.to_string())
+      on_tap: move |_| $write(this).increment(),
+      @pipe!($read(this).0.to_string())
     }
     .into_widget()
   }
@@ -657,7 +657,7 @@ fn main() {
     // 没有声明 `margin`
     let mut hello_world = @Text { text: "Hello World!" };
     // 直接修改 `margin`
-    $hello_world.write().margin = EdgeInsets::all(10.);
+    *$write(hello_world.margin()) = EdgeInsets::all(10.);
     hello_world
   });
 }
@@ -698,9 +698,9 @@ let state = State::value(AppData { count: 0 });
 let map_count = state.part_writer(PartialId::any(), |d| PartMut::new(&mut d.count));
 let split_count = state.part_writer(PartialId::any(), |d| PartMut::new(&mut d.count));
 
-watch!($state.count).subscribe(|_| println!("父状态数据"));
-watch!(*$map_count).subscribe(|_| println!("子状态（转换）数据"));
-watch!(*$split_count).subscribe(|_| println!("子状态（分离）数据"));
+watch!($read(state).count).subscribe(|_| println!("父状态数据"));
+watch!(*$read(map_count)).subscribe(|_| println!("子状态（转换）数据"));
+watch!(*$read(split_count)).subscribe(|_| println!("子状态（分离）数据"));
 state
   .raw_modifies()
   .filter(|s| s.contains(ModifyEffect::FRAMEWORK))

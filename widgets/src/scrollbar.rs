@@ -91,68 +91,72 @@ impl<'c> ComposeChild<'c> for Scrollbar {
     providers! {
       providers: [Provider::value_of_writer(scroll.clone_writer(), None)],
       @ {
-        let h_scrollbar = distinct_pipe!($scroll.is_x_scrollable())
+        let h_scrollbar = distinct_pipe!($read(scroll).is_x_scrollable())
           .map(move |need_bar| need_bar.then(|| fn_widget!{
             let mut h_track = @Stack {
               class: H_SCROLL_TRACK,
               h_align: HAlign::Stretch,
-              on_wheel: move |e| $scroll.write().scroll(-e.delta_x, -e.delta_y),
+              on_wheel: move |e| $write(scroll).scroll(-e.delta_x, -e.delta_y),
             };
             let mut h_thumb =  @Container {
               class: H_SCROLL_THUMB,
               size: distinct_pipe!{
-                let width = h_thumb_rate(&$scroll) * $h_track.layout_width();
+                let track_width = *$read(h_track.layout_width());
+                let width = h_thumb_rate(&$read(scroll)) * track_width;
                 Size::new(width, 4.)
               }
             };
 
             @(h_track) {
               on_tap: move |e| if e.is_primary {
-                let rate = e.position().x / $h_track.layout_width();
-                let mut scroll = $scroll.write();
+                let rate = e.position().x / *$read(h_track.layout_width());
+                let mut scroll = $write(scroll);
                 let x = rate * scroll.max_scrollable().x;
                 let scroll_pos = Point::new(x, scroll.get_scroll_pos().y);
                 scroll.jump_to(scroll_pos);
               },
               @(h_thumb) {
                 anchor: distinct_pipe!{
-                  let rate = $scroll.get_x_scroll_rate();
-                  let distance = $h_track.layout_width() - $h_thumb.layout_width();
-                  Anchor::left(rate * distance)
+                  let rate = $read(scroll).get_x_scroll_rate();
+                  let track_width = *$read(h_track.layout_width());
+                  let thumb_width = *$read(h_thumb.layout_width());
+                  Anchor::left(rate * (track_width - thumb_width))
                 }
               }
             }
           }));
 
-        let v_scrollbar = distinct_pipe!($scroll.is_y_scrollable())
+        let v_scrollbar = distinct_pipe!($read(scroll).is_y_scrollable())
           .map(move |need_bar| need_bar.then(|| fn_widget!{
             let mut v_track = @Stack {
               class: V_SCROLL_TRACK,
               v_align: VAlign::Stretch,
-              on_wheel: move |e| $scroll.write().scroll(-e.delta_x, -e.delta_y),
+              on_wheel: move |e| $write(scroll).scroll(-e.delta_x, -e.delta_y),
             };
 
             let mut v_thumb = @Container {
               class: V_SCROLL_THUMB,
               size: distinct_pipe!{
-                let height = v_thumb_rate(&$scroll) * $v_track.layout_height();
+                let track_height = *$read(v_track.layout_height());
+                let height = v_thumb_rate(&$read(scroll)) * track_height;
                 Size::new(4., height)
               }
             };
 
             @(v_track) {
               on_tap: move |e| if e.is_primary {
-                let rate = e.position().y / $v_track.layout_height();
-                let mut scroll = $scroll.write();
+                let rate = e.position().y / *$read(v_track.layout_height());
+                let mut scroll = $write(scroll);
                 let y = rate * scroll.max_scrollable().y;
                 let scroll_pos = Point::new(scroll.get_scroll_pos().x, y);
                 scroll.jump_to(scroll_pos);
               },
               @(v_thumb) {
                 anchor: distinct_pipe!{
-                  let rate = $scroll.get_y_scroll_rate();
-                  let distance = $v_track.layout_height() - $v_thumb.layout_height();
-                  Anchor::top(rate * distance)
+                  let rate = $read(scroll).get_y_scroll_rate();
+                  let track_height = *$read(v_track.layout_height());
+                  let thumb_height = *$read(v_thumb.layout_height());
+                  Anchor::top(rate * (track_height - thumb_height))
                 }
               }
             }

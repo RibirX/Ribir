@@ -106,7 +106,7 @@ impl Compose for Slider {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       let u = this.modifies().subscribe(move |_| {
-        let mut this = $this.write();
+        let mut this = $write(this);
         this.validate();
         this.forget_modifies();
       });
@@ -118,12 +118,12 @@ impl Compose for Slider {
         @(row) {
           v_align: VAlign::Center,
           on_tap: move |e| {
-            let width = $row.layout_size().width;
-            $this.write().set_to(e.position().x / width);
+            let width = *$read(row.layout_width());
+            $write(this).set_to(e.position().x / width);
           },
           on_disposed: move |_| u.unsubscribe(),
           @Expanded {
-            flex: pipe!($this.ratio()),
+            flex: pipe!($read(this).ratio()),
             @Void { class: SLIDER_ACTIVE_TRACK }
           }
           @Void {
@@ -131,30 +131,30 @@ impl Compose for Slider {
             on_tap: move |e| e.stop_propagation(),
             on_pointer_down: move |e| {
               if let Some(handle) = GrabPointer::grab(e.current_target(), &e.window()) {
-                *$drag_info.write() = Some((handle, e.global_pos().x, $this.ratio()));
+                *$write(drag_info) = Some((handle, e.global_pos().x, $read(this).ratio()));
               }
             },
-            on_pointer_move: move|e| if let Some((_, pos, ratio)) = $drag_info.as_ref() {
-              let width = $row.layout_size().width;
+            on_pointer_move: move|e| if let Some((_, pos, ratio)) = $read(drag_info).as_ref() {
+              let width = *$read(row.layout_width());
               let val = ratio + (e.global_pos().x - pos) / width;
-              $this.write().set_to(val);
+              $write(this).set_to(val);
             },
             on_pointer_up: move |_| {
-              $drag_info.write().take();
+              $write(drag_info).take();
             },
             tooltips: pipe! {
-              let this = $this;
+              let this = $read(this);
               let precision = precision(this.min, this.max);
               format!("{:.1$}", this.value, precision)
             },
           }
           @Expanded {
-            flex: pipe!(1. - $this.ratio()),
+            flex: pipe!(1. - $read(this).ratio()),
             @Void { class: SLIDER_INACTIVE_TRACK }
           }
         }
 
-        @{ pipe!($this.stop_indicator_track() ) }
+        @{ pipe!($read(this).stop_indicator_track() ) }
       }
     }
     .into_widget()
@@ -272,7 +272,7 @@ impl Compose for RangeSlider {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       let u = this.modifies().subscribe(move |_| {
-        let mut this = $this.write();
+        let mut this = $write(this);
         this.validate();
         this.forget_modifies();
       });
@@ -285,68 +285,71 @@ impl Compose for RangeSlider {
         @(row) {
           v_align: VAlign::Center,
           on_tap: move |e| {
-            let width = $row.layout_size().width;
-            $this.write().set_ratio(e.position().x / width);
+            let width = *$read(row.layout_width());
+            $write(this).set_ratio(e.position().x / width);
           },
           on_disposed: move |_| u.unsubscribe(),
           @Expanded {
-            flex: pipe!($this.start_ratio()),
+            flex: pipe!($read(this).start_ratio()),
             @Void { class: RANGE_SLIDER_INACTIVE_TRACK_LEFT }
           }
           @Void {
             class: SLIDER_INDICATOR,
             tooltips: pipe!{
-              let this = $this;
+              let this = $read(this);
               let precision = precision(this.min, this.max);
               format!("{:.1$}", this.start, precision)
             },
             on_tap: move |e| e.stop_propagation(),
             on_pointer_down: move |e| {
               if let Some(handle) = GrabPointer::grab(e.current_target(), &e.window()) {
-                *$drag_info1.write() = Some((handle, e.global_pos().x, $this.start_ratio()));
+                *$write(drag_info1) = Some((handle, e.global_pos().x, $read(this).start_ratio()));
               }
             },
             on_pointer_move: move |e| {
-              if let Some((_, pos, ratio)) = $drag_info1.as_ref() {
-                let width = $row.layout_size().width;
+              if let Some((_, pos, ratio)) = $read(drag_info1).as_ref() {
+                let width = *$read(row.layout_width());
                 let val = ratio + (e.global_pos().x - pos) / width;
-                $this.write().set_start_ratio(val);
+                $write(this).set_start_ratio(val);
               }
             },
-            on_pointer_up: move |_| { $drag_info1.write().take(); }
+            on_pointer_up: move |_| { $write(drag_info1).take(); }
           }
           @Expanded {
-            flex: pipe!($this.end_ratio() - $this.start_ratio()),
+            flex: pipe!{
+              let this = $read(this);
+              this.end_ratio() - this.start_ratio()
+            },
             @Void { class: RANGE_SLIDER_ACTIVE_TRACK }
           }
           @Void {
             class: SLIDER_INDICATOR,
             tooltips: pipe!{
-              let this = $this;
+              let this = $read(this);
               let precision = precision(this.min, this.max);
               format!("{:.1$}", this.end, precision)
             },
             on_tap: move |e| e.stop_propagation(),
             on_pointer_down: move |e| {
               if let Some(handle) = GrabPointer::grab(e.current_target(), &e.window()) {
-                *$drag_info2.write() = Some((handle, e.global_pos().x, $this.end_ratio()));
+                *$write(drag_info2) = Some((handle, e.global_pos().x, $read(this).end_ratio()));
               }
             },
             on_pointer_move: move |e| {
-              if let Some((_, pos, ratio)) = $drag_info2.as_ref() {
-                let width = $row.layout_size().width;
+              if let Some((_, pos, ratio)) = $read(drag_info2).as_ref() {
+                let width = *$read(row.layout_width());
                 let val = ratio + (e.global_pos().x - pos) / width;
-                $this.write().set_end_ratio(val);
+                $write(this).set_end_ratio(val);
               }
             },
-            on_pointer_up: move |_| { $drag_info2.write().take(); }
+            on_pointer_up: move |_| { $write(drag_info2).take(); }
           }
           @Expanded {
-            flex: pipe!(1. - $this.end_ratio()),
+            flex: pipe!(1. - $read(this).end_ratio()),
             @Void { class: RANGE_SLIDER_INACTIVE_TRACK_RIGHT }
           }
         }
-        @{ pipe!($this.stop_indicator_track()) }
+        @{ pipe!($read(this).stop_indicator_track()) }
       }
     }
     .into_widget()

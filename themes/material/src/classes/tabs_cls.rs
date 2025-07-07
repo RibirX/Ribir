@@ -99,7 +99,7 @@ pub fn init(classes: &mut Classes) {
     // The active header's track id is written to the `ActiveHeaderId` provider.
     Provider::write_of::<ActiveHeaderId>(BuildCtx::get())
       .unwrap()
-      .0 = w.get_track_id_widget().read().track_id();
+      .0 = w.track_id();
 
     let mut w = if tab_type() == TabType::Primary {
       // The primary tabs indicator's length depends on the active tab's content size.
@@ -169,20 +169,22 @@ fn indicator(pos: &TabPos) -> Widget<'static> {
   let tt = tab_type();
   let (size, anchor): (PipeValue<_>, PipeValue<_>) = match (tt, pos.is_horizontal()) {
     (TabType::Primary, true) => (
-      distinct_pipe!(Size::new(p_length($header.width()), 3.)).r_into(),
-      distinct_pipe!(Anchor::left($header.min_x() + p_offset($header.width()))).r_into(),
+      distinct_pipe!(Size::new(p_length($read(header).width()), 3.)).r_into(),
+      distinct_pipe!(Anchor::left($read(header).min_x() + p_offset($read(header).width())))
+        .r_into(),
     ),
     (TabType::Primary, false) => (
-      distinct_pipe!(Size::new(3., p_length($header.height()))).r_into(),
-      distinct_pipe!(Anchor::top($header.min_y() + p_offset($header.height()))).r_into(),
+      distinct_pipe!(Size::new(3., p_length($read(header).height()))).r_into(),
+      distinct_pipe!(Anchor::top($read(header).min_y() + p_offset($read(header).height())))
+        .r_into(),
     ),
     (_, true) => (
-      distinct_pipe!(Size::new($header.width(), 2.)).r_into(),
-      distinct_pipe!(Anchor::left($header.min_x())).r_into(),
+      distinct_pipe!(Size::new($read(header).width(), 2.)).r_into(),
+      distinct_pipe!(Anchor::left($read(header).min_x())).r_into(),
     ),
     (_, false) => (
-      distinct_pipe!(Size::new(2., $header.height())).r_into(),
-      distinct_pipe!(Anchor::top($header.min_y())).r_into(),
+      distinct_pipe!(Size::new(2., $read(header).height())).r_into(),
+      distinct_pipe!(Anchor::top($read(header).min_y())).r_into(),
     ),
   };
 
@@ -287,7 +289,7 @@ fn foreground_color() -> PipeValue<Brush> {
 fn is_active_header() -> Pipe<bool> {
   let tabs = tabs_watcher();
   let cur_tab = tab_info();
-  pipe!($tabs.active_idx() == cur_tab.idx)
+  pipe!($read(tabs).active_idx() == cur_tab.idx)
 }
 
 impl std::ops::Deref for ActiveHeaderRect {

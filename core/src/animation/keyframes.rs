@@ -19,10 +19,8 @@
 //!     background: Color::RED,
 //!   };
 //!
-//!   let state = part_writer!(&mut color_rect.background);
-//!
 //!   keyframes! {
-//!     state: state,
+//!     state: color_rect.background(),
 //!     0.2 => Color::YELLOW.into(),
 //!     0.5 => Color::BLUE.into(),
 //!     0.8 => Color::GREEN.into(),
@@ -44,10 +42,9 @@
 //! let _w = fn_widget! {
 //!   let mut opacity_rect = @SizedBox { size: Size::new(100., 100.) };
 //!
-//!   let opacity = part_writer!(&mut opacity_rect.opacity);
 //!   let animate = @Animate {
 //!     state: keyframes! {
-//!       state: opacity,
+//!       state: opacity_rect.opacity(),
 //!       20% => 0.,
 //!       50% => 0.5,
 //!       80% => 0.,

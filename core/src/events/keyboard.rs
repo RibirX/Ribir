@@ -59,21 +59,19 @@ mod tests {
           @MockBox {
             size: Size::zero(),
             on_key_down_capture: move |key| {
-              $this.0.write().push(format!("key down capture {:?}", key.key));
+              $write(this).0.write().push(format!("key down capture {:?}", key.key));
             },
             on_key_up_capture: move |key| {
-              $this.0.write().push(format!("key up capture {:?}", key.key));
+              $write(this).0.write().push(format!("key up capture {:?}", key.key));
             },
             @MockBox {
               size: Size::zero(),
               auto_focus: true,
               on_key_down: move |key| {
-                $this.0
-                  .write()
-                  .push(format!("key down {:?}", key.key));
+                $write(this).0.write().push(format!("key down {:?}", key.key));
               },
               on_key_up: move |key| {
-                $this.0.write().push(format!("key up {:?}", key.key));
+                $write(this).0.write().push(format!("key up {:?}", key.key));
               }
             }
           }

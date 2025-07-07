@@ -370,9 +370,9 @@ mod tests {
     let w = fn_widget! {
       let child_box = child_box.clone_writer();
       @MockMulti {
-        on_performed_layout: move |_| *$w_layout_cnt.write() += 1,
+        on_performed_layout: move |_| *$write(w_layout_cnt) += 1,
         @ {
-          pipe!($child_box.size.is_empty())
+          pipe!($read(child_box).size.is_empty())
             .map(move|b| {
               let child_box = child_box.clone_writer();
               fn_widget! {
@@ -407,14 +407,14 @@ mod tests {
     let size = trigger.clone_watcher();
     let w = fn_widget! {
       @MockBox {
-        size: pipe!(*$size),
-        on_performed_layout: move |_| $order.write().push(1),
+        size: pipe!(*$read(size)),
+        on_performed_layout: move |_| $write(order).push(1),
         @MockBox {
-          size: pipe!(*$size),
-          on_performed_layout: move |_| $order.write().push(2),
+          size: pipe!(*$read(size)),
+          on_performed_layout: move |_| $write(order).push(2),
           @MockBox {
-            size: pipe!(*$size),
-            on_performed_layout: move |_| $order.write().push(3),
+            size: pipe!(*$read(size)),
+            on_performed_layout: move |_| $write(order).push(3),
           }
         }
       }
@@ -442,7 +442,7 @@ mod tests {
         offset: Point::new(50., 50.),
         @MockBox {
           size: Size::new(50., 50.),
-          @MockBox { size: pipe!(*$size) }
+          @MockBox { size: pipe!(*$read(size)) }
         }
       }
     };
@@ -477,8 +477,8 @@ mod tests {
     let w = fn_widget! {
       @MockBox {
         size: Size::new(50., 50.),
-        on_performed_layout: move |_| *$w_cnt.write() += 1,
-        @MockBox { size: pipe!(*$size) }
+        on_performed_layout: move |_| *$write(w_cnt) += 1,
+        @MockBox { size: pipe!(*$read(size)) }
       }
     };
 

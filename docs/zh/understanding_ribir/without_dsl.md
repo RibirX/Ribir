@@ -87,7 +87,7 @@ let mut radio = Radio::declarer();
 radio.on_tap(|_| println!("taped!"));
 let radio: FatObj<State<Radio>> = radio.finish();
 
-watch!($radio.selected)
+watch!($read(radio).selected)
   .subscribe(|selected| println!("The radio state change to {selected}"));
 ```
 
@@ -105,7 +105,7 @@ radio1.with_selected(true);
 let radio1: FatObj<State<Radio>>  = radio1.finish();
   
 let mut radio2 = Radio::declarer();
-radio2.with_selected(pipe!($radio1.selected));
+radio2.with_selected(pipe!($read(radio1).selected));
 let radio2 = radio2.finish();
 
 let _row = Row::declarer()
@@ -125,8 +125,8 @@ use ribir::prelude::*;
 fn radio_btn() -> Widget<'static> {
   let mut btn = Radio::declarer().finish();
   
-  let mut m = btn.get_margin_widget().clone_writer();
-  btn.on_tap(move |_| m.write().margin = EdgeInsets::all(10.0));
+  let mut m = btn.margin();
+  btn.on_tap(move |_| *m.write() = EdgeInsets::all(10.0));
   btn.into_widget()
 }
 ```
@@ -161,11 +161,11 @@ use ribir::prelude::*;
 let counter = fn_widget! {
   let cnt = Stateful::new(0);
   let mut btn = Button::declarer();
-  btn.on_tap(move |_| *$cnt.write() += 1);
+  btn.on_tap(move |_| *$write(cnt) += 1);
   let btn = btn.finish().with_child("Inc");
 
   let mut label = H1::declarer();
-  label.with_text(pipe!($cnt.to_string()));
+  label.with_text(pipe!($read(cnt).to_string()));
   let label = label.finish();
 
   @Row {

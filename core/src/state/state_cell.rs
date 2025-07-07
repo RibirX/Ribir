@@ -242,6 +242,7 @@ pub struct ValueMutRef<'a, T: ?Sized> {
   pub(crate) borrow: BorrowRefMut<'a>,
 }
 
+#[derive(Clone)]
 pub(crate) struct BorrowRefMut<'b> {
   borrow: &'b Cell<BorrowFlag>,
 }
@@ -418,4 +419,11 @@ impl<'a, T> From<&'a T> for PartRef<'a, T> {
 
 impl<'a, T> From<&'a mut T> for PartMut<'a, T> {
   fn from(part: &'a mut T) -> Self { PartMut::new(part) }
+}
+
+impl<'a, V: ?Sized> Clone for ValueMutRef<'a, V> {
+  fn clone(&self) -> Self {
+    let InnerPart::Ref(ptr) = &self.inner else { unreachable!() };
+    ValueMutRef { inner: InnerPart::Ref(*ptr), borrow: self.borrow.clone() }
+  }
 }

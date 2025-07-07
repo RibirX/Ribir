@@ -342,6 +342,26 @@ impl PartialId {
 }
 
 impl<'a, V: ?Sized> WriteRef<'a, V> {
+  pub fn silent(self) -> WriteRef<'a, V> {
+    WriteRef {
+      modify_effect: ModifyEffect::DATA,
+      value: self.value.clone(),
+      info: self.info,
+      modified: false,
+      path: self.path,
+    }
+  }
+
+  pub fn shallow(self) -> WriteRef<'a, V> {
+    WriteRef {
+      modify_effect: ModifyEffect::FRAMEWORK,
+      value: self.value.clone(),
+      info: self.info,
+      modified: false,
+      path: self.path,
+    }
+  }
+
   pub fn map<U: ?Sized, M>(mut orig: WriteRef<'a, V>, part_map: M) -> WriteRef<'a, U>
   where
     M: Fn(&mut V) -> PartMut<U>,

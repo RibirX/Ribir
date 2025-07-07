@@ -9,7 +9,7 @@ pub(super) fn init(classes: &mut Classes) {
       let mut w = FatObj::new(w);
       let blink_interval = Duration::from_millis(500);
       let u = interval(blink_interval, AppCtx::scheduler())
-        .subscribe(move |idx| $w.write().opacity = (idx % 2) as f32);
+        .subscribe(move |idx| *$write(w.opacity()) = (idx % 2) as f32);
       let border = BuildCtx::color()
         .map(|color| Border::only_left(BorderSide::new(2., (*color).into())));
       @(w) {
@@ -35,7 +35,7 @@ pub(super) fn init(classes: &mut Classes) {
     let mut w = FatObj::new(w);
     let blur = Palette::of(BuildCtx::get()).on_surface_variant();
 
-    let focus_watcher = part_watcher!(&w.is_focused());
+    let focus_watcher = w.is_focused();
     let border = BuildCtx::color().map_with_watcher(focus_watcher, move |c, focus| {
       let color = if *focus { *c } else { blur };
       Border::all(BorderSide::new(1., color.into()))

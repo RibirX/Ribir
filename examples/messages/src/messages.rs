@@ -80,7 +80,7 @@ impl Compose for MessageList {
                   @List {
                     @ {
                       let mut children = List::child_builder();
-                      for message in $this.messages.iter() {
+                      for message in $read(this).messages.iter() {
                         children = children.with_child(@ListItem {
                           @Avatar { @{ message.img.clone() }}
                           @ListItemHeadline { @ { message.nick_name.clone()} }

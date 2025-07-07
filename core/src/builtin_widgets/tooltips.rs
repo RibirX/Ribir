@@ -31,8 +31,6 @@ impl Declare for Tooltips {
 }
 
 impl Tooltips {
-  fn tooltips(&self) -> &CowArc<str> { &self.tooltips }
-
   pub fn show(&self, wnd: Sc<Window>) {
     if let Some(overlay) = self.overlay.borrow().clone() {
       if !overlay.is_showing() {
@@ -53,52 +51,45 @@ impl Tooltips {
 impl<'c> ComposeChild<'c> for Tooltips {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    let mut child = FatObj::new(child);
+
+    let content = text! {
+      text: pipe!($read(this).tooltips.clone()),
+      class: TOOLTIPS,
+      global_anchor_x: {
+        let track_id = $clone(child.track_id());
+        GlobalAnchorX::center_align_to(track_id, 0.).always_follow()
+      },
+      global_anchor_y: {
+        let track_id = $clone(child.track_id());
+        let height = *$read(child.layout_height());
+        GlobalAnchorY::bottom_align_to(track_id, height).always_follow()
+      },
+    };
+    *this.read().overlay.borrow_mut() = Some(Overlay::new(
+      content,
+      OverlayStyle { auto_close_policy: AutoClosePolicy::NOT_AUTO_CLOSE, mask: None },
+    ));
+
     fn_widget! {
-      let mut child = FatObj::new(child);
-      *$this.overlay.borrow_mut() = Some(Overlay::new(
-        GenWidget::new(move || {
-          let mut w = @Text {
-            text: pipe!($this.tooltips().clone()),
-            class: TOOLTIPS,
-          };
-
-          @(w) {
-            global_anchor_x: pipe!(
-              GlobalAnchorX::center_align_to(
-                $child.track_id(), 0.
-              ).always_follow()
-            ),
-            global_anchor_y: pipe!(
-              GlobalAnchorY::bottom_align_to(
-                $child.track_id(), $child.layout_size().height
-              ).always_follow()
-            ),
-          }
-        }),
-        OverlayStyle {
-          auto_close_policy: AutoClosePolicy::NOT_AUTO_CLOSE,
-          mask: None,
-        }
-      ));
-
       let wnd = BuildCtx::get().window();
-      let u = watch!($child.is_hovered())
+      let u = watch!(*$read(child.is_hovered()))
         .delay(Duration::from_millis(50), AppCtx::scheduler())
         .distinct_until_changed()
         .subscribe(move |_| {
-          if $child.is_hovered() {
-            $this.show(wnd.clone());
+          if *$read(child.is_hovered()) {
+            $read(this).show(wnd.clone());
           } else {
-            $this.hidden();
+            $read(this).hidden();
           }
         });
 
-      @(child) {
-        on_disposed: move|_| {
-          u.unsubscribe();
-          $this.hidden();
-        },
-      }
+      child.on_disposed(move |_| {
+        u.unsubscribe();
+        $read(this).hidden();
+      });
+
+      child
     }
     .into_widget()
   }

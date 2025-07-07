@@ -97,17 +97,17 @@ mod tests {
 
     let w = fn_widget! {
       let mut host = @MockMulti {};
-      watch!($host.is_focused())
-        .subscribe(move |v| *$w_focused.write() = v);
+      watch!(*$read(host.is_focused()))
+        .subscribe(move |v| *$write(w_focused) = v);
 
       @(host) {
         @MockBox {
           size: Size::new(50., 50.,),
-          on_tap: move |_| *$w_tap.write() += 1,
+          on_tap: move |_| *$write(w_tap) += 1,
         }
         @MockBox {
           size: Size::new(50., 50.,),
-          on_tap: move |_| *$w_tap.write() += 1,
+          on_tap: move |_| *$write(w_tap) += 1,
           on_key_down: move |_| println!("dummy code"),
         }
       }

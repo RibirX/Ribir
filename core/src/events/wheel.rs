@@ -33,15 +33,15 @@ mod tests {
       @MockBox {
         size: Size::new(200., 200.),
         on_wheel_capture: move |wheel| {
-          *$capture_receive.write() = (wheel.delta_x,  wheel.delta_y);
-          $event_order.write().push("capture");
+          *$write(capture_receive) = (wheel.delta_x,  wheel.delta_y);
+          $write(event_order).push("capture");
         },
         @MockBox {
           size: Size::new(100., 100.),
           auto_focus: true,
           on_wheel: move |wheel| {
-            *$bubble_receive.write() = (wheel.delta_x, wheel.delta_y);
-            $event_order.write().push("bubble");
+            *$write(bubble_receive) = (wheel.delta_x, wheel.delta_y);
+            $write(event_order).push("bubble");
           }
         }
       }

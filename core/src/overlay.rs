@@ -123,7 +123,7 @@ impl Overlay {
   ///       overlay.show_map(move |w| {
   ///         let mut w = FatObj::new(w);
   ///         @(w) {
-  ///           global_anchor_x: GlobalAnchorX::left_align_to($button.track_id(), 0.),
+  ///           global_anchor_x: GlobalAnchorX::left_align_to($clone(button.track_id()), 0.),
   ///         }.into_widget()
   ///        },
   ///        e.window()
@@ -224,7 +224,7 @@ impl Overlay {
         });
       }
 
-      *inner.borrow().track_id.borrow_mut() = Some($w.track_id());
+      *inner.borrow().track_id.borrow_mut() = Some($clone(w.track_id()));
       w
     };
 

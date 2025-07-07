@@ -187,7 +187,7 @@ mod tests {
     let (flex, w_flex) = split_value(1f32);
     let widget = fn_widget! {
       let expanded = @Expanded { flex: 1. };
-      watch!(*$flex).subscribe(move |val| $expanded.write().flex = val);
+      watch!(*$read(flex)).subscribe(move |val| $write(expanded).flex = val);
 
       @Flex {
         h_align: HAlign::Stretch,

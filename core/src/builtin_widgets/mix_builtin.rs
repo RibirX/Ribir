@@ -3,7 +3,7 @@ use std::{cell::RefCell, convert::Infallible};
 use rxrust::prelude::*;
 
 use self::focus_mgr::FocusType;
-use crate::prelude::*;
+use crate::prelude::{window::WindowId, *};
 
 const MULTI_TAP_DURATION: Duration = Duration::from_millis(250);
 
@@ -71,7 +71,7 @@ const TAB_IDX_MASK: u64 = 0xFFFF << TAB_IDX_SHIFT;
 pub type EventSubject = MutRefItemSubject<'static, Event, Infallible>;
 
 pub struct MixBuiltin {
-  flags: State<MixFlags>,
+  flags: Stateful<MixFlags>,
   subject: EventSubject,
 }
 
@@ -183,7 +183,13 @@ impl MixFlags {
 }
 
 impl MixBuiltin {
-  pub fn mix_flags(&self) -> &State<MixFlags> { &self.flags }
+  pub fn mix_flags(&self) -> &Stateful<MixFlags> { &self.flags }
+
+  pub fn focus_handle(&self, wnd: WindowId, host: TrackId) -> FocusHandle {
+    self.trace_focus();
+
+    FocusHandle { flags: self.flags.clone_writer(), wnd, host }
+  }
 
   pub fn dispatch(&self, event: &mut Event) { self.subject.clone().next(event) }
 
@@ -384,6 +390,7 @@ impl MixBuiltin {
   }
 
   /// Begin tracing the focus status of this widget.
+  /// Begin tracing the focus status of this widget.
   pub fn trace_focus(&self) {
     if !self.contain_flag(MixFlags::TraceFocus) {
       self.silent_mark(MixFlags::TraceFocus);
@@ -448,25 +455,92 @@ fn life_fn_once_to_fn_mut(
 
 fn callbacks_for_focus_node(child: Widget) -> Widget {
   fn_widget! {
-  let guard = Sc::new(RefCell::new(None));
-  let guard2 = guard.clone();
-  let mut child = FatObj::new(child);
-  @(child) {
-    on_mounted: move |e| {
-      let mut all_mix = e.query_all_iter::<MixBuiltin>().peekable();
+    let guard = Sc::new(RefCell::new(None));
+    let guard2 = guard.clone();
+    let mut child = FatObj::new(child);
+    @(child) {
+      on_mounted: move |e| {
+        let mut all_mix = e.query_all_iter::<MixBuiltin>().peekable();
         if all_mix.peek().is_some() {
           let auto_focus = all_mix.any(|mix| mix.flags.read().auto_focus());
-          *guard.borrow_mut() = Some(
-            Window::add_focus_node(e.window(), $child.track_id(), auto_focus, FocusType::Node)
-          );
+          *guard.borrow_mut() = Some(Window::add_focus_node(
+            e.window(),
+            $clone(child.track_id()),
+            auto_focus, FocusType::Node
+          ));
         }
       },
-      on_disposed: move |_| {
-        guard2.borrow_mut().take();
-      }
+      on_disposed: move |_| { guard2.borrow_mut().take(); }
     }
   }
   .into_widget()
+}
+
+/// A handle to help for tracking focus status and control the focus for the
+/// host widget.
+pub struct FocusHandle {
+  pub(super) flags: Stateful<MixFlags>,
+  wnd: WindowId,
+  host: TrackId,
+}
+
+impl FocusHandle {
+  /// Checks if the widget or any descendant currently has focus visibility.
+  ///
+  /// Focus tracking must be explicitly enabled during widget creation by
+  /// calling `MixBuiltin::trace_focus`. Without initialization, this method
+  /// will consistently return `false` regardless of actual focus state.
+  #[inline]
+  pub fn is_focused(&self) -> bool { self.flags.read().contains(MixFlags::Focused) }
+
+  /// Retrieves the reason for the most recent focus change event.
+  ///
+  /// When focused: indicates why focus was gained  
+  /// When unfocused: indicates why focus was lost
+  ///
+  /// # Note
+  /// Meaningful only when focus tracking is enabled via
+  /// `MixBuiltin::trace_focus`. The return value becomes undefined if focus
+  /// tracing wasn't initialized.
+  pub fn focus_changed_reason(&self) -> FocusReason { self.flags.read().focus_changed_reason() }
+
+  /// Indicates whether auto-focus is enabled for initial view activation.
+  #[inline]
+  pub fn auto_focus(&self) -> bool { self.flags.read().auto_focus() }
+
+  /// Configures auto-focus behavior with proper flag management.
+  ///
+  /// Enables/disables automatic focus acquisition during view activation,
+  /// maintaining valid flag combinations.
+  pub fn set_auto_focus(&mut self, enable: bool) { self.flags.write().set_auto_focus(enable); }
+
+  /// Retrieves validated tab index for keyboard navigation.
+  ///
+  /// Returns `None` if tab navigation is disabled (Focus flag unset).
+  /// The returned value is guaranteed to be within valid bounds.
+  pub fn tab_index(&self) -> Option<i16> { self.flags.read().tab_index() }
+
+  /// Updates tab index with value sanitization and layout invalidation.
+  ///
+  /// Automatically enables focus tracking and clamps values to valid ranges.
+  pub fn set_tab_index(&mut self, tab_idx: i16) { self.flags.write().set_tab_index(tab_idx); }
+
+  pub fn request_focus(&self, reason: FocusReason) {
+    if let Some(wnd) = AppCtx::get_window(self.wnd) {
+      if let Some(wid) = self.host.get() {
+        wnd.focus_mgr.borrow_mut().focus(wid, reason);
+      }
+    }
+  }
+
+  pub fn unfocus(&self, reason: FocusReason) {
+    if let Some(wnd) = AppCtx::get_window(self.wnd) {
+      let mut focus_mgr = wnd.focus_mgr.borrow_mut();
+      if focus_mgr.focusing() == self.host.get() {
+        focus_mgr.blur(reason);
+      }
+    }
+  }
 }
 
 impl<'c> ComposeChild<'c> for MixBuiltin {
@@ -532,7 +606,7 @@ fn x_times_tap_map_filter(
 
 impl Default for MixBuiltin {
   fn default() -> Self {
-    Self { flags: State::value(MixFlags::default()), subject: Default::default() }
+    Self { flags: Stateful::new(MixFlags::default()), subject: Default::default() }
   }
 }
 
@@ -540,6 +614,13 @@ impl Clone for MixBuiltin {
   fn clone(&self) -> Self {
     let flags = self.flags.clone_writer();
     Self { flags, subject: self.subject.clone() }
+  }
+}
+
+impl Clone for FocusHandle {
+  fn clone(&self) -> Self {
+    let flags = self.flags.clone_writer();
+    Self { flags, wnd: self.wnd, host: self.host.clone() }
   }
 }
 
@@ -557,12 +638,12 @@ mod tests {
     let (outer_layout, w_outer_layout) = split_value(0);
     let mix_keep = fn_widget! {
       let mut pipe_w = FatObj::new( pipe! {
-        $trigger;
+        $read(trigger);
         fn_widget! { @Void { on_performed_layout: move |_| {} }}
       });
 
       @(pipe_w) {
-        on_performed_layout: move |_| *$w_outer_layout.write() +=1 ,
+        on_performed_layout: move |_| *$write(w_outer_layout) +=1 ,
       }
     };
 

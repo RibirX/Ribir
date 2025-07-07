@@ -206,12 +206,12 @@ mod tests {
         },
         @MockMulti {
           @pipe! {
-            (0..*$item_cnt).map(move |i| {
+            (0..*$read(item_cnt)).map(move |i| {
               @Reuse {
                 reuse_id: LocalId::number(i),
                 @ {
                   fn_widget! {
-                    *$build_w.write() += 1;
+                    *$write(build_w) += 1;
                     Void {}.into_widget()
                   }
                 }

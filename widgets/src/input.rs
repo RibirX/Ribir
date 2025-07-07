@@ -38,7 +38,7 @@ class_names!(
 /// let w = fn_widget! {
 ///   let input = @Input {};
 ///   @Column {
-///     @ Text { text: pipe!("the input value is:".to_string() + $input.text()) }
+///     @ Text { text: pipe!("the input value is:".to_string() + $read(input).text()) }
 ///     @ Row {
 ///       @ Text { text: "input value:" }
 ///       @ { input }
@@ -207,8 +207,8 @@ mod tests {
     let (value, w_value) = split_value(String::default());
     let w = fn_widget! {
       let input = @Input { auto_focus: true };
-      watch!($input.text().clone())
-        .subscribe(move |text| *$w_value.write() = text.to_string());
+      watch!($read(input).text().clone())
+        .subscribe(move |text| *$write(w_value) = text.to_string());
       input
     };
 
@@ -227,8 +227,8 @@ mod tests {
     let (value, w_value) = split_value(String::default());
     let w = fn_widget! {
       let input = @Input {  };
-      watch!($input.text().clone())
-        .subscribe(move |text| *$w_value.write() = text.to_string());
+      watch!($read(input).text().clone())
+        .subscribe(move |text| *$write(w_value) = text.to_string());
 
       @SizedBox {
         size: Size::new(200., 24.),

@@ -27,11 +27,11 @@
 //!
 //!   let first_fade_in = @Animate {
 //!     transition: transitions::EASE_IN.of(ctx),
-//!      state: part_writer!(&mut first.opacity),
+//!      state:  first.opacity(),
 //!   };
 //!
 //!   stagger.write().push_animation(first_fade_in);
-//!   stagger.write().push_state(part_writer!(&mut second.opacity), 0.);
+//!   stagger.write().push_state(second.opacity(), 0.);
 //!
 //!   @Column {
 //!     on_mounted: move |_| stagger.run(),
@@ -231,7 +231,7 @@ mod tests {
 
       let animate = @Animate {
         transition: transitions::EASE_IN.of(BuildCtx::get()),
-        state: part_writer!(&mut mock_box.opacity),
+        state: mock_box.opacity(),
         from: 0.,
       };
 
@@ -263,7 +263,7 @@ mod tests {
     let c_stagger = stagger.clone_writer();
     let w = fn_widget! {
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };
-      $stagger.write().push_state(part_writer!(&mut mock_box.opacity),0.);
+      $write(stagger).push_state(mock_box.opacity(), 0.);
       stagger.run();
 
       mock_box

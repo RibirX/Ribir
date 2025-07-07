@@ -8,8 +8,8 @@ use syn::{
 };
 
 use crate::{
-  symbol_process::{DollarRef, DollarRefsCtx, DollarUsedInfo},
-  variable_names::{BUILTIN_INFOS, BuiltinMemberType},
+  dollar_macro::{OriginExpr, StateExpr},
+  symbol_process::*,
 };
 
 pub fn gen_part_writer(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>) -> TokenStream {
@@ -142,37 +142,20 @@ impl Parse for PartState {
 
 impl PartState {
   fn host_tokens(&self, used: DollarUsedInfo, refs_ctx: Option<&mut DollarRefsCtx>) -> TokenStream {
+    let mut tokens = quote! {};
     if let Some(refs_ctx) = refs_ctx {
-      let info = self.state_info(refs_ctx, used);
-      let host = if info.builtin.is_some() {
-        refs_ctx.builtin_host_tokens(&info)
+      let state_expr = StateExpr::new(self.state.clone(), OriginExpr::Var(self.state.clone()));
+      if !refs_ctx.is_capture_var(&self.state) {
+        self.state.to_tokens(&mut tokens);
       } else {
-        self.state.to_token_stream()
-      };
-      refs_ctx.add_dollar_ref(info);
-      host
+        state_expr.name.to_tokens(&mut tokens);
+      }
+      refs_ctx.add_dollar_ref(DollarRef { state_expr, used });
     } else {
-      let ctx = DollarRefsCtx::top_level();
-      let info = self.state_info(&ctx, used);
-      info.real_state_tokens()
+      self.state.to_tokens(&mut tokens);
     }
-  }
 
-  fn state_info(&self, refs_ctx: &DollarRefsCtx, used: DollarUsedInfo) -> DollarRef {
-    let builtin_info = match &self.part_expr {
-      PartExpr::Member(Member::Named(member)) => BUILTIN_INFOS
-        .get(member.to_string().as_str())
-        .filter(|info| info.mem_ty == BuiltinMemberType::Field),
-      PartExpr::Method { method, .. } => BUILTIN_INFOS
-        .get(method.to_string().as_str())
-        .filter(|info| info.mem_ty == BuiltinMemberType::Method),
-      _ => None,
-    };
-    if let Some(info) = builtin_info {
-      refs_ctx.builtin_dollar_ref(self.state.clone(), info, used)
-    } else {
-      DollarRef { name: self.state.clone(), builtin: None, used }
-    }
+    tokens
   }
 }
 

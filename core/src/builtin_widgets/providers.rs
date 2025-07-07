@@ -894,7 +894,7 @@ mod tests {
         size: Size::new(1.,1.),
         @ {
           let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
-          *$w_value.write() = *v;
+          *$write(w_value) = *v;
           Void
         }
       }
@@ -917,7 +917,7 @@ mod tests {
         providers: [Provider::new(1i32)],
         @ {
           let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
-          *$w_value1.write() = *v;
+          *$write(w_value1) = *v;
           Void
         }
       }
@@ -926,7 +926,7 @@ mod tests {
         providers: smallvec![Provider::new(2i32)],
         @ {
           let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
-          *$w_value2.write() = *v;
+          *$write(w_value2) = *v;
           Void
         }
       }
@@ -951,8 +951,8 @@ mod tests {
         // We do not allow the use of the build context in the pipe at the moment.
         let value = Provider::of::<Stateful<i32>>(BuildCtx::get())
           .unwrap().clone_writer();
-        pipe!(*$trigger).map(move |_| {
-          *$value.write() += 1;
+        pipe!(*$read(trigger)).map(move |_| {
+          *$write(value) += 1;
           @Void {}
         })
       }

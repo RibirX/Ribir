@@ -23,6 +23,7 @@ pub struct DeclareObj {
 enum ObjType {
   Type(Path),
   Expr {
+    // todo: support expr
     expr: Ident,
     /// A virtual scope that collects references used in the object's fields.
     ///
@@ -178,39 +179,10 @@ impl DeclareObj {
         }
       }
       ObjType::Expr { expr, fields_used } => {
-        // todo: we can not care if it self reference used in the fields, if
-        // we capture builtin state as normal.
-
-        // if has capture self, rename to `_ಠ_ಠ` avoid conflict name.
-        let self_ref = fields_used.iter().find(|r| r.builtin.is_none());
-        if let Some(mut self_ref) = self_ref.cloned() {
-          fields_used
-            .iter()
-            .filter(|r| r.builtin.is_some())
-            .for_each(|r| r.to_tokens(tokens));
-
-          let name = Ident::new("_ಠ_ಠ", expr.span());
-          quote_spanned! { expr.span() =>  let mut #name = #expr;}.to_tokens(tokens);
-          let orig = std::mem::replace(&mut self_ref.name, name.clone());
-          self_ref.capture_state(&orig, tokens);
-
-          self.gen_fields_tokens(&name, tokens);
-          // If a child exist, revert the variable name to compose children.
-          if !self.children.is_empty() {
-            quote_spanned! { expr.span() =>
-              #[allow(unused_mut)]
-              let mut #expr = #name;
-            }
-            .to_tokens(tokens);
-          } else {
-            name.to_tokens(tokens);
-          }
-        } else {
-          fields_used.to_tokens(tokens);
-          self.gen_fields_tokens(expr, tokens);
-          if self.children.is_empty() {
-            expr.to_tokens(tokens);
-          }
+        fields_used.to_tokens(tokens);
+        self.gen_fields_tokens(expr, tokens);
+        if self.children.is_empty() {
+          expr.to_tokens(tokens);
         }
       }
     };

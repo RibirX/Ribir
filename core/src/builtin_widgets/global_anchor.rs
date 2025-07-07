@@ -54,11 +54,11 @@ pub enum GlobalAnchorY {
 ///       @Text {
 ///         text: "anchor by global anchor",
 ///         global_anchor_x:
-///           GlobalAnchorX::center_align_to($button.track_id(), 0.),
+///           GlobalAnchorX::center_align_to($clone(button.track_id()), 0.),
 ///         global_anchor_y:
 ///           GlobalAnchorY::bottom_align_to(
-///             $button.track_id(),
-///             $button.layout_size().height
+///             $clone(button.track_id()),
+///             *$read(button.layout_height())
 ///           )
 ///        }.into_widget()
 ///     },
@@ -271,20 +271,22 @@ impl<'c> ComposeChild<'c> for GlobalAnchor {
   type Child = Widget<'c>;
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     let modifies = this.raw_modifies();
+
     fn_widget! {
       let wnd = BuildCtx::get().window();
       let mut child = FatObj::new(child);
-      let this2 = this.clone_writer();
-      let anchor_widget = child.get_relative_anchor_widget().clone_writer();
       let u = this.modifies()
-          .subscribe(move |_| {
-            apply_global_anchor(&this2, &anchor_widget, $child.track_id(), wnd.clone());
-          });
+        .subscribe(move |_| {
+          let global = $writer(this);
+          let relative = $writer(child.relative_anchor_widget());
+          let track_id = $clone(child.track_id());
+          apply_global_anchor(global, relative, track_id, wnd.clone());
+        });
 
       @(child) {
         on_disposed: move |_| {
           u.unsubscribe();
-          $this.guard.borrow_mut().take();
+          $read(this).guard.borrow_mut().take();
         }
       }
     }
@@ -294,7 +296,7 @@ impl<'c> ComposeChild<'c> for GlobalAnchor {
 }
 
 fn apply_global_anchor(
-  this: &impl StateWriter<Value = GlobalAnchor>, anchor: &impl StateWriter<Value = RelativeAnchor>,
+  this: impl StateWriter<Value = GlobalAnchor>, anchor: impl StateWriter<Value = RelativeAnchor>,
   host: TrackId, wnd: Sc<Window>,
 ) {
   let tick_of_layout_ready = wnd
@@ -375,14 +377,14 @@ mod tests {
 
       let top_left = @MockBox {
         size: Size::new(10., 10.),
-        global_anchor_x: GlobalAnchorX::left_align_to($parent.track_id(), 20.),
-        global_anchor_y: GlobalAnchorY::top_align_to($parent.track_id(), 10.),
+        global_anchor_x: GlobalAnchorX::left_align_to($clone(parent.track_id()), 20.),
+        global_anchor_y: GlobalAnchorY::top_align_to($clone(parent.track_id()), 10.),
       };
 
       let bottom_right = @MockBox {
         size: Size::new(10., 10.),
-        global_anchor_x: GlobalAnchorX::right_align_to($parent.track_id(), 10.),
-        global_anchor_y: GlobalAnchorY::bottom_align_to($parent.track_id(), 20.),
+        global_anchor_x: GlobalAnchorX::right_align_to($clone(parent.track_id()), 10.),
+        global_anchor_y: GlobalAnchorY::bottom_align_to($clone(parent.track_id()), 20.),
       };
 
       @(parent) {
