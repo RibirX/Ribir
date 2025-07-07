@@ -3,19 +3,12 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{Ident, Visibility, spanned::Spanned};
 
-use crate::{
-  simple_declare_attr::*,
-  variable_names::{BUILTIN_INFOS, BuiltinMemberType},
-};
+use crate::simple_declare_attr::*;
 
 pub(crate) fn declare_derive(stt: &mut syn::ItemStruct) -> syn::Result<TokenStream> {
   let declarer = Declarer::new(stt)?;
 
   let Declarer { name, fields, original, .. } = &declarer;
-  // reverse name check.
-  fields
-    .iter()
-    .try_for_each(DeclareField::check_reserve)?;
   let syn::ItemStruct { vis, ident: host, generics, .. } = &original;
 
   let set_methods = declarer_set_methods(vis, fields);
@@ -188,29 +181,6 @@ fn field_values<'a>(declarer: &'a Declarer) -> impl Iterator<Item = TokenStream>
       let #f_name: (#ty, Option<ValueStream<#ty>>) = #v;
     }
   })
-}
-
-impl<'a> DeclareField<'a> {
-  fn check_reserve(&self) -> syn::Result<()> {
-    let member = self.member();
-    BUILTIN_INFOS
-      .get(member.to_string().as_str())
-      .filter(|info| info.mem_ty == BuiltinMemberType::Field)
-      .map(|builtin_mem| {
-        let mut field = self.field.clone();
-        // not display the attrs in the help code.
-        field.attrs.clear();
-
-        let msg = format!(
-          "Error: Identifier `{member}` is reserved for {type_name} usage.
-      This name conflicts with a built-in declaration. ",
-          type_name = &builtin_mem.host_ty,
-        );
-
-        Err(syn::Error::new_spanned(field, msg))
-      })
-      .unwrap_or(Ok(()))
-  }
 }
 
 fn deref_fat_obj(declarer: &Declarer) -> TokenStream {

@@ -16,7 +16,6 @@ mod fn_widget_macro;
 mod pipe_macro;
 mod rdl_macro;
 mod simple_declare_attr;
-pub(crate) mod variable_names;
 mod watch_macro;
 pub(crate) use rdl_macro::*;
 pub(crate) mod declare_obj;

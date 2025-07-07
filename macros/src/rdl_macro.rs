@@ -82,11 +82,7 @@ impl RdlMacro {
 
   fn gen_rdl(self, refs: &mut DollarRefsCtx) -> crate::error::Result<TokenStream> {
     let tokens = match self {
-      RdlMacro::Literal(stl) => {
-        let obj = DeclareObj::from_literal(stl, refs);
-        obj.error_check()?;
-        obj.to_token_stream()
-      }
+      RdlMacro::Literal(stl) => DeclareObj::from_literal(stl, refs).to_token_stream(),
       RdlMacro::ExprObj { span, stmts } => {
         let stmts = stmts.into_iter().map(|s| refs.fold_stmt(s));
         if stmts.len() > 1 {
