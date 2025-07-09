@@ -22,10 +22,10 @@ lyon_geom.workspace = true
 paste.workspace = true
 triomphe.workspace = true
 pin-project-lite.workspace = true
-ribir_algo = {path = "../algo", version = "0.4.0-alpha.40" }
-ribir_geom = {path = "../geom", version = "0.4.0-alpha.40" }
-ribir_macros = {path = "../macros", version = "0.4.0-alpha.40" }
-ribir_painter = {path = "../painter", version = "0.4.0-alpha.40" }
+ribir_algo = {path = "../algo", version = "0.4.0-alpha.43" }
+ribir_geom = {path = "../geom", version = "0.4.0-alpha.43" }
+ribir_macros = {path = "../macros", version = "0.4.0-alpha.43" }
+ribir_painter = {path = "../painter", version = "0.4.0-alpha.43" }
 rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
@@ -36,7 +36,7 @@ cfg-if.workspace = true
 tokio-run-until-stalled.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { workspace = true, features = ["rt-multi-thread", "rt", "time", "macros"]}
+tokio = { workspace = true, features = ["rt-multi-thread", "rt", "time", "macros", "sync"]}
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { workspace = true, features = ["Location", "Window", "History"]}

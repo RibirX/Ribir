@@ -1,6 +1,6 @@
 [package]
 name = "cli"
-version = "0.4.0-alpha.40"
+version = "0.4.0-alpha.43"
 edition = "2021"
 publish = false
 
