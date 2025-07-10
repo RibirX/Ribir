@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.44] - 2025-07-10
+
 ### Features
 
 - **macros**: Supported parent expression syntax using `$(...) { }`. (#773 @M-Adoo)
@@ -859,7 +861,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.40...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.44...HEAD
+[0.4.0-alpha.44]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.40...ribir-v0.4.0-alpha.44
 [0.4.0-alpha.40]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.39...ribir-v0.4.0-alpha.40
 [0.4.0-alpha.39]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.38...ribir-v0.4.0-alpha.39
 [0.4.0-alpha.38]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.37...ribir-v0.4.0-alpha.38
