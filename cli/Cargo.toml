@@ -11,3 +11,12 @@ anyhow = "1.0"
 fs_extra = "1.3.0"
 notify-debouncer-mini = "0.6.0"
 gitignore = "1.0.8"
+tauri-bundler.workspace = true
+tauri-utils.workspace = true
+serde_json.workspace = true
+serde = {workspace = true, features = ["derive"]}
+serde-value.workspace = true
+serde_with.workspace = true
+toml.workspace = true
+log = { workspace = true, features = ["kv", "kv_std"]}
+env_logger.workspace = true
