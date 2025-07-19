@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **cli**: add support for packaging Ribir projects. (#pr @wjian23)
+
 ## [0.4.0-alpha.44] - 2025-07-10
 
 ### Features
