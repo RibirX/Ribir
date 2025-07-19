@@ -45,14 +45,14 @@ bitflags = "2.6.0"
 colored = "2.1.0"
 derive_more = "1.0.0"
 dssim-core = "3.2.9"
-env_logger = "0.7.1"
+env_logger = "0.11.8"
 euclid = "0.22.11"
 fontdb = "0.23.0"
 futures = "0.3.26"
 guillotiere = "0.6.0"
 image = { version = "0.25.6", default-features = false, features = ["rayon"] }
 indextree = "4.7.3"
-log = "0.4.14"
+log = "0.4.27"
 lyon_algorithms = "1.0.5"
 lyon_geom = "1.0.6"
 lyon_path = "1.0.7"
@@ -97,6 +97,11 @@ thiserror = "2.0.12"
 wasm-bindgen-futures = "0.4.50"
 getrandom-v3 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 cfg-if = "1.0"
+tauri-bundler = "2.6.*"
+tauri-utils = "2.7.*"
+serde-value = "0.7.0"
+serde_with = "3.14.0"
+toml = "0.9.2"
 
 [workspace.metadata.release]
 shared-version = true

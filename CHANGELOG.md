@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **cli**: add support for packaging Ribir projects, see README.md in cli for details. (#777 @wjian23)
+
 ### Fixed
 
 - **gpu**: Fixed the missed submission of GPU commands for drawing mask triangles, which led to abnormal color filling. (#781 @wjian23)

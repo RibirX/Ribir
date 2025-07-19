@@ -256,4 +256,4 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: compile to wasm
-        run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper
+        run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper --exclude cli

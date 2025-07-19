@@ -33,3 +33,13 @@ wgpu = ["ribir/wgpu"]
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
+[bundle]
+"productName" = "Counter"
+"version" = "1.0.0"
+"identifier" = "com.ribir.counter"
+"shortDescription" = ""
+"longDescription" = ""
+"copyright" = "Copyright (c) You 2021. All rights reserved."
+"icon" = ["../Logo.ico"]
+"resources" = []  
+"externalBin" = []
