@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Added built-in property `backdrop_filter`. (#pr @wjian23)
+
 ## [0.4.0-alpha.44] - 2025-07-10
 
 ### Features

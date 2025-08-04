@@ -280,6 +280,7 @@ fn fallback_color_check(cmds: &[PaintCommand]) -> (bool, bool) {
         fill_fallback = f;
         stroke_fallback |= s;
       }
+      PaintCommand::Filter { .. } => {}
     }
   }
   (fill_fallback, stroke_fallback)
@@ -313,6 +314,7 @@ fn brush_replace(cmds: &[PaintCommand], fill: &Brush, stroke: &Brush) -> Box<[Pa
           cmds,
         }
       }
+      PaintCommand::Filter { .. } => c.clone(),
     })
     .collect()
 }

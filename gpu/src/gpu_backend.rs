@@ -5,13 +5,13 @@ use ribir_geom::{
   DeviceRect, DeviceSize, Point, Transform, rect_corners, transform_to_device_rect,
 };
 use ribir_painter::{
-  Color, ColorMatrix, CommandBrush, PaintCommand, PaintPath, PaintPathAction, PainterBackend,
-  PaintingStyle, PathCommand, PixelImage, Vertex, VertexBuffers, color::ColorFilterMatrix,
-  image::ColorFormat,
+  Color, ColorMatrix, CommandBrush, FilterType, FlattenMatrix, PaintCommand, PaintPath,
+  PaintPathAction, PainterBackend, PaintingStyle, PathCommand, PixelImage, Vertex, VertexBuffers,
+  color::ColorFilterMatrix, image::ColorFormat,
 };
 
 use crate::{
-  ColorAttr, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex, ImgPrimitive,
+  ColorAttr, FilterPrimitive, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex, ImgPrimitive,
   LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, RadialGradientPrimIndex,
   RadialGradientPrimitive,
 };
@@ -26,6 +26,7 @@ pub struct GPUBackend<Impl: GPUBackendImpl> {
   tex_mgr: TexturesMgr<Impl::Texture>,
   color_vertices_buffer: VertexBuffers<ColorAttr>,
   img_vertices_buffer: VertexBuffers<ImagePrimIndex>,
+  filter_vertices_buffer: VertexBuffers<()>,
   img_prims: Vec<ImgPrimitive>,
   radial_gradient_vertices_buffer: VertexBuffers<RadialGradientPrimIndex>,
   radial_gradient_stops: Vec<GradientStopPrimitive>,
@@ -42,13 +43,72 @@ pub struct GPUBackend<Impl: GPUBackendImpl> {
   surface_color: Option<Color>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug)]
 enum CurrentPhase {
   None,
   Color,
   Img,
   RadialGradient,
   LinearGradient,
+  Filter(Box<FilterPhase>),
+}
+
+#[derive(Clone, Debug)]
+struct FilterPhase {
+  view_rect: DeviceRect,
+  mask_head: i32,
+  filters: Vec<FilterType>,
+}
+
+impl FilterPhase {
+  fn primitive_iter(&self) -> impl Iterator<Item = (FilterPrimitive, Vec<f32>)> + '_ {
+    let mut origin_it = self.filters.iter().peekable();
+    std::iter::from_fn(move || {
+      let filter = origin_it.next()?;
+      let (mut color_matrix, mut matrix) = match filter {
+        FilterType::Color(color_matrix) => (Some(*color_matrix), None),
+        FilterType::Convolution(matrix) => (None, Some(matrix)),
+      };
+      while let Some(next) = origin_it.peek() {
+        match next {
+          FilterType::Color(matrix) => {
+            if let Some(color_matrix) = &mut color_matrix {
+              color_matrix.chains(matrix);
+            } else {
+              color_matrix = Some(*matrix);
+            }
+          }
+          FilterType::Convolution(m) if matrix.is_none() => {
+            matrix = Some(m);
+          }
+          _ => break,
+        };
+        origin_it.next();
+      }
+      let matrix =
+        matrix
+          .cloned()
+          .unwrap_or_else(|| FlattenMatrix { width: 1, height: 1, matrix: vec![1.] });
+
+      if color_matrix.is_none() {
+        color_matrix = Some(ColorMatrix::identity().to_matrix());
+      }
+      let ColorFilterMatrix { matrix: color_matrix, base_color } = color_matrix.unwrap();
+      let FlattenMatrix { width, height, matrix, .. } = matrix;
+      Some((
+        FilterPrimitive {
+          sample_offset: [0.; 2],
+          mask_offset: [0.; 2],
+          dummy: 0,
+          color_matrix,
+          base_color: base_color.map_or_else(|| [0.; 4], |c| c.into_f32_components()),
+          kernel_size: [width as i32, height as i32],
+          mask_head: self.mask_head,
+        },
+        matrix,
+      ))
+    })
+  }
 }
 
 struct ClipLayer {
@@ -135,6 +195,7 @@ where
       skip_clip_cnt: 0,
       color_vertices_buffer: VertexBuffers::with_capacity(256, 512),
       img_vertices_buffer: VertexBuffers::with_capacity(256, 512),
+      filter_vertices_buffer: VertexBuffers::with_capacity(16, 32),
       radial_gradient_vertices_buffer: VertexBuffers::with_capacity(256, 512),
       radial_gradient_prims: vec![],
       radial_gradient_stops: vec![],
@@ -336,13 +397,30 @@ where
           points,
         );
       }
+      PaintCommand::Filter { path, path_bounds, transform, filters } => {
+        let bounds = transform_to_device_rect(path_bounds, global_matrix);
+        let Some(view_rect) = self.viewport().intersection(&bounds) else {
+          return;
+        };
+
+        self.new_draw_phase(output);
+
+        let ts = transform.then(global_matrix);
+        let (_, mask_head) = self.new_mask_layer(&view_rect, &ts, path, &PaintingStyle::Fill);
+
+        self.current_phase = CurrentPhase::Filter(Box::new(FilterPhase {
+          view_rect,
+          mask_head,
+          filters: filters.clone(),
+        }));
+      }
     }
   }
 
   fn can_batch_img_path(&self) -> bool {
     let limits = self.gpu_impl.limits();
-    self.current_phase == CurrentPhase::None
-      || (self.current_phase == CurrentPhase::Img
+    matches!(self.current_phase, CurrentPhase::None)
+      || (matches!(self.current_phase, CurrentPhase::Img)
         && self.tex_ids_map.len() < limits.max_tex_load - 1
         && self.img_prims.len() < limits.max_image_primitives)
   }
@@ -413,6 +491,8 @@ where
       .indices
       .clear();
     self.linear_gradient_stops.clear();
+    self.filter_vertices_buffer.vertices.clear();
+    self.filter_vertices_buffer.indices.clear();
   }
 
   fn draw_img_slice(
@@ -445,12 +525,17 @@ where
     let limits = self.gpu_impl.limits();
     let tex_used = self.tex_ids_map.len();
 
+    if matches!(self.current_phase, CurrentPhase::Filter(_)) {
+      return false;
+    }
+
     let PaintPathAction::Paint { brush, .. } = &cmd.action else {
       return tex_used < limits.max_tex_load;
     };
 
-    match (self.current_phase, brush) {
+    match (&self.current_phase, brush) {
       (CurrentPhase::None, _) => true,
+      (CurrentPhase::Filter(_), _) => false,
       (CurrentPhase::Color, CommandBrush::Color(_)) => tex_used < limits.max_tex_load,
       (CurrentPhase::Img, CommandBrush::Image { .. }) => {
         tex_used < limits.max_tex_load - 1 && self.img_prims.len() < limits.max_image_primitives
@@ -530,7 +615,8 @@ where
     }
     gpu_impl.load_textures(&tex_buffer);
 
-    match self.current_phase {
+    let current_phase = std::mem::replace(&mut self.current_phase, CurrentPhase::None);
+    match current_phase {
       CurrentPhase::None => {
         if color.is_some() {
           gpu_impl.draw_color_triangles(output, 0..0, color.take())
@@ -571,7 +657,70 @@ where
         let rg = 0..self.linear_gradient_vertices_buffer.indices.len() as u32;
         gpu_impl.draw_linear_gradient_triangles(output, rg, color.take())
       }
+      CurrentPhase::Filter(filters) => {
+        self.draw_filter(&filters, output);
+      }
       _ => {}
+    }
+  }
+
+  fn draw_filter(&mut self, filter: &FilterPhase, output: &mut Impl::Texture) {
+    let mut tex_tmp = self
+      .gpu_impl
+      .new_texture(filter.view_rect.size, ColorFormat::Rgba8);
+
+    let mut p_src_tex = output as *mut _;
+    let mut p_dst_tex = &mut tex_tmp as *mut Impl::Texture;
+    let mask_origin = filter.view_rect.origin.cast().cast_unit();
+    let mut src_origin = filter.view_rect.origin.cast().cast_unit();
+    let mut dst_origin = Point::new(0_f32, 0.);
+    let primitives = filter.primitive_iter();
+
+    for (mut prim, kernel) in primitives {
+      prim.sample_offset = (src_origin - dst_origin).into();
+      prim.mask_offset = (mask_origin - dst_origin).into();
+
+      let dst_tex = unsafe { &mut *p_dst_tex };
+      let origin = unsafe { &*p_src_tex };
+
+      self
+        .gpu_impl
+        .load_filter_primitive(&prim, &kernel);
+
+      self.filter_vertices_buffer.clear();
+      let dst_size = dst_tex.size();
+
+      add_rect_vertices(
+        [
+          dst_origin,
+          dst_origin + Vector2D::new(dst_size.width as f32, 0.),
+          dst_origin + Vector2D::new(dst_size.width as f32, dst_size.height as f32),
+          dst_origin + Vector2D::new(0., dst_size.height as f32),
+        ],
+        dst_size,
+        (),
+        &mut self.filter_vertices_buffer,
+      );
+
+      self
+        .gpu_impl
+        .load_filter_vertices(&self.filter_vertices_buffer);
+      let indices = 0..self.filter_vertices_buffer.indices.len() as u32;
+      self
+        .gpu_impl
+        .draw_filter_triangles(dst_tex, origin, indices, None);
+
+      std::mem::swap(&mut p_dst_tex, &mut p_src_tex);
+      std::mem::swap(&mut dst_origin, &mut src_origin);
+    }
+
+    if std::ptr::eq(p_dst_tex, output) {
+      self.gpu_impl.copy_texture_from_texture(
+        output,
+        dst_origin.cast().cast_unit(),
+        &tex_tmp,
+        &DeviceRect::from_size(tex_tmp.size()),
+      );
     }
   }
 }

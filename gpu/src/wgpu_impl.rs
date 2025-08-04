@@ -18,9 +18,10 @@ use self::{
   uniform::Uniform,
 };
 use crate::{
-  ColorAttr, DrawPhaseLimits, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex, ImgPrimitive,
-  LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, RadialGradientPrimIndex,
-  RadialGradientPrimitive, gpu_backend::Texture,
+  ColorAttr, DrawPhaseLimits, FilterPrimitive, GPUBackendImpl, GradientStopPrimitive,
+  ImagePrimIndex, ImgPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer,
+  RadialGradientPrimIndex, RadialGradientPrimitive, gpu_backend::Texture,
+  wgpu_impl::draw_filter_pass::DrawFilterPass,
 };
 mod shaders;
 mod uniform;
@@ -28,6 +29,7 @@ mod vertex_buffer;
 
 mod draw_alpha_triangles_pass;
 mod draw_color_triangles_pass;
+mod draw_filter_pass;
 mod draw_img_triangles_pass;
 mod draw_linear_gradient_pass;
 mod draw_radial_gradient_pass;
@@ -50,6 +52,7 @@ pub struct WgpuImpl {
   img_triangles_pass: Option<DrawImgTrianglesPass>,
   radial_gradient_pass: Option<DrawRadialGradientTrianglesPass>,
   linear_gradient_pass: Option<DrawLinearGradientTrianglesPass>,
+  filter_pass: Option<DrawFilterPass>,
   texs_layout: wgpu::BindGroupLayout,
   textures_bind: Option<wgpu::BindGroup>,
   mask_layers_uniform: Uniform<MaskLayer>,
@@ -125,6 +128,19 @@ macro_rules! linear_gradient_pass {
   };
 }
 
+macro_rules! filter_pass {
+  ($backend:ident) => {
+    $backend.filter_pass.get_or_insert_with(|| {
+      DrawFilterPass::new(
+        &$backend.device,
+        $backend.mask_layers_uniform.layout(),
+        &$backend.texs_layout,
+        &$backend.limits,
+      )
+    })
+  };
+}
+
 pub(crate) use command_encoder;
 
 pub struct Surface<'a> {
@@ -192,6 +208,10 @@ impl GPUBackendImpl for WgpuImpl {
     img_pass!(self).load_img_primitives(&self.queue, primitives);
   }
 
+  fn load_filter_vertices(&mut self, buffers: &VertexBuffers<()>) {
+    filter_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue);
+  }
+
   fn load_radial_gradient_primitives(&mut self, primitives: &[RadialGradientPrimitive]) {
     radial_gradient_pass!(self).load_radial_gradient_primitives(&self.queue, primitives);
   }
@@ -214,6 +234,10 @@ impl GPUBackendImpl for WgpuImpl {
 
   fn load_linear_gradient_vertices(&mut self, buffers: &VertexBuffers<LinearGradientPrimIndex>) {
     linear_gradient_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue);
+  }
+
+  fn load_filter_primitive(&mut self, primitive: &FilterPrimitive, kernel_matrix: &[f32]) {
+    filter_pass!(self).load_filter_primitive(&self.queue, primitive, kernel_matrix);
   }
 
   fn load_mask_layers(&mut self, layers: &[crate::MaskLayer]) {
@@ -308,6 +332,24 @@ impl GPUBackendImpl for WgpuImpl {
       &self.mask_layers_uniform,
     );
     self.submit()
+  }
+
+  fn draw_filter_triangles(
+    &mut self, texture: &mut Self::Texture, origin: &Self::Texture, indices: Range<u32>,
+    clear: Option<Color>,
+  ) {
+    let encoder = command_encoder!(self);
+    filter_pass!(self).draw_triangles(
+      texture,
+      origin,
+      indices,
+      clear,
+      &self.device,
+      encoder,
+      self.textures_bind.as_ref().unwrap(),
+      &self.mask_layers_uniform,
+    );
+    self.submit();
   }
 
   fn copy_texture_from_texture(
@@ -621,6 +663,8 @@ impl WgpuImpl {
       max_linear_gradient_primitives: uniform_bytes / size_of::<LinearGradientPrimitive>(),
       max_gradient_stop_primitives: uniform_bytes / size_of::<GradientStopPrimitive>(),
       max_mask_layers: uniform_bytes / size_of::<MaskLayer>(),
+      max_filter_matrix_len: ((uniform_bytes - size_of::<FilterPrimitive>()) & 0xFFFFFF00)
+        / size_of::<f32>(), // the matrix size must be aligned to 16 bytes
     };
 
     let mask_layers_uniform =
@@ -640,6 +684,7 @@ impl WgpuImpl {
       img_triangles_pass: None,
       radial_gradient_pass: None,
       linear_gradient_pass: None,
+      filter_pass: None,
       texs_layout,
       textures_bind: None,
       mask_layers_uniform,
@@ -656,7 +701,7 @@ impl WgpuImpl {
         .expect("No suitable format found for the surface!");
 
       let config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         format,
         width: 0,
         height: 0,
