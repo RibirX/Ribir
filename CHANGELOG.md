@@ -27,7 +27,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: Added built-in property `backdrop_filter`. (#pr @wjian23)
+- **core**: Added built-in property `backdrop_filter`. (#778 @wjian23)
+
+### Fixed
+
+- **gpu**: Fixed the drawn colors are biased. (#778 @wjian23)
 
 ## [0.4.0-alpha.44] - 2025-07-10
 

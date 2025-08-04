@@ -7,7 +7,7 @@ use wgpu::include_wgsl;
 use super::{uniform::Uniform, vertex_buffer::VerticesBuffer};
 use crate::WgpuTexture;
 
-pub const SAMPLE_COUNT: u32 = 6;
+pub const SAMPLE_COUNT: u32 = 8;
 
 pub struct DrawAlphaTrianglesPass {
   vertices_buffer: VerticesBuffer<()>,
