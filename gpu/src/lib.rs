@@ -131,6 +131,13 @@ pub trait GPUBackendImpl {
   /// Load the vertices and indices buffer that `draw_linear_gradient_triangles`
   /// will use.
   fn load_linear_gradient_vertices(&mut self, buffers: &VertexBuffers<LinearGradientPrimIndex>);
+
+  /// load the filter
+  fn load_filter_primitive(&mut self, primitives: &FilterPrimitive, kernel_matrix: &[f32]);
+
+  /// load the filter vertices
+  fn load_filter_vertices(&mut self, buffers: &VertexBuffers<()>);
+
   /// Draw pure color triangles in the texture. And use the clear color clear
   /// the texture first if it's a Some-Value
   fn draw_color_triangles(
@@ -141,6 +148,12 @@ pub trait GPUBackendImpl {
   fn draw_img_triangles(
     &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
   );
+
+  fn draw_filter_triangles(
+    &mut self, texture: &mut Self::Texture, origin: &Self::Texture, indices: Range<u32>,
+    clear: Option<Color>,
+  );
+
   /// Draw triangles fill with color radial gradient. And use the clear color
   /// clear the texture first if it's a Some-Value
   fn draw_radial_gradient_triangles(
@@ -179,6 +192,10 @@ pub struct DrawPhaseLimits {
   /// The maximum number of gradient stops that the backend can load in a single
   /// draw phase
   pub max_gradient_stop_primitives: usize,
+
+  /// The maximum size of the filter matrix that the backend can load in a
+  /// single draw phase
+  pub max_filter_matrix_len: usize,
   /// The maximum number of mask layers that the backend can load in a single
   pub max_mask_layers: usize,
 }
@@ -308,4 +325,23 @@ pub struct MaskLayer {
   /// negative value means there isn't any more mask layer that needs to be
   /// applied.
   pub prev_mask_idx: i32,
+}
+
+#[repr(C, packed)]
+#[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
+pub struct FilterPrimitive {
+  /// The origin of the image placed in texture.
+  pub sample_offset: [f32; 2],
+  /// The origin of the mask layer in the texture.
+  pub mask_offset: [f32; 2],
+  /// The size of the filter kernel.
+  pub kernel_size: [i32; 2],
+  /// The index of the head mask layer.
+  pub mask_head: i32,
+  /// dummy for align
+  pub dummy: i32,
+  /// the final pix color will be color * color_matrix + base_color
+  pub base_color: [f32; 4],
+  /// the final pix color will be color * color_matrix + base_color
+  pub color_matrix: [f32; 4 * 4],
 }

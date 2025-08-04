@@ -35,9 +35,9 @@ pub const LUMINANCE_TO_ALPHA_FILTER: ColorFilterMatrix = ColorFilterMatrix {
 /// palette, altering its overall color tone.
 /// Parameters:
 ///   - level: The saturation_level parameter accepts values between 0.0 and 1.0 (float).
-///       - Values < 0.5 desaturate colors (grayscale effect).
-///       - Values > 0.5 saturate colors (vibrant effect).
-///       - saturation_level = 1.0 maintains original saturation.
+///       - level < 0.5 desaturate colors (grayscale effect).
+///       - level > 0.5 saturate colors (vibrant effect).
+///       - and level = 1.0 maintains original saturation.
 #[rustfmt::skip]
 pub fn saturate_filter(level: f32) -> ColorFilterMatrix {
   ColorFilterMatrix {
@@ -49,6 +49,115 @@ pub fn saturate_filter(level: f32) -> ColorFilterMatrix {
     ],
     base_color: None,
   }
+}
+
+/// grayscale_filter
+/// 
+/// Creates a color filter that converts the color value of each pixel in an image to grayscale.
+/// Parameters:
+///   - amount: The amount parameter accepts values between 0.0 and 1. value 1.0 means full grayscale, while 0.0 means no change.
+#[rustfmt::skip]
+pub fn grayscale_filter(amount: f32) -> ColorFilterMatrix {
+  let t = amount.clamp(0.0,1.0);
+  let (r, g, b) = (0.2126, 0.7152, 0.0722);
+  ColorFilterMatrix {
+    matrix: [
+      1.0 - t + t * r,   t * g,             t * b,             0.0, // red
+      t * r,             1.0 - t + t * g,   t * b,             0.0, // green
+      t * r,             t * g,             1.0 - t + t * b,   0.0, // blue
+      0.0,               0.0,               0.0,               1.0, // alpha
+    ],
+  base_color: None,
+  }
+}
+
+/// opacity_filter
+/// 
+/// Creates a color filter that changes the opacity of the color.
+/// Parameters:
+///   - amount: The amount parameter accepts values between 0.0 and 1. value 1.0 means no changed, while 0.0 means transparent.
+#[rustfmt::skip]
+pub fn opacity_filter(amount: f32) -> ColorFilterMatrix {
+  let v = amount.clamp(0.0, 1.0);
+  ColorFilterMatrix {
+    matrix: [
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, v
+    ],
+    base_color: None,
+  }
+}
+
+/// contrast_filter
+///
+/// Creates a color filter that adjusts the contrast of an element's color
+/// palette, altering the distinction between light and dark areas.
+/// Parameters:
+///   - amount: The contrast adjustment parameter accepts values between 0.0 and
+///     1.0 (float).
+///       - amount = 0.0: Minimum contrast (all colors become neutral gray 0.5)
+///       - 0.0 < amount < 1.0: Gradual contrast adjustment
+///       - amount = 1.0: Maximum contrast (original colors preserved)
+///
+/// Visual effect:
+///   - Lower values reduce contrast, flattening color differences
+///   - Higher values enhance contrast, intensifying color separation
+pub fn contrast_filter(amount: f32) -> ColorFilterMatrix {
+  let c = amount.clamp(0.0, 1.0);
+  let offset = 0.5 * (1.0 - c);
+
+  ColorFilterMatrix {
+    matrix: [
+      c, 0.0, 0.0, 0.0, // R 行
+      0.0, c, 0.0, 0.0, // G 行
+      0.0, 0.0, c, 0.0, // B 行
+      0.0, 0.0, 0.0, 1.0, // A 行
+    ],
+    base_color: Some(Color::from_f32_rgba(offset, offset, offset, 0.0)),
+  }
+}
+
+/// brightness_filter
+/// 
+/// Creates a color filter that adjusts the brightness of an element's color palette.
+/// Parameters:
+///    - amount: The amount parameter accepts values between 0.0 and INFINITY.
+///        - value == 1.0, no change, 
+///        - values < 1.0, darken the colors,
+///        - values > 1.0, brighten the colors.
+#[rustfmt::skip]
+pub fn brightness_filter(amount: f32) -> ColorFilterMatrix {
+    let t = (amount - 1.0).max(-1.0); 
+    ColorFilterMatrix {
+      matrix: [
+        1.,   0.0,  0.0,  0.0, 
+        0.0,  1.,   0.0,  0.0, 
+        0.0,  0.0,  1.,    0.0, 
+        0.0,  0.0,  0.0,  1.0,
+      ],
+      base_color: Some(Color::from_f32_rgba(t, t, t, 0.0)),
+    }
+}
+
+/// invert_filter
+/// 
+/// Creates a color filter that inverts the color value of each pixel in an image.
+/// Parameters:
+///    - amount: The amount parameter accepts values between 0.0 and 1.0. 1.0 means full invert, while 0.0 means no change.
+#[rustfmt::skip]
+pub fn invert_filter(amount: f32) -> ColorFilterMatrix {
+    let i = amount.clamp(0.0, 1.0);
+    ColorFilterMatrix {
+      matrix: [
+        1. - 2. * i,    0.0,             0.0,             0.0,
+        0.0,            1. - 2. * i,     0.0,             0.0,
+        0.0,            0.0,             1. - 2. * i,     0.0,
+        0.0,            0.0,             0.0,             1.0,
+      ],
+      base_color: Some(Color::from_f32_rgba(i, i, i, 0.)),
+    }
 }
 
 /// hue_rotate_filter
@@ -116,7 +225,7 @@ mod tests {
 
   #[cfg(feature = "png")]
   widget_image_tests!(
-    default_text,
+    color_filter,
     WidgetTester::new(fn_widget! {
       let img = Resource::new(PixelImage::from_png(include_bytes!("../../../gpu/imgs/leaves.png")));
       let svg = Svg::parse_from_bytes(

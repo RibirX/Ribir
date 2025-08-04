@@ -132,6 +132,19 @@ pub enum PathStyle {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FilterType {
+  Color(ColorFilterMatrix),
+  Convolution(FlattenMatrix),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlattenMatrix {
+  pub width: usize,
+  pub height: usize,
+  pub matrix: Vec<f32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PaintCommand {
   Path(PathCommand),
   PopClip,
@@ -144,6 +157,20 @@ pub enum PaintCommand {
     /// command
     bounds: Rect,
     cmds: Resource<Box<[PaintCommand]>>,
+  },
+
+  Filter {
+    /// the path area to apply the filter.
+    path: PaintPath,
+
+    /// the transform to apply to the path.
+    transform: Transform,
+
+    /// the bounds of the path.
+    path_bounds: Rect,
+
+    /// the filter primitive to apply.
+    filters: Vec<FilterType>,
   },
 }
 
@@ -190,14 +217,14 @@ impl ColorMatrix {
     *self = v;
   }
 
-  fn chains(&mut self, next: &ColorMatrix) {
+  pub fn chains(&mut self, next: &ColorMatrix) {
     match next {
       ColorMatrix::Opacity(a) => self.apply_alpha(*a),
       ColorMatrix::Matrix(m) => self.apply_color_filter(*m),
     }
   }
 
-  fn apply_to(&self, color: &Color) -> Color {
+  pub fn apply_to(&self, color: &Color) -> Color {
     match self {
       ColorMatrix::Opacity(a) => color.apply_alpha(*a),
       ColorMatrix::Matrix(m) => m.apply_to(color),
@@ -729,6 +756,7 @@ impl Painter {
             color_filter.chains(self.color_filter());
             PaintCommand::Bundle { transform: transform.then(&b_ts), color_filter, bounds, cmds }
           }
+          PaintCommand::Filter { .. } => cmd.clone(),
         };
         self.commands.push(cmd);
       }
@@ -842,6 +870,26 @@ impl Painter {
     for g in glyphs {
       self.draw_glyph(&g, visual_glyphs.font_size(), font_db);
     }
+
+    self
+  }
+
+  pub fn filters(&mut self, path: PaintPath, filters: Vec<FilterType>) -> &mut Self {
+    invisible_return!(self);
+    let p_bounds = path.bounds(None);
+    if p_bounds.is_empty() || !locatable_bounds(&p_bounds) {
+      return self;
+    }
+
+    if !self.intersect_paint_bounds(&p_bounds) {
+      return self;
+    }
+
+    let transform = *self.transform();
+    let path_bounds = transform.outer_transformed_rect(&p_bounds);
+    self
+      .commands
+      .push(PaintCommand::Filter { path, path_bounds, transform, filters });
 
     self
   }

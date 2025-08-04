@@ -447,7 +447,7 @@ pub fn img_triangles_shader(limits: &DrawPhaseLimits) -> String {
       }
   
       color.a = color.a * alpha;
-      return  color * prim.color_matrix + prim.base_color;
+      return color * prim.color_matrix + prim.base_color;
   }
   
   fn img_sample(prim: ImgPrimitive, pos: vec2<f32>) -> vec4<f32> {
@@ -471,6 +471,117 @@ pub fn img_triangles_shader(limits: &DrawPhaseLimits) -> String {
       return textureSampleLevel(tex, s_sampler, sample_pos, 0.);
   }
   "#
+}
+
+pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
+  let filter_shader = r#"
+  // Since a the different alignment between WebGPU and WebGL, we not use 
+  // mat3x2<f32> in the struct, but use vec2<f32> instead. Then, we compose it.
+  struct FilterPrimitive {
+    /// The origin of the image placed in texture.
+    sample_offset: vec2<f32>,
+    /// The size of the image image.
+    mask_offset: vec2<f32>,
+
+    /// The size of the filter kernel.
+    kernel_size: vec2<u32>,
+
+    /// the  index of head mask layer.
+    mask_head: i32,
+
+    /// for align
+    dummy: i32,
+
+    /// base color
+    base_color: vec4<f32>,
+
+    /// color matrix of [f32; 4 * 4]
+    color_matrix: mat4x4<f32>,
+
+    kernel_matrix: array<vec4<f32>,"#
+    .to_string()
+    + &format!("{}", limits.max_filter_matrix_len / 4)
+    + r#">,
+  }
+
+  @group(2) @binding(0) 
+  var<uniform> filter_primitive: FilterPrimitive;
+
+  @group(3) @binding(0)
+  var original_tex: texture_2d<f32>;
+
+  struct VertexInput {
+    @location(0) pos: vec2<f32>,
+  }
+
+  struct VertexOutput {
+    @builtin(position) pos: vec4<f32>
+  }
+  
+  @vertex
+  fn vs_main(v: VertexInput) -> VertexOutput {
+      var o: VertexOutput;
+      // convert from gpu-backend coords(0..1) to wgpu corrds(-1..1)
+      let pos = v.pos * vec2(2., -2.) + vec2(-1., 1.);
+      o.pos = vec4<f32>(pos, 1., 1.);
+      return o;
+  }
+  
+  @fragment
+  fn fs_main(f: VertexOutput) -> @location(0) vec4<f32> {
+    let base = f.pos.xy;
+    let alpha = sample_mask(filter_primitive, base);
+    
+    let kernel_size = filter_primitive.kernel_size;
+    let x_radius = f32(kernel_size.x >> 1);
+    let y_radius = f32(kernel_size.y >> 1);
+    var sum = vec4<f32>(0., 0., 0., 0.);
+    for (var i: u32 = 0; i< kernel_size.x; i++) {
+      for (var j: u32 = 0; j < kernel_size.y; j++) {
+        let pos = base + vec2<f32>(f32(i) - x_radius, f32(j) - y_radius);
+        let index = j * kernel_size.x + i;
+        let weight = filter_primitive.kernel_matrix[index / 4][index % 4];
+
+        let sample_pos = pos + filter_primitive.sample_offset;
+        var color = tex_sample(original_tex, sample_pos);
+        sum = sum + (color * weight);
+      }
+    }
+    sum[3] = 1.;
+
+    if alpha < 0.5 {
+      // return a transparent color when
+      //  - the alpha is 0., means it is out of the filter area
+      //  - the 0. < alpha < 0.5, means it is in the edge of the filter area,
+      return vec4<f32>(0., 0., 0., 0.);
+    } else {
+      return sum * filter_primitive.color_matrix + filter_primitive.base_color;
+    }
+  }
+
+  fn sample_mask( prim: FilterPrimitive, pos: vec2<f32>) -> f32 {
+    var mask_idx = prim.mask_head;
+    var alpha = 1.0;
+    let mask_pos = pos + prim.mask_offset;
+    
+    loop {
+        if mask_idx < 0 { break; }
+
+        let mask = mask_layers[u32(mask_idx)];
+        alpha *= mask_sample(mask, mask_pos);
+        mask_idx = mask.prev_mask_idx;
+    }
+
+    return alpha;
+  }
+  
+  fn tex_sample(tex: texture_2d<f32>, pos: vec2<f32>) -> vec4<f32> {
+      let tex_size = textureDimensions(tex);
+      let sample_pos = pos / vec2<f32>(f32(tex_size.x), f32(tex_size.y));
+      return textureSampleLevel(tex, s_sampler, sample_pos, 0.);
+  }
+  "#;
+  basic_template(limits.max_mask_layers) + &filter_shader
 }
 
 fn basic_template(max_mask_layers: usize) -> String {

@@ -17,6 +17,8 @@ pub use widget_scope::*;
 pub mod image_widget;
 pub mod keep_alive;
 pub use keep_alive::*;
+pub mod backdrop_filter;
+pub use backdrop_filter::*;
 mod theme;
 use smallvec::SmallVec;
 pub use theme::*;
@@ -136,6 +138,7 @@ pub struct FatObj<T> {
   constrained_box: Option<State<ConstrainedBox>>,
   radius: Option<State<RadiusWidget>>,
   border: Option<State<BorderWidget>>,
+  backdrop: Option<State<BackdropFilter>>,
   background: Option<State<Background>>,
   foreground: Option<State<Foreground>>,
   scrollable: Option<State<ScrollableWidget>>,
@@ -188,6 +191,7 @@ impl<T> FatObj<T> {
       fitted_box: self.fitted_box,
       border: self.border,
       radius: self.radius,
+      backdrop: self.backdrop,
       background: self.background,
       foreground: self.foreground,
       padding: self.padding,
@@ -231,6 +235,7 @@ impl<T> FatObj<T> {
       && self.fitted_box.is_none()
       && self.border.is_none()
       && self.radius.is_none()
+      && self.backdrop.is_none()
       && self.background.is_none()
       && self.foreground.is_none()
       && self.padding.is_none()
@@ -666,6 +671,13 @@ impl<T> FatObj<T> {
     init_text_style!(self, overflow, v)
   }
 
+  /// Initializes the backdrop filter of the widget.
+  pub fn with_backdrop_filter<K: ?Sized>(
+    &mut self, v: impl RInto<PipeValue<Vec<Vec<FilterType>>>, K>,
+  ) -> &mut Self {
+    init_sub_widget!(self, backdrop, filters, v)
+  }
+
   /// Initializes the background of the widget.
   pub fn with_background<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Brush>, K>) -> &mut Self {
     init_sub_widget!(self, background, background, v)
@@ -929,6 +941,13 @@ impl<T> FatObj<T> {
   pub fn box_fit(&mut self) -> impl StateWriter<Value = BoxFit> {
     let fitted_box = sub_widget!(self, fitted_box);
     part_writer!(&mut fitted_box.box_fit)
+  }
+
+  /// Creates and returns a state writer for managing the widget's backdrop
+  /// filters.
+  pub fn backdrop_filter(&mut self) -> impl StateWriter<Value = Vec<Vec<FilterType>>> {
+    let backdrop = sub_widget!(self, backdrop);
+    part_writer!(&mut backdrop.filters)
   }
 
   /// Creates and returns a state writer for managing the widget's background
@@ -1315,6 +1334,7 @@ impl<'a> FatObj<Widget<'a>> {
           foreground,
           border,
           background,
+          backdrop,
           clip_boundary,
           fitted_box,
           radius,
