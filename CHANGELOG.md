@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.45] - 2025-08-06
+
 ### Features
 
 - **core**: Added built-in property `backdrop_filter`. (#778 @wjian23)
@@ -869,7 +871,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.44...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.45...HEAD
+[0.4.0-alpha.45]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.44...ribir-v0.4.0-alpha.45
 [0.4.0-alpha.44]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.40...ribir-v0.4.0-alpha.44
 [0.4.0-alpha.40]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.39...ribir-v0.4.0-alpha.40
 [0.4.0-alpha.39]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.38...ribir-v0.4.0-alpha.39
