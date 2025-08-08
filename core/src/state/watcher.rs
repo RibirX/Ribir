@@ -26,7 +26,7 @@ impl<R: StateReader> StateReader for Watcher<R> {
   type Reader = R::Reader;
 
   #[inline]
-  fn read(&self) -> ReadRef<Self::Value> { self.reader.read() }
+  fn read(&self) -> ReadRef<'_, Self::Value> { self.reader.read() }
 
   #[inline]
   fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {

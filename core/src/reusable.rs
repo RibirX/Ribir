@@ -227,11 +227,11 @@ impl Query for ReusableRenderWrapper {
       .query_all_write(query_id, out);
   }
 
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     self.as_render_node().query(query_id)
   }
 
-  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query_write<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     self.as_render_node().query_write(query_id)
   }
 

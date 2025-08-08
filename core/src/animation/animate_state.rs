@@ -7,27 +7,26 @@ use crate::prelude::*;
 
 /// Trait to help animate update the state.
 pub trait AnimateStateSetter {
-  type C: AnimateStateSetter<Value = Self::Value>;
   type Value: Clone;
 
   fn get(&self) -> Self::Value;
   fn set(&self, v: Self::Value);
-  fn revert_value(&self, v: Self::Value);
+  fn revert(&self, v: Self::Value);
   fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible>;
-  fn clone_setter(&self) -> Self::C;
 }
 
-/// Trait to help animate calc the lerp value.
 pub trait AnimateState: AnimateStateSetter {
   fn calc_lerp_value(&mut self, from: &Self::Value, to: &Self::Value, rate: f32) -> Self::Value;
 
-  /// Use an animate to transition the state after it modified.
-  fn transition(self, transition: impl Transition + 'static) -> Stateful<Animate<Self>>
+  /// Creates an animation that smoothly transitions a writer's value on every
+  /// change.
+  fn transition(self, transition: impl Transition + 'static) -> State<Animate<Self>>
   where
     Self: Sized,
     Self::Value: PartialEq,
   {
-    let state = self.clone_setter();
+    let init_value = observable::of(self.get());
+
     let mut animate = Animate::declarer();
     animate
       .with_transition(Box::new(transition))
@@ -35,19 +34,24 @@ pub trait AnimateState: AnimateStateSetter {
       .with_state(self);
     let animate = animate.finish();
 
-    let c_animate = animate.as_stateful().clone_writer();
-    let init_value = observable::of(state.get());
-    state
-      .animate_state_modifies()
-      .map(move |_| state.get())
+    // fixme: circle reference here
+    let modifies = animate.read().state.animate_state_modifies();
+    modifies
+      .map({
+        let animate = animate.clone_writer();
+        move |_| animate.read().state.get()
+      })
       .merge(init_value)
       .distinct_until_changed()
       .pairwise()
-      .subscribe(move |(old, _)| {
-        animate.write().from = old;
-        animate.run();
+      .subscribe({
+        let animate = animate.clone_writer();
+        move |(old, _)| {
+          animate.write().from = old;
+          animate.run();
+        }
       });
-    c_animate
+    animate
   }
 }
 
@@ -67,7 +71,6 @@ where
   S: StateWriter,
   S::Value: Clone,
 {
-  type C = S;
   type Value = S::Value;
 
   #[inline]
@@ -77,14 +80,11 @@ where
   fn set(&self, v: Self::Value) { *self.shallow() = v; }
 
   #[inline]
-  fn revert_value(&self, v: Self::Value) {
+  fn revert(&self, v: Self::Value) {
     let mut w = self.write();
     *w = v;
     w.forget_modifies();
   }
-
-  #[inline]
-  fn clone_setter(&self) -> Self::C { self.clone_writer() }
 
   #[inline]
   fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
@@ -107,8 +107,8 @@ where
 impl<S, F> AnimateStateSetter for LerpFnState<S, F>
 where
   S: AnimateStateSetter,
+  F: FnMut(&S::Value, &S::Value, f32) -> S::Value,
 {
-  type C = S::C;
   type Value = S::Value;
 
   #[inline]
@@ -118,10 +118,7 @@ where
   fn set(&self, v: Self::Value) { self.state.set(v) }
 
   #[inline]
-  fn revert_value(&self, v: Self::Value) { self.state.revert_value(v) }
-
-  #[inline]
-  fn clone_setter(&self) -> Self::C { self.state.clone_setter() }
+  fn revert(&self, v: Self::Value) { self.state.revert(v) }
 
   #[inline]
   fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
@@ -129,19 +126,21 @@ where
   }
 }
 
-impl<S, F, V> AnimateState for LerpFnState<S, F>
+impl<S, F> AnimateState for LerpFnState<S, F>
 where
-  S: AnimateStateSetter<Value = V>,
-  F: FnMut(&V, &V, f32) -> V,
+  S: AnimateStateSetter,
+  F: FnMut(&S::Value, &S::Value, f32) -> S::Value,
 {
   #[inline]
-  fn calc_lerp_value(&mut self, from: &V, to: &V, rate: f32) -> V { (self.lerp_fn)(from, to, rate) }
+  fn calc_lerp_value(&mut self, from: &S::Value, to: &S::Value, rate: f32) -> S::Value {
+    (self.lerp_fn)(from, to, rate)
+  }
 }
 
-impl<V, S, F> LerpFnState<S, F>
+impl<S, F> LerpFnState<S, F>
 where
-  S: AnimateStateSetter<Value = V>,
-  F: FnMut(&V, &V, f32) -> V,
+  S: AnimateStateSetter,
+  F: FnMut(&S::Value, &S::Value, f32) -> S::Value,
 {
   #[inline]
   pub fn new(state: S, lerp_fn: F) -> Self { Self { state, lerp_fn } }
@@ -159,7 +158,6 @@ macro_rules! impl_animate_state_for_tuple {
       where
         $([<S $tuple>]: AnimateStateSetter), *
       {
-        type C = ($([<S $tuple>]::C), *);
         type Value = ($([<S $tuple>]::Value), *);
 
         fn get(&self) -> Self::Value {
@@ -171,13 +169,8 @@ macro_rules! impl_animate_state_for_tuple {
           $(self.$tuple.set(v.$tuple);) *
         }
 
-        fn revert_value(&self, v: Self::Value) {
-          $(self.$tuple.revert_value(v.$tuple);) *
-        }
-
-        #[inline]
-        fn clone_setter(&self) -> Self::C {
-          ( $(self.$tuple.clone_setter()),*)
+        fn revert(&self, v: Self::Value) {
+          $(self.$tuple.revert(v.$tuple);) *
         }
 
         fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
@@ -187,17 +180,17 @@ macro_rules! impl_animate_state_for_tuple {
         }
       }
 
-      impl<$([<S $tuple>]), *> AnimateState for ($([<S $tuple>]),*)
+      impl<$([<S $tuple>]), *> AnimateState for ($([<S $tuple>]), *)
       where
-        $([<S $tuple>]: AnimateState,)*
+        $([<S $tuple>]: AnimateState), *
       {
         #[inline]
         fn calc_lerp_value(
           &mut self,
-          from: &Self::Value,
-          to: &Self::Value,
+          from: &<Self as AnimateStateSetter>::Value,
+          to: &<Self as AnimateStateSetter>::Value,
           rate: f32
-        ) -> Self::Value
+        ) -> <Self as AnimateStateSetter>::Value
         {
           (
             $(self.$tuple.calc_lerp_value(&from.$tuple, &to.$tuple, rate),) *

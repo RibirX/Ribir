@@ -108,9 +108,9 @@ impl ContainerColor {
 }
 
 impl Theme {
-  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<Self> { Provider::of(ctx).unwrap() }
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<'_, Self> { Provider::of(ctx).unwrap() }
 
-  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<Self> {
+  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<'_, Self> {
     Provider::write_of(ctx).unwrap()
   }
 
@@ -138,16 +138,16 @@ impl Theme {
     let providers = smallvec![
       // The theme provider is designated as writable state,
       // while other components of the theme provider are treated as read-only state.
-      Provider::value_of_writer(this.clone_writer(), None),
-      Provider::value_of_reader(part_reader!(&this.palette.primary)),
-      Provider::value_of_reader(container_color),
-      Provider::value_of_reader(part_reader!(&this.typography_theme.body_medium.text)),
-      Provider::value_of_reader(part_reader!(&this.palette)),
-      Provider::value_of_reader(part_reader!(&this.typography_theme)),
-      Provider::value_of_reader(part_reader!(&this.icon_theme)),
+      Provider::writer(this.clone_writer(), None),
+      Provider::reader(part_reader!(&this.palette.primary)),
+      Provider::reader(container_color),
+      Provider::reader(part_reader!(&this.typography_theme.body_medium.text)),
+      Provider::reader(part_reader!(&this.palette)),
+      Provider::reader(part_reader!(&this.typography_theme)),
+      Provider::reader(part_reader!(&this.icon_theme)),
       Classes::reader_into_provider(part_reader!(&this.classes)),
-      Provider::value_of_reader(part_reader!(&this.transitions_theme)),
-      Provider::value_of_reader(part_reader!(&this.icon_font))
+      Provider::reader(part_reader!(&this.transitions_theme)),
+      Provider::reader(part_reader!(&this.icon_font))
     ];
     let child = pipe!($read(this);)
       .map(move |_| {

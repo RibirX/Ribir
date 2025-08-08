@@ -165,7 +165,7 @@ impl<'w> ComposeChild<'w> for LocalWidgets {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'w> {
     fn_widget! {
       @Providers {
-        providers: smallvec![Provider::value_of_writer(this, None)],
+        providers: smallvec![Provider::writer(this, None)],
         @ { child }
       }
     }

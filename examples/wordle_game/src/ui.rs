@@ -4,18 +4,17 @@ use crate::wordle::{CharHint, Wordle, WordleChar};
 
 pub fn wordle_game() -> Widget<'static> { Wordle::new(5, 5).into_widget() }
 
-trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
+impl Wordle {
   fn chars_key<const N: usize>(
-    self, chars: [char; N],
+    this: &impl StateWriter<Value = Wordle>, chars: [char; N],
   ) -> impl Iterator<Item = Widget<'static>> + 'static {
-    chars
-      .into_iter()
-      .map(move |c| self.clone_writer().char_key(c))
+    chars.into_iter().map({
+      let this = this.clone_writer();
+      move |c| Wordle::char_key(&this, c)
+    })
   }
 
-  fn char_key(self, key: char) -> Widget<'static> {
-    let this = self.clone_writer();
-
+  fn char_key(this: &impl StateWriter<Value = Wordle>, key: char) -> Widget<'static> {
     let palette = Palette::of(BuildCtx::get());
     let base = palette.base_of(&palette.surface_variant());
     let success = palette.success();
@@ -32,7 +31,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
     });
 
     filled_button! {
-      providers: [Provider::value_of_writer(color, None)],
+      providers: [Provider::writer(color, None)],
       on_tap: move |_| $write(this).guessing.enter_char(key),
       on_disposed:  move |_| u.unsubscribe(),
       @ { key.to_string() }
@@ -40,8 +39,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
     .into_widget()
   }
 
-  fn keyboard(self, state_bar: impl StateWriter<Value = Text> + 'static) -> Widget<'static> {
-    let this = self.clone_writer();
+  fn keyboard(this: impl StateWriter<Value = Wordle>, state_bar: State<Text>) -> Widget<'static> {
     let palette = Palette::of(BuildCtx::get());
     let gray = palette.base_of(&palette.surface_variant());
     flex! {
@@ -53,13 +51,13 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Center,
-        @ { this.clone_writer().chars_key(['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P']) }
+        @Wordle::chars_key(&this, ['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P'])
       }
       @Flex {
         item_gap: 5.,
         align_items: Align::Center,
         justify_content: JustifyContent::Center,
-        @ { this.clone_writer().chars_key(['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ]) }
+        @Wordle::chars_key(&this, ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ])
       }
       @Flex {
         item_gap: 5.,
@@ -70,7 +68,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
           on_tap: move |_| $write(this).guessing.delete_back_char(),
           @ { "Del" }
         }
-        @ { self.chars_key(['Z', 'X', 'C', 'V', 'B', 'N', 'M' ]) }
+        @Wordle::chars_key(&this, ['Z', 'X', 'C', 'V', 'B', 'N', 'M' ])
 
         @FilledButton {
           providers: [Provider::new(gray)],
@@ -85,8 +83,7 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
     .into_widget()
   }
 
-  fn chars_grid(self) -> Widget<'static> {
-    let this = self.clone_writer();
+  fn chars_grid(this: &impl StateWriter<Value = Wordle>) -> Widget<'static> {
     fn_widget! {
       @Flex {
         direction: Direction::Vertical,
@@ -111,8 +108,6 @@ trait WordleExtraWidgets: StateWriter<Value = Wordle> + Sized + 'static {
     .into_widget()
   }
 }
-
-impl<T: StateWriter<Value = Wordle> + 'static> WordleExtraWidgets for T {}
 
 fn hint_color(hint: Option<CharHint>) -> Color {
   let palette = Palette::of(BuildCtx::get());
@@ -170,7 +165,7 @@ impl Compose for Wordle {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       let state_bar = @Text { text: "" };
-      let keyboard = this.clone_writer().keyboard(state_bar.clone_writer());
+      let keyboard = Wordle::keyboard($writer(this), state_bar.clone_writer());
 
       let give_up = @Button {
         on_tap: move |_| {
@@ -214,7 +209,7 @@ impl Compose for Wordle {
           item_gap: 5.,
           @H1 { text: "Wordle" }
           @Divider { }
-          @ { this.chars_grid() }
+          @Wordle::chars_grid(&this)
           @ { state_bar }
           @ { keyboard }
           @Flex {

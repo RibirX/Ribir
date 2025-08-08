@@ -27,17 +27,6 @@ pub struct ScrollableWidget {
   view_id: Option<TrackId>,
 }
 
-/// The provider of `ScrollableWidget` providers the descendant widgets to use
-/// it.
-///
-/// - Use `Provider::state_of::<ScrollableProvider>` to get the writer of the
-///   `ScrollableWidget`.
-/// - Use `Provider::of::<ScrollableWidget>` to get reference of the
-///   `ScrollableWidget`.
-/// - Use `Provider::write_of` to get the writer's reference of the
-///   `ScrollableWidget`.
-pub type ScrollableProvider = Box<dyn StateWriter<Value = ScrollableWidget>>;
-
 impl Declare for ScrollableWidget {
   type Builder = FatObj<()>;
   #[inline]
@@ -79,7 +68,7 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
             this.set_page(view_size);
           }
         },
-        providers: [Provider::value_of_writer(this.clone_boxed_writer(), None)],
+        providers: [Provider::writer(this.clone_writer(), None)],
         @ { child }
       }
     }
@@ -90,21 +79,21 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
 impl ScrollableWidget {
   /// Returns the reference of the closest scrollable widget from the context.
   #[inline]
-  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<Self>> { Provider::of::<Self>(ctx) }
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<'_, Self>> {
+    Provider::of::<Self>(ctx)
+  }
 
   /// Returns the write reference of the closest scrollable widget from the
   /// context.
   #[inline]
-  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> Option<WriteRef<Self>> {
+  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> Option<WriteRef<'_, Self>> {
     Provider::write_of::<Self>(ctx)
   }
 
   /// Returns the writer of the closest scrollable widget from the context.
   #[inline]
-  pub fn boxed_writer_of(
-    ctx: &impl AsRef<ProviderCtx>,
-  ) -> Option<Box<dyn StateWriter<Value = Self>>> {
-    Provider::state_of::<Box<dyn StateWriter<Value = Self>>>(ctx).map(|s| s.clone_boxed_writer())
+  pub fn writer_of(ctx: &impl AsRef<ProviderCtx>) -> Option<Box<dyn StateWriter<Value = Self>>> {
+    Provider::writer_of::<Self>(ctx).map(|s| s.clone_writer())
   }
 
   pub fn map_to_view(&self, p: Point, child: WidgetId, wnd: &Window) -> Option<Point> {

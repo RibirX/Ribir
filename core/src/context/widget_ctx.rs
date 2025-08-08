@@ -87,12 +87,12 @@ pub trait WidgetCtx {
   /// This method differs from `Provider::write_of`, as `Provider::write_of`
   /// searches in all ancestors of the widget, whereas this method only
   /// searches within the current widget.
-  fn query_write<T: 'static>(&self) -> Option<WriteRef<T>>;
+  fn query_write<T: 'static>(&self) -> Option<WriteRef<'_, T>>;
   /// Query a reference to the `T` if it is shared within the widget `w`.
   fn query_of_widget<T: 'static>(&self, w: WidgetId) -> Option<QueryRef<'_, T>>;
   // Query a write reference to the `T` if a writer of `T` is shared within the
   // widget `w`.
-  fn query_write_of_widget<T: 'static>(&self, w: WidgetId) -> Option<WriteRef<T>>;
+  fn query_write_of_widget<T: 'static>(&self, w: WidgetId) -> Option<WriteRef<'_, T>>;
   /// Retrieve the window associated with this context.
   fn window(&self) -> Sc<Window>;
 }
@@ -202,7 +202,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   fn query<Q: 'static>(&self) -> Option<QueryRef<'_, Q>> { self.query_of_widget::<Q>(self.id()) }
 
   #[inline]
-  fn query_write<Q: 'static>(&self) -> Option<WriteRef<Q>> {
+  fn query_write<Q: 'static>(&self) -> Option<WriteRef<'_, Q>> {
     self.query_write_of_widget::<Q>(self.id())
   }
 
@@ -210,7 +210,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     w.query_ref::<Q>(self.tree())
   }
 
-  fn query_write_of_widget<Q: 'static>(&self, w: WidgetId) -> Option<WriteRef<Q>> {
+  fn query_write_of_widget<Q: 'static>(&self, w: WidgetId) -> Option<WriteRef<'_, Q>> {
     w.query_write(self.tree())
   }
 

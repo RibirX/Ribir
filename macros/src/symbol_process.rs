@@ -28,13 +28,6 @@ pub mod kw {
   syn::custom_keyword!(rdl);
 }
 
-#[derive(Hash, PartialEq, Eq, Debug, Clone)]
-pub struct BuiltinInfo {
-  pub(crate) host: Ident,
-  pub(crate) get_builtin: Ident,
-  pub(crate) run_before_clone: SmallVec<[Ident; 1]>,
-}
-
 #[derive(Hash, PartialEq, Eq, Debug, Clone, PartialOrd, Ord)]
 pub enum DollarUsedInfo {
   Reader,

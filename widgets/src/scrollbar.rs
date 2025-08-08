@@ -89,7 +89,7 @@ impl<'c> ComposeChild<'c> for Scrollbar {
     // scroll states or enables descendants to trigger scrolling to a different
     // position.
     providers! {
-      providers: [Provider::value_of_writer(scroll.clone_writer(), None)],
+      providers: [Provider::writer(scroll.clone_writer(), None)],
       @ {
         let h_scrollbar = distinct_pipe!($read(scroll).is_x_scrollable())
           .map(move |need_bar| need_bar.then(|| fn_widget!{
