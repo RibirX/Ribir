@@ -20,10 +20,10 @@ pub trait Query: Any {
 
   /// Queries the type that matches the provided type id, returning its handle.
   /// This method always returns the outermost type.
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle>;
+  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>>;
 
   /// Queries the reference of the writer that matches the provided type id.
-  fn query_write(&self, id: &QueryId) -> Option<QueryHandle>;
+  fn query_write<'q>(&'q self, id: &QueryId) -> Option<QueryHandle<'q>>;
 
   /// Hint if this is a queryable type.
   fn queryable(&self) -> bool { true }
@@ -213,11 +213,11 @@ impl<T: Any> Query for Queryable<T> {
 
   fn query_all_write<'q>(&'q self, _: &QueryId, _: &mut SmallVec<[QueryHandle<'q>; 1]>) {}
 
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     (query_id == &QueryId::of::<T>()).then(|| QueryHandle::new(&self.0))
   }
 
-  fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
+  fn query_write(&self, _: &QueryId) -> Option<QueryHandle<'_>> { None }
 
   fn queryable(&self) -> bool { true }
 }
@@ -240,7 +240,7 @@ where
     }
   }
 
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     if query_id == &QueryId::of::<T::Value>() {
       Some(QueryHandle::from_read_ref(self.read()))
     } else if query_id == &QueryId::of::<T>() {
@@ -256,7 +256,7 @@ where
     }
   }
 
-  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query_write<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     if query_id == &QueryId::of::<T::Value>() {
       Some(QueryHandle::from_write_ref(self.write()))
     } else if query_id == &QueryId::of::<T>() {
@@ -281,7 +281,7 @@ macro_rules! impl_query_for_reader {
 
     fn query_all_write<'q>(&'q self, _: &QueryId, _: &mut SmallVec<[QueryHandle<'q>; 1]>) {}
 
-    fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+    fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
       if query_id == &QueryId::of::<V>() {
         Some(QueryHandle::from_read_ref(self.read()))
       } else if query_id == &QueryId::of::<Self>() {
@@ -293,7 +293,7 @@ macro_rules! impl_query_for_reader {
       }
     }
 
-    fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
+    fn query_write(&self, _: &QueryId) -> Option<QueryHandle<'_>> { None }
 
     fn queryable(&self) -> bool { true }
   };
@@ -323,7 +323,7 @@ impl<V: 'static, R: StateReader<Value = V>> Query for Watcher<R> {
 
   fn query_all_write<'q>(&'q self, _: &QueryId, _: &mut SmallVec<[QueryHandle<'q>; 1]>) {}
 
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     if query_id == &QueryId::of::<V>() {
       Some(QueryHandle::from_read_ref(self.read()))
     } else if query_id == &QueryId::of::<Self>() {
@@ -337,7 +337,7 @@ impl<V: 'static, R: StateReader<Value = V>> Query for Watcher<R> {
     }
   }
 
-  fn query_write(&self, _: &QueryId) -> Option<QueryHandle> { None }
+  fn query_write(&self, _: &QueryId) -> Option<QueryHandle<'_>> { None }
 
   fn queryable(&self) -> bool { true }
 }
@@ -466,7 +466,7 @@ where
     self.data.query_all_write(&target, out);
   }
 
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     let target = QueryId::of::<T>();
     if query_id != &target {
       return None;
@@ -474,7 +474,7 @@ where
     self.data.query(&target)
   }
 
-  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query_write<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     let target = QueryId::of::<T>();
     if query_id != &target {
       return None;

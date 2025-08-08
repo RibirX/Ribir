@@ -56,14 +56,14 @@ bitflags! {
 impl TypographyTheme {
   /// Retrieve the nearest `TypographyTheme` from the context among its
   /// ancestors
-  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<Self> {
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<'_, Self> {
     // At least one application theme exists
     Provider::of(ctx).unwrap()
   }
 
   /// Retrieve the nearest `TypographyTheme` from the context among its
   /// ancestors and return a write reference to the theme.
-  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<Self> {
+  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<'_, Self> {
     // At least one application theme exists
     Provider::write_of(ctx).unwrap()
   }

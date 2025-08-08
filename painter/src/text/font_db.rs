@@ -334,7 +334,7 @@ impl Face {
   #[inline]
   pub fn has_char(&self, c: char) -> bool { self.rb_face.as_ref().glyph_index(c).is_some() }
 
-  pub fn as_rb_face(&self) -> &rustybuzz::Face { &self.rb_face }
+  pub fn as_rb_face(&self) -> &rustybuzz::Face<'_> { &self.rb_face }
 
   pub fn outline_glyph(&self, glyph_id: GlyphId) -> Option<Resource<Path>> {
     self
@@ -389,7 +389,7 @@ impl Face {
   pub fn units_per_em(&self) -> u16 { self.rb_face.deref().units_per_em() }
 }
 
-fn to_db_family(f: &FontFamily) -> Family {
+fn to_db_family(f: &FontFamily) -> Family<'_> {
   match f {
     FontFamily::Name(name) => Family::Name(name),
     FontFamily::Serif => Family::Serif,

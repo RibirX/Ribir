@@ -134,7 +134,7 @@ impl TextShaper {
   ) -> Option<Sc<ShapeResult>> {
     self
       .shape_cache
-      .get(&(face_ids, text, direction, baseline) as &(dyn ShapeKeySlice))
+      .get(&(face_ids, text, direction, baseline) as &dyn ShapeKeySlice)
       .cloned()
   }
 

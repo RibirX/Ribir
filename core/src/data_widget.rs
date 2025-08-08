@@ -50,14 +50,14 @@ impl Query for DataAttacher {
     }
   }
 
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     self
       .data
       .query(query_id)
       .or_else(|| self.render.query(query_id))
   }
 
-  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle> {
+  fn query_write<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     self
       .data
       .query_write(query_id)
@@ -78,9 +78,11 @@ impl Query for AnonymousAttacher {
   }
 
   #[inline]
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle> { self.render.query(query_id) }
+  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
+    self.render.query(query_id)
+  }
 
-  fn query_write(&self, type_id: &QueryId) -> Option<QueryHandle> {
+  fn query_write<'q>(&'q self, type_id: &QueryId) -> Option<QueryHandle<'q>> {
     self.render.query_write(type_id)
   }
 

@@ -284,7 +284,7 @@ pub fn include_svg(input: TokenStream) -> TokenStream {
   while let Some(p) = span.parent() {
     span = p;
   }
-  let mut file = span.source_file().path();
+  let mut file = span.local_file().unwrap();
   file.pop();
   file.push(path);
 

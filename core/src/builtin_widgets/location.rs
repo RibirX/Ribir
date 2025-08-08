@@ -102,7 +102,7 @@ impl Location {
   }
 
   /// Gets a read-only reference to the Location provider from the context
-  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<Self> {
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<'_, Self> {
     Provider::of(ctx).expect("Location provider not found")
   }
 
@@ -114,7 +114,7 @@ impl Location {
   }
 
   /// Get a query parameter by name
-  pub fn get_query(&self, name: &str) -> Option<Cow<str>> {
+  pub fn get_query(&self, name: &str) -> Option<Cow<'_, str>> {
     self
       .url
       .query_pairs()
@@ -217,7 +217,7 @@ impl Location {
     Err(format!("Cross-origin navigation blocked: {self_display} → {other_display}"))
   }
 
-  fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<Location> {
+  fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<'_, Location> {
     Provider::write_of(ctx).expect("Location write provider not found")
   }
 

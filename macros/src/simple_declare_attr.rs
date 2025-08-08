@@ -143,7 +143,7 @@ impl<'a> Declarer<'a> {
     }
   }
 
-  fn no_skip_fields(&self) -> impl Iterator<Item = &DeclareField> {
+  fn no_skip_fields(&self) -> impl Iterator<Item = &DeclareField<'_>> {
     self.fields.iter().filter(|f| f.is_not_skip())
   }
 

@@ -34,7 +34,7 @@ impl<W> StateCell<W> {
   }
 
   #[track_caller]
-  pub(crate) fn read(&self) -> ReadRef<W> {
+  pub(crate) fn read(&self) -> ReadRef<'_, W> {
     let borrow = &self.borrow_flag;
     let b = borrow.get().wrapping_add(1);
     borrow.set(b);

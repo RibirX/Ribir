@@ -203,7 +203,7 @@ impl<'c> ComposeChild<'c> for Tabs {
         .unzip();
 
       @Flex {
-        providers: [Provider::value_of_writer(this.clone_writer(), None)],
+        providers: [Provider::writer(this.clone_writer(), None)],
         class: TABS,
         direction: position.clone().map(TabPos::main_dir),
         reverse: position.clone().map(TabPos::main_reverse),

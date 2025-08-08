@@ -24,7 +24,7 @@ where
   type Reader = PartReader<S::Reader, M>;
 
   #[inline]
-  fn read(&self) -> ReadRef<Self::Value> { self.part_map.call(self.origin.read()) }
+  fn read(&self) -> ReadRef<'_, Self::Value> { self.part_map.call(self.origin.read()) }
 
   #[inline]
   fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
@@ -47,7 +47,7 @@ where
   type Reader = PartReader<S::Reader, WriterMapReaderFn<M>>;
 
   #[inline]
-  fn read(&self) -> ReadRef<Self::Value> {
+  fn read(&self) -> ReadRef<'_, Self::Value> {
     ReadRef::mut_as_ref_map(self.origin.read(), &self.part_map)
   }
 
@@ -112,19 +112,19 @@ where
   W: StateWriter,
   M: Fn(&mut W::Value) -> PartMut<V> + Clone,
 {
-  fn write(&self) -> WriteRef<Self::Value> {
+  fn write(&self) -> WriteRef<'_, Self::Value> {
     let mut w = WriteRef::map(self.origin.write(), &self.part_map);
     w.path = &self.path;
     w
   }
 
-  fn silent(&self) -> WriteRef<Self::Value> {
+  fn silent(&self) -> WriteRef<'_, Self::Value> {
     let mut w = WriteRef::map(self.origin.silent(), &self.part_map);
     w.path = &self.path;
     w
   }
 
-  fn shallow(&self) -> WriteRef<Self::Value> {
+  fn shallow(&self) -> WriteRef<'_, Self::Value> {
     let mut w = WriteRef::map(self.origin.shallow(), &self.part_map);
     w.path = &self.path;
     w
