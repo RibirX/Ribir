@@ -25,7 +25,7 @@ impl TextAlignWidget {
   pub fn into_provider(this: impl StateWriter<Value = Self>) -> Provider {
     match this.try_into_value() {
       Ok(this) => Provider::new(this.text_align),
-      Err(this) => Provider::value_of_writer(
+      Err(this) => Provider::writer(
         this.part_writer(PartialId::any(), |w| PartMut::new(&mut w.text_align)),
         Some(DirtyPhase::LayoutSubtree),
       ),

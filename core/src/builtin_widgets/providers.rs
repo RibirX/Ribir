@@ -1,160 +1,144 @@
-//! Providers serve as a mechanism in Ribir to distribute data to descendants.
+//! Providers enable hierarchical data distribution in Ribir, allowing data to
+//! be made available to descendant widgets within a specific scope.
 //!
-//! The data is set up in the context for the descendants' scope and removed
-//! when out of scope. Descendants can access the data using [`Provider::of`]
-//! with contexts such as `BuildCtx`, `LayoutCtx`, `PaintingCtx`, and event
-//! objects.
+//! Providers establish data in the context for descendant widgets. The data is
+//! automatically scoped - it becomes available when entering the provider's
+//! scope and is removed when exiting that scope. Descendants can access
+//! provided data through various contexts (`BuildCtx`, `LayoutCtx`,
+//! `PaintingCtx`) and event objects.
+//!
+//! ## Basic Usage
 //!
 //! ```
-//! use ribir::prelude::*;
+//! use ribir_core::prelude::*;
 //!
 //! providers! {
 //!   providers: [Provider::new(1i32)],
 //!   @{
-//!     // Providers accessible via `BuildCtx`.
+//!     // Access provider via BuildCtx
 //!     let value = Provider::of::<i32>(BuildCtx::get()).unwrap();
 //!     assert_eq!(*value, 1);
+//!
 //!     @Text {
 //!       text: "Good!",
 //!       on_tap: move |e| {
-//!         // Accessing providers through event objects.
-//!         let value = Provider::write_of::<i32>(e).unwrap();
-//!         assert_eq!(*value, 1);
+//!         // Access provider through event object
+//!         let mut value = Provider::write_of::<i32>(e).unwrap();
+//!         *value = 2; // Modify the value
 //!       }
 //!     }
 //!   }
 //! };
 //! ```
 //!
-//! ## Provider Based on Type
+//! ## Type-Based Provider Resolution
 //!
-//! Providers are based on their type, allowing only one provider of the same
-//! type to remain in the context at a time. When a new provider of the same
-//! type is provided, it overwrites the previous one. Thus, the closest provider
-//! of the same type to its usage will be accessed.
+//! Providers are uniquely identified by their type. Only one provider of a
+//! given type can exist in any context. When a new provider of the same type is
+//! introduced, it shadows previous providers. Descendants always access the
+//! closest provider in their ancestor hierarchy.
 //!
 //! ```
-//! use ribir::prelude::*;
+//! use ribir_core::prelude::*;
 //! use smallvec::smallvec;
 //!
 //! providers! {
 //!   providers: smallvec![Provider::new(1i32), Provider::new(Color::RED)],
 //!   @Providers {
-//!     providers: [Provider::new(2i32)],
-//!     @ {
-//!       let value = Provider::of::<i32>(BuildCtx::get()).unwrap();
-//!       assert_eq!(*value, 2);
-//!       let value = Provider::of::<Color>(BuildCtx::get()).unwrap();
-//!       assert_eq!(*value, Color::RED);
-//!       @Text { text: "`i32` overwritten with 2, color remains unchanged" }
-//!     }
-//!   }
-//! };
-//! ```
-//!
-//! ## Providing State
-//!
-//! State can be provided in unique manner, allowing both its value and the
-//! self reference to be accessed through a single provider. You can choose to
-//! provide a writer, watcher, or reader using [`Provider::value_of_writer`],
-//! [`Provider::value_of_watcher`], and [`Provider::value_of_reader`]
-//! respectively.
-//!
-//! The value can be accessed using [`Provider::of`], and the state itself can
-//! be accessed using [`Provider::state_of`].
-//!
-//! If a writer is provided, the write reference can be accessed using
-//! [`Provider::write_of`] to make writer reference to the state.
-//!
-//! ```
-//! use ribir::prelude::*;
-//! use smallvec::smallvec;
-//!
-//! let state = Stateful::new(1i32);
-//!
-//! providers! {
-//!   providers: smallvec![
-//!     // Providing an writer of `i32`
-//!     Provider::value_of_writer(state, None),
-//!   ],
-//!   @ {
-//!     let ctx = BuildCtx::get();
-//!     // Accessing the state value
-//!     let value = *Provider::of::<i32>(ctx).unwrap();
-//!     assert_eq!(value, 1);
-//!     {
-//!       // Accessing the state itself
-//!       let _state = Provider::state_of::<Stateful<i32>>(ctx).unwrap();
-//!     }
-//!     // Accessing the write reference of the state to modify the value
-//!     let mut value = Provider::write_of::<i32>(ctx).unwrap();
-//!     *value = 2;
-//!     @Text { text: "Both state and its value provided!" }
-//!   }
-//! };
-//! ```
-//!
-//! If the type of the state is unknown, we can provide it using a boxed state
-//! trait.
-//!
-//! ```
-//! use ribir::prelude::*;
-//! use smallvec::smallvec;
-//!
-//! fn provide_box_state(writer: impl StateWriter<Value = i32>) {
-//!   let writer: Box<dyn StateWriter<Value = i32>> = Box::new(writer);
-//!   let _ = providers! {
-//!     providers: [Provider::value_of_writer(writer, None)],
+//!     providers: [Provider::new(2i32)], // Shadows outer i32 provider
 //!     @ {
 //!       let ctx = BuildCtx::get();
-//!       // Accessing the state value
-//!       let value = *Provider::of::<i32>(ctx).unwrap();
-//!       assert_eq!(value, 1);
-//!       // Accessing the state itself
-//!       {
-//!         let _state = Provider::state_of::<Box<dyn StateWriter<Value = i32>>>(ctx).unwrap();
-//!       }
-//!       @Text { text: "Both state and its value provided!" }
-//!     }
-//!   };
-//! }
-//! ```
-//!
-//! ## Scope of Providers in the Build Process
-//!
-//! Providers are visible to their descendants. However, in the build process,
-//! the scope starts when the `Providers` are created and ends when they are
-//! fully composed with their children. Thus, it is recommended to declare
-//! providers together with their children.
-//!
-//! ```
-//! use ribir::prelude::*;
-//!
-//! let _bad_example = fn_widget! {
-//!   let providers = Providers::new([Provider::new(1i32)]);
-//!   // Providers are already accessible here
-//!   let v = *Provider::of::<i32>(BuildCtx::get()).unwrap();
-//!   assert_eq!(v, 1);
-//!
-//!   @Row {
-//!     @Text { text: "I can access providers in the build process" }
-//!     @(providers) {
-//!       @Text { text: "We only want providers accessible in this subtree" }
+//!       assert_eq!(*Provider::of::<i32>(ctx).unwrap(), 2);
+//!       assert_eq!(*Provider::of::<Color>(ctx).unwrap(), Color::RED);
+//!       @Text { text: "Inner i32 shadows outer, Color remains visible" }
 //!     }
 //!   }
 //! };
 //! ```
 //!
-//! The correct approach is as follows:
+//! ## State Providers
+//!
+//! State can be accessed through different provider types:
+//! - **Reader**: Immutable access (`Provider::reader`)
+//! - **Watcher**: Immutable access with change notifications
+//!   (`Provider::watcher`)
+//! - **Writer**: Mutable access (`Provider::writer`)
+//!
+//! ### Access Methods
+//!
+//! | Provider Type | Read Reference   | Write Reference      | State Access          |
+//! |---------------|------------------|----------------------|-----------------------|
+//! | Reader        | `Provider::of`   | —                    | `Provider::reader_of` |
+//! | Watcher       | `Provider::of`   | —                    | `Provider::watcher_of`|
+//! | Writer        | `Provider::of`   | `Provider::write_of` | `Provider::writer_of` |
+//!
+//! > **Note**: You can also use `Provider::state_of` to directly access the
+//! > concrete state type
+//! > instead of using the boxed state accessors (`reader_of`, `watcher_of`,
+//! > `writer_of`).
+
 //! ```
+//! use ribir_core::prelude::*;
+//!
+//! let state = Stateful::new(1i32);
+//! providers! {
+//!   providers: [Provider::writer(state, None)],
+//!   @ {
+//!     let ctx = BuildCtx::get();
+//!
+//!     // Access value
+//!     assert_eq!(*Provider::of::<i32>(ctx).unwrap(), 1);
+//!
+//!     // Access state container
+//!     let state_ref = Provider::state_of::<Stateful<i32>>(ctx).unwrap();
+//!
+//!     // Get writer handle
+//!     let mut value = Provider::write_of::<i32>(ctx).unwrap();
+//!     *value = 42; // Modify state
+//!     assert_eq!(*state_ref.read(), 42);
+//!
+//!     @Text { text: "State management example" }
+//!   }
+//! };
+//! ```
+//!
+//! ## Scoping Rules
+//!
+//! Providers are only visible to their descendants. During widget building:
+//! 1. Provider scope begins when `Providers` widget is created
+//! 2. Scope ends when composition completes
+//!
+//! ### Correct Usage
+//! ```rust
 //! use ribir::prelude::*;
 //!
-//! let _good_example = fn_widget! {
+//! let good = fn_widget! {
 //!   @Row {
-//!     @Text { text: "I can't see the `i32` provider" }
+//!     // Outside provider scope - NO access
+//!     @Text { text: "Can't access provider here" }
+//!
 //!     @Providers {
 //!       providers: [Provider::new(1i32)],
-//!       @Text { text: "I can see the `i32` provider" }
+//!       // Inside provider scope - access available
+//!       @Text { text: "Can access provider here" }
+//!     }
+//!   }
+//! };
+//! ```
+//!
+//! ### Incorrect Usage
+//! ```rust
+//! use ribir::prelude::*;
+//!
+//! let bad = fn_widget! {
+//!   let providers = Providers::new([Provider::new(1i32)]);
+//!   // ❌ Improper access outside composition scope
+//!   let _ = Provider::of::<i32>(BuildCtx::get());
+//!
+//!   @Row {
+//!     @Text { text: "Building..." }
+//!     @ (providers) {  // Providers attached late
+//!       @Text { text: "Actual provider scope" }
 //!     }
 //!   }
 //! };
@@ -191,22 +175,8 @@ pub enum Provider {
 /// This trait is used to set up the providers in the context. In most cases,
 /// you don't need to worry about it unless you want to customize the setup
 /// process.
-pub trait ProviderSetup {
+pub trait ProviderSetup: Any {
   fn setup(self: Box<Self>, ctx: &mut ProviderCtx) -> Box<dyn ProviderRestore>;
-  /// This method indicates whether this provider may affect the dirty state of
-  /// the widget tree.
-  fn is_dirty_affecting(&self) -> bool { false }
-  /// If the provider is mutable and a change in value affects the widget tree,
-  /// it should implement this method to provide two pieces of information.
-  /// First, it should indicate its dirty phase to show that this provider
-  /// impacts layout or paint. Second, it should offer the observable for the
-  /// framework to monitor to trigger relayout or paint operations.
-  ///
-  /// This method is only invoked if the [`ProviderSetup::is_dirty_affecting`]
-  /// returns true and is called when `Providers` compose their child.
-  fn unzip(
-    self: Box<Self>,
-  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyInfo, Infallible>);
 }
 
 /// This trait is used to retrieve the providers from the context. In most
@@ -226,9 +196,9 @@ pub struct ProviderCtx {
 }
 
 impl Provider {
-  /// Establish a provider for `T` using [`Provider::of`].
+  /// Creates a value provider accessible via [`Provider::of`].
   ///
-  /// ## Example
+  /// # Example
   ///
   /// ```
   /// use ribir_core::prelude::*;
@@ -243,103 +213,123 @@ impl Provider {
   /// ```
   pub fn new<T: 'static>(value: T) -> Provider { Provider::Setup(Box::new(Setup::new(value))) }
 
-  /// Establish a provider for the value of a reader. It will clone the reader
-  /// to create the provider to prevent any writer leaks.
-  ///  
-  /// Obtain the value using [`Provider::of`], and if you want to access the
-  /// reader, using [`Provider::state_of`].  
-  ///  
-  /// ## Example
-  ///  
-  ///  ```
-  ///  use ribir_core::prelude::*;
-  ///  
-  ///  let w = providers! {
-  ///    providers: [Provider::value_of_reader(Stateful::new(1i32))],
-  ///    @ {
-  ///      let ctx = BuildCtx::get();
-  ///      // Obtain the value
-  ///      assert_eq!(*Provider::of::<i32>(ctx).unwrap(), 1);
-  ///      
-  ///      // Obtain the reader  
-  ///      let reader = Provider::state_of::<Reader<i32>>(ctx);
-  ///       assert_eq!(*reader.unwrap().read(), 1);
-  ///      Void
-  ///    }
-  ///  };
-  ///  ```
-  pub fn value_of_reader(value: impl StateReader<Value: Sized, Reader: Query>) -> Provider {
+  /// Creates a provider for an immutable reader of the given value.
+  ///
+  /// Clones the reader to prevent writer leaks when establishing the provider.
+  ///
+  /// Access methods:
+  /// - Value reference: [`Provider::of`]
+  /// - Concrete reader: [`Provider::state_of`]
+  /// - Boxed reader: [`Provider::reader_of`]
+  ///
+  /// # Example
+  ///
+  /// ```
+  /// use ribir_core::prelude::*;
+  ///
+  /// let w = providers! {
+  ///   providers: [Provider::reader(Stateful::new(1i32))],
+  ///   @ {
+  ///     let ctx = BuildCtx::get();
+  ///     // Access value
+  ///     assert_eq!(*Provider::of::<i32>(ctx).unwrap(), 1);
+  ///
+  ///     // Access concrete reader
+  ///     let reader = Provider::state_of::<Reader<i32>>(ctx);
+  ///     assert_eq!(*reader.unwrap().read(), 1);
+  ///
+  ///     // Access boxed reader
+  ///     let boxed_reader = Provider::reader_of::<i32>(ctx);
+  ///     assert_eq!(*boxed_reader.unwrap().read(), 1);
+  ///     Void
+  ///   }
+  /// };
+  /// ```
+  pub fn reader(value: impl StateReader<Value: Sized, Reader: Query>) -> Provider {
     Provider::Setup(Box::new(Setup::from_state(value.clone_reader())))
   }
 
-  /// Establish a provider for the value of a watcher. It will clone the watcher
-  /// to create the provider to prevent any writer leaks.
+  /// Creates a provider for a value watcher.
   ///
-  /// Obtain the value using [`Provider::of`], and if you want to access the
-  /// watcher, using [`Provider::state_of`].
+  /// Clones the watcher to prevent writer leaks when establishing the provider.
   ///
-  /// ## Example
+  /// Access methods:
+  /// - Value reference: [`Provider::of`]
+  /// - Concrete watcher: [`Provider::state_of`]
+  /// - Boxed watcher: [`Provider::watcher_of`]
+  ///
+  /// # Example
   ///
   /// ```
   /// use ribir_core::prelude::*;
   ///
   /// let w = providers! {
-  ///   providers: [Provider::value_of_watcher(Stateful::new(1i32))],
+  ///   providers: [Provider::watcher(Stateful::new(1i32))],
   ///   @ {
   ///     let ctx = BuildCtx::get();
-  ///     // Obtain the value
+  ///     // Access value
   ///     assert_eq!(*Provider::of::<i32>(ctx).unwrap(), 1);
-  ///     // Obtain the watcher
+  ///
+  ///     // Access concrete watcher
   ///     let watcher = Provider::state_of::<Watcher<Reader<i32>>>(ctx);
   ///     assert_eq!(*watcher.unwrap().read(), 1);
+  ///
+  ///     // Access boxed watcher
+  ///     let boxed_watcher = Provider::watcher_of::<i32>(ctx);
+  ///     assert_eq!(*boxed_watcher.unwrap().read(), 1);
   ///     Void
   ///   }
   /// };
   /// ```
-  pub fn value_of_watcher(value: impl StateWatcher<Value: Sized, Watcher: Query>) -> Provider {
+  pub fn watcher(value: impl StateWatcher<Value: Sized, Watcher: Query>) -> Provider {
     Provider::Setup(Box::new(Setup::from_state(value.clone_watcher())))
   }
 
-  /// Establish a provider for the value of a writer.
+  /// Creates a provider for a mutable state writer.
   ///
-  /// Obtain the value using [`Provider::of`], get the write reference of the
-  /// writer using [`Provider::write_of`], and if you need to access the writer,
-  /// use [`Provider::state_of`].
+  /// Access methods:
+  /// - Value reference: [`Provider::of`]
+  /// - Mutable reference: [`Provider::write_of`]
+  /// - Concrete writer: [`Provider::state_of`]
+  /// - Boxed writer: [`Provider::writer_of`]
   ///
-  /// The `dirty` parameter is used to specify the affected dirty phase when
-  /// modifying the writer's value. Depending on how your descendants use it, if
-  /// they rely on the writer's value for painting or layout, a dirty phase
-  /// should be passed; otherwise, `None` can be passed.
+  /// # Dirty Phase Handling
   ///
-  /// Generally, if your provider affects the layout, it impacts the entire
-  /// subtree because the entire subtree can access and use the provider. In
-  /// such cases, pass `Some(DirtyPhase::LayoutSubtree)`.
+  /// The `dirty` parameter controls update propagation:
+  /// - `Some(phase)`: Triggers dirty marking in specified phase
+  /// - `None`: Requires manual update notifications
   ///
-  /// ## Example
+  /// > Use `Some(DirtyPhase::LayoutSubtree)` when value affects layout/painting
+  /// > as providers can impact entire subtrees.
+  ///
+  /// # Example
   ///
   /// ```
   /// use ribir_core::prelude::*;
   ///
   /// let w = providers! {
-  ///   providers: [Provider::value_of_writer(Stateful::new(1i32), None)],
+  ///   providers: [Provider::writer(Stateful::new(1i32), None)],
   ///   @ {
   ///     let ctx = BuildCtx::get();
-  ///     // Obtain the value
+  ///     // Access value
   ///     assert_eq!(*Provider::of::<i32>(ctx).unwrap(), 1);
   ///
-  ///     // Obtain the writer reference
-  ///     let w_value = Provider::write_of::<i32>(ctx);
-  ///     *w_value.unwrap() = 2;
+  ///     // Get mutable reference
+  ///     let mut_ref = Provider::write_of::<i32>(ctx);
+  ///     *mut_ref.unwrap() = 2;
   ///
-  ///     // Obtain the writer
+  ///     // Access concrete writer
   ///     let writer = Provider::state_of::<Stateful<i32>>(ctx);
   ///     assert_eq!(*writer.unwrap().write(), 2);
   ///
+  ///     // Access boxed writer
+  ///     let boxed_writer = Provider::writer_of::<i32>(ctx);
+  ///     *boxed_writer.unwrap().write() = 3;
   ///     Void
   ///   }
   /// };
   /// ```
-  pub fn value_of_writer<V: 'static>(
+  pub fn writer<V: 'static>(
     value: impl StateWriter<Value = V> + Query, dirty: Option<DirtyPhase>,
   ) -> Provider {
     if let Some(dirty) = dirty {
@@ -355,26 +345,76 @@ impl Provider {
     }
   }
 
-  /// Obtain the provider of `V` from the context where `V` is created using
-  /// [`Provider::new`], or where it is the value of a state created with
-  /// [`Provider::value_of_reader`] or [`Provider::value_of_writer`].
-  pub fn of<V: 'static>(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<V>> {
+  /// Gets a shared reference to value `V` from provider context
+  ///
+  /// **Requires** `V` was provided via:
+  /// - [`Provider::new`]
+  /// - State reader value ([`Provider::reader`])
+  /// - State watcher value ([`Provider::watcher`])
+  /// - State writer value ([`Provider::writer`])
+  pub fn of<V: 'static>(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<'_, V>> {
     ctx.as_ref().get_provider::<V>()
   }
 
-  /// Obtain the write reference of the writer's value from the context in
-  /// which the provider is created using [`Provider::value_of_writer`].
-  pub fn write_of<V: 'static>(ctx: &impl AsRef<ProviderCtx>) -> Option<WriteRef<V>> {
+  /// Gets an exclusive mutable reference to value `V`
+  ///
+  /// **Requires** `V` was provided via [`Provider::writer`]
+  pub fn write_of<V: 'static>(ctx: &impl AsRef<ProviderCtx>) -> Option<WriteRef<'_, V>> {
     ctx.as_ref().get_provider_write::<V>()
   }
 
-  /// Obtain the state of `S` from the context where `S` is created using
-  /// [`Provider::value_of_reader`] or [`Provider::value_of_writer`].
-  pub fn state_of<S>(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<S>>
+  /// Gets the concrete state instance `S`
+  ///
+  /// **Requires** `S` was provided via:
+  /// - [`Provider::reader`]
+  /// - [`Provider::writer`]
+  /// - [`Provider::watcher`]
+  pub fn state_of<S>(ctx: &impl AsRef<ProviderCtx>) -> Option<QueryRef<'_, S>>
   where
     S: StateReader<Value: Sized + 'static>,
   {
     ctx.as_ref().get_provider_state::<S>()
+  }
+
+  /// Gets a boxed state writer for value `V`
+  ///
+  /// **Requires** `V` was provided via [`Provider::writer`]
+  pub fn writer_of<V: 'static>(
+    ctx: &impl AsRef<ProviderCtx>,
+  ) -> Option<Box<dyn StateWriter<Value = V>>> {
+    ctx
+      .as_ref()
+      .get_state_of_value::<Box<dyn StateWriter<Value = V>>>()
+      .map(|s| s.clone_writer())
+  }
+
+  /// Gets a boxed state watcher for value `V`
+  ///
+  /// **Requires** `V` was provided via:
+  /// - [`Provider::watcher`]
+  /// - [`Provider::writer`]
+  pub fn watcher_of<V: 'static>(
+    ctx: &impl AsRef<ProviderCtx>,
+  ) -> Option<Box<dyn StateWatcher<Value = V>>> {
+    ctx
+      .as_ref()
+      .get_state_of_value::<Box<dyn StateWatcher<Value = V>>>()
+      .map(|s| s.clone_watcher())
+  }
+
+  /// Gets a boxed state reader for value `V`
+  ///
+  /// **Requires** `V` was provided via:
+  /// - [`Provider::reader`]
+  /// - [`Provider::watcher`]
+  /// - [`Provider::writer`]
+  pub fn reader_of<V: 'static>(
+    ctx: &impl AsRef<ProviderCtx>,
+  ) -> Option<Box<dyn StateReader<Value = V>>> {
+    ctx
+      .as_ref()
+      .get_state_of_value::<Box<dyn StateReader<Value = V>>>()
+      .map(|s| s.clone_reader())
   }
 
   /// Setup the provider to the context.
@@ -536,7 +576,7 @@ impl ProviderCtx {
     self.data.get(info).map(|q| &**q)
   }
 
-  pub(crate) fn get_provider<T: 'static>(&self) -> Option<QueryRef<T>> {
+  pub(crate) fn get_provider<T: 'static>(&self) -> Option<QueryRef<'_, T>> {
     let info = Provider::info::<T>();
     self
       .data
@@ -545,7 +585,7 @@ impl ProviderCtx {
       .and_then(QueryHandle::into_ref)
   }
 
-  pub(crate) fn get_provider_write<T: 'static>(&self) -> Option<WriteRef<T>> {
+  pub(crate) fn get_provider_write<T: 'static>(&self) -> Option<WriteRef<'_, T>> {
     let info = Provider::info::<T>();
     self
       .data
@@ -554,10 +594,16 @@ impl ProviderCtx {
       .and_then(QueryHandle::into_mut)
   }
 
-  pub fn get_provider_state<S>(&self) -> Option<QueryRef<S>>
+  pub fn get_provider_state<S>(&self) -> Option<QueryRef<'_, S>>
   where
     S: StateReader<Value: Sized + 'static>,
   {
+    self.get_state_of_value::<S>()
+  }
+
+  pub(crate) fn get_state_of_value<S: StateReader<Value: Sized + 'static>>(
+    &self,
+  ) -> Option<QueryRef<'_, S>> {
     let info = Provider::info::<S::Value>();
     self
       .data
@@ -589,12 +635,9 @@ impl Providers {
 
     for provider in self.providers.borrow_mut().iter_mut() {
       let Provider::Setup(p) = provider else { unreachable!() };
-      if p.is_dirty_affecting() {
-        let setup = unsafe { Box::from_raw(&mut **p) };
-        let (s, dirty, upstream) = setup.unzip();
-        child = child.dirty_on(upstream, dirty);
-        let f = std::mem::replace(p, s);
-        std::mem::forget(f);
+      let p_any: &mut dyn Any = &mut **p;
+      if let Some(writer) = p_any.downcast_mut::<WriterSetup>() {
+        child = child.dirty_on(writer.modifies.clone(), writer.dirty);
       }
     }
 
@@ -653,7 +696,7 @@ impl Query for ProvidersRender {
     self.render.query_all_write(query_id, out);
   }
 
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle<'_>> {
+  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     if query_id == &QueryId::of::<Providers>() {
       Some(QueryHandle::new(&self.providers))
     } else {
@@ -661,7 +704,7 @@ impl Query for ProvidersRender {
     }
   }
 
-  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle<'_>> {
+  fn query_write<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     self.render.query_write(query_id)
   }
 
@@ -734,12 +777,6 @@ impl ProviderSetup for Setup {
 
     Box::new(Restore { info, value: old })
   }
-
-  fn unzip(
-    self: Box<Self>,
-  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyInfo, Infallible>) {
-    unreachable!();
-  }
 }
 
 impl ProviderRestore for Restore {
@@ -756,22 +793,13 @@ impl ProviderSetup for WriterSetup {
     let old = map.set_raw_provider(info, value);
     Box::new(WriterRestore { info, restore_value: old, modifies, dirty })
   }
-
-  fn is_dirty_affecting(&self) -> bool { true }
-
-  fn unzip(
-    self: Box<Self>,
-  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyInfo, Infallible>) {
-    let Self { info, value, modifies, dirty } = *self;
-    (Box::new(Setup { info, value }), dirty, modifies)
-  }
 }
 
 impl ProviderRestore for WriterRestore {
   fn restore(self: Box<Self>, map: &mut ProviderCtx) -> Box<dyn ProviderSetup> {
     let WriterRestore { info, restore_value, modifies, dirty } = *self;
-    let v = restore(info, restore_value, map);
-    Box::new(WriterSetup { info, value: v, modifies, dirty })
+    let value = restore(info, restore_value, map);
+    Box::new(WriterSetup { info, value, modifies, dirty })
   }
 }
 
@@ -993,8 +1021,8 @@ mod tests {
 
     let w = providers! {
       providers: smallvec![
-        Provider::value_of_writer(paint.clone_writer(), Some(DirtyPhase::Paint)),
-        Provider::value_of_writer(layout.clone_writer(), Some(DirtyPhase::LayoutSubtree)),
+        Provider::writer(paint.clone_writer(), Some(DirtyPhase::Paint)),
+        Provider::writer(layout.clone_writer(), Some(DirtyPhase::LayoutSubtree)),
       ],
       @ {w_cnt.clone_writer()}
     };
@@ -1029,7 +1057,7 @@ mod tests {
       let boxed_reader: Box<dyn StateReader<Value = i32>> = Box::new(Stateful::new(1i32));
 
       @Providers {
-        providers: [Provider::value_of_reader(boxed_reader)],
+        providers: [Provider::reader(boxed_reader)],
         @ {
           let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
           assert_eq!(*v, 1);
@@ -1053,7 +1081,7 @@ mod tests {
       let boxed_watcher: Box<dyn StateWatcher<Value = i32>> = Box::new(Stateful::new(1i32));
 
       @Providers {
-        providers: [Provider::value_of_watcher(boxed_watcher)],
+        providers: [Provider::watcher(boxed_watcher)],
         @ {
           let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
           assert_eq!(*v, 1);
@@ -1080,7 +1108,7 @@ mod tests {
       let boxed_writer: Box<dyn StateWriter<Value = i32>> = Box::new(Stateful::new(1i32));
 
       @Providers {
-        providers: [Provider::value_of_writer(boxed_writer, None)],
+        providers: [Provider::writer(boxed_writer, None)],
         @ {
           let v = Provider::of::<i32>(BuildCtx::get()).unwrap();
           assert_eq!(*v, 1);

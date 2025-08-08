@@ -116,7 +116,7 @@ pub struct LightnessCfg {
 impl Palette {
   /// Retrieve the nearest `Palette` from the context among its ancestors
   #[inline]
-  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<Self> {
+  pub fn of(ctx: &impl AsRef<ProviderCtx>) -> QueryRef<'_, Self> {
     // At least one application theme exists
     Provider::of::<Self>(ctx).unwrap()
   }
@@ -124,7 +124,7 @@ impl Palette {
   /// Retrieve the nearest `Palette` from the context among its ancestors and
   /// return a write reference to the theme.
   #[inline]
-  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<Self> {
+  pub fn write_of(ctx: &impl AsRef<ProviderCtx>) -> WriteRef<'_, Self> {
     // At least one application theme exists
     Provider::write_of::<Self>(ctx).unwrap()
   }

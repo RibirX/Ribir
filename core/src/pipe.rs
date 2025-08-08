@@ -516,7 +516,7 @@ impl Query for PipeNode {
     p.data.query_all_write(query_id, out);
   }
 
-  fn query(&self, query_id: &QueryId) -> Option<QueryHandle<'_>> {
+  fn query<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     let p = self.as_ref();
     if query_id == &QueryId::of::<Self>() {
       Some(QueryHandle::new(self))
@@ -525,7 +525,7 @@ impl Query for PipeNode {
     }
   }
 
-  fn query_write(&self, query_id: &QueryId) -> Option<QueryHandle<'_>> {
+  fn query_write<'q>(&'q self, query_id: &QueryId) -> Option<QueryHandle<'q>> {
     self.as_ref().data.query_write(query_id)
   }
 

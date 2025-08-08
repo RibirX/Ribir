@@ -586,7 +586,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
   ```rust
   let state = Stateful::value(0132);
   providers!{
-    providers: [Provider::value_of_reader(state)],
+    providers: [Provider::reader(state)],
     @SizedBox {
       size: Size::new(1.,1.),
       on_tap: |e| {

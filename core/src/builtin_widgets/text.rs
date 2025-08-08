@@ -101,7 +101,7 @@ impl Text {
   pub fn new(text: impl Into<CowArc<str>>) -> Self {
     Self { text: text.into(), glyphs: Default::default() }
   }
-  pub fn glyphs(&self) -> Option<Ref<VisualGlyphs>> {
+  pub fn glyphs(&self) -> Option<Ref<'_, VisualGlyphs>> {
     Ref::filter_map(self.glyphs.borrow(), |v| v.as_ref()).ok()
   }
 }

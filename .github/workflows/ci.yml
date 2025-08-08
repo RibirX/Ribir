@@ -29,7 +29,7 @@ env:
   CI_BINARY_BUILD: "build18"
 
   # We have some features that are only available on nightly. We need to test it.
-  NIGHTLY_VERSION: "nightly-2025-03-06"
+  NIGHTLY_VERSION: "nightly-2025-08-01"
 
 name: CI
 jobs:

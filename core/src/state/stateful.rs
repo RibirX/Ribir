@@ -127,13 +127,13 @@ impl<W: 'static> StateWatcher for Stateful<W> {
 
 impl<W: 'static> StateWriter for Stateful<W> {
   #[inline]
-  fn write(&self) -> WriteRef<W> { self.write_ref(ModifyEffect::BOTH) }
+  fn write(&self) -> WriteRef<'_, W> { self.write_ref(ModifyEffect::BOTH) }
 
   #[inline]
-  fn silent(&self) -> WriteRef<W> { self.write_ref(ModifyEffect::DATA) }
+  fn silent(&self) -> WriteRef<'_, W> { self.write_ref(ModifyEffect::DATA) }
 
   #[inline]
-  fn shallow(&self) -> WriteRef<W> { self.write_ref(ModifyEffect::FRAMEWORK) }
+  fn shallow(&self) -> WriteRef<'_, W> { self.write_ref(ModifyEffect::FRAMEWORK) }
 
   #[inline]
   fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {

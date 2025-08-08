@@ -370,7 +370,7 @@ impl Painter {
   }
 
   #[inline]
-  pub fn finish(&mut self) -> PainterResult {
+  pub fn finish(&mut self) -> PainterResult<'_> {
     self.fill_all_pop_clips();
     PainterResult(&mut self.commands)
   }
@@ -378,7 +378,7 @@ impl Painter {
   /// Saves the entire state and return a guard to auto restore the state when
   /// if drop.
   #[must_use]
-  pub fn save_guard(&mut self) -> PainterGuard {
+  pub fn save_guard(&mut self) -> PainterGuard<'_> {
     self.save();
     PainterGuard(self)
   }

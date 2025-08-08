@@ -326,7 +326,7 @@ impl WidgetId {
   /// Return a iterator of all reference of type `T` in this node.
   pub(crate) fn query_all_iter<T: Any>(
     self, tree: &WidgetTree,
-  ) -> impl DoubleEndedIterator<Item = QueryRef<T>> {
+  ) -> impl DoubleEndedIterator<Item = QueryRef<'_, T>> {
     let mut out = smallvec![];
     self
       .assert_get(tree)
@@ -337,7 +337,7 @@ impl WidgetId {
   #[allow(unused)]
   pub(crate) fn query_all_write_iter<T: Any>(
     self, tree: &WidgetTree,
-  ) -> impl DoubleEndedIterator<Item = WriteRef<T>> {
+  ) -> impl DoubleEndedIterator<Item = WriteRef<'_, T>> {
     let mut out = smallvec![];
     self
       .assert_get(tree)
@@ -347,7 +347,7 @@ impl WidgetId {
 
   #[allow(unused)]
   /// Query the outermost of reference of type `T` in this node.
-  pub(crate) fn query_write<T: Any>(self, tree: &WidgetTree) -> Option<WriteRef<T>> {
+  pub(crate) fn query_write<T: Any>(self, tree: &WidgetTree) -> Option<WriteRef<'_, T>> {
     self
       .assert_get(tree)
       .query_write(&QueryId::of::<T>())
@@ -355,7 +355,7 @@ impl WidgetId {
   }
 
   /// Query the outermost of reference of type `T` in this node.
-  pub(crate) fn query_ref<T: Any>(self, tree: &WidgetTree) -> Option<QueryRef<T>> {
+  pub(crate) fn query_ref<T: Any>(self, tree: &WidgetTree) -> Option<QueryRef<'_, T>> {
     self
       .assert_get(tree)
       .query(&QueryId::of::<T>())

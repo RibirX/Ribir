@@ -37,9 +37,8 @@
 //! App::run(w).with_app_theme(theme_fn);
 //! ```
 
-use std::{convert::Infallible, hash::Hash};
+use std::hash::Hash;
 
-use ops::box_it::CloneableBoxOp;
 use pipe::PipeNode;
 use smallvec::{SmallVec, smallvec};
 
@@ -289,12 +288,6 @@ impl ProviderSetup for Classes {
     let classes = Box::new(Setup::new(*self)).setup(map);
     Box::new(ClassesRestore { overrides, classes })
   }
-
-  fn unzip(
-    self: Box<Self>,
-  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyInfo, Infallible>) {
-    unreachable!();
-  }
 }
 
 impl<R: StateReader<Value = Classes> + Query> ProviderSetup for ClassesReaderSetup<R> {
@@ -303,12 +296,6 @@ impl<R: StateReader<Value = Classes> + Query> ProviderSetup for ClassesReaderSet
     let overrides = classes.read().remove_intersects_class(map);
     let classes = Box::new(Setup::from_state(classes)).setup(map);
     Box::new(ClassesRestore { overrides, classes })
-  }
-
-  fn unzip(
-    self: Box<Self>,
-  ) -> (Box<dyn ProviderSetup>, DirtyPhase, CloneableBoxOp<'static, ModifyInfo, Infallible>) {
-    unreachable!();
   }
 }
 
@@ -877,7 +864,7 @@ mod tests {
       providers!{
         providers: smallvec![
           classes.clone().into_provider(),
-          Provider::value_of_watcher(cls.clone_watcher())
+          Provider::watcher(cls.clone_watcher())
         ],
         @MockBox {
           class: pipe!(*$read(out)),
@@ -925,8 +912,8 @@ mod tests {
       providers!{
         providers: smallvec![
           out_cls, out_cls_2, inner_cls, inner_cls_2,
-          Provider::value_of_watcher(inner.clone_watcher()),
-          Provider::value_of_writer(w_inner_apply.clone_writer(), None),
+          Provider::watcher(inner.clone_watcher()),
+          Provider::writer(w_inner_apply.clone_writer(), None),
         ],
         @MockBox {
           class: pipe!(*$read(out)),
