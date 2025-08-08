@@ -5,7 +5,7 @@ use crate::todos::{Task, Todos};
 impl Compose for Todos {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     providers! {
-      providers: [Provider::value_of_writer(this.clone_writer(), None)],
+      providers: [Provider::writer(this.clone_writer(), None)],
       @Flex {
         direction: Direction::Vertical,
         align_items: Align::Center,

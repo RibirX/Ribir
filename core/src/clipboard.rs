@@ -17,7 +17,7 @@ pub trait Clipboard {
   fn write_img(&mut self, img: &PixelImage) -> Result<(), Error>;
 
   // read the custom format from the clipboard
-  fn read(&mut self, format: &str) -> Result<Cow<[u8]>, Error>;
+  fn read(&mut self, format: &str) -> Result<Cow<'_, [u8]>, Error>;
 
   // write the custom format from the clipboard
   fn write(&mut self, format: &str, data: &[u8]) -> Result<(), Error>;
@@ -49,7 +49,7 @@ impl Clipboard for MockClipboard {
     Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard write_img"))
   }
 
-  fn read(&mut self, format: &str) -> Result<Cow<[u8]>, Error> {
+  fn read(&mut self, format: &str) -> Result<Cow<'_, [u8]>, Error> {
     warn!("read {format} data from clipboard");
     Err(Error::new(std::io::ErrorKind::Unsupported, "clipboard read format {format}"))
   }

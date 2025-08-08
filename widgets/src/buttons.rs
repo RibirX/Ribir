@@ -75,7 +75,7 @@
 //!       @ { "Custom Color" }
 //!     }
 //!     @Button {
-//!       providers: [Provider::value_of_writer(dyn_color, None)],
+//!       providers: [Provider::writer(dyn_color, None)],
 //!       @ { "Dynamic Color" }
 //!     }
 //!   }

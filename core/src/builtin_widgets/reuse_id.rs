@@ -165,18 +165,14 @@ impl<'a> ComposeChild<'a> for Reuse {
     fn_widget! {
       match this.reuse_id {
         ReuseId::Global(key) => {
-          let p = Provider::state_of
-            ::<Box<dyn StateWriter<Value = GlobalWidgets>>>(BuildCtx::get())
-            .unwrap();
-          get_or_insert(&*p, &key, child).expect("{this.reuse_id:?} is not find")
+          let p = Provider::writer_of::<GlobalWidgets>(BuildCtx::get()).unwrap();
+          get_or_insert(&p, &key, child).expect("{this.reuse_id:?} is not find")
         },
         ReuseId::Local(key, policy) => {
-          let p = Provider::state_of
-            ::<Box<dyn StateWriter<Value = LocalWidgets>>>(BuildCtx::get())
-            .unwrap();
-          let w = get_or_insert(&*p, &key, child).expect("{this.reuse_id:?} is not find");
+          let p = Provider::writer_of::<LocalWidgets>(BuildCtx::get()).unwrap();
+          let w = get_or_insert(&p, &key, child).expect("{this.reuse_id:?} is not find");
           if policy == CachePolicy::ImmediateRelease {
-            wrap_dispose_recycled(&key, &*p, w)
+            wrap_dispose_recycled(&key, &p, w)
           } else {
             w
           }
@@ -203,12 +199,10 @@ impl Compose for Reuse {
           p.get(&key).expect("{this.reuse_id:?} is not find")
         },
         ReuseId::Local(key, policy) => {
-          let p = Provider::state_of
-            ::<Box<dyn StateWriter<Value = LocalWidgets>>>(BuildCtx::get())
-            .unwrap();
+          let p = Provider::writer_of::<LocalWidgets>(BuildCtx::get()).unwrap();
           let w = $read(p).get(&key).expect("{this.reuse_id:?} is not find");
           if policy == CachePolicy::ImmediateRelease {
-            wrap_dispose_recycled(&key, &*p, w)
+            wrap_dispose_recycled(&key, &p, w)
           } else {
             w
           }

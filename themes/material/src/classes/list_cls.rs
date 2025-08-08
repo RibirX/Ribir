@@ -54,7 +54,7 @@ pub(super) fn init(classes: &mut Classes) {
         ListItemAlignItems(align)
       });
       @(item) {
-        providers: [Provider::value_of_watcher(align_provider)],
+        providers: [Provider::watcher(align_provider)],
         @FatObj {
           clamp: BoxClamp::min_height(40.),
           margin,

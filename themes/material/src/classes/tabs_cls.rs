@@ -118,7 +118,7 @@ pub fn init(classes: &mut Classes) {
     // This code is responsible for making sure the active tab header is visible
     // when the user navigates to it.
     w.on_mounted(|e| {
-      let scrollable = ScrollableWidget::boxed_writer_of(e).unwrap();
+      let scrollable = ScrollableWidget::writer_of(e).unwrap();
       let wnd = e.window();
       let wid = e.current_target();
 
@@ -263,8 +263,8 @@ fn inline_icon() -> Variant<TabsInlineIcon> {
 fn providers() -> SmallVec<[Provider; 1]> {
   let mut providers = smallvec![
     Provider::new(TextAlign::Center),
-    Provider::value_of_writer(Stateful::new(ActiveHeaderId::default()), None),
-    Provider::value_of_writer(Stateful::new(ActiveHeaderRect::default()), None),
+    Provider::writer(Stateful::new(ActiveHeaderId::default()), None),
+    Provider::writer(Stateful::new(ActiveHeaderRect::default()), None),
   ];
   if tab_type() == TabType::Primary {
     providers.push(Provider::new(TabsInlineIcon(false)));

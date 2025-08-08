@@ -247,6 +247,8 @@ impl App {
       app();
     });
 
+    AppCtx::spawn_local(async move { register_platform_app_events_handlers() });
+
     let event_loop = App::take_event_loop();
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -261,7 +263,6 @@ impl App {
     static APP: LazyLock<LocalSender<App>> = LazyLock::new(|| {
       let event_loop = EventLoop::with_user_event().build().unwrap();
 
-      register_platform_app_events_handlers();
       let event_loop = Box::new(event_loop);
 
       let app: App = App {

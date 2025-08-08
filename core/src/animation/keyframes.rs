@@ -69,7 +69,7 @@ pub struct KeyFrames<S: AnimateStateSetter> {
   frames: Box<[KeyFrame<S::Value>]>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KeyFrame<S> {
   pub rate: f32,
   pub state_value: S,

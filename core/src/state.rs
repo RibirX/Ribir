@@ -117,16 +117,16 @@ pub trait StateWatcher: StateReader {
 
 pub trait StateWriter: StateWatcher {
   /// Return a write reference of this state.
-  fn write(&self) -> WriteRef<Self::Value>;
+  fn write(&self) -> WriteRef<'_, Self::Value>;
   /// Return a silent write reference which notifies will be ignored by the
   /// framework.
-  fn silent(&self) -> WriteRef<Self::Value>;
+  fn silent(&self) -> WriteRef<'_, Self::Value>;
   /// Return a shallow write reference. Modify across this reference will notify
   /// framework only. That means the modifies on shallow reference should only
   /// effect framework but not effect on data. eg. temporary to modify the
   /// state and then modifies it back to trigger the view update. Use it only
   /// if you know how a shallow reference works.
-  fn shallow(&self) -> WriteRef<Self::Value>;
+  fn shallow(&self) -> WriteRef<'_, Self::Value>;
 
   /// Clone a boxed writer of this state.
   fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>>;
@@ -259,13 +259,13 @@ impl<T: 'static> StateWatcher for State<T> {
 
 impl<T: 'static> StateWriter for State<T> {
   #[inline]
-  fn write(&self) -> WriteRef<T> { self.as_stateful().write() }
+  fn write(&self) -> WriteRef<'_, T> { self.as_stateful().write() }
 
   #[inline]
-  fn silent(&self) -> WriteRef<T> { self.as_stateful().silent() }
+  fn silent(&self) -> WriteRef<'_, T> { self.as_stateful().silent() }
 
   #[inline]
-  fn shallow(&self) -> WriteRef<T> { self.as_stateful().shallow() }
+  fn shallow(&self) -> WriteRef<'_, T> { self.as_stateful().shallow() }
 
   #[inline]
   fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {
@@ -547,11 +547,11 @@ impl<V: ?Sized + 'static> StateWatcher for Box<dyn StateWriter<Value = V>> {
 
 impl<V: ?Sized + 'static> StateWriter for Box<dyn StateWriter<Value = V>> {
   #[inline]
-  fn write(&self) -> WriteRef<Self::Value> { (**self).write() }
+  fn write(&self) -> WriteRef<'_, Self::Value> { (**self).write() }
   #[inline]
-  fn silent(&self) -> WriteRef<Self::Value> { (**self).silent() }
+  fn silent(&self) -> WriteRef<'_, Self::Value> { (**self).silent() }
   #[inline]
-  fn shallow(&self) -> WriteRef<Self::Value> { (**self).shallow() }
+  fn shallow(&self) -> WriteRef<'_, Self::Value> { (**self).shallow() }
   #[inline]
   fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {
     (**self).clone_boxed_writer()
