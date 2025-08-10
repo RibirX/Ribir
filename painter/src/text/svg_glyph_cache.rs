@@ -167,7 +167,7 @@ impl SvgDocument {
     let name = e.name();
     let name = reader.decoder().decode(name.as_ref()).unwrap();
 
-    format!("<{}>{}</{}>", std::str::from_utf8_unchecked(e), content, name)
+    unsafe { format!("<{}>{}</{}>", std::str::from_utf8_unchecked(e), content, name) }
   }
 
   fn collect_link(content: &str, all_links: &mut HashSet<String>) -> Vec<String> {

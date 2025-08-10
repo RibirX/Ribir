@@ -51,7 +51,7 @@ pub struct OverlayStyle {
 }
 
 struct InnerOverlay {
-  gen: GenWidget,
+  gen_widget: GenWidget,
   auto_close_policy: AutoClosePolicy,
   mask: Option<Brush>,
   showing: Option<ShowingInfo>,
@@ -65,11 +65,11 @@ struct ShowingInfo {
 
 impl Overlay {
   /// Create overlay from a function widget that may call many times.
-  pub fn new<K: ?Sized>(gen: impl RInto<GenWidget, K>, style: OverlayStyle) -> Self {
-    let gen = gen.r_into();
+  pub fn new<K: ?Sized>(gen_widget: impl RInto<GenWidget, K>, style: OverlayStyle) -> Self {
+    let gen_widget = gen_widget.r_into();
     let OverlayStyle { auto_close_policy, mask } = style;
     Self(Sc::new(RefCell::new(InnerOverlay {
-      gen,
+      gen_widget,
       auto_close_policy,
       mask,
       showing: None,
@@ -95,8 +95,8 @@ impl Overlay {
     if self.is_showing() {
       return;
     }
-    let gen = self.0.borrow().gen.clone();
-    self.inner_show(gen, wnd);
+    let gen_widget = self.0.borrow().gen_widget.clone();
+    self.inner_show(gen_widget, wnd);
   }
 
   /// User can make transform before the widget show at the top level of all
@@ -141,9 +141,9 @@ impl Overlay {
     if self.is_showing() {
       return;
     }
-    let gen = self.0.borrow().gen.clone();
-    let gen = move || f(gen.gen_widget());
-    self.inner_show(gen.r_into(), wnd);
+    let gen_widget = self.0.borrow().gen_widget.clone();
+    let gen_widget = move || f(gen_widget.gen_widget());
+    self.inner_show(gen_widget.r_into(), wnd);
   }
 
   /// Show the widget at the give position.
@@ -194,7 +194,7 @@ impl Overlay {
     let background = self.mask();
     let close_policy = self.auto_close_policy();
     let inner = self.0.clone();
-    let gen = fn_widget! {
+    let gen_widget = fn_widget! {
       let w = content.gen_widget();
       let mut w = if background.is_some() || close_policy.contains(AutoClosePolicy::TAP_OUTSIDE) {
         let mut container = @Container { size: Size::splat(f32::INFINITY) };
@@ -231,7 +231,7 @@ impl Overlay {
     let this = self.clone();
     AppCtx::spawn_local(async move {
       let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
-      let generator: GenWidget = gen.r_into();
+      let generator: GenWidget = gen_widget.r_into();
       let wid = BuildCtx::get_mut().build(generator.gen_widget());
       let tree = wnd.tree_mut();
       tree.root().append(wid, tree);

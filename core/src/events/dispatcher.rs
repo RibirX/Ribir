@@ -346,7 +346,7 @@ mod tests {
   fn mouse_pointer_bubble() {
     reset_test_env!();
 
-    let (gen, records) = record_pointer();
+    let (r#gen, records) = record_pointer();
     let events = records.clone_writer();
     let root = fn_widget! {
       @MockMulti {
@@ -354,7 +354,7 @@ mod tests {
         on_pointer_move: move |e| $write(events).push(Info::new(e)),
         on_pointer_up: move |e| $write(events).push(Info::new(e)),
         on_pointer_cancel: move |e| $write(events).push(Info::new(e)),
-        @ { gen.gen_widget() }
+        @ { r#gen.gen_widget() }
       }
     };
 
