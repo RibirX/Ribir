@@ -77,7 +77,7 @@ where
   fn deref(&self) -> &B {
     match self {
       CowArc::Borrowed(borrowed) => borrowed,
-      CowArc::Owned(ref owned) => (**owned).borrow(),
+      CowArc::Owned(owned) => (**owned).borrow(),
     }
   }
 }

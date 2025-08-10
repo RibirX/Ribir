@@ -444,7 +444,7 @@ where
       let (w, ribir_waker) = unsafe { &*waker };
       w.wake_by_ref();
       ribir_waker.wake();
-      drop(this);
+      unsafe { drop(this) };
     }
 
     unsafe fn wake_by_ref(this: *const ()) {
@@ -456,7 +456,7 @@ where
 
     unsafe fn drop(this: *const ()) {
       let waker = this as *mut RawLocalWaker;
-      let _ = Box::from_raw(waker);
+      let _ = unsafe { Box::from_raw(waker) };
     }
     static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
 

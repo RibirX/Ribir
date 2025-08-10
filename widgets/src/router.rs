@@ -140,17 +140,17 @@ impl Router {
   fn switch_to(&self, path: &str) -> Widget<'static> {
     let mut params = smallvec![];
 
-    let gen = self.routes.iter().find_map(|route| {
+    let gen_widget = self.routes.iter().find_map(|route| {
       params.clear();
       route_match(path, &route.path, &mut params).then(|| route.child.clone())
     });
 
-    gen
-      .map(move |gen| {
+    gen_widget
+      .map(move |gen_widget| {
         let params = RouterParams { params };
         providers! {
           providers: [Provider::new(params)],
-          @{ gen.gen_widget() }
+          @{ gen_widget.gen_widget() }
         }
         .into_widget()
       })

@@ -97,14 +97,14 @@ struct MenuData {
   item_trigger: Option<ParentMenuInfo>,
   selected: Option<usize>,
   items: Vec<MenuItemData>,
-  gen: GenWidget,
+  gen_widget: GenWidget,
 }
 
 impl MenuControl {
   /// Receive a function generator of widget return a MenuControl
-  pub fn new<K: ?Sized>(gen: impl RInto<GenWidget, K>) -> Self {
+  pub fn new<K: ?Sized>(gen_widget: impl RInto<GenWidget, K>) -> Self {
     Self(Sc::new(RefCell::new(MenuData {
-      gen: gen.r_into(),
+      gen_widget: gen_widget.r_into(),
       handle: None,
       item_trigger: None,
       selected: None,
@@ -118,8 +118,8 @@ impl MenuControl {
 
   /// Show the menu
   pub fn show(&self, wnd: &Sc<Window>) {
-    let gen = self.0.borrow().gen.clone();
-    self.inner_show(gen, None, wnd);
+    let gen_widget = self.0.borrow().gen_widget.clone();
+    self.inner_show(gen_widget, None, wnd);
   }
 
   /// Focus the menu
@@ -150,9 +150,9 @@ impl MenuControl {
   where
     F: FnMut(Widget<'static>) -> Widget<'static> + 'static,
   {
-    let gen = self.0.borrow().gen.clone();
-    let gen = GenWidget::new(move || f(gen.gen_widget()));
-    self.inner_show(gen, None, wnd);
+    let gen_widget = self.0.borrow().gen_widget.clone();
+    let gen_widget = GenWidget::new(move || f(gen_widget.gen_widget()));
+    self.inner_show(gen_widget, None, wnd);
   }
 
   /// Close the menu
@@ -258,10 +258,10 @@ impl MenuControl {
 
   fn selected(&self) -> Option<usize> { self.0.borrow().selected }
 
-  fn inner_show(&self, gen: GenWidget, parent: Option<ParentMenuInfo>, wnd: &Sc<Window>) {
+  fn inner_show(&self, gen_widget: GenWidget, parent: Option<ParentMenuInfo>, wnd: &Sc<Window>) {
     let handle = self.clone();
     let fn_gen = GenWidget::from_fn_widget(fn_widget! {
-      let mut w = FatObj::new(gen.clone());
+      let mut w = FatObj::new(gen_widget.clone());
       handle.0.borrow_mut().id = Some(w.track_id());
       @Providers {
         providers: smallvec![Provider::new(handle.clone())],
@@ -315,10 +315,10 @@ impl MenuControl {
     let pos = wnd.map_to_global(Point::zero(), around_wid);
     let size = wnd.widget_size(around_wid).unwrap();
     let rc = Rect::new(pos, size);
-    let gen = sub_menu.0.borrow().gen.clone();
+    let gen_widget = sub_menu.0.borrow().gen_widget.clone();
 
     sub_menu.inner_show(
-      GenWidget::new(move || anchor_around(rc)(gen.gen_widget())),
+      GenWidget::new(move || anchor_around(rc)(gen_widget.gen_widget())),
       Some(ParentMenuInfo { menu: self.clone(), idx: from_item }),
       wnd,
     );

@@ -12,17 +12,17 @@ use crate::util::{declare_init_method, doc_attr};
 const BUILDER: &str = "Builder";
 const TEMPLATE: &str = "Template";
 fn with_child_generics(generics: &syn::Generics, child_ty: &Type) -> syn::Generics {
-  let mut gen = generics.clone();
-  gen.params.push(parse_quote!(_K: ?Sized));
-  gen.params.push(parse_quote!(_C));
+  let mut r#gen = generics.clone();
+  r#gen.params.push(parse_quote!(_K: ?Sized));
+  r#gen.params.push(parse_quote!(_C));
 
-  let predicates = &mut gen
+  let predicates = &mut r#gen
     .where_clause
     .get_or_insert_with(|| parse_quote! { where })
     .predicates;
   predicates.push(parse_quote!(_C: RInto<#child_ty, _K>));
 
-  gen
+  r#gen
 }
 
 pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result<TokenStream> {
@@ -62,8 +62,8 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
         };
         let ty = option_type_extract(&f.ty).unwrap_or(&f.ty);
 
-        let gen = with_child_generics(generics, ty);
-        let (g_impl, _, g_where) = gen.split_for_impl();
+        let r#gen = with_child_generics(generics, ty);
+        let (g_impl, _, g_where) = r#gen.split_for_impl();
         let kind_name = Ident::new(
           &format!("{builder}{}Kind", field_name.to_string().to_upper_camel_case()),
           Span::call_site(),
@@ -201,8 +201,8 @@ pub(crate) fn derive_child_template(input: &mut syn::DeriveInput) -> syn::Result
             let f = unnamed.first().unwrap();
             let ty = &f.ty;
             let v_name = &v.ident;
-            let gen = with_child_generics(generics, ty);
-            let (g_impl, _, g_where) = gen.split_for_impl();
+            let r#gen = with_child_generics(generics, ty);
+            let (g_impl, _, g_where) = r#gen.split_for_impl();
             let kind_name = Ident::new(&format!("{name}{}Kind", v.ident), Span::call_site());
 
             tokens.extend(quote! {
@@ -231,7 +231,7 @@ fn option_type_extract(ty: &syn::Type) -> Option<&syn::Type> {
     seg.ident == ident && seg.arguments.is_empty()
   }
 
-  let syn::Type::Path(ref path) = ty else {
+  let syn::Type::Path(path) = ty else {
     return None;
   };
   let mut iter = path.path.segments.iter().rev();
@@ -254,7 +254,7 @@ fn option_type_extract(ty: &syn::Type) -> Option<&syn::Type> {
     })
     .filter(|args| args.len() == 1)
     .and_then(|args| match args.first() {
-      Some(GenericArgument::Type(ref ty)) => Some(ty),
+      Some(GenericArgument::Type(ty)) => Some(ty),
       _ => None,
     })
 }

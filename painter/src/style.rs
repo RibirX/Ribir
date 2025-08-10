@@ -29,8 +29,8 @@ impl Brush {
     match self {
       Brush::Color(c) => c.alpha > 0,
       Brush::Image(_) => true,
-      Brush::RadialGradient(RadialGradient { ref stops, .. })
-      | Brush::LinearGradient(LinearGradient { ref stops, .. }) => {
+      Brush::RadialGradient(RadialGradient { stops, .. })
+      | Brush::LinearGradient(LinearGradient { stops, .. }) => {
         stops.iter().any(|s| s.color.alpha > 0)
       }
     }
