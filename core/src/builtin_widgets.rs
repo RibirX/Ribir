@@ -843,7 +843,7 @@ impl<T> FatObj<T> {
   /// changes.
   pub fn is_hovered(&mut self) -> impl StateWatcher<Value = bool> {
     self.mix_builtin_widget().trace_hover();
-    self.mix_flags_watcher(|mix| unsafe { PartRef::from_ptr(mix.is_hovered()) })
+    self.mix_flags_watcher(|mix| PartRef::from_value(mix.is_hovered()))
   }
 
   /// Returns a watcher that tracks whether a pointer device is currently
@@ -852,7 +852,7 @@ impl<T> FatObj<T> {
   /// Useful for implementing press/release interactions and visual feedback.
   pub fn is_pointer_pressed(&mut self) -> impl StateWatcher<Value = bool> {
     self.mix_builtin_widget().trace_pointer_pressed();
-    self.mix_flags_watcher(|mix| unsafe { PartRef::from_ptr(mix.is_pointer_pressed()) })
+    self.mix_flags_watcher(|mix| PartRef::from_value(mix.is_pointer_pressed()))
   }
 
   /// Returns a watcher that tracks the auto-focus state of the widget.
@@ -864,7 +864,7 @@ impl<T> FatObj<T> {
     self
       .focus_handle()
       .flags
-      .part_watcher(|focus| unsafe { PartRef::from_ptr(focus.auto_focus()) })
+      .part_watcher(|focus| PartRef::from_value(focus.auto_focus()))
   }
 
   /// Returns a watcher that tracks whether the widget currently has input
@@ -876,7 +876,7 @@ impl<T> FatObj<T> {
     self
       .focus_handle()
       .flags
-      .part_watcher(|focus| unsafe { PartRef::from_ptr(focus.is_focused()) })
+      .part_watcher(|focus| PartRef::from_value(focus.is_focused()))
   }
 
   /// Returns a watcher that tracks the reason why the widget currently has
@@ -885,7 +885,7 @@ impl<T> FatObj<T> {
     self
       .focus_handle()
       .flags
-      .part_watcher(|focus| unsafe { PartRef::from_ptr(focus.focus_changed_reason()) })
+      .part_watcher(|focus| PartRef::from_value(focus.focus_changed_reason()))
   }
 
   // Layout-related property watchers
@@ -893,19 +893,19 @@ impl<T> FatObj<T> {
   /// Returns a watcher for tracking changes to the widget's layout rectangle
   /// (position and size).
   pub fn layout_rect(&mut self) -> impl StateWatcher<Value = Rect> {
-    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_rect()) })
+    self.layout_box_watcher(|layout| PartRef::from_value(layout.layout_rect()))
   }
 
   /// Returns a watcher for tracking changes to the widget's layout position
   /// (x,y coordinates).
   pub fn layout_pos(&mut self) -> impl StateWatcher<Value = Point> {
-    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_pos()) })
+    self.layout_box_watcher(|layout| PartRef::from_value(layout.layout_pos()))
   }
 
   /// Returns a watcher for tracking changes to the widget's dimensions (width
   /// and height).
   pub fn layout_size(&mut self) -> impl StateWatcher<Value = Size> {
-    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_size()) })
+    self.layout_box_watcher(|layout| PartRef::from_value(layout.layout_size()))
   }
 
   // Individual layout dimension watchers
@@ -913,25 +913,25 @@ impl<T> FatObj<T> {
   /// Returns a watcher specifically for tracking the left position of the
   /// widget's layout.
   pub fn layout_left(&mut self) -> impl StateWatcher<Value = f32> {
-    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_left()) })
+    self.layout_box_watcher(|layout| PartRef::from_value(layout.layout_left()))
   }
 
   /// Returns a watcher specifically for tracking the top position of the
   /// widget's layout.
   pub fn layout_top(&mut self) -> impl StateWatcher<Value = f32> {
-    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_top()) })
+    self.layout_box_watcher(|layout| PartRef::from_value(layout.layout_top()))
   }
 
   /// Returns a watcher specifically for tracking the width of the widget's
   /// layout.
   pub fn layout_width(&mut self) -> impl StateWatcher<Value = f32> {
-    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_width()) })
+    self.layout_box_watcher(|layout| PartRef::from_value(layout.layout_width()))
   }
 
   /// Returns a watcher specifically for tracking the height of the widget's
   /// layout.
   pub fn layout_height(&mut self) -> impl StateWatcher<Value = f32> {
-    self.layout_box_watcher(|layout| unsafe { PartRef::from_ptr(layout.layout_height()) })
+    self.layout_box_watcher(|layout| PartRef::from_value(layout.layout_height()))
   }
 
   // Style property writers
