@@ -136,18 +136,16 @@ pub trait StateWriter: StateWatcher {
   where
     Self: Sized;
 
-  /// Creates a child writer focused on a specific data segment identified by
-  /// `id`.
+  /// Creates a writer that targets a specific data segment identified by `id`.
   ///
-  /// This establishes a parent-child hierarchy where:
-  /// - The `id` identifies a segment within the parent writer's data
-  /// - The `part_map` function accesses the specific data segment
-  /// - Parents can control whether child modifications propagate upstream
-  /// - Child writer will not be notified of parent modifications and siblings
-  ///   notifications
+  /// Establishes a parent-child hierarchy where:
+  /// - `id` identifies a segment within the parent writer's data
+  /// - `part_map` accesses the specific data segment
+  /// - Parents control child modification propagation
+  /// - Child isn't notified of parent/sibling changes
   ///
   /// # Parameters
-  /// - `id`: Identifies the data segment (use `PartialId::any()` for wildcard)
+  /// - `id`: Segment identifier (use `PartialId::any()` for wildcard)
   /// - `part_map`: Function mapping parent data to child's data segment
   fn part_writer<V: ?Sized + 'static, M>(&self, id: PartialId, part_map: M) -> PartWriter<Self, M>
   where
@@ -160,6 +158,17 @@ pub trait StateWriter: StateWatcher {
     }
 
     PartWriter { origin: self.clone_writer(), part_map, path, include_partial: false }
+  }
+
+  /// Creates a writer that maps the entire parent data (wildcard segment).
+  ///
+  /// Equivalent to `part_writer(PartialId::any(), part_map)`
+  fn map_writer<V: ?Sized + 'static, M>(&self, part_map: M) -> PartWriter<Self, M>
+  where
+    M: Fn(&mut Self::Value) -> PartMut<V> + Clone + 'static,
+    Self: Sized,
+  {
+    self.part_writer(PartialId::any(), part_map)
   }
 
   /// Configures whether modifications from partial writers should be included
@@ -187,6 +196,10 @@ pub trait StateWriter: StateWatcher {
 
 pub struct WriteRef<'a, V: ?Sized> {
   value: ValueMutRef<'a, V>,
+  notify_guard: WriteRefNotifyGuard<'a>,
+}
+
+struct WriteRefNotifyGuard<'a> {
   info: &'a Sc<WriterInfo>,
   modify_effect: ModifyEffect,
   modified: bool,
@@ -341,37 +354,33 @@ impl PartialId {
   pub fn new(str_id: CowArc<str>) -> Self { Self::from(str_id) }
 }
 
-impl<'a, V: ?Sized> WriteRef<'a, V> {
-  pub fn silent(self) -> WriteRef<'a, V> {
-    WriteRef {
-      modify_effect: ModifyEffect::DATA,
-      value: self.value.clone(),
-      info: self.info,
-      modified: false,
-      path: self.path,
-    }
+impl<'a, V: ?Sized + 'a> WriteRef<'a, V> {
+  fn new(
+    value: ValueMutRef<'a, V>, info: &'a Sc<WriterInfo>, path: &'a PartialPath,
+    modify_effect: ModifyEffect,
+  ) -> Self {
+    let notify_guard = WriteRefNotifyGuard { info, modify_effect, path, modified: false };
+    WriteRef { value, notify_guard }
   }
+  /// Converts to a silent write reference which notifies will be ignored by the
+  /// framework.
+  pub fn silent(self) -> WriteRef<'a, V> { self.with_modify_effect(ModifyEffect::DATA) }
 
-  pub fn shallow(self) -> WriteRef<'a, V> {
-    WriteRef {
-      modify_effect: ModifyEffect::FRAMEWORK,
-      value: self.value.clone(),
-      info: self.info,
-      modified: false,
-      path: self.path,
-    }
-  }
+  /// Converts to a shallow write reference. Modify across this reference will
+  /// notify framework only. That means the modifies on shallow reference
+  /// should only effect framework but not effect on data. eg. temporary to
+  /// modify the state and then modifies it back to trigger the view update.
+  /// Use it only if you know how a shallow reference works.
+  pub fn shallow(self) -> WriteRef<'a, V> { self.with_modify_effect(ModifyEffect::FRAMEWORK) }
 
-  pub fn map<U: ?Sized, M>(mut orig: WriteRef<'a, V>, part_map: M) -> WriteRef<'a, U>
+  pub fn map<U: ?Sized, M>(orig: WriteRef<'a, V>, part_map: M) -> WriteRef<'a, U>
   where
     M: Fn(&mut V) -> PartMut<U>,
   {
-    let WriteRef { ref mut value, info, modify_effect: modify_scope, path, .. } = orig;
-
-    let inner = part_map(value).inner;
-    let value = ValueMutRef { inner, borrow: value.borrow.clone() };
-
-    WriteRef { value, modified: false, modify_effect: modify_scope, info, path }
+    let WriteRef { value, mut notify_guard } = orig;
+    notify_guard.notify();
+    let value = ValueMutRef::map(value, part_map);
+    WriteRef { value, notify_guard }
   }
 
   /// Makes a new `WriteRef` for an optional component of the borrowed data. The
@@ -399,12 +408,13 @@ impl<'a, V: ?Sized> WriteRef<'a, V> {
   where
     M: Fn(&mut V) -> Option<PartMut<U>>,
   {
-    let WriteRef { ref mut value, info, modify_effect: modify_scope, path: scopes, .. } = orig;
-    match part_map(value) {
-      Some(inner) => {
-        let inner = inner.inner;
-        let value = ValueMutRef { inner, borrow: value.borrow.clone() };
-        Ok(WriteRef { value, modified: false, modify_effect: modify_scope, info, path: scopes })
+    match part_map(&mut orig.value).map(|v| v.inner) {
+      Some(part) => {
+        let WriteRef { value, mut notify_guard } = orig;
+        notify_guard.notify();
+        let ValueMutRef { inner, borrow, mut origin_store } = value;
+        origin_store.add(inner);
+        Ok(WriteRef { value: ValueMutRef { origin_store, inner: part, borrow }, notify_guard })
       }
       None => Err(orig),
     }
@@ -414,9 +424,35 @@ impl<'a, V: ?Sized> WriteRef<'a, V> {
   /// this reference before this call will not be notified. Return true if there
   /// is any modifies on this reference.
   #[inline]
-  pub fn forget_modifies(&mut self) -> bool { std::mem::replace(&mut self.modified, false) }
+  pub fn forget_modifies(&mut self) -> bool {
+    std::mem::replace(&mut self.notify_guard.modified, false)
+  }
+
+  /// Internal helper to create a new WriteRef with specified modify effect
+  fn with_modify_effect(mut self, modify_effect: ModifyEffect) -> WriteRef<'a, V> {
+    self.notify_guard.notify();
+    self.notify_guard.modify_effect = modify_effect;
+    self
+  }
 }
 
+impl<'a> WriteRefNotifyGuard<'a> {
+  fn notify(&mut self) {
+    let Self { info, modify_effect, modified, path } = self;
+    if !*modified {
+      return;
+    }
+
+    let batched_modifies = &info.batched_modifies;
+    if batched_modifies.get().is_empty() && !modify_effect.is_empty() {
+      batched_modifies.set(*modify_effect);
+      AppCtx::data_changed(path.clone(), info.clone());
+    } else {
+      batched_modifies.set(*modify_effect | batched_modifies.get());
+    }
+    *modified = false;
+  }
+}
 impl PartialId {
   /// A wildcard partial id, which means it equals to its parent scope.
   pub fn any() -> Self { Self(None) }
@@ -433,29 +469,13 @@ impl<'a, W: ?Sized> DerefMut for WriteRef<'a, W> {
   #[track_caller]
   #[inline]
   fn deref_mut(&mut self) -> &mut Self::Target {
-    self.modified = true;
+    self.notify_guard.modified = true;
     self.value.deref_mut()
   }
 }
 
-impl<'a, W: ?Sized> Drop for WriteRef<'a, W> {
-  fn drop(&mut self) {
-    let Self { info, modify_effect: modify_scope, modified, .. } = self;
-    if !*modified {
-      return;
-    }
-
-    let batched_modifies = &info.batched_modifies;
-    if batched_modifies.get().is_empty() && !modify_scope.is_empty() {
-      batched_modifies.set(*modify_scope);
-
-      let info = info.clone();
-
-      AppCtx::data_changed(self.path.clone(), info);
-    } else {
-      batched_modifies.set(*modify_scope | batched_modifies.get());
-    }
-  }
+impl<'a> Drop for WriteRefNotifyGuard<'a> {
+  fn drop(&mut self) { self.notify(); }
 }
 
 impl<V: ?Sized + 'static> StateReader for Box<dyn StateReader<Value = V>> {

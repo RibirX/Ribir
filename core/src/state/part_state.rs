@@ -87,7 +87,12 @@ where
   }
 
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
-    let modifies = self.write().info.notifier.raw_modifies();
+    let modifies = self
+      .write()
+      .notify_guard
+      .info
+      .notifier
+      .raw_modifies();
     let path = self.path.clone();
     let include_partial = self.include_partial;
 
@@ -114,19 +119,19 @@ where
 {
   fn write(&self) -> WriteRef<'_, Self::Value> {
     let mut w = WriteRef::map(self.origin.write(), &self.part_map);
-    w.path = &self.path;
+    w.notify_guard.path = &self.path;
     w
   }
 
   fn silent(&self) -> WriteRef<'_, Self::Value> {
     let mut w = WriteRef::map(self.origin.silent(), &self.part_map);
-    w.path = &self.path;
+    w.notify_guard.path = &self.path;
     w
   }
 
   fn shallow(&self) -> WriteRef<'_, Self::Value> {
     let mut w = WriteRef::map(self.origin.shallow(), &self.part_map);
-    w.path = &self.path;
+    w.notify_guard.path = &self.path;
     w
   }
 
@@ -155,7 +160,9 @@ where
 
 trait MapReaderFn<Input: ?Sized>: Clone {
   type Output: ?Sized;
-  fn call<'a>(&self, input: ReadRef<'a, Input>) -> ReadRef<'a, Self::Output>;
+  fn call<'a>(&self, input: ReadRef<'a, Input>) -> ReadRef<'a, Self::Output>
+  where
+    Input: 'a;
 }
 
 impl<Input: ?Sized, Output: ?Sized, F> MapReaderFn<Input> for F
@@ -163,7 +170,10 @@ where
   F: Fn(&Input) -> PartRef<Output> + Clone,
 {
   type Output = Output;
-  fn call<'a>(&self, input: ReadRef<'a, Input>) -> ReadRef<'a, Self::Output> {
+  fn call<'a>(&self, input: ReadRef<'a, Input>) -> ReadRef<'a, Self::Output>
+  where
+    Input: 'a,
+  {
     ReadRef::map(input, self)
   }
 }
@@ -173,7 +183,10 @@ where
   F: Fn(&mut Input) -> PartMut<Output> + Clone,
 {
   type Output = Output;
-  fn call<'a>(&self, input: ReadRef<'a, Input>) -> ReadRef<'a, Self::Output> {
+  fn call<'a>(&self, input: ReadRef<'a, Input>) -> ReadRef<'a, Self::Output>
+  where
+    Input: 'a,
+  {
     ReadRef::mut_as_ref_map(input, &self.0)
   }
 }

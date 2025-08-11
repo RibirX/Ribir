@@ -373,7 +373,9 @@ where
       let (w, ribir_waker) = unsafe { &*waker };
       w.wake_by_ref();
       ribir_waker.wake();
-      unsafe{drop(this);}
+      unsafe {
+        drop(this);
+      }
     }
 
     unsafe fn wake_by_ref(this: *const ()) {

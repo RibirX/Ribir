@@ -227,8 +227,7 @@ impl<W> Stateful<W> {
 
   fn write_ref(&self, effect: ModifyEffect) -> WriteRef<'_, W> {
     let path = wildcard_scope_path();
-    let value = self.data.write();
-    WriteRef { value, modified: false, modify_effect: effect, info: &self.info, path }
+    WriteRef::new(self.data.write(), &self.info, path, effect)
   }
 
   fn clone(&self) -> Self {
