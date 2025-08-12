@@ -2,7 +2,7 @@ mod part_state;
 mod prior_op;
 mod stateful;
 mod watcher;
-use std::{cell::UnsafeCell, convert::Infallible, mem::MaybeUninit, ops::DerefMut};
+use std::{convert::Infallible, ops::DerefMut};
 pub mod state_cell;
 
 pub use part_state::*;
@@ -20,11 +20,8 @@ use crate::prelude::*;
 ///
 /// Use [`PartialId::any()`] to create a wildcard identifier that shares the
 /// same scope as its parent writer.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PartialId(Option<CowArc<str>>);
-
-/// Hierarchical path from root to current writer, represented as owned string
-/// segments.
-pub type PartialPath = SmallVec<[CowArc<str>; 1]>;
 
 /// The `StateReader` trait allows for reading, clone and map the state.
 pub trait StateReader: 'static {
@@ -152,12 +149,7 @@ pub trait StateWriter: StateWatcher {
     M: Fn(&mut Self::Value) -> PartMut<V> + Clone + 'static,
     Self: Sized,
   {
-    let mut path = self.scope_path().clone();
-    if let Some(id) = id.0 {
-      path.push(id);
-    }
-
-    PartWriter { origin: self.clone_writer(), part_map, path, include_partial: false }
+    PartWriter { origin: self.clone_writer(), part_map, id, include_partial: false }
   }
 
   /// Creates a writer that maps the entire parent data (wildcard segment).
@@ -186,12 +178,9 @@ pub trait StateWriter: StateWatcher {
   /// `partial_a` will appear in notifications about `P`.
   ///
   /// Change this setting not effects the already subscribed downstream.p
-  fn include_partial_writers(self, include: bool) -> Self
-  where
-    Self: Sized;
+  fn include_partial_writers(&mut self, include: bool);
 
-  /// Temporary API, not use it.
-  fn scope_path(&self) -> &PartialPath;
+  fn scope_path(&self) -> SmallVec<[PartialId; 1]>;
 }
 
 pub struct WriteRef<'a, V: ?Sized> {
@@ -203,160 +192,17 @@ struct WriteRefNotifyGuard<'a> {
   info: &'a Sc<WriterInfo>,
   modify_effect: ModifyEffect,
   modified: bool,
-  path: &'a PartialPath,
-}
-
-/// Enum to store both stateless and stateful object.
-pub struct State<W>(pub(crate) UnsafeCell<InnerState<W>>);
-
-pub(crate) enum InnerState<W> {
-  Data(StateCell<W>),
-  Stateful(Stateful<W>),
-}
-
-impl<T: 'static> StateReader for State<T> {
-  type Value = T;
-  type Reader = Reader<T>;
-
-  fn read(&self) -> ReadRef<'_, T> {
-    match self.inner_ref() {
-      InnerState::Data(w) => w.read(),
-      InnerState::Stateful(w) => w.read(),
-    }
-  }
-
-  #[inline]
-  fn clone_boxed_reader(&self) -> Box<dyn StateReader<Value = Self::Value>> {
-    Box::new(self.clone_reader())
-  }
-
-  #[inline]
-  fn clone_reader(&self) -> Self::Reader { self.as_stateful().clone_reader() }
-
-  fn try_into_value(self) -> Result<Self::Value, Self> {
-    match self.0.into_inner() {
-      InnerState::Data(w) => Ok(w.into_inner()),
-      InnerState::Stateful(w) => w.try_into_value().map_err(State::stateful),
-    }
-  }
-}
-
-impl<T: 'static> StateWatcher for State<T> {
-  type Watcher = Watcher<Self::Reader>;
-
-  fn into_reader(self) -> Result<Self::Reader, Self>
-  where
-    Self: Sized,
-  {
-    match self.0.into_inner() {
-      InnerState::Data(d) => Ok(Reader(Sc::new(d))),
-      InnerState::Stateful(s) => s.into_reader().map_err(State::stateful),
-    }
-  }
-
-  #[inline]
-  fn clone_boxed_watcher(&self) -> Box<dyn StateWatcher<Value = Self::Value>> {
-    Box::new(self.clone_watcher())
-  }
-
-  #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
-    self.as_stateful().raw_modifies()
-  }
-
-  #[inline]
-  fn clone_watcher(&self) -> Watcher<Self::Reader> {
-    Watcher::new(self.clone_reader(), self.raw_modifies())
-  }
-}
-
-impl<T: 'static> StateWriter for State<T> {
-  #[inline]
-  fn write(&self) -> WriteRef<'_, T> { self.as_stateful().write() }
-
-  #[inline]
-  fn silent(&self) -> WriteRef<'_, T> { self.as_stateful().silent() }
-
-  #[inline]
-  fn shallow(&self) -> WriteRef<'_, T> { self.as_stateful().shallow() }
-
-  #[inline]
-  fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {
-    Box::new(self.clone_writer())
-  }
-
-  #[inline]
-  fn clone_writer(&self) -> Self { State::stateful(self.as_stateful().clone_writer()) }
-
-  #[inline]
-  fn scope_path(&self) -> &PartialPath { wildcard_scope_path() }
-
-  #[inline]
-  fn include_partial_writers(self, include: bool) -> Self
-  where
-    Self: Sized,
-  {
-    State::stateful(
-      self
-        .into_stateful()
-        .include_partial_writers(include),
-    )
-  }
-}
-
-impl<W> State<W> {
-  pub fn stateful(stateful: Stateful<W>) -> Self {
-    State(UnsafeCell::new(InnerState::Stateful(stateful)))
-  }
-
-  pub fn value(value: W) -> Self { State(UnsafeCell::new(InnerState::Data(StateCell::new(value)))) }
-
-  pub fn into_stateful(self) -> Stateful<W>
-  where
-    W: 'static,
-  {
-    self.as_stateful().clone_writer()
-  }
-  pub fn as_stateful(&self) -> &Stateful<W> {
-    match self.inner_ref() {
-      InnerState::Data(w) => {
-        assert!(w.is_unused());
-
-        let mut uninit: MaybeUninit<_> = MaybeUninit::uninit();
-        // Safety: we already check there is no other reference to the state data.
-        unsafe {
-          std::ptr::copy(w, uninit.as_mut_ptr(), 1);
-          let value = uninit.assume_init().into_inner();
-          let stateful = InnerState::Stateful(Stateful::new(value));
-          let copy = std::mem::replace(&mut *self.0.get(), stateful);
-          // this is a copy of the inner data so we need forget it.
-          std::mem::forget(copy);
-        };
-
-        match self.inner_ref() {
-          InnerState::Stateful(w) => w,
-          _ => unreachable!(),
-        }
-      }
-      InnerState::Stateful(w) => w,
-    }
-  }
-
-  fn inner_ref(&self) -> &InnerState<W> {
-    // Safety: we only use this method to get the inner state, and no way to get the
-    // mutable reference of the inner state except the `as_stateful` method and the
-    // `as_stateful` will check the inner borrow state.
-    unsafe { &*self.0.get() }
-  }
+  path: SmallVec<[PartialId; 1]>,
 }
 
 impl PartialId {
+  const ANY: PartialId = PartialId(None);
   pub fn new(str_id: CowArc<str>) -> Self { Self::from(str_id) }
 }
 
 impl<'a, V: ?Sized + 'a> WriteRef<'a, V> {
   fn new(
-    value: ValueMutRef<'a, V>, info: &'a Sc<WriterInfo>, path: &'a PartialPath,
+    value: ValueMutRef<'a, V>, info: &'a Sc<WriterInfo>, path: SmallVec<[PartialId; 1]>,
     modify_effect: ModifyEffect,
   ) -> Self {
     let notify_guard = WriteRefNotifyGuard { info, modify_effect, path, modified: false };
@@ -580,11 +426,9 @@ impl<V: ?Sized + 'static> StateWriter for Box<dyn StateWriter<Value = V>> {
   fn clone_writer(&self) -> Self { self.clone_boxed_writer() }
 
   #[inline]
-  fn include_partial_writers(self, _: bool) -> Self {
-    unimplemented!();
-  }
+  fn include_partial_writers(&mut self, include: bool) { (**self).include_partial_writers(include) }
 
-  fn scope_path(&self) -> &PartialPath { (**self).scope_path() }
+  fn scope_path(&self) -> SmallVec<[PartialId; 1]> { (**self).scope_path() }
 }
 
 impl<T: Into<CowArc<str>>> From<T> for PartialId {
@@ -611,7 +455,7 @@ mod tests {
   fn map_same_with_origin() {
     reset_test_env!();
 
-    let origin = State::value(Origin { a: 0, b: 0 });
+    let origin = Stateful::new(Origin { a: 0, b: 0 });
     let map_state = origin.part_writer(PartialId::any(), |v| PartMut::new(&mut v.b));
 
     let track_origin = Sc::new(Cell::new(0));
@@ -646,7 +490,8 @@ mod tests {
   fn split_notify() {
     reset_test_env!();
 
-    let origin = State::value(Origin { a: 0, b: 0 }).include_partial_writers(true);
+    let mut origin = Stateful::new(Origin { a: 0, b: 0 });
+    origin.include_partial_writers(true);
     let split_a = origin.part_writer("a".into(), |v| PartMut::new(&mut v.a));
     let split_b = origin.part_writer("b".into(), |v| PartMut::new(&mut v.b));
 
@@ -707,7 +552,7 @@ mod tests {
     reset_test_env!();
 
     let _state_compose_widget = fn_widget! {
-      State::value(C)
+      Stateful::new(C)
     };
 
     let _sateful_compose_widget = fn_widget! {
@@ -742,12 +587,12 @@ mod tests {
     reset_test_env!();
 
     let _state_with_child = fn_widget! {
-      let cc = State::value(CC);
+      let cc = Stateful::new(CC);
       @(cc) { @{ Void } }
     };
 
     let _state_without_child = fn_widget! {
-      State::value(CC)
+      Stateful::new(CC)
     };
 
     let _stateful_with_child = fn_widget! {
@@ -796,10 +641,6 @@ mod tests {
   fn state_reader_builder() {
     reset_test_env!();
 
-    let _state_render_widget = fn_widget! {
-      State::value(Void)
-    };
-
     let _stateful_render_widget = fn_widget! {
       Stateful::new(Void)
     };
@@ -827,7 +668,7 @@ mod tests {
   #[test]
   fn trait_object_part_data() {
     reset_test_env!();
-    let s = State::value(0);
+    let s = Stateful::new(0);
     let m = s.part_writer("0".into(), |v| PartMut::new(v as &mut dyn Any));
     let v: ReadRef<dyn Any> = m.read();
     assert_eq!(*v.downcast_ref::<i32>().unwrap(), 0);

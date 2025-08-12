@@ -67,7 +67,7 @@ use ribir::prelude::*;
 
 let mut btn = Radio::declarer();
 btn.with_selected(true).on_tap(|_| println!("Radio clicked"));
-let btn: FatObj<State<Radio>> = btn.finish();
+let btn: FatObj<Stateful<Radio>> = btn.finish();
 ```
 
 ### 为何我们应使用 `Declare` 创建 widget？
@@ -77,7 +77,7 @@ let btn: FatObj<State<Radio>> = btn.finish();
 
 #### 完整的初始化 API
 
-要注意的是，我们最终创建的是 `FatObj<State<Radio>>`，而不是 `Radio`。这是因为通过 `Declare`，我们不仅可以使用同名方法配置属性，还可以利用 `FatObj` 扩展内建 widget 的能力。至于为什么要使用 `State`，这是因为 `State` 可以让你的 widget 状态被监听和修改。
+要注意的是，我们最终创建的是 `FatObj<Stateful<Radio>>`，而不是 `Radio`。这是因为通过 `Declare`，我们不仅可以使用同名方法配置属性，还可以利用 `FatObj` 扩展内建 widget 的能力。至于为什么要使用 `Stateful`，这是因为 `Stateful` 可以让你的 widget 状态被监听和修改。
 
 ```rust
 use ribir::prelude::*;
@@ -85,13 +85,13 @@ use ribir::prelude::*;
 let mut radio = Radio::declarer();
 // 我们可以使用内建能力
 radio.on_tap(|_| println!("taped!"));
-let radio: FatObj<State<Radio>> = radio.finish();
+let radio: FatObj<Stateful<Radio>> = radio.finish();
 
 watch!($read(radio).selected)
   .subscribe(|selected| println!("The radio state change to {selected}"));
 ```
 
-当然，无论是 `FatObj` 还是 `State`，只有在你用到它们提供的能力时，才会影响到最终构建的视图的开销。
+当然，无论是 `FatObj` 还是 `Stateful`，只有在你用到它们提供的能力时，才会影响到最终构建的视图的开销。
 
 #### 支持使用 `pipe!` 流进行初始化
 
@@ -102,7 +102,7 @@ use ribir::prelude::*;
 
 let mut radio1 = Radio::declarer();
 radio1.with_selected(true);
-let radio1: FatObj<State<Radio>>  = radio1.finish();
+let radio1: FatObj<Stateful<Radio>>  = radio1.finish();
   
 let mut radio2 = Radio::declarer();
 radio2.with_selected(pipe!($read(radio1).selected));

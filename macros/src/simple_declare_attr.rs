@@ -65,11 +65,11 @@ pub(crate) fn simple_declarer_attr(
   } else {
     tokens.extend(quote! {
       impl #g_impl ObjDeclarer for #name #g_ty #g_where {
-        type Target = State<#host #g_ty>;
+        type Target = Stateful<#host #g_ty>;
 
         #[track_caller]
         fn finish(mut self) -> Self::Target {
-          State::value(#finish_obj)
+          Stateful::new(#finish_obj)
         }
       }
     });

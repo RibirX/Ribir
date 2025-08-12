@@ -107,11 +107,11 @@ impl WidgetTree {
           let visual_rect = ctx.visual_box(wid);
           ctx.perform_layout(clamp);
           let new_rect = ctx.visual_box(wid);
-          if visual_rect != new_rect {
-            if let Some(parent) = wid.parent(self) {
-              let depth = parent.ancestors(self).count();
-              visual_roots.insert((depth, parent));
-            }
+          if visual_rect != new_rect
+            && let Some(parent) = wid.parent(self)
+          {
+            let depth = parent.ancestors(self).count();
+            visual_roots.insert((depth, parent));
           }
         }
       }
@@ -128,10 +128,10 @@ impl WidgetTree {
         let mut ctx = LayoutCtx::new(wid, self, laid_out_queue);
         let visual_rect = ctx.visual_box(wid);
         let new_rect = ctx.update_visual_box();
-        if visual_rect != new_rect {
-          if let Some(parent) = wid.parent(self) {
-            visual_roots.insert((depth - 1, parent));
-          }
+        if visual_rect != new_rect
+          && let Some(parent) = wid.parent(self)
+        {
+          visual_roots.insert((depth - 1, parent));
         }
       }
     }

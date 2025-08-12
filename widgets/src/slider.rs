@@ -51,10 +51,10 @@ pub struct Slider {
 impl Slider {
   fn set_to(&mut self, mut v: f32) {
     v = v.clamp(0., 1.);
-    if let Some(divisions) = self.divisions {
-      if divisions > 0 {
-        v = (v * divisions as f32).round() / (divisions as f32);
-      }
+    if let Some(divisions) = self.divisions
+      && divisions > 0
+    {
+      v = (v * divisions as f32).round() / (divisions as f32);
     }
 
     self.value = (self.min + v * (self.max - self.min)).clamp(self.min, self.max);
@@ -66,10 +66,10 @@ impl Slider {
     }
     let mut v = (self.value - self.min) / (self.max - self.min);
     v = v.clamp(0., 1.);
-    if let Some(divisions) = self.divisions {
-      if divisions > 0 {
-        v = (v * divisions as f32).round() / (divisions as f32)
-      }
+    if let Some(divisions) = self.divisions
+      && divisions > 0
+    {
+      v = (v * divisions as f32).round() / (divisions as f32)
     }
     v
   }
@@ -213,10 +213,10 @@ impl RangeSlider {
   }
 
   fn convert_ratio(&self, mut ratio: f32) -> f32 {
-    if let Some(divisions) = self.divisions {
-      if divisions > 1 {
-        ratio = (ratio * divisions as f32).round() / (divisions as f32);
-      }
+    if let Some(divisions) = self.divisions
+      && divisions > 1
+    {
+      ratio = (ratio * divisions as f32).round() / (divisions as f32);
     }
     self.min + ratio * (self.max - self.min)
   }
@@ -227,10 +227,10 @@ impl RangeSlider {
     }
     let mut v = (v - self.min) / (self.max - self.min);
     v = v.clamp(0., 1.);
-    if let Some(divisions) = self.divisions {
-      if divisions > 0 {
-        v = (v * divisions as f32).round() / (divisions as f32);
-      }
+    if let Some(divisions) = self.divisions
+      && divisions > 0
+    {
+      v = (v * divisions as f32).round() / (divisions as f32);
     }
     v
   }

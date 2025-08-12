@@ -284,7 +284,7 @@ pub struct Pair<W, C> {
 /// A pair used to store a `ComposeChild` widget and its child. This preserves
 /// the type information of both the parent and child without composition.
 pub struct PairOf<'c, W: ComposeChild<'c>>(
-  pub(super) FatObj<Pair<State<W>, <W as ComposeChild<'c>>::Child>>,
+  pub(super) FatObj<Pair<Stateful<W>, <W as ComposeChild<'c>>::Child>>,
 );
 
 impl<'w> OptionWidget<'w> {
@@ -309,7 +309,7 @@ impl<W, C> Pair<W, C> {
 }
 
 impl<'c, W: ComposeChild<'c>> PairOf<'c, W> {
-  pub fn parent(&self) -> &State<W> { &self.0.parent }
+  pub fn parent(&self) -> &Stateful<W> { &self.0.parent }
 
   pub fn into_fat_widget(self) -> FatObj<Widget<'c>>
   where

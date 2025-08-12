@@ -71,12 +71,10 @@ impl Declare for Scrollbar {
 impl ObjDeclarer for ScrollbarDeclarer {
   type Target = FatObj<Scrollbar>;
   fn finish(mut self) -> Self::Target {
-    let scroll = self.0.take_scrollable_widget();
-    let scroll = if let Some(scroll) = scroll {
-      scroll.into_stateful()
-    } else {
-      Stateful::new(ScrollableWidget::default())
-    };
+    let scroll = self
+      .0
+      .take_scrollable_widget()
+      .unwrap_or_else(|| Stateful::new(ScrollableWidget::default()));
     self.0.map(|_| Scrollbar { scroll })
   }
 }

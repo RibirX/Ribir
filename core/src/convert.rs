@@ -81,25 +81,25 @@ where
 {
   fn r_from(from: Pair<W, C>) -> Self {
     let (parent, child) = from.unzip();
-    Self(FatObj::new(Pair::new(State::value(parent), child.r_into())))
+    Self(FatObj::new(Pair::new(Stateful::new(parent), child.r_into())))
   }
 }
 
-impl<'c, W, C, K: ?Sized> RFrom<Pair<State<W>, C>, K> for PairOf<'c, W>
+impl<'c, W, C, K: ?Sized> RFrom<Pair<Stateful<W>, C>, K> for PairOf<'c, W>
 where
   W: ComposeChild<'c, Child: RFrom<C, K>> + 'static,
 {
-  fn r_from(from: Pair<State<W>, C>) -> Self {
+  fn r_from(from: Pair<Stateful<W>, C>) -> Self {
     let (parent, child) = from.unzip();
     Self(FatObj::new(Pair::new(parent, child.r_into())))
   }
 }
 
-impl<'c, W, C, K: ?Sized> RFrom<FatObj<Pair<State<W>, C>>, K> for PairOf<'c, W>
+impl<'c, W, C, K: ?Sized> RFrom<FatObj<Pair<Stateful<W>, C>>, K> for PairOf<'c, W>
 where
   W: ComposeChild<'c, Child: RFrom<C, K>> + 'static,
 {
-  fn r_from(from: FatObj<Pair<State<W>, C>>) -> Self {
+  fn r_from(from: FatObj<Pair<Stateful<W>, C>>) -> Self {
     let pair = from.map(|p| {
       let (parent, child) = p.unzip();
       Pair::new(parent, child.r_into())
@@ -132,7 +132,7 @@ impl<K: ?Sized> NotWidgetSelf for PipeOptionWidget<K> {}
 
 // Base composition conversion for static components
 impl<C: Compose + 'static> RFrom<C, OtherWidget<dyn Compose>> for Widget<'static> {
-  fn r_from(widget: C) -> Self { Compose::compose(State::value(widget)) }
+  fn r_from(widget: C) -> Self { Compose::compose(Stateful::new(widget)) }
 }
 
 // State-aware composition conversion
@@ -196,7 +196,6 @@ impl_into_x_widget_for_state_reader!(
   where PartReader<O, M>: StateReader<Value: Render + Sized>
 );
 impl_into_x_widget_for_state_watcher!(<R: Render> Stateful<R>);
-impl_into_x_widget_for_state_watcher!(<R: Render> State<R>);
 impl_into_x_widget_for_state_watcher!(
   <W, WM> PartWriter<W, WM>
   where PartWriter<W, WM>: StateWatcher<Value: Render + Sized>

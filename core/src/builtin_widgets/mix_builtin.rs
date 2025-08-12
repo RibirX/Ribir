@@ -526,10 +526,10 @@ impl FocusHandle {
   pub fn set_tab_index(&mut self, tab_idx: i16) { self.flags.write().set_tab_index(tab_idx); }
 
   pub fn request_focus(&self, reason: FocusReason) {
-    if let Some(wnd) = AppCtx::get_window(self.wnd) {
-      if let Some(wid) = self.host.get() {
-        wnd.focus_mgr.borrow_mut().focus(wid, reason);
-      }
+    if let Some(wnd) = AppCtx::get_window(self.wnd)
+      && let Some(wid) = self.host.get()
+    {
+      wnd.focus_mgr.borrow_mut().focus(wid, reason);
     }
   }
 

@@ -67,7 +67,7 @@ use ribir::prelude::*;
 
 let mut btn = Radio::declarer();
 btn.with_selected(true).on_tap(|_| println!("Radio clicked"));
-let btn: FatObj<State<Radio>> = btn.finish();
+let btn: FatObj<Stateful<Radio>> = btn.finish();
 ```
 
 ### Why should we use `Declare` to create widgets?
@@ -77,7 +77,7 @@ In the above example, we created the widgets in a similar way to the Builder pat
 
 #### Complete Initialization API
 
-Note that we end up creating a `FatObj<State<Radio>>` instead of a `Radio`. This is because with `Declare`, we can not only configure properties using the method of the same name, but also extend the capabilities of the built-in widget with `FatObj`. As for why we use `State`, it's because `State` allows you to have the state of your control listened to and modified.
+Note that we end up creating a `FatObj<Stateful<Radio>>` instead of a `Radio`. This is because with `Declare`, we can not only configure properties using the method of the same name, but also extend the capabilities of the built-in widget with `FatObj`. As for why we use `Stateful`, it's because `Stateful` allows you to have the state of your control listened to and modified.
 
 ```rust
 use ribir::prelude::*;
@@ -85,13 +85,13 @@ use ribir::prelude::*;
 let mut radio = Radio::declarer();
   // We can use the built-in ability
 radio.on_tap(|_| println!("taped!"));
-let radio: FatObj<State<Radio>> = radio.finish();
+let radio: FatObj<Stateful<Radio>> = radio.finish();
 
 watch!($read(radio).selected)
   .subscribe(|selected| println!("The radio state change to {selected}"));
 ```
 
-Of course, both `FatObj` and `State` only affect the overhead of the final constructed view if you use the capabilities they provide.
+Of course, both `FatObj` and `Stateful` only affect the overhead of the final constructed view if you use the capabilities they provide.
 
 #### Support for initialization using `pipe!` streams
 
@@ -103,7 +103,7 @@ use ribir::prelude::*;
 
 let mut radio1 = Radio::declarer();
 radio1.with_selected(true);
-let radio1: FatObj<State<Radio>> = radio1.finish();
+let radio1: FatObj<Stateful<Radio>> = radio1.finish();
 let mut radio2 = Radio::declarer();
 radio2.with_selected(pipe!($read(radio1).selected));
 let radio2 = radio2.finish();
@@ -181,6 +181,6 @@ let counter = fn_widget! {
 
 We want everyone who uses Ribir to be able to choose how they want to use it, whether it's through the "DSL" or using the API directly, to get the best experience possible.
 
-But what you need to understand is that Ribir's "DSL" is not a new language - we don't even call it a "DSL". It's built entirely on the API we described above, and is just a set of macros designed to make the UI structure clearer and more readable, and to avoid some obvious duplication of code, such as the need to clone State frequently because of move semantics.
+But what you need to understand is that Ribir's "DSL" is not a new language - we don't even call it a "DSL". It's built entirely on the API we described above, and is just a set of macros designed to make the UI structure clearer and more readable, and to avoid some obvious duplication of code, such as the need to clone Stateful frequently because of move semantics.
 
 In short, you can choose to use it partially or not at all, everything is free and there is no need to be intimidated by seeing new syntax. Continue your [Ribir journey](../get_started/quick_start.md)!

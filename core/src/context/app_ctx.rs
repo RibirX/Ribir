@@ -11,6 +11,7 @@ use pin_project_lite::pin_project;
 use ribir_algo::Sc;
 use ribir_painter::{TypographyStore, font_db::FontDB};
 use rxrust::prelude::{AsyncExecutor, NEW_TIMER_FN};
+use smallvec::SmallVec;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::{
@@ -19,7 +20,7 @@ use crate::{
   event_loop::{EventLoop, FrameworkEvent},
   local_sender::LocalSender,
   scheduler::{RibirScheduler, RuntimeWaker},
-  state::{ModifyEffect, ModifyInfo, PartialPath, StateWriter, Stateful, WriterInfo},
+  state::{ModifyEffect, ModifyInfo, PartialId, StateWriter, Stateful, WriterInfo},
   widget::GenWidget,
   window::{BoxShell, UiEvent, Window, WindowAttributes, WindowFlags, WindowId},
 };
@@ -70,7 +71,7 @@ struct ChangeDataset(RefCell<ChangeDatasetInner>);
 
 #[derive(Default)]
 struct ChangeDatasetInner {
-  dirty_info: Vec<(PartialPath, Sc<WriterInfo>)>,
+  dirty_info: Vec<(SmallVec<[PartialId; 1]>, Sc<WriterInfo>)>,
   in_emit: bool,
 }
 
@@ -99,7 +100,7 @@ impl ChangeDataset {
     changed
   }
 
-  fn add_changed(&self, dirty_info: (PartialPath, Sc<WriterInfo>)) {
+  fn add_changed(&self, dirty_info: (SmallVec<[PartialId; 1]>, Sc<WriterInfo>)) {
     self.0.borrow_mut().dirty_info.push(dirty_info);
     if !self.0.borrow().in_emit
       && self.0.borrow().dirty_info.len() == 1
@@ -277,7 +278,7 @@ impl AppCtx {
       .end_frame();
   }
 
-  pub(crate) fn data_changed(path: PartialPath, writer: Sc<WriterInfo>) {
+  pub(crate) fn data_changed(path: SmallVec<[PartialId; 1]>, writer: Sc<WriterInfo>) {
     AppCtx::shared()
       .change_dataset
       .add_changed((path, writer));

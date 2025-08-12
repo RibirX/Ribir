@@ -127,10 +127,10 @@ impl Router {
   /// - Injects matched parameters into widget context
   /// - Returns void widget when no routes match
   fn switch(&self, ctx: &BuildCtx) -> Widget<'static> {
-    if let Some(route_params) = Provider::of::<RouterParams>(ctx) {
-      if let Some(path) = route_params.get_param("*") {
-        return self.switch_to(path);
-      }
+    if let Some(route_params) = Provider::of::<RouterParams>(ctx)
+      && let Some(path) = route_params.get_param("*")
+    {
+      return self.switch_to(path);
     }
 
     self.switch_to(Location::of(ctx).path())

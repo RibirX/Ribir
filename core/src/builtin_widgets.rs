@@ -131,36 +131,36 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FatObj<T> {
   host: T,
-  track_id: Option<State<TrackWidgetId>>,
-  class: Option<State<Class>>,
-  padding: Option<State<Padding>>,
-  fitted_box: Option<State<FittedBox>>,
-  constrained_box: Option<State<ConstrainedBox>>,
-  radius: Option<State<RadiusWidget>>,
-  border: Option<State<BorderWidget>>,
-  backdrop: Option<State<BackdropFilter>>,
-  background: Option<State<Background>>,
-  foreground: Option<State<Foreground>>,
-  scrollable: Option<State<ScrollableWidget>>,
-  layout_box: Option<State<LayoutBox>>,
+  track_id: Option<Stateful<TrackWidgetId>>,
+  class: Option<Stateful<Class>>,
+  padding: Option<Stateful<Padding>>,
+  fitted_box: Option<Stateful<FittedBox>>,
+  constrained_box: Option<Stateful<ConstrainedBox>>,
+  radius: Option<Stateful<RadiusWidget>>,
+  border: Option<Stateful<BorderWidget>>,
+  backdrop: Option<Stateful<BackdropFilter>>,
+  background: Option<Stateful<Background>>,
+  foreground: Option<Stateful<Foreground>>,
+  scrollable: Option<Stateful<ScrollableWidget>>,
+  layout_box: Option<Stateful<LayoutBox>>,
   mix_builtin: Option<MixBuiltin>,
-  cursor: Option<State<Cursor>>,
-  margin: Option<State<Margin>>,
-  transform: Option<State<TransformWidget>>,
-  opacity: Option<State<Opacity>>,
-  visibility: Option<State<Visibility>>,
-  h_align: Option<State<HAlignWidget>>,
-  v_align: Option<State<VAlignWidget>>,
-  relative_anchor: Option<State<RelativeAnchor>>,
-  global_anchor: Option<State<GlobalAnchor>>,
-  painting_style: Option<State<PaintingStyleWidget>>,
-  text_align: Option<State<TextAlignWidget>>,
-  text_style: Option<State<TextStyleWidget>>,
-  keep_alive: Option<State<KeepAlive>>,
+  cursor: Option<Stateful<Cursor>>,
+  margin: Option<Stateful<Margin>>,
+  transform: Option<Stateful<TransformWidget>>,
+  opacity: Option<Stateful<Opacity>>,
+  visibility: Option<Stateful<Visibility>>,
+  h_align: Option<Stateful<HAlignWidget>>,
+  v_align: Option<Stateful<VAlignWidget>>,
+  relative_anchor: Option<Stateful<RelativeAnchor>>,
+  global_anchor: Option<Stateful<GlobalAnchor>>,
+  painting_style: Option<Stateful<PaintingStyleWidget>>,
+  text_align: Option<Stateful<TextAlignWidget>>,
+  text_style: Option<Stateful<TextStyleWidget>>,
+  keep_alive: Option<Stateful<KeepAlive>>,
   keep_alive_unsubscribe_handle: Option<Box<dyn Any>>,
-  tooltips: Option<State<Tooltips>>,
-  disabled: Option<State<Disabled>>,
-  clip_boundary: Option<State<ClipBoundary>>,
+  tooltips: Option<Stateful<Tooltips>>,
+  disabled: Option<Stateful<Disabled>>,
+  clip_boundary: Option<Stateful<ClipBoundary>>,
   providers: Option<SmallVec<[Provider; 1]>>,
   reuse: Option<Reuse>,
 }
@@ -636,7 +636,7 @@ impl<T> FatObj<T> {
       .get_or_insert_with(MixBuiltin::default);
     let text_style = self
       .text_style
-      .get_or_insert_with(|| State::value(TextStyleWidget::inherit_widget()));
+      .get_or_insert_with(|| Stateful::new(TextStyleWidget::inherit_widget()));
 
     mix.init_sub_widget(v, text_style, move |widget, v| widget.text_style = v);
     self
@@ -1188,7 +1188,7 @@ impl<T> FatObj<T> {
 
 impl<T> FatObj<T> {
   /// Take the scrollable widget from this widget, and return it if it exists.
-  pub fn take_scrollable_widget(&mut self) -> Option<State<ScrollableWidget>> {
+  pub fn take_scrollable_widget(&mut self) -> Option<Stateful<ScrollableWidget>> {
     self.scrollable.take()
   }
 
@@ -1205,19 +1205,21 @@ impl<T> FatObj<T> {
     self.mix_builtin_widget().focus_handle(wnd, host)
   }
 
-  /// Returns the `State<ScrollableWidget>` widget from the FatObj. If it
+  /// Returns the `Stateful<ScrollableWidget>` widget from the FatObj. If it
   /// doesn't exist, a new one will be created.
-  pub fn scrollable_widget(&mut self) -> &State<ScrollableWidget> { sub_widget!(self, scrollable) }
+  pub fn scrollable_widget(&mut self) -> &Stateful<ScrollableWidget> {
+    sub_widget!(self, scrollable)
+  }
 
-  /// Returns the `State<RelativeAnchor>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn relative_anchor_widget(&mut self) -> &State<RelativeAnchor> {
+  /// Returns the `Stateful<RelativeAnchor>` widget from the FatObj. If it
+  /// doesn't exist, a new one will be created.
+  pub fn relative_anchor_widget(&mut self) -> &Stateful<RelativeAnchor> {
     sub_widget!(self, relative_anchor)
   }
 
-  /// Returns the `State<GlobalAnchor>` widget from the FatObj. If it doesn't
+  /// Returns the `Stateful<GlobalAnchor>` widget from the FatObj. If it doesn't
   /// exist, a new one will be created.
-  pub fn global_anchor_widget(&mut self) -> &State<GlobalAnchor> {
+  pub fn global_anchor_widget(&mut self) -> &Stateful<GlobalAnchor> {
     sub_widget!(self, global_anchor)
   }
 
@@ -1227,20 +1229,20 @@ impl<T> FatObj<T> {
       .get_or_insert_with(MixBuiltin::default)
   }
 
-  /// Returns the `State<TextStyleWidget>` widget from the FatObj. If it
+  /// Returns the `Stateful<TextStyleWidget>` widget from the FatObj. If it
   /// doesn't exist, a new one will be created.
-  fn text_style_widget(&mut self) -> &State<TextStyleWidget> {
+  fn text_style_widget(&mut self) -> &Stateful<TextStyleWidget> {
     self
       .text_style
-      .get_or_insert_with(|| State::value(TextStyleWidget::inherit_widget()))
+      .get_or_insert_with(|| Stateful::new(TextStyleWidget::inherit_widget()))
   }
 
-  /// Returns the `State<Tooltips>` widget from the FatObj. If it doesn't
+  /// Returns the `Stateful<Tooltips>` widget from the FatObj. If it doesn't
   /// exist, a new one is created.
-  pub fn tooltips_widget(&mut self) -> &State<Tooltips> {
+  pub fn tooltips_widget(&mut self) -> &Stateful<Tooltips> {
     self
       .tooltips
-      .get_or_insert_with(|| State::value(<_>::default()))
+      .get_or_insert_with(|| Stateful::new(<_>::default()))
   }
 }
 
@@ -1248,7 +1250,7 @@ macro_rules! sub_widget {
   ($this:expr, $path:ident) => {
     $this
       .$path
-      .get_or_insert_with(|| State::value(<_>::default()))
+      .get_or_insert_with(|| Stateful::new(<_>::default()))
   };
 }
 use sub_widget;
@@ -1260,7 +1262,7 @@ macro_rules! init_sub_widget {
       .get_or_insert_with(MixBuiltin::default);
     let sub_widget = $this
       .$sub_widget_path
-      .get_or_insert_with(|| State::value(<_>::default()));
+      .get_or_insert_with(|| Stateful::new(<_>::default()));
     mix.init_sub_widget($init_value, sub_widget, move |widget, v| widget.$field = v);
     $this
   }};
@@ -1273,7 +1275,7 @@ macro_rules! init_text_style {
       .get_or_insert_with(MixBuiltin::default);
     let text_style = $this
       .text_style
-      .get_or_insert_with(|| State::value(TextStyleWidget::inherit_widget()));
+      .get_or_insert_with(|| Stateful::new(TextStyleWidget::inherit_widget()));
     mix.init_sub_widget($init_value, text_style, move |w, v| w.text_style.$field = v);
     $this
   }};

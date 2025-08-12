@@ -67,7 +67,7 @@ impl Declare for Expanded {
 }
 
 impl ObjDeclarer for ExpandedDeclarer {
-  type Target = DeclarerWithSubscription<State<Expanded>>;
+  type Target = DeclarerWithSubscription<Stateful<Expanded>>;
 
   fn finish(self) -> Self::Target {
     let (flex, u_flex) = self.flex.map_or((1., None), |v| v.unzip());
@@ -75,7 +75,7 @@ impl ObjDeclarer for ExpandedDeclarer {
       .defer_alloc
       .map_or((true, None), |v| v.unzip());
 
-    let host = State::value(Expanded { flex, defer_alloc });
+    let host = Stateful::new(Expanded { flex, defer_alloc });
     let mut subscribes = SmallVec::new();
     if let Some(o) = u_flex {
       let host = host.clone_writer();

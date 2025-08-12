@@ -39,7 +39,9 @@ impl Wordle {
     .into_widget()
   }
 
-  fn keyboard(this: impl StateWriter<Value = Wordle>, state_bar: State<Text>) -> Widget<'static> {
+  fn keyboard(
+    this: impl StateWriter<Value = Wordle>, state_bar: Stateful<Text>,
+  ) -> Widget<'static> {
     let palette = Palette::of(BuildCtx::get());
     let gray = palette.base_of(&palette.surface_variant());
     flex! {

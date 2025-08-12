@@ -305,8 +305,7 @@ impl MenuControl {
       .borrow_mut()
       .items
       .push(MenuItemData { wid, label: key });
-    let idx = self.0.borrow().items.len() - 1;
-    idx
+    self.0.borrow().items.len() - 1
   }
 
   fn show_sub_menu(
@@ -331,13 +330,10 @@ impl MenuControl {
       .items
       .iter()
       .position(|item| item.label == label)
+      && let Some(wid) = this.items[idx].wid.get()
     {
-      if let Some(wid) = this.items[idx].wid.get() {
-        wnd.bubble_custom_event(
-          wid,
-          MenuEventData::Complete { idx, label, menu: self.clone(), data },
-        );
-      }
+      wnd
+        .bubble_custom_event(wid, MenuEventData::Complete { idx, label, menu: self.clone(), data });
     }
   }
 }
@@ -436,10 +432,10 @@ impl<'w> MenuItem<'w> {
         on_disposed: {
           let sub_menu = sub_menu.clone();
           move |e| {
-            if let Some(menu) = sub_menu.as_ref() {
-              if menu.is_show() {
-                menu.close(&e.window());
-              }
+            if let Some(menu) = sub_menu.as_ref()
+              && menu.is_show()
+            {
+              menu.close(&e.window());
             }
           }
         },
@@ -451,19 +447,19 @@ impl<'w> MenuItem<'w> {
                 *$write(class) = MENU_ITEM_SELECTED;
               } else {
                 *$write(class) = MENU_ITEM;
-                if let Some(menu) = sub_menu.as_ref() {
-                  if menu.is_show() {
-                    menu.close(&wnd);
-                  }
+                if let Some(menu) = sub_menu.as_ref() &&
+                  menu.is_show()
+                {
+                  menu.close(&wnd);
                 }
               }
             },
             MenuEventData::Enter{ idx, menu, .. } => {
-              if let Some(sub_menu) = sub_menu.as_ref() {
-                if !sub_menu.is_show() {
-                  let id = e.current_target();
-                  menu.show_sub_menu(*idx, sub_menu, id, &wnd);
-                }
+              if let Some(sub_menu) = sub_menu.as_ref()
+                && !sub_menu.is_show()
+              {
+                let id = e.current_target();
+                menu.show_sub_menu(*idx, sub_menu, id, &wnd);
               }
             },
             _ => (),
@@ -637,9 +633,9 @@ mod tests {
     let (r, w) = split_value(false);
     let menu = MenuControl::new(menu! {
       on_custom_concrete_event: move|e: &mut MenuEvent| {
-        if let MenuEventData::Enter{idx, ..} = e.data() {
-          if *idx == 1 { *$write(w) = true; }
-        }
+        if let MenuEventData::Enter{idx, ..} = e.data()
+          && *idx == 1
+        { *$write(w) = true; }
       },
       @MenuItem { @ { "Item 1" } }
       @MenuItem { @ { "Item 2" } }
@@ -680,10 +676,10 @@ mod tests {
     let sub_menu2 = sub_menu.clone();
     let menu = MenuControl::new(menu! {
         on_custom_concrete_event: move |e: &mut MenuEvent| {
-          if let MenuEventData::Complete{data: Some(data), ..} = e.data() {
-            if let Ok(s) = data.clone().downcast::<String>() {
-              *$write(w) = s.to_string();
-            }
+          if let MenuEventData::Complete{data: Some(data), ..} = e.data()
+            && let Ok(s) = data.clone().downcast::<String>()
+          {
+            *$write(w) = s.to_string();
           }
         },
         @MenuItem {

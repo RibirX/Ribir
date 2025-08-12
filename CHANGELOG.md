@@ -29,6 +29,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **gpu**: Fixed the missed submission of GPU commands for drawing mask triangles, which led to abnormal color filling. (#781 @wjian23)
 
+### BREAKING
+
+- **core**: Remove `State`; use `Stateful` instead. (#782 by @M-Adoo)
+
 ## [0.4.0-alpha.46] - 2025-08-13
 
 ### Fixed
@@ -44,6 +48,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Fixed
 
 - **gpu**: Fixed the drawn colors are biased. (#778 @wjian23)
+
 
 ## [0.4.0-alpha.44] - 2025-07-10
 

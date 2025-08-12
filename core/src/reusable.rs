@@ -86,9 +86,7 @@ impl Reusable {
         let render = render.clone();
         let track_id = track_id.clone();
         Widget::from_fn(move |ctx| {
-          let reuse_id =
-            move_inner_render_to_new(render.take(), track_id.get().unwrap(), ctx.tree_mut());
-          reuse_id
+          move_inner_render_to_new(render.take(), track_id.get().unwrap(), ctx.tree_mut())
         })
       }
       ReusableState::Recycled { track_id, wnd_id } => {

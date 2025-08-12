@@ -185,10 +185,10 @@ impl Dispatcher {
     } else {
       if let Some(hit) = hit {
         wnd.add_delay_event(DelayEvent::PointerUp(hit));
-        if let Some(wid) = self.pointer_down_wid {
-          if let Some(p) = wid.lowest_common_ancestor(hit, wnd.tree()) {
-            wnd.add_delay_event(DelayEvent::Tap(p));
-          }
+        if let Some(wid) = self.pointer_down_wid
+          && let Some(p) = wid.lowest_common_ancestor(hit, wnd.tree())
+        {
+          wnd.add_delay_event(DelayEvent::Tap(p));
         }
       }
       self.pointer_down_wid = None;
@@ -242,12 +242,12 @@ impl Dispatcher {
           hit_target = Some(id);
         }
 
-        if hit || can_hit_child {
-          if let Some(c) = id.last_child(tree) {
-            *pos = ctx.map_from_parent(*pos);
-            ctx.set_id(c);
-            continue;
-          }
+        if (hit || can_hit_child)
+          && let Some(c) = id.last_child(tree)
+        {
+          *pos = ctx.map_from_parent(*pos);
+          ctx.set_id(c);
+          continue;
         }
 
         break;
