@@ -701,7 +701,9 @@ impl WgpuImpl {
         .expect("No suitable format found for the surface!");
 
       let config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+          | wgpu::TextureUsages::COPY_SRC
+          | wgpu::TextureUsages::COPY_DST,
         format,
         width: 0,
         height: 0,

@@ -167,7 +167,7 @@ pub trait GPUBackendImpl {
   );
 
   fn copy_texture_from_texture(
-    &mut self, dist_tex: &mut Self::Texture, copy_to: DevicePoint, from_tex: &Self::Texture,
+    &mut self, dest_tex: &mut Self::Texture, copy_to: DevicePoint, from_tex: &Self::Texture,
     from_rect: &DeviceRect,
   );
   /// A frame end, call once per frame

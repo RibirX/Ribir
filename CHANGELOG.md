@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **gpu**: Fixed filter panic in some platform which Surface can't with TEXTURE_BINDING usage. (#pr @wjian23)
+
 ## [0.4.0-alpha.45] - 2025-08-06
 
 ### Features
