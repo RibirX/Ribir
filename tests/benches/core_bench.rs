@@ -74,7 +74,7 @@ fn bench_widget_inflate_x(width: usize, depth: usize, b: &mut Bencher) {
   bench_widget_inflate(b, Embed { width, depth });
 }
 
-fn bench_widget_repair(b: &mut Bencher, w: State<impl Compose + 'static>) {
+fn bench_widget_repair(b: &mut Bencher, w: Stateful<impl Compose + 'static>) {
   let trigger = w.clone_writer();
   let wnd = TestWindow::from_widget(fn_widget!(w.clone_writer()));
   let id = wnd.id();
@@ -88,11 +88,11 @@ fn bench_widget_repair(b: &mut Bencher, w: State<impl Compose + 'static>) {
 }
 
 fn bench_recursive_repair_pow(width: usize, depth: usize, b: &mut Bencher) {
-  bench_widget_repair(b, State::value(Recursive { width, depth }))
+  bench_widget_repair(b, Stateful::new(Recursive { width, depth }))
 }
 
 fn bench_recursive_repair_x(width: usize, depth: usize, b: &mut Bencher) {
-  bench_widget_repair(b, State::value(Embed { width, depth }))
+  bench_widget_repair(b, Stateful::new(Embed { width, depth }))
 }
 
 fn tree_build_regen(c: &mut Criterion) {

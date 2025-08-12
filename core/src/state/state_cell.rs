@@ -228,13 +228,6 @@ pub(crate) struct BorrowRef<'b> {
 pub(crate) struct OriginPartStore<'a>(Option<Box<dyn FnOnce() + 'a>>);
 
 impl<'a> OriginPartStore<'a> {
-  pub(crate) fn new<T: ?Sized + 'a>(origin: InnerPart<T>) -> Self {
-    match origin {
-      InnerPart::Ref(_) => Self(None),
-      InnerPart::Owned(data) => Self(Some(Box::new(move || drop(data)))),
-    }
-  }
-
   pub(crate) fn add<T: ?Sized + 'a>(&mut self, origin: InnerPart<T>) {
     let InnerPart::Owned(data) = origin else { return };
     if let Some(free) = self.0.take() {
@@ -291,38 +284,6 @@ impl Drop for BorrowRef<'_> {
     let borrow = self.borrow.get();
     debug_assert!(is_reading(borrow));
     self.borrow.set(borrow - 1);
-  }
-}
-
-impl<'b> BorrowRefMut<'b> {
-  // Clones a `BorrowRefMut`.
-  //
-  // This is only valid if each `BorrowRefMut` is used to track a mutable
-  // reference to a distinct, nonoverlapping range of the original object.
-  // This isn't in a Clone impl so that code doesn't call this implicitly.
-  #[inline]
-  pub(crate) fn clone(&self) -> BorrowRefMut<'b> {
-    let borrow = self.borrow.get();
-    debug_assert!(is_writing(borrow));
-    // Prevent the borrow counter from underflowing.
-    assert!(borrow != BorrowFlag::MIN);
-    self.borrow.set(borrow - 1);
-    BorrowRefMut { borrow: self.borrow }
-  }
-}
-
-impl BorrowRef<'_> {
-  #[inline]
-  pub(crate) fn clone(&self) -> Self {
-    // Since this Ref exists, we know the borrow flag
-    // is a reading borrow.
-    let borrow = self.borrow.get();
-    debug_assert!(is_reading(borrow));
-    // Prevent the borrow counter from overflowing into
-    // a writing borrow.
-    assert!(borrow != BorrowFlag::MAX);
-    self.borrow.set(borrow + 1);
-    BorrowRef { borrow: self.borrow }
   }
 }
 

@@ -281,8 +281,8 @@ use ribir::prelude::*;
 
 fn main() {
   App::run(fn_widget! {
-    // Change 1: Create a state using `State::value`
-    let count = State::value(0);
+    // Change 1: Create a state using `Stateful::new`
+    let count = Stateful::new(0);
     @Button {
       // Change 2: Modify the state on tap
       on_tap: move |_| *$write(count) += 1,
@@ -359,8 +359,8 @@ In the following example, `sum` is a `Pipe` stream of the sum of `a` and `b`. Wh
 ```rust 
 use ribir::prelude::*;
 
-let a = State::value(0);
-let b = State::value(0);
+let a = Stateful::new(0);
+let b = Stateful::new(0);
 
 let sum = pipe!(*$read(a) + *$read(b));
 ```
@@ -456,8 +456,8 @@ use ribir::prelude::*;
 
 fn main() {
   App::run(fn_widget! {
-    let a = State::value(0);
-    let b = State::value(0);
+    let a = Stateful::new(0);
+    let b = Stateful::new(0);
 
     @Column {
       @Text { text: pipe!($read(a).to_string()) }
@@ -504,7 +504,7 @@ use ribir::prelude::*;
 
 fn main() {
   App::run(fn_widget! {
-    let count = State::value(0);
+    let count = Stateful::new(0);
     let display = @H1 { text: "0" };
 
     watch!(*$read(count)).subscribe(move |v| {
@@ -534,7 +534,7 @@ In the first case, you want the subscription to have a shorter lifecycle than th
 ```rust
 use ribir::prelude::*;
 
-fn show_name(name: State<String>) -> Widget<'static> {
+fn show_name(name: Stateful<String>) -> Widget<'static> {
   fn_widget!{
     let mut text = @Text { text: "Hi, Guest!" };
     let u = watch!($read(name).to_string()).subscribe(move |name| {
@@ -557,7 +557,7 @@ In the second case, the downstream of `watch!` performs a write operation on the
 ```rust
 use ribir::prelude::*;
 
-let even_num = State::value(0);
+let even_num = Stateful::new(0);
 
 // Respond to changes in even_num, ensure it is even. 
 // If even_num is odd, add 1 to make it even
@@ -692,7 +692,7 @@ struct AppData {
   count: usize,
 }
 
-let state = State::value(AppData { count: 0 });
+let state = Stateful::new(AppData { count: 0 });
 let map_count = state.part_writer(PartialId::any(), |d| PartMut::new(&mut d.count));
 let split_count = state.part_writer(PartialId::any(), |d| PartMut::new(&mut d.count));
 

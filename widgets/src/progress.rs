@@ -101,7 +101,7 @@ impl Compose for SpinnerProgress {
       // It is essential to ensure that the spinner is accessible by the class,
       // as the class may need to perform animations on the spinner.
       @Providers {
-        providers: [Provider::new(spinner.clone_writer().into_stateful())],
+        providers: [Provider::new(spinner.clone_writer())],
         @(spinner) {
           class: distinct_pipe! {
             if $read(this).value.is_some() {

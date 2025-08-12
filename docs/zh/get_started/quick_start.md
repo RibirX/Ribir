@@ -291,8 +291,8 @@ use ribir::prelude::*;
 
 fn main() {
   App::run(fn_widget! {
-    // 变更 1: 通过 `State::value` 创建一个状态
-    let count = State::value(0);
+    // 变更 1: 通过 `Stateful::new` 创建一个状态
+    let count = Stateful::new(0);
     @Button {
       // 变更 2： 通过点击事件来修改状态
       on_tap: move |_| *$write(count) += 1,
@@ -369,8 +369,8 @@ Ribir 提供了一个 `pipe!` 宏来辅助你快速创建 `Pipe` 流。它接收
 ```rust 
 use ribir::prelude::*;
 
-let a = State::value(0);
-let b = State::value(0);
+let a = Stateful::new(0);
+let b = Stateful::new(0);
 
 let sum = pipe!(*$read(a) + *$read(b));
 ```
@@ -465,8 +465,8 @@ use ribir::prelude::*;
 
 fn main() {
   App::run(fn_widget! {
-    let a = State::value(0);
-    let b = State::value(0);
+    let a = Stateful::new(0);
+    let b = Stateful::new(0);
 
     @Column {
       @Text { text: pipe!($read(a).to_string()) }
@@ -513,7 +513,7 @@ use ribir::prelude::*;
 
 fn main() {
   App::run(fn_widget! {
-    let count = State::value(0);
+    let count = Stateful::new(0);
     let display = @H1 { text: "0" };
 
     watch!(*$read(count)).subscribe(move |v| {
@@ -542,7 +542,7 @@ fn main() {
 ```rust
 use ribir::prelude::*;
 
-fn show_name(name: State<String>) -> Widget<'static> {
+fn show_name(name: Stateful<String>) -> Widget<'static> {
   fn_widget!{
     let mut text = @Text { text: "Hi, Guest!" };
     let u = watch!($read(name).to_string()).subscribe(move |name| {
@@ -562,7 +562,7 @@ fn show_name(name: State<String>) -> Widget<'static> {
 ```rust
 use ribir::prelude::*;
 
-let even_num = State::value(0);
+let even_num = Stateful::new(0);
 
 // 响应 even_num 的变更，确保其为偶数，当 even_num 为奇数时，将其加 1 使其变为偶数
 let u = watch!(*$read(even_num)).subscribe(move |v| {
@@ -694,7 +694,7 @@ struct AppData {
   count: usize,
 }
 
-let state = State::value(AppData { count: 0 });
+let state = Stateful::new(AppData { count: 0 });
 let map_count = state.part_writer(PartialId::any(), |d| PartMut::new(&mut d.count));
 let split_count = state.part_writer(PartialId::any(), |d| PartMut::new(&mut d.count));
 

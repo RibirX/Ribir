@@ -2,6 +2,7 @@ use std::{cell::Cell, convert::Infallible};
 
 use ribir_algo::Sc;
 use rxrust::ops::box_it::CloneableBoxOp;
+use smallvec::{SmallVec, smallvec};
 
 use crate::prelude::*;
 
@@ -31,29 +32,15 @@ bitflags! {
   }
 }
 
-pub fn wildcard_scope_path() -> &'static PartialPath {
-  use std::sync::OnceLock;
-  static EMPTY_PATH: OnceLock<PartialPath> = OnceLock::new();
-
-  EMPTY_PATH.get_or_init(PartialPath::new)
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModifyInfo {
   pub(crate) effect: ModifyEffect,
-  pub(crate) path: PartialPath,
+  pub(crate) path: SmallVec<[PartialId; 1]>,
 }
 
 impl ModifyInfo {
-  pub fn new(effect: ModifyEffect, scopes: PartialPath) -> Self { Self { effect, path: scopes } }
-
   /// Check if the effect is contained in this modify info.
   pub fn contains(&self, effect: ModifyEffect) -> bool { self.effect.contains(effect) }
-
-  /// Check if the modify info validate the scope path.
-  pub(crate) fn path_matches(&self, path: &PartialPath, include_partial: bool) -> bool {
-    if include_partial { self.path.starts_with(path) } else { path == &self.path }
-  }
 }
 
 impl Notifier {
@@ -109,14 +96,14 @@ impl<W: 'static> StateWatcher for Stateful<W> {
   }
 
   fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
-    let modifies = self.info.notifier.raw_modifies();
-    if self.include_partial {
-      modifies
-    } else {
-      modifies
-        .filter(|info| info.path.is_empty())
-        .box_it()
+    let include_partial = self.include_partial;
+    let mut modifies = self.info.notifier.raw_modifies();
+    if !include_partial {
+      modifies = modifies
+        .filter(move |info| info.path.iter().all(|id| id == &PartialId::ANY))
+        .box_it();
     }
+    modifies
   }
 
   #[inline]
@@ -143,13 +130,10 @@ impl<W: 'static> StateWriter for Stateful<W> {
   #[inline]
   fn clone_writer(&self) -> Self { self.clone() }
 
-  fn include_partial_writers(mut self, include: bool) -> Self {
-    self.include_partial = include;
-    self
-  }
+  fn include_partial_writers(&mut self, include: bool) { self.include_partial = include; }
 
   #[inline]
-  fn scope_path(&self) -> &PartialPath { wildcard_scope_path() }
+  fn scope_path(&self) -> SmallVec<[PartialId; 1]> { smallvec![] }
 }
 
 impl<W: 'static> StateReader for Reader<W> {
@@ -226,7 +210,7 @@ impl<W> Stateful<W> {
   }
 
   fn write_ref(&self, effect: ModifyEffect) -> WriteRef<'_, W> {
-    let path = wildcard_scope_path();
+    let path = smallvec![];
     WriteRef::new(self.data.write(), &self.info, path, effect)
   }
 
@@ -271,7 +255,9 @@ impl<W: Default> Default for Stateful<W> {
 }
 
 impl Default for ModifyInfo {
-  fn default() -> Self { ModifyInfo { path: PartialPath::new(), effect: ModifyEffect::BOTH } }
+  fn default() -> Self {
+    ModifyInfo { path: smallvec![PartialId::any()], effect: ModifyEffect::BOTH }
+  }
 }
 
 #[cfg(test)]

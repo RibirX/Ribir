@@ -618,10 +618,10 @@ impl ProviderCtx {
     let mut out = Vec::new();
     let keys = self.data.keys().cloned().collect::<Vec<_>>();
     for k in keys {
-      if f(&k) {
-        if let Some(v) = self.data.remove(&k) {
-          out.push((k, v));
-        }
+      if f(&k)
+        && let Some(v) = self.data.remove(&k)
+      {
+        out.push((k, v));
       }
     }
     out

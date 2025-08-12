@@ -186,7 +186,7 @@ where
 
 pub fn todos() -> Widget<'static> {
   let todos = if cfg!(not(target_arch = "wasm32")) {
-    let todos = State::value(Todos::load());
+    let todos = Stateful::new(Todos::load());
     // save changes to disk every 5 seconds .
     let save_todos = todos.clone_reader();
     todos
@@ -199,7 +199,7 @@ pub fn todos() -> Widget<'static> {
       });
     todos
   } else {
-    State::value(Todos::default())
+    Stateful::new(Todos::default())
   };
 
   todos.into_widget()

@@ -488,7 +488,7 @@ where
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{prelude::PartMut, reset_test_env, state::State};
+  use crate::{prelude::PartMut, reset_test_env};
 
   #[test]
   fn query_ref() {
@@ -508,7 +508,7 @@ mod tests {
   fn query_state() {
     reset_test_env!();
 
-    let x = State::value(0i32);
+    let x = Stateful::new(0i32);
     {
       let h = x.query(&QueryId::of::<i32>()).unwrap();
       assert!(h.downcast_ref::<i32>().is_some());
@@ -527,7 +527,7 @@ mod tests {
       _b: i32,
     }
 
-    let x = State::value(X { a: 0, _b: 1 });
+    let x = Stateful::new(X { a: 0, _b: 1 });
     let y = x.part_writer("a".into(), |x| PartMut::new(&mut x.a));
     {
       let h = y.query(&QueryId::of::<i32>()).unwrap();
@@ -541,7 +541,7 @@ mod tests {
   fn query_reader_only() {
     reset_test_env!();
 
-    let x = State::value(0i32).clone_reader();
+    let x = Stateful::new(0i32).clone_reader();
     let mut h = x.query(&QueryId::of::<i32>()).unwrap();
     assert!(h.downcast_ref::<i32>().is_some());
     assert!(h.downcast_mut::<i32>().is_none());

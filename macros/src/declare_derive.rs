@@ -62,12 +62,12 @@ pub(crate) fn declare_derive(stt: &mut syn::ItemStruct) -> syn::Result<TokenStre
     let finish_obj = declarer.finish_obj(declarer.all_members().map(|m| quote! {#m.0}));
     tokens.extend(quote! {
       impl #g_impl ObjDeclarer for #name #g_ty #g_where {
-        type Target = FatObj<State<#host #g_ty>>;
+        type Target = FatObj<Stateful<#host #g_ty>>;
 
         #[track_caller]
         fn finish(mut self) -> Self::Target {
           #(#field_values)*
-          let this_ಠ_ಠ = State::value(#finish_obj);
+          let this_ಠ_ಠ = Stateful::new(#finish_obj);
           let mut fat_ಠ_ಠ = self.fat_ಠ_ಠ;
           #(
             if let Some(o) = #field_names.1 {

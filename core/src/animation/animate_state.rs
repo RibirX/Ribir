@@ -20,7 +20,7 @@ pub trait AnimateState: AnimateStateSetter {
 
   /// Creates an animation that smoothly transitions a writer's value on every
   /// change.
-  fn transition(self, transition: impl Transition + 'static) -> State<Animate<Self>>
+  fn transition(self, transition: impl Transition + 'static) -> Stateful<Animate<Self>>
   where
     Self: Sized,
     Self::Value: PartialEq,
@@ -213,7 +213,7 @@ mod tests {
   #[test]
   fn group_two() {
     reset_test_env!();
-    let mut group = (State::value(1.), State::value(2.));
+    let mut group = (Stateful::new(1.), Stateful::new(2.));
     let half = group.calc_lerp_value(&(0., 0.), &group.get(), 0.5);
     assert_eq!(half, (0.5, 1.));
   }

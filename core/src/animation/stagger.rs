@@ -75,7 +75,7 @@ impl<T: Transition + 'static> Stagger<T> {
   ///
   /// **state**: the state you want to transition.
   /// **from**: the state you want to transition from.
-  pub fn push_state<A>(&mut self, state: A, from: A::Value) -> State<Animate<A>>
+  pub fn push_state<A>(&mut self, state: A, from: A::Value) -> Stateful<Animate<A>>
   where
     A: AnimateState + 'static,
   {
@@ -91,7 +91,7 @@ impl<T: Transition + 'static> Stagger<T> {
   /// - **from**: the state you want to transition from.
   pub fn push_state_with<A>(
     &mut self, stagger: Duration, state: A, from: A::Value,
-  ) -> State<Animate<A>>
+  ) -> Stateful<Animate<A>>
   where
     A: AnimateState + 'static,
   {

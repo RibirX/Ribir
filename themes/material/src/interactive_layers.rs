@@ -12,7 +12,7 @@ use crate::{focus_indicator::*, ripple::*, state_layer::*};
 /// - **Ripple Effect**: Animated touch/click feedback
 /// - **Visual Hierarchy**: Maintains proper layer ordering and offsets
 pub struct InteractiveLayers {
-  ripple: State<Ripple>,
+  ripple: Stateful<Ripple>,
   ring_outer_offset: f32,
 }
 

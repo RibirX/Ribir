@@ -10,7 +10,7 @@ pub struct PartReader<S, F> {
 pub struct PartWriter<W, WM> {
   pub(super) origin: W,
   pub(super) part_map: WM,
-  pub(super) path: PartialPath,
+  pub(super) id: PartialId,
   pub(super) include_partial: bool,
 }
 
@@ -74,10 +74,10 @@ where
   type Watcher = Watcher<Self::Reader>;
 
   fn into_reader(self) -> Result<Self::Reader, Self> {
-    let Self { origin, part_map, path, include_partial } = self;
+    let Self { origin, part_map, id: path, include_partial } = self;
     match origin.into_reader() {
       Ok(origin) => Ok(PartReader { origin, part_map: WriterMapReaderFn(part_map) }),
-      Err(origin) => Err(Self { origin, part_map, path, include_partial }),
+      Err(origin) => Err(Self { origin, part_map, id: path, include_partial }),
     }
   }
 
@@ -93,12 +93,14 @@ where
       .info
       .notifier
       .raw_modifies();
-    let path = self.path.clone();
-    let include_partial = self.include_partial;
 
-    if !self.path.is_empty() {
+    let path = self.scope_path();
+    if !path.is_empty() {
+      let include_partial = self.include_partial;
       modifies
-        .filter(move |info| info.path_matches(&path, include_partial))
+        .filter(move |info| {
+          info.path.starts_with(&path) && (include_partial || info.path.len() == path.len())
+        })
         .box_it()
     } else {
       modifies
@@ -117,23 +119,11 @@ where
   W: StateWriter,
   M: Fn(&mut W::Value) -> PartMut<V> + Clone,
 {
-  fn write(&self) -> WriteRef<'_, Self::Value> {
-    let mut w = WriteRef::map(self.origin.write(), &self.part_map);
-    w.notify_guard.path = &self.path;
-    w
-  }
+  fn write(&self) -> WriteRef<'_, Self::Value> { write_ref!(self, write) }
 
-  fn silent(&self) -> WriteRef<'_, Self::Value> {
-    let mut w = WriteRef::map(self.origin.silent(), &self.part_map);
-    w.notify_guard.path = &self.path;
-    w
-  }
+  fn silent(&self) -> WriteRef<'_, Self::Value> { write_ref!(self, silent) }
 
-  fn shallow(&self) -> WriteRef<'_, Self::Value> {
-    let mut w = WriteRef::map(self.origin.shallow(), &self.part_map);
-    w.notify_guard.path = &self.path;
-    w
-  }
+  fn shallow(&self) -> WriteRef<'_, Self::Value> { write_ref!(self, shallow) }
 
   #[inline]
   fn clone_boxed_writer(&self) -> Box<dyn StateWriter<Value = Self::Value>> {
@@ -145,18 +135,32 @@ where
     PartWriter {
       origin: self.origin.clone_writer(),
       part_map: self.part_map.clone(),
-      path: self.path.clone(),
+      id: self.id.clone(),
       include_partial: self.include_partial,
     }
   }
 
-  fn include_partial_writers(mut self, include: bool) -> Self {
-    self.include_partial = include;
-    self
-  }
+  fn include_partial_writers(&mut self, include: bool) { self.include_partial = include; }
 
-  fn scope_path(&self) -> &PartialPath { &self.path }
+  fn scope_path(&self) -> SmallVec<[PartialId; 1]> {
+    let mut path = self.origin.scope_path();
+    if self.id != PartialId::ANY {
+      path.push(self.id.clone());
+    }
+    path
+  }
 }
+
+macro_rules! write_ref {
+  ($this:ident, $method:ident) => {{
+    let mut w = WriteRef::map($this.origin.$method(), &$this.part_map);
+    if $this.id != PartialId::ANY {
+      w.notify_guard.path.push($this.id.clone());
+    }
+    w
+  }};
+}
+use write_ref;
 
 trait MapReaderFn<Input: ?Sized>: Clone {
   type Output: ?Sized;

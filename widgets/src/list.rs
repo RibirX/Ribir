@@ -245,7 +245,7 @@ pub enum ListChild<'c> {
   /// Custom-designed list item
   CustomItem(PairOf<'c, ListCustomItem>),
   /// Visual divider between list items
-  Divider(FatObj<State<Divider>>),
+  Divider(FatObj<Stateful<Divider>>),
 }
 
 /// Defines the selection behavior for the List widget
@@ -382,7 +382,7 @@ impl<'c> ComposeChild<'c> for List {
       @ {
         child.into_iter().map(move |item| match item {
           ListChild::StandardItem(pair) => {
-            let item = pair.parent().as_stateful().clone_writer();
+            let item = pair.parent().clone_writer();
             $read(this).item_select_actions(item, pair.into_fat_widget())
           },
           ListChild::CustomItem(pair) => {
@@ -655,7 +655,7 @@ impl List {
     let List { items, subscriptions, .. } = &mut *list;
     children.iter().for_each(|child| match child {
       ListChild::StandardItem(pair) => {
-        let item = pair.parent().as_stateful().clone_writer();
+        let item = pair.parent().clone_writer();
         items.push(item.clone_writer());
       }
       ListChild::CustomItem(pair) => {
@@ -742,7 +742,7 @@ impl ObjDeclarer for ListCustomItemDeclarer {
 
   fn finish(self) -> Self::Target {
     let item = self.0.finish();
-    item.map(|item| ListCustomItem(item.as_stateful().clone_writer()))
+    item.map(|item| ListCustomItem(item.clone_writer()))
   }
 }
 

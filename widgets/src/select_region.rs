@@ -57,14 +57,14 @@ impl<'c> ComposeChild<'c> for PointerSelectRegion {
         },
         on_pointer_up: move |e| {
           let from = $write(from).take();
-          if $write(grab_handle).take().is_some() {
-            if let Some(from) = from {
-              notify_select_changed(
-                e.current_target(),
-                PointerSelectData::End{ from, to: e.position() },
-                &e.window()
-              );
-            }
+          if $write(grab_handle).take().is_some()
+            && let Some(from) = from
+          {
+            notify_select_changed(
+              e.current_target(),
+              PointerSelectData::End{ from, to: e.position() },
+              &e.window()
+            );
           }
         },
       }

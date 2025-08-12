@@ -70,10 +70,10 @@ impl ApplicationHandler<RibirAppEvent> for AppHandler {
           is_repeat: event.repeat,
           location: event.location,
         });
-        if event.state == ElementState::Pressed {
-          if let Some(txt) = event.text {
-            App::send_event(UiEvent::ReceiveChars { wnd_id, chars: txt.to_string().into() });
-          }
+        if event.state == ElementState::Pressed
+          && let Some(txt) = event.text
+        {
+          App::send_event(UiEvent::ReceiveChars { wnd_id, chars: txt.to_string().into() });
         }
       }
       WindowEvent::Ime(ime) => {

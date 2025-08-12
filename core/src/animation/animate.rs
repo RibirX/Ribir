@@ -30,7 +30,7 @@ pub(crate) struct AnimateInfo<V> {
   _tick_msg_guard: Option<Box<dyn Any>>,
 }
 
-impl<S> Animation for State<Animate<S>>
+impl<S> Animation for Stateful<Animate<S>>
 where
   S: AnimateState<Value: Clone> + 'static,
 {
@@ -119,11 +119,11 @@ where
 
   fn stop(&self) {
     let mut this = self.silent();
-    if this.is_running() {
-      if let Some(wnd) = AppCtx::get_window(this.window_id) {
-        wnd.dec_running_animate();
-        this.running_info.take();
-      }
+    if this.is_running()
+      && let Some(wnd) = AppCtx::get_window(this.window_id)
+    {
+      wnd.dec_running_animate();
+      this.running_info.take();
     }
   }
 
@@ -174,10 +174,10 @@ where
   P: AnimateState + 'static,
 {
   fn drop(&mut self) {
-    if self.running_info.is_some() {
-      if let Some(wnd) = AppCtx::get_window(self.window_id) {
-        wnd.dec_running_animate();
-      }
+    if self.running_info.is_some()
+      && let Some(wnd) = AppCtx::get_window(self.window_id)
+    {
+      wnd.dec_running_animate();
     }
   }
 }
