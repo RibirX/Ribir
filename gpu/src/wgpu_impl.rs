@@ -4,9 +4,11 @@ use std::{
   ops::Range,
 };
 
+use ahash::HashSet;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
 use ribir_painter::{Color, PixelImage, VertexBuffers, image::ColorFormat};
 use tokio::sync::oneshot;
+use wgpu::TextureFormat;
 
 use self::{
   draw_alpha_triangles_pass::DrawAlphaTrianglesPass,
@@ -149,20 +151,8 @@ pub struct Surface<'a> {
   current_texture: Option<WgpuTexture>,
 }
 
-impl GPUBackendImpl for WgpuImpl {
-  type Texture = WgpuTexture;
-
-  fn limits(&self) -> &DrawPhaseLimits { &self.limits }
-
-  fn begin_frame(&mut self) {
-    if self.command_encoder.is_none() {
-      #[cfg(debug_assertions)]
-      self.start_capture();
-    }
-  }
-
-  fn new_texture(&mut self, size: DeviceSize, format: ColorFormat) -> Self::Texture {
-    let format = into_wgpu_format(format);
+impl WgpuImpl {
+  pub(crate) fn create_texture(&mut self, size: DeviceSize, format: TextureFormat) -> WgpuTexture {
     let size = wgpu::Extent3d {
       width: size.width as u32,
       height: size.height as u32,
@@ -183,6 +173,24 @@ impl GPUBackendImpl for WgpuImpl {
     };
     let tex = self.device.create_texture(texture_descriptor);
     WgpuTexture::from_tex(tex)
+  }
+}
+
+impl GPUBackendImpl for WgpuImpl {
+  type Texture = WgpuTexture;
+
+  fn limits(&self) -> &DrawPhaseLimits { &self.limits }
+
+  fn begin_frame(&mut self) {
+    if self.command_encoder.is_none() {
+      #[cfg(debug_assertions)]
+      self.start_capture();
+    }
+  }
+
+  fn new_texture(&mut self, size: DeviceSize, format: ColorFormat) -> Self::Texture {
+    let format = into_wgpu_format(format);
+    self.create_texture(size, format)
   }
 
   fn load_textures(&mut self, textures: &[&Self::Texture]) {
@@ -353,18 +361,18 @@ impl GPUBackendImpl for WgpuImpl {
   }
 
   fn copy_texture_from_texture(
-    &mut self, dist_tex: &mut Self::Texture, dist_pos: DevicePoint, from_tex: &Self::Texture,
+    &mut self, dest_tex: &mut Self::Texture, dist_pos: DevicePoint, from_tex: &Self::Texture,
     from_rect: &DeviceRect,
   ) {
-    if dist_tex.format() == from_tex.format() {
+    if dest_tex.format() == from_tex.format() {
       self.copy_same_format_texture(
-        dist_tex.inner_tex.texture(),
+        dest_tex.inner_tex.texture(),
         dist_pos,
         from_tex.inner_tex.texture(),
         from_rect,
       );
     } else {
-      self.draw_texture_to_texture(dist_tex, dist_pos, from_tex, from_rect)
+      self.draw_texture_to_texture(dest_tex, dist_pos, from_tex, from_rect)
     }
   }
 
@@ -463,6 +471,8 @@ impl WgpuTexture {
   fn format(&self) -> wgpu::TextureFormat { self.inner_tex.texture().format() }
 
   fn view(&self) -> &wgpu::TextureView { &self.view }
+
+  fn usage(&self) -> wgpu::TextureUsages { self.inner_tex.texture().usage() }
 }
 
 impl Texture for WgpuTexture {
@@ -693,11 +703,15 @@ impl WgpuImpl {
 
     let surface = surface.map(|surface| {
       use wgpu::TextureFormat::*;
-      let format = surface
-        .get_capabilities(&adapter)
-        .formats
-        .into_iter()
-        .find(|&f| f == Rgba8Unorm || f == Bgra8Unorm)
+      let formats = HashSet::from_iter(
+        surface
+          .get_capabilities(&adapter)
+          .formats
+          .into_iter(),
+      );
+      let format = *formats
+        .get(&Rgba8Unorm)
+        .or_else(|| formats.get(&Bgra8Unorm))
         .expect("No suitable format found for the surface!");
 
       let config = wgpu::SurfaceConfiguration {

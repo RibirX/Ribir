@@ -6,7 +6,9 @@ use wgpu::{StoreOp, include_wgsl};
 use zerocopy::AsBytes;
 
 use super::vertex_buffer::new_vertices;
-use crate::{WgpuImpl, WgpuTexture, command_encoder, gpu_backend::Texture, vertices_coord};
+use crate::{
+  GPUBackendImpl, WgpuImpl, WgpuTexture, command_encoder, gpu_backend::Texture, vertices_coord,
+};
 
 pub struct CopyTexturePass {
   pipeline: Option<wgpu::RenderPipeline>,
@@ -134,76 +136,85 @@ impl ClearTexturePass {
 
 impl WgpuImpl {
   pub(crate) fn draw_texture_to_texture(
-    &mut self, dist_tex: &WgpuTexture, dist_at: DevicePoint, from_tex: &WgpuTexture,
+    &mut self, dest_tex: &WgpuTexture, dest_at: DevicePoint, from_tex: &WgpuTexture,
     src_rect: &DeviceRect,
   ) {
-    let pass = self
-      .copy_tex_pass
-      .get_or_insert_with(|| CopyTexturePass::new(&self.device));
+    if !from_tex
+      .usage()
+      .contains(wgpu::TextureUsages::TEXTURE_BINDING)
+    {
+      let mut tex = self.create_texture(src_rect.size, from_tex.format());
+      self.copy_texture_from_texture(&mut tex, DevicePoint::default(), from_tex, src_rect);
+      self.draw_texture_to_texture(dest_tex, dest_at, &tex, &DeviceRect::from_size(tex.size()));
+    } else {
+      let pass = self
+        .copy_tex_pass
+        .get_or_insert_with(|| CopyTexturePass::new(&self.device));
 
-    pass.update(dist_tex.format(), &self.device);
+      pass.update(dest_tex.format(), &self.device);
 
-    let [d_lt, d_rt, d_rb, d_lb] =
-      vertices_corners(&DeviceRect::new(dist_at, src_rect.size), Texture::size(dist_tex));
+      let [d_lt, d_rt, d_rb, d_lb] =
+        vertices_corners(&DeviceRect::new(dest_at, src_rect.size), Texture::size(dest_tex));
 
-    let [s_lt, s_rt, s_rb, s_lb] = vertices_corners(src_rect, Texture::size(from_tex));
+      let [s_lt, s_rt, s_rb, s_lb] = vertices_corners(src_rect, Texture::size(from_tex));
 
-    self.queue.write_buffer(
-      &pass.vertices_buffer,
-      0,
-      [
-        Vertex::new(d_lt, s_lt),
-        Vertex::new(d_lb, s_lb),
-        Vertex::new(d_rt, s_rt),
-        Vertex::new(d_rb, s_rb),
-      ]
-      .as_bytes(),
-    );
+      self.queue.write_buffer(
+        &pass.vertices_buffer,
+        0,
+        [
+          Vertex::new(d_lt, s_lt),
+          Vertex::new(d_lb, s_lb),
+          Vertex::new(d_rt, s_rt),
+          Vertex::new(d_rb, s_rb),
+        ]
+        .as_bytes(),
+      );
 
-    let bind_group = self
-      .device
-      .create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &pass.bind_layout,
-        entries: &[
-          wgpu::BindGroupEntry {
-            binding: 0,
-            resource: wgpu::BindingResource::TextureView(from_tex.view()),
-          },
-          wgpu::BindGroupEntry {
-            binding: 1,
-            resource: wgpu::BindingResource::Sampler(&self.sampler),
-          },
-        ],
-        label: Some("Color primitives storage bind group"),
+      let bind_group = self
+        .device
+        .create_bind_group(&wgpu::BindGroupDescriptor {
+          layout: &pass.bind_layout,
+          entries: &[
+            wgpu::BindGroupEntry {
+              binding: 0,
+              resource: wgpu::BindingResource::TextureView(from_tex.view()),
+            },
+            wgpu::BindGroupEntry {
+              binding: 1,
+              resource: wgpu::BindingResource::Sampler(&self.sampler),
+            },
+          ],
+          label: Some("Color primitives storage bind group"),
+        });
+
+      let color_attachments = wgpu::RenderPassColorAttachment {
+        view: dest_tex.view(),
+        resolve_target: None,
+        ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: StoreOp::Store },
+      };
+
+      let encoder = command_encoder!(self);
+      let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("Copy texture"),
+        color_attachments: &[Some(color_attachments)],
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
       });
 
-    let color_attachments = wgpu::RenderPassColorAttachment {
-      view: dist_tex.view(),
-      resolve_target: None,
-      ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: StoreOp::Store },
-    };
+      rpass.set_vertex_buffer(0, pass.vertices_buffer.slice(..));
+      rpass.set_bind_group(0, &bind_group, &[]);
 
-    let encoder = command_encoder!(self);
-    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-      label: Some("Copy texture"),
-      color_attachments: &[Some(color_attachments)],
-      depth_stencil_attachment: None,
-      timestamp_writes: None,
-      occlusion_query_set: None,
-    });
+      rpass.set_scissor_rect(
+        dest_at.x as u32,
+        dest_at.y as u32,
+        src_rect.width() as u32,
+        src_rect.height() as u32,
+      );
+      rpass.set_pipeline(pass.pipeline.as_ref().unwrap());
 
-    rpass.set_vertex_buffer(0, pass.vertices_buffer.slice(..));
-    rpass.set_bind_group(0, &bind_group, &[]);
-
-    rpass.set_scissor_rect(
-      dist_at.x as u32,
-      dist_at.y as u32,
-      src_rect.width() as u32,
-      src_rect.height() as u32,
-    );
-    rpass.set_pipeline(pass.pipeline.as_ref().unwrap());
-
-    rpass.draw(0..4, 0..1)
+      rpass.draw(0..4, 0..1)
+    }
   }
 
   pub(crate) fn clear_tex_areas(&mut self, clear_areas: &[DeviceRect], tex: &WgpuTexture) {
