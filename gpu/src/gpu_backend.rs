@@ -2,7 +2,7 @@ use std::error::Error;
 
 use guillotiere::euclid::Vector2D;
 use ribir_geom::{
-  DeviceRect, DeviceSize, Point, Transform, rect_corners, transform_to_device_rect,
+  DevicePoint, DeviceRect, DeviceSize, Point, Transform, rect_corners, transform_to_device_rect,
 };
 use ribir_painter::{
   Color, ColorMatrix, CommandBrush, FilterType, FlattenMatrix, PaintCommand, PaintPath,
@@ -665,20 +665,31 @@ where
   }
 
   fn draw_filter(&mut self, filter: &FilterPhase, output: &mut Impl::Texture) {
-    let mut tex_tmp = self
+    let mask_origin: DevicePoint = filter.view_rect.origin.cast().cast_unit();
+
+    let mut tex_tmp1 = self
       .gpu_impl
       .new_texture(filter.view_rect.size, ColorFormat::Rgba8);
 
-    let mut p_src_tex = output as *mut _;
-    let mut p_dst_tex = &mut tex_tmp as *mut Impl::Texture;
-    let mask_origin = filter.view_rect.origin.cast().cast_unit();
-    let mut src_origin = filter.view_rect.origin.cast().cast_unit();
-    let mut dst_origin = Point::new(0_f32, 0.);
+    let mut tex_tmp2 = self
+      .gpu_impl
+      .new_texture(filter.view_rect.size, ColorFormat::Rgba8);
+
+    self.gpu_impl.copy_texture_from_texture(
+      &mut tex_tmp1,
+      DevicePoint::zero(),
+      output,
+      &filter.view_rect.cast_unit(),
+    );
+
+    let mut p_src_tex = &mut tex_tmp1 as *mut _;
+    let mut p_dst_tex = &mut tex_tmp2 as *mut Impl::Texture;
+
     let primitives = filter.primitive_iter();
 
     for (mut prim, kernel) in primitives {
-      prim.sample_offset = (src_origin - dst_origin).into();
-      prim.mask_offset = (mask_origin - dst_origin).into();
+      prim.sample_offset = [0.; 2];
+      prim.mask_offset = mask_origin.to_vector().cast().into();
 
       let dst_tex = unsafe { &mut *p_dst_tex };
       let origin = unsafe { &*p_src_tex };
@@ -689,7 +700,7 @@ where
 
       self.filter_vertices_buffer.clear();
       let dst_size = dst_tex.size();
-
+      let dst_origin = Point::new(0., 0.);
       add_rect_vertices(
         [
           dst_origin,
@@ -711,17 +722,14 @@ where
         .draw_filter_triangles(dst_tex, origin, indices, None);
 
       std::mem::swap(&mut p_dst_tex, &mut p_src_tex);
-      std::mem::swap(&mut dst_origin, &mut src_origin);
     }
 
-    if std::ptr::eq(p_dst_tex, output) {
-      self.gpu_impl.copy_texture_from_texture(
-        output,
-        dst_origin.cast().cast_unit(),
-        &tex_tmp,
-        &DeviceRect::from_size(tex_tmp.size()),
-      );
-    }
+    self.gpu_impl.copy_texture_from_texture(
+      output,
+      filter.view_rect.origin.cast().cast_unit(),
+      unsafe { &*p_src_tex },
+      &DeviceRect::from_size(tex_tmp1.size()),
+    );
   }
 }
 

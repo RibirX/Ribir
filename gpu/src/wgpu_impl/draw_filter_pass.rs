@@ -1,11 +1,12 @@
 use std::{mem::size_of, ops::Range};
 
 use ribir_painter::{Color, Vertex, VertexBuffers};
+use zerocopy::AsBytes;
 
 use super::{uniform::Uniform, vertex_buffer::VerticesBuffer};
 use crate::{
   DrawPhaseLimits, FilterPrimitive, MaskLayer, WgpuTexture,
-  wgpu_impl::shaders::filter_triangles_shader,
+  wgpu_impl::{shaders::filter_triangles_shader, uniform::UniformVar},
 };
 
 pub struct DrawFilterPass {
@@ -183,54 +184,4 @@ impl DrawFilterPass {
       self.pipeline = Some(pipeline);
     }
   }
-}
-
-use zerocopy::AsBytes;
-
-pub struct UniformVar {
-  layout: wgpu::BindGroupLayout,
-  buffer: wgpu::Buffer,
-  bind: wgpu::BindGroup,
-}
-
-impl UniformVar {
-  pub fn new(device: &wgpu::Device, visibility: wgpu::ShaderStages, max_byte_size: usize) -> Self {
-    let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-      entries: &[wgpu::BindGroupLayoutEntry {
-        binding: 0,
-        visibility,
-        ty: wgpu::BindingType::Buffer {
-          ty: wgpu::BufferBindingType::Uniform,
-          has_dynamic_offset: false,
-          min_binding_size: None,
-        },
-        count: None,
-      }],
-      label: Some("UniformVar layout"),
-    });
-
-    let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-      label: Some("UniformVar buffer"),
-      size: max_byte_size as u64,
-      usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-      mapped_at_creation: false,
-    });
-    let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
-      label: Some("UniformVar bind"),
-      layout: &layout,
-      entries: &[wgpu::BindGroupEntry {
-        binding: 0,
-        resource: wgpu::BindingResource::Buffer(buffer.as_entire_buffer_binding()),
-      }],
-    });
-
-    Self { layout, buffer, bind }
-  }
-
-  pub fn write_buffer(&mut self, queue: &wgpu::Queue, offset: usize, data: &[u8]) {
-    queue.write_buffer(&self.buffer, offset as u64, data);
-  }
-
-  pub fn bind_group(&self) -> &wgpu::BindGroup { &self.bind }
-  pub fn layout(&self) -> &wgpu::BindGroupLayout { &self.layout }
 }

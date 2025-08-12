@@ -535,6 +535,7 @@ pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
     let kernel_size = filter_primitive.kernel_size;
     let x_radius = f32(kernel_size.x >> 1);
     let y_radius = f32(kernel_size.y >> 1);
+    var origin = vec4<f32>(0., 0., 0., 0.);
     var sum = vec4<f32>(0., 0., 0., 0.);
     for (var i: u32 = 0; i< kernel_size.x; i++) {
       for (var j: u32 = 0; j < kernel_size.y; j++) {
@@ -544,16 +545,20 @@ pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
 
         let sample_pos = pos + filter_primitive.sample_offset;
         var color = tex_sample(original_tex, sample_pos);
+        if (i == u32(x_radius) && j == u32(y_radius)) {
+          origin = color;
+        }
         sum = sum + (color * weight);
       }
     }
     sum[3] = 1.;
-
+    
     if alpha < 0.5 {
-      // return a transparent color when
+      // return origin color when
       //  - the alpha is 0., means it is out of the filter area
-      //  - the 0. < alpha < 0.5, means it is in the edge of the filter area,
-      return vec4<f32>(0., 0., 0., 0.);
+      //  - the 0. < alpha < 1., means it is in the edge of the filter area,
+      //    here we return the origin color when it < 0.5, in the out-side of edge.
+      return origin;
     } else {
       return sum * filter_primitive.color_matrix + filter_primitive.base_color;
     }
