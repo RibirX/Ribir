@@ -259,6 +259,7 @@ impl GPUBackendImpl for WgpuImpl {
     self
       .alpha_triangles_pass
       .draw_alpha_triangles(indices, texture, None, &self.queue, encoder);
+    self.submit();
   }
 
   fn draw_radial_gradient_triangles(
@@ -308,6 +309,7 @@ impl GPUBackendImpl for WgpuImpl {
       &self.queue,
       encoder,
     );
+    self.submit();
   }
 
   fn draw_color_triangles(
