@@ -19,15 +19,21 @@
 //!   let ctx = BuildCtx::get();
 //!   let mut stagger = Stagger::new(
 //!     Duration::from_millis(100),
-//!     transitions::EASE_IN.of(ctx)
+//!     EasingTransition {
+//!       easing: easing::EASE_IN,
+//!       duration: Duration::from_millis(100),
+//!     },
 //!   );
 //!
 //!   let mut first = @Text { text: "first" };
 //!   let mut second = @Text { text: "second" };
 //!
 //!   let first_fade_in = @Animate {
-//!     transition: transitions::EASE_IN.of(ctx),
-//!      state:  first.opacity(),
+//!     transition: EasingTransition {
+//!       easing: easing::EASE_IN,
+//!       duration: Duration::from_millis(100),
+//!     },
+//!     state:  first.opacity(),
 //!   };
 //!
 //!   stagger.write().push_animation(first_fade_in);
@@ -40,7 +46,6 @@
 //! };
 //! ```
 
-use ribir_algo::Sc;
 use ribir_macros::rdl;
 
 use super::*;
@@ -48,22 +53,22 @@ use crate::prelude::*;
 
 /// The controller of a stagger animation. It's allow you to transition states
 /// and run animation in a stagger way.
-pub struct Stagger<T> {
+pub struct Stagger {
   stagger: std::time::Duration,
-  transition: Sc<T>,
+  transition: Box<dyn Transition>,
   running_handle: Option<TaskHandle<NormalReturn<()>>>,
   next_to_run: Option<AnimationCursor>,
   animations: Vec<(std::time::Duration, Box<dyn Animation>)>,
   run_times: usize,
 }
 
-impl<T: Transition + 'static> Stagger<T> {
+impl Stagger {
   /// **stagger**: the default duration between two adjacent animations start.
   /// **transition**: the transition for the states.
-  pub fn new(stagger: Duration, transition: T) -> Stateful<Self> {
+  pub fn new(stagger: Duration, transition: impl Transition + 'static) -> Stateful<Self> {
     Stateful::new(Self {
       stagger,
-      transition: Sc::new(transition),
+      transition: Box::new(transition),
       running_handle: None,
       next_to_run: None,
       animations: vec![],
@@ -95,8 +100,9 @@ impl<T: Transition + 'static> Stagger<T> {
   where
     A: AnimateState + 'static,
   {
-    let transition = Box::new(self.transition.clone());
-    let animate = rdl! { Animate { transition, state, from } };
+    let animate = rdl! {
+      Animate { transition: self.transition.box_clone(), state, from }
+    };
     self.push_animation_with(stagger, animate.clone_writer());
     animate
   }
@@ -131,7 +137,7 @@ struct AnimationCursor {
   index: usize,
 }
 
-impl<T: Transition + 'static> Animation for Stateful<Stagger<T>> {
+impl Animation for Stateful<Stagger> {
   fn run(&self) {
     if self.is_running() {
       self.stop()
@@ -167,7 +173,7 @@ impl<T: Transition + 'static> Animation for Stateful<Stagger<T>> {
   }
 }
 
-impl<T: Transition + 'static> Stateful<Stagger<T>> {
+impl Stateful<Stagger> {
   fn trigger_next(&self) {
     let mut this = self.write();
     if let Some(step) = this.next_to_run.take() {
@@ -194,7 +200,7 @@ impl<T: Transition + 'static> Stateful<Stagger<T>> {
   }
 }
 
-impl<T> Stagger<T> {
+impl Stagger {
   /// Check if the stagger animation is running.
   pub fn is_running(&self) -> bool {
     self.running_handle.is_some()
@@ -225,12 +231,19 @@ mod tests {
     WidgetTester::new(fn_widget! {
       let stagger = Stagger::new(
         Duration::from_millis(100),
-        transitions::EASE_IN.of(BuildCtx::get())
+        EasingTransition{
+          duration: Duration::from_millis(100),
+          easing: easing::EASE_IN
+        }
+
       );
       let mut mock_box = @MockBox { size: Size::new(100., 100.) };
 
       let animate = @Animate {
-        transition: transitions::EASE_IN.of(BuildCtx::get()),
+        transition: EasingTransition {
+          easing: easing::EASE_IN,
+          duration: Duration::from_millis(100),
+        },
         state: mock_box.opacity(),
         from: 0.,
       };

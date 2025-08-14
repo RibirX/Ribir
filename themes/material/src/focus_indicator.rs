@@ -71,10 +71,10 @@ impl FocusRing {
     animate
       .with_from(0.)
       .with_state(part_writer!(&mut ring.stroke_width))
-      .with_transition(Box::new(EasingTransition {
+      .with_transition(EasingTransition {
         duration: md::easing::duration::MEDIUM2,
         easing: easing::CubicBezierEasing::new(0.05, 1., 0.4, 3.),
-      }));
+      });
     let animate = animate.finish();
 
     let u = watch! {

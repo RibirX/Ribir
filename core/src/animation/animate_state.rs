@@ -29,7 +29,7 @@ pub trait AnimateState: AnimateStateSetter {
 
     let mut animate = Animate::declarer();
     animate
-      .with_transition(Box::new(transition))
+      .with_transition(transition)
       .with_from(self.get())
       .with_state(self);
     let animate = animate.finish();

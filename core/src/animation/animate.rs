@@ -5,11 +5,8 @@ use crate::{
 };
 
 #[simple_declare]
-pub struct Animate<S>
-where
-  S: AnimateState + 'static,
-{
-  #[declare(strict, default = transitions::LINEAR.of(BuildCtx::get()))]
+pub struct Animate<S: AnimateState + 'static> {
+  #[declare(custom, default = Self::default_transition())]
   pub transition: Box<dyn Transition>,
   #[declare(strict)]
   pub state: S,
@@ -18,6 +15,17 @@ where
   running_info: Option<AnimateInfo<S::Value>>,
   #[declare(skip, default = BuildCtx::get().window().id())]
   window_id: WindowId,
+}
+
+impl<S: AnimateState> AnimateDeclarer<S> {
+  pub fn with_transition(&mut self, transition: impl Transition + 'static) -> &mut Self {
+    self.transition = Some(Box::new(transition));
+    self
+  }
+
+  pub fn default_transition() -> Box<dyn Transition> {
+    Box::new(EasingTransition { easing: easing::LINEAR, duration: Duration::from_millis(300) })
+  }
 }
 
 pub(crate) struct AnimateInfo<V> {
@@ -171,7 +179,7 @@ where
 
 impl<P> Drop for Animate<P>
 where
-  P: AnimateState + 'static,
+  P: AnimateState,
 {
   fn drop(&mut self) {
     if self.running_info.is_some()

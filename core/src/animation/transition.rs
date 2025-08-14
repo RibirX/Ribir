@@ -1,5 +1,3 @@
-use ribir_algo::Sc;
-
 use crate::prelude::*;
 
 /// Transition use `Easing` trait to calc the rate of change over time.
@@ -31,6 +29,8 @@ pub trait Transition {
   /// Return the duration of the animation from start to finish.
   fn duration(&self) -> Duration;
 
+  fn box_clone(&self) -> Box<dyn Transition>;
+
   /// Transition will apply with repeat times
   fn repeat(self, repeat: f32) -> RepeatTransition<Self>
   where
@@ -55,16 +55,7 @@ pub trait Transition {
   }
 }
 
-// todo: remove it after `TransitionTheme` is removed
-pub trait RocBoxClone: Transition {
-  fn box_clone(&self) -> Box<dyn Transition>;
-}
-
-impl<T: Transition + Clone + 'static> RocBoxClone for T {
-  fn box_clone(&self) -> Box<dyn Transition> { self.clone().box_it() }
-}
-
-impl<T: Transition> Transition for DelayTransition<T> {
+impl<T: Transition + Clone + 'static> Transition for DelayTransition<T> {
   fn rate_of_change(&self, dur: Duration) -> AnimateProgress {
     if dur < self.delay {
       return AnimateProgress::Dismissed;
@@ -73,9 +64,11 @@ impl<T: Transition> Transition for DelayTransition<T> {
   }
 
   fn duration(&self) -> Duration { self.delay + self.transition.duration() }
+
+  fn box_clone(&self) -> Box<dyn Transition> { Box::new(self.clone()) }
 }
 
-impl<T: Transition> Transition for RepeatTransition<T> {
+impl<T: Transition + Clone + 'static> Transition for RepeatTransition<T> {
   fn rate_of_change(&self, dur: Duration) -> AnimateProgress {
     let repeat = self.repeat;
     let duration = self.transition.duration();
@@ -99,21 +92,19 @@ impl<T: Transition> Transition for RepeatTransition<T> {
     let repeat = self.repeat;
     Duration::from_secs_f32(duration.as_secs_f32() * repeat)
   }
+
+  fn box_clone(&self) -> Box<dyn Transition> { Box::new(self.clone()) }
 }
 
 impl Transition for Box<dyn Transition> {
   fn rate_of_change(&self, dur: Duration) -> AnimateProgress { (**self).rate_of_change(dur) }
 
   fn duration(&self) -> Duration { (**self).duration() }
+
+  fn box_clone(&self) -> Box<dyn Transition> { (**self).box_clone() }
 }
 
-impl<T: Transition> Transition for Sc<T> {
-  fn rate_of_change(&self, dur: Duration) -> AnimateProgress { (**self).rate_of_change(dur) }
-
-  fn duration(&self) -> Duration { (**self).duration() }
-}
-
-impl<E: Easing> Transition for EasingTransition<E> {
+impl<E: Easing + Clone + 'static> Transition for EasingTransition<E> {
   fn rate_of_change(&self, run_dur: Duration) -> AnimateProgress {
     if run_dur > self.duration {
       return AnimateProgress::Finish;
@@ -124,4 +115,6 @@ impl<E: Easing> Transition for EasingTransition<E> {
   }
 
   fn duration(&self) -> Duration { self.duration }
+
+  fn box_clone(&self) -> Box<dyn Transition> { Box::new(self.clone()) }
 }

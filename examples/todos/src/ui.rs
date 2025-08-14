@@ -44,7 +44,10 @@ fn task_lists(
     let editing = Stateful::new(None);
     let stagger = Stagger::new(
       Duration::from_millis(100),
-      transitions::EASE_IN_OUT.of(BuildCtx::get())
+      EasingTransition {
+        easing: easing::EASE_IN_OUT,
+        duration: Duration::from_millis(250),
+      }
     );
     let c_stagger = stagger.clone_writer();
 
@@ -139,7 +142,7 @@ fn input(
   .into_widget()
 }
 
-fn task_item_widget<S>(task: S, stagger: Stateful<Stagger<Box<dyn Transition>>>) -> Widget<'static>
+fn task_item_widget<S>(task: S, stagger: Stateful<Stagger>) -> Widget<'static>
 where
   S: StateWriter<Value = Task> + 'static,
 {
