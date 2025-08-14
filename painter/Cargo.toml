@@ -18,7 +18,7 @@ image = {workspace = true, optional = true}
 log.workspace = true
 lyon_algorithms = {version = "1.0.3", features = ["serialization"]}
 lyon_tessellation = {version = "1.0.3", features = ["serialization"], optional = true}
-material-color-utilities-rs = {workspace = true}
+material-colors = {workspace = true}
 ribir_algo = {path = "../algo", version = "0.4.0-alpha.46" }
 ribir_geom = {path = "../geom", version = "0.4.0-alpha.46" }
 serde = {version = "1.0", features = ["derive"]}
@@ -38,7 +38,6 @@ triomphe.workspace = true
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom-v2.workspace = true
 getrandom-v3.workspace = true
 
 [features]
