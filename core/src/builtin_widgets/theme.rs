@@ -11,10 +11,8 @@ pub use palette::*;
 mod icon_theme;
 pub use icon_theme::*;
 mod typography_theme;
-pub use typography_theme::*;
-mod transition_theme;
 pub use ribir_painter::*;
-pub use transition_theme::*;
+pub use typography_theme::*;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Brightness {
@@ -74,7 +72,6 @@ pub struct Theme {
   pub typography_theme: TypographyTheme,
   pub classes: Classes,
   pub icon_theme: IconTheme,
-  pub transitions_theme: TransitionTheme,
   // The theme requires font bytes.
   pub font_bytes: Vec<Vec<u8>>,
   // The theme requires font files.
@@ -140,7 +137,6 @@ impl Theme {
       Provider::reader(part_reader!(&this.typography_theme)),
       Provider::reader(part_reader!(&this.icon_theme)),
       Classes::reader_into_provider(part_reader!(&this.classes)),
-      Provider::reader(part_reader!(&this.transitions_theme)),
       Provider::reader(part_reader!(&this.icon_font))
     ];
     let child = pipe!($read(this);)
@@ -196,8 +192,6 @@ impl Default for Theme {
       typography_theme: typography_theme(),
       icon_theme,
       classes: <_>::default(),
-      transitions_theme: Default::default(),
-
       font_bytes: vec![],
       font_files: vec![],
       icon_font: Default::default(),

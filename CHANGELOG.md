@@ -32,6 +32,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### BREAKING
 
 - **core**: Remove `State`; use `Stateful` instead. (#782 by @M-Adoo)
+- **core**: Remove `TransitionTheme`. (#783 by @M-Adoo)
 
 ## [0.4.0-alpha.46] - 2025-08-13
 
