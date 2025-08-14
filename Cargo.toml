@@ -57,7 +57,7 @@ lyon_algorithms = "1.0.5"
 lyon_geom = "1.0.6"
 lyon_path = "1.0.7"
 lyon_tessellation = "1.0.15"
-material-color-utilities-rs = "0.2.1"
+material-colors = "0.4.2"
 icrate = "0.0.4"
 paste = "1.0"
 pin-project-lite = "0.2.15"
@@ -95,10 +95,8 @@ heck = "0.5.0"
 url = "2.5.4"
 thiserror = "2.0.12"
 wasm-bindgen-futures = "0.4.50"
-getrandom-v2 = { package = "getrandom", version = "0.2", features = ["js"] }
 getrandom-v3 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 cfg-if = "1.0"
-
 
 [workspace.metadata.release]
 shared-version = true
