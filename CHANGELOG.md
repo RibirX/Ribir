@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.47] - 2025-08-20
+
 ### Features
 
 - **cli**: add support for packaging Ribir projects, see README.md in cli for details. (#777 @wjian23)
@@ -891,7 +893,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.46...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.47...HEAD
+[0.4.0-alpha.47]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.46...ribir-v0.4.0-alpha.47
 [0.4.0-alpha.46]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.45...ribir-v0.4.0-alpha.46
 [0.4.0-alpha.45]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.44...ribir-v0.4.0-alpha.45
 [0.4.0-alpha.44]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.40...ribir-v0.4.0-alpha.44
