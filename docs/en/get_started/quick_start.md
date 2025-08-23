@@ -225,7 +225,7 @@ fn main() {
 }
 ```
 
-Notice the `rdl!{ $btn { ... } }` syntax? Similar to struct literal syntax, but with `$` in front, it indicates that the parent is a variable rather than a type, so it doesn't create a new widget but directly uses that variable to compose with the child.
+Notice the `rdl!{ (btn) { ... } }` syntax? it indicates that the parent is a variable rather than a type, so it doesn't create a new widget but directly uses that variable to compose with the child.
 
 > Tips
 >
@@ -243,7 +243,7 @@ In the process of compose widgets, we used multiple `rdl!`. On one hand, it help
 Fortunately, Ribir provides an `@` syntactic sugar for `rdl!`, and in actual use, you mostly use `@` instead of `rdl!`. There are three main cases:
 
 - `@Button {...}` as a struct literal's syntactic sugar, expands to `rdl!{ Button {...} }`
-- `@ $btn {...}` as syntactic sugar for variable struct literals, expands to `rdl!{ $btn {...} }`
+- `@(btn) {...}` as syntactic sugar for variable struct literals, expands to `rdl!{ btn {...} }`
 - `@ { ... }` is syntactic sugar for expressions, expanding to `rdl!{ ... }`
 
 Now, let's rewrite the above counter example using `@`:
@@ -302,22 +302,14 @@ In Ribir, there are two important syntactic sugars, one is the [`@` Syntactic Su
 
 ### State Read and Write References
 
-`$` indicates a read or write reference to the state that follows it. For example, `$count` represents a read reference to `count`, and when followed by a `write()` call, it represents a write reference to `count`, such as `$count.write()`.
-
-Besides `write`, Ribir also provides a `silent` write reference, where modifying data through `silent` write does not trigger view updates.
-
-The expansion logic of state's `$` syntactic sugar is as follows:
-
-- `$counter.write()` expands to `counter.write()`
-- `$counter.silent()` expands to `counter.silent()`
-- `$counter` expands to `counter.read()`
+`$read` indicates a read reference to the state, while `$write` indicates a write reference. For example, `*$read(count)` return the value of `count`, and `*$write(count) += 1` can add 1 to the value of `count`.
 
 ### Automatic Sharing of States
 
-When `$` is inside a `move` closure, it points to a cloned version of the state (read/write). The closure captures a clone of the state, allowing you to use the state directly and easily share it without needing to clone it explicitly.
+When `$read` or `$write` is inside a `move` closure, it points to a cloned version of the state (read/write). The closure captures a clone of the state, allowing you to use the state directly and easily share it without needing to clone it explicitly.
 
 ```rust ignore
-move |_| *$count.write() += 1
+move |_| *$write(count) += 1
 ```
 
 Expands roughly to
@@ -331,9 +323,7 @@ Expands roughly to
 
 ### Priority of Syntactic Sugar Expansion
 
-Remember we also used `$` in [Composing Widgets](#composing-widgets)? For example, `rdl!{ $btn { ... } }` or `@ $btn { ... }`. This is not a reference to state data, as `rdl!` assigns a different semantic meaning to it — creating a parent widget using a variable declaration.
-
-Whether it's `@` or `$`, they should first follow the semantics of the macro they are in, and then be considered as Ribir's syntactic sugar. When using `@` or `$` inside an external macro, they no longer act as Ribir's syntactic sugar, as the external macro likely gives them special meanings.
+When using `@` or `$`, they should first follow the semantics of the macro they are in, and then be considered as Ribir's syntactic sugar. When using `@` or `$` inside an external macro, they no longer act as Ribir's syntactic sugar, as the external macro likely gives them special meanings.
 
 ```rust ignore
 use ribir::prelude::*;
@@ -415,7 +405,7 @@ fn main() {
 Although `pipe!` can contain as many expressions as you like, it is recommended that you try to include only the smallest expressions in `pipe!` and then use `map` to complete the transformation. This allows you to see the source of changes in `pipe!` more clearly and avoids unnecessary dependencies in complex expressions. So, the example above writes
 
 ```rust ignore
-pipe!(*$counter).map(move |counter| {
+pipe!(*$read(counter)).map(move |counter| {
   move || {
     (0..counter).map(move |_| {
       @Container {
@@ -433,7 +423,7 @@ instead of:
 ```rust ignore
 pipe!{
   move || {
-    (0..*$counter).map(move |_| {
+    (0..*$read(counter)).map(move |_| {
       @Container {
         margin: EdgeInsets::all(2.),
         size: Size::new(10., 10.),
@@ -446,7 +436,7 @@ pipe!{
 
 ### Operators for rxRust on `Pipe` chains
 
-The update push of the `Pipe` stream is built on top of the rxRust stream, so `Pipe` also provides the method `value_chain` that lets you manipulate the rxRust stream. So you can use rxRust operators such as `filter`, `debounce` `distinct_until_change` and so on to reduce the frequency of updates.
+The update push of the `Pipe` stream is built on top of the rxRust stream, so `Pipe` also provides the method `transform` that lets you manipulate the rxRust stream. So you can use rxRust operators such as `filter`, `debounce` `distinct_until_change` and so on to reduce the frequency of updates.
 
 Suppose you have a simple auto-summing example:
 
@@ -750,9 +740,6 @@ If you just want a read-only sub-state, then you can convert it with `part_reade
 ```rust ignore
 let count_reader = state.part_reader(|d| &d.count);
 ```
-
-But Ribir doesn't provide a ``split_reader``, because separating a read-only sub-state is equivalent to converting a read-only sub-state.
-
 
 ## The next step
 

@@ -229,7 +229,7 @@ fn main() {
 }
 ```
 
-注意到 `rdl!{ $btn { ... } }` 了吗？ 它和结构体字面量语法一样，但是加上 `$` 后，它表示作为父亲的是一个变量而不是类型，所以它不会新建一个 widget ，而是直接使用这个变量来和孩子组合。
+注意到 `rdl!{ (btn) { ... } }` 了吗？ 它表示作为父亲的是一个变量而不是类型，所以它不会新建一个 widget ，而是直接使用这个变量来和孩子组合。
 
 > 小提示
 >
@@ -249,7 +249,7 @@ fn main() {
 好在，Ribir 为 `rdl!` 提供了一个 `@` 语法糖，在实际使用的过程中，基本上用的都是 `@` 而非 `rdl!`。总共有三种情况：
 
 - `@Button {...}` 作为结构体字面量的语法糖，展开为 `rdl!{ Button {...} }`
-- `@ $btn {...}` 作为变量结构体字面量的语法糖，展开为 `rdl!{ $btn {...} }`
+- `@ (btn) {...}` 作为变量结构体字面量的语法糖，展开为 `rdl!{ (btn) {...} }`
 - `@ { ... } ` 是表达式的语法糖，展开为 `rdl!{ ... }` 
 
 现在用 `@` 改写上面的计数器的例子:
@@ -312,19 +312,11 @@ fn main() {
 
 ### 状态的读写引用
 
-`$` 表示对跟随其后的状态做读或写引用。比如 `$count` 表示对 `count` 状态的读引用，而当其后多跟随一个`write()` 调用时，则表示对 `count` 状态的写引用，如 `$count.write()`。
-
-除了 `write` 以外， Ribir 还有一个 `silent` 写引用，通过 `silent` 写引用修改数据不会触发视图更新。
-
-状态的 `$` 语法糖展开逻辑为：
-
-- `$counter.write()` 展开为 `counter.write()`
-- `$counter.silent()` 展开为 `counter.silent()`
-- `$counter` 展开为 `counter.read()`
+`$read` 表示对状态做读引用, `$write` 表示对跟随其后的状态做写引用。比如 `*$read(count)` 将返回 count 的值, 而`*$write(count) += 1` 则会修改 count 的值加 1。
 
 ### 状态的自动共享
 
-当 `$` 处在一个 `move` 闭包中时，它指向的状态会被克隆（读/写），闭包捕获的是状态的克隆，因此 `$` 让你可以直接使用一个状态，并轻易的完成共享，而不用去额外的克隆它。
+当 `$read` 或 `$write` 处在一个 `move` 闭包中时，它指向的状态会被克隆（读/写），闭包捕获的是状态的克隆，因此 `$` 让你可以直接使用一个状态，并轻易的完成共享，而不用去额外的克隆它。
 
 
 ```rust ignore
@@ -362,7 +354,7 @@ fn_widget!{
 
 `Pipe` 流是一个带初始值的持续更新的数据流，它可以被分解为一个初始值和 rxRust 流 —— rxRust 流可以被订阅。它也是 Ribir 将数据变更更新到视图的唯一通道。
 
-Ribir 提供了一个 `pipe!` 宏来辅助你快速创建 `Pipe` 流。它接收一个表达式，并监测表达式中的所有用 `$` 标记出的状态，以此来触发表达式的重算。
+Ribir 提供了一个 `pipe!` 宏来辅助你快速创建 `Pipe` 流。它接收一个表达式，并监测表达式中的所有用 `$read` 或 `$write` 标记出的状态，以此来触发表达式的重算。
 
 在下面的例子中, `sum` 是一个 `a`， `b` 之和的 `Pipe` 流，每当 `a` 或 `b` 变更时，`sum` 都能向它的下游发送最新结果。
 
@@ -378,7 +370,7 @@ let sum = pipe!(*$read(a) + *$read(b));
 在声明一个对象时，你可以通过一个 `Pipe` 流去初始化它的属性，这样它的属性就会持续随着这个 `Pipe` 流变更。如我们在[状态——让数据变得可被侦和共享](#状态——让数据变得可被侦和共享)中见过的：
 
 ```rust ignore
-  @Text { text: pipe!($count.to_string()) }
+  @Text { text: pipe!($read(count).to_string()) }
 ```
 
 ### 动态渲染 widget
@@ -456,7 +448,7 @@ pipe!{
 
 ### 为 `Pipe` 链上 rxRust 的操作符
 
-`Pipe` 流的更新推送是建立在 rxRust 流之上的，所以 `Pipe` 也提供了方法 `value_chain` 让你可以操作 rxRust 流。因此，你可以使用 rxRust 的操作符来如 `filter`, `debounce` `distinct_until_change` 等等操作来减少更新的频率。
+`Pipe` 流的更新推送是建立在 rxRust 流之上的，所以 `Pipe` 也提供了方法 `transform` 让你可以操作 rxRust 流。因此，你可以使用 rxRust 的操作符来如 `filter`, `debounce` `distinct_until_change` 等等操作来减少更新的频率。
 
 假设你有一个简单的自动求和例子：
 
@@ -752,9 +744,6 @@ AppCtx::run_until_stalled();
 ```rust ignore
 let count_reader = state.part_reader(|d| &d.count);
 ```
-
-但 Ribir 并没有提供一个 `split_reader`，因为分离一个只读的子状态，其意义等同于转换一个只读子状态。
-
 
 ## 下一步
 
