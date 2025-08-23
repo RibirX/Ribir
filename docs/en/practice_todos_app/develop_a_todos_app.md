@@ -154,28 +154,28 @@ use ribir::prelude::*;
 use std::time::Duration;
 
 fn main() {
-  let todos = State::value(todos::Todos::load());
+  App::run(fn_widget! {
+    let todos = Stateful::new(Todos::load());
 
-  // save changes to disk every 5 seconds .
-  let save_todos = todos.clone_reader();
-  
-  watch!($todos;)
+    // save changes to disk every 5 seconds .
+    let save_todos = todos.clone_reader();
+    watch!($read(todos);)
     .debounce(Duration::from_secs(5), AppCtx::scheduler())
     .subscribe(move |_| {
       if let Err(err) = save_todos.read().save() {
         log::error!("Save tasks failed: {}", err);
       }
     });
-
-  App::run(fn_widget! { todos })
+    todos
+  })
 }
 ```
 
-In `main.rs`, a `State` is first created to save the `Todos` data, and it is passed to the `App::run` method as the root widget, so that the application can run.
+In `main.rs`, a `Stateful` is first created to save the `Todos` data, and it is passed to the `App::run` method as the root widget, so that the application can run.
 
 Simultaneously, any modifications to `todos` are monitored, and it to the disk every 5 seconds. Currently, your application lacks interaction and cannot modify `todos`, so the auto-save logic won't be triggered. However, as soon as you add interaction, it'll work.
 
-Have you noticed the `;` in `watch!($todo;)`? This is intentional, because we don't want to receive the result of `todos`, but just want to know that it has modified. This is because we will read its latest value in the subscription function to save it.
+Have you noticed the `;` in `watch!($read(todo);)`? This is intentional, because we don't want to receive the result of `todos`, but just want to know that it has modified. This is because we will read its latest value in the subscription function to save it.
 
 Then, add the following code to `ui.rs` to describe `Todos` as a widget:
 
@@ -204,15 +204,15 @@ Next, we'll add an empty task tabs to the `Column` to set up our entire structur
 @Tabs {
   @Tab {
     @{ "ALL" }
-    @text! { text: text: "Coming Soon!" }
+    @text! { "Coming Soon!" }
   }
   @Tab {
     @{ "ACTIVE" }
-    @text! { text: text: "Coming Soon!" }
+    @text! { "Coming Soon!" }
   }
   @Tab {
     @{ "DONE" }
-    @text! { text: "Coming Soon!" }
+    @text! { "Coming Soon!" }
   }
 }
 ```
@@ -241,16 +241,15 @@ Fortunately, Ribir interacts seamlessly with Rust. Do you remember how we discus
 
 ```rust ignore
 @ {
-  let input = @Input {};
-  @$input {
+  let mut input = @Input {};
+  @$read(input) {
     on_key_down: move |e| {
     if e.key_code() == &PhysicalKey::Code(KeyCode::Enter)
-      && !$input.text().is_empty() {
-        $this.write().new_task($input.text().to_string());
-        $input.write().set_text("");
+      && !$read(input).text().is_empty() {
+        $write(this).new_task($read(input).text().to_string());
+        $write(input).set_text("");
       }
     },
-    @{ Placeholder::new("What do you want to do ?") }
   }
 }
 
@@ -272,55 +271,52 @@ Let's look at the implementation of `task_list`:
 // ui.rs
 
 ...
-
-fn task_lists(this: &impl StateWriter<Value = Todos>, filter: fn(&Task) -> bool) -> GenWidget {
+fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -> GenWidget {
   let this = this.clone_writer();
   fn_widget! {
-    @VScrollBar {
-      @Lists {
-        @ { pipe!($this;).map(move |_| {
-          // Here, we intentionally write a line of code that won't be executed, to tell Ribir that the current closure needs to capture `this`'s Writer, not its Reader
-          let _hint_capture_writer = || $this.write();
-          
-          let mut widgets = vec![];
-          for id in $this.all_tasks() {
-            if $this.get_task(id).map_or(false, filter) {
-              let task = this..part_writer(
-                Some(format!("task{id}")),
-                |todos| PartMut::new(&mut todos.get_task_mut(id).unwrap())
-              );
-              widgets.push(task_item(task));
+    let editing = Stateful::new(None);
+    @pipe!($read(this);).map(move |_| fn_widget!{
+      let mut items = vec![];
+      for id in $read(this)
+        .all_tasks()
+        .filter(move |id| { $read(this).get_task(*id).map_or(false, cond) })
+        {
+          let task = $writer(this).part_writer(
+            format!("task {id:?}").into(),
+            // task will always exist, if the task is removed,
+            // the widgets list will be rebuild.
+            move |todos| PartMut::new(todos.get_task_mut(id).unwrap()),
+          );
+          itmes.push(@ListCustomItem {
+            interactive: false,
+            @ { pipe!(*$read(editing) == Some(id))
+              .transform(|s| s.distinct_until_changed().box_it())
+              .map(move |b| fn_widget! {
+                task_item($writer(task))
+              })
             }
-          }
-          widgets
-        }) }
-      }
-    }
-  }
-  .into()
+          });
+        }
+        @Lists {
+          @ { items }
+        }
+      })
+  }.r_into()
 }
 ```
 
-This function widget uses `Lists` to display the entire list. It listens to changes in `this` through `pipe!($this;).map(move |_| { ... })` to ensure that the task list content changes as `this` changes. Finally, it uses a `VScrollBar` to provide scrolling capability.
+This function widget uses `Lists` to display the entire list. It listens to changes in `this` through `pipe!($read(this);).map(move |_| { ... })` to ensure that the task list content changes as `this` changes. Finally, it uses a `ScrollBar` to provide scrolling capability.
 
 Did you notice the line about state splitting?
   
 ```rust ignore
 let task = this.part_writer(
-  Some(&format!("task{id}")),
-  |todos| PartMut::new(&mut todos.get_task_mut(id).unwrap())
+  format!("task{id}").into(),
+  |todos| PartMut::new(todos.get_task_mut(id).unwrap())
 );
 ```
 
 It splits a Writer of Task from `this` and passes it to the `task_item` function widget. This way, the `Task` data can be directly modified in the `task_item` widget without affecting the entire UI of `Todos`.
-
-In `task_lists`, there's a tricky part that you've probably noticed:
-
-```rust ignore
-let _hint_capture_writer = || $this.write();
-```
-
-Why do we need this line of code? When Ribir parses a move closure, it checks whether `$this` is used within the closure. It then automatically captures the reader or writer of `this` for you, so you don't have to manually clone the reader or writer. If the move closure only uses a read reference (`$this`), it captures the Reader. If it uses a write reference (`$this.write()` or `$this.silent()`), it captures the Writer. In the above closure, `$this`'s write reference isn't used at all, but we need to split a child `Writer` from `this` — and only a Writer can split a child `Writer`. So, we intentionally write this line to force Ribir to capture `this`'s `Writer`.
 
 Next, let's look at the implementation of `task_item`:
 
@@ -337,20 +333,20 @@ where
   let todos = task.origin_writer().clone_writer();
 
   fn_widget! {
-    let id = $task.id();
-    let checkbox = @Checkbox { checked: pipe!($task.complete) };
-    watch!($checkbox.checked)
+    let id = $read(task).id();
+    let checkbox = @Checkbox { checked: pipe!($read(task).complete) };
+    watch!($read(checkbox).checked)
       .distinct_until_changed()
-      .subscribe(move |v| $task.write().complete = v);
+      .subscribe(move |v| $write(task).complete = v);
 
     @ListItem {
-      @{ HeadlineText(Label::new($task.label.clone())) }
+      @{ HeadlineText(Label::new($read(task).label.clone())) }
       @Leading {
         @{ CustomEdgeWidget(checkbox.build(ctx!())) }
       }
       @Trailing {
         cursor: CursorIcon::Pointer,
-        on_tap: move |_| $todos.write().remove(id),
+        on_tap: move |_| $write(todos).remove(id),
         @{ svgs::CLOSE }
       }
     }
@@ -401,60 +397,59 @@ We'll use a double-click to mark a task as being in edit mode. When a task is no
 Let's go back to `task_lists` and make the following changes:
 
 ```rust ignore
-
 fn_widget! {
-    // new: Add a new state to record the ID of the task being edited
-    let editing = Stateful::new(None);
-
-    @VScrollBar {
-      @Lists {
-        @ { pipe!($this;).map(move |_| {
-          let _hint_capture_this = || $this.write();
-          let mut widgets = vec![];
-
-          for id in $this.all_tasks() {
-            if $this.get_task(id).map_or(false, cond) {
-              let task = this.part_writer(
-                Some(&format!("task{id}")),
-                |todos| PartMut::new(&mut todos.get_task_mut(id).unwrap())
-              );
-              // new: If the task is in edit mode, display an input box. Otherwise, display the task item.
-              let item = pipe!(*$editing == Some($task.id()))
-                .value_chain(|s| s.distinct_until_changed().box_it())
-                .map(move |b|{
-                  if b {
-                    let input = @Input { auto_focus: true };
-                    $input.write().set_text(&$task.label);
-                    @$input {
-                      on_key_down: move |e| {
-                        let key = e.key_code();
-                        if key == &PhysicalKey::Code(KeyCode::Escape) {
-                          *$editing.write() = None;
-                        } else if e.key_code() == &PhysicalKey::Code(KeyCode::Enter) {
-                          let label = $input.text().to_string();
-                          if !label.is_empty() {
-                            $task.write().label = label;
-                            *$editing.write() = None;
-                          }
+  let editing = Stateful::new(None);
+  @Scrollbar {
+    @ { pipe!($read(this);).map(move |_| fn_widget! {
+      let mut widgets = vec![];
+      for id in $read(this)
+        .all_tasks()
+        .filter(move |id| { $read(this).get_task(*id).map_or(false, cond) }) {
+          let task = $writer(this).part_writer(
+            format!("task {id:?}").into(),
+            // task will always exist, if the task is removed,
+            // the widgets list will be rebuild.
+            move |todos| PartMut::new(todos.get_task_mut(id).unwrap()),
+          );
+          widgets.push(@ListCustomItem {
+            interactive: false,
+            @ { pipe!(*$read(editing) == Some(id))
+              .transform(|s| s.distinct_until_changed().box_it())
+              .map(move |b| fn_widget!{
+                if b {
+                  let mut input = @Input { auto_focus: true };
+                  $write(input).set_text(&$read(task).label);
+                  @(input) {
+                    on_key_down: move |e| {
+                      let key = e.key_code();
+                      if key == &PhysicalKey::Code(KeyCode::Escape) {
+                        *$write(editing) = None;
+                      } else if e.key_code() == &PhysicalKey::Code(KeyCode::Enter) {
+                        let label = $read(input).text().to_string();
+                        if !label.is_empty() {
+                          $write(task).label = label;
+                          *$write(editing) = None;
                         }
                       }
-                    }.build(ctx!())
-                  } else {
-                    let item = task_item(task.clone_writer());
-                    @$item {
-                      on_double_tap: move |_| *$editing.write() = Some(id)
-                    }.build(ctx!())
-                  }
-                });
-              widgets.push(item);
+                    }
+                  }.into_widget()
+                } else {
+                  let item = task_item($writer(task));
+                  let mut item = FatObj::new(item);
+                  @(item) {
+                    on_double_tap: move |_| *$write(editing) = Some(id)
+                  }.into_widget()
+                }
+              })
             }
-          }
-          widgets
-        }) }
+        });
       }
-    }
+      @List {
+        @ { widgets }
+      }
+    })}
   }
-  .into()
+}
 ```
 
 At this point, your Todos application is complete. You can run the application , then add, delete, and mark tasks, double-click to edit, and even if you close the application and open it again, your task list will still be there because your data is automatically saved to the disk.
@@ -475,20 +470,24 @@ use ribir::prelude::*;
 use std::time::Duration;
 
 fn main() {
-  let todos = State::value(todos::Todos::load());
+    let w = fn_widget! {
 
-  // save changes to disk every 5 seconds .
-  let save_todos = todos.clone_reader();
-  
-  watch!($todos;)
+    let todos = Stateful::new(Todos::load());
+
+    // save changes to disk every 5 seconds .
+    let save_todos = todos.clone_reader();
+
+    watch!($read(todos);)
     .debounce(Duration::from_secs(5), AppCtx::scheduler())
     .subscribe(move |_| {
       if let Err(err) = save_todos.read().save() {
         log::error!("Save tasks failed: {}", err);
       }
     });
+    todos
+  };
 
-  App::run(fn_widget! { todos })
+  App::run(w)
 }
 
 // todos.rs
@@ -570,41 +569,48 @@ use ribir::prelude::{svgs, *};
 use std::time::Duration;
 
 impl Compose for Todos {
-  fn compose(this: impl StateWriter<Value = Self>) -> impl IntoWidget<FN> {
+  fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      @Column {
+      let mut input = @Input {};
+      @Flex {
+        direction: Direction::Vertical,
         align_items: Align::Center,
-        item_gap: 12.,
         @H1 { text: "Todo" }
-        @ {
-          let input = @Input {};
-          @$input {
+        @Stack {
+          padding: EdgeInsets::horizontal(24.),
+          @Text {
+            h_align: HAlign::Stretch,
+            visible: pipe!($read(input).text().is_empty()),
+            text: "What do you want to do ?"
+          }
+          @(input) {
+            h_align: HAlign::Stretch,
             on_key_down: move |e| {
             if e.key_code() == &PhysicalKey::Code(KeyCode::Enter)
-              && !$input.text().is_empty() {
-                $this.write().new_task($input.text().to_string());
-                $input.write().set_text("");
+              && !$read(input).text().is_empty() {
+                $write(this).new_task($read(input).text().to_string());
+                $write(input).set_text("");
               }
             },
-            @Text { text:"What do you want to do ?" }
           }
         }
         @Tabs {
           @Tab {
-            @{ "ALL" }
-            @task_lists(&this, |_| true)
+            @ { "ALL" }
+            @ { task_lists(&this, |_| true) }
           }
           @Tab {
             @{ "ACTIVE" }
-            @task_lists(&this, |t| !t.complete )
+            @ { task_lists(&this, |t| !t.complete ) }
           }
           @Tab {
             @{ "DONE" }
-            @task_lists(&this, |t| t.complete )
+            @ { task_lists(&this, |t| t.complete ) }
           }
         }
       }
     }
+    .into_widget()
   }
 }
 
@@ -612,84 +618,87 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
   let this = this.clone_writer();
   fn_widget! {
     let editing = Stateful::new(None);
-
-    @VScrollBar {
-      @Lists {
-        @ { pipe!($this;).map(move |_| {
-          let _hint_capture_this = || $this.write();
-          let mut widgets = vec![];
-
-          for id in $this.all_tasks() {
-            if $this.get_task(id).map_or(false, cond) {
-              let task = this.part_writer(
-                Some(&format!("task{id}")),
-                |todos| PartMut::new(&mut todos.get_task_mut(id).unwrap())
-              );
-              let item = pipe!(*$editing == Some($task.id()))
-                .value_chain(|s| s.distinct_until_changed().box_it())
-                .map(move |b|{
+    @Scrollbar {
+      @ { pipe!($read(this);).map(move |_| fn_widget! {
+        let mut widgets = vec![];
+        for id in $read(this)
+          .all_tasks()
+          .filter(move |id| { $read(this).get_task(*id).map_or(false, cond) }) {
+            let task = $writer(this).part_writer(
+              format!("task {id:?}").into(),
+              // task will always exist, if the task is removed,
+              // the widgets list will be rebuild.
+              move |todos| PartMut::new(todos.get_task_mut(id).unwrap()),
+            );
+            widgets.push(@ListCustomItem {
+              interactive: false,
+              @ { pipe!(*$read(editing) == Some(id))
+                .transform(|s| s.distinct_until_changed().box_it())
+                .map(move |b| fn_widget!{
                   if b {
-                    let input = @Input { auto_focus: true };
-                    $input.write().set_text(&$task.label);
-                    @$input {
+                    let mut input = @Input { auto_focus: true };
+                    $write(input).set_text(&$read(task).label);
+                    @(input) {
                       on_key_down: move |e| {
                         let key = e.key_code();
                         if key == &PhysicalKey::Code(KeyCode::Escape) {
-                          *$editing.write() = None;
+                          *$write(editing) = None;
                         } else if e.key_code() == &PhysicalKey::Code(KeyCode::Enter) {
-                          let label = $input.text().to_string();
+                          let label = $read(input).text().to_string();
                           if !label.is_empty() {
-                            $task.write().label = label;
-                            *$editing.write() = None;
+                            $write(task).label = label;
+                            *$write(editing) = None;
                           }
                         }
                       }
-                    }.build(ctx!())
+                    }.into_widget()
                   } else {
-                    let item = task_item(task.clone_writer());
-                    @$item {
-                      on_double_tap: move |_| *$editing.write() = Some(id)
-                    }.build(ctx!())
+                    let item = task_item($writer(task));
+                    let mut item = FatObj::new(item);
+                    @(item) {
+                      on_double_tap: move |_| *$write(editing) = Some(id)
+                    }.into_widget()
                   }
-                });
-              widgets.push(item);
-            }
-          }
-          widgets
-        }) }
-      }
+                })
+              }
+          });
+        }
+        @List {
+          @ { widgets }
+        }
+      })}
     }
   }
-  .into()
+  .r_into()
 }
 
-fn task_item<S>(task: S) -> impl IntoWidget<FN>
+fn task_item<S>(task: S) -> Widget<'static>
 where
   S: StateWriter<Value = Task> + 'static,
-  S::OriginWriter: StateWriter<Value = Todos>,
 {
-  let todos = task.origin_writer().clone_writer();
-
   fn_widget! {
-    let id = $task.id();
-    let item = @ListItem {};
-    let checkbox = @Checkbox { checked: pipe!($task.complete) };
-    watch!($checkbox.checked)
-      .distinct_until_changed()
-      .subscribe(move |v| $task.write().complete = v);
+    let id = $read(task).id();
 
-    @$item {
-      @{ HeadlineText(Label::new($task.label.clone())) }
-      @Leading {
-        @{ CustomEdgeWidget(checkbox.build(ctx!())) }
+    @ListItem {
+      @ {
+        let mut checkbox = @Checkbox { checked: pipe!($read(task).complete) };
+        let u = watch!($read(checkbox).checked)
+          .distinct_until_changed()
+          .subscribe(move |v| $write(task).complete = v);
+        checkbox.on_disposed(move |_| u.unsubscribe());
+        checkbox
       }
+      @ListItemHeadline { @ { $read(task).label.clone() } }
       @Trailing {
-        cursor: CursorIcon::Pointer,
-        on_tap: move |_| $todos.write().remove(id),
-        @{ svgs::CLOSE }
+        @Icon {
+          cursor: CursorIcon::Pointer,
+          on_tap: move |e| Provider::write_of::<Todos>(e).unwrap().remove(id),
+          @ { svgs::CLOSE }
+        }
       }
     }
   }
+  .into_widget()
 }
 
 ```
