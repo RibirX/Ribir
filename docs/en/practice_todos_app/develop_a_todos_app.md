@@ -325,32 +325,33 @@ Next, let's look at the implementation of `task_item`:
 
 ...
 
-fn task_item<S>(task: S) -> impl IntoWidget<FN>
+fn task_item<S>(task: S) -> Widget<'static>
 where
   S: StateWriter<Value = Task> + 'static,
-  S::OriginWriter: StateWriter<Value = Todos>,
 {
-  let todos = task.origin_writer().clone_writer();
-
   fn_widget! {
     let id = $read(task).id();
-    let checkbox = @Checkbox { checked: pipe!($read(task).complete) };
-    watch!($read(checkbox).checked)
-      .distinct_until_changed()
-      .subscribe(move |v| $write(task).complete = v);
 
     @ListItem {
-      @{ HeadlineText(Label::new($read(task).label.clone())) }
-      @Leading {
-        @{ CustomEdgeWidget(checkbox.build(ctx!())) }
+      @ {
+        let mut checkbox = @Checkbox { checked: pipe!($read(task).complete) };
+        let u = watch!($read(checkbox).checked)
+          .distinct_until_changed()
+          .subscribe(move |v| $write(task).complete = v);
+        checkbox.on_disposed(move |_| u.unsubscribe());
+        checkbox
       }
+      @ListItemHeadline { @ { $read(task).label.clone() } }
       @Trailing {
-        cursor: CursorIcon::Pointer,
-        on_tap: move |_| $write(todos).remove(id),
-        @{ svgs::CLOSE }
+        @Icon {
+          cursor: CursorIcon::Pointer,
+          on_tap: move |e| Provider::write_of::<Todos>(e).unwrap().remove(id),
+          @ { svgs::CLOSE }
+        }
       }
     }
   }
+  .into_widget()
 }
 ```
 
