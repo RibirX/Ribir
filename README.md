@@ -177,7 +177,7 @@ Ribir is [MIT-licensed](./LICENSE)
 [Flutter]: https://flutter.dev/
 [QML]: https://doc.qt.io/qt-6/qtqml-index.html
 [Examples]: ./examples/
-[Documents]: https://ribir.org/docs/introduction
-[中文文档]: https://ribir.org/zh/docs/introduction
+[Documents]: https://ribir.org/docs/next/introduction
+[中文文档]: https://ribir.org/zh/docs/next/introduction
 [wgpu]: https://github.com/gfx-rs/wgpu
 [Web Demo]: https://ribir.org/wordle_game/
