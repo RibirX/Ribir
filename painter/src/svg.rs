@@ -265,12 +265,12 @@ fn fallback_color_check(cmds: &[PaintCommand]) -> (bool, bool) {
 
     match c {
       PaintCommand::Path(p) => {
-        if let PaintPathAction::Paint { painting_style, brush, .. } = &p.action
-          && matches!(brush, CommandBrush::Color(c) if c == &Svg::DYNAMIC_COLOR)
-        {
-          match painting_style {
-            crate::PaintingStyle::Fill => fill_fallback = true,
-            crate::PaintingStyle::Stroke(_) => stroke_fallback = true,
+        if let PaintPathAction::Paint { painting_style, brush, .. } = &p.action {
+          if matches!(brush, CommandBrush::Color(c) if c == &Svg::DYNAMIC_COLOR) {
+            match painting_style {
+              crate::PaintingStyle::Fill => fill_fallback = true,
+              crate::PaintingStyle::Stroke(_) => stroke_fallback = true,
+            }
           }
         }
       }
@@ -292,12 +292,12 @@ fn brush_replace(cmds: &[PaintCommand], fill: &Brush, stroke: &Brush) -> Box<[Pa
     .map(|c| match c {
       PaintCommand::Path(p) => {
         let mut p = p.clone();
-        if let PaintPathAction::Paint { painting_style, brush, .. } = &mut p.action
-          && matches!(brush, CommandBrush::Color(c) if c == &Svg::DYNAMIC_COLOR)
-        {
-          match painting_style {
-            crate::PaintingStyle::Fill => *brush = fill.clone().into(),
-            crate::PaintingStyle::Stroke(_) => *brush = stroke.clone().into(),
+        if let PaintPathAction::Paint { painting_style, brush, .. } = &mut p.action {
+          if matches!(brush, CommandBrush::Color(c) if c == &Svg::DYNAMIC_COLOR) {
+            match painting_style {
+              crate::PaintingStyle::Fill => *brush = fill.clone().into(),
+              crate::PaintingStyle::Stroke(_) => *brush = stroke.clone().into(),
+            }
           }
         }
         PaintCommand::Path(p)
@@ -335,16 +335,16 @@ fn convert_to_gradient_stops(stops: &[Stop]) -> Vec<GradientStop> {
 
   stops.sort_by(|s1, s2| s1.offset.partial_cmp(&s2.offset).unwrap());
 
-  if let Some(first) = stops.first()
-    && first.offset != 0.
-  {
-    stops.insert(0, GradientStop { offset: 0., color: first.color });
+  if let Some(first) = stops.first() {
+    if first.offset != 0. {
+      stops.insert(0, GradientStop { offset: 0., color: first.color });
+    }
   }
 
-  if let Some(last) = stops.last()
-    && last.offset < 1.
-  {
-    stops.push(GradientStop { offset: 1., color: last.color });
+  if let Some(last) = stops.last() {
+    if last.offset < 1. {
+      stops.push(GradientStop { offset: 1., color: last.color });
+    }
   }
   stops
 }

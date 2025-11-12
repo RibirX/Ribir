@@ -171,21 +171,21 @@ impl Overlay {
     let track_id = self.0.borrow_mut().track_id.take();
     if let Some(showing) = showing {
       let ShowingInfo { wnd_id, .. } = showing;
-      if let Some(wnd) = AppCtx::get_window(wnd_id)
-        && let Some(wid) = track_id.and_then(|track_id| track_id.get())
-      {
-        let this = self.clone();
-        AppCtx::spawn_local(async move {
-          {
-            let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
-            let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
-            showing_overlays.remove(&this);
-          }
-          let tree = wnd.tree_mut();
-          let root = tree.root();
-          wid.dispose_subtree(tree);
-          tree.dirty_marker().mark(root, DirtyPhase::Layout);
-        });
+      if let Some(wnd) = AppCtx::get_window(wnd_id) {
+        if let Some(wid) = track_id.and_then(|track_id| track_id.get()) {
+          let this = self.clone();
+          AppCtx::spawn_local(async move {
+            {
+              let _guard = BuildCtx::init_for(wnd.tree().root(), wnd.tree);
+              let showing_overlays = Provider::of::<ShowingOverlays>(BuildCtx::get()).unwrap();
+              showing_overlays.remove(&this);
+            }
+            let tree = wnd.tree_mut();
+            let root = tree.root();
+            wid.dispose_subtree(tree);
+            tree.dirty_marker().mark(root, DirtyPhase::Layout);
+          });
+        }
       }
     }
   }
@@ -203,10 +203,10 @@ impl Overlay {
         }
         if close_policy.contains(AutoClosePolicy::TAP_OUTSIDE) {
           container.on_tap(move |e| {
-            if e.target() == e.current_target()
-              && let Some(overlay) = Overlay::of(&**e)
-            {
+            if e.target() == e.current_target() {
+              if let Some(overlay) = Overlay::of(&**e) {
                 overlay.close();
+              }
             }
           });
         }
@@ -216,10 +216,10 @@ impl Overlay {
       };
       if close_policy.contains(AutoClosePolicy::ESC) {
         w.on_key_down(move |e| {
-          if *e.key() == VirtualKey::Named(NamedKey::Escape) &&
-            let Some(overlay) = Overlay::of(&**e)
-          {
-            overlay.close();
+          if *e.key() == VirtualKey::Named(NamedKey::Escape) {
+            if let Some(overlay) = Overlay::of(&**e) {
+              overlay.close();
+            }
           }
         });
       }

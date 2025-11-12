@@ -281,10 +281,17 @@ impl WidgetId {
     let mut painting = vec![];
     loop {
       let id = ctx.id();
-      if !ctx.painter().is_transparent()
-        && let Some(layout_box) = ctx.box_rect()
-      {
-        painting.push(id);
+      let layout_box = if !ctx.painter().is_transparent() {
+        if let Some(layout_box) = ctx.box_rect() {
+          painting.push(id);
+          Some(layout_box)
+        } else {
+          None
+        }
+      } else {
+        None
+      };
+      if let Some(layout_box) = layout_box {
         let render = id.assert_get(tree);
         ctx
           .painter()

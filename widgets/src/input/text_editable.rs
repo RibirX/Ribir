@@ -72,12 +72,12 @@ impl<T: EditText + 'static> BasicEditor<T> {
         class: TEXT_CARET,
         on_performed_layout: move |e| {
           let caret_size = e.box_size().unwrap();
-          if !$read(this).is_in_pre_edit()
-            && let Some(mut scrollable) = Provider::write_of::<ScrollableWidget>(e)
-          {
-            let wnd = e.window();
-            let lt = scrollable.map_to_content(Point::zero(), e.current_target(), &wnd).unwrap();
-            scrollable.visible_content_box(Rect::new(lt, caret_size), Anchor::default());
+          if !$read(this).is_in_pre_edit() {
+            if let Some(mut scrollable) = Provider::write_of::<ScrollableWidget>(e) {
+              let wnd = e.window();
+              let lt = scrollable.map_to_content(Point::zero(), e.current_target(), &wnd).unwrap();
+              scrollable.visible_content_box(Rect::new(lt, caret_size), Anchor::default());
+            }
           }
           let pos = e.map_to_global(Point::zero());
           e.window().set_ime_cursor_area(&Rect::new(pos, caret_size));

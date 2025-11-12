@@ -210,10 +210,10 @@ impl ShellWindow for ShellWndHandle {
       .winit_wnd
       .request_inner_size(LogicalSize::new(size.width, size.height))
       .map(|size| Size::new(size.width as f32, size.height as f32));
-    if size.is_some()
-      && let Some(wnd) = AppCtx::get_window(self.id())
-    {
-      wnd.shell_wnd().borrow().request_draw();
+    if size.is_some() {
+      if let Some(wnd) = AppCtx::get_window(self.id()) {
+        wnd.shell_wnd().borrow().request_draw();
+      }
     }
   }
 

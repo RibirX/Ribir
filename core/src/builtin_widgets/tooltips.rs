@@ -32,18 +32,18 @@ impl Declare for Tooltips {
 
 impl Tooltips {
   pub fn show(&self, wnd: Sc<Window>) {
-    if let Some(overlay) = self.overlay.borrow().clone()
-      && !overlay.is_showing()
-    {
-      overlay.show(wnd);
+    if let Some(overlay) = self.overlay.borrow().clone() {
+      if !overlay.is_showing() {
+        overlay.show(wnd);
+      }
     }
   }
 
   pub fn hidden(&self) {
-    if let Some(overlay) = self.overlay.borrow().clone()
-      && overlay.is_showing()
-    {
-      overlay.close();
+    if let Some(overlay) = self.overlay.borrow().clone() {
+      if overlay.is_showing() {
+        overlay.close();
+      }
     }
   }
 }
