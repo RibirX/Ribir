@@ -697,11 +697,12 @@ impl Window {
             ElementState::Released => Event::KeyUp(event),
           };
           self.bottom_up_emit(&mut event, None);
-          if let Event::KeyDown(e) = event
-            && !e.is_prevent_default()
-            && *e.key() == VirtualKey::Named(NamedKey::Tab)
-          {
-            self.add_delay_event(DelayEvent::TabFocusMove);
+          if let Event::KeyDown(e) = event {
+            if !e.is_prevent_default()
+              && *e.key() == VirtualKey::Named(NamedKey::Tab)
+            {
+              self.add_delay_event(DelayEvent::TabFocusMove);
+            }
           }
         }
         DelayEvent::TabFocusMove => {

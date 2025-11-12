@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **all**: Replace all unstable 'if let ... && let ...' syntax with stable nested 'if let' structures, fixing 40 compilation errors to allow the code to compile on stable Rust. (#pr @vnxfsc)
+
 ## [0.4.0-alpha.49] - 2025-09-03
 
 ## [0.4.0-alpha.48] - 2025-08-27

@@ -60,11 +60,12 @@ impl TextShaper {
         .shape_text_with_fallback(text, direction, face_ids, baseline)
         .unwrap_or_default();
 
-      if let Some(last_char) = text.bytes().last()
-        && (last_char == b'\r' || last_char == b'\n')
-        && let Some(g) = glyphs.last_mut()
-      {
-        g.glyph_id = NEWLINE_GLYPH_ID;
+      if let Some(last_char) = text.bytes().last() {
+        if last_char == b'\r' || last_char == b'\n' {
+          if let Some(g) = glyphs.last_mut() {
+            g.glyph_id = NEWLINE_GLYPH_ID;
+          }
+        }
       }
 
       let glyphs = Sc::new(ShapeResult { text: text.clone(), glyphs });
