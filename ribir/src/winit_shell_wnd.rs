@@ -6,7 +6,7 @@ use ribir_core::{
   window::{BoxShellWindow, Shell, ShellWindow, WindowId, WindowLevel},
 };
 use winit::{
-  dpi::{LogicalPosition, LogicalSize, PhysicalPosition},
+  dpi::{LogicalPosition, LogicalSize},
   window::WindowAttributes,
 };
 
