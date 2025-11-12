@@ -9,7 +9,7 @@ use ribir_algo::Sc;
 use smallvec::SmallVec;
 use widget_id::TrackId;
 use winit::event::{ElementState, Ime};
-pub use winit::window::CursorIcon;
+pub use winit::window::{CursorIcon, WindowLevel};
 
 use crate::{
   events::{
@@ -28,6 +28,7 @@ pub struct WindowAttributes(pub winit::window::WindowAttributes);
 fn into_winit_size(size: Size) -> winit::dpi::Size {
   winit::dpi::LogicalSize::new(size.width, size.height).into()
 }
+
 impl WindowAttributes {
   /// Initial title of the window in the title bar.
   ///
@@ -255,9 +256,12 @@ pub trait ShellWindow {
   fn set_minimized(&mut self, minimized: bool);
   fn focus_window(&mut self);
   fn request_resize(&mut self, size: Size);
+  fn set_window_level(&mut self, level: WindowLevel);
   // fn set_decorations(&mut self, decorations: bool);
   fn as_any(&self) -> &dyn Any;
   fn as_any_mut(&mut self) -> &mut dyn Any;
+  fn position(&self) -> Point;
+  fn set_position(&mut self, point: Point);
 
   fn close(&self);
 
@@ -495,6 +499,10 @@ impl Window {
 
     Sc::new(window)
   }
+
+  pub fn position(&self) -> Point { self.shell_wnd.borrow().position() }
+
+  pub fn set_position(&self, pos: Point) { self.shell_wnd.borrow_mut().set_position(pos); }
 
   pub fn init(&self, content: GenWidget) {
     let root = self.tree_mut().init(self, content);
@@ -943,6 +951,14 @@ impl Window {
 
   pub fn set_min_size(&self, size: Size) -> &Self {
     self.shell_wnd.borrow_mut().set_min_size(size);
+    self
+  }
+
+  pub fn set_window_level(&self, level: WindowLevel) -> &Self {
+    self
+      .shell_wnd
+      .borrow_mut()
+      .set_window_level(level);
     self
   }
 

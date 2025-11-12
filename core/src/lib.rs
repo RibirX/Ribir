@@ -71,7 +71,7 @@ pub mod prelude {
     widget::*,
     widget_children::*,
     widget_tree::{BoxClamp, DirtyPhase, LayoutInfo, TrackId, WidgetId},
-    window::Window,
+    window::{Window, WindowLevel},
   };
   pub use crate::*;
 }
