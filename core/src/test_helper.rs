@@ -184,7 +184,7 @@ impl ShellWindow for TestShellWindow {
 
   fn set_minimized(&mut self, _: bool) {}
 
-  fn set_window_level(&mut self, _: bool) {}
+  fn set_window_level(&mut self, _: WindowLevel) {}
 
   fn set_ime_allowed(&mut self, _: bool) {}
 
