@@ -171,8 +171,7 @@ impl Overlay {
     let track_id = self.0.borrow_mut().track_id.take();
     if let Some(showing) = showing {
       let ShowingInfo { wnd_id, .. } = showing;
-      if let Some(wid) = track_id.and_then(|track_id| track_id.get())
-      {
+      if let Some(wid) = track_id.and_then(|track_id| track_id.get()) {
         let this = self.clone();
         AppCtx::spawn_local(async move {
           if let Some(wnd) = AppCtx::get_window(wnd_id) {

@@ -130,8 +130,8 @@ impl ComposeChild<'static> for Checkbox {
       let window = BuildCtx::get().window();
       watch!($read(this).checked)
         .distinct_until_changed()
-        .subscribe(move |checked| {    
-          if let Some(id) = track_id.get() { 
+        .subscribe(move |checked| {
+          if let Some(id) = track_id.get() {
             window.bubble_custom_event(id, CheckState { checked });
           }
         });

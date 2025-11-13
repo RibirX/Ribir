@@ -1,0 +1,48 @@
+[package]
+authors.workspace = true
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "pomodoro"
+publish = false
+version.workspace = true
+
+[dependencies]
+paste.workspace = true
+# we disable `default-features`, because we want more control over testing.
+ribir = {path = "../../ribir", features = ["material", "widgets"]}
+tokio.workspace = true
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rodio = "0.21"
+dirs = "5.0"
+
+[dev-dependencies]
+ribir_dev_helper = {path = "../../dev-helper"}
+ribir_slim = { path = "../../themes/ribir_slim" }
+ribir_core = { path = "../../core", features = ["test-utils"]}
+
+[features]
+wgpu = ["ribir/wgpu"]
+
+[release]
+opt-level = "z"
+lto = true      
+codegen-units = 1
+strip = true        
+panic = "abort"
+
+[bundle]
+"productName" = "Pomodoro"
+"version" = "1.0.0"
+"identifier" = "com.ribir.pomodoro"
+"shortDescription" = ""
+"longDescription" = ""
+"copyright" = "Copyright (c) You 2021. All rights reserved."
+"icon" = ["./icon.ico"]
+"resources" = ["./static"]  
+"externalBin" = []

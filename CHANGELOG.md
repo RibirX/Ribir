@@ -30,6 +30,16 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: reduce the memory usage. (#797 @wjian23)
   - update wgpu from v24 to v27, create gpu backend with memory_hints of MemoryHints::MemoryUsage
 
+- **core**: fix overlay close panic when window been closed. (#796 @wjian23)
+
+### Features
+
+- **widgets**: add changed event to Slider and Checkbox.(#796 @wjian23)
+
+- **core**: add window positioning and level control APIs.(#796 @wjian23)
+
+- **example**: add example of a Pomodoro timer app.(#796 @wjian23)
+
 ## [0.4.0-alpha.49] - 2025-09-03
 
 ## [0.4.0-alpha.48] - 2025-08-27

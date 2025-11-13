@@ -398,7 +398,7 @@ fn stop_indicator_track(
         align_items: Align::Center,
         justify_content: JustifyContent::SpaceBetween
     };
-    
+
     @IgnorePointer {
         @(flex) {
           v_align: VAlign::Center,
