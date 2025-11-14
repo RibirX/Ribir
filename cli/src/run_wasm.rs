@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::Result;
-use clap::{CommandFactory, FromArgMatches, Parser, command};
+use clap::{CommandFactory, FromArgMatches, Parser};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer, notify::*};
 
 use crate::{

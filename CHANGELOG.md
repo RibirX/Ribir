@@ -27,7 +27,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Fixed
 
-- **core**: reduce the memory usage. (#pr @wjian23)
+- **core**: reduce the memory usage. (#797 @wjian23)
   - update wgpu from v24 to v27, create gpu backend with memory_hints of MemoryHints::MemoryUsage
 
 ## [0.4.0-alpha.49] - 2025-09-03
