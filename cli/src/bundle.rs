@@ -7,13 +7,13 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use clap::{CommandFactory, FromArgMatches, Parser, command};
+use clap::{CommandFactory, FromArgMatches, Parser};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use tauri_bundler::{
   AppCategory, AppImageSettings, BundleBinary, BundleSettings, DebianSettings, DmgSettings,
-  IosSettings, MacOsSettings, PackageSettings, Position, RpmSettings, SettingsBuilder, Size,
-  WindowsSettings, bundle_project,
+  Entitlements, IosSettings, MacOsSettings, PackageSettings, Position, RpmSettings,
+  SettingsBuilder, Size, WindowsSettings, bundle_project,
 };
 use tauri_utils::config::{
   AndroidConfig, BundleResources, BundleTarget, CustomSignCommandConfig, FileAssociation,
@@ -356,8 +356,11 @@ fn bundle_setting_from_config(
       signing_identity,
       hardened_runtime: config.macos.hardened_runtime,
       provider_short_name,
-      entitlements: config.macos.entitlements,
-      info_plist_path: None,
+      entitlements: config
+        .macos
+        .entitlements
+        .map(|p| Entitlements::Path(PathBuf::from(p))),
+      info_plist: None,
       skip_stapling: false,
     },
     #[allow(deprecated)]
