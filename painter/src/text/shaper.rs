@@ -313,7 +313,7 @@ impl<'a> FallBackFaceHelper<'a> {
   }
 
   fn next_fallback_face(&mut self, text: &str) -> Option<Face> {
-    let font_db = self.font_db.borrow();
+    let mut font_db = self.font_db.borrow_mut();
     loop {
       if self.face_idx >= self.ids.len() {
         return None;
@@ -322,7 +322,7 @@ impl<'a> FallBackFaceHelper<'a> {
       let face = self
         .ids
         .get(self.face_idx)
-        .and_then(|id| font_db.try_get_face_data(*id))
+        .and_then(|id| font_db.face_data_or_insert(*id))
         .cloned();
 
       self.face_idx += 1;
