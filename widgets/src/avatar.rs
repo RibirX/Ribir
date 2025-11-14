@@ -1,7 +1,5 @@
 use ribir_core::prelude::*;
 
-use crate::prelude::*;
-
 /// Represents an avatar widget that can display either text content or a custom
 /// child widget.
 ///

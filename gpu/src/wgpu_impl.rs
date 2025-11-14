@@ -380,7 +380,9 @@ impl GPUBackendImpl for WgpuImpl {
 
   fn end_frame(&mut self) {
     self.submit();
-    self.device.poll(wgpu::Maintain::Wait);
+    let _ = self
+      .device
+      .poll(wgpu::PollType::Wait { timeout: None, submission_index: None });
     #[cfg(debug_assertions)]
     self.stop_capture();
   }
@@ -453,7 +455,7 @@ impl WgpuTexture {
 
     let view = self.view();
     let ops = wgpu::Operations { load, store: wgpu::StoreOp::Store };
-    wgpu::RenderPassColorAttachment { view, resolve_target: None, ops }
+    wgpu::RenderPassColorAttachment { view, resolve_target: None, ops, depth_slice: None }
   }
 
   fn new(inner_tex: InnerTexture) -> Self {
@@ -613,7 +615,7 @@ impl WgpuImpl {
     if instance
       .request_adapter(&<_>::default())
       .await
-      .is_none()
+      .is_err()
     {
       instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends: wgpu::Backends::SECONDARY,
@@ -632,14 +634,13 @@ impl WgpuImpl {
       .expect("No suitable GPU adapters found on the system!");
 
     let (device, queue) = adapter
-      .request_device(
-        &wgpu::DeviceDescriptor {
-          required_limits: adapter.limits(),
-          required_features: wgpu::Features::CLEAR_TEXTURE,
-          ..Default::default()
-        },
-        None,
-      )
+      .request_device(&wgpu::DeviceDescriptor {
+        required_limits: adapter.limits(),
+        required_features: wgpu::Features::CLEAR_TEXTURE,
+        memory_hints: wgpu::MemoryHints::MemoryUsage,
+        experimental_features: wgpu::ExperimentalFeatures::disabled(),
+        ..Default::default()
+      })
       .await
       .expect("Unable to find a suitable GPU adapter!");
 
@@ -735,9 +736,17 @@ impl WgpuImpl {
     (gpu_impl, surface)
   }
 
-  pub fn start_capture(&self) { self.device.start_capture(); }
+  pub fn start_capture(&self) {
+    unsafe {
+      self.device.start_graphics_debugger_capture();
+    }
+  }
 
-  pub fn stop_capture(&self) { self.device.stop_capture(); }
+  pub fn stop_capture(&self) {
+    unsafe {
+      self.device.stop_graphics_debugger_capture();
+    }
+  }
 
   pub fn device(&self) -> &wgpu::Device { &self.device }
 

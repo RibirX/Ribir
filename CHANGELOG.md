@@ -25,6 +25,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **core**: reduce the memory usage. (#pr @wjian23)
+  - update wgpu from v24 to v27, create gpu backend with memory_hints of MemoryHints::MemoryUsage
+
 ## [0.4.0-alpha.49] - 2025-09-03
 
 ## [0.4.0-alpha.48] - 2025-08-27
