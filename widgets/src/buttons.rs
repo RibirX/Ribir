@@ -398,7 +398,8 @@ mod tests {
         @Trailing::new(@Icon { @miss_icon() })
       }
     })
-    .with_wnd_size(Size::new(400., 128.)),
+    .with_wnd_size(Size::new(400., 128.))
+    .with_comparison(0.0001),
   );
 
   widget_image_tests!(

@@ -75,12 +75,12 @@ mod tests {
   fn clip_boundary() {
     reset_test_env!();
 
-    let size = Size::new(80., 20.);
+    let size = Size::new(40., 40.);
     assert_widget_eq_image!(
       WidgetTester::new(fn_widget! {
         @MockBox {
           clip_boundary: true,
-          radius: Radius::all(10.),
+          radius: Radius::all(20.),
           size: size,
           @MockBox {
             background: Color::GRAY,
