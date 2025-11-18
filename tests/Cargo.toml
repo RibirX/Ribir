@@ -29,8 +29,8 @@ storybook = {path = "../examples/storybook"}
 wordle_game = {path = "../examples/wordle_game"}
 
 [[test]]
-name = "include_svg"
-path = "include_svg_test.rs"
+name = "assets_test"
+path = "assets_test.rs"
 
 [[test]]
 name = "rdl_macro_test"

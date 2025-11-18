@@ -25,6 +25,15 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **macros**: add `asset!` macros for asset management.(#798 @M-Adoo)
+
+### Breaking
+
+- **macros**: replace `include_crate_svg!` with new `asset!` macro for general asset management.(#798 @M-Adoo)
+
+
 ## [0.4.0-alpha.50] - 2025-11-19
 
 ### Fixed
@@ -37,9 +46,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **widgets**: add changed event to Slider and Checkbox.(#796 @wjian23)
-
 - **core**: add window positioning and level control APIs.(#796 @wjian23)
-
 - **example**: add example of a Pomodoro timer app.(#796 @wjian23)
 
 ## [0.4.0-alpha.49] - 2025-09-03
