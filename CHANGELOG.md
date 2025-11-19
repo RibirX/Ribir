@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.50] - 2025-11-19
+
 ### Fixed
 
 - **core**: reduce the memory usage. (#797 @wjian23)
@@ -912,7 +914,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.49...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.50...HEAD
+[0.4.0-alpha.50]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.49...ribir-v0.4.0-alpha.50
 [0.4.0-alpha.49]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.48...ribir-v0.4.0-alpha.49
 [0.4.0-alpha.48]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.47...ribir-v0.4.0-alpha.48
 [0.4.0-alpha.47]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.46...ribir-v0.4.0-alpha.47
