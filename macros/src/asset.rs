@@ -9,7 +9,14 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Ident, LitBool, LitStr, parse::Parse};
 
-/// Generate asset loading code - this is the main entry point
+mod basic;
+mod svg;
+
+use basic::{BinaryAsset, TextAsset};
+use svg::SvgAsset;
+
+/// Generate asset loading code - this is the main entry point for `asset!`
+/// macro.
 ///
 /// This function processes different types of assets with their specific
 /// parameters.
@@ -76,51 +83,69 @@ use syn::{Ident, LitBool, LitStr, parse::Parse};
 /// # Adding New Asset Types
 ///
 /// To add a new asset type:
-/// 1. Add a new variant to `AssetType` enum with its parameters
-/// 2. Update `AssetArgs::parse()` to handle the new type string and parse its
-///    parameters
-/// 3. Add a new `process_xxx_asset()` function following the DRY pattern
-/// 4. Add a match arm in `asset_impl()` to call your processor
-pub fn gen_asset(input: TokenStream) -> TokenStream {
-  match syn::parse2::<AssetArgs>(input).and_then(asset_impl) {
+/// 1. Define a new struct implementing `Asset` trait.
+/// 2. Update `AssetArgs::parse()` to handle the new type string and create your
+///    struct.
+pub fn gen_asset(input: TokenStream) -> TokenStream { gen_asset_internal(input, false) }
+
+/// Generate asset embedding code - this is the main entry point for
+/// `include_asset!` macro.
+///
+/// This macro is similar to `asset!`, but instead of copying the file to the
+/// assets directory and loading it at runtime, it embeds the file content
+/// directly into the executable.
+pub fn gen_include_asset(input: TokenStream) -> TokenStream { gen_asset_internal(input, true) }
+
+fn gen_asset_internal(input: TokenStream, embed: bool) -> TokenStream {
+  match syn::parse2::<AssetArgs>(input).and_then(|args| process_and_generate(args, embed)) {
     Ok(ts) => ts,
     Err(e) => e.to_compile_error(),
   }
 }
 
-pub enum AssetType {
-  Binary,
-  Text,
-  Svg { inherit_fill: bool, inherit_stroke: bool },
+fn process_and_generate(args: AssetArgs, embed: bool) -> syn::Result<TokenStream> {
+  let ctx = prepare_asset_context(&args.input, embed)?;
+  println!("cargo:rerun-if-changed={}", ctx.abs_input.display());
+
+  args.asset.generate(&ctx)
 }
+
+// --- Asset Trait ---
+
+pub(crate) trait Asset {
+  /// Generate the code to load the asset (either runtime or embedded)
+  fn generate(&self, ctx: &AssetContext) -> syn::Result<TokenStream>;
+}
+
+// --- Parsing ---
 
 pub struct AssetArgs {
   pub input: LitStr,
-  pub asset_type: AssetType,
+  asset: Box<dyn Asset>,
 }
 
 impl Parse for AssetArgs {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let input_str = input.parse::<LitStr>()?;
-    let asset_type = if input.parse::<syn::Token![,]>().is_ok() {
+    let asset: Box<dyn Asset> = if input.parse::<syn::Token![,]>().is_ok() {
       let type_str = input.parse::<LitStr>()?;
       let type_name = type_str.value().to_lowercase();
 
       match type_name.as_str() {
-        "text" => AssetType::Text,
+        "text" => Box::new(TextAsset),
         "svg" => {
           let params = parse_key_value_params(input)?;
           let inherit_fill = get_bool_param(&params, "inherit_fill", type_str.span())?;
           let inherit_stroke = get_bool_param(&params, "inherit_stroke", type_str.span())?;
-          AssetType::Svg { inherit_fill, inherit_stroke }
+          Box::new(SvgAsset { inherit_fill, inherit_stroke })
         }
-        _ => AssetType::Binary,
+        _ => Box::new(BinaryAsset),
       }
     } else {
-      AssetType::Binary
+      Box::new(BinaryAsset)
     };
 
-    Ok(AssetArgs { input: input_str, asset_type })
+    Ok(AssetArgs { input: input_str, asset })
   }
 }
 
@@ -160,7 +185,6 @@ fn parse_key_value_params(
       ));
     }
   }
-
   Ok(params)
 }
 
@@ -169,66 +193,93 @@ enum ParamValue {
   String(String),
 }
 
-fn hash_path(path: &str) -> String {
-  let mut hasher = AHasher::default();
-  path.hash(&mut hasher);
-  format!("{:08x}", hasher.finish())
+// --- Context & Helpers ---
+
+pub(crate) struct AssetContext {
+  pub input_path: String,
+  pub abs_input: PathBuf,
+  pub abs_output: PathBuf,
+  pub relative_output: String,
+  pub input_span: proc_macro2::Span,
+  pub is_bundle: bool,
+  pub embed: bool,
 }
 
-struct AssetContext {
-  input_path: String,
-  abs_input: PathBuf,
-  abs_output: PathBuf,
-  relative_output: String,
-  input_span: proc_macro2::Span,
-  is_bundle: bool,
-}
+impl AssetContext {
+  fn abs_output_str(&self) -> String { self.abs_output.to_string_lossy().into_owned() }
 
-fn asset_impl(args: AssetArgs) -> syn::Result<TokenStream> {
-  let ctx = prepare_asset_context(&args)?;
+  pub fn panic_msg(&self, action: &str) -> String {
+    format!("Failed to {} asset '{}'", action, self.relative_output)
+  }
 
-  println!("cargo:rerun-if-changed={}", ctx.abs_input.display());
+  pub fn copy_input_to_output(&self) -> syn::Result<()> {
+    fs::copy(&self.abs_input, &self.abs_output).map_err(|e| {
+      syn::Error::new(self.input_span, format!("Failed to copy asset '{}': {}", self.input_path, e))
+    })?;
+    Ok(())
+  }
 
-  match args.asset_type {
-    AssetType::Binary => process_simple_asset(&ctx, "binary", quote! { std::fs::read }),
-    AssetType::Text => process_simple_asset(&ctx, "text", quote! { std::fs::read_to_string }),
-    AssetType::Svg { inherit_fill, inherit_stroke } => {
-      process_svg_asset(&ctx, inherit_fill, inherit_stroke)
+  pub fn write_output(&self, data: &[u8]) -> syn::Result<()> {
+    fs::write(&self.abs_output, data).map_err(|e| {
+      syn::Error::new(
+        self.input_span,
+        format!("Failed to write asset '{}': {}", self.input_path, e),
+      )
+    })
+  }
+
+  pub fn runtime_path_tokens(&self) -> TokenStream {
+    if self.is_bundle {
+      let relative_path = &self.relative_output;
+      quote! {
+        {
+          let exe_dir = std::env::current_exe()
+            .expect("Failed to get executable path")
+            .parent()
+            .expect("Failed to get executable directory")
+            .to_path_buf();
+          exe_dir.join(#relative_path)
+        }
+      }
+    } else {
+      let abs_output = self.abs_output_str();
+      quote! {
+        std::path::Path::new(#abs_output).to_path_buf()
+      }
     }
   }
 }
 
-fn prepare_asset_context(args: &AssetArgs) -> syn::Result<AssetContext> {
-  let input_path = args.input.value();
+fn prepare_asset_context(input: &LitStr, embed: bool) -> syn::Result<AssetContext> {
+  let input_path = input.value();
   let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
   let is_bundle = profile == "bundle";
 
-  let abs_input = resolve_caller_relative_path(&input_path, args.input.span())?;
+  let abs_input = resolve_caller_relative_path(&input_path, input.span())?;
 
   if !abs_input.exists() {
     let err_msg = format!("Asset file '{}' does not exist at: {:?}", input_path, abs_input);
-    return Err(syn::Error::new_spanned(&args.input, err_msg));
+    return Err(syn::Error::new_spanned(input, err_msg));
   }
 
   if !abs_input.is_file() {
     let err_msg =
       format!("Asset path '{}' is not a file. Only single files are supported.", input_path);
-    return Err(syn::Error::new_spanned(&args.input, err_msg));
+    return Err(syn::Error::new_spanned(input, err_msg));
   }
 
   let filename = abs_input
     .file_name()
     .and_then(|n| n.to_str())
-    .ok_or_else(|| syn::Error::new_spanned(&args.input, "Failed to extract filename"))?;
+    .ok_or_else(|| syn::Error::new_spanned(input, "Failed to extract filename"))?;
 
   // Use path hash to avoid conflicts between files with same name from different
   // directories
   let path_hash = hash_path(&input_path);
   let hashed_filename = format!("{}_{}", path_hash, filename);
 
-  let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").map_err(|e| {
-    syn::Error::new(args.input.span(), format!("`CARGO_MANIFEST_DIR` not set: {e}"))
-  })?;
+  let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+    .map_err(|e| syn::Error::new(input.span(), format!("`CARGO_MANIFEST_DIR` not set: {e}")))?;
   let manifest_path = PathBuf::from(&manifest_dir);
 
   let workspace_opt = find_workspace_root(&manifest_path);
@@ -246,106 +297,24 @@ fn prepare_asset_context(args: &AssetArgs) -> syn::Result<AssetContext> {
   let abs_output = target_dir.join(&hashed_filename);
 
   fs::create_dir_all(&target_dir).map_err(|e| {
-    let err_msg = format!("Failed to create asset output directory: {}", e);
-    syn::Error::new(args.input.span(), err_msg)
+    syn::Error::new(input.span(), format!("Failed to create asset output directory: {}", e))
   })?;
 
   let relative_output = format!("assets/{}", hashed_filename);
 
-  // Append to manifest file for tracking asset mappings
-  append_to_manifest(&input_path, &relative_output, &target_dir, args.input.span())?;
+  // Append to manifest file for tracking asset mappings only if not embedding
+  if !embed {
+    append_to_manifest(&input_path, &relative_output, &target_dir, input.span())?;
+  }
 
   Ok(AssetContext {
     input_path,
     abs_input,
     abs_output,
     relative_output,
-    input_span: args.input.span(),
+    input_span: input.span(),
     is_bundle,
-  })
-}
-
-fn copy_asset_file(ctx: &AssetContext, asset_type_name: &str) -> syn::Result<()> {
-  fs::copy(&ctx.abs_input, &ctx.abs_output).map_err(|e| {
-    let err_msg = format!("Failed to copy {} asset '{}': {}", asset_type_name, ctx.input_path, e);
-    syn::Error::new(ctx.input_span, err_msg)
-  })?;
-  Ok(())
-}
-
-fn generate_asset_path_code(ctx: &AssetContext) -> TokenStream {
-  if ctx.is_bundle {
-    let relative_path = &ctx.relative_output;
-    quote! {
-      {
-        let exe_dir = std::env::current_exe()
-          .expect("Failed to get executable path")
-          .parent()
-          .expect("Failed to get executable directory")
-          .to_path_buf();
-        exe_dir.join(#relative_path)
-      }
-    }
-  } else {
-    let abs_output = ctx.abs_output.to_string_lossy();
-    quote! {
-      std::path::Path::new(#abs_output).to_path_buf()
-    }
-  }
-}
-
-fn process_simple_asset(
-  ctx: &AssetContext, asset_type: &str, read_fn: TokenStream,
-) -> syn::Result<TokenStream> {
-  copy_asset_file(ctx, asset_type)?;
-
-  let relative_path = &ctx.relative_output;
-  let asset_path_code = generate_asset_path_code(ctx);
-
-  Ok(quote! {
-    {
-      let asset_path = #asset_path_code;
-      #read_fn(&asset_path)
-        .unwrap_or_else(|e| panic!(
-          "Failed to read {} asset '{}': {}. Asset path: {:?}",
-          #asset_type, #relative_path, e, asset_path
-        ))
-    }
-  })
-}
-
-fn process_svg_asset(
-  ctx: &AssetContext, inherit_fill: bool, inherit_stroke: bool,
-) -> syn::Result<TokenStream> {
-  let compressed_data = ribir_painter::Svg::open(&ctx.abs_input, inherit_fill, inherit_stroke)
-    .and_then(|svg| svg.serialize())
-    .map_err(|e| {
-      let err_msg = format!("Failed to compress SVG file '{}': {}", ctx.input_path, e);
-      syn::Error::new(ctx.input_span, err_msg)
-    })?;
-
-  fs::write(&ctx.abs_output, &compressed_data).map_err(|e| {
-    let err_msg = format!("Failed to write compressed SVG '{}': {}", ctx.input_path, e);
-    syn::Error::new(ctx.input_span, err_msg)
-  })?;
-
-  let relative_path = &ctx.relative_output;
-  let asset_path_code = generate_asset_path_code(ctx);
-
-  Ok(quote! {
-    {
-      let asset_path = #asset_path_code;
-      let data = std::fs::read_to_string(&asset_path)
-        .unwrap_or_else(|e| panic!(
-          "Failed to read SVG asset '{}': {}. Asset path: {:?}",
-          #relative_path, e, asset_path
-        ));
-      Svg::deserialize(&data)
-        .unwrap_or_else(|e| panic!(
-          "Failed to deserialize SVG asset '{}': {}",
-          #relative_path, e
-        ))
-    }
+    embed,
   })
 }
 
@@ -375,6 +344,12 @@ fn resolve_caller_relative_path(input_path: &str, span: proc_macro2::Span) -> sy
   Ok(abs_input)
 }
 
+fn hash_path(path: &str) -> String {
+  let mut hasher = AHasher::default();
+  path.hash(&mut hasher);
+  format!("{:08x}", hasher.finish())
+}
+
 fn append_to_manifest(
   input_path: &str, output_path: &str, target_dir: &Path, span: proc_macro2::Span,
 ) -> syn::Result<()> {
@@ -390,8 +365,7 @@ fn append_to_manifest(
       file.write_all(entry.as_bytes())
     })
     .map_err(|e| {
-      let err_msg = format!("Failed to append to asset manifest file: {}", e);
-      syn::Error::new(span, err_msg)
+      syn::Error::new(span, format!("Failed to append to asset manifest file: {}", e))
     })?;
 
   Ok(())
@@ -410,6 +384,5 @@ fn find_workspace_root(start: &Path) -> Option<PathBuf> {
     }
     current = cur.parent();
   }
-
   None
 }

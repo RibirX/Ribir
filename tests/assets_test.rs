@@ -1,4 +1,4 @@
-use ribir::prelude::{asset, *};
+use ribir::prelude::{asset, include_asset, *};
 use ribir_dev_helper::*;
 
 #[test]
@@ -100,4 +100,27 @@ fn asset_conflict_resolution() {
   println!("✅ Asset conflict resolution test passed!");
   println!("Asset 1: {}", content1.trim());
   println!("Asset 2: {}", content2.trim());
+}
+
+// Include Asset macro tests
+
+#[test]
+fn include_asset_svg_basic() {
+  let svg: Svg = include_asset!("./assets/test1.svg", "svg");
+  assert!(svg.command_size() > 0);
+}
+
+#[test]
+fn include_asset_text() {
+  // reusing one of the text files from conflict test
+  let content: String = include_asset!("./assets_conflict/dir1/test.txt", "text");
+  assert!(content.contains("dir1"));
+}
+
+#[test]
+fn include_asset_binary() {
+  // reusing one of the text files from conflict test as binary
+  let data: Vec<u8> = include_asset!("./assets_conflict/dir1/test.txt");
+  let content = String::from_utf8(data).unwrap();
+  assert!(content.contains("dir1"));
 }
