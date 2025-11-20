@@ -262,6 +262,19 @@ pub fn part_reader(input: TokenStream) -> TokenStream {
 /// The asset will be placed in an `assets` folder next to your executable,
 /// making it easy for bundle tools to include it in your application package.
 ///
+/// # Asset vs Include Asset
+///
+/// `asset!` copies files and loads them at runtime, while `include_asset!`
+/// embeds them into the binary.
+///
+/// | Feature | `asset!` | `include_asset!` |
+/// |---------|----------|------------------|
+/// | **Loading Strategy** | Runtime loading from filesystem | Compile-time embedding |
+/// | **Distribution** | Must bundle `assets` folder | Single binary (easier distribution) |
+/// | **Binary Size** | Smaller binary | Larger binary (contains all assets) |
+/// | **Performance** | I/O overhead at runtime | Instant access (memory mapped) |
+/// | **Hot Reloading** | Possible (if file changes on disk) | Requires recompilation |
+///
 /// # Path Resolution
 ///
 /// Asset paths are resolved **relative to the source file** where the macro is
@@ -373,3 +386,43 @@ pub fn part_reader(input: TokenStream) -> TokenStream {
 /// - The file cannot be copied
 #[proc_macro]
 pub fn asset(input: TokenStream) -> TokenStream { asset::gen_asset(input.into()).into() }
+
+/// Embeds an asset file directly into the executable binary during build time.
+///
+/// This macro is similar to `asset!`, but instead of copying the file to the
+/// assets directory and loading it at runtime, it embeds the file content
+/// directly into the executable.
+///
+/// # Asset vs Include Asset
+///
+/// `asset!` copies files and loads them at runtime, while `include_asset!`
+/// embeds them into the binary.
+///
+/// | Feature | `asset!` | `include_asset!` |
+/// |---------|----------|------------------|
+/// | **Loading Strategy** | Runtime loading from filesystem | Compile-time embedding |
+/// | **Distribution** | Must bundle `assets` folder | Single binary (easier distribution) |
+/// | **Binary Size** | Smaller binary | Larger binary (contains all assets) |
+/// | **Performance** | I/O overhead at runtime | Instant access (memory mapped) |
+/// | **Hot Reloading** | Possible (if file changes on disk) | Requires recompilation |
+///
+/// # Syntax
+///
+/// Same as `asset!`:
+///
+/// ```ignore
+/// include_asset!("path/to/file.ext")
+/// include_asset!("path/to/file.txt", "text")
+/// include_asset!("path/to/file.svg", "svg")
+/// ```
+///
+/// # Returns
+///
+/// Same types as `asset!`:
+/// - `Vec<u8>` for binary
+/// - `String` for text
+/// - `Svg` for SVG
+#[proc_macro]
+pub fn include_asset(input: TokenStream) -> TokenStream {
+  asset::gen_include_asset(input.into()).into()
+}
