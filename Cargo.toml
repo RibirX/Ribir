@@ -35,14 +35,14 @@ homepage = "https://ribir.org"
 keywords = ["gui", "ui", "declarative", "compose-ui"]
 license = "MIT"
 readme = "README.md"
-version = "0.4.0-alpha.49"
+version = "0.4.0-alpha.50"
 rust-version = "1.88.0"
 
 [workspace.dependencies]
 ahash = "0.8.11"
 arboard = "3.2.0"
 bitflags = "2.6.0"
-colored = "2.1.0"
+colored = "3.0.0"
 derive_more = "2.0.1"
 dssim-core = "3.2.9"
 env_logger = "0.11.8"
@@ -61,7 +61,7 @@ material-colors = "0.4.2"
 icrate = "0.0.4"
 paste = "1.0"
 pin-project-lite = "0.2.15"
-proc-macro2 = "1.0.89"
+proc-macro2 = "1.0.101"
 quote = "1.0.37"
 rayon = "1.10.0"
 rustybuzz = "0.20.1"
@@ -76,7 +76,7 @@ unicode-bidi = "0.3.7"
 unicode-script = "0.5.4"
 unicode-segmentation = "1.9.0"
 usvg = { version = "0.45.0", default-features = false }
-wgpu = { version = "24.0.3", features = ["webgl"] }
+wgpu = { version = "27.0.1", features = ["webgl"] }
 winit = { version = "0.30.11", default-features = false, features = [
   "x11",
   "wayland",
@@ -97,8 +97,8 @@ thiserror = "2.0.12"
 wasm-bindgen-futures = "0.4.50"
 getrandom-v3 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 cfg-if = "1.0"
-tauri-bundler = "2.6.*"
-tauri-utils = "2.7.*"
+tauri-bundler = "=2.7.3"
+tauri-utils = "=2.8.0"
 serde-value = "0.7.0"
 serde_with = "3.14.0"
 toml = "0.9.2"

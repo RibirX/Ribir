@@ -191,6 +191,7 @@ impl WgpuImpl {
         view: dest_tex.view(),
         resolve_target: None,
         ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: StoreOp::Store },
+        depth_slice: None,
       };
 
       let encoder = command_encoder!(self);
@@ -246,6 +247,7 @@ impl WgpuImpl {
       view: tex.view(),
       resolve_target: None,
       ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: StoreOp::Store },
+      depth_slice: None,
     };
 
     let encoder = command_encoder!(self);

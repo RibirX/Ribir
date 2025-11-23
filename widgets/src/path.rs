@@ -43,7 +43,7 @@ mod tests {
       }
     })
     .with_wnd_size(WND_SIZE)
-    .with_comparison(0.000025),
+    .with_comparison(0.0002),
     LayoutCase::default().with_size(Size::zero())
   );
 
@@ -54,7 +54,7 @@ mod tests {
       @circle40()
     })
     .with_wnd_size(WND_SIZE)
-    .with_comparison(0.000025),
+    .with_comparison(0.0002),
     LayoutCase::default().with_size(SIZE_40)
   );
 
@@ -68,7 +68,7 @@ mod tests {
       }
     })
     .with_wnd_size(WND_SIZE)
-    .with_comparison(0.000025),
+    .with_comparison(0.0002),
     LayoutCase::default().with_size(SIZE_40)
   );
 
@@ -80,7 +80,7 @@ mod tests {
       @circle40()
     })
     .with_wnd_size(WND_SIZE)
-    .with_comparison(0.00003),
+    .with_comparison(0.0002),
     LayoutCase::default().with_size(Size::splat(40.5))
   );
 }

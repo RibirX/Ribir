@@ -184,6 +184,8 @@ impl ShellWindow for TestShellWindow {
 
   fn set_minimized(&mut self, _: bool) {}
 
+  fn set_window_level(&mut self, _: WindowLevel) {}
+
   fn set_ime_allowed(&mut self, _: bool) {}
 
   fn as_any(&self) -> &dyn Any { self }
@@ -200,6 +202,10 @@ impl ShellWindow for TestShellWindow {
   fn request_draw(&self) {}
 
   fn id(&self) -> WindowId { self.id }
+
+  fn position(&self) -> Point { Point::new(0., 0.) }
+
+  fn set_position(&mut self, _: Point) {}
 
   fn close(&self) {}
 }

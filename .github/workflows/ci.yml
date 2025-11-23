@@ -46,6 +46,10 @@ jobs:
           toolchain: $NIGHTLY_VERSION
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Install audio development libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
       - name: format style check
         run: cargo fmt --all -- --check
       - name: cargo clippy check
@@ -190,6 +194,12 @@ jobs:
           echo "LD_LIBRARY_PATH=$PWD/mesa/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
           echo "LIBGL_DRIVERS_PATH=$PWD/mesa/lib/x86_64-linux-gnu/dri" >> "$GITHUB_ENV"
 
+      - name: (linux) install audio development libraries
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+
       - name: disable debug
         shell: bash
         run: |
@@ -236,7 +246,7 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - name: build ribir
-        run: cargo build
+        run: cargo build --workspace --exclude pomodoro
       - name: compile doc examples
         run: |
           {
@@ -256,4 +266,4 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: compile to wasm
-        run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper --exclude cli
+        run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper --exclude cli --exclude pomodoro

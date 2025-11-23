@@ -25,6 +25,31 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **macros**: add `asset!` macros for asset management.(#798 @M-Adoo)
+- **macros**: add `include_asset!` macro for compile-time asset embedding. (#799 @M-Adoo)
+
+### Breaking
+
+- **macros**: replace `include_crate_svg!` with new `asset!` macro for general asset management.(#798 @M-Adoo)
+
+
+## [0.4.0-alpha.50] - 2025-11-19
+
+### Fixed
+
+- **core**: reduce the memory usage. (#797 @wjian23)
+  - update wgpu from v24 to v27, create gpu backend with memory_hints of MemoryHints::MemoryUsage
+
+- **core**: fix overlay close panic when window been closed. (#796 @wjian23)
+
+### Features
+
+- **widgets**: add changed event to Slider and Checkbox.(#796 @wjian23)
+- **core**: add window positioning and level control APIs.(#796 @wjian23)
+- **example**: add example of a Pomodoro timer app.(#796 @wjian23)
+
 ## [0.4.0-alpha.49] - 2025-09-03
 
 ## [0.4.0-alpha.48] - 2025-08-27
@@ -897,7 +922,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.49...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.50...HEAD
+[0.4.0-alpha.50]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.49...ribir-v0.4.0-alpha.50
 [0.4.0-alpha.49]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.48...ribir-v0.4.0-alpha.49
 [0.4.0-alpha.48]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.47...ribir-v0.4.0-alpha.48
 [0.4.0-alpha.47]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.46...ribir-v0.4.0-alpha.47

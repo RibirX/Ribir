@@ -3,7 +3,7 @@ use std::{future::Future, sync::Arc};
 use ribir_core::{
   prelude::{image::ColorFormat, *},
   scheduler::BoxFuture,
-  window::{BoxShellWindow, Shell, ShellWindow, WindowId},
+  window::{BoxShellWindow, Shell, ShellWindow, WindowId, WindowLevel},
 };
 use winit::{
   dpi::{LogicalPosition, LogicalSize},
@@ -199,6 +199,8 @@ impl ShellWindow for ShellWndHandle {
 
   fn set_ime_allowed(&mut self, allowed: bool) { self.winit_wnd.set_ime_allowed(allowed); }
 
+  fn set_window_level(&mut self, level: WindowLevel) { self.winit_wnd.set_window_level(level); }
+
   fn set_ime_cursor_area(&mut self, rect: &Rect) {
     let position: LogicalPosition<f32> = LogicalPosition::new(rect.origin.x, rect.origin.y);
     let size: LogicalSize<f32> = LogicalSize::new(rect.size.width, rect.size.height);
@@ -233,6 +235,24 @@ impl ShellWindow for ShellWndHandle {
     self
       .sender
       .send(ShellCmd::RequestDraw { id: self.id() });
+  }
+
+  fn position(&self) -> Point {
+    let scale_factor = self.winit_wnd.scale_factor() as f32;
+    self
+      .winit_wnd
+      .outer_position()
+      .map(|pos| Point::new(pos.x as f32 / scale_factor, pos.y as f32 / scale_factor))
+      .unwrap_or_default()
+  }
+
+  fn set_position(&mut self, point: Point) {
+    let pos = self.position();
+    if pos != point {
+      self
+        .winit_wnd
+        .set_outer_position(LogicalPosition::new(point.x, point.y));
+    }
   }
 }
 

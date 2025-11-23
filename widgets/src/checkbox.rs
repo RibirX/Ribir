@@ -47,6 +47,13 @@ pub struct Checkbox {
   pub indeterminate: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct CheckState {
+  pub checked: bool,
+}
+
+pub type CheckboxEvent = CustomEvent<CheckState>;
+
 class_names! {
   /// The class name for the container of a checked checkbox.
   CHECKBOX_CHECKED,
@@ -99,20 +106,37 @@ impl ComposeChild<'static> for Checkbox {
   type Child = Option<PositionChild<TextValue>>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
-    fat_obj! {
-      on_tap: move |_| $write(this).switch_check(),
-      @ {
-        let classes = class_array![distinct_pipe!($read(this).state_class_name()), CHECKBOX];
-        let icon = @(classes) {
-          @Icon {
-            on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
-              $write(this).switch_check()
-            },
-            @Void { class: distinct_pipe!($read(this).icon_class_name())}
+    fn_widget! {
+      let mut obj = @FatObj {
+        on_tap: move |e| {
+          $write(this).switch_check();
+          e.stop_propagation();
+        },
+        @ {
+          let classes = class_array![distinct_pipe!($read(this).state_class_name()), CHECKBOX];
+          let icon = @(classes) {
+            @Icon {
+              on_key_up: move |k| if *k.key() == VirtualKey::Named(NamedKey::Space) {
+                $write(this).switch_check()
+              },
+              @Void { class: distinct_pipe!($read(this).icon_class_name())}
+            }
+          };
+          icon_with_label(icon.into_widget(), child)
+        }
+      };
+
+      let track_id = obj.track_id();
+      let window = BuildCtx::get().window();
+      watch!($read(this).checked)
+        .distinct_until_changed()
+        .subscribe(move |checked| {
+          if let Some(id) = track_id.get() {
+            window.bubble_custom_event(id, CheckState { checked });
           }
-        };
-        icon_with_label(icon.into_widget(), child)
-      }
+        });
+
+      obj
     }
     .into_widget()
   }

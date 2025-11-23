@@ -25,6 +25,13 @@ class_names! {
   STOP_INDICATOR_INACTIVE,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct SliderChanged {
+  pub from: f32,
+  pub to: f32,
+}
+
+pub type SliderChangedEvent = CustomEvent<SliderChanged>;
 /// The widget displays a slider.
 #[derive(Declare)]
 pub struct Slider {
@@ -119,7 +126,14 @@ impl Compose for Slider {
           v_align: VAlign::Center,
           on_tap: move |e| {
             let width = *$read(row.layout_width());
+            let old = $read(this).value;
             $write(this).set_to(e.position().x / width);
+            if old != $read(this).value {
+              e.window().bubble_custom_event(e.current_target(), SliderChanged {
+                from: old,
+                to: $read(this).value,
+              });
+            }
           },
           on_disposed: move |_| u.unsubscribe(),
           @Expanded {
@@ -137,7 +151,14 @@ impl Compose for Slider {
             on_pointer_move: move|e| if let Some((_, pos, ratio)) = $read(drag_info).as_ref() {
               let width = *$read(row.layout_width());
               let val = ratio + (e.global_pos().x - pos) / width;
+              let old = $read(this).value;
               $write(this).set_to(val);
+              if old != $read(this).value {
+                e.window().bubble_custom_event(e.current_target(), SliderChanged {
+                  from: old,
+                  to: $read(this).value,
+                });
+              }
             },
             on_pointer_up: move |_| {
               $write(drag_info).take();
@@ -360,23 +381,31 @@ fn stop_indicator_track(
   cnt: usize, actives: Range<usize>, filter: Vec<usize>,
 ) -> BoxFnWidget<'static> {
   fn_widget!(
-    @IgnorePointer {
-      @Flex {
-        v_align: VAlign::Center,
+    let stop_builder = move |i| {
+      @Void {
+        class: if actives.contains(&i) {
+          STOP_INDICATOR_ACTIVE
+        } else {
+          STOP_INDICATOR_INACTIVE
+        },
+        visible: !filter.contains(&i),
+      }
+    };
+
+    // ReWrap FatObj to get the whole stop Widget's layout
+    let mut last = FatObj::new(stop_builder(cnt - 1));
+    let mut flex =  @Flex {
         align_items: Align::Center,
-        justify_content: JustifyContent::SpaceBetween,
-        @ {
-          (0..cnt).map(move |i| {
-            @Void {
-              class: if actives.contains(&i) {
-                STOP_INDICATOR_ACTIVE
-              } else {
-                STOP_INDICATOR_INACTIVE
-              },
-              visible: !filter.contains(&i),
-            }
-          })
-        }
+        justify_content: JustifyContent::SpaceBetween
+    };
+
+    @IgnorePointer {
+        @(flex) {
+          v_align: VAlign::Center,
+          opacity: pipe!($read(last.layout_rect()).max_x() <= *$read(flex.layout_width()) + 0.001)
+            .map(|v| if v { 1. } else { 0. }),
+          @ {(0..cnt-1).map(stop_builder)}
+          @{ last }
       }
     }
   )

@@ -19,6 +19,12 @@ impl Render for NoAffectedParentSize {
   }
 
   fn size_affected_by_child(&self) -> bool { false }
+
+  fn hit_test(&self, _ctx: &mut HitTestCtx, _pos: Point) -> HitTest {
+    // The hit test is always delegated to its child,
+    // just return { hit: false, can_hit_child: true } here.
+    HitTest { hit: false, can_hit_child: true }
+  }
 }
 
 #[cfg(test)]

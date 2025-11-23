@@ -1,5 +1,4 @@
 #![allow(clippy::needless_lifetimes)]
-#![cfg_attr(feature = "nightly", feature(proc_macro_span))]
 
 extern crate proc_macro;
 
@@ -11,6 +10,7 @@ mod util;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, parse_macro_input};
+mod asset;
 mod child_template;
 mod fn_widget_macro;
 mod pipe_macro;
@@ -249,79 +249,180 @@ pub fn part_reader(input: TokenStream) -> TokenStream {
   part_state::gen_part_reader(input.into(), None).into()
 }
 
-/// Includes an SVG file as an `Svg`.
+/// Includes an asset file by copying it to the application's asset directory
+/// during build time and generating code to load it at runtime.
 ///
-/// The file is located relative to the current crate (similar to the location
-/// of your `cargo.toml`). The provided path is interpreted in a
-/// platform-specific way at compile time. For example, a Windows path with
-/// backslashes \ would not compile correctly on Unix.
+/// This macro manages application assets by:
+/// 1. Copying the specified file to `target/{profile}/assets/` during
+///    compilation
+/// 2. Generating code that reads the asset from the filesystem at runtime
+///    (relative to the executable)
+/// 3. Automatically triggering rebuilds when the asset file changes
 ///
-/// This macro returns an expression of type `Svg`.
+/// The asset will be placed in an `assets` folder next to your executable,
+/// making it easy for bundle tools to include it in your application package.
+///
+/// # Asset vs Include Asset
+///
+/// `asset!` copies files and loads them at runtime, while `include_asset!`
+/// embeds them into the binary.
+///
+/// | Feature | `asset!` | `include_asset!` |
+/// |---------|----------|------------------|
+/// | **Loading Strategy** | Runtime loading from filesystem | Compile-time embedding |
+/// | **Distribution** | Must bundle `assets` folder | Single binary (easier distribution) |
+/// | **Binary Size** | Smaller binary | Larger binary (contains all assets) |
+/// | **Performance** | I/O overhead at runtime | Instant access (memory mapped) |
+/// | **Hot Reloading** | Possible (if file changes on disk) | Requires recompilation |
+///
+/// # Path Resolution
+///
+/// Asset paths are resolved **relative to the source file** where the macro is
+/// called, similar to how `#include` works in C/C++ or `include_str!` works in
+/// Rust.
+///
+/// **Requirements:** Rust 1.88 or later
+///
+/// ```ignore
+/// // In src/ui/widgets/button.rs
+/// let icon: Svg = asset!("../icons/button.svg", "svg");
+/// // Resolves to: src/ui/icons/button.svg (relative to button.rs)
+/// ```
+///
+/// # Syntax
+///
+/// ```ignore
+/// asset!("path/to/file.ext")                                  // Load as binary (returns Vec<u8>)
+/// asset!("path/to/file.txt", "text")                          // Load as text (returns String)
+/// asset!("path/to/file.txt", "TEXT")                          // Case-insensitive type matching
+/// asset!("path/to/file.svg", "svg")                           // Load as SVG with compression (returns Svg)
+/// asset!("path/to/icon.svg", "SVG", inherit_fill = true)      // SVG with parameters (key=value style)
+/// asset!("path/to/icon.svg", "svg", inherit_fill = true, inherit_stroke = false)  // Multiple parameters
+/// ```
+///
+/// # Arguments
+///
+/// * `path` - Relative path to the asset file. On nightly with
+///   `procmacro2_semver_exempt`, this is relative to the calling source file.
+///   On stable, this is relative to the project root (where `Cargo.toml` is
+///   located).
+/// * `type` - Optional. Use `"text"` (or `"TEXT"`) to load as a `String`,
+///   `"svg"` (or `"SVG"`) to load as a compressed `Svg`, otherwise loads as
+///   `Vec<u8>`. Type matching is case-insensitive.
+///
+/// ## Type-Specific Parameters (key=value format)
+///
+/// ### SVG Parameters
+/// * `inherit_fill` - Boolean to inherit fill style from parent (default:
+///   false)
+/// * `inherit_stroke` - Boolean to inherit stroke style from parent (default:
+///   false)
+///
+/// # Output
+///
+/// The asset is copied to `target/{profile}/assets/{filename}` where:
+/// - `{profile}` is either `debug` or `release` depending on build
+///   configuration
+/// - `{filename}` is the name of the input file
+///
+/// For SVG files (when using `"svg"` type), the file is compressed at compile
+/// time before being copied, resulting in smaller asset files.
+///
+/// # Returns
+///
+/// - `Vec<u8>` - When loading binary files (default)
+/// - `String` - When `"text"` parameter is specified
+/// - `Svg` - When `"svg"` parameter is specified (compressed at compile time)
+///
+/// # Examples
+///
+/// ```ignore
+/// // Load an image as binary data
+/// let icon_data: Vec<u8> = asset!("resources/icon.png");
+///
+/// // Load a configuration file as text
+/// let config: String = asset!("config/settings.json", "text");
+///
+/// // Load a shader file as text
+/// let shader_source: String = asset!("shaders/fragment.glsl", "text");
+///
+/// // Load an SVG file with compile-time compression
+/// let icon: Svg = asset!("assets/icon.svg", "svg");
+///
+/// // Load an SVG file with parameters (key=value style)
+/// let styled_icon: Svg = asset!("assets/icon.svg", "svg", inherit_fill = true);
+/// let styled_icon2: Svg = asset!("assets/icon.svg", "SVG", inherit_fill = true, inherit_stroke = false);
+///
+/// // Type names are case-insensitive
+/// let config: String = asset!("config.json", "TEXT");
+///
+/// // Load multiple assets
+/// let logo_svg: Svg = asset!("assets/logo.svg", "svg");
+/// let font: Vec<u8> = asset!("fonts/roboto.ttf");
+/// ```
+///
+/// # Bundling for Distribution
+///
+/// When packaging your application for distribution, ensure the `assets` folder
+/// is included alongside your executable:
+///
+/// - **macOS**: Copy `assets/` to `YourApp.app/Contents/MacOS/assets/`
+/// - **Windows**: Copy `assets/` next to your `.exe` file
+/// - **Linux**: Copy `assets/` next to your binary
+///
+/// # Panics
+///
+/// The generated code will panic at runtime if:
+/// - The asset file cannot be found at the expected location
+/// - The file cannot be read (permissions, I/O errors, etc.)
+/// - The file cannot be decoded as UTF-8 (when using `"text"` mode)
+///
+/// # Compile Errors
+///
+/// The macro will fail at compile time if:
+/// - The specified asset file does not exist
+/// - The path points to a directory instead of a file
+/// - The output directory cannot be created
+/// - The file cannot be copied
 #[proc_macro]
-pub fn include_crate_svg(input: TokenStream) -> TokenStream {
-  let IncludeSvgArgs { path, inherit_fill, inherit_stroke } =
-    parse_macro_input! { input as IncludeSvgArgs };
-  let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-  let path = std::path::Path::new(&dir).join(path);
-  include_svg_from_path(path, inherit_fill, inherit_stroke)
-}
+pub fn asset(input: TokenStream) -> TokenStream { asset::gen_asset(input.into()).into() }
 
-/// Includes an SVG file as an `Svg`.
+/// Embeds an asset file directly into the executable binary during build time.
 ///
-/// The file is located relative to the current file (similarly to how modules
-/// are found). The provided path is interpreted in a platform-specific way at
-/// compile time. For example, a Windows path with backslashes \ would not
-/// compile correctly on Unix.
+/// This macro is similar to `asset!`, but instead of copying the file to the
+/// assets directory and loading it at runtime, it embeds the file content
+/// directly into the executable.
 ///
-/// This macro returns an expression of type `Svg`.
-#[cfg(feature = "nightly")]
+/// # Asset vs Include Asset
+///
+/// `asset!` copies files and loads them at runtime, while `include_asset!`
+/// embeds them into the binary.
+///
+/// | Feature | `asset!` | `include_asset!` |
+/// |---------|----------|------------------|
+/// | **Loading Strategy** | Runtime loading from filesystem | Compile-time embedding |
+/// | **Distribution** | Must bundle `assets` folder | Single binary (easier distribution) |
+/// | **Binary Size** | Smaller binary | Larger binary (contains all assets) |
+/// | **Performance** | I/O overhead at runtime | Instant access (memory mapped) |
+/// | **Hot Reloading** | Possible (if file changes on disk) | Requires recompilation |
+///
+/// # Syntax
+///
+/// Same as `asset!`:
+///
+/// ```ignore
+/// include_asset!("path/to/file.ext")
+/// include_asset!("path/to/file.txt", "text")
+/// include_asset!("path/to/file.svg", "svg")
+/// ```
+///
+/// # Returns
+///
+/// Same types as `asset!`:
+/// - `Vec<u8>` for binary
+/// - `String` for text
+/// - `Svg` for SVG
 #[proc_macro]
-pub fn include_svg(input: TokenStream) -> TokenStream {
-  let IncludeSvgArgs { path, inherit_fill, inherit_stroke } =
-    parse_macro_input! { input as IncludeSvgArgs };
-
-  let mut span = proc_macro::Span::call_site();
-  while let Some(p) = span.parent() {
-    span = p;
-  }
-  let mut file = span.local_file().unwrap();
-  file.pop();
-  file.push(path);
-
-  include_svg_from_path(file, inherit_fill, inherit_stroke)
-}
-
-fn include_svg_from_path(
-  path: std::path::PathBuf, inherit_fill: bool, inherit_stroke: bool,
-) -> TokenStream {
-  let encoded_bytes = ribir_painter::Svg::open(path.as_path(), inherit_fill, inherit_stroke)
-    .and_then(|reader| reader.serialize());
-  match encoded_bytes {
-    Ok(data) => quote! {
-      Svg::deserialize(#data).unwrap()
-    }
-    .into(),
-    Err(err) => {
-      let err = format!("{err}({:?})", &path);
-      quote! { compile_error!(#err) }.into()
-    }
-  }
-}
-
-struct IncludeSvgArgs {
-  path: String,
-  inherit_fill: bool,
-  inherit_stroke: bool,
-}
-
-impl syn::parse::Parse for IncludeSvgArgs {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let path = input.parse::<syn::LitStr>()?.value();
-    input.parse::<syn::Token![,]>()?;
-    let inherit_fill = input.parse::<syn::LitBool>()?.value;
-    input.parse::<syn::Token![,]>()?;
-    let inherit_stroke = input.parse::<syn::LitBool>()?.value;
-
-    Ok(IncludeSvgArgs { path, inherit_fill, inherit_stroke })
-  }
+pub fn include_asset(input: TokenStream) -> TokenStream {
+  asset::gen_include_asset(input.into()).into()
 }

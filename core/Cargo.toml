@@ -22,10 +22,10 @@ lyon_geom.workspace = true
 paste.workspace = true
 triomphe.workspace = true
 pin-project-lite.workspace = true
-ribir_algo = {path = "../algo", version = "0.4.0-alpha.49" }
-ribir_geom = {path = "../geom", version = "0.4.0-alpha.49" }
-ribir_macros = {path = "../macros", version = "0.4.0-alpha.49" }
-ribir_painter = {path = "../painter", version = "0.4.0-alpha.49" }
+ribir_algo = {path = "../algo", version = "0.4.0-alpha.50" }
+ribir_geom = {path = "../geom", version = "0.4.0-alpha.50" }
+ribir_macros = {path = "../macros", version = "0.4.0-alpha.50" }
+ribir_painter = {path = "../painter", version = "0.4.0-alpha.50" }
 rxrust.workspace = true
 smallvec.workspace = true
 winit.workspace = true
@@ -59,7 +59,5 @@ wasm-bindgen-test = "0.3.42"
 [features]
 png = ["ribir_painter/png"]
 jpeg = ["ribir_painter/jpeg"]
-nightly = ["ribir_macros/nightly"]
+nightly = []
 test-utils = []
-
-
