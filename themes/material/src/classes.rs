@@ -12,6 +12,7 @@ mod progress_cls;
 mod radio_cls;
 mod scrollbar_cls;
 mod slider_cls;
+mod switch_cls;
 mod tabs_cls;
 mod tooltips_cls;
 
@@ -32,6 +33,7 @@ pub fn initd_classes() -> Classes {
   disabled_cls::init(&mut classes);
   avatar_cls::init(&mut classes);
   list_cls::init(&mut classes);
+  switch_cls::init(&mut classes);
 
   classes
 }

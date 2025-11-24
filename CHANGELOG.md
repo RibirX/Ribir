@@ -30,6 +30,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **macros**: add `asset!` macros for asset management.(#798 @M-Adoo)
 - **macros**: add `include_asset!` macro for compile-time asset embedding. (#799 @M-Adoo)
 
+- **widgets**: add Switch widget for toggling boolean states with Material Design styling and animations.(#pr @wjian23)
+
 ### Breaking
 
 - **macros**: replace `include_crate_svg!` with new `asset!` macro for general asset management.(#798 @M-Adoo)
