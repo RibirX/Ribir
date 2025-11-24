@@ -17,6 +17,7 @@ pub mod router;
 pub mod scrollbar;
 pub mod select_region;
 pub mod slider;
+pub mod switch;
 pub mod tabs;
 
 pub mod transform_box;
@@ -24,6 +25,6 @@ pub mod prelude {
   pub use super::{
     avatar::*, buttons::*, checkbox::*, common_widget::*, divider::*, grid_view::*, icon::*,
     input::*, label::*, layout::*, list::*, menu::*, path::*, progress::*, radio::*, router::*,
-    scrollbar::*, select_region::*, slider::*, tabs::*, transform_box::*,
+    scrollbar::*, select_region::*, slider::*, switch::*, tabs::*, transform_box::*,
   };
 }
