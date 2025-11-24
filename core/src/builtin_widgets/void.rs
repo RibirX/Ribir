@@ -1,25 +1,15 @@
 use crate::prelude::*;
 
-/// A widget use to help write code when you need a widget as a empty node in
-/// `widget!` macro, or hold a place in tree.
+/// A widget that represents an empty node in the widget tree.
 ///
-/// When it have a child itself will be dropped when build tree, otherwise as a
-/// render widget but do nothing.
+/// This widget is used when you need a placeholder widget that doesn't render
+/// anything and doesn't accept children. It's useful for conditional rendering
+/// or as a neutral widget in compositions.
 #[derive(Declare)]
 pub struct Void;
 
 impl Render for Void {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx
-      .perform_single_child_layout(clamp)
-      .unwrap_or(clamp.min)
-  }
+  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.min }
 
   fn paint(&self, _: &mut PaintingCtx) {}
-}
-
-impl<'c> ComposeChild<'c> for Void {
-  type Child = Widget<'c>;
-
-  fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> { child }
 }

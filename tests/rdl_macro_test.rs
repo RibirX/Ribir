@@ -491,7 +491,7 @@ fn widget_wrap_bind_work() {
 
 #[test]
 fn expression_parent() {
-  fn parent() -> FatObj<Void> { FatObj::new(Void) }
+  fn parent() -> FatObj<SizedBox> { FatObj::new(SizedBox { size: Size::new(50., 50.) }) }
 
   let _x = fn_widget! {
     @(parent()) {
