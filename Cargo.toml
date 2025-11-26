@@ -84,7 +84,7 @@ winit = { version = "0.30.11", default-features = false, features = [
   "rwh_06",
 ] }
 zerocopy = "0.7.3"
-quick-xml = "0.37.1"
+quick-xml = "0.38.4"
 macos-accessibility-client = { version = "0.0.1" }
 tokio = { version = "1.0" }
 tokio-run-until-stalled = "0.1.0"
