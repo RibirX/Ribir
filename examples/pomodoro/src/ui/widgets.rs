@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use ribir::{material::material_svgs, prelude::*};
+use ribir::prelude::*;
 
 use crate::{
   pomodoro::{Pomodoro, PomodoroState, UPDATE_INTERVAL},
@@ -35,9 +35,9 @@ fn run_button() -> Widget<'static> {
           .transform(|obs| obs.distinct_until_changed().box_it())
           .map(move |running| {
             if running {
-              named_svgs::get("pause")
+              svg_registry::get("pause")
             } else {
-              named_svgs::get("play")
+              svg_registry::get("play")
             }
           })
       }
@@ -64,9 +64,9 @@ fn mode_icon() -> Widget<'static> {
           .transform(|obs| obs.distinct_until_changed().box_it())
           .map(move |in_mini| {
             if in_mini {
-              named_svgs::get("full")
+              svg_registry::get("full")
             } else {
-              named_svgs::get("mini")
+              svg_registry::get("mini")
             }
           })
       }
@@ -95,9 +95,9 @@ fn keep_icon() -> Widget<'static> {
           .transform(|obs| obs.distinct_until_changed().box_it())
           .map(move |always_on_top| {
             if always_on_top {
-              named_svgs::get("pin")
+              svg_registry::get("pin")
             } else {
-              named_svgs::get("pin_off")
+              svg_registry::get("pin_off")
             }
           })
       }
@@ -152,13 +152,13 @@ impl Compose for WindowBar {
             on_tap: move |e| {
               e.window().shell_wnd().borrow_mut().set_minimized(true);
             },
-            @{ named_svgs::get_or_default("minimize") }
+            @{ svg_registry::get_or_default("minimize") }
           }
           @ { mode_icon() }
           @Icon {
             cursor: CursorIcon::Pointer,
             on_tap: move |e| e.window().close(),
-            @{ named_svgs::get_or_default("close") }
+            @{ svg_registry::get_or_default("close") }
           }
         }
       }
@@ -237,9 +237,9 @@ pub(crate) fn main_page() -> Widget<'static> {
             .transform(|obs| obs.distinct_until_changed().box_it())
             .map(move |muted| {
                 if muted {
-                named_svgs::get("volume_off")
+                svg_registry::get("volume_off")
                 } else {
-                named_svgs::get("volume_up")
+                svg_registry::get("volume_up")
                 }
             })
           }
@@ -261,7 +261,7 @@ pub(crate) fn main_page() -> Widget<'static> {
           cursor: CursorIcon::Pointer,
           on_tap: move |_| $write(pomodoro).next_state(),
           tooltips: "skip",
-          @{ named_svgs::get("skip_next").unwrap() }
+          @{ svg_registry::get("skip_next").unwrap() }
         }
       }
     }
@@ -450,7 +450,7 @@ pub(crate) fn setting_page() -> Widget<'static> {
         v_align: VAlign::Stretch,
         @Tab {
           @{ "Settings" }
-          @Icon { @ { svgs::SETTINGS } }
+          @Icon { @ { svg_registry::get_or_default("settings") } }
           @fn_widget! {
             @FatObj {
               margin: EdgeInsets::new(10.0, 16.0, 10.0, 16.0),
@@ -460,7 +460,7 @@ pub(crate) fn setting_page() -> Widget<'static> {
         }
         @Tab {
           @ { "about" }
-          @Icon { @ { material_svgs::INFO } }
+          @Icon { @ { svg_registry::get_or_default("info") } }
           @fn_widget! { about() }
         }
       }

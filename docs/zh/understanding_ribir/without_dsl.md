@@ -148,7 +148,7 @@ let text_btn = Button::declarer()
 
 let icon_btn = Button::declarer()
   .finish()
-  .with_child(Icon.with_child(named_svgs::get_or_default("search")));
+  .with_child(Icon.with_child(svg_registry::get_or_default("search")));
 ```
 
 ## API 和宏的混合使用

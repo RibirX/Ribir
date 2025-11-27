@@ -162,7 +162,7 @@ where
         @Icon {
           cursor: CursorIcon::Pointer,
           on_tap: move |e| Provider::write_of::<Todos>(e).unwrap().remove(id),
-          @ { svgs::CLOSE }
+          @ { svg_registry::get_or_default("close") }
         }
       }
     }.build_tml().compose_sections();

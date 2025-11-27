@@ -1,4 +1,3 @@
-use material::material_svgs;
 use ribir::prelude::*;
 
 #[derive(Clone)]
@@ -55,7 +54,7 @@ impl Compose for MessageList {
           align_items: Align::Center,
           @Flex {
             item_gap: 10.,
-            @Icon { @{ svgs::MENU } }
+            @Icon { @{ svg_registry::get_or_default("menu") } }
             @Text {
               text: "Message",
               foreground: palette.on_surface(),
@@ -64,8 +63,8 @@ impl Compose for MessageList {
           }
           @Flex {
             item_gap: 10.,
-            @Icon { @{ svgs::SEARCH } }
-            @Icon { @{ svgs::MORE_VERT } }
+            @Icon { @{ svg_registry::get_or_default("search") } }
+            @Icon { @{ svg_registry::get_or_default("more_vert") } }
           }
         }
         @Expanded {
@@ -74,7 +73,7 @@ impl Compose for MessageList {
             providers: [Provider::new(TabPos::Bottom)],
             @Tab {
               @ { "Messages" }
-              @Icon { @{ material_svgs::SMS } }
+              @Icon { @{ svg_registry::get_or_default("sms") } }
               @ fn_widget! {
                 @Scrollbar {
                   @List {
@@ -87,7 +86,7 @@ impl Compose for MessageList {
                           @ListItemSupporting {
                             @ { message.content.clone() }
                           }
-                          @Trailing { @Icon { @{ svgs::MORE_HORIZ } } }
+                          @Trailing { @Icon { @{ svg_registry::get_or_default("more_horiz") } } }
                         })
                         .with_child(@Divider {});
                       }
@@ -99,7 +98,7 @@ impl Compose for MessageList {
             }
             @Tab {
               @ { "Person" }
-              @Icon { @{ material_svgs::ACCOUNT_CIRCLE } }
+              @Icon { @{ svg_registry::get_or_default("account_circle") } }
               @ { fn_widget! { @Text { text: "Person" } } }
             }
           }

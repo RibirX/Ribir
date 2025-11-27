@@ -1,4 +1,4 @@
-use ribir::{material::material_svgs, prelude::*};
+use ribir::prelude::*;
 use webbrowser::{Browser, open_browser};
 
 fn header() -> Widget<'static> {
@@ -22,7 +22,7 @@ fn content() -> Widget<'static> {
             @Row {
               clamp: BoxClamp::fixed_height(30.),
               @Text { text: "Common buttons" }
-              @Icon { @ { material_svgs::INFO } }
+              @Icon { @ { svg_registry::get_or_default("info") } }
             }
             @Flex {
               direction: Direction::Vertical,
@@ -38,7 +38,7 @@ fn content() -> Widget<'static> {
                 item_gap: 20.,
                 @FilledButton { @ {"Filled" } }
                 @FilledButton {
-                  @Icon { @{ svgs::SETTINGS } }
+                  @Icon { @{ svg_registry::get_or_default("settings") } }
                   @ { "Icon" }
                 }
               }
@@ -46,7 +46,7 @@ fn content() -> Widget<'static> {
                 item_gap: 20.,
                 @Button { @ { "Outlined" } }
                 @Button {
-                  @Icon { @Icon { @ { svgs::SEARCH } } }
+                  @Icon { @Icon { @ { svg_registry::get_or_default("search") } } }
                   @ { "Icon" }
                 }
               }
@@ -54,7 +54,7 @@ fn content() -> Widget<'static> {
                 item_gap: 20.,
                 @TextButton { @ { "Text" } }
                 @TextButton {
-                  @Icon { @ { svgs::ADD } }
+                  @Icon { @ { svg_registry::get_or_default("add") } }
                   @ { "Icon" }
                 }
               }
@@ -66,7 +66,7 @@ fn content() -> Widget<'static> {
               clamp: BoxClamp::fixed_height(30.),
               @Row {
                 @Text { text: "Floating action buttons" }
-                @Icon { @ { material_svgs::INFO } }
+                @Icon { @ { svg_registry::get_or_default("info") } }
               }
             }
             @Flex {
@@ -81,9 +81,9 @@ fn content() -> Widget<'static> {
               }),
               @Flex {
                 item_gap: 20.,
-                @Fab { @Icon { @ { svgs::ADD } } }
+                @Fab { @Icon { @ { svg_registry::get_or_default("add") } } }
                 @Fab {
-                  @Icon { @ { svgs::ADD } }
+                  @Icon { @ { svg_registry::get_or_default("add") } }
                   @ { "Create" }
                 }
               }
@@ -95,7 +95,7 @@ fn content() -> Widget<'static> {
               clamp: BoxClamp::fixed_height(30.),
               @Row {
                 @Text { text: "Icon buttons" }
-                @Icon { @ { material_svgs::INFO } }
+                @Icon { @ { svg_registry::get_or_default("info") } }
               }
             }
             @Flex {
@@ -110,9 +110,9 @@ fn content() -> Widget<'static> {
               }),
               @Flex {
                 item_gap: 20.,
-                @TextButton { @Icon { @ { svgs::SETTINGS } } }
-                @FilledButton { @Icon { @ { svgs::SETTINGS } } }
-                @Button { @Icon{ @ { svgs::SETTINGS } } }
+                @TextButton { @Icon { @ { svg_registry::get_or_default("settings") } } }
+                @FilledButton { @Icon { @ { svg_registry::get_or_default("settings") } } }
+                @Button { @Icon{ @ { svg_registry::get_or_default("settings") } } }
               }
             }
           }
@@ -127,17 +127,17 @@ fn content() -> Widget<'static> {
       @Tabs {
         @Tab {
           @ { "Videos" }
-          @Icon { @ { svgs::HOME } }
+          @Icon { @ { svg_registry::get_or_default("home") } }
           @void! {}
         }
         @Tab {
           @ { "Photos" }
-          @Icon { @ { svgs::HOME } }
+          @Icon { @ { svg_registry::get_or_default("home") } }
           @void! {}
         }
         @Tab {
           @ { "Audio" }
-          @Icon { @ { svgs::HOME } }
+          @Icon { @ { svg_registry::get_or_default("home") } }
           @void! {}
         }
       }
@@ -154,7 +154,7 @@ fn content() -> Widget<'static> {
             h_align: HAlign::Center,
             @Text { text: "Divider" }
             @Icon {
-              @ { material_svgs::INFO }
+              @ { svg_registry::get_or_default("info") }
             }
           }
         }
@@ -177,13 +177,13 @@ fn content() -> Widget<'static> {
                 println!("Failed to open browser: {}", err);
               }
             },
-            @Icon { @{ svgs::CHECK_BOX_OUTLINE_BLANK } }
+            @Icon { @{ svg_registry::get_or_default("check") } }
             @ListItemHeadline { @ { "One line list item" } }
             @ListItemSupporting { @ { "One line supporting text"}}
           }
           @Divider { indent: DividerIndent::Start }
           @ListItem {
-            @Icon { @ { svgs::MENU } }
+            @Icon { @ { svg_registry::get_or_default("menu") } }
             @ListItemHeadline { @{ "One line list item"} }
             @ListItemTrailingSupporting { @{ "100+" } }
           }
@@ -197,7 +197,7 @@ fn content() -> Widget<'static> {
               lines: 2usize,
               @ { "Two lines supporting text \rTwo lines supporting text" }
             }
-            @Trailing { @Icon {  @ { svgs::CHECK_BOX_OUTLINE_BLANK } } }
+            @Trailing { @Icon {  @ { svg_registry::get_or_default("check") } } }
           }
           @Divider { indent: DividerIndent::Start }
           @ListItem {

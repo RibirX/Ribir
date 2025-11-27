@@ -54,7 +54,7 @@ macro_rules! widget_image_tests {
       #[test]
       fn [<$name _with_default_by_wgpu>]() {
         let _scope = unsafe { AppCtx::new_lock_scope() };
-        svg::named_svgs::reset();
+        svg::svg_registry::clear();
         unsafe { AppCtx::set_app_theme(ribir_slim::purple()) };
 
         let name = format!("{}_with_default_by_wgpu", std::stringify!($name));
@@ -64,7 +64,7 @@ macro_rules! widget_image_tests {
       #[test]
       fn [<$name _with_material_by_wgpu>]() {
         let _scope = unsafe { AppCtx::new_lock_scope() };
-        svg::named_svgs::reset();
+        svg::svg_registry::clear();
         unsafe { AppCtx::set_app_theme(ribir_material::purple::light()) };
 
         let name = format!("{}_with_material_by_wgpu", std::stringify!($name));

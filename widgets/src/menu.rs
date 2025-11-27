@@ -52,7 +52,7 @@ pub type MenuEvent = CustomEvent<MenuEventData>;
 /// let w = fn_widget! {
 ///   let sub_menu = MenuControl::new(menu! {
 ///     @MenuItem {
-///       @ Leading::new( @Icon { @ { svgs::MENU } })
+///       @ Leading::new( @Icon { @svg_registry::get_or_default("menu") })
 ///       @ { "sub_menu" }
 ///     }
 ///   });
@@ -63,7 +63,7 @@ pub type MenuEvent = CustomEvent<MenuEventData>;
 ///       }
 ///     },
 ///     @MenuItem {
-///       @ Leading::new( @Icon { @ { svgs::MENU } })
+///       @ Leading::new( @Icon { @svg_registry::get_or_default("menu") })
 ///       @ { "Menu Item1" }
 ///       @ { sub_menu.clone() }
 ///     }

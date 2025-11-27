@@ -27,12 +27,12 @@ use crate::prelude::*;
 ///   }
 ///   @Tab {
 ///     @ { "Sports" }
-///     @Icon { @named_svgs::get_or_default("sports") }
+///     @Icon { @svg_registry::get_or_default("sports") }
 ///     @text! { text: "Live sports updates..." }
 ///   }
 ///   @Tab {
 ///     @ { "Settings" }
-///     @Icon { @named_svgs::get_or_default("settings") }
+///     @Icon { @svg_registry::get_or_default("settings") }
 ///     @text! { text: "System configuration..." }
 ///   }
 /// };
@@ -67,17 +67,17 @@ use crate::prelude::*;
 ///   ],
 ///   @Tab {
 ///     @ { "Mail" }
-///     @Icon { @named_svgs::get_or_default("mail") }
+///     @Icon { @svg_registry::get_or_default("mail") }
 ///     @text!{ text: "Mail widget here" }
 ///   }
 ///   @Tab {
 ///     @ { "Calendar" }
-///     @Icon { @named_svgs::get_or_default("calendar") }
+///     @Icon { @svg_registry::get_or_default("calendar") }
 ///     @text!{ text: "Calendar widget here" }
 ///   }
 ///   @Tab {
 ///     @ { "Files" }
-///     @Icon { @named_svgs::get_or_default("files") }
+///     @Icon { @svg_registry::get_or_default("files") }
 ///     @text!{ text: "Files widget here" }
 ///   }
 /// };
@@ -355,12 +355,12 @@ mod tests {
       }
       // Tab only icon
       @Tab {
-         @Icon { @named_svgs::default() }
+         @Icon { @svg_registry::default_svg() }
       }
       // Tab with label and icon
       @Tab {
         @ { "Tab 3" }
-        @Icon { @named_svgs::default() }
+        @Icon { @svg_registry::default_svg() }
         @text! { text: "Label and icon" }
       }
     })

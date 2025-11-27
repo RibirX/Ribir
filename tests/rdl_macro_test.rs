@@ -164,10 +164,9 @@ widget_layout_test!(
   WidgetTester::new({
     let (scale, w_scale) = split_value(1.);
     let w = fn_widget! {
-      let base = IconSize::of(BuildCtx::get()).tiny;
-      rdl!{ SizedBox {
-        size: pipe!(base * *$read(scale))
-      }}
+      @SizedBox {
+        size: pipe!(Size::splat(18.0f32) * *$read(scale))
+      }
     };
     *w_scale.write() = 2.;
     w

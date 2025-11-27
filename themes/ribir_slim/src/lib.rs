@@ -1,4 +1,4 @@
-use ribir_core::{fill_svgs, prelude::*};
+use ribir_core::prelude::*;
 mod classes;
 pub mod slim;
 
@@ -22,45 +22,7 @@ pub fn purple() -> Theme {
 
 pub fn with_palette(palette: Palette) -> Theme {
   let classes = classes::initd_classes();
-  let icon_size = IconSize {
-    tiny: Size::new(18., 18.),
-    small: Size::new(24., 24.),
-    medium: Size::new(36., 36.),
-    large: Size::new(48., 48.),
-    huge: Size::new(64., 64.),
-  };
-
-  let mut icon_theme = IconTheme::new(icon_size);
-  fill_svgs! {
-    icon_theme,
-    svgs::ADD: "../icons/add_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ARROW_BACK: "../icons/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ARROW_DROP_DOWN: "../icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ARROW_FORWARD: "../icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CANCEL: "../icons/cancel_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHECK_BOX: "../icons/check_box_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHECK_BOX_OUTLINE_BLANK: "../icons/check_box_outline_blank_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHEVRON_RIGHT: "../icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CLOSE: "../icons/close_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::DELETE: "../icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::DONE: "../icons/done_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::EXPAND_MORE: "../icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::FAVORITE: "../icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::HOME: "../icons/home_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::INDETERMINATE_CHECK_BOX: "../icons/indeterminate_check_box_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::LOGIN: "../icons/login_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::LOGOUT: "../icons/logout_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::MENU: "../icons/menu_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::MORE_HORIZ: "../icons/more_horiz_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::MORE_VERT: "../icons/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::OPEN_IN_NEW: "../icons/open_in_new_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::SEARCH: "../icons/search_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::SETTINGS: "../icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::STAR: "../icons/star_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::TEXT_CARET: "../icons/text_caret.svg"
-  };
-
-  Theme { palette, classes, typography_theme: typography_theme(), icon_theme, ..Default::default() }
+  Theme { palette, classes, typography_theme: typography_theme(), ..Default::default() }
 }
 
 fn typography_theme() -> TypographyTheme {
