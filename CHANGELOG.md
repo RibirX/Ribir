@@ -25,6 +25,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **themes**: Material theme now registers icons to `svg_registry`. (#806 @M-Adoo)
+
+### Breaking
+
+- **themes**: Removed `IconTheme`, `fill_svgs!`, `svgs` and `material_svgs`. Use `svg_registry` to manage and access icons instead. (#806 @M-Adoo)
+
 ## [0.4.0-alpha.51] - 2025-11-26
 
 ### Features

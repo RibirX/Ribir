@@ -36,44 +36,47 @@ pub static APP_ICON: LazyLock<Resource<PixelImage>> = LazyLock::new(|| {
 });
 
 pub fn load_icons() {
-  named_svgs::register(
+  svg_registry::register(
     "pause",
     Svg::open(get_resource_path("static/pause.svg"), true, true).unwrap(),
   );
-  named_svgs::register(
+  svg_registry::register(
     "play",
     Svg::open(get_resource_path("static/play.svg"), true, true).unwrap(),
   );
-  named_svgs::register(
+  svg_registry::register(
     "volume_off",
     Svg::open(get_resource_path("static/volume_off.svg"), true, false).unwrap(),
   );
-  named_svgs::register(
+  svg_registry::register(
     "volume_up",
     Svg::open(get_resource_path("static/volume_up.svg"), true, false).unwrap(),
   );
-  named_svgs::register(
+  svg_registry::register(
     "skip_next",
     Svg::open(get_resource_path("static/skip_next.svg"), true, false).unwrap(),
   );
-  named_svgs::register(
+  svg_registry::register(
     "close",
     Svg::open(get_resource_path("static/close.svg"), true, false).unwrap(),
   );
-  named_svgs::register(
+  svg_registry::register(
     "minimize",
     Svg::open(get_resource_path("static/minimize.svg"), true, false).unwrap(),
   );
-  named_svgs::register(
+  svg_registry::register(
     "full",
     Svg::open(get_resource_path("static/full.svg"), true, false).unwrap(),
   );
-  named_svgs::register(
+  svg_registry::register(
     "mini",
     Svg::open(get_resource_path("static/mini.svg"), true, false).unwrap(),
   );
-  named_svgs::register("pin", Svg::open(get_resource_path("static/pin.svg"), true, false).unwrap());
-  named_svgs::register(
+  svg_registry::register(
+    "pin",
+    Svg::open(get_resource_path("static/pin.svg"), true, false).unwrap(),
+  );
+  svg_registry::register(
     "pin_off",
     Svg::open(get_resource_path("static/pin_off.svg"), true, false).unwrap(),
   );

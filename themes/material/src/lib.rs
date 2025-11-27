@@ -1,17 +1,22 @@
-use ribir_core::{fill_svgs, prelude::*};
+use ribir_core::prelude::*;
 use ribir_widgets::prelude::*;
 pub mod ripple;
 pub mod state_layer;
 pub use ripple::*;
 pub use state_layer::*;
-mod styles_sheet;
-pub use styles_sheet::*;
+
 mod classes;
 mod interactive_layers;
 pub mod md;
 pub use interactive_layers::*;
 mod focus_indicator;
 pub use focus_indicator::*;
+
+macro_rules! register_svg {
+  ($name:expr, $file_name:literal) => {
+    svg_registry::register($name, asset!($file_name, "svg", inherit_fill = true));
+  };
+}
 
 /// A provider used to hint widgets in the subtree to disable the ripple effect.
 pub struct DisabledRipple(pub bool);
@@ -24,57 +29,49 @@ impl DisabledRipple {
 
 /// Crate a material theme with palette.
 fn new(palette: Palette) -> Theme {
+  // Register SVG icons in the global registry
+  register_svg!("add", "../icons/add_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("arrow_back", "../icons/arrow_back_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("arrow_drop_down", "../icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("arrow_forward", "../icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("cancel", "../icons/cancel_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("chevron_right", "../icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("close", "../icons/close_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("delete", "../icons/delete_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("done", "../icons/done_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("expand_more", "../icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("favorite", "../icons/favorite_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("home", "../icons/home_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("login", "../icons/login_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("logout", "../icons/logout_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("menu", "../icons/menu_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("more_vert", "../icons/more_vert_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("search", "../icons/search_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("settings", "../icons/settings_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("star", "../icons/star_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("more_horiz", "../icons/more_horiz_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("text_caret", "../icons/text_caret.svg");
+  register_svg!("add_circle", "../icons/add_circle_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("check_circle", "../icons/check_circle_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("check", "../icons/check_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("file_download", "../icons/file_download_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("grade", "../icons/grade_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("refresh", "../icons/refresh_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("sms", "../icons/sms_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("account_circle", "../icons/account_circle_FILL0_wght400_GRAD0_opsz48.svg");
+  register_svg!("info", "../icons/info_FILL0_wght400_GRAD0_opsz48.svg");
+
   let classes = classes::initd_classes();
-  let mut theme = Theme {
+  Theme {
     palette,
     typography_theme: typography_theme(),
     classes,
-    icon_theme: icon_theme(),
     font_bytes: vec![
       include_bytes!("./fonts/Roboto-Regular.ttf").to_vec(),
       include_bytes!("./fonts/Roboto-Medium.ttf").to_vec(),
     ],
     ..Default::default()
-  };
-
-  fill_svgs! { theme.icon_theme,
-    svgs::ADD: "../icons/add_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ARROW_BACK: "../icons/arrow_back_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ARROW_DROP_DOWN: "../icons/arrow_drop_down_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::ARROW_FORWARD: "../icons/arrow_forward_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CANCEL: "../icons/cancel_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CHEVRON_RIGHT: "../icons/chevron_right_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::CLOSE: "../icons/close_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::DELETE: "../icons/delete_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::DONE: "../icons/done_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::EXPAND_MORE: "../icons/expand_more_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::FAVORITE: "../icons/favorite_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::HOME: "../icons/home_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::LOGIN: "../icons/login_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::LOGOUT: "../icons/logout_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::MENU: "../icons/menu_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::MORE_VERT: "../icons/more_vert_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::SEARCH: "../icons/search_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::SETTINGS: "../icons/settings_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::STAR: "../icons/star_FILL0_wght400_GRAD0_opsz48.svg",
-    svgs::TEXT_CARET: "../icons/text_caret.svg",
-    svgs::MORE_HORIZ: "../icons/more_horiz_FILL0_wght400_GRAD0_opsz48.svg"
-  };
-
-  fill_svgs! {
-    theme.icon_theme,
-    material_svgs::ADD_CIRCLE: "../icons/add_circle_FILL0_wght400_GRAD0_opsz48.svg",
-    material_svgs::CHECK_CIRCLE: "../icons/check_circle_FILL0_wght400_GRAD0_opsz48.svg",
-    material_svgs::CHECK: "../icons/check_FILL0_wght400_GRAD0_opsz48.svg",
-    material_svgs::FILE_DOWNLOAD: "../icons/file_download_FILL0_wght400_GRAD0_opsz48.svg",
-    material_svgs::GRADE: "../icons/grade_FILL0_wght400_GRAD0_opsz48.svg",
-    material_svgs::REFRESH: "../icons/refresh_FILL0_wght400_GRAD0_opsz48.svg",
-    material_svgs::SMS: "../icons/sms_FILL0_wght400_GRAD0_opsz48.svg",
-    material_svgs::ACCOUNT_CIRCLE: "../icons/account_circle_FILL0_wght400_GRAD0_opsz48.svg",
-    material_svgs::INFO: "../icons/info_FILL0_wght400_GRAD0_opsz48.svg"
   }
-
-  theme
 }
 
 pub mod purple {
@@ -101,17 +98,6 @@ pub mod purple {
 
   /// A default dark theme with a teal accent color. Colors from <https://material.io/design/color/dark-theme.html#ui-application>
   pub fn dark() -> Theme { new(palette(Brightness::Dark)) }
-}
-
-fn icon_theme() -> IconTheme {
-  let icon_size = IconSize {
-    tiny: md::SIZE_18,
-    small: md::SIZE_24,
-    medium: md::SIZE_36,
-    large: md::SIZE_48,
-    huge: md::SIZE_64,
-  };
-  IconTheme::new(icon_size)
 }
 
 /// Create a TypographyTheme which implement the typography styles base on the

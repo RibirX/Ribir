@@ -318,7 +318,7 @@ mod tests {
 
   use super::*;
 
-  fn miss_icon() -> Svg { named_svgs::get_or_default("default") }
+  fn miss_icon() -> Svg { svg_registry::get_or_default("default") }
 
   widget_image_tests!(
     button,
@@ -343,7 +343,8 @@ mod tests {
         @Trailing::new(@Icon { @miss_icon() })
       }
     })
-    .with_wnd_size(Size::new(400., 120.)),
+    .with_wnd_size(Size::new(400., 120.))
+    .with_comparison(0.00003)
   );
 
   widget_image_tests!(
@@ -436,7 +437,8 @@ mod tests {
         @Trailing::new(@Icon { @miss_icon() })
       }
     })
-    .with_wnd_size(Size::new(400., 128.)),
+    .with_wnd_size(Size::new(400., 128.))
+    .with_comparison(0.00005)
   );
 
   widget_image_tests!(

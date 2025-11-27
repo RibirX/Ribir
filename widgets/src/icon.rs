@@ -33,7 +33,7 @@ use ribir_core::{impl_compose_child_for_wrap_render, prelude::*, wrap_render::Wr
 /// });
 ///
 /// // Using a named SVG as an icon
-/// let _icon = icon! { @ { svgs::DELETE } };
+/// let _icon = icon! { @ { svg_registry::get_or_default("delete") } };
 /// // Using a font icon
 /// let _icon = icon! { @ { "search" } };
 /// // Using any widget you want
@@ -53,7 +53,7 @@ use ribir_core::{impl_compose_child_for_wrap_render, prelude::*, wrap_render::Wr
 ///
 /// let _icon = icon! {
 ///   text_line_height: 64.,
-///   @ { named_svgs::get_or_default("search") }
+///   @ { svg_registry::get_or_default("search") }
 /// };
 /// ```
 #[derive(Declare, Default, Clone, Copy)]
@@ -169,7 +169,7 @@ mod tests {
       text_line_height: 24.,
       @Icon {
         foreground: Color::BLUE,
-        @ { svgs::DELETE }
+        @ { svg_registry::get_or_default("delete") }
       }
       @Icon {
         foreground: Color::RED,
@@ -205,7 +205,7 @@ mod tests {
       @Icon {
         foreground: Color::RED,
         text_line_height: 48.,
-        @ { named_svgs::get_or_default("") }
+        @ { svg_registry::get_or_default("") }
       }
     })
     .with_wnd_size(Size::splat(64.))

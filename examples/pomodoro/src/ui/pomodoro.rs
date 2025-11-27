@@ -22,8 +22,8 @@ fn setting_button_icon() -> Widget<'static> {
       }
       @ {
         pipe!($read(ui_state).current_page).map(move |v| match v {
-          PomodoroPage::Mini | PomodoroPage::Main => svgs::SETTINGS,
-          PomodoroPage::Setting => svgs::ARROW_BACK,
+          PomodoroPage::Mini | PomodoroPage::Main => svg_registry::get_or_default("settings"),
+          PomodoroPage::Setting => svg_registry::get_or_default("arrow_back"),
         })
       }
     }

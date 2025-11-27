@@ -30,15 +30,15 @@ use crate::prelude::*;
 /// list! {
 ///   select_mode: ListSelectMode::Single,
 ///   @ListItem {
-///     @Icon { @named_svgs::default() }
+///     @Icon { @svg_registry::default_svg() }
 ///     @ListItemHeadline { @ { "Primary Text" } }
 ///     @ListItemSupporting { @ { "Secondary Text" } }
 ///     @ListItemTrailingSupporting { @{ "100+" } }
 ///   }
 ///   @ListItem {
-///     @Icon { @named_svgs::default() }
+///     @Icon { @svg_registry::default_svg() }
 ///     @ListItemHeadline { @ { "Headline Only" } }
-///     @Trailing { @Icon { @named_svgs::default() } }
+///     @Trailing { @Icon { @svg_registry::default_svg() } }
 ///   }
 /// };
 /// ```
@@ -69,7 +69,7 @@ use crate::prelude::*;
 ///   @ListCustomItem { @H2 { text: "Section Header" } }
 ///   @ListItem {
 ///     @ListItemHeadline { @ { "First Item" } }
-///     @Trailing { @Icon { @named_svgs::get_or_default("info") } }
+///     @Trailing { @Icon { @svg_registry::get_or_default("info") } }
 ///   }
 ///   @ListItem {
 ///     @ListItemHeadline { @ { "Second Item" } }
@@ -117,7 +117,7 @@ use crate::prelude::*;
 ///     @Trailing {
 ///       @TextButton {
 ///         on_tap: move |_| log::info!("Star clicked"),
-///         @Icon { @named_svgs::get_or_default("star") }
+///         @Icon { @svg_registry::get_or_default("star") }
 ///       }
 ///     }
 ///   }
@@ -767,29 +767,29 @@ mod tests {
    list,
    WidgetTester::new(list!{
      @ListItem {
-       @Icon { @named_svgs::default() }
+       @Icon { @svg_registry::default_svg() }
        @ListItemHeadline { @ { "Icon"} }
        @ListItemSupporting { @ { "description"} }
        @ListItemTrailingSupporting { @ { "100+"} }
      }
      @ListItem {
        disabled: true,
-       @Icon { @named_svgs::default() }
+       @Icon { @svg_registry::default_svg() }
        @ListItemHeadline { @ { "Only Headline"} }
-       @Trailing { @Icon { @named_svgs::default() } }
+       @Trailing { @Icon { @svg_registry::default_svg() } }
      }
      @ListCustomItem { @Text { text: "Custom Item" } }
      @ListItem {
-       @Icon { @named_svgs::default() }
+       @Icon { @svg_registry::default_svg() }
        @ListItemHeadline { @ { "Only Headline"} }
        @ListItemTrailingSupporting { @ { "100+"} }
-       @Trailing { @Icon { @named_svgs::default() } }
+       @Trailing { @Icon { @svg_registry::default_svg() } }
      }
      @ListItem {
        @Avatar { @ { "A" } }
        @ListItemHeadline { @ { "Avatar"} }
        @ListItemSupporting { @ { "description"} }
-       @Trailing { @Icon { @named_svgs::default() } }
+       @Trailing { @Icon { @svg_registry::default_svg() } }
      }
      @ListItem {
        @ListItemImg {
@@ -808,7 +808,7 @@ mod tests {
          @ { "there is supporting lines, many lines, wrap to multiple lines, xxhadkasda"}
        }
        @ListItemTrailingSupporting { @ { "100+" } }
-       @Trailing { @Icon { @named_svgs::default() } }
+       @Trailing { @Icon { @svg_registry::default_svg() } }
      }
 
      @ListItem {

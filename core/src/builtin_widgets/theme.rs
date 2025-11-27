@@ -8,8 +8,6 @@ use crate::prelude::*;
 
 mod palette;
 pub use palette::*;
-mod icon_theme;
-pub use icon_theme::*;
 mod typography_theme;
 pub use ribir_painter::*;
 pub use typography_theme::*;
@@ -71,7 +69,6 @@ pub struct Theme {
   pub palette: Palette,
   pub typography_theme: TypographyTheme,
   pub classes: Classes,
-  pub icon_theme: IconTheme,
   // The theme requires font bytes.
   pub font_bytes: Vec<Vec<u8>>,
   // The theme requires font files.
@@ -135,7 +132,6 @@ impl Theme {
       Provider::reader(part_reader!(&this.typography_theme.body_medium.text)),
       Provider::reader(part_reader!(&this.palette)),
       Provider::reader(part_reader!(&this.typography_theme)),
-      Provider::reader(part_reader!(&this.icon_theme)),
       Classes::reader_into_provider(part_reader!(&this.classes)),
       Provider::reader(part_reader!(&this.icon_font))
     ];
@@ -177,20 +173,9 @@ impl ComposeChild<'static> for Theme {
 
 impl Default for Theme {
   fn default() -> Self {
-    let icon_size = IconSize {
-      tiny: Size::new(18., 18.),
-      small: Size::new(24., 24.),
-      medium: Size::new(36., 36.),
-      large: Size::new(48., 48.),
-      huge: Size::new(64., 64.),
-    };
-
-    let icon_theme = IconTheme::new(icon_size);
-
     Theme {
       palette: Palette::default(),
       typography_theme: typography_theme(),
-      icon_theme,
       classes: <_>::default(),
       font_bytes: vec![],
       font_files: vec![],
