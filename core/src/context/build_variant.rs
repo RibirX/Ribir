@@ -116,46 +116,52 @@ impl<V: 'static> Variant<V> {
   }
 }
 
+macro_rules! impl_color_methods {
+  ($V:ty) => {
+    /// Convert a color variant to another color variant with its base lightness
+    /// tone.
+    pub fn into_base_color(
+      self, ctx: &impl AsRef<ProviderCtx>,
+    ) -> VariantMap<$V, impl Fn(&$V) -> Color> {
+      let p = Palette::of(ctx);
+      let lightness = p.lightness_group().base;
+      self.map(move |c| c.clone().with_lightness(lightness))
+    }
+
+    /// Converts a color variant to another color variant with its container
+    /// lightness tone.
+    pub fn into_container_color(
+      self, ctx: &impl AsRef<ProviderCtx>,
+    ) -> VariantMap<$V, impl Fn(&$V) -> Color> {
+      let p = Palette::of(ctx);
+      let lightness = p.lightness_group().container;
+      self.map(move |c| c.clone().with_lightness(lightness))
+    }
+
+    /// Converts a color variant to another color variant that its lightness tone
+    /// is suitable display on its base color.
+    pub fn on_this_color(
+      self, ctx: &impl AsRef<ProviderCtx>,
+    ) -> VariantMap<$V, impl Fn(&$V) -> Color> {
+      let p = Palette::of(ctx);
+      let lightness = p.lightness_group().on;
+      self.map(move |c| c.clone().with_lightness(lightness))
+    }
+
+    /// Converts a color variant to another color variant that its lightness tone
+    /// is suitable display on its container color.
+    pub fn on_this_container_color(
+      self, ctx: &impl AsRef<ProviderCtx>,
+    ) -> VariantMap<$V, impl Fn(&$V) -> Color> {
+      let p = Palette::of(ctx);
+      let lightness = p.lightness_group().on_container;
+      self.map(move |c| c.clone().with_lightness(lightness))
+    }
+  };
+}
+
 impl Variant<Color> {
-  /// Convert a color variant to another color variant with its base lightness
-  /// tone.
-  pub fn into_base_color(
-    self, ctx: &impl AsRef<ProviderCtx>,
-  ) -> VariantMap<Color, impl Fn(&Color) -> Color> {
-    let p = Palette::of(ctx);
-    let lightness = p.lightness_group().base;
-    self.map(move |c| c.with_lightness(lightness))
-  }
-
-  /// Converts a color variant to another color variant with its container
-  /// lightness tone.
-  pub fn into_container_color(
-    self, ctx: &impl AsRef<ProviderCtx>,
-  ) -> VariantMap<Color, impl Fn(&Color) -> Color> {
-    let p = Palette::of(ctx);
-    let lightness = p.lightness_group().container;
-    self.map(move |c| c.with_lightness(lightness))
-  }
-
-  /// Converts a color variant to another color variant that its lightness tone
-  /// is suitable display on its base color.
-  pub fn on_this_color(
-    self, ctx: &impl AsRef<ProviderCtx>,
-  ) -> VariantMap<Color, impl Fn(&Color) -> Color> {
-    let p = Palette::of(ctx);
-    let lightness = p.lightness_group().on;
-    self.map(move |c| c.with_lightness(lightness))
-  }
-
-  /// Converts a color variant to another color variant that its lightness tone
-  /// is suitable display on its container color.
-  pub fn on_this_container_color(
-    self, ctx: &impl AsRef<ProviderCtx>,
-  ) -> VariantMap<Color, impl Fn(&Color) -> Color> {
-    let p = Palette::of(ctx);
-    let lightness = p.lightness_group().on_container;
-    self.map(move |c| c.with_lightness(lightness))
-  }
+  impl_color_methods!(Color);
 }
 
 impl<V, F> VariantMap<V, F> {
@@ -176,6 +182,13 @@ impl<V, F> VariantMap<V, F> {
   {
     (self.map)(&self.variant.clone_value())
   }
+}
+
+impl<V, F> VariantMap<V, F>
+where
+  F: Fn(&V) -> Color,
+{
+  impl_color_methods!(V);
 }
 
 pub struct VariantKind<K: ?Sized>(PhantomData<fn() -> K>);
