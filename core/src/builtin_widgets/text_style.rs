@@ -1,7 +1,22 @@
 use crate::prelude::*;
 
-/// This widget establishes the text style for painting the text within its
-/// descendants.
+/// Provides a `TextStyle` to descendant text widgets for painting text.
+///
+/// This is a built-in `FatObj` field. Setting `text_style` attaches a
+/// `TextStyleWidget` which supplies text style information to descendants.
+///
+/// # Example
+///
+/// Paint text using the title-large style from the typography theme.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// text! {
+///   text: "Big Text",
+///   text_style: TypographyTheme::of(BuildCtx::get()).title_large.text.clone(),
+/// };
+/// ```
 pub struct TextStyleWidget {
   pub text_style: TextStyle,
 }

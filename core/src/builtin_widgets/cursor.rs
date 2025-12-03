@@ -1,7 +1,23 @@
 use crate::prelude::*;
 
-/// `Cursor` is an attribute to assign an `cursor` to a widget.
-
+/// Assigns a `CursorIcon` to a widget to control the pointer cursor while
+/// hovering it.
+///
+/// This is a built-in `FatObj` field. Setting the `cursor` field attaches a
+/// `Cursor` widget that updates the window cursor on pointer enter/leave.
+///
+/// # Example
+///
+/// Show a pointer cursor when hovering the text.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// text! {
+///   cursor: CursorIcon::Pointer,
+///   text: "Hover me!"
+/// };
+/// ```
 #[derive(Default, Debug)]
 pub struct Cursor {
   pub cursor: CursorIcon,

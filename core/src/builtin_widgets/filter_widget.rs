@@ -4,24 +4,22 @@ use ribir_painter::Filter;
 
 use crate::{prelude::*, wrap_render::WrapRender};
 
-/// A widget that applies a filter to its content.
+/// A wrapper that applies a painter `Filter` to its content subtree.
 ///
-/// This is a builtin field of FatObj. You can simply set the `filter` field
-/// to attach a FilterWidget to the host widget.
+/// This is a built-in `FatObj` field. Setting the `filter` field attaches a
+/// `FilterWidget` to the host, causing subsequent painting to run through the
+/// configured filter pipeline.
 ///
 /// # Example
+///
+/// Apply a blur filter to the text content.
 ///
 /// ```rust
 /// use ribir::prelude::*;
 ///
-/// fn_widget! {
-///   @Container {
-///     size: Size::new(100., 100.),
-///     @Text {
-///       filter: Filter::blur(20.),
-///       text: "Hello, Ribir!",
-///     }
-///   }
+/// text! {
+///   filter: Filter::blur(20.),
+///   text: "Hello, Ribir!",
 /// };
 /// ```
 #[derive(Default, Clone)]

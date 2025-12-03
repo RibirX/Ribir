@@ -1,6 +1,23 @@
 use crate::{prelude::*, wrap_render::*};
 
-/// a widget that imposes additional constraints clamp on its child.
+/// A wrapper that applies additional constraint clamping to its child.
+///
+/// This is a built-in `FatObj` field. Setting the `clamp` field attaches a
+/// `ConstrainedBox` which constrains the child's min/max sizes.
+///
+/// # Example
+///
+/// Constrain a container to a maximum width of 100.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// container! {
+///   size: Size::new(200., 50.), // This will be constrained to width 100.
+///   background: Color::RED,
+///   clamp: BoxClamp::max_width(100.),
+/// };
+/// ```
 #[derive(Clone, Default)]
 pub struct ConstrainedBox {
   pub clamp: BoxClamp,

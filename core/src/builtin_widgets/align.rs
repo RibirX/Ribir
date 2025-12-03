@@ -1,6 +1,6 @@
 use crate::{prelude::*, wrap_render::*};
 
-/// A enum that describe how widget align to its box.
+/// Enum describing how a widget is aligned inside its box.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Align {
   /// The children are aligned to the start edge of the box provided by parent.
@@ -23,7 +23,7 @@ pub enum Align {
   Stretch,
 }
 
-/// A enum that describe how widget align to its box in x-axis.
+/// Enum describing horizontal alignment of a widget inside its box.
 #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HAlign {
   /// The children are aligned to the left edge of the box provided by parent.
@@ -38,7 +38,7 @@ pub enum HAlign {
   Stretch,
 }
 
-/// A enum that describe how widget align to its box in y-axis.
+/// Enum describing vertical alignment of a widget inside its box.
 #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VAlign {
   #[default]
@@ -53,30 +53,44 @@ pub enum VAlign {
   Stretch,
 }
 
-/// A virtual widget that horizontally positions its child based on parent
-/// constraints.
+/// A wrapper widget that horizontally positions its child according to the
+/// parent's constraints.
 ///
-/// ## Layout Behavior
+/// # Example, the text will be horizontally centered in the container.
 ///
-/// As we don't know the parent size during layout, the alignment container
-/// width is determined by the following priority rules:
+/// ```rust
+/// use ribir::prelude::*;
 ///
-/// 1. Use the maximum constraint width if it's finite.
-/// 2. Fall back to the clamped child width (constrained by min/max limits) .
+/// container! {
+///   size: Size::new(200., 100.),
+///   @Text {
+///     text: "Horizontal Center",
+///     h_align: HAlign::Center,
+///   }
+/// };
+/// ```
 ///
-/// ## Implementation Notes
+/// ## Layout behavior
 ///
-/// - Parent precedence: Final x-position may be overridden by parent layout
-///   logic
-/// - Constraint relaxation: This widget removes width constraints during child
-///   layout to ensure proper alignment calculation
+/// The alignment container width is determined using the following priority
+/// rules because the parent's final size may be unknown during layout:
 ///
-/// ## Usage Guidelines
+/// 1. Use the maximum constraint width if it is finite.
+/// 2. Otherwise fall back to the child's clamped width (respecting min/max).
 ///
-/// For reliable alignment:
+/// ## Implementation notes
 ///
-/// - Use within parents with fixed width
-/// - Avoid combining with parents that perform custom x-axis positioning
+/// - Parent precedence: The final x-position can still be overridden by the
+///   parent's layout logic.
+/// - Constraint relaxation: This widget relaxes width constraints when laying
+///   out its child to compute the alignment correctly.
+///
+/// ## Usage guidelines
+///
+/// For predictable behavior:
+///
+/// - Use inside parents with a fixed width when possible.
+/// - Avoid nesting inside parents that apply custom x-axis positioning.
 #[derive(Default)]
 pub struct HAlignWidget {
   /// Configuration for horizontal alignment strategy
@@ -88,6 +102,20 @@ pub struct HAlignWidget {
 
 /// A virtual widget that vertically positions its child based on parent
 /// constraints.
+///
+/// # Example, the text will be vertically centered in the container.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// container! {
+///   size: Size::new(200., 100.),
+///   @Text {
+///     text: "Vertical Center",
+///     v_align: VAlign::Center,
+///   }
+/// };
+/// ```
 ///
 /// This widget is similar to [`HAlignWidget`], but aligns children in y-axis.
 /// See [`HAlignWidget`] for more details.

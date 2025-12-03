@@ -41,23 +41,23 @@ impl BoxShadow {
   }
 }
 
-/// A widget that applies box shadow effect to its content.
-/// It draws a colored area and applies a blur filter based on the radius.
+/// A widget that renders a box shadow for its host by drawing a colored area
+/// and applying an optional blur.
 ///
-/// This is a builtin field of FatObj. You can simply set the `box_shadow` field
-/// to attach a BoxShadowWidget to the host widget.
+/// This is a built-in `FatObj` field. Setting the `box_shadow` field attaches
+/// a `BoxShadowWidget` to the host to render shadow effects.
 ///
 /// # Example
+///
+/// Apply a red box shadow to a container.
 ///
 /// ```rust
 /// use ribir::prelude::*;
 ///
-/// fn_widget! {
-///   @Container {
-///     size: Size::new(100., 100.),
-///     radius: Radius::all(50.),
-///     box_shadow: BoxShadow::new(Point::new(45., 15.), 20., 12., Color::RED),
-///   }
+/// container! {
+///   size: Size::new(100., 100.),
+///   radius: Radius::all(50.),
+///   box_shadow: BoxShadow::new(Point::new(45., 15.), 20., 12., Color::RED),
 /// };
 /// ```
 #[derive(Default, Clone)]

@@ -1,6 +1,20 @@
 use crate::prelude::*;
 
-/// Widget with fixed size as a container for its child.
+/// A simple container widget with a fixed size for its child.
+///
+/// # Example
+///
+/// Place text inside a 100x100 container.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// container! {
+///   size: Size::new(100., 100.),
+///   background: Color::BLUE,
+///   @Text { text: "Hello" }
+/// };
+/// ```
 #[derive(Declare, SingleChild)]
 pub struct Container {
   pub size: Size,

@@ -34,7 +34,7 @@ pub enum Brightness {
 ///
 /// Every descendant widget of the theme can query it or its parts.
 ///
-/// ```no_run
+/// ```rust no_run
 /// use ribir::prelude::*;
 ///
 /// let w = fn_widget! {
@@ -57,12 +57,12 @@ pub enum Brightness {
 ///
 /// You can use an other theme for a widget.
 ///
-/// ```
+/// ```rust no_run
 /// use ribir::prelude::*;
 ///
 /// // Feel free to use a different theme here.
 /// let w = Theme::default().with_child(fn_widget! {
-///   Void
+///   @Void {}
 /// });
 /// ```
 pub struct Theme {

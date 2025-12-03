@@ -1,6 +1,29 @@
 use crate::{prelude::*, wrap_render::*};
 
-/// Widget use to ignore pointer events
+/// A wrapper that ignores pointer events according to a specified scope.
+///
+/// `IgnorePointer` can suppress pointer events for the host, only the host,
+/// or the whole subtree depending on `IgnoreScope`.
+///
+/// # Example
+///
+/// The red container below will not respond to pointer events when the scope
+/// is set to `IgnoreScope::Subtree`.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @IgnorePointer {
+///     ignore: IgnoreScope::Subtree,
+///     @Container {
+///       size: Size::new(100., 100.),
+///       background: Color::RED,
+///       on_tap: |_: &mut PointerEvent| println!("This will never be printed"),
+///     }
+///   }
+/// };
+/// ```
 #[derive(Declare, Clone)]
 pub struct IgnorePointer {
   #[declare(default)]

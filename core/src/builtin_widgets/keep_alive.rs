@@ -1,17 +1,57 @@
 use crate::prelude::*;
 
-/// A widget will be painted event if it has been dispose until the `keep_alive`
-/// field be set to `false` or its parent is dropped.
+/// A wrapper that keeps a widget alive (paintable and layout-capable) after
+/// it has been logically disposed until `keep_alive` becomes `false` or the
+/// parent is dropped.
 ///
-/// This widget not effect the widget lifecycle, if the widget is dispose but
-/// the `keep_alive` is `true`, it's not part of the widget tree anymore
-/// but not drop immediately, is disposed in `logic`, but not release resource.
-/// It's be isolated from the widget tree and can layout and paint normally.
+/// This does not change the widget lifecycle semantics — the widget is
+/// removed from the tree when disposed — but when `keep_alive` is true the
+/// object is retained (not immediately dropped) so it can continue to run
+/// animations or paint its final frame.
 ///
-/// Once the `keep_alive` field be set to `false`, the widget will be
+/// This is useful to play exit/leave animations when a widget is removed.
+///
+/// This is a built-in `FatObj` field. Setting `keep_alive` attaches `KeepAlive`
+/// behavior to the host.
+///
+/// # Example
+///
+/// Use `keep_alive` to allow a widget to run a leave animation before being
 /// dropped.
 ///
-/// It's useful when you need run a leave animation for a widget.
+/// ``` rust
+/// use ribir::{material::md, prelude::*};
+///
+/// fn_widget! {
+///   let checkbox = @Checkbox { checked: true };
+///   let text = pipe!($read(checkbox).checked).map(move |v|
+///     if v {
+///       let mut w = @Text {
+///         text: "text will survive even if removed until animation finished!",
+///       };
+///       // opacity animation will auto trigger when the opacity is changed
+///       let animate = w.opacity()
+///         .transition(EasingTransition{
+///           easing: easing::LINEAR,
+///           duration: md::easing::duration::SHORT4,
+///         }.box_it());
+///       @(w) {
+///         // when the widget alive(the opacity is set to 0 in on_disposed)
+///         // or the animation is running, keep the widget alive
+///         keep_alive: pipe!(*$read(w.opacity()) != 0. || $read(animate).is_running()),
+///         on_disposed: move |_| *$write(w.opacity()) = 0.,
+///       }.into_widget()
+///     } else {
+///       @Void {}.into_widget()
+///     }
+///   );
+///   @Row {
+///     align_items: Align::Center,
+///     @ { checkbox }
+///     @ { text }
+///   }
+/// };
+/// ```
 #[derive(Default)]
 pub struct KeepAlive {
   pub keep_alive: bool,

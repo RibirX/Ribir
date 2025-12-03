@@ -1,6 +1,6 @@
 use crate::{prelude::*, wrap_render::*};
 
-/// Specifies the horizontal position you want to anchor the widget.
+/// Specifies a horizontal anchor position for a widget relative to a target.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum HAnchor {
   /// positions the widget's left edge x pixels to the right of the target's
@@ -12,7 +12,7 @@ pub enum HAnchor {
   Right(Measure),
 }
 
-/// Specifies the vertical position you want to anchor the widget.
+/// Specifies a vertical anchor position for a widget relative to a target.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VAnchor {
   /// positions the widget's top edge x pixels bellow the target's top edge.
@@ -146,21 +146,40 @@ impl Anchor {
   }
 }
 
-/// A virtual widget that anchors its child relative to parent constraints.
+/// A wrapper widget that anchors its child relative to its parent or a target.
+///
+/// This is a built-in field of `FatObj`. Setting the `anchor` field attaches
+/// an `Anchor` to the host, allowing precise placement relative to the parent
+/// bounds.
+///
+/// # Example, the text will be anchored to the bottom right corner of the
+/// container with 10 pixels offset from the right and bottom edges.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// container! {
+///   size: Size::new(200., 200.),
+///   @Text {
+///     text: "Bottom Right",
+///     anchor: Anchor::right_bottom(10., 10.),
+///   }
+/// };
+/// ```
 ///
 /// ## Note
 ///
-/// If the anchor is percentage or relative to the bottom or right edge, we
-/// calculate the offset based on a container base on the child size and the
-/// constraints but not the parent constraints. The container is determined by
-/// the following priority rules:
+/// For percentage-based or right/bottom-relative anchors we compute offsets
+/// from a container derived from the child size and local constraints, not
+/// from the parent's unconstrained sizes. The container is chosen by:
 ///
-/// 1. Use the maximum constraint if it's finite.
-/// 2. Fall back to the clamped child size (constrained by min/max limits) .
+/// 1. Use the maximum constraint when it is finite.
+/// 2. Otherwise, fall back to the child's clamped size (respecting min/max).
 ///
-/// ## Usage Guidelines
+/// ## Usage guidelines
 ///
-/// For reliable alignment, use within parents has fixed size
+/// For reliable placement, prefer using anchors inside parents with fixed
+/// sizes or predictable layout behavior.
 
 #[derive(Default)]
 pub struct RelativeAnchor {

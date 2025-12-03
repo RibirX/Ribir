@@ -1,13 +1,32 @@
 use crate::prelude::*;
 
-/// A widget that allows access to the layout result of its child.
+/// A widget that exposes the layout result of its child.
 ///
-/// ## Caution: Avoid Dependency on Layout Results for View Updates
+/// This built-in `FatObj` field provides helper methods such as
+/// `layout_rect()`, `layout_size()`, `layout_pos()`, `layout_left()`,
+/// `layout_top()`, `layout_width()`, `layout_height()` to access the child's
+/// layout information.
 ///
-/// Layout operations occur frequently, so relying on layout results to update
-/// other widgets should be done with extreme caution. Doing so can easily lead
-/// to performance issues, such as double layouts or infinite layout loops
-/// within a single frame.
+/// # Example, the text will show the width of the parent container.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   let mut container = @Container { size: Size::new(100., 100.) };
+///   @(container) {
+///     @Text {
+///       text: $read(container.layout_width()).to_string()
+///     }
+///   }
+/// };
+/// ```
+///
+/// ## Caution: Avoid depending on layout results for view updates
+///
+/// Layout runs frequently. Using layout results to trigger updates in other
+/// widgets can easily cause performance issues, including double layouts or
+/// infinite layout loops within the same frame.
 ///
 /// ### Example Scenario:
 ///
@@ -25,16 +44,17 @@ use crate::prelude::*;
 /// In step 4, this can lead to a double layout within the same frame. In step
 /// 5, it may result in an infinite layout loop.
 ///
-/// **Solution**:
-/// - Use `OnlySizedByParent` to wrap `B` if `B` does not affect the size of its
-///   parent. This prevents unnecessary dirty propagation to the parent.
-/// - Ensure that there is no circular dependency in your logic.
+/// **Mitigations**
 ///
-/// ## Avoid Using Layout Results to Create Pipe Widgets
+/// - Wrap widgets with `OnlySizedByParent` if they do not affect their parent's
+///   size to prevent unnecessary dirty propagation.
+/// - Avoid circular dependencies between widgets' layout and state updates.
 ///
-/// Layout result changes are only notified within a `Data` scope. This means
-/// that if you use a layout result as the upstream of a pipe widget, the pipe
-/// widget will not update when the layout result of the widget changes.
+/// ## Avoid using layout results as pipe widget sources
+///
+/// Layout result changes are notified only inside a `Data` scope. If you use
+/// a layout result as the upstream source for a pipe widget, that pipe may not
+/// update when the layout result changes.
 
 #[derive(Default)]
 pub struct LayoutBox {

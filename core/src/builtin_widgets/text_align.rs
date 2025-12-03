@@ -1,6 +1,24 @@
 use crate::prelude::*;
 
-/// `TextAlign` is used to align multiline text within the text bounds, with the
+/// Controls alignment of multi-line text within its bounds. Descendant
+/// `Text` widgets will use the `TextAlign` value to determine line alignment.
+///
+/// This is a built-in `FatObj` field. Setting `text_align` attaches a
+/// `TextAlignWidget` that provides alignment to descendant text renderers.
+///
+/// # Example
+///
+/// Center-align all lines of a multi-line `Text` widget.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// container! {
+///   size: Size::new(120., 40.),
+///   text_align: TextAlign::Center,
+///   @Text { text: "Line 1\nlong line 2" }
+/// };
+/// ```
 #[derive(Default)]
 pub struct TextAlignWidget {
   pub text_align: TextAlign,

@@ -3,8 +3,25 @@ use wrap_render::WrapRender;
 
 use super::*;
 
-/// A widget that provides a radius for the host widget, applying it to both the
-/// background and border of the widget.
+/// A widget that provides corner radius information to its host, affecting
+/// background and border rendering.
+///
+/// This is a built-in `FatObj` field. Setting the `radius` field attaches a
+/// `RadiusWidget` that provides corner radii to downstream painters.
+///
+/// # Example
+///
+/// Display a red container with a radius of 10.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// container! {
+///   background: Color::RED,
+///   radius: Radius::all(10.),
+///   size: Size::new(100., 100.),
+/// };
+/// ```
 ///
 /// If you set the radius in different `FatObj`, ensure it is set in the
 /// outermost `FatObj`. Otherwise, the outer border or background will ignore
@@ -12,26 +29,24 @@ use super::*;
 ///
 /// For example:
 ///
-/// ```
+/// ```rust
 /// use ribir::prelude::*;
 ///
 /// let _ = fn_widget! {
 ///   @Background {
 ///     background: Color::RED,
-///     @RadiusWidget {
-///       radius: Radius::all(10.),
-///       @BorderWidget {
-///         border: Border::all(BorderSide::new(1., Color::BLACK.into())),
-///         @Container {
-///           size: Size::new(100., 100.),
-///         }
+///     radius: Radius::all(10.),
+///     @BorderWidget {
+///       border: Border::all(BorderSide::new(1., Color::BLACK.into())),
+///       @Container {
+///         size: Size::new(100., 100.),
 ///       }
 ///     }
 ///   }
 /// };
 /// ```
 ///
-/// This widget will create a border with a radius of 10 and a red box without a
+/// This widget will create a border with a radius of 10 and a red box with a
 /// radius.
 #[derive(Default, Clone)]
 pub struct RadiusWidget {

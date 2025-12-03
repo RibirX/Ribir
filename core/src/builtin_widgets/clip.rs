@@ -1,5 +1,24 @@
 use crate::prelude::*;
 
+/// A widget that clips its child using a specified path.
+///
+/// # Example
+///
+/// Clip a container by a rounded rectangle path.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Clip {
+///     clip_path: Path::rect_round(&Rect::new(Point::zero(), Size::new(50., 50.)), &Radius::all(25.)),
+///     @Container {
+///       size: Size::new(100., 100.),
+///       background: Color::RED
+///     }
+///   }
+/// };
+/// ```
 #[derive(SingleChild, Declare)]
 pub struct Clip {
   pub clip_path: Path,

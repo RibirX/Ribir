@@ -5,24 +5,29 @@ class_names! {
   DISABLED,
 }
 
-/// Disabled Widget
+/// A widget wrapper that marks its subtree as disabled.
 ///
-/// When a widget is disabled, it will no longer receive keyboard or pointer
-/// events. Disabling a widget can be easily achieved by setting the built-in
-/// disabled property to true. To customize the disabled appearance, you can
-/// implement a dedicated Disabled class to override the default styling.
+/// When disabled, a widget and its descendants do not receive keyboard or
+/// pointer events. Toggle the built-in `disabled` field to apply this
+/// behavior. To change the visual appearance, provide a custom `Disabled`
+/// style class.
+///
+/// This is a built-in `FatObj` field. Setting `disabled` attaches a
+/// `Disabled` wrapper to the host.
 ///
 /// # Example
 ///
-/// ``` no_run
+/// Disable a text widget so it cannot be clicked.
+///
+/// ```rust
 /// use ribir::prelude::*;
 ///
-/// let w = button! {
-///     on_tap: move |_| panic!("you can't trigger me"),
-///     disabled: true,
-///     @ { "disabled" }
+/// text! {
+///   text: "You can't click me",
+///   disabled: true,
+///   on_tap: |_: &mut PointerEvent| println!("Click!"),
 /// };
-/// App::run(w);
+/// ```
 #[derive(Clone, Default)]
 pub struct Disabled {
   pub disabled: bool,

@@ -1,5 +1,9 @@
 use crate::{prelude::*, wrap_render::*};
 
+/// TransformWidget is a widget that applies a transformation to its child.
+///
+/// This is a builtin field of FatObj. You can simply set the `transform`
+/// field to attach a TransformWidget to the host widget.
 #[derive(Clone, Default)]
 pub struct TransformWidget {
   pub transform: Transform,

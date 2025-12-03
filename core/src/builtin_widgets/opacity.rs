@@ -1,5 +1,23 @@
 use crate::{prelude::*, wrap_render::*};
 
+/// A wrapper that controls the opacity of its child.
+///
+/// This is a built-in `FatObj` field. Setting the `opacity` field attaches an
+/// `Opacity` wrapper which applies an alpha multiplier when painting.
+///
+/// # Example
+///
+/// Display a red container with 50% opacity.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// container! {
+///   size: Size::new(100., 100.),
+///   background: Color::RED,
+///   opacity: 0.5,
+/// };
+/// ```
 #[derive(Clone)]
 pub struct Opacity {
   pub opacity: f32,

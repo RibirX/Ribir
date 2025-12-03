@@ -1,9 +1,23 @@
 use crate::{prelude::*, wrap_render::*};
 
-/// A widget that sets the brush for foreground elements. It's can be inherited
-/// by its descendants. When meet a color of `background`, the foreground will
-/// be overwrite by it.
-
+/// A widget that provides a foreground brush for painting elements in its
+/// subtree. The foreground brush is inherited by descendant widgets; children
+/// can access it via the `Provider`. The built-in `Text` widget uses this brush
+/// when painting text.
+///
+/// # Example
+/// Apply a foreground brush to render text in red.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Text {
+///     text: "I am red!",
+///     foreground: Color::RED,
+///   }
+/// };
+/// ```
 #[derive(Default)]
 pub struct Foreground {
   pub foreground: Brush,

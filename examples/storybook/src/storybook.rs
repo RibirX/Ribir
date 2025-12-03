@@ -275,7 +275,7 @@ pub fn storybook() -> Widget<'static> {
     direction: Direction::Vertical,
     align_items: Align::Center,
     background: Palette::of(BuildCtx::get()).surface_container_low(),
-    @ { header() }
+    @header()
     @Expanded { @ { content() } }
   }
   .into_widget()

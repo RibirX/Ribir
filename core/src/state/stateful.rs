@@ -15,7 +15,7 @@ pub struct Stateful<W> {
 
 pub struct Reader<W>(pub(crate) Sc<StateCell<W>>);
 
-/// The notifier is a `RxRust` stream that emit notification when the state
+/// The notifier is a `rxRust` stream that emit notification when the state
 /// changed.
 #[derive(Default, Clone)]
 pub struct Notifier(Subject<'static, ModifyInfo, Infallible>);
