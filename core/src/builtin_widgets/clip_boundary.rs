@@ -2,7 +2,25 @@ use wrap_render::WrapRender;
 
 use crate::prelude::*;
 
-/// This widget use to clip the host widget by the boundary rect with radius.
+/// A wrapper that clips the host widget to its boundary rectangle, optionally
+/// respecting corner radius.
+///
+/// This is a built-in `FatObj` field. Setting `clip_boundary` attaches a
+/// `ClipBoundary` to the host and will clip contents to the host box.
+///
+/// # Example
+///
+/// Clip text to the parent rect.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// container! {
+///   size: Size::new(40., 20.),
+///   clip_boundary: true,
+///   @Text { text: "long text will be clipped" }
+/// };
+/// ```
 #[derive(Default, Clone)]
 pub struct ClipBoundary {
   /// If true, clip the host widget by the boundary rect with radius, else do

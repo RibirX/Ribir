@@ -8,21 +8,25 @@ pub struct EdgeInsets {
   pub top: f32,
 }
 
-/// The widget utilizes empty space to surround the child widget.
+/// A widget that adds empty space (margin) around its child.
 ///
-/// ```
+/// This is a built-in `FatObj` field. Setting the `margin` field attaches a
+/// `Margin` wrapper that expands the host by the specified `EdgeInsets`.
+///
+/// # Example
+///
+/// Show text with margins inside a green container.
+///
+/// ```rust
 /// use ribir::prelude::*;
 ///
-/// let _padding = text! {
-///   text: "Background includes the empty space",
-///   padding: EdgeInsets::all(10.),
-///   background: Color::GREEN,
-/// };
-///
-/// let _margin = text! {
-///   text: "Background does not include the empty space",
-///   margin: EdgeInsets::all(10.),
-///   background: Color::GREEN,
+/// container! {
+///     size: Size::new(100., 100.),
+///     background: Color::GREEN,
+///     @Text {
+///       text: "Margin example",
+///       margin: EdgeInsets::all(10.),
+///     }
 /// };
 /// ```
 #[derive(SingleChild, Default, Clone, PartialEq)]

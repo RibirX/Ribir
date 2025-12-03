@@ -5,6 +5,16 @@ use crate::prelude::*;
 /// This widget is used when you need a placeholder widget that doesn't render
 /// anything and doesn't accept children. It's useful for conditional rendering
 /// or as a neutral widget in compositions.
+///
+/// # Example
+///
+/// ```rust no_run
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Void {}
+/// };
+/// ```
 #[derive(Declare)]
 pub struct Void;
 

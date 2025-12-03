@@ -9,7 +9,7 @@ use crate::{prelude::*, window::WindowId};
 ///
 /// ### Example
 ///
-/// ```no_run
+/// ```rust no_run
 /// use ribir::prelude::*;
 ///
 /// let w = fn_widget! {
@@ -107,7 +107,7 @@ impl Overlay {
   /// Overlay widget which auto align horizontal position to the src button even
   /// when window's size changed
   ///
-  /// ``` no_run
+  /// ```rust no_run
   /// use ribir::prelude::*;
   /// let w = fn_widget! {
   ///   let overlay = Overlay::new(
@@ -123,7 +123,7 @@ impl Overlay {
   ///       overlay.show_map(move |w| {
   ///         let mut w = FatObj::new(w);
   ///         @(w) {
-  ///           global_anchor_x: GlobalAnchorX::left_align_to($clone(button.track_id()), 0.),
+  ///           global_anchor_x: GlobalAnchorX::left_align_to($clone(button.track_id())),
   ///         }.into_widget()
   ///        },
   ///        e.window()

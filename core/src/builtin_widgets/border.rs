@@ -4,8 +4,24 @@ use wrap_render::WrapRender;
 
 use super::*;
 
-/// This widget adds a border to the host widget based on the layout size and
-/// utilizes the provided `Radius` to round the corners.
+/// A widget that draws borders around its host using the configured `Border`.
+/// Corner radii (from a `Radius` provider) are respected when present.
+///
+/// This is a built-in `FatObj` field. Setting the `border` field attaches a
+/// `BorderWidget` to the host, which paints borders based on the layout size.
+///
+/// # Example
+///
+/// Draw a blue border around the text.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// text! {
+///   text: "Widget with Border",
+///   border: Border::all(BorderSide::new(2., Color::BLUE.into()))
+/// };
+/// ```
 #[derive(Default, Clone)]
 pub struct BorderWidget {
   pub border: Border,

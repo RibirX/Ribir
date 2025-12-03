@@ -2,9 +2,24 @@ use wrap_render::WrapRender;
 
 use super::*;
 
-/// A widget that utilizes the background brush to paint a background box based
-/// on the layout size. If a `Radius` is provided, the corners of the box will
-/// be rounded.
+/// A widget that paints a background box for its host using the provided
+/// brush. If a `Radius` provider is present, corners will be rounded.
+///
+/// This is a built-in `FatObj` field. Setting the `background` field attaches
+/// a `Background` widget to the host to draw backgrounds based on layout size.
+///
+/// # Example
+///
+/// Fill the text background with a red color.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// text! {
+///   text: "I have a red background",
+///   background: Color::RED,
+/// };
+/// ```
 #[derive(Default, Clone)]
 pub struct Background {
   /// The background of the box.

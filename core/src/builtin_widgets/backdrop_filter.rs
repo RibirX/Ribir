@@ -1,6 +1,31 @@
 use crate::{prelude::*, wrap_render::WrapRender};
 
-/// A widget that applies a backdrop filter to background content.
+/// A widget that applies a backdrop filter to the content behind it.
+///
+/// This is a built-in `FatObj` field. Setting the `backdrop_filter` field
+/// attaches a `BackdropFilter` to the host, allowing visual effects (e.g.
+/// blur) to be applied to background content.
+///
+/// # Example
+///
+/// The centered area behind the container will be blurred.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// stack! {
+///   @Text { text: "Hello, Ribir!" }
+///   @InParentLayout {
+///     @Container {
+///       size: Size::new(20., 20.),
+///       v_align: VAlign::Center,
+///       h_align: HAlign::Center,
+///       // Apply a blur effect to the background content behind this container
+///       backdrop_filter: Filter::blur(5.),
+///     }
+///   }
+/// };
+/// ```
 #[derive(Default, Clone)]
 pub struct BackdropFilter {
   pub filter: Filter,

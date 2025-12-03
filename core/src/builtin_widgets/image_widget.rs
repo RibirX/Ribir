@@ -1,3 +1,21 @@
+//! Implement `Render` for `Resource<PixelImage>` so images can be used as
+//! widgets directly.
+//!
+//! # Example
+//!
+//! Display an image loaded from bytes.
+//!
+//! ```rust,no_run
+//! use ribir::prelude::*;
+//!
+//! fn_widget! {
+//!    // Load an image from bytes (e.g., included from a file)
+//!    let img = Resource::new(
+//!      PixelImage::from_png(include_bytes!("../../../static/hero-banner.png"))
+//!    );
+//!    @ { img }
+//! };
+//! ```
 use crate::prelude::*;
 
 impl Render for Resource<PixelImage> {

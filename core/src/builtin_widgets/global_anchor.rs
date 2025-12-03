@@ -34,44 +34,41 @@ pub enum GlobalAnchorY {
   AlwaysFollow(Box<AnchorOffsetFn>),
 }
 
-/// This widget is used to anchor child constraints relative to the global
-/// position. You can use it by builtin fields: `global_anchor_x` and
-/// `global_anchor_y`.
+/// A wrapper that anchors a child relative to global (window) coordinates.
 ///
-/// It's important to note that if you anchor the child widget outside of its
-/// parent, it may become unable to click, so ensure there is ample space within
-/// the parent.
+/// Use the built-in fields `global_anchor_x` and `global_anchor_y` to attach
+/// a `GlobalAnchor` that positions a widget based on global coordinates or
+/// another widget's position.
+///
+/// Note: Anchoring a child outside its parent's bounds may affect hit-testing
+/// and interactivity. When using global anchors, ensure the anchored widget
+/// is placed in a container with sufficient space or rendered on a top-level
+/// overlay layer to preserve expected layout and input behavior.
 ///
 /// ### Example
-/// ```no_run
+///
+/// When a button is clicked, show an overlay anchored to the button's top
+/// center.
+/// ``` rust no_run
 /// use ribir::prelude::*;
 /// let app = fn_widget! {
-///   let mut button = @FilledButton {
-///     @{ "click show overlay" }
-///   };
+///   let mut button = @FatObj{ @FilledButton { @{ "click show overlay" } } };
 ///   let overlay = Overlay::new(
-///     move || {
-///       @Text {
-///         text: "anchor by global anchor",
-///         global_anchor_x:
-///           GlobalAnchorX::center_align_to($clone(button.track_id()), 0.),
-///         global_anchor_y:
-///           GlobalAnchorY::bottom_align_to(
-///             $clone(button.track_id()),
-///             *$read(button.layout_height())
-///           )
-///        }.into_widget()
+///     text! {
+///       text: "anchor by global anchor",
+///       global_anchor_x:
+///         GlobalAnchorX::left_align_to($clone(button.track_id())),
+///       global_anchor_y:
+///         GlobalAnchorY::bottom_align_to($clone(button.track_id()))
+///           .offset(*$read(button.layout_height()))
 ///     },
 ///     OverlayStyle {
 ///       auto_close_policy: AutoClosePolicy::TAP_OUTSIDE,
 ///       mask: None
 ///     });
-///   @Container {
-///     size: Size::new(200., 100.),
-///     padding: EdgeInsets::all(20.0),
-///     @(button) {
-///       on_tap: move |e| overlay.show(e.window()),
-///     }
+///   @(button) {
+///     margin: EdgeInsets::all(20.0),
+///     on_tap: move |e| overlay.show(e.window()),
 ///   }
 /// };
 /// App::run(app);

@@ -1,5 +1,25 @@
 use crate::{prelude::*, wrap_render::*};
 
+/// A wrapper that controls whether its child is visible and participates in
+/// layout, painting, and hit testing.
+///
+/// This is a built-in `FatObj` field. Setting the `visible` field attaches a
+/// `Visibility` wrapper which can hide the child from layout, painting, and
+/// hit testing when disabled.
+///
+/// # Example
+///
+/// Hide a container by setting `visible` to `false`.
+///
+/// ```rust no_run
+/// use ribir::prelude::*;
+///
+/// container! {
+///   size: Size::new(100., 100.),
+///   background: Color::RED,
+///   visible: false,
+/// };
+/// ```
 #[derive(Default)]
 pub struct Visibility {
   pub visible: bool,

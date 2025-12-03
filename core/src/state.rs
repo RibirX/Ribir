@@ -239,7 +239,7 @@ impl<'a, V: ?Sized + 'a> WriteRef<'a, V> {
   ///
   /// # Examples
   ///
-  /// ```
+  /// ``` rust no_run
   /// use ribir_core::prelude::*;
   ///
   /// let c = Stateful::new(vec![1, 2, 3]);

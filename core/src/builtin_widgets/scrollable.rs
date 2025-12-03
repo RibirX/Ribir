@@ -1,7 +1,7 @@
 use std::cell::Cell;
 
 use crate::prelude::*;
-/// Enumerate to describe which direction allow widget to scroll.
+/// Enumerates the allowed scroll directions for a scrollable widget.
 #[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Hash)]
 pub enum Scrollable {
   /// let child widget horizontal scrollable and the scroll view is as large as
@@ -16,7 +16,27 @@ pub enum Scrollable {
   Both,
 }
 
-/// Helper struct for builtin scrollable field.
+/// Helper widget for the built-in `scrollable` field.
+///
+/// This is a built-in `FatObj` field. Setting `scrollable` attaches a
+/// `ScrollableWidget` that enables scrolling behavior in the chosen axis.
+///
+/// # Example
+///
+/// Make a container vertically scrollable.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// container! {
+///   size: Size::new(100., 100.),
+///   scrollable: Scrollable::Y,
+///   @Container {
+///     size: Size::new(100., 1000.),
+///     background: Color::RED,
+///   }
+/// };
+/// ```
 #[derive(Default)]
 pub struct ScrollableWidget {
   pub scrollable: Scrollable,

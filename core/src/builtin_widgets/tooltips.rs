@@ -6,17 +6,22 @@ class_names! {
   #[doc = "Class name for the tooltips"]
   TOOLTIPS,
 }
-/// Add attributes of tooltips to Widget Declarer.
+/// Adds tooltip behavior to a widget declarer.
 ///
-/// ### Example:
-/// ```no_run
+/// This built-in `FatObj` field attaches a `Tooltips` overlay that shows
+/// when the host is hovered.
+///
+/// # Example
+///
+/// Hover the text to show a tooltip.
+///
+/// ```rust no_run
 /// use ribir::prelude::*;
 ///
-/// let w = text! {
-///   text: "hover to show tooltips!",
-///   tooltips: "this is tooltips",
+/// text! {
+///   text: "Hover me",
+///   tooltips: "I'm a tooltip!",
 /// };
-/// App::run(w);
 /// ```
 #[derive(Default)]
 pub struct Tooltips {
@@ -58,12 +63,12 @@ impl<'c> ComposeChild<'c> for Tooltips {
       class: TOOLTIPS,
       global_anchor_x: {
         let track_id = $clone(child.track_id());
-        GlobalAnchorX::center_align_to(track_id, 0.).always_follow()
+        GlobalAnchorX::center_align_to(track_id).always_follow()
       },
       global_anchor_y: {
         let track_id = $clone(child.track_id());
         let height = *$read(child.layout_height());
-        GlobalAnchorY::bottom_align_to(track_id, height).always_follow()
+        GlobalAnchorY::bottom_align_to(track_id).offset(height).always_follow()
       },
     };
     *this.read().overlay.borrow_mut() = Some(Overlay::new(

@@ -24,13 +24,29 @@ pub enum BoxFit {
   CoverWidth,
 }
 
-/// A widget that scales and positions its child according to specified [BoxFit]
-/// strategy
+/// A widget that scales and positions its child according to a `BoxFit`
+/// strategy.
 ///
-/// The FittedBox applies scaling transformation and optional clipping to ensure
-/// its child fits within the available space according to the selected fitting
-/// strategy. It maintains the calculated scale factor for proper rendering
-/// transformation.
+/// `FittedBox` applies a scaling transform (and optional clipping) so the
+/// child fits the available space as defined by the chosen strategy. It keeps
+/// the computed scale factor for rendering and transform queries.
+///
+/// # Example
+///
+/// Scale the inner red container to cover the width of the outer container.
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// container! {
+///   size: Size::new(200., 200.),
+///   @Container {
+///     box_fit: BoxFit::CoverWidth,
+///     size: Size::new(50., 100.),
+///     background: Color::RED,
+///   }
+/// };
+/// ```
 #[derive(SingleChild, Default)]
 pub struct FittedBox {
   /// The fitting strategy to apply

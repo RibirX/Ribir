@@ -2,22 +2,25 @@ use wrap_render::WrapRender;
 
 use crate::prelude::*;
 
-/// A widget shrinks its content size, and the padding area is the space between
-/// its content and its border.
+/// A widget that reduces the available content area by applying padding
+/// around its child.
 ///
-/// ```
+/// This is a built-in `FatObj` field. Setting the `padding` field attaches a
+/// `Padding` wrapper that offsets and constrains its child by the given
+/// `EdgeInsets`.
+///
+/// # Example
+///
+/// Show text inside a container with 10px padding.
+///
+/// ```rust
 /// use ribir::prelude::*;
 ///
-/// let _padding = text! {
-///   text: "Background includes the empty space",
+/// container! {
+///   size: Size::new(100., 100.),
 ///   padding: EdgeInsets::all(10.),
-///   background: Color::GREEN,
-/// };
-///
-/// let _margin = text! {
-///   text: "Background does not include the empty space",
-///   margin: EdgeInsets::all(10.),
-///   background: Color::GREEN,
+///   background: Color::BLUE,
+///   @Text { text: "Padding example" }
 /// };
 /// ```
 #[derive(Default)]
@@ -59,6 +62,8 @@ impl WrapRender for Padding {
       })
   }
 
+  /// Returns the transform to apply to the child widget.
+  /// The padding is applied when mapping the child's coordinates(content area).
   fn get_transform(&self, host: &dyn Render) -> Option<Transform> {
     let padding_matrix = Transform::translation(self.padding.left, self.padding.top);
 
