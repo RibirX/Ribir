@@ -148,6 +148,23 @@ impl Anchor {
 
 /// A virtual widget that anchors its child relative to parent constraints.
 ///
+/// This is a builtin field of FatObj. You can simply set the `anchor` field
+/// to attach an Anchor widget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(200., 200.),
+///     anchor: Anchor::right_bottom(10., 10.),
+///     @Text { text: "Bottom Right" }
+///   }
+/// };
+/// ```
+///
 /// ## Note
 ///
 /// If the anchor is percentage or relative to the bottom or right edge, we

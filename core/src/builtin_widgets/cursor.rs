@@ -1,7 +1,23 @@
 use crate::prelude::*;
 
-/// `Cursor` is an attribute to assign an `cursor` to a widget.
-
+/// `Cursor` is an attribute to assign a `cursor` to a widget.
+///
+/// This is a builtin field of FatObj. You can simply set the `cursor` field
+/// to attach a Cursor widget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(100., 100.),
+///     cursor: CursorIcon::Pointer,
+///     @Text { text: "Hover me!" }
+///   }
+/// };
+/// ```
 #[derive(Default, Debug)]
 pub struct Cursor {
   pub cursor: CursorIcon,

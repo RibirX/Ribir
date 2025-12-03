@@ -12,6 +12,22 @@ use crate::prelude::*;
 /// dropped.
 ///
 /// It's useful when you need run a leave animation for a widget.
+///
+/// This is a builtin field of FatObj. You can simply set the `keep_alive`
+/// field to attach a KeepAlive widget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Text {
+///     text: "I will survive even if my parent tries to remove me!",
+///     keep_alive: true,
+///   }
+/// };
+/// ```
 #[derive(Default)]
 pub struct KeepAlive {
   pub keep_alive: bool,

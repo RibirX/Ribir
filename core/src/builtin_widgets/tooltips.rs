@@ -8,15 +8,19 @@ class_names! {
 }
 /// Add attributes of tooltips to Widget Declarer.
 ///
-/// ### Example:
-/// ```no_run
+/// This is a builtin field of FatObj. You can simply set the `tooltips`
+/// field to attach a Tooltips widget to the host widget.
+///
+/// # Example:
+/// ```rust no_run
 /// use ribir::prelude::*;
 ///
-/// let w = text! {
-///   text: "hover to show tooltips!",
-///   tooltips: "this is tooltips",
+/// fn_widget! {
+///   @Text {
+///     text: "Hover me",
+///     tooltips: "I'm a tooltip!",
+///   }
 /// };
-/// App::run(w);
 /// ```
 #[derive(Default)]
 pub struct Tooltips {

@@ -2,6 +2,26 @@ use crate::prelude::*;
 
 /// A widget that allows access to the layout result of its child.
 ///
+/// This is a builtin field of FatObj. You can simply use the `layout_rect()`,
+/// `layout_size()`, `layout_pos()`, `layout_left()`, `layout_top()`,
+/// `layout_width()`, `layout_height()` to access the layout result of the
+/// child widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   let mut container = @Container { size: Size::new(100., 100.) };
+///   @(container) {
+///     @Text {
+///       text: pipe!($read(container.layout_width()).to_string())
+///     }
+///   }
+/// };
+/// ```
+///
 /// ## Caution: Avoid Dependency on Layout Results for View Updates
 ///
 /// Layout operations occur frequently, so relying on layout results to update

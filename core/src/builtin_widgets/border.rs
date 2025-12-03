@@ -6,6 +6,23 @@ use super::*;
 
 /// This widget adds a border to the host widget based on the layout size and
 /// utilizes the provided `Radius` to round the corners.
+///
+/// This is a builtin field of FatObj. You can simply set the `border` field
+/// to attach a BorderWidget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(100., 100.),
+///     border: Border::all(BorderSide::new(2., Color::BLUE.into())),
+///     @Text { text: "Widget with Border" }
+///   }
+/// };
+/// ```
 #[derive(Default, Clone)]
 pub struct BorderWidget {
   pub border: Border,

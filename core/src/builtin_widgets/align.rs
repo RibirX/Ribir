@@ -56,6 +56,20 @@ pub enum VAlign {
 /// A virtual widget that horizontally positions its child based on parent
 /// constraints.
 ///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(200., 100.),
+///     h_align: HAlign::Center,
+///     @Text { text: "Horizontal Center" }
+///   }
+/// };
+/// ```
+///
 /// ## Layout Behavior
 ///
 /// As we don't know the parent size during layout, the alignment container
@@ -88,6 +102,20 @@ pub struct HAlignWidget {
 
 /// A virtual widget that vertically positions its child based on parent
 /// constraints.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(100., 200.),
+///     v_align: VAlign::Center,
+///     @Text { text: "Vertical Center" }
+///   }
+/// };
+/// ```
 ///
 /// This widget is similar to [`HAlignWidget`], but aligns children in y-axis.
 /// See [`HAlignWidget`] for more details.

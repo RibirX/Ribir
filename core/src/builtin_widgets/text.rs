@@ -7,16 +7,32 @@ use crate::prelude::*;
 
 pub type TextValue = PipeValue<CowArc<str>>;
 
-/// A single-style text widget that uses context providers for formatting and
-/// alignment.
+/// A single-style text widget that displays a single string of text.
 ///
-/// This widget combines three key aspects:
-/// 1. Text content (`text` field)
-/// 2. Formatting style ([`TextStyle`] context provider)
-/// 3. Alignment ([`TextAlign`] context provider)
+/// This Text will inherit the text style from its parent widget. You can
+/// also use the builtin field to set it:
+/// 1. `text_style` (see ./text_style.rs) - This is a builtin field of FatObj.
+///    You can simply set the `text_style` field to attach a TextStyleWidget to
+///    the host widget.
+/// 2. `font_size` (set by text_style, see ./text_style.rs)
+/// 3. `text_line_height` (set by text_style, see ./text_style.rs)
+/// 4. `text_align` (see ./text_align.rs) - This is a builtin field of FatObj.
+///    You can simply set the `text_align` field to attach a TextAlignWidget to
+///    the host widget.
+/// 5. `foreground` (see ./painting_style.rs)
 ///
-/// The default alignment is [`TextAlign::Start`]. Glyph calculations are cached
-/// internally to optimize rendering performance.
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Text {
+///     text: "Hello Ribir!",
+///     foreground: Color::RED,
+///   }
+/// };
+/// ```
 #[derive(Declare)]
 pub struct Text {
   /// The text content to display, using copy-on-write semantics for efficient

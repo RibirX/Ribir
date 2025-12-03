@@ -12,17 +12,22 @@ class_names! {
 /// disabled property to true. To customize the disabled appearance, you can
 /// implement a dedicated Disabled class to override the default styling.
 ///
+/// This is a builtin field of FatObj. You can simply set the `disabled` field
+/// to attach a Disabled widget to the host widget.
+///
 /// # Example
 ///
-/// ``` no_run
+/// ```rust
 /// use ribir::prelude::*;
 ///
-/// let w = button! {
-///     on_tap: move |_| panic!("you can't trigger me"),
+/// fn_widget! {
+///   @Text {
+///     text: "You can't click me",
 ///     disabled: true,
-///     @ { "disabled" }
+///     on_tap: |_: &mut PointerEvent| println!("Click!"),
+///   }
 /// };
-/// App::run(w);
+/// ```
 #[derive(Clone, Default)]
 pub struct Disabled {
   pub disabled: bool,

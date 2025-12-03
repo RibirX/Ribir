@@ -196,6 +196,23 @@ pub const INVERT_FILTER: ColorFilterMatrix = ColorFilterMatrix {
 };
 
 /// This widget applies a [`ColorFilterMatrix`] to the child widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @ColorFilter {
+///     filter: GRAYSCALE_FILTER,
+///     @Container {
+///       size: Size::new(100., 100.),
+///       background: Color::RED,
+///       @Text { text: "Grayscale Filter" }
+///     }
+///   }
+/// };
+/// ```
 #[derive(Declare)]
 pub struct ColorFilter {
   pub filter: ColorFilterMatrix,

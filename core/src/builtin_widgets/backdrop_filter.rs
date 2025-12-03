@@ -4,6 +4,23 @@ use crate::{
 };
 
 /// A widget that applies a backdrop filter to background content.
+///
+/// This is a builtin field of FatObj. You can simply set the `backdrop_filter`
+/// field to attach a BackdropFilter widget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(100., 100.),
+///     // Apply a blur effect to the background content behind this container
+///     backdrop_filter: vec![BackdropFilter::blur_filter(5)],
+///   }
+/// };
+/// ```
 #[derive(Default, Clone)]
 pub struct BackdropFilter {
   pub filters: Vec<Vec<FilterType>>,

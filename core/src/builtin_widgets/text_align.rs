@@ -1,6 +1,26 @@
 use crate::prelude::*;
 
-/// `TextAlign` is used to align multiline text within the text bounds, with the
+/// `TextAlign` is used to align multiline text within the text bounds. The
+/// descendent `Text` widget will be aligned according to the `TextAlign` value.
+///
+/// This is a builtin field of FatObj. You can simply set the `text_align`
+/// field to attach a TextAlign widget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(120., 40.),
+///     text_align: TextAlign::Center,
+///     @Text {
+///        text: "Line 1\nLine 2",
+///     }
+///   }
+/// };
+/// ```
 #[derive(Default)]
 pub struct TextAlignWidget {
   pub text_align: TextAlign,

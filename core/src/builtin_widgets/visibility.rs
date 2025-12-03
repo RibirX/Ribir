@@ -1,5 +1,23 @@
 use crate::{prelude::*, wrap_render::*};
 
+/// Visibility is a widget that controls the visibility of its child.
+///
+/// This is a builtin field of FatObj. You can simply set the `visible`
+/// field to attach a Visibility widget to the host widget.
+///
+/// # Example
+///
+/// ```rust no_run
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(100., 100.),
+///     background: Color::RED,
+///     visible: false,
+///   }
+/// };
+/// ```
 #[derive(Default)]
 pub struct Visibility {
   pub visible: bool,

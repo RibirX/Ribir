@@ -1,9 +1,24 @@
 use crate::{prelude::*, wrap_render::*};
 
-/// A widget that sets the brush for foreground elements. It's can be inherited
+/// A widget that sets the brush for foreground elements. It can be inherited
 /// by its descendants. When meet a color of `background`, the foreground will
-/// be overwrite by it.
-
+/// be overwritten by it.
+///
+/// This is a builtin field of FatObj. You can simply set the `foreground` field
+/// to attach a Foreground widget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Text {
+///     text: "I am red!",
+///     foreground: Color::RED,
+///   }
+/// };
+/// ```
 #[derive(Default)]
 pub struct Foreground {
   pub foreground: Brush,

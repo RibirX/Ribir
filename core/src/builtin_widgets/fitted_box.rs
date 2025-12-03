@@ -31,6 +31,23 @@ pub enum BoxFit {
 /// its child fits within the available space according to the selected fitting
 /// strategy. It maintains the calculated scale factor for proper rendering
 /// transformation.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(200., 200.),
+///     box_fit: BoxFit::Contain,
+///     @Container {
+///       size: Size::new(50., 100.),
+///       background: Color::RED,
+///     }
+///   }
+/// };
+/// ```
 #[derive(SingleChild, Default)]
 pub struct FittedBox {
   /// The fitting strategy to apply

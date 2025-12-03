@@ -2,6 +2,24 @@ use std::cell::RefCell;
 
 use crate::{events::focus_mgr::FocusType, prelude::*};
 
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @FocusScope {
+///     // Prevent children from being focused
+///     skip_descendants: true,
+///
+///     // the checkbox can not be triggered by space key, because it's not focused
+///     @Checkbox {
+///       checked: false,
+///       @Trailing::new("can not be triggered by space key!")
+///     }
+///   }
+/// };
+/// ```
 #[derive(Declare, Clone, Default)]
 pub struct FocusScope {
   /// If true, the descendants can not be focused.

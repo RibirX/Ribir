@@ -1,5 +1,22 @@
 use crate::{prelude::*, wrap_render::*};
 
+/// Opacity is a widget that allows you to control the opacity of its child.
+///
+/// This is a builtin field of FatObj. You can simply set the `opacity` field
+/// to attach an Opacity widget to the host widget.
+///
+/// # Example
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(100., 100.),
+///     background: Color::RED,
+///     opacity: 0.5,
+///   }
+/// };
+/// ```
 #[derive(Clone)]
 pub struct Opacity {
   pub opacity: f32,
