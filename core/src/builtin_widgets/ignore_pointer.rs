@@ -1,6 +1,23 @@
 use crate::{prelude::*, wrap_render::*};
 
 /// Widget use to ignore pointer events
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @IgnorePointer {
+///     ignore: IgnoreScope::Subtree,
+///     @Container {
+///       size: Size::new(100., 100.),
+///       background: Color::RED,
+///       on_tap: |_: &mut PointerEvent| println!("This will never be printed"),
+///     }
+///   }
+/// };
+/// ```
 #[derive(Declare, Clone)]
 pub struct IgnorePointer {
   #[declare(default)]

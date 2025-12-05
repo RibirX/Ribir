@@ -2,22 +2,24 @@ use wrap_render::WrapRender;
 
 use crate::prelude::*;
 
-/// A widget shrinks its content size, and the padding area is the space between
-/// its content and its border.
+/// A widget that shrinks its content size, and the padding area is the space
+/// between its content and its border.
 ///
-/// ```
+/// This is a builtin field of FatObj. You can simply set the `padding` field
+/// to attach a Padding widget to the host widget.
+///
+/// # Example
+///
+/// ```rust
 /// use ribir::prelude::*;
 ///
-/// let _padding = text! {
-///   text: "Background includes the empty space",
-///   padding: EdgeInsets::all(10.),
-///   background: Color::GREEN,
-/// };
-///
-/// let _margin = text! {
-///   text: "Background does not include the empty space",
-///   margin: EdgeInsets::all(10.),
-///   background: Color::GREEN,
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(100., 100.),
+///     padding: EdgeInsets::all(10.),
+///     background: Color::BLUE,
+///     @Text { text: "Padding example" }
+///   }
 /// };
 /// ```
 #[derive(Default)]

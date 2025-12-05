@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Documented
+
+- **doc**: add guide for ribir. (#pr @wjian23)
+
 ## [0.4.0-alpha.52] - 2025-12-03
 
 ### Features

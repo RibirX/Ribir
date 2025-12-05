@@ -1,7 +1,21 @@
 use crate::prelude::*;
 
 /// This widget establishes the text style for painting the text within its
-/// descendants.
+/// descendants. This is a builtin field of FatObj. You can simply set the
+/// `text_style` field to attach a TextStyleWidget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Text {
+///     text: "Big Text",
+///     text_style: TypographyTheme::of(BuildCtx::get()).title_large.text.clone(),
+///   }
+/// };
+/// ```
 pub struct TextStyleWidget {
   pub text_style: TextStyle,
 }

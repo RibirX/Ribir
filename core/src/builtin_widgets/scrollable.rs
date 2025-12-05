@@ -17,6 +17,23 @@ pub enum Scrollable {
 }
 
 /// Helper struct for builtin scrollable field.
+///
+/// This is a builtin field of FatObj. You can simply set the `scrollable`
+/// field to attach a Scrollable widget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(100., 1000.),
+///     background: Color::RED,
+///     scrollable: Scrollable::Y,
+///   }
+/// };
+/// ```
 #[derive(Default)]
 pub struct ScrollableWidget {
   pub scrollable: Scrollable,

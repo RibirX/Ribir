@@ -6,32 +6,47 @@ use super::*;
 /// A widget that provides a radius for the host widget, applying it to both the
 /// background and border of the widget.
 ///
+/// This is a builtin field of FatObj. You can simply set the `radius` field
+/// to attach a RadiusWidget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Background {
+///     background: Color::RED,
+///     radius: Radius::all(10.),
+///     @Container { size: Size::new(100., 100.) }
+///   }
+/// };
+/// ```
+///
 /// If you set the radius in different `FatObj`, ensure it is set in the
 /// outermost `FatObj`. Otherwise, the outer border or background will ignore
 /// it.
 ///
 /// For example:
 ///
-/// ```
+/// ```rust
 /// use ribir::prelude::*;
 ///
 /// let _ = fn_widget! {
 ///   @Background {
 ///     background: Color::RED,
-///     @RadiusWidget {
-///       radius: Radius::all(10.),
-///       @BorderWidget {
-///         border: Border::all(BorderSide::new(1., Color::BLACK.into())),
-///         @Container {
-///           size: Size::new(100., 100.),
-///         }
+///     radius: Radius::all(10.),
+///     @BorderWidget {
+///       border: Border::all(BorderSide::new(1., Color::BLACK.into())),
+///       @Container {
+///         size: Size::new(100., 100.),
 ///       }
 ///     }
 ///   }
 /// };
 /// ```
 ///
-/// This widget will create a border with a radius of 10 and a red box without a
+/// This widget will create a border with a radius of 10 and a red box with a
 /// radius.
 #[derive(Default, Clone)]
 pub struct RadiusWidget {

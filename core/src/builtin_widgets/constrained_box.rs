@@ -1,6 +1,23 @@
 use crate::{prelude::*, wrap_render::*};
 
-/// a widget that imposes additional constraints clamp on its child.
+/// A widget that imposes additional constraints clamp on its child.
+///
+/// This is a builtin field of FatObj. You can simply set the `clamp` field
+/// to attach a ConstrainedBox widget to the host widget.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(50., 50.), // This will be constrained to width 100.
+///     background: Color::RED,
+///     clamp: BoxClamp::min_width(100.),
+///   }
+/// };
+/// ```
 #[derive(Clone, Default)]
 pub struct ConstrainedBox {
   pub clamp: BoxClamp,

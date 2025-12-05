@@ -387,6 +387,9 @@ impl Class {
   /// implementation of a class or be used to override the implementation of a
   /// class.
   ///
+  /// This is a builtin field of FatObj. You can simply set the `class` field
+  /// to attach a Class widget to the host widget.
+  ///
   /// ## Example
   ///
   /// ```

@@ -4,6 +4,24 @@ use crate::prelude::*;
 /// A widget that imposes no constraints on its child, allowing it to layout and
 /// display as its "natural" size. Its size is equal to its child then clamp by
 /// parent.
+///
+/// # Example
+///
+/// ```rust no_run
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   @Container {
+///     size: Size::new(100., 100.),
+///     @UnconstrainedBox {
+///       @Container {
+///         size: Size::new(200., 200.),
+///         background: Color::RED,
+///       }
+///     }
+///   }
+/// };
+/// ```
 pub struct UnconstrainedBox {
   #[declare(default)]
   pub dir: UnconstrainedDir,
