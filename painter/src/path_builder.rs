@@ -153,6 +153,36 @@ impl PathBuilder {
     self
   }
 
+  // exclude a rect from the path.
+  pub fn exclude_rect(&mut self, rect: &Rect) -> &mut Self {
+    self
+      .lyon_builder
+      .add_rectangle(&rect.to_box2d().to_untyped(), Winding::Negative);
+    self
+  }
+
+  // exclude a rect with radius from the path.
+  pub fn exclude_rect_round(&mut self, rect: &Rect, radius: &Radius) -> &mut Self {
+    let radius: &BorderRadii = unsafe { std::mem::transmute(radius) };
+    self.lyon_builder.add_rounded_rectangle(
+      &rect.to_box2d().cast_unit(),
+      radius,
+      Winding::Negative,
+    );
+    self
+  }
+
+  // exclude an ellipse from the path.
+  pub fn exclude_ellipse(&mut self, center: Point, radius: Vector, rotation: f32) -> &mut Self {
+    self.lyon_builder.add_ellipse(
+      center.to_untyped(),
+      radius.to_untyped(),
+      Angle::radians(rotation),
+      Winding::Negative,
+    );
+    self
+  }
+
   /// Construct a path from the current state of the builder.
   #[inline]
   pub fn build(self) -> Path {

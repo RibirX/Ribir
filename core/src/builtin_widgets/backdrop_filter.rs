@@ -32,7 +32,7 @@ impl WrapRender for BackdropFilter {
         return;
       }
 
-      ctx.painter().filters(path, filters);
+      ctx.painter().filter_path(path, filters);
     }
   }
 

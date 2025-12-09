@@ -402,8 +402,8 @@ pub fn img_triangles_shader(limits: &DrawPhaseLimits) -> String {
     /// - the low 16 bits is the index of texture, as a u16 type.
     mask_head_and_tex_idx: i32,
 
-    /// align
-    dummy: i32,
+    /// 1 for premultiplied alpha, 0 for non-premultiplied alpha
+    is_premultiplied: i32,
 
     /// base color
     base_color: vec4<f32>,
@@ -445,7 +445,9 @@ pub fn img_triangles_shader(limits: &DrawPhaseLimits) -> String {
           alpha *= mask_sample(mask, f.pos.xy);
           mask_idx = mask.prev_mask_idx;
       }
-  
+      if prim.is_premultiplied == 1 && color.a > 0.0 {
+        color = vec4<f32>(color.rgb / color.a, color.a);
+      }
       color.a = color.a * alpha;
       return color * prim.color_matrix + prim.base_color;
   }
@@ -544,14 +546,14 @@ pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
         let weight = filter_primitive.kernel_matrix[index / 4][index % 4];
 
         let sample_pos = pos + filter_primitive.sample_offset;
-        var color = tex_sample(original_tex, sample_pos);
+        let color = tex_sample(original_tex, sample_pos);
+        
         if (i == u32(x_radius) && j == u32(y_radius)) {
           origin = color;
         }
         sum = sum + (color * weight);
       }
     }
-    sum[3] = 1.;
     
     if alpha < 0.5 {
       // return origin color when

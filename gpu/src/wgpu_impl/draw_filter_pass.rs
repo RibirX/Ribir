@@ -156,7 +156,7 @@ impl DrawFilterPass {
           entry_point: Some("fs_main"),
           targets: &[Some(wgpu::ColorTargetState {
             format,
-            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+            blend: Some(wgpu::BlendState::REPLACE),
             write_mask: wgpu::ColorWrites::all(),
           })],
           compilation_options: Default::default(),

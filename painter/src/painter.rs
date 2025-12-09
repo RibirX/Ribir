@@ -3,6 +3,7 @@ use std::ops::{Deref, DerefMut};
 use ribir_algo::Resource;
 use ribir_geom::{Angle, DeviceRect, Point, Rect, Size, Transform, Vector};
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 
 use crate::{
   Brush, Color, Glyph, PixelImage, Svg, VisualGlyphs,
@@ -259,6 +260,16 @@ struct PainterState {
   /// The visible boundary of the painter in visual axis, not care about the
   /// transform.
   bounds: Rect,
+
+  filters: SmallVec<[FilterState; 0]>,
+}
+
+#[derive(Clone)]
+struct FilterState {
+  filters: Vec<FilterType>,
+  filter_start_idx: usize,
+  color_filter: ColorMatrix,
+  transform: Transform,
 }
 
 impl PainterState {
@@ -272,6 +283,7 @@ impl PainterState {
       clip_cnt: 0,
       color_filter: ColorMatrix::Opacity(1.),
       style: PathStyle::Fill,
+      filters: SmallVec::new(),
     }
   }
 }
@@ -370,8 +382,14 @@ impl Painter {
   }
 
   #[inline]
+  // Finish the painter and return to the original state.
   pub fn finish(&mut self) -> PainterResult<'_> {
-    self.fill_all_pop_clips();
+    self
+      .state_stack
+      .insert(0, self.init_state.clone());
+    while self.state_stack.len() > 1 {
+      self.restore();
+    }
     PainterResult(&mut self.commands)
   }
 
@@ -396,9 +414,25 @@ impl Painter {
   /// nothing.
   #[inline]
   pub fn restore(&mut self) {
-    let clip_cnt = self.current_state().clip_cnt;
-    self.state_stack.pop();
+    let state = self
+      .state_stack
+      .pop()
+      .expect("Must have one state in stack!");
+
+    let clip_cnt = state.clip_cnt;
     self.push_n_pop_cmd(clip_cnt - self.current_state().clip_cnt);
+
+    // If the current state has filters set via [`Painter::filter`], the commands
+    // drawn since the last save will be bundled and a filter command will be
+    // generated to apply the filters to the bundled content.
+    for filter in state.filters.into_iter().rev() {
+      self.generate_filter_bundle(
+        filter.transform,
+        filter.filter_start_idx,
+        filter.color_filter,
+        filter.filters,
+      );
+    }
   }
 
   pub fn reset(&mut self) {
@@ -874,7 +908,11 @@ impl Painter {
     self
   }
 
-  pub fn filters(&mut self, path: PaintPath, filters: Vec<FilterType>) -> &mut Self {
+  /// Apply filters to the background content within the specified path area.
+  ///
+  /// This is useful for effects like backdrop blur where you want to apply
+  /// a filter to what's already been drawn behind a specific region.
+  pub fn filter_path(&mut self, path: PaintPath, filters: Vec<FilterType>) -> &mut Self {
     invisible_return!(self);
     let p_bounds = path.bounds(None);
     if p_bounds.is_empty() || !locatable_bounds(&p_bounds) {
@@ -891,6 +929,44 @@ impl Painter {
       .commands
       .push(PaintCommand::Filter { path, path_bounds, transform, filters });
 
+    self
+  }
+
+  /// Set filters to apply to all commands drawn in the current state scope.
+  ///
+  /// When [`Painter::restore`] is called, all commands drawn since the last
+  /// [`Painter::save`] will be bundled together and the filters will be
+  /// applied to the bundled content.
+  ///
+  /// # Example
+  /// ```ignore
+  /// painter.save();
+  /// painter.filter(BackdropFilter::blur_filter(5));
+  /// painter.rect(&rect).fill();
+  /// painter.circle(center, radius).fill();
+  /// painter.restore(); // Generates Bundle + Filter commands
+  /// ```
+  pub fn filter(&mut self, filters: Vec<FilterType>) -> &mut Self {
+    // all color filter in filters apply to the painter direly,
+    // other filter, push to the state's filter
+    let mut v = vec![];
+    for filter in filters {
+      match filter {
+        FilterType::Color(matrix) => {
+          self.apply_color_matrix(matrix);
+        }
+        _ => v.push(filter),
+      };
+    }
+    if !v.is_empty() {
+      let state = FilterState {
+        transform: *self.transform(),
+        filter_start_idx: self.commands.len(),
+        color_filter: self.color_filter().clone(),
+        filters: v,
+      };
+      self.current_state_mut().filters.push(state);
+    }
     self
   }
 
@@ -985,6 +1061,76 @@ impl Painter {
       && t.m22.is_finite()
       && t.m31.is_finite()
       && t.m32.is_finite()
+  }
+
+  /// Generate a Bundle command from the commands drawn since cmd_start_idx,
+  /// then generate a Filter command to apply filters to the bundled content.
+  fn generate_filter_bundle(
+    &mut self, transform: Transform, cmd_start_idx: usize, color_filter: ColorMatrix,
+    filters: Vec<FilterType>,
+  ) {
+    if cmd_start_idx >= self.commands.len() {
+      return;
+    }
+
+    // Collect commands drawn in this filter scope
+    let mut cmds: Vec<PaintCommand> = self.commands.drain(cmd_start_idx..).collect();
+    if cmds.is_empty() {
+      return;
+    }
+
+    // Calculate the bounds of all commands
+    let bounds = Self::compute_commands_bounds(&cmds);
+    if bounds.is_none() || !locatable_bounds(&bounds.unwrap()) {
+      return;
+    }
+
+    let mut filter_expand = filters
+      .iter()
+      .filter_map(|f| match f {
+        FilterType::Convolution(matrix) => Some((matrix.width, matrix.height)),
+        _ => None,
+      })
+      .fold(Size::zero(), |acc, (w, h)| acc + Size::new(w as f32 - 1., h as f32 - 1.));
+
+    filter_expand = transform
+      .outer_transformed_rect(&Rect::from_size(filter_expand))
+      .size;
+
+    let origin_bounds = bounds.unwrap();
+    let outer_bounds =
+      Rect::new(origin_bounds.origin - filter_expand / 2., origin_bounds.size + filter_expand);
+
+    let path = Path::rect(&outer_bounds).into();
+    cmds.push(PaintCommand::Filter {
+      path,
+      transform: Transform::identity(),
+      path_bounds: outer_bounds,
+      filters,
+    });
+
+    // Generate Bundle command
+    self.commands.push(PaintCommand::Bundle {
+      transform: Transform::identity(),
+      color_filter,
+      bounds: outer_bounds,
+      cmds: Resource::new(cmds.into_boxed_slice()),
+    });
+  }
+
+  /// Compute the union bounds of a list of paint commands.
+  fn compute_commands_bounds(cmds: &[PaintCommand]) -> Option<Rect> {
+    let mut bounds: Option<Rect> = None;
+    for cmd in cmds {
+      let cmd_bounds = match cmd {
+        PaintCommand::Path(path_cmd) => path_cmd.paint_bounds,
+        PaintCommand::Bundle { bounds: b, transform, .. } => transform.outer_transformed_rect(b),
+        PaintCommand::Filter { path_bounds, .. } => *path_bounds,
+        PaintCommand::PopClip => continue,
+      };
+      bounds = Some(bounds.map_or(cmd_bounds, |b| b.union(&cmd_bounds)));
+    }
+    bounds
   }
 }
 
