@@ -135,7 +135,7 @@ impl ClearTexturePass {
 }
 
 impl WgpuImpl {
-  pub(crate) fn draw_texture_to_texture(
+  pub(crate) fn copy_diff_format_texture(
     &mut self, dest_tex: &WgpuTexture, dest_at: DevicePoint, from_tex: &WgpuTexture,
     src_rect: &DeviceRect,
   ) {
@@ -145,7 +145,7 @@ impl WgpuImpl {
     {
       let mut tex = self.create_texture(src_rect.size, from_tex.format());
       self.copy_texture_from_texture(&mut tex, DevicePoint::default(), from_tex, src_rect);
-      self.draw_texture_to_texture(dest_tex, dest_at, &tex, &DeviceRect::from_size(tex.size()));
+      self.copy_diff_format_texture(dest_tex, dest_at, &tex, &DeviceRect::from_size(tex.size()));
     } else {
       let pass = self
         .copy_tex_pass
@@ -309,7 +309,7 @@ fn tex_render_pipeline<T>(
   })
 }
 
-fn vertices_corners(rect: &DeviceRect, tex_size: DeviceSize) -> [[f32; 2]; 4] {
+pub(crate) fn vertices_corners(rect: &DeviceRect, tex_size: DeviceSize) -> [[f32; 2]; 4] {
   let [a, b, c, d] = rect_corners(&rect.to_f32().cast_unit());
   [
     vertices_coord(a, tex_size),

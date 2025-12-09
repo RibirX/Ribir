@@ -269,7 +269,15 @@ where
             CommandBrush::Image { img, color_filter } => {
               let slice = self.tex_mgr.store_image(img, &mut self.gpu_impl);
               let ts = matrix.inverse().unwrap();
-              self.draw_img_slice(slice, &ts, mask_head, color_filter, output_tex_size, rect);
+              self.draw_img_slice(
+                slice,
+                &ts,
+                mask_head,
+                color_filter,
+                output_tex_size,
+                rect,
+                false,
+              );
             }
             CommandBrush::Radial(radial) => {
               let prim: RadialGradientPrimitive = RadialGradientPrimitive {
@@ -353,17 +361,20 @@ where
             // Overwrite the viewport to the slice bounds.
             self
               .clip_layer_stack
-              .push(ClipLayer { viewport, mask_head: -1 });
+              .push(ClipLayer { viewport: *slice, mask_head: -1 });
 
-            let matrix = Transform::translation(bounds.origin.x, bounds.origin.y)
+            let matrix = Transform::translation(-bounds.origin.x, -bounds.origin.y)
               .then_scale(scale, scale)
               .then_translate(slice.origin.to_f32().cast_unit().to_vector());
+
+            let surface_color = this.surface_color.take();
+            this.surface_color = Some(Color::TRANSPARENT);
             this.draw_commands(*slice, cmds, &matrix, tex);
+            this.surface_color = surface_color;
 
             // restore the clip layer and viewport
             self.clip_layer_stack.pop();
             this.viewport = viewport;
-            this.begin_draw_phase();
           },
         );
 
@@ -395,6 +406,7 @@ where
           color_filter,
           output_tex_size,
           points,
+          true,
         );
       }
       PaintCommand::Filter { path, path_bounds, transform, filters } => {
@@ -419,7 +431,7 @@ where
 
   fn can_batch_img_path(&self) -> bool {
     let limits = self.gpu_impl.limits();
-    matches!(self.current_phase, CurrentPhase::None)
+    (matches!(self.current_phase, CurrentPhase::None) && self.surface_color.is_none())
       || (matches!(self.current_phase, CurrentPhase::Img)
         && self.tex_ids_map.len() < limits.max_tex_load - 1
         && self.img_prims.len() < limits.max_image_primitives)
@@ -495,9 +507,10 @@ where
     self.filter_vertices_buffer.indices.clear();
   }
 
+  #[allow(clippy::too_many_arguments)]
   fn draw_img_slice(
     &mut self, img_slice: TextureSlice, transform: &Transform, mask_head: i32,
-    color_filter: &ColorMatrix, output_tex_size: DeviceSize, rect: [Point; 4],
+    color_filter: &ColorMatrix, output_tex_size: DeviceSize, rect: [Point; 4], premultiplied: bool,
   ) {
     let img_start = img_slice.rect.origin.to_f32().to_array();
     let img_size = img_slice.rect.size.to_f32().to_array();
@@ -513,7 +526,7 @@ where
       mask_head_and_tex_idx,
       color_matrix: matrix,
       base_color: base,
-      dummy: 0,
+      is_premultiplied: if premultiplied { 1 } else { 0 },
     };
     self.img_prims.push(prim);
     let buffer = &mut self.img_vertices_buffer;
@@ -534,7 +547,7 @@ where
     };
 
     match (&self.current_phase, brush) {
-      (CurrentPhase::None, _) => true,
+      (CurrentPhase::None, _) => self.surface_color.is_none(),
       (CurrentPhase::Filter(_), _) => false,
       (CurrentPhase::Color, CommandBrush::Color(_)) => tex_used < limits.max_tex_load,
       (CurrentPhase::Img, CommandBrush::Image { .. }) => {
@@ -719,7 +732,7 @@ where
       let indices = 0..self.filter_vertices_buffer.indices.len() as u32;
       self
         .gpu_impl
-        .draw_filter_triangles(dst_tex, origin, indices, None);
+        .draw_filter_triangles(dst_tex, origin, indices, Some(Color::TRANSPARENT));
 
       std::mem::swap(&mut p_dst_tex, &mut p_src_tex);
     }

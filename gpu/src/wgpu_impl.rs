@@ -374,7 +374,7 @@ impl GPUBackendImpl for WgpuImpl {
         from_rect,
       );
     } else {
-      self.draw_texture_to_texture(dest_tex, dist_pos, from_tex, from_rect)
+      self.copy_diff_format_texture(dest_tex, dist_pos, from_tex, from_rect);
     }
   }
 

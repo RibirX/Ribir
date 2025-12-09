@@ -19,6 +19,8 @@ pub mod keep_alive;
 pub use keep_alive::*;
 pub mod backdrop_filter;
 pub use backdrop_filter::*;
+pub mod box_shadow;
+pub use box_shadow::*;
 mod theme;
 use smallvec::SmallVec;
 pub use theme::*;
@@ -139,6 +141,7 @@ pub struct FatObj<T> {
   radius: Option<Stateful<RadiusWidget>>,
   border: Option<Stateful<BorderWidget>>,
   backdrop: Option<Stateful<BackdropFilter>>,
+  box_shadow: Option<Stateful<BoxShadowWidget>>,
   background: Option<Stateful<Background>>,
   foreground: Option<Stateful<Foreground>>,
   scrollable: Option<Stateful<ScrollableWidget>>,
@@ -192,6 +195,7 @@ impl<T> FatObj<T> {
       border: self.border,
       radius: self.radius,
       backdrop: self.backdrop,
+      box_shadow: self.box_shadow,
       background: self.background,
       foreground: self.foreground,
       padding: self.padding,
@@ -678,6 +682,13 @@ impl<T> FatObj<T> {
     init_sub_widget!(self, backdrop, filters, v)
   }
 
+  /// Initializes the box shadow of the widget.
+  pub fn with_box_shadow<K: ?Sized>(
+    &mut self, v: impl RInto<PipeValue<BoxShadow>, K>,
+  ) -> &mut Self {
+    init_sub_widget!(self, box_shadow, box_shadow, v)
+  }
+
   /// Initializes the background of the widget.
   pub fn with_background<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Brush>, K>) -> &mut Self {
     init_sub_widget!(self, background, background, v)
@@ -948,6 +959,12 @@ impl<T> FatObj<T> {
   pub fn backdrop_filter(&mut self) -> impl StateWriter<Value = Vec<Vec<FilterType>>> {
     let backdrop = sub_widget!(self, backdrop);
     part_writer!(&mut backdrop.filters)
+  }
+
+  /// Creates and returns a state writer for managing the widget's box shadow.
+  pub fn box_shadow(&mut self) -> impl StateWriter<Value = BoxShadow> {
+    let box_shadow = sub_widget!(self, box_shadow);
+    part_writer!(&mut box_shadow.box_shadow)
   }
 
   /// Creates and returns a state writer for managing the widget's background
@@ -1338,6 +1355,7 @@ impl<'a> FatObj<Widget<'a>> {
           background,
           backdrop,
           clip_boundary,
+          box_shadow,
           fitted_box,
           radius,
           scrollable,

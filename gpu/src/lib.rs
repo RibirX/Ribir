@@ -170,6 +170,7 @@ pub trait GPUBackendImpl {
     &mut self, dest_tex: &mut Self::Texture, copy_to: DevicePoint, from_tex: &Self::Texture,
     from_rect: &DeviceRect,
   );
+
   /// A frame end, call once per frame
   fn end_frame(&mut self);
 }
@@ -296,8 +297,8 @@ pub struct ImgPrimitive {
   /// - The low 16-bit index represents the texture. It is a u16.
   pub mask_head_and_tex_idx: i32,
 
-  /// dummy for align
-  pub dummy: i32,
+  /// 1 for premultiplied alpha, 0 for non-premultiplied alpha
+  pub is_premultiplied: i32,
 
   /// the final pix color will be color * color_matrix + base_color
   pub base_color: [f32; 4],
