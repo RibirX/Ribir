@@ -8,6 +8,7 @@ use smallvec::SmallVec;
 use crate::{
   Brush, Color, Glyph, PixelImage, Svg, VisualGlyphs,
   color::{ColorFilterMatrix, LinearGradient, RadialGradient},
+  filter::{Filter, FilterType},
   font_db::FontDB,
   path::*,
   path_builder::PathBuilder,
@@ -133,19 +134,6 @@ pub enum PathStyle {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FilterType {
-  Color(ColorFilterMatrix),
-  Convolution(FlattenMatrix),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlattenMatrix {
-  pub width: usize,
-  pub height: usize,
-  pub matrix: Vec<f32>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PaintCommand {
   Path(PathCommand),
   PopClip,
@@ -266,7 +254,7 @@ struct PainterState {
 
 #[derive(Clone)]
 struct FilterState {
-  filters: Vec<FilterType>,
+  filter: Filter,
   filter_start_idx: usize,
   color_filter: ColorMatrix,
   transform: Transform,
@@ -404,7 +392,10 @@ impl Painter {
   /// Saves the entire state of the canvas by pushing the current drawing state
   /// onto a stack.
   pub fn save(&mut self) -> &mut Self {
-    let new_state = self.current_state().clone();
+    let mut new_state = self.current_state().clone();
+
+    new_state.filters = SmallVec::new();
+
     self.state_stack.push(new_state);
     self
   }
@@ -430,7 +421,7 @@ impl Painter {
         filter.transform,
         filter.filter_start_idx,
         filter.color_filter,
-        filter.filters,
+        filter.filter.into_vec(),
       );
     }
   }
@@ -478,14 +469,6 @@ impl Painter {
       .current_state_mut()
       .color_filter
       .apply_alpha(alpha);
-    self
-  }
-
-  pub fn apply_color_filter(&mut self, filter: impl Into<ColorMatrix>) -> &mut Self {
-    self
-      .current_state_mut()
-      .color_filter
-      .chains(&filter.into());
     self
   }
 
@@ -607,7 +590,7 @@ impl Painter {
     self.fill_path(builder.build().into())
   }
 
-  pub fn apply_color_matrix(&mut self, matrix: ColorFilterMatrix) -> &mut Self {
+  fn apply_color_matrix(&mut self, matrix: ColorFilterMatrix) -> &mut Self {
     self
       .current_state_mut()
       .color_filter
@@ -912,7 +895,7 @@ impl Painter {
   ///
   /// This is useful for effects like backdrop blur where you want to apply
   /// a filter to what's already been drawn behind a specific region.
-  pub fn filter_path(&mut self, path: PaintPath, filters: Vec<FilterType>) -> &mut Self {
+  pub fn filter_path(&mut self, path: PaintPath, filter: Filter) -> &mut Self {
     invisible_return!(self);
     let p_bounds = path.bounds(None);
     if p_bounds.is_empty() || !locatable_bounds(&p_bounds) {
@@ -925,6 +908,7 @@ impl Painter {
 
     let transform = *self.transform();
     let path_bounds = transform.outer_transformed_rect(&p_bounds);
+    let filters = filter.into_vec();
     self
       .commands
       .push(PaintCommand::Filter { path, path_bounds, transform, filters });
@@ -941,31 +925,27 @@ impl Painter {
   /// # Example
   /// ```ignore
   /// painter.save();
-  /// painter.filter(BackdropFilter::blur_filter(5));
+  /// painter.filter(Filter::blur(5.));
   /// painter.rect(&rect).fill();
   /// painter.circle(center, radius).fill();
   /// painter.restore(); // Generates Bundle + Filter commands
   /// ```
-  pub fn filter(&mut self, filters: Vec<FilterType>) -> &mut Self {
+  pub fn filter(&mut self, filter: Filter) -> &mut Self {
     // all color filter in filters apply to the painter direly,
     // other filter, push to the state's filter
-    let mut v = vec![];
-    for filter in filters {
-      match filter {
-        FilterType::Color(matrix) => {
-          self.apply_color_matrix(matrix);
-        }
-        _ => v.push(filter),
-      };
-    }
-    if !v.is_empty() {
+    let (color_filter, filter) = filter.extract_color_and_convolution();
+    if !filter.is_empty() {
       let state = FilterState {
         transform: *self.transform(),
         filter_start_idx: self.commands.len(),
-        color_filter: self.color_filter().clone(),
-        filters: v,
+        color_filter: *self.color_filter(),
+        filter,
       };
       self.current_state_mut().filters.push(state);
+    }
+
+    if let Some(color_filter) = color_filter {
+      self.apply_color_matrix(color_filter);
     }
     self
   }

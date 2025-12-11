@@ -80,15 +80,7 @@ impl WrapRender for BoxShadowWidget {
       return;
     }
     let box_shadow = self.box_shadow;
-    let kernel = (box_shadow.blur_radius > 0.).then(|| {
-      // Convert blur radius to an appropriate kernel size
-      gaussian_kernel(box_shadow.blur_radius.round() as usize, box_shadow.blur_radius / 2.0)
-    });
-
-    let blur_radius = kernel
-      .as_ref()
-      .map(|kernel| kernel.len() as f32 / 2.)
-      .unwrap_or(0.);
+    let blur_radius = box_shadow.blur_radius.round().max(0.);
 
     let shadow_rect = box_shadow.shadow_rect(size, blur_radius);
     let shadow_size = shadow_rect.size;
@@ -123,16 +115,8 @@ impl WrapRender for BoxShadowWidget {
     );
 
     // Apply blur filter if blur radius is specified
-    if let Some(kernel) = kernel {
-      let filters = vec![
-        FilterType::Convolution(FlattenMatrix {
-          width: kernel.len(),
-          height: 1,
-          matrix: kernel.clone(),
-        }),
-        FilterType::Convolution(FlattenMatrix { width: 1, height: kernel.len(), matrix: kernel }),
-      ];
-      painter.filter(filters);
+    if blur_radius > 0. {
+      painter.filter(Filter::blur(blur_radius));
     }
 
     painter.scale(scale_x, scale_y);
