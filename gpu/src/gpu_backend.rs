@@ -854,7 +854,7 @@ mod tests {
     painter
       .set_fill_brush(Color::RED)
       .set_transform(transform)
-      .rect(&rect)
+      .rect(&rect, true)
       .fill();
 
     let leaves_brush = Resource::new(PixelImage::from_png(include_bytes!("../imgs/leaves.png")));
@@ -862,7 +862,7 @@ mod tests {
     painter
       .set_fill_brush(leaves_brush)
       .set_transform(transform.then_translate((400., 0.).into()))
-      .rect(&rect)
+      .rect(&rect, true)
       .fill();
 
     painter
@@ -875,11 +875,11 @@ mod tests {
     painter
       .set_fill_brush(Color::RED)
       .translate(10., 20.)
-      .rect(&rect_100x100)
+      .rect(&rect_100x100, true)
       .fill()
       .translate(0., 200.)
       .clip(Path::circle(Point::new(50., 50.), 50.).into())
-      .rect(&rect_100x100)
+      .rect(&rect_100x100, true)
       .fill();
 
     painter
@@ -909,12 +909,12 @@ mod tests {
     let rect = rect(0., 0., 100., 100.);
     painter
       .set_fill_brush(brush1)
-      .rect(&rect)
+      .rect(&rect, true)
       .fill()
       .set_fill_brush(brush2)
       .translate(100., 0.)
       .clip(Path::circle(Point::new(50., 50.), 50.).into())
-      .rect(&rect)
+      .rect(&rect, true)
       .fill();
 
     painter
