@@ -124,7 +124,7 @@ impl<const M: u8> WrapRender for StateLayer<M> {
         if *constrain_to_bounds {
           layer.clip(widget_boundary(ctx).into());
         }
-        layer.circle(*center, *radius).fill()
+        layer.circle(*center, *radius, true).fill()
       }
       LayerArea::FullContent => layer.fill_path(widget_boundary(ctx).into()),
     };

@@ -5,7 +5,7 @@ use lyon_algorithms::{
   measure::{PathMeasurements, SampleType},
   path::{Event, Path as LyonPath},
 };
-use ribir_geom::{Point, Rect, Transform};
+use ribir_geom::{Point, Rect, Transform, Vector};
 use serde::{Deserialize, Serialize};
 
 use crate::path_builder::PathBuilder;
@@ -126,7 +126,7 @@ impl Path {
   /// create a rect path.
   pub fn rect(rect: &Rect) -> Self {
     let mut builder = Path::builder();
-    builder.rect(rect);
+    builder.rect(rect, true);
     builder.build()
   }
 
@@ -134,14 +134,21 @@ impl Path {
   /// #[inline]
   pub fn rect_round(rect: &Rect, radius: &Radius) -> Self {
     let mut builder = Path::builder();
-    builder.rect_round(rect, radius);
+    builder.rect_round(rect, radius, true);
     builder.build()
   }
 
   /// create a circle path.
   pub fn circle(center: Point, radius: f32) -> Self {
     let mut builder = Path::builder();
-    builder.circle(center, radius);
+    builder.circle(center, radius, true);
+    builder.build()
+  }
+
+  /// create an ellipse path.
+  pub fn ellipse(center: Point, radius: Vector, rotation: f32) -> Self {
+    let mut builder = Path::builder();
+    builder.ellipse(center, radius, rotation, true);
     builder.build()
   }
 

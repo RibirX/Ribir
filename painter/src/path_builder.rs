@@ -107,13 +107,22 @@ impl PathBuilder {
   ///
   /// There must be no sub-path in progress when this method is called.
   /// No sub-path is in progress after the method is called.
+  ///
+  /// # Parameters
+  /// * `center` - The center point of the ellipse
+  /// * `radius` - The radius vector (x and y radii) of the ellipse
+  /// * `rotation` - The rotation angle of the ellipse in radians
+  /// * `is_positive` - If true, adds the ellipse with positive winding (normal
+  ///   fill). If false, adds the ellipse with negative winding (can be used to
+  ///   exclude area).
   #[inline]
-  pub fn ellipse(&mut self, center: Point, radius: Vector, rotation: f32) {
+  pub fn ellipse(&mut self, center: Point, radius: Vector, rotation: f32, is_positive: bool) {
+    let winding = if is_positive { Winding::Positive } else { Winding::Negative };
     self.lyon_builder.add_ellipse(
       center.to_untyped(),
       radius.to_untyped(),
       Angle::radians(rotation),
-      Winding::Positive,
+      winding,
     );
   }
 
@@ -121,11 +130,18 @@ impl PathBuilder {
   ///
   /// There must be no sub-path in progress when this method is called.
   /// No sub-path is in progress after the method is called.
+  ///
+  /// # Parameters
+  /// * `rect` - The rectangle to add to the path
+  /// * `is_positive` - If true, adds the rectangle with positive winding
+  ///   (normal fill). If false, adds the rectangle with negative winding (can
+  ///   be used to exclude area).
   #[inline]
-  pub fn rect(&mut self, rect: &Rect) -> &mut Self {
+  pub fn rect(&mut self, rect: &Rect, is_positive: bool) -> &mut Self {
+    let winding = if is_positive { Winding::Positive } else { Winding::Negative };
     self
       .lyon_builder
-      .add_rectangle(&rect.to_box2d().to_untyped(), Winding::Positive);
+      .add_rectangle(&rect.to_box2d().to_untyped(), winding);
     self
   }
 
@@ -133,53 +149,37 @@ impl PathBuilder {
   ///
   /// There must be no sub-path in progress when this method is called.
   /// No sub-path is in progress after the method is called.
+  ///
+  /// # Parameters
+  /// * `center` - The center point of the circle
+  /// * `radius` - The radius of the circle
+  /// * `is_positive` - If true, adds the circle with positive winding (normal
+  ///   fill). If false, adds the circle with negative winding (can be used to
+  ///   exclude area).
   #[inline]
-  pub fn circle(&mut self, center: Point, radius: f32) -> &mut Self {
+  pub fn circle(&mut self, center: Point, radius: f32, is_positive: bool) -> &mut Self {
+    let winding = if is_positive { Winding::Positive } else { Winding::Negative };
     self
       .lyon_builder
-      .add_circle(center.to_untyped(), radius, Winding::Positive);
+      .add_circle(center.to_untyped(), radius, winding);
     self
   }
 
   /// Creates a path for a rectangle by `rect` with `radius`.
-  /// #[inline]
-  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) -> &mut Self {
+  ///
+  /// # Parameters
+  /// * `rect` - The rectangle to add to the path
+  /// * `radius` - The corner radius for rounded rectangle
+  /// * `is_positive` - If true, adds the rectangle with positive winding
+  ///   (normal fill). If false, adds the rectangle with negative winding (can
+  ///   be used to exclude area).
+  #[inline]
+  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius, is_positive: bool) -> &mut Self {
     let radius: &BorderRadii = unsafe { std::mem::transmute(radius) };
-    self.lyon_builder.add_rounded_rectangle(
-      &rect.to_box2d().cast_unit(),
-      radius,
-      Winding::Positive,
-    );
-    self
-  }
-
-  // exclude a rect from the path.
-  pub fn exclude_rect(&mut self, rect: &Rect) -> &mut Self {
+    let winding = if is_positive { Winding::Positive } else { Winding::Negative };
     self
       .lyon_builder
-      .add_rectangle(&rect.to_box2d().to_untyped(), Winding::Negative);
-    self
-  }
-
-  // exclude a rect with radius from the path.
-  pub fn exclude_rect_round(&mut self, rect: &Rect, radius: &Radius) -> &mut Self {
-    let radius: &BorderRadii = unsafe { std::mem::transmute(radius) };
-    self.lyon_builder.add_rounded_rectangle(
-      &rect.to_box2d().cast_unit(),
-      radius,
-      Winding::Negative,
-    );
-    self
-  }
-
-  // exclude an ellipse from the path.
-  pub fn exclude_ellipse(&mut self, center: Point, radius: Vector, rotation: f32) -> &mut Self {
-    self.lyon_builder.add_ellipse(
-      center.to_untyped(),
-      radius.to_untyped(),
-      Angle::radians(rotation),
-      Winding::Negative,
-    );
+      .add_rounded_rectangle(&rect.to_box2d().cast_unit(), radius, winding);
     self
   }
 

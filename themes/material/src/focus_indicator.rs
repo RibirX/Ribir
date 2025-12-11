@@ -120,9 +120,9 @@ impl WrapRender for FocusRing {
       .set_line_width(self.stroke_width);
 
     if let Some(radius) = widget_radius {
-      painter.rect_round(&rect, &radius);
+      painter.rect_round(&rect, &radius, true);
     } else {
-      painter.rect(&rect);
+      painter.rect(&rect, true);
     }
 
     painter.stroke();
