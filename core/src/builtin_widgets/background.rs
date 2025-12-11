@@ -28,9 +28,9 @@ impl WrapRender for Background {
 
       painter.set_fill_brush(self.background.clone());
       if let Some(radius) = Provider::of::<Radius>(provider_ctx) {
-        painter.rect_round(&rect, &radius);
+        painter.rect_round(&rect, &radius, true);
       } else {
-        painter.rect(&rect);
+        painter.rect(&rect, true);
       }
       painter.fill();
 

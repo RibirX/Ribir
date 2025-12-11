@@ -309,7 +309,7 @@ impl Painter {
   ///
   /// // Overlay draws in original state context
   /// overlay
-  ///   .rect(&Rect::from_size(Size::splat(200.)))
+  ///   .rect(&Rect::from_size(Size::splat(200.)), true)
   ///   .fill();
   ///
   /// // Original painter changes state
@@ -694,9 +694,15 @@ impl Painter {
   ///
   /// There must be no sub-path in progress when this method is called.
   /// No sub-path is in progress after the method is called.
+  ///
+  /// # Parameters
+  /// * `rect` - The rectangle to add to the path
+  /// * `is_positive` - If true, adds the rectangle with positive winding
+  ///   (normal fill). If false, adds the rectangle with negative winding (can
+  ///   be used to exclude area).
   #[inline]
-  pub fn rect(&mut self, rect: &Rect) -> &mut Self {
-    self.path_builder.rect(rect);
+  pub fn rect(&mut self, rect: &Rect, is_positive: bool) -> &mut Self {
+    self.path_builder.rect(rect, is_positive);
     self
   }
 
@@ -704,17 +710,56 @@ impl Painter {
   ///
   /// There must be no sub-path in progress when this method is called.
   /// No sub-path is in progress after the method is called.
+  ///
+  /// # Parameters
+  /// * `center` - The center point of the circle
+  /// * `radius` - The radius of the circle
+  /// * `is_positive` - If true, adds the circle with positive winding (normal
+  ///   fill). If false, adds the circle with negative winding (can be used to
+  ///   exclude area).
   #[inline]
-  pub fn circle(&mut self, center: Point, radius: f32) -> &mut Self {
-    self.path_builder.circle(center, radius);
+  pub fn circle(&mut self, center: Point, radius: f32, is_positive: bool) -> &mut Self {
+    self
+      .path_builder
+      .circle(center, radius, is_positive);
+    self
+  }
+
+  /// Adds a sub-path containing an ellipse.
+  ///
+  /// There must be no sub-path in progress when this method is called.
+  /// No sub-path is in progress after the method is called.
+  ///
+  /// # Parameters
+  /// * `center` - The center point of the ellipse
+  /// * `radius` - The radius vector (x and y radii) of the ellipse
+  /// * `rotation` - The rotation angle of the ellipse in radians
+  /// * `is_positive` - If true, adds the ellipse with positive winding (normal
+  ///   fill). If false, adds the ellipse with negative winding (can be used to
+  ///   exclude area).
+  #[inline]
+  pub fn ellipse(
+    &mut self, center: Point, radius: Vector, rotation: f32, is_positive: bool,
+  ) -> &mut Self {
+    self
+      .path_builder
+      .ellipse(center, radius, rotation, is_positive);
     self
   }
 
   /// Creates a path for a rectangle by `rect` with `radius`.
-  /// #[inline]
+  ///
+  /// # Parameters
+  /// * `rect` - The rectangle to add to the path
+  /// * `radius` - The corner radius for rounded rectangle
+  /// * `is_positive` - If true, adds the rectangle with positive winding
+  ///   (normal fill). If false, adds the rectangle with negative winding (can
+  ///   be used to exclude area).
   #[inline]
-  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius) -> &mut Self {
-    self.path_builder.rect_round(rect, radius);
+  pub fn rect_round(&mut self, rect: &Rect, radius: &Radius, is_positive: bool) -> &mut Self {
+    self
+      .path_builder
+      .rect_round(rect, radius, is_positive);
     self
   }
 
@@ -810,7 +855,7 @@ impl Painter {
       painter
         .scale(dst_rect.width() / paint_rect.width(), dst_rect.height() / paint_rect.height())
         .translate(-paint_rect.min_x(), -paint_rect.min_y())
-        .rect(&Rect::from_size(Size::new(m_width, m_height)))
+        .rect(&Rect::from_size(Size::new(m_width, m_height)), true)
         .set_fill_brush(img)
         .fill();
     }
@@ -1277,11 +1322,11 @@ mod test {
     let commands = painter
       .save()
       .clip(Path::rect(&rect(0., 0., 100., 100.)).into())
-      .rect(&rect(0., 0., 10., 10.))
+      .rect(&rect(0., 0., 10., 10.), true)
       .fill()
       .save()
       .clip(Path::rect(&rect(0., 0., 50., 50.)).into())
-      .rect(&rect(0., 0., 10., 10.))
+      .rect(&rect(0., 0., 10., 10.), true)
       .fill()
       .finish();
 
@@ -1338,7 +1383,7 @@ mod test {
       .save()
       .clip(Path::rect(&rect(0., 0., 100., 100.)).into())
       .set_transform(Transform::translation(500., 500.))
-      .rect(&rect(-500., -500., 10., 10.))
+      .rect(&rect(-500., -500., 10., 10.), true)
       .fill();
     assert_eq!(painter.commands.len(), 2);
   }
@@ -1349,7 +1394,7 @@ mod test {
 
     painter
       .scale(0., 0.)
-      .rect(&rect(0., 0., 10., 10.))
+      .rect(&rect(0., 0., 10., 10.), true)
       .fill();
   }
 
@@ -1359,7 +1404,7 @@ mod test {
 
     painter
       .clip(Path::rect(&rect(0., 0., 0., 0.)).into())
-      .rect(&rect(0., 0., 10., 10.))
+      .rect(&rect(0., 0., 10., 10.), true)
       .fill();
 
     assert_eq!(painter.commands.len(), 0);

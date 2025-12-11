@@ -93,11 +93,11 @@ impl WrapRender for BoxShadowWidget {
 
     // build clip path, exclude the original box
     let mut builder = path_builder::PathBuilder::default();
-    builder.rect(&shadow_rect);
+    builder.rect(&shadow_rect, true); // positive winding for outer rectangle
     if let Some(radius) = &radius {
-      builder.exclude_rect_round(&Rect::from_size(size), radius);
+      builder.rect_round(&Rect::from_size(size), radius, false); // negative winding to exclude inner rounded rect
     } else {
-      builder.exclude_rect(&Rect::from_size(size));
+      builder.rect(&Rect::from_size(size), false); // negative winding to exclude inner rectangle
     }
 
     ctx.painter().save();
@@ -123,9 +123,9 @@ impl WrapRender for BoxShadowWidget {
 
     // Use rounded rectangle if radius is provided, otherwise use regular rectangle
     if let Some(radius) = radius {
-      painter.rect_round(&Rect::from_size(size), &radius);
+      painter.rect_round(&Rect::from_size(size), &radius, true);
     } else {
-      painter.rect(&Rect::from_size(size));
+      painter.rect(&Rect::from_size(size), true);
     }
 
     painter.set_fill_brush(box_shadow.color).fill();
