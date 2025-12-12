@@ -48,7 +48,7 @@ mod tests {
         @Container {
           anchor: Anchor::left_top(20., 20.),
           size: Size::new(80., 80.),
-          backdrop_filter: Filter::grayscale(1.).with(Filter::blur(3.)),
+          backdrop_filter: Filter::grayscale(1.).then(Filter::blur(3.)),
         }
       }
     })

@@ -171,6 +171,20 @@ pub trait GPUBackendImpl {
     from_rect: &DeviceRect,
   );
 
+  /// Load the vertices and indices buffer that `draw_texture_triangles` will
+  /// use.
+  fn load_texture_vertices(&mut self, buffers: &VertexBuffers<TexturePrimIndex>);
+
+  /// Load the primitives that `draw_texture_triangles` will use.
+  fn load_texture_primitives(&mut self, primitives: &[TexturePrimitive]);
+
+  /// Draw triangles fill with texture. And use the clear color clear the
+  /// texture first if it's a Some-Value
+  fn draw_texture_triangles(
+    &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
+    from_texture: &Self::Texture,
+  );
+
   /// A frame end, call once per frame
   fn end_frame(&mut self);
 }
@@ -193,6 +207,9 @@ pub struct DrawPhaseLimits {
   /// The maximum number of gradient stops that the backend can load in a single
   /// draw phase
   pub max_gradient_stop_primitives: usize,
+  /// The maximum number of texture primitives that the backend can load in a
+  /// single draw phase
+  pub max_texture_primitives: usize,
 
   /// The maximum size of the filter matrix that the backend can load in a
   /// single draw phase
@@ -332,17 +349,50 @@ pub struct MaskLayer {
 #[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
 pub struct FilterPrimitive {
   /// The origin of the image placed in texture.
+  /// Used to locate the original image position in the texture.
   pub sample_offset: [f32; 2],
+  /// Filter effect offset for drop-shadow etc.
+  /// This offset is applied during filter convolution sampling to create
+  /// displaced effects like shadows.
+  pub offset: [f32; 2],
   /// The origin of the mask layer in the texture.
   pub mask_offset: [f32; 2],
   /// The size of the filter kernel.
   pub kernel_size: [i32; 2],
   /// The index of the head mask layer.
   pub mask_head: i32,
+  /// The composite mode for filter application.
+  /// - 0 = Replace: filter result completely replaces the original content
+  /// - 1 = ExcludeSource: filter result is only applied where original alpha is
+  ///   0
+  pub composite: i32,
+
   /// dummy for align
-  pub dummy: i32,
+  pub dummy: [f32; 2],
   /// the final pix color will be color * color_matrix + base_color
   pub base_color: [f32; 4],
+
   /// the final pix color will be color * color_matrix + base_color
   pub color_matrix: [f32; 4 * 4],
+}
+
+#[repr(C, packed)]
+#[derive(AsBytes, PartialEq, Clone, Copy, Debug)]
+pub struct TexturePrimIndex(pub u32);
+
+#[repr(C, packed)]
+#[derive(AsBytes, PartialEq, Clone, Copy)]
+pub struct TexturePrimitive {
+  /// A 2x3 column-major matrix, transform a vertex position to the texture
+  /// position
+  pub transform: [f32; 6],
+  /// The index of the head mask layer.
+  pub mask_head: i32,
+  /// opacity
+  pub opacity: f32,
+  /// The index of the texture.
+  /// 1 for premultiplied alpha, 0 for non-premultiplied alpha
+  pub is_premultiplied: u32,
+  /// dummy for align
+  pub _padding: [u32; 3],
 }

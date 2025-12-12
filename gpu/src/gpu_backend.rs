@@ -5,15 +5,15 @@ use ribir_geom::{
   DevicePoint, DeviceRect, DeviceSize, Point, Transform, rect_corners, transform_to_device_rect,
 };
 use ribir_painter::{
-  Color, ColorMatrix, CommandBrush, FilterType, FlattenMatrix, PaintCommand, PaintPath,
-  PaintPathAction, PainterBackend, PaintingStyle, PathCommand, PixelImage, Vertex, VertexBuffers,
-  color::ColorFilterMatrix, image::ColorFormat,
+  Color, ColorMatrix, CommandBrush, FilterComposite, FilterLayer, FilterOp, PaintCommand,
+  PaintPath, PaintPathAction, PainterBackend, PaintingStyle, PathCommand, PixelImage, Vertex,
+  VertexBuffers, color::ColorFilterMatrix, image::ColorFormat,
 };
 
 use crate::{
   ColorAttr, FilterPrimitive, GPUBackendImpl, GradientStopPrimitive, ImagePrimIndex, ImgPrimitive,
   LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer, RadialGradientPrimIndex,
-  RadialGradientPrimitive,
+  RadialGradientPrimitive, TexturePrimIndex, TexturePrimitive,
 };
 
 mod atlas;
@@ -34,6 +34,7 @@ pub struct GPUBackend<Impl: GPUBackendImpl> {
   linear_gradient_prims: Vec<LinearGradientPrimitive>,
   linear_gradient_stops: Vec<GradientStopPrimitive>,
   linear_gradient_vertices_buffer: VertexBuffers<LinearGradientPrimIndex>,
+  texture_vertices_buffer: VertexBuffers<TexturePrimIndex>,
   current_phase: CurrentPhase,
   tex_ids_map: TextureIdxMap,
   viewport: DeviceRect,
@@ -57,58 +58,7 @@ enum CurrentPhase {
 struct FilterPhase {
   view_rect: DeviceRect,
   mask_head: i32,
-  filters: Vec<FilterType>,
-}
-
-impl FilterPhase {
-  fn primitive_iter(&self) -> impl Iterator<Item = (FilterPrimitive, Vec<f32>)> + '_ {
-    let mut origin_it = self.filters.iter().peekable();
-    std::iter::from_fn(move || {
-      let filter = origin_it.next()?;
-      let (mut color_matrix, mut matrix) = match filter {
-        FilterType::Color(color_matrix) => (Some(*color_matrix), None),
-        FilterType::Convolution(matrix) => (None, Some(matrix)),
-      };
-      while let Some(next) = origin_it.peek() {
-        match next {
-          FilterType::Color(matrix) => {
-            if let Some(color_matrix) = &mut color_matrix {
-              color_matrix.chains(matrix);
-            } else {
-              color_matrix = Some(*matrix);
-            }
-          }
-          FilterType::Convolution(m) if matrix.is_none() => {
-            matrix = Some(m);
-          }
-          _ => break,
-        };
-        origin_it.next();
-      }
-      let matrix =
-        matrix
-          .cloned()
-          .unwrap_or_else(|| FlattenMatrix { width: 1, height: 1, matrix: vec![1.] });
-
-      if color_matrix.is_none() {
-        color_matrix = Some(ColorMatrix::identity().to_matrix());
-      }
-      let ColorFilterMatrix { matrix: color_matrix, base_color } = color_matrix.unwrap();
-      let FlattenMatrix { width, height, matrix, .. } = matrix;
-      Some((
-        FilterPrimitive {
-          sample_offset: [0.; 2],
-          mask_offset: [0.; 2],
-          dummy: 0,
-          color_matrix,
-          base_color: base_color.map_or_else(|| [0.; 4], |c| c.into_f32_components()),
-          kernel_size: [width as i32, height as i32],
-          mask_head: self.mask_head,
-        },
-        matrix,
-      ))
-    })
-  }
+  filters: Vec<FilterLayer>,
 }
 
 struct ClipLayer {
@@ -195,6 +145,7 @@ where
       skip_clip_cnt: 0,
       color_vertices_buffer: VertexBuffers::with_capacity(256, 512),
       img_vertices_buffer: VertexBuffers::with_capacity(256, 512),
+      texture_vertices_buffer: VertexBuffers::with_capacity(256, 512),
       filter_vertices_buffer: VertexBuffers::with_capacity(16, 32),
       radial_gradient_vertices_buffer: VertexBuffers::with_capacity(256, 512),
       radial_gradient_prims: vec![],
@@ -423,7 +374,16 @@ where
         self.current_phase = CurrentPhase::Filter(Box::new(FilterPhase {
           view_rect,
           mask_head,
-          filters: filters.clone(),
+          filters: filters
+            .iter()
+            .map(|f| FilterLayer {
+              ops: f.ops.clone(),
+              offset: global_matrix
+                .transform_vector(f.offset.into())
+                .into(),
+              composite: f.composite,
+            })
+            .collect(),
         }));
       }
     }
@@ -679,70 +639,178 @@ where
 
   fn draw_filter(&mut self, filter: &FilterPhase, output: &mut Impl::Texture) {
     let mask_origin: DevicePoint = filter.view_rect.origin.cast().cast_unit();
+    let size = filter.view_rect.size;
 
-    let mut tex_tmp1 = self
+    // 1. Initialize temporary textures
+    let mut tex_a = self
       .gpu_impl
-      .new_texture(filter.view_rect.size, ColorFormat::Rgba8);
-
-    let mut tex_tmp2 = self
+      .new_texture(size, ColorFormat::Rgba8);
+    let mut tex_b = self
       .gpu_impl
-      .new_texture(filter.view_rect.size, ColorFormat::Rgba8);
+      .new_texture(size, ColorFormat::Rgba8);
 
+    // Initial Copy: Output -> tex_a
     self.gpu_impl.copy_texture_from_texture(
-      &mut tex_tmp1,
+      &mut tex_a,
       DevicePoint::zero(),
       output,
       &filter.view_rect.cast_unit(),
     );
 
-    let mut p_src_tex = &mut tex_tmp1 as *mut _;
-    let mut p_dst_tex = &mut tex_tmp2 as *mut Impl::Texture;
+    let p_a = &mut tex_a as *mut Impl::Texture;
+    let p_b = &mut tex_b as *mut Impl::Texture;
+    let mut p_src = p_a;
+    let mut p_dst = p_b;
 
-    let primitives = filter.primitive_iter();
+    for layer in &filter.filters {
+      // Prepare Ops Iterator
+      // Handle case where ops are empty but offset exists (e.g. strict shift)
+      let mut ops_vec: Vec<(FilterOp, [f32; 2])> = layer
+        .ops
+        .iter()
+        .map(|op| (op.clone(), [0.; 2]))
+        .collect();
 
-    for (mut prim, kernel) in primitives {
-      prim.sample_offset = [0.; 2];
-      prim.mask_offset = mask_origin.to_vector().cast().into();
+      if ops_vec.is_empty() && layer.offset != [0., 0.] {
+        ops_vec.push((FilterOp::Color(ColorMatrix::identity().to_matrix()), [0.; 2]));
+      }
 
-      let dst_tex = unsafe { &mut *p_dst_tex };
-      let origin = unsafe { &*p_src_tex };
+      // Apply Offset to Last Op
+      if let Some(last) = ops_vec.last_mut() {
+        last.1 = layer.offset;
+      } else {
+        // Layer effectively empty/no-op
+        continue;
+      }
 
-      self
-        .gpu_impl
-        .load_filter_primitive(&prim, &kernel);
+      // Execute Ops (Ping-Pong)
+      // p_src holds Input (Source for this layer).
+      for (op, offset) in ops_vec {
+        let (color_matrix, base_color, matrix) = match &op {
+          FilterOp::Color(m) => (
+            m.matrix,
+            m.base_color
+              .map_or([0.; 4], |c| c.into_f32_components()),
+            vec![1.0],
+          ),
+          FilterOp::Convolution(m) => {
+            (ColorMatrix::identity().to_matrix().matrix, [0.; 4], m.matrix.clone())
+          }
+        };
 
-      self.filter_vertices_buffer.clear();
-      let dst_size = dst_tex.size();
-      let dst_origin = Point::new(0., 0.);
-      add_rect_vertices(
-        [
-          dst_origin,
-          dst_origin + Vector2D::new(dst_size.width as f32, 0.),
-          dst_origin + Vector2D::new(dst_size.width as f32, dst_size.height as f32),
-          dst_origin + Vector2D::new(0., dst_size.height as f32),
-        ],
-        dst_size,
-        (),
-        &mut self.filter_vertices_buffer,
+        let width = if let FilterOp::Convolution(m) = &op { m.width as i32 } else { 1 };
+        let height = if let FilterOp::Convolution(m) = &op { m.height as i32 } else { 1 };
+
+        let prim = FilterPrimitive {
+          sample_offset: [0.; 2],
+          offset,
+          mask_offset: mask_origin.to_vector().cast().into(),
+          kernel_size: [width, height],
+          mask_head: filter.mask_head,
+          composite: 0, // Ops strictly Replace
+          dummy: [0.; 2],
+          base_color,
+          color_matrix,
+        };
+
+        self.filter_vertices_buffer.clear();
+        let dst_origin = Point::new(0., 0.);
+        add_rect_vertices(
+          [
+            dst_origin,
+            dst_origin + Vector2D::new(size.width as f32, 0.),
+            dst_origin + Vector2D::new(size.width as f32, size.height as f32),
+            dst_origin + Vector2D::new(0., size.height as f32),
+          ],
+          size,
+          (),
+          &mut self.filter_vertices_buffer,
+        );
+
+        let src_tex = unsafe { &*p_src };
+        let dst_tex = unsafe { &mut *p_dst };
+
+        self
+          .gpu_impl
+          .load_filter_primitive(&prim, &matrix);
+        self
+          .gpu_impl
+          .load_filter_vertices(&self.filter_vertices_buffer);
+        let indices = 0..self.filter_vertices_buffer.indices.len() as u32;
+
+        // Draw Op, clearing dst first
+        self
+          .gpu_impl
+          .draw_filter_triangles(dst_tex, src_tex, indices, Some(Color::TRANSPARENT));
+
+        std::mem::swap(&mut p_src, &mut p_dst);
+      }
+
+      // If ExcludeSource: We want Source OVER Filter.
+      if layer.composite == FilterComposite::ExcludeSource {
+        // 1. Copy Source (Output) -> p_dst
+        self.gpu_impl.copy_texture_from_texture(
+          unsafe { &mut *p_dst },
+          DevicePoint::zero(),
+          output,
+          &filter.view_rect,
+        );
+
+        // 2. Swap so p_src=Source(Back), p_dst=Filter(Front/Dest)
+        std::mem::swap(&mut p_src, &mut p_dst);
+
+        // 3. Draw Source (p_src) OVER Filter (p_dst)
+        // Composite Mode = ExcludeSource (passed to shader/backend)
+        // We use TexturePrimitive via draw_texture_triangles to handle composition
+        let transform = Transform::identity().to_array();
+        let prim = TexturePrimitive {
+          transform,
+          mask_head: filter.mask_head,
+          opacity: 1.0,
+          is_premultiplied: 1,
+          _padding: [0; 3],
+        };
+
+        self.texture_vertices_buffer.clear();
+        let dst_origin = Point::new(0., 0.);
+        add_rect_vertices(
+          [
+            dst_origin,
+            dst_origin + Vector2D::new(size.width as f32, 0.),
+            dst_origin + Vector2D::new(size.width as f32, size.height as f32),
+            dst_origin + Vector2D::new(0., size.height as f32),
+          ],
+          size,
+          TexturePrimIndex(0),
+          &mut self.texture_vertices_buffer,
+        );
+
+        let src_tex = unsafe { &*p_src };
+        let dst_tex = unsafe { &mut *p_dst };
+
+        self.gpu_impl.load_texture_primitives(&[prim]);
+        self
+          .gpu_impl
+          .load_texture_vertices(&self.texture_vertices_buffer);
+        let indices = 0..self.texture_vertices_buffer.indices.len() as u32;
+
+        // Draw src_tex OVER dst_tex with composition.
+        self
+          .gpu_impl
+          .draw_texture_triangles(dst_tex, indices, None, src_tex);
+
+        // 4. Swap back so p_src holds the Final Result
+        std::mem::swap(&mut p_src, &mut p_dst);
+      }
+
+      // Update Output (Source for next layer)
+      self.gpu_impl.copy_texture_from_texture(
+        output,
+        filter.view_rect.origin.cast().cast_unit(),
+        unsafe { &*p_src },
+        &DeviceRect::from_size(size),
       );
-
-      self
-        .gpu_impl
-        .load_filter_vertices(&self.filter_vertices_buffer);
-      let indices = 0..self.filter_vertices_buffer.indices.len() as u32;
-      self
-        .gpu_impl
-        .draw_filter_triangles(dst_tex, origin, indices, Some(Color::TRANSPARENT));
-
-      std::mem::swap(&mut p_dst_tex, &mut p_src_tex);
     }
-
-    self.gpu_impl.copy_texture_from_texture(
-      output,
-      filter.view_rect.origin.cast().cast_unit(),
-      unsafe { &*p_src_tex },
-      &DeviceRect::from_size(tex_tmp1.size()),
-    );
   }
 }
 

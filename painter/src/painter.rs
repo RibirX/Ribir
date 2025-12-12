@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 use crate::{
   Brush, Color, Glyph, PixelImage, Svg, VisualGlyphs,
   color::{ColorFilterMatrix, LinearGradient, RadialGradient},
-  filter::{Filter, FilterType},
+  filter::{Filter, FilterLayer, FilterOp},
   font_db::FontDB,
   path::*,
   path_builder::PathBuilder,
@@ -159,7 +159,7 @@ pub enum PaintCommand {
     path_bounds: Rect,
 
     /// the filter primitive to apply.
-    filters: Vec<FilterType>,
+    filters: Vec<FilterLayer>,
   },
 }
 
@@ -421,7 +421,7 @@ impl Painter {
         filter.transform,
         filter.filter_start_idx,
         filter.color_filter,
-        filter.filter.into_vec(),
+        filter.filter.into_layers(),
       );
     }
   }
@@ -953,7 +953,20 @@ impl Painter {
 
     let transform = *self.transform();
     let path_bounds = transform.outer_transformed_rect(&p_bounds);
-    let filters = filter.into_vec();
+
+    // Transform the offset in each filter stage from user coordinates to device
+    // coordinates. We use transform_vector (not transform_point) because offset
+    // is a direction vector that should not be affected by translation.
+    let filters: Vec<_> = filter
+      .into_layers()
+      .into_iter()
+      .map(|mut stage| {
+        let offset = transform.transform_vector(Vector::new(stage.offset[0], stage.offset[1]));
+        stage.offset = [offset.x, offset.y];
+        stage
+      })
+      .collect();
+
     self
       .commands
       .push(PaintCommand::Filter { path, path_bounds, transform, filters });
@@ -976,9 +989,8 @@ impl Painter {
   /// painter.restore(); // Generates Bundle + Filter commands
   /// ```
   pub fn filter(&mut self, filter: Filter) -> &mut Self {
-    // all color filter in filters apply to the painter direly,
-    // other filter, push to the state's filter
     let (color_filter, filter) = filter.extract_color_and_convolution();
+
     if !filter.is_empty() {
       let state = FilterState {
         transform: *self.transform(),
@@ -1092,7 +1104,7 @@ impl Painter {
   /// then generate a Filter command to apply filters to the bundled content.
   fn generate_filter_bundle(
     &mut self, transform: Transform, cmd_start_idx: usize, color_filter: ColorMatrix,
-    filters: Vec<FilterType>,
+    filters: Vec<FilterLayer>,
   ) {
     if cmd_start_idx >= self.commands.len() {
       return;
@@ -1105,42 +1117,60 @@ impl Painter {
     }
 
     // Calculate the bounds of all commands
-    let bounds = Self::compute_commands_bounds(&cmds);
-    if bounds.is_none() || !locatable_bounds(&bounds.unwrap()) {
-      return;
+    let mut current_bounds = match Self::compute_commands_bounds(&cmds) {
+      Some(b) if locatable_bounds(&b) => b,
+      _ => return,
+    };
+
+    let len = filters.len();
+    for (i, mut layer) in filters.into_iter().enumerate() {
+      let (w, h) = layer
+        .ops
+        .iter()
+        .find_map(|op| match op {
+          FilterOp::Convolution(matrix) => Some((matrix.width, matrix.height)),
+          _ => None,
+        })
+        .unwrap_or((1, 1));
+
+      let expand = Size::new(w as f32 - 1., h as f32 - 1.);
+      let expand = transform
+        .outer_transformed_rect(&Rect::from_size(expand))
+        .size;
+
+      let expanded_bounds =
+        Rect::new(current_bounds.origin - expand / 2., current_bounds.size + expand);
+
+      // Transform the offset in each filter stage from user coordinates to device
+      // coordinates. We use transform_vector (not transform_point) because offset
+      // is a direction vector that should not be affected by translation.
+      let offset = transform.transform_vector(Vector::new(layer.offset[0], layer.offset[1]));
+      layer.offset = [offset.x, offset.y];
+
+      let shift_bounds = expanded_bounds.translate(offset);
+      let new_bounds = current_bounds.union(&shift_bounds);
+
+      let path = Path::rect(&new_bounds).into();
+      cmds.push(PaintCommand::Filter {
+        path,
+        transform: Transform::identity(),
+        path_bounds: new_bounds,
+        filters: vec![layer],
+      });
+
+      // Generate Bundle command
+      let color_filter = if i == len - 1 { color_filter } else { ColorMatrix::default() };
+      let bundle = PaintCommand::Bundle {
+        transform: Transform::identity(),
+        color_filter,
+        bounds: new_bounds,
+        cmds: Resource::new(cmds.into_boxed_slice()),
+      };
+      cmds = vec![bundle];
+      current_bounds = new_bounds;
     }
 
-    let mut filter_expand = filters
-      .iter()
-      .filter_map(|f| match f {
-        FilterType::Convolution(matrix) => Some((matrix.width, matrix.height)),
-        _ => None,
-      })
-      .fold(Size::zero(), |acc, (w, h)| acc + Size::new(w as f32 - 1., h as f32 - 1.));
-
-    filter_expand = transform
-      .outer_transformed_rect(&Rect::from_size(filter_expand))
-      .size;
-
-    let origin_bounds = bounds.unwrap();
-    let outer_bounds =
-      Rect::new(origin_bounds.origin - filter_expand / 2., origin_bounds.size + filter_expand);
-
-    let path = Path::rect(&outer_bounds).into();
-    cmds.push(PaintCommand::Filter {
-      path,
-      transform: Transform::identity(),
-      path_bounds: outer_bounds,
-      filters,
-    });
-
-    // Generate Bundle command
-    self.commands.push(PaintCommand::Bundle {
-      transform: Transform::identity(),
-      color_filter,
-      bounds: outer_bounds,
-      cmds: Resource::new(cmds.into_boxed_slice()),
-    });
+    self.commands.extend(cmds);
   }
 
   /// Compute the union bounds of a list of paint commands.

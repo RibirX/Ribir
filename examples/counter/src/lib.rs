@@ -1,11 +1,16 @@
 use ribir::prelude::*;
 
 pub fn counter(cnt: &'static Stateful<i32>) -> Widget<'static> {
-  button! {
-    h_align: HAlign::Center,
-    v_align: VAlign::Center,
-    on_tap: move |_| *$write(cnt) += 1,
-    @pipe!($read(cnt).to_string())
+  fn_widget! {
+    let img = Resource::new(PixelImage::from_png(include_bytes!("../../attachments/3DDD-2.png")));
+    @Container {
+      size: Size::new(100., 100.),
+      filter: Filter::blur(3.),
+      @Container {
+        size: Size::new(40., 40.),
+        background: Color::GREEN,
+      }
+    }
   }
   .into_widget()
 }
