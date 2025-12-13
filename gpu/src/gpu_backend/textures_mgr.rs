@@ -39,7 +39,7 @@ pub(super) struct TexturesMgr<T: Texture> {
   /// We keep it separate from `rgba_atlas` because the backend may not permit a
   /// texture to be used both as a target and as a sampled resource in the same
   /// draw call.
-  target_atlas: Atlas<Resource<dyn Any>, T>,
+  bundle_atlas: Atlas<Resource<dyn Any>, T>,
   tess_task: Vec<TessTask>,
   tess_task_buffer: VertexBuffers<()>,
   need_clear_areas: Vec<DeviceRect>,
@@ -65,7 +65,7 @@ macro_rules! id_to_texture_mut {
     match $id {
       TextureID::Alpha(id) => $mgr.alpha_atlas.get_texture_mut(id),
       TextureID::Rgba(id) => $mgr.rgba_atlas.get_texture_mut(id),
-      TextureID::Bundle(id) => $mgr.target_atlas.get_texture_mut(id),
+      TextureID::Bundle(id) => $mgr.bundle_atlas.get_texture_mut(id),
     }
   };
 }
@@ -75,7 +75,7 @@ macro_rules! id_to_texture {
     match $id {
       TextureID::Alpha(id) => $mgr.alpha_atlas.get_texture(id),
       TextureID::Rgba(id) => $mgr.rgba_atlas.get_texture(id),
-      TextureID::Bundle(id) => $mgr.target_atlas.get_texture(id),
+      TextureID::Bundle(id) => $mgr.bundle_atlas.get_texture(id),
     }
   };
 }
@@ -99,7 +99,7 @@ where
         ColorFormat::Rgba8,
         gpu_impl,
       ),
-      target_atlas: Atlas::new(
+      bundle_atlas: Atlas::new(
         AtlasConfig::new("Bundle atlas", max_size),
         ColorFormat::Rgba8,
         gpu_impl,
@@ -214,15 +214,34 @@ where
     &mut self, size: DeviceSize, target: Resource<dyn Any>, scale: f32, gpu: &mut T::Host,
     init: impl FnOnce(&DeviceRect, &mut T, &mut T::Host),
   ) -> (f32, TextureSlice) {
-    let dist = self
-      .target_atlas
-      .get_or_cache(target, scale, size, gpu, init);
+    if let Some(h) = self.bundle_atlas.get(&target, scale).copied() {
+      return (
+        h.scale,
+        TextureSlice {
+          tex_id: TextureID::Bundle(h.tex_id()),
+          rect: h.tex_rect(&self.bundle_atlas),
+        },
+      );
+    }
+
+    let bundle_dist = self.bundle_atlas.allocate(size, gpu);
+    let bundle_rect = bundle_dist.tex_rect(&self.bundle_atlas);
+    let mut temp_tex = gpu.new_texture(size, ColorFormat::Rgba8);
+    let temp_rect = DeviceRect::from_size(size);
+    init(&temp_rect, &mut temp_tex, gpu);
+
+    let bundle_tex = self
+      .bundle_atlas
+      .get_texture_mut(bundle_dist.tex_id());
+
+    gpu.copy_texture_from_texture(bundle_tex, bundle_rect.min(), &temp_tex, &temp_rect);
+
+    let h = self
+      .bundle_atlas
+      .cache(target, scale, bundle_dist);
     (
-      dist.scale,
-      TextureSlice {
-        tex_id: TextureID::Bundle(dist.tex_id()),
-        rect: dist.tex_rect(&self.target_atlas),
-      },
+      h.scale,
+      TextureSlice { tex_id: TextureID::Bundle(h.tex_id()), rect: h.tex_rect(&self.bundle_atlas) },
     )
   }
 
@@ -402,7 +421,7 @@ where
       self.need_clear_areas.push(rect);
     });
     self.rgba_atlas.end_frame();
-    self.target_atlas.end_frame();
+    self.bundle_atlas.end_frame();
   }
 }
 
