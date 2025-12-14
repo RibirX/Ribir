@@ -220,7 +220,6 @@ jobs:
         continue-on-error: true
         run: |
           set -e
-
           cargo llvm-cov report --lcov --output-path lcov.info
       
       - uses: actions/upload-artifact@v4
@@ -234,6 +233,12 @@ jobs:
         if: steps.coverage.outcome == 'success'
         with:
           files: lcov.info
+
+      - name: (linux) Cleanup llvm-cov-target
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          rm -rf target/llvm-cov-target
+
   doc-examples:
     needs: lint
     name: compile doc examples
