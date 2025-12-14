@@ -27,8 +27,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Features
 
-- **core**: add builtin `box_shadow` property. (#pr @wjian23)
-- **core**: add builtin `filter` property. (#pr @wjian23)
+- **core**: add builtin `box_shadow` property. (#811 @wjian23)
+- **core**: add builtin `filter` property. (#811 @wjian23)
 
 ## [0.4.0-alpha.52] - 2025-12-03
 
