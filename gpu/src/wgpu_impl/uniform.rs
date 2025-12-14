@@ -69,4 +69,5 @@ impl<T: AsBytes> Uniform<T> {
 
   pub fn bind_group(&self) -> &wgpu::BindGroup { &self.var.bind }
   pub fn layout(&self) -> &wgpu::BindGroupLayout { &self.var.layout }
+  pub fn buffer(&self) -> &wgpu::Buffer { &self.var.buffer }
 }

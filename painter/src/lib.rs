@@ -2,6 +2,7 @@
 
 //! A 2d logic painter, generate the paint command
 pub mod color;
+pub mod filter;
 mod painter;
 pub mod path;
 pub mod path_builder;
@@ -11,6 +12,7 @@ pub use text::*;
 
 pub use crate::{
   color::{Color, GradientStop, LightnessTone},
+  filter::*,
   painter::*,
 };
 pub mod image;

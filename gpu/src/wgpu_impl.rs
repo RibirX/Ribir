@@ -22,8 +22,9 @@ use self::{
 use crate::{
   ColorAttr, DrawPhaseLimits, FilterPrimitive, GPUBackendImpl, GradientStopPrimitive,
   ImagePrimIndex, ImgPrimitive, LinearGradientPrimIndex, LinearGradientPrimitive, MaskLayer,
-  RadialGradientPrimIndex, RadialGradientPrimitive, gpu_backend::Texture,
-  wgpu_impl::draw_filter_pass::DrawFilterPass,
+  RadialGradientPrimIndex, RadialGradientPrimitive, TexturePrimIndex, TexturePrimitive,
+  gpu_backend::Texture,
+  wgpu_impl::{draw_filter_pass::DrawFilterPass, draw_texture_pass::DrawTexturePass},
 };
 mod shaders;
 mod uniform;
@@ -35,6 +36,7 @@ mod draw_filter_pass;
 mod draw_img_triangles_pass;
 mod draw_linear_gradient_pass;
 mod draw_radial_gradient_pass;
+mod draw_texture_pass;
 mod texture_pass;
 
 pub const TEX_PER_DRAW: usize = 8;
@@ -55,6 +57,7 @@ pub struct WgpuImpl {
   radial_gradient_pass: Option<DrawRadialGradientTrianglesPass>,
   linear_gradient_pass: Option<DrawLinearGradientTrianglesPass>,
   filter_pass: Option<DrawFilterPass>,
+  draw_texture_pass: Option<DrawTexturePass>,
   texs_layout: wgpu::BindGroupLayout,
   textures_bind: Option<wgpu::BindGroup>,
   mask_layers_uniform: Uniform<MaskLayer>,
@@ -134,6 +137,19 @@ macro_rules! filter_pass {
   ($backend:ident) => {
     $backend.filter_pass.get_or_insert_with(|| {
       DrawFilterPass::new(
+        &$backend.device,
+        $backend.mask_layers_uniform.layout(),
+        &$backend.texs_layout,
+        &$backend.limits,
+      )
+    })
+  };
+}
+
+macro_rules! draw_texture_pass {
+  ($backend:ident) => {
+    $backend.draw_texture_pass.get_or_insert_with(|| {
+      DrawTexturePass::new(
         &$backend.device,
         $backend.mask_layers_uniform.layout(),
         &$backend.texs_layout,
@@ -376,6 +392,32 @@ impl GPUBackendImpl for WgpuImpl {
     } else {
       self.copy_diff_format_texture(dest_tex, dist_pos, from_tex, from_rect);
     }
+  }
+
+  fn load_texture_vertices(&mut self, buffers: &VertexBuffers<TexturePrimIndex>) {
+    draw_texture_pass!(self).load_triangles_vertices(buffers, &self.device, &self.queue);
+  }
+
+  fn load_texture_primitives(&mut self, primitives: &[TexturePrimitive]) {
+    draw_texture_pass!(self).load_texture_primitives(&self.queue, primitives);
+  }
+
+  fn draw_texture_triangles(
+    &mut self, texture: &mut Self::Texture, indices: Range<u32>, clear: Option<Color>,
+    from_texture: &Self::Texture,
+  ) {
+    let encoder = command_encoder!(self);
+    draw_texture_pass!(self).draw_triangles(
+      texture,
+      indices,
+      clear,
+      &self.device,
+      encoder,
+      self.textures_bind.as_ref().unwrap(),
+      &self.mask_layers_uniform,
+      from_texture,
+    );
+    self.submit();
   }
 
   fn end_frame(&mut self) {
@@ -678,6 +720,7 @@ impl WgpuImpl {
       max_mask_layers: uniform_bytes / size_of::<MaskLayer>(),
       max_filter_matrix_len: ((uniform_bytes - size_of::<FilterPrimitive>()) & 0xFFFFFF00)
         / size_of::<f32>(), // the matrix size must be aligned to 16 bytes
+      max_texture_primitives: uniform_bytes / size_of::<TexturePrimitive>(),
     };
 
     let mask_layers_uniform =
@@ -698,6 +741,7 @@ impl WgpuImpl {
       radial_gradient_pass: None,
       linear_gradient_pass: None,
       filter_pass: None,
+      draw_texture_pass: None,
       texs_layout,
       textures_bind: None,
       mask_layers_uniform,

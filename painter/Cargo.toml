@@ -26,7 +26,7 @@ serde_json.workspace = true
 usvg.workspace = true
 zerocopy = {workspace = true, optional = true, features = ["derive"]}
 derive_more= {workspace = true, features = ["add", "add_assign", "not", "mul"]} 
-smallvec.workspace = true
+smallvec = { workspace = true, features = ["serde"] }
 fontdb.workspace = true
 rustybuzz.workspace = true
 unicode-bidi.workspace = true
