@@ -481,8 +481,14 @@ pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
   // mat3x2<f32> in the struct, but use vec2<f32> instead. Then, we compose it.
   struct FilterPrimitive {
     /// The origin of the image placed in texture.
+    /// Used to locate the original image position in the texture.
     sample_offset: vec2<f32>,
-    /// The size of the image image.
+    
+    /// Filter effect offset for drop-shadow etc.
+    /// This offset is applied during filter convolution sampling.
+    offset: vec2<f32>,
+
+    /// The origin of the mask layer in the texture.
     mask_offset: vec2<f32>,
 
     /// The size of the filter kernel.
@@ -491,8 +497,13 @@ pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
     /// the  index of head mask layer.
     mask_head: i32,
 
+    /// The composite mode for filter application.
+    /// - 0 = Replace: filter result completely replaces the original content
+    /// - 1 = ExcludeSource: filter result is only applied where original alpha is 0
+    composite: i32,
+
     /// for align
-    dummy: i32,
+    dummy: vec2<f32>,
 
     /// base color
     base_color: vec4<f32>,
@@ -531,26 +542,38 @@ pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
   
   @fragment
   fn fs_main(f: VertexOutput) -> @location(0) vec4<f32> {
-    let base = f.pos.xy;
+    var base = f.pos.xy;
     let alpha = sample_mask(filter_primitive, base);
     
+    // Sample original color at current position (without offset) for composite operations.
+    // This is critical for drop-shadow: we need to check if the original content exists
+    // at the current output position, not at the offset position.
+    base += filter_primitive.sample_offset;
+    let origin = tex_sample(original_tex, base);
+
+    let tex_size = textureDimensions(original_tex);
+
+    // The movement shifts the final effect by filter_primitive.offset, which means we should
+    // sample with an offset of -filter_primitive.offset.
+    base -= filter_primitive.offset;
+
     let kernel_size = filter_primitive.kernel_size;
     let x_radius = f32(kernel_size.x >> 1);
     let y_radius = f32(kernel_size.y >> 1);
-    var origin = vec4<f32>(0., 0., 0., 0.);
     var sum = vec4<f32>(0., 0., 0., 0.);
     for (var i: u32 = 0; i< kernel_size.x; i++) {
       for (var j: u32 = 0; j < kernel_size.y; j++) {
-        let pos = base + vec2<f32>(f32(i) - x_radius, f32(j) - y_radius);
+        var pos = base + vec2<f32>(f32(i) - x_radius, f32(j) - y_radius);
         let index = j * kernel_size.x + i;
         let weight = filter_primitive.kernel_matrix[index / 4][index % 4];
 
-        let sample_pos = pos + filter_primitive.sample_offset;
-        let color = tex_sample(original_tex, sample_pos);
-        
-        if (i == u32(x_radius) && j == u32(y_radius)) {
-          origin = color;
-        }
+        // Filter convolution sampling uses sample_offset.
+        // - sample_offset: locates the original image in the texture
+        // For output pixel at (x, y), we sample from (x + sample_offset) for the filter.
+
+        pos.x = min(max(0., pos.x), f32(tex_size.x) - 1.);
+        pos.y = min(max(0., pos.y), f32(tex_size.y) -1.);
+        let color = tex_sample(original_tex, pos);
         sum = sum + (color * weight);
       }
     }
@@ -561,9 +584,9 @@ pub fn filter_triangles_shader(limits: &DrawPhaseLimits) -> String {
       //  - the 0. < alpha < 1., means it is in the edge of the filter area,
       //    here we return the origin color when it < 0.5, in the out-side of edge.
       return origin;
-    } else {
-      return sum * filter_primitive.color_matrix + filter_primitive.base_color;
     }
+    
+    return sum * filter_primitive.color_matrix + filter_primitive.base_color;
   }
 
   fn sample_mask( prim: FilterPrimitive, pos: vec2<f32>) -> f32 {
@@ -646,6 +669,7 @@ fn mask_sample(mask: MaskLayer, pos: vec2<f32>) -> f32 {
   };
 }
 
+
 fn mask_tex_sampler(tex: texture_2d<f32>, mask: MaskLayer, pos: vec2<f32>) -> f32 {
     var mask_pos = mat3x2(mask.t0, mask.t1, mask.t2) * vec3(pos, 1.);
     if any(mask_pos < mask.min) || any(mask.max < mask_pos) {
@@ -656,4 +680,76 @@ fn mask_tex_sampler(tex: texture_2d<f32>, mask: MaskLayer, pos: vec2<f32>) -> f3
     return textureSampleLevel(tex, s_sampler, mask_pos / tex_size, 0.).r;
 }
 "#
+}
+
+pub fn texture_triangles_shader(limits: &DrawPhaseLimits) -> String {
+  basic_template(limits.max_mask_layers)
+    + &format!(
+      "
+      @group(2) @binding(0) 
+      var<uniform> primtives: array<TexturePrimitive, {}>;",
+      limits.max_texture_primitives
+    )
+    + r#"
+    struct VertexInput {
+        @location(0) pos: vec2<f32>,
+        @location(1) prim_idx: u32,
+    }
+    struct VertexOutput {
+        @builtin(position) pos: vec4<f32>,
+        @location(0) @interpolate(flat) prim_idx: u32,
+    }
+
+    struct TexturePrimitive {
+        t0: vec2<f32>,
+        t1: vec2<f32>,
+        t2: vec2<f32>,
+        mask_head: i32,
+        opacity: f32,
+        is_premultiplied: u32,
+        pad1: u32,
+        pad2: vec2<u32>,
+    }
+
+    @vertex
+    fn vs_main(input: VertexInput) -> VertexOutput {
+        var output: VertexOutput;
+        let pos = input.pos * vec2(2., -2.) + vec2(-1., 1.);
+        output.pos = vec4<f32>(pos, 0.0, 1.0);
+        output.prim_idx = input.prim_idx;
+        return output;
+    }
+
+    @group(2) @binding(1)
+    var input_tex: texture_2d<f32>;
+
+    @fragment
+    fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+        let prim = primtives[input.prim_idx];
+        
+        let pos = mat3x2(prim.t0, prim.t1, prim.t2) * input.pos.xyz;
+        
+        // Sampling from the single bound input_tex
+        let size = textureDimensions(input_tex);
+        let sample_pos = pos.xy / vec2<f32>(f32(size.x), f32(size.y));
+        var color = textureSampleLevel(input_tex, s_sampler, sample_pos, 0.);
+        
+        var alpha = 1.0;
+        var mask_idx = prim.mask_head;
+
+        loop {
+            if (mask_idx < 0) { break; }
+            let mask = mask_layers[u32(mask_idx)];
+            alpha *= mask_sample(mask, input.pos.xy);
+            mask_idx = mask.prev_mask_idx;
+        }
+
+        if (prim.is_premultiplied == 1u && color.a > 0.0) {
+            color = vec4<f32>(color.rgb / color.a, color.a);
+        }
+        
+        return vec4<f32>(color.rgb, color.a * prim.opacity);
+    }
+
+  "#
 }
