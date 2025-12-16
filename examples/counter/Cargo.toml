@@ -33,7 +33,7 @@ wgpu = ["ribir/wgpu"]
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
-[bundle]
+[package.metadata.bundle]
 "productName" = "Counter"
 "version" = "1.0.0"
 "identifier" = "com.ribir.counter"

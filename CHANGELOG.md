@@ -27,6 +27,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [0.4.0-alpha.53] - 2025-12-17
 
+- **cli**: support both [bundle] and [package.metadata.bundle] config formats. (#814 @M-Adoo)
+
 ### Features
 
 - **core**: add builtin `box_shadow` property. (#811 @wjian23)

@@ -1,0 +1,9 @@
+[bundle]
+"productName" = "Counter"
+"version" = "1.0.0"
+"identifier" = "com.ribir.counter"
+# Keep CI simple: produce an AppImage on Linux
+"targets" = ["appimage"]
+"icon" = ["../Logo.ico"]
+"resources" = []
+"externalBin" = []

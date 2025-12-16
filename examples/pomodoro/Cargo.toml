@@ -29,14 +29,14 @@ ribir_core = { path = "../../core", features = ["test-utils"]}
 [features]
 wgpu = ["ribir/wgpu"]
 
-[release]
+[package.metadata.release]
 opt-level = "z"
 lto = true      
 codegen-units = 1
 strip = true        
 panic = "abort"
 
-[bundle]
+[package.metadata.bundle]
 "productName" = "Pomodoro"
 "version" = "1.0.0"
 "identifier" = "com.ribir.pomodoro"
