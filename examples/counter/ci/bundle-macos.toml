@@ -1,0 +1,9 @@
+[bundle]
+"productName" = "Counter"
+"version" = "1.0.0"
+"identifier" = "com.ribir.counter"
+# Keep CI simple: only build an app bundle on macOS
+"targets" = ["app"]
+"icon" = ["../Logo.ico"]
+"resources" = []
+"externalBin" = []

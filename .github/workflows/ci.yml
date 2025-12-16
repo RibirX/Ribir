@@ -221,7 +221,7 @@ jobs:
         run: |
           set -e
           cargo llvm-cov report --lcov --output-path lcov.info
-      
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -272,3 +272,64 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: compile to wasm
         run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper --exclude cli --exclude pomodoro
+
+  bundle:
+    needs: [lint, test-with-gpu, doc-examples, wasm-compile]
+    name: bundle
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.88.0
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Bundle counter example
+        shell: bash
+        working-directory: examples/counter
+        run: |
+          case "${{ matrix.os }}" in
+            macos-latest)   cfg=ci/bundle-macos.toml ;;
+            ubuntu-latest)  cfg=ci/bundle-linux.toml ;;
+            windows-latest) cfg=ci/bundle-windows.toml ;;
+            *) echo "Unknown OS"; exit 1 ;;
+          esac
+
+          # Build CLI + bundle using our workspace tool.
+          cargo run -p cli -- bundle -c "$cfg"
+
+  status-report:
+    name: CI unified status report
+    needs: [lint, test-with-gpu, doc-examples, wasm-compile, bundle]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check CI Status
+        shell: bash
+        run: |
+          if [ "${{ needs['lint'].result }}" != "success" ] || \
+             [ "${{ needs['test-with-gpu'].result }}" != "success" ] || \
+             [ "${{ needs['doc-examples'].result }}" != "success" ] || \
+             [ "${{ needs['wasm-compile'].result }}" != "success" ] || \
+             [ "${{ needs['bundle'].result }}" != "success" ]; then
+            echo "CI failed"
+            exit 1
+          fi

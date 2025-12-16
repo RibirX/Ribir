@@ -6,7 +6,7 @@ use std::{
   str::FromStr,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::{CommandFactory, FromArgMatches, Parser};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -121,10 +121,27 @@ pub fn custom_sign_settings(
   }
 }
 
-/// Configuration for bundle the app
+/// Cargo.toml shape we care about for bundling.
+///
+/// Supports both legacy `[bundle]` and the Cargo-recommended
+/// `[package.metadata.bundle]` (which avoids `unused manifest key` warnings).
 #[skip_serializing_none]
-#[derive(Clone, Deserialize, Serialize, Debug)]
+#[derive(Clone, Deserialize, Serialize, Debug, Default)]
 struct CargoTomlBundle {
+  bundle: Option<BundleConfig>,
+  package: Option<CargoTomlPackage>,
+}
+
+#[skip_serializing_none]
+#[derive(Clone, Deserialize, Serialize, Debug, Default)]
+struct CargoTomlPackage {
+  #[serde(default)]
+  metadata: CargoTomlPackageMetadata,
+}
+
+#[skip_serializing_none]
+#[derive(Clone, Deserialize, Serialize, Debug, Default)]
+struct CargoTomlPackageMetadata {
   bundle: Option<BundleConfig>,
 }
 
@@ -359,7 +376,7 @@ fn bundle_setting_from_config(
       entitlements: config
         .macos
         .entitlements
-        .map(|p| Entitlements::Path(PathBuf::from(p))),
+        .map(|p| Entitlements::Path(p.into())),
       info_plist: None,
       skip_stapling: false,
     },
@@ -424,9 +441,15 @@ impl Bundle {
       package_path.clone()
     };
 
-    let CargoTomlBundle { bundle: bundle_config, .. } = read_toml(&config_path)?;
-    let bundle_config = bundle_config
-      .ok_or_else(|| anyhow::anyhow!("no bundle config found in {}", config_path.display()))?;
+    let CargoTomlBundle { bundle, package } = read_toml(&config_path)?;
+    let bundle_config = bundle
+      .or_else(|| package.and_then(|p| p.metadata.bundle))
+      .ok_or_else(|| {
+        anyhow::anyhow!(
+          "no bundle config found in {} (expected `[bundle]` or `[package.metadata.bundle]`) ",
+          config_path.display()
+        )
+      })?;
 
     let cargo_settings = CargoSettings::load(&package_path)?;
     let cargo_package_settings = cargo_settings
@@ -436,6 +459,7 @@ impl Bundle {
       cargo_package_settings.resolve(&bundle_config.product_name, &bundle_config.version)?;
 
     let mut binaries = vec![];
+    let mut expected_binary_names: Vec<String> = vec![];
     if let Some(bins) = &cargo_settings.bin {
       let default_run = cargo_package_settings
         .default_run
@@ -444,11 +468,50 @@ impl Bundle {
       for bin in bins {
         let file_name = bin.file_name();
         let is_main = file_name == cargo_package_settings.name || file_name == default_run;
-        binaries.push(BundleBinary::with_path(file_name.to_owned(), is_main, bin.path.clone()))
+        binaries.push(BundleBinary::with_path(file_name.to_owned(), is_main, bin.path.clone()));
+        expected_binary_names.push(file_name.to_owned());
       }
     }
     if binaries.is_empty() {
       binaries.push(BundleBinary::new(cargo_package_settings.name.clone(), true));
+      expected_binary_names.push(cargo_package_settings.name.clone());
+    }
+
+    // Preflight: tauri-bundler expects built binaries under
+    // `target/{debug|release}`. We do NOT auto-build here (this CLI is intended
+    // to be used as a released binary tool), so provide an actionable error
+    // message instead.
+    {
+      let cargo_metadata = get_cargo_metadata().context("failed to get cargo metadata")?;
+      let profile_dir = if self.debug { "debug" } else { "release" };
+      let expected_dir = cargo_metadata.target_directory.join(profile_dir);
+      let mut missing = vec![];
+      for name in &expected_binary_names {
+        let mut p = expected_dir.join(name);
+        if cfg!(windows) {
+          p.set_extension("exe");
+        }
+        if !p.exists() {
+          missing.push(p);
+        }
+      }
+
+      if !missing.is_empty() {
+        let profile_flag = if self.debug { "" } else { "--release" };
+        bail!(
+          "Missing built binary(ies):\n  {}\n\nBuild them first, then re-run bundling. For \
+           example:\n  cargo build --manifest-path {} {}\n\nNote: bundling copies binaries from \
+           {}.",
+          missing
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join("\n  "),
+          package_path.display(),
+          profile_flag,
+          expected_dir.display(),
+        );
+      }
     }
 
     let package_types = bundle_config
