@@ -98,7 +98,7 @@ wasm-bindgen-futures = "0.4.50"
 getrandom-v3 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 cfg-if = "1.0"
 tauri-bundler = "=2.7.3"
-tauri-utils = "=2.8.0"
+tauri-utils = "=2.8.1"
 serde-value = "0.7.0"
 serde_with = "3.14.0"
 toml = "0.9.2"
