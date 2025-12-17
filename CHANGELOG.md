@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.53] - 2025-12-17
+
 ### Features
 
 - **core**: add builtin `box_shadow` property. (#811 @wjian23)
@@ -943,7 +945,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.52...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.53...HEAD
+[0.4.0-alpha.53]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.52...ribir-v0.4.0-alpha.53
 [0.4.0-alpha.52]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.51...ribir-v0.4.0-alpha.52
 [0.4.0-alpha.51]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.50...ribir-v0.4.0-alpha.51
 [0.4.0-alpha.50]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.49...ribir-v0.4.0-alpha.50
