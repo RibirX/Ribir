@@ -108,51 +108,62 @@ impl GlobalAnchorX {
   }
 
   /// Init the global horizontal anchor, which will anchor the widget's
-  /// horizontal position by placing its left edge right to the left edge of
-  /// the specified widget (`target`) with the given relative pixel value
-  pub fn left_align_to(target: TrackId, offset: f32) -> Self {
+  /// horizontal position by placing its left edge align to the left edge of
+  /// the specified widget (`target`)
+  pub fn left_align_to(target: TrackId) -> Self {
     Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
       let host_id = host.get().unwrap();
       let target_id = target.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target_id.is_dropped(wnd.tree()) {
         return Err(());
       }
-      let base = wnd.map_to_global(Point::zero(), target_id).x;
-      Ok(offset + base)
+
+      let target_parent = target_id.parent(wnd.tree()).unwrap();
+      let target_pos = wnd.widget_pos(target_id).unwrap();
+      let base = wnd.map_to_global(target_pos, target_parent).x;
+
+      Ok(base)
     }))
   }
 
   /// Init the global horizontal anchor, which will anchor the widget's
-  /// horizontal position by placing its center right to the center of the
-  /// specified widget (`target`) with the given relative pixel value
-  pub fn center_align_to(track_id: TrackId, offset: f32) -> Self {
+  /// horizontal position by placing its center align to the center of the
+  /// specified widget (`target`)
+  pub fn center_align_to(target: TrackId) -> Self {
     Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
       let host_id = host.get().unwrap();
-      let target = track_id.get().unwrap();
+      let target = target.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target.is_dropped(wnd.tree()) {
         return Err(());
       }
-      let base = wnd.map_to_global(Point::zero(), target).x;
+      let target_parent = target.parent(wnd.tree()).unwrap();
+      let target_pos = wnd.widget_pos(target).unwrap();
+      let base = wnd.map_to_global(target_pos, target_parent).x;
+
       let host_size = wnd.widget_size(host_id).unwrap_or_default();
       let target_size = wnd.widget_size(target).unwrap_or_default();
-      Ok(base + (target_size.width - host_size.width) / 2.0 + offset)
+
+      Ok(base + (target_size.width - host_size.width) / 2.0)
     }))
   }
 
   /// Init the global horizontal anchor, which will anchor the widget's
   /// horizontal position by placing its right edge left to the right edge of
-  /// the specified widget (`target`) with the given relative pixel value
-  pub fn right_align_to(track_id: TrackId, offset: f32) -> Self {
+  /// the specified widget (`target`)
+  pub fn right_align_to(track_id: TrackId) -> Self {
     Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
       let host_id = host.get().unwrap();
       let target = track_id.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target.is_dropped(wnd.tree()) {
         return Err(());
       }
-      let base = wnd.map_to_global(Point::zero(), target).x;
+      let target_parent = target.parent(wnd.tree()).unwrap();
+      let target_pos = wnd.widget_pos(target).unwrap();
+      let base = wnd.map_to_global(target_pos, target_parent).x;
       let host_size = wnd.widget_size(host_id).unwrap_or_default();
       let target_size = wnd.widget_size(target).unwrap_or_default();
-      Ok(base + target_size.width - host_size.width - offset)
+
+      Ok(base + target_size.width - host_size.width)
     }))
   }
 
@@ -164,9 +175,19 @@ impl GlobalAnchorX {
     }
   }
 
+  /// Add the offset to the anchor
+  pub fn offset(self, offset: f32) -> Self {
+    match self {
+      Self::Once(f) => Self::Once(Box::new(move |host, wnd| f(host, wnd).map(|v| v + offset))),
+      Self::AlwaysFollow(f) => {
+        Self::AlwaysFollow(Box::new(move |host, wnd| f(host, wnd).map(|v| v + offset)))
+      }
+    }
+  }
+
   fn is_once(&self) -> bool { matches!(self, Self::Once(_)) }
 
-  fn offset(&self, host: &TrackId, wnd: &Sc<Window>) -> Result<f32, ()> {
+  fn offset_val(&self, host: &TrackId, wnd: &Sc<Window>) -> Result<f32, ()> {
     match self {
       Self::Once(f) => f(host, wnd),
       Self::AlwaysFollow(f) => f(host, wnd),
@@ -195,51 +216,62 @@ impl GlobalAnchorY {
   }
 
   /// Init the global vertical anchor, which will anchor the widget's
-  /// vertical position by placing its top edge down to the top edge of the
-  /// specified widget (`target`) with the given relative pixel value
-  pub fn top_align_to(track_id: TrackId, offset: f32) -> Self {
+  /// vertical position by placing its top edge align to the top edge of the
+  /// specified widget (`target`).
+  pub fn top_align_to(track_id: TrackId) -> Self {
     Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
       let host_id = host.get().unwrap();
       let target = track_id.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target.is_dropped(wnd.tree()) {
         return Err(());
       }
-      let y = wnd.map_to_global(Point::zero(), target).y;
-      Ok(offset + y)
+
+      let target_parent = target.parent(wnd.tree()).unwrap();
+      let target_pos = wnd.widget_pos(target).unwrap();
+      let base = wnd.map_to_global(target_pos, target_parent).y;
+
+      Ok(base)
     }))
   }
 
   /// Init the global vertical anchor, which will anchor the widget's
-  /// vertical position by placing its center down to the center of the
-  /// specified widget (`target`) with the given relative pixel value
-  pub fn center_align_to(track_id: TrackId, offset: f32) -> Self {
+  /// vertical position by placing its center vertical align to the center of
+  /// the specified widget (`target`).
+  pub fn center_align_to(track_id: TrackId) -> Self {
     Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
       let host_id = host.get().unwrap();
       let target = track_id.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target.is_dropped(wnd.tree()) {
         return Err(());
       }
-      let y = wnd.map_to_global(Point::zero(), target).y;
+
+      let target_parent = target.parent(wnd.tree()).unwrap();
+      let target_pos = wnd.widget_pos(target).unwrap();
+      let base = wnd.map_to_global(target_pos, target_parent).y;
+
       let host_size = wnd.widget_size(host_id).unwrap_or_default();
       let target_size = wnd.widget_size(target).unwrap_or_default();
-      Ok(y + (target_size.height - host_size.height) / 2.0 + offset)
+      Ok(base + (target_size.height - host_size.height) / 2.0)
     }))
   }
 
   /// Init the global vertical anchor, which will anchor the widget's
-  /// vertical position by placing its bottom edge up to the bottom edge of
-  /// the specified widget (`target`) with the given relative pixel value
-  pub fn bottom_align_to(track_id: TrackId, offset: f32) -> Self {
+  /// vertical position by placing its bottom edge align to the bottom edge of
+  /// the specified widget (`target`).
+  pub fn bottom_align_to(track_id: TrackId) -> Self {
     Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
       let host_id = host.get().unwrap();
       let target = track_id.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target.is_dropped(wnd.tree()) {
         return Err(());
       }
-      let y = wnd.map_to_global(Point::zero(), target).y;
+
+      let target_parent = target.parent(wnd.tree()).unwrap();
+      let target_pos = wnd.widget_pos(target).unwrap();
+      let base = wnd.map_to_global(target_pos, target_parent).y;
       let host_size = wnd.widget_size(host_id).unwrap_or_default();
       let target_size = wnd.widget_size(target).unwrap_or_default();
-      Ok(y + target_size.height - host_size.height - offset)
+      Ok(base + target_size.height - host_size.height)
     }))
   }
 
@@ -251,9 +283,19 @@ impl GlobalAnchorY {
     }
   }
 
+  /// Add the offset to the anchor
+  pub fn offset(self, offset: f32) -> Self {
+    match self {
+      Self::Once(f) => Self::Once(Box::new(move |host, wnd| f(host, wnd).map(|v| v + offset))),
+      Self::AlwaysFollow(f) => {
+        Self::AlwaysFollow(Box::new(move |host, wnd| f(host, wnd).map(|v| v + offset)))
+      }
+    }
+  }
+
   fn is_once(&self) -> bool { matches!(self, Self::Once(_)) }
 
-  fn offset(&self, host: &TrackId, wnd: &Sc<Window>) -> Result<f32, ()> {
+  fn offset_val(&self, host: &TrackId, wnd: &Sc<Window>) -> Result<f32, ()> {
     match self {
       Self::Once(f) => f(host, wnd),
       Self::AlwaysFollow(f) => f(host, wnd),
@@ -321,13 +363,13 @@ fn apply_global_anchor(
         let x = read_ref
           .global_anchor_x
           .as_ref()
-          .map(|x| x.offset(&host, &wnd))
+          .map(|x| x.offset_val(&host, &wnd))
           .transpose();
         let y = read_ref
           .global_anchor_y
           .as_ref()
           .as_ref()
-          .map(|y| y.offset(&host, &wnd))
+          .map(|y| y.offset_val(&host, &wnd))
           .transpose();
 
         if let (Ok(x), Ok(y)) = (x, y) {
@@ -377,14 +419,14 @@ mod tests {
 
       let top_left = @MockBox {
         size: Size::new(10., 10.),
-        global_anchor_x: GlobalAnchorX::left_align_to($clone(parent.track_id()), 20.),
-        global_anchor_y: GlobalAnchorY::top_align_to($clone(parent.track_id()), 10.),
+        global_anchor_x: GlobalAnchorX::left_align_to($clone(parent.track_id())).offset(20.),
+        global_anchor_y: GlobalAnchorY::top_align_to($clone(parent.track_id())).offset(10.),
       };
 
       let bottom_right = @MockBox {
         size: Size::new(10., 10.),
-        global_anchor_x: GlobalAnchorX::right_align_to($clone(parent.track_id()), 10.),
-        global_anchor_y: GlobalAnchorY::bottom_align_to($clone(parent.track_id()), 20.),
+        global_anchor_x: GlobalAnchorX::right_align_to($clone(parent.track_id())).offset(-10.),
+        global_anchor_y: GlobalAnchorY::bottom_align_to($clone(parent.track_id())).offset(-20.),
       };
 
       @(parent) {
