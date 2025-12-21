@@ -3,7 +3,7 @@ use std::{
   collections::HashMap,
   convert::Infallible,
   future::Future,
-  sync::LazyLock,
+  sync::{Arc, LazyLock},
   task::{Context, RawWaker, RawWakerVTable, Waker},
 };
 
@@ -27,7 +27,10 @@ mod app_event_handler;
 
 pub struct App {
   event_loop: RefCell<Option<EventLoopState>>,
-  event_loop_proxy: EventLoopProxy<RibirAppEvent>,
+  //Cloning an EventLoopProxy has side effects—it activates the event loop—so wrap it in an Arc to
+  // avoid affecting the timing of the event loop(EventLoopProxy::new will call CFRunLoopWakeUp
+  // on mac).
+  event_loop_proxy: Arc<EventLoopProxy<RibirAppEvent>>,
   windows: RefCell<HashMap<WindowId, Sc<RefCell<WinitShellWnd>>>>,
   active_wnd: std::cell::Cell<Option<WindowId>>,
   events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
@@ -63,13 +66,13 @@ pub enum RibirAppEvent {
 /// A sender to send event to the application event loop from which the
 /// `EventSender` was created.
 #[derive(Clone)]
-pub struct EventSender(EventLoopProxy<RibirAppEvent>);
+pub struct EventSender(Arc<EventLoopProxy<RibirAppEvent>>);
 
 #[derive(Clone)]
-pub(crate) struct CmdSender(EventLoopProxy<RibirAppEvent>);
+pub(crate) struct CmdSender(Arc<EventLoopProxy<RibirAppEvent>>);
 
 #[derive(Clone)]
-pub struct EventWaker(EventLoopProxy<RibirAppEvent>);
+pub struct EventWaker(Arc<EventLoopProxy<RibirAppEvent>>);
 
 /// Represents the lifecycle states of an application's event loop
 enum EventLoopState {
@@ -266,7 +269,7 @@ impl App {
       let event_loop = Box::new(event_loop);
 
       let app: App = App {
-        event_loop_proxy: event_loop.create_proxy(),
+        event_loop_proxy: Arc::new(event_loop.create_proxy()),
         event_loop: RefCell::new(Some(EventLoopState::NotStarted(event_loop))),
         events_stream: <_>::default(),
         active_wnd: std::cell::Cell::new(None),

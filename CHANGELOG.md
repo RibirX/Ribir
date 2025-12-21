@@ -25,6 +25,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Fixed
+
+- **core**: Fix abnormal CPU usage on macOS caused by the side effects of cloning EventLoopProxy.
+
 ## [0.4.0-alpha.53] - 2025-12-17
 
 - **cli**: support both [bundle] and [package.metadata.bundle] config formats. (#814 @M-Adoo)
