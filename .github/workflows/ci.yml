@@ -212,7 +212,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          cargo llvm-cov --workspace --lcov --output-path lcov.info --all-features --doctests
+          cargo llvm-cov --workspace --lcov --output-path lcov.info --all-features
 
       - name: generate coverage report
         id: coverage
@@ -238,6 +238,21 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           rm -rf target/llvm-cov-target
+
+  doc-test:
+    needs: [lint]
+    name: Run doc tests
+    runs-on: macos-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.NIGHTLY_VERSION }}
+      - name: Run doc tests
+        run: |
+          set -e
+          cargo test --doc --workspace --all-features
 
   doc-examples:
     needs: lint
