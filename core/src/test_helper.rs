@@ -41,9 +41,7 @@ pub struct TestShell {}
 impl Shell for TestShell {
   fn exit(&self) {}
 
-  fn new_shell_window(
-    &self, attr: window::WindowAttributes,
-  ) -> scheduler::BoxFuture<'static, BoxShellWindow> {
+  fn new_shell_window(&self, attr: window::WindowAttributes) -> BoxFuture<'static, BoxShellWindow> {
     Box::pin(async move {
       Box::new(TestShellWindow::new(attr.0.inner_size.map_or_else(
         || Size::new(1024., 1024.),
@@ -55,7 +53,7 @@ impl Shell for TestShell {
     })
   }
 
-  fn run_in_shell(&self, f: scheduler::BoxFuture<'static, ()>) { AppCtx::spawn_local(f); }
+  fn run_in_shell(&self, f: BoxFuture<'static, ()>) { AppCtx::spawn_local(f); }
 }
 
 impl TestWindow {

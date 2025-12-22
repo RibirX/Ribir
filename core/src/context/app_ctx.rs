@@ -1,25 +1,20 @@
-use std::{
-  cell::RefCell,
-  future::Future,
-  ops::DerefMut,
-  sync::LazyLock,
-  task::{Context, RawWaker, RawWakerVTable, Waker},
-};
+use std::{cell::RefCell, future::Future, sync::LazyLock};
 
 use log::warn;
-use pin_project_lite::pin_project;
 use ribir_algo::Sc;
 use ribir_painter::{TypographyStore, font_db::FontDB};
-use rxrust::prelude::{AsyncExecutor, NEW_TIMER_FN};
+use rxrust::prelude::{AsyncExecutor, BoxFuture, NEW_TIMER_FN};
 use smallvec::SmallVec;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::{runtime::Runtime, task::LocalSet};
 
 use crate::{
   builtin_widgets::Theme,
   clipboard::{Clipboard, MockClipboard},
   event_loop::{EventLoop, FrameworkEvent},
   local_sender::LocalSender,
-  scheduler::{RibirScheduler, RuntimeWaker},
+  prelude::Duration,
   state::{ModifyEffect, ModifyInfo, PartialId, StateWriter, Stateful, WriterInfo},
   widget::GenWidget,
   window::{BoxShell, UiEvent, Window, WindowAttributes, WindowFlags, WindowId},
@@ -43,13 +38,7 @@ where
 /// where it was created. Any attempt to use it across threads may result
 /// in panic.
 ///
-/// # Initialization Requirements
-///
-/// - The context must be initialized by an application instance before use
-/// - Contains runtime-dependent components including:
-///   - Future wakers
-///   - Clipboard handlers
-///   - Other platform-specific subsystems
+/// - The context must be initialized by an application instance before use.
 ///
 /// # Caveats
 ///
@@ -64,6 +53,10 @@ pub struct AppCtx {
   event_sender: RefCell<Option<UnboundedSender<FrameworkEvent>>>,
   shell: RefCell<Option<BoxShell>>,
   change_dataset: ChangeDataset,
+  #[cfg(not(target_arch = "wasm32"))]
+  pub(crate) local_set: RefCell<LocalSet>,
+  #[cfg(all(not(target_arch = "wasm32"), feature = "test-utils"))]
+  pub(crate) spawn_count: std::cell::Cell<usize>,
 }
 
 #[derive(Default)]
@@ -113,8 +106,16 @@ impl ChangeDataset {
   }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
+  tokio::runtime::Builder::new_current_thread()
+    .enable_all()
+    .build()
+    .expect("Failed building the Runtime")
+});
+
 static APP_CTX: LazyLock<LocalSender<AppCtx>> = LazyLock::new(|| {
-  let _ = NEW_TIMER_FN.set(RibirScheduler::timer);
+  let _ = NEW_TIMER_FN.set(AppCtx::timer);
   LocalSender::new(AppCtx::default())
 });
 
@@ -123,7 +124,7 @@ impl AppCtx {
   /// should be called only once and before any other access to the context.
   pub(crate) fn init(shell: BoxShell) -> EventLoop {
     assert!(APP_CTX.event_sender.borrow().is_none());
-    let _ = NEW_TIMER_FN.set(RibirScheduler::timer);
+    let _ = NEW_TIMER_FN.set(AppCtx::timer);
     let (sender, receiver) = unbounded_channel();
     *APP_CTX.event_sender.borrow_mut() = Some(sender);
     *APP_CTX.shell.borrow_mut() = Some(shell);
@@ -137,13 +138,16 @@ impl AppCtx {
   ) {
     #[cfg(not(target_arch = "wasm32"))]
     std::thread::spawn(move || {
-      use crate::scheduler::RibirScheduler;
       let event_loop = AppCtx::init(shell);
-      RibirScheduler::spawn_local(async {
+      // Drive the app main future inside a LocalSet for the whole lifetime of
+      // the AppCtx thread. This ensures `spawn_local` remains valid as long as
+      // the main loop is running.
+      let main_fut = async {
         init.await;
         event_loop.run(ui_events).await
-      });
-      RibirScheduler::run();
+      };
+      let local_set = &*AppCtx::shared().local_set.borrow();
+      RUNTIME.block_on(local_set.run_until(main_fut));
     });
     #[cfg(target_arch = "wasm32")]
     {
@@ -298,29 +302,50 @@ impl AppCtx {
 
 impl AppCtx {
   #[cfg(not(target_arch = "wasm32"))]
-  pub fn wait_future<F: Future>(f: F) -> F::Output { RibirScheduler::run_until(f) }
-
   #[inline]
   pub fn spawn_local<Fut>(future: Fut)
   where
     Fut: Future<Output = ()> + 'static,
   {
-    RibirScheduler::spawn_local(future);
+    let local_set = AppCtx::shared().local_set.borrow();
+
+    #[cfg(feature = "test-utils")]
+    let future = {
+      let count = &AppCtx::shared().spawn_count;
+      count.set(count.get() + 1);
+      async move {
+        future.await;
+        let count = &AppCtx::shared().spawn_count;
+        count.set(count.get() - 1);
+      }
+    };
+
+    local_set.spawn_local(future);
   }
 
-  #[cfg(not(target_arch = "wasm32"))]
-  pub fn run_until_stalled() {
-    let _ = AppCtx::shared(); // check thread
-    RibirScheduler::run_until_stalled();
-  }
-
-  #[cfg(not(target_arch = "wasm32"))]
-  pub fn spawn<Fut>(future: Fut) -> tokio::task::JoinHandle<Fut::Output>
+  #[cfg(target_arch = "wasm32")]
+  #[inline]
+  pub fn spawn_local<Fut>(future: Fut)
   where
-    Fut: Future + 'static + Send,
-    Fut::Output: Send,
+    Fut: Future<Output = ()> + 'static,
   {
-    RibirScheduler::spawn(future)
+    wasm_bindgen_futures::spawn_local(future);
+  }
+
+  #[cfg(not(target_arch = "wasm32"))]
+  pub fn spawn<Fut>(future: Fut)
+  where
+    Fut: Future<Output = ()> + Send + 'static,
+  {
+    tokio::task::spawn(future);
+  }
+
+  #[cfg(target_arch = "wasm32")]
+  pub fn spawn<Fut>(future: Fut)
+  where
+    Fut: Future<Output = ()> + 'static,
+  {
+    wasm_bindgen_futures::spawn_local(future);
   }
 
   #[inline]
@@ -342,83 +367,22 @@ impl AppCtx {
     receiver
   }
 
-  pub(crate) fn shell_mut() -> impl DerefMut<Target = Option<BoxShell>> {
+  pub(crate) fn shell_mut() -> std::cell::RefMut<'static, Option<BoxShell>> {
     AppCtx::shared().shell.borrow_mut()
   }
-}
 
-pin_project! {
-  struct WakerFuture<F> {
-    #[pin]
-    fut: F,
-    waker: Box<dyn RuntimeWaker + Send>,
+  #[cfg(not(target_arch = "wasm32"))]
+  pub fn enter() -> tokio::runtime::EnterGuard<'static> { RUNTIME.enter() }
+
+  #[cfg(not(target_arch = "wasm32"))]
+  pub fn timer(duration: Duration) -> BoxFuture<'static, ()> {
+    Box::pin(tokio::time::sleep(duration))
   }
-}
 
-impl<F> WakerFuture<F>
-where
-  F: Future,
-{
-  fn local_waker(&self, cx: &std::task::Context<'_>) -> Waker {
-    type RawLocalWaker = (std::task::Waker, Box<dyn RuntimeWaker + Send>);
-    fn clone(this: *const ()) -> RawWaker {
-      let waker = this as *const RawLocalWaker;
-      let (w, cb) = unsafe { &*waker };
-      let data = Box::new((w.clone(), cb.clone()));
-      let raw = Box::leak(data) as *const RawLocalWaker;
-      RawWaker::new(raw as *const (), &VTABLE)
-    }
-
-    unsafe fn wake(this: *const ()) {
-      let waker = this as *mut RawLocalWaker;
-      let (w, ribir_waker) = unsafe { &*waker };
-      w.wake_by_ref();
-      ribir_waker.wake();
-      unsafe {
-        drop(this);
-      }
-    }
-
-    unsafe fn wake_by_ref(this: *const ()) {
-      let waker = this as *mut RawLocalWaker;
-      let (w, ribir_waker) = unsafe { &*waker };
-      w.wake_by_ref();
-      ribir_waker.wake();
-    }
-
-    unsafe fn drop(this: *const ()) {
-      let waker = this as *mut RawLocalWaker;
-      let _ = unsafe { Box::from_raw(waker) };
-    }
-    static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
-
-    let old_waker = cx.waker().clone();
-    let data = Box::new((old_waker, self.waker.clone()));
-    let raw = RawWaker::new(Box::leak(data) as *const RawLocalWaker as *const (), &VTABLE);
-    unsafe { Waker::from_raw(raw) }
+  #[cfg(target_arch = "wasm32")]
+  pub fn timer(duration: Duration) -> BoxFuture<'static, ()> {
+    Box::pin(gloo_timers::future::sleep(duration))
   }
-}
-
-impl<F> Future for WakerFuture<F>
-where
-  F: Future,
-{
-  type Output = F::Output;
-  fn poll(
-    self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>,
-  ) -> std::task::Poll<Self::Output> {
-    let waker = self.local_waker(cx);
-    let mut cx = Context::from_waker(&waker);
-    let this = self.project();
-    this.fut.poll(&mut cx)
-  }
-}
-
-#[derive(Clone, Copy, Default)]
-pub struct MockWaker;
-impl RuntimeWaker for MockWaker {
-  fn wake(&self) {}
-  fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> { Box::new(MockWaker) }
 }
 
 impl Default for AppCtx {
@@ -441,6 +405,10 @@ impl Default for AppCtx {
       change_dataset: ChangeDataset::default(),
       event_sender: RefCell::new(None),
       shell: RefCell::new(None),
+      #[cfg(not(target_arch = "wasm32"))]
+      local_set: RefCell::new(LocalSet::new()), // Will be reset in first test
+      #[cfg(all(not(target_arch = "wasm32"), feature = "test-utils"))]
+      spawn_count: std::cell::Cell::new(0),
     }
   }
 }
@@ -456,12 +424,12 @@ pub mod test_utils {
   use tokio::{
     runtime::EnterGuard,
     sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
+    task::LocalSet,
   };
 
   use crate::{
     context::{AppCtx, app_ctx::APP_CTX},
     event_loop::{EventLoop, FrameworkEvent},
-    scheduler::RibirScheduler,
     test_helper::{TestShell, TestWindow},
     window::{UiEvent, Window},
   };
@@ -471,7 +439,16 @@ pub mod test_utils {
   }
 
   impl Drop for AppCtxScopeGuard {
-    fn drop(&mut self) { self._guard.0.take(); }
+    fn drop(&mut self) {
+      // Drop TestRuntimeGuard first (runs cleanup tasks)
+      self._guard.0.take();
+
+      // Clean up scheduler resources before releasing the lock.
+      // This ensures LocalSet is dropped in the same thread that created it.
+      AppCtx::clear_scheduler();
+
+      // MutexGuard will be dropped automatically, releasing the lock
+    }
   }
 
   impl AppCtx {
@@ -505,6 +482,7 @@ pub mod test_utils {
       });
 
       APP_CTX.reset();
+      AppCtx::reset_scheduler();
       let guard = AppCtx::reset_test_env();
 
       AppCtxScopeGuard { _guard: (Some(guard), locker) }
@@ -532,7 +510,7 @@ pub mod test_utils {
       }
       AppCtx::run_until_stalled();
       AppCtx::shared().event_sender.borrow_mut().take();
-      RibirScheduler::run();
+      AppCtx::run_until_stalled();
       std::mem::swap(&mut *AppCtx::shared().event_sender.borrow_mut(), &mut self.old_sender);
     }
   }
@@ -540,10 +518,38 @@ pub mod test_utils {
   impl AppCtx {
     pub fn new_test_frame(wnd: &TestWindow) {
       wnd.run_frame_tasks();
-      RibirScheduler::run_until_stalled();
+      AppCtx::run_until_stalled();
       AppCtx::send_event(FrameworkEvent::NewFrame { wnd_id: wnd.id(), force_redraw: false });
       wnd.run_frame_tasks();
-      RibirScheduler::run_until_stalled();
+      AppCtx::run_until_stalled();
+    }
+
+    pub fn run_until_stalled() {
+      let ctx = AppCtx::shared();
+      let local_set = &*ctx.local_set.borrow();
+      for _ in 0..10 {
+        if ctx.spawn_count.get() == 0 {
+          break;
+        }
+        super::RUNTIME.block_on(local_set.run_until(tokio::task::yield_now()));
+      }
+    }
+
+    pub fn run_until<F: std::future::Future>(fut: F) -> F::Output {
+      let ctx = AppCtx::shared();
+      let local_set = &*ctx.local_set.borrow();
+      super::RUNTIME.block_on(local_set.run_until(fut))
+    }
+
+    fn reset_scheduler() {
+      let old = Self::clear_scheduler();
+      std::mem::forget(old);
+    }
+
+    fn clear_scheduler() -> LocalSet {
+      let ctx = AppCtx::shared();
+      ctx.spawn_count.set(0);
+      std::mem::replace(&mut *ctx.local_set.borrow_mut(), LocalSet::new())
     }
 
     pub fn reset_test_env() -> TestRuntimeGuard {
@@ -551,11 +557,11 @@ pub mod test_utils {
       let (ui_sender, ui_receiver) = unbounded_channel();
       let old_sender = Option::replace(&mut *AppCtx::shared().event_sender.borrow_mut(), sender);
       *AppCtx::shared().shell.borrow_mut() = Some(Box::new(TestShell {}));
-      RibirScheduler::spawn_local(async move {
+      AppCtx::spawn_local(async move {
         let event_loop = EventLoop::new(receiver);
         event_loop.run(ui_receiver).await;
       });
-      let _runtime_guard = RibirScheduler::enter();
+      let _runtime_guard = AppCtx::enter();
       TestRuntimeGuard { _sender: ui_sender, old_sender, _runtime_guard }
     }
 

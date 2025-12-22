@@ -1,4 +1,4 @@
-use ribir::prelude::*;
+use ribir::{core::reset_test_env, prelude::*};
 
 #[derive(Declare)]
 struct P;
@@ -59,6 +59,7 @@ impl ComposeChild<'static> for P3 {
 
 #[test]
 fn syntax_pass() {
+  reset_test_env!();
   let _no_care_order = fn_widget! {
     @P {
       @{self::ChildC}
@@ -75,6 +76,7 @@ fn syntax_pass() {
 
 #[test]
 fn tuple_struct_template_syntax_pass() {
+  reset_test_env!();
   let _no_care_order = fn_widget! {
     @P2 {
       @{ self::ChildC }
@@ -89,6 +91,7 @@ fn tuple_struct_template_syntax_pass() {
 
 #[test]
 fn enum_template() {
+  reset_test_env!();
   let _a = fn_widget! {
     @P3 { @{ self::ChildA } }
   };

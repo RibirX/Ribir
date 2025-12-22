@@ -2,13 +2,9 @@ use std::{future::Future, sync::Arc};
 
 use ribir_core::{
   prelude::{image::ColorFormat, *},
-  scheduler::BoxFuture,
-  window::{BoxShellWindow, Shell, ShellWindow, WindowId, WindowLevel},
+  window::{BoxShellWindow, Shell, ShellWindow, WindowAttributes, WindowId, WindowLevel},
 };
-use winit::{
-  dpi::{LogicalPosition, LogicalSize},
-  window::WindowAttributes,
-};
+use winit::dpi::{LogicalPosition, LogicalSize};
 
 #[cfg(target_arch = "wasm32")]
 pub const RIBIR_CANVAS: &str = "ribir_canvas";
@@ -58,7 +54,7 @@ pub(crate) struct RibirShell {
 impl Shell for RibirShell {
   fn new_shell_window(
     &self, attrs: ribir_core::window::WindowAttributes,
-  ) -> scheduler::BoxFuture<'static, BoxShellWindow> {
+  ) -> BoxFuture<'static, BoxShellWindow> {
     let (sender, receiver) = tokio::sync::oneshot::channel::<BoxShellWindow>();
 
     self.run_in_shell(Box::pin(async move {
@@ -288,7 +284,7 @@ impl WinitShellWnd {
       document.append_child(&canvas).unwrap();
     }
 
-    attrs = attrs.with_canvas(Some(canvas));
+    attrs.0 = attrs.0.with_canvas(Some(canvas));
     let wnd = Self::inner_new(attrs).await;
 
     wnd
@@ -300,7 +296,7 @@ impl WinitShellWnd {
   async fn inner_new(attrs: WindowAttributes) -> Self {
     let winit_wnd = Arc::new(
       App::active_event_loop()
-        .create_window(attrs)
+        .create_window(attrs.0)
         .unwrap(),
     );
     let ptr = winit_wnd.as_ref() as *const winit::window::Window;

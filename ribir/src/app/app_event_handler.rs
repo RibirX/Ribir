@@ -13,7 +13,7 @@ pub struct AppHandler {}
 impl ApplicationHandler<RibirAppEvent> for AppHandler {
   fn resumed(&mut self, event_loop: &ActiveEventLoop) {
     let _guard = active_event_guard(event_loop);
-    App::run_until_stalled();
+    App::pump_ui_tasks();
   }
 
   fn window_event(
@@ -139,7 +139,7 @@ impl ApplicationHandler<RibirAppEvent> for AppHandler {
 
   fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
     let _guard = active_event_guard(event_loop);
-    App::run_until_stalled();
+    App::pump_ui_tasks();
   }
 }
 

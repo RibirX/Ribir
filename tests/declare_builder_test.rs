@@ -1,7 +1,8 @@
-use ribir::prelude::*;
+use ribir::{core::reset_test_env, prelude::*};
 
 #[test]
 fn declarer_smoke() {
+  reset_test_env!();
   // empty struct
   #[derive(Declare)]
   struct A;
@@ -24,6 +25,7 @@ fn declarer_smoke() {
 #[test]
 #[should_panic = "Required field `T::a` not set"]
 fn panic_if_miss_require_field() {
+  reset_test_env!();
   #[derive(Declare)]
   struct T {
     a: f32,
@@ -35,6 +37,7 @@ fn panic_if_miss_require_field() {
 #[test]
 
 fn default_field() {
+  reset_test_env!();
   #[derive(Declare)]
   struct DefaultDeclare {
     #[declare(default)]
@@ -48,6 +51,7 @@ fn default_field() {
 #[test]
 
 fn default_field_with_value() {
+  reset_test_env!();
   #[derive(Declare)]
   struct DefaultWithValue {
     #[declare(default = "hi!")]
@@ -60,6 +64,7 @@ fn default_field_with_value() {
 
 #[test]
 fn declarer_simple_attr() {
+  reset_test_env!();
   #[simple_declare]
   struct Simple {
     a: f32,
