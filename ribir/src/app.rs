@@ -4,15 +4,12 @@ use std::{
   convert::Infallible,
   future::Future,
   sync::{Arc, LazyLock},
-  task::{Context, RawWaker, RawWakerVTable, Waker},
 };
 
 use app_event_handler::AppHandler;
-use pin_project_lite::pin_project;
 use ribir_core::{
   local_sender::LocalSender,
   prelude::*,
-  scheduler::{LocalPool, RuntimeWaker},
   window::{BoxShell, BoxShellWindow, UiEvent, WindowAttributes, WindowFlags, WindowId},
 };
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
@@ -24,6 +21,7 @@ use crate::{
 };
 
 mod app_event_handler;
+mod ui_executor;
 
 pub struct App {
   event_loop: RefCell<Option<EventLoopState>>,
@@ -34,8 +32,8 @@ pub struct App {
   windows: RefCell<HashMap<WindowId, Sc<RefCell<WinitShellWnd>>>>,
   active_wnd: std::cell::Cell<Option<WindowId>>,
   events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
-  local_pool: LocalPool,
   _app_handler: RefCell<Option<UnboundedSender<UiEvent>>>,
+  ui_executor: ui_executor::UiExecutor,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -70,9 +68,6 @@ pub struct EventSender(Arc<EventLoopProxy<RibirAppEvent>>);
 
 #[derive(Clone)]
 pub(crate) struct CmdSender(Arc<EventLoopProxy<RibirAppEvent>>);
-
-#[derive(Clone)]
-pub struct EventWaker(Arc<EventLoopProxy<RibirAppEvent>>);
 
 /// Represents the lifecycle states of an application's event loop
 enum EventLoopState {
@@ -126,7 +121,7 @@ impl App {
   /// theme to create an application and use the `root` widget to create a
   /// window, then run the application.
   #[track_caller]
-  pub fn run<K: ?Sized, W: RInto<GenWidget, K> + Send + 'static>(root: W) -> AppRunGuard {
+  pub fn run<K: ?Sized>(root: impl RInto<GenWidget, K> + Send + 'static) -> AppRunGuard {
     // Keep the application instance is created, when user call
     let _app = App::shared();
     AppRunGuard::new(move || root.r_into())
@@ -141,14 +136,9 @@ impl App {
   ///  2. as the application's logic will be run in a separated thread, so the
   ///     data need to be `Send` and lazy init.
   #[track_caller]
-  pub fn run_with_data<
-    K,
-    Data: 'static,
-    W: IntoWidget<'static, K>,
-    Builder: Fn(&'static Data) -> W + Send + 'static,
-    DataBuilder: FnOnce() -> Data + Send + 'static,
-  >(
-    data_builder: DataBuilder, widget_builder: Builder,
+  pub fn run_with_data<K, Data: 'static, W: IntoWidget<'static, K>>(
+    data_builder: impl FnOnce() -> Data + Send + 'static,
+    widget_builder: impl Fn(&'static Data) -> W + Send + 'static,
   ) -> AppRunGuard {
     // Keep the application instance is created, when user call
     let _app = App::shared();
@@ -179,7 +169,7 @@ impl App {
   ///   - Subsequent windows will look for the next container with this class
   /// - If no container found, creates and appends the canvas to the body.
   pub async fn new_window(attrs: WindowAttributes) -> BoxShellWindow {
-    let shell_wnd = WinitShellWnd::new(attrs.0).await;
+    let shell_wnd = WinitShellWnd::new(attrs).await;
 
     let proxy = ShellWndHandle {
       winit_wnd: shell_wnd.winit_wnd.clone(),
@@ -229,7 +219,7 @@ impl App {
   where
     Fut: Future<Output = ()> + 'static,
   {
-    App::shared().local_pool.spawn_local(future);
+    Self::shared().ui_executor.spawn_local(future);
   }
 
   /// run the application, this will start the event loop and block the current
@@ -239,18 +229,13 @@ impl App {
     let (sender, recv) = unbounded_channel();
     *Self::shared()._app_handler.borrow_mut() = Some(sender);
     let shell: BoxShell = Box::new(RibirShell { cmd_sender: App::cmd_sender() });
-    #[cfg(not(target_arch = "wasm32"))]
-    AppCtx::run(recv, shell, async {
-      AppCtx::set_clipboard(Box::new(crate::clipboard::Clipboard::new().unwrap()));
-      app();
-    });
-
-    #[cfg(target_arch = "wasm32")]
     AppCtx::run(recv, shell, async move {
-      app();
-    });
+      #[cfg(not(target_arch = "wasm32"))]
+      AppCtx::set_clipboard(Box::new(crate::clipboard::Clipboard::new().unwrap()));
 
-    AppCtx::spawn_local(async move { register_platform_app_events_handlers() });
+      app();
+      register_platform_app_events_handlers()
+    });
 
     let event_loop = App::take_event_loop();
 
@@ -268,14 +253,16 @@ impl App {
 
       let event_loop = Box::new(event_loop);
 
+      let event_loop_proxy = event_loop.create_proxy();
+
       let app: App = App {
         event_loop_proxy: Arc::new(event_loop.create_proxy()),
         event_loop: RefCell::new(Some(EventLoopState::NotStarted(event_loop))),
         events_stream: <_>::default(),
         active_wnd: std::cell::Cell::new(None),
-        local_pool: LocalPool::default(),
         windows: <_>::default(),
         _app_handler: <_>::default(),
+        ui_executor: ui_executor::UiExecutor::new(event_loop_proxy),
       };
       LocalSender::new(app)
     });
@@ -283,12 +270,7 @@ impl App {
   }
 
   #[track_caller]
-  fn run_until_stalled() {
-    let waker = Box::new(EventWaker(App::shared().event_loop_proxy.clone()));
-    App::shared()
-      .local_pool
-      .run_until_stalled(Some(waker));
-  }
+  fn pump_ui_tasks() { App::shared().ui_executor.pump(); }
 
   fn take_event_loop() -> EventLoop<RibirAppEvent> {
     let app = App::shared();
@@ -396,18 +378,6 @@ impl CmdSender {
   }
 }
 
-impl RuntimeWaker for EventWaker {
-  fn clone_box(&self) -> Box<dyn RuntimeWaker + Send> { Box::new(self.clone()) }
-  fn wake(&self) {
-    let _ = self
-      .0
-      .send_event(RibirAppEvent::App(AppEvent::FuturesWake));
-  }
-}
-
-/// EventWaker only send `RibirEvent::FuturesWake`.
-unsafe impl Send for EventWaker {}
-
 impl std::ops::Deref for AppRunGuard {
   type Target = WindowAttributes;
 
@@ -417,71 +387,6 @@ impl std::ops::Deref for AppRunGuard {
 impl std::ops::DerefMut for AppRunGuard {
   fn deref_mut(&mut self) -> &mut Self::Target {
     unsafe { self.wnd_attrs.as_mut().unwrap_unchecked() }
-  }
-}
-
-pin_project! {
-  struct WakerFuture<F> {
-    #[pin]
-    fut: F,
-    waker: Box<dyn RuntimeWaker + Send>,
-  }
-}
-
-impl<F> WakerFuture<F>
-where
-  F: Future,
-{
-  fn local_waker(&self, cx: &std::task::Context<'_>) -> Waker {
-    type RawLocalWaker = (std::task::Waker, Box<dyn RuntimeWaker + Send>);
-    fn clone(this: *const ()) -> RawWaker {
-      let waker = this as *const RawLocalWaker;
-      let (w, cb) = unsafe { &*waker };
-      let data = Box::new((w.clone(), cb.clone()));
-      let raw = Box::leak(data) as *const RawLocalWaker;
-      RawWaker::new(raw as *const (), &VTABLE)
-    }
-
-    unsafe fn wake(this: *const ()) {
-      let waker = this as *mut RawLocalWaker;
-      let (w, ribir_waker) = unsafe { &*waker };
-      w.wake_by_ref();
-      ribir_waker.wake();
-      unsafe { drop(this) };
-    }
-
-    unsafe fn wake_by_ref(this: *const ()) {
-      let waker = this as *mut RawLocalWaker;
-      let (w, ribir_waker) = unsafe { &*waker };
-      w.wake_by_ref();
-      ribir_waker.wake();
-    }
-
-    unsafe fn drop(this: *const ()) {
-      let waker = this as *mut RawLocalWaker;
-      let _ = unsafe { Box::from_raw(waker) };
-    }
-    static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
-
-    let old_waker = cx.waker().clone();
-    let data = Box::new((old_waker, self.waker.clone()));
-    let raw = RawWaker::new(Box::leak(data) as *const RawLocalWaker as *const (), &VTABLE);
-    unsafe { Waker::from_raw(raw) }
-  }
-}
-
-impl<F> Future for WakerFuture<F>
-where
-  F: Future,
-{
-  type Output = F::Output;
-  fn poll(
-    self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>,
-  ) -> std::task::Poll<Self::Output> {
-    let waker = self.local_waker(cx);
-    let mut cx = Context::from_waker(&waker);
-    let this = self.project();
-    this.fut.poll(&mut cx)
   }
 }
 

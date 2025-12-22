@@ -25,7 +25,7 @@ pub mod event_loop;
 pub mod overlay;
 pub mod query;
 pub mod reusable;
-pub mod scheduler;
+
 pub mod wrap_render;
 
 /// Represents measurement units for positioning and sizing.

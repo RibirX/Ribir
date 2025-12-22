@@ -33,7 +33,6 @@ priority-queue = { workspace = true }
 url.workspace = true
 futures-timer = { version = "3.0.3", optional = true }
 cfg-if.workspace = true
-tokio-run-until-stalled.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "rt", "time", "macros", "sync"]}

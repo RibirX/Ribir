@@ -17,7 +17,6 @@ use crate::{
     focus_mgr::{FocusManager, FocusType},
   },
   prelude::{image::ColorFormat, *},
-  scheduler::BoxFuture,
   ticker::{FrameMsg, FrameTicker},
 };
 

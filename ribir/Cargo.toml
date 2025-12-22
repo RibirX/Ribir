@@ -27,12 +27,13 @@ cfg-if.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 arboard.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "rt", "sync"]}
+tokio = { workspace = true, features = ["rt-multi-thread", "rt", "sync", "time"]}
 
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true
 tokio = { workspace = true, features = ["rt", "sync"]}
+wasm-bindgen-futures.workspace = true
 
 
 [target.'cfg(target_os = "macos")'.dependencies]

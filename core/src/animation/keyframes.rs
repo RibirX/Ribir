@@ -199,10 +199,11 @@ use super::{AnimateStateSetter, Lerp, LerpFnState};
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::{animation::animate_state::AnimateState, state::Stateful};
+  use crate::{animation::animate_state::AnimateState, reset_test_env, state::Stateful};
 
   #[test]
   fn smoke() {
+    reset_test_env!();
     let state = Stateful::new(1.);
     let mut keyframes = keyframes! {
       state: state,

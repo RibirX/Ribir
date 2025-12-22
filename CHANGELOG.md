@@ -25,9 +25,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Changed
+
+- **core**: Refactor the scheduler to improve async ecosystem compatibility. (#815 @M-Adoo)
+
 ### Fixed
 
-- **core**: Fix abnormal CPU usage on macOS caused by the side effects of cloning EventLoopProxy.
+- **core**: Fix abnormal CPU usage on macOS caused by the side effects of cloning EventLoopProxy (#816 @wjian23).
 
 ## [0.4.0-alpha.53] - 2025-12-17
 
