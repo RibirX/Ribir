@@ -104,9 +104,8 @@ fn gen_asset_internal(input: TokenStream, embed: bool) -> TokenStream {
 }
 
 fn process_and_generate(args: AssetArgs, embed: bool) -> syn::Result<TokenStream> {
-  let ctx = prepare_asset_context(&args.input, embed)?;
-  println!("cargo:rerun-if-changed={}", ctx.abs_input.display());
-
+  let params_hash = args.asset.params_hash();
+  let ctx = prepare_asset_context(&args.input, embed, params_hash)?;
   args.asset.generate(&ctx)
 }
 
@@ -115,6 +114,10 @@ fn process_and_generate(args: AssetArgs, embed: bool) -> syn::Result<TokenStream
 pub(crate) trait Asset {
   /// Generate the code to load the asset (either runtime or embedded)
   fn generate(&self, ctx: &AssetContext) -> syn::Result<TokenStream>;
+
+  /// Return a hash of the processing parameters (for cache invalidation)
+  /// Default returns None (no parameters affect output)
+  fn params_hash(&self) -> Option<String> { None }
 }
 
 // --- Parsing ---
@@ -212,14 +215,34 @@ impl AssetContext {
     format!("Failed to {} asset '{}'", action, self.relative_output)
   }
 
-  pub fn copy_input_to_output(&self) -> syn::Result<()> {
+  /// Check if output needs to be (re)generated.
+  /// Returns true if input is newer than output, or output doesn't exist.
+  pub fn needs_update(&self) -> bool {
+    match (self.abs_input.metadata(), self.abs_output.metadata()) {
+      (Ok(in_meta), Ok(out_meta)) => match (in_meta.modified(), out_meta.modified()) {
+        (Ok(in_time), Ok(out_time)) => in_time > out_time,
+        _ => true,
+      },
+      _ => true, // Output doesn't exist or can't read metadata
+    }
+  }
+
+  /// Copy input to output (incremental: skips if output is up-to-date)
+  pub fn copy_to_output(&self) -> syn::Result<()> {
+    if !self.needs_update() {
+      return Ok(());
+    }
     fs::copy(&self.abs_input, &self.abs_output).map_err(|e| {
       syn::Error::new(self.input_span, format!("Failed to copy asset '{}': {}", self.input_path, e))
     })?;
     Ok(())
   }
 
-  pub fn write_output(&self, data: &[u8]) -> syn::Result<()> {
+  /// Write data to output (incremental: skips if output is up-to-date)
+  pub fn write_to_output(&self, data: &[u8]) -> syn::Result<()> {
+    if !self.needs_update() {
+      return Ok(());
+    }
     fs::write(&self.abs_output, data).map_err(|e| {
       syn::Error::new(
         self.input_span,
@@ -250,7 +273,9 @@ impl AssetContext {
   }
 }
 
-fn prepare_asset_context(input: &LitStr, embed: bool) -> syn::Result<AssetContext> {
+fn prepare_asset_context(
+  input: &LitStr, embed: bool, params_hash: Option<String>,
+) -> syn::Result<AssetContext> {
   let input_path = input.value();
   let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
   let is_bundle = profile == "bundle";
@@ -273,16 +298,14 @@ fn prepare_asset_context(input: &LitStr, embed: bool) -> syn::Result<AssetContex
     .and_then(|n| n.to_str())
     .ok_or_else(|| syn::Error::new_spanned(input, "Failed to extract filename"))?;
 
-  // Use path hash to avoid conflicts between files with same name from different
-  // directories
+  // Use path hash (and optional params hash) to avoid conflicts
   let path_hash = hash_path(&input_path);
-  let hashed_filename = format!("{}_{}", path_hash, filename);
+  let hashed_filename = match params_hash {
+    Some(ph) => format!("{}_{}_{}", path_hash, ph, filename),
+    None => format!("{}_{}", path_hash, filename),
+  };
 
-  let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-    .map_err(|e| syn::Error::new(input.span(), format!("`CARGO_MANIFEST_DIR` not set: {e}")))?;
-  let manifest_path = PathBuf::from(&manifest_dir);
-
-  let workspace_opt = find_workspace_root(&manifest_path);
+  let (manifest_path, workspace_opt) = get_workspace_base(input.span())?;
 
   let base_target_dir = std::env::var_os("CARGO_TARGET_DIR")
     .map(PathBuf::from)
@@ -296,9 +319,12 @@ fn prepare_asset_context(input: &LitStr, embed: bool) -> syn::Result<AssetContex
   let target_dir = base_target_dir.join(&profile).join("assets");
   let abs_output = target_dir.join(&hashed_filename);
 
-  fs::create_dir_all(&target_dir).map_err(|e| {
-    syn::Error::new(input.span(), format!("Failed to create asset output directory: {}", e))
-  })?;
+  // Optimize: only create directory if it doesn't exist
+  if !target_dir.exists() {
+    fs::create_dir_all(&target_dir).map_err(|e| {
+      syn::Error::new(input.span(), format!("Failed to create asset output directory: {}", e))
+    })?;
+  }
 
   let relative_output = format!("assets/{}", hashed_filename);
 
@@ -335,13 +361,26 @@ fn resolve_caller_relative_path(input_path: &str, span: proc_macro2::Span) -> sy
     )
   })?;
 
-  let abs_input = if Path::new(input_path).is_absolute() {
-    PathBuf::from(input_path)
-  } else {
-    caller_dir.join(input_path)
-  };
+  let resolved = caller_dir.join(input_path);
 
-  Ok(abs_input)
+  // `include_bytes!` resolves paths relative to the source file location.
+  // If `local_file()` returns a relative path, we must convert to absolute.
+  if resolved.is_absolute() {
+    Ok(resolved)
+  } else {
+    let (manifest_path, workspace_opt) = get_workspace_base(span)?;
+    let base = workspace_opt.unwrap_or(manifest_path);
+    Ok(base.join(&resolved))
+  }
+}
+
+/// Get manifest path and optional workspace root
+fn get_workspace_base(span: proc_macro2::Span) -> syn::Result<(PathBuf, Option<PathBuf>)> {
+  let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+    .map_err(|e| syn::Error::new(span, format!("`CARGO_MANIFEST_DIR` not set: {e}")))?;
+  let manifest_path = PathBuf::from(&manifest_dir);
+  let workspace_opt = find_workspace_root(&manifest_path);
+  Ok((manifest_path, workspace_opt))
 }
 
 fn hash_path(path: &str) -> String {
@@ -353,22 +392,20 @@ fn hash_path(path: &str) -> String {
 fn append_to_manifest(
   input_path: &str, output_path: &str, target_dir: &Path, span: proc_macro2::Span,
 ) -> syn::Result<()> {
-  let manifest_path = target_dir.join(".asset_manifest.txt");
-  let entry = format!("{} -> {}\n", input_path, output_path);
+  use std::io::Write;
 
-  fs::OpenOptions::new()
+  let manifest_path = target_dir.join(".asset_manifest.txt");
+
+  // Append-only: no race condition, duplicates resolved when reading
+  // (BTreeMap keeps last value for each key)
+  let mut file = fs::OpenOptions::new()
     .create(true)
     .append(true)
     .open(&manifest_path)
-    .and_then(|mut file| {
-      use std::io::Write;
-      file.write_all(entry.as_bytes())
-    })
-    .map_err(|e| {
-      syn::Error::new(span, format!("Failed to append to asset manifest file: {}", e))
-    })?;
+    .map_err(|e| syn::Error::new(span, format!("Failed to open asset manifest: {}", e)))?;
 
-  Ok(())
+  writeln!(file, "{} -> {}", input_path, output_path)
+    .map_err(|e| syn::Error::new(span, format!("Failed to write to asset manifest: {}", e)))
 }
 
 fn find_workspace_root(start: &Path) -> Option<PathBuf> {
