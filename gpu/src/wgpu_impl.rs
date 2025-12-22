@@ -718,8 +718,11 @@ impl WgpuImpl {
       max_linear_gradient_primitives: uniform_bytes / size_of::<LinearGradientPrimitive>(),
       max_gradient_stop_primitives: uniform_bytes / size_of::<GradientStopPrimitive>(),
       max_mask_layers: uniform_bytes / size_of::<MaskLayer>(),
-      max_filter_matrix_len: ((uniform_bytes - size_of::<FilterPrimitive>()) & 0xFFFFFF00)
-        / size_of::<f32>(), // the matrix size must be aligned to 16 bytes
+      // Limit the max filter kernel size to avoid shader compilation hanging on macOS Metal.
+      // 127x127 kernel (16129 elements) is sufficient for most blur/filter effects.
+      max_filter_matrix_len: (((uniform_bytes - size_of::<FilterPrimitive>()) & 0xFFFFFF00)
+        / size_of::<f32>()) // the matrix size must be aligned to 16 bytes
+      .min(128 * 128),
       max_texture_primitives: uniform_bytes / size_of::<TexturePrimitive>(),
     };
 
