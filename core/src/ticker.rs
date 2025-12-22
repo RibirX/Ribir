@@ -1,13 +1,10 @@
 use std::convert::Infallible;
-#[cfg(not(target_arch = "wasm32"))]
-pub use std::time::{Duration, Instant};
 
-use rxrust::prelude::Subject;
-#[cfg(target_arch = "wasm32")]
-pub use web_time::{Duration, Instant};
+use rxrust::subject::LocalSubject;
+pub use rxrust::{Duration, Instant};
 
 /// Frame ticker emit message when new frame need to draw.
-pub type FrameTicker = Subject<'static, FrameMsg, Infallible>;
+pub type FrameTicker = LocalSubject<'static, FrameMsg, Infallible>;
 
 /// Message emitted at different status of a frame.
 

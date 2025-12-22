@@ -1428,11 +1428,11 @@ impl<T> std::ops::DerefMut for FatObj<T> {
 /// of unsubscribing when disposed.
 pub struct DeclarerWithSubscription<T> {
   inner: T,
-  subscribes: SmallVec<[BoxSubscription<'static>; 1]>,
+  subscribes: SmallVec<[BoxedSubscription; 1]>,
 }
 
 impl<T> DeclarerWithSubscription<T> {
-  pub fn new(host: T, subscribes: SmallVec<[BoxSubscription<'static>; 1]>) -> Self {
+  pub fn new(host: T, subscribes: SmallVec<[BoxedSubscription; 1]>) -> Self {
     Self { inner: host, subscribes }
   }
 

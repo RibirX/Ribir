@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use indextree::{Node, NodeId};
 use smallvec::{SmallVec, smallvec};
 
@@ -155,7 +153,7 @@ impl WidgetId {
     // another node,so we need check it manually.
     assert!(!self.is_dropped(tree));
 
-    let last_elem = Rc::new(RefCell::new(self));
+    let last_elem = Sc::new(RefCell::new(self));
     let last_elem2 = last_elem.clone();
     self
       .0

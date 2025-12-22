@@ -161,7 +161,7 @@ pub struct List {
   items: Vec<Stateful<ListItem>>,
   /// Handles single-select subscription cleanup
   #[declare(skip)]
-  subscriptions: Vec<BoxSubscription<'static>>,
+  subscriptions: Vec<BoxedSubscription>,
 }
 
 // Defines class names used for styling list widgets
@@ -672,7 +672,7 @@ impl List {
         .distinct_until_changed()
         .filter(|selected| *selected)
         .subscribe(move |_| this.write().on_item_select(idx));
-      subscriptions.push(BoxSubscription::new(u));
+      subscriptions.push(BoxedSubscription::new(u));
     });
   }
 

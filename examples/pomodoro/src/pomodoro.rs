@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use ribir::prelude::{ops::box_it::BoxOp, *};
+use ribir::prelude::*;
 use rodio::Sink;
 
 use crate::{audio, config::PomodoroConfig};
@@ -22,7 +22,7 @@ pub struct Pomodoro {
   #[declare(skip)]
   pub state: PomodoroState,
   #[declare(skip)]
-  pub running_guard: Option<SubscriptionGuard<BoxSubscription<'static>>>,
+  pub running_guard: Option<SubscriptionGuard<BoxedSubscription>>,
   #[declare(skip)]
   pub rounds: u32,
 
@@ -110,11 +110,11 @@ impl Pomodoro {
 
   pub fn run(this: &impl StateWriter<Value = Self>, update_interval: Duration) {
     let mut start = Instant::now();
-    let boxed: BoxOp<'_, usize, _> = interval(update_interval, AppCtx::scheduler()).box_it();
+    let boxed: LocalBoxedObservable<'_, usize, _> = Local::interval(update_interval).box_it();
 
     let this = this.clone_writer();
     let this2 = this.clone_writer();
-    let guard: SubscriptionGuard<BoxSubscription<'_>> = boxed
+    let guard: SubscriptionGuard<BoxedSubscription> = boxed
       .subscribe(move |_| {
         let state_changed = this.write().elapse(start.elapsed());
         if state_changed {

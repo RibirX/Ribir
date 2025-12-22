@@ -8,7 +8,7 @@ pub(super) fn init(classes: &mut Classes) {
     rdl! {
       let mut w = FatObj::new(w);
       let blink_interval = Duration::from_millis(500);
-      let u = interval(blink_interval, AppCtx::scheduler())
+      let u = Local::interval(blink_interval)
         .subscribe(move |idx| *$write(w.opacity()) = (idx % 2) as f32);
       let border = BuildCtx::color()
         .map(|color| Border::only_left(BorderSide::new(2., (*color).into())));

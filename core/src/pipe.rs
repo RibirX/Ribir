@@ -4,13 +4,18 @@ use std::{
 };
 
 use ribir_algo::Sc;
-use rxrust::ops::box_it::BoxOp;
+use rxrust::{
+  context::LocalCtx,
+  observable::boxed::LocalBoxedObservable,
+  scheduler::LocalScheduler,
+  subscription::{BoxedSubscription, IntoBoxedSubscription},
+};
 use smallvec::{SmallVec, smallvec};
 use widget_id::RenderQueryable;
 
 use crate::{prelude::*, render_helper::PureRender, ticker::FrameMsg};
 
-pub type ValueStream<V> = BoxOp<'static, V, Infallible>;
+pub type ValueStream<V> = LocalBoxedObservable<'static, V, Infallible>;
 
 /// A continuous state stream that drives dynamic widget updates.
 ///
@@ -21,7 +26,7 @@ pub struct Pipe<V> {
   // Internal subscription configuration
   subscribe_info: Sc<RefCell<SubscribeInfo>>,
   // The underlying observable stream
-  observable: BoxOp<'static, V, Infallible>,
+  observable: LocalBoxedObservable<'static, V, Infallible>,
 }
 
 impl<V: 'static> Pipe<V> {
@@ -31,12 +36,14 @@ impl<V: 'static> Pipe<V> {
   /// - `trigger`: Observable stream of modification scopes
   /// - `map_handler`: Function converting ModifyScope to output values
   pub fn new(
-    trigger: BoxOp<'static, ModifyInfo, Infallible>,
+    trigger: LocalBoxedObservable<'static, ModifyInfo, Infallible>,
     map_handler: impl FnMut(ModifyInfo) -> V + 'static,
   ) -> Self {
     let info = SubscribeInfo { effect: ModifyEffect::DATA, priority: None };
     let info: Sc<RefCell<SubscribeInfo>> = Sc::new(RefCell::new(info));
-    let observable = PipeOp { source: trigger, info: info.clone() }
+    let (trigger_core, scheduler) = trigger.into_parts();
+    let trigger = Local::from_parts(trigger_core, scheduler);
+    let observable = Local::from_parts(PipeOp { source: trigger, info: info.clone() }, scheduler)
       .map(map_handler)
       .box_it();
 
@@ -61,7 +68,7 @@ impl<V: 'static> Pipe<V> {
   }
 
   /// Converts this Pipe into its underlying observable stream.
-  pub fn into_observable(self) -> BoxOp<'static, V, Infallible> { self.observable }
+  pub fn into_observable(self) -> LocalBoxedObservable<'static, V, Infallible> { self.observable }
 
   /// Transforms pipe values using a mapping function.
   ///
@@ -235,7 +242,9 @@ impl<V: 'static> Pipe<V> {
   where
     V: XParent,
   {
-    fn bind_update<P: XParent>(node: PipeNode, observable: BoxOp<'static, P, Infallible>) {
+    fn bind_update<P: XParent + 'static>(
+      node: PipeNode, observable: LocalBoxedObservable<'static, P, Infallible>,
+    ) {
       let pipe_node = node.clone();
       let tree = BuildCtx::get().tree_ptr();
       let u = observable.subscribe(move |w| {
@@ -588,93 +597,81 @@ impl Priority for PipeWidgetPriority {
   }
 }
 
-struct PipeWidgetContextOp<S> {
-  source: S,
-  priority: PipeWidgetPriority,
-}
-
 struct PipeOp {
-  source: BoxOp<'static, ModifyInfo, Infallible>,
+  source: LocalBoxedObservable<'static, ModifyInfo, Infallible>,
   info: Sc<RefCell<SubscribeInfo>>,
 }
 
 struct PipeWidgetContextObserver<O> {
   observer: O,
-  priority: PipeWidgetPriority,
+  pipe_node: PipeNode,
+  wnd: Sc<Window>,
 }
 
-impl<Item: 'static, Err: 'static, O, S> Observable<Item, Err, O> for PipeWidgetContextOp<S>
+impl<O> Observer<ModifyInfo, Infallible> for PipeWidgetContextObserver<O>
 where
-  O: Observer<Item, Err> + 'static,
-  S: Observable<Item, Err, PipeWidgetContextObserver<O>> + 'static,
+  O: Observer<ModifyInfo, Infallible>,
 {
-  type Unsub = S::Unsub;
+  fn next(&mut self, value: ModifyInfo) {
+    let wid = self.pipe_node.dyn_info().host_id();
 
-  fn actual_subscribe(self, observer: O) -> Self::Unsub {
-    let Self { source, priority } = self;
-    source.actual_subscribe(PipeWidgetContextObserver { observer, priority })
-  }
-}
+    // Initialize the build context for the duration of the observer callback.
+    // This matches the pre-rxrust-update behavior where pipe updates scheduled
+    // via priority always execute with a valid `BuildCtx`.
+    let old = self.pipe_node.take_data();
+    let _guard = BuildCtx::init_for(wid, self.wnd.tree);
+    self.pipe_node.replace_data(old);
 
-impl<O> Observable<ModifyInfo, Infallible, O> for PipeOp
-where
-  O: Observer<ModifyInfo, Infallible> + 'static,
-{
-  type Unsub = BoxSubscription<'static>;
-
-  fn actual_subscribe(self, observer: O) -> Self::Unsub {
-    let mut info = self.info.borrow_mut();
-    let scope = info.effect;
-
-    let priority = info.priority.take();
-    let source = self.source.filter(move |s| s.contains(scope));
-
-    let stream = if let Some(priority) = priority {
-      let sampler = priority
-        .wnd
-        .frame_tick_stream()
-        .filter_map(|msg| matches!(msg, FrameMsg::NewFrame(_)).then_some(()))
-        .merge(observable::of(()));
-
-      let source = source.sample(sampler).priority(priority.clone());
-
-      PipeWidgetContextOp { source, priority }.box_it()
-    } else {
-      source.box_it()
-    };
-
-    stream.actual_subscribe(observer)
-  }
-}
-
-impl<Item, Err, S> ObservableExt<Item, Err> for PipeWidgetContextOp<S> where
-  S: ObservableExt<Item, Err>
-{
-}
-
-impl ObservableExt<ModifyInfo, Infallible> for PipeOp {}
-
-impl<Item, Err, O> Observer<Item, Err> for PipeWidgetContextObserver<O>
-where
-  O: Observer<Item, Err>,
-{
-  fn next(&mut self, value: Item) {
-    let Self { observer, priority } = self;
-    let wid = priority.node.dyn_info().host_id();
-
-    // Initialize the build context
-    let old = priority.node.take_data();
-    let _guard = BuildCtx::init_for(wid, priority.wnd.tree);
-    priority.node.replace_data(old);
-
-    observer.next(value);
+    self.observer.next(value);
   }
 
-  fn error(self, err: Err) { self.observer.error(err); }
+  fn error(self, err: Infallible) { self.observer.error(err); }
 
   fn complete(self) { self.observer.complete(); }
 
-  fn is_finished(&self) -> bool { self.observer.is_finished() }
+  fn is_closed(&self) -> bool { self.observer.is_closed() }
+}
+
+impl ObservableType for PipeOp {
+  type Item<'a>
+    = ModifyInfo
+  where
+    Self: 'a;
+
+  type Err = Infallible;
+}
+
+impl<O> CoreObservable<LocalCtx<O, LocalScheduler>> for PipeOp
+where
+  O: Observer<ModifyInfo, Infallible> + 'static,
+{
+  type Unsub = BoxedSubscription;
+
+  fn subscribe(self, observer: LocalCtx<O, LocalScheduler>) -> Self::Unsub {
+    let (observer, _) = observer.into_parts();
+
+    let mut info = self.info.borrow_mut();
+    let scope = info.effect;
+    let priority = info.priority.take();
+
+    let source = self.source.filter(move |s| s.contains(scope));
+
+    if let Some(priority) = priority {
+      let pipe_node = priority.node.clone();
+      let wnd = priority.wnd.clone();
+
+      let sampler = wnd
+        .frame_tick_stream()
+        .filter_map(|msg| matches!(msg, FrameMsg::NewFrame(_)).then_some(()))
+        .merge(Local::of(()));
+
+      let stream = source.sample(sampler).priority(priority);
+      let observer = PipeWidgetContextObserver { observer, pipe_node, wnd };
+      stream.subscribe_with(observer).into_boxed()
+    } else {
+      source.subscribe_with(observer).into_boxed()
+    }
+  }
 }
 
 #[cfg(test)]

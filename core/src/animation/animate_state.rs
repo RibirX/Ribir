@@ -1,18 +1,18 @@
 use std::convert::Infallible;
 
-use rxrust::{observable::ObservableExt, ops::box_it::BoxOp, prelude::BoxIt};
+use rxrust::observable::boxed::LocalBoxedObservable;
 
 use super::*;
 use crate::prelude::*;
 
-/// Trait to help animate update the state.
+/// Trait to help animations update state.
 pub trait AnimateStateSetter {
   type Value: Clone;
 
   fn get(&self) -> Self::Value;
   fn set(&self, v: Self::Value);
   fn revert(&self, v: Self::Value);
-  fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible>;
+  fn animate_state_modifies(&self) -> LocalBoxedObservable<'static, ModifyInfo, Infallible>;
 }
 
 pub trait AnimateState: AnimateStateSetter {
@@ -25,7 +25,7 @@ pub trait AnimateState: AnimateStateSetter {
     Self: Sized,
     Self::Value: PartialEq,
   {
-    let init_value = observable::of(self.get());
+    let init_value = Local::of(self.get());
 
     let mut animate = Animate::declarer();
     animate
@@ -34,7 +34,7 @@ pub trait AnimateState: AnimateStateSetter {
       .with_state(self);
     let animate = animate.finish();
 
-    // fixme: circle reference here
+    // FIXME: circular reference here
     let modifies = animate.read().state.animate_state_modifies();
     modifies
       .map({
@@ -87,7 +87,7 @@ where
   }
 
   #[inline]
-  fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
+  fn animate_state_modifies(&self) -> LocalBoxedObservable<'static, ModifyInfo, Infallible> {
     StateWatcher::raw_modifies(self)
       .filter(|s| s.contains(ModifyEffect::all()))
       .box_it()
@@ -121,7 +121,7 @@ where
   fn revert(&self, v: Self::Value) { self.state.revert(v) }
 
   #[inline]
-  fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
+  fn animate_state_modifies(&self) -> LocalBoxedObservable<'static, ModifyInfo, Infallible> {
     self.state.animate_state_modifies()
   }
 }
@@ -173,8 +173,8 @@ macro_rules! impl_animate_state_for_tuple {
           $(self.$tuple.revert(v.$tuple);) *
         }
 
-        fn animate_state_modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
-          rxrust::observable::from_iter([$(self.$tuple.animate_state_modifies()), *])
+        fn animate_state_modifies(&self) -> LocalBoxedObservable<'static, ModifyInfo, Infallible> {
+          Local::from_iter([$(self.$tuple.animate_state_modifies()), *])
             .merge_all(usize::MAX)
             .box_it()
         }

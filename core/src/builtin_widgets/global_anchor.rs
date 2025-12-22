@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use ops::box_it::BoxOp;
+use rxrust::{observable::boxed::LocalBoxedObservable, subscription::BoxedSubscription};
 
 use crate::{prelude::*, ticker::FrameMsg};
 
@@ -84,7 +84,7 @@ pub struct GlobalAnchor {
   /// the vertical global anchor
   pub global_anchor_y: Option<GlobalAnchorY>,
 
-  guard: RefCell<Option<SubscriptionGuard<BoxSubscription<'static>>>>,
+  guard: RefCell<Option<SubscriptionGuard<BoxedSubscription>>>,
 }
 
 impl GlobalAnchorX {
@@ -308,7 +308,7 @@ fn apply_global_anchor(
   let anchor_x = this_ref.global_anchor_x.as_ref();
   let anchor_y = this_ref.global_anchor_y.as_ref();
 
-  let watch: BoxOp<'static, _, _> =
+  let watch: LocalBoxedObservable<'static, _, _> =
     match (anchor_x.is_some_and(|x| x.is_once()), anchor_y.is_some_and(|y| y.is_once())) {
       (true, true) => tick_of_layout_ready.take(1).box_it(),
       _ => tick_of_layout_ready.box_it(),

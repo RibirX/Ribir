@@ -192,7 +192,6 @@ impl FrameHandle {
     }
     let mut ticker = self.wnd.frame_ticker.clone();
     ticker.next(FrameMsg::Finish(Instant::now()));
-    ticker.retain();
   }
 
   fn frame_end(self) -> (Vec<RibirEvent>, EventLoopHandle) {

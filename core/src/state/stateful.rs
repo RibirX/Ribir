@@ -1,7 +1,6 @@
 use std::{cell::Cell, convert::Infallible};
 
 use ribir_algo::Sc;
-use rxrust::ops::box_it::CloneableBoxOp;
 use smallvec::{SmallVec, smallvec};
 
 use crate::prelude::*;
@@ -17,8 +16,12 @@ pub struct Reader<W>(pub(crate) Sc<StateCell<W>>);
 
 /// The notifier is a `RxRust` stream that emit notification when the state
 /// changed.
-#[derive(Default, Clone)]
-pub struct Notifier(Subject<'static, ModifyInfo, Infallible>);
+#[derive(Clone)]
+pub struct Notifier(LocalSubject<'static, ModifyInfo, Infallible>);
+
+impl Default for Notifier {
+  fn default() -> Self { Self(Local::subject()) }
+}
 
 bitflags! {
   #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -44,7 +47,7 @@ impl ModifyInfo {
 }
 
 impl Notifier {
-  pub(crate) fn unsubscribe(&mut self) { self.0.clone().unsubscribe(); }
+  pub(crate) fn unsubscribe(&mut self) { self.0.clone().complete(); }
 }
 
 pub(crate) struct WriterInfo {
@@ -95,13 +98,13 @@ impl<W: 'static> StateWatcher for Stateful<W> {
     Box::new(self.clone_watcher())
   }
 
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
+  fn raw_modifies(&self) -> LocalBoxedObservableClone<'static, ModifyInfo, Infallible> {
     let include_partial = self.include_partial;
     let mut modifies = self.info.notifier.raw_modifies();
     if !include_partial {
       modifies = modifies
         .filter(move |info| info.path.iter().all(|id| id == &PartialId::ANY))
-        .box_it();
+        .box_it_clone();
     }
     modifies
   }
@@ -196,7 +199,7 @@ impl<W> Stateful<W> {
     Sc::ptr_eq(&this.data, &other.data) && Sc::ptr_eq(&this.info, &other.info)
   }
 
-  pub fn from_pipe(p: Pipe<W>) -> (Self, BoxSubscription<'static>)
+  pub fn from_pipe(p: Pipe<W>) -> (Self, BoxedSubscription)
   where
     W: Default,
     Self: 'static,
@@ -235,8 +238,8 @@ impl WriterInfo {
 }
 
 impl Notifier {
-  pub(crate) fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
-    self.0.clone().box_it()
+  pub(crate) fn raw_modifies(&self) -> LocalBoxedObservableClone<'static, ModifyInfo, Infallible> {
+    self.0.clone().box_it_clone()
   }
 
   pub(crate) fn next(&self, scope: ModifyInfo) { self.0.clone().next(scope) }

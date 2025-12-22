@@ -37,7 +37,7 @@ impl HoverLayer {
 
     let u = watch!(*$read(host.is_hovered()))
       // Delay hover effects to prevent displaying this layer while scrolling.
-      .throttle_time(Duration::from_millis(100), ThrottleEdge::tailing(), AppCtx::scheduler())
+      .throttle_time(Duration::from_millis(100), ThrottleEdge::trailing())
       .distinct_until_changed()
       .subscribe({
         let layer = layer.clone_writer();

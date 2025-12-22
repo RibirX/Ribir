@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use rxrust::ops::box_it::BoxOp;
+use rxrust::observable::boxed::LocalBoxedObservable;
 
 use crate::prelude::*;
 
@@ -25,7 +25,7 @@ pub enum PipeValue<V> {
   Pipe { init_value: V, pipe: Pipe<V> },
 }
 
-pub type ValueStream<V> = BoxOp<'static, V, Infallible>;
+pub type ValueStream<V> = LocalBoxedObservable<'static, V, Infallible>;
 
 impl<V: 'static> PipeValue<V> {
   pub fn unzip(self) -> (V, Option<ValueStream<V>>) {

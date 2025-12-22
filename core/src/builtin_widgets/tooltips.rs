@@ -74,7 +74,7 @@ impl<'c> ComposeChild<'c> for Tooltips {
     fn_widget! {
       let wnd = BuildCtx::get().window();
       let u = watch!(*$read(child.is_hovered()))
-        .delay(Duration::from_millis(50), AppCtx::scheduler())
+        .delay(Duration::from_millis(50))
         .distinct_until_changed()
         .subscribe(move |_| {
           if *$read(child.is_hovered()) {

@@ -86,7 +86,7 @@ where
     Box::new(self.clone_watcher())
   }
 
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
+  fn raw_modifies(&self) -> LocalBoxedObservableClone<'static, ModifyInfo, Infallible> {
     let modifies = self
       .write()
       .notify_guard
@@ -101,7 +101,7 @@ where
         .filter(move |info| {
           info.path.starts_with(&path) && (include_partial || info.path.len() == path.len())
         })
-        .box_it()
+        .box_it_clone()
     } else {
       modifies
     }
