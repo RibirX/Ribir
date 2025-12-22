@@ -99,6 +99,9 @@ where
       let state_handle = this
         .state
         .animate_state_modifies()
+        // State transition may trigger an animation run during a state modification, causing borrow
+        // conflicts. To avoid this, delay the run until the next tick.
+        .delay_subscription(Duration::ZERO)
         .subscribe(move |_| {
           let mut animate = animate.write();
           let v = animate.state.get();

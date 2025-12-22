@@ -1,7 +1,6 @@
 use std::{
   cell::{Cell, RefCell},
   collections::VecDeque,
-  convert::Infallible,
   ptr::NonNull,
 };
 
@@ -379,9 +378,7 @@ impl Window {
 
   pub fn priority_task_queue(&self) -> &PriorityTaskQueue { &self.priority_task_queue }
 
-  pub fn frame_tick_stream(&self) -> Subject<'static, FrameMsg, Infallible> {
-    self.frame_ticker.clone()
-  }
+  pub fn frame_tick_stream(&self) -> FrameTicker { self.frame_ticker.clone() }
 
   pub fn inc_running_animate(&self) {
     self
@@ -487,7 +484,7 @@ impl Window {
       painter: RefCell::new(painter),
       focus_mgr,
       delay_emitter: <_>::default(),
-      frame_ticker: FrameTicker::default(),
+      frame_ticker: Local::subject(),
       running_animates: <_>::default(),
       priority_task_queue: PriorityTaskQueue::default(),
       shell_wnd: RefCell::new(shell_wnd),
@@ -540,7 +537,7 @@ impl Window {
 
     let wnd = this.clone();
     let guard = watch!(*$read(watcher))
-      .merge(observable::of(Some(init_id)))
+      .merge(Local::of(Some(init_id)))
       .distinct_until_changed()
       .pairwise()
       .subscribe(move |(old, new)| {
@@ -1028,7 +1025,7 @@ impl Window {
       .frame_ticker
       .clone()
       .filter(filter)
-      .take(1)
+      .first()
       .subscribe(move |_| f.take().unwrap()());
   }
 }

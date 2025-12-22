@@ -1,17 +1,17 @@
 use std::convert::Infallible;
 
-use rxrust::ops::box_it::CloneableBoxOp;
+use rxrust::observable::boxed::LocalBoxedObservableClone;
 
 use crate::prelude::*;
 
 pub struct Watcher<R> {
   reader: R,
-  modifies_observable: CloneableBoxOp<'static, ModifyInfo, Infallible>,
+  modifies_observable: LocalBoxedObservableClone<'static, ModifyInfo, Infallible>,
 }
 
 impl<R> Watcher<R> {
   pub fn new(
-    reader: R, modifies_observable: CloneableBoxOp<'static, ModifyInfo, Infallible>,
+    reader: R, modifies_observable: LocalBoxedObservableClone<'static, ModifyInfo, Infallible>,
   ) -> Self {
     Self { reader, modifies_observable }
   }
@@ -59,7 +59,7 @@ impl<R: StateReader> StateWatcher for Watcher<R> {
   }
 
   #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
+  fn raw_modifies(&self) -> LocalBoxedObservableClone<'static, ModifyInfo, Infallible> {
     self.modifies_observable.clone()
   }
 

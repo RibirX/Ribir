@@ -13,8 +13,7 @@ use icrate::{
     *,
   },
 };
-use ribir_core::prelude::AppCtx;
-use rxrust::prelude::{ObservableExt, ObservableItem, interval};
+use ribir_core::prelude::*;
 use winit::keyboard::{KeyCode, ModifiersState};
 
 use crate::prelude::{App, AppEvent, HotkeyEvent};
@@ -108,7 +107,7 @@ pub fn register_platform_app_events_handlers() {
       if query_accessibility_permissions() {
         add_global_monitor_for_events_matching_mask_handler();
       } else {
-        let _ = interval(Duration::from_secs(5), AppCtx::scheduler())
+        let _wait_complete = Local::interval(Duration::from_secs(5))
           .take_while(|_| !query_accessibility_permissions())
           .on_complete(|| {
             add_global_monitor_for_events_matching_mask_handler();

@@ -75,12 +75,14 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
       *$write(w.opacity()) = 1.;
       *$write(w.visible()) = true;
       fade.take();
-      let u = observable::timer((), Duration::from_secs(3), AppCtx::scheduler())
-        .filter(move |_| !*$read(w.is_hovered()))
+      let u = Local::timer(Duration::from_secs(3))
         .subscribe(move |_| {
-          *$write(w.opacity()) = 0.;
-          *$write(w.visible()) = false;
-        }).unsubscribe_when_dropped();
+          if !*$read(w.is_hovered()) {
+            *$write(w.opacity()) = 0.;
+            *$write(w.visible()) = false;
+          }
+        })
+        .unsubscribe_when_dropped();
       fade = Some(u);
     };
 

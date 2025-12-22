@@ -177,7 +177,7 @@ where
         (Transform::translation(0., 64.), 0.),
       );
       // items not displayed until the stagger animation is started.
-      watch!($read(fly_in).is_running()).filter(|v| *v).first().subscribe(move |_| {
+      watch!($read(fly_in).is_running()).filter(|v| *v).take(1).subscribe(move |_| {
         *$write(item.opacity()) = 1.;
       });
     }
@@ -194,7 +194,7 @@ pub fn todos() -> Widget<'static> {
     let save_todos = todos.clone_reader();
     todos
       .modifies()
-      .debounce(Duration::from_secs(5), AppCtx::scheduler())
+      .debounce(Duration::from_secs(5))
       .subscribe(move |_| {
         if let Err(err) = save_todos.read().save() {
           log::error!("Save tasks failed: {}", err);

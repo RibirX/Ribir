@@ -68,7 +68,7 @@ const FOCUS_REASON_MASK: u64 = 0b11 << FOCUS_REASON_SHIFT;
 const TAB_IDX_SHIFT: u64 = 34;
 const TAB_IDX_MASK: u64 = 0xFFFF << TAB_IDX_SHIFT;
 
-pub type EventSubject = MutRefItemSubject<'static, Event, Infallible>;
+pub type EventSubject = LocalSubjectMutRef<'static, Event, Infallible>;
 
 pub struct MixBuiltin {
   flags: Stateful<MixFlags>,
@@ -81,22 +81,15 @@ impl Declare for MixBuiltin {
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-macro_rules! event_map_filter {
-  ($event_name:ident, $event_ty:ty) => {
-    (|e| match e {
-      Event::$event_name(e) => Some(e),
-      _ => None,
-    }) as fn(&mut Event) -> Option<&mut $event_ty>
-  };
-}
-
 macro_rules! impl_event_callback {
   ($this:ident, $listen_type:ident, $event_name:ident, $event_ty:ty, $handler:ident) => {{
     $this.silent_mark(MixFlags::$listen_type);
-    let _ = $this
-      .subject()
-      .filter_map(event_map_filter!($event_name, $event_ty))
-      .subscribe($handler);
+    let mut handler = $handler;
+    let _ = $this.subject().subscribe(move |e: &mut Event| {
+      if let Event::$event_name(inner) = e {
+        handler(inner);
+      }
+    });
 
     $this
   }};
@@ -202,11 +195,17 @@ impl MixBuiltin {
 
   pub fn on_mounted(&self, handler: impl FnOnce(&mut LifecycleEvent) + 'static) -> &Self {
     self.silent_mark(MixFlags::Lifecycle);
-    let _ = self
+
+    let mut handler = life_fn_once_to_fn_mut(handler);
+    self
       .subject()
-      .filter_map(event_map_filter!(Mounted, LifecycleEvent))
-      .take(1)
-      .subscribe(life_fn_once_to_fn_mut(handler));
+      .filter(|e| matches!(e, Event::Mounted(_)))
+      .first()
+      .subscribe(move |e: &mut Event| {
+        if let Event::Mounted(inner) = e {
+          handler(inner);
+        }
+      });
 
     self
   }
@@ -217,11 +216,17 @@ impl MixBuiltin {
 
   pub fn on_disposed(&self, handler: impl FnOnce(&mut LifecycleEvent) + 'static) -> &Self {
     self.silent_mark(MixFlags::Lifecycle);
-    let _ = self
+
+    let mut handler = life_fn_once_to_fn_mut(handler);
+    self
       .subject()
-      .filter_map(event_map_filter!(Disposed, LifecycleEvent))
-      .take(1)
-      .subscribe(life_fn_once_to_fn_mut(handler));
+      .filter(|e| matches!(e, Event::Disposed(_)))
+      .first()
+      .subscribe(move |e: &mut Event| {
+        if let Event::Disposed(inner) = e {
+          handler(inner);
+        }
+      });
 
     self
   }
@@ -311,10 +316,13 @@ impl MixBuiltin {
     handler: impl FnMut(&mut PointerEvent) + 'static,
   ) -> &Self {
     self.silent_mark(MixFlags::Pointer);
-    self
-      .subject()
-      .filter_map(x_times_tap_map_filter(times, dur, capture))
-      .subscribe(handler);
+    let mut map_filter = x_times_tap_map_filter(times, dur, capture);
+    let mut handler = handler;
+    self.subject().subscribe(move |e: &mut Event| {
+      if let Some(e) = map_filter(e) {
+        handler(e);
+      }
+    });
     self
   }
 
@@ -550,10 +558,10 @@ impl<'c> ComposeChild<'c> for MixBuiltin {
     if mix.contain_flag(MixFlags::Focus) {
       child = callbacks_for_focus_node(child);
     }
-    if !mix.subject.is_empty() {
+    if !mix.subject.is_closed() {
       let subject = mix.subject.clone();
       mix.on_disposed(move |_| {
-        AppCtx::spawn_local(async move { subject.unsubscribe() });
+        AppCtx::spawn_local(async move { subject.complete() });
       });
     }
     drop(mix);
@@ -606,7 +614,7 @@ fn x_times_tap_map_filter(
 
 impl Default for MixBuiltin {
   fn default() -> Self {
-    Self { flags: Stateful::new(MixFlags::default()), subject: Default::default() }
+    Self { flags: Stateful::new(MixFlags::default()), subject: Local::subject_mut_ref() }
   }
 }
 

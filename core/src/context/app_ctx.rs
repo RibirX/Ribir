@@ -1,9 +1,14 @@
-use std::{cell::RefCell, future::Future, sync::LazyLock};
+use std::{cell::RefCell, future::Future, pin::Pin, sync::LazyLock};
 
 use log::warn;
 use ribir_algo::Sc;
 use ribir_painter::{TypographyStore, font_db::FontDB};
-use rxrust::prelude::{AsyncExecutor, BoxFuture, NEW_TIMER_FN};
+use rxrust::LocalScheduler;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+#[cfg(target_arch = "wasm32")]
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 use smallvec::SmallVec;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 #[cfg(not(target_arch = "wasm32"))]
@@ -19,16 +24,6 @@ use crate::{
   widget::GenWidget,
   window::{BoxShell, UiEvent, Window, WindowAttributes, WindowFlags, WindowId},
 };
-
-#[derive(Clone)]
-pub struct RibirSchedulerRunner {}
-
-impl<T> AsyncExecutor<T> for RibirSchedulerRunner
-where
-  T: Future<Output = ()> + 'static,
-{
-  fn spawn(&self, f: T) { AppCtx::spawn_local(f); }
-}
 
 /// Global context shared throughout the application.
 ///
@@ -114,17 +109,15 @@ pub(crate) static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
     .expect("Failed building the Runtime")
 });
 
-static APP_CTX: LazyLock<LocalSender<AppCtx>> = LazyLock::new(|| {
-  let _ = NEW_TIMER_FN.set(AppCtx::timer);
-  LocalSender::new(AppCtx::default())
-});
+static APP_CTX: LazyLock<LocalSender<AppCtx>> =
+  LazyLock::new(|| LocalSender::new(AppCtx::default()));
 
 impl AppCtx {
   /// Initialize the application context.
   /// should be called only once and before any other access to the context.
   pub(crate) fn init(shell: BoxShell) -> EventLoop {
     assert!(APP_CTX.event_sender.borrow().is_none());
-    let _ = NEW_TIMER_FN.set(AppCtx::timer);
+
     let (sender, receiver) = unbounded_channel();
     *APP_CTX.event_sender.borrow_mut() = Some(sender);
     *APP_CTX.shell.borrow_mut() = Some(shell);
@@ -175,7 +168,10 @@ impl AppCtx {
   #[track_caller]
   pub fn app_theme() -> &'static Stateful<Theme> { &Self::shared().app_theme }
 
-  pub fn scheduler() -> RibirSchedulerRunner { RibirSchedulerRunner {} }
+  /// Scheduler accessor used by codepaths that pass an explicit scheduler to
+  /// rxrust observables (e.g. `observable::{timer,timer_at,interval}`).
+  #[inline]
+  pub fn scheduler() -> LocalScheduler { LocalScheduler }
 
   pub async fn new_window(
     content: GenWidget, flags: WindowFlags, attrs: WindowAttributes,
@@ -498,6 +494,7 @@ pub mod test_utils {
     _sender: UnboundedSender<UiEvent>,
     old_sender: Option<UnboundedSender<FrameworkEvent>>,
     _runtime_guard: EnterGuard<'static>,
+    _local_enter_guard: tokio::task::LocalEnterGuard,
   }
 
   impl Drop for TestRuntimeGuard {
@@ -557,12 +554,26 @@ pub mod test_utils {
       let (ui_sender, ui_receiver) = unbounded_channel();
       let old_sender = Option::replace(&mut *AppCtx::shared().event_sender.borrow_mut(), sender);
       *AppCtx::shared().shell.borrow_mut() = Some(Box::new(TestShell {}));
+
+      // Enter the LocalSet context so that tokio::task::spawn_local (used by rxRust)
+      // can spawn tasks. We leak the LocalSet reference to get a 'static lifetime
+      // for the enter guard. This is safe because reset_scheduler already uses
+      // mem::forget for the old LocalSet, so we're already accepting this leak in
+      // test.
+      let _local_enter_guard = {
+        let local_set = AppCtx::shared().local_set.borrow();
+        // SAFETY: We leak the reference to create a 'static lifetime. The LocalSet
+        // will be properly forgotten in reset_scheduler when a new test starts.
+        let local_set_ref: &'static LocalSet = unsafe { &*(&*local_set as *const LocalSet) };
+        local_set_ref.enter()
+      };
+
       AppCtx::spawn_local(async move {
         let event_loop = EventLoop::new(receiver);
         event_loop.run(ui_receiver).await;
       });
       let _runtime_guard = AppCtx::enter();
-      TestRuntimeGuard { _sender: ui_sender, old_sender, _runtime_guard }
+      TestRuntimeGuard { _sender: ui_sender, old_sender, _runtime_guard, _local_enter_guard }
     }
 
     pub fn insert_window(wnd: Sc<Window>) {

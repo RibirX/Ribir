@@ -220,9 +220,7 @@ impl<'c> ComposeChild<'c> for Tabs {
         }
         @Expanded {
           defer_alloc: true,
-          @pipe! {
-            panes[$read(this).active].clone()
-          }
+          @pipe! { panes[$read(this).active].clone() }
         }
       }
     }

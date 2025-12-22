@@ -6,8 +6,8 @@ pub use std::{
 };
 use std::{cell::RefCell, convert::Infallible};
 
-use ops::box_it::CloneableBoxOp;
 use ribir_algo::Sc;
+use rxrust::observable::boxed::LocalBoxedObservableClone;
 use widget_id::RenderQueryable;
 
 pub(crate) use crate::widget_tree::*;
@@ -201,7 +201,7 @@ impl<'w> Widget<'w> {
 
   /// Establish reactive dirtiness tracking
   pub fn dirty_on(
-    self, upstream: CloneableBoxOp<'static, ModifyInfo, Infallible>, dirty: DirtyPhase,
+    self, upstream: LocalBoxedObservableClone<'static, ModifyInfo, Infallible>, dirty: DirtyPhase,
   ) -> Self {
     let track = TrackWidgetId::default();
     let id = track.track_id();

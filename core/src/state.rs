@@ -7,7 +7,7 @@ pub mod state_cell;
 
 pub use part_state::*;
 pub use prior_op::*;
-use rxrust::ops::box_it::{BoxOp, CloneableBoxOp};
+use rxrust::observable::boxed::LocalBoxedObservableClone;
 use smallvec::SmallVec;
 pub use state_cell::*;
 pub use stateful::*;
@@ -81,16 +81,16 @@ pub trait StateWatcher: StateReader {
 
   /// Return a modifies `Rx` stream of the state, user can subscribe it to
   /// response the state changes.
-  fn modifies(&self) -> BoxOp<'static, ModifyInfo, Infallible> {
+  fn modifies(&self) -> LocalBoxedObservableClone<'static, ModifyInfo, Infallible> {
     self
       .raw_modifies()
       .filter(|s| s.contains(ModifyEffect::DATA))
-      .box_it()
+      .box_it_clone()
   }
 
   /// Return a modifies `Rx` stream of the state, including all modifies. Use
   /// `modifies` instead if you only want to response the data changes.
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible>;
+  fn raw_modifies(&self) -> LocalBoxedObservableClone<'static, ModifyInfo, Infallible>;
 
   /// Clone a boxed watcher that can be used to observe the modifies of the
   /// state.
@@ -362,7 +362,7 @@ impl<V: ?Sized + 'static> StateWatcher for Box<dyn StateWatcher<Value = V>> {
   fn into_reader(self) -> Result<Self::Reader, Self> { Err(self) }
 
   #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
+  fn raw_modifies(&self) -> LocalBoxedObservableClone<'static, ModifyInfo, Infallible> {
     (**self).raw_modifies()
   }
 
@@ -398,7 +398,7 @@ impl<V: ?Sized + 'static> StateWatcher for Box<dyn StateWriter<Value = V>> {
   fn into_reader(self) -> Result<Self::Reader, Self> { Err(self) }
 
   #[inline]
-  fn raw_modifies(&self) -> CloneableBoxOp<'static, ModifyInfo, Infallible> {
+  fn raw_modifies(&self) -> LocalBoxedObservableClone<'static, ModifyInfo, Infallible> {
     (**self).raw_modifies()
   }
 

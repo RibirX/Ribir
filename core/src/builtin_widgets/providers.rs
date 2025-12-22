@@ -145,7 +145,7 @@
 //! ```
 use std::{cell::RefCell, convert::Infallible};
 
-use ops::box_it::CloneableBoxOp;
+use rxrust::observable::boxed::LocalBoxedObservableClone;
 use smallvec::SmallVec;
 use widget_id::RenderQueryable;
 
@@ -759,14 +759,14 @@ struct Restore {
 struct WriterSetup {
   info: TypeInfo,
   value: Box<dyn Query>,
-  modifies: CloneableBoxOp<'static, ModifyInfo, Infallible>,
+  modifies: LocalBoxedObservableClone<'static, ModifyInfo, Infallible>,
   dirty: DirtyPhase,
 }
 
 struct WriterRestore {
   info: TypeInfo,
   restore_value: Option<Box<dyn Query>>,
-  modifies: CloneableBoxOp<'static, ModifyInfo, Infallible>,
+  modifies: LocalBoxedObservableClone<'static, ModifyInfo, Infallible>,
   dirty: DirtyPhase,
 }
 
@@ -977,8 +977,7 @@ mod tests {
       providers: [Provider::new(w_value.clone_writer())],
       @ {
         // We do not allow the use of the build context in the pipe at the moment.
-        let value = Provider::of::<Stateful<i32>>(BuildCtx::get())
-          .unwrap().clone_writer();
+        let value = Provider::of::<Stateful<i32>>(BuildCtx::get()).unwrap();
         pipe!(*$read(trigger)).map(move |_| {
           *$write(value) += 1;
           @Void {}

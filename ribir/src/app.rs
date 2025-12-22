@@ -31,7 +31,8 @@ pub struct App {
   event_loop_proxy: Arc<EventLoopProxy<RibirAppEvent>>,
   windows: RefCell<HashMap<WindowId, Sc<RefCell<WinitShellWnd>>>>,
   active_wnd: std::cell::Cell<Option<WindowId>>,
-  events_stream: MutRefItemSubject<'static, AppEvent, Infallible>,
+  events_stream: LocalSubjectMutRef<'static, AppEvent, Infallible>,
+
   _app_handler: RefCell<Option<UnboundedSender<UiEvent>>>,
   ui_executor: ui_executor::UiExecutor,
 }
@@ -81,7 +82,7 @@ enum EventLoopState {
 }
 
 impl App {
-  pub fn events_stream() -> MutRefItemSubject<'static, AppEvent, Infallible> {
+  pub fn events_stream() -> LocalSubjectMutRef<'static, AppEvent, Infallible> {
     App::shared().events_stream.clone()
   }
 
@@ -229,6 +230,7 @@ impl App {
     let (sender, recv) = unbounded_channel();
     *Self::shared()._app_handler.borrow_mut() = Some(sender);
     let shell: BoxShell = Box::new(RibirShell { cmd_sender: App::cmd_sender() });
+
     AppCtx::run(recv, shell, async move {
       #[cfg(not(target_arch = "wasm32"))]
       AppCtx::set_clipboard(Box::new(crate::clipboard::Clipboard::new().unwrap()));
@@ -258,7 +260,7 @@ impl App {
       let app: App = App {
         event_loop_proxy: Arc::new(event_loop.create_proxy()),
         event_loop: RefCell::new(Some(EventLoopState::NotStarted(event_loop))),
-        events_stream: <_>::default(),
+        events_stream: Local::subject_mut_ref(),
         active_wnd: std::cell::Cell::new(None),
         windows: <_>::default(),
         _app_handler: <_>::default(),

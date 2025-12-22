@@ -97,7 +97,7 @@ impl ToTokens for Upstreams {
     if self.0.len() == 1 {
       let modify = Modifies(&self.0[0]);
       quote_spanned! { modify.expr().span() =>
-          observable::of(ModifyInfo::default()).merge(#modify)
+          Local::of(ModifyInfo::default()).merge(#modify)
       }
       .to_tokens(tokens);
     } else {
@@ -110,8 +110,8 @@ impl ToTokens for Upstreams {
         .span();
 
       quote_spanned! { first_span =>
-          observable::of(ModifyInfo::default())
-              .merge(observable::from_iter([#(#modifies_iter),*]).merge_all(usize::MAX))
+          Local::of(ModifyInfo::default())
+              .merge(Local::from_iter([#(#modifies_iter),*]).merge_all(usize::MAX))
       }
       .to_tokens(tokens);
     }

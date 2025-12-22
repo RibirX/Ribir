@@ -342,7 +342,7 @@ impl<'c> ComposeChild<'c> for Class {
         let u = this2
           .raw_modifies()
           .filter(|s| s.contains(ModifyEffect::FRAMEWORK))
-          .merge(observable::of(ModifyInfo::default()))
+          .merge(Local::of(ModifyInfo::default()))
           .map(move |_| this2.read().clone())
           .distinct_until_changed()
           .skip(1)

@@ -65,7 +65,7 @@ proc-macro2 = "1.0.101"
 quote = "1.0.37"
 rayon = "1.10.0"
 rustybuzz = "0.20.1"
-rxrust = { version = "1.0.0-beta.10", default-features = false, features = [] }
+rxrust = "1.0.0-rc.0"
 scoped_threadpool = "0.1.9"
 triomphe = "0.1.12"
 serde = "1.0"
@@ -87,9 +87,9 @@ zerocopy = "0.7.3"
 quick-xml = "0.38.4"
 macos-accessibility-client = { version = "0.0.1" }
 tokio = { version = "1.0" }
+
 priority-queue = "2.1.1"
 web-sys = { version = "0.3.69", features = ["HtmlCollection"] }
-web-time = "1.1.0"
 heck = "0.5.0"
 url = "2.5.4"
 thiserror = "2.0.12"

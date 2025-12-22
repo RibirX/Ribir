@@ -56,7 +56,7 @@ use crate::prelude::*;
 pub struct Stagger {
   stagger: std::time::Duration,
   transition: Box<dyn Transition>,
-  running_handle: Option<TaskHandle<NormalReturn<()>>>,
+  running_handle: Option<TaskHandle>,
   next_to_run: Option<AnimationCursor>,
   animations: Vec<(std::time::Duration, Box<dyn Animation>)>,
   run_times: usize,
@@ -188,7 +188,7 @@ impl Stateful<Stagger> {
         drop(this);
 
         let this = self.clone_writer();
-        let h = observable::timer_at((), at, AppCtx::scheduler()).subscribe(move |_| {
+        let h = Local::timer_at(at).subscribe(move |_| {
           next.run();
           this.trigger_next();
         });
