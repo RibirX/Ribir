@@ -28,6 +28,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Changed
 
 - **core**: Refactor the scheduler to improve async ecosystem compatibility. (#815 @M-Adoo)
+- **gpu**: Upgrade wgpu to 0.28.0 and adapt to API changes. (#pr @M-Adoo)
+- **gpu**: Limit max filter kernel size to avoid macOS Metal hangs. (#pr @M-Adoo)
 
 ### Fixed
 

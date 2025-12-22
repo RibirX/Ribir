@@ -27,7 +27,7 @@ impl DrawColorTrianglesPass {
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Color triangles pipeline layout"),
       bind_group_layouts: &[mask_layout, texs_layout],
-      push_constant_ranges: &[],
+      immediate_size: 0,
     });
 
     Self { layout, vertices_buffer, pipeline: None, shader, format: None }
@@ -57,6 +57,7 @@ impl DrawColorTrianglesPass {
       depth_stencil_attachment: None,
       timestamp_writes: None,
       occlusion_query_set: None,
+      multiview_mask: None,
     });
 
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
@@ -134,7 +135,7 @@ impl DrawColorTrianglesPass {
           mask: !0,
           alpha_to_coverage_enabled: false,
         },
-        multiview: None,
+        multiview_mask: None,
         cache: None,
       });
       self.pipeline = Some(pipeline);

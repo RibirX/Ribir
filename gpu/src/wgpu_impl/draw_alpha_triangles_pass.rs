@@ -26,7 +26,7 @@ impl DrawAlphaTrianglesPass {
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Alpha triangles pipeline layout"),
       bind_group_layouts: &[size_uniform.layout()],
-      push_constant_ranges: &[],
+      immediate_size: 0,
     });
 
     let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -74,7 +74,7 @@ impl DrawAlphaTrianglesPass {
       },
       depth_stencil: None,
       multisample: wgpu::MultisampleState { count: 1, mask: !0, alpha_to_coverage_enabled: false },
-      multiview: None,
+      multiview_mask: None,
       cache: None,
     });
 
@@ -104,6 +104,7 @@ impl DrawAlphaTrianglesPass {
       depth_stencil_attachment: None,
       timestamp_writes: None,
       occlusion_query_set: None,
+      multiview_mask: None,
     });
     rpass.set_bind_group(0, self.size_uniform.bind_group(), &[]);
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));

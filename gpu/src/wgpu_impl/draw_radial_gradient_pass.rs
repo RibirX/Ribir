@@ -40,7 +40,7 @@ impl DrawRadialGradientTrianglesPass {
         prims_storage.layout(),
         stops_storage.layout(),
       ],
-      push_constant_ranges: &[],
+      immediate_size: 0,
     });
 
     Self {
@@ -88,6 +88,7 @@ impl DrawRadialGradientTrianglesPass {
       depth_stencil_attachment: None,
       timestamp_writes: None,
       occlusion_query_set: None,
+      multiview_mask: None,
     });
 
     rpass.set_vertex_buffer(0, self.vertices_buffer.vertices().slice(..));
@@ -161,7 +162,7 @@ impl DrawRadialGradientTrianglesPass {
           mask: !0,
           alpha_to_coverage_enabled: false,
         },
-        multiview: None,
+        multiview_mask: None,
         cache: None,
       });
       self.pipeline = Some(pipeline);
