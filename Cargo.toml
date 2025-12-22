@@ -36,7 +36,7 @@ keywords = ["gui", "ui", "declarative", "compose-ui"]
 license = "MIT"
 readme = "README.md"
 version = "0.4.0-alpha.53"
-rust-version = "1.88.0"
+rust-version = "1.92.0"
 
 [workspace.dependencies]
 ahash = "0.8.11"
@@ -76,7 +76,7 @@ unicode-bidi = "0.3.7"
 unicode-script = "0.5.4"
 unicode-segmentation = "1.9.0"
 usvg = { version = "0.45.0", default-features = false }
-wgpu = { version = "27.0.1", features = ["webgl"] }
+wgpu = { version = "28.0.0", features = ["webgl"] }
 winit = { version = "0.30.11", default-features = false, features = [
   "x11",
   "wayland",

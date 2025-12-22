@@ -48,7 +48,7 @@ impl CopyTexturePass {
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Copy texture"),
       bind_group_layouts: &[&bind_layout],
-      push_constant_ranges: &[],
+      immediate_size: 0,
     });
     let vertices_buffer = new_vertices::<[f32; 2]>(device, 4);
     Self { pipeline: None, shader, format: None, bind_layout, layout, vertices_buffer }
@@ -101,7 +101,7 @@ impl ClearTexturePass {
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Clear texture areas"),
       bind_group_layouts: &[],
-      push_constant_ranges: &[],
+      immediate_size: 0,
     });
 
     let vertices_buffer = new_vertices::<()>(device, 256);
@@ -201,6 +201,7 @@ impl WgpuImpl {
         depth_stencil_attachment: None,
         timestamp_writes: None,
         occlusion_query_set: None,
+        multiview_mask: None,
       });
 
       rpass.set_vertex_buffer(0, pass.vertices_buffer.slice(..));
@@ -257,6 +258,7 @@ impl WgpuImpl {
       depth_stencil_attachment: None,
       timestamp_writes: None,
       occlusion_query_set: None,
+      multiview_mask: None,
     });
 
     rpass.set_vertex_buffer(0, pass.vertices_buffer.slice(..));
@@ -304,7 +306,7 @@ fn tex_render_pipeline<T>(
     },
     depth_stencil: None,
     multisample: wgpu::MultisampleState { count: 1, mask: !0, alpha_to_coverage_enabled: false },
-    multiview: None,
+    multiview_mask: None,
     cache: None,
   })
 }

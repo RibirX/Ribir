@@ -52,7 +52,7 @@ impl DrawTexturePass {
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
       label: Some("Texture triangles pipeline layout"),
       bind_group_layouts: &[mask_layout, texs_layout, &single_tex_layout],
-      push_constant_ranges: &[],
+      immediate_size: 0,
     });
 
     let vertices_buffer = VerticesBuffer::new(128, 512, device);
@@ -100,6 +100,7 @@ impl DrawTexturePass {
       depth_stencil_attachment: None,
       timestamp_writes: None,
       occlusion_query_set: None,
+      multiview_mask: None,
     });
 
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -187,7 +188,7 @@ impl DrawTexturePass {
           mask: !0,
           alpha_to_coverage_enabled: false,
         },
-        multiview: None,
+        multiview_mask: None,
         cache: None,
       });
       self.pipeline = Some(pipeline);
