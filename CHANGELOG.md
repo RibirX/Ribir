@@ -28,12 +28,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Features
 
 - **core**: Add Image widget with lazy WebP decoding, caching, and animation support. (#823 @M-Adoo)
+- **core**: Add a tool to run CI tests locally via `cargo +nightly ci`. (#822 @M-Adoo)
 
 ### Changed
 
 - **core**: Refactor the scheduler to improve async ecosystem compatibility. (#815 @M-Adoo)
-- **gpu**: Upgrade wgpu to 0.28.0 and adapt to API changes. (#823 @M-Adoo)
-- **gpu**: Limit max filter kernel size to avoid macOS Metal hangs. (#823 @M-Adoo)
+- **gpu**: Upgrade wgpu to 0.28.0 and adapt to API changes. (#820 @M-Adoo)
+- **gpu**: Limit max filter kernel size to avoid macOS Metal hangs. (#820 @M-Adoo)
 
 ### Fixed
 

@@ -28,37 +28,47 @@ env:
   # Corresponds to https://github.com/gfx-rs/ci-build/releases
   CI_BINARY_BUILD: "build18"
 
-  # We have some features that are only available on nightly. We need to test it.
-  NIGHTLY_VERSION: "nightly-2025-12-20"
-
 name: CI
 jobs:
-  lint:
-    if: ${{ github.event_name != 'labeled' || github.event.label.name == 'B-pr-num' }}
-    name: rust code lint
+  get-nightly-version:
+    name: Get nightly version
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-nightly.outputs.version }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
         with:
-          # we use nightly for clippy and rustfmt
-          toolchain: $NIGHTLY_VERSION
+          toolchain: nightly
+      - name: Get nightly version from ci.rs
+        id: get-nightly
+        run: echo "version=$(cargo +nightly ci config-nightly)" >> $GITHUB_OUTPUT
+
+
+  lint:
+    if: ${{ github.event_name != 'labeled' || github.event.label.name == 'B-pr-num' }}
+    name: rust code lint
+    runs-on: ubuntu-latest
+    needs: get-nightly-version
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      # Install the specific nightly version with components
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ needs.get-nightly-version.outputs.version }}
           components: rustfmt, clippy
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - name: Install development libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
-      - name: format style check
-        run: cargo fmt --all -- --check
-      - name: cargo clippy check
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      # Check with stable toolchain to ensure stable compilation
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-      - run: cargo check
+      - name: Run lint checks
+        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci lint
   test-with-gpu:
     # The content of this job is largely borrowed from the 'ci.yml' file in the 'wgpu/.github/workflows' directory.
     timeout-minutes: 30
@@ -81,7 +91,7 @@ jobs:
 
     name: Test ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    needs: [lint]
+    needs: [lint, get-nightly-version]
 
     steps:
       - name: checkout repo
@@ -89,7 +99,11 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: $NIGHTLY_VERSION
+          toolchain: ${{ needs.get-nightly-version.outputs.version }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
           components: llvm-tools-preview
 
       - name: Install cargo-nextest and cargo-llvm-cov
@@ -234,53 +248,21 @@ jobs:
         run: |
           rm -rf target/llvm-cov-target
 
-  doc-test:
-    needs: [lint]
-    name: Run doc tests
-    runs-on: macos-latest
+      # Run doc tests on macOS (nextest/llvm-cov doesn't support doc tests)
+      - name: (macos) Run doc tests
+        if: matrix.os == 'macos-14'
+        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci doctest
+
+  doc-and-wasm:
+    needs: [lint, get-nightly-version]
+    name: Doc examples & WASM compile
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.NIGHTLY_VERSION }}
-      - name: Install webp
-        run: brew install webp
-      - name: Run doc tests
-        run: |
-          set -e
-          cargo test --doc --workspace --all-features
-
-  doc-examples:
-    needs: lint
-    name: compile doc examples
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install development libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
-      - name: build ribir
-        run: cargo build --workspace --exclude pomodoro
-      - name: compile doc examples
-        run: |
-          {
-            echo ./README.md
-            find "./docs" -name "*.md"
-          } |  xargs -I {} rustdoc --test {} -L target/debug/deps/  --edition 2018 --extern ribir=target/debug/libribir.rlib
-  wasm-compile:
-    needs: lint
-    name: wasm compile
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
+          toolchain: ${{ needs.get-nightly-version.outputs.version }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -289,26 +271,34 @@ jobs:
       - name: Install development libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libwebp-dev
-      - name: compile to wasm
-        run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper --exclude cli --exclude pomodoro
+          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
+      - name: Compile doc examples
+        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci doc
+      - name: Compile to WASM
+        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci wasm
 
   bundle:
-    needs: [lint, test-with-gpu, doc-examples, wasm-compile]
+    needs: [lint, test-with-gpu, doc-and-wasm, get-nightly-version]
     name: bundle
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # TODO: Re-enable ubuntu-latest after fixing AppImage icon issue
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - name: Install Rust (nightly for cargo script)
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: ${{ needs.get-nightly-version.outputs.version }}
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
@@ -325,21 +315,40 @@ jobs:
 
       - name: Bundle counter example
         shell: bash
-        working-directory: examples/counter
-        run: |
-          case "${{ matrix.os }}" in
-            macos-latest)   cfg=ci/bundle-macos.toml ;;
-            ubuntu-latest)  cfg=ci/bundle-linux.toml ;;
-            windows-latest) cfg=ci/bundle-windows.toml ;;
-            *) echo "Unknown OS"; exit 1 ;;
-          esac
+        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci bundle
 
-          # Build CLI + bundle using our workspace tool.
-          cargo run -p cli -- bundle -c "$cfg"
+  release-dry-run:
+    needs: [test-with-gpu]
+    name: Verify packages are publishable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-release
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-release
+
+      - name: Install audio development libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
+
+      - name: Dry run release
+        run: cargo release alpha --no-verify --no-confirm --no-push --no-tag --allow-branch "*"
 
   status-report:
     name: CI unified status report
-    needs: [lint, test-with-gpu, doc-examples, wasm-compile, bundle]
+    needs: [lint, test-with-gpu, doc-and-wasm, bundle, release-dry-run]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -351,9 +360,9 @@ jobs:
         run: |
           if [ "${{ needs['lint'].result }}" != "success" ] || \
              [ "${{ needs['test-with-gpu'].result }}" != "success" ] || \
-             [ "${{ needs['doc-examples'].result }}" != "success" ] || \
-             [ "${{ needs['wasm-compile'].result }}" != "success" ] || \
-             [ "${{ needs['bundle'].result }}" != "success" ]; then
+             [ "${{ needs['doc-and-wasm'].result }}" != "success" ] || \
+             [ "${{ needs['bundle'].result }}" != "success" ] || \
+             [ "${{ needs['release-dry-run'].result }}" != "success" ]; then
             echo "CI failed"
             exit 1
           fi

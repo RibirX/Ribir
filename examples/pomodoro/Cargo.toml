@@ -29,11 +29,11 @@ ribir_core = { path = "../../core", features = ["test-utils"]}
 [features]
 wgpu = ["ribir/wgpu"]
 
-[package.metadata.release]
+[profile.release]
 opt-level = "z"
-lto = true      
+lto = true
 codegen-units = 1
-strip = true        
+strip = true
 panic = "abort"
 
 [package.metadata.bundle]

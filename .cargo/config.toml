@@ -1,5 +1,7 @@
 [env]
 CARGO_WORKSPACE_DIR = {value = "", relative = true}
+
 [alias]
 run-wasm = "run --package cli -- run-wasm --template ./cli/template"
 bundle = "run --package cli -- bundle"
+ci = ["-Zscript", "tools/ci.rs"]

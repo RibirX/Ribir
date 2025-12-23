@@ -33,4 +33,6 @@ The bundle config file is in toml format. Here is an simple example:
 "resources" = []  
 "externalBin" = []
 ```
-Note that this is just an example, and the actual configuration will depend on the specific requirements of your application. and for more details, you can refer to the [`BundleConfig`] struct in the cli crate.
+Note that this is just an example, and the actual configuration will depend on the specific requirements of your application. For more details, you can refer to the [`BundleConfig`] struct in the cli crate.
+
+**Path Resolution**: Relative paths in the config file (such as `icon`, `resources`, `licenseFile`) are resolved relative to the config file's directory, not the current working directory. This makes it easier to organize your bundle configuration and assets together.

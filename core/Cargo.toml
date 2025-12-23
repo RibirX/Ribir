@@ -58,5 +58,4 @@ wasm-bindgen-test = "0.3.42"
 [features]
 png = ["ribir_painter/png"]
 jpeg = ["ribir_painter/jpeg"]
-nightly = []
 test-utils = []

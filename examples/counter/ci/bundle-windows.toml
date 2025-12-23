@@ -4,6 +4,6 @@
 "identifier" = "com.ribir.counter"
 # Keep CI simple: produce an MSI on Windows
 "targets" = ["msi"]
-"icon" = ["../Logo.ico"]
+"icon" = ["../../Logo.ico"]
 "resources" = []
 "externalBin" = []
