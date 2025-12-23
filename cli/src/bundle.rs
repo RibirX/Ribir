@@ -145,7 +145,11 @@ struct CargoTomlPackageMetadata {
   bundle: Option<BundleConfig>,
 }
 
-/// Configuration for bundle the app
+/// Configuration for bundle the app.
+///
+/// All relative paths in this configuration (such as `icon`, `resources`,
+/// `externalBin`, `licenseFile`) are resolved relative to the config file's
+/// directory, not the current working directory.
 #[skip_serializing_none]
 #[derive(Clone, Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -264,14 +268,35 @@ fn default_window_config() -> WindowsConfig {
   WindowsConfig { webview_install_mode: WebviewInstallMode::Skip, ..Default::default() }
 }
 
+/// Resolve a relative path against a base directory.
+/// Returns the path as-is if it's absolute.
+fn resolve_path(path: &str, base_dir: &Path) -> String {
+  let p = Path::new(path);
+  if p.is_absolute() { path.to_string() } else { base_dir.join(p).to_string_lossy().into_owned() }
+}
+
 fn bundle_setting_from_config(
   config: BundleConfig, config_dir: &Path, package_settings: CargoPackageSettings,
 ) -> Result<BundleSettings> {
   let work_space_path = get_workspace_dir()?;
   let work_space = CargoSettings::load_from_dir(&work_space_path).ok();
+
+  // Resolve resource paths relative to config directory
   let (resources, resources_map) = match config.resources {
-    Some(BundleResources::List(paths)) => (Some(paths), None),
-    Some(BundleResources::Map(map)) => (None, Some(map)),
+    Some(BundleResources::List(paths)) => {
+      let resolved: Vec<String> = paths
+        .into_iter()
+        .map(|p| resolve_path(&p, config_dir))
+        .collect();
+      (Some(resolved), None)
+    }
+    Some(BundleResources::Map(map)) => {
+      let resolved = map
+        .into_iter()
+        .map(|(k, v)| (resolve_path(&k, config_dir), v))
+        .collect();
+      (None, Some(resolved))
+    }
     None => (None, None),
   };
 
@@ -290,7 +315,14 @@ fn bundle_setting_from_config(
     identifier: config.identifier,
     publisher: config.publisher,
     homepage: config.homepage,
-    icon: Some(config.icon),
+    // Resolve icon paths relative to config directory
+    icon: Some(
+      config
+        .icon
+        .into_iter()
+        .map(|p| resolve_path(&p, config_dir))
+        .collect(),
+    ),
     resources,
     resources_map,
     copyright: config.copyright,
@@ -304,7 +336,13 @@ fn bundle_setting_from_config(
     file_associations: config.file_associations,
     short_description: config.short_description,
     long_description: config.long_description,
-    external_bin: config.external_bin,
+    // Resolve external_bin paths relative to config directory
+    external_bin: config.external_bin.map(|bins| {
+      bins
+        .into_iter()
+        .map(|p| resolve_path(&p, config_dir))
+        .collect()
+    }),
     deb: DebianSettings {
       depends: if depends_deb.is_empty() { None } else { Some(depends_deb) },
       recommends: config.linux.deb.recommends,
@@ -410,6 +448,7 @@ fn bundle_setting_from_config(
           .unwrap()
       })
     }),
+    // Resolve license_file path relative to config directory
     license_file: config
       .license_file
       .map(|l| if l.is_absolute() { l } else { config_dir.join(l) }),
@@ -429,7 +468,7 @@ fn default_target_dir(is_debug: bool) -> Option<PathBuf> {
 impl Bundle {
   fn bundle(&self) -> Result<()> {
     let package_path = CargoSettings::toml_path(&env::current_dir()?).expect("no cargo settings");
-    let config_path = if let Some(target_dir) = &self.config {
+    let config_path: PathBuf = if let Some(target_dir) = &self.config {
       if target_dir.is_absolute() {
         target_dir.clone()
       } else {

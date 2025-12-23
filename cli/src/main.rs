@@ -78,6 +78,7 @@ fn main() {
       let res = cmd.exec(matches);
       if let Err(err) = res {
         log::error!("{}", err);
+        std::process::exit(1);
       }
     }
   }

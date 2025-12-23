@@ -102,7 +102,7 @@ tauri-bundler = "2.7.*"
 tauri-utils = "2.8.*"
 serde-value = "0.7.0"
 serde_with = "3.14.0"
-toml = "0.9.2"
+toml = "0.9.*"
 
 [workspace.metadata.release]
 shared-version = true
