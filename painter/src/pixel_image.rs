@@ -35,6 +35,19 @@ impl PixelImage {
   pub fn new(data: Cow<'static, [u8]>, width: u32, height: u32, format: ColorFormat) -> Self {
     PixelImage { data, width, height, format }
   }
+  #[inline]
+  pub fn color_format(&self) -> ColorFormat { self.format }
+  #[inline]
+  pub fn width(&self) -> u32 { self.width }
+  #[inline]
+  pub fn height(&self) -> u32 { self.height }
+  pub fn size(&self) -> DeviceSize { DeviceSize::new(self.width as i32, self.height as i32) }
+  #[inline]
+  pub fn pixel_bytes(&self) -> &[u8] { &self.data }
+
+  // TODO: Move these image format methods out of painter crate
+  // These should be in a separate utility crate or in core
+  // Blocker: Many usages across examples, tests, and internal code
 
   #[cfg(feature = "jpeg")]
   pub fn from_jpeg(bytes: &[u8]) -> Self {
@@ -78,17 +91,6 @@ impl PixelImage {
     encoder.write_image(&self.data, self.width, self.height, fmt.into())?;
     Ok(())
   }
-
-  #[inline]
-  pub fn color_format(&self) -> ColorFormat { self.format }
-  #[inline]
-  pub fn width(&self) -> u32 { self.width }
-  #[inline]
-  pub fn height(&self) -> u32 { self.height }
-
-  pub fn size(&self) -> DeviceSize { DeviceSize::new(self.width as i32, self.height as i32) }
-  #[inline]
-  pub fn pixel_bytes(&self) -> &[u8] { &self.data }
 
   #[cfg(any(feature = "jpeg", feature = "png"))]
   pub fn parse_img(bytes: &[u8], format: image::ImageFormat) -> image::ImageResult<PixelImage> {

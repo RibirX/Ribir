@@ -3,7 +3,7 @@ use std::hash::Hash;
 use guillotiere::{Allocation, AtlasAllocator};
 use ribir_algo::FrameCache;
 use ribir_geom::{DeviceRect, DeviceSize};
-use ribir_painter::image::ColorFormat;
+use ribir_painter::ColorFormat;
 use slab::Slab;
 
 use super::Texture;

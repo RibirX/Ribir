@@ -46,10 +46,10 @@ jobs:
           toolchain: $NIGHTLY_VERSION
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Install audio development libraries
+      - name: Install development libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config
+          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
       - name: format style check
         run: cargo fmt --all -- --check
       - name: cargo clippy check
@@ -184,11 +184,16 @@ jobs:
           echo "LD_LIBRARY_PATH=$PWD/mesa/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
           echo "LIBGL_DRIVERS_PATH=$PWD/mesa/lib/x86_64-linux-gnu/dri" >> "$GITHUB_ENV"
 
-      - name: (linux) install audio development libraries
+      - name: (linux) install development libraries
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config
+          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
+
+      - name: (macos) install webp
+        if: matrix.os == 'macos-14'
+        run: |
+          brew install webp
 
       - name: disable debug
         shell: bash
@@ -239,6 +244,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.NIGHTLY_VERSION }}
+      - name: Install webp
+        run: brew install webp
       - name: Run doc tests
         run: |
           set -e
@@ -255,6 +262,10 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
+      - name: Install development libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
       - name: build ribir
         run: cargo build --workspace --exclude pomodoro
       - name: compile doc examples
@@ -275,6 +286,10 @@ jobs:
           toolchain: stable
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+      - name: Install development libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libwebp-dev
       - name: compile to wasm
         run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo build --workspace --target wasm32-unknown-unknown --exclude ribir_dev_helper --exclude cli --exclude pomodoro
 
@@ -302,7 +317,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config
+          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
+
+      - name: Install macOS dependencies
+        if: matrix.os == 'macos-latest'
+        run: brew install webp
 
       - name: Bundle counter example
         shell: bash

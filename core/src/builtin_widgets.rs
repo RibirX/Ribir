@@ -14,7 +14,9 @@ pub use painting_style::*;
 mod text_align;
 pub use text_align::*;
 pub use widget_scope::*;
-pub mod image_widget;
+pub mod image;
+
+pub use image::{DecodedFrame, FrameIterator, Image, LoopCount};
 pub mod keep_alive;
 pub use keep_alive::*;
 pub mod backdrop_filter;

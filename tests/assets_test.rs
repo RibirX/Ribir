@@ -124,3 +124,54 @@ fn include_asset_binary() {
   let content = String::from_utf8(data).unwrap();
   assert!(content.contains("dir1"));
 }
+
+// Image Asset macro tests
+
+#[test]
+fn asset_image_basic() {
+  use ribir_core::prelude::Image;
+  let img: Image = asset!("./assets/test_image.png", "image");
+  // Verify it loads successfully and has correct dimensions
+  assert!(img.width() > 0);
+  assert!(img.height() > 0);
+  assert_eq!(img.frame_count(), 1);
+  assert!(!img.is_animated());
+}
+
+#[test]
+fn asset_image_first_frame() {
+  use ribir_core::prelude::Image;
+  let img: Image = asset!("./assets/test_image.png", "image");
+  let frame = img.first_frame();
+  // Verify the frame can be decoded
+  assert!(frame.image.width() > 0);
+  assert!(frame.image.height() > 0);
+}
+
+#[test]
+fn include_asset_image() {
+  use ribir_core::prelude::Image;
+  let img: Image = include_asset!("./assets/test_image.png", "image");
+  assert!(img.width() > 0);
+  assert!(!img.is_animated());
+}
+
+#[test]
+fn asset_animated_gif() {
+  use ribir_core::prelude::Image;
+  let img: Image = asset!("./assets/test_animated.gif", "image");
+  // Verify animated GIF is converted to animated WebP
+  assert_eq!(img.width(), 32);
+  assert_eq!(img.height(), 32);
+  assert!(img.frame_count() > 1, "Expected animated image with multiple frames");
+  assert!(img.is_animated());
+}
+
+#[test]
+fn include_asset_animated_gif() {
+  use ribir_core::prelude::Image;
+  let img: Image = include_asset!("./assets/test_animated.gif", "image");
+  assert_eq!(img.width(), 32);
+  assert!(img.is_animated());
+  assert!(img.frame_count() > 1);
+}

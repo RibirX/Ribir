@@ -18,9 +18,11 @@ proc-macro = true
 [dependencies]
 ahash.workspace = true
 bitflags.workspace = true
+image = { workspace = true, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 proc-macro2.workspace = true
 quote.workspace = true
 ribir_painter = {path = "../painter", version = "0.4.0-alpha.53" }
 smallvec = { workspace = true, features= ["drain_filter"] }
 syn = { workspace = true, features = ["fold", "full", "extra-traits"]}
 heck.workspace = true
+webp-animation.workspace = true

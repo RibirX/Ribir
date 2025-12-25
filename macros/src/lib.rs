@@ -249,171 +249,134 @@ pub fn part_reader(input: TokenStream) -> TokenStream {
   part_state::gen_part_reader(input.into(), None).into()
 }
 
-/// Includes an asset file by copying it to the application's asset directory
-/// during build time and generating code to load it at runtime.
+/// Loads an asset file at runtime after processing it during compilation.
 ///
 /// This macro manages application assets by:
-/// 1. Copying the specified file to `target/{profile}/assets/` during
-///    compilation
-/// 2. Generating code that reads the asset from the filesystem at runtime
-///    (relative to the executable)
-/// 3. Automatically triggering rebuilds when the asset file changes
+/// 1. Processing the asset at compile time (format conversion, compression,
+///    etc.)
+/// 2. Copying the processed file to `target/{profile}/assets/`
+/// 3. Generating code to load it from the filesystem at runtime
+/// 4. Automatically triggering rebuilds when the source file changes
 ///
-/// The asset will be placed in an `assets` folder next to your executable,
-/// making it easy for bundle tools to include it in your application package.
+/// # Supported Types
 ///
-/// # Asset vs Include Asset
-///
-/// `asset!` copies files and loads them at runtime, while `include_asset!`
-/// embeds them into the binary.
-///
-/// | Feature | `asset!` | `include_asset!` |
-/// |---------|----------|------------------|
-/// | **Loading Strategy** | Runtime loading from filesystem | Compile-time embedding |
-/// | **Distribution** | Must bundle `assets` folder | Single binary (easier distribution) |
-/// | **Binary Size** | Smaller binary | Larger binary (contains all assets) |
-/// | **Performance** | I/O overhead at runtime | Instant access (memory mapped) |
-/// | **Hot Reloading** | Possible (if file changes on disk) | Requires recompilation |
-///
-/// # Path Resolution
-///
-/// Asset paths are resolved **relative to the source file** where the macro is
-/// called, similar to how `#include` works in C/C++ or `include_str!` works in
-/// Rust.
-///
-/// **Requirements:** Rust 1.88 or later
-///
-/// ```ignore
-/// // In src/ui/widgets/button.rs
-/// let icon: Svg = asset!("../icons/button.svg", "svg");
-/// // Resolves to: src/ui/icons/button.svg (relative to button.rs)
-/// ```
+/// | Type | Syntax | Return | Processing |
+/// |------|--------|--------|------------|
+/// | Binary | `asset!("file.bin")` | `Vec<u8>` | None (raw copy) |
+/// | Text | `asset!("file.txt", "text")` | `String` | None (raw copy) |
+/// | SVG | `asset!("file.svg", "svg")` | `Svg` | Serialized/compressed |
+/// | Image | `asset!("file.png", "image")` | `Image` | Converted to WebP |
 ///
 /// # Syntax
 ///
 /// ```ignore
-/// asset!("path/to/file.ext")                                  // Load as binary (returns Vec<u8>)
-/// asset!("path/to/file.txt", "text")                          // Load as text (returns String)
-/// asset!("path/to/file.txt", "TEXT")                          // Case-insensitive type matching
-/// asset!("path/to/file.svg", "svg")                           // Load as SVG with compression (returns Svg)
-/// asset!("path/to/icon.svg", "SVG", inherit_fill = true)      // SVG with parameters (key=value style)
-/// asset!("path/to/icon.svg", "svg", inherit_fill = true, inherit_stroke = false)  // Multiple parameters
+/// // Binary (default)
+/// asset!("path/to/file.bin")
+///
+/// // Text
+/// asset!("path/to/file.txt", "text")
+///
+/// // SVG with optional parameters
+/// asset!("path/to/icon.svg", "svg")
+/// asset!("path/to/icon.svg", "svg", inherit_fill = true)
+/// asset!("path/to/icon.svg", "svg", inherit_fill = true, inherit_stroke = true)
+///
+/// // Image (PNG, JPEG, GIF, BMP → WebP)
+/// asset!("path/to/photo.png", "image")
+/// asset!("path/to/animation.gif", "image")  // Animated GIF → Animated WebP
 /// ```
 ///
-/// # Arguments
+/// # Path Resolution
 ///
-/// * `path` - Relative path to the asset file. On nightly with
-///   `procmacro2_semver_exempt`, this is relative to the calling source file.
-///   On stable, this is relative to the project root (where `Cargo.toml` is
-///   located).
-/// * `type` - Optional. Use `"text"` (or `"TEXT"`) to load as a `String`,
-///   `"svg"` (or `"SVG"`) to load as a compressed `Svg`, otherwise loads as
-///   `Vec<u8>`. Type matching is case-insensitive.
+/// Paths are resolved **relative to the source file** where the macro is
+/// called, similar to `include_str!` in Rust.
 ///
-/// ## Type-Specific Parameters (key=value format)
+/// ```ignore
+/// // In src/ui/widgets/button.rs
+/// let icon: Svg = asset!("../icons/button.svg", "svg");
+/// // Resolves to: src/ui/icons/button.svg
+/// ```
 ///
-/// ### SVG Parameters
-/// * `inherit_fill` - Boolean to inherit fill style from parent (default:
-///   false)
-/// * `inherit_stroke` - Boolean to inherit stroke style from parent (default:
-///   false)
+/// # Type Parameters
 ///
-/// # Output
+/// ## SVG Parameters
+/// - `inherit_fill`: Inherit fill style from parent widget (default: false)
+/// - `inherit_stroke`: Inherit stroke style from parent widget (default: false)
 ///
-/// The asset is copied to `target/{profile}/assets/{filename}` where:
-/// - `{profile}` is either `debug` or `release` depending on build
-///   configuration
-/// - `{filename}` is the name of the input file
+/// # asset! vs include_asset!
 ///
-/// For SVG files (when using `"svg"` type), the file is compressed at compile
-/// time before being copied, resulting in smaller asset files.
-///
-/// # Returns
-///
-/// - `Vec<u8>` - When loading binary files (default)
-/// - `String` - When `"text"` parameter is specified
-/// - `Svg` - When `"svg"` parameter is specified (compressed at compile time)
+/// | Feature | `asset!` | `include_asset!` |
+/// |---------|----------|------------------|
+/// | Loading | Runtime (filesystem) | Compile-time (embedded) |
+/// | Distribution | Bundle `assets/` folder | Single binary |
+/// | Binary Size | Smaller | Larger |
+/// | Hot Reload | Possible | Requires recompile |
 ///
 /// # Examples
 ///
 /// ```ignore
-/// // Load an image as binary data
-/// let icon_data: Vec<u8> = asset!("resources/icon.png");
-///
-/// // Load a configuration file as text
-/// let config: String = asset!("config/settings.json", "text");
-///
-/// // Load a shader file as text
-/// let shader_source: String = asset!("shaders/fragment.glsl", "text");
-///
-/// // Load an SVG file with compile-time compression
-/// let icon: Svg = asset!("assets/icon.svg", "svg");
-///
-/// // Load an SVG file with parameters (key=value style)
-/// let styled_icon: Svg = asset!("assets/icon.svg", "svg", inherit_fill = true);
-/// let styled_icon2: Svg = asset!("assets/icon.svg", "SVG", inherit_fill = true, inherit_stroke = false);
-///
-/// // Type names are case-insensitive
-/// let config: String = asset!("config.json", "TEXT");
-///
-/// // Load multiple assets
-/// let logo_svg: Svg = asset!("assets/logo.svg", "svg");
+/// // Binary assets
 /// let font: Vec<u8> = asset!("fonts/roboto.ttf");
+/// let data: Vec<u8> = asset!("data/model.bin");
+///
+/// // Text assets
+/// let config: String = asset!("config/settings.json", "text");
+/// let shader: String = asset!("shaders/fragment.glsl", "text");
+///
+/// // SVG assets (compressed at compile-time)
+/// let icon: Svg = asset!("icons/menu.svg", "svg");
+/// let themed: Svg = asset!("icons/logo.svg", "svg", inherit_fill = true);
+///
+/// // Image assets (converted to WebP)
+/// let photo: Image = asset!("images/hero.jpg", "image");
+/// let anim: Image = asset!("images/loading.gif", "image");  // Animated!
 /// ```
 ///
 /// # Bundling for Distribution
 ///
-/// When packaging your application for distribution, ensure the `assets` folder
-/// is included alongside your executable:
-///
-/// - **macOS**: Copy `assets/` to `YourApp.app/Contents/MacOS/assets/`
-/// - **Windows**: Copy `assets/` next to your `.exe` file
-/// - **Linux**: Copy `assets/` next to your binary
+/// Include the `assets/` folder alongside your executable:
+/// - **macOS**: `YourApp.app/Contents/MacOS/assets/`
+/// - **Windows/Linux**: Same directory as executable
 ///
 /// # Panics
 ///
-/// The generated code will panic at runtime if:
-/// - The asset file cannot be found at the expected location
-/// - The file cannot be read (permissions, I/O errors, etc.)
-/// - The file cannot be decoded as UTF-8 (when using `"text"` mode)
+/// Runtime panic if:
+/// - Asset file not found at expected location
+/// - File read error (permissions, I/O)
+/// - UTF-8 decode error (text mode only)
 ///
 /// # Compile Errors
 ///
-/// The macro will fail at compile time if:
-/// - The specified asset file does not exist
-/// - The path points to a directory instead of a file
-/// - The output directory cannot be created
-/// - The file cannot be copied
+/// Compile-time error if:
+/// - Source file does not exist
+/// - Path is a directory
+/// - Cannot create output directory
+/// - Cannot process/copy file
 #[proc_macro]
 pub fn asset(input: TokenStream) -> TokenStream { asset::gen_asset(input.into()).into() }
 
-/// Embeds an asset file directly into the executable binary during build time.
+/// Embeds an asset directly into the executable binary.
 ///
-/// This macro is similar to `asset!`, but instead of copying the file to the
-/// assets directory and loading it at runtime, it embeds the file content
-/// directly into the executable.
+/// Similar to `asset!`, but embeds the processed file content directly into
+/// the binary instead of loading from filesystem at runtime. This results in
+/// a larger binary but simpler distribution (single file, no external assets).
 ///
-/// # Asset vs Include Asset
+/// # When to Use
 ///
-/// `asset!` copies files and loads them at runtime, while `include_asset!`
-/// embeds them into the binary.
-///
-/// | Feature | `asset!` | `include_asset!` |
-/// |---------|----------|------------------|
-/// | **Loading Strategy** | Runtime loading from filesystem | Compile-time embedding |
-/// | **Distribution** | Must bundle `assets` folder | Single binary (easier distribution) |
-/// | **Binary Size** | Smaller binary | Larger binary (contains all assets) |
-/// | **Performance** | I/O overhead at runtime | Instant access (memory mapped) |
-/// | **Hot Reloading** | Possible (if file changes on disk) | Requires recompilation |
+/// - Single-binary distribution is preferred
+/// - Assets are small and few
+/// - No need for hot-reloading
 ///
 /// # Syntax
 ///
 /// Same as `asset!`:
 ///
 /// ```ignore
-/// include_asset!("path/to/file.ext")
-/// include_asset!("path/to/file.txt", "text")
-/// include_asset!("path/to/file.svg", "svg")
+/// include_asset!("file.bin")                        // → Vec<u8>
+/// include_asset!("file.txt", "text")                // → String
+/// include_asset!("icon.svg", "svg")                 // → Svg
+/// include_asset!("photo.png", "image")              // → Image (WebP)
+/// include_asset!("anim.gif", "image")               // → Image (animated WebP)
 /// ```
 ///
 /// # Returns
@@ -422,6 +385,7 @@ pub fn asset(input: TokenStream) -> TokenStream { asset::gen_asset(input.into())
 /// - `Vec<u8>` for binary
 /// - `String` for text
 /// - `Svg` for SVG
+/// - `Image` for image
 #[proc_macro]
 pub fn include_asset(input: TokenStream) -> TokenStream {
   asset::gen_include_asset(input.into()).into()

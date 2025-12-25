@@ -51,6 +51,8 @@ fontdb = "0.23.0"
 futures = "0.3.26"
 guillotiere = "0.6.0"
 image = { version = "0.25.6", default-features = false, features = ["rayon"] }
+image-webp = "0.2"
+webp-animation = "0.9"
 indextree = "4.7.3"
 log = "0.4.27"
 lyon_algorithms = "1.0.5"

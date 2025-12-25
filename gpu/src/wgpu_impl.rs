@@ -6,7 +6,7 @@ use std::{
 
 use ahash::HashSet;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
-use ribir_painter::{Color, PixelImage, VertexBuffers, image::ColorFormat};
+use ribir_painter::{Color, ColorFormat, PixelImage, VertexBuffers};
 use tokio::sync::oneshot;
 use wgpu::TextureFormat;
 

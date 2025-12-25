@@ -1,5 +1,5 @@
 use ribir_geom::Transform;
-use ribir_painter::{PixelImage, image::ColorFormat};
+use ribir_painter::{ColorFormat, PixelImage};
 
 /// This macro generates image tests for the painter with every backend.
 ///
