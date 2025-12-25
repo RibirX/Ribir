@@ -121,6 +121,7 @@ fn fab_init(classes: &mut Classes) {
     let ctx = BuildCtx::get();
     let background = color.clone().into_container_color(ctx);
     let foreground = color.on_this_container_color(ctx);
+    let shadow_color = Palette::of(ctx).shadow();
     let fab_size = fab_size();
 
     let btn_height = match fab_size {
@@ -138,9 +139,19 @@ fn fab_init(classes: &mut Classes) {
     w.with_background(background);
 
     let mut w = base_interactive(w.into_widget());
+    let is_hovered = w.is_hovered();
     w.with_foreground(foreground)
       .with_clamp(BoxClamp::min_width(btn_height).with_fixed_height(btn_height))
-      .with_radius(radius);
+      .with_radius(radius)
+      .with_box_shadow(pipe! {
+        let level = if *$read(is_hovered) { 4 } else { 3 };
+        md::elevation_shadow(level, shadow_color)
+      });
+    // Add transition animation to box_shadow, matching HoverLayer behavior
+    w.box_shadow().transition(
+      EasingTransition { easing: md::easing::STANDARD, duration: md::easing::duration::SHORT2 }
+        .delay(HOVER_THROTTLE_TIME),
+    );
     w.into_widget()
   }
 

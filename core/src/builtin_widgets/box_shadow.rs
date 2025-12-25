@@ -1,6 +1,6 @@
 use crate::{prelude::*, wrap_render::WrapRender};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Lerp)]
 pub struct BoxShadow {
   pub offset: Point,
   pub blur_radius: f32,

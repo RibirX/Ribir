@@ -5,6 +5,7 @@ use crate::md;
 const HOVER_OPACITY: u8 = 8;
 const PRESSED_OPACITY: u8 = 10;
 const FOCUS_OPACITY: u8 = 10;
+pub const HOVER_THROTTLE_TIME: Duration = Duration::from_millis(50);
 
 pub type HoverLayer = StateLayer<HOVER_OPACITY>;
 pub type PressedLayer = StateLayer<PRESSED_OPACITY>;
@@ -37,7 +38,7 @@ impl HoverLayer {
 
     let u = watch!(*$read(host.is_hovered()))
       // Delay hover effects to prevent displaying this layer while scrolling.
-      .throttle_time(Duration::from_millis(100), ThrottleEdge::trailing())
+      .throttle_time(HOVER_THROTTLE_TIME, ThrottleEdge::trailing())
       .distinct_until_changed()
       .subscribe({
         let layer = layer.clone_writer();

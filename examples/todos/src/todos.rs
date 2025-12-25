@@ -49,8 +49,9 @@ impl Task {
 impl Todos {
   pub fn load() -> Self {
     std::fs::read(Self::store_path())
-      .map(|v| serde_json::from_slice(v.as_slice()).unwrap())
-      .unwrap_or_else(|_| Todos { tasks: BTreeMap::new(), next_id: TaskId(0) })
+      .ok()
+      .and_then(|v| serde_json::from_slice(v.as_slice()).ok())
+      .unwrap_or_else(|| Todos { tasks: BTreeMap::new(), next_id: TaskId(0) })
   }
 
   pub fn save(&self) -> Result<(), io::Error> {
