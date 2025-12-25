@@ -25,11 +25,15 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+### Features
+
+- **core**: Add Image widget with lazy WebP decoding, caching, and animation support. (#823 @M-Adoo)
+
 ### Changed
 
 - **core**: Refactor the scheduler to improve async ecosystem compatibility. (#815 @M-Adoo)
-- **gpu**: Upgrade wgpu to 0.28.0 and adapt to API changes. (#pr @M-Adoo)
-- **gpu**: Limit max filter kernel size to avoid macOS Metal hangs. (#pr @M-Adoo)
+- **gpu**: Upgrade wgpu to 0.28.0 and adapt to API changes. (#823 @M-Adoo)
+- **gpu**: Limit max filter kernel size to avoid macOS Metal hangs. (#823 @M-Adoo)
 
 ### Fixed
 
@@ -37,7 +41,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ### Documented
 
-- **doc**: add guide for ribir. (#pr @wjian23)
+- **doc**: add guide for ribir. (#823 @wjian23)
 
 ## [0.4.0-alpha.53] - 2025-12-17
 

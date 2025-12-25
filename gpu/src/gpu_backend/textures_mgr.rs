@@ -5,8 +5,7 @@ use rayon::{prelude::ParallelIterator, slice::ParallelSlice};
 use ribir_algo::Resource;
 use ribir_geom::{DeviceRect, DeviceSize, Size, Transform, transform_to_device_rect};
 use ribir_painter::{
-  PaintPath, PaintingStyle, Path, PixelImage, StrokeOptions, Vertex, VertexBuffers,
-  image::ColorFormat,
+  ColorFormat, PaintPath, PaintingStyle, Path, PixelImage, StrokeOptions, Vertex, VertexBuffers,
 };
 
 use super::{

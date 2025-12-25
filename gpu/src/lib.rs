@@ -4,7 +4,7 @@ use std::ops::Range;
 
 pub use gpu_backend::Texture;
 use ribir_geom::{DevicePoint, DeviceRect, DeviceSize};
-use ribir_painter::{Color, GradientStop, VertexBuffers, image::ColorFormat};
+use ribir_painter::{Color, ColorFormat, GradientStop, VertexBuffers};
 mod gpu_backend;
 use zerocopy::AsBytes;
 

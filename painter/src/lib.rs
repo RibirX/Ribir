@@ -15,10 +15,10 @@ pub use crate::{
   filter::*,
   painter::*,
 };
-pub mod image;
+pub mod pixel_image;
 mod style;
 pub use style::*;
 
-pub use crate::image::PixelImage;
+pub use crate::pixel_image::{ColorFormat, PixelImage};
 mod svg;
 pub use svg::Svg;

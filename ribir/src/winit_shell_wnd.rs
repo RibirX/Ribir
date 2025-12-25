@@ -1,7 +1,7 @@
 use std::{future::Future, sync::Arc};
 
 use ribir_core::{
-  prelude::{image::ColorFormat, *},
+  prelude::*,
   window::{BoxShellWindow, Shell, ShellWindow, WindowAttributes, WindowId, WindowLevel},
 };
 use winit::dpi::{LogicalPosition, LogicalSize};
