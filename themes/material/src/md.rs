@@ -153,3 +153,27 @@ pub fn border_2_surface_color() -> Border {
   let surface_variant = Palette::of(BuildCtx::get()).on_surface_variant();
   Border::all(BorderSide::new(2., surface_variant.into()))
 }
+
+/// M3 elevation shadow for a given level (0-5).
+///
+/// See: https://m3.material.io/styles/elevation/overview
+///
+/// - Level 0: 0dp (no shadow)
+/// - Level 1: 1dp
+/// - Level 2: 3dp
+/// - Level 3: 6dp (FAB resting)
+/// - Level 4: 8dp (FAB hover)
+/// - Level 5: 12dp
+pub fn elevation_shadow(level: u8, shadow_color: Color) -> BoxShadow {
+  // M3 elevation dp values and alpha (higher elevation = slightly more visible
+  // shadow)
+  let (offset_y, blur, spread, alpha) = match level {
+    0 => (0., 0., 0., 0.),
+    1 => (1., 2., 0., 0.10),
+    2 => (2., 4., 0., 0.12),
+    3 => (3., 6., 1., 0.15),
+    4 => (4., 8., 1., 0.18),
+    _ => (6., 12., 2., 0.22), // Level 5+
+  };
+  BoxShadow::new(Point::new(0., offset_y), blur, spread, shadow_color.with_alpha(alpha as f32))
+}
