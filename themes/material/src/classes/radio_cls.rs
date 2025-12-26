@@ -50,7 +50,7 @@ pub(super) fn init(classes: &mut Classes) {
         transition: EasingTransition {
           duration: md::easing::duration::SHORT3,
           easing: md::easing::EMPHASIZED_DECELERATE,
-        }.box_it(),
+        },
         from: BoxClamp::fixed_size(ZERO_SIZE),
       };
       @Container {

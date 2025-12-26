@@ -42,7 +42,7 @@ pub(super) fn init(classes: &mut Classes) {
 
       let enter = @Animate {
         state: (container.margin(), container.clamp(), container.radius()),
-        transition: THUMB_TRANS.box_it(),
+        transition: THUMB_TRANS,
         from: (EdgeInsets::only_left(24.),
           BoxClamp::fixed_size(Size::new(24., 24.)),
           md::RADIUS_12
@@ -69,7 +69,7 @@ pub(super) fn init(classes: &mut Classes) {
 
       let enter = @Animate {
         state: (container.margin(), container.clamp(), container.radius()),
-        transition: THUMB_TRANS.box_it(),
+        transition: THUMB_TRANS,
         from: (EdgeInsets::only_left(8.), BoxClamp::fixed_size(Size::new(16., 16.)), md::RADIUS_8),
       };
       @(container) {

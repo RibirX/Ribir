@@ -21,7 +21,7 @@ pub(super) fn init(classes: &mut Classes) {
         .transition(EasingTransition{
           easing: md::easing::STANDARD_ACCELERATE,
           duration: md::easing::duration::SHORT2
-        }.box_it());
+        });
       @(w) {
         keep_alive: pipe!($read(animate).is_running() || *$read(w.opacity()) != 0.),
         on_disposed: move |_| {

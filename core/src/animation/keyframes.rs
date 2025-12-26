@@ -53,7 +53,7 @@
 //!     transition: EasingTransition {
 //!       duration: Duration::from_millis(1000),
 //!       easing: easing::LinearEasing
-//!     }.box_it()
+//!     }
 //!   };
 //!
 //!   @(opacity_rect) {

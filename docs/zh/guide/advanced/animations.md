@@ -43,7 +43,7 @@ fn custom_easing_example() -> Widget<'static> {
             transition: EasingTransition {
                 duration: Duration::from_millis(1000),
                 easing: easing::CubicBezierEasing::new(0.68, -0.55, 0.265, 1.55), // 弹跳效果
-            }.box_it()
+            }
         };
 
         @SizedBox {
@@ -129,7 +129,7 @@ fn writer_animate() -> Widget<'static> {
             .transition(EasingTransition{
                 easing: md::easing::STANDARD_ACCELERATE,
                 duration: md::easing::duration::SHORT2
-            }.box_it());
+            });
 
         let cnt = Stateful::new(0);
 
@@ -179,7 +179,7 @@ fn keyframes_example() -> Widget<'static> {
             transition: EasingTransition {
                 duration: Duration::from_millis(1000),
                 easing: easing::EASE_IN_OUT,
-            }.box_it()
+            }
         };
 
         @(box_widget) { 
@@ -270,7 +270,7 @@ fn advanced_stagger_example() -> Widget<'static> {
                 transition: EasingTransition {
                     duration: Duration::from_millis(300),
                     easing: easing::EASE_IN_OUT,
-                }.box_it()
+                }
             };
             animate
         });
@@ -308,7 +308,7 @@ fn animation_control_example() -> Widget<'static> {
             transition: EasingTransition {
                 duration: Duration::from_millis(2000),
                 easing: easing::EASE_IN_OUT,
-            }.box_it()
+            }
         };
 
         let animation = @Animate {
@@ -317,7 +317,7 @@ fn animation_control_example() -> Widget<'static> {
             transition: EasingTransition {
                 duration: Duration::from_millis(2000),
                 easing: easing::EASE_IN_OUT,
-            }.box_it()
+            }
         };
 
         @Column {
@@ -368,7 +368,7 @@ fn composition_example() -> Widget<'static> {
             transition: EasingTransition {
                 duration: Duration::from_millis(1000),
                 easing: easing::EASE_IN_OUT,
-            }.box_it()
+            }
         };
 
         let rotation_anim = @Animate {
@@ -377,7 +377,7 @@ fn composition_example() -> Widget<'static> {
             transition: EasingTransition {
                 duration: Duration::from_millis(2000),
                 easing: easing::LINEAR,
-            }.box_it()
+            }
         };
 
         @(box_widget) {
@@ -419,7 +419,6 @@ fn transition_modifiers_example() -> Widget<'static> {
             }
             .repeat(3.) // 重复3次
             .delay(Duration::from_millis(1000)) // 延迟1000ms 再执行
-            .box_it()
         };
 
         @(box_widget) {

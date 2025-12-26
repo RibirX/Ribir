@@ -67,7 +67,7 @@ pub(super) fn init(classes: &mut Classes) {
           let sub_path = sampler.normalized_sub_path(0f32..rate);
           Resource::new(sub_path)
         }),
-        transition: ICON_TRANS.box_it(),
+        transition: ICON_TRANS,
         from: empty_path
       };
       @Stack {
@@ -93,7 +93,7 @@ pub(super) fn init(classes: &mut Classes) {
       };
       let enter = @Animate {
         state: part_writer!(&mut icon.size),
-        transition: ICON_TRANS.box_it(),
+        transition: ICON_TRANS,
         from: Size::new(0., 2.),
       };
       @(icon) {

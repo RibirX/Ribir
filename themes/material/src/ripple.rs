@@ -65,7 +65,7 @@ fn init_ripple_launcher(
       transition: EasingTransition {
         easing: md::easing::EMPHASIZED_DECELERATE,
         duration: md::easing::duration::SHORT3,
-      }.box_it(),
+      },
       from: (LayerArea::FullContent, 0.),
     };
 
@@ -74,7 +74,7 @@ fn init_ripple_launcher(
       transition: EasingTransition{
         easing: md::easing::STANDARD_ACCELERATE,
         duration: md::easing::duration::MEDIUM3
-      }.box_it(),
+      },
       from: PressedLayer::show_opacity(),
     };
 
