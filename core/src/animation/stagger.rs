@@ -101,7 +101,7 @@ impl Stagger {
     A: AnimateState + 'static,
   {
     let animate = rdl! {
-      Animate { transition: self.transition.box_clone(), state, from }
+      Animate { transition: self.transition.clone(), state, from }
     };
     self.push_animation_with(stagger, animate.clone_writer());
     animate

@@ -9,10 +9,9 @@ const DETERMINATE_TRANS: EasingTransition<CubicBezierEasing> = EasingTransition 
   duration: md::easing::duration::LONG4,
 };
 
-fn indeterminate_trans() -> Box<dyn Transition> {
+fn indeterminate_trans() -> impl Transition {
   EasingTransition { easing: md::easing::EMPHASIZED, duration: Duration::from_secs(2) }
     .repeat(f32::INFINITY)
-    .box_it()
 }
 
 fn md_base_spinner(w: Widget, foreground: PipeValue<Brush>) -> Widget {

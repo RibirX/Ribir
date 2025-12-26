@@ -208,7 +208,7 @@ mod tests {
         transition: EasingTransition {
           easing: easing::LINEAR,
           duration: Duration::ZERO,
-        }.box_it(),
+        },
         state: Stateful::new(1.),
         from: 0.,
       };
@@ -230,7 +230,7 @@ mod tests {
         transition: EasingTransition {
           easing: easing::LINEAR,
           duration: Duration::from_millis(1),
-        }.box_it(),
+        },
         state: state.clone_writer(),
         from: 100,
       };

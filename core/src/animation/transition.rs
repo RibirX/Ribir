@@ -29,7 +29,9 @@ pub trait Transition {
   /// Return the duration of the animation from start to finish.
   fn duration(&self) -> Duration;
 
-  fn box_clone(&self) -> Box<dyn Transition>;
+  /// Private method to clone the transition as a boxed trait object.
+  #[doc(hidden)]
+  fn dyn_clone(&self) -> Box<dyn Transition>;
 
   /// Transition will apply with repeat times
   fn repeat(self, repeat: f32) -> RepeatTransition<Self>
@@ -46,13 +48,10 @@ pub trait Transition {
   {
     DelayTransition { delay, transition: self }
   }
+}
 
-  fn box_it(self) -> Box<dyn Transition>
-  where
-    Self: Sized + 'static,
-  {
-    Box::new(self)
-  }
+impl Clone for Box<dyn Transition> {
+  fn clone(&self) -> Self { self.dyn_clone() }
 }
 
 impl<T: Transition + Clone + 'static> Transition for DelayTransition<T> {
@@ -65,7 +64,7 @@ impl<T: Transition + Clone + 'static> Transition for DelayTransition<T> {
 
   fn duration(&self) -> Duration { self.delay + self.transition.duration() }
 
-  fn box_clone(&self) -> Box<dyn Transition> { Box::new(self.clone()) }
+  fn dyn_clone(&self) -> Box<dyn Transition> { Box::new(self.clone()) }
 }
 
 impl<T: Transition + Clone + 'static> Transition for RepeatTransition<T> {
@@ -93,7 +92,7 @@ impl<T: Transition + Clone + 'static> Transition for RepeatTransition<T> {
     Duration::from_secs_f32(duration.as_secs_f32() * repeat)
   }
 
-  fn box_clone(&self) -> Box<dyn Transition> { Box::new(self.clone()) }
+  fn dyn_clone(&self) -> Box<dyn Transition> { Box::new(self.clone()) }
 }
 
 impl Transition for Box<dyn Transition> {
@@ -101,7 +100,7 @@ impl Transition for Box<dyn Transition> {
 
   fn duration(&self) -> Duration { (**self).duration() }
 
-  fn box_clone(&self) -> Box<dyn Transition> { (**self).box_clone() }
+  fn dyn_clone(&self) -> Box<dyn Transition> { (**self).dyn_clone() }
 }
 
 impl<E: Easing + Clone + 'static> Transition for EasingTransition<E> {
@@ -116,5 +115,5 @@ impl<E: Easing + Clone + 'static> Transition for EasingTransition<E> {
 
   fn duration(&self) -> Duration { self.duration }
 
-  fn box_clone(&self) -> Box<dyn Transition> { Box::new(self.clone()) }
+  fn dyn_clone(&self) -> Box<dyn Transition> { Box::new(self.clone()) }
 }

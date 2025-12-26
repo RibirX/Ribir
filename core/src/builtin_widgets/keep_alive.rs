@@ -34,7 +34,7 @@ use crate::prelude::*;
 ///         .transition(EasingTransition{
 ///           easing: easing::LINEAR,
 ///           duration: md::easing::duration::SHORT4,
-///         }.box_it());
+///         });
 ///       @(w) {
 ///         // when the widget alive(the opacity is set to 0 in on_disposed)
 ///         // or the animation is running, keep the widget alive
