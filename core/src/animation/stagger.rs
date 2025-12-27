@@ -82,7 +82,7 @@ impl Stagger {
   /// **from**: the state you want to transition from.
   pub fn push_state<A>(&mut self, state: A, from: A::Value) -> Stateful<Animate<A>>
   where
-    A: AnimateState + 'static,
+    A: AnimateState<Value: PartialEq> + 'static,
   {
     self.push_state_with(self.default_stagger(), state, from)
   }
@@ -98,7 +98,7 @@ impl Stagger {
     &mut self, stagger: Duration, state: A, from: A::Value,
   ) -> Stateful<Animate<A>>
   where
-    A: AnimateState + 'static,
+    A: AnimateState<Value: PartialEq> + 'static,
   {
     let animate = rdl! {
       Animate { transition: self.transition.clone(), state, from }
