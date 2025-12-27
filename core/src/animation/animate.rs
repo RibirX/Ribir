@@ -35,12 +35,15 @@ pub(crate) struct AnimateInfo<V> {
   last_progress: AnimateProgress,
   // Determines if lerp value in current frame.
   already_lerp: bool,
+  // The value that animation last set to the state, used to detect if the state
+  // was modified externally.
+  last_set_value: Option<V>,
   _tick_msg_guard: Option<Box<dyn Any>>,
 }
 
 impl<S> Animation for Stateful<Animate<S>>
 where
-  S: AnimateState<Value: Clone> + 'static,
+  S: AnimateState<Value: Clone + PartialEq> + 'static,
 {
   fn run(&self) {
     let mut animate_ref = self.write();
@@ -54,13 +57,16 @@ where
 
     let new_to = this.state.get();
 
-    if let Some(AnimateInfo { from, to, last_progress, start_at, .. }) = &mut this.running_info {
+    if let Some(AnimateInfo { from, to, last_progress, start_at, last_set_value, .. }) =
+      &mut this.running_info
+    {
       *from = this
         .state
         .calc_lerp_value(from, to, last_progress.value());
       *to = new_to;
       *last_progress = AnimateProgress::Between(0.);
       *start_at = Instant::now();
+      *last_set_value = None;
     } else {
       drop(animate_ref);
 
@@ -72,12 +78,34 @@ where
         .subscribe(move |msg| {
           match msg {
             FrameMsg::BeforeLayout(time) => {
+              let mut a_ref = animate.write();
+              // Detect inter-frame modifications: if the current value differs from
+              // the `to` value (which was reverted at last frame's Finish), it means
+              // the state was modified externally between frames.
+              let current = a_ref.state.get();
+              let info = a_ref.running_info.as_mut().unwrap();
+              if current != info.to {
+                info.to = current;
+              }
+              drop(a_ref);
               animate.shallow().advance_to(time);
             }
             FrameMsg::Finish(_) => {
               let mut w_ref = animate.write();
+              // Get the current state value first before mutably borrowing info.
+              let current = w_ref.state.get();
               let info = w_ref.running_info.as_mut().unwrap();
               let last_progress = info.last_progress;
+
+              // Detect intra-frame modifications: if the current value differs from
+              // what the animation set in BeforeLayout, it means the state was
+              // modified externally within this frame.
+              if let Some(last_set) = info.last_set_value.take()
+                && current != last_set
+              {
+                info.to = current.clone();
+              }
+
               let to = info.to.clone();
               info.already_lerp = false;
               w_ref.state.revert(to);
@@ -95,31 +123,14 @@ where
         })
         .unsubscribe_when_dropped();
 
-      let animate = self.clone_writer();
-      let state_handle = this
-        .state
-        .animate_state_modifies()
-        // State transition may trigger an animation run during a state modification, causing borrow
-        // conflicts. To avoid this, delay the run until the next tick.
-        .delay_subscription(Duration::ZERO)
-        .subscribe(move |_| {
-          let mut animate = animate.write();
-          let v = animate.state.get();
-          // if the animate state modified, we need to update the restore value.
-          if let Some(info) = animate.running_info.as_mut() {
-            info.to = v;
-          }
-          animate.forget_modifies();
-        })
-        .unsubscribe_when_dropped();
-
       this.running_info = Some(AnimateInfo {
         from: this.from.clone(),
         to: new_to,
         start_at: Instant::now(),
         last_progress: AnimateProgress::Dismissed,
-        _tick_msg_guard: Some(Box::new((tick_handle, state_handle))),
+        _tick_msg_guard: Some(Box::new(tick_handle)),
         already_lerp: false,
+        last_set_value: None,
       });
 
       wnd.inc_running_animate();
@@ -154,7 +165,7 @@ where
   ///
   /// Panics if the animation is not running.
   fn advance_to(&mut self, at: Instant) -> AnimateProgress {
-    let AnimateInfo { from, to, start_at, last_progress, already_lerp, .. } = self
+    let AnimateInfo { from, to, start_at, last_progress, already_lerp, last_set_value, .. } = self
       .running_info
       .as_mut()
       .expect("This animation is not running.");
@@ -171,6 +182,7 @@ where
       AnimateProgress::Dismissed => from.clone(),
       AnimateProgress::Finish => to.clone(),
     };
+    *last_set_value = Some(v.clone());
     self.state.set(v);
 
     *last_progress = progress;
