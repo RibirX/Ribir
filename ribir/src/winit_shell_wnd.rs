@@ -34,6 +34,13 @@ pub enum ShellCmd {
   RunAsync {
     fut: BoxFuture<'static, ()>,
   },
+  /// Create a new window. The winit window is created synchronously in the
+  /// event loop (where active_event_loop is available), then the backend is
+  /// initialized asynchronously.
+  NewWindow {
+    attrs: Box<WindowAttributes>,
+    sender: tokio::sync::oneshot::Sender<BoxShellWindow>,
+  },
 }
 
 impl ShellCmd {
@@ -42,7 +49,7 @@ impl ShellCmd {
       ShellCmd::RequestDraw { id } | ShellCmd::Draw { id, .. } | ShellCmd::Close { id } => {
         Some(*id)
       }
-      ShellCmd::RunAsync { .. } | ShellCmd::Exit => None,
+      ShellCmd::RunAsync { .. } | ShellCmd::Exit | ShellCmd::NewWindow { .. } => None,
     }
   }
 }
@@ -57,9 +64,12 @@ impl Shell for RibirShell {
   ) -> BoxFuture<'static, BoxShellWindow> {
     let (sender, receiver) = tokio::sync::oneshot::channel::<BoxShellWindow>();
 
-    self.run_in_shell(Box::pin(async move {
-      let _ = sender.send(App::new_window(attrs).await);
-    }));
+    // Send NewWindow command to create winit window synchronously in the event
+    // loop, where active_event_loop is available. This fixes the WASM bug where
+    // spawn_local schedules futures outside the event loop callback.
+    self
+      .cmd_sender
+      .send(ShellCmd::NewWindow { attrs: Box::new(attrs), sender });
 
     Box::pin(async move { receiver.await.unwrap() })
   }
@@ -258,6 +268,64 @@ pub(crate) fn new_id(id: winit::window::WindowId) -> WindowId {
 }
 
 impl WinitShellWnd {
+  /// Synchronously create a winit window. This must be called from within the
+  /// event loop callback where `active_event_loop` is available.
+  #[cfg(target_arch = "wasm32")]
+  pub(crate) fn create_winit_window(mut attrs: WindowAttributes) -> Arc<winit::window::Window> {
+    use web_sys::wasm_bindgen::JsCast;
+    use winit::platform::web::WindowAttributesExtWebSys;
+
+    let document = web_sys::window().unwrap().document().unwrap();
+    let canvas = document
+      .create_element("canvas")
+      .unwrap()
+      .dyn_into::<web_sys::HtmlCanvasElement>()
+      .unwrap();
+    canvas.set_class_name(RIBIR_CANVAS);
+    let style = canvas.style();
+    let _ = style.set_property("width", "100%");
+    let _ = style.set_property("height", "100%");
+    let elems = document.get_elements_by_class_name(RIBIR_CONTAINER);
+
+    if let Some(elem) = elems.item(0) {
+      elem.set_class_name(&elem.class_name().replace(RIBIR_CONTAINER, ""));
+      elem.append_child(&canvas).unwrap();
+    } else if let Some(body) = document.body() {
+      body.append_child(&canvas).unwrap();
+    } else {
+      document.append_child(&canvas).unwrap();
+    }
+
+    attrs.0 = attrs.0.with_canvas(Some(canvas));
+
+    Arc::new(
+      App::active_event_loop()
+        .create_window(attrs.0)
+        .unwrap(),
+    )
+  }
+
+  /// Synchronously create a winit window. This must be called from within the
+  /// event loop callback where `active_event_loop` is available.
+  #[cfg(not(target_arch = "wasm32"))]
+  pub(crate) fn create_winit_window(attrs: WindowAttributes) -> Arc<winit::window::Window> {
+    Arc::new(
+      App::active_event_loop()
+        .create_window(attrs.0)
+        .unwrap(),
+    )
+  }
+
+  /// Asynchronously initialize the backend for an existing winit window.
+  /// This doesn't require `active_event_loop` to be available.
+  pub(crate) async fn from_winit_window(winit_wnd: Arc<winit::window::Window>) -> Self {
+    let ptr = winit_wnd.as_ref() as *const winit::window::Window;
+    // Safety: a reference to winit_wnd is valid as long as the WinitShellWnd is
+    // alive.
+    let backend = Backend::new(unsafe { &*ptr }).await;
+    WinitShellWnd { backend, winit_wnd }
+  }
+
   #[cfg(target_arch = "wasm32")]
   pub(crate) async fn new(mut attrs: WindowAttributes) -> Self {
     use web_sys::wasm_bindgen::JsCast;
@@ -285,9 +353,8 @@ impl WinitShellWnd {
     }
 
     attrs.0 = attrs.0.with_canvas(Some(canvas));
-    let wnd = Self::inner_new(attrs).await;
 
-    wnd
+    Self::inner_new(attrs).await
   }
 
   #[cfg(not(target_arch = "wasm32"))]

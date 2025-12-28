@@ -5,7 +5,7 @@ use winit::{
   event_loop::*,
 };
 
-use crate::app::*;
+use crate::{app::*, winit_shell_wnd::WinitShellWnd};
 
 #[derive(Default)]
 pub struct AppHandler {}
@@ -124,6 +124,17 @@ impl ApplicationHandler<RibirAppEvent> for AppHandler {
       RibirAppEvent::Cmd(cmd) => match cmd {
         ShellCmd::RunAsync { fut } => {
           App::spawn_local(fut);
+        }
+        ShellCmd::NewWindow { attrs, sender } => {
+          // Create winit window synchronously - we're in the event loop callback
+          // where active_event_loop is available
+          let winit_wnd = WinitShellWnd::create_winit_window(*attrs);
+
+          // Initialize backend asynchronously - this doesn't need active_event_loop
+          App::spawn_local(async move {
+            let shell_wnd = App::new_window_from_winit(winit_wnd).await;
+            let _ = sender.send(shell_wnd);
+          });
         }
         ShellCmd::Exit => {
           event_loop.exit();

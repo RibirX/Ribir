@@ -191,6 +191,34 @@ impl App {
     Box::new(proxy)
   }
 
+  /// Creates a new shell window from an existing winit window.
+  /// This is used for two-phase window creation where the winit window is
+  /// created synchronously (in event loop callback) and backend is initialized
+  /// asynchronously.
+  pub(crate) async fn new_window_from_winit(
+    winit_wnd: std::sync::Arc<winit::window::Window>,
+  ) -> BoxShellWindow {
+    let shell_wnd = WinitShellWnd::from_winit_window(winit_wnd).await;
+
+    let proxy = ShellWndHandle {
+      winit_wnd: shell_wnd.winit_wnd.clone(),
+      sender: App::cmd_sender(),
+      cursor: CursorIcon::Default,
+    };
+
+    let wid: WindowId = shell_wnd.id();
+
+    let app = App::shared();
+    app
+      .windows
+      .borrow_mut()
+      .insert(wid, Sc::new(RefCell::new(shell_wnd)));
+    if app.active_wnd.get().is_none() {
+      app.active_wnd.set(Some(wid));
+    }
+    Box::new(proxy)
+  }
+
   pub fn active_window() -> Sc<Window> {
     App::shared()
       .active_wnd
@@ -268,6 +296,7 @@ impl App {
       };
       LocalSender::new(app)
     });
+
     &APP
   }
 
@@ -277,6 +306,7 @@ impl App {
   fn take_event_loop() -> EventLoop<RibirAppEvent> {
     let app = App::shared();
     let mut event_loop = app.event_loop.borrow_mut();
+
     let event_loop = event_loop
       .take()
       .expect("Event loop already consumed.");
