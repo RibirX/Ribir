@@ -27,7 +27,7 @@ If you don't quite understand the above, don't worry, because you don't need to 
 - `Render` widget
 - `ComposeChild` widget
 
-This chapter will only introduce function widgets and `Compose` widgets. Because in most scenarios, these two types of widgets are sufficient to meet our needs. As advanced content, we will cover `Render` widgets and `ComposeChild` widgets in [Widgets In-depth](../understanding_ribir/widget_in_depth.md).
+This chapter will only introduce function widgets and `Compose` widgets. Because in most scenarios, these two types of widgets are sufficient to meet our needs. As advanced content, we will cover `Render` widgets and `ComposeChild` widgets in [Pure Composition](../advanced/pure_composition.md).
 
 Please note the difference between `Widget` and widget in the entire context of Ribir. Widget is a generic term, while the capitalized `Widget` is a specific widget, also the pass for all widgets to enter the view.
 
@@ -233,7 +233,7 @@ Notice the `rdl!{ (btn) { ... } }` syntax? it indicates that the parent is a var
 > In our example, `Button` specifies that it can accept two optional children: a string as a label and a `Widget` as an icon.
 > **Why is the label of the Button designed to be a child rather than its own field?** This is because, if it were a field of `Button`, it would occupy memory regardless of whether `Button` has a label or not. By making it a child, there is no memory overhead for this field when the Button doesn't have a label.
 
-> We will delve into how to constrain the type of children for widgets in [Understanding Ribir](../understanding_ribir/widget_in_depth.md).
+> We will delve into how to constrain the type of children for widgets in [Understanding Ribir](../advanced/pure_composition.md).
 
 
 ## `@` Syntactic Sugar

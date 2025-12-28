@@ -27,7 +27,7 @@ sidebar_position: 2
 - `Render` widget
 - `ComposeChild` widget
 
-本章将只会介绍函数 widget 和 `Compose` widget。因为在大部分场景中这两种 widget 已经足够满足我们的需求了。作为进阶的内容，我们将在[深入 widget](../understanding_ribir/widget_in_depth.md)中覆盖 `Render` widget 和 `ComposeChild` widget。
+本章将只会介绍函数 widget 和 `Compose` widget。因为在大部分场景中这两种 widget 已经足够满足我们的需求了。作为进阶的内容，我们将在[纯组合](../advanced/pure_composition.md)中覆盖 `Render` widget 和 `ComposeChild` widget。
 
 注意 `Widget` 和 widget 的差别，在整个 Ribir 的语境中，widget 是一个泛称，而大写开头的 `Widget` 是一个具体的 widget，也是所有 widget 构建进入视图的通行证。
 
@@ -240,7 +240,7 @@ fn main() {
 > **为什么 Button 的标签要设计为是一个孩子而不是一个自己的字段呢？**
 > 这是因为，如果设计为 `Button` 自己的字段，那么无论 `Button` 在使用时是否有一个标签，这个字段都要占用内存。而如果是作为一个孩子，则不存在这个字段内存的开销了。
 >
-> 关于如何约束 widget 的孩子类型，我们将在[深入 widget ](../understanding_ribir/widget_in_depth.md)中展开介绍。
+> 关于如何约束 widget 的孩子类型，我们将在[深入 widget ](../advanced/pure_composition.md)中展开介绍。
 
 ## `@` 语法糖
 

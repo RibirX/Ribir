@@ -1,0 +1,8 @@
+{
+    "label": "Core Concepts",
+    "position": 4,
+    "link": {
+        "type": "generated-index",
+        "description": "Understand the core concepts and design philosophy of Ribir."
+    }
+}

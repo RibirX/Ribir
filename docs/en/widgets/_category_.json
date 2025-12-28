@@ -1,0 +1,8 @@
+{
+    "label": "Widget System",
+    "position": 5,
+    "link": {
+        "type": "generated-index",
+        "description": "Explore the built-in widgets and theming system."
+    }
+}
