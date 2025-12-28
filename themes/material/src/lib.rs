@@ -14,6 +14,9 @@ pub use focus_indicator::*;
 
 macro_rules! register_svg {
   ($name:expr, $file_name:literal) => {
+    #[cfg(target_arch = "wasm32")]
+    svg_registry::register($name, include_asset!($file_name, "svg", inherit_fill = true));
+    #[cfg(not(target_arch = "wasm32"))]
     svg_registry::register($name, asset!($file_name, "svg", inherit_fill = true));
   };
 }
