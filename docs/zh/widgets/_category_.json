@@ -1,0 +1,8 @@
+{
+    "label": "Widget System",
+    "position": 5,
+    "link": {
+        "type": "generated-index",
+        "description": "探索内置组件和主题系统。"
+    }
+}
