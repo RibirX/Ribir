@@ -1,0 +1,198 @@
+name: PR Bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to process'
+        required: false
+        default: ''
+
+jobs:
+  check:
+    # Only run for PRs targeting master/main (skip dependabot, require @ribir-bot mention for comments)
+    if: |
+      (github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.base.ref == 'master')) &&
+      (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '@ribir-bot')))
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    outputs:
+      should_run: ${{ steps.decision.outputs.should_run }}
+      command: ${{ steps.decision.outputs.command }}
+      pr_id: ${{ steps.decision.outputs.pr_id }}
+      context: ${{ steps.decision.outputs.context }}
+      show_help: ${{ steps.decision.outputs.show_help }}
+    steps:
+      - name: Check and Validate
+        id: decision
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Default to not running
+          echo "should_run=false" >> $GITHUB_OUTPUT
+          echo "show_help=false" >> $GITHUB_OUTPUT # Initialize show_help
+
+          # --- Case 1: Pull Request Event (Auto trigger) ---
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "command=pr-fill" >> $GITHUB_OUTPUT
+            echo "pr_id=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # --- Case 2: Workflow Dispatch ---
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "command=pr-fill" >> $GITHUB_OUTPUT
+            echo "pr_id=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # --- Case 3: Issue Comment (@ribir-bot commands) ---
+          COMMENT_USER="${{ github.event.comment.user.login }}"
+          PR_AUTHOR="${{ github.event.issue.user.login }}"
+          REPO="${{ github.repository }}"
+          PR_NUMBER="${{ github.event.issue.number }}"
+
+          # 3.1 Check Permissions
+          ALLOWED="false"
+          if [ "$COMMENT_USER" = "$PR_AUTHOR" ]; then
+             ALLOWED="true"
+             echo "✓ User is PR author"
+          else
+             PERMISSION=$(gh api "/repos/$REPO/collaborators/$COMMENT_USER/permission" --jq '.permission')
+             if [ "$PERMISSION" = "write" ] || [ "$PERMISSION" = "admin" ]; then
+                ALLOWED="true"
+                echo "✓ User has $PERMISSION permission"
+             else
+                echo "✗ User does not have permission (found: $PERMISSION)"
+                # Exit with success (0) but should_run=false implies we stop here cleanly
+                exit 0
+             fi
+          fi
+
+          # 3.2 Check if RC PR (Skip if so)
+          BASE_BRANCH=$(gh pr view $PR_NUMBER --repo $REPO --json baseRefName -q '.baseRefName')
+          HEAD_BRANCH=$(gh pr view $PR_NUMBER --repo $REPO --json headRefName -q '.headRefName')
+          if [[ "$BASE_BRANCH" == "master" && "$HEAD_BRANCH" =~ ^release-[0-9]+\.[0-9]+\.x$ ]]; then
+             echo "⏭️ RC PR detected - use @ribir-bot rc-* commands"
+             exit 0
+          fi
+
+          # 3.3 Parse Command
+          COMMENT="${{ github.event.comment.body }}"
+          BOT_LINE=$(echo "$COMMENT" | grep -E "^@ribir-bot\s+" | head -n 1)
+
+          if [ -z "$BOT_LINE" ]; then
+            echo "show_help=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          COMMAND=$(echo "$BOT_LINE" | sed -E 's/@ribir-bot\s+([a-z-]+).*/\1/')
+          CONTENT=$(echo "$BOT_LINE" | sed -E 's/@ribir-bot\s+[a-z-]+\s*//')
+          
+          # 3.4 Validate Command
+          case "$COMMAND" in
+            pr-fill|pr-regen|pr-summary|pr-entry)
+              echo "should_run=true" >> $GITHUB_OUTPUT
+              echo "command=$COMMAND" >> $GITHUB_OUTPUT
+              echo "pr_id=$PR_NUMBER" >> $GITHUB_OUTPUT
+              if [ -n "$CONTENT" ]; then
+                echo "context<<EOF" >> $GITHUB_OUTPUT
+                echo "$CONTENT" >> $GITHUB_OUTPUT
+                echo "EOF" >> $GITHUB_OUTPUT
+              fi
+              ;;
+            help)
+              echo "show_help=true" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "show_help=true" >> $GITHUB_OUTPUT
+              echo "❌ Unknown command: $COMMAND"
+              ;;
+          esac
+
+      - name: Post Help Comment
+        if: steps.decision.outputs.show_help == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "## 🤖 Ribir Bot Commands
+          
+          Hi! I can help with generating PR summaries and changelog entries.
+          
+          ### Command Format
+          \`@ribir-bot COMMAND [CONTEXT]\`
+          
+          Commands must start with \`@ribir-bot\` at the beginning of a line.
+          
+          ### Available Commands
+          - \`@ribir-bot pr-fill\` - Auto-fill placeholders in PR body
+          - \`@ribir-bot pr-regen [context]\` - Regenerate summary and changelog
+          - \`@ribir-bot pr-summary [context]\` - Regenerate only the summary section
+          - \`@ribir-bot pr-entry [context]\` - Regenerate only the changelog entries
+          - \`@ribir-bot help\` - Show this help message
+          
+          ### Note
+          Only the PR author and users with write access can use these commands."
+
+  execute:
+    needs: check
+    if: needs.check.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache Gemini CLI
+        id: cache-gemini
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm-global
+          key: gemini-cli-0.22.4
+
+      - name: Install Gemini CLI
+        if: steps.cache-gemini.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.npm-global
+          npm config set prefix ~/.npm-global
+          npm install -g @google/gemini-cli@0.22.4
+
+      - name: Add Gemini to PATH
+        run: echo "$HOME/.npm-global/bin" >> $GITHUB_PATH
+
+      - name: Run PR Bot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          COMMAND: ${{ needs.check.outputs.command }}
+          PR_ID: ${{ needs.check.outputs.pr_id }}
+          CONTEXT: ${{ needs.check.outputs.context }}
+        run: |
+          if [ -n "$CONTEXT" ]; then
+            cargo run --manifest-path tools/ribir-bot/Cargo.toml -- $COMMAND $PR_ID "$CONTEXT"
+          else
+            cargo run --manifest-path tools/ribir-bot/Cargo.toml -- $COMMAND $PR_ID
+          fi

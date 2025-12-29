@@ -2,24 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
-Please keep one empty line before and after all headers. (This is required for `git` to produce a conflict when a release is made while a PR is open and the PR's changelog entry would go into the wrong section).
-
-There are 5 types of changes:
-
-- `Features` for new features.
-- `Changed` for changes in existing functionality.
-- `Fixed` for any bug fixes.
-- `Documented` for any changes to the documentation.
-- `Breaking` for the detail of any backward incompatible changes.
-
-Please only add new entries below the [Unreleased](#unreleased---releasedate) header with the following format:
-
-``` md
-**crate or effect scope**: description of change (#pr @contributor)
-```
-
-1. When creating a pull request, `#pr` will automatically update with the pull request number.
-2. Replace `@contributor` with your GitHub username.
+This changelog is automatically generated from Pull Request descriptions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to write changelog entries in your PR.
 
 <!-- next-header -->
 

@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["examples/attachments"]
+exclude = ["examples/attachments", "tools/ribir-bot"]
 members = [
   "core",
   "gpu",
@@ -24,6 +24,8 @@ debug = true
 lto = true
 strip = true
 codegen-units = 1
+opt-level = "z"
+
 
 [workspace.package]
 authors = ["RibirX<Adoo@outlook.com>"]

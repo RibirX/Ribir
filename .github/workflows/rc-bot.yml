@@ -1,0 +1,218 @@
+name: RC Bot
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'RC PR number to process'
+        required: true
+      command:
+        description: 'Command to run (release-highlights or release-social-card)'
+        required: true
+        default: 'release-highlights'
+
+jobs:
+  check:
+    # Only run for comments on PRs mentioning @ribir-bot, or workflow_dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request && contains(github.event.comment.body, '@ribir-bot'))
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    outputs:
+      should_run: ${{ steps.decision.outputs.should_run }}
+      command: ${{ steps.decision.outputs.command }}
+      context: ${{ steps.decision.outputs.context }}
+      branch: ${{ steps.decision.outputs.branch }}
+      pr_number: ${{ steps.decision.outputs.pr_number }}
+    steps:
+      - name: Check and Validate
+        id: decision
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Default to not running
+          echo "should_run=false" >> $GITHUB_OUTPUT
+
+          # 1. Determine PR Number & Validation Logic
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+            COMMAND="${{ github.event.inputs.command }}"
+            # Dispatch assumes admin/write permission by who triggered it
+            # We still need to verify it is an RC PR
+            BASE_BRANCH=$(gh pr view $PR_NUMBER --repo ${{ github.repository }} --json baseRefName -q '.baseRefName')
+            HEAD_BRANCH=$(gh pr view $PR_NUMBER --repo ${{ github.repository }} --json headRefName -q '.headRefName')
+            
+            if [[ "$BASE_BRANCH" == "master" && "$HEAD_BRANCH" =~ ^release-[0-9]+\.[0-9]+\.x$ ]]; then
+               echo "should_run=true" >> $GITHUB_OUTPUT
+               echo "command=$COMMAND" >> $GITHUB_OUTPUT
+               echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+               echo "branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
+               exit 0
+            else
+               echo "❌ Not an RC PR (dispatch)"
+               exit 0
+            fi
+          fi
+
+          # 2. Issue Comment Logic
+          PR_NUMBER="${{ github.event.issue.number }}"
+          COMMENT_USER="${{ github.event.comment.user.login }}"
+          PR_AUTHOR="${{ github.event.issue.user.login }}"
+          REPO="${{ github.repository }}"
+
+          # 2.1 Check if RC PR
+          BASE_BRANCH=$(gh pr view $PR_NUMBER --repo $REPO --json baseRefName -q '.baseRefName')
+          HEAD_BRANCH=$(gh pr view $PR_NUMBER --repo $REPO --json headRefName -q '.headRefName')
+
+          if [[ "$BASE_BRANCH" != "master" || ! "$HEAD_BRANCH" =~ ^release-[0-9]+\.[0-9]+\.x$ ]]; then
+             echo "❌ Not an RC PR detected during comment event."
+             # Exit success, stop workflow
+             exit 0
+          fi
+
+          # 2.2 Check Permissions
+          if [ "$COMMENT_USER" != "$PR_AUTHOR" ]; then
+             PERMISSION=$(gh api "/repos/$REPO/collaborators/$COMMENT_USER/permission" --jq '.permission')
+             if [ "$PERMISSION" != "write" ] && [ "$PERMISSION" != "admin" ]; then
+                echo "✗ User does not have permission"
+                exit 0
+             fi
+          fi
+
+          # 2.3 Parse Command
+          COMMENT="${{ github.event.comment.body }}"
+          BOT_LINE=$(echo "$COMMENT" | grep -E "^@ribir-bot\s+" | head -n 1)
+
+          if [ -z "$BOT_LINE" ]; then
+            echo "show_help=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          COMMAND=$(echo "$BOT_LINE" | sed -E 's/@ribir-bot\s+([a-z-]+).*/\1/')
+          CONTENT=$(echo "$BOT_LINE" | sed -E 's/@ribir-bot\s+[a-z-]+\s*//')
+          
+          # 2.4 Validate Command
+          case "$COMMAND" in
+            release-highlights|release-social-card)
+               echo "should_run=true" >> $GITHUB_OUTPUT
+               echo "command=$COMMAND" >> $GITHUB_OUTPUT
+               echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+               echo "branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
+               if [ -n "$CONTENT" ]; then
+                 echo "context<<EOF" >> $GITHUB_OUTPUT
+                 echo "$CONTENT" >> $GITHUB_OUTPUT
+                 echo "EOF" >> $GITHUB_OUTPUT
+               fi
+               ;;
+            help)
+               echo "show_help=true" >> $GITHUB_OUTPUT
+               ;;
+            *)
+               echo "show_help=true" >> $GITHUB_OUTPUT
+               echo "❌ Unknown RC command: $COMMAND"
+               ;;
+          esac
+
+      - name: Post Help Comment
+        if: steps.decision.outputs.show_help == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "## 🚀 RC Bot Commands
+          
+          Hi! I help manage Release Candidate PRs.
+          
+          ### Command Format
+          \`@ribir-bot COMMAND [CONTEXT]\`
+          
+          Commands must start with \`@ribir-bot\` at the beginning of a line.
+          
+          ### Available Commands
+          - \`@ribir-bot release-highlights [context]\` - Regenerate highlights section
+          - \`@ribir-bot release-social-card\` - Generate social card (coming soon)
+          - \`@ribir-bot help\` - Show this help message
+          
+          ### Note
+          Only the PR author and users with write access can use these commands."
+
+  execute:
+    needs: check
+    if: needs.check.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.branch }}
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache Gemini CLI
+        id: cache-gemini
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm-global
+          key: gemini-cli-0.22.4
+
+      - name: Install Gemini CLI
+        if: steps.cache-gemini.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.npm-global
+          npm config set prefix ~/.npm-global
+          npm install -g @google/gemini-cli@0.22.4
+
+      - name: Add Gemini to PATH
+        run: echo "$HOME/.npm-global/bin" >> $GITHUB_PATH
+
+      - name: Run RC Bot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          COMMAND: ${{ needs.check.outputs.command }}
+          CONTEXT: ${{ needs.check.outputs.context }}
+        run: |
+          # Convert release-highlights -> release highlights
+          SUBCMD=$(echo "$COMMAND" | sed 's/release-//')
+
+          cd tools/ribir-bot
+          if [ -n "$CONTEXT" ]; then
+            cargo run -- release $SUBCMD "$CONTEXT"
+          else
+            cargo run -- release $SUBCMD
+          fi
+
+          cd ../..
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+
+            # Amend if last commit was from bot, otherwise create new
+            if git log -1 --pretty=%B | grep -q "Generated by ribir-bot"; then
+              git commit --amend --no-edit
+              git push --force-with-lease
+            else
+              git commit -m "chore(release): regenerate release content
+
+              🤖 Generated by ribir-bot"
+              git push
+            fi
+          fi

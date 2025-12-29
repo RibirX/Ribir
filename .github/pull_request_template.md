@@ -1,18 +1,81 @@
-## Purpose of this Pull Request
+## Summary
+<!-- 
+Please explain:
+1. Why is this change needed? (Context/Problem)
+2. What does this change do? (Solution)
 
-*Please briefly describe what this Pull Request is aiming to achieve.*
+If this fixes an issue, use: Closes #123 
+-->
 
-## Checklist Before Merging
+<!-- RIBIR_SUMMARY_START -->
 
-Please ensure the following are completed before merging:
-- [ ] If this is linked to an issue, include the link in your description.
-- [ ] If you've made changes to the code or documentation, make sure these are updated in the `CHANGELOG.md` file.
-- [ ] If you've introduced any break changes, briefly describe them in the `Breaking` section of the `CHANGELOG.md` file.
+> 🤖 *Leave this placeholder to let AI generate, or replace with your summary.*
 
-## Additional Information
+<!-- RIBIR_SUMMARY_END -->
 
-**The bot will replace `#pr` in `CHANGELOG.md` with your pull request number. If your branch is out of sync, use `git pull --rebase` to update it.**
+## Changelog
 
-If you're unsure about which branch to submit your Pull Request to, or when it will be released after being merged, please refer to our [Release Guide](https://github.com/RibirX/Ribir/blob/master/RELEASE.md).
+<!-- These entries will be collected into release notes. Changelog entries are for external users, not internal technical context. -->
 
-If you're working on a widget and need help writing test cases, we have some macros that can assist you. Please refer to the [Ribir Dev Helper](https://docs.rs/ribir_dev_helper) documentation.
+<!-- RIBIR_CHANGELOG_START -->
+
+**Type:** `feat` | `fix` | `change` | `perf` | `docs` | `breaking`  
+**Scope:** `core` | `gpu` | `macros` | `widgets` | `themes` | `painter` | `cli` | `text` | `tools`
+
+> 🤖 *Leave this placeholder to let AI generate, or replace with your entries:*
+>
+> ```
+> - feat(widgets): add `Tooltip` widget with auto-positioning
+> - fix(core): prevent crash when window resizes to zero
+> ```
+
+- [ ] 🔧 No changelog needed (tests, CI, infra, or unreleased fix)
+<!-- RIBIR_CHANGELOG_END -->
+
+## Notes for Reviewers (Optional)
+<!--
+Help reviewers understand your code:
+- Key design decisions
+- Any potential side effects or risks
+-->
+
+*Leave blank if not applicable.*
+
+
+
+<details>
+<summary>🌐 WASM Preview (for UI changes)</summary>
+
+> 🚧 Coming soon: A bot will generate a WASM preview link when enabled.
+
+- [ ] Generate WASM preview
+- Example path: `examples/counter`
+
+</details>
+
+---
+
+> **Tip:** Run `cargo +nightly ci` locally to pre-verify your changes.
+
+<details>
+<summary>📚 Resources</summary>
+
+- [Contributing Guide](https://github.com/RibirX/Ribir/blob/master/CONTRIBUTING.md)
+- [Release Guide](https://github.com/RibirX/Ribir/blob/master/RELEASE.md)
+
+</details>
+
+<details>
+<summary>💡 Ribir Bot Commands</summary>
+
+You can control the bot via comments:
+
+```
+@ribir-bot pr-fill             # Auto-fill placeholders
+@ribir-bot pr-regen [context]  # Regenerate summary and changelog
+@ribir-bot pr-summary [context] # Regenerate only the summary
+@ribir-bot pr-entry [context]  # Regenerate only the changelog
+@ribir-bot help                # Show all available commands
+```
+
+</details>

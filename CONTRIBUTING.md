@@ -41,6 +41,10 @@ Ribir uses pixel-matching tests to ensure UI rendering remains correct.
     ```
 *   **Inspecting Failures**: If a visual test fails, an "actual" image and a "difference" image will be generated in `test_cases/` alongside the expected image for easy comparison.
 
+### Widget Testing
+
+If you're developing a widget, the [`ribir_dev_helper`](https://docs.rs/ribir_dev_helper) crate provides useful macros for testing. See its documentation for details.
+
 ---
 
 ## 🚀 Pull Request Process
