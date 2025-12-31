@@ -1,7 +1,7 @@
 use std::{cell::RefCell, future::Future, pin::Pin, sync::LazyLock};
 
 use log::warn;
-use ribir_algo::Sc;
+use ribir_algo::Rc;
 use ribir_painter::{TypographyStore, font_db::FontDB};
 use rxrust::LocalScheduler;
 
@@ -41,8 +41,8 @@ use crate::{
 /// - ⚠️ Using uninitialized context may lead to undefined behavior
 pub struct AppCtx {
   app_theme: Stateful<Theme>,
-  windows: RefCell<ahash::HashMap<WindowId, Sc<Window>>>,
-  font_db: Sc<RefCell<FontDB>>,
+  windows: RefCell<ahash::HashMap<WindowId, Rc<Window>>>,
+  font_db: Rc<RefCell<FontDB>>,
   typography_store: RefCell<TypographyStore>,
   clipboard: RefCell<Box<dyn Clipboard>>,
   event_sender: RefCell<Option<UnboundedSender<FrameworkEvent>>>,
@@ -59,7 +59,7 @@ struct ChangeDataset(RefCell<ChangeDatasetInner>);
 
 #[derive(Default)]
 struct ChangeDatasetInner {
-  dirty_info: Vec<(SmallVec<[PartialId; 1]>, Sc<WriterInfo>)>,
+  dirty_info: Vec<(SmallVec<[PartialId; 1]>, Rc<WriterInfo>)>,
   in_emit: bool,
 }
 
@@ -88,7 +88,7 @@ impl ChangeDataset {
     changed
   }
 
-  fn add_changed(&self, dirty_info: (SmallVec<[PartialId; 1]>, Sc<WriterInfo>)) {
+  fn add_changed(&self, dirty_info: (SmallVec<[PartialId; 1]>, Rc<WriterInfo>)) {
     self.0.borrow_mut().dirty_info.push(dirty_info);
     if !self.0.borrow().in_emit
       && self.0.borrow().dirty_info.len() == 1
@@ -175,7 +175,7 @@ impl AppCtx {
 
   pub async fn new_window(
     content: GenWidget, flags: WindowFlags, attrs: WindowAttributes,
-  ) -> Sc<Window> {
+  ) -> Rc<Window> {
     let fut = Self::shared()
       .shell
       .borrow()
@@ -207,7 +207,7 @@ impl AppCtx {
   /// belongs to `Window`.
   #[track_caller]
   #[inline]
-  pub fn get_window(id: WindowId) -> Option<Sc<Window>> {
+  pub fn get_window(id: WindowId) -> Option<Rc<Window>> {
     Self::shared().windows.borrow().get(&id).cloned()
   }
 
@@ -215,12 +215,12 @@ impl AppCtx {
   /// the window not found.
   #[track_caller]
   #[inline]
-  pub fn get_window_assert(id: WindowId) -> Sc<Window> {
+  pub fn get_window_assert(id: WindowId) -> Rc<Window> {
     Self::get_window(id).expect("Window not found!")
   }
 
   /// Return the windows collection of the application.
-  pub fn windows() -> &'static RefCell<ahash::HashMap<WindowId, Sc<Window>>> {
+  pub fn windows() -> &'static RefCell<ahash::HashMap<WindowId, Rc<Window>>> {
     &Self::shared().windows
   }
 
@@ -250,7 +250,7 @@ impl AppCtx {
 
   /// Get the font database of the application.
   #[track_caller]
-  pub fn font_db() -> &'static Sc<RefCell<FontDB>> { &Self::shared().font_db }
+  pub fn font_db() -> &'static Rc<RefCell<FontDB>> { &Self::shared().font_db }
 
   /// Set the theme of the application
   ///
@@ -281,7 +281,7 @@ impl AppCtx {
       .end_frame();
   }
 
-  pub(crate) fn data_changed(path: SmallVec<[PartialId; 1]>, writer: Sc<WriterInfo>) {
+  pub(crate) fn data_changed(path: SmallVec<[PartialId; 1]>, writer: Rc<WriterInfo>) {
     AppCtx::shared()
       .change_dataset
       .add_changed((path, writer));
@@ -391,7 +391,7 @@ impl Default for AppCtx {
     let mut font_db = FontDB::default();
     font_db.load_system_fonts();
 
-    let font_db = Sc::new(RefCell::new(font_db));
+    let font_db = Rc::new(RefCell::new(font_db));
     let typography_store = RefCell::new(TypographyStore::new(font_db.clone()));
 
     AppCtx {
@@ -419,7 +419,7 @@ pub mod test_utils {
     sync::{Mutex, MutexGuard},
   };
 
-  use ribir_algo::Sc;
+  use ribir_algo::Rc;
   use tokio::{
     runtime::EnterGuard,
     sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
@@ -579,7 +579,7 @@ pub mod test_utils {
       TestRuntimeGuard { _sender: ui_sender, old_sender, _runtime_guard, _local_enter_guard }
     }
 
-    pub fn insert_window(wnd: Sc<Window>) {
+    pub fn insert_window(wnd: Rc<Window>) {
       AppCtx::windows()
         .borrow_mut()
         .insert(wnd.id(), wnd);

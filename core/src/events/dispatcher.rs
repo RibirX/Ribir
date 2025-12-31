@@ -13,7 +13,7 @@ use crate::{
 /// (on_pointer_down, on_pointer_move, and on_pointer_up) until the handle's
 /// release() is called or the GrabPointer is dropped; other widgets get no
 /// pointer events at all.
-pub struct GrabPointer(Sc<RefCell<Option<WidgetId>>>);
+pub struct GrabPointer(Rc<RefCell<Option<WidgetId>>>);
 
 impl GrabPointer {
   /// Grab the pointer input to the widget corresponding to the wid.
@@ -36,7 +36,7 @@ pub(crate) struct Dispatcher {
   wnd_id: WindowId,
   pub(crate) info: DispatchInfo,
   pub(crate) entered_widgets: Vec<WidgetId>,
-  grab_mouse_wid: Sc<RefCell<Option<WidgetId>>>,
+  grab_mouse_wid: Rc<RefCell<Option<WidgetId>>>,
   pointer_down_wid: Option<WidgetId>,
 }
 
@@ -46,7 +46,7 @@ impl Dispatcher {
       wnd_id,
       info: <_>::default(),
       entered_widgets: vec![],
-      grab_mouse_wid: Sc::new(RefCell::new(None)),
+      grab_mouse_wid: Rc::new(RefCell::new(None)),
       pointer_down_wid: None,
     }
   }
@@ -64,7 +64,7 @@ impl Dispatcher {
     }
   }
 
-  fn window(&self) -> Sc<Window> {
+  fn window(&self) -> Rc<Window> {
     AppCtx::get_window(self.wnd_id).expect("The window of the `Dispatcher` already dropped")
   }
 }

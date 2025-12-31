@@ -32,9 +32,9 @@ pub enum MenuEventData {
   Enter { idx: usize, label: CowArc<str>, menu: MenuControl },
   /// Emitted when the menu is completed,
   /// the MenuItemControl is the item that is triggered,
-  /// the Option<Sc<dyn Any>> is the data that is returned from the item.
+  /// the Option<Resource<dyn Any>> is the data that is returned from the item.
   /// if the sub_menu's complete event is not stopped, the menu will be closed.
-  Complete { idx: usize, label: CowArc<str>, menu: MenuControl, data: Option<Sc<dyn Any>> },
+  Complete { idx: usize, label: CowArc<str>, menu: MenuControl, data: Option<Rc<Box<dyn Any>>> },
 }
 
 /// the menu event will be emitted from the menu item that is triggered
@@ -84,7 +84,7 @@ pub struct Menu {}
 
 /// the controller of the popup menu
 #[derive(Clone)]
-pub struct MenuControl(Sc<RefCell<MenuData>>);
+pub struct MenuControl(Rc<RefCell<MenuData>>);
 
 struct MenuItemData {
   wid: TrackId,
@@ -103,7 +103,7 @@ struct MenuData {
 impl MenuControl {
   /// Receive a function generator of widget return a MenuControl
   pub fn new<K: ?Sized>(gen_widget: impl RInto<GenWidget, K>) -> Self {
-    Self(Sc::new(RefCell::new(MenuData {
+    Self(Rc::new(RefCell::new(MenuData {
       gen_widget: gen_widget.r_into(),
       handle: None,
       item_trigger: None,
@@ -117,13 +117,13 @@ impl MenuControl {
   pub fn is_show(&self) -> bool { self.0.borrow().handle.is_some() }
 
   /// Show the menu
-  pub fn show(&self, wnd: &Sc<Window>) {
+  pub fn show(&self, wnd: &Rc<Window>) {
     let gen_widget = self.0.borrow().gen_widget.clone();
     self.inner_show(gen_widget, None, wnd);
   }
 
   /// Focus the menu
-  pub fn focus(&self, wnd: &Sc<Window>) {
+  pub fn focus(&self, wnd: &Rc<Window>) {
     if let Some(id) = self
       .0
       .borrow()
@@ -137,16 +137,16 @@ impl MenuControl {
 
   /// Show the menu around the target rect, the target rect is relative to the
   /// window
-  pub fn show_around(&self, target: Rect, wnd: &Sc<Window>) {
+  pub fn show_around(&self, target: Rect, wnd: &Rc<Window>) {
     self.show_map(anchor_around(target), wnd);
   }
 
   /// Show the menu around the global position
-  pub fn show_at(&self, pos: Point, wnd: &Sc<Window>) {
+  pub fn show_at(&self, pos: Point, wnd: &Rc<Window>) {
     self.show_map(anchor_around(Rect::new(pos, Size::zero())), wnd);
   }
 
-  pub fn show_map<F>(&self, mut f: F, wnd: &Sc<Window>)
+  pub fn show_map<F>(&self, mut f: F, wnd: &Rc<Window>)
   where
     F: FnMut(Widget<'static>) -> Widget<'static> + 'static,
   {
@@ -156,7 +156,7 @@ impl MenuControl {
   }
 
   /// Close the menu
-  pub fn close(&self, wnd: &Sc<Window>) {
+  pub fn close(&self, wnd: &Rc<Window>) {
     let mut this = self.0.borrow_mut();
     if this.handle.is_none() {
       return;
@@ -178,7 +178,7 @@ impl MenuControl {
   }
 
   /// Select the next selectable item
-  pub fn select_next(&self, forward: bool, wnd: &Sc<Window>) {
+  pub fn select_next(&self, forward: bool, wnd: &Rc<Window>) {
     let calc_next_idx = |this: &MenuData| {
       let len = this.items.len();
       if len == 0 {
@@ -204,7 +204,7 @@ impl MenuControl {
   ///
   /// Returns:
   /// return true if select successfully, false otherwise.
-  pub fn select(&self, idx: Option<usize>, wnd: &Sc<Window>) -> bool {
+  pub fn select(&self, idx: Option<usize>, wnd: &Rc<Window>) -> bool {
     let mut this = self.0.borrow_mut();
     if this.selected == idx {
       return true;
@@ -243,7 +243,7 @@ impl MenuControl {
   ///
   /// Return:
   /// return true if enter successfully, false otherwise.
-  pub fn enter(&self, idx: usize, wnd: &Sc<Window>) -> bool {
+  pub fn enter(&self, idx: usize, wnd: &Rc<Window>) -> bool {
     if !self.select(Some(idx), wnd) {
       return false;
     }
@@ -258,7 +258,7 @@ impl MenuControl {
 
   fn selected(&self) -> Option<usize> { self.0.borrow().selected }
 
-  fn inner_show(&self, gen_widget: GenWidget, parent: Option<ParentMenuInfo>, wnd: &Sc<Window>) {
+  fn inner_show(&self, gen_widget: GenWidget, parent: Option<ParentMenuInfo>, wnd: &Rc<Window>) {
     let handle = self.clone();
     let fn_gen = GenWidget::from_fn_widget(fn_widget! {
       let mut w = FatObj::new(gen_widget.clone());
@@ -309,7 +309,7 @@ impl MenuControl {
   }
 
   fn show_sub_menu(
-    &self, from_item: usize, sub_menu: &MenuControl, around_wid: WidgetId, wnd: &Sc<Window>,
+    &self, from_item: usize, sub_menu: &MenuControl, around_wid: WidgetId, wnd: &Rc<Window>,
   ) {
     let pos = wnd.map_to_global(Point::zero(), around_wid);
     let size = wnd.widget_size(around_wid).unwrap();
@@ -324,7 +324,7 @@ impl MenuControl {
   }
 
   // emit MenuEventData::Complete
-  pub fn complete(&self, label: CowArc<str>, data: Option<Sc<dyn Any>>, wnd: &Sc<Window>) {
+  pub fn complete(&self, label: CowArc<str>, data: Option<Rc<Box<dyn Any>>>, wnd: &Rc<Window>) {
     let this = self.0.borrow();
     if let Some(idx) = this
       .items
@@ -664,7 +664,7 @@ mod tests {
       on_custom_concrete_event: move|e: &mut MenuEvent| {
         if let MenuEventData::Enter{ menu, label,.. } = e.data() {
           let s = "close from sub item".to_string();
-          menu.complete(label.clone(), Some(Sc::new_any(s)), &e.window());
+          menu.complete(label.clone(), Some(Rc::new(Box::new(s))), &e.window());
         }
       },
       @ MenuItem {
@@ -677,7 +677,7 @@ mod tests {
     let menu = MenuControl::new(menu! {
         on_custom_concrete_event: move |e: &mut MenuEvent| {
           if let MenuEventData::Complete{data: Some(data), ..} = e.data()
-            && let Ok(s) = data.clone().downcast::<String>()
+            && let Some(s) = data.downcast_ref::<String>()
           {
             *$write(w) = s.to_string();
           }

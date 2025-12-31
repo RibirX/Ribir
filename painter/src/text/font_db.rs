@@ -3,7 +3,7 @@ use std::{cell::RefCell, num::NonZeroU16, ops::Deref, sync::Arc};
 use ahash::HashMap;
 use fontdb::{Database, Query};
 pub use fontdb::{FaceInfo, Family, ID};
-use ribir_algo::{Resource, Sc};
+use ribir_algo::{Rc, Resource};
 use ribir_geom::{Point, Rect, rect};
 use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
 
@@ -30,7 +30,7 @@ pub enum GlyphBaseline {
   Middle,
 }
 
-type FontGlyphCache<K, V> = Sc<RefCell<HashMap<K, Option<V>>>>;
+type FontGlyphCache<K, V> = Rc<RefCell<HashMap<K, Option<V>>>>;
 #[derive(Clone)]
 pub struct Face {
   pub face_id: ID,
@@ -39,7 +39,7 @@ pub struct Face {
   pub rb_face: rustybuzz::Face<'static>,
   raster_image_glyphs: FontGlyphCache<GlyphId, Resource<PixelImage>>,
   outline_glyphs: FontGlyphCache<GlyphId, Resource<Path>>,
-  svg_glyphs: Sc<RefCell<SvgGlyphCache>>,
+  svg_glyphs: Rc<RefCell<SvgGlyphCache>>,
   x_height: u16,
   cap_height: i16,
   ascender: i16,

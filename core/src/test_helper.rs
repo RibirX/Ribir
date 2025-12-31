@@ -27,7 +27,7 @@ pub fn split_value<T: 'static>(v: T) -> (Watcher<Reader<T>>, Stateful<T>) {
 /// The Window assists in writing unit tests; animations are disabled by
 /// default.
 #[derive(Clone)]
-pub struct TestWindow(pub Sc<Window>);
+pub struct TestWindow(pub Rc<Window>);
 
 #[macro_export]
 macro_rules! reset_test_env {

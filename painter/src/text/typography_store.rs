@@ -1,7 +1,7 @@
 use std::{cell::RefCell, ops::Range};
 
 use font_db::GlyphBaseline;
-use ribir_algo::{FrameCache, Sc, Substr};
+use ribir_algo::{FrameCache, Rc, Substr};
 use ribir_geom::{Point, Rect, Size};
 
 use crate::{
@@ -37,8 +37,8 @@ pub struct TypographyKey {
 pub struct TypographyStore {
   reorder: TextReorder,
   shaper: TextShaper,
-  font_db: Sc<RefCell<FontDB>>,
-  cache: FrameCache<TypographyKey, Sc<VisualInfos>>,
+  font_db: Rc<RefCell<FontDB>>,
+  cache: FrameCache<TypographyKey, Rc<VisualInfos>>,
 }
 
 #[derive(Clone)]
@@ -46,12 +46,12 @@ pub struct VisualGlyphs {
   font_size: f32,
   x: GlyphUnit,
   y: GlyphUnit,
-  visual_info: Sc<VisualInfos>,
-  order_info: Sc<ReorderResult>,
+  visual_info: Rc<VisualInfos>,
+  order_info: Rc<ReorderResult>,
 }
 
 impl VisualGlyphs {
-  pub fn new(font_size: f32, order_info: Sc<ReorderResult>, visual_info: Sc<VisualInfos>) -> Self {
+  pub fn new(font_size: f32, order_info: Rc<ReorderResult>, visual_info: Rc<VisualInfos>) -> Self {
     Self { font_size, visual_info, order_info, x: GlyphUnit::ZERO, y: GlyphUnit::ZERO }
   }
 
@@ -81,7 +81,7 @@ impl VisualGlyphs {
 }
 
 impl TypographyStore {
-  pub fn new(font_db: Sc<RefCell<FontDB>>) -> Self {
+  pub fn new(font_db: Rc<RefCell<FontDB>>) -> Self {
     let reorder = TextReorder::default();
     let shaper = TextShaper::new(font_db.clone());
     TypographyStore { reorder, shaper, font_db, cache: <_>::default() }
@@ -152,7 +152,7 @@ impl TypographyStore {
 
       let t_man = TypographyMan::new(inputs, line_dir, text_align, line_height, bounds, overflow);
       let visual_info = t_man.typography_all();
-      let infos = Sc::new(visual_info);
+      let infos = Rc::new(visual_info);
       self.cache.put(key, infos.clone());
       infos
     };
@@ -160,7 +160,7 @@ impl TypographyStore {
     VisualGlyphs::new(font_size, info, infos.clone())
   }
 
-  pub fn font_db(&self) -> &Sc<RefCell<FontDB>> { &self.font_db }
+  pub fn font_db(&self) -> &Rc<RefCell<FontDB>> { &self.font_db }
 }
 
 impl VisualGlyphs {
@@ -510,7 +510,7 @@ mod tests {
   use crate::FontFamily;
 
   fn test_store() -> TypographyStore {
-    let font_db = Sc::new(RefCell::new(FontDB::default()));
+    let font_db = Rc::new(RefCell::new(FontDB::default()));
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
     let _ = font_db.borrow_mut().load_font_file(path);
     TypographyStore::new(font_db)

@@ -5,6 +5,6 @@ mod frame_cache;
 pub use cow_rc::{CowArc, Substr};
 pub use frame_cache::*;
 mod resource;
+// Re-export rclite::Rc for convenience
+pub use rclite::Rc;
 pub use resource::*;
-mod sc;
-pub use sc::*;

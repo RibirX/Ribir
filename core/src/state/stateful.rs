@@ -1,18 +1,18 @@
 use std::{cell::Cell, convert::Infallible};
 
-use ribir_algo::Sc;
+use ribir_algo::Rc;
 use smallvec::{SmallVec, smallvec};
 
 use crate::prelude::*;
 
 /// Stateful object use to watch the modifies of the inner data.
 pub struct Stateful<W> {
-  data: Sc<StateCell<W>>,
-  info: Sc<WriterInfo>,
+  data: Rc<StateCell<W>>,
+  info: Rc<WriterInfo>,
   include_partial: bool,
 }
 
-pub struct Reader<W>(pub(crate) Sc<StateCell<W>>);
+pub struct Reader<W>(pub(crate) Rc<StateCell<W>>);
 
 /// The notifier is a `rxRust` stream that emit notification when the state
 /// changed.
@@ -74,11 +74,11 @@ impl<W: 'static> StateReader for Stateful<W> {
   fn clone_reader(&self) -> Self::Reader { Reader(self.data.clone()) }
 
   fn try_into_value(self) -> Result<W, Self> {
-    if self.data.ref_count() == 1 {
+    if self.data.strong_count() == 1 {
       let data = self.data.clone();
       drop(self);
-      // SAFETY: `self.data.ref_count() == 1` guarantees unique access.
-      let data = unsafe { Sc::try_unwrap(data).unwrap_unchecked() };
+      // SAFETY: `self.data.strong_count() == 1` guarantees unique access.
+      let data = unsafe { Rc::try_unwrap(data).unwrap_unchecked() };
       Ok(data.into_inner())
     } else {
       Err(self)
@@ -155,9 +155,9 @@ impl<W: 'static> StateReader for Reader<W> {
   fn clone_reader(&self) -> Self { Reader(self.0.clone()) }
 
   fn try_into_value(self) -> Result<Self::Value, Self> {
-    if self.0.ref_count() == 1 {
-      // SAFETY: `self.0.ref_count() == 1` guarantees unique access.
-      let data = unsafe { Sc::try_unwrap(self.0).unwrap_unchecked() };
+    if self.0.strong_count() == 1 {
+      // SAFETY: `self.0.strong_count() == 1` guarantees unique access.
+      let data = unsafe { Rc::try_unwrap(self.0).unwrap_unchecked() };
       Ok(data.into_inner())
     } else {
       Err(self)
@@ -183,8 +183,8 @@ impl Drop for WriterInfo {
 impl<W> Stateful<W> {
   pub fn new(data: W) -> Self {
     Self {
-      data: Sc::new(StateCell::new(data)),
-      info: Sc::new(WriterInfo::new()),
+      data: Rc::new(StateCell::new(data)),
+      info: Rc::new(WriterInfo::new()),
       include_partial: false,
     }
   }
@@ -196,7 +196,7 @@ impl<W> Stateful<W> {
   /// - The associated metadata
   #[inline]
   pub fn ptr_eq(this: &Self, other: &Self) -> bool {
-    Sc::ptr_eq(&this.data, &other.data) && Sc::ptr_eq(&this.info, &other.info)
+    Rc::ptr_eq(&this.data, &other.data) && Rc::ptr_eq(&this.info, &other.info)
   }
 
   pub fn from_pipe(p: Pipe<W>) -> (Self, BoxedSubscription)
@@ -389,7 +389,7 @@ mod tests {
   fn change_notify() {
     crate::reset_test_env!();
 
-    let notified = Sc::new(RefCell::new(vec![]));
+    let notified = Rc::new(RefCell::new(vec![]));
     let c_notified = notified.clone();
     let w = Stateful::new(MockBox { size: Size::zero() });
     w.raw_modifies()
@@ -458,8 +458,8 @@ mod tests {
     let _r = v.clone_reader();
 
     AppCtx::run_until_stalled();
-    assert_eq!(v.data.ref_count(), 2);
-    assert_eq!(v.info.ref_count(), 1);
+    assert_eq!(v.data.strong_count(), 2);
+    assert_eq!(v.info.strong_count(), 1);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -475,8 +475,8 @@ mod tests {
       .subscribe(|v| println!("{v}"));
 
     AppCtx::run_until_stalled();
-    assert_eq!(v.data.ref_count(), 2);
-    assert_eq!(v.info.ref_count(), 1);
+    assert_eq!(v.data.strong_count(), 2);
+    assert_eq!(v.info.strong_count(), 1);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -490,8 +490,8 @@ mod tests {
     let _ = watch!(*$read(v)).subscribe(|v| println!("{v}"));
 
     AppCtx::run_until_stalled();
-    assert_eq!(v.data.ref_count(), 2);
-    assert_eq!(v.info.ref_count(), 1);
+    assert_eq!(v.data.strong_count(), 2);
+    assert_eq!(v.info.strong_count(), 1);
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -511,7 +511,7 @@ mod tests {
       let u = watch!(*$read(v)).subscribe(move |_| *v.write() = 2);
       u.unsubscribe();
       AppCtx::run_until_stalled();
-      assert_eq!(info.ref_count(), 1);
+      assert_eq!(info.strong_count(), 1);
     }
 
     AppCtx::run_until_stalled();

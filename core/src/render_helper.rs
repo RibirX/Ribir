@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use ribir_algo::Sc;
+use ribir_algo::Rc;
 use smallvec::SmallVec;
 use state_cell::StateCell;
 
@@ -62,7 +62,7 @@ impl<R: Render> RenderProxy for StateCell<R> {
   fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self.read() }
 }
 
-impl<R: Render> RenderProxy for Sc<R> {
+impl<R: Render> RenderProxy for Rc<R> {
   fn proxy(&self) -> impl Deref<Target = impl Render + ?Sized> { self }
 }
 

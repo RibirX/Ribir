@@ -1,6 +1,6 @@
 use std::ptr::NonNull;
 
-use ribir_algo::Sc;
+use ribir_algo::Rc;
 use ribir_geom::{Point, Rect, Size};
 
 use crate::{
@@ -94,7 +94,7 @@ pub trait WidgetCtx {
   // widget `w`.
   fn query_write_of_widget<T: 'static>(&self, w: WidgetId) -> Option<WriteRef<'_, T>>;
   /// Retrieve the window associated with this context.
-  fn window(&self) -> Sc<Window>;
+  fn window(&self) -> Rc<Window>;
 }
 
 pub(crate) trait WidgetCtxImpl {
@@ -214,7 +214,7 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
     w.query_write(self.tree())
   }
 
-  fn window(&self) -> Sc<Window> { self.tree().window() }
+  fn window(&self) -> Rc<Window> { self.tree().window() }
 }
 
 pub struct HitTestCtx {

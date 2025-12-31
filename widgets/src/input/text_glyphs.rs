@@ -231,7 +231,7 @@ mod tests {
   use crate::{input::text_glyphs::VisualGlyphsHelper, prelude::CaretPosition};
 
   fn test_store() -> TypographyStore {
-    let font_db = Sc::new(RefCell::new(FontDB::default()));
+    let font_db = Rc::new(RefCell::new(FontDB::default()));
     let path = env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/DejaVuSans.ttf";
     let _ = font_db.borrow_mut().load_font_file(path);
     TypographyStore::new(font_db)

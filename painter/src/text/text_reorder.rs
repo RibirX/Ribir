@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use ribir_algo::{FrameCache, Sc, Substr};
+use ribir_algo::{FrameCache, Rc, Substr};
 use unicode_bidi::{BidiClass, BidiInfo, Level, LevelRun};
 
 pub struct Paragraph {
@@ -16,15 +16,15 @@ pub struct ReorderResult {
 // unnecessary cache
 #[derive(Default)]
 pub struct TextReorder {
-  cache: FrameCache<Substr, Sc<ReorderResult>>,
+  cache: FrameCache<Substr, Rc<ReorderResult>>,
 }
 
 impl TextReorder {
-  pub fn get_cache(&mut self, text: &Substr) -> Option<Sc<ReorderResult>> {
+  pub fn get_cache(&mut self, text: &Substr) -> Option<Rc<ReorderResult>> {
     self.cache.get(text).cloned()
   }
 
-  pub fn reorder_text(&mut self, text: &Substr) -> &Sc<ReorderResult> {
+  pub fn reorder_text(&mut self, text: &Substr) -> &Rc<ReorderResult> {
     self.cache.get_or_insert(text.clone(), || {
       let info = BidiInfo::new(text, None);
       let mut paras: Vec<Paragraph> = info
@@ -44,7 +44,7 @@ impl TextReorder {
         })
       }
 
-      Sc::new(ReorderResult { original_classes: info.original_classes, paras })
+      Rc::new(ReorderResult { original_classes: info.original_classes, paras })
     })
   }
 

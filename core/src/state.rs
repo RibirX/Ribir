@@ -189,7 +189,7 @@ pub struct WriteRef<'a, V: ?Sized> {
 }
 
 struct WriteRefNotifyGuard<'a> {
-  info: &'a Sc<WriterInfo>,
+  info: &'a Rc<WriterInfo>,
   modify_effect: ModifyEffect,
   modified: bool,
   path: SmallVec<[PartialId; 1]>,
@@ -202,7 +202,7 @@ impl PartialId {
 
 impl<'a, V: ?Sized + 'a> WriteRef<'a, V> {
   fn new(
-    value: ValueMutRef<'a, V>, info: &'a Sc<WriterInfo>, path: SmallVec<[PartialId; 1]>,
+    value: ValueMutRef<'a, V>, info: &'a Rc<WriterInfo>, path: SmallVec<[PartialId; 1]>,
     modify_effect: ModifyEffect,
   ) -> Self {
     let notify_guard = WriteRefNotifyGuard { info, modify_effect, path, modified: false };
@@ -458,8 +458,8 @@ mod tests {
     let origin = Stateful::new(Origin { a: 0, b: 0 });
     let map_state = origin.part_writer(PartialId::any(), |v| PartMut::new(&mut v.b));
 
-    let track_origin = Sc::new(Cell::new(0));
-    let track_map = Sc::new(Cell::new(0));
+    let track_origin = Rc::new(Cell::new(0));
+    let track_map = Rc::new(Cell::new(0));
 
     let c_origin = track_origin.clone();
     origin.modifies().subscribe(move |_| {
@@ -495,9 +495,9 @@ mod tests {
     let split_a = origin.part_writer("a".into(), |v| PartMut::new(&mut v.a));
     let split_b = origin.part_writer("b".into(), |v| PartMut::new(&mut v.b));
 
-    let track_origin = Sc::new(Cell::new(0));
-    let track_split_a = Sc::new(Cell::new(0));
-    let track_split_b = Sc::new(Cell::new(0));
+    let track_origin = Rc::new(Cell::new(0));
+    let track_split_a = Rc::new(Cell::new(0));
+    let track_split_b = Rc::new(Cell::new(0));
 
     let c_origin = track_origin.clone();
     origin.modifies().subscribe(move |s| {

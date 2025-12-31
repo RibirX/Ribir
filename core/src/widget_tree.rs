@@ -23,7 +23,7 @@ pub enum DirtyPhase {
   Paint,
 }
 
-pub(crate) type DirtySet = Sc<RefCell<ahash::HashMap<WidgetId, DirtyPhase>>>;
+pub(crate) type DirtySet = Rc<RefCell<ahash::HashMap<WidgetId, DirtyPhase>>>;
 
 pub(crate) struct WidgetTree {
   pub(crate) root: WidgetId,
@@ -150,7 +150,7 @@ impl WidgetTree {
   #[allow(unused)]
   pub(crate) fn count(&self, wid: WidgetId) -> usize { wid.descendants(self).count() }
 
-  pub(crate) fn window(&self) -> Sc<Window> {
+  pub(crate) fn window(&self) -> Rc<Window> {
     AppCtx::get_window(self.wnd_id).expect("Must initialize the widget tree before use it.")
   }
 

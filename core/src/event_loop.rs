@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use ribir_algo::Sc;
+use ribir_algo::Rc;
 use ribir_geom::Size;
 use rxrust::prelude::Observer;
 use tokio::{select, sync::mpsc::UnboundedReceiver};
@@ -93,14 +93,14 @@ impl EventLoop {
 struct IdleHandle {}
 
 struct FrameHandle {
-  wnd: Sc<Window>,
+  wnd: Rc<Window>,
   need_redraw: bool,
   has_data_changed: bool,
   events: Vec<RibirEvent>,
 }
 
 impl FrameHandle {
-  fn new(wnd: Sc<Window>, force_draw: bool) -> Self {
+  fn new(wnd: Rc<Window>, force_draw: bool) -> Self {
     let wnd_id = wnd.id();
     let this = Self { wnd, events: vec![], need_redraw: force_draw, has_data_changed: false };
 

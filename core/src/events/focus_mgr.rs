@@ -106,7 +106,7 @@ impl FocusManager {
     }
   }
 
-  pub(crate) fn window(&self) -> Sc<Window> {
+  pub(crate) fn window(&self) -> Rc<Window> {
     AppCtx::get_window(self.wnd_id).expect("The window of `FocusManager` has already dropped.")
   }
 
@@ -679,7 +679,7 @@ mod tests {
 
     #[derive(Debug, Default, Clone)]
     struct EmbedFocus {
-      log: Sc<RefCell<Vec<&'static str>>>,
+      log: Rc<RefCell<Vec<&'static str>>>,
     }
 
     impl Compose for EmbedFocus {
@@ -721,7 +721,7 @@ mod tests {
     }
 
     let widget = EmbedFocus::default();
-    let log: Sc<RefCell<Vec<&str>>> = widget.log.clone();
+    let log: Rc<RefCell<Vec<&str>>> = widget.log.clone();
     let wnd = TestWindow::from_widget(fn_widget! {
       widget.clone()
     });

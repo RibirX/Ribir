@@ -189,7 +189,7 @@ mod tests {
     reset_test_env!();
     let (build_cnt, build_w) = split_value(0);
     let (item_cnt, item_w) = split_value(1);
-    let local_scope = Sc::new(RefCell::new(None));
+    let local_scope = Rc::new(RefCell::new(None));
     let local_scope2 = local_scope.clone();
     let w = fn_widget! {
 

@@ -16,7 +16,7 @@ pub struct BuildCtx {
 
 impl BuildCtx {
   /// Return the window of this context is created from.
-  pub fn window(&self) -> Sc<Window> { self.tree().window() }
+  pub fn window(&self) -> Rc<Window> { self.tree().window() }
 
   /// Return the variant of `Color` provided in the current build context.
   pub fn color() -> Variant<Color> { Variant::new(BuildCtx::get()).unwrap() }
