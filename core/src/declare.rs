@@ -66,7 +66,7 @@ where
   P: RInto<V, K> + 'static,
 {
   fn r_from(value: Pipe<P>) -> Self {
-    let pipe = value.transform(|stream| stream.map(RInto::r_into).box_it());
+    let pipe = value.transform(|stream| stream.map(RInto::r_into));
     Self::Pipe { init_value: V::default(), pipe }
   }
 }

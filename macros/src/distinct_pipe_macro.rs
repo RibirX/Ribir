@@ -9,7 +9,7 @@ pub fn gen_code(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>) -> Tok
   let res = process_watch_body(input, refs_ctx).map(|WatchBody { upstream, map_handler }| {
     quote_spanned! {span =>
       Pipe::new(#upstream.box_it(), #map_handler)
-        .transform(|s| s.distinct_until_changed().box_it())
+        .transform(|s| s.distinct_until_changed())
     }
   });
   result_to_token_stream(res)

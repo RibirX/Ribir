@@ -290,7 +290,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
           itmes.push(@ListCustomItem {
             interactive: false,
             @ { pipe!(*$read(editing) == Some(id))
-              .transform(|s| s.distinct_until_changed().box_it())
+                .transform(|s| s.distinct_until_changed())
               .map(move |b| fn_widget! {
                 task_item($writer(task))
               })
@@ -415,7 +415,7 @@ fn_widget! {
           widgets.push(@ListCustomItem {
             interactive: false,
             @ { pipe!(*$read(editing) == Some(id))
-              .transform(|s| s.distinct_until_changed().box_it())
+                .transform(|s| s.distinct_until_changed())
               .map(move |b| fn_widget!{
                 if b {
                   let mut input = @Input { auto_focus: true };
@@ -634,7 +634,7 @@ fn task_lists(this: &impl StateWriter<Value = Todos>, cond: fn(&Task) -> bool) -
             widgets.push(@ListCustomItem {
               interactive: false,
               @ { pipe!(*$read(editing) == Some(id))
-                .transform(|s| s.distinct_until_changed().box_it())
+                  .transform(|s| s.distinct_until_changed())
                 .map(move |b| fn_widget!{
                   if b {
                     let mut input = @Input { auto_focus: true };

@@ -32,7 +32,7 @@ fn run_button() -> Widget<'static> {
       },
       @{
         pipe!($read(pomodoro).is_running())
-          .transform(|obs| obs.distinct_until_changed().box_it())
+          .transform(|obs| obs.distinct_until_changed())
           .map(move |running| {
             if running {
               svg_registry::get("pause")
@@ -61,7 +61,7 @@ fn mode_icon() -> Widget<'static> {
       },
       @{
         pipe!($read(ui_state).in_mini())
-          .transform(|obs| obs.distinct_until_changed().box_it())
+          .transform(|obs| obs.distinct_until_changed())
           .map(move |in_mini| {
             if in_mini {
               svg_registry::get("full")
@@ -92,7 +92,7 @@ fn keep_icon() -> Widget<'static> {
       },
       @{
         pipe!($read(ui_state).keep_on_top)
-          .transform(|obs| obs.distinct_until_changed().box_it())
+          .transform(|obs| obs.distinct_until_changed())
           .map(move |always_on_top| {
             if always_on_top {
               svg_registry::get("pin")
@@ -234,7 +234,7 @@ pub(crate) fn main_page() -> Widget<'static> {
           },
           @ {
             pipe!($read(pomodoro).volume <= 0.)
-            .transform(|obs| obs.distinct_until_changed().box_it())
+            .transform(|obs| obs.distinct_until_changed())
             .map(move |muted| {
                 if muted {
                 svg_registry::get("volume_off")
