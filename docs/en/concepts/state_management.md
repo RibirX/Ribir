@@ -215,7 +215,7 @@ fn advanced_pipe() -> Widget<'static> {
             @Text {
                 // Only update the text if the value is even
                 text: pipe!(*$read(count))
-                    .transform(|s| s.filter(|v| v % 2 == 0).box_it())
+                    .transform(|s| s.filter(|v| v % 2 == 0))
                     .map(|v| format!("Even number: {}", v))
             }
             @Button {

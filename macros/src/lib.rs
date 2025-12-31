@@ -148,7 +148,7 @@ pub fn ribir_expanded_ಠ_ಠ(input: TokenStream) -> TokenStream { input }
 pub fn pipe(input: TokenStream) -> TokenStream { pipe_macro::gen_code(input.into(), None).into() }
 
 /// A shorthand macro for `pipe!` can be utilized as follows:
-/// `pipe!(...).value_chain(|s| s.distinct_until_changed().box_it())`.
+/// `pipe!(...).transform(|s| s.distinct_until_changed())`.
 ///
 /// It triggers when the new result differs from the previous one. The `$`
 /// symbol denotes the state reference and automatically subscribes to any

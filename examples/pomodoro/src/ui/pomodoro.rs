@@ -88,7 +88,7 @@ impl Compose for Pomodoro {
         @WindowBar {}
         @ {
           pipe!($read(ui_state).current_page)
-            .transform(|p| p.distinct_until_changed().box_it())
+            .transform(|p| p.distinct_until_changed())
             .map(move |b| match b {
               PomodoroPage::Main => main_page(),
               PomodoroPage::Mini => concise_page(),

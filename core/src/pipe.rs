@@ -74,7 +74,7 @@ impl<V: 'static> Pipe<V> {
   ///
   /// Creates a new Pipe with transformed output type.
   pub fn map<U: 'static>(self, f: impl FnMut(V) -> U + 'static) -> Pipe<U> {
-    self.transform(move |o| o.map(f).box_it())
+    self.transform(move |o| o.map(f))
   }
 
   /// Applies a transformation to the underlying observable stream, creating a
@@ -86,12 +86,18 @@ impl<V: 'static> Pipe<V> {
   /// # Example
   ///
   /// ``` ignore
-  /// pipe.transform(|obs| obs.distinct_until_changed().box_it())
+  /// pipe.transform(|obs| obs.distinct_until_changed())
   /// ```
-  pub fn transform<U>(
-    self, transform_op: impl FnOnce(ValueStream<V>) -> ValueStream<U> + 'static,
-  ) -> Pipe<U> {
-    Pipe { subscribe_info: self.subscribe_info, observable: transform_op(self.observable) }
+  pub fn transform<'a, R>(
+    self, transform_op: impl FnOnce(ValueStream<V>) -> Local<R> + 'static,
+  ) -> Pipe<R::Item<'a>>
+  where
+    R: ObservableType<Err = Infallible>,
+    R: IntoBoxedCoreObservable<
+      <Local<R> as Context>::BoxedCoreObservable<'static, R::Item<'a>, Infallible>,
+    >,
+  {
+    Pipe { subscribe_info: self.subscribe_info, observable: transform_op(self.observable).box_it() }
   }
 
   /// Provides initial value for the pipe, creating a PipeValue.
