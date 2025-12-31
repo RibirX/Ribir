@@ -411,50 +411,12 @@ fn run_bundle(stable_version: &str) -> Result<(), ()> {
   // First build the counter example in release mode
   run_cargo_command(stable_version, &["build", "-p", "counter", "--release"], None, &[])?;
 
-  // Run bundle without CARGO_TARGET_DIR - the bundle CLI uses cargo metadata
-  // for path resolution, and inheriting our custom target dir causes issues
-  // with icon and resource path resolution in tauri-bundler.
-  run_cargo_command_no_target_dir(
+  run_cargo_command(
     stable_version,
     &["run", "-p", "cli", "--", "bundle", "-c", cfg],
     Some("examples/counter"),
+    &[],
   )
-}
-
-/// Run cargo command without setting CARGO_TARGET_DIR.
-/// Used for commands that spawn subprocesses that rely on cargo metadata.
-fn run_cargo_command_no_target_dir(
-  toolchain: &str, args: &[&str], cwd: Option<&str>,
-) -> Result<(), ()> {
-  let mut cmd = Command::new("cargo");
-  cmd.arg(format!("+{}", toolchain));
-  cmd.args(args);
-  // Explicitly remove CARGO_TARGET_DIR to let cargo use the default
-  cmd.env_remove("CARGO_TARGET_DIR");
-
-  if let Some(cwd) = cwd {
-    cmd.current_dir(cwd);
-  }
-
-  let status = cmd
-    .stdout(Stdio::inherit())
-    .stderr(Stdio::inherit())
-    .status();
-
-  match status {
-    Ok(s) if s.success() => {
-      println!("✅ Success!\n");
-      Ok(())
-    }
-    Ok(_) => {
-      eprintln!("❌ Command failed: cargo +{} {}", toolchain, args.join(" "));
-      Err(())
-    }
-    Err(e) => {
-      eprintln!("❌ Failed to run cargo: {}", e);
-      Err(())
-    }
-  }
 }
 
 fn run_cargo_command(
