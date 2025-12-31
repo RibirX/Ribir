@@ -193,6 +193,9 @@ impl AppCtx {
 
     wnd.init(content);
 
+    // request draw the first frame.
+    wnd.shell_wnd().borrow().request_draw();
+
     wnd
   }
 
