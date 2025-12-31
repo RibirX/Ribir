@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use ribir_algo::Sc;
+use ribir_algo::Rc;
 
 use crate::{prelude::*, window::WindowId};
 
@@ -31,7 +31,7 @@ use crate::{prelude::*, window::WindowId};
 /// App::run(w);
 /// ```
 #[derive(Clone)]
-pub struct Overlay(Sc<RefCell<InnerOverlay>>);
+pub struct Overlay(Rc<RefCell<InnerOverlay>>);
 
 bitflags! {
   #[derive(Clone, Copy)]
@@ -68,7 +68,7 @@ impl Overlay {
   pub fn new<K: ?Sized>(gen_widget: impl RInto<GenWidget, K>, style: OverlayStyle) -> Self {
     let gen_widget = gen_widget.r_into();
     let OverlayStyle { auto_close_policy, mask } = style;
-    Self(Sc::new(RefCell::new(InnerOverlay {
+    Self(Rc::new(RefCell::new(InnerOverlay {
       gen_widget,
       auto_close_policy,
       mask,
@@ -91,7 +91,7 @@ impl Overlay {
   pub fn mask(&self) -> Option<Brush> { self.0.borrow().mask.clone() }
 
   /// Show the overlay.
-  pub fn show(&self, wnd: Sc<Window>) {
+  pub fn show(&self, wnd: Rc<Window>) {
     if self.is_showing() {
       return;
     }
@@ -134,7 +134,7 @@ impl Overlay {
   /// };
   /// App::run(w);
   /// ```
-  pub fn show_map<F>(&self, mut f: F, wnd: Sc<Window>)
+  pub fn show_map<F>(&self, mut f: F, wnd: Rc<Window>)
   where
     F: FnMut(Widget<'static>) -> Widget<'static> + 'static,
   {
@@ -148,7 +148,7 @@ impl Overlay {
 
   /// Show the widget at the give position.
   /// if the overlay is showing, nothing will happen.
-  pub fn show_at(&self, pos: Point, wnd: Sc<Window>) {
+  pub fn show_at(&self, pos: Point, wnd: Rc<Window>) {
     if self.is_showing() {
       return;
     }
@@ -190,7 +190,7 @@ impl Overlay {
     }
   }
 
-  fn inner_show(&self, content: GenWidget, wnd: Sc<Window>) {
+  fn inner_show(&self, content: GenWidget, wnd: Rc<Window>) {
     let background = self.mask();
     let close_policy = self.auto_close_policy();
     let inner = self.0.clone();
@@ -288,7 +288,7 @@ impl ShowingOverlays {
     self
       .0
       .borrow_mut()
-      .retain(|o| !Sc::ptr_eq(&o.0, &overlay.0))
+      .retain(|o| !Rc::ptr_eq(&o.0, &overlay.0))
   }
 
   fn showing_of(&self, ctx: &impl WidgetCtx) -> Option<Overlay> {

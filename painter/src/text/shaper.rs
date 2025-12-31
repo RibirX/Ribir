@@ -3,7 +3,7 @@ use std::{
   hash::{Hash, Hasher},
 };
 
-use ribir_algo::{FrameCache, Sc, Substr};
+use ribir_algo::{FrameCache, Rc, Substr};
 pub use rustybuzz::ttf_parser::GlyphId;
 use rustybuzz::{GlyphInfo, UnicodeBuffer};
 
@@ -19,8 +19,8 @@ pub const NEWLINE_GLYPH_ID: GlyphId = GlyphId(u16::MAX);
 ///
 /// This shaper will cache shaper result for per frame.
 pub struct TextShaper {
-  font_db: Sc<RefCell<FontDB>>,
-  shape_cache: FrameCache<ShapeKey, Sc<ShapeResult>>,
+  font_db: Rc<RefCell<FontDB>>,
+  shape_cache: FrameCache<ShapeKey, Rc<ShapeResult>>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,7 +44,7 @@ struct GlyphsWithoutFallback {
 
 impl TextShaper {
   #[inline]
-  pub fn new(font_db: Sc<RefCell<FontDB>>) -> Self { Self { font_db, shape_cache: <_>::default() } }
+  pub fn new(font_db: Rc<RefCell<FontDB>>) -> Self { Self { font_db, shape_cache: <_>::default() } }
 
   pub fn end_frame(&mut self) { self.shape_cache.end_frame("Text shape"); }
 
@@ -52,7 +52,7 @@ impl TextShaper {
   /// call this method.
   pub fn shape_text(
     &mut self, text: &Substr, face_ids: &[ID], direction: TextDirection, baseline: GlyphBaseline,
-  ) -> Sc<ShapeResult> {
+  ) -> Rc<ShapeResult> {
     if let Some(res) = self.get_cache(text, face_ids, direction, baseline) {
       res.clone()
     } else {
@@ -67,7 +67,7 @@ impl TextShaper {
         g.glyph_id = NEWLINE_GLYPH_ID;
       }
 
-      let glyphs = Sc::new(ShapeResult { text: text.clone(), glyphs });
+      let glyphs = Rc::new(ShapeResult { text: text.clone(), glyphs });
       self.shape_cache.put(
         ShapeKey { face_ids: face_ids.into(), text: text.clone(), direction, baseline },
         glyphs.clone(),
@@ -130,14 +130,14 @@ impl TextShaper {
 
   pub fn get_cache(
     &mut self, text: &str, face_ids: &[ID], direction: TextDirection, baseline: GlyphBaseline,
-  ) -> Option<Sc<ShapeResult>> {
+  ) -> Option<Rc<ShapeResult>> {
     self
       .shape_cache
       .get(&(face_ids, text, direction, baseline) as &dyn ShapeKeySlice)
       .cloned()
   }
 
-  pub fn font_db(&self) -> &Sc<RefCell<FontDB>> { &self.font_db }
+  pub fn font_db(&self) -> &Rc<RefCell<FontDB>> { &self.font_db }
 }
 
 fn collect_miss_part<'a>(
@@ -471,7 +471,7 @@ mod tests {
 
   #[test]
   fn partiall_glyphs() {
-    let font_db = Sc::new(RefCell::new(FontDB::default()));
+    let font_db = Rc::new(RefCell::new(FontDB::default()));
     let _ = font_db
       .borrow_mut()
       .load_font_file(env!("CARGO_MANIFEST_DIR").to_owned() + "/../fonts/GaramondNo8-Reg.ttf");

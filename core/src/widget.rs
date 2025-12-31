@@ -6,7 +6,7 @@ pub use std::{
 };
 use std::{cell::RefCell, convert::Infallible};
 
-use ribir_algo::Sc;
+use ribir_algo::Rc;
 use rxrust::observable::boxed::LocalBoxedObservableClone;
 use widget_id::RenderQueryable;
 
@@ -129,7 +129,7 @@ pub trait IntoWidget<'a, K> {
 /// Contains a boxed closure that can produce new widget instances on demand.
 #[derive(Clone)]
 pub struct GenWidget(InnerGenWidget);
-type InnerGenWidget = Sc<RefCell<Box<dyn FnMut() -> Widget<'static>>>>;
+type InnerGenWidget = Rc<RefCell<Box<dyn FnMut() -> Widget<'static>>>>;
 
 /// Single-use widget generator
 ///
@@ -166,7 +166,7 @@ impl GenWidget {
   where
     W: IntoWidget<'static, K>,
   {
-    Self(Sc::new(RefCell::new(Box::new(move || f().into_widget()))))
+    Self(Rc::new(RefCell::new(Box::new(move || f().into_widget()))))
   }
 
   pub fn from_fn_widget<F, W, K>(f: FnWidget<W, F>) -> Self

@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use ribir_algo::Sc;
+use ribir_algo::Rc;
 use ribir_geom::Size;
 use smallvec::{SmallVec, smallvec};
 use unicode_script::{Script, UnicodeScript};
@@ -309,7 +309,7 @@ where
 }
 
 pub struct InputRun {
-  pub(crate) shape_result: Sc<ShapeResult>,
+  pub(crate) shape_result: Rc<ShapeResult>,
   /// The factor relative to the standard size.
   pub(crate) font_size_factor: f32,
   pub(crate) letter_space: GlyphUnit,
@@ -470,7 +470,7 @@ fn letter_spacing_char(c: char) -> bool {
 
 impl InputRun {
   pub(crate) fn new(
-    shape_result: Sc<ShapeResult>, font_size_factor: f32, letter_space: GlyphUnit,
+    shape_result: Rc<ShapeResult>, font_size_factor: f32, letter_space: GlyphUnit,
     range: Range<usize>,
   ) -> Self {
     let text: &str = &shape_result.text;

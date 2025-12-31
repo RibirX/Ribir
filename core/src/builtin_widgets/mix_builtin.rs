@@ -463,7 +463,7 @@ fn life_fn_once_to_fn_mut(
 
 fn callbacks_for_focus_node(child: Widget) -> Widget {
   fn_widget! {
-    let guard = Sc::new(RefCell::new(None));
+    let guard = Rc::new(RefCell::new(None));
     let guard2 = guard.clone();
     let mut child = FatObj::new(child);
     @(child) {

@@ -3,7 +3,7 @@ use std::{
   convert::Infallible,
 };
 
-use ribir_algo::Sc;
+use ribir_algo::Rc;
 use rxrust::{
   context::LocalCtx,
   observable::boxed::LocalBoxedObservable,
@@ -24,7 +24,7 @@ pub type ValueStream<V> = LocalBoxedObservable<'static, V, Infallible>;
 /// the stream emits new values.
 pub struct Pipe<V> {
   // Internal subscription configuration
-  subscribe_info: Sc<RefCell<SubscribeInfo>>,
+  subscribe_info: Rc<RefCell<SubscribeInfo>>,
   // The underlying observable stream
   observable: LocalBoxedObservable<'static, V, Infallible>,
 }
@@ -40,7 +40,7 @@ impl<V: 'static> Pipe<V> {
     map_handler: impl FnMut(ModifyInfo) -> V + 'static,
   ) -> Self {
     let info = SubscribeInfo { effect: ModifyEffect::DATA, priority: None };
-    let info: Sc<RefCell<SubscribeInfo>> = Sc::new(RefCell::new(info));
+    let info: Rc<RefCell<SubscribeInfo>> = Rc::new(RefCell::new(info));
     let (trigger_core, scheduler) = trigger.into_parts();
     let trigger = Local::from_parts(trigger_core, scheduler);
     let observable = Local::from_parts(PipeOp { source: trigger, info: info.clone() }, scheduler)
@@ -369,7 +369,7 @@ struct SubscribeInfo {
 /// the pipe to the first node, and user can attach `key` or `listener` to the
 /// widget after `Pipe::build_widget` call.
 #[derive(Clone)]
-pub(crate) struct PipeNode(Sc<UnsafeCell<InnerPipeNode>>);
+pub(crate) struct PipeNode(Rc<UnsafeCell<InnerPipeNode>>);
 
 struct InnerPipeNode {
   data: Box<dyn RenderQueryable>,
@@ -431,7 +431,7 @@ impl PipeNode {
   pub(crate) fn empty_node(gen_range: GenRange) -> Self {
     let dyn_info = DynWidgetsInfo::new(gen_range);
     let inner = InnerPipeNode { data: Box::new(PureRender(Void)), dyn_info };
-    Self(Sc::new(UnsafeCell::new(inner)))
+    Self(Rc::new(UnsafeCell::new(inner)))
   }
 
   pub(crate) fn init_for_single(&self, w: WidgetId) { self.init(w, GenRange::Single(w)); }
@@ -511,7 +511,7 @@ fn query_outside_infos<'l>(
       if hit {
         false
       } else {
-        hit = Sc::ptr_eq(&info.0, &to.0);
+        hit = Rc::ptr_eq(&info.0, &to.0);
         true
       }
     })
@@ -574,11 +574,11 @@ impl Render for PipeNode {
 #[derive(Clone)]
 pub struct PipeWidgetPriority {
   node: PipeNode,
-  wnd: Sc<Window>,
+  wnd: Rc<Window>,
 }
 
 impl PipeWidgetPriority {
-  fn new(node: PipeNode, wnd: Sc<Window>) -> Self { Self { node, wnd } }
+  fn new(node: PipeNode, wnd: Rc<Window>) -> Self { Self { node, wnd } }
 
   fn tree(&self) -> &WidgetTree { self.wnd.tree() }
 }
@@ -605,13 +605,13 @@ impl Priority for PipeWidgetPriority {
 
 struct PipeOp {
   source: LocalBoxedObservable<'static, ModifyInfo, Infallible>,
-  info: Sc<RefCell<SubscribeInfo>>,
+  info: Rc<RefCell<SubscribeInfo>>,
 }
 
 struct PipeWidgetContextObserver<O> {
   observer: O,
   pipe_node: PipeNode,
-  wnd: Sc<Window>,
+  wnd: Rc<Window>,
 }
 
 impl<O> Observer<ModifyInfo, Infallible> for PipeWidgetContextObserver<O>

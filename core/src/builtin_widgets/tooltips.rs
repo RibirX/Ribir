@@ -36,7 +36,7 @@ impl Declare for Tooltips {
 }
 
 impl Tooltips {
-  pub fn show(&self, wnd: Sc<Window>) {
+  pub fn show(&self, wnd: Rc<Window>) {
     if let Some(overlay) = self.overlay.borrow().clone()
       && !overlay.is_showing()
     {

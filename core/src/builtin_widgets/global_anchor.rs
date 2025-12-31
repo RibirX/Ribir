@@ -10,7 +10,7 @@ use crate::{prelude::*, ticker::FrameMsg};
 /// Returns Ok(offset) when calculate success.
 /// Return Err(()) when failed, usually because the widget is dropped. Then will
 /// cause the anchor to unsubscribe to refresh.
-pub type AnchorOffsetFn = dyn Fn(&TrackId, &Sc<Window>) -> Result<f32, ()>;
+pub type AnchorOffsetFn = dyn Fn(&TrackId, &Rc<Window>) -> Result<f32, ()>;
 
 /// The horizontal global anchor
 pub enum GlobalAnchorX {
@@ -87,7 +87,7 @@ pub struct GlobalAnchor {
 impl GlobalAnchorX {
   /// Init the horizontal offset from the HAnchor relative to the Window View.
   pub fn value(x: HAnchor) -> Self {
-    Self::Once(Box::new(move |t, wnd: &Sc<Window>| {
+    Self::Once(Box::new(move |t, wnd: &Rc<Window>| {
       let wid = t.get().unwrap();
       if wid.is_dropped(wnd.tree()) {
         return Err(());
@@ -100,7 +100,7 @@ impl GlobalAnchorX {
 
   /// Init the global horizontal anchor from the custom function, which will
   /// return the horizontal offset relative to the global position
-  pub fn custom(f: impl Fn(&TrackId, &Sc<Window>) -> Result<f32, ()> + 'static) -> Self {
+  pub fn custom(f: impl Fn(&TrackId, &Rc<Window>) -> Result<f32, ()> + 'static) -> Self {
     Self::Once(Box::new(f))
   }
 
@@ -108,7 +108,7 @@ impl GlobalAnchorX {
   /// horizontal position by placing its left edge align to the left edge of
   /// the specified widget (`target`)
   pub fn left_align_to(target: TrackId) -> Self {
-    Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
+    Self::Once(Box::new(move |host, wnd: &Rc<Window>| {
       let host_id = host.get().unwrap();
       let target_id = target.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target_id.is_dropped(wnd.tree()) {
@@ -127,7 +127,7 @@ impl GlobalAnchorX {
   /// horizontal position by placing its center align to the center of the
   /// specified widget (`target`)
   pub fn center_align_to(target: TrackId) -> Self {
-    Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
+    Self::Once(Box::new(move |host, wnd: &Rc<Window>| {
       let host_id = host.get().unwrap();
       let target = target.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target.is_dropped(wnd.tree()) {
@@ -148,7 +148,7 @@ impl GlobalAnchorX {
   /// horizontal position by placing its right edge left to the right edge of
   /// the specified widget (`target`)
   pub fn right_align_to(track_id: TrackId) -> Self {
-    Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
+    Self::Once(Box::new(move |host, wnd: &Rc<Window>| {
       let host_id = host.get().unwrap();
       let target = track_id.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target.is_dropped(wnd.tree()) {
@@ -184,7 +184,7 @@ impl GlobalAnchorX {
 
   fn is_once(&self) -> bool { matches!(self, Self::Once(_)) }
 
-  fn offset_val(&self, host: &TrackId, wnd: &Sc<Window>) -> Result<f32, ()> {
+  fn offset_val(&self, host: &TrackId, wnd: &Rc<Window>) -> Result<f32, ()> {
     match self {
       Self::Once(f) => f(host, wnd),
       Self::AlwaysFollow(f) => f(host, wnd),
@@ -195,7 +195,7 @@ impl GlobalAnchorX {
 impl GlobalAnchorY {
   /// Init the global vertical anchor from VAnchor relative to the Window View.
   pub fn value(y: VAnchor) -> Self {
-    Self::Once(Box::new(move |t, wnd: &Sc<Window>| {
+    Self::Once(Box::new(move |t, wnd: &Rc<Window>| {
       let wid = t.get().unwrap();
       if wid.is_dropped(wnd.tree()) {
         return Err(());
@@ -208,7 +208,7 @@ impl GlobalAnchorY {
 
   /// Init the global vertical anchor from the custom function, which will
   /// return the vertical offset relative to the global position
-  pub fn custom(f: impl Fn(&TrackId, &Sc<Window>) -> Result<f32, ()> + 'static) -> Self {
+  pub fn custom(f: impl Fn(&TrackId, &Rc<Window>) -> Result<f32, ()> + 'static) -> Self {
     Self::Once(Box::new(f))
   }
 
@@ -216,7 +216,7 @@ impl GlobalAnchorY {
   /// vertical position by placing its top edge align to the top edge of the
   /// specified widget (`target`).
   pub fn top_align_to(track_id: TrackId) -> Self {
-    Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
+    Self::Once(Box::new(move |host, wnd: &Rc<Window>| {
       let host_id = host.get().unwrap();
       let target = track_id.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target.is_dropped(wnd.tree()) {
@@ -235,7 +235,7 @@ impl GlobalAnchorY {
   /// vertical position by placing its center vertical align to the center of
   /// the specified widget (`target`).
   pub fn center_align_to(track_id: TrackId) -> Self {
-    Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
+    Self::Once(Box::new(move |host, wnd: &Rc<Window>| {
       let host_id = host.get().unwrap();
       let target = track_id.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target.is_dropped(wnd.tree()) {
@@ -256,7 +256,7 @@ impl GlobalAnchorY {
   /// vertical position by placing its bottom edge align to the bottom edge of
   /// the specified widget (`target`).
   pub fn bottom_align_to(track_id: TrackId) -> Self {
-    Self::Once(Box::new(move |host, wnd: &Sc<Window>| {
+    Self::Once(Box::new(move |host, wnd: &Rc<Window>| {
       let host_id = host.get().unwrap();
       let target = track_id.get().unwrap();
       if host_id.is_dropped(wnd.tree()) || target.is_dropped(wnd.tree()) {
@@ -292,7 +292,7 @@ impl GlobalAnchorY {
 
   fn is_once(&self) -> bool { matches!(self, Self::Once(_)) }
 
-  fn offset_val(&self, host: &TrackId, wnd: &Sc<Window>) -> Result<f32, ()> {
+  fn offset_val(&self, host: &TrackId, wnd: &Rc<Window>) -> Result<f32, ()> {
     match self {
       Self::Once(f) => f(host, wnd),
       Self::AlwaysFollow(f) => f(host, wnd),
@@ -336,7 +336,7 @@ impl<'c> ComposeChild<'c> for GlobalAnchor {
 
 fn apply_global_anchor(
   this: impl StateWriter<Value = GlobalAnchor>, anchor: impl StateWriter<Value = RelativeAnchor>,
-  host: TrackId, wnd: Sc<Window>,
+  host: TrackId, wnd: Rc<Window>,
 ) {
   let tick_of_layout_ready = wnd
     .frame_tick_stream()

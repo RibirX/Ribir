@@ -5,7 +5,7 @@ use std::{
   ops::{Bound, Deref, Range, RangeBounds},
 };
 
-use triomphe::Arc;
+use rclite::Arc;
 
 #[derive(Eq)]
 /// A copy on write smart pointer shared value without deep clone .

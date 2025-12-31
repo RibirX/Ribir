@@ -20,7 +20,6 @@ indextree.workspace = true
 log.workspace = true
 lyon_geom.workspace = true
 paste.workspace = true
-triomphe.workspace = true
 pin-project-lite.workspace = true
 ribir_algo = {path = "../algo", version = "0.4.0-alpha.53" }
 ribir_geom = {path = "../geom", version = "0.4.0-alpha.53" }

@@ -39,7 +39,7 @@ impl<'c> ComposeChild<'c> for FocusScope {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     fn_widget! {
       let mut child = FatObj::new(child);
-      let guard = Sc::new(RefCell::new(None));
+      let guard = Rc::new(RefCell::new(None));
       @(child) {
         on_mounted: move |e| {
           let track_id = $clone(child.track_id());

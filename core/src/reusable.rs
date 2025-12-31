@@ -36,7 +36,7 @@ use crate::{
 /// - Calling `get_widget()` in Dropped state
 /// - Window disposal before widget release
 #[derive(Clone)]
-pub struct Reusable(Sc<RefCell<ReusableState>>);
+pub struct Reusable(Rc<RefCell<ReusableState>>);
 
 impl Reusable {
   /// Creates a new Reusable container from a widget.
@@ -46,7 +46,7 @@ impl Reusable {
   pub fn new<'a, K>(w: impl IntoWidget<'a, K>) -> (Widget<'a>, Self) {
     let mut obj = FatObj::new(w);
     let track_id = obj.track_id();
-    let this = Self(Sc::new(RefCell::new(ReusableState::WaitToUse { track_id })));
+    let this = Self(Rc::new(RefCell::new(ReusableState::WaitToUse { track_id })));
 
     (this.handle_reusable_wrapper(obj.into_widget()), this)
   }
@@ -201,7 +201,7 @@ fn move_inner_render_to_new(
 /// node and its outer wrapper, so we can take the original render node out to
 /// be recycled and return the wrapper to be disposed.
 #[derive(Clone)]
-struct ReusableRenderWrapper(Sc<UnsafeCell<Box<dyn RenderQueryable>>>);
+struct ReusableRenderWrapper(Rc<UnsafeCell<Box<dyn RenderQueryable>>>);
 
 enum ReusableState {
   WaitToUse { track_id: TrackId },
@@ -249,12 +249,12 @@ impl ReusableRenderWrapper {
 }
 
 impl Default for ReusableRenderWrapper {
-  fn default() -> Self { Self(Sc::new(UnsafeCell::new(Box::new(PureRender(Void))))) }
+  fn default() -> Self { Self(Rc::new(UnsafeCell::new(Box::new(PureRender(Void))))) }
 }
 
 impl Drop for Reusable {
   fn drop(&mut self) {
-    if self.0.ref_count() == 1 {
+    if self.0.strong_count() == 1 {
       self.release();
     }
   }
@@ -271,7 +271,7 @@ mod tests {
 
     let (info, w_info) = split_value(vec![]);
     let (w_trigger, trigger) = split_value(0);
-    let ctrl = Sc::new(RefCell::new(None));
+    let ctrl = Rc::new(RefCell::new(None));
     let ctrl2 = ctrl.clone();
     let wnd = TestWindow::from_widget(fn_widget! {
       let (w, reusable) = Reusable::new(@Text {

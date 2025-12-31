@@ -29,7 +29,7 @@ pub struct App {
   // avoid affecting the timing of the event loop(EventLoopProxy::new will call CFRunLoopWakeUp
   // on mac).
   event_loop_proxy: Arc<EventLoopProxy<RibirAppEvent>>,
-  windows: RefCell<HashMap<WindowId, Sc<RefCell<WinitShellWnd>>>>,
+  windows: RefCell<HashMap<WindowId, Rc<RefCell<WinitShellWnd>>>>,
   active_wnd: std::cell::Cell<Option<WindowId>>,
   events_stream: LocalSubjectMutRef<'static, AppEvent, Infallible>,
 
@@ -86,7 +86,7 @@ impl App {
     App::shared().events_stream.clone()
   }
 
-  pub(crate) fn shell_window(id: WindowId) -> Option<Sc<RefCell<WinitShellWnd>>> {
+  pub(crate) fn shell_window(id: WindowId) -> Option<Rc<RefCell<WinitShellWnd>>> {
     App::shared().windows.borrow().get(&id).cloned()
   }
 
@@ -184,7 +184,7 @@ impl App {
     app
       .windows
       .borrow_mut()
-      .insert(wid, Sc::new(RefCell::new(shell_wnd)));
+      .insert(wid, Rc::new(RefCell::new(shell_wnd)));
     if app.active_wnd.get().is_none() {
       app.active_wnd.set(Some(wid));
     }
@@ -212,14 +212,14 @@ impl App {
     app
       .windows
       .borrow_mut()
-      .insert(wid, Sc::new(RefCell::new(shell_wnd)));
+      .insert(wid, Rc::new(RefCell::new(shell_wnd)));
     if app.active_wnd.get().is_none() {
       app.active_wnd.set(Some(wid));
     }
     Box::new(proxy)
   }
 
-  pub fn active_window() -> Sc<Window> {
+  pub fn active_window() -> Rc<Window> {
     App::shared()
       .active_wnd
       .get()

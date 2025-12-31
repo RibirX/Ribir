@@ -4,7 +4,7 @@ use std::{
   ptr::NonNull,
 };
 
-use ribir_algo::Sc;
+use ribir_algo::Rc;
 use smallvec::SmallVec;
 use widget_id::TrackId;
 use winit::event::{ElementState, Ime};
@@ -186,7 +186,7 @@ pub struct Window {
   pub(crate) dispatcher: RefCell<Dispatcher>,
   pub(crate) frame_ticker: FrameTicker,
   pub(crate) focus_mgr: RefCell<FocusManager>,
-  pub(crate) running_animates: Sc<Cell<u32>>,
+  pub(crate) running_animates: Rc<Cell<u32>>,
   pre_edit: RefCell<Option<String>>,
   /// This vector store the task to emit events. When perform layout, dispatch
   /// event and so on, some part of window may be already mutable borrowed and
@@ -471,7 +471,7 @@ impl Window {
 
   pub fn need_draw(&self) -> bool { self.tree().is_dirty() || self.running_animates.get() > 0 }
 
-  pub fn new(shell_wnd: BoxShellWindow, flags: WindowFlags) -> Sc<Self> {
+  pub fn new(shell_wnd: BoxShellWindow, flags: WindowFlags) -> Rc<Self> {
     let wnd_id = shell_wnd.id();
     let focus_mgr = RefCell::new(FocusManager::new(wnd_id));
     let tree = Box::new(WidgetTree::new(wnd_id));
@@ -493,7 +493,7 @@ impl Window {
       pre_edit: <_>::default(),
     };
 
-    Sc::new(window)
+    Rc::new(window)
   }
 
   pub fn position(&self) -> Point { self.shell_wnd.borrow().position() }
@@ -525,7 +525,7 @@ impl Window {
   }
 
   pub(crate) fn add_focus_node(
-    this: Sc<Self>, track_id: TrackId, auto_focus: bool, focus_type: FocusType,
+    this: Rc<Self>, track_id: TrackId, auto_focus: bool, focus_type: FocusType,
   ) -> FocusNodeGuard<impl Subscription> {
     let init_id = track_id.get().unwrap();
     let watcher = track_id.clone_watcher();
@@ -1031,7 +1031,7 @@ impl Window {
 }
 
 pub(crate) struct FocusNodeGuard<U: Subscription> {
-  wnd: Sc<Window>,
+  wnd: Rc<Window>,
   track_id: TrackId,
   focus_type: FocusType,
   _guard: SubscriptionGuard<U>,
