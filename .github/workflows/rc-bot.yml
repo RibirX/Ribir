@@ -214,17 +214,18 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Cache Gemini CLI
         id: cache-gemini
         uses: actions/cache@v4
         with:
           path: ~/.npm-global
           key: gemini-cli-0.22.4
+
+      - name: Setup Node.js
+        if: steps.cache-gemini.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Install Gemini CLI
         if: steps.cache-gemini.outputs.cache-hit != 'true'
