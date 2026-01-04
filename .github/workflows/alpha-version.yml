@@ -42,18 +42,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Get next version from cargo-release dry-run
-          VERSION=$(cargo release alpha --dry-run 2>&1 | grep -oP 'Upgrading.*to \K[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+' | head -1)
-
-          # Collect changelog and stage it
+          # One command handles: changelog collect, cargo release, GitHub Release
           cd tools/ribir-bot
-          cargo run -- log-collect --version $VERSION --write
-          cd ../..
-          git add CHANGELOG.md
-
-          # Bump version, tag, and publish (includes staged changelog)
-          cargo release alpha --execute --no-confirm
-
-          # Create GitHub Release
-          cd tools/ribir-bot
-          cargo run -- release publish
+          cargo run -- release next alpha

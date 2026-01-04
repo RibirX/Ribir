@@ -19,6 +19,7 @@ CHANGELOG COMMANDS (update CHANGELOG.md):
     log-verify                   Verify changelog structure
 
 RELEASE COMMANDS:
+    release next <level>             Full release (alpha|rc|patch|minor|major)
     release prepare --version VER    Prepare RC release
     release publish [PR_ID]          Publish GitHub release
     release promote --version VER    Promote RC to stable
@@ -28,6 +29,7 @@ RELEASE COMMANDS:
 
 GLOBAL OPTIONS:
     --dry-run    Preview without applying changes
+    --execute    Execute changes (for release next/promote)
     --write      Write changes (for log-collect/log-merge)
     -h, --help   Show help
 
@@ -36,6 +38,8 @@ EXAMPLES:
     ribir-bot pr-regen 123                 Regenerate PR #123
     ribir-bot pr-summary "be concise"      Regenerate with context
     ribir-bot log-collect --version 0.5.0  Collect merged PRs
+    ribir-bot release next alpha           Preview alpha release
+    ribir-bot release next alpha --execute Execute alpha release
     ribir-bot release prepare --version 0.5.0
     ribir-bot release highlights           Regenerate highlights
 "#;
@@ -48,16 +52,24 @@ USAGE:
     ribir-bot release <SUBCOMMAND> [OPTIONS]
 
 SUBCOMMANDS:
+    next <level> Full release (alpha|rc|patch|minor|major)
+                 Default: dry-run. Use --execute to apply.
     prepare      Prepare RC release (archive, merge, highlights, PR)
     publish      Publish GitHub release
-    promote      Promote RC to stable
+    promote      Promote RC to stable (default: dry-run)
     highlights   Regenerate highlights in CHANGELOG.md
     social-card  Generate social card from highlights (coming soon)
     verify       Verify release state
 
 OPTIONS:
     --version VER    Target version (required for prepare/promote)
+    --execute        Execute changes (required for next/promote)
     --dry-run        Preview without applying
+
+EXAMPLES:
+    ribir-bot release next alpha           Preview next alpha release
+    ribir-bot release next alpha --execute Execute alpha release
+    ribir-bot release promote --version 0.5.0 --execute
 "#
   );
 }
@@ -75,6 +87,7 @@ pub fn parse_args() -> Result<Config> {
   }
 
   let dry_run = args.contains("--dry-run");
+  let execute = args.contains("--execute");
 
   let cmd_str: Option<String> = args.opt_free_from_str()?;
   let command = match cmd_str.as_deref() {
@@ -128,7 +141,17 @@ pub fn parse_args() -> Result<Config> {
     return Err(format!("Unexpected arguments: {:?}", remaining).into());
   }
 
-  Ok(Config { command, dry_run })
+  // For release next/promote: default is dry-run, need --execute to run
+  // For other commands: default is execute, use --dry-run to preview
+  let effective_dry_run = match &command {
+    Cmd::Release(ReleaseCmd::Next { .. }) | Cmd::Release(ReleaseCmd::Promote { .. }) => {
+      // Default dry-run unless --execute is passed
+      !execute
+    }
+    _ => dry_run,
+  };
+
+  Ok(Config { command, dry_run: effective_dry_run })
 }
 
 fn parse_release_args(args: &mut pico_args::Arguments) -> Result<ReleaseCmd> {
@@ -136,6 +159,12 @@ fn parse_release_args(args: &mut pico_args::Arguments) -> Result<ReleaseCmd> {
   let version: Option<String> = args.opt_value_from_str("--version")?;
 
   match subcmd.as_deref() {
+    Some("next") => {
+      let level: String = args
+        .opt_free_from_str()?
+        .ok_or("Level required: alpha, rc, patch, minor, major")?;
+      Ok(ReleaseCmd::Next { level })
+    }
     Some("prepare") => {
       let version = version.ok_or("--version required for prepare")?;
       Ok(ReleaseCmd::Prepare { version })

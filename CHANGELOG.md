@@ -7,7 +7,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to write changelog entries in you
 
 <!-- next-header -->
 
-## [@Unreleased] - @ReleaseDate
+## [0.4.0-alpha.54] - 2025-12-30
 
 ### Features
 
