@@ -373,6 +373,20 @@ fn commit_and_create_release_pr(
 }
 
 fn get_version_from_context() -> Result<String> {
+  // First try: get version from latest git tag (most reliable after cargo release)
+  if let Ok(output) = std::process::Command::new("git")
+    .args(["describe", "--tags", "--abbrev=0"])
+    .output()
+  {
+    if output.status.success() {
+      let tag = String::from_utf8_lossy(&output.stdout).trim().to_string();
+      if let Some(version) = tag.strip_prefix('v') {
+        return Ok(version.to_string());
+      }
+    }
+  }
+
+  // Fallback: parse from CHANGELOG.md
   let changelog = fs::read_to_string("CHANGELOG.md")?;
   parse_latest_version(&changelog).ok_or("Could not determine version from context".into())
 }
