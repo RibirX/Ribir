@@ -15,10 +15,10 @@ on:
 
 jobs:
   check:
-    # Only run for comments on PRs mentioning @ribir-bot, or workflow_dispatch
+    # Filter: Only respond to @ribir-bot release-* commands or workflow_dispatch
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event.issue.pull_request && contains(github.event.comment.body, '@ribir-bot'))
+      (github.event.issue.pull_request && contains(github.event.comment.body, '@ribir-bot') && contains(github.event.comment.body, 'release-'))
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -35,87 +35,141 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Default to not running
-          echo "should_run=false" >> $GITHUB_OUTPUT
+          # ============================================================
+          # Helper: Check if PR is a Release Candidate PR
+          # RC PR = base:master + head:release-X.Y.x
+          # Returns: sets IS_RC_PR=true/false and HEAD_BRANCH
+          # ============================================================
+          check_rc_pr() {
+            local pr_number=$1
+            local repo=$2
 
-          # 1. Determine PR Number & Validation Logic
+            BASE_BRANCH=$(gh pr view $pr_number --repo $repo --json baseRefName -q '.baseRefName')
+            HEAD_BRANCH=$(gh pr view $pr_number --repo $repo --json headRefName -q '.headRefName')
+
+            if [[ "$BASE_BRANCH" == "master" && "$HEAD_BRANCH" =~ ^release-[0-9]+\.[0-9]+\.x$ ]]; then
+              IS_RC_PR=true
+            else
+              IS_RC_PR=false
+            fi
+          }
+
+          # ============================================================
+          # Helper: Check user permissions
+          # ============================================================
+          check_permission() {
+            local user=$1
+            local author=$2
+            local repo=$3
+
+            if [ "$user" = "$author" ]; then
+              return 0
+            fi
+
+            local perm=$(gh api "/repos/$repo/collaborators/$user/permission" --jq '.permission')
+            if [ "$perm" = "write" ] || [ "$perm" = "admin" ]; then
+              return 0
+            fi
+
+            echo "✗ User does not have permission"
+            return 1
+          }
+
+          # ============================================================
+          # Helper: Parse @ribir-bot command from comment
+          # ============================================================
+          parse_command() {
+            local comment="$1"
+            local bot_line=$(echo "$comment" | grep -E "^@ribir-bot\s+" | head -n 1)
+
+            if [ -z "$bot_line" ]; then
+              echo ""
+              return
+            fi
+
+            echo "$bot_line" | sed -E 's/@ribir-bot\s+([a-z-]+).*/\1/'
+          }
+
+          parse_context() {
+            local comment="$1"
+            local bot_line=$(echo "$comment" | grep -E "^@ribir-bot\s+" | head -n 1)
+            echo "$bot_line" | sed -E 's/@ribir-bot\s+[a-z-]+\s*//'
+          }
+
+          # ============================================================
+          # Main Logic
+          # ============================================================
+          echo "should_run=false" >> $GITHUB_OUTPUT
+          echo "show_help=false" >> $GITHUB_OUTPUT
+
+          REPO="${{ github.repository }}"
+
+          # --- Case 1: Workflow Dispatch ---
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             PR_NUMBER="${{ github.event.inputs.pr_number }}"
             COMMAND="${{ github.event.inputs.command }}"
-            # Dispatch assumes admin/write permission by who triggered it
-            # We still need to verify it is an RC PR
-            BASE_BRANCH=$(gh pr view $PR_NUMBER --repo ${{ github.repository }} --json baseRefName -q '.baseRefName')
-            HEAD_BRANCH=$(gh pr view $PR_NUMBER --repo ${{ github.repository }} --json headRefName -q '.headRefName')
-            
-            if [[ "$BASE_BRANCH" == "master" && "$HEAD_BRANCH" =~ ^release-[0-9]+\.[0-9]+\.x$ ]]; then
-               echo "should_run=true" >> $GITHUB_OUTPUT
-               echo "command=$COMMAND" >> $GITHUB_OUTPUT
-               echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-               echo "branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
-               exit 0
+
+            check_rc_pr "$PR_NUMBER" "$REPO"
+
+            if [ "$IS_RC_PR" = "true" ]; then
+              echo "should_run=true" >> $GITHUB_OUTPUT
+              echo "command=$COMMAND" >> $GITHUB_OUTPUT
+              echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+              echo "branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
             else
-               echo "❌ Not an RC PR (dispatch)"
-               exit 0
+              echo "❌ PR #$PR_NUMBER is not an RC PR (requires base:master + head:release-X.Y.x)"
             fi
+            exit 0
           fi
 
-          # 2. Issue Comment Logic
+          # --- Case 2: Issue Comment (@ribir-bot release-* commands) ---
           PR_NUMBER="${{ github.event.issue.number }}"
           COMMENT_USER="${{ github.event.comment.user.login }}"
           PR_AUTHOR="${{ github.event.issue.user.login }}"
-          REPO="${{ github.repository }}"
-
-          # 2.1 Check if RC PR
-          BASE_BRANCH=$(gh pr view $PR_NUMBER --repo $REPO --json baseRefName -q '.baseRefName')
-          HEAD_BRANCH=$(gh pr view $PR_NUMBER --repo $REPO --json headRefName -q '.headRefName')
-
-          if [[ "$BASE_BRANCH" != "master" || ! "$HEAD_BRANCH" =~ ^release-[0-9]+\.[0-9]+\.x$ ]]; then
-             echo "❌ Not an RC PR detected during comment event."
-             # Exit success, stop workflow
-             exit 0
-          fi
-
-          # 2.2 Check Permissions
-          if [ "$COMMENT_USER" != "$PR_AUTHOR" ]; then
-             PERMISSION=$(gh api "/repos/$REPO/collaborators/$COMMENT_USER/permission" --jq '.permission')
-             if [ "$PERMISSION" != "write" ] && [ "$PERMISSION" != "admin" ]; then
-                echo "✗ User does not have permission"
-                exit 0
-             fi
-          fi
-
-          # 2.3 Parse Command
           COMMENT="${{ github.event.comment.body }}"
-          BOT_LINE=$(echo "$COMMENT" | grep -E "^@ribir-bot\s+" | head -n 1)
 
-          if [ -z "$BOT_LINE" ]; then
+          # 2.1 Verify this is an RC PR
+          check_rc_pr "$PR_NUMBER" "$REPO"
+
+          if [ "$IS_RC_PR" != "true" ]; then
+            echo "ℹ️ Not an RC PR - release-* commands only work on RC PRs"
+            exit 0
+          fi
+
+          # 2.2 Check permissions
+          if ! check_permission "$COMMENT_USER" "$PR_AUTHOR" "$REPO"; then
+            exit 0
+          fi
+
+          # 2.3 Parse and validate command
+          COMMAND=$(parse_command "$COMMENT")
+
+          if [ -z "$COMMAND" ]; then
             echo "show_help=true" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          COMMAND=$(echo "$BOT_LINE" | sed -E 's/@ribir-bot\s+([a-z-]+).*/\1/')
-          CONTENT=$(echo "$BOT_LINE" | sed -E 's/@ribir-bot\s+[a-z-]+\s*//')
-          
-          # 2.4 Validate Command
           case "$COMMAND" in
             release-highlights|release-social-card)
-               echo "should_run=true" >> $GITHUB_OUTPUT
-               echo "command=$COMMAND" >> $GITHUB_OUTPUT
-               echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-               echo "branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
-               if [ -n "$CONTENT" ]; then
-                 echo "context<<EOF" >> $GITHUB_OUTPUT
-                 echo "$CONTENT" >> $GITHUB_OUTPUT
-                 echo "EOF" >> $GITHUB_OUTPUT
-               fi
-               ;;
+              echo "should_run=true" >> $GITHUB_OUTPUT
+              echo "command=$COMMAND" >> $GITHUB_OUTPUT
+              echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+              echo "branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
+
+              CONTENT=$(parse_context "$COMMENT")
+              if [ -n "$CONTENT" ]; then
+                echo "context<<EOF" >> $GITHUB_OUTPUT
+                echo "$CONTENT" >> $GITHUB_OUTPUT
+                echo "EOF" >> $GITHUB_OUTPUT
+              fi
+              ;;
             help)
-               echo "show_help=true" >> $GITHUB_OUTPUT
-               ;;
+              echo "show_help=true" >> $GITHUB_OUTPUT
+              ;;
             *)
-               echo "show_help=true" >> $GITHUB_OUTPUT
-               echo "❌ Unknown RC command: $COMMAND"
-               ;;
+              echo "show_help=true" >> $GITHUB_OUTPUT
+              echo "❌ Unknown RC command: $COMMAND"
+              ;;
           esac
 
       - name: Post Help Comment
@@ -124,19 +178,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "## 🚀 RC Bot Commands
-          
+
           Hi! I help manage Release Candidate PRs.
-          
+
           ### Command Format
           \`@ribir-bot COMMAND [CONTEXT]\`
-          
+
           Commands must start with \`@ribir-bot\` at the beginning of a line.
-          
+
           ### Available Commands
           - \`@ribir-bot release-highlights [context]\` - Regenerate highlights section
           - \`@ribir-bot release-social-card\` - Generate social card (coming soon)
           - \`@ribir-bot help\` - Show this help message
-          
+
           ### Note
           Only the PR author and users with write access can use these commands."
 
