@@ -48,5 +48,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # One command handles: changelog collect, cargo release, GitHub Release
-          cd tools/ribir-bot
-          cargo run -- release next alpha
+          cargo run --manifest-path tools/ribir-bot/Cargo.toml -- release next alpha
