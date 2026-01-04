@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          token: ${{ secrets.GITHUB_RELEASE_TOKEN }}
+          # token: ${{ secrets.GITHUB_RELEASE_TOKEN }}
 
       - name: Check for new commits
         run: |
@@ -30,6 +30,9 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebp-dev libasound2-dev pkg-config
 
       - name: Install cargo-release
         run: cargo install cargo-release
