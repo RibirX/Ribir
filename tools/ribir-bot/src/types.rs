@@ -73,7 +73,7 @@ impl SectionKind {
       Self::Breaking => ("💥", "Breaking"),
       Self::Internal => ("🔧", "Internal"),
     };
-    format!("### {} {}", emoji, name)
+    format!("{} {}", emoji, name)
   }
 }
 
@@ -84,7 +84,6 @@ pub struct PR {
   pub title: String,
   pub body: Option<String>,
   pub author: Author,
-  pub merged_at: Option<String>,
 }
 
 #[derive(Deserialize)]

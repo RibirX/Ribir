@@ -213,6 +213,12 @@ impl<'a> ChangelogContext<'a> {
   }
 
   pub fn save(&self, dry_run: bool) -> Result<()> {
+    self.save_and_get_content(dry_run)?;
+    Ok(())
+  }
+
+  /// Save changelog and return the generated content.
+  pub fn save_and_get_content(&self, dry_run: bool) -> Result<String> {
     let mut out = Vec::new();
     comrak::format_commonmark(self.root, &Options::default(), &mut out)?;
     let content = String::from_utf8(out)?;
@@ -230,7 +236,7 @@ impl<'a> ChangelogContext<'a> {
       fs::write(&self.path, &content)?;
       println!("✅ Saved {}", self.path);
     }
-    Ok(())
+    Ok(content)
   }
 
   pub fn new_node(&self, value: NodeValue) -> &'a Node<'a, RefCell<Ast>> {
@@ -383,16 +389,33 @@ pub fn replace_version_header(changelog: &str, old_version: &str, new_version: &
 
 /// Extract a version section from the changelog (string-based, for output).
 pub fn extract_version_section(changelog: &str, version: &str) -> Option<String> {
-  let header_pattern = format!("## [{}]", version);
-  let start = changelog.find(&header_pattern)?;
+  // Try both escaped and unescaped patterns (comrak may escape brackets)
+  let patterns = [
+    format!("## [{}]", version),
+    format!("## \\[{}\\]", version),
+  ];
+
+  let (start, matched_pattern) = patterns
+    .iter()
+    .find_map(|p| changelog.find(p).map(|pos| (pos, p.as_str())))?;
 
   let rest = &changelog[start..];
+
+  // Find the next version header (either escaped or unescaped)
   let end = rest[3..]
     .find("\n## [")
+    .or_else(|| rest[3..].find("\n## \\["))
     .map(|pos| pos + 3)
     .unwrap_or(rest.len());
 
-  Some(rest[..end].to_string())
+  let section = rest[..end].to_string();
+
+  // Unescape the section if it was escaped
+  if matched_pattern.contains("\\[") {
+    Some(section.replace("\\[", "[").replace("\\]", "]"))
+  } else {
+    Some(section)
+  }
 }
 
 /// Find RC highlights from changelog (uses AST via Release).

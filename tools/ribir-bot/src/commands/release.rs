@@ -136,15 +136,23 @@ fn collect_changelog_entries(version: &str, dry_run: bool) -> Result<String> {
     dry_run,
   };
 
-  // Run collection (writes if not dry_run)
-  cmd_collect(&collect_config, version, !dry_run)?;
+  // Run collection (writes if not dry_run) and get the generated content
+  let generated_content = cmd_collect(&collect_config, version, !dry_run)?;
 
-  // Read and extract the version section
-  let changelog = fs::read_to_string("CHANGELOG.md")?;
-  Ok(extract_version_section(&changelog, version).unwrap_or_else(|| {
-    // If version not found (dry-run), return placeholder
-    format!("(Changelog entries for {} will be collected from merged PRs)", version)
-  }))
+  // In dry-run mode, use the generated content directly
+  // In write mode, read from the saved file
+  if dry_run && !generated_content.is_empty() {
+    // Extract the version section from the generated content
+    Ok(extract_version_section(&generated_content, version).unwrap_or_else(|| {
+      format!("(Changelog entries for {} will be collected from merged PRs)", version)
+    }))
+  } else {
+    // Read from file (either just written or for fallback)
+    let changelog = fs::read_to_string("CHANGELOG.md")?;
+    Ok(extract_version_section(&changelog, version).unwrap_or_else(|| {
+      format!("(Changelog entries for {} will be collected from merged PRs)", version)
+    }))
+  }
 }
 
 fn validate_release_level(level: &str) -> Result<()> {

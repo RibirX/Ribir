@@ -18,7 +18,8 @@ use crate::{
 };
 
 /// Collect PRs and generate changelog entries.
-pub fn cmd_collect(_config: &Config, version: &str, write: bool) -> Result<()> {
+/// Returns the changelog content (for dry-run preview) or empty string if no new content.
+pub fn cmd_collect(_config: &Config, version: &str, write: bool) -> Result<String> {
   println!("📋 Collecting PRs for version {}...", version);
   let target_ver = Version::parse(version)?;
   let arena = Arena::new();
@@ -33,7 +34,7 @@ pub fn cmd_collect(_config: &Config, version: &str, write: bool) -> Result<()> {
   let prs = get_merged_prs_since(&latest)?;
   if prs.is_empty() {
     println!("✅ No new content.");
-    return Ok(());
+    return Ok(String::new());
   }
   println!("🔍 Found {} new PRs", prs.len());
 
@@ -74,7 +75,7 @@ pub fn cmd_collect(_config: &Config, version: &str, write: bool) -> Result<()> {
     }
   }
 
-  ctx.save(!write)
+  ctx.save_and_get_content(!write)
 }
 
 /// Merge pre-release versions into target version.
@@ -264,7 +265,6 @@ mod tests {
       title: "test".into(),
       body: Some(body),
       author: Author { login: "user".into() },
-      merged_at: None,
     };
 
     let arena = Arena::new();
@@ -295,7 +295,6 @@ mod tests {
       title: "test".into(),
       body: Some(body),
       author: Author { login: "dev".into() },
-      merged_at: None,
     };
 
     let arena = Arena::new();

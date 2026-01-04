@@ -156,42 +156,86 @@ pub fn comment_on_pr(pr_number: &str, comment: &str) -> Result<()> {
   Ok(())
 }
 
-/// Get merged PRs since a version.
+/// Get merged PRs since a version tag.
+/// Uses commit ancestry to determine if a PR was merged after the tag.
 pub fn get_merged_prs_since(ver: &Version) -> Result<Vec<crate::types::PR>> {
-  let date = get_tag_date(ver).ok_or(format!("Tag for {} not found", ver))?;
+  let tag_commit = get_tag_commit(ver).ok_or(format!("Tag for {} not found", ver))?;
+  eprintln!("📌 Tag commit for {}: {}", ver, &tag_commit[..8]);
+
+  // Get the origin repo to query PRs from
+  let repo = get_origin_repo()?;
+  eprintln!("📌 Querying PRs from: {}", repo);
+
   let out = Command::new("gh")
     .args([
       "pr",
       "list",
+      "--repo",
+      &repo,
       "--state",
       "merged",
       "--base",
       "master",
       "--limit",
-      "500",
+      "100",
       "--json",
-      "number,title,body,author,mergedAt",
+      "number,title,body,author,mergeCommit",
     ])
     .output()?;
   if !out.status.success() {
     return Err(format!("gh failed: {}", String::from_utf8_lossy(&out.stderr)).into());
   }
 
-  let prs: Vec<crate::types::PR> = serde_json::from_slice(&out.stdout)?;
-  Ok(
-    prs
-      .into_iter()
-      .filter(|p| p.merged_at.as_ref().is_some_and(|d| d > &date))
-      .collect(),
-  )
+  #[derive(serde::Deserialize)]
+  struct PRWithCommit {
+    number: u32,
+    title: String,
+    body: Option<String>,
+    author: crate::types::Author,
+    #[serde(rename = "mergeCommit")]
+    merge_commit: Option<MergeCommit>,
+  }
+
+  #[derive(serde::Deserialize)]
+  struct MergeCommit {
+    oid: String,
+  }
+
+  let prs: Vec<PRWithCommit> = serde_json::from_slice(&out.stdout)?;
+  let mut result = Vec::new();
+
+  for pr in prs {
+    if let Some(ref mc) = pr.merge_commit {
+      // Check if the merge commit is NOT an ancestor of the tag (i.e., was merged after the tag)
+      // git merge-base --is-ancestor <commit> <tag> returns 0 if commit is ancestor of tag
+      let is_ancestor = Command::new("git")
+        .args(["merge-base", "--is-ancestor", &mc.oid, &tag_commit])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+      // If the merge commit is NOT an ancestor of the tag, it was merged after
+      if !is_ancestor {
+        result.push(crate::types::PR {
+          number: pr.number,
+          title: pr.title,
+          body: pr.body,
+          author: pr.author,
+        });
+      }
+    }
+  }
+
+  eprintln!("🔍 Found {} PRs merged after tag", result.len());
+  Ok(result)
 }
 
-/// Get the date of a version tag.
-pub fn get_tag_date(ver: &Version) -> Option<String> {
+/// Get the commit SHA of a version tag.
+fn get_tag_commit(ver: &Version) -> Option<String> {
   let tags = [format!("v{}", ver), format!("ribir-v{}", ver), ver.to_string()];
   for tag in tags {
     if let Ok(o) = Command::new("git")
-      .args(["log", "-1", "--format=%aI", &tag])
+      .args(["rev-parse", &tag])
       .output()
     {
       if o.status.success() {
@@ -200,6 +244,35 @@ pub fn get_tag_date(ver: &Version) -> Option<String> {
     }
   }
   None
+}
+
+/// Get the origin repository in "owner/repo" format.
+fn get_origin_repo() -> Result<String> {
+  let out = Command::new("git")
+    .args(["remote", "get-url", "origin"])
+    .output()?;
+
+  if !out.status.success() {
+    return Err("Failed to get origin remote URL".into());
+  }
+
+  let url = String::from_utf8_lossy(&out.stdout).trim().to_string();
+
+  // Parse owner/repo from various URL formats:
+  // - git@github.com:owner/repo.git
+  // - https://github.com/owner/repo.git
+  // - https://github.com/owner/repo
+  let repo = url
+    .trim_end_matches(".git")
+    .rsplit(['/', ':'])
+    .take(2)
+    .collect::<Vec<_>>()
+    .into_iter()
+    .rev()
+    .collect::<Vec<_>>()
+    .join("/");
+
+  Ok(repo)
 }
 
 // ============================================================================

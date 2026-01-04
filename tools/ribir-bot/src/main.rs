@@ -25,7 +25,7 @@ fn run() -> Result<()> {
 
   match &config.command {
     Cmd::Pr(pr_cmd) => commands::cmd_pr(&config, pr_cmd),
-    Cmd::Collect { version, write } => commands::cmd_collect(&config, version, *write),
+    Cmd::Collect { version, write } => commands::cmd_collect(&config, version, *write).map(|_| ()),
     Cmd::Merge { version, write } => commands::cmd_merge(&config, version, *write),
     Cmd::Verify => commands::cmd_verify(&config),
     Cmd::Release(rel_cmd) => commands::cmd_release(&config, rel_cmd),
