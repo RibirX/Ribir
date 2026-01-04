@@ -187,6 +187,7 @@ pub enum ReleaseCmd {
   Prepare { version: String },
   Publish { pr_id: Option<String> },
   Promote { version: String },
+  Next { level: String },
   Verify,
   Highlights { context: Option<String> },
   SocialCard,

@@ -1,6 +1,6 @@
 //! Release command implementations.
 
-use std::{fs, process::Command};
+use std::{fs, process::{Command, Stdio}};
 
 use comrak::Arena;
 use semver::Version;
@@ -57,6 +57,7 @@ Example output:
 /// Execute release command.
 pub fn cmd_release(config: &Config, cmd: &ReleaseCmd) -> Result<()> {
   match cmd {
+    ReleaseCmd::Next { level } => cmd_release_next(config, level),
     ReleaseCmd::Prepare { version } => cmd_release_prepare(config, version),
     ReleaseCmd::Publish { pr_id } => cmd_release_publish(config, pr_id.as_deref()),
     ReleaseCmd::Promote { version } => cmd_release_promote(config, version),
@@ -64,6 +65,127 @@ pub fn cmd_release(config: &Config, cmd: &ReleaseCmd) -> Result<()> {
     ReleaseCmd::Highlights { context } => cmd_release_highlights(config, context.as_deref()),
     ReleaseCmd::SocialCard => cmd_release_social_card(config),
   }
+}
+
+/// Execute full release at the specified level.
+/// Levels: alpha, rc, patch, minor, major
+pub fn cmd_release_next(config: &Config, level: &str) -> Result<()> {
+  // 1. Validate level
+  validate_release_level(level)?;
+
+  println!("🚀 Starting {} release...", level);
+
+  // 2. Get next version from cargo release dry-run
+  let version = get_next_version(level)?;
+  println!("📦 Next version: {}", version);
+
+  // 3. Collect changelog entries
+  println!("📋 Collecting changelog entries...");
+  if !config.dry_run {
+    run_log_collect(&version)?;
+    run_git(&["add", "CHANGELOG.md"])?;
+  } else {
+    println!("   Would collect changelog for {}", version);
+  }
+
+  // 4. Run cargo release (version bump, commit, tag, push, optional publish)
+  println!("🔧 Running cargo release...");
+  if !config.dry_run {
+    run_cargo_release(level)?;
+  } else {
+    println!("   Would run: cargo release {} --execute --no-confirm", level);
+  }
+
+  // 5. Create GitHub Release
+  let is_prerelease = level == "alpha" || level == "rc";
+  println!("🎉 Creating GitHub Release (prerelease: {})...", is_prerelease);
+  if !config.dry_run {
+    let changelog = fs::read_to_string("CHANGELOG.md")?;
+    let notes = extract_version_section(&changelog, &version)
+      .ok_or_else(|| format!("Release notes not found for version {}", version))?;
+    create_github_release(&version, &notes, is_prerelease)?;
+  } else {
+    println!("   Would create GitHub Release v{}", version);
+  }
+
+  if config.dry_run {
+    println!("\n💡 This is a dry-run. Use --execute to apply changes.");
+  } else {
+    println!("\n✅ Release {} complete!", version);
+  }
+  Ok(())
+}
+
+fn validate_release_level(level: &str) -> Result<()> {
+  match level {
+    "alpha" | "rc" | "patch" | "minor" | "major" => Ok(()),
+    _ => Err(format!(
+      "Invalid level: '{}'. Use: alpha, rc, patch, minor, major",
+      level
+    )
+    .into()),
+  }
+}
+
+fn get_next_version(level: &str) -> Result<String> {
+  let output = Command::new("cargo")
+    .args(["release", level, "--dry-run"])
+    .stderr(Stdio::piped())
+    .stdout(Stdio::piped())
+    .output()?;
+
+  let combined = format!(
+    "{}{}",
+    String::from_utf8_lossy(&output.stdout),
+    String::from_utf8_lossy(&output.stderr)
+  );
+
+  // Find "Upgrading ... to X.Y.Z" pattern and extract version using semver
+  // Look for lines containing "Upgrading" and extract the last valid semver
+  for line in combined.lines() {
+    if line.contains("Upgrading") && line.contains(" to ") {
+      // Split by " to " and take the second part
+      if let Some(after_to) = line.split(" to ").nth(1) {
+        // The version is the first word after "to"
+        let version_str = after_to.split_whitespace().next().unwrap_or("");
+        // Validate with semver
+        if Version::parse(version_str).is_ok() {
+          return Ok(version_str.to_string());
+        }
+      }
+    }
+  }
+
+  Err(
+    format!(
+      "Could not parse version from cargo release output:\n{}",
+      &combined[..combined.len().min(500)]
+    )
+    .into(),
+  )
+}
+
+fn run_cargo_release(level: &str) -> Result<()> {
+  let status = Command::new("cargo")
+    .args(["release", level, "--execute", "--no-confirm"])
+    .status()?;
+
+  if !status.success() {
+    return Err(format!("cargo release failed with exit code: {:?}", status.code()).into());
+  }
+  Ok(())
+}
+
+fn run_log_collect(version: &str) -> Result<()> {
+  use crate::commands::cmd_collect;
+
+  // Create a config that writes (not dry-run)
+  let collect_config = Config {
+    command: crate::types::Cmd::Verify, // Dummy, not used
+    dry_run: false,
+  };
+
+  cmd_collect(&collect_config, version, true)
 }
 
 /// Prepare RC release.
@@ -193,14 +315,22 @@ pub fn cmd_release_promote(config: &Config, version_str: &str) -> Result<()> {
 
   if !config.dry_run {
     fs::write(&changelog_path, &updated_changelog)?;
+    run_git(&["add", &changelog_path])?;
     println!("✅ Updated CHANGELOG.md with stable version");
   }
 
-  let tag = format!("v{}", version_str);
-  println!("🏷️  Creating tag {}...", tag);
+  // Run cargo release to bump version, commit, tag, and optionally publish to crates.io
+  println!("📦 Running cargo release {}...", version_str);
   if !config.dry_run {
-    run_git(&["tag", "-a", &tag, "-m", &format!("Release {}", version_str)])?;
-    run_git(&["push", "origin", &tag])?;
+    let status = Command::new("cargo")
+      .args(["release", version_str, "--execute", "--no-confirm"])
+      .status()?;
+
+    if !status.success() {
+      return Err(format!("cargo release failed with exit code: {:?}", status.code()).into());
+    }
+  } else {
+    println!("   Would run: cargo release {} --execute --no-confirm", version_str);
   }
 
   let release_notes = extract_version_section(&updated_changelog, version_str)
@@ -211,7 +341,11 @@ pub fn cmd_release_promote(config: &Config, version_str: &str) -> Result<()> {
     create_github_release(version_str, &release_notes, false)?;
   }
 
-  println!("✅ Stable release {} published!", version_str);
+  if config.dry_run {
+    println!("\n💡 This is a dry-run. Use --execute to apply changes.");
+  } else {
+    println!("\n✅ Stable release {} published!", version_str);
+  }
   Ok(())
 }
 
@@ -373,6 +507,20 @@ fn commit_and_create_release_pr(
 }
 
 fn get_version_from_context() -> Result<String> {
+  // First try: get version from latest git tag (most reliable after cargo release)
+  if let Ok(output) = std::process::Command::new("git")
+    .args(["describe", "--tags", "--abbrev=0"])
+    .output()
+  {
+    if output.status.success() {
+      let tag = String::from_utf8_lossy(&output.stdout).trim().to_string();
+      if let Some(version) = tag.strip_prefix('v') {
+        return Ok(version.to_string());
+      }
+    }
+  }
+
+  // Fallback: parse from CHANGELOG.md
   let changelog = fs::read_to_string("CHANGELOG.md")?;
   parse_latest_version(&changelog).ok_or("Could not determine version from context".into())
 }

@@ -14,10 +14,11 @@ on:
 
 jobs:
   check:
-    # Only run for PRs targeting master/main (skip dependabot, require @ribir-bot mention for comments)
+    # Filter: PR events (non-dependabot, targeting master) or @ribir-bot comments (excluding release-* commands)
     if: |
-      (github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.base.ref == 'master')) &&
-      (github.event_name != 'issue_comment' || (github.event.issue.pull_request && contains(github.event.comment.body, '@ribir-bot')))
+      (github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.base.ref == 'master') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@ribir-bot') && !contains(github.event.comment.body, 'release-')) ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -34,15 +35,93 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Default to not running
-          echo "should_run=false" >> $GITHUB_OUTPUT
-          echo "show_help=false" >> $GITHUB_OUTPUT # Initialize show_help
+          # ============================================================
+          # Helper: Check if PR is a Release Candidate PR
+          # RC PR = base:master + head:release-X.Y.x
+          # ============================================================
+          is_rc_pr() {
+            local pr_number=$1
+            local repo=$2
+            local base=$(gh pr view $pr_number --repo $repo --json baseRefName -q '.baseRefName')
+            local head=$(gh pr view $pr_number --repo $repo --json headRefName -q '.headRefName')
+            [[ "$base" == "master" && "$head" =~ ^release-[0-9]+\.[0-9]+\.x$ ]]
+          }
 
-          # --- Case 1: Pull Request Event (Auto trigger) ---
+          # ============================================================
+          # Helper: Check if PR targets main/master branch
+          # ============================================================
+          targets_main_branch() {
+            local pr_number=$1
+            local repo=$2
+            local base=$(gh pr view $pr_number --repo $repo --json baseRefName -q '.baseRefName')
+            [[ "$base" == "master" || "$base" == "main" ]]
+          }
+
+          # ============================================================
+          # Helper: Check user permissions
+          # ============================================================
+          check_permission() {
+            local user=$1
+            local author=$2
+            local repo=$3
+
+            if [ "$user" = "$author" ]; then
+              echo "✓ User is PR author"
+              return 0
+            fi
+
+            local perm=$(gh api "/repos/$repo/collaborators/$user/permission" --jq '.permission')
+            if [ "$perm" = "write" ] || [ "$perm" = "admin" ]; then
+              echo "✓ User has $perm permission"
+              return 0
+            fi
+
+            echo "✗ User does not have permission (found: $perm)"
+            return 1
+          }
+
+          # ============================================================
+          # Helper: Parse @ribir-bot command from comment
+          # ============================================================
+          parse_command() {
+            local comment="$1"
+            local bot_line=$(echo "$comment" | grep -E "^@ribir-bot\s+" | head -n 1)
+
+            if [ -z "$bot_line" ]; then
+              echo ""
+              return
+            fi
+
+            echo "$bot_line" | sed -E 's/@ribir-bot\s+([a-z-]+).*/\1/'
+          }
+
+          parse_context() {
+            local comment="$1"
+            local bot_line=$(echo "$comment" | grep -E "^@ribir-bot\s+" | head -n 1)
+            echo "$bot_line" | sed -E 's/@ribir-bot\s+[a-z-]+\s*//'
+          }
+
+          # ============================================================
+          # Main Logic
+          # ============================================================
+          echo "should_run=false" >> $GITHUB_OUTPUT
+          echo "show_help=false" >> $GITHUB_OUTPUT
+
+          REPO="${{ github.repository }}"
+
+          # --- Case 1: Pull Request Event (Auto-fill on PR open/update) ---
           if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+
+            # Skip RC PRs (they use rc-bot.yml)
+            if is_rc_pr "$PR_NUMBER" "$REPO"; then
+              echo "⏭️ RC PR detected - skipping pr-bot"
+              exit 0
+            fi
+
             echo "should_run=true" >> $GITHUB_OUTPUT
             echo "command=pr-fill" >> $GITHUB_OUTPUT
-            echo "pr_id=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "pr_id=$PR_NUMBER" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -55,54 +134,43 @@ jobs:
           fi
 
           # --- Case 3: Issue Comment (@ribir-bot commands) ---
+          PR_NUMBER="${{ github.event.issue.number }}"
           COMMENT_USER="${{ github.event.comment.user.login }}"
           PR_AUTHOR="${{ github.event.issue.user.login }}"
-          REPO="${{ github.repository }}"
-          PR_NUMBER="${{ github.event.issue.number }}"
-
-          # 3.1 Check Permissions
-          ALLOWED="false"
-          if [ "$COMMENT_USER" = "$PR_AUTHOR" ]; then
-             ALLOWED="true"
-             echo "✓ User is PR author"
-          else
-             PERMISSION=$(gh api "/repos/$REPO/collaborators/$COMMENT_USER/permission" --jq '.permission')
-             if [ "$PERMISSION" = "write" ] || [ "$PERMISSION" = "admin" ]; then
-                ALLOWED="true"
-                echo "✓ User has $PERMISSION permission"
-             else
-                echo "✗ User does not have permission (found: $PERMISSION)"
-                # Exit with success (0) but should_run=false implies we stop here cleanly
-                exit 0
-             fi
-          fi
-
-          # 3.2 Check if RC PR (Skip if so)
-          BASE_BRANCH=$(gh pr view $PR_NUMBER --repo $REPO --json baseRefName -q '.baseRefName')
-          HEAD_BRANCH=$(gh pr view $PR_NUMBER --repo $REPO --json headRefName -q '.headRefName')
-          if [[ "$BASE_BRANCH" == "master" && "$HEAD_BRANCH" =~ ^release-[0-9]+\.[0-9]+\.x$ ]]; then
-             echo "⏭️ RC PR detected - use @ribir-bot rc-* commands"
-             exit 0
-          fi
-
-          # 3.3 Parse Command
           COMMENT="${{ github.event.comment.body }}"
-          BOT_LINE=$(echo "$COMMENT" | grep -E "^@ribir-bot\s+" | head -n 1)
 
-          if [ -z "$BOT_LINE" ]; then
+          # 3.1 Only process PRs targeting main/master
+          if ! targets_main_branch "$PR_NUMBER" "$REPO"; then
+            echo "⏭️ PR does not target main/master - skipping"
+            exit 0
+          fi
+
+          # 3.2 Skip RC PRs (they use rc-bot.yml)
+          if is_rc_pr "$PR_NUMBER" "$REPO"; then
+            echo "⏭️ RC PR detected - use @ribir-bot release-* commands instead"
+            exit 0
+          fi
+
+          # 3.3 Check permissions
+          if ! check_permission "$COMMENT_USER" "$PR_AUTHOR" "$REPO"; then
+            exit 0
+          fi
+
+          # 3.4 Parse and validate command
+          COMMAND=$(parse_command "$COMMENT")
+
+          if [ -z "$COMMAND" ]; then
             echo "show_help=true" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          COMMAND=$(echo "$BOT_LINE" | sed -E 's/@ribir-bot\s+([a-z-]+).*/\1/')
-          CONTENT=$(echo "$BOT_LINE" | sed -E 's/@ribir-bot\s+[a-z-]+\s*//')
-          
-          # 3.4 Validate Command
           case "$COMMAND" in
             pr-fill|pr-regen|pr-summary|pr-entry)
               echo "should_run=true" >> $GITHUB_OUTPUT
               echo "command=$COMMAND" >> $GITHUB_OUTPUT
               echo "pr_id=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+              CONTENT=$(parse_context "$COMMENT")
               if [ -n "$CONTENT" ]; then
                 echo "context<<EOF" >> $GITHUB_OUTPUT
                 echo "$CONTENT" >> $GITHUB_OUTPUT
@@ -124,21 +192,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "## 🤖 Ribir Bot Commands
-          
+
           Hi! I can help with generating PR summaries and changelog entries.
-          
+
           ### Command Format
           \`@ribir-bot COMMAND [CONTEXT]\`
-          
+
           Commands must start with \`@ribir-bot\` at the beginning of a line.
-          
+
           ### Available Commands
           - \`@ribir-bot pr-fill\` - Auto-fill placeholders in PR body
           - \`@ribir-bot pr-regen [context]\` - Regenerate summary and changelog
           - \`@ribir-bot pr-summary [context]\` - Regenerate only the summary section
           - \`@ribir-bot pr-entry [context]\` - Regenerate only the changelog entries
           - \`@ribir-bot help\` - Show this help message
-          
+
           ### Note
           Only the PR author and users with write access can use these commands."
 
