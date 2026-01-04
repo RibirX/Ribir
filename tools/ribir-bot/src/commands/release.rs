@@ -1,6 +1,9 @@
 //! Release command implementations.
 
-use std::{fs, process::{Command, Stdio}};
+use std::{
+  fs,
+  process::{Command, Stdio},
+};
 
 use comrak::Arena;
 use semver::Version;
@@ -13,7 +16,7 @@ use crate::{
   external::{
     call_gemini_with_fallback, comment_on_pr, create_github_release, create_pr, extract_json,
   },
-  types::{Config, Highlight, HighlightsResponse, ReleaseCmd, Result},
+  types::{Config, Highlight, HighlightsResponse, ReleaseCmd, ReleaseLevel, Result},
   utils::{
     branch_exists, create_release_branch, get_changelog_path, get_current_branch, get_latest_tags,
     run_git,
@@ -57,10 +60,10 @@ Example output:
 /// Execute release command.
 pub fn cmd_release(config: &Config, cmd: &ReleaseCmd) -> Result<()> {
   match cmd {
-    ReleaseCmd::Next { level } => cmd_release_next(config, level),
-    ReleaseCmd::Prepare { version } => cmd_release_prepare(config, version),
+    ReleaseCmd::Next { level, .. } => cmd_release_next(config, *level),
+    ReleaseCmd::EnterRc { version } => cmd_release_enter_rc(config, version),
     ReleaseCmd::Publish { pr_id } => cmd_release_publish(config, pr_id.as_deref()),
-    ReleaseCmd::Promote { version } => cmd_release_promote(config, version),
+    ReleaseCmd::Stable { version, .. } => cmd_release_stable(config, version.as_deref()),
     ReleaseCmd::Verify => cmd_release_verify(config),
     ReleaseCmd::Highlights { context } => cmd_release_highlights(config, context.as_deref()),
     ReleaseCmd::SocialCard => cmd_release_social_card(config),
@@ -68,15 +71,19 @@ pub fn cmd_release(config: &Config, cmd: &ReleaseCmd) -> Result<()> {
 }
 
 /// Execute full release at the specified level.
-/// Levels: alpha, rc, patch, minor, major
-pub fn cmd_release_next(config: &Config, level: &str) -> Result<()> {
-  // 1. Validate level
-  validate_release_level(level)?;
+pub fn cmd_release_next(config: &Config, level: ReleaseLevel) -> Result<()> {
+  let level_str = match level {
+    ReleaseLevel::Alpha => "alpha",
+    ReleaseLevel::Rc => "rc",
+    ReleaseLevel::Patch => "patch",
+    ReleaseLevel::Minor => "minor",
+    ReleaseLevel::Major => "major",
+  };
 
-  println!("🚀 Starting {} release...", level);
+  println!("🚀 Starting {} release...", level_str);
 
   // 2. Get next version from cargo release dry-run
-  let version = get_next_version(level)?;
+  let version = get_next_version(level_str)?;
   println!("📦 Next version: {}", version);
 
   // 3. Collect changelog entries
@@ -90,13 +97,13 @@ pub fn cmd_release_next(config: &Config, level: &str) -> Result<()> {
   // 4. Run cargo release (version bump, commit, tag, push, optional publish)
   println!("🔧 Running cargo release...");
   if !config.dry_run {
-    run_cargo_release(level)?;
+    run_cargo_release(level_str)?;
   } else {
-    println!("   Would run: cargo release {} --execute --no-confirm", level);
+    println!("   Would run: cargo release {} --execute --no-confirm", level_str);
   }
 
   // 5. Create GitHub Release
-  let is_prerelease = level == "alpha" || level == "rc";
+  let is_prerelease = matches!(level, ReleaseLevel::Alpha | ReleaseLevel::Rc);
   println!("🎉 Creating GitHub Release (prerelease: {})...", is_prerelease);
 
   let changelog = fs::read_to_string("CHANGELOG.md")?;
@@ -132,7 +139,7 @@ fn collect_changelog_entries(version: &str, dry_run: bool) -> Result<String> {
   use crate::commands::cmd_collect;
 
   let collect_config = Config {
-    command: crate::types::Cmd::Verify, // Dummy, not used
+    command: crate::types::Cmd::Release { cmd: ReleaseCmd::Verify }, // Dummy, not used
     dry_run,
   };
 
@@ -152,17 +159,6 @@ fn collect_changelog_entries(version: &str, dry_run: bool) -> Result<String> {
     Ok(extract_version_section(&changelog, version).unwrap_or_else(|| {
       format!("(Changelog entries for {} will be collected from merged PRs)", version)
     }))
-  }
-}
-
-fn validate_release_level(level: &str) -> Result<()> {
-  match level {
-    "alpha" | "rc" | "patch" | "minor" | "major" => Ok(()),
-    _ => Err(format!(
-      "Invalid level: '{}'. Use: alpha, rc, patch, minor, major",
-      level
-    )
-    .into()),
   }
 }
 
@@ -215,12 +211,13 @@ fn run_cargo_release(level: &str) -> Result<()> {
   Ok(())
 }
 
-/// Prepare RC release.
-pub fn cmd_release_prepare(config: &Config, version_str: &str) -> Result<()> {
+/// Enter RC phase: create release branch, merge changelog, generate highlights,
+/// create PR, and publish RC.1.
+pub fn cmd_release_enter_rc(config: &Config, version_str: &str) -> Result<()> {
   let version = Version::parse(version_str)?;
   let rc_version = format!("{}.{}.{}-rc.1", version.major, version.minor, version.patch);
 
-  println!("🚀 Preparing RC for version {}", version_str);
+  println!("🚀 Entering RC phase for version {}", version_str);
 
   // Step 1: Archive changelog if needed
   let needs_archive = should_archive_changelog(&version)?;
@@ -312,13 +309,21 @@ pub fn cmd_release_publish(config: &Config, pr_number: Option<&str>) -> Result<(
   Ok(())
 }
 
-/// Promote RC to stable.
-pub fn cmd_release_promote(config: &Config, version_str: &str) -> Result<()> {
-  let version = Version::parse(version_str)?;
+/// Release stable version.
+/// If version is not provided, auto-detects from current release branch
+/// (release-X.Y.x -> X.Y.0).
+pub fn cmd_release_stable(config: &Config, version: Option<&str>) -> Result<()> {
+  // Auto-detect version from release branch if not provided
+  let version_str = match version {
+    Some(v) => v.to_string(),
+    None => detect_stable_version_from_branch()?,
+  };
+
+  let version = Version::parse(&version_str)?;
   let rc1_version = format!("{}-rc.1", version_str);
   let changelog_path = get_changelog_path()?;
 
-  println!("🚀 Promoting {} to stable...", version_str);
+  println!("🚀 Releasing stable version {}...", version_str);
 
   let changelog = fs::read_to_string(&changelog_path)?;
   let has_highlights = find_rc_highlights(&changelog, &rc1_version).is_some();
@@ -333,12 +338,12 @@ pub fn cmd_release_promote(config: &Config, version_str: &str) -> Result<()> {
   if rc_versions.len() > 1 {
     println!("🔀 Found {} RC versions, merging bug fix entries...", rc_versions.len());
     if !config.dry_run {
-      run_changelog_merge(version_str)?;
+      run_changelog_merge(&version_str)?;
     }
   }
 
   let changelog = fs::read_to_string(&changelog_path)?;
-  let updated_changelog = replace_version_header(&changelog, &rc1_version, version_str);
+  let updated_changelog = replace_version_header(&changelog, &rc1_version, &version_str);
 
   if !config.dry_run {
     fs::write(&changelog_path, &updated_changelog)?;
@@ -346,11 +351,12 @@ pub fn cmd_release_promote(config: &Config, version_str: &str) -> Result<()> {
     println!("✅ Updated CHANGELOG.md with stable version");
   }
 
-  // Run cargo release to bump version, commit, tag, and optionally publish to crates.io
+  // Run cargo release to bump version, commit, tag, and optionally publish to
+  // crates.io
   println!("📦 Running cargo release {}...", version_str);
   if !config.dry_run {
     let status = Command::new("cargo")
-      .args(["release", version_str, "--execute", "--no-confirm"])
+      .args(["release", &version_str, "--execute", "--no-confirm"])
       .status()?;
 
     if !status.success() {
@@ -360,12 +366,12 @@ pub fn cmd_release_promote(config: &Config, version_str: &str) -> Result<()> {
     println!("   Would run: cargo release {} --execute --no-confirm", version_str);
   }
 
-  let release_notes = extract_version_section(&updated_changelog, version_str)
+  let release_notes = extract_version_section(&updated_changelog, &version_str)
     .ok_or_else(|| format!("Release notes not found for version {}", version_str))?;
 
   println!("🎉 Creating stable GitHub Release...");
   if !config.dry_run {
-    create_github_release(version_str, &release_notes, false)?;
+    create_github_release(&version_str, &release_notes, false)?;
   }
 
   if config.dry_run {
@@ -374,6 +380,35 @@ pub fn cmd_release_promote(config: &Config, version_str: &str) -> Result<()> {
     println!("\n✅ Stable release {} published!", version_str);
   }
   Ok(())
+}
+
+/// Detect stable version from current release branch name.
+/// Branch pattern: release-X.Y.x -> Version: X.Y.0
+fn detect_stable_version_from_branch() -> Result<String> {
+  let branch = get_current_branch()?;
+
+  // Parse release-X.Y.x pattern using simple string manipulation
+  if let Some(suffix) = branch.strip_prefix("release-") {
+    // suffix should be "X.Y.x"
+    let parts: Vec<&str> = suffix.split('.').collect();
+    if parts.len() == 3 && parts[2] == "x" {
+      // Validate that major and minor are numbers
+      if let (Ok(major), Ok(minor)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+        let version = format!("{}.{}.0", major, minor);
+        println!("📌 Auto-detected version {} from branch {}", version, branch);
+        return Ok(version);
+      }
+    }
+  }
+
+  Err(
+    format!(
+      "Cannot auto-detect version: current branch '{}' is not a release branch (expected \
+       release-X.Y.x)",
+      branch
+    )
+    .into(),
+  )
 }
 
 /// Verify release state.
@@ -534,13 +569,16 @@ fn commit_and_create_release_pr(
 }
 
 fn get_version_from_context() -> Result<String> {
-  // First try: get version from latest git tag (most reliable after cargo release)
+  // First try: get version from latest git tag (most reliable after cargo
+  // release)
   if let Ok(output) = std::process::Command::new("git")
     .args(["describe", "--tags", "--abbrev=0"])
     .output()
   {
     if output.status.success() {
-      let tag = String::from_utf8_lossy(&output.stdout).trim().to_string();
+      let tag = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .to_string();
       if let Some(version) = tag.strip_prefix('v') {
         return Ok(version.to_string());
       }
@@ -568,8 +606,7 @@ pub fn cmd_release_highlights(config: &Config, context: Option<&str>) -> Result<
   // 1. Get version from changelog (latest version in file)
   let changelog_path = get_changelog_path()?;
   let changelog = fs::read_to_string(&changelog_path)?;
-  let version =
-    parse_latest_version(&changelog).ok_or("Could not find version in CHANGELOG.md")?;
+  let version = parse_latest_version(&changelog).ok_or("Could not find version in CHANGELOG.md")?;
 
   println!("📌 Found version: {}", version);
 
@@ -603,7 +640,9 @@ pub fn cmd_release_social_card(_config: &Config) -> Result<()> {
   Ok(())
 }
 
-fn generate_highlights_with_context(entries: &str, context: Option<&str>) -> Result<Vec<Highlight>> {
+fn generate_highlights_with_context(
+  entries: &str, context: Option<&str>,
+) -> Result<Vec<Highlight>> {
   println!("✨ Generating highlights with AI...");
 
   let mut prompt = HIGHLIGHTS_PROMPT.replace("{changelog_entries}", entries);
@@ -617,8 +656,8 @@ fn generate_highlights_with_context(entries: &str, context: Option<&str>) -> Res
 
   let response = call_gemini_with_fallback(&prompt)?;
   let json_str = extract_json(&response).ok_or("No JSON found in AI response")?;
-  let parsed: HighlightsResponse =
-    serde_json::from_str(&json_str).map_err(|e| format!("Invalid JSON from AI: {e}\nRaw: {response}"))?;
+  let parsed: HighlightsResponse = serde_json::from_str(&json_str)
+    .map_err(|e| format!("Invalid JSON from AI: {e}\nRaw: {response}"))?;
 
   validate_highlights(&parsed.highlights)?;
   Ok(parsed.highlights)

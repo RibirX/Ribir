@@ -19,7 +19,6 @@ An automated release system with:
 - **Streamlined flow**: Alpha (weekly) → RC (1-2 weeks) → Stable
 - **Release materials**: CHANGELOG with embedded highlights + social cards
 - **Human-in-the-loop**: Automated generation with manual review via PR
-- **One Command, Done**: Unified `release next` command handles everything
 
 ## Documentation Structure
 
@@ -34,16 +33,8 @@ An automated release system with:
    - PR Bot: Auto-generate summaries and changelog entries
    - Changelog Bot: Collect and merge entries
    - Release materials: Highlights in CHANGELOG and social cards
-   - Main commands and usage
 
-**2. [Complete Release Flow](02-complete-flow.md)**
-   - Unified release command reference
-   - Step-by-step operations for each release type
-   - How to trigger workflows
-   - Verification checklists
-   - Troubleshooting common issues
-
-**3. [Social Card Generation](03-social-card-generation.md)**
+**2. [Social Card Generation](03-social-card-generation.md)**
    - Standalone ribir-render tool design
    - Visual asset generation for releases
 
@@ -55,69 +46,36 @@ An automated release system with:
 
 Unified CLI tool for PR, changelog, and release automation.
 
-```
-PR Commands           Changelog Commands       Release Commands
-────────────          ──────────────────       ────────────────
-pr-fill               log-collect              release next <level>
-pr-regen              log-merge                release prepare
-pr-summary            log-verify               release publish
-pr-entry                                       release promote
-                                               release verify
-                                               release highlights
-```
-
-**PR Commands** (`pr-*`)
-- `pr-fill` - Auto-fill placeholders in PR body
-- `pr-regen` - Regenerate all AI content (summary + changelog)
-- `pr-summary` - Regenerate summary only
-- `pr-entry` - Regenerate changelog entry only
-
-**Changelog Commands** (`log-*`)
-- `log-collect` - Collect entries from merged PRs into CHANGELOG.md
-- `log-merge` - Merge pre-release version entries
-- `log-verify` - Verify changelog structure and parsing
-
-**Release Commands** (`release *`)
-- `release next <level>` - **Full release in one command** (changelog + cargo release + GitHub Release)
-  - Levels: `alpha`, `rc`, `patch`, `minor`, `major`
-  - Default: dry-run. Use `--execute` to apply.
-- `release prepare` - Prepare RC release (archive, merge, AI highlights, PR)
-- `release publish` - Publish GitHub release
-- `release promote` - Promote RC to stable
-- `release verify` - Verify release state
-- `release highlights` - Regenerate highlights in CHANGELOG.md
+> **Reference:** For installation, usage, and full command reference, see [tools/ribir-bot/README.md](../../tools/ribir-bot/README.md).
 
 ### GitHub Actions Workflows
 
-**Alpha Release** (automated weekly)
+**Release Alpha** (automated weekly)
 - Runs every Tuesday at 14:00 UTC
-- Uses `ribir-bot release next alpha --execute`
 - Auto-increments version (e.g., 0.5.0-alpha.23 → alpha.24)
 - Collects changelog entries and creates GitHub Release
 - Publishes to crates.io
 - Can be triggered manually for on-demand releases
 
-**RC Preparation** (manual)
-- Merges all alpha changelogs
+**Stable Preparation** (`release enter-rc`, manual)
+- Creates release branch (`release-0.5.x`) from master
+- Archives and merges all alpha changelogs
 - AI generates highlights section in CHANGELOG.md
-- Generates social card preview (future)
-- Creates PR for human review
+- Creates PR (`release-0.5.x` → `master`) for human review
+- **Automatically publishes RC.1**
 
-**RC Publishing** (automatic on PR merge)
-- Triggers when RC preparation PR is merged
-- Creates release branch (`release-0.5.x`)
-- Generates final social card (future)
-- Publishes GitHub Release with materials
+**Release RC** (manual, for rc.2+ only)
+- Runs on release branch when critical bugs are fixed during RC testing
+- Publishes rc.2, rc.3, etc.
+- Creates GitHub Release (marked as pre-release)
 
-**Stable Release** (manual)
-- Uses `ribir-bot release promote --version X.Y.Z --execute`
-- Promotes RC to stable after testing period (1-2 weeks)
-- Reuses RC materials (highlights in CHANGELOG, social card)
-- Removes pre-release flag
-- Finalized version published to GitHub and crates.io
+**Release Stable** (`release stable`, automatic on PR merge)
+- Triggers when stable preparation PR is merged
+- Merges any bug fix changelog from RC versions
+- Reuses highlights from RC.1
+- Publishes GitHub Release (stable, not pre-release)
 
-**Patch Release** (manual)
-- Uses `ribir-bot release next patch --execute`
+**Release Patch** (manual)
 - Quick bug fix releases on release branch
 - Collects only bug fix changelog entries
 - No social cards or highlights (not needed for patches)
@@ -129,24 +87,10 @@ pr-entry                                       release promote
 
 1. **[Release Strategy](00-release-strategy.md)** - Understand the overall flow
 2. **[Changelog Automation](01-changelog-automation.md)** - Learn how changelog works and release materials
-3. **[Complete Release Flow](02-complete-flow.md)** - Follow operations for your release type
-4. **[Social Card Generation](03-social-card-generation.md)** - Understand ribir-render tooling
-
-**Quick Command Reference:**
-
-```bash
-# Preview release (default dry-run)
-ribir-bot release next alpha
-
-# Execute release
-ribir-bot release next alpha --execute
-
-# Promote RC to stable
-ribir-bot release promote --version 0.5.0 --execute
-```
+3. **[Social Card Generation](03-social-card-generation.md)** - Understand ribir-render tooling
 
 **Need technical details?**
-- See `implementation/` directory for workflows, tools, and architecture
+- See [tools/ribir-bot/README.md](../../tools/ribir-bot/README.md) for CLI command reference.
 
 ## Related Documentation
 

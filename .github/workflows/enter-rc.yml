@@ -1,0 +1,136 @@
+name: Enter RC Phase
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Target stable version (e.g., 0.5.0). Leave empty to auto-detect from current alpha.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enter-rc:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Determine version
+        id: version
+        run: |
+          INPUT_VERSION="${{ github.event.inputs.version }}"
+
+          if [ -n "$INPUT_VERSION" ]; then
+            # User provided version - validate format
+            if [[ ! "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Error: Version must be in format X.Y.Z (e.g., 0.5.0)"
+              exit 1
+            fi
+            VERSION="$INPUT_VERSION"
+            echo "Using provided version: $VERSION"
+          else
+            # Auto-detect from latest tag (e.g., v0.4.0-alpha.54 -> 0.4.0)
+            LAST_TAG=$(git describe --tags --abbrev=0)
+            echo "Latest tag: $LAST_TAG"
+
+            # Extract version: v0.4.0-alpha.54 -> 0.4.0
+            VERSION=$(echo "$LAST_TAG" | sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+
+            if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Error: Could not extract version from tag $LAST_TAG"
+              exit 1
+            fi
+            echo "Auto-detected version: $VERSION"
+          fi
+
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          BRANCH="release-${MAJOR}.${MINOR}.x"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Preparing to enter RC phase for version $VERSION (branch: $BRANCH)"
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebp-dev libasound2-dev pkg-config
+
+      - name: Install cargo-release
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-release
+
+      - name: Cache Gemini CLI
+        id: cache-gemini
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm-global
+          key: gemini-cli-0.22.4
+
+      - name: Setup Node.js
+        if: steps.cache-gemini.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Gemini CLI
+        if: steps.cache-gemini.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.npm-global
+          npm config set prefix ~/.npm-global
+          npm install -g @google/gemini-cli@0.22.4
+
+      - name: Add Gemini to PATH
+        run: echo "$HOME/.npm-global/bin" >> $GITHUB_PATH
+
+      - name: Enter RC Phase
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          VERSION="${{ steps.version.outputs.version }}"
+          BRANCH="${{ steps.version.outputs.branch }}"
+
+          # Step 1: Run enter-rc command
+          # This creates release branch, archives changelog, merges alpha entries,
+          # generates AI highlights, commits, and creates the preparation PR
+          cargo run --manifest-path tools/ribir-bot/Cargo.toml -- release enter-rc --version $VERSION
+
+          # Step 2: Switch to release branch and publish RC.1
+          echo "Switching to release branch: $BRANCH"
+          git checkout $BRANCH
+          git pull origin $BRANCH
+
+          # Step 3: Publish RC.1 using cargo release (dry-run mode for testing)
+          echo "Publishing RC.1 (dry-run)..."
+          cargo run --manifest-path tools/ribir-bot/Cargo.toml -- release next rc
+
+      - name: Summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BRANCH="${{ steps.version.outputs.branch }}"
+
+          echo "## RC Phase Initiated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Stable Version**: v${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "- **RC.1 Version**: v${VERSION}-rc.1" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Branch**: ${BRANCH}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review the Stable Preparation PR" >> $GITHUB_STEP_SUMMARY
+          echo "2. Community tests the RC" >> $GITHUB_STEP_SUMMARY
+          echo "3. If bugs found, use \`release-rc.yml\` for rc.2, rc.3, etc." >> $GITHUB_STEP_SUMMARY
+          echo "4. Merge the PR to trigger stable release" >> $GITHUB_STEP_SUMMARY

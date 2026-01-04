@@ -56,7 +56,9 @@ fn call_gemini(prompt: &str, model: &str) -> std::result::Result<String, String>
       .map_err(|e| e.to_string())?;
   }
 
-  let output = child.wait_with_output().map_err(|e| e.to_string())?;
+  let output = child
+    .wait_with_output()
+    .map_err(|e| e.to_string())?;
 
   if output.status.success() {
     Ok(String::from_utf8_lossy(&output.stdout).into())
@@ -77,7 +79,9 @@ pub fn extract_json(s: &str) -> Option<String> {
 // ============================================================================
 
 /// Fetch PR data as JSON.
-pub fn gh_json<T: for<'de> serde::Deserialize<'de>>(pr_id: Option<&str>, fields: &str) -> Result<T> {
+pub fn gh_json<T: for<'de> serde::Deserialize<'de>>(
+  pr_id: Option<&str>, fields: &str,
+) -> Result<T> {
   let mut args = vec!["pr", "view"];
   extend_with_pr_id(&mut args, pr_id);
   args.extend(["--json", fields]);
@@ -134,7 +138,11 @@ pub fn create_pr(title: &str, body: &str, base: &str, head: &str) -> Result<Stri
     return Err(format!("Failed to create PR: {}", String::from_utf8_lossy(&output.stderr)).into());
   }
 
-  Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+  Ok(
+    String::from_utf8_lossy(&output.stdout)
+      .trim()
+      .to_string(),
+  )
 }
 
 /// Create a GitHub release.
@@ -206,8 +214,9 @@ pub fn get_merged_prs_since(ver: &Version) -> Result<Vec<crate::types::PR>> {
 
   for pr in prs {
     if let Some(ref mc) = pr.merge_commit {
-      // Check if the merge commit is NOT an ancestor of the tag (i.e., was merged after the tag)
-      // git merge-base --is-ancestor <commit> <tag> returns 0 if commit is ancestor of tag
+      // Check if the merge commit is NOT an ancestor of the tag (i.e., was merged
+      // after the tag) git merge-base --is-ancestor <commit> <tag> returns 0 if
+      // commit is ancestor of tag
       let is_ancestor = Command::new("git")
         .args(["merge-base", "--is-ancestor", &mc.oid, &tag_commit])
         .output()
@@ -239,7 +248,11 @@ fn get_tag_commit(ver: &Version) -> Option<String> {
       .output()
     {
       if o.status.success() {
-        return Some(String::from_utf8_lossy(&o.stdout).trim().to_string());
+        return Some(
+          String::from_utf8_lossy(&o.stdout)
+            .trim()
+            .to_string(),
+        );
       }
     }
   }
@@ -256,7 +269,9 @@ fn get_origin_repo() -> Result<String> {
     return Err("Failed to get origin remote URL".into());
   }
 
-  let url = String::from_utf8_lossy(&out.stdout).trim().to_string();
+  let url = String::from_utf8_lossy(&out.stdout)
+    .trim()
+    .to_string();
 
   // Parse owner/repo from various URL formats:
   // - git@github.com:owner/repo.git
@@ -273,6 +288,58 @@ fn get_origin_repo() -> Result<String> {
     .join("/");
 
   Ok(repo)
+}
+
+/// Check if user has permission (is author or has write access).
+pub fn check_permission(user: &str, author: &str, repo: &str) -> Result<bool> {
+  if user == author {
+    return Ok(true);
+  }
+
+  let output = Command::new("gh")
+    .args(["api", &format!("/repos/{repo}/collaborators/{user}/permission"), "--jq", ".permission"])
+    .output()?;
+
+  if output.status.success() {
+    let perm = String::from_utf8_lossy(&output.stdout)
+      .trim()
+      .to_string();
+    Ok(perm == "write" || perm == "admin")
+  } else {
+    Ok(false)
+  }
+}
+
+/// Get PR info (base branch, head branch) from GitHub.
+pub fn get_pr_info(pr_number: u32, repo: &str) -> Result<(String, String)> {
+  let output = Command::new("gh")
+    .args([
+      "pr",
+      "view",
+      &pr_number.to_string(),
+      "--repo",
+      repo,
+      "--json",
+      "baseRefName,headRefName",
+    ])
+    .output()?;
+
+  if !output.status.success() {
+    return Err(
+      format!("Failed to get PR info: {}", String::from_utf8_lossy(&output.stderr)).into(),
+    );
+  }
+
+  #[derive(serde::Deserialize)]
+  struct PrInfo {
+    #[serde(rename = "baseRefName")]
+    base_ref_name: String,
+    #[serde(rename = "headRefName")]
+    head_ref_name: String,
+  }
+
+  let info: PrInfo = serde_json::from_slice(&output.stdout)?;
+  Ok((info.base_ref_name, info.head_ref_name))
 }
 
 // ============================================================================

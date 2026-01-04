@@ -1,13 +1,14 @@
 //! Ribir Release Bot - Unified CLI for PR, changelog, and release automation.
 
 mod changelog;
-mod cli;
+
 mod commands;
 mod external;
 mod types;
 mod utils;
 
-use types::{Cmd, Result};
+use clap::Parser;
+use types::{Cmd, Config, LogSubCmd, ReleaseCmd};
 
 fn main() {
   if let Err(e) = run() {
@@ -16,18 +17,34 @@ fn main() {
   }
 }
 
-fn run() -> Result<()> {
-  let config = cli::parse_args()?;
+fn run() -> types::Result<()> {
+  let mut config = Config::parse();
+
+  // For release next/stable: default is dry-run unless --execute is passed
+  match &config.command {
+    Cmd::Release { cmd: ReleaseCmd::Next { execute, .. } }
+    | Cmd::Release { cmd: ReleaseCmd::Stable { execute, .. } } => {
+      if !execute {
+        config.dry_run = true;
+      }
+    }
+    _ => {}
+  }
 
   if config.dry_run {
     eprintln!("🔍 Dry-run mode enabled");
   }
 
   match &config.command {
-    Cmd::Pr(pr_cmd) => commands::cmd_pr(&config, pr_cmd),
-    Cmd::Collect { version, write } => commands::cmd_collect(&config, version, *write).map(|_| ()),
-    Cmd::Merge { version, write } => commands::cmd_merge(&config, version, *write),
-    Cmd::Verify => commands::cmd_verify(&config),
-    Cmd::Release(rel_cmd) => commands::cmd_release(&config, rel_cmd),
+    Cmd::Pr { cmd } => commands::cmd_pr(&config, cmd),
+    Cmd::Log { cmd } => match cmd {
+      LogSubCmd::Collect { version, write } => {
+        commands::cmd_collect(&config, version, *write).map(|_| ())
+      }
+      LogSubCmd::Merge { version, write } => commands::cmd_merge(&config, version, *write),
+      LogSubCmd::Verify => commands::cmd_verify(&config),
+    },
+    Cmd::Release { cmd } => commands::cmd_release(&config, cmd),
+    Cmd::Workflow { cmd } => commands::cmd_workflow(&config, cmd),
   }
 }

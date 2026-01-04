@@ -70,9 +70,9 @@ ribir-bot release <SUBCOMMAND> [OPTIONS]
 | Subcommand | Description |
 |------------|-------------|
 | `next <level>` | **Full release in one command** (changelog + cargo release + GitHub Release) |
-| `prepare --version VER` | Prepare RC release (archive, merge, highlights, PR) |
+| `enter-rc --version VER` | Enter RC phase (branch + PR + RC.1) |
 | `publish [PR_ID]` | Publish GitHub release |
-| `promote --version VER` | Promote RC to stable |
+| `stable [--version VER]` | Release stable version (auto-detect from branch) |
 | `highlights [CTX]` | Regenerate highlights in CHANGELOG.md |
 | `verify` | Verify release state |
 
@@ -94,8 +94,14 @@ ribir-bot release next alpha
 # Execute release
 ribir-bot release next alpha --execute
 
-# Promote RC to stable
-ribir-bot release promote --version 0.5.0 --execute
+# Enter RC phase (creates branch, PR, and publishes RC.1)
+ribir-bot release enter-rc --version 0.5.0
+
+# Release stable version (auto-detect from release branch)
+ribir-bot release stable --execute
+
+# Release stable version (explicit version)
+ribir-bot release stable --version 0.5.0 --execute
 
 # Verify release state
 ribir-bot release verify
@@ -106,7 +112,7 @@ ribir-bot release verify
 | Option | Description |
 |--------|-------------|
 | `--dry-run` | Preview without applying changes |
-| `--execute` | Execute changes (required for `release next` and `promote`) |
+| `--execute` | Execute changes (required for `release next` and `stable`) |
 | `--write` | Write changes (for log-collect/log-merge) |
 | `-h, --help` | Show help |
 
@@ -160,9 +166,9 @@ The unified release workflow:
 
 #### Other Commands
 
-- **prepare**: Archives old changelog, merges alpha entries, generates AI highlights, creates release PR
+- **enter-rc**: Creates release branch, archives old changelog, merges alpha entries, generates AI highlights, creates PR, and publishes RC.1
 - **publish**: Creates GitHub release with release notes from changelog
-- **promote**: Merges RC versions, calls cargo release, creates stable release
+- **stable**: Merges RC versions (if multiple), updates changelog, calls cargo release, creates stable GitHub release
 
 ## Conventional Commit Types
 

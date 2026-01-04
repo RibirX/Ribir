@@ -118,7 +118,12 @@ The branch merging process consolidates changes from multiple pre-release versio
 
 **Version increment:** `0.5.0-alpha.23 → 0.5.0-alpha.24`
 
-**See:** [02-complete-flow.md](02-complete-flow.md#alpha-release-operations) for operational details
+**Verification Checklist:**
+- [ ] GitHub Release appears on releases page
+- [ ] Version number incremented correctly
+- [ ] CHANGELOG.md updated with new section
+- [ ] Release marked as "Pre-release"
+- [ ] Package published to crates.io
 
 ---
 
@@ -148,9 +153,38 @@ The branch merging process consolidates changes from multiple pre-release versio
 
 **Version increment:** `0.5.0-rc.1 → 0.5.0-rc.2` (if critical bugs found, usually only need rc.1)
 
-**See:**
-- [02-complete-flow.md](02-complete-flow.md#rc-release-operations) for operational steps
-- [01-changelog-automation.md](01-changelog-automation.md#4-release-materials) for highlights and social card details
+### RC to Stable Flow
+
+#### Phase 1: Preparation (Manual)
+**Trigger:** Release manager runs `release enter-rc` workflow.
+- Creates release branch `release-0.5.x` from master.
+- Archives CHANGELOG.md on master (→ changelogs/CHANGELOG-0.5.md).
+- Collects and merges all alpha changelogs.
+- AI generates highlights section in CHANGELOG.md.
+- Creates "Stable Preparation" PR (`release-0.5.x` → `master`) for human review.
+- **Automatically publishes RC.1** (v0.5.0-rc.1).
+
+#### Phase 2: Review Period (Human)
+**During RC testing (1-2 weeks):**
+- Community tests the RC.1 release.
+- PR remains open for reviewing release materials (highlights, changelog).
+- Use `@ribir-bot release-highlights` to regenerate if needed.
+- If critical bugs are found and fixed, manually run `Release RC` to publish rc.2, rc.3, etc.
+
+**Review Checklist:**
+- [ ] All important PRs included in changelog
+- [ ] ⚠️ **AI Safety Check:** Verify highlights are real and accurate (no AI hallucinations)
+- [ ] Highlights section in CHANGELOG.md makes sense (3-5 items)
+- [ ] (Future) Social card is readable and accurate
+- [ ] Version number and date correct
+
+#### Phase 3: Stable Publishing (Automated)
+**Trigger:** Merging the preparation PR.
+- Merges release materials back to master.
+- Triggers stable release workflow.
+- Creates GitHub Release v0.5.0 (stable, not pre-release).
+
+**See:** [01-changelog-automation.md](01-changelog-automation.md#4-release-materials) for highlights and social card details
 
 ---
 
@@ -177,7 +211,12 @@ The branch merging process consolidates changes from multiple pre-release versio
 
 **Version:** `0.5.0-rc.1 → 0.5.0` (remove pre-release tag)
 
-**See:** [02-complete-flow.md](02-complete-flow.md#stable-release-operations) for publishing process
+**Verification Checklist:**
+- [ ] GitHub Release v0.5.0 published (stable, not pre-release)
+- [ ] Social card attached (when implemented)
+- [ ] CHANGELOG.md contains highlights section (from RC.1)
+- [ ] Pre-release flag removed
+- [ ] Package published to crates.io
 
 ---
 
@@ -202,7 +241,11 @@ The branch merging process consolidates changes from multiple pre-release versio
 - Collect changelog entries from bug fix PRs
 - Publish immediately (no highlights, no social cards)
 
-**See:** [02-complete-flow.md](02-complete-flow.md#patch-release-operations) for process
+**Verification Checklist:**
+- [ ] GitHub Release appears
+- [ ] Changelog updated on release branch
+- [ ] Version number correct
+- [ ] Package published to crates.io
 
 ---
 
@@ -306,5 +349,4 @@ A: Before creating the RC branch, `ribir-bot release prepare` archives CHANGELOG
 ## Related Documentation
 
 - [01-changelog-automation.md](01-changelog-automation.md) - Changelog collection, format, and release materials
-- [02-complete-flow.md](02-complete-flow.md) - Operational procedures for each release type
 - [03-social-card-generation.md](03-social-card-generation.md) - Social card tooling details

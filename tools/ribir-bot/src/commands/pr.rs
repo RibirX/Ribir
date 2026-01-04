@@ -3,10 +3,7 @@
 use crate::{
   changelog::{MARKER_END as CHANGELOG_END_MARKER, MARKER_START as CHANGELOG_START_MARKER},
   external::{call_gemini_with_fallback, extract_json, gh_diff, gh_edit_body, gh_json},
-  types::{
-    Commit, Config, GeminiResponse, PRCommits, PRView, PrCmd, PrMode, Result,
-    SKIP_CHANGELOG_CHECKED,
-  },
+  types::{Commit, Config, GeminiResponse, PRCommits, PRView, PrSubCmd, Result, SKIP_CHANGELOG_CHECKED},
   utils::{sanitize_markdown, truncate},
 };
 
@@ -61,14 +58,14 @@ Examples:
 {"summary": "**Context**: CI failing on Windows.\n**Changes**:\n- Fixed path handling in workflow file.", "changelog": "", "skip_changelog": true}"#;
 
 /// Execute PR command.
-pub fn cmd_pr(config: &Config, pr_cmd: &PrCmd) -> Result<()> {
-  pr_cmd.mode.log_status();
+pub fn cmd_pr(config: &Config, pr_cmd: &PrSubCmd) -> Result<()> {
+  pr_cmd.log_status();
 
-  let pr = gh_json::<PRView>(pr_cmd.pr_id.as_deref(), "title,body")?;
+  let pr = gh_json::<PRView>(pr_cmd.pr_id(), "title,body")?;
   let mut body = pr.body.clone();
 
   let mut modified = false;
-  let (needs_summary, mut needs_changelog) = pr_cmd.mode.needs(&body);
+  let (needs_summary, mut needs_changelog) = pr_cmd.needs(&body);
 
   // If user manually skipped changelog, clean it up and skip AI generation
   if needs_changelog && body.contains(SKIP_CHANGELOG_CHECKED) {
@@ -80,23 +77,16 @@ pub fn cmd_pr(config: &Config, pr_cmd: &PrCmd) -> Result<()> {
   }
 
   if needs_summary || needs_changelog {
-    let commits = gh_json::<PRCommits>(pr_cmd.pr_id.as_deref(), "commits")?.commits;
-    let diff = gh_diff(pr_cmd.pr_id.as_deref())?;
-    let prompt = build_pr_prompt(
-      &pr,
-      &body,
-      &format_commits(&commits),
-      &diff,
-      &pr_cmd.mode,
-      pr_cmd.pr_id.as_deref(),
-    );
+    let commits = gh_json::<PRCommits>(pr_cmd.pr_id(), "commits")?.commits;
+    let diff = gh_diff(pr_cmd.pr_id())?;
+    let prompt = build_pr_prompt(&pr, &body, &format_commits(&commits), &diff, pr_cmd);
     let response = generate_pr_content(&prompt)?;
     body = update_pr_body(&body, &response, needs_summary, needs_changelog);
     modified = true;
   }
 
   if modified {
-    save_pr_body(config, pr_cmd.pr_id.as_deref(), &body)
+    save_pr_body(config, pr_cmd.pr_id(), &body)
   } else {
     println!("No placeholders found - skipping. Use --regenerate to force.");
     Ok(())
@@ -121,10 +111,8 @@ fn format_commits(commits: &[Commit]) -> String {
   }
 }
 
-fn build_pr_prompt(
-  pr: &PRView, body: &str, commits: &str, diff: &str, mode: &PrMode, pr_id: Option<&str>,
-) -> String {
-  let pr_id_display = pr_id.unwrap_or("<current PR>");
+fn build_pr_prompt(pr: &PRView, body: &str, commits: &str, diff: &str, cmd: &PrSubCmd) -> String {
+  let pr_id_display = cmd.pr_id().unwrap_or("<current PR>");
   let mut prompt = PR_PROMPT_TEMPLATE
     .replace("{title}", &pr.title)
     .replace("{body}", body)
@@ -132,12 +120,9 @@ fn build_pr_prompt(
     .replace("{diff}", diff)
     .replace("{pr_id}", pr_id_display);
 
-  if let Some(ctx) = mode.context() {
+  if let Some(ctx) = cmd.context() {
     prompt = format!("ADDITIONAL CONTEXT FROM USER:\n{}\n\n{}", ctx, prompt);
-  } else if matches!(
-    mode,
-    PrMode::Regenerate(_) | PrMode::SummaryOnly(_) | PrMode::ChangelogOnly(_)
-  ) {
+  } else if !matches!(cmd, PrSubCmd::Fill { .. }) {
     prompt = format!(
       "TASK: Regenerate the content. The previous output was not satisfactory. Please generate a \
        fresh response.\n\n{}",
@@ -331,10 +316,15 @@ mod tests {
   #[test]
   fn test_mode_needs() {
     let body_with_both = format!("{}\n{}", SUMMARY_PLACEHOLDER, CHANGELOG_PLACEHOLDER);
-    assert_eq!(PrMode::Auto.needs(&body_with_both), (true, true));
-    assert_eq!(PrMode::Auto.needs("no placeholders"), (false, false));
-    assert_eq!(PrMode::Regenerate(None).needs(""), (true, true));
-    assert_eq!(PrMode::SummaryOnly(None).needs(""), (true, false));
-    assert_eq!(PrMode::ChangelogOnly(None).needs(""), (false, true));
+    let fill = PrSubCmd::Fill { pr_id: None };
+    let regen = PrSubCmd::Regen { pr_id: None, context: None };
+    let summary = PrSubCmd::Summary { pr_id: None, context: None };
+    let entry = PrSubCmd::Entry { pr_id: None, context: None };
+
+    assert_eq!(fill.needs(&body_with_both), (true, true));
+    assert_eq!(fill.needs("no placeholders"), (false, false));
+    assert_eq!(regen.needs(""), (true, true));
+    assert_eq!(summary.needs(""), (true, false));
+    assert_eq!(entry.needs(""), (false, true));
   }
 }

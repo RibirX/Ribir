@@ -127,6 +127,22 @@ pub fn truncate(s: &mut String, max_len: usize, suffix: &str) {
   }
 }
 
+/// Check if a branch name matches the RC pattern (release-X.Y.x).
+pub fn is_rc_branch(branch: &str) -> bool {
+  // Pattern: release-X.Y.x where X, Y are digits and ends with .x
+  if let Some(rest) = branch.strip_prefix("release-") {
+    let parts: Vec<&str> = rest.split('.').collect();
+    if parts.len() == 3 && parts[2] == "x" {
+      return parts[0].chars().all(|c| c.is_ascii_digit())
+        && parts[1].chars().all(|c| c.is_ascii_digit());
+    }
+  }
+  false
+}
+
+/// Check if this is an RC PR (base=master, head=release-X.Y.x).
+pub fn is_rc_pr(base: &str, head: &str) -> bool { base == "master" && is_rc_branch(head) }
+
 #[cfg(test)]
 mod tests {
   use std::sync::Mutex;
@@ -149,6 +165,22 @@ mod tests {
       std::env::remove_var("CHANGELOG_BRANCH");
     }
     result
+  }
+
+  #[test]
+  fn test_is_rc_branch() {
+    assert!(is_rc_branch("release-0.5.x"));
+    assert!(is_rc_branch("release-1.0.x"));
+    assert!(!is_rc_branch("release-0.5.0"));
+    assert!(!is_rc_branch("main"));
+    assert!(!is_rc_branch("feature-branch"));
+  }
+
+  #[test]
+  fn test_is_rc_pr() {
+    assert!(is_rc_pr("master", "release-0.5.x"));
+    assert!(!is_rc_pr("main", "release-0.5.x"));
+    assert!(!is_rc_pr("master", "feature-branch"));
   }
 
   #[test]

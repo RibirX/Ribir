@@ -79,31 +79,15 @@ For changes that don't need recording (tests, CI configs, infra, or unreleased f
 
 ---
 
-### 2. PR Commands (`pr-*`)
+### 2. PR Automation
 
 **Purpose:** Uses Gemini AI to automatically generate PR summaries and changelog entries.
 
 **Location:** [tools/ribir-bot](../../tools/ribir-bot)
 
-#### Commands
+Ribir uses an AI-powered bot to analyze code changes and descriptions, automatically filling in the PR summary and suggested changelog entries. This ensures consistency and reduces the manual burden on contributors.
 
-| Command | Description |
-|---------|-------------|
-| `ribir-bot pr-fill [PR_ID]` | Auto-fill placeholders in PR body |
-| `ribir-bot pr-regen [PR_ID] [CTX]` | Regenerate all AI content |
-| `ribir-bot pr-summary [PR_ID] [CTX]` | Regenerate summary only |
-| `ribir-bot pr-entry [PR_ID] [CTX]` | Regenerate changelog entry only |
-
-PR commands can also be triggered via comment commands in pull requests:
-
-```bash
-@pr-bot regenerate [context]  # Regenerate summary and changelog
-@pr-bot summary [context]     # Regenerate only summary
-@pr-bot changelog [context]   # Regenerate only changelog
-@pr-bot help                  # Show all commands
-```
-
-The optional `[context]` parameter provides additional information to help AI understand the changes better.
+> **Reference:** For technical CLI usage and comment triggers, see [tools/ribir-bot/README.md](../../tools/ribir-bot/README.md#pr-commands).
 
 #### Workflow
 
@@ -124,19 +108,15 @@ The optional `[context]` parameter provides additional information to help AI un
 
 ---
 
-### 3. Changelog Commands (`log-*`)
+### 3. Changelog Management
 
 **Purpose:** Manages CHANGELOG.md structure and collects entries from merged PRs.
 
 **Location:** [tools/ribir-bot](../../tools/ribir-bot)
 
-#### Commands
+The system automatically scans merged pull requests to extract and categorize changelog entries, updating the appropriate changelog files based on the release branch.
 
-| Command | Purpose | When to Use |
-|---------|---------|-------------|
-| `ribir-bot log-collect --version VER` | Collect entries from merged PRs | Alpha and Patch releases |
-| `ribir-bot log-merge --version VER` | Merge pre-release version entries | RC and Stable releases |
-| `ribir-bot log-verify` | Verify changelog parsing logic | Testing and debugging |
+> **Reference:** For technical CLI usage and options, see [tools/ribir-bot/README.md](../../tools/ribir-bot/README.md#changelog-commands).
 
 #### Collect Command Flow
 
@@ -182,24 +162,23 @@ PR types are automatically mapped to CHANGELOG.md sections:
 ### Alpha Releases
 
 **Process:**
-1. Run `ribir-bot log-collect --version <version>` on master branch
-2. Creates new version section in `CHANGELOG.md`
-3. Categorizes and adds all merged PR entries
+1. The system identifies merged PRs since the last alpha release.
+2. Creates a new version section in `CHANGELOG.md`.
+3. Categorizes and adds all merged PR entries automatically.
 
 **Output:** Basic changelog entries only (no highlights, no social cards)
 
 ### RC/Stable Releases
 
 **Process:**
-1. Run `ribir-bot log-merge --version 0.5.0-rc.1` (during RC.1 preparation)
-2. Merges all alpha changelog entries
-3. AI analyzes entries and generates highlights section
-4. Creates PR for human review
-5. After approval, materials are finalized for RC.1
+1. During RC.1 preparation, the system merges all previous alpha changelog entries.
+2. AI analyzes entries and generates a highlights section.
+3. A preparation PR is created for human review.
+4. After approval, materials are finalized for the RC.1 release.
 
 **For Stable Release:**
-- If multiple RC versions exist (rc.2, rc.3), only merge bug fix changelog entries
-- Always reuse highlights and social card from RC.1 (RC versions never add new features)
+- If multiple RC versions exist (rc.2, rc.3), only bug fix changelog entries are merged.
+- Highlights and social cards from RC.1 are reused.
 
 **Output:**
 - Merged changelog entries (including bug fixes from all RC versions if multiple)
@@ -209,8 +188,8 @@ PR types are automatically mapped to CHANGELOG.md sections:
 ### Patch Releases
 
 **Process:**
-1. Run `ribir-bot log-collect --version <version>` on release branch
-2. Adds bug fix entries to version-specific changelog
+1. The system identifies bug fix PRs merged to the release branch.
+2. Adds entries to the version-specific changelog (e.g., `changelogs/CHANGELOG-0.5.md`).
 
 **Output:** Basic changelog entries only (no highlights, no social cards)
 
@@ -262,7 +241,7 @@ Highlights appear at the top of each RC/Stable release section:
 
 #### AI-Powered Generation
 
-During RC preparation, `ribir-bot log-merge` uses Gemini AI to analyze all changelog entries and generate the highlights section.
+During RC preparation, the system uses Gemini AI to analyze all changelog entries and generate the highlights section.
 
 **Selection Criteria:**
 1. **Impact** - User-facing changes prioritized over internal refactors
@@ -283,7 +262,7 @@ The AI-generated highlights are reviewed in the RC preparation PR. Edit CHANGELO
 - Avoid jargon and technical terms
 - Select diverse changes (don't pick 5 widget updates)
 
-**Current Status:** Manual - highlights section is currently added manually. Future implementation will use `ribir-bot log-merge` with AI to auto-generate this section.
+**Current Status:** Manual - highlights section is currently added manually. Future implementation will use AI to auto-generate this section.
 
 ---
 
@@ -334,8 +313,8 @@ For older versions:
 
 **Key Points:**
 - No `[Unreleased]` section - entries are stored in PR descriptions
-- `ribir-bot log-collect` creates version sections directly (e.g., `## [0.6.0-alpha.1]`)
-- Archiving is coordinated by `ribir-bot release prepare` during RC preparation
+- New version sections are created directly (e.g., `## [0.6.0-alpha.1]`)
+- Archiving is coordinated automatically during RC preparation
 
 **Release Branches:**
 ```
@@ -404,7 +383,7 @@ The changelog automation provides the foundation for the entire release system:
 
 ### Changelog Bot Can't Find PRs
 
-**Symptoms:** `collect` command returns no entries
+**Symptoms:** Collection process returns no entries
 
 **Solutions:**
 - Confirm target version tag exists
@@ -474,7 +453,6 @@ The workflow will fail with an error message. You'll need to manually add the hi
 ## Related Documentation
 
 - [00-release-strategy.md](00-release-strategy.md) - Release strategy and flow
-- [02-complete-flow.md](02-complete-flow.md) - Complete operational workflows
 - [03-social-card-generation.md](03-social-card-generation.md) - Social card tooling details
 - [CHANGELOG.md](../../CHANGELOG.md) - Project changelog
 - [PR Template](../../.github/pull_request_template.md) - Pull request template
