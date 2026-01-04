@@ -81,11 +81,10 @@ pub fn cmd_release_next(config: &Config, level: &str) -> Result<()> {
 
   // 3. Collect changelog entries
   println!("📋 Collecting changelog entries...");
+  let changelog_entries = collect_changelog_entries(&version, config.dry_run)?;
+
   if !config.dry_run {
-    run_log_collect(&version)?;
     run_git(&["add", "CHANGELOG.md"])?;
-  } else {
-    println!("   Would collect changelog for {}", version);
   }
 
   // 4. Run cargo release (version bump, commit, tag, push, optional publish)
@@ -99,21 +98,53 @@ pub fn cmd_release_next(config: &Config, level: &str) -> Result<()> {
   // 5. Create GitHub Release
   let is_prerelease = level == "alpha" || level == "rc";
   println!("🎉 Creating GitHub Release (prerelease: {})...", is_prerelease);
+
+  let changelog = fs::read_to_string("CHANGELOG.md")?;
+  let release_notes = extract_version_section(&changelog, &version)
+    .or_else(|| {
+      // In dry-run, the version might not be in changelog yet, use collected entries
+      if config.dry_run { Some(changelog_entries.clone()) } else { None }
+    })
+    .ok_or_else(|| format!("Release notes not found for version {}", version))?;
+
   if !config.dry_run {
-    let changelog = fs::read_to_string("CHANGELOG.md")?;
-    let notes = extract_version_section(&changelog, &version)
-      .ok_or_else(|| format!("Release notes not found for version {}", version))?;
-    create_github_release(&version, &notes, is_prerelease)?;
-  } else {
-    println!("   Would create GitHub Release v{}", version);
+    create_github_release(&version, &release_notes, is_prerelease)?;
   }
 
   if config.dry_run {
+    println!("\n{}", "─".repeat(60));
+    println!("📝 Changelog entries for {}:\n", version);
+    println!("{}", changelog_entries);
+    println!("\n{}", "─".repeat(60));
+    println!("📄 Release notes preview:\n");
+    println!("{}", release_notes);
+    println!("\n{}", "─".repeat(60));
     println!("\n💡 This is a dry-run. Use --execute to apply changes.");
   } else {
     println!("\n✅ Release {} complete!", version);
   }
   Ok(())
+}
+
+/// Collect changelog entries for a version.
+/// If write is true, writes to CHANGELOG.md. Returns the collected entries.
+fn collect_changelog_entries(version: &str, dry_run: bool) -> Result<String> {
+  use crate::commands::cmd_collect;
+
+  let collect_config = Config {
+    command: crate::types::Cmd::Verify, // Dummy, not used
+    dry_run,
+  };
+
+  // Run collection (writes if not dry_run)
+  cmd_collect(&collect_config, version, !dry_run)?;
+
+  // Read and extract the version section
+  let changelog = fs::read_to_string("CHANGELOG.md")?;
+  Ok(extract_version_section(&changelog, version).unwrap_or_else(|| {
+    // If version not found (dry-run), return placeholder
+    format!("(Changelog entries for {} will be collected from merged PRs)", version)
+  }))
 }
 
 fn validate_release_level(level: &str) -> Result<()> {
@@ -174,18 +205,6 @@ fn run_cargo_release(level: &str) -> Result<()> {
     return Err(format!("cargo release failed with exit code: {:?}", status.code()).into());
   }
   Ok(())
-}
-
-fn run_log_collect(version: &str) -> Result<()> {
-  use crate::commands::cmd_collect;
-
-  // Create a config that writes (not dry-run)
-  let collect_config = Config {
-    command: crate::types::Cmd::Verify, // Dummy, not used
-    dry_run: false,
-  };
-
-  cmd_collect(&collect_config, version, true)
 }
 
 /// Prepare RC release.

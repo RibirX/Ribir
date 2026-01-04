@@ -6,7 +6,7 @@ Unified CLI for PR, changelog, and release automation for the Ribir project.
 
 - **PR Automation**: AI-powered PR body generation (summary + changelog entries)
 - **Changelog Management**: Collect, merge, and verify changelog entries using AST parsing
-- **Release Automation**: Prepare RC releases, publish GitHub releases, promote to stable
+- **Release Automation**: Full release workflow with one command - changelog, cargo release, GitHub Release
 
 ## Installation
 
@@ -18,6 +18,7 @@ cargo install --path .
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) - for GitHub operations
 - [Gemini CLI](https://github.com/anthropics/gemini) (`gemini`) - for AI generation
+- [cargo-release](https://crates.io/crates/cargo-release) - for version bumping and publishing
 
 ## Usage
 
@@ -68,16 +69,35 @@ ribir-bot release <SUBCOMMAND> [OPTIONS]
 
 | Subcommand | Description |
 |------------|-------------|
+| `next <level>` | **Full release in one command** (changelog + cargo release + GitHub Release) |
 | `prepare --version VER` | Prepare RC release (archive, merge, highlights, PR) |
 | `publish [PR_ID]` | Publish GitHub release |
 | `promote --version VER` | Promote RC to stable |
+| `highlights [CTX]` | Regenerate highlights in CHANGELOG.md |
 | `verify` | Verify release state |
+
+#### Release Levels for `next`
+
+| Level | Example | Description |
+|-------|---------|-------------|
+| `alpha` | 0.5.0-alpha.54 | Development releases |
+| `rc` | 0.5.0-rc.1 | Release candidates |
+| `patch` | 0.5.1 | Patch releases |
+| `minor` | 0.6.0 | Minor releases |
+| `major` | 1.0.0 | Major releases |
 
 **Examples:**
 ```bash
-ribir-bot release prepare --version 0.5.0
-ribir-bot release publish 456
-ribir-bot release promote --version 0.5.0
+# Preview release (default is dry-run)
+ribir-bot release next alpha
+
+# Execute release
+ribir-bot release next alpha --execute
+
+# Promote RC to stable
+ribir-bot release promote --version 0.5.0 --execute
+
+# Verify release state
 ribir-bot release verify
 ```
 
@@ -86,6 +106,7 @@ ribir-bot release verify
 | Option | Description |
 |--------|-------------|
 | `--dry-run` | Preview without applying changes |
+| `--execute` | Execute changes (required for `release next` and `promote`) |
 | `--write` | Write changes (for log-collect/log-merge) |
 | `-h, --help` | Show help |
 
@@ -124,9 +145,24 @@ src/
 
 ### Release Commands
 
-1. **prepare**: Archives old changelog, merges alpha entries, generates AI highlights, creates release PR
-2. **publish**: Creates GitHub release with release notes from changelog
-3. **promote**: Merges RC versions, updates version header, creates stable release
+#### `release next <level>` - One Command, Done
+
+The unified release workflow:
+
+1. **Get version**: Runs `cargo release <level> --dry-run` to determine next version
+2. **Collect changelog**: Gathers entries from merged PRs into CHANGELOG.md
+3. **Cargo release**: Bumps versions, commits, tags, pushes, publishes to crates.io
+4. **GitHub Release**: Creates release with notes from changelog
+
+**Dry-run mode** (default): Shows what would happen, including changelog and release notes preview.
+
+**Execute mode** (`--execute`): Performs all operations.
+
+#### Other Commands
+
+- **prepare**: Archives old changelog, merges alpha entries, generates AI highlights, creates release PR
+- **publish**: Creates GitHub release with release notes from changelog
+- **promote**: Merges RC versions, calls cargo release, creates stable release
 
 ## Conventional Commit Types
 

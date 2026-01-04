@@ -19,6 +19,7 @@ An automated release system with:
 - **Streamlined flow**: Alpha (weekly) → RC (1-2 weeks) → Stable
 - **Release materials**: CHANGELOG with embedded highlights + social cards
 - **Human-in-the-loop**: Automated generation with manual review via PR
+- **One Command, Done**: Unified `release next` command handles everything
 
 ## Documentation Structure
 
@@ -36,6 +37,7 @@ An automated release system with:
    - Main commands and usage
 
 **2. [Complete Release Flow](02-complete-flow.md)**
+   - Unified release command reference
    - Step-by-step operations for each release type
    - How to trigger workflows
    - Verification checklists
@@ -51,15 +53,17 @@ An automated release system with:
 
 ### Ribir Bot (`tools/ribir-bot`)
 
-Unified CLI tool for PR, changelog, and release automation. Uses a flat command structure for simplicity:
+Unified CLI tool for PR, changelog, and release automation.
 
 ```
 PR Commands           Changelog Commands       Release Commands
 ────────────          ──────────────────       ────────────────
-pr-fill               log-collect              release prepare
-pr-regen              log-merge                release publish
-pr-summary            log-verify               release promote
-pr-entry                                       release verify
+pr-fill               log-collect              release next <level>
+pr-regen              log-merge                release prepare
+pr-summary            log-verify               release publish
+pr-entry                                       release promote
+                                               release verify
+                                               release highlights
 ```
 
 **PR Commands** (`pr-*`)
@@ -74,17 +78,23 @@ pr-entry                                       release verify
 - `log-verify` - Verify changelog structure and parsing
 
 **Release Commands** (`release *`)
+- `release next <level>` - **Full release in one command** (changelog + cargo release + GitHub Release)
+  - Levels: `alpha`, `rc`, `patch`, `minor`, `major`
+  - Default: dry-run. Use `--execute` to apply.
 - `release prepare` - Prepare RC release (archive, merge, AI highlights, PR)
 - `release publish` - Publish GitHub release
 - `release promote` - Promote RC to stable
 - `release verify` - Verify release state
+- `release highlights` - Regenerate highlights in CHANGELOG.md
 
 ### GitHub Actions Workflows
 
 **Alpha Release** (automated weekly)
 - Runs every Tuesday at 14:00 UTC
+- Uses `ribir-bot release next alpha --execute`
 - Auto-increments version (e.g., 0.5.0-alpha.23 → alpha.24)
 - Collects changelog entries and creates GitHub Release
+- Publishes to crates.io
 - Can be triggered manually for on-demand releases
 
 **RC Preparation** (manual)
@@ -100,12 +110,14 @@ pr-entry                                       release verify
 - Publishes GitHub Release with materials
 
 **Stable Release** (manual)
+- Uses `ribir-bot release promote --version X.Y.Z --execute`
 - Promotes RC to stable after testing period (1-2 weeks)
 - Reuses RC materials (highlights in CHANGELOG, social card)
 - Removes pre-release flag
 - Finalized version published to GitHub and crates.io
 
 **Patch Release** (manual)
+- Uses `ribir-bot release next patch --execute`
 - Quick bug fix releases on release branch
 - Collects only bug fix changelog entries
 - No social cards or highlights (not needed for patches)
@@ -119,6 +131,19 @@ pr-entry                                       release verify
 2. **[Changelog Automation](01-changelog-automation.md)** - Learn how changelog works and release materials
 3. **[Complete Release Flow](02-complete-flow.md)** - Follow operations for your release type
 4. **[Social Card Generation](03-social-card-generation.md)** - Understand ribir-render tooling
+
+**Quick Command Reference:**
+
+```bash
+# Preview release (default dry-run)
+ribir-bot release next alpha
+
+# Execute release
+ribir-bot release next alpha --execute
+
+# Promote RC to stable
+ribir-bot release promote --version 0.5.0 --execute
+```
 
 **Need technical details?**
 - See `implementation/` directory for workflows, tools, and architecture
@@ -135,7 +160,8 @@ pr-entry                                       release verify
 - [x] Changelog automation (PR Bot + Changelog Bot) - ✅ Complete
 - [x] Release strategy documentation - ✅ Complete
 - [x] Core documentation reorganization - ✅ Complete
-- [ ] Tool implementation (ribir-bot release commands, social-card-gen)
-- [ ] GitHub Actions workflows
+- [x] Tool implementation (ribir-bot release commands) - ✅ Complete
+- [ ] Social card generation (ribir-render)
+- [ ] GitHub Actions workflows refinement
 - [ ] System testing and validation
 - [ ] Production rollout

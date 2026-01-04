@@ -11,11 +11,44 @@
 This document provides concrete operational steps for executing each release type. For the strategic rationale behind these release types, see [00-release-strategy.md](00-release-strategy.md).
 
 **Quick Navigation:**
-- [Workflow Triggers](#workflow-triggers)
+- [Unified Release Command](#unified-release-command)
 - [Alpha Release Operations](#alpha-release-operations)
 - [RC Release Operations](#rc-release-operations)
 - [Stable Release Operations](#stable-release-operations)
 - [Patch Release Operations](#patch-release-operations)
+
+---
+
+## Unified Release Command
+
+All releases now use the unified `ribir-bot release next` command:
+
+```bash
+# Preview what will happen (default - dry-run mode)
+ribir-bot release next <level>
+
+# Execute the release
+ribir-bot release next <level> --execute
+```
+
+**Available levels:**
+
+| Level | Example | Use Case |
+|-------|---------|----------|
+| `alpha` | 0.5.0-alpha.54 | Weekly development releases |
+| `rc` | 0.5.0-rc.1 | Release candidates |
+| `patch` | 0.5.1 | Bug fix releases |
+| `minor` | 0.6.0 | Feature releases |
+| `major` | 1.0.0 | Major version releases |
+
+**What the command does:**
+
+1. **Get version**: Runs `cargo release <level> --dry-run` to determine next version
+2. **Collect changelog**: Gathers entries from merged PRs into CHANGELOG.md
+3. **Cargo release**: Bumps versions, commits, tags, pushes, publishes to crates.io
+4. **GitHub Release**: Creates release with notes from changelog
+
+**Dry-run mode** (default): Shows changelog and release notes preview without making changes.
 
 ---
 
@@ -46,17 +79,28 @@ Each operation section below specifies which trigger type applies.
 
 **Trigger:** Automatic (Tuesdays 14:00 UTC) or Manual
 
+**Command:**
+```bash
+# Preview
+ribir-bot release next alpha
+
+# Execute
+ribir-bot release next alpha --execute
+```
+
 **What happens:**
-1. Increments alpha version (0.5.0-alpha.23 → 0.5.0-alpha.24)
-2. Collects changelog entries via `ribir-bot log-collect`
+1. Gets next alpha version from cargo-release (0.5.0-alpha.23 → 0.5.0-alpha.24)
+2. Collects changelog entries from merged PRs
 3. Updates CHANGELOG.md
-4. Creates GitHub Release (pre-release flag)
+4. Runs `cargo release alpha` (version bump, commit, tag, push, publish)
+5. Creates GitHub Release (pre-release flag)
 
 **Verification Checklist:**
 - [ ] GitHub Release appears on releases page
 - [ ] Version number incremented correctly
 - [ ] CHANGELOG.md updated with new section
 - [ ] Release marked as "Pre-release"
+- [ ] Package published to crates.io
 
 **Timeline:** ~2-5 minutes
 
@@ -76,6 +120,11 @@ Each operation section below specifies which trigger type applies.
 ### Phase 1: Preparation
 
 **Trigger:** Manual (version input: `0.5.0`)
+
+**Command:**
+```bash
+ribir-bot release prepare --version 0.5.0
+```
 
 **What happens automatically:**
 1. Collects all alpha changelogs
@@ -109,13 +158,19 @@ Edit `CHANGELOG.md` directly in the preparation PR branch to adjust the highligh
 
 ### Phase 3: Publishing
 
-**Trigger:** Automatic (on PR merge)
+**Trigger:** Automatic (on PR merge) or Manual
+
+**Command (manual):**
+```bash
+ribir-bot release next rc --execute
+```
 
 **What happens automatically:**
 1. Creates release branch `release-0.5.x`
-2. Creates GitHub Release v0.5.0-rc.1
-3. Comments on PR with release link
-4. (Note: Social cards are NOT attached to RC releases)
+2. Runs `cargo release rc` (version bump, commit, tag, push, publish)
+3. Creates GitHub Release v0.5.0-rc.1
+4. Comments on PR with release link
+5. (Note: Social cards are NOT attached to RC releases)
 
 **Timeline:** ~3-5 minutes
 
@@ -138,14 +193,23 @@ Edit `CHANGELOG.md` directly in the preparation PR branch to adjust the highligh
 - No critical bugs reported
 - Community feedback positive (or no feedback after 2 weeks)
 
-**Trigger:** Manual (RC version: `0.5.0-rc.1`)
+**Trigger:** Manual
+
+**Command:**
+```bash
+# Preview
+ribir-bot release promote --version 0.5.0
+
+# Execute
+ribir-bot release promote --version 0.5.0 --execute
+```
 
 **What happens:**
 
 1. Collects changelog from all RC versions (rc.2, rc.3 if multiple exist)
 2. Merges bug fix entries into stable changelog
 3. Reuses RC.1 materials (highlights in CHANGELOG, social card)
-4. Creates stable tag (v0.5.0) from latest RC tag
+4. Runs `cargo release 0.5.0` (version bump, commit, tag, push, publish)
 5. Publishes GitHub Release (removes pre-release flag)
 
 **Note:** RC versions only fix bugs and never add new features. Therefore, highlights and social cards generated during RC.1 preparation are always reused for stable release, regardless of how many RC versions exist.
@@ -155,6 +219,7 @@ Edit `CHANGELOG.md` directly in the preparation PR branch to adjust the highligh
 - [ ] Social card attached (when implemented)
 - [ ] CHANGELOG.md contains highlights section (from RC.1)
 - [ ] Pre-release flag removed
+- [ ] Package published to crates.io
 
 **Timeline:** ~2-5 minutes
 
@@ -175,13 +240,23 @@ Edit `CHANGELOG.md` directly in the preparation PR branch to adjust the highligh
 - Fixes are tested
 - Ready to publish immediately
 
-**Trigger:** Manual (patch version: `0.5.1`)
+**Trigger:** Manual
+
+**Command:**
+```bash
+# Preview
+ribir-bot release next patch
+
+# Execute
+ribir-bot release next patch --execute
+```
 
 **What happens:**
-1. Collects changelog entries from bug fix PRs
-2. Updates changelog on release branch
-3. Creates patch release (0.5.0 → 0.5.1)
-4. Publishes immediately
+1. Gets next patch version (0.5.0 → 0.5.1)
+2. Collects changelog entries from bug fix PRs
+3. Updates changelog on release branch
+4. Runs `cargo release patch` (version bump, commit, tag, push, publish)
+5. Creates GitHub Release
 
 **Materials generated:**
 - ✅ Updated CHANGELOG entry
@@ -192,6 +267,7 @@ Edit `CHANGELOG.md` directly in the preparation PR branch to adjust the highligh
 - [ ] GitHub Release appears
 - [ ] Changelog updated on release branch
 - [ ] Version number correct
+- [ ] Package published to crates.io
 
 **Timeline:** ~2-3 minutes
 
