@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to process'
+        description: "PR number to process"
         required: false
-        default: ''
+        default: ""
 
 jobs:
   pr-bot:
@@ -42,15 +42,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RESULT=$(cargo run --manifest-path tools/ribir-bot/Cargo.toml -- workflow handle-event \
-            --dispatch-pr "${{ github.event.inputs.pr_number }}")
-          echo "$RESULT" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          cargo run --manifest-path tools/ribir-bot/Cargo.toml -- workflow handle-event \
+            --dispatch-pr "${{ github.event.inputs.pr_number }}" | tee -a "$GITHUB_OUTPUT"
 
       - name: Post Help
         if: steps.event.outputs.show_help == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           cargo run --manifest-path tools/ribir-bot/Cargo.toml -- workflow post-help \
             --pr "${{ github.event.issue.number }}" --bot pr
 
@@ -60,12 +61,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          set -euo pipefail
           COMMAND="${{ steps.event.outputs.command }}"
           PR_ID="${{ steps.event.outputs.pr_id }}"
           CONTEXT="${{ steps.event.outputs.context }}"
 
+          if [ -z "$COMMAND" ] || [ -z "$PR_ID" ]; then
+            echo "Missing required outputs: command/pr_id" >&2
+            exit 1
+          fi
+
+          case "$COMMAND" in
+            "pr-fill")    CMD=(pr fill) ;;
+            "pr-regen")   CMD=(pr regen) ;;
+            "pr-summary") CMD=(pr summary) ;;
+            "pr-entry")   CMD=(pr entry) ;;
+            *)
+              echo "Unknown or disallowed command: $COMMAND" >&2
+              exit 1
+              ;;
+          esac
+
           if [ -n "$CONTEXT" ]; then
-            cargo run --manifest-path tools/ribir-bot/Cargo.toml -- $COMMAND $PR_ID "$CONTEXT"
+            cargo run --manifest-path tools/ribir-bot/Cargo.toml -- "${CMD[@]}" "$PR_ID" --context "$CONTEXT"
           else
-            cargo run --manifest-path tools/ribir-bot/Cargo.toml -- $COMMAND $PR_ID
+            cargo run --manifest-path tools/ribir-bot/Cargo.toml -- "${CMD[@]}" "$PR_ID"
           fi

@@ -191,12 +191,12 @@ pub fn handle_pr_bot_event(
         return Ok(result);
       }
 
-      result.set_run("pr fill", &pr.number.to_string());
+      result.set_run("pr-fill", &pr.number.to_string());
     }
 
     "workflow_dispatch" => {
       if let Some(pr) = dispatch_pr {
-        result.set_run("pr fill", pr);
+        result.set_run("pr-fill", pr);
       }
     }
 
@@ -221,15 +221,15 @@ pub fn handle_pr_bot_event(
 
       match BotCommand::parse(&event.comment.body) {
         Some(cmd) => match cmd {
-          BotCommand::PrFill => result.set_run("pr fill", &pr_number.to_string()),
+          BotCommand::PrFill => result.set_run("pr-fill", &pr_number.to_string()),
           BotCommand::PrRegen(ctx) => {
-            result.set_run_with_context("pr regen", &pr_number.to_string(), ctx)
+            result.set_run_with_context("pr-regen", &pr_number.to_string(), ctx)
           }
           BotCommand::PrSummary(ctx) => {
-            result.set_run_with_context("pr summary", &pr_number.to_string(), ctx)
+            result.set_run_with_context("pr-summary", &pr_number.to_string(), ctx)
           }
           BotCommand::PrEntry(ctx) => {
-            result.set_run_with_context("pr entry", &pr_number.to_string(), ctx)
+            result.set_run_with_context("pr-entry", &pr_number.to_string(), ctx)
           }
           BotCommand::Help => result.show_help = true,
           _ => {

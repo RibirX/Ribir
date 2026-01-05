@@ -274,7 +274,8 @@ pub struct Commit {
 /// Release subcommands
 #[derive(Debug, Subcommand)]
 pub enum ReleaseCmd {
-  /// Full release (alpha|rc|patch|minor|major). Default: dry-run, use --execute to apply.
+  /// Full release (alpha|rc|patch|minor|major). Default: dry-run, use --execute
+  /// to apply.
   Next {
     /// Release level
     #[arg(value_enum)]
@@ -410,12 +411,36 @@ impl EventResult {
       lines.push(format!("pr_id={id}"));
     }
     if let Some(ref ctx) = self.context {
-      // Use heredoc syntax for multi-line context
-      lines.push(format!("context<<EOF\n{ctx}\nEOF"));
+      // Use heredoc syntax for (potentially) multi-line context.
+      // IMPORTANT: the delimiter must not be attacker-controllable; otherwise a
+      // comment body that contains the delimiter can inject additional GitHub
+      // Actions outputs.
+      let delimiter = Self::unique_output_delimiter(ctx);
+      lines.push(format!("context<<{delimiter}\n{ctx}\n{delimiter}"));
     }
     if let Some(ref branch) = self.branch {
       lines.push(format!("branch={branch}"));
     }
     lines.join("\n")
+  }
+
+  fn unique_output_delimiter(content: &str) -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let pid = std::process::id();
+    let nanos = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .map(|d| d.as_nanos())
+      .unwrap_or(0);
+
+    for attempt in 0u32..1000 {
+      let delimiter = format!("RIBIR_BOT_CTX_{pid}_{nanos}_{attempt}");
+      if !content.contains(&delimiter) {
+        return delimiter;
+      }
+    }
+
+    // Extremely unlikely fallback.
+    "RIBIR_BOT_CTX".to_string()
   }
 }

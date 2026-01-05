@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'RC PR number to process'
+        description: "RC PR number to process"
         required: true
       command:
-        description: 'Command to run (release-highlights or release-social-card)'
+        description: "Command to run (release-highlights or release-social-card)"
         required: true
-        default: 'release-highlights'
+        default: "release-highlights"
 
 jobs:
   rc-bot:
@@ -73,22 +73,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "command=${{ github.event.inputs.command }}" >> $GITHUB_OUTPUT
             exit 0
           fi
 
           # Parse command from comment
-          RESULT=$(cargo run --manifest-path tools/ribir-bot/Cargo.toml -- workflow handle-event \
+          cargo run --manifest-path tools/ribir-bot/Cargo.toml -- workflow handle-event \
             --dispatch-pr "${{ steps.event.outputs.pr_number }}" \
-            --dispatch-command "")
-          echo "$RESULT" >> $GITHUB_OUTPUT
+            --dispatch-command "" | tee -a "$GITHUB_OUTPUT"
 
       - name: Post Help
         if: steps.event.outputs.should_run == 'true' && steps.cmd.outputs.show_help == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           cargo run --manifest-path tools/ribir-bot/Cargo.toml -- workflow post-help \
             --pr "${{ steps.event.outputs.pr_number }}" --bot rc
 
@@ -104,15 +105,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          set -euo pipefail
           COMMAND="${{ steps.cmd.outputs.command }}"
           SUBCMD=$(echo "$COMMAND" | sed 's/release-//')
           CONTEXT="${{ steps.cmd.outputs.context }}"
 
           cd tools/ribir-bot
-          if [ -n "$CONTEXT" ]; then
-            cargo run -- release $SUBCMD "$CONTEXT"
+          if [ -n "$CONTEXT" ] && [ "$SUBCMD" = "highlights" ]; then
+            cargo run -- release "$SUBCMD" --context "$CONTEXT"
           else
-            cargo run -- release $SUBCMD
+            cargo run -- release "$SUBCMD"
           fi
 
           cd ../..
