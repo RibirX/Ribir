@@ -520,7 +520,20 @@ pub mod test_utils {
       wnd.run_frame_tasks();
       AppCtx::run_until_stalled();
       AppCtx::send_event(FrameworkEvent::NewFrame { wnd_id: wnd.id(), force_redraw: false });
-      wnd.run_frame_tasks();
+
+      // Continuously run the event loop until the frame is fully processed.
+      // Complex widgets may require multiple poll cycles to complete their layout.
+      let ctx = AppCtx::shared();
+      let local_set = &*ctx.local_set.borrow();
+      for _ in 0..1000 {
+        wnd.run_frame_tasks();
+        super::RUNTIME.block_on(local_set.run_until(tokio::task::yield_now()));
+
+        // Check if the tree is no longer dirty, indicating the frame is complete
+        if !wnd.tree().is_dirty() {
+          break;
+        }
+      }
       AppCtx::run_until_stalled();
     }
 
