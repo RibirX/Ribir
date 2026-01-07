@@ -497,11 +497,36 @@ fn resolve_caller_relative_path(input_path: &str, span: proc_macro2::Span) -> sy
   let resolved = caller_dir.join(input_path);
 
   if resolved.is_absolute() {
-    Ok(resolved)
-  } else {
-    let (manifest, workspace) = get_workspace_base(span)?;
-    Ok(workspace.unwrap_or(manifest).join(&resolved))
+    return Ok(resolved);
   }
+
+  // When resolved is relative, we need to find the right base directory.
+  // The span.local_file() behavior differs between contexts:
+  // - In workspace: returns path relative to workspace root (e.g.,
+  //   "core/src/file.rs")
+  // - In cargo package: returns path relative to crate root (e.g., "src/file.rs")
+  //
+  // Strategy: Try CARGO_MANIFEST_DIR first, then workspace root as fallback.
+  let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+    .map_err(|_| syn::Error::new(span, "CARGO_MANIFEST_DIR not set"))?;
+  let manifest_path = PathBuf::from(&manifest_dir);
+
+  // First try: resolve relative to CARGO_MANIFEST_DIR (works for cargo package)
+  let candidate = manifest_path.join(&resolved);
+  if candidate.exists() {
+    return Ok(candidate);
+  }
+
+  // Second try: resolve relative to workspace root (works for workspace builds)
+  if let Some(workspace_root) = find_workspace_root(&manifest_path) {
+    let candidate = workspace_root.join(&resolved);
+    if candidate.exists() {
+      return Ok(candidate);
+    }
+  }
+
+  // Return the manifest-based path for error reporting
+  Ok(manifest_path.join(&resolved))
 }
 
 /// Get manifest directory and workspace root.
