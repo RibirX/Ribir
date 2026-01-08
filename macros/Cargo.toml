@@ -21,7 +21,7 @@ bitflags.workspace = true
 image = { workspace = true, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 proc-macro2.workspace = true
 quote.workspace = true
-ribir_painter = {path = "../painter", version = "0.4.0-alpha.53" }
+ribir_painter = {path = "../painter", version = "0.4.0-alpha.54" }
 smallvec = { workspace = true, features= ["drain_filter"] }
 syn = { workspace = true, features = ["fold", "full", "extra-traits"]}
 heck.workspace = true

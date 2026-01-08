@@ -25,6 +25,8 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 ## [@Unreleased] - @ReleaseDate
 
+## [0.4.0-alpha.54] - 2026-01-08
+
 ### Features
 
 - **core**: Add Image widget with lazy WebP decoding, caching, and animation support. (#823 @M-Adoo)
@@ -966,7 +968,8 @@ We are very happy to share it with you. We hope you can try it out and give us f
 - **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
 
 <!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.53...HEAD
+[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.54...HEAD
+[0.4.0-alpha.54]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.53...ribir-v0.4.0-alpha.54
 [0.4.0-alpha.53]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.52...ribir-v0.4.0-alpha.53
 [0.4.0-alpha.52]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.51...ribir-v0.4.0-alpha.52
 [0.4.0-alpha.51]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.50...ribir-v0.4.0-alpha.51
