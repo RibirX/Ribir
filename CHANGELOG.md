@@ -2,30 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-Please keep one empty line before and after all headers. (This is required for `git` to produce a conflict when a release is made while a PR is open and the PR's changelog entry would go into the wrong section).
-
-There are 5 types of changes:
-
-- `Features` for new features.
-- `Changed` for changes in existing functionality.
-- `Fixed` for any bug fixes.
-- `Documented` for any changes to the documentation.
-- `Breaking` for the detail of any backward incompatible changes.
-
-Please only add new entries below the [Unreleased](#unreleased---releasedate) header with the following format:
-
-``` md
-**crate or effect scope**: description of change (#pr @contributor)
-```
-
-1. When creating a pull request, `#pr` will automatically update with the pull request number.
-2. Replace `@contributor` with your GitHub username.
+For older versions:
+- [0.3.x changelog](changelogs/CHANGELOG-0.3.md)
+- [0.2.x changelog](changelogs/CHANGELOG-0.2.md)
+- [0.1.x changelog](changelogs/CHANGELOG-0.1.md)
 
 <!-- next-header -->
 
-## [@Unreleased] - @ReleaseDate
-
-## [0.4.0-alpha.54] - 2026-01-08
+## [0.4.0-alpha.54](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.54) - 2026-01-08
 
 ### Features
 
@@ -42,11 +26,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Fix abnormal CPU usage on macOS caused by the side effects of cloning EventLoopProxy (#816 @wjian23).
 
-### Documented
+### Documentation
 
 - **doc**: add guide for ribir. (#823 @wjian23)
 
-## [0.4.0-alpha.53] - 2025-12-17
+## [0.4.0-alpha.53](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.53) - 2025-12-17
+
+### Fixed
 
 - **cli**: support both [bundle] and [package.metadata.bundle] config formats. (#814 @M-Adoo)
 
@@ -55,7 +41,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: add builtin `box_shadow` property. (#811 @wjian23)
 - **core**: add builtin `filter` property. (#811 @wjian23)
 
-## [0.4.0-alpha.52] - 2025-12-03
+## [0.4.0-alpha.52](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.52) - 2025-12-03
 
 ### Features
 
@@ -67,7 +53,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **themes**: Removed `IconTheme`, `fill_svgs!`, `svgs` and `material_svgs`. Use `svg_registry` to manage and access icons instead. (#806 @M-Adoo)
 
-## [0.4.0-alpha.51] - 2025-11-26
+## [0.4.0-alpha.51](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.51) - 2025-11-26
 
 ### Features
 
@@ -81,7 +67,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **macros**: replace `include_crate_svg!` with new `asset!` macro for general asset management.(#798 @M-Adoo)
 
 
-## [0.4.0-alpha.50] - 2025-11-19
+## [0.4.0-alpha.50](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.50) - 2025-11-19
 
 ### Fixed
 
@@ -96,11 +82,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: add window positioning and level control APIs.(#796 @wjian23)
 - **example**: add example of a Pomodoro timer app.(#796 @wjian23)
 
-## [0.4.0-alpha.49] - 2025-09-03
+## [0.4.0-alpha.49](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.49) - 2025-09-03
 
-## [0.4.0-alpha.48] - 2025-08-27
+## [0.4.0-alpha.48](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.48) - 2025-08-27
 
-## [0.4.0-alpha.47] - 2025-08-20
+## [0.4.0-alpha.47](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.47) - 2025-08-20
 
 ### Features
 
@@ -110,18 +96,18 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **gpu**: Fixed the missed submission of GPU commands for drawing mask triangles, which led to abnormal color filling. (#781 @wjian23)
 
-### BREAKING
+### Breaking
 
 - **core**: Remove `State`; use `Stateful` instead. (#782 by @M-Adoo)
 - **core**: Remove `TransitionTheme`. (#783 by @M-Adoo)
 
-## [0.4.0-alpha.46] - 2025-08-13
+## [0.4.0-alpha.46](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.46) - 2025-08-13
 
 ### Fixed
 
 - **gpu**: Fixed filter panic in some platform which Surface can't with TEXTURE_BINDING usage. (#780 @wjian23)
 
-## [0.4.0-alpha.45] - 2025-08-06
+## [0.4.0-alpha.45](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.45) - 2025-08-06
 
 ### Features
 
@@ -132,7 +118,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **gpu**: Fixed the drawn colors are biased. (#778 @wjian23)
 
 
-## [0.4.0-alpha.44] - 2025-07-10
+## [0.4.0-alpha.44](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.44) - 2025-07-10
 
 ### Features
 
@@ -144,21 +130,21 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Separate UI Rendering and Application Logic into Independent Threads. (@wjian23).
 - **core**: remove CustomStyles and TextField Widget.(@wjian23)
 
-### BREAKING
+### Breaking
 
 - **macros**: supported explicit '$' syntax for variable capture and state modifies (#773 @M-Adoo)
   - Requires using `$read()`, `$write()`, `$reader()`, `$writer()`, `$watcher()`, and `$clone()` for state operations
 - **core**: Removed all `get_xxx_widget` methods from `FatObj`, built-in state now directly accessible via `FatObj` exports (#773 @M-Adoo)
 
 
-## [0.4.0-alpha.40] - 2025-06-04
+## [0.4.0-alpha.40](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.40) - 2025-06-04
 
 ### Changed
 
 - **core**: Refactored `Pipe` trait into a `Pipe` struct, simplifying pipe-type management. (#765 @M-Adoo)
 - **core**: Added built-in `TextAlign` provider for text alignment via `text_align` property. (#764 @M-Adoo)
 
-### BREAKING
+### Breaking
 
 - **core**: Refactor partial writer to use `PartialId` (#762 by @wjian23)  
   Changes include:
@@ -174,17 +160,17 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **macros**: Replaced `@ $var { ... }` syntax with `@(expr) { ... }` to support expression parent and provide more uniform syntax. (#768 @M-Adoo)
 
 
-## [0.4.0-alpha.39] - 2025-05-28
+## [0.4.0-alpha.39](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.39) - 2025-05-28
 
 
-## [0.4.0-alpha.38] - 2025-05-21
+## [0.4.0-alpha.38](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.38) - 2025-05-21
 
-### BREAKING
+### Breaking
 
 - **Widgets**: `Row` and `Column` now provide basic linear layouts, arranging children in a straight line without `Flex`'s advanced capabilities. (#759 @M-Adoo)
 
 
-## [0.4.0-alpha.37] - 2025-05-14
+## [0.4.0-alpha.37](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.37) - 2025-05-14
 
 ### Features
 
@@ -195,17 +181,17 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Simplify type conversion system by unifying implementations under `RFrom` and `RInto` traits (by @M-Adoo)
 
 
-## [0.4.0-alpha.36] - 2025-05-07
+## [0.4.0-alpha.36](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.36) - 2025-05-07
 
 ### Features
 
 - **core**: Added common fallback system fonts list function `fallback_font_families`, so that themes can use. (#748 @M-Adoo)
 
-### BREAKING
+### Breaking
 
 - **core**: The `ComposeDecorator` trait has been removed. (#754 @M-Adoo)
 
-## [0.4.0-alpha.35] - 2025-04-30
+## [0.4.0-alpha.35](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.35) - 2025-04-30
 
 ### Fixed
 - **core**: Fixed the priority of the pipe does not depend on its position (the previous position was not accurately tracked). (#742 @wjian23)
@@ -214,10 +200,10 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **widgets**: Prevent stack re-layout when subtree of InParentLayout changed.(#745 @wjian23)
 - **widgets**: Constrain the size of Expanded when the remaining space for Expanded in Flex is zero(#747 @wjian23)
 
-### BREAKING CHANGES
+### Breaking
 - **core**: method of Render `only_sized_by_parent` rename to `size_affected_by_child`, Widget `OnlySizedByParent` rename to `NoAffectedParentSize`.(#745 @wjian23)
 
-## [0.4.0-alpha.34] - 2025-04-23
+## [0.4.0-alpha.34](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.34) - 2025-04-23
 
 ### Features
 
@@ -227,17 +213,17 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 ### Fixed
 - **core**: Fixed `Reuseable` panic when when holding the same Reuseable while pipe changes continuously.(#741 @wjian23)
 
-### BREAKING CHANGES
+### Breaking
 - **core**: Added built in filed `reuse_id`, `GlobalWidgets` and `LocalWidgets`; removed `KeyWidget`. Use `reuse_id` as replacements for similar scenarios.(#741 @wjian23)
 
-## [0.4.0-alpha.33] - 2025-04-16
+## [0.4.0-alpha.33](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.33) - 2025-04-16
 
 ### Features
 
 - **core**: Added `Reusable` helper to enable widget recycling and reuse. (#737 @M-Adoo)
 
 
-## [0.4.0-alpha.32] - 2025-04-09
+## [0.4.0-alpha.32](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.32) - 2025-04-09
 
 ### Features
 
@@ -262,7 +248,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **ribir**: Updated wgpu dependency to v0.24.* (#728 @M-Adoo)
 
 
-### BREAKING CHANGES
+### Breaking
 
 - **core**: Standardize built-in method naming conventions: (#734 @M-Adoo)
   - Boolean state checks (past participle):
@@ -275,7 +261,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
   - No longer reuses existing canvas elements
 
 
-## [0.4.0-alpha.31] - 2025-04-02
+## [0.4.0-alpha.31](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.31) - 2025-04-02
 
 ### Features
 
@@ -294,7 +280,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Refactor KeyWidget, reuse the instance with same key when Pipe regenerate. (#726 @wjian23)
 
 
-## [0.4.0-alpha.30] - 2025-03-26
+## [0.4.0-alpha.30](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.30) - 2025-03-26
 
 ### Features
 
@@ -305,7 +291,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **macros**: Fixed `part_xxx!` macro handling of built-in widget state when used as a top-level macro. (#722 @M-Adoo)
 
-## [0.4.0-alpha.29] - 2025-03-19
+## [0.4.0-alpha.29](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.29) - 2025-03-19
 
 
 ### Features
@@ -341,7 +327,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Remove the `text_align` from the `Text` widget and replace it with the `TextAlign` provider instead. (#706 @M-Adoo)
 
-## [0.4.0-alpha.27] - 2025-02-12
+## [0.4.0-alpha.27](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.27) - 2025-02-12
 
 ### Features
 
@@ -352,14 +338,14 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Fix window staying empty after switching workspace (e.g. in i3wm) by doing a force redraw. (#697 @zihadmahiuddin)
 
-## [0.4.0-alpha.26] - 2025-02-05
+## [0.4.0-alpha.26](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.26) - 2025-02-05
 
 ### Fixed
 
 - **widgets**: Ensure that the `Flex` expands items only after allocating space to all items, prioritizing the display of items in full initially. (#696 @M-Adoo)
 
 
-## [0.4.0-alpha.25] - 2025-01-29
+## [0.4.0-alpha.25](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.25) - 2025-01-29
 
 ### Features
 
@@ -367,7 +353,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: `IgnorePointer` now has the ability to only ignore events for the widget itself. (#695 @M-Adoo)
 - **core**: Included `BoxPainter` to draw decorations starting from the widget box's origin while ignoring padding. (#695 @M-Adoo)
 
-### Changed 
+### Changed
 
 - **macros**: Generate cleaner code for #[derive(Declare)] when all fields are omitted. (#695 @M-Adoo)
 
@@ -380,7 +366,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: The crash occurs when a parent widget with a class tries to convert the widget with more than one leaf. (#695 @M-Adoo)
 - **core**: The padding only reduces the content size and does not affect the border and background size. (#695 @M-Adoo)
 
-## [0.4.0-alpha.24] - 2025-01-22
+## [0.4.0-alpha.24](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.24) - 2025-01-22
 
 ### Features
 
@@ -394,11 +380,11 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Unified implementation of IntoWidget for impl StateWriter<V:Compose>. (#684 @wjian23)
 - **widgets**: Refactor `Input` Widget. (#684 @wjian23)
 
-### Breading
+### Breaking
 
 - **core**: Rename `can_focus` field of FocusScope to `skip_host`. (#684 @wjian23)
 
-## [0.4.0-alpha.23] - 2025-01-15
+## [0.4.0-alpha.23](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.23) - 2025-01-15
 
 ### Features
 
@@ -418,25 +404,25 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **Core**: `PartData` allows the use of a reference to create a write reference, which is unsafe. Introduce `PartRef` and `PartMut` to replace it. (#690 @M-Adoo)
 
 
-### Breading
+### Breaking
 
 - **core**: Removed `PartData`. (#690 @M-Adoo)
 - **core**: Removed `BoxDecoration`. (#691 @M-Adoo)
 
-## [0.4.0-alpha.22] - 2025-01-08
+## [0.4.0-alpha.22](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.22) - 2025-01-08
 
 ### Fixed
 
 - cargo: Fixed Documentation link (#686 @EpixMan)
 
-## [0.4.0-alpha.21] - 2025-01-01
+## [0.4.0-alpha.21](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.21) - 2025-01-01
 
 ### Fixed
 
 - **core**: The animation finish may miss drawing the last frame. (#682 @M-Adoo)
 
 
-## [0.4.0-alpha.20] - 2024-12-25
+## [0.4.0-alpha.20](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.20) - 2024-12-25
 
 ### Features
 
@@ -462,7 +448,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Optimize QueryId::is_same by not creating a String using format for every comparison (#678 @tashcan)
 
-## [0.4.0-alpha.19] - 2024-12-18
+## [0.4.0-alpha.19](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.19) - 2024-12-18
 
 ### Features
 
@@ -474,7 +460,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: Fix mismatch of providers. (#669 @wjian23)
 - **core**: Added DeclarerWithSubscription to let Widget `Expanded` accept pipe value. (#669 @wjian23)
 
-## [0.4.0-alpha.18] - 2024-12-11
+## [0.4.0-alpha.18](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.18) - 2024-12-11
 
 ### Features
 
@@ -486,7 +472,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Refactor the builtin widget of global_anchor (#664 @wjian23)
 
-## [0.4.0-alpha.17] - 2024-12-04
+## [0.4.0-alpha.17](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.17) - 2024-12-04
 
 ### Features
 
@@ -514,7 +500,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: fix query render object with multi target hits (#665 @wjian23)
 - **core**: Use track_id track WidgetId, which may changed when created by pipe or class. (#665 @wjian23)
 
-## [0.4.0-alpha.15] - 2024-11-13
+## [0.4.0-alpha.15](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.15) - 2024-11-13
 
 ### Features
 
@@ -538,7 +524,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: function widget no longer requires a `&mut BuildCtx` parameter. (#650 @M-Adoo)
 - **macros**: Removed the `ctx!` macro. (#650 @M-Adoo)
 
-## [0.4.0-alpha.14] - 2024-10-30
+## [0.4.0-alpha.14](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.14) - 2024-10-30
 
 ### Features
 
@@ -559,7 +545,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **macros**: Using expression parent (`@(w) { ... }` before `@ $w { ...}`) will no longer automatically wrap a `FatObj` for `w`. (#639 @M-Adoo)
 
-## [0.4.0-alpha.12] - 2024-10-09
+## [0.4.0-alpha.12](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.12) - 2024-10-09
 
 ### Features
 
@@ -569,7 +555,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **text**: Removed the `ribir_text` crate and integrated it into the `ribir_painter` crate. (#635 @M-Adoo)
 
-## [0.4.0-alpha.11] - 2024-10-02
+## [0.4.0-alpha.11](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.11) - 2024-10-02
 
 ### Features
 
@@ -583,7 +569,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **text**: Enhance the typography APIs by eliminating `FontSize`, `Pixel`, and `Em`, and directly utilize only logical pixels represented by `f32`.  (#629 @M-Adoo)
 
-## [0.4.0-alpha.10] - 2024-09-25
+## [0.4.0-alpha.10](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.10) - 2024-09-25
 
 ### Features
 
@@ -605,7 +591,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **painter**: Removed `Painter::brush` and `Painter::set_brush`, now using `fill_brush`, `stroke_brush`, `set_fill_brush`, and `set_stroke_brush` methods instead. (#628 @M-Adoo)
 
-## [0.4.0-alpha.9] - 2024-09-18
+## [0.4.0-alpha.9](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.9) - 2024-09-18
 
 ### Changed
 
@@ -615,7 +601,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: The `Layouter` has been removed, so the render widget needs to adjust the APIs used accordingly. (#625, @M-Adoo)
 
-## [0.4.0-alpha.8] - 2024-09-11
+## [0.4.0-alpha.8](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.8) - 2024-09-11
 
 ### Features
 
@@ -638,13 +624,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **macros**: Declaring the variable parent with built-in fields as immutable is incorrect if its child uses it as mutable. (#623 @M-Adoo)
 
-## [0.4.0-alpha.7] - 2024-09-04
+## [0.4.0-alpha.7](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.7) - 2024-09-04
 
 ### Fixed
 
 - **widgets**: Flex may not decrease the gap for the second child during layout. (#622 @M-Adoo)
 
-## [0.4.0-alpha.6] - 2024-08-21
+## [0.4.0-alpha.6](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.6) - 2024-08-21
 
 ### Features
 
@@ -707,7 +693,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - **core**: `GenWidget::gen_widget` no longer requires a `&mut BuildCtx` parameter. (#616 @M-Adoo)
 - **core**: Removed `FullTheme` and `InheritTheme`, now only using `Theme`. Any part of the theme, such as `Palette`, can be directly used to overwrite its corresponding theme component. (#618 @M-Adoo)
 
-## [0.4.0-alpha.5] - 2024-08-14
+## [0.4.0-alpha.5](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.5) - 2024-08-14
 
 ### Features
 
@@ -717,7 +703,7 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Removed unnecessary `Writer` since it has the same capabilities as `Stateful`. (#615 @M-Adoo)
 
-## [0.4.0-alpha.4] - 2024-08-07
+## [0.4.0-alpha.4](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.4) - 2024-08-07
 
 ### Features
 
@@ -742,9 +728,9 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 - Removed the all builder traits such as WidgetBuilder and ComposeBuilder and so on. (#612 @M-Adoo)
 - All implicit child conversions have been removed, except for conversions to Widget. (#612 @M-Adoo)
 
-## [0.4.0-alpha.3] - 2024-06-26
+## [0.4.0-alpha.3](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.3) - 2024-06-26
 
-## [0.4.0-alpha.2] - 2024-06-19
+## [0.4.0-alpha.2](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.2) - 2024-06-19
 
 ### Features
 
@@ -772,247 +758,13 @@ Please only add new entries below the [Unreleased](#unreleased---releasedate) he
 
 - **core**: Render widgets no longer need to implement the `Query` trait. Data can only be queried if it's a state or wrapped with `Queryable`. (#601 @M-Adoo)
 
-### BREAKING
+### Breaking
 
 - **core**: Removed the infrequently used `StateFrom` trait, as there's a more efficient alternative. (#604 @M-Adoo)
 
-## [0.4.0-alpha.1](https://github.com/RibirX/Ribir/compare/ribir-v0.3.0-beta.2...ribir-v0.4.0-alpha.1) - 2024-06-12
+## [0.4.0-alpha.1](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.4.0-alpha.1) - 2024-06-12
 
 ### Changed
 
 - **core**: Removed the unused stamp checker for the split state. (#599 @M-Adoo)
 
-## [0.3.0-beta.2](https://github.com/RibirX/Ribir/compare/ribir-v0.3.0-alpha.5...ribir-v0.3.0-beta.2) - 2024-06-05
-
-We're thrilled to announce that Ribir now supports the Web platform\! 🎉🎉🎉
-
-Experience the power of compiling Rust code to wasm and rendering it with WebGPU or WebGL.
-
-Check out our Wordle game demo, now running smoothly in your browser\!
-
-[![Wordle Game](./static/wordle-wasm.png)](https://ribir.org/wordle_game/)
-
-### Features
-
-- **ribir**: support stable Rust 1.77.0 (\#552 @M-Adoo)
-- **macros**: Added a `include_crate_svg!` macro to include the svg relative to current crate. (\#552, @M-Adoo)
-- **ribir**: Added a `nightly` feature to enable functionalities that require nightly Rust. (\#552, @M-Adoo)
-  - The `include_crates_svg!` macro can operate without the `nightly` feature.
-  - The `include_svg!` macro requires the `nightly` feature to be enabled.
-
-- **ribir**: Introduced `AppRunGuard` to allow app and window configuration prior to app startup. (\#565, @M-Adoo)
-  Previously, to configure the app and window before startup, `App::run` couldn't be used:
-
-  ``` rust
-  unsafe {
-    AppCtx::set_app_theme(material::purple::light());
-  }
-
-  App::new_window(root, None).set_title("Counter");
-  App::exec();
-  ```
-
-  Now, with AppRunGuard, you can use `App::run` and chain the configuration methods:
-
-  ``` rust
-  App::run(root)
-    .with_app_theme(material::purple::light())
-    .with_title("Counter");
-  ```
-
-- **core**: The split functions in `StateReader::part_reader`, `StateWriter::map_writer`, and `StateWriter::split_writer` no longer need to return a reference. (\#568 @M-Adoo)
-- **core**: Introduced `StateWatcher` for watching state modifies, which was previously the responsibility of `StateReader`. This results in a cleaner and more compact `StateReader` implementation. (\#556, @M-Adoo)
-- **gpu**: Introduced `GPUBackendImpl::max_textures_per_draw` to set a limit on textures per draw phase (\#562 @M-Adoo)
-- **gpu**: Updated the `wgpu` implementation of the GPU backend to support WebGL. (\#578, @M-Adoo)
-- **ci**: Added wasm test (\#583 @wjian23)
-- **ci**: wasm server watch file change (\#586 @wjian23)
-- **painter**: Introduced support for `Resource<Path>` for drawing. This indicates that the `Path` may be shared with others, allowing the backend to cache it. (\#589 @M-Adoo)
-- **painter**: Introduced support for bundled commands, enabling the backend to process these commands as a single entity and cache the resulting output. (\#589 @M-Adoo)
-
-### Fixed
-
-- **examples**: fix crash issue in Storybook (\#559 @M-Adoo)
-
-- **ribir**: Resolved the issue causing a black screen on the first frame. (\#566, @M-Adoo)
-
-- **gpu**: Retrieve the texture limit size from the GPU instead of using a hardcoded value. (\#578, @M-Adoo)
-- **ribir**: fixed the crash issue when the shell window is zero-sized at startup. (\#582, @M-Adoo)
-
-### Changed
-
-- **core**: Enhanced panic location tracking during widget build (\#559 @M-Adoo)
-
-- **core**: rename builtin field of delay\_drop\_until to keep\_alive (\#561 @wjian23)
-
-- **macros**: polish the compile error message of invalid filed in `@(var) {}` (\#556 @M-Adoo)
-- **gpu**: Removed dependency on the texture array feature of wgpu. (\#562, @M-Adoo)
-- **algo**: removed `Resource` and rename `ShareResource` to `Resource`. (\#564, @M-Adoo)
-- **dev-helper**: Support specific the comparison of image tests. (\#573 @M-Adoo)
-- **dev-helper**: If test images differ, both actual and difference images are saved with the expected image. (\#573 @M-Adoo)
-- **painter**: Removed the AntiAliasing feature from the `painter` package, This responsibility now lies with the painter backend. (\#584 @M-Adoo)
-- **gpu**: The GPU backend no longer relies on MSAA, which is dependent on the graphics API. Instead, it uses the alpha atlas to provide a solution similar to SSAA.(\#584, @M-Adoo)
-- **example**: run example in web wasm (\#571 @wjian23)
-- **gpu**: The GPU backend now only caches the path command if it is a `Resource`. This change reduces GPU memory usage and accelerates cache detection. (\#589 @M-Adoo)
-- **text**: Implemented caching of the glyph path as a `Resource` to improve performance. (\#589 @M-Adoo)
-
-### Documented
-
-- **core**: Explained when to use `unsubscribe` with `watch!`. (\#556, @M-Adoo)
-
-### Breaking
-
-- **ribir**: compile wasm (\#543 @wjian23)
-
-- **ribir**: Updated `App::new_window` to accept `WindowAttributes` instead of size as the second parameter. (\#565, \#566, @M-Adoo)
-- **ribir**: The window creation APIs have been updated to use asynchronous methods, improving compatibility with browsers. (\#565, @M-Adoo)
-
-- **macros**: removed `map_writer!` and `split_writer!` macros. (\#568, @M-Adoo)
-- **ribir**: `StateWriter::map_writer` and `StateWriter::split_writer` now only require a writer split function, enhancing both reader and writer split operations. (\#568, @M-Adoo)
-- **core**: The `StateReader` no longer supports watching its modifications. Use the `StateWatcher` trait instead for this functionality. (\#556 @M-Adoo)
-- **painter**: Changes to `BackendPainter` APIs. This only affects you if you've implemented a custom painter. (\#562 @M-Adoo)
-
-## [0.2.0](https://github.com/RibirX/Ribir/compare/ribir-v0.1.0...ribir-v0.2.0) - 2024-05-29
-
-### Documented
-
-- fix broken links and format the example code (\#526 @M-Adoo)
-- **ribir**: We no longer auto-generate the built-in list document, as `FatObj` lists all. Its API documentation is sufficient. (\#540 @M-Adoo)
-- **ribir**: Added guide "Using Ribir without 'DSL'" (\#545 @M-Adoo)
-- **ribir**: Added a roadmap. (\#550, @M-Adoo)
-
-### Breaking
-
-While these are public APIs, they are typically not required for direct use in user code.
-
-- **core**: removed `Stateful::on_state_drop` and `Stateful::unsubscribe_on_drop` (\#539 @M-Adoo)
-- **core**: removed `AppCtx::add_trigger_task` and `AppCtx::trigger_task` (\#539 @M-Adoo)
-- **core**: removed `FatObj::unzip` and `FatObj::from_host` (\#535 @M-Adoo)
-- **core**: removed `BuiltinObj`. (\#535 @M-Adoo)
-- **core**: `FatObj::new(host: T, builtin: BuiltinObj)` -\> `FatObj::new(host: T)`
-- **core**: rename `DeclareBuilder` to `ObjDeclarer` (\#547 @M-Adoo)
-- **core**: rename `DeclareBuilder::build_declare` to `ObjDeclarer::finish` (\#547 @M-Adoo)
-- **core**: rename `Declare::declare_builder` to `Declare::declarer` (\#547 @M-Adoo)
-- **core**: Renamed the `widget_build` method to `build` for brevity, given its frequent usage. (\#549 @M-Adoo)
-
-### Features
-
-- Support the overlay (@wjian23).
-
-  This enhancement simplifies the creation of overlay widgets. It streamlines the addition of any widget to an overlay and offers a more user-friendly API for overlay management
-
-- **macros**: Generates documentation for the builder methods of members in `#[derive(Declare)]`, thus improving IDE support.(\#538 @M-Adoo)
-
-- **core**: All built-in widget abilities are now exported on `FatObj`. (\#535 @M-Adoo)
-  You can directly use `FatObj` to configure built-in widget abilities such as `on_click`, `on_key_down`, etc.
-
-  ``` rust
-  let _ = FatObj::new(Void)
-    .margin(EdgeInsets::all(1.0))
-    .on_click(|_, _| { println!("click"); });
-  ```
-
-- **macros**: `#[derive(Decalre)]` now generates a `FatObj<State<T>>` instead of `State<T>`, and supports initialization of all built-in widgets on its ObjBuilder. (\#535 @M-Adoo)
-  All pipes used to initialize the field will be unsubscribed when the FatObj is disposed.
-
-  ``` rust
-  let row = Row::builder()
-    .margin(...)
-    .on_click(...)
-    .finish(ctx);
-  ```
-
-- **macros**: Introduced `simple_declare` macro for types that don't use `Pipe` for initialization. (\#535 @M-Adoo)
-
-### Changed
-
-- **core**: StateReader now automatically unsubscribes when no writer is present (\#532 @wjian23)
-- **core**: Consolidated all listener and `FocusNode` into a `MixBuiltin` widget (\#534 @M-Adoo)
-  - The `MixBuiltin` widget reduces memory usage and allows users to utilize all `on_xxx` event handlers, not only during the build declaration but also after the widget has been built.
-- **core**: removed `MixBuiltinDeclarer`, which is no longer needed. (\#538 @M-Adoo)
-- **macros**: removed crate `ribir_builtin` that is no longer needed. (\#535 @M-Adoo)
-
-## [0.1.0](https://github.com/RibirX/Ribir/releases/tag/ribir-v0.1.0) - 2024-03-26
-
-🎉🎉🎉 The first version of Ribir.
-
-![background](./static/hero-banner.png)
-
-The goal of this version of Ribir is to finish the core framework and answer our questions about the feasibility of the design.
-
-We use it to build examples and build some apps for our daily work. And we are satisfied with the experience of using it.
-
-We are very happy to share it with you. We hope you can try it out and give us feedback. But we don't recommend you to use it in production environments yet.
-
-### Features
-
-- **core**: control the process of the entire view: compose, build, update, layout and render.
-- **declarative language**: not a new language, but a set of Rust macros that easily interact with Rust.
-- **widgets compose system**: has four kinds of widgets to support you can implement your own widget in different ways:
-  - function widget and `Compose`, from other widgets composition.
-  - `Render`, implement your layout and paint anything you want.
-  - `ComposeChild`, control the compose logic between parent and child widgets and specify the template of child widgets.
-- **non-intrusive state**: convert your data to a listenable state, and update the view according to the change of the state.
-- **layout system**: learning and inspired by [Flutter](https://flutter.dev/) Sublinear layout, but not the same.
-- **event system**: a composition event system, that supports event bubbling and capture. Allow to compose with any widget, and exists only if you use it.
-- **theme System**: support full and inherit/partial theme, so you can use it to override or dynamically switch the theme of the subtree. Include palette, icons, animate transitions, the decoration widget of the widget, etc. In a very rough state and the API will be redesigned soon.
-- **animations**: based on state but no side effect animation, it's almost stable in concept, but not many predefined animations yet.
-- **painter**： convert the view to the 2D path.
-- **GPU render**: GPU backend for the **painter**, do path tessellation, so that easy to render the triangles in any GPU render engine. A `wgpu` implementation is provided as the default GPU render engine. Tessellation base on [lyon](https://github.com/nical/lyon).
-- **text**: support basic text typography and IME input, in a usable but rough stage.
-- **widgets**: the widgets library provides 20+ basic widgets, but all are in a rough stage, and the API is not stable yet.
-- **examples**: counter, storybook, messages, todos, wordle\_game, etc.
-
-### Documented
-
-- **introduction**: added `introduction.md` to introduce Ribir and why choose it.
-- **get started**: added the `get_started` series of tutorials to help users get started with Ribir.
-
-<!-- next-url -->
-[@Unreleased]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.54...HEAD
-[0.4.0-alpha.54]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.53...ribir-v0.4.0-alpha.54
-[0.4.0-alpha.53]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.52...ribir-v0.4.0-alpha.53
-[0.4.0-alpha.52]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.51...ribir-v0.4.0-alpha.52
-[0.4.0-alpha.51]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.50...ribir-v0.4.0-alpha.51
-[0.4.0-alpha.50]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.49...ribir-v0.4.0-alpha.50
-[0.4.0-alpha.49]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.48...ribir-v0.4.0-alpha.49
-[0.4.0-alpha.48]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.47...ribir-v0.4.0-alpha.48
-[0.4.0-alpha.47]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.46...ribir-v0.4.0-alpha.47
-[0.4.0-alpha.46]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.45...ribir-v0.4.0-alpha.46
-[0.4.0-alpha.45]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.44...ribir-v0.4.0-alpha.45
-[0.4.0-alpha.44]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.40...ribir-v0.4.0-alpha.44
-[0.4.0-alpha.40]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.39...ribir-v0.4.0-alpha.40
-[0.4.0-alpha.39]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.38...ribir-v0.4.0-alpha.39
-[0.4.0-alpha.38]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.37...ribir-v0.4.0-alpha.38
-[0.4.0-alpha.37]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.36...ribir-v0.4.0-alpha.37
-[0.4.0-alpha.36]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.35...ribir-v0.4.0-alpha.36
-[0.4.0-alpha.35]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.34...ribir-v0.4.0-alpha.35
-[0.4.0-alpha.34]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.33...ribir-v0.4.0-alpha.34
-[0.4.0-alpha.33]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.32...ribir-v0.4.0-alpha.33
-[0.4.0-alpha.32]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.31...ribir-v0.4.0-alpha.32
-[0.4.0-alpha.31]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.30...ribir-v0.4.0-alpha.31
-[0.4.0-alpha.30]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.29...ribir-v0.4.0-alpha.30
-[0.4.0-alpha.29]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.27...ribir-v0.4.0-alpha.29
-[0.4.0-alpha.27]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.26...ribir-v0.4.0-alpha.27
-[0.4.0-alpha.26]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.25...ribir-v0.4.0-alpha.26
-[0.4.0-alpha.25]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.24...ribir-v0.4.0-alpha.25
-[0.4.0-alpha.24]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.23...ribir-v0.4.0-alpha.24
-[0.4.0-alpha.23]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.22...ribir-v0.4.0-alpha.23
-[0.4.0-alpha.22]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.21...ribir-v0.4.0-alpha.22
-[0.4.0-alpha.21]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.20...ribir-v0.4.0-alpha.21
-[0.4.0-alpha.20]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.19...ribir-v0.4.0-alpha.20
-[0.4.0-alpha.19]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.18...ribir-v0.4.0-alpha.19
-[0.4.0-alpha.18]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.17...ribir-v0.4.0-alpha.18
-[0.4.0-alpha.17]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.15...ribir-v0.4.0-alpha.17
-[0.4.0-alpha.15]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.14...ribir-v0.4.0-alpha.15
-[0.4.0-alpha.14]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.12...ribir-v0.4.0-alpha.14
-[0.4.0-alpha.12]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.11...ribir-v0.4.0-alpha.12
-[0.4.0-alpha.11]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.10...ribir-v0.4.0-alpha.11
-[0.4.0-alpha.10]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.9...ribir-v0.4.0-alpha.10
-[0.4.0-alpha.9]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.8...ribir-v0.4.0-alpha.9
-[0.4.0-alpha.8]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.7...ribir-v0.4.0-alpha.8
-[0.4.0-alpha.7]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.6...ribir-v0.4.0-alpha.7
-[0.4.0-alpha.6]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.5...ribir-v0.4.0-alpha.6
-[0.4.0-alpha.5]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.4...ribir-v0.4.0-alpha.5
-[0.4.0-alpha.4]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.3...ribir-v0.4.0-alpha.4
-[0.4.0-alpha.3]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.2...ribir-v0.4.0-alpha.3
-[0.4.0-alpha.2]: https://github.com/RibirX/Ribir/compare/ribir-v0.4.0-alpha.1...ribir-v0.4.0-alpha.2

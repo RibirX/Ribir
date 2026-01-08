@@ -2,7 +2,7 @@
 
 Check out the [Milestones](https://github.com/RibirX/Ribir/milestones) to stay updated with our current projects and upcoming releases.
 
-Refer to the [Releases](./RELEASE.md) for information on our release schedule and our process for publishing new versions.
+Refer to the [Release Strategy](./dev-docs/release-system/00-release-strategy.md) for information on our release schedule and our process for publishing new versions.
 
 
 ## Prototyping (v0.1 done, 2024 Feb)

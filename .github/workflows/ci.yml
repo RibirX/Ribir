@@ -1,7 +1,7 @@
 on:
   merge_group:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches:
       - master
@@ -30,30 +30,59 @@ env:
 
 name: CI
 jobs:
+  check-merge-allowed:
+    name: Check Merge Allowed
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Check for do-not-merge label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        if: contains(github.event.pull_request.labels.*.name, 'do-not-merge')
+        run: |
+          gh pr comment "$PR_NUMBER" --body "⚠️ **Merge Blocked**: This PR has the \`do-not-merge\` label.
+          
+          - If this is a **Release PR**, please wait and use \`@ribir-bot release-stable\` to merge it.
+          - If you manually confirmed it's safe to merge, remove the \`do-not-merge\` label first."
+          
+          echo "❌ PR has 'do-not-merge' label. Manual merging is disabled."
+          exit 1
+
   get-nightly-version:
     name: Get nightly version
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || (github.event.action != 'labeled' && github.event.action != 'unlabeled')
     outputs:
-      version: ${{ steps.get-nightly.outputs.version }}
+      version: ${{ steps.nightly-version.outputs.version }}
+      tools-changed: ${{ steps.filter.outputs.tools }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
+        uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v2
+        id: filter
         with:
-          toolchain: nightly
-      - name: Get nightly version from ci.rs
-        id: get-nightly
-        run: echo "version=$(cargo +nightly ci config-nightly)" >> $GITHUB_OUTPUT
+          filters: |
+            tools:
+              - 'tools/**'
+
+      - name: Install unstable rustfmt
+        id: nightly-version
+        shell: bash
+        run: |
+          echo "version=$(cargo +nightly ci config-nightly)" >> "$GITHUB_OUTPUT"
 
 
   lint:
-    if: ${{ github.event_name != 'labeled' || github.event.label.name == 'B-pr-num' }}
     name: rust code lint
     runs-on: ubuntu-latest
     needs: get-nightly-version
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       # Install the specific nightly version with components
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -94,6 +123,18 @@ jobs:
     needs: [lint, get-nightly-version]
 
     steps:
+      - name: Free Disk Space (Ubuntu)
+        if: matrix.os == 'ubuntu-22.04'
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
       - name: checkout repo
         uses: actions/checkout@v4
 
@@ -254,10 +295,21 @@ jobs:
         run: cargo +${{ needs.get-nightly-version.outputs.version }} ci doctest
 
   doc-and-wasm:
-    needs: [lint, get-nightly-version]
+    needs: [lint, test-with-gpu, get-nightly-version]
     name: Doc examples & WASM compile
     runs-on: ubuntu-latest
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
       - name: Checkout sources
         uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -276,6 +328,15 @@ jobs:
         run: cargo +${{ needs.get-nightly-version.outputs.version }} ci doc
       - name: Compile to WASM
         run: cargo +${{ needs.get-nightly-version.outputs.version }} ci wasm
+
+  ribir-bot-check:
+    needs: [get-nightly-version]
+    name: Ribir Tools Check
+    # Only run if any tool files changed
+    if: needs.get-nightly-version.outputs.tools-changed == 'true'
+    uses: ./.github/workflows/tools-ci.yml
+    with:
+      nightly-version: ${{ needs.get-nightly-version.outputs.version }}
 
   bundle:
     needs: [lint, test-with-gpu, doc-and-wasm, get-nightly-version]
@@ -333,10 +394,10 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Install cargo-release
+      - name: Install cargo-workspaces
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-release
+          tool: cargo-workspaces
 
       - name: Install audio development libraries
         run: |
@@ -344,13 +405,13 @@ jobs:
           sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
 
       - name: Dry run release
-        run: cargo release alpha --no-verify --no-confirm --no-push --no-tag --allow-branch "*"
+        run: cargo ws publish --dry-run -y --allow-branch "*"
 
   status-report:
     name: CI unified status report
-    needs: [lint, test-with-gpu, doc-and-wasm, bundle, release-dry-run]
+    needs: [lint, test-with-gpu, doc-and-wasm, bundle, release-dry-run, check-merge-allowed, ribir-bot-check]
     runs-on: ubuntu-latest
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || (github.event.action != 'labeled' && github.event.action != 'unlabeled'))
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -362,7 +423,9 @@ jobs:
              [ "${{ needs['test-with-gpu'].result }}" != "success" ] || \
              [ "${{ needs['doc-and-wasm'].result }}" != "success" ] || \
              [ "${{ needs['bundle'].result }}" != "success" ] || \
-             [ "${{ needs['release-dry-run'].result }}" != "success" ]; then
+             [ "${{ needs['release-dry-run'].result }}" != "success" ] || \
+             [ "${{ needs['ribir-bot-check'].result }}" != "success" && "${{ needs['ribir-bot-check'].result }}" != "skipped" ] || \
+             [ "${{ needs['check-merge-allowed'].result }}" == "failure" ]; then
             echo "CI failed"
             exit 1
           fi

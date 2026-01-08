@@ -1,0 +1,54 @@
+name: Ribir Tools CI
+
+on:
+  workflow_call:
+    inputs:
+      nightly-version:
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ribir-bot-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            ribir-bot:
+              - 'tools/ribir-bot/**'
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.filter.outputs.ribir-bot == 'true'
+        with:
+          toolchain: ${{ inputs.nightly-version }}
+          components: rustfmt, clippy
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.filter.outputs.ribir-bot == 'true'
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.filter.outputs.ribir-bot == 'true'
+
+      - name: Check formatting
+        if: steps.filter.outputs.ribir-bot == 'true'
+        working-directory: tools/ribir-bot
+        run: cargo +${{ inputs.nightly-version }} fmt -- --check
+
+      - name: Run clippy
+        if: steps.filter.outputs.ribir-bot == 'true'
+        working-directory: tools/ribir-bot
+        run: cargo +${{ inputs.nightly-version }} clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        if: steps.filter.outputs.ribir-bot == 'true'
+        working-directory: tools/ribir-bot
+        run: cargo test --all-features

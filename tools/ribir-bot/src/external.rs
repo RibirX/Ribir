@@ -1,0 +1,433 @@
+//! External tool integrations (Gemini AI and GitHub CLI).
+
+use std::{
+  io::Write as IoWrite,
+  process::{Command, Stdio},
+};
+
+use semver::Version;
+
+use crate::{types::Result, utils::run_command};
+
+// ============================================================================
+// Gemini AI Integration
+// ============================================================================
+
+const PREFERRED_MODELS: &[&str] = &[
+  "gemini-3-flash-preview",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-3-pro-preview",
+  "gemini-2.5-pro",
+];
+
+pub fn call_gemini_with_fallback(prompt: &str) -> Result<String> {
+  let mut last_error = String::new();
+
+  for model in PREFERRED_MODELS {
+    eprintln!("Trying model: {model}");
+    match call_gemini(prompt, model) {
+      Ok(res) => {
+        eprintln!("✓ Success: {model}");
+        return Ok(res);
+      }
+      Err(e) => {
+        eprintln!("✗ Failed: {model} - {e}");
+        last_error = e;
+      }
+    }
+  }
+
+  Err(format!("All models failed. Last error: {last_error}").into())
+}
+
+fn call_gemini(prompt: &str, model: &str) -> std::result::Result<String, String> {
+  let mut child = Command::new("gemini")
+    .args(["--model", model, "--approval-mode", "yolo", "-o", "text"])
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
+    .map_err(|e| e.to_string())?;
+
+  if let Some(mut stdin) = child.stdin.take() {
+    stdin
+      .write_all(prompt.as_bytes())
+      .map_err(|e| e.to_string())?;
+  }
+
+  let output = child
+    .wait_with_output()
+    .map_err(|e| e.to_string())?;
+
+  if output.status.success() {
+    Ok(String::from_utf8_lossy(&output.stdout).into())
+  } else {
+    Err(String::from_utf8_lossy(&output.stderr).into())
+  }
+}
+
+/// Extract JSON from a response string.
+pub fn extract_json(s: &str) -> Option<String> {
+  let start = s.find('{')?;
+  let end = s.rfind('}')?;
+  Some(s[start..=end].to_string())
+}
+
+// ============================================================================
+// GitHub CLI Integration
+// ============================================================================
+
+/// Fetch PR data as JSON.
+pub fn gh_json<T: for<'de> serde::Deserialize<'de>>(
+  pr_id: Option<&str>, fields: &str,
+) -> Result<T> {
+  let mut args = vec!["pr", "view"];
+  extend_with_pr_id(&mut args, pr_id);
+  args.extend(["--json", fields]);
+
+  let output = run_command("gh", &args)?;
+  Ok(serde_json::from_slice(&output.stdout)?)
+}
+
+/// Fetch PR diff.
+pub fn gh_diff(pr_id: Option<&str>) -> Result<String> {
+  let mut args = vec!["pr", "diff"];
+  extend_with_pr_id(&mut args, pr_id);
+  args.push("--patch");
+
+  let output = run_command("gh", &args)?;
+  let full_diff = String::from_utf8_lossy(&output.stdout);
+
+  // Truncate diff if it's too large (to avoid token limits)
+  const MAX_DIFF_SIZE: usize = 50000;
+  if full_diff.len() > MAX_DIFF_SIZE {
+    Ok(format!(
+      "{}...\n\n(Diff truncated - {} chars total)",
+      &full_diff[..MAX_DIFF_SIZE],
+      full_diff.len()
+    ))
+  } else {
+    Ok(full_diff.to_string())
+  }
+}
+
+/// Edit PR body.
+pub fn gh_edit_body(pr_id: Option<&str>, body: &str) -> Result<()> {
+  let mut args = vec!["pr", "edit"];
+  extend_with_pr_id(&mut args, pr_id);
+  args.extend(["--body", body]);
+
+  run_command("gh", &args)?;
+  Ok(())
+}
+
+fn extend_with_pr_id<'a>(args: &mut Vec<&'a str>, pr_id: Option<&'a str>) {
+  if let Some(id) = pr_id {
+    args.push(id);
+  }
+}
+
+/// Get PR body and number from the current branch's associated PR.
+pub fn gh_get_pr_details() -> Result<(u32, String)> {
+  #[derive(serde::Deserialize)]
+  struct PrDetails {
+    number: u32,
+    body: String,
+  }
+
+  let pr: PrDetails = gh_json(None, "number,body")?;
+  Ok((pr.number, pr.body))
+}
+
+/// Get PR body from the current branch's associated PR.
+pub fn gh_get_pr_body() -> Result<String> {
+  let (_, body) = gh_get_pr_details()?;
+  Ok(body)
+}
+
+/// Create a new pull request with labels.
+pub fn create_pr(
+  title: &str, body: &str, base: &str, head: &str, labels: Option<&[&str]>,
+) -> Result<String> {
+  let mut args =
+    vec!["pr", "create", "--title", title, "--body", body, "--base", base, "--head", head];
+
+  if let Some(lbls) = labels {
+    for label in lbls {
+      args.extend(["--label", label]);
+    }
+  }
+
+  let output = Command::new("gh").args(&args).output()?;
+
+  if !output.status.success() {
+    return Err(format!("Failed to create PR: {}", String::from_utf8_lossy(&output.stderr)).into());
+  }
+
+  Ok(
+    String::from_utf8_lossy(&output.stdout)
+      .trim()
+      .to_string(),
+  )
+}
+
+/// Merge a PR.
+pub fn merge_pr(pr_number: &str) -> Result<()> {
+  // Use --merge to create a merge commit, preserving history of the release
+  // branch Use --auto if we want to enable auto-merge, but for immediate action
+  // use --merge directly However, often release branches are merged to master.
+  // Let's use `gh pr merge <number> --merge --delete-branch`
+
+  let output = Command::new("gh")
+    .args(["pr", "merge", pr_number, "--merge", "--delete-branch"])
+    .output()?;
+
+  if !output.status.success() {
+    // If it fails, maybe it's not mergeable yet?
+    return Err(format!("Failed to merge PR: {}", String::from_utf8_lossy(&output.stderr)).into());
+  }
+  Ok(())
+}
+
+/// Add label to a PR/Issue.
+pub fn add_label(id: &str, label: &str) -> Result<()> {
+  run_command("gh", &["issue", "edit", id, "--add-label", label])?;
+  Ok(())
+}
+
+/// Remove label from a PR/Issue.
+pub fn remove_label(id: &str, label: &str) -> Result<()> {
+  run_command("gh", &["issue", "edit", id, "--remove-label", label])?;
+  Ok(())
+}
+
+/// Create a GitHub release.
+pub fn create_github_release(version: &str, notes: &str, prerelease: bool) -> Result<()> {
+  let tag = format!("v{}", version);
+  let mut args = vec!["release", "create", &tag, "--title", &tag, "--notes", notes];
+
+  if prerelease {
+    args.push("--prerelease");
+  }
+
+  run_command("gh", &args)?;
+  Ok(())
+}
+
+/// Comment on a PR.
+pub fn comment_on_pr(pr_number: &str, comment: &str) -> Result<()> {
+  run_command("gh", &["pr", "comment", pr_number, "--body", comment])?;
+  Ok(())
+}
+
+/// Add an emoji reaction to a comment.
+/// Allowed reactions: +1, -1, laugh, confused, heart, hooray, rocket, eyes.
+pub fn add_reaction(comment_id: u64, reaction: &str) -> Result<()> {
+  let repo = get_origin_repo()?;
+  run_command(
+    "gh",
+    &[
+      "api",
+      "--method",
+      "POST",
+      &format!("/repos/{repo}/issues/comments/{comment_id}/reactions"),
+      "-f",
+      &format!("content={reaction}"),
+    ],
+  )?;
+  Ok(())
+}
+
+/// Get merged PRs since a version tag.
+/// Uses commit ancestry to determine if a PR was merged after the tag.
+pub fn get_merged_prs_since(ver: &Version) -> Result<Vec<crate::types::PR>> {
+  let tag_commit = get_tag_commit(ver).ok_or(format!("Tag for {} not found", ver))?;
+  eprintln!("📌 Tag commit for {}: {}", ver, &tag_commit[..8]);
+
+  // Get the origin repo to query PRs from
+  let repo = get_origin_repo()?;
+  eprintln!("📌 Querying PRs from: {}", repo);
+
+  let out = Command::new("gh")
+    .args([
+      "pr",
+      "list",
+      "--repo",
+      &repo,
+      "--state",
+      "merged",
+      "--base",
+      "master",
+      "--limit",
+      "100",
+      "--json",
+      "number,title,body,author,mergeCommit",
+    ])
+    .output()?;
+  if !out.status.success() {
+    return Err(format!("gh failed: {}", String::from_utf8_lossy(&out.stderr)).into());
+  }
+
+  #[derive(serde::Deserialize)]
+  struct PRWithCommit {
+    number: u32,
+    title: String,
+    body: Option<String>,
+    author: crate::types::Author,
+    #[serde(rename = "mergeCommit")]
+    merge_commit: Option<MergeCommit>,
+  }
+
+  #[derive(serde::Deserialize)]
+  struct MergeCommit {
+    oid: String,
+  }
+
+  let prs: Vec<PRWithCommit> = serde_json::from_slice(&out.stdout)?;
+  let mut result = Vec::new();
+
+  for pr in prs {
+    if let Some(ref mc) = pr.merge_commit {
+      // Check if the merge commit is NOT an ancestor of the tag (i.e., was merged
+      // after the tag) git merge-base --is-ancestor <commit> <tag> returns 0 if
+      // commit is ancestor of tag
+      let is_ancestor = Command::new("git")
+        .args(["merge-base", "--is-ancestor", &mc.oid, &tag_commit])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+      // If the merge commit is NOT an ancestor of the tag, it was merged after
+      if !is_ancestor {
+        result.push(crate::types::PR {
+          number: pr.number,
+          title: pr.title,
+          body: pr.body,
+          author: pr.author,
+        });
+      }
+    }
+  }
+
+  eprintln!("🔍 Found {} PRs merged after tag", result.len());
+  Ok(result)
+}
+
+/// Get the commit SHA of a version tag.
+fn get_tag_commit(ver: &Version) -> Option<String> {
+  let tags = [format!("v{}", ver), format!("ribir-v{}", ver), ver.to_string()];
+  for tag in tags {
+    if let Ok(o) = Command::new("git")
+      .args(["rev-parse", &tag])
+      .output()
+      && o.status.success()
+    {
+      return Some(
+        String::from_utf8_lossy(&o.stdout)
+          .trim()
+          .to_string(),
+      );
+    }
+  }
+  None
+}
+
+/// Get the origin repository in "owner/repo" format.
+pub fn get_origin_repo() -> Result<String> {
+  let out = Command::new("git")
+    .args(["remote", "get-url", "origin"])
+    .output()?;
+
+  if !out.status.success() {
+    return Err("Failed to get origin remote URL".into());
+  }
+
+  let url = String::from_utf8_lossy(&out.stdout)
+    .trim()
+    .to_string();
+
+  // Parse owner/repo from various URL formats:
+  // - git@github.com:owner/repo.git
+  // - https://github.com/owner/repo.git
+  // - https://github.com/owner/repo
+  let repo = url
+    .trim_end_matches(".git")
+    .rsplit(['/', ':'])
+    .take(2)
+    .collect::<Vec<_>>()
+    .into_iter()
+    .rev()
+    .collect::<Vec<_>>()
+    .join("/");
+
+  Ok(repo)
+}
+
+/// Check if user has permission (is author or has write access).
+pub fn check_permission(user: &str, _author: &str, repo: &str) -> Result<bool> {
+  let output = Command::new("gh")
+    .args(["api", &format!("/repos/{repo}/collaborators/{user}/permission"), "--jq", ".permission"])
+    .output()?;
+
+  if output.status.success() {
+    let perm = String::from_utf8_lossy(&output.stdout)
+      .trim()
+      .to_string();
+    Ok(perm == "write" || perm == "admin")
+  } else {
+    Ok(false)
+  }
+}
+
+/// Get PR info (base branch, head branch) from GitHub.
+pub fn get_pr_info(pr_number: u32, repo: &str) -> Result<(String, String)> {
+  let output = Command::new("gh")
+    .args([
+      "pr",
+      "view",
+      &pr_number.to_string(),
+      "--repo",
+      repo,
+      "--json",
+      "baseRefName,headRefName",
+    ])
+    .output()?;
+
+  if !output.status.success() {
+    return Err(
+      format!("Failed to get PR info: {}", String::from_utf8_lossy(&output.stderr)).into(),
+    );
+  }
+
+  #[derive(serde::Deserialize)]
+  struct PrInfo {
+    #[serde(rename = "baseRefName")]
+    base_ref_name: String,
+    #[serde(rename = "headRefName")]
+    head_ref_name: String,
+  }
+
+  let info: PrInfo = serde_json::from_slice(&output.stdout)?;
+  Ok((info.base_ref_name, info.head_ref_name))
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_extract_json() {
+    let response = r#"Here is the JSON:
+{"highlights": [{"emoji": "⚡", "description": "test"}]}
+That's all."#;
+    let json = extract_json(response).unwrap();
+    assert!(json.starts_with('{'));
+    assert!(json.ends_with('}'));
+    assert!(json.contains("highlights"));
+  }
+}

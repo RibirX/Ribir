@@ -1,0 +1,66 @@
+name: Enter RC Phase
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enter-rc:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: ribir-bot@0.1,cargo-workspaces
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebp-dev libasound2-dev pkg-config
+
+      - uses: ./.github/actions/setup-gemini
+
+      - name: Enter RC Phase
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Version is auto-detected from the latest git tag
+          ribir-bot release enter-rc --execute
+
+      - name: Summary
+        run: |
+          # Extract version from latest tag for summary
+          LAST_TAG=$(git describe --tags --abbrev=0)
+          VERSION=$(echo "$LAST_TAG" | sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          BRANCH="release-${MAJOR}.${MINOR}.x"
+
+          echo "## RC Phase Initiated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Stable Version**: v${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "- **RC.1 Version**: v${VERSION}-rc.1" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Branch**: ${BRANCH}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review the Stable Preparation PR" >> $GITHUB_STEP_SUMMARY
+          echo "2. Community tests the RC.1 (published)" >> $GITHUB_STEP_SUMMARY
+          echo "3. If bugs found, fix and use \`/release-rc\` for rc.2, rc.3, etc." >> $GITHUB_STEP_SUMMARY
+          echo "4. Merge the Preparation PR to trigger stable release" >> $GITHUB_STEP_SUMMARY

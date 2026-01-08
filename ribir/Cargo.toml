@@ -64,13 +64,3 @@ widgets = ["ribir_widgets"]
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.3.9"
-
-[package.metadata.release]
-tag = true
-pre-release-replacements = [
-  {file="../CHANGELOG.md", search="@Unreleased", replace="{{version}}", prerelease = true},
-  {file="../CHANGELOG.md", search="\\.\\.\\.HEAD", replace="...{{tag_name}}", min=0, prerelease = true},
-  {file="../CHANGELOG.md", search="@ReleaseDate", replace="{{date}}", prerelease = true},
-  {file="../CHANGELOG.md", search="<!-- next-header -->", replace="<!-- next-header -->\n\n## [@Unreleased] - @ReleaseDate", exactly=1, prerelease = true},
-  {file="../CHANGELOG.md", search="<!-- next-url -->", replace="<!-- next-url -->\n[@Unreleased]: https://github.com/RibirX/Ribir/compare/{{tag_name}}...HEAD", exactly=1, prerelease = true},
-]
