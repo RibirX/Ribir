@@ -41,6 +41,10 @@ Ribir uses pixel-matching tests to ensure UI rendering remains correct.
     ```
 *   **Inspecting Failures**: If a visual test fails, an "actual" image and a "difference" image will be generated in `test_cases/` alongside the expected image for easy comparison.
 
+### Widget Testing
+
+If you're developing a widget, the [`ribir_dev_helper`](https://docs.rs/ribir_dev_helper) crate provides useful macros for testing. See its documentation for details.
+
 ---
 
 ## 🚀 Pull Request Process
@@ -48,7 +52,7 @@ Ribir uses pixel-matching tests to ensure UI rendering remains correct.
 1.  **Format and Lint**: Before committing, please run `./tools/ci.rs lint` to ensure your code matches the project style and passes static analysis.
 2.  **Add Tests**: If you're adding a new feature or fixing a bug, please include corresponding tests.
 3.  **Update Documentation**: Update `README.md` or relevant files in `docs/` if your change affects the public API or environment variables.
-4.  **Versioning**: Prior to version 1.0, we do not strictly adhere to SemVer. For details on our versioning policy and release process, please refer to [RELEASE.md](./RELEASE.md). Version numbers are managed via GitHub Actions.
+4.  **Versioning**: Prior to version 1.0, we do not strictly adhere to SemVer. For details on our versioning policy and release process, please refer to [Release Strategy](dev-docs/release-system/00-release-strategy.md). Version numbers are managed via GitHub Actions.
 5.  **Review**: PRs require sign-off from at least one core developer before they can be merged.
 
 ---

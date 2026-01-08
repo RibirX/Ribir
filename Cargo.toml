@@ -14,6 +14,24 @@ members = [
   "dev-helper",
   "examples/*",
   "cli",
+  "tools/ribir-bot",
+]
+# Default members to build when running `cargo build` without `-p`.
+# tools/* are excluded from default builds.
+default-members = [
+  "core",
+  "gpu",
+  "painter",
+  "macros",
+  "algo",
+  "widgets",
+  "ribir",
+  "themes/*",
+  "geom",
+  "tests",
+  "dev-helper",
+  "examples/*",
+  "cli",
 ]
 resolver = "2"
 
@@ -24,6 +42,8 @@ debug = true
 lto = true
 strip = true
 codegen-units = 1
+opt-level = "z"
+
 
 [workspace.package]
 authors = ["RibirX<Adoo@outlook.com>"]
@@ -103,7 +123,3 @@ tauri-utils = "2.8.*"
 serde-value = "0.7.0"
 serde_with = "3.14.0"
 toml = "0.9.*"
-
-[workspace.metadata.release]
-shared-version = true
-tag = false

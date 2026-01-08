@@ -33,7 +33,8 @@ module.exports = {
     "geom",
     "examples",
     "deps",
-    "dev-helper"
+    "dev-helper",
+    "tools"
   ],
   "types": {
     "build": {

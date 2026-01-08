@@ -172,7 +172,7 @@ Ribir is [MIT-licensed](./LICENSE)
 
 [Website]: https://ribir.org
 [Changelog]: ./CHANGELOG.md
-[Releases]: ./RELEASE.md
+[Releases]: ./dev-docs/release-system/00-release-strategy.md
 [Roadmap]: ./ROADMAP.md
 [Flutter]: https://flutter.dev/
 [QML]: https://doc.qt.io/qt-6/qtqml-index.html

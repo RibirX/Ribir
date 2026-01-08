@@ -1,0 +1,157 @@
+name: RC Bot
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  rc-bot:
+    # Filter: Only respond to @ribir-bot release-* commands
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '@ribir-bot') && contains(github.event.comment.body, 'release-')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Handle Event
+        id: event
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get event details for checkout
+          PR_NUMBER="${{ github.event.issue.number }}"
+
+          # Get branch info
+          BRANCH=$(gh pr view $PR_NUMBER --repo ${{ github.repository }} --json headRefName -q '.headRefName')
+          BASE=$(gh pr view $PR_NUMBER --repo ${{ github.repository }} --json baseRefName -q '.baseRefName')
+
+          # Validate RC PR
+          if [[ "$BASE" != "master" ]] || [[ ! "$BRANCH" =~ ^release-[0-9]+\.[0-9]+\.x$ ]]; then
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "❌ Not an RC PR"
+            exit 0
+          fi
+
+          echo "should_run=true" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v4
+        if: steps.event.outputs.should_run == 'true'
+        with:
+          ref: ${{ steps.event.outputs.branch }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Install ribir-bot
+        if: steps.event.outputs.should_run == 'true'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: ribir-bot@0.1
+
+      - name: Parse Command
+        if: steps.event.outputs.should_run == 'true'
+        id: cmd
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Parse command from comment
+          ribir-bot workflow handle-event \
+            --dispatch-pr "${{ steps.event.outputs.pr_number }}" \
+            --dispatch-command "" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Post Help
+        if: steps.event.outputs.should_run == 'true' && steps.cmd.outputs.show_help == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ribir-bot workflow post-help \
+            --pr "${{ steps.event.outputs.pr_number }}" --bot rc
+
+      # ========================================
+      # Release Highlights / Social Card
+      # ========================================
+      - uses: ./.github/actions/setup-gemini
+        if: steps.event.outputs.should_run == 'true' && steps.cmd.outputs.command != 'release-stable'
+
+      - name: Run RC Command (highlights/social-card)
+        if: steps.event.outputs.should_run == 'true' && steps.cmd.outputs.command != 'release-stable' && steps.cmd.outputs.should_run == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          COMMAND="${{ steps.cmd.outputs.command }}"
+          SUBCMD=$(echo "$COMMAND" | sed 's/release-//')
+          CONTEXT="${{ steps.cmd.outputs.context }}"
+
+          if [ -n "$CONTEXT" ] && [ "$SUBCMD" = "highlights" ]; then
+            ribir-bot release "$SUBCMD" --context "$CONTEXT"
+          else
+            ribir-bot release "$SUBCMD"
+          fi
+
+
+      - name: Check Mergeability
+        if: steps.cmd.outputs.command == 'release-stable'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          MERGEABLE=$(gh pr view ${{ steps.event.outputs.pr_number }} --repo ${{ github.repository }} --json mergeable -q '.mergeable')
+          if [ "$MERGEABLE" != "MERGEABLE" ]; then
+            echo "❌ PR is not mergeable (Status: $MERGEABLE). Release aborted."
+            gh pr comment ${{ steps.event.outputs.pr_number }} --body "❌ @${{ github.event.comment.user.login }} The release was aborted because the PR is not mergeable (Status: $MERGEABLE). Please resolve any conflicts or wait for checks to pass."
+            exit 1
+          fi
+
+      # ========================================
+      # Release Stable
+      # ========================================
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.cmd.outputs.command == 'release-stable'
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.cmd.outputs.command == 'release-stable'
+
+      - name: Install system dependencies
+        if: steps.cmd.outputs.command == 'release-stable'
+        run: sudo apt-get update && sudo apt-get install -y libwebp-dev libasound2-dev pkg-config
+
+      - name: Install cargo-workspaces
+        if: steps.cmd.outputs.command == 'release-stable'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-workspaces
+
+      - name: Release Stable
+        if: steps.cmd.outputs.command == 'release-stable'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          ribir-bot release stable --execute
+
+      - name: Post Release Summary
+        if: steps.cmd.outputs.command == 'release-stable'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ steps.event.outputs.branch }}"
+          PR_NUMBER="${{ steps.event.outputs.pr_number }}"
+          VERSION=$(echo "$BRANCH" | sed -E 's/release-([0-9]+)\.([0-9]+)\.x/\1.\2.0/')
+
+          gh pr comment $PR_NUMBER --body "## 🎉 Stable Release Published
+
+          **Version:** v$VERSION
+          **Release:** https://github.com/${{ github.repository }}/releases/tag/v$VERSION
+
+          The release branch has been merged to master.
+
+          ---
+          🤖 Published by ribir-bot"

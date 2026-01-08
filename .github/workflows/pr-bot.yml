@@ -1,0 +1,88 @@
+name: PR Bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to process"
+        required: false
+        default: ""
+
+jobs:
+  pr-bot:
+    # Filter: PR events (non-dependabot, targeting master) or @ribir-bot comments (excluding release-* commands)
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.base.ref == 'master') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@ribir-bot') && !contains(github.event.comment.body, 'release-')) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install ribir-bot
+        uses: taiki-e/install-action@v2
+        with:
+          tool: ribir-bot@0.1
+
+      - uses: ./.github/actions/setup-gemini
+
+      - name: Handle Event
+        id: event
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ribir-bot workflow handle-event \
+            --dispatch-pr "${{ github.event.inputs.pr_number }}" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Post Help
+        if: steps.event.outputs.show_help == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ribir-bot workflow post-help \
+            --pr "${{ github.event.issue.number }}" --bot pr
+
+      - name: Run PR Command
+        if: steps.event.outputs.should_run == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          COMMAND="${{ steps.event.outputs.command }}"
+          PR_ID="${{ steps.event.outputs.pr_id }}"
+          CONTEXT="${{ steps.event.outputs.context }}"
+
+          if [ -z "$COMMAND" ] || [ -z "$PR_ID" ]; then
+            echo "Missing required outputs: command/pr_id" >&2
+            exit 1
+          fi
+
+          case "$COMMAND" in
+            "pr-fill")    CMD=(pr fill) ;;
+            "pr-regen")   CMD=(pr regen) ;;
+            "pr-summary") CMD=(pr summary) ;;
+            "pr-entry")   CMD=(pr entry) ;;
+            *)
+              echo "Unknown or disallowed command: $COMMAND" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ -n "$CONTEXT" ]; then
+            ribir-bot "${CMD[@]}" "$PR_ID" --context "$CONTEXT"
+          else
+            ribir-bot "${CMD[@]}" "$PR_ID"
+          fi
