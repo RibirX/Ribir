@@ -13,8 +13,7 @@ members = [
   "tests",
   "dev-helper",
   "examples/*",
-  "cli",
-  "tools/ribir-bot",
+  "tools/*",
 ]
 # Default members to build when running `cargo build` without `-p`.
 # tools/* are excluded from default builds.
@@ -31,7 +30,6 @@ default-members = [
   "tests",
   "dev-helper",
   "examples/*",
-  "cli",
 ]
 resolver = "2"
 
@@ -118,8 +116,3 @@ thiserror = "2.0.12"
 wasm-bindgen-futures = "0.4.50"
 getrandom-v3 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 cfg-if = "1.0"
-tauri-bundler = "2.7.*"
-tauri-utils = "2.8.*"
-serde-value = "0.7.0"
-serde_with = "3.14.0"
-toml = "0.9.*"
