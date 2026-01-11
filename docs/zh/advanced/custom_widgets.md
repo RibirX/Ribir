@@ -24,7 +24,7 @@ sidebar_position: 1
 ```rust no_run
 use ribir::prelude::*;
 
-#[derive(Declare)]
+#[declare]
 pub struct DocWelcomeCard;
 
 impl Compose for DocWelcomeCard {
@@ -61,7 +61,7 @@ fn main() {
 ```rust no_run
 use ribir::prelude::*;
 
-#[derive(Declare)]
+#[declare]
 pub struct DocUserCard {
     name: String,
     email: String,
@@ -220,7 +220,7 @@ enum ContentType {
     Number(i32),
 }
 
-#[derive(Declare)]
+#[declare]
 struct MyWidget;
 
 impl<'a> ComposeChild<'a> for MyWidget {
@@ -266,7 +266,7 @@ struct StructTemplate {
     c: Option<TypeC>,
 }
 
-#[derive(Declare)]
+#[declare]
 struct MyContainer;
 
 impl ComposeChild<'static> for MyContainer {
@@ -395,7 +395,7 @@ use ribir::prelude::*;
 
 // 这是一个简单的示例 - 更复杂的 Render Widget 将
 // 实现自定义布局和绘制逻辑
-#[derive(Declare)]
+#[declare]
 pub struct DocCustomShape {
     #[declare(default)]
     color: Color,

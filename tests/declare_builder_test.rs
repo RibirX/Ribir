@@ -4,12 +4,12 @@ use ribir::{core::reset_test_env, prelude::*};
 fn declarer_smoke() {
   reset_test_env!();
   // empty struct
-  #[derive(Declare)]
+  #[declare]
   struct A;
 
   let _: FatObj<A> = A::declarer().finish();
 
-  #[derive(Declare)]
+  #[declare]
   struct B {
     a: f32,
     b: i32,
@@ -23,10 +23,49 @@ fn declarer_smoke() {
 }
 
 #[test]
+fn declare_attr_with_args() {
+  reset_test_env!();
+  #[declare(validate)]
+  struct T {
+    a: f32,
+  }
+
+  impl T {
+    fn declare_validate(self) -> Result<Self, String> {
+      if self.a > 0. { Ok(self) } else { Err("a must > 0".to_string()) }
+    }
+  }
+
+  let mut t = T::declarer();
+  t.with_a(1.);
+  let _ = t.finish();
+}
+
+#[test]
+#[should_panic = "Validation failed"]
+fn declare_attr_validate_panic() {
+  reset_test_env!();
+  #[declare(validate)]
+  struct T {
+    a: f32,
+  }
+
+  impl T {
+    fn declare_validate(self) -> Result<Self, String> {
+      if self.a > 0. { Ok(self) } else { Err("a must > 0".to_string()) }
+    }
+  }
+
+  let mut t = T::declarer();
+  t.with_a(-1.);
+  let _ = t.finish();
+}
+
+#[test]
 #[should_panic = "Required field `T::a` not set"]
 fn panic_if_miss_require_field() {
   reset_test_env!();
-  #[derive(Declare)]
+  #[declare]
   struct T {
     a: f32,
   }
@@ -38,7 +77,7 @@ fn panic_if_miss_require_field() {
 
 fn default_field() {
   reset_test_env!();
-  #[derive(Declare)]
+  #[declare]
   struct DefaultDeclare {
     #[declare(default)]
     a: f32,
@@ -52,7 +91,7 @@ fn default_field() {
 
 fn default_field_with_value() {
   reset_test_env!();
-  #[derive(Declare)]
+  #[declare]
   struct DefaultWithValue {
     #[declare(default = "hi!")]
     text: &'static str,
@@ -76,4 +115,50 @@ fn declarer_simple_attr() {
   let s = s.finish();
   assert_eq!(s.read().a, 1.);
   assert_eq!(s.read().b, 1);
+}
+
+#[test]
+fn unified_declare_simple() {
+  reset_test_env!();
+  #[declare(simple)]
+  struct Simple {
+    a: f32,
+    b: i32,
+  }
+
+  let mut s = Simple::declarer();
+  s.with_a(1.).with_b(1);
+  let s = s.finish();
+  assert_eq!(s.read().a, 1.);
+  assert_eq!(s.read().b, 1);
+}
+
+#[test]
+fn unified_declare_stateless() {
+  reset_test_env!();
+  #[declare(simple, stateless)]
+  struct Stateless {
+    a: f32,
+  }
+
+  let mut s = Stateless::declarer();
+  s.with_a(1.);
+  let s: Stateless = s.finish();
+  assert_eq!(s.a, 1.);
+}
+
+#[test]
+fn unified_declare_full_stateless() {
+  reset_test_env!();
+  #[declare(stateless)]
+  struct FullStateless {
+    a: f32,
+  }
+
+  let mut s = FullStateless::declarer();
+  s.with_a(1.);
+  let mut s = s.finish();
+  // s should be FatObj<FullStateless>
+  assert_eq!(s.a, 1.);
+  let _ = s.with_margin(EdgeInsets::all(10.));
 }

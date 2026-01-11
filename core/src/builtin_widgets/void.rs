@@ -15,7 +15,7 @@ use crate::prelude::*;
 ///   @Void {}
 /// };
 /// ```
-#[derive(Declare)]
+#[declare]
 pub struct Void;
 
 impl Render for Void {

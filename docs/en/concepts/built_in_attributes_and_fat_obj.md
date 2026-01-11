@@ -14,16 +14,18 @@ When you use the `@` syntax (e.g., `@Text { ... }`) in `fn_widget!`, Ribir perfo
 2.  **Initialize Fields**: For each field specified in the `{ ... }` block, it calls the corresponding `with_xxx()` method on the builder (e.g., `with_text(...)`).
 3.  **Finish Construction**: Finally, it calls the builder's `finish()` method (builder implements `ObjDeclarer` trait), to complete the construction and return the declared widget.
 
-### What `#[derive(Declare)]` Does
+### `#[declare]` Options
 
-To support the process above, the `#[derive(Declare)]` macro automatically generates the necessary code for your widget:
-*   It creates a **Builder struct** (e.g., `TextBuilder` for `Text`).
-*   It implements the **`Declare` trait** for your widget, linking it to the builder.
-*   It generates **`with_xxx` methods** for each field, allowing you to set values fluently.
-*   It implements **`ObjDeclarer`** for the builder, which handles the final build step `finish()` and returns `FatObj<Stateful<T>>` (where `T` is the type of the widget being built).
-*   It also generates a convenient macro for simple use. For example, after defining `Text` with `#[derive(Declare)]`, it also generates the `text! { ... }` macro, which is essentially equivalent to `fn_widget! { @Text { ... } }` within `fn_widget!`. Note that since it is generated through `fn_widget!`, this approach makes it essentially a function that is lazy. If you create it via `@text! {}` instead of `@Text {}`, you cannot access the `Text`'s attributes externally.
+The `#[declare]` macro supports several options to customize its behavior:
 
-**Note**: Ribir also provides the `#[simple_declare]` macro, which generates a simplified Builder for your Widget that eventually returns `T`. This is suitable for Widgets that do not require built-in attributes or complex state management.
+- **Default**: Generates a full builder that returns `FatObj<Stateful<T>>`, enabling all built-in attributes and reactive state.
+- **`#[declare(stateless)]`**: Generates a full builder that returns `FatObj<T>`. Supports built-in attributes, but the widget itself is not stateful.
+- **`#[declare(simple)]`**: Generates a simplified builder that returns `Stateful<T>` (or `T` if it has no fields). This is suitable for widgets that don't need built-in attributes.
+- **`#[declare(simple, stateless)]`**: Similar to `simple`, but always returns the plain object `T`.
+- **`#[declare(validate)]`**: Enables the `declare_validate` method for the widget.
+
+> [!NOTE]
+> `#[simple_declare]` is now deprecated in favor of `#[declare(simple)]`.
 
 ## What is FatObj?
 
@@ -135,9 +137,9 @@ These attributes are used to handle user interactions. All event callbacks recei
 
 ### Scenario 1: Declaring a New Widget
 
-In most cases, widgets are defined with the `#[derive(Declare)]` macro. This means you can directly use built-in attributes when declaring a widget using the `@` syntax.
+In most cases, widgets are defined with the `#[declare]` macro. This means you can directly use built-in attributes when declaring a widget using the `@` syntax.
 
-For example, the `Text` widget itself does not contain `margin` or `background` fields, but through the `#[derive(Declare)]` and `FatObj` mechanism, you can use them directly during declaration:
+For example, the `Text` widget itself does not contain `margin` or `background` fields, but through the `#[declare]` and `FatObj` mechanism, you can use them directly during declaration:
 
 ```rust no_run
 use ribir::prelude::*;

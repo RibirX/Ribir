@@ -28,7 +28,7 @@ To create a custom `Compose` widget, you need to:
 ```rust no_run
 use ribir::prelude::*;
 
-#[derive(Declare)]
+#[declare]
 pub struct DocWelcomeCard;
 
 impl Compose for DocWelcomeCard {
@@ -66,7 +66,7 @@ You can add properties to your custom widget by adding fields to your struct. Th
 ```rust no_run
 use ribir::prelude::*;
 
-#[derive(Declare)]
+#[declare]
 pub struct DocUserCard {
     name: String,
     email: String,
@@ -227,7 +227,7 @@ enum ContentType {
     Number(i32),
 }
 
-#[derive(Declare)]
+#[declare]
 struct MyWidget;
 
 impl<'a> ComposeChild<'a> for MyWidget {
@@ -273,7 +273,7 @@ struct StructTemplate {
     c: Option<TypeC>,
 }
 
-#[derive(Declare)]
+#[declare]
 struct MyContainer;
 
 impl ComposeChild<'static> for MyContainer {
@@ -404,7 +404,7 @@ use ribir::prelude::*;
 
 // This is a simple example - more complex Render widgets would
 // implement custom layout and painting logic
-#[derive(Declare)]
+#[declare]
 pub struct DocCustomShape {
     #[declare(default)]
     color: Color,

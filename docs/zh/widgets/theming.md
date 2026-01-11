@@ -100,7 +100,7 @@ class_names! {
 在您 Widget 的 `compose` 方法中，使用这些类名应用来自当前主题的样式。
 
 ```rust ignore
-#[derive(Declare)]
+#[declare]
 pub struct MyCard;
 
 impl Compose for MyCard {

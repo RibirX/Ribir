@@ -106,7 +106,7 @@ fn keep_icon() -> Widget<'static> {
   .into_widget()
 }
 
-#[derive(Declare)]
+#[declare]
 pub(crate) struct WindowBar {}
 
 impl Compose for WindowBar {

@@ -152,7 +152,7 @@ When your expression is a struct literal, `rdl!` creates objects using the `Decl
 ```rust
 use ribir::prelude::*;
 
-#[derive(Declare)]
+#[declare]
 pub struct Counter {
   #[declare(default = 1usize)]
   count: usize,

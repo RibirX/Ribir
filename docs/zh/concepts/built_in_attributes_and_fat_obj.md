@@ -14,17 +14,18 @@ Ribir 提供了一个强大的内置属性系统，让您可以为任何 Widget 
 2.  **初始化字段**: 对于 `{ ... }` 块中指定的每个字段，调用 Builder 上相应的 `with_xxx()` 方法（例如 `with_text(...)`）。
 3.  **完成构建**: 最后，调用 Builder 的 `finish()` 方法（Builder 实现了 `ObjDeclarer` trait）来完成构建并返回已声明的 Widget。
 
-### `#[derive(Declare)]` 的作用
+### `#[declare]` 选项
 
-为了支持上述过程，`#[derive(Declare)]` 宏会自动为您的 Widget 生成必要的代码：
-*   它创建了一个 **Builder 结构体**（例如 `Text` 的 `TextBuilder`）。
-*   它为您的 Widget 实现了 **`Declare` trait**，将其与构建器关联。
-*   它生成了 **`with_xxx` 方法**，让您可以流畅地设置值。
-*   它为 Builder 实现了 **`ObjDeclarer`**，这处理了最终的构建步骤 `finish()` 并返回 `FatObj<Stateful<T>>`（其中 `T` 是正在构建的 Widget 类型）。
+`#[declare]` 宏支持多项选项来自定义其行为：
 
-*   它还会生成一个方便的宏以便简单使用。例如，在用 `#[derive(Declare)]` 定义 `Text` 之后，它还会生成 `text! { ... }` 宏，这在 `fn_widget!` 中相当于 `fn_widget! { @Text { ... } }`。注意因为它是通过 `fn_widget!` 生成的，这个宏在语义上是一个惰性的函数。如果你用 `@text! {}` 而不是 `@Text {}`，就无法在外部访问 `Text` 的结构字段。
+- **默认**: 生成一个完整的 Builder，返回 `FatObj<Stateful<T>>`，启用所有内置属性和响应式状态。
+- **`#[declare(stateless)]`**: 生成一个完整的 Builder，返回 `FatObj<T>`。支持内置属性，但 Widget 本身不是有状态的。
+- **`#[declare(simple)]`**: 生成一个简化的 Builder，返回 `Stateful<T>`（如果 struct 没有字段则返回 `T`）。这适用于不需要内置属性的 Widget。
+- **`#[declare(simple, stateless)]`**: 与 `simple` 类似，但始终返回原始对象 `T`。
+- **`#[declare(validate)]`**: 为 Widget 启用 `declare_validate` 验证方法。
 
-**注意**: Ribir 还提供了 `#[simple_declare]` 宏，该宏会为您的 Widget 生成一个简化的 Builder，该 Builder 最终将返回 `T`。这适用于不需要内置属性或复杂状态管理的简单 Widget。
+> [!NOTE]
+> `#[simple_declare]` 现在已被废弃，推荐使用 `#[declare(simple)]`。
 
 ## 什么是 FatObj？
 
@@ -134,9 +135,9 @@ Ribir 提供了一个强大的内置属性系统，让您可以为任何 Widget 
 
 ### 场景 1: 声明一个新 Widget
 
-在大多数情况下，widgets 都是用 `#[derive(Declare)]` 宏定义的。这意味着您可以在使用 `@` 语法声明 Widget 时，直接使用内置属性。
+在大多数情况下，widgets 都是用 `#[declare]` 宏定义的。这意味着您可以在使用 `@` 语法声明 Widget 时，直接使用内置属性。
 
-例如，`Text` 组件本身并不包含 `margin` 或 `background` 字段，但通过 `#[derive(Declare)]` 和 `FatObj` 机制，您可以在声明时直接使用它们：
+例如，`Text` 组件本身并不包含 `margin` 或 `background` 字段，但通过 `#[declare]` 和 `FatObj` 机制，您可以在声明时直接使用它们：
 
 ```rust no_run
 use ribir::prelude::*;

@@ -1,6 +1,6 @@
 use ribir::{core::reset_test_env, prelude::*};
 
-#[derive(Declare)]
+#[declare]
 struct P;
 
 struct ChildA;
@@ -24,7 +24,7 @@ impl ComposeChild<'static> for P {
   }
 }
 
-#[derive(Declare)]
+#[declare]
 struct P2;
 
 #[allow(dead_code)]
@@ -39,7 +39,7 @@ impl ComposeChild<'static> for P2 {
   }
 }
 
-#[derive(Declare)]
+#[declare]
 struct P3;
 
 #[derive(Template)]

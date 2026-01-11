@@ -42,7 +42,7 @@ impl Render for MyCustomPainter {
 ```rust no_run
 use ribir::prelude::*;
 
-#[derive(Declare)]
+#[declare]
 pub struct WelcomeCard;
 
 impl Compose for WelcomeCard {

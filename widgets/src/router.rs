@@ -68,7 +68,7 @@ use smallvec::SmallVec;
 /// instead of rebuilding on navigation, wrap content with [`ReuseId`] in
 /// appropriate scopes.
 
-#[derive(Declare)]
+#[declare]
 pub struct Router {
   #[declare(default)]
   routes: Vec<Route>,

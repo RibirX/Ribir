@@ -4,7 +4,7 @@ use crate::{LayerArea, PressedLayer, md};
 
 /// Widget use to do ripple animate as a visual feedback to user interactive.
 /// Usually for touch and mouse.
-#[derive(Declare)]
+#[declare]
 pub struct Ripple {
   /// The radius in pixels of foreground ripples when fully expanded. The
   /// default radius will be the distance from the center of the ripple to the

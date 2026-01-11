@@ -9,7 +9,7 @@ use ribir_core::{prelude::*, wrap_render::WrapRender};
 /// When empty:
 /// - Sizes itself using the same factors
 /// - Defaults to 20×20 pixels if space is unconstrained or factors are invalid
-#[derive(Declare)]
+#[declare]
 pub struct FractionallySizedBox {
   #[declare(default = 1.0)]
   pub width_factor: f32,
@@ -27,7 +27,7 @@ pub struct FractionallySizedBox {
 /// When empty:
 /// - Width follows same factor rules
 /// - Height defaults to 20 pixels (subject to layout constraints)
-#[derive(Declare)]
+#[declare]
 pub struct FractionallyWidthBox {
   #[declare(default = 1.0)]
   pub factor: f32,
@@ -43,7 +43,7 @@ pub struct FractionallyWidthBox {
 /// When empty:
 /// - Height follows same factor rules
 /// - Width defaults to 20 pixels (subject to layout constraints)
-#[derive(Declare)]
+#[declare]
 pub struct FractionallyHeightBox {
   #[declare(default = 1.0)]
   pub factor: f32,

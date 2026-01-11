@@ -15,7 +15,7 @@ pub enum PomodoroState {
 
 pub const UPDATE_INTERVAL: Duration = Duration::from_millis(250);
 
-#[derive(Declare)]
+#[declare]
 pub struct Pomodoro {
   #[declare(default = PomodoroConfig::load())]
   pub config: PomodoroConfig,

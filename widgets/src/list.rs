@@ -143,7 +143,7 @@ use crate::prelude::*;
 /// - **Structural Metadata**   `ListItemStructInfo` exposes item structure for
 ///   theme class implementations
 
-#[derive(Declare)]
+#[declare]
 pub struct List {
   /// The selection mode for the list items.
   /// - `None`: No selection
@@ -213,7 +213,7 @@ class_names! {
 /// +------------------ +--------------------+---------------------+------------------+
 /// ```
 
-#[derive(Declare)]
+#[declare]
 pub struct ListItem {
   /// Controls visual feedback for user interactions without affecting selection
   /// logic. The visual effect is determined by the user's theme settings.

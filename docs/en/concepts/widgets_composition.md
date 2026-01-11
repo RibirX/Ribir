@@ -42,7 +42,7 @@ Most application-level widgets (like a `UserProfile` or `LoginForm`) implement `
 ```rust no_run
 use ribir::prelude::*;
 
-#[derive(Declare)]
+#[declare]
 pub struct WelcomeCard;
 
 impl Compose for WelcomeCard {
