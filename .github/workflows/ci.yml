@@ -147,6 +147,8 @@ jobs:
           toolchain: stable
           components: llvm-tools-preview
 
+      - uses: Swatinem/rust-cache@v2
+
       - name: Install cargo-nextest and cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
@@ -197,20 +199,6 @@ jobs:
           echo "VK_DRIVER_FILES=`cygpath --windows $PWD/mesa/lvp_icd.x86_64.json`" >> "$GITHUB_ENV"
           echo "GALLIUM_DRIVER=llvmpipe" >> "$GITHUB_ENV"
 
-      - name: (linux) install vulkan sdk
-        if: matrix.os == 'ubuntu-22.04'
-        shell: bash
-        run: |
-          set -e
-
-          sudo apt-get update -y -qq
-
-          # vulkan sdk
-          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
-          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-$VULKAN_SDK_VERSION-jammy.list https://packages.lunarg.com/vulkan/$VULKAN_SDK_VERSION/lunarg-vulkan-$VULKAN_SDK_VERSION-jammy.list
-
-          sudo apt-get update
-          sudo apt install -y vulkan-sdk
 
       - name: (linux) install mesa
         if: matrix.os == 'ubuntu-22.04'
@@ -239,11 +227,17 @@ jobs:
           echo "LD_LIBRARY_PATH=$PWD/mesa/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
           echo "LIBGL_DRIVERS_PATH=$PWD/mesa/lib/x86_64-linux-gnu/dri" >> "$GITHUB_ENV"
 
-      - name: (linux) install development libraries
+      - name: (linux) install dependencies
         if: matrix.os == 'ubuntu-22.04'
+        shell: bash
         run: |
+          set -e
+          # vulkan sdk repository
+          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-$VULKAN_SDK_VERSION-jammy.list https://packages.lunarg.com/vulkan/$VULKAN_SDK_VERSION/lunarg-vulkan-$VULKAN_SDK_VERSION-jammy.list
+
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
+          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev vulkan-sdk
 
       - name: (macos) install webp
         if: matrix.os == 'macos-14'
@@ -295,7 +289,7 @@ jobs:
         run: cargo +${{ needs.get-nightly-version.outputs.version }} ci doctest
 
   doc-and-wasm:
-    needs: [lint, test-with-gpu, get-nightly-version]
+    needs: [lint, get-nightly-version]
     name: Doc examples & WASM compile
     runs-on: ubuntu-latest
     steps:
@@ -339,7 +333,7 @@ jobs:
       nightly-version: ${{ needs.get-nightly-version.outputs.version }}
 
   bundle:
-    needs: [lint, test-with-gpu, doc-and-wasm, get-nightly-version]
+    needs: [lint, get-nightly-version]
     name: bundle
     strategy:
       fail-fast: false
@@ -379,7 +373,7 @@ jobs:
         run: cargo +${{ needs.get-nightly-version.outputs.version }} ci bundle
 
   release-dry-run:
-    needs: [test-with-gpu]
+    needs: [lint]
     name: Verify packages are publishable
     runs-on: ubuntu-latest
     steps:
