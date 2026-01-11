@@ -173,7 +173,7 @@ pub fn handle_pr_bot_event(
   let mut result = EventResult::default();
 
   match event_name {
-    "pull_request" => {
+    "pull_request" | "pull_request_target" => {
       let event: PullRequestEvent = serde_json::from_str(&event_data)?;
       let pr = &event.pull_request;
 
