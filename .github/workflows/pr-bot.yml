@@ -1,7 +1,7 @@
 name: PR Bot
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, edited]
   issue_comment:
     types: [created]
@@ -16,7 +16,7 @@ jobs:
   pr-bot:
     # Filter: PR events (non-dependabot, targeting master) or @ribir-bot comments (excluding release-* commands)
     if: |
-      (github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.base.ref == 'master') ||
+      (github.event_name == 'pull_request_target' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.base.ref == 'master') ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@ribir-bot') && !contains(github.event.comment.body, 'release-')) ||
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -42,6 +42,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # Compatibility: ribir-bot 0.1 only recognizes "pull_request" event.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request_target" ]; then
+            export GITHUB_EVENT_NAME="pull_request"
+          fi
           ribir-bot workflow handle-event \
             --dispatch-pr "${{ github.event.inputs.pr_number }}" | tee -a "$GITHUB_OUTPUT"
 
@@ -52,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           ribir-bot workflow post-help \
-            --pr "${{ github.event.issue.number }}" --bot pr
+            --pr "${{ steps.event.outputs.pr_id }}" --bot pr
 
       - name: Run PR Command
         if: steps.event.outputs.should_run == 'true'
