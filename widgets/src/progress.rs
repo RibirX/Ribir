@@ -18,7 +18,8 @@ class_names! {
 }
 
 /// The widget that shows progress along a line.
-#[derive(Declare, Clone)]
+#[declare]
+#[derive(Clone)]
 pub struct LinearProgress {
   /// there are two kind of linear progress.
   /// 1.Determinate, when the value is Some(xx).
@@ -34,7 +35,8 @@ pub struct LinearProgress {
 }
 
 /// The widget displays progress along a spinner.
-#[derive(Declare, Clone)]
+#[declare]
+#[derive(Clone)]
 pub struct SpinnerProgress {
   /// there are two kind of linear progress.
   /// 1.Determinate, when the value is Some(xx).
@@ -116,7 +118,7 @@ impl Compose for SpinnerProgress {
     .into_widget()
   }
 }
-#[derive(Declare)]
+#[declare]
 pub struct SpinnerArc {
   pub start: Angle,
   pub end: Angle,

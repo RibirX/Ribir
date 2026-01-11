@@ -887,7 +887,7 @@ mod tests {
       .into_widget()
     }
 
-    #[derive(Declare)]
+    #[declare]
     struct TaskWidget {
       trigger: u32,
       paint_cnt: Rc<Cell<u32>>,

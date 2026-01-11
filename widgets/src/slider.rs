@@ -1,5 +1,3 @@
-use std::{mem::swap, ops::Range};
-
 use ribir_core::prelude::*;
 
 use crate::prelude::*;
@@ -33,75 +31,97 @@ pub struct SliderChanged {
 
 pub type SliderChangedEvent = CustomEvent<SliderChanged>;
 /// The widget displays a slider.
-#[derive(Declare)]
+#[declare(validate)]
 pub struct Slider {
   /// The value of the slider
-  pub value: f32,
+  #[declare(setter = set_value)]
+  value: f32,
 
   /// The maximum value of the slider
-  #[declare(default = 100.)]
-  pub max: f32,
+  #[declare(default = 100., setter = set_max)]
+  max: f32,
 
   /// The minimum value of the slider
-  #[declare(default = 0.)]
-  pub min: f32,
+  #[declare(default = 0., setter = set_min)]
+  min: f32,
 
   /// The number of divisions
   ///
   /// if None, the slider will be continuous
   /// if Some(divisions), the slider will be divided into `divisions + 1` parts,
   /// and the indicator will be located to the closest division
-  #[declare(default)]
-  pub divisions: Option<usize>,
+  #[declare(default, setter = set_divisions)]
+  divisions: Option<usize>,
 }
 
 impl Slider {
-  fn set_to(&mut self, mut v: f32) {
-    v = v.clamp(0., 1.);
-    if let Some(divisions) = self.divisions
-      && divisions > 0
-    {
-      v = (v * divisions as f32).round() / (divisions as f32);
+  fn declare_validate(mut self) -> Result<Self, std::convert::Infallible> {
+    if self.min > self.max {
+      std::mem::swap(&mut self.min, &mut self.max);
     }
+    self.value = self.value.clamp(self.min, self.max);
+    if let Some(0) = self.divisions {
+      self.divisions = None;
+    }
+    self.value = self.snap_v(self.value);
+    Ok(self)
+  }
+}
 
-    self.value = (self.min + v * (self.max - self.min)).clamp(self.min, self.max);
+impl Slider {
+  pub fn value(&self) -> f32 { self.value }
+
+  pub fn max(&self) -> f32 { self.max }
+
+  pub fn min(&self) -> f32 { self.min }
+
+  pub fn divisions(&self) -> Option<usize> { self.divisions }
+
+  fn set_by_ratio(&mut self, mut v: f32) {
+    v = v.clamp(0., 1.);
+    self.value = self.snap_v(self.min + v * (self.max - self.min));
   }
 
   fn ratio(&self) -> f32 {
     if self.max == self.min {
       return 1.;
     }
-    let mut v = (self.value - self.min) / (self.max - self.min);
-    v = v.clamp(0., 1.);
-    if let Some(divisions) = self.divisions
-      && divisions > 0
-    {
-      v = (v * divisions as f32).round() / (divisions as f32)
-    }
-    v
+    ((self.value - self.min) / (self.max - self.min)).clamp(0., 1.)
   }
 
-  fn validate(&mut self) {
-    if self.max < self.min {
-      swap(&mut self.max, &mut self.min);
+  fn snap_v(&self, v: f32) -> f32 {
+    if let Some(divisions) = self.divisions
+      && self.max != self.min
+    {
+      let ratio = (v - self.min) / (self.max - self.min);
+      let ratio = (ratio * divisions as f32).round() / (divisions as f32);
+      self.min + ratio * (self.max - self.min)
+    } else {
+      v
     }
+  }
 
-    if self.value < self.min {
-      self.value = self.min;
-    }
+  pub fn set_value(&mut self, val: f32) { self.value = self.snap_v(val.clamp(self.min, self.max)); }
 
-    if self.value > self.max {
-      self.value = self.max;
-    }
+  pub fn set_max(&mut self, max: f32) {
+    self.max = max.max(self.min);
+    self.set_value(self.value);
+  }
+
+  pub fn set_min(&mut self, min: f32) {
+    self.min = min.min(self.max);
+    self.set_value(self.value);
+  }
+
+  pub fn set_divisions(&mut self, divisions: Option<usize>) {
+    self.divisions = divisions.filter(|&v| v > 0);
+    self.value = self.snap_v(self.value);
   }
 
   fn stop_indicator_track(&self) -> Option<BoxFnWidget<'static>> {
     let divisions = self.divisions?;
-    if divisions == 0 {
-      return None;
-    }
-    let active = (self.ratio() * divisions as f32) as usize;
-    Some(stop_indicator_track(divisions + 1, 0..active, vec![active]))
+    let active = (self.ratio() * divisions as f32).round() as usize;
+    Some(stop_indicator_track(divisions + 1, 0..=active, vec![active]))
   }
 }
 
@@ -112,12 +132,6 @@ fn precision(min: f32, max: f32) -> usize {
 impl Compose for Slider {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      let u = this.modifies().subscribe(move |_| {
-        let mut this = $write(this);
-        this.validate();
-        this.forget_modifies();
-      });
-
       let mut row = @Flex { align_items: Align::Center };
       let drag_info = Stateful::new(None);
       @Stack {
@@ -127,7 +141,7 @@ impl Compose for Slider {
           on_tap: move |e| {
             let width = *$read(row.layout_width());
             let old = $read(this).value;
-            $write(this).set_to(e.position().x / width);
+            $write(this).set_by_ratio(e.position().x / width);
             if old != $read(this).value {
               e.window().bubble_custom_event(e.current_target(), SliderChanged {
                 from: old,
@@ -135,7 +149,6 @@ impl Compose for Slider {
               });
             }
           },
-          on_disposed: move |_| u.unsubscribe(),
           @Expanded {
             flex: pipe!($read(this).ratio()),
             @Void { class: SLIDER_ACTIVE_TRACK }
@@ -152,7 +165,7 @@ impl Compose for Slider {
               let width = *$read(row.layout_width());
               let val = ratio + (e.global_pos().x - pos) / width;
               let old = $read(this).value;
-              $write(this).set_to(val);
+              $write(this).set_by_ratio(val);
               if old != $read(this).value {
                 e.window().bubble_custom_event(e.current_target(), SliderChanged {
                   from: old,
@@ -183,121 +196,147 @@ impl Compose for Slider {
 }
 
 /// A widget that display a range slider.
-#[derive(Declare)]
+#[declare(validate)]
 pub struct RangeSlider {
   /// The start value of the range slider
-  pub start: f32,
+  #[declare(setter = set_start)]
+  start: f32,
 
   /// The end value of the range slider
-  pub end: f32,
+  #[declare(setter = set_end)]
+  end: f32,
 
   /// The maximum value of the range slider
-  #[declare(default = 100.)]
-  pub max: f32,
+  #[declare(default = 100., setter = set_max)]
+  max: f32,
 
   /// The minimum value of the range slider
-  #[declare(default = 0.)]
-  pub min: f32,
+  #[declare(default = 0., setter = set_min)]
+  min: f32,
 
   /// The number of divisions
   ///
   /// if None, the slider will be continuous
   /// if Some(divisions), the slider will be divided into `divisions + 1` parts,
   /// and the indicator will be located to the closest division
-  #[declare(default)]
-  pub divisions: Option<usize>,
+  #[declare(default, setter = set_divisions)]
+  divisions: Option<usize>,
 }
 
 impl RangeSlider {
-  fn set_ratio(&mut self, mut ratio: f32) {
+  fn declare_validate(mut self) -> Result<Self, std::convert::Infallible> {
+    if self.min > self.max {
+      std::mem::swap(&mut self.min, &mut self.max);
+    }
+    self.start = self.start.clamp(self.min, self.max);
+    self.end = self.end.clamp(self.min, self.max);
+    if self.start > self.end {
+      std::mem::swap(&mut self.start, &mut self.end);
+    }
+    if let Some(0) = self.divisions {
+      self.divisions = None;
+    }
+    self.start = self.snap_v(self.start);
+    self.end = self.snap_v(self.end);
+    Ok(self)
+  }
+}
+
+impl RangeSlider {
+  pub fn start(&self) -> f32 { self.start }
+
+  pub fn end(&self) -> f32 { self.end }
+
+  pub fn max(&self) -> f32 { self.max }
+
+  pub fn min(&self) -> f32 { self.min }
+
+  pub fn divisions(&self) -> Option<usize> { self.divisions }
+
+  fn set_by_ratio(&mut self, mut ratio: f32) {
     ratio = ratio.clamp(0., 1.);
-    let val = self.convert_ratio(ratio);
+    let val = self.snap_v(self.convert_ratio(ratio));
     if (self.start - val).abs() < (self.end - val).abs() {
-      self.start = val;
+      self.set_start(val);
     } else {
-      self.end = val;
+      self.set_end(val);
     }
   }
 
   fn set_start_ratio(&mut self, ratio: f32) {
-    self.start = self
-      .convert_ratio(ratio)
-      .min(self.end)
-      .max(self.min);
+    let val = self.convert_ratio(ratio.clamp(0., 1.));
+    self.set_start(val);
   }
 
   fn set_end_ratio(&mut self, ratio: f32) {
-    self.end = self
-      .convert_ratio(ratio)
-      .max(self.start)
-      .min(self.max);
+    let val = self.convert_ratio(ratio.clamp(0., 1.));
+    self.set_end(val);
   }
 
-  fn convert_ratio(&self, mut ratio: f32) -> f32 {
-    if let Some(divisions) = self.divisions
-      && divisions > 1
-    {
-      ratio = (ratio * divisions as f32).round() / (divisions as f32);
-    }
-    self.min + ratio * (self.max - self.min)
-  }
+  fn convert_ratio(&self, ratio: f32) -> f32 { self.min + ratio * (self.max - self.min) }
 
   fn ratio(&self, v: f32) -> f32 {
     if self.max == self.min {
       return 1.;
     }
-    let mut v = (v - self.min) / (self.max - self.min);
-    v = v.clamp(0., 1.);
-    if let Some(divisions) = self.divisions
-      && divisions > 0
-    {
-      v = (v * divisions as f32).round() / (divisions as f32);
-    }
-    v
+    ((v - self.min) / (self.max - self.min)).clamp(0., 1.)
   }
 
   fn start_ratio(&self) -> f32 { self.ratio(self.start) }
 
   fn end_ratio(&self) -> f32 { self.ratio(self.end) }
 
-  fn validate(&mut self) {
-    if self.max < self.min {
-      swap(&mut self.max, &mut self.min);
+  fn snap_v(&self, v: f32) -> f32 {
+    if let Some(divisions) = self.divisions
+      && self.max != self.min
+    {
+      let ratio = (v - self.min) / (self.max - self.min);
+      let ratio = (ratio * divisions as f32).round() / (divisions as f32);
+      self.min + ratio * (self.max - self.min)
+    } else {
+      v
     }
+  }
 
-    if self.start > self.end {
-      swap(&mut self.start, &mut self.end);
-    }
+  pub fn set_start(&mut self, start: f32) {
+    self.start = self.snap_v(start.clamp(self.min, self.end));
+  }
 
-    if self.start < self.min {
-      self.start = self.min;
-    }
+  pub fn set_end(&mut self, end: f32) { self.end = self.snap_v(end.clamp(self.start, self.max)); }
 
-    if self.end > self.max {
-      self.end = self.max;
-    }
+  pub fn set_max(&mut self, max: f32) {
+    self.max = max.max(self.min);
+    self.end = self.end.min(self.max);
+    self.start = self.start.min(self.end);
+    self.start = self.snap_v(self.start);
+    self.end = self.snap_v(self.end);
+  }
+
+  pub fn set_min(&mut self, min: f32) {
+    self.min = min.min(self.max);
+    self.start = self.start.max(self.min);
+    self.end = self.end.max(self.start);
+    self.start = self.snap_v(self.start);
+    self.end = self.snap_v(self.end);
+  }
+
+  pub fn set_divisions(&mut self, divisions: Option<usize>) {
+    self.divisions = divisions.filter(|&v| v > 0);
+    self.start = self.snap_v(self.start);
+    self.end = self.snap_v(self.end);
   }
 
   fn stop_indicator_track(&self) -> Option<BoxFnWidget<'static>> {
     let divisions = self.divisions?;
-    if divisions == 0 {
-      return None;
-    }
-    let start = (self.start_ratio() * divisions as f32) as usize;
-    let end = (self.end_ratio() * divisions as f32) as usize;
-    Some(stop_indicator_track(divisions + 1, start..end + 1, vec![start, end]))
+    let start = (self.start_ratio() * divisions as f32).round() as usize;
+    let end = (self.end_ratio() * divisions as f32).round() as usize;
+    Some(stop_indicator_track(divisions + 1, start..=end, vec![start, end]))
   }
 }
 
 impl Compose for RangeSlider {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      let u = this.modifies().subscribe(move |_| {
-        let mut this = $write(this);
-        this.validate();
-        this.forget_modifies();
-      });
-
       let mut row = @Flex { align_items: Align::Center };
       let drag_info1 = Stateful::new(None);
       let drag_info2 = Stateful::new(None);
@@ -307,9 +346,8 @@ impl Compose for RangeSlider {
           v_align: VAlign::Center,
           on_tap: move |e| {
             let width = *$read(row.layout_width());
-            $write(this).set_ratio(e.position().x / width);
+            $write(this).set_by_ratio(e.position().x / width);
           },
-          on_disposed: move |_| u.unsubscribe(),
           @Expanded {
             flex: pipe!($read(this).start_ratio()),
             @Void { class: RANGE_SLIDER_INACTIVE_TRACK_LEFT }
@@ -378,7 +416,7 @@ impl Compose for RangeSlider {
 }
 
 fn stop_indicator_track(
-  cnt: usize, actives: Range<usize>, filter: Vec<usize>,
+  cnt: usize, actives: std::ops::RangeInclusive<usize>, filter: Vec<usize>,
 ) -> BoxFnWidget<'static> {
   fn_widget!(
     let stop_builder = move |i| {
@@ -400,12 +438,12 @@ fn stop_indicator_track(
     };
 
     @IgnorePointer {
-        @(flex) {
-          v_align: VAlign::Center,
-          opacity: pipe!($read(last.layout_rect()).max_x() <= *$read(flex.layout_width()) + 0.001)
-            .map(|v| if v { 1. } else { 0. }),
-          @ {(0..cnt-1).map(stop_builder)}
-          @{ last }
+      @(flex) {
+        v_align: VAlign::Center,
+        opacity: pipe!($read(last.layout_rect()).max_x() <= *$read(flex.layout_width()) + 0.001)
+          .map(|v| if v { 1. } else { 0. }),
+        @ {(0..cnt-1).map(stop_builder)}
+        @{ last }
       }
     }
   )
@@ -433,4 +471,148 @@ mod tests {
     .with_wnd_size(Size::new(300., 200.))
     .with_comparison(0.0002)
   );
+
+  #[test]
+  fn slider_divisions_calibration() {
+    let mut slider = Slider { value: 50., min: 0., max: 100., divisions: Some(0) };
+    slider.set_divisions(Some(0));
+    assert_eq!(slider.divisions(), None);
+
+    slider.set_value(50.5);
+    assert_eq!(slider.value(), 50.5); // Continuous
+
+    slider.set_divisions(Some(10));
+    assert_eq!(slider.divisions(), Some(10));
+    slider.set_value(32.);
+    assert!((slider.value() - 30.).abs() < 1e-5); // Snapped
+  }
+
+  #[test]
+  fn slider_min_max_clamping() {
+    let mut slider = Slider { value: 50., min: 0., max: 100., divisions: None };
+    slider.set_min(150.);
+    assert_eq!(slider.min(), 100.);
+    assert_eq!(slider.max(), 100.);
+
+    slider.set_max(50.);
+    assert_eq!(slider.min(), 100.);
+    assert_eq!(slider.max(), 100.);
+
+    slider.set_min(0.);
+    assert_eq!(slider.min(), 0.);
+    assert_eq!(slider.max(), 100.);
+  }
+
+  #[test]
+  fn range_slider_behavior() {
+    let mut range = RangeSlider { start: 10., end: 90., min: 0., max: 100., divisions: Some(10) };
+    range.set_start(95.);
+    assert!((range.start() - 90.).abs() < 1e-5); // Clamped by end (90)
+
+    range.set_min(120.);
+    assert!((range.min() - 100.).abs() < 1e-5);
+    assert!((range.start() - 100.).abs() < 1e-5);
+    assert!((range.end() - 100.).abs() < 1e-5);
+  }
+
+  #[test]
+  fn slider_declare_validate() {
+    reset_test_env!();
+    // 1. Min > Max -> Swap
+    let mut builder = Slider::declarer();
+    builder.with_value(0.).with_min(100.).with_max(0.);
+    let slider = builder.finish();
+    assert_eq!(slider.read().min, 0.);
+    assert_eq!(slider.read().max, 100.);
+
+    // 2. Value out of range -> Clamp
+    let mut builder = Slider::declarer();
+    builder.with_value(150.).with_max(100.);
+    let slider = builder.finish();
+    assert_eq!(slider.read().value, 100.);
+
+    let mut builder = Slider::declarer();
+    builder.with_value(-50.).with_min(0.);
+    let slider = builder.finish();
+    assert_eq!(slider.read().value, 0.);
+
+    // 3. Divisions: Some(0) -> None
+    let mut builder = Slider::declarer();
+    builder.with_value(0.).with_divisions(Some(0));
+    let slider = builder.finish();
+    assert_eq!(slider.read().divisions, None);
+
+    // 4. Value snapping
+    let mut builder = Slider::declarer();
+    builder
+      .with_min(0.)
+      .with_max(10.)
+      .with_divisions(Some(2))
+      .with_value(3.);
+    let slider = builder.finish();
+    assert_eq!(slider.read().value, 5.);
+
+    let mut builder = Slider::declarer();
+    builder
+      .with_min(0.)
+      .with_max(10.)
+      .with_divisions(Some(2))
+      .with_value(2.);
+    let slider = builder.finish();
+    assert_eq!(slider.read().value, 0.);
+  }
+
+  #[test]
+  fn range_slider_declare_validate() {
+    reset_test_env!();
+    // 1. Min > Max -> Swap
+    let mut builder = RangeSlider::declarer();
+    builder
+      .with_start(0.)
+      .with_end(0.)
+      .with_min(100.)
+      .with_max(0.);
+    let range = builder.finish();
+    assert_eq!(range.read().min, 0.);
+    assert_eq!(range.read().max, 100.);
+
+    // 2. Start/End out of range -> Clamp
+    let mut builder = RangeSlider::declarer();
+    builder
+      .with_start(-10.)
+      .with_end(110.)
+      .with_min(0.)
+      .with_max(100.);
+    let range = builder.finish();
+    assert_eq!(range.read().start, 0.);
+    assert_eq!(range.read().end, 100.);
+
+    // 3. Start > End -> Swap
+    let mut builder = RangeSlider::declarer();
+    builder.with_start(80.).with_end(20.);
+    let range = builder.finish();
+    assert_eq!(range.read().start, 20.);
+    assert_eq!(range.read().end, 80.);
+
+    // 4. Divisions: Some(0) -> None
+    let mut builder = RangeSlider::declarer();
+    builder
+      .with_start(0.)
+      .with_end(0.)
+      .with_divisions(Some(0));
+    let range = builder.finish();
+    assert_eq!(range.read().divisions, None);
+
+    // 5. Snapping
+    let mut builder = RangeSlider::declarer();
+    builder
+      .with_min(0.)
+      .with_max(100.)
+      .with_divisions(Some(4))
+      .with_start(12.)
+      .with_end(88.);
+    let range = builder.finish();
+    assert_eq!(range.read().start, 0.);
+    assert_eq!(range.read().end, 100.);
+  }
 }

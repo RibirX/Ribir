@@ -12,7 +12,7 @@ pub enum PointerSelectData {
 pub type PointerSelectEvent = CustomEvent<PointerSelectData>;
 
 /// A Widget that extends Widget to emit SelectRegionEvent
-#[derive(Declare)]
+#[declare]
 pub struct PointerSelectRegion {}
 
 fn notify_select_changed(wid: WidgetId, e: PointerSelectData, wnd: &Window) {

@@ -26,7 +26,7 @@ fn main() {
 
 要实例化一个 Widget，请使用 `@` 符号后跟 Widget 的类型名称。属性在花括号 `{}` 内使用标准的 Rust 结构初始化语法 `key: value` 定义。
 
-当 `@` 直接跟随一个类型时，它会调用相应的 Builder 来构造对象。这个 Builder 通常由 `#[derive(Declare)]` 宏生成，从而支持内置属性的使用。我们将在 [内置属性和 FatObj](./built_in_attributes_and_fat_obj.md) 部分详细探讨这一机制。
+当 `@` 直接跟随一个类型时，它会调用相应的 Builder 来构造对象。这个 Builder 通常由 `#[declare]` 宏生成，从而支持内置属性的使用。我们将在 [内置属性和 FatObj](./built_in_attributes_and_fat_obj.md) 部分详细探讨这一机制。
 
 **重要**: `@` 运算符是 **DSL 专用的**，只在支持 Ribir DSL 语法的宏中有效，如 `fn_widget!` 和 `rdl!`。在这些宏之外，该运算符不是有效的 Rust 语法，如果在常规 Rust 代码或第三方宏中使用，将导致编译错误。
 

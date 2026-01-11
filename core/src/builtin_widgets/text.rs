@@ -33,7 +33,7 @@ pub type TextValue = PipeValue<CowArc<str>>;
 ///   }
 /// };
 /// ```
-#[derive(Declare)]
+#[declare]
 pub struct Text {
   /// The text content to display, using copy-on-write semantics for efficient
   /// string handling
@@ -124,7 +124,7 @@ impl Text {
 
 macro_rules! define_text_with_theme_style {
   ($name:ident, $style:ident) => {
-    #[derive(Declare)]
+    #[declare]
     pub struct $name {
       pub text: CowArc<str>,
     }

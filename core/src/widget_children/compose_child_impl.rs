@@ -223,7 +223,7 @@ mod tests {
     }
   }
 
-  #[derive(Declare)]
+  #[declare]
   struct XX;
 
   impl<'c> ComposeChild<'c> for XX {
@@ -246,7 +246,7 @@ mod tests {
     };
   }
 
-  #[derive(Declare)]
+  #[declare]
   struct PipeParent;
 
   impl ComposeChild<'static> for PipeParent {
@@ -278,7 +278,7 @@ mod tests {
       Text(TextValue),
     }
 
-    #[derive(Declare)]
+    #[declare]
     struct EnumTest {}
 
     impl ComposeChild<'static> for EnumTest {

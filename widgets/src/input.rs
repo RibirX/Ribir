@@ -47,7 +47,7 @@ class_names!(
 /// };
 /// App::run(w);
 /// ```
-#[derive(Declare)]
+#[declare]
 pub struct Input {
   #[declare(skip)]
   basic: BasicEditor<InputText>,
@@ -82,7 +82,7 @@ impl Input {
 
 /// The `TextArea` struct is a widget that represents a text input field
 /// that displays multiple lines of text. for single line text, use `[Input]`
-#[derive(Declare)]
+#[declare]
 pub struct TextArea {
   /// if true, the text will be auto wrap when the text is too long
   #[declare(default = true)]

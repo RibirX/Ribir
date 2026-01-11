@@ -47,7 +47,7 @@ class_names! {
 ///   @Trailing::new("Trailing label placed after the radio button!")
 /// };
 /// ```
-#[derive(Declare)]
+#[declare]
 pub struct Radio {
   #[declare(default)]
   pub selected: bool,

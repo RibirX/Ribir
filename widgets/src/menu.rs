@@ -79,7 +79,7 @@ pub type MenuEvent = CustomEvent<MenuEventData>;
 /// };
 /// App::run(w);
 /// ```
-#[derive(Declare)]
+#[declare]
 pub struct Menu {}
 
 /// the controller of the popup menu

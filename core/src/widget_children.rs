@@ -45,7 +45,7 @@ pub trait MultiChild: Sized {
 /// ```rust
 /// use ribir::prelude::*;
 ///
-/// #[derive(Declare)]
+/// #[declare]
 /// struct RedBackground;
 ///
 /// impl<'c> ComposeChild<'c> for RedBackground {
@@ -71,7 +71,7 @@ pub trait MultiChild: Sized {
 /// ```rust
 /// use ribir::prelude::*;
 ///
-/// #[derive(Declare)]
+/// #[declare]
 /// struct Dashboard;
 ///
 /// // Header, Content, and Footer just for example here.
@@ -191,7 +191,7 @@ pub trait IntoWidgetIter<'w, K: ?Sized> {
 ///   label: CowArc<str>,
 /// }
 ///
-/// #[derive(Declare)]
+/// #[declare]
 /// struct MyButton;
 ///
 /// impl ComposeChild<'static> for MyButton {
@@ -211,7 +211,7 @@ pub trait IntoWidgetIter<'w, K: ?Sized> {
 /// ```rust
 /// use ribir::prelude::*;
 ///
-/// #[derive(Declare)]
+/// #[declare]
 /// struct ArticleCard;
 ///
 /// impl ComposeChild<'static> for ArticleCard {
@@ -453,7 +453,7 @@ mod tests {
   #[allow(dead_code)]
   fn compose_template_child() {
     reset_test_env!();
-    #[derive(Declare)]
+    #[declare]
     struct Page;
 
     #[derive(Template)]
@@ -494,7 +494,7 @@ mod tests {
   fn compose_option_child() {
     reset_test_env!();
 
-    #[derive(Declare)]
+    #[declare]
     struct Parent;
     struct Child;
 
@@ -528,9 +528,9 @@ mod tests {
   fn tuple_as_vec() {
     reset_test_env!();
 
-    #[derive(Declare)]
+    #[declare]
     struct A;
-    #[derive(Declare)]
+    #[declare]
     struct B;
 
     impl ComposeChild<'static> for A {
@@ -631,7 +631,7 @@ mod tests {
   pub struct ConfigTml {
     _field: Option<Field>,
   }
-  #[derive(Declare)]
+  #[declare]
   struct Host {}
 
   impl ComposeChild<'static> for Host {
@@ -659,7 +659,7 @@ mod tests {
       child: Widget<'static>,
     }
 
-    #[derive(Declare)]
+    #[declare]
     struct X;
 
     impl ComposeChild<'static> for X {

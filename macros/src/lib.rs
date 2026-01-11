@@ -2,7 +2,7 @@
 
 extern crate proc_macro;
 
-mod declare_derive;
+mod declare_macro;
 mod dollar_macro;
 mod lerp_derive;
 mod part_state;
@@ -15,7 +15,6 @@ mod child_template;
 mod fn_widget_macro;
 mod pipe_macro;
 mod rdl_macro;
-mod simple_declare_attr;
 mod watch_macro;
 pub(crate) use rdl_macro::*;
 pub(crate) mod declare_obj;
@@ -70,7 +69,24 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Declare, attributes(declare))]
 pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
   let mut stt = parse_macro_input!(input as syn::ItemStruct);
-  declare_derive::declare_derive(&mut stt)
+  declare_macro::declare_macro(&mut stt, false)
+    .unwrap_or_else(|e| e.into_compile_error())
+    .into()
+}
+
+/// Macro attribute to implement the `Declare` trait and build a `FatObj<T>`.
+/// This is the preferred way to implement the `Declare` trait.
+#[proc_macro_attribute]
+pub fn declare(attr: TokenStream, item: TokenStream) -> TokenStream {
+  let mut stt = parse_macro_input!(item as syn::ItemStruct);
+  if !attr.is_empty() {
+    let attr: proc_macro2::TokenStream = attr.into();
+    stt
+      .attrs
+      .push(syn::parse_quote! { #[declare(#attr)] });
+  }
+
+  declare_macro::declare_macro(&mut stt, true)
     .unwrap_or_else(|e| e.into_compile_error())
     .into()
 }
@@ -80,9 +96,16 @@ pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
 /// init the field.
 #[proc_macro_attribute]
 pub fn simple_declare(attr: TokenStream, item: TokenStream) -> TokenStream {
-  let mut input = parse_macro_input!(item as syn::ItemStruct);
-  let stateless = syn::parse::<syn::Ident>(attr).is_ok_and(|i| i == "stateless");
-  simple_declare_attr::simple_declarer_attr(&mut input, stateless)
+  let mut stt = parse_macro_input!(item as syn::ItemStruct);
+  let mut extra = vec![];
+  if syn::parse::<syn::Ident>(attr.clone()).is_ok_and(|i| i == "stateless") {
+    extra.push(quote! { stateless });
+  }
+  stt
+    .attrs
+    .push(syn::parse_quote! { #[declare(simple, #(#extra),*)] });
+
+  declare_macro::declare_macro(&mut stt, true)
     .unwrap_or_else(|e| e.into_compile_error())
     .into()
 }

@@ -2,7 +2,7 @@ use ribir_core::{impl_compose_child_for_wrap_render, prelude::*, wrap_render::Wr
 
 /// A widget that constrains its children to a certain size, the size as
 /// characters laid out to rows * columns based on text style metrics.
-#[derive(Declare)]
+#[declare]
 pub struct TextClamp {
   /// If rows is Some(rows), the height of the child will be constrained to
   /// rows * text_style.line_height

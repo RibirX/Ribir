@@ -100,7 +100,7 @@ class_names! {
 In your widget's `compose` method, use these class names to apply styles from the current theme.
 
 ```rust ignore
-#[derive(Declare)]
+#[declare]
 pub struct MyCard;
 
 impl Compose for MyCard {
