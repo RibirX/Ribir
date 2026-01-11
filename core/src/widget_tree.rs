@@ -313,7 +313,7 @@ impl DirtyMarker {
   pub(crate) fn is_dirty(&self, id: WidgetId) -> bool { self.0.borrow().contains_key(&id) }
 }
 
-#[simple_declare]
+#[declare(simple)]
 #[derive(MultiChild)]
 pub(crate) struct Root;
 

@@ -54,18 +54,15 @@ pub fn lerp_derive(input: TokenStream) -> TokenStream {
 }
 
 /// Macro to implement the `Declare` trait and build a `FatObj<T>`.
-/// To know how to use it see the [`declare` mod document](declare)
 ///
-/// This macro implement a `XXXBuilder` struct with same field type for `XXX`
-/// widget, then
+/// This is an alternative to the `#[declare]` attribute macro.
+/// Use this when you prefer running the macro as a derive, for example, to
+/// coexist with other macros that might conflict with attribute macros.
 ///
-/// - implement `Declare` for `XXX`  mark `XXXBuilder` as its builder type.
-/// - implement `ObjDeclarer` for `XXXBuilder` which build `XXX` and used by
-///   `declare!` to build the `XXX` widget.
-/// - for every field of `XXXBuilder`
-///   - implement method with same name of the field and use to init the field.
+/// For a detailed tutorial, see the `declare` module documentation in the core
+/// crate.
 ///
-/// [declare]: ../ribir/declare/index.html
+/// [declare]: ../ribir_core/declare/index.html
 #[proc_macro_derive(Declare, attributes(declare))]
 pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
   let mut stt = parse_macro_input!(input as syn::ItemStruct);
@@ -76,6 +73,9 @@ pub fn declare_trait_macro_derive(input: TokenStream) -> TokenStream {
 
 /// Macro attribute to implement the `Declare` trait and build a `FatObj<T>`.
 /// This is the preferred way to implement the `Declare` trait.
+///
+/// See the `declare` module documentation in the core crate for a full
+/// tutorial.
 #[proc_macro_attribute]
 pub fn declare(attr: TokenStream, item: TokenStream) -> TokenStream {
   let mut stt = parse_macro_input!(item as syn::ItemStruct);
@@ -85,25 +85,6 @@ pub fn declare(attr: TokenStream, item: TokenStream) -> TokenStream {
       .attrs
       .push(syn::parse_quote! { #[declare(#attr)] });
   }
-
-  declare_macro::declare_macro(&mut stt, true)
-    .unwrap_or_else(|e| e.into_compile_error())
-    .into()
-}
-
-/// Macro attribute implement the `Declare` trait with that only build a
-/// `State<T>` that not extend any built-in ability, and not support `pipe!` to
-/// init the field.
-#[proc_macro_attribute]
-pub fn simple_declare(attr: TokenStream, item: TokenStream) -> TokenStream {
-  let mut stt = parse_macro_input!(item as syn::ItemStruct);
-  let mut extra = vec![];
-  if syn::parse::<syn::Ident>(attr.clone()).is_ok_and(|i| i == "stateless") {
-    extra.push(quote! { stateless });
-  }
-  stt
-    .attrs
-    .push(syn::parse_quote! { #[declare(simple, #(#extra),*)] });
 
   declare_macro::declare_macro(&mut stt, true)
     .unwrap_or_else(|e| e.into_compile_error())

@@ -24,7 +24,7 @@ pub struct Stack {
 /// This widget is used to control the layout behavior of its child within a
 /// `Stack`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-#[simple_declare]
+#[declare(simple)]
 pub struct InParentLayout;
 
 /// This macro is use to generate a function widget that using

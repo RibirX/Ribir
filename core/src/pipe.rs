@@ -50,6 +50,18 @@ impl<V: 'static> Pipe<V> {
     Pipe { subscribe_info: info, observable }
   }
 
+  /// Creates a new Pipe from a `StateWatcher`.
+  ///
+  /// The pipe will emit the initial value of the watcher and then emit new
+  /// values whenever the watcher modifies.
+  pub fn from_watcher<W>(writer: W) -> Self
+  where
+    W: StateWatcher<Value = V> + 'static,
+    V: Clone,
+  {
+    pipe!((*$read(writer)).clone())
+  }
+
   /// Sets the modification effect filter for this pipe.
   ///
   /// Only modifications matching this effect will trigger updates.

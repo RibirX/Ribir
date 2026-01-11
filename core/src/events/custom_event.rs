@@ -8,9 +8,9 @@ use crate::prelude::*;
 /// [`Window.bubble_custom_event`].
 ///
 /// To listen to the custom event, you can register the event handler to a
-/// specific custom event by [`on_custom_concrete_event`], or register a handler
+/// specific custom event by [`on_custom`], or register a handler
 /// to [`RawCustomEvent`] and downcast it to the specific type as you want by
-/// [`on_custom_event`].
+/// [`on_raw_custom`].
 pub struct CustomEvent<E: ?Sized> {
   pub(crate) common: CommonEvent,
   pub(crate) data: Box<dyn Any>,
@@ -86,7 +86,7 @@ mod tests {
     let w = fn_widget! {
       @MockBox {
         size: Size::new(100., 100.),
-        on_custom_event: move |e: &mut RawCustomEvent| {
+        on_raw_custom: move |e: &mut RawCustomEvent| {
           if let Some(e) = e.downcast_mut() {
             *$write(w_parent_data) = Some(*e.data());
           }
@@ -96,7 +96,7 @@ mod tests {
           on_mounted: move |e| {
             e.window().bubble_custom_event(e.widget_id(), MyCustomData(1));
           },
-          on_custom_concrete_event: move |e: &mut MyCustomEvent| {
+          on_custom: move |e: &mut MyCustomEvent| {
             *$write(w_self_data) = Some(*e.data());
           }
         }
