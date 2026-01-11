@@ -8,6 +8,15 @@ pub enum PointerSelectData {
   End { from: Point, to: Point },
 }
 
+impl PointerSelectData {
+  pub fn endpoints(&self) -> (Point, Point) {
+    match self {
+      PointerSelectData::Start(p) => (*p, *p),
+      PointerSelectData::Move { from, to } | PointerSelectData::End { from, to } => (*from, *to),
+    }
+  }
+}
+
 /// region select event
 pub type PointerSelectEvent = CustomEvent<PointerSelectData>;
 

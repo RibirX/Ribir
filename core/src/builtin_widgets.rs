@@ -560,16 +560,16 @@ impl<T> FatObj<T> {
 
   /// Attaches a handler to the specific custom event that is bubbled from the
   /// descendants.
-  pub fn on_custom_concrete_event<E: 'static>(
+  pub fn on_custom<E: 'static>(
     &mut self, f: impl FnMut(&mut CustomEvent<E>) + 'static,
   ) -> &mut Self {
-    on_mixin!(self, on_custom_concrete_event, f)
+    on_mixin!(self, on_custom, f)
   }
 
   /// Attaches a handler to raw custom event that is bubbled from the
   /// descendants.
-  pub fn on_custom_event(&mut self, f: impl FnMut(&mut RawCustomEvent) + 'static) -> &mut Self {
-    on_mixin!(self, on_custom_event, f)
+  pub fn on_raw_custom(&mut self, f: impl FnMut(&mut RawCustomEvent) + 'static) -> &mut Self {
+    on_mixin!(self, on_raw_custom, f)
   }
 
   /// Attaches a handler to the widget that is triggered during the capture

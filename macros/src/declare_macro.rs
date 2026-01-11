@@ -127,24 +127,47 @@ fn gen_set_methods(declarer: &Declarer) -> TokenStream {
         }
       } else {
         // Full & Stateful
-        if f.is_strict() {
+        let (generic, v_ty, v_val) = match (f.event_meta(), f.is_strict()) {
+          (Some(_), true) => (quote!(), quote!(TwoWayValue<#ty>), quote!(v)),
+          (Some(_), false) => {
+            (quote!(<_K: ?Sized>), quote!(impl RInto<TwoWayValue<#ty>, _K>), quote!(v.r_into()))
+          }
+          (None, true) => (quote!(), quote!(#ty), quote!(PipeValue::Value(v))),
+          (None, false) => {
+            (quote!(<_K: ?Sized>), quote!(impl RInto<PipeValue<#ty>, _K>), quote!(v.r_into()))
+          }
+        };
+
+        let set_logic = if let Some(event_meta) = f.event_meta() {
+          let event_type = &event_meta.event_type;
+          let convert_expr = event_meta.gen_convert_expr(ty);
           quote! {
-            #[inline] #doc
-            #vis fn #set_method(&mut self, v: #ty) -> &mut Self {
-              self.#field_name = Some(PipeValue::Value(v));
-              self
+            match #v_val {
+              TwoWayValue::Pipe(pipe_value) => {
+                self.#field_name = Some(pipe_value);
+              }
+              TwoWayValue::TwoWay(writer) => {
+                let pipe = Pipe::from_watcher(writer.clone_watcher());
+                self.#field_name = Some(PipeValue::Pipe {
+                  init_value: writer.read().clone(),
+                  pipe
+                });
+                // Bind event handler to write back
+                self.on_custom::<#event_type>(move |e: &mut CustomEvent<#event_type>| {
+                  #convert_expr
+                });
+              }
             }
           }
         } else {
-          quote! {
-            #[inline] #[allow(clippy::type_complexity)] #doc
-            #vis fn #set_method<_K: ?Sized>(
-              &mut self,
-              v: impl RInto<PipeValue<#ty>, _K>
-            ) -> &mut Self {
-              self.#field_name = Some(v.r_into());
-              self
-            }
+          quote! { self.#field_name = Some(#v_val); }
+        };
+
+        quote! {
+          #[inline] #[allow(clippy::type_complexity)] #doc
+          #vis fn #set_method #generic (&mut self, v: #v_ty) -> &mut Self {
+            #set_logic
+            self
           }
         }
       }
@@ -254,7 +277,7 @@ pub struct Declarer<'a> {
   pub name: Ident,
   pub fields: Vec<DeclareField<'a>>,
   pub original: &'a syn::ItemStruct,
-  pub validate: bool,
+  pub validate: Option<Ident>,
   pub simple: bool,
   pub stateless: bool,
 }
@@ -263,15 +286,18 @@ impl<'a> Declarer<'a> {
   pub fn new(item_stt: &'a mut syn::ItemStruct) -> Result<Self> {
     let host = &item_stt.ident;
     let name = Ident::new(&format!("{host}Declarer"), host.span());
-    let mut validate = false;
+    let mut validate = None;
     let mut simple = false;
     let mut stateless = false;
     item_stt.attrs.retain(|attr| {
       if attr.path().is_ident(DECLARE_ATTR)
         && let Ok(attr) = attr.parse_args::<DeclareAttr>()
       {
-        if attr.validate.is_some() {
-          validate = true;
+        if let Some(v) = attr.validate {
+          validate = Some(
+            v.method_name
+              .unwrap_or_else(|| Ident::new("declare_validate", v.validate_kw.span())),
+          );
         }
         if attr.simple.is_some() {
           simple = true;
@@ -289,8 +315,8 @@ impl<'a> Declarer<'a> {
       (&*ptr, &mut *ptr)
     };
     let fields = match &mut item_stt.fields {
-      Fields::Named(named) => collect_fields(named.named.iter_mut()),
-      Fields::Unnamed(unnamed) => collect_fields(unnamed.unnamed.iter_mut()),
+      Fields::Named(named) => collect_fields(named.named.iter_mut())?,
+      Fields::Unnamed(unnamed) => collect_fields(unnamed.unnamed.iter_mut())?,
       Fields::Unit => vec![],
     };
 
@@ -326,8 +352,8 @@ impl<'a> Declarer<'a> {
       Fields::Unnamed(_) => quote!(#host(#(#values),*)),
       Fields::Unit => quote!(#host),
     };
-    if self.validate {
-      quote! { #finish_obj.declare_validate().expect("Validation failed") }
+    if let Some(validate) = self.validate.as_ref() {
+      quote! { #finish_obj.#validate().expect("Validation failed") }
     } else {
       finish_obj
     }
@@ -396,27 +422,44 @@ impl<'a> DeclareField<'a> {
       .and_then(|attr| attr.setter.as_ref())
       .and_then(|meta| meta.ty.as_ref())
   }
+
+  /// Returns event metadata if this field has `event = on_xxx(EventType)`
+  /// attribute
+  pub fn event_meta(&self) -> Option<&EventMeta> {
+    self
+      .attr
+      .as_ref()
+      .and_then(|attr| attr.event.as_ref())
+  }
 }
 
-fn collect_fields<'a>(fields: impl Iterator<Item = &'a mut syn::Field>) -> Vec<DeclareField<'a>> {
+fn collect_fields<'a>(
+  fields: impl Iterator<Item = &'a mut syn::Field>,
+) -> Result<Vec<DeclareField<'a>>> {
   fields
     .enumerate()
     .map(|(idx, f)| {
       if f.ident.is_none() {
         f.ident = Some(Ident::new(&format!("v_{idx}"), f.span()))
       }
-      DeclareField { attr: take_build_attr(f), field: f }
+      Ok(DeclareField { attr: take_build_attr(f)?, field: f })
     })
     .collect()
 }
 
-fn take_build_attr(field: &mut syn::Field) -> Option<DeclareAttr> {
+fn take_build_attr(field: &mut syn::Field) -> Result<Option<DeclareAttr>> {
   let idx = field
     .attrs
     .iter()
     .position(|attr| matches!(&attr.meta, syn::Meta::List(l) if l.path.is_ident(DECLARE_ATTR)));
 
-  field.attrs.remove(idx?).parse_args().ok()
+  match idx {
+    Some(idx) => {
+      let attr = field.attrs.remove(idx);
+      Ok(Some(attr.parse_args()?))
+    }
+    None => Ok(None),
+  }
 }
 
 mod kw {
@@ -429,6 +472,58 @@ mod kw {
   custom_keyword!(validate);
   custom_keyword!(simple);
   custom_keyword!(stateless);
+  custom_keyword!(event);
+}
+
+pub(crate) struct ValidateMeta {
+  pub(crate) validate_kw: kw::validate,
+  pub(crate) method_name: Option<Ident>,
+}
+
+impl Parse for ValidateMeta {
+  fn parse(input: syn::parse::ParseStream) -> Result<Self> {
+    let validate_kw = input.parse()?;
+    let method_name = if input.peek(syn::Token![=]) {
+      let _: syn::Token![=] = input.parse()?;
+      Some(input.parse()?)
+    } else {
+      None
+    };
+    Ok(Self { validate_kw, method_name })
+  }
+}
+
+/// Event metadata supporting three syntaxes:
+/// - `event = Type` (use Into trait)
+/// - `event = Type.field` or `event = Type.a.b` (field path)
+/// - `event = Type.method()` or `event = Type.a.method()` (method call with
+///   optional chain)
+pub(crate) struct EventMeta {
+  /// The event type (e.g., `SliderChanged`)
+  pub(crate) event_type: syn::Type,
+  /// The conversion expression chain after the type (e.g., `.to` or
+  /// `.extract()`) None means use Into trait directly
+  pub(crate) convert_chain: Option<TokenStream>,
+}
+
+impl EventMeta {
+  /// Generate the conversion expression for TwoWay binding
+  pub(crate) fn gen_convert_expr(&self, field_ty: &syn::Type) -> TokenStream {
+    if let Some(chain) = &self.convert_chain {
+      // Type.field or Type.method() syntax
+      quote! {
+        let v: Option<#field_ty> = e.data()#chain.into();
+        if let Some(v) = v {
+          *writer.write() = v;
+        }
+      }
+    } else {
+      // Type syntax - use Into trait
+      quote! {
+        *writer.write() = e.data().clone().into();
+      }
+    }
+  }
 }
 
 #[allow(dead_code)]
@@ -454,9 +549,11 @@ pub(crate) struct DeclareAttr {
   pub(crate) strict: Option<kw::strict>,
   // Setter binding: `setter = method_name` or `setter = method_name(Type)`
   pub(crate) setter: Option<SetterMeta>,
-  pub(crate) validate: Option<kw::validate>,
+  pub(crate) validate: Option<ValidateMeta>,
   pub(crate) simple: Option<kw::simple>,
   pub(crate) stateless: Option<kw::stateless>,
+  // Event binding: `event = Type` or `event = Type.field` or `event = Type.method()`
+  pub(crate) event: Option<EventMeta>,
 }
 
 impl Parse for DeclareAttr {
@@ -481,6 +578,10 @@ impl Parse for DeclareAttr {
         attr.simple = Some(input.parse()?);
       } else if lookahead.peek(kw::stateless) {
         attr.stateless = Some(input.parse()?);
+      } else if lookahead.peek(kw::event) {
+        let _: kw::event = input.parse()?;
+        let _: syn::Token![=] = input.parse()?;
+        attr.event = Some(input.parse()?);
       } else {
         return Err(lookahead.error());
       }
@@ -517,6 +618,41 @@ impl Parse for SetterMeta {
       None
     };
     Ok(Self { setter_kw: kw, eq_token: eq, method_name: method, ty })
+  }
+}
+
+impl Parse for EventMeta {
+  fn parse(input: syn::parse::ParseStream) -> Result<Self> {
+    // Parse the event type first
+    let event_type: syn::Type = input.parse()?;
+
+    // Check if there's a dot-chain following
+    let convert_chain = if input.peek(syn::Token![.]) {
+      let mut tokens = TokenStream::new();
+
+      // Parse the entire chain: .field.field2.method()
+      while input.peek(syn::Token![.]) {
+        let dot: syn::Token![.] = input.parse()?;
+        dot.to_tokens(&mut tokens);
+
+        let ident: Ident = input.parse()?;
+        ident.to_tokens(&mut tokens);
+
+        // Check for method call parentheses
+        if input.peek(syn::token::Paren) {
+          let content;
+          let paren = syn::parenthesized!(content in input);
+          let inner: TokenStream = content.parse()?;
+          paren.surround(&mut tokens, |t| inner.to_tokens(t));
+        }
+      }
+
+      Some(tokens)
+    } else {
+      None
+    };
+
+    Ok(Self { event_type, convert_chain })
   }
 }
 

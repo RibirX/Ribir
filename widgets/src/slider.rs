@@ -30,11 +30,105 @@ pub struct SliderChanged {
 }
 
 pub type SliderChangedEvent = CustomEvent<SliderChanged>;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RangeSliderValue {
+  pub start: f32,
+  pub end: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct RangeSliderChanged {
+  pub from: RangeSliderValue,
+  pub to: RangeSliderValue,
+}
+
+pub type RangeSliderChangedEvent = CustomEvent<RangeSliderChanged>;
+
+trait SliderCore {
+  fn min(&self) -> f32;
+  fn max(&self) -> f32;
+  fn divisions(&self) -> Option<usize>;
+
+  fn snap_v(&self, v: f32) -> f32 {
+    let (min, max) = (self.min(), self.max());
+    let v = v.clamp(min.min(max), min.max(max));
+    if let Some(divisions) = self.divisions()
+      && max != min
+    {
+      let ratio = (v - min) / (max - min);
+      let ratio = (ratio * divisions as f32).round() / (divisions as f32);
+      min + ratio * (max - min)
+    } else {
+      v
+    }
+  }
+
+  fn calc_ratio(&self, v: f32) -> f32 {
+    let (min, max) = (self.min(), self.max());
+    if max == min { 1. } else { ((v - min) / (max - min)).clamp(0., 1.) }
+  }
+
+  fn convert_ratio(&self, ratio: f32) -> f32 {
+    self.min() + ratio.clamp(0., 1.) * (self.max() - self.min())
+  }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum RangeSliderPart {
+  Start,
+  End,
+}
+
+fn slider_update<E: std::ops::Deref<Target = CommonEvent>>(
+  this: &impl StateWriter<Value = Slider>, e: &E, ratio: f32,
+) {
+  let mut this = this.write();
+  let from = this.value;
+  this.set_by_ratio(ratio);
+  let to = this.value;
+  if from != to {
+    e.window()
+      .bubble_custom_event(e.target(), SliderChanged { from, to });
+  }
+}
+
+fn range_slider_update<E: std::ops::Deref<Target = CommonEvent>>(
+  this: &impl StateWriter<Value = RangeSlider>, e: &E, ratio: f32, part: RangeSliderPart,
+) {
+  let from = this.read().value();
+  {
+    let mut writer = this.write();
+    match part {
+      RangeSliderPart::Start => writer.set_start_ratio(ratio),
+      RangeSliderPart::End => writer.set_end_ratio(ratio),
+    }
+  }
+  let to = this.read().value();
+  if from != to {
+    e.window()
+      .bubble_custom_event(e.target(), RangeSliderChanged { from, to });
+  }
+}
+
+fn slider_core_validate(min: &mut f32, max: &mut f32, divisions: &mut Option<usize>) {
+  if *min > *max {
+    std::mem::swap(min, max);
+  }
+  if let Some(0) = *divisions {
+    *divisions = None;
+  }
+}
+
+fn slider_tooltip(min: f32, max: f32, val: f32) -> String {
+  let precision = ((max - min).log10().floor() - 2.).min(-2.).abs() as usize;
+  format!("{:.1$}", val, precision)
+}
 /// The widget displays a slider.
 #[declare(validate)]
 pub struct Slider {
   /// The value of the slider
-  #[declare(setter = set_value)]
+  #[declare(setter = set_value, event = SliderChanged.to)]
   value: f32,
 
   /// The maximum value of the slider
@@ -56,16 +150,16 @@ pub struct Slider {
 
 impl Slider {
   fn declare_validate(mut self) -> Result<Self, std::convert::Infallible> {
-    if self.min > self.max {
-      std::mem::swap(&mut self.min, &mut self.max);
-    }
-    self.value = self.value.clamp(self.min, self.max);
-    if let Some(0) = self.divisions {
-      self.divisions = None;
-    }
-    self.value = self.snap_v(self.value);
+    slider_core_validate(&mut self.min, &mut self.max, &mut self.divisions);
+    self.set_value(self.value);
     Ok(self)
   }
+}
+
+impl SliderCore for Slider {
+  fn min(&self) -> f32 { self.min }
+  fn max(&self) -> f32 { self.max }
+  fn divisions(&self) -> Option<usize> { self.divisions }
 }
 
 impl Slider {
@@ -77,31 +171,11 @@ impl Slider {
 
   pub fn divisions(&self) -> Option<usize> { self.divisions }
 
-  fn set_by_ratio(&mut self, mut v: f32) {
-    v = v.clamp(0., 1.);
-    self.value = self.snap_v(self.min + v * (self.max - self.min));
-  }
+  fn set_by_ratio(&mut self, ratio: f32) { self.set_value(self.convert_ratio(ratio)); }
 
-  fn ratio(&self) -> f32 {
-    if self.max == self.min {
-      return 1.;
-    }
-    ((self.value - self.min) / (self.max - self.min)).clamp(0., 1.)
-  }
+  fn ratio(&self) -> f32 { self.calc_ratio(self.value) }
 
-  fn snap_v(&self, v: f32) -> f32 {
-    if let Some(divisions) = self.divisions
-      && self.max != self.min
-    {
-      let ratio = (v - self.min) / (self.max - self.min);
-      let ratio = (ratio * divisions as f32).round() / (divisions as f32);
-      self.min + ratio * (self.max - self.min)
-    } else {
-      v
-    }
-  }
-
-  pub fn set_value(&mut self, val: f32) { self.value = self.snap_v(val.clamp(self.min, self.max)); }
+  pub fn set_value(&mut self, val: f32) { self.value = self.snap_v(val); }
 
   pub fn set_max(&mut self, max: f32) {
     self.max = max.max(self.min);
@@ -115,7 +189,7 @@ impl Slider {
 
   pub fn set_divisions(&mut self, divisions: Option<usize>) {
     self.divisions = divisions.filter(|&v| v > 0);
-    self.value = self.snap_v(self.value);
+    self.set_value(self.value);
   }
 
   fn stop_indicator_track(&self) -> Option<BoxFnWidget<'static>> {
@@ -125,70 +199,40 @@ impl Slider {
   }
 }
 
-fn precision(min: f32, max: f32) -> usize {
-  ((max - min).log10().floor() - 2.).min(-2.).abs() as usize
-}
-
 impl Compose for Slider {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       let mut row = @Flex { align_items: Align::Center };
-      let drag_info = Stateful::new(None);
-      @Stack {
-        class: SLIDER_CONTAINER,
-        @(row) {
-          v_align: VAlign::Center,
-          on_tap: move |e| {
-            let width = *$read(row.layout_width());
-            let old = $read(this).value;
-            $write(this).set_by_ratio(e.position().x / width);
-            if old != $read(this).value {
-              e.window().bubble_custom_event(e.current_target(), SliderChanged {
-                from: old,
-                to: $read(this).value,
-              });
+      @PointerSelectRegion {
+        on_custom: move |e: &mut PointerSelectEvent| {
+          let width = *$read(row.layout_width());
+          if width > 0. {
+            let (_, to) = e.data().endpoints();
+            slider_update(&$writer(this), e, to.x / width);
+          }
+        },
+        @Stack {
+          class: SLIDER_CONTAINER,
+          @(row) {
+            v_align: VAlign::Center,
+            @Expanded {
+              flex: pipe!($read(this).ratio()),
+              @Void { class: SLIDER_ACTIVE_TRACK }
             }
-          },
-          @Expanded {
-            flex: pipe!($read(this).ratio()),
-            @Void { class: SLIDER_ACTIVE_TRACK }
+            @Void {
+              class: SLIDER_INDICATOR,
+              tooltips: pipe! {
+                let this = $read(this);
+                slider_tooltip(this.min, this.max, this.value)
+              },
+            }
+            @Expanded {
+              flex: pipe!(1. - $read(this).ratio()),
+              @Void { class: SLIDER_INACTIVE_TRACK }
+            }
           }
-          @Void {
-            class: SLIDER_INDICATOR ,
-            on_tap: move |e| e.stop_propagation(),
-            on_pointer_down: move |e| {
-              if let Some(handle) = GrabPointer::grab(e.current_target(), &e.window()) {
-                *$write(drag_info) = Some((handle, e.global_pos().x, $read(this).ratio()));
-              }
-            },
-            on_pointer_move: move|e| if let Some((_, pos, ratio)) = $read(drag_info).as_ref() {
-              let width = *$read(row.layout_width());
-              let val = ratio + (e.global_pos().x - pos) / width;
-              let old = $read(this).value;
-              $write(this).set_by_ratio(val);
-              if old != $read(this).value {
-                e.window().bubble_custom_event(e.current_target(), SliderChanged {
-                  from: old,
-                  to: $read(this).value,
-                });
-              }
-            },
-            on_pointer_up: move |_| {
-              $write(drag_info).take();
-            },
-            tooltips: pipe! {
-              let this = $read(this);
-              let precision = precision(this.min, this.max);
-              format!("{:.1$}", this.value, precision)
-            },
-          }
-          @Expanded {
-            flex: pipe!(1. - $read(this).ratio()),
-            @Void { class: SLIDER_INACTIVE_TRACK }
-          }
+          @{ pipe!($read(this).stop_indicator_track() ) }
         }
-
-        @{ pipe!($read(this).stop_indicator_track() ) }
       }
     }
     .into_widget()
@@ -199,11 +243,11 @@ impl Compose for Slider {
 #[declare(validate)]
 pub struct RangeSlider {
   /// The start value of the range slider
-  #[declare(setter = set_start)]
+  #[declare(setter = set_start, event = RangeSliderChanged.to.start)]
   start: f32,
 
   /// The end value of the range slider
-  #[declare(setter = set_end)]
+  #[declare(setter = set_end, event = RangeSliderChanged.to.end)]
   end: f32,
 
   /// The maximum value of the range slider
@@ -225,21 +269,20 @@ pub struct RangeSlider {
 
 impl RangeSlider {
   fn declare_validate(mut self) -> Result<Self, std::convert::Infallible> {
-    if self.min > self.max {
-      std::mem::swap(&mut self.min, &mut self.max);
-    }
-    self.start = self.start.clamp(self.min, self.max);
-    self.end = self.end.clamp(self.min, self.max);
+    slider_core_validate(&mut self.min, &mut self.max, &mut self.divisions);
+    self.start = self.snap_v(self.start);
+    self.end = self.snap_v(self.end);
     if self.start > self.end {
       std::mem::swap(&mut self.start, &mut self.end);
     }
-    if let Some(0) = self.divisions {
-      self.divisions = None;
-    }
-    self.start = self.snap_v(self.start);
-    self.end = self.snap_v(self.end);
     Ok(self)
   }
+}
+
+impl SliderCore for RangeSlider {
+  fn min(&self) -> f32 { self.min }
+  fn max(&self) -> f32 { self.max }
+  fn divisions(&self) -> Option<usize> { self.divisions }
 }
 
 impl RangeSlider {
@@ -253,77 +296,53 @@ impl RangeSlider {
 
   pub fn divisions(&self) -> Option<usize> { self.divisions }
 
-  fn set_by_ratio(&mut self, mut ratio: f32) {
-    ratio = ratio.clamp(0., 1.);
+  pub fn value(&self) -> RangeSliderValue { RangeSliderValue { start: self.start, end: self.end } }
+
+  fn choose_part(&self, ratio: f32) -> RangeSliderPart {
     let val = self.snap_v(self.convert_ratio(ratio));
     if (self.start - val).abs() < (self.end - val).abs() {
-      self.set_start(val);
+      RangeSliderPart::Start
+    } else if (self.start - val).abs() > (self.end - val).abs() {
+      RangeSliderPart::End
+    } else if ratio < self.start_ratio() {
+      RangeSliderPart::Start
     } else {
-      self.set_end(val);
+      RangeSliderPart::End
     }
   }
 
-  fn set_start_ratio(&mut self, ratio: f32) {
-    let val = self.convert_ratio(ratio.clamp(0., 1.));
-    self.set_start(val);
-  }
+  fn set_start_ratio(&mut self, ratio: f32) { self.set_start(self.convert_ratio(ratio)); }
 
-  fn set_end_ratio(&mut self, ratio: f32) {
-    let val = self.convert_ratio(ratio.clamp(0., 1.));
-    self.set_end(val);
-  }
+  fn set_end_ratio(&mut self, ratio: f32) { self.set_end(self.convert_ratio(ratio)); }
 
-  fn convert_ratio(&self, ratio: f32) -> f32 { self.min + ratio * (self.max - self.min) }
+  fn start_ratio(&self) -> f32 { self.calc_ratio(self.start) }
 
-  fn ratio(&self, v: f32) -> f32 {
-    if self.max == self.min {
-      return 1.;
-    }
-    ((v - self.min) / (self.max - self.min)).clamp(0., 1.)
-  }
-
-  fn start_ratio(&self) -> f32 { self.ratio(self.start) }
-
-  fn end_ratio(&self) -> f32 { self.ratio(self.end) }
-
-  fn snap_v(&self, v: f32) -> f32 {
-    if let Some(divisions) = self.divisions
-      && self.max != self.min
-    {
-      let ratio = (v - self.min) / (self.max - self.min);
-      let ratio = (ratio * divisions as f32).round() / (divisions as f32);
-      self.min + ratio * (self.max - self.min)
-    } else {
-      v
-    }
-  }
+  fn end_ratio(&self) -> f32 { self.calc_ratio(self.end) }
 
   pub fn set_start(&mut self, start: f32) {
-    self.start = self.snap_v(start.clamp(self.min, self.end));
+    self.start = self.snap_v(start.clamp(self.min, self.end.max(self.min)));
   }
 
-  pub fn set_end(&mut self, end: f32) { self.end = self.snap_v(end.clamp(self.start, self.max)); }
+  pub fn set_end(&mut self, end: f32) {
+    self.end = self.snap_v(end.clamp(self.start.min(self.max), self.max));
+  }
 
   pub fn set_max(&mut self, max: f32) {
     self.max = max.max(self.min);
-    self.end = self.end.min(self.max);
-    self.start = self.start.min(self.end);
-    self.start = self.snap_v(self.start);
-    self.end = self.snap_v(self.end);
+    self.set_end(self.end);
+    self.set_start(self.start);
   }
 
   pub fn set_min(&mut self, min: f32) {
     self.min = min.min(self.max);
-    self.start = self.start.max(self.min);
-    self.end = self.end.max(self.start);
-    self.start = self.snap_v(self.start);
-    self.end = self.snap_v(self.end);
+    self.set_start(self.start);
+    self.set_end(self.end);
   }
 
   pub fn set_divisions(&mut self, divisions: Option<usize>) {
     self.divisions = divisions.filter(|&v| v > 0);
-    self.start = self.snap_v(self.start);
-    self.end = self.snap_v(self.end);
+    self.set_start(self.start);
+    self.set_end(self.end);
   }
 
   fn stop_indicator_track(&self) -> Option<BoxFnWidget<'static>> {
@@ -338,77 +357,59 @@ impl Compose for RangeSlider {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
       let mut row = @Flex { align_items: Align::Center };
-      let drag_info1 = Stateful::new(None);
-      let drag_info2 = Stateful::new(None);
-      @Stack {
-        class: SLIDER_CONTAINER,
-        @(row) {
-          v_align: VAlign::Center,
-          on_tap: move |e| {
-            let width = *$read(row.layout_width());
-            $write(this).set_by_ratio(e.position().x / width);
-          },
-          @Expanded {
-            flex: pipe!($read(this).start_ratio()),
-            @Void { class: RANGE_SLIDER_INACTIVE_TRACK_LEFT }
+      let active_part = Stateful::new(RangeSliderPart::Start);
+
+      @PointerSelectRegion {
+        on_custom: move |e: &mut PointerSelectEvent| {
+          let width = *$read(row.layout_width());
+          if width <= 0. {
+            return;
           }
-          @Void {
-            class: SLIDER_INDICATOR,
-            tooltips: pipe!{
-              let this = $read(this);
-              let precision = precision(this.min, this.max);
-              format!("{:.1$}", this.start, precision)
-            },
-            on_tap: move |e| e.stop_propagation(),
-            on_pointer_down: move |e| {
-              if let Some(handle) = GrabPointer::grab(e.current_target(), &e.window()) {
-                *$write(drag_info1) = Some((handle, e.global_pos().x, $read(this).start_ratio()));
-              }
-            },
-            on_pointer_move: move |e| {
-              if let Some((_, pos, ratio)) = $read(drag_info1).as_ref() {
-                let width = *$read(row.layout_width());
-                let val = ratio + (e.global_pos().x - pos) / width;
-                $write(this).set_start_ratio(val);
-              }
-            },
-            on_pointer_up: move |_| { $write(drag_info1).take(); }
+
+          let (_, to) = e.data().endpoints();
+          let mut active_part = $write(active_part);
+          if let PointerSelectData::Start(p) = e.data() {
+            let ratio = p.x / width;
+            *active_part = $read(this).choose_part(ratio);
           }
-          @Expanded {
-            flex: pipe!{
-              let this = $read(this);
-              this.end_ratio() - this.start_ratio()
-            },
-            @Void { class: RANGE_SLIDER_ACTIVE_TRACK }
+          range_slider_update(&$writer(this), e, to.x / width, *active_part);
+        },
+        @Stack {
+          class: SLIDER_CONTAINER,
+          @(row) {
+            v_align: VAlign::Center,
+            @Expanded {
+              flex: pipe!($read(this).start_ratio()),
+              @Void { class: RANGE_SLIDER_INACTIVE_TRACK_LEFT }
+            }
+            @Void {
+              class: SLIDER_INDICATOR,
+              tooltips: pipe! {
+                let this = $read(this);
+                slider_tooltip(this.min, this.max, this.start)
+              },
+            }
+            @Expanded {
+              flex: pipe! {
+                let this = $read(this);
+                this.end_ratio() - this.start_ratio()
+              },
+              @Void { class: RANGE_SLIDER_ACTIVE_TRACK }
+            }
+            @Void {
+              class: SLIDER_INDICATOR,
+              tooltips: pipe! {
+                let this = $read(this);
+                slider_tooltip(this.min, this.max, this.end)
+              },
+            }
+            @Expanded {
+              flex: pipe!(1. - $read(this).end_ratio()),
+              @Void { class: RANGE_SLIDER_INACTIVE_TRACK_RIGHT }
+            }
           }
-          @Void {
-            class: SLIDER_INDICATOR,
-            tooltips: pipe!{
-              let this = $read(this);
-              let precision = precision(this.min, this.max);
-              format!("{:.1$}", this.end, precision)
-            },
-            on_tap: move |e| e.stop_propagation(),
-            on_pointer_down: move |e| {
-              if let Some(handle) = GrabPointer::grab(e.current_target(), &e.window()) {
-                *$write(drag_info2) = Some((handle, e.global_pos().x, $read(this).end_ratio()));
-              }
-            },
-            on_pointer_move: move |e| {
-              if let Some((_, pos, ratio)) = $read(drag_info2).as_ref() {
-                let width = *$read(row.layout_width());
-                let val = ratio + (e.global_pos().x - pos) / width;
-                $write(this).set_end_ratio(val);
-              }
-            },
-            on_pointer_up: move |_| { $write(drag_info2).take(); }
-          }
-          @Expanded {
-            flex: pipe!(1. - $read(this).end_ratio()),
-            @Void { class: RANGE_SLIDER_INACTIVE_TRACK_RIGHT }
-          }
+          @{ pipe!($read(this).stop_indicator_track()) }
         }
-        @{ pipe!($read(this).stop_indicator_track()) }
       }
     }
     .into_widget()
@@ -614,5 +615,29 @@ mod tests {
     let range = builder.finish();
     assert_eq!(range.read().start, 0.);
     assert_eq!(range.read().end, 100.);
+  }
+
+  #[test]
+  fn range_slider_set_by_ratio_robustness() {
+    let mut range = RangeSlider { start: 50., end: 50., min: 0., max: 100., divisions: None };
+
+    // Move start (click left)
+    let ratio = 0.4;
+    let part = range.choose_part(ratio);
+    assert_eq!(part, RangeSliderPart::Start);
+    range.set_start_ratio(ratio);
+    assert!((range.start() - 40.).abs() < 1e-5);
+    assert!((range.end() - 50.).abs() < 1e-5);
+
+    // Reset
+    range.set_start(50.);
+
+    // Move end (click right)
+    let ratio = 0.6;
+    let part = range.choose_part(ratio);
+    assert_eq!(part, RangeSliderPart::End);
+    range.set_end_ratio(ratio);
+    assert!((range.start() - 50.).abs() < 1e-5);
+    assert!((range.end() - 60.).abs() < 1e-5);
   }
 }
