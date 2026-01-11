@@ -284,11 +284,11 @@ pub struct ListItemSupporting {
 pub struct ListItemTrailingSupporting(TextValue);
 
 /// Widget for images in list items
-#[simple_declare]
+#[declare(simple)]
 pub struct ListItemImg;
 
 /// Widget for thumbnail images in list items
-#[simple_declare]
+#[declare(simple)]
 pub struct ListItemThumbnail;
 
 /// The template for the [`ListItem`] widget, which includes the leading,

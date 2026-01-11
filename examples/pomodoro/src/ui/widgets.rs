@@ -120,13 +120,10 @@ impl Compose for WindowBar {
         class: pipe!($read(ui_state).in_mini())
           .map(|in_mini| if in_mini { MINI_WINDOW_BAR } else { WINDOW_BAR }),
         @PointerSelectRegion {
-          on_custom_concrete_event: move |e: &mut PointerSelectEvent| {
-            match e.data() {
-              PointerSelectData::Move{ from, to } |
-              PointerSelectData::End { from, to } => {
+          on_custom: move |e: &mut PointerSelectEvent| {
+            if let PointerSelectData::Move{ from, to } |
+              PointerSelectData::End { from, to } = e.data() {
                 e.window().set_position(e.window().position() + (*to - *from));
-              },
-              _ => {}
             }
           },
           @Container {
@@ -250,7 +247,7 @@ pub(crate) fn main_page() -> Widget<'static> {
             min: 0.0,
             max: 100.0,
             value: $read(pomodoro).volume * 100.0,
-            on_custom_concrete_event: move |e: &mut SliderChangedEvent| {
+            on_custom: move |e: &mut SliderChangedEvent| {
               $write(pomodoro).volume = e.data().to / 100.;
             }
           }
@@ -319,7 +316,7 @@ fn setting_config() -> Widget<'static> {
           max: 90.0,
           value: $read(config).focus.as_secs_f32() / 60.0,
           divisions: Some(89),
-          on_custom_concrete_event: move |e: &mut SliderChangedEvent| {
+          on_custom: move |e: &mut SliderChangedEvent| {
             let dur = Duration::from_secs_f32(e.data().to * 60.0);
             $write(config).focus = dur;
             if $read(pomodoro).state == PomodoroState::Focus {
@@ -341,7 +338,7 @@ fn setting_config() -> Widget<'static> {
           max: 90.0,
           value: $read(config).short_break.as_secs_f32() / 60.0,
           divisions: Some(89),
-          on_custom_concrete_event: move |e: &mut SliderChangedEvent| {
+          on_custom: move |e: &mut SliderChangedEvent| {
             let dur = Duration::from_secs_f32(e.data().to * 60.0);
             $write(config).short_break = dur;
             if $read(pomodoro).state == PomodoroState::ShortBreak {
@@ -363,7 +360,7 @@ fn setting_config() -> Widget<'static> {
           max: 90.0,
           value: $read(config).long_break.as_secs_f32() / 60.0,
           divisions: Some(89),
-          on_custom_concrete_event: move |e: &mut SliderChangedEvent| {
+          on_custom: move |e: &mut SliderChangedEvent| {
             let dur = Duration::from_secs_f32(e.data().to * 60.0);
             $write(config).long_break = dur;
             if $read(pomodoro).state == PomodoroState::LongBreak {
@@ -385,7 +382,7 @@ fn setting_config() -> Widget<'static> {
           max: 10.0,
           value: $read(config).cycles as f32,
           divisions: Some(9),
-          on_custom_concrete_event: move |e: &mut SliderChangedEvent| {
+          on_custom: move |e: &mut SliderChangedEvent| {
             $write(config).cycles = e.data().to as u32;
           }
         }
@@ -425,7 +422,7 @@ fn setting_config() -> Widget<'static> {
           h_align: HAlign::Center,
           @Checkbox {
             checked: $read(config).always_on_top,
-            on_custom_concrete_event: move |e: &mut CheckboxEvent| {
+            on_custom: move |e: &mut CheckboxEvent| {
               $write(config).always_on_top = e.data().checked;
             }
           }
