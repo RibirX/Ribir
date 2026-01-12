@@ -10,20 +10,35 @@ use crate::prelude::*;
 /// use ribir::prelude::*;
 ///
 /// container! {
-///   size: Size::new(100., 100.),
+///   width: 100.,
+///   height: 100.,
 ///   background: Color::BLUE,
 ///   @Text { text: "Hello" }
 /// };
 /// ```
-#[derive(Declare, SingleChild)]
+#[derive(Declare, SingleChild, Clone)]
 pub struct Container {
-  pub size: Size,
+  #[declare(default = Measure::Percent(1.))]
+  pub width: Measure,
+  #[declare(default = Measure::Percent(1.))]
+  pub height: Measure,
 }
 
 impl Render for Container {
   fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    let size = clamp.clamp(self.size);
-    ctx.perform_single_child_layout(BoxClamp::max_size(size));
+    let width = self
+      .width
+      .into_pixel(clamp.max.width)
+      .clamp(clamp.min.width, clamp.max.width);
+    let height = self
+      .height
+      .into_pixel(clamp.max.height)
+      .clamp(clamp.min.height, clamp.max.height);
+
+    let size = Size::new(width, height);
+    let child_clamp = BoxClamp::max_size(size);
+
+    ctx.perform_single_child_layout(child_clamp);
     size
   }
 
@@ -38,11 +53,16 @@ mod tests {
   use super::*;
   use crate::test_helper::*;
 
-  const SIZE: Size = Size::new(100., 100.);
+  const TEST_SIZE: Size = Size::new(100., 100.);
 
   widget_layout_test!(
     smoke,
-    WidgetTester::new(fn_widget! { @Container { size: SIZE }}),
-    LayoutCase::default().with_size(SIZE)
+    WidgetTester::new(fn_widget! {
+      @Container {
+        width: 100.,
+        height: 100.,
+      }
+    }),
+    LayoutCase::default().with_size(TEST_SIZE)
   );
 }

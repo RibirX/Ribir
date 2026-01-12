@@ -79,7 +79,8 @@ impl ComposeChild<'static> for Switch {
         },
         @ {
           let switch_widget = @Container {
-            size: Size::new(28., 20.),
+            width: 28.,
+            height: 20.,
             class: distinct_pipe!($read(this).state_class_name()),
             @Void { class: distinct_pipe!($read(this).thumb_class_name()), }
           };

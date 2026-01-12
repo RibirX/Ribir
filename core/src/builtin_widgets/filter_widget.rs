@@ -71,13 +71,15 @@ mod tests {
     filter_drop_shadow,
     WidgetTester::new(fn_widget! {
       @Container {
-        size: Size::new(600., 200.),
+        width: 600.,
+        height: 200.,
         // filter apply to the subtree
         filter: Filter::drop_shadow((100., 10.), 10., Color::BLACK.with_alpha(0.5)),
         @Container {
-          h_align: HAlign::Center,
-          v_align: VAlign::Center,
-          size: Size::new(100., 100.),
+          x: AnchorX::at_center(),
+          y: AnchorY::at_center(),
+          width: 100.,
+          height: 100.,
           background: Color::YELLOW,
         }
       }

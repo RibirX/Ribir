@@ -1,6 +1,4 @@
 use ribir_core::prelude::*;
-
-use crate::prelude::{NoAffectedParentSize, no_affected_parent_size};
 /// A widget that overlaps its children, allowing for flexible layout
 /// management.
 ///
@@ -112,8 +110,15 @@ impl<'c> ComposeChild<'c> for InParentLayout {
   type Child = Widget<'c>;
 
   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    no_affected_parent_size! {
-      @ {child}
+    fn_widget! {
+      @IgnorePointer {
+        ignore: IgnoreScope::OnlySelf,
+        @Container {
+          width: 1.percent(),
+          height: 1.percent(),
+          @ {child}
+        }
+      }
     }
     .into_widget()
     .attach_data(Box::new(Queryable(InParentLayout)))
@@ -125,7 +130,6 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::prelude::*;
 
   const ONE: Size = Size::new(1., 1.);
   const FIVE: Size = Size::new(5., 5.);
@@ -134,8 +138,8 @@ mod tests {
   widget_layout_test!(
     smoke,
     WidgetTester::new(stack! {
-      @SizedBox { size: ONE }
-      @SizedBox { size: FIVE }
+      @Container { width: ONE.width, height: ONE.height }
+      @Container { width: FIVE.width, height: FIVE.height }
     }),
     LayoutCase::default().with_size(FIVE)
   );
@@ -145,8 +149,8 @@ mod tests {
     WidgetTester::new(stack! {
       clamp: BoxClamp::min_size(TEN),
       fit: StackFit::Loose,
-      @SizedBox { size: ONE }
-      @SizedBox { size: FIVE }
+      @Container { width: ONE.width, height: ONE.height }
+      @Container { width: FIVE.width, height: FIVE.height }
     }),
     LayoutCase::default().with_size(TEN),
     LayoutCase::new(&[0, 0]).with_size(ONE),
@@ -158,8 +162,8 @@ mod tests {
     WidgetTester::new(stack! {
       clamp: BoxClamp::max_size(TEN),
       fit: StackFit::Expand,
-      @SizedBox { size: ONE }
-      @SizedBox { size: FIVE }
+      @Container { width: ONE.width, height: ONE.height }
+      @Container { width: FIVE.width, height: FIVE.height }
     }),
     LayoutCase::default().with_size(TEN),
     LayoutCase::new(&[0, 0]).with_size(TEN),
@@ -171,8 +175,8 @@ mod tests {
     WidgetTester::new(stack! {
       clamp: BoxClamp::fixed_size(FIVE),
       fit: StackFit::Passthrough,
-      @SizedBox { size: ONE }
-      @SizedBox { size: TEN }
+      @Container { width: ONE.width, height: ONE.height }
+      @Container { width: TEN.width, height: TEN.height }
     }),
     LayoutCase::default().with_size(FIVE)
   );
@@ -180,9 +184,9 @@ mod tests {
   widget_layout_test!(
     in_parent_layout,
     WidgetTester::new(stack! {
-      @SizedBox { size: TEN }
+      @Container { width: TEN.width, height: TEN.height }
       @InParentLayout {
-        @SizedBox { h_align: HAlign::Right, size: ONE }
+        @Container { x: AnchorX::at_right(), width: ONE.width, height: ONE.height }
       }
     }),
     LayoutCase::default().with_size(TEN),

@@ -322,9 +322,9 @@ impl TabPos {
 impl TabsInlineIcon {
   fn align_header_widget(self) -> XMultiChild<'static> {
     if self.0 {
-      Row { align_items: Align::Center, justify_content: JustifyContent::Center }.into()
+      Row { align_items: Align::Center, justify_content: JustifyContent::Compact }.into()
     } else {
-      Column { align_items: Align::Center, justify_content: JustifyContent::Center }.into()
+      Column { align_items: Align::Center, justify_content: JustifyContent::Compact }.into()
     }
   }
 }
@@ -344,8 +344,7 @@ mod tests {
   fn tabs_tester(tab_type: TabType, pos: TabPos) -> WidgetTester {
     WidgetTester::new(tabs! {
       providers: smallvec![Provider::new(tab_type), Provider::new(pos)],
-      h_align: HAlign::Stretch,
-      v_align: VAlign::Stretch,
+      clamp: BoxClamp::EXPAND_BOTH,
       // Tab only label
       @Tab {
         @{ "Tab 1" }

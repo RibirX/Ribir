@@ -12,10 +12,12 @@ use crate::prelude::*;
 ///
 /// fn_widget! {
 ///   @Container {
-///     size: Size::new(100., 100.),
+///     width: 100.,
+///     height: 100.,
 ///     @UnconstrainedBox {
 ///       @Container {
-///         size: Size::new(200., 200.),
+///         width: 200.,
+///         height: 200.,
 ///         background: Color::RED,
 ///       }
 ///     }

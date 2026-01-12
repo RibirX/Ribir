@@ -41,8 +41,8 @@ pub(super) fn init(classes: &mut Classes) {
         clamp: BoxClamp::fixed_size(md::SIZE_10),
         background: BuildCtx::color(),
         radius: md::RADIUS_5,
-        h_align: HAlign::Center,
-        v_align: VAlign::Center,
+        x: AnchorX::at_center(),
+        y: AnchorY::at_center(),
       };
 
       let scale_in = @Animate {
@@ -54,7 +54,8 @@ pub(super) fn init(classes: &mut Classes) {
         from: BoxClamp::fixed_size(ZERO_SIZE),
       };
       @Container {
-        size: md::SIZE_20,
+        width: md::SIZE_20.width,
+        height: md::SIZE_20.height,
         border: md::border_2(),
         radius: md::RADIUS_10,
         on_mounted: move |_| scale_in.run(),

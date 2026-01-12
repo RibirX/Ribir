@@ -50,12 +50,7 @@ impl<T: Default + VisualText + EditText + Clone + 'static> Compose for BasicEdit
           },
           on_ime_pre_edit: move|e| { $write(this).process_pre_edit(e);},
         }
-        @IgnorePointer {
-          @UnconstrainedBox {
-            dir: UnconstrainedDir::Both,
-            @NoAffectedParentSize { @ { caret } }
-          }
-        }
+        @InParentLayout{ @ { caret } }
       }
     }
     .into_widget()

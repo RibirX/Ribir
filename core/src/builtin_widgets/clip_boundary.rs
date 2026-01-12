@@ -16,7 +16,8 @@ use crate::prelude::*;
 /// use ribir::prelude::*;
 ///
 /// container! {
-///   size: Size::new(40., 20.),
+///   width: 40.,
+///   height: 20.,
 ///   clip_boundary: true,
 ///   @Text { text: "long text will be clipped" }
 /// };

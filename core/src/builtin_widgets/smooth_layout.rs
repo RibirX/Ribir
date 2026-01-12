@@ -30,8 +30,8 @@
 //!   init_value: Anchor::right(Measure::Percent(0.1)),
 //!   @Void {
 //!     clamp: BoxClamp::fixed_size(Size::new(100., 100.)),
-//!     x: PosX::at_center(),
-//!     y: PosY::at_center(),
+//!     x: AnchorX::at_center(),
+//!     y: AnchorY::at_center(),
 //!     background: Color::RED,
 //!   }
 //! };
@@ -583,8 +583,8 @@ mod tests {
       background: Color::RED,
       width: 10.,
       height: 10.,
-      x: PosX::at_center(),
-      y: PosY::at_center()
+      x: AnchorX::at_center(),
+      y: AnchorY::at_center()
     }
     .into_widget()
   }

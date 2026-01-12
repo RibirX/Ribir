@@ -137,7 +137,7 @@ impl Compose for Slider {
       @Stack {
         class: SLIDER_CONTAINER,
         @(row) {
-          v_align: VAlign::Center,
+          y: AnchorY::at_center(),
           on_tap: move |e| {
             let width = *$read(row.layout_width());
             let old = $read(this).value;
@@ -343,7 +343,7 @@ impl Compose for RangeSlider {
       @Stack {
         class: SLIDER_CONTAINER,
         @(row) {
-          v_align: VAlign::Center,
+          y: AnchorY::at_center(),
           on_tap: move |e| {
             let width = *$read(row.layout_width());
             $write(this).set_by_ratio(e.position().x / width);
@@ -439,11 +439,11 @@ fn stop_indicator_track(
 
     @IgnorePointer {
       @(flex) {
-        v_align: VAlign::Center,
+        y: AnchorY::at_center(),
         opacity: pipe!($read(last.layout_rect()).max_x() <= *$read(flex.layout_width()) + 0.001)
           .map(|v| if v { 1. } else { 0. }),
         @ {(0..cnt-1).map(stop_builder)}
-        @{ last }
+        @ { last }
       }
     }
   )

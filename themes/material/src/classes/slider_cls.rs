@@ -12,7 +12,7 @@ const RADIUS_L8_R2: Radius = Radius::new(8., 2., 8., 2.);
 macro_rules! stop_indicator_class {
   ($($field: ident: $value: expr),* ) => {
     style_class! {
-      v_align: VAlign::Center,
+      y: AnchorY::at_center(),
       radius: md::RADIUS_2,
       margin: md::EDGES_HOR_6,
       clamp: BoxClamp::fixed_size(md::SIZE_4),
@@ -50,7 +50,7 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(
     SLIDER_INDICATOR,
     style_class! {
-      v_align: VAlign::Center,
+      y: AnchorY::at_center(),
       background: BuildCtx::color(),
       radius: md::RADIUS_2,
       margin: EdgeInsets::horizontal(6.),

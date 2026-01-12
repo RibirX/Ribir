@@ -67,8 +67,8 @@ impl Compose for Pomodoro {
       Overlay::new(fn_widget! {
         @(FatObj::new(())) {
           providers: [Provider::writer($writer(ui_state), Some(DirtyPhase::LayoutSubtree))],
-          global_anchor_x: GlobalAnchorX::value(HAnchor::Left(6.0.into())),
-          global_anchor_y: GlobalAnchorY::value(VAnchor::Top(30.0.into())),
+          x: AnchorX::at_left().offset(6.),
+          y: AnchorY::at_top().offset(30.),
           @ { setting_button_icon() }
         }
       }, OverlayStyle {

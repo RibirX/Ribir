@@ -1,4 +1,4 @@
-use ribir_geom::{Point, Size};
+use ribir_geom::Size;
 
 use super::{WidgetCtx, WidgetCtxImpl};
 use crate::{
@@ -124,7 +124,7 @@ impl<'a> LayoutCtx<'a> {
       .tree
       .store
       .layout_info(child)
-      .map(|info| info.pos)
+      .map(|info| (info.pos_x.clone(), info.pos_y.clone()))
   }
 
   /// Adjust the size of the layout widget. Use this method to directly modify

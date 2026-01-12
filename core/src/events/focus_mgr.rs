@@ -939,7 +939,8 @@ mod tests {
     let f = fn_widget! {
       let mut w = @Container {
         auto_focus: true,
-        size: Size::splat(100.)
+        width: 100.,
+        height: 100.,
       };
       let u = watch!(*$read(w.focus_changed_reason()))
         .subscribe(move |v| *$write(w_reason) = v);

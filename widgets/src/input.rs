@@ -230,8 +230,9 @@ mod tests {
       watch!($read(input).text().clone())
         .subscribe(move |text| *$write(w_value) = text.to_string());
 
-      @SizedBox {
-        size: Size::new(200., 24.),
+      @Container {
+        width: 200.,
+        height: 24.,
         @ { input }
       }
     };

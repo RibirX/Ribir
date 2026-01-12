@@ -149,7 +149,9 @@ pub(super) fn init(classes: &mut Classes) {
       stack! {
         fit: StackFit::Passthrough,
         clamp: BoxClamp::min_width(48.),
-        @(widget) { h_align: HAlign::Center }
+        @(widget) {
+          x: AnchorX::at_center(),
+        }
       }
       .into_widget()
     } else {

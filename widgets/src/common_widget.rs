@@ -53,7 +53,7 @@ impl<T> Trailing<T> {
 pub fn icon_with_label(icon: Widget, label: Option<PositionChild<TextValue>>) -> Widget {
   let Some(label) = label else { return icon };
 
-  let row = Row { align_items: Align::Center, justify_content: JustifyContent::Start };
+  let row = Row { align_items: Align::Center, justify_content: JustifyContent::Compact };
   let row = match label {
     PositionChild::Leading(Leading(text)) => row.with_child(text! { text}).with_child(icon),
     PositionChild::Trailing(Trailing(text)) | PositionChild::Default(text) => {

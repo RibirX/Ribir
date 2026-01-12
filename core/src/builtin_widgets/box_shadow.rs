@@ -55,7 +55,8 @@ impl BoxShadow {
 /// use ribir::prelude::*;
 ///
 /// container! {
-///   size: Size::new(100., 100.),
+///   width: 100.,
+///   height: 100.,
 ///   radius: Radius::all(50.),
 ///   box_shadow: BoxShadow::new(Point::new(45., 15.), 20., 12., Color::RED),
 /// };
@@ -167,7 +168,8 @@ mod tests {
     box_shadow_basic,
     WidgetTester::new(fn_widget! {
       @Container {
-        size: Size::new(100., 100.),
+        width: 100.,
+        height: 100.,
         radius: Radius::all(50.),
         box_shadow: BoxShadow::new(Point::new(45., 15.), 20., 12., Color::RED.with_alpha(0.6)),
       }

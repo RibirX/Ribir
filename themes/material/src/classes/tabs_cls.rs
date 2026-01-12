@@ -4,8 +4,8 @@ use smallvec::smallvec;
 
 use crate::*;
 
-#[derive(Default, Clone)]
-pub struct ActiveHeaderId(TrackId);
+#[derive(Clone)]
+pub struct HeaderContainerId(TrackId);
 
 #[derive(Default, Clone)]
 pub struct ActiveHeaderRect(Rect);
@@ -16,41 +16,40 @@ pub fn init(classes: &mut Classes) {
     MD_ACTIVE_HEADER,
   }
 
+  // Removed h_align/v_align since they are no longer available
   classes.insert(
     TAB_HEADERS_VIEW,
     style_class! {
-      h_align: tab_pos_var()
-        .map(|pos| if pos.is_horizontal() { HAlign::Stretch } else { HAlign::Left }),
-      v_align: tab_pos_var()
-        .map(|pos| if !pos.is_horizontal() { VAlign::Stretch } else { VAlign::Top }),
+      clamp: tab_pos_var().map(|pos| match pos.is_horizontal() {
+        true => BoxClamp::EXPAND_X,
+        false => BoxClamp::EXPAND_Y,
+      })
     },
   );
+
   classes.insert(TAB_HEADERS_CONTAINER, |w| {
-    stack! {
-      providers: providers(),
-      fit: StackFit::Passthrough,
-      text_style: TypographyTheme::of(BuildCtx::get()).title_small.text.clone(),
-      foreground: Palette::of(BuildCtx::get()).on_surface(),
-      // divider
-      border: {
-        let color = Palette::of(BuildCtx::get()).surface_variant();
-        tab_pos_var().map(move |pos| match pos {
-          TabPos::Top => md::border_1_bottom(color),
-          TabPos::Bottom => md::border_1_top(color),
-          TabPos::Left => md::border_1_right(color),
-          TabPos::Right => md::border_1_left(color),
-        })
-      },
-      on_performed_layout: move |e|  {
-        if let Some(active) = Provider::of::<ActiveHeaderId>(e).and_then(|i| i.0.get()) {
-          let g_pos = e.map_from(Point::zero(), active);
-          let size = e.widget_box_size(active).unwrap();
-          Provider::write_of::<ActiveHeaderRect>(e).unwrap().0 = Rect::new(g_pos, size);
+    fn_widget! {
+      let mut stack = @Stack {fit: StackFit::Passthrough};
+      let track_id = stack.track_id();
+      @(stack) {
+        providers: providers(HeaderContainerId(track_id)),
+        text_style: TypographyTheme::of(BuildCtx::get()).title_small.text.clone(),
+        foreground: Palette::of(BuildCtx::get()).on_surface(),
+        // divider
+        border: {
+          let color = Palette::of(BuildCtx::get()).surface_variant();
+          tab_pos_var().map(move |pos| match pos {
+            TabPos::Top => md::border_1_bottom(color),
+            TabPos::Bottom => md::border_1_top(color),
+            TabPos::Left => md::border_1_right(color),
+            TabPos::Right => md::border_1_left(color),
+          })
+        },
+
+        @{ w }
+        @in_parent_layout! {
+          @ { tab_pos_var().map(indicator) }
         }
-      },
-      @{ w }
-      @in_parent_layout! {
-        @ { tab_pos_var().map(indicator) }
       }
     }
     .into_widget()
@@ -91,29 +90,63 @@ pub fn init(classes: &mut Classes) {
     .into_widget()
   });
 
-  classes.insert(MD_INACTIVE_HEADER, style_class!(margin: md::EDGES_HOR_16));
+  classes.insert(MD_INACTIVE_HEADER, |w| {
+    fn_widget! {
+      @Stack {
+        @FatObj {
+          x: AnchorX::at_center(),
+          y: AnchorY::at_center(),
+          margin: md::EDGES_HOR_16,
+          @ { w }
+        }
+      }
+    }
+    .into_widget()
+  });
 
   classes.insert(MD_ACTIVE_HEADER, |w| {
     let mut w = FatObj::new(w);
 
-    // The active header's track id is written to the `ActiveHeaderId` provider.
-    Provider::write_of::<ActiveHeaderId>(BuildCtx::get())
-      .unwrap()
-      .0 = w.track_id();
-
-    let mut w = if tab_type() == TabType::Primary {
-      // The primary tabs indicator's length depends on the active tab's content size.
-      // Wrapping the tab header in a stack ensures the content retains its original
-      // size.
-      let stack = Stack::declarer().finish();
-      w.with_margin(md::EDGES_HOR_16)
-        .with_h_align(HAlign::Center)
-        .with_v_align(VAlign::Center);
-      stack.map(|p| p.with_child(w).into_widget())
-    } else {
-      w.with_padding(md::EDGES_HOR_16);
-      w.map(IntoWidget::into_widget)
+    let layout_ready = move |e: &mut LifecycleEvent| {
+      let cid = Provider::of::<HeaderContainerId>(e)
+        .unwrap()
+        .clone();
+      let base = e
+        .window()
+        .map_to_global(Point::zero(), cid.0.get().unwrap());
+      let g_pos = e.map_to_global(Point::zero());
+      let size = e.widget_box_size(e.widget_id()).unwrap();
+      Provider::write_of::<ActiveHeaderRect>(e)
+        .unwrap()
+        .0 = Rect::new(base + g_pos.to_vector(), size);
     };
+
+    let mut stack = Stack::declarer().finish();
+    let w = if tab_type() == TabType::Primary {
+      rdl! {
+        @FatObj{
+          margin: md::EDGES_HOR_16,
+          x: AnchorX::at_center(),
+          y: AnchorY::at_center(),
+          @(w) {
+            on_performed_layout: layout_ready,
+          }
+        }
+      }
+      .into_widget()
+    } else {
+      stack.on_performed_layout(layout_ready);
+      rdl! {
+        @(w) {
+          margin: md::EDGES_HOR_16,
+          x: AnchorX::at_center(),
+          y: AnchorY::at_center(),
+        }
+      }
+      .into_widget()
+    };
+
+    let mut w = stack.map(|s| s.with_child(w).into_widget());
 
     // This code is responsible for making sure the active tab header is visible
     // when the user navigates to it.
@@ -135,22 +168,25 @@ pub fn init(classes: &mut Classes) {
         let min_space: f32 = 64.;
         let edge_gap = |size: f32, other_side_space| size.max(min_space).min(other_side_space);
 
+        // Use the new scroll visible API with x and y values
         if scrollable.is_x_scrollable() {
           if header.max_x() + min_space > view.width && header.min_x() > 0. {
-            let right = Anchor::right(edge_gap(header.width(), header.min_x()));
-            scrollable.visible_widget(wid, right, &wnd);
+            let right = AnchorX::at_right().offset(-edge_gap(header.width(), header.min_x()));
+            scrollable.visible_widget(wid, Anchor { x: Some(right), y: None }, &wnd);
           } else if header.min_x() < min_space && header.max_x() < view.width {
-            let left = Anchor::left(edge_gap(header.width(), view.width - header.max_x()));
-            scrollable.visible_widget(wid, left, &wnd);
+            let x =
+              AnchorX::at_left().offset(edge_gap(header.width(), view.width - header.max_x()));
+            scrollable.visible_widget(wid, Anchor { x: Some(x), y: None }, &wnd);
           }
         }
         if scrollable.is_y_scrollable() {
           if header.max_y() + min_space > view.height && header.min_y() > 0. {
-            let bottom = Anchor::bottom(edge_gap(header.height(), header.min_y()));
-            scrollable.visible_widget(wid, bottom, &wnd);
+            let y = AnchorY::at_bottom().offset(-edge_gap(header.height(), header.min_y()));
+            scrollable.visible_widget(wid, Anchor { x: None, y: Some(y) }, &wnd);
           } else if header.min_y() < min_space && header.max_y() < view.height {
-            let top = Anchor::top(edge_gap(header.height(), view.height - header.max_y()));
-            scrollable.visible_widget(wid, top, &wnd);
+            let y =
+              AnchorY::at_top().offset(edge_gap(header.height(), view.height - header.max_y()));
+            scrollable.visible_widget(wid, Anchor { x: None, y: Some(y) }, &wnd);
           }
         }
 
@@ -185,28 +221,44 @@ fn indicator(pos: &TabPos) -> Widget<'static> {
     PipeValue<Option<AnchorY>>,
   ) = match (tt, pos.is_horizontal()) {
     (TabType::Primary, true) => (
-      distinct_pipe!(Size::new(p_length($read(header).width()), 3.)).r_into(),
-      distinct_pipe!(Anchor::left($read(header).min_x() + p_offset($read(header).width())))
+      distinct_pipe!(p_length($read(header).width())).r_into(),
+      3_f32.r_into(),
+      distinct_pipe!($read(header).min_x() + p_offset($read(header).width()))
+        .map(move |offset| x.clone().offset(offset))
         .r_into(),
+      y.r_into(),
     ),
     (TabType::Primary, false) => (
-      distinct_pipe!(Size::new(3., p_length($read(header).height()))).r_into(),
-      distinct_pipe!(Anchor::top($read(header).min_y() + p_offset($read(header).height())))
+      3_f32.r_into(),
+      distinct_pipe!(p_length($read(header).height())).r_into(),
+      x.r_into(),
+      distinct_pipe!($read(header).min_y() + p_offset($read(header).height()))
+        .map(move |offset| y.clone().offset(offset))
         .r_into(),
     ),
     (_, true) => (
-      distinct_pipe!(Size::new($read(header).width(), 2.)).r_into(),
-      distinct_pipe!(Anchor::left($read(header).min_x())).r_into(),
+      distinct_pipe!($read(header).width()).r_into(),
+      2_f32.r_into(),
+      distinct_pipe!($read(header).min_x())
+        .map(move |offset| x.clone().offset(offset))
+        .r_into(),
+      y.r_into(),
     ),
     (_, false) => (
-      distinct_pipe!(Size::new(2., $read(header).height())).r_into(),
-      distinct_pipe!(Anchor::top($read(header).min_y())).r_into(),
+      2_f32.r_into(),
+      distinct_pipe!($read(header).height()).r_into(),
+      x.r_into(),
+      distinct_pipe!($read(header).min_y())
+        .map(move |offset| y.clone().offset(offset))
+        .r_into(),
     ),
   };
 
   rdl! {
     let mut indicator = @Container {
-      size, background: BuildCtx::color(),
+      width: width,
+      height: height,
+      background: BuildCtx::color(),
      };
 
      if tt == TabType::Primary {
@@ -218,20 +270,16 @@ fn indicator(pos: &TabPos) -> Widget<'static> {
       });
     }
 
-    let mut smooth = @SmoothPos {
+
+    let smooth = @SmoothPos {
       transition: EasingTransition {
         easing: md::easing::EMPHASIZED_DECELERATE,
         duration: md::easing::duration::MEDIUM1,
       },
-      anchor
+
+      x, y
     };
 
-    match pos {
-      TabPos::Top =>  smooth.with_v_align(VAlign::Bottom),
-      TabPos::Bottom =>  smooth.with_v_align(VAlign::Top),
-      TabPos::Left =>  smooth.with_h_align(HAlign::Right),
-      TabPos::Right =>  smooth.with_h_align(HAlign::Left),
-    };
     @(smooth) {
       @NoAffectedParentSize { @IgnorePointer {
         @ @UnconstrainedBox {
@@ -276,10 +324,10 @@ fn inline_icon() -> Variant<TabsInlineIcon> {
   Variant::<TabsInlineIcon>::new_or_default(BuildCtx::get())
 }
 
-fn providers() -> SmallVec<[Provider; 1]> {
+fn providers(header_container_id: HeaderContainerId) -> SmallVec<[Provider; 1]> {
   let mut providers = smallvec![
     Provider::new(TextAlign::Center),
-    Provider::writer(Stateful::new(ActiveHeaderId::default()), None),
+    Provider::new(header_container_id),
     Provider::writer(Stateful::new(ActiveHeaderRect::default()), None),
   ];
   if tab_type() == TabType::Primary {

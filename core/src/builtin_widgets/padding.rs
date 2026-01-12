@@ -17,7 +17,8 @@ use crate::prelude::*;
 /// use ribir::prelude::*;
 ///
 /// container! {
-///   size: Size::new(100., 100.),
+///   width: 100.,
+///   height: 100.,
 ///   padding: EdgeInsets::all(10.),
 ///   background: Color::BLUE,
 ///   @Text { text: "Padding example" }

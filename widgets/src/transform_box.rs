@@ -47,14 +47,13 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::prelude::*;
 
   widget_layout_test!(
     smoke,
     WidgetTester::new(fn_widget! {
       @TransformBox {
         matrix: Transform::new(2., 0., 0., 2., 0., 0.),
-        @SizedBox { size: Size::new(100., 100.) }
+        @Container { width: 100., height: 100. }
       }
     }),
     LayoutCase::default().with_size(Size::new(200., 200.))

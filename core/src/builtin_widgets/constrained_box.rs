@@ -13,7 +13,8 @@ use crate::{prelude::*, wrap_render::*};
 /// use ribir::prelude::*;
 ///
 /// container! {
-///   size: Size::new(200., 50.), // This will be constrained to width 100.
+///   width: 200., // This will be constrained to width 100.
+///   height: 50.,
 ///   background: Color::RED,
 ///   clamp: BoxClamp::max_width(100.),
 /// };

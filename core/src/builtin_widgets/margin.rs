@@ -21,7 +21,8 @@ pub struct EdgeInsets {
 /// use ribir::prelude::*;
 ///
 /// container! {
-///     size: Size::new(100., 100.),
+///     width: 100.,
+///     height: 100.,
 ///     background: Color::GREEN,
 ///     @Text {
 ///       text: "Margin example",

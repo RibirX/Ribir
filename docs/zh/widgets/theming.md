@@ -28,7 +28,8 @@ fn example() -> Widget<'static> {
     fn_widget! {
         let palette = Palette::of(BuildCtx::get());
         @Container {
-            size: Size::new(100., 100.),
+            width: 100.,
+            height: 100.,
             background: palette.primary(), // 访问主色
         }
     }.into_widget()
@@ -132,7 +133,8 @@ fn main() {
         Class::provider(MY_CARD, move |w| {
           fn_widget! {
             @Container {
-              size: Size::new(100., 100.),
+              width: 100.,
+              height: 100.,
               radius: Radius::all(12.),
               clamp: BoxClamp::fixed_size(Size::splat(48.)),
               @ { w }

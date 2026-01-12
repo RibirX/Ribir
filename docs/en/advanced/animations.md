@@ -27,15 +27,16 @@ Ribir has predefined some animation Transitions:
 - `easing::EASE_IN_OUT`: Starts slowly, accelerates in the middle, then decelerates
 - `easing::CubicBezierEasing`: Cubic Bezier easing
 
-In the following example, `SizedBox` will perform a bouncing animation when first loaded.
+In the following example, `Container` will perform a bouncing animation when first loaded.
 
 ```rust no_run
 use ribir::prelude::*;
 
 fn custom_easing_example() -> Widget<'static> {
     fn_widget! {
-        let mut moving_box = @SizedBox {
-            size: Size::new(50., 50.),
+        let mut moving_box = @Container {
+            width: 50.,
+            height: 50.,
             background: Color::RED,
             margin: EdgeInsets::horizontal(200.),
         };
@@ -49,8 +50,9 @@ fn custom_easing_example() -> Widget<'static> {
             }
         };
 
-        @SizedBox {
-            size: Size::new(250., 100.),
+        @Container {
+            width: 250.,
+            height: 100.,
             @(moving_box) {  
                 on_mounted: move |_| animate.run(),
             }
@@ -93,7 +95,7 @@ fn_widget! {
         ...
     };
 
-    @SizedBox {
+    @Container {
         opacity: pipe!(*$read(opacity_state)),
         on_tap: move |_| animate.run(),
     }
@@ -107,7 +109,7 @@ The correct approach is to bind the animation directly to the Widget's state, as
 ```rust ignore
 // ✅ CORRECT: Animate Widget's state
 fn_widget! {
-    let w = @SizedBox {
+    let w = @Container {
         opacity: 1.,
         ...
     };
@@ -130,7 +132,7 @@ use ribir::prelude::*;
 use ribir::material::md;
 fn writer_animate() -> Widget<'static> {
     fn_widget! {
-        let mut w = @Container { size: Size::new(40., 20.) };
+        let mut w = @Container { width: 40., height: 20. };
         w.opacity()
             .transition(EasingTransition{
                 easing: md::easing::STANDARD_ACCELERATE,
@@ -169,20 +171,24 @@ use ribir::prelude::*;
 
 fn keyframes_example() -> Widget<'static> {
     fn_widget! {
-        let mut box_widget = @SizedBox {
-            size: Size::new(50., 50.),
+        let mut box_widget = @Container {
+            width: 50.,
+            height: 50.,
             background: Color::GREEN,
         };
 
         let animate = @Animate {
             state: keyframes! {
-                state: box_widget.map_writer(|w| PartMut::new(&mut w.size)),
-                0.25 => Size::new(100., 50.),  // Stretch horizontally at 25% progress
-                0.5 => Size::new(100., 100.),  // Stretch vertically at 50% progress
-                0.75 => Size::new(50., 100.),  // Shrink horizontally at 75% progress
-                1.0 => Size::new(50., 50.),    // Return to original at 100% progress
+                state: (
+                    box_widget.map_writer(|w| PartMut::new(&mut w.width)),
+                    box_widget.map_writer(|w| PartMut::new(&mut w.height))
+                ),
+                0.25 => (100.px(), 50.px()),  // Stretch horizontally at 25% progress
+                0.5 => (100.px(), 100.px()),  // Stretch vertically at 50% progress
+                0.75 => (50.px(), 100.px()),  // Shrink horizontally at 75% progress
+                1.0 => (50.px(), 50.px()),    // Return to original at 100% progress
             },
-            from: Size::new(50., 50.),
+            from: (50.px(), 50.px()),
             transition: EasingTransition {
                 duration: Duration::from_millis(1000),
                 easing: easing::EASE_IN_OUT,
@@ -263,9 +269,9 @@ fn advanced_stagger_example() -> Widget<'static> {
             }
         );
 
-        let mut box1 = @SizedBox { size: Size::new(50., 50.), background: Color::RED, opacity: 0. };
-        let mut box2 = @SizedBox { size: Size::new(50., 50.), background: Color::GREEN, opacity: 0. };
-        let mut box3 = @SizedBox { size: Size::new(50., 50.), background: Color::BLUE, opacity: 0. };
+        let mut box1 = @Container { width: 50., height: 50., background: Color::RED, opacity: 0. };
+        let mut box2 = @Container { width: 50., height: 50., background: Color::GREEN, opacity: 0. };
+        let mut box3 = @Container { width: 50., height: 50., background: Color::BLUE, opacity: 0. };
 
         // Add boxes with different stagger intervals
         stagger.write().push_state(box1.opacity(), 0.);
@@ -303,8 +309,9 @@ use ribir::prelude::*;
 
 fn animation_control_example() -> Widget<'static> {
     fn_widget! {
-        let mut box_widget = @SizedBox {
-            size: Size::new(100., 100.),
+        let mut box_widget = @Container {
+            width: 100.,
+            height: 100.,
             background: Color::PURPLE,
             opacity: 0.0,
         };
@@ -362,16 +369,20 @@ use ribir::prelude::*;
 
 fn composition_example() -> Widget<'static> {
     fn_widget! {
-        let mut box_widget = @SizedBox {
-            size: Size::new(50., 50.),
+        let mut box_widget = @Container {
+            width: 50.,
+            height: 50.,
             background: Color::BLUE,
             opacity: 0.,
             transform: Transform::identity(),
         };
 
         let opacity_size_anim = @Animate {
-            state: (box_widget.opacity(), box_widget.map_writer(|w| PartMut::new(&mut w.size))),
-            from: (0., Size::new(50., 50.)),
+            state: (
+                box_widget.opacity(),
+                box_widget.map_writer(|w| PartMut::new(&mut w.width)),
+            ),
+            from: (0., 20.px()),
             transition: EasingTransition {
                 duration: Duration::from_millis(1000),
                 easing: easing::EASE_IN_OUT,
@@ -411,8 +422,9 @@ use ribir::prelude::*;
 
 fn transition_modifiers_example() -> Widget<'static> {
     fn_widget! {
-        let mut box_widget = @SizedBox {
-            size: Size::new(200., 100.),
+        let mut box_widget = @Container {
+            width: 200.,
+            height: 100.,
             background: Color::YELLOW,
             opacity: 1.,
         };

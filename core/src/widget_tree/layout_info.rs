@@ -14,6 +14,14 @@ pub struct BoxClamp {
 
 impl BoxClamp {
   pub const UNLIMITED: BoxClamp = BoxClamp { min: ZERO_SIZE, max: INFINITY_SIZE };
+  /// Expand horizontally to fill available width
+  pub const EXPAND_X: BoxClamp =
+    BoxClamp { min: Size::new(f32::INFINITY, 0.), max: Size::new(f32::INFINITY, f32::INFINITY) };
+  /// Expand vertically to fill available height
+  pub const EXPAND_Y: BoxClamp =
+    BoxClamp { min: Size::new(0., f32::INFINITY), max: Size::new(f32::INFINITY, f32::INFINITY) };
+  /// Expand both horizontally and vertically to fill available space
+  pub const EXPAND_BOTH: BoxClamp = BoxClamp { min: INFINITY_SIZE, max: INFINITY_SIZE };
 
   /// clamp use fixed width and unfixed height
   pub const fn fixed_width(width: f32) -> Self {
@@ -390,6 +398,20 @@ pub struct LayoutInfo {
   pub visual_box: VisualBox,
 }
 
+impl LayoutInfo {
+  /// Calculate the actual position based on the stored position rules.
+  pub fn calculate_pos(&self, parent_size: Size) -> Point {
+    let self_size = self.size.unwrap_or_default();
+    let x = self
+      .pos_x
+      .calculate(parent_size.width, self_size.width);
+    let y = self
+      .pos_y
+      .calculate(parent_size.height, self_size.height);
+    Point::new(x, y)
+  }
+}
+
 /// Store the render object's place relative to parent coordinate and the
 /// clamp passed from parent.
 #[derive(Default)]
@@ -426,10 +448,18 @@ impl LayoutStore {
 }
 
 impl WidgetTree {
+  /// Get the parent size of a widget for position calculation
+  fn parent_size_of(&self, id: WidgetId) -> Size {
+    id.parent(self)
+      .and_then(|p| self.store.layout_box_size(p))
+      .unwrap_or_default()
+  }
+
   pub(crate) fn map_to_parent(&self, id: WidgetId, pos: Point) -> Point {
+    let parent_size = self.parent_size_of(id);
     self
       .store
-      .layout_box_pos(id)
+      .layout_box_pos(id, parent_size)
       .map_or(pos, |offset| {
         let pos = id
           .assert_get(self)
@@ -440,9 +470,10 @@ impl WidgetTree {
   }
 
   pub(crate) fn map_from_parent(&self, id: WidgetId, pos: Point) -> Point {
+    let parent_size = self.parent_size_of(id);
     self
       .store
-      .layout_box_pos(id)
+      .layout_box_pos(id, parent_size)
       .map_or(pos, |offset| {
         let pos = pos - offset.to_vector();
         id.assert_get(self)
@@ -640,8 +671,10 @@ mod tests {
 
     #[track_caller]
     fn assert_rect_by_path(wnd: &TestWindow, path: &[usize], rect: Rect) {
+      let id = wnd.widget_id_by_path(path);
+      let pos = wnd.widget_pos(id).unwrap();
+      assert_eq!(pos, rect.origin);
       let info = wnd.layout_info_by_path(path).unwrap();
-      assert_eq!(info.pos, rect.origin);
       assert_eq!(info.size.unwrap(), rect.size);
     }
 

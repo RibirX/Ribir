@@ -17,7 +17,8 @@ use crate::{prelude::*, wrap_render::*};
 ///   @IgnorePointer {
 ///     ignore: IgnoreScope::Subtree,
 ///     @Container {
-///       size: Size::new(100., 100.),
+///       width: 100.,
+///       height: 100.,
 ///       background: Color::RED,
 ///       on_tap: |_: &mut PointerEvent| println!("This will never be printed"),
 ///     }

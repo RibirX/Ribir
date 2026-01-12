@@ -71,7 +71,8 @@ pub type MenuEvent = CustomEvent<MenuEventData>;
 ///     @MenuItem { @ { "Menu Item2" } }
 ///   });
 ///   @Container {
-///     size: Size::new(f32::INFINITY, f32::INFINITY),
+///     width: f32::INFINITY,
+///     height: f32::INFINITY,
 ///     on_tap: move |e| {
 ///       menu.show_at(e.position(), &e.window());
 ///     },
@@ -364,6 +365,7 @@ fn anchor_around(target: Rect) -> impl FnMut(Widget<'static>) -> Widget<'static>
         },
         @ { w }
       }
+
     }
     .into_widget()
   }

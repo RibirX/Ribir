@@ -47,7 +47,8 @@ use ribir::prelude::*;
 fn example() -> Widget<'static> {
     fn_widget! {
         @Container {
-            size: Size::new(100., 100.),
+            width: 100.,
+            height:100.,
             background: Color::RED,
             // 强制约束：不管父级给出什么约束，Container 的宽度必须在 50 到 200 之间
             clamp: BoxClamp {

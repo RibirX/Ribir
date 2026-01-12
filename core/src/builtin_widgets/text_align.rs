@@ -14,7 +14,8 @@ use crate::prelude::*;
 /// use ribir::prelude::*;
 ///
 /// container! {
-///   size: Size::new(120., 40.),
+///   width: 120.,
+///   height: 40.,
 ///   text_align: TextAlign::Center,
 ///   @Text { text: "Line 1\nlong line 2" }
 /// };

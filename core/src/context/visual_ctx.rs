@@ -91,11 +91,18 @@ impl<'a> VisualCtx<'a> {
   }
 
   fn position(&self, id: WidgetId) -> Option<Point> {
+    // Get parent size for lazy position calculation
+    let parent_size = id
+      .parent(self.tree)
+      .and_then(|p| self.tree.store.layout_info(p))
+      .and_then(|info| info.size)
+      .unwrap_or_default();
+
     self
       .tree
       .store
       .layout_info(id)
-      .map(|info| info.pos)
+      .map(|info| info.calculate_pos(parent_size))
   }
 }
 

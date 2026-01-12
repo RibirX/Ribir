@@ -62,7 +62,8 @@ pub(super) fn init(classes: &mut Classes) {
           x: AnchorX::at_right(),
           background: BuildCtx::color(),
           radius: md::RADIUS_2,
-          size: Size::new(md::THICKNESS_4, md::THICKNESS_4),
+          width: md::THICKNESS_4,
+          height: md::THICKNESS_4,
         }
       }
     }

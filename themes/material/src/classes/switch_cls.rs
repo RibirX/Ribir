@@ -32,7 +32,7 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(SWITCH_THUMB_UNCHECKED, |w| {
     fn_widget! {
       let mut container = @FatObj {
-        v_align: VAlign::Center,
+        y: AnchorY::at_center(),
         clamp: BoxClamp::fixed_size(Size::new(16., 16.)),
         radius: md::RADIUS_8,
         background: Palette::of(BuildCtx::get()).outline(),
@@ -60,7 +60,7 @@ pub(super) fn init(classes: &mut Classes) {
     fn_widget! {
       let mut container = @FatObj {
         clamp: BoxClamp::fixed_size(Size::new(24., 24.)),
-        v_align: VAlign::Center,
+        y: AnchorY::at_center(),
         radius: md::RADIUS_12,
         background: Palette::of(BuildCtx::get()).on_primary(),
         margin: EdgeInsets::only_left(24.),

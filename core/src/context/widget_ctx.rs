@@ -167,14 +167,32 @@ impl<T: WidgetCtxImpl> WidgetCtx for T {
   }
 
   fn widget_box_pos(&self, wid: WidgetId) -> Option<Point> {
-    self.tree().layout_info(wid).map(|info| info.pos)
-  }
+    // Get parent size for lazy position calculation
+    let parent_size = wid
+      .parent(self.tree())
+      .and_then(|p| self.tree().layout_info(p))
+      .and_then(|info| info.size)
+      .unwrap_or_default();
 
-  fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {
     self
       .tree()
       .layout_info(wid)
-      .and_then(|info| info.size.map(|size| Rect::new(info.pos, size)))
+      .map(|info| info.calculate_pos(parent_size))
+  }
+
+  fn widget_box_rect(&self, wid: WidgetId) -> Option<Rect> {
+    // Get parent size for lazy position calculation
+    let parent_size = wid
+      .parent(self.tree())
+      .and_then(|p| self.tree().layout_info(p))
+      .and_then(|info| info.size)
+      .unwrap_or_default();
+
+    self.tree().layout_info(wid).and_then(|info| {
+      info
+        .size
+        .map(|size| Rect::new(info.calculate_pos(parent_size), size))
+    })
   }
 
   fn map_to_global(&self, pos: Point) -> Point { self.tree().map_to_global(pos, self.id()) }
@@ -296,7 +314,7 @@ mod tests {
         size: Size::new(100., 100.),
         @MockBox {
           transform: Transform::scale(0.5, 0.5),
-          anchor: Anchor::left_top(30., 30.),
+          x: 30., y: 30.,
           size: Size::new(40., 40.)
         }
       }

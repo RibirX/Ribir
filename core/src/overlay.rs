@@ -17,8 +17,8 @@ use crate::{prelude::*, window::WindowId};
 ///     fn_widget! {
 ///       @Text {
 ///         on_tap: move |e| Overlay::of(&**e).unwrap().close(),
-///         x: PosX::at_center(),
-///         y: PosY::at_center(),
+///         x: AnchorX::at_center(),
+///         y: AnchorY::at_center(),
 ///         text: "Click me to close overlay!"
 ///       }
 ///     },
@@ -113,8 +113,8 @@ impl Overlay {
   ///     OverlayStyle { auto_close_policy: AutoClosePolicy::TAP_OUTSIDE, mask: None }
   ///   );
   ///   @(button) {
-  ///     x: PosX::at_center(),
-  ///     y: PosY::at_center(),
+  ///     x: AnchorX::at_center(),
+  ///     y: AnchorY::at_center(),
   ///     on_tap: move |e| {
   ///       let wnd = e.window();
   ///       overlay.show_map(move |w| fn_widget! {

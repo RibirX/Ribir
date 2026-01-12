@@ -47,7 +47,8 @@ use ribir::prelude::*;
 fn example() -> Widget<'static> {
     fn_widget! {
         @Container {
-            size: Size::new(100., 100.),
+            width: 100.,
+            height: 100.,
             background: Color::RED,
             // Force constraint: no matter what constraint the parent gives, the Container's width must be between 50 and 200
             clamp: BoxClamp {

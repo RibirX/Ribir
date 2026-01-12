@@ -25,7 +25,7 @@ sidebar_position: 3
 
 以 `Radio`  widget 为例，其定义如下：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 pub struct Radio {
@@ -36,7 +36,7 @@ pub struct Radio {
 
 这与常规的 Rust 结构体无异，你可以直接创建一个对象：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let radio = Radio { selected: true, value: Box::new(1.) };
@@ -52,7 +52,7 @@ let radio = Radio { selected: true, value: Box::new(1.) };
 
 并且，对于内建 widget 如事件响应，我们可以无需通过组合方式即可获取。Ribir 提供了一个 `FatObj<T>` 的泛型，它提供了所有内建 widget 的初始化 API。只需用它包裹我们的 widget，即可让 widget 获得所有内建 widget 的能力。
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let radio = Radio { selected: true, value: Box::new(1.) };
@@ -62,7 +62,7 @@ let radio = FatObj::new(radio)
 
 但在实际使用中，我们通常不直接这样写，而是通过 `Declare` 这个 trait 来创建 widget。
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let mut btn = Radio::declarer();
@@ -79,7 +79,7 @@ let btn: FatObj<Stateful<Radio>> = btn.finish();
 
 要注意的是，我们最终创建的是 `FatObj<Stateful<Radio>>`，而不是 `Radio`。这是因为通过 `Declare`，我们不仅可以使用同名方法配置属性，还可以利用 `FatObj` 扩展内建 widget 的能力。至于为什么要使用 `Stateful`，这是因为 `Stateful` 可以让你的 widget 状态被监听和修改。
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let mut radio = Radio::declarer();
@@ -97,7 +97,7 @@ watch!($read(radio).selected)
 
 使用 `Declare` 创建 widget 的另一个优点是，它支持通过 `pipe!` 流来初始化属性。通过 `pipe!` 流初始化的属性会随着流的变化而变化。例如，我们想要创建两个 `Radio`，其中一个的状态会跟随着另一个的状态而变化。
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let mut radio1 = Radio::declarer();
@@ -119,7 +119,7 @@ let _row = Row::declarer()
 
 需要注意的是，虽然通过 `Declare` 创建的 widget 可以直接配置所有内建能力，但如果你需要在初始化后修改内建 widget 的属性，你需要先获取对应的内建 widget 再进行操作。这是因为这些内建 widget 是按需组合得到的。下面的例子中，我们创建一个按钮，并在点击时更改其边距：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn radio_btn() -> Widget<'static> {
@@ -139,7 +139,7 @@ fn radio_btn() -> Widget<'static> {
 
 这是一个文本按钮和图标按钮的例子：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let text_btn = Button::declarer()
@@ -155,7 +155,7 @@ let icon_btn = Button::declarer()
 
 Ribir 的 "DSL" 并不是一种全新的语言，而只是一组宏。每个宏都可以作为一个独立的表达式使用，因此你可以自由地混合使用它们。下面我们将实现一个计数器的例子。我们将直接通过 API 创建按钮和计数的文本，并在初始化它们的属性时使用 `$` 来避免克隆 `cnt`。最后，我们将使用 `@` 语法将它们组合成一个 `Row`：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let counter = fn_widget! {
