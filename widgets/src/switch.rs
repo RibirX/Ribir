@@ -73,7 +73,7 @@ impl ComposeChild<'static> for Switch {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fn_widget! {
       let mut obj = @FatObj {
-        on_tap: move |e| {
+        on_action: move |e| {
           $write(this).switch_check();
           e.stop_propagation();
         },
