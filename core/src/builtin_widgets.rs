@@ -392,6 +392,14 @@ impl<T> FatObj<T> {
     on_mixin!(self, on_tap_capture, f)
   }
 
+  /// Attaches a handler to the widget that is triggered by a tap(click),
+  /// the 'Enter' key (on key down), or the 'Space' key (on key up). This
+  /// provides a unified way to handle user activation of the widget via
+  /// mouse, touch, or keyboard.
+  pub fn on_action(&mut self, f: impl FnMut(&mut Event) + 'static) -> &mut Self {
+    on_mixin!(self, on_action, f)
+  }
+
   /// Attaches a handler to the widget that is triggered when a double tap
   /// occurs.
   pub fn on_double_tap(&mut self, f: impl FnMut(&mut PointerEvent) + 'static) -> &mut Self {
