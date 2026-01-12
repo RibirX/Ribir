@@ -65,7 +65,8 @@ impl Render for GridView {
           max: Size::new(self.child_x_extent, self.child_y_extent),
         },
       );
-      ctx.update_position(c, self.calc_child_pos(idx));
+      let pos = self.calc_child_pos(idx);
+      ctx.update_anchor(c, AnchorX::new(pos.x), AnchorY::new(pos.y));
       idx += 1;
     }
 

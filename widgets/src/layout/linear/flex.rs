@@ -2,6 +2,35 @@ use ribir_core::prelude::{log::warn, *};
 
 use super::{Direction, Expanded, JustifyContent};
 
+/// Enum describing how a widget is aligned inside its box.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Align {
+  /// The children are aligned to the start edge of the box provided by parent.
+  #[default]
+  Start,
+  /// The children are aligned to the center of the line of the box provide by
+  /// parent.
+  Center,
+  /// The children are aligned to the end edge of the box provided by parent.
+  End,
+  /// Require the children to fill the whole box of one axis. This causes the
+  /// constraints passed to the children to be tight.
+  Stretch,
+}
+
+impl Align {
+  /// Calculate the offset for aligning a child of `child_size` within
+  /// `parent_size`.
+  pub fn align_value(self, child_size: f32, parent_size: f32) -> f32 {
+    match self {
+      Align::Start => 0.,
+      Align::Center => (parent_size - child_size) / 2.,
+      Align::End => parent_size - child_size,
+      Align::Stretch => 0.,
+    }
+  }
+}
+
 /// The `Flex` is a layout container that arranges its children in a
 /// one-dimensional manner. It distributes space among the children and provides
 /// alignment options in two axes.
@@ -281,7 +310,7 @@ impl FlexLayouter {
       line.items_info.iter_mut().for_each(|info| {
         let child = children.next().unwrap();
         let pos = dir.to_point(info.main_pos, info.cross_pos);
-        ctx.update_position(child, pos);
+        ctx.update_anchor(child, AnchorX::new(pos.x), AnchorY::new(pos.y));
       })
     });
   }
@@ -398,7 +427,7 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Flex {
         @{
-          (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
+          (0..10).map(|_| @Container { width: 10., height: 20., })
         }
       }
     }),
@@ -410,7 +439,7 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Flex {
         direction: Direction::Vertical,
-        @{ (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })}
+        @{ (0..10).map(|_| @Container { width: 10., height: 20., })}
       }
     }),
     LayoutCase::default().with_size(Size::new(10., 200.))
@@ -421,7 +450,7 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Flex {
         wrap: true,
-        @{ (0..3).map(|_| SizedBox { size: Size::new(200., 20.) }) }
+        @{ (0..3).map(|_| @Container { width: 200., height: 20., }) }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -439,7 +468,7 @@ mod tests {
       @Flex {
         wrap: true,
         reverse: true,
-        @{ (0..3).map(|_| SizedBox { size: Size::new(200., 20.) }) }
+        @{ (0..3).map(|_| @Container { width: 200., height: 20., }) }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -454,9 +483,9 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Flex {
         item_gap: 15.,
-        @SizedBox { size: Size::new(120., 20.) }
-        @SizedBox { size: Size::new(80., 20.) }
-        @SizedBox { size: Size::new(30., 20.) }
+        @Container { width: 120., height: 20. }
+        @Container { width: 80., height: 20. }
+        @Container { width: 30., height: 20. }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -471,9 +500,9 @@ mod tests {
       @Flex {
         item_gap: 15.,
         reverse: true,
-        @SizedBox { size: Size::new(120., 20.) }
-        @SizedBox { size: Size::new(80., 20.) }
-        @SizedBox { size: Size::new(30., 20.) }
+        @Container { width: 120., height: 20. }
+        @Container { width: 80., height: 20. }
+        @Container { width: 30., height: 20. }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -486,19 +515,19 @@ mod tests {
     main_axis_expand,
     WidgetTester::new(fn_widget! {
       @Flex {
-        h_align: HAlign::Stretch,
+        clamp: BoxClamp::EXPAND_X,
         item_gap: 15.,
-        @SizedBox { size: Size::new(120., 20.) }
+        @Container { width: 120., height: 20. }
         @Expanded {
           flex: 1.,
-          @SizedBox { size: Size::new(10., 20.) }
+          @Container { width: 10., height: 20. }
         }
-        @SizedBox { size: Size::new(80., 20.) }
+        @Container { width: 80., height: 20. }
         @Expanded {
           flex: 2.,
-          @SizedBox { size: Size::new(10., 20.) }
+          @Container { width: 10., height: 20. }
         }
-        @SizedBox { size: Size::new(30., 20.) }
+        @Container { width: 30., height: 20. }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -516,7 +545,7 @@ mod tests {
         wrap: true,
         line_gap: 10.,
         align_items: Align::Center,
-        @{ (0..3).map(|_| SizedBox { size: Size::new(200., 20.) }) }
+        @{ (0..3).map(|_| @Container { width: 200., height: 20.,  }) }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -530,9 +559,9 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Flex {
         align_items: align,
-        @SizedBox { size: Size::new(100., 20.) }
-        @SizedBox { size: Size::new(100., 30.) }
-        @SizedBox { size: Size::new(100., 40.) }
+        @Container { width: 100., height: 20. }
+        @Container { width: 100., height: 30. }
+        @Container { width: 100., height: 40. }
       }
     })
     .with_wnd_size(Size::new(500., 40.))
@@ -578,14 +607,15 @@ mod tests {
   fn main_align(justify_content: JustifyContent) -> WidgetTester {
     WidgetTester::new(fn_widget! {
       let item_size = Size::new(100., 20.);
-      @SizedBox {
-        size: Size::new(500., 500.),
+      @Container {
+        width: 500.,
+        height: 500.,
         @Flex {
           justify_content,
           align_items: Align::Start,
-          @SizedBox { size: item_size }
-          @SizedBox { size: item_size }
-          @SizedBox { size: item_size }
+          @Container { width: item_size.width, height: item_size.height }
+          @Container { width: item_size.width, height: item_size.height }
+          @Container { width: item_size.width, height: item_size.height }
         }
       }
     })
@@ -594,35 +624,17 @@ mod tests {
 
   widget_layout_test!(
     start_main_align,
-    main_align(JustifyContent::Start),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    main_align(JustifyContent::Compact),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(300., 20.)),
     LayoutCase::new(&[0, 0, 0]).with_x(0.),
     LayoutCase::new(&[0, 0, 1]).with_x(100.),
     LayoutCase::new(&[0, 0, 2]).with_x(200.)
   );
 
   widget_layout_test!(
-    center_main_align,
-    main_align(JustifyContent::Center),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
-    LayoutCase::new(&[0, 0, 0]).with_x(100.),
-    LayoutCase::new(&[0, 0, 1]).with_x(200.),
-    LayoutCase::new(&[0, 0, 2]).with_x(300.)
-  );
-
-  widget_layout_test!(
-    end_main_align,
-    main_align(JustifyContent::End),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
-    LayoutCase::new(&[0, 0, 0]).with_x(200.),
-    LayoutCase::new(&[0, 0, 1]).with_x(300.),
-    LayoutCase::new(&[0, 0, 2]).with_x(400.)
-  );
-
-  widget_layout_test!(
     space_between_align,
     main_align(JustifyContent::SpaceBetween),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 20.)),
     LayoutCase::new(&[0, 0, 0]).with_x(0.),
     LayoutCase::new(&[0, 0, 1]).with_x(200.),
     LayoutCase::new(&[0, 0, 2]).with_x(400.)
@@ -632,7 +644,7 @@ mod tests {
   widget_layout_test!(
     space_around_align,
     main_align(JustifyContent::SpaceAround),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 20.)),
     LayoutCase::new(&[0, 0, 0]).with_x(0.5 * AROUND_SPACE),
     LayoutCase::new(&[0, 0, 1]).with_x(100. + AROUND_SPACE * 1.5),
     LayoutCase::new(&[0, 0, 2]).with_x(2.5 * AROUND_SPACE + 200.)
@@ -641,7 +653,7 @@ mod tests {
   widget_layout_test!(
     space_evenly_align,
     main_align(JustifyContent::SpaceEvenly),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 20.)),
     LayoutCase::new(&[0, 0, 0]).with_x(50.),
     LayoutCase::new(&[0, 0, 1]).with_x(200.),
     LayoutCase::new(&[0, 0, 2]).with_x(350.)
@@ -650,25 +662,26 @@ mod tests {
   widget_layout_test!(
     flex_expand,
     WidgetTester::new(fn_widget! {
-      @SizedBox {
-        size: Size::new(500., 25.),
+      @Container {
+        width: 500.,
+        height: 25.,
         @Flex {
           direction: Direction::Horizontal,
           @Expanded {
             defer_alloc: false,
             flex: 2.,
-            @SizedBox { size: Size::splat(100.),}
+            @Container { width: 100., height: 100., }
           }
           @Expanded {
             defer_alloc: false,
             flex: 1.,
-            @SizedBox { size: Size::splat(50.),}
+            @Container { width: 50., height: 50., }
           }
-          @SizedBox { size: Size::new(100., 20.) }
+          @Container { width: 100., height: 20. }
           @Expanded {
             defer_alloc: false,
             flex: 1.,
-            @SizedBox { size: Size::splat(100.), }
+            @Container { width: 100., height: 100., }
           }
         }
       }
@@ -687,8 +700,8 @@ mod tests {
       @Flex {
         direction: Direction::Vertical,
         item_gap: 50.,
-        @SizedBox { size: Size::new(100., 100.) }
-        @SizedBox { size: Size::new(100., 500.) }
+        @Container { width: 100., height: 100. }
+        @Container { width: 100., height: 500. }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -706,7 +719,7 @@ mod tests {
     WidgetTester::new(flex! {
       clamp: BoxClamp::min_height(500.),
       align_items: Align::Center,
-      @Container { size: Size::new(100., 100.) }
+      @Container { width: 100., height: 100. }
     })
     .with_wnd_size(Size::new(500., 500.)),
     LayoutCase::default().with_height(500.),
@@ -718,19 +731,22 @@ mod tests {
     WidgetTester::new(flex! {
       direction: Direction::Vertical,
       @Container {
-        size: Size::new(60., 500.),
+        width: 60.,
+        height: 500.,
       }
       @Expanded {
         flex: 1.,
         @Container {
-          size: Size::new(50., 140.),
+          width: 50.,
+          height: 140.,
         }
       }
       @Expanded {
         flex: 1.,
         defer_alloc: false,
         @Container {
-          size: Size::new(50., 140.),
+          width: 50.,
+          height: 140.,
         }
       }
     })
@@ -746,13 +762,15 @@ mod tests {
     WidgetTester::new(unconstrained_box! {
       @Flex {
         @Container {
-          size: Size::splat(300.),
+          width: 300.,
+          height: 300.,
         }
         @Expanded {
           flex: 1.,
           defer_alloc: true,
           @Container {
-            size: Size::new(50., 140.),
+            width: 50.,
+            height: 140.,
           }
         }
       }

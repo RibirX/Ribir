@@ -5,7 +5,7 @@ use crate::{
   context::VisualCtx,
   prelude::ProviderCtx,
   widget::{BoxClamp, VisualBox, WidgetTree},
-  widget_tree::WidgetId,
+  widget_tree::{AnchorX, AnchorY, WidgetId},
 };
 
 /// A place to compute the render object's layout.
@@ -78,7 +78,7 @@ impl<'a> LayoutCtx<'a> {
       .unwrap_or_else(|| {
         // The position needs to be reset, as some parent render widgets may not have
         // set the position.
-        self.update_position(child, Point::zero());
+        self.update_anchor(child, AnchorX::default(), AnchorY::default());
 
         let id = std::mem::replace(&mut self.id, child);
         let size = self.perform_layout(clamp);
@@ -91,13 +91,35 @@ impl<'a> LayoutCtx<'a> {
   /// Adjust the position of the widget where it should be placed relative to
   /// its parent.
   #[inline]
-  pub fn update_position(&mut self, child: WidgetId, pos: Point) {
-    self.tree.store.layout_info_or_default(child).pos = pos;
+  pub fn update_anchor(&mut self, child: WidgetId, pos_x: AnchorX, pos_y: AnchorY) {
+    let info = self.tree.store.layout_info_or_default(child);
+    info.pos_x = pos_x;
+    info.pos_y = pos_y;
   }
 
-  /// Return the position of the widget relative to its parent.
   #[inline]
-  pub fn position(&mut self, child: WidgetId) -> Option<Point> {
+  pub fn update_anchor_x(&mut self, child: WidgetId, pos_x: AnchorX) {
+    self
+      .tree
+      .store
+      .layout_info_or_default(child)
+      .pos_x = pos_x;
+  }
+
+  #[inline]
+  pub fn update_anchor_y(&mut self, child: WidgetId, pos_y: AnchorY) {
+    self
+      .tree
+      .store
+      .layout_info_or_default(child)
+      .pos_y = pos_y;
+  }
+
+  /// Return the stored anchor rules of the widget.
+  /// Returns (AnchorX, AnchorY) so caller can apply offset methods without
+  /// calculation.
+  #[inline]
+  pub fn anchor(&mut self, child: WidgetId) -> Option<(AnchorX, AnchorY)> {
     self
       .tree
       .store

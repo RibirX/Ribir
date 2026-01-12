@@ -99,7 +99,7 @@ impl FittedBox {
     } else {
       container.height = child_size.height * scale.y;
     }
-    ctx.update_position(child, pos);
+    ctx.update_anchor(child, AnchorX::new(pos.x), AnchorY::new(pos.y));
 
     clamp.clamp(container)
   }

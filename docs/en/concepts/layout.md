@@ -34,7 +34,7 @@ fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size
 
 In this method, the Widget needs to do three things:
 1.  **Layout children**: Iterate through its child nodes, calculate a new `BoxClamp` for each child (based on the incoming `clamp` and its own layout logic), and call `ctx.perform_child_layout(child, child_clamp)`.
-2.  **Determine position**: Get the `Size` returned by the child node, and set the child node's position according to the layout logic `ctx.update_position(child, position)`.
+2.  **Determine position**: Get the `Size` returned by the child node, and set the child node's position according to the layout logic `ctx.update_anchor(child, anchor_x, anchor_y)`.
 3.  **Return size**: Calculate and return its own final `Size`, and this size must satisfy the incoming `clamp` constraint.
 
 ## Using the `clamp` Attribute to Intervene in Layout
@@ -93,7 +93,7 @@ impl Render for FixedSizeBox {
             ctx.perform_child_layout(child, child_clamp);
 
             // Set child node position (usually (0,0))
-            ctx.update_position(child, Point::zero());
+            ctx.update_anchor(child, AnchorX::default(), AnchorY::default());
         }
 
         // 3. Return final size

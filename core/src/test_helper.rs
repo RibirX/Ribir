@@ -257,7 +257,7 @@ impl Render for MockMulti {
     let (ctx, children) = ctx.split_children();
     for c in children {
       let child_size = ctx.perform_child_layout(c, clamp);
-      ctx.update_position(c, Point::new(size.width, 0.));
+      ctx.update_anchor(c, AnchorX::new(size.width), AnchorY::new(0.));
       size.width += child_size.width;
       size.height = size.height.max(child_size.height);
     }

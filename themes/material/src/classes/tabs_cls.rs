@@ -167,7 +167,23 @@ fn indicator(pos: &TabPos) -> Widget<'static> {
 
   let header = active_header_rect_state();
   let tt = tab_type();
-  let (size, anchor): (PipeValue<_>, PipeValue<_>) = match (tt, pos.is_horizontal()) {
+
+  let mut x = AnchorX::default();
+  let mut y = AnchorY::default();
+  if *pos == TabPos::Top {
+    y = AnchorY::at_bottom();
+  } else if *pos == TabPos::Left {
+    x = AnchorX::at_right();
+  }
+
+  #[allow(clippy::type_complexity)]
+  // Replace Anchor with Position using x/y coordinates
+  let (width, height, x, y): (
+    PipeValue<Measure>,
+    PipeValue<Measure>,
+    PipeValue<Option<AnchorX>>,
+    PipeValue<Option<AnchorY>>,
+  ) = match (tt, pos.is_horizontal()) {
     (TabType::Primary, true) => (
       distinct_pipe!(Size::new(p_length($read(header).width()), 3.)).r_into(),
       distinct_pipe!(Anchor::left($read(header).min_x() + p_offset($read(header).width())))

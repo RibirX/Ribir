@@ -49,12 +49,10 @@ mod unconstrained_box;
 pub use unconstrained_box::*;
 mod opacity;
 pub use opacity::*;
-mod anchor;
-pub use anchor::*;
+
 mod layout_box;
 pub use layout_box::*;
-pub mod align;
-pub use align::*;
+
 pub mod fitted_box;
 pub use fitted_box::*;
 pub mod svg;
@@ -71,8 +69,11 @@ pub mod clip_boundary;
 pub use clip_boundary::*;
 pub mod focus_scope;
 pub use focus_scope::*;
-pub mod global_anchor;
-pub use global_anchor::*;
+
+pub mod anchor;
+pub use anchor::*;
+pub mod follow;
+pub use follow::*;
 mod mix_builtin;
 pub use mix_builtin::*;
 pub mod container;
@@ -155,10 +156,8 @@ pub struct FatObj<T> {
   transform: Option<Stateful<TransformWidget>>,
   opacity: Option<Stateful<Opacity>>,
   visibility: Option<Stateful<Visibility>>,
-  h_align: Option<Stateful<HAlignWidget>>,
-  v_align: Option<Stateful<VAlignWidget>>,
-  relative_anchor: Option<Stateful<RelativeAnchor>>,
-  global_anchor: Option<Stateful<GlobalAnchor>>,
+
+  anchor: Option<Stateful<Anchor>>,
   painting_style: Option<Stateful<PaintingStyleWidget>>,
   text_align: Option<Stateful<TextAlignWidget>>,
   text_style: Option<Stateful<TextStyleWidget>>,
@@ -209,10 +208,8 @@ impl<T> FatObj<T> {
       scrollable: self.scrollable,
       constrained_box: self.constrained_box,
       transform: self.transform,
-      h_align: self.h_align,
-      v_align: self.v_align,
-      relative_anchor: self.relative_anchor,
-      global_anchor: self.global_anchor,
+
+      anchor: self.anchor,
       painting_style: self.painting_style,
       text_style: self.text_style,
       text_align: self.text_align,
@@ -254,10 +251,7 @@ impl<T> FatObj<T> {
       && self.scrollable.is_none()
       && self.constrained_box.is_none()
       && self.transform.is_none()
-      && self.h_align.is_none()
-      && self.v_align.is_none()
-      && self.relative_anchor.is_none()
-      && self.global_anchor.is_none()
+      && self.anchor.is_none()
       && self.class.is_none()
       && self.painting_style.is_none()
       && self.text_style.is_none()
@@ -759,33 +753,15 @@ impl<T> FatObj<T> {
     init_sub_widget!(self, transform, transform, v)
   }
 
-  /// Initializes how the widget should be aligned horizontally.
-  pub fn with_h_align<K: ?Sized>(&mut self, v: impl RInto<PipeValue<HAlign>, K>) -> &mut Self {
-    init_sub_widget!(self, h_align, h_align, v)
+  /// Initializes the x position of the widget.
+  /// Initializes the x position of the widget.
+  pub fn with_x<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Option<AnchorX>>, K>) -> &mut Self {
+    init_sub_widget!(self, anchor, x, v)
   }
 
-  /// Initializes how the widget should be aligned vertically.
-  pub fn with_v_align<K: ?Sized>(&mut self, v: impl RInto<PipeValue<VAlign>, K>) -> &mut Self {
-    init_sub_widget!(self, v_align, v_align, v)
-  }
-
-  /// Initializes the relative anchor to the parent of the widget.
-  pub fn with_anchor<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Anchor>, K>) -> &mut Self {
-    init_sub_widget!(self, relative_anchor, anchor, v)
-  }
-
-  /// Initializes the horizontal global anchor of the widget.
-  pub fn with_global_anchor_x<K: ?Sized>(
-    &mut self, v: impl RInto<PipeValue<Option<GlobalAnchorX>>, K>,
-  ) -> &mut Self {
-    init_sub_widget!(self, global_anchor, global_anchor_x, v)
-  }
-
-  /// Initializes the vertical global anchor of the widget.
-  pub fn with_global_anchor_y<K: ?Sized>(
-    &mut self, v: impl RInto<PipeValue<Option<GlobalAnchorY>>, K>,
-  ) -> &mut Self {
-    init_sub_widget!(self, global_anchor, global_anchor_y, v)
+  /// Initializes the y position of the widget.
+  pub fn with_y<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Option<AnchorY>>, K>) -> &mut Self {
+    init_sub_widget!(self, anchor, y, v)
   }
 
   /// Initializes the visibility of the widget.
@@ -1087,22 +1063,6 @@ impl<T> FatObj<T> {
     part_writer!(&mut margin.margin)
   }
 
-  /// Returns a state writer for modifying horizontal anchoring in global space.
-  /// Positions widget relative to the screen's horizontal edges
-  /// (left/center/right).
-  pub fn global_anchor_x(&mut self) -> impl StateWriter<Value = Option<GlobalAnchorX>> {
-    let anchor = sub_widget!(self, global_anchor);
-    part_writer!(&mut anchor.global_anchor_x)
-  }
-
-  /// Returns a state writer for modifying vertical anchoring in global space.
-  /// Positions widget relative to the screen's vertical edges
-  /// (top/center/bottom).
-  pub fn global_anchor_y(&mut self) -> impl StateWriter<Value = Option<GlobalAnchorY>> {
-    let anchor = sub_widget!(self, global_anchor);
-    part_writer!(&mut anchor.global_anchor_y)
-  }
-
   /// Returns a state writer for modifying the cursor icon.
   /// Changes the mouse cursor when hovering over the widget (pointer, text,
   /// etc.).
@@ -1132,30 +1092,6 @@ impl<T> FatObj<T> {
   pub fn transform(&mut self) -> impl StateWriter<Value = Transform> {
     let transform = sub_widget!(self, transform);
     part_writer!(&mut transform.transform)
-  }
-
-  /// Returns a state writer for modifying horizontal alignment.
-  /// Controls positioning within available horizontal space (left, center,
-  /// right).
-  pub fn h_align(&mut self) -> impl StateWriter<Value = HAlign> {
-    let h_align = sub_widget!(self, h_align);
-    part_writer!(&mut h_align.h_align)
-  }
-
-  /// Returns a state writer for modifying vertical alignment.
-  /// Controls positioning within available vertical space (top, center,
-  /// bottom).
-  pub fn v_align(&mut self) -> impl StateWriter<Value = VAlign> {
-    let v_align = sub_widget!(self, v_align);
-    part_writer!(&mut v_align.v_align)
-  }
-
-  /// Returns a state writer for modifying relative anchoring.
-  /// Positions widget relative to its parent using normalized coordinates
-  /// (0-1).
-  pub fn anchor(&mut self) -> impl StateWriter<Value = Anchor> {
-    let anchor = sub_widget!(self, relative_anchor);
-    part_writer!(&mut anchor.anchor)
   }
 
   /// Returns a state writer for modifying visibility state.
@@ -1246,16 +1182,16 @@ impl<T> FatObj<T> {
     sub_widget!(self, scrollable)
   }
 
-  /// Returns the `Stateful<RelativeAnchor>` widget from the FatObj. If it
-  /// doesn't exist, a new one will be created.
-  pub fn relative_anchor_widget(&mut self) -> &Stateful<RelativeAnchor> {
-    sub_widget!(self, relative_anchor)
+  /// Returns a state writer for modifying the x position.
+  pub fn x(&mut self) -> impl StateWriter<Value = Option<AnchorX>> {
+    let anchor = sub_widget!(self, anchor);
+    part_writer!(&mut anchor.x)
   }
 
-  /// Returns the `Stateful<GlobalAnchor>` widget from the FatObj. If it doesn't
-  /// exist, a new one will be created.
-  pub fn global_anchor_widget(&mut self) -> &Stateful<GlobalAnchor> {
-    sub_widget!(self, global_anchor)
+  /// Returns a state writer for modifying the y position.
+  pub fn y(&mut self) -> impl StateWriter<Value = Option<AnchorY>> {
+    let anchor = sub_widget!(self, anchor);
+    part_writer!(&mut anchor.y)
   }
 
   fn mix_builtin_widget(&mut self) -> &MixBuiltin {
@@ -1398,10 +1334,7 @@ impl<'a> FatObj<Widget<'a>> {
           opacity,
           visibility,
           disabled,
-          h_align,
-          v_align,
-          relative_anchor,
-          global_anchor,
+          anchor,
           keep_alive,
           reuse
         ]
