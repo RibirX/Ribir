@@ -28,6 +28,7 @@ jobs:
       stable-version: ${{ steps.detect.outputs.stable }}
       nightly-version: ${{ steps.detect.outputs.nightly }}
       image-tag: ${{ steps.detect.outputs.image_tag }}
+      owner-lc: ${{ steps.detect.outputs.owner_lc }}
     steps:
       - uses: actions/checkout@v4
 
@@ -43,14 +44,19 @@ jobs:
           # Generate image tag
           IMAGE_TAG="v${STABLE}-${NIGHTLY}"
 
+          # Lowercase owner for docker image tags
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+
           echo "stable=$STABLE" >> $GITHUB_OUTPUT
           echo "nightly=$NIGHTLY" >> $GITHUB_OUTPUT
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "owner_lc=$OWNER_LC" >> $GITHUB_OUTPUT
 
           echo "Detected versions:"
           echo "  Stable: $STABLE"
           echo "  Nightly: $NIGHTLY"
           echo "  Image Tag: $IMAGE_TAG"
+          echo "  Owner (lc): $OWNER_LC"
 
   check-image-exists:
     name: Check if Images Exist
@@ -65,7 +71,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_TAG: ${{ needs.detect-versions.outputs.image-tag }}
-          OWNER: ${{ github.repository_owner }}
+          OWNER: ${{ needs.detect-versions.outputs.owner-lc }}
         run: |
           # If scheduled run, always rebuild to update cache
           if [ "${{ github.event_name }}" = "schedule" ]; then
@@ -127,8 +133,8 @@ jobs:
           file: ./.github/docker/linux/linux.dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.detect-versions.outputs.image-tag }}
-            ghcr.io/${{ github.repository_owner }}/ribir-linux:latest
+            ghcr.io/${{ needs.detect-versions.outputs.owner-lc }}/ribir-linux:${{ needs.detect-versions.outputs.image-tag }}
+            ghcr.io/${{ needs.detect-versions.outputs.owner-lc }}/ribir-linux:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -164,8 +170,8 @@ jobs:
           file: ./.github/docker/windows/base.dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/ribir-windows-base:${{ needs.detect-versions.outputs.image-tag }}
-            ghcr.io/${{ github.repository_owner }}/ribir-windows-base:latest
+            ghcr.io/${{ needs.detect-versions.outputs.owner-lc }}/ribir-windows-base:${{ needs.detect-versions.outputs.image-tag }}
+            ghcr.io/${{ needs.detect-versions.outputs.owner-lc }}/ribir-windows-base:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -186,7 +192,7 @@ jobs:
       - name: Test Linux image
         run: |
           docker run --rm \
-            ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.detect-versions.outputs.image-tag }} \
+            ghcr.io/${{ needs.detect-versions.outputs.owner-lc }}/ribir-linux:${{ needs.detect-versions.outputs.image-tag }} \
             bash -c "rustc --version && cargo --version"
 
       - name: Verify CI script works in image
@@ -194,7 +200,7 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/app \
             -w /app \
-            ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.detect-versions.outputs.image-tag }} \
+            ghcr.io/${{ needs.detect-versions.outputs.owner-lc }}/ribir-linux:${{ needs.detect-versions.outputs.image-tag }} \
             bash -c "cargo +nightly ci config-nightly"
 
   summary:
