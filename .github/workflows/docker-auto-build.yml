@@ -1,0 +1,219 @@
+name: Auto Build Docker Images
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'Cargo.toml'
+      - 'tools/ci.rs'
+      - '.github/docker/**'
+  workflow_dispatch:
+  schedule:
+    # Run at 20:00 UTC every day (04:00 CST) to keep cache fresh
+    - cron: '0 20 * * *'
+
+env:
+  VULKAN_VERSION: 1.3.268
+  MESA_VERSION: 23.3.1
+  CI_BINARY_BUILD: build18
+  DXC_RELEASE: v1.7.2308
+  DXC_FILENAME: dxc_2023_08_14.zip
+  WARP_VERSION: 1.0.8
+
+jobs:
+  detect-versions:
+    name: Detect Rust Versions
+    runs-on: ubuntu-latest
+    outputs:
+      stable-version: ${{ steps.detect.outputs.stable }}
+      nightly-version: ${{ steps.detect.outputs.nightly }}
+      image-tag: ${{ steps.detect.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect versions
+        id: detect
+        run: |
+          # Get MSRV (stable) from Cargo.toml
+          STABLE=$(grep 'rust-version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+
+          # Get nightly version from tools/ci.rs without running it
+          NIGHTLY=$(grep 'NIGHTLY_VERSION' tools/ci.rs | head -1 | sed 's/.*"\(.*\)".*/\1/')
+
+          # Generate image tag
+          IMAGE_TAG="v${STABLE}-${NIGHTLY}"
+
+          echo "stable=$STABLE" >> $GITHUB_OUTPUT
+          echo "nightly=$NIGHTLY" >> $GITHUB_OUTPUT
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+          echo "Detected versions:"
+          echo "  Stable: $STABLE"
+          echo "  Nightly: $NIGHTLY"
+          echo "  Image Tag: $IMAGE_TAG"
+
+  check-image-exists:
+    name: Check if Images Exist
+    runs-on: ubuntu-latest
+    needs: detect-versions
+    outputs:
+      linux-exists: ${{ steps.check.linux_exists }}
+      windows-base-exists: ${{ steps.check.windows_base_exists }}
+    steps:
+      - name: Check if images exist in GHCR
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_TAG: ${{ needs.detect-versions.outputs.image-tag }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          # If scheduled run, always rebuild to update cache
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "linux_exists=false" >> $GITHUB_OUTPUT
+            echo "windows_base_exists=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check Linux image
+          LINUX_RESPONSE=$(gh api \
+            --method GET \
+            /users/${OWNER}/packages/container/ribir-linux/versions/${IMAGE_TAG} \
+            2>/dev/null || echo "not_found")
+
+          if [ "$LINUX_RESPONSE" = "not_found" ]; then
+            echo "linux_exists=false" >> $GITHUB_OUTPUT
+            echo "ribir-linux:${IMAGE_TAG} - NOT FOUND"
+          else
+            echo "linux_exists=true" >> $GITHUB_OUTPUT
+            echo "ribir-linux:${IMAGE_TAG} - EXISTS"
+          fi
+
+          # Check Windows base image
+          WINDOWS_RESPONSE=$(gh api \
+            --method GET \
+            /users/${OWNER}/packages/container/ribir-windows-base/versions/${IMAGE_TAG} \
+            2>/dev/null || echo "not_found")
+
+          if [ "$WINDOWS_RESPONSE" = "not_found" ]; then
+            echo "windows_base_exists=false" >> $GITHUB_OUTPUT
+            echo "ribir-windows-base:${IMAGE_TAG} - NOT FOUND"
+          else
+            echo "windows_base_exists=true" >> $GITHUB_OUTPUT
+            echo "ribir-windows-base:${IMAGE_TAG} - EXISTS"
+          fi
+
+  build-linux:
+    name: Build Linux Image
+    runs-on: ubuntu-latest
+    needs: [detect-versions, check-image-exists]
+    if: needs.check-image-exists.outputs.linux-exists != 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./.github/docker/linux
+          file: ./.github/docker/linux/linux.dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.detect-versions.outputs.image-tag }}
+            ghcr.io/${{ github.repository_owner }}/ribir-linux:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            RUST_STABLE_VERSION=${{ needs.detect-versions.outputs.stable-version }}
+            RUST_NIGHTLY_VERSION=${{ needs.detect-versions.outputs.nightly-version }}
+            VULKAN_SDK_VERSION=${{ env.VULKAN_VERSION }}
+            MESA_VERSION=${{ env.MESA_VERSION }}
+            CI_BINARY_BUILD=${{ env.CI_BINARY_BUILD }}
+            PREWARM_CACHE=true
+
+  build-windows-base:
+    name: Build Windows Base Image
+    runs-on: windows-2022
+    needs: [detect-versions, check-image-exists]
+    if: needs.check-image-exists.outputs.windows-base-exists != 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./.github/docker/windows
+          file: ./.github/docker/windows/base.dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/ribir-windows-base:${{ needs.detect-versions.outputs.image-tag }}
+            ghcr.io/${{ github.repository_owner }}/ribir-windows-base:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            RUST_STABLE_VERSION=${{ needs.detect-versions.outputs.stable-version }}
+            RUST_NIGHTLY_VERSION=${{ needs.detect-versions.outputs.nightly-version }}
+            DXC_RELEASE=${{ env.DXC_RELEASE }}
+            DXC_FILENAME=${{ env.DXC_FILENAME }}
+            WARP_VERSION=${{ env.WARP_VERSION }}
+
+  verify-images:
+    name: Verify Images Work
+    runs-on: ubuntu-latest
+    needs: [detect-versions, build-linux, build-windows-base]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test Linux image
+        run: |
+          docker run --rm \
+            ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.detect-versions.outputs.image-tag }} \
+            bash -c "rustc --version && cargo --version"
+
+      - name: Verify CI script works in image
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/app \
+            -w /app \
+            ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.detect-versions.outputs.image-tag }} \
+            bash -c "cargo +nightly ci config-nightly"
+
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [detect-versions, check-image-exists, build-linux, build-windows-base, verify-images]
+    if: always()
+    steps:
+      - name: Create summary
+        run: |
+          echo "## Docker Images Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** \`${{ needs.detect-versions.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Versions:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Stable: ${{ needs.detect-versions.outputs.stable-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Nightly: ${{ needs.detect-versions.outputs.nightly-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Status:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Linux: ${{ needs.build-linux.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Windows Base: ${{ needs.build-windows-base.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Verification: ${{ needs.verify-images.result }}" >> $GITHUB_STEP_SUMMARY

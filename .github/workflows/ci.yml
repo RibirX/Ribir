@@ -44,23 +44,23 @@ jobs:
         if: contains(github.event.pull_request.labels.*.name, 'do-not-merge')
         run: |
           gh pr comment "$PR_NUMBER" --body "⚠️ **Merge Blocked**: This PR has the \`do-not-merge\` label.
-          
+
           - If this is a **Release PR**, please wait and use \`@ribir-bot release-stable\` to merge it.
           - If you manually confirmed it's safe to merge, remove the \`do-not-merge\` label first."
-          
+
           echo "❌ PR has 'do-not-merge' label. Manual merging is disabled."
           exit 1
 
-  get-nightly-version:
-    name: Get nightly version
+  get-versions:
+    name: Get Versions
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || (github.event.action != 'labeled' && github.event.action != 'unlabeled')
     outputs:
-      version: ${{ steps.nightly-version.outputs.version }}
+      stable-version: ${{ steps.versions.outputs.stable }}
+      nightly-version: ${{ steps.versions.outputs.nightly }}
+      image-tag: ${{ steps.versions.outputs.image_tag }}
       tools-changed: ${{ steps.filter.outputs.tools }}
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - uses: dorny/paths-filter@v2
         id: filter
@@ -69,62 +69,72 @@ jobs:
             tools:
               - 'tools/**'
 
-      - name: Install unstable rustfmt
-        id: nightly-version
-        shell: bash
+      - name: Get versions
+        id: versions
         run: |
-          echo "version=$(cargo +nightly ci config-nightly)" >> "$GITHUB_OUTPUT"
+          # Get MSRV (stable) from Cargo.toml
+          STABLE=$(grep 'rust-version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
 
+          # Get nightly version from tools/ci.rs without running it
+          NIGHTLY=$(grep 'NIGHTLY_VERSION' tools/ci.rs | head -1 | sed 's/.*"\(.*\)".*/\1/')
+
+          # Generate image tag
+          IMAGE_TAG="v${STABLE}-${NIGHTLY}"
+
+          echo "stable=$STABLE" >> $GITHUB_OUTPUT
+          echo "nightly=$NIGHTLY" >> $GITHUB_OUTPUT
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+          echo "Detected versions:"
+          echo "  Stable: $STABLE"
+          echo "  Nightly: $NIGHTLY"
+          echo "  Image Tag: $IMAGE_TAG"
 
   lint:
     name: rust code lint
     runs-on: ubuntu-latest
-    needs: get-nightly-version
+    needs: get-versions
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-      # Install the specific nightly version with components
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ needs.get-nightly-version.outputs.version }}
-          components: rustfmt, clippy
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install development libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
+      - uses: actions/checkout@v4
       - name: Run lint checks
-        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci lint
+        run: |
+          NIGHTLY_VERSION=$(cargo +nightly ci config-nightly)
+          cargo +${NIGHTLY_VERSION} ci lint
+
   test-with-gpu:
-    # The content of this job is largely borrowed from the 'ci.yml' file in the 'wgpu/.github/workflows' directory.
-    timeout-minutes: 30
+    # The content of this job is largely borrowed from 'ci.yml' file in the 'wgpu/.github/workflows' directory.
+    timeout-minutes: 20
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Windows
-          - name: Windows x86_64
-            os: windows-2022
-
           # Mac
           - name: Mac aarch64
             os: macos-14
+            use_docker: false
 
           # Linux
           - name: Linux x86_64
-            os: ubuntu-22.04
+            os: ubuntu-latest
+            use_docker: true
+
+          # Windows (keeping without Docker for now for stability)
+          - name: Windows x86_64
+            os: windows-2022
+            use_docker: false
 
     name: Test ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    needs: [lint, get-nightly-version]
+    needs: [get-versions, lint]
+    container:
+      image: ${{ matrix.os == 'ubuntu-latest' && format('ghcr.io/{0}/ribir-linux:{1}', github.repository_owner, needs.get-versions.outputs.image_tag) || '' }}
 
     steps:
       - name: Free Disk Space (Ubuntu)
-        if: matrix.os == 'ubuntu-22.04'
+        if: matrix.os == 'ubuntu-latest' && matrix.use_docker == false
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: false
@@ -135,116 +145,62 @@ jobs:
           docker-images: true
           swap-storage: true
 
-      - name: checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      # Install Rust and dependencies for non-Docker (macOS and Windows)
+      - name: Install Rust (nightly, non-Docker)
+        if: matrix.use_docker == false
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ needs.get-nightly-version.outputs.version }}
+          toolchain: ${{ needs.get-versions.outputs.nightly-version }}
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust (stable, non-Docker)
+        if: matrix.use_docker == false
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
           components: llvm-tools-preview
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Install macOS dependencies
+        if: matrix.os == 'macos-14'
+        run: brew install webp
 
-      - name: Install cargo-nextest and cargo-llvm-cov
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest,cargo-llvm-cov
-
-      - name: (windows) install dxc
+      # Install dependencies for Windows (non-Docker)
+      - name: (windows) Install DXC
         if: matrix.os == 'windows-2022'
         shell: bash
         run: |
           set -e
-
           curl.exe -L --retry 5 https://github.com/microsoft/DirectXShaderCompiler/releases/download/$DXC_RELEASE/$DXC_FILENAME -o dxc.zip
           7z.exe e dxc.zip -odxc bin/x64/{dxc.exe,dxcompiler.dll,dxil.dll}
-
-          # We need to use cygpath to convert PWD to a windows path as we're using bash.
           cygpath --windows "$PWD/dxc" >> "$GITHUB_PATH"
 
-      - name: (windows) install warp
+      - name: (windows) Install WARP
         if: matrix.os == 'windows-2022'
         shell: bash
         run: |
           set -e
-
-          # Make sure dxc is in path.
           dxc --version
-
           curl.exe -L --retry 5 https://www.nuget.org/api/v2/package/Microsoft.Direct3D.WARP/$WARP_VERSION -o warp.zip
           7z.exe e warp.zip -owarp build/native/amd64/d3d10warp.dll
-
           mkdir -p target/llvm-cov-target/debug/deps
-
           cp -v warp/d3d10warp.dll target/llvm-cov-target/debug/
           cp -v warp/d3d10warp.dll target/llvm-cov-target/debug/deps
 
-      - name: (windows) install mesa
+      - name: (windows) Install Mesa
         if: matrix.os == 'windows-2022'
         shell: bash
         run: |
           set -e
-
           curl.exe -L --retry 5 https://github.com/pal1000/mesa-dist-win/releases/download/$MESA_VERSION/mesa3d-$MESA_VERSION-release-msvc.7z -o mesa.7z
           7z.exe e mesa.7z -omesa x64/{opengl32.dll,libgallium_wgl.dll,libglapi.dll,vulkan_lvp.dll,lvp_icd.x86_64.json}
-
           cp -v mesa/* target/llvm-cov-target/debug/
           cp -v mesa/* target/llvm-cov-target/debug/deps
-
-          # We need to use cygpath to convert PWD to a windows path as we're using bash.
           echo "VK_DRIVER_FILES=`cygpath --windows $PWD/mesa/lvp_icd.x86_64.json`" >> "$GITHUB_ENV"
           echo "GALLIUM_DRIVER=llvmpipe" >> "$GITHUB_ENV"
 
-
-      - name: (linux) install mesa
-        if: matrix.os == 'ubuntu-22.04'
-        shell: bash
-        run: |
-          set -e
-
-          curl -L --retry 5 https://github.com/gfx-rs/ci-build/releases/download/$CI_BINARY_BUILD/mesa-$MESA_VERSION-linux-x86_64.tar.xz -o mesa.tar.xz
-          mkdir mesa
-          tar xpf mesa.tar.xz -C mesa
-
-          # The ICD provided by the mesa build is hardcoded to the build environment.
-          #
-          # We write out our own ICD file to point to the mesa vulkan
-          cat <<- EOF > icd.json
-          {
-            "ICD": {
-                "api_version": "1.1.255",
-                "library_path": "$PWD/mesa/lib/x86_64-linux-gnu/libvulkan_lvp.so"
-            },
-            "file_format_version": "1.0.0"
-          }
-          EOF
-
-          echo "VK_DRIVER_FILES=$PWD/icd.json" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=$PWD/mesa/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
-          echo "LIBGL_DRIVERS_PATH=$PWD/mesa/lib/x86_64-linux-gnu/dri" >> "$GITHUB_ENV"
-
-      - name: (linux) install dependencies
-        if: matrix.os == 'ubuntu-22.04'
-        shell: bash
-        run: |
-          set -e
-          # vulkan sdk repository
-          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
-          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-$VULKAN_SDK_VERSION-jammy.list https://packages.lunarg.com/vulkan/$VULKAN_SDK_VERSION/lunarg-vulkan-$VULKAN_SDK_VERSION-jammy.list
-
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev vulkan-sdk
-
-      - name: (macos) install webp
-        if: matrix.os == 'macos-14'
-        run: |
-          brew install webp
-
-      - name: disable debug
+      - name: Disable debug
         shell: bash
         run: |
           mkdir -p .cargo
@@ -252,13 +208,14 @@ jobs:
           [profile.dev]
           debug = 1" >> .cargo/config.toml
 
-      - name: run tests
+      - name: Run tests
         shell: bash
         run: |
           set -e
+          NIGHTLY_VERSION=$(cargo +nightly ci config-nightly)
           cargo llvm-cov --workspace --lcov --output-path lcov.info --all-features
 
-      - name: generate coverage report
+      - name: Generate coverage report
         id: coverage
         shell: bash
         continue-on-error: true
@@ -272,73 +229,52 @@ jobs:
           name: test-cases-${{ matrix.os }}
           path: ./test_cases
 
-      - name: upload coverage report to codecov
+      - name: Upload coverage report to codecov
         uses: codecov/codecov-action@v3
         if: steps.coverage.outcome == 'success'
         with:
           files: lcov.info
 
-      - name: (linux) Cleanup llvm-cov-target
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          rm -rf target/llvm-cov-target
-
       # Run doc tests on macOS (nextest/llvm-cov doesn't support doc tests)
-      - name: (macos) Run doc tests
+      - name: Run doc tests (macOS only)
         if: matrix.os == 'macos-14'
-        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci doctest
+        run: |
+          NIGHTLY_VERSION=$(cargo +nightly ci config-nightly)
+          cargo +${NIGHTLY_VERSION} ci doctest
 
   doc-and-wasm:
-    needs: [lint, get-nightly-version]
+    needs: [get-versions, lint]
     name: Doc examples & WASM compile
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
     steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Checkout sources
-        uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ needs.get-nightly-version.outputs.version }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-          targets: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
-      - name: Install development libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
+      - uses: actions/checkout@v4
       - name: Compile doc examples
-        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci doc
+        run: |
+          NIGHTLY_VERSION=$(cargo +nightly ci config-nightly)
+          cargo +${NIGHTLY_VERSION} ci doc
       - name: Compile to WASM
-        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci wasm
+        run: |
+          NIGHTLY_VERSION=$(cargo +nightly ci config-nightly)
+          cargo +${NIGHTLY_VERSION} ci wasm
 
   ribir-bot-check:
-    needs: [get-nightly-version]
+    needs: [get-versions]
     name: Ribir Tools Check
     # Only run if any tool files changed
-    if: needs.get-nightly-version.outputs.tools-changed == 'true'
+    if: needs.get-versions.outputs.tools-changed == 'true'
     uses: ./.github/workflows/tools-ci.yml
     with:
-      nightly-version: ${{ needs.get-nightly-version.outputs.version }}
+      nightly-version: ${{ needs.get-versions.outputs.nightly-version }}
 
   bundle:
-    needs: [lint, get-nightly-version]
+    needs: [get-versions, lint]
     name: bundle
     strategy:
       fail-fast: false
       matrix:
-        # TODO: Re-enable ubuntu-latest after fixing AppImage icon issue
+        # Note: macOS uses existing workflow, Windows could use Docker in future
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
@@ -348,7 +284,7 @@ jobs:
       - name: Install Rust (nightly for cargo script)
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ needs.get-nightly-version.outputs.version }}
+          toolchain: ${{ needs.get-versions.outputs.nightly-version }}
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -358,45 +294,26 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
-
       - name: Install macOS dependencies
         if: matrix.os == 'macos-latest'
         run: brew install webp
 
       - name: Bundle counter example
         shell: bash
-        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci bundle
+        run: cargo +${{ needs.get-versions.outputs.nightly-version }} ci bundle
 
   release-dry-run:
-    needs: [lint]
+    needs: [get-versions, lint]
     name: Verify packages are publishable
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
       - name: Install cargo-workspaces
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-workspaces
-
-      - name: Install audio development libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
+        run: cargo install cargo-workspaces
 
       - name: Dry run release
         run: cargo ws publish --dry-run -y --allow-branch "*"

@@ -1,0 +1,90 @@
+name: Version Change Detector
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+    paths:
+      - "Cargo.toml"
+      - "tools/ci.rs"
+
+jobs:
+  detect-version-change:
+    name: Detect Version Change
+    runs-on: ubuntu-latest
+    outputs:
+      rust_version_changed: ${{ steps.check.outputs.rust_version_changed }}
+      nightly_version_changed: ${{ steps.check.outputs.nightly_version_changed }}
+      stable_version: ${{ steps.check.outputs.stable }}
+      nightly_version: ${{ steps.check.outputs.nightly }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Install Rust (nightly for cargo script)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+
+      - name: Check for version changes
+        id: check
+        run: |
+          # Check if rust-version changed in Cargo.toml
+          if git diff HEAD~1..HEAD Cargo.toml | grep -q 'rust-version'; then
+            echo "rust_version_changed=true" >> $GITHUB_OUTPUT
+            echo "📦 rust-version changed in Cargo.toml"
+          else
+            echo "rust_version_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check if NIGHTLY_VERSION changed in tools/ci.rs
+          if git diff HEAD~1..HEAD tools/ci.rs | grep -q 'NIGHTLY_VERSION'; then
+            echo "nightly_version_changed=true" >> $GITHUB_OUTPUT
+            echo "🌙 NIGHTLY_VERSION changed in tools/ci.rs"
+          else
+            echo "nightly_version_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Extract current versions for reference
+          STABLE=$(grep 'rust-version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          NIGHTLY=$(cargo +nightly ci config-nightly)
+
+          echo "stable=$STABLE" >> $GITHUB_OUTPUT
+          echo "nightly=$NIGHTLY" >> $GITHUB_OUTPUT
+
+          echo ""
+          echo "Current versions:"
+          echo "  Stable: $STABLE"
+          echo "  Nightly: $NIGHTLY"
+
+      - name: Trigger Docker build if needed
+        if: steps.check.outputs.rust_version_changed == 'true' || steps.check.outputs.nightly_version_changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Version changed, triggering Docker image build..."
+          gh workflow run docker-auto-build.yml
+          echo "Docker build workflow triggered."
+
+      - name: Create PR comment (if applicable)
+        if: github.event_name == 'pull_request' && (steps.check.outputs.rust_version_changed == 'true' || steps.check.outputs.nightly_version_changed == 'true')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comment } = await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🐳 **Rust version changed!**
+
+              Docker images will be automatically built with new versions.
+
+              **New versions:**
+              - Stable: \`${{ steps.check.outputs.stable }}\`
+              - Nightly: \`${{ steps.check.outputs.nightly_version }}\`
+
+              Monitor build at: https://github.com/${{ github.repository }}/actions/workflows/docker-auto-build.yml`
+            });
+            console.log(`Created comment: ${comment.html_url}`);

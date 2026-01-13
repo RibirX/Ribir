@@ -10,7 +10,7 @@ To ensure high code quality and consistency with our CI pipeline, we provide a l
 
 ### Using the CI Script (`tools/ci.rs`)
 
-`tools/ci.rs` is a Rust-based script (using `cargo-script`) that mirrors our GitHub Actions workflow. You can run it locally to verify your changes.
+`tools/ci.rs` is a Rust-based script (using `cargo-script`) that mirrors our GitHub Actions workflow and provides project management tools.
 
 #### How to run:
 *   **Via cargo (requires nightly):** `cargo +nightly ci [command]`
@@ -18,15 +18,19 @@ To ensure high code quality and consistency with our CI pipeline, we provide a l
 
 #### Common commands:
 *   `all`: Run all checks (default).
-*   `fmt` (or `f`): Check code formatting.
-*   `clippy` (or `c`): Run Clippy lints.
-*   `check`: Run `cargo check` (using stable).
 *   `lint` (or `l`): Run all lint checks (`fmt` + `clippy` + `check`).
-*   `test` (or `t`): Run tests (includes coverage if `cargo-llvm-cov` is installed).
-*   `doctest` (or `d`): Run code examples in documentation.
-*   `wasm` (or `w`): Verify compilation for `wasm32-unknown-unknown`.
-*   `bundle` (or `b`): Verify the bundle process using the counter example.
-*   `config`: Show current CI configuration and toolchain versions.
+*   `test` (or `t`): Run tests.
+*   `check-env`: Verify your local environment (toolchain, docker, gh cli).
+*   `docker <cmd>`: Docker management (e.g., `docker dev`, `docker pull`, `docker test`).
+*   ...
+*   `help`: Show all available commands and details.
+
+#### Docker Development:
+For Linux and Windows users, we recommend using the Docker environment to ensure consistency with CI:
+```bash
+./tools/ci.rs docker dev    # Start interactive shell
+./tools/ci.rs docker lint   # Run lints in container
+```
 
 ---
 
