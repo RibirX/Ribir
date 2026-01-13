@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.4
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
 ARG RUST_STABLE_VERSION=1.92.0
