@@ -82,7 +82,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install Cargo tools
-RUN cargo install cargo-chef sccache cargo-llvm-cov cargo-nextest
+RUN cargo install cargo-chef sccache cargo-llvm-cov cargo-nextest cargo-workspaces
 
 # Configure sccache
 ENV RUSTC_WRAPPER=sccache
