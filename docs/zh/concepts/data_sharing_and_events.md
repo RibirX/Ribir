@@ -226,14 +226,14 @@ fn child_emitter() -> Widget<'static> {
 
 ### 监听事件
 
-祖先可以使用 `on_custom_concrete_event` 监听特定的自定义事件。
+祖先可以使用 `on_custom` 监听特定的自定义事件。
 
 ```rust ignore
 fn parent_listener() -> Widget<'static> {
     fn_widget! {
         @Column {
             // 监听从 Widget 冒泡的 MyCustomEvent
-            on_custom_concrete_event: |e: &mut CustomEvent<MyCustomEvent>| {
+            on_custom: |e: &mut CustomEvent<MyCustomEvent>| {
                 println!("Received: {}", e.message);
 
                 // 停止事件进一步向上冒泡
@@ -247,11 +247,11 @@ fn parent_listener() -> Widget<'static> {
 
 ### 监听任何自定义事件
 
-您还可以使用 `on_custom_event` 监听所有冒泡的自定义事件，但您将收到一个 `RawCustomEvent`，如果需要，您需要手动向下转换。
+您还可以使用 `on_raw_custom` 监听所有冒泡的自定义事件，但您将收到一个 `RawCustomEvent`，如果需要，您需要手动向下转换。
 
 ```rust ignore
 @Container {
-    on_custom_event: |e: &mut RawCustomEvent| {
+    on_raw_custom: |e: &mut RawCustomEvent| {
         println!("Something happened!");
     }
 }

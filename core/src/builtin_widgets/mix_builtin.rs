@@ -428,9 +428,7 @@ impl MixBuiltin {
     impl_event_callback!(self, FocusInOut, FocusOutCapture, FocusEvent, f)
   }
 
-  pub fn on_custom_concrete_event<E: 'static, F: FnMut(&mut CustomEvent<E>) + 'static>(
-    &self, mut f: F,
-  ) -> &Self {
+  pub fn on_custom<E: 'static, F: FnMut(&mut CustomEvent<E>) + 'static>(&self, mut f: F) -> &Self {
     let wrap_f = move |arg: &mut RawCustomEvent| {
       if let Some(e) = arg.downcast_mut::<E>() {
         f(e);
@@ -439,7 +437,7 @@ impl MixBuiltin {
     impl_event_callback!(self, Customs, CustomEvent, RawCustomEvent, wrap_f)
   }
 
-  pub fn on_custom_event(&self, f: impl FnMut(&mut RawCustomEvent) + 'static) -> &Self {
+  pub fn on_raw_custom(&self, f: impl FnMut(&mut RawCustomEvent) + 'static) -> &Self {
     impl_event_callback!(self, Customs, CustomEvent, RawCustomEvent, f)
   }
 

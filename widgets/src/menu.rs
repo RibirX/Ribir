@@ -57,7 +57,7 @@ pub type MenuEvent = CustomEvent<MenuEventData>;
 ///     }
 ///   });
 ///   let menu = MenuControl::new(menu! {
-///     on_custom_concrete_event: move |e: &mut MenuEvent| {
+///     on_custom: move |e: &mut MenuEvent| {
 ///       if matches!( e.data(), MenuEventData::Enter {..}) {
 ///         println!("Enter");
 ///       }
@@ -266,7 +266,7 @@ impl MenuControl {
       @Providers {
         providers: smallvec![Provider::new(handle.clone())],
         @(w) {
-          on_custom_concrete_event: move |e: &mut MenuEvent| {
+          on_custom: move |e: &mut MenuEvent| {
             if let MenuEventData::Complete{menu,  data, ..} = e.data() {
               if let Some(ParentMenuInfo {menu, idx}) = menu.0.borrow().item_trigger.as_ref() {
                 let item = &menu.0.borrow().items[*idx];
@@ -439,7 +439,7 @@ impl<'w> MenuItem<'w> {
             }
           }
         },
-        on_custom_concrete_event: move|e: &mut MenuEvent| {
+        on_custom: move|e: &mut MenuEvent| {
           let wnd = e.window();
           match e.data() {
             MenuEventData::Select{ selected, .. } => {
@@ -495,7 +495,7 @@ pub enum MenuChild<'w> {
 /// it will use a default divider, otherwise, it will use the specified
 /// widget as the divider.
 
-#[simple_declare(stateless)]
+#[declare(simple, stateless)]
 pub struct MenuDivider {
   #[declare(default)]
   divider: Option<Widget<'static>>,
@@ -632,7 +632,7 @@ mod tests {
     reset_test_env!();
     let (r, w) = split_value(false);
     let menu = MenuControl::new(menu! {
-      on_custom_concrete_event: move|e: &mut MenuEvent| {
+      on_custom: move|e: &mut MenuEvent| {
         if let MenuEventData::Enter{idx, ..} = e.data()
           && *idx == 1
         { *$write(w) = true; }
@@ -661,7 +661,7 @@ mod tests {
 
     let (r, w) = split_value(String::new());
     let sub_menu = MenuControl::new(menu! {
-      on_custom_concrete_event: move|e: &mut MenuEvent| {
+      on_custom: move|e: &mut MenuEvent| {
         if let MenuEventData::Enter{ menu, label,.. } = e.data() {
           let s = "close from sub item".to_string();
           menu.complete(label.clone(), Some(Rc::new(Box::new(s))), &e.window());
@@ -675,7 +675,7 @@ mod tests {
 
     let sub_menu2 = sub_menu.clone();
     let menu = MenuControl::new(menu! {
-        on_custom_concrete_event: move |e: &mut MenuEvent| {
+        on_custom: move |e: &mut MenuEvent| {
           if let MenuEventData::Complete{data: Some(data), ..} = e.data()
             && let Some(s) = data.downcast_ref::<String>()
           {

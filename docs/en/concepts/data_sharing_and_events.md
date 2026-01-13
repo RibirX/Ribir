@@ -225,14 +225,14 @@ fn child_emitter() -> Widget<'static> {
 
 ### Listening to Events
 
-Ancestors can listen to specific custom events using `on_custom_concrete_event`.
+Ancestors can listen to specific custom events using `on_custom`.
 
 ```rust ignore
 fn parent_listener() -> Widget<'static> {
     fn_widget! {
         @Column {
             // Listen for MyCustomEvent bubbling up from children
-            on_custom_concrete_event: |e: &mut CustomEvent<MyCustomEvent>| {
+            on_custom: |e: &mut CustomEvent<MyCustomEvent>| {
                 println!("Received: {}", e.message);
                 
                 // Stop the event from bubbling further up
@@ -246,11 +246,11 @@ fn parent_listener() -> Widget<'static> {
 
 ### Listening to Any Custom Event
 
-You can also listen to all bubbling custom events using `on_custom_event`, but you will receive a `RawCustomEvent` that you need to downcast manually if needed.
+You can also listen to all bubbling custom events using `on_raw_custom`, but you will receive a `RawCustomEvent` that you need to downcast manually if needed.
 
 ```rust ignore
 @Container {
-    on_custom_event: |e: &mut RawCustomEvent| {
+    on_raw_custom: |e: &mut RawCustomEvent| {
         println!("Something happened!");
     }
 }

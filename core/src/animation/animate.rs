@@ -4,7 +4,7 @@ use crate::{
   window::{WindowFlags, WindowId},
 };
 
-#[simple_declare]
+#[declare(simple)]
 pub struct Animate<S: AnimateState + 'static> {
   #[declare(custom, default = Self::default_transition())]
   pub transition: Box<dyn Transition>,

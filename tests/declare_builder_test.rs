@@ -1,4 +1,7 @@
-use ribir::{core::reset_test_env, prelude::*};
+use ribir::{
+  core::{reset_test_env, test_helper::*},
+  prelude::*,
+};
 
 #[test]
 fn declarer_smoke() {
@@ -104,7 +107,7 @@ fn default_field_with_value() {
 #[test]
 fn declarer_simple_attr() {
   reset_test_env!();
-  #[simple_declare]
+  #[declare(simple)]
   struct Simple {
     a: f32,
     b: i32,
@@ -160,5 +163,133 @@ fn unified_declare_full_stateless() {
   let mut s = s.finish();
   // s should be FatObj<FullStateless>
   assert_eq!(s.a, 1.);
-  let _ = s.with_margin(EdgeInsets::all(10.));
+  let _ = s.with_margin(ribir::core::builtin_widgets::EdgeInsets::all(10.));
+}
+
+#[test]
+fn strict_event_interaction() {
+  reset_test_env!();
+  #[declare]
+  struct Interaction {
+    #[declare(strict, event = f32)]
+    a: f32,
+  }
+
+  let mut it = Interaction::declarer();
+  it.with_a(TwoWayValue::Pipe(PipeValue::Value(1.)));
+  let it = it.finish();
+  assert_eq!(it.read().a, 1.);
+}
+
+#[test]
+fn normal_strict_field() {
+  reset_test_env!();
+  #[declare]
+  struct S {
+    #[declare(strict)]
+    a: f32,
+  }
+
+  let mut s = S::declarer();
+  s.with_a(1.0);
+  let s = s.finish();
+  assert_eq!(s.read().a, 1.0);
+}
+
+use ribir::prelude::WidgetCtx;
+
+#[test]
+fn two_way_complete_set() {
+  reset_test_env!();
+
+  #[derive(Clone)]
+  struct SimpleEvent(f32);
+  impl From<SimpleEvent> for f32 {
+    fn from(v: SimpleEvent) -> Self { v.0 }
+  }
+
+  #[derive(Clone)]
+  struct FieldEvent {
+    v: f32,
+  }
+
+  #[derive(Clone)]
+  struct MethodEvent(f32);
+  impl MethodEvent {
+    fn get_v(&self) -> f32 { self.0 }
+  }
+
+  #[derive(Clone)]
+  struct OptEvent {
+    v: Option<f32>,
+  }
+
+  #[derive(Clone)]
+  struct DeepEvent {
+    a: Inner,
+  }
+  #[derive(Clone)]
+  struct Inner {
+    b: f32,
+  }
+
+  #[declare]
+  struct TwoWayTest {
+    #[declare(event = SimpleEvent)]
+    a: f32,
+    #[declare(event = FieldEvent.v)]
+    b: f32,
+    #[declare(event = MethodEvent.get_v())]
+    c: f32,
+    #[declare(event = OptEvent.v)]
+    d: f32,
+    #[declare(event = DeepEvent.a.b)]
+    e: f32,
+  }
+
+  impl Compose for TwoWayTest {
+    fn compose(_this: impl StateWriter<Value = Self>) -> Widget<'static> {
+      fn_widget! {
+        @MockBox {
+          size: Size::new(100., 100.),
+          on_mounted: move |e| {
+            let id = e.current_target();
+            let wnd = e.window();
+            wnd.bubble_custom_event(id, SimpleEvent(1.));
+            wnd.bubble_custom_event(id, FieldEvent { v: 2. });
+            wnd.bubble_custom_event(id, MethodEvent(3.));
+            wnd.bubble_custom_event(id, OptEvent { v: Some(4.) });
+            wnd.bubble_custom_event(id, DeepEvent { a: Inner { b: 5. } });
+          }
+        }
+      }
+      .into_widget()
+    }
+  }
+
+  let a = Stateful::new(0.0f32);
+  let b = Stateful::new(0.0f32);
+  let c = Stateful::new(0.0f32);
+  let d = Stateful::new(0.0f32);
+  let e = Stateful::new(0.0f32);
+
+  let wnd = TestWindow::new_with_size(
+    fn_widget! {
+      let mut w = TwoWayTest::declarer();
+      w.with_a(TwoWay::new($writer(a)))
+        .with_b(TwoWay::new($writer(b)))
+        .with_c(TwoWay::new($writer(c)))
+        .with_d(TwoWay::new($writer(d)))
+        .with_e(TwoWay::new($writer(e)));
+      w.finish()
+    },
+    Size::new(100., 100.),
+  );
+  wnd.draw_frame();
+
+  assert_eq!(*a.read(), 1.);
+  assert_eq!(*b.read(), 2.);
+  assert_eq!(*c.read(), 3.);
+  assert_eq!(*d.read(), 4.);
+  assert_eq!(*e.read(), 5.);
 }

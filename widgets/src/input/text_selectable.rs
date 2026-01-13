@@ -59,11 +59,10 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
       let selection = part_writer!(&mut this.selection);
 
       @PointerSelectRegion {
-        on_custom_concrete_event: {
+        on_custom: {
           move |e: &mut PointerSelectEvent| {
-            match e.data() {
-              PointerSelectData::Move{ from, to } |
-              PointerSelectData::End { from, to } => {
+            if let PointerSelectData::Move{ from, to } |
+              PointerSelectData::End { from, to } = e.data() {
                 let new_sel = $read(this).glyphs().map(|g| {
                   Selection {
                     from: g.caret_position_from_pos(*from),
@@ -73,8 +72,6 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
                 if let Some(new_sel) = new_sel {
                   *$write(selection) = new_sel;
                 }
-              },
-              _ => {}
             }
           }
         },
