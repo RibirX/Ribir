@@ -100,7 +100,7 @@ ENV MESA_LOADER_DRIVER_OVERRIDE=zink
 # Pre-warm sccache with dependencies from master
 ARG PREWARM_CACHE=false
 RUN if [ "$PREWARM_CACHE" = "true" ]; then \
-    git clone --depth 1 https://github.com/ribir-org/ribir.git /tmp/ribir && \
+    git clone --depth 1 https://github.com/RibirX/Ribir.git /tmp/ribir && \
     cd /tmp/ribir && \
     cargo test --workspace --all-features --no-run && \
     cd / && \
@@ -108,7 +108,7 @@ RUN if [ "$PREWARM_CACHE" = "true" ]; then \
     fi
 
 WORKDIR /app
-LABEL org.opencontainers.image.source="https://github.com/ribir-org/ribir"
+LABEL org.opencontainers.image.source="https://github.com/RibirX/Ribir"
 LABEL org.opencontainers.image.description="Ribir Linux Development & Testing Environment"
 LABEL version="${RUST_STABLE_VERSION}-${RUST_NIGHTLY_VERSION}"
 LABEL gpu-support=true

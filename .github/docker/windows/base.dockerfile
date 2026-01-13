@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.4
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
 ARG RUST_STABLE_VERSION=1.92.0
@@ -8,7 +7,7 @@ ARG DXC_FILENAME=dxc_2023_08_14.zip
 ARG WARP_VERSION=1.0.8
 
 # Set working directory
-WORKDIR C:\build
+WORKDIR C:/build
 
 # Install Chocolatey
 RUN powershell -Command \
@@ -18,6 +17,19 @@ RUN powershell -Command \
 
 # Install base tools using Chocolatey
 RUN choco install -y git pkgconfiglite webp curl
+
+# Install Visual Studio 2022 Build Tools
+RUN powershell -Command \
+    $ErrorActionPreference = 'Stop'; \
+    Invoke-WebRequest -Uri https://aka.ms/vs/17/release/vs_buildtools.exe -OutFile vs_buildtools.exe; \
+    Start-Process -FilePath .\vs_buildtools.exe -ArgumentList '--quiet', '--wait', '--norestart', '--noUpdateInstaller', \
+        '--add', 'Microsoft.VisualStudio.Workload.VCTools', \
+        '--add', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', \
+        '--add', 'Microsoft.VisualStudio.Component.Windows11SDK.22621' -Wait; \
+    Remove-Item vs_buildtools.exe; \
+    if (Test-Path 'C:\ProgramData\Microsoft\VisualStudio\Packages') { \
+        Remove-Item -Recurse -Force 'C:\ProgramData\Microsoft\VisualStudio\Packages' \
+    }
 
 # Install Rust
 RUN powershell -Command \
@@ -38,6 +50,18 @@ RUN powershell -Command \
     rustup target add wasm32-unknown-unknown; \
     rustup component add rustfmt clippy llvm-tools-preview --toolchain ${RUST_NIGHTLY_VERSION}; \
     rustup component add llvm-tools-preview --toolchain stable
+
+# Set up MSVC environment variables (Path, INCLUDE, LIB) for the system
+RUN powershell -Command \
+    $ErrorActionPreference = 'Stop'; \
+    $vsPath = 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools'; \
+    $devShell = Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll'; \
+    Import-Module $devShell; \
+    Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -Arch amd64; \
+    [Environment]::SetEnvironmentVariable('Path', $env:Path, 'Machine'); \
+    [Environment]::SetEnvironmentVariable('INCLUDE', $env:INCLUDE, 'Machine'); \
+    [Environment]::SetEnvironmentVariable('LIB', $env:LIB, 'Machine'); \
+    [Environment]::SetEnvironmentVariable('LIBPATH', $env:LIBPATH, 'Machine')
 
 # Install Cargo tools
 RUN powershell -Command \
@@ -61,7 +85,7 @@ RUN powershell -Command \
     [Environment]::SetEnvironmentVariable('SCCACHE_DIR', 'C:\sccache', 'Machine'); \
     [Environment]::SetEnvironmentVariable('CARGO_INCREMENTAL', '0', 'Machine')
 
-WORKDIR C:\app
-LABEL org.opencontainers.image.source="https://github.com/ribir-org/ribir"
+WORKDIR C:/app
+LABEL org.opencontainers.image.source="https://github.com/RibirX/Ribir"
 LABEL org.opencontainers.image.description="Ribir Windows Base Development Environment"
 LABEL version="${RUST_STABLE_VERSION}-${RUST_NIGHTLY_VERSION}"

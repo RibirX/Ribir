@@ -58,6 +58,7 @@ jobs:
       stable-version: ${{ steps.versions.outputs.stable }}
       nightly-version: ${{ steps.versions.outputs.nightly }}
       image-tag: ${{ steps.versions.outputs.image_tag }}
+      repo-owner: ${{ steps.versions.outputs.repo_owner }}
       tools-changed: ${{ steps.filter.outputs.tools }}
     steps:
       - uses: actions/checkout@v4
@@ -81,21 +82,26 @@ jobs:
           # Generate image tag
           IMAGE_TAG="v${STABLE}-${NIGHTLY}"
 
+          # Lowercase repository owner for Docker
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+
           echo "stable=$STABLE" >> $GITHUB_OUTPUT
           echo "nightly=$NIGHTLY" >> $GITHUB_OUTPUT
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "repo_owner=$REPO_OWNER" >> $GITHUB_OUTPUT
 
           echo "Detected versions:"
           echo "  Stable: $STABLE"
           echo "  Nightly: $NIGHTLY"
           echo "  Image Tag: $IMAGE_TAG"
+          echo "  Repo Owner: $REPO_OWNER"
 
   lint:
     name: rust code lint
     runs-on: ubuntu-latest
     needs: get-versions
     container:
-      image: ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
+      image: ghcr.io/${{ needs.get-versions.outputs.repo-owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
     steps:
       - uses: actions/checkout@v4
       - name: Run lint checks
@@ -130,7 +136,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [get-versions, lint]
     container:
-      image: ${{ matrix.os == 'ubuntu-latest' && format('ghcr.io/{0}/ribir-linux:{1}', github.repository_owner, needs.get-versions.outputs.image_tag) || '' }}
+      image: ${{ matrix.os == 'ubuntu-latest' && format('ghcr.io/{0}/ribir-linux:{1}', needs.get-versions.outputs.repo-owner, needs.get-versions.outputs.image_tag) || '' }}
 
     steps:
       - name: Free Disk Space (Ubuntu)
@@ -247,7 +253,7 @@ jobs:
     name: Doc examples & WASM compile
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
+      image: ghcr.io/${{ needs.get-versions.outputs.repo-owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
     steps:
       - uses: actions/checkout@v4
       - name: Compile doc examples
@@ -307,7 +313,7 @@ jobs:
     name: Verify packages are publishable
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository_owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
+      image: ghcr.io/${{ needs.get-versions.outputs.repo-owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
