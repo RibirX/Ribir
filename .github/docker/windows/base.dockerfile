@@ -54,7 +54,7 @@ RUN powershell -Command \
 # Set up MSVC environment variables (Path, INCLUDE, LIB) for the system
 RUN powershell -Command \
     $ErrorActionPreference = 'Stop'; \
-    $vsPath = 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools'; \
+    $vsPath = 'C:\Program Files\Microsoft Visual Studio\2022\BuildTools'; \
     $devShell = Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll'; \
     Import-Module $devShell; \
     Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -Arch amd64; \

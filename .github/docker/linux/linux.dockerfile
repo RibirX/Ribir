@@ -69,20 +69,23 @@ EOF
 
 # Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    --default-toolchain stable \
+    --default-toolchain none \
     --profile minimal \
     && . "$HOME/.cargo/env" \
+    && rustup toolchain install ${RUST_STABLE_VERSION} \
+    && rustup toolchain install ${RUST_NIGHTLY_VERSION} \
+    && rustup toolchain link stable ${RUST_STABLE_VERSION} \
+    && rustup toolchain link nightly ${RUST_NIGHTLY_VERSION} \
     && rustup default stable \
-    && rustup install ${RUST_NIGHTLY_VERSION} \
     && rustup target add wasm32-unknown-unknown \
-    && rustup component add rustfmt clippy llvm-tools-preview --toolchain ${RUST_NIGHTLY_VERSION} \
+    && rustup component add rustfmt clippy llvm-tools-preview --toolchain nightly \
     && rustup component add llvm-tools-preview --toolchain stable
 
 # Configure environment
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install Cargo tools
-RUN cargo install cargo-chef sccache cargo-llvm-cov cargo-nextest
+RUN cargo install cargo-chef sccache cargo-llvm-cov cargo-nextest cargo-workspaces
 
 # Configure sccache
 ENV RUSTC_WRAPPER=sccache
@@ -106,6 +109,12 @@ RUN if [ "$PREWARM_CACHE" = "true" ]; then \
     cd / && \
     rm -rf /tmp/ribir; \
     fi
+
+RUN git clone --depth 1 https://github.com/RibirX/Ribir.git /tmp/ribir-ci && \
+    cd /tmp/ribir-ci && \
+    cargo +nightly ci config-nightly && \
+    cd / && \
+    rm -rf /tmp/ribir-ci
 
 WORKDIR /app
 LABEL org.opencontainers.image.source="https://github.com/RibirX/Ribir"

@@ -105,9 +105,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run lint checks
-        run: |
-          NIGHTLY_VERSION=$(cargo +nightly ci config-nightly)
-          cargo +${NIGHTLY_VERSION} ci lint
+        run: cargo +nightly ci lint
 
   test-with-gpu:
     # The content of this job is largely borrowed from 'ci.yml' file in the 'wgpu/.github/workflows' directory.
@@ -165,7 +163,7 @@ jobs:
         if: matrix.use_docker == false
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          toolchain: ${{ needs.get-versions.outputs.stable-version }}
           components: llvm-tools-preview
 
       - name: Install macOS dependencies
@@ -218,8 +216,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          NIGHTLY_VERSION=$(cargo +nightly ci config-nightly)
-          cargo llvm-cov --workspace --lcov --output-path lcov.info --all-features
+          cargo +stable llvm-cov --workspace --lcov --output-path lcov.info --all-features
 
       - name: Generate coverage report
         id: coverage
@@ -244,9 +241,7 @@ jobs:
       # Run doc tests on macOS (nextest/llvm-cov doesn't support doc tests)
       - name: Run doc tests (macOS only)
         if: matrix.os == 'macos-14'
-        run: |
-          NIGHTLY_VERSION=$(cargo +nightly ci config-nightly)
-          cargo +${NIGHTLY_VERSION} ci doctest
+        run: cargo +nightly ci doctest
 
   doc-and-wasm:
     needs: [get-versions, lint]
@@ -257,13 +252,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile doc examples
-        run: |
-          NIGHTLY_VERSION=$(cargo +nightly ci config-nightly)
-          cargo +${NIGHTLY_VERSION} ci doc
+        run: cargo +nightly ci doc
       - name: Compile to WASM
-        run: |
-          NIGHTLY_VERSION=$(cargo +nightly ci config-nightly)
-          cargo +${NIGHTLY_VERSION} ci wasm
+        run: cargo +nightly ci wasm
 
   ribir-bot-check:
     needs: [get-versions]
@@ -306,7 +297,7 @@ jobs:
 
       - name: Bundle counter example
         shell: bash
-        run: cargo +${{ needs.get-versions.outputs.nightly-version }} ci bundle
+        run: cargo +nightly ci bundle
 
   release-dry-run:
     needs: [get-versions, lint]
@@ -318,11 +309,12 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Install cargo-workspaces
-        run: cargo install cargo-workspaces
-
       - name: Dry run release
-        run: cargo ws publish --dry-run -y --allow-branch "*"
+        run: |
+          if ! command -v cargo-ws &> /dev/null; then
+            cargo install cargo-workspaces
+          fi
+          cargo ws publish --dry-run -y --allow-branch "*"
 
   status-report:
     name: CI unified status report
