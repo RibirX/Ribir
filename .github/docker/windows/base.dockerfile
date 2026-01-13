@@ -62,6 +62,6 @@ RUN powershell -Command \
     [Environment]::SetEnvironmentVariable('CARGO_INCREMENTAL', '0', 'Machine')
 
 WORKDIR C:\app
-LABEL org.opencontainers.image.source="https://github.com/ribir-org/ribir"
+LABEL org.opencontainers.image.source="https://github.com/RibirX/Ribir"
 LABEL org.opencontainers.image.description="Ribir Windows Base Development Environment"
 LABEL version="${RUST_STABLE_VERSION}-${RUST_NIGHTLY_VERSION}"
