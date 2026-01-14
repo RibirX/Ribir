@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: get-versions
     container:
-      image: ghcr.io/${{ needs.get-versions.outputs.repo-owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
+      image: ghcr.io/${{ needs.get-versions.outputs['repo-owner'] }}/ribir-linux:${{ needs.get-versions.outputs['image-tag'] }}
     steps:
       - uses: actions/checkout@v4
       - name: Run lint checks
@@ -134,7 +134,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [get-versions, lint]
     container:
-      image: ${{ matrix.os == 'ubuntu-latest' && format('ghcr.io/{0}/ribir-linux:{1}', needs.get-versions.outputs.repo-owner, needs.get-versions.outputs.image_tag) || '' }}
+      image: ${{ matrix.os == 'ubuntu-latest' && format('ghcr.io/{0}/ribir-linux:{1}', needs.get-versions.outputs['repo-owner'], needs.get-versions.outputs['image-tag']) || '' }}
 
     steps:
       - name: Free Disk Space (Ubuntu)
@@ -248,7 +248,7 @@ jobs:
     name: Doc examples & WASM compile
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ needs.get-versions.outputs.repo-owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
+      image: ghcr.io/${{ needs.get-versions.outputs['repo-owner'] }}/ribir-linux:${{ needs.get-versions.outputs['image-tag'] }}
     steps:
       - uses: actions/checkout@v4
       - name: Compile doc examples
@@ -304,7 +304,7 @@ jobs:
     name: Verify packages are publishable
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ needs.get-versions.outputs.repo-owner }}/ribir-linux:${{ needs.get-versions.outputs.image-tag }}
+      image: ghcr.io/${{ needs.get-versions.outputs['repo-owner'] }}/ribir-linux:${{ needs.get-versions.outputs['image-tag'] }}
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4

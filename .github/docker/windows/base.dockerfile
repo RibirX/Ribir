@@ -36,21 +36,19 @@ RUN powershell -Command \
     $ErrorActionPreference = 'Stop'; \
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
     Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe; \
-    .\rustup-init.exe -y --default-toolchain none --profile minimal; \
+    .\rustup-init.exe -y --default-toolchain $env:RUST_STABLE_VERSION --profile minimal; \
     Remove-Item rustup-init.exe;
 
 # Configure Rust - Set PATH to include Cargo
-RUN powershell -Command \
-    [Environment]::SetEnvironmentVariable('Path', $env:Path + ';C:\Users\ContainerAdministrator\.cargo\bin', 'Machine')
+ENV PATH="C:\Users\ContainerAdministrator\.cargo\bin;${PATH}"
 
 # Install Rust toolchains and components
 RUN powershell -Command \
-    rustup toolchain install ${RUST_STABLE_VERSION}; \
-    rustup toolchain install ${RUST_NIGHTLY_VERSION}; \
-    rustup default ${RUST_STABLE_VERSION}; \
+    $ErrorActionPreference = 'Stop'; \
+    rustup toolchain install $env:RUST_NIGHTLY_VERSION; \
     rustup target add wasm32-unknown-unknown; \
-    rustup component add rustfmt clippy llvm-tools-preview --toolchain ${RUST_NIGHTLY_VERSION}; \
-    rustup component add llvm-tools-preview --toolchain ${RUST_STABLE_VERSION}
+    rustup component add rustfmt clippy llvm-tools-preview --toolchain $env:RUST_NIGHTLY_VERSION; \
+    rustup component add llvm-tools-preview --toolchain $env:RUST_STABLE_VERSION
 
 # Set up MSVC environment variables (Path, INCLUDE, LIB) for the system
 RUN powershell -Command \

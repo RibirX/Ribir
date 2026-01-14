@@ -148,6 +148,7 @@ jobs:
   build-windows-base:
     name: Build Windows Base Image
     runs-on: windows-2022
+    timeout-minutes: 180
     needs: [detect-versions, check-image-exists]
     if: needs.check-image-exists.outputs.windows-base-exists != 'true'
     steps:
