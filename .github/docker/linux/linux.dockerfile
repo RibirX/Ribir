@@ -57,7 +57,7 @@ RUN curl -L --retry 5 \
     && rm mesa.tar.xz
 
 # Configure ICD for Vulkan
-RUN cat <<EOF > /opt/icd.json
+RUN cat <<EOC > /opt/icd.json
 {
   "ICD": {
       "api_version": "1.1.255",
@@ -65,18 +65,18 @@ RUN cat <<EOF > /opt/icd.json
   },
   "file_format_version": "1.0.0"
 }
-EOF
+EOC
 
 # Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    --default-toolchain stable \
+    --default-toolchain ${RUST_STABLE_VERSION} \
     --profile minimal \
     && . "$HOME/.cargo/env" \
-    && rustup default stable \
+    && rustup default ${RUST_STABLE_VERSION} \
     && rustup install ${RUST_NIGHTLY_VERSION} \
     && rustup target add wasm32-unknown-unknown \
     && rustup component add rustfmt clippy llvm-tools-preview --toolchain ${RUST_NIGHTLY_VERSION} \
-    && rustup component add llvm-tools-preview --toolchain stable
+    && rustup component add llvm-tools-preview --toolchain ${RUST_STABLE_VERSION}
 
 # Configure environment
 ENV PATH="/root/.cargo/bin:${PATH}"
