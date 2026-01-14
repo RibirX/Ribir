@@ -74,12 +74,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && . "$HOME/.cargo/env" \
     && rustup toolchain install ${RUST_STABLE_VERSION} \
     && rustup toolchain install ${RUST_NIGHTLY_VERSION} \
-    && rustup toolchain link stable ${RUST_STABLE_VERSION} \
-    && rustup toolchain link nightly ${RUST_NIGHTLY_VERSION} \
-    && rustup default stable \
+    && rustup default ${RUST_STABLE_VERSION} \
     && rustup target add wasm32-unknown-unknown \
-    && rustup component add rustfmt clippy llvm-tools-preview --toolchain nightly \
-    && rustup component add llvm-tools-preview --toolchain stable
+    && rustup component add rustfmt clippy llvm-tools-preview --toolchain ${RUST_NIGHTLY_VERSION} \
+    && rustup component add llvm-tools-preview --toolchain ${RUST_STABLE_VERSION}
 
 # Configure environment
 ENV PATH="/root/.cargo/bin:${PATH}"
