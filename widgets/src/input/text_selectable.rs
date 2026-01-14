@@ -118,8 +118,10 @@ impl<T: VisualText + Clone + 'static> Compose for TextSelectable<T> {
                 rcs.into_iter().map(move |rc| {
                   @Container {
                     class: TEXT_SELECTION,
-                    anchor: Anchor::from_point(rc.origin),
-                    size: rc.size,
+                    x: rc.origin.x,
+                    y: rc.origin.y,
+                    width: rc.size.width,
+                    height: rc.size.height,
                   }
                 })
               }

@@ -13,7 +13,8 @@ use crate::prelude::*;
 ///   @Clip {
 ///     clip_path: Path::rect_round(&Rect::new(Point::zero(), Size::new(50., 50.)), &Radius::all(25.)),
 ///     @Container {
-///       size: Size::new(100., 100.),
+///       width: 100.,
+///       height: 100.,
 ///       background: Color::RED
 ///     }
 ///   }

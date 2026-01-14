@@ -88,7 +88,8 @@ impl Compose for DocUserCard {
                             foreground: pipe!($read(this).is_online).map(|v| if v { Color::GREEN } else { Color::GRAY }),
                         }
                         @Container {
-                            size: Size::new(10., 10.),
+                            width: 10.,
+                            height: 10.,
                             margin: EdgeInsets::horizontal(8.),
                             background: pipe!($read(this).is_online).map(|v| if v { Color::GREEN } else { Color::GRAY }),
                             radius: Radius::all(5.),
@@ -187,7 +188,8 @@ impl Render for Container {
 fn example() -> Widget<'static> {
     fn_widget! {
         @Container {
-            size: Size::new(100., 100.),
+            width: 100.,
+            height: 100.,
             @Text { text: "Hello" } // 可以接受Child Widget
         }
     }

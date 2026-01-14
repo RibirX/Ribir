@@ -58,6 +58,10 @@ impl Clone for TrackId {
   fn clone(&self) -> Self { Self(self.0.clone_writer()) }
 }
 
+impl PartialEq for TrackId {
+  fn eq(&self, other: &Self) -> bool { Stateful::ptr_eq(&self.0, &other.0) }
+}
+
 impl WidgetId {
   /// Returns a reference to the node data.
   pub(crate) fn get<'a, 'b>(self, tree: &'a WidgetTree) -> Option<&'a (dyn RenderQueryable + 'b)> {

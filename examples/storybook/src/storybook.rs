@@ -12,10 +12,11 @@ fn header() -> Widget<'static> {
 fn content() -> Widget<'static> {
   fn actions_show() -> GenWidget {
     scrollbar! {
-      h_align: HAlign::Stretch,
+      clamp: BoxClamp::EXPAND_X,
       @Stack {
-        h_align: HAlign::Center,
+        x: AnchorX::at_center(),
         @Column {
+          x: AnchorX::at_center(),
           align_items: Align::Center,
           @Column {
             align_items: Align::Center,
@@ -151,7 +152,7 @@ fn content() -> Widget<'static> {
         @ConstrainedBox {
           clamp: BoxClamp::fixed_height(30.),
           @Row {
-            h_align: HAlign::Center,
+            x: AnchorX::at_center(),
             @Text { text: "Divider" }
             @Icon {
               @ { svg_registry::get_or_default("info") }

@@ -39,7 +39,8 @@ use ribir_core::{impl_compose_child_for_wrap_render, prelude::*, wrap_render::Wr
 /// // Using any widget you want
 /// let _icon = icon! {
 ///   @Container {
-///     size: Size::new(200., 200.),
+///     width: 200.,
+///     height: 200.,
 ///     background: Color::RED,
 ///   }
 /// };
@@ -201,7 +202,8 @@ mod tests {
   widget_image_tests!(
     keep_icon_visual,
     WidgetTester::new(container! {
-      size: Size::splat(24.),
+      width: 24.,
+      height: 24.,
       @Icon {
         foreground: Color::RED,
         text_line_height: 48.,

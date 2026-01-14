@@ -55,7 +55,8 @@ mod tests {
         font_size: 12.,
         text_line_height: 16.,
         @Container {
-          size: WND_SIZE
+          width: WND_SIZE.width,
+          height: WND_SIZE.height,
         }
       }
     })
@@ -70,7 +71,8 @@ mod tests {
         rows: Some(1.5),
         text_line_height: 16.,
         @Container {
-          size: WND_SIZE
+          width: WND_SIZE.width,
+          height: WND_SIZE.height,
         }
       }
     })
@@ -85,7 +87,8 @@ mod tests {
         cols: Some(15.5),
         font_size: 12.,
         @Container {
-          size: WND_SIZE
+          width: WND_SIZE.width,
+          height: WND_SIZE.height,
         }
       }
     })

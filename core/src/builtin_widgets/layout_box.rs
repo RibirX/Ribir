@@ -13,7 +13,7 @@ use crate::prelude::*;
 /// use ribir::prelude::*;
 ///
 /// fn_widget! {
-///   let mut container = @Container { size: Size::new(100., 100.) };
+///   let mut container = @Container { width: 100., height: 100. };
 ///   @(container) {
 ///     @Text {
 ///       text: $read(container.layout_width()).to_string()

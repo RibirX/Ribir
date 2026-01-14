@@ -129,7 +129,8 @@ fn themed_box() -> Widget<'static> {
         let color = Variant::<Color>::new(BuildCtx::get()).unwrap();
         
         @Container {
-            size: Size::new(100., 100.),
+            width: 100.,
+            height: 100.,
             // If an ancestor provides a writer of Color, this will react to changes
             background: color,
         }

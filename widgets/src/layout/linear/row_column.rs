@@ -1,6 +1,6 @@
 use ribir_core::prelude::*;
 
-use super::{Direction, JustifyContent};
+use super::{Align, Direction, JustifyContent};
 
 /// A horizontal layout container that arranges children sequentially in a row.
 ///
@@ -109,7 +109,8 @@ fn perform_linear_layout(
     let child_size = ctx.widget_box_size(child).unwrap();
     let cross_pos = align_items.align_value(dir.cross_of(child_size), cross);
 
-    ctx.update_position(child, dir.to_point(main_pos, cross_pos));
+    let pos = dir.to_point(main_pos, cross_pos);
+    ctx.update_anchor(child, AnchorX::new(pos.x), AnchorY::new(pos.y));
     main_pos += dir.main_of(child_size) + step;
   }
 

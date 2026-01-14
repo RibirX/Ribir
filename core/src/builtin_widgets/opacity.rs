@@ -13,7 +13,8 @@ use crate::{prelude::*, wrap_render::*};
 /// use ribir::prelude::*;
 ///
 /// container! {
-///   size: Size::new(100., 100.),
+///   width: 100.,
+///   height: 100.,
 ///   background: Color::RED,
 ///   opacity: 0.5,
 /// };

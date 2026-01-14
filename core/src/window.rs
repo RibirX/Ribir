@@ -873,7 +873,21 @@ impl Window {
 
   pub fn widget_size(&self, id: WidgetId) -> Option<Size> { self.tree().store.layout_box_size(id) }
 
-  pub fn widget_pos(&self, id: WidgetId) -> Option<Point> { self.tree().store.layout_box_pos(id) }
+  pub fn widget_pos(&self, id: WidgetId) -> Option<Point> {
+    let parent_size = id
+      .parent(self.tree())
+      .and_then(|p| self.tree().store.layout_box_size(p))
+      .unwrap_or_default();
+    self.tree().store.layout_box_pos(id, parent_size)
+  }
+
+  /// Update the position of a widget. This is used by widgets like `Follow`
+  /// that need to update position after layout is complete.
+  pub(crate) fn update_widget_position(&self, id: WidgetId, pos_x: AnchorX, pos_y: AnchorY) {
+    let info = self.tree_mut().store.layout_info_or_default(id);
+    info.pos_x = pos_x;
+    info.pos_y = pos_y;
+  }
 
   pub fn is_valid_widget(&self, id: WidgetId) -> bool { !id.is_dropped(self.tree()) }
 

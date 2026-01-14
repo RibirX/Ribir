@@ -120,17 +120,17 @@ mod tests {
   widget_layout_test!(
     one_line_expanded,
     WidgetTester::new(fn_widget! {
-      let size = Size::new(100., 50.);
+      let (w, h) = (100., 50.);
       @Flex  {
         @Expanded {
           flex: 1.,
-          @SizedBox { size }
+          @Container { width: w, height: h }
         }
-        @SizedBox { size }
-        @SizedBox { size }
+        @Container { width: w, height: h }
+        @Container { width: w, height: h }
         @Expanded {
           flex: 2.,
-          @SizedBox { size }
+          @Container { width: w, height: h }
         }
       }
     })
@@ -145,27 +145,27 @@ mod tests {
   widget_layout_test!(
     wrap_expanded,
     WidgetTester::new(fn_widget! {
-      let size = Size::new(100., 50.);
+      let (w, h) = (100., 50.);
       @Flex {
         wrap: true,
         @Expanded {
           defer_alloc: false,
           flex: 1. ,
-          @SizedBox { size }
+          @Container { width: w, height: h }
         }
-        @SizedBox { size }
-        @SizedBox { size }
-        @SizedBox { size }
-        @SizedBox { size }
+        @Container { width: w, height: h }
+        @Container { width: w, height: h }
+        @Container { width: w, height: h }
+        @Container { width: w, height: h }
         @Expanded {
           defer_alloc: false,
           flex: 1. ,
-          @SizedBox { size, }
+          @Container { width: w, height: h }
         }
         @Expanded {
           defer_alloc: false,
           flex: 4.,
-          @SizedBox { size, }
+          @Container { width: w, height: h, }
         }
       }
     })
@@ -190,13 +190,13 @@ mod tests {
       watch!(*$read(flex)).subscribe(move |val| $write(expanded).flex = val);
 
       @Flex {
-        h_align: HAlign::Stretch,
+        clamp: BoxClamp::EXPAND_X,
         @(expanded) { @ { Void } }
         @Expanded {
           flex: 1.,
           @ { Void }
         }
-        @SizedBox { size: Size::new(100., 100.) }
+        @Container { width: 100., height: 100. }
       }
     };
 

@@ -69,7 +69,7 @@ impl Compose for MessageList {
         }
         @Expanded {
           @Tabs {
-            h_align: HAlign::Stretch,
+            clamp: BoxClamp::EXPAND_X,
             providers: [Provider::new(TabPos::Bottom)],
             @Tab {
               @ { "Messages" }

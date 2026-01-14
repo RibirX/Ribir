@@ -34,7 +34,7 @@ fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size
 
 在此方法中，Widget 需要做三件事：
 1.  **布局子项**: 遍历其子节点，为每个子节点计算新的 `BoxClamp`（基于传入的 `clamp` 和其自身的布局逻辑），并调用 `ctx.perform_child_layout(child, child_clamp)`。
-2.  **确定位置**: 获取子节点返回的 `Size`，并根据布局逻辑设置子节点的位置 `ctx.update_position(child, position)`。
+2.  **确定位置**: 获取子节点返回的 `Size`，并根据布局逻辑设置子节点的位置 `ctx.update_anchor(child, anchor_x, anchor_y)`。
 3.  **返回尺寸**: 计算并返回自身的最终 `Size`，并且此尺寸必须满足传入的 `clamp` 约束。
 
 ## 使用 `clamp` 属性干预布局
@@ -47,7 +47,8 @@ use ribir::prelude::*;
 fn example() -> Widget<'static> {
     fn_widget! {
         @Container {
-            size: Size::new(100., 100.),
+            width: 100.,
+            height:100.,
             background: Color::RED,
             // 强制约束：不管父级给出什么约束，Container 的宽度必须在 50 到 200 之间
             clamp: BoxClamp {
@@ -94,7 +95,7 @@ impl Render for FixedSizeBox {
             ctx.perform_child_layout(child, child_clamp);
 
             // 设置子节点位置（通常为 (0,0)）
-            ctx.update_position(child, Point::zero());
+            ctx.update_anchor(child, AnchorX::default(), AnchorY::default());
         }
 
         // 3. 返回最终尺寸

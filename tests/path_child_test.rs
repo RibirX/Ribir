@@ -9,12 +9,11 @@ const SIZE_ONE: Size = Size::new(1., 1.);
 impl Compose for AB {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      @SizedBox {
-        size: match *$read(this) {
-          AB::A => ZERO_SIZE,
-          AB::B => SIZE_ONE
-        }
-      }
+      let size = match *$read(this) {
+        AB::A => ZERO_SIZE,
+        AB::B => SIZE_ONE
+      };
+      @Container { width: size.width, height: size.height }
     }
     .into_widget()
   }
@@ -38,8 +37,9 @@ struct TupleBox(Size);
 impl Compose for TupleBox {
   fn compose(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      @SizedBox {
-        size: pipe!($read(this).0),
+      @Container {
+        width: pipe!($read(this).0.width),
+        height: pipe!($read(this).0.height),
       }
     }
     .into_widget()

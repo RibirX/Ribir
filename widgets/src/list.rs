@@ -421,8 +421,8 @@ impl<'c> ComposeChild<'c> for ListCustomItem {
       .with_child(unconstrained_box! {
         clamp_dim: ClampDim::Max,
         dir: UnconstrainedDir::Y,
-        @VAlignWidget {
-          v_align: ListItemAlignItems::get_align(BuildCtx::get()).map(|v| v.into()),
+        @Row {
+          align_items: ListItemAlignItems::get_align(BuildCtx::get()),
           @ { child }
         }
       })
@@ -793,14 +793,14 @@ mod tests {
      }
      @ListItem {
        @ListItemImg {
-         @Container { size: Size::new(100., 100.), background: Color::PINK }
+         @Container { width: 100., height: 100., background: Color::PINK }
        }
        @ListItemHeadline { @ { "Image Item"} }
        @ListItemSupporting { @ { "description"} }
      }
      @ListItem {
        @ListItemThumbnail {
-         @Container { size: Size::new(160., 90.), background: Color::GREEN }
+         @Container { width: 160., height: 90., background: Color::GREEN }
        }
        @ListItemHeadline { @ { "Counter"} }
        @ListItemSupporting {
@@ -815,7 +815,7 @@ mod tests {
       @ListItemHeadline { @ { "Counter"} }
       @Trailing {
         @ListItemThumbnail {
-          @Container { size: Size::new(160., 90.), background: Color::GREEN }
+          @Container { width: 160., height: 90., background: Color::GREEN }
         }
       }
     }

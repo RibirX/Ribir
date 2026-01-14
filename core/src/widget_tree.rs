@@ -609,12 +609,12 @@ mod tests {
             @ FixedSizeBox {
               size: Size::new(100., 100.),
               background: Color::GRAY,
-              anchor: Anchor::left_top(-30., 0.),
+              x: -30., y: 0.,
             }
             @ FixedSizeBox {
               size: Size::new(100., 100.),
               background: Color::GRAY,
-              anchor: Anchor::top(-20.),
+              y: -20.,
             }
           }
         }
@@ -625,7 +625,7 @@ mod tests {
           @ FixedSizeBox {
             size: Size::new(100., 100.),
             background: Color::GRAY,
-            anchor: Anchor::left_top(-30., 20.),
+            x: -30., y: 20.,
           }
         }
       }

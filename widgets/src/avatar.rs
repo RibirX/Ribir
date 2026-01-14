@@ -11,7 +11,7 @@ use ribir_core::prelude::*;
 /// let text_avatar = avatar! { @{"A"} };
 ///
 /// // Display an avatar with a custom widget (e.g., an image)
-/// let widget_avatar = avatar! { @Container { size: Size::splat(100.), background: Color::RED } };
+/// let widget_avatar = avatar! { @Container { width: 100., height: 100., background: Color::RED } };
 /// ```
 #[derive(Declare, Clone)]
 pub struct Avatar;
@@ -43,7 +43,8 @@ impl<'c> ComposeChild<'c> for Avatar {
     container! {
       class: child.container_class(),
       clip_boundary: true,
-      size: Size::splat(40.),
+      width: 40.,
+      height: 40.,
       @ { child.wrap_with_class() }
     }
     .into_widget()
@@ -81,8 +82,8 @@ mod tests {
   widget_image_tests! {
     label_avatar,
     WidgetTester::new(avatar!{
-      h_align: HAlign::Center,
-      v_align: VAlign::Center,
+      x: AnchorX::at_center(),
+      y: AnchorY::at_center(),
       @{"A"}
     }).with_wnd_size(Size::splat(64.))
   }
@@ -90,8 +91,8 @@ mod tests {
   widget_image_tests! {
     widget_avatar,
     WidgetTester::new(avatar!{
-      h_align: HAlign::Center,
-      v_align: VAlign::Center,
+      x: AnchorX::at_center(),
+      y: AnchorY::at_center(),
       @MockBox { size: Size::splat(100.), background: Color::RED }
     }).with_wnd_size(Size::splat(64.))
   }

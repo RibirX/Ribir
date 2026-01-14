@@ -17,7 +17,8 @@ use crate::prelude::*;
 /// let _ = fn_widget! {
 ///   let color = Variant::<Color>::new(BuildCtx::get()).unwrap();
 ///   @Container {
-///     size: Size::new(100., 100.),
+///     width: 100.,
+///     height: 100.,
 ///     background: color,
 ///   }
 /// };

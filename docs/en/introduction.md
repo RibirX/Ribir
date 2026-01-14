@@ -54,7 +54,7 @@ Due to the need to handle multiple complex real-life situations, a general GUI f
 
 **Pure composition**: Ribir uses widgets to build interfaces. Unlike common object-oriented GUI frameworks, Ribir widgets do not need to inherit a base class or hold a base object. It is a pure composition model, even the parent-child relationship and built-in fields are completed through composition. The advantage of this is that the widget only needs to focus on the capabilities it provides, so it can be made very small to improve reuse. For example, Ribir has many very mini built-in widgets, and using these built-in widgets to extend ordinary widgets is powerful, but does not bring any overhead to them. For example:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn_widget!{
@@ -74,7 +74,7 @@ The above example shows the way of combining built-in widgets. Even if `Text` do
 
 **Sateful without writing source will convert to Stateless**: Unlike other declarative frameworks that add fields to widgets to control widget updates. Ribir is non-intrusive. Ribir treats the entire widget as a state to control updates. It provides the ability to split the state so that the local view can directly depend on the modification of part of the data to update (introduced in detail in the subsequent tutorial). Another big difference is that stateful and stateless can be converted to each other. If a state has no write source, it will degenerate into stateless， because no one will update it. For example:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn_widget!{

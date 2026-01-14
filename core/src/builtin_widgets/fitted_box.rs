@@ -39,10 +39,12 @@ pub enum BoxFit {
 /// use ribir::prelude::*;
 ///
 /// container! {
-///   size: Size::new(200., 200.),
+///   width: 200.,
+///   height: 200.,
 ///   @Container {
 ///     box_fit: BoxFit::CoverWidth,
-///     size: Size::new(50., 100.),
+///     width: 50.,
+///     height: 100.,
 ///     background: Color::RED,
 ///   }
 /// };
@@ -99,7 +101,7 @@ impl FittedBox {
     } else {
       container.height = child_size.height * scale.y;
     }
-    ctx.update_position(child, pos);
+    ctx.update_anchor(child, AnchorX::new(pos.x), AnchorY::new(pos.y));
 
     clamp.clamp(container)
   }

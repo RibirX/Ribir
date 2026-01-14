@@ -42,7 +42,8 @@ pub(super) fn init(classes: &mut Classes) {
 
   fn checked_icon_container<'w>(icon: Widget<'w>) -> Widget<'w> {
     container! {
-      size: md::SIZE_18,
+      width: md::SIZE_18.width,
+      height: md::SIZE_18.height,
       background: BuildCtx::color(),
       radius: md::RADIUS_2,
       @ { icon }
@@ -86,15 +87,16 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(CHECKBOX_INDETERMINATE_ICON, |w| {
     let icon = rdl! {
       let mut icon = @Container{
-        size: Size::new(12., 2.),
-        h_align: HAlign::Center,
-        v_align: VAlign::Center,
+        width: 12.,
+        height: 2.,
+        x: AnchorX::at_center(),
+        y: AnchorY::at_center(),
         background: BuildCtx::color().on_this_color(BuildCtx::get()),
       };
       let enter = @Animate {
-        state: part_writer!(&mut icon.size),
+        state: (part_writer!(&mut icon.width), part_writer!(&mut icon.height)),
         transition: ICON_TRANS,
-        from: Size::new(0., 2.),
+        from: (0_f32.into(), 2_f32.into()),
       };
       @(icon) {
         on_mounted: move |_| enter.run(),

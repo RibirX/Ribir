@@ -103,7 +103,8 @@ impl<'a> ComposeChild<'a> for Badge {
       @ InParentLayout {
         @Text {
           visible: pipe!($read(this).content.is_some()),
-          anchor: pipe!($read(this).offset),
+          x: pipe!($read(this).offset.x.clone().unwrap_or_default()),
+          y: pipe!($read(this).offset.y.clone().unwrap_or_default()),
           text: pipe!($read(this).content.clone().unwrap_or_default()),
           class: pipe! {
             if $read(this).content.as_ref().map_or(true, |s| s.is_empty()) {
@@ -134,7 +135,7 @@ impl<'a> ComposeChild<'a> for NumBadge {
           }
         })
       }),
-      offset: pipe!($read(this).offset),
+      offset: pipe!($read(this).offset.clone()),
       @ { child }
     }
     .into_widget()
@@ -153,18 +154,18 @@ mod tests {
     WidgetTester::new(self::column! {
       @Badge {
         content: Some("".into()),
-        @Container { size: Size::new(40., 40.), background: Color::GRAY }
+        @Container { width: 40., height: 40., background: Color::GRAY }
       }
       @Badge {
         content: Some("error!".into()),
         offset: Anchor::right(-14.),
-        @Container { size: Size::new(40., 40.)}
+        @Container { width: 40., height: 40.}
       }
       @NumBadge {
         count: 1000,
         max_count: 99_u32,
         providers: [Provider::new(BadgeColor(Color::GREEN))],
-        @Container { size: Size::new(40., 40.), background: Color::GRAY }
+        @Container { width: 40., height: 40., background: Color::GRAY }
       }
     })
     .with_wnd_size(Size::new(200., 200.))

@@ -129,7 +129,8 @@ fn themed_box() -> Widget<'static> {
         let color = Variant::<Color>::new(BuildCtx::get()).unwrap();
 
         @Container {
-            size: Size::new(100., 100.),
+            width: 100.,
+            height: 100.,
             // 如果祖先提供 Color 的写入器，这将对变化做出反应
             background: color,
         }

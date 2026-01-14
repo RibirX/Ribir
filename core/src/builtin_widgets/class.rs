@@ -29,7 +29,8 @@
 //!
 //! let w = fn_widget! {
 //!   @Container {
-//!     size: Size::new(100., 100.),
+//!     width: 100.,
+//!     height: 100.,
 //!     class: RED_BORDER,
 //!   }
 //! };
@@ -156,7 +157,8 @@ macro_rules! class_multi_impl {
 /// let widget = fn_widget! {
 ///   @(two_classes) {
 ///     @Container {
-///       size: Size::new(100., 100.),
+///       width: 100.,
+///       height: 100.,
 ///     }
 ///   }
 /// };
@@ -550,7 +552,8 @@ mod tests {
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          width: 100.,
+          height: 100.,
           class: pipe!(*$read(cls)),
         }
       }
@@ -603,7 +606,8 @@ mod tests {
       @Providers {
         providers: smallvec![classes.into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          width: 100.,
+          height: 100.,
           class: pipe!(*$read(cls)),
         }
       }
@@ -627,7 +631,8 @@ mod tests {
         providers: smallvec![initd_classes().into_provider()],
         @(margin_and_clamp) {
           @Container {
-            size: Size::new(100., 100.),
+            width: 100.,
+            height: 100.,
           }
         }
       }
@@ -659,7 +664,8 @@ mod tests {
       @Providers {
         providers: smallvec![classes.into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          width: 100.,
+          height: 100.,
           class: pipe!(*$read(cls)),
         }
       }
@@ -691,7 +697,8 @@ mod tests {
       @Providers {
         providers: smallvec![classes.into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          width: 100.,
+          height: 100.,
           class: pipe!($read(trigger); PROVIDER_CLS),
           on_performed_layout: move |e| {
             *$write(w_val) =  *Provider::of::<i32>(e).unwrap();
@@ -714,7 +721,8 @@ mod tests {
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          width: 100.,
+          height: 100.,
           class: pipe!(*$read(cls)),
         }
       }
@@ -739,7 +747,8 @@ mod tests {
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          width: 100.,
+          height: 100.,
           class: pipe!(*$read(cls)),
         }
       }
@@ -766,7 +775,8 @@ mod tests {
           })
         ],
         @Container {
-          size: Size::new(100., 100.),
+          width: 100.,
+          height: 100.,
           class: MARGIN,
         }
       }
@@ -790,7 +800,10 @@ mod tests {
         providers: smallvec![initd_classes().into_provider()],
         @ {
           let w = pipe!(*$read(w_trigger)).map(|_| fn_widget!{
-            @Container {size: Size::new(100., 100.) }
+            @Container {
+              width: 100.,
+              height: 100.,
+            }
           });
           @Class {
             class: pipe!(*$read(cls)),
@@ -818,7 +831,8 @@ mod tests {
       let mut w = FatObj::new(w);
       rdl! {
         @Container {
-          size: Size::new(100., 100.),
+          width: 100.,
+          height: 100.,
           @(w) {
             on_performed_layout: move |e| {
               let id = $clone(w.track_id()).get().unwrap();
@@ -837,7 +851,8 @@ mod tests {
       @Providers {
         providers: smallvec![classes.clone().into_provider()],
         @Container {
-          size: Size::new(100., 100.),
+          width: 100.,
+          height: 100.,
           class: pipe!(*$read(cls)),
         }
       }

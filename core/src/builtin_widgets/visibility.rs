@@ -15,7 +15,8 @@ use crate::{prelude::*, wrap_render::*};
 /// use ribir::prelude::*;
 ///
 /// container! {
-///   size: Size::new(100., 100.),
+///   width: 100.,
+///   height: 100.,
 ///   background: Color::RED,
 ///   visible: false,
 /// };
@@ -120,7 +121,8 @@ mod tests {
     let (visible, w_visible) = split_value(true);
     let hit2 = hit.clone_writer();
     let wnd = TestWindow::from_widget(container! {
-      size: Size::splat(100.),
+      width: 100.,
+      height: 100.,
       visible: pipe!(*$read(visible)),
       @PainterHit(hit2.clone_writer())
     });

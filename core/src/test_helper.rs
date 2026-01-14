@@ -87,14 +87,19 @@ impl TestWindow {
   /// [0, 1, 2] the first node at the root level (must be 0), then down to its
   /// second child, then down to third child.
   pub fn layout_info_by_path(&self, path: &[usize]) -> Option<LayoutInfo> {
+    let node = self.widget_id_by_path(path);
+    self.0.tree().store.layout_info(node).cloned()
+  }
+
+  pub fn widget_id_by_path(&self, path: &[usize]) -> WidgetId {
     let tree = self.0.tree();
     let mut node = tree.root();
     for (level, idx) in path[..].iter().enumerate() {
       node = node.children(tree).nth(*idx).unwrap_or_else(|| {
-        panic!("node no exist: {:?}", &path[0..level]);
+        panic!("node no exist: {:?}", &path[0..level + 1]);
       });
     }
-    tree.store.layout_info(node).cloned()
+    node
   }
 
   pub fn take_last_frame(&mut self) -> Option<Frame> {
@@ -257,7 +262,7 @@ impl Render for MockMulti {
     let (ctx, children) = ctx.split_children();
     for c in children {
       let child_size = ctx.perform_child_layout(c, clamp);
-      ctx.update_position(c, Point::new(size.width, 0.));
+      ctx.update_anchor(c, AnchorX::new(size.width), AnchorY::new(0.));
       size.width += child_size.width;
       size.height = size.height.max(child_size.height);
     }
@@ -374,11 +379,24 @@ impl LayoutCase {
     let Self { path, x, y, width, height, visual_rect } = self;
 
     let info = wnd.layout_info_by_path(path).unwrap();
+
+    // Calculate position from parent size
+    let parent_size = if path.len() > 1 {
+      let parent_path = &path[..path.len() - 1];
+      wnd
+        .layout_info_by_path(parent_path)
+        .and_then(|p| p.size)
+        .unwrap_or_default()
+    } else {
+      Size::default()
+    };
+    let pos = info.calculate_pos(parent_size);
+
     if let Some(x) = x {
-      assert_eq!(info.pos.x, *x, "unexpected x");
+      assert_eq!(pos.x, *x, "unexpected x");
     }
     if let Some(y) = y {
-      assert_eq!(info.pos.y, *y, "unexpected y");
+      assert_eq!(pos.y, *y, "unexpected y");
     }
     if let Some(w) = width {
       assert_eq!(info.size.unwrap().width, *w, "unexpected width");
