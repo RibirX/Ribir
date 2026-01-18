@@ -6,7 +6,7 @@ Unified CLI for PR, changelog, and release automation for the Ribir project.
 
 - **PR Automation**: AI-powered PR body generation (summary + changelog entries)
 - **Changelog Management**: Collect, merge, and verify changelog entries using AST parsing
-- **Release Automation**: Full release workflow with one command - changelog, cargo release, GitHub Release
+- **Release Automation**: Full release workflow with one command - changelog, cargo workspace, GitHub Release
 
 ## Installation
 
@@ -18,7 +18,7 @@ cargo install --path .
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) - for GitHub operations
 - [Gemini CLI](https://github.com/anthropics/gemini) (`gemini`) - for AI generation
-- [cargo-release](https://crates.io/crates/cargo-release) - for version bumping and publishing
+- [cargo-workspaces](https://github.com/pksunkara/cargo-workspaces) - for version bumping and publishing
 
 ## Usage
 
@@ -69,7 +69,7 @@ ribir-bot release <SUBCOMMAND> [OPTIONS]
 
 | Subcommand | Description |
 |------------|-------------|
-| `next <level>` | **Full release in one command** (changelog + cargo release + GitHub Release) |
+| `next <level>` | **Full release in one command** (changelog + cargo workspace + GitHub Release) |
 | `enter-rc --version VER` | Enter RC phase (branch + PR + RC.1) |
 | `publish [PR_ID]` | Publish GitHub release |
 | `stable [--version VER]` | Release stable version (auto-detect from branch) |
@@ -155,9 +155,9 @@ src/
 
 The unified release workflow:
 
-1. **Get version**: Runs `cargo release <level> --dry-run` to determine next version
+1. **Get version**: Runs `cargo ws version <level> --dry-run` to determine next version
 2. **Collect changelog**: Gathers entries from merged PRs into CHANGELOG.md
-3. **Cargo release**: Bumps versions, commits, tags, pushes, publishes to crates.io
+3. **Cargo workspace**: Bumps versions, commits, tags, pushes, publishes to crates.io
 4. **GitHub Release**: Creates release with notes from changelog
 
 **Dry-run mode** (default): Shows what would happen, including changelog and release notes preview.
