@@ -11,6 +11,9 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: full
 
+  # Faster linkers: rust-lld for Windows (2-4x faster than MSVC link.exe)
+  CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: rust-lld
+
   # Sourced from https://vulkan.lunarg.com/sdk/home#linux
   VULKAN_SDK_VERSION: "1.3.268"
   # Sourced from https://www.nuget.org/packages/Microsoft.Direct3D.WARP
@@ -44,19 +47,19 @@ jobs:
         if: contains(github.event.pull_request.labels.*.name, 'do-not-merge')
         run: |
           gh pr comment "$PR_NUMBER" --body "⚠️ **Merge Blocked**: This PR has the \`do-not-merge\` label.
-          
+
           - If this is a **Release PR**, please wait and use \`@ribir-bot release-stable\` to merge it.
           - If you manually confirmed it's safe to merge, remove the \`do-not-merge\` label first."
-          
+
           echo "❌ PR has 'do-not-merge' label. Manual merging is disabled."
           exit 1
 
-  get-nightly-version:
-    name: Get nightly version
-    runs-on: ubuntu-latest
+  lint:
+    name: rust code lint
+    runs-on: ubuntu-22.04
     if: github.event_name != 'pull_request' || (github.event.action != 'labeled' && github.event.action != 'unlabeled')
     outputs:
-      version: ${{ steps.nightly-version.outputs.version }}
+      nightly-version: ${{ steps.nightly-version.outputs.version }}
       tools-changed: ${{ steps.filter.outputs.tools }}
     steps:
       - name: Checkout sources
@@ -69,35 +72,31 @@ jobs:
             tools:
               - 'tools/**'
 
-      - name: Install unstable rustfmt
+      - name: Get nightly version
         id: nightly-version
         shell: bash
         run: |
           echo "version=$(cargo +nightly ci config-nightly)" >> "$GITHUB_OUTPUT"
 
-
-  lint:
-    name: rust code lint
-    runs-on: ubuntu-latest
-    needs: get-nightly-version
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
       # Install the specific nightly version with components
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ needs.get-nightly-version.outputs.version }}
+          toolchain: ${{ steps.nightly-version.outputs.version }}
           components: rustfmt, clippy
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            . -> target/${{ steps.nightly-version.outputs.version }}
       - name: Install development libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
       - name: Run lint checks
-        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci lint
+        run: cargo +${{ steps.nightly-version.outputs.version }} ci lint
   test-with-gpu:
     # The content of this job is largely borrowed from the 'ci.yml' file in the 'wgpu/.github/workflows' directory.
     timeout-minutes: 30
@@ -120,39 +119,26 @@ jobs:
 
     name: Test ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    needs: [lint, get-nightly-version]
+    needs: [lint]
 
     steps:
-      - name: Free Disk Space (Ubuntu)
-        if: matrix.os == 'ubuntu-22.04'
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
       - name: checkout repo
         uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ needs.get-nightly-version.outputs.version }}
+          toolchain: ${{ needs.lint.outputs.nightly-version }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          components: llvm-tools-preview
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install cargo-nextest and cargo-llvm-cov
+      - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-llvm-cov
+          tool: cargo-nextest
 
       - name: (windows) install dxc
         if: matrix.os == 'windows-2022'
@@ -178,10 +164,10 @@ jobs:
           curl.exe -L --retry 5 https://www.nuget.org/api/v2/package/Microsoft.Direct3D.WARP/$WARP_VERSION -o warp.zip
           7z.exe e warp.zip -owarp build/native/amd64/d3d10warp.dll
 
-          mkdir -p target/llvm-cov-target/debug/deps
+          mkdir -p target/debug/deps
 
-          cp -v warp/d3d10warp.dll target/llvm-cov-target/debug/
-          cp -v warp/d3d10warp.dll target/llvm-cov-target/debug/deps
+          cp -v warp/d3d10warp.dll target/debug/
+          cp -v warp/d3d10warp.dll target/debug/deps
 
       - name: (windows) install mesa
         if: matrix.os == 'windows-2022'
@@ -192,13 +178,12 @@ jobs:
           curl.exe -L --retry 5 https://github.com/pal1000/mesa-dist-win/releases/download/$MESA_VERSION/mesa3d-$MESA_VERSION-release-msvc.7z -o mesa.7z
           7z.exe e mesa.7z -omesa x64/{opengl32.dll,libgallium_wgl.dll,libglapi.dll,vulkan_lvp.dll,lvp_icd.x86_64.json}
 
-          cp -v mesa/* target/llvm-cov-target/debug/
-          cp -v mesa/* target/llvm-cov-target/debug/deps
+          cp -v mesa/* target/debug/
+          cp -v mesa/* target/debug/deps
 
           # We need to use cygpath to convert PWD to a windows path as we're using bash.
           echo "VK_DRIVER_FILES=`cygpath --windows $PWD/mesa/lvp_icd.x86_64.json`" >> "$GITHUB_ENV"
           echo "GALLIUM_DRIVER=llvmpipe" >> "$GITHUB_ENV"
-
 
       - name: (linux) install mesa
         if: matrix.os == 'ubuntu-22.04'
@@ -254,17 +239,7 @@ jobs:
 
       - name: run tests
         shell: bash
-        run: |
-          set -e
-          cargo llvm-cov --workspace --lcov --output-path lcov.info --all-features
-
-      - name: generate coverage report
-        id: coverage
-        shell: bash
-        continue-on-error: true
-        run: |
-          set -e
-          cargo llvm-cov report --lcov --output-path lcov.info
+        run: cargo +${{ needs.lint.outputs.nightly-version }} ci test
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -272,74 +247,74 @@ jobs:
           name: test-cases-${{ matrix.os }}
           path: ./test_cases
 
-      - name: upload coverage report to codecov
-        uses: codecov/codecov-action@v3
-        if: steps.coverage.outcome == 'success'
-        with:
-          files: lcov.info
-
-      - name: (linux) Cleanup llvm-cov-target
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          rm -rf target/llvm-cov-target
-
-      # Run doc tests on macOS (nextest/llvm-cov doesn't support doc tests)
+      # Run doc tests on macOS (nextest doesn't support doc tests)
       - name: (macos) Run doc tests
         if: matrix.os == 'macos-14'
-        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci doctest
+        run: cargo +${{ needs.lint.outputs.nightly-version }} ci doctest
 
-  doc-and-wasm:
-    needs: [lint, get-nightly-version]
-    name: Doc examples & WASM compile
-    runs-on: ubuntu-latest
+  doc-examples:
+    needs: [lint]
+    name: Doc examples compile
+    runs-on: ubuntu-22.04
     steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
       - name: Checkout sources
         uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ needs.get-nightly-version.outputs.version }}
+          toolchain: ${{ needs.lint.outputs.nightly-version }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+
       - name: Install development libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
       - name: Compile doc examples
-        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci doc
+        run: cargo +${{ needs.lint.outputs.nightly-version }} ci doc
+
+  wasm-compile:
+    needs: [lint]
+    name: WASM compile
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ needs.lint.outputs.nightly-version }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install development libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebp-dev
       - name: Compile to WASM
-        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci wasm
+        run: cargo +${{ needs.lint.outputs.nightly-version }} ci wasm
 
   ribir-bot-check:
-    needs: [get-nightly-version]
+    needs: [lint]
     name: Ribir Tools Check
     # Only run if any tool files changed
-    if: needs.get-nightly-version.outputs.tools-changed == 'true'
+    if: needs.lint.outputs.tools-changed == 'true'
     uses: ./.github/workflows/tools-ci.yml
     with:
-      nightly-version: ${{ needs.get-nightly-version.outputs.version }}
+      nightly-version: ${{ needs.lint.outputs.nightly-version }}
 
   bundle:
-    needs: [lint, get-nightly-version]
+    needs: [lint]
     name: bundle
     strategy:
       fail-fast: false
       matrix:
-        # TODO: Re-enable ubuntu-latest after fixing AppImage icon issue
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-14
+          - os: windows-2022
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -348,7 +323,7 @@ jobs:
       - name: Install Rust (nightly for cargo script)
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ needs.get-nightly-version.outputs.version }}
+          toolchain: ${{ needs.lint.outputs.nightly-version }}
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -358,24 +333,18 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
-
       - name: Install macOS dependencies
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
         run: brew install webp
 
       - name: Bundle counter example
         shell: bash
-        run: cargo +${{ needs.get-nightly-version.outputs.version }} ci bundle
+        run: cargo +${{ needs.lint.outputs.nightly-version }} ci bundle
 
   release-dry-run:
     needs: [lint]
     name: Verify packages are publishable
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -393,17 +362,25 @@ jobs:
         with:
           tool: cargo-workspaces
 
-      - name: Install audio development libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
+      - name: Install dependencies
+        run: brew install webp
 
       - name: Dry run release
         run: cargo ws publish --dry-run -y --allow-branch "*"
 
   status-report:
     name: CI unified status report
-    needs: [lint, test-with-gpu, doc-and-wasm, bundle, release-dry-run, check-merge-allowed, ribir-bot-check]
+    needs:
+      [
+        lint,
+        test-with-gpu,
+        doc-examples,
+        wasm-compile,
+        bundle,
+        release-dry-run,
+        check-merge-allowed,
+        ribir-bot-check,
+      ]
     runs-on: ubuntu-latest
     if: always() && (github.event_name != 'pull_request' || (github.event.action != 'labeled' && github.event.action != 'unlabeled'))
     steps:
@@ -415,7 +392,8 @@ jobs:
         run: |
           if [ "${{ needs['lint'].result }}" != "success" ] || \
              [ "${{ needs['test-with-gpu'].result }}" != "success" ] || \
-             [ "${{ needs['doc-and-wasm'].result }}" != "success" ] || \
+             [ "${{ needs['doc-examples'].result }}" != "success" ] || \
+             [ "${{ needs['wasm-compile'].result }}" != "success" ] || \
              [ "${{ needs['bundle'].result }}" != "success" ] || \
              [ "${{ needs['release-dry-run'].result }}" != "success" ] || \
              [ "${{ needs['ribir-bot-check'].result }}" != "success" && "${{ needs['ribir-bot-check'].result }}" != "skipped" ] || \
@@ -423,3 +401,76 @@ jobs:
             echo "CI failed"
             exit 1
           fi
+
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-22.04
+    needs: [status-report]
+    if: success()
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov and cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
+
+      - name: Install development libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config libwebp-dev
+
+      - name: (linux) install mesa
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -e
+
+          curl -L --retry 5 https://github.com/gfx-rs/ci-build/releases/download/$CI_BINARY_BUILD/mesa-$MESA_VERSION-linux-x86_64.tar.xz -o mesa.tar.xz
+          mkdir mesa
+          tar xpf mesa.tar.xz -C mesa
+
+          # The ICD provided by the mesa build is hardcoded to the build environment.
+          #
+          # We write out our own ICD file to point to the mesa vulkan
+          cat <<- EOF > icd.json
+          {
+            "ICD": {
+                "api_version": "1.1.255",
+                "library_path": "$PWD/mesa/lib/x86_64-linux-gnu/libvulkan_lvp.so"
+            },
+            "file_format_version": "1.0.0"
+          }
+          EOF
+
+          echo "VK_DRIVER_FILES=$PWD/icd.json" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$PWD/mesa/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
+          echo "LIBGL_DRIVERS_PATH=$PWD/mesa/lib/x86_64-linux-gnu/dri" >> "$GITHUB_ENV"
+
+      - name: (linux) install vulkan sdk
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -e
+          # vulkan sdk repository
+          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-$VULKAN_SDK_VERSION-jammy.list https://packages.lunarg.com/vulkan/$VULKAN_SDK_VERSION/lunarg-vulkan-$VULKAN_SDK_VERSION-jammy.list
+
+          sudo apt-get update
+          sudo apt-get install -y vulkan-sdk
+
+      - name: Generate coverage
+        run: cargo llvm-cov nextest --workspace --all-features --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: lcov.info

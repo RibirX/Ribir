@@ -1,9 +1,6 @@
 //! Release command implementations.
 
-use std::{
-  fs,
-  process::{Command, Stdio},
-};
+use std::{fs, process::Command};
 
 use comrak::Arena;
 use semver::Version;
