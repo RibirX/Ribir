@@ -494,38 +494,42 @@ fn detect_version_from_tag() -> Result<Version> {
 }
 
 fn get_next_version(level: &str) -> Result<String> {
-  let output = Command::new("cargo")
-    .args(["release", level, "--dry-run"])
-    .stderr(Stdio::piped())
-    .stdout(Stdio::piped())
-    .env("CARGO_NET_GIT_FETCH_WITH_CLI", "true")
-    .output()?;
+  let tag = get_latest_git_tag()?;
+  let mut version = Version::parse(&tag)?;
 
-  let combined = format!(
-    "{}{}",
-    String::from_utf8_lossy(&output.stdout),
-    String::from_utf8_lossy(&output.stderr)
-  );
-
-  for line in combined.lines() {
-    if line.contains("Upgrading")
-      && line.contains(" to ")
-      && let Some(after_to) = line.split(" to ").nth(1)
-    {
-      let version_str = after_to.split_whitespace().next().unwrap_or("");
-      if Version::parse(version_str).is_ok() {
-        return Ok(version_str.to_string());
+  match level {
+    "alpha" | "rc" => {
+      let prefix = format!("{}.", level);
+      if let Some(pre_str) = version.pre.as_str().strip_prefix(&prefix)
+        && let Ok(num) = pre_str.parse::<u64>()
+      {
+        version.pre = semver::Prerelease::new(&format!("{}{}", prefix, num + 1)).unwrap();
+      } else {
+        if version.pre.is_empty() {
+          version.patch += 1;
+        }
+        version.pre = semver::Prerelease::new(&format!("{}1", prefix)).unwrap();
       }
     }
+    "patch" => {
+      version.patch += 1;
+      version.pre = semver::Prerelease::EMPTY;
+    }
+    "minor" => {
+      version.minor += 1;
+      version.patch = 0;
+      version.pre = semver::Prerelease::EMPTY;
+    }
+    "major" => {
+      version.major += 1;
+      version.minor = 0;
+      version.patch = 0;
+      version.pre = semver::Prerelease::EMPTY;
+    }
+    _ => return Err(format!("Unsupported release level: {level}").into()),
   }
 
-  Err(
-    format!(
-      "Could not parse version from cargo release output:\n{}",
-      &combined[..combined.len().min(500)]
-    )
-    .into(),
-  )
+  Ok(version.to_string())
 }
 
 /// Configuration for cargo-workspaces publish
@@ -591,7 +595,8 @@ fn run_cargo_ws_publish(cfg: CargoWsPublishConfig) -> Result<()> {
 }
 
 fn get_version_from_context() -> Result<String> {
-  // Try git tag first (most reliable after cargo release)
+  // Try git tag first (most reliable after cargo publish)
+
   if let Ok(version) = get_latest_git_tag() {
     return Ok(version);
   }
