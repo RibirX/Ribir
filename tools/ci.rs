@@ -16,7 +16,7 @@ serde = { version = "1.0", features = ["derive"] }
 //!   clippy    - Run clippy lints (nightly)
 //!   check     - Cargo check (stable)
 //!   lint      - Run all lint checks (fmt + clippy + check)
-//!   test      - Run tests (stable)
+//!   test      - Run tests (uses nextest if available)
 //!   doctest   - Run doc tests (stable)
 //!   doc       - Compile doc examples (stable)
 //!   wasm      - Compile to wasm32 (stable)
@@ -195,8 +195,8 @@ Commands:
   clippy (c)     - Run clippy lints           [{}]
   check          - Cargo check                [stable]
   lint (l)       - Run all lint checks (fmt + clippy + check)
-  test (t)       - Run tests with coverage    [{}]
-  doctest (d)    - Run doc tests              [{}]
+  test (t)       - Run tests (nextest if available)
+  doctest (d)    - Run doc tests              [stable]
   doc            - Compile doc examples       [stable]
   wasm (w)       - Compile to wasm32          [stable]
   bundle (b)     - Bundle counter example     [stable]
@@ -210,7 +210,7 @@ Examples:
   cargo +nightly ci l     # Run all lints (fmt + clippy + check)
   cargo +nightly ci t     # Run tests
 "#,
-    NIGHTLY_VERSION, NIGHTLY_VERSION, NIGHTLY_VERSION, NIGHTLY_VERSION
+    NIGHTLY_VERSION, NIGHTLY_VERSION
   );
 }
 
@@ -265,13 +265,16 @@ fn run_check(stable_version: &str) -> Result<(), ()> {
   run_cargo_command(stable_version, &["check"], None, &[])
 }
 
-/// cargo llvm-cov --workspace --all-features
-/// Falls back to cargo test if llvm-cov is not installed
+/// Run tests using nextest if available, otherwise fallback to cargo test
 fn run_test(stable_version: &str) -> Result<(), ()> {
-  // Use stable for tests and coverage
-  if has_cargo_tool("llvm-cov") {
-    println!("🧪 Running tests with coverage [{}]...", stable_version);
-    run_cargo_command(stable_version, &["llvm-cov", "--workspace", "--all-features"], None, &[])
+  if has_cargo_tool("nextest") {
+    println!("🧪 Running tests with nextest [{}]...", stable_version);
+    run_cargo_command(
+      stable_version,
+      &["nextest", "run", "--workspace", "--all-features"],
+      None,
+      &[],
+    )
   } else {
     println!("🧪 Running tests [{}]...", stable_version);
     run_cargo_command(
@@ -386,6 +389,8 @@ fn run_wasm(stable_version: &str) -> Result<(), ()> {
       "cli",
       "--exclude",
       "pomodoro",
+      "--exclude",
+      "ribir-bot",
     ],
     None,
     &[("RUSTFLAGS", r#"--cfg getrandom_backend="wasm_js""#)],
@@ -460,9 +465,6 @@ fn get_toolchain_target_dir(toolchain: &str) -> std::path::PathBuf {
   let mut path = std::env::current_dir().expect("Failed to get current directory");
   path.push("target");
 
-  // If this toolchain is the default one, we reuse the 'target' directory
-  // directly. Otherwise, we use a toolchain-specific subdirectory to avoid
-  // invalidating the cache when switching.
   if !is_default_toolchain(toolchain) {
     path.push(toolchain);
   }

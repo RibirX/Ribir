@@ -1,6 +1,6 @@
 [package]
 name = "ribir-bot"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 description = "A CLI tool for managing Ribir releases and changelogs"
 license = "MIT"
