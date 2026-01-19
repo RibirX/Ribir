@@ -236,24 +236,40 @@ fn gen_full_stateful_finish(declarer: &Declarer) -> TokenStream {
   let (field_tys, setter_logic): (Vec<_>, Vec<_>) = declarer
     .fields
     .iter()
-    .map(|f| {
+    .map(|f| (&f.field.ty, f.gen_setter_logic()))
+    .unzip();
+
+  let event_bindings: Vec<_> = declarer
+    .fields
+    .iter()
+    .filter_map(|f| {
+      let event_meta = f.event_meta()?;
+      let field_name = f.member();
       let ty = &f.field.ty;
-      let logic = if let Some(setter) = f.setter_name() {
-        if let Some(st) = f.setter_ty() {
-          quote! {
-            let v: #st = v.into();
-            this_ಠ_ಠ.write().#setter(v);
+      let event_type = &event_meta.event_type;
+      let set_logic = f.gen_setter_logic();
+
+      let convert_expr = if let Some(chain) = &event_meta.convert_chain {
+        quote! {
+          let v: Option<#ty> = e.data()#chain.into();
+          if let Some(v) = v {
+            #set_logic
           }
-        } else {
-          quote! { this_ಠ_ಠ.write().#setter(v); }
         }
       } else {
-        let member = f.member();
-        quote! { this_ಠ_ಠ.write().#member = v; }
+        quote! {
+          let v: #ty = e.data().clone().into();
+          #set_logic
+        }
       };
-      (ty, logic)
+
+      Some((field_name.clone(), event_type.clone(), convert_expr))
     })
-    .unzip();
+    .collect();
+
+  let event_field_names: Vec<_> = event_bindings.iter().map(|(f, _, _)| f).collect();
+  let event_types: Vec<_> = event_bindings.iter().map(|(_, t, _)| t).collect();
+  let event_convert_exprs: Vec<_> = event_bindings.iter().map(|(_, _, e)| e).collect();
 
   quote! {
     #(#field_values)*
@@ -261,6 +277,17 @@ fn gen_full_stateful_finish(declarer: &Declarer) -> TokenStream {
     let this_ಠ_ಠ = Stateful::new(_obj_ಠ_ಠ);
 
     let mut fat_ಠ_ಠ = self.fat_ಠ_ಠ;
+
+    // Bind self-event handlers for uncontrolled fields before pipe subscriptions consume .1
+    #(
+      if #event_field_names.1.is_none() {
+        let this_ಠ_ಠ = this_ಠ_ಠ.clone_writer();
+        fat_ಠ_ಠ.on_custom::<#event_types>(move |e: &mut CustomEvent<#event_types>| {
+          #event_convert_exprs
+        });
+      }
+    )*
+
     #(
       if let Some(o) = #field_names.1 {
         let this_ಠ_ಠ = this_ಠ_ಠ.clone_writer();
@@ -430,6 +457,23 @@ impl<'a> DeclareField<'a> {
       .attr
       .as_ref()
       .and_then(|attr| attr.event.as_ref())
+  }
+
+  /// Generates the setter logic for updating this field via `this_ಠ_ಠ.write()`
+  pub fn gen_setter_logic(&self) -> TokenStream {
+    if let Some(setter) = self.setter_name() {
+      if let Some(setter_ty) = self.setter_ty() {
+        quote! {
+          let v: #setter_ty = v.into();
+          this_ಠ_ಠ.write().#setter(v);
+        }
+      } else {
+        quote! { this_ಠ_ಠ.write().#setter(v); }
+      }
+    } else {
+      let member = self.member();
+      quote! { this_ಠ_ಠ.write().#member = v; }
+    }
   }
 }
 

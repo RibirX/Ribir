@@ -69,33 +69,38 @@ class_names! {
 
 impl Checkbox {
   fn state_class_name(&self) -> ClassName {
-    if self.indeterminate {
-      CHECKBOX_INDETERMINATE
-    } else if self.checked {
-      CHECKBOX_CHECKED
-    } else {
-      CHECKBOX_UNCHECKED
+    match (self.indeterminate, self.checked) {
+      (true, _) => CHECKBOX_INDETERMINATE,
+      (_, true) => CHECKBOX_CHECKED,
+      _ => CHECKBOX_UNCHECKED,
     }
   }
 
   fn icon_class_name(&self) -> ClassName {
-    if self.indeterminate {
-      CHECKBOX_INDETERMINATE_ICON
-    } else if self.checked {
-      CHECKBOX_CHECKED_ICON
-    } else {
-      CHECKBOX_UNCHECKED_ICON
+    match (self.indeterminate, self.checked) {
+      (true, _) => CHECKBOX_INDETERMINATE_ICON,
+      (_, true) => CHECKBOX_CHECKED_ICON,
+      _ => CHECKBOX_UNCHECKED_ICON,
     }
   }
 
-  fn switch_check(&mut self, e: &CommonEvent) {
+  fn request_toggle(&self, e: &CommonEvent) {
+    let mut new_state = *self;
+    new_state.switch_check();
+    e.window()
+      .bubble_custom_event(e.target(), new_state);
+  }
+
+  /// Manually toggle the checkbox state.
+  /// This is an imperative API (Path C) and should not be used for default UI
+  /// interactions.
+  pub fn switch_check(&mut self) {
     if self.indeterminate {
       self.indeterminate = false;
       self.checked = false;
     } else {
       self.checked = !self.checked;
     }
-    e.window().bubble_custom_event(e.target(), *self);
   }
 }
 
@@ -110,7 +115,7 @@ impl ComposeChild<'static> for Checkbox {
       };
       let icon_with_label = icon_with_label(icon.into_widget(), child);
       @FatObj {
-        on_action: move |e| $write(this).switch_check(e),
+        on_action: move |e| $read(this).request_toggle(e),
         @{ icon_with_label }
       }
     }

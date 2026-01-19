@@ -89,37 +89,6 @@ enum RangeSliderPart {
   End,
 }
 
-fn slider_update<E: std::ops::Deref<Target = CommonEvent>>(
-  this: &impl StateWriter<Value = Slider>, e: &E, ratio: f32,
-) {
-  let mut this = this.write();
-  let from = this.value;
-  this.set_by_ratio(ratio);
-  let to = this.value;
-  if from != to {
-    e.window()
-      .bubble_custom_event(e.target(), SliderChanged { from, to });
-  }
-}
-
-fn range_slider_update<E: std::ops::Deref<Target = CommonEvent>>(
-  this: &impl StateWriter<Value = RangeSlider>, e: &E, ratio: f32, part: RangeSliderPart,
-) {
-  let from = this.read().value();
-  {
-    let mut writer = this.write();
-    match part {
-      RangeSliderPart::Start => writer.set_start_ratio(ratio),
-      RangeSliderPart::End => writer.set_end_ratio(ratio),
-    }
-  }
-  let to = this.read().value();
-  if from != to {
-    e.window()
-      .bubble_custom_event(e.target(), RangeSliderChanged { from, to });
-  }
-}
-
 fn slider_core_validate(min: &mut f32, max: &mut f32, divisions: &mut Option<usize>) {
   if *min > *max {
     std::mem::swap(min, max);
@@ -202,7 +171,14 @@ impl Slider {
 
   pub fn divisions(&self) -> Option<usize> { self.divisions }
 
-  fn set_by_ratio(&mut self, ratio: f32) { self.set_value(self.convert_ratio(ratio)); }
+  fn request_value_change(&self, ratio: f32, e: &impl std::ops::Deref<Target = CommonEvent>) {
+    let from = self.value;
+    let to = self.snap_v(self.convert_ratio(ratio));
+    if from != to {
+      e.window()
+        .bubble_custom_event(e.target(), SliderChanged { from, to });
+    }
+  }
 
   fn ratio(&self) -> f32 { self.calc_ratio(self.value) }
 
@@ -270,7 +246,7 @@ impl Compose for Slider {
           let width = *$read(track_width);
           if width > 0. {
             let (_, to) = e.data().endpoints();
-            slider_update(&$writer(this), e, to.x / width);
+            $read(this).request_value_change(to.x / width, e);
           }
         },
         @Stack {
@@ -430,6 +406,23 @@ impl RangeSlider {
     self.set_end(self.end);
   }
 
+  fn request_value_change(
+    &self, ratio: f32, part: RangeSliderPart, e: &impl std::ops::Deref<Target = CommonEvent>,
+  ) {
+    let from = self.value();
+    let mut to = from;
+    let val = self.snap_v(self.convert_ratio(ratio));
+    match part {
+      RangeSliderPart::Start => to.start = val.min(self.end),
+      RangeSliderPart::End => to.end = val.max(self.start),
+    }
+
+    if from != to {
+      e.window()
+        .bubble_custom_event(e.target(), RangeSliderChanged { from, to });
+    }
+  }
+
   fn choose_part(&self, ratio: f32) -> RangeSliderPart {
     let val = self.snap_v(self.convert_ratio(ratio));
     if (self.start - val).abs() < (self.end - val).abs() {
@@ -442,10 +435,6 @@ impl RangeSlider {
       RangeSliderPart::End
     }
   }
-
-  fn set_start_ratio(&mut self, ratio: f32) { self.set_start(self.convert_ratio(ratio)); }
-
-  fn set_end_ratio(&mut self, ratio: f32) { self.set_end(self.convert_ratio(ratio)); }
 
   fn start_ratio(&self) -> f32 { self.calc_ratio(self.start) }
 
@@ -475,7 +464,7 @@ impl Compose for RangeSlider {
             let ratio = p.x / width;
             *active_part = $read(this).choose_part(ratio);
           }
-          range_slider_update(&$writer(this), e, to.x / width, *active_part);
+          $read(this).request_value_change(to.x / width, *active_part, e);
         },
         @Stack {
           class: SLIDER_CONTAINER,
@@ -699,7 +688,7 @@ mod tests {
     let ratio = 0.4;
     let part = range.choose_part(ratio);
     assert_eq!(part, RangeSliderPart::Start);
-    range.set_start_ratio(ratio);
+    range.set_start(range.convert_ratio(ratio));
     assert!((range.start() - 40.).abs() < 1e-5);
     assert!((range.end() - 50.).abs() < 1e-5);
 
@@ -710,7 +699,7 @@ mod tests {
     let ratio = 0.6;
     let part = range.choose_part(ratio);
     assert_eq!(part, RangeSliderPart::End);
-    range.set_end_ratio(ratio);
+    range.set_end(range.convert_ratio(ratio));
     assert!((range.start() - 50.).abs() < 1e-5);
     assert!((range.end() - 60.).abs() < 1e-5);
   }
