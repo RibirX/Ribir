@@ -39,20 +39,16 @@ use crate::prelude::*;
 ///   @Trailing::new("Label placed after the checkbox!")
 /// };
 /// ```
-#[derive(Clone, Copy, Declare, PartialEq, Eq)]
+
+#[derive(Debug, Clone, Copy, Declare, PartialEq, Eq)]
 pub struct Checkbox {
-  #[declare(default)]
+  #[declare(default, event = Checkbox.checked)]
   pub checked: bool,
-  #[declare(default)]
+  #[declare(default, event = Checkbox.indeterminate)]
   pub indeterminate: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct CheckState {
-  pub checked: bool,
-}
-
-pub type CheckboxEvent = CustomEvent<CheckState>;
+pub type CheckboxChanged = CustomEvent<Checkbox>;
 
 class_names! {
   /// The class name for the container of a checked checkbox.
@@ -72,15 +68,6 @@ class_names! {
 }
 
 impl Checkbox {
-  pub fn switch_check(&mut self) {
-    if self.indeterminate {
-      self.indeterminate = false;
-      self.checked = false;
-    } else {
-      self.checked = !self.checked;
-    }
-  }
-
   fn state_class_name(&self) -> ClassName {
     if self.indeterminate {
       CHECKBOX_INDETERMINATE
@@ -100,6 +87,16 @@ impl Checkbox {
       CHECKBOX_UNCHECKED_ICON
     }
   }
+
+  fn switch_check(&mut self, e: &CommonEvent) {
+    if self.indeterminate {
+      self.indeterminate = false;
+      self.checked = false;
+    } else {
+      self.checked = !self.checked;
+    }
+    e.window().bubble_custom_event(e.target(), *self);
+  }
 }
 
 impl ComposeChild<'static> for Checkbox {
@@ -107,33 +104,15 @@ impl ComposeChild<'static> for Checkbox {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fn_widget! {
-      let mut obj = @FatObj {
-        on_action: move |e| {
-          $write(this).switch_check();
-          e.stop_propagation();
-        },
-        @ {
-          let classes = class_array![distinct_pipe!($read(this).state_class_name()), CHECKBOX];
-          let icon = @(classes) {
-            @Icon {
-              @Void { class: distinct_pipe!($read(this).icon_class_name())}
-            }
-          };
-          icon_with_label(icon.into_widget(), child)
-        }
+      let classes = class_array![distinct_pipe!($read(this).state_class_name()), CHECKBOX];
+      let icon = @(classes) {
+        @Icon { @Void { class: distinct_pipe!($read(this).icon_class_name())} }
       };
-
-      let track_id = obj.track_id();
-      let window = BuildCtx::get().window();
-      watch!($read(this).checked)
-        .distinct_until_changed()
-        .subscribe(move |checked| {
-          if let Some(id) = track_id.get() {
-            window.bubble_custom_event(id, CheckState { checked });
-          }
-        });
-
-      obj
+      let icon_with_label = icon_with_label(icon.into_widget(), child);
+      @FatObj {
+        on_action: move |e| $write(this).switch_check(e),
+        @{ icon_with_label }
+      }
     }
     .into_widget()
   }

@@ -422,7 +422,7 @@ fn setting_config() -> Widget<'static> {
           h_align: HAlign::Center,
           @Checkbox {
             checked: $read(config).always_on_top,
-            on_custom: move |e: &mut CheckboxEvent| {
+            on_custom: move |e: &mut CheckboxChanged| {
               $write(config).always_on_top = e.data().checked;
             }
           }
