@@ -219,14 +219,10 @@ fn btn_label_style(line_height: f32) -> TextStyle {
 }
 
 fn base_interactive(w: Widget) -> FatObj<Widget> {
-  let mut w = if DisabledRipple::get(BuildCtx::get()) {
-    FatObj::new(w)
-  } else {
-    let mut layers = InteractiveLayers::declarer();
-    layers.with_bounded(true);
-    let layers = layers.finish();
-    layers.map(move |l| l.with_child(w).into_widget())
-  };
+  let mut layers = InteractiveLayers::declarer();
+  layers.with_bounded(true);
+  let layers = layers.finish();
+  let mut w = layers.map(move |l| l.with_child(w).into_widget());
   w.with_cursor(CursorIcon::Pointer);
   w
 }

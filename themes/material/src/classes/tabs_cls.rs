@@ -80,10 +80,6 @@ pub fn init(classes: &mut Classes) {
       @{ w }
     };
 
-    if DisabledRipple::get(BuildCtx::get()) {
-      return w.into_widget();
-    }
-
     interactive_layers! {
       bounded: true,
       @ { w }

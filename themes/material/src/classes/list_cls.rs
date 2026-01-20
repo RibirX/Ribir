@@ -30,10 +30,6 @@ pub(super) fn init(classes: &mut Classes) {
   );
 
   classes.insert(LIST_ITEM_INTERACTIVE, |w| {
-    if DisabledRipple::get(BuildCtx::get()) {
-      return w;
-    }
-
     interactive_layers! {
       cursor: CursorIcon::Pointer,
       bounded: true,
