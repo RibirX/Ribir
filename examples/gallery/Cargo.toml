@@ -22,3 +22,9 @@ wgpu = ["ribir/wgpu"]
 [[bin]]
 name = "gallery"
 path = "src/main.rs"
+
+[package.metadata.bundle]
+product-name = "Gallery"
+identifier = "com.ribir.gallery"
+icon = ["../../examples/Logo.ico"]
+targets = "all"

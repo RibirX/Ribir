@@ -1,9 +1,0 @@
-[bundle]
-"productName" = "Counter"
-"version" = "1.0.0"
-"identifier" = "com.ribir.counter"
-# Keep CI simple: produce an MSI on Windows
-"targets" = ["msi"]
-"icon" = ["../../Logo.ico"]
-"resources" = []
-"externalBin" = []

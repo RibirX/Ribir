@@ -156,13 +156,6 @@ pub(crate) trait Asset {
   /// A `TokenStream` that evaluates to the final asset type (e.g., `Svg`,
   /// `Image`).
   fn load_expr(&self, data_expr: TokenStream) -> TokenStream;
-
-  /// Return a hash of processing parameters for cache invalidation.
-  ///
-  /// When the same input file is processed with different parameters (e.g.,
-  /// `inherit_fill = true` vs `false` for SVG), this hash ensures separate
-  /// cached outputs.
-  fn params_hash(&self) -> Option<String> { None }
 }
 
 // =============================================================================
@@ -177,7 +170,7 @@ fn gen_asset_internal(input: TokenStream, embed: bool) -> TokenStream {
 }
 
 fn process_and_generate(args: AssetArgs, embed: bool) -> syn::Result<TokenStream> {
-  let ctx = prepare_asset_context(&args.input, embed, args.asset.params_hash())?;
+  let ctx = prepare_asset_context(&args.input, embed)?;
   generate_for_asset(args.asset.as_ref(), &ctx)
 }
 
@@ -223,6 +216,16 @@ fn generate_for_asset(asset: &dyn Asset, ctx: &AssetContext) -> syn::Result<Toke
     let path = ctx.runtime_path_tokens(asset.output_extension());
     quote! { std::borrow::Cow::<[u8]>::Owned(std::fs::read(#path).expect("Failed to read asset")) }
   };
+
+  // Record in manifest for bundle packaging (skip for embedded assets)
+  if !ctx.embed {
+    append_to_manifest(
+      &ctx.abs_input.to_string_lossy(),
+      &output_path,
+      &ctx.relative_output_with_ext(asset.output_extension()),
+      ctx.input_span,
+    )?;
+  }
 
   // Generate final expression with include_bytes for change tracking
   let abs_input = ctx.abs_input.to_string_lossy().into_owned();
@@ -360,32 +363,48 @@ impl AssetContext {
     }
   }
 
+  pub fn relative_output_with_ext(&self, new_ext: Option<&str>) -> String {
+    match new_ext {
+      Some(ext) => Path::new(&self.relative_output)
+        .with_extension(ext)
+        .to_string_lossy()
+        .into_owned(),
+      None => self.relative_output.clone(),
+    }
+  }
+
   /// Generate runtime path expression for loading the asset.
   ///
   /// In bundle mode, generates path relative to executable.
   /// In debug mode, generates absolute path to target directory.
   pub fn runtime_path_tokens(&self, new_ext: Option<&str>) -> TokenStream {
-    let relative = match new_ext {
-      Some(ext) => {
-        let stem = Path::new(&self.relative_output)
-          .file_stem()
-          .and_then(|s| s.to_str())
-          .unwrap_or(&self.relative_output);
-        let parent = Path::new(&self.relative_output)
-          .parent()
-          .and_then(|p| p.to_str())
-          .unwrap_or("");
-        if parent.is_empty() {
-          format!("{}.{}", stem, ext)
-        } else {
-          format!("{}/{}.{}", parent, stem, ext)
-        }
-      }
-      None => self.relative_output.clone(),
-    };
+    let relative = self.relative_output_with_ext(new_ext);
 
     if self.is_bundle {
-      quote! { std::env::current_exe().unwrap().parent().unwrap().join(#relative) }
+      #[cfg(target_os = "macos")]
+      {
+        quote! {
+          std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("Resources")
+            .join(&#relative)
+        }
+      }
+
+      #[cfg(not(target_os = "macos"))]
+      {
+        quote! {
+          std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join(&#relative)
+        }
+      }
     } else {
       let output = match new_ext {
         Some(ext) => self.abs_output.with_extension(ext),
@@ -402,13 +421,10 @@ impl AssetContext {
 // =============================================================================
 
 /// Prepare the asset context from macro input.
-fn prepare_asset_context(
-  input: &LitStr, embed: bool, params_hash: Option<String>,
-) -> syn::Result<AssetContext> {
+fn prepare_asset_context(input: &LitStr, embed: bool) -> syn::Result<AssetContext> {
   let input_path = input.value();
   let span = input.span();
-  let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".into());
-  let is_bundle = profile == "bundle";
+  let is_bundle = std::env::var("RIBIR_BUNDLE_MODE").is_ok();
 
   let abs_input = resolve_caller_relative_path(&input_path, span)?;
 
@@ -424,41 +440,33 @@ fn prepare_asset_context(
     .and_then(|n| n.to_str())
     .ok_or_else(|| syn::Error::new(span, "Invalid filename"))?;
 
-  // Generate unique output filename using path hash + params hash
+  // Generate unique output filename using path hash
   // Use absolute path for hash to ensure same file = same cache regardless of how
   // it's referenced
   let abs_input_str = abs_input.to_string_lossy();
   let path_hash = hash_path(&abs_input_str);
-  let hashed_filename = match params_hash {
-    Some(ph) => format!("{path_hash}_{ph}_{filename}"),
-    None => format!("{path_hash}_{filename}"),
-  };
+  let hashed_filename = format!("{path_hash}_{filename}");
+
+  // Get the Cargo profile (debug/release) from PROFILE env var set by Cargo
+
+  let cargo_profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".into());
 
   let (manifest_path, workspace_opt) = get_workspace_base(span)?;
+  let root = workspace_opt.unwrap_or(manifest_path);
   let base_target = std::env::var_os("CARGO_TARGET_DIR")
     .map(PathBuf::from)
-    .unwrap_or_else(|| {
-      workspace_opt
-        .clone()
-        .unwrap_or_else(|| manifest_path.clone())
-        .join("target")
-    });
+    .map(|p| if p.is_absolute() { p } else { root.join(p) })
+    .unwrap_or_else(|| root.join("target"));
 
-  let target_dir = base_target.join(&profile).join("assets");
-  let abs_output = target_dir.join(&hashed_filename);
+  let target_assets_dir = base_target.join(cargo_profile).join("assets");
 
-  if !target_dir.exists() {
-    fs::create_dir_all(&target_dir)
+  if !target_assets_dir.exists() {
+    fs::create_dir_all(&target_assets_dir)
       .map_err(|e| syn::Error::new(span, format!("Failed to create dir: {e}")))?;
   }
 
+  let abs_output = target_assets_dir.join(&hashed_filename);
   let relative_output = format!("assets/{hashed_filename}");
-
-  // Record in manifest for bundle packaging (skip for embedded assets)
-  // Use absolute path in manifest for consistency
-  if !embed {
-    append_to_manifest(&abs_input_str, &relative_output, &target_dir, span)?;
-  }
 
   Ok(AssetContext {
     input_path,
@@ -545,18 +553,36 @@ fn hash_path(path: &str) -> String {
 }
 
 /// Append asset mapping to manifest file for bundle packaging.
+///
+/// Manifest format (pipe-separated):
+/// source_absolute_path | build_absolute_path | bundle_relative_path |
+/// call_location
 fn append_to_manifest(
-  input: &str, output: &str, target_dir: &Path, span: proc_macro2::Span,
+  source_abs: &str, build_abs: &Path, bundle_relative: &str, span: proc_macro2::Span,
 ) -> syn::Result<()> {
   use std::io::Write;
-  let path = target_dir.join(".asset_manifest.txt");
+  let path = build_abs
+    .parent()
+    .ok_or_else(|| syn::Error::new(span, "Invalid build path"))?
+    .join(".asset_manifest.txt");
+
+  let caller_file = span
+    .unwrap()
+    .local_file()
+    .map(|p| p.to_string_lossy().into_owned())
+    .unwrap_or_else(|| "unknown".to_string());
+  let line = span.unwrap().start().line();
+  let col = span.unwrap().start().column();
+  let location = format!("{caller_file}:{line}:{col}");
+
   let mut file = fs::OpenOptions::new()
     .create(true)
     .append(true)
     .open(&path)
     .map_err(|e| syn::Error::new(span, format!("Manifest open failed: {e}")))?;
-  writeln!(file, "{input} -> {output}")
-    .map_err(|e| syn::Error::new(span, format!("Manifest write failed: {e}")))
+  writeln!(file, "{source_abs} | {} | {bundle_relative} | {location}", build_abs.display())
+    .map_err(|e| syn::Error::new(span, format!("Manifest write failed: {e}")))?;
+  Ok(())
 }
 
 /// Find workspace root by searching for Cargo.toml with [workspace].

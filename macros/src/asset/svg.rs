@@ -25,9 +25,4 @@ impl Asset for SvgAsset {
       ).expect("Failed to deserialize SVG")
     }
   }
-
-  fn params_hash(&self) -> Option<String> {
-    let hash = (self.inherit_fill as u8) | ((self.inherit_stroke as u8) << 1);
-    Some(format!("{:x}", hash))
-  }
 }

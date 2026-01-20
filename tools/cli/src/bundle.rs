@@ -1,13 +1,14 @@
 /// Forked and modified from Tauri CLI
 /// https://github.com/tauri-apps/tauri/tree/dev/crates/tauri-cli
 use std::{
-  env,
+  env, fs,
   path::{Path, PathBuf},
+  process::Command,
   str::FromStr,
 };
 
 use anyhow::{Context, Result, bail};
-use clap::{CommandFactory, FromArgMatches, Parser};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use tauri_bundler::{
@@ -28,29 +29,47 @@ use crate::{
   },
 };
 
+const RIBIR_BUNDLE_MODE_ENV: &str = "RIBIR_BUNDLE_MODE";
+
 pub fn bundle() -> Box<dyn CliCommand> { Box::new(BundleCmd {}) }
 
 struct BundleCmd {}
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "bundle")]
-/// run as web wasm
+/// Bundle the application for distribution
 struct Bundle {
-  /// Direction path to output, default to target/wasm
-  #[arg(short, long)]
+  #[command(subcommand)]
+  action: Option<BundleAction>,
+
+  /// Path to bundle config file (defaults to Cargo.toml)
+  #[arg(short, long, global = true)]
   config: Option<PathBuf>,
 
-  /// verbose, default to false
-  #[arg(short, long)]
-  debug: bool,
+  /// Cargo profile to use. Auto-detects [profile.bundle] if exists, otherwise
+  /// uses 'release'
+  #[arg(long, global = true)]
+  profile: Option<String>,
 
-  /// Direction path of the target dir
-  #[arg(short, long)]
+  /// Clean bundle artifacts before building
+  #[arg(long, global = true)]
+  clean: bool,
+
+  /// Custom target directory
+  #[arg(short, long, global = true)]
   target_dir: Option<PathBuf>,
 
-  /// verbose, default to false
-  #[arg(short, long)]
+  /// Enable verbose output
+  #[arg(short, long, global = true)]
   verbose: bool,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum BundleAction {
+  /// Only build the application (do not package)
+  Build,
+  /// Only package the application (assumes already built)
+  Pack,
 }
 
 pub fn wix_settings(config: WixConfig) -> tauri_bundler::WixSettings {
@@ -111,7 +130,7 @@ pub fn custom_sign_settings(
     CustomSignCommandConfig::Command(command) => {
       let mut tokens = command.split(' ');
       tauri_bundler::CustomSignCommandSettings {
-        cmd: tokens.next().unwrap().to_string(), // split always has at least one element
+        cmd: tokens.next().unwrap().to_string(),
         args: tokens.map(String::from).collect(),
       }
     }
@@ -121,15 +140,11 @@ pub fn custom_sign_settings(
   }
 }
 
-/// Cargo.toml shape we care about for bundling.
-///
-/// Supports both legacy `[bundle]` and the Cargo-recommended
-/// `[package.metadata.bundle]` (which avoids `unused manifest key` warnings).
 #[skip_serializing_none]
 #[derive(Clone, Deserialize, Serialize, Debug, Default)]
 struct CargoTomlBundle {
-  bundle: Option<BundleConfig>,
   package: Option<CargoTomlPackage>,
+  profile: Option<toml::Value>,
 }
 
 #[skip_serializing_none]
@@ -152,7 +167,7 @@ struct CargoTomlPackageMetadata {
 /// directory, not the current working directory.
 #[skip_serializing_none]
 #[derive(Clone, Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct BundleConfig {
   /// The application name.
   pub product_name: Option<String>,
@@ -162,17 +177,15 @@ struct BundleConfig {
   /// the webview data directory. This string must contain only alphanumeric
   /// characters (A-Z, a-z, and 0-9), hyphens (-), and periods (.).
   pub identifier: Option<String>,
-
   /// The application version. if not set, will be read from Cargo.toml
   #[serde(default)]
   pub version: Option<String>,
-
   /// The bundle targets, currently supports ["deb", "rpm", "appimage", "nsis",
   /// "msi", "app", "dmg"] or "all".
   #[serde(default)]
   pub targets: BundleTarget,
-  #[serde(default)]
   /// Produce updaters and their signatures or not
+  #[serde(default)]
   pub create_updater_artifacts: Updater,
   /// The application's publisher. Defaults to the second element in the
   /// identifier string.
@@ -199,7 +212,6 @@ struct BundleConfig {
   /// bundles. If not set, defaults to the license from the Cargo.toml file.
   pub license: Option<String>,
   /// The path to the license file to be included in the appropriate bundles.
-  #[serde(alias = "license-file")]
   pub license_file: Option<PathBuf>,
   /// The application kind.
   ///
@@ -215,10 +227,8 @@ struct BundleConfig {
   /// File associations to application.
   pub file_associations: Option<Vec<FileAssociation>>,
   /// A short description of your application.
-  #[serde(alias = "short-description")]
   pub short_description: Option<String>,
   /// A longer, multi-line description of the application.
-  #[serde(alias = "long-description")]
   pub long_description: Option<String>,
   /// Whether to use the project's `target` directory, for caching build tools
   /// (e.g., Wix and NSIS) when building this application. Defaults to `false`.
@@ -231,7 +241,7 @@ struct BundleConfig {
   /// building this application as a Windows System user (e.g., AWS EC2
   /// workloads), because the Window system's app data directory is
   /// restricted.
-  #[serde(default, alias = "use-local-tools-dir")]
+  #[serde(default)]
   pub use_local_tools_dir: bool,
   /// A list of—either absolute or relative—paths to binaries to embed with your
   /// application.
@@ -246,7 +256,6 @@ struct BundleConfig {
   /// - "my-binary-x86_64-unknown-linux-gnu" for Linux
   ///
   /// so don't forget to provide binaries for all targeted platforms.
-  #[serde(alias = "external-bin")]
   pub external_bin: Option<Vec<String>>,
   /// Configuration for the Windows bundles.
   #[serde(default = "default_window_config")]
@@ -264,15 +273,24 @@ struct BundleConfig {
   #[serde(default)]
   pub android: AndroidConfig,
 }
+
 fn default_window_config() -> WindowsConfig {
   WindowsConfig { webview_install_mode: WebviewInstallMode::Skip, ..Default::default() }
 }
 
-/// Resolve a relative path against a base directory.
-/// Returns the path as-is if it's absolute.
 fn resolve_path(path: &str, base_dir: &Path) -> String {
   let p = Path::new(path);
   if p.is_absolute() { path.to_string() } else { base_dir.join(p).to_string_lossy().into_owned() }
+}
+
+fn has_bundle_profile(toml_path: &PathBuf) -> Result<bool> {
+  let cargo_toml: CargoTomlBundle = read_toml(toml_path)?;
+  Ok(
+    cargo_toml
+      .profile
+      .and_then(|p| p.as_table().map(|t| t.contains_key("bundle")))
+      .unwrap_or(false),
+  )
 }
 
 fn bundle_setting_from_config(
@@ -281,7 +299,6 @@ fn bundle_setting_from_config(
   let work_space_path = get_workspace_dir()?;
   let work_space = CargoSettings::load_from_dir(&work_space_path).ok();
 
-  // Resolve resource paths relative to config directory
   let (resources, resources_map) = match config.resources {
     Some(BundleResources::List(paths)) => {
       let resolved: Vec<String> = paths
@@ -315,7 +332,6 @@ fn bundle_setting_from_config(
     identifier: config.identifier,
     publisher: config.publisher,
     homepage: config.homepage,
-    // Resolve icon paths relative to config directory
     icon: Some(
       config
         .icon
@@ -336,7 +352,6 @@ fn bundle_setting_from_config(
     file_associations: config.file_associations,
     short_description: config.short_description,
     long_description: config.long_description,
-    // Resolve external_bin paths relative to config directory
     external_bin: config.external_bin.map(|bins| {
       bins
         .into_iter()
@@ -448,7 +463,6 @@ fn bundle_setting_from_config(
           .unwrap()
       })
     }),
-    // Resolve license_file path relative to config directory
     license_file: config
       .license_file
       .map(|l| if l.is_absolute() { l } else { config_dir.join(l) }),
@@ -457,35 +471,251 @@ fn bundle_setting_from_config(
   })
 }
 
-fn default_target_dir(is_debug: bool) -> Option<PathBuf> {
-  get_cargo_metadata().ok().map(|mut v| {
-    v.target_directory
-      .push(if is_debug { "debug" } else { "release" });
-    v.target_directory
-  })
-}
-
 impl Bundle {
-  fn bundle(&self) -> Result<()> {
+  fn resolve_profile(&self) -> Result<String> {
+    if let Some(profile) = &self.profile {
+      return Ok(profile.clone());
+    }
+
     let package_path = CargoSettings::toml_path(&env::current_dir()?).expect("no cargo settings");
-    let config_path: PathBuf = if let Some(target_dir) = &self.config {
-      if target_dir.is_absolute() {
-        target_dir.clone()
-      } else {
-        env::current_dir()
-          .unwrap()
-          .join(target_dir.clone())
-      }
+    if has_bundle_profile(&package_path)? {
+      println!("Detected [profile.bundle] in Cargo.toml, using 'bundle' profile");
+      return Ok("bundle".to_string());
+    }
+
+    let workspace_toml_path = get_workspace_dir()?.join("Cargo.toml");
+    if workspace_toml_path.exists() && has_bundle_profile(&workspace_toml_path)? {
+      println!("Detected [profile.bundle] in workspace Cargo.toml, using 'bundle' profile");
+      return Ok("bundle".to_string());
+    }
+
+    Ok("release".to_string())
+  }
+
+  fn get_profile_dir(&self, profile: &str) -> Result<PathBuf> {
+    let dir_name = if profile == "dev" { "debug" } else { profile };
+
+    let base_target = if let Some(target_dir) = std::env::var_os("CARGO_TARGET_DIR") {
+      PathBuf::from(target_dir)
     } else {
-      package_path.clone()
+      let cargo_metadata = get_cargo_metadata()?;
+      cargo_metadata.target_directory
     };
 
-    let CargoTomlBundle { bundle, package } = read_toml(&config_path)?;
-    let bundle_config = bundle
-      .or_else(|| package.and_then(|p| p.metadata.bundle))
+    Ok(base_target.join(dir_name))
+  }
+
+  fn clean_bundle_artifacts(&self, profile: &str) -> Result<()> {
+    let profile_dir = self.get_profile_dir(profile)?;
+    let assets_dir = profile_dir.join("assets");
+
+    if assets_dir.exists() {
+      println!("Cleaning assets directory: {}", assets_dir.display());
+      fs::remove_dir_all(&assets_dir)?;
+    }
+
+    let bundle_dir = profile_dir.join("bundle");
+    if bundle_dir.exists() {
+      println!("Cleaning bundle directory: {}", bundle_dir.display());
+      fs::remove_dir_all(&bundle_dir)?;
+    }
+
+    Ok(())
+  }
+
+  fn run_cargo_build(&self, profile: &str) -> Result<()> {
+    let package_path = CargoSettings::toml_path(&env::current_dir()?).expect("no cargo settings");
+    let cargo_settings = CargoSettings::load(&package_path)?;
+    let cargo_package_settings = cargo_settings
+      .package
+      .as_ref()
+      .expect("no package settings");
+
+    println!(
+      "Building package '{}' with profile '{}' ({}=1)",
+      cargo_package_settings.name, profile, RIBIR_BUNDLE_MODE_ENV
+    );
+
+    let mut cmd = Command::new("cargo");
+    cmd
+      .arg("build")
+      .arg("--package")
+      .arg(&cargo_package_settings.name);
+
+    match profile {
+      "dev" | "debug" => {}
+      "release" => {
+        cmd.arg("--release");
+      }
+      custom => {
+        cmd.arg("--profile").arg(custom);
+      }
+    }
+
+    cmd.env(RIBIR_BUNDLE_MODE_ENV, "1");
+
+    let status = cmd.status()?;
+    if !status.success() {
+      bail!("Cargo build failed");
+    }
+
+    Ok(())
+  }
+
+  fn detect_assets(&self, profile: &str) -> Result<Option<PathBuf>> {
+    let profile_dir = self.get_profile_dir(profile)?;
+    let assets_dir = profile_dir.join("assets");
+
+    if !assets_dir.exists() {
+      return Ok(None);
+    }
+
+    let manifest = assets_dir.join(".asset_manifest.txt");
+    if !manifest.exists() {
+      return Ok(None);
+    }
+
+    let content = fs::read_to_string(&manifest).context("Failed to read asset manifest")?;
+
+    let file_count = content.lines().count();
+    if file_count == 0 {
+      return Ok(None);
+    }
+
+    self.check_duplicate_assets(&content)?;
+
+    println!("Detected {file_count} asset entries in manifest");
+    Ok(Some(assets_dir))
+  }
+
+  fn check_duplicate_assets(&self, manifest_content: &str) -> Result<()> {
+    use std::{
+      collections::{HashMap, HashSet},
+      hash::{Hash, Hasher},
+    };
+
+    struct AssetInfo {
+      source: String,
+      build_path: PathBuf,
+      location: String,
+    }
+
+    // 1. Parse manifest into structured data
+    let mut bundle_map: HashMap<String, Vec<AssetInfo>> = HashMap::new();
+    for line in manifest_content.lines() {
+      let parts: Vec<&str> = line.split(" | ").collect();
+      if parts.len() != 4 {
+        continue;
+      }
+      let info = AssetInfo {
+        source: parts[0].to_string(),
+        build_path: PathBuf::from(parts[1]),
+        location: parts[3].to_string(),
+      };
+      bundle_map
+        .entry(parts[2].to_string())
+        .or_default()
+        .push(info);
+    }
+
+    if bundle_map.is_empty() {
+      return Ok(());
+    }
+
+    let mut has_warnings = false;
+    let mut content_hashes: HashMap<u64, Vec<(String, String)>> = HashMap::new();
+
+    // 2. Analyze grouped assets
+    for (bundle_path, entries) in bundle_map {
+      let unique_sources: HashSet<_> = entries.iter().map(|e| &e.source).collect();
+
+      // Check for multiple calls to the same asset (Redundancy)
+      if entries.len() > 1 && unique_sources.len() == 1 {
+        let source = *unique_sources.iter().next().unwrap();
+        let locations: Vec<_> = entries.iter().map(|e| &e.location).collect();
+        eprintln!(
+          "⚠️  Asset '{}' is referenced {} times in different locations: {:?}",
+          source,
+          entries.len(),
+          locations
+        );
+        has_warnings = true;
+      }
+
+      // Check for different source files mapping to same output (Conflict)
+      if unique_sources.len() > 1 {
+        let sources: Vec<_> = entries
+          .iter()
+          .map(|e| format!("{} (at {})", e.source, e.location))
+          .collect();
+        eprintln!(
+          "❌ Conflict: Multiple different source files map to same output filename '{}':\n   \
+           Sources: {:?}",
+          bundle_path, sources
+        );
+        has_warnings = true;
+      }
+
+      // Collect content hashes for cross-file duplication detection
+      // Only hash each physical file once per bundle path
+      if let Some(entry) = entries.first() {
+        if let Ok(content) = fs::read(&entry.build_path) {
+          let mut hasher = std::collections::hash_map::DefaultHasher::new();
+          content.hash(&mut hasher);
+          let hash = hasher.finish();
+          for source in unique_sources {
+            content_hashes
+              .entry(hash)
+              .or_default()
+              .push((source.clone(), bundle_path.clone()));
+          }
+        }
+      }
+    }
+
+    // 3. Detect identical content across different assets (Optimization)
+    for (hash, variants) in content_hashes {
+      if variants.len() > 1 {
+        eprintln!(
+          "⚠️  Identical content detected across {} different asset paths (Hash: {:016x}):",
+          variants.len(),
+          hash
+        );
+        for (src, bundle_path) in variants {
+          eprintln!("   - Source: {}\n     Bundle Path: {}", src, bundle_path);
+        }
+        has_warnings = true;
+      }
+    }
+
+    if has_warnings {
+      eprintln!("⚠️  Consolidating redundant assets can reduce bundle size and build time.");
+    }
+
+    Ok(())
+  }
+
+  fn do_build(&self, profile: &str) -> Result<()> {
+    if self.clean {
+      self.clean_bundle_artifacts(profile)?;
+    }
+    self.run_cargo_build(profile)
+  }
+
+  fn do_pack(&self, profile: &str) -> Result<()> {
+    let package_path = CargoSettings::toml_path(&env::current_dir()?).expect("no cargo settings");
+    let config_path = self
+      .config
+      .as_ref()
+      .map(|p| if p.is_absolute() { p.clone() } else { env::current_dir().unwrap().join(p) })
+      .unwrap_or_else(|| package_path.clone());
+
+    let CargoTomlBundle { package, .. } = read_toml(&config_path)?;
+    let bundle_config = package
+      .and_then(|p| p.metadata.bundle)
       .ok_or_else(|| {
         anyhow::anyhow!(
-          "no bundle config found in {} (expected `[bundle]` or `[package.metadata.bundle]`) ",
+          "no bundle config found in {} (expected `[package.metadata.bundle]`) ",
           config_path.display()
         )
       })?;
@@ -516,41 +746,28 @@ impl Bundle {
       expected_binary_names.push(cargo_package_settings.name.clone());
     }
 
-    // Preflight: tauri-bundler expects built binaries under
-    // `target/{debug|release}`. We do NOT auto-build here (this CLI is intended
-    // to be used as a released binary tool), so provide an actionable error
-    // message instead.
-    {
-      let cargo_metadata = get_cargo_metadata().context("failed to get cargo metadata")?;
-      let profile_dir = if self.debug { "debug" } else { "release" };
-      let expected_dir = cargo_metadata.target_directory.join(profile_dir);
-      let mut missing = vec![];
-      for name in &expected_binary_names {
-        let mut p = expected_dir.join(name);
-        if cfg!(windows) {
-          p.set_extension("exe");
-        }
-        if !p.exists() {
-          missing.push(p);
-        }
+    let profile_dir = self.get_profile_dir(profile)?;
+    let mut missing = vec![];
+    for name in &expected_binary_names {
+      let mut p = profile_dir.join(name);
+      if cfg!(windows) {
+        p.set_extension("exe");
       }
+      if !p.exists() {
+        missing.push(p);
+      }
+    }
 
-      if !missing.is_empty() {
-        let profile_flag = if self.debug { "" } else { "--release" };
-        bail!(
-          "Missing built binary(ies):\n  {}\n\nBuild them first, then re-run bundling. For \
-           example:\n  cargo build --manifest-path {} {}\n\nNote: bundling copies binaries from \
-           {}.",
-          missing
-            .iter()
-            .map(|p| p.display().to_string())
-            .collect::<Vec<_>>()
-            .join("\n  "),
-          package_path.display(),
-          profile_flag,
-          expected_dir.display(),
-        );
-      }
+    if !missing.is_empty() {
+      bail!(
+        "Missing built binary(ies):\n  {}\n\nRun 'bundle' or 'bundle build' first to build the \
+         application.",
+        missing
+          .iter()
+          .map(|p| p.display().to_string())
+          .collect::<Vec<_>>()
+          .join("\n  "),
+      );
     }
 
     let package_types = bundle_config
@@ -559,18 +776,26 @@ impl Bundle {
       .iter()
       .map(|t| t.clone().into())
       .collect();
-    let bundle_setting = bundle_setting_from_config(
+    let mut bundle_setting = bundle_setting_from_config(
       bundle_config,
       config_path.parent().unwrap(),
       cargo_package_settings,
     )?;
+
+    if let Some(assets_dir) = self.detect_assets(profile)? {
+      println!("Adding auto-detected assets to bundle");
+      let mut resources_map = bundle_setting.resources_map.unwrap_or_default();
+
+      resources_map.insert(assets_dir.to_string_lossy().to_string(), "assets".to_string());
+
+      bundle_setting.resources_map = Some(resources_map);
+    }
+
     let settings = SettingsBuilder::new()
       .package_settings(package_setting)
       .bundle_settings(bundle_setting)
       .binaries(binaries)
-      .project_out_directory(self.target_dir.clone().unwrap_or_else(|| {
-        default_target_dir(self.debug).expect("Failed to get default target directory")
-      }))
+      .project_out_directory(self.target_dir.clone().unwrap_or(profile_dir))
       .target(tauri_utils::platform::target_triple()?)
       .package_types(package_types)
       .log_level(log::Level::Info)
@@ -578,8 +803,8 @@ impl Bundle {
 
     bundle_project(&settings)?;
 
-    log::info!(
-      "bundle success {:?}",
+    println!(
+      "Bundle success: {:?}",
       settings
         .project_out_directory()
         .to_path_buf()
@@ -587,6 +812,20 @@ impl Bundle {
     );
 
     Ok(())
+  }
+
+  fn bundle(&self) -> Result<()> {
+    let profile = self.resolve_profile()?;
+    println!("Using profile: {}", profile);
+
+    match &self.action {
+      Some(BundleAction::Build) => self.do_build(&profile),
+      Some(BundleAction::Pack) => self.do_pack(&profile),
+      None => {
+        self.do_build(&profile)?;
+        self.do_pack(&profile)
+      }
+    }
   }
 }
 
@@ -636,7 +875,7 @@ impl CargoPackageSettings {
       description: self
         .description
         .as_ref()
-        .map(|v| {
+        .and_then(|v| {
           v.clone()
             .resolve("description", || {
               ws_package_settings
@@ -646,9 +885,9 @@ impl CargoPackageSettings {
                   anyhow::anyhow!("Couldn't inherit value for `description` from workspace")
                 })
             })
-            .expect("failed to resolve description")
+            .ok()
         })
-        .unwrap(),
+        .unwrap_or_default(),
       homepage: self.homepage.as_ref().and_then(|v| {
         v.clone()
           .resolve("homepage", || {
