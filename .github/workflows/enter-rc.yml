@@ -16,7 +16,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_RELEASE_TOKEN }}
 
       - name: Install tools
         uses: taiki-e/install-action@v2
@@ -34,7 +34,7 @@ jobs:
       - name: Enter RC Phase
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_RELEASE_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: |

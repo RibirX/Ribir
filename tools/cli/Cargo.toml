@@ -2,6 +2,11 @@
 name = "cli"
 version = "0.4.0-alpha.54"
 edition = "2021"
+description = "Ribir command-line tools for bundling and wasm builds."
+license = "MIT"
+repository = "https://github.com/RibirX/Ribir"
+readme = "README.md"
+publish = false
 
 [package.metadata.workspaces]
 independent = true
