@@ -12,23 +12,22 @@ pub(super) fn init(classes: &mut Classes) {
   );
 
   classes.insert(RADIO, |w| {
-    let mut w = FatObj::new(w);
-    w.with_text_line_height(20.)
-      .with_cursor(CursorIcon::Pointer);
-
-    if DisabledRipple::get(BuildCtx::get()) {
-      w.with_margin(md::EDGES_2);
-      // 24x24 if no ripple
-      return w.into_widget();
-    }
+    let margin = if Provider::of::<DisableInteractiveLayer>(BuildCtx::get()).is_some() {
+      EdgeInsets::all(3.)
+    } else {
+      md::EDGES_4
+    };
 
     interactive_layers! {
-      margin: md::EDGES_4,
       center: true,
       ripple_radius: 20.,
-      radius: md::RADIUS_20,
       ring_outer_offset: 2.,
+
+      radius: md::RADIUS_20,
+      text_line_height: 20.,
+      cursor: CursorIcon::Pointer,
       clamp: BoxClamp::fixed_size(md::SIZE_40),
+      margin,
       @ { w }
     }
     .into_widget()

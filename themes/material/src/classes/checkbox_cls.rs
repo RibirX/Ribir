@@ -13,24 +13,22 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(CHECKBOX_INDETERMINATE, style_class! { foreground: BuildCtx::color() });
 
   classes.insert(CHECKBOX, |w| {
-    let mut w = FatObj::new(w);
-    w.with_text_line_height(18.)
-      .with_cursor(CursorIcon::Pointer);
-
-    if DisabledRipple::get(BuildCtx::get()) {
-      // 24x24 if no ripple
-      w.with_margin(EdgeInsets::all(3.));
-      return w.into_widget();
-    }
-
+    let margin = if Provider::of::<DisableInteractiveLayer>(BuildCtx::get()).is_some() {
+      EdgeInsets::all(3.)
+    } else {
+      md::EDGES_4
+    };
     interactive_layers! {
-      clamp: BoxClamp::fixed_size(md::SIZE_40),
-      margin: md::EDGES_4,
-      radius: md::RADIUS_20,
       ripple_radius: 20.,
       center: true,
       ring_outer_offset: 2.,
-      @ { w}
+
+      margin,
+      radius: md::RADIUS_20,
+      clamp: BoxClamp::fixed_size(md::SIZE_40),
+      text_line_height: 18.,
+      cursor: CursorIcon::Pointer,
+      @ { w }
     }
     .into_widget()
   });

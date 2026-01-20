@@ -2,8 +2,16 @@ use ribir_core::prelude::*;
 
 use crate::{focus_indicator::*, ripple::*, state_layer::*};
 
+/// A provider used to hint widgets in the subtree to disable the interactive
+/// layers (including ripple, hover layer and focus indicator).
+pub struct DisableInteractiveLayer;
+
 /// A widget that provides material design interactive visual layers for its
-/// child
+/// child.
+///
+/// This widget will check for the [`DisableInteractiveLayer`] provider in the
+/// context. If it is present, the widget will simply return its child
+/// without adding any interactive layers.
 ///
 /// # Features
 ///
@@ -16,7 +24,11 @@ pub struct InteractiveLayers {
   ring_outer_offset: f32,
 }
 
-/// Creates a widget function using `InteractiveLayers` as the root component
+/// Creates a widget function using `InteractiveLayers` as the root component.
+///
+/// This macro is the preferred way to apply interactive feedback to a widget.
+/// It automatically handles the conditional rendering based on the
+/// [`DisableInteractiveLayer`] provider.
 ///
 /// # Example
 ///
@@ -49,6 +61,10 @@ impl<'c> ComposeChild<'c> for InteractiveLayers {
   type Child = Widget<'c>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    if Provider::of::<DisableInteractiveLayer>(BuildCtx::get()).is_some() {
+      return child;
+    }
+
     let mut child = FatObj::new(child);
     let hover_layer = StateLayer::created_for(LayerArea::FullContent, &mut child);
     let Self { ripple, ring_outer_offset } = this

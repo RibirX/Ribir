@@ -7,9 +7,9 @@ pub use state_layer::*;
 
 mod classes;
 mod interactive_layers;
-pub mod md;
 pub use interactive_layers::*;
 mod focus_indicator;
+pub mod md;
 pub use focus_indicator::*;
 
 macro_rules! register_svg {
@@ -19,15 +19,6 @@ macro_rules! register_svg {
     #[cfg(not(target_arch = "wasm32"))]
     svg_registry::register($name, asset!($file_name, "svg", inherit_fill = true));
   };
-}
-
-/// A provider used to hint widgets in the subtree to disable the ripple effect.
-pub struct DisabledRipple(pub bool);
-
-impl DisabledRipple {
-  pub fn get(ctx: &impl AsRef<ProviderCtx>) -> bool {
-    Provider::of::<Self>(ctx).is_some_and(|d| d.0)
-  }
 }
 
 /// Crate a material theme with palette.
