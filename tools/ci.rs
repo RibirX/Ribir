@@ -397,31 +397,67 @@ fn run_wasm(stable_version: &str) -> Result<(), ()> {
   )
 }
 
-/// Bundle counter example (stable)
 fn run_bundle(stable_version: &str) -> Result<(), ()> {
-  println!("📦 Bundling counter example [{}]...", stable_version);
-
-  // Determine the bundle config based on OS
-  let cfg = if cfg!(target_os = "macos") {
-    "ci/bundle-macos.toml"
-  } else if cfg!(target_os = "linux") {
-    "ci/bundle-linux.toml"
-  } else if cfg!(target_os = "windows") {
-    "ci/bundle-windows.toml"
-  } else {
-    eprintln!("❌ Unknown OS for bundling!");
-    return Err(());
-  };
-
-  // First build the counter example in release mode
-  run_cargo_command(stable_version, &["build", "-p", "counter", "--release"], None, &[])?;
+  println!("📦 Bundling gallery example [{}]...", stable_version);
 
   run_cargo_command(
     stable_version,
-    &["run", "-p", "cli", "--", "bundle", "-c", cfg],
-    Some("examples/counter"),
-    &[],
-  )
+    &["run", "-p", "cli", "--", "bundle", "--profile", "dev"],
+    Some("examples/gallery"),
+    &[("RIBIR_FEATURES", "wgpu")],
+  )?;
+
+  println!("🧪 Verifying bundled assets...");
+  let mut bundle_assets_path = get_toolchain_target_dir(stable_version);
+  bundle_assets_path.push("debug/bundle");
+
+  let asset_manifest = if cfg!(target_os = "macos") {
+    let mut p = bundle_assets_path.clone();
+    p.push("macos/Gallery.app/Contents/Resources/assets");
+    if p.join(".asset_manifest.txt").exists() {
+      Some(p.join(".asset_manifest.txt"))
+    } else {
+      find_assets_manifest(&p)
+    }
+  } else {
+    find_assets_manifest(&bundle_assets_path)
+  };
+
+  match asset_manifest {
+    Some(path) => {
+      println!("✅ Found asset manifest at: {}", path.display());
+      let content = std::fs::read_to_string(&path).map_err(|_| ())?;
+      if content.trim().is_empty() {
+        eprintln!("❌ Asset manifest is empty");
+        return Err(());
+      }
+      println!("✅ Asset manifest content:\n{}", content);
+      Ok(())
+    }
+    None => {
+      eprintln!("❌ Could not find asset manifest in bundle");
+      Err(())
+    }
+  }
+}
+
+fn find_assets_manifest(path: &std::path::Path) -> Option<std::path::PathBuf> {
+  if !path.exists() {
+    return None;
+  }
+  if path.join(".asset_manifest.txt").exists() {
+    return Some(path.join(".asset_manifest.txt"));
+  }
+  if let Ok(entries) = std::fs::read_dir(path) {
+    for entry in entries.flatten() {
+      if entry.path().is_dir() {
+        if let Some(found) = find_assets_manifest(&entry.path()) {
+          return Some(found);
+        }
+      }
+    }
+  }
+  None
 }
 
 fn run_cargo_command(

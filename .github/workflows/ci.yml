@@ -337,7 +337,7 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install webp
 
-      - name: Bundle counter example
+      - name: Bundle gallery example
         shell: bash
         run: cargo +${{ needs.lint.outputs.nightly-version }} ci bundle
 
