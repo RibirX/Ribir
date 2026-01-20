@@ -33,22 +33,21 @@ use crate::prelude::*;
 /// ```
 #[derive(Clone, Copy, Declare, PartialEq, Eq)]
 pub struct Switch {
-  #[declare(default)]
+  #[declare(default, event = Switch.checked)]
   pub checked: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct SwitchState {
-  pub checked: bool,
-}
-
-pub type SwitchEvent = CustomEvent<SwitchState>;
+pub type SwitchChanged = CustomEvent<Switch>;
 
 class_names! {
   /// The class name for the container of a checked switch.
   SWITCH_CHECKED,
   /// The class name for the container of an unchecked switch.
   SWITCH_UNCHECKED,
+  /// The base class name for the switch container.
+  SWITCH,
+  /// The base class name for the switch thumb.
+  SWITCH_THUMB,
   /// The class name for the thumb of a checked switch.
   SWITCH_THUMB_CHECKED,
   /// The class name for the thumb of an unchecked switch.
@@ -56,8 +55,6 @@ class_names! {
 }
 
 impl Switch {
-  pub fn switch_check(&mut self) { self.checked = !self.checked; }
-
   fn state_class_name(&self) -> ClassName {
     if self.checked { SWITCH_CHECKED } else { SWITCH_UNCHECKED }
   }
@@ -65,6 +62,18 @@ impl Switch {
   fn thumb_class_name(&self) -> ClassName {
     if self.checked { SWITCH_THUMB_CHECKED } else { SWITCH_THUMB_UNCHECKED }
   }
+
+  fn request_toggle(&self, e: &CommonEvent) {
+    let mut new_state = *self;
+    new_state.switch_check();
+    e.window()
+      .bubble_custom_event(e.target(), new_state);
+  }
+
+  /// Manually toggle the switch state.
+  /// This is an imperative API and should not be used for default UI
+  /// interactions.
+  pub fn switch_check(&mut self) { self.checked = !self.checked; }
 }
 
 impl ComposeChild<'static> for Switch {
@@ -72,32 +81,25 @@ impl ComposeChild<'static> for Switch {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fn_widget! {
-      let mut obj = @FatObj {
-        on_action: move |e| {
-          $write(this).switch_check();
-          e.stop_propagation();
-        },
-        @ {
-          let switch_widget = @Container {
-            size: Size::new(28., 20.),
-            class: distinct_pipe!($read(this).state_class_name()),
-            @Void { class: distinct_pipe!($read(this).thumb_class_name()), }
-          };
-          icon_with_label(switch_widget.into_widget(), child)
+      let classes = class_array![SWITCH, distinct_pipe!($read(this).state_class_name())];
+      let switch_widget = @(classes) {
+        @Stack {
+          @(class_array![
+            SWITCH_THUMB,
+            distinct_pipe!($read(this).thumb_class_name())
+            ]) {
+            @Void {
+              clamp: BoxClamp::fixed_size(Size::new(40., 20.)),
+            }
+          }
         }
       };
 
-      let track_id = obj.track_id();
-      let window = BuildCtx::get().window();
-      watch!($read(this).checked)
-        .distinct_until_changed()
-        .subscribe(move |checked| {
-          if let Some(id) = track_id.get() {
-            window.bubble_custom_event(id, SwitchState { checked });
-          }
-        });
-
-      obj
+      @FatObj {
+        cursor: CursorIcon::Pointer,
+        on_action: move |e| $read(this).request_toggle(e),
+        @ { icon_with_label(switch_widget.into_widget(), child) }
+      }
     }
     .into_widget()
   }

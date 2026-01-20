@@ -7,49 +7,69 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(
     SWITCH_UNCHECKED,
     style_class! {
-      clamp: BoxClamp::fixed_size(Size::new(52., 32.)),
       background: Palette::of(BuildCtx::get()).surface_variant(),
       border: Border::all(BorderSide {
         color: Palette::of(BuildCtx::get()).outline().into(),
         width: 2.,
       }),
-      radius: md::RADIUS_16,
     },
   );
 
   classes.insert(
     SWITCH_CHECKED,
     style_class! {
-      clamp: BoxClamp::fixed_size(Size::new(52., 32.)),
       background: Palette::of(BuildCtx::get()).primary(),
-      radius: md::RADIUS_16,
+      border: Border::all(BorderSide {
+        color: Color::TRANSPARENT.into(),
+        width: 2.,
+      }),
     },
   );
+
+  classes.insert(SWITCH, |w| {
+    let mut w = FatObj::new(w);
+    w.with_cursor(CursorIcon::Pointer)
+      .with_radius(md::RADIUS_16)
+      .with_clamp(BoxClamp::fixed_size(Size::new(52., 32.)));
+    w.into_widget()
+  });
+
+  classes.insert(SWITCH_THUMB, |w| {
+    interactive_layers! {
+      radius: md::RADIUS_20,
+      ripple_radius: 20.,
+      center: true,
+      @FatObj {
+        v_align: VAlign::Center,
+        @ { w }
+      }
+    }
+    .into_widget()
+  });
 
   const THUMB_TRANS: EasingTransition<CubicBezierEasing> =
     EasingTransition { duration: md::easing::duration::SHORT4, easing: md::easing::STANDARD };
 
   classes.insert(SWITCH_THUMB_UNCHECKED, |w| {
     fn_widget! {
-      let mut container = @FatObj {
-        v_align: VAlign::Center,
+      let mut thumb = @FatObj {
+        margin: EdgeInsets::only_left(4.),
         clamp: BoxClamp::fixed_size(Size::new(16., 16.)),
         radius: md::RADIUS_8,
         background: Palette::of(BuildCtx::get()).outline(),
-        margin: EdgeInsets::only_left(8.)
         @ { w }
       };
 
       let enter = @Animate {
-        state: (container.margin(), container.clamp(), container.radius()),
+        state: (thumb.margin(), thumb.clamp(), thumb.radius()),
         transition: THUMB_TRANS,
-        from: (EdgeInsets::only_left(24.),
+        from: (md::EDGES_LEFT_24,
           BoxClamp::fixed_size(Size::new(24., 24.)),
           md::RADIUS_12
         ),
       };
 
-      @(container) {
+      @(thumb) {
         on_mounted: move |_| enter.run(),
       }
     }
@@ -58,21 +78,20 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(SWITCH_THUMB_CHECKED, |w| {
     fn_widget! {
-      let mut container = @FatObj {
+      let mut thumb = @FatObj {
+        margin: md::EDGES_LEFT_24,
         clamp: BoxClamp::fixed_size(Size::new(24., 24.)),
-        v_align: VAlign::Center,
         radius: md::RADIUS_12,
         background: Palette::of(BuildCtx::get()).on_primary(),
-        margin: EdgeInsets::only_left(24.),
         @ { w }
       };
 
       let enter = @Animate {
-        state: (container.margin(), container.clamp(), container.radius()),
+        state: (thumb.margin(), thumb.clamp(), thumb.radius()),
         transition: THUMB_TRANS,
-        from: (EdgeInsets::only_left(8.), BoxClamp::fixed_size(Size::new(16., 16.)), md::RADIUS_8),
+        from: (EdgeInsets::only_left(4.), BoxClamp::fixed_size(Size::new(16., 16.)), md::RADIUS_8),
       };
-      @(container) {
+      @(thumb) {
         on_mounted: move |_| enter.run(),
       }
     }

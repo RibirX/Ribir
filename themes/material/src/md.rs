@@ -127,6 +127,8 @@ pub const EDGES_TOP_16: EdgeInsets = EdgeInsets::only_top(16.);
 pub const EDGES_BOTTOM_16: EdgeInsets = EdgeInsets::only_bottom(16.);
 
 pub const EDGES_HOR_24: EdgeInsets = EdgeInsets::horizontal(24.);
+pub const EDGES_LEFT_24: EdgeInsets = EdgeInsets::only_left(24.);
+
 pub const EDGES_HOR_32: EdgeInsets = EdgeInsets::horizontal(32.);
 pub const EDGES_HOR_36: EdgeInsets = EdgeInsets::horizontal(36.);
 pub const EDGES_HOR_48: EdgeInsets = EdgeInsets::horizontal(48.);
