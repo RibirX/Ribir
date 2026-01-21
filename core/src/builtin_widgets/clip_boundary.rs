@@ -37,8 +37,8 @@ impl Declare for ClipBoundary {
 impl_compose_child_for_wrap_render!(ClipBoundary);
 
 impl WrapRender for ClipBoundary {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    host.perform_layout(clamp, ctx)
+  fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
+    host.measure(clamp, ctx)
   }
 
   fn size_affected_by_child(&self, host: &dyn Render) -> bool { host.size_affected_by_child() }

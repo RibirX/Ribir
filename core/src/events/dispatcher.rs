@@ -681,7 +681,7 @@ mod tests {
     let w = fn_widget! {
       @MockStack {
         @MockBox {
-          anchor: Point::new(50., 50.),
+          x: 50., y: 50.,
           on_mounted: move |ctx| {
             $write(writer).wid1 = Some(ctx.id);
           },
@@ -692,7 +692,7 @@ mod tests {
             $write(writer).wid2 = Some(ctx.id);
           },
           size: Size::new(50., 150.),
-          anchor: Point::new(100., 100.),
+          x: 100., y: 100.,
         }
       }
     };
@@ -716,8 +716,8 @@ mod tests {
     let wnd = TestWindow::new_with_size(
       fn_widget! {
         @MockBox {
-          h_align: HAlign::Center,
-          v_align: VAlign::Center,
+          x: AnchorX::center(),
+          y: AnchorY::center(),
           size: Size::new(100., 100.),
           on_mounted: move |ctx| *$write(w_hit) = Some(ctx.id),
         }
@@ -738,7 +738,7 @@ mod tests {
     let wnd = TestWindow::new_with_size(
       fn_widget! {
         @MockBox {
-          anchor: Point::new(50., 50.),
+          x: 50., y: 50.,
           transform: Transform::rotation(Angle::degrees(45.)),
           size: Size::new(100., 100.),
           on_mounted: move |ctx| *$write(w_hit) = Some(ctx.id),
@@ -760,7 +760,7 @@ mod tests {
     let wnd = TestWindow::new_with_size(
       mock_stack! {
         @MockBox {
-          anchor: Anchor::left_top(100., 100.),
+          x: 100., y: 100.,
           size: Size::new(100., 100.),
          }
       },

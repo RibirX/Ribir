@@ -58,21 +58,19 @@ impl<'c> ComposeChild<'c> for Tooltips {
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
     let mut child = FatObj::new(child);
 
-    let content = text! {
-      text: pipe!($read(this).tooltips.clone()),
-      class: TOOLTIPS,
-      global_anchor_x: {
-        let track_id = $clone(child.track_id());
-        GlobalAnchorX::center_align_to(track_id).always_follow()
-      },
-      global_anchor_y: {
-        let track_id = $clone(child.track_id());
-        let height = *$read(child.layout_height());
-        GlobalAnchorY::bottom_align_to(track_id).offset(height).always_follow()
-      },
-    };
+    let track_id = child.track_id();
     *this.read().overlay.borrow_mut() = Some(Overlay::new(
-      content,
+      fn_widget! {
+      @Follow {
+        target: $clone(track_id),
+        x_align: AnchorX::center(),
+        y_align: AnchorY::under(),
+        @ Text {
+            text: pipe!($read(this).tooltips.clone()),
+            class: TOOLTIPS,
+          }
+        }
+      },
       OverlayStyle { auto_close_policy: AutoClosePolicy::NOT_AUTO_CLOSE, mask: None },
     ));
 

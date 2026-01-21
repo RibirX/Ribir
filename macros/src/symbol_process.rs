@@ -151,15 +151,43 @@ mod tokens_pre_process {
         _ => return Err(Error::RdlAtSyntax { at: at_span, follow: Some(g.span()) }),
       },
 
-      // Named widget declaration: `@WidgetName { ... }`
+      // Named widget declaration: `@WidgetName { ... }` or `@WidgetName::<T> { ... }`
       mut token => {
-        while let Some(t) = token.take() {
-          let is_group = matches!(&t, TokenTree::Group(_));
-          rdl_group.push(t);
+        // Track angle bracket depth for generics (e.g., ::<T, U>)
+        let mut angle_depth: u32 = 0;
 
-          if is_group {
+        while let Some(t) = token.take() {
+          // Track angle brackets for generic parameters
+          if let TokenTree::Punct(ref p) = t {
+            match p.as_char() {
+              '<' => angle_depth += 1,
+              '>' => angle_depth = angle_depth.saturating_sub(1),
+              '-' => {
+                // Check if it's an arrow `->`
+                if let Some(TokenTree::Punct(next_p)) = iter.peek()
+                  && next_p.as_char() == '>'
+                {
+                  rdl_group.push(t);
+                  rdl_group.push(iter.next().unwrap());
+                  token = iter.next();
+                  continue;
+                }
+              }
+              _ => {}
+            }
+          }
+
+          // Stop at any Group when not inside generics (original behavior)
+          // This handles: @expr(...), @Widget { ... }
+          // For generics like ::<()>, we need to continue past the parentheses
+          if angle_depth == 0
+            && let TokenTree::Group(_) = t
+          {
+            rdl_group.push(t);
             break;
           }
+
+          rdl_group.push(t);
           token = iter.next();
         }
       }

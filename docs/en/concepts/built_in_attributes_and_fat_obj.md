@@ -51,9 +51,7 @@ These attributes are used to control the appearance and layout of Widgets.
 *   **Layout**:
     *   `margin`: Sets outer margin.
     *   `padding`: Sets inner padding.
-    *   `h_align` / `v_align`: Sets horizontal/vertical alignment.
-    *   `anchor`: Used for absolute positioning in `Stack` layout.
-    *   `global_anchor_x` / `global_anchor_y`: Used for positioning relative to the global window.
+    *   `x` / `y`: Sets horizontal/vertical positioning using `PosX` and `PosY`.
     *   `clamp`: Forces constraints on the Widget's size range (Layout Constraints).
     *   `box_fit`: Controls how child elements fit into container space (like fill, contain, etc.).
     *   `scrollable`: Controls the Widget's scrolling behavior (X-axis, Y-axis, or both).
@@ -151,7 +149,7 @@ fn simple_card_traditional() -> Widget<'static> {
             // Built-in attributes: Layout
             margin: EdgeInsets::all(10.),
             padding: EdgeInsets::symmetrical(10., 5.),
-            h_align: HAlign::Center,
+            x: AnchorX::center(),
 
             // Built-in attributes: Visual
             background: Color::from_u32(0xFFEEAA00),
@@ -179,7 +177,7 @@ fn simple_card(w: Widget<'static>) -> Widget<'static> {
         @FatObj {
             margin: EdgeInsets::all(10.),
             padding: EdgeInsets::symmetrical(10., 5.),
-            h_align: HAlign::Center,
+            x: AnchorX::center(),
             background: Color::from_u32(0xFFEEAA00),
             border: Border::all(BorderSide::new(2., Color::BLACK.into())),
             radius: Radius::all(4.),
@@ -225,10 +223,9 @@ The wrapping order from **inner to outer** is as follows (simplified for common 
 21. `opacity`
 22. `visibility`
 23. `disabled`
-24. `h_align` / `v_align`
-25. `anchor` / `global_anchor`
-26. `keep_alive`
-27. `reuse`
+24. `x` / `y` (position)
+25. `keep_alive`
+26. `reuse`
 
 #### Key Takeaways
 

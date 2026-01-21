@@ -27,8 +27,8 @@ pub struct Clip {
 impl Render for Clip {
   fn size_affected_by_child(&self) -> bool { false }
 
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    ctx.assert_perform_single_child_layout(clamp);
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
+    ctx.perform_single_child_layout(clamp);
     self
       .clip_path
       .bounds(None)

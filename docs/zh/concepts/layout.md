@@ -34,7 +34,7 @@ fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size
 
 在此方法中，Widget 需要做三件事：
 1.  **布局子项**: 遍历其子节点，为每个子节点计算新的 `BoxClamp`（基于传入的 `clamp` 和其自身的布局逻辑），并调用 `ctx.perform_child_layout(child, child_clamp)`。
-2.  **确定位置**: 获取子节点返回的 `Size`，并根据布局逻辑设置子节点的位置 `ctx.update_position(child, position)`。
+2.  **确定位置**: 获取子节点返回的 `Size`，并根据布局逻辑设置子节点的位置 `ctx.update_anchor(child, anchor_x, anchor_y)`。
 3.  **返回尺寸**: 计算并返回自身的最终 `Size`，并且此尺寸必须满足传入的 `clamp` 约束。
 
 ## 使用 `clamp` 属性干预布局
@@ -81,7 +81,7 @@ struct FixedSizeBox {
 }
 
 impl Render for FixedSizeBox {
-    fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
         // 1. 确定我们想要的尺寸，必须在父约束范围内
         let my_size = clamp.clamp(self.size);
 
@@ -91,10 +91,7 @@ impl Render for FixedSizeBox {
             let child_clamp = BoxClamp { min: my_size, max: my_size };
 
             // 布局子节点
-            ctx.perform_child_layout(child, child_clamp);
-
-            // 设置子节点位置（通常为 (0,0)）
-            ctx.update_position(child, Point::zero());
+            ctx.layout_child(child, child_clamp);
         }
 
         // 3. 返回最终尺寸

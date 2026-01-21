@@ -23,8 +23,8 @@ pub(super) fn init(classes: &mut Classes) {
     style_class! {
       foreground: BuildCtx::color().on_this_container_color(BuildCtx::get()),
       text_style: TypographyTheme::of(BuildCtx::get()).title_medium.text.clone(),
-      h_align: HAlign::Center,
-      v_align: VAlign::Center,
+      x: AnchorX::center(),
+      y: AnchorY::center(),
     },
   );
 }

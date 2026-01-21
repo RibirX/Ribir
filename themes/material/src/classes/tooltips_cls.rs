@@ -13,8 +13,8 @@ pub(super) fn init(classes: &mut Classes) {
         @(w) {
           margin: EdgeInsets::new(4., 8., 4., 8.),
           foreground: Palette::of(BuildCtx::get()).inverse_on_surface(),
-          v_align: VAlign::Center,
-          h_align: HAlign::Center,
+          x: AnchorX::center(),
+          y: AnchorY::center(),
         }
       };
       let animate = w.opacity()

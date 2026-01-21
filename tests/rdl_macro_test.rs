@@ -7,7 +7,7 @@ use ribir_dev_helper::*;
 widget_layout_test!(
   simplest_leaf_rdl,
   WidgetTester::new(fn_widget! {
-    rdl!{ SizedBox { size: Size::new(500.,500.) } }
+    rdl!{ Container { size: Size::new(500., 500.) } }
   }),
   LayoutCase::default().with_size(Size::new(500., 500.))
 );
@@ -17,7 +17,7 @@ widget_layout_test!(
   WidgetTester::new(fn_widget! {
     rdl!{
       Row {
-        rdl!{ SizedBox { size: Size::new(500.,500.)  } }
+        rdl!{ Container { size: Size::new(500., 500.) } }
       }
     }
   }),
@@ -27,8 +27,8 @@ widget_layout_test!(
 widget_layout_test!(
   with_builtin_child_rdl,
   WidgetTester::new(fn_widget! {
-    rdl!{ SizedBox {
-      size: Size::new(500.,500.),
+    rdl!{ Container {
+      size: Size::new(500., 500.),
       margin: EdgeInsets::all(10.)
     }}
   }),
@@ -38,7 +38,7 @@ widget_layout_test!(
 widget_layout_test!(
   rdl_with_child,
   WidgetTester::new(fn_widget! {
-    let single_p = rdl!{ SizedBox { size: Size::new(500.,500.)  }};
+    let single_p = rdl!{ Container { size: Size::new(500., 500.) }};
     rdl!{ (single_p) { rdl!{ Void } } }
   }),
   LayoutCase::default().with_size(Size::new(500., 500.))
@@ -47,8 +47,8 @@ widget_layout_test!(
 widget_layout_test!(
   single_rdl_has_builtin_with_child,
   WidgetTester::new(fn_widget! {
-    let single_p = rdl!{ SizedBox {
-      size: Size::new(500.,500.),
+    let single_p = rdl!{ Container {
+      size: Size::new(500., 500.),
       margin: EdgeInsets::all(10.)
     }};
     rdl!{ (single_p) { rdl!{ Void } } }
@@ -79,9 +79,9 @@ widget_layout_test!(
 widget_layout_test!(
   access_rdl_widget,
   WidgetTester::new(fn_widget! {
-    let b = rdl!{ SizedBox {size: Size::new(500.,500.)}};
+    let mut b = rdl!{ Container { size: Size::new(500., 500.) }};
     rdl!{ Row {
-      rdl!{ SizedBox { size: $read(b).size } }
+      rdl!{ Container { size: *$read(b.size()) } }
       rdl!{ b }
     }}
   }),
@@ -91,7 +91,7 @@ widget_layout_test!(
 widget_layout_test!(
   access_builtin_rdl_widget,
   WidgetTester::new(fn_widget! {
-    let mut b = rdl!{ SizedBox {
+    let mut b = rdl!{ Container {
       size: Size::new(100.,100.),
       margin: EdgeInsets::all(10.)
     }};
@@ -99,8 +99,8 @@ widget_layout_test!(
     rdl!{
       Row {
         rdl!{
-          SizedBox {
-            size: $read(b).size,
+          Container {
+            size: *$read(b.size()),
             margin: *$read(b.margin()),
           }
         }
@@ -114,7 +114,7 @@ widget_layout_test!(
 widget_layout_test!(
   dollar_as_rdl_parent,
   WidgetTester::new(fn_widget! {
-    let b = rdl!{SizedBox { size: Size::new(500.,500.) }};
+    let b = rdl!{Container { size: Size::new(500.,500.) }};
     rdl!{ (b) { rdl!{ Void {}} } }
   }),
   LayoutCase::default().with_size(Size::new(500., 500.))
@@ -123,7 +123,7 @@ widget_layout_test!(
 widget_layout_test!(
   dollar_as_middle_parent,
   WidgetTester::new(fn_widget! {
-    let b = rdl!{ SizedBox { size: Size::new(500.,500.) }};
+    let b = rdl!{ Container { size: Size::new(500.,500.) }};
     rdl!{ Row { rdl!{ (b) { rdl!{ Void {} } } } } }
   }),
   LayoutCase::default().with_size(Size::new(500., 500.))
@@ -132,9 +132,9 @@ widget_layout_test!(
 widget_layout_test!(
   pipe_as_field_value,
   WidgetTester::new({
-    let (size, w_size) = split_value(Size::zero());
+    let (size, w_size) = split_value::<Size>(Size::zero());
     let w = fn_widget! {
-      rdl!{ SizedBox { size: pipe!(*$read(size)) }}
+      rdl!{ Container { size: pipe!(*$read(size)) }}
     };
     *w_size.write() = Size::new(100., 100.);
     w
@@ -147,8 +147,8 @@ widget_layout_test!(
   WidgetTester::new({
     let (margin, w_margin) = split_value(EdgeInsets::all(0.));
     let w = fn_widget! {
-      rdl!{ SizedBox {
-        size: Size::zero(),
+      rdl!{ Container {
+        size: Size::new(0., 0.),
         margin: pipe!(*$read(margin))
       }}
     };
@@ -164,7 +164,7 @@ widget_layout_test!(
   WidgetTester::new({
     let (scale, w_scale) = split_value(1.);
     let w = fn_widget! {
-      @SizedBox {
+      @Container {
         size: pipe!(Size::splat(18.0f32) * *$read(scale))
       }
     };
@@ -177,8 +177,11 @@ widget_layout_test!(
 widget_layout_test!(
   pipe_with_builtin_field,
   WidgetTester::new(fn_widget! {
-    let mut box1 = @SizedBox { size: Size::zero(), margin: EdgeInsets::all(1.) };
-    let box2 = @SizedBox { size: $read(box1).size, margin: pipe!(*$read(box1.margin())) };
+    let mut box1 = @Container { size: Size::zero(), margin: EdgeInsets::all(1.) };
+    let box2 = @Container {
+      size: pipe!(*$read(box1.size())),
+      margin: pipe!(*$read(box1.margin()))
+    };
     @Row {
       @{ box1 }
       @{ box2 }
@@ -207,7 +210,7 @@ fn pipe_single_parent() {
     };
     rdl!{
       (blank) {
-        rdl!{ SizedBox { size: Size::new(100., 100.) } }
+        rdl!{ Container { size: Size::new(100., 100.) } }
       }
     }
   };
@@ -241,8 +244,8 @@ fn pipe_multi_parent() {
 
     rdl!{
       (container) {
-        rdl!{ SizedBox { size: Size::new(100., 100.) } }
-        rdl!{ SizedBox { size: Size::new(100., 100.) } }
+        rdl!{ Container { size: Size::new(100., 100.) } }
+        rdl!{ Container { size: Size::new(100., 100.) } }
       }
     }
   };
@@ -266,7 +269,7 @@ fn pipe_as_child() {
     let blank = pipe!{
       $read(box_or_not2).then(|| {
         fn_widget!{
-          rdl!{ SizedBox { size: Size::new(100., 100.) } }
+          rdl!{ Container { size: Size::new(100., 100.) } }
         }
       })
     };
@@ -289,11 +292,9 @@ fn pipe_as_multi_child() {
   let (cnt, w_cnt) = split_value(0);
 
   let w = fn_widget! {
-    let fix_box = SizedBox { size: Size::new(100., 100.) };
     let boxes = pipe! {
-      let fix_box = fix_box.clone();
       (0..*$read(cnt)).map(move |_| {
-        fix_box.clone()
+        rdl! { Container { size: Size::new(100., 100.) } }
       })
     };
     rdl!{ Flex { rdl!{ boxes } } }
@@ -311,7 +312,7 @@ fn pipe_as_multi_child() {
 widget_layout_test!(
   at_in_widget_macro,
   WidgetTester::new(fn_widget! {
-    @SizedBox { size: Size::new(100., 100.) }
+    @Container { size: Size::new(100., 100.) }
   }),
   LayoutCase::default().with_size(Size::new(100., 100.))
 );
@@ -323,9 +324,9 @@ widget_layout_test!(
     let row = @Row {};
     @(row) {
       // @ in @
-      @SizedBox { size }
+      @Container { size }
       // `rdl!` in @
-      rdl!{ SizedBox { size } }
+      rdl!{ Container { size } }
     }
   }),
   LayoutCase::default().with_size(Size::new(200., 100.))
@@ -338,8 +339,8 @@ widget_layout_test!(
     let row = @Row {};
     rdl!{
       (row) {
-        @SizedBox { size }
-        @SizedBox { size }
+        @Container { size }
+        @Container { size }
       }
     }
   }),
@@ -350,8 +351,14 @@ widget_layout_test!(
   access_builtin_field_by_dollar,
   WidgetTester::new(fn_widget! {
     let size = Size::new(100., 100.);
-    let mut box1 = @SizedBox { size, margin: EdgeInsets::all(10.) };
-    let box2 = @SizedBox { size, margin: *$read(box1.margin()) };
+    let box1 = @Container {
+      size,
+      margin: EdgeInsets::all(10.)
+    };
+    let box2 = @Container {
+      size,
+      margin: EdgeInsets::all(10.)
+    };
     @Row { @ { box1 } @{ box2 } }
   }),
   LayoutCase::default().with_size(Size::new(240., 120.))
@@ -380,7 +387,7 @@ widget_layout_test!(
   WidgetTester::new(fn_widget! {
     @Row {
       @{ (0..3).map(|_| {
-        @SizedBox { size: Size::new(100., 100.) }
+        @Container { size: Size::new(100., 100.) }
       })}
     }
   }),
@@ -392,7 +399,7 @@ fn declare_smoke() {
   reset_test_env!();
 
   let _ = fn_widget! {
-    @SizedBox {
+    @Container {
       size: Size::new(500.,500.),
       background: Color::RED,
     }
@@ -405,11 +412,16 @@ fn simple_ref_bind_work() {
 
   let size = Size::new(100., 100.);
   let w = fn_widget! {
-    let size2 = @SizedBox { size };
+    let mut size2 = @Container { size };
     @Flex {
-     @SizedBox {
-       size: pipe!($read(size2).size),
-       on_tap: move |_| $write(size2).size *= 2.,
+     @Container {
+       size: pipe!(*$read(size2.size())),
+       on_tap: move |_| {
+         let w = $read(size2.width()).into_pixel(0.);
+         let h = $read(size2.height()).into_pixel(0.);
+         *$write(size2.width()) = (w * 2.).into();
+         *$write(size2.height()) = (h * 2.).into();
+       },
      }
      @ { size2 }
    }
@@ -432,11 +444,13 @@ fn event_attr_sugar_work() {
   const BEFORE_SIZE: Size = Size::new(50., 50.);
   const AFTER_TAP_SIZE: Size = Size::new(100., 100.);
   let w = fn_widget! {
-    let sized_box = @SizedBox { size: BEFORE_SIZE };
+    let mut sized_box = @Container { size: BEFORE_SIZE };
     @(sized_box) {
-      @SizedBox {
-        size: pipe!($read(sized_box).size),
-        on_tap: move |_| $write(sized_box).size = AFTER_TAP_SIZE,
+      @Container {
+        size: pipe!(*$read(sized_box.size())),
+        on_tap: move |_| {
+          *$write(sized_box.size()) = AFTER_TAP_SIZE.into();
+        },
       }
     }
   };
@@ -459,17 +473,24 @@ fn widget_wrap_bind_work() {
   reset_test_env!();
 
   let w = fn_widget! {
-    let mut sibling = @SizedBox {
+    let mut sibling = @Container {
       margin: EdgeInsets::all(1.0),
       size: Size::new(50., 50.),
     };
-    let next_box = @SizedBox {
+    let next_box = @Container {
       margin: pipe!(*$read(sibling.margin())),
-      size: pipe!{
+      width: pipe! {
         if $read(sibling.margin()).left > 1. {
-          Size::zero()
+          0_f32.into()
         } else {
-          $read(sibling).size
+          *$read(sibling.width())
+        }
+      },
+      height: pipe! {
+        if $read(sibling.margin()).left > 1. {
+          0_f32.into()
+        } else {
+          *$read(sibling.height())
         }
       },
       on_tap: move |_| *$write(sibling.margin()) = EdgeInsets::all(5.),
@@ -490,10 +511,11 @@ fn widget_wrap_bind_work() {
 
 #[test]
 fn expression_parent() {
-  fn parent() -> FatObj<SizedBox> { FatObj::new(SizedBox { size: Size::new(50., 50.) }) }
+  fn parent() -> FatObj<Container> { FatObj::new(Container {}) }
 
   let _x = fn_widget! {
     @(parent()) {
+      size: Size::new(50., 50.),
       background: Color::RED,
       @ { Void }
     }
@@ -507,17 +529,23 @@ fn expression_for_children() {
   let size_one = Size::new(1., 1.);
   let size_five = Size::new(5., 5.);
   let embed_expr = fn_widget! {
-    let sized_box = @SizedBox { size: size_one };
+    let mut sized_box = @Container { size: size_one };
     let multi_box = (0..3).map(move |_| fn_widget! {
-      @SizedBox { size: pipe!($read(sized_box).size) }
+      @Container { size: pipe!(*$read(sized_box.size())) }
     });
-    let pipe_box = pipe!($read(sized_box).size.area() > 2.)
+    let pipe_box = pipe!(*$read(sized_box.size()))
+      .map(move |v| v.width.into_pixel(0.) * v.height.into_pixel(0.) > 2.)
       .map(move |v| v.then(|| fn_widget! {
-        @SizedBox { size: pipe!($read(sized_box).size) } }
-      ));
+        @Container {
+          size: pipe!(*$read(sized_box.size()))
+        }
+      }));
 
     @Flex {
-      on_tap: move |_| $write(sized_box).size = size_five,
+      on_tap: move |_| {
+        *$write(sized_box.width()) = size_five.width.into();
+        *$write(sized_box.height()) = size_five.height.into();
+      },
       @ { sized_box }
       @ { multi_box }
       @ { pipe_box }
@@ -548,10 +576,17 @@ fn embed_widget_ref_outside() {
   reset_test_env!();
 
   let w = fn_widget! {
-    let mut first = @SizedBox { size: Size::new(1., 1.) };
-    let three_box = @{ (0..3).map(move |_| @ SizedBox { size: pipe!($read(first).size) } )};
+    let mut first = @Container { size: Size::new(1., 1.) };
+    let three_box = @{
+      (0..3).map(move |_| {
+        @Container { size: pipe!(*$read(first.size()))}
+      })
+    };
     @Flex {
-      @(first) { on_tap: move |_| $write(first).size = Size::new(2., 2.)}
+      @(first) { on_tap: move |_| {
+        *$write(first.width()) = 2_f32.into();
+        *$write(first.height()) = 2_f32.into();
+      }}
       @{ three_box }
     }
   };
@@ -571,13 +606,21 @@ fn bind_fields() {
 
   let size = Size::new(1., 1.);
   let w = fn_widget! {
-    let a = @SizedBox { size };
-    let b = @SizedBox { size: pipe!($read(a).size) };
-    let c = @SizedBox { size };
-    watch!($read(a).size + $read(b).size)
-      .subscribe(move |v| $write(c).size = v);
+    let mut a = @Container { size };
+    let mut b = @Container { size: pipe!(*$read(a.size())) };
+    let mut c = @Container { size };
+    watch!((*$read(a.size()), *$read(b.size())))
+      .subscribe(move |(a, b)| {
+        let a_size = a.into_size(0., 0.);
+        let b_size = b.into_size(0., 0.);
+        *$write(c.size()) = (a_size + b_size).into();
+      });
     @Flex {
-      on_tap: move |_| $write(a).size *= 2.,
+      on_tap: move |_| {
+        let w = $read(a.width()).into_pixel(0.);
+        *$write(a.width()) = (w * 2.).into();
+        *$write(a.height()) = (w * 2.).into();
+      },
       @ { [a, b, c] }
     }
   };
@@ -607,8 +650,8 @@ const BE_CLIPPED_SIZE: Size = Size::new(500., 500.);
 widget_layout_test!(
   local_var_not_bind,
   WidgetTester::new(fn_widget! {
-    let _size_box = @SizedBox { size: BE_CLIPPED_SIZE };
-    @SizedBox {
+    let _size_box = @Container { size: BE_CLIPPED_SIZE };
+    @Container {
       size: {
         let _size_box = EXPECT_SIZE;
         let _size_box_def = EXPECT_SIZE;
@@ -629,7 +672,7 @@ fn builtin_ref() {
   let (icon, w_icon) = split_value(CursorIcon::default());
 
   let w = fn_widget! {
-    let mut tap_box = @SizedBox {
+    let mut tap_box = @Container {
       size: Size::new(5., 5.),
       cursor: CursorIcon::Pointer,
     };
@@ -659,10 +702,12 @@ fn builtin_bind_to_self() {
   let (icon, w_icon) = split_value(CursorIcon::default());
   let w = fn_widget! {
     let w_icon = w_icon.clone_writer();
-    let mut sized_box = @SizedBox { size: Size::new(5., 5.) };
+    let mut sized_box = @Container { size: Size::new(5., 5.) };
     @(sized_box) {
-      cursor: pipe!{
-        let icon = if $read(sized_box).size.area() < 100. {
+      cursor: pipe! {
+        let width = $read(sized_box.width()).into_pixel(0.);
+        let height = $read(sized_box.height()).into_pixel(0.);
+        let icon = if width * height < 100. {
           CursorIcon::Pointer
         } else {
           CursorIcon::Help
@@ -670,7 +715,10 @@ fn builtin_bind_to_self() {
         *w_icon.silent() = icon;
         icon
       },
-      on_tap: move |_| $write(sized_box).size = Size::new(20.,20.),
+      on_tap: move |_| {
+        *$write(sized_box.width()) = 20_f32.into();
+        *$write(sized_box.height()) = 20_f32.into();
+      },
     }
   };
 
@@ -694,7 +742,7 @@ fn builtin_method_support() {
   let layout_size = Stateful::new(Size::zero());
   let c_layout_size = layout_size.clone_reader();
   let w = fn_widget! {
-    let mut sized_box  = @SizedBox { size: Size::new(100., 100.) };
+    let mut sized_box  = @Container { size: Size::new(100., 100.) };
     watch!(*$read(sized_box.layout_size()))
       .subscribe(move |v| *$write(layout_size) = v);
     sized_box
@@ -756,14 +804,14 @@ fn fix_subscribe_cancel_after_widget_drop() {
   let (cnt, w_cnt) = split_value(0);
   let (trigger, w_trigger) = split_value(true);
   let w = fn_widget! {
-    let mut container = @SizedBox { size: Size::zero() };
+    let mut container = @Container { size: Size::zero() };
     let h = watch!(*$read(trigger)).subscribe(move |_| *$write(w_cnt) +=1 );
     container.on_disposed(move |_| h.unsubscribe());
 
     @(container) {
       @ {
         pipe!{$read(trigger).then(|| fn_widget!{
-          @SizedBox { size: Size::zero() }
+          @Container { size: Size::zero() }
         })}
       }
     }
@@ -786,12 +834,9 @@ fn fix_subscribe_cancel_after_widget_drop() {
 widget_layout_test!(
   fix_local_assign_tuple,
   WidgetTester::new(fn_widget! {
-    let _sized = @SizedBox { size: Size::new(1., 1.) };
-    let sized_box2 = @SizedBox {
-      size: {
-        let (x, _) = ($read(_sized), 2);
-        x.size
-      }
+    let mut _sized = @Container { size: Size::new(1., 1.) };
+    let sized_box2 = @Container {
+      size: pipe!(*$read(_sized.size())),
     };
     @Row {
       @ { _sized }
@@ -810,8 +855,8 @@ fn fix_silent_not_relayout_dyn_widget() {
   let w = fn_widget! {
     pipe! {
       fn_widget! {
-        @SizedBox {
-          size: if $read(trigger_size).area() > 0. { *$read(trigger_size) } else { ZERO_SIZE}
+        @Container {
+           size: if $read(trigger_size).area() > 0. { *$read(trigger_size) } else { ZERO_SIZE}
         }
       }
     }
@@ -833,9 +878,9 @@ fn no_watch() {
   reset_test_env!();
 
   let size = Stateful::new(ZERO_SIZE);
-  let c_size = size.clone_reader();
+  let c_size = size.clone_watcher();
   let w = fn_widget! {
-    @SizedBox { size: *$read(c_size) }
+    @Container { size: *$read(c_size) }
   };
 
   let wnd = TestWindow::from_widget(w);

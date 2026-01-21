@@ -50,7 +50,7 @@ pub mod prelude {
   pub use smallvec;
 
   pub use super::{
-    Measure,
+    Measure, MeasureExt,
     animation::*,
     builtin_widgets::*,
     class_multi_impl, class_names,
@@ -69,7 +69,7 @@ pub mod prelude {
     ticker::{Duration, Instant},
     widget::*,
     widget_children::*,
-    widget_tree::{BoxClamp, DirtyPhase, LayoutInfo, TrackId, WidgetId},
+    widget_tree::{AnchorX, AnchorY, BoxClamp, DirtyPhase, LayoutInfo, TrackId, WidgetId},
     window::{Window, WindowLevel},
   };
   pub use crate::*;
@@ -78,8 +78,11 @@ pub mod prelude {
 #[cfg(feature = "test-utils")]
 pub mod test_helper;
 
-impl From<f32> for Measure {
-  fn from(value: f32) -> Self { Measure::Pixel(value) }
+impl<T> From<T> for Measure
+where
+  T: Into<f32>,
+{
+  fn from(value: T) -> Self { Measure::Pixel(value.into()) }
 }
 
 impl Default for Measure {
@@ -99,4 +102,25 @@ impl Measure {
       }
     }
   }
+}
+
+/// Extension trait for convenient Measure construction
+pub trait MeasureExt {
+  fn px(self) -> Measure;
+  fn percent(self) -> Measure;
+}
+
+impl MeasureExt for f32 {
+  fn px(self) -> Measure { Measure::Pixel(self) }
+  fn percent(self) -> Measure { Measure::Percent(self) }
+}
+
+impl MeasureExt for f64 {
+  fn px(self) -> Measure { Measure::Pixel(self as f32) }
+  fn percent(self) -> Measure { Measure::Percent(self as f32) }
+}
+
+impl MeasureExt for i32 {
+  fn px(self) -> Measure { Measure::Pixel(self as f32) }
+  fn percent(self) -> Measure { Measure::Percent(self as f32) }
 }

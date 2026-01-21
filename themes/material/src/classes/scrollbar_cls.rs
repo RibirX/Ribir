@@ -43,9 +43,9 @@ fn style_track(w: Widget, is_hor: bool) -> Widget {
   rdl! {
     let mut w = FatObj::new(w);
     if is_hor {
-      w.with_v_align(VAlign::Bottom);
+      w.with_y(AnchorY::bottom());
     } else {
-      w.with_h_align(HAlign::Right);
+      w.with_x(AnchorX::right());
     }
     let mut w = @(w) {
       opacity: 0.,

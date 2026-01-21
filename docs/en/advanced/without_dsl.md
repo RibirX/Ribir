@@ -25,7 +25,7 @@ Therefore, there are two key points involved in building the UI through the API:
 
 As an example, the `Radio` control is defined as follows:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 pub struct Radio {
@@ -36,7 +36,7 @@ pub struct Radio {
 
 This is no different than a regular Rust struct, you can just create an object:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let radio = Radio { selected: true, value: Box::new(1.) };
@@ -52,7 +52,7 @@ This is because in Ribir, event response is implemented by a separate widget. An
 
 And, for built-in widgets such as event responses, we can get them without composing them; Ribir provides a `FatObj<T>` generic, which provides the initialization API for all built-in widgets, and wrapping our widgets in it gives the widgets all of the capabilities of the built-in widgets.
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let radio = Radio { selected: true, value: Box::new(1.) };
@@ -62,7 +62,7 @@ let radio = FatObj::new(radio)
 
 But in practice, instead of writing it this way, we usually create the widget via the `Declare` trait.
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let mut btn = Radio::declarer();
@@ -79,7 +79,7 @@ In the above example, we created the widgets in a similar way to the Builder pat
 
 Note that we end up creating a `FatObj<Stateful<Radio>>` instead of a `Radio`. This is because with `Declare`, we can not only configure properties using the method of the same name, but also extend the capabilities of the built-in widget with `FatObj`. As for why we use `Stateful`, it's because `Stateful` allows you to have the state of your control listened to and modified.
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let mut radio = Radio::declarer();
@@ -98,7 +98,7 @@ Of course, both `FatObj` and `Stateful` only affect the overhead of the final co
 Another advantage of using `Declare` to create widgets is that it supports initializing properties with a `pipe!` stream. Properties initialized by a `pipe!` stream will change as the stream changes. For example, we want to create two `Radio`s, where the state of one follows the state of the other.
 
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let mut radio1 = Radio::declarer();
@@ -120,7 +120,7 @@ let _row = Row::declarer()
 Note that while widgets created with `Declare` can be configured with all built-in capabilities directly, if you need to modify the properties of a built-in widget after initialization, you need to get the corresponding built-in widget before doing so. This is because these built-in widgets are composed on demand. In the following example, we create a button and change its margins when clicked:
 
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn radio_btn() -> Widget<'static> {
@@ -140,7 +140,7 @@ For example, for a `Button`, the text it displays is even a child widget, not it
 
 Here's an example of a text button and an icon button:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let text_btn = Button::declarer()
@@ -156,7 +156,7 @@ let icon_btn = Button::declarer()
 
 Ribir's "DSL" is not an entirely new language, but rather a set of macros. Each macro can be used as a standalone expression, so you can mix and match them freely. Below we will implement a counter example. We'll create the text for the button and the counter directly through the API, and use `$` when initializing their properties to avoid cloning `cnt`. Finally, we'll combine them into a `Row` using the `@` syntax:
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let counter = fn_widget! {

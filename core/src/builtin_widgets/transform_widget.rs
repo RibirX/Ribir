@@ -19,8 +19,8 @@ impl_compose_child_for_wrap_render!(TransformWidget);
 
 impl WrapRender for TransformWidget {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    host.perform_layout(clamp, ctx)
+  fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
+    host.measure(clamp, ctx)
   }
 
   fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {

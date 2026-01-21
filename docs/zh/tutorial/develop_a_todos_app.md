@@ -569,12 +569,12 @@ impl Compose for Todos {
         @Stack {
           padding: EdgeInsets::horizontal(24.),
           @Text {
-            h_align: HAlign::Stretch,
+            clamp: BoxClamp::EXPAND_X,
             visible: pipe!($read(input).text().is_empty()),
             text: "What do you want to do ?"
           }
           @(input) {
-            h_align: HAlign::Stretch,
+            clamp: BoxClamp::EXPAND_X,
             on_key_down: move |e| {
             if e.key_code() == &PhysicalKey::Code(KeyCode::Enter)
               && !$read(input).text().is_empty() {

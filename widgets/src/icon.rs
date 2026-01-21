@@ -79,14 +79,14 @@ struct IconText;
 impl_compose_child_for_wrap_render!(IconText);
 
 impl WrapRender for IconText {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
     let font_face = Provider::of::<IconFont>(&ctx).unwrap().0.clone();
     let mut style = Provider::of::<TextStyle>(ctx).unwrap().clone();
     style.font_face = font_face;
     style.font_size = style.line_height;
     let mut style = Provider::new(style);
     style.setup(ctx.as_mut());
-    let size = host.perform_layout(clamp, ctx);
+    let size = host.measure(clamp, ctx);
     style.restore(ctx.as_mut());
     size
   }
@@ -101,7 +101,7 @@ struct IconRender {
 }
 
 impl Render for IconRender {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let icon_size = Provider::of::<TextStyle>(ctx)
       .unwrap()
       .line_height;

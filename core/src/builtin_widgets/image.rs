@@ -362,7 +362,7 @@ impl Compose for Image {
 }
 
 impl Render for Resource<PixelImage> {
-  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, _: &mut MeasureCtx) -> Size {
     let size = Size::new(self.width() as f32, self.height() as f32);
     clamp.clamp(size)
   }

@@ -421,8 +421,8 @@ impl<'c> ComposeChild<'c> for ListCustomItem {
       .with_child(unconstrained_box! {
         clamp_dim: ClampDim::Max,
         dir: UnconstrainedDir::Y,
-        @VAlignWidget {
-          v_align: ListItemAlignItems::get_align(BuildCtx::get()).map(|v| v.into()),
+        @Row {
+          align_items: ListItemAlignItems::get_align(BuildCtx::get()),
           @ { child }
         }
       })

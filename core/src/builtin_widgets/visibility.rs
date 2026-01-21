@@ -57,8 +57,8 @@ impl_compose_child_for_wrap_render!(VisibilityRender);
 
 impl WrapRender for VisibilityRender {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    if self.display { host.perform_layout(clamp, ctx) } else { clamp.min }
+  fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
+    if self.display { host.measure(clamp, ctx) } else { clamp.min }
   }
 
   fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {
@@ -111,7 +111,7 @@ mod tests {
     struct PainterHit(Stateful<i32>);
 
     impl Render for PainterHit {
-      fn perform_layout(&self, clamp: BoxClamp, _ctx: &mut LayoutCtx) -> Size { clamp.max }
+      fn measure(&self, clamp: BoxClamp, _ctx: &mut MeasureCtx) -> Size { clamp.max }
 
       fn paint(&self, _ctx: &mut PaintingCtx) { *self.0.write() += 1; }
     }

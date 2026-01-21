@@ -103,7 +103,8 @@ impl<'a> ComposeChild<'a> for Badge {
       @ InParentLayout {
         @Text {
           visible: pipe!($read(this).content.is_some()),
-          anchor: pipe!($read(this).offset),
+          x: pipe!($read(this).offset.x.clone().unwrap_or_default()),
+          y: pipe!($read(this).offset.y.clone().unwrap_or_default()),
           text: pipe!($read(this).content.clone().unwrap_or_default()),
           class: pipe! {
             if $read(this).content.as_ref().map_or(true, |s| s.is_empty()) {
@@ -134,7 +135,7 @@ impl<'a> ComposeChild<'a> for NumBadge {
           }
         })
       }),
-      offset: pipe!($read(this).offset),
+      offset: pipe!($read(this).offset.clone()),
       @ { child }
     }
     .into_widget()

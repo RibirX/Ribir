@@ -18,8 +18,8 @@ use crate::{prelude::*, wrap_render::WrapRender};
 ///   @InParentLayout {
 ///     @Container {
 ///       size: Size::new(20., 20.),
-///       v_align: VAlign::Center,
-///       h_align: HAlign::Center,
+///       x: AnchorX::center(),
+///       y: AnchorY::center(),
 ///       // Apply a blur effect to the background content behind this container
 ///       backdrop_filter: Filter::blur(5.),
 ///     }
@@ -71,7 +71,7 @@ mod tests {
       @Stack {
         @ { img }
         @Container {
-          anchor: Anchor::left_top(20., 20.),
+          x: 20., y: 20.,
           size: Size::new(80., 80.),
           backdrop_filter: Filter::grayscale(1.).then(Filter::blur(3.)),
         }

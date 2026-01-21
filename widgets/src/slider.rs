@@ -109,7 +109,7 @@ fn slider_ticks(
 ) -> Widget<'static> {
   fn_widget! {
     @Flex {
-      v_align: VAlign::Center,
+      y: AnchorY::center(),
       align_items: Align::Center,
       justify_content: JustifyContent::SpaceBetween,
       @ {
@@ -213,7 +213,7 @@ impl Slider {
       };
       let thumb_width = thumb.layout_width();
       @ (thumb_container) {
-        h_align: HAlign::Stretch,
+        clamp: BoxClamp::EXPAND_X,
         @pipe! {
           (ticks == SliderTicks::Always).then(|| {
             let this = $read(this);
@@ -223,11 +223,11 @@ impl Slider {
           }).flatten()
         }
         @(thumb) {
-          anchor: pipe! {
+          x: pipe! {
             let ratio = $read(this).ratio();
             let track_width = *$read(thumb_container_width);
             let thumb_width = *$read(thumb_width);
-            Anchor::left(ratio * track_width - thumb_width / 2.)
+            ratio * track_width - thumb_width / 2.
           }
         }
       }
@@ -252,7 +252,7 @@ impl Compose for Slider {
         @Stack {
           class: SLIDER_CONTAINER,
           @(track) {
-            v_align: VAlign::Center,
+            y: AnchorY::center(),
             @Expanded {
               flex: pipe!($read(this).ratio()),
               @Void { class: SLIDER_ACTIVE_TRACK }
@@ -335,7 +335,7 @@ impl RangeSlider {
       let end_thumb_width = end_thumb.layout_width();
 
       @(thumb_container) {
-        h_align: HAlign::Stretch,
+        clamp: BoxClamp::EXPAND_X,
         @pipe! {
           (ticks == SliderTicks::Always).then(|| {
             let this = $read(this);
@@ -346,19 +346,19 @@ impl RangeSlider {
           }).flatten()
         }
         @(start_thumb) {
-          anchor: pipe! {
+          x: pipe! {
             let ratio = $read(this).start_ratio();
             let track_width = *$read(thumb_container_width);
             let thumb_width = *$read(start_thumb_width);
-            Anchor::left(ratio * track_width - thumb_width / 2.)
+            ratio * track_width - thumb_width / 2.
           }
         }
         @(end_thumb) {
-          anchor: pipe! {
+          x: pipe! {
             let ratio = $read(this).end_ratio();
             let track_width = *$read(thumb_container_width);
             let thumb_width = *$read(end_thumb_width);
-            Anchor::left(ratio * track_width - thumb_width / 2.)
+            ratio * track_width - thumb_width / 2.
           }
         }
       }
@@ -469,7 +469,7 @@ impl Compose for RangeSlider {
         @Stack {
           class: SLIDER_CONTAINER,
           @(track) {
-            v_align: VAlign::Center,
+            y: AnchorY::center(),
             @Expanded {
               flex: pipe!($read(this).start_ratio()),
               @Void { class: RANGE_SLIDER_INACTIVE_TRACK_LEFT }
@@ -708,12 +708,11 @@ mod tests {
     reset_test_env!();
     let (value, w_value) = split_value(0.);
     let w = fn_widget! {
-      let slider = @Slider { value: 0., max: 100. };
+      let mut slider = @Slider { value: 0., max: 100. };
       watch!($read(slider).value())
         .subscribe(move |v| *$write(w_value) = v);
-      @SizedBox {
+      @(slider) {
         size: Size::new(100., 20.),
-        @ { slider }
       }
     };
 
@@ -731,12 +730,11 @@ mod tests {
     reset_test_env!();
     let (value, w_value) = split_value(RangeSliderValue { start: 0., end: 100. });
     let w = fn_widget! {
-      let slider = @RangeSlider { start: 10., end: 90., max: 100. };
+      let mut slider = @RangeSlider { start: 10., end: 90., max: 100. };
       watch!($read(slider).value())
         .subscribe(move |v| *$write(w_value) = v);
-      @SizedBox {
+      @(slider) {
         size: Size::new(100., 20.),
-        @ { slider }
       }
     };
 
@@ -747,6 +745,7 @@ mod tests {
     wnd.process_cursor_move(Point::new(20., 10.));
     wnd.process_mouse_press(Box::new(DummyDeviceId), MouseButtons::PRIMARY);
     wnd.draw_frame();
+
     let value = value.read();
     assert!((value.start - 20.).abs() < 1e-5);
     assert!((value.end - 90.).abs() < 1e-5);

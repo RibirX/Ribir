@@ -1,9 +1,9 @@
-use ribir_geom::{Point, Size};
+use ribir_geom::Size;
 
 use super::{WidgetCtx, WidgetCtxImpl};
 use crate::{
   context::VisualCtx,
-  prelude::ProviderCtx,
+  prelude::{Point, ProviderCtx},
   widget::{BoxClamp, VisualBox, WidgetTree},
   widget_tree::WidgetId,
 };
@@ -11,18 +11,24 @@ use crate::{
 /// A place to compute the render object's layout.
 ///
 /// Rather than holding children directly, `Layout` perform layout across
-/// `LayoutCtx`. `LayoutCtx` provide method to perform child layout and also
+/// `MeasureCtx`. `MeasureCtx` provide method to perform child layout and also
 /// provides methods to update descendants position.
-pub struct LayoutCtx<'a> {
+pub struct MeasureCtx<'a> {
   pub(crate) id: WidgetId,
   /// The widget tree of the window, not borrow it from `wnd` is because a
-  /// `LayoutCtx` always in a mutable borrow.
+  /// `MeasureCtx` always in a mutable borrow.
   pub(crate) tree: &'a mut WidgetTree,
   pub(crate) provider_ctx: ProviderCtx,
   pub(crate) laid_out_queue: &'a mut Vec<WidgetId>,
 }
 
-impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
+pub struct PlaceCtx<'a> {
+  pub(crate) id: WidgetId,
+  pub(crate) tree: &'a mut WidgetTree,
+  pub(crate) provider_ctx: &'a mut ProviderCtx,
+}
+
+impl<'a> WidgetCtxImpl for MeasureCtx<'a> {
   #[inline]
   fn id(&self) -> WidgetId { self.id }
 
@@ -30,7 +36,15 @@ impl<'a> WidgetCtxImpl for LayoutCtx<'a> {
   fn tree(&self) -> &WidgetTree { self.tree }
 }
 
-impl<'a> LayoutCtx<'a> {
+impl<'a> WidgetCtxImpl for PlaceCtx<'a> {
+  #[inline]
+  fn id(&self) -> WidgetId { self.id }
+
+  #[inline]
+  fn tree(&self) -> &WidgetTree { self.tree }
+}
+
+impl<'a> MeasureCtx<'a> {
   pub(crate) fn new(
     id: WidgetId, tree: &'a mut WidgetTree, laid_out_queue: &'a mut Vec<WidgetId>,
   ) -> Self {
@@ -48,17 +62,24 @@ impl<'a> LayoutCtx<'a> {
       .get_calculated_size(self.id, clamp)
       .unwrap_or_else(|| {
         // Safety: the `tree` just use to get the widget of `id`, and `tree2` not drop
-        // or modify it during perform layout.
+        // or modify it during measure.
         let tree2 = unsafe { &*(self.tree as *mut WidgetTree) };
 
         let id = self.id();
+        {
+          let info = self.tree.store.layout_info_or_default(id);
+          info.clamp = clamp;
+        }
 
         debug_assert!(clamp.min.is_finite());
-        let size = id.assert_get(tree2).perform_layout(clamp, self);
+        let size = id.assert_get(tree2).measure(clamp, self);
         debug_assert!(size.is_finite());
         let info = self.tree.store.layout_info_or_default(id);
-        info.clamp = clamp;
         info.size = Some(size);
+
+        let mut layout_ctx = PlaceCtx { id, tree: self.tree, provider_ctx: &mut self.provider_ctx };
+        id.assert_get(tree2)
+          .place_children(size, &mut layout_ctx);
 
         {
           VisualCtx::from_layout_ctx(self).update_visual_box();
@@ -72,13 +93,13 @@ impl<'a> LayoutCtx<'a> {
   }
 
   /// Perform layout of the `child` and return its size.
-  pub fn perform_child_layout(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
+  pub fn layout_child(&mut self, child: WidgetId, clamp: BoxClamp) -> Size {
     self
       .get_calculated_size(child, clamp)
       .unwrap_or_else(|| {
         // The position needs to be reset, as some parent render widgets may not have
         // set the position.
-        self.update_position(child, Point::zero());
+        self.tree.store.layout_info_or_default(child).pos = Point::zero();
 
         let id = std::mem::replace(&mut self.id, child);
         let size = self.perform_layout(clamp);
@@ -88,21 +109,13 @@ impl<'a> LayoutCtx<'a> {
       })
   }
 
-  /// Adjust the position of the widget where it should be placed relative to
-  /// its parent.
-  #[inline]
-  pub fn update_position(&mut self, child: WidgetId, pos: Point) {
-    self.tree.store.layout_info_or_default(child).pos = pos;
-  }
-
-  /// Return the position of the widget relative to its parent.
-  #[inline]
-  pub fn position(&mut self, child: WidgetId) -> Option<Point> {
+  pub fn clamp(&self) -> BoxClamp {
     self
       .tree
       .store
-      .layout_info(child)
-      .map(|info| info.pos)
+      .layout_info(self.id())
+      .unwrap()
+      .clamp
   }
 
   /// Adjust the size of the layout widget. Use this method to directly modify
@@ -115,7 +128,7 @@ impl<'a> LayoutCtx<'a> {
   }
 
   /// Split a children iterator from the context, returning a tuple of `&mut
-  /// LayoutCtx` and the iterator of the children.
+  /// MeasureCtx` and the iterator of the children.
   pub fn split_children(&mut self) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
     // Safety: The widget tree structure is immutable during the layout phase, so we
     // can safely split an iterator of children from the layout.
@@ -132,7 +145,7 @@ impl<'a> LayoutCtx<'a> {
   pub fn perform_single_child_layout(&mut self, clamp: BoxClamp) -> Option<Size> {
     self
       .single_child()
-      .map(|child| self.perform_child_layout(child, clamp))
+      .map(|child| self.layout_child(child, clamp))
   }
 
   /// Quick method to do the work of computing the layout for the single child,
@@ -142,11 +155,11 @@ impl<'a> LayoutCtx<'a> {
   /// panic if there is not only one child it have.
   pub fn assert_perform_single_child_layout(&mut self, clamp: BoxClamp) -> Size {
     let child = self.assert_single_child();
-    self.perform_child_layout(child, clamp)
+    self.layout_child(child, clamp)
   }
 
   /// Clear the child layout information, so the `child` will be force layout
-  /// when call `[LayoutCtx::perform_child_layout]!` even if it has layout cache
+  /// when call `[MeasureCtx::layout_child]!` even if it has layout cache
   /// information with same input.
   #[inline]
   pub fn force_child_relayout(&mut self, child: WidgetId) -> bool {
@@ -169,10 +182,64 @@ impl<'a> LayoutCtx<'a> {
   }
 }
 
-impl<'w> AsRef<ProviderCtx> for LayoutCtx<'w> {
+impl<'a> PlaceCtx<'a> {
+  /// Adjust the position of the widget where it should be placed relative to
+  /// its parent.
+  #[inline]
+  pub fn update_position(&mut self, child: WidgetId, pos: Point) {
+    self.tree.store.layout_info_or_default(child).pos = pos;
+  }
+
+  /// Return the stored position of the widget.
+  #[inline]
+  pub fn position(&mut self, child: WidgetId) -> Option<Point> {
+    self
+      .tree
+      .store
+      .layout_info(child)
+      .map(|info| info.pos)
+  }
+  #[inline]
+  pub fn clamp(&self) -> BoxClamp {
+    self
+      .tree
+      .store
+      .layout_info(self.id)
+      .unwrap()
+      .clamp
+  }
+
+  /// Split a children iterator from the context, returning a tuple of `&mut
+  /// LayoutCtx` and the iterator of the children.
+  pub fn split_children(&mut self) -> (&mut Self, impl Iterator<Item = WidgetId> + '_) {
+    // Safety: The widget tree structure is immutable during the layout phase, so we
+    // can safely split an iterator of children from the layout.
+    let tree = unsafe { &*(self.tree as *mut WidgetTree) };
+    let id = self.id;
+    (self, id.children(tree))
+  }
+
+  pub fn widget_box_size(&self, widget: WidgetId) -> Option<Size> {
+    self
+      .tree
+      .store
+      .layout_info(widget)
+      .and_then(|info| info.size)
+  }
+}
+
+impl<'w> AsRef<ProviderCtx> for MeasureCtx<'w> {
   fn as_ref(&self) -> &ProviderCtx { &self.provider_ctx }
 }
 
-impl<'w> AsMut<ProviderCtx> for LayoutCtx<'w> {
+impl<'w> AsMut<ProviderCtx> for MeasureCtx<'w> {
   fn as_mut(&mut self) -> &mut ProviderCtx { &mut self.provider_ctx }
+}
+
+impl<'a> AsRef<ProviderCtx> for PlaceCtx<'a> {
+  fn as_ref(&self) -> &ProviderCtx { self.provider_ctx }
+}
+
+impl<'a> AsMut<ProviderCtx> for PlaceCtx<'a> {
+  fn as_mut(&mut self) -> &mut ProviderCtx { self.provider_ctx }
 }

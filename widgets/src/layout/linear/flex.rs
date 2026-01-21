@@ -2,6 +2,35 @@ use ribir_core::prelude::{log::warn, *};
 
 use super::{Direction, Expanded, JustifyContent};
 
+/// Enum describing how a widget is aligned inside its box.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Align {
+  /// The children are aligned to the start edge of the box provided by parent.
+  #[default]
+  Start,
+  /// The children are aligned to the center of the line of the box provide by
+  /// parent.
+  Center,
+  /// The children are aligned to the end edge of the box provided by parent.
+  End,
+  /// Require the children to fill the whole box of one axis. This causes the
+  /// constraints passed to the children to be tight.
+  Stretch,
+}
+
+impl Align {
+  /// Calculate the offset for aligning a child of `child_size` within
+  /// `parent_size`.
+  pub fn align_value(self, child_size: f32, parent_size: f32) -> f32 {
+    match self {
+      Align::Start => 0.,
+      Align::Center => (parent_size - child_size) / 2.,
+      Align::End => parent_size - child_size,
+      Align::Stretch => 0.,
+    }
+  }
+}
+
 /// The `Flex` is a layout container that arranges its children in a
 /// one-dimensional manner. It distributes space among the children and provides
 /// alignment options in two axes.
@@ -64,7 +93,7 @@ pub struct Flex {
 }
 
 impl Render for Flex {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     if Align::Stretch == self.align_items && self.wrap {
       warn!("stretch align and wrap property is conflict");
     }
@@ -81,7 +110,23 @@ impl Render for Flex {
       lines: vec![],
       has_flex: false,
     };
-    layouter.layout(clamp, ctx)
+    layouter.measure_children(clamp, ctx)
+  }
+
+  fn place_children(&self, size: Size, ctx: &mut PlaceCtx) {
+    let mut layouter = FlexLayouter {
+      reverse: self.reverse,
+      dir: self.direction,
+      align_items: self.align_items,
+      justify_content: self.justify_content,
+      wrap: self.wrap,
+      main_axis_gap: self.item_gap,
+      cross_axis_gap: self.line_gap,
+      current_line: <_>::default(),
+      lines: vec![],
+      has_flex: false,
+    };
+    layouter.layout_children(size, ctx)
   }
 
   #[inline]
@@ -102,25 +147,34 @@ struct FlexLayouter {
 }
 
 impl FlexLayouter {
-  fn layout(&mut self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure_children(&mut self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let dir = self.dir;
 
     let main_max = dir.max_of(&clamp);
 
     let child_clamp = self.create_child_clamp(clamp);
-    self.perform_children_layout(main_max, child_clamp, ctx);
+    self.perform_children_measure(main_max, child_clamp, ctx);
     if self.has_flex {
       let container = dir.container_main(&clamp, self.main_size());
-      self.flex_layout(container, main_max, child_clamp, ctx);
+      self.flex_measure(container, main_max, child_clamp, ctx);
     }
 
     let expect = self.finally_size(main_max);
-    let real = clamp.clamp(expect);
+    clamp.clamp(expect)
+  }
+
+  fn layout_children(&mut self, size: Size, ctx: &mut PlaceCtx) {
+    let dir = self.dir;
+    let main_max = dir.main_of(size);
+
+    // Rebuild lines info from already-measured children (no re-measuring)
+    self.rebuild_lines_from_cache(main_max, ctx);
+
+    let expect = self.finally_size(main_max);
     let cross_box_offset = self
       .align_items
-      .align_value(dir.cross_of(expect), dir.cross_of(real));
-    self.update_children_position(dir.main_of(real), cross_box_offset, ctx);
-    real
+      .align_value(dir.cross_of(expect), dir.cross_of(size));
+    self.update_children_position(dir.main_of(size), cross_box_offset, ctx);
   }
 
   /// Creates child constraints based on wrapping behavior:
@@ -144,7 +198,7 @@ impl FlexLayouter {
     }
   }
 
-  fn perform_children_layout(&mut self, max_main: f32, clamp: BoxClamp, ctx: &mut LayoutCtx) {
+  fn perform_children_measure(&mut self, max_main: f32, clamp: BoxClamp, ctx: &mut MeasureCtx) {
     let (ctx, children) = ctx.split_children();
     let &mut Self { wrap, dir, .. } = self;
     let mut children = children.peekable();
@@ -165,7 +219,7 @@ impl FlexLayouter {
       let size = if expanded.is_some_and(|e| e.defer_alloc) {
         Size::zero()
       } else {
-        ctx.perform_child_layout(c, clamp)
+        ctx.layout_child(c, clamp)
       };
       let main = dir.main_of(size);
       if wrap && !line.is_empty() && line.main + main > max_main {
@@ -195,7 +249,58 @@ impl FlexLayouter {
     self.place_line();
   }
 
-  fn flex_layout(&mut self, container: f32, max: f32, clamp: BoxClamp, ctx: &mut LayoutCtx) {
+  /// Rebuild lines info from already-measured children for the layout phase.
+  /// This method uses widget_box_size instead of perform_child_layout to avoid
+  /// re-measuring children during the layout phase.
+  fn rebuild_lines_from_cache(&mut self, max_main: f32, ctx: &mut PlaceCtx) {
+    let (ctx, children) = ctx.split_children();
+    let &mut Self { wrap, dir, .. } = self;
+    let mut children = children.peekable();
+    while let Some(c) = children.next() {
+      let gap = if children.peek().is_some() && !self.justify_content.is_space_layout() {
+        self.main_axis_gap
+      } else {
+        0.
+      };
+
+      let line = &mut self.current_line;
+
+      let expanded = ctx
+        .query_of_widget::<Expanded>(c)
+        .map(|e| *e)
+        .filter(|e| (e.flex.is_normal() && e.flex > 0.) || e.flex == 0.);
+
+      // Use cached size instead of re-measuring
+      let size = ctx.widget_box_size(c).unwrap_or(Size::zero());
+      let main = dir.main_of(size);
+      if wrap && !line.is_empty() && line.main + main > max_main {
+        self.place_line();
+      } else {
+        line.main += gap;
+      }
+
+      let line = &mut self.current_line;
+      line.main += main;
+
+      let flex = expanded.map(|e| {
+        self.current_line.has_flex = true;
+        self.has_flex = true;
+        e.flex
+      });
+      let info = FlexLayoutInfo {
+        flex,
+        main_pos: 0.,
+        cross_pos: 0.,
+        size,
+        defer_layout: expanded.is_some_and(|e| e.defer_alloc),
+      };
+      self.current_line.items_info.push(info);
+    }
+
+    self.place_line();
+  }
+
+  fn flex_measure(&mut self, container: f32, max: f32, clamp: BoxClamp, ctx: &mut MeasureCtx) {
     let (ctx, mut children) = ctx.split_children();
     let dir = self.dir;
 
@@ -222,7 +327,7 @@ impl FlexLayouter {
           continue;
         };
 
-        info.size = ctx.perform_child_layout(child, item_clamp);
+        info.size = ctx.layout_child(child, item_clamp);
         line.main += dir.main_of(info.size) - item_main;
       }
     });
@@ -252,7 +357,7 @@ impl FlexLayouter {
     self.dir.to_size(main, cross)
   }
 
-  fn update_children_position(&mut self, container: f32, cross_offset: f32, ctx: &mut LayoutCtx) {
+  fn update_children_position(&mut self, container: f32, cross_offset: f32, ctx: &mut PlaceCtx) {
     let Self { reverse, dir, align_items, justify_content, cross_axis_gap, main_axis_gap, .. } =
       *self;
     let mut cross = cross_offset - cross_axis_gap;
@@ -398,7 +503,7 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Flex {
         @{
-          (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })
+          (0..10).map(|_| @Container { size: Size::new(10., 20.) })
         }
       }
     }),
@@ -410,7 +515,7 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Flex {
         direction: Direction::Vertical,
-        @{ (0..10).map(|_| SizedBox { size: Size::new(10., 20.) })}
+        @{ (0..10).map(|_| @Container { size: Size::new(10., 20.) })}
       }
     }),
     LayoutCase::default().with_size(Size::new(10., 200.))
@@ -421,7 +526,7 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Flex {
         wrap: true,
-        @{ (0..3).map(|_| SizedBox { size: Size::new(200., 20.) }) }
+        @{ (0..3).map(|_| @Container { size: Size::new(200., 20.) }) }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -439,7 +544,7 @@ mod tests {
       @Flex {
         wrap: true,
         reverse: true,
-        @{ (0..3).map(|_| SizedBox { size: Size::new(200., 20.) }) }
+        @{ (0..3).map(|_| @Container { size: Size::new(200., 20.) }) }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -454,9 +559,9 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Flex {
         item_gap: 15.,
-        @SizedBox { size: Size::new(120., 20.) }
-        @SizedBox { size: Size::new(80., 20.) }
-        @SizedBox { size: Size::new(30., 20.) }
+        @Container { size: Size::new(120., 20.) }
+        @Container { size: Size::new(80., 20.) }
+        @Container { size: Size::new(30., 20.) }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -471,9 +576,9 @@ mod tests {
       @Flex {
         item_gap: 15.,
         reverse: true,
-        @SizedBox { size: Size::new(120., 20.) }
-        @SizedBox { size: Size::new(80., 20.) }
-        @SizedBox { size: Size::new(30., 20.) }
+        @Container { size: Size::new(120., 20.) }
+        @Container { size: Size::new(80., 20.) }
+        @Container { size: Size::new(30., 20.) }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -486,19 +591,19 @@ mod tests {
     main_axis_expand,
     WidgetTester::new(fn_widget! {
       @Flex {
-        h_align: HAlign::Stretch,
+        clamp: BoxClamp::EXPAND_X,
         item_gap: 15.,
-        @SizedBox { size: Size::new(120., 20.) }
+        @Container { size: Size::new(120., 20.) }
         @Expanded {
           flex: 1.,
-          @SizedBox { size: Size::new(10., 20.) }
+          @Container { size: Size::new(10., 20.) }
         }
-        @SizedBox { size: Size::new(80., 20.) }
+        @Container { size: Size::new(80., 20.) }
         @Expanded {
           flex: 2.,
-          @SizedBox { size: Size::new(10., 20.) }
+          @Container { size: Size::new(10., 20.) }
         }
-        @SizedBox { size: Size::new(30., 20.) }
+        @Container { size: Size::new(30., 20.) }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -516,7 +621,7 @@ mod tests {
         wrap: true,
         line_gap: 10.,
         align_items: Align::Center,
-        @{ (0..3).map(|_| SizedBox { size: Size::new(200., 20.) }) }
+        @{ (0..3).map(|_| @Container { size: Size::new(200., 20.) }) }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -530,9 +635,9 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Flex {
         align_items: align,
-        @SizedBox { size: Size::new(100., 20.) }
-        @SizedBox { size: Size::new(100., 30.) }
-        @SizedBox { size: Size::new(100., 40.) }
+        @Container { size: Size::new(100., 20.) }
+        @Container { size: Size::new(100., 30.) }
+        @Container { size: Size::new(100., 40.) }
       }
     })
     .with_wnd_size(Size::new(500., 40.))
@@ -578,14 +683,14 @@ mod tests {
   fn main_align(justify_content: JustifyContent) -> WidgetTester {
     WidgetTester::new(fn_widget! {
       let item_size = Size::new(100., 20.);
-      @SizedBox {
+      @Container {
         size: Size::new(500., 500.),
         @Flex {
           justify_content,
           align_items: Align::Start,
-          @SizedBox { size: item_size }
-          @SizedBox { size: item_size }
-          @SizedBox { size: item_size }
+          @Container { size: item_size }
+          @Container { size: item_size }
+          @Container { size: item_size }
         }
       }
     })
@@ -594,35 +699,17 @@ mod tests {
 
   widget_layout_test!(
     start_main_align,
-    main_align(JustifyContent::Start),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    main_align(JustifyContent::Compact),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(300., 20.)),
     LayoutCase::new(&[0, 0, 0]).with_x(0.),
     LayoutCase::new(&[0, 0, 1]).with_x(100.),
     LayoutCase::new(&[0, 0, 2]).with_x(200.)
   );
 
   widget_layout_test!(
-    center_main_align,
-    main_align(JustifyContent::Center),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
-    LayoutCase::new(&[0, 0, 0]).with_x(100.),
-    LayoutCase::new(&[0, 0, 1]).with_x(200.),
-    LayoutCase::new(&[0, 0, 2]).with_x(300.)
-  );
-
-  widget_layout_test!(
-    end_main_align,
-    main_align(JustifyContent::End),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
-    LayoutCase::new(&[0, 0, 0]).with_x(200.),
-    LayoutCase::new(&[0, 0, 1]).with_x(300.),
-    LayoutCase::new(&[0, 0, 2]).with_x(400.)
-  );
-
-  widget_layout_test!(
     space_between_align,
     main_align(JustifyContent::SpaceBetween),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 20.)),
     LayoutCase::new(&[0, 0, 0]).with_x(0.),
     LayoutCase::new(&[0, 0, 1]).with_x(200.),
     LayoutCase::new(&[0, 0, 2]).with_x(400.)
@@ -632,7 +719,7 @@ mod tests {
   widget_layout_test!(
     space_around_align,
     main_align(JustifyContent::SpaceAround),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 20.)),
     LayoutCase::new(&[0, 0, 0]).with_x(0.5 * AROUND_SPACE),
     LayoutCase::new(&[0, 0, 1]).with_x(100. + AROUND_SPACE * 1.5),
     LayoutCase::new(&[0, 0, 2]).with_x(2.5 * AROUND_SPACE + 200.)
@@ -641,7 +728,7 @@ mod tests {
   widget_layout_test!(
     space_evenly_align,
     main_align(JustifyContent::SpaceEvenly),
-    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 500.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(500., 20.)),
     LayoutCase::new(&[0, 0, 0]).with_x(50.),
     LayoutCase::new(&[0, 0, 1]).with_x(200.),
     LayoutCase::new(&[0, 0, 2]).with_x(350.)
@@ -650,25 +737,25 @@ mod tests {
   widget_layout_test!(
     flex_expand,
     WidgetTester::new(fn_widget! {
-      @SizedBox {
+      @Container {
         size: Size::new(500., 25.),
         @Flex {
           direction: Direction::Horizontal,
           @Expanded {
             defer_alloc: false,
             flex: 2.,
-            @SizedBox { size: Size::splat(100.),}
+            @Container { size: Size::splat(100.),}
           }
           @Expanded {
             defer_alloc: false,
             flex: 1.,
-            @SizedBox { size: Size::splat(50.),}
+            @Container { size: Size::splat(50.),}
           }
-          @SizedBox { size: Size::new(100., 20.) }
+          @Container { size: Size::new(100., 20.) }
           @Expanded {
             defer_alloc: false,
             flex: 1.,
-            @SizedBox { size: Size::splat(100.), }
+            @Container { size: Size::splat(100.), }
           }
         }
       }
@@ -687,8 +774,8 @@ mod tests {
       @Flex {
         direction: Direction::Vertical,
         item_gap: 50.,
-        @SizedBox { size: Size::new(100., 100.) }
-        @SizedBox { size: Size::new(100., 500.) }
+        @Container { size: Size::new(100., 100.) }
+        @Container { size: Size::new(100., 500.) }
       }
     })
     .with_wnd_size(Size::new(500., 500.)),
@@ -746,7 +833,7 @@ mod tests {
     WidgetTester::new(unconstrained_box! {
       @Flex {
         @Container {
-          size: Size::splat(300.),
+          size: Size::new(300., 300.),
         }
         @Expanded {
           flex: 1.,

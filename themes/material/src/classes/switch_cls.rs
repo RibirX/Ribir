@@ -40,7 +40,7 @@ pub(super) fn init(classes: &mut Classes) {
       ripple_radius: 20.,
       center: true,
       @FatObj {
-        v_align: VAlign::Center,
+        y: AnchorY::center(),
         @ { w }
       }
     }

@@ -65,9 +65,11 @@ impl<'c> ComposeChild<'c> for ScrollableWidget {
 
       let mut child = FatObj::new(child);
       let child = @(child) {
-        anchor: distinct_pipe!{
-          let pos = $read(this).get_scroll_pos();
-          Anchor::left_top(-pos.x, -pos.y)
+        x: distinct_pipe!{
+          -$read(this).get_scroll_pos().x
+        },
+        y: distinct_pipe!{
+          -$read(this).get_scroll_pos().y
         },
         on_performed_layout: move |e| {
           let content_size = e.box_size().unwrap_or_default();
@@ -143,32 +145,31 @@ impl ScrollableWidget {
   /// view in vertical direction, when the widget is out of the view.
   pub fn visible_content_box(&mut self, rect: Rect, anchor: Anchor) {
     let view_size = self.scroll_view_size();
-
     let offset_x = anchor
       .x
       .or_else(|| {
         if rect.max_x() > self.scroll_pos.x + view_size.width {
-          Some(HAnchor::Right(0.0.into()))
+          Some(AnchorX::right())
         } else if rect.min_x() < self.scroll_pos.x {
-          Some(HAnchor::Left(0.0.into()))
+          Some(AnchorX::left())
         } else {
           None
         }
       })
-      .map_or(self.scroll_pos.x, |x| rect.min_x() - x.into_pixel(rect.width(), view_size.width));
+      .map_or(self.scroll_pos.x, |x| rect.min_x() - x.calculate(rect.width(), view_size.width));
 
     let offset_y = anchor
       .y
       .or_else(|| {
         if rect.max_y() > view_size.height + self.scroll_pos.y {
-          Some(VAnchor::Bottom(0.0.into()))
+          Some(AnchorY::bottom())
         } else if rect.min_y() < self.scroll_pos.y {
-          Some(VAnchor::Top(0.0.into()))
+          Some(AnchorY::top())
         } else {
           None
         }
       })
-      .map_or(self.scroll_pos.y, |y| rect.min_y() - y.into_pixel(rect.height(), view_size.height));
+      .map_or(self.scroll_pos.y, |y| rect.min_y() - y.calculate(rect.height(), view_size.height));
 
     self.jump_to(Point::new(offset_x, offset_y));
   }
@@ -256,7 +257,7 @@ struct Viewport {
 }
 
 impl Render for Viewport {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let mut child_clamp = clamp;
     if self.scroll_dir != Scrollable::X {
       child_clamp.max.height = f32::INFINITY;
@@ -301,7 +302,8 @@ mod tests {
     wnd.process_wheel(delta_x, delta_y);
 
     wnd.draw_frame();
-    let pos = wnd.layout_info_by_path(&[0, 0]).unwrap().pos;
+    let id = wnd.widget_id_by_path(&[0, 0]);
+    let pos = wnd.widget_pos(id).unwrap();
     assert_eq!(pos, Point::new(expect_x, expect_y));
   }
 
@@ -339,7 +341,7 @@ mod tests {
 
   impl Render for FixedBox {
     #[inline]
-    fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    fn measure(&self, _: BoxClamp, ctx: &mut MeasureCtx) -> Size {
       ctx.perform_single_child_layout(BoxClamp { min: self.size, max: self.size });
       self.size
     }

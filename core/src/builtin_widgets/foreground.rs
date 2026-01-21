@@ -32,8 +32,8 @@ impl Declare for Foreground {
 impl_compose_child_for_wrap_render!(Foreground);
 
 impl WrapRender for Foreground {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    host.perform_layout(clamp, ctx)
+  fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
+    host.measure(clamp, ctx)
   }
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) {

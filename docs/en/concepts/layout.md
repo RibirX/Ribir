@@ -34,7 +34,7 @@ fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size
 
 In this method, the Widget needs to do three things:
 1.  **Layout children**: Iterate through its child nodes, calculate a new `BoxClamp` for each child (based on the incoming `clamp` and its own layout logic), and call `ctx.perform_child_layout(child, child_clamp)`.
-2.  **Determine position**: Get the `Size` returned by the child node, and set the child node's position according to the layout logic `ctx.update_position(child, position)`.
+2.  **Determine position**: Get the `Size` returned by the child node, and set the child node's position according to the layout logic `ctx.update_anchor(child, anchor_x, anchor_y)`.
 3.  **Return size**: Calculate and return its own final `Size`, and this size must satisfy the incoming `clamp` constraint.
 
 ## Using the `clamp` Attribute to Intervene in Layout
@@ -47,7 +47,8 @@ use ribir::prelude::*;
 fn example() -> Widget<'static> {
     fn_widget! {
         @Container {
-            size: Size::new(100., 100.),
+            width: 100.,
+            height: 100.,
             background: Color::RED,
             // Force constraint: no matter what constraint the parent gives, the Container's width must be between 50 and 200
             clamp: BoxClamp {
@@ -80,7 +81,7 @@ struct FixedSizeBox {
 }
 
 impl Render for FixedSizeBox {
-    fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
         // 1. Determine the size we want, must be within the parent constraint range
         let my_size = clamp.clamp(self.size);
 
@@ -90,10 +91,7 @@ impl Render for FixedSizeBox {
             let child_clamp = BoxClamp { min: my_size, max: my_size };
 
             // Layout child node
-            ctx.perform_child_layout(child, child_clamp);
-
-            // Set child node position (usually (0,0))
-            ctx.update_position(child, Point::zero());
+            ctx.layout_child(child, child_clamp);
         }
 
         // 3. Return final size

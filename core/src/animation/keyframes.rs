@@ -14,7 +14,7 @@
 //! use ribir::prelude::*;
 //!
 //! let _w = fn_widget! {
-//!   let mut color_rect = @SizedBox {
+//!   let mut color_rect = @Container {
 //!     size: Size::new(100., 100.),
 //!     background: Color::RED,
 //!   };
@@ -40,7 +40,7 @@
 //! use ribir::prelude::*;
 //!
 //! let _w = fn_widget! {
-//!   let mut opacity_rect = @SizedBox { size: Size::new(100., 100.) };
+//!   let mut opacity_rect = @Container { size: Size::new(100., 100.) };
 //!
 //!   let animate = @Animate {
 //!     state: keyframes! {

@@ -67,8 +67,8 @@ impl Compose for Pomodoro {
       Overlay::new(fn_widget! {
         @(FatObj::new(())) {
           providers: [Provider::writer($writer(ui_state), Some(DirtyPhase::LayoutSubtree))],
-          global_anchor_x: GlobalAnchorX::value(HAnchor::Left(6.0.into())),
-          global_anchor_y: GlobalAnchorY::value(VAnchor::Top(30.0.into())),
+          x: AnchorX::left().offset(6.),
+          y: AnchorY::top().offset(30.),
           @ { setting_button_icon() }
         }
       }, OverlayStyle {
@@ -76,7 +76,8 @@ impl Compose for Pomodoro {
           auto_close_policy: AutoClosePolicy::NOT_AUTO_CLOSE,
       }).show(BuildCtx::get().window());
 
-      @Column {
+      @Flex {
+        direction: Direction::Vertical,
         providers: {
           let mut ps = vec!(
             Provider::writer(this.clone_writer(), None),
@@ -86,14 +87,16 @@ impl Compose for Pomodoro {
           SmallVec::from_vec(ps)
         },
         @WindowBar {}
-        @ {
-          pipe!($read(ui_state).current_page)
+        @Expanded {
+          @ {
+            pipe!($read(ui_state).current_page)
             .transform(|p| p.distinct_until_changed())
             .map(move |b| match b {
               PomodoroPage::Main => main_page(),
               PomodoroPage::Mini => concise_page(),
               PomodoroPage::Setting => setting_page(),
             })
+          }
         }
       }
     }

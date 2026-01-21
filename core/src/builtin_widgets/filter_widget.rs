@@ -75,8 +75,8 @@ mod tests {
         // filter apply to the subtree
         filter: Filter::drop_shadow((100., 10.), 10., Color::BLACK.with_alpha(0.5)),
         @Container {
-          h_align: HAlign::Center,
-          v_align: VAlign::Center,
+          x: AnchorX::center(),
+          y: AnchorY::center(),
           size: Size::new(100., 100.),
           background: Color::YELLOW,
         }

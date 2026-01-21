@@ -712,12 +712,19 @@ impl Query for ProvidersRender {
 }
 
 impl Render for ProvidersRender {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let Self { render, providers } = self;
     providers.setup_providers(ctx.as_mut());
-    let size = render.perform_layout(clamp, ctx);
+    let size = render.measure(clamp, ctx);
     providers.restore_providers(ctx.as_mut());
     size
+  }
+
+  fn place_children(&self, _size: Size, ctx: &mut PlaceCtx) {
+    let Self { render, providers } = self;
+    providers.setup_providers(ctx.as_mut());
+    render.place_children(_size, ctx);
+    providers.restore_providers(ctx.as_mut());
   }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> { self.render.visual_box(ctx) }
@@ -1004,7 +1011,7 @@ mod tests {
     }
 
     impl Render for PaintCnt {
-      fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
+      fn measure(&self, clamp: BoxClamp, _: &mut MeasureCtx) -> Size {
         self.layout_cnt.set(self.layout_cnt.get() + 1);
         clamp.max
       }

@@ -16,7 +16,7 @@ impl Compose for Todos {
         })
         @Expanded {
           @Tabs {
-            h_align: HAlign::Stretch,
+            clamp: BoxClamp::EXPAND_X,
             @Tab {
               @ { "All" }
               @task_lists(this.clone_writer(), |_| true)
@@ -71,7 +71,7 @@ fn task_lists(
                 .map(move |b| fn_widget!{
                   if b {
                     @Container {
-                      size: Size::new(f32::INFINITY, 64.),
+                      clamp: BoxClamp::EXPAND_X.with_fixed_height(64.),
                       @{
                         let input = input(Some($read(task).label.clone()), move |text|{
                           $write(task).label = text.to_string();
@@ -79,7 +79,7 @@ fn task_lists(
                         });
                         let mut input = FatObj::new(input);
                         @(input) {
-                          v_align: VAlign::Center,
+                          y: AnchorY::center(),
                           on_key_down: move |e| {
                             if e.key_code() == &PhysicalKey::Code(KeyCode::Escape) {
                               *$write(editing) = None;
@@ -124,12 +124,12 @@ fn input(
     @ Stack {
       padding: EdgeInsets::horizontal(24.),
       @Text {
-        h_align: HAlign::Stretch,
+        clamp: BoxClamp::EXPAND_X,
         visible: pipe!($read(input).text().is_empty()),
         text: "What do you want to do ?"
       }
       @(input) {
-        h_align: HAlign::Stretch,
+        clamp: BoxClamp::EXPAND_X,
         on_key_down: move |e| {
           if e.key_code() == &PhysicalKey::Code(KeyCode::Enter) {
             on_submit($read(input).text().clone());

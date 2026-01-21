@@ -49,9 +49,7 @@ Ribir 提供了一个强大的内置属性系统，让您可以为任何 Widget 
 *   **布局**:
     *   `margin`: 设置外边距。
     *   `padding`: 设置内边距。
-    *   `h_align` / `v_align`: 设置水平/垂直对齐。
-    *   `anchor`: 用于 `Stack` 布局中的绝对定位。
-    *   `global_anchor_x` / `global_anchor_y`: 用于相对于全局窗口的定位。
+    *   `x` / `y`: 使用 `PosX` 和 `PosY` 设置水平/垂直定位。
     *   `clamp`: 强制对 Widget 大小范围的约束（布局约束）。
     *   `box_fit`: 控制子元素如何适应容器空间（如填充、包含等）。
     *   `scrollable`: 控制 Widget 的滚动行为（X轴、Y轴或两者）。
@@ -149,7 +147,7 @@ fn simple_card_traditional() -> Widget<'static> {
             // 内置属性：布局
             margin: EdgeInsets::all(10.),
             padding: EdgeInsets::symmetrical(10., 5.),
-            h_align: HAlign::Center,
+            x: AnchorX::center(),
 
             // 内置属性：视觉
             background: Color::from_u32(0xFFEEAA00),
@@ -177,7 +175,7 @@ fn simple_card(w: Widget<'static>) -> Widget<'static> {
         @FatObj {
             margin: EdgeInsets::all(10.),
             padding: EdgeInsets::symmetrical(10., 5.),
-            h_align: HAlign::Center,
+            x: AnchorX::center(),
             background: Color::from_u32(0xFFEEAA00),
             border: Border::all(BorderSide::new(2., Color::BLACK.into())),
             radius: Radius::all(4.),
@@ -223,10 +221,9 @@ fn simple_card(w: Widget<'static>) -> Widget<'static> {
 21. `opacity`
 22. `visibility`
 23. `disabled`
-24. `h_align` / `v_align`
-25. `anchor` / `global_anchor`
-26. `keep_alive`
-27. `reuse`
+24. `x` / `y` (position)
+25. `keep_alive`
+26. `reuse`
 
 #### 关键要点
 

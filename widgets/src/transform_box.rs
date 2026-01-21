@@ -6,7 +6,7 @@ pub struct TransformBox {
 }
 
 impl Render for TransformBox {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     self
       .matrix
       .inverse()
@@ -47,14 +47,13 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::prelude::*;
 
   widget_layout_test!(
     smoke,
     WidgetTester::new(fn_widget! {
       @TransformBox {
         matrix: Transform::new(2., 0., 0., 2., 0., 0.),
-        @SizedBox { size: Size::new(100., 100.) }
+        @Container { size: Size::new(100., 100.) }
       }
     }),
     LayoutCase::default().with_size(Size::new(200., 200.))

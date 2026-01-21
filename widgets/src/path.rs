@@ -9,7 +9,7 @@ pub struct PathPaintKit {
 
 impl Render for PathPaintKit {
   #[inline]
-  fn perform_layout(&self, _: BoxClamp, _: &mut LayoutCtx) -> Size { Size::zero() }
+  fn measure(&self, _: BoxClamp, _: &mut MeasureCtx) -> Size { Size::zero() }
 
   fn visual_box(&self, _: &mut VisualCtx) -> Option<Rect> { Some(self.path.bounds(None)) }
 

@@ -32,10 +32,10 @@ impl Declare for ConstrainedBox {
 impl_compose_child_for_wrap_render!(ConstrainedBox);
 
 impl WrapRender for ConstrainedBox {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
     let max = clamp.clamp(self.clamp.max);
     let min = clamp.clamp(self.clamp.min);
-    host.perform_layout(BoxClamp { min, max }, ctx)
+    host.measure(BoxClamp { min, max }, ctx)
   }
 
   fn size_affected_by_child(&self, host: &dyn Render) -> bool {

@@ -45,26 +45,30 @@ impl Wordle {
     let palette = Palette::of(BuildCtx::get());
     let gray = palette.base_of(&palette.surface_variant());
     flex! {
+      y: AnchorY::center(),
       direction: Direction::Vertical,
       item_gap: 5.,
       align_items: Align::Center,
-      justify_content: JustifyContent::Center,
+      justify_content: JustifyContent::Compact,
       @Flex {
+        x: AnchorX::center(),
         item_gap: 5.,
         align_items: Align::Center,
-        justify_content: JustifyContent::Center,
+        justify_content: JustifyContent::Compact,
         @Wordle::chars_key(&this, ['Q', 'W', 'E', 'R','T', 'Y', 'U', 'I','O', 'P'])
       }
       @Flex {
+        x: AnchorX::center(),
         item_gap: 5.,
         align_items: Align::Center,
-        justify_content: JustifyContent::Center,
+        justify_content: JustifyContent::Compact,
         @Wordle::chars_key(&this, ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L' ])
       }
       @Flex {
+        x: AnchorX::center(),
         item_gap: 5.,
         align_items: Align::Center,
-        justify_content: JustifyContent::Center,
+        justify_content: JustifyContent::Compact,
         @FilledButton {
           providers: [Provider::new(gray)],
           on_tap: move |_| $write(this).guessing.delete_back_char(),
@@ -88,16 +92,18 @@ impl Wordle {
   fn chars_grid(this: &impl StateWriter<Value = Wordle>) -> Widget<'static> {
     fn_widget! {
       @Flex {
+        y: AnchorY::center(),
         direction: Direction::Vertical,
         item_gap: 5.,
         align_items: Align::Center,
-        justify_content: JustifyContent::Center,
+        justify_content: JustifyContent::Compact,
         @ {
           (0..$read(this).max_rounds()).map(move |row| {
             @Flex {
+              y: AnchorY::center(),
               item_gap: 5.,
               align_items: Align::Center,
-              justify_content: JustifyContent::Center,
+              justify_content: JustifyContent::Compact,
               @pipe! {
                 (0..$read(this).len_hint())
                   .map(move |col| fn_widget! { $read(this).char_grid(row, col) })
@@ -147,14 +153,15 @@ impl Wordle {
       let color = palette.container_of(&color);
       let font_color = palette.on_container_of(&color);
       @Container {
-        size: Size::new(56., 56.),
+        width: 56.,
+        height: 56.,
         background: color,
         radius: Radius::all(4.),
         @Text {
           text_style: TypographyTheme::of(BuildCtx::get()).display_small.text.clone(),
           foreground: font_color,
-          h_align: HAlign::Center,
-          v_align: VAlign::Center,
+          x: AnchorX::center(),
+          y: AnchorY::center(),
           text: c.to_string(),
         }
       }
@@ -185,7 +192,6 @@ impl Compose for Wordle {
       };
 
       @Container {
-        size: Size::new(f32::INFINITY, f32::INFINITY),
         auto_focus: true,
         on_chars: move |e| {
           e.chars.chars().for_each(|c| $write(this).guessing.enter_char(c))
@@ -203,11 +209,13 @@ impl Compose for Wordle {
           }
         },
         @Flex {
+          clamp: BoxClamp::EXPAND_BOTH,
           direction: Direction::Vertical,
           margin: EdgeInsets::only_top(10.),
-          h_align: HAlign::Center,
+          x: AnchorX::center(),
+          y: AnchorY::center(),
           align_items: Align::Center,
-          justify_content: JustifyContent::Center,
+          justify_content: JustifyContent::Compact,
           item_gap: 5.,
           @H1 { text: "Wordle" }
           @Divider { }

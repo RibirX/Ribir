@@ -77,13 +77,12 @@ pub fn paint_text(
 }
 
 impl Render for Text {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let style = Provider::of::<TextStyle>(ctx).unwrap();
     let text_align = Provider::of::<TextAlign>(ctx).map_or(TextAlign::Start, |t| *t);
     let mut glyphs = text_glyph(self.text.substr(..), &style, text_align, clamp.max);
-    let mut size = glyphs.visual_rect().size;
+    let size = glyphs.visual_rect().size;
     if text_align != TextAlign::Start {
-      size.width = clamp.container_width(size.width);
       glyphs.align(Rect::from_size(size));
     }
 

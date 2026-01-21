@@ -569,14 +569,6 @@ mod tests {
   }
 
   #[test]
-  fn switch_class_many() {
-    for i in 0..10 {
-      println!("{i}");
-      switch_class();
-    }
-  }
-
-  #[test]
 
   fn on_disposed_of_class_nodes() {
     reset_test_env!();

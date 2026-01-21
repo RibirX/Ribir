@@ -296,7 +296,7 @@ mod tests {
         size: Size::new(100., 100.),
         @MockBox {
           transform: Transform::scale(0.5, 0.5),
-          anchor: Anchor::left_top(30., 30.),
+          x: 30., y: 30.,
           size: Size::new(40., 40.)
         }
       }

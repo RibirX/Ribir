@@ -127,23 +127,23 @@ impl Compose for WindowBar {
             }
           },
           @Container {
-            size: Size::new(f32::INFINITY, f32::INFINITY),
             @Text {
-              h_align: HAlign::Center,
-              v_align: VAlign::Center,
+              x: AnchorX::center(),
+              y: AnchorY::center(),
               visible: pipe!($read(ui_state).current_page != PomodoroPage::Mini),
               text: "Pomodoro",
             }
           }
         }
+
         @FatObj {
-          h_align: HAlign::Left,
-          v_align: VAlign::Center,
+          x: AnchorX::left(),
+          y: AnchorY::center(),
           @ { keep_icon() }
         }
         @Row {
-          h_align: HAlign::Right,
-          v_align: VAlign::Center,
+          x: AnchorX::right(),
+          y: AnchorY::center(),
           @Icon {
             cursor: CursorIcon::Pointer,
             on_tap: move |e| {
@@ -170,14 +170,14 @@ pub(crate) fn main_page() -> Widget<'static> {
     let pomodoro = Provider::writer_of::<Pomodoro>(BuildCtx::get()).unwrap();
     @Column {
       align_items: Align::Center,
-      h_align: Align::Center,
+      x: AnchorX::center(),
       @Container {
         margin: EdgeInsets::vertical(26.),
         size: Size::new(256., 256.),
         @Stack {
           @Column {
-            h_align: HAlign::Center,
-            v_align: VAlign::Center,
+            x: AnchorX::center(),
+            y: AnchorY::center(),
             align_items: Align::Center,
             @H1 {
               text: @pipe!($read(pomodoro).current_remaining)
@@ -191,8 +191,8 @@ pub(crate) fn main_page() -> Widget<'static> {
             box_fit: BoxFit::Cover,
             @SpinnerProgress {
               class: CURRENT,
-              h_align: HAlign::Center,
-              v_align: VAlign::Center,
+              x: AnchorX::center(),
+              y: AnchorY::center(),
               value: pipe!(1. - $read(pomodoro).state_progress())
             }
           }
@@ -269,10 +269,10 @@ pub(crate) fn main_page() -> Widget<'static> {
 fn about() -> Widget<'static> {
   fn_widget! {
     @Container {
-      size: Size::new(f32::INFINITY, f32::INFINITY),
+      clamp: BoxClamp::EXPAND_BOTH,
       @Column {
-        v_align: Align::Center,
-        h_align: Align::Center,
+        y: AnchorY::center(),
+        x: AnchorX::center(),
         align_items: Align::Center,
         @H4 { text: "About" }
         @Container {
@@ -388,7 +388,7 @@ fn setting_config() -> Widget<'static> {
         }
         @Row {
           align_items: Align::Center,
-          h_align: HAlign::Center,
+          x: AnchorX::center(),
           margin: EdgeInsets::only_top(4.),
           @Checkbox {
             checked: pipe!($read(config).start_mini_mode),
@@ -404,7 +404,7 @@ fn setting_config() -> Widget<'static> {
         }
         @Row {
           align_items: Align::Center,
-          h_align: HAlign::Center,
+          x: AnchorX::center(),
           @Checkbox {
             checked: pipe!($read(config).auto_run),
             on_tap: move |_| {
@@ -419,7 +419,7 @@ fn setting_config() -> Widget<'static> {
         }
         @Row {
           align_items: Align::Center,
-          h_align: HAlign::Center,
+          x: AnchorX::center(),
           @Checkbox {
             checked: $read(config).always_on_top,
             on_custom: move |e: &mut CheckboxChanged| {
@@ -440,11 +440,11 @@ fn setting_config() -> Widget<'static> {
 pub(crate) fn setting_page() -> Widget<'static> {
   fn_widget! {
     @Container {
-      size: Size::new(f32::INFINITY, CONTENT_HEIGHT),
+      clamp: BoxClamp::EXPAND_X.with_fixed_height(CONTENT_HEIGHT),
       @Tabs{
         providers: [Provider::new(TabPos::Bottom)],
-        h_align: HAlign::Stretch,
-        v_align: VAlign::Stretch,
+        x: AnchorX::left(),
+        y: AnchorY::top(),
         @Tab {
           @{ "Settings" }
           @Icon { @ { svg_registry::get_or_default("settings") } }
@@ -474,16 +474,14 @@ pub(crate) fn concise_page() -> Widget<'static> {
         box_fit: BoxFit::Contain,
         @SpinnerProgress {
           class: CURRENT,
-          h_align: HAlign::Center,
-          v_align: VAlign::Center,
           value: pipe!(1. - $read(pomodoro).state_progress())
         }
       }
 
       @InParentLayout {
         @Column {
-          h_align: HAlign::Center,
-          v_align: VAlign::Center,
+          x: AnchorX::center(),
+          y: AnchorY::center(),
           align_items: Align::Center,
           @Text { text: "Pomodoro" }
           @H4 {

@@ -124,13 +124,13 @@ mod tests {
       @Flex  {
         @Expanded {
           flex: 1.,
-          @SizedBox { size }
+          @Container { size }
         }
-        @SizedBox { size }
-        @SizedBox { size }
+        @Container { size }
+        @Container { size }
         @Expanded {
           flex: 2.,
-          @SizedBox { size }
+          @Container { size }
         }
       }
     })
@@ -151,21 +151,21 @@ mod tests {
         @Expanded {
           defer_alloc: false,
           flex: 1. ,
-          @SizedBox { size }
+          @Container { size }
         }
-        @SizedBox { size }
-        @SizedBox { size }
-        @SizedBox { size }
-        @SizedBox { size }
+        @Container { size }
+        @Container { size }
+        @Container { size }
+        @Container { size }
         @Expanded {
           defer_alloc: false,
           flex: 1. ,
-          @SizedBox { size, }
+          @Container { size, }
         }
         @Expanded {
           defer_alloc: false,
           flex: 4.,
-          @SizedBox { size, }
+          @Container { size, }
         }
       }
     })
@@ -190,13 +190,13 @@ mod tests {
       watch!(*$read(flex)).subscribe(move |val| $write(expanded).flex = val);
 
       @Flex {
-        h_align: HAlign::Stretch,
+        clamp: BoxClamp::EXPAND_X,
         @(expanded) { @ { Void } }
         @Expanded {
           flex: 1.,
           @ { Void }
         }
-        @SizedBox { size: Size::new(100., 100.) }
+        @Container { size: Size::new(100., 100.) }
       }
     };
 

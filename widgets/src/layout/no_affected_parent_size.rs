@@ -12,7 +12,7 @@ pub struct NoAffectedParentSize {}
 // dirty. For instance, if `w2` in a Row[w1, NoAffectedParentSize<w2>] is
 // dirty, the Row requires a relayout.
 impl Render for NoAffectedParentSize {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     ctx
       .perform_single_child_layout(clamp)
       .unwrap_or(ZERO_SIZE)

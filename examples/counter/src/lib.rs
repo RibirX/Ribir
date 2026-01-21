@@ -2,8 +2,8 @@ use ribir::prelude::*;
 
 pub fn counter(cnt: &'static Stateful<i32>) -> Widget<'static> {
   button! {
-    h_align: HAlign::Center,
-    v_align: VAlign::Center,
+    x: AnchorX::center(),
+    y: AnchorY::center(),
     on_tap: move |_| *$write(cnt) += 1,
     @pipe!($read(cnt).to_string())
   }

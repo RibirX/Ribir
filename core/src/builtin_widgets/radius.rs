@@ -39,7 +39,7 @@ use super::*;
 ///     @BorderWidget {
 ///       border: Border::all(BorderSide::new(1., Color::BLACK.into())),
 ///       @Container {
-///         size: Size::new(100., 100.),
+///         size: Size::new(100., 100.)
 ///       }
 ///     }
 ///   }
