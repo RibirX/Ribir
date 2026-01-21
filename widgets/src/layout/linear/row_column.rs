@@ -1,6 +1,6 @@
 use ribir_core::prelude::*;
 
-use super::{Direction, JustifyContent};
+use super::{Align, Direction, JustifyContent};
 
 /// A horizontal layout container that arranges children sequentially in a row.
 ///
@@ -57,22 +57,47 @@ pub struct Column {
 }
 
 impl Render for Row {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    perform_linear_layout(Direction::Horizontal, self.align_items, self.justify_content, clamp, ctx)
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
+    perform_linear_measure(
+      Direction::Horizontal,
+      self.align_items,
+      self.justify_content,
+      clamp,
+      ctx,
+    )
+  }
+
+  fn place_children(&self, _size: Size, ctx: &mut PlaceCtx) {
+    perform_linear_layout_positions(
+      Direction::Horizontal,
+      self.align_items,
+      self.justify_content,
+      _size,
+      ctx,
+    )
   }
 }
 
 impl Render for Column {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
-    perform_linear_layout(Direction::Vertical, self.align_items, self.justify_content, clamp, ctx)
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
+    perform_linear_measure(Direction::Vertical, self.align_items, self.justify_content, clamp, ctx)
+  }
+
+  fn place_children(&self, _size: Size, ctx: &mut PlaceCtx) {
+    perform_linear_layout_positions(
+      Direction::Vertical,
+      self.align_items,
+      self.justify_content,
+      _size,
+      ctx,
+    )
   }
 }
 
-/// Core layout algorithm for linear arrangements (both rows and columns).
+/// Core measure algorithm for linear arrangements (both rows and columns).
 ///
-/// Implements a two-phase layout process:
-/// 1. **Measurement Phase**: Calculate total content size and child constraints
-/// 2. **Placement Phase**: Position children according to alignment rules
+/// Implements the measurement phase:
+/// 1. Calculate total content size and child constraints
 ///
 /// # Parameters
 /// - `dir`: Layout direction (horizontal/vertical)
@@ -80,41 +105,87 @@ impl Render for Column {
 /// - `justify_content`: Main-axis space distribution
 /// - `clamp`: Size constraints from parent
 /// - `ctx`: Layout context for children measurement
-fn perform_linear_layout(
+fn perform_linear_measure(
   dir: Direction, align_items: Align, justify_content: JustifyContent, clamp: BoxClamp,
-  ctx: &mut LayoutCtx,
+  ctx: &mut MeasureCtx,
 ) -> Size {
   let cross_max = dir.cross_max_of(&clamp);
   let child_clamp = if align_items == Align::Stretch && cross_max.is_finite() {
-    dir.with_fixed_cross(BoxClamp::default(), cross_max)
+    dir.with_fixed_cross(clamp.loose(), cross_max)
   } else {
-    dir.with_cross_max(BoxClamp::default(), cross_max)
+    dir.with_cross_max(clamp.loose(), cross_max)
   };
 
   let (ctx, children) = ctx.split_children();
   let (mut main, mut cross) = (0., 0f32);
   for child in children {
-    let child_size = ctx.perform_child_layout(child, child_clamp);
+    let child_size = ctx.layout_child(child, child_clamp);
     main += dir.main_of(child_size);
     cross = cross.max(dir.cross_of(child_size));
   }
 
-  let child_cnt = ctx.children().count();
   let main_container = dir.container_main(&clamp, main);
-  let (mut main_pos, step) = justify_content.item_offset_and_step(main_container - main, child_cnt);
-
-  let (ctx, children) = ctx.split_children();
-  let cross = dir.cross_clamp(cross, &clamp);
-  for child in children {
-    let child_size = ctx.widget_box_size(child).unwrap();
-    let cross_pos = align_items.align_value(dir.cross_of(child_size), cross);
-
-    ctx.update_position(child, dir.to_point(main_pos, cross_pos));
-    main_pos += dir.main_of(child_size) + step;
-  }
-
   let main = dir.main_clamp(main, &clamp);
   let main = if justify_content.is_space_layout() { main_container } else { main };
-
+  let cross = dir.cross_clamp(cross, &clamp);
   dir.to_size(main, cross)
+}
+
+/// Core layout algorithm for positioning children in linear arrangements.
+///
+/// # Parameters
+/// - `dir`: Layout direction (horizontal/vertical)
+/// - `align_items`: Cross-axis alignment strategy
+/// - `justify_content`: Main-axis space distribution
+/// - `size`: Container size (calculated in measure phase)
+/// - `ctx`: Layout context for positioning children
+fn perform_linear_layout_positions(
+  dir: Direction, align_items: Align, justify_content: JustifyContent, size: Size,
+  ctx: &mut PlaceCtx,
+) {
+  let child_cnt = ctx.children().count();
+  let main_container = dir.main_of(size);
+  let cross_container = dir.cross_of(size);
+
+  // Calculate total main size from already-measured children
+  let (ctx, children) = ctx.split_children();
+  let total_main: f32 = children
+    .map(|c| {
+      let size = ctx.widget_box_size(c).unwrap();
+      dir.main_of(size)
+    })
+    .sum();
+  let (mut main_pos, step) =
+    justify_content.item_offset_and_step(main_container - total_main, child_cnt);
+
+  let (ctx, children) = ctx.split_children();
+  for child in children {
+    let child_size = ctx.widget_box_size(child).unwrap();
+    let cross_pos = align_items.align_value(dir.cross_of(child_size), cross_container);
+
+    let pos = dir.to_point(main_pos, cross_pos);
+    ctx.update_position(child, pos);
+    main_pos += dir.main_of(child_size) + step;
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use ribir_core::test_helper::*;
+  use ribir_dev_helper::*;
+
+  use super::*;
+  use crate::prelude::*;
+
+  widget_layout_test!(
+    row_stretch_height,
+    WidgetTester::new(fn_widget! {
+      @Row {
+        align_items: Align::Stretch,
+        @Container { size: Size::new(100., 50.) }
+      }
+    })
+    .with_wnd_size(Size::new(500., 200.)),
+    LayoutCase::new(&[0, 0]).with_size(Size::new(100., 200.))
+  );
 }

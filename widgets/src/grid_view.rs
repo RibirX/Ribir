@@ -54,22 +54,29 @@ impl GridView {
 }
 
 impl Render for GridView {
-  fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, _: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let mut idx = 0;
     let (ctx, children) = ctx.split_children();
     for c in children {
-      ctx.perform_child_layout(
+      ctx.layout_child(
         c,
         BoxClamp {
           min: Size::new(self.child_x_extent, self.child_y_extent),
           max: Size::new(self.child_x_extent, self.child_y_extent),
         },
       );
-      ctx.update_position(c, self.calc_child_pos(idx));
       idx += 1;
     }
 
     self.bound_size(idx)
+  }
+
+  fn place_children(&self, _size: Size, ctx: &mut PlaceCtx) {
+    let (ctx, children) = ctx.split_children();
+    for (idx, c) in children.enumerate() {
+      let pos = self.calc_child_pos(idx as u32);
+      ctx.update_position(c, pos);
+    }
   }
 
   #[inline]

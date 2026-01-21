@@ -12,20 +12,20 @@ use crate::prelude::*;
 /// // use default Divider default settings
 /// let widget = fn_widget! {
 ///   @Column {
-///     @SizedBox { size: Size::new(10., 0.) }
+///     @Container { size: Size::new(10., 0.) }
 ///     @Divider { }
-///     @SizedBox { size: Size::new(10., 0.) }
+///     @Container { size: Size::new(10., 0.) }
 ///   }
 /// };
 ///
 /// // with indent settings
 /// let widget = fn_widget! {
 ///   @Column {
-///     @SizedBox { size: Size::new(10., 0.) }
+///     @Container { size: Size::new(10., 0.) }
 ///     @Divider {
 ///       indent: DividerIndent::Start,
 ///     }
-///     @SizedBox { size: Size::new(10., 0.) }
+///     @Container { size: Size::new(10., 0.) }
 ///   }
 /// };
 /// ```

@@ -131,7 +131,7 @@ impl BaseText for InputText {
 }
 
 impl VisualText for InputText {
-  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &LayoutCtx) -> VisualGlyphs {
+  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> VisualGlyphs {
     self.0.layout_glyphs(clamp, ctx)
   }
 
@@ -230,7 +230,7 @@ mod tests {
       watch!($read(input).text().clone())
         .subscribe(move |text| *$write(w_value) = text.to_string());
 
-      @SizedBox {
+      @Container {
         size: Size::new(200., 24.),
         @ { input }
       }

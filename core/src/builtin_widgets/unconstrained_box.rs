@@ -52,7 +52,7 @@ pub enum ClampDim {
 
 impl Render for UnconstrainedBox {
   #[inline]
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let mut child_clamp = clamp;
     if self.clamp_dim != ClampDim::Max {
       match self.dir {

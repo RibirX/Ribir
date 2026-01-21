@@ -48,8 +48,8 @@ fn main() {
     || Stateful::new(0),
     move |cnt: &'static Stateful<i32>| {
       button! {
-        h_align: HAlign::Center,
-        v_align: VAlign::Center,
+        x: AnchorX::center(),
+        y: AnchorY::center(),
         on_tap: move |_| *$write(cnt) += 1,
         @pipe!($read(cnt).to_string())
       }
@@ -77,8 +77,8 @@ fn main() {
       let mut btn = Button::declarer();
       btn
         .on_tap(move |_| *c_cnt.write() += 1)
-        .with_h_align(HAlign::Center)
-        .with_v_align(VAlign::Center);
+        .with_x(AnchorX::center())
+        .with_y(AnchorY::center());
       btn.finish().with_child(pipe!($read(cnt).to_string()))
     });
 }

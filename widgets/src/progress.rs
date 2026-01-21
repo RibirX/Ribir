@@ -126,9 +126,7 @@ pub struct SpinnerArc {
 
 impl Render for SpinnerArc {
   fn size_affected_by_child(&self) -> bool { false }
-  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size {
-    clamp.clamp(Size::splat(40.))
-  }
+  fn measure(&self, clamp: BoxClamp, _: &mut MeasureCtx) -> Size { clamp.clamp(Size::splat(40.)) }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
     let size = ctx.box_size()?;

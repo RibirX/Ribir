@@ -59,7 +59,7 @@ pub trait MultiChild: Sized {
 /// }
 ///
 /// // Usage examples:
-/// let _red_container = red_background! { @Container { size: Size::splat(100.) } };
+/// let _red_container = red_background! { @Container { size: Size::new(100., 100.) } };
 /// let _red_text = red_background! { @Text { text: "Red Text!" } };
 /// ```
 ///

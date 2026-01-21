@@ -301,8 +301,9 @@ impl<'c> ButtonChild<'c> {
 
         @Row {
           class: btn,
+          x: AnchorX::center(),
           align_items: Align::Center,
-          justify_content: JustifyContent::Center,
+          justify_content: JustifyContent::Compact,
           @ { items }
         }
       }
@@ -351,7 +352,7 @@ mod tests {
     filled_button,
     WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
-      v_align: Align::Center,
+      y: AnchorY::center(),
       line_gap: 20.,
       wrap: true,
       // icon only
@@ -379,7 +380,7 @@ mod tests {
     outlined_button,
     WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
-      v_align: Align::Center,
+      y: AnchorY::center(),
       line_gap: 20.,
       wrap: true,
       // icon only
@@ -407,7 +408,7 @@ mod tests {
     mini_fab,
     WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
-      v_align: Align::Center,
+      y: AnchorY::center(),
       line_gap: 20.,
       wrap: true,
       // icon only
@@ -445,7 +446,7 @@ mod tests {
     fab,
     WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
-      v_align: Align::Center,
+      y: AnchorY::center(),
       line_gap: 20.,
       wrap: true,
       // icon only
@@ -472,7 +473,7 @@ mod tests {
     large_fab,
     WidgetTester::new(flex! {
       justify_content: JustifyContent::SpaceAround,
-      v_align: Align::Center,
+      y: AnchorY::center(),
       line_gap: 20.,
       wrap: true,
       // label only

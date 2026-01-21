@@ -6,14 +6,12 @@ use crate::md;
 const THICKNESS: f32 = 1.;
 
 named_style_impl!(horizontal_base => {
-  clamp: BoxClamp::fixed_height(THICKNESS),
-  h_align: HAlign::Stretch,
+  clamp: BoxClamp::EXPAND_X.with_fixed_height(THICKNESS),
   background: Palette::of(BuildCtx::get()).outline_variant(),
 });
 
 named_style_impl!(vertical_base => {
-  clamp: BoxClamp::fixed_width(THICKNESS),
-  v_align: VAlign::Stretch,
+  clamp: BoxClamp::EXPAND_Y.with_fixed_width(THICKNESS),
   background: Palette::of(BuildCtx::get()).outline_variant(),
 });
 pub(super) fn init(classes: &mut Classes) {

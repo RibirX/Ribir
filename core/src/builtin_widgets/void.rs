@@ -19,7 +19,7 @@ use crate::prelude::*;
 pub struct Void;
 
 impl Render for Void {
-  fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.min }
+  fn measure(&self, clamp: BoxClamp, _: &mut MeasureCtx) -> Size { clamp.min }
 
   fn paint(&self, _: &mut PaintingCtx) {}
 }

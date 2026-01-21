@@ -65,8 +65,8 @@ impl FittedBox {
   /// Creates a FittedBox with specified scaling strategy
   pub fn new(box_fit: BoxFit) -> Self { Self { box_fit, scale_factor: Cell::default() } }
 
-  fn layout_child(
-    &self, clamp: BoxClamp, ctx: &mut LayoutCtx, max_valid: impl FnOnce(Size) -> bool,
+  fn measure_child(
+    &self, clamp: BoxClamp, ctx: &mut MeasureCtx, max_valid: impl FnOnce(Size) -> bool,
     min_valid: impl Fn(Size) -> bool, fit_scale: impl FnOnce(Size, Size) -> Vector,
   ) -> Size {
     let mut container = if max_valid(clamp.max) {
@@ -75,10 +75,11 @@ impl FittedBox {
       clamp.min
     } else {
       self.scale_factor.set(Vector::one());
-      return ctx.assert_perform_single_child_layout(clamp);
+      return ctx.layout_child(ctx.assert_single_child(), clamp);
     };
 
-    let child_size = ctx.assert_perform_single_child_layout(BoxClamp::default());
+    let child = ctx.assert_single_child();
+    let child_size = ctx.layout_child(child, BoxClamp::default());
 
     if !min_valid(child_size) {
       self.scale_factor.set(Vector::one());
@@ -87,32 +88,26 @@ impl FittedBox {
 
     let scale = fit_scale(child_size, container);
     self.scale_factor.set(scale);
-    let child = ctx.assert_single_child();
-    let mut pos = ctx.widget_box_pos(child).unwrap_or_default();
-    if container.width.is_finite() {
-      pos.x = center_align(container.width, child_size.width, scale.x);
-    } else {
+
+    if !container.width.is_finite() {
       container.width = child_size.width * scale.x;
     }
-    if container.height.is_finite() {
-      pos.y = center_align(container.height, child_size.height, scale.y);
-    } else {
+    if !container.height.is_finite() {
       container.height = child_size.height * scale.y;
     }
-    ctx.update_position(child, pos);
 
     clamp.clamp(container)
   }
 }
 
 impl Render for FittedBox {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     match self.box_fit {
       BoxFit::None => {
         self.scale_factor.set(Vector::one());
-        ctx.assert_perform_single_child_layout(clamp)
+        ctx.layout_child(ctx.assert_single_child(), clamp)
       }
-      BoxFit::Fill => self.layout_child(
+      BoxFit::Fill => self.measure_child(
         clamp,
         ctx,
         Size::is_finite,
@@ -121,7 +116,7 @@ impl Render for FittedBox {
           Vector::new(container.width / child.width, container.height / child.height)
         },
       ),
-      BoxFit::Contain => self.layout_child(
+      BoxFit::Contain => self.measure_child(
         clamp,
         ctx,
         |size| size.width.is_finite() || size.height.is_finite(),
@@ -131,7 +126,7 @@ impl Render for FittedBox {
           Vector::splat(scale)
         },
       ),
-      BoxFit::Cover => self.layout_child(
+      BoxFit::Cover => self.measure_child(
         clamp,
         ctx,
         Size::is_finite,
@@ -141,7 +136,7 @@ impl Render for FittedBox {
           Vector::splat(scale)
         },
       ),
-      BoxFit::CoverWidth => self.layout_child(
+      BoxFit::CoverWidth => self.measure_child(
         clamp,
         ctx,
         |size| size.width.is_finite(),
@@ -151,7 +146,7 @@ impl Render for FittedBox {
           Vector::splat(scale)
         },
       ),
-      BoxFit::CoverHeight => self.layout_child(
+      BoxFit::CoverHeight => self.measure_child(
         clamp,
         ctx,
         |size| size.height.is_finite(),
@@ -162,6 +157,23 @@ impl Render for FittedBox {
         },
       ),
     }
+  }
+
+  fn place_children(&self, size: Size, ctx: &mut PlaceCtx) {
+    let child = ctx.assert_single_child();
+    let child_size = ctx
+      .tree
+      .store
+      .layout_info(child)
+      .map(|i| i.size.unwrap())
+      .unwrap_or_default();
+    let scale = self.scale_factor.get();
+    let mut pos = Point::zero();
+
+    pos.x = center_align(size.width, child_size.width, scale.x);
+    pos.y = center_align(size.height, child_size.height, scale.y);
+
+    ctx.update_position(child, pos);
   }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {

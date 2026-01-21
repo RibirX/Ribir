@@ -81,8 +81,8 @@ mod tests {
   widget_image_tests! {
     label_avatar,
     WidgetTester::new(avatar!{
-      h_align: HAlign::Center,
-      v_align: VAlign::Center,
+      x: AnchorX::center(),
+      y: AnchorY::center(),
       @{"A"}
     }).with_wnd_size(Size::splat(64.))
   }
@@ -90,8 +90,8 @@ mod tests {
   widget_image_tests! {
     widget_avatar,
     WidgetTester::new(avatar!{
-      h_align: HAlign::Center,
-      v_align: VAlign::Center,
+      x: AnchorX::center(),
+      y: AnchorY::center(),
       @MockBox { size: Size::splat(100.), background: Color::RED }
     }).with_wnd_size(Size::splat(64.))
   }

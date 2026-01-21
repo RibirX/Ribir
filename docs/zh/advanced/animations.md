@@ -28,14 +28,14 @@ Ribir 中已经预定义了一些动画 Transition
 - `easing::EASE_IN_OUT`: 开始缓慢，中间加速，然后减速
 - `easing::CubicBezierEasing`: 三次贝塞尔缓动
 
-下例中，`SizedBox` 会在首次加载时实现一个跳动的动画。
+下例中，`Container` 会在首次加载时实现一个跳动的动画。
 
 ```rust no_run
 use ribir::prelude::*;
 
 fn custom_easing_example() -> Widget<'static> {
     fn_widget! {
-        let mut moving_box = @SizedBox {
+        let mut moving_box = @Container {
             size: Size::new(50., 50.),
             background: Color::RED,
             margin: EdgeInsets::horizontal(200.),
@@ -50,7 +50,7 @@ fn custom_easing_example() -> Widget<'static> {
             }
         };
 
-        @SizedBox {
+        @Container {
             size: Size::new(250., 100.),
             @(moving_box) {
                 on_mounted: move |_| animate.run(),
@@ -91,7 +91,7 @@ fn_widget! {
         ...
     };
 
-    @SizedBox {
+    @Container {
         opacity: pipe!(*$read(opacity_state)),
         on_tap: move |_| animate.run(),
     }
@@ -105,7 +105,7 @@ fn_widget! {
 ```rust ignore
 // ✅ 正确：动画化 Widget 的状态
 fn_widget! {
-    let w = @SizedBox {
+    let w = @Container {
         opacity: 1.,
         ...
     };
@@ -166,20 +166,20 @@ use ribir::prelude::*;
 
 fn keyframes_example() -> Widget<'static> {
     fn_widget! {
-        let mut box_widget = @SizedBox {
+        let mut box_widget = @Container {
             size: Size::new(50., 50.),
             background: Color::GREEN,
         };
 
         let animate = @Animate {
             state: keyframes! {
-                state: box_widget.map_writer(|w| PartMut::new(&mut w.size)),
-                0.25 => Size::new(100., 50.),  // 在 25% 进度时水平拉伸
-                0.5 => Size::new(100., 100.),  // 在 50% 进度时垂直拉伸
-                0.75 => Size::new(50., 100.),  // 在 75% 进度时水平缩小
-                1.0 => Size::new(50., 50.),    // 在 100% 进度时返回原始
+                state: box_widget.size(),
+                0.25 => DimensionSize::new(100., 50.),  // 在 25% 进度时水平拉伸
+                0.5 => DimensionSize::new(100., 100.),  // 在 50% 进度时垂直拉伸
+                0.75 => DimensionSize::new(50., 100.),  // 在 75% 进度时水平缩小
+                1.0 => DimensionSize::new(50., 50.),    // 在 100% 进度时返回原始
             },
-            from: Size::new(50., 50.),
+            from: DimensionSize::new(50., 50.),
             transition: EasingTransition {
                 duration: Duration::from_millis(1000),
                 easing: easing::EASE_IN_OUT,
@@ -260,9 +260,9 @@ fn advanced_stagger_example() -> Widget<'static> {
             }
         );
 
-        let mut box1 = @SizedBox { size: Size::new(50., 50.), background: Color::RED, opacity: 0. };
-        let mut box2 = @SizedBox { size: Size::new(50., 50.), background: Color::GREEN, opacity: 0. };
-        let mut box3 = @SizedBox { size: Size::new(50., 50.), background: Color::BLUE, opacity: 0. };
+        let mut box1 = @Container { size: Size::new(50., 50.), background: Color::RED, opacity: 0. };
+        let mut box2 = @Container { size: Size::new(50., 50.), background: Color::GREEN, opacity: 0. };
+        let mut box3 = @Container { size: Size::new(50., 50.), background: Color::BLUE, opacity: 0. };
 
         // 以不同的 stagger 间隔添加框
         stagger.write().push_state(box1.opacity(), 0.);
@@ -300,7 +300,7 @@ use ribir::prelude::*;
 
 fn animation_control_example() -> Widget<'static> {
     fn_widget! {
-        let mut box_widget = @SizedBox {
+        let mut box_widget = @Container {
             size: Size::new(100., 100.),
             background: Color::PURPLE,
             opacity: 0.0,
@@ -359,7 +359,7 @@ use ribir::prelude::*;
 
 fn composition_example() -> Widget<'static> {
     fn_widget! {
-        let mut box_widget = @SizedBox {
+        let mut box_widget = @Container {
             size: Size::new(50., 50.),
             background: Color::BLUE,
             opacity: 0.,
@@ -367,8 +367,11 @@ fn composition_example() -> Widget<'static> {
         };
 
         let opacity_size_anim = @Animate {
-            state: (box_widget.opacity(), box_widget.map_writer(|w| PartMut::new(&mut w.size))),
-            from: (0., Size::new(50., 50.)),
+            state: (
+                box_widget.opacity(),
+                box_widget.width()
+            ),
+            from: (0., 20_f32.into()),
             transition: EasingTransition {
                 duration: Duration::from_millis(1000),
                 easing: easing::EASE_IN_OUT,
@@ -408,7 +411,7 @@ use ribir::prelude::*;
 
 fn transition_modifiers_example() -> Widget<'static> {
     fn_widget! {
-        let mut box_widget = @SizedBox {
+        let mut box_widget = @Container {
             size: Size::new(200., 100.),
             background: Color::YELLOW,
             opacity: 1.,

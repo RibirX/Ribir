@@ -20,7 +20,7 @@ pub struct TextClamp {
 impl_compose_child_for_wrap_render!(TextClamp);
 
 impl WrapRender for TextClamp {
-  fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
     let text_style = Provider::of::<TextStyle>(ctx).unwrap();
     if let Some(rows) = self.rows {
       let height = rows * text_style.line_height;
@@ -31,7 +31,7 @@ impl WrapRender for TextClamp {
       clamp = clamp.with_fixed_width(width.clamp(clamp.min.width, clamp.max.width));
     }
 
-    host.perform_layout(clamp, ctx)
+    host.measure(clamp, ctx)
   }
 
   #[inline]

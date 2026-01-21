@@ -59,7 +59,7 @@ Because the `Text` widget only provides a declarative API creation method, we ne
 
 For declarative widgets, we can also simplify their writing with `rdl!`.
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn hello_world() -> Widget<'static> {
@@ -149,7 +149,7 @@ rdl! {
 
 When your expression is a struct literal, `rdl!` creates objects using the `Declare` trait, which requires the object type you create to inherit or implement the `Declare` trait.
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 #[declare]
@@ -346,7 +346,7 @@ Ribir provides a `pipe!` macro to help you quickly create a `Pipe` stream. It ac
 
 In the following example, `sum` is a `Pipe` stream of the sum of `a` and `b`. Whenever `a` or `b` changes, `sum` can send the latest result to its downstream.
 
-```rust 
+```rust no_run 
 use ribir::prelude::*;
 
 let a = Stateful::new(0);
@@ -388,7 +388,8 @@ fn main() {
             (0..cnt).map(move |_| {
               @Container {
                 margin: EdgeInsets::all(2.),
-                size: Size::new(10., 10.),
+                width: 10.,
+                height: 10.,
                 background: Color::RED
               }
             })
@@ -410,7 +411,8 @@ pipe!(*$read(counter)).map(move |counter| {
     (0..counter).map(move |_| {
       @Container {
         margin: EdgeInsets::all(2.),
-        size: Size::new(10., 10.),
+        width: 10.,
+        height: 10.,
         background: Color::RED
       }
     })
@@ -521,7 +523,7 @@ Typically, there are two cases where you need to call `unsubscribe` manually:
 In the first case, you want the subscription to have a shorter lifecycle than the state it is listening to. A typical example of this situation is building widgets using external state, for example:
 
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn show_name(name: Stateful<String>) -> Widget<'static> {
@@ -544,7 +546,7 @@ fn show_name(name: Stateful<String>) -> Widget<'static> {
 In the second case, the downstream of `watch!` performs a write operation on the listened state. Because `watch!` relies on the listened state no longer having a write source to automatically unsubscribe, this constitutes a circular reference when its downstream holds a write source for the listened state. At this point, the subscription must be manually unsubscribed or a memory leak will result. Example:
 
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let even_num = Stateful::new(0);

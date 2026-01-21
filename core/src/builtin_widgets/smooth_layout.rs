@@ -30,8 +30,8 @@
 //!   init_value: Anchor::right(Measure::Percent(0.1)),
 //!   @Void {
 //!     clamp: BoxClamp::fixed_size(Size::new(100., 100.)),
-//!     h_align: HAlign::Center,
-//!     v_align: VAlign::Center,
+//!     x: AnchorX::center(),
+//!     y: AnchorY::center(),
 //!     background: Color::RED,
 //!   }
 //! };
@@ -49,11 +49,11 @@ pub struct SmoothPos(Stateful<SmoothImpl<Anchor, Point>>);
 
 /// This widget enables smooth transitions for its declare child's x-axis
 /// between layout.
-pub struct SmoothX(Stateful<SmoothImpl<HAnchor, f32>>);
+pub struct SmoothX(Stateful<SmoothImpl<AnchorX, f32>>);
 
 /// This widget enables smooth transitions for its declare child's y-axis
 /// between layout.
-pub struct SmoothY(Stateful<SmoothImpl<VAnchor, f32>>);
+pub struct SmoothY(Stateful<SmoothImpl<AnchorY, f32>>);
 
 /// This widget enables smooth transitions for its declare child's size
 /// between layout. See the [module-level documentation](self) for more.
@@ -111,8 +111,8 @@ smooth_size_widget_impl!(SmoothHeight);
 smooth_size_widget_impl!(SmoothWidth);
 
 impl_smooth_layout_declare!(SmoothPos, Anchor);
-impl_smooth_layout_declare!(SmoothY, VAnchor);
-impl_smooth_layout_declare!(SmoothX, HAnchor);
+impl_smooth_layout_declare!(SmoothX, AnchorX);
+impl_smooth_layout_declare!(SmoothY, AnchorY);
 impl_smooth_layout_declare!(SmoothSize, Size<Measure>);
 impl_smooth_layout_declare!(SmoothWidth, Measure);
 impl_smooth_layout_declare!(SmoothHeight, Measure);
@@ -150,7 +150,7 @@ where
 
   fn transition(&self, transition: impl Transition + 'static)
   where
-    SmoothValue<I, T>: Lerp + PartialEq + Clone + std::fmt::Debug + 'static,
+    SmoothValue<I, T>: Lerp + PartialEq + Clone + 'static,
   {
     let animate = part_writer!(&mut self.value).transition(transition);
     let this = self.clone_writer();
@@ -161,15 +161,13 @@ where
 macro_rules! smooth_size_widget_impl {
   ($name:ident) => {
     impl WrapRender for $name {
-      fn perform_layout(
-        &self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx,
-      ) -> Size {
+      fn measure(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
         if !ctx
           .window()
           .flags()
           .contains(WindowFlags::ANIMATIONS)
         {
-          return host.perform_layout(clamp, ctx);
+          return host.measure(clamp, ctx);
         }
 
         self.switch_init_to_value(clamp.max);
@@ -181,7 +179,7 @@ macro_rules! smooth_size_widget_impl {
             self.0.set_force_layout(false);
           }
 
-          let size = host.perform_layout(clamp, ctx);
+          let size = host.measure(clamp, ctx);
           // We need to modify the real size to trigger the animation, but we will
           // delay this action until the next frame begins to avoid disturbing the
           // layout and animation logic.
@@ -192,7 +190,7 @@ macro_rules! smooth_size_widget_impl {
         }
 
         self.clamp_layout_clamp(&mut clamp);
-        host.perform_layout(clamp, ctx)
+        host.measure(clamp, ctx)
       }
 
       fn dirty_phase(&self, host: &dyn Render) -> DirtyPhase {
@@ -210,13 +208,13 @@ macro_rules! smooth_size_widget_impl {
 macro_rules! smooth_pos_widget_impl {
   ($name:ident) => {
     impl WrapRender for $name {
-      fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+      fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
         if !ctx
           .window()
           .flags()
           .contains(WindowFlags::ANIMATIONS)
         {
-          return host.perform_layout(clamp, ctx);
+          return host.measure(clamp, ctx);
         }
 
         let SmoothImpl { force_layout, running, .. } = *self.0.read();
@@ -249,7 +247,7 @@ macro_rules! smooth_pos_widget_impl {
           });
         }
 
-        let size = host.perform_layout(clamp, ctx);
+        let size = host.measure(clamp, ctx);
         self.switch_init_to_value(size, clamp.max);
         size
       }
@@ -434,7 +432,7 @@ impl SmoothValue<Anchor, Point> {
   }
 }
 
-impl SmoothValue<HAnchor, f32> {
+impl SmoothValue<AnchorX, f32> {
   fn get_pos(&self, default: Point) -> Point {
     match self {
       SmoothValue::Value(v) => Point::new(*v, default.y),
@@ -443,7 +441,7 @@ impl SmoothValue<HAnchor, f32> {
   }
 }
 
-impl SmoothValue<VAnchor, f32> {
+impl SmoothValue<AnchorY, f32> {
   fn get_pos(&self, default: Point) -> Point {
     match self {
       SmoothValue::Value(v) => Point::new(default.x, *v),
@@ -454,8 +452,8 @@ impl SmoothValue<VAnchor, f32> {
 
 impl SmoothPos {
   fn switch_init_to_value(&self, size: Size, max_clamp: Size) {
-    let SmoothValue::Init(Some(v)) = self.0.read().value else { return };
-    let pos = v.into_pixel(size, max_clamp);
+    let SmoothValue::Init(Some(v)) = self.0.read().value.clone() else { return };
+    let pos = v.calculate(max_clamp, size);
     self.0.write().value = SmoothValue::Value(pos);
   }
 
@@ -470,8 +468,8 @@ impl SmoothPos {
 
 impl SmoothX {
   fn switch_init_to_value(&self, size: Size, max_clamp: Size) {
-    let SmoothValue::Init(Some(v)) = self.0.read().value else { return };
-    let x = v.into_pixel(size.width, max_clamp.width);
+    let SmoothValue::Init(Some(v)) = self.0.read().value.clone() else { return };
+    let x = v.calculate(max_clamp.width, size.width);
     self.0.write().value = SmoothValue::Value(x);
   }
 
@@ -486,8 +484,8 @@ impl SmoothX {
 
 impl SmoothY {
   fn switch_init_to_value(&self, size: Size, max_clamp: Size) {
-    let SmoothValue::Init(Some(v)) = self.0.read().value else { return };
-    let y = v.into_pixel(size.height, max_clamp.height);
+    let SmoothValue::Init(Some(v)) = self.0.read().value.clone() else { return };
+    let y = v.calculate(max_clamp.height, size.height);
     self.0.write().value = SmoothValue::Value(y);
   }
 
@@ -582,8 +580,8 @@ mod tests {
     container! {
       background: Color::RED,
       size: Size::new(10., 10.),
-      h_align: Align::Center,
-      v_align: Align::Center
+      x: AnchorX::center(),
+      y: AnchorY::center()
     }
     .into_widget()
   }
@@ -603,6 +601,7 @@ mod tests {
 
     assert_widget_eq_image!(
       WidgetTester::new(stack! {
+        clamp: BoxClamp::EXPAND_BOTH,
         // If no initial value is provided, the widget should start at its real place.
         @SmoothPos {
           transition: TEST_TRANS,
@@ -644,16 +643,18 @@ mod tests {
         // Begin at the left 10 percent.
         @SmoothX {
           transition: TEST_TRANS,
-          init_value: Measure::Percent(0.1),
+          init_value: AnchorX::percent(0.1),
           @red_block_10_x_10()
         }
         // Begin at the right.
         @SmoothX {
           transition: TEST_TRANS,
-          init_value: HAnchor::Right(0f32.into()),
+          init_value: AnchorX::right(),
           @red_block_10_x_10()
         }
-        @SizedBox { size: Size::new(100., 10.) }
+        @Container {
+          size: Size::new(100., 10.),
+        }
       })
       .with_wnd_size(Size::new(100., 30.))
       .with_flags(WindowFlags::ANIMATIONS),
@@ -678,16 +679,16 @@ mod tests {
         // Begin at the top 10 percent.
         @SmoothY {
           transition: TEST_TRANS,
-          init_value: Measure::Percent(0.1),
+          init_value: AnchorY::percent(0.1),
           @red_block_10_x_10()
         }
         // Begin at the bottom.
         @SmoothY {
           transition: TEST_TRANS,
-          init_value: VAnchor::Bottom(0f32.into()),
+          init_value: AnchorY::bottom(),
           @red_block_10_x_10()
         }
-        @SizedBox { size: Size::new(10., 100.) }
+        @Container { size: Size::new(10., 100.) }
       })
       .with_wnd_size(Size::new(30., 100.))
       .with_flags(WindowFlags::ANIMATIONS),

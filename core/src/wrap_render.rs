@@ -14,8 +14,12 @@ use crate::prelude::*;
 /// child size, it can be implemented as a `WrapRender` instead of `Render`,
 /// eliminating the need to allocate a node in the widget tree.
 pub trait WrapRender {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    host.perform_layout(clamp, ctx)
+  fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
+    host.measure(clamp, ctx)
+  }
+
+  fn place_children(&self, size: Size, host: &dyn Render, ctx: &mut PlaceCtx) {
+    host.place_children(size, ctx)
   }
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) { host.paint(ctx) }
@@ -36,6 +40,8 @@ pub trait WrapRender {
   }
 
   fn dirty_phase(&self, host: &dyn Render) -> DirtyPhase { host.dirty_phase() }
+
+  fn self_positioned(&self, _host: &dyn Render) -> bool { false }
 
   fn wrapper_dirty_phase(&self) -> DirtyPhase;
 
@@ -92,10 +98,16 @@ impl Query for RenderPair {
 }
 
 impl Render for RenderPair {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     self
       .wrapper
-      .perform_layout(clamp, self.host.as_render(), ctx)
+      .measure(clamp, self.host.as_render(), ctx)
+  }
+
+  fn place_children(&self, size: Size, ctx: &mut PlaceCtx) {
+    self
+      .wrapper
+      .place_children(size, self.host.as_render(), ctx)
   }
 
   fn visual_box(&self, ctx: &mut VisualCtx) -> Option<Rect> {
@@ -121,6 +133,12 @@ impl Render for RenderPair {
   fn dirty_phase(&self) -> DirtyPhase { self.wrapper.dirty_phase(self.host.as_render()) }
 
   fn get_transform(&self) -> Option<Transform> { self.wrapper.get_transform(self.host.as_render()) }
+
+  fn self_positioned(&self) -> bool {
+    self
+      .wrapper
+      .self_positioned(self.host.as_render())
+  }
 }
 
 impl<R> WrapRender for R
@@ -128,8 +146,12 @@ where
   R: StateReader,
   R::Value: WrapRender,
 {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    self.read().perform_layout(clamp, host, ctx)
+  fn measure(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
+    self.read().measure(clamp, host, ctx)
+  }
+
+  fn place_children(&self, size: Size, host: &dyn Render, ctx: &mut PlaceCtx) {
+    self.read().place_children(size, host, ctx)
   }
 
   fn paint(&self, host: &dyn Render, ctx: &mut PaintingCtx) { self.read().paint(host, ctx) }
@@ -153,6 +175,8 @@ where
   /// Returns the dirty phase of the wrapped render, this value should
   /// always be the same.
   fn wrapper_dirty_phase(&self) -> DirtyPhase { self.read().wrapper_dirty_phase() }
+
+  fn self_positioned(&self, host: &dyn Render) -> bool { self.read().self_positioned(host) }
 }
 
 #[macro_export]

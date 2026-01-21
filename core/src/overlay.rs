@@ -17,8 +17,8 @@ use crate::{prelude::*, window::WindowId};
 ///     fn_widget! {
 ///       @Text {
 ///         on_tap: move |e| Overlay::of(&**e).unwrap().close(),
-///         h_align: HAlign::Center,
-///         v_align: VAlign::Center,
+///         x: AnchorX::center(),
+///         y: AnchorY::center(),
 ///         text: "Click me to close overlay!"
 ///       }
 ///     },
@@ -99,9 +99,6 @@ impl Overlay {
     self.inner_show(gen_widget, wnd);
   }
 
-  /// User can make transform before the widget show at the top level of all
-  /// widget. if the overlay is showing, nothing will happen.
-  ///
   /// ### Example
   ///
   /// Overlay widget which auto align horizontal position to the src button even
@@ -110,24 +107,24 @@ impl Overlay {
   /// ```rust no_run
   /// use ribir::prelude::*;
   /// let w = fn_widget! {
+  ///   let mut button = @FilledButton {};
   ///   let overlay = Overlay::new(
-  ///     fn_widget! { @Text { text: "overlay" } },
+  ///     text! { text: "overlay" },
   ///     OverlayStyle { auto_close_policy: AutoClosePolicy::TAP_OUTSIDE, mask: None }
   ///   );
-  ///   let mut button = @FilledButton {};
   ///   @(button) {
-  ///     h_align: HAlign::Center,
-  ///     v_align: VAlign::Center,
+  ///     x: AnchorX::center(),
+  ///     y: AnchorY::center(),
   ///     on_tap: move |e| {
   ///       let wnd = e.window();
-  ///       overlay.show_map(move |w| {
-  ///         let mut w = FatObj::new(w);
-  ///         @(w) {
-  ///           global_anchor_x: GlobalAnchorX::left_align_to($clone(button.track_id())),
-  ///         }.into_widget()
-  ///        },
-  ///        e.window()
-  ///       );
+  ///       overlay.show_map(move |w| fn_widget! {
+  ///         @Follow {
+  ///           target: $clone(button.track_id()),
+  ///           x_align: AnchorX::center(),
+  ///           y_align: AnchorY::under(),
+  ///           @ { w }
+  ///         }
+  ///       }.into_widget(), wnd);
   ///     },
   ///     @{ "Click to show overlay" }
   ///   }
@@ -155,7 +152,7 @@ impl Overlay {
     self.show_map(
       move |w| {
         let mut obj = FatObj::new(w);
-        obj.with_anchor(Anchor::from_point(pos));
+        obj.with_x(pos.x).with_y(pos.y);
         obj.into_widget()
       },
       wnd,
@@ -197,7 +194,7 @@ impl Overlay {
     let gen_widget = fn_widget! {
       let w = content.gen_widget();
       let mut w = if background.is_some() || close_policy.contains(AutoClosePolicy::TAP_OUTSIDE) {
-        let mut container = @Container { size: Size::splat(f32::INFINITY) };
+        let mut container = @Container {};
         if let Some(background) = background.clone() {
           container.with_background(background);
         }
@@ -355,7 +352,8 @@ mod tests {
     wnd.draw_frame();
     assert_eq!(*r_log.borrow(), &["mounted"]);
 
-    assert_eq!(wnd.layout_info_by_path(&[1]).unwrap().pos, Point::new(50., 30.));
+    let id = wnd.widget_id_by_path(&[1]);
+    assert_eq!(wnd.widget_pos(id).unwrap(), Point::new(50., 30.));
 
     overlay.close();
     wnd.draw_frame();

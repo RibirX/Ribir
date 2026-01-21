@@ -40,8 +40,8 @@ pub(super) fn init(classes: &mut Classes) {
         clamp: BoxClamp::fixed_size(md::SIZE_10),
         background: BuildCtx::color(),
         radius: md::RADIUS_5,
-        h_align: HAlign::Center,
-        v_align: VAlign::Center,
+        x: AnchorX::center(),
+        y: AnchorY::center(),
       };
 
       let scale_in = @Animate {

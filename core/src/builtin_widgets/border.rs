@@ -77,12 +77,12 @@ impl BorderSide {
 impl_compose_child_for_wrap_render!(BorderWidget);
 
 impl WrapRender for BorderWidget {
-  fn perform_layout(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, mut clamp: BoxClamp, host: &dyn Render, ctx: &mut MeasureCtx) -> Size {
     let border = &self.border;
     let min =
       Size::new(border.left.width + border.right.width, border.top.width + border.bottom.width);
     clamp.min = clamp.clamp(min);
-    host.perform_layout(clamp, ctx)
+    host.measure(clamp, ctx)
   }
 
   fn visual_box(&self, host: &dyn Render, ctx: &mut VisualCtx) -> Option<Rect> {

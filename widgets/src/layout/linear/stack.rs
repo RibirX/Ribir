@@ -61,7 +61,7 @@ pub enum StackFit {
 }
 
 impl Render for Stack {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     // Determine appropriate clamp based on stack fit
     let stack_clamp = match self.fit {
       StackFit::Loose => clamp.loose(),
@@ -91,7 +91,7 @@ impl Render for Stack {
     let stack_size = regulars
       .into_iter()
       .fold(ZERO_SIZE, |max_size, child| {
-        let child_size = ctx.perform_child_layout(child, stack_clamp);
+        let child_size = ctx.layout_child(child, stack_clamp);
         max_size.max(child_size)
       });
 
@@ -101,7 +101,7 @@ impl Render for Stack {
     if !in_parents.is_empty() {
       let parent_relative_clamp = BoxClamp::max_size(stack_size);
       in_parents.into_iter().for_each(|child| {
-        ctx.perform_child_layout(child, parent_relative_clamp);
+        ctx.layout_child(child, parent_relative_clamp);
       });
     }
     stack_size
@@ -112,11 +112,9 @@ impl<'c> ComposeChild<'c> for InParentLayout {
   type Child = Widget<'c>;
 
   fn compose_child(_: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
-    no_affected_parent_size! {
-      @ {child}
-    }
-    .into_widget()
-    .attach_data(Box::new(Queryable(InParentLayout)))
+    no_affected_parent_size! { @ { child } }
+      .into_widget()
+      .attach_data(Box::new(Queryable(InParentLayout)))
   }
 }
 #[cfg(test)]
@@ -125,7 +123,6 @@ mod tests {
   use ribir_dev_helper::*;
 
   use super::*;
-  use crate::prelude::*;
 
   const ONE: Size = Size::new(1., 1.);
   const FIVE: Size = Size::new(5., 5.);
@@ -134,8 +131,8 @@ mod tests {
   widget_layout_test!(
     smoke,
     WidgetTester::new(stack! {
-      @SizedBox { size: ONE }
-      @SizedBox { size: FIVE }
+      @Container { size: ONE }
+      @Container { size: FIVE }
     }),
     LayoutCase::default().with_size(FIVE)
   );
@@ -145,8 +142,8 @@ mod tests {
     WidgetTester::new(stack! {
       clamp: BoxClamp::min_size(TEN),
       fit: StackFit::Loose,
-      @SizedBox { size: ONE }
-      @SizedBox { size: FIVE }
+      @Container { size: ONE }
+      @Container { size: FIVE }
     }),
     LayoutCase::default().with_size(TEN),
     LayoutCase::new(&[0, 0]).with_size(ONE),
@@ -158,8 +155,8 @@ mod tests {
     WidgetTester::new(stack! {
       clamp: BoxClamp::max_size(TEN),
       fit: StackFit::Expand,
-      @SizedBox { size: ONE }
-      @SizedBox { size: FIVE }
+      @Container { size: ONE }
+      @Container { size: FIVE }
     }),
     LayoutCase::default().with_size(TEN),
     LayoutCase::new(&[0, 0]).with_size(TEN),
@@ -171,8 +168,8 @@ mod tests {
     WidgetTester::new(stack! {
       clamp: BoxClamp::fixed_size(FIVE),
       fit: StackFit::Passthrough,
-      @SizedBox { size: ONE }
-      @SizedBox { size: TEN }
+      @Container { size: ONE }
+      @Container { size: TEN }
     }),
     LayoutCase::default().with_size(FIVE)
   );
@@ -180,9 +177,9 @@ mod tests {
   widget_layout_test!(
     in_parent_layout,
     WidgetTester::new(stack! {
-      @SizedBox { size: TEN }
+      @Container { size: TEN }
       @InParentLayout {
-        @SizedBox { h_align: HAlign::Right, size: ONE }
+        @Container { x: AnchorX::right(), size: ONE }
       }
     }),
     LayoutCase::default().with_size(TEN),

@@ -87,14 +87,19 @@ impl TestWindow {
   /// [0, 1, 2] the first node at the root level (must be 0), then down to its
   /// second child, then down to third child.
   pub fn layout_info_by_path(&self, path: &[usize]) -> Option<LayoutInfo> {
+    let node = self.widget_id_by_path(path);
+    self.0.tree().store.layout_info(node).cloned()
+  }
+
+  pub fn widget_id_by_path(&self, path: &[usize]) -> WidgetId {
     let tree = self.0.tree();
     let mut node = tree.root();
     for (level, idx) in path[..].iter().enumerate() {
       node = node.children(tree).nth(*idx).unwrap_or_else(|| {
-        panic!("node no exist: {:?}", &path[0..level]);
+        panic!("node no exist: {:?}", &path[0..level + 1]);
       });
     }
-    tree.store.layout_info(node).cloned()
+    node
   }
 
   pub fn take_last_frame(&mut self) -> Option<Frame> {
@@ -230,16 +235,17 @@ impl TestShellWindow {
 pub struct MockStack {}
 
 impl Render for MockStack {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let mut size = ZERO_SIZE;
     let (ctx, children) = ctx.split_children();
     for c in children {
-      let child_size = ctx.perform_child_layout(c, clamp);
+      let child_size = ctx.layout_child(c, clamp);
       size = size.max(child_size);
     }
 
     size
   }
+
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
@@ -252,12 +258,11 @@ pub struct MockBox {
 }
 
 impl Render for MockMulti {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let mut size = ZERO_SIZE;
     let (ctx, children) = ctx.split_children();
     for c in children {
-      let child_size = ctx.perform_child_layout(c, clamp);
-      ctx.update_position(c, Point::new(size.width, 0.));
+      let child_size = ctx.layout_child(c, clamp);
       size.width += child_size.width;
       size.height = size.height.max(child_size.height);
     }
@@ -265,17 +270,28 @@ impl Render for MockMulti {
     size
   }
 
+  fn place_children(&self, _size: Size, ctx: &mut PlaceCtx) {
+    let (ctx, children) = ctx.split_children();
+    let mut x = 0.;
+    for c in children {
+      let child_size = ctx.widget_box_size(c).unwrap();
+      ctx.update_position(c, Point::new(x, 0.));
+      x += child_size.width;
+    }
+  }
+
   fn paint(&self, _: &mut PaintingCtx) {}
 }
 
 impl Render for MockBox {
-  fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, mut clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let size = clamp.clamp(self.size);
     clamp.max = clamp.max.min(size);
     ctx.perform_single_child_layout(clamp);
 
     size
   }
+
   #[inline]
   fn size_affected_by_child(&self) -> bool { false }
 
@@ -374,11 +390,14 @@ impl LayoutCase {
     let Self { path, x, y, width, height, visual_rect } = self;
 
     let info = wnd.layout_info_by_path(path).unwrap();
+
+    let pos = info.pos;
+
     if let Some(x) = x {
-      assert_eq!(info.pos.x, *x, "unexpected x");
+      assert_eq!(pos.x, *x, "unexpected x");
     }
     if let Some(y) = y {
-      assert_eq!(info.pos.y, *y, "unexpected y");
+      assert_eq!(pos.y, *y, "unexpected y");
     }
     if let Some(w) = width {
       assert_eq!(info.size.unwrap().width, *w, "unexpected width");

@@ -1,6 +1,6 @@
 use ribir_geom::{Point, Rect, Size};
 
-use super::{LayoutCtx, WidgetCtxImpl};
+use super::{MeasureCtx, WidgetCtxImpl};
 use crate::{
   prelude::ProviderCtx,
   widget::{VisualBox, WidgetTree},
@@ -22,9 +22,9 @@ impl<'a> WidgetCtxImpl for VisualCtx<'a> {
 }
 
 impl<'a> VisualCtx<'a> {
-  pub(crate) fn from_layout_ctx<'c: 'a, 'b: 'a>(ctx: &'c mut LayoutCtx<'b>) -> Self {
+  pub(crate) fn from_layout_ctx<'c: 'a, 'b: 'a>(ctx: &'c mut MeasureCtx<'b>) -> Self {
     let id = ctx.id();
-    let LayoutCtx { provider_ctx, tree, .. } = ctx;
+    let MeasureCtx { provider_ctx, tree, .. } = ctx;
     Self { id, tree: *tree, provider_ctx, clip_area: None }
   }
 

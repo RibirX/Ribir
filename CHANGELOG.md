@@ -714,7 +714,7 @@ For older versions:
   let state = Stateful::value(0132);
   providers!{
     providers: [Provider::reader(state)],
-    @SizedBox {
+    @Container {
       size: Size::new(1.,1.),
       on_tap: |e| {
         // Access the provider in a callback.

@@ -19,6 +19,10 @@ pub enum DirtyPhase {
   /// primarily used for providers that may introduce layout constraints beyond
   /// the parent level.
   LayoutSubtree,
+  /// Indicates that only the widget's position needs updating (no size change).
+  /// When a widget with this flag is marked dirty with `DirtyPhase::Position`,
+  /// only `place_children` is called instead of a full layout.
+  Position,
   /// Indicates that the widget needs to be repainted.
   Paint,
 }
@@ -88,7 +92,7 @@ impl WidgetTree {
   /// node has really computing the layout.
   pub(crate) fn layout(&mut self, win_size: Size, laid_out_queue: &mut Vec<WidgetId>) {
     loop {
-      let Some((mut needs_layout, mut needs_paint)) = self.layout_list() else {
+      let Some((mut needs_layout, mut needs_paint, mut needs_position)) = self.layout_list() else {
         break;
       };
       let mut visual_roots = BTreeSet::new();
@@ -103,7 +107,7 @@ impl WidgetTree {
             .map(|info| info.clamp)
             .unwrap_or_else(|| BoxClamp { min: Size::zero(), max: win_size });
 
-          let mut ctx = LayoutCtx::new(wid, self, laid_out_queue);
+          let mut ctx = MeasureCtx::new(wid, self, laid_out_queue);
           let visual_rect = ctx.visual_box(wid);
           ctx.perform_layout(clamp);
           let new_rect = ctx.visual_box(wid);
@@ -116,6 +120,14 @@ impl WidgetTree {
         }
       }
 
+      // Handle position-only updates
+      while let Some(wid) = needs_position.pop() {
+        if wid.is_dropped(self) {
+          continue;
+        }
+        self.update_position_only(wid, laid_out_queue);
+      }
+
       while let Some(wid) = needs_paint.pop() {
         if wid.is_dropped(self) {
           continue;
@@ -125,7 +137,7 @@ impl WidgetTree {
       }
 
       while let Some((depth, wid)) = visual_roots.pop_first() {
-        let mut ctx = LayoutCtx::new(wid, self, laid_out_queue);
+        let mut ctx = MeasureCtx::new(wid, self, laid_out_queue);
         let visual_rect = ctx.visual_box(wid);
         let new_rect = ctx.update_visual_box();
         if visual_rect != new_rect
@@ -135,6 +147,45 @@ impl WidgetTree {
         }
       }
     }
+  }
+
+  /// Update widget position only, without re-measuring.
+  /// This is called for widgets marked with `DirtyPhase::Position`.
+  fn update_position_only(&mut self, wid: WidgetId, laid_out_queue: &mut Vec<WidgetId>) {
+    // 1. If widget has self_positioned, call its place_children
+    if wid.assert_get(self).self_positioned() {
+      self.call_place_children(wid, laid_out_queue);
+    }
+
+    // 2. Walk up ancestors and call place_children on each until one doesn't have
+    //    self_positioned
+    for ancestor in wid.ancestors(self).skip(1).collect::<Vec<_>>() {
+      self.call_place_children(ancestor, laid_out_queue);
+      if !ancestor.assert_get(self).self_positioned() {
+        break;
+      }
+    }
+  }
+
+  /// Helper to call place_children on a widget with proper context setup.
+  fn call_place_children(&mut self, wid: WidgetId, laid_out_queue: &mut Vec<WidgetId>) {
+    let Some(size) = self.store.layout_box_size(wid) else {
+      return;
+    };
+
+    // Safety: same pattern as in perform_layout
+    let tree2 = unsafe { &*(self as *mut WidgetTree) };
+    let mut provider_ctx = if let Some(p) = wid.parent(self) {
+      ProviderCtx::collect_from(p, self)
+    } else {
+      ProviderCtx::default()
+    };
+
+    let mut layout_ctx = PlaceCtx { id: wid, tree: self, provider_ctx: &mut provider_ctx };
+    wid
+      .assert_get(tree2)
+      .place_children(size, &mut layout_ctx);
+    laid_out_queue.push(wid);
   }
 
   pub(crate) fn alloc_node(&mut self, node: Box<dyn RenderQueryable>) -> WidgetId {
@@ -178,13 +229,14 @@ impl WidgetTree {
       self.display_node(prefix, c, display)
     });
   }
-  pub(crate) fn layout_list(&mut self) -> Option<(Vec<WidgetId>, Vec<WidgetId>)> {
+  pub(crate) fn layout_list(&mut self) -> Option<(Vec<WidgetId>, Vec<WidgetId>, Vec<WidgetId>)> {
     if !self.is_dirty() {
       return None;
     }
 
     let mut needs_layout = vec![];
     let mut needs_paint = vec![];
+    let mut needs_position = vec![];
 
     for (id, dirty) in self.dirty_set.borrow_mut().drain() {
       if id.is_dropped(self) {
@@ -192,6 +244,10 @@ impl WidgetTree {
       }
       if dirty == DirtyPhase::Paint {
         needs_paint.push(id);
+        continue;
+      }
+      if dirty == DirtyPhase::Position {
+        needs_position.push(id);
         continue;
       }
 
@@ -230,7 +286,9 @@ impl WidgetTree {
 
     needs_layout.sort_by_cached_key(|w| Reverse(w.ancestors(self).count()));
 
-    Some((needs_layout, needs_paint))
+    needs_position.retain(|w| self.store.layout_box_size(*w).is_some());
+
+    Some((needs_layout, needs_paint, needs_position))
   }
 
   pub fn detach(&mut self, id: WidgetId) {
@@ -318,10 +376,10 @@ impl DirtyMarker {
 pub(crate) struct Root;
 
 impl Render for Root {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let (ctx, children) = ctx.split_children();
     for c in children {
-      ctx.perform_child_layout(c, clamp);
+      ctx.layout_child(c, clamp);
     }
 
     clamp.max
@@ -469,7 +527,7 @@ mod tests {
     tree.detach(root);
     tree.remove_subtree(root);
 
-    assert_eq!(tree.layout_list(), Some((vec![new_root], vec![])));
+    assert_eq!(tree.layout_list(), Some((vec![new_root], vec![], vec![])));
   }
 
   #[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
@@ -550,7 +608,7 @@ mod tests {
     }
 
     impl Render for DirtyPaintOnly {
-      fn perform_layout(&self, clamp: BoxClamp, _: &mut LayoutCtx) -> Size { clamp.max }
+      fn measure(&self, clamp: BoxClamp, _: &mut MeasureCtx) -> Size { clamp.max }
 
       fn paint(&self, _: &mut PaintingCtx) { self.paint_cnt.set(self.paint_cnt.get() + 1); }
 
@@ -590,7 +648,7 @@ mod tests {
 
   impl Render for FixedSizeBox {
     #[inline]
-    fn perform_layout(&self, _: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    fn measure(&self, _: BoxClamp, ctx: &mut MeasureCtx) -> Size {
       ctx.perform_single_child_layout(BoxClamp { min: self.size, max: self.size });
       self.size
     }
@@ -609,12 +667,12 @@ mod tests {
             @ FixedSizeBox {
               size: Size::new(100., 100.),
               background: Color::GRAY,
-              anchor: Anchor::left_top(-30., 0.),
+              x: -30., y: 0.,
             }
             @ FixedSizeBox {
               size: Size::new(100., 100.),
               background: Color::GRAY,
-              anchor: Anchor::top(-20.),
+              y: -20.,
             }
           }
         }
@@ -625,7 +683,7 @@ mod tests {
           @ FixedSizeBox {
             size: Size::new(100., 100.),
             background: Color::GRAY,
-            anchor: Anchor::left_top(-30., 20.),
+            x: -30., y: 20.,
           }
         }
       }

@@ -59,7 +59,7 @@ fn main() {
 
 对于声明式 widget 我们还可以通过 `rdl!` 来简化它的写法。
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn hello_world() -> Widget<'static> {
@@ -152,7 +152,7 @@ rdl! {
 
 当你的表达式是一个结构体字面量时， `rdl!` 会通过 `Declare` trait 来创建对象，这就要求你所创建的对象的类型必须继承或实现了 `Declare` trait。
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 #[declare]
@@ -358,7 +358,7 @@ Ribir 提供了一个 `pipe!` 宏来辅助你快速创建 `Pipe` 流。它接收
 
 在下面的例子中, `sum` 是一个 `a`， `b` 之和的 `Pipe` 流，每当 `a` 或 `b` 变更时，`sum` 都能向它的下游发送最新结果。
 
-```rust 
+```rust no_run
 use ribir::prelude::*;
 
 let a = Stateful::new(0);
@@ -531,7 +531,7 @@ fn main() {
 
 第一种情况，你希望订阅的生命周期短于所监听的状态。这种情况的典型例子就是使用外部状态来构建 widget，例如：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 fn show_name(name: Stateful<String>) -> Widget<'static> {
@@ -551,7 +551,7 @@ fn show_name(name: Stateful<String>) -> Widget<'static> {
 
 第二种情况，`watch!` 的下游对所监听的状态进行了写操作。因为 `watch!` 依赖于所监听的状态不再拥有写入源来自动取消订阅，当其下游持有了所监听的状态的写入源时，这就构成了循环引用。这时，必须手动取消订阅，否则会导致内存泄漏。例如：
 
-```rust
+```rust no_run
 use ribir::prelude::*;
 
 let even_num = Stateful::new(0);

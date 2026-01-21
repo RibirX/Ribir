@@ -117,10 +117,12 @@ fn has_libwebp() -> bool {
   {
     // On Windows, vcpkg or manual installation might put it in various places
     // The libwebp-sys crate can build from source, so we're more lenient here
-    return true;
+    true
   }
-
-  false
+  #[cfg(not(target_os = "windows"))]
+  {
+    false
+  }
 }
 
 /// Print C compiler installation instructions.

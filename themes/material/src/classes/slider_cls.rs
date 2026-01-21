@@ -43,7 +43,7 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(
     SLIDER_THUMB,
     style_class! {
-      v_align: VAlign::Center,
+      y: AnchorY::center(),
       background: BuildCtx::color(),
       radius: md::RADIUS_2,
       clamp: BoxClamp::fixed_size(Size::new(md::THICKNESS_4, THUMB_HEIGHT)),
@@ -81,7 +81,7 @@ pub(super) fn init(classes: &mut Classes) {
   );
 
   named_style_impl! { base_tick => {
-    v_align: VAlign::Center,
+    y: AnchorY::center(),
     radius: md::RADIUS_2,
     clamp: BoxClamp::fixed_size(md::SIZE_4),
   } }

@@ -71,7 +71,6 @@ pub type MenuEvent = CustomEvent<MenuEventData>;
 ///     @MenuItem { @ { "Menu Item2" } }
 ///   });
 ///   @Container {
-///     size: Size::new(f32::INFINITY, f32::INFINITY),
 ///     on_tap: move |e| {
 ///       menu.show_at(e.position(), &e.window());
 ///     },
@@ -341,32 +340,28 @@ impl MenuControl {
 fn anchor_around(target: Rect) -> impl FnMut(Widget<'static>) -> Widget<'static> {
   move |w: Widget<'static>| -> Widget<'static> {
     fn_widget! {
-      let mut w = FatObj::new(w);
-      @(w) {
-        global_anchor_x: GlobalAnchorX::custom(move |host, wnd| {
-          let host_id = host.get().unwrap();
+      @CustomAnchor {
+        data: target,
+        anchor: move |target: &Rect, self_size: Size, _, ctx: &mut PlaceCtx| {
+          let wnd = ctx.window();
+
           let wnd_size = wnd.size();
-          if let Some(size) = wnd.widget_size(host_id) {
-            if target.max_x() + size.width < wnd_size.width {
-              return Ok(target.max_x())
-            } else {
-              return Ok((0_f32).max(target.min_x() - size.width))
-            }
-          }
-          Ok(0.)
-        }),
-        global_anchor_y: GlobalAnchorY::custom(move |host, wnd| {
-          let host_id = host.get().unwrap();
-          let wnd_size = wnd.size();
-          if let Some(size) = wnd.widget_size(host_id) {
-            if target.min_y() + size.height < wnd_size.height {
-              return Ok(target.min_y())
-            } else {
-              return Ok((0_f32).max(wnd_size.height - size.height))
-            }
-          }
-          Ok(0.)
-        })
+          let x = if target.max_x() + self_size.width < wnd_size.width {
+            target.max_x()
+          } else {
+            (0_f32).max(target.min_x() - self_size.width)
+          };
+
+          let y = if target.min_y() + self_size.height < wnd_size.height {
+            target.min_y()
+          } else {
+            (0_f32).max(wnd_size.height - self_size.height)
+          };
+
+          let pos = ctx.map_to_parent(Point::new(x, y));
+          Anchor::left_top(pos.x, pos.y)
+        },
+        @ { w }
       }
     }
     .into_widget()

@@ -50,12 +50,7 @@ impl<T: Default + VisualText + EditText + Clone + 'static> Compose for BasicEdit
           },
           on_ime_pre_edit: move|e| { $write(this).process_pre_edit(e);},
         }
-        @IgnorePointer {
-          @UnconstrainedBox {
-            dir: UnconstrainedDir::Both,
-            @NoAffectedParentSize { @ { caret } }
-          }
-        }
+        @InParentLayout{ @ { caret } }
       }
     }
     .into_widget()
@@ -65,31 +60,49 @@ impl<T: Default + VisualText + EditText + Clone + 'static> Compose for BasicEdit
 impl<T: EditText + 'static> BasicEditor<T> {
   fn caret_widget(this: impl StateWriter<Value = Self>) -> Widget<'static> {
     fn_widget! {
-      let mut caret = @TextClamp {
-        rows: Some(1.),
-        class: TEXT_CARET,
-        on_performed_layout: move |e| {
-          let caret_size = e.box_size().unwrap();
-          if !$read(this).is_in_pre_edit()
-            && let Some(mut scrollable) = Provider::write_of::<ScrollableWidget>(e)
-          {
-            let wnd = e.window();
-            let lt = scrollable.map_to_content(Point::zero(), e.current_target(), &wnd).unwrap();
-            scrollable.visible_content_box(Rect::new(lt, caret_size), Anchor::default());
+      @Providers {
+        providers: [Provider::writer(this, Some(DirtyPhase::Layout))],
+        @CustomAnchor {
+          data: (),
+          anchor: |_: &(), _child_size: Size, _clamp: BoxClamp, ctx: &mut PlaceCtx| {
+            let id = ctx.widget_id();
+            let editor = Provider::reader_of::<BasicEditor<T>>(ctx).unwrap();
+
+            // Calculate caret position now during layout
+            let caret_pos = editor.read().caret_pos();
+
+            // Schedule scroll and IME updates after layout is ready
+            let in_pre_edit = editor.read().is_in_pre_edit();
+            let wnd = ctx.window();
+            let scroll = Provider::writer_of::<ScrollableWidget>(ctx);
+            wnd.clone().once_layout_ready(move || {
+              let caret_size = wnd.widget_size(id);
+              if caret_size.is_none() {
+                return;
+              }
+              let caret_size = caret_size.unwrap();
+              if !in_pre_edit
+                && let Some(scrollable) = scroll {
+                  let lt = scrollable
+                    .write()
+                    .map_to_content(Point::zero(), id, &wnd)
+                    .unwrap();
+                  scrollable
+                    .write()
+                    .visible_content_box(Rect::new(lt, caret_size), Anchor::default());
+              }
+              let pos = wnd.map_to_global(Point::zero(), id);
+              wnd.set_ime_cursor_area(&Rect::new(pos, caret_size));
+            });
+            Anchor::left_top(caret_pos.x, caret_pos.y)
+          },
+          @TextClamp {
+            rows: Some(1.),
+            class: TEXT_CARET,
+            @ { Void }
           }
-          let pos = e.map_to_global(Point::zero());
-          e.window().set_ime_cursor_area(&Rect::new(pos, caret_size));
-        },
-        @ { Void }
-      };
-      let wnd = BuildCtx::get().window();
-      let u = watch!($read(this);).subscribe(move |_| {
-        wnd.once_layout_ready(move || {
-          *$write(caret.anchor()) = Anchor::from_point($read(this).caret_pos())
-        })
-      });
-      caret.on_disposed(move |_| u.unsubscribe());
-      caret
+        }
+      }
     }
     .into_widget()
   }
@@ -99,7 +112,9 @@ impl<T: EditText + 'static> BasicEditor<T> {
       .map(|g| g.cursor(self.selection.to))
       .unwrap_or_default()
   }
+}
 
+impl<T: EditText + 'static> BasicEditor<T> {
   fn chars_handle(&mut self, event: &CharsEvent) -> bool {
     if event.common.with_command_key() {
       return false;

@@ -36,14 +36,14 @@ impl<T: 'static> TextGlyphs<T> {
 
 pub trait VisualText: BaseText {
   /// return self's glyphs layout info.
-  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &LayoutCtx) -> VisualGlyphs;
+  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> VisualGlyphs;
 
   /// paint the glyphs in the rect.
   fn paint(&self, painter: &mut Painter, style: PaintingStyle, glyphs: &VisualGlyphs, rect: Rect);
 }
 
 impl VisualText for CowArc<str> {
-  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &LayoutCtx) -> VisualGlyphs {
+  fn layout_glyphs(&self, clamp: BoxClamp, ctx: &MeasureCtx) -> VisualGlyphs {
     let style = Provider::of::<TextStyle>(ctx).unwrap();
     text_glyph(self.substr(..), &style, TextAlign::Start, clamp.max)
   }
@@ -60,13 +60,13 @@ impl<T: VisualText> TextGlyphs<T> {
     }
   }
 
-  pub fn layout_glyphs(&mut self, clamp: BoxClamp, ctx: &LayoutCtx) {
+  pub fn layout_glyphs(&mut self, clamp: BoxClamp, ctx: &MeasureCtx) {
     *self.glyphs.borrow_mut() = Some(self.text.layout_glyphs(clamp, ctx));
   }
 }
 
 impl<T: VisualText + 'static> Render for TextGlyphs<T> {
-  fn perform_layout(&self, clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+  fn measure(&self, clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
     let glyphs = self.text.layout_glyphs(clamp, ctx);
     let size = glyphs.visual_rect().size;
     *self.glyphs.borrow_mut() = Some(glyphs);

@@ -23,11 +23,7 @@ pub enum Direction {
 pub enum JustifyContent {
   /// Place the children as close to the start of the main axis as possible.
   #[default]
-  Start,
-  ///Place the children as close to the middle of the main axis as possible.
-  Center,
-  /// Place the children as close to the end of the main axis as possible.
-  End,
+  Compact,
   /// The children are evenly distributed within the alignment container along
   /// the main axis. The spacing between each pair of adjacent items is the
   /// same. The first item is flush with the main-start edge, and the last
@@ -226,9 +222,7 @@ impl JustifyContent {
     }
 
     match self {
-      JustifyContent::Start => (0.0, 0.0),
-      JustifyContent::Center => (main_space_leave / 2.0, 0.0),
-      JustifyContent::End => (main_space_leave, 0.0),
+      JustifyContent::Compact => (0.0, 0.0),
       JustifyContent::SpaceAround => {
         let step = main_space_leave / item_cnt as f32;
         (step / 2.0, step)
@@ -244,10 +238,5 @@ impl JustifyContent {
     }
   }
 
-  fn is_space_layout(&self) -> bool {
-    matches!(
-      self,
-      JustifyContent::SpaceAround | JustifyContent::SpaceBetween | JustifyContent::SpaceEvenly
-    )
-  }
+  fn is_space_layout(&self) -> bool { !matches!(self, JustifyContent::Compact) }
 }

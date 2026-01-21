@@ -1,330 +1,198 @@
-use crate::{prelude::*, wrap_render::*};
+//! Anchor widget for positioning children relative to their parent.
+//!
+//! This module re-exports anchor types from `widget_tree::layout_info`.
 
-/// Specifies a horizontal anchor position for a widget relative to a target.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum HAnchor {
-  /// positions the widget's left edge x pixels to the right of the target's
-  /// left edge.
-  Left(Measure),
+// Re-export anchor types from layout_info
+pub use crate::widget_tree::{Anchor, AnchorX, AnchorY, WidgetId};
+use crate::{prelude::*, wrap_render::WrapRender};
 
-  /// positions the widget's right edge x pixels to the left of the target's
-  /// right edge.
-  Right(Measure),
-}
-
-/// Specifies a vertical anchor position for a widget relative to a target.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum VAnchor {
-  /// positions the widget's top edge x pixels bellow the target's top edge.
-  Top(Measure),
-
-  /// positions the widget's bottom edge x pixels above the target's bottom
-  /// edge.
-  Bottom(Measure),
-}
-
-impl HAnchor {
-  fn map(self, f: impl FnOnce(Measure) -> Measure) -> Self {
-    match self {
-      HAnchor::Left(x) => HAnchor::Left(f(x)),
-      HAnchor::Right(x) => HAnchor::Right(f(x)),
-    }
-  }
-}
-
-impl VAnchor {
-  fn map(self, f: impl FnOnce(Measure) -> Measure) -> Self {
-    match self {
-      VAnchor::Top(x) => VAnchor::Top(f(x)),
-      VAnchor::Bottom(x) => VAnchor::Bottom(f(x)),
-    }
-  }
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Anchor {
-  /// Specifies the horizontal position you want to anchor the widget, See
-  /// [`HAnchor`]!. if None, the widget is anchored by the parent
-  pub x: Option<HAnchor>,
-
-  /// Specifies the vertical position you want to anchor the widget, See
-  /// [`VAnchor`]! if None, the widget is anchored by the parent
-  pub y: Option<VAnchor>,
-}
-
-impl Lerp for HAnchor {
-  fn lerp(&self, other: &Self, t: f32) -> Self {
-    match (self, other) {
-      (HAnchor::Left(x1), HAnchor::Left(x2)) => HAnchor::Left(x1.lerp(x2, t)),
-      (HAnchor::Right(x1), HAnchor::Right(x2)) => HAnchor::Right(x1.lerp(x2, t)),
-      _ => *other,
-    }
-  }
-}
-
-impl Lerp for VAnchor {
-  fn lerp(&self, other: &Self, t: f32) -> Self {
-    match (self, other) {
-      (VAnchor::Top(y1), VAnchor::Top(y2)) => VAnchor::Top(y1.lerp(y2, t)),
-      (VAnchor::Bottom(y1), VAnchor::Bottom(y2)) => VAnchor::Bottom(y1.lerp(y2, t)),
-      _ => *other,
-    }
-  }
-}
-
-impl Lerp for Anchor {
-  fn lerp(&self, other: &Self, t: f32) -> Self {
-    let x = match (self.x, other.x) {
-      (Some(x1), Some(x2)) => Some(x1.lerp(&x2, t)),
-      (Some(x1), None) => Some(x1.map(|x| x.lerp(&Measure::default(), t))),
-      (None, Some(x1)) => Some(x1.map(|x| Measure::default().lerp(&x, t))),
-      _ => None,
-    };
-
-    let y = match (self.y, other.y) {
-      (Some(y1), Some(y2)) => Some(y1.lerp(&y2, t)),
-      (Some(y1), None) => Some(y1.map(|y| y.lerp(&Measure::default(), t))),
-      (None, Some(y1)) => Some(y1.map(|y| Measure::default().lerp(&y, t))),
-      _ => None,
-    };
-    Self { x, y }
-  }
-}
-
-impl Anchor {
-  pub fn new(x: HAnchor, y: VAnchor) -> Self { Self { x: Some(x), y: Some(y) } }
-
-  /// Return Anchor that positions the widget's left top corner to the position
-  pub fn from_point(pos: Point) -> Self { pos.into() }
-
-  /// Return Anchor that positions the widget's left edge x pixels to the right
-  /// of the target's left edge.
-  pub fn left(x: impl Into<Measure>) -> Self { Self { x: Some(HAnchor::Left(x.into())), y: None } }
-
-  /// Return Anchor that positions the widget's right edge x pixels to the left
-  /// of the target's right edge.
-  pub fn right(x: impl Into<Measure>) -> Self {
-    Self { x: Some(HAnchor::Right(x.into())), y: None }
-  }
-
-  /// Return Anchor that positions the widget's top edge x pixels bellow the
-  /// target's top edge.
-  pub fn top(y: impl Into<Measure>) -> Self { Self { x: None, y: Some(VAnchor::Top(y.into())) } }
-
-  /// Return Anchor that positions the widget's bottom edge x pixels above the
-  /// parent's bottom edge.
-  pub fn bottom(y: impl Into<Measure>) -> Self {
-    Self { x: None, y: Some(VAnchor::Bottom(y.into())) }
-  }
-
-  /// Return Anchor that positions the widget's left top corner to the position
-  /// x pixel right, y pixel bellow relative to the left top corner of
-  /// the target
-  pub fn left_top(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
-    Self::new(HAnchor::Left(x.into()), VAnchor::Top(y.into()))
-  }
-
-  /// Return Anchor that positions the widget's right top corner to the position
-  /// x pixel left, y pixel bellow relative to the right top corner of
-  /// the target
-  pub fn right_top(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
-    Self::new(HAnchor::Right(x.into()), VAnchor::Top(y.into()))
-  }
-
-  /// Return Anchor that positions the widget's left bottom corner to the
-  /// position x pixel right, y pixel above relative to the left bottom corner
-  /// of the target
-  pub fn left_bottom(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
-    Self::new(HAnchor::Left(x.into()), VAnchor::Bottom(y.into()))
-  }
-
-  /// Return Anchor that positions the widget's right bottom corner to the
-  /// position x pixel left, y pixel above relative to the right bottom corner
-  /// of the target
-  pub fn right_bottom(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
-    Self::new(HAnchor::Right(x.into()), VAnchor::Bottom(y.into()))
-  }
-}
-
-/// A wrapper widget that anchors its child relative to its parent or a target.
+/// A widget that positions its child.
 ///
-/// This is a built-in field of `FatObj`. Setting the `anchor` field attaches
-/// an `Anchor` to the host, allowing precise placement relative to the parent
-/// bounds.
+/// Use `x` and `y` to position the child. The value can be a fixed pixel value,
+/// a percentage of the parent size, or a calculated value.
 ///
-/// # Example, the text will be anchored to the bottom right corner of the
-/// container with 10 pixels offset from the right and bottom edges.
+/// # Example, with fixed pixel value
 ///
 /// ```rust
 /// use ribir::prelude::*;
 ///
-/// container! {
-///   size: Size::new(200., 200.),
+/// fn_widget! {
 ///   @Text {
-///     text: "Bottom Right",
-///     anchor: Anchor::right_bottom(10., 10.),
+///     text: "Hello World!",
+///     x: 10.,
+///     y: AnchorY::percent(0.5),
 ///   }
 /// };
 /// ```
 ///
-/// ## Note
+/// # Example, align relactive to parent
 ///
-/// For percentage-based or right/bottom-relative anchors we compute offsets
-/// from a container derived from the child size and local constraints, not
-/// from the parent's unconstrained sizes. The container is chosen by:
+/// ``` rust
+/// use ribir::prelude::*;
 ///
-/// 1. Use the maximum constraint when it is finite.
-/// 2. Otherwise, fall back to the child's clamped size (respecting min/max).
-///
-/// ## Usage guidelines
-///
-/// For reliable placement, prefer using anchors inside parents with fixed
-/// sizes or predictable layout behavior.
-
-#[derive(Default)]
-pub struct RelativeAnchor {
-  pub anchor: Anchor,
-}
-
-impl Declare for RelativeAnchor {
+/// fn_widget! {
+///   @Text {
+///     text: "Hello World!",
+///     x: AnchorX::center(),
+///     y: AnchorY::center().offset(-10.), // move 10 pixel up above center
+///   }
+/// };
+/// ```
+impl Declare for Anchor {
   type Builder = FatObj<()>;
   #[inline]
   fn declarer() -> Self::Builder { FatObj::new(()) }
 }
 
-impl_compose_child_for_wrap_render!(RelativeAnchor);
+impl_compose_child_for_wrap_render!(Anchor);
 
-impl WrapRender for RelativeAnchor {
-  fn perform_layout(&self, clamp: BoxClamp, host: &dyn Render, ctx: &mut LayoutCtx) -> Size {
-    ctx.update_position(ctx.widget_id(), Point::zero());
-    let child_size = host.perform_layout(clamp, ctx);
+impl WrapRender for Anchor {
+  fn place_children(&self, size: Size, host: &dyn Render, ctx: &mut PlaceCtx) {
+    host.place_children(size, ctx);
 
-    let container =
-      Size::new(clamp.container_width(child_size.width), clamp.container_height(child_size.height));
+    let clamp = ctx.clamp();
+    let max_width = clamp.container_width(size.width);
+    let max_height = clamp.container_height(size.height);
 
-    let offset = self.anchor.into_pixel(child_size, container);
-    let pos = ctx.box_pos().unwrap_or_default();
-    ctx.update_position(ctx.widget_id(), pos + Size::new(offset.x, offset.y));
-    child_size
+    let pos = self.calculate(Size::new(max_width, max_height), size);
+    ctx.update_position(ctx.widget_id(), pos);
   }
 
   #[inline]
-  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Layout }
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Position }
+
+  #[inline]
+  fn self_positioned(&self, _host: &dyn Render) -> bool { true }
 }
 
-impl HAnchor {
-  pub fn into_pixel(self, width: f32, parent: f32) -> f32 {
-    match self {
-      HAnchor::Left(x) => x.into_pixel(parent),
-      HAnchor::Right(x) => parent - width - x.into_pixel(parent),
+/// Type alias for the custom anchor function.
+pub type CustomAnchorFn<T> = fn(&T, Size, BoxClamp, &mut PlaceCtx) -> Anchor;
+
+/// A generalized wrap_render widget that accepts a custom anchor-setting
+/// closure. The closure is called after the child layout is complete, receiving
+/// the data, child size, clamp, and layout context to set the anchor.
+///
+/// # Note
+///
+/// It is recommended to use standard layout widgets (like `Row`, `Column`,
+/// `Stack`) to position children whenever possible. `CustomAnchor` is intended
+/// for complex or dynamic positioning scenarios that cannot be achieved with
+/// standard layouts.
+///
+/// # Reactivity
+///
+/// If your anchor logic depends on mutable state, you must pass that state via
+/// the `data` field. This ensures that when the state changes, the layout is
+/// re-calculated. If you capture a variable directly in the closure without
+/// passing it through `data`, the layout will not automatically update when
+/// that variable changes.
+///
+/// # Example
+///
+/// ```rust
+/// use ribir::prelude::*;
+///
+/// fn_widget! {
+///   let state = Stateful::new(10.);
+///
+///   @CustomAnchor {
+///     // Pass the state value via `data`. When `state` changes, `CustomAnchor`
+///     // will be notified to re-layout.
+///     data: pipe!(*$read(state)),
+///     anchor: |offset, _, _, _| {
+///       // Use the passed data `offset` to calculate the anchor
+///       Anchor::from_point(Point::new(*offset, *offset))
+///     },
+///     @Text { text: "I move diagonally!" }
+///   }
+/// };
+/// ```
+pub struct CustomAnchor<T> {
+  data: T,
+  anchor: CustomAnchorFn<T>,
+}
+
+/// Declarer for `CustomAnchor`.
+pub struct CustomAnchorDeclarer<T: 'static> {
+  data: Option<PipeValue<T>>,
+  anchor: Option<CustomAnchorFn<T>>,
+}
+
+impl<T: 'static> CustomAnchorDeclarer<T> {
+  /// Sets the anchor closure for the `CustomAnchor`.
+  pub fn with_anchor(&mut self, f: CustomAnchorFn<T>) -> &mut Self {
+    self.anchor = Some(f);
+    self
+  }
+
+  /// Sets the data for the `CustomAnchor`.
+  pub fn with_data<K: ?Sized>(&mut self, data: impl RInto<PipeValue<T>, K>) -> &mut Self {
+    self.data = Some(data.r_into());
+    self
+  }
+}
+
+impl<T: 'static> Declare for CustomAnchor<T> {
+  type Builder = CustomAnchorDeclarer<T>;
+
+  fn declarer() -> Self::Builder { CustomAnchorDeclarer { data: None, anchor: None } }
+}
+
+impl<T: 'static> ObjDeclarer for CustomAnchorDeclarer<T> {
+  type Target = FatObj<Stateful<CustomAnchor<T>>>;
+
+  fn finish(self) -> Self::Target {
+    let (data, data_pipe) = self.data.unwrap().unzip();
+    let anchor = self.anchor.unwrap();
+    let state = Stateful::new(CustomAnchor { data, anchor });
+    let writer = state.clone_writer();
+    let mut fat = FatObj::new(state);
+
+    if let Some(pipe) = data_pipe {
+      let handle = pipe
+        .subscribe(move |v| {
+          writer.write().data = v;
+        })
+        .unsubscribe_when_dropped();
+      fat.on_disposed(move |_| drop(handle));
     }
+
+    fat
   }
 }
 
-impl VAnchor {
-  pub fn into_pixel(self, height: f32, parent: f32) -> f32 {
-    match self {
-      VAnchor::Top(y) => y.into_pixel(parent),
-      VAnchor::Bottom(y) => parent - height - y.into_pixel(parent),
-    }
+impl<T: 'static> WrapRender for CustomAnchor<T> {
+  fn place_children(&self, size: Size, host: &dyn Render, ctx: &mut PlaceCtx) {
+    host.place_children(size, ctx);
+    let id = ctx.widget_id();
+    let clamp = ctx
+      .tree()
+      .store
+      .layout_info(id)
+      .map_or(BoxClamp::default(), |i| i.clamp);
+    let anchor = (self.anchor)(&self.data, size, clamp, ctx);
+
+    let parent_size = id
+      .parent(ctx.tree())
+      .and_then(|p| ctx.tree().store.layout_box_size(p))
+      .unwrap_or(clamp.max);
+
+    let current_pos = ctx.position(id).unwrap_or_default();
+    let pos = anchor.calculate(parent_size, size);
+
+    ctx.update_position(id, pos + current_pos.to_vector());
   }
+
+  #[inline]
+  fn wrapper_dirty_phase(&self) -> DirtyPhase { DirtyPhase::Position }
+
+  #[inline]
+  fn self_positioned(&self, _host: &dyn Render) -> bool { true }
 }
 
-impl Anchor {
-  pub fn into_pixel(self, size: Size, parent: Size) -> Point {
-    let Self { x, y } = self;
-    Point::new(
-      x.map(|x| x.into_pixel(size.width, parent.width))
-        .unwrap_or_default(),
-      y.map(|y| y.into_pixel(size.height, parent.height))
-        .unwrap_or_default(),
-    )
+impl<'c, T: 'static> ComposeChild<'c> for CustomAnchor<T> {
+  type Child = Widget<'c>;
+  fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'c> {
+    WrapRender::combine_child(this, child)
   }
-}
-
-impl From<Point> for Anchor {
-  fn from(value: Point) -> Self {
-    Self::new(HAnchor::Left(value.x.into()), VAnchor::Top(value.y.into()))
-  }
-}
-
-impl Default for HAnchor {
-  fn default() -> Self { Self::Left(Measure::default()) }
-}
-
-impl Default for VAnchor {
-  fn default() -> Self { Self::Top(Measure::default()) }
-}
-
-impl From<f32> for HAnchor {
-  fn from(value: f32) -> Self { Self::Left(value.into()) }
-}
-
-impl From<f32> for VAnchor {
-  fn from(value: f32) -> Self { Self::Top(value.into()) }
-}
-
-impl From<Measure> for HAnchor {
-  fn from(value: Measure) -> Self { Self::Left(value) }
-}
-
-impl From<Measure> for VAnchor {
-  fn from(value: Measure) -> Self { Self::Top(value) }
-}
-
-#[cfg(test)]
-mod test {
-  use ribir_dev_helper::*;
-
-  use super::*;
-  use crate::test_helper::*;
-  const CHILD_SIZE: Size = Size::new(50., 50.);
-  const WND_SIZE: Size = Size::new(100., 100.);
-
-  fn widget_tester(anchor: Anchor) -> WidgetTester {
-    WidgetTester::new(fn_widget! {
-      @MockBox { size: CHILD_SIZE, anchor }
-    })
-    .with_wnd_size(WND_SIZE)
-  }
-  widget_layout_test!(
-    pixel_left_top,
-    widget_tester(Anchor::left_top(1., 1.)),
-    LayoutCase::default().with_pos(Point::new(1., 1.))
-  );
-
-  widget_layout_test!(
-    pixel_left_bottom,
-    widget_tester(Anchor::left_bottom(1., 1.)),
-    LayoutCase::default().with_pos((1., 49.).into())
-  );
-
-  widget_layout_test!(
-    pixel_top_right,
-    widget_tester(Anchor::right_top(1., 1.)),
-    LayoutCase::default().with_pos((49., 1.).into())
-  );
-
-  widget_layout_test!(
-    pixel_bottom_right,
-    widget_tester(Anchor::right_bottom(1., 1.)),
-    LayoutCase::default().with_pos((49., 49.).into())
-  );
-
-  widget_layout_test!(
-    multi_anchor,
-    WidgetTester::new(fn_widget! {
-      let w = @Container {
-        size: Size::new(100., 100.),
-        anchor: Anchor::left(40.),
-      }.into_widget();
-
-      let mut w = FatObj::new(w);
-      @(w) {
-        anchor: Anchor::top(30.)
-      }
-    })
-    .with_wnd_size(Size::new(500., 500.)),
-    LayoutCase::new(&[0]).with_rect(ribir_geom::rect(40., 30., 100., 100.))
-  );
 }

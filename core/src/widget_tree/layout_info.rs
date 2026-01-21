@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use ribir_geom::{Rect, ZERO_SIZE};
 
 use super::{Lerp, WidgetId, WidgetTree};
-use crate::prelude::{INFINITY_SIZE, Point, Size};
+use crate::prelude::{INFINITY_SIZE, Measure, Point, RFrom, Size};
 
 /// boundary limit of the render object's layout
 #[derive(Debug, Clone, PartialEq, Copy, Lerp)]
@@ -14,6 +14,14 @@ pub struct BoxClamp {
 
 impl BoxClamp {
   pub const UNLIMITED: BoxClamp = BoxClamp { min: ZERO_SIZE, max: INFINITY_SIZE };
+  /// Expand horizontally to fill available width
+  pub const EXPAND_X: BoxClamp =
+    BoxClamp { min: Size::new(f32::INFINITY, 0.), max: Size::new(f32::INFINITY, f32::INFINITY) };
+  /// Expand vertically to fill available height
+  pub const EXPAND_Y: BoxClamp =
+    BoxClamp { min: Size::new(0., f32::INFINITY), max: Size::new(f32::INFINITY, f32::INFINITY) };
+  /// Expand both horizontally and vertically to fill available space
+  pub const EXPAND_BOTH: BoxClamp = BoxClamp { min: INFINITY_SIZE, max: INFINITY_SIZE };
 
   /// clamp use fixed width and unfixed height
   pub const fn fixed_width(width: f32) -> Self {
@@ -187,6 +195,198 @@ impl VisualBox {
   }
 }
 
+// === Positioning Types ===
+
+#[derive(Clone, PartialEq, Debug, Default)]
+enum AlignType {
+  #[default]
+  Start,
+  Center,
+  End,
+  Before,
+  After,
+}
+
+/// A unit to describe the position of a widget relative to its parent.
+#[derive(Clone, PartialEq, Default, Debug)]
+struct AnchorUnit {
+  align: AlignType,
+  /// Pixel offset, accumulated via offset() calls
+  pixel_offset: f32,
+  /// Percent offset (0.0-1.0), accumulated via offset() calls
+  percent_offset: f32,
+}
+
+impl AnchorUnit {
+  fn new(align: AlignType) -> Self { Self { align, pixel_offset: 0., percent_offset: 0. } }
+
+  /// Add an offset. Pixel and percent offsets are accumulated separately.
+  fn offset(mut self, offset: impl Into<Measure>) -> Self {
+    match offset.into() {
+      Measure::Pixel(px) => self.pixel_offset += px,
+      Measure::Percent(pct) => self.percent_offset += pct,
+    }
+    self
+  }
+
+  fn calculate(&self, reference: f32, this: f32) -> f32 {
+    let offset = self.pixel_offset + self.percent_offset * reference;
+    match self.align {
+      AlignType::Start => offset,
+      AlignType::Center => (reference - this) / 2. + offset,
+      AlignType::End => reference - this - offset,
+      AlignType::Before => -this + offset,
+      AlignType::After => reference + offset,
+    }
+  }
+
+  fn start() -> Self { Self::new(AlignType::Start) }
+  fn center() -> Self { Self::new(AlignType::Center) }
+  fn end() -> Self { Self::new(AlignType::End) }
+  fn before() -> Self { Self::new(AlignType::Before) }
+  fn after() -> Self { Self::new(AlignType::After) }
+}
+
+#[derive(Default, PartialEq, Clone, Debug)]
+pub struct AnchorX(AnchorUnit);
+
+impl AnchorX {
+  pub fn new(v: impl Into<Measure>) -> Self { Self(AnchorUnit::start().offset(v)) }
+  pub fn percent(v: f32) -> Self { Self(AnchorUnit::start().offset(Measure::Percent(v))) }
+  /// align to the left
+  pub fn left() -> Self { Self(AnchorUnit::start()) }
+  /// align to the right
+  pub fn right() -> Self { Self(AnchorUnit::end()) }
+  /// align to the center
+  pub fn center() -> Self { Self(AnchorUnit::center()) }
+  /// left of the parent
+  pub fn before() -> Self { Self(AnchorUnit::before()) }
+  /// right of the parent
+  pub fn after() -> Self { Self(AnchorUnit::after()) }
+  pub fn offset(self, offset: impl Into<Measure>) -> Self { Self(self.0.offset(offset)) }
+  pub fn calculate(&self, reference: f32, this: f32) -> f32 { self.0.calculate(reference, this) }
+}
+
+#[derive(Default, PartialEq, Clone, Debug)]
+pub struct AnchorY(AnchorUnit);
+
+impl AnchorY {
+  pub fn new(v: impl Into<Measure>) -> Self { Self(AnchorUnit::start().offset(v)) }
+  pub fn percent(v: f32) -> Self { Self(AnchorUnit::start().offset(Measure::Percent(v))) }
+  /// align to the top
+  pub fn top() -> Self { Self(AnchorUnit::start()) }
+  /// align to the bottom
+  pub fn bottom() -> Self { Self(AnchorUnit::end()) }
+  /// align to the center
+  pub fn center() -> Self { Self(AnchorUnit::center()) }
+  /// above the parent
+  pub fn above() -> Self { Self(AnchorUnit::before()) }
+  /// below the parent
+  pub fn under() -> Self { Self(AnchorUnit::after()) }
+  pub fn offset(self, offset: impl Into<Measure>) -> Self { Self(self.0.offset(offset)) }
+  pub fn calculate(&self, reference: f32, this: f32) -> f32 { self.0.calculate(reference, this) }
+}
+
+#[derive(Default, PartialEq, Clone)]
+pub struct Anchor {
+  pub x: Option<AnchorX>,
+  pub y: Option<AnchorY>,
+}
+
+impl Anchor {
+  pub fn new(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
+    Self { x: Some(AnchorX::left().offset(x)), y: Some(AnchorY::top().offset(y)) }
+  }
+
+  pub fn left(x: impl Into<Measure>) -> Self {
+    Self { x: Some(AnchorX::left().offset(x)), y: None }
+  }
+
+  pub fn right(x: impl Into<Measure>) -> Self {
+    Self { x: Some(AnchorX::right().offset(x)), y: None }
+  }
+
+  pub fn top(y: impl Into<Measure>) -> Self { Self { x: None, y: Some(AnchorY::top().offset(y)) } }
+
+  pub fn bottom(y: impl Into<Measure>) -> Self {
+    Self { x: None, y: Some(AnchorY::bottom().offset(y)) }
+  }
+
+  pub fn left_top(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
+    Self { x: Some(AnchorX::left().offset(x)), y: Some(AnchorY::top().offset(y)) }
+  }
+
+  pub fn right_top(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
+    Self { x: Some(AnchorX::right().offset(x)), y: Some(AnchorY::top().offset(y)) }
+  }
+
+  pub fn left_bottom(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
+    Self { x: Some(AnchorX::left().offset(x)), y: Some(AnchorY::bottom().offset(y)) }
+  }
+
+  pub fn right_bottom(x: impl Into<Measure>, y: impl Into<Measure>) -> Self {
+    Self { x: Some(AnchorX::right().offset(x)), y: Some(AnchorY::bottom().offset(y)) }
+  }
+
+  pub fn from_point(p: Point) -> Self {
+    Self { x: Some(AnchorX::new(p.x)), y: Some(AnchorY::new(p.y)) }
+  }
+
+  pub fn calculate(&self, reference: Size, this: Size) -> Point {
+    let x = self
+      .x
+      .as_ref()
+      .map(|x| x.calculate(reference.width, this.width))
+      .unwrap_or(0.);
+    let y = self
+      .y
+      .as_ref()
+      .map(|y| y.calculate(reference.height, this.height))
+      .unwrap_or(0.);
+    Point::new(x, y)
+  }
+}
+
+impl From<f32> for AnchorX {
+  fn from(v: f32) -> Self { AnchorX::new(v) }
+}
+
+impl From<Measure> for AnchorX {
+  fn from(m: Measure) -> Self { AnchorX::default().offset(m) }
+}
+
+impl From<f32> for AnchorY {
+  fn from(v: f32) -> Self { AnchorY::new(v) }
+}
+
+impl From<Measure> for AnchorY {
+  fn from(m: Measure) -> Self { AnchorY::default().offset(m) }
+}
+
+// RFrom impls for Option<AnchorX> and Option<AnchorY> - allows f32 and Measure
+// to be used directly with with_x()/with_y().
+// We use RFrom instead of From to bypass Rust's orphan rules (since RFrom is
+// local). We implement for specific types (f32, Measure) rather than generic T:
+// Into<Anchor*> to avoid ambiguity with IntoKind when AnchorX/AnchorY is passed
+// directly.
+pub struct OptionAnchorKind;
+
+impl RFrom<f32, OptionAnchorKind> for Option<AnchorX> {
+  fn r_from(v: f32) -> Self { Some(AnchorX::from(v)) }
+}
+
+impl RFrom<Measure, OptionAnchorKind> for Option<AnchorX> {
+  fn r_from(v: Measure) -> Self { Some(AnchorX::from(v)) }
+}
+
+impl RFrom<f32, OptionAnchorKind> for Option<AnchorY> {
+  fn r_from(v: f32) -> Self { Some(AnchorY::from(v)) }
+}
+
+impl RFrom<Measure, OptionAnchorKind> for Option<AnchorY> {
+  fn r_from(v: Measure) -> Self { Some(AnchorY::from(v)) }
+}
+
 /// render object's layout box, the information about layout, including box
 /// size, box position, and the clamp of render object layout.
 #[derive(Debug, Default, Clone)]
@@ -197,7 +397,7 @@ pub struct LayoutInfo {
   /// The size of the object's layout result, indicating that the object has
   /// been laid out; otherwise, it is `None`.
   pub size: Option<Size>,
-  /// The position render object to place, default is zero
+  /// The position of the widget relative to its parent.
   pub pos: Point,
 
   /// the visual box of the render object
@@ -221,6 +421,9 @@ impl LayoutStore {
     self.layout_info(id).and_then(|info| info.size)
   }
 
+  /// Calculate the position of widget `id` given the parent size.
+  /// This performs lazy position calculation based on stored AnchorX/AnchorY
+  /// rules.
   pub(crate) fn layout_box_pos(&self, id: WidgetId) -> Option<Point> {
     self.layout_info(id).map(|info| info.pos)
   }
@@ -343,12 +546,16 @@ mod tests {
   }
 
   impl Render for OffsetBox {
-    fn perform_layout(&self, mut clamp: BoxClamp, ctx: &mut LayoutCtx) -> Size {
+    fn measure(&self, mut clamp: BoxClamp, ctx: &mut MeasureCtx) -> Size {
       clamp.max = clamp.max.min(self.size);
       let child = ctx.assert_single_child();
-      ctx.perform_child_layout(child, clamp);
-      ctx.update_position(child, self.offset);
+      ctx.layout_child(child, clamp);
       self.size
+    }
+
+    fn place_children(&self, _size: Size, ctx: &mut PlaceCtx) {
+      let child = ctx.assert_single_child();
+      ctx.update_position(child, self.offset);
     }
 
     #[inline]
@@ -449,8 +656,10 @@ mod tests {
 
     #[track_caller]
     fn assert_rect_by_path(wnd: &TestWindow, path: &[usize], rect: Rect) {
+      let id = wnd.widget_id_by_path(path);
+      let pos = wnd.widget_pos(id).unwrap();
+      assert_eq!(pos, rect.origin);
       let info = wnd.layout_info_by_path(path).unwrap();
-      assert_eq!(info.pos, rect.origin);
       assert_eq!(info.size.unwrap(), rect.size);
     }
 
