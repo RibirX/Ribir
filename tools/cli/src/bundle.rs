@@ -24,8 +24,11 @@ use tauri_utils::config::{
 
 use crate::{
   CliCommand,
-  util::cargo_settings::{
-    CargoPackageSettings, CargoSettings, get_cargo_metadata, get_workspace_dir, read_toml,
+  util::{
+    cargo_settings::{
+      CargoPackageSettings, CargoSettings, get_cargo_metadata, get_workspace_dir, read_toml,
+    },
+    windows_version::normalize_windows_version,
   },
 };
 
@@ -623,7 +626,7 @@ impl Bundle {
     }
 
     let mut has_warnings = false;
-    let mut content_hashes: HashMap<u64, Vec<(String, String)>> = HashMap::new();
+    let mut content_hashes: HashMap<u64, Vec<(String, String, Vec<String>)>> = HashMap::new();
 
     // 2. Analyze grouped assets
     for (bundle_path, entries) in bundle_map {
@@ -634,10 +637,8 @@ impl Bundle {
         let source = *unique_sources.iter().next().unwrap();
         let locations: Vec<_> = entries.iter().map(|e| &e.location).collect();
         eprintln!(
-          "⚠️  Asset '{}' is referenced {} times in different locations: {:?}",
-          source,
-          entries.len(),
-          locations
+          "⚠️  Asset '{source}' is referenced {} times in different locations: {locations:?}",
+          entries.len()
         );
         has_warnings = true;
       }
@@ -649,9 +650,8 @@ impl Bundle {
           .map(|e| format!("{} (at {})", e.source, e.location))
           .collect();
         eprintln!(
-          "❌ Conflict: Multiple different source files map to same output filename '{}':\n   \
-           Sources: {:?}",
-          bundle_path, sources
+          "❌ Conflict: Multiple different source files map to same output filename \
+           '{bundle_path}':\n   Sources: {sources:?}"
         );
         has_warnings = true;
       }
@@ -664,10 +664,16 @@ impl Bundle {
           content.hash(&mut hasher);
           let hash = hasher.finish();
           for source in unique_sources {
-            content_hashes
-              .entry(hash)
-              .or_default()
-              .push((source.clone(), bundle_path.clone()));
+            let locations: Vec<_> = entries
+              .iter()
+              .filter(|e| e.source == *source)
+              .map(|e| e.location.clone())
+              .collect();
+            content_hashes.entry(hash).or_default().push((
+              source.clone(),
+              bundle_path.clone(),
+              locations,
+            ));
           }
         }
       }
@@ -677,12 +683,13 @@ impl Bundle {
     for (hash, variants) in content_hashes {
       if variants.len() > 1 {
         eprintln!(
-          "⚠️  Identical content detected across {} different asset paths (Hash: {:016x}):",
-          variants.len(),
-          hash
+          "⚠️  Identical content detected across {} different asset paths (Hash: {hash:016x}):",
+          variants.len()
         );
-        for (src, bundle_path) in variants {
-          eprintln!("   - Source: {}\n     Bundle Path: {}", src, bundle_path);
+        for (src, bundle_path, locations) in variants {
+          eprintln!(
+            "   - Source: {src}\n     Bundle Path: {bundle_path}\n     Locations: {locations:?}"
+          );
         }
         has_warnings = true;
       }
@@ -782,11 +789,19 @@ impl Bundle {
       cargo_package_settings,
     )?;
 
+    if cfg!(target_os = "windows") {
+      let msi_version = normalize_windows_version(&package_setting.version)?;
+      bundle_setting
+        .windows
+        .wix
+        .get_or_insert_with(Default::default)
+        .version = Some(msi_version);
+    }
+
     if let Some(assets_dir) = self.detect_assets(profile)? {
       println!("Adding auto-detected assets to bundle");
       let mut resources_map = bundle_setting.resources_map.unwrap_or_default();
-
-      resources_map.insert(assets_dir.to_string_lossy().to_string(), "assets".to_string());
+      resources_map.insert(format!("{}/**/*", assets_dir.to_string_lossy()), "assets".to_string());
 
       bundle_setting.resources_map = Some(resources_map);
     }
@@ -798,8 +813,12 @@ impl Bundle {
       .project_out_directory(self.target_dir.clone().unwrap_or(profile_dir))
       .target(tauri_utils::platform::target_triple()?)
       .package_types(package_types)
-      .log_level(log::Level::Info)
+      .log_level(if self.verbose { log::Level::Debug } else { log::Level::Info })
       .build()?;
+
+    if self.verbose {
+      println!("Bundle settings: {:?}", settings);
+    }
 
     bundle_project(&settings)?;
 
@@ -853,24 +872,28 @@ impl CargoPackageSettings {
       product_name: product_name
         .clone()
         .unwrap_or_else(|| self.name.clone()),
-      version: version.clone().unwrap_or_else(|| {
-        self
-          .version
-          .as_ref()
-          .map(|v| {
-            v.clone()
-              .resolve("version", || {
-                ws_package_settings
-                  .as_ref()
-                  .and_then(|p| p.version.clone())
-                  .ok_or_else(|| {
-                    anyhow::anyhow!("Couldn't inherit value for `version` from workspace")
-                  })
-              })
-              .expect("failed to resolve version")
-          })
-          .unwrap()
-      }),
+      version: {
+        let resolved = version.clone().unwrap_or_else(|| {
+          self
+            .version
+            .as_ref()
+            .map(|v| {
+              v.clone()
+                .resolve("version", || {
+                  ws_package_settings
+                    .as_ref()
+                    .and_then(|p| p.version.clone())
+                    .ok_or_else(|| {
+                      anyhow::anyhow!("Couldn't inherit value for `version` from workspace")
+                    })
+                })
+                .expect("failed to resolve version")
+            })
+            .unwrap()
+        });
+
+        resolved
+      },
 
       description: self
         .description
@@ -912,5 +935,28 @@ impl CargoPackageSettings {
       }),
       default_run: self.default_run.clone(),
     })
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::util::windows_version::normalize_windows_version;
+
+  #[test]
+  fn normalize_windows_version_prerelease_numeric() {
+    let normalized = normalize_windows_version("0.4.0-alpha.55").unwrap();
+    assert_eq!(normalized, "0.4.0.55");
+
+    let normalized = normalize_windows_version("0.4.0-beta.1").unwrap();
+    assert_eq!(normalized, "0.4.0.20001");
+
+    let normalized = normalize_windows_version("0.4.0-rc.10").unwrap();
+    assert_eq!(normalized, "0.4.0.40010");
+  }
+
+  #[test]
+  fn normalize_windows_version_stable() {
+    let normalized = normalize_windows_version("1.2.0").unwrap();
+    assert_eq!(normalized, "1.2.0.65535");
   }
 }

@@ -13,11 +13,11 @@ repository = "https://github.com/RibirX/Ribir"
 version.workspace = true
 
 [dependencies]
-ribir_algo = { path = "../algo", version = "0.4.0-alpha.54" }
-ribir_core = { path = "../core", version = "0.4.0-alpha.54", default-features = false }
-ribir_gpu = { path = "../gpu", version = "0.4.0-alpha.54" }
-ribir_material = { path = "../themes/material", version = "0.4.0-alpha.54", optional = true }
-ribir_widgets = { path = "../widgets", version = "0.4.0-alpha.54", optional = true }
+ribir_algo = { workspace = true }
+ribir_core = { workspace = true, default-features = false }
+ribir_gpu = { workspace = true }
+ribir_material = { workspace = true, optional = true }
+ribir_widgets = { workspace = true, optional = true }
 rxrust.workspace = true
 wgpu = { workspace = true, optional = true }
 winit.workspace = true
@@ -52,7 +52,7 @@ env_logger.workspace = true
 futures.workspace = true
 ribir_dev_helper = { path = "../dev-helper" }
 ribir_material = { path = "../themes/material" }
-ribir_core = { path = "../core", default-features = false, features=["test-utils"]  }
+ribir_core = { workspace = true, features=["test-utils"]  }
 
 [features]
 default = ["wgpu", "widgets", "material", "png", "jpeg"]

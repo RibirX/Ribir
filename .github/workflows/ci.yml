@@ -339,7 +339,7 @@ jobs:
 
       - name: Bundle gallery example
         shell: bash
-        run: cargo +${{ needs.lint.outputs.nightly-version }} ci bundle
+        run: cargo +${{ needs.lint.outputs.nightly-version }} ci bundle --verbose
 
   release-dry-run:
     needs: [lint]
@@ -396,7 +396,7 @@ jobs:
              [ "${{ needs['wasm-compile'].result }}" != "success" ] || \
              [ "${{ needs['bundle'].result }}" != "success" ] || \
              [ "${{ needs['release-dry-run'].result }}" != "success" ] || \
-             [ "${{ needs['ribir-bot-check'].result }}" != "success" && "${{ needs['ribir-bot-check'].result }}" != "skipped" ] || \
+             { [ "${{ needs['ribir-bot-check'].result }}" != "success" ] && [ "${{ needs['ribir-bot-check'].result }}" != "skipped" ]; } || \
              [ "${{ needs['check-merge-allowed'].result }}" == "failure" ]; then
             echo "CI failed"
             exit 1
@@ -415,8 +415,6 @@ jobs:
         with:
           toolchain: stable
           components: llvm-tools-preview
-
-      - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@v2
