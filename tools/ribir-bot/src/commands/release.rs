@@ -638,6 +638,7 @@ fn collect_changelog_entries(version: &str, dry_run: bool) -> Result<String> {
   let collect_config = Config {
     command: crate::types::Cmd::Release { cmd: ReleaseCmd::Verify },
     dry_run,
+    repo: None,
     comment_id: None,
   };
 

@@ -43,7 +43,7 @@ const NIGHTLY_VERSION: &str = "nightly-2025-12-20";
 
 fn main() -> ExitCode {
   let args: Vec<String> = env::args().collect();
-  let command = args.get(1).map(|s| s.as_str()).unwrap_or("all");
+  let command = args.get(1).map(String::as_str).unwrap_or("all");
 
   // Commands that require stable version
   let needs_stable = matches!(
@@ -68,7 +68,7 @@ fn main() -> ExitCode {
     match get_stable_version() {
       Ok(v) => v,
       Err(e) => {
-        eprintln!("❌ Failed to determine stable version: {}", e);
+        eprintln!("❌ Failed to determine stable version: {e}");
         return ExitCode::FAILURE;
       }
     }
@@ -93,7 +93,7 @@ fn main() -> ExitCode {
     }
     "config-nightly" => {
       // Output just the nightly version for CI to parse
-      println!("{}", NIGHTLY_VERSION);
+      println!("{NIGHTLY_VERSION}");
       Ok(())
     }
     "help" | "-h" | "--help" => {
@@ -101,7 +101,7 @@ fn main() -> ExitCode {
       Ok(())
     }
     _ => {
-      eprintln!("Unknown command: {}", command);
+      eprintln!("Unknown command: {command}");
       print_help();
       Err(())
     }
@@ -142,20 +142,20 @@ fn get_stable_version() -> Result<String, String> {
     .workspace
     .and_then(|w| w.package)
     .and_then(|p| p.rust_version)
-    .ok_or_else(|| "No rust-version found in workspace.package".to_string())?;
+    .ok_or("No rust-version found in workspace.package")?;
 
   // Get current stable version
   let output = Command::new("rustc")
     .args(["+stable", "--version"])
     .output()
-    .map_err(|e| format!("Failed to run rustc: {}", e))?;
+    .map_err(|e| format!("Failed to run rustc: {e}"))?;
 
   let version_str = String::from_utf8_lossy(&output.stdout);
   // Parse version like "rustc 1.88.0 (some hash)"
   let current_stable = version_str
     .split_whitespace()
     .nth(1)
-    .ok_or_else(|| "Failed to parse rustc version".to_string())?;
+    .ok_or("Failed to parse rustc version")?;
 
   // Compare versions
   let msrv_parts: Vec<u32> = msrv
@@ -167,16 +167,13 @@ fn get_stable_version() -> Result<String, String> {
     .filter_map(|s| s.parse().ok())
     .collect();
 
-  let msrv_ok = stable_parts >= msrv_parts;
-
-  if !msrv_ok {
+  if stable_parts < msrv_parts {
     return Err(format!(
-      "Current stable ({}) is less than MSRV ({}). Please update rustup.",
-      current_stable, msrv
+      "Current stable ({current_stable}) is less than MSRV ({msrv}). Please update rustup."
     ));
   }
 
-  println!("📦 Using stable toolchain: {} (MSRV: {})", current_stable, msrv);
+  println!("📦 Using stable toolchain: {current_stable} (MSRV: {msrv})");
   Ok("stable".to_string())
 }
 
@@ -191,8 +188,8 @@ Usage:
 
 Commands:
   all            - Run all checks (default)
-  fmt (f)        - Check code formatting      [{}]
-  clippy (c)     - Run clippy lints           [{}]
+  fmt (f)        - Check code formatting      [{NIGHTLY_VERSION}]
+  clippy (c)     - Run clippy lints           [{NIGHTLY_VERSION}]
   check          - Cargo check                [stable]
   lint (l)       - Run all lint checks (fmt + clippy + check)
   test (t)       - Run tests (nextest if available)
@@ -209,14 +206,13 @@ Examples:
   cargo +nightly ci f     # Check formatting only
   cargo +nightly ci l     # Run all lints (fmt + clippy + check)
   cargo +nightly ci t     # Run tests
-"#,
-    NIGHTLY_VERSION, NIGHTLY_VERSION
+"#
   );
 }
 
 fn print_config() {
   println!("CI Configuration:");
-  println!("  NIGHTLY_VERSION: {}", NIGHTLY_VERSION);
+  println!("  NIGHTLY_VERSION: {NIGHTLY_VERSION}");
 }
 
 fn run_all(stable_version: &str) -> Result<(), ()> {
@@ -244,13 +240,13 @@ fn run_lint(stable_version: &str) -> Result<(), ()> {
 
 /// cargo fmt --all -- --check (nightly)
 fn run_fmt() -> Result<(), ()> {
-  println!("📝 Checking code formatting [{}]...", NIGHTLY_VERSION);
+  println!("📝 Checking code formatting [{NIGHTLY_VERSION}]...");
   run_cargo_command(NIGHTLY_VERSION, &["fmt", "--all", "--", "--check"], None, &[])
 }
 
 /// cargo clippy --all-targets --all-features -- -D warnings (nightly)
 fn run_clippy() -> Result<(), ()> {
-  println!("📎 Running clippy [{}]...", NIGHTLY_VERSION);
+  println!("📎 Running clippy [{NIGHTLY_VERSION}]...");
   run_cargo_command(
     NIGHTLY_VERSION,
     &["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"],
@@ -261,14 +257,14 @@ fn run_clippy() -> Result<(), ()> {
 
 /// cargo check (stable)
 fn run_check(stable_version: &str) -> Result<(), ()> {
-  println!("✔️  Running cargo check [{}]...", stable_version);
+  println!("✔️  Running cargo check [{stable_version}]...");
   run_cargo_command(stable_version, &["check"], None, &[])
 }
 
 /// Run tests using nextest if available, otherwise fallback to cargo test
 fn run_test(stable_version: &str) -> Result<(), ()> {
   if has_cargo_tool("nextest") {
-    println!("🧪 Running tests with nextest [{}]...", stable_version);
+    println!("🧪 Running tests with nextest [{stable_version}]...");
     run_cargo_command(
       stable_version,
       &["nextest", "run", "--workspace", "--all-features"],
@@ -276,7 +272,7 @@ fn run_test(stable_version: &str) -> Result<(), ()> {
       &[],
     )
   } else {
-    println!("🧪 Running tests [{}]...", stable_version);
+    println!("🧪 Running tests [{stable_version}]...");
     run_cargo_command(
       stable_version,
       &["test", "--workspace", "--all-targets", "--all-features"],
@@ -288,13 +284,13 @@ fn run_test(stable_version: &str) -> Result<(), ()> {
 
 /// cargo test --doc --workspace --all-features
 fn run_doctest(toolchain: &str) -> Result<(), ()> {
-  println!("📚 Running doc tests [{}]...", toolchain);
+  println!("📚 Running doc tests [{toolchain}]...");
   run_cargo_command(toolchain, &["test", "--doc", "--workspace", "--all-features"], None, &[])
 }
 
 /// Build ribir and compile doc examples with rustdoc (stable)
 fn run_doc_examples(stable_version: &str) -> Result<(), ()> {
-  println!("📖 Compiling doc examples [{}]...", stable_version);
+  println!("📖 Compiling doc examples [{stable_version}]...");
 
   // First build the workspace
   run_cargo_command(stable_version, &["build", "--workspace", "--exclude", "pomodoro"], None, &[])?;
@@ -336,7 +332,7 @@ fn run_doc_examples(stable_version: &str) -> Result<(), ()> {
 
   // Compile each markdown file
   for md_file in &md_files {
-    println!("   Compiling: {}", md_file);
+    println!("   Compiling: {md_file}");
     let status = Command::new("rustup")
       .args([
         "run",
@@ -358,11 +354,11 @@ fn run_doc_examples(stable_version: &str) -> Result<(), ()> {
     match status {
       Ok(s) if s.success() => {}
       Ok(_) => {
-        eprintln!("❌ Failed to compile doc examples in: {}", md_file);
+        eprintln!("❌ Failed to compile doc examples in: {md_file}");
         return Err(());
       }
       Err(e) => {
-        eprintln!("❌ Failed to run rustdoc: {}", e);
+        eprintln!("❌ Failed to run rustdoc: {e}");
         return Err(());
       }
     }
@@ -374,7 +370,7 @@ fn run_doc_examples(stable_version: &str) -> Result<(), ()> {
 
 /// Compile to wasm32-unknown-unknown (stable)
 fn run_wasm(stable_version: &str) -> Result<(), ()> {
-  println!("🌐 Compiling to wasm32 [{}]...", stable_version);
+  println!("🌐 Compiling to wasm32 [{stable_version}]...");
 
   run_cargo_command(
     stable_version,
@@ -398,7 +394,7 @@ fn run_wasm(stable_version: &str) -> Result<(), ()> {
 }
 
 fn run_bundle(stable_version: &str) -> Result<(), ()> {
-  println!("📦 Bundling gallery example [{}]...", stable_version);
+  println!("📦 Bundling gallery example [{stable_version}]...");
 
   run_cargo_command(
     stable_version,
@@ -408,37 +404,159 @@ fn run_bundle(stable_version: &str) -> Result<(), ()> {
   )?;
 
   println!("🧪 Verifying bundled assets...");
-  let mut bundle_assets_path = get_toolchain_target_dir(stable_version);
-  bundle_assets_path.push("debug/bundle");
+  let target_dir = get_toolchain_target_dir(stable_version);
+  let bundle_dir = target_dir.join("debug/bundle");
 
-  let asset_manifest = if cfg!(target_os = "macos") {
-    let mut p = bundle_assets_path.clone();
-    p.push("macos/Gallery.app/Contents/Resources/assets");
-    if p.join(".asset_manifest.txt").exists() {
-      Some(p.join(".asset_manifest.txt"))
-    } else {
-      find_assets_manifest(&p)
-    }
+  if cfg!(target_os = "macos") {
+    // macOS: check inside the .app bundle directly
+    let app_assets = bundle_dir.join("macos/Gallery.app/Contents/Resources/assets");
+    verify_assets_in_dir(&app_assets)
+  } else if cfg!(target_os = "windows") {
+    // Windows: extract NSIS installer with 7z and verify assets
+    verify_nsis_bundle_assets(&bundle_dir)
   } else {
-    find_assets_manifest(&bundle_assets_path)
+    // Linux: check DEB or AppImage
+    verify_linux_bundle_assets(&bundle_dir)
+  }
+}
+
+fn verify_assets_in_dir(assets_dir: &std::path::Path) -> Result<(), ()> {
+  let manifest = assets_dir.join(".asset_manifest.txt");
+  if !manifest.exists() {
+    eprintln!("❌ Could not find asset manifest at: {}", manifest.display());
+    return Err(());
+  }
+
+  let content = std::fs::read_to_string(&manifest).map_err(|e| {
+    eprintln!("❌ Failed to read asset manifest at {}: {e}", manifest.display());
+  })?;
+
+  if content.trim().is_empty() {
+    eprintln!("❌ Asset manifest at {} is empty", manifest.display());
+    return Err(());
+  }
+
+  println!("✅ Found asset manifest at: {}", manifest.display());
+  println!("✅ Asset manifest content:\n{content}");
+  Ok(())
+}
+
+fn verify_nsis_bundle_assets(bundle_dir: &std::path::Path) -> Result<(), ()> {
+  let nsis_dir = bundle_dir.join("nsis");
+  if !nsis_dir.exists() {
+    eprintln!("❌ NSIS bundle directory not found: {}", nsis_dir.display());
+    return Err(());
+  }
+
+  // Find the NSIS installer (.exe)
+  let installer = std::fs::read_dir(&nsis_dir)
+    .map_err(|_| ())?
+    .filter_map(|e| e.ok())
+    .find(|e| {
+      e.path()
+        .extension()
+        .is_some_and(|ext| ext == "exe")
+    });
+
+  let installer = match installer {
+    Some(i) => i.path(),
+    None => {
+      eprintln!("❌ No NSIS installer found in: {}", nsis_dir.display());
+      return Err(());
+    }
   };
 
-  match asset_manifest {
-    Some(path) => {
-      println!("✅ Found asset manifest at: {}", path.display());
-      let content = std::fs::read_to_string(&path).map_err(|_| ())?;
-      if content.trim().is_empty() {
-        eprintln!("❌ Asset manifest is empty");
-        return Err(());
-      }
-      println!("✅ Asset manifest content:\n{}", content);
+  println!("📦 Found NSIS installer: {}", installer.display());
+
+  // Extract with 7z to a temp directory
+  let extract_dir = bundle_dir.join("_nsis_extract_verify");
+  if extract_dir.exists() {
+    let _ = std::fs::remove_dir_all(&extract_dir);
+  }
+
+  // Determine 7z command
+  let cmd_7z = if cfg!(windows) && std::path::Path::new("C:\\Program Files\\7-Zip\\7z.exe").exists()
+  {
+    "C:\\Program Files\\7-Zip\\7z.exe".to_string()
+  } else {
+    "7z".to_string()
+  };
+
+  let status = Command::new(&cmd_7z)
+    .args(["x", "-y", &format!("-o{}", extract_dir.display())])
+    .arg(&installer)
+    .stdout(Stdio::null())
+    .stderr(Stdio::null())
+    .status();
+
+  match status {
+    Ok(s) if s.success() => {}
+    Ok(_) => {
+      eprintln!("❌ Failed to extract NSIS installer with {cmd_7z}");
+      return Err(());
+    }
+    Err(e) => {
+      eprintln!("❌ Failed to run {cmd_7z} (is it installed?): {e}");
+      return Err(());
+    }
+  }
+
+  // Look for assets in the extracted content
+  let result = find_assets_manifest(&extract_dir);
+
+  // Read content before cleanup
+  let manifest_content = result
+    .as_ref()
+    .and_then(|manifest| std::fs::read_to_string(manifest).ok());
+
+  // Cleanup
+  let _ = std::fs::remove_dir_all(&extract_dir);
+
+  match manifest_content {
+    Some(content) if !content.trim().is_empty() => {
+      println!("✅ Verified assets in NSIS installer");
+      println!("✅ Asset manifest content:\n{content}");
       Ok(())
     }
+    Some(_) => {
+      eprintln!("❌ Asset manifest in NSIS installer is empty");
+      Err(())
+    }
     None => {
-      eprintln!("❌ Could not find asset manifest in bundle");
+      eprintln!("❌ Could not find assets in extracted NSIS installer");
       Err(())
     }
   }
+}
+
+fn verify_linux_bundle_assets(bundle_dir: &std::path::Path) -> Result<(), ()> {
+  // Try AppImage first, then DEB
+  let appimage_dir = bundle_dir.join("appimage");
+  if appimage_dir.exists() {
+    if let Some(manifest) = find_assets_manifest(&appimage_dir) {
+      let content = std::fs::read_to_string(&manifest).map_err(|_| ())?;
+      if !content.trim().is_empty() {
+        println!("✅ Found asset manifest in AppImage: {}", manifest.display());
+        println!("✅ Asset manifest content:\n{content}");
+        return Ok(());
+      }
+    }
+  }
+
+  let deb_dir = bundle_dir.join("deb");
+  if deb_dir.exists() {
+    if let Some(manifest) = find_assets_manifest(&deb_dir) {
+      let content = std::fs::read_to_string(&manifest).map_err(|_| ())?;
+      if !content.trim().is_empty() {
+        println!("✅ Found asset manifest in DEB: {}", manifest.display());
+        println!("✅ Asset manifest content:\n{content}");
+        return Ok(());
+      }
+    }
+  }
+
+  eprintln!("❌ Could not find asset manifest in Linux bundle (checked AppImage and DEB)");
+  Err(())
 }
 
 fn find_assets_manifest(path: &std::path::Path) -> Option<std::path::PathBuf> {
@@ -487,11 +605,12 @@ fn run_cargo_command(
       Ok(())
     }
     Ok(_) => {
-      eprintln!("❌ Command failed: cargo +{} {}", toolchain, args.join(" "));
+      let args_str = args.join(" ");
+      eprintln!("❌ Command failed: cargo +{toolchain} {args_str}");
       Err(())
     }
     Err(e) => {
-      eprintln!("❌ Failed to run cargo: {}", e);
+      eprintln!("❌ Failed to run cargo: {e}");
       Err(())
     }
   }

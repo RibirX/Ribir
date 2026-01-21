@@ -25,13 +25,11 @@ pub fn cmd_collect(_config: &Config, version: &str, write: bool) -> Result<Strin
   let arena = Arena::new();
   let ctx = ChangelogContext::load(&arena)?;
 
-  let latest = ctx
-    .changelog
-    .latest_version()
-    .ok_or("No releases found")?;
-  println!("📌 Latest version: {}", latest);
+  let releases = ctx.changelog.releases();
+  let base_version = select_base_version(&releases, &target_ver)?;
+  println!("📌 Base version: {}", base_version);
 
-  let prs = get_merged_prs_since(&latest)?;
+  let prs = get_merged_prs_since(&base_version, _config.repo.as_deref())?;
   if prs.is_empty() {
     println!("✅ No new content.");
     return Ok(String::new());
@@ -39,6 +37,7 @@ pub fn cmd_collect(_config: &Config, version: &str, write: bool) -> Result<Strin
   println!("🔍 Found {} new PRs", prs.len());
 
   let release_node = ctx.ensure_release(&target_ver, &today());
+  clear_release_content(release_node);
   let mut current_pos = release_node;
 
   // Group entries by type
@@ -51,47 +50,57 @@ pub fn cmd_collect(_config: &Config, version: &str, write: bool) -> Result<Strin
 
   // Insert sections
   for kind in SectionKind::ALL {
-    if let Some(entries) = sections.get(kind) {
-      if *kind == SectionKind::Internal {
-        // Internal section: wrap in collapsible <details> tag
-        let mut items_md = String::new();
-        for entry in entries {
-          let text = collect_text(entry);
-          items_md.push_str(&format!("- {}\n", text.trim()));
-        }
+    if let Some(mut entries) = sections.remove(kind) {
+      entries.sort_by_cached_key(|node| crate::changelog::extract_scope(node));
 
-        let details_html =
-          format!("<details>\n<summary>{}</summary>\n\n{}\n</details>\n", kind.header(), items_md);
-        let html_block = ctx.new_html_block(&details_html);
-        current_pos.insert_after(html_block);
-        current_pos = html_block;
+      current_pos = if *kind == SectionKind::Internal {
+        insert_internal_section(&ctx, current_pos, kind, entries)
       } else {
-        // Regular section: H3 heading + list
-        // 1. Heading
-        let h3 = ctx.new_heading(3, &kind.header());
-        current_pos.insert_after(h3);
-        current_pos = h3;
-
-        // 2. List
-        let list = ctx.new_node(NodeValue::List(NodeList {
-          list_type: ListType::Bullet,
-          delimiter: ListDelimType::Period,
-          bullet_char: b'-',
-          tight: true,
-          ..NodeList::default()
-        }));
-        current_pos.insert_after(list);
-        current_pos = list;
-
-        // 3. Items
-        for entry in entries {
-          list.append(*entry);
-        }
-      }
+        insert_regular_section(&ctx, current_pos, kind, entries)
+      };
     }
   }
 
   ctx.save_and_get_content(!write)
+}
+
+fn insert_internal_section<'a>(
+  ctx: &ChangelogContext<'a>, current_pos: Node<'a>, kind: &SectionKind, entries: Vec<Node<'a>>,
+) -> Node<'a> {
+  // Internal section: wrap in collapsible <details> tag
+  let mut items_md = String::new();
+  for entry in entries {
+    let text = collect_text(entry);
+    items_md.push_str(&format!("- {}\n", text.trim()));
+  }
+
+  let details_html =
+    format!("<details>\n<summary>{}</summary>\n\n{}\n</details>\n", kind.header(), items_md);
+  let html_block = ctx.new_html_block(&details_html);
+  current_pos.insert_after(html_block);
+  html_block
+}
+
+fn insert_regular_section<'a>(
+  ctx: &ChangelogContext<'a>, current_pos: Node<'a>, kind: &SectionKind, entries: Vec<Node<'a>>,
+) -> Node<'a> {
+  // Regular section: H3 heading + list
+  let h3 = ctx.new_heading(3, &kind.header());
+  current_pos.insert_after(h3);
+
+  let list = ctx.new_node(NodeValue::List(NodeList {
+    list_type: ListType::Bullet,
+    delimiter: ListDelimType::Period,
+    bullet_char: b'-',
+    tight: true,
+    ..NodeList::default()
+  }));
+  h3.insert_after(list);
+
+  for entry in entries {
+    list.append(entry);
+  }
+  list
 }
 
 /// Merge pre-release versions into target version.
@@ -134,10 +143,6 @@ fn extract_change_entries<'a>(ctx: &ChangelogContext<'a>, pr: &PR) -> Vec<(Secti
     }
 
     if let Some(content) = extract_block(body) {
-      // Note: We need a temporary arena for parsing the PR body block.
-      // But we can't easily move nodes between arenas if they are lifetime bound to
-      // arena. COMRAK LIMITATION: We must use the SAME arena.
-      // `ctx.arena` is available.
       let root = parse_document(ctx.arena, &content, &Options::default());
 
       // Collect all items from lists and top-level paragraphs
@@ -145,30 +150,15 @@ fn extract_change_entries<'a>(ctx: &ChangelogContext<'a>, pr: &PR) -> Vec<(Secti
 
       for (target, content_node) in items {
         let text = collect_text(content_node);
-        if let Some((kind, _desc)) = parse_conventional_head(&text) {
-          let item = ctx.new_node(NodeValue::Item(NodeList {
-            list_type: ListType::Bullet,
-            bullet_char: b'-',
-            delimiter: ListDelimType::Period,
-            tight: true,
-            ..NodeList::default()
-          }));
-
-          if matches!(target.data.borrow().value, NodeValue::Item(_)) {
-            for child in target.children() {
-              item.append(ctx.deep_clone(child));
-            }
-          } else {
-            let p = ctx.new_node(NodeValue::Paragraph);
-            p.append(ctx.deep_clone(target));
-            item.append(p);
-          }
-
+        if let Some((kind, desc)) = parse_conventional_head(&text) {
+          let item = create_formatted_item(ctx, target, &text, desc);
           inject_pr_meta(ctx, item, pr);
           entries.push((kind, item));
         }
       }
-      return entries;
+      if !entries.is_empty() {
+        return entries;
+      }
     }
   }
 
@@ -182,6 +172,38 @@ fn extract_change_entries<'a>(ctx: &ChangelogContext<'a>, pr: &PR) -> Vec<(Secti
   }
 
   entries
+}
+
+fn create_formatted_item<'a>(
+  ctx: &ChangelogContext<'a>, target: Node<'a>, raw_text: &str, desc: &str,
+) -> Node<'a> {
+  let item = ctx.new_node(NodeValue::Item(NodeList {
+    list_type: ListType::Bullet,
+    bullet_char: b'-',
+    delimiter: ListDelimType::Period,
+    tight: true,
+    ..NodeList::default()
+  }));
+
+  let p = ctx.new_node(NodeValue::Paragraph);
+  if let Some(scope) = extract_conventional_scope(raw_text) {
+    let strong = ctx.new_node(NodeValue::Strong);
+    strong.append(ctx.new_text(scope));
+    p.append(strong);
+    p.append(ctx.new_text(format!(": {}", desc)));
+  } else {
+    p.append(ctx.new_text(desc.to_string()));
+  }
+  item.append(p);
+
+  if matches!(target.data.borrow().value, NodeValue::Item(_)) {
+    for (i, child) in target.children().enumerate() {
+      if i != 0 {
+        item.append(ctx.deep_clone(child));
+      }
+    }
+  }
+  item
 }
 
 /// Collect changelog items from parsed markdown AST.
@@ -238,6 +260,41 @@ fn parse_conventional_head(text: &str) -> Option<(SectionKind, &str)> {
     .unwrap_or(head);
   let kind = SectionKind::from_str(type_scope)?;
   Some((kind, desc.trim()))
+}
+
+fn extract_conventional_scope(text: &str) -> Option<String> {
+  let (head, _) = text.split_once(':')?;
+  let start = head.find('(')?;
+  let end = head[start + 1..].find(')')?;
+  Some(head[start + 1..start + 1 + end].to_string())
+}
+
+fn select_base_version(
+  releases: &[crate::changelog::Release<'_>], target: &Version,
+) -> Result<Version> {
+  if releases.is_empty() {
+    return Err("No releases found".into());
+  }
+
+  if let Some(pos) = releases.iter().position(|r| &r.version == target) {
+    let next = releases
+      .get(pos + 1)
+      .ok_or("No previous release found for target version")?;
+    return Ok(next.version.clone());
+  }
+
+  Ok(releases[0].version.clone())
+}
+
+fn clear_release_content(header: Node<'_>) {
+  let mut current = header.next_sibling();
+  while let Some(node) = current {
+    current = node.next_sibling();
+    if matches!(node.data.borrow().value, NodeValue::Heading(ref h) if h.level == 2) {
+      break;
+    }
+    node.detach();
+  }
 }
 
 #[cfg(test)]
@@ -338,5 +395,69 @@ mod tests {
       "Should preserve additional documentation, got: {}",
       all_text
     );
+  }
+
+  #[test]
+  fn test_extract_entries_fallback_to_title_when_block_empty() {
+    use crate::types::Author;
+
+    let body = format!(
+      "{}\n\n- [ ] 🔧 No changelog needed (tests, CI, infra, or unreleased fix)\n{}",
+      MARKER_START, MARKER_END
+    );
+    let pr = PR {
+      number: 24,
+      title: "Scripts".into(),
+      body: Some(body),
+      author: Author { login: "dev".into() },
+    };
+
+    let arena = Arena::new();
+    let ctx = ChangelogContext::load_from_content(&arena, "# Changelog\n").unwrap();
+    let entries = extract_change_entries(&ctx, &pr);
+
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].0, SectionKind::Internal);
+  }
+
+  #[test]
+  fn test_select_base_version() {
+    let arena = Arena::new();
+    let content = r#"## [0.5.0-alpha.2] - 2025-01-20
+
+## [0.5.0-alpha.1] - 2025-01-15
+"#;
+    let ctx = ChangelogContext::load_from_content(&arena, content).unwrap();
+    let releases = ctx.changelog.releases();
+
+    let target = Version::parse("0.5.0-alpha.2").unwrap();
+    let base = select_base_version(&releases, &target).unwrap();
+    assert_eq!(base.to_string(), "0.5.0-alpha.1");
+
+    let missing = Version::parse("0.5.0-alpha.3").unwrap();
+    let base = select_base_version(&releases, &missing).unwrap();
+    assert_eq!(base.to_string(), "0.5.0-alpha.2");
+  }
+
+  #[test]
+  fn test_clear_release_content() {
+    let arena = Arena::new();
+    let content = r#"## [0.5.0-alpha.2] - 2025-01-20
+
+### Features
+- feat: example
+
+## [0.5.0-alpha.1] - 2025-01-15
+"#;
+    let ctx = ChangelogContext::load_from_content(&arena, content).unwrap();
+    let header = ctx.changelog.releases()[0].header;
+
+    clear_release_content(header);
+
+    let mut output = String::new();
+    let mut opts = Options::default();
+    opts.render.r#unsafe = true;
+    comrak::format_commonmark(ctx.root, &opts, &mut output).unwrap();
+    assert!(!output.contains("feat: example"));
   }
 }

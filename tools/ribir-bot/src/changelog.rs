@@ -9,7 +9,7 @@ use comrak::{
   Arena, Node, Options,
   nodes::{
     Ast, AstNode, LineColumn, ListDelimType, ListType, NodeCode, NodeHeading, NodeHtmlBlock,
-    NodeList, NodeValue,
+    NodeLink, NodeList, NodeValue,
   },
   parse_document,
 };
@@ -124,13 +124,20 @@ pub fn collect_text<'a>(node: Node<'a>) -> String {
 /// Returns the scope string for sorting purposes.
 pub fn extract_scope<'a>(node: Node<'a>) -> String {
   let text = collect_text(node);
-  // Look for **scope**: pattern
+
   if let Some(start) = text.find("**")
     && let Some(end) = text[start + 2..].find("**")
   {
     return text[start + 2..start + 2 + end].to_lowercase();
   }
-  // Fallback: return the whole text for sorting
+
+  if let Some((head, _)) = text.split_once(':')
+    && let Some(start) = head.find('(')
+    && let Some(end) = head[start + 1..].find(')')
+  {
+    return head[start + 1..start + 1 + end].to_lowercase();
+  }
+
   text.to_lowercase()
 }
 
@@ -199,7 +206,8 @@ impl<'a> ChangelogContext<'a> {
     comrak::format_commonmark(self.root, &opts, &mut content)?;
 
     if dry_run {
-      println!("📝 Preview:\n{}\n... (truncated)", &content.chars().take(2000).collect::<String>());
+      let preview = content.chars().take(2000).collect::<String>();
+      println!("📝 Preview:\n{}\n... (truncated)", preview);
       println!("\n💡 Run with --write to apply.");
     } else {
       // Ensure parent directory exists
@@ -226,6 +234,13 @@ impl<'a> ChangelogContext<'a> {
     let h = self.new_node(NodeValue::Heading(NodeHeading { level, setext: false, closed: false }));
     h.append(self.new_text(text.to_string()));
     h
+  }
+
+  pub fn new_link(&self, text: &str, url: &str) -> Node<'a> {
+    let link = self
+      .new_node(NodeValue::Link(Box::new(NodeLink { url: url.to_string(), title: String::new() })));
+    link.append(self.new_text(text.to_string()));
+    link
   }
 
   pub fn deep_clone<'b>(&self, node: Node<'b>) -> Node<'a> {
@@ -270,12 +285,15 @@ impl<'a> ChangelogContext<'a> {
     }
 
     // Create new header with release link
-    let text = if let Ok(repo) = crate::external::get_origin_repo() {
-      format!("[{}](https://github.com/{}/releases/tag/v{}) - {}", ver, repo, ver, date)
+    let h2 =
+      self.new_node(NodeValue::Heading(NodeHeading { level: 2, setext: false, closed: false }));
+    if let Ok(repo) = crate::external::get_origin_repo() {
+      let url = format!("https://github.com/{}/releases/tag/v{}", repo, ver);
+      h2.append(self.new_link(&ver.to_string(), &url));
     } else {
-      format!("[{}] - {}", ver, date)
-    };
-    let h2 = self.new_heading(2, &text);
+      h2.append(self.new_text(ver.to_string()));
+    }
+    h2.append(self.new_text(format!(" - {}", date)));
 
     // Insert: Find insertion point (first H2 or specific marker)
     let insert_node = self
@@ -461,6 +479,23 @@ mod tests {
     assert_eq!(releases.len(), 1);
     assert_eq!(releases[0].version.to_string(), "0.5.0-alpha.1");
     assert_eq!(releases[0].date, "2025-01-15");
+  }
+
+  #[test]
+  fn test_render_release_link_without_escaping() {
+    let arena = Arena::new();
+    let ctx = ChangelogContext::load_from_content(&arena, "# Changelog\n").unwrap();
+    let version = Version::parse("0.5.0-alpha.1").unwrap();
+
+    ctx.ensure_release(&version, "2025-01-15");
+
+    let mut output = String::new();
+    let mut opts = Options::default();
+    opts.render.r#unsafe = true;
+    comrak::format_commonmark(ctx.root, &opts, &mut output).unwrap();
+
+    assert!(output.contains("## [0.5.0-alpha.1]"));
+    assert!(!output.contains("## \\[") && !output.contains("\\]"));
   }
 
   #[test]

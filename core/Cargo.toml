@@ -21,10 +21,10 @@ log.workspace = true
 lyon_geom.workspace = true
 paste.workspace = true
 pin-project-lite.workspace = true
-ribir_algo = {path = "../algo", version = "0.4.0-alpha.54" }
-ribir_geom = {path = "../geom", version = "0.4.0-alpha.54" }
-ribir_macros = {path = "../macros", version = "0.4.0-alpha.54" }
-ribir_painter = {path = "../painter", version = "0.4.0-alpha.54" }
+ribir_algo = { workspace = true }
+ribir_geom = { workspace = true }
+ribir_macros = { workspace = true }
+ribir_painter = { workspace = true }
 image-webp.workspace = true
 rxrust.workspace = true
 smallvec.workspace = true

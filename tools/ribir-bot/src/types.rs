@@ -25,13 +25,17 @@ pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
     ribir-bot release next alpha           Preview alpha release
     ribir-bot release next alpha --execute Execute alpha release
     ribir-bot release enter-rc --version 0.5.0
-    ribir-bot release highlights           Regenerate highlights")]
+    ribir-bot release highlights           Regenerate highlights
+    ribir-bot log collect --repo RibirX/Ribir --version 0.5.0")]
 pub struct Config {
   #[command(subcommand)]
   pub command: Cmd,
   /// Preview without applying changes
   #[arg(long, global = true)]
   pub dry_run: bool,
+  /// GitHub repo to use (owner/repo)
+  #[arg(long, global = true)]
+  pub repo: Option<String>,
   /// GitHub comment ID to react to
   #[arg(long, global = true, value_parser = parse_comment_id)]
   pub comment_id: Option<Option<u64>>,

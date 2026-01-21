@@ -50,11 +50,9 @@
 
 use std::{
   fs,
-  hash::{Hash, Hasher},
   path::{Path, PathBuf},
 };
 
-use ahash::AHasher;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Ident, LitBool, LitStr, parse::Parse};
@@ -547,9 +545,16 @@ fn get_workspace_base(span: proc_macro2::Span) -> syn::Result<(PathBuf, Option<P
 
 /// Generate a short hash of the path for unique filenames.
 fn hash_path(path: &str) -> String {
-  let mut h = AHasher::default();
-  path.hash(&mut h);
-  format!("{:08x}", h.finish())
+  // Use FNV-1a 64-bit hash for stability across builds
+  const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+  const FNV_PRIME: u64 = 0x100_0000_01b3;
+
+  let mut hash = FNV_OFFSET_BASIS;
+  for byte in path.bytes() {
+    hash ^= byte as u64;
+    hash = hash.wrapping_mul(FNV_PRIME);
+  }
+  format!("{hash:016x}")
 }
 
 /// Append asset mapping to manifest file for bundle packaging.
