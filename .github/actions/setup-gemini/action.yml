@@ -9,13 +9,13 @@ runs:
       uses: actions/cache@v4
       with:
         path: ~/.npm-global
-        key: gemini-cli-0.23
+        key: gemini-cli-0.24
 
     - name: Setup Node.js
       if: steps.cache-gemini.outputs.cache-hit != 'true'
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: "20"
 
     - name: Install Gemini CLI
       if: steps.cache-gemini.outputs.cache-hit != 'true'
@@ -23,7 +23,7 @@ runs:
       run: |
         mkdir -p ~/.npm-global
         npm config set prefix ~/.npm-global
-        npm install -g @google/gemini-cli@^0.23.0
+        npm install -g @google/gemini-cli@^0.24.0
 
     - name: Add Gemini to PATH
       shell: bash

@@ -84,6 +84,18 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -euo pipefail
+
+          # Create .geminiignore to exclude unsupported image formats (Gemini API only supports PNG/JPEG/WEBP)
+          cat > .geminiignore << 'EOF'
+          *.gif
+          *.GIF
+          *.heic
+          *.HEIC
+          *.tiff
+          *.TIFF
+          test_cases/**/*.png
+          EOF
+
           COMMAND="${{ steps.cmd.outputs.command }}"
           SUBCMD=$(echo "$COMMAND" | sed 's/release-//')
           CONTEXT="${{ steps.cmd.outputs.context }}"
@@ -94,6 +106,16 @@ jobs:
             ribir-bot release "$SUBCMD"
           fi
 
+      - name: Dump Gemini error report
+        if: failure() && steps.event.outputs.should_run == 'true' && steps.cmd.outputs.command != 'release-stable'
+        run: |
+          set -euo pipefail
+          ls /tmp/gemini-client-error-*.json 2>/dev/null || exit 0
+          echo "--- Gemini error report(s) ---"
+          for f in /tmp/gemini-client-error-*.json; do
+            echo "# $f"
+            cat "$f"
+          done
 
       - name: Check Mergeability
         if: steps.cmd.outputs.command == 'release-stable'
