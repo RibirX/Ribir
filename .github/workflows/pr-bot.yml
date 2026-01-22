@@ -29,10 +29,13 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Install ribir-bot
-        uses: taiki-e/install-action@v2
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          tool: ribir-bot@0.1
+          toolchain: stable
+
+      - name: Install ribir-bot from repo
+        run: cargo install --path tools/ribir-bot
 
       - uses: ./.github/actions/setup-gemini
 
@@ -65,9 +68,24 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -euo pipefail
+
+          # Create .geminiignore to exclude unsupported image formats (Gemini API only supports PNG/JPEG/WEBP)
+          cat > .geminiignore << 'EOF'
+          *.gif
+          *.GIF
+          *.heic
+          *.HEIC
+          *.tiff
+          *.TIFF
+          test_cases/**/*.png
+          EOF
+
+          echo "Gemini CLI: $(gemini --version || true)"
           COMMAND="${{ steps.event.outputs.command }}"
           PR_ID="${{ steps.event.outputs.pr_id }}"
           CONTEXT="${{ steps.event.outputs.context }}"
+          echo "Command=$COMMAND PR_ID=$PR_ID"
+          echo "Context length=${#CONTEXT}"
 
           if [ -z "$COMMAND" ] || [ -z "$PR_ID" ]; then
             echo "Missing required outputs: command/pr_id" >&2
@@ -90,3 +108,14 @@ jobs:
           else
             ribir-bot "${CMD[@]}" "$PR_ID"
           fi
+
+      - name: Dump Gemini error report
+        if: failure() && steps.event.outputs.should_run == 'true'
+        run: |
+          set -euo pipefail
+          ls /tmp/gemini-client-error-*.json 2>/dev/null || exit 0
+          echo "--- Gemini error report(s) ---"
+          for f in /tmp/gemini-client-error-*.json; do
+            echo "# $f"
+            cat "$f"
+          done
