@@ -27,15 +27,6 @@ pub struct Stack {
 #[declare(simple)]
 pub struct InParentLayout;
 
-/// This macro is use to generate a function widget that using
-/// [`InParentLayout`] as the root widget.
-#[macro_export]
-macro_rules! in_parent_layout {
-  ($($tt:tt)*) => {
-    fn_widget! { @InParentLayout { $($tt)* } }
-  };
-}
-
 /// Determines how the constraints are passed to the children of a [`Stack`].
 ///
 /// This enum controls the layout behavior of the `Stack`'s children based on
