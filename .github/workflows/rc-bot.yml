@@ -121,11 +121,11 @@ jobs:
         if: steps.cmd.outputs.command == 'release-stable'
         run: sudo apt-get update && sudo apt-get install -y libwebp-dev libasound2-dev pkg-config
 
-      - name: Install cargo-workspaces
+      - name: Install cargo-edit
         if: steps.cmd.outputs.command == 'release-stable'
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-workspaces
+          tool: cargo-edit
 
       - name: Release Stable
         if: steps.cmd.outputs.command == 'release-stable'

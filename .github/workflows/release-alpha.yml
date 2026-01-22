@@ -31,7 +31,7 @@ jobs:
       - name: Install tools
         uses: taiki-e/install-action@v2
         with:
-          tool: ribir-bot@0.1,cargo-workspaces
+          tool: ribir-bot@0.1,cargo-edit
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2

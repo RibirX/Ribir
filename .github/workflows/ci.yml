@@ -357,16 +357,16 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Install cargo-workspaces
+      - name: Install cargo-edit
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-workspaces
+          tool: cargo-edit
 
       - name: Install dependencies
         run: brew install webp
 
       - name: Dry run release
-        run: cargo ws publish --dry-run -y --allow-branch "*"
+        run: cargo run -p ribir-bot -- release next alpha --dry-run
 
   status-report:
     name: CI unified status report

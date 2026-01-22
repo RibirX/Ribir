@@ -8,9 +8,6 @@ repository = "https://github.com/RibirX/Ribir"
 readme = "README.md"
 publish = false
 
-[package.metadata.workspaces]
-independent = true
-
 [dependencies]
 xshell = "0.2.3"
 clap = {version = "4.5.4", features = ["cargo", "derive"] }
