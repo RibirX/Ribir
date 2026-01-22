@@ -21,8 +21,8 @@ pub(crate) fn declare_macro(stt: &mut syn::ItemStruct, is_attr: bool) -> Result<
 
   if !declarer.simple {
     tokens.extend(deref_fat_obj(&declarer));
-    tokens.extend(widget_macro_to_tokens(declarer.host(), &declarer.original.vis));
   }
+  tokens.extend(widget_macro_to_tokens(declarer.host(), &declarer.original.vis));
 
   if is_attr || declarer.simple {
     declarer.original.to_tokens(&mut tokens);
