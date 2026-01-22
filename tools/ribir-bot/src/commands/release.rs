@@ -567,7 +567,7 @@ fn run_release_publish(cfg: CargoWsPublishConfig) -> Result<()> {
     // 2. Update Cargo.lock
     println!("🔧 Updating Cargo.lock...");
     let status = Command::new("cargo")
-      .args(&["check", "--workspace"])
+      .args(["check", "--workspace"])
       .status()?;
     if !status.success() {
       return Err("Failed to update Cargo.lock".into());
@@ -594,7 +594,7 @@ fn run_release_publish(cfg: CargoWsPublishConfig) -> Result<()> {
   // 5. Publish
   println!("🚀 Publishing workspace...");
   let mut cmd = Command::new("cargo");
-  cmd.args(&["publish", "--workspace", "--exclude", "ribir-bot", "--exclude", "cli"]);
+  cmd.args(["publish", "--workspace", "--exclude", "ribir-bot", "--exclude", "cli"]);
 
   if cfg.dry_run {
     cmd.arg("--dry-run");
