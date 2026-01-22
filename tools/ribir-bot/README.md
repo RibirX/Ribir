@@ -18,7 +18,7 @@ cargo install --path .
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) - for GitHub operations
 - [Gemini CLI](https://github.com/anthropics/gemini) (`gemini`) - for AI generation
-- [cargo-workspaces](https://github.com/pksunkara/cargo-workspaces) - for version bumping and publishing
+- [cargo-edit](https://github.com/killercup/cargo-edit) - for version management
 
 ## Usage
 
@@ -155,9 +155,9 @@ src/
 
 The unified release workflow:
 
-1. **Get version**: Runs `cargo ws version <level> --dry-run` to determine next version
+1. **Get version**: Runs `cargo set-version <level> --dry-run` logic (internal) to determine next version
 2. **Collect changelog**: Gathers entries from merged PRs into CHANGELOG.md
-3. **Cargo workspace**: Bumps versions, commits, tags, pushes, publishes to crates.io
+3. **Cargo workspace**: Bumps versions using `cargo set-version`, commits, tags, and publishes to crates.io
 4. **GitHub Release**: Creates release with notes from changelog
 
 **Dry-run mode** (default): Shows what would happen, including changelog and release notes preview.

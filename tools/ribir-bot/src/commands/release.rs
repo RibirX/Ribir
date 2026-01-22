@@ -69,7 +69,7 @@ pub fn cmd_release_next(config: &Config, level: ReleaseLevel) -> Result<()> {
   println!("📋 Collecting changelog entries...");
   let changelog_entries = collect_changelog_entries(&version, config.dry_run)?;
 
-  // Commit changelog first, then cargo ws publish will --amend it
+  // Commit changelog first, then cargo publish will --amend it
   let has_changelog_commit = if !config.dry_run {
     run_git(&["add", "CHANGELOG.md"])?;
     run_git(&[
@@ -82,8 +82,8 @@ pub fn cmd_release_next(config: &Config, level: ReleaseLevel) -> Result<()> {
     false
   };
 
-  println!("🔧 Publishing with cargo-workspaces...");
-  run_cargo_ws_publish(CargoWsPublishConfig {
+  println!("🔧 Publishing with cargo-edit & cargo publish...");
+  run_release_publish(CargoWsPublishConfig {
     version: &version,
     has_changelog_commit,
     dry_run: config.dry_run,
@@ -166,7 +166,7 @@ pub fn cmd_release_enter_rc(config: &Config) -> Result<()> {
 
     println!("📦 Publishing {}...", rc_version);
     // commit_and_create_release_pr already committed, so use --amend
-    run_cargo_ws_publish(CargoWsPublishConfig {
+    run_release_publish(CargoWsPublishConfig {
       version: &rc_version,
       has_changelog_commit: true,
       dry_run: config.dry_run,
@@ -279,7 +279,7 @@ pub fn cmd_release_stable(config: &Config, version: Option<&str>) -> Result<()> 
   };
 
   println!("📦 Publishing {}...", version_str);
-  run_cargo_ws_publish(CargoWsPublishConfig {
+  run_release_publish(CargoWsPublishConfig {
     version: &version_str,
     has_changelog_commit,
     dry_run: config.dry_run,
@@ -400,16 +400,12 @@ pub fn cmd_release_verify() -> Result<()> {
   }
 
   println!("\n🔧 Required tools:");
-  for (cmd, name) in [("gh", "GitHub CLI"), ("gemini", "Gemini CLI")] {
-    let status = if Command::new(cmd)
-      .arg("--version")
-      .output()
-      .is_ok()
-    {
-      "✅"
-    } else {
-      "❌"
-    };
+  for (cmd, args, name) in [
+    ("gh", vec!["--version"], "GitHub CLI"),
+    ("gemini", vec!["--version"], "Gemini CLI"),
+    ("cargo", vec!["set-version", "--version"], "cargo-edit"),
+  ] {
+    let status = if Command::new(cmd).args(args).output().is_ok() { "✅" } else { "❌" };
     println!("   {} {}", status, name);
   }
 
@@ -529,7 +525,7 @@ fn get_next_version(level: &str) -> Result<String> {
   Ok(version.to_string())
 }
 
-/// Configuration for cargo-workspaces publish
+/// Configuration for release publish
 struct CargoWsPublishConfig<'a> {
   /// The version to publish (e.g., "0.4.0" or "0.4.0-alpha.55")
   version: &'a str,
@@ -540,54 +536,77 @@ struct CargoWsPublishConfig<'a> {
   dry_run: bool,
 }
 
-/// Publish using cargo-workspaces with smart commit handling.
+/// Publish using cargo-edit (set-version) and cargo publish.
 ///
 /// If `has_changelog_commit` is true, uses `--amend` to merge the version
 /// bump into the existing changelog commit, resulting in a single clean commit.
-fn run_cargo_ws_publish(cfg: CargoWsPublishConfig) -> Result<()> {
+fn run_release_publish(cfg: CargoWsPublishConfig) -> Result<()> {
+  // 1. Set Version
   let mut args = vec![
-    "ws".to_string(),
-    "publish".to_string(),
-    "custom".to_string(),
+    "set-version".to_string(),
+    "--workspace".to_string(),
     cfg.version.to_string(),
-    "--no-individual-tags".to_string(),
-    "--no-git-push".to_string(), // We control push separately
-    "--allow-dirty".to_string(), // Allow staged changelog changes
-    "-y".to_string(),            // Skip confirmation
+    "--exclude".to_string(),
+    "ribir-bot".to_string(),
+    "--exclude".to_string(),
+    "cli".to_string(),
   ];
 
-  // Use --amend to merge into existing changelog commit
-
-  // Release-related commit message (overwrites changelog message if --amend)
-  let commit_msg = format!("chore(release): v{}\n\n🤖 Generated with ribir-bot", cfg.version);
-
-  if cfg.has_changelog_commit {
-    // If getting ready to amend, ensure the message is correct first because
-    // cargo-workspaces doesn't allow -m with --amend
-    if !cfg.dry_run {
-      run_git(&["commit", "--amend", "-m", &commit_msg])?;
-    }
-    args.push("--amend".to_string());
-  } else {
-    args.push("-m".to_string());
-    args.push(commit_msg);
-  }
-
-  // Dry-run mode for safety (default)
   if cfg.dry_run {
     args.push("--dry-run".to_string());
   }
 
   println!("🔧 Running: cargo {}", args.join(" "));
-
-  let status = Command::new("cargo")
-    .args(&args)
-    .env("CARGO_NET_GIT_FETCH_WITH_CLI", "true")
-    .status()?;
+  let status = Command::new("cargo").args(&args).status()?;
 
   if !status.success() {
-    return Err(format!("cargo ws publish failed with exit code: {:?}", status.code()).into());
+    return Err(format!("cargo set-version failed with exit code: {:?}", status.code()).into());
   }
+
+  if !cfg.dry_run {
+    // 2. Update Cargo.lock
+    println!("🔧 Updating Cargo.lock...");
+    let status = Command::new("cargo")
+      .args(&["check", "--workspace"])
+      .status()?;
+    if !status.success() {
+      return Err("Failed to update Cargo.lock".into());
+    }
+
+    // 3. Commit
+    run_git(&["add", "."])?;
+
+    let commit_msg = format!("chore(release): v{}\n\n🤖 Generated with ribir-bot", cfg.version);
+
+    if cfg.has_changelog_commit {
+      run_git(&["commit", "--amend", "-m", &commit_msg])?;
+    } else {
+      run_git(&["commit", "-m", &commit_msg])?;
+    }
+
+    // 4. Tag
+    println!("🏷️  Creating git tag v{}...", cfg.version);
+    run_git(&["tag", &format!("v{}", cfg.version)])?;
+  } else {
+    println!("📝 Skipping Lockfile update, Commit, and Tag in dry-run mode");
+  }
+
+  // 5. Publish
+  println!("🚀 Publishing workspace...");
+  let mut cmd = Command::new("cargo");
+  cmd.args(&["publish", "--workspace", "--exclude", "ribir-bot", "--exclude", "cli"]);
+
+  if cfg.dry_run {
+    cmd.arg("--dry-run");
+    cmd.arg("--allow-dirty");
+  }
+
+  let status = cmd.status()?;
+
+  if !status.success() {
+    return Err("Failed to publish workspace".into());
+  }
+
   Ok(())
 }
 
