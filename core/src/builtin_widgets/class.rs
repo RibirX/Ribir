@@ -131,8 +131,28 @@ macro_rules! named_styles_impl {
 /// Combines multiple class implementations into a single implementation.
 /// This macro takes a list of class implementations and returns a closure
 /// that applies each implementation sequentially to a `Widget`.
+///
+/// The first implementation in the list runs first, and the last one is
+/// applied last (closest to the widget).
+///
+/// # Example
+/// ```
+/// use ribir::prelude::*;
+///
+/// class_names!(PADDING_AND_BG);
+///
+/// fn init_classes(classes: &mut Classes) {
+///   classes.insert(
+///     PADDING_AND_BG,
+///     class_chain_impl![
+///       style_class! { padding: EdgeInsets::all(4.) },
+///       style_class! { background: Color::BLUE }
+///     ],
+///   );
+/// }
+/// ```
 #[macro_export]
-macro_rules! class_multi_impl {
+macro_rules! class_chain_impl {
   ($($class: expr),*) => {
     move |mut w: Widget| {
       $(w = $class(w);)*
@@ -141,37 +161,26 @@ macro_rules! class_multi_impl {
   };
 }
 
-/// Creates a vector of class names from a list of class expressions. The
-/// resulting array can be used to apply multiple classes to a widget. The last
-/// class in the list will be applied first, as it is closest to the widget.
+/// Applies multiple class names in order, closest to the child last.
+///
+/// Use `class_chain!` in DSL contexts, or `@ClassChain { ... }` in
+/// `rdl!`/`fn_widget!`.
 ///
 /// # Example
 /// ```
 /// use ribir::prelude::*;
 ///
-/// class_names!(RED_BORDER, BLUE_BACKGROUND);
+/// class_names!(RED_BORDER, BLUE_BG);
 ///
-/// let two_classes = class_array!(RED_BORDER, BLUE_BACKGROUND);
-///
-/// let widget = fn_widget! {
-///   @(two_classes) {
-///     @Container {
-///       size: Size::new(100., 100.),
-///     }
-///   }
+/// let _w = class_chain! {
+///   class_chain: [RED_BORDER.r_into(), BLUE_BG.r_into()],
+///   @Container { size: Size::new(100., 100.) }
 /// };
 /// ```
-#[macro_export]
-macro_rules! class_array {
-  ($($class:expr),* $(,)?) => {{
-    [
-      $(
-        $crate::prelude::PipeValue
-          ::<Option<$crate::prelude::ClassName>>
-          ::r_from($class)
-      ),*
-    ]
-  }};
+#[declare[simple, stateless]]
+pub struct ClassChain<const N: usize> {
+  #[declare(strict)]
+  pub class_chain: [PipeValue<Option<ClassName>>; N],
 }
 
 /// A empty class implementation that returns the input widget as is.
@@ -361,14 +370,15 @@ impl<'c> ComposeChild<'c> for Class {
   }
 }
 
-impl<'w, const M: usize> ComposeChild<'w> for [PipeValue<Option<ClassName>>; M] {
+impl<'w, const M: usize> ComposeChild<'w> for ClassChain<M> {
   type Child = Widget<'w>;
 
   fn compose_child(this: impl StateWriter<Value = Self>, mut widget: Self::Child) -> Widget<'w> {
-    let this = this
+    let class_chain = this
       .try_into_value()
-      .unwrap_or_else(|_| panic!("Class array only supports stateless."));
-    for cls in this.into_iter().rev() {
+      .unwrap_or_else(|_| panic!("ClassChain only supports stateless."));
+
+    for cls in class_chain.class_chain.into_iter().rev() {
       widget = match cls {
         PipeValue::Value(class) => Class { class }.with_child(widget).into_widget(),
         cls @ PipeValue::Pipe { .. } => {
@@ -610,14 +620,14 @@ mod tests {
   }
 
   #[test]
-  fn class_array() {
+  fn class_chain() {
     reset_test_env!();
 
     let wnd = TestWindow::from_widget(fn_widget! {
-      let margin_and_clamp = class_array![MARGIN, CLAMP_50];
       @Providers {
         providers: smallvec![initd_classes().into_provider()],
-        @(margin_and_clamp) {
+        @ClassChain {
+          class_chain: [ MARGIN.r_into(), CLAMP_50.r_into()],
           @Container {
             size: Size::new(100., 100.),
           }

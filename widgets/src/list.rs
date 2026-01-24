@@ -346,14 +346,17 @@ impl ListItem {
   }
 
   /// Generates classes based on the item's state
-  fn item_classes(item: &impl StateWatcher<Value = Self>) -> [PipeValue<Option<ClassName>>; 3] {
-    class_array![
-      distinct_pipe! {
-        if $read(item).is_selected() { LIST_ITEM_SELECTED } else { LIST_ITEM_UNSELECTED }
-      },
-      distinct_pipe! { $read(item).is_interactive().then_some(LIST_ITEM_INTERACTIVE) },
-      LIST_ITEM
-    ]
+  fn item_classes(item: &impl StateWatcher<Value = Self>) -> ClassChain<3> {
+    ClassChain {
+      class_chain: [
+        distinct_pipe! {
+          if $read(item).is_selected() { LIST_ITEM_SELECTED } else { LIST_ITEM_UNSELECTED }
+        }
+        .r_into(),
+        distinct_pipe! { $read(item).is_interactive().then_some(LIST_ITEM_INTERACTIVE) }.r_into(),
+        LIST_ITEM.r_into(),
+      ],
+    }
   }
 }
 

@@ -80,8 +80,9 @@ impl ComposeChild<'static> for Radio {
     fat_obj! {
       on_action: move |_| $write(this).selected = true,
       @ {
-        let classes = class_array![distinct_pipe!($read(this).radio_class_name()), RADIO];
-        let icon = @(classes) {
+        let select_state_cls = distinct_pipe!($read(this).radio_class_name());
+        let icon = @ClassChain {
+          class_chain: [select_state_cls.r_into(), RADIO.r_into()],
           @Icon {
             @Void { class: distinct_pipe!($read(this).radio_icon_class_name()) }
           }
