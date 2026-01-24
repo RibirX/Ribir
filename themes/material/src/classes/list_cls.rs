@@ -108,21 +108,21 @@ pub(super) fn init(classes: &mut Classes) {
       // Overrides the thumbnail class, to shrink the left margin space in the leading.
       providers: [Class::provider(
         LIST_ITEM_THUMBNAIL,
-        class_multi_impl![standard_thumbnail, style_class! { margin: EdgeInsets::only_left(-16.)}],
+        class_chain_impl![standard_thumbnail, style_class! { margin: EdgeInsets::only_left(-16.)}],
       )],
     },
   );
 
   classes.insert(
     LIST_ITEM_TRAILING,
-    class_multi_impl![
+    class_chain_impl![
       ensure_trailing_spacing,
       style_class! {
         margin: md::EDGES_RIGHT_16,
         // Overrides the thumbnail class, to shrink the right margin space in the trailing.
         providers: [Class::provider(
           LIST_ITEM_THUMBNAIL,
-          class_multi_impl![
+          class_chain_impl![
             standard_thumbnail,
             style_class! { margin: EdgeInsets::only_right(-16.)}
           ],

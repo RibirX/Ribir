@@ -81,13 +81,13 @@ impl ComposeChild<'static> for Switch {
 
   fn compose_child(this: impl StateWriter<Value = Self>, child: Self::Child) -> Widget<'static> {
     fn_widget! {
-      let classes = class_array![SWITCH, distinct_pipe!($read(this).state_class_name())];
-      let switch_widget = @(classes) {
+      let state_cls = distinct_pipe!($read(this).state_class_name());
+      let thumb_state_cls = distinct_pipe!($read(this).thumb_class_name());
+      let switch_widget = @ClassChain {
+        class_chain: [SWITCH.r_into(), state_cls.r_into()],
         @Stack {
-          @(class_array![
-            SWITCH_THUMB,
-            distinct_pipe!($read(this).thumb_class_name())
-            ]) {
+          @ClassChain {
+            class_chain: [SWITCH_THUMB.r_into(), thumb_state_cls.r_into()],
             @Void {
               clamp: BoxClamp::fixed_size(Size::new(40., 20.)),
             }

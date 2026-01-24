@@ -13,7 +13,7 @@ pub(super) fn init(classes: &mut Classes) {
   classes.insert(AVATAR_WIDGET, empty_cls);
   classes.insert(
     AVATAR_LABEL_CONTAINER,
-    class_multi_impl![
+    class_chain_impl![
       style_class! { background: BuildCtx::color().into_container_color(BuildCtx::get()) },
       base_container
     ],

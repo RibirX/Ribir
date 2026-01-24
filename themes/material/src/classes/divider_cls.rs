@@ -19,7 +19,7 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(
     HORIZONTAL_DIVIDER_INDENT_START,
-    class_multi_impl! {
+    class_chain_impl! {
       horizontal_base,
       style_class!{ margin: md::EDGES_LEFT_16 }
     },
@@ -27,7 +27,7 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(
     HORIZONTAL_DIVIDER_INDENT_END,
-    class_multi_impl! {
+    class_chain_impl! {
       horizontal_base,
       style_class!{ margin: md::EDGES_RIGHT_16 }
     },
@@ -35,7 +35,7 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(
     HORIZONTAL_DIVIDER_INDENT_BOTH,
-    class_multi_impl! {
+    class_chain_impl! {
       horizontal_base,
       style_class!{ margin: md::EDGES_HOR_16 }
     },
@@ -45,7 +45,7 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(
     VERTICAL_DIVIDER_INDENT_START,
-    class_multi_impl! {
+    class_chain_impl! {
       vertical_base,
       style_class! { margin: md::EDGES_TOP_8 }
     },
@@ -53,7 +53,7 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(
     VERTICAL_DIVIDER_INDENT_END,
-    class_multi_impl! {
+    class_chain_impl! {
       vertical_base,
       style_class! { margin: md::EDGES_BOTTOM_8}
     },
@@ -61,7 +61,7 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(
     VERTICAL_DIVIDER_INDENT_BOTH,
-    class_multi_impl! {
+    class_chain_impl! {
       vertical_base,
       style_class! { margin: md::EDGES_VER_8 }
     },

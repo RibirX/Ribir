@@ -88,7 +88,7 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(
     SLIDER_TICK_ACTIVE,
-    class_multi_impl![
+    class_chain_impl![
       style_class! {
         background: BuildCtx::color().on_this_color(BuildCtx::get())
       },
@@ -98,7 +98,7 @@ pub(super) fn init(classes: &mut Classes) {
 
   classes.insert(
     SLIDER_TICK_INACTIVE,
-    class_multi_impl![
+    class_chain_impl![
       style_class! {
         background: BuildCtx::color().on_this_container_color(BuildCtx::get())
       },

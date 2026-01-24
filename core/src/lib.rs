@@ -53,7 +53,7 @@ pub mod prelude {
     Measure, MeasureExt,
     animation::*,
     builtin_widgets::*,
-    class_multi_impl, class_names,
+    class_chain_impl, class_names,
     context::*,
     convert::*,
     declare::*,
