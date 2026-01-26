@@ -191,6 +191,27 @@ widget_layout_test!(
 );
 
 #[test]
+fn pipe_with_clone_does_not_track_dependency() {
+  reset_test_env!();
+
+  let key = "a".to_string();
+  let (selected, w_selected) = split_value::<Option<String>>(None);
+  let w = fn_widget! {
+    @Text {
+      text: pipe!({
+        if $read(selected).as_ref() == Some(&$clone(key)) {
+          "hit".to_string()
+        } else {
+          "miss".to_string()
+        }
+      })
+    }
+  };
+  *w_selected.write() = Some("a".to_string());
+  let _ = w;
+}
+
+#[test]
 fn pipe_single_parent() {
   reset_test_env!();
 
