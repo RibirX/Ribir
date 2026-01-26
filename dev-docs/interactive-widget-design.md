@@ -127,32 +127,38 @@ Use for simple fields with no side effects.
 @Slider { value: TwoWay::new(data.volume) }
 ```
 
-**Widget Definition**: To support `TwoWay`, widget authors mark fields with `#[declare(event = on_xxx(EventType))]`:
+**Widget Definition**: To support `TwoWay`, widget authors mark fields with `#[declare(event = EventType.field_path)]`. This tells the builder which event contains the new value and where to find it.
+
 ```rust
+// 1. Define the event
+#[derive(Debug, Clone, Copy)]
+pub struct SliderChanged {
+  pub from: f32,
+  pub to: f32, // <--- The new value is here
+}
+
+// 2. Declare the widget
 #[derive(Declare)]
 pub struct Slider {
-    #[declare(event = on_value_change(SliderChangedEvent))]
-    pub value: f32,
+  // Bind the 'value' field to the 'to' field of the SliderChanged event
+  #[declare(event = SliderChanged.to)]
+  pub value: f32,
 }
 ```
 
-This generates on the Declarer:
-- An `on_value_change` field and setter method
-- In `finish()`, the handler is connected via `on_custom::<SliderChangedEvent>`
-
-**Logic Flow**: When `TwoWay::new(source)` is passed to an event-enabled field:
+**Logic Flow**: When `TwoWay::new(source)` is passed to the `value` field:
 1. A read pipe is auto-generated: `pipe!($read(source).clone())`
-2. An event handler is auto-generated to write back to source on change
+2. An event handler (for `SliderChanged`) is auto-generated. When the event fires, it extracts `event.to` and writes it back to `source`.
 3. The field accepts three initialization modes:
    - `value: 50.0` → Uncontrolled
    - `value: pipe!(...)` → Controlled (one-way)
    - `value: TwoWay::new(...)` → Two-Way (auto-sync)
 
 **Behavior Details**:
-- **Source changes**: When the source `StateWriter` is modified externally (not via UI), the widget automatically updates on the next frame.
-- **Performance**: Changes trigger a single update cycle, same as manual `pipe!` + handler.
+- **Source changes**: When the source `StateWriter` is modified externally, the widget automatically updates.
+- **Performance**: Changes trigger a single update cycle.
 
-**Avoid when**: You need validation, type conversion, or side effects (logging/analytics). There is no intermediate form—if you need any custom behavior, use the explicit `pipe!` + event handler pattern.
+**Avoid when**: You need validation *before* the model updates, or side effects (logging). Use the explicit `pipe!` + event handler pattern for those cases.
 
 ### 4.3 Type Conversion & Live Validation
 Handling mismatched types (String input -> Number model).
@@ -251,8 +257,10 @@ on_change: move |v| {
 
 ### 4.7 Advanced Declare Patterns
 
-#### Validation
+#### Validation & Normalization
 To ensure widget consistency at creation time, add `#[declare(validate)]` to your struct. This forces the `declare!` macro to call `declare_validate()` before finishing.
+
+Unlike strict validation, `declare_validate` consumes `self` and returns `Result<Self, ...>`, allowing you to **modify** the widget (normalization) to ensure it's valid (e.g., swapping min/max).
 
 ```rust
 #[derive(Declare)]
@@ -263,12 +271,12 @@ pub struct Range {
 }
 
 impl Range {
-    fn declare_validate(&self) -> Result<(), &'static str> {
+    // Consumes self, allows mutation/swapping, returns result
+    fn declare_validate(mut self) -> Result<Self, std::convert::Infallible> {
         if self.min > self.max {
-             Err("min cannot be greater than max")
-        } else {
-             Ok(())
+             std::mem::swap(&mut self.min, &mut self.max);
         }
+        Ok(self)
     }
 }
 ```
@@ -286,8 +294,9 @@ pub struct Slider {
 
 impl Slider {
     // This is called whenever the pipe updates 'value'
-    fn set_value(&mut self, v: f32) {
-        self.value = v.clamp(0.0, 100.0);
+    // It is also called by declare_validate if needed to ensure consistency
+    pub fn set_value(&mut self, v: f32) {
+        self.value = v.clamp(self.min, self.max);
         // ... trigger other updates ...
     }
 }

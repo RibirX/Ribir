@@ -529,7 +529,7 @@ impl DollarRefsCtx {
 impl DollarRefsScope {
   pub(crate) fn is_state_empty(&self) -> bool { self.state_refs().next().is_none() }
 
-  fn state_refs(&self) -> impl Iterator<Item = &DollarRef> {
+  pub(crate) fn state_refs(&self) -> impl Iterator<Item = &DollarRef> {
     self
       .refs
       .iter()

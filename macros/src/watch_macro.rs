@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote_spanned};
+use smallvec::SmallVec;
 use syn::{
   Stmt,
   fold::Fold,
@@ -82,13 +83,14 @@ pub fn gen_code(input: TokenStream, refs_ctx: Option<&mut DollarRefsCtx>) -> Tok
 //===================================================================
 
 /// Represents all upstream dependencies being watched
-pub struct Upstreams(DollarRefsScope);
+pub struct Upstreams(SmallVec<[DollarRef; 1]>);
 
 impl Upstreams {
   /// Creates new Upstream from validated scope (must not be empty)
   fn new(scope: DollarRefsScope) -> Self {
-    assert!(!scope.is_state_empty());
-    Self(scope)
+    let refs: SmallVec<[DollarRef; 1]> = scope.state_refs().cloned().collect();
+    assert!(!refs.is_empty());
+    Self(refs)
   }
 }
 
