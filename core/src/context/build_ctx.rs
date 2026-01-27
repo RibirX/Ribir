@@ -23,7 +23,8 @@ impl BuildCtx {
 
   /// Return the variant of the `ContainerColor` provide in the current build
   /// context and unwrap it as a `Color`.
-  pub fn container_color() -> VariantMap<ContainerColor, impl Fn(&ContainerColor) -> Color> {
+  pub fn container_color() -> VariantMap<Variant<ContainerColor>, impl Fn(&ContainerColor) -> Color>
+  {
     Variant::new(BuildCtx::get())
       .unwrap()
       .map(|c: &ContainerColor| c.0)

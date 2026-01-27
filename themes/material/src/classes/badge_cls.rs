@@ -1,7 +1,7 @@
 use ribir_core::prelude::*;
 use ribir_widgets::prelude::{BADGE_LARGE, BADGE_SMALL, BadgeColor};
 
-fn get_badge_color() -> VariantMap<BadgeColor, impl Fn(&BadgeColor) -> Color + Clone> {
+fn get_badge_color() -> VariantMap<Variant<BadgeColor>, impl Fn(&BadgeColor) -> Color + Clone> {
   Variant::new_or_else(BuildCtx::get(), || BadgeColor(Palette::of(BuildCtx::get()).error()))
     .map(|c| c.0)
 }

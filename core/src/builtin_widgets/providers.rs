@@ -862,10 +862,10 @@ mod tests {
       @Providers {
         providers: smallvec![Provider::new(Color::RED)],
         @ {
-          assert_eq!(BuildCtx::color().clone_value(), Color::RED);
+          assert_eq!(BuildCtx::color().snapshot(), Color::RED);
           @MockMulti {
             @fn_widget!{
-              assert_eq!(BuildCtx::color().clone_value(), Color::RED);
+              assert_eq!(BuildCtx::color().snapshot(), Color::RED);
               Void
             }
           }
@@ -873,7 +873,7 @@ mod tests {
       }
       @ {
         let color = BuildCtx::color();
-        assert_eq!(color.clone_value(), Palette::of(BuildCtx::get()).primary());
+        assert_eq!(color.snapshot(), Palette::of(BuildCtx::get()).primary());
         Void
       }
     });
@@ -890,9 +890,9 @@ mod tests {
         providers: smallvec![ContainerColor::provider(Color::GREEN)],
         @ {
           let container_color = BuildCtx::container_color();
-          assert_eq!(container_color.clone_value(), Color::GREEN);
+          assert_eq!(container_color.snapshot(), Color::GREEN);
           let color = BuildCtx::color();
-          assert_eq!(color.clone_value(), Color::RED);
+          assert_eq!(color.snapshot(), Color::RED);
           Void
         }
       }

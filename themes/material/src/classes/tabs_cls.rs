@@ -338,7 +338,7 @@ fn foreground_color() -> PipeValue<Brush> {
   let active_color = BuildCtx::color();
 
   active_color
-    .map_with_watcher(tabs, move |active_color, tabs| {
+    .combine_with(tabs, move |(active_color, tabs)| {
       if tabs.active_idx() == cur_tab.idx { *active_color } else { inactive_color }
     })
     .r_into()
