@@ -65,6 +65,7 @@ pub const RADIUS_10: Radius = Radius::all(10.);
 pub const RADIUS_12: Radius = Radius::all(12.);
 pub const RADIUS_16: Radius = Radius::all(16.);
 pub const RADIUS_20: Radius = Radius::all(20.);
+pub const RADIUS_28: Radius = Radius::all(28.);
 
 pub const RADIUS_1: Radius = Radius::all(1.);
 pub const RADIUS_2: Radius = Radius::all(2.);
@@ -125,6 +126,8 @@ pub const EDGES_LEFT_16: EdgeInsets = EdgeInsets::only_left(16.);
 pub const EDGES_RIGHT_16: EdgeInsets = EdgeInsets::only_right(16.);
 pub const EDGES_TOP_16: EdgeInsets = EdgeInsets::only_top(16.);
 pub const EDGES_BOTTOM_16: EdgeInsets = EdgeInsets::only_bottom(16.);
+
+pub const EDGES_LEFT_20: EdgeInsets = EdgeInsets::only_left(20.);
 
 pub const EDGES_HOR_24: EdgeInsets = EdgeInsets::horizontal(24.);
 pub const EDGES_LEFT_24: EdgeInsets = EdgeInsets::only_left(24.);

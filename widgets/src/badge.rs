@@ -16,7 +16,7 @@ pub struct BadgeColor(pub Color);
 /// # use ribir_widgets::prelude::*;
 ///
 /// let _badge = badge! {
-///   content: Some(CowArc::from("New")),
+///   content: "New",
 ///   @Text { text: "Child widget" }
 /// };
 ///
@@ -27,7 +27,7 @@ pub struct BadgeColor(pub Color);
 ///
 /// let _color_badge = badge! {
 ///   providers: [Provider::new(BadgeColor(Color::GREEN))],
-///   content: Some(CowArc::from("New")),
+///   content: "New",
 ///   @Text { text: "Child widget" }
 /// };
 /// ```

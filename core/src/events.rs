@@ -1,4 +1,8 @@
-use std::{any::Any, ptr::NonNull};
+use std::{
+  any::Any,
+  ops::{Deref, DerefMut},
+  ptr::NonNull,
+};
 
 use self::dispatcher::DispatchInfo;
 use crate::{
@@ -186,7 +190,7 @@ pub enum Event {
   CustomEvent(CustomEvent<dyn Any>),
 }
 
-impl std::ops::Deref for Event {
+impl Deref for Event {
   type Target = CommonEvent;
 
   fn deref(&self) -> &Self::Target {
@@ -219,7 +223,7 @@ impl std::ops::Deref for Event {
   }
 }
 
-impl std::ops::DerefMut for Event {
+impl DerefMut for Event {
   fn deref_mut(&mut self) -> &mut Self::Target {
     match self {
       Event::Mounted(e) | Event::PerformedLayout(e) | Event::Disposed(e) => e,
@@ -348,4 +352,12 @@ impl AsRef<ProviderCtx> for CommonEvent {
 
 impl AsMut<ProviderCtx> for CommonEvent {
   fn as_mut(&mut self) -> &mut ProviderCtx { &mut self.provider_ctx }
+}
+
+impl AsRef<ProviderCtx> for Event {
+  fn as_ref(&self) -> &ProviderCtx { self.deref().as_ref() }
+}
+
+impl AsMut<ProviderCtx> for Event {
+  fn as_mut(&mut self) -> &mut ProviderCtx { self.deref_mut().as_mut() }
 }

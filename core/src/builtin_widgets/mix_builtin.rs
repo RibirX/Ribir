@@ -360,45 +360,25 @@ impl MixBuiltin {
 
   pub fn on_action(&self, handler: impl FnMut(&mut Event) + 'static) -> &Self {
     self.silent_mark(MixFlags::Pointer | MixFlags::KeyBoard);
+    let mut handler = handler;
 
-    let handler = Rc::new(RefCell::new(handler));
-
-    let sub_tap = {
-      let h = handler.clone();
-      self.subject().subscribe(move |e: &mut Event| {
-        if let Event::Tap(_) = e {
-          (h.borrow_mut())(e);
-        }
-      })
-    };
-
-    let sub_key_down = {
-      let h = handler.clone();
-      self.subject().subscribe(move |e: &mut Event| {
-        if let Event::KeyDown(k) = e
-          && matches!(k.key(), VirtualKey::Named(NamedKey::Enter))
-          && !k.is_repeat()
-        {
-          (h.borrow_mut())(e);
-        }
-      })
-    };
-
-    let sub_key_up = {
-      let h = handler;
-      self.subject().subscribe(move |e: &mut Event| {
-        if let Event::KeyUp(k) = e
-          && matches!(k.key(), VirtualKey::Named(NamedKey::Space))
-        {
-          (h.borrow_mut())(e);
-        }
-      })
-    };
+    let sub_action = self.subject().subscribe(move |e: &mut Event| {
+      if let Event::Tap(_) = e {
+        (handler)(e);
+      } else if let Event::KeyDown(k) = e
+        && matches!(k.key(), VirtualKey::Named(NamedKey::Enter))
+        && !k.is_repeat()
+      {
+        (handler)(e);
+      } else if let Event::KeyUp(k) = e
+        && matches!(k.key(), VirtualKey::Named(NamedKey::Space))
+      {
+        (handler)(e);
+      }
+    });
 
     self.on_disposed(move |_| {
-      sub_tap.unsubscribe();
-      sub_key_down.unsubscribe();
-      sub_key_up.unsubscribe();
+      sub_action.unsubscribe();
     });
 
     self

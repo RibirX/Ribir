@@ -11,6 +11,7 @@ pub mod label;
 pub mod layout;
 pub mod list;
 pub mod menu;
+pub mod navigation_rail;
 pub mod path;
 pub mod progress;
 pub mod radio;
@@ -25,7 +26,7 @@ pub mod transform_box;
 pub mod prelude {
   pub use super::{
     avatar::*, badge::*, buttons::*, checkbox::*, common_widget::*, divider::*, grid_view::*,
-    icon::*, input::*, label::*, layout::*, list::*, menu::*, path::*, progress::*, radio::*,
+    icon::*, input::*, label::*, layout::*, list::*, menu::*, navigation_rail::*, path::*, progress::*, radio::*,
     router::*, scrollbar::*, select_region::*, slider::*, switch::*, tabs::*, transform_box::*,
   };
 }

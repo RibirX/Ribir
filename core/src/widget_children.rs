@@ -311,6 +311,12 @@ impl<W, C> Pair<W, C> {
 impl<'c, W: ComposeChild<'c>> PairOf<'c, W> {
   pub fn parent(&self) -> &Stateful<W> { &self.0.parent }
 
+  pub fn unzip(self) -> (FatObj<Stateful<W>>, W::Child) {
+    let (pair, fat) = self.0.into_parts();
+    let (parent, child) = pair.unzip();
+    (fat.with_child(parent), child)
+  }
+
   pub fn into_fat_widget(self) -> FatObj<Widget<'c>>
   where
     W: 'static,

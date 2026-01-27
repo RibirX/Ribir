@@ -133,7 +133,9 @@ macro_rules! named_styles_impl {
 /// that applies each implementation sequentially to a `Widget`.
 ///
 /// The first implementation in the list runs first, and the last one is
-/// applied last (closest to the widget).
+/// applied last (closest to the widget). Therefore, the last implementation
+/// has the highest visual priority (e.g. `[BASE, SELECTED]` ->
+/// `BASE(SELECTED(child))`).
 ///
 /// # Example
 /// ```
@@ -161,7 +163,14 @@ macro_rules! class_chain_impl {
   };
 }
 
-/// Applies multiple class names in order, closest to the child last.
+/// Applies multiple class names in order. The last class in the chain is
+/// applied directly to the child, while preceding classes wrap the result.
+///
+/// This means the last class is "closest" to the widget and has the highest
+/// visual priority (e.g., its background draws on top, its styles override).
+///
+/// For example, `[BASE, SELECTED]` results in structure
+/// `BASE(SELECTED(Child))`.
 ///
 /// Use `class_chain!` in DSL contexts, or `@ClassChain { ... }` in
 /// `rdl!`/`fn_widget!`.

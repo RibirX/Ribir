@@ -9,6 +9,7 @@ mod divider_cls;
 mod input_cls;
 mod list_cls;
 mod menu_cls;
+mod navigation_rail_cls;
 mod progress_cls;
 mod radio_cls;
 mod scrollbar_cls;
@@ -36,6 +37,7 @@ pub fn initd_classes() -> Classes {
   list_cls::init(&mut classes);
   switch_cls::init(&mut classes);
   badge_cls::init(&mut classes);
+  navigation_rail_cls::init(&mut classes);
 
   classes
 }
