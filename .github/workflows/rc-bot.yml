@@ -153,7 +153,7 @@ jobs:
         if: steps.cmd.outputs.command == 'release-stable'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.CRATE_RELEASE_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
