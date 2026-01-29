@@ -6,7 +6,7 @@ use crate::{prelude::*, wrap_render::*};
 /// This is a built-in `FatObj` field. Setting the `width` or `height` field
 /// attaches a `FixedSize` which constrains the child's dimensions.
 ///
-/// When using `Measure::Percent`, the percentage is calculated relative to the
+/// When using `Measure::Unit`, the percentage is calculated relative to the
 /// incoming clamp's max size.
 ///
 /// # Example
@@ -18,7 +18,7 @@ use crate::{prelude::*, wrap_render::*};
 ///
 /// fn_widget! {
 ///   @Text {
-///     width: 0.5.percent(),
+///     width: 50.percent(),
 ///     text: "50% width"
 ///   }
 /// };
@@ -180,7 +180,7 @@ mod tests {
     fixed_width_percent,
     WidgetTester::new(fn_widget! {
       @FixedSize {
-        width: Measure::Percent(0.5),
+        width: Measure::Unit(0.5),
         @Container {}
       }
     })

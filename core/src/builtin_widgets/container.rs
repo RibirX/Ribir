@@ -68,7 +68,7 @@ mod tests {
     WidgetTester::new(fn_widget! {
       @Container {
         clamp: BoxClamp::max_width(400.),
-        width: 0.5.percent(),
+        width: 50.percent(),
         height: 100.,
       }
     })
