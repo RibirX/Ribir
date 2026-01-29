@@ -27,7 +27,7 @@
 //!      easing: easing::LinearEasing,
 //!      duration: Duration::from_millis(1000),
 //!   },
-//!   init_value: Anchor::right(Measure::Percent(0.1)),
+//!   init_value: Anchor::right(Measure::Unit(0.1)),
 //!   @Void {
 //!     clamp: BoxClamp::fixed_size(Size::new(100., 100.)),
 //!     x: AnchorX::center(),
@@ -610,13 +610,13 @@ mod tests {
         // Begin at the top left.
         @SmoothPos {
           transition: TEST_TRANS,
-          init_value: Anchor::left_top(5., Measure::Percent(0.1)),
+          init_value: Anchor::left_top(5., 10.percent()),
           @center_red_block_10_x_10()
         }
         // Begin at the bottom right.
         @SmoothPos {
           transition: TEST_TRANS,
-          init_value: Anchor::right_bottom(Measure::Percent(0.1), 5.),
+          init_value: Anchor::right_bottom(10.percent(), 5.),
           @center_red_block_10_x_10()
         }
       })
@@ -643,7 +643,7 @@ mod tests {
         // Begin at the left 10 percent.
         @SmoothX {
           transition: TEST_TRANS,
-          init_value: AnchorX::percent(0.1),
+          init_value: 10.percent(),
           @red_block_10_x_10()
         }
         // Begin at the right.
@@ -679,7 +679,7 @@ mod tests {
         // Begin at the top 10 percent.
         @SmoothY {
           transition: TEST_TRANS,
-          init_value: AnchorY::percent(0.1),
+          init_value: 10.percent(),
           @red_block_10_x_10()
         }
         // Begin at the bottom.
@@ -704,7 +704,7 @@ mod tests {
     assert_widget_eq_image!(
       WidgetTester::new(crate::smooth_size! {
         transition: TEST_TRANS,
-        init_value: Size::splat(Measure::Percent(0.5)),
+        init_value: Size::splat(50.percent()),
         @red_block_10_x_10()
       })
       .with_wnd_size(Size::new(100., 100.))
@@ -751,7 +751,7 @@ mod tests {
         // Begin at 50 percent.
         @SmoothWidth {
           transition: TEST_TRANS,
-          init_value: Measure::Percent(0.5),
+          init_value: 50.percent(),
           @red_block_10_x_10()
         }
         // Begin at 5 px.
@@ -783,7 +783,7 @@ mod tests {
         // Begin at 50 percent.
         @SmoothHeight {
           transition: TEST_TRANS,
-          init_value: Measure::Percent(0.5),
+          init_value: 50.percent(),
           @red_block_10_x_10()
         }
         // Begin at 5 px.

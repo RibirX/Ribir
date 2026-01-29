@@ -748,7 +748,7 @@ impl<T> FatObj<T> {
 
   /// Initializes a fixed width constraint for the widget.
   ///
-  /// When using `Measure::Percent`, the percentage is calculated relative to
+  /// When using `Measure::Unit`, the percentage is calculated relative to
   /// the incoming clamp's max width. This is applied inside any `clamp`
   /// constraints.
   pub fn with_width<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Dimension>, K>) -> &mut Self {
@@ -764,7 +764,7 @@ impl<T> FatObj<T> {
 
   /// Initializes a fixed height constraint for the widget.
   ///
-  /// When using `Measure::Percent`, the percentage is calculated relative to
+  /// When using `Measure::Unit`, the percentage is calculated relative to
   /// the incoming clamp's max height. This is applied inside any `clamp`
   /// constraints.
   pub fn with_height<K: ?Sized>(&mut self, v: impl RInto<PipeValue<Dimension>, K>) -> &mut Self {

@@ -224,7 +224,7 @@ impl AnchorUnit {
   fn offset(mut self, offset: impl Into<Measure>) -> Self {
     match offset.into() {
       Measure::Pixel(px) => self.pixel_offset += px,
-      Measure::Percent(pct) => self.percent_offset += pct,
+      Measure::Unit(pct) => self.percent_offset += pct,
     }
     self
   }
@@ -252,7 +252,7 @@ pub struct AnchorX(AnchorUnit);
 
 impl AnchorX {
   pub fn new(v: impl Into<Measure>) -> Self { Self(AnchorUnit::start().offset(v)) }
-  pub fn percent(v: f32) -> Self { Self(AnchorUnit::start().offset(Measure::Percent(v))) }
+  pub fn percent(v: f32) -> Self { Self(AnchorUnit::start().offset(Measure::Unit(v))) }
   /// align to the left
   pub fn left() -> Self { Self(AnchorUnit::start()) }
   /// align to the right
@@ -272,7 +272,7 @@ pub struct AnchorY(AnchorUnit);
 
 impl AnchorY {
   pub fn new(v: impl Into<Measure>) -> Self { Self(AnchorUnit::start().offset(v)) }
-  pub fn percent(v: f32) -> Self { Self(AnchorUnit::start().offset(Measure::Percent(v))) }
+  pub fn percent(v: f32) -> Self { Self(AnchorUnit::start().offset(Measure::Unit(v))) }
   /// align to the top
   pub fn top() -> Self { Self(AnchorUnit::start()) }
   /// align to the bottom

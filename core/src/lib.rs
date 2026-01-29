@@ -33,10 +33,10 @@ pub enum Measure {
   /// Value in logical pixels.
   Pixel(f32),
 
-  /// The value represents a percentage of the maximum size provided by the
+  /// The value represents a fraction of the maximum size provided by the
   /// finite parent clamp, corresponding to the parent's size if the parent is a
   /// fixed-size container. A value of 1.0 corresponds to 100%.
-  Percent(f32),
+  Unit(f32),
 }
 
 pub mod prelude {
@@ -93,7 +93,7 @@ impl Measure {
   pub fn into_pixel(self, max_clamp: f32) -> f32 {
     match self {
       Measure::Pixel(x) => x,
-      Measure::Percent(x) => {
+      Measure::Unit(x) => {
         if x.is_finite() {
           x * max_clamp
         } else {
@@ -107,20 +107,24 @@ impl Measure {
 /// Extension trait for convenient Measure construction
 pub trait MeasureExt {
   fn px(self) -> Measure;
+  fn unit(self) -> Measure;
   fn percent(self) -> Measure;
 }
 
 impl MeasureExt for f32 {
   fn px(self) -> Measure { Measure::Pixel(self) }
-  fn percent(self) -> Measure { Measure::Percent(self) }
+  fn unit(self) -> Measure { Measure::Unit(self) }
+  fn percent(self) -> Measure { Measure::Unit(self / 100.) }
 }
 
 impl MeasureExt for f64 {
   fn px(self) -> Measure { Measure::Pixel(self as f32) }
-  fn percent(self) -> Measure { Measure::Percent(self as f32) }
+  fn unit(self) -> Measure { Measure::Unit(self as f32) }
+  fn percent(self) -> Measure { Measure::Unit(self as f32 / 100.) }
 }
 
 impl MeasureExt for i32 {
   fn px(self) -> Measure { Measure::Pixel(self as f32) }
-  fn percent(self) -> Measure { Measure::Percent(self as f32) }
+  fn unit(self) -> Measure { Measure::Unit(self as f32) }
+  fn percent(self) -> Measure { Measure::Unit(self as f32 / 100.) }
 }

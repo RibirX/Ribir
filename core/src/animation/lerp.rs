@@ -154,7 +154,7 @@ impl Lerp for Measure {
   fn lerp(&self, to: &Self, factor: f32) -> Self {
     match (self, to) {
       (Measure::Pixel(from), Measure::Pixel(to)) => Measure::Pixel(from.lerp(to, factor)),
-      (Measure::Percent(from), Measure::Percent(to)) => Measure::Percent(from.lerp(to, factor)),
+      (Measure::Unit(from), Measure::Unit(to)) => Measure::Unit(from.lerp(to, factor)),
       _ => *to,
     }
   }
